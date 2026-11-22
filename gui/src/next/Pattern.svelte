@@ -10,7 +10,7 @@
    *   view menu;
    * - the view menu holds Show only the data and the two range gestures;
    * - the axes carry no titles. Each carries a muted unit hint by its tick
-   *   labels (`° 2θ`, `√` or `log` on the intensity, `σ` on the difference),
+   *   labels (`° 2θ`, `√` or `log` on the intensity, `Δ/σ` on the difference),
    *   a hover explains the hint, and a click on the intensity or the
    *   difference axis opens a small menu of that axis's choices, the one
    *   place each is chosen. The choice is kept per project in
@@ -135,7 +135,11 @@
   let hoverAt = $state<number | null>(null);
   let arm = $state<null | "limits" | "exclude">(null);
   let zoomed = $state(false);
-  let geom = $state.raw<Record<"main" | "ticks" | "resid", { top: number; height: number; pad: number }> | null>(null);
+  /** Each pane's plot area in the host: its top, height and top padding, and
+   *  where its top labelled tick and its zero sit from the plot area's top
+   *  (`mark`, `zero`; null where there is none in view). */
+  type PaneGeom = { top: number; height: number; pad: number; mark: number | null; zero: number | null };
+  let geom = $state.raw<Record<"main" | "ticks" | "resid", PaneGeom> | null>(null);
   /** The plot area's left edge and width in the host, shared by every pane. */
   let plotX = $state.raw<{ left: number; width: number } | null>(null);
   /** The axis whose menu is open, and where. */
@@ -146,6 +150,13 @@
   /** The x axis's tick labels take this height under the plot, and the strip
    *  uPlot keeps for a title sits under them (`rxplot.mjs`, X_LABELS, TITLE). */
   const X_TICKS = 24;
+  /** A scale mark's line height, and half a tick label plus the gap kept
+   *  under the mark, in CSS px; the axis labels are 11 px type. */
+  const MARK_LINE = 14;
+  const LABEL_HALF = 12;
+  /** The y tick labels end this far left of the plot area: uPlot's tick length
+   *  (10 px) and its label gap (5 px), neither of which the chart changes. */
+  const LABEL_INSET = 15;
   const X_STRIP = 18;
   let tipTimer: ReturnType<typeof setTimeout> | undefined;
   /** An SVG export redraws the panes from their spec, and a figure that
@@ -229,7 +240,9 @@
       chart = new mod.PatternChart(host, c, overlayNow(), {
         scale: untrack(() => scale),
         kind: untrack(() => kind),
-        // no titles on screen (2026-11-11): each axis carries a hint instead
+        // no titles on screen (2026-11-11): each axis carries a hint instead,
+        // and the y axes keep no strip for one (the look of 2026-11-21, item 1)
+        titled: () => exporting,
         labels: {
           y: () => (!exporting ? "" : scale === "linear" ? "intensity"
             : `intensity (${scale === "sqrt" ? "√" : "log"})`),
@@ -281,12 +294,32 @@
       const x = curves?.arrays?.two_theta ?? held?.two_theta;
       const n = x?.length ?? 0;
       zoomed = n > 1 && (lo > x![0] + 1e-9 || hi < x![n - 1] - 1e-9);
+      // the y range follows the x range, and the scale marks its top tick
+      relayout();
     };
   }
 
   /** Each pane's plot area from the top of the host, which places the legend
    *  beside the pane its curve is drawn in. Read after a draw, since a scale
    *  switch builds a new pane. */
+  /** Where `v` sits from the plot area's top in CSS px, or null out of view. */
+  function inView(u: any, v: number): number | null {
+    const y = u.valToPos(v, "y");
+    return Number.isFinite(y) && y >= -0.5 && y <= u.bbox.height / devicePixelRatio + 0.5 ? y : null;
+  }
+
+  /** The top labelled y tick's place, from the splits and labels uPlot drew. */
+  function topTick(u: any): number | null {
+    const axis = u.axes?.[1], splits: number[] = axis?._splits ?? [], values: unknown[] = axis?._values ?? [];
+    let top: number | null = null;
+    splits.forEach((v, i) => {
+      if (values[i] == null || values[i] === "") return;
+      const y = inView(u, v);
+      if (y != null && (top == null || y < top)) top = y;
+    });
+    return top;
+  }
+
   function relayout() {
     requestAnimationFrame(() => {
       if (!chart) return;
@@ -295,7 +328,8 @@
         const u = chart.fig.panes[key];
         if (!u) continue;
         out[key] = { top: (u.root as HTMLElement).offsetTop + u.bbox.top / dpr,
-                     height: u.bbox.height / dpr, pad: u.bbox.top / dpr };
+                     height: u.bbox.height / dpr, pad: u.bbox.top / dpr,
+                     mark: topTick(u), zero: inView(u, 0) };
       }
       geom = out;
       const main = chart.fig.panes.main;
@@ -339,7 +373,10 @@
     const o = untrack(overlayNow);
     untrack(() => {
       if (!chart || !applied) return;
-      if (applied.kind !== k) chart.fig.setResidual(k);
+      if (applied.kind !== k) {
+        chart.fig.setResidual(k);
+        relayout();
+      }
       if (applied.scale !== s) {
         chart.fig.setY(s === "linear" ? "lin" : s);
         relayout();
@@ -450,12 +487,21 @@
     });
   });
 
+  /** A scale mark's top in its axis button (which starts at the pane's top):
+   *  its line's height plus half a tick label and a gap above the top labelled
+   *  tick, right-aligned with the labels, so it sits in their column and never
+   *  on one. `MARK_ROOM` (rxplot) is the padding that keeps a tick at the plot's
+   *  top edge clear of it; no tick in view puts it at the plot's top. */
+  function markTop(g: PaneGeom): number {
+    return Math.max(0, g.pad + (g.mark ?? 0) - MARK_LINE - LABEL_HALF);
+  }
+
   /** What each axis's hint says: a unit, or a scale's mark. Linear intensity
    *  has no mark, since counts are what an intensity axis is read in. */
   const hints = $derived({
     x: "° 2θ",
     y: scale === "sqrt" ? "√" : scale === "log" ? "log" : "",
-    resid: kind === "cumulative" ? "Σχ²" : kind === "delta" ? "counts" : "σ",
+    resid: kind === "cumulative" ? "Σχ²" : kind === "delta" ? "Δ" : "Δ/σ",
   });
 
   /** Where σ comes from, read off the route's `weighted` flag (WP-1029):
@@ -811,7 +857,8 @@
     {:else if loadError}
       <p class="empty bad">{loadError}</p>
     {/if}
-    <div class="plot" class:armed={!!arm} style:--gutter="{GUTTER}px">
+    <div class="plot" class:armed={!!arm} style:--gutter="{GUTTER}px"
+      style:--inset="{LABEL_INSET}px" style:--mark-line="{MARK_LINE}px">
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div class="host" bind:this={host} bind:clientWidth={hostWidth} onpointerdowncapture={down}
         onpointerupcapture={up} oncontextmenu={context}
@@ -829,7 +876,8 @@
           onpointerleave={hideTip}
           onfocus={(e) => showTip("y", e.currentTarget.firstElementChild as HTMLElement, true)}
           onblur={hideTip}>
-          <span class="hint" class:blank={!hints.y}>{hints.y || "\u00a0"}</span>
+          <span class="hint" class:blank={!hints.y} style:top="{markTop(geom.main)}px"
+            >{hints.y || "\u00a0"}</span>
         </button>
         {#if !held.raw}
           <button class="axis" bind:this={axisButtons.resid}
@@ -843,7 +891,7 @@
             onpointerleave={hideTip}
             onfocus={(e) => showTip("resid", e.currentTarget.firstElementChild as HTMLElement, true)}
             onblur={hideTip}>
-            <span class="hint">{hints.resid}</span>
+            <span class="hint" style:top="{markTop(geom.resid)}px">{hints.resid}</span>
           </button>
         {/if}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -1000,11 +1048,11 @@
     background: color-mix(in srgb, var(--hover) 60%, transparent);
   }
 
-  /* the hint: muted and small, by the tick labels, in the strips the chart
-     keeps where a title used to be, so it moves nothing: a y axis's at the
-     plot's top in the strip left of its labels (over the top label it
-     collided with a tick at the plot's edge), the x axis's after its last
-     label in the strip under them */
+  /* the hint: muted and small, by the tick labels. A y axis's sits in its
+     tick-label column over the top labelled tick, in room the chart keeps
+     above the plot (`MARK_ROOM`), so it never lands on a label and costs no
+     column of its own (the maintainer's look, 2026-11-21, item 1); the x
+     axis's sits after its last label in the strip under them */
   .hint {
     display: inline-block;
     padding: 0 2px;
@@ -1014,10 +1062,13 @@
     white-space: nowrap;
   }
 
+  /* a scale mark: in the tick-label column, right-aligned with the labels,
+     its top set from the top labelled tick (`markTop`) */
   .axis .hint {
     position: absolute;
-    top: var(--pad);
-    left: 0;
+    right: var(--inset);
+    margin: 0;
+    line-height: var(--mark-line);
   }
 
   .hint.blank {

@@ -325,14 +325,18 @@ function decadeSplits(u, min, max, gap = 22) {
 function axes(spec, gutter) {
   const ink = () => token("--fg"), line = () => token("--line");
   const text = { font: FONT, labelFont: FONT };
-  // no gridlines (`gui/STYLE.md` § Plots)
+  // no vertical gridlines; horizontal ones only on a pane that asks (`grid`),
+  // the intensity's, as the prototype draws them (`gui/STYLE.md` § Plots)
   const x = { ...text, stroke: ink, grid: { show: false }, ticks: { stroke: line } };
   // a bare x axis carries no tick marks either: the 2θ ticks sit at the foot
   if (!spec.xLabels) Object.assign(x, { values: (u, s) => s.map(() => ""), size: X_BARE, ticks: { show: false } });
   else Object.assign(x, { size: X_LABELS, values: (u, s) => tickLabels(s) },
                      spec.xLabel == null ? {} : { label: spec.xLabel, labelSize: TITLE, labelGap: X_TITLE_GAP });
-  const y = { ...text, stroke: ink, grid: { show: false }, ticks: { stroke: line }, size: gutter,
-              label: spec.label ?? "", labelSize: TITLE };
+  // `titled()` false leaves no strip for a title: the GUI's scale marks sit in
+  // the tick-label column instead, and only an exported figure has titles
+  const y = { ...text, stroke: ink, grid: spec.grid ? { stroke: line, width: 1 } : { show: false },
+              ticks: { stroke: line }, size: gutter,
+              label: spec.label ?? "", labelSize: spec.titled && !spec.titled() ? 0 : TITLE };
   if (spec.yLabels === false) {
     // a band, like the reflection ticks, whose y means nothing and whose grid would cross every row
     return [{ ...x, grid: { show: false } },
@@ -362,7 +366,10 @@ function axes(spec, gutter) {
  *   chosen one, in place of the data's padded extent. uPlot calls it at every
  *   x range, with `u.series[0].idxs` the channels in view;
  * - `label`, the y axis title, a string or a function uPlot reads at each draw;
- *   `yLabels: false` for a band whose y means nothing;
+ *   `yLabels: false` for a band whose y means nothing; `titled()`, false to
+ *   leave no strip for that title;
+ * - `grid`, horizontal gridlines at the y ticks; `padTop`, the plot area's top
+ *   padding in CSS px, in place of uPlot's own;
  * - `xLabels`, and `xLabel` the x axis title under them;
  * - `hooks`, merged into uPlot's.
  *
@@ -479,7 +486,8 @@ export function panes(uPlot, host, spec) {
       axes: axes(p, gutter),
       // A band has no y labels for uPlot's automatic top padding to make room
       // for, and that padding took 17 px of a one-phase band's 22.
-      ...(p.yLabels === false ? { padding: [0, null, null, null] } : {}),
+      ...(p.yLabels === false ? { padding: [0, null, null, null] }
+        : p.padTop != null ? { padding: [p.padTop, null, null, null] } : {}),
       // A line is a line. uPlot rings every point of a series whose points sit
       // far enough apart, which a zoom always reaches, and a ringed calculated
       // curve reads as observed points. A series that wants marks says so.
@@ -838,8 +846,18 @@ export function tickHeight(rows) {
   return 6 + X_BARE + 16 * rows;
 }
 
-/** The difference pane's height in CSS px: the prototype's 70 px plot over a bare x axis. */
-const RESID_HEIGHT = 70 + X_BARE;
+/**
+ * Room above a pane's plot area for the scale mark the GUI sets over the top
+ * tick label (√, Δ/σ): the mark's line and half a label, so a top tick at the
+ * plot's edge still leaves the mark clear of it (the maintainer's look,
+ * 2026-11-21, item 1).
+ */
+export const MARK_ROOM = 28;
+
+/** The difference pane's height in CSS px: the prototype's 70 px pane over a
+ *  bare x axis, plus what `MARK_ROOM` adds over uPlot's own 17 px of top
+ *  padding, so the difference keeps its plot area. */
+const RESID_HEIGHT = 70 + X_BARE + (MARK_ROOM - 17);
 
 /** The tick band at the foot, in CSS px: its rows, the 2θ labels and their title. */
 export function footHeight(rows) {
@@ -1030,6 +1048,8 @@ const RESIDUAL_COLUMNS = { weighted: "delta_over_sigma", delta: "obs_minus_calc"
  * - `hidden`: the curves not drawn, as "obs", "masked", "calc", "bkg", "diff"
  *   and "ticks:<phase>".
  * - `labels`: `{ y, resid }`, the two y axis titles, as functions.
+ *   `titled()`: whether the y axes keep a strip for them; false drops it (the
+ *   GUI on screen, which marks each scale in the tick-label column).
  * - `layers`: per pane key ("main", "ticks", "resid"), `{ under, over }` lists
  *   of `(u) => void`, run before the grid and after the series, each clipped
  *   to its pane's plot area (`clipped`).
@@ -1113,6 +1133,7 @@ export function pattern(uPlot, host, curves, spec) {
     x: curves.arrays.two_theta,
     panes: [
       { key: "main", share: 1, y: state.y, auto: spec.ranges?.main, label: () => spec.labels?.y?.() ?? "",
+        padTop: MARK_ROOM, titled: spec.titled,
         series: [markers("obs"), markers("masked"),
                  { show: !state.hidden.has("calc"), stroke: ink("calc"), width: 1.2 },
                  { show: !state.hidden.has("bkg"), stroke: ink("bkg"), width: 1, dash: [3, 3] }],
@@ -1120,10 +1141,11 @@ export function pattern(uPlot, host, curves, spec) {
       // the difference, then the reflection ticks at the foot carrying the x
       // axis, as the prototype stacks them
       { key: "resid", height: RESID_HEIGHT, auto: spec.ranges?.resid,
-        label: () => spec.labels?.resid?.() ?? "",
+        label: () => spec.labels?.resid?.() ?? "", padTop: MARK_ROOM, titled: spec.titled,
         series: [{ show: residShown(), stroke: ink("diff"), width: 1 }],
         data: residData(), hooks: hooks("resid", { drawAxes: [drawZero] }) },
       { key: "ticks", height: footHeight(Object.keys(state.c.ticks).length), range: [0, 1], yLabels: false,
+        titled: spec.titled,
         xLabels: true, xLabel: "2θ (°)",
         series: [{ show: false }], data: nulls(), hooks: hooks("ticks", { draw: [drawTicks] }) },
     ],
