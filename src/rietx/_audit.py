@@ -4299,15 +4299,19 @@ ROWS: tuple[Row, ...] = (
                   "of its own FWHM of a cut is listed with the share of its profile past it; "
                   "gates nothing. At 3 FWHM a pseudo-Voigt's share past the cut is under 6 % "
                   "for a pure Lorentzian (arithmetic); the issue's families and the two public "
-                  "patterns as for CUT_WINDOW_DEG; untested beyond them"),
+                  "patterns as for CUT_WINDOW_DEG; untested beyond them. Listing pinned on "
+                  "family A by tests/test_fit_range.py: every model reflection centred within "
+                  "3 FWHM of each cut (range ends and band edges) is listed and none beyond, "
+                  "one channel either side of 3 FWHM, and exactly at it to the ulp"),
         grounds=("A reporting distance of ours: a reflection centred within 3 of its own FWHM "
                  "of a cut is listed with the share of its profile past the cut, the distance "
                  "rides on the record (fit_range.straddle_fwhm), and it gates nothing. "
-                 "Arithmetic bounds what it leaves out: at 3 FWHM a pure Lorentzian puts 5.3 % "
-                 "of its area past the cut and any Gaussian share less, so an unlisted "
-                 "reflection has at most that share outside. Read on the issue's synthetic "
-                 "families, SRM 1976a and 11-BM LaB6 660a. Where it fails: a reflection past "
-                 "the model's generation margin is not listed (#1481), and "
+                 "Arithmetic bounds what it leaves out, on the symmetric pseudo-Voigt reading of "
+                 "each reflection's FWHM and eta (not an asymmetric profile): at 3 FWHM a pure "
+                 "Lorentzian puts 5.3 % of its area past the cut and any Gaussian share less, "
+                 "so an unlisted reflection has at most that share outside. Read on the issue's "
+                 "synthetic families, SRM 1976a and 11-BM LaB6 660a. Where it fails: a "
+                 "reflection past the model's generation margin is not listed (#1481), and "
                  "reflections_searched is approximate.")),
     Row("rietx.report.layer0.LAYER0_MATCH_TOL_DEG", "constant", value=0.08),
     Row("rietx.report.layer2.BACKGROUND_INCREASE_CAP", "constant", value=0.6),
