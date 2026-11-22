@@ -312,9 +312,8 @@ The closing stage takes the last declared stage's iteration budget, Le Bail cycl
 It takes the solver's default tolerance, as the last declared stage does.
 `RefinementResult.stages` ends with it under the name `closing`, and `StageResult.window_area_tol` and `NodeAction.window_area_tol` record the fraction.
 A declared stage records `None`, the declared stages' 2 %.
-`compile_model`, and `Refinement.predict` on a `Refinement` not yet fitted, evaluate at `CLOSING_WINDOW_TOL`, so a synthetic pattern carries near-complete tails.
-After a fit, `Refinement.predict` on a grid compiles at the last stage's fraction, so it draws the fit's own curve.
-Rebuild a fit's own curve with `window_area_tol=recorded_window_tol(result.stages[-1].window_area_tol)` (`rietx.model.forward.recorded_window_tol`).
+`compile_model`, and `Refinement.predict` before a fit, evaluate at `CLOSING_WINDOW_TOL`, so a synthetic pattern carries near-complete tails.
+After a fit, `Refinement.predict` draws the fit's own curve, as `compile_model` does given `window_area_tol=recorded_window_tol(result.stages[-1].window_area_tol)`.
 At any window fraction under the declared stages' 2 %, the axial-divergence asymmetry is sampled at a finer node rule as well.
 So a `closing_window_tol` loosened past 1e-3 loosens the windows alone.
 

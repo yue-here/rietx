@@ -55,8 +55,6 @@ against `predict` at 8e-6; its § Inherited carries a note. PR #1640 (WP-1947, o
 2026-11-21) adds a section to `exports.md` directly after this paragraph, so rebase on it if it
 merges first.
 
-### Inherited
-
 ## Rulings
 
 **Ruled by Yue, 2026-11-22: option A.** He was brought the numbers in § Context and
