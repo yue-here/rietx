@@ -122,7 +122,13 @@ shared offset have a mean z-score under 0.5 in size.
     the declared line's Kα2 placement the guide's Limitations already name. A first look at
     six seeds gave the offset a mean z of +0.50; at twelve it is +0.26, so that was scatter.
     Gates: the new test passed alone in 207 s; `tests/test_examples.py -k holder` 2 passed;
-    the guide script runs clean in 40-95 s under load.
+    the guide script runs clean in 40-95 s under load. Fast suite on this tree (main
+    2be17c651 included), `-m "not slow"` verbatim: 15124 passed, 443 skipped, 32 xfailed.
+    The new test is `slow`, so the fast counts move by none; the fast tier's
+    `test_every_guide_script_prints_what_its_page_quotes[holder_cell]` took 37 s in that
+    run, the series fit included (`tests.added_test_times` lists no added fast test).
+    Reader output unchanged (`tests.reader_output`, exit 0). CI's lint steps clean;
+    Vale's two warnings on new lines were rewritten.
   - *Gotchas.* Declare the four variables `vary=False`. A stage reaching an equation's
     target frees every variable it names, so the holder stage would otherwise free
     `zero` and `height` with the lines. Only `height` is in `per_histogram`. The fit
