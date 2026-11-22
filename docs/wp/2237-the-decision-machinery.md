@@ -262,6 +262,26 @@ the audit sample stays under the pre-change rate; no wait is stale (a test).
   *Review.* `/code-review high --fix` found two nits, both fixed (5b88870e3): the
   `approved_by` check now also covers unaudited rows, and the hindcast scorer reads UTF-8.
 
+  *Generality.* The `generality-review` judge on `Row.approved_by`, verdict **weak**. Its
+  findings: (i) two procedures under one value. The agent file and `generality.md` made the
+  judge's `holds` the approval. CONTRIBUTING and `/pr-review` 6b made it a Claude settlement
+  checked by a blind agent that never saw the judge's verdict. (ii) No writer on a WP branch:
+  `/wp-handover` step 7 did not name one. (iii) The default `"maintainer"` reads as an
+  approval on rows nobody approved, and `StageSpec:lebail_tol` carries a date Claude settled
+  under the 2026-11-05 delegation. (iv) The agent file let `holds` approve a constant that
+  sets a warning's threshold, an area the maintainer has made a trigger. (v) CONTRIBUTING's
+  "every row that changes what a default does" read as covering every constant. (vi) No test
+  ties `"checked"` to a recorded check.
+
+  Author's answer. (i), (ii), (iv) and (v) fixed: every document now follows the ruling as
+  written (line 50). The judge's `holds` approves the row, any other verdict goes to the
+  maintainer, and a threshold constant goes to him whatever the verdict. Step 7 names the
+  writer, and CONTRIBUTING excludes a *change of value* only. WP-2006's six constants now
+  wait for the judge's `holds` when their rows are written. (iii): the docstring says the
+  field is read only where `approved` is set. Whether the `lebail_tol` delegation counts as
+  his approval is left for the maintainer. (vi) declined: no row carries `"checked"` yet,
+  and the first writer is step 7 with the judge's report beside the row.
+
   *Gotchas.* `wp_index.py` rejects ⏸, so a parked WP stays 🔄 with "parked" in its Status
   text (WP-2020). The rietx-only triggers live in project records, never in the paste text,
   so other projects inherit only the generic rule.

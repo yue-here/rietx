@@ -198,7 +198,10 @@ re-reading its own diff.
    `.claude/agents/generality-review.md` first and follow it. Paste its
    sections into the handover entry under *Generality*, unedited, with the
    author's one-line answer under any `fails`.
-   The maintainer reads both.
+   The maintainer reads both, except on a tier-3 constant or suggestion row
+   the judge calls `holds`: write that row's `approved` (today) and
+   `approved_by="checked"` on this branch, unless the constant sets a
+   warning's or an action's threshold (ruled 2026-11-22, WP-2237).
 8. **If the WP is closing** (✅/🛑): delete its consumed `### Inherited`
    section and its `Priority:` line (a closed WP's priority is moot), and
    MOVE its narrative to the record of the release in flight

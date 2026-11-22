@@ -112,7 +112,8 @@ class Row:
     """One heuristic.  ``grounds`` and ``approved`` are required on a tier-3
     row and on a tier-2 action row, and ``approved_by`` says whose approval
     the date is: ``"checked"`` (the ``generality-review`` judge agreed) is
-    allowed on a tier-3 constant or suggestion row only; ``ambiguity`` is DESIGN.md § Rules, 1's
+    allowed on a tier-3 constant or suggestion row only, and the field is
+    read only where ``approved`` is set; ``ambiguity`` is DESIGN.md § Rules, 1's
     kind, required on an audited code, action or default row (DESIGN.md
     § Rules, 4 asks a new default or action for it) and allowed on a
     suggestion row.  ``response``, ``responds`` and ``scope`` are a code

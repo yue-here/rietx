@@ -96,13 +96,14 @@ pull request that adds one, and prints every row the pull request adds,
 changes or deletes. At review the `generality-review` agent drafts the case
 against each of those rows, and the case for any action the change removes
 or leaves to the caller. A tier-3 row, and a tier-2 automatic action, needs
-a dated ruling in its `approved` field. Where the evidence settles a tier-3
-constant or suggestion row clearly, a Claude session working for the
-maintainer may write that ruling, with `approved_by="checked"`. A fresh agent
-then checks it blind, shown the evidence but not the answer. The other rows
-wait for the maintainer: every tier-3 code, action or default row, every
-tier-2 action, every row that changes what a default does for every user, and
-every row whose crux is a value judgement. Either may write the field into your branch. Ruled 2026-11-22.
+a dated ruling in its `approved` field. On a tier-3 constant or
+suggestion row, the `generality-review` judge's `holds` is that ruling: a
+Claude session writes it with `approved_by="checked"`, and any other verdict
+sends the row to the maintainer. The other rows wait for him: every tier-3
+code, action or default row, every tier-2 action, a constant that sets the
+threshold of a warning or an automatic action, every change to a value that
+alters what a default does for every user, and every row whose crux is a value
+judgement. Either may write the field into your branch. Ruled 2026-11-22.
 
 **Land the machinery first.** Machinery is what a caller operates: a model,
 a fit, a reported quantity. A heuristic is a choice rietx makes for the

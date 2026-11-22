@@ -450,14 +450,14 @@ line if the checkpoint ended it. Close with
    - **Settle the clear classes of tier-3 constant and suggestion rows, and
      batch the rest** (ruled 2026-11-22, WP-2237). A class is every row
      resting on the same evidence (WP-2002 ruled 256 rows as 16 classes). A
-     class of constants or suggestions whose answer is clear, and which none
-     of the maintainer's triggers reaches (the maintainer's instructions,
-     § "Before you bring me a decision"), is yours to settle. A tier-3 code,
-     action or default row, and a tier-2 action, always goes to the batch
-     (`tests/test_audit_table.py` refuses `approved_by="checked"` on one). Dispatch one fresh agent on Opus over the settled classes. Give
-     it each class's evidence and diff, and withhold your tier, your grounds
-     and the judge's verdict. A class it answers differently is not clear and
-     goes to the batch. List the settled classes under **Settled for you**,
+     class of constants or suggestions that the judge called `holds`, and
+     which none of the maintainer's triggers reaches (the maintainer's
+     instructions, § "Before you bring me a decision"; a constant setting a
+     warning's or an action's threshold is one), is approved by that verdict.
+     A tier-3 code, action or default row, and a tier-2 action, always goes
+     to the batch (`tests/test_audit_table.py` refuses `approved_by="checked"`
+     on one), and so does a class the judge did not call `holds`. List the
+     approved classes under **Settled for you**,
      and show the maintainer a random one in ten. Every other class goes to
      the batch as one question. After a settlement or a ruling, write
      `grounds` and `approved` (that day's date) into the PR's rows, and
