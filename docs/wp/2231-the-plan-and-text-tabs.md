@@ -205,12 +205,24 @@ the third PR in the order 7, 5, 6, 1, 2, 3, 8, 4):
 Items 6 and 8 are reversals of calls a runner settled; both are recorded in the maintainer's
 memory as reversals in one area (leaving out an affordance a sibling panel has).
 
+**The maintainer, 2026-11-22** (§ Questions 1 and 2):
+
+9. **The toggle stays as built (§ Questions 2, option A):** `Show [Preview | Last fit]` on the
+   Pattern graph's title line, with the words "Last fit".
+10. **§ Questions 1 is answered in WP-2227 § Rulings**: the words sit beside Rwp on the Pattern
+    graph's title line and in a Console comment after each fit; after a one-stage re-fit the
+    Plan tab draws one stand-in row after the stages; a staged run names what the last fit held.
+    WP-2227 builds them, so the title line carries both the toggle and the re-fit's words.
+    The maintainer's fallback, the same day: if either is cut, the toggle moves to the legend.
+    WP-2227 measured both cut at 1440 px and moved it (its `2227-screenshots/README.md`).
+
 ## Questions
 
-Filled in by the session that builds each PR. Question 1 is carried from WP-2227, unanswered.
+Filled in by the session that builds each PR. Question 1 is carried from WP-2227 and answered
+there (§ Rulings 10); Question 2 is answered (§ Rulings 9).
 
-1. **How a Refine shows whether it ran in one stage or in stages** (WP-2227, filed 2026-11-19
-   from the maintainer's ruling on WP-2224). Since WP-2224, a second `fit` of a model the last
+1. **How a Refine shows whether it ran in one stage or in stages** (answered 2026-11-22,
+   § Rulings 10; WP-2227, filed 2026-11-19 from the maintainer's ruling on WP-2224). Since WP-2224, a second `fit` of a model the last
    fit converged runs one stage, `warm_refit`. It runs the plan in stages instead when the plan
    frees a parameter the converged fit held, or when the one stage is rejected. Today's GUI
    passes `refit="stages"` on every Refine, so it never runs the one stage, because after one
@@ -225,8 +237,8 @@ Filled in by the session that builds each PR. Question 1 is carried from WP-2227
      parameter on screen.
    Until they are answered, `/next` keeps `refit="stages"`, so every Refine on the staged plan
    runs in stages, as today's page does.
-2. **Where the toggle between the preview and the last fit sits, and what it says** (§ Rulings
-   item 4). No design gives either. The third PR builds the most conventional form: a
+2. **Where the toggle between the preview and the last fit sits, and what it says** (answered
+   2026-11-22, § Rulings 9; § Rulings item 4). No design gives either. The third PR builds the most conventional form: a
    segmented choice `Show [Preview | Last fit]` on the Pattern graph's title line, as the
    Peaks graph's `Show` is. It shows only while a preview is in hand, and the line keeps its
    slot unseen at rest, so a preview appearing moves no control. Last fit draws the fit whole,

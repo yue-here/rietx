@@ -57,10 +57,8 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md) | The extinction screen names a wrong class at a correct cell | 2026-11-13 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-16 | P2 | [series](#series) |
 | [2081](2081-how-a-series-holds-what-the-setup-fixes.md) | How a series holds what the setup fixes (a design discussion) | 2026-11-18 | P2 | [series](#series) |
-| [2107](2107-an-equation-over-a-reflection.md) | An equation over a reflection | 2026-11-20 | P2 | [parametric](#parametric) |
 | [2149](2149-a-reduced-panel-names-the-systems-searched.md) | INDEX_PANEL_REDUCED names the systems the run searched | 2026-11-17 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2211](2211-the-history-table.md) | The History table: Compare on the pattern, Restore as pending edits | 2026-11-22 | P2 | [gui-overhaul](#gui-overhaul) |
-| [2212](2212-console-lines-by-kind.md) | Console lines by kind: the `>>>` prompt and the session as a script | 2026-11-22 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2220](2220-a-comparison-says-which-fits-it-rests-on.md) | A nested comparison says which fits it rests on, and which freed columns carried information | 2026-11-20 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2221](2221-a-group-with-no-tabulated-type-reaches-the-report.md) | A phase whose group has no tabulated type still gets its report and its CIF | 2026-11-21 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2227](2227-the-gui-shows-how-a-refine-ran.md) | The GUI shows how a refine ran: in one stage or in stages | 2026-11-22 | P2 | [gui-overhaul](#gui-overhaul) |
@@ -87,6 +85,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2110](2110-a-trial-error-unit-stays-inside-its-memory.md) | A trial_error unit stays inside its memory under a raised budget | P2 | — | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
 | [2140](2140-every-atom-is-named-by-its-unique-label.md) | Every atom is named by its unique label | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2148](2148-a-held-standard-cell-pins-the-wavelength.md) | A held standard's cell pins the wavelength, and a skipped λ is said | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2151](2151-the-zrp2o7-peak-equations-on-its-data.md) | The ZrP₂O₇ input's peak equations on its data | P2 | — | [parametric](#parametric) |
 | [2228](2228-a-reflection-past-the-range-end-keeps-its-tail.md) | A reflection centred past the range end keeps its tail | P2 | [2222](2222-the-closing-stage-off-by-default.md) ([2075](2075-the-result-records-its-fit-range-and-what-lies-outside-it.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 
 ## <a id="v0-3"></a>v0.3 — multi-phase workflows
@@ -501,9 +500,13 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2103](2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) | A joint fit has the verbs a single fit has | ⬜ | P2 | — ([2102](2102-a-joint-fit-takes-a-planspec.md), [2081](2081-how-a-series-holds-what-the-setup-fixes.md) soft) |
 | [2104](2104-a-parametric-cell-in-a-le-bail-or-pawley-joint-fit.md) | A parametric cell in a Le Bail or Pawley joint fit | ✅ 2026-11-13 | — | — ([1325](1325-parametric-series.md), [1964](1964-a-parametric-equation-the-user-writes.md) soft) |
 | [2106](2106-an-equation-fitted-to-a-series-trajectory.md) | An equation fitted to a series trajectory | ⬜ | P2 | [1964](1964-a-parametric-equation-the-user-writes.md) |
-| [2107](2107-an-equation-over-a-reflection.md) | An equation over a reflection | 🔄 2026-11-20 | P2 | [1964](1964-a-parametric-equation-the-user-writes.md) |
+| [2107](2107-an-equation-over-a-reflection.md) | An equation over a reflection | ✅ 2026-11-22 | — | [1964](1964-a-parametric-equation-the-user-writes.md) |
 | [2108](2108-a-pawley-phase-beside-a-rietveld-phase.md) | A Pawley phase beside a Rietveld phase | ✅ 2026-11-15 | — | [1964](1964-a-parametric-equation-the-user-writes.md) ([2104](2104-a-parametric-cell-in-a-le-bail-or-pawley-joint-fit.md) soft) |
 | [2118](2118-one-formula-language-for-every-constraint.md) | One formula language for every constraint | ✅ 2026-11-07 | — | [1964](1964-a-parametric-equation-the-user-writes.md) ([2103](2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) soft) |
+| [2151](2151-the-zrp2o7-peak-equations-on-its-data.md) | The ZrP₂O₇ input's peak equations on its data | ⬜ | P2 | — |
+| [2152](2152-a-peak-equation-reads-the-wavelength.md) | A peak equation reads the wavelength | ⬜ | P3 | — |
+| [2153](2153-a-peak-equations-width-held-inside-the-step.md) | A peak equation's width held inside the step | ⬜ | P3 | — |
+| [2154](2154-a-holder-offset-shared-across-a-joint-fit.md) | A holder offset shared across a joint fit | ✅ 2026-11-22 | — | — ([2103](2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) soft) |
 
 ## <a id="gui-overhaul"></a>gui-overhaul — the GUI redesigned around the pattern and the model
 
@@ -523,7 +526,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2208](2208-a-plan-stage-that-fixes.md) | A plan stage that fixes as well as frees | ✅ 2026-11-13 | — | [2127](2127-the-plan-tab.md) |
 | [2209](2209-unapplied-edits-survive-a-close.md) | Unapplied edits survive a close or a crash | ✅ 2026-11-13 | — | [2133](2133-the-file-menu.md) |
 | [2211](2211-the-history-table.md) | The History table: Compare on the pattern, Restore as pending edits | 🔄 2026-11-22 | P2 | [2214](2214-the-gui-rebuild-plan-and-inventory.md) |
-| [2212](2212-console-lines-by-kind.md) | Console lines by kind: the `>>>` prompt and the session as a script | 🔄 2026-11-22 | P2 | [2214](2214-the-gui-rebuild-plan-and-inventory.md) |
+| [2212](2212-console-lines-by-kind.md) | Console lines by kind: the `>>>` prompt and the session as a script | ✅ 2026-11-22 | — | [2214](2214-the-gui-rebuild-plan-and-inventory.md) |
 | [2213](2213-text-and-model-edits-join-the-recovery-copy.md) | The Text buffer and the Model forms join the recovery copy | ✅ 2026-11-19 | — | [2209](2209-unapplied-edits-survive-a-close.md), #1523 |
 | [2214](2214-the-gui-rebuild-plan-and-inventory.md) | The GUI rebuild: its plan, and a home for every feature of today's GUI | ✅ 2026-11-11 | — | — |
 | [2215](2215-the-frame.md) | The frame: the rebuild's first piece, served at `/next` | ✅ 2026-11-17 | — | [2214](2214-the-gui-rebuild-plan-and-inventory.md) |
@@ -709,6 +712,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2228](2228-a-reflection-past-the-range-end-keeps-its-tail.md) | A reflection centred past the range end keeps its tail | ⬜ | P2 | [2222](2222-the-closing-stage-off-by-default.md) ([2075](2075-the-result-records-its-fit-range-and-what-lies-outside-it.md) soft) |
 | [2230](2230-an-estimable-combination-keeps-its-esd.md) | An estimable combination keeps its esd | 🔄 2026-11-21 | P3 | [2219](2219-a-direction-the-data-does-not-determine-has-no-esd.md) ([2062](2062-pawley-is-the-structure-free-default.md) soft) |
 | [2232](2232-a-size-near-no-broadening-is-a-bound.md) | A size near no broadening is quoted as a bound | ⬜ | P3 | — ([2060](2060-the-likelihood-interval-where-an-esd-cannot-be-read.md) soft) |
+| [2239](2239-a-joint-stage-seeds-and-holds-a-stephens-block.md) | A joint stage seeds and holds a Stephens block as a single fit does | ✅ 2026-11-22 | — | — |
 
 ### <a id="unscheduled-a-long-run-is-not-one-fit"></a>A long run is not one fit
 
@@ -736,7 +740,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2222](2222-the-closing-stage-off-by-default.md) | The closing stage off by default | ✅ 2026-11-19 | — | — |
 | [2224](2224-a-refit-of-a-converged-model-runs-one-stage.md) | A re-fit of a converged model runs one stage | ✅ 2026-11-19 | — | — ([2222](2222-the-closing-stage-off-by-default.md) soft) |
 | [2226](2226-the-preview-on-the-declared-windows.md) | The preview on the declared windows | ✅ 2026-11-21 | — | [2222](2222-the-closing-stage-off-by-default.md) |
-| [2235](2235-predict-on-a-grid-says-which-peak-cut-it-draws.md) | Predict on a grid says which peak cut it draws | ⬜ | P3 | — |
+| [2235](2235-predict-on-a-grid-says-which-peak-cut-it-draws.md) | Predict on a grid says which peak cut it draws | ✅ 2026-11-22 | — | — |
 
 ### <a id="unscheduled-one-file-many-patterns"></a>One file, many patterns
 

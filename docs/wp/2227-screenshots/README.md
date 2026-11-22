@@ -55,3 +55,31 @@ Question 1, in the Console:
 - `console-all-*.png`: the Console after three Refines, one per state. After each
   `ref.fit(...)` line, a comment carries the plan line that `Refinement.summary()` prints. The
   first two are the real lines from these fits; the third is WP-2224's fallback text.
+
+## As built (2026-11-22)
+
+The rulings of 2026-11-22, built at `/next` (WP-2227 § Rulings). Each picture is a real fit of
+`fap` driven over the GUI server, 1440 × 900, with nothing drawn over the page. The fallback is
+a real staged run after a one-stage fit the probe made the library reject, as the server test
+does, so its words are "was discarded"; a one stage that diverged reads "diverged".
+
+- `built-title-one-*.png`: after a one-stage re-fit, "One stage: the model had converged"
+  beside Rwp.
+- `built-plan-one-*.png`: the Plan tab after it. One row stands in for the stages, drawn like
+  the closing stage, with 20 free and Rwp 9.25 %. The stage rows keep their counts.
+- `built-title-released-*.png`: the plan gained a seventh stage freeing atom positions, so the
+  Refine ran in stages: "In stages: Atom position shift was held".
+- `built-title-fallback-*.png`: "In stages: the one-stage re-fit was discarded".
+- `built-console-*.png`: the Console of a page that watched the re-fits, one comment per fit.
+- `built-status-one-light.png`: the status bar while a one-stage re-fit runs, in the title
+  line's words.
+
+Where the Show choice sits, with a preview up after a one-stage re-fit, at 1440 × 900 and
+1000 × 640. With the choice on the title line, the line had 311 px at 1440 and the words need
+437-497 px, so they were cut. With the choice in the legend, the line has 494 px and nothing is
+cut at 1440. At 1000 the graph panel is about 215 px wide beside the Interactive tab, and the
+line is cut in both layouts, as it was before this WP. The legend layout shipped.
+
+- `layout-title-{preview,last}-{1440,1000}-light.png`: the choice on the title line.
+- `layout-legend-{preview,last}-{1440,1000}-light.png`: the choice in the legend, under the
+  curves it chooses between.

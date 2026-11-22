@@ -392,7 +392,7 @@ def test_a_refine_moves_nothing_while_it_runs_or_after(browser, tmp_path_factory
     url = f"http://127.0.0.1:{httpd.server_address[1]}/"
     try:
         page = _open(browser, url, WIDTHS["wide"])
-        page.locator(".actions button", has_text="One cycle").click()
+        page.locator(".actions button", has_text="As ticked").click()
         _frames(page)
         before = page.evaluate(SNAP, LANDMARKS)
         page.locator(".actions button.refine").click()
