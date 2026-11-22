@@ -183,7 +183,7 @@ def plot_candidates(candidates: Sequence, peaks, *, path: str | None = None,
     **``q_match`` is the window the search matched with, and passing the wrong
     one makes the picture contradict the number printed beside it.**  CLAUDE.md's
     rule — the matching window is an argument separate from the per-line σ —
-    applies here for the same reason it applies to :func:`fom.fom_panel`: on a
+    applies here for the same reason it applies to :func:`~rietx.indexing.fom.fom_panel`: on a
     pattern with a shift allowance the search asked "is this the same line" in a
     *widened* window, and asking it again in the raw σ answers a different
     question.  Measured on 11-BM NAC, which carries the default 0.05° allowance:
