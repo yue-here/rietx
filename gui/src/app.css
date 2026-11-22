@@ -558,7 +558,7 @@ kbd {
 }
 
 .tok-string {
-  color: var(--warn);
+  color: var(--code-string);
 }
 
 .tok-comment {
