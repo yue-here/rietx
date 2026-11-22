@@ -91,9 +91,9 @@ the data adds one row to its linear inequalities ({ref}`ch-estimation`,
 {source}`rietx.optimize.least_squares.gaussian_width_inequalities`
 
 $\Gamma_G^2$ here includes the phase's Gaussian size and strain terms, and the
-angles are those of the cell at the start of the stage. TRF and a joint fit
-build no rows, and neither does a reflection that starts under the clamp. The
-guard above stays the check for those.
+angles are those of the cell at the start of the stage. A joint fit builds
+each histogram's rows. TRF builds no rows, and neither does a reflection that
+starts under the clamp. The guard above stays the check for those.
 
 ```{math}
 :label: prof-caglioti-l
