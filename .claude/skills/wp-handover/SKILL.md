@@ -114,8 +114,9 @@ re-reading its own diff.
      one that never ran.
    - A finding outside this WP goes into that WP's `### Inherited` (step 5),
      not into this branch.
-7. **Audit this session's CLAUDE.md edits** (root, `gui/`, `tests/`,
-   `src/rietx/io/`, `src/rietx/indexing/`): every added line must be a
+7. **Audit this session's rulebook edits** (every committed `CLAUDE.md`
+   and `AGENTS.md`, the files `tests/rulebook_limits.py` limits): every
+   added line must be a
    standing rule with a one-clause reason and a pointer (protocol rule 4).
    An incident, a sha, a dataset's number or a count of cases is evidence
    and goes to the WP, never into the rulebook, numbered or not (ruled
