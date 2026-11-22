@@ -8,7 +8,7 @@ Each rule names its WP. The measurement, story or example behind it is in that W
 its § "Moved from gui/CLAUDE.md" holds the paragraph this file carried until WP-2134,
 verbatim. A rule enters here only as a standing rule with its identifiers and anchor
 (`docs/milestones/process.md` § The rule); its evidence goes to the WP.
-`tests/test_docs_consistency.py::test_gui_rulebook_paths_resolve` fails on a path written
+`tests/test_docs_consistency.py::test_rulebook_paths_and_names_resolve` fails on a path written
 here with a directory (`lib/plot.ts`, `gui/session.py`) that no longer exists, and on a
 `file:symbol` whose symbol has left the file. Write paths that way, so a rename breaks the
 test and never silently the rule.
