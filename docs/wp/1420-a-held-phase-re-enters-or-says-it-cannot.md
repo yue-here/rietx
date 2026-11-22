@@ -398,6 +398,23 @@ series golden is bit-identical.
 
 ## Handover log
 
+- **2026-11-21** — **The ruling on #1402: A now, then B1 once WP-1419's metric
+  symmetry point lands; B2 is decided then.** The maintainer answered the
+  question the 2026-11-04 entry left open (review of PR #1401). Tasks 2–5
+  retire as written, since their trigger, a held phase with Rwp rising,
+  fires in none of the 42 chains. The finding is then keyed on the starting
+  state (B1): a start at a metric symmetry point reports a fact, a tier-1
+  group-theory test, with the two-start recipe as its suggestion. It waits
+  for WP-1419's metric symmetry point. The automatic two-start probe (B2)
+  picks an answer, so it comes back with measurements for a ruling once it
+  can be built. The maintainer's words were to take this lean "and see what
+  comes up as we develop". The pruned `### Inherited` items and the dated
+  "Superseded in part" paragraph in § Context are accepted. Follow-up, not
+  for #1401: the guide's 84 of 84 rests on one parent–subgroup pair, so the
+  generality judge's open items (a second, unrelated pair, and a fraction of
+  0.05) are the natural first rows if #1402 lands on B. *Next:* B1 after
+  WP-1419's metric symmetry point lands.
+
 - **2026-11-04** — **The hold no longer takes part; the saddle does, and
   the docs now say how to beat it.** Re-running the issue's construction on
   today's tree, across seven noise draws, showed that no chain holds the
