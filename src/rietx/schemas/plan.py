@@ -275,9 +275,8 @@ class PlanSpec(Base):
 
     ``stages`` is deliberately *not* ``min_length=1`` here, because this schema
     also has to read history trees written by earlier versions and a header is
-    persisted before the first stage runs.  The agent surface, which validates
-    a request a caller is about to spend minutes on, rejects an empty stage
-    list in ``agent._RequestBase._known_plan`` instead.
+    persisted before the first stage runs.  ``Refinement.fit`` refuses an empty
+    stage list instead, before it builds a history tree.
     """
 
     stages: list[StageSpec] = Field(default_factory=list)

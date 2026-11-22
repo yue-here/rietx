@@ -60,8 +60,10 @@ is the one the applied hold gives. A hold may be a glob, resolved as
 ``Refinement.hold`` resolves one, and may name any parameter: a held scale
 moves the background's band through the covariance too. A pending *release*
 needs no arm: a released parameter comes back fixed (``Refinement.unhold``), so
-its band is the held one. A path or glob the table does not have is refused,
-never ignored.
+its band is the held one. A literal path the table does not have is refused,
+never ignored, while a glob matching nothing is an empty sweep, as the hold
+verb takes it (``params.vector.is_literal_path``), so the band never refuses
+a hold that Apply accepts.
 """
 
 from __future__ import annotations
@@ -80,6 +82,7 @@ from ..optimize.statistics import (
     discarded_directions,
     normal_factors,
 )
+from ..params.vector import is_literal_path
 from ..viz.packed import Packed
 from . import preview
 
@@ -90,7 +93,7 @@ _CACHE_LOCK = threading.Lock()
 
 
 class UnknownHold(ValueError):
-    """A pending hold names a path, or a glob, the working table does not have."""
+    """A pending hold names a literal path the working table does not have."""
 
     def __init__(self, missing: list[str]):
         super().__init__(f"no parameter to hold: {', '.join(missing)}")
@@ -214,7 +217,7 @@ def answer(project, hold: list[str] | None = None) -> Packed:
         if holds:
             known = [e.path for e in table.entries]
             hits = {h: [p for p in known if fnmatch.fnmatchcase(p, h)] for h in holds}
-            if missing := [h for h in holds if not hits[h]]:
+            if missing := [h for h in holds if not hits[h] and is_literal_path(h)]:
                 raise UnknownHold(missing)
             table.set_held(sorted({p for found in hits.values() for p in found}), True)
         esd, facts = band_esd(model, table)

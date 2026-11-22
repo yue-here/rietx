@@ -187,7 +187,7 @@ class Stage:
     #: is ~0.1°); a fit that *tests a hypothesis it must not walk toward* —
     #: the indexing Le Bail validation, whose candidate may be metrically
     #: wrong by design — declares the capture range its verdict needs
-    #: (``indexing.workflow.VALIDATION_WINDOW_SLACK_DEG``).  ``None`` = the
+    #: (``indexing.workflow.VALIDATION_SLACK_BOUNDS_DEG``).  ``None`` = the
     #: default; frozen at stage compile like every other discrete choice.
     window_slack_deg: float | None = None
     #: path globs this stage **fixes** after it frees ``turn_on`` (WP-2208,
@@ -400,7 +400,7 @@ class RefinementPlan:
     #: converge only by alternating.  ``1`` is the single run every fit made
     #: before this field, bit for bit.  Above 1 under ``mode="lebail"``,
     #: ``Refinement.fit`` repeats the plan, keeps the best pass and records why
-    #: it stopped (:data:`LEBAIL_ALTERNATION_STOPPED`).  Ignored in every
+    #: it stopped (``LEBAIL_ALTERNATION_STOPPED``).  Ignored in every
     #: other mode, where there is nothing to alternate.
     lebail_passes: int = 1
     #: the absent-phase hold's threshold, in esds of the phase's scale against
@@ -492,7 +492,7 @@ class RefinementPlan:
         """The tolerance each stage runs at, in order — the one authority.
 
         Both runners ask this rather than reading ``stage.ftol``
-        (``Refinement._run_stage`` through ``fit``, ``MultiRefinement.fit``),
+        (``Refinement._run_stage`` through ``fit``, ``MultiHistogramRefinement.fit``),
         because the answer needs a fact no stage has: **whether it is the
         last**.  A plan is the only object that knows, so the rule lives here
         and is applied once per fit instead of restated per call site.
@@ -2214,7 +2214,7 @@ def check_resolution_positive(table, model) -> list[GuardFinding]:
 
 #: a free column counts as "on its bound" within this fraction of **the closest
 #: bound's own magnitude**, floored at 1 — scipy's ``rtol`` from
-#: ``optimize._lsq.common.find_active_constraints``, which is the test TRF
+#: ``scipy.optimize._lsq.common.find_active_constraints``, which is the test TRF
 #: itself uses to fill ``OptimizeResult.active_mask``.  Quoted rather than
 #: chosen: the diagnostic and the solver then cannot hold different opinions
 #: about the same column, and the value is calibrated to how far
@@ -2687,5 +2687,9 @@ def check_guards(table, outcome, threshold: float,
     if pressed and sd_internal is not None:
         report.at_bounds += tied_bound_findings(
             table, pressed,
-            table.stderr_physical(outcome.theta, sd_internal, outcome.correlation))
+            # the result's own esds, a tie the data determine included
+            # (WP-2230), as the joint fit's per-histogram build reads them
+            table.stderr_physical(
+                outcome.theta, sd_internal, outcome.correlation,
+                discarded=getattr(outcome, "discarded_subspace", None)))
     return report
