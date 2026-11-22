@@ -22,8 +22,7 @@ raises the bar. They must fail differently for that to mean anything, and they d
 answers with ranked classes, each carrying a *list* of space groups; there the singleton is not
 unsupported but unmeasurable. Its absence test can only speak where its own null model is silent — a σ
 threshold is counting noise, not model error, and a forbidden position inside a neighbour's tail
-measures the *profile* (WP-1077; `_model_is_quiet` and the sham-probe measurement are in
-`extinction.py`'s docstring; `n_testable` is `None` until the class's own fit runs). Its reference
+measures the *profile* (WP-1077; `_model_is_quiet` and the sham probe: `extinction.py`'s docstring; `n_testable` is `None` until the class's own fit runs). Its reference
 fit is gated on the picker's envelope (`REFERENCE_NET_RWP_MAX`).
 **A raised fit is no evidence**: its class stays unscored (WP-2076). **A k is a position hypothesis
 too** (WP-1418 M-8): `kvector.py` scores k against a known parent, its null is per pattern, no call in
@@ -48,12 +47,10 @@ the line screen (`predicted_but_absent`, the windowed uncancellable count) and
 since one Le Bail pass stalls (WP-2011) — stays **mandatory for the forward direction**
 (`unmatched_observed`, Rwp for a reader; `freeze_profile` is off, measured in
 `validation_plan`). Layer 0's `unmatched_calc` **cannot** serve (a phantom costs it
-~nothing, so it fires on the truth about as often as on a doubled cell; `workflow.py`'s
-docstring), nor `unmatched_observed` as a caveat (its level is the *specimen's*, so
+~nothing; `workflow.py`'s docstring), nor `unmatched_observed` as a caveat (its level is the *specimen's*, so
 comparative only, WP-1041). **The validation fit holds
 the cell**, freeing exactly one peak-position parameter from the candidate's own shift
-template, and its Chebyshev background is **sized from the data**, or a band reads
-as lines (WP-2113). On real data with no measured shift, `high` is *unreachable* by design
+template, with its Chebyshev background **sized from the data** (WP-2113). On real data with no measured shift, `high` is *unreachable* by design
 (`shift_allowance_assumed`); the fix is evidence, not a bigger constant (WP-1026).
 
 ## The scheduler, the presets and the stream (WP-1042)
