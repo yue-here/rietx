@@ -1,8 +1,7 @@
 # WP-2153 — a peak equation's width held inside the step
 
-Milestone: parametric · Status: 🔄 2026-11-22 — claimed by @yue-here (ghostshift runner)
+Milestone: parametric · Status: ✅ 2026-11-22 — option B: an exact equation term enters the LM width rows; PR #1784
 Depends on: —
-Priority: P3 2026-11-22 — a workaround covers it: `PEAK_WIDTH_NOT_POSITIVE` reports a width that went below zero after the fit, and TRF or a refit from a better start avoids it
 
 ## Goal
 
@@ -82,22 +81,15 @@ unchecked. `docs/practice.md` § Peak-width limits carries the reading.
 
 **Tier.** Physics: a width is positive. No threshold is added. ε is the existing floor.
 
-### Inherited
-
-- **2026-11-22, from WP-2151 (the ZrP₂O₇ real-data run).** The gap is reachable on real
-  data, in a third form none of A-D addresses: a term that starts below the floor at every
-  reflection. The input's stored silicon TCHZ gives Γ_G² = −0.0055 deg² at 15° and
-  −0.0029 at 90°. So all four Gaussian coefficients start with zero gradient. They stay
-  exactly where they started, with no esd, and `PEAK_WIDTH_NOT_POSITIVE` fires at 7 of 7
-  reflections. A row the start violates is dropped (above), so no row helps either.
-  Lifting w alone until the smallest Γ_G² is 0.002 deg² gave χ² 197573.6 against 201508.1
-  on 1167 free parameters, which took Rwp from 31.793 % to 31.481 %. The fitted silicon
-  Γ_G² then runs 0.0069 to 0.0034 deg², close to the size of the stored values with the
-  sign flipped. Silicon's Lorentzian x and y also returned to the input's values. One
-  hypothesis fits that: TOPAS reads a negative Γ_G² as its magnitude. It is not checked,
-  so this WP's TOPAS reading in § Practice should look for it. The numbers are in
-  WP-2151's handover entry. Kept on 2026-11-22 as the record of the third form; § Decision
-  leaves it to the report, and § Practice records that the TOPAS reading found nothing.
+**A third form, from WP-2151's ZrP₂O₇ run** (inherited 2026-11-22, folded here at the
+close). A term can start below the floor at every reflection. The input's stored silicon
+TCHZ gives Γ_G² = −0.0055 deg² at 15° and −0.0029 at 90°, so all four Gaussian
+coefficients start with zero gradient. They stay where they started, with no esd, and
+`PEAK_WIDTH_NOT_POSITIVE` fires at 7 of 7 reflections. Lifting w alone until the smallest
+Γ_G² is 0.002 deg² took Rwp from 31.793 % to 31.481 %, and the fitted silicon Γ_G² then
+ran 0.0069 to 0.0034 deg², close to the stored values with the sign flipped. One
+hypothesis fits that: TOPAS reads a negative Γ_G² as its magnitude. § Practice found
+nothing to check it against. The numbers are in WP-2151's handover entry.
 
 ### Decision
 
@@ -179,6 +171,36 @@ closes on option A with the fixture's numbers recorded.
 
 ## Handover log
 
+- **2026-11-22** — Closed by a ghostshift runner, PR #1784. The default LM driver now
+  keeps a peak's total width positive inside each step with a width peak equation's term
+  included, wherever that term is exact. Before, an equation carrying the Gaussian width
+  could step it below zero and stall the fit far from TRF's answer, and a held positive
+  term could make the instrument's own row bind where the total did not. Both are measured
+  and both now land on TRF's answer. A term that is not exact, and a term that starts
+  below zero, are still left to `PEAK_WIDTH_NOT_POSITIVE` after the fit.
+  *Done:* `_equation_width_rows` in `optimize/least_squares.py`, called by both row
+  builders; `is_affine` in `model/peak_equations.py`; § Decision above; docstrings of the
+  builders and of three guards in `strategy/staged.py`; the theory page's two row
+  paragraphs; `docs/practice.md` § A width an equation sets. No derivative path was added,
+  so `tests/test_cross_backend.py` is unchanged. The skill row is unchanged.
+  *Measured* ([dev] venv, macOS arm64): the two fixtures in § Tasks; the TOPAS 5
+  Technical Reference reading in § Practice. Fast selection on 20ea53959 (the review's
+  fixes in 16b14ae3b change docstrings and test set-up only): 15151 passed, 443 skipped,
+  32 xfailed, with 17 test cases added in `tests/test_peak_equations.py`, 1.29 s between
+  them; no base count was taken, so the +17 is from the diff, not a measured difference.
+  The full suite did not run: only fits with a width equation reach the change, and
+  their files (`test_peak_equations`, `test_parametric_expression`, `test_magnetic`,
+  `test_textdoc`, `test_cross_backend`, the examples) pass. `tests.reader_output` exit 0.
+  *Review:* a blind subagent chose B, the kept built-in row, structural affinity and the
+  report for a start below zero, as § Decision does. `/code-review high` found seven nits,
+  all fixed in 16b14ae3b. *Generality:* not dispatched. The audit table is untouched, and
+  the change adds no threshold or data-driven choice: an exact term enters, an inexact one
+  stays out. *Gotchas:* `make_lab6`'s cell is free by default, so a "step" on a test table
+  must move only the columns it means to. A condition in an equation cannot read a
+  coefficient (the schema refuses it), so `is_affine`'s `if` branch only ever sees a
+  coefficient-free condition.
+  Next: nothing in this WP. A TOPAS run on a negative TCHZ Γ_G² would settle the WP-2151
+  hypothesis, if anyone has TOPAS to hand.
 - **2026-11-22** — Filed by the session closing WP-2107, from its review finding 2, left
   open there. No open WP owns the LM width rows: 1937, 1938 and 1325 are closed. Premises
   checked on main f590981ab: neither row builder reads `peak_equations`. Next: the stall
