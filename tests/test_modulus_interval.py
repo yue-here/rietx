@@ -30,6 +30,7 @@ import pytest
 import rietx as rx
 from rietx.crystallography.magnetic.isotropy import candidates
 from rietx.schemas.common import Parameter as P
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
 from rietx.schemas.structure import Atom, Cell, MagneticSymmetry, Moment, Phase, Structure
 from rietx.strategy.parameter_interval import _sign_is_unseen
 
@@ -91,7 +92,8 @@ def _fitted(seed: int):
         rx.Stage("scale", ["phases.*.scale", "instrument.background.c*"]),
         rx.Stage("cell", ["phases.*.cell.*", "instrument.zero_shift",
                           "instrument.profile.w"]),
-        rx.Stage("moment", [MOD])])
+        rx.Stage("moment", [MOD])],
+        closing_window_tol=CLOSING_WINDOW_TOL)   # declared, not inherited: off by default since WP-2222
     result = ref.fit(data, plan=plan, telemetry=False)
     return ref, data, result
 

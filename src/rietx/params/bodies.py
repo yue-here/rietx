@@ -30,7 +30,9 @@ today's E; dim W = 1, W = span{n}, E = n for a body that is not linear, and
 for a linear one n when the axis is perpendicular to it and nothing when it
 is parallel, each to within the tilt that atoms typed within the site
 tolerance can give it (:meth:`RigidBodyBlock._axis_tilt_bound`, in radians,
-from :func:`site_reach` in Å); dim W = 0, no rotation DOF at all.
+from :func:`site_reach` in Å), or, with no reach given (atoms not typed on a
+site, so nothing was snapped), the nearer of the two untested; dim W = 0, no
+rotation DOF at all.
 ``site_axes`` carries W in the Cartesian frame; it is cell-independent in
 every setting but rhombohedral axes, which the table refuses for a site body.
 
@@ -181,7 +183,7 @@ class RigidBodyBlock(DerivedBlock):
 
     def __init__(self, *, phase_base: str, body_base: str, atom_bases: list[str],
                  template: np.ndarray, q0, torsions=(), angles=(), names=(),
-                 site_axes=None, site_reach: float = 0.0, labels=()):
+                 site_axes=None, site_reach: float | None = None, labels=()):
         self.template = np.asarray(template, dtype=np.float64)
         #: the template-frame axes the rotation DOFs turn about, (3, k)
         self.body_axes = rotation_axes(self.template)
@@ -194,8 +196,13 @@ class RigidBodyBlock(DerivedBlock):
                        or [str(i) for i in range(len(self.template))])
         #: the most (rad) a linear body's axis tilts off its site's plane or
         #: line with every atom within ``site_reach`` Å of it (:func:`site_reach`);
-        #: the default 0 holds the axis to the bit
-        self.axis_tol = self._axis_tilt_bound(float(site_reach))
+        #: ``None`` when no reach is given: the atoms were not typed on a site,
+        #: so no snap bounds the tilt and the axis test does not apply (a body
+        #: typed exactly still tilts by rounding, 5.5e-17 rad on Linux and up
+        #: to 5.9e-16 rad on macOS arm64, which a bound of 0 would refuse;
+        #: #1551's review)
+        self.axis_tol = (None if site_reach is None
+                         else self._axis_tilt_bound(float(site_reach)))
         self._set_anchor(np.asarray(q0, dtype=np.float64))
         #: (axis_a, axis_b, moves) index triples into the template (WP-1808)
         self.torsions = [(int(a), int(b), np.asarray(m, dtype=np.intp))
@@ -288,6 +295,10 @@ class RigidBodyBlock(DerivedBlock):
         c = abs(float(n @ u))
         off = float(np.linalg.norm(u - (n @ u) * n))
         perpendicular = c <= off
+        if self.axis_tol is None:
+            # no typed site: the nearer case, untested (the table, which types
+            # the atoms, always passes a reach)
+            return n.reshape(3, 1) if perpendicular else np.zeros((3, 0))
         if perpendicular and c <= self.axis_tol:
             return n.reshape(3, 1)
         if not perpendicular and off <= self.axis_tol:

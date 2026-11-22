@@ -1,7 +1,9 @@
 """WP-2125 — ``POST /api/preview``, the pattern at values nobody has applied.
 
 Each of the three evaluation paths is chosen where it should be and agrees
-with a fresh compile at the values; nothing is written; the refusals are
+with a fresh compile at the values and the last fit's peak cut (WP-2226); at
+the head's values the answer is the fit's own curve; nothing is written; the
+refusals are
 ``set_values``' own; the route 409s while a run is in flight. The fixtures
 are the shipped ``fap`` (one phase, axial divergence on) and ``nac`` (two
 phases, no axial term) examples, each fitted once with its default plan.
@@ -21,7 +23,7 @@ import pytest
 from rietx.examples import build_example
 from rietx.gui import GuiSession, build_server, preview
 from rietx.gui.session import GuiError
-from rietx.model.forward import compile_model
+from rietx.model.forward import WINDOW_AREA_TOL, compile_model, recorded_window_tol
 from rietx.schemas.common import Parameter
 from rietx.schemas.instrument import PeakComponent
 from rietx.viz.packed import MEDIA_TYPE, unpack
@@ -45,8 +47,15 @@ def nac(tmp_path_factory):
     return _fitted(tmp_path_factory, "nac")
 
 
+def _fit_cut(project) -> float:
+    """The window fraction the last fit's last stage ran at, read off its
+    result rather than through the preview's own reading of the tree."""
+    return recorded_window_tol(project.refinement.result_.stages[-1].window_area_tol)
+
+
 def _fresh(project, edits: dict[str, float]):
-    """A compile at the edited values from scratch, and its curve there."""
+    """A compile at the edited values from scratch, at the last fit's peak
+    cut, and its curve there."""
     r = project.refinement
     structure = r.structure.model_copy(deep=True)
     instrument = r.instrument.model_copy(deep=True)
@@ -57,7 +66,8 @@ def _fresh(project, edits: dict[str, float]):
     table.refresh_ties()
     table.apply_to_models(structure, instrument)
     model = compile_model(structure, instrument, project.data, mode=project.doc.mode,
-                          two_theta_limits=project.doc.two_theta_limits)
+                          two_theta_limits=project.doc.two_theta_limits,
+                          window_area_tol=_fit_cut(project))
     return model, np.asarray(model.evaluate(table.decode(table.x0())))
 
 
@@ -107,16 +117,19 @@ def test_evaluate_parts_keeps_the_association_with_a_declared_peak(fap):
 
 
 # ---------------------------------------------------------------- the three paths
-def test_at_the_base_values_the_answer_is_frozen_and_the_last_fit(fap):
-    answer = preview.evaluate(fap, {"values": {}})
+@pytest.mark.parametrize("name", ["fap", "nac"])
+def test_at_the_base_values_the_answer_is_frozen_and_the_last_fit(name, request):
+    """The preview compiles at the last fit's peak cut, so before a slider
+    moves it draws the fit's own curve and Rwp bit for bit (WP-2226). At
+    compile_model's default 0.1 % the curve sat 0.13 % of the strongest peak
+    off on fap and the Rwp header 0.13 points."""
+    project = request.getfixturevalue(name)
+    assert _fit_cut(project) == WINDOW_AREA_TOL
+    answer = preview.evaluate(project, {"values": {}})
     assert answer.header["evaluated"] == "frozen"
-    ref = np.asarray(fap.refinement.result_.y_calc)
-    y = answer.arrays["y_calc"]
-    # the closing compile the result came from, at the values it ended on
-    assert np.max(np.abs(y - ref)) <= 1e-9 * np.max(np.abs(ref))
-    _, fresh = _fresh(fap, {})
-    assert np.max(np.abs(y - fresh)) <= 1e-9 * np.max(np.abs(fresh))
-    assert answer.header["rwp"] == pytest.approx(fap.refinement.result_.statistics.rwp, rel=1e-9)
+    res = project.refinement.result_
+    assert np.array_equal(answer.arrays["y_calc"], np.asarray(res.y_calc))
+    assert answer.header["rwp"] == res.statistics.rwp
 
 
 @pytest.mark.parametrize("name", ["fap", "nac"])
@@ -129,20 +142,24 @@ def test_the_scale_slider_stays_frozen_and_exact(name, request):
         assert err < 1e-9
 
 
-def test_a_zero_shift_of_one_fwhm_is_frozen_within_a_twentieth_of_sigma(fap, nac):
-    for project in (fap, nac):
+def test_a_zero_shift_of_one_fwhm_is_rewindowed(fap, nac):
+    """A peak moved inside its frozen window is cut off-centre at 2 %, which
+    drifted 0.42-1.26 σ from a fresh compile (WP-2226), so a moved window is
+    rewindowed. What is left on fap, 0.0175 σ, is the frozen reflection list
+    at the range edge, which no window rule changes."""
+    for project, bar in ((fap, 0.05), (nac, 1e-9)):
         zero = preview._base(project).values["instrument.zero_shift"]
         evaluated, err = _err_sigma(
             project, {"instrument.zero_shift": zero + _fwhm(project)})
-        assert evaluated == "frozen"
-        assert err < 0.05
+        assert evaluated == "rewindowed"
+        assert err < bar
 
 
-def test_a_cell_edit_is_frozen_within_a_twentieth_of_sigma(nac):
+def test_a_cell_edit_is_rewindowed_and_exact(nac):
     a = preview._base(nac).values["phases.0.cell.a"]
     evaluated, err = _err_sigma(nac, {"phases.0.cell.a": a * 1.0005})
-    assert evaluated == "frozen"
-    assert err < 0.05
+    assert evaluated == "rewindowed"
+    assert err < 1e-9
 
 
 def test_a_width_that_grows_the_windows_is_rewindowed_and_exact(fap):
@@ -183,9 +200,7 @@ def _magnetic_base(size: float) -> preview._Base:
     return preview._Base(
         key=(), table=table, stored=[e.value for e in table.entries],
         values=values, model=model, positions=preview._positions(model, values),
-        fcj_n=[f for _, f, _ in sized(model, values)],
-        fcj_n_mag=[None if s is None else s[1]
-                   for s in sized(model, values, component=1)],
+        sized=sized(model, values), sized_mag=sized(model, values, component=1),
         lebail=None)
 
 
@@ -209,6 +224,17 @@ def test_a_magnetic_family_outgrown_is_recompiled():
     assert preview._choose(base, values) == "recompiled"
 
 
+def test_a_magnetic_family_shrunk_or_shifted_is_recompiled():
+    """A frozen window a peak has moved inside, or one wider than its peak
+    now needs, is cut off-centre or too wide, and only a compile resizes the
+    magnetic family (WP-2226)."""
+    base = _magnetic_base(0.01)
+    zero = base.values["instrument.zero_shift"]
+    for edit in ({"phases.0.magnetic_lor_size": 0.001},
+                 {"instrument.zero_shift": zero + 0.05}):
+        assert preview._choose(base, {**base.values, **edit}) == "recompiled"
+
+
 # ---------------------------------------------------------------- the answer
 def test_the_phases_and_background_sum_to_the_total(nac):
     answer = preview.evaluate(nac, {"values": {}})
@@ -224,17 +250,19 @@ def test_the_phases_and_background_sum_to_the_total(nac):
 
 
 def test_the_residuals_are_the_curves_route_s_at_the_last_fit(fap):
-    """At the last fit's values the three residuals are the ones the curves
-    route sends, so the residual pane does not change when a preview starts
-    from there (WP-2128)."""
+    """At the last fit's values the three residuals are the curves route's,
+    over the same σ (WP-2128), bit for bit since the preview compiles at the
+    fit's own peak cut (WP-2226), so the residual pane does not move when a
+    preview starts from there."""
     answer = preview.evaluate(fap, {"values": {}})
     res = fap.refinement.result_
     raw = np.asarray(res.y_obs) - np.asarray(res.y_calc)
-    delta = raw / np.asarray(res.sig())
-    np.testing.assert_allclose(answer.arrays["delta_raw"], raw, rtol=0, atol=1e-6)
-    np.testing.assert_allclose(answer.arrays["delta"], delta, rtol=0, atol=1e-6)
-    np.testing.assert_allclose(answer.arrays["cumulative_chi2"], np.cumsum(delta**2),
-                               rtol=1e-6)
+    sig = np.asarray(res.sig())
+    assert np.array_equal(answer.arrays["delta_raw"], raw)
+    np.testing.assert_allclose(answer.arrays["delta"], answer.arrays["delta_raw"] / sig,
+                               rtol=1e-9, atol=1e-12)
+    np.testing.assert_allclose(answer.arrays["cumulative_chi2"],
+                               np.cumsum(answer.arrays["delta"] ** 2), rtol=1e-6)
     # and the Rwp in the header is taken over the same σ
     sig = answer.arrays["delta_raw"] / answer.arrays["delta"]
     y = answer.arrays["y_calc"] + answer.arrays["delta_raw"]
@@ -288,11 +316,40 @@ def test_the_cache_follows_the_head(tmp_path_factory):
     project = _fitted(tmp_path_factory, "nac")
     first = preview.evaluate(project, {"values": {}})
     assert first.header["head"] == project.refinement._head_id
+    cut = _fit_cut(project)
     project.refinement.set_values({"instrument.zero_shift": 0.001})
     second = preview.evaluate(project, {"values": {}})
     assert second.header["head"] == project.refinement._head_id != first.header["head"]
     assert preview._base(project).values["instrument.zero_shift"] == 0.001
     assert second.header["evaluated"] == "frozen"
+    # a head that is no stage (an applied slider) keeps the stage's cut above it
+    assert preview._base(project).window_area_tol == cut
+
+
+def test_a_fit_ending_at_another_cut_is_drawn_at_it_after_a_reopen(tmp_path_factory):
+    """A last stage run at 0.1 % windows, as a closing stage runs, is drawn at
+    0.1 %, and the cut is read off the history, so a reopened project, which
+    carries no result, still draws the fit's curve (WP-2226)."""
+    from rietx import Stage
+    from rietx.project import Project
+
+    project = _fitted(tmp_path_factory, "fap")
+    result = project.run_stage(Stage("close", ["phases.0.scale"]),
+                               window_area_tol=1e-3)
+    assert result.stages[-1].window_area_tol == 1e-3
+    reopened = Project.open(project.path)
+    assert reopened.refinement.result_ is None
+    base = preview._base(reopened)
+    assert base.window_area_tol == 1e-3 == base.model.window_area_tol
+    answer = preview.evaluate(reopened, {"values": {}})
+    assert answer.header["evaluated"] == "frozen"
+    assert np.array_equal(answer.arrays["y_calc"], np.asarray(result.y_calc))
+    assert answer.header["rwp"] == result.statistics.rwp
+
+
+def test_a_tree_with_no_stage_is_drawn_at_the_declared_cut(tmp_path_factory):
+    project = build_example("fap", tmp_path_factory.mktemp("preview-unfitted"))
+    assert preview._base(project).model.window_area_tol == WINDOW_AREA_TOL
 
 
 # ---------------------------------------------------------------- refusals

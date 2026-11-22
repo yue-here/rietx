@@ -545,6 +545,7 @@ def test_planarity_rows_leave_the_data_statistics_bit_identical():
     from them, are bit-identical with and without a plane's rows, at the same
     parameters and at a fit's answer."""
     from rietx import Refinement
+    from rietx.model.forward import recorded_window_tol
     from rietx.optimize.statistics import compute_statistics
 
     ins = Instrument.debye_scherrer(wavelength=1.5406)
@@ -568,7 +569,10 @@ def test_planarity_rows_leave_the_data_statistics_bit_identical():
     unrestrained = compile_model(
         ref.structure.model_copy(update={"phases": [
             ref.structure.phases[0].model_copy(update={"restraints": []})]}),
-        ref.instrument, pattern, mode="rietveld")
+        ref.instrument, pattern, mode="rietveld",
+        # the windows the answer was measured on: the last stage's, since no
+        # closing stage runs by default (WP-2222)
+        window_area_tol=recorded_window_tol(result.stages[-1].window_area_tol))
     st = compute_statistics(unrestrained.y_obs, unrestrained.evaluate(values),
                             unrestrained.sigma,
                             n_free=result.statistics.n_free_parameters)
