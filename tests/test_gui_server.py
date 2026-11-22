@@ -599,6 +599,50 @@ def test_a_species_refused_in_a_list_names_its_place_in_the_project(
     assert not (tmp_path / "species.rex").exists()   # refused before anything is made
 
 
+def test_a_list_member_s_structure_restraints_are_refused_not_dropped(
+        blank, tmp_path, pattern_file):
+    """The join keeps each member's phases and nothing else, so a member's
+    ``Structure.restraints`` (WP-1942) would vanish without a word; their phase
+    indices count within the member, and nothing re-keys them yet (#1653).
+    Refused, naming the member; the same member with no rows joins as before,
+    and alone (not in a list) it keeps its rows."""
+    from rietx.schemas.structure import lebail_scaffold
+
+    session, client = blank
+    member = lebail_scaffold("F m -3 m", [5.463, 5.463, 5.463, 90, 90, 90],
+                             name="CaF2").model_dump(mode="json")
+    member["restraints"] = [{"terms": [["phases.0.cell.a", 1.0]],
+                             "target": 5.463, "sigma": 0.01}]
+    cell = {"space_group": "P m -3 m", "cell": {"a": 4.160}, "name": "LaB6"}
+    body = {"pattern": str(pattern_file), "mode": "lebail",
+            "instrument": {"preset": "debye_scherrer", "wavelength": 0.4139}}
+
+    status, payload = client.post("/api/project/new", {
+        **body, "structure": [cell, member], "path": str(tmp_path / "rows.rex")})
+    assert status == 400, payload
+    error = payload["error"]
+    assert error["where"] == ["structure.1.restraints"]
+    for words in ("structure member 1", "'CaF2'", "1 structure-level restraint",
+                  "cannot carry", "one inline structure"):
+        assert words in error["message"], (words, error["message"])
+    assert not (tmp_path / "rows.rex").exists()   # refused before anything is made
+
+    for empty in ({**member, "restraints": []},
+                  {k: v for k, v in member.items() if k != "restraints"}):
+        status, payload = client.post("/api/project/new", {
+            **body, "structure": [cell, empty],
+            "path": str(tmp_path / f"joined{len(empty)}.rex")})
+        assert status == 200, payload
+        assert [p.name for p in session.project.refinement.structure.phases] \
+            == ["LaB6", "CaF2"]
+
+    status, payload = client.post("/api/project/new", {
+        **body, "structure": member, "path": str(tmp_path / "alone.rex")})
+    assert status == 200, payload
+    kept = session.project.refinement.structure.restraints
+    assert [r.terms for r in kept] == [[("phases.0.cell.a", 1.0)]]
+
+
 def test_new_refuses_an_instrument_it_would_have_to_guess(blank, tmp_path,
                                                           pattern_file):
     """A default anode would put a wavelength nobody chose into every cell."""
