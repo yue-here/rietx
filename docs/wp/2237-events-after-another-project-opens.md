@@ -1,6 +1,6 @@
 # WP-2237 — a project opened in the same window streams its events from the first
 
-Milestone: gui-overhaul · Status: ⬜
+Milestone: gui-overhaul · Status: 🔄 2026-11-22 — claimed by @yue-here (ghostshift runner)
 Depends on: —
 Priority: P3 2026-11-22 — a view over what the fit already knows; reloading the page is the workaround
 
