@@ -40,7 +40,7 @@ from ..crystallography.spherical_harmonics import (
     texture_basis,
 )
 from ..crystallography.symmetry import reflection_orbits
-from ..params.expression import Call, Expression
+from ..params.expression import BinOp, Call, Expression, Name, Neg, names_in
 from ..schemas.peak_equation import PeakEquation, _walk, harmonic_args
 from .preferred_orientation import orbit_layout
 
@@ -279,6 +279,48 @@ def gradient(eq: CompiledPeakEquation, values, frame: ReflectionFrame, *, d, the
     shape = np.shape(theta)
     return (np.broadcast_to(v, shape).astype(np.float64),
             [np.broadcast_to(p, shape).astype(np.float64) for p in parts])
+
+
+def is_affine(eq: CompiledPeakEquation) -> bool:
+    """Whether ``eq`` is affine in its coefficients, read off the tree (WP-2153).
+
+    Then its value at frozen angles is f₀ + Σₖ gₖ·(cₖ − cₖ₀) exactly, with
+    gₖ the gradient :func:`gradient` returns, so a width row built from it is
+    exact (``least_squares.gaussian_width_inequalities``).  The test is
+    structural and sufficient: a sum or difference of affine parts, an affine
+    part times or over a coefficient-free one, ``orbit_mean`` of an affine
+    part (a mean is linear), or ``if`` with a coefficient-free condition and
+    affine branches.  Anything else that reads a coefficient is not affine,
+    so ``c - c`` inside a ``sin`` reads as not affine although it is.
+    """
+    coefficients = {name for name, _path in eq.paths}
+
+    def free(node) -> bool:
+        return not coefficients.intersection(names_in(node))
+
+    def affine(node) -> bool:
+        if free(node) or isinstance(node, Name):
+            return True
+        if isinstance(node, Neg):
+            return affine(node.arg)
+        if isinstance(node, BinOp):
+            if node.op in "+-":
+                return affine(node.left) and affine(node.right)
+            if node.op == "*":
+                return ((free(node.left) and affine(node.right))
+                        or (free(node.right) and affine(node.left)))
+            if node.op == "/":
+                return free(node.right) and affine(node.left)
+            return False
+        if isinstance(node, Call):
+            if node.func == "orbit_mean":
+                return affine(node.args[0])
+            if node.func == "if":
+                cond, a, b = node.args
+                return free(cond) and affine(a) and affine(b)
+        return False
+
+    return affine(eq.expression.tree)
 
 
 def check_orbits(eq: CompiledPeakEquation, values, frame: ReflectionFrame, *, d,
