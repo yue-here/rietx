@@ -1,6 +1,6 @@
 # WP-2227 — The GUI shows how a refine ran: in one stage or in stages
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-22 — built at `/next`; the maintainer's look at the three states waits
+Milestone: gui-overhaul · Status: 🔄 2026-11-22 — built at `/next` (PR #1776); the maintainer's look at the three states waits
 Depends on: 2224 (the re-fit rule)
 Priority: P2 2026-11-19 — a ruling of Yue's waiting on the GUI; the rebuild's Plan tab (R4 of WP-2214) is where it lands
 
@@ -81,7 +81,7 @@ at the three states.
 
 ## Handover log
 
-### 2026-11-22 (2nd session) — built at `/next` on the rulings
+### 2026-11-22 (2nd session) — built at `/next` on the rulings (PR #1776)
 
 The rebuilt GUI at `/next` now says how each Refine ran, in words beside Rwp on the Pattern
 graph, in the status bar while it runs, in a Console comment and in the Plan tab. Refine there
