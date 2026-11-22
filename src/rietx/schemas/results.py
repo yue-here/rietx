@@ -436,9 +436,9 @@ class Identifiability(Base):
     a new field on an existing shape not being a new shape.  **That is no
     longer the rule.**  Since WP-1117 the only question is whether a consumer
     could *notice*, and a new field on a result is noticeable, so an addition
-    of this shape now bumps the version like any other: the comment beside
-    :data:`~rietx.schemas.common.SCHEMA_VERSION` is the changelog, and three of
-    its entries are additive defaulted fields.  Corrected here rather than
+    of this shape now bumps the version like any other: the notes for
+    :data:`~rietx.schemas.common.SCHEMA_VERSION` in ``docs/contracts/schema.md``
+    are the changelog, and three of them are additive defaulted fields.  Corrected here rather than
     deleted because this is the sentence that talked a later reader out of a
     bump it owed.
 
@@ -1320,7 +1320,7 @@ class StageResult(Base):
     #: and 0 only means this particular stage never reached one.
     #: Additive field, defaulted to 0 (the honest "never happened" state);
     #: bumped with this change, ``SCHEMA_VERSION`` 0.19 → 0.20 (see the
-    #: changelog entry in ``schemas/common.py``).
+    #: note in ``docs/contracts/schema.md``).
     n_degenerate_cell_probes: int = 0
     #: decompositions this stage's solve and esds repeated with LAPACK's
     #: QR-iteration driver because the divide-and-conquer driver stopped
@@ -1630,8 +1630,8 @@ class HistogramResult(Base):
     #: Which reflection each of those ticks is, index for index, as the orbit
     #: representative ``h k l`` (WP-1438).  A **companion**, not a change of
     #: shape: :attr:`ticks` has four readers that want a list of positions and
-    #: none of them wants this, so the pairing is by index and
-    #: ``tests/test_ticks.py`` pins the two lengths equal per phase.
+    #: none of them wants this, so the pairing is by index, one entry per
+    #: position for each phase.
     #:
     #: Absent for a phase's key rather than empty when there is nothing to
     #: say, which is the case the reserved declared-peaks key is in: a peak
@@ -2273,8 +2273,8 @@ class RefinementResult(Base):
     #: Which reflection each of those ticks is, index for index, as the orbit
     #: representative ``h k l`` (WP-1438).  A **companion**, not a change of
     #: shape: :attr:`ticks` has four readers that want a list of positions and
-    #: none of them wants this, so the pairing is by index and
-    #: ``tests/test_ticks.py`` pins the two lengths equal per phase.
+    #: none of them wants this, so the pairing is by index, one entry per
+    #: position for each phase.
     #:
     #: Absent for a phase's key rather than empty when there is nothing to
     #: say, which is the case the reserved declared-peaks key is in: a peak

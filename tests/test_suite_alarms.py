@@ -25,6 +25,8 @@ from rietx.schemas.results import _NAMED_PURPOSES
 from rietx.viz.compare import STANDARD_BY_KEY
 from tests import suite_alarms
 
+FLAT_TRIPLE = suite_alarms.FLAT_TRIPLE
+
 
 def test_the_pin_parses_and_names_only_live_codes_standards_and_purposes():
     pin = suite_alarms.load_pin()
@@ -41,6 +43,18 @@ def test_the_pin_parses_and_names_only_live_codes_standards_and_purposes():
         assert n == sum(code in fired for fired in pin["standards"].values()), code
 
 
+def test_the_instrument_width_code_is_pinned_on_exactly_the_standards_whose_plan_frees_a_pair():
+    """WP-2225: ``INSTRUMENT_WIDTH_HELD`` reads ``StageResult.width_twins_held``
+    exactly, so among the eight standards it fires on the four whose QPA plan
+    frees an instrument width beside a specimen width of its shape, and on none of the
+    others.  The slow row below holds the measurement to this pin."""
+    pin = suite_alarms.load_pin()
+    fired = {key for key, codes in pin["standards"].items() if "INSTRUMENT_WIDTH_HELD" in codes}
+    assert fired == {"zincite", "fluorite", "corundum", "brucite"}, sorted(fired)
+    assert {pin["standards"][key]["INSTRUMENT_WIDTH_HELD"] for key in fired} == {"warning"}
+    assert len(pin["standards"]) == 8
+
+
 def test_the_differences_name_the_code_and_the_standard_it_moved_on():
     pin = {"standards": {"fap": {"FLOOR_HIT": "warning"}},
            "n_results": {"FLOOR_HIT": 1}, "warnings_per_result": {"qpa": 1.0}}
@@ -54,6 +68,35 @@ def test_the_differences_name_the_code_and_the_standard_it_moved_on():
         "all standards: BOUND_HIT fired on 0 -> 1",
         "all standards: warnings per result under qpa 1.0 -> 0.0",
     ]
+
+
+def test_only_the_findings_rounding_decides_leave_the_table():
+    """WP-2036: fluorite's floor and discarded-direction findings on the flat
+    width triple, and zincite's floor finding there, depend on a 1e-14 nudge
+    to the start, so the pin leaves them out.  The same codes elsewhere, and
+    other codes on the triple, stay in."""
+    from types import SimpleNamespace
+
+    from rietx.schemas.common import Diagnostic
+
+    def diag(code, *where):
+        return Diagnostic(level="warning", code=code, message=code, where=list(where))
+
+    size, strain, w = FLAT_TRIPLE
+    fluorite = [diag("FLOOR_HIT", strain), diag("COVARIANCE_DIRECTION_DISCARDED", size, strain, w),
+                diag("FLOOR_HIT", "phases.0.atoms.0.biso"), diag("HIGH_CORRELATION", size, w)]
+    zincite = [diag("FLOOR_HIT", strain), diag("COVARIANCE_DIRECTION_DISCARDED", size, strain, w)]
+    corundum = [diag("FLOOR_HIT", strain)]
+    table = suite_alarms.firing_table({key: SimpleNamespace(diagnostics=d) for key, d in
+                                       (("fluorite", fluorite), ("zincite", zincite),
+                                        ("corundum", corundum))})
+    assert table["standards"] == {
+        "fluorite": {"FLOOR_HIT": "warning", "HIGH_CORRELATION": "warning"},
+        "zincite": {"COVARIANCE_DIRECTION_DISCARDED": "warning"},
+        "corundum": {"FLOOR_HIT": "warning"},
+    }
+    assert table["n_results"]["FLOOR_HIT"] == 2
+    assert set(suite_alarms.ROUNDING) <= set(STANDARD_BY_KEY)
 
 
 @pytest.mark.slow
@@ -79,11 +122,6 @@ def test_brucites_correlation_findings_do_not_move_under_a_rounding_nudge():
         seen.append(sorted((d.code, tuple(d.where)) for d in fit.diagnostics
                            if d.level == "warning"))
     assert seen[0] == seen[1] == seen[2]
-
-
-#: The exactly degenerate width triple of the round-robin protocol
-#: (1/cos²θ = 1 + tan²θ): Gaussian size, Gaussian strain and Caglioti W.
-FLAT_TRIPLE = ("phases.0.gauss_size", "phases.0.gauss_strain", "instrument.profile.w")
 
 
 @pytest.mark.slow

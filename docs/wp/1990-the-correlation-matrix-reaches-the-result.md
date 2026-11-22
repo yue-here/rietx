@@ -2,7 +2,7 @@
 
 Milestone: unscheduled · Status: 🔄 2026-11-09 — six of seven tasks landed (#1475); the printed block and a joint fit's matrix wait on the maintainer
 Track: Render what the fit already knows
-Depends on: —
+Depends on: 1318 soft (the strain-surface band only, issue #1624)
 Priority: P3 2026-10-16 — a view over what the fit already computes; the one defect in it is a suggestion naming a field that does not exist, which misleads but changes no number
 
 ## Goal
@@ -61,6 +61,20 @@ and the Bérar–Lelann factor cancel in it, and it is the matrix the
 disagree.
 
 ### Inherited
+
+- **2026-11-21, issue triage (#1624 item 2): a second consumer, the strain surface's
+  confidence band.** WP-1318 (PR #1620, open on 2026-11-21) draws the Stephens strain surface
+  (`rx.viz.plot_strain_surface` over `crystallography.stephens.directional_sigma2`) with no
+  band. ε²(u) is linear in the S_HKL coefficients, so its variance in direction u is
+  mᵀ·Cov_S·m, with m the monomials at B⁻¹u and Cov_S = B_L·Cov_θ·B_Lᵀ over the Laue basis of
+  the `phases.i.microstrain.dof.k` entries. That needs the off-diagonal block, which a result
+  does not carry today (`top_correlations` keeps five pairs). A diagonal shortcut is wrong in
+  both directions (root CLAUDE.md, WP-1072), and WP-1318 declined it. This WP's ρ with the
+  rows' own esds gives Cov_θ = D·ρ·D, so the band can be built on this field once it exists.
+  WP-1318 closes with #1620, so the band is folded here as this field's first consumer: a
+  task drawing it on `plot_strain_surface`, after #1620 merges, with the out-of-cone region
+  handled as the figure handles it today. Checked at `c1033a0e8`: `directional_sigma2` and
+  `plot_strain_surface` are not on `main` yet.
 
 ## Non-goals
 
