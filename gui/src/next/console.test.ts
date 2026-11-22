@@ -1,11 +1,13 @@
 // The Console's lines by kind (WP-2212): the kinds, the two caps, the shared
-// panels' boundary, the runnable forms, and every writer's spelling.
+// panels' boundary, the runnable forms, every writer's spelling, the entries
+// the panel draws and the script the File menu exports.
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
-  EVENT_CAP, LINE_CAP, LINE_KINDS, eventLine, makeLine, pushLine, serverScript, sharedSay,
-  stageScript, structureScript, type Line, type LineKind,
+  EVENT_CAP, LINE_CAP, LINE_KINDS, clock, copyText, entries, eventLine, foldSummary, makeLine,
+  pieces, pushLine, serverScript, sharedSay, stageScript, structureScript, type Line,
+  type LineKind,
 } from "./console";
 
 const HERE = fileURLToPath(new URL("./", import.meta.url));
@@ -21,6 +23,7 @@ describe("a line", () => {
     expect(line.kind).toBe("event");
     expect(line.t).toBe(12.5);
     expect(line.text).toContain("stage_start");
+    expect(line.ev).toEqual({ kind: "stage_start", stage: "scale" });
   });
 });
 
@@ -99,5 +102,64 @@ describe("every writer under next/", () => {
       return !/^(p|ref|rx)\.|^p = rx\.Project\.open/.test(text) && !args.includes("null");
     });
     expect(unbound).toEqual([]);
+  });
+});
+
+describe("the entries the Console draws", () => {
+  const at = (kind: LineKind, text: string, entry?: number, extra: Partial<Line> = {}): Line =>
+    ({ ...makeLine(kind, text, undefined, 100), ...(entry === undefined ? {} : { entry }), ...extra });
+  const ev = (kind: string, data: Record<string, unknown> = {}) =>
+    eventLine({ seq: 1, kind, t: 101, data } as any);
+
+  it("group one action's lines, and fold a run's events under its call", () => {
+    const drawn = entries([
+      at("call", "ref.set_values({})", 1),
+      at("call", "ref.set_vary('a', True)", 1),
+      at("call", "p.fit()", 2, { run: true }),
+      ev("stage_start", { stage: "scale" }),
+      at("comment", "# view kept", 3),
+      ev("eval", { stage: "scale", n_eval: 4 }),
+    ]);
+    expect(drawn.map((e) => e.lines.map((l) => l.text))).toEqual([
+      ["ref.set_values({})", "ref.set_vary('a', True)"], ["p.fit()"], ["# view kept"]]);
+    // the eval that came after the comment still folds under the run's call
+    expect(drawn[1].events.map((l) => l.ev?.kind)).toEqual(["stage_start", "eval"]);
+    expect(drawn[2].events).toEqual([]);
+  });
+
+  it("open with the events from before any run on this page, under no call", () => {
+    const drawn = entries([ev("fit_end"), at("call", "p.fit()", 1)]);
+    expect(drawn[0].lines).toEqual([]);
+    expect(drawn[0].events).toHaveLength(1);
+  });
+
+  it("sum a fold as events, stages and evaluations", () => {
+    expect(foldSummary([
+      ev("fit_start"), ev("stage_start", { stage: "a" }), ev("eval", { stage: "a", n_eval: 1 }),
+      ev("eval", { stage: "a", n_eval: 7 }), ev("stage_end", { stage: "a" }),
+      ev("stage_start", { stage: "b" }), ev("eval", { stage: "b", n_eval: 5 }),
+    ])).toBe("7 engine events, 2 stages, 12 evaluations");
+    expect(foldSummary([ev("index_start")])).toBe("1 engine event");
+  });
+});
+
+describe("a line's drawing", () => {
+  it("cuts a call into plain runs, strings and a trailing comment", () => {
+    expect(pieces('ref.hold("a.b")  # 2 path(s)')).toEqual([
+      { text: "ref.hold(", cls: "" }, { text: '"a.b"', cls: "str" }, { text: ")  ", cls: "" },
+      { text: "# 2 path(s)", cls: "cm" }]);
+    // a # inside a string is the string's
+    expect(pieces("x = '#1'").map((p) => p.cls)).toEqual(["", "str"]);
+  });
+
+  it("prints the time of day as the prototype does", () => {
+    expect(clock(new Date(2026, 10, 22, 9, 5, 7).getTime() / 1000)).toBe("09:05:07");
+  });
+
+  it("copies the calls alone", () => {
+    const lines = [makeLine("call", "p.fit()"), makeLine("output", "done"),
+                   makeLine("comment", "# x"), makeLine("call", "ref.hold('a')")];
+    expect(copyText(lines)).toBe("p.fit()\nref.hold('a')\n");
+    expect(copyText([])).toBe("");
   });
 });

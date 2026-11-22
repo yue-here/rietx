@@ -33,6 +33,12 @@ export interface Line {
   t: number;
   /** a call's runnable form: absent is the text, `null` is none */
   script?: string | null;
+  /** which entry a non-event line belongs to (`entries`), stamped by the writer */
+  entry?: number;
+  /** a call that started a run, whose events fold under it */
+  run?: boolean;
+  /** an event's kind and the two fields the fold's summary counts */
+  ev?: { kind: string; stage?: string; n_eval?: number };
 }
 
 /** How a panel writes to the Console. */
@@ -50,7 +56,12 @@ export function makeLine(kind: LineKind, text: string, script?: string | null,
 
 /** An engine event as a Console line, stamped with the event's own time. */
 export function eventLine(event: EngineEvent): Line {
-  return makeLine("event", consoleLine(event), undefined, event.t ?? Date.now() / 1000);
+  const line = makeLine("event", consoleLine(event), undefined, event.t ?? Date.now() / 1000);
+  const data = event.data ?? {};
+  line.ev = { kind: event.kind };
+  if (typeof data.stage === "string") line.ev.stage = data.stage;
+  if (typeof data.n_eval === "number") line.ev.n_eval = data.n_eval;
+  return line;
 }
 
 /** Append `line`, dropping the oldest of its own class past that class's cap. */
@@ -113,4 +124,145 @@ const BOUND = /^(p|ref|rx)\./;
  */
 export function serverScript(text: string): undefined | null {
   return BOUND.test(text) && !text.includes("…") ? undefined : null;
+}
+
+/**
+ * What the Console draws: the lines grouped into entries, as the prototype
+ * draws them. An entry is one action's lines (a timestamp, its calls, what
+ * came back), written in one turn of the page's event loop: `Line.entry`
+ * says which, stamped by the writer. A run's engine events fold under the
+ * call that started it (the maintainer's ruling of 2026-11-21): they join
+ * the newest entry holding a `run` call, whatever was written since. Events
+ * from before any run on this page (a stream replayed at load) open the list
+ * in an entry of their own, with no call.
+ */
+export interface Entry {
+  id: number;
+  t: number;
+  lines: Line[];
+  events: Line[];
+}
+
+export function entries(lines: readonly Line[]): Entry[] {
+  const out: Entry[] = [];
+  let runEntry: Entry | null = null;
+  let earlier: Entry | null = null;
+  for (const line of lines) {
+    if (line.kind === "event") {
+      if (!runEntry && !earlier) {
+        earlier = { id: -1, t: line.t, lines: [], events: [] };
+        out.unshift(earlier);
+      }
+      (runEntry ?? earlier)!.events.push(line);
+      continue;
+    }
+    let last: Entry | undefined = out[out.length - 1];
+    if (!last || last === earlier || line.entry === undefined || last.id !== line.entry) {
+      last = { id: line.entry ?? -2, t: line.t, lines: [], events: [] };
+      out.push(last);
+    }
+    last.lines.push(line);
+    if (line.run) runEntry = last;
+  }
+  return out;
+}
+
+/** The fold's one line: how many events, and the stages and evaluations
+ *  they report. A stage's evaluations are its largest `n_eval`, which counts
+ *  every evaluation even where the stream thinned the events. */
+export function foldSummary(events: readonly Line[]): string {
+  const n = events.length;
+  const parts = [`${n} engine event${n === 1 ? "" : "s"}`];
+  let stages = 0;
+  const evals = new Map<string, number>();
+  for (const { ev } of events) {
+    if (!ev) continue;
+    if (ev.kind === "stage_start") stages += 1;
+    if (ev.kind === "eval" && ev.n_eval !== undefined) {
+      const key = `${stages}:${ev.stage ?? ""}`;
+      evals.set(key, Math.max(evals.get(key) ?? 0, ev.n_eval));
+    }
+  }
+  if (stages) parts.push(`${stages} stage${stages === 1 ? "" : "s"}`);
+  const total = [...evals.values()].reduce((a, b) => a + b, 0);
+  if (total) parts.push(`${total} evaluation${total === 1 ? "" : "s"}`);
+  return parts.join(", ");
+}
+
+/** A time of day as the prototype prints it, `HH:MM:SS`. */
+export function clock(t: number): string {
+  const d = new Date(t * 1000);
+  return [d.getHours(), d.getMinutes(), d.getSeconds()]
+    .map((v) => String(v).padStart(2, "0")).join(":");
+}
+
+/** A call cut into plain runs, string literals and a trailing comment: the
+ *  two syntax classes the Console colours. */
+export type Piece = { text: string; cls: "" | "str" | "cm" };
+
+export function pieces(text: string): Piece[] {
+  const out: Piece[] = [];
+  const re = /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')|(#.*$)/g;
+  let at = 0;
+  for (const m of text.matchAll(re)) {
+    const start = m.index ?? 0;
+    if (start > at) out.push({ text: text.slice(at, start), cls: "" });
+    out.push({ text: m[0], cls: m[1] ? "str" : "cm" });
+    at = start + m[0].length;
+  }
+  if (at < text.length) out.push({ text: text.slice(at), cls: "" });
+  return out;
+}
+
+/** What Copy takes: the calls alone, one per line, without prompts,
+ *  timestamps or output (the prototype's Copy). */
+export function copyText(lines: readonly Line[]): string {
+  const calls = lines.filter((l) => l.kind === "call").map((l) => l.text);
+  return calls.length ? calls.join("\n") + "\n" : "";
+}
+
+/**
+ * The session as a Python script: File › Export › Console as a Python script.
+ *
+ * Built from the page's uncapped store of calls, so a long session's start
+ * is never lost to the Console's cap. The preamble binds the names the calls
+ * use (`rx`, `p`, `ref`, the prototype's spelling) and opens the project
+ * named on the command line, because the script changes the project it
+ * opens and is meant for a copy: running it on the original would repeat
+ * every step on top of the session's own. A call echoed as
+ * `p = rx.Project.open(…)` is the window opening this project, which the
+ * preamble does. A call with no runnable form is written as a comment, and
+ * the head says how many there are, so a reader knows the script may not
+ * reach the session's state. The project's settings are saved at the end,
+ * as the GUI saves them on each verb.
+ */
+export function sessionScript(calls: readonly Line[], projectPath: string,
+                              when: Date = new Date()): string {
+  const name = projectPath.replace(/[\\/]+$/, "").split(/[\\/]/).pop()!.replace(/\.rex$/, "");
+  const body: string[] = [];
+  let skipped = 0;
+  for (const line of calls) {
+    if (line.kind !== "call" || line.text.startsWith("p = rx.Project.open(")) continue;
+    if (line.script === null) {
+      skipped += 1;
+      body.push(`# not repeated: ${line.text}`);
+    } else {
+      body.push(line.script ?? line.text);
+    }
+  }
+  const day = [when.getFullYear(), when.getMonth() + 1, when.getDate()]
+    .map((v) => String(v).padStart(2, "0")).join("-");
+  const head = [
+    `# ${name}: the rietx GUI session of ${day}, as a script.`,
+    `# The session ran on ${projectPath}.`,
+    "# The script changes the project it opens, so run it on a copy:",
+    `#   python ${name}.py path/to/copy.rex`,
+  ];
+  if (skipped) {
+    head.push(`# ${skipped} of its ${body.length} steps are comments: the window ran them,`,
+              "# and this script does not repeat them, so it may not reach the same state.");
+  }
+  return [...head, "import sys", "", "import rietx as rx", "",
+          "p = rx.Project.open(sys.argv[1])", "ref = p.refinement", "",
+          ...body, ...(body.length ? [""] : []), "p.save()", ""].join("\n");
 }

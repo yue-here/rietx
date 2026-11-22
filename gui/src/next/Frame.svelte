@@ -253,9 +253,40 @@
     write(makeLine(kind, text, script));
   }
 
-  function write(line: Line) {
+  /**
+   * Start a run behind its call: the run's events fold under it. The call is
+   * written before the request, since the stream can deliver the run's first
+   * events before the route answers; a refused run takes it back, so neither
+   * the Console nor the script holds a call that never ran.
+   */
+  async function startRun(body: any, text: string, script?: string) {
+    const line = write({ ...makeLine("call", text, script), run: true });
+    try {
+      run = await api.run(body);
+    } catch (error) {
+      lines = lines.filter((l) => l !== line);
+      calls = calls.filter((l) => l !== line);
+      throw error;
+    }
+  }
+
+  /** The entry the lines written in this turn of the event loop share: one
+   *  action's echoes land together, so they draw under one timestamp. */
+  let entry = 0;
+  let entryOpen = false;
+
+  function write(line: Line): Line {
+    if (line.kind !== "event") {
+      if (!entryOpen) {
+        entry += 1;
+        entryOpen = true;
+        queueMicrotask(() => (entryOpen = false));
+      }
+      line = { ...line, entry };
+    }
     lines = pushLine(lines, line);
     if (line.kind === "call") calls = [...calls, line];
+    return line;
   }
 
   /** What the two shared panels write through (`console.ts:sharedSay`). */
@@ -313,6 +344,8 @@
 
   async function opened(doc: any) {
     await leaveEdits();
+    // the script is this project's session: another project's calls are not
+    calls = [];
     project = doc;
     openError = "";
     newOpen = false;
@@ -546,8 +579,7 @@
           return;
         }
       }
-      run = await api.run({ kind: "stage", stage });
-      say("call", echo, stageScript(stage));
+      await startRun({ kind: "stage", stage }, echo, stageScript(stage));
     } catch (error) {
       say("refusal", `refused: ${(error as Error).message}`);
     } finally {
@@ -563,11 +595,10 @@
     try {
       if (touched && !(await applyPending())) return;
       if (mode === "plan") {
-        run = await api.run({ kind: "fit" });
-        say("call", "p.fit()");
+        await startRun({ kind: "fit" }, "p.fit()");
       } else {
-        run = await api.run({ kind: "stage", stage: { name: "cycle", turn_on: [] } });
-        say("call", 'p.run_stage(rx.Stage("cycle", turn_on=[]))');
+        await startRun({ kind: "stage", stage: { name: "cycle", turn_on: [] } },
+                       'p.run_stage(rx.Stage("cycle", turn_on=[]))');
       }
     } catch (error) {
       say("refusal", `refused: ${(error as Error).message}`);
