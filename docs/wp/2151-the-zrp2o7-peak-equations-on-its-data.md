@@ -196,6 +196,63 @@ script stays runnable from the repository root.
   Lorentzian returns to the input's. It is not checked, since TOPAS is closed. WP-2153's
   § Practice reading of the Technical Reference is where to check it.
 
+  *Tests.* The branch adds none and changes no code under `src/`. Fast selection at
+  `fabd51554`: 15124 passed, 443 skipped, 32 xfailed in 522 s (`[dev]`, macOS arm64). The
+  full selection did not run, since nothing here moves a measured number.
+
+  *Review.* `/code-review high --fix` found eight problems, one important. The TOPAS page
+  said to seed w above zero, but silicon's stored w is already positive and its z takes
+  the width negative. Seven were fixed (`fabd51554`). Declined: regenerating
+  `zrp2o7_formula_results.txt`, which is WP-1964's record and would carry data into the
+  tree. The documented command now writes to `~/.cache`.
+
+  *Generality* (the `generality-review` judge, 2026-11-22; its verdicts and reasons, condensed from its tables, in its words):
+
+  > **Item 1, the `PEAK_WIDTH_NOT_POSITIVE` skill row's new sentence: weak.** The case for
+  > the remedy is stronger, because it is arithmetic and was measured. But the sentence is
+  > written for the whole code, and it is true for only half of it. The arithmetic holds
+  > for Γ_G² alone. A Γ_L below zero at every reflection still has a gradient. Its
+  > "Measured" tag also cites a χ² drop rather than the mechanism. [Q2] The forward model
+  > clamps Γ_G² at the floor `caglioti._MIN_GAMMA_G2` (1e-8 deg²) with a select
+  > (`caglioti.py:306`); the equation's Gaussian column is set to zero there
+  > (`forward.py:1568-1569`, `1628-1629`). Γ_L has no clamp (`caglioti.py:342`; its column
+  > is `d_l = g`, `forward.py:1625`). [Q3] (a) Someone porting from TOPAS who knows how
+  > TOPAS reads a negative Γ_G² would copy that reading rather than reseed;
+  > `docs/practice.md:181` records TOPAS's handling as "undocumented". (b) On a Γ_L firing,
+  > no refiner would reseed for a gradient reason. (c) Which term to raise is a detail of
+  > the seed. [Q4] Strong: silicon's x went 0.00984 → −0.01845 ± 0.00291 and y 0.03434 →
+  > 0.07119 ± 0.00109; seeded, both return to 0.00984 and 0.03445; χ² 201508 → 197574 on the
+  > same 1167 free. Practice (`practice.md:175-184`): none of the seven programs goes on to
+  > a usable fit from such a start. [Q5] Tier 1 for Γ_G²; the tag cites a χ² comparison,
+  > which CLAUDE.md bars as evidence for an action. [Q6] One family, development data;
+  > acceptable for an arithmetic claim. [Q7] The message names the component and the
+  > count. *What would change the verdict:* rewording to "Γ_G² below zero at every
+  > reflection" and tagging the mechanism (zero gradient on the floor) in place of the Δχ²
+  > would make this `holds`.
+  >
+  > **Item 2, `docs/docs/switching/topas.md`, the paragraph after the peak-equation table:
+  > holds.** Both claims are exact arithmetic and the run confirmed each. Both remedies
+  > leave the fitted widths unchanged or are only starting values. The case against is a
+  > TOPAS convention that nobody can check, plus the input's own authors, who freed all
+  > six terms. [Q3] (a) The input's authors refined all six terms; the page gives the
+  > consequence rather than a command, which suits that. (b) A refiner who reads z as
+  > Gaussian size would hold u or w from a standard instead (`practice.md:225-229`).
+  > (c) The page asks TOPAS users to reseed without saying that TOPAS's own handling of a
+  > negative Γ_G² is undocumented (`practice.md:181`). *What would change the verdict:* a
+  > reading of TOPAS's Technical Reference (WP-2153's task) showing that TOPAS reads a
+  > negative Γ_G² some other way.
+  >
+  > **Item 3, `zrp2o7_formula.py` arm (e), the lift to a smallest Γ_G² of 0.002 deg²:
+  > holds as evidence; not a heuristic in my scope.** The script sits outside `src/rietx`,
+  > so the audit table cannot reach it, and it decides nothing for any caller. The fit
+  > moved w from its seed of 0.02344 to 0.03011, about 13 esd away, so the landing is the
+  > data's, not the seed's. *What would change the verdict:* a second lift landing on
+  > different silicon coefficients.
+
+  Author's answer: item 1 is reworded as the judge says, naming Γ_G², n of n and the zero
+  gradient on the floor, with no Δχ² in the tag (`a767b0871`). Item 2's (c) is added to
+  the page in one sentence.
+
   *Settled by Claude* (the grounds in brackets): the reported coefficients come from the
   z-held fit (1/cos²θ = 1 + tan²θ, an exact reparameterisation; measured χ² equal). The
   Si-seeded fit is added to measure the cost of the `PEAK_WIDTH_NOT_POSITIVE` firing (the
