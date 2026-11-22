@@ -464,9 +464,10 @@ line if the checkpoint ended it. Close with
      `gh pr view N --json maintainerCanModify` says true; otherwise ask the
      contributor in the review.
 6c. **What a reader receives** (ruled 2026-11-01). The package should pass no
-   junk back to a reader, a person or an agent, so every change to what a
-   reader receives goes to the user before merge. A PR changes it when either
-   holds:
+   junk back to a reader, a person or an agent. Since 2026-11-22 (WP-2237)
+   each change is settled here, checked blind, and the user reads the whole
+   diff once per release (`docs/RELEASING.md` step 2). A PR changes it when
+   either holds:
    - `.venv/bin/python -m tests.reader_output`, run in the bench on the merged
      tree, exits 1. It prints the diff of one standard fit's printed result,
      report and diagnostics against the base (about 25 s).
@@ -474,8 +475,10 @@ line if the checkpoint ended it. Close with
      generated `docs/skill/rietx/references/api*.md`. A diagnostic code new
      to the audit table (step 6b's printout) counts too.
 
-   Either way it is a question for the batch: the before and after text, and
-   your reading of whether each added line tells this fit's reader something.
+   Either way, read whether each added line tells this fit's reader something,
+   then give a fresh subagent the before and after text without your reading
+   and have it judge the same. Agreement settles the PR; a disagreement goes
+   to the batch with both readings.
    A line that reads the same for every fit, repeats another field, or gives
    no action is the junk the ruling names. #1266 added 930 characters to every
    report that way, and it reached the user only because its author flagged it.
