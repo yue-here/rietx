@@ -1,6 +1,6 @@
 # WP-2212 — console lines by kind: the `>>>` prompt and the session as a script
 
-Milestone: gui-overhaul · Status: ✅ 2026-11-22 — the Console reads as the session in Python, and every padlock is the drawn one (PR #1764, PR #PRNUM)
+Milestone: gui-overhaul · Status: ✅ 2026-11-22 — the Console reads as the session in Python, and every padlock is the drawn one (PR #1764, PR #1775)
 Depends on: 2214 (the rebuild's plan: it builds on piece R1's bottom panel)
 
 ## Goal
@@ -212,7 +212,7 @@ The browser files skip in CI (no playwright there), so the PR quotes their local
 
 ## Handover log
 
-- **2026-11-22** — PR #PRNUM, the look. The maintainer looked at the Console's screens and ruled on the
+- **2026-11-22** — PR #1775, the look. The maintainer looked at the Console's screens and ruled on the
   six choices the first PR had built conventionally, and this closes the WP. Three changed. An
   echoed dict or list now reads as Python writes it, `{"instrument.zero_shift": 0.01}`, so
   each Console line is a line of the script it exports. The session's first output line gives
