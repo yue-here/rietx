@@ -1,6 +1,6 @@
 # WP-2235 — predict on a grid says which peak cut it draws
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-22 — claimed by ghostshift runner (Claude)
 Track: A long run is not one fit
 Depends on: —
 Priority: P3 2026-11-21 — the manual and a docstring state a difference between `predict`'s two forms that is 200× too small; no fit moves, and the docstring's own recipe is the workaround
