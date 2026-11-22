@@ -186,6 +186,16 @@ attention), in place of "Settle every call you can". Two runs an arm, same items
 
 Cost: four agents at about 114k tokens each, 457k against a 450k estimate.
 
+## The first blind check (2026-11-22)
+
+Applied to PR #1768 (WP-2009), whose last step was the maintainer's read of every
+reworded rule. The author's reading and this session's both found no change of meaning.
+A fresh Opus agent given the diff without either reading found one rule deleted outright
+and six changed instructions, plus a wrong fact and a dropped pointer; all were real and
+are fixed on that branch (96120fa8d). It cost 239k tokens. The check caught what a read by
+the doer did not, which is the case for part 1's checker; it did not need to be a saved
+agent definition, since the dispatch prompt carried the question.
+
 ## Tasks
 
 - [x] Hindcast test (above).
