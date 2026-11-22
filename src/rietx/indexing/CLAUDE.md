@@ -40,9 +40,8 @@ rules. **`high` requires zero caveats**, and `IndexCaveat`/`INDEX_REFUTING_CAVEA
 reversed question is asked of inputs a candidate cannot buy, at the measured resolution**
 (C3, #916, `screen.py`: peak list + picker's envelope + the one overlap rule, after the
 common shift the forward matches imply) — never the candidate's own Le Bail fit
-(magnetite's wrong P description bought a negative background and read 0 of 163 absent,
-WP-1043) and never the search window (±0.15° on a 0.023° FWHM read a resolved split as
-*supported*). The oversized cell is **capped** by the line screen (`predicted_but_absent`,
+(WP-1043) and never the search window (a ±0.15° window
+read a resolved split as *supported*). The oversized cell is **capped** by the line screen (`predicted_but_absent`,
 the windowed uncancellable count) and **refuted** by the generalised supercell check; the
 whole-profile fit — **Pawley**, since one Le Bail pass stalls (WP-2011) — stays **mandatory
 for the forward direction** (`unmatched_observed`, Rwp for a reader; `freeze_profile` is
@@ -51,7 +50,7 @@ gets ~nothing, so it fires on 68 % of the truth's reflections against 55 % of a 
 cell's), nor `unmatched_observed` as a caveat (its level is the *specimen's* — 10-188
 across 21 correct candidates — comparative only, WP-1041). **The validation fit holds the
 cell**, freeing exactly one peak-position parameter from the candidate's own shift
-template, and its Chebyshev background is **sized from the data**, or a band's maxima read
+template, and its Chebyshev background is **sized from the data**, or a band reads
 as lines (WP-2113). On real data with no measured shift, `high` is *unreachable* by design
 (`shift_allowance_assumed`); the fix is evidence, not a bigger constant (WP-1026).
 
