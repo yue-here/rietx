@@ -458,9 +458,9 @@ COLLECT_DATA_CONFIDENCE = 0.5
 
 #: Le Bail gap (WP-1057) — the structural-vs-profile triage statistic.
 #: ``LEBAIL_GAP_CYCLES`` partition cycles at the frozen converged state: the
-#: fixed point is reached by cycle 2 on the LaB₆ pore-proxy fixture
-#: (Rwp_lebail 0.01708 after one cycle, 0.01706 from two onward, 2026-11-02),
-#: so 5 is margin, not tuning.  ``LEBAIL_GAP_NOTABLE`` is the ratio above
+#: partition sits at its fixed point by 5 cycles on one family of three
+#: (WP-2017 group Q); on FAP and cpd-1a more cycles still raise the ratio, so
+#: 5 is a setting, not a converged value.  ``LEBAIL_GAP_NOTABLE`` is the ratio above
 #: which the summary quotes the gap; measured separation on the same fixtures:
 #: 2.36 on the pore proxy (re-measured 2026-11-02; guest scatterer in truth
 #: only — intensity model wrong) against ≤ 1.00 on every position/profile

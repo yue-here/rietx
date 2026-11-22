@@ -3447,8 +3447,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
     "MODEL_FAR_FROM_DATA": HelpEntry(
         title="The model does not describe the data",
         description=(
-            "Rwp is so high that the model does no better than one that predicts no "
-            "intensity. This is a mismatch between model and data. The optimiser can "
+            "The fit's chi-squared is no better than a refit of the background alone "
+            "(Hamilton's ratio test at the 0.05 level), so the model explains none of the "
+            "peaks. This is a mismatch between model and data. The optimiser can "
             "still report convergence, because a zero phase scale is a minimum once the "
             "peaks sit far from the data. Do not read the parameters or their esds. "
             "Check the cell, the wavelength, the zero shift and the 2θ range. Re-index "

@@ -171,6 +171,8 @@ def test_the_second_phase_is_on_the_record_and_on_no_code(planted):
     at, end = EVENT_AT["second_phase"], EVENT_AT["transition"]
     run = planted.entries[at:end]
     ratios = [e.rwp_over_median for e in run]
+    # 1.9, not 2: group K's quarantine changes the series median these ratios
+    # divide by, so the rise is slightly smaller; do not loosen it further.
     assert ratios == sorted(ratios) and ratios[-1] > 1.9 * ratios[0]
     gof = [e.statistics.gof for e in run]
     rexp = [e.statistics.rexp for e in run]

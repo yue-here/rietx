@@ -1123,7 +1123,9 @@ def test_a_blocked_fit_lands_on_the_dense_answer(n):
 #: The margin `DENSE_JACOBIAN_MAX_BYTES`'s answer-invariance is held to, in
 #: plain esd: WP-2017 group D's largest shift between the two layouts on a real
 #: joint family (0.00503 on the CuCr2O4 ramp's cell b, 11-BM), which is the same
-#: ramp's own rounding-noise arm (0.00503).  Stated from that measurement, not
+#: ramp's own rounding-noise arm (0.00503) and sits just above this 0.005 bar:
+#: the bar is the margin the test holds the *library* to (about 1e-5), not a
+#: bound on that ramp.  Stated from that measurement, not
 #: tuned on this library, which moves about 1e-5.
 LAYOUT_INVARIANCE_MARGIN_ESD = 0.005
 

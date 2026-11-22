@@ -91,8 +91,12 @@ _MIN_GAMMA_G2 = 1e-8  # deg²; keeps Γ_G real when U,V,W make the quadratic dip
 #: (Scherrer, 1918, Nachr. Ges. Wiss. Göttingen, Math.-Phys. Kl. 1918, 98-100 —
 #: the primary record's volume is the year, not the "26" the constant is usually
 #: quoted with; Langford & Wilson, 1978, J. Appl. Cryst. 11, 102-113 tabulate K
-#: by crystallite shape *and* by which width measure is used — 0.89 for the FWHM
-#: of a sphere against 1.0747 for its integral breadth).  Shape moves it by
+#: by crystallite shape *and* by which width measure is used; their § 3 says the
+#: FWHM constant "does not display a wide variation with hkl or crystallite shape
+#: and a value of 0·90 may be taken as a first approximation", so 0.9 is their
+#: own value, not a rounding of 0.89.  Their size is the cube root of the
+#: crystallite volume, for crystallites of one size; they give 0.829 for spheres.
+#: GSAS-II's code implies K = 1.0).  Shape moves it by
 #: ~10-20 %, so an apparent size is an order-of-magnitude statement and never a
 #: quotable two-figure one; K is an argument everywhere below so a caller with a
 #: known morphology can say so.

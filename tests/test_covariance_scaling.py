@@ -608,7 +608,8 @@ def test_a_psd_matrix_keeps_numpys_bits():
 DEAD_COLUMN_W_REL = 1e-12
 #: a live floored row's own esd may move this much, relative, under the same
 #: steps.  Measured 1.7e-5 on this state (2026-11-19, macOS arm64): the column
-#: is differenced, so its esd carries the difference's error, and a row whose
+#: is differenced, so its esd carries the difference's error (margin 5.9 over
+#: the measurement, one platform: no cross-platform spread measured yet), and a row whose
 #: esd followed the step (cpd-1a's 51, 511, 4.26 in WP-2017 group N) fails.
 LIVE_FLOOR_ESD_REL = 1e-4
 

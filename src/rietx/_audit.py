@@ -3252,13 +3252,22 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.model.geometry.ANGLE_LINEARISATION_LIMIT_DEG", "constant", tier=1, value=0.002562345120281331,
         evidence=("physics: a straight angle is a stationary point of the coordinates; value "
                   "inherits restraints._COS_CLAMP with no free factor")),
-    Row("rietx.model.geometry.BOND_SLACK_ANG", "constant", tier=2, value=0.4,
+    Row("rietx.model.geometry.BOND_SLACK_ANG", "constant", tier=3, value=0.4,
         evidence=("CSD bond-perception convention (radii sum + 0.4 A), named in WP-1072; radii are "
                   "Cordero 2008, checked in the docstring (not checked by me); WP-2017 group S, "
                   "2026-11-17: no source held states the rule (WP-1072 names 'the CSD 0.4 A slack' "
                   "without one, and the docstring cites it to nobody), nor whether it pairs 0.4 A "
                   "with CSD's own radii or Cordero's; Cordero et al. (2008) Dalton Trans. (21), "
-                  "2832-2838, doi:10.1039/b801115j, gives the radii only and is not held")),
+                  "2832-2838, doi:10.1039/b801115j, gives the radii only and is not held; the CSD's own "
+                  "rule (Bruno, Shields & Taylor 2011, Acta Cryst. B67, 333, section 3, p. 337, "
+                  "as cited in Yue's review of #1577): per-pair limits from the CCDC covalent "
+                  "radii plus 0.45 A, or Kerr's radii plus 0.40 A for s-block to p-block "
+                  "pairs, then tuned by hand; rietx uses Cordero's radii with 0.40 A for every "
+                  "pair, so no program default matches"),
+        grounds=("Our own chosen band: it decides which loop a row is listed in and nothing "
+                 "else (a pair past it is still reported, as a contact); kept at 0.40 A "
+                 "(Yue's review of #1577, 2026-11-21)."),
+        approved="2026-11-21"),
     Row("rietx.model.geometry.CONTACT_MAX_ANG", "constant", tier=1, value=3.5,
         evidence=("report scope (tier 1's cap clause, ruled 2026-10-21): every contact within "
                   "3.5 A is listed, in an unreduced cell where a fixed one-cell shell drops a "
@@ -3350,13 +3359,16 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic: FWHM = 2 sqrt(2 ln2) sigma; pinned against GSAS-II's drawn LaB6 "
                   "peaks, tests/test_gsas2_instprm.py")),
     Row("rietx.model.profiles.caglioti.SCHERRER_K", "constant", tier=2, value=0.9,
-        evidence=("Scherrer (1918); Langford & Wilson (1978) J. Appl. Cryst. 11, 102 (0.89 sphere "
-                  "FWHM; docstring; not checked); WP-2017 group S, 2026-11-17: metadata confirmed "
+        evidence=("Scherrer (1918); Langford & Wilson (1978) J. Appl. Cryst. 11, 102, section 3: K "
+                  "\"does not display a wide variation with hkl or crystallite shape and a value "
+                  "of 0.90 may be taken as a first approximation\" (their size is the cube root "
+                  "of the crystallite volume, for crystallites of one size), so 0.9 is their own "
+                  "value, not a rounding of 0.89; the paper gives 0.829 for spheres; GSAS-II's "
+                  "code implies K = 1.0 (Yue's review of #1577, 2026-11-21); WP-2017 group S, 2026-11-17: metadata confirmed "
                   "(Scherrer, Nachr. Ges. Wiss. Goettingen, Math.-Phys. Kl. 1918, 98-100; Langford "
                   "& Wilson 11, 102-113, doi:10.1107/S0021889878012844) and K is applied to a FWHM "
                   "(caglioti.apparent_size), the right family for a FWHM constant; neither source "
-                  "held, so the 0.89 and which size definition it belongs to are unchecked, and "
-                  "0.9 rounds it by 1 %")),
+                  "held here")),
     Row("rietx.model.profiles.caglioti._MIN_GAMMA_G2", "constant", tier=3, value=1e-08,
         evidence=("Gaussian-variance floor (WP-2002, 2026-10-21, tests/test_gaussian_width_floor.py): "
                   "max |dy|/sigma at fixed parameters 0 on SRM 660c, FAP and NAC and 4.8e-9 on cpd-1a; "
@@ -4242,7 +4254,7 @@ ROWS: tuple[Row, ...] = (
         evidence=("linear-algebra round-off: R.v - v of an allowed mode vector is ~1e-15, a "
                   "forbidden one O(1) (docstring, WP-1419); tests/test_distortion_block.py::"
                   "test_a_mode_vector_its_site_does_not_allow_is_refused")),
-    Row("rietx.params.vector.FLOOR_SEED_DEG", "constant", tier=1, value=0.001,
+    Row("rietx.params.vector.FLOOR_SEED_DEG", "constant", tier=3, value=0.001,
         evidence=("numerical setting (B10, ruled 2026-10-19; Q22b, settled 2026-11-17): "
                   "FLOOR_SEEDS' size, the forward-difference typical of a width row bounded at "
                   "0 (optimize.least_squares._fd_typicals, WP-1936), which sets how accurately "
@@ -4261,8 +4273,13 @@ ROWS: tuple[Row, ...] = (
                   "column has no esd and leaves W's within 1e-12 at x10 and /10, a live one "
                   "keeps its marginal esd within 1e-4); a gauss_size column at 0 is live "
                   "(it adds to the Gaussian variance linearly), so what moved cpd-1a's is "
-                  "open (PR #1577)")),
-    Row("rietx.params.vector.FLOOR_SEED_UM2", "constant", tier=1, value=0.001,
+                  "open (PR #1577)"),
+        grounds=("The cpd-1a width and W esds follow the finite-difference step (51, 511, 4.26 "
+                 "at x1, x10, /10), and Q22a says a live column's esd should not depend on it; "
+                 "tier 3 as _MIN_GAMMA_G2. A test on that real state showing the esds steady "
+                 "would move it back to tier 1 (Yue's review of #1577, 2026-11-21)."),
+        approved="2026-11-21"),
+    Row("rietx.params.vector.FLOOR_SEED_UM2", "constant", tier=3, value=0.001,
         evidence=("numerical setting (B10, ruled 2026-10-19; Q22b, settled 2026-11-17): "
                   "FLOOR_SEEDS' size, the forward-difference typical of a width row bounded at "
                   "0 (optimize.least_squares._fd_typicals, WP-1936), which sets how accurately "
@@ -4281,7 +4298,12 @@ ROWS: tuple[Row, ...] = (
                   "column has no esd and leaves W's within 1e-12 at x10 and /10, a live one "
                   "keeps its marginal esd within 1e-4); a gauss_size column at 0 is live "
                   "(it adds to the Gaussian variance linearly), so what moved cpd-1a's is "
-                  "open (PR #1577)")),
+                  "open (PR #1577)"),
+        grounds=("The cpd-1a width and W esds follow the finite-difference step (51, 511, 4.26 "
+                 "at x1, x10, /10), and Q22a says a live column's esd should not depend on it; "
+                 "tier 3 as _MIN_GAMMA_G2. A test on that real state showing the esds steady "
+                 "would move it back to tier 1 (Yue's review of #1577, 2026-11-21)."),
+        approved="2026-11-21"),
     Row("rietx.params.vector.PARENT_STRAIN_PD_MARGIN", "constant", tier=1, value=1e-09,
         evidence=("numerical floor: the box sum 2|s_j|.|E_j|_2 < lambda_min(C) keeps the child metric "
                   "positive definite (Weyl's inequality, Horn & Johnson, Matrix Analysis, 2nd ed., "
@@ -4488,17 +4510,22 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.report.schemas.EXCHANGEABLE_MIN_R2", "constant", value=0.9),
     Row("rietx.report.schemas.EXCHANGE_PARTNER_MIN_SIGNIFICANCE", "constant", value=5.0),
     Row("rietx.report.schemas.IMPURITY_SHIFT_CAP", "constant", value=0.3),
-    Row("rietx.report.schemas.LEBAIL_GAP_CYCLES", "constant", tier=1, value=5,
+    Row("rietx.report.schemas.LEBAIL_GAP_CYCLES", "constant", tier=3, value=5,
         evidence=("numerical setting (B10; the lead's settlement of Q27, 2026-11-17): the "
-                  "cycles of the Le Bail partition the gap read runs, 0.07 of the ratio at most "
-                  "(FAP, 5 cycles against 20); WP-2004 enters the row. WP-2017 group Q (2026-11-16, Linux "
+                  "cycles of the Le Bail partition the gap read runs, 0.077 of the ratio at most "
+                  "(cpd-1a, 5 cycles against 20: 0.549 to 0.626); WP-2004 enters the row. WP-2017 group Q (2026-11-16, Linux "
                   "x86_64): the gap read at 2, 5 and 20 cycles from one converged Rietveld state "
                   "(n_cycles echoed back) is 0.977, 0.978, 0.978 on LaB6+cBN, 0.536, 0.549, 0.626 "
                   "on cpd-1a and 0.764, 0.980, 1.052 on FAP, so the partition sits at its fixed "
                   "point by 5 cycles on one family of three, not claimed for the others; on FAP and cpd-1a more cycles raise "
                   "the ratio (5 cycles under-reads FAP's by 0.07); every arm is a correct model "
                   "and none comes near LEBAIL_GAP_NOTABLE (1.5), so no arm here could change that "
-                  "verdict")),
+                  "verdict"),
+        grounds=("A numerical setting whose fixed-point claim holds on one family of three "
+                 "and no test reads it; a later change could stop the partition at "
+                 "LEBAIL_CONVERGED_REL instead, which would retire the constant "
+                 "(Yue's review of #1577, 2026-11-21)."),
+        approved="2026-11-21"),
     Row("rietx.report.schemas.LEBAIL_GAP_NOTABLE", "constant", value=1.5),
     Row("rietx.report.schemas.MAGNETIC_WIDTH_MIN_REFLECTIONS", "constant", value=2),
     Row("rietx.report.schemas.MAGNETIC_WIDTH_MOMENT_SHIFT_SIGMA", "constant", value=1.0),
