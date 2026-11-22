@@ -5,6 +5,7 @@ This page gives what a `RefinementResult` carries beside the refined values: the
 `Refinement.fit` and `refine` return a `RefinementResult`.
 [API: everyday calls](api.md#results) lists every field.
 The refined values are `RefinementResult.parameters`, one row per parameter with its esd, and `RefinementResult.parameter` looks one up by path.
+A row's esd is `None` where the data do not determine the parameter: it measured nothing, or it lies on a combination the covariance discards ([Why a direction the data do not move has no esd](../concepts/correlations.md#why-a-direction-the-data-do-not-move-has-no-esd)).
 [Derived quantities](derived.md) gives the distances, angles, cell volumes, sizes and strains a fit computes from them.
 
 The IUCr guidelines rank this evidence differently from a table of R values.

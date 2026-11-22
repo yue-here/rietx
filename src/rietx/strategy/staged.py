@@ -187,7 +187,7 @@ class Stage:
     #: is ~0.1°); a fit that *tests a hypothesis it must not walk toward* —
     #: the indexing Le Bail validation, whose candidate may be metrically
     #: wrong by design — declares the capture range its verdict needs
-    #: (``indexing.workflow.VALIDATION_WINDOW_SLACK_DEG``).  ``None`` = the
+    #: (``indexing.workflow.VALIDATION_SLACK_BOUNDS_DEG``).  ``None`` = the
     #: default; frozen at stage compile like every other discrete choice.
     window_slack_deg: float | None = None
     #: path globs this stage **fixes** after it frees ``turn_on`` (WP-2208,
@@ -400,7 +400,7 @@ class RefinementPlan:
     #: converge only by alternating.  ``1`` is the single run every fit made
     #: before this field, bit for bit.  Above 1 under ``mode="lebail"``,
     #: ``Refinement.fit`` repeats the plan, keeps the best pass and records why
-    #: it stopped (:data:`LEBAIL_ALTERNATION_STOPPED`).  Ignored in every
+    #: it stopped (``LEBAIL_ALTERNATION_STOPPED``).  Ignored in every
     #: other mode, where there is nothing to alternate.
     lebail_passes: int = 1
     #: the absent-phase hold's threshold, in esds of the phase's scale against
@@ -492,7 +492,7 @@ class RefinementPlan:
         """The tolerance each stage runs at, in order — the one authority.
 
         Both runners ask this rather than reading ``stage.ftol``
-        (``Refinement._run_stage`` through ``fit``, ``MultiRefinement.fit``),
+        (``Refinement._run_stage`` through ``fit``, ``MultiHistogramRefinement.fit``),
         because the answer needs a fact no stage has: **whether it is the
         last**.  A plan is the only object that knows, so the rule lives here
         and is applied once per fit instead of restated per call site.
@@ -1235,6 +1235,17 @@ class GuardFinding:
                    f"over the sphere)")
 
     @classmethod
+    def nonpositive_peak_width(cls, paths: tuple[str, ...], component: str,
+                               n_bad: int, n_total: int, worst: float, unit: str,
+                               hkl: str) -> "GuardFinding":
+        """A phase's width equations (``paths``, one per equation) driving
+        ``component`` (Γ_G² or Γ_L) below zero at ``n_bad`` of its ``n_total``
+        fitted reflections (WP-2107, :func:`check_peak_width_positive`)."""
+        return cls("PEAK_WIDTH_NOT_POSITIVE", tuple(paths), float(worst),
+                   f"{' and '.join(paths)} ({component} below zero at {n_bad} of {n_total} "
+                   f"reflections, worst {worst:+.2e} {unit} at {hkl})")
+
+    @classmethod
     def unsupported_resolution(cls, freed: tuple[str, ...], share: float,
                                n_lorentzian: int, n_total: int) -> "GuardFinding":
         names = ", ".join(path.rsplit(".", 1)[1].upper() for path in freed)
@@ -1349,6 +1360,9 @@ class GuardReport:
     # phases whose spherical-harmonics pole density dips below zero on the
     # sphere (WP-1960, see check_texture_positive)
     nonpositive_texture: list[GuardFinding] = field(default_factory=list)
+    # phases whose width peak equations take Γ_G² or Γ_L below zero at a
+    # fitted reflection (WP-2107, see check_peak_width_positive)
+    nonpositive_peak_width: list[GuardFinding] = field(default_factory=list)
     # the instrument resolution function dipping below zero somewhere in the
     # fitted range — a variance the forward model then clamps to a floor
     # (see check_resolution_positive)
@@ -1407,7 +1421,7 @@ class GuardReport:
         rule, since a declared name whose reader is missing fails no test)."""
         return [*self.high_correlations, *self.at_bounds, *self.nonpositive_adps,
                 *self.nonpositive_strain, *self.nonpositive_texture,
-                *self.unsupported_resolution,
+                *self.nonpositive_peak_width, *self.unsupported_resolution,
                 *self.flat_directions, *self.discarded_directions,
                 *self.large_biso, *self.negative_biso,
                 *self.nonpositive_resolution, *self.narrow_humps,
@@ -1723,6 +1737,74 @@ def check_texture_positive(table, model) -> list[GuardFinding]:
             out.append(GuardFinding.nonpositive_texture(
                 f"phases.{ip}.texture", int((p < -TEXTURE_POSITIVITY_TOL).sum()),
                 len(p), on_reflections, on_sphere))
+    return out
+
+
+def check_peak_width_positive(table, model) -> list[GuardFinding]:
+    """Phases whose width peak equations take a width below zero (WP-2107).
+
+    A peak equation's Gaussian term adds to Γ_G² and its Lorentzian term to
+    Γ_L, and either may be negative: Stinton & Evans's per-phase TCHZ stores a
+    negative v and w.  The total is what must stay positive, and it couples
+    every coefficient with the instrument's and the phase's own terms, so it
+    cannot be a box bound.  The forward model floors Γ_G² at
+    ``caglioti._MIN_GAMMA_G2``, and a negative Γ_L is no peak shape, so below
+    zero the reflection's width is no longer the equation's.
+
+    Tested at the answer on the primary emission line, over the frozen
+    reflections whose Bragg 2θ lies in the fitted range.  Γ_G² is the built-in
+    terms' floored value plus the equation's, so a dip the instrument's own
+    U, V and W cause stays ``RESOLUTION_NOT_POSITIVE``'s.  Zero is a legal Γ_L,
+    so that test is one-sided.  A phase with no width equation is skipped.
+    """
+    import numpy as np
+
+    from ..crystallography.symmetry import reflection_label
+    from ..model.peak_equations import WIDTH_TARGETS
+    from ..model.profiles.caglioti import gaussian_fwhm
+
+    if model is None:
+        return []
+    values = {e.path: e.value for e in table.entries}
+    lo, hi = float(np.min(model.tt)), float(np.max(model.tt))
+    out: list[GuardFinding] = []
+    for ip, cp in enumerate(model.phases):
+        if cp.peq is None or not cp.peq.has(*WIDTH_TARGETS):
+            continue
+        cell = model._phase_cell(ip, values)
+        d, tt_lines = model._cell_block(cp, cell, model.line_lambdas(values))
+        tt = np.asarray(tt_lines[0], dtype=np.float64)
+        on = np.isfinite(tt) & (tt >= lo) & (tt <= hi)
+        if not on.any():
+            continue
+        aniso = model.strain_width(ip, values, d)
+        extra_g2, _ = model._width_terms(ip, values, tt_lines[0], d)
+        _g, gam_l = model._line_fwhms(ip, values, tt_lines[0], aniso, d=d)
+        eqs = cp.peq.equations
+        checks = []
+        if "lor_fwhm" in eqs:
+            checks.append(("Γ_L", "deg", (eqs["lor_fwhm"].prefix,),
+                           np.asarray(gam_l, dtype=np.float64)))
+        if extra_g2 is not None:
+            base = np.asarray(gaussian_fwhm(
+                0.5 * tt, values["instrument.profile.u"],
+                values["instrument.profile.v"], values["instrument.profile.w"],
+                values[f"phases.{ip}.gauss_size"],
+                values[f"phases.{ip}.gauss_strain"]), dtype=np.float64)
+            checks.insert(0, ("Γ_G²", "deg²",
+                              tuple(eqs[t].prefix for t in ("gauss_fwhm",
+                                                            "gauss_fwhm_squared")
+                                    if t in eqs),
+                              base * base + np.asarray(extra_g2, dtype=np.float64)))
+        for component, unit, paths, total in checks:
+            total = np.broadcast_to(total, tt.shape)
+            bad = on & (total < 0.0)
+            if bad.any():
+                k = int(np.argmin(np.where(on, total, np.inf)))
+                out.append(GuardFinding.nonpositive_peak_width(
+                    paths, component, int(bad.sum()),
+                    int(on.sum()), float(total[k]), unit,
+                    reflection_label(cp.reflections.hklm[k])))
     return out
 
 
@@ -2073,7 +2155,7 @@ def check_resolution_positive(table, model) -> list[GuardFinding]:
 
 #: a free column counts as "on its bound" within this fraction of **the closest
 #: bound's own magnitude**, floored at 1 — scipy's ``rtol`` from
-#: ``optimize._lsq.common.find_active_constraints``, which is the test TRF
+#: ``scipy.optimize._lsq.common.find_active_constraints``, which is the test TRF
 #: itself uses to fill ``OptimizeResult.active_mask``.  Quoted rather than
 #: chosen: the diagnostic and the solver then cannot hold different opinions
 #: about the same column, and the value is calibrated to how far
@@ -2377,6 +2459,36 @@ def check_discarded_directions(jac, free: list[str],
     return [GuardFinding.discarded_direction(paths, n)]
 
 
+def outcome_discarded_directions(outcome, free: list[str],
+                                 flat: list[GuardFinding]) -> list[GuardFinding]:
+    """:func:`check_discarded_directions` on the directions the solve's own
+    covariance discarded (``LSQOutcome.discarded``, WP-2219).
+
+    Those are the columns whose esds the solve left absent, so the finding
+    and the missing esds name one set.  The test ran on the matrix the
+    covariance cut, a Pawley intensity block and a joint fit's penalty rows
+    included.  Only table paths are named: a touched intensity has no path,
+    and its own reports are ``PAWLEY_OVERLAP_UNRESOLVED`` and the off-data
+    note.  An outcome without the record (a chart matrix moved its columns)
+    is read off its Jacobian as before, which a Pawley solve's omits.
+    """
+    disc = getattr(outcome, "discarded", None)
+    if disc is None or len(outcome.theta) != len(free):
+        if getattr(outcome, "n_aux", 0) or outcome.jac is None:
+            return []
+        from ..optimize.least_squares import covariance_jacobian
+
+        return check_discarded_directions(covariance_jacobian(outcome, free),
+                                          free, flat)
+    n, touched = disc
+    paths = tuple(free[i] for i in touched if i < len(free))
+    if n == 0 or not paths:
+        return []
+    if any(set(paths) <= set(f.paths) for f in flat):
+        return []
+    return [GuardFinding.discarded_direction(paths, n)]
+
+
 def _correlation_findings(corr, free: list[str], threshold: float
                           ) -> tuple[list["GuardFinding"], list["GuardFinding"]]:
     """``high_correlations`` and ``flat_directions`` off one correlation matrix.
@@ -2429,6 +2541,7 @@ def check_guards(table, outcome, threshold: float,
     report.nonpositive_adps = check_adp_positive_definite(table)
     report.nonpositive_strain = check_stephens_positive(table, model)
     report.nonpositive_texture = check_texture_positive(table, model)
+    report.nonpositive_peak_width = check_peak_width_positive(table, model)
     report.nonpositive_resolution = check_resolution_positive(table, model)
     report.large_biso = check_biso_plausible(table, model)
     report.negative_biso = check_biso_negative(table, model)
@@ -2480,16 +2593,13 @@ def check_guards(table, outcome, threshold: float,
         if scan_exchangeability and model is not None:
             report.measured_exchangeability = exchangeability_scan(model, table)
         try:
-            # no esds, nothing to qualify; and a Pawley solve cuts the matrix
-            # augmented by its intensity block, which ``outcome.jac`` omits.
-            # The matrix is the one the covariance cut: a moment angle the
-            # stationary test left out (WP-1929) is a zero column here too.
-            if outcome.correlation is not None and not outcome.n_aux:
-                from ..optimize.least_squares import covariance_jacobian
-
-                report.discarded_directions = check_discarded_directions(
-                    covariance_jacobian(outcome, free), free,
-                    report.flat_directions)
+            # no esds, nothing to qualify.  The matrix is the one the
+            # covariance cut: a moment angle the stationary test left out
+            # (WP-1929) is a zero column here too, and a Pawley solve's
+            # intensity block, which ``outcome.jac`` omits, is in it (WP-2219)
+            if outcome.correlation is not None:
+                report.discarded_directions = outcome_discarded_directions(
+                    outcome, free, report.flat_directions)
         except np.linalg.LinAlgError:
             # ``soft_modes``' rule above: the stage already said so
             if getattr(outcome, "covariance_error", None) is None:
@@ -2518,5 +2628,9 @@ def check_guards(table, outcome, threshold: float,
     if pressed and sd_internal is not None:
         report.at_bounds += tied_bound_findings(
             table, pressed,
-            table.stderr_physical(outcome.theta, sd_internal, outcome.correlation))
+            # the result's own esds, a tie the data determine included
+            # (WP-2230), as the joint fit's per-histogram build reads them
+            table.stderr_physical(
+                outcome.theta, sd_internal, outcome.correlation,
+                discarded=getattr(outcome, "discarded_subspace", None)))
     return report

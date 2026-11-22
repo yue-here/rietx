@@ -1,8 +1,7 @@
 # WP-2101 — the parametric surface as it stands, in the manual
 
-Milestone: parametric · Status: 🔄 2026-11-19 — every task done; `VARIABLE_NOT_FREED` and the refusal's `.parameters()` in review (#1714)
+Milestone: parametric · Status: ✅ 2026-11-19 — every task done; the last slice merged as #1714
 Depends on: —
-Priority: P2 2026-11-04 — a feature the open milestone was opened for, and it needs no machinery
 
 ## Goal
 
@@ -46,20 +45,6 @@ Measured on 2026-11-03, on a seven-pattern synthetic LaB₆ ramp and by reading 
 - The refusal for an unknown target points at the private
   `mtable.tables[h].entries`, where `.parameters()` is the public answer.
   *Superseded 2026-11-19:* it names `.parameters()`.
-
-### Inherited
-
-- 2026-11-09, from [1325](1325-parametric-series.md): `reference/parametric.md`
-  § Range and visibility warnings describes `PARAMETRIC_OUT_OF_RANGE` as a warning
-  after the fit. In a real fit it never fires. A target past its own bound makes the
-  write-back after the solve raise `ValueError`, naming the target and the equation,
-  before any result exists. Under the default LM driver a linear equation's target is
-  now held inside its bounds at every step, so the raise is left to TRF and to an
-  `"expression"` equation. 1325's handover entry asks the maintainer whether the
-  warning stays, goes, or replaces the raise. Rewrite that section once they rule.
-  Done in 1325's PR #1497 (2026-11-09): the warning replaces the raise, settled by
-  Claude, and that section and `help.py`'s entry now say a TRF or expression fit
-  finishes with it. Nothing is left here.
 
 ## Non-goals
 
@@ -233,6 +218,15 @@ temperature-calibration and cell coefficient carries `!`, so the 1167 frees none
 | `chi2_convergence_criteria`, `iters`, `seed`, `Rietveld_Plot` | numerics and output | nothing to write | not parametric |
 
 ## Handover log
+
+- **2026-11-19 (closed)** — The last slice, PR #1714, merged as `8aaaf54c3` at 22:09Z,
+  merged by the maintainer. Every task was already ticked, and the entry below said the
+  WP closes once #1714 merged. This close was done by a ghostshift runner in the
+  close-only PR #1719: the Priority line and the consumed `### Inherited` section went
+  (its one note was done in WP-1325's PR #1497), and the narrative moved to the v1.13
+  record. One follow-up went to WP-2103's `### Inherited`: once a joint fit has a
+  `hold` verb, its `VARIABLE_NOT_FREED` builder leaves out a held coefficient, as the
+  single fit's does.
 
 - **2026-11-19 (the rulings; PR #1714)** — A fit now says when a variable never
   refined. In a joint fit, an equation whose coefficients no stage freed is named with

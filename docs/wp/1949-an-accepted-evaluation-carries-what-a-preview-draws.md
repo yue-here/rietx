@@ -73,6 +73,20 @@ drop it. The re-measured costs are under Task 1 below.
 decides nothing for the caller: `caller` (an opt-in the user asks for; no
 threshold, no automatic action). No number is added.
 
+### Inherited
+
+- **2026-11-21, issue triage (#1652 item 2): the "36 of 4200 channels at up
+  to 8e-6" bullet above is stale.** At `c1033a0e8`, after a default fit on
+  the fluorapatite tutorial, `predict()` equals `result.y_calc` bit for bit,
+  and `predict(grid)` differs from it on every channel by up to 1.6e-3 of the
+  strongest peak. The cause is the window cut: a grid compiles at 1e-3 of
+  each peak's area, and the fit measured at the declared stages' 2 %
+  (WP-2222). The measurement and the docs fix sit in WP-2235. So
+  the Acceptance's comparison of an `eval` event's curve with `predict` at
+  the event's values compiles at the window the stage ran at, with the recipe
+  in `predict`'s docstring (`compile_model(..., window_area_tol=...)`). A bar
+  of 8e-6 against `predict(grid)` cannot pass today.
+
 ## Non-goals
 
 - The per-stage `snapshot.json` and `rietx watch` (unchanged).

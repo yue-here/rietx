@@ -65,6 +65,7 @@ from . import blocked, lapack
 from .blocked import BlockJacobian
 from .cancel import RefinementCancelled
 from .lm import FTOL
+from .statistics import DiscardedSubspace
 
 if TYPE_CHECKING:
     from ..params.multi import MultiParameterTable
@@ -105,6 +106,9 @@ _TEXTURE_PATH = re.compile(r"^phases\.(\d+)\.texture\.c\d+_(?:neg)?\d+$")
 #: Phase scale — the one parameter the intensity is *exactly linear* in, so
 #: its column needs no perturbed ``phase_peaks`` at all (``_scale_column``).
 _SCALE_PATH = re.compile(r"^phases\.(\d+)\.scale$")
+#: a phase's peak-equation coefficient (WP-2107); the instrument's ride the
+#: scalar chain, since a phase equation's ``two_theta`` reads their shift
+_PEQ_PATH = re.compile(r"^phases\.(\d+)\.peak_equations\.\d+\.\w+$")
 
 #: Residual evaluations per accepted iteration that TRF's budget must allow
 #: for, so that a run genuinely needing ``max_iter`` iterations is never cut
@@ -353,6 +357,24 @@ class LSQOutcome:
     #: ``status="diverged"``, no Jacobian and no esds; ``refine`` and
     #: ``multi`` end the stage there and say so in ``STAGE_NOT_FINITE``.
     non_finite: NonFiniteStop | None = None
+    #: the covariance solve's discarded directions (WP-2219):
+    #: :func:`.statistics.discarded_directions` on the matrix the covariance
+    #: cut, the Pawley intensity block included, as ``(n, touched)`` with
+    #: ``touched`` indexing that matrix's columns (table columns first, so an
+    #: index past ``len(theta)`` is an intensity).  Every touched column's esd
+    #: is ``inf`` in :attr:`stderr_internal` and on ``model.pawley.stderr``,
+    #: the absent one.  Written by :func:`_guarded_covariance`'s callers;
+    #: ``None`` where no covariance was computed, or where a chart matrix
+    #: moved the columns (:func:`rechart_outcome`), and the guard then reads
+    #: :attr:`jac` itself.
+    discarded: tuple[int, np.ndarray] | None = None
+    #: the same solve's :class:`~.statistics.DiscardedSubspace` over the table
+    #: columns (WP-2230), so a tie or a derived number on touched columns can
+    #: keep the esd the data determine (:func:`.statistics.estimable`).
+    #: Written beside :attr:`discarded`; ``None`` where nothing was touched,
+    #: where no covariance was computed, or where a chart matrix moved the
+    #: columns, and every consumer then marks such a number absent as before.
+    discarded_subspace: DiscardedSubspace | None = None
 
 
 @dataclass(frozen=True)
@@ -504,8 +526,11 @@ def rechart_outcome(outcome: LSQOutcome, theta: np.ndarray,
     tests = _rechart_stationary(outcome, theta,
                                 np.diag(s) if s.ndim == 2 else s, free_paths)
     if s.ndim == 2:
+        # a discarded direction mixes under T, so the guard re-reads the
+        # new Jacobian; the esds it marked stay absent (the block rule above)
         return replace(_rechart_matrix(outcome, theta, s),
-                       moment_angle_tests=tests)
+                       moment_angle_tests=tests, discarded=None,
+                       discarded_subspace=None)
 
     def padded(n: int) -> np.ndarray:
         # a Pawley block rides after the table columns and never moves
@@ -523,9 +548,14 @@ def rechart_outcome(outcome: LSQOutcome, theta: np.ndarray,
     cosine = outcome.residual_cosine
     if cosine is not None:
         cosine = np.asarray(cosine) * padded(len(cosine))
+    subspace = outcome.discarded_subspace
+    if subspace is not None:
+        # a basis row is a column's loading, and takes its sign as a
+        # Jacobian column does; an esd takes none
+        subspace = subspace.signed(padded(len(subspace.stderr)))
     return replace(outcome, theta=np.asarray(theta, dtype=np.float64), jac=jac,
                    correlation=corr, residual_cosine=cosine,
-                   moment_angle_tests=tests)
+                   moment_angle_tests=tests, discarded_subspace=subspace)
 
 
 def _rechart_stationary(outcome: LSQOutcome, theta: np.ndarray,
@@ -626,12 +656,14 @@ def _rechart_matrix(outcome: LSQOutcome, theta: np.ndarray,
 
 def _guarded_covariance(jac, fun, n_free: int, n_data: int
                         ) -> tuple[np.ndarray | None, np.ndarray | None,
-                                   float | None, str | None]:
+                                   float | None, str | None,
+                                   tuple[int, np.ndarray] | None,
+                                   DiscardedSubspace | None]:
     """:func:`covariance_estimates`, with an eigensolver failure made absent.
 
-    Returns ``(stderr, corr, factor, None)``, ``factor`` the Bérar-Lelann
-    factor ``stderr`` carries (:func:`_covariance_and_inflation`), or
-    ``(None, None, None, repr(exc))`` when
+    Returns ``(stderr, corr, factor, None, discards, subspace)``, ``factor``
+    the Bérar-Lelann factor ``stderr`` carries (:func:`_covariance_and_inflation`),
+    or ``(None, None, None, repr(exc), None, None)`` when
     ``np.linalg.LinAlgError`` escapes the pseudo-inverse.  Issue #225 met it
     at a converged fit, pattern 78 of a 182-pattern chain, as ``Eigenvalues
     did not converge`` out of ``eigh``, and the raise discarded the answer the
@@ -641,13 +673,52 @@ def _guarded_covariance(jac, fun, n_free: int, n_data: int
     :func:`~.statistics.normal_covariance` without raising.  Only
     ``LinAlgError`` is caught, which is the one type an eigensolve reports
     non-convergence with; anything else is a defect and stays loud.
+
+    **A column a discarded direction touches gets an esd of** ``inf``, the
+    absent one (WP-2219).  The pseudo-inverse reports such a column's spread
+    along the directions the data did measure, at least √2 short and by a
+    factor nothing bounds: 140 esd between two starts of one LaB6 fit
+    (WP-2028).  A parameter that is not estimable has no standard error
+    (Searle 1971, *Linear Models*, p. 169), so the column joins the
+    gradient-free ones, and every consumer that marks those
+    (:meth:`~rietx.params.vector.ParameterTable.unmeasured_rows`) marks it
+    too.  The test is :func:`.statistics.discarded_directions` on this very
+    matrix, the Pawley intensity block included, and its answer is returned
+    as ``discards`` for the guard that names the parameters.  The
+    correlations stay the pseudo-inverse's.  The marking happens here and
+    not in :func:`covariance_estimates`, which the support test calls on a
+    sub-matrix to ask a different question (``refine._scale_significance``).
+
+    **What the marking hides comes back beside it** (WP-2230): a
+    :class:`~.statistics.DiscardedSubspace` holding the pseudo-inverse's own
+    esds and the discarded basis in the reported covariance's units, so a
+    derived number built on touched columns can ask
+    :func:`~.statistics.estimable` whether the data determine *it*.
+    ``None`` where nothing was touched.
+    Returns ``(stderr, corr, factor, error, discards, subspace)``.
     """
+    from .statistics import discarded_directions
+
     try:
         stderr, corr, factor = _covariance_and_inflation(jac, fun, n_free,
                                                          n_data=n_data)
     except np.linalg.LinAlgError as exc:
-        return None, None, None, repr(exc)
-    return stderr, corr, factor, None
+        return None, None, None, repr(exc), None, None
+    # outside the guard: where the covariance did form, a failure of the
+    # discard test stays loud, as it was in ``check_guards`` before WP-2219
+    n_gone, touched, basis = discarded_directions(jac, basis=True)
+    discards = (n_gone, touched)
+    subspace = None
+    if len(touched):
+        stderr = np.array(stderr, dtype=np.float64)
+        data = fun if n_data is None else fun[:n_data]
+        # the χ²_red and factor the esds carry, so ‖lostᵀc‖² and cᵀ·Cov·c
+        # are in one unit (``normal_factors``' own Σr²/(N−P))
+        chi2_red = float(data @ data) / max(len(data) - n_free, 1)
+        subspace = DiscardedSubspace(basis * (factor * np.sqrt(chi2_red)),
+                                     stderr.copy())
+        stderr[touched] = np.inf
+    return stderr, corr, factor, None, discards, subspace
 
 
 def _residual_cosine(jac, fun) -> np.ndarray | None:
@@ -1753,6 +1824,39 @@ def _scale_column(model: CompiledModel, bases: DerivativeBases,
     return _accumulate(len(model.tt), parts)
 
 
+def _peak_equation_column(model: CompiledModel, bases: DerivativeBases,
+                          values: dict[str, float], ip: int,
+                          path: str) -> np.ndarray | None:
+    """∂y/∂c for one coefficient of phase ip's peak equations, exact.
+
+    :meth:`~rietx.model.forward.CompiledModel.peak_equation_partials` gives
+    ∂(pos, w₁, w₂, intensity)/∂c per line, and the bases carry them onto the
+    pattern as :func:`_peak_chain_at` carries its differences.  ``None``
+    where the partials decline (an intensity factor at zero), and the caller
+    then takes the scalar chain.
+    """
+    partials = model.peak_equation_partials(ip, values, path)
+    if partials is None:
+        return None
+    pp = bases.planes[ip]
+    lay = pp.layout
+    if not len(lay.i0):
+        return np.zeros(len(model.tt))
+    d_pos, d_w1, d_w2, d_i = (lay.gather(partials, slot) for slot in range(4))
+    terms = []
+    with np.errstate(invalid="ignore"):
+        d_i = np.where(pp.finite, d_i, 0.0)
+        coefs = [np.where(pp.finite, pp.inten * x, 0.0) for x in (d_pos, d_w1, d_w2)]
+    if np.any(d_i != 0.0):
+        terms.append((d_i, pp.omega))
+    for coef, plane, what in zip(coefs, (pp.d_pos, pp.d_gamma, pp.d_eta),
+                                 ("position", "width", "mixing")):
+        if np.any(coef != 0.0):
+            _require_basis(plane, path, what)
+            terms.append((coef, plane))
+    return _accumulate(len(model.tt), [(lay, terms)])
+
+
 def _axial_column(model: CompiledModel, bases: DerivativeBases,
                   which: int) -> np.ndarray:
     """∂y/∂θ_c for S/L (which=8) or H/L (which=9) from the node-FD bases.
@@ -2336,6 +2440,12 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
                 # a phase sitting at zero falls through to the FD path below
                 J[:n_data, c] = -sqrt_w * _scale_column(
                     model, get_bases(), values, int(sc.group(1)))
+            elif ((pq := _PEQ_PATH.match(path)) and own
+                    and not model.mag_split(int(pq.group(1)))
+                    and (col := _peak_equation_column(
+                        model, get_bases(), values, int(pq.group(1)), path))
+                    is not None):
+                J[:n_data, c] = -sqrt_w * col
             elif model.scalar_chain_supported(path) and all(
                     model.scalar_chain_supported(p) and p not in bkg_cols
                     and p not in axial_paths for p in extra):
@@ -3607,7 +3717,7 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
     # esds from the *full* augmented covariance (table ↔ intensity correlation
     # feeds the table esds too), then split: table columns stay in the outcome,
     # the intensity tail lands on the model's Pawley block.
-    stderr = corr = stderr_full = None
+    stderr = corr = stderr_full = discards = subspace = None
     covariance_error = esd_inflation = None
     moment_angle_tests = None
     if compute_uncertainties and res.jac is not None and len(res.fun) > len(res.x):
@@ -3617,11 +3727,14 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
             probe, res.x, res.jac, len(model.tt), table.free_paths,
             _column_entries([table], [np.arange(n_table)], len(res.x)),
             len(res.x), angle_block=_analytic_angle_block(model, table))
-        stderr_full, corr_full, esd_inflation, covariance_error = _guarded_covariance(
+        (stderr_full, corr_full, esd_inflation, covariance_error,
+         discards, subspace) = _guarded_covariance(
             _without_columns(res.jac, stationary), res.fun, len(res.x),
             n_data=len(model.tt))
     if stderr_full is not None:
         stderr, corr = stderr_full[:n_table], corr_full[:n_table, :n_table]
+        if subspace is not None:
+            subspace = subspace.take(slice(0, n_table))
         if model.pawley is not None:
             model.pawley.stderr = stderr_full[n_table:]
     if model.pawley is not None:
@@ -3646,6 +3759,8 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
                       n_degenerate_cell_probes=cell_guard.n_degenerate,
                       n_lapack_fallbacks=lapack.retries() - lapack_start,
                       covariance_error=covariance_error,
+                      discarded=discards,
+                      discarded_subspace=subspace,
                       esd_inflation=esd_inflation,
                       moment_angle_tests=moment_angle_tests)
 
@@ -3972,7 +4087,7 @@ def run_multi_least_squares(models: list[CompiledModel],
                    else _TRF_TERMINATION.get(res.status, str(res.status)))
 
     stderr = corr = covariance_error = moment_angle_tests = esd_inflation = None
-    stderr_full = None
+    stderr_full = discards = subspace = None
     if compute_uncertainties and res.jac is not None and len(res.fun) > len(res.x):
         # the single-histogram rule (WP-1929) on the stacked residual: a
         # moment angle's column is every histogram's rows of it, and a shared
@@ -3986,11 +4101,13 @@ def run_multi_least_squares(models: list[CompiledModel],
         # off the full vector, the Pawley blocks with it, then sliced: the
         # single fit's rule, so the table esds carry the intensities'
         # correlation (``run_least_squares``)
-        stderr_full, corr, esd_inflation, covariance_error = _guarded_covariance(
-            _without_columns(res.jac, stationary), res.fun, len(res.x),
-            n_data=n_data_total)
+        (stderr_full, corr, esd_inflation, covariance_error, discards,
+         subspace) = _guarded_covariance(_without_columns(res.jac, stationary),
+                                         res.fun, len(res.x), n_data=n_data_total)
         if stderr_full is not None:
             stderr, corr = stderr_full[:n_table], corr[:n_table, :n_table]
+            if subspace is not None:
+                subspace = subspace.take(slice(0, n_table))
     if pawley:
         # the last evaluation need not sit at the solution (the single fit's
         # reason), so the answer's intensities are written back here
@@ -4016,6 +4133,8 @@ def run_multi_least_squares(models: list[CompiledModel],
                       n_degenerate_cell_probes=cell_guard.n_degenerate,
                       n_lapack_fallbacks=lapack.retries() - lapack_start,
                       covariance_error=covariance_error,
+                      discarded=discards,
+                      discarded_subspace=subspace,
                       esd_inflation=esd_inflation,
                       moment_angle_tests=moment_angle_tests,
                       jacobian_layout=layout,
