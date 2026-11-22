@@ -21,6 +21,7 @@
    * profile replaces the instrument at once, one node, and the dialog then
    * shows what it loaded. Saving a profile is File › Export (row 133).
    */
+  import { instrumentScript, type Say } from "./console";
   import { ApiError, api, type InstrumentEdit } from "../api";
   import Help from "../Help.svelte";
   import { GEOMETRIES, applyFields, axialWarning, editableValue, fieldParam, fieldText,
@@ -34,7 +35,7 @@
     rows,
     anodes = [],
     busy = false,
-    say = (_line: string) => {},
+    say = () => {},
     onlanded = () => {},
     ondropped = (_ended: (path: string) => boolean) => {},
     onclose,
@@ -45,7 +46,7 @@
     /** `GET /api/capabilities`'s anodes */
     anodes?: readonly Anode[];
     busy?: boolean;
-    say?: (line: string) => void;
+    say?: Say;
     /** an edit landed: the head moved */
     onlanded?: () => void;
     /** an instrument edit ended these paths' old parameters (a source cut to
@@ -58,8 +59,10 @@
   /** Say what an instrument edit did, the registers' part included, and drop
    *  the pending edits on the paths it ended. Returns the test for those
    *  paths, or `null` when it ended none. */
-  function landedEdit(answer: InstrumentEdit, echo: string): ((path: string) => boolean) | null {
-    for (const line of registerEcho(answer, echo)) say(line);
+  function landedEdit(answer: InstrumentEdit, echo: string,
+                      script: string | null): ((path: string) => boolean) | null {
+    for (const line of registerEcho(answer, echo))
+      say("call", line, line === echo ? script : undefined);
     const ended = endedBy(answer);
     if (ended) ondropped(ended);
     return ended;
@@ -185,8 +188,9 @@
       // so values set before it would be written back by it
       if (d.fields.length) {
         const fresh = (await api.instrument()).instrument;
-        ended = landedEdit(await api.patchInstrument(clearForGeometry(applyFields(fresh, d.fields, edits)),
-                                             "instrument edited"), "ref.edit(instrument=…)");
+        const next = clearForGeometry(applyFields(fresh, d.fields, edits));
+        ended = landedEdit(await api.patchInstrument(next, "instrument edited"),
+                           "ref.edit(instrument=…)", instrumentScript(next));
         moved = true;
         // what landed is no longer an edit: kept, it would compare unequal to
         // the reloaded rendering and send the same model again
@@ -200,10 +204,10 @@
       // of the same name: the request half applied (WP-2229 review)
       const values = Object.entries(d.values).filter(([path]) => !ended?.(path));
       const gone = Object.keys(d.values).filter((path) => ended?.(path));
-      if (gone.length) say(`# typed values dropped: ${gone.sort().join(", ")}`);
+      if (gone.length) say("comment", `# typed values dropped: ${gone.sort().join(", ")}`);
       if (values.length) {
         await api.patchParams({ values: Object.fromEntries(values) });
-        say(`ref.set_values({${values.map(([k, v]) => `"${k}": ${v}`).join(", ")}})`);
+        say("call", `ref.set_values({${values.map(([k, v]) => `"${k}": ${v}`).join(", ")}})`);
         moved = true;
       }
       onlanded();
@@ -227,7 +231,7 @@
     try {
       const preview = await api.uploadFile("instrument", file);
       landedEdit(await api.patchInstrument({ upload: preview.upload }, `instrument from ${file.name}`),
-                 `ref.edit(instrument=load_instrument_profile("${file.name}"))`);
+                 `ref.edit(instrument=load_instrument_profile("${file.name}"))`, null);
       edits = new Map();
       refusal = "";
       onlanded();
