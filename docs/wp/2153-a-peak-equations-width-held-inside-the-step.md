@@ -1,6 +1,6 @@
 # WP-2153 — a peak equation's width held inside the step
 
-Milestone: parametric · Status: ⬜
+Milestone: parametric · Status: 🔄 2026-11-22 — claimed by @yue-here (ghostshift runner)
 Depends on: —
 Priority: P3 2026-11-22 — a workaround covers it: `PEAK_WIDTH_NOT_POSITIVE` reports a width that went below zero after the fit, and TRF or a refit from a better start avoids it
 
