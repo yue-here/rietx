@@ -1,8 +1,7 @@
 # WP-2107 — an equation over a reflection
 
-Milestone: parametric · Status: 🔄 2026-11-22 — claimed by ghostshift runner (MacBook-Air-c4aacd) to close it and file its follow-ons
+Milestone: parametric · Status: ✅ 2026-11-22 — every task built, PR #1635 merged 2026-11-20 with the rulings recorded; follow-ons filed as 2151-2154
 Depends on: 1964 (the grammar, evaluated on arrays)
-Priority: P2 2026-11-04 — a feature the open milestone was opened for: the method's founding paper uses both a 2θ calibration curve and a width on a family of hkl
 
 ## Goal
 
@@ -226,6 +225,45 @@ then adds both to its protocol.
 - WP-1964 (the grammar), WP-0503 (Stephens), WP-1102 (the expression clause), WP-2061.
 
 ## Handover log
+
+- **2026-11-22 (a ghostshift runner; PR #1779)** — WP-2107 is closed. PR #1635 merged on
+  2026-11-20 with every task built and both of the maintainer's rulings of that day in
+  the code, so the status line's "waiting on the maintainer" was stale. Nothing in `src/`
+  changed here. The four things the WP left open are now WPs of their own, each readable
+  without this file: a real-data run, a new name in the equation's vocabulary, a design
+  question in the solver, and a joint-fit recipe for WP-2108's holder.
+  - *Premises checked* (main f590981ab). #1635's state is `MERGED`, at 4f60a8e86.
+    `schemas/peak_equation.py`'s `REFLECTION_NAMES` holds no wavelength, and no
+    evaluation site in `model/forward.py` passes one. `gaussian_width_inequalities` and
+    `lorentzian_width_inequalities` (`optimize/least_squares.py`) read no peak-equation
+    term. WP-2108's entry records the joint holder fit as not tried, and nothing since has
+    tried it. The milestone row's real-data run has not been made.
+  - *Filed.* An owner was looked for first, by grepping `docs/wp/` for ZrP₂O₇, the width
+    rows, the wavelength and the holder, and reading WP-2103's Goal and Tasks. None owns
+    any of the four: 1964, 1325, 1937, 1938 and 2108 are closed, and 2103 adds verbs to a
+    joint fit. Numbers 2151-2154 continue the parametric block above its highest, 2150.
+    - [2151](2151-the-zrp2o7-peak-equations-on-its-data.md), P2: the ZrP₂O₇ input's 2θ
+      curve and each phase's TCHZ terms as peak equations on the 37 real patterns, beside
+      the temperature calibration. A measurement with no gate.
+    - [2152](2152-a-peak-equation-reads-the-wavelength.md), P3: a `wavelength` name, so a
+      size-like term carries its own λ dependence. It serves the 2026-11-20 ruling's
+      practice, where TOPAS writes `Lam`. Whether the warning stays silent on an equation
+      reading it amends that ruling, so the WP sends it to the maintainer.
+    - [2153](2153-a-peak-equations-width-held-inside-the-step.md), P3: review finding (2)
+      with the design options recorded (leave it, add the term where it is linear in its
+      coefficients, linearise at the stage start, a nonlinear constraint). It also records
+      a second direction, unmeasured: a positive equation term makes the built-in row
+      stricter than the total needs.
+    - [2154](2154-a-holder-offset-shared-across-a-joint-fit.md), P2: WP-2108's holder
+      offset shared across a synthetic series, likely through `variables=` and expression
+      equations, with 2103's tie as the fallback.
+  - *Also done.* The milestone record lists the four, marks this WP's row met, and points
+    the ZrP₂O₇ and holder rows at 2151 and 2154. The v1.13 record carries this WP's
+    narrative. The staged 1.13 notes had no entry for #1635's addition, which protocol rule
+    6 asks for on the day it lands. They now carry the schema and grammar versions, the
+    new type and its three diagnostics, and a Files-that-change line that the cut must
+    measure against 1.12.0.
+  - *Next.* None in this WP. 2151 and 2154 are the milestone's.
 
 - **2026-11-20 (ghostshift runners, two sessions; PR #1635)** — A user can now write
   a peak's width, position or intensity as an equation in its hkl and angle, refine the
