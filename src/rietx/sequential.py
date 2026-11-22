@@ -925,7 +925,9 @@ def _keep_held_values(ref: Refinement, source: tuple[Structure, Instrument] | No
     read warm.  Limited by ``carry`` as the warm start is.  A value a hook set
     for this pattern on purpose wins: a held path whose value no longer equals
     ``declared``'s (the caller's models) was moved by ``prepare`` or by
-    ``constrain``, and is left alone.  A named variable has no declared value
+    ``constrain``, and is left alone.  A hook that writes the caller's own
+    value cannot be told from one that wrote nothing, so that value is
+    replaced as if no hook had run.  A named variable has no declared value
     to compare, so a held one takes ``source_vars``' value, as a warm rung's
     does.  A site DOF is a step from where its fit began and a tied or locked
     path follows something else, so neither is written.
@@ -1596,7 +1598,11 @@ class SequentialRefinement:
                 series.steps[:verify_steps], patterns, names, mode, base_plan,
                 two_theta_limits, prepare, constrain, stream=stream,
                 cancel=cancel,
-                fitted={e.index: m for e, m in zip(entries, models)})
+                fitted={e.index: m for e, m in zip(entries, models)},
+                fitted_vars={e.index: {p[len(VAR_PREFIX):]: v
+                                       for p, v in (e.held_values or {}).items()
+                                       if is_variable_path(p)}
+                             for e in entries})
         # what the per-pattern diagnostics could not say: "42 of 68" (WP-1110),
         # every count and no threshold (WP-2003, C6)
         series.code_counts = _code_counts(series)
@@ -2164,6 +2170,7 @@ class SequentialRefinement:
                       stream: EventStream | None = None,
                       cancel=None,
                       fitted: dict[int, tuple[Structure, Instrument]] | None = None,
+                      fitted_vars: dict[int, dict[str, float]] | None = None,
                       ) -> None:
         """Refit each given step's two patterns cold, and record the ratio.
 
@@ -2199,7 +2206,9 @@ class SequentialRefinement:
         ``fitted`` is each pattern's fitted models by series index: a path the
         hook holds is held at the value the chain held it at on that pattern
         (:func:`_keep_held_values`, WP-2081), since a refit holding the
-        caller's value instead would be a different model too.
+        caller's value instead would be a different model too.  ``fitted_vars``
+        is the same for a held named variable, by bare name, which the models
+        cannot carry.
         """
         cold: dict[int, RefinementResult | _PatternRaised] = {}
         result_structures: dict[int, Structure | None] = {}
@@ -2215,7 +2224,8 @@ class SequentialRefinement:
                         stamp={"series_index": k, "series_label": names[k],
                                "series_n": len(patterns),
                                "series_pass": "verify"},
-                        hold_source=(fitted or {}).get(k))
+                        hold_source=(fitted or {}).get(k),
+                        hold_vars=(fitted_vars or {}).get(k))
                     # a stand-in fit (a test's) may hand back no ``Refinement``
                     result_structures[k] = getattr(_ref, "structure", None)
                 except _PatternRaised as exc:

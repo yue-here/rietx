@@ -573,10 +573,14 @@ class _ColdOnFrame(SequentialRefinement):
 
     cold_index = 2
 
-    def _fit_one(self, data, label, previous, *args, **kw):
-        if args[8] == self.cold_index and previous is not None:
+    def _fit_one(self, data, label, previous, previous_hkl, plan, mode,
+                 two_theta_limits, position, previous_tag, prepare, constrain,
+                 index, *args, **kw):
+        if index == self.cold_index and previous is not None:
             raise _PatternRaised(RuntimeError("forced to the cold rung"))
-        return super()._fit_one(data, label, previous, *args, **kw)
+        return super()._fit_one(data, label, previous, previous_hkl, plan, mode,
+                                two_theta_limits, position, previous_tag,
+                                prepare, constrain, index, *args, **kw)
 
 
 def _hold_zero_after_the_first(index, ref):
@@ -2079,6 +2083,7 @@ class _StubColdFits(SequentialRefinement):
         self.refits: list[str] = []
         self.hooks: list[object] = []
         self.hold_sources: list[object] = []
+        self.hold_vars: list[object] = []
 
     def _fit_one(self, data, label, previous, previous_hkl, plan, mode,
                  two_theta_limits, position, previous_tag, prepare, constrain,
@@ -2089,6 +2094,7 @@ class _StubColdFits(SequentialRefinement):
         self.refits.append(label)
         self.hooks.append(constrain)
         self.hold_sources.append(hold_source)
+        self.hold_vars.append(hold_vars)
         return None, _fake_result(0.1, parameters=[
             RefinedParameter(path=p, value=v)
             for p, v in self._values[label].items()])
@@ -2169,10 +2175,13 @@ def test_verification_refits_hold_what_the_chain_held_on_their_pattern():
     runner = _StubColdFits({"p2": {"phases.0.cell.a": 4.0},
                             "p3": {"phases.0.cell.a": 4.002}})
     fitted = {2: ("models of p2",), 3: ("models of p3",)}
+    held_vars = {2: {"t": 1.0}, 3: {"t": 2.0}}
     runner._verify_steps([_flagged("phases.0.cell.a", 2e-3)], [None] * 6,
                          [f"p{i}" for i in range(6)], "rietveld", _CHEAP, None,
-                         None, None, fitted=fitted)
+                         None, None, fitted=fitted, fitted_vars=held_vars)
     assert runner.hold_sources == [fitted[2], fitted[3]]
+    # a held named variable is not in the models, so it rides beside them
+    assert runner.hold_vars == [held_vars[2], held_vars[3]]
 
 
 def _synthetic_series(path: str, values, stderr) -> SeriesResult:
