@@ -447,19 +447,22 @@ line if the checkpoint ended it. Close with
    - **Post the proposed rows** in the PR's step-8 review, each with the
      judge's one-line verdict. In the `all` mode that review waits for the
      judge and goes out in the apply pass.
-   - **Settle the clear classes of tier-3 rows and tier-2 actions, and batch
-     the rest** (ruled 2026-11-22). A class is every row resting on the same
-     evidence (WP-2002 ruled 256 rows as 16 classes). A class whose answer is
-     clear, and which none of the maintainer's triggers reaches (the
-     maintainer's instructions, § "Before you bring me a decision"), is yours
-     to settle. Dispatch one fresh agent on Opus over the settled classes. Give
+   - **Settle the clear classes of tier-3 constant and suggestion rows, and
+     batch the rest** (ruled 2026-11-22, WP-2237). A class is every row
+     resting on the same evidence (WP-2002 ruled 256 rows as 16 classes). A
+     class of constants or suggestions whose answer is clear, and which none
+     of the maintainer's triggers reaches (the maintainer's instructions,
+     § "Before you bring me a decision"), is yours to settle. A tier-3 code,
+     action or default row, and a tier-2 action, always goes to the batch
+     (`tests/test_audit_table.py` refuses `approved_by="checked"` on one). Dispatch one fresh agent on Opus over the settled classes. Give
      it each class's evidence and diff, and withhold your tier, your grounds
      and the judge's verdict. A class it answers differently is not clear and
      goes to the batch. List the settled classes under **Settled for you**,
      and show the maintainer a random one in ten. Every other class goes to
      the batch as one question. After a settlement or a ruling, write
-     `grounds` and `approved` (that day's date) into the PR's rows. A settled
-     row's `grounds` ends "settled by Claude under <grounds>". Push them to
+     `grounds` and `approved` (that day's date) into the PR's rows, and
+     `approved_by="checked"` on a settled one. A settled row's `grounds` ends
+     "settled by Claude under <grounds>". Push them to
      its branch where
      `gh pr view N --json maintainerCanModify` says true; otherwise ask the
      contributor in the review.
