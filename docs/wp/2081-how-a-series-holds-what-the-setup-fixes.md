@@ -1,6 +1,6 @@
 # WP-2081 — How a series holds what the setup fixes (a design discussion)
 
-Milestone: series · Status: 🔄 2026-11-18 — the rulings are being built; the width-growth removal is in review
+Milestone: series · Status: 🔄 2026-11-22 — claimed by @yue-here (ghostshift runner): the 2026-11-22 rulings applied
 Depends on: 2003 soft (PR #1310 reshapes the ladder this discusses)
 Priority: P2 2026-11-04 — a scoping WP whose decision sets what a series frees after its first frame; Yue's account (2026-11-03) shows the default refits the instrument on every frame where an expert fixes it, and a held setup value lost on the cold rung carries to every later pattern (measured); no move
 
