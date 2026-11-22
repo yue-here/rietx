@@ -1,6 +1,6 @@
 # WP-2231 — the Plan and Text tabs at `/next`: a plan read as a recipe with Free and Fix rows, and a text buffer whose edits ride the action bar
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-21 — the Text tab in review (#1763); the maintainer's look at both tabs waits
+Milestone: gui-overhaul · Status: 🔄 2026-11-22 — the look's third PR in review (#PRNUM); the maintainer's look at its pictures waits
 Depends on: 2218 (hand fitting and the other graphs)
 Priority: P2 2026-11-21 — a feature the open milestone was opened for: R4, the next piece after R3
 
@@ -349,6 +349,62 @@ The maintainer's look (the third PR), most consequential first:
     (`pattern-*.png`).
 
 ## Handover log
+
+- **2026-11-22** — the maintainer's look at R4, the third PR (#PRNUM, branch
+  `wp2231-gui-r4-look`), finished from its pause. All eight look items are built. A typed
+  number in the Text tab now previews on the plot, as a slider move does. While a preview is
+  up, the Pattern graph's title line offers Show with Preview or Last fit, and Last fit draws
+  the fit whole with its own difference and Rwp. The graph strip gained the `?` box the model
+  strip got, in the prototype's words. The toggle's place and words are in no design, so they
+  wait for the maintainer beside the legend's existing switches (§ Questions 2).
+  - *Done* (this session, one commit each, dist rebuilt, pictures re-shot): item 8 in
+    `next/Text.svelte` and `next/Frame.svelte`, from the validation route's `delta.values`
+    through a `PreviewQueue` to `POST /api/preview`, the frame drawing the Text tab's answer
+    over the sliders' (§ Settled 19, 20); item 4 in `next/Pattern.svelte`; the graph strip's
+    box, `GRAPH_HELP` in `next/helpbox.ts` (§ Settled 21). § Settled 11 and 12 are marked
+    reversed, and § Settled 22 records the scale marks' geometry from the paused session.
+    The pictures' README lists every picture this PR re-shot.
+  - *Fixed on the way*: hiding a curve or swapping the preview moves the intensity range, and
+    the √ mark stayed where the old top tick had been, on the 20k label. The knob and preview
+    effects now place the marks again. Found in `toggle-legend`, a sibling of item 1.
+  - *Measured*: `[dev]` venv plus playwright, darwin/arm64, on the final tree
+    (main had not moved since the branch forked from `e439a8f48`): the fast selection 15296
+    passed, 433 skipped, 32 xfailed, through `serial.py`, alone on the machine at load 7-9
+    (`tests.added_test_times`: no python test added; the browser test changed in place);
+    vitest 911 passed in 51 files; svelte-check 0 errors over 470 files;
+    `tests/test_gui_layout_browser.py` 46 passed after the fixes below; ruff, the tutorials'
+    format check, skill caps, skill surface and audit delta clean; Vale 0 errors (281
+    warnings, none on a file this branch touches); `tests.reader_output` exit 0, unchanged
+    against the merge base. The first run of every `tests/*_browser.py` with the GUI python
+    files and `test_docs_consistency.py` was 3 failed and 603 passed. All three were this
+    PR's: the Show choice moved Show all and ⋯ 183 px when a preview appeared; a Pattern
+    graph rebuilt under a preview drew an empty plot; the frame-control test counted the `?`
+    buttons as tabs. Each is fixed, and the fast selection above ran after the fixes.
+  - *Review*: `/code-review high --fix` found ten. Seven fixed in one commit, with a vitest
+    checking every `?` box anchor against `gui-guide.md`'s headings: a text refusal drawn over
+    the sliders' curves; a repeated identical preview request; the scale marks republished
+    when nothing moved; `PatternSpec.titled` missing from `rxplot.d.ts` (svelte-check red);
+    two doc comments on the wrong declarations. Three of the seven skipped findings were then
+    fixed by hand: the Text tab's preview always winning over a later slider drag (now the
+    panel that answered last, § Settled 19); the Structure box's words, which promised a
+    preview the Structure graph does not draw for a text edit; and the `?` box not taking
+    focus as it opens. Declined: `HelpBox` re-implementing `lib/help.ts:manualUrl`, and the
+    preview `send` written in both `Interactive.svelte` and `Text.svelte` (sharing either
+    moves `api` into `lib/interactive.ts`, a seam outside this diff); uPlot's private
+    `_splits` read by the scale marks' placement. No heuristic, audit-table row or CLAUDE.md
+    line was added, so no generality review.
+  - *Not done*: the narrow layout (1000 × 640) runs the graph strip's tabs and its `?` off the
+    strip's right edge, as it ran the tabs before; listed, not fixed. The `plan-lists`,
+    `plan-picker`, `plan-stagemenu`, `plan-settings`, `plan-menu`, `text-invalid` and
+    `text-offer` pictures predate both `?` buttons. The register guard's reach into
+    `gui/src/next/` stays as the second PR's entry left it. Nothing here changes what a fit
+    prints or returns.
+  - *Gotchas*: a vitest mounting `next/Text.svelte` with a preview needs `rxplot` mocked,
+    since the tab imports it dynamically. In a fresh worktree `gui/node_modules` is absent,
+    and vitest then fails to load its config with a module-not-found message.
+  - *Next*: the maintainer's look at the third PR's pictures, which closes the WP: the
+    toggle's place and words (§ Questions 2), then Questions 1 (a)-(c), carried from
+    WP-2227.
 
 - **2026-11-22** — the maintainer's look at R4, the third PR (branch `wp2231-gui-r4-look`, no
   PR yet), paused by the shift's budget. Six of the eight look items landed, one commit each,
