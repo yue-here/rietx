@@ -712,6 +712,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2228](2228-a-reflection-past-the-range-end-keeps-its-tail.md) | A reflection centred past the range end keeps its tail | ⬜ | P2 | [2222](2222-the-closing-stage-off-by-default.md) ([2075](2075-the-result-records-its-fit-range-and-what-lies-outside-it.md) soft) |
 | [2230](2230-an-estimable-combination-keeps-its-esd.md) | An estimable combination keeps its esd | 🔄 2026-11-21 | P3 | [2219](2219-a-direction-the-data-does-not-determine-has-no-esd.md) ([2062](2062-pawley-is-the-structure-free-default.md) soft) |
 | [2232](2232-a-size-near-no-broadening-is-a-bound.md) | A size near no broadening is quoted as a bound | ⬜ | P3 | — ([2060](2060-the-likelihood-interval-where-an-esd-cannot-be-read.md) soft) |
+| [2239](2239-a-joint-stage-seeds-and-holds-a-stephens-block.md) | A joint stage seeds and holds a Stephens block as a single fit does | ⬜ | P3 | — |
 
 ### <a id="unscheduled-a-long-run-is-not-one-fit"></a>A long run is not one fit
 
@@ -739,7 +740,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2222](2222-the-closing-stage-off-by-default.md) | The closing stage off by default | ✅ 2026-11-19 | — | — |
 | [2224](2224-a-refit-of-a-converged-model-runs-one-stage.md) | A re-fit of a converged model runs one stage | ✅ 2026-11-19 | — | — ([2222](2222-the-closing-stage-off-by-default.md) soft) |
 | [2226](2226-the-preview-on-the-declared-windows.md) | The preview on the declared windows | ✅ 2026-11-21 | — | [2222](2222-the-closing-stage-off-by-default.md) |
-| [2235](2235-predict-on-a-grid-says-which-peak-cut-it-draws.md) | Predict on a grid says which peak cut it draws | ⬜ | P3 | — |
+| [2235](2235-predict-on-a-grid-says-which-peak-cut-it-draws.md) | Predict on a grid says which peak cut it draws | ✅ 2026-11-22 | — | — |
 
 ### <a id="unscheduled-one-file-many-patterns"></a>One file, many patterns
 
