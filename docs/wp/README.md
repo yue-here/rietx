@@ -88,6 +88,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2110](2110-a-trial-error-unit-stays-inside-its-memory.md) | A trial_error unit stays inside its memory under a raised budget | P2 | — | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
 | [2140](2140-every-atom-is-named-by-its-unique-label.md) | Every atom is named by its unique label | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2148](2148-a-held-standard-cell-pins-the-wavelength.md) | A held standard's cell pins the wavelength, and a skipped λ is said | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2151](2151-the-zrp2o7-peak-equations-on-its-data.md) | The ZrP₂O₇ input's peak equations on its data | P2 | — | [parametric](#parametric) |
 | [2228](2228-a-reflection-past-the-range-end-keeps-its-tail.md) | A reflection centred past the range end keeps its tail | P2 | [2222](2222-the-closing-stage-off-by-default.md) ([2075](2075-the-result-records-its-fit-range-and-what-lies-outside-it.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 
 ## <a id="v0-3"></a>v0.3 — multi-phase workflows
@@ -505,6 +506,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2107](2107-an-equation-over-a-reflection.md) | An equation over a reflection | 🔄 2026-11-22 | P2 | [1964](1964-a-parametric-equation-the-user-writes.md) |
 | [2108](2108-a-pawley-phase-beside-a-rietveld-phase.md) | A Pawley phase beside a Rietveld phase | ✅ 2026-11-15 | — | [1964](1964-a-parametric-equation-the-user-writes.md) ([2104](2104-a-parametric-cell-in-a-le-bail-or-pawley-joint-fit.md) soft) |
 | [2118](2118-one-formula-language-for-every-constraint.md) | One formula language for every constraint | ✅ 2026-11-07 | — | [1964](1964-a-parametric-equation-the-user-writes.md) ([2103](2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) soft) |
+| [2151](2151-the-zrp2o7-peak-equations-on-its-data.md) | The ZrP₂O₇ input's peak equations on its data | ⬜ | P2 | — |
 
 ## <a id="gui-overhaul"></a>gui-overhaul — the GUI redesigned around the pattern and the model
 
