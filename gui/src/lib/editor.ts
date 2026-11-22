@@ -19,8 +19,11 @@
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { HighlightStyle, StreamLanguage, syntaxHighlighting } from "@codemirror/language";
 import { lintGutter, setDiagnostics, type Diagnostic } from "@codemirror/lint";
-import { Compartment, EditorState, type Extension } from "@codemirror/state";
+import { Compartment, EditorState, RangeSetBuilder, StateEffect, StateField,
+         type Extension } from "@codemirror/state";
 import {
+  Decoration,
+  type DecorationSet,
   EditorView,
   crosshairCursor,
   drawSelection,
@@ -111,6 +114,12 @@ export function editorTheme(dark: boolean): Extension {
         border: "1px solid var(--line)",
       },
       ".cm-lineNumbers .cm-gutterElement": { color: "var(--muted)" },
+      // a line the rendering does not have (WP-2231): the prototype's
+      // highlighted edit, over the line's text and not the gutter
+      ".cm-edited": {
+        backgroundColor: "color-mix(in srgb, var(--accent) 16%, transparent)",
+        borderRadius: "2px",
+      },
     },
     { dark },
   );
@@ -156,11 +165,39 @@ const rxtLanguage = StreamLanguage.define<StreamState>({
   tokenTable: TOKEN_TAGS,
 });
 
+/** The edited lines as marks over each line's text, set whole by `setEdited`
+ *  and carried through the edits typed between two sets. */
+const setEditedEffect = StateEffect.define<number[]>();
+const EDITED_MARK = Decoration.mark({ class: "cm-edited" });
+
+const editedField = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(marks, tr) {
+    let out = marks.map(tr.changes);
+    for (const effect of tr.effects) {
+      if (!effect.is(setEditedEffect)) continue;
+      const doc = tr.state.doc;
+      const builder = new RangeSetBuilder<Decoration>();
+      for (const n of [...effect.value].sort((x, y) => x - y)) {
+        if (n < 1 || n > doc.lines) continue;
+        const line = doc.line(n);
+        const from = line.from + (line.text.length - line.text.trimStart().length);
+        if (from < line.to) builder.add(from, line.to, EDITED_MARK);
+      }
+      out = builder.finish();
+    }
+    return out;
+  },
+  provide: (field) => EditorView.decorations.from(field),
+});
+
 export interface EditorHandle {
   /** Replace the document with a server rendering, keeping cursor and scroll. */
   setDoc(text: string): void;
   /** Paint the server's problems as lint diagnostics. */
   setProblems(problems: Problem[]): void;
+  /** Mark these lines (1-based) as edited, replacing the previous marks. */
+  setEdited(lines: number[]): void;
   /** Put the caret on a line (1-based) and scroll it into view. */
   goToLine(line: number): void;
   /** Re-measure after the container was hidden and shown again. */
@@ -199,6 +236,7 @@ export function createEditor(options: EditorOptions): EditorHandle {
     rectangularSelection(),
     crosshairCursor(),
     lintGutter(),
+    editedField,
     EditorState.allowMultipleSelections.of(true),
     rxtLanguage,
     syntaxHighlighting(HIGHLIGHT),
@@ -248,6 +286,9 @@ export function createEditor(options: EditorOptions): EditorHandle {
         };
       });
       view.dispatch(setDiagnostics(view.state, diagnostics));
+    },
+    setEdited(lines: number[]) {
+      view.dispatch({ effects: setEditedEffect.of(lines) });
     },
     goToLine(line: number) {
       const at = view.state.doc.line(Math.min(Math.max(line, 1), view.state.doc.lines));

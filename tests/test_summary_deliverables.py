@@ -92,6 +92,26 @@ def test_microstructure_is_not_quotable_under_resolution_unconstrained(fitted):
     assert text.index(caveat) < text.index("PhaseMicrostructure:")
 
 
+def test_microstructure_is_not_quotable_under_instrument_width_held(fitted):
+    """WP-2225 (ruled 2026-11-21): a held instrument width leaves the
+    specimen widths a split the plan chose, so the block says so the way
+    RESOLUTION_UNCONSTRAINED does, and both lines print when both fire."""
+    _ref, result, _report = fitted
+    held = Diagnostic(level="warning", code="INSTRUMENT_WIDTH_HELD", message="m",
+                      where=["instrument.profile.u", "phases.0.gauss_strain"])
+    caveat = "size and strain: not quotable (INSTRUMENT_WIDTH_HELD)"
+    text = _rows(fitted, "microstructure", diagnostics=[*result.diagnostics, held])
+    assert caveat in text and "conditional on held instrument widths" in text
+    assert text.index(caveat) < text.index("PhaseMicrostructure:")
+    assert "(RESOLUTION_UNCONSTRAINED)" not in text
+    ru = Diagnostic(level="warning", code="RESOLUTION_UNCONSTRAINED", message="m",
+                    where=["instrument.profile.u"])
+    both = _rows(fitted, "microstructure", diagnostics=[*result.diagnostics, ru, held])
+    assert both.count("size and strain: not quotable") == 2
+    assert "(RESOLUTION_UNCONSTRAINED)" in both and caveat in both
+    assert both.index(caveat) < both.index("PhaseMicrostructure:")
+
+
 def test_microstructure_says_when_nothing_measured_it(fitted):
     text = _rows(fitted, "microstructure", microstructure=[])
     assert "microstructure: not measured on this result" in text
