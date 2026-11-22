@@ -2865,6 +2865,20 @@ def test_unique_labels_disambiguates_by_position():
     assert _labels_for([None, None, None], ["x", "x", "y"]) == ["x", "x_1", "y"]
 
 
+def test_a_generated_label_never_takes_a_name_already_given():
+    """The suffix ``unique_labels`` makes is itself a name, and the series
+    diagnostics find a pattern by it (#1395's review): before, the second ``a``
+    became ``a_1`` while the third pattern was already ``a_1``, and an empty
+    label fell back to the index another pattern was named by."""
+    from rietx.sequential import unique_labels
+
+    assert unique_labels(["a", "a", "a_1"]) == ["a", "a_1", "a_1_2"]
+    assert unique_labels(["a", "a_1", "a"]) == ["a", "a_1", "a_2"]
+    # an empty label takes the name an unlabelled pattern gets, never the index
+    assert _labels_for([None, None], ["", "0"]) == ["p000", "0"]
+    assert _labels_for([None, None], ["", "p000"]) == ["p000", "p000_1"]
+
+
 def test_every_patterns_events_carry_its_place_in_the_series():
     """Per-pattern telemetry, and not one new ``EventKind``.
 

@@ -799,3 +799,10 @@ defaulted to empty, the 0.25 → 0.26 rule, so every stored document loads and
 refines as before.  A bump rather than "also in 0.61" because 1.12.0 shipped
 0.61: a 1.12 build refuses a phase or instrument carrying the key, and the
 version now says why.
+
+Also in 0.62 (#1395's review): ``SeriesResult`` refuses two patterns, across
+``entries`` and ``failures``, under one name, the label or the index where the
+label is empty, which is how every series diagnostic's ``where`` names its
+pattern.  No field moves; a stored series that gives two patterns one name no
+longer loads, and the error names both.  A run never wrote one except through
+the ``unique_labels`` collision fixed in the same change.

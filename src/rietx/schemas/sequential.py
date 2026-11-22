@@ -39,6 +39,17 @@ from .results import (
 )
 
 
+def _pattern_name(index: int, label: str) -> str:
+    """The name a series diagnostic gives one pattern in its ``where``.
+
+    The pattern's label, or its index where it has none.  Every series fence
+    names its pattern this way, and a reader of ``where`` (the GUI's trace)
+    finds the pattern by it, so :class:`SeriesResult` refuses two patterns
+    under one name rather than leave that reader to pick one.
+    """
+    return label or str(index)
+
+
 def _rejected(fit) -> bool:
     """Whether ``fit`` is a fit the chain reads no value from (WP-2003, C2 q5).
 
@@ -1001,6 +1012,32 @@ class SeriesResult(Base):
         if isinstance(data, dict) and "discontinuities" in data:
             data = {k: v for k, v in data.items() if k != "discontinuities"}
         return data
+
+    @model_validator(mode="after")
+    def _one_name_per_pattern(self) -> SeriesResult:
+        """Refuse two patterns under one name (#1395's review).
+
+        A series diagnostic names its pattern only by
+        :func:`_pattern_name`, so two patterns sharing one would leave its
+        ``where`` naming either and a mark landing on the wrong point.
+        :func:`rietx.sequential.unique_labels` keeps a run from writing such
+        a series; this refuses one built or edited by hand.
+        """
+        seen: dict[str, tuple[str, int]] = {}
+        rows = [("entries", i, p) for i, p in enumerate(self.entries)]
+        rows += [("failures", i, p) for i, p in enumerate(self.failures)]
+        for field, i, p in rows:
+            name = _pattern_name(p.index, p.label)
+            first = seen.setdefault(name, (f"{field}[{i}]", p.index))
+            if first[1] != p.index:
+                raise ValueError(
+                    f"two patterns are both named {name!r}: {first[0]} (pattern "
+                    f"{first[1]}) and {field}[{i}] (pattern {p.index}). A series "
+                    f"diagnostic names its pattern by its label (its index where "
+                    f"the label is empty), so it could mean either. Give each "
+                    f"pattern its own label; rietx.sequential.unique_labels "
+                    f"makes a list of labels distinct.")
+        return self
 
     def __len__(self) -> int:
         return len(self.entries)
