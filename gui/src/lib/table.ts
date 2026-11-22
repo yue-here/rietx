@@ -100,6 +100,9 @@ export function heldKind(row: ParamRow): "" | "locked" | "tied" | "mode" | "hold
   return "";
 }
 
+/** What `heldGlyph` answers for a row the padlock marks: drawn, not typed. */
+export const PADLOCK = "padlock";
+
 /** The mark a held row wears where its vary checkbox would be, or "" if free.
  *
  * Here rather than in either panel because two of them draw it now (WP-1214):
@@ -113,12 +116,15 @@ export function heldKind(row: ParamRow): "" | "locked" | "tied" | "mode" | "hold
  * `refinable` is the server's answer and it knows reasons this client may not,
  * and a held row drawn with nothing in the box's place reads as a control that
  * failed to render — which is what the fourth reason did until WP-1214.
- * `tests/test_gui_server.py` fails when a fifth arrives. */
+ * `tests/test_gui_server.py` fails when a fifth arrives.
+ *
+ * A lock and a hold both answer `PADLOCK`, which `HeldMark.svelte` draws as
+ * the one stroked padlock (`Padlock.svelte`), never an emoji (the maintainer's
+ * look of 2026-11-22, WP-2212). The mark tells them apart by its ink. */
 export function heldGlyph(row: ParamRow): string {
   const kind = heldKind(row);
-  if (kind === "locked") return "🔒";
+  if (kind === "locked" || kind === "hold") return PADLOCK;
   if (kind === "tied") return "=";
-  if (kind === "hold") return "📌";
   if (kind === "degenerate") return "≈";
   return kind === "" && row.refinable ? "" : "·";
 }
