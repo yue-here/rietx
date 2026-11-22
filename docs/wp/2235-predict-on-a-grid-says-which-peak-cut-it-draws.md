@@ -1,6 +1,6 @@
 # WP-2235 — predict on a grid says which peak cut it draws
 
-Milestone: unscheduled · Status: ✅ 2026-11-22 — ruling A: after a fit `predict(grid)` compiles at the fit's peak cut, so it returns `y_calc` bit for bit; PR #PRNUM
+Milestone: unscheduled · Status: ✅ 2026-11-22 — ruling A: after a fit `predict(grid)` compiles at the fit's peak cut, so it returns `y_calc` bit for bit; PR #1773
 Track: A long run is not one fit
 Depends on: —
 
@@ -115,7 +115,7 @@ that has never fitted keeps today's default, `CLOSING_WINDOW_TOL` (1e-3 of each 
 
 ## Handover log
 
-- **2026-11-22** — closed (ghostshift runner, PR #PRNUM). After a fit, `predict` on a
+- **2026-11-22** — closed (ghostshift runner, PR #1773). After a fit, `predict` on a
   pattern's own grid now draws exactly the fitted curve, so a person or an agent redrawing
   a fit no longer needs the `compile_model` recipe. A `Refinement` that has never fitted
   still draws the near-complete tails a synthetic pattern wants. The price is the one Yue
@@ -156,7 +156,13 @@ that has never fitted keeps today's default, `CLOSING_WINDOW_TOL` (1e-3 of each 
     After: 0 of 5751 under both. A never-fitted twin is unchanged: it equals the
     default-cut compile on every channel. `predict()` equalled `y_calc` before and after.
     The new test fails both cases when the cut line is reverted (checked once).
-    TESTCOUNTS
+    Fast selection on this branch merged with `origin/main` (`e0b7ca3fd`, `[dev]`,
+    darwin arm64): 15122 passed, 443 skipped, 32 xfailed, 2 failed. Both failures
+    were this branch's (`refinement.md` 113 characters over its 50 000-character page
+    cap, and this closed WP's `### Inherited`), fixed in `4b9773e74` and re-run green.
+    Full selection on `4b9773e74`, alone under the machine's suite lock: 16081 passed,
+    454 skipped, 52 xfailed, 0 failed, 38 min. The test change is +2 cases (one case
+    replaced by three), 1.42 s for the three on the local junit file.
   - *Siblings in other WPs.* WP-1949's § Inherited note carries a dated "superseded in
     part" paragraph. PR #1640 (WP-1947) was still open, so no rebase was needed.
   - *Reader output.* `python -m tests.reader_output` exit 0, unchanged against
