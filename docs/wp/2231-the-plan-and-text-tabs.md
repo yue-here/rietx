@@ -1,6 +1,6 @@
 # WP-2231 — the Plan and Text tabs at `/next`: a plan read as a recipe with Free and Fix rows, and a text buffer whose edits ride the action bar
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-21 — the Text tab in review (#1763); the maintainer's look at both tabs waits
+Milestone: gui-overhaul · Status: 🔄 2026-11-22 — the look's third PR in review (#1769); the maintainer's look at its pictures waits
 Depends on: 2218 (hand fitting and the other graphs)
 Priority: P2 2026-11-21 — a feature the open milestone was opened for: R4, the next piece after R3
 
@@ -158,6 +158,9 @@ drawing them today (`Frame.svelte`'s `carried`); R4 makes both arms this page's 
   prototype's at the same size in the runner's scratch, with an inventory of where each of
   today's Plan and Text features lives. The last PR waits on the maintainer's look.
   Taken in the second PR; the inventory is the folder's README.
+- [x] The maintainer's look at R4 (§ Rulings, eight items), built in the third PR in the order
+  7, 5, 6, 1, 2, 3, 8, 4, with the graph strip's `?` box beside the model strip's. The
+  toggle's place and words wait for the maintainer (§ Questions 2).
 
 ## Acceptance
 
@@ -174,6 +177,33 @@ the prototype's (WP-2214 § How the maintainer reviews).
 ## Rulings
 
 Filled in as the maintainer answers § Questions.
+
+**The maintainer's look at R4, 2026-11-21** (relayed by the shift lead; eight items, built in
+the third PR in the order 7, 5, 6, 1, 2, 3, 8, 4):
+
+1. **The √ and Δ/σ scale markers sit in the tick-label column, not in a gutter of their own**
+   (option A). Each marker sits above its axis's top tick: √ over the intensity axis's top
+   tick, Δ/σ over the difference strip's top tick. It must not collide with a tick label, must
+   align to the tick column, and must survive a log or linear switch and a narrow panel. The
+   difference marker reads Δ/σ always; the weighted flag changes only the axis title's words
+   (WP-1029).
+2. **The Difference legend entry is centred vertically on the difference strip**, as Observed
+   and Last fit sit beside the main plot.
+3. **The horizontal gridlines come back as the prototype draws them.**
+4. **The Pattern graph gains a toggle between the last refined curve and the preview.** The
+   maintainer: "can we have a toggle between last refined and preview?" Its placement and
+   words follow the prototype where it has them; where no design gives them, the options go
+   to the maintainer in screenshots.
+5. **"Never freed" on the Plan tab is drawn as read-only chips** in the stage rows' chip
+   style, not as a sentence.
+6. **The Text tab has the `?` help box the other panels have.** This reverses § Settled 11.
+7. **The Text tab's stale notice is reworded and Re-read becomes a Button.** The words were
+   unclear and Re-read sat too close to them. Under `gui/STYLE.md` a Link goes somewhere and
+   Re-read is an action, so it is a Button (outlined, `line-strong`, hover ground).
+8. **A Text edit previews on the plot, as a slider move does.** This reverses § Settled 12.
+
+Items 6 and 8 are reversals of calls a runner settled; both are recorded in the maintainer's
+memory as reversals in one area (leaving out an affordance a sibling panel has).
 
 ## Questions
 
@@ -195,6 +225,19 @@ Filled in by the session that builds each PR. Question 1 is carried from WP-2227
      parameter on screen.
    Until they are answered, `/next` keeps `refit="stages"`, so every Refine on the staged plan
    runs in stages, as today's page does.
+2. **Where the toggle between the preview and the last fit sits, and what it says** (§ Rulings
+   item 4). No design gives either. The third PR builds the most conventional form: a
+   segmented choice `Show [Preview | Last fit]` on the Pattern graph's title line, as the
+   Peaks graph's `Show` is. It shows only while a preview is in hand, and the line keeps its
+   slot unseen at rest, so a preview appearing moves no control. Last fit draws the fit whole,
+   as with no preview, so the difference strip, the ticks and the title's Rwp are the fit's.
+   The choice returns to Preview when the preview goes. The alternative already on the page
+   is the legend's own switches: a click on Last fit hides the grey curve, while the
+   difference strip keeps the preview's residual. The cost of the built form is width. At
+   1440 px the title line elides the last fit's Rwp to "9.2…" (its tooltip keeps the whole
+   line). Pictures: `toggle-preview`, `toggle-last` and `toggle-legend` under
+   `2231-screenshots/`. "Last fit" is the page's existing word for the curve, where the
+   maintainer wrote "last refined".
 
 ## Settled by Claude
 
@@ -237,7 +280,8 @@ The Plan tab (the first PR), most consequential first:
 
 The Text tab (the second PR), most consequential first:
 
-11. **The `?` box is not built here.** The task line names it, and no panel on `/next` has
+11. **Reversed by the maintainer on 2026-11-21** (§ Rulings item 6); the third PR built the
+    box. As first settled: **The `?` box is not built here.** The task line names it, and no panel on `/next` has
     one yet. WP-2215 settled that the tab strips' `?` boxes (WP-2214 row 246) wait for a
     help piece, and no WP owns that piece yet. A box drawn for the Text tab alone would put
     a control on the strip that the other three tabs lack. The footer's words are removed from the tab and kept here for that
@@ -247,7 +291,9 @@ The Text tab (the second PR), most consequential first:
     as in Parameters. Edited values are highlighted; a line rietx cannot read is
     underlined." The alternative is a `?` button on the model strip now, drawn only on the
     Text tab.
-12. **The whole buffer is one pending edit, and a text edit draws no preview.** The
+12. **Reversed by the maintainer on 2026-11-21** (§ Rulings item 8); the third PR previews a
+    typed number. As first settled: **The whole buffer is one pending edit, and a text edit
+    draws no preview.** The
     prototype turns each changed value into an entry of the Parameters panel's pending set,
     so the Pattern graph previews it. Grounds: this WP's task line counts "a typed change"
     as one pending edit, and the document applies as one delta through the verbs a form
@@ -281,7 +327,105 @@ The Text tab (the second PR), most consequential first:
 18. **The tab's title names the file after the project**, `<name>.rxt`, from the project's
     path (`lib/filemenu.ts:projectStem`), as the File menu names the project.
 
+The maintainer's look (the third PR), most consequential first:
+
+19. **While both the Interactive tab and the Text tab hold a preview, the graphs draw the
+    panel that answered last**, and fall back to the other's when that one is taken down.
+    Curves and refusal always come from one panel. Grounds: the plot follows what the person
+    touched last, as the Structure graph already follows the sliders. The alternative, the
+    Text tab's always, was this PR's first draft; the code review found it left a slider
+    drag invisible on the Pattern graph while the Structure graph moved.
+20. **A buffer whose changes are only refine flags, settings or peak moves previews
+    nothing**, and takes down a preview it had. Grounds: none of them moves a curve, and
+    `POST /api/preview` takes values only. The values come from the validation route's own
+    diff (`delta.values`), so the client parses no `.rxt`.
+21. **The graph strip has a `?` box too**, at its right, in the prototype's words cut to what
+    the page does: the Background box drops the Points family the page does not draw, and
+    the Pattern box names the new Show choice. Grounds: item 6 gave the model strip one,
+    and the prototype draws one on each strip. The alternative was listing it as remaining.
+22. **A scale mark sits 12 px over its top labelled tick's centre, in 28 px each pane keeps
+    above its plot** (`LABEL_HALF`, `next/rxplot.mjs:MARK_ROOM`). The room keeps a tick at the
+    plot's top edge clear of the mark on every scale and at the narrow floor
+    (`pattern-*.png`).
+
 ## Handover log
+
+- **2026-11-22** — the maintainer's look at R4, the third PR (#1769, branch
+  `wp2231-gui-r4-look`), finished from its pause. All eight look items are built. A typed
+  number in the Text tab now previews on the plot, as a slider move does. While a preview is
+  up, the Pattern graph's title line offers Show with Preview or Last fit, and Last fit draws
+  the fit whole with its own difference and Rwp. The graph strip gained the `?` box the model
+  strip got, in the prototype's words. The toggle's place and words are in no design, so they
+  wait for the maintainer beside the legend's existing switches (§ Questions 2).
+  - *Done* (this session, one commit each, dist rebuilt, pictures re-shot): item 8 in
+    `next/Text.svelte` and `next/Frame.svelte`, from the validation route's `delta.values`
+    through a `PreviewQueue` to `POST /api/preview`, the frame drawing the Text tab's answer
+    over the sliders' (§ Settled 19, 20); item 4 in `next/Pattern.svelte`; the graph strip's
+    box, `GRAPH_HELP` in `next/helpbox.ts` (§ Settled 21). § Settled 11 and 12 are marked
+    reversed, and § Settled 22 records the scale marks' geometry from the paused session.
+    The pictures' README lists every picture this PR re-shot.
+  - *Fixed on the way*: hiding a curve or swapping the preview moves the intensity range, and
+    the √ mark stayed where the old top tick had been, on the 20k label. The knob and preview
+    effects now place the marks again. Found in `toggle-legend`, a sibling of item 1.
+  - *Measured*: `[dev]` venv plus playwright, darwin/arm64, on the final tree
+    (main had not moved since the branch forked from `e439a8f48`): the fast selection 15296
+    passed, 433 skipped, 32 xfailed, through `serial.py`, alone on the machine at load 7-9
+    (`tests.added_test_times`: no python test added; the browser test changed in place);
+    vitest 911 passed in 51 files; svelte-check 0 errors over 470 files;
+    `tests/test_gui_layout_browser.py` 46 passed after the fixes below; ruff, the tutorials'
+    format check, skill caps, skill surface and audit delta clean; Vale 0 errors (281
+    warnings, none on a file this branch touches); `tests.reader_output` exit 0, unchanged
+    against the merge base. The first run of every `tests/*_browser.py` with the GUI python
+    files and `test_docs_consistency.py` was 3 failed and 603 passed. All three were this
+    PR's: the Show choice moved Show all and ⋯ 183 px when a preview appeared; a Pattern
+    graph rebuilt under a preview drew an empty plot; the frame-control test counted the `?`
+    buttons as tabs. Each is fixed, and the fast selection above ran after the fixes.
+  - *Review*: `/code-review high --fix` found ten. Seven fixed in one commit, with a vitest
+    checking every `?` box anchor against `gui-guide.md`'s headings: a text refusal drawn over
+    the sliders' curves; a repeated identical preview request; the scale marks republished
+    when nothing moved; `PatternSpec.titled` missing from `rxplot.d.ts` (svelte-check red);
+    two doc comments on the wrong declarations. Three of the seven skipped findings were then
+    fixed by hand: the Text tab's preview always winning over a later slider drag (now the
+    panel that answered last, § Settled 19); the Structure box's words, which promised a
+    preview the Structure graph does not draw for a text edit; and the `?` box not taking
+    focus as it opens. Declined: `HelpBox` re-implementing `lib/help.ts:manualUrl`, and the
+    preview `send` written in both `Interactive.svelte` and `Text.svelte` (sharing either
+    moves `api` into `lib/interactive.ts`, a seam outside this diff); uPlot's private
+    `_splits` read by the scale marks' placement. No heuristic, audit-table row or CLAUDE.md
+    line was added, so no generality review.
+  - *Not done*: the narrow layout (1000 × 640) runs the graph strip's tabs and its `?` off the
+    strip's right edge, as it ran the tabs before; listed, not fixed. The `plan-lists`,
+    `plan-picker`, `plan-stagemenu`, `plan-settings`, `plan-menu`, `text-invalid` and
+    `text-offer` pictures predate both `?` buttons. The register guard's reach into
+    `gui/src/next/` stays as the second PR's entry left it. Nothing here changes what a fit
+    prints or returns.
+  - *Gotchas*: a vitest mounting `next/Text.svelte` with a preview needs `rxplot` mocked,
+    since the tab imports it dynamically. In a fresh worktree `gui/node_modules` is absent,
+    and vitest then fails to load its config with a module-not-found message.
+  - *Next*: the maintainer's look at the third PR's pictures, which closes the WP: the
+    toggle's place and words (§ Questions 2), then Questions 1 (a)-(c), carried from
+    WP-2227.
+
+- **2026-11-22** — the maintainer's look at R4, the third PR (branch `wp2231-gui-r4-look`, no
+  PR yet), paused by the shift's budget. Six of the eight look items landed, one commit each,
+  with the dist rebuilt and their pictures retaken under `docs/wp/2231-screenshots/`:
+  item 7 (the stale notice's words, and Re-read as a Button set apart from them), item 5
+  (Never freed as read-only chips), item 6 (a `?` box on the model strip for all four tabs,
+  in `gui/src/next/HelpBox.svelte` and `helpbox.ts`), item 1 (the √, log and Δ/σ marks in
+  the tick-label column, over the top labelled tick), item 2 (the Difference label on the
+  strip's zero line) and item 3 (horizontal gridlines on the intensity pane; `gui/STYLE.md`
+  § Plots updated for both).
+  - *Not done*: item 8 (a Text edit previews on the plot) was half-written and set aside
+    uncommitted: the validation route's `delta.values` feed a `PreviewQueue` in
+    `next/Text.svelte`, and the frame keeps the slider and text previews apart. The runner's
+    scratch holds the draft. Item 4 (the last refined or preview toggle) is not started; its
+    placement and words are in no design, so its options go to the maintainer in pictures.
+    The graph strip's `?` box is not built.
+  - *Measured so far*: vitest on the touched files, svelte-check not yet run; no fast suite,
+    browser files, lint steps or `tests.reader_output` yet. Nothing here changes what a fit
+    prints or returns.
+  - *Next*: item 8, then item 4, then § Settled 11 and 12 marked reversed, the pictures'
+    README, the gates and `/wp-handover`.
 
 - **2026-11-21** — the Text tab at `/next`, the second of R4's two PRs (#1763), and the
   screenshots and inventory for both tabs. The rebuilt page now shows the project as `.rxt`

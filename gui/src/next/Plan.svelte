@@ -112,16 +112,23 @@
   const chosen = $derived(presets.find((p) => p.name === preset) ?? null);
   const planName = $derived(chosen ? chosen.title : "This project's plan");
 
-  /** What no stage frees, in words: one name per family, with its count. */
-  const neverWords = $derived.by(() => {
+  /** What no stage frees, one read-only chip per family: its name, its count
+   *  and the paths it stands for, which the chip's tooltip lists. */
+  const neverChips = $derived.by(() => {
     const byPath = new Map(rows.map((r) => [r.path, r]));
-    const named = new Map<string, number>();
+    const named = new Map<string, string[]>();
     for (const path of neverFreed) {
       const key = byPath.get(path)?.help_key ?? null;
       const name = (key && globName(key, corpus)) || path;
-      named.set(name, (named.get(name) ?? 0) + 1);
+      const paths = named.get(name);
+      if (paths) paths.push(path);
+      else named.set(name, [path]);
     }
-    return [...named].map(([name, n]) => (n > 1 ? `${name} (${n})` : name));
+    return [...named].map(([name, paths]) => ({
+      words: paths.length > 1 ? `${name} (${paths.length})` : name,
+      mono: name === paths[0],
+      paths,
+    }));
   });
 
   /* ---- undo ------------------------------------------------------------ */
@@ -829,7 +836,17 @@
       </div>
       <div class="stg2">
         <span class="verb"></span>
-        <span class="muted">{current ? (neverWords.length ? neverWords.join(", ") : "Nothing") : "not applied"}</span>
+        {#if !current}
+          <span class="muted">not applied</span>
+        {:else if !neverChips.length}
+          <span class="muted">Nothing</span>
+        {:else}
+          <span class="bag">
+            {#each neverChips as chip (chip.words)}
+              <span class="pt still" class:mono={chip.mono} title={chip.paths.join("\n")}>{chip.words}</span>
+            {/each}
+          </span>
+        {/if}
       </div>
     </div>
 
@@ -1146,6 +1163,20 @@
     border-radius: 12px;
     background: color-mix(in srgb, var(--fg) 7%, var(--panel));
     color: var(--fg);
+  }
+
+  /* Never freed's chips wrap under each other, never under the verb column */
+  .bag {
+    display: flex;
+    flex: 1 1 0;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  /* a read-only chip (Never freed): no × to make room for */
+  .pt.still {
+    padding: 0 8px;
   }
 
   .pt.mono {
