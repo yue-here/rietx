@@ -65,7 +65,7 @@ at the three states.
 
 - **2026-11-22** — Task 1 is drawn and nothing is decided. Each option for the three questions
   is drawn over the real rebuilt page on the `fap` example, light and dark, in
-  `docs/wp/2227-screenshots/` (PR #PRNUM). Its README lists every picture. Drawing them turned up
+  `docs/wp/2227-screenshots/` (PR #1770). Its README lists every picture. Drawing them turned up
   two facts about today's page. After a one-stage re-fit the Plan tab shows every stage's Rwp
   blank. While one runs, the status bar shows the internal stage name `warm_refit (1/1)`. A
   fourth question came up: the action bar's "Staged plan, 6 stages" would then run one stage.
