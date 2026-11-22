@@ -111,6 +111,7 @@ def test_index_pattern_finds_the_cubic_cell_on_the_steep_flank(steep):
     # reduce the panel to cubic alone (INDEX_SYSTEMS_NOT_COVERED), whose units
     # finish in ~1 s of the quick preset's 120 s ceiling, so the order is not
     # a load sensor (tests/CLAUDE.md § Budgets in tests)
+    assert result.candidates, "no candidate survived the eight usable lines"
     best = result.candidates[0]
     assert (best.system, best.centring) == ("cubic", "F") and abs(
         best.cell[0] - A_SI) < 0.01, [
