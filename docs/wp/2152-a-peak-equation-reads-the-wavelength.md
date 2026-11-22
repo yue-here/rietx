@@ -89,7 +89,10 @@ takes no TOPAS spelling as one.
   wavelengths, one shared coefficient, against the built-in `lor_size` twin to 1e-12
   relative. A second test with λ free.
 - [x] `tests/test_cross_backend.py`: the λ-free row (`peak_equations_wavelength`).
-- [ ] Record which version moves, with its reason. Bump it.
+- [x] Record which version moves, with its reason. Bump it. The schema's: an "Also in
+  0.62" note in `docs/contracts/schema.md`, and no new number, since 0.62 is unreleased
+  (the rule above `SCHEMA_VERSION`). `GRAMMAR_VERSION` stays 2: the grammar parses any
+  name, and the names are the schema's. Settled by Claude under those two written rules.
 - [ ] Bring the warning's silence question to the maintainer with its options, or record
   that it was left firing.
 - [ ] Manual: the guide's name list and practice paragraph, `reference/data.md`, the
