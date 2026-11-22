@@ -115,16 +115,51 @@ that knew the answers. Three findings survive that.
 Cost: four agents at about 105k tokens each, 425k in all against a 150k estimate; each
 subagent starts at about 100k of auto-loaded context.
 
+The hindcast cannot answer the plan's main question, whether fewer calls reach him: every
+case was one he had ruled, so bringing it was correct, and no arm changed the routing rules.
+
+## The routing test (2026-11-22)
+
+Twenty-four real items brought to him between 2026-10-19 and 2026-11-17, gathered from the
+WP rulings files, the shift logs and the shift decision files. Twelve he delegated or
+approved as recommended (S); twelve he answered with a different pick or a new principle
+(B). Each Opus agent saw the item as brought, with its recommendation, and chose settle
+(with a pick) or bring. Two runs an arm, items in two orders. Arms: **T**, today's
+instructions; **N**, the consent-line and approval-field triggers removed, the threshold
+exclusion by direction, a pre-bring pass; **M**, N plus two triggers restored in plainer
+words (a change to what a default does on every fit; reading a meaning into one of his
+rules or amending one). The items quote private logs, so they live outside the repo.
+
+| Arm | Brought (of 24) | Needless brings (S items) | Wrong settlements (B items) |
+|---|---|---|---|
+| T | 17-18 | 9 | 2 |
+| N | 8-10 | 3 | 4 |
+| M | 14-16 | 5-7 | 1-2 |
+
+- The approval-field and printed-output triggers send most of the needless items: I5, I6,
+  I9 and I11 leave under N and M.
+- N's extra wrong settlements are all calls about a default plan or what one of his
+  rules means (I13, I17, I19), where he answered with a new principle.
+- M's remaining needless items share a trigger with real ones: what his rule means (I1,
+  I2), a threshold-fired action (I4, I10), a stored format (I7, a hard trigger).
+- Every arm settles I21 wrong: six of six agents read root CLAUDE.md's "a row the format
+  states two ways is refused rather than chosen" as covering a `.pcr` bare R symbol, which
+  he ruled read-and-notify on 2026-11-03 (WP-1911). An input for WP-2009.
+
+Cost: the gathering agent 311k tokens, six routing agents about 112k each; about 1.0M in
+all against a 0.5M estimate.
+
 ## Tasks
 
 - [x] Hindcast test (above).
+- [x] Routing test (above).
 - [ ] Global-instructions paste text to the maintainer (another repo).
 - [ ] The checker agent and the consent-line replacement (part 1, 5).
 - [ ] The register, its backfill and its marker test (part 2).
 - [ ] Rule 1's one-word replacement (part 3).
 - [ ] The queue token (part 4), after measuring why the five went stale.
 - [ ] The printout cap (part 6).
-- [ ] Log the two 2026-11-21 reversals in memory.
+- [x] Log the two 2026-11-21 reversals in memory.
 
 ## Acceptance
 
