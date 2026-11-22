@@ -69,6 +69,7 @@
     onui = () => {},
     preview = null,
     previewError = "",
+    compared = null,
     oncurves = () => {},
   }: {
     result: any;
@@ -101,6 +102,9 @@
     previewError?: string;
     /** the curves each fetch drew, which the sliders' ranges are measured from */
     oncurves?: (curves: Curves | null) => void;
+    /** the History tab's compared node: its step's name and its curve on its
+     *  own channels (WP-2211), or null */
+    compared?: { label: string; tt: Float64Array; y: Float64Array } | null;
   } = $props();
 
   /** The difference axis's choices: the three today's page draws
@@ -207,7 +211,8 @@
   const previewing = $derived(hasPreview && shown === "preview");
   /** Data only also hides the preview, which has no toggle in `toggles`. */
   const dataOnly = $derived(isDataOnly(toggles, hidden)
-    && (!previewing || hidden.includes("preview")));
+    && (!previewing || hidden.includes("preview"))
+    && (!compared || hidden.includes("compare")));
   const pct = (x: number | null | undefined) => (x == null ? "" : `${(x * 100).toFixed(2)} %`);
   /** The whole title line as its tooltip, since the title is what gives way
    *  (B1); a refused preview's reason is said there, in the route's words. */
@@ -281,6 +286,8 @@
       // has no view yet to keep: keeping one drew an empty plot (WP-2218)
       const p = untrack(() => (shown === "preview" ? preview : null));
       if (p) chart.setPreview(p.curves, false);
+      const cmp = untrack(() => compared);
+      if (cmp) chart.setCompared(cmp);
     } else {
       chart.setCurves(c, keep);
       chart.update(overlayNow());
@@ -437,6 +444,16 @@
     });
   });
 
+  // A compared node is a repaint too (WP-2211). A new one arrives drawn, as a
+  // curve a later build adds does: a hidden curve is not remembered.
+  $effect(() => {
+    const cmp = compared;
+    untrack(() => {
+      if (hidden.includes("compare")) hidden = hidden.filter((id) => id !== "compare");
+      chart?.setCompared(cmp);
+    });
+  });
+
   // -- the readout, handed to the frame's status bar ----------------------
 
   $effect(() => {
@@ -459,8 +476,9 @@
       beforeDataOnly = null;
     } else {
       beforeDataOnly = hidden;
-      // the preview has no toggle of its own but is no data either
-      hidden = [...dataOnlyHidden(toggles), "preview"];
+      // the preview and a compared node have no toggle of their own but are
+      // no data either
+      hidden = [...dataOnlyHidden(toggles), "preview", "compare"];
     }
   }
 
@@ -825,6 +843,9 @@
         }
       }
     }
+    // the compared node last, under every other label of the pane, so one
+    // appearing moves none of them
+    if (compared) out.push({ id: "compare", label: compared.label, top: main });
     return out;
   });
 
@@ -837,7 +858,7 @@
       return phases.length > 1 ? c.phase[i % c.phase.length] : c.obs;
     }
     return ({ obs: c.obs, calc: previewing ? c.last : c.calc, preview: c.calc, bkg: c.bkg,
-              diff: c.diff } as any)[id]
+              diff: c.diff, compare: c.compare } as any)[id]
       ?? "currentColor";
   }
 </script>
@@ -952,7 +973,7 @@
                 <path d="M5 3l6 6M11 3l-6 6" />
               {:else if l.id.startsWith("ticks:")}
                 <path d="M8 1.5v9" />
-              {:else if l.id === "bkg"}
+              {:else if l.id === "bkg" || l.id === "compare"}
                 <path d="M0 6h4M6 6h4M12 6h4" />
               {:else}
                 <path d="M0 6h16" />

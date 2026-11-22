@@ -115,6 +115,9 @@ export class PatternChart {
    *  fit's channels, and those channels' 2θ, or null while there is none. */
   private previewOn: { tt: Float64Array; last: ArrayLike<number>; calc: Float64Array } | null = null;
   private preview: Curves | null = null;
+  /** A history node's curve the History tab compares (WP-2211), on the
+   *  node's own channels, or null while none is. */
+  private compared: { tt: Float64Array; y: Float64Array } | null = null;
   private readonly ringEl: HTMLDivElement;
 
   constructor(host: HTMLElement, curves: Curves, overlay: Overlay, opts: ChartOptions) {
@@ -143,7 +146,7 @@ export class PatternChart {
       rawResidual: () => this.groupResidual(),
       layers: {
         main: { under: [shade, (u) => this.candidateLines(u)],
-                over: [(u) => this.previewLines(u), (u) => this.peakFit(u), (u) => this.peakMarkers(u), (u) => this.placeRing(u)] },
+                over: [(u) => this.previewLines(u), (u) => this.compareLine(u), (u) => this.peakFit(u), (u) => this.peakMarkers(u), (u) => this.placeRing(u)] },
         ticks: { under: [shade] },
         resid: { under: [shade] },
       },
@@ -210,6 +213,17 @@ export class PatternChart {
     this.fig.setCurves({ header, arrays: {
       ...base.arrays, delta: pick(pv.delta), delta_raw: pick(pv.delta_raw),
       cumulative_chi2: cum } }, keep);
+  }
+
+  /**
+   * Draw a history node's curve over the pattern, or take it off with null
+   * (WP-2211). A repaint: the view and every y range are kept. The curve is on
+   * the node's own channels, placed by their 2θ, since a node can have been
+   * fitted over another range than the head.
+   */
+  setCompared(compared: { tt: Float64Array; y: Float64Array } | null): void {
+    this.compared = compared;
+    this.fig.redraw();
   }
 
   /** New layer inputs; a repaint, never a refetch. */
@@ -330,6 +344,29 @@ export class PatternChart {
     ctx.save();
     if (!hidden.includes("calc")) trace(on.last, this.colors.last, 1.2);
     if (!hidden.includes("preview")) trace(on.calc, this.colors.calc, 1.4);
+    ctx.restore();
+  }
+
+  /** The compared node's curve, dashed in its own ink (`--plot-compare`),
+   *  as the design drew it. Its legend label is its switch. */
+  private compareLine(u: any): void {
+    const on = this.compared;
+    if (!on || this.overlay.hidden.includes("compare")) return;
+    const { ctx } = u, dpr = devicePixelRatio, { min, max } = u.scales.x, log = u.scales.y.distr === 3;
+    ctx.save();
+    ctx.strokeStyle = this.colors.compare;
+    ctx.lineWidth = 1.2 * dpr;
+    ctx.setLineDash([4 * dpr, 3 * dpr]);
+    ctx.beginPath();
+    let pen = false;
+    for (let q = 0; q < on.tt.length; q++) {
+      const x = on.tt[q], y = on.y[q];
+      if (x < min || x > max || !Number.isFinite(y) || (log && !(y > 0))) { pen = false; continue; }
+      const X = u.valToPos(x, "x", true), Y = u.valToPos(y, "y", true);
+      if (pen) ctx.lineTo(X, Y); else ctx.moveTo(X, Y);
+      pen = true;
+    }
+    ctx.stroke();
     ctx.restore();
   }
 

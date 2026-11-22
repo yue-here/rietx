@@ -56,7 +56,7 @@ PLOT_TS = ROOT / "gui" / "src" / "lib" / "plot.ts"
 #: zero line, a wash over what is not fitted), and neither carries a quantity.
 #: The pairs that sit under the floor are named below in :data:`NAMED_PAIRS`.
 CURVES = ("--plot-obs", "--plot-calc", "--plot-bkg", "--plot-diff", "--plot-last",
-          "--plot-peak", "--plot-peakfit", "--plot-candidate")
+          "--plot-compare", "--plot-peak", "--plot-peakfit", "--plot-candidate")
 
 #: What a *layer's* colour must clear: every other curve, plus the two inks a
 #: mark can otherwise be mistaken for.
