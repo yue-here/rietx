@@ -76,7 +76,7 @@ from ..schemas.instrument import Instrument
 from ..schemas.plan import PlanSpec, StageSpec
 from ..schemas.structure import Structure
 from ..strategy.refit import REFIT_MODES, WARM_REFIT_STAGE, _collapse
-from ..strategy.staged import PLAN_PRESETS, resolve_plan
+from ..strategy.staged import CLOSING_STAGE_NAME, PLAN_PRESETS, resolve_plan
 from ..viz import packed as _packed
 from ..viz import theme
 from ..viz.compare import decimation_index
@@ -1406,13 +1406,11 @@ class GuiSession:
         # stage the plan collapses to, and its closing stage when it has one
         one_stage = None
         if stages and not any(s.turn_off for s in plan.stages):
-            tree, head = p.refinement.history, p.refinement._head_id
-            if tree is not None and head is not None and head in tree:
-                ran = self._aligned_rwp(tree, head, _collapse(plan).run_stages())
-                if ran[0] is not None:
-                    one_stage = {"n_free": stages[-1]["n_free"], "rwp": ran[0]}
-                    if len(ran) > 1:    # the closing stage's, the answer's
-                        rwps[-1] = ran[-1]
+            ran = self._stage_rwp(p, _collapse(plan))
+            if ran[0] is not None:
+                one_stage = {"n_free": stages[-1]["n_free"], "rwp": ran[0]}
+                if len(ran) > 1:    # the closing stage's, the answer's
+                    rwps[-1] = ran[-1]
         # the rows the closing stage's fix takes back from its frees: a tied,
         # locked or held row its literals name was never free to keep fixed
         closing_entry = None if closing is None else {
@@ -2361,11 +2359,13 @@ class GuiSession:
             result = call(stream, token)
             finish = summarize(result, token)
         except RefinementCancelled as exc:
+            # ``how`` is said only of a fit that returned; a cancelled or
+            # failed one keeps none of what its one stage set while it ran
             finish = {"status": "cancelled", "stage": exc.stage,
-                      "node_id": exc.node_id,
+                      "node_id": exc.node_id, "how": None,
                       "completed_stages": [s.name for s in exc.completed_stages]}
         except Exception as exc:  # noqa: BLE001 — the run record IS the channel
-            finish = {"status": "failed",
+            finish = {"status": "failed", "how": None,
                       "error": {"code": "RUN_FAILED",
                                 "message": f"{type(exc).__name__}: {exc}"}}
         finally:
@@ -2425,8 +2425,10 @@ class GuiSession:
                 self._run["stage_index"] = data.get("index")
                 # a re-fit's one stage is said in words while it runs, as the
                 # graph's title says it after (WP-2227); a fallback's staged
-                # plan then starts a stage of another name, which clears it
-                if self._run["kind"] == "fit":
+                # plan then starts a stage of another name, which clears it.
+                # The closing stage ends either run, so it leaves the words be
+                if (self._run["kind"] == "fit"
+                        and self._run["stage"] != CLOSING_STAGE_NAME):
                     self._run["how"] = (
                         {"ran": "one_stage", "reason": "converged"}
                         if self._run["stage"] == WARM_REFIT_STAGE else None)
@@ -3726,8 +3728,10 @@ def _how_ran(ref, before: int) -> dict:
     Console.  ``ran`` is ``"one_stage"`` or ``"stages"``; ``reason`` is
     ``"converged"``, ``"released"`` (``released`` the paths the last fit held,
     ``families`` their help keys in order), ``"fallback"`` (``diverged``
-    whether the discarded one-stage fit diverged, read off its own nodes,
-    the ones this fit added past ``before``) or ``None``, a first fit's plan.
+    whether the discarded one-stage fit diverged, read off its last node of
+    the ones this fit added past ``before``: a result's status is its last
+    stage's, and ``WARM_REFIT_REJECTED`` says "diverged" off that one) or
+    ``None``, a first fit's plan.
     """
     from ..help import help_key_for
 
@@ -3739,9 +3743,10 @@ def _how_ran(ref, before: int) -> dict:
         tree = ref.history
         discarded = ([] if tree is None else
                      [tree.nodes[n] for n in tree.order[before:]
-                      if tree.nodes[n].notes.get("refit_discarded")])
-        out.update(reason="fallback", diverged=any(
-            n.metrics.status == "diverged" for n in discarded))
+                      if tree.nodes[n].notes.get("refit_discarded")
+                      and tree.nodes[n].action.kind == "stage"])
+        out.update(reason="fallback", diverged=bool(discarded) and (
+            discarded[-1].metrics.status == "diverged"))
     elif isinstance(how, list):
         families: list[str] = []
         for path in how:
