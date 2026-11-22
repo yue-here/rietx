@@ -50,7 +50,11 @@ machinery.
 | [1995](../wp/1995-soft-restraints-in-a-joint-fit.md) | restraints in a joint fit, and a penalty written in the grammar |
 | [2104](../wp/2104-a-parametric-cell-in-a-le-bail-or-pawley-joint-fit.md) | a shared cell across Le Bail or Pawley patterns |
 | [2107](../wp/2107-an-equation-over-a-reflection.md) | a width, position or intensity set by an equation over a reflection |
+| [2151](../wp/2151-the-zrp2o7-peak-equations-on-its-data.md) | the ZrP₂O₇ input's 2θ curve and TCHZ terms freed on its data, beside the calibration |
+| [2152](../wp/2152-a-peak-equation-reads-the-wavelength.md) | a peak equation reads the line's wavelength |
+| [2153](../wp/2153-a-peak-equations-width-held-inside-the-step.md) | a peak equation's width term held inside the LM step |
 | [2108](../wp/2108-a-pawley-phase-beside-a-rietveld-phase.md) | a structure-free phase beside a structural one |
+| [2154](../wp/2154-a-holder-offset-shared-across-a-joint-fit.md) | the holder's offset shared across a joint fit |
 | [2106](../wp/2106-an-equation-fitted-to-a-series-trajectory.md) | GSAS-II's practice: an equation fitted to a sequential trajectory |
 | [1965](../wp/1965-a-parametric-equation-declared-by-condition-and-glob.md) | a subset by condition and a target by glob, cut on 2026-11-04 from a formula as well |
 | [1325](../wp/1325-parametric-series.md) | what remains of it: bounds held inside the step, and starting structures that agree |
@@ -117,7 +121,8 @@ a WP sharpens its row here, because a bar set before reading a WP is a bar set t
   the instrument and a `gauss_fwhm_squared` and a `lor_fwhm` equation on each phase. A
   synthetic ramp of that shape recovers all twelve coefficients within 2 esd
   (`tests/test_peak_equations.py`), and the real-data run frees them beside the
-  calibration.
+  calibration. That run is [2151](../wp/2151-the-zrp2o7-peak-equations-on-its-data.md),
+  not yet done.
 - **Every evaluator answers one conformance table** (1964). Each row of (expression,
   bindings, expected value or error) passes on numpy, jax and torch. A `polynomial` and
   the same form written as an expression agree to 0.01 esd.
@@ -141,14 +146,21 @@ a WP sharpens its row here, because a bar set before reading a WP is a bar set t
   as the stored ones. Windows follow the equation, and every analytic column agrees with
   its oracle. A term written as an equation equals its built-in twin: `y*tan(th)` against
   `lor_strain`, a cosθ position against sample displacement, an exponential in s² (sinθ/λ
-  squared) against Biso.
+  squared) against Biso. Met on 2026-11-20 (PR #1635): single-fit mean z −0.24 to +0.31,
+  every mean z 0.50 or less over twelve ZrP₂O₇-shaped joint ramps, every twin under 1e-12
+  relative. Its open follow-ons are 2151, 2152 and 2153.
 - **A sample holder fits beside the sample** (2108). On a synthetic series with a second
   phase of scrambled intensities, over 12 pinned seeds, the first phase's structure, both
   cells and a constant height offset between the two have a mean z-score under 0.5 in size.
   The same fit with the second phase treated as a structure misses the truth, and the
   fixture is built so that it does. A height offset is what the holder is there to give.
   Met on single patterns on 2026-11-15 by declared peaks with formula centres, with no new
-  surface (`tests/test_holder_cell.py`); a joint fit sharing the offset was not tried.
+  surface (`tests/test_holder_cell.py`). Met on a series on 2026-11-22
+  ([2154](../wp/2154-a-holder-offset-shared-across-a-joint-fit.md)), again with no new
+  surface: five patterns at five specimen heights, fitted jointly with one expression
+  equation per line centre, share the holder's cell, its offset and the zero shift. Over
+  12 seeds every mean z lies between −0.32 and +0.26, each height's included, and the
+  offset's esd is 0.42-0.49 of one pattern's.
 - **GSAS-II's practice has a home** (2106). An equation in the grammar fits a
   `SeriesResult` trajectory with its esds, the coefficients carry esds, and on a synthetic
   ramp the result agrees with the joint fit's coefficients within their combined esds. On a

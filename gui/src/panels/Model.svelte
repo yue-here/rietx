@@ -36,6 +36,7 @@
    */
   import { ApiError, api } from "../api";
   import Help from "../Help.svelte";
+  import HeldMark from "../HeldMark.svelte";
   import {
     applyFields,
     atomRows,
@@ -72,7 +73,6 @@
     editState,
     formatEsd,
     formatValue,
-    heldGlyph,
     normalize,
     varyEdit,
     varyEditFor,
@@ -782,7 +782,7 @@
         onchange={(e) =>
           toggleVary(row, (e.currentTarget as HTMLInputElement).checked)} />
     {:else if row}
-      <span class="vary muted" data-vary={path} title={why(path)}>{heldGlyph(row)}</span>
+      <span class="vary muted" data-vary={path} title={why(path)}><HeldMark {row} /></span>
     {/if}
   {/snippet}
 
@@ -1133,7 +1133,7 @@
                            draws for every other flag in this row -->
                       <span class="vary muted" data-vary={glob}
                         title={why(row.dofs[0].path)}
-                        >{heldGlyph(row.dofs[0])}</span>
+                        ><HeldMark row={row.dofs[0]} /></span>
                     {/if}
                   {:else}
                     {@render varyBox(`${row.base}.x`)}
