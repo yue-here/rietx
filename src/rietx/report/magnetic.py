@@ -56,6 +56,7 @@ def analyse_moments(model, values, structure=None, *,
                     correlations: list | None = None,
                     flat_axes: dict[str, list[float]] | None = None,
                     turned: list[str] | None = None,
+                    covariance: tuple | None = None,
                     ) -> list[MomentEvidence]:
     """One row per magnetic site of the compiled model, or an empty list.
 
@@ -96,6 +97,14 @@ def analyse_moments(model, values, structure=None, *,
     says the moment was turned only where the fit says it turned it.
     ``None`` reads as "no such site", the state of every result stored
     before the fields.
+
+    ``covariance`` is the live covariance of the fit that produced the
+    result, :attr:`~rietx.Refinement._answer_covariance`'s tuple, or
+    ``None``.  A pair whose moduli lie on a direction the solve discarded has
+    no esd on either (WP-2219), and only that covariance can say whether
+    their quadrature sum is determined (WP-2230,
+    :func:`_estimable_pair_esd`).  It is never serialized, so a result read
+    back without its fit folds such a pair into nothing, as before.
     """
     if model is None:
         return []
@@ -117,12 +126,46 @@ def analyse_moments(model, values, structure=None, *,
                             flat_axes or {}, set(turned or ())))
     if correlations:
         out = _pair_degenerate_moments(
-            out, correlations, {r.path: float(values[r.path]) for r in out})
+            out, correlations, {r.path: float(values[r.path]) for r in out},
+            covariance=covariance)
     return out
 
 
+def _estimable_pair_esd(covariance, path_a: str, path_b: str,
+                        d_a: float, d_b: float) -> float | None:
+    """σ of √(d_a² + d_b²) through the live covariance, when the data
+    determine it, else ``None`` (WP-2230).
+
+    Used where a modulus has no esd because a discarded direction touched
+    it.  The gradient g = (d_a, d_b)/m is asked
+    :meth:`~rietx.params.vector.ParameterTable.unmeasured_functions`: on the
+    powder-degenerate pair the discarded direction is the tangent
+    (d_b, −d_a), g is orthogonal to it, and gᵀ·Cov·g through the
+    pseudo-inverse is the esd a fit on the sum alone would give (Searle
+    1971, p. 169).  ``None`` when the tuple carries no discarded subspace or
+    no correlation, or when the sum is not estimable.
+    """
+    _result, table, theta, stderr_internal, correlation, discarded = covariance
+    if stderr_internal is None or correlation is None or discarded is None:
+        return None
+    m = math.hypot(d_a, d_b)
+    paths = [path_a, path_b]
+    if m <= 0.0 or any(p not in table._paths for p in paths):
+        return None
+    g = np.array([[d_a / m, d_b / m]])
+    rows = [table._paths[p] for p in paths]
+    if table.unmeasured_functions(theta, stderr_internal, rows, g,
+                                  correlation=correlation, discarded=discarded)[0]:
+        return None
+    cov = table.physical_covariance(theta, stderr_internal, correlation, paths,
+                                    discarded=discarded)
+    return math.sqrt(max(float(g[0] @ cov @ g[0]), 0.0))
+
+
 def _pair_degenerate_moments(rows: list[MomentEvidence], correlations: list,
-                             signed: dict[str, float]) -> list[MomentEvidence]:
+                             signed: dict[str, float], *,
+                             covariance: tuple | None = None
+                             ) -> list[MomentEvidence]:
     """Q5: fold a powder-degenerate pair into one measured number.
 
     ``isotropy.analyse`` computes, pre-fit, how many of a candidate's free
@@ -151,6 +194,10 @@ def _pair_degenerate_moments(rows: list[MomentEvidence], correlations: list,
     flipped that cross term and reported √2·σ for a sum the data determines
     well (review of #433, finding 4).  Required rather than defaulted, so no
     caller can reach the unsigned form by leaving it out.
+
+    A row with no esd (its modulus on a discarded direction, WP-2219) folds
+    only through ``covariance`` (:func:`_estimable_pair_esd`), and only when
+    the sum is estimable; the two rows keep their absent esds.
     """
     by_path = {r.path: i for i, r in enumerate(rows) if r.path}
     claimed: set[str] = set()
@@ -165,19 +212,23 @@ def _pair_degenerate_moments(rows: list[MomentEvidence], correlations: list,
             continue
         ia, ib = by_path[c.path_a], by_path[c.path_b]
         a, b = updated[ia], updated[ib]
-        if a.magnitude_esd is None or b.magnitude_esd is None:
-            continue
         d_a, d_b = signed[a.path], signed[b.path]
         m = math.sqrt(d_a ** 2 + d_b ** 2)
         if m <= 0.0:
             continue
-        # rho belongs to (path_a, path_b); the rows are in that order here
-        cov_ab = c.rho * a.magnitude_esd * b.magnitude_esd
-        g_a, g_b = d_a / m, d_b / m
-        var_m = (g_a ** 2 * a.magnitude_esd ** 2
-                 + g_b ** 2 * b.magnitude_esd ** 2
-                 + 2.0 * g_a * g_b * cov_ab)
-        esd_m = math.sqrt(max(var_m, 0.0))
+        if a.magnitude_esd is None or b.magnitude_esd is None:
+            esd_m = (None if covariance is None else
+                     _estimable_pair_esd(covariance, a.path, b.path, d_a, d_b))
+            if esd_m is None:
+                continue
+        else:
+            # rho belongs to (path_a, path_b); the rows are in that order here
+            cov_ab = c.rho * a.magnitude_esd * b.magnitude_esd
+            g_a, g_b = d_a / m, d_b / m
+            var_m = (g_a ** 2 * a.magnitude_esd ** 2
+                     + g_b ** 2 * b.magnitude_esd ** 2
+                     + 2.0 * g_a * g_b * cov_ab)
+            esd_m = math.sqrt(max(var_m, 0.0))
         note = (f"not separately determined: this modulus and {b.atom}'s "
                 f"({b.path}) are correlated at rho={c.rho:.3f} — the powder "
                 f"measures their quadrature sum, sqrt(m_a^2 + m_b^2) = "

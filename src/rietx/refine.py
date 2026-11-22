@@ -2944,8 +2944,11 @@ class Refinement:
                                    n_free=len(table.free_paths) + _pawley_n(model),
                                    y_background=y_bkg)
         stats.max_shift_over_esd = outcome.max_shift_over_esd  # copied, never derived
-        stderr = (table.stderr_physical(outcome.theta, outcome.stderr_internal,
-                                        outcome.correlation)
+        # the node records the esds the stage's result reports, a tie the
+        # data determine included (WP-2230)
+        stderr = (table.stderr_physical(
+            outcome.theta, outcome.stderr_internal, outcome.correlation,
+            discarded=getattr(outcome, "discarded_subspace", None))
                   if outcome.stderr_internal is not None else {})
         metrics = NodeMetrics(
             statistics=stats, status=outcome.status, n_iterations=outcome.n_iterations,
@@ -6356,6 +6359,7 @@ class Refinement:
                                                  table.origin_holds))
             diagnostics.extend(_parent_strain_held_diagnostics(
                 stage_results, table.free_paths, self.structure))
+            diagnostics.extend(_instrument_width_held_diagnostics(stage_results))
             diagnostics.extend(_variable_not_freed_diagnostics(stage_results, table,
                                                                mode))
             diagnostics.extend(_origin_diagnostics(table, stage_results,
@@ -6376,7 +6380,8 @@ class Refinement:
                 stage_results=stage_results, diagnostics=diagnostics,
                 structure=self.structure, stderr_internal=outcome.stderr_internal,
                 esd_inflation=outcome.esd_inflation,
-                correlation=outcome.correlation, backend=self._backend,
+                correlation=outcome.correlation,
+                discarded=outcome.discarded_subspace, backend=self._backend,
                 solver=self._solver,
                 mu_r_source=self._mu_r_source, mu_r_skipped=self._mu_r_skipped,
                 guard=guard, max_shift_over_esd=outcome.max_shift_over_esd,
@@ -6398,7 +6403,8 @@ class Refinement:
             _apply_esds(table, self.result_, self.structure, self.instrument)
             self._answer_covariance = (self.result_, table, outcome.theta,
                                        outcome.stderr_internal,
-                                       outcome.correlation)
+                                       outcome.correlation,
+                                       outcome.discarded_subspace)
             self._answer = self._freeze_answer()
             self._stamp(self.result_, tree)
             if self._auto_intervals:
@@ -6786,16 +6792,22 @@ class Refinement:
             stage_results=[], diagnostics=list(stage_diagnostics),
             structure=self.structure, stderr_internal=outcome.stderr_internal,
             esd_inflation=outcome.esd_inflation,
-            correlation=outcome.correlation, backend=self._backend,
+            correlation=outcome.correlation,
+            discarded=outcome.discarded_subspace, backend=self._backend,
             solver=self._solver, mu_r_source=self._mu_r_source,
             mu_r_skipped=self._mu_r_skipped, guard=guard,
             max_shift_over_esd=outcome.max_shift_over_esd,
             significance=significance,
             phase_support_sigma=plan.phase_support_sigma, with_geometry=False)
+        # the stage's own covariance, so a moment pair on a discarded
+        # direction folds here as it does in ``report()`` (WP-2230)
+        covariance = (result, table, outcome.theta, outcome.stderr_internal,
+                      outcome.correlation, outcome.discarded_subspace)
         report = build_report(result, model=model,
                               values=table.decode(outcome.theta), plan=plan,
                               structure=self.structure, instrument=self.instrument,
-                              free_paths=list(table.free_paths))
+                              free_paths=list(table.free_paths),
+                              covariance=covariance)
         return report.for_stage(name)
 
     def run_stage(self, data: PatternData, stage: Stage, *,
@@ -6965,6 +6977,7 @@ class Refinement:
                                                  table.origin_holds))
             diagnostics.extend(_parent_strain_held_diagnostics(
                 [stage_result], table.free_paths, self.structure))
+            diagnostics.extend(_instrument_width_held_diagnostics([stage_result]))
             diagnostics.extend(_origin_diagnostics(
                 table, [stage_result], origins=[(stage.name, hold.origin)]))
             diagnostics.extend(_unknown_path_diagnostics(
@@ -7010,7 +7023,8 @@ class Refinement:
                 stage_results=[stage_result], diagnostics=diagnostics,
                 structure=self.structure, stderr_internal=outcome.stderr_internal,
                 esd_inflation=outcome.esd_inflation,
-                correlation=outcome.correlation, backend=self._backend,
+                correlation=outcome.correlation,
+                discarded=outcome.discarded_subspace, backend=self._backend,
                 solver=self._solver,
                 mu_r_source=self._mu_r_source, mu_r_skipped=self._mu_r_skipped,
                 guard=guard, max_shift_over_esd=outcome.max_shift_over_esd,
@@ -7026,7 +7040,8 @@ class Refinement:
             _apply_esds(table, self.result_, self.structure, self.instrument)
             self._answer_covariance = (self.result_, table, outcome.theta,
                                        outcome.stderr_internal,
-                                       outcome.correlation)
+                                       outcome.correlation,
+                                       outcome.discarded_subspace)
             self._answer = self._freeze_answer()
             self._stamp(self.result_, tree)
             if self._auto_intervals:
@@ -7167,6 +7182,9 @@ class Refinement:
         # the answer frozen with the result, never the live models: a later
         # cancelled fit keeps its completed stages and this result (WP-1421)
         answer = self._answer
+        live = self._answer_covariance
+        kw.setdefault("covariance", live if live is not None
+                      and live[0] is self.result_ else None)
         return build_report(self.result_, model=self._model,
                             values=answer["values"], plan=plan,
                             structure=answer["structure"],
@@ -7561,7 +7579,7 @@ class Refinement:
                 and live[0] is self.result_ and self._answer is not None):
             if self._model.mode != "rietveld" or not self._model.phases:
                 return None
-            _result, table, theta, stderr_internal, correlation = live
+            _result, table, theta, stderr_internal, correlation, discarded = live
             structure = self._answer["structure"]
             sites_of = [cp.sites for cp in self._model.phases]
         else:
@@ -7570,14 +7588,16 @@ class Refinement:
             structure = self.structure
             table = ParameterTable(structure, self.instrument)
             theta, stderr_internal, correlation = table.x0(), None, None
+            discarded = None
             sites_of = [compile_phase_sites(p) for p in structure.phases]
         if request is None:
             return geometry_from_sites(sites_of, table, theta, structure,
                                        stderr_internal=stderr_internal,
-                                       correlation=correlation)
+                                       correlation=correlation,
+                                       discarded=discarded)
         return request_table(request, sites_of, table, theta, structure,
                              stderr_internal=stderr_internal,
-                             correlation=correlation)
+                             correlation=correlation, discarded=discarded)
 
     def reflection_table(self) -> list["ReflectionRow"]:
         """Every (emission line, reflection) of the last fit as typed rows.
@@ -7726,6 +7746,12 @@ def _microstructure_lines(result: RefinementResult) -> list[str]:
         # strain read from them"
         lines.append("    size and strain: not quotable (RESOLUTION_UNCONSTRAINED); "
                      "the readings below are the fit's, not answers")
+    if any(d.code == "INSTRUMENT_WIDTH_HELD" for d in result.diagnostics):
+        # the code's own message: the specimen widths are "the remainder of a
+        # split that the plan's stage order chose"
+        lines.append("    size and strain: not quotable (INSTRUMENT_WIDTH_HELD); "
+                     "the specimen widths are a split the plan chose, conditional "
+                     "on held instrument widths")
     return lines + ["    " + line for block in result.microstructure
                     for line in str(block).splitlines()]
 
@@ -8711,6 +8737,96 @@ def _parent_strain_held_diagnostics(stage_results: list[StageResult],
                         "'phases.*.parent_cell.strain.*' in a stage's turn_on."),
         ))
     return out
+
+
+def _instrument_width_held_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
+    """``INSTRUMENT_WIDTH_HELD`` — the answer's specimen widths are what a held
+    instrument width leaves (WP-2225, ruled by the maintainer 2026-11-20).
+
+    The instrument width hold (:func:`_hold_width_twins`, WP-2002) fixes an
+    instrument width for a stage whenever a specimen width with its angular
+    shape is free beside it, since the data fix only the pair's sum
+    (Caglioti, Paoletti & Ricci 1958, *Nucl. Instrum.* **3**, 223: Gaussian
+    variances add, Lorentzian FWHMs add).  The held value is whatever an
+    earlier stage left, or the start.  So the specimen width is the remainder
+    of a split that the plan's stage order chose, and two starts disagree on
+    it by several of its own esds (5.11 on cpd-1a's fluorite ``lor_strain``,
+    WP-2225 task 1).  The held paths are not measurements and leave
+    ``RefinementResult.parameters`` (WP-1999), so without this finding the
+    split prints nowhere.
+
+    Said aloud as a package-made hold is (:func:`_phase_support_diagnostics`
+    for the absent-phase hold, :func:`_hold_diagnostics` for a caller's):
+    read off the **last** stage's :attr:`~StageResult.width_twins_held`,
+    because the answer is that stage's, and exact, with no threshold.  One
+    finding per fit.  ``where`` is the held instrument widths, then the
+    specimen widths beside them; ``value`` the count of held instrument
+    widths.  The message names a width term by its letter (U, X, Y) and any
+    other column, such as a ``vars.`` one, by its path.  Each held
+    width is named with the latest stage whose ``freed`` lists it, which is
+    the stage whose value it keeps, or whose ``seeded`` lists it, since a stage
+    seeds a floored width before the hold reads it; or its start where none
+    did.  The
+    specimen widths' esds are left as they are: they are conditional on the
+    held values, and whether they should say so is WP-2219's question.
+    ``summary(deliverable="microstructure")`` marks the readings not
+    quotable while this fires (:func:`_microstructure_lines`).
+    """
+    if not stage_results:
+        return []
+    last = stage_results[-1]
+    beside = last.width_twins_held or {}
+    if not beside:
+        return []
+    held = sorted(beside)
+    specimen = sorted({t for path in held for t in beside[path]})
+
+    def source(path: str) -> str:
+        # a stage seeds before it holds, so a floored width held in the stage
+        # that seeded it keeps the seed; one the stage refined keeps its answer
+        for sr in reversed(stage_results):
+            if path in sr.freed:
+                return f"stage {sr.name!r} left"
+            if path in (sr.seeded or {}):
+                return f"stage {sr.name!r} seeded"
+        return "the fit started from"
+
+    def term(path: str) -> str:
+        # instrument.profile.u reads as U; a vars. column keeps its path
+        head, _, letter = path.rpartition(".")
+        return letter.upper() if head == "instrument.profile" else path
+
+    by_source: dict[str, list[str]] = {}
+    for path in held:
+        by_source.setdefault(source(path), []).append(term(path))
+    n = len(held)
+    if len(by_source) == 1:
+        kept = (f"The held value{' is the one' if n == 1 else 's are the ones'} "
+                f"{next(iter(by_source))}")
+    else:
+        kept = "The held values are " + "; ".join(
+            f"the ones {phrase} for {' and '.join(names)}"
+            for phrase, names in by_source.items())
+    terms = [term(path) for path in held]
+    named = terms[0] if n == 1 else f"{', '.join(terms[:-1])} and {terms[-1]}"
+    pairs = "; ".join(f"{term(path)} with {', '.join(beside[path])}" for path in held)
+    return [Diagnostic(
+        level="warning", code="INSTRUMENT_WIDTH_HELD",
+        where=held + specimen, value=float(n),
+        message=(f"The last stage, {last.name!r}, held the instrument width "
+                 f"term{'' if n == 1 else 's'} {named} fixed because a specimen "
+                 "width with the same angular shape was free beside "
+                 f"{'it' if n == 1 else 'each'}: {pairs}.  {kept}.  The data fix "
+                 "only each pair's sum, so the specimen widths are the remainder of a "
+                 "split that the plan's stage order chose.  Their esds are "
+                 "conditional on the held "
+                 "instrument values."),
+        suggestion=("To measure the specimen widths, calibrate the instrument on a "
+                    "standard first: fit it with the lab_calibrate plan, its certified "
+                    "cell held, and save_instrument_profile.  Then "
+                    "load_instrument_profile here and refine with a sample-only plan "
+                    "such as lab_sample_refine."),
+    )]
 
 
 def _variable_not_freed_diagnostics(stage_results: list[StageResult],
@@ -9760,6 +9876,7 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
                   mode: Mode, status: str, stage_results: list[StageResult],
                   diagnostics: list[Diagnostic], structure: Structure,
                   stderr_internal=None, correlation=None,
+                  discarded=None,
                   esd_inflation: float | None = None,
                   backend: str = "numpy", solver: str = DEFAULT_SOLVER,
                   mu_r_source: str = "given",
@@ -9783,7 +9900,9 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # is the one writer); an evaluate-only caller leaves the honest None
     stats.max_shift_over_esd = max_shift_over_esd
 
-    stderr_phys = (table.stderr_physical(theta, stderr_internal, correlation)
+    # ``discarded``: a tie the data determine keeps its esd (WP-2230)
+    stderr_phys = (table.stderr_physical(theta, stderr_internal, correlation,
+                                         discarded=discarded)
                    if stderr_internal is not None else {})
     # at_bound is the BOUND_HIT and FLOOR_HIT findings projected onto the
     # rows, never a second bound test (WP-1076).  Only the free set was
@@ -9884,16 +10003,18 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # of a rung's result build (WP-1335)
     geometry = (geometry_table(model, table, theta, structure,
                                stderr_internal=stderr_internal,
-                               correlation=correlation)
+                               correlation=correlation, discarded=discarded)
                 if with_geometry else None)
     volumes = cell_volumes(table, theta, structure,
-                           stderr_internal=stderr_internal, correlation=correlation)
+                           stderr_internal=stderr_internal, correlation=correlation,
+                           discarded=discarded)
 
     # Each irrep block of a child on mode amplitudes (WP-1419): A_τ, its esd and
     # T² off the same final covariance, for geometry's reason.  Quantities only.
     distortion_totals = _distortion_totals(table, theta, structure, values,
                                            stderr_internal=stderr_internal,
-                                           correlation=correlation)
+                                           correlation=correlation,
+                                           discarded=discarded)
 
     # The widths read as a coherent domain size and a Δd/d (WP-1131), built
     # here for geometry's reason — the esds come off the same final Jacobian —
