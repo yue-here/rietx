@@ -569,40 +569,54 @@ def _row_pattern(gauss, coefficients, **profile) -> rx.PatternData:
     return rx.PatternData(two_theta=model.tt.tolist(), intensity=y.tolist())
 
 
-def _row_fits(stem, pattern, gauss, coefficients, plan, **profile):
+def _row_fits(stem, pattern, gauss, plan, start, truth):
+    """LM from ``start``, and the reference: TRF from ``truth``.
+
+    Each is ``(equation coefficients, instrument profile values)``.  The
+    reference starts at the truth because TRF from the bad start is no
+    oracle here: nothing holds the total width inside its step either, and
+    under rounding-level nudges of w's start (``1 + k·1e-14``) it stalled
+    under the floor in 5 of 7 (Rwp 0.191-0.195, every esd ``None``, the case
+    Linux CI met), where LM landed in 7 of 7 ([dev] macOS arm64, 2026-11-22).
+    """
     from rietx.viz.plots import plot_result
 
     out = {}
-    for solver in ("trf", "lm"):
+    for solver, (coefficients, profile) in (("lm", start), ("trf", truth)):
         s, ins = _row_models(gauss, coefficients, False, **profile)
-        result = rx.Refinement(s, ins, solver=solver, history=False).fit(pattern,
-                                                                          plan=plan)
-        out[solver] = result
+        out[solver] = rx.Refinement(s, ins, solver=solver, history=False).fit(
+            pattern, plan=plan)
     OUT.mkdir(exist_ok=True)
     plot_result(out["lm"], path=OUT / f"{stem}_lm.png")
-    return ({p.path: p for p in out["lm"].parameters},
-            {p.path: p for p in out["trf"].parameters}, out["lm"])
+    ref = {p.path: p for p in out["trf"].parameters}
+    assert all(p.stderr is not None for p in ref.values()), "the reference stalled"
+    return {p.path: p for p in out["lm"].parameters}, ref, out["lm"]
 
 
-def test_a_free_equation_is_held_above_the_floor_and_lm_lands_on_trf():
+@pytest.mark.parametrize("k", [0, -1, 3])
+def test_a_free_equation_is_held_above_the_floor_and_lm_lands_on_the_minimum(k):
     """The stall the rows were built for, reached through an equation.
 
     Without the equation's term (main before WP-2153) w stepped to -0.150,
     Γ_G² sat under the floor at 19 of 19 reflections, and the fit stopped at
-    Rwp 0.195 against TRF's 0.0416, u, v and w 27-427 esd from TRF's.  With
-    it LM lands within 0.0025 esd ([dev] macOS arm64, 2026-11-22).  The WP's
-    bar is 0.1 esd, 40 times that margin; the spread on Linux is not measured.
+    Rwp 0.195 against 0.0416 at the minimum, u, v and w 27-427 esd from it.
+    With it LM lands within 0.0025 esd of a fit started at the truth ([dev]
+    macOS arm64, 2026-11-22); the bar is the WP's 0.1 esd.  ``k`` nudges the
+    start by k·1e-14, two of the starts where TRF stalled (:func:`_row_fits`).
     """
     plan = rx.RefinementPlan(stages=[
         rx.Stage(name="scale", turn_on=_ROW_B),
         rx.Stage(name="eq_w", turn_on=_ROW_B + [_ROW_EQ + "w"]),
         rx.Stage(name="eq", turn_on=_ROW_B + [_ROW_EQ + "*", "instrument.profile.x"])])
     pattern = _row_pattern(ROW_TCHZ, ROW_TRUE)
-    lm, trf, result = _row_fits("peak_equation_width_rows", pattern, ROW_TCHZ,
-                                {"u": 0.0, "v": 0.0, "w": 1.0}, plan)
-    for k in "uvw":
-        path = _ROW_EQ + k
-        assert abs(lm[path].value - trf[path].value) < 0.1 * trf[path].stderr, path
+    lm, ref, result = _row_fits(
+        "peak_equation_width_rows", pattern, ROW_TCHZ, plan,
+        start=({"u": 0.0, "v": 0.0, "w": 1.0 * (1 + k * 1e-14)}, {}),
+        truth=(ROW_TRUE, {"x": 2e-3}))
+    for c in "uvw":
+        path = _ROW_EQ + c
+        assert lm[path].stderr is not None, path
+        assert abs(lm[path].value - ref[path].value) < 0.1 * ref[path].stderr, path
     assert result.stages[1].n_constraint_truncations >= 1
     assert not any(d.code == "PEAK_WIDTH_NOT_POSITIVE" for d in result.diagnostics)
 
@@ -618,12 +632,14 @@ def test_a_held_positive_term_lets_the_built_in_width_dip_where_the_total_does_n
         rx.Stage(name="w", turn_on=_ROW_B + ["instrument.profile.w"]),
         rx.Stage(name="profile", turn_on=_ROW_B + [f"instrument.profile.{k}"
                                                     for k in "uvwx"])])
-    pattern = _row_pattern("s", {"s": 3e-5}, u=9e-4, v=-2.4e-4, w=2e-6)
-    lm, trf, _result = _row_fits("peak_equation_width_rows_held", pattern, "s",
-                                 {"s": 3e-5}, plan, w=1e-3)
+    truth = {"u": 9e-4, "v": -2.4e-4, "w": 2e-6}
+    pattern = _row_pattern("s", {"s": 3e-5}, **truth)
+    lm, ref, _result = _row_fits("peak_equation_width_rows_held", pattern, "s", plan,
+                                 start=({"s": 3e-5}, {"w": 1e-3}),
+                                 truth=({"s": 3e-5}, {**truth, "x": 2e-3}))
     for k in "uvwx":
         path = f"instrument.profile.{k}"
-        assert abs(lm[path].value - trf[path].value) < 0.1 * trf[path].stderr, path
+        assert abs(lm[path].value - ref[path].value) < 0.1 * ref[path].stderr, path
     assert lm["instrument.profile.v"].value < 0.0
 
 
