@@ -1,6 +1,6 @@
 # WP-2212 — console lines by kind: the `>>>` prompt and the session as a script
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-21 — claimed by @yue-here (ghostshift runner)
+Milestone: gui-overhaul · Status: 🔄 2026-11-22 — built, in review (#1764); the maintainer's look at its pictures waits
 Depends on: 2214 (the rebuild's plan: it builds on piece R1's bottom panel)
 Priority: P2 2026-11-17 — was P3: R1's bottom panel landed with WP-2215 (#1534), so nothing blocks it; a feature the open milestone was opened for
 
@@ -193,6 +193,65 @@ The browser files skip in CI (no playwright there), so the PR quotes their local
   (the bottom panel).
 
 ## Handover log
+
+- **2026-11-22** — The Console at `/next` now reads as the session written in Python (PR #1764).
+  Each line knows whether it is a call, an output, a comment, a refusal or an engine event. A
+  call shows behind `>>>`, and a fit's engine events fold into one muted line under the call
+  that started it. File › Export › "Console as a Python script" writes the calls as a `.py`
+  file. A browser test drives a short session by clicks, runs the exported script on a copy of
+  the project, and gets the same parameter values. Two defects folded in from WP-2229 and
+  #1656 are fixed too: the instrument form's answer names what `set_vary` really changed, and
+  the Console's dropped-frame count is no longer always zero. Six visual choices are built in
+  their most conventional form and wait for the maintainer's look.
+  *Done*: every task. The tagged line type (`gui/src/next/console.ts`) and its writers. A call
+  is echoed only once its verb lands, in the order the server ran the verbs, since the script
+  repeats that order. A run's call is written before the run and retracted on refusal, so its
+  events have an entry to fold under. `Console.svelte` draws entries with a timestamp, a 4ch
+  prompt gutter, `--code-string` strings and muted italic comments. Copy copies the calls. The
+  session opens with the prototype's preamble (`import rietx as rx`,
+  `p = rx.Project.open(...)`, `ref = p.refinement`) and where the project stands. The script
+  (`sessionScript`) opens `sys.argv[1]`, so it runs on whichever copy it is given. A call with
+  no runnable form is a counted `# not repeated: …` comment. Server: the `script` export kind
+  (`POST /api/export/script`, documented in `reference/gui-power.md`). `instrument_patch`
+  answers set_vary's returns, releases from the registers when only the old model builds no
+  table, and says so in `release_after`. `follow()` reports lost frames on the SSE and polling
+  paths (`onDropped`), counting from its first answer. The GUI chapter waits for the swap
+  (WP-2214 § Tests and the manual, piece by piece). Screenshots, light and dark, are in
+  `docs/wp/2212-screenshots/`. A race in WP-2229's Terms-box browser test is fixed: it read
+  the rows between the edit and its free arm, and failed once under load.
+  *Measured*: the fast suite on the merged tree (origin/main at its fetch of 2026-11-22),
+  `[dev]` venv plus playwright, darwin/arm64, run alone through serial.py: 15299 passed, 433
+  skipped, 32 xfailed, one failure (the WP index, stale from filing WP-2237, regenerated after).
+  Four pytest tests added, three node-free and the browser test, which skips in CI. Added cost,
+  one local run: the browser test 10.90 s, the other three 0.27 s together. vitest 934 passed
+  (53 files); svelte-check 0 errors. Every `tests/*_browser.py` file run locally, two or three a
+  command: 49+1 failed (the race above, passing after the fix), 8, 59 and 61 passed. `python -m
+  tests.reader_output`: exit 0, unchanged.
+  *Review*: `/code-review high --fix` found eight. Five fixed: the release order on a tableless
+  model, the Apply echo order, the drop count after an empty first poll, `pushLine`'s count,
+  and the prompts worked out once per entry. Its Apply order put values before releases; the
+  route runs releases first, so that was corrected by hand. Three declined: a value sent with a
+  new limit lands inside the limits edit, which the script writes as a comment (a fix needs a
+  runnable limits edit); Copy copies display text, as the prototype's Copy does; the echo loop
+  shared by Background and Instrument is a cleanup. One finding outside the diff is filed as
+  WP-2237: opening another project resets the server's event count while the page's cursor
+  keeps the old one, so the new project's first events never reach the Console.
+  *Ruling, 2026-11-22, the maintainer, on the prototype's screenshots*: "not that sensitive, I
+  just wanted to do the development outside first. whatever is fine." Commit 0ed76de7c added
+  two of them by mistake and e1c5ac238 removed them. They stay in the branch's history and
+  merge as usual. The rest stay in the runner's scratch.
+  *Open for the maintainer* (visual, built conventionally, not settled):
+  (1) timestamps, prompts and comments take `--muted`, where the prototype draws a fainter
+  ink: no mix of muted and panel fainter than 10 % clears 4.5:1 (light 4.73:1), STYLE's
+  contrast rule; (2) the Text tab's strings still take `--warn`, not the new `--code-string`;
+  (3) timestamps and outputs start after the prompt gutter, where the prototype starts them at
+  column 0; (4) the fold's wording, "47 engine events, 6 stages, 33 evaluations"; (5) the
+  `set_values` echo prints compact JSON (`{"instrument.zero_shift":0.01}`); (6) the preamble's
+  output line gives Rwp and the node count, where the prototype adds the free count.
+  *Gotchas*: macOS's filesystem is case-insensitive, so `Console.test.ts` overwrote
+  `console.test.ts`; the mount test is `consolePanel.test.ts`. The Console is mounted only
+  while the bottom panel shows (`footer button.console`).
+  Next: the maintainer's look at the six visual choices, against the screenshots; then close.
 
 - **2026-11-21** — The maintainer has ruled the console's two open visual questions from drawn
   options, so the session that builds it can start on the code. A fit's engine events fold
