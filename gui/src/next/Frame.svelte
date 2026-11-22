@@ -18,6 +18,7 @@
   import { onMount, untrack } from "svelte";
 
   import { ApiError, api } from "../api";
+  import { py } from "../lib/py";
   import FileMenu from "../panels/FileMenu.svelte";
   import NewProject from "../panels/NewProject.svelte";
   import Palette from "../panels/Palette.svelte";
@@ -43,8 +44,9 @@
   import { eventLine, makeLine, pushLine, sessionScript, sharedSay, stageScript, type Line,
            type LineKind } from "./console";
   import HelpBox from "./HelpBox.svelte";
+  import History from "./History.svelte";
   import { howComment, howWords } from "./howran";
-  import { GRAPH_HELP, MODEL_HELP } from "./helpbox";
+  import { GRAPH_HELP, HISTORY_HELP, MODEL_HELP } from "./helpbox";
   import Keys from "./Keys.svelte";
   import Menu, { type MenuAt } from "./Menu.svelte";
   import Params from "./Params.svelte";
@@ -156,6 +158,12 @@
   let graphTab = $state<GraphTab>("pattern");
   let modelTab = $state<ModelTab>("params");
   let bottomTab = $state<BottomTab>("console");
+  /** The History tab (WP-2211): its view, a view choice kept for the session
+   *  like the panels' layout; its node count, for the tab's label; and the
+   *  node whose fit is overlaid on the pattern. */
+  let historyView = $state<"graph" | "table">("graph");
+  let historyCount = $state<number | null>(null);
+  let compared = $state.raw<{ id: string; label: string; tt: Float64Array; y: Float64Array } | null>(null);
   let wf = $state<WorkflowId>("refine");
   let step = $state(0);
 
@@ -322,24 +330,43 @@
    * The session's first entry, as the prototype opens it: the lines that bind
    * the names every later call uses, and where the project stands. The script
    * writes its own preamble, so these lines are marked and it skips them.
+   * The output line reads as the prototype's: Rwp, the free count and the
+   * history nodes. The free count is `GET /api/params`' `n_free`, the rows
+   * whose vary flag is set, as the Parameters panel counts them; a plan's
+   * stages replace those flags, so it is not what a Refine frees. An
+   * unreadable table leaves it out. The count is read beside the result
+   * (`freeCount`), so the open waits for neither in turn, and the lines are
+   * written in one turn, so they share an entry.
    */
-  function sayPreamble() {
+  async function freeCount(): Promise<number | null> {
+    try {
+      const n = (await api.params())?.n_free;
+      return typeof n === "number" ? n : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function sayPreamble(free: number | null) {
     if (!project?.path) return;
+    const path = project.path;
     const bind = (text: string) => write({ ...makeLine("call", text), preamble: true });
     bind("import rietx as rx");
-    bind(`p = rx.Project.open(${JSON.stringify(project.path)})`);
+    bind(`p = rx.Project.open(${JSON.stringify(path)})`);
     bind("ref = p.refinement");
     const rwp = result?.statistics?.rwp;
     const nodes = project.n_nodes ?? 0;
-    say("output", `${typeof rwp === "number" ? `Rwp ${(rwp * 100).toFixed(2)} %, ` : ""}`
-      + `${nodes} history node${nodes === 1 ? "" : "s"}`);
+    say("output", [typeof rwp === "number" ? `Rwp ${(rwp * 100).toFixed(2)} %` : null,
+                   free === null ? null : `${free} free`,
+                   `${nodes} history node${nodes === 1 ? "" : "s"}`]
+      .filter(Boolean).join(", "));
   }
 
   async function loadProject() {
     try {
       project = await api.project();
-      await loadResult();
-      sayPreamble();
+      const [, free] = await Promise.all([loadResult(), freeCount()]);
+      sayPreamble(free);
       await offerRecovery();
     } catch (error) {
       project = null;
@@ -370,8 +397,8 @@
     project = doc;
     openError = "";
     newOpen = false;
-    await loadResult();
-    sayPreamble();
+    const [, free] = await Promise.all([loadResult(), freeCount()]);
+    sayPreamble(free);
     await offerRecovery();
   }
 
@@ -386,6 +413,10 @@
     interactivePanel?.revert();
     planPanel?.leave();
     textPanel?.forget();
+    // node ids repeat across projects (n0000, n0001, …), so a compared node
+    // is cleared here, never by looking for its id in the next history
+    compared = null;
+    historyCount = null;
   }
 
   /** Offer the open project's kept edits, or start keeping new ones. */
@@ -467,7 +498,7 @@
         say("call", `p.doc.two_theta_limits = ${limits ? `(${limits.join(", ")})` : "None"}`);
       }
       if ("excluded_regions" in patch)
-        say("call", `p.set_excluded_regions(${JSON.stringify(patch.excluded_regions)})`);
+        say("call", `p.set_excluded_regions(${py(patch.excluded_regions)})`);
       protocolError = "";
     } catch (error) {
       protocolError = (error as Error).message;
@@ -485,7 +516,7 @@
       const doc = await api.patchProject({ ui: patch });
       if (project?.path === path) project = doc;
       for (const [key, value] of Object.entries(patch))
-        say("comment", `# view kept: ui[${JSON.stringify(key)}] = ${JSON.stringify(value)}`);
+        say("comment", `# view kept: ui[${py(key)}] = ${py(value)}`);
     } catch (error) {
       say("comment", `# not kept: ${(error as Error).message}`);
     }
@@ -925,7 +956,7 @@
               {protocolError} onprotocol={setProtocol} onreadout={(r) => (reading = r)}
               projectPath={project?.path ?? null} ui={project?.doc?.ui ?? null} onui={saveUi}
               preview={previewAnswer} {previewError} oncurves={(c) => (baseCurves = c)}
-              howText={howWords(result?.how, corpus)} />
+              {compared} howText={howWords(result?.how, corpus)} />
           {:else if graphTab === "peaks"}
             <Peaks {plotKey} {theme} preview={previewAnswer} {previewError}
               rwp={result?.statistics?.rwp ?? null} oncurves={(c) => (baseCurves = c)} />
@@ -1029,13 +1060,33 @@
       <div class="tabs" role="tablist" aria-label="Console and history">
         {#each BOTTOM_TABS as t (t.id)}
           <button class="tab" role="tab" aria-selected={bottomTab === t.id}
-            onclick={() => (bottomTab = t.id)}>{t.label}</button>
+            onclick={() => (bottomTab = t.id)}>{t.label}{#if t.id === "history" && historyCount != null}<span
+              class="count">{historyCount}</span>{/if}</button>
         {/each}
+        {#if bottomTab === "history"}
+          <span class="hright">
+          <span class="segmented hview" role="group" aria-label="History view">
+            {#each [["graph", "Graph", "Draw the nodes as lanes"], ["table", "Table", "List the nodes with their numbers"]] as [id, label, tip] (id)}
+              <button class:on={historyView === id} aria-pressed={historyView === id} title={tip}
+                onclick={() => (historyView = id as "graph" | "table")}>{label}</button>
+            {/each}
+          </span>
+          <HelpBox entry={HISTORY_HELP} {docsUrl} label="About the History tab" />
+          </span>
+        {/if}
       </div>
       <div class="pane" class:gone={bottomTab !== "console"}>
         <Console {lines} {dropped} shown={bottomTab === "console"} />
       </div>
-      <div class="pane" class:gone={bottomTab !== "history"}></div>
+      <div class="pane" class:gone={bottomTab !== "history"}>
+        <!-- keyed on the project: two projects' heads can share an id, and
+             History re-reads only when its head changes -->
+        {#key project.path}
+          <History {head} {busy} {say} view={historyView} compared={compared?.id ?? null}
+            oncount={(n) => (historyCount = n)} oncompare={(c) => (compared = c)}
+            onrestore={(plan) => paramsPanel?.loadRestore(plan)} onmoved={structureMoved} />
+        {/key}
+      </div>
     </section>
   {/if}
 </div>
@@ -1177,6 +1228,21 @@
 
   .gone {
     display: none;
+  }
+
+  /* the History tab's node count, in the muted register (the design's
+     "History 8") */
+  .count {
+    margin-left: 6px;
+    color: var(--muted);
+  }
+
+  /* the History tab's view choice and ? box, at the strip's right */
+  .hright {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
   }
 
   .wfpane {

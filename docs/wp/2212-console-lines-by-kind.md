@@ -1,8 +1,7 @@
 # WP-2212 — console lines by kind: the `>>>` prompt and the session as a script
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-22 — built, in review (#1764); the maintainer's look at its pictures waits
+Milestone: gui-overhaul · Status: ✅ 2026-11-22 — the Console reads as the session in Python, and every padlock is the drawn one (PR #1764, PR #1775)
 Depends on: 2214 (the rebuild's plan: it builds on piece R1's bottom panel)
-Priority: P2 2026-11-17 — was P3: R1's bottom panel landed with WP-2215 (#1534), so nothing blocks it; a feature the open milestone was opened for
 
 ## Goal
 
@@ -82,6 +81,23 @@ prototype with the changed region boxed, on a private page.
   and `#8fc79d` in the dark, as drawn on the options page. It goes into
   `src/rietx/viz/theme.py`. It was offered as "this lands unless you object", and the
   maintainer answered the other questions without objecting.
+- **The look, 2026-11-22, the maintainer, on the six choices #1764 built conventionally**
+  (its handover entry lists them), judged on the screenshots:
+  1. Timestamps, prompts and comments keep `--muted`. Kept.
+  2. The Text tab's string literals take `--code-string`, the Console's green, in place of
+     `--warn`. Changed.
+  3. Timestamps and outputs stay indented past the prompt gutter. Kept.
+  4. The fold's wording ("47 engine events, 6 stages, 33 evaluations") stays. Kept.
+  5. An echo that holds a dict or a list is spaced as Python spaces it
+     (`{"instrument.zero_shift": 0.01}`), since it is a line of a Python script. Changed, for
+     every such echo and not only `set_values`.
+  6. The preamble's output line adds the free-parameter count, as the prototype does
+     ("6 free, 1 history node"; Rwp leads when the project has a fit). Changed.
+- **One padlock, 2026-11-22, the maintainer:** "I note the instrument padlocks are different
+  from the atom ones. we should use the simple non-emoji ones for everything." A locked
+  instrument row wore the emoji padlock, and an atom row the drawn one. Every padlock is now
+  the drawn one, and no source under `gui/src` may name an emoji character
+  (`gui/STYLE.md` § Components; `gui/src/lib/style.test.ts` checks it).
 
 ### Seams
 
@@ -172,6 +188,8 @@ Pruned 2026-11-21 at start: all four entries still hold on `origin/main` (`d76e4
 - [x] `instrument_patch` answers what `set_vary` returned (WP-2229 finding 8), and works from
   the registers when only the old table fails (finding 5). One server test each.
 - [x] Skill: none. The GUI is a human surface, and an agent drives the python API.
+- [x] The maintainer's look (§ Rulings, 2026-11-22): items 2, 5 and 6 changed, the one
+  padlock everywhere with its check, the screenshots retaken.
 
 ## Acceptance
 
@@ -193,6 +211,58 @@ The browser files skip in CI (no playwright there), so the PR quotes their local
   (the bottom panel).
 
 ## Handover log
+
+- **2026-11-22** — PR #1775, the look. The maintainer looked at the Console's screens and ruled on the
+  six choices the first PR had built conventionally, and this closes the WP. Three changed. An
+  echoed dict or list now reads as Python writes it, `{"instrument.zero_shift": 0.01}`, so
+  each Console line is a line of the script it exports. The session's first output line gives
+  the free-parameter count, as the prototype does. The Text tab's strings take the Console's
+  green, since `--warn` means a warning. He also asked for one padlock. A locked instrument row
+  wore the emoji padlock while an atom row wore the drawn one, so now every padlock in the GUI
+  is the drawn one, and a test fails on any emoji character in the GUI's source.
+  *Done*: § Rulings records all seven rulings. `lib/py.ts` writes a JSON value as its Python
+  literal (`True`, `False`, `None`, `float("inf")` included), and every dict or list echo in
+  the rebuild goes through it: `set_values` from Parameters, Interactive and the Instrument
+  form, the position comment, a stage's `turn_on` and `turn_off`, the excluded regions, the
+  view-kept comment, and `registerEcho`'s lists, which the first GUI's Model panel shares. A
+  string still takes `JSON.stringify`, whose escapes mean the same in Python. The preamble
+  reads `GET /api/params`' `n_free` before it writes its lines, so they share one entry.
+  `.tok-string` takes `--code-string` in `app.css`, which both pages load. The padlock:
+  `Padlock.svelte` holds the one drawing, moved out of `next/Params.svelte`; `heldGlyph`
+  answers `PADLOCK` for a lock and for a hold, and `HeldMark.svelte` draws it, muted for a
+  lock and in `--accent-ink` for a hold. Glyph sites changed: the rebuild's Parameters
+  (locked rows, which is what the instrument rows showed; the hold buttons and atom locks now
+  use the shared component), the first GUI's Parameters panel (lock and hold marks) and its
+  Model panel (two held-mark sites, scalar rows and atom DOFs). The first GUI's hold mark was a
+  pin emoji and is the accent padlock now. Left as they are, all text-presentation symbols,
+  which draw as text: ⚠ (History, Series, App), ✂ (Plot), ✓ and ○ (Checklist, Plan), ☀ ☾ ◐
+  (App's theme), ❄ and ↑ (stream). No emoji in `src/rietx/viz/static`, `watch/` or
+  `compare_app/` either. The check: `lib/style.test.ts` fails on any `Emoji_Presentation`
+  character or VS16 in a `.svelte`, `.css` or `.ts` file under `gui/src`; run against the
+  base's `table.ts` it names both glyphs. `gui/STYLE.md` says it in the Padlock row, the Icons
+  rule and § Checks. Screenshots in `docs/wp/2212-screenshots/`, whole windows at 1440 by 900,
+  light and dark, the changed region boxed: the eight earlier ones retaken, and
+  `padlock-instrument`, `padlock-atoms`, `text-strings` and `console-start` added. The
+  manual's `text-document` shot is retaken for the string colour; its `parameters` shot shows
+  no locked row, so it stays.
+  *Measured*: the fast suite on this branch (origin/main unmoved since the branch,
+  `133aa002f`), `[dev]` venv plus playwright, darwin/arm64, run alone through serial.py at
+  load 10-22: 15300 passed, 433 skipped, 32 xfailed. passed+skipped is the base entry's
+  15733 (15299 + 433 + its one failure, the stale index); no pytest test was added. The run
+  held every `tests/*_browser.py` file, all passing: 6, 4, 1, 46, 2, 5, 12, 41, 8 and 53.
+  vitest 941 passed (54 files), seven added (six `py`, one emoji check); svelte-check 0
+  errors. `python -m tests.reader_output`: exit 0, unchanged. CI's lint steps run locally:
+  ruff clean, tutorials formatted, Vale 0 errors.
+  *Review*: `/code-review high --fix` found seven. Fixed: a stale comment calling the hold a
+  pin, the `n_free` comment (it counts rows whose vary flag is set, which is not what a
+  staged Refine frees), `py` writing an undefined key as `None` where the request drops it,
+  the preamble's extra wait and a race it opened (the count is now read beside the result and
+  the preamble written in one turn, as before), and the emoji check's reach (it now reads
+  `next/rxplot.mjs` and the two page shells too). Settled rather than changed: lock and hold
+  now share one drawing and differ by ink, which gui/CLAUDE.md's held-mark rule now says.
+  The maintainer's ruling asks for one padlock "for everything", and the rebuild already drew
+  a hold as the padlock.
+  Next: none. WP-2237 (the event cursor across an open) is the Console's open follow-up.
 
 - **2026-11-22** — The Console at `/next` now reads as the session written in Python (PR #1764).
   Each line knows whether it is a call, an output, a comment, a refusal or an engine event. A

@@ -274,3 +274,34 @@ describe("one filled primary per view", () => {
     expect(filled).toEqual(ALLOWED);
   });
 });
+
+/**
+ * A glyph whose default presentation is emoji draws in colour, at the emoji
+ * font's size and in each platform's own picture, so two marks for one meaning
+ * stop looking alike: the instrument rows' emoji padlock beside the atom rows'
+ * drawn one (the maintainer's look of 2026-11-22, WP-2212). `gui/STYLE.md`
+ * § Components: a mark is drawn from the stroked set, and a glyph is text.
+ * Unicode's `Emoji_Presentation` property is the test, with VS16, the selector
+ * that asks for an emoji picture. A text-default symbol (⚠, ✓, ☀) passes.
+ */
+describe("no source draws an emoji", () => {
+  it("names no emoji-presentation character in any file", () => {
+    const EMOJI = /[\p{Emoji_Presentation}\u{FE0F}]/u;
+    // every source a page is built from: the scanned sources, the chart
+    // module beside them and the two pages' shells
+    const files = [
+      ...allSources(),
+      ...readdirSync(`${SRC}next`).filter((f) => /\.(mjs|js|html)$/.test(f)).map((f) => `next/${f}`),
+      "../index.html",
+      "../next.html",
+    ];
+    const found: string[] = [];
+    for (const rel of files)
+      read(rel).split("\n").forEach((line, i) => {
+        const m = EMOJI.exec(line);
+        if (m) found.push(`${rel}:${i + 1}: U+${m[0].codePointAt(0)!.toString(16).toUpperCase()}`);
+      });
+    expect(found).toEqual([]);
+    expect(allSources().length).toBeGreaterThan(100);
+  });
+});

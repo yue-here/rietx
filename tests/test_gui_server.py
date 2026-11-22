@@ -3281,6 +3281,18 @@ def test_report_and_history_read_the_fitted_session(fitted):
     assert client.get("/api/history/diff?a=n0000")[0] == 400
     assert client.get("/api/history/diff?a=n0000&b=nope")[0] == 404
 
+    # WP-2211: a node's own curve, for Compare, writing nothing. At the head
+    # it is the fit's curve on the fit's channels
+    n_before = len(project.history)
+    got = _packed(client, f"/api/history/curves?node={payload['head']}")
+    res = project.refinement.result_
+    assert got.header["node"] == payload["head"]
+    np.testing.assert_array_equal(got.arrays["two_theta"], res.two_theta)
+    np.testing.assert_allclose(got.arrays["y_calc"], res.y_calc, rtol=1e-6)
+    assert len(project.history) == n_before
+    assert client.get("/api/history/curves")[0] == 400
+    assert client.get("/api/history/curves?node=nope")[0] == 404
+
 
 def test_two_text_writers_race_and_the_second_is_refused_whole(
         blank, tmp_path, pattern_file):
