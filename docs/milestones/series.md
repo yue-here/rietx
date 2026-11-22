@@ -166,7 +166,7 @@ Two were open, and both were the maintainer's. Answered 2026-11-22 under the mai
   `grounds` rewritten to cite the 2026-11-16 ruling and its named dissent; `approved` set
   to the maintainer's date. `_audit.py` was unchanged until the maintainer approved.
   **Settled by Claude 2026-11-22, checked blind:** the label correction (`ambiguity` 1 to 3, `grounds` citing the 2026-11-16 ruling and
-  its named dissent) is settled. **Ruled by Yue 2026-11-22:** tier 3 with the plan kept, approved 2026-11-22.
+  its named dissent) is settled. **Ruled by Yue 2026-11-22:** tier 3 with the plan kept, approved 2026-11-22. Applied to `_audit.py` in WP-2081 the same day.
 
 ## The WPs
 

@@ -5495,15 +5495,19 @@ ROWS: tuple[Row, ...] = (
                   "(docs/practice.md): none defaults to Le Bail; FullProf, RIETAN-FP and TOPAS "
                   "make the user state it. GSAS-II fits each histogram of a series by RefineCore, "
                   "the single fit's solver (docs/practice.md § Sequential refinement, checked)")),
-    Row("rietx.sequential.SequentialRefinement.fit:plan", "default", tier=3, ambiguity=1,
+    Row("rietx.sequential.SequentialRefinement.fit:plan", "default", tier=3, ambiguity=3,
         value="mccusker_default",
         evidence=("the first pattern's plan and, collapsed, every warm refit's; the same "
                   "value as Refinement.fit:plan, whose row carries the evidence (McCusker et "
                   "al. 1999, the order only; no program ships a default plan)"),
-        grounds=("B7's approval of the single fit's default plan (ruled 2026-10-19), "
-                 "extended to the series seat by the maintainer 2026-11-03 "
-                 "(2003-batch/batch.md, C9 q3)."),
-        approved="2026-11-03"),
+        grounds=("the maintainer kept today's default on 2026-11-16 (docs/milestones/"
+                 "series.md § Ruled after the open; WP-2081 question 1, option a). The "
+                 "traditional sequential, which calibrates the instrument and holds it "
+                 "through the series, is a named dissent (WP-2081 § How a human expert "
+                 "runs a series), so the unanimity gate fails; whether the setup held "
+                 "still is a fact outside the pattern (series rule 4). Tier 3 with the "
+                 "plan kept, ruled 2026-11-22."),
+        approved="2026-11-22"),
     Row("rietx.sequential.SequentialRefinement.fit:refit", "default", value="single"),
     Row("rietx.sequential.SequentialRefinement.fit:two_theta_limits", "default", tier=2,
         ambiguity=1, value=None,
