@@ -23,6 +23,10 @@ from .staged import RefinementPlan, Stage
 #: the ``capabilities()`` rule at a smaller scale.
 REFIT_MODES = ("single", "stages")
 
+#: The one stage a re-fit runs, by name.  The GUI's status bar reads a run
+#: starting it as a one-stage re-fit (WP-2227), so the name is spelled once.
+WARM_REFIT_STAGE = "warm_refit"
+
 
 def _collapse(plan: RefinementPlan) -> RefinementPlan:
     """One stage freeing everything the plan would free, in one solve.
@@ -72,9 +76,9 @@ def _collapse(plan: RefinementPlan) -> RefinementPlan:
     # stage's, which the closing stage copies for the same reason
     # (``RefinementPlan.closing_stage``): a restraint weight, an ftol or a
     # window slack set there would otherwise fall back to the default
-    last = plan.stages[-1] if plan.stages else Stage("warm_refit", [])
+    last = plan.stages[-1] if plan.stages else Stage(WARM_REFIT_STAGE, [])
     return RefinementPlan(
-        stages=[Stage("warm_refit", turn_on,
+        stages=[Stage(WARM_REFIT_STAGE, turn_on,
                       max_iter=max((s.max_iter for s in plan.stages), default=100),
                       ftol=last.ftol,
                       restraint_weight_scale=last.restraint_weight_scale,

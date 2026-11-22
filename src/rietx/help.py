@@ -791,6 +791,21 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
                 "rise; 1e-3 as a seed where they do",
         anchor="theory/background.html#additive-background-models",
     ),
+    "instrument.peak_equations.*.*": HelpEntry(
+        title="Instrument peak equation coefficient",
+        description=(
+            "A coefficient of the instrument's position equation, which adds a shift "
+            "in degrees 2θ to every phase's peaks as a function of the angle alone, "
+            "such as a calibration curve in `two_theta`. Its unit is whatever makes "
+            "the expression come out in degrees. In a joint fit it is per pattern "
+            "unless the sharing map shares it, like every instrument parameter. No "
+            "preset plan frees it, so a stage names `instrument.peak_equations.*` "
+            "itself."
+        ),
+        unit=None, default=None,
+        typical="set by the expression; a shift of hundredths of a degree",
+        anchor="guides/peak_equation.html#declare-the-equations-and-fit",
+    ),
     "instrument.extra_components.*.position": HelpEntry(
         title="Background-peak position",
         description=(
@@ -1077,6 +1092,25 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
                 "mounts produce",
         anchor="theory/corrections.html#preferred-orientation-march-dollase",
     ),
+    "phases.*.peak_equations.*.*": HelpEntry(
+        title="Peak equation coefficient",
+        description=(
+            "A coefficient of one of the phase's peak equations, named in its "
+            "`coefficients` and read by its expression. The equation adds a term to "
+            "each reflection's Lorentzian or Gaussian width or to its position, or "
+            "multiplies its intensity, as its `target` says. Its unit is whatever "
+            "makes the expression come out in the target's unit: degrees 2θ for a "
+            "width or a shift, deg² for `gauss_fwhm_squared`, and none for an "
+            "intensity factor. No preset plan frees it, so a stage names "
+            "`phases.*.peak_equations.*` itself. A coefficient that is very small in "
+            "its own unit refines better rescaled near 1, by writing its factor into "
+            "the expression."
+        ),
+        unit=None, default=None,
+        typical="set by the expression; a Lorentzian tanθ coefficient near "
+                "lor_strain's",
+        anchor="guides/peak_equation.html#declare-the-equations-and-fit",
+    ),
     "phases.*.texture.*": HelpEntry(
         title="Texture coefficient",
         description=(
@@ -1297,9 +1331,9 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "isotropic limit with `Stage.strain_seed`, because at S = 0 the square root "
             "in the width has unbounded slope. Positivity of σ²(M) couples all fifteen "
             "coefficients as a cone, so it cannot be a bound on each coefficient. The "
-            "default Levenberg-Marquardt solver holds it as a linear inequality. Under "
-            "`solver=\"trf\"` and in a joint fit, `STEPHENS_STRAIN_NOT_POSITIVE` reports "
-            "it instead. Read that flag as 'these coefficients are not quotable, and the "
+            "default Levenberg-Marquardt solver holds it as a linear inequality, in a "
+            "joint fit too. Under `solver=\"trf\"`, `STEPHENS_STRAIN_NOT_POSITIVE` "
+            "reports it instead. Read that flag as 'these coefficients are not quotable, and the "
             "fit leaned on the clamp'. It is no evidence of anisotropy."
         ),
         unit=None, default=None,
@@ -2126,6 +2160,21 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "but the species spelling in the model now differs from the file."
         ),
     ),
+    "COMPARISON_UNCONVERGED": HelpEntry(
+        title="A comparison rests on a fit short of its optimum",
+        description=(
+            "ΔBIC and the t-ratios beside it compare two optima. One of the two fits "
+            "stopped before its convergence test passed, or the fuller fit ended with a "
+            "cost more than 2 above the fit it contains. The cost is the data χ² plus any "
+            "restraint and penalty rows. A model that contains another cannot fit worse at "
+            "its optimum, so that fit had not reached its minimum. The margin of 2 is the "
+            "lower edge of Kass and Raftery's (1995) \"positive evidence\" band, so an "
+            "excess inside it cannot change a ΔBIC verdict. The ΔBIC can "
+            "then have either sign. Run the named fit on to convergence and compare again. "
+            "A fit stopped on its budget can sit on its optimum, so the comparison is "
+            "flagged and not refused."
+        ),
+    ),
     "CONSTRAINT_ACTIVE": HelpEntry(
         title="A constraint held the optimum on its edge",
         description=(
@@ -2143,10 +2192,14 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         title="A combination of parameters is not measured",
         description=(
             "The data do not constrain one combination of several parameters. The solver "
-            "discards that direction, so each esd in the group comes out too small, by "
-            "at least a factor of the square root of two. Do not quote these esds as "
-            "measured. Free fewer of the parameters in one stage, hold the ones you know "
-            "independently, or widen the fitted range. Esds of other parameters are "
+            "discards that direction, and each parameter on it has no esd: the result, "
+            "the CIF and the GUI show it as undetermined. A tie or a derived quantity "
+            "built on them has none either, unless the data determine that combination: "
+            "a zero shift tied to the sum of three such parameters keeps its esd, as do "
+            "a bond, a cell volume or a moment pair's quadrature sum built that way. "
+            "Free fewer of "
+            "the parameters in one stage, hold the ones you know independently, or widen "
+            "the fitted range, and refit for their esds. Esds of other parameters are "
             "unaffected."
         ),
     ),
@@ -2346,7 +2399,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "Two parameters are correlated so completely that the data measure only one "
             "combination of them. This is a statement about the rank of the problem and "
             "not about a strong correlation. Each esd is conditional on the other "
-            "parameter being right. Fix one at an independently known value and refine "
+            "parameter being right. Where the data do not move their difference at "
+            "all, neither has an esd. Fix one at an independently known value and refine "
             "the other, or free them in separate stages. A wider range or a second "
             "histogram can separate them."
         ),
@@ -3303,6 +3357,22 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "`n_unindexed` forbids both retries."
         ),
     ),
+    "INSTRUMENT_WIDTH_HELD": HelpEntry(
+        title="Instrument width terms held beside specimen widths",
+        description=(
+            "The plan freed an instrument width and a specimen width with the same "
+            "angular shape: U with the Gaussian strain or size, X with the Lorentzian "
+            "size, Y with the Lorentzian strain or a Stephens anisotropic strain "
+            "block. The data fix only each pair's sum, so "
+            "the last stage held the instrument width at the value an earlier stage "
+            "left, or at its start. The message names that stage. The specimen widths "
+            "are the remainder of a split that the plan's stage order chose. Two starts "
+            "can disagree on them by several of their own esds, so they are not a "
+            "measurement of the specimen. To measure them, calibrate the instrument on a "
+            "standard with the `lab_calibrate` plan, load it with "
+            "`load_instrument_profile`, and refine the sample with `lab_sample_refine`."
+        ),
+    ),
     "K_SEARCH_PARTNER": HelpEntry(
         title="The cell's metric pairs this propagation vector with another",
         description=(
@@ -3979,6 +4049,31 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         ),
         anchor="theory/profiles.html#the-instrument-sample-width-split",
     ),
+    "PEAK_EQUATION_SHARED_ACROSS_WAVELENGTHS": HelpEntry(
+        title="A peak equation's coefficient is shared across wavelengths",
+        description=(
+            "In a joint fit of patterns at different wavelengths, a peak equation's "
+            "coefficient is one number in degrees for every pattern. The right value "
+            "in degrees can differ with wavelength. A size-like term scales with λ, "
+            "and a strain-like one, such as a tan θ term, does not. The package "
+            "converts its own size terms, but cannot tell which kind an equation "
+            "holds. For a wavelength-dependent term, give each pattern its own "
+            "coefficient with SharingMap(per_histogram=[...]) and refit. TOPAS writes "
+            "such a term per pattern, or with Lam in the expression."
+        ),
+    ),
+    "PEAK_WIDTH_NOT_POSITIVE": HelpEntry(
+        title="A peak equation takes a width below zero",
+        description=(
+            "A phase's width peak equation makes the Gaussian variance Γ_G² or the "
+            "Lorentzian FWHM Γ_L negative at some reflections in the fitted range. A "
+            "term in an equation may be negative, as a TCHZ v or w often is, but the "
+            "total width may not. The forward model floors a negative Γ_G², and a "
+            "negative Γ_L is no peak shape, so those reflections do not carry the "
+            "equation's width. Bound the coefficients, or write the term so that it "
+            "cannot go negative, and refit."
+        ),
+    ),
     "PHASE_HELD_IN_PATTERNS": HelpEntry(
         title="A phase was held in some patterns of a joint fit",
         description=(
@@ -4051,6 +4146,20 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "its width, and the data do not choose. Then quote the range and the "
             "widths that produced it. A width the specimen justifies, a background "
             "that takes the broad hump, or longer counting can narrow the range."
+        ),
+    ),
+    "QPA_INTENSITY_FACTOR": HelpEntry(
+        title="A weight fraction ignores an intensity factor",
+        description=(
+            "A phase carries an `intensity_factor` peak equation, so each of its "
+            "reflections' intensities is multiplied by a number. The weight fraction "
+            "is computed from the phase's scale, which absorbs that factor. A factor "
+            "that averages 0.83 makes the scale, and so the fraction relative to the "
+            "other phases, about 1/0.83 = 1.2× too high. A factor averaging above 1 "
+            "makes it too low. The message quotes the factor's range and mean over the "
+            "phase's reflections in range. Write the factor so it averages 1, or "
+            "multiply the phase's scale by the mean factor before reading its "
+            "fraction."
         ),
     ),
     "QPA_UNAVAILABLE": HelpEntry(
@@ -4706,9 +4815,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "phase's m·|F|² they carry. The fit's χ², cells and phase fractions lean "
             "on those reflections too. A negative value is not evidence of large "
             "anisotropy. Under `solver=\"trf\"`, refit with the default "
-            "Levenberg-Marquardt driver, which holds the variance at or above zero; a "
-            "joint fit holds it under neither driver, so fit each pattern alone or drop "
-            "the block from the joint fit. That "
+            "Levenberg-Marquardt driver, which holds the variance at or above zero, in "
+            "a joint fit too. That "
             "makes the coefficients admissible, not measured, so compare a few starts. "
             "Do not quote the coefficients."
         ),
@@ -4894,6 +5002,22 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "neutral atom for it. The TOPAS file therefore names the neutral element and "
             "the ion's charge is lost. A site that carries a moment keeps its ion. "
             "Respell the site in TOPAS if you want to refine the ion."
+        ),
+    ),
+    "VARIABLE_NOT_FREED": HelpEntry(
+        title="A variable was never refined",
+        description=(
+            "No stage of the plan freed a variable, so it kept its starting value. In "
+            "a joint fit the variable is a coefficient of a parametric equation. A "
+            "stage that frees the equation's target frees its coefficients. A "
+            "formula's variable declared `vary=False` is freed only by a stage naming "
+            "its `vars.<name>` path. In a single fit a variable that other parameters "
+            "are tied to is freed only by a stage naming its `vars.<name>` path. The "
+            "parameters that follow the variable are set from its start, and the data "
+            "did not measure them. The result has no row for the variable in "
+            "`parameters`. Add a stage that frees it before you quote what it sets. In a "
+            "single fit, hold the variable with `Refinement.hold` to say the start is "
+            "meant, and it is not named."
         ),
     ),
     "WARM_REFIT_REJECTED": HelpEntry(

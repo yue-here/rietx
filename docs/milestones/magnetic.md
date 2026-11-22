@@ -35,6 +35,22 @@ landed here, and the ruling is 1419's `### Inherited`. Magnetic structures
 left the v2+ fence on 2026-09-02 by a decision recorded in DESIGN.md, and a
 second item leaves it the same way or not at all.
 
+## Who decides
+
+- **The magnetic path is Mike's** (mustachefeeling). He accepted Yue's proposal on #1075 on
+  2026-11-04. He takes the design decisions on what the package does on a magnetic fit:
+  physics, defaults, diagnostics, names, reader output and magCIF reading. His rulings read
+  "Ruled by Mike". Yue keeps anything that reaches a non-magnetic fit, releases, stored
+  formats and deletions.
+- **The distortion-mode work is Mike's too.** Yue, 2026-11-21: "let mike own the
+  distortion modes work". It covers 1419's child structure refined on its mode amplitudes,
+  with `distortion_candidates`, `Phase.parent_cell`, `RefinementResult.distortion_totals`
+  and what follows from them. Claude's reading, for Yue to correct, is that the terms match
+  the magnetic path's: Mike holds the work and its design decisions, and Yue keeps releases,
+  stored formats, deletions and anything that reaches a fit with no distortion model.
+
+A question on either path goes to Mike on #1075, not to Yue.
+
 ## The order
 
 Moved from ROADMAP on 2026-10-03 (WP-1540), verbatim.

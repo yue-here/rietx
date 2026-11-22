@@ -47,9 +47,18 @@ describe("number slots (WP-2126)", () => {
     expect(slotWidth(slots)).toBe(12);
   });
 
-  it("opens the editor on the number as drawn, so a click in and out changes nothing", () => {
-    expect(editText(4.15678, 0.0002)).toBe("4.1568");
-    expect(editText(0.00152, 0.00003)).toBe("1.52e-3");
-    expect(Number(editText(0.00152, 0.00003))).toBeCloseTo(0.00152, 12);
+  it("opens the editor on the stored value to its last digit, as a spreadsheet does (WP-2223)", () => {
+    // drawn as 4.1568(2), edited in full
+    expect(numParts(4.15678, 0.0002).frac).toBe("1568");
+    expect(editText(4.15678)).toBe("4.15678");
+    // a ×10ⁿ cell opens in e-form where JavaScript prints one, plain where it prints plain
+    expect(editText(2.7725887222397814e-7)).toBe("2.7725887222397814e-7");
+    expect(editText(0.00152)).toBe("0.00152");
+    expect(editText(-1234.5)).toBe("-1234.5");
+    // the text reads back as the same double, so Enter on it moves nothing
+    for (const v of [0.1 + 0.2, 1 / 3, 2.7725887222397814e-7, 9.371724e5, -0.0011090354888959]) {
+      expect(Number(editText(v))).toBe(v);
+    }
+    expect(editText(Infinity)).toBe("");
   });
 });

@@ -86,7 +86,7 @@ One row under the panel column, on every tab.
 
 | Control | Does |
 |---|---|
-| `One cycle \| Staged plan` | what a refine runs: one stage on exactly the ticked parameters, or the project's plan |
+| `As ticked \| Staged plan` | what a refine runs: one stage on exactly the ticked parameters, or the project's plan |
 | the pending count | how many Parameters and Interactive edits wait, plus one for an edited plan, and the first refusal if one is invalid |
 | `Revert` / `Apply` | drop or apply the pending edits: the Parameters edits first, then the Interactive values, then the plan |
 | `Refine` | run the choice; it reads `Apply and refine` while edits wait, and applies them first |
@@ -94,7 +94,7 @@ One row under the panel column, on every tab.
 `⌘⏎` (`Ctrl+Enter` off a Mac) presses `Refine`, except inside the Text
 document, where it applies the document. A refused edit runs nothing. A plan
 replaces the vary flags, so a parameter you ticked by hand stays free under
-`One cycle` and may be held again under `Staged plan`. The Plan tab's ladder
+`As ticked` and may be held again under `Staged plan`. The Plan tab's ladder
 shows which.
 
 There is no Save command, and that is not an omission. Settings
@@ -343,11 +343,10 @@ always plain. The decimal points in a group line up, and the unit follows the
 value. A number you can edit is tinted; a number you cannot is not.
 
 Press a number to edit it. The editor opens over the number, so nothing else
-moves. Enter keeps the value, and Escape drops it. A value typed back as it was
-shown is no edit, so pressing into `4.1568(2)` and out again cannot truncate
-the parameter. Below the editor, the value's limits can be set, and
-`Restrain` adds a restraint toward a target with a σ. Press the word to tick
-its box.
+moves. Enter keeps the value, and Escape drops it. It opens in full, so
+`4.1568(2)` opens as `4.15678`. Unchanged text is no edit. Below the editor,
+the value's limits can be set, and `Restrain` adds a restraint toward a target
+with a σ. Press the word to tick its box.
 
 To edit several values at once, press them with `⌘` held (`Ctrl` off a Mac), or
 press one and then another with Shift held to take every value between them in
@@ -414,11 +413,11 @@ width wide. Every range stops at the parameter's own bounds. Click the
 parameter's name to set the range and the track yourself. A range you set is
 kept when a fit moves the values, and `Default` gives the measured one back.
 
-Click the number to type a value. `Enter` takes it and `Esc` leaves it. A value
-outside the parameter's bounds is refused with the bound it crossed. Each number
-keeps one format for its whole range, so the digits stay put while you drag. `↺`
-puts one slider back at the last fit, and the tick on the track marks where that
-is.
+Click the number to type a value, which opens in full. `Enter` takes a change
+and `Esc` leaves it. It reads `1.5×10⁻³` too. A value outside the parameter's
+bounds is refused with the bound it crossed. Each number keeps one format for
+its whole range, so the digits stay put while you drag. `↺` puts one slider
+back at the last fit, and the tick on the track marks where that is.
 
 ```{image} ../screenshots/interactive-light.png
 :class: only-light

@@ -102,6 +102,22 @@ async function arrays(path: string, body?: unknown): Promise<ArrayBuffer> {
   throw new ApiError(response.status, payload);
 }
 
+/** `PATCH /api/instrument`'s answer: the new instrument, and what the edit
+ *  did to the hold and free registers. `ended` names each path whose old
+ *  parameter the edit removed or redefined (a Chebyshev `c3` under a
+ *  P-spline), where a pending edit no longer applies. */
+export interface InstrumentEdit {
+  node_id: string | null;
+  instrument: any;
+  released: string[];
+  freed: string[];
+  /** built paths the free register still named and the new model fixes */
+  fixed: string[];
+  /** the release ran after the edit: the old model built no table (WP-2212) */
+  release_after?: boolean;
+  ended: string[];
+}
+
 export const api = {
   capabilities: () => call("GET", "/api/capabilities"),
   /** The whole help corpus plus `docs_url` (WP-1202/1203).  Fetched once at
@@ -255,11 +271,12 @@ export const api = {
    *  changes what the parameter table *contains* (WP-1008).  One history node. */
   patchStructure: (structure: unknown, label?: string) =>
     call("PATCH", "/api/structure", { structure, label }),
-  /** `unhold` paths are released before the edit and `free` ones freed after
-   *  it, all or nothing (`GuiSession.instrument_patch`, WP-2218 review). */
-  patchInstrument: (instrument: unknown, label?: string,
-                    arms: { unhold?: string[]; free?: string[] } = {}) =>
-    call("PATCH", "/api/instrument", { instrument, label, ...arms }),
+  /** The server works out what the edit asks of the hold and free registers
+   *  and answers it beside the instrument (`GuiSession.instrument_patch`,
+   *  WP-2229): `released`, `freed`, and the `ended` paths whose pending edits
+   *  a client drops. */
+  patchInstrument: (instrument: unknown, label?: string): Promise<InstrumentEdit> =>
+    call("PATCH", "/api/instrument", { instrument, label }),
   /** Opt one atom into anisotropic ADPs.  Its own verb because both directions
    *  are physics (the isotropic tensor is not Uiso·δ, and U_eq weights by the
    *  metric) and a client that computed either would get non-orthogonal cells
@@ -318,6 +335,10 @@ export const api = {
     call("GET", `/api/history/diff?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`),
   historyCompare: (ids: string[]) =>
     call("GET", `/api/history/compare?ids=${encodeURIComponent(ids.join(","))}`),
+  /** One node's calculated curve, recomputed at its own values on its own
+   *  channels, packed as the curves are (WP-2211). Writes nothing. */
+  historyCurves: (nodeId: string) =>
+    arrays(`/api/history/curves?node=${encodeURIComponent(nodeId)}`),
 
   textdoc: () => call("GET", "/api/textdoc"),
   putTextdoc: (text: string, baseRevision?: string, validateOnly = false) =>
@@ -386,7 +407,8 @@ export const api = {
 
   /** One export kind; with `directory` it is written there rather than into
    *  `exports/`, and an existing file is refused unless `overwrite` (WP-2133). */
-  export: (kind: string, body: { directory?: string; filename?: string; overwrite?: boolean } = {}) =>
+  export: (kind: string, body: { directory?: string; filename?: string; overwrite?: boolean;
+                                 script?: string } = {}) =>
     call("POST", `/api/export/${kind}`, body),
   events: (since: number) => call("GET", `/api/events?poll=1&since=${since}`),
 };

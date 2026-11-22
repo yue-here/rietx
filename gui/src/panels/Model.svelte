@@ -36,6 +36,7 @@
    */
   import { ApiError, api } from "../api";
   import Help from "../Help.svelte";
+  import HeldMark from "../HeldMark.svelte";
   import {
     applyFields,
     atomRows,
@@ -48,6 +49,7 @@
     newAtom,
     phaseFields,
     positionEdits,
+    registerEcho,
     splitEdits,
     structureFields,
     xyzText,
@@ -71,7 +73,6 @@
     editState,
     formatEsd,
     formatValue,
-    heldGlyph,
     normalize,
     varyEdit,
     varyEditFor,
@@ -520,9 +521,9 @@
       }
       if (insDelta?.fields.length) {
         const fresh = (await api.instrument()).instrument;
-        await api.patchInstrument(applyFields(fresh, insDelta.fields, edits),
-                                  "instrument edited");
-        say("ref.edit(instrument=…)");
+        const answer = await api.patchInstrument(applyFields(fresh, insDelta.fields, edits),
+                                                 "instrument edited");
+        for (const line of registerEcho(answer, "ref.edit(instrument=…)")) say(line);
         moves.push(`${insDelta.fields.length} instrument field(s)`);
       }
       revert();
@@ -657,17 +658,20 @@
     }
   }
 
-  /** The Chebyshev term count is a *shape* change, so it is not a Field. */
+  /** The Chebyshev term count is a *shape* change, so it is not a Field. An
+   *  added term is built free, as `BackgroundChebyshev.with_terms` builds one;
+   *  the server releases the holds on the terms a cut removes and frees the
+   *  ones an extension adds (`GuiSession.instrument_patch`, WP-2229). */
   async function setBackgroundTerms(n: number) {
     const next = clone(instrument);
     const current = next.background.coefficients as any[];
     if (n === current.length || n < 1) return;
     next.background.coefficients = n < current.length
       ? current.slice(0, n)
-      : [...current, ...Array.from({ length: n - current.length }, () => ({ value: 0 }))];
+      : [...current, ...Array.from({ length: n - current.length }, () => ({ value: 0, vary: true }))];
     try {
-      await api.patchInstrument(next, `background: ${n} terms`);
-      say(`instrument.background = BackgroundChebyshev.with_terms(${n})`);
+      const answer = await api.patchInstrument(next, `background: ${n} terms`);
+      for (const line of registerEcho(answer, `instrument.background = BackgroundChebyshev.with_terms(${n})`)) say(line);
       error = "";
       onmoved();
       await load();
@@ -687,8 +691,11 @@
         await api.patchStructure({ upload: preview.upload }, `structure from ${file.name}`);
         say(`ref.edit(structure=structure_from_cif("${file.name}"))`);
       } else {
-        await api.patchInstrument({ upload: preview.upload }, `instrument from ${file.name}`);
-        say(`ref.edit(instrument=load_instrument_profile("${file.name}"))`);
+        const answer = await api.patchInstrument({ upload: preview.upload },
+                                                 `instrument from ${file.name}`);
+        for (const line of registerEcho(answer, `ref.edit(instrument=load_instrument_profile("${file.name}"))`)) {
+          say(line);
+        }
       }
       error = "";
       onmoved();
@@ -775,7 +782,7 @@
         onchange={(e) =>
           toggleVary(row, (e.currentTarget as HTMLInputElement).checked)} />
     {:else if row}
-      <span class="vary muted" data-vary={path} title={why(path)}>{heldGlyph(row)}</span>
+      <span class="vary muted" data-vary={path} title={why(path)}><HeldMark {row} /></span>
     {/if}
   {/snippet}
 
@@ -1126,7 +1133,7 @@
                            draws for every other flag in this row -->
                       <span class="vary muted" data-vary={glob}
                         title={why(row.dofs[0].path)}
-                        >{heldGlyph(row.dofs[0])}</span>
+                        ><HeldMark row={row.dofs[0]} /></span>
                     {/if}
                   {:else}
                     {@render varyBox(`${row.base}.x`)}

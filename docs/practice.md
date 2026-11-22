@@ -27,7 +27,7 @@ The Lorentzian column is the area a pure Lorentzian loses to the default cut.
 | Program | Default cut | Lorentzian area lost | When the window is set |
 |---|---|---|---|
 | rietx | `WINDOW_AREA_TOL`, 2 % of each peak's own area | 2 % | once per stage, at the stage's start (checked (source)) |
-| TOPAS | `ymin_on_ymax` 0.001 of the strongest line's height | 2.0 % | peak buffer rebuilt when a width moves past `aberration_range_change_allowed`, and per derivative for width parameters (§7.4, §7.7, checked (manual)) |
+| TOPAS | `ymin_on_ymax` 0.001 of each peak's own height (a property of the emission profile, TR v5 §5.3.2 p.48; corrected 2026-11-19 from "the strongest line's") | 2.0 % | peak buffer rebuilt when a width moves past `aberration_range_change_allowed`, and per derivative for width parameters (§7.4, §7.7, checked (manual)) |
 | MAUD | ±30 HWHM (±15 FWHM) | 2.1 % | every evaluation, finite-difference columns included (checked (source)) |
 | RIETAN-FP | `PC` 0.002 of each peak's own height, in three of four shipped examples; no default | 2.8 % | every evaluation (ran) |
 | FullProf | `Wdt` × FWHM each side; no default, floored at 3; examples 3-15, PbSO₄ 6 | 5.3 % at 6 (10.5 % at 3, 2.1 % at 15) | once per run, at the starting widths (`Ias = 0`, ran); `Ias = 1` lags one cycle |
@@ -84,6 +84,33 @@ stand-in derivative in `sources/powsubs/psvfcjo.for:139` and `:288-299`.
 | MAUD | `cutoff` × 0.1°, 3° at the default (checked (source)) |
 | EasyDiffraction | 4° in 2θ each side of the included points (checked (source)) |
 | BGMN | about the Kα₁-Kα₂ split, 0.05° at 30° to 0.6° at 150° (ran) |
+
+The two cuts agree only for a pure Lorentzian. For a mixed peak, the height cut keeps more
+tail than rietx's area cut. At 0.001 of the peak's height the window is ±1.6 FWHM at η = 0,
+±4.2 at η = 0.1 and ±11.2 at η = 0.6. rietx's 2 % of the area gives ±1.0, ±1.6 and ±9.5,
+before its 0.3° movement slack (`WINDOW_MIN_DEG`). Computed 2026-11-19 for WP-2228.
+
+### A reflection centred past the range end
+
+Surveyed 2026-11-19 for WP-2228, one agent, the GSAS-II lines from its source. The case: the
+range ends inside the tail of a strong reflection centred just outside it. In a Le Bail or
+Pawley fit, a neighbour's free intensity can absorb an unmodelled tail and drag the cell.
+
+| Program | Its in-range tail | Le Bail or Pawley handling | Warning or guidance |
+|---|---|---|---|
+| rietx | the reflection's own window, which can hold no channel (WP-2228) | Pawley ridges an off-data intensity toward zero (`PAWLEY_OFF_DATA_RIDGED`, WP-1459); Le Bail nothing | none |
+| GSAS-II 5.8.4 | not modelled: the reflection is not generated (`GSASIIstrIO.py:3177`) | the Pawley upper limit is clipped to the Pawley dmin (`GSASIIstrIO.py:3019-3025`) | the Pawley help page advises against reflections beyond the limits (checked (source), checked (manual)) |
+| TOPAS (TR v5) | an ordinary peak, generated within `extra_X_right` | a free intensity like any other (inferred, not run); p.111 warns that low-d-edge Pawley intensities can be badly wrong | none found (checked (manual)) |
+| FullProf | an ordinary peak, generated within 3 × `Wdt` × FWHM | none in the fit; `Dum = 3` leaves reflections near a limit out of R_Bragg and the hkl files | the manual warns a small `Wdt` leaves "discontinuities in the edges" (checked (manual)) |
+| RIETAN-FP | not modelled: the reflection is dropped with its tails | none in the fit; the `.lst` marks `H` a reflection whose profile passes 2θmax, left out of R_B and R_F (§17.8.10) | §11.1 advises widening Le Bail profile ranges step by step (checked (manual)) |
+| MAUD, BGMN, EasyDiffraction | not checked | not checked | not checked |
+
+What practice adds up to: no program windows or restrains such a reflection specially. Either
+it is generated and gets a free intensity on a sliver of data (TOPAS, FullProf, rietx), or it
+is left out and its tail is unmodelled (GSAS-II, RIETAN-FP). FullProf and RIETAN-FP flag edge
+reflections in their output. The literature read (McCusker et al. 1999 §5 and §12.4; Hill
+1992; Le Bail 2005; Toby 2006) treats each peak's own cut-off and says nothing about a peak
+centred outside the data. Pawley (1981) was not read.
 
 ## Staging and what a stage holds
 
@@ -207,7 +234,8 @@ FullProf's constant-wavelength combination rule with an IRF.
 
 ### When one twin reaches its limit, and a re-run
 
-Read 2026-11-19 (WP-2225), one session, GSAS-II source only. rietx holds the instrument half of
+Read 2026-11-19 (WP-2225), one session, GSAS-II source only; the TOPAS row added 2026-11-20
+from the TOPAS 5 Technical Reference. rietx holds the instrument half of
 a twin pair for the stage whenever the specimen half is free. Its test reads no bound. A
 specimen width that lands on its floor of 0 therefore leaves its instrument partner held where an
 earlier stage put it, and no free parameter in the stage can narrow that part of the width.
@@ -216,11 +244,13 @@ earlier stage put it, and no free parameter in the stage can narrow that part of
 |---|---|---|
 | rietx | the step lands it on its box bound and it stays free; its instrument twin stays held (`refine._width_twin_flats` reads C and no bound, checked (source)) | `fit` runs the plan's stages again. The stage that frees the instrument widths and no twin re-solves them, so each staged re-fit moves them once (measured, WP-2225). WP-2224 makes a re-fit one stage, which applies the hold again and moves nothing |
 | GSAS-II 5.8.4 | limits are the user's (`Controls['parmMinDict']`, set in the GUI; none by default). After a refinement, a variable outside its limit is reset to the limit, its esd set to 0, and frozen for later refinements with a printed warning. Its partner keeps refining (`GSASIIstrMain.py:573-599`, `dropOOBvars` at `:1198`, checked (source)) | the frozen list is removed from the vary list at the start of every refinement (`:530-542`, checked (source)); each refinement starts from the stored values (inferred) |
-| TOPAS | `min`/`max` on a `prm`; not checked this session | `num_runs` re-reads the INP (§ A stage that fixes a parameter) |
+| TOPAS 5 | `min`/`max` on a `prm`, kept inside the solve by a bound-constrained conjugate-gradient step (Coelho 2005). The parameter stays refined. At the end of the refinement, a value close to its limit is printed with `_LIMIT_MIN_#` or `_LIMIT_MAX_#` appended, where # is the limit; `no_LIMIT_warnings` suppresses this. Its partner is untouched (Technical Reference §3.8 and §5, checked (manual), 2026-11-20, WP-2225) | `num_runs` re-reads the INP (§ A stage that fixes a parameter) |
 | FullProf | not checked | the program rewrites the PCR and a re-run continues from it with the same codes (§ A stage that fixes a parameter) |
 
-In the one program read, the parameter that crossed its limit is the one taken out, and its
-partner keeps refining. No program holds an instrument width because its specimen twin is free
+In GSAS-II the parameter that crossed its limit is the one taken out, and its partner keeps
+refining. In TOPAS it stays refined at its limit, and the output marks it. Neither touches the
+partner. rietx's analogue of TOPAS's mark is `FLOOR_HIT` on a floor of 0 and `BOUND_HIT` on
+any other limit, and rietx marks a limit only when it carried load. No program holds an instrument width because its specimen twin is free
 (the table above), so none meets this case in the form rietx does.
 
 ## Extinction
@@ -952,7 +982,7 @@ first at ζ = 0 raised Rwp from 8.22 % to 10.81 % (his Table 2).
 
 | Program | Gaussian/Lorentzian split | σ²(M) < 0 |
 |---|---|---|
-| rietx | none: Λ is wholly Lorentzian (ζ = 1) | clamped to zero width; the default LM driver holds σ² ≥ 0, and `STEPHENS_STRAIN_NOT_POSITIVE` reports the clamped intensity share under TRF or a joint fit |
+| rietx | none: Λ is wholly Lorentzian (ζ = 1) | clamped to zero width; the default LM driver holds σ² ≥ 0, and `STEPHENS_STRAIN_NOT_POSITIVE` reports the clamped intensity share under TRF |
 | GSAS-II 5.8.4 | `Mustrain;mx`, Stephens' form: γ += Mγ·mx, σ² += (Mγ·(1−mx))² (`GSASIIstrMath.py:3330-3331`; checked (source)) | no clamp at the width: `np.sqrt(Sum)` (`GSASIIstrMath.py:3265`; checked (source)); what follows a negative sum was not traced |
 | TOPAS (shipped macros) | `eta`: `gauss_fwhm = 1.8/π·pp·(1−eta)·Tan(Th)`, `lor_fwhm = 1.8/π·pp·eta·Tan(Th)` | `Sqrt(Max(mhkl, 0))`, the same clamp, reported nowhere; `Stephens_tetragonal` takes `Abs()` first, folding a negative σ² back into a positive width (TOPAS wiki, read 2026-09-25 by the review) |
 
@@ -1285,6 +1315,24 @@ Surveyed 2026-11-10 for WP-2208, one agent. GSAS-II 5.8.4 source and scripting m
 
 No program has a plan whose steps declare "fix this" as a separate list from "free this". GSAS-II comes closest and is the only one with the shape the maintainer describes: a step dict with both `set` and `clear`, flags kept in the project and carried forward, and `set` applied before `clear` within a step. `once` is its way to make a flag last for one step only. TOPAS, FullProf and RIETAN-FP all keep the recipe outside the program, as an edit of the input file between runs, except that RIETAN-FP's `NAUTO=1` list is a built-in schedule in which each cycle refines only its own group, which fixes the earlier groups. For a series, GSAS-II builds the vary list per histogram and has per-histogram fix lists, FullProf reuses one set of codes for every pattern, and TOPAS rereads the INP each run. For Pawley then Rietveld, the three documented routes are two runs with a file edit between them, with GSAS-II alone doing it as steps of one job.
 
+## How a program reports the way a refinement ran
+
+Gathered 2026-11-22 for WP-2227 (the GUI shows whether a Refine ran in one stage or in stages).
+GSAS-II 5.8.4 source read; the rest is recall or an earlier survey, marked as such.
+
+| Program | What a run reports when it ends | Says how it was staged |
+|---|---|---|
+| GSAS-II 5.8.4 | A dialog titled "Refinement results, Rw=…" with the reduced χ² before and after, the largest shift/σ, and a table of every varied parameter before and after with its σ; the person accepts or discards the result. An accepted run adds one Notebook line, "LS Refinement: Rw = …, GOF = …, Nobs = …, Nvar = …" (checked (source): `GSASIIdataGUI.py:5797-5858`, `:6166`; `GSASIIctrlGUI.G2AfterFit`) | No staging to report; a zero-cycle run says "Zero cycle "refinement" computation completed" (checked (source): `:5838`) |
+| TOPAS | GUI mode's Fit Window prints Rwp per iteration and plots Rwp per cycle (an earlier survey of the TOPAS 5 user manual, not re-read); Launch mode prints the iteration log | No staging to report (§ Staging) |
+| FullProf | The console and the `.out` file list each cycle's shifts and agreement factors; the `.sum` file holds the final ones (recall) | No staging to report (§ Staging) |
+| Profex with BGMN | A docked convergence panel plots Rwp against Rexp while BGMN runs (an earlier survey of the Profex part 3 UI reference, not re-read) | BGMN stages by itself (§ Staging); whether the panel names the step is not checked |
+
+### Practice adds up to
+
+The three programs rietx compares itself with do not stage, so none has a view of how a run was
+staged to copy. Each reports a run as its agreement indices, with the cycle log one step away.
+GSAS-II also records every accepted run as one line in the project's Notebook.
+
 ## Depth cueing, and filled rings and faces, in a structure figure
 
 Surveyed 2026-11-12 for WP-1548, one agent reading each program's user documentation on the
@@ -1450,6 +1498,96 @@ with the default, in four interleaved pairs, and 104 fits ran 2.0× slower in tw
 pinned to one thread in both. So rietx keeps its default in a pool and does not read
 `OMP_NUM_THREADS`: under loky, or under the BLAS pinning `batch-operating.md` 9c.31 advises,
 that variable is 1, the setting measured slower.
+
+## What a refined parameter is: the physical quantity or a model coefficient
+
+Surveyed 2026-11-21 for the sample-broadening parametrisation question, one session, all seven
+programs. The question is whether a program refines the quantity a scientist reports (a
+crystallite size, a microstrain, Uiso, a cell edge) or a coefficient that enters the calculated
+pattern linearly, converting to the reported quantity after the fit. § Peak-width limits holds
+each program's limits on widths, and § Instrument and specimen widths refined together holds the
+twin pairs and each width formula. This section does not repeat them.
+
+rietx refines sample broadening as coefficients. `gauss_size` and `gauss_strain` are Gaussian
+variance terms in deg², and `lor_size` and `lor_strain` are Lorentzian FWHM terms in deg. All four
+start at 0 with a bound at 0. `model/microstructure.py` converts each one to a size or a strain
+after the fit, with a one-parameter esd (checked (source)).
+
+One fact governs how the start value matters. Gaussian variances add under convolution, and
+Lorentzian FWHMs add. A Gaussian term written as a FWHM, or as a size or a strain, therefore enters
+the variance squared. Its first derivative at zero is zero, so a fit started there cannot leave
+it. A Lorentzian term written as a FWHM, a strain or an inverse size enters linearly and has no
+such point (inferred, from the convolution rules).
+
+The mark after each cell says how it was read. "Manual" for TOPAS is the online Technical
+Reference, fetched 2026-11-21. The page heads itself "Version X". The RIETAN-FP rows are
+paraphrased, since its licence forbids copying.
+
+### A. Sample broadening
+
+| Program | Refined variable and unit | How it enters the width | Start value and bounds | Reported size or strain, and its esd |
+|---|---|---|---|---|
+| rietx | four coefficients, deg² (Gaussian) and deg (Lorentzian) | linear in the Gaussian variance, linear in the Lorentzian FWHM | 0, bound at 0 | converted after the fit; esd from one variance (checked (source)) |
+| GSAS-II 5.8.4 | crystallite size in µm, microstrain in units of 10⁻⁶, and a mixing coefficient for each | FWHM ∝ 1/size and ∝ strain; a fraction mx goes to the Lorentzian width linearly and 1 − mx to the Gaussian variance squared (`GSASIIstrMath.py:3228-3333`, checked (source)) | size 1 µm, strain 1000, mx 1 (all Lorentzian), refine flags off, no bounds (`GSASIImath.py:6295-6298`, checked (source)) | the refined variable is the reported one; its esd is read off the refined variable (`GSASIIstrIO.py:3530-3549`, checked (source)) |
+| FullProf 8.20 | coefficients: IG (Gaussian size), Y (Lorentzian size), U (Gaussian strain), X (Lorentzian strain), in the instrument's units | IG/cos²θ and U·tan²θ linear in the Gaussian FWHM²; Y/cosθ and X·tanθ linear in the Lorentzian FWHM (manual p. 21, p. 51, checked (manual)) | the user's `.pcr` values; no bounds (§ Peak-width limits) | the `.mic` file lists an apparent size and strain per reflection, written only with a resolution file (manual pp. 21, 25). Its "standard deviation" is the spread over directions, a measure of anisotropy and not an esd (manual p. 25, checked (manual)) |
+| TOPAS v9 | `CS_L` and `CS_G`: crystallite size in nm. `Strain_L` and `Strain_G`: a coefficient c | FWHM = 0.1·(180/π)·λ/(CS·cosθ) and FWHM = c·tanθ, each a separate convolution (§22.1 macro list, checked (manual)). The Gaussian ones therefore enter the variance squared (inferred) | the start is the macro's argument. `CS_L` carries limits of 0.3 and 10 000 nm (§2.18, checked (manual)). Strain limits not checked | strain ε₀ comes from the macro `e0_from_Strain`, the Voigt FWHM of the two strain terms (§20.9.5, checked (manual)). A dependent parameter's esd is GOF·J·Cov·Jᵀ over the full covariance (§2.17, checked (manual)) |
+| RIETAN-FP 3.12 | coefficients U, V, W, P (Gaussian) and X, Y (Lorentzian), plus anisotropic ones | linear in the Gaussian variance; linear in the Lorentzian FWHM (manual p. 35, eqs 3.69-3.71, checked (manual)) | not checked | size and strain are computed by hand after the fit, subtracting the instrument's U and Y measured on a standard (manual pp. 106-107, checked (manual)). The manual offers Williamson-Hall and Halder-Wagner plots of integral breadths as the better route (p. 107). Esd not checked |
+| BGMN 4.2.23 | B1 in nm⁻¹ (a Lorentzian width that goes as 1/size), k1 (size-distribution shape, 0 to 1), k2 (the squared rms microstrain) | B1 linear in a Lorentzian width; k2·(1/d)² linear in a squared width (manual pp. 20, 101, 110, checked (manual)) | the manual's examples start at 0 with a lower bound at 0 (`PARAM=B1=0_0`, p. 20, checked (manual)) | `GrainSize(h,k,l)` converts B1 and k1 to a volume-weighted diameter (eq. 5.29, p. 41) and prints it with an esd (p. 81, checked (manual)). How the esd is formed is not stated (not checked) |
+| MAUD 3.07 | crystallite size in Å and r.m.s. microstrain | Delft model: Lorentzian breadth ∝ 1/size, Gaussian breadth ∝ strain (`SizeStrainDelf.java`, checked (source)). The Gaussian part therefore enters the variance squared (inferred) | size 1000 Å, limits 50 and 5000; strain 0.0006, limits 0 and 0.005 (`SizeStrainSymIso.java:88-99`, checked (source)). Neither limit is enforced (§ Peak-width limits) | the refined variable is the reported one (inferred) |
+| EasyDiffraction 0.21.1 / cryspy 0.13.0 | EasyDiffraction exposes no constant-wavelength sample term (§ Instrument and specimen widths). cryspy's phase carries `igsize`, `u`, `v`, `w`, `x`, `y`, coefficients like FullProf's | added to the instrument's: linear in H_G², linear in H_L (`cryspy/C_item_loop_classes/cl_1_phase.py:25`, `A_functions_base/powder_diffraction_const_wavelength.py:114-122`, checked (source)) | not set by default (checked (source)); H_G² floored at machine ε | no conversion (inferred) |
+
+Anisotropic broadening follows each program's isotropic choice. GSAS-II refines an ellipsoidal or
+uniaxial size in µm and Stephens S_HKL terms under a square root. Its Stephens terms start at 0.01
+each, not at 0 (`GSASIImath.py:6297`, checked (source)). FullProf adds DST² to the Gaussian FWHM²
+and DST to the Lorentzian FWHM, and its size models refine a coefficient SZ (manual pp. 21, 27-28,
+checked (manual)). RIETAN-FP adds coefficients Xe, Ye, σa and γa (manual p. 35, checked
+(manual)). BGMN puts a quadratic form, or the square root of one, on B1 or k2 (`ANISOLIN`,
+`ANISOSQR`, manual p. 100, checked (manual)).
+
+**The practice.** The programs split. FullProf, RIETAN-FP, BGMN and cryspy refine coefficients that
+enter the width linearly, and leave the size and strain to a conversion. GSAS-II and MAUD refine
+the physical size and strain. TOPAS refines a physical size and a strain coefficient. Every
+program that refines a physical size enters it as 1/size and starts it large, near no broadening.
+GSAS-II starts at 1 µm, MAUD at 1000 Å, and TOPAS bounds the size at 10 000 nm. The two that refine
+a physical strain start it away from zero, GSAS-II at 0.1 % and MAUD at 0.06 %. Their Gaussian
+part enters the variance squared, so a start at zero would not move. Among the defaults read, no
+term that starts at zero enters the variance squared. TOPAS's Gaussian terms start where the user
+puts them. rietx's coefficients, linear and starting at 0, follow FullProf, RIETAN-FP and BGMN.
+TOPAS propagates a derived quantity's esd through the full covariance. GSAS-II needs no
+propagation for size and strain, since it refines them. FullProf's per-reflection table carries no
+esd. BGMN prints one without saying how it is formed.
+
+### B. Other parameters
+
+Each cell says whether the program refines the physical quantity (**phys**) or a coefficient
+(**coef**), and how it enters.
+
+| Family | rietx | GSAS-II 5.8.4 | FullProf 8.20 | TOPAS v9 | RIETAN-FP 3.12 | BGMN 4.2.23 | MAUD 3.07 | EasyDiffraction / cryspy |
+|---|---|---|---|---|---|---|---|---|
+| Cell | phys a, b, c, α, β, γ (checked (source)) | coef: reciprocal metric terms A0-A5 and strain terms D11-D23 (`GSASIIlattice.py:144`, `GSASIIstrMath.py:2933`, checked (source)) | phys a, b, c, α, β, γ in the `.pcr` (manual p. 107, checked (manual)); converted to an internal metric for limits (§ Limits a control file declares) | phys a, b, c, al, be, ga, with default limits (§2.18, checked (manual)) | phys (recall) | phys, in nm (recall) | phys `_cell_length_a` etc. (`Phase.java:64`, checked (source)) | phys (recall) |
+| Displacement | phys Biso in Å²; aniso U^ij in Å² (checked (source)) | phys Uiso and U_ij in Å² (`GSASIIstrMath.py:1120, 1274`, checked (source)) | phys Biso in Å² (manual p. 102); aniso β_ij (manual p. 36, checked (manual)) | phys `beq` in Å², limits −10 to 20 about the value; `u11`-`u23` (§2.18, checked (manual)) | phys B; aniso coef β_ij, dimensionless, refined and printed as such, with U_ij advised for papers (manual p. 24, checked (manual)) | phys `TDS`, in nm² by default (manual p. 20, checked (manual)) | phys B_iso and aniso B_ij (`AtomSite.java:65-67`, checked (source)) | phys Biso or Uiso, the user's choice (`atom_sites/enums.py:13-14`, checked (source)) |
+| Scale | linear, bound at 0 (checked (source)) | linear, floored at 1e-12 (`GSASIIstrMath.py:3178-3180`, checked (source)) | linear (manual p. 33, checked (manual)) | linear, minimum 1e-11 (§2.18, checked (manual)) | linear (recall) | `GEWICHT`, linear, bound at 0; carries the texture too (manual pp. 20, 94, checked (manual)) | volume fraction (recall) | linear (cryspy `cl_1_phase.py:25`, checked (source)) |
+| Weight fraction esd | full covariance (`qpa.weight_fractions`, per CLAUDE.md) | full covariance, J·Cov·Jᵀ (`GSASIIstrMath.py:5205-5268`, checked (source)) | formula on p. 31; esd method not checked | full covariance through a dependent parameter (§2.17, inferred) | not checked | not printed by default; a GOAL gives one (manual p. 109, checked (manual)) | not checked | not checked |
+| Occupancy | phys, bound at 0 (checked (source)) | phys site fraction (recall) | coef: chemical occupancy × site multiplicity (manual p. 102, checked (manual)) | phys, limits 0 to 2·value + 1 (§2.18, checked (manual)) | phys (recall) | not checked | phys `_atom_site_occupancy` (`AtomSite.java:63`, checked (source)) | phys (recall) |
+| Preferred orientation | phys March-Dollase r, with a floor above its pole (checked (source)) | phys March-Dollase ratio, default 1.0, or spherical-harmonic coefficients (`GSASIImath.py:6293`, `GSASIIstrMath.py:3066-3079`, checked (source)) | March (Nor = 1) or exponential (Nor = 0) parameters G1, G2 (manual pp. 54-55, checked (manual)) | March parameter, or spherical-harmonic coefficients (§22.1, checked (manual)) | March-Dollase r (manual pp. 30-31, checked (manual)) | spherical harmonics inside `GEWICHT`; the manual calls March unsuitable (manual pp. 12, 28, checked (manual)) | March-Dollase coefficient, default 1 (`MarchDollaseComponent.java:86`, checked (source)); harmonic and WIMV models too (recall) | not checked |
+| Extinction | coef: Sabine D² in µm², bound at 0, opt-in (checked (source)) | coef: one coefficient multiplying x linearly, default 0 (`GSASIIstrMath.py:3135`, checked (source)) | coef `Extinc` (manual p. 110, checked (manual)) | a user `prm` in `scale_pks`, linear inside 1/√(1 + x) (Extinction entry, checked (manual)) | not checked | not checked | coef `_refine_ls_extinction_coef`, default 1 (`ExtinctionSabineModel.java:40, 81`, checked (source)) | not checked |
+| Absorption | phys µR or µt, not refinable (CLAUDE.md, checked (source)) | phys µR, refinable (`GSASIIstrMath.py:3105`, checked (source)) | not checked | phys µ in the `Absorption` macro (recall) | not checked | not checked | not checked | not checked |
+| Zero and displacement | phys: zero in deg, displacement and transparency in mm (checked (source)) | phys: zero in deg, `Shift` in µm, transparency in 1/µeff cm (`GSASIIstrMath.py:3560-3567`, checked (source)) | coef: `SyCos` = −2s/R and `SySin` in deg; the user computes s (manual pp. 56-57, checked (manual)) | phys: zero error, specimen displacement (§22.1.7, checked (manual)); units not checked | coef: Z + Ds·cosθ + Ts·sin2θ (manual p. 40, eq. 3.94, checked (manual)) | coef EPS1-EPS3 (manual pp. 24, 39, checked (manual)); units not checked | not checked | coef `offset_sysin` for transparency (`calculators/cryspy.py:840`, checked (source)) |
+| Background | coef: Chebyshev or P-spline (checked (source)) | coef: Chebyshev and others (`GSASIIpwd.py:978-1023`, checked (source)) | coef (recall) | coef (recall) | coef: Legendre polynomial (recall) | coef (recall) | coef (recall) | coef (recall) |
+| Instrument U V W X Y | coef: variance in deg², FWHM in deg | coef: variance in centideg², FWHM in centideg (`GSASIIstrMath.py:3891-3904`, `GSASIIpwd.py:818`, checked (source)) | coef: FWHM² and FWHM (manual p. 21, checked (manual)) | coef: TCHZ u, v, w, z, x, y (§7.2, checked (manual)) | coef: variance in deg², FWHM in deg (manual p. 106, checked (manual)) | none; ray-traced (§ Instrument and specimen widths) | coef: FWHM² polynomial in tanθ (`InstrumentBroadeningPVCaglioti.java:577-580`, checked (source)) | coef: deg² and deg (`peak/cwl_mixins.py`, checked (source)) |
+
+**The practice.** Structural quantities are refined as the physical quantity in every program.
+Cell edges and angles, Biso or Uiso, occupancies and March-Dollase ratios refine as reported, with
+two exceptions. GSAS-II refines the reciprocal metric tensor, and RIETAN-FP refines dimensionless
+β_ij. Both convert for the report. GSAS-II's cell esds go through the covariance
+(`GSASIIlattice.py:363`, checked (source)). Every program refines a scale linearly, with a floor at
+or near zero; none refines log scale. Every program refines instrument widths and background as
+coefficients. Positional aberrations divide. GSAS-II and TOPAS refine a displacement in a length
+unit, and FullProf, RIETAN-FP and BGMN refine the coefficient of an angular term. Positional
+aberrations and sample broadening (table A) are the two families where practice splits. rietx matches the majority in every
+row but one. It refines a displacement and a transparency in mm, as GSAS-II and TOPAS do, while
+four programs refine angular coefficients. Its physical cell and Biso follow TOPAS, FullProf and
+MAUD.
 
 ## Sources
 

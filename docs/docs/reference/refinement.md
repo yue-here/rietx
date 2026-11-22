@@ -312,8 +312,8 @@ The closing stage takes the last declared stage's iteration budget, Le Bail cycl
 It takes the solver's default tolerance, as the last declared stage does.
 `RefinementResult.stages` ends with it under the name `closing`, and `StageResult.window_area_tol` and `NodeAction.window_area_tol` record the fraction.
 A declared stage records `None`, the declared stages' 2 %.
-`compile_model` and `Refinement.predict` evaluate outside a fit at `CLOSING_WINDOW_TOL`, so a synthetic pattern carries near-complete tails.
-Rebuild a fit's own curve with `window_area_tol=recorded_window_tol(result.stages[-1].window_area_tol)` (`rietx.model.forward.recorded_window_tol`).
+`compile_model`, and `Refinement.predict` before a fit, evaluate at `CLOSING_WINDOW_TOL`, so a synthetic pattern carries near-complete tails.
+After a fit, `Refinement.predict` draws the fit's own curve, as `compile_model` does given `window_area_tol=recorded_window_tol(result.stages[-1].window_area_tol)`.
 At any window fraction under the declared stages' 2 %, the axial-divergence asymmetry is sampled at a finer node rule as well.
 So a `closing_window_tol` loosened past 1e-3 loosens the windows alone.
 
@@ -600,7 +600,7 @@ Each kind has one constructor, so each format string is written once:
 |---|---|---|---|
 | `GuardFinding.correlation` | `HIGH_CORRELATION` | two free parameters correlate above the plan's `correlation_guard` | ρ |
 | `GuardFinding.flat_direction` | `FLAT_DIRECTION` | a correlated pair reaches \|ρ\| = 1.000 to the three decimals the message prints, so the data do not separate them | ρ |
-| `GuardFinding.discarded_direction` | `COVARIANCE_DIRECTION_DISCARDED` | three or more parameters share a direction the covariance solve discards, which no pairwise correlation shows, so each esd is at least √2 too small | the number of directions |
+| `GuardFinding.discarded_direction` | `COVARIANCE_DIRECTION_DISCARDED` | three or more parameters share a direction the covariance solve discards, which no pairwise correlation shows, so none of them has an esd | the number of directions |
 | `GuardFinding.at_bound`, `GuardFinding.tied_at_bound` | `BOUND_HIT`, or `FLOOR_HIT` on a lower bound at 0 | a bound carried load at the answer, on a free or a tied parameter | the residual's cosine with the column, or `None` |
 | `GuardFinding.background_absorption` | `BACKGROUND_ABSORPTION` | the background could largely reproduce a structural parameter's column | the block R² |
 | `GuardFinding.roughness_absorption` | `ROUGHNESS_ABSORPTION` | the surface-roughness correction could | the block R² |

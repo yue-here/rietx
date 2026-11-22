@@ -250,6 +250,13 @@ def test_the_hostile_pairs_runaway_reports_its_stale_windows(monkeypatch):
 
     monkeypatch.setattr(refine_mod, "compile_model", guarded)
     monkeypatch.setattr(rx.RefinementPlan, "stage_ftols", pre_2045)
+    # and the stage order of that time: lines_axial after sample_broadening.
+    # qpa_plan moved it ahead on 2026-11-19 (WP-2017 § Inherited), and cpd-1b's
+    # warm stage then stops at a sane axial ratio, so the runaway needs this.
+    plan = qpa_plan()
+    names = [s.name for s in plan.stages]
+    axial = plan.stages.pop(names.index("lines_axial"))
+    plan.stages.insert(names.index("sample_broadening"), axial)
     structure = rx.Structure(phases=_phases())
     ins = qarr_instrument()
     patterns = [rx.read_pattern(DATA / f"{s}.prn") for s in SAMPLE1[:2]]
@@ -262,7 +269,7 @@ def test_the_hostile_pairs_runaway_reports_its_stale_windows(monkeypatch):
 
     with pytest.raises(_Runaway):
         rx.SequentialRefinement(structure, ins).fit(
-            patterns, labels=list(SAMPLE1[:2]), plan=qpa_plan(), events=listen)
+            patterns, labels=list(SAMPLE1[:2]), plan=plan, events=listen)
     cpd_1a = [e["window_loss"] for e in ends if e["series_index"] == 0]
     assert all(x < 0.02 for x in cpd_1a), cpd_1a
     warm = [e for e in ends if e["series_index"] == 1][-1]
