@@ -8147,10 +8147,8 @@ def _guard_diagnostics(guard) -> list[Diagnostic]:
             message=f"The Stephens strain coefficients of {msg} lie outside "
                     f"the physical cone.{finding.detail}",
             suggestion="Under solver='trf', refit with the default LM "
-                       "driver, which holds σ²(M) ≥ 0 at every reflection; "
-                       "a joint fit holds it under neither driver, so fit "
-                       "each histogram alone or drop the block from the "
-                       "joint fit. That makes the coefficients "
+                       "driver, which holds σ²(M) ≥ 0 at every reflection, "
+                       "in a joint fit too. That makes the coefficients "
                        "admissible, not measured, so compare a few starts "
                        "(StephensStrain.isotropic at different "
                        "microstrains). Do not report the S_HKL as measured. "

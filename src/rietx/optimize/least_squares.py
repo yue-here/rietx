@@ -2936,6 +2936,29 @@ def _joint_width_inequalities(models: list[CompiledModel], mtable, x0: np.ndarra
     reads its own histogram's table, whose C already carries the λ factor a
     shared size column takes (WP-1131), so a row needs only its columns moved.
     """
+    return _on_joint_columns((gaussian_width_inequalities,
+                              lorentzian_width_inequalities), models, mtable, x0)
+
+
+def _joint_positivity_inequalities(models: list[CompiledModel], mtable,
+                                   x0: np.ndarray) -> list["lm_mod.LinearInequality"]:
+    """The single fit's Stephens strain cone and texture P ≥ 0 rows, asked of
+    each histogram and laid on the joint columns (WP-2239).
+
+    A shared Stephens block gets a cone per histogram, since each histogram's
+    reflections are its own monomials; a point inside all of them is a block
+    no histogram's width reads as negative.  Each builder's skip rules hold
+    per histogram: nothing free in the direction, or a start already outside.
+    """
+    return _on_joint_columns((strain_cone_inequalities,
+                              texture_positivity_inequalities), models, mtable, x0)
+
+
+def _on_joint_columns(builders, models: list[CompiledModel], mtable, x0: np.ndarray
+                      ) -> list["lm_mod.LinearInequality"]:
+    """Each single-fit builder asked of each histogram's own model and table,
+    its rows moved onto the joint columns (``mtable.col_map``) and labelled
+    ``"hist.<h> <label>"``."""
     from . import lm as lm_mod
 
     out: list[lm_mod.LinearInequality] = []
@@ -2943,12 +2966,12 @@ def _joint_width_inequalities(models: list[CompiledModel], mtable, x0: np.ndarra
     for h, (model, table, local) in enumerate(
             zip(models, mtable.tables, mtable.split(x0), strict=True)):
         cols = np.asarray(mtable.col_map(h), dtype=np.intp)
-        for block in (gaussian_width_inequalities(model, table, local)
-                      + lorentzian_width_inequalities(model, table, local)):
-            T = np.zeros((block.T.shape[0], n), dtype=np.float64)
-            T[:, cols] = block.T
-            out.append(lm_mod.LinearInequality(T=T, c=block.c,
-                                               label=f"hist.{h} {block.label}"))
+        for build in builders:
+            for block in build(model, table, local):
+                T = np.zeros((block.T.shape[0], n), dtype=np.float64)
+                T[:, cols] = block.T
+                out.append(lm_mod.LinearInequality(T=T, c=block.c,
+                                                   label=f"hist.{h} {block.label}"))
     return out
 
 
@@ -3977,10 +4000,9 @@ def run_multi_least_squares(models: list[CompiledModel],
     ``solver`` selects the driver exactly as in :func:`run_least_squares` —
     this is the *second* entry point WP-0308 warned about, and a solver swap
     that reached only the single-histogram one would leave joint refinements
-    silently on scipy.  The Stephens cone is not built here: its rows are
-    per-model and the stacked column map would have to scatter each phase's T
-    into the joint vector.  Deferred rather than half-done — a joint refinement
-    with `solver="lm"` gets the bounded driver, not the cone.  The width rows
+    silently on scipy.  Under it the single fit's rows are built per
+    histogram on the joint columns: the Stephens cone and texture positivity
+    (:func:`_joint_positivity_inequalities`, WP-2239), the width rows
     (:func:`_joint_width_inequalities`) and each tied entry's own bounds, a
     parametric target's in every subset pattern among them
     (:func:`_joint_tied_bound_inequalities`, WP-1325), are built, and the
@@ -4093,7 +4115,9 @@ def run_multi_least_squares(models: list[CompiledModel],
             res = _lm_outcome(residual, jacobian, x0, lo, hi, max_nfev=max_nfev,
                               ftol=ftol,
                               inequalities=_pad_inequalities(
-                                  _joint_width_inequalities(models, mtable, x0[:n_table])
+                                  _joint_positivity_inequalities(
+                                      models, mtable, x0[:n_table])
+                                  + _joint_width_inequalities(models, mtable, x0[:n_table])
                                   + _joint_tied_bound_inequalities(
                                       mtable, x0[:n_table], lo[:n_table],
                                       hi[:n_table]), n_aux),
