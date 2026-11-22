@@ -138,52 +138,58 @@ approval, and no tier-3 row is recorded as approved.
 6. *The inherited pdCIF weight-column note* is stale, as PR #1636 found. Yue ruled the
    whole-column fallback on 2026-10-26 (`PATTERN_WEIGHT_UNUSABLE`, issue #1181).
 
-**Consent lines, awaiting Yue.** Each is "I will X, unless you object". A rule sends it to
-him: a tier-3 keep needs his dated approval, and a reader-output change or a deletion is his.
+**The consent lines, answered 2026-11-22.** Each was "I will X, unless you object". A rule sent
+it to him: a tier-3 keep needs his dated approval, and a reader-output change or a deletion is
+his.
+
+Answered 2026-11-22 under the maintainer's routing rules of that day (WP-2237): each item was
+settled by Claude and checked by a fresh agent that did not see the pick, or brought to the
+maintainer, who answered "All as recommended".
 
 7. `fullprof._OCCUPANCY_RTOL`: tighten its nuclear use to the file's printed rounding, so a
    site at Occ × 0.996 is refused rather than built full with no record. The magnetic
-   Scale × f² use goes to Mike.
+   Scale × f² use goes to Mike. **Settled by Claude 2026-11-22, checked blind:** proposal as written. Grounds: the constant's own
+   docstring rule, "a real partial occupancy is refused rather than rounded off".
 8. `FULLPROF_OCCUPANCY_UNCHECKED`: fire only for a one-atom phase whose symbol has a second
-   origin setting (clause 1 of *Attention is a cost*).
+   origin setting (clause 1 of *Attention is a cost*). **Settled by Claude 2026-11-22, checked blind:** proposal as written. Grounds: *Attention is a cost*, clause 1.
 9. The three writer notices that fire on every write (`GSAS2_CIF_FIELD_NOT_WRITTEN`,
    `GSAS2_INSTPRM_FIELD_NOT_WRITTEN`, `GSAS_PRM_FIELD_NOT_WRITTEN`): the fixed part moves to
    each writer's docstring and help entry, and a code stays only for a dropped item that
-   varies with the model (clause 1).
-10. `RECIPE_FIELD_DROPPED`: split into one code per level (clause 2).
+   varies with the model (clause 1). **Settled by Claude 2026-11-22, checked blind:** proposal as written. Grounds: *Attention is a cost*, clause 1.
+10. `RECIPE_FIELD_DROPPED`: split into one code per level (clause 2). **Settled by Claude 2026-11-22, checked blind:** proposal as written. Grounds: *Attention is a cost*, clause 2.
 11. The recipe hump's `0.0 if pos is None`: refuse a background peak with no position, under
-    the 2026-11-02 ruling that made `HumpComponent.position` required.
+    the 2026-11-02 ruling that made `HumpComponent.position` required. **Settled by Claude 2026-11-22, checked blind:** proposal as written. Grounds: that ruling.
 12. A symmetry-fixed angle within 1e-3° of its value (`cif.py:98`): snap it and record
-    `CIF_CELL_ANGLE_CORRECTED`, as the reader already does from 1e-3° to 0.1°.
+    `CIF_CELL_ANGLE_CORRECTED`, as the reader already does from 1e-3° to 0.1°. **Settled by Claude 2026-11-22, checked blind:** NOT the proposal: leave a symmetry-fixed angle within 1e-3° as stored, with no record; the proposal (snap it and record `CIF_CELL_ANGLE_CORRECTED`) was the alternative. Grounds: nothing changes, so there is no repair to report, and a record would fire on rounding noise (*Attention is a cost*, clause 1).
 13. `gui.imports.WAVELENGTH_RTOL`: match a header to the rounding of its own printed digits,
-    so 0.71 Å reads as Mo and 0.56 Å as Ag.
+    so 0.71 Å reads as Mo and 0.56 Å as Ag. **Settled by Claude 2026-11-22, checked blind:** proposal as written. Grounds: the printed-digit convention (`CIF_PRINTED_ROUNDING`).
 14. `ProjectFormat.refuses`: retire it. No member has set it since WP-2013 (Rule 5). It is a
-    deletion, staged in the release notes.
+    deletion, staged in the release notes. **Ruled by Yue 2026-11-22:** retire it, as proposed. `capabilities()` also exposes it as `ProjectFormatCapability.refuses` (`capabilities.py:248`), so the release note names that output change too.
 15. `CIF_STATED_MULTIPLICITY_SNAP_TOL`, `DUPLICATE_U_TOLERANCE`, `OCCUPANCY_TOLERANCE`: take
     `CIF_PRINTED_ROUNDING`'s per-file printed-digit rule and become tier 1 (Rule 5,
-    convention).
+    convention). **Settled by Claude 2026-11-22, checked blind:** proposal as written. Grounds: the printed-digit convention (`CIF_PRINTED_ROUNDING`).
 16. Keep at tier 3 as written: `TWIN_DISTANCE`, `CIF_ANGLE_CORRECT_MAX_DEG` (the WP-1028 band
     in the root CLAUDE.md), `SYMMETRY_ANGLE_TOL_DEG`, `MAX_HKL_GRID_POINTS` (the shape of the
     approved memory caps), `LINE_DISPERSION_TOL`, `NEAR_EDGE_EV` (an XAFS citation would move
-    it to tier 2), `GSAS_EXP_REFINE_FLAG_MERGED` and `PATTERN_ROWS_DROPPED` sites 2 and 3.
+    it to tier 2), `GSAS_EXP_REFINE_FLAG_MERGED` and `PATTERN_ROWS_DROPPED` sites 2 and 3. **Settled by Claude 2026-11-22, checked blind:** the six constants (`TWIN_DISTANCE`, `CIF_ANGLE_CORRECT_MAX_DEG`, `SYMMETRY_ANGLE_TOL_DEG`, `MAX_HKL_GRID_POINTS`, `LINE_DISPERSION_TOL`, `NEAR_EDGE_EV`) stay at tier 3 with `approved_by="checked"`. **Ruled by Yue 2026-11-22:** `GSAS_EXP_REFINE_FLAG_MERGED` and `PATTERN_ROWS_DROPPED` sites 2 and 3: tier 3 approved, dated 2026-11-22 ("All as recommended").
 17. Keep at tier 3 under the rare-feature clause, each naming its one family:
     `GSAS_BANK_COMMENTED`, `RECIPE_BACKGROUND_PEAK_DEGENERATE`,
-    `RECIPE_ENGINE_DEFAULT_DECLINED`, `RECIPE_PLAN_STAGED`, `TOPAS_PHASE_TERM_READ`.
+    `RECIPE_ENGINE_DEFAULT_DECLINED`, `RECIPE_PLAN_STAGED`, `TOPAS_PHASE_TERM_READ`. **Ruled by Yue 2026-11-22:** tier 3 approved for the five, dated 2026-11-22 ("All as recommended").
 18. `SITE_TOL`: widen to GSAS-II's reach (2e-4 per coordinate) at tier 2 if the 564-setting
     orbit sweep and the rigid-body tilt case pass at it, else keep it at tier 3 with the
-    four-decimal case named.
+    four-decimal case named. **Settled by Claude 2026-11-22, checked blind:** proposal as written: the measurement decides. Run the orbit sweep and the tilt case; widen to 2e-4 at tier 2 if they pass, else tier 3 naming the case.
 19. `HEAD_BYTES` and `gsas._GSAS_TIME_MAP_SCAN_BYTES`: one 64 kB sniff window, dropping the
     two escalations it makes redundant. The 2026-11-17 probe found no change in which reader
-    claims any of the 210 files in `tests/data`.
+    claims any of the 210 files in `tests/data`. **Settled by Claude 2026-11-22, checked blind:** proposal as written. Grounds: the 2026-11-17 probe.
 20. The phase-scale start of 1e-3 (`GSAS2_GPX_SCALE_NOT_COMPARABLE`,
     `GSAS_EXP_SCALE_NOT_COMPARABLE`): a start-invariance test from 1e-3 and from a
     data-seeded scale. If both answers agree, the start is answer-invariant. If not, it
-    stays at tier 3 with the case named.
+    stays at tier 3 with the case named. **Settled by Claude 2026-11-22, checked blind:** proposal as written: the measurement decides.
 21. `RECIPE_BACKGROUND_RESEEDED`: compare GSAS-II 5.8.4's Chebyshev basis with rietx's. If
     they are equal, carry the coefficients (tier 1). If not, refuse a held background
-    rather than zero it.
+    rather than zero it. **Settled by Claude 2026-11-22, checked blind:** proposal as written, with one addition: compare the bases first. If equal, carry (tier 1). If not, the refuse-or-reseed choice comes back to the maintainer before it is built, since a reader's refuse-versus-repair form is his (reversal of 2026-11-21).
 22. `GSAS_PRM_GEOMETRY_ASSUMED`: adopt GSAS-II's rule (one wavelength is Debye-Scherrer, a
-    doublet is Bragg-Brentano) at tier 2, keeping the warning.
+    doublet is Bragg-Brentano) at tier 2, keeping the warning. **Settled by Claude 2026-11-22, checked blind:** proposal as written. Grounds: GSAS-II's own rule (tier 2).
 
 **Ruled by Yue, 2026-11-21.** 23. The two reader picks where careful refiners differ (the
 brief is in the 2026-11-21 handover entry).
@@ -209,8 +215,8 @@ reading defaults.
 - **2026-11-21** — A rulings triage, docs only (PR #1759), over this file and PR #1636's
   batch. The gate ruling this WP waited on was made on 2026-11-16, and PR #1636 has since
   tiered 218 rows under it. So what waits now is that PR's batch. Of its items, six are
-  settled by a written rule or a measurement, 16 are consent lines Yue can wave through,
-  one is a brief, and the magnetic ones are Mike's. § Rulings above lists each. Nothing was
+  settled by a written rule or a measurement, 16 were consent lines (answered 2026-11-22, § Rulings above),
+  one was a brief (answered 2026-11-21), and the magnetic ones are Mike's. § Rulings above lists each. Nothing was
   built, and PR #1636 needs no change for these rulings to stand.
 
   #### Brief for the maintainer: two reader picks where careful refiners differ

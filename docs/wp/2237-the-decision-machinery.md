@@ -196,6 +196,18 @@ are fixed on that branch (96120fa8d). It cost 239k tokens. The check caught what
 the doer did not, which is the case for part 1's checker; it did not need to be a saved
 agent definition, since the dispatch prompt carried the question.
 
+## The 47 consent lines under the new rules (2026-11-22)
+
+The 47 lines pending on 2026-11-21 were triaged under the rules ruled above. Claude settled
+33 outright and 3 in part, and a fresh agent checked them blind. Eleven went to the
+maintainer: six tier-3 approvals, two public posts and three rulings. He answered "All as
+recommended". The blind check changed two outcomes. On the CIF angle within 1e-3° of its
+symmetry value, it chose to leave the angle as stored over the proposed snap. On
+`PHASE_UNCONSTRAINED`, it found the cited precedent wrong. Each outcome is written in its
+own record: `docs/wp/2005-batch/rulings.md`, WP-2006 and WP-2020 § Rulings, and
+`docs/milestones/generality.md` and `series.md`. The collation cost 195k tokens, the check
+141k and the recording 156k.
+
 ## Tasks
 
 - [x] Hindcast test (above).

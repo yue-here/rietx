@@ -797,12 +797,24 @@ reverse it knowing what it would be giving up.
   histograms' own. `SharingMap.is_shared`'s default is not settled here. Its tier needs a
   survey of what each program shares across histograms by default, and
   `docs/practice.md` has none.
-- **Awaiting the maintainer from the same pass, 2026-11-21.** Nothing below is recorded
-  as approved. (1) `SeriesEntry.rungs_tried` and `SeriesEntry.rungs_raised` at tier 3,
-  their approval dated to the maintainer's acceptance of series Rule 6 on 2026-11-16
-  ("each act is recorded"). (2) Whether the maintainer's merge of PR #1310 on 2026-11-04
-  closes the review of its series-panel sentences and of the joint fit's ten moved test
-  records. (3) The agent run that § The rule asks of a contested demotion, a spend.
+- **Three items from the same pass, answered 2026-11-22.** They waited on the maintainer
+  from 2026-11-21.
+
+  Answered 2026-11-22 under the maintainer's routing rules of that day (WP-2237): each item was
+  settled by Claude and checked by a fresh agent that did not see the pick, or brought to the
+  maintainer, who answered "All as recommended".
+
+  (1) `SeriesEntry.rungs_tried` and `SeriesEntry.rungs_raised` at tier 3, their approval
+  dated to the maintainer's acceptance of series Rule 6 on 2026-11-16 ("each act is
+  recorded"). **Ruled by Yue 2026-11-22:** tier 3 approved, dated 2026-11-22 (his own date, not one read from his
+  Rule 6 acceptance). (2) Whether the maintainer's merge of PR #1310 on 2026-11-04 closes
+  the review of its series-panel sentences and of the joint fit's ten moved test records.
+  **Settled by Claude 2026-11-22, checked blind:** closed: the merge of PR #1310 closes its review, and its printed sentences join the
+  once-per-release read of printed output (`docs/RELEASING.md` step 2). (3) The agent run
+  that § The rule asks of a contested demotion, a spend. **Ruled by Yue 2026-11-22:** deferred. The contested
+  demotions (`HIGH_CORRELATION` and this one) wait for one agent run on
+  `tests/eval_report_agent` after WP-2008 rewrites skill rule 7, so one spend measures both.
+  It flips if the warning is found causing harm in fits today.
 
 ## The two reviews at the open
 

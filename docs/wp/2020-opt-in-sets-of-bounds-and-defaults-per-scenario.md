@@ -1,6 +1,6 @@
 # WP-2020 — Opt-in sets of bounds and defaults for a scenario, tested on the datasets they name
 
-Milestone: generality · Status: 🔄 2026-11-21 — rulings triaged: two settled by Claude; parking the scenario-set file and recording the loaded profile wait on the maintainer
+Milestone: generality · Status: 🔄 2026-11-22 — parked by the maintainer: the scenario-set file reopens when a WP-2017 demotion leaves a limit or a starting value with nowhere to go; the instrument-profile record reopens on a result whose calibration source mattered and could not be traced, or a user asking for it
 Track: The registry and the guard
 Depends on: —
 Priority: P2 2026-10-21 — the maintainer's concept, raised while declining a default backstop in WP-2002; it gives a demoted default somewhere to go other than away
@@ -137,7 +137,11 @@ datasets it was tested on.
 ## Rulings
 
 From the rulings triage of 2026-11-21, which checked the 2026-11-15 brief against the design
-rules. Nothing here is the maintainer's approval.
+rules. Items 3 and 4 were answered on 2026-11-22.
+
+Answered 2026-11-22 under the maintainer's routing rules of that day (WP-2237): each item was
+settled by Claude and checked by a fresh agent that did not see the pick, or brought to the
+maintainer, who answered "All as recommended".
 
 1. *The "tested on" line in each plan preset's help text* (half of the brief's option B) is
    dropped. Settled by Claude under DESIGN.md § Rules, 2 (ruled 2026-10-27 and 2026-11-01),
@@ -149,9 +153,13 @@ rules. Nothing here is the maintainer's approval.
    alternative was to move them into a series set.
 3. *Park the scenario-set file* (the brief's option C) until a WP-2017 demotion leaves a limit
    or a starting value with nowhere to go, under DESIGN.md Rule 5 (nothing is built before a
-   case needs it). Awaiting Yue, as a consent line. It is the maintainer's own concept.
-4. *Record which instrument profile file a result was fitted under, or park the WP.* Awaiting
-   Yue: the brief is in the 2026-11-21 handover entry.
+   case needs it). It is the maintainer's own concept. **Ruled by Yue 2026-11-22:** parked, as
+   proposed; it reopens when a WP-2017 demotion leaves a limit or a starting value with
+   nowhere to go.
+4. *Record which instrument profile file a result was fitted under, or park the WP.* The
+   brief is in the 2026-11-21 handover entry. **Ruled by Yue 2026-11-22:** park WP-2020
+   (recommendation A), as recommended. It reopens on a result whose calibration source
+   mattered and could not be traced, or a user asking for it.
 
 ## Handover log
 
@@ -353,7 +361,8 @@ rules. Nothing here is the maintainer's approval.
 
   **Consent line.** I will leave `strain_cap` and `size_cap` as package defaults, because
   their audit rows are tier 1 (a line wider than the scan carries no information) and the
-  generality rule keeps tier-1 defaults, unless you object.
+  generality rule keeps tier-1 defaults, unless you object. (Settled by Claude 2026-11-21,
+  § Rulings item 2: only a tier-3 row needs the maintainer, so this line no longer waits.)
 
   **Settled for you.**
 
