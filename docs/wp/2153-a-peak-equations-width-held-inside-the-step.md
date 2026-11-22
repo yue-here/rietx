@@ -195,7 +195,12 @@ closes on option A with the fixture's numbers recorded.
   report for a start below zero, as § Decision does. `/code-review high` found seven nits,
   all fixed in 16b14ae3b. *Generality:* not dispatched. The audit table is untouched, and
   the change adds no threshold or data-driven choice: an exact term enters, an inexact one
-  stays out. *Gotchas:* `make_lab6`'s cell is free by default, so a "step" on a test table
+  stays out. *CI fix:* Linux CI found TRF from the stall fixture's start stalled under
+  the floor too, every esd `None`. Nudging w's start by k·1e-14 reproduced it here: TRF
+  stalled in 5 of 7 starts (Rwp 0.191-0.195), and LM landed on the minimum in 7 of 7.
+  Nothing holds the total width inside TRF's step, a non-goal here. So the reference is
+  now TRF started at the truth, and the free test runs three nudged starts.
+  *Gotchas:* `make_lab6`'s cell is free by default, so a "step" on a test table
   must move only the columns it means to. A condition in an equation cannot read a
   coefficient (the schema refuses it), so `is_affine`'s `if` branch only ever sees a
   coefficient-free condition.
