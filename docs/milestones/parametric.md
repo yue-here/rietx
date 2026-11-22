@@ -122,7 +122,7 @@ a WP sharpens its row here, because a bar set before reading a WP is a bar set t
   synthetic ramp of that shape recovers all twelve coefficients within 2 esd
   (`tests/test_peak_equations.py`), and the real-data run frees them beside the
   calibration. [2151](../wp/2151-the-zrp2o7-peak-equations-on-its-data.md) ran it on all
-  37 patterns, seeded from the input, and every fit converged at Rwp 31.79 % (TOPAS
+  37 patterns, seeded from the input, and the reported fit converged at Rwp 31.79 % (TOPAS
   31.56 %). The stored silicon Gaussian is below zero at every reflection, so its
   coefficients cannot move. Seeded above zero, it takes Rwp to 31.48 %.
 - **Every evaluator answers one conformance table** (1964). Each row of (expression,

@@ -1,11 +1,12 @@
 """WP-1964 task 13 and WP-2151: the ZrP2O7 input's equations written as rietx text.
 
-    .venv/bin/python docs/wp/1964-measure/zrp2o7_formula.py \
-        > docs/wp/1964-measure/zrp2o7_formula_results.txt
+    .venv/bin/python docs/wp/1964-measure/zrp2o7_formula.py > ~/.cache/zrp2o7_run.txt
     .venv/bin/python docs/wp/1964-measure/zrp2o7_formula.py e   # arm (e) alone
 
 Run from the repository root.
 An argument names the arms to run, as letters; the default is all of them.
+``zrp2o7_formula_results.txt`` beside this script is WP-1964's record of arms (a)-(d),
+kept as it ran on 2026-11-06. WP-2151's handover entry carries the numbers of (e).
 The data is Durham TOPAS tutorial 9.5 (Stinton & Evans, 2007, *J. Appl. Cryst.* 40, 87).
 It is local only, from ``python -m tests.local_data durham-topas/zrp2o7``.
 The model, the protocol and the chain are WP-1325's ``zrp2o7_model.py``, imported unchanged.
@@ -377,6 +378,8 @@ def peak_plan(closing: float | None, free_z: bool) -> RefinementPlan:
             s = Stage(name="peak_equations", turn_on=[
                 *gauss, "phases.*.peak_equations.1.*", "instrument.peak_equations.*"])
         stages.append(s)
+    if not any(s.name == "peak_equations" for s in stages):
+        raise SystemExit("WP-1325's plan has no sample_profile stage; the equations would never be freed")
     return RefinementPlan(stages=stages, closing_window_tol=closing)
 
 
@@ -422,6 +425,8 @@ def arm_e(data: dict, c: dict[str, float], chain: dict, formula) -> None:
     # smallest Γ_G² in the range is 0.002 deg², a Gaussian FWHM of 0.045°
     si = tchz[1]
     deficit = -min(widths(si, t)[0] for t in np.linspace(lo, hi, 301))
+    if deficit <= 0:
+        raise SystemExit("silicon's stored Γ_G² is no longer below zero; the Si-seeded variant's premise moved")
     si_seed = [si[k] + (deficit + 0.002 if k == "w" else 0.0) for k in TCHZ_SLOTS]
     print(f"    silicon's seeded variant lifts w from {si['w']:+.5f} to {si_seed[2]:+.5f} deg²")
     fits = {}
@@ -483,7 +488,7 @@ def arm_e(data: dict, c: dict[str, float], chain: dict, formula) -> None:
         frows = {p.path: p for p in formula.parameters}
         print("    calibration in (d), same run: " + ", ".join(
             f"{n} {frows[f'vars.{n}'].value:+.2f} ± {frows[f'vars.{n}'].stderr:.2f} K" for n in TRIAL))
-    worst_path = max(moves, key=lambda p: abs(moves[p]))
+    worst_path = max(moves, key=lambda p: abs(moves[p]) if np.isfinite(moves[p]) else -1.0)
     print(f"    closing at CLOSING_WINDOW_TOL = {CLOSING_WINDOW_TOL:g}: largest move "
           f"{moves[worst_path]:+.2f} esd at {worst_path}; "
           f"{sum(abs(m) > 0.5 for m in moves.values())} of {len(moves)} rows move more than 0.5 esd")
@@ -539,4 +544,7 @@ def hand_delta(t: float, tm: float, tr: float, cal: dict[str, float]) -> float:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else "abcde")
+    arms = sys.argv[1] if len(sys.argv) > 1 else "abcde"
+    if not arms or set(arms) - set("abcde"):
+        raise SystemExit(f"arms are letters from abcde, not {arms!r}")
+    main(arms)
