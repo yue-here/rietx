@@ -271,8 +271,8 @@ roughly the shift.
 - The known-cell scoreboard is *never wrong, and silent more often than right* —
   **never round it up**, and **keep the found-but-not-first bucket** (collapsing it
   into right-or-wrong miscounts the board). It is **generated** by
-  `tests/indexing_gallery.py` — re-measure by running
-  the suite; counts live in the v1.0 dossier, never retyped here (WP-1041). And
+  `tests/indexing_gallery.py` — counts live in the v1.0
+  dossier, never retyped here (WP-1041). And
   **say "high-symmetry" whenever the board is quoted** (WP-1043): until the corpus
   moves, every claim from it is about high-symmetry lattices.
 - **An ambiguity partner must be refuted by the lines it needs and the data lack**
@@ -295,18 +295,15 @@ roughly the shift.
 - **A candidate is reported in its conventional setting, at `to_cell_candidate`**
   (WP-1923): `engines.conventional_fit` re-sets af, `cov_af`, cell and esds in one map. A
   new surface showing an engine's cell goes through it too, or one search speaks two.
-- **A metric direction no line constrains is refused, never marked** (#1232, WP-1915): a
-  dead *cross* term is not one unmeasured angle, it enters every length.
+- **A metric direction no line constrains is refused, never marked** (WP-1915): a dead
+  cross term enters every length.
 - **An assumed precision may never refuse to index** (`from_positions` lists get no
   `MAX_RELATIVE_SIGMA_Q` vote; the shift-allowance half is above).
 - **This package is not slow at indexing, it is silent** (WP-1037). Buy
   responsiveness with ordering and reporting, never by shrinking
-  the box. **`budget_seconds` is per (engine × system)** — probe and validation on
-  top — so the whole-run bound is `total_budget_seconds`, a `Deadline` that *is*
-  the cancel token; `estimate_ceiling` is the pre-run arithmetic,
-  `INDEX_BUDGET_EXHAUSTED` names the three states (searched/truncated/not reached),
-  and a truncated validation reads `not_validated`, never `validation_failed`
-  (1037). And **a Monte Carlo indexer must refine each proposal; raw random cells
+  the box. **`budget_seconds` is per (engine × system)**, so the whole-run bound is `total_budget_seconds`, a `Deadline` that *is*
+  the cancel token; `INDEX_BUDGET_EXHAUSTED` names the three states (searched/truncated/not reached),
+  and a truncated validation reads `not_validated`, never `validation_failed`. And **a Monte Carlo indexer must refine each proposal; raw random cells
   do not rank** (WP-1023).
 - **Coelho's N_c/N_o gate bounds the *volume*, it is not a per-trial verdict**
   (WP-1040, `svd.volume_window`): N_c ∝ V, so one probe gives κ and the gate is
