@@ -54,6 +54,13 @@ verdict goes to him. Grounds: 166 tier-3 rows, 111 of them constants, and none o
 reversals was a constant's value. Built in `generality.md` § The rule and § Acceptance,
 `_audit.Row.approved_by` with its test, and the judge's brief.
 
+**Ruled 2026-11-22.** The routing rules: he approved the paste text (the middle set,
+generalised for every project, with the user-surface trigger kept). The rietx-only
+triggers stay in rietx's records: the reversal log's escalated areas, the tier-3 rule
+above, and printed-output changes, now settled per PR with a blind check and read by
+him once per release (`docs/RELEASING.md` step 2; `/pr-review` 6c and `/wp-handover`
+step 11 changed to match).
+
 ## Plan
 
 Each part names its prose cost. "Step-only" means read only by the step that needs it.
@@ -183,7 +190,8 @@ Cost: four agents at about 114k tokens each, 457k against a 450k estimate.
 
 - [x] Hindcast test (above).
 - [x] Routing test (above).
-- [ ] Global-instructions paste text to the maintainer (another repo).
+- [x] Global-instructions paste text to the maintainer (another repo); approved 2026-11-22.
+- [x] Printed-output review moved to once per release.
 - [ ] The checker agent and the consent-line replacement (part 1, 5).
 - [ ] The register, its backfill and its marker test (part 2).
 - [ ] Rule 1's one-word replacement (part 3).
