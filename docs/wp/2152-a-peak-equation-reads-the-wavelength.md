@@ -1,8 +1,7 @@
 # WP-2152 — a peak equation reads the wavelength
 
-Milestone: parametric · Status: 🔄 2026-11-22 — built (PR #1785); one question for the maintainer, the warning on an equation reading wavelength
+Milestone: parametric · Status: ✅ 2026-11-22 — `wavelength` binds per emission line (PR #1785); the shared-across-wavelengths warning is silent on an equation reading it (PR #PRNUM)
 Depends on: —
-Priority: P3 2026-11-22 — a workaround covers it: a per-pattern coefficient through `SharingMap(per_histogram=[...])`, which the warning already names
 
 ## Goal
 
@@ -59,7 +58,9 @@ takes no TOPAS spelling as one.
   2026-11-20 ruling's ("silent with one wavelength, an unshared or parametric coefficient,
   or an `intensity_factor`"), so adding a case amends a ruling and goes to the maintainer.
   An equation reading `wavelength` may still carry a coefficient that belongs per
-  wavelength, so the case is a judgement.
+  wavelength, so the case is a judgement. *Superseded 2026-11-22:* the maintainer
+  answered "your call", and an equation reading `wavelength` is now silent (option (b),
+  handover entry of that date).
 - Versions. `params/expression.py` says `GRAMMAR_VERSION` moves on "a change to what any
   expression means, or to what is accepted". The reflection names are the peak equation's
   vocabulary, not the grammar's, so the version that moves is a call for this WP to make
@@ -96,6 +97,9 @@ takes no TOPAS spelling as one.
 - [x] Bring the warning's silence question to the maintainer with its options, or record
   that it was left firing. Left firing, unchanged, and brought as a brief in the
   2026-11-22 handover entry.
+- [x] Act on the answer. The maintainer answered "your call" on 2026-11-22. Option (b):
+  silent on an equation whose expression reads `wavelength`, settled by Claude under
+  that answer (PR #PRNUM).
 - [x] Manual: the guide's name list and practice paragraph, `reference/data.md`, the
   Theory equation. Help entries. Skill row. Also `switching/topas.md`'s name table
   (`Lam` → `wavelength`). The instrument help entry is unchanged, since it cannot read λ.
@@ -118,6 +122,75 @@ backend.
   wavelengths), WP-1134 (λ a table entry).
 
 ## Handover log
+
+- **2026-11-22** — Closed by a ghostshift runner, PR #PRNUM. A joint fit no longer warns
+  about a shared coefficient in a peak equation that reads `wavelength`. Before, a user
+  who wrote a size term as `y*wavelength/cos(theta)` fitted correctly and still got a
+  warning whose suggestion said to give each pattern its own `y`, which would fit two
+  sizes where the specimen has one. An equation that reads no wavelength warns as before.
+  The cost is a known gap: a size term written in degrees in the same expression, as
+  `+ x/cos(theta)`, is not warned either.
+
+  *Settled by Claude under the maintainer's "your call", 2026-11-22.* The question in the
+  entry below went to Yue, who answered "your call"; the shift lead chose option (b),
+  silent whenever the expression reads `wavelength`. Grounds: it extends the 2026-11-20
+  ruling's own principle. The warning exists because "the package cannot tell which kind
+  the user wrote"; a parametric coefficient is already silent, and writing `wavelength`
+  states the λ dependence the same way. The named alternative was (c), per-coefficient
+  silence, which would still warn on the mixed case's `x`. It loses on cost: a new
+  expression analysis, for mixed equations nobody has been seen to write. (c) would also
+  warn on a strain term beside the λ term (`+ w*tan(theta)`), which is rightly shared,
+  as the warning already does on a degree-only equation.
+
+  *Done.* `multi._peak_equation_sharing_diagnostics` skips an equation whose
+  `PeakEquation.reads()` holds `wavelength`, beside the `intensity_factor` skip. Tests:
+  `test_an_equation_reading_wavelength_is_not_warned`, five rows (the λ term alone,
+  silent; a degree-only size term, warned; λ term plus a strain term, silent; λ term plus
+  a degree size term, silent, pinning the known limit; a λ-reading `lor_fwhm` beside a
+  degree-only `gauss_fwhm_squared`, which warns on the second alone). The silence pair
+  (`tests/silence.py`) gains the λ-reading equation in its silent half. Help entry, the
+  guide's practice paragraph and its diagnostics line, the audit row's evidence and a
+  release-note fragment (`docs/releases/unreleased/wp2152.new.md`) say it, with the
+  limit. The skill row needs no change: it never said the warning fires on such an
+  equation. A phase holds one equation per target, so the mixed case cannot be split
+  into two equations to get its warning back.
+
+  *Measured* (`[dev]` venv, macOS arm64). A mutation restoring the old skip
+  failed 5 tests: the 4 new rows with a λ-reading equation, and the silence pair. Fast selection (`-m "not slow"`, on main f9adf0e57 plus
+  this branch): 15166 passed, 448 skipped, 32 xfailed, in 13 min 23 s. The jax and torch
+  rows self-skip in a `[dev]` venv, so these counts do not compare with the entry
+  below. The branch adds 5 cases (one parametrised test, 0.03 s in all, local junit)
+  and no skip.
+  `tests.reader_output`: unchanged against the merge-base (exit 0); the standard fit is
+  a single pattern and never reaches this code. The warning's own before/after is in the
+  PR body.
+
+  *Review.* `/code-review high --fix`, four findings, three fixed: a release-note
+  fragment, the guide's diagnostics line naming the exemption, and explicit coefficient
+  names in the new test. The fourth (record the ruling in this WP) is this entry.
+
+  *Generality* (judge's verdicts, condensed). Audit row: **holds, with two wording
+  faults.** (1) The row called the parametric silence a like-for-like precedent, but that
+  one is per coefficient and this one per equation; reworded in the row and the
+  docstring. (2) The delegation it cites was written nowhere; this entry records it.
+  Pre-existing, not changed: the row's `ambiguity=2` reads better as 3, since the warning
+  ranks nothing. The exemption itself: **holds**. The case for silence is a concrete
+  wrong suggestion; the case for warning is a mixed equation nobody has measured. Two
+  more misses it named, both user errors in a stated dependence, which the parametric
+  case also accepts: a constant in degrees beside the λ term (`+ c`), and a wrong power
+  of λ (a size *variance* needs λ²). Evidence of real ports writing mixed equations
+  would flip it to (c).
+  *Blind reader check* (fresh agent, the diff without this reading): "belongs with a
+  caveat", the caveat being the mixed equation, with (c) as its fix. That is the named
+  alternative above, so it is recorded rather than brought back.
+
+  *Leftovers.* The strain report's compile-time λ (Gotcha 2 below) went to WP-1335's
+  `### Inherited`, which works in the same function. The per-line width of the built-in
+  size terms (Gotcha 1) stays recorded here and in the v1.13 record, not filed: changing
+  it changes a default for every user, and no one has asked for it.
+
+  Next: none on this WP. Seeing a ported TOPAS or user input with a λ term and a degree
+  term in one width expression would reopen the choice for (c).
 
 - **2026-11-22** — Ghostshift runner, PR #1785. A phase's peak equation can now read
   `wavelength`, the λ in Å of the emission line each peak is drawn at. A size width is
