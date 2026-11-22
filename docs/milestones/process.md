@@ -1791,6 +1791,17 @@ SIZE_CAPS: dict[str, int | None] = {
 }
 ```
 
+### The byte limits, re-pinned by WP-2009 (2026-11-22)
+
+The findings pass moved each rulebook's evidence (incidents, shas, one
+dataset's numbers) to the WP or record its pointer names, and the five
+budgets it cut were re-pinned at the landed bytes, each ceiling lowered by the
+same amount so the gap stays the one WP-2233 measured.  Root `CLAUDE.md`
+86 787 -> 77 188 B, `src/rietx/io/` 55 732 -> 49 292 B, `gui/` 45 159 ->
+44 892 B (WP-2134 had already done its pass), `src/rietx/indexing/` 27 747 ->
+24 935 B, `tests/` 19 733 -> 17 707 B.  Each pass stopped where the next cut
+would have been a rule.
+
 ## What a session's reading costs
 
 Measured 2026-09-30 for `/pr-review`
@@ -2077,6 +2088,7 @@ lanes, the ten trial sessions first:
 | 2026-11-05 | 534f4819 | 2 | 0 | 0K | 6 | 22K | 1.05 | 2 / 0 | -0.26 | -2% |
 | 2026-11-12 | d64d4e39 | 2 | 0 | 0K | 9 | 19K | 1.44 | 0 / 0 | -0.72 | -3% |
 | 2026-11-13 | 3f3ab8ac | 1 | 4 | 0K | 5 | 6K | 1.00 | 1 / 0 | +0.28 | +5% |
+| 2026-11-21 | 58fcb0cd | 4 | 0 | 0K | 4 | 7K | 0.75 | 0 / 0 | +2.33 | +14% |
 
 Session 38257a74 (WP-1523) resumed its one lane by `SendMessage` with a
 revised design after the first report. The tool counts that as no redo, and the

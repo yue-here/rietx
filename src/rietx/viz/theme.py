@@ -105,6 +105,9 @@ SCHEMES: dict[str, str] = {"light": "light", "dark": "dark"}
 #: ``--line-strong`` (a control's border) and ``--hover`` (a hover ground).
 #: The site's other roles (a second ink, a faint ink, a tinted ground, an info
 #: state) wait for a reader: a token nothing reads is a name with no writer.
+#: ``--code-string`` is the Console's string literal (WP-2212; the maintainer
+#: accepted the drawn pair on 2026-11-21), the one syntax colour the Console
+#: draws beyond its comments.
 TOKENS: dict[str, dict[str, str]] = {
     "light": {
         "--fg": "#1c1917",
@@ -119,11 +122,13 @@ TOKENS: dict[str, dict[str, str]] = {
         "--ok": "#2a7d2a",
         "--warn": "#7d5f00",
         "--bad": "#b4271f",
+        "--code-string": "#2f6f3e",
         "--plot-obs": "#1c1917",
         "--plot-calc": "#c65d0a",
         "--plot-bkg": "#b5793a",
         "--plot-diff": "#6b6259",
         "--plot-last": "#849499",
+        "--plot-compare": "#403a35",
         "--plot-zero": "#cfcfcf",
         "--plot-peak": "#0072b2",
         "--plot-peakfit": "#6f83e6",
@@ -145,11 +150,13 @@ TOKENS: dict[str, dict[str, str]] = {
         "--ok": "#5fd45f",
         "--warn": "#e3c25b",
         "--bad": "#ff8f86",
+        "--code-string": "#8fc79d",
         "--plot-obs": "#d2c9bd",
         "--plot-calc": "#ff9d4d",
         "--plot-bkg": "#c99a6a",
         "--plot-diff": "#8f8f8f",
         "--plot-last": "#7f8f94",
+        "--plot-compare": "#f5f5f5",
         "--plot-zero": "#4a4a4a",
         "--plot-peak": "#008ad5",
         "--plot-peakfit": "#516494",
@@ -233,6 +240,12 @@ the difference curve, which draws in its own strip below the pattern, and
 region, where no model curve draws.  It is at least 0.131 from every other
 plot colour and 5.25:1 on `--panel`.  `tests/test_gui_palette.py` names both
 pairs.""",
+    "--plot-compare": """A node the History tab compares, drawn dashed over the
+pattern (WP-2211).  The design rounds drew it in the site's second ink,
+`#403a35` light and `#d2c9bd` dark.  The dark one is the observed points'
+colour exactly, so the dark value here is the nearest neutral that clears the
+0.13 floor from every curve (0.132 from the observed points).  Both are the
+design's choice to confirm with the maintainer.""",
     "--plot-peak": """The picked-peak layer (WP-1210, recoloured by WP-2200).
 The marks take Okabe-Ito blue, the complement of the orange fits, which the
 maintainer chose in the design rounds of 2026-11-08 (`#0072b2`).  Its dark

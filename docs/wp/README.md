@@ -44,12 +44,13 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2005](2005-refine-py-codes-and-literals.md) | `refine.py`'s codes and its inline literals | 2026-11-21 | P3 | [generality](#generality-the-audits) |
 | [2006](2006-readers-crystallography-gui-and-the-dead-surface.md) | Readers, crystallography and GUI codes, and the dead surface | 2026-10-24 | P3 | [generality](#generality-the-audits) |
 | [2008](2008-the-skill-read-against-the-table.md) | The skill slimmed to the API, the feedback surface and sourced traps | 2026-11-19 | P3 | [generality](#generality-the-prose) |
+| [2009](2009-the-rulebooks-findings-out-generators-rewritten.md) | The rulebooks: findings out, and the rules that generate overfit rewritten | 2026-11-22 | P3 | [generality](#generality-the-prose) |
 | [2010](2010-every-feature-names-what-verifies-and-validates-it.md) | Every feature names what verifies it and what validates it | 2026-11-01 | P3 | [generality](#generality-the-audits) |
 | [2012](2012-the-axial-ratios-are-interchangeable.md) | The two axial-divergence ratios are interchangeable, and a fit reports one branch | 2026-11-03 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2017](2017-the-second-pass-every-tier-3-threshold-on-three-families.md) | The second pass: every surviving tier-3 threshold measured on three families | 2026-11-05 | P2 | [generality](#generality-the-audits) |
 | [2018](2018-the-clash-table-measured.md) | The clash table: actions that read or move the same parameter, measured both ways | 2026-11-09 | P3 | [generality](#generality-the-audits) |
 | [2019](2019-each-fast-leg-runs-what-only-it-can-see.md) | Each fast leg runs what only it can see, and the tail is cut again | 2026-11-02 | P2 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
-| [2020](2020-opt-in-sets-of-bounds-and-defaults-per-scenario.md) | Opt-in sets of bounds and defaults for a scenario, tested on the datasets they name | 2026-11-21 | P2 | [generality](#generality-the-registry-and-the-guard) |
+| [2020](2020-opt-in-sets-of-bounds-and-defaults-per-scenario.md) | Opt-in sets of bounds and defaults for a scenario, tested on the datasets they name | 2026-11-22 | P2 | [generality](#generality-the-registry-and-the-guard) |
 | [2024](2024-a-parameters-list-under-each-call.md) | A Parameters list under each call: the format, the gate, and the Refinement calls | 2026-11-16 | P3 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2028](2028-a-joint-fits-guards-see-every-histogram.md) | A joint fit's guards see every histogram | 2026-11-18 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2036](2036-main-is-green-on-every-nightly-leg.md) | Main is green on every nightly leg: a full suite that finishes, two Windows tooling tests, and answers that move with the platform | 2026-11-21 | P2 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
@@ -60,13 +61,14 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2081](2081-how-a-series-holds-what-the-setup-fixes.md) | How a series holds what the setup fixes (a design discussion) | 2026-11-18 | P2 | [series](#series) |
 | [2107](2107-an-equation-over-a-reflection.md) | An equation over a reflection | 2026-11-20 | P2 | [parametric](#parametric) |
 | [2149](2149-a-reduced-panel-names-the-systems-searched.md) | INDEX_PANEL_REDUCED names the systems the run searched | 2026-11-17 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [2211](2211-the-history-table.md) | The History table: Compare on the pattern, Restore as pending edits | 2026-11-21 | P2 | [gui-overhaul](#gui-overhaul) |
-| [2212](2212-console-lines-by-kind.md) | Console lines by kind: the `>>>` prompt and the session as a script | 2026-11-21 | P2 | [gui-overhaul](#gui-overhaul) |
+| [2211](2211-the-history-table.md) | The History table: Compare on the pattern, Restore as pending edits | 2026-11-22 | P2 | [gui-overhaul](#gui-overhaul) |
+| [2212](2212-console-lines-by-kind.md) | Console lines by kind: the `>>>` prompt and the session as a script | 2026-11-22 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2220](2220-a-comparison-says-which-fits-it-rests-on.md) | A nested comparison says which fits it rests on, and which freed columns carried information | 2026-11-20 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2221](2221-a-group-with-no-tabulated-type-reaches-the-report.md) | A phase whose group has no tabulated type still gets its report and its CIF | 2026-11-21 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2227](2227-the-gui-shows-how-a-refine-ran.md) | The GUI shows how a refine ran: in one stage or in stages | 2026-11-22 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2230](2230-an-estimable-combination-keeps-its-esd.md) | An estimable combination keeps its esd | 2026-11-21 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2231](2231-the-plan-and-text-tabs.md) | The Plan and Text tabs at `/next`: a plan read as a recipe with Free and Fix rows, and a text buffer whose edits ride the action bar | 2026-11-22 | P2 | [gui-overhaul](#gui-overhaul) |
+| [2238](2238-the-decision-machinery.md) | The decision machinery: fewer calls reach the maintainer, and each ruling is reused | 2026-11-22 | P2 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 
 ## Next, by priority
 
@@ -460,7 +462,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 |---|---|---|---|---|
 | [2001](2001-the-rule-the-table-and-the-guard.md) | The rule, the audit table and the guard | ✅ 2026-10-19 | — | — |
 | [2014](2014-a-heuristic-meets-the-judge-on-every-path.md) | A heuristic meets the judge on every path into main | ✅ 2026-10-20 | — | [2001](2001-the-rule-the-table-and-the-guard.md) |
-| [2020](2020-opt-in-sets-of-bounds-and-defaults-per-scenario.md) | Opt-in sets of bounds and defaults for a scenario, tested on the datasets they name | 🔄 2026-11-21 | P2 | — |
+| [2020](2020-opt-in-sets-of-bounds-and-defaults-per-scenario.md) | Opt-in sets of bounds and defaults for a scenario, tested on the datasets they name | 🔄 2026-11-22 | P2 | — |
 | [2037](2037-attention-is-a-cost.md) | Attention is a cost: two channels, a response per code, relevance by purpose | ✅ 2026-10-24 | — | [2001](2001-the-rule-the-table-and-the-guard.md) |
 | [2038](2038-the-softening-a-brief-not-a-change.md) | The softening: unanimity for a recorded, cheap-to-undo default, a brief and not a change | ⬜ | P4 | — ([2037](2037-attention-is-a-cost.md) soft) |
 
@@ -486,7 +488,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | WP | Title | Status | Priority | Depends on |
 |---|---|---|---|---|
 | [2008](2008-the-skill-read-against-the-table.md) | The skill slimmed to the API, the feedback surface and sourced traps | 🔄 2026-11-19 | P3 | [2001](2001-the-rule-the-table-and-the-guard.md), [2002](2002-the-single-fit-actions.md), [2003](2003-the-chain-actions.md), [2004](2004-the-fitreport-reasons-for-the-caller.md) ([2005](2005-refine-py-codes-and-literals.md), [2006](2006-readers-crystallography-gui-and-the-dead-surface.md), [2007](2007-indexing-codes-constants-and-gates.md) soft) |
-| [2009](2009-the-rulebooks-findings-out-generators-rewritten.md) | The rulebooks: findings out, and the rules that generate overfit rewritten | ⬜ | P3 | [2001](2001-the-rule-the-table-and-the-guard.md) ([2008](2008-the-skill-read-against-the-table.md) soft) |
+| [2009](2009-the-rulebooks-findings-out-generators-rewritten.md) | The rulebooks: findings out, and the rules that generate overfit rewritten | 🔄 2026-11-22 | P3 | [2001](2001-the-rule-the-table-and-the-guard.md) ([2008](2008-the-skill-read-against-the-table.md) soft) |
 
 ## <a id="parametric"></a>parametric — a parametric refinement written by hand ports to rietx
 
@@ -522,8 +524,8 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2200](2200-the-palette.md) | The palette | ✅ 2026-11-17 | — | [2142](2142-the-gui-style-guide.md) |
 | [2208](2208-a-plan-stage-that-fixes.md) | A plan stage that fixes as well as frees | ✅ 2026-11-13 | — | [2127](2127-the-plan-tab.md) |
 | [2209](2209-unapplied-edits-survive-a-close.md) | Unapplied edits survive a close or a crash | ✅ 2026-11-13 | — | [2133](2133-the-file-menu.md) |
-| [2211](2211-the-history-table.md) | The History table: Compare on the pattern, Restore as pending edits | 🔄 2026-11-21 | P2 | [2214](2214-the-gui-rebuild-plan-and-inventory.md) |
-| [2212](2212-console-lines-by-kind.md) | Console lines by kind: the `>>>` prompt and the session as a script | 🔄 2026-11-21 | P2 | [2214](2214-the-gui-rebuild-plan-and-inventory.md) |
+| [2211](2211-the-history-table.md) | The History table: Compare on the pattern, Restore as pending edits | 🔄 2026-11-22 | P2 | [2214](2214-the-gui-rebuild-plan-and-inventory.md) |
+| [2212](2212-console-lines-by-kind.md) | Console lines by kind: the `>>>` prompt and the session as a script | 🔄 2026-11-22 | P2 | [2214](2214-the-gui-rebuild-plan-and-inventory.md) |
 | [2213](2213-text-and-model-edits-join-the-recovery-copy.md) | The Text buffer and the Model forms join the recovery copy | ✅ 2026-11-19 | — | [2209](2209-unapplied-edits-survive-a-close.md), #1523 |
 | [2214](2214-the-gui-rebuild-plan-and-inventory.md) | The GUI rebuild: its plan, and a home for every feature of today's GUI | ✅ 2026-11-11 | — | — |
 | [2215](2215-the-frame.md) | The frame: the rebuild's first piece, served at `/next` | ✅ 2026-11-17 | — | [2214](2214-the-gui-rebuild-plan-and-inventory.md) |
@@ -533,6 +535,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2227](2227-the-gui-shows-how-a-refine-ran.md) | The GUI shows how a refine ran: in one stage or in stages | 🔄 2026-11-22 | P2 | [2224](2224-a-refit-of-a-converged-model-runs-one-stage.md) |
 | [2229](2229-every-background-shape-change-releases-its-holds.md) | Every change to the background's shape releases its holds, and no pending edit outlives its path | ✅ 2026-11-21 | — | [2218](2218-hand-fitting-and-the-other-graphs.md) |
 | [2231](2231-the-plan-and-text-tabs.md) | The Plan and Text tabs at `/next`: a plan read as a recipe with Free and Fix rows, and a text buffer whose edits ride the action bar | 🔄 2026-11-22 | P2 | [2218](2218-hand-fitting-and-the-other-graphs.md) |
+| [2237](2237-events-after-another-project-opens.md) | A project opened in the same window streams its events from the first | ⬜ | P3 | — |
 
 ## <a id="series"></a>series — a series a scientist can predict and drive
 
@@ -888,6 +891,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2217](2217-source-read-records.md) | Records of what was read in another program's source | ✅ 2026-11-13 | — | — |
 | [2233](2233-comments-and-rulebooks-checked-against-the-tree.md) | Comments and rulebooks checked against the tree, and their size limits held from main | ✅ 2026-11-21 | — | — |
 | [2236](2236-narration-trend-decides-gate-or-drop.md) | The narration trend, measured over six weeks, decides a gate or a drop | ⬜ | P4 | [2233](2233-comments-and-rulebooks-checked-against-the-tree.md) |
+| [2238](2238-the-decision-machinery.md) | The decision machinery: fewer calls reach the maintainer, and each ruling is reused | 🔄 2026-11-22 | P2 | — ([2009](2009-the-rulebooks-findings-out-generators-rewritten.md) soft) |
 
 ### <a id="unscheduled-candidates-named-on-a-use-case-not-yet-on-a-measurement"></a>Candidates — named on a use case, not yet on a measurement
 
