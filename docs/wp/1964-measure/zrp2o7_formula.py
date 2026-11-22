@@ -1,9 +1,11 @@
-"""WP-1964 task 13: the ZrP2O7 input's cell equations written as formula text.
+"""WP-1964 task 13 and WP-2151: the ZrP2O7 input's equations written as rietx text.
 
     .venv/bin/python docs/wp/1964-measure/zrp2o7_formula.py \
         > docs/wp/1964-measure/zrp2o7_formula_results.txt
+    .venv/bin/python docs/wp/1964-measure/zrp2o7_formula.py e   # arm (e) alone
 
 Run from the repository root.
+An argument names the arms to run, as letters; the default is all of them.
 The data is Durham TOPAS tutorial 9.5 (Stinton & Evans, 2007, *J. Appl. Cryst.* 40, 87).
 It is local only, from ``python -m tests.local_data durham-topas/zrp2o7``.
 The model, the protocol and the chain are WP-1325's ``zrp2o7_model.py``, imported unchanged.
@@ -34,15 +36,30 @@ What it measures, in order.
     The fit is seeded from WP-1325's chain, under ``SharingMap(per_histogram=["phases.*"])``.
     The ZrP2O7 edge stays one value per pattern, as the input refines it.
 
-What (d) leaves out, because rietx cannot yet express it.
+What (d) leaves out.
 TOPAS refines a 2θ calibration curve quadratic in (2θ - 54°), shared by all patterns.
 The input's refined curve is 0.0105° at 15°, zero at 54° and 0.0059° at 90°.
 TOPAS also refines one TCHZ profile per phase shared by all patterns.
-Here each phase's four broadening terms refine per pattern instead, as in WP-1325.
-Both join the protocol once WP-2107 lands.
+In (d) each phase's four broadening terms refine per pattern instead, as in WP-1325.
 The omitted curve is the same in every pattern, so it shifts every silicon edge alike.
 The specimen displacement refines per pattern and absorbs part of it.
-How far the rest moves the calibration is not measured here, so (d) is not compared with TOPAS.
+
+(e) WP-2151: the fit of (d) with both put back as peak equations (WP-2107).
+    The curve is one ``shift`` equation on the instrument, written in ``two_theta``.
+    Each phase's TCHZ is a ``gauss_fwhm_squared`` equation, u·tan²θ + v·tanθ + w + z/cos²θ,
+    and a ``lor_fwhm`` equation, x·tanθ + y/cosθ, read by argument position (WP-1455).
+    Every coefficient is seeded from the input and shared by the 37 patterns, as the input shares it.
+    The instrument's U, V, X and Y are held at 0 and W at its floor, since the equations
+    duplicate them, and so are each phase's four built-in broadening terms.
+    z/cos²θ is z + z·tan²θ, so u, w and z are one exact degeneracy, and the covariance
+    solve then gives none of the three an esd.  So the fit runs four times.
+    "as written" frees all six terms, as the input does.
+    "z held" holds each z at the input's value, which leaves the fitted widths the same
+    and gives u and w an esd; its coefficients are the ones reported.
+    "closed" is "z held" with the plan closed at ``CLOSING_WINDOW_TOL``, to see whether
+    the answer moves when the peaks are cut wider.
+    "Si seeded" lifts silicon's w: the input's silicon Γ_G² is below zero across the
+    whole range, so its Gaussian coefficients start on the width floor with no gradient.
 """
 
 from __future__ import annotations
@@ -70,7 +87,10 @@ from zrp2o7_model import (  # noqa: E402
 )
 
 import rietx as rx  # noqa: E402
+from rietx.model.profiles.caglioti import _MIN_GAMMA_G2  # noqa: E402
 from rietx.params.multi import SharingMap  # noqa: E402
+from rietx.schemas.plan import CLOSING_WINDOW_TOL  # noqa: E402
+from rietx.strategy.staged import RefinementPlan, Stage  # noqa: E402
 from rietx.viz.plots import plot_result  # noqa: E402
 
 OUT = REPO / "tests" / "output"
@@ -83,11 +103,16 @@ SI_NAMES = ("a0", "const1", "theta1", "const2", "theta2", "const3", "theta3")
 AL_NAMES = ("a0_al2o3", "ax1_al2o3", "ax2_al2o3", "a_al2o3_offset",
             "c0_al2o3", "cx1_al2o3", "cx2_al2o3", "c_al2o3_offset")
 CAL_NAMES = ("t_middle", "tra2", "T_calibration_b", "T_calibration_c", "T_calibration_d")
+CURVE_NAMES = ("zero", "step_error", "square", "data_middle")
+#: the input's TCHZ_Peak_Type slots by argument position (WP-1455)
+TCHZ_SLOTS = ("u", "v", "w", "z", "x", "y")
+GAUSS = "u*tan(theta)^2 + v*tan(theta) + w + z/cos(theta)^2"
+LOR = "x*tan(theta) + y/cos(theta)"
 
 
 def coefficients(text: str) -> dict[str, float]:
     out = {}
-    for name in SI_NAMES + AL_NAMES + CAL_NAMES:
+    for name in SI_NAMES + AL_NAMES + CAL_NAMES + CURVE_NAMES:
         m = re.search(rf"^\s*prm\s+!?{name}\s+(-?[\d.]+(?:[eE][-+]?\d+)?)", text, re.M)
         if m is None:
             raise SystemExit(f"{INP}: no prm {name}")
@@ -175,13 +200,13 @@ def worst(a: dict, b: dict) -> tuple[float, str, int]:
     return best
 
 
-def main() -> None:
+def main(arms: str) -> None:
     from tests.local_data import dataset
 
     text = (dataset("durham-topas/zrp2o7") / INP).read_text(encoding="utf-8", errors="replace")
     c = coefficients(text)
-    print("WP-1964 task 13: the ZrP2O7 input's cell equations as formula text "
-          "(Durham TOPAS tutorial 9.5)")
+    print("WP-1964 task 13 and WP-2151: the ZrP2O7 input's equations as rietx text "
+          f"(Durham TOPAS tutorial 9.5); arms {arms}")
     print(f"rietx     {rx.__version__}; load {' '.join(f'{x:.1f}' for x in os.getloadavg())}")
     print("coefficients read from the input: " + ", ".join(f"{k} {v:g}" for k, v in c.items()))
     for e in equations(c):
@@ -190,11 +215,26 @@ def main() -> None:
 
     t0 = time.perf_counter()
     data = load()
+    if any(c[f"T_calibration_{n[-1]}"] != 0.0 for n in TRIAL):
+        raise SystemExit("the input's calibration coefficients are not all 0; gate (a)'s premise moved")
+    if set(arms) & set("abc"):
+        previews(text, c, data)
+    if set(arms) & set("de"):
+        chain = run_chain(data)
+        print(f"WP-1325's chain, the seed of (d) and (e): {chain['seconds']:.1f} s; status "
+              f"{sorted(set(chain['status']))}; Σχ² {chain['chi2']:.1f}, "
+              f"Rwp {100 * min(chain['rwp']):.2f}-{100 * max(chain['rwp']):.2f} %")
+        print()
+        formula = arm_d(data, c, chain) if "d" in arms else None
+        if "e" in arms:
+            arm_e(data, c, chain, formula)
+    print(f"total {time.perf_counter() - t0:.0f} s; load at end {' '.join(f'{x:.1f}' for x in os.getloadavg())}")
+
+
+def previews(text: str, c: dict[str, float], data: dict) -> None:
     proto, temps = data["proto"], data["temps"]
     stored = stored_cells(text, list(temps))
     zero = {n: 0.0 for n in TRIAL}
-    if any(c[f"T_calibration_{n[-1]}"] != 0.0 for n in TRIAL):
-        raise SystemExit("the input's calibration coefficients are not all 0; gate (a)'s premise moved")
 
     print(f"(a) preview at the input's coefficients, against the cells it prints ({len(temps)} patterns)")
     got = preview(proto, temps, c, zero)
@@ -227,10 +267,12 @@ def main() -> None:
           "test_a_temperature_calibration_feeding_the_cell_recovers_its_coefficients")
     print()
 
+
+
+def arm_d(data: dict, c: dict[str, float], chain: dict):
+    proto, temps = data["proto"], data["temps"]
+    zero = {n: 0.0 for n in TRIAL}
     print("(d) the real data, calibration b, c and d freed (no gate)")
-    chain = run_chain(data)
-    print(f"    chain {chain['seconds']:.1f} s; status {sorted(set(chain['status']))}; "
-          f"Σχ² {chain['chi2']:.1f}, Rwp {100 * min(chain['rwp']):.2f}-{100 * max(chain['rwp']):.2f} %")
     series = chain["series"]
     coords = rx.CoordinateTable(columns={"T": temps.tolist()}, units={"T": "K"})
     fits = {}
@@ -275,7 +317,217 @@ def main() -> None:
     print(f"    plots: tests/output/wp1964_zrp2o7_formula_h*_fit.png (patterns 0, {int(np.argmax(temps))}, "
           f"{len(temps) - 1})")
     print()
-    print(f"total {time.perf_counter() - t0:.0f} s; load at end {' '.join(f'{x:.1f}' for x in os.getloadavg())}")
+    return result
+
+
+def tchz_equations(tchz: list[float]) -> list[rx.PeakEquation]:
+    """A phase's TCHZ as two peak equations, seeded from the input's slots."""
+    v = dict(zip(TCHZ_SLOTS, tchz, strict=True))
+    return [rx.PeakEquation(target="gauss_fwhm_squared", expression=GAUSS,
+                            coefficients={k: rx.Parameter(value=v[k]) for k in "uvwz"}),
+            rx.PeakEquation(target="lor_fwhm", expression=LOR,
+                            coefficients={k: rx.Parameter(value=v[k]) for k in "xy"})]
+
+
+def curve_equation(c: dict[str, float]) -> rx.PeakEquation:
+    """The input's ``th2_offset`` with its held zero left out, in ``two_theta`` (degrees)."""
+    m = f"(two_theta - {c['data_middle']:g})"
+    return rx.PeakEquation(target="shift", expression=f"square*{m}^2/1000 + step_error*{m}/1000",
+                           coefficients={k: rx.Parameter(value=c[k]) for k in ("square", "step_error")})
+
+
+def peak_models(chain: dict, proto: dict, c: dict[str, float],
+                seeds: dict[int, list[float]] | None = None) -> tuple[list, list]:
+    """The chain's fitted models with the input's TCHZ and curve as peak equations.
+
+    The built-in width terms the equations duplicate are held: each phase's four
+    broadening terms and the instrument's U, V, X and Y at 0, and W at its floor.
+    ``seeds`` replaces a phase's six stored TCHZ values, keyed by phase index.
+    """
+    seeds = seeds or {}
+    structures, instruments = [], []
+    series = chain["series"]
+    for s, ins in zip(series.fitted_structures, series.fitted_instruments, strict=True):
+        s, ins = s.model_copy(deep=True), ins.model_copy(deep=True)
+        for ip, (ph, read) in enumerate(zip(s.phases, proto["phases"], strict=True)):
+            for name in ("gauss_size", "gauss_strain", "lor_size", "lor_strain"):
+                getattr(ph, name).value = 0.0
+            ph.peak_equations = tchz_equations(seeds.get(ip, read["tchz"]))
+        for name in "uvxy":
+            getattr(ins.profile, name).value = 0.0
+        ins.profile.w.value = _MIN_GAMMA_G2
+        ins.peak_equations = [curve_equation(c)]
+        structures.append(s)
+        instruments.append(ins)
+    return structures, instruments
+
+
+def peak_plan(closing: float | None, free_z: bool) -> RefinementPlan:
+    """WP-1325's plan with its per-pattern broadening stage replaced by the equations'.
+
+    z/cos²θ is z + z·tan²θ, so with z free the Gaussian's u, w and z are one exact
+    degeneracy and only u + z and w + z are measured.  ``free_z=False`` holds z where
+    it was seeded, which leaves the fitted width the same and gives u and w an esd.
+    """
+    gauss = (["phases.*.peak_equations.0.*"] if free_z else
+             [f"phases.*.peak_equations.0.{k}" for k in "uvw"])
+    stages = []
+    for s in plan().stages:
+        if s.name == "sample_profile":
+            s = Stage(name="peak_equations", turn_on=[
+                *gauss, "phases.*.peak_equations.1.*", "instrument.peak_equations.*"])
+        stages.append(s)
+    return RefinementPlan(stages=stages, closing_window_tol=closing)
+
+
+#: (d)'s per-pattern phases, with every peak equation's coefficient one value for all 37
+PEAK_SHARING = SharingMap(per_histogram=["phases.*.cell.*", "phases.*.atoms.*"],
+                          shared=["instrument.peak_equations.*"])
+
+
+def widths(v: dict[str, float], two_theta: float) -> tuple[float, float]:
+    """Γ_G² (deg²) and Γ_L (deg) of one TCHZ at one angle."""
+    th = np.radians(two_theta / 2)
+    g2 = v["u"] * np.tan(th) ** 2 + v["v"] * np.tan(th) + v["w"] + v["z"] / np.cos(th) ** 2
+    return float(g2), float(v["x"] * np.tan(th) + v["y"] / np.cos(th))
+
+
+def curve_at(square: float, step: float, middle: float, two_theta: float) -> float:
+    return (two_theta - middle) ** 2 * square / 1000 + (two_theta - middle) * step / 1000
+
+
+def arm_e(data: dict, c: dict[str, float], chain: dict, formula) -> None:
+    proto, temps = data["proto"], data["temps"]
+    if c["zero"] != 0.0:
+        raise SystemExit("the input's zero is not 0; the curve equation leaves it out")
+    print("(e) WP-2151: (d) plus the 2θ curve and each phase's TCHZ as peak equations (no gate)")
+    lo, hi = proto["limits"]
+    stored = {f"instrument.peak_equations.0.{k}": c[k] for k in ("square", "step_error")}
+    tchz = []
+    for ip, ph in enumerate(proto["phases"]):
+        v = dict(zip(TCHZ_SLOTS, ph["tchz"], strict=True))
+        tchz.append(v)
+        stored.update({f"phases.{ip}.peak_equations.0.{k}": v[k] for k in "uvwz"})
+        stored.update({f"phases.{ip}.peak_equations.1.{k}": v[k] for k in "xy"})
+        g_lo, l_lo = widths(v, lo)
+        g_hi, l_hi = widths(v, hi)
+        print(f"    stored TCHZ, {ph['name']:8} Γ_G² {g_lo:+.5f} deg² at {lo:g}°, {g_hi:+.5f} at {hi:g}°; "
+              f"Γ_L {l_lo:+.5f}° at {lo:g}°, {l_hi:+.5f}° at {hi:g}°")
+    print(f"    stored curve {curve_at(c['square'], c['step_error'], c['data_middle'], lo):+.5f}° at {lo:g}°, "
+          f"{curve_at(c['square'], c['step_error'], c['data_middle'], hi):+.5f}° at {hi:g}°")
+    coords = rx.CoordinateTable(columns={"T": temps.tolist()}, units={"T": "K"})
+    zero = {n: 0.0 for n in TRIAL}
+    # silicon's stored Γ_G² is below zero over the whole range, so its four Gaussian
+    # coefficients start on the floor with no gradient; one variant lifts w until the
+    # smallest Γ_G² in the range is 0.002 deg², a Gaussian FWHM of 0.045°
+    si = tchz[1]
+    deficit = -min(widths(si, t)[0] for t in np.linspace(lo, hi, 301))
+    si_seed = [si[k] + (deficit + 0.002 if k == "w" else 0.0) for k in TCHZ_SLOTS]
+    print(f"    silicon's seeded variant lifts w from {si['w']:+.5f} to {si_seed[2]:+.5f} deg²")
+    fits = {}
+    for label, closing, free_z, seeds in (
+            ("as written", None, True, None), ("z held", None, False, None),
+            ("closed", CLOSING_WINDOW_TOL, False, None), ("Si seeded", None, False, {1: si_seed})):
+        structures, instruments = peak_models(chain, proto, c, seeds)
+        t1 = time.perf_counter()
+        fit = rx.MultiHistogramRefinement(
+            structures, instruments, sharing=PEAK_SHARING, coordinates=coords,
+            parametric=equations(c), variables=variables(c, zero, free=True))
+        result = fit.fit(data["patterns"], plan=peak_plan(closing, free_z),
+                         two_theta_limits=proto["limits"])
+        s = result.statistics
+        fits[label] = result
+        beside = f"(d) {100 * formula.statistics.rwp:.3f} %, " if formula is not None else ""
+        print(f"    {label:10} {time.perf_counter() - t1:6.1f} s (load {os.getloadavg()[0]:.1f}); "
+              f"status {result.status}; Rwp {100 * s.rwp:.3f} % ({beside}TOPAS 31.56 %); "
+              f"χ² {total_chi2(s):.1f} with {s.n_free_parameters} free; χ²r {s.chi2:.4f}")
+    result = fits["z held"]
+    rows = {p.path: p for p in result.parameters}
+    crows = {p.path: p for p in fits["closed"].parameters}
+    srows = {p.path: p for p in fits["Si seeded"].parameters}
+    wrows = {p.path: p for p in fits["as written"].parameters}
+    print("    the z-held fit: z stays at the input's value, so u and w carry u + z and w + z")
+    print("    coefficient                       stored     fit ± esd              (fit-stored)/esd  "
+          "(closed-fit)/esd")
+    moves, seeded_moves = {}, {}
+
+    def line(path: str, ref: float | None) -> None:
+        r, rc, rs = rows.get(path), crows.get(path), srows.get(path)
+        if r is None or r.stderr is None:
+            value = "" if r is None else f" (value {r.value:+.5f})"
+            print(f"    {path:32} no esd in the z-held fit{value}")
+            return
+        bound = " AT BOUND" if getattr(r, "at_bound", None) else ""
+        moves[path] = (rc.value - r.value) / r.stderr if rc is not None else float("nan")
+        if rs is not None and not path.startswith("phases.1.peak_equations.0."):
+            seeded_moves[path] = (rs.value - r.value) / r.stderr
+        z = f"{(r.value - ref) / r.stderr:+8.2f}" if ref is not None else "        "
+        ref_s = f"{ref:+10.5f}" if ref is not None else " " * 10
+        print(f"    {path:32} {ref_s} {r.value:+10.5f} ± {r.stderr:.5f}   {z}          "
+              f"{moves[path]:+6.2f}{bound}")
+
+    for path, v0 in stored.items():
+        line(path, v0)
+    for n in TRIAL:
+        line(f"vars.{n}", None)
+    if formula is not None:
+        frows = {p.path: p for p in formula.parameters}
+        print("    calibration in (d), same run: " + ", ".join(
+            f"{n} {frows[f'vars.{n}'].value:+.2f} ± {frows[f'vars.{n}'].stderr:.2f} K" for n in TRIAL))
+    worst_path = max(moves, key=lambda p: abs(moves[p]))
+    print(f"    closing at CLOSING_WINDOW_TOL = {CLOSING_WINDOW_TOL:g}: largest move "
+          f"{moves[worst_path]:+.2f} esd at {worst_path}; "
+          f"{sum(abs(m) > 0.5 for m in moves.values())} of {len(moves)} rows move more than 0.5 esd")
+    for ip in (0, 2):
+        pre = f"phases.{ip}.peak_equations.0."
+        print(f"    {proto['phases'][ip]['name']:8} u + z, w + z: stored "
+              f"{tchz[ip]['u'] + tchz[ip]['z']:+.5f}, {tchz[ip]['w'] + tchz[ip]['z']:+.5f}; "
+              f"as written {wrows[pre + 'u'].value + wrows[pre + 'z'].value:+.5f}, "
+              f"{wrows[pre + 'w'].value + wrows[pre + 'z'].value:+.5f}; "
+              f"z held {rows[pre + 'u'].value + rows[pre + 'z'].value:+.5f}, "
+              f"{rows[pre + 'w'].value + rows[pre + 'z'].value:+.5f}")
+    fitted = {k: rows[f"instrument.peak_equations.0.{k}"].value for k in ("square", "step_error")}
+    print("    fitted curve " + ", ".join(
+        f"{curve_at(fitted['square'], fitted['step_error'], c['data_middle'], t):+.5f}° at {t:g}°"
+        for t in (lo, 30.0, c["data_middle"], hi)))
+    for label, rr in (("z held", rows), ("Si seeded", srows)):
+        for ip, ph in enumerate(proto["phases"]):
+            v = {k: rr[f"phases.{ip}.peak_equations.0.{k}"].value for k in "uvwz"}
+            v.update({k: rr[f"phases.{ip}.peak_equations.1.{k}"].value for k in "xy"})
+            g_lo, l_lo = widths(v, lo)
+            g_hi, l_hi = widths(v, hi)
+            print(f"    fitted TCHZ ({label}), {ph['name']:8} Γ_G² {g_lo:+.5f} deg² at {lo:g}°, "
+                  f"{g_hi:+.5f} at {hi:g}°; Γ_L {l_lo:+.5f}° at {lo:g}°, {l_hi:+.5f}° at {hi:g}°")
+    si_rows = [srows[f"phases.1.peak_equations.0.{k}"] for k in "uvwz"]
+    print("    silicon seeded, Gaussian rows: " + ", ".join(
+        f"{k} {r.value:+.5f}" + (f" ± {r.stderr:.5f}" if r.stderr is not None else " (no esd)")
+        for k, r in zip("uvwz", si_rows, strict=True)))
+    worst_seed = max(seeded_moves, key=lambda p: abs(seeded_moves[p]))
+    print(f"    silicon seeded against the z-held fit: largest move of any other row "
+          f"{seeded_moves[worst_seed]:+.2f} esd at {worst_seed}; "
+          f"{sum(abs(m) > 1.0 for m in seeded_moves.values())} of {len(seeded_moves)} move more than 1 esd")
+    for label, r in fits.items():
+        counts: dict[str, int] = {}
+        for d in r.diagnostics:
+            counts[d.code] = counts.get(d.code, 0) + 1
+        print(f"    diagnostics, {label}: " + ", ".join(f"{k} ×{v}" for k, v in sorted(counts.items())))
+        for d in r.diagnostics:
+            if d.code in ("PEAK_WIDTH_NOT_POSITIVE", "FLOOR_HIT", "BOUND_HIT",
+                          "COVARIANCE_DIRECTION_DISCARDED", "HIGH_CORRELATION"):
+                print(f"      {d.code} {d.where[:6]}: {d.message[:300]}")
+    OUT.mkdir(exist_ok=True)
+    picks = (0, int(np.argmax(temps)), len(temps) - 1)
+    for h in picks:
+        one = result.for_histogram(h)
+        plot_result(one, path=str(OUT / f"wp2151_zrp2o7_peak_h{h}_fit.png"))
+        plot_result(one, path=str(OUT / f"wp2151_zrp2o7_peak_h{h}_high.png"), two_theta_range=(70.0, hi))
+    for label, tag in (("z held", "zheld"), ("Si seeded", "siseeded")):
+        plot_result(fits[label].for_histogram(0), two_theta_range=(27.6, 29.4),
+                    path=str(OUT / f"wp2151_zrp2o7_peak_h0_si111_{tag}.png"))
+    print(f"    plots: tests/output/wp2151_zrp2o7_peak_h*_{{fit,high}}.png (patterns "
+          f"{', '.join(map(str, picks))}), and pattern 0's Si 111 line in two fits, "
+          "wp2151_zrp2o7_peak_h0_si111_*.png")
+    print()
 
 
 def hand_delta(t: float, tm: float, tr: float, cal: dict[str, float]) -> float:
@@ -285,4 +537,4 @@ def hand_delta(t: float, tm: float, tr: float, cal: dict[str, float]) -> float:
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1] if len(sys.argv) > 1 else "abcde")

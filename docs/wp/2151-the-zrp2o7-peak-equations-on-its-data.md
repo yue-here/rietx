@@ -74,7 +74,7 @@ phases' negative v and w make that gap reachable here. Report each firing.
 
 ## Tasks
 
-- [ ] A new arm in `docs/wp/1964-measure/zrp2o7_formula.py`: the formula fit of arm (d)
+- [x] A new arm in `docs/wp/1964-measure/zrp2o7_formula.py`: the formula fit of arm (d)
   plus the `shift` equation and both width equations per phase, each coefficient shared
   across patterns, the instrument's width terms held. Seed from the input's stored values.
 - [ ] Run it on the 37 patterns. Report each coefficient with its esd beside the input's
