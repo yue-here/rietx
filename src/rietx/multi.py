@@ -3405,8 +3405,14 @@ def _peak_equation_sharing_diagnostics(mtable) -> list[Diagnostic]:
     joint fit, :func:`~rietx.params.multi.row_shared`, and no parametric
     equation's target), whose target carries degrees, in a joint fit whose
     patterns declare at least two different wavelengths.  Silent with one
-    wavelength, with a source that declares no line, and for an
-    ``intensity_factor``, a pure number.
+    wavelength, with a source that declares no line, for an
+    ``intensity_factor``, a pure number, and for an equation whose expression
+    reads ``wavelength`` (WP-2152): the user wrote its λ dependence, as a
+    parametric coefficient states it.  The silence covers the whole
+    expression, and a phase holds one equation per target, so a strain term
+    beside the λ-reading one (``+ w*tan(theta)``), rightly shared, is silent,
+    and so is a size term in degrees there (``+ x/cos(theta)``), the known
+    limit.  Another target's degree-only equation on the same phase warns.
     """
     lams = [_longest_wavelength(ins) for ins in mtable.instruments]
     if any(lam is None for lam in lams) or len(set(lams)) < 2:
@@ -3428,7 +3434,7 @@ def _peak_equation_sharing_diagnostics(mtable) -> list[Diagnostic]:
             phase = mtable.structures[0].phases[int(base.split(".")[1])]
             eq = phase.peak_equations[int(index)]
             owner = f"Phase {base.split('.')[1]} ({phase.name})"
-        if eq.target == "intensity_factor":
+        if eq.target == "intensity_factor" or "wavelength" in eq.reads():
             continue
         unit = "deg²" if eq.target == "gauss_fwhm_squared" else "degrees"
         noun = "its coefficient" if len(names) == 1 else "its coefficients"
