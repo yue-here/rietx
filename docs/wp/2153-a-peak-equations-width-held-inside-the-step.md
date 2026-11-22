@@ -78,6 +78,22 @@ choosing, and record what it says in `docs/practice.md`.
 
 **Tier.** Physics: a width is positive. No threshold is added. ε is the existing floor.
 
+### Inherited
+
+- **2026-11-22, from WP-2151 (the ZrP₂O₇ real-data run).** The gap is reachable on real
+  data, in a third form none of A-D addresses: a term that starts below the floor at every
+  reflection. The input's stored silicon TCHZ gives Γ_G² = −0.0055 deg² at 15° and
+  −0.0029 at 90°. So all four Gaussian coefficients start with zero gradient. They stay
+  exactly where they started, with no esd, and `PEAK_WIDTH_NOT_POSITIVE` fires at 7 of 7
+  reflections. A row the start violates is dropped (above), so no row helps either.
+  Lifting w alone until the smallest Γ_G² is 0.002 deg² gave χ² 197573.6 against 201508.1
+  on 1167 free parameters, which took Rwp from 31.793 % to 31.481 %. The fitted silicon
+  Γ_G² then runs 0.0069 to 0.0034 deg², close to the size of the stored values with the
+  sign flipped. Silicon's Lorentzian x and y also returned to the input's values. One
+  hypothesis fits that: TOPAS reads a negative Γ_G² as its magnitude. It is not checked,
+  so this WP's TOPAS reading in § Practice should look for it. The numbers are in
+  WP-2151's handover entry.
+
 ## Non-goals
 
 - TRF, which keeps its iterates feasible by its own means. Its guards stay as they are.
