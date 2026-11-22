@@ -40,6 +40,8 @@
   import { WORKFLOWS, menuLabel, workflow, type WorkflowId } from "../lib/workflows";
   import ActionBar from "./ActionBar.svelte";
   import Console from "./Console.svelte";
+  import HelpBox from "./HelpBox.svelte";
+  import { MODEL_HELP } from "./helpbox";
   import Keys from "./Keys.svelte";
   import Menu, { type MenuAt } from "./Menu.svelte";
   import Params from "./Params.svelte";
@@ -881,6 +883,10 @@
               <button class="tab" role="tab" aria-selected={modelTab === t.id} disabled={!project}
                 onclick={() => (modelTab = t.id)}>{t.label}</button>
             {/each}
+            {#if project}
+              <HelpBox entry={MODEL_HELP[modelTab]} {docsUrl}
+                label="About the {MODEL_TABS.find((t) => t.id === modelTab)?.label} tab" />
+            {/if}
           </div>
         {/if}
         <div class="pane" class:gone={!!unbuilt || modelTab !== "params"}>
