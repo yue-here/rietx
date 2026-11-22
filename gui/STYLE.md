@@ -158,7 +158,6 @@ Claude inferred rules 1 to 12 from the rulings on background points and peak pic
 - What a name means is a `rietx.help` entry, and a short label comes from that entry's label field. [inferred, WP-1203, WP-1209]
 - Text in prose takes the minus sign −, and a number a person may copy takes the hyphen-minus -. [inferred, WP-1213]
 - Any sentence the GUI shows (help, empty states, error text) is written under the house documentation style, in British spelling. [inferred, WP-1201]
-- GUI text never names another program, such as GSAS-II, TOPAS or FullProf. [Yue 2026-11-22]
 - The Refine choice that runs every ticked parameter together to convergence is called "As ticked", never "One cycle": in the field a cycle is one least-squares iteration. [Yue 2026-11-22]
 
 ## Plots
@@ -184,7 +183,7 @@ These tests hold the rules a machine can check cheaply. A new rule that a machin
 
 - `tests/test_gui_palette.py`: the token values and the generated `gui/src/tokens.css`, the plot palette's floor, every text colour's contrast on its grounds, and the ink on the primary fill.
 - `tests/test_gui_layout_browser.py`: no click moves the layout, collapse buttons stay where they were, and a phone-width window never scrolls sideways.
-- `gui/src/lib/style.test.ts`: no panel sets a register's size, padding or radius, no size falls outside the steps, no source names an emoji character, and no source shows another program's name or the words "One cycle".
+- `gui/src/lib/style.test.ts`: no panel sets a register's size, padding or radius, no size falls outside the steps, no source names an emoji character, and no source shows the words "One cycle".
 - `tests/test_gui_dist.py`: no built file names a remote host, so every font is the app's own.
 - `tests/test_gui_style_guide.py`: this guide names only tokens and tests that exist, carries a marker on every rule, and restates no colour or pixel value.
 

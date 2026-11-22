@@ -307,19 +307,15 @@ describe("no source draws an emoji", () => {
 });
 
 /**
- * Two words the GUI never shows (the maintainer's rulings of 2026-11-22,
- * `gui/STYLE.md` § Numbers and words on screen). Another program's name: GUI
- * text speaks rietx's own terms. And "One cycle" for the Refine choice that
- * runs every ticked parameter to convergence, since a cycle is one
- * least-squares iteration in the field; the choice is "As ticked".
+ * "One cycle" is never the name of the Refine choice that runs every ticked
+ * parameter to convergence (the maintainer's ruling of 2026-11-22,
+ * `gui/STYLE.md` § Numbers and words on screen). In the field a cycle is one
+ * least-squares iteration, so the choice is "As ticked".
  *
- * Comments are stripped first, so a comment citing prior art passes, and
- * tests are skipped, since their fixtures quote server text. What the server
- * sends (help entries, example titles, reader names) is outside this check.
+ * Comments are stripped first, and tests are skipped, since their fixtures
+ * quote the old label.
  */
-describe("the GUI's words", () => {
-  const PROGRAMS =
-    /\b(GSAS|TOPAS|FullProf|Jana|BGMN|Profex|MAUD|HighScore|VESTA|Mercury|CrystalMaker|SHELX|RIETAN|DIFFRAC|PDXL|Olex2|ChimeraX|Mantid)\b/;
+describe("the Refine choice's label", () => {
   const uncommented = (text: string) =>
     text
       .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
@@ -327,20 +323,18 @@ describe("the GUI's words", () => {
       .replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
   const shown = () => allSources().filter((rel) => !/\.test\.ts$|(^|\/)test-/.test(rel));
 
-  it("names no other program and never says One cycle", () => {
+  it("never says One cycle", () => {
     const found: string[] = [];
     for (const rel of shown())
       uncommented(read(rel)).split("\n").forEach((line, i) => {
-        const m = PROGRAMS.exec(line) ?? /one cycle/i.exec(line);
+        const m = /one cycle/i.exec(line);
         if (m) found.push(`${rel}:${i + 1}: ${m[0]}`);
       });
     expect(found).toEqual([]);
   });
 
-  it("would see a name the GUI shows", () => {
-    const sample = '/** GSAS */\n<span title="as VESTA has it">One cycle</span>';
-    expect(PROGRAMS.test(uncommented(sample))).toBe(true);
-    expect(/one cycle/i.test(uncommented(sample))).toBe(true);
-    expect(PROGRAMS.test(uncommented("// TOPAS\n/* FullProf */\n<!-- Mercury -->"))).toBe(false);
+  it("would see the label the GUI shows", () => {
+    expect(/one cycle/i.test(uncommented('/** x */\n<span title="t">One cycle</span>'))).toBe(true);
+    expect(/one cycle/i.test(uncommented("// One cycle\n/* One cycle */\n<!-- One cycle -->"))).toBe(false);
   });
 });

@@ -70,8 +70,11 @@ the same date):
    convergence. That is a standard refinement, and its behaviour stays. In the field a cycle is
    one least-squares iteration, so only the words were wrong. Its tooltip reads "Refine every
    ticked parameter together until it converges.", with the Python call on the second line.
-7. **GUI text never names another program**, such as GSAS-II, TOPAS or FullProf. Code comments
-   and `docs/` are not GUI text.
+7. **The "As ticked" tooltip names no other program**, such as GSAS-II or TOPAS. This is a
+   wording note on that one tooltip. On 2026-11-22 the branch first widened it into a rule for
+   all GUI text, with a `gui/STYLE.md` line, a vitest and VESTA cut from the 3D viewer's
+   tooltip. Yue withdrew that the same day: "program names isn't really a rule, it just felt
+   weird there." The rule, the check and the VESTA cut are undone.
 
 ## Tasks
 
@@ -173,16 +176,15 @@ settled, close this WP.
 *Merged and renamed* (PR #1776, the steward's pass of 2026-11-22). The branch takes #1775's
 branch (WP-2212, with main's History tab), so it stays clean once #1775 lands. The Console
 comment already used #1775's `comment` line kind. Rulings 6 and 7 are built: "As ticked" on both
-action bars and in `/`'s command menu, the tooltip on both bars, `gui/STYLE.md` one line each, and
-a vitest in `lib/style.test.ts` that fails on another program's name or on "One cycle" in any
-non-test source under `gui/src`, comments stripped. One site named a program: the 3D viewer's
-"view down" tooltip on `/` cited VESTA, now cut. The as-built pictures here and in
+action bars and in `/`'s command menu, the tooltip on both bars naming no other program, one
+`gui/STYLE.md` line for the label, and a vitest in `lib/style.test.ts` that fails on "One cycle"
+in any non-test source under `gui/src`, comments stripped. The as-built pictures here and in
 `2231-screenshots/` are retaken. The option pictures keep the old label, since they record
 what the rulings were made on.
-Open for Yue: text the server sends and the GUI shows still names programs. These are the
-library's words too: `rietx.help` entries (about 25 name GSAS-II, TOPAS or FullProf), the `fap`
-example's title "GSAS-II LabData — fluorapatite", the reader name "GSAS raw powder data" and the
-`FULLPROF_*` diagnostics. Ruling 7 does not yet say whether it reaches them.
+The same pass had widened ruling 7 into a rule that GUI text never names another program: a
+`gui/STYLE.md` line, a program-name half in that vitest, and VESTA cut from the 3D viewer's
+"view down" tooltip on `/`. Yue withdrew it the same day (ruling 7 above). The STYLE line and
+the vitest half are removed, and the VESTA wording is back as on `main`.
 
 - **2026-11-22** — Task 1 is drawn and nothing is decided. Each option for the three questions
   is drawn over the real rebuilt page on the `fap` example, light and dark, in
