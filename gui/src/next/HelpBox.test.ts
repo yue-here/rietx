@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import { flushSync, mount, unmount } from "svelte";
 import { afterEach, describe, expect, it } from "vitest";
 import HelpBox from "./HelpBox.svelte";
-import { GRAPH_HELP, HISTORY_HELP, MODEL_HELP } from "./helpbox";
+import { GRAPH_HELP, HISTORY_HELP, MODEL_HELP, WORKFLOW_HELP } from "./helpbox";
 import { GRAPH_TABS, MODEL_TABS } from "./tabs";
 
 let app: Record<string, any> | null = null;
@@ -37,7 +37,8 @@ describe("the ? box", () => {
       .replace(/^\/@fs/, ""), "utf-8");
     const ids = new Set([...guide.matchAll(/^#{1,6} (.+)$/gm)].map(([, h]) =>
       h.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")));
-    for (const entry of [...Object.values(MODEL_HELP), ...Object.values(GRAPH_HELP), HISTORY_HELP]) {
+    for (const entry of [...Object.values(MODEL_HELP), ...Object.values(GRAPH_HELP), HISTORY_HELP,
+                         ...Object.values(WORKFLOW_HELP)]) {
       expect(ids, entry.anchor).toContain(entry.anchor);
     }
   });

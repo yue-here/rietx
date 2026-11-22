@@ -26,6 +26,7 @@ import { channelIndex } from "../lib/interactive";
 import { joinCurves, type GroupCurve, type PeakRow } from "../lib/peaks";
 import {
   curveColors,
+  lens,
   maskShapes,
   nearestIndex,
   type CandidateOverlay,
@@ -87,6 +88,10 @@ export interface Overlay {
   /** the Peaks tab is up: only there are the markers, their fit and the candidate drawn */
   peaksActive: boolean;
   candidate: CandidateOverlay | null;
+  /** the peak row a person chose in the Pick step's table (WP-2240): its mark
+   *  is drawn larger with a ring, or, for a line left out, a dotted line
+   *  stands where it is (interaction rule 5) */
+  selected?: number | null;
   hidden: readonly string[];
   /** the payload in the readout's shape (`windowOf`), for a marker's height */
   held: Window | null;
@@ -370,40 +375,91 @@ export class PatternChart {
   }
 
   /**
-   * The picked lines, at the measured intensity nearest each: a circle where
-   * the picker fitted it and a diamond where a person placed it, hollow where
-   * it is not used. The whisker is capped at 3×FWHM (WP-1027).
+   * The lines the search uses, each a lens (the shape of a reflection tick)
+   * standing just clear of the highest count near it (WP-2240, the
+   * maintainer's rounds 11c and 11d, 2026-11-08). A line left out of the
+   * search has no mark: its row in the table is its route, and choosing that
+   * row draws a dotted line where it is. Lines closer than a lens's width
+   * stack upward, so a duplicate never hides under its twin. The chosen line's
+   * lens is larger, with a ring in the text ink (`gui/STYLE.md` § Plots,
+   * 2026-11-09). A halo of the page's background lets a lens read over the
+   * crosses.
    */
   private peakMarkers(u: any): void {
-    const { peaks, peaksActive, hidden } = this.overlay;
+    const { peaks, peaksActive, hidden, selected } = this.overlay;
     if (!peaksActive || !peaks?.length || hidden.includes("peaks")) return;
-    const { ctx } = u, dpr = devicePixelRatio, r = 4.5 * dpr, cap = 3 * dpr;
+    const { ctx } = u, dpr = devicePixelRatio;
+    const H = LENS_HEIGHT * dpr, W = LENS_WIDTH * dpr, gap = LENS_GAP * dpr;
+    const row = (LENS_HEIGHT + 1) * dpr, near = 7 * dpr, top = u.bbox.top + H / 2 + 2 * dpr;
     const { min, max } = u.scales.x;
+    const style = getComputedStyle(document.body);
+    const halo = style.getPropertyValue("--bg").trim();
+    const ink = style.getPropertyValue("--fg").trim();
+    const marks: Array<{ x: number; y: number; level: number; chosen: boolean }> = [];
+    let dotted: number | null = null;
+    for (const p of [...peaks].sort((a, b) => a.two_theta - b.two_theta)) {
+      if (p.two_theta < min || p.two_theta > max) continue;
+      const chosen = selected === p.index;
+      if (!p.usable) {
+        if (chosen) dotted = u.valToPos(p.two_theta, "x", true);
+        continue;
+      }
+      const h = this.crest(p.two_theta);
+      if (h == null) continue;
+      const x = u.valToPos(p.two_theta, "x", true);
+      let level = 0;
+      while (marks.some((m) => m.level === level && Math.abs(m.x - x) < near)) level++;
+      // at the plot's top the stack turns downward, so a twin under the
+      // strongest line still clears its partner rather than landing on it
+      const y = Math.max(top + level * row, u.valToPos(h, "y", true) - gap - H / 2 - level * row);
+      marks.push({ x, y, level, chosen });
+    }
     ctx.save();
-    ctx.strokeStyle = ctx.fillStyle = this.colors.peak;
-    ctx.lineWidth = 1.2 * dpr;
     // uPlot leaves the last series' dash on the context (the background's)
     ctx.setLineDash([]);
-    for (const p of peaks) {
-      if (p.two_theta < min || p.two_theta > max) continue;
-      const h = this.height(p.two_theta);
-      if (h == null) continue;
-      const X = u.valToPos(p.two_theta, "x", true), Y = u.valToPos(h, "y", true);
-      const w = Math.min(p.two_theta_esd, 3 * p.fwhm);
-      if (w > 0) {
-        const a = u.valToPos(p.two_theta - w, "x", true), b = u.valToPos(p.two_theta + w, "x", true);
-        ctx.beginPath();
-        ctx.moveTo(a, Y); ctx.lineTo(b, Y);
-        ctx.moveTo(a, Y - cap); ctx.lineTo(a, Y + cap);
-        ctx.moveTo(b, Y - cap); ctx.lineTo(b, Y + cap);
-        ctx.stroke();
+    const size = (m: { chosen: boolean }) => (m.chosen ? 1.4 : 1);
+    if (halo) {
+      ctx.fillStyle = halo;
+      for (const m of marks) {
+        lens(ctx, m.x, m.y, H * size(m) + 5 * dpr, W * size(m) + 4 * dpr);
+        ctx.fill();
       }
+    }
+    ctx.fillStyle = this.colors.peak;
+    for (const m of marks) {
+      lens(ctx, m.x, m.y, H * size(m), W * size(m));
+      ctx.fill();
+    }
+    const chosen = marks.find((m) => m.chosen);
+    if (chosen && ink) {
+      ctx.strokeStyle = ink;
+      ctx.lineWidth = 1.2 * dpr;
+      lens(ctx, chosen.x, chosen.y, H * 1.4 + 6 * dpr, W * 1.4 + 5 * dpr);
+      ctx.stroke();
+    }
+    if (dotted != null) {
+      ctx.strokeStyle = style.getPropertyValue("--accent").trim();
+      ctx.lineWidth = 1.2 * dpr;
+      ctx.setLineDash([2 * dpr, 3 * dpr]);
       ctx.beginPath();
-      if (p.origin === "fitted") ctx.arc(X, Y, r, 0, 2 * Math.PI);
-      else { ctx.moveTo(X, Y - r); ctx.lineTo(X + r, Y); ctx.lineTo(X, Y + r); ctx.lineTo(X - r, Y); ctx.closePath(); }
-      if (p.usable) ctx.fill(); else ctx.stroke();
+      ctx.moveTo(dotted, u.bbox.top);
+      ctx.lineTo(dotted, u.bbox.top + u.bbox.height);
+      ctx.stroke();
     }
     ctx.restore();
+  }
+
+  /** The highest measured count within three channels of 2θ, or null on a log
+   *  axis at or under zero: what a lens stands clear of. */
+  private crest(tt: number): number | null {
+    const w = this.overlay.held, k = w ? nearestIndex(w.two_theta, tt) : -1;
+    let v = k < 0 ? 0 : w!.y_obs[k];
+    if (k >= 0) {
+      for (let q = Math.max(0, k - 3); q < Math.min(w!.y_obs.length, k + 4); q++) {
+        if (w!.y_obs[q] > v) v = w!.y_obs[q];
+      }
+    }
+    return this.fig.panes.main.scales.y.distr === 3 && !(v > 0) ? null : v;
   }
 
   /** The measured intensity at the channel nearest 2θ, or null on a log axis at or under zero. */
@@ -452,6 +508,12 @@ function trace(u: any, tt: ArrayLike<number>, ys: ArrayLike<number>, colour: str
   }
   ctx.stroke();
 }
+
+/** A peak mark's lens, in CSS pixels: 18 tall and 4.5 wide, its lower tip
+ *  7 above the data (round 11c, 2026-11-08). */
+export const LENS_HEIGHT = 18;
+export const LENS_WIDTH = 4.5;
+export const LENS_GAP = 7;
 
 function readColors(): ReturnType<typeof curveColors> {
   const style = getComputedStyle(document.body);

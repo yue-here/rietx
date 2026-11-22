@@ -145,7 +145,7 @@ package. `src/rietx/_audit.py` is untouched.
   #1526); a pytest holds the lines' sum to the group's model.
 - [x] 3. `lib/peaks.ts` helpers for the steps, filters, groups to look at, the candidate
   columns and relations, with `lib/peaksteps.test.ts` (from #1526).
-- [ ] 4. The workflow built at `/next`: the step strip drawn as the prototype's, each step's
+- [x] 4. The workflow built at `/next`: the step strip drawn as the prototype's, each step's
   foot, and the Pick step (settings, Pick peaks, the filtered table with its tickboxes and
   notes, Picking settings with Pick peaks again asking first); the Pattern graph's peak layer
   while the workflow is up, with a row click framing its line. A vitest mount case. The first

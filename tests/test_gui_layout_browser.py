@@ -2179,3 +2179,53 @@ def test_no_history_control_moves_the_window(browser, tmp_path_factory):
     finally:
         page.close()
         httpd.shutdown()
+
+
+def test_the_pick_step_picks_frames_a_line_and_a_tick_moves_nothing(browser, tmp_path_factory):
+    """The peaks-and-indexing workflow's Pick step at ``/next``, by real clicks (WP-2240).
+
+    Choosing the workflow from the menu shows its four steps and the two graph
+    tabs it draws; Pick peaks in the step's foot fills the table; a tickbox
+    leaves a line out without moving the table or the frame (round 11b call 22,
+    `gui/STYLE.md` principle 4); a row's click frames its line, so the Pattern
+    graph is zoomed and Show all is offered.
+    """
+    httpd, _client = _serve(tmp_path_factory, "next-index")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    page = _open_next(browser, url, 1440)
+    try:
+        page.locator("button.mbtn.wf").click()
+        page.get_by_role("menuitemradio", name="Peaks and indexing", exact=True).click()
+        page.wait_for_selector("nav.steps button.step")
+        assert page.locator("nav.steps button.step .sname").all_text_contents() == [
+            "Pick peaks", "Fit peaks", "Index", "Judge"]
+        assert page.locator("section.graphs .tabs [role=tab]").all_text_contents() == [
+            "Pattern", "Peaks"]
+        assert page.locator(".actions").count() == 0
+        page.locator(".foot").get_by_role("button", name="Pick peaks", exact=True).click()
+        page.wait_for_selector("table.lines tbody tr")
+        _frames(page)
+        n = page.locator("table.lines tbody tr").count()
+        assert n > 3, n
+        landmarks = NEXT_LANDMARKS + ["nav.steps", "nav.steps > *", ".segmented", "table.lines",
+                                      "table.lines thead th"]
+        before = page.evaluate(SNAP, landmarks)
+        first = page.locator("table.lines tbody tr").first
+        first.locator("input[type=checkbox]").scroll_into_view_if_needed()
+        with page.expect_response("**/api/peaks/flag"):
+            first.locator("input[type=checkbox]").click()
+        _frames(page)
+        assert "off" in (first.get_attribute("class") or "")
+        moved = _moved(before, page.evaluate(SNAP, landmarks))
+        assert not moved, moved
+        assert page.locator("table.lines tbody tr").count() == n
+        show_all = page.get_by_role("button", name="Show all", exact=True)
+        assert show_all.is_disabled()
+        page.locator("table.lines tbody tr").nth(1).locator("td.num").first.click()
+        _frames(page)
+        assert "sel" in (page.locator("table.lines tbody tr").nth(1).get_attribute("class") or "")
+        assert show_all.is_enabled()
+        assert not page.errors, page.errors
+    finally:
+        page.close()
+        httpd.shutdown()
