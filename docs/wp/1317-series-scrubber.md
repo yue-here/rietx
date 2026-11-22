@@ -53,6 +53,18 @@ screenshots come from `docs/manual/make_screenshots.py`.
 
 ### Inherited
 
+- **2026-11-22, from the issue triage (#133, #141): both issues' asks have
+  landed, so the round's batch proposes closing them now.** Checked at
+  `f590981ab`. #133 asked for a trace on the experiment's own axis with the
+  series' events marked, and a scrub that updates the linked fit. Both
+  shipped in PR #1395 (merged 2026-11-21): `rietx.gui.series.TRACE_VOCABULARY`
+  and the Series panel's trace. #133 itself left external annotations,
+  export and film views to this WP. #141's surviving residual was one
+  vocabulary for flags and markers (the same PR) and the planted-events
+  fixture (PR #1011, merged 2026-10-21, `tests/planted_series.py`). If the
+  maintainer approves the closes, the PR that ticks the last task carries no
+  keyword for either issue, and § Acceptance's closing sentence is void. If
+  not, it stands.
 - **2026-11-05, from the issue triage (issue #1397): the screenshots need a series example and
   a driver phase.** Checked at `541f0daf7`: `docs/docs/make_screenshots.py` line 101 reads
   `PHASES = ("empty", "opened", "fitted", "forked")`, and the driver opens one example project.
