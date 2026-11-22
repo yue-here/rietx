@@ -106,7 +106,7 @@ It then also misses a size term written in degrees in that equation, as `+ x/cos
 Three diagnostics are specific to peak equations.
 `PEAK_WIDTH_NOT_POSITIVE` fires where a width equation takes Γ<sub>G</sub>² or Γ<sub>L</sub> below zero at a fitted reflection.
 A negative term is legal, but the total width is not.
-`PEAK_EQUATION_SHARED_ACROSS_WAVELENGTHS` fires in a joint fit where a width or shift coefficient is shared across patterns of different wavelengths.
+`PEAK_EQUATION_SHARED_ACROSS_WAVELENGTHS` fires in a joint fit where a width or shift coefficient is shared across patterns of different wavelengths, in an equation that does not read `wavelength`.
 `QPA_INTENSITY_FACTOR` fires on a mixture whose phase carries an intensity factor.
 The fraction is computed from the phase's scale, which absorbs the factor.
 A factor that averages 0.83 makes the fraction about 1/0.83 = 1.2× too high relative to the other phases.
