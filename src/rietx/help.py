@@ -2192,8 +2192,11 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "The data do not constrain one combination of several parameters. The solver "
             "discards that direction, and each parameter on it has no esd: the result, "
-            "the CIF and the GUI show it as undetermined. A parameter tied to one of "
-            "them, and a derived quantity built on one, has none either. Free fewer of "
+            "the CIF and the GUI show it as undetermined. A tie or a derived quantity "
+            "built on them has none either, unless the data determine that combination: "
+            "a zero shift tied to the sum of three such parameters keeps its esd, as do "
+            "a bond, a cell volume or a moment pair's quadrature sum built that way. "
+            "Free fewer of "
             "the parameters in one stage, hold the ones you know independently, or widen "
             "the fitted range, and refit for their esds. Esds of other parameters are "
             "unaffected."
@@ -3387,6 +3390,22 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "line of a supercell. A supercell of the leading cell predicts the last kind. "
             "Declaring "
             "`n_unindexed` forbids both retries."
+        ),
+    ),
+    "INSTRUMENT_WIDTH_HELD": HelpEntry(
+        title="Instrument width terms held beside specimen widths",
+        description=(
+            "The plan freed an instrument width and a specimen width with the same "
+            "angular shape: U with the Gaussian strain or size, X with the Lorentzian "
+            "size, Y with the Lorentzian strain or a Stephens anisotropic strain "
+            "block. The data fix only each pair's sum, so "
+            "the last stage held the instrument width at the value an earlier stage "
+            "left, or at its start. The message names that stage. The specimen widths "
+            "are the remainder of a split that the plan's stage order chose. Two starts "
+            "can disagree on them by several of their own esds, so they are not a "
+            "measurement of the specimen. To measure them, calibrate the instrument on a "
+            "standard with the `lab_calibrate` plan, load it with "
+            "`load_instrument_profile`, and refine the sample with `lab_sample_refine`."
         ),
     ),
     "K_SEARCH_PARTNER": HelpEntry(
