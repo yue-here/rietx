@@ -26,6 +26,7 @@
 
 import type { InstrumentEdit } from "../api";
 import { formatValue, num, type ParamRow } from "./table";
+import { py } from "./py";
 // the two geometry fields both forms offer: one wording, so the wizard and the
 // editor cannot explain the same quantity two ways (WP-1032)
 
@@ -273,13 +274,13 @@ export function clone<T>(model: T): T {
 export function registerEcho(answer: Partial<InstrumentEdit>, edit: string): string[] {
   const released = answer.released ?? [], freed = answer.freed ?? [];
   const fixed = answer.fixed ?? [];
-  const release = released.length ? [`ref.unhold(${JSON.stringify(released)})`] : [];
+  const release = released.length ? [`ref.unhold(${py(released)})`] : [];
   return [
     ...(answer.release_after ? [] : release),
     edit,
     ...(answer.release_after ? release : []),
-    ...(freed.length ? [`ref.set_vary(${JSON.stringify(freed)}, True)`] : []),
-    ...(fixed.length ? [`ref.set_vary(${JSON.stringify(fixed)}, False)`] : []),
+    ...(freed.length ? [`ref.set_vary(${py(freed)}, True)`] : []),
+    ...(fixed.length ? [`ref.set_vary(${py(fixed)}, False)`] : []),
   ];
 }
 

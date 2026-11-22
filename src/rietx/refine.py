@@ -7512,29 +7512,35 @@ class Refinement:
                 f"{', '.join(repr(d) for d in DELIVERABLES)}")
         return lines
 
+    def _plan_line(self) -> str | None:
+        """The ``plan:`` line of :meth:`summary`: the stages the last run ran,
+        and whether in one stage or in stages and why (WP-2224), or ``None``
+        before a plan has run.  The GUI's Console quotes it (WP-2227)."""
+        plan = self._last_plan
+        how = self._refit_how
+        if plan is None:
+            return None
+        if how == "single" and self._refit_plan is not None:
+            return (f"plan: one stage ({', '.join(s.name for s in plan.stages)}), "
+                    f"because the model had already converged on this pattern. "
+                    f"refit=\"stages\" runs "
+                    f"{', '.join(s.name for s in self._refit_plan.stages)} in turn.")
+        if how == "fallback":
+            return (f"plan: {', '.join(s.name for s in plan.stages)}, in stages, "
+                    f"after the one-stage re-fit was discarded.")
+        if isinstance(how, list):
+            return (f"plan: {', '.join(s.name for s in plan.stages)}, in stages, "
+                    f"because this fit frees {_name_paths(how)}, which the last "
+                    f"fit held.")
+        return f"plan: {', '.join(s.name for s in plan.stages)}"
+
     def _protocol_lines(self) -> list[str]:
         """Section 4 (minus provenance, appended separately — the one clause
         a bare result can also answer): the protocol actually run."""
-        plan = self._last_plan
         lines = ["  protocol:"]
-        how = self._refit_how
-        if plan is not None and how == "single" and self._refit_plan is not None:
-            lines.append(
-                f"    plan: one stage ({', '.join(s.name for s in plan.stages)}), "
-                f"because the model had already converged on this pattern. "
-                f"refit=\"stages\" runs "
-                f"{', '.join(s.name for s in self._refit_plan.stages)} in turn.")
-        elif plan is not None and how == "fallback":
-            lines.append(
-                f"    plan: {', '.join(s.name for s in plan.stages)}, in stages, "
-                f"after the one-stage re-fit was discarded.")
-        elif plan is not None and isinstance(how, list):
-            lines.append(
-                f"    plan: {', '.join(s.name for s in plan.stages)}, in stages, "
-                f"because this fit frees {_name_paths(how)}, which the last "
-                f"fit held.")
-        elif plan is not None:
-            lines.append(f"    plan: {', '.join(s.name for s in plan.stages)}")
+        plan_line = self._plan_line()
+        if plan_line is not None:
+            lines.append(f"    {plan_line}")
         rows = self.parameters()
         # exhaustive over ParameterRow.held_because's four reasons, minus
         # "tied" (excluded above: a tied path moves with its source, so it
