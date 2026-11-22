@@ -86,9 +86,10 @@ plus a pointer.
 - [x] The caps re-landed with diary lines.
 - [x] `tests/test_docs_consistency.py` green; the rulebook word counts before and after in
       the handover.
-- [ ] `claude-config/workflow/LESSONS.md`: the lesson "a rulebook's incentives are audited,
+- [x] `claude-config/workflow/LESSONS.md`: the lesson "a rulebook's incentives are audited,
       not only its facts", worded for the other projects, through `/workflow-sync`.
-- [ ] Skill: none; nothing here reaches an agent driving rietx.
+      Handed to the maintainer as paste text for a claude-config session (2026-11-22).
+- [x] Skill: none; nothing here reaches an agent driving rietx.
 
 ## Acceptance
 
