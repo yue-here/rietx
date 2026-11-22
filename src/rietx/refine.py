@@ -2564,7 +2564,12 @@ def _snapshot_sinks(*candidates) -> list:
 
 def _compile_cut(model: CompiledModel) -> dict[str, float]:
     """``model``'s peak cut as ``compile_model`` keywords: the area fraction
-    its windows drop and their slack, as the compile resolved them."""
+    its windows drop and their slack, as the compile resolved them.  A
+    time-of-flight bank has no such cut (its windows are sized per side by the
+    compiler, in every stage), so it records none and a grid compiles at the
+    bank's own defaults."""
+    if _is_tof(model):
+        return {}
     return {"window_area_tol": model.window_area_tol,
             "window_slack_deg": model.window_slack_deg}
 
