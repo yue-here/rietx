@@ -6574,6 +6574,19 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "`SEQUENTIAL_MOMENT_HOLD` names these patterns."
         ),
     ),
+    "SeriesEntry.held_values": HelpEntry(
+        title="Values you held",
+        description=(
+            "Each path you held on this pattern with `ref.hold` in the `constrain` "
+            "hook, named variables included, with the value it was held at. A site "
+            "coordinate DOF is left out, since its value is a step from where the fit "
+            "began; read the coordinate's own row. A held parameter has no row in "
+            "`parameters`, so read its value along the series here. A value that "
+            "differs from its neighbours' was set for this pattern by a hook, or the "
+            "path was free on the pattern before. `None` where nothing was held, and "
+            "in a series saved before the field."
+        ),
+    ),
     "SeriesEntry.pattern_paths": HelpEntry(
         title="This pattern's own paths",
         description=(
