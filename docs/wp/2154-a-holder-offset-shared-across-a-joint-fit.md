@@ -59,12 +59,12 @@ tie.
 
 ## Tasks
 
-- [ ] A synthetic series: the 2108 fixture over five patterns, one holder cell and one
+- [x] A synthetic series: the 2108 fixture over five patterns, one holder cell and one
   offset, a sample height per pattern. Fit it jointly by the route above.
-- [ ] Measure over 12 pinned seeds: the mean z-score of the truth for both cells, the
+- [x] Measure over 12 pinned seeds: the mean z-score of the truth for both cells, the
   sample's coordinates, the offset and each height; their spread; GoF; time per fit as a
   range. Compare the offset's esd with the single-pattern recipe's.
-- [ ] A slow test beside `tests/test_holder_cell.py`, holding the milestone's bar.
+- [x] A slow test beside `tests/test_holder_cell.py`, holding the milestone's bar.
 - [ ] A section in `docs/docs/guides/holder_cell.md` with its script under
   `examples/guides/`, every quoted number asserted.
 - [ ] The milestone's 2108 row, rewritten to say what the series measured.
