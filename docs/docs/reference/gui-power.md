@@ -269,7 +269,7 @@ indices int32, so a browser reads each array without copying it.
 | `POST /api/run` · `POST /api/cancel` · `GET /api/run/state` | start the plan; ask it to stop between iterations; where it is |
 | `GET /api/result` | the fit's numbers, without the curves |
 | `GET /api/result/curves` | every channel of the pattern and, after a fit, its curves on the channels it kept |
-| `POST /api/preview` | the calculated curve, the background, each phase, the three residuals and the ticks at values sent in the body and never applied; writes nothing, and says whether it evaluated the last compile, resized its windows or compiled afresh |
+| `POST /api/preview` | the calculated curve, the background, each phase, the three residuals and the ticks at values sent in the body and never applied; writes nothing, and says whether it evaluated the last compile, resized its windows or compiled afresh. Every compile cuts the peak tails where the last fit did, so at the head's values the curve and Rwp are the fit's |
 | `GET /api/background` | the background curve at the working state's values, the observed pattern, and the curve's esd at each fitted channel through the whole covariance of the free parameters; `?hold=` names paths held for that answer alone, so the band shows what a pending hold would give; writes nothing |
 | `GET /api/report` · `POST /api/report/apply` | the `FitReport`; run the stage one of its suggestions names |
 

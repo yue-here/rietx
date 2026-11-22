@@ -21,10 +21,10 @@
    * profile replaces the instrument at once, one node, and the dialog then
    * shows what it loaded. Saving a profile is File › Export (row 133).
    */
-  import { ApiError, api } from "../api";
+  import { ApiError, api, type InstrumentEdit } from "../api";
   import Help from "../Help.svelte";
   import { GEOMETRIES, applyFields, axialWarning, editableValue, fieldParam, fieldText,
-           splitEdits, type InstrumentField } from "../lib/model";
+           endedBy, registerEcho, splitEdits, type InstrumentField } from "../lib/model";
   import type { ParamRow } from "../lib/table";
   import { PRESET_TITLES, anodeLabel } from "../lib/wizard";
   import { SHAPE_LABELS, anodeChoices, anodeOf, clearForGeometry, dialogFields, dialogRows,
@@ -36,6 +36,7 @@
     busy = false,
     say = (_line: string) => {},
     onlanded = () => {},
+    ondropped = (_ended: (path: string) => boolean) => {},
     onclose,
   }: {
     /** `GET /api/params`, the panel's: which fields the table owns, and the
@@ -47,8 +48,22 @@
     say?: (line: string) => void;
     /** an edit landed: the head moved */
     onlanded?: () => void;
+    /** an instrument edit ended these paths' old parameters (a source cut to
+     *  one line, a profile of another background kind), so the pending edits
+     *  on them go (WP-2229) */
+    ondropped?: (ended: (path: string) => boolean) => void;
     onclose: () => void;
   } = $props();
+
+  /** Say what an instrument edit did, the registers' part included, and drop
+   *  the pending edits on the paths it ended. Returns the test for those
+   *  paths, or `null` when it ended none. */
+  function landedEdit(answer: InstrumentEdit, echo: string): ((path: string) => boolean) | null {
+    for (const line of registerEcho(answer, echo)) say(line);
+    const ended = endedBy(answer);
+    if (ended) ondropped(ended);
+    return ended;
+  }
 
   let model = $state<any>(null);
   let loadError = $state("");
@@ -164,14 +179,14 @@
     if (!d || !d.touched || d.invalid.length || busy || sending) return;
     sending = true;
     let moved = false;
+    let ended: ((path: string) => boolean) | null = null;
     try {
       // the model first, read fresh: it carries every value the table holds,
       // so values set before it would be written back by it
       if (d.fields.length) {
         const fresh = (await api.instrument()).instrument;
-        await api.patchInstrument(clearForGeometry(applyFields(fresh, d.fields, edits)),
-                                  "instrument edited");
-        say("ref.edit(instrument=…)");
+        ended = landedEdit(await api.patchInstrument(clearForGeometry(applyFields(fresh, d.fields, edits)),
+                                             "instrument edited"), "ref.edit(instrument=…)");
         moved = true;
         // what landed is no longer an edit: kept, it would compare unequal to
         // the reloaded rendering and send the same model again
@@ -180,9 +195,14 @@
         rest.delete("geometry.kind");
         edits = rest;
       }
-      const values = Object.entries(d.values);
+      // a value typed against a parameter the model edit ended would be
+      // refused once the model had landed, or set the new model's parameter
+      // of the same name: the request half applied (WP-2229 review)
+      const values = Object.entries(d.values).filter(([path]) => !ended?.(path));
+      const gone = Object.keys(d.values).filter((path) => ended?.(path));
+      if (gone.length) say(`# typed values dropped: ${gone.sort().join(", ")}`);
       if (values.length) {
-        await api.patchParams({ values: d.values });
+        await api.patchParams({ values: Object.fromEntries(values) });
         say(`ref.set_values({${values.map(([k, v]) => `"${k}": ${v}`).join(", ")}})`);
         moved = true;
       }
@@ -206,8 +226,8 @@
     sending = true;
     try {
       const preview = await api.uploadFile("instrument", file);
-      await api.patchInstrument({ upload: preview.upload }, `instrument from ${file.name}`);
-      say(`ref.edit(instrument=load_instrument_profile("${file.name}"))`);
+      landedEdit(await api.patchInstrument({ upload: preview.upload }, `instrument from ${file.name}`),
+                 `ref.edit(instrument=load_instrument_profile("${file.name}"))`);
       edits = new Map();
       refusal = "";
       onlanded();
