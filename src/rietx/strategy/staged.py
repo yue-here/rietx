@@ -1756,6 +1756,14 @@ def check_peak_width_positive(table, model) -> list[GuardFinding]:
     terms' floored value plus the equation's, so a dip the instrument's own
     U, V and W cause stays ``RESOLUTION_NOT_POSITIVE``'s.  Zero is a legal Γ_L,
     so that test is one-sided.  A phase with no width equation is skipped.
+
+    Under the default LM driver the total, the equation's term included, is
+    held inside the step wherever that term is exact at the stage's frozen
+    angles (WP-2153, ``optimize.least_squares._equation_width_rows``).  So
+    there this fires on a term that is not affine in a free coefficient, on a
+    start already below zero, which no row can restore, and on what a moving
+    cell or zero shift does between the frozen angles and the answer.  Under
+    TRF it is the only check.
     """
     import numpy as np
 
