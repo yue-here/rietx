@@ -278,7 +278,9 @@ DIRECTIONS = ("forward", "backward", "both")
 #: refinements, and one that cannot be fitted is no reason to throw away the
 #: others, the same argument that makes a cancelled series *return*.
 #: ``"skip"`` records it the same way but fits the successor **cold**, for a
-#: caller who reads the failure as evidence against the warm state too.
+#: caller who reads the failure as evidence against the warm state too.  A
+#: path the caller held keeps the last accepted pattern's value there, as on
+#: any cold rung (WP-2081): a held value is the caller's, not the warm state's.
 #: ``"raise"`` ends the chain in the last rung's exception, with the partial
 #: results kept: ``SequentialRefinement.results_``/``.failures_`` and the
 #: exception's own ``series_results``/``series_failures``/``series_failed``.
@@ -1404,7 +1406,8 @@ class SequentialRefinement:
             records the pattern on ``SeriesResult.failures`` (and this
             instance's ``.failures_``) with ``SERIES_PATTERN_FAILED`` and
             warm-starts its successor from the last accepted pattern;
-            ``"skip"`` starts the successor cold; ``"raise"`` ends the chain in
+            ``"skip"`` starts the successor cold, each held path still at the
+            last accepted pattern's value; ``"raise"`` ends the chain in
             the exception, keeping what completed on ``.results_``/``.trees_``
             and on the exception.  A chain that fitted no pattern at all raises
             whichever is chosen.  The caller's own ``prepare``/``constrain``
@@ -1772,8 +1775,9 @@ class SequentialRefinement:
         #: one, and ``carry``'s default ``["*"]`` would be a claim nothing kept
         #: (WP-1441).
         previous_vars: dict[str, float] = {}
-        #: the last accepted pattern's fitted models and variables, where a
-        #: cold rung's held paths read their values (WP-2081, series rule 6).
+        #: the last accepted pattern's carry source (``previous``, moments
+        #: floored) and variables, where a cold rung's held paths read their
+        #: values, so they read what a warm rung would (WP-2081, rule 6).
         #: Beside ``previous`` and unlike it never cleared by
         #: ``on_error="skip"``, since a skip stops a warm start and leaves a
         #: fixed value fixed
@@ -2021,7 +2025,7 @@ class SequentialRefinement:
                 previous_hkl = _extract_reflections(best_ref._model)
                 previous_vars = {name: prm.value
                                  for name, prm in best_ref._variables.items()}
-                hold_source, hold_vars = models[k], dict(previous_vars)
+                hold_source, hold_vars = previous, dict(previous_vars)
                 previous_tag = (entry.tree_id, entry.node_id)
                 if entry.statistics is not None:
                     accepted_rwp.append(entry.statistics.rwp)

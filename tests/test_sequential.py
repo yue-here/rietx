@@ -612,6 +612,8 @@ def test_a_hold_keeps_its_value_across_the_cold_rung(thermal_patterns):
         assert ins.zero_shift.value == calibrated, k
         a = runner.fitted_structures[k].phases[0].cell.a.value
         truth = A0 * (1.0 + RAMP * k)
+        # the script reads 1.9-2.0 ppm, the acceptance row's "within 2 ppm";
+        # 3 leaves room for the platform's last digits
         assert abs(a - truth) / truth < 3e-6, k
     assert series.entries[0].held_values is None
     assert [e.held_values for e in series.entries[1:]] == [
@@ -622,6 +624,32 @@ def test_a_hold_keeps_its_value_across_the_cold_rung(thermal_patterns):
     plot_result(runner.results_[2], path=str(out / "sequential_cold_hold_p2.png"))
     plot_result(runner.results_[2], path=str(out / "sequential_cold_hold_p2_zoom.png"),
                 two_theta_range=(3.0, 10.0))
+
+
+class _FailOnFrame(_ColdOnFrame):
+    """Every rung of one pattern raises, so ``on_error`` decides its successor."""
+
+    def _fit_one(self, data, label, previous, previous_hkl, plan, mode,
+                 two_theta_limits, position, previous_tag, prepare, constrain,
+                 index, *args, **kw):
+        if index == self.cold_index:
+            raise _PatternRaised(RuntimeError("every rung raises"))
+        return SequentialRefinement._fit_one(
+            self, data, label, previous, previous_hkl, plan, mode,
+            two_theta_limits, position, previous_tag, prepare, constrain,
+            index, *args, **kw)
+
+
+def test_a_skip_fits_the_successor_cold_and_keeps_the_held_value(thermal_patterns):
+    """``on_error="skip"`` distrusts the warm state, and a held value is the
+    caller's rather than the warm state's, so the cold successor keeps it."""
+    runner = _FailOnFrame(*_start_models())
+    series = runner.fit(thermal_patterns[:4], plan="mccusker_default",
+                        on_error="skip", constrain=_hold_zero_after_the_first)
+    assert [e.index for e in series.entries] == [0, 1, 3]
+    assert series.entries[-1].rung == "cold" and series.entries[-1].seeded_from is None
+    calibrated = runner.fitted_instruments[0].zero_shift.value
+    assert series.entries[-1].held_values == {"instrument.zero_shift": calibrated}
 
 
 def test_a_value_a_hook_sets_on_the_cold_rung_wins_over_the_kept_hold(
