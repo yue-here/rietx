@@ -40,8 +40,12 @@ and no client; check that nothing reads `seq == 1` as "a fresh session" first.
   why in the handover.
 - [x] A server test: open a second project after a run of N events, run again, and the poll
   from the old cursor returns the new run's events.
-- [ ] A vitest case on `follow()` if the client changes.
-- [ ] Skill: none. The GUI is a human surface.
+- [x] A vitest case on `follow()` if the client changes. Not owed: the client is unchanged.
+- [x] Sibling, same stream (found by this session's browser probe): a reconnecting
+  EventSource resumes at its `Last-Event-ID`, not at the `since` of the URL it first opened.
+  Test: `test_a_reconnecting_stream_resumes_at_its_last_event_id`.
+- [x] Sibling survey of per-project client state across an open: filed as WP-2242.
+- [x] Skill: none. The GUI is a human surface.
 
 ## Acceptance
 
