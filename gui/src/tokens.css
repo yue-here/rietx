@@ -54,6 +54,13 @@
      curve draws. It is at least 0.131 from every other plot colour and
      5.25:1 on `--panel`. `tests/test_gui_palette.py` names both pairs. */
   --plot-last: #849499;
+  /* A node the History tab compares, drawn dashed over the pattern
+     (WP-2211). The design rounds drew it in the site's second ink,
+     `#403a35` light and `#d2c9bd` dark. The dark one is the observed
+     points' colour exactly, so the dark value here is the nearest neutral
+     that clears the 0.13 floor from every curve (0.132 from the observed
+     points). Both are the design's choice to confirm with the maintainer. */
+  --plot-compare: #403a35;
   --plot-zero: #cfcfcf;
   /* The picked-peak layer (WP-1210, recoloured by WP-2200). The marks take
      Okabe-Ito blue, the complement of the orange fits, which the
@@ -125,6 +132,7 @@
     --plot-bkg: #c99a6a;
     --plot-diff: #8f8f8f;
     --plot-last: #7f8f94;
+    --plot-compare: #f5f5f5;
     --plot-zero: #4a4a4a;
     --plot-peak: #008ad5;
     --plot-peakfit: #516494;
@@ -159,6 +167,7 @@
   --plot-bkg: #c99a6a;
   --plot-diff: #8f8f8f;
   --plot-last: #7f8f94;
+  --plot-compare: #f5f5f5;
   --plot-zero: #4a4a4a;
   --plot-peak: #008ad5;
   --plot-peakfit: #516494;
