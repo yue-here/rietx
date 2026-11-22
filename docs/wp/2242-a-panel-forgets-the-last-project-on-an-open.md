@@ -66,6 +66,11 @@ choices, the Peaks and Pattern view knobs, `refineMode`, the workflow choice, an
 Console transcript with its dropped-frame count (`Frame.svelte`'s `opened()` clears only
 `calls`, "the script is this project's session").
 
+Also stale, and cheap to fix in the same rebuild: `follow()`'s doc comment
+(`gui/src/lib/stream.ts`) says a reconnect re-opens with the cursor the page holds. The
+browser re-opens the URL it first used and sends `Last-Event-ID`, which the server reads
+since WP-2237.
+
 Overlap: WP-2211 (History table) and WP-2231 (Plan and Text tabs) are in flight on `/next`
 panels this WP touches. Read their branches before editing those panels.
 
