@@ -2,16 +2,16 @@
 
 Scope: running, timing, counting and budgeting the test suite, and the CI
 that runs it. The headline rules live in the root CLAUDE.md (they govern how
-any session quotes numbers); this file holds the operating detail and the
-evidence. The measurement diary that taught these rules is archived in
+any session quotes numbers); this file holds the operating detail. The
+measurement diary that taught these rules is archived in
 `docs/milestones/v1.0.md` § Appendix.
 
 ## Running
 
 **The ladder — cheapest rung first, and the expensive one fires once.** A
 session's test bill is set by *how often* the top rung runs, not by how much is
-tested (WP-1070 spent ~80 min and earned ~43; the whole difference was one
-whole-suite run launched mid-edit and therefore repeated):
+tested (WP-1070's difference was one whole-suite run launched mid-edit and
+therefore repeated; `docs/milestones/process.md`):
 
 1. **The files you just touched** — seconds, continuously, while writing.
 2. **The fast suite** (`-m "not slow"`, 3-5 min) — before a substantial commit,
@@ -30,11 +30,10 @@ real-data row's *answer*. So look before starting one — `ps aux | grep -c
 '[p]ython -m pytest'`, with `lsof -a -d cwd -p <pid>` for which tree and
 `ps -o etime= -p <pid>` for how long — and **observe rather than reserve**,
 since a lock adds a release to forget and a stale window to wait out while a
-process list cannot go stale. **`ps`, not `pgrep -f`**: measured 2026-09-15,
-`pgrep -f pytest` exited 1 against a live `pytest -n 4` that `pgrep python`
-and `ps` both saw, and it is not stable between sessions — a check that
-silently finds nothing returns a false all-clear every time, which is worse
-than no check. **Count trees, not lines**: `grep` reads the command line, so a
+process list cannot go stale. **`ps`, not `pgrep -f`**: `pgrep -f` misses live
+suites, inconsistently between sessions (`docs/milestones/process.md`), and a
+check that silently finds nothing returns a false all-clear every time, which
+is worse than no check. **Count trees, not lines**: `grep` reads the command line, so a
 background launch matches its own zsh wrapper too and `-c` says 1 on an idle
 machine. **A ghostshift runner queues instead** (WP-2077): it starts a full
 suite only through ghostshift's `bin/serial.py` (in claude-config), which holds
@@ -96,35 +95,29 @@ mark is not, so its check stays a `--durations` scan for a setup appearing twice
 
 **One dataset, one group**, and runtime is set by the longest *group*, not by
 total work — splitting a group is the only way to go faster, and un-sharing a
-fixture to do it just moves the cost. A group ordering is a measurement with
-a shelf life: "indexing does not set the wall clock" expired unnoticed at
-~550–590 s against `stephens-brucite`'s 533 until a `--durations` re-read
-caught it, and moving the LaB6 rows into their own `indexing-acceptance-lab6`
-group was free because nothing in the group shared a fixture. Re-read the
-`--durations` list rather than the last session's sentence about it.
+fixture to do it just moves the cost; a group whose members share no fixture
+splits for free. A group ordering is a measurement with a shelf life (v1.0
+record § Appendix): re-read the `--durations` list rather than the last
+session's sentence about it.
 
 ## Guards that go quiet instead of red
 
 A guard asserting that something is *absent* fails safe only if you know it can
-still fail. Three measured ways one stops asking (the first two WP-1062, both
-green for months; the third WP-1426):
+still fail. Three ways one stops asking while staying green (WP-1062, WP-1426):
 
-- **It pins a copy of a string that lives somewhere else.** `test_gui_dist`
-  filtered `check-ignore` output on the literal text of a `.gitignore` rule, so
-  renaming the path in one file and not the other left it passing and testing
-  nothing. Assert the *shape* that carries the meaning — a rule beginning `!` is
-  a negation — never a second copy of the line.
+- **It pins a copy of a string that lives somewhere else.** A test filtering
+  output on the literal text of a `.gitignore` rule passes and tests nothing once
+  one copy is renamed. Assert the *shape* that carries the meaning — a rule
+  beginning `!` is a negation — never a second copy of the line.
 - **The tool answers from somewhere you did not mean.** `git check-ignore`
   consults the index first and answers for a **tracked** file without reading
-  the ignore rules at all; every file that test checks is committed, so the
-  rules were never asked. `--no-index` is what makes it ask.
+  the ignore rules at all. `--no-index` is what makes it ask.
 - **The instrument does not reach the thing you aimed it at.** A `layout-shift`
   entry fires when an element's *box* moves, and a chart repaints canvases inside
-  one, so a stage boundary that moved plotly's plot area 19 px scored exactly 0.
-  The *page* reads the observer, the *picture* each uPlot pane's `over`, and a
-  stillness test needs both. Colour likewise: a series' `stroke` is what it was
-  handed (a plotly tick row painted another, WP-1438), and what it painted is
-  `RECORD`'s log of every stroke and fill (`test_watch_browser.py`).
+  one, so a moved plot area scores 0. The *page* reads the observer, the
+  *picture* each uPlot pane's `over`, and a stillness test needs both. Colour
+  likewise: a series' `stroke` is what it was handed (WP-1438), and what it
+  painted is `RECORD`'s log of every stroke and fill (`test_watch_browser.py`).
 
 The check all three share: make the guard fail on purpose once, and confirm the
 failure message is the one you expected.
@@ -137,12 +130,11 @@ handed; `tests/eval_agent_surface/` (WP-1110) which **surface** it reaches for;
 reads; `tests/eval_skill/` (WP-1905) whether a **body** change keeps outcomes.
 What they share is the discipline, the part to copy into a fifth: **register the
 round before running it**, never rewritten afterwards; enforce the condition in
-a **shim** rather than in the prompt; fix the read-outs in advance (WP-1303's
-headline was none of them), and report a cell that came back **split** at N = 2
-as split.
+a **shim** rather than in the prompt; fix the read-outs in advance (WP-1303),
+and report a cell that came back **split** at N = 2 as split.
 
-A shim has to be **invisible to its subject**: the surface round's first tracer
-lacked `functools.wraps`, and an agent went reading source for a signature.
+A shim has to be **invisible to its subject**: a tracer without
+`functools.wraps` sent an agent reading source for a signature (WP-1110).
 And **check the condition reached each cell**, off its transcript: a user-level
 skill shadows a workspace one of the same name (WP-1338's § Amendment 1.1), and
 one on the task's subject picks the route, so launch with `--setting-sources
@@ -152,26 +144,21 @@ project,local`; the user `CLAUDE.md` still loads (WP-1504's § Amendment 1.1).
 
 A scored row asserts what the *data* supports, and that needs checking as much
 as any guard does — **before** the grid is read, since afterwards a correction
-cannot be told from moving the goalposts. Two of WP-1059's three rows failed
-it, both expecting `ambiguous` where the data in fact chose: one converges to
-truth under the default plan, the other's one-parameter rivals differ by χ²
-4.075 against 3.489 (5332 points; the R² 0.9977 saying otherwise is geometric).
-Fitting each rival alone costs seconds; that round cost 1.7 M tokens. Both:
-`tests/eval_report_agent/PROTOCOL.md` § Episode validity.
+cannot be told from moving the goalposts. Fitting each rival alone costs
+seconds and settles it, where a wrong expected answer costs a whole round
+(WP-1059; `tests/eval_report_agent/PROTOCOL.md` § Episode validity).
 
 ## Budgets in tests
 
 **A wall-clock budget inside a test is a runaway guard, never a timer.** Any
 test whose serial time is a large fraction of its declared budget is a load
 sensor pretending to be an assertion — it passes serially and fails under
-`-n auto` for reasons unrelated to what it asserts. Four measured instances:
-`BUDGET_SECONDS` in `tests/test_indexing_engines.py` (180 s against an
-~85–105 s search, broken by adding one unrelated module); **the budget a
-test depends on may be one rank down, in the library**
-(`DOMINANT_ZONE_PROBE_SECONDS`, a hard-coded 10 s against a 4.3 s serial
-cost); a real-data row that reported a *different centring* under load
-(73 s serial, 258 s loaded, 60 s declared — `REAL_DATA_BUDGET_SECONDS`, now
-300 s and still binding on the Linux nightly); and completion assertions
+`-n auto` for reasons unrelated to what it asserts. Measured instances (v1.0
+record § Appendix): `BUDGET_SECONDS` in `tests/test_indexing_engines.py`;
+**the budget a test depends on may be one rank down, in the library**
+(`DOMINANT_ZONE_PROBE_SECONDS`); a real-data row that reported a *different
+centring* under load (`REAL_DATA_BUDGET_SECONDS`, still binding on the Linux
+nightly); and completion assertions
 generally — "some system did not finish" is a statement about machine load,
 not the data, and belongs as "every system searched reports whether its
 domain was exhausted".
@@ -184,23 +171,22 @@ the assertion is a load sensor.**
 senses solver termination unless it carries the measured cross-platform
 spread** — a TRF stopping point moves with platform libm while the physics does
 not. **Measure that spread on the quantity the assertion names, not on its
-neighbour**: sized on `a` at 2.5e-6, the same bar fired 12 days later on `c`,
-7x wider and bit-identical across two runs, so a re-run proves nothing. Every
-number: `test_acceptance_srm676a.py` §3. A pass margin under ~10x still smells.
+neighbour**; a re-run is bit-identical and proves nothing (`test_acceptance_srm676a.py` §3). A pass margin under ~10x
+still smells.
 
 **The honest-budget rule and the CI budget pull against each other, so expect
 to pay in scope.** When a budget fix makes something slow, narrow what is
 searched — never the budget, never a silent cap (the pure phases' declared
-`systems_searched`, 15:33 → 8:09; v1.0 record § Appendix). **Where the budget
-still binds, an *order* waits for a finished search** (WP-1449): finished,
-brucite ranks a supercell first, and cut, the truth in one run of two.
+`systems_searched`; v1.0 record § Appendix). **Where the budget
+still binds, an *order* waits for a finished search** (WP-1449): a cut search's
+ranking depends on load.
 `_skip_unless_finished` reads each unit's clock against the recorded budget,
 never `search_complete` (a cap sets it too); a *found* claim stays live.
 
 **The fast tier grows by its tail, so its guard is a report** (WP-1506): each
 added test's seconds and each file's total (`python -m tests.added_test_times`),
 and one joining the tail says why it is not `slow`. **Local seconds understate a
-CI leg by 3-4×**, so it reads CI's `junit-*` file when the branch has one (WP-1547).
+CI leg**, so it reads CI's `junit-*` file when the branch has one (WP-1547).
 
 ## Quoting numbers
 
@@ -209,33 +195,26 @@ CI leg by 3-4×**, so it reads CI's `junit-*` file when the branch has one (WP-1
   all** — the run looks clean, exits 0, and the passed/skipped counts you came
   to measure are simply absent. Use the root CLAUDE.md's commands verbatim; the
   ones that do show `-q` are single-file selections where the count is not the
-  point. This wastes whole runs before anyone notices the line is missing
-  rather than the run being quiet.
-- **Quote wall clock as a range, never as a figure**: the same green tree
-  measured 7:37 and 5:44 minutes apart on one machine, 11:52 on a busier
-  one, and 12:40 while it also ran a headless browser, three vite builds and
-  a second pytest. Machine state moves it further than most changes do;
-  compare runs, not records.
-  That 12:40 is the same tree as the 5:44, so **say whether another session was
-  running** — and check first (§ Running), which makes "alone" a fact rather
-  than an assumption.
-- **Memory on macOS is the physical footprint**: compressed pages leave RSS (57 MB
-  against 1.9 GB, WP-1924). Compare peaks at equal work, since a loaded run under a
+  point.
+- **Quote wall clock as a range, never as a figure**: machine state moves it
+  further than most changes do (v1.0 record § Appendix); compare runs, not
+  records. **Say whether another session was running** — and check first
+  (§ Running), which makes "alone" a fact rather than an assumption.
+- **Memory on macOS is the physical footprint**: compressed pages leave RSS
+  (WP-1924). Compare peaks at equal work, since a loaded run under a
   wall ceiling searches less (`tests/repro_780.py`: `memory_bytes`, `--cpu-clock`).
 - **Quote the extras with any count**: `[jax,torch]` turns most skips into
   passes, so a count needs its venv, and a traced-path change needs them
-  installed or its cross-backend rows skip green (WP-1953, red on CI's jax).
+  installed or its cross-backend rows skip green (WP-1953).
 - **A pass count cannot show a module that never ran.** A collection error is
   one `error` line beside five thousand passes, and every case in that file
-  stops being evidence without one of them going red — `tests/test_runs.py`
-  was unrun on Windows for three nights that way (WP-1439). What shows it is
-  the **total**: passed+skipped agreed across platforms at 5450 once the
-  import was guarded, and was 51 short of it before. Compare totals across the
-  matrix, never pass counts, which move for every legitimate skip.
+  stops being evidence without one of them going red (WP-1439). What shows it
+  is the **total**: compare passed+skipped across the matrix, never pass
+  counts, which move for every legitimate skip.
 - **A test that pins a number declares which *path* produced it**, not only
   which settings — the dispersion rule (root CLAUDE.md) one rank wider, because
-  WP-1115 added a second default that changes arithmetic. The compiled kernel
-  tier is on unless switched off, so a golden or a bit-identity assertion says
+  the compiled tier is a second default that changes arithmetic (WP-1115). It
+  is on unless switched off, so a golden or a bit-identity assertion says
   `compiled.set_enabled(False)` (or `True`) rather than inheriting. The
   signature of getting this wrong is a test that **passes on darwin/arm64 and
   fails on Linux**, whose C library `exp` the symmetric kernels call (x86-64's FCJ
@@ -258,16 +237,13 @@ CI leg by 3-4×**, so it reads CI's `junit-*` file when the branch has one (WP-1
   additions cannot simply be summed — re-measure after the merge.
 - **Say which numbers moved**: after adding N tests, passed+skipped must
   move by exactly N **in the fast selection**, and a new skip is not a new
-  pass (WP-1029 added six: five passes and one skip, which is the
-  version of this check that earns its keep). For the **full** selection quote
+  pass (WP-1029). For the **full** selection quote
   green plus a delta consistent with the fast one; both ends of an exact check
   there costs an hour of machine time, and the baseline it needs is CI's job
-  (§ Running, the ladder). The vitest suite is counted
-  separately — its 207 was once quoted as 206 until the next session re-ran
-  it, the same lesson one suite over.
+  (§ Running, the ladder). The vitest suite is counted separately, by the same
+  rule (v1.0 record § Appendix).
 - **`--collect-only` undercounts by one per module-level `importorskip` that
-  fires** (resolved 2026-07-31, WP-1031, by diffing junitxml nodeids against
-  the collection list): a module skipped at import is **one skipped test**
+  fires** (WP-1031): a module skipped at import is **one skipped test**
   in the run summary and **zero items** under `--collect-only`. Which
   modules fire depends on the venv (jax, torch, the playwright browser files
   and the rest `conftest.pytest_make_collect_report` names). So
@@ -290,17 +266,16 @@ header). Nightly (`nightly.yml`): the full suite `[dev,jax]` on Linux (3.13, not
 a gate), the fast suite on 3.12 and 3.13 and on Windows (the release pre-upload
 gate, `docs/RELEASING.md` step 4), macOS fast plus the informational goldens
 step, and `[torch]`. **Read spend from the Actions usage page or `gh run list`,
-never from comments or this file**: a written total rots (303 vs ≈495).
+never from comments or this file**: a written total rots (WP-1060).
 
 Two consequences for local work:
 
 - **The bit-identity goldens are pinned to `darwin/arm64`** (`GOLDEN_PLATFORM`
-  in `tests/test_backend_shim.py`) and *skip* elsewhere: measured, Linux x86-64
-  diverges by 1 ulp to 1.7e-13 relative — a libm and summation-order difference
-  — so the gate is asserted where it was captured rather than loosened to a
-  tolerance that could not distinguish it from a real change.
-- **`tests/.jax_cache` is why the jax rows feel free locally** — deleting it
-  takes the two jax files from ~12 s to 107 s — but caching it in CI was
-  measured and does *not* help (8:18 warm against 8:12 cold): jax's
-  persistent cache holds only XLA compilations above a time threshold, while
-  per-process tracing and lowering are paid every run.
+  in `tests/test_backend_shim.py`) and *skip* elsewhere: Linux x86-64 diverges
+  by a libm and summation-order difference (WP-1002), so the gate is asserted
+  where it was captured rather than loosened to a tolerance that could not
+  distinguish it from a real change.
+- **`tests/.jax_cache` is why the jax rows feel free locally**, but caching it
+  in CI was measured and does *not* help (WP-1002): jax's persistent cache
+  holds only XLA compilations above a time threshold, while per-process tracing
+  and lowering are paid every run.
