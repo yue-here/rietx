@@ -36,6 +36,12 @@ const answer = {
 /** the holds the last band was fetched with: the answer echoes them, as the
  *  server's `pending_holds` does; a hold on "refused.*" is answered 400 */
 let lastHold: string[] = [];
+/** an instrument edit, answered as the server answers a Type switch (WP-2229) */
+const patchInstrument = vi.fn(async (_instrument: any, _label?: string) => ({
+  node_id: "n2", instrument: {}, released: ["instrument.background.c1"],
+  freed: ["instrument.background.c0", "instrument.background.c1"],
+  ended: ["instrument.background.c0", "instrument.background.c1", "instrument.background.c2"],
+}));
 vi.mock("../api", async (original) => {
   const real = await original<typeof import("../api")>();
   return {
@@ -46,7 +52,10 @@ vi.mock("../api", async (original) => {
       return hold.some((h) => h.startsWith("refused."))
         ? Promise.reject(new real.ApiError(400, { error: { message: "no parameter to hold: refused.x" } }))
         : Promise.resolve(new ArrayBuffer(0));
-    } },
+    },
+    instrument: async () => ({ instrument: { background: {
+      kind: "chebyshev", coefficients: [0, 1, 2].map(() => ({ value: 1, vary: true })) } } }),
+    patchInstrument: (instrument: any, label?: string) => patchInstrument(instrument, label) },
   };
 });
 vi.mock("./rxplot.mjs", async (original) => ({
@@ -72,6 +81,7 @@ afterEach(() => {
   app = null;
   document.body.innerHTML = "";
   background.mockClear();
+  patchInstrument.mockClear();
   payload = curves([12, 20, 30, 40, 48]);
 });
 
@@ -169,6 +179,28 @@ describe("the Background graph (rows 63-68)", () => {
     } finally {
       answer.header = saved;
     }
+  });
+
+  it("sends a Type switch alone and passes the server's answer on", async () => {
+    // the server works out the registers' part (WP-2229): the graph sends no
+    // arms, echoes what was released and freed, and drops what was ended
+    const lines: string[] = [];
+    const ondropped = vi.fn();
+    app = mount(Background, { target: document.body, props: {
+      head: "n1", say: (line: string) => lines.push(line), ondropped } });
+    await settle(() => document.querySelectorAll(".chips .term").length === 3);
+    const spline = [...document.querySelectorAll<HTMLButtonElement>('[aria-label="Type"] button')]
+      .find((b) => b.textContent === "P-spline")!;
+    spline.click();
+    await settle(() => ondropped.mock.calls.length > 0);
+    const [sent, label] = patchInstrument.mock.calls[0];
+    expect(sent.background.kind).toBe("pspline");
+    expect(label).toBe("background: pspline");
+    expect(lines[0]).toBe('ref.unhold(["instrument.background.c1"])');
+    expect(lines[1]).toMatch(/^instrument\.background = BackgroundPSpline\.for_range/);
+    expect(lines[2]).toBe('ref.set_vary(["instrument.background.c0","instrument.background.c1"], True)');
+    const ended = ondropped.mock.calls[0][0] as (path: string) => boolean;
+    expect(["instrument.background.c2", "instrument.background.c3"].map(ended)).toEqual([true, false]);
   });
 
   it("names the current values at rest, and waits for a run", async () => {

@@ -306,11 +306,12 @@ line if the checkpoint ended it. Close with
    of 9 open fork PRs on 2026-10-01). Otherwise ask for a rebase.
 
    - **`docs/wp/README.md`**: regenerate it with `wp_index.py`.
-   - **The schema number**, `src/rietx/schemas/common.py` and the pin in
-     `tests/test_magnetic.py`. It moves once per release cycle (the comment
-     above `SCHEMA_VERSION`, decided 2026-10-15). The first change after a
-     release bumps it, and every later change adds an `Also in M` note under
-     that number. So a sync never renumbers onto main. Read R, the number at
+   - **The schema number**, `src/rietx/schemas/common.py`, its notes in
+     `docs/contracts/schema.md` and the pin in `tests/test_magnetic.py`. It
+     moves once per release cycle (the comment above `SCHEMA_VERSION`,
+     decided 2026-10-15). The first change after a release bumps it, and
+     every later change adds an `Also in M` note under that number in the
+     notes file. So a sync never renumbers onto main. Read R, the number at
      the last release tag (`git show <tag>:src/rietx/schemas/common.py`), and
      M, main's number. Where M is R, main has not bumped this cycle, and the
      PR's own bump merges as written. Where M is past R, the PR's change
@@ -328,7 +329,10 @@ line if the checkpoint ended it. Close with
      no document carries. The block's grep is whole-word: without `-w`, 0.50
      matched 0.500000E+01 in #911's GSAS fixtures.
      `INDEXING_THRESHOLDS_VERSION` in `src/rietx/schemas/indexing.py` moves
-     the same way, with `Also <M>` notes and no pin. On 2026-10-30 #1107
+     the same way, with `Also <M>` notes in
+     `docs/contracts/indexing-thresholds.md` and no pin.
+     `tests/test_capabilities.py::test_every_contract_bump_carries_its_note`
+     fails when the newest note is not under the constant's value. On 2026-10-30 #1107
      and #1123 both added 0.60 notes, and the sync kept both, #1123's first
      (`2da66e61`).
    - **`docs/releases/<next>.md`**, the staging file: keep both sides when
@@ -441,10 +445,20 @@ line if the checkpoint ended it. Close with
    - **Post the proposed rows** in the PR's step-8 review, each with the
      judge's one-line verdict. In the `all` mode that review waits for the
      judge and goes out in the apply pass.
-   - **Tier-3 rows and tier-2 actions go to the batch, grouped by class**:
-     one question for every row resting on the same evidence (WP-2002 ruled
-     256 rows as 16 classes). After a ruling, write `grounds` and `approved`
-     (the ruling's date) into the PR's rows. Push them to its branch where
+   - **Settle the clear classes of tier-3 rows and tier-2 actions, and batch
+     the rest** (ruled 2026-11-22). A class is every row resting on the same
+     evidence (WP-2002 ruled 256 rows as 16 classes). A class whose answer is
+     clear, and which none of the maintainer's triggers reaches (the
+     maintainer's instructions, § "Before you bring me a decision"), is yours
+     to settle. Dispatch one fresh agent on Opus over the settled classes. Give
+     it each class's evidence and diff, and withhold your tier, your grounds
+     and the judge's verdict. A class it answers differently is not clear and
+     goes to the batch. List the settled classes under **Settled for you**,
+     and show the maintainer a random one in ten. Every other class goes to
+     the batch as one question. After a settlement or a ruling, write
+     `grounds` and `approved` (that day's date) into the PR's rows. A settled
+     row's `grounds` ends "settled by Claude under <grounds>". Push them to
+     its branch where
      `gh pr view N --json maintainerCanModify` says true; otherwise ask the
      contributor in the review.
 6c. **What a reader receives** (ruled 2026-11-01). The package should pass no

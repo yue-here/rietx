@@ -189,6 +189,20 @@ jobs:
         # judge's item list.
         if: ${{ !cancelled() && github.event_name == 'pull_request' }}
         run: .venv/bin/python -m tests.audit_delta
+      - name: Code-reference allowlist entries
+        # Each entry new against the base in tests/code_references.py's
+        # ALLOWLIST, printed as a warning.  An entry exempts a comment's
+        # citation from the check that it names live code, so it fails unless
+        # the change touches no other file (WP-2233).  Same base as above.
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        run: .venv/bin/python -m tests.code_references --delta
+      - name: Rulebook size limits
+        # Every always-loaded rulebook's bytes against the budget in the
+        # base's tests/rulebook_limits.py, so a change cannot raise the limit
+        # it is measured against.  A raise prints a warning and fails unless
+        # it is a change of its own (WP-2233).  The ceiling is in the suite.
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        run: .venv/bin/python -m tests.rulebook_limits
 
   changes:
     # Which suite this run needs, as `scope`: `docs` when every file the PR
