@@ -1,13 +1,13 @@
 /**
- * What each model tab's `?` box says (WP-2231; the maintainer's look of
- * 2026-11-21, item 6, reversing § Settled 11).
+ * What each tab's `?` box says, on the model strip and the graph strip
+ * (WP-2231; the maintainer's look of 2026-11-21, item 6, reversing § Settled 11).
  *
  * The prototype puts one `?` button at the right of each tab strip, in a fixed
  * place, and its box explains the tab that is up. These are its words, cut to
  * what the rebuilt page does. `anchor` is the section of the manual's GUI
  * chapter (`reference/gui-guide.md`) the box links to.
  */
-import type { ModelTab } from "./tabs";
+import type { GraphTab, ModelTab } from "./tabs";
 
 export type HelpBoxEntry = {
   title: string;
@@ -56,5 +56,45 @@ export const MODEL_HELP: Record<ModelTab, HelpBoxEntry> = {
       "An edit applies through the same verbs the forms call, so it lands as history nodes and a checkout undoes it.",
     ],
     anchor: "text",
+  },
+};
+
+export const GRAPH_HELP: Record<GraphTab, HelpBoxEntry> = {
+  pattern: {
+    title: "Pattern",
+    items: [
+      "Drag across the plot to zoom in. Double-click it, or press Show all, to zoom out.",
+      "Click a label on the right to hide or show its curve.",
+      "The difference is (observed − calculated) / esd. The shaded band is ±3 esd.",
+      "While you edit, the preview draws in orange and the last fit turns grey. Show switches between the preview and the last fit.",
+    ],
+    anchor: "the-pattern",
+  },
+  peaks: {
+    title: "Peaks",
+    lead: "Each window shows the strongest reflection in its part of the pattern.",
+    items: [
+      "‹ and › step to the next one.",
+      "The scale stays at the last fit, so a preview that grows a peak runs off the top.",
+    ],
+    anchor: "single-peaks",
+  },
+  background: {
+    title: "Background",
+    lead: "The shaded band shows where the curve may move in the next fit, given what else is free. “Band drawn” only exaggerates it.",
+    items: [
+      "Chebyshev: a held term keeps its value from the last fit.",
+      "P-spline: stiffness sets how smooth the curve must be.",
+    ],
+    anchor: "the-background",
+  },
+  structure: {
+    title: "Structure",
+    items: [
+      "Drag to rotate. Scroll to zoom.",
+      "a, b and c look down that axis.",
+      "It draws the last fit, or the preview while you edit positions or the cell.",
+    ],
+    anchor: "the-3d-view",
   },
 };

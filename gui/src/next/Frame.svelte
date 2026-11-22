@@ -41,7 +41,7 @@
   import ActionBar from "./ActionBar.svelte";
   import Console from "./Console.svelte";
   import HelpBox from "./HelpBox.svelte";
-  import { MODEL_HELP } from "./helpbox";
+  import { GRAPH_HELP, MODEL_HELP } from "./helpbox";
   import Keys from "./Keys.svelte";
   import Menu, { type MenuAt } from "./Menu.svelte";
   import Params from "./Params.svelte";
@@ -840,6 +840,10 @@
             <button class="tab" role="tab" aria-selected={graphTab === t.id} disabled={!project}
               onclick={() => (graphTab = t.id)}>{t.label}</button>
           {/each}
+          {#if project}
+            <HelpBox entry={GRAPH_HELP[graphTab]} {docsUrl}
+              label="About the {GRAPH_TABS.find((t) => t.id === graphTab)?.label} graph" />
+          {/if}
         </div>
         <div class="pane">
           {#if graphTab === "pattern"}

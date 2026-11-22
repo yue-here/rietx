@@ -5,8 +5,8 @@
 import { flushSync, mount, unmount } from "svelte";
 import { afterEach, describe, expect, it } from "vitest";
 import HelpBox from "./HelpBox.svelte";
-import { MODEL_HELP } from "./helpbox";
-import { MODEL_TABS } from "./tabs";
+import { GRAPH_HELP, MODEL_HELP } from "./helpbox";
+import { GRAPH_TABS, MODEL_TABS } from "./tabs";
 
 let app: Record<string, any> | null = null;
 
@@ -20,6 +20,11 @@ describe("the ? box", () => {
   it("has words for every model tab", () => {
     expect(Object.keys(MODEL_HELP).sort()).toEqual(MODEL_TABS.map((t) => t.id).sort());
     for (const t of MODEL_TABS) expect(MODEL_HELP[t.id].title).toBe(t.label);
+  });
+
+  it("has words for every graph tab", () => {
+    expect(Object.keys(GRAPH_HELP).sort()).toEqual(GRAPH_TABS.map((t) => t.id).sort());
+    for (const t of GRAPH_TABS) expect(GRAPH_HELP[t.id].title).toBe(t.label);
   });
 
   it("opens the tab's box, links the manual's section, and closes on Esc and on Close", () => {
