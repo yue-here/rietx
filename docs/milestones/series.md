@@ -180,6 +180,8 @@ Two were open, and both were the maintainer's. Answered 2026-11-22 under the mai
 | [1317](../wp/1317-series-scrubber.md) | the GUI's view of a finished series | not moved: [gui-overhaul](gui-overhaul.md) § R7 carries it (maintainer, 2026-11-21) |
 | [2103](../wp/2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) | hold, tie and restart on a joint fit | stays in parametric; rule 2's start from a series result depends on it |
 | [2003](../wp/2003-the-chain-actions.md) | the tiers of the series' automatic actions | stays in generality |
+| [2300](../wp/2300-a-series-declares-each-parameter.md) | rule 1's declaration on the series call, and rule 2's refusal | filed 2026-11-22; its vocabulary is the maintainer's |
+| [2301](../wp/2301-the-typical-temperature-series.md) | the typical temperature series: one documented route, its preset and a Switching page | filed 2026-11-22; the preset's name is the maintainer's |
 
 The two proposed rows keep `Milestone: unscheduled` in their files until their next edit
 carries the move (the moves were settled 2026-11-22). Each has an open pull request that edits the same header line (#1401
@@ -193,10 +195,10 @@ structural one, WP-2108) are work of their own.
 ## The order
 
 Rules 3 to 6 describe the code as it nearly stands, so their work is small: the field for
-WP-2080, a fixed value surviving a restart (WP-2081 question 4), and
-`SEQUENTIAL_MOMENT_ONSET` once ruled. `SEQUENTIAL_WIDTH_GROWTH` is removed. Rule 1 comes next, as a declaration on the series call. Rule 2's start
+WP-2080, a fixed value surviving a restart (WP-2081 question 4, built 2026-11-22), and
+`SEQUENTIAL_MOMENT_ONSET` once ruled. `SEQUENTIAL_WIDTH_GROWTH` is removed. Rule 1 comes next, as a declaration on the series call (WP-2300). Rule 2's start
 from a series result waits on WP-2103. The default is ruled, so a preset for the typical
-temperature series can be written. The documentation for a user arriving from another program's
+temperature series can be written (WP-2301). The documentation for a user arriving from another program's
 sequential mode is written with rule 1. Before rule 2 is built, a second real series that
 nobody who changes the package has run is named, with its independent measurement. Each
 WP's `Priority:` line outranks this paragraph.

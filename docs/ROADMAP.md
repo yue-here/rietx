@@ -447,7 +447,7 @@ Opened 2026-11-08 by the maintainer ([record](milestones/gui-overhaul.md)), on t
 
 ### series — a series a scientist can predict and drive
 
-Opened 2026-11-16 by the maintainer ([record](milestones/series.md)), beside parametric and separate from it. The record holds six rules for series work, each accepted by the maintainer, and the decisions still open. The default stays as it is, and a joint fit starting from a series result waits on 2103. The block 23xx is claimed. [The WPs](wp/README.md#series).
+Opened 2026-11-16 by the maintainer ([record](milestones/series.md)), beside parametric and separate from it. The record holds six rules for series work, each accepted by the maintainer, and the decisions answered since. The default stays as it is, and a joint fit starting from a series result waits on 2103. Rule 1's declaration on the series call is 2300, and the typical temperature series' preset and documented route is 2301. The block 23xx is claimed. [The WPs](wp/README.md#series).
 
 ### Unscheduled
 

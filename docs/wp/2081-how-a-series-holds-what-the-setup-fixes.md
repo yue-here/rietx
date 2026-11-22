@@ -218,8 +218,11 @@ held value is a symptom, and the default on later frames is the question.
   coordinate on top of it.
 - `SequentialRefinement.fit:plan` and `:refit` are in `UNAUDITED_BASELINE`
   (`src/rietx/_audit.py`), so today's default carries no recorded Rule 1 kind.
+  *Superseded in part 2026-11-22:* `fit:plan` has a tier-3 row, `ambiguity` 3, the plan
+  kept, approved by the maintainer 2026-11-22. `fit:refit` is still unaudited.
 
-**PR #1310 (WP-2003), open and mergeable on 2026-11-04 at `4c54a0350`.** It sets
+**PR #1310 (WP-2003), open and mergeable on 2026-11-04 at `4c54a0350`.** *Superseded
+2026-11-22:* it merged on 2026-11-04, so what follows describes `main`. It sets
 `reseed_factor` and `first_rung_factor` to `None` by default and removes `RESEED_FACTOR`,
 `FIRST_RUNG_FACTOR` and `SEQUENTIAL_RWP_OUTLIER`. A warm frame then climbs the ladder when
 it diverged, raised or carries an error-level diagnostic. `SeriesEntry.rwp_over_median`
@@ -269,6 +272,7 @@ runaway neighbour made them raise, so the ladder keeps its cold rung.
 | zero shift free, nothing forced | 0.00797 | 0.00799 | 0.00801 (warm) | 0.00802 |
 | zero shift free, frame 2 cold | 0.00797 | 0.00799 | 0.00801 | 0.00802 |
 | held from frame 1 in `constrain`, frame 2 cold | 0.00797 | 0.00797 | **0.00000** | **0.00000** |
+| the same, after question 4 was built (2026-11-22) | 0.00797 | 0.00797 | 0.00797 | 0.00797 |
 | three hooks, frame 2 cold | 0.00797 | 0.00797 | 0.00797 | 0.00797 |
 
 Each free value has an esd of 1.6e-5°. The consequences, from the same runs:
@@ -279,6 +283,9 @@ Each free value has an esd of 1.6e-5°. The consequences, from the same runs:
   absorbs the missing zero shift and lands 546 ppm short, and GoF rises from 1.04 to 9.73.
   Frame 3 warm-starts from frame 2's answer, so it carries 0.0 too: −547 ppm, GoF 9.76,
   after climbing all three rungs.
+- *Superseded 2026-11-22:* the next two points describe the tree before PR #1310 merged
+  and before question 4 was built. The held arm now holds 0.00797° on every frame, and the
+  cell sits 1.9-2.0 ppm from the truth (`cold_rung.json`, rerun on this branch).
 - It is not silent on `main`, because the error is gross. `SEQUENTIAL_RESEED` says frame 2
   was refitted from the initial model, and `SEQUENTIAL_RWP_OUTLIER` fires on frames 2 and 3
   at 7.3× the Rwp fence. Neither names the held parameter or its value. After PR #1310
@@ -311,8 +318,8 @@ for the traditional workflow.
 **Related WPs.** WP-1441 (ties and variables reach every pattern through `constrain`);
 WP-1435 (the hold, and why `vary=False` is not one); WP-1208 (a plan replaces the vary
 flags); WP-1051 (the ladder and the quarantine); WP-2003 (the chain actions and their
-tiers, PR #1310); WP-2080 (a warm fit in a wrong basin; its ruled trigger escalates to
-`warm_staged` only, so it sends no frame to the cold rung); WP-1325 (the parametric joint
+tiers, PR #1310, merged); WP-2080 (a warm fit in a wrong basin; ruled 2026-11-16 to a
+field with no retry, so it sends no frame to any rung); WP-1325 (the parametric joint
 fit); WP-2028 (the joint fit's screens); WP-2015 (the declared geometry picks the
 `Refinement.fit` plan, which would free displacement on Bragg-Brentano); WP-1317 (the
 post-fit series scrubber, which rules a waterfall out of its own scope).
@@ -498,8 +505,12 @@ Lower questions, still open:
       the cold one and the `verify_steps` refits included, and `SeriesEntry.held_values`
       records each pattern's held values (`sequential._keep_held_values`,
       `_held_values`).
-- [ ] Turn the rulings into work: fold each into this WP's tasks or the owning WP, or
+- [x] Turn the rulings into work: fold each into this WP's tasks or the owning WP, or
       file a new WP, each with its practice row and the measurement it rests on.
+      (2026-11-22: question 4 built here; rule 1's declaration and rule 2's refusal filed
+      as WP-2300; the typical temperature preset, the one documented route and the
+      Switching page as WP-2301. Questions 6 and 8 are work of their own, per the
+      milestone record.)
 - [x] Skill: the hold line in `references/series.md`'s `constrain` bullet (2026-11-22).
       The route for the typical temperature series moves to the WP filed for it.
 
