@@ -217,6 +217,21 @@ the declared ratio is wrong by 5σ.
 
 ## Handover log
 
+- **2026-11-22** — #1653 item 3 closed here, as the maintainer asked there:
+  `gui/session._as_structure` refuses a list member carrying
+  structure-level `restraints` (`where` `structure.<i>.restraints`), naming
+  the member and its phases, rather than dropping the rows. Carrying them,
+  re-keyed to the joined phase indices, waits for the GUI form that first
+  produces them. An empty or absent list joins as before; a single
+  structure keeps its rows.
+  - *Measured* ([dev], darwin arm64, on 2cf3f9b34's tree, the workstation
+    unreachable): the new test fails on the PR head (200, the silent drop)
+    and passes with the change; fast suite `-n 4 --dist loadgroup -m "not
+    slow"` 15162 passed, 447 skipped, 32 xfailed, 0 failed;
+    `tests.reader_output` exit 0; `tests.rulebook_limits`,
+    `tests.release_notes --check` and ruff clean.
+  - *Next:* review of #1642.
+
 - **2026-11-17 (later)** — gates run on the final tree, follow-ups filed,
   PR #1642 marked ready. Current main (13 commits) merged in cleanly first,
   so the counts below are the merged tree's.
