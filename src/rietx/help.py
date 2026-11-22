@@ -1330,9 +1330,9 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "isotropic limit with `Stage.strain_seed`, because at S = 0 the square root "
             "in the width has unbounded slope. Positivity of σ²(M) couples all fifteen "
             "coefficients as a cone, so it cannot be a bound on each coefficient. The "
-            "default Levenberg-Marquardt solver holds it as a linear inequality. Under "
-            "`solver=\"trf\"` and in a joint fit, `STEPHENS_STRAIN_NOT_POSITIVE` reports "
-            "it instead. Read that flag as 'these coefficients are not quotable, and the "
+            "default Levenberg-Marquardt solver holds it as a linear inequality, in a "
+            "joint fit too. Under `solver=\"trf\"`, `STEPHENS_STRAIN_NOT_POSITIVE` "
+            "reports it instead. Read that flag as 'these coefficients are not quotable, and the "
             "fit leaned on the clamp'. It is no evidence of anisotropy."
         ),
         unit=None, default=None,
@@ -4814,9 +4814,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "phase's m·|F|² they carry. The fit's χ², cells and phase fractions lean "
             "on those reflections too. A negative value is not evidence of large "
             "anisotropy. Under `solver=\"trf\"`, refit with the default "
-            "Levenberg-Marquardt driver, which holds the variance at or above zero; a "
-            "joint fit holds it under neither driver, so fit each pattern alone or drop "
-            "the block from the joint fit. That "
+            "Levenberg-Marquardt driver, which holds the variance at or above zero, in "
+            "a joint fit too. That "
             "makes the coefficients admissible, not measured, so compare a few starts. "
             "Do not quote the coefficients."
         ),
