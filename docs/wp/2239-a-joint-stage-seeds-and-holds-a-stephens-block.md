@@ -29,8 +29,8 @@ allowed subspace with σ²(M) > 0 for every reflection.
 only a phase whose whole block is still zero, so a deliberate start is never
 overwritten.
 
-**The two runners disagree.**
-- `refine._run_stage` (`refine.py:5238-5260`) calls `seed_floored` for
+**The two runners disagree.** Line numbers are as of `2ce794581`.
+- `refine._run_stage` (`refine.py:5272-5294`) calls `seed_floored` for
   `Stage.seed`, then `seed_stephens` for `Stage.strain_seed`. It adds the
   strain rows to `seeded`, which becomes `StageResult.seeded`. It also adds
   their phases to `seeded_phases`, so the support hold drops the previous
