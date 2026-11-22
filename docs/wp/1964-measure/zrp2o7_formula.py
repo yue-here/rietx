@@ -446,16 +446,25 @@ def arm_e(data: dict, c: dict[str, float], chain: dict, formula) -> None:
     crows = {p.path: p for p in fits["closed"].parameters}
     srows = {p.path: p for p in fits["Si seeded"].parameters}
     wrows = {p.path: p for p in fits["as written"].parameters}
+
+    def tchz_of(rr: dict, ip: int) -> dict[str, float]:
+        """A fit's six values for one phase; a held row leaves the result, so it is the seed's."""
+        seed = dict(zip(TCHZ_SLOTS, si_seed, strict=True)) if rr is srows and ip == 1 else tchz[ip]
+        return {k: rr[path].value if (path := f"phases.{ip}.peak_equations.{0 if k in 'uvwz' else 1}.{k}")
+                in rr else seed[k] for k in TCHZ_SLOTS}
+
     print("    the z-held fit: z stays at the input's value, so u and w carry u + z and w + z")
     print("    coefficient                       stored     fit ± esd              (fit-stored)/esd  "
-          "(closed-fit)/esd")
+          "(closed-fit)/esd  Si seeded ± esd")
     moves, seeded_moves = {}, {}
 
     def line(path: str, ref: float | None) -> None:
         r, rc, rs = rows.get(path), crows.get(path), srows.get(path)
+        seeded = (f"{rs.value:+10.5f} ± {rs.stderr:.5f}" if rs is not None and rs.stderr is not None
+                  else "no esd" if rs is not None else "held")
         if r is None or r.stderr is None:
-            value = "" if r is None else f" (value {r.value:+.5f})"
-            print(f"    {path:32} no esd in the z-held fit{value}")
+            value = "held" if r is None else f"no esd, value {r.value:+.5f}"
+            print(f"    {path:32} z-held fit: {value}; Si seeded {seeded}")
             return
         bound = " AT BOUND" if getattr(r, "at_bound", None) else ""
         moves[path] = (rc.value - r.value) / r.stderr if rc is not None else float("nan")
@@ -464,7 +473,7 @@ def arm_e(data: dict, c: dict[str, float], chain: dict, formula) -> None:
         z = f"{(r.value - ref) / r.stderr:+8.2f}" if ref is not None else "        "
         ref_s = f"{ref:+10.5f}" if ref is not None else " " * 10
         print(f"    {path:32} {ref_s} {r.value:+10.5f} ± {r.stderr:.5f}   {z}          "
-              f"{moves[path]:+6.2f}{bound}")
+              f"{moves[path]:+6.2f}{bound}   {seeded}")
 
     for path, v0 in stored.items():
         line(path, v0)
@@ -479,29 +488,22 @@ def arm_e(data: dict, c: dict[str, float], chain: dict, formula) -> None:
           f"{moves[worst_path]:+.2f} esd at {worst_path}; "
           f"{sum(abs(m) > 0.5 for m in moves.values())} of {len(moves)} rows move more than 0.5 esd")
     for ip in (0, 2):
-        pre = f"phases.{ip}.peak_equations.0."
+        held, written = tchz_of(rows, ip), tchz_of(wrows, ip)
         print(f"    {proto['phases'][ip]['name']:8} u + z, w + z: stored "
               f"{tchz[ip]['u'] + tchz[ip]['z']:+.5f}, {tchz[ip]['w'] + tchz[ip]['z']:+.5f}; "
-              f"as written {wrows[pre + 'u'].value + wrows[pre + 'z'].value:+.5f}, "
-              f"{wrows[pre + 'w'].value + wrows[pre + 'z'].value:+.5f}; "
-              f"z held {rows[pre + 'u'].value + rows[pre + 'z'].value:+.5f}, "
-              f"{rows[pre + 'w'].value + rows[pre + 'z'].value:+.5f}")
+              f"as written {written['u'] + written['z']:+.5f}, {written['w'] + written['z']:+.5f}; "
+              f"z held {held['u'] + held['z']:+.5f}, {held['w'] + held['z']:+.5f}")
     fitted = {k: rows[f"instrument.peak_equations.0.{k}"].value for k in ("square", "step_error")}
     print("    fitted curve " + ", ".join(
         f"{curve_at(fitted['square'], fitted['step_error'], c['data_middle'], t):+.5f}° at {t:g}°"
         for t in (lo, 30.0, c["data_middle"], hi)))
     for label, rr in (("z held", rows), ("Si seeded", srows)):
         for ip, ph in enumerate(proto["phases"]):
-            v = {k: rr[f"phases.{ip}.peak_equations.0.{k}"].value for k in "uvwz"}
-            v.update({k: rr[f"phases.{ip}.peak_equations.1.{k}"].value for k in "xy"})
+            v = tchz_of(rr, ip)
             g_lo, l_lo = widths(v, lo)
             g_hi, l_hi = widths(v, hi)
             print(f"    fitted TCHZ ({label}), {ph['name']:8} Γ_G² {g_lo:+.5f} deg² at {lo:g}°, "
                   f"{g_hi:+.5f} at {hi:g}°; Γ_L {l_lo:+.5f}° at {lo:g}°, {l_hi:+.5f}° at {hi:g}°")
-    si_rows = [srows[f"phases.1.peak_equations.0.{k}"] for k in "uvwz"]
-    print("    silicon seeded, Gaussian rows: " + ", ".join(
-        f"{k} {r.value:+.5f}" + (f" ± {r.stderr:.5f}" if r.stderr is not None else " (no esd)")
-        for k, r in zip("uvwz", si_rows, strict=True)))
     worst_seed = max(seeded_moves, key=lambda p: abs(seeded_moves[p]))
     print(f"    silicon seeded against the z-held fit: largest move of any other row "
           f"{seeded_moves[worst_seed]:+.2f} esd at {worst_seed}; "
