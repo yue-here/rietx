@@ -320,24 +320,40 @@
    * The session's first entry, as the prototype opens it: the lines that bind
    * the names every later call uses, and where the project stands. The script
    * writes its own preamble, so these lines are marked and it skips them.
+   * The output line reads as the prototype's: Rwp, the free count and the
+   * history nodes. The free count is `GET /api/params`' `n_free`, the rows a
+   * Refine would refine now; an unreadable table leaves it out.
    */
-  function sayPreamble() {
+  async function sayPreamble() {
     if (!project?.path) return;
+    const path = project.path;
+    let free: number | null = null;
+    try {
+      const n = (await api.params())?.n_free;
+      free = typeof n === "number" ? n : null;
+    } catch {
+      free = null;
+    }
+    // another project opened while the count was read: its own preamble follows
+    if (project?.path !== path) return;
+    // the lines are written together, after the await, so they share an entry
     const bind = (text: string) => write({ ...makeLine("call", text), preamble: true });
     bind("import rietx as rx");
-    bind(`p = rx.Project.open(${JSON.stringify(project.path)})`);
+    bind(`p = rx.Project.open(${JSON.stringify(path)})`);
     bind("ref = p.refinement");
     const rwp = result?.statistics?.rwp;
     const nodes = project.n_nodes ?? 0;
-    say("output", `${typeof rwp === "number" ? `Rwp ${(rwp * 100).toFixed(2)} %, ` : ""}`
-      + `${nodes} history node${nodes === 1 ? "" : "s"}`);
+    say("output", [typeof rwp === "number" ? `Rwp ${(rwp * 100).toFixed(2)} %` : null,
+                   free === null ? null : `${free} free`,
+                   `${nodes} history node${nodes === 1 ? "" : "s"}`]
+      .filter(Boolean).join(", "));
   }
 
   async function loadProject() {
     try {
       project = await api.project();
       await loadResult();
-      sayPreamble();
+      await sayPreamble();
       await offerRecovery();
     } catch (error) {
       project = null;
@@ -369,7 +385,7 @@
     openError = "";
     newOpen = false;
     await loadResult();
-    sayPreamble();
+    await sayPreamble();
     await offerRecovery();
   }
 
