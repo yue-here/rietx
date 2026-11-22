@@ -43,6 +43,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2005](2005-refine-py-codes-and-literals.md) | `refine.py`'s codes and its inline literals | 2026-11-21 | P3 | [generality](#generality-the-audits) |
 | [2006](2006-readers-crystallography-gui-and-the-dead-surface.md) | Readers, crystallography and GUI codes, and the dead surface | 2026-10-24 | P3 | [generality](#generality-the-audits) |
 | [2008](2008-the-skill-read-against-the-table.md) | The skill slimmed to the API, the feedback surface and sourced traps | 2026-11-19 | P3 | [generality](#generality-the-prose) |
+| [2009](2009-the-rulebooks-findings-out-generators-rewritten.md) | The rulebooks: findings out, and the rules that generate overfit rewritten | 2026-11-22 | P3 | [generality](#generality-the-prose) |
 | [2010](2010-every-feature-names-what-verifies-and-validates-it.md) | Every feature names what verifies it and what validates it | 2026-11-01 | P3 | [generality](#generality-the-audits) |
 | [2012](2012-the-axial-ratios-are-interchangeable.md) | The two axial-divergence ratios are interchangeable, and a fit reports one branch | 2026-11-03 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2017](2017-the-second-pass-every-tier-3-threshold-on-three-families.md) | The second pass: every surviving tier-3 threshold measured on three families | 2026-11-05 | P2 | [generality](#generality-the-audits) |
@@ -484,7 +485,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | WP | Title | Status | Priority | Depends on |
 |---|---|---|---|---|
 | [2008](2008-the-skill-read-against-the-table.md) | The skill slimmed to the API, the feedback surface and sourced traps | 🔄 2026-11-19 | P3 | [2001](2001-the-rule-the-table-and-the-guard.md), [2002](2002-the-single-fit-actions.md), [2003](2003-the-chain-actions.md), [2004](2004-the-fitreport-reasons-for-the-caller.md) ([2005](2005-refine-py-codes-and-literals.md), [2006](2006-readers-crystallography-gui-and-the-dead-surface.md), [2007](2007-indexing-codes-constants-and-gates.md) soft) |
-| [2009](2009-the-rulebooks-findings-out-generators-rewritten.md) | The rulebooks: findings out, and the rules that generate overfit rewritten | ⬜ | P3 | [2001](2001-the-rule-the-table-and-the-guard.md) ([2008](2008-the-skill-read-against-the-table.md) soft) |
+| [2009](2009-the-rulebooks-findings-out-generators-rewritten.md) | The rulebooks: findings out, and the rules that generate overfit rewritten | 🔄 2026-11-22 | P3 | [2001](2001-the-rule-the-table-and-the-guard.md) ([2008](2008-the-skill-read-against-the-table.md) soft) |
 
 ## <a id="parametric"></a>parametric — a parametric refinement written by hand ports to rietx
 
