@@ -1630,7 +1630,7 @@ class HistogramResult(Base):
     label: str = ""
     weight: float = 1.0
     statistics: Statistics
-    #: This histogram's abscissa — see :class:`_HasAbscissa`.  Exactly one of
+    #: This histogram's abscissa — the axis rules are :class:`PatternData`'s.  Exactly one of
     #: the two is set on a histogram that carries a curve at all.
     two_theta: list[float] | None = None
     tof: list[float] | None = None
@@ -2288,7 +2288,7 @@ class RefinementResult(Base):
 
     # Arrays for plotting/export (kept as lists for JSON round-trip; use
     # the exporters for column files).
-    # The abscissa the fit ran on — see :class:`_HasAbscissa`.  ``two_theta``
+    # The abscissa the fit ran on — the axis rules are :class:`PatternData`'s.  ``two_theta``
     # in degrees for a constant-wavelength fit, ``tof`` in microseconds for a
     # time-of-flight bank, never both, and neither on a result that carries no
     # curve.  ``result.axis`` is the discriminator and ``result.x()`` the

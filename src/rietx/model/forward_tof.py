@@ -436,8 +436,8 @@ class CompiledTOFModel:
     #: field exists because every consumer tests it for ``None``.
     pawley: None = None
     #: The ``"centroid"`` floating-origin rows (WP-1912), as on the
-    #: constant-wavelength model and written by the same stage runner
-    #: (``refine._attach_origin``).  They are a statement about site positions
+    #: constant-wavelength model and written by the same stage runner.
+    #: They are a statement about site positions
     #: alone, and their weights are read off :meth:`evaluate` and ``sigma``,
     #: so nothing in them knows which axis the grid is.
     origin: "CompiledOrigin | None" = None
