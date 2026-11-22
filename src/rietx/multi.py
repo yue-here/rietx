@@ -1874,13 +1874,18 @@ class MultiHistogramRefinement:
         ``result`` that is this object's last fit, whose values the tables
         still hold.  A ``result`` (a saved one, read back with
         ``RefinementResult.model_validate_json``) is written in first by
-        :meth:`set_values`: every row it refined that is not tied here.
-        Construct the object from the inputs that fit was built from; a row
-        the result did not refine keeps the constructor's value.
+        :meth:`set_values`: every row it refined that is neither tied nor held
+        here (a value you set and held stays yours).  Construct the object from
+        the inputs that fit was built from: a refined row with no place here
+        raises, naming it.  A row the result did not refine keeps the
+        constructor's value.
 
         A restart of a converged fit stops in that one stage and moves nothing
         by more than 0.01 esd.  Holds and ties declared since are honoured,
-        so this is the way to rerun after editing one.  ``mode`` is the
+        so this is the way to rerun after editing one.  A held row tied onto
+        a refined ``vars.<name>`` still moves with the variable, which the
+        restart frees literally (``hold``'s rule: naming a variable frees it).
+        ``mode`` is the
         result's; ``plan`` is refused, being what this replaces.  Every other
         keyword is :meth:`fit`'s.
         """
@@ -3336,19 +3341,36 @@ def _restart_values(mtable, result: RefinementResult) -> dict[str, float]:
     """The rows of ``result`` a restart writes back (WP-2103).
 
     Every row it refined that names a free-able row here: not tied, not
-    locked, and spelled as this fit spells it.  A parametric target is a
-    tied row, so its coefficients carry it.
+    locked, and not held by the caller (a value the caller set and held is
+    the caller's, and wins over the saved one).  A parametric target is a
+    tied row, so its coefficients carry it.  A refined row this object has
+    no place for means it was built differently from the fit that made
+    ``result`` (another sharing map, another histogram count): refused,
+    naming the first few, since writing the rest would drop those rows
+    silently.
     """
     out: dict[str, float] = {}
+    unplaced: list[str] = []
     for row in result.parameters:
         try:
             where = mtable.places(row.path)
         except ValueError:
+            if row.vary:
+                unplaced.append(row.path)
             continue
         if any(mtable._entry(h, p).tie is not None or mtable._entry(h, p).locked
                for h, p in where):
             continue
+        if mtable.held_by(row.path) == "caller":
+            continue
         out[row.path] = float(row.value)
+    if unplaced:
+        shown = ", ".join(repr(n) for n in unplaced[:3])
+        more = f" and {len(unplaced) - 3} more" if len(unplaced) > 3 else ""
+        raise ValueError(
+            f"result= refined {shown}{more}, which this joint fit has no row "
+            "for; build the object from the inputs (histograms and sharing "
+            "map) the result was fitted with")
     return out
 
 def _refuse_joint_mode(mtable, mode: str) -> None:
@@ -4287,8 +4309,8 @@ def _joint_fixed_literals(stages, mtable) -> list[Diagnostic]:
 
     A shared row is one column, so a shared path fixed in every table is one
     finding, keyed by its ``where``.  The message says which histograms' tables
-    hold it.  A joint fit has no tie verb; its one caller's constraint is a
-    parametric equation's target (WP-1325), spared as a single fit spares a user tie,
+    hold it.  A caller's constraint is a tie (WP-2103) or a parametric
+    equation's target (WP-1325), spared as a single fit spares a user tie,
     since a stage naming it frees its coefficients.
     """
     found: dict[str, tuple[Diagnostic, list[int]]] = {}

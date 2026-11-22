@@ -535,8 +535,6 @@ class MultiParameterTable:
         #: spelled as the caller wrote them: the register :meth:`untie` reads
         #: and the joint ``parameters()`` marks ``user=True`` from
         self.user_ties: dict[str, TieSpec] = {}
-        #: the caller's variables declared after construction (WP-2103)
-        self.user_variables: dict[str, Parameter] = {}
         # a private structure copy per histogram: shared parameters are written
         # identically into every copy at each commit; only the per-histogram
         # scale (and any per-histogram override) diverges.
@@ -1591,10 +1589,18 @@ class MultiParameterTable:
                             f"{source!r} is fixed or follows another parameter, so "
                             "it carries no freedom of its own; tie to what it "
                             "follows instead, or name a variable")
-                    # a size row is stored in each pattern's units (WP-1131), so
-                    # the tie is written in them: c·f_t/f_s on the source
+                    # a size row is stored in each pattern's units (WP-1131).
+                    # The tie's coefficients are written against the source's
+                    # physical value but a column holds value/f_s, so a scaled
+                    # source would decode short by f_s in that pattern: refuse
+                    # it, as ParameterTable.apply_value_scale does.
+                    if self._scale(h, s) != 1.0:
+                        raise ValueError(
+                            f"{source!r} carries a value scale in pattern {h} "
+                            "(a size across wavelengths, WP-1131); a tie's "
+                            "sources must be unscaled")
                     by_h.setdefault(h, (t, []))[1].append(
-                        (s, c * self._scale(h, t) / self._scale(h, s)))
+                        (s, c * self._scale(h, t)))
             for h, (t, pairs) in by_h.items():
                 e = self._entry(h, t)
                 k = const * self._scale(h, t)
@@ -1818,7 +1824,6 @@ class MultiParameterTable:
                                 lo=param.min, hi=param.max, unit=param.unit)
         if not param.vary:
             self._fixed_variables.add(path)
-        self.user_variables[name] = param
         self._rebuild_columns()
         return path
 

@@ -146,7 +146,7 @@ rerun from stored values, `load_save_locals`), and the WO₃ protocol of
 
   *Done.* `MultiHistogramRefinement.hold`/`unhold`/`tie`/`tie_equal`/`untie`/`add_variable`/
   `set_values`/`refit`, each a thin call onto `MultiParameterTable`, which holds the
-  registers (`user_holds`, `user_ties`, `user_variables`), the authority every stage reads.
+  registers (`user_holds`, `user_ties`), the authority every stage reads.
   Rows are named as `parameters()` prints them. A bare tie target is tied in every pattern,
   each to its own source; a source in another pattern, a bare target onto one pattern's row,
   and a shared target onto a per-pattern source are refused naming `sharing=`. A stage glob

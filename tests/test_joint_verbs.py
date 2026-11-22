@@ -434,3 +434,45 @@ def test_a_held_coefficient_is_not_named_as_one_no_stage_freed(pair):
         "Parametric equation 'b' sets phases.0.atoms.0.biso, and no stage freed "
         "vars.b_1, and the caller holds the other. It kept the starting value (0), "
         "so the equation is the one declared and the data did not measure it.")
+
+
+# --- third review (Yue, 2026-11-21) -------------------------------------------
+
+def test_a_tie_on_a_scaled_size_source_is_refused_and_an_unscaled_one_decodes():
+    """The tie's coefficient is written against the source's value but a column
+    holds value/f_s, so a size source scaled in pattern 1 decoded short by f_s
+    there.  Refused, as ``apply_value_scale`` refuses it; and the allowed
+    direction (scaled target, unscaled source) is read through ``decode``."""
+    ref = _ref()
+    mt = ref.mtable
+    assert mt.value_scales[1].get("phases.0.lor_size", 1.0) != 1.0
+    with pytest.raises(ValueError, match="sources must be unscaled"):
+        ref.tie("phases.0.lor_strain", "phases.0.lor_size")
+    assert not mt._entry(1, "phases.0.lor_strain").locked
+    ref.add_variable("L", 0.05, min=0.0)
+    ref.tie("phases.0.lor_size", "vars.L", offset=0.01)
+    mt.set_vary(["vars.L"], True)
+    for h in (0, 1):
+        t = mt.tables[h]
+        assert t.decode(t.x0())["phases.0.lor_size"] == pytest.approx(
+            mt._entry(h, "phases.0.lor_size").value)
+
+
+def test_refit_keeps_a_value_the_caller_set_and_held(pair):
+    ref = _ref()
+    first = ref.fit(pair, plan=_cheap_joint_plan(), telemetry=False)
+    saved = RefinementResult.model_validate_json(first.model_dump_json())
+    fresh = _ref()
+    fresh.set_values({"hist.0.instrument.zero_shift": 0.0})
+    fresh.hold("hist.0.instrument.zero_shift")
+    fresh.refit(pair, result=saved, telemetry=False)
+    assert fresh.fitted_instruments[0].zero_shift.value == 0.0
+
+
+def test_refit_from_a_differently_built_result_is_refused_naming_rows(pair):
+    per_pattern = _ref(sharing=SharingMap(per_histogram=["phases.0.atoms.*.biso"]))
+    first = per_pattern.fit(pair, plan=_plan(), telemetry=False)
+    saved = RefinementResult.model_validate_json(first.model_dump_json())
+    with pytest.raises(ValueError, match="has no row for") as err:
+        _ref().refit(pair, result=saved, telemetry=False)
+    assert "hist.0.phases.0.atoms" in str(err.value)
