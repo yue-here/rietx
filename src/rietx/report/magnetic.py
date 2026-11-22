@@ -56,7 +56,7 @@ def analyse_moments(model, values, structure=None, *,
                     correlations: list | None = None,
                     flat_axes: dict[str, list[float]] | None = None,
                     turned: list[str] | None = None,
-                    covariance=None,
+                    covariance: tuple | None = None,
                     ) -> list[MomentEvidence]:
     """One row per magnetic site of the compiled model, or an empty list.
 
@@ -98,13 +98,16 @@ def analyse_moments(model, values, structure=None, *,
     ``None`` reads as "no such site", the state of every result stored
     before the fields.
 
-    ``covariance`` maps a list of parameter paths to their physical
-    covariance block from the fit's own answer stage
-    (``ParameterTable.physical_covariance``), or is ``None`` where that
-    covariance is not in hand.  It is what the esd of a co-sited group's
-    moment per position (:func:`cosited_moments`, issue #1692) is
-    propagated through; without it the group is still named on every row
-    and the combination carries no esd, so nothing is tested on it.
+    ``covariance`` is the live covariance of the fit that produced the
+    result, :attr:`~rietx.Refinement._answer_covariance`'s tuple, or
+    ``None``; it is never serialized, so a result read back without its fit
+    has none.  Two readings are made through it.  A pair whose moduli lie on
+    a direction the solve discarded has no esd on either (WP-2219), and only
+    that covariance can say whether their quadrature sum is determined
+    (WP-2230, :func:`_estimable_pair_esd`).  The esd of a co-sited group's
+    moment per position (:func:`cosited_moments`, issue #1692) is propagated
+    through it; without it the group is still named on every row and the
+    combination carries no esd, so nothing is tested on it.
     """
     if model is None:
         return []
@@ -130,7 +133,7 @@ def analyse_moments(model, values, structure=None, *,
     if correlations:
         out = _pair_degenerate_moments(
             out, correlations, {r.path: float(values[r.path]) for r in out},
-            skip={p for c in cosited for p in c.paths})
+            skip={p for c in cosited for p in c.paths}, covariance=covariance)
     return out
 
 
@@ -177,12 +180,17 @@ def cosited_moments(model, values, esd: dict[str, float],
     The group shares one orthonormal frame, so in its coefficients
     c_j = μ_j·u_j(angles) the modulus is |M| = ‖Σ occ_j·c_j‖, and its esd is
     the linearised gᵀ·Cov·g over every modulus, angle and occupancy of the
-    group, Cov read off the fit's own answer covariance through
-    ``covariance`` (a held angle or occupancy has a zero row there and adds
-    nothing).  The esd is ``None`` without ``covariance``, and where any
-    modulus of the group has no esd of its own (stated and held, or left out
-    of the covariance as unmeasured): a combination over a modulus nothing
-    measured is not tested, never certified.
+    group, Cov read off the fit's own answer covariance, ``covariance``
+    (:attr:`~rietx.Refinement._answer_covariance`'s tuple; a held angle or
+    occupancy has a zero row there and adds nothing).  The esd is ``None``
+    without ``covariance``, and where a modulus of the group has no esd of its
+    own (stated and held, or left out of the covariance as unmeasured): a
+    combination over a modulus nothing measured is not tested, never
+    certified.  **One exception, WP-2230's:** a modulus with no esd only
+    because a discarded direction touched it (the exactly degenerate pair at
+    equal form factors puts both moduli there) keeps the position's esd where
+    the data determine the combination, read through the pseudo-inverse's
+    covariance (:func:`_cosited_sigma`).
     """
     from ..crystallography.magnetic.moments import _coefficients
 
@@ -208,8 +216,7 @@ def cosited_moments(model, values, esd: dict[str, float],
             magnitude = float(np.linalg.norm(total))
             dof0 = [f"{site}.moment.dof0" for site, *_ in parts]
             sigma = None
-            if (covariance is not None and magnitude > 0.0
-                    and all(p in esd for p in dof0)):
+            if covariance is not None and magnitude > 0.0:
                 unit = total / magnitude
                 paths: list[str] = []
                 grad: list[float] = []
@@ -220,12 +227,47 @@ def cosited_moments(model, values, esd: dict[str, float],
                         grad.append(occ * float(unit @ jac[:, k]))
                     paths.append(f"{site}.occ")
                     grad.append(float(unit @ c))
-                cov = covariance(paths)
-                if cov is not None:
-                    g = np.asarray(grad)
-                    sigma = math.sqrt(max(float(g @ np.asarray(cov) @ g), 0.0))
+                sigma = _cosited_sigma(covariance, esd, dof0, paths,
+                                       np.asarray(grad))
             out.append(CositedMoment(tuple(dof0), magnitude, sigma))
     return out
+
+
+def _cosited_sigma(covariance, esd: dict[str, float], dof0: list[str],
+                   paths: list[str], g: np.ndarray) -> float | None:
+    """σ of one position's |Σ occ·m| (gradient ``g`` over ``paths``) through
+    the live covariance, or ``None`` where it is not measured.
+
+    Without a discarded direction this is gᵀ·Cov·g on the answer's own block.
+    A modulus with no esd that is *free* was left out by a discarded direction
+    (WP-2219): the combination is then read through the pseudo-inverse's
+    covariance only if ``unmeasured_functions`` says the data determine it
+    (WP-2230), and rows no discarded direction touched keep the covariance
+    they were always read through.  A modulus with no esd that is not free
+    (stated and held) is a combination over something nothing measured:
+    ``None``.
+    """
+    _result, table, theta, stderr_internal, correlation, *rest = covariance
+    discarded = rest[0] if rest else None
+    if stderr_internal is None or any(q not in table._paths for q in paths):
+        return None
+    free = set(getattr(table, "free_paths", ()) or ())
+    if any(p not in esd and not (discarded is not None and p in free)
+           for p in dof0):
+        return None
+    rows = [table._paths[q] for q in paths]
+    grad = g.reshape(1, -1)
+    extra = {}
+    if table.unmeasured_functions(theta, stderr_internal, rows, grad,
+                                  correlation=correlation)[0]:
+        if discarded is None or table.unmeasured_functions(
+                theta, stderr_internal, rows, grad, correlation=correlation,
+                discarded=discarded)[0]:
+            return None
+        extra = {"discarded": discarded}
+    cov = table.physical_covariance(theta, stderr_internal, correlation, paths,
+                                    **extra)
+    return math.sqrt(max(float(g @ np.asarray(cov) @ g), 0.0))
 
 
 def _coefficient_jacobian(d: np.ndarray) -> np.ndarray:
@@ -282,9 +324,41 @@ def _fold_cosited(rows: list[MomentEvidence],
     return updated
 
 
+def _estimable_pair_esd(covariance, path_a: str, path_b: str,
+                        d_a: float, d_b: float) -> float | None:
+    """σ of √(d_a² + d_b²) through the live covariance, when the data
+    determine it, else ``None`` (WP-2230).
+
+    Used where a modulus has no esd because a discarded direction touched
+    it.  The gradient g = (d_a, d_b)/m is asked
+    :meth:`~rietx.params.vector.ParameterTable.unmeasured_functions`: on the
+    powder-degenerate pair the discarded direction is the tangent
+    (d_b, −d_a), g is orthogonal to it, and gᵀ·Cov·g through the
+    pseudo-inverse is the esd a fit on the sum alone would give (Searle
+    1971, p. 169).  ``None`` when the tuple carries no discarded subspace or
+    no correlation, or when the sum is not estimable.
+    """
+    _result, table, theta, stderr_internal, correlation, discarded = covariance
+    if stderr_internal is None or correlation is None or discarded is None:
+        return None
+    m = math.hypot(d_a, d_b)
+    paths = [path_a, path_b]
+    if m <= 0.0 or any(p not in table._paths for p in paths):
+        return None
+    g = np.array([[d_a / m, d_b / m]])
+    rows = [table._paths[p] for p in paths]
+    if table.unmeasured_functions(theta, stderr_internal, rows, g,
+                                  correlation=correlation, discarded=discarded)[0]:
+        return None
+    cov = table.physical_covariance(theta, stderr_internal, correlation, paths,
+                                    discarded=discarded)
+    return math.sqrt(max(float(g[0] @ cov @ g[0]), 0.0))
+
+
 def _pair_degenerate_moments(rows: list[MomentEvidence], correlations: list,
                              signed: dict[str, float], *,
-                             skip: set[str] = frozenset()
+                             skip: set[str] = frozenset(),
+                             covariance: tuple | None = None
                              ) -> list[MomentEvidence]:
     """Q5: fold a powder-degenerate pair into one measured number.
 
@@ -319,6 +393,10 @@ def _pair_degenerate_moments(rows: list[MomentEvidence], correlations: list,
     correlate because they share a position, and the number measured there
     is the linear sum, so a quadrature-sum pair is never formed with one of
     them (issue #1692).
+
+    A row with no esd (its modulus on a discarded direction, WP-2219) folds
+    only through ``covariance`` (:func:`_estimable_pair_esd`), and only when
+    the sum is estimable; the two rows keep their absent esds.
     """
     by_path = {r.path: i for i, r in enumerate(rows)
                if r.path and r.path not in skip}
@@ -334,19 +412,23 @@ def _pair_degenerate_moments(rows: list[MomentEvidence], correlations: list,
             continue
         ia, ib = by_path[c.path_a], by_path[c.path_b]
         a, b = updated[ia], updated[ib]
-        if a.magnitude_esd is None or b.magnitude_esd is None:
-            continue
         d_a, d_b = signed[a.path], signed[b.path]
         m = math.sqrt(d_a ** 2 + d_b ** 2)
         if m <= 0.0:
             continue
-        # rho belongs to (path_a, path_b); the rows are in that order here
-        cov_ab = c.rho * a.magnitude_esd * b.magnitude_esd
-        g_a, g_b = d_a / m, d_b / m
-        var_m = (g_a ** 2 * a.magnitude_esd ** 2
-                 + g_b ** 2 * b.magnitude_esd ** 2
-                 + 2.0 * g_a * g_b * cov_ab)
-        esd_m = math.sqrt(max(var_m, 0.0))
+        if a.magnitude_esd is None or b.magnitude_esd is None:
+            esd_m = (None if covariance is None else
+                     _estimable_pair_esd(covariance, a.path, b.path, d_a, d_b))
+            if esd_m is None:
+                continue
+        else:
+            # rho belongs to (path_a, path_b); the rows are in that order here
+            cov_ab = c.rho * a.magnitude_esd * b.magnitude_esd
+            g_a, g_b = d_a / m, d_b / m
+            var_m = (g_a ** 2 * a.magnitude_esd ** 2
+                     + g_b ** 2 * b.magnitude_esd ** 2
+                     + 2.0 * g_a * g_b * cov_ab)
+            esd_m = math.sqrt(max(var_m, 0.0))
         note = (f"not separately determined: this modulus and {b.atom}'s "
                 f"({b.path}) are correlated at rho={c.rho:.3f} — the powder "
                 f"measures their quadrature sum, sqrt(m_a^2 + m_b^2) = "

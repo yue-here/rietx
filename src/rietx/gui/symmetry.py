@@ -471,14 +471,21 @@ def _strain_causes(causes: dict, base: str, sg, phase) -> None:
     from ..crystallography.stephens import S_NAMES, strain_basis
 
     basis = strain_basis(rotation_matrices(sg))
-    laue = sg.laue_str()
+    # An operation list has no laue_str of its own; its closest type has the
+    # same point group, and where no tabulated setting has these axes the
+    # operators are the subject instead (issue #1688).
+    try:
+        laue = (sg.closest_type if isinstance(sg, OperatorGroup) else sg).laue_str()
+        subject, allow, force = f"Laue class {laue}", "allows", "forces"
+    except ValueError:
+        subject, allow, force = f"the operators of {sg.xhm()}", "allow", "force"
     for v, name in enumerate(S_NAMES):
         path = f"{base}.microstrain.{name}"
         if basis.size and np.any(basis[:, v]):
-            causes[path] = (f"Laue class {laue} allows {len(basis)} Stephens "
+            causes[path] = (f"{subject} {allow} {len(basis)} Stephens "
                             f"pattern(s), so {name} follows {base}.microstrain.dof.*")
         else:
-            causes[path] = f"Laue class {laue} forces {name} to zero"
+            causes[path] = f"{subject} {force} {name} to zero"
 
 
 # ----------------------------------------------------------------------

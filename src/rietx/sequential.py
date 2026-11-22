@@ -181,7 +181,6 @@ from .params.vector import VAR_PREFIX, ParameterTable
 from .refine import (
     _VERSION,
     Refinement,
-    _answer_covariance_block,
     _declared_wavelengths,
     _extract_reflections,
     _judge_magnetic_groups,
@@ -943,6 +942,7 @@ def _moment_evidence(ref, result: RefinementResult) -> list[MomentEvidence]:
                                 for cp in model.phases):
         return []
     from .report.magnetic import analyse_moments
+    from .strategy.magnetic import _live_covariance
 
     table = ParameterTable(ref.structure, ref.instrument)
     # the model reads the moment DOFs in the last stage's frames (#598)
@@ -959,9 +959,9 @@ def _moment_evidence(ref, result: RefinementResult) -> list[MomentEvidence]:
         flat_axes=(result.stages[-1].moment_flat_axes if result.stages
                    else None),
         turned=(result.stages[-1].moment_turned if result.stages else None),
-        # a mixed-occupancy position is judged by its moment per position,
-        # whose esd needs the answer's covariance (issue #1692)
-        covariance=_answer_covariance_block(ref, result))
+        # the pattern's own live covariance, so a pair on a discarded
+        # direction folds as on a single pattern (WP-2230)
+        covariance=_live_covariance(ref, result))
 
 
 def _floor_unsupported_moments(structure: Structure,

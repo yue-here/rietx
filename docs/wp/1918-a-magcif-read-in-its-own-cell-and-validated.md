@@ -147,6 +147,12 @@ transcriptions were deliberately not copied. TOPAS is a black box.
   `crystallography/satellites.py:746` and `write_structure_block` at `io/cif/blocks.py:217`,
   both through `OperatorGroup.closest_type`. Checked against the tree at 7a4a6cd20. WP-2221
   owns the fix. I-d's acceptance run reaches the same raise until it lands.
+  **Update 2026-11-19, from WP-2221 (PR #1721):** both now return.
+  `OperatorGroup.crystal_system_str` reads the operators in any cell
+  (`symmetry.crystal_system_of`). `hm`, `ext`, `number`, `monoclinic_unique_axis` and
+  `cell_constraints` on such a list still raise, so an I-d phase states its cell through
+  `parent_cell`. Its satellite candidates omit the hexagonal (⅓, ⅓, ·) points, and its GUI
+  symmetry row stays an error row.
 
 - **2026-11-19, from the issue triage (PR #1697; issues #1689, #1691): the 4d ions past M⁺ have no
   form-factor row, and computed rows are offered.** Folded here beside I-e because both add
@@ -174,6 +180,17 @@ transcriptions were deliberately not copied. TOPAS is a black box.
     touch the maintainer's side and are named for the maintainer: computed coefficients would ship in the
     wheel, where the data fence asks each file to state its status (root CLAUDE.md
     § Licensing), and question 4 decides whether the input decks enter the repository.
+  - **Ruled by the maintainer 2026-11-21: the computed rows ship in the wheel, labelled.**
+    They go in their own data file beside Brown's, which states that the rows were computed
+    for rietx with RCN and are not peer-reviewed. `approximation_name` names that footing on
+    every result that uses a row. The rule that nothing without a peer-reviewed citation goes
+    public guards against exposing someone's data (its recorded case was an embargoed sample).
+    These numbers are the contributor's own and are already public in #1691, so the rule does
+    not bar them. The docs keep the free-ion caveat that applies to every row.
+  - Question 4, settled by Claude under that ruling: the input decks and the driver script go
+    in `tools/`, outside the wheel, so anyone can regenerate and check the rows. RCN itself
+    stays out; only its output numbers ship. The other four questions, and the bare-row note,
+    stay Mike's.
 
 ## Non-goals
 

@@ -205,8 +205,8 @@ SOLVE_D_MIN = 1.5
 #: subspace** (:func:`~rietx.crystallography.magnetic.moments.tilted_seed`,
 #: mostly along the allowed basis's first row and, since issue #390's tilt,
 #: with a small nonzero component on every other row too when the basis has
-#: more than one — see :data:`~rietx.crystallography.magnetic.moments.
-#: SEED_TILT`), which is the one thing a seed here must not get wrong.
+#: more than one — see
+#: :data:`~rietx.crystallography.magnetic.moments.SEED_TILT`), which is the one thing a seed here must not get wrong.
 SOLVE_SEED_MU_B = 2.0
 
 #: Alias of :data:`~rietx.crystallography.magnetic.moments.SEED_TILT`, kept
@@ -1635,7 +1635,6 @@ def _moment_rows(ref, result, structure
     # than the fit that produced it.  WP-1327's own writer either way — the
     # ``supported`` ratio, the held directions and the degenerate pairing are not
     # recomputed here.
-    from ..refine import _answer_covariance_block
 
     evidence = analyse_moments(
         ref._model, _values_of(ref), structure,
@@ -1643,7 +1642,7 @@ def _moment_rows(ref, result, structure
         esd={p.path: p.stderr for p in result.parameters
              if p.stderr is not None},
         correlations=_moment_correlations(ref, result),
-        covariance=_answer_covariance_block(ref, result))
+        covariance=_live_covariance(ref, result))
     rows = [
         MomentRow(label=e.atom, ion=e.ion, magnitude=float(e.magnitude),
                   esd=None if e.magnitude_esd is None
@@ -1706,19 +1705,29 @@ def _moment_correlations(ref, result):
     degeneracy.  ``None`` when the fit kept no covariance (no esds, or
     ``ref`` holds another result's), exactly as before: a fit whose
     covariance was not measured reports each modulus on its own.
+
+    A free modulus with no esd because a discarded direction touched it
+    (WP-2219) is paired too, its ρ read through the pseudo-inverse's own
+    esds (the kept tuple's discarded subspace, WP-2230): the pair's fold then
+    asks whether the quadrature sum is determined.
     """
     from ..schemas.results import CorrelationPair
 
-    kept = getattr(ref, "_answer_covariance", None)
-    if kept is None or kept[0] is not result or kept[3] is None:
+    kept = _live_covariance(ref, result)
+    if kept is None:
         return None
-    _result, table, theta, stderr_internal, correlation = kept
+    _result, table, theta, stderr_internal, correlation = kept[:5]
+    discarded = kept[5] if len(kept) > 5 else None
+    free = set(getattr(table, "free_paths", ()) or ())
     paths = [p.path for p in result.parameters
-             if p.vary and p.stderr is not None and _MOMENT_GLOB in p.path
-             and p.path.endswith(".dof0")]
+             if p.vary and _MOMENT_GLOB in p.path and p.path.endswith(".dof0")
+             and (p.stderr is not None
+                  or (discarded is not None and p.path in free))]
     if len(paths) < 2:
         return None
-    cov = table.physical_covariance(theta, stderr_internal, correlation, paths)
+    extra = {} if discarded is None else {"discarded": discarded}
+    cov = table.physical_covariance(theta, stderr_internal, correlation, paths,
+                                    **extra)
     var = np.diag(cov)
     pairs = []
     for i in range(len(paths)):
@@ -1728,6 +1737,15 @@ def _moment_correlations(ref, result):
                     path_a=paths[i], path_b=paths[j],
                     rho=float(cov[i, j] / math.sqrt(var[i] * var[j]))))
     return pairs or None
+
+
+def _live_covariance(ref, result):
+    """``ref._answer_covariance`` when it is ``result``'s and carries esds,
+    else ``None``."""
+    kept = getattr(ref, "_answer_covariance", None)
+    if kept is None or kept[0] is not result or kept[3] is None:
+        return None
+    return kept
 
 
 def _values_of(ref):
