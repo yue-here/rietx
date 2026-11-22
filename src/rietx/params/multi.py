@@ -1390,6 +1390,55 @@ class MultiParameterTable:
             self._rebuild_columns()
         return seeded
 
+    def seed_stephens(self, scoped_paths: list[str],
+                      microstrain: float) -> list[str]:
+        """Put each freed, all-zero Stephens block on the isotropic ray (per
+        histogram); see the single-histogram :meth:`ParameterTable.seed_stephens`.
+
+        S_HKL are λ-free, so the default sharing gives one block to every
+        histogram, and :meth:`seed_floored`'s rule holds: a shared block is
+        seeded in every histogram or in none.  It is declined when any
+        histogram's copy is not all zero.  The ray reads the cell, so under a
+        per-histogram cell (``SharingMap(per_histogram=["phases.*.cell.*"])``)
+        each histogram would compute its own; a shared block takes
+        **histogram 0's ray** in all of them.  That start is inside every
+        histogram's cone, which is all a seed needs, while seeding each
+        histogram from its own cell would give one column several values and
+        the last write would win ``x0``.  A block the sharing gives each
+        histogram (any DOF of it per-histogram makes it so) is seeded from
+        that histogram's own cell, as a single fit would seed it.
+        """
+        if microstrain <= 0.0:
+            return []
+        wants = []
+        for h in range(len(self.tables)):
+            want = [self._unscope(h, p) for p in scoped_paths
+                    if self._owner(p) in (None, h)]
+            wants.append([w for w in want if w is not None
+                          and ".microstrain.dof." in w])
+
+        def base(p: str) -> str:
+            return p.rpartition(".microstrain.dof.")[0]
+
+        # a block is one set of columns only when every DOF of it is shared
+        own = {base(p) for w in wants for p in w if not self.sharing.is_shared(p)}
+        shared = {base(p) for w in wants for p in w} - own
+        declined = {b for b in shared for h, table in enumerate(self.tables)
+                    if b not in table._stephens_seedable(
+                        [p for p in wants[h] if base(p) == b])}
+        seeded: list[str] = []
+        for h, table in enumerate(self.tables):
+            joint = [p for p in wants[h] if base(p) in shared - declined]
+            mine = [p for p in wants[h] if base(p) in own]
+            done = (table.seed_stephens(joint, microstrain, ray_from=self.tables[0])
+                    + table.seed_stephens(mine, microstrain))
+            for p in done:
+                if self._canonical(h, p) not in seeded:
+                    seeded.append(self._canonical(h, p))
+        if seeded:
+            self._rebuild_columns()
+        return seeded
+
     # -- combined column layout ----------------------------------------
     def _rebuild_columns(self) -> None:
         """Recompute the shared/per-histogram combined column layout.

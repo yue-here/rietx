@@ -108,10 +108,14 @@ records such a fit moves, and the WP says which.
 
 ## Tasks
 
-- [ ] `MultiParameterTable.seed_stephens(scoped_paths, microstrain)`, the
+- [x] `MultiParameterTable.seed_stephens(scoped_paths, microstrain)`, the
       fan-out counterpart of `seed_floored`, with the per-histogram-cell
-      rule decided and written in its docstring.
-- [ ] Call it in the joint stage loop after `seed_floored`. Add each DOF at
+      rule decided and written in its docstring. Settled by Claude: a shared
+      block takes histogram 0's ray in every histogram, since σ²(M) is the
+      literal monomial sum and any cell's ray makes it (hᵀG*h)² > 0, inside
+      every histogram's cone; a block with any per-histogram DOF takes each
+      histogram's own ray. `ParameterTable.seed_stephens` gained `ray_from=`.
+- [x] Call it in the joint stage loop after `seed_floored`. Add each DOF at
       its seeded value to `seeded`, so `StageResult.seeded` and the support
       hold's `seeded_phases` read it. Rewrite the `StageResult.seeded`
       docstring's joint-fit sentence.
