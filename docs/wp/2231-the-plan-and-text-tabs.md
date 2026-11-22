@@ -175,6 +175,33 @@ the prototype's (WP-2214 § How the maintainer reviews).
 
 Filled in as the maintainer answers § Questions.
 
+**The maintainer's look at R4, 2026-11-21** (relayed by the shift lead; eight items, built in
+the third PR in the order 7, 5, 6, 1, 2, 3, 8, 4):
+
+1. **The √ and Δ/σ scale markers sit in the tick-label column, not in a gutter of their own**
+   (option A). Each marker sits above its axis's top tick: √ over the intensity axis's top
+   tick, Δ/σ over the difference strip's top tick. It must not collide with a tick label, must
+   align to the tick column, and must survive a log or linear switch and a narrow panel. The
+   difference marker reads Δ/σ always; the weighted flag changes only the axis title's words
+   (WP-1029).
+2. **The Difference legend entry is centred vertically on the difference strip**, as Observed
+   and Last fit sit beside the main plot.
+3. **The horizontal gridlines come back as the prototype draws them.**
+4. **The Pattern graph gains a toggle between the last refined curve and the preview.** The
+   maintainer: "can we have a toggle between last refined and preview?" Its placement and
+   words follow the prototype where it has them; where no design gives them, the options go
+   to the maintainer in screenshots.
+5. **"Never freed" on the Plan tab is drawn as read-only chips** in the stage rows' chip
+   style, not as a sentence.
+6. **The Text tab has the `?` help box the other panels have.** This reverses § Settled 11.
+7. **The Text tab's stale notice is reworded and Re-read becomes a Button.** The words were
+   unclear and Re-read sat too close to them. Under `gui/STYLE.md` a Link goes somewhere and
+   Re-read is an action, so it is a Button (outlined, `line-strong`, hover ground).
+8. **A Text edit previews on the plot, as a slider move does.** This reverses § Settled 12.
+
+Items 6 and 8 are reversals of calls a runner settled; both are recorded in the maintainer's
+memory as reversals in one area (leaving out an affordance a sibling panel has).
+
 ## Questions
 
 Filled in by the session that builds each PR. Question 1 is carried from WP-2227, unanswered.
