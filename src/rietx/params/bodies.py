@@ -198,8 +198,9 @@ class RigidBodyBlock(DerivedBlock):
         #: line with every atom within ``site_reach`` Å of it (:func:`site_reach`);
         #: ``None`` when no reach is given: the atoms were not typed on a site,
         #: so no snap bounds the tilt and the axis test does not apply (a body
-        #: typed exactly still tilts by rounding, ~1e-17 rad, which a bound of 0
-        #: would refuse; #1551's review)
+        #: typed exactly still tilts by rounding, 5.5e-17 rad on Linux and up
+        #: to 5.9e-16 rad on macOS arm64, which a bound of 0 would refuse;
+        #: #1551's review)
         self.axis_tol = (None if site_reach is None
                          else self._axis_tilt_bound(float(site_reach)))
         self._set_anchor(np.asarray(q0, dtype=np.float64))

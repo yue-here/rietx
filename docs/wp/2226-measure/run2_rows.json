@@ -1,0 +1,301 @@
+[
+ {
+  "pattern": "fap",
+  "case": "base",
+  "A_branch": "frozen",
+  "ms": {
+   "status quo": [
+    28.69,
+    43.48,
+    62.31
+   ],
+   "A": [
+    8.23,
+    9.69,
+    10.96
+   ]
+  },
+  "A_exact_err_sigma": 0.0,
+  "A_exact_rewindow_eval_ms": [
+   7.63,
+   9.94
+  ]
+ },
+ {
+  "pattern": "fap",
+  "case": "scale x0.5",
+  "A_branch": "frozen",
+  "ms": {
+   "status quo": [
+    40.19,
+    54.3,
+    67.39
+   ],
+   "A": [
+    7.2,
+    10.36,
+    13.27
+   ]
+  },
+  "A_exact_err_sigma": 0.0,
+  "A_exact_rewindow_eval_ms": [
+   6.44,
+   8.1
+  ]
+ },
+ {
+  "pattern": "fap",
+  "case": "scale x2",
+  "A_branch": "frozen",
+  "ms": {
+   "status quo": [
+    32.57,
+    49.65,
+    63.17
+   ],
+   "A": [
+    8.26,
+    10.76,
+    14.35
+   ]
+  },
+  "A_exact_err_sigma": 0.0,
+  "A_exact_rewindow_eval_ms": [
+   8.35,
+   10.08
+  ]
+ },
+ {
+  "pattern": "fap",
+  "case": "zero +1 FWHM",
+  "A_branch": "frozen",
+  "ms": {
+   "status quo": [
+    36.47,
+    57.71,
+    80.45
+   ],
+   "A": [
+    7.59,
+    8.69,
+    12.17
+   ]
+  },
+  "A_exact_err_sigma": 0.017499285313566853,
+  "A_exact_rewindow_eval_ms": [
+   7.51,
+   9.59
+  ]
+ },
+ {
+  "pattern": "fap",
+  "case": "w x4",
+  "A_branch": "frozen",
+  "ms": {
+   "status quo": [
+    37.27,
+    47.94,
+    59.16
+   ],
+   "A": [
+    8.71,
+    10.41,
+    14.07
+   ]
+  },
+  "A_exact_err_sigma": 0.0,
+  "A_exact_rewindow_eval_ms": [
+   6.87,
+   8.87
+  ]
+ },
+ {
+  "pattern": "fap",
+  "case": "zero +1.0 deg",
+  "A_branch": "recompiled",
+  "ms": {
+   "status quo": [
+    66.17,
+    85.77,
+    108.58
+   ],
+   "A": [
+    35.56,
+    41.46,
+    45.59
+   ]
+  },
+  "A_exact_err_sigma": null,
+  "A_exact_rewindow_eval_ms": null
+ },
+ {
+  "pattern": "nac",
+  "case": "base",
+  "A_branch": "frozen",
+  "ms": {
+   "status quo": [
+    4.89,
+    6.18,
+    7.64
+   ],
+   "A": [
+    4.29,
+    5.14,
+    11.28
+   ]
+  },
+  "A_exact_err_sigma": 0.0,
+  "A_exact_rewindow_eval_ms": [
+   4.0,
+   4.82
+  ]
+ },
+ {
+  "pattern": "nac",
+  "case": "scale x0.5",
+  "A_branch": "frozen",
+  "ms": {
+   "status quo": [
+    5.76,
+    7.06,
+    12.06
+   ],
+   "A": [
+    4.68,
+    5.9,
+    11.64
+   ]
+  },
+  "A_exact_err_sigma": 0.0,
+  "A_exact_rewindow_eval_ms": [
+   3.59,
+   4.47
+  ]
+ },
+ {
+  "pattern": "nac",
+  "case": "scale x2",
+  "A_branch": "frozen",
+  "ms": {
+   "status quo": [
+    5.63,
+    6.64,
+    8.66
+   ],
+   "A": [
+    4.28,
+    5.06,
+    8.15
+   ]
+  },
+  "A_exact_err_sigma": 0.0,
+  "A_exact_rewindow_eval_ms": [
+   3.7,
+   4.32
+  ]
+ },
+ {
+  "pattern": "nac",
+  "case": "zero +1 FWHM",
+  "A_branch": "frozen",
+  "ms": {
+   "status quo": [
+    5.45,
+    7.26,
+    9.81
+   ],
+   "A": [
+    3.96,
+    4.94,
+    7.42
+   ]
+  },
+  "A_exact_err_sigma": 0.0,
+  "A_exact_rewindow_eval_ms": [
+   3.46,
+   4.31
+  ]
+ },
+ {
+  "pattern": "nac",
+  "case": "cell a x1.0005",
+  "A_branch": "frozen",
+  "ms": {
+   "status quo": [
+    5.54,
+    6.9,
+    9.0
+   ],
+   "A": [
+    3.81,
+    4.48,
+    5.17
+   ]
+  },
+  "A_exact_err_sigma": 1.6932645134241159e-13,
+  "A_exact_rewindow_eval_ms": [
+   3.45,
+   4.27
+  ]
+ },
+ {
+  "pattern": "nac",
+  "case": "lor_size 0.02",
+  "A_branch": "rewindowed",
+  "ms": {
+   "status quo": [
+    18.41,
+    20.87,
+    24.38
+   ],
+   "A": [
+    7.31,
+    8.41,
+    10.46
+   ]
+  },
+  "A_exact_err_sigma": 0.0,
+  "A_exact_rewindow_eval_ms": [
+   4.25,
+   6.16
+  ]
+ },
+ {
+  "pattern": "nac",
+  "case": "axial_sl 0.025",
+  "A_branch": "rewindowed",
+  "ms": {
+   "status quo": [
+    485.63,
+    521.04,
+    575.04
+   ],
+   "A": [
+    20.03,
+    25.2,
+    32.53
+   ]
+  },
+  "A_exact_err_sigma": 0.0,
+  "A_exact_rewindow_eval_ms": [
+   17.75,
+   24.44
+  ]
+ },
+ {
+  "nac_axial_split": {
+   "0.02": {
+    "sigma": 264.1359482422458,
+    "frac_of_max": 0.07927310263371419
+   },
+   "0.0199": {
+    "sigma": 0.2464532885394462,
+    "frac_of_max": 7.275125625384426e-05
+   },
+   "0.001": {
+    "sigma": 0.0,
+    "frac_of_max": 0.0
+   }
+  }
+ }
+]
