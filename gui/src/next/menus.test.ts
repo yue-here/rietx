@@ -110,7 +110,7 @@ describe("the Pattern graph's axes", () => {
   it("hints each axis's unit, the intensity's on square root at first", async () => {
     await draw();
     const hints = [...document.querySelectorAll(".hint")].map((h) => h.textContent!.trim());
-    expect(hints).toEqual(["√", "σ", "° 2θ"]);
+    expect(hints).toEqual(["√", "Δ/σ", "° 2θ"]);
   });
 
   it("opens the intensity's three scales on a click and keeps the choice with the project", async () => {
@@ -133,7 +133,7 @@ describe("the Pattern graph's axes", () => {
     named("Difference in counts (Δ)")!.click();
     flushSync();
     expect(onui).toHaveBeenCalledWith({ difference: "delta" });
-    expect(document.querySelectorAll(".hint")[1].textContent!.trim()).toBe("counts");
+    expect(document.querySelectorAll(".hint")[1].textContent!.trim()).toBe("Δ");
   });
 
   it("opens on the project's remembered choices", async () => {

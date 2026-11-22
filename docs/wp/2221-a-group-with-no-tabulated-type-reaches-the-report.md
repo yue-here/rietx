@@ -1,6 +1,6 @@
 # WP-2221 — A phase whose group has no tabulated type still gets its report and its CIF
 
-Milestone: unscheduled · Status: 🔄 2026-11-21 — the raise fixed, PR #1721 merged 2026-11-20; Mike ruled on #1688 (R-group k-points, parent-frame wording) and the two tasks from that ruling remain
+Milestone: unscheduled · Status: 🔄 2026-11-21 — the raise fixed, PR #1721 merged 2026-11-20; Mike ruled on #1688 (R-group k-points, parent-frame wording) and the maintainer on the panel line (2026-11-21); three tasks remain
 Track: What fires, and what stays silent
 Depends on: — (1918 soft: its I-d reads phases of this kind)
 Priority: P2 2026-11-21 — the raise is fixed (PR #1721); what remains is Mike's ruling: every R group's satellite candidates include two k-points that are not points of symmetry, and a child's moment note prints a direction that sits 2.19° off its axis when read as a lattice direction; a path few fits run
@@ -119,6 +119,24 @@ follow-up"). The ruling's measurements are on the issue.
       recorded flat axis to < 1e-6°; `MomentEvidence.phase` names the parent setting, the
       transform and BNS 2.7; #599's named control keeps its own-cell wording and numbers. This
       changes what a fit prints, so the texts go to the maintainer before merge.
+
+**Ruled by the maintainer, 2026-11-21** (a GUI panel question, which #1075 leaves with the maintainer).
+
+- [ ] (c) The Model panel's symmetry line for an unnamed group is a short line of facts the
+      operators give. Today `gui/symmetry.phase_facts` returns an `error` row for these
+      phases, and the panel prints its whole text, about 450 characters with the start of the
+      operation list, in the one-line slot under the space-group field. Return the facts that
+      need no tabulated setting instead: the crystal system, the number of operations, the
+      centring and the centre of symmetry, all read from the list. The setting-bound fields
+      (`hm`, `ext`, `number`, the setting phrase, the cell ties) come back empty with the
+      reason in one field. `symmetryLine` then reads, on the NiO child, "unnamed group ·
+      trigonal · 24 operations · centrosymmetric · no tabulated setting". The full
+      explanation stays reachable from the line (on hover or in an expandable note). Laue
+      class and point group stay out: deriving them from the rotations would be a new rule,
+      and a later task can add it. Tests: the NiO and Pnma children give that line in
+      vitest, and `phase_facts` returns no `error` key for them; an unresolvable symbol still
+      returns its error row. Rebuild the committed dist. How the full text is reached is a
+      visual detail, so a screenshot goes to the maintainer before merge.
 
 ## Acceptance
 
