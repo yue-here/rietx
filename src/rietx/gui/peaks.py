@@ -467,7 +467,7 @@ class PeakEditor:
 
         ``lines`` is each component's own curve over the same window, model
         only (no envelope), lowest 2θ first, each with the row ``index`` it
-        draws (WP-2202).  The model is linear in the component areas, so the
+        draws (WP-2240).  The model is linear in the component areas, so the
         group's model evaluated with one area kept and the rest zeroed is that
         line's curve, its Kα2 partner included, and the lines sum to the
         group's model to rounding.  No route of its own: the panel draws them

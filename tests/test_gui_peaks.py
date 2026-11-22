@@ -131,7 +131,7 @@ def test_the_peak_verbs_round_trip_with_their_echoes(served, client):
     assert picked["groups"] and all(
         len(g["two_theta"]) == len(g["y_obs"]) == len(g["y_fit"]) == len(g["delta"])
         for g in picked["groups"])
-    # each line's own curve (WP-2202): one per component, naming its row, and
+    # each line's own curve (WP-2240): one per component, naming its row, and
     # together they are the group's model, since the model is linear in the
     # areas: the lines sum to y_fit minus the envelope
     rows = {p["index"]: p for p in picked["peaks"]}

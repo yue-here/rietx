@@ -143,7 +143,7 @@ package. `src/rietx/_audit.py` is untouched.
 - [x] 1. File this WP; the milestone's R6 row names it.
 - [x] 2. Per-line curves: `PeakEditor.curves` serves `lines` and `y_obs` on each group (from
   #1526); a pytest holds the lines' sum to the group's model.
-- [ ] 3. `lib/peaks.ts` helpers for the steps, filters, groups to look at, the candidate
+- [x] 3. `lib/peaks.ts` helpers for the steps, filters, groups to look at, the candidate
   columns and relations, with `lib/peaksteps.test.ts` (from #1526).
 - [ ] 4. The workflow built at `/next`: the step strip drawn as the prototype's, each step's
   foot, and the Pick step (settings, Pick peaks, the filtered table with its tickboxes and
