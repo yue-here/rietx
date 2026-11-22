@@ -1,6 +1,6 @@
 # WP-2152 — a peak equation reads the wavelength
 
-Milestone: parametric · Status: ⬜
+Milestone: parametric · Status: 🔄 2026-11-22 — claimed by @yue-here
 Depends on: —
 Priority: P3 2026-11-22 — a workaround covers it: a per-pattern coefficient through `SharingMap(per_histogram=[...])`, which the warning already names
 
