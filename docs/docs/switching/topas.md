@@ -192,6 +192,7 @@ Hold z at the input's value, or u, w and z come back with no esd (`COVARIANCE_DI
 Check too that the stored values give a positive Γ<sub>G</sub>² across the fitted range.
 A Gaussian term below the floor at every reflection has no gradient, so its coefficients never move (`PEAK_WIDTH_NOT_POSITIVE`).
 Raise the seeded w until Γ<sub>G</sub>² is above zero across the range.
+How TOPAS itself treats a negative Γ<sub>G</sub>² is not documented, so its refined values need not carry over.
 The silicon phase of Durham TOPAS tutorial 9.5 stores such a set: its w is +0.016 deg², and its z of −0.022 takes Γ<sub>G</sub>² below zero.
 
 The names differ as well.
