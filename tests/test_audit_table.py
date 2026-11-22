@@ -158,7 +158,8 @@ def test_the_indexing_records_are_walked():
 def test_an_audited_row_carries_its_evidence():
     """Self-certification is the failure the table exists against, so a tier
     names its source; tier 3, and a tier-2 action, also carry the two-ground
-    answer and the maintainer's dated approval."""
+    answer and a dated approval, the maintainer's except on a tier-3
+    constant or suggestion (``approved_by``)."""
     for row in _audit.ROWS:
         if row.tier == "unaudited":
             continue
@@ -170,6 +171,13 @@ def test_an_audited_row_carries_its_evidence():
         if row.tier == 3 or (row.tier == 2 and row.kind == "action"):
             assert row.grounds and row.approved, (
                 f"{row.name}: tier {row.tier} {row.kind} needs grounds and approved")
+        assert row.approved_by in ("maintainer", "checked"), row
+        if row.approved_by == "checked":
+            # ruled 2026-11-22 (WP-2237): the judge's check stands in for the
+            # maintainer on a tier-3 constant or suggestion, never elsewhere
+            assert row.tier == 3 and row.kind in ("constant", "suggestion"), (
+                f"{row.name}: a tier-{row.tier} {row.kind} row needs the maintainer's "
+                "approval, not the judge's")
 
 
 def test_every_unaudited_row_is_on_the_baseline():

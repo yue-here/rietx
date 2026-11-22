@@ -6,7 +6,9 @@ its own: (1) physics or arithmetic; (2) established practice, a citation that
 tested it or the same choice made *by default* in an established Rietveld
 program (the seven rietx-bench runs: GSAS-II, FullProf, TOPAS, RIETAN-FP,
 BGMN, MAUD, EasyDiffraction), whatever the other six do; (3) rietx's own, kept only on the record's two grounds with a
-dated approval (CONTRIBUTING.md § A heuristic needs its tier names who gives it).  ``invariant`` is the record's answer-invariant
+dated approval: the maintainer's on a code, action or default row, the
+``generality-review`` judge's agreement on a constant or suggestion row
+(``approved_by``, ruled 2026-11-22 in WP-2237; CONTRIBUTING.md § A heuristic needs its tier).  ``invariant`` is the record's answer-invariant
 class.  ``caller`` is no evidence grade: it marks a row where the package
 decided nothing for the caller, since DESIGN.md § Rules, 1 governs what the
 package decides alone.  Both must hold: the caller asked for it by name (a flag
@@ -95,6 +97,7 @@ from typing import Literal
 Kind = Literal["code", "action", "constant", "default", "suggestion"]
 Tier = Literal[1, 2, 3, "invariant", "caller", "unaudited"]
 Ambiguity = Literal[1, 2, 3]
+Approver = Literal["maintainer", "checked"]
 Response = Literal["error", "warning", "info"]
 
 KINDS: tuple[str, ...] = Kind.__args__
@@ -107,7 +110,9 @@ _STATES_AMBIGUITY = ("code", "action", "default")
 @dataclasses.dataclass(frozen=True)
 class Row:
     """One heuristic.  ``grounds`` and ``approved`` are required on a tier-3
-    row and on a tier-2 action row; ``ambiguity`` is DESIGN.md § Rules, 1's
+    row and on a tier-2 action row, and ``approved_by`` says whose approval
+    the date is: ``"checked"`` (the ``generality-review`` judge agreed) is
+    allowed on a tier-3 constant or suggestion row only; ``ambiguity`` is DESIGN.md § Rules, 1's
     kind, required on an audited code, action or default row (DESIGN.md
     § Rules, 4 asks a new default or action for it) and allowed on a
     suggestion row.  ``response``, ``responds`` and ``scope`` are a code
@@ -125,6 +130,7 @@ class Row:
     response: Response | None = None
     responds: str = ""
     scope: tuple[str, ...] = ()
+    approved_by: Approver = "maintainer"
 
 
 _PACKAGE = pathlib.Path(__file__).resolve().parent

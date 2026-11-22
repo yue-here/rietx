@@ -47,6 +47,13 @@ CLAUDE.md +99/−97 lines in a month under its 995 cap).
 - WP-2009 owns the rulebook cleanup (the maintainer, same day); this WP hands it inputs
   and edits none of the five CLAUDE.md files.
 
+**Ruled 2026-11-22.** Tier 3 eased (option B of the brief): a tier-3 code, action or
+default row keeps his dated approval; a tier-3 constant or suggestion row is approved by
+the `generality-review` judge's `holds`, recorded `approved_by="checked"`, and any other
+verdict goes to him. Grounds: 166 tier-3 rows, 111 of them constants, and none of his
+reversals was a constant's value. Built in `generality.md` § The rule and § Acceptance,
+`_audit.Row.approved_by` with its test, and the judge's brief.
+
 ## Plan
 
 Each part names its prose cost. "Step-only" means read only by the step that needs it.
@@ -183,6 +190,7 @@ Cost: four agents at about 114k tokens each, 457k against a 450k estimate.
 - [ ] The queue token (part 4), after measuring why the five went stale.
 - [ ] The printout cap (part 6).
 - [x] Log the two 2026-11-21 reversals in memory.
+- [x] Tier-3 approval eased for constants and suggestions (ruled 2026-11-22).
 
 ## Acceptance
 
