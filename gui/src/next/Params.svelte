@@ -35,7 +35,8 @@
    * Each acts at once, one history node through today's verb (interaction
    * rules 11 and 12), and waits while edits are pending, since a deleted atom
    * renumbers the paths a pending edit names. The filter row's ⋯ holds the
-   * bulk Free and Fix.
+   * bulk Free and Fix. The Instrument band's ⋯ holds Source and geometry…,
+   * which opens the Instrument dialog (WP-2218, rows 133-136).
    *
    * The layout rule (2026-11-07): no click moves the layout unless it asks
    * to. So the editor and its popover float (`position: fixed`), a pending
@@ -44,6 +45,7 @@
    */
   import { ApiError, api } from "../api";
   import Help from "../Help.svelte";
+  import { fnmatch } from "../lib/fnmatch";
   import { clone, newAtom } from "../lib/model";
   import { paramKey, resolve, type HelpCorpus } from "../lib/help";
   import { editText, expText, numParts, slotWidth, slotsFor, type NumParts,
@@ -55,6 +57,8 @@
   import { asGlob, editState, heldGlyph, matches, normalize, selection,
            validateEdit, varyEdit, varyOf, type ParamRow } from "../lib/table";
   import Ask, { type AskField } from "./Ask.svelte";
+  import Instrument from "./Instrument.svelte";
+  import type { Anode } from "./instrument";
   import Menu, { type MenuAt, type MenuEntry } from "./Menu.svelte";
   import SpaceGroup from "./SpaceGroup.svelte";
   import { shortTitle, unitText } from "./words";
@@ -63,17 +67,24 @@
     head = null,
     busy = false,
     corpus = null,
+    anodes = [],
     say = (_line: string) => {},
     onpending = (_touched: number, _invalid: string) => {},
+    onholds = (_holds: ReadonlyMap<string, boolean>) => {},
     onmoved = () => {},
   }: {
     head?: string | null;
     busy?: boolean;
     corpus?: HelpCorpus | null;
+    /** `GET /api/capabilities`'s anodes, for the Instrument dialog */
+    anodes?: readonly Anode[];
     say?: (line: string) => void;
     /** the pending edits, reported to the shell's action bar (WP-2123): how
      *  many, and the first invalid one's reason or "" */
     onpending?: (touched: number, invalid: string) => void;
+    /** the pending holds and releases, path or glob → held, reported so the
+     *  Background graph's term chips share them (WP-2218) */
+    onholds?: (holds: ReadonlyMap<string, boolean>) => void;
     /** a structural edit landed: the head moved under the shell */
     onmoved?: () => void;
   } = $props();
@@ -112,6 +123,8 @@
 
   interface Editor {
     keys: string[];
+    /** the text the editor opened on: committing it is no edit (WP-2223) */
+    opened: string;
     left: number;
     top: number;
     width: number;
@@ -212,7 +225,7 @@
     return pair ? { ...r, lo: pair[0] ?? -Infinity, hi: pair[1] ?? Infinity } : r;
   }) : rows);
   const limitedByPath = $derived(new Map(limitedRows.map((r) => [r.path, r])));
-  const valueState = $derived(editState(limitedRows, edits, 0));
+  const valueState = $derived(editState(limitedRows, edits, 0, "stored"));
   const limitInvalid = $derived([...limitEdits].filter(([, [lo, hi]]) =>
     lo !== null && hi !== null && lo > hi)
     .map(([path]) => ({ path, why: "lower limit above the upper one" })));
@@ -236,12 +249,21 @@
     onpending(touched, first ? `${first.path.split(".").pop()}: ${first.why}` : "");
   });
 
+  $effect(() => {
+    onholds(holdEdits);
+  });
+
   async function load() {
     loading = true;
     try {
       const [p, s] = await Promise.all([api.params(), api.structure()]);
       rows = normalize(p.parameters);
       nFree = p.n_free;
+      // a pending edit on a path the working state no longer has can never
+      // apply, and would get every Apply refused (and the Background band, a
+      // hold): the head moved under it, by a checkout, the text editor or a
+      // structural edit (WP-2218 review)
+      dropUnknown();
       structure = s.structure;
       sites = s.sites ?? [];
       symmetry = s.symmetry ?? [];
@@ -368,6 +390,42 @@
     refusal = "";
   }
 
+  /** Drop every pending edit whose key `gone` names: an edit on another
+   *  surface removed or redefined those paths (the Background graph's Type
+   *  and Terms, WP-2218 review; any instrument edit's `ended`, WP-2229), so
+   *  Apply would be refused on them, or land on the new model's path of the
+   *  same name. All six kinds go: values, flags, holds, limits, restraints,
+   *  and positions, which are keyed by atom and asked about by the
+   *  coordinate paths they set. Returns the keys dropped. */
+  export function dropPending(gone: (key: string) => boolean): string[] {
+    const dropped: string[] = [];
+    const keep = <V,>(m: Map<string, V>, ended = (key: string, _v: V) => gone(key)
+                     ): Map<string, V> => {
+      const hit = [...m].filter(([k, v]) => ended(k, v)).map(([k]) => k);
+      if (!hit.length) return m;
+      dropped.push(...hit);
+      return new Map([...m].filter(([k]) => !hit.includes(k)));
+    };
+    edits = keep(edits);
+    varyEdits = keep(varyEdits);
+    holdEdits = keep(holdEdits);
+    limitEdits = keep(limitEdits);
+    restraintEdits = keep(restraintEdits);
+    positionEdits = keep(positionEdits,
+                         (atom, fields) => Object.keys(fields).some((axis) => gone(`${atom}.${axis}`)));
+    if (dropped.length) say(`# pending edits dropped: ${[...new Set(dropped)].sort().join(", ")}`);
+    return dropped;
+  }
+
+  /** Drop the pending edits on paths the loaded rows no longer have: the
+   *  reload's question, asked also of a restored draft. Before the first
+   *  load the rows are empty and say nothing about any path. */
+  function dropUnknown() {
+    if (!rows.length) return;
+    const known = rows.map((r) => r.path);
+    dropPending((key) => !known.some((path) => fnmatch(path, key)));
+  }
+
   /** The pending edits as plain data, for the recovery copy (WP-2209), or
    *  `null` when nothing is pending.  Reading the six maps here is what lets
    *  the shell's writer follow every change, a retyped value included. */
@@ -384,7 +442,8 @@
     };
   }
 
-  /** Put recovered edits back as pending edits, in place of any on screen. */
+  /** Put recovered edits back as pending edits, in place of any on screen,
+   *  less those on a path the rows no longer have. */
   export function restoreDraft(d: ParamsDraft) {
     closeEditor(false);
     edits = new Map(Object.entries(d.edits ?? {}));
@@ -393,6 +452,20 @@
     limitEdits = new Map(Object.entries(d.limits ?? {})) as Map<string, Limits>;
     restraintEdits = new Map(Object.entries(d.restraints ?? {})) as Map<string, Restraint>;
     positionEdits = new Map(Object.entries(d.positions ?? {}));
+    // a draft kept across a head move can name a path the head no longer
+    // has, such as a hold on a cut background term; left pending, it gets
+    // the band and every Apply refused (review of #1683, finding 1)
+    dropUnknown();
+  }
+
+  /** A hold or release on one path from another panel: the Background graph's
+   *  "Hold at last fit" chips (WP-2218). One pending set, so the action bar
+   *  counts it once, Apply sends it once, and the recovery copy carries it. */
+  export function setHold(path: string, held: boolean, serverHeld: boolean) {
+    const next = new Map(holdEdits);
+    if (held === serverHeld) next.delete(path);
+    else next.set(path, held);
+    holdEdits = next;
   }
 
   export function focusFilter() {
@@ -404,9 +477,11 @@
 
   // ---------------------------------------------------------------- menus
 
-  /** The menu open: the filter row's, a phase band's, or an atom row's. */
+  /** The menu open: the filter row's, a phase band's, the Instrument band's,
+   *  or an atom row's. */
   type Open =
     | { kind: "filter"; at: MenuAt; anchor: HTMLElement }
+    | { kind: "instrument"; at: MenuAt; anchor: HTMLElement }
     | { kind: "phase"; phase: number; at: MenuAt; anchor: HTMLElement }
     | { kind: "atom"; phase: number; atom: number; at: MenuAt; anchor: HTMLElement | null };
   let menu = $state<Open | null>(null);
@@ -414,6 +489,7 @@
   let ask = $state<{ at: { x: number; y: number }; label: string; fields: AskField[];
                      submit: string; send: (v: Record<string, string>) => Promise<string> } | null>(null);
   let sgFor = $state<number | null>(null);
+  let instrumentOpen = $state(false);
   let cifInput: HTMLInputElement | undefined = $state();
 
   /** Why a structural edit waits, or "" when it can go. */
@@ -463,6 +539,9 @@
         { id: "fix", label: bulkLabel("Fix", bulk.toFix), disabled: busy || !bulk.toFix, title: why },
       ];
     }
+    if (m.kind === "instrument") {
+      return [{ id: "instrument", label: "Source and geometry…", ...gate }];
+    }
     if (m.kind === "phase") {
       return [
         { id: "rename", label: "Rename…", ...gate },
@@ -492,6 +571,10 @@
     if (m.kind === "filter") {
       if (id === "free") void bulkVary(true);
       else if (id === "fix") void bulkVary(false);
+      return;
+    }
+    if (m.kind === "instrument") {
+      if (id === "instrument") instrumentOpen = true;
       return;
     }
     const r = m.anchor?.getBoundingClientRect();
@@ -861,7 +944,7 @@
     if (pending !== undefined) return pending;
     const row = byPath.get(key);
     if (!row) return "";
-    return editText(row.value, row.esd, !COORD.test(key) && !/\.atoms\.\d+\.(occ|biso)$/.test(key));
+    return editText(row.value);
   }
 
   function openEditor(target: HTMLElement, keys: string[]) {
@@ -872,7 +955,7 @@
     const width = Math.max(rect.width + 10, (Math.max(text.length + 4, 12)) * 8);
     const left = Math.min(Math.max(8, rect.left), window.innerWidth - width - 8);
     editorText = text;
-    editor = { keys, left, top: rect.top, width, height: rect.height,
+    editor = { keys, opened: text, left, top: rect.top, width, height: rect.height,
                below: rect.bottom + 180 < window.innerHeight, error: "" };
     queueMicrotask(() => {
       editorInput?.focus();
@@ -880,20 +963,20 @@
     });
   }
 
-  /** Write the editor's text into every key it edits, as pending edits. A
-   *  text equal to what the cell already drew is no edit (WP-1009). */
+  /** Write the editor's text into every key it edits, as pending edits. The
+   *  text it opened on is no edit (WP-1009's rule, WP-2223), and a text that
+   *  reads as a key's stored value drops that key's edit. */
   function commit(): boolean {
     if (!editor) return true;
     const text = editorText.trim();
+    if (text === editor.opened) return true;                  // untouched
     if (editor.keys.length > 1 && text === "") return true;   // "Mixed", untouched
     let nextEdits = edits;
     let nextPositions = positionEdits;
     for (const key of editor.keys) {
       const row = byPath.get(key);
       if (!row) continue;
-      const drawn = editText(row.value, row.esd,
-        !COORD.test(key) && !/\.atoms\.\d+\.(occ|biso)$/.test(key));
-      const same = text === drawn || (text !== "" && Number(text) === Number(drawn));
+      const same = text !== "" && Number(text) === row.value;
       const m = COORD.exec(key);
       if (m) {
         const fields = { ...(nextPositions.get(m[1]) ?? {}) };
@@ -1273,6 +1356,11 @@
               title="Rename, change the space group, add an atom"
               onclick={(e) => toggleMenu({ kind: "phase", phase: phaseOf(section),
                 at: below(e.currentTarget, true), anchor: e.currentTarget })}>{@render dots()}</button>
+          {:else if section.kind === "instrument"}
+            <button class="ib" aria-label="Instrument actions" aria-haspopup="menu"
+              aria-expanded={menu?.kind === "instrument"} title="Source and geometry"
+              onclick={(e) => toggleMenu({ kind: "instrument", at: below(e.currentTarget, true),
+                anchor: e.currentTarget })}>{@render dots()}</button>
           {:else}
             <!-- the ⋯'s slot, kept so every band's count sits in one column -->
             <span class="ibslot" aria-hidden="true"></span>
@@ -1291,8 +1379,14 @@
 </section>
 
 {#if menu}
-  <Menu at={menu.at} label={menu.kind === "filter" ? "Free or fix" : menu.kind === "phase" ? "Phase" : "Atom"}
+  <Menu at={menu.at} label={menu.kind === "filter" ? "Free or fix" : menu.kind === "phase" ? "Phase"
+    : menu.kind === "instrument" ? "Instrument" : "Atom"}
     anchor={menu.anchor} items={menuItems} onchoose={chooseMenu} onclose={() => (menu = null)} />
+{/if}
+
+{#if instrumentOpen}
+  <Instrument {rows} {anodes} {busy} {say} onlanded={landed} ondropped={dropPending}
+    onclose={() => (instrumentOpen = false)} />
 {/if}
 
 {#if ask}

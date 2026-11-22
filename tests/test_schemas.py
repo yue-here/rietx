@@ -219,7 +219,7 @@ def test_atom_reusing_one_parameter_for_occ_and_biso_gets_each_fields_own_range(
 
 def test_schema_version_bumped_and_pre_fix_documents_still_load():
     """Review item 2 on PR #206: ``SCHEMA_VERSION`` must move, since the set
-    of legal ``Atom`` constructions shrank — the constant's own changelog
+    of legal ``Atom`` constructions shrank — the constant's changelog
     names this exact bump. Also pins the claim the comment makes and issue
     #209 depends on: a document written *before* this fix, carrying the
     unbounded ``biso`` the bug allowed (explicit ``-Infinity``/``Infinity``,
@@ -234,12 +234,13 @@ def test_schema_version_bumped_and_pre_fix_documents_still_load():
     as though this fix broke (review round 4 on PR #206).  What this test
     is entitled to assert is that the bump for *this* change is recorded
     and has been reached — not that nothing has happened since."""
-    import rietx.schemas.common as common
     from rietx.schemas.common import SCHEMA_VERSION
 
+    # the changelog left the source for docs/contracts/ in WP-2233
+    notes = Path(__file__).resolve().parents[1] / "docs" / "contracts" / "schema.md"
     entry = re.search(
-        r"^#: (\d+\.\d+) \u2192 (\d+\.\d+) \(issue #204\)",
-        inspect.getsource(common),
+        r"^(\d+\.\d+) \u2192 (\d+\.\d+) \(issue #204\)",
+        notes.read_text(encoding="utf-8"),
         re.M,
     )
     assert entry is not None, (
@@ -685,6 +686,7 @@ def test_one_zero_sigma_on_a_peak_no_longer_holds_the_fit():
 
     start = make_lab6()
     start.phases[0].cell.a.value = 4.1585
+    start.phases[0].cell.b.value = start.phases[0].cell.c.value = start.phases[0].cell.a.value  # the cell's ties follow a
     res = rx.Refinement(start, Instrument.debye_scherrer(wavelength=1.5406),
                         history=False).fit(data)
     out = Path(__file__).parent / "output"

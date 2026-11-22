@@ -26,6 +26,7 @@ Each guide's fits are a script in `examples/guides/`, run by the test suite, and
 - [How to tie parameters together](tie.md) makes parameters equal, or one a linear function of others.
 - [How to restrain a bond length or an angle](restrain.md) adds chemistry as weighted observations.
 - [How to add a stage to a refinement plan](plan.md) edits a preset or builds a plan.
+- [How to write a peak's width or position as an equation](peak_equation.md) adds terms in hkl and 2θ with `rx.PeakEquation`.
 
 ## Running a fit
 
@@ -75,6 +76,7 @@ Keep a parameter fixed whatever the plan frees <hold>
 Tie parameters together <tie>
 Restrain a bond length or an angle <restrain>
 Add a stage to a refinement plan <plan>
+Write a peak's width or position as an equation <peak_equation>
 Run a plan one stage at a time <stage>
 Choose the next parameter to free <next>
 Branch a refinement, compare the branches and roll back <branch>

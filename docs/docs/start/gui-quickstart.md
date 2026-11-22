@@ -126,6 +126,20 @@ a three-way theme control (`◐` follow the system, `☀` light, `☾` dark). Ov
 pattern, the `Pattern` tab and a title line say what the graph shows. Once a fit
 has run, `Rwp` and `GoF` sit on that line.
 
+### The trace
+
+On `Series`, a strip above the plot draws the series coordinate against the pattern index. Marks, from the series answer:
+
+| mark | label | meaning |
+|---|---|---|
+| `SERIES_PATTERN_FAILED` | failed | no fit |
+| `SEQUENTIAL_UNRECOVERED` | unrecovered | diverged |
+| `SEQUENTIAL_RESEED` | reseeded | fit cold |
+| `findings` | findings | bar: codes raised |
+| `largest_step` | largest step | a rank, no verdict |
+
+Drag the strip to scrub; the plot keeps your zoom.
+
 ## Run the fit
 
 Under the panel column is the action bar. Press its `Refine` button, or `⌘⏎`

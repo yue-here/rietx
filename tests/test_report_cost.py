@@ -184,7 +184,7 @@ def test_fit_end_carries_the_rungs_cost_and_the_summary_counts_it():
     ref = _fit(True, events)
     (end,) = [e for e in events if e["kind"] == "fit_end"]
     spent = end["data"]["stage_report_seconds"]
-    assert spent > 0.0 and len(ref.stage_reports_) == 3
+    assert spent > 0.0 and len(ref.stage_reports_) == 2   # one per declared stage
     summary = _summarize_run(None, events)
     assert summary.stage_report_seconds == spent
     assert "stage reports" in str(summary)

@@ -149,7 +149,7 @@ TOKENS: dict[str, dict[str, str]] = {
         "--plot-calc": "#ff9d4d",
         "--plot-bkg": "#c99a6a",
         "--plot-diff": "#8f8f8f",
-        "--plot-last": "#776849",
+        "--plot-last": "#7f8f94",
         "--plot-zero": "#4a4a4a",
         "--plot-peak": "#008ad5",
         "--plot-peakfit": "#516494",
@@ -225,8 +225,14 @@ each to its measured distance.""",
 the preview takes the calculated curve's accent and the last fit turns grey,
 as the design rounds drew it (`gui/STYLE.md` § Plots).  The round's greys
 (`#a79f94`, `#6f675b`) sat under the 0.13 floor from the background brown and
-the dark peak fit, and the light one under 3:1 on the page, so each is the
-nearest colour in OKLab that clears both.""",
+the dark peak fit, and the light one under 3:1 on the page.  The light grey is
+the nearest colour in OKLab that clears both.  The dark one is the blue-grey
+the maintainer chose on 2026-11-19 ("since they never intersect"): 0.023 from
+the difference curve, which draws in its own strip below the pattern, and
+0.056 from `--muted`, which draws observed points only inside an excluded
+region, where no model curve draws.  It is at least 0.131 from every other
+plot colour and 5.25:1 on `--panel`.  `tests/test_gui_palette.py` names both
+pairs.""",
     "--plot-peak": """The picked-peak layer (WP-1210, recoloured by WP-2200).
 The marks take Okabe-Ito blue, the complement of the orange fits, which the
 maintainer chose in the design rounds of 2026-11-08 (`#0072b2`).  Its dark
@@ -398,7 +404,7 @@ def state_dir(override: str | Path | None = None) -> Path:
     moves (``_about.py`` holds that warning; the two are the same literal and
     no test can catch them being confused).
 
-    One expression, called by :class:`~rietx.gui.session.Session` and by the two
+    One expression, called by :class:`~rietx.gui.session.GuiSession` and by the two
     Python servers, because a theme read from a different directory than the one
     the GUI wrote to is a bug that looks like the choice not sticking.
     """
@@ -411,7 +417,7 @@ def theme_choice() -> str:
     """The theme the person chose, from ``settings.json``; ``system`` by default.
 
     Anything unreadable, missing or hand-mangled is ``"system"``, never an
-    error — the same grammar :meth:`~rietx.gui.session.Session.settings` uses,
+    error — the same grammar :meth:`~rietx.gui.session.GuiSession.settings` uses,
     and for the same reason: no setting here is worth refusing to start over.
 
     No directory argument: every caller wants the person's, and a parameter

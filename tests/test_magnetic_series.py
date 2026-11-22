@@ -165,12 +165,17 @@ def simulate(mz: float, seed: int, *, scale: float = 200.0,
 
 
 def moment_plan(max_iter: int = 100) -> rx.RefinementPlan:
-    """Scale and background, then the moment beside them."""
+    """Scale and background, then the moment beside them, and the closing
+    stage, declared rather than inherited: off by default since WP-2222, and
+    the chains here were measured with it."""
+    from rietx.schemas.plan import CLOSING_WINDOW_TOL
+
     return rx.RefinementPlan(stages=[
         rx.Stage("scale", ["phases.*.scale", "instrument.background.c*"],
                  max_iter=max_iter),
         rx.Stage("moment", ["phases.*.atoms.*.moment.dof*", "phases.*.scale",
-                            "instrument.background.c*"], max_iter=max_iter)])
+                            "instrument.background.c*"], max_iter=max_iter)],
+        closing_window_tol=CLOSING_WINDOW_TOL)
 
 
 #: The ramp's temperatures.  60 K and 75 K straddle T_N = 67 K, so the bracket

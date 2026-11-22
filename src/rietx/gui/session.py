@@ -160,7 +160,7 @@ def _utcnow() -> str:
 class GuiError(Exception):
     """A verb refused, carrying what the transport should report.
 
-    Same grammar as :class:`~rietx.schemas.diagnostics.Diagnostic` and the
+    Same grammar as :class:`~rietx.schemas.common.Diagnostic` and the
     agent envelope (WP-0602): a ``code`` to branch on, a message for a human,
     and ``where`` naming the paths at fault.  The HTTP status lives here rather
     than in the router because the reason is what decides it — a run in flight
@@ -175,7 +175,7 @@ class GuiError(Exception):
         self.code = code
         self.status = status
         self.where = list(where or [])
-        #: per-item failures, as ``AgentError.details`` does it — a text document
+        #: per-item failures: a text document
         #: apply reports every bad line at once, because fixing them one HTTP
         #: round trip at a time is not an editing experience
         self.details = list(details or [])
@@ -1402,9 +1402,20 @@ class GuiSession:
         reached = {path for entry in stages for path in entry["frees"]}
         set_aside = [row.path for row in rows.values()
                      if row.vary and row.refinable and row.path not in reached]
+        # what a person could free and no stage does (WP-2231, the Plan tab's
+        # "Never freed" row): the refinable rows outside every stage's frees.
+        # A stage's ``held`` paths are absent from both sides: most are not
+        # refinable, and the rest (a column the mode fixes through a tie) a
+        # stage matched and could not free, which no plan edit changes. The
+        # closing stage frees only what the stages above it named
+        held = {row["path"] for entry in stages for row in entry["held"]}
+        never_freed = [row.path for row in rows.values()
+                       if row.refinable and row.path not in reached
+                       and row.path not in held]
         return {"mode": mode, "n_parameters": len(rows),
                 "n_free_final": stages[-1]["n_free"] if stages else 0,
-                "set_aside": set_aside, "stages": stages,
+                "set_aside": set_aside, "never_freed": never_freed,
+                "stages": stages,
                 "closing": closing_entry,
                 "head": p.refinement._head_id,
                 "live": self._state != "idle"}
@@ -1682,8 +1693,15 @@ class GuiSession:
     def structure3d(self, phase: int = 0, *, probability: float = 0.5,
                     bond_tolerance: float | None = None, disorder: str = "all",
                     centres: list[str] | None = None,
-                    ligands: list[str] | None = None) -> dict:
+                    ligands: list[str] | None = None,
+                    body: dict | None = None) -> dict:
         """The current model as drawable geometry (WP-1015).
+
+        ``body`` is that of ``POST /api/structure3d``: the same ``values`` map
+        ``POST /api/preview`` takes, so the Structure graph draws a person's
+        unapplied slider values as the Pattern graph does (WP-2218). Writing
+        nothing, and idle-only like that preview, since it reads the compiled
+        table the preview keeps.
 
         A route beside ``/api/structure`` rather than an arm of it, on WP-1008's
         test for a new one: it returns what the model does **not** already say —
@@ -1694,8 +1712,9 @@ class GuiSession:
         symmetry search may live that ``/api/structure`` refused (that route
         refetches on every head move; this one is opened deliberately).
 
-        Not idle-gated: it reads the model, like ``/api/structure``, and a fit in
-        flight does not move the values the working state holds.
+        Without a ``body`` it is not idle-gated: it reads the model, like
+        ``/api/structure``, and a fit in flight does not move the values the
+        working state holds. With one it is, as said above.
         """
         from . import structure3d as geometry
 
@@ -1708,7 +1727,13 @@ class GuiSession:
                     geometry.element_list(values, what)
             except ValueError as exc:
                 raise GuiError(str(exc), where=[what]) from None
-        structure = self._need_project().refinement.structure
+        if body is not None:
+            from . import preview
+
+            self._require_idle()
+            structure = preview.structure_at(self._need_project(), body)
+        else:
+            structure = self._need_project().refinement.structure
         try:
             built = geometry.build(
                 structure, int(phase), probability=float(probability),
@@ -1766,13 +1791,60 @@ class GuiSession:
         return {"node_id": node, **self.structure()}
 
     def instrument_patch(self, body: dict) -> dict:
+        """Replace the instrument: one ``edit_model`` node, and what it asks
+        of the hold and free registers.
+
+        The registers are declarations about a *path*, and ``Refinement.edit``
+        keeps them across an edit, so a checkout restores them. A Chebyshev
+        ``c3`` held would then hold a new P-spline's ``c3``, and a cut
+        ``c5``'s hold would come back on the ``c5`` a later extension adds.
+        Whatever sent the instrument, this verb therefore works out the
+        registers' part itself (:func:`_register_arms`, WP-2229): it releases
+        the holds on the paths the edit removes, redefines or rebuilds (one
+        ``set_hold`` node, before the edit). Each path it builds then takes
+        its new model's ``vary``: freed where that says so (one ``set_vary``
+        node, after it), and fixed where it does not and the free register
+        still names the path from its old parameter (one more). Every client
+        gets this, and so does a hold no row shows, such as one left on a path
+        an earlier cut removed. All the verbs run on a history-free copy first
+        (:func:`rehearse`), so a refusal from any leaves the holds, the model
+        and the history as they were.
+
+        The answer carries ``released``, ``freed`` and ``fixed`` for the
+        console, and ``ended``: the paths whose old parameter the edit removed
+        or redefined, so a client drops its pending edits on them.
+        """
         self._require_idle()
-        node = self._edit(
-            instrument=_as_instrument(_with_file_optics(
-                _need(body, "instrument"),
-                lambda: self._need_project().data.metadata), self.uploads),
-            label=body.get("label") or "instrument edited")
-        return {"node_id": node, **self.instrument()}
+        p = self._need_project()
+        instrument = _as_instrument(_with_file_optics(
+            _need(body, "instrument"), lambda: p.data.metadata), self.uploads)
+        label = body.get("label") or "instrument edited"
+        arms = _register_arms(p.refinement, instrument)
+
+        def apply(ref) -> str | None:
+            if arms is None:  # no table: the edit's own refusal says why
+                return _edit_on(ref, instrument=instrument, label=label)
+            release, free, fix, _ = arms
+            try:
+                if release:
+                    ref.unhold(release)
+                node = _edit_on(ref, instrument=instrument, label=label)
+                if free:
+                    ref.set_vary(free, True)
+                    node = ref._head_id
+                if fix:
+                    ref.set_vary(fix, False)
+                    node = ref._head_id
+            except ValueError as exc:  # a register verb's refusal, in its words
+                raise GuiError(str(exc), where=release + free + fix) from None
+            return node
+
+        if arms and (arms[0] or arms[1] or arms[2]):
+            rehearse(p.refinement, apply)
+        node = apply(p.refinement)
+        release, free, fix, ended = arms or ([], [], [], [])
+        return {"node_id": node, "released": release, "freed": free, "fixed": fix,
+                "ended": ended, **self.instrument()}
 
     def structure_position(self, body: dict) -> dict:
         """Move one atom to a typed position (WP-1215).
@@ -2091,7 +2163,11 @@ class GuiSession:
             plan = self._effective_plan(body.get("plan"))
 
             def call(stream, token):
-                return p.fit(plan=plan, events=stream, cancel=token)
+                # staged until the stage ladder has a view of a one-stage
+                # re-fit: after one, no run on record matches the plan on
+                # screen and the Rwp column goes blank (WP-2224, with Yue)
+                return p.fit(plan=plan, events=stream, cancel=token,
+                             refit="stages")
 
             label = ""
             n_stages = len(plan.run_stages())   # the closing stage counts
@@ -2955,7 +3031,8 @@ class GuiSession:
         return series_mod.result_payload(
             entry["result"], entry["backward"], running=busy,
             curves=[bool(r.two_theta) for r in runner.results_],
-            relative=entry["relative"], angles=entry["angles"])
+            relative=entry["relative"], angles=entry["angles"],
+            coordinates=[m["x"] for m in entry["members"]])
 
     def _series_member_result(self, index: int):
         """The series entry and member ``index``'s result, which has curves, or a refusal."""
@@ -2988,15 +3065,21 @@ class GuiSession:
         the curves beside it, because a series member cannot be refitted under
         a new protocol without re-running the chain, which replaces the whole
         answer.
+
+        ``index`` is the entry's position, as ``runner.results_`` is kept, and
+        the staged member is found by the entry's own ``SeriesEntry.index``:
+        a failed pattern has no entry, so past one the two positions differ
+        and pairing them would draw one pattern's fit over another's data.
         """
         from ..project import fitted_mask
 
         entry, res = self._series_member_result(index)
-        data, member = entry["data"][index], entry["members"][index]
+        at = entry["result"].entries[index].index
+        data, member = entry["data"][at], entry["members"][at]
         return curve_arrays(
             data.tt(), data.y(), fitted_mask(data, entry["limits"]), res,
             weighted=bool(member["has_sigma"]),
-            header={"index": index, "label": member["label"], "x": member["x"]})
+            header={"index": at, "label": member["label"], "x": member["x"]})
 
     def series_history(self, index: int) -> dict:
         """One series member's own history tree — read-only, and that is the point.
@@ -3021,8 +3104,11 @@ class GuiSession:
         if tree is None:  # pragma: no cover - the GUI always runs with history
             raise GuiError("this series was run without history",
                            code="NO_HISTORY", status=409)
-        member = entry["members"][index]
-        return {"index": index, "label": member["label"],
+        # by the entry's own index, as ``series_curves`` finds its member:
+        # ``trees_`` skips a failed pattern and the staged members do not
+        at = entry["result"].entries[index].index
+        member = entry["members"][at]
+        return {"index": at, "label": member["label"],
                 "checkout": False, **tree_payload(tree)}
 
     def _series_entry(self) -> dict:
@@ -3140,14 +3226,18 @@ class GuiSession:
         self._require_idle()
         return preview.evaluate(self._need_project(), body)
 
-    def background(self) -> Packed:
+    def background(self, hold: list[str] | None = None) -> Packed:
         """The background curve and the band it may move in, writing nothing
         (WP-2129). Idle-only, like every verb that compiles;
-        :mod:`rietx.gui.background` has the band's derivation."""
+        :mod:`rietx.gui.background` has the band's derivation. ``hold`` names
+        paths held for this answer alone, a person's pending holds (WP-2218)."""
         from . import background
 
         self._require_idle()
-        return background.answer(self._need_project())
+        try:
+            return background.answer(self._need_project(), hold)
+        except background.UnknownHold as exc:
+            raise GuiError(str(exc), where=exc.missing) from exc
 
     def report(self, plan: str | None = None) -> dict:
         """The three-layer :class:`FitReport` for the last fit, plus what applies.
@@ -3792,6 +3882,61 @@ def _validate(model, payload, where: str):
 _LEADING_PATH = re.compile(r"\b((?:phases|instrument)\.[\w.]*[\w])")
 
 
+def _register_arms(refinement, instrument: Instrument
+                   ) -> tuple[list[str], list[str], list[str], list[str]] | None:
+    """What replacing the instrument asks of the hold and free registers (WP-2229).
+
+    Returns ``(release, free, fix, ended)``, or ``None`` when either model
+    builds no parameter table, whose refusal ``Refinement.edit`` gives.
+
+    The two tables are compared by path. A path the old one has and the new
+    one lacks is *removed*. A background coefficient whose basis changes is
+    *redefined*: P-spline ``c3`` is a basis function at a knot, Chebyshev
+    ``c3`` a polynomial order, and they share only the name. So is a
+    P-spline's ``c3`` over other breakpoints, a function at another knot. A
+    path the new table has and the old one lacked, or redefined, is *built*:
+    its parameter starts with the edit.
+
+    - ``release``: every path in the hold register that the edit removes or
+      builds, read off the register and not off the rows, so a hold left on
+      a path an earlier edit removed is found too.
+    - ``free``: every built path whose new model says ``vary``. Once a stage
+      has declared the free set, a path outside it is built fixed whatever
+      its ``vary`` says, and the client that built ``Parameter(value=0.0,
+      vary=True)`` asked for it free.
+    - ``fix``: every built path whose new model says fixed and that the free
+      register still names, from the old parameter of that name or from one
+      an earlier cut removed. Kept, it would come back free.
+    - ``ended``: every path whose old parameter the edit removed or
+      redefined, where a pending edit typed against the old model no longer
+      applies.
+
+    Instrument paths only. A structure edit carries its holds through a
+    renumbering of atoms (``Refinement.edit``, #1264), which a comparison by
+    path would undo.
+    """
+    from ..params.vector import ParameterTable
+
+    try:
+        old = {e.path for e in ParameterTable(refinement.structure,
+                                              refinement.instrument).entries}
+        new = {e.path: e for e in ParameterTable(refinement.structure, instrument).entries}
+    except ValueError:
+        return None
+    before, after = refinement.instrument.background, instrument.background
+    redefined: set[str] = set()
+    if (before.kind != after.kind
+            or getattr(before, "breakpoints", None) != getattr(after, "breakpoints", None)):
+        redefined = {p for p in old if p.startswith("instrument.background.")}
+    ended = (old - new.keys()) | redefined
+    built = {p for p in new if p not in old or p in redefined}
+    release = sorted(refinement._user_holds & (ended | built))
+    free = sorted(p for p in built if new[p].vary)
+    declared = set(refinement._free_paths)
+    fix = sorted(p for p in built if not new[p].vary and p in declared)
+    return release, free, fix, sorted(ended)
+
+
 def rehearse(refinement, apply: Callable[[Any], Any]) -> None:
     """Run ``apply`` on a history-free copy of ``refinement``, to see it refuse.
 
@@ -3948,6 +4093,40 @@ def _stored_param(tree: dict, path: str) -> dict:
     return node
 
 
+def _follow_cell_ties(tree: dict, path: str, value: float) -> None:
+    """Move every cell entry its space group ties to ``path`` along with it.
+
+    ``set_values`` does this through ``ParameterTable.refresh_ties``.  A value
+    written into the dumped model has no table behind it, and since WP-2150
+    the table refuses a tied entry left behind its source, so b follows a here
+    as it does there.  A parent's cell (``phases.0.parent_cell.cell.a``) is
+    tied under the parent's group, as the table ties it.
+    """
+    from ..crystallography.symmetry import cell_constraints, resolve_group
+
+    match = re.fullmatch(r"phases\.(\d+)\.(parent_cell\.)?cell\.(\w+)", path)
+    if match is None:
+        return
+    phase = tree["phases"][int(match.group(1))]
+    declared = phase.get("parent_cell")
+    try:
+        if match.group(2):
+            if declared is None:
+                return
+            sg, cell = resolve_group(declared["space_group"]), declared["cell"]
+        elif declared is not None:
+            return                   # the child's own cell is derived and locked
+        else:
+            sg = resolve_group(phase["space_group"], phase.get("symmetry_operations"))
+            cell = phase["cell"]
+        ties = cell_constraints(sg).ties
+    except (RuntimeError, ValueError):
+        return                       # the table's own refusal names the group
+    for name, source in ties.items():
+        if source == match.group(3):
+            cell[name]["value"] = value
+
+
 def _limit_and_restraint_edit(refinement, limits: dict, restraints: dict,
                               values: dict) -> tuple[Structure | None,
                                                      Instrument | None]:
@@ -3991,6 +4170,7 @@ def _limit_and_restraint_edit(refinement, limits: dict, restraints: dict,
         stored["min"], stored["max"] = lo, hi
         if value is not None:
             stored["value"] = value
+            _follow_cell_ties(tree, path, value)
         touched["instrument" if path.startswith("instrument.") else "structure"] = True
     if restraints:
         from ..schemas.structure import ValueRestraint
