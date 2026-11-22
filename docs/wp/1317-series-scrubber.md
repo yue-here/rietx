@@ -273,6 +273,25 @@ still open, since its surviving residual lands here.
 
 ## Handover log
 
+- **2026-11-22** — the three follow-ups from #1395's review. A series can no
+  longer give two patterns one name, so a trace mark lands on the pattern its
+  fence meant; the Series panel reads `--fg` with no literal fallback; and the
+  trace's position arithmetic is node-tested.
+  *Done.* `schemas.sequential._pattern_name` is the name a fence writes in
+  `where` and the trace looks up. `SeriesResult` refuses two patterns under
+  one, across `entries` and `failures`. `unique_labels` no longer lets a
+  suffix it made collide with a given name, and `_labels_for` names an empty
+  label `pNNN`. `rxplot.traceLayout`/`traceBand` are `trace`'s draw
+  arithmetic, with five cases in `tests/rxplot.test.mjs`.
+  *Not done.* Tasks 4 and 5, as before.
+  *Gate:* `origin/main` `4a0c73896` + this branch, macOS arm64, worktree
+  `.venv` `[dev]`: fast 15 158 passed, 442 skipped, 32 xfailed (`-n 4`; the
+  branch adds 4 pytest tests and 5 node cases). `npm --prefix gui test` 968
+  passed under `LANG=en_US.UTF-8`; under `en_CA` one existing App test fails
+  on the locale's "a.m.". `npm --prefix gui run check` clean; ruff, Vale,
+  `tests.rulebook_limits`, `tests.release_notes --check` clean;
+  `tests.reader_output` unchanged.
+
 - **2026-11-04** — the scrubber, less its screenshots and the annotations
   decision. An in-situ series can now be read on its own axis in the GUI: a
   strip above the Series panel's plot draws the coordinate against the
