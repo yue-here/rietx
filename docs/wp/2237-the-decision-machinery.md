@@ -1,6 +1,6 @@
 # WP-2237 — The decision machinery: fewer calls reach the maintainer, and each ruling is reused
 
-Milestone: unscheduled · Status: 🔄 2026-11-21 — plan consolidated with the maintainer; hindcast test run before any build
+Milestone: unscheduled · Status: 🔄 2026-11-22 — new routing rules approved and applied to the 47 pending lines; the register, the queue token, Rule 1's word and the printout cap are not built
 Track: The repo's own process
 Depends on: 2009 soft (owns the rulebook cleanup this plan feeds)
 Priority: P2 2026-11-21 — the maintainer's attention is the scarcest resource in the workflow, and 11 settled calls were reversed in three weeks
@@ -214,7 +214,8 @@ own record: `docs/wp/2005-batch/rulings.md`, WP-2006 and WP-2020 § Rulings, and
 - [x] Routing test (above).
 - [x] Global-instructions paste text to the maintainer (another repo); approved 2026-11-22.
 - [x] Printed-output review moved to once per release.
-- [ ] The checker agent and the consent-line replacement (part 1, 5).
+- [x] The consent-line replacement (part 1): the paste text. The checker is a dispatch prompt, not a saved agent (§ The first blind check).
+- [ ] Settled calls record the options weighed (part 5).
 - [ ] The register, its backfill and its marker test (part 2).
 - [ ] Rule 1's one-word replacement (part 3).
 - [ ] The queue token (part 4), after measuring why the five went stale.
@@ -230,6 +231,49 @@ week fall; the share answered without a request for background rises; the revers
 the audit sample stays under the pre-change rate; no wait is stale (a test).
 
 ## Handover log
+
+- **2026-11-22** — The maintainer's attention now goes only to calls that need it. His new
+  standing rule, given as paste text for his own instructions file, has Claude settle every
+  clear call a project rule sends him, with a fresh agent checking the batch blind and one
+  in ten shown to him. Applied to the 47 lines that waited on him, it brought him 11, and he
+  accepted all 11 as recommended. The first blind check, on WP-2009's rulebook rewrite, found
+  seven meaning changes that two careful reads had missed, which is the evidence the checker
+  earns its cost (about 240k tokens a check). Tier-3 approval is eased for constants and
+  suggestions only, since none of his reversals concerned a constant's value.
+
+  *Done.* Hindcast and routing tests recorded (§ The hindcast, § The routing test). The
+  batch sentence he asked about adds nothing measurable; the drop in calls comes from the
+  approval-field waiver. Ruling B: `_audit.Row.approved_by` (`"maintainer"` by default,
+  `"checked"` only on a tier-3 constant or suggestion), held by `test_audit_table.py`, mirrored
+  in `audit_delta.py`, and followed by the generality judge's agent file, CONTRIBUTING,
+  `generality.md` and `/pr-review` 6b. Printed-output changes are settled per PR with a blind
+  check and read once per release (`/pr-review` 6c, `/wp-handover` step 11,
+  `docs/RELEASING.md` step 2). WP-2009's PR #1768 was fixed under the new check and merged.
+  The 47 outcomes are written in the 2005 batch rulings, WP-2006, WP-2020 (parked),
+  `generality.md` and `series.md`; the two public posts are on #1075 and #1214.
+
+  *Measured.* No test was added (the new assertions sit in an existing test), so passed+skipped
+  should not move. The fast selection did not run locally: another session's suite was
+  running (17 pytest processes), so CI's run is the count. `test_docs_consistency.py` and
+  `test_audit_table.py`: 80 passed (.venv, macOS arm64). `tests.audit_delta`: no row or
+  declaration changed. Costs of the consent triage: 195k
+  tokens collation, 141k check, 156k recording.
+
+  *Review.* `/code-review high --fix` found two nits, both fixed (5b88870e3): the
+  `approved_by` check now also covers unaudited rows, and the hindcast scorer reads UTF-8.
+
+  *Gotchas.* `wp_index.py` rejects ⏸, so a parked WP stays 🔄 with "parked" in its Status
+  text (WP-2020). The rietx-only triggers live in project records, never in the paste text,
+  so other projects inherit only the generic rule.
+
+  *Not done.* The register (part 2), the queue token (part 4), Rule 1's word (part 3), the
+  printout cap (part 6) and the options record (part 5). The maintainer pastes the new section
+  into his instructions file himself, and deletes the consent-list sentence there.
+
+  Next: build the settled items in their own WPs' sessions (WP-2006's rows go with PR #1636's
+  successor; the WP-1420 and WP-1453 Milestone headers move with PRs #1401 and #1594). Then
+  decide whether part 2's register still pays now that rulings land in their own records: the
+  month-on acceptance figures above decide it.
 
 - **2026-11-21** — filed from the reappraisal session. No open WP owns the decision
   workflow; WP-2009 owns the rulebook half and is in flight elsewhere.
