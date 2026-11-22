@@ -409,6 +409,11 @@
     await leaveEdits();
     // the script is this project's session: another project's calls are not
     calls = [];
+    // the peak list is the project's (`peaks.json`): another project's rows,
+    // their chosen line and a frame request are not this one's
+    peaksPayload = null;
+    selectedPeak = null;
+    frameAt = null;
     project = doc;
     openError = "";
     newOpen = false;
@@ -764,8 +769,8 @@
     if (g) graphTab = g;
   }
 
+  /** The chosen row itself arrives through `bind:selected`. */
   function framePeak(row: PeakRow) {
-    selectedPeak = row.index;
     frameAt = { two_theta: row.two_theta, seq: (frameAt?.seq ?? 0) + 1 };
   }
 
@@ -1057,12 +1062,16 @@
           </div>
         {/if}
         <!-- mounted for the workflow's life, so a step switch keeps the list's
-             filter and the chosen row -->
+             filter and the chosen row; keyed on the project, since the list
+             is read once on mount and its row numbers are that project's -->
         {#if wf === "index"}
-          <div class="pane wfsteps">
-            <Indexing {step} steps={wfSteps ?? []} {busy} {corpus} {say}
-              onpeaks={(p) => (peaksPayload = p)} onframe={framePeak} />
-          </div>
+          {#key project.path}
+            <div class="pane wfsteps">
+              <Indexing {step} steps={wfSteps ?? []} {busy} {corpus} {say}
+                bind:selected={selectedPeak}
+                onpeaks={(p) => (peaksPayload = p)} onframe={framePeak} />
+            </div>
+          {/key}
         {/if}
         <div class="pane" class:gone={!!wfSteps || modelTab !== "params"}>
           <Params bind:this={paramsPanel} {head} {busy} {corpus} {say} onmoved={structureMoved}

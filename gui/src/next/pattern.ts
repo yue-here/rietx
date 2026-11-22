@@ -111,6 +111,10 @@ const Y: Record<Scale, "lin" | "sqrt" | "log"> = { linear: "lin", sqrt: "sqrt", 
 export class PatternChart {
   readonly fig: Pattern;
   private colors: ReturnType<typeof curveColors>;
+  /** the chrome inks the peak layer borrows: a lens's halo, the chosen
+   *  line's ring and a left-out line's dotted mark; read with `colors`, at
+   *  build and on `retheme`, never on a draw */
+  private chrome: Chrome;
   private overlay: Overlay;
   private curves: Curves;
   /** What the raw view's residual was last built from, so a repaint rebuilds it only when that moved. */
@@ -130,6 +134,7 @@ export class PatternChart {
     this.curves = curves;
     this.residualKey = this.residualInputs();
     this.colors = readColors();
+    this.chrome = readChrome();
     this.ringEl = document.createElement("div");
     this.ringEl.className = "rx-ring";
     const shade = (u: any) => this.shade(u);
@@ -163,6 +168,7 @@ export class PatternChart {
   async retheme(): Promise<void> {
     await Promise.resolve();
     this.colors = readColors();
+    this.chrome = readChrome();
     this.fig.redraw();
   }
 
@@ -392,9 +398,7 @@ export class PatternChart {
     const H = LENS_HEIGHT * dpr, W = LENS_WIDTH * dpr, gap = LENS_GAP * dpr;
     const row = (LENS_HEIGHT + 1) * dpr, near = 7 * dpr, top = u.bbox.top + H / 2 + 2 * dpr;
     const { min, max } = u.scales.x;
-    const style = getComputedStyle(document.body);
-    const halo = style.getPropertyValue("--bg").trim();
-    const ink = style.getPropertyValue("--fg").trim();
+    const { halo, ink, accent } = this.chrome;
     const marks: Array<{ x: number; y: number; level: number; chosen: boolean }> = [];
     let dotted: number | null = null;
     for (const p of [...peaks].sort((a, b) => a.two_theta - b.two_theta)) {
@@ -409,9 +413,15 @@ export class PatternChart {
       const x = u.valToPos(p.two_theta, "x", true);
       let level = 0;
       while (marks.some((m) => m.level === level && Math.abs(m.x - x) < near)) level++;
+      // a stacked lens stands a row above the twin it stacks on, never a row
+      // above its own crest: zoomed out, the twin's crest can be the higher
+      let y = u.valToPos(h, "y", true) - gap - H / 2;
+      for (const m of marks) {
+        if (m.level === level - 1 && Math.abs(m.x - x) < near) y = Math.min(y, m.y - row);
+      }
       // at the plot's top the stack turns downward, so a twin under the
       // strongest line still clears its partner rather than landing on it
-      const y = Math.max(top + level * row, u.valToPos(h, "y", true) - gap - H / 2 - level * row);
+      y = Math.max(top + level * row, y);
       marks.push({ x, y, level, chosen });
     }
     ctx.save();
@@ -438,7 +448,7 @@ export class PatternChart {
       ctx.stroke();
     }
     if (dotted != null) {
-      ctx.strokeStyle = style.getPropertyValue("--accent").trim();
+      ctx.strokeStyle = accent;
       ctx.lineWidth = 1.2 * dpr;
       ctx.setLineDash([2 * dpr, 3 * dpr]);
       ctx.beginPath();
@@ -518,4 +528,12 @@ export const LENS_GAP = 7;
 function readColors(): ReturnType<typeof curveColors> {
   const style = getComputedStyle(document.body);
   return curveColors((name) => style.getPropertyValue(name));
+}
+
+interface Chrome { halo: string; ink: string; accent: string }
+
+function readChrome(): Chrome {
+  const style = getComputedStyle(document.body);
+  const read = (name: string) => style.getPropertyValue(name).trim();
+  return { halo: read("--bg"), ink: read("--fg"), accent: read("--accent") };
 }

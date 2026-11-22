@@ -491,12 +491,13 @@ const sameCell = (x: readonly number[], y: readonly number[]) =>
   && x.every((v, i) => Math.abs(v - y[i]) <= 1e-9 * Math.max(1, Math.abs(v)));
 
 /**
- * How candidate `i` relates to a candidate above it, in words, or "".
+ * How candidate `i` relates to another reported row, in words, or "".
  *
  * Marked, never merged (round 11 call 8): every candidate stays a row. Only
  * the relations rietx states are named. "Same cell" is the same numbers
- * printed under another lattice label; a supercell is a `supercell_checks`
- * entry whose parent is another reported row. Relations rietx does not compute
+ * printed under another lattice label, said of the lower row; a supercell is
+ * a `supercell_checks` entry whose parent is another reported row, above or
+ * below it. Relations rietx does not compute
  * ("c doubled", "a × √3") are a follow-up (WP-2240 § Inherited).
  */
 export function candidateRelation(cands: readonly Candidate[], i: number): string {

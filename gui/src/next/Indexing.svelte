@@ -42,6 +42,7 @@
     say = () => {},
     onpeaks = () => {},
     onframe = () => {},
+    selected = $bindable(null),
   }: {
     step?: number;
     steps: readonly Step[];
@@ -52,6 +53,9 @@
     onpeaks?: (payload: PeaksPayload | null) => void;
     /** frame this row's line on the Pattern graph */
     onframe?: (row: PeakRow) => void;
+    /** the row chosen in the table, bound to the shell, which marks its line
+     *  on the Pattern graph; a pick clears it, as the rows are renumbered */
+    selected?: number | null;
   } = $props();
 
   let payload = $state.raw<PeaksPayload | null>(null);
@@ -60,12 +64,10 @@
   let filter = $state<PeakFilter>("all");
   /** rows ticked or unticked since the filter was chosen (call 22) */
   let keep = $state<Set<number>>(new Set());
-  let selected = $state<number | null>(null);
   /** the flags rietx had on a line a person ticked, for its note: the
    *  overrule drops them (`set_flags(..., use_for_indexing=True)`), and the
    *  stored list does not remember them (WP-2240 § Inherited) */
   let overruled = $state<Map<number, string[]>>(new Map());
-  let removed = $state(0);
   let asking = $state(false);
   let settingsOpen = $state(false);
   /** the picker's options as typed: the 2θ range's two ends are text, so a
@@ -81,10 +83,10 @@
   const nUsed = $derived(rows ? rows.filter((p) => p.usable).length : 0);
   const shown = $derived(rows ? filterPeaks(rows, filter, keep) : []);
   /** what picking again would replace: lines added, moved or left out by a
-   *  person, the lines they ticked over rietx's flags, and those removed */
+   *  person, and the lines they ticked over rietx's flags */
   const edits = $derived(rows
     ? rows.filter((p) => p.origin !== "fitted" || p.flags.includes("excluded")).length
-      + overruled.size + removed : 0);
+      + overruled.size : 0);
   const range = $derived.by((): [number, number] | null | "bad" => {
     if (!lo.trim() && !hi.trim()) return null;
     const a = Number(lo), b = Number(hi);
@@ -141,7 +143,6 @@
     };
     if (await verb(() => api.pickPeaks(body))) {
       overruled = new Map();
-      removed = 0;
       keep = new Set();
       selected = null;
       asking = false;
@@ -158,7 +159,8 @@
     keep = new Set();
   }
 
-  async function use(row: PeakRow, on: boolean) {
+  async function use(row: PeakRow, box: HTMLInputElement) {
+    const on = box.checked;
     const hard = row.flags.filter((f) => unusable.has(f) && f !== "excluded");
     keep = new Set([...keep, row.index]);
     if (await verb(() => api.flagPeak(row.index, { use_for_indexing: on }))) {
@@ -166,6 +168,10 @@
       if (on && hard.length) next.set(row.index, hard);
       else if (!on) next.delete(row.index);
       overruled = next;
+    } else {
+      // a refusal leaves the list as it was, and `checked` is one-way: the box
+      // would otherwise keep the click and say the opposite of the stored line
+      box.checked = row.usable;
     }
   }
 
@@ -253,7 +259,7 @@
               onclick={(ev) => { if (!(ev.target as HTMLElement).closest("label")) frame(row); }}>
               <td class="ck"><label><input type="checkbox" checked={row.usable} {disabled}
                 aria-label="Use {formatPosition(row.two_theta, null).value}° in the search"
-                onchange={(ev) => use(row, (ev.target as HTMLInputElement).checked)} /></label></td>
+                onchange={(ev) => use(row, ev.target as HTMLInputElement)} /></label></td>
               <td class="r num">{formatPosition(row.two_theta, null).value}<span class="u">°</span></td>
               <td class="r num">{row.d.toFixed(4)}{" "}<span class="u">Å</span></td>
               <td class="r num">{formatIntensity(row.intensity, imax, row.flags)}</td>
@@ -276,7 +282,7 @@
         <div class="field">
           {#if asking}
             <span class="why">Picking again replaces the list, with the {edits}
-              line{edits === 1 ? "" : "s"} you added, moved, removed or ruled on.</span>
+              line{edits === 1 ? "" : "s"} you added, moved or ruled on.</span>
             <button class="ghost" onclick={() => (asking = false)}>Cancel</button>
             <button onclick={pick} disabled={disabled || range === "bad"}>Pick peaks</button>
           {:else}
