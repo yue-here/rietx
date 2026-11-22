@@ -108,10 +108,11 @@
     </div>
     <div class="log">
       {#each drawn as e (e.id)}
+        {@const prompt_of = prompts(e.lines)}
         <div class="entry" data-entry={e.id}>
           <div class="ln t">{clock(e.t)}</div>
           {#each e.lines as line, i (i)}
-            {@const prompt = prompts(e.lines)[i]}
+            {@const prompt = prompt_of[i]}
             <div class="ln {line.kind}" data-kind={line.kind}>
               {#if prompt}<span class="pr" aria-hidden="true">{prompt} </span>{/if}{#if line.kind === "call"}{#each pieces(line.text) as piece, j (j)}{#if piece.cls}<span
                 class={piece.cls}>{piece.text}</span>{:else}{piece.text}{/if}{/each}{:else}{line.text}{/if}

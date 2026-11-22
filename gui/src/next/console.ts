@@ -73,6 +73,9 @@ export function pushLine(lines: readonly Line[], line: Line,
   const next = [...lines, line];
   const isEvent = line.kind === "event";
   const cap = isEvent ? caps.events : caps.lines;
+  // a class cannot pass its cap while the whole list is within it: skip the
+  // count, which a fit would otherwise pay once per event
+  if (next.length <= cap) return next;
   let count = 0;
   for (const l of next) if ((l.kind === "event") === isEvent) count += 1;
   if (count <= cap) return next;

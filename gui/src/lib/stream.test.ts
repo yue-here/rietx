@@ -73,6 +73,25 @@ describe("follow reports the frames it lost (#1656 item 1)", () => {
     expect(heard).toEqual([3]);
   });
 
+  it("from the first poll on, even when that poll found nothing", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("EventSource", undefined);
+    vi.stubGlobal("window", globalThis);
+    const batches = [
+      // followed from an idle server, before any run
+      { events: [], oldest: 1, next: 0 },
+      // a run overran the ring between two polls: 1..4 were lost while followed
+      { events: [event(5, "eval")], oldest: 5, next: 5 },
+    ];
+    const heard: number[] = [];
+    const stop = follow(() => {}, () => {}, {
+      poll: async () => batches.shift() ?? { events: [], next: 5, oldest: 5 },
+      onDropped: (n) => heard.push(n) });
+    for (let i = 0; i < 3; i++) await vi.advanceTimersByTimeAsync(700);
+    stop();
+    expect(heard).toEqual([4]);
+  });
+
   it("on the SSE path, from a jump in seq", () => {
     const sources: any[] = [];
     class FakeSource {

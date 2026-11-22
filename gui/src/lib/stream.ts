@@ -134,7 +134,8 @@ export function advance(cursor: Cursor, batch: { events: EngineEvent[]; oldest?:
  * this page followed (#1656 item 1): the polling path reads it off each
  * batch's `oldest` (`advance`), and the SSE path off a jump in `seq`, which
  * the server numbers one by one. What the ring had lost before the first
- * delivery is history this page never followed, so it is not counted, unless
+ * answer (a poll's, or the first SSE event) is history this page never
+ * followed, so it is not counted, unless
  * the caller gave a `since` and so claimed the frames after it. */
 export function follow(
   onEvent: (event: EngineEvent) => void,
@@ -183,7 +184,9 @@ export function follow(
         for (const event of batch.events ?? []) onEvent(event);
         const next = advance(cursor, batch);
         moved(primed ? next : { ...next, dropped: cursor.dropped });
-        if ((batch.events ?? []).length) primed = true;
+        // the first answer, empty or not, is where this page began following:
+        // a frame the ring loses after it was lost while followed
+        primed = true;
         if (batch.state) onState(batch as RunState);
       } catch {
         /* the server is gone; the next tick will find out */
