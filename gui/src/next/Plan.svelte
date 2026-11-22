@@ -26,6 +26,7 @@
   import { tick } from "svelte";
 
   import Help from "../Help.svelte";
+  import { py } from "../lib/py";
   import { ApiError, api } from "../api";
   import type { HelpCorpus } from "../lib/help";
   import { resolve as helpEntry } from "../lib/help";
@@ -444,10 +445,10 @@
     const stage = stages[index];
     if (!stage || busy || noPhasesReason) return;
     selected = index;
-    const off = stage.turn_off?.length ? `, turn_off=${JSON.stringify(stage.turn_off)}` : "";
+    const off = stage.turn_off?.length ? `, turn_off=${py(stage.turn_off)}` : "";
     // the shell prints it once the run starts: it can still refuse
     onrun($state.snapshot(stage),
-          `p.run_stage(rx.Stage(${JSON.stringify(stage.name)}, ${JSON.stringify(stage.turn_on)}${off}))`);
+          `p.run_stage(rx.Stage(${py(stage.name)}, ${py(stage.turn_on)}${off}))`);
   }
 
   /** The stage `.` would run, for the palette's label: "" when there is none. */

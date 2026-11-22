@@ -18,6 +18,7 @@
   import { onMount, untrack } from "svelte";
 
   import { ApiError, api } from "../api";
+  import { py } from "../lib/py";
   import FileMenu from "../panels/FileMenu.svelte";
   import NewProject from "../panels/NewProject.svelte";
   import Palette from "../panels/Palette.svelte";
@@ -464,7 +465,7 @@
         say("call", `p.doc.two_theta_limits = ${limits ? `(${limits.join(", ")})` : "None"}`);
       }
       if ("excluded_regions" in patch)
-        say("call", `p.set_excluded_regions(${JSON.stringify(patch.excluded_regions)})`);
+        say("call", `p.set_excluded_regions(${py(patch.excluded_regions)})`);
       protocolError = "";
     } catch (error) {
       protocolError = (error as Error).message;
@@ -482,7 +483,7 @@
       const doc = await api.patchProject({ ui: patch });
       if (project?.path === path) project = doc;
       for (const [key, value] of Object.entries(patch))
-        say("comment", `# view kept: ui[${JSON.stringify(key)}] = ${JSON.stringify(value)}`);
+        say("comment", `# view kept: ui[${py(key)}] = ${py(value)}`);
     } catch (error) {
       say("comment", `# not kept: ${(error as Error).message}`);
     }

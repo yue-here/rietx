@@ -47,6 +47,7 @@
   import { ApiError, api } from "../api";
   import Help from "../Help.svelte";
   import { fnmatch } from "../lib/fnmatch";
+  import { py } from "../lib/py";
   import { clone, newAtom } from "../lib/model";
   import { paramKey, resolve, type HelpCorpus } from "../lib/help";
   import { editText, expText, numParts, slotWidth, slotsFor, type NumParts,
@@ -352,7 +353,7 @@
       for (const [path, flag] of holdEdits) {
         if (!flag) say("call", `ref.unhold(${JSON.stringify(path)})`);
       }
-      if (Object.keys(values).length) say("call", `ref.set_values(${JSON.stringify(values)})`);
+      if (Object.keys(values).length) say("call", `ref.set_values(${py(values)})`);
       for (const [path, flag] of varyEdits) {
         say("call", `ref.set_vary(${JSON.stringify(path)}, ${flag ? "True" : "False"})`);
       }
@@ -375,7 +376,7 @@
         // a set_values node (WP-1215); its answer names the values it set
         const out = await api.position(atom, xyz);
         if (out?.changed && out.values)
-          say("call", `ref.set_values(${JSON.stringify(out.values)})  # ${atom} to ${JSON.stringify(xyz)}`);
+          say("call", `ref.set_values(${py(out.values)})  # ${atom} to ${py(xyz)}`);
       } catch (exc) {
         // what landed before this changed the structure; the panel re-reads it
         await load();
