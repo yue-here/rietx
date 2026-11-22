@@ -1297,3 +1297,5 @@ Author's answers: items 4 and 5's wording corrections are applied (`db61420`); i
 - **2026-10-18** — created, from the milestone's opening session. 1317 (the series
   scrubber) and 1325 (parametric series) are open and adjacent; neither owns the fences,
   and this WP changes no view.
+
+*Pointer, 2026-11-21:* a rulings pass settled the ranking criterion, `fit:refit`, `relative_paths`/`angle_paths` and C10 q1, and listed what still awaits the maintainer, in `../milestones/generality.md` § Decisions (its last seven entries).
