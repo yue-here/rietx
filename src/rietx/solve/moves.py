@@ -57,7 +57,7 @@ model's own expression, read once at build.  With S_j(h) = Σ_m exp(2πi(Q·x_j 
 HT)), F = Σ_j a_j·S_j and |F|² = |A|² + |B|², the Friedel average
 :func:`~rietx.crystallography.structure_factor.structure_factors_squared`
 returns, in its units (electrons², fm²).  A move updates the running sums,
-F_new = F_old + a_j·(S_j,new − S_j,old), and :meth:`Scattering.refresh`
+F_new = F_old + a_j·(S_j,new − S_j,old), and :meth:`Scattering.sums`
 recomputes them in full.  The orbit sums dispatch to the compiled kernels
 (:func:`~rietx.model.compiled.solve_orbit_sums`,
 :func:`~rietx.model.compiled.solve_orbit_sums_one`); where those decline

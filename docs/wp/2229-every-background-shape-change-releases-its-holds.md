@@ -1,8 +1,7 @@
 # WP-2229 — Every change to the background's shape releases its holds, and no pending edit outlives its path
 
-Milestone: gui-overhaul · Status: ⬜
+Milestone: gui-overhaul · Status: ✅ 2026-11-21 — every instrument edit releases and frees on the server, and no pending edit outlives its path (PR #1741)
 Depends on: 2218 (the Background graph's fix this generalises)
-Priority: P3 2026-11-19 — a held term can come back held on a background that never had it, and nothing says so; `unhold` by hand is the workaround, and two of the three surfaces leave with today's page at the swap
 
 ## Goal
 
@@ -55,6 +54,26 @@ WP-2218's handover (2026-11-19, the review-fix bullet) recorded three cases it l
 case 1 on today's page is worth doing only if the swap is far off; the first task records
 which.
 
+**Case 1 checked against the tree, 2026-11-21 (at 8e100829b).** Three findings change the
+list above.
+
+- The `.rxt` document cannot change the background's shape. `textdoc.apply` runs
+  `set_values`, `set_vary`, the plan, three settings and the peak editor, and no model edit.
+  It is dropped.
+- The old Background tab is clean. `lib/background.ts:withLambda` sets `lambda_smooth` alone,
+  which changes no path. Dropped.
+- Today's instrument form (`applyFields` in `Model.svelte`) reaches no background field:
+  `lib/model.ts:instrumentFields` builds none. It is dropped as a background surface. Two
+  surfaces the list missed do change the shape: **Replace from file** on both pages
+  (`Model.svelte:replaceFrom`, `next/Instrument.svelte:loadProfile`) sends a whole instrument,
+  whose background may be of another kind or length. The rebuilt dialog's anode choice also
+  changes the number of emission lines, so a hold on `instrument.source.lines.1.weight` has
+  the same defect in another family.
+- So the arms move to the server: `GuiSession.instrument_patch` derives them from the two
+  tables, for every client and every positional family in the instrument. Today's page
+  then needs only its added terms built free. The swap is three pieces off (R5 to R7 after
+  R4), so that one-line fix is worth making.
+
 **The tier of each rule this WP adds.** None. A release or a free follows from the edit the
 person asked for, and the edit's console line says so.
 
@@ -66,16 +85,16 @@ person asked for, and the edit's console line says so.
 
 ## Tasks
 
-- [ ] Confirm each surface in case 1 against the tree; drop the ones that cannot change the
+- [x] Confirm each surface in case 1 against the tree; drop the ones that cannot change the
       background's shape, and say whether the swap makes today's page's fix moot.
-- [ ] Case 1: every surface left sends `unhold` and `free` built by `next/background.ts`, or
+- [x] Case 1: every surface left sends `unhold` and `free` built by `next/background.ts`, or
       the arms move to the server so no client can omit them.
-- [ ] Case 2: a hold on a background path the model lacks is released when an extension
+- [x] Case 2: a hold on a background path the model lacks is released when an extension
       rebuilds that path.
-- [ ] Case 3: `dropPending` drops pending positions and restraints on a gone path.
-- [ ] Tests: `tests/test_gui_background.py` for the server arms; vitest for `dropPending` and
+- [x] Case 3: `dropPending` drops pending positions and restraints on a gone path.
+- [x] Tests: `tests/test_gui_background.py` for the server arms; vitest for `dropPending` and
       for each client surface; a browser case by real clicks for any surface still mounted.
-- [ ] Skill: none. The skill drives the python API, which keeps holds by path on purpose.
+- [x] Skill: none. The skill drives the python API, which keeps holds by path on purpose.
 
 ## Acceptance
 
@@ -85,6 +104,62 @@ npm --prefix gui test && npm --prefix gui run check
 ```
 
 ## Handover log
+
+- **2026-11-21** — closed, PR #1741 (two ghostshift runners, one after the other). A hold or a
+  free flag in the GUI is a note about a parameter's *name*, and the package keeps it when the
+  model changes. Before this WP, only the Background graph at `/next` cleaned those notes up
+  when a background changed type or length. Now the server does it for every instrument edit,
+  whichever screen sent it. A held Chebyshev term no longer holds the P-spline term of the same
+  name, a hold left on a term an old cut removed no longer comes back, and an added term is free
+  as the screen built it. The same rule covers emission lines, which the new dialog's anode
+  choice and Replace from file can add or remove. The Parameters panel drops every kind of
+  pending edit on a path the edit ended, so Apply is not refused on a path that is gone.
+  - *Done.* Case 1 checked against the tree (see Context): the `.rxt` document and the old
+    Background tab cannot change the background's shape, and Replace from file on both pages
+    can. `GuiSession.instrument_patch` compares the old and new parameter tables
+    (`_register_arms`) and works out four lists: `release` (holds on paths the edit removes,
+    redefines or builds, read off the hold register, so case 2's hold with no row is found),
+    `free` (built paths the new model says vary), `fix` (built paths the new model says fixed
+    and the free register still names) and `ended`. A background coefficient is *redefined*
+    when the kind or the P-spline's breakpoints change. The verbs run on a history-free copy
+    first (`rehearse`), so a refusal leaves everything as it was. The request's `unhold` and
+    `free` fields are gone; the answer gains `released`, `freed`, `fixed` and `ended`. Every
+    client echoes the registers' part (`lib/model.ts:registerEcho`) and passes `ended` to the
+    Parameters panel's `dropPending`, which now drops restraints and positions too (case 3).
+    Today's Model-tab Terms box builds an added term free. `next/background.ts` lost
+    `kindArms`/`termsArms`.
+  - *Review.* `/code-review high --fix` made three fixes (b1e50ed14): a re-knotted P-spline
+    counts as redefined; the `fix` arm; `_user_holds` read without a snapshot. Two more findings
+    fixed by the second runner (138cb7c6e): **4**, the Instrument dialog sent its typed values
+    after a model edit that could have ended their paths, so the request could land half; it
+    now drops them and says so. No dialog field ends a path today (probed on `fap` and `nac`:
+    geometry kind and peak shape end none), so this is a guard. **9**, the ended test was
+    written twice; `lib/model.ts:endedBy` is now the one reading.
+  - *Left open.* **5**: when the current or the new model builds no parameter table,
+    `_register_arms` returns `None` and the edit runs with no register work. Whether a broken
+    model's holds should be released is a design call; it would go in `_register_arms`
+    (`src/rietx/gui/session.py`) under a new WP. **6**: an `extra_components` or
+    `peak_equations` entry that changes kind at the same index keeps its paths and is not
+    treated as redefined; the rule would extend `_register_arms`' `redefined` set, under a new
+    WP if the GUI grows a surface that swaps one. **7**: today's page ignores `ended`, since it
+    has no pending-edit store of the Parameters panel's kind; it retires at the swap (WP-2214,
+    pieces R5 to R7), so nothing is planned. **8**: `freed` and `fixed` echo the lists offered
+    to `set_vary`, not its return; folded into WP-2212's `### Inherited`, since the console's
+    script export is what would trust the line.
+  - *Not generalised.* Structure edits: the package carries holds through an atom renumbering
+    by label (#1264), which a comparison by path would undo. Today's page's Params pending
+    edits. A stale entry left in the free register by a cut before this WP still warns
+    "restored parameter path(s) no longer exist" on a checkout.
+  - *Measured* (venv `[dev]` + playwright, darwin/arm64, on main e1f6d1ac4 merged in):
+    vitest 867 passed (47 files), svelte-check 0 errors in 461 files; every `tests/*_browser.py`
+    174 passed; fast suite 15218 passed, 433 skipped, 32 xfailed (playwright installed, so the
+    browser files run in it). The added tests cost 4.80 s in that run, 4.26 s of it the browser
+    case; the eight server tests 0.55 s. `tests/test_gui_background.py` gained 8 tests and lost 1 (a rename);
+    `tests/test_gui_layout_browser.py` gained 1, which skips in CI (no playwright there).
+    `tests.reader_output` exit 0, unchanged. ruff clean; vale 0 errors.
+  - *Generality.* Not dispatched: `_audit.py` untouched, and the release and free follow from
+    the edit the person asked for, which the console line names (Context, tier).
+  - Next: none in this WP. The open findings above have their places.
 
 - **2026-11-19** — filed by the ghostshift runner on WP-2223's branch, from WP-2218's
   review-fix bullet. No open WP owns the hold registers or the Parameters panel's pending
