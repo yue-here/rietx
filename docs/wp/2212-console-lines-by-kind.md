@@ -162,13 +162,16 @@ Pruned 2026-11-21 at start: all four entries still hold on `origin/main` (`d76e4
   Export submenu. A test drives a short session on a copy of a shipped example (a value set, a
   stage run), runs the exported script on a second copy, and asserts the two heads hold the
   same parameter values.
-- [ ] The GUI chapter on the Console and the File menu's Export, the screenshot driver, the
+- [x] The GUI chapter on the Console and the File menu's Export, the screenshot driver, the
   screenshots retaken, each beside the prototype's at 1440 by 900 in the PR (milestone row 11).
+  The chapter waits for the swap, under WP-2214 § Tests and the manual, piece by piece. The new
+  route's row is in `reference/gui-power.md`, because `test_gui_manual` partitions routes now.
+  The shots are in `docs/wp/2212-screenshots/`. The prototype's stay out of the tree.
 - [x] `follow()` reports the frames it lost on both paths, and the Console reads the count
   (#1656 item 1, folded above). One vitest case per path.
 - [x] `instrument_patch` answers what `set_vary` returned (WP-2229 finding 8), and works from
   the registers when only the old table fails (finding 5). One server test each.
-- [ ] Skill: none. The GUI is a human surface, and an agent drives the python API.
+- [x] Skill: none. The GUI is a human surface, and an agent drives the python API.
 
 ## Acceptance
 
