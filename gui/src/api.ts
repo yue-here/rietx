@@ -113,6 +113,8 @@ export interface InstrumentEdit {
   freed: string[];
   /** built paths the free register still named and the new model fixes */
   fixed: string[];
+  /** the release ran after the edit: the old model built no table (WP-2212) */
+  release_after?: boolean;
   ended: string[];
 }
 

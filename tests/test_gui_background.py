@@ -427,6 +427,8 @@ def test_an_old_model_with_no_table_is_tidied_from_the_registers(tmp_path_factor
     single = {**ins, "source": {**ins["source"], "lines": ins["source"]["lines"][:1]}}
     answer = session.instrument_patch({"instrument": single})
     assert answer["released"] == ["instrument.source.lines.1.weight"]
+    # the release ran after the edit, and the console's echo says so
+    assert answer["release_after"] is True
     assert answer["ended"] == ["instrument.source.lines.1.weight"]
     assert answer["freed"] == [] and answer["fixed"] == []
     assert project.refinement.snapshot().holds == []

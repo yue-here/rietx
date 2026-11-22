@@ -1820,7 +1820,9 @@ class GuiSession:
         and ``fixed`` are what ``set_vary`` returned, never the lists offered
         to it: it can refuse a locked or force-fixed path, and the console
         line, which the Console's script repeats, must name only what changed
-        (WP-2212, WP-2229's finding 8).
+        (WP-2212, WP-2229's finding 8). ``release_after`` says the release ran
+        after the edit, as it must on an old model with no table, so the
+        script repeats the two in that order.
         """
         self._require_idle()
         p = self._need_project()
@@ -1858,9 +1860,9 @@ class GuiSession:
         if arms and (arms[0] or arms[1] or arms[2]):
             rehearse(p.refinement, apply)
         node = apply(p.refinement)
-        release, _, _, ended, _ = arms or ([], [], [], [], False)
+        release, _, _, ended, tableless = arms or ([], [], [], [], False)
         return {"node_id": node, "released": release, "freed": changed["freed"],
-                "fixed": changed["fixed"],
+                "fixed": changed["fixed"], "release_after": tableless,
                 "ended": ended, **self.instrument()}
 
     def structure_position(self, body: dict) -> dict:

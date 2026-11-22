@@ -336,14 +336,11 @@
       || limitEdits.size || restraintEdits.size;
     if (needsPatch) {
       if (!(await patch(body))) return false;
-      // landed, so echoed: a refused patch ran nothing the script could repeat
-      if (Object.keys(values).length) say("call", `ref.set_values(${JSON.stringify(values)})`);
-      for (const [path, flag] of varyEdits) {
-        say("call", `ref.set_vary(${JSON.stringify(path)}, ${flag ? "True" : "False"})`);
-      }
-      for (const [path, flag] of holdEdits) {
-        say("call", `ref.${flag ? "hold" : "unhold"}(${JSON.stringify(path)})`);
-      }
+      // landed, so echoed, in the order the route ran them
+      // (`session._apply_param_arms`): limits and restraints, the releases,
+      // values, the vary flags, the holds. The script repeats this order,
+      // and `set_vary` refuses a path still held.
+      // A refused patch ran nothing the script could repeat.
       if (limitEdits.size || restraintEdits.size) {
         const onInstrument = [...limitEdits.keys()].some((p) => p.startsWith("instrument."));
         const onStructure = restraintEdits.size > 0
@@ -351,6 +348,16 @@
         const args = [onStructure ? "structure=…" : "", onInstrument ? "instrument=…" : ""]
           .filter(Boolean).join(", ");
         say("call", `ref.edit(${args})  # limits and restraints`, null);
+      }
+      for (const [path, flag] of holdEdits) {
+        if (!flag) say("call", `ref.unhold(${JSON.stringify(path)})`);
+      }
+      if (Object.keys(values).length) say("call", `ref.set_values(${JSON.stringify(values)})`);
+      for (const [path, flag] of varyEdits) {
+        say("call", `ref.set_vary(${JSON.stringify(path)}, ${flag ? "True" : "False"})`);
+      }
+      for (const [path, flag] of holdEdits) {
+        if (flag) say("call", `ref.hold(${JSON.stringify(path)})`);
       }
       // landed: a retry after a refused position below must not send these
       // again (an unhold of a path no longer held is refused)
