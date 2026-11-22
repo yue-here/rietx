@@ -440,8 +440,9 @@
   function readColors() {
     const style = getComputedStyle(document.documentElement);
     const read = (name: string) => style.getPropertyValue(name);
+    // `--fg` is a token every theme sets (tokens.css), so it has no fallback
     return { ...curveColors(read), warn: read("--warn").trim() || "#7d5f00",
-             fg: read("--fg").trim() || "#222222" };
+             fg: read("--fg").trim() };
   }
   let colors = readColors();
 
