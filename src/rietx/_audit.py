@@ -2149,8 +2149,9 @@ ROWS: tuple[Row, ...] = (
                  "the milestone's acceptance row 'a fixed value stays fixed' names this "
                  "fixture and value: 0.00797 on every pattern and every attempt "
                  "(docs/milestones/series.md § Acceptance). The source, the warm rung's "
-                 "own, settled by Claude 2026-11-22 as WP-2081 question 4's option A."),
-        approved="2026-11-18"),
+                 "own, settled by Claude 2026-11-22 as WP-2081 question 4's option A and "
+                 "approved by the maintainer with PR #1778 on 2026-11-22."),
+        approved="2026-11-22"),
     Row("rietx.schemas.sequential.SeriesEntry.rungs_tried", "action"),
     Row("rietx.schemas.sequential.SeriesEntry.rungs_raised", "action"),
     Row("rietx.schemas.sequential.SeriesEntry.seeded_from", "action", tier=3, ambiguity=1,

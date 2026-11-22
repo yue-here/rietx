@@ -698,7 +698,8 @@ flag reprints the saved numbers without fitting.
      neighbours" field, under series rule 5 (a field, never a code) and WP-1076.
      Alternatives: `{}` for nothing held; a second boolean field.
   5. The field's row at tier 3 approved 2026-11-18, resting on the maintainer's approval
-     of the acceptance row. Alternative: bring the row to the maintainer.
+     of the acceptance row. Alternative: bring the row to the maintainer. Superseded
+     2026-11-22: the maintainer approved PR #1778, and the row is dated to that approval.
   6. Rules 1 and 2 combined into WP-2300, and the preset, route and Switching page into
      WP-2301, both P3, under the WP-filing rule (one seam, one decision). Alternative: four
      WPs, or folding the declaration into WP-2103.
