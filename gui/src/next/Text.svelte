@@ -85,6 +85,9 @@
   /** Whether this tab has a preview (or a refusal) up, so taking it down is
    *  said once and never clears another panel's. */
   let previewUp = false;
+  /** The values last sent, so a check that changes none of them (a comment,
+   *  a refine flag) asks the server for no second identical pattern. */
+  let previewKey = "";
   const queue = new PreviewQueue<Curves>(
     async (values) => {
       const [answer, chart] = await Promise.all([api.preview(values), import("rxplot")]);
@@ -102,6 +105,7 @@
 
   function dropPreview() {
     queue.clear();
+    previewKey = "";
     if (!previewUp) return;
     previewUp = false;
     onpreview(null, "");
@@ -112,18 +116,18 @@
   // not on every dispatch (checking, checked) that leaves both alone
   const base = $derived(sync.base);
   const buffer = $derived(sync.buffer);
-  /** A comment does not survive a re-render (WP-1009), so say so before Apply
-   *  replaces the buffer. */
   /** The stale notice's words (the maintainer's look, 2026-11-21: today's
    *  `STALE_NOTICE` read unclearly). Re-read beside it discards the edit. */
-  const STALE_WORDS =
-    "The project changed after this text was read. Re-read it, then make your edit again.";
+  const STALE_CAUSE = "The project changed after this text was read.";
+  const STALE_WORDS = `${STALE_CAUSE} Re-read it, then make your edit again.`;
+  /** A comment does not survive a re-render (WP-1009), so say so before Apply
+   *  replaces the buffer. */
   const addedComments = $derived(
     Math.max(0, commentLines(buffer) - commentLines(base)));
   const edited = $derived(loaded && buffer !== base);
   const editedMarks = $derived(edited ? editedLines(base, buffer) : []);
   const why = $derived(!edited ? ""
-    : sync.stale ? "The project changed after this text was read. Re-read it in the Text tab."
+    : sync.stale ? `${STALE_CAUSE} Re-read it in the Text tab.`
     : sync.phase === "invalid"
       ? (problems.length
         ? `The text has ${problems.length} problem${problems.length === 1 ? "" : "s"}.`
@@ -228,8 +232,14 @@
       // a newer keystroke has its own check coming, which previews its values
       if (seq !== sync.seq) return;
       const values = (payload.delta?.values ?? {}) as Record<string, number>;
-      if (Object.keys(values).length) queue.push(values);
-      else dropPreview();
+      if (!Object.keys(values).length) dropPreview();
+      else {
+        const key = JSON.stringify(Object.entries(values).sort(([a], [b]) => (a < b ? -1 : 1)));
+        if (key !== previewKey) {
+          previewKey = key;
+          queue.push(values);
+        }
+      }
     } catch (error) {
       absorb(error, seq);
     }

@@ -314,9 +314,6 @@
     };
   }
 
-  /** Each pane's plot area from the top of the host, which places the legend
-   *  beside the pane its curve is drawn in. Read after a draw, since a scale
-   *  switch builds a new pane. */
   /** Where `v` sits from the plot area's top in CSS px, or null out of view. */
   function inView(u: any, v: number): number | null {
     const y = u.valToPos(v, "y");
@@ -335,6 +332,10 @@
     return top;
   }
 
+  /** Each pane's plot area from the top of the host, which places the legend
+   *  beside the pane its curve is drawn in. Read after a draw, since a scale
+   *  switch builds a new pane. A preview redraws at every slider answer, so
+   *  an unchanged layout is not published again. */
   function relayout() {
     requestAnimationFrame(() => {
       if (!chart) return;
@@ -346,12 +347,13 @@
                      height: u.bbox.height / dpr, pad: u.bbox.top / dpr,
                      mark: topTick(u), zero: inView(u, 0) };
       }
-      geom = out;
+      if (JSON.stringify(out) !== JSON.stringify(geom)) geom = out;
       const main = chart.fig.panes.main;
       if (main && host) {
-        plotX = { left: (main.over as HTMLElement).getBoundingClientRect().left
-                    - host.getBoundingClientRect().left,
-                  width: main.bbox.width / dpr };
+        const x = { left: (main.over as HTMLElement).getBoundingClientRect().left
+                      - host.getBoundingClientRect().left,
+                    width: main.bbox.width / dpr };
+        if (x.left !== plotX?.left || x.width !== plotX?.width) plotX = x;
       }
     });
   }

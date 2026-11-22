@@ -93,7 +93,7 @@ export const GRAPH_HELP: Record<GraphTab, HelpBoxEntry> = {
     items: [
       "Drag to rotate. Scroll to zoom.",
       "a, b and c look down that axis.",
-      "It draws the last fit, or the preview while you edit positions or the cell.",
+      "It draws the last fit, or the preview while you move a position or the cell in Interactive.",
     ],
     anchor: "the-3d-view",
   },

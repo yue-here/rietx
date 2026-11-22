@@ -26,6 +26,11 @@
   let box: HTMLDivElement | undefined = $state();
   let at = $state({ right: 0, top: 0 });
 
+  // the box takes focus as it opens, as every help popover does (gui/CLAUDE.md)
+  $effect(() => {
+    if (open && box) box.focus();
+  });
+
   const manual = $derived(docsUrl
     ? `${docsUrl.replace(/\/+$/, "")}/reference/gui-guide.html#${entry.anchor}` : null);
 
@@ -63,7 +68,7 @@
   aria-expanded={open} title="Help for this tab" onclick={toggle}>?</button>
 
 {#if open}
-  <div class="helpbox" role="dialog" aria-label={entry.title} bind:this={box}
+  <div class="helpbox" role="dialog" tabindex="-1" aria-label={entry.title} bind:this={box}
     style="right: {at.right}px; top: {at.top}px">
     <p class="title">{entry.title}</p>
     {#if entry.lead}<p>{entry.lead}</p>{/if}
@@ -87,6 +92,11 @@
     margin-left: auto;
     font-weight: 600;
     color: var(--muted);
+  }
+
+  /* focused as it opens, for a screen reader; the box itself draws no ring */
+  .helpbox:focus {
+    outline: none;
   }
 
   .helpbox {

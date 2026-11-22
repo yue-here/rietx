@@ -329,9 +329,11 @@ The Text tab (the second PR), most consequential first:
 The maintainer's look (the third PR), most consequential first:
 
 19. **While both the Interactive tab and the Text tab hold a preview, the graphs draw the
-    Text tab's.** The frame keeps the two answers apart, and the text is the wider
-    statement, since it can carry every value a slider moves. The alternative is the later
-    answer of the two, which would flip the plot between them as each panel's queue lands.
+    panel that answered last**, and fall back to the other's when that one is taken down.
+    Curves and refusal always come from one panel. Grounds: the plot follows what the person
+    touched last, as the Structure graph already follows the sliders. The alternative, the
+    Text tab's always, was this PR's first draft; the code review found it left a slider
+    drag invisible on the Pattern graph while the Structure graph moved.
 20. **A buffer whose changes are only refine flags, settings or peak moves previews
     nothing**, and takes down a preview it had. Grounds: none of them moves a curve, and
     `POST /api/preview` takes values only. The values come from the validation route's own

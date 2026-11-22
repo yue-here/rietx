@@ -2,6 +2,7 @@
 // A tab strip's `?` box at /next (WP-2231, the maintainer's look of
 // 2026-11-21, item 6): one button opens the box for the tab that is up, with
 // a link into the manual, and Esc or Close shuts it.
+import { readFileSync } from "node:fs";
 import { flushSync, mount, unmount } from "svelte";
 import { afterEach, describe, expect, it } from "vitest";
 import HelpBox from "./HelpBox.svelte";
@@ -27,6 +28,20 @@ describe("the ? box", () => {
     for (const t of GRAPH_TABS) expect(GRAPH_HELP[t.id].title).toBe(t.label);
   });
 
+  it("links only to sections the manual's GUI chapter has", () => {
+    // `help.py`'s anchors are checked against the built manual; these live in
+    // TypeScript, so a renamed heading would otherwise leave a dead link
+    // a jsdom test's module URL is vite's `/@fs/…`, so drop that prefix
+    const guide = readFileSync(decodeURIComponent(
+      new URL("../../../docs/docs/reference/gui-guide.md", import.meta.url).pathname)
+      .replace(/^\/@fs/, ""), "utf-8");
+    const ids = new Set([...guide.matchAll(/^#{1,6} (.+)$/gm)].map(([, h]) =>
+      h.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")));
+    for (const entry of [...Object.values(MODEL_HELP), ...Object.values(GRAPH_HELP)]) {
+      expect(ids, entry.anchor).toContain(entry.anchor);
+    }
+  });
+
   it("opens the tab's box, links the manual's section, and closes on Esc and on Close", () => {
     app = mount(HelpBox, { target: document.body, props: {
       entry: MODEL_HELP.text, label: "About the Text tab", docsUrl: "https://rietx.org/docs/" } });
@@ -37,6 +52,7 @@ describe("the ? box", () => {
     flushSync();
     const box = document.querySelector("[role=dialog]")!;
     expect(box.getAttribute("aria-label")).toBe("Text");
+    expect(document.activeElement).toBe(box);
     expect(box.textContent).toContain("becomes a pending edit");
     expect(box.querySelector("a")!.getAttribute("href"))
       .toBe("https://rietx.org/docs/reference/gui-guide.html#text");

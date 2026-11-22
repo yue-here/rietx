@@ -120,7 +120,9 @@
     for (const path of neverFreed) {
       const key = byPath.get(path)?.help_key ?? null;
       const name = (key && globName(key, corpus)) || path;
-      named.set(name, [...(named.get(name) ?? []), path]);
+      const paths = named.get(name);
+      if (paths) paths.push(path);
+      else named.set(name, [path]);
     }
     return [...named].map(([name, paths]) => ({
       words: paths.length > 1 ? `${name} (${paths.length})` : name,
