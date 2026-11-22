@@ -991,14 +991,19 @@ def test_no_frame_control_moves_the_rebuilt_layout(browser, gui):
         page.close()
 
     page = _open_next(browser, url, 1300)
-    tabs = page.locator("section .tabs button").all_text_contents()
+    tabs = page.locator("section .tabs [role=tab]").all_text_contents()
     page.close()
     assert len(tabs) == 8, tabs
     for name in tabs:
-        pressing(name, lambda p, n=name: p.locator("section .tabs button", has_text=n).first.click())
+        pressing(name, lambda p, n=name: p.locator("section .tabs [role=tab]", has_text=n).first.click())
 
     def escape(p):
         p.keyboard.press("Escape")
+
+    # each strip's ? box floats over the page (the maintainer's look, 2026-11-21, item 6)
+    for strip, label in (("graphs", "About the Pattern graph"), ("model", "About the Parameters tab")):
+        pressing(f"{strip} ? box", lambda p, n=label: p.get_by_role("button", name=n, exact=True).click(),
+                 escape)
 
     def series(p):
         p.locator("button.mbtn.wf").click()
@@ -1756,5 +1761,261 @@ def test_the_background_graph_s_edits_leave_no_stale_hold_or_pending_edit(browse
             [p for p, r in spline.items() if r["held"] or not r["vary"]]
         assert not page.errors, page.errors
         page.close()
+    finally:
+        httpd.shutdown()
+
+
+def test_today_s_terms_box_leaves_no_stale_hold(browser, tmp_path_factory):
+    """WP-2229 case 1, on today's page: its Model tab's Terms box sends the
+    instrument alone, and the server releases the hold on a term the cut
+    removes and frees the terms the extension adds. Before, the box sent no
+    arms and built an added term fixed, so the hold came back with the term.
+    Typed and committed with the keyboard, as a person does. A project of its
+    own, since the edits are written."""
+    httpd, client = _serve(tmp_path_factory, "today-terms")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    try:
+        status, body = client.patch("/api/params", {"vary": {"instrument.background.*": True}})
+        assert status == 200, body
+        status, body = client.patch("/api/params", {"hold": {"instrument.background.c2": True}})
+        assert status == 200, body
+        page = browser.new_page(viewport={"width": 1440, "height": 900})
+        errors: list[str] = []
+        page.on("pageerror", lambda exc: errors.append(str(exc)))
+        page.goto(url)
+        page.locator("nav.tabs").get_by_role("button", name="Model", exact=True).click()
+
+        def rows():
+            return {r["path"]: r for r in client.get("/api/params")[1]["parameters"]
+                    if r["path"].startswith("instrument.background.c")}
+
+        def terms(n: int) -> None:
+            box = page.locator("label.inline", has_text="terms").locator("input")
+            box.click()
+            page.keyboard.press("ControlOrMeta+A")
+            page.keyboard.type(str(n))
+            page.keyboard.press("Enter")
+            for _ in range(100):
+                if len(rows()) == n:
+                    return
+                page.wait_for_timeout(50)
+            raise AssertionError(f"the background never reached {n} terms: {sorted(rows())}")
+
+        before = len(rows())
+        assert rows()["instrument.background.c2"]["held"]
+        terms(2)
+        assert sorted(rows()) == ["instrument.background.c0", "instrument.background.c1"]
+        terms(before + 1)
+        back = rows()
+        assert not back["instrument.background.c2"]["held"], back["instrument.background.c2"]
+        assert all(back[f"instrument.background.c{k}"]["vary"]
+                   for k in range(2, before + 1)), back
+        assert not errors, errors
+        page.close()
+    finally:
+        httpd.shutdown()
+
+
+#: A five-stage plan, as acceptance row 8 asks, on the synthetic project.
+FIVE_STAGES = [
+    {"name": "scale", "turn_on": ["phases.*.scale"], "max_iter": 5},
+    {"name": "background", "turn_on": ["instrument.background.*"], "max_iter": 5},
+    {"name": "cell", "turn_on": ["phases.*.cell.*"], "max_iter": 5},
+    {"name": "zero", "turn_on": ["instrument.zero_shift"], "max_iter": 5},
+    {"name": "biso", "turn_on": ["phases.*.atoms.*.biso"], "max_iter": 5},
+]
+
+
+@pytest.fixture(scope="module")
+def next_plan(tmp_path_factory):
+    """A project whose stored plan has five stages, served as ``rietx gui`` serves it."""
+    httpd, client = _serve(tmp_path_factory, "next-plan")
+    status, body = client.put("/api/plan", {"plan": {"stages": FIVE_STAGES}})
+    assert status == 200, body
+    try:
+        yield f"http://127.0.0.1:{httpd.server_address[1]}/", client
+    finally:
+        httpd.shutdown()
+
+
+def _open_next_plan(browser, url: str):
+    page = _open_window(browser, url)
+    page.locator("section.model .tabs").get_by_role("tab", name="Plan", exact=True).click()
+    page.wait_for_selector("section[aria-label=plan] .stg .badge")
+    _frames(page)
+    return page
+
+
+def _next_names(page) -> list[str]:
+    return page.locator("section[aria-label=plan] input.sn").evaluate_all(
+        "els => els.map(e => e.value)")
+
+
+def test_the_rebuilt_plan_reorders_by_a_real_drag_and_moves_nothing_else(browser, next_plan):
+    """WP-2231 on a five-stage plan. A press on the grip with no drag moves
+    nothing. A real drag drops the stage where its centre crossed and is one
+    pending edit in the action bar, whose slot is reserved, so no landmark
+    moves. ⌘Z takes it back, ⇧⌘Z redoes it, and the bar's Revert restores
+    the stored plan."""
+    url, _ = next_plan
+    page = _open_next_plan(browser, url)
+    names = _next_names(page)
+    assert names == [s["name"] for s in FIVE_STAGES]
+
+    box = page.locator('[data-handle="2"]').bounding_box()
+    x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+    before = page.evaluate(SNAP, WINDOW_LANDMARKS)
+    page.mouse.move(x, y)
+    page.mouse.down()
+    page.mouse.up()
+    _frames(page)
+    assert _next_names(page) == names
+    assert not _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))
+
+    top = page.locator('[data-handle="0"]').bounding_box()
+    page.mouse.move(x, y)
+    page.mouse.down()
+    page.mouse.move(x, top["y"] - 12, steps=8)
+    page.mouse.up()
+    _frames(page)
+    assert _next_names(page) == [names[2], names[0], names[1], *names[3:]]
+    assert page.locator(".actions .pending").text_content().strip() == "1 pending"
+    moved = _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))
+
+    page.keyboard.press("ControlOrMeta+z")
+    _frames(page)
+    assert _next_names(page) == names
+    page.keyboard.press("ControlOrMeta+Shift+z")
+    _frames(page)
+    assert _next_names(page)[0] == names[2]
+    page.get_by_role("button", name="Revert", exact=True).click()
+    _frames(page)
+    assert _next_names(page) == names
+    assert page.locator(".actions .pending").text_content().strip() == ""
+    assert not page.errors, page.errors
+    page.close()
+    assert not moved, moved
+
+
+def test_the_rebuilt_plan_picker_adds_a_chip_and_moves_nothing(browser, next_plan):
+    """`+ Add` opens the grouped picker. The stage's own glob is offered
+    disabled, and a glob another stage frees says it moves from there. The
+    chosen one becomes a chip in the stage's Free row, one pending edit, and
+    neither the picker nor the chip moves a landmark."""
+    url, _ = next_plan
+    page = _open_next_plan(browser, url)
+    before = page.evaluate(SNAP, WINDOW_LANDMARKS)
+    zero = page.locator('section[aria-label=plan] .stg[data-stage="3"]')
+    zero.get_by_role("button", name="+ Add", exact=True).click()
+    dialog = page.get_by_role("dialog", name="Add to stage 4", exact=True)
+    dialog.get_by_role("textbox", name="Search parameters", exact=True).fill("zero")
+    own = dialog.locator('button.op[title="instrument.zero_shift"]')
+    assert own.is_disabled() and "in this stage" in own.text_content()
+    page.keyboard.press("Escape")
+    _frames(page)
+    assert not dialog.count()
+
+    stage = page.locator('section[aria-label=plan] .stg[data-stage="2"]')
+    stage.get_by_role("button", name="+ Add", exact=True).click()
+    dialog = page.get_by_role("dialog", name="Add to stage 3", exact=True)
+    dialog.get_by_role("textbox", name="Search parameters", exact=True).fill("zero")
+    choice = dialog.locator('button.op[title="instrument.zero_shift"]')
+    assert "moves from stage 4" in choice.text_content()
+    choice.click()
+    _frames(page)
+    free = stage.locator(".stg2").first.locator(".pt")
+    assert free.evaluate_all("els => els.map(e => e.title)") == [
+        "phases.*.cell.*", "instrument.zero_shift"]
+    assert page.locator(".actions .pending").text_content().strip() == "1 pending"
+
+    # the picker stays open after a choice, so a glob no group names is
+    # typed into it and entered as itself
+    assert dialog.count()
+    search = dialog.get_by_role("textbox", name="Search parameters", exact=True)
+    search.fill("phases.*.atoms.0.*")
+    search.press("Enter")
+    _frames(page)
+    assert free.evaluate_all("els => els.map(e => e.title)") == [
+        "phases.*.cell.*", "instrument.zero_shift", "phases.*.atoms.0.*"]
+    page.keyboard.press("Escape")
+    _frames(page)
+    moved = _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))
+    page.get_by_role("button", name="Revert", exact=True).click()
+    _frames(page)
+    assert not page.errors, page.errors
+    page.close()
+    assert not moved, moved
+
+
+def _biso(client) -> float:
+    rows = client.get("/api/params")[1]["parameters"]
+    return next(r["value"] for r in rows if r["path"] == "phases.0.atoms.0.biso")
+
+
+def _retype_line(page, line, text: str) -> None:
+    """A real click on the line, then Home, Shift+End and typing over it."""
+    line.scroll_into_view_if_needed()
+    line.click()
+    page.keyboard.press("Home")
+    page.keyboard.press("Shift+End")
+    page.keyboard.type(text)
+
+
+def test_the_rebuilt_text_tab_applies_a_typed_value_from_the_bar(browser, tmp_path_factory):
+    """WP-2231 rows 139-146. The Text tab names the file and its sync word. A
+    value typed into the editor marks its line, is one pending edit in the
+    action bar and moves no place; the bar's Apply stores it. ⌘⏎ inside the
+    editor applies a second value and starts no run. A project of its own,
+    since both applies are written."""
+    httpd, client = _serve(tmp_path_factory, "next-text")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    try:
+        page = _open_window(browser, url)
+        runs = []
+        page.on("request", lambda r: runs.append(r.url) if "/api/run" in r.url else None)
+        page.locator("section.model .tabs").get_by_role("tab", name="Text", exact=True).click()
+        text = page.locator("section[aria-label=text]")
+        page.wait_for_function(
+            "() => document.querySelector('section[aria-label=text] .sync')?.textContent === 'in sync'")
+        page.wait_for_selector("section[aria-label=text] .cm-content")
+        _frames(page)
+        assert text.locator(".bar .file").text_content() == "sample.rxt"
+        assert not text.get_by_role("button").count()
+        # ⌘⏎ in the editor is its Apply, so with nothing typed it refines nothing
+        text.locator(".cm-line", has_text="atoms.0.biso").click()
+        page.keyboard.press("ControlOrMeta+Enter")
+        _frames(page)
+        assert not runs, runs
+        before = page.evaluate(SNAP, WINDOW_LANDMARKS)
+
+        line = text.locator(".cm-line", has_text="atoms.0.biso")
+        _retype_line(page, line, "atoms.0.biso 0.7")
+        page.wait_for_function(
+            "() => document.querySelector('section[aria-label=text] .sync')?.textContent === 'edited'")
+        _frames(page)
+        assert page.locator(".actions .pending").text_content().strip() == "1 pending"
+        assert "atoms.0.biso 0.7" in text.locator(".cm-edited").all_text_contents()[0]
+        moved = _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))
+
+        page.get_by_role("button", name="Apply", exact=True).click()
+        page.wait_for_function(
+            "() => document.querySelector('section[aria-label=text] .sync')?.textContent === 'in sync'")
+        _frames(page)
+        assert _biso(client) == pytest.approx(0.7)
+        assert page.locator(".actions .pending").text_content().strip() == ""
+        assert not text.locator(".cm-edited").count()
+
+        _retype_line(page, text.locator(".cm-line", has_text="atoms.0.biso"), "atoms.0.biso 0.8")
+        page.wait_for_function(
+            "() => document.querySelector('section[aria-label=text] .sync')?.textContent === 'edited'")
+        page.keyboard.press("ControlOrMeta+Enter")
+        page.wait_for_function(
+            "() => document.querySelector('section[aria-label=text] .sync')?.textContent === 'in sync'")
+        _frames(page)
+        assert _biso(client) == pytest.approx(0.8)
+        assert not runs, runs
+        assert not page.errors, page.errors
+        page.close()
+        assert not moved, moved
     finally:
         httpd.shutdown()

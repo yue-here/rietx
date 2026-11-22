@@ -9,13 +9,15 @@
    "DISPERSION_NEGLECTED": "info",
    "FLAT_DIRECTION": "warning",
    "FLOOR_HIT": "warning",
-   "HIGH_CORRELATION": "warning"
+   "HIGH_CORRELATION": "warning",
+   "INSTRUMENT_WIDTH_HELD": "warning"
   },
   "corundum": {
    "DISPERSION_NEGLECTED": "info",
    "FLAT_DIRECTION": "warning",
    "FLOOR_HIT": "warning",
    "HIGH_CORRELATION": "warning",
+   "INSTRUMENT_WIDTH_HELD": "warning",
    "SPACE_GROUP_SETTING_ASSUMED": "warning"
   },
   "fap": {
@@ -24,10 +26,10 @@
    "SITE_SNAPPED_TO_SPECIAL_POSITION": "warning"
   },
   "fluorite": {
-   "COVARIANCE_DIRECTION_DISCARDED": "warning",
    "DISPERSION_NEGLECTED": "info",
    "FLAT_DIRECTION": "warning",
-   "HIGH_CORRELATION": "warning"
+   "HIGH_CORRELATION": "warning",
+   "INSTRUMENT_WIDTH_HELD": "warning"
   },
   "lab6_capillary": {
    "CAPILLARY_OFFSET_UNAVAILABLE": "info",
@@ -49,6 +51,7 @@
    "FLAT_DIRECTION": "warning",
    "FLOOR_HIT": "warning",
    "HIGH_CORRELATION": "warning",
+   "INSTRUMENT_WIDTH_HELD": "warning",
    "RESOLUTION_NOT_POSITIVE": "warning"
   }
  },
@@ -57,11 +60,11 @@
   "BOUND_HIT": 1,
   "CAPILLARY_OFFSET_UNAVAILABLE": 2,
   "CONSTRAINT_ACTIVE": 3,
-  "COVARIANCE_DIRECTION_DISCARDED": 1,
   "DISPERSION_NEGLECTED": 7,
   "FLAT_DIRECTION": 4,
   "FLOOR_HIT": 4,
   "HIGH_CORRELATION": 4,
+  "INSTRUMENT_WIDTH_HELD": 4,
   "PATTERN_UNDERSAMPLED": 1,
   "RESOLUTION_NOT_POSITIVE": 2,
   "RESOLUTION_UNCONSTRAINED": 1,
@@ -69,12 +72,12 @@
   "SPACE_GROUP_SETTING_ASSUMED": 1
  },
  "warnings_per_result": {
-  "phase_id": 7.75,
-  "qpa": 8.125,
-  "structure": 8.125,
-  "cell": 8.0,
-  "microstructure": 9.0,
-  "calibration": 9.125,
-  "magnetic": 8.125
+  "phase_id": 7.625,
+  "qpa": 8.0,
+  "structure": 8.0,
+  "cell": 7.875,
+  "microstructure": 9.375,
+  "calibration": 9.5,
+  "magnetic": 8.0
  }
 }

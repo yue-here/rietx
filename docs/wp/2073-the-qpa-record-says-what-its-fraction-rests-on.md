@@ -70,6 +70,8 @@ The 1b docs recipe rests on one synthetic family and says so.
   takes the diagnostics (the issue leans to the record); whether `qpa_trajectory` marks or
   skips a `PHASE_UNCONSTRAINED` point; whether `QPA_FRACTION_RANGE`'s suggestion names the
   unmodelled-background reading before "quote the range" when `fit_admissible` is false.
+- Issue #1653's question (2026-11-21 triage, § Inherited): whether
+  `weight_fraction_covariance` belongs in the flat QPA table, or in a file of its own.
 
 ### Inherited
 
@@ -83,6 +85,22 @@ The 1b docs recipe rests on one synthetic family and says so.
   surfaces, add the mole-fraction columns there too, with a `#` line quoting
   `formula_unit_withheld` when it is set, so a table never shows a
   per-formula-unit column on two bases.
+- **2026-11-21, issue triage (#1653 items 1 and 2): two more fields the table and the
+  trajectory do not carry.** WP-1942 (PR #1642, open on 2026-11-21) adds
+  `PhaseQuantity.element_counts` and `QuantitativePhaseAnalysis.weight_fraction_covariance`.
+  Neither reaches `write_qpa_table` (`io/exporters.py:302`) or `SeriesResult.qpa_trajectory`
+  (`schemas/sequential.py:1104`), the two writers this WP already extends. Checked at
+  `c1033a0e8`: neither field exists on `main` yet (`element_counts` sits on `optimize.qpa.ZMV`
+  only), so this half waits for #1642. A reader of the exported table sees independent esds
+  with no sign that the fractions are correlated. The reporter's question is now the last
+  bullet of "Decisions for the maintainer" above, since the table's columns are reader output.
+  It asks whether a matrix belongs in the flat table at all. The precedent is WP-1990's export task, which writes the correlation
+  matrix as its own labelled table and CSV. That suggests a separate file, or the JSON dump
+  only, with a `#` caveat line in the flat table naming the correlation.
+  Item 3 of #1653 is not this WP's. `_as_structure` (`src/rietx/gui/session.py`) joins a list
+  of structure forms into `Structure(phases=phases)` and would drop a member's
+  structure-level `restraints`. That field arrives with #1642, so the join is that PR's to
+  refuse or carry. If #1642 merges without it, the next issue triage files it.
 
 ## Non-goals
 
