@@ -1,6 +1,6 @@
 # WP-2151 — the ZrP₂O₇ input's peak equations on its data
 
-Milestone: parametric · Status: ⬜
+Milestone: parametric · Status: 🔄 2026-11-22 — claimed by ghostshift runner (MacBook-Air-c4aacd)
 Depends on: —
 Priority: P2 2026-11-22 — a feature the open milestone was opened for: the last unmeasured clause of the ZrP₂O₇ acceptance row
 
