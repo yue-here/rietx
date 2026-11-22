@@ -41,7 +41,8 @@
   import ActionBar from "./ActionBar.svelte";
   import Console from "./Console.svelte";
   import HelpBox from "./HelpBox.svelte";
-  import { GRAPH_HELP, MODEL_HELP } from "./helpbox";
+  import History from "./History.svelte";
+  import { GRAPH_HELP, HISTORY_HELP, MODEL_HELP } from "./helpbox";
   import Keys from "./Keys.svelte";
   import Menu, { type MenuAt } from "./Menu.svelte";
   import Params from "./Params.svelte";
@@ -151,6 +152,12 @@
   let graphTab = $state<GraphTab>("pattern");
   let modelTab = $state<ModelTab>("params");
   let bottomTab = $state<BottomTab>("console");
+  /** The History tab (WP-2211): its view, a view choice kept for the session
+   *  like the panels' layout; its node count, for the tab's label; and the
+   *  node whose fit is overlaid on the pattern. */
+  let historyView = $state<"graph" | "table">("graph");
+  let historyCount = $state<number | null>(null);
+  let compared = $state.raw<{ id: string; label: string; tt: Float64Array; y: Float64Array } | null>(null);
   let wf = $state<WorkflowId>("refine");
   let step = $state(0);
 
@@ -856,7 +863,8 @@
             <Pattern {result} {plotKey} {theme} {protocol} {extent} {wavelengths} {busy}
               {protocolError} onprotocol={setProtocol} onreadout={(r) => (reading = r)}
               projectPath={project?.path ?? null} ui={project?.doc?.ui ?? null} onui={saveUi}
-              preview={previewAnswer} {previewError} oncurves={(c) => (baseCurves = c)} />
+              preview={previewAnswer} {previewError} oncurves={(c) => (baseCurves = c)}
+              {compared} />
           {:else if graphTab === "peaks"}
             <Peaks {plotKey} {theme} preview={previewAnswer} {previewError}
               rwp={result?.statistics?.rwp ?? null} oncurves={(c) => (baseCurves = c)} />
@@ -960,13 +968,29 @@
       <div class="tabs" role="tablist" aria-label="Console and history">
         {#each BOTTOM_TABS as t (t.id)}
           <button class="tab" role="tab" aria-selected={bottomTab === t.id}
-            onclick={() => (bottomTab = t.id)}>{t.label}</button>
+            onclick={() => (bottomTab = t.id)}>{t.label}{#if t.id === "history" && historyCount != null}<span
+              class="count">{historyCount}</span>{/if}</button>
         {/each}
+        {#if bottomTab === "history"}
+          <span class="hright">
+          <span class="segmented hview" role="group" aria-label="History view">
+            {#each [["graph", "Graph", "Draw the nodes as lanes"], ["table", "Table", "List the nodes with their numbers"]] as [id, label, tip] (id)}
+              <button class:on={historyView === id} aria-pressed={historyView === id} title={tip}
+                onclick={() => (historyView = id as "graph" | "table")}>{label}</button>
+            {/each}
+          </span>
+          <HelpBox entry={HISTORY_HELP} {docsUrl} label="About the History tab" />
+          </span>
+        {/if}
       </div>
       <div class="pane" class:gone={bottomTab !== "console"}>
         <Console {lines} {dropped} shown={bottomTab === "console"} />
       </div>
-      <div class="pane" class:gone={bottomTab !== "history"}></div>
+      <div class="pane" class:gone={bottomTab !== "history"}>
+        <History {head} {busy} {say} view={historyView} compared={compared?.id ?? null}
+          oncount={(n) => (historyCount = n)} oncompare={(c) => (compared = c)}
+          onrestore={(plan) => paramsPanel?.loadRestore(plan)} onmoved={structureMoved} />
+      </div>
     </section>
   {/if}
 </div>
@@ -1108,6 +1132,21 @@
 
   .gone {
     display: none;
+  }
+
+  /* the History tab's node count, in the muted register (the design's
+     "History 8") */
+  .count {
+    margin-left: 6px;
+    color: var(--muted);
+  }
+
+  /* the History tab's view choice and ? box, at the strip's right */
+  .hright {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
   }
 
   .wfpane {

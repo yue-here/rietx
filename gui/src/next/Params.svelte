@@ -458,6 +458,16 @@
     dropUnknown();
   }
 
+  /** A history node's values, from the History tab's Restore (WP-2211), in
+   *  place of the value and position edits on screen, as the design's Restore
+   *  does. The pending flags, holds, limits and restraints stay. */
+  export function loadRestore(plan: { values: Record<string, string>;
+                                      positions: Record<string, Record<string, string>> }) {
+    closeEditor(false);
+    edits = new Map(Object.entries(plan.values));
+    positionEdits = new Map(Object.entries(plan.positions));
+  }
+
   /** A hold or release on one path from another panel: the Background graph's
    *  "Hold at last fit" chips (WP-2218). One pending set, so the action bar
    *  counts it once, Apply sends it once, and the recovery copy carries it. */

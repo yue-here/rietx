@@ -188,13 +188,16 @@ Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`
 - [x] Questions 1 and 2 drawn as options and brought to the maintainer; the rulings recorded
   here (§ Rulings, 2026-11-21).
 - [x] Question 5, the git words: ruled 2026-11-21 (§ Rulings).
-- [ ] The Graph view with rounded branch corners, the Table | Graph toggle defaulting to Graph,
+- [x] The Graph view with rounded branch corners, the Table | Graph toggle defaulting to Graph,
   the node menu shared by both views. Vitest over a branched tree's lanes.
 - [x] Questions 3 and 4 measured on the shipped examples: how many nodes differ from their head
   by more than values, and the replay cost of a node's curve. The decision written here.
-- [ ] The tab label carries `n_nodes`; `BOTTOM_TABS` and the panel corpus follow. Vitest.
-- [ ] `panels/History.svelte` as the table, with the verbs placed as ruled. Vitest over the
+- [x] The tab label carries `n_nodes`; `BOTTOM_TABS` and the panel corpus follow. Vitest.
+  Done at `/next`: the count is drawn by `next/Frame.svelte` beside the label, so `BOTTOM_TABS`
+  keeps the word, and the panel corpus waits for the swap (WP-2214 § Tests and the manual).
+- [x] `panels/History.svelte` as the table, with the verbs placed as ruled. Vitest over the
   rows a branched tree produces.
+  Built as `gui/src/next/History.svelte`, the rebuild's page (§ Inherited, 2026-11-11).
 - [ ] Compare: the dashed curve on the Pattern graph, its legend entry, its token. A browser
   test that Compare draws the node's curve and moves no element.
 - [ ] Restore: the node's values into the action bar's pending edits, the refusal or the
@@ -202,7 +205,7 @@ Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`
   pass: Restore, then Apply, reaches the node's values; Restore, then Revert, changes nothing.
 - [ ] The GUI chapter on History, the screenshot driver, the screenshots retaken, each beside
   the prototype's at 1440 by 900 in the PR (milestone row 11).
-- [ ] Skill: none. The GUI is a human surface, and an agent drives the python API.
+- [x] Skill: none. The GUI is a human surface, and an agent drives the python API.
 
 ## Acceptance
 
