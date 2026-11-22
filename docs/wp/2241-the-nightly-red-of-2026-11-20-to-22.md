@@ -1,6 +1,6 @@
 # WP-2241 — the nightly red of 2026-11-20 to 11-22: Windows path checks, the width triple's esd, and a lost runner
 
-Milestone: unscheduled · Status: 🔄 2026-11-22 — claimed by a ghostshift runner
+Milestone: unscheduled · Status: 🔄 2026-11-22 — fixes in PR #1789; waits on the next scheduled nightly
 Track: The repo's own process
 Depends on: —
 Priority: P1 2026-11-22 — a required check red on main: the Windows fast job is the release pre-upload gate (`docs/RELEASING.md` step 4)
@@ -85,11 +85,11 @@ behaviour.
 
 - [x] The directory set is built in POSIX form, so a cited directory resolves on Windows.
 - [x] The single-fit width-triple test takes the joint-fit test's bar, measured under 1e-14
-      start nudges.
+      start nudges; both bars lowered from 1000 to 100 times the value at review.
 - [x] The two alarm-pin failures (11-20, 11-21) checked against `main`, and the full
       suite's death on 11-22 measured from what GitHub exposes and recorded.
-- [ ] Tests: the touched files and the fast selection.
-- [ ] Skill: none. Nothing an agent driving rietx does changes.
+- [x] Tests: the touched files and the fast selection.
+- [x] Skill: none. Nothing an agent driving rietx does changes.
 
 ## Acceptance
 
@@ -109,6 +109,52 @@ gh run list --workflow nightly.yml --branch main --limit 1
   a discarded direction), WP-2225 (the triple's split is reported).
 
 ## Handover log
+
+- **2026-11-22** — The three red nightlies had four causes, and two are now fixed on this
+  branch. The Windows fast job failed ten tooling tests because a helper wrote Windows
+  folder names with backslashes and then looked them up with forward slashes, so every
+  folder a comment or rulebook named looked missing; it now keeps git's forward slashes.
+  The eleventh Windows failure was a test expecting "no esd" on a set of three width
+  parameters that the data cannot separate; rounding decides whether they get no esd or one
+  ten thousand times their value, and the test now accepts either and still catches a short
+  one. The two alarm-pin failures of 11-20 and 11-21 were already fixed on `main` before
+  this session. The full suite's death on 11-22 was the runner losing contact with GitHub,
+  with no log left behind, and nothing in this repo can recover it. Next: read the
+  2026-11-23 nightly.
+
+  *Done* (PR #1789). `tests/code_references._committable` builds its directory set from
+  `PurePosixPath` and reads `git ls-files -z` (the `-z` from review: git C-quotes a
+  non-ASCII path otherwise). `tests/test_discarded_direction.py`: the single-fit triple test
+  asserts no esd or one over `_SHORT = 1e2` times the value, the joint-fit test takes the
+  same constant (was 1e3), and both are renamed `…_has_no_short_esd_…`. WP-2036 gets an
+  `### Inherited` pointer to this WP. Package code is untouched.
+
+  *Measured* (arm64 Mac, worktree `[dev]` venv, compiled tier on). The triple under 1e-14
+  nudges to the start W (k = 0, ±1, ±3, ±7, ±20, 50, both starts): 16 of 20 starts give no
+  esd, four give 3.47-4.13 on W = 2.45e-4 and 2.49e-4. Review's nudges at ±2e-14 gave 2.63
+  and 3.14. `tests/test_suite_alarms.py` at `f9adf0e57`: 10 passed, the pin row included.
+  Fast selection on `fb229e169`: 15161 passed, 448 skipped, 32 xfailed. Before the review, on `f533e565a`, it was the same:
+  15161 passed, 448 skipped. No test added or removed; two renamed, so the counts do not
+  move. CI's lint steps run locally on `fb229e169`: ruff, the tutorials' format check, Vale
+  (0 errors, 281 warnings, none on lines this branch wrote), skill caps, skill surface,
+  audit delta, the allowlist delta and rulebook limits all exit 0.
+  `tests.reader_output`: unchanged.
+
+  *Review* (`/code-review high --fix`): five findings. Accepted: `-z` on `ls-files`, a
+  redundant `as_posix`, the WP's ratio (10 000-16 000, not 16 000), WP-2036's note wording.
+  The 10-times margin finding was taken by this session, not the reviewer: both bars went
+  to 100 times, settled under `tests/CLAUDE.md`'s "a pass margin under ~10x still smells".
+
+  *Generality*: no audit-table change and no heuristic added, so no judge was sent.
+
+  *Gotchas*. A lost runner leaves the job's "Full suite" step `in_progress` forever and a
+  404 log, so `gh run view --log-failed` prints nothing useful; the check run's annotations
+  (`gh api …/check-runs/<job>/annotations`) say what happened.
+
+  *Next*: read the 2026-11-23 nightly (`gh run list --workflow nightly.yml --limit 1`).
+  Windows green closes the first two causes; a green `full` job confirms the alarm pin on
+  Linux. If the `full` job dies again near the same point, the suite (its memory, say) is
+  the suspect rather than the host. Close this WP once that nightly is read.
 
 - **2026-11-22** — created. No open WP but WP-2036 owns nightly health, and WP-2036's claim
   is stale, so the three nights are filed here and WP-2036 gets a pointer.
