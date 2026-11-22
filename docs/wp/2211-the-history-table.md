@@ -265,14 +265,17 @@ The browser files skip in CI (no playwright there), so the PR quotes their local
   preview and compared curves share one trace loop. The docstring now says replay uses the
   project's current excluded regions, since a node records none; changing that is outside
   this WP. Declined: the tab reads "History 0" while a load error shows, a cosmetic case.
-  *Measured* (macOS arm64, `[dev]` venv on Python 3.12): vitest 929 passed in 53 files;
-  svelte-check 0 errors; every `tests/*_browser.py` 180 passed (layout and gui 53, compare
-  and peaks 8, recovery and html 17, rxplot and structure3d 49, watch 53; layout and gui
-  rerun after the review, 53 again); ruff clean; vale 0 errors and no warning on a changed
-  line; `tests.reader_output` exit 0, unchanged.
+  *Measured* (macOS arm64, `[dev]` venv on Python 3.12, on this branch with origin/main merged
+  after #1764): the fast selection 15303 passed, 433 skipped, 32 xfailed in 11 min 04 s, with
+  playwright installed, so the browser files ran inside it. The three added tests are browser
+  cases, 15.05 s together locally (3.7-7.0 s each); CI skips them. vitest 952 passed in 55 files;
+  svelte-check 0 errors; every `tests/*_browser.py` 180 passed (layout and gui 53, compare,
+  peaks, recovery and html 25, rxplot and structure3d 49, watch 53); ruff clean; vale 0 errors
+  and no warning on a changed line; `tests.reader_output` exit 0, unchanged.
   *Gotchas*: macOS folds case, so `History.test.ts` and `history.test.ts` are one file; the
-  mount cases are `historyPanel.test.ts`. PR #1764 (WP-2212) was open throughout; its `say`
-  change may need `History`'s single-string `say` wrapped once it merges.
+  mount cases are `historyPanel.test.ts`. #1764 merged mid-handover; History now writes
+  through its `say(kind, text, script?)`, the verbs as runnable calls and the Restore line as
+  a comment.
   *For the maintainer* (pictures in `2211-screenshots/`, its README § Open):
   (1) the compared curve's dark ink, `#f5f5f5`, since the prototype's equals the observed
   points'; (2) the Graph | Table choice and `?` at the strip's right; (3) Graph rows carry Rwp
