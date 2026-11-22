@@ -171,7 +171,8 @@ maintainer, who answered "All as recommended".
 16. Keep at tier 3 as written: `TWIN_DISTANCE`, `CIF_ANGLE_CORRECT_MAX_DEG` (the WP-1028 band
     in the root CLAUDE.md), `SYMMETRY_ANGLE_TOL_DEG`, `MAX_HKL_GRID_POINTS` (the shape of the
     approved memory caps), `LINE_DISPERSION_TOL`, `NEAR_EDGE_EV` (an XAFS citation would move
-    it to tier 2), `GSAS_EXP_REFINE_FLAG_MERGED` and `PATTERN_ROWS_DROPPED` sites 2 and 3. **Settled by Claude 2026-11-22, checked blind:** the six constants (`TWIN_DISTANCE`, `CIF_ANGLE_CORRECT_MAX_DEG`, `SYMMETRY_ANGLE_TOL_DEG`, `MAX_HKL_GRID_POINTS`, `LINE_DISPERSION_TOL`, `NEAR_EDGE_EV`) stay at tier 3 with `approved_by="checked"`. **Ruled by Yue 2026-11-22:** `GSAS_EXP_REFINE_FLAG_MERGED` and `PATTERN_ROWS_DROPPED` sites 2 and 3: tier 3 approved, dated 2026-11-22 ("All as recommended").
+    it to tier 2), `GSAS_EXP_REFINE_FLAG_MERGED` and `PATTERN_ROWS_DROPPED` sites 2 and 3. **Settled by Claude 2026-11-22, checked blind:** the six constants (`TWIN_DISTANCE`, `CIF_ANGLE_CORRECT_MAX_DEG`, `SYMMETRY_ANGLE_TOL_DEG`, `MAX_HKL_GRID_POINTS`, `LINE_DISPERSION_TOL`, `NEAR_EDGE_EV`) stay at tier 3. Each takes `approved_by="checked"` when its row is written and the
+generality judge calls it `holds`; any other verdict sends it to the maintainer. **Ruled by Yue 2026-11-22:** `GSAS_EXP_REFINE_FLAG_MERGED` and `PATTERN_ROWS_DROPPED` sites 2 and 3: tier 3 approved, dated 2026-11-22 ("All as recommended").
 17. Keep at tier 3 under the rare-feature clause, each naming its one family:
     `GSAS_BANK_COMMENTED`, `RECIPE_BACKGROUND_PEAK_DEGENERATE`,
     `RECIPE_ENGINE_DEFAULT_DECLINED`, `RECIPE_PLAN_STAGED`, `TOPAS_PHASE_TERM_READ`. **Ruled by Yue 2026-11-22:** tier 3 approved for the five, dated 2026-11-22 ("All as recommended").

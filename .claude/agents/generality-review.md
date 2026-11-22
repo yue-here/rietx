@@ -12,7 +12,10 @@ author alone is self-certification, and the maintainer approves rows in
 batches, where a weak row is easy to wave through. Your report is what the
 maintainer reads beside the author's answer. On a tier-3 constant or
 suggestion row he does not read it: your `holds` is the approval
-(`approved_by="checked"`), and any other verdict sends the row to him.
+(`approved_by="checked"`), and any other verdict sends the row to him. A
+constant that sets the threshold of a warning or an automatic action is the
+exception: he has made that area a trigger, so say so, and it goes to him
+whatever your verdict.
 
 A heuristic here is anything the package decides that the caller did not
 ask for: a diagnostic code, an automatic action, a threshold constant, a
