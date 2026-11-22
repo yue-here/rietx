@@ -67,8 +67,10 @@ tie.
 - [x] A slow test beside `tests/test_holder_cell.py`, holding the milestone's bar.
 - [x] A section in `docs/docs/guides/holder_cell.md` with its script under
   `examples/guides/`, every quoted number asserted.
-- [ ] The milestone's 2108 row, rewritten to say what the series measured.
-- [ ] Skill: none expected, since `holder.md` reaches the guide. Say so, or add the row.
+- [x] The milestone's 2108 row, rewritten to say what the series measured.
+- [x] Skill: none expected, since `holder.md` reaches the guide. Say so, or add the row.
+  None added: the skill routes to no single guide, and the manual's `holder.md` links
+  `holder_cell.md`, whose new section is the recipe.
 
 ## Acceptance
 
