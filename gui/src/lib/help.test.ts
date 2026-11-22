@@ -303,6 +303,8 @@ describe("`title=` is no longer how this app explains a name", () => {
     "panels/Structure3D.svelte": 4,  // drawing thresholds, not physics
     "next/Console.svelte": 1,        // the event ring's size, as panels/Console's
     "next/Frame.svelte": 2,          // the two splitters' drag gesture
+    "next/Plan.svelte": 4,           // the reorder handle, the edited mark, an unapplied
+                                     // stage, the closing stage: panels/Plan's, carried (WP-2231)
   };
 
   function markupFiles(): Array<[string, string]> {

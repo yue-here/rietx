@@ -56,6 +56,73 @@ def _utcnow() -> str:
 _CONSTRAINTS = " Constraints: "
 
 
+def _tie_stored_cells(pending: Sequence[Any]) -> list[Diagnostic]:
+    """Read each stored cell entry its space group ties as its source (WP-2150).
+
+    ``ParameterTable`` has always built a tied entry (b and c from a on a cubic
+    cell; β and γ from α on rhombohedral axes) from its source, and since
+    WP-2150 it refuses a stored value further from that source than its
+    tolerance (``symmetry.check_cell_ties``).  A node an older release
+    committed before any fit wrote the tied value back can hold one, and an old
+    file always opens.  Every fit of such a node built the entry from its
+    source, so reading it that way changes no number the history ever
+    produced.  Said once per phase and entry as ``HISTORY_CELL_TIE_CORRECTED``,
+    naming how many nodes held it.  A group that does not resolve is left to
+    the table's own refusal.
+    """
+    from ..crystallography.symmetry import (
+        cell_constraints,
+        cell_tie_deviation,
+        cell_tie_tolerance,
+        constrained_cell,
+    )
+
+    # a history repeats the same few groups in every node, so each is
+    # resolved once (keyed by what the group is read from)
+    groups: dict[tuple, Any] = {}
+    found: dict[tuple[int, str], list[tuple[float, float, str, str]]] = {}
+    for item in pending:
+        if not isinstance(item, HistoryNode):
+            continue
+        for ip, phase in enumerate(item.state.structure.phases):
+            declared = phase.parent_cell
+            key = ((declared.space_group,) if declared is not None else
+                   (phase.space_group, tuple(phase.symmetry_operations or ())))
+            if key not in groups:
+                resolved = constrained_cell(phase)
+                groups[key] = (None if resolved is None else
+                               (resolved[0], resolved[1].xhm(),
+                                cell_constraints(resolved[1]).ties))
+            if groups[key] is None:
+                continue
+            path, symbol, ties = groups[key]
+            cell = declared.cell if declared is not None else phase.cell
+            for name, source in ties.items():
+                entry, origin = getattr(cell, name), getattr(cell, source)
+                off = cell_tie_deviation(name, entry.value, origin.value)
+                if not off > cell_tie_tolerance(name):
+                    continue              # within tolerance, or not a number
+                found.setdefault((ip, f"{path}.{name}"), []).append(
+                    (entry.value, origin.value, symbol, source))
+                entry.value = origin.value
+    out: list[Diagnostic] = []
+    for (ip, where), group in found.items():
+        value, target, symbol, source = group[0]
+        name = where.rsplit(".", 1)[1]
+        unit = " Å" if name in ("a", "b", "c") else "°"
+        stored = f" (stored in {len(group)} nodes)" if len(group) > 1 else ""
+        out.append(Diagnostic(
+            level="info", code="HISTORY_CELL_TIE_CORRECTED",
+            where=[f"phases.{ip}.{where}"],
+            message=(f"this history stores {name} = {value}{unit} and {source} = "
+                     f"{target}{unit} under space group {symbol!r}, whose "
+                     f"symmetry makes {name} equal to {source}. Every fit of it "
+                     f"built {name} from {source}, so {name} was read as "
+                     f"{target}{unit}{stored}."),
+            value=float(len(group))))
+    return out
+
+
 def _merge_stored_twins(pending: Sequence[Any]) -> list[Diagnostic]:
     """Put each stored site whose own images coincide on its special position.
 
@@ -199,7 +266,11 @@ class RefinementTree:
         repair moves a coordinate: a site within 5e-4 (fractional) of its
         special position (a stored ``y = 0.2501`` on a mirror at ¼) is put on the
         special position they collapse to, in every node that stored it, and
-        said once per site as ``SITE_TWINS_MERGED`` (issue #1007).
+        said once per site as ``SITE_TWINS_MERGED`` (issue #1007).  A third
+        reads a cell entry its space group ties (b to a on a tetragonal cell)
+        as its source where a node stores it further off than the table now
+        accepts, which is what every fit of that node built, said once per
+        entry as ``HISTORY_CELL_TIE_CORRECTED`` (WP-2150).
 
         Records are applied **in file order**, replaying exactly what the
         in-memory tree did as each was appended: a node record advances HEAD
@@ -259,6 +330,7 @@ class RefinementTree:
         notes = [_earlier_tree_skipped(path, len(earlier) + 1, header_line, *tree)
                  for tree in earlier]
         notes.extend(restore_declared_ranges(found, "this history"))
+        notes.extend(_tie_stored_cells(pending))
         notes.extend(_merge_stored_twins(pending))
         if diagnostics is not None:
             diagnostics.extend(notes)

@@ -95,14 +95,18 @@ A name new to the table may not enter at `unaudited`. CI's lint job fails a
 pull request that adds one, and prints every row the pull request adds,
 changes or deletes. At review the `generality-review` agent drafts the case
 against each of those rows, and the case for any action the change removes
-or leaves to the caller. A tier-3 row, and a tier-2 automatic action, waits
-for the maintainer's dated ruling in its `approved` field. The maintainer
-may write that field into your branch.
+or leaves to the caller. A tier-3 row, and a tier-2 automatic action, needs
+a dated ruling in its `approved` field. Where the evidence settles the row
+clearly, a Claude session working for the maintainer may write that ruling.
+A fresh agent then checks it blind, shown the evidence but not the answer.
+The other rows wait for the maintainer. Among them is every row that changes
+what a default does for every user, and every row whose crux is a value
+judgement. Either may write the field into your branch. Ruled 2026-11-22.
 
 **Land the machinery first.** Machinery is what a caller operates: a model,
 a fit, a reported quantity. A heuristic is a choice rietx makes for the
-caller. A pull request that adds a tier-3 row waits on the maintainer's
-ruling, so a machinery pull request adds none. A number the machinery needs
+caller. A pull request that adds a tier-3 row waits on that ruling, so a
+machinery pull request adds none. A number the machinery needs
 is physics or arithmetic (tier 1), established practice (tier 2), or a
 required argument on a verb no default path calls (`caller`). The tier-3
 default follows in its own pull request. Adopted 2026-10-30 from #1224.
@@ -190,6 +194,16 @@ file's corpus, a reference without its header, a link that does not resolve, a
 field name no type carries, a code span a table cell cuts, a file over its
 ceiling, and a change that grows a file past its budget. The second
 regenerates the two copies.
+
+## Release notes
+
+A change a user upgrading needs to hear about (a break, a number that moves,
+a user-facing addition) stages its note in the same pull request, as a new
+file in `docs/releases/unreleased/` named `<id>.<section>.md`. The id is the
+pull request's number, or before it exists any name no other note uses.
+[That directory's README](docs/releases/unreleased/README.md) says how to name
+the section and what the file holds. A new file never conflicts with another
+pull request's, which a line appended to the staged notes often did.
 
 ## Licensing
 

@@ -102,6 +102,20 @@ async function arrays(path: string, body?: unknown): Promise<ArrayBuffer> {
   throw new ApiError(response.status, payload);
 }
 
+/** `PATCH /api/instrument`'s answer: the new instrument, and what the edit
+ *  did to the hold and free registers. `ended` names each path whose old
+ *  parameter the edit removed or redefined (a Chebyshev `c3` under a
+ *  P-spline), where a pending edit no longer applies. */
+export interface InstrumentEdit {
+  node_id: string | null;
+  instrument: any;
+  released: string[];
+  freed: string[];
+  /** built paths the free register still named and the new model fixes */
+  fixed: string[];
+  ended: string[];
+}
+
 export const api = {
   capabilities: () => call("GET", "/api/capabilities"),
   /** The whole help corpus plus `docs_url` (WP-1202/1203).  Fetched once at
@@ -235,7 +249,8 @@ export const api = {
    *  The arguments are drawing thresholds, not settings, which is why they ride
    *  on the query string and are never persisted. */
   structure3d: (phase = 0, bondTolerance?: number, disorder?: "all" | "major",
-                centres?: string[] | null, ligands?: string[] | null) => {
+                centres?: string[] | null, ligands?: string[] | null,
+                values?: Record<string, number> | null) => {
     const query = new URLSearchParams({ phase: String(phase) });
     if (bondTolerance !== undefined) {
       query.set("bond_tolerance", String(bondTolerance));
@@ -244,14 +259,21 @@ export const api = {
     // present and empty asks for none, so only null leaves the chemistry's
     if (centres != null) query.set("centres", centres.join(","));
     if (ligands != null) query.set("ligands", ligands.join(","));
-    return call("GET", `/api/structure3d?${query}`);
+    // unapplied values ride in a POST body, as `POST /api/preview` takes them
+    // (WP-2218): the Structure graph's preview, which writes nothing
+    return values ? call("POST", `/api/structure3d?${query}`, { values })
+      : call("GET", `/api/structure3d?${query}`);
   },
   instrument: () => call("GET", "/api/instrument"),
   /** A whole validated model, not a field patch — adding a phase or an ADP block
    *  changes what the parameter table *contains* (WP-1008).  One history node. */
   patchStructure: (structure: unknown, label?: string) =>
     call("PATCH", "/api/structure", { structure, label }),
-  patchInstrument: (instrument: unknown, label?: string) =>
+  /** The server works out what the edit asks of the hold and free registers
+   *  and answers it beside the instrument (`GuiSession.instrument_patch`,
+   *  WP-2229): `released`, `freed`, and the `ended` paths whose pending edits
+   *  a client drops. */
+  patchInstrument: (instrument: unknown, label?: string): Promise<InstrumentEdit> =>
     call("PATCH", "/api/instrument", { instrument, label }),
   /** Opt one atom into anisotropic ADPs.  Its own verb because both directions
    *  are physics (the isotropic tensor is not Uiso·δ, and U_eq weights by the
@@ -277,7 +299,9 @@ export const api = {
   curves: () => arrays("/api/result/curves"),
   /** The background curve, the observed pattern and the curve's esd at each
    *  fitted channel, packed as the curves are (WP-2129). Writes nothing. */
-  background: () => arrays("/api/background"),
+  background: (hold: readonly string[] = []) => arrays(hold.length
+    // WP-2218: paths held for this answer alone, a person's pending holds
+    ? `/api/background?hold=${encodeURIComponent(hold.join(","))}` : "/api/background"),
   /** The curves at values nobody has applied, writing nothing (WP-2125): the
    *  fitted channels, the model, its background, each phase, the three
    *  residuals and the ticks, with the Rwp there. */

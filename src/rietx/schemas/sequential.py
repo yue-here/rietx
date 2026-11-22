@@ -1282,7 +1282,7 @@ class SeriesResult(Base):
 
         The one question the two layers outside this class need to put to the
         prefix set: the GUI's forward/backward guard (a derived curve gets no
-        backward chain, since ``_disagreement`` divides by a σ a residual does
+        backward chain, since its gap would divide by a σ a residual does
         not have) and the server test that skips those rows.  They ask this
         rather than reading :attr:`_TRAJECTORY_PREFIXES`, so the tuple stays a
         private detail of the dispatch and this class stays its one authority.
@@ -1665,28 +1665,6 @@ class SeriesResult(Base):
                          f"{self.direction} only, and direction='both' is the "
                          f"one check that separates a trajectory from the order "
                          f"it was refined in")
-
-        # a width that grew while the fit got worse (WP-1465): the one reading
-        # of a trajectory that says a phase stood in for something missing
-        growth = by_code.get("SEQUENTIAL_WIDTH_GROWTH", [])
-        # a series stamped before thresholds 1.9 never ran the check, and its
-        # zero would read as "checked, none" — the row the ordering artefact
-        # above already refuses to print for a comparison that did not run
-        stamped = (None if self.provenance is None
-                   else self.provenance.report_thresholds_version)
-        try:
-            predates = (stamped is not None and tuple(
-                int(p) for p in stamped.split(".")[:2]) < (1, 9))
-        except ValueError:
-            predates = False
-        if predates and not growth:
-            lines.append(f"    widths grown with a worsening fit: NOT measured "
-                         f"— this series was stamped at thresholds {stamped}, "
-                         f"before SEQUENTIAL_WIDTH_GROWTH existed (1.9)")
-        else:
-            lines.append(f"    widths grown with a worsening fit: {len(growth)}")
-        for d in growth[:5]:
-            lines.append(f"      {d.message}")
 
         # the form itself (WP-1325): a chain measures points, and a line drawn
         # through them afterwards weights each by an esd conditional on its

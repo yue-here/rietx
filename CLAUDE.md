@@ -72,7 +72,7 @@ Structure/Instrument/PatternData (schemas/, pydantic, JSON round-trip)
   → CompiledModel (model/forward.py): per-stage frozen state — reflection list
     (crystallography/symmetry.py, gemmi), per-atom symmetry-op subsets
     (structure_factor.py), per-(emission line, reflection) point windows,
-    FCJ quadrature node counts (profiles/fcj.py), background design matrix
+    FCJ quadrature node counts (model/profiles/fcj.py), background design matrix
     (+ P-spline penalty rows); derivative_bases() serves both the analytic
     Jacobian and FitReport Layer 1 from one expansion
   → run_least_squares (optimize/least_squares.py): bounded LM (TRF selectable),
@@ -245,7 +245,7 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   window index ranges are computed at stage compile and NEVER change during a least-squares run;
   regenerate only between stages. Keeps the residual smooth for FD/autodiff Jacobians. (FCJ node
   *positions* follow the parameters smoothly, quadrature split at the overlap-trapezoid kink —
-  `profiles/fcj.py`.)
+  `model/profiles/fcj.py`.)
 - **fp64 everywhere** in the core; a GPU backend may compute Jacobian *columns* in fp32, but the
   residual used for cost/statistics and the solve stay fp64 on host — `backend/linalg64.py` is
   that boundary. Holds on real hardware: an all-fp32-column Apple-MPS refinement lands 3.5e-8 Å

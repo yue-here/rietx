@@ -6,7 +6,7 @@
 index lists the rows.
 
 Narrative about the WPs below goes to the record of the release in flight,
-[v1.11](v1.11.md) today, as for every other WP (protocol rule 5).
+[v1.13](v1.13.md) today, as for every other WP (protocol rule 5).
 
 ## Scope
 
@@ -33,6 +33,12 @@ test.
 
 The practice behind the design is `docs/practice.md` § A parameter set by an equation
 the user writes, surveyed across fields on 2026-11-03.
+
+How a series declares its parameters, and when a series becomes a joint fit, is the
+[series](series.md) milestone's question (opened 2026-11-16, kept separate from this one
+by the maintainer's ruling of that day). Its rule 1 names the four kinds of parameter a
+series can declare, and two of them, a common value and an equation, are this milestone's
+machinery.
 
 | WP | What it adds |
 |---|---|
@@ -107,7 +113,11 @@ a WP sharpens its row here, because a bar set before reading a WP is a bar set t
   1e-6 Å. A synthetic ramp with known coefficients then recovers each within 2 esd. A
   run on the real data frees them and reports the answer, with no gate, since TOPAS stores
   nothing for it. The 2θ curve in `Xo` (0.0105° at 15°, zero at 54°, 0.0059° at 90°) and
-  each phase's six TCHZ terms join the protocol once 2107 lands.
+  each phase's six TCHZ terms are written as peak equations (2107): a `shift` equation on
+  the instrument and a `gauss_fwhm_squared` and a `lor_fwhm` equation on each phase. A
+  synthetic ramp of that shape recovers all twelve coefficients within 2 esd
+  (`tests/test_peak_equations.py`), and the real-data run frees them beside the
+  calibration.
 - **Every evaluator answers one conformance table** (1964). Each row of (expression,
   bindings, expected value or error) passes on numpy, jax and torch. A `polynomial` and
   the same form written as an expression agree to 0.01 esd.
