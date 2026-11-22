@@ -111,6 +111,36 @@ prototype with the changed region boxed, on a private page.
   and Figma say "Restore this version" and "Name this version"; "Branch" reaches non-programmers
   in Onshape and Figma, while "Checkout" and "Tag" stay in programmers' tools.
 
+### Measured: questions 3 and 4 (2026-11-22)
+
+Each shipped example was opened, fitted with its stored plan (seven nodes: the root and six
+stages), and every earlier node set against the head. Scripts and logs stay in the runner's
+scratch directory; the numbers are below.
+
+| | fap | nac |
+|---|---|---|
+| nodes whose parameter paths differ from the head's | 0 of 6 | 0 of 6 |
+| nodes whose free set differs from the head's | 6 of 6 | 6 of 6 |
+| rows Restore sets (untied, unlocked, differing) | 20 | 24 |
+| paths still differing after Restore and Apply | 0, on every node | 0, on every node |
+| a node's curve through `refine.replay` | 64-67 ms | 58-214 ms |
+| the same curve through `POST /api/preview` | 3-18 ms, 1e-14 σ from replay's | 2-29 ms, 9e-14 σ |
+| older nodes whose paths differ after one atom is removed | 7 of 7 | 7 of 7 |
+
+**Question 3, decided.** Restore loads values, as ruling 2 words it: the differing values of
+every untied row, and a moved atom as a position edit. It leaves the free set, ties and holds
+as the working state has them. Claude's lean would have offered Checkout on every node of a
+default fit, because each stage frees more than the last, so the free set always differs.
+A node whose parameter paths differ from the head's (an atom added or removed, a background
+of another type) cannot be loaded as pending edits: Restore says so and offers Make current.
+
+**Question 4, decided.** Compare draws `refine.replay`'s curve, served by one new route,
+`GET /api/history/curves?node=`. A preview at the node's values draws the same curve faster,
+but only for a node with the head's paths, no moved atom and no Le Bail intensities of its own.
+Replay answers every node, at its own 2θ range, in under a quarter of a second. The NAC root's
+curve is on a different 2θ range from the head's, so the client places a compared curve by
+2θ, never by index.
+
 ### Seams
 
 - **Routes.** `GET /api/history` (`tree_payload` in `src/rietx/gui/session.py`) already serves
@@ -160,7 +190,7 @@ Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`
 - [x] Question 5, the git words: ruled 2026-11-21 (§ Rulings).
 - [ ] The Graph view with rounded branch corners, the Table | Graph toggle defaulting to Graph,
   the node menu shared by both views. Vitest over a branched tree's lanes.
-- [ ] Questions 3 and 4 measured on the shipped examples: how many nodes differ from their head
+- [x] Questions 3 and 4 measured on the shipped examples: how many nodes differ from their head
   by more than values, and the replay cost of a node's curve. The decision written here.
 - [ ] The tab label carries `n_nodes`; `BOTTOM_TABS` and the panel corpus follow. Vitest.
 - [ ] `panels/History.svelte` as the table, with the verbs placed as ruled. Vitest over the
