@@ -52,7 +52,11 @@ The rubric is weighted shortest job first (SAFe: cost of delay over size),
 scored on Nielsen's severity axes (how often, how badly, and whether it
 persists), with the repo's own severity class on top: a wrong number that
 nothing flags outranks one that raises, and one on a path few fits run
-is P2.
+is P2. The class ranks the defect and never names its fix. The fix takes
+the kind DESIGN.md § Rules, 1 gives the ambiguity: act and record where
+every competent refiner would act, rank where the data can rank the
+alternatives, and otherwise report the number with its meaning. A new flag
+is a fix only as the record of an action or as that report.
   P1  paid by every user on every run: a silent wrong answer in a shipped
       path (a number a user quotes, wrong, nothing fired), a required check
       red on main, data loss; or the last rung of a feature whose other
