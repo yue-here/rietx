@@ -11,6 +11,9 @@ surface is 0.120 mm lower again. The holder is drawn as a crystal with a
 March-Dollase texture along [111], so its line intensities are not those of
 its structure. Stinton & Evans (2007, J. Appl. Cryst. 40, 87) fit an aluminium
 holder this way, for the same reason.
+
+The last section makes five more patterns of the same specimen and holder, each
+with the specimen at its own height, and fits them jointly (WP-2154).
 """
 
 import tempfile
@@ -49,16 +52,16 @@ def true_instrument(height, background):
     return instrument
 
 
-def simulate(seed=7):
-    """Fluorapatite at HEIGHT, textured aluminium at HEIGHT + OFFSET, Poisson noise."""
+def simulate(seed=7, height=HEIGHT):
+    """Fluorapatite at `height`, textured aluminium at `height` + OFFSET, Poisson noise."""
     sample = FLUORAPATITE.model_copy(deep=True)
     sample.phases[0].scale.value = 5e-4
     holder = ALUMINIUM.model_copy(deep=True)
     holder.phases[0].scale.value = 1e-3
     holder.phases[0].preferred_orientation = rx.PreferredOrientation(
         axis=(1, 1, 1), r=rx.Parameter(value=0.55))
-    y = (rx.Refinement(sample, true_instrument(HEIGHT, (300.0, -60.0, 20.0, -5.0))).predict(TWO_THETA)
-         + rx.Refinement(holder, true_instrument(HEIGHT + OFFSET, (0.0,) * 4)).predict(TWO_THETA))
+    y = (rx.Refinement(sample, true_instrument(height, (300.0, -60.0, 20.0, -5.0))).predict(TWO_THETA)
+         + rx.Refinement(holder, true_instrument(height + OFFSET, (0.0,) * 4)).predict(TWO_THETA))
     counts = np.random.default_rng(seed).poisson(y).astype(float)
     return rx.PatternData(two_theta=TWO_THETA, intensity=counts)
 
@@ -131,6 +134,52 @@ for name in ("offset", "height"):
     print(f"{name:<8} {rx.format_su(p.value, p.stderr)}")
 # guide: known end
 
+# guide: series start
+heights = [0.040, -0.030, 0.090, 0.010, -0.060]  # mm, one per pattern
+series = [simulate(seed=20 + k, height=h) for k, h in enumerate(heights)]
+
+instruments = []
+for _ in heights:
+    one = rx.Instrument.bragg_brentano(radiation="CuKa")
+    one.background = rx.BackgroundChebyshev.with_terms(4)
+    for hkl, n in reflections.items():
+        start = 2 * np.degrees(np.arcsin(wavelength * np.sqrt(n) / (2 * 4.05)))
+        one.extra_components.append(rx.PeakComponent(
+            label=f"aluminium {hkl}",
+            center=rx.Parameter(value=start, min=start - 0.4, max=start + 0.4, unit="deg"),
+            area=rx.Parameter(value=10.0, min=0.0, unit="counts*deg"),
+            fwhm=rx.Parameter(value=0.1, min=0.02, max=0.4, unit="deg")))
+    instruments.append(one)
+
+variables = {
+    "a_holder": rx.Parameter(value=4.05, vary=False, min=4.0, max=4.1, unit="Å"),
+    "offset": rx.Parameter(value=0.0, vary=False, min=-0.5, max=0.5, unit="mm"),
+    "zero": rx.Parameter(value=0.0, vary=False, min=-0.2, max=0.2, unit="deg"),
+    "height": rx.Parameter(value=0.0, vary=False, min=-0.5, max=0.5, unit="mm")}
+equations = [
+    rx.ParametricEquation(name="zero_shift", target="instrument.zero_shift",
+                          basis="expression", expression="zero"),
+    rx.ParametricEquation(name="displacement", target="instrument.geometry.sample_displacement",
+                          basis="expression", expression="height")]
+for j, (hkl, n) in enumerate(reflections.items()):
+    theta = f"asin({wavelength} * sqrt({n}) / (2 * a_holder))"
+    equations.append(rx.ParametricEquation(
+        name=f"aluminium_{hkl}", target=f"instrument.extra_components.{j}.center",
+        basis="expression",
+        expression=f"2 * {theta} * 180 / pi + zero"
+                   f" - 2 * (height + offset) / {radius} * cos({theta}) * 180 / pi"))
+
+joint = rx.MultiHistogramRefinement(
+    FLUORAPATITE.model_copy(deep=True), instruments,
+    sharing=rx.SharingMap(shared=["instrument.profile.*"], per_histogram=["vars.height"]),
+    variables=variables, parametric=equations)
+joint_result = joint.fit(series, plan=plan, two_theta_limits=(15, 90))
+rows = {p.path: p for p in joint_result.parameters}
+for path, true in (("vars.a_holder", A_HOLDER), ("vars.offset", OFFSET), ("vars.zero", ZERO),
+                   *((f"hist.{k}.vars.height", h) for k, h in enumerate(heights))):
+    print(f"{path:<20} {rx.format_su(rows[path].value, rows[path].stderr):<12} made with {true}")
+# guide: series end
+
 
 
 # 2026-11-15, darwin/arm64.
@@ -156,3 +205,23 @@ assert any(d.code == "FLAT_DIRECTION" and set(d.where) == {"vars.zero", "vars.he
 assert 0.5 < known.parameter("vars.height").stderr / result.parameter("vars.height").stderr < 0.6
 # The page: the phase leaves the holder's lines misfit, and the declared lines do not.
 assert round(result.statistics.gof, 2) == 1.02 and round(phase_result.statistics.gof, 2) == 1.18
+
+# 2026-11-22, darwin/arm64: the series.
+truths = {"vars.a_holder": A_HOLDER, "vars.offset": OFFSET, "vars.zero": ZERO,
+          **{f"hist.{k}.vars.height": h for k, h in enumerate(heights)}}
+assert [quoted(joint_result, path) for path in truths] == [
+    "4.049470(77)", "-0.11943(96)", "0.0120(54)",
+    "0.0401(97)", "-0.0299(97)", "0.0900(97)", "0.0100(97)", "-0.0600(97)"]
+# The page: each recovered value lies within 1.5 esd of the one it was made with.
+for path, true in truths.items():
+    assert abs(rows[path].value - true) < 1.5 * rows[path].stderr
+# The page: five patterns measure the offset to less than half the esd of one.
+assert 0.4 < rows["vars.offset"].stderr / result.parameter("vars.offset").stderr < 0.5
+# The page: the zero shift trades against every pattern's height, and the fit says so.
+for k in range(len(heights)):
+    assert any(d.code == "FLAT_DIRECTION" and set(d.where) == {"vars.zero", f"hist.{k}.vars.height"}
+               for d in joint_result.diagnostics)
+# The page: the heights miss their values by nearly one amount, under a tenth of an esd apart.
+misses = [rows[f"hist.{k}.vars.height"].value - h for k, h in enumerate(heights)]
+assert max(misses) - min(misses) < 0.1 * rows["hist.0.vars.height"].stderr
+assert round(joint_result.statistics.gof, 2) == 1.0

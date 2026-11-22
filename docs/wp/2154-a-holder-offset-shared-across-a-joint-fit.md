@@ -65,7 +65,7 @@ tie.
   sample's coordinates, the offset and each height; their spread; GoF; time per fit as a
   range. Compare the offset's esd with the single-pattern recipe's.
 - [x] A slow test beside `tests/test_holder_cell.py`, holding the milestone's bar.
-- [ ] A section in `docs/docs/guides/holder_cell.md` with its script under
+- [x] A section in `docs/docs/guides/holder_cell.md` with its script under
   `examples/guides/`, every quoted number asserted.
 - [ ] The milestone's 2108 row, rewritten to say what the series measured.
 - [ ] Skill: none expected, since `holder.md` reaches the guide. Say so, or add the row.
