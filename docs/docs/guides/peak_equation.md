@@ -98,7 +98,8 @@ Give each pattern its own coefficient with `SharingMap(per_histogram=["phases.0.
 Or write the λ into the expression, as `y*wavelength/cos(theta)`, and keep `y` shared.
 `y` is then in degrees per Å, one number for one crystallite size at every wavelength.
 TOPAS does the same two ways: a term per pattern, or `Lam` in the expression.
-The fit still warns about a shared coefficient in an equation that reads `wavelength`, since such an equation can carry a term that does not scale with λ.
+The fit does not warn about a shared coefficient in an equation that reads `wavelength`.
+It then also misses a size term written in degrees in that equation, as `+ x/cos(theta)`.
 
 ## Read what the fit says
 
