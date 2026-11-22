@@ -144,7 +144,7 @@ __all__ = ["Recipe", "RecipeError", "read_recipe", "write_recipe_tables"]
 #
 # Each is one number and it is written once.  The measurement that fixed it is
 # in this module's docstring and in ``tests/data/README.md``; the test that
-# keeps it true is ``test_recipe.py::test_conventions_reproduce_the_reference``,
+# keeps it true is ``test_recipe.py::test_conventions_reproduce_the_reference_peak_list``,
 # which recomputes the reference peak list's own columns from the recipe.
 
 #: GSAS-II Gaussian variance (centideg²) → a Caglioti FWHM² term (deg²).
@@ -292,7 +292,7 @@ def read_recipe(source: str | Path | dict,
 
     ``diagnostics`` is the same opt-in channel
     :func:`~rietx.io.read_pattern` and
-    :func:`~rietx.structure_from_cif` take: pass a list to receive every
+    :func:`~rietx.crystallography.cif.structure_from_cif` take: pass a list to receive every
     dropped field, honoured bound and assumed convention.  The returned
     :class:`Recipe` carries them too, so the argument is for a caller
     accumulating across several reads.

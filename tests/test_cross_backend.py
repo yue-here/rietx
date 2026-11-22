@@ -2547,7 +2547,7 @@ def test_fd_columns_hold_at_every_protocol_answer(family, monkeypatch):
 
     ref, _res = _protocol(family)
     model = ref._model
-    _result, table, theta, _se, _corr = ref._answer_covariance
+    _result, table, theta, _se, _corr = ref._answer_covariance[:5]
     theta = np.asarray(theta, dtype=np.float64)
     jac, fd = _fd_taken(model, table, theta, monkeypatch)
     oracle, oracle_2h = _forward_richardson(model, table, theta)
