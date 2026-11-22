@@ -143,8 +143,9 @@ and 2045 on 2026-10-25):
   at `f9adf0e57`, and no Linux full suite has run it yet. The 11-22 `full` job did not
   finish: its runner "lost communication with the server" 1 h 58 min in, and it left no log.
   It is the only such ending in the last 40 nightly `full` jobs, and githubstatus.com lists
-  no incident that day. WP-2241 fixed the 11-22 Windows failures. A second death at a similar
-  point would point at the suite, its memory say, rather than at the host.
+  no incident that day. WP-2241 fixes the 11-22 Windows failures, and the next Windows
+  nightly measures the fix. A second death at a similar point would point at the suite,
+  its memory for example, rather than at the host.
 
 ## Non-goals
 

@@ -331,6 +331,13 @@ def _triple_plan() -> RefinementPlan:
     ])
 
 
+#: An esd over this multiple of its value is not short.  The defect read 0.0025
+#: (WP-2028: ± 6.3e-7 on a W of 2.5e-4); a triple above the cut reads 6200 in a
+#: joint fit and 10 000-16 000 in a single one, so the bar sits 4e4 above the
+#: defect and 62 times under the smallest reading above the cut (WP-2241).
+_SHORT = 1e2
+
+
 @pytest.mark.parametrize("w_start", [5e-4, 1.5e-4])
 def test_the_lab6_width_triple_has_no_short_esd_from_either_start(w_start):
     """WP-2028's case: synthetic LaB6 with W, ``gauss_size`` and
@@ -340,14 +347,15 @@ def test_the_lab6_width_triple_has_no_short_esd_from_either_start(w_start):
     at rounding level, and so does the cut, so rounding decides whether it is
     discarded (WP-2241).  Measured on an arm64 Mac under 1e-14 nudges to the
     start W: 16 of 20 starts gave no esd, and four gave 3.5-4.1 on a W of
-    2.5e-4.  Windows read the second from this start on 2026-11-22."""
+    2.5e-4 (a review's nudges added 2.6 and 3.1).  Windows read an esd
+    from this start on 2026-11-22."""
     structure, ins = perturbed_models()
     ins.profile.w.value = w_start
     result = Refinement(structure, ins).fit(synthesize(), plan=_triple_plan())
     rows = {p.path: p for p in result.parameters}
     for path in _TRIPLE_PATHS:
         row = rows[path]
-        assert row.stderr is None or row.stderr > 1e3 * abs(row.value), (path, row)
+        assert row.stderr is None or row.stderr > _SHORT * abs(row.value), (path, row)
     assert rows["phases.0.cell.a"].stderr > 0.0
     assert not result.stages[2].width_twins_held
 
@@ -372,4 +380,4 @@ def test_the_lab6_width_triple_has_no_short_esd_in_a_joint_fit():
              *(f"hist.{h}.phases.0.gauss_{t}" for h in range(3) for t in ("size", "strain"))]
     for path in paths:
         row = rows[path]
-        assert row.stderr is None or row.stderr > 1e3 * abs(row.value), (path, row)
+        assert row.stderr is None or row.stderr > _SHORT * abs(row.value), (path, row)

@@ -47,8 +47,11 @@ on 2026-11-21 at 21:03Z, so 11-22 was their first Windows night.
 pseudo-inverse cut is `PINV_RCOND = 1e-15` of the largest eigenvalue, which is also
 rounding level. So rounding decides on which side of the cut the eigenvalue falls. Below
 it the direction is discarded and the three report no esd. Above it they report an esd
-about 16 000 times W's value. The joint-fit test beside it already says so and asserts
-"no esd, or one more than 1000 times the value". The single-fit test asserted no esd only.
+10 000 to 16 000 times W's value (2.6-4.1 on a W of 2.5e-4). The joint-fit test beside it
+already says so and asserted "no esd, or one more than 1000 times the value". The
+single-fit test asserted no esd only. Both now take a bar of 100 times the value, because
+1000 cleared the joint fit's measured 6200 by 6 times only, under `tests/CLAUDE.md`'s
+10-times smell. The defect the tests exist for read 0.0025 times the value.
 
 **The two alarm-pin failures are already fixed on `main`.** The 11-20 diff is the one
 WP-2225 re-pinned in `997816bfb` (2026-11-21 00:12Z), after that night's run started. The

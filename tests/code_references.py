@@ -451,12 +451,14 @@ def _committable() -> tuple[frozenset[str], frozenset[str]]:
 
     Both sets are in git's POSIX form, as :func:`in_tree` asks.  A ``Path``
     would print a Windows parent as ``docs\\wp``, and every cited directory
-    would miss there."""
+    would miss there.  ``-z`` keeps git from C-quoting a path that holds a
+    non-ASCII byte, which would then match nothing."""
     files = frozenset(subprocess.run(
-        ["git", "-C", str(ROOT), "ls-files", "--cached", "--others", "--exclude-standard"],
-        capture_output=True, encoding="utf-8", check=True).stdout.splitlines())
-    dirs = frozenset(p.as_posix() for f in files for p in PurePosixPath(f).parents
-                     if p.as_posix() != ".")
+        ["git", "-C", str(ROOT), "ls-files", "-z", "--cached", "--others",
+         "--exclude-standard"],
+        capture_output=True, encoding="utf-8", check=True).stdout.split("\0")) - {""}
+    dirs = frozenset(str(p) for f in files for p in PurePosixPath(f).parents
+                     if str(p) != ".")
     return files, dirs
 
 
