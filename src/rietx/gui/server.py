@@ -582,7 +582,7 @@ def _handler(session: GuiSession, holder: dict):
             # a reconnecting EventSource re-opens the URL it was first given and
             # says how far it read in this header, the SSE spec's resume cursor
             last = self.headers.get("Last-Event-ID", "")
-            if last.isdigit():
+            if last.isascii() and last.isdigit():  # "²" is a digit int() refuses
                 since = session.resume_at(since, int(last))
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream; charset=utf-8")

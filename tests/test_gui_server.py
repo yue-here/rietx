@@ -2876,8 +2876,11 @@ def _first_sse_event(port: int, path: str, headers: dict) -> dict:
     response = conn.getresponse()
     name = ""
     try:
+        assert response.status == 200, response.read()[:300]
         while True:
             line = response.fp.readline().decode()
+            if not line:
+                raise AssertionError("the stream closed before an event frame")
             if line.startswith("event: "):
                 name = line[7:].strip()
             elif line.startswith("data: ") and name == "event":
