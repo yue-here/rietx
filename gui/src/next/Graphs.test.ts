@@ -187,7 +187,7 @@ describe("the Background graph (rows 63-68)", () => {
     const lines: string[] = [];
     const ondropped = vi.fn();
     app = mount(Background, { target: document.body, props: {
-      head: "n1", say: (line: string) => lines.push(line), ondropped } });
+      head: "n1", say: (_kind: string, line: string) => lines.push(line), ondropped } });
     await settle(() => document.querySelectorAll(".chips .term").length === 3);
     const spline = [...document.querySelectorAll<HTMLButtonElement>('[aria-label="Type"] button')]
       .find((b) => b.textContent === "P-spline")!;
