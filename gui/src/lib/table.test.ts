@@ -209,8 +209,9 @@ describe("the refine flag", () => {
       .toBe("≈");
     expect(heldKind(row("a", { needs_held_cell: true }))).toBe("degenerate");
     // the fifth: the caller declared this one with `Refinement.hold`, so a
-    // plan's turn_on glob loses to it (WP-1435).  A pin rather than a lock,
-    // because unhold() takes it back and a space group does not
+    // plan's turn_on glob loses to it (WP-1435).  The same drawn padlock as a
+    // lock since WP-2212; `HeldMark.svelte` inks it as a hold, because unhold()
+    // takes it back and a space group does not
     expect(heldGlyph(row("a", { held: true, refinable: false }))).toBe(PADLOCK);
     expect(heldKind(row("a", { held: true }))).toBe("hold");
     // and it loses in turn to the reasons above it, which unhold cannot lift

@@ -21,8 +21,11 @@ export function py(value: unknown): string {
   }
   if (typeof value === "string") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(py).join(", ")}]`;
+  // a key holding undefined is dropped, as JSON.stringify drops it from the
+  // request body the echo stands for
   if (typeof value === "object")
     return `{${Object.entries(value as Record<string, unknown>)
+      .filter(([, v]) => v !== undefined)
       .map(([k, v]) => `${JSON.stringify(k)}: ${py(v)}`).join(", ")}}`;
   return String(value);
 }

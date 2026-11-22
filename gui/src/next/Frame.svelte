@@ -321,22 +321,25 @@
    * the names every later call uses, and where the project stands. The script
    * writes its own preamble, so these lines are marked and it skips them.
    * The output line reads as the prototype's: Rwp, the free count and the
-   * history nodes. The free count is `GET /api/params`' `n_free`, the rows a
-   * Refine would refine now; an unreadable table leaves it out.
+   * history nodes. The free count is `GET /api/params`' `n_free`, the rows
+   * whose vary flag is set, as the Parameters panel counts them; a plan's
+   * stages replace those flags, so it is not what a Refine frees. An
+   * unreadable table leaves it out. The count is read beside the result
+   * (`freeCount`), so the open waits for neither in turn, and the lines are
+   * written in one turn, so they share an entry.
    */
-  async function sayPreamble() {
-    if (!project?.path) return;
-    const path = project.path;
-    let free: number | null = null;
+  async function freeCount(): Promise<number | null> {
     try {
       const n = (await api.params())?.n_free;
-      free = typeof n === "number" ? n : null;
+      return typeof n === "number" ? n : null;
     } catch {
-      free = null;
+      return null;
     }
-    // another project opened while the count was read: its own preamble follows
-    if (project?.path !== path) return;
-    // the lines are written together, after the await, so they share an entry
+  }
+
+  function sayPreamble(free: number | null) {
+    if (!project?.path) return;
+    const path = project.path;
     const bind = (text: string) => write({ ...makeLine("call", text), preamble: true });
     bind("import rietx as rx");
     bind(`p = rx.Project.open(${JSON.stringify(path)})`);
@@ -352,8 +355,8 @@
   async function loadProject() {
     try {
       project = await api.project();
-      await loadResult();
-      await sayPreamble();
+      const [, free] = await Promise.all([loadResult(), freeCount()]);
+      sayPreamble(free);
       await offerRecovery();
     } catch (error) {
       project = null;
@@ -384,8 +387,8 @@
     project = doc;
     openError = "";
     newOpen = false;
-    await loadResult();
-    await sayPreamble();
+    const [, free] = await Promise.all([loadResult(), freeCount()]);
+    sayPreamble(free);
     await offerRecovery();
   }
 

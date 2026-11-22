@@ -287,8 +287,16 @@ describe("one filled primary per view", () => {
 describe("no source draws an emoji", () => {
   it("names no emoji-presentation character in any file", () => {
     const EMOJI = /[\p{Emoji_Presentation}\u{FE0F}]/u;
+    // every source a page is built from: the scanned sources, the chart
+    // module beside them and the two pages' shells
+    const files = [
+      ...allSources(),
+      ...readdirSync(`${SRC}next`).filter((f) => /\.(mjs|js|html)$/.test(f)).map((f) => `next/${f}`),
+      "../index.html",
+      "../next.html",
+    ];
     const found: string[] = [];
-    for (const rel of allSources())
+    for (const rel of files)
       read(rel).split("\n").forEach((line, i) => {
         const m = EMOJI.exec(line);
         if (m) found.push(`${rel}:${i + 1}: U+${m[0].codePointAt(0)!.toString(16).toUpperCase()}`);

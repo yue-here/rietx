@@ -19,6 +19,10 @@ describe("py", () => {
     expect(py({ a: true, b: false, c: null })).toBe('{"a": True, "b": False, "c": None}');
   });
 
+  it("drops a key holding undefined, as the request body's JSON does", () => {
+    expect(py({ a: 1, b: undefined })).toBe('{"a": 1}');
+  });
+
   it("writes a non-finite number as the call Python needs", () => {
     expect(py([Infinity, -Infinity, NaN])).toBe('[float("inf"), float("-inf"), float("nan")]');
   });
