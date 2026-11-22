@@ -354,7 +354,7 @@ def _mean_position(ref, result) -> list[tuple[float, float]]:
     # the covariance of *this* answer, correlated: a diagonal-only one would
     # pass for the whole covariance silently (magnetic._moment_correlations)
     assert kept is not None and kept[0] is result, "no covariance kept for this result"
-    _, table, theta, stderr_internal, correlation = kept
+    _, table, theta, stderr_internal, correlation = kept[:5]
     assert stderr_internal is not None and correlation is not None
     row = {e.path: i for i, e in enumerate(table.entries)}
     heavy = [(i, a) for i, a in enumerate(ref.fitted_structure.phases[0].atoms)
