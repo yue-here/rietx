@@ -991,14 +991,19 @@ def test_no_frame_control_moves_the_rebuilt_layout(browser, gui):
         page.close()
 
     page = _open_next(browser, url, 1300)
-    tabs = page.locator("section .tabs button").all_text_contents()
+    tabs = page.locator("section .tabs [role=tab]").all_text_contents()
     page.close()
     assert len(tabs) == 8, tabs
     for name in tabs:
-        pressing(name, lambda p, n=name: p.locator("section .tabs button", has_text=n).first.click())
+        pressing(name, lambda p, n=name: p.locator("section .tabs [role=tab]", has_text=n).first.click())
 
     def escape(p):
         p.keyboard.press("Escape")
+
+    # each strip's ? box floats over the page (the maintainer's look, 2026-11-21, item 6)
+    for strip, label in (("graphs", "About the Pattern graph"), ("model", "About the Parameters tab")):
+        pressing(f"{strip} ? box", lambda p, n=label: p.get_by_role("button", name=n, exact=True).click(),
+                 escape)
 
     def series(p):
         p.locator("button.mbtn.wf").click()
