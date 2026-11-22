@@ -151,13 +151,21 @@ its writer named at review (root CLAUDE.md, a declared name is a claim).
       never disagree in cost, close this WP on that measurement.
       *(2026-11-16: they do, in 9 of 42 series, so the WP stays open;
       § Context, "The package's own passes, measured".)*
-- [ ] Option 1: the two costs at each pattern, on every `DirectionGap` row
-      or once per pattern beside the rows, as the ruling on the handover's
-      question 1 says. *(2026-11-16: was "the costs on the finding and on
-      the entry"; WP-2003 removed the `SEQUENTIAL_PATH_DEPENDENT` finding,
-      and the entry's backward cost is already reachable through
-      `series.backward`.)*
-- [ ] Decide whether option 2 or 3 ships, and write the decision here.
+- [ ] Option 1: the two costs **once per pattern, beside the
+      `direction_gaps` rows**, not repeated on every row (ruled by the
+      maintainer, 2026-11-21: a cost belongs to a pattern's fit, not to one
+      path's gap). A projection of the costs `series.backward` already
+      carries, saying which pass is lower and by how much, with the
+      `SCHEMA_VERSION` bump it needs. *(2026-11-16: was "the costs on the
+      finding and on the entry"; WP-2003 removed the
+      `SEQUENTIAL_PATH_DEPENDENT` finding, and the entry's backward cost is
+      already reachable through `series.backward`.)*
+- [ ] ~~Decide whether option 2 or 3 ships~~ **Deferred** (ruled
+      2026-11-21): option 2 is to be ruled together with #1402's B2 (the
+      automatic two-start probe) on one set of measurements, both being
+      automatic picks between basins of one failure. #1402's own ruling is A
+      now and B1 after WP-1419, "and see what comes up as we develop".
+      Nothing to build here until that joint ruling.
 - [ ] Tests: the fixture reports the right pass at the right pattern.
       *(Waits on PR #1401's `tests/test_identity_point_seed.py` helpers,
       unmerged on 2026-11-16, which build the fixture and which the task 1
@@ -170,7 +178,8 @@ its writer named at review (root CLAUDE.md, a declared name is a claim).
 On the fixture, at each disagreeing pattern the series result names the
 pass with the lower cost and quotes both costs, on the `DirectionGap` rows
 or the per-pattern pair, whichever the ruling on option 1 picks.
-*(2026-11-16: was "the finding at the disagreeing pattern"; WP-2003 removed
+*(2026-11-21: the ruling picks the per-pattern pair, once per pattern beside
+the rows.)* *(2026-11-16: was "the finding at the disagreeing pattern"; WP-2003 removed
 `SEQUENTIAL_PATH_DEPENDENT`.)*
 
 ```sh
@@ -185,6 +194,17 @@ or the per-pattern pair, whichever the ruling on option 1 picks.
   rule), WP-1301 (the holds), WP-1417 (ΔBIC).
 
 ## Handover log
+
+- **2026-11-21** — **Rulings recorded** (maintainer's review of PR #1594;
+  the PR merges as it stands, since it records a measurement and decides
+  neither). (1) Option 1 ships as **one cost pair per pattern beside the
+  `direction_gaps` rows**, not on every row; a projection of what
+  `series.backward` carries, with the `SCHEMA_VERSION` bump. (2) Option 2 is
+  **deferred**, to be ruled with #1402's B2 on one set of measurements.
+  (3) The WP-file edits (pruned Inherited, "superseded in part" on Context)
+  are accepted. *Next:* task 2 (option 1) in `_direction_gaps`; the test
+  task waits on #1401's `tests/test_identity_point_seed.py` helpers, and if
+  #1401 merges first the probe script can be committed beside them.
 
 - **2026-11-16** — **The package's own two passes do disagree in cost,
   and where they do, the cheaper one was right every time.** On the
@@ -232,7 +252,7 @@ or the per-pattern pair, whichever the ruling on option 1 picks.
   option 2 limited to equal
   P with a floor measured from noise draws; option 3 only as #1402's
   two-sided start, if that issue's option B is taken.
-  *Next:* the maintainer's ruling on the two questions above. Then option 1
+  *Next (superseded 2026-11-21 by the entry above):* the maintainer's ruling on the two questions above. Then option 1
   in `_direction_gaps` (its one writer), the test on this construction at
   0.15 (the smallest gap, 3.6 %), and the skill paragraph.
 
