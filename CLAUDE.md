@@ -714,7 +714,7 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   S = ε²·[M²] is both the seed and the only legal start: at S ≡ 0 the √ has unbounded slope, so
   `Stage.strain_seed`, not `Stage.seed`, which lifts only a row sitting on a floor at or above 0.
   σ²(M) ≥ 0 is a *cone* coupling all fifteen, so it cannot be a box bound. The default LM driver
-  holds it as a linear inequality. Under `solver="trf"`, and in a joint fit (no cone), it is a
+  holds it as a linear inequality, per histogram in a joint fit (WP-2239). Under `solver="trf"` it is a
   guard (`STEPHENS_STRAIN_NOT_POSITIVE`). Read a firing as "not quotable, and the fit leaned on
   the clamp" (σ² < 0 → zero strain width, a free hinge; `detail` carries the m·|F|² share), never
   as evidence *of* anisotropy. **Zero is on the cone, not outside it**: the guard's test is

@@ -119,16 +119,24 @@ records such a fit moves, and the WP says which.
       its seeded value to `seeded`, so `StageResult.seeded` and the support
       hold's `seeded_phases` read it. Rewrite the `StageResult.seeded`
       docstring's joint-fit sentence.
-- [ ] Add `strain_cone_inequalities` and `texture_positivity_inequalities` to
+- [x] Add `strain_cone_inequalities` and `texture_positivity_inequalities` to
       the joint LM rows, per histogram on the joint columns, as
       `_joint_width_inequalities` does. Rewrite the manual's joint-fit
       sentence in `theory/microstructure.md`. WP-1960 is closed, so its
-      stale Context line stays as history.
-- [ ] Tests: a one-histogram joint fit and `Refinement.fit` on the same
+      stale Context line stays as history. Built as
+      `_joint_positivity_inequalities`, beside `_joint_width_inequalities` on a
+      shared `_on_joint_columns` helper. The same stale claim was also in
+      `reference/data.md`, `help.py` (two entries), `staged.py`'s guard
+      docstring, `docs/practice.md`, root CLAUDE.md and the skill's
+      `abstention.md` row; all rewritten.
+- [x] Tests: a one-histogram joint fit and `Refinement.fit` on the same
       stage write the same `seeded` mapping; a two-histogram joint stage with
       `strain_seed` starts an all-zero shared block on the isotropic ray in
       both histograms; a joint LM fit whose box-only step would leave the
       cone counts the cone block in `LSQOutcome.truncated_by`.
+      `tests/test_joint_stage_seeds.py`, which also covers a per-histogram
+      cell, a per-histogram block, a deliberate start, the texture rows and
+      the rows' column mapping.
 - [ ] Measure which joint goldens and acceptance fits move, and by how much,
       before and after, and record it in the handover.
 - [ ] Skill: none expected. `references/surprises.md` says a block needs
