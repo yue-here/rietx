@@ -208,6 +208,14 @@ own record: `docs/wp/2005-batch/rulings.md`, WP-2006 and WP-2020 § Rulings, and
 `docs/milestones/generality.md` and `series.md`. The collation cost 195k tokens, the check
 141k and the recording 156k.
 
+**Ruled 2026-11-22.** A row settled by Claude under an explicit delegation of the
+maintainer's counts as his approval: its `approved_by` stays `"maintainer"`, and its date is
+the settlement's. Asked of `StageSpec:lebail_tol` (WP-1542, the delegation of 2026-11-05,
+"use your best judgement"); he chose this over a third `approved_by` value, `"delegated"`.
+The same reading covers the other tier-3 rows dated by a delegation
+(`VALIDATION_RESERVE_FRACTION`, `PAWLEY_SPARSE_DENSITY`), which already read
+`"maintainer"`.
+
 ## Tasks
 
 - [x] Hindcast test (above).
@@ -278,8 +286,9 @@ the audit sample stays under the pre-change rate; no wait is stale (a test).
   maintainer, and a threshold constant goes to him whatever the verdict. Step 7 names the
   writer, and CONTRIBUTING excludes a *change of value* only. WP-2006's six constants now
   wait for the judge's `holds` when their rows are written. (iii): the docstring says the
-  field is read only where `approved` is set. Whether the `lebail_tol` delegation counts as
-  his approval is left for the maintainer. (vi) declined: no row carries `"checked"` yet,
+  field is read only where `approved` is set. The `lebail_tol` delegation was then put to the
+  maintainer, who counted it as his approval (§ Ruled above § Tasks). WP-1542, closed,
+  gains a one-line correction to its own record saying so; it asks for no work. (vi) declined: no row carries `"checked"` yet,
   and the first writer is step 7 with the judge's report beside the row.
 
   *Gotchas.* `wp_index.py` rejects ⏸, so a parked WP stays 🔄 with "parked" in its Status

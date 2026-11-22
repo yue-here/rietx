@@ -5158,7 +5158,8 @@ ROWS: tuple[Row, ...] = (
         grounds=("B11 (ruled 2026-10-19): repeat until the intensities stop changing, with a cap, "
                  "judged against the true structure.  The number, FAP as its failing case and "
                  "LaMnO3's 150x cost were settled by Claude under the maintainer's delegation "
-                 "of 2026-11-05, and the date is that settlement's.  No "
+                 "of 2026-11-05, and the date is that settlement's, which he counted as his "
+                 "approval on 2026-11-22 (WP-2237).  No "
                  "surveyed program stops on the intensities at a fixed model, because each "
                  "extracts inside the solve (docs/practice.md); 1e-8 leaves FAP at 0.55 and "
                  "more than doubles LaMnO3's cycles."),
