@@ -227,8 +227,9 @@ Filled in by the session that builds each PR. Question 1 is carried from WP-2227
    runs in stages, as today's page does.
 2. **Where the toggle between the preview and the last fit sits, and what it says** (§ Rulings
    item 4). No design gives either. The third PR builds the most conventional form: a
-   segmented choice `Show [Preview | Last fit]` on the Pattern graph's title line, drawn only
-   while a preview is in hand, as the Peaks graph's `Show` is. Last fit draws the fit whole,
+   segmented choice `Show [Preview | Last fit]` on the Pattern graph's title line, as the
+   Peaks graph's `Show` is. It shows only while a preview is in hand, and the line keeps its
+   slot unseen at rest, so a preview appearing moves no control. Last fit draws the fit whole,
    as with no preview, so the difference strip, the ticks and the title's Rwp are the fit's.
    The choice returns to Preview when the preview goes. The alternative already on the page
    is the legend's own switches: a click on Last fit hides the grey curve, while the

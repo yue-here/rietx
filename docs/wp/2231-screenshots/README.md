@@ -58,7 +58,8 @@ The maintainer's look (the third PR), each picture re-shot on its tree:
   notice's right (item 7).
 - `toggle-preview-*.png` and `toggle-last-*.png`: the Pattern graph's toggle between the
   preview and the last fit (item 4), built as `Show [Preview | Last fit]` on the title line,
-  shown only while a preview is in hand. Last fit draws the fit whole, with its own
+  drawn only while a preview is in hand, in a slot the line keeps unseen at rest so a preview
+  appearing moves no control. Last fit draws the fit whole, with its own
   difference, ticks and Rwp. The words and the place are Claude's; no design gives them.
 - `toggle-legend-*.png`: the other way, already on the page. The legend's Last fit label is
   its curve's switch, so a click leaves the preview alone on the plot. The difference strip

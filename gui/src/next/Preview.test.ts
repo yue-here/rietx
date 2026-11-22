@@ -75,7 +75,10 @@ describe("the Pattern graph's title line", () => {
   it("toggles between the preview and the last fit, drawn whole", async () => {
     // the maintainer's look, 2026-11-21, item 4
     await draw({});
-    expect(document.querySelector(".gctl .segmented")).toBeNull();
+    // laid out and unseen with no preview, so one appearing moves no control
+    expect(document.querySelector(".gctl .vg.reserved")).not.toBeNull();
+    expect([...document.querySelectorAll<HTMLButtonElement>(".gctl .segmented button")]
+      .every((b) => b.disabled)).toBe(true);
     app && unmount(app);
     document.body.innerHTML = "";
     const curves = { header: { rwp: 0.3001 }, arrays: {} };

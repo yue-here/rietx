@@ -279,7 +279,7 @@
       watchZoom(chart);
       // a chart built under a preview (the graph tab came back to Pattern)
       // has no view yet to keep: keeping one drew an empty plot (WP-2218)
-      const p = untrack(() => (previewing ? preview : null));
+      const p = untrack(() => (shown === "preview" ? preview : null));
       if (p) chart.setPreview(p.curves, false);
     } else {
       chart.setCurves(c, keep);
@@ -426,7 +426,7 @@
   // from the moment its values were set to the frame after it painted: the
   // drag-to-redraw latency the browser test reads, as on today's page.
   $effect(() => {
-    const p = previewing ? preview : null;
+    const p = shown === "preview" ? preview : null;
     untrack(() => {
       if (!chart) return;
       chart.setPreview(p?.curves ?? null);
@@ -866,16 +866,16 @@
       {/if}
     </div>
     <div class="gctl">
-      {#if hasPreview}
-        <span class="vg">Show
-          <span class="segmented" role="group" aria-label="Show">
-            {#each SHOWN as s (s.id)}
-              <button class:on={shown === s.id} aria-pressed={shown === s.id} title={s.title}
-                onclick={() => (shown = s.id)}>{s.label}</button>
-            {/each}
-          </span>
+      <!-- laid out while no preview is in hand, unseen, so a preview
+           appearing moves no control (as the legend keeps the Preview slot) -->
+      <span class="vg" class:reserved={!hasPreview} aria-hidden={hasPreview ? undefined : "true"}>Show
+        <span class="segmented" role="group" aria-label="Show">
+          {#each SHOWN as s (s.id)}
+            <button class:on={shown === s.id} aria-pressed={shown === s.id} title={s.title}
+              disabled={!hasPreview} onclick={() => (shown = s.id)}>{s.label}</button>
+          {/each}
         </span>
-      {/if}
+      </span>
       <button class="ghost" disabled={!zoomed} onclick={showAll}
         title="Show the whole pattern">Show all</button>
       <button class="ib" bind:this={viewButton} aria-label="View" aria-haspopup="menu"
@@ -1190,6 +1190,11 @@
   .gut:disabled {
     color: var(--muted);
     cursor: default;
+  }
+
+  /* the Show choice's slot while no preview is in hand: laid out, unseen */
+  .vg.reserved {
+    visibility: hidden;
   }
 
   /* the Preview label's slot while no preview is drawn: laid out, unseen */
