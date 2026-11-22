@@ -315,10 +315,28 @@
     plotKey += 1;
   }
 
+  /**
+   * The session's first entry, as the prototype opens it: the lines that bind
+   * the names every later call uses, and where the project stands. The script
+   * writes its own preamble, so these lines are marked and it skips them.
+   */
+  function sayPreamble() {
+    if (!project?.path) return;
+    const bind = (text: string) => write({ ...makeLine("call", text), preamble: true });
+    bind("import rietx as rx");
+    bind(`p = rx.Project.open(${JSON.stringify(project.path)})`);
+    bind("ref = p.refinement");
+    const rwp = result?.statistics?.rwp;
+    const nodes = project.n_nodes ?? 0;
+    say("output", `${typeof rwp === "number" ? `Rwp ${(rwp * 100).toFixed(2)} %, ` : ""}`
+      + `${nodes} history node${nodes === 1 ? "" : "s"}`);
+  }
+
   async function loadProject() {
     try {
       project = await api.project();
       await loadResult();
+      sayPreamble();
       await offerRecovery();
     } catch (error) {
       project = null;
@@ -350,6 +368,7 @@
     openError = "";
     newOpen = false;
     await loadResult();
+    sayPreamble();
     await offerRecovery();
   }
 
@@ -611,8 +630,8 @@
     // a write still on the timer lands first, for the project it was made in
     await recoveryWriter.flush();
     try {
+      // opened() writes the session's first entry, the open among it
       await opened(await api.openProject(path));
-      say("call", `p = rx.Project.open(${JSON.stringify(path)})`);
       return "";
     } catch (error) {
       openError = (error as Error).message;
@@ -627,7 +646,6 @@
     try {
       const doc = reset ? await api.resetExample(name) : await api.openExample(name);
       await opened(doc);
-      say("call", `p = rx.Project.open(${JSON.stringify(doc.path)})  # the ${name} example`);
       return "";
     } catch (error) {
       openError = (error as Error).message;

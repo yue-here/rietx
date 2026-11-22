@@ -37,6 +37,9 @@ export interface Line {
   entry?: number;
   /** a call that started a run, whose events fold under it */
   run?: boolean;
+  /** one of the lines that open a session, binding the names; the script
+   *  writes its own */
+  preamble?: boolean;
   /** an event's kind and the two fields the fold's summary counts */
   ev?: { kind: string; stage?: string; n_eval?: number };
 }
@@ -169,7 +172,7 @@ export function entries(lines: readonly Line[]): Entry[] {
 
 /** The fold's one line: how many events, and the stages and evaluations
  *  they report. A stage's evaluations are its largest `n_eval`, which counts
- *  every evaluation even where the stream thinned the events. */
+ *  every measured trial even where the ring dropped some of the events. */
 export function foldSummary(events: readonly Line[]): string {
   const n = events.length;
   const parts = [`${n} engine event${n === 1 ? "" : "s"}`];
@@ -229,9 +232,9 @@ export function copyText(lines: readonly Line[]): string {
  * use (`rx`, `p`, `ref`, the prototype's spelling) and opens the project
  * named on the command line, because the script changes the project it
  * opens and is meant for a copy: running it on the original would repeat
- * every step on top of the session's own. A call echoed as
- * `p = rx.Project.open(…)` is the window opening this project, which the
- * preamble does. A call with no runnable form is written as a comment, and
+ * every step on top of the session's own. The lines the Console opens a
+ * session with (`Line.preamble`) are the script's own preamble, written
+ * here for the copy. A call with no runnable form is written as a comment, and
  * the head says how many there are, so a reader knows the script may not
  * reach the session's state. The project's settings are saved at the end,
  * as the GUI saves them on each verb.
@@ -242,7 +245,7 @@ export function sessionScript(calls: readonly Line[], projectPath: string,
   const body: string[] = [];
   let skipped = 0;
   for (const line of calls) {
-    if (line.kind !== "call" || line.text.startsWith("p = rx.Project.open(")) continue;
+    if (line.kind !== "call" || line.preamble) continue;
     if (line.script === null) {
       skipped += 1;
       body.push(`# not repeated: ${line.text}`);

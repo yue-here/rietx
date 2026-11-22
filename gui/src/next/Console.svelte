@@ -149,6 +149,8 @@
   .bar {
     position: sticky;
     top: 0;
+    /* each line is positioned for its prompt gutter and would paint over it */
+    z-index: 1;
     display: flex;
     justify-content: flex-end;
     align-items: center;

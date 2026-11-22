@@ -169,7 +169,7 @@ describe("the session as a script", () => {
 
   it("binds the names, opens the copy it is given, and repeats each call's runnable form", () => {
     const text = sessionScript([
-      call('p = rx.Project.open("/w/fap.rex")'),
+      { ...call('p = rx.Project.open("/w/fap.rex")'), preamble: true },
       call("ref.set_values({\"a\": 1})"),
       call("ref.run_stage(...)", "p.run_stage(rx.StageSpec.model_validate_json(\"{}\").to_stage())"),
       makeLine("comment", "# view kept", undefined, 0),
@@ -178,7 +178,7 @@ describe("the session as a script", () => {
     expect(lines[0]).toBe("# fap: the rietx GUI session of 2026-11-22, as a script.");
     expect(text).toContain("#   python fap.py path/to/copy.rex\n");
     expect(text).toContain("import rietx as rx\n\np = rx.Project.open(sys.argv[1])\nref = p.refinement\n");
-    // the window's own open is the preamble's; a comment line is no call
+    // the Console's opening lines are the preamble's; a comment line is no call
     expect(text).not.toContain('Project.open("/w/fap.rex")');
     expect(text).not.toContain("view kept");
     expect(text.endsWith('ref.set_values({"a": 1})\n'
