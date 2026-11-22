@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   EVENT_CAP, LINE_CAP, LINE_KINDS, clock, copyText, entries, eventLine, foldSummary, makeLine,
-  pieces, pushLine, serverScript, sharedSay, stageScript, structureScript, type Line,
+  pieces, pushLine, serverScript, sessionScript, sharedSay, stageScript, structureScript, type Line,
   type LineKind,
 } from "./console";
 
@@ -161,5 +161,35 @@ describe("a line's drawing", () => {
                    makeLine("comment", "# x"), makeLine("call", "ref.hold('a')")];
     expect(copyText(lines)).toBe("p.fit()\nref.hold('a')\n");
     expect(copyText([])).toBe("");
+  });
+});
+
+describe("the session as a script", () => {
+  const call = (text: string, script?: string | null): Line => makeLine("call", text, script, 0);
+
+  it("binds the names, opens the copy it is given, and repeats each call's runnable form", () => {
+    const text = sessionScript([
+      call('p = rx.Project.open("/w/fap.rex")'),
+      call("ref.set_values({\"a\": 1})"),
+      call("ref.run_stage(...)", "p.run_stage(rx.StageSpec.model_validate_json(\"{}\").to_stage())"),
+      makeLine("comment", "# view kept", undefined, 0),
+    ], "/w/fap.rex", new Date(2026, 10, 22));
+    const lines = text.split("\n");
+    expect(lines[0]).toBe("# fap: the rietx GUI session of 2026-11-22, as a script.");
+    expect(text).toContain("#   python fap.py path/to/copy.rex\n");
+    expect(text).toContain("import rietx as rx\n\np = rx.Project.open(sys.argv[1])\nref = p.refinement\n");
+    // the window's own open is the preamble's; a comment line is no call
+    expect(text).not.toContain('Project.open("/w/fap.rex")');
+    expect(text).not.toContain("view kept");
+    expect(text.endsWith('ref.set_values({"a": 1})\n'
+      + 'p.run_stage(rx.StageSpec.model_validate_json("{}").to_stage())\n\np.save()\n')).toBe(true);
+    expect(text).not.toContain("steps are comments");
+  });
+
+  it("writes a call it cannot repeat as a comment, and says so at its head", () => {
+    const text = sessionScript([call("ref.edit(structure=…)  # limits", null), call("p.fit()")],
+                               "/w/fap.rex");
+    expect(text).toContain("# 1 of its 2 steps are comments: the window ran them,");
+    expect(text).toContain("# not repeated: ref.edit(structure=…)  # limits\np.fit()\n");
   });
 });

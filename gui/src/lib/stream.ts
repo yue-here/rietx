@@ -128,13 +128,27 @@ export function advance(cursor: Cursor, batch: { events: EngineEvent[]; oldest?:
  *
  * EventSource cannot be told "resume at seq N" once it reconnects on its own,
  * so the query carries the cursor and a reconnect re-opens with the cursor we
- * hold — which is why the server accepts `?since=` on the SSE route too. */
+ * hold — which is why the server accepts `?since=` on the SSE route too.
+ *
+ * `onDropped` hears the running count of frames the server's ring lost while
+ * this page followed (#1656 item 1): the polling path reads it off each
+ * batch's `oldest` (`advance`), and the SSE path off a jump in `seq`, which
+ * the server numbers one by one. What the ring had lost before the first
+ * delivery is history this page never followed, so it is not counted, unless
+ * the caller gave a `since` and so claimed the frames after it. */
 export function follow(
   onEvent: (event: EngineEvent) => void,
   onState: (state: RunState) => void,
-  options: { since?: number; poll?: (since: number) => Promise<any> } = {},
+  options: { since?: number; poll?: (since: number) => Promise<any>;
+             onDropped?: (dropped: number) => void } = {},
 ): () => void {
   let cursor: Cursor = { seq: options.since ?? 0, dropped: 0 };
+  let primed = options.since !== undefined;
+  const moved = (next: Cursor) => {
+    const lost = next.dropped !== cursor.dropped;
+    cursor = next;
+    if (lost) options.onDropped?.(cursor.dropped);
+  };
   let stopped = false;
   let source: EventSource | null = null;
   let timer: number | null = null;
@@ -144,7 +158,9 @@ export function follow(
     source = new EventSource(`/api/events?since=${cursor.seq}`);
     source.addEventListener("event", (message) => {
       const event = JSON.parse((message as MessageEvent).data) as EngineEvent;
-      cursor = { ...cursor, seq: Math.max(cursor.seq, event.seq) };
+      const gap = primed ? Math.max(0, event.seq - (cursor.seq + 1)) : 0;
+      primed = true;
+      moved({ seq: Math.max(cursor.seq, event.seq), dropped: cursor.dropped + gap });
       onEvent(event);
     });
     source.addEventListener("state", (message) => {
@@ -165,7 +181,9 @@ export function follow(
       try {
         const batch = await options.poll!(cursor.seq);
         for (const event of batch.events ?? []) onEvent(event);
-        cursor = advance(cursor, batch);
+        const next = advance(cursor, batch);
+        moved(primed ? next : { ...next, dropped: cursor.dropped });
+        if ((batch.events ?? []).length) primed = true;
         if (batch.state) onState(batch as RunState);
       } catch {
         /* the server is gone; the next tick will find out */

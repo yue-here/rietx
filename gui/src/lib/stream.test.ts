@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { advance, consoleLine, stageProgress, type EngineEvent, type RunState } from "./stream";
+import { advance, consoleLine, follow, stageProgress, type EngineEvent,
+         type RunState } from "./stream";
 
 const event = (seq: number, kind: string, data: Record<string, any> = {}): EngineEvent => ({
   seq,
@@ -43,6 +44,59 @@ describe("cursor", () => {
   it("never moves backwards on an empty batch", () => {
     const cursor = advance({ seq: 7, dropped: 1 }, { events: [], next: 7, oldest: 8 });
     expect(cursor).toEqual({ seq: 7, dropped: 1 });
+  });
+});
+
+describe("follow reports the frames it lost (#1656 item 1)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it("on the polling path, from a batch whose oldest skips past the cursor", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("EventSource", undefined);
+    vi.stubGlobal("window", globalThis);  // this file runs under node
+    const batches = [
+      // the first delivery: what the ring lost before it was never followed
+      { events: [event(4, "eval")], oldest: 4, next: 4 },
+      { events: [event(5, "eval")], oldest: 5, next: 5 },
+      // 6..8 left the ring between two polls
+      { events: [event(9, "eval")], oldest: 9, next: 9 },
+    ];
+    const heard: number[] = [];
+    const stop = follow(() => {}, () => {}, {
+      poll: async () => batches.shift() ?? { events: [], next: 9, oldest: 9 },
+      onDropped: (n) => heard.push(n) });
+    for (let i = 0; i < 4; i++) await vi.advanceTimersByTimeAsync(700);
+    stop();
+    expect(heard).toEqual([3]);
+  });
+
+  it("on the SSE path, from a jump in seq", () => {
+    const sources: any[] = [];
+    class FakeSource {
+      static CLOSED = 2;
+      readyState = 1;
+      listeners: Record<string, (m: any) => void> = {};
+      onerror: (() => void) | null = null;
+      constructor(public url: string) { sources.push(this); }
+      addEventListener(name: string, fn: (m: any) => void) { this.listeners[name] = fn; }
+      close() {}
+    }
+    vi.stubGlobal("EventSource", FakeSource);
+    const heard: number[] = [];
+    const seen: number[] = [];
+    const stop = follow((e) => seen.push(e.seq), () => {}, { onDropped: (n) => heard.push(n) });
+    const send = (seq: number) =>
+      sources[0].listeners.event({ data: JSON.stringify(event(seq, "eval")) });
+    send(40);     // the first delivery primes the cursor
+    send(41);
+    send(45);     // 42..44 lost
+    send(46);
+    stop();
+    expect(seen).toEqual([40, 41, 45, 46]);
+    expect(heard).toEqual([3]);
   });
 });
 

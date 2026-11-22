@@ -141,6 +141,7 @@ EXPORT_DEFAULTS = {
     "html": "fit.html",
     "result_json": "result.json",
     "instrument_profile": "instrument_profile.json",
+    "script": "session.py",
 }
 
 #: Exports that describe the **model** rather than a fit, and are therefore
@@ -150,7 +151,10 @@ EXPORT_DEFAULTS = {
 #: calibration is frozen *from* — the file is written to be loaded into the next
 #: sample's project, and the fit that produced it has already been run and its
 #: numbers already stand in the model (WP-1214).
-_EXPORT_MODEL_ONLY = frozenset({"instrument_profile"})
+#: The Console's script (WP-2212) is the third kind of answer: the page holds
+#: the session's calls, so the request carries the text and the server only
+#: writes it, through the same destination rules.
+_EXPORT_MODEL_ONLY = frozenset({"instrument_profile", "script"})
 
 
 def _utcnow() -> str:
@@ -3437,6 +3441,9 @@ class GuiSession:
                            f"available: {sorted(EXPORT_DEFAULTS)}",
                            code="NOT_FOUND", status=404)
         res = None if kind in _EXPORT_MODEL_ONLY else self._need_result()
+        if kind == "script" and not isinstance(body.get("script"), str):
+            raise GuiError("a script export carries the script's text as `script`",
+                           where=["script"])
         filename = body.get("filename") or EXPORT_DEFAULTS[kind]
         if body.get("directory"):
             target = self._export_elsewhere(body["directory"], filename)
@@ -3446,7 +3453,9 @@ class GuiSession:
             target = self._export_target(filename)
         ref = p.refinement
         try:
-            if kind == "instrument_profile":
+            if kind == "script":
+                target.write_text(body["script"], encoding="utf-8")
+            elif kind == "instrument_profile":
                 from ..io.instrument_profile import save_instrument_profile
 
                 save_instrument_profile(ref.instrument, target)

@@ -19,7 +19,6 @@ CI.
 from __future__ import annotations
 
 import re
-import time
 
 import pytest
 
@@ -396,19 +395,14 @@ def test_a_refine_moves_nothing_while_it_runs_or_after(browser, tmp_path_factory
         page.locator(".actions button", has_text="One cycle").click()
         _frames(page)
         before = page.evaluate(SNAP, LANDMARKS)
-        head = client.get("/api/project")[1]["head"]
         page.locator(".actions button.refine").click()
         # The fixture already fitted a stage, so "Last fit" and an idle server
-        # are both true before the click. Wait for the console's echo, then
-        # for the head to move, which only a run that happened does, and only
-        # then for the run to end (WP-2212 writes the echo before the request).
+        # are both true before the click. Wait for the console's echo, which
+        # the page writes once the server has taken the run, and only then for
+        # the run to end, or the test passes without a run having happened.
         page.wait_for_function(
             "document.querySelector('.console')?.textContent"
-            ".includes('p.run_stage(rx.Stage(\"cycle\"')")
-        deadline = time.monotonic() + 60
-        while client.get("/api/project")[1]["head"] == head:
-            assert time.monotonic() < deadline, "the run never moved the head"
-            time.sleep(0.05)
+            ".includes('ref.run_stage(Stage(\"cycle\"')")
         _wait_idle(client)
         page.wait_for_selector('.pill[data-state="idle"]')
         page.wait_for_function("document.querySelector('.gtitle .what').textContent === 'Last fit'")

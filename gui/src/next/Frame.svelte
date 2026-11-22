@@ -40,7 +40,7 @@
   import { WORKFLOWS, menuLabel, workflow, type WorkflowId } from "../lib/workflows";
   import ActionBar from "./ActionBar.svelte";
   import Console from "./Console.svelte";
-  import { eventLine, makeLine, pushLine, sharedSay, stageScript, type Line,
+  import { eventLine, makeLine, pushLine, sessionScript, sharedSay, stageScript, type Line,
            type LineKind } from "./console";
   import HelpBox from "./HelpBox.svelte";
   import { GRAPH_HELP, MODEL_HELP } from "./helpbox";
@@ -824,7 +824,7 @@
         }
         seen = key;
       },
-      { poll: (since) => api.events(since) },
+      { poll: (since) => api.events(since), onDropped: (n) => (dropped = n) },
     );
     return () => {
       unfollow();
@@ -858,7 +858,8 @@
     {workflow(wf).name}<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"
       ><path d="M4.5 6.5 8 10l3.5-3.5" /></svg></button>
   <span class="proj">
-    <FileMenu {project} {busy} say={sayShared} onnew={() => (newOpen = true)} onopen={open}
+    <FileMenu {project} {busy} say={sayShared} script={() => sessionScript(calls, project?.path ?? "")}
+      onnew={() => (newOpen = true)} onopen={open}
       onproject={(doc) => (project = doc)} onclosed={closed} />
   </span>
   <span class="gap"></span>
