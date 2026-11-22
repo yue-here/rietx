@@ -3354,6 +3354,36 @@ class GuiSession:
         except KeyError as exc:
             raise GuiError(str(exc), code="NOT_FOUND", status=404) from None
 
+    def history_curves(self, node_id: str) -> Packed:
+        """One node's calculated curve, for the History tab's Compare (WP-2211).
+
+        Through :func:`refine.replay`, which compiles the node's own model at
+        its own values, 2θ range and extracted intensities, so it answers a
+        node the working table cannot express. A preview at the node's values
+        draws the same curve only for a node with the head's paths, no moved
+        atom and no Le Bail intensities of its own (WP-2211 § Measured).
+        Writes nothing. Idle-only, like every verb that compiles. The curve is
+        on the node's channels, which can differ from the head's, so a client
+        places it by 2θ.
+        """
+        import numpy as np
+
+        from ..refine import replay
+
+        self._require_idle()
+        p = self._need_project()
+        try:
+            node = p.history.resolve(node_id)
+        except KeyError as exc:
+            raise GuiError(str(exc), code="NOT_FOUND", status=404) from None
+        try:
+            res = replay(p.history, node, p.data)
+        except ValueError as exc:
+            raise GuiError(str(exc), code="MODEL_REFUSED") from None
+        return Packed({"node": node, "rwp": res.statistics.rwp},
+                      {"two_theta": np.asarray(res.two_theta, dtype=np.float64),
+                       "y_calc": np.asarray(res.y_calc, dtype=np.float64)})
+
     def history_checkout(self, body: dict) -> dict:
         """Restore a node's state as the working state (``git checkout``)."""
         self._require_idle()
