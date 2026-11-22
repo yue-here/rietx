@@ -7099,12 +7099,15 @@ class Refinement:
         a fresh grid carries them over from the fitted model by hkl and there
         is nothing to carry before one exists.
 
-        **After a default fit the two forms agree bit for bit.**  ``predict()``
+        **After a fit, both forms draw the fit's own curve.**  ``predict()``
         evaluates the model the result was measured on, a compile at the
-        answer (#272, WP-1421), so it returns ``RefinementResult.y_calc``; a
-        grid compiles at the same values and windows.  Measured on the
-        fluorapatite tutorial under ``mccusker_default``: 0 of 5751 channels
-        differ.
+        answer (#272, WP-1421), so it returns ``RefinementResult.y_calc``.  A
+        grid compiles at that model's peak cut: the last stage's
+        ``window_area_tol`` and ``window_slack_deg`` (WP-2235).  So
+        ``predict(result.two_theta)`` returns ``y_calc`` bit for bit too.  At
+        ``compile_model``'s default cut instead, that grid differs from
+        ``y_calc`` on all 5751 channels of the fluorapatite tutorial under
+        ``mccusker_default``, by up to 1.4e-3 of the strongest peak.
 
         **The free set reaches the curve in one case** (#774).  With both
         axial-divergence ratios at exactly zero and either refined, the
@@ -7115,15 +7118,16 @@ class Refinement:
         of the strongest peak (the issue's rutile reproducer, 2026-10-25).
         Every positive value is sized by value alone.
 
-        A grid compiles at ``compile_model``'s default windows whatever this
-        object has fitted, so a never-fitted twin carrying the same models
-        returns the same array.  That default is ``CLOSING_WINDOW_TOL``
-        (WP-2002, the seventh round's Q1), so a synthetic pattern carries
-        near-complete tails.  A default fit measures its answer at the declared
-        stages' ``forward.WINDOW_AREA_TOL`` since the closing stage went off by
-        default (WP-2222), so a grid differs from its ``y_calc`` by the tails;
-        redraw a fit's own curve with ``compile_model(...,
-        window_area_tol=recorded_window_tol(result.stages[-1].window_area_tol))``.
+        An object that has not been fitted compiles a grid at
+        ``compile_model``'s default cut, ``CLOSING_WINDOW_TOL`` (WP-2002, the
+        seventh round's Q1), so a synthetic pattern carries near-complete
+        tails.  A default fit measures its answer at the declared stages'
+        ``forward.WINDOW_AREA_TOL`` since the closing stage went off by default
+        (WP-2222).  So a never-fitted twin carrying the fitted models returns
+        the default-cut array, and differs from the fitted object by the tails.
+        ``compile_model(...,
+        window_area_tol=recorded_window_tol(result.stages[-1].window_area_tol))``
+        rebuilds a fit's curve from its record alone.
         """
         table = ParameterTable(self.structure, self.instrument)
         if two_theta is None:
@@ -7153,8 +7157,15 @@ class Refinement:
                 f"{mode} intensities are extracted by a fit, not computed from "
                 "the structure, so there is nothing to evaluate before one has "
                 "run. Fit first, or predict in rietveld mode.")
+        # the peak cut the last answer was measured at, slack included, so a
+        # grid draws the fit's own curve (WP-2235, ruling A); before a fit,
+        # compile_model's default
+        cut = ({} if self._model is None else
+               {"window_area_tol": self._model.window_area_tol,
+                "window_slack_deg": self._model.window_slack_deg})
         model = compile_model(self.structure, self.instrument, grid,
-                              mode=mode, moving_paths=set(table.moving_paths))
+                              mode=mode, moving_paths=set(table.moving_paths),
+                              **cut)
         if mode in ("lebail", "pawley"):
             _carry_lebail(self._model, model)
         return model.evaluate(table.decode(table.x0()))

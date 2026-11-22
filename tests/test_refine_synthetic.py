@@ -1,14 +1,17 @@
 """Round-trip: synthesize a LaB6 pattern with known parameters, perturb the
 model, refine, and check the truth is recovered."""
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
 from rietx import Instrument, PatternData, Refinement, build_report
-from rietx.model.forward import compile_model
+from rietx.model.forward import WINDOW_AREA_TOL, compile_model, recorded_window_tol
 from rietx.params.vector import ParameterTable
 from rietx.schemas.common import Parameter
 from rietx.schemas.instrument import BackgroundChebyshev
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
 from tests.test_schemas import make_lab6
 
 WAVELENGTH = 0.4139
@@ -180,22 +183,47 @@ def test_predict_needs_no_fit(synthetic_pattern):
     assert np.array_equal(y, ref.predict(np.asarray(synthetic_pattern.two_theta)))
 
 
-def test_predict_at_the_fitted_values_needs_no_fit_either(synthetic_pattern):
-    """The equivalence bar: a fit is a way to *set* the parameters, not to
-    license evaluating them.
+@pytest.mark.parametrize("mode", ["rietveld", "lebail"])
+def test_predict_on_the_fit_grid_returns_the_fit_curve(synthetic_pattern, mode):
+    """After a default fit a grid compiles at the fit's peak cut (WP-2235,
+    ruling A), so both forms of ``predict`` return ``y_calc`` bit for bit.
 
-    A never-fitted `Refinement` carrying the fitted models must return exactly
-    what the fitted one returns for the same grid — bit-identical, not close,
-    since it is the same compile of the same values.
+    A never-fitted twin carrying the fitted models still compiles at
+    ``compile_model``'s default cut, so it returns that compile's array and
+    differs from the fit's curve by the tails the fit's windows leave out.
     """
     structure, ins = perturbed_models()
-    fitted = Refinement(structure, ins)
-    fitted.fit(synthetic_pattern, plan="profile_only")
+    fitted = Refinement(structure, ins, history=False)
+    result = fitted.fit(synthetic_pattern, mode=mode)
+    tt = np.asarray(result.two_theta)
+    y_calc = np.asarray(result.y_calc)
+
+    cut = recorded_window_tol(result.stages[-1].window_area_tol)
+    assert cut == WINDOW_AREA_TOL
+    # predict reads the cut off the answer's compile; the record says the same
+    assert fitted._model.window_area_tol == cut
+    assert np.array_equal(fitted.predict(), y_calc)
+    assert np.array_equal(fitted.predict(tt), y_calc)
+    assert np.array_equal(fitted.predict(PatternData(
+        two_theta=tt.tolist(), intensity=[0.0] * len(tt))), y_calc)
+    from rietx.viz.plots import plot_result
+
+    out = Path(__file__).parent / "output"
+    out.mkdir(exist_ok=True)
+    plot_result(result, path=str(out / f"predict_fit_grid_{mode}.png"))
+    if mode != "rietveld":
+        return  # a Le Bail twin has no intensities to evaluate
 
     twin = Refinement(fitted.structure.model_copy(deep=True),
-                      fitted.instrument.model_copy(deep=True))
-    assert np.array_equal(twin.predict(synthetic_pattern),
-                          fitted.predict(synthetic_pattern))
+                      fitted.instrument.model_copy(deep=True), history=False)
+    y_twin = twin.predict(tt)
+    table = ParameterTable(twin.structure, twin.instrument)
+    grid = PatternData(two_theta=tt.tolist(), intensity=[0.0] * len(tt))
+    default = compile_model(twin.structure, twin.instrument, grid,
+                            moving_paths=set(table.moving_paths))
+    assert default.window_area_tol == CLOSING_WINDOW_TOL
+    assert np.array_equal(y_twin, default.evaluate(table.decode(table.x0())))
+    assert not np.array_equal(y_twin, y_calc)
 
 
 def test_predict_with_no_grid_still_needs_one(synthetic_pattern):
