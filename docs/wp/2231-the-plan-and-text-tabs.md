@@ -1,6 +1,6 @@
 # WP-2231 — the Plan and Text tabs at `/next`: a plan read as a recipe with Free and Fix rows, and a text buffer whose edits ride the action bar
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-22 — the look's third PR in review (#PRNUM); the maintainer's look at its pictures waits
+Milestone: gui-overhaul · Status: 🔄 2026-11-22 — the look's third PR in review (#1769); the maintainer's look at its pictures waits
 Depends on: 2218 (hand fitting and the other graphs)
 Priority: P2 2026-11-21 — a feature the open milestone was opened for: R4, the next piece after R3
 
@@ -350,7 +350,7 @@ The maintainer's look (the third PR), most consequential first:
 
 ## Handover log
 
-- **2026-11-22** — the maintainer's look at R4, the third PR (#PRNUM, branch
+- **2026-11-22** — the maintainer's look at R4, the third PR (#1769, branch
   `wp2231-gui-r4-look`), finished from its pause. All eight look items are built. A typed
   number in the Text tab now previews on the plot, as a slider move does. While a preview is
   up, the Pattern graph's title line offers Show with Preview or Last fit, and Last fit draws
