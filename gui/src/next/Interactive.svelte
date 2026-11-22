@@ -31,6 +31,7 @@
    * the new value is no longer an edit.
    */
   import { type Say } from "./console";
+  import { py } from "../lib/py";
   import { untrack } from "svelte";
   import type { Curves } from "rxplot";
 
@@ -339,7 +340,7 @@
         : (exc as Error).message;
       return false;
     }
-    say("call", `ref.set_values(${JSON.stringify(values)})`);
+    say("call", `ref.set_values(${py(values)})`);
     edits = new Map();
     error = "";
     ask();
