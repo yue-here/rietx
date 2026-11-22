@@ -188,8 +188,23 @@
     loadError ? "The pattern could not be drawn"
     : !held ? "" : held.raw ? "Observed pattern" : "Last fit");
 
-  /** Whether the graph draws a preview: values nobody has applied (WP-2128). */
-  const previewing = $derived(!!preview && !!held && !loadError);
+  /** Whether a preview is in hand: values nobody has applied (WP-2128). */
+  const hasPreview = $derived(!!preview && !!held && !loadError);
+  /** Which of the two the graph draws while a preview is in hand: a view
+   *  choice, session-local like the knobs, back to the preview whenever the
+   *  preview goes (the maintainer's look, 2026-11-21, item 4: "a toggle
+   *  between last refined and preview"). The last fit is drawn whole, as with
+   *  no preview, so its difference, ticks and Rwp are the fit's. */
+  let shown = $state<"preview" | "last">("preview");
+  $effect(() => {
+    if (!hasPreview) untrack(() => (shown = "preview"));
+  });
+  const SHOWN: { id: "preview" | "last"; label: string; title: string }[] = [
+    { id: "preview", label: "Preview", title: "Draw the pattern at the values not yet applied" },
+    { id: "last", label: "Last fit", title: "Draw the last fit, as it was before the edit" },
+  ];
+  /** Whether the graph draws the preview. */
+  const previewing = $derived(hasPreview && shown === "preview");
   /** Data only also hides the preview, which has no toggle in `toggles`. */
   const dataOnly = $derived(isDataOnly(toggles, hidden)
     && (!previewing || hidden.includes("preview")));
@@ -264,7 +279,7 @@
       watchZoom(chart);
       // a chart built under a preview (the graph tab came back to Pattern)
       // has no view yet to keep: keeping one drew an empty plot (WP-2218)
-      const p = untrack(() => preview);
+      const p = untrack(() => (previewing ? preview : null));
       if (p) chart.setPreview(p.curves, false);
     } else {
       chart.setCurves(c, keep);
@@ -385,6 +400,8 @@
       applied = { kind: k, scale: s, theme: t };
       chart.fig.setHidden(h);
       chart.update(o);
+      // a hidden curve can move the y range, and the scale mark its top tick
+      relayout();
     });
   });
 
@@ -407,10 +424,11 @@
   // from the moment its values were set to the frame after it painted: the
   // drag-to-redraw latency the browser test reads, as on today's page.
   $effect(() => {
-    const p = preview;
+    const p = previewing ? preview : null;
     untrack(() => {
       if (!chart) return;
       chart.setPreview(p?.curves ?? null);
+      relayout();
       if (!p) performance.clearMeasures?.("rx-preview-redraw");
       else requestAnimationFrame(() => requestAnimationFrame(() =>
         performance.measure("rx-preview-redraw", { start: p.sentAt })));
@@ -846,6 +864,16 @@
       {/if}
     </div>
     <div class="gctl">
+      {#if hasPreview}
+        <span class="vg">Show
+          <span class="segmented" role="group" aria-label="Show">
+            {#each SHOWN as s (s.id)}
+              <button class:on={shown === s.id} aria-pressed={shown === s.id} title={s.title}
+                onclick={() => (shown = s.id)}>{s.label}</button>
+            {/each}
+          </span>
+        </span>
+      {/if}
       <button class="ghost" disabled={!zoomed} onclick={showAll}
         title="Show the whole pattern">Show all</button>
       <button class="ib" bind:this={viewButton} aria-label="View" aria-haspopup="menu"
