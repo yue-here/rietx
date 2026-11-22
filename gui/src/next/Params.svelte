@@ -263,8 +263,7 @@
       // apply, and would get every Apply refused (and the Background band, a
       // hold): the head moved under it, by a checkout, the text editor or a
       // structural edit (WP-2218 review)
-      const known = rows.map((r) => r.path);
-      dropPending((key) => !known.some((path) => fnmatch(path, key)));
+      dropUnknown();
       structure = s.structure;
       sites = s.sites ?? [];
       symmetry = s.symmetry ?? [];
@@ -391,25 +390,40 @@
     refusal = "";
   }
 
-  /** Drop the pending values, flags, holds and limits whose key `gone`
-   *  names: an edit on another surface removed or redefined those paths
-   *  (the Background graph's Type and Terms, WP-2218 review), so Apply
-   *  would be refused on them, or land on the new model's path of the same
-   *  name. Returns the keys dropped. */
+  /** Drop every pending edit whose key `gone` names: an edit on another
+   *  surface removed or redefined those paths (the Background graph's Type
+   *  and Terms, WP-2218 review; any instrument edit's `ended`, WP-2229), so
+   *  Apply would be refused on them, or land on the new model's path of the
+   *  same name. All six kinds go: values, flags, holds, limits, restraints,
+   *  and positions, which are keyed by atom and asked about by the
+   *  coordinate paths they set. Returns the keys dropped. */
   export function dropPending(gone: (key: string) => boolean): string[] {
     const dropped: string[] = [];
-    const keep = <V,>(m: Map<string, V>): Map<string, V> => {
-      const hit = [...m.keys()].filter(gone);
+    const keep = <V,>(m: Map<string, V>, ended = (key: string, _v: V) => gone(key)
+                     ): Map<string, V> => {
+      const hit = [...m].filter(([k, v]) => ended(k, v)).map(([k]) => k);
       if (!hit.length) return m;
       dropped.push(...hit);
-      return new Map([...m].filter(([k]) => !gone(k)));
+      return new Map([...m].filter(([k]) => !hit.includes(k)));
     };
     edits = keep(edits);
     varyEdits = keep(varyEdits);
     holdEdits = keep(holdEdits);
     limitEdits = keep(limitEdits);
+    restraintEdits = keep(restraintEdits);
+    positionEdits = keep(positionEdits,
+                         (atom, fields) => Object.keys(fields).some((axis) => gone(`${atom}.${axis}`)));
     if (dropped.length) say(`# pending edits dropped: ${[...new Set(dropped)].sort().join(", ")}`);
     return dropped;
+  }
+
+  /** Drop the pending edits on paths the loaded rows no longer have: the
+   *  reload's question, asked also of a restored draft. Before the first
+   *  load the rows are empty and say nothing about any path. */
+  function dropUnknown() {
+    if (!rows.length) return;
+    const known = rows.map((r) => r.path);
+    dropPending((key) => !known.some((path) => fnmatch(path, key)));
   }
 
   /** The pending edits as plain data, for the recovery copy (WP-2209), or
@@ -428,7 +442,8 @@
     };
   }
 
-  /** Put recovered edits back as pending edits, in place of any on screen. */
+  /** Put recovered edits back as pending edits, in place of any on screen,
+   *  less those on a path the rows no longer have. */
   export function restoreDraft(d: ParamsDraft) {
     closeEditor(false);
     edits = new Map(Object.entries(d.edits ?? {}));
@@ -437,6 +452,10 @@
     limitEdits = new Map(Object.entries(d.limits ?? {})) as Map<string, Limits>;
     restraintEdits = new Map(Object.entries(d.restraints ?? {})) as Map<string, Restraint>;
     positionEdits = new Map(Object.entries(d.positions ?? {}));
+    // a draft kept across a head move can name a path the head no longer
+    // has, such as a hold on a cut background term; left pending, it gets
+    // the band and every Apply refused (review of #1683, finding 1)
+    dropUnknown();
   }
 
   /** A hold or release on one path from another panel: the Background graph's
@@ -1366,7 +1385,7 @@
 {/if}
 
 {#if instrumentOpen}
-  <Instrument {rows} {anodes} {busy} {say} onlanded={landed}
+  <Instrument {rows} {anodes} {busy} {say} onlanded={landed} ondropped={dropPending}
     onclose={() => (instrumentOpen = false)} />
 {/if}
 

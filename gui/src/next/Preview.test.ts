@@ -72,6 +72,31 @@ describe("the Pattern graph's title line", () => {
     expect(setPreview).toHaveBeenCalled();
   });
 
+  it("toggles between the preview and the last fit, drawn whole", async () => {
+    // the maintainer's look, 2026-11-21, item 4
+    await draw({});
+    // laid out and unseen with no preview, so one appearing moves no control
+    expect(document.querySelector(".gctl .vg.reserved")).not.toBeNull();
+    expect([...document.querySelectorAll<HTMLButtonElement>(".gctl .segmented button")]
+      .every((b) => b.disabled)).toBe(true);
+    app && unmount(app);
+    document.body.innerHTML = "";
+    const curves = { header: { rwp: 0.3001 }, arrays: {} };
+    await draw({ preview: { curves, sentAt: 0 } });
+    const buttons = [...document.querySelectorAll<HTMLButtonElement>(".gctl .segmented button")];
+    expect(buttons.map((b) => b.textContent)).toEqual(["Preview", "Last fit"]);
+    expect(buttons[0].getAttribute("aria-pressed")).toBe("true");
+    setPreview.mockClear();
+    buttons[1].click();
+    flushSync();
+    expect(setPreview).toHaveBeenLastCalledWith(null);
+    expect(titleText()).toBe("Last fit Rwp 9.28 % GoF 1.66");
+    buttons[0].click();
+    flushSync();
+    expect(setPreview).toHaveBeenLastCalledWith(curves);
+    expect(titleText()).toBe("Preview, not refined Rwp 30.01 %, last fit 9.28 %");
+  });
+
   it("says a refused preview, the route's words in its tooltip", async () => {
     await draw({ previewError: "below the lower bound 0" });
     expect(titleText()).toBe("Last fit Preview refused Rwp 9.28 % GoF 1.66");

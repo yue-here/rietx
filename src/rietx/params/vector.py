@@ -65,6 +65,7 @@ from ..crystallography.wyckoff import (
     stabilizer_rotations,
 )
 from ..optimize import lapack
+from ..optimize.statistics import DiscardedSubspace
 from ..schemas.common import Parameter
 from ..schemas.instrument import (
     CAPILLARY_OFFSETS,
@@ -4289,7 +4290,7 @@ class ParameterTable:
         phase's cell, and the only free *name* is then the variable's.
 
         One column-wise read of the same **C** that :attr:`moving_paths` reads
-        row-wise and that ``optimize._column_extras`` reads for the Jacobian's
+        row-wise and that ``optimize.least_squares._column_extras`` reads for the Jacobian's
         own reach gate — never a second derivation, which could disagree with
         the matrix the residual is actually built from.  An explicitly stored
         zero coefficient is not reach, matching ``moving_paths``' test rather
@@ -4869,7 +4870,9 @@ class ParameterTable:
         return done
 
     def stderr_physical(self, theta: np.ndarray, stderr_internal: np.ndarray,
-                        correlation: np.ndarray | None = None) -> dict[str, float]:
+                        correlation: np.ndarray | None = None, *,
+                        discarded: DiscardedSubspace | None = None
+                        ) -> dict[str, float]:
         """Physical esds for every free or tied parameter.
 
         σ²_phys = diag(C · Cov_free · Cᵀ), where Cov_free is the covariance
@@ -4886,6 +4889,16 @@ class ParameterTable:
         *absent* rather than zero — this is that rule one rank down, and it
         reaches the tied rows as well, since a tie whose source measured
         nothing measured nothing.
+
+        **Except where the row is a combination the data determine**
+        (WP-2230).  With ``discarded``, the solve's
+        :class:`~rietx.optimize.statistics.DiscardedSubspace`, and a
+        ``correlation``, a row drawing on a column a discarded direction
+        touched is kept when :func:`~rietx.optimize.statistics.estimable`
+        says so, at the variance the pseudo-inverse gives it: a tie
+        ``zero_shift = za + zb + zc`` over three columns on one discarded
+        direction reports the sum's esd while each term reports none.  A
+        gradient-free source still empties every row it reaches.
         """
         # C itself without a derived block; with one, each derived row is the
         # block's local Jacobian at θ chained through its inputs (WP-1804)
@@ -4905,9 +4918,28 @@ class ParameterTable:
         # rows with any free source, read off the declared reach: a derived
         # row whose Jacobian is zero at this θ still has its sources
         touched = np.diff(self._reach.indptr) > 0
+        blind = self.unmeasured_rows(theta, stderr_internal)
+        kept = np.zeros_like(blind)
+        if discarded is not None and correlation is not None and blind.any():
+            # only the blind rows are asked, each as its own function
+            idx = np.flatnonzero(blind)
+            still = self.unmeasured_functions(
+                theta, stderr_internal, idx,
+                sparse.identity(len(idx), format="csr"),
+                correlation=correlation, discarded=discarded)
+            kept[idx] = ~still
+            blind = blind & ~kept
+        if kept.any():
+            # only those rows re-read, through the pseudo-inverse's own esds:
+            # every other row keeps its bits
+            cov = self._cov_free(theta, discarded.stderr, correlation)
+            sub = jac[kept]
+            with np.errstate(over="ignore", invalid="ignore"):
+                var[kept] = np.maximum(np.asarray(
+                    sub.multiply(sub @ cov).sum(axis=1)).ravel(), 0.0)
         # a propagated variance past the double range is an infinite one, and
         # absent for the same reason (WP-1463; ``_phys_sigma_free``)
-        blind = self.unmeasured_rows(theta, stderr_internal) | ~np.isfinite(var)
+        blind = blind | ~np.isfinite(var)
         return {e.path: float(np.sqrt(var[i]))
                 for i, e in enumerate(self.entries) if touched[i] and not blind[i]}
 
@@ -4983,23 +5015,77 @@ class ParameterTable:
         return ~np.isfinite(self._phys_sigma_free(theta, stderr_internal))
 
     def unmeasured_rows(self, theta: np.ndarray, stderr_internal: np.ndarray,
-                        rows: np.ndarray | None = None) -> np.ndarray:
+                        rows: np.ndarray | None = None, *,
+                        correlation: np.ndarray | None = None,
+                        discarded: DiscardedSubspace | None = None
+                        ) -> np.ndarray:
         """Boolean over ``C``'s rows (or ``rows`` of it): which are unmeasured.
 
         A row is unmeasured when it draws on any column
         :meth:`unmeasured_free` names — the propagated variance would be
         infinite, and an infinite esd is the absent one, not a large one.
+        With ``discarded`` and ``correlation``, a row whose only such sources
+        are columns a discarded direction touched is measured when its
+        combination is estimable (:meth:`unmeasured_functions`, WP-2230).
         """
+        n = self._C.shape[0] if rows is None else len(rows)
         bad = self.unmeasured_free(theta, stderr_internal)
         if not bad.any():
-            n = self._C.shape[0] if rows is None else len(rows)
             return np.zeros(n, dtype=bool)
         c = self._reach if rows is None else self._reach[rows, :]
-        return np.asarray(abs(c) @ bad.astype(np.float64)).ravel() > 0.0
+        blind = np.asarray(abs(c) @ bad.astype(np.float64)).ravel() > 0.0
+        if discarded is None or correlation is None or not blind.any():
+            return blind
+        idx = np.arange(n) if rows is None else np.asarray(rows)
+        return self.unmeasured_functions(
+            theta, stderr_internal, idx, sparse.identity(len(idx), format="csr"),
+            correlation=correlation, discarded=discarded)
+
+    def unmeasured_functions(self, theta: np.ndarray, stderr_internal: np.ndarray,
+                             rows, grad, *,
+                             correlation: np.ndarray | None = None,
+                             discarded: DiscardedSubspace | None = None
+                             ) -> np.ndarray:
+        """Boolean over the functions ``grad`` (``(m, len(rows))``, each row a
+        gradient over the entries ``rows``): which have no measured esd.
+
+        One reading for a table row (``grad`` the identity) and a geometry
+        row (its partials).  A function is unmeasured when its reach
+        includes a column :meth:`unmeasured_free` names, read off the
+        declared reach so a source whose partial happens to vanish at this θ
+        still counts.  The exception is WP-2230's: with ``discarded`` and
+        ``correlation``, a function whose only such sources are columns a
+        discarded direction touched (none gradient-free) keeps its esd when
+        :func:`~rietx.optimize.statistics.estimable` says the data
+        determine it.  A function that moves one column alone is that
+        column, and stays unmeasured as the solve marked it.
+        """
+        g = grad.tocsr() if sparse.issparse(grad) else sparse.csr_matrix(grad)
+        bad = self.unmeasured_free(theta, stderr_internal)
+        if not bad.any():
+            return np.zeros(g.shape[0], dtype=bool)
+        reach = abs(g) @ abs(self._reach[np.asarray(rows), :])
+        blind = np.asarray(reach @ bad.astype(np.float64)).ravel() > 0.0
+        if discarded is None or correlation is None or not blind.any():
+            return blind
+        dead = self.unmeasured_free(theta, discarded.stderr)
+        cand = blind & ~(np.asarray(reach @ dead.astype(np.float64)).ravel() > 0.0)
+        if not cand.any():
+            return blind
+        from ..optimize.statistics import estimable
+
+        c = (g[np.flatnonzero(cand)]
+             @ self.local_jacobian(theta)[np.asarray(rows), :]).toarray()
+        cov = self._cov_free(theta, discarded.stderr, correlation)
+        ok = estimable(c, cov, discarded.lost) & ((c != 0.0).sum(axis=1) > 1)
+        blind[np.flatnonzero(cand)[ok]] = False
+        return blind
 
     def physical_covariance(self, theta: np.ndarray, stderr_internal: np.ndarray,
                             correlation: np.ndarray | None,
-                            paths: list[str]) -> np.ndarray:
+                            paths: list[str], *,
+                            discarded: DiscardedSubspace | None = None
+                            ) -> np.ndarray:
         """Physical covariance sub-block for ``paths`` (free or tied entries).
 
         Generalises :meth:`stderr_physical` (which returns only the diagonal)
@@ -5008,10 +5094,18 @@ class ParameterTable:
         fractions from the phase scales.  A parameter that was never freed has
         an all-zero ``C`` row, hence a zero covariance row/column (no
         uncertainty), which the caller handles naturally.
+
+        With ``discarded`` (and a ``correlation``) a column a discarded
+        direction touched enters at its pseudo-inverse esd rather than as
+        zero (WP-2230).  That block is only meaningful for a function the
+        data determine, so a caller pairs it with
+        :meth:`unmeasured_functions` and quotes nothing else from it.
         """
         rows = [self._paths[p] for p in paths]
         if not self._free_idx:
             return np.zeros((len(paths), len(paths)), dtype=np.float64)
+        if discarded is not None and correlation is not None:
+            stderr_internal = discarded.stderr
         cov_free = self._cov_free(theta, stderr_internal, correlation)
         c_rows = self.local_jacobian(theta)[rows, :].toarray()
         return c_rows @ cov_free @ c_rows.T
