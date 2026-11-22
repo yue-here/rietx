@@ -118,6 +118,20 @@ prototype with the changed region boxed, on a private page.
   recall and not checked: TOPAS, GSAS-II and FullProf have no history tree; Google Docs, Overleaf
   and Figma say "Restore this version" and "Name this version"; "Branch" reaches non-programmers
   in Onshape and Figma, while "Checkout" and "Tag" stay in programmers' tools.
+- **The maintainer's look at PR #1772, 2026-11-22**, on the five items it listed
+  (pictures in `2211-screenshots/`):
+  1. The compared curve's dark ink, `#f5f5f5`: kept.
+  2. The Graph | Table choice and the `?` at the strip's right: kept.
+  3. The Graph view: "don't need more columns, but there is way too much white space. user
+     can't compare 2 entries at a single glance." Tightened: the view is one grid whose rows
+     are subgrids, every column as wide as its widest cell, so Rwp and the row's actions
+     follow the step name (292 px from the step's first letter to the end of Rwp, where it
+     was 1170 px at 1440 wide). The candidate not taken, each row capped at 760 px, is
+     `alt-graph-capped-*.png`.
+  4. Step names stay the stage's own for now.
+  5. The manual: WP-2214 holds, so nothing changes until the swap. The History section's
+     rewrite (ruling 5) is listed with the swap's manual work in WP-2214 § Tests and the
+     manual.
 
 ### Measured: questions 3 and 4 (2026-11-22)
 
@@ -207,8 +221,8 @@ Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`
   the prototype's at 1440 by 900 in the PR (milestone row 11).
   The pictures are `2211-screenshots/` (its README maps WP-2214's rows 152-160). The chapter and
   `docs/docs/make_screenshots.py` stay as they are, under WP-2214 § Tests and the manual
-  ("unchanged until the swap"). Ruling 5 says the chapter is rewritten in this WP: the two
-  rules conflict, so the timing is a question for the maintainer (handover entry, 2026-11-22).
+  ("unchanged until the swap"). The maintainer placed the chapter's History rewrite at the
+  swap, 2026-11-22 (§ Rulings, the look's item 5).
 - [x] Skill: none. The GUI is a human surface, and an agent drives the python API.
 - [ ] WP-2214's inventory row 158: the diff panel (filter, metrics, ranked paths; WP-1217),
   opened by Compare values… on a node's menu. Where it opens is a placement the prototype
@@ -237,6 +251,21 @@ The browser files skip in CI (no playwright there), so the PR quotes their local
   panel), WP-2209 (edit recovery).
 
 ## Handover log
+
+- **2026-11-22** (after the maintainer's look) — The Graph view now reads across: a row's step
+  name, Rwp, Compare and Restore sit together, so two fits can be compared at a glance, at
+  1440 and at 1000 px alike. The maintainer kept the other four items as built, and the
+  manual's History rewrite now waits for the swap, where WP-2214 lists it.
+  *Done*: the five answers in § Rulings; the Graph view as one grid of subgrid rows, columns
+  sized by their widest cell; `history-graph`, `history-compare` and `history-restore`
+  retaken in the Graph view, light and dark, with `history-graph-1000-*` and the candidate not
+  taken as `alt-graph-capped-*`; the rewrite added to WP-2214 § Tests and the manual. That WP
+  is closed, so this is a line in its swap plan, which the session filing the swap reads.
+  *Measured* (macOS arm64, `[dev]` venv, Python 3.12): vitest 952 passed in 55 files;
+  svelte-check 0 errors; the layout and gui browser files 53 passed; docs consistency, dist
+  and manual 83 passed.
+  Next: unchanged. Draw the placements for rows 155 and 158 for the maintainer, then build
+  them in a second PR.
 
 - **2026-11-22** — The History tab is built at `/next`, in review as PR #1772. A person can
   now see every fit as a row, in the graph view it opens in or the table, overlay any earlier

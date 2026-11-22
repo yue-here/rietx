@@ -438,8 +438,15 @@
     clip-path: inset(50%);
   }
 
+  /* One grid for every row, each row a subgrid of it, so a column is as wide
+     as its widest cell and Rwp and the row's actions sit beside the step name.
+     Two rows then read across at a glance; the free width is the last track. */
   .graph {
     position: relative;
+    display: grid;
+    grid-template-columns: var(--lanes) 6ch fit-content(48ch) 9ch auto 1fr;
+    grid-auto-rows: 30px;
+    column-gap: 12px;
     padding-left: 12px;
   }
 
@@ -465,11 +472,9 @@
 
   .grow {
     display: grid;
-    grid-template-columns: var(--lanes) 6ch minmax(14em, 1fr) 9ch auto;
+    grid-template-columns: subgrid;
+    grid-column: 1 / -1;
     align-items: center;
-    column-gap: 12px;
-    height: 30px;
-    padding-right: 12px;
   }
 
   .grow > .id {
