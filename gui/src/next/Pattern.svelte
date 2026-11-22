@@ -785,7 +785,11 @@
     for (const t of toggles) {
       const label = CURVE_WORDS[t.id] ?? t.label;
       if (t.id === "diff") {
-        out.push({ id: t.id, label, top: geom.resid.top + geom.resid.height / 2 - LEGEND_ROW / 2 });
+        // centred on the trace: its zero line, the ±3 esd band's middle,
+        // else the strip's (the maintainer's look, 2026-11-21, item 2)
+        const mid = kind !== "cumulative" && geom.resid.zero != null
+          ? geom.resid.zero : geom.resid.height / 2;
+        out.push({ id: t.id, label, top: geom.resid.top + mid - LEGEND_ROW / 2 });
       } else if (t.id.startsWith("ticks:")) {
         const row = geom.ticks.height / Math.max(phases, 1);
         out.push({ id: t.id, label, top: geom.ticks.top + row * (tick + 0.5) - LEGEND_ROW / 2 });
