@@ -485,16 +485,12 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
 ## Conventions
 
 - **Never spell the distribution name, a format token or the state dir — import it from
-  `_about.py`** (WP-1062, 1066): its docstring says which is which, and why no test can enforce
-  it.
-- **A value somebody chose says so where it is, and names where the alternatives are** (WP-1448):
-  `*(Chosen: WP-NNNN, YYYY-MM-DD — what over what)*`, or `docs/DESIGN.md § <heading>` for a choice
-  binding later WPs, with the alternatives in that record under that date. A paper is cited and a
-  measurement names its WP; `tests/test_chosen_values.py` fails a tag naming no record of its day.
+  `_about.py`** (WP-1062, 1066): its docstring says which.
+- **A chosen value is tagged `*(Chosen: WP-NNNN, YYYY-MM-DD — …)*`** (WP-1448).
 - **What a name *is* is written in `src/rietx/help.py` and nowhere else** (WP-1202): parameters,
   peak flags, stage fields, reader options, instrument preset fields, with unit, default and
   typical range. Every arm is crossed against its live vocabulary **both ways**
-  (`tests/test_help.py`), so neither a new member nor a rename slips past. `unit`/`default` are
+  (`tests/test_help.py`). `unit`/`default` are
   the schema's own through `UNIT_DISPLAY`; `typical` and `label` (the short words a chip carries,
   WP-1209) are the only authored fields. A `ParameterRow` carries `help_key`, the family glob,
   never the entry, since an entry describes a *family*. The manual's `reference/parameters.md`
