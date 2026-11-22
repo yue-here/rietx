@@ -60,47 +60,10 @@ export function heldWith(path: string, serverHeld: boolean,
   return held;
 }
 
-/** What a structural edit also asks of the hold and free registers, which
- *  `Refinement` keeps by path and reapplies to whatever the new model calls
- *  `c3` (`GuiSession.instrument_patch`): the holds to release first, the
- *  paths to free after, and which paths the edit removes or redefines, whose
- *  pending edits go too. */
-export interface Arms {
-  unhold: string[];
-  free: string[];
-  gone: (path: string) => boolean;
-}
-
-const BACKGROUND = "instrument.background.*";
-
-/** A Type switch redefines every coefficient: release them all, free the new
- *  ones, so the fresh background starts at zero and free as its docstring
- *  says, and nothing pending on the old one survives. */
-export function kindArms(): Arms {
-  return { unhold: [BACKGROUND], free: [BACKGROUND], gone: (path) => fnmatch(path, BACKGROUND) };
-}
-
-/** A Terms change from `held` terms (each path and whether it is held now)
- *  to `n`: a cut releases the held terms it removes, or a later extension
- *  would bring them back held; an extension frees the terms it adds, which
- *  the free register does not name. */
-export function termsArms(terms: readonly { path: string; held: boolean }[], n: number): Arms {
-  const index = (path: string) => {
-    const m = /^instrument\.background\.c(\d+)$/.exec(path);
-    return m ? Number(m[1]) : -1;
-  };
-  return {
-    unhold: terms.filter((t) => t.held && index(t.path) >= n).map((t) => t.path),
-    free: Array.from({ length: Math.max(0, n - terms.length) },
-                     (_, k) => `instrument.background.c${terms.length + k}`),
-    gone: (path) => index(path) >= n,
-  };
-}
-
 /** A copy of `instrument` with its Chebyshev cut or extended to `n` terms,
  *  keeping the fitted values and flags of the terms it keeps. An added term
- *  is built at zero and free, as `BackgroundChebyshev.with_terms` builds one;
- *  `termsArms`' `free` makes it free in the table too. */
+ *  is built at zero and free, as `BackgroundChebyshev.with_terms` builds one,
+ *  and the server frees it in the table too (`GuiSession.instrument_patch`). */
 export function withTerms(instrument: any, n: number): any {
   const next = JSON.parse(JSON.stringify(instrument));
   const current = next.background.coefficients as any[];
@@ -125,8 +88,9 @@ export function knots(lo: number, hi: number, step = KNOT_STEP_DEG): number[] {
 
 /** A copy of `instrument` with a background of the other type: a P-spline
  *  as `BackgroundPSpline.for_range` builds one over the fitted channels' ends,
- *  or a Chebyshev of `DEFAULT_TERMS`. Its coefficients start at zero, and
- *  `kindArms`' `free` frees them, so the next refine fits them. */
+ *  or a Chebyshev of `DEFAULT_TERMS`. Its coefficients start at zero and
+ *  free, and the server frees them in the table (`GuiSession.instrument_patch`),
+ *  so the next refine fits them. */
 export function switchKind(instrument: any, kind: "chebyshev" | "pspline", lo: number, hi: number): any {
   const next = JSON.parse(JSON.stringify(instrument));
   if (kind === "pspline") {

@@ -1999,7 +1999,7 @@ def from_structure(structure, *,
     * ``_space_group_name_H-M_alt`` — the fully resolved ``xhm()``, the current
       dictionary's tag, and the one gemmi prefers when both are present
       (measured).  This is what makes the round trip through
-      :func:`~rietx.structure_from_cif` exact.
+      :func:`~rietx.crystallography.cif.structure_from_cif` exact.
     * ``_space_group_symop_operation_xyz`` — the operations themselves, which is
       the channel that needs no convention at all.  GSAS-II reads them to check
       its own resolution of the symbol, and

@@ -331,7 +331,7 @@ def _shade(base, n0, n1, n2, look):
 
 
 def _outline_numpy(ext0, sr0, hs, ws, total, ow, otau, ocol, zb, pm, fog=None):
-    """``_outline`` in numpy: one shifted comparison per offset in the disc."""
+    """The Rust kernel's ``draw_outline`` in numpy: one shifted comparison per offset in the disc."""
     rows = slice(sr0 - ext0, sr0 - ext0 + hs)
     core = zb[rows]
     edge = np.zeros(core.shape, dtype=bool)
