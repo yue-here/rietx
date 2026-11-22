@@ -447,10 +447,20 @@ line if the checkpoint ended it. Close with
    - **Post the proposed rows** in the PR's step-8 review, each with the
      judge's one-line verdict. In the `all` mode that review waits for the
      judge and goes out in the apply pass.
-   - **Tier-3 rows and tier-2 actions go to the batch, grouped by class**:
-     one question for every row resting on the same evidence (WP-2002 ruled
-     256 rows as 16 classes). After a ruling, write `grounds` and `approved`
-     (the ruling's date) into the PR's rows. Push them to its branch where
+   - **Settle the clear classes of tier-3 rows and tier-2 actions, and batch
+     the rest** (ruled 2026-11-22). A class is every row resting on the same
+     evidence (WP-2002 ruled 256 rows as 16 classes). A class whose answer is
+     clear, and which none of the maintainer's triggers reaches (the
+     maintainer's instructions, § "Before you bring me a decision"), is yours
+     to settle. Dispatch one fresh agent on Opus over the settled classes. Give
+     it each class's evidence and diff, and withhold your tier, your grounds
+     and the judge's verdict. A class it answers differently is not clear and
+     goes to the batch. List the settled classes under **Settled for you**,
+     and show the maintainer a random one in ten. Every other class goes to
+     the batch as one question. After a settlement or a ruling, write
+     `grounds` and `approved` (that day's date) into the PR's rows. A settled
+     row's `grounds` ends "settled by Claude under <grounds>". Push them to
+     its branch where
      `gh pr view N --json maintainerCanModify` says true; otherwise ask the
      contributor in the review.
 6c. **What a reader receives** (ruled 2026-11-01). The package should pass no
