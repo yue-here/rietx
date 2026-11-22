@@ -294,6 +294,7 @@ indices int32, so a browser reads each array without copying it.
 | `GET /api/series/curves` · `GET /api/series/history` | one member's channels and curves, as float64 arrays; one member's tree |
 | `GET /api/history` | the node graph |
 | `GET /api/history/diff` · `GET /api/history/compare` | one node against its parent; two nodes against each other |
+| `GET /api/history/curves` | one node's calculated curve, recomputed at its own values, for Compare |
 | `POST /api/history/checkout` · `POST /api/history/branch` | restore a state; fork from one |
 | `POST /api/history/tag` · `POST /api/history/annotate` | name a node; attach a note |
 
