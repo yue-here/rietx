@@ -23,6 +23,20 @@ export interface EngineEvent {
   data: Record<string, any>;
 }
 
+/** How a fit ran, as the run frame and `GET /api/result` serve it (WP-2227). */
+export interface HowRan {
+  ran: "one_stage" | "stages";
+  reason: "converged" | "released" | "fallback" | null;
+  /** the plan line `Refinement.summary()` prints */
+  plan_line?: string | null;
+  /** the paths the last fit held and this plan frees, under `released` */
+  released?: string[];
+  /** their help keys, one per family, in order */
+  families?: string[];
+  /** whether the discarded one stage diverged, under `fallback` */
+  diverged?: boolean;
+}
+
 export interface RunState {
   state: "idle" | "running" | "cancelling";
   run: {
@@ -43,6 +57,9 @@ export interface RunState {
       pass?: number; of?: number | null;
       stopped?: string; level?: string; suggestion?: string | null;
     } | null;
+    /** How a fit ran (WP-2227): set while a re-fit's one stage runs, and at
+     *  the fit's end. `/next` words it (`next/howran.ts`). */
+    how?: HowRan | null;
   };
   project: string | null;
   head: string | null;

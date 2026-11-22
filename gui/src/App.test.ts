@@ -1272,10 +1272,10 @@ describe("the parameter table", () => {
     const order = stub.calls.filter((c) => c.method === "PATCH" || c.path === "/api/run")
       .map((c) => c.path);
     expect(order).toEqual(["/api/params", "/api/run"]);
-    expect(stub.calls.find((c) => c.path === "/api/run")?.body).toEqual({ kind: "fit" });
+    expect(stub.calls.find((c) => c.path === "/api/run")?.body).toEqual({ kind: "fit", refit: "stages" });
 
-    // one cycle is one stage on the ticked rows: an empty turn_on
-    button("One cycle")!.click();
+    // As ticked is one stage on the ticked rows: an empty turn_on
+    button("As ticked")!.click();
     await flush();
     refineButton()!.click();
     await flush();
@@ -2389,7 +2389,7 @@ describe("disclosure and the command palette", () => {
     expect(order).toEqual(["/api/params", "/api/run"]);
     expect(stub.calls.find((c) => c.method === "PATCH")?.body)
       .toEqual({ values: { "phases.0.cell.a": 4.157 }, vary: {} });
-    expect(stub.calls.find((c) => c.path === "/api/run")?.body).toEqual({ kind: "fit" });
+    expect(stub.calls.find((c) => c.path === "/api/run")?.body).toEqual({ kind: "fit", refit: "stages" });
 
     // an invalid edit blocks `r` as it disables the button
     await editValue("phases.0.cell.a", "abc");
@@ -3408,7 +3408,7 @@ describe("the model editor", () => {
     // and the fully fixed atom gets the mark rather than a box
     expect(host.querySelector('[data-vary="phases.0.atoms.0.dof.*"]')).toBeNull();
     expect(host.querySelector<HTMLElement>(
-      '[data-vary="phases.0.atoms.0.x"]')!.textContent).toBe("🔒");
+      '[data-vary="phases.0.atoms.0.x"] svg.padlock')).toBeTruthy();
 
     box.checked = true;
     box.dispatchEvent(new Event("change", { bubbles: true }));
@@ -3570,7 +3570,7 @@ describe("the model editor", () => {
     const mark = (path: string) => host.querySelector(`[data-vary="${path}"]`);
     expect(mark("phases.0.cell.b")!.tagName).toBe("SPAN");
     expect(mark("phases.0.cell.b")!.textContent).toBe("=");
-    expect(mark("phases.0.cell.alpha")!.textContent).toBe("🔒");
+    expect(mark("phases.0.cell.alpha")!.querySelector("svg.padlock")).toBeTruthy();
     // …and a mode-fixed row keeps its editable value: `set_values` still takes
     // one, it is only `set_vary` that the mode overrules
     expect(mark("phases.0.atoms.0.biso")!.textContent).toBe("·");
