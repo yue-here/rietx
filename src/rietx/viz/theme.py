@@ -105,6 +105,9 @@ SCHEMES: dict[str, str] = {"light": "light", "dark": "dark"}
 #: ``--line-strong`` (a control's border) and ``--hover`` (a hover ground).
 #: The site's other roles (a second ink, a faint ink, a tinted ground, an info
 #: state) wait for a reader: a token nothing reads is a name with no writer.
+#: ``--code-string`` is the Console's string literal (WP-2212; the maintainer
+#: accepted the drawn pair on 2026-11-21), the one syntax colour the Console
+#: draws beyond its comments.
 TOKENS: dict[str, dict[str, str]] = {
     "light": {
         "--fg": "#1c1917",
@@ -119,6 +122,7 @@ TOKENS: dict[str, dict[str, str]] = {
         "--ok": "#2a7d2a",
         "--warn": "#7d5f00",
         "--bad": "#b4271f",
+        "--code-string": "#2f6f3e",
         "--plot-obs": "#1c1917",
         "--plot-calc": "#c65d0a",
         "--plot-bkg": "#b5793a",
@@ -145,6 +149,7 @@ TOKENS: dict[str, dict[str, str]] = {
         "--ok": "#5fd45f",
         "--warn": "#e3c25b",
         "--bad": "#ff8f86",
+        "--code-string": "#8fc79d",
         "--plot-obs": "#d2c9bd",
         "--plot-calc": "#ff9d4d",
         "--plot-bkg": "#c99a6a",
