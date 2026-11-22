@@ -163,7 +163,7 @@ def test_an_audited_row_carries_its_evidence():
     for row in _audit.ROWS:
         assert row.approved_by in ("maintainer", "checked"), row
         if row.approved_by == "checked":
-            # ruled 2026-11-22 (WP-2237): the judge's check stands in for the
+            # ruled 2026-11-22 (WP-2238): the judge's check stands in for the
             # maintainer on a tier-3 constant or suggestion, never elsewhere
             assert row.tier == 3 and row.kind in ("constant", "suggestion"), (
                 f"{row.name}: a tier-{row.tier} {row.kind} row needs the maintainer's "

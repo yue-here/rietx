@@ -10,7 +10,7 @@ a fit *prints*.  WP-2010 added a 930-character sentence to every Rietveld
 report, the same for every fit with the same free parameters, and it reached
 the maintainer only because its author flagged the length.  The maintainer
 ruled on 2026-11-01 that the package should pass no junk back to a reader, and
-on 2026-11-22 (WP-2237) that each change is settled per PR and checked blind,
+on 2026-11-22 (WP-2238) that each change is settled per PR and checked blind,
 with the whole diff shown to him once per release.  So `/pr-review` and
 `/wp-handover` run this, and `docs/RELEASING.md` step 2 runs it against the
 last tag.

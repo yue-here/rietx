@@ -109,7 +109,7 @@ no finding, by the maintainer's ruling of 2026-11-03 on Q1.
   Le Bail code stands as the entry below describes it. The three questions that entry left open are settled
   by Claude under Yue's delegation of 2026-11-05 ("use your best judgement. we should be
   moving away from le bail to pawley as default anyway"). None of them is a ruling of
-  Yue's. (2026-11-22, WP-2237: Yue counted this delegation as his approval of item 1's
+  Yue's. (2026-11-22, WP-2238: Yue counted this delegation as his approval of item 1's
   dates.)
 
   *Settled by Claude under Yue's delegation of 2026-11-05.*

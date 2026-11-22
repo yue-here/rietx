@@ -1,4 +1,4 @@
-# WP-2237 — The decision machinery: fewer calls reach the maintainer, and each ruling is reused
+# WP-2238 — The decision machinery: fewer calls reach the maintainer, and each ruling is reused
 
 Milestone: unscheduled · Status: 🔄 2026-11-22 — new routing rules approved and applied to the 47 pending lines; the register, the queue token, Rule 1's word and the printout cap are not built
 Track: The repo's own process

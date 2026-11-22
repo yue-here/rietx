@@ -142,7 +142,7 @@ approval, and no tier-3 row is recorded as approved.
 it to him: a tier-3 keep needs his dated approval, and a reader-output change or a deletion is
 his.
 
-Answered 2026-11-22 under the maintainer's routing rules of that day (WP-2237): each item was
+Answered 2026-11-22 under the maintainer's routing rules of that day (WP-2238): each item was
 settled by Claude and checked by a fresh agent that did not see the pick, or brought to the
 maintainer, who answered "All as recommended".
 

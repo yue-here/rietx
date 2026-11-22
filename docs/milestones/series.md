@@ -152,7 +152,7 @@ which. "Accepted" records the maintainer's answer in chat on 2026-11-16.
 
 ## Open decisions, answered 2026-11-22
 
-Two were open, and both were the maintainer's. Answered 2026-11-22 under the maintainer's routing rules of that day (WP-2237): each item was settled by Claude and checked by a fresh agent that did not see the pick, or brought to the maintainer, who answered "All as recommended".
+Two were open, and both were the maintainer's. Answered 2026-11-22 under the maintainer's routing rules of that day (WP-2238): each item was settled by Claude and checked by a fresh agent that did not see the pick, or brought to the maintainer, who answered "All as recommended".
 
 - **`SEQUENTIAL_MOMENT_ONSET`** still fires on a tuned threshold, against rule 5. It is
   magnetic, so the magnetic path's owner rules on it. **Ruled by Yue 2026-11-22:** sent to Mike: posted as question
@@ -174,8 +174,8 @@ Two were open, and both were the maintainer's. Answered 2026-11-22 under the mai
 |---|---|---|
 | [2081](../wp/2081-how-a-series-holds-what-the-setup-fixes.md) | the design discussion these rules came from, its measurements and its twelve questions | moved here 2026-11-16 |
 | [2080](../wp/2080-a-warm-fit-in-a-wrong-basin.md) | the goodness-of-fit ratio as a field, ruled 2026-11-16 | moved here 2026-11-16 |
-| [1420](../wp/1420-a-held-phase-re-enters-or-says-it-cannot.md) | a phase held on one pattern gets back in on a later one | proposed for this milestone with tasks 2 to 5 retired as written. Rules 4 to 6 exclude a series code and a retry of a converged fit (issue #1402's option A). **Settled by Claude 2026-11-22, checked blind:** the move stands as proposed (answered 2026-11-22 under the routing rules of WP-2237); the file's `Milestone` header is not touched here. |
-| [1453](../wp/1453-both-directions-name-the-lower-cost.md) | the two directions of a series compared by cost | proposed for this milestone. Option 1's cost pair is a rule 5 field whose names go to the maintainer, and rule 6 excludes option 3's cold rung. **Settled by Claude 2026-11-22, checked blind:** the move stands (answered 2026-11-22 under the routing rules of WP-2237); option 1's cost-pair field names go to the maintainer when WP-1453 is built. |
+| [1420](../wp/1420-a-held-phase-re-enters-or-says-it-cannot.md) | a phase held on one pattern gets back in on a later one | proposed for this milestone with tasks 2 to 5 retired as written. Rules 4 to 6 exclude a series code and a retry of a converged fit (issue #1402's option A). **Settled by Claude 2026-11-22, checked blind:** the move stands as proposed (answered 2026-11-22 under the routing rules of WP-2238); the file's `Milestone` header is not touched here. |
+| [1453](../wp/1453-both-directions-name-the-lower-cost.md) | the two directions of a series compared by cost | proposed for this milestone. Option 1's cost pair is a rule 5 field whose names go to the maintainer, and rule 6 excludes option 3's cold rung. **Settled by Claude 2026-11-22, checked blind:** the move stands (answered 2026-11-22 under the routing rules of WP-2238); option 1's cost-pair field names go to the maintainer when WP-1453 is built. |
 | [1524](../wp/1524-the-step-scans-last-two-blind-spots.md) | the step list's two blind spots | not moved (2026-11-21): WP-2003 removed the scan it targets, and PR #1588 closes it with tests alone |
 | [1317](../wp/1317-series-scrubber.md) | the GUI's view of a finished series | not moved: [gui-overhaul](gui-overhaul.md) § R7 carries it (maintainer, 2026-11-21) |
 | [2103](../wp/2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) | hold, tie and restart on a joint fit | stays in parametric; rule 2's start from a series result depends on it |

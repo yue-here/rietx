@@ -70,7 +70,7 @@ which is the backlog this rule exists to prevent.
    last release's tag, prints the change in a standard fit's printed text
    since then. A line he rejects is fixed before the tag. Each PR's change was
    settled and checked blind, so this is where he reads them (ruled 2026-11-22,
-   WP-2237).
+   WP-2238).
 3. Land both on `main` and let CI go green. Branch protection requires `lint`
    and `ci-ok`, which passes only when the fast suite passed on py3.11, py3.14
    and jax (WP-1506, WP-1547). So a commit on `main` has already passed them,

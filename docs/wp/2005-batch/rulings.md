@@ -66,7 +66,7 @@ Two of the batch's questions are settled as well.
 
 ## The consent lines, answered 2026-11-22
 
-Answered 2026-11-22 under the maintainer's routing rules of that day (WP-2237): each item was
+Answered 2026-11-22 under the maintainer's routing rules of that day (WP-2238): each item was
 settled by Claude and checked by a fresh agent that did not see the pick, or brought to the
 maintainer, who answered "All as recommended". The outcome of each line is in its last column.
 Every line changes what a reader of some fit receives, or asks for a tier-3 approval.
@@ -95,7 +95,7 @@ Every line changes what a reader of some fit receives, or asks for a tier-3 appr
 
 ## `HIGH_CORRELATION`, answered 2026-11-22
 
-Answered 2026-11-22 under the maintainer's routing rules of that day (WP-2237): each item was
+Answered 2026-11-22 under the maintainer's routing rules of that day (WP-2238): each item was
 settled by Claude and checked by a fresh agent that did not see the pick, or brought to the
 maintainer, who answered "All as recommended". **Ruled by Yue 2026-11-22:** deferred. The
 demotion waits for one agent run on `tests/eval_report_agent` after WP-2008 rewrites skill

@@ -448,7 +448,7 @@ line if the checkpoint ended it. Close with
      judge's one-line verdict. In the `all` mode that review waits for the
      judge and goes out in the apply pass.
    - **Settle the clear classes of tier-3 constant and suggestion rows, and
-     batch the rest** (ruled 2026-11-22, WP-2237). A class is every row
+     batch the rest** (ruled 2026-11-22, WP-2238). A class is every row
      resting on the same evidence (WP-2002 ruled 256 rows as 16 classes). A
      class of constants or suggestions that the judge called `holds`, and
      which none of the maintainer's triggers reaches (the maintainer's
@@ -467,7 +467,7 @@ line if the checkpoint ended it. Close with
      `gh pr view N --json maintainerCanModify` says true; otherwise ask the
      contributor in the review.
 6c. **What a reader receives** (ruled 2026-11-01). The package should pass no
-   junk back to a reader, a person or an agent. Since 2026-11-22 (WP-2237)
+   junk back to a reader, a person or an agent. Since 2026-11-22 (WP-2238)
    each change is settled here, checked blind, and the user reads the whole
    diff once per release (`docs/RELEASING.md` step 2). A PR changes it when
    either holds:

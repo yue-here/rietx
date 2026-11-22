@@ -139,7 +139,7 @@ datasets it was tested on.
 From the rulings triage of 2026-11-21, which checked the 2026-11-15 brief against the design
 rules. Items 3 and 4 were answered on 2026-11-22.
 
-Answered 2026-11-22 under the maintainer's routing rules of that day (WP-2237): each item was
+Answered 2026-11-22 under the maintainer's routing rules of that day (WP-2238): each item was
 settled by Claude and checked by a fresh agent that did not see the pick, or brought to the
 maintainer, who answered "All as recommended".
 

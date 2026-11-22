@@ -100,7 +100,7 @@ inherits `rcond`'s tier, the 2 is tiered on its own evidence).
      maintainer in a batch on a code, action or default row. On a constant or a
      suggestion the `generality-review` judge's agreement is the approval, the row says
      so (`approved_by="checked"`), and a disagreement goes to the maintainer (ruled
-     2026-11-22, WP-2237: none of his reversals was a constant's value): **shown this statistic, would every competent refiner take
+     2026-11-22, WP-2238: none of his reversals was a constant's value): **shown this statistic, would every competent refiner take
      this action?** This is DESIGN.md § Rules, 1's unanimity gate. An action is kept only
      where the answer is yes. Where two careful people could respond differently to the
      same number, the action moves to Rule 1's second or third kind. Where the
@@ -800,7 +800,7 @@ reverse it knowing what it would be giving up.
 - **Three items from the same pass, answered 2026-11-22.** They waited on the maintainer
   from 2026-11-21.
 
-  Answered 2026-11-22 under the maintainer's routing rules of that day (WP-2237): each item was
+  Answered 2026-11-22 under the maintainer's routing rules of that day (WP-2238): each item was
   settled by Claude and checked by a fresh agent that did not see the pick, or brought to the
   maintainer, who answered "All as recommended".
 
