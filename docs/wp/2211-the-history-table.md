@@ -198,9 +198,9 @@ Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`
 - [x] `panels/History.svelte` as the table, with the verbs placed as ruled. Vitest over the
   rows a branched tree produces.
   Built as `gui/src/next/History.svelte`, the rebuild's page (§ Inherited, 2026-11-11).
-- [ ] Compare: the dashed curve on the Pattern graph, its legend entry, its token. A browser
+- [x] Compare: the dashed curve on the Pattern graph, its legend entry, its token. A browser
   test that Compare draws the node's curve and moves no element.
-- [ ] Restore: the node's values into the action bar's pending edits, the refusal or the
+- [x] Restore: the node's values into the action bar's pending edits, the refusal or the
   Checkout offer for a node that is more than values, the console echo. Vitest and a browser
   pass: Restore, then Apply, reaches the node's values; Restore, then Revert, changes nothing.
 - [ ] The GUI chapter on History, the screenshot driver, the screenshots retaken, each beside
