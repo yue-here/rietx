@@ -35,11 +35,13 @@
   import { peakWindows, widestFwhm } from "../lib/peakwin";
   import Splitter from "../panels/Splitter.svelte";
   import { modifier, runWords, toggleTitle } from "../lib/statusbar";
-  import { consoleLine, follow, type EngineEvent, type RunState } from "../lib/stream";
+  import { follow, type EngineEvent, type RunState } from "../lib/stream";
   import { applyTheme, readChoice, resolveTheme, type ThemeChoice } from "../lib/theme";
   import { WORKFLOWS, menuLabel, workflow, type WorkflowId } from "../lib/workflows";
   import ActionBar from "./ActionBar.svelte";
   import Console from "./Console.svelte";
+  import { eventLine, makeLine, pushLine, sessionScript, sharedSay, stageScript, type Line,
+           type LineKind } from "./console";
   import HelpBox from "./HelpBox.svelte";
   import { GRAPH_HELP, MODEL_HELP } from "./helpbox";
   import Keys from "./Keys.svelte";
@@ -57,7 +59,9 @@
   let project = $state<any>(null);
   let version = $state<any>(null);
   let run = $state<RunState | null>(null);
-  let lines = $state<string[]>([]);
+  let lines = $state.raw<Line[]>([]);
+  /** Every call since the page loaded, uncapped: the script export reads it. */
+  let calls = $state.raw<Line[]>([]);
   let dropped = $state(0);
   let capabilities = $state<any>(null);
   let docsUrl = $state<string | null>(null);
@@ -245,9 +249,48 @@
     untrack(() => recoveryWriter.schedule(path, at, draft));
   });
 
-  function say(line: string) {
-    lines = [...lines.slice(-400), line];
+  function say(kind: LineKind, text: string, script?: string | null) {
+    write(makeLine(kind, text, script));
   }
+
+  /**
+   * Start a run behind its call: the run's events fold under it. The call is
+   * written before the request, since the stream can deliver the run's first
+   * events before the route answers; a refused run takes it back, so neither
+   * the Console nor the script holds a call that never ran.
+   */
+  async function startRun(body: any, text: string, script?: string) {
+    const line = write({ ...makeLine("call", text, script), run: true });
+    try {
+      run = await api.run(body);
+    } catch (error) {
+      lines = lines.filter((l) => l !== line);
+      calls = calls.filter((l) => l !== line);
+      throw error;
+    }
+  }
+
+  /** The entry the lines written in this turn of the event loop share: one
+   *  action's echoes land together, so they draw under one timestamp. */
+  let entry = 0;
+  let entryOpen = false;
+
+  function write(line: Line): Line {
+    if (line.kind !== "event") {
+      if (!entryOpen) {
+        entry += 1;
+        entryOpen = true;
+        queueMicrotask(() => (entryOpen = false));
+      }
+      line = { ...line, entry };
+    }
+    lines = pushLine(lines, line);
+    if (line.kind === "call") calls = [...calls, line];
+    return line;
+  }
+
+  /** What the two shared panels write through (`console.ts:sharedSay`). */
+  const sayShared = sharedSay(say);
 
   $effect(() => {
     applyTheme(theme, document.documentElement);
@@ -272,10 +315,28 @@
     plotKey += 1;
   }
 
+  /**
+   * The session's first entry, as the prototype opens it: the lines that bind
+   * the names every later call uses, and where the project stands. The script
+   * writes its own preamble, so these lines are marked and it skips them.
+   */
+  function sayPreamble() {
+    if (!project?.path) return;
+    const bind = (text: string) => write({ ...makeLine("call", text), preamble: true });
+    bind("import rietx as rx");
+    bind(`p = rx.Project.open(${JSON.stringify(project.path)})`);
+    bind("ref = p.refinement");
+    const rwp = result?.statistics?.rwp;
+    const nodes = project.n_nodes ?? 0;
+    say("output", `${typeof rwp === "number" ? `Rwp ${(rwp * 100).toFixed(2)} %, ` : ""}`
+      + `${nodes} history node${nodes === 1 ? "" : "s"}`);
+  }
+
   async function loadProject() {
     try {
       project = await api.project();
       await loadResult();
+      sayPreamble();
       await offerRecovery();
     } catch (error) {
       project = null;
@@ -301,10 +362,13 @@
 
   async function opened(doc: any) {
     await leaveEdits();
+    // the script is this project's session: another project's calls are not
+    calls = [];
     project = doc;
     openError = "";
     newOpen = false;
     await loadResult();
+    sayPreamble();
     await offerRecovery();
   }
 
@@ -355,7 +419,7 @@
     recoveryWriter.arm(o.path, o.draft);
     modelTab = o.draft.params ? "params" : o.draft.interactive ? "interactive"
       : o.draft.plan ? "plan" : "text";
-    say(restoredText(o.draft));
+    say("comment", restoredText(o.draft));
   }
 
   async function discardKept() {
@@ -365,7 +429,7 @@
     try {
       await api.putRecovery(o.path, null, null);
     } catch (error) {
-      say(`refused: ${(error as Error).message}`);
+      say("refusal", `refused: ${(error as Error).message}`);
       if (project?.path === o.path) {
         recoveryWriter.arm(o.path, o.draft);
         recoveryWriter.schedule(o.path, head, null);
@@ -382,7 +446,7 @@
   function setAsideKept() {
     if (!offer) return;
     offer = null;
-    say("# unapplied edits kept; offered again when the project next opens");
+    say("comment", "# unapplied edits kept; offered again when the project next opens");
   }
 
   function pageHidden() {
@@ -397,14 +461,14 @@
       project = await api.patchProject(patch);
       if ("two_theta_limits" in patch) {
         const limits = patch.two_theta_limits as number[] | null;
-        say(`project.doc.two_theta_limits = ${limits ? `(${limits.join(", ")})` : "None"}`);
+        say("call", `p.doc.two_theta_limits = ${limits ? `(${limits.join(", ")})` : "None"}`);
       }
       if ("excluded_regions" in patch)
-        say(`project.set_excluded_regions(${JSON.stringify(patch.excluded_regions)})`);
+        say("call", `p.set_excluded_regions(${JSON.stringify(patch.excluded_regions)})`);
       protocolError = "";
     } catch (error) {
       protocolError = (error as Error).message;
-      say(`refused: ${(error as Error).message}`);
+      say("refusal", `refused: ${(error as Error).message}`);
     }
   }
 
@@ -418,9 +482,9 @@
       const doc = await api.patchProject({ ui: patch });
       if (project?.path === path) project = doc;
       for (const [key, value] of Object.entries(patch))
-        say(`project.doc.ui[${JSON.stringify(key)}] = ${JSON.stringify(value)}`);
+        say("comment", `# view kept: ui[${JSON.stringify(key)}] = ${JSON.stringify(value)}`);
     } catch (error) {
-      say(`# not kept: ${(error as Error).message}`);
+      say("comment", `# not kept: ${(error as Error).message}`);
     }
   }
 
@@ -534,10 +598,9 @@
           return;
         }
       }
-      run = await api.run({ kind: "stage", stage });
-      say(echo);
+      await startRun({ kind: "stage", stage }, echo, stageScript(stage));
     } catch (error) {
-      say(`refused: ${(error as Error).message}`);
+      say("refusal", `refused: ${(error as Error).message}`);
     } finally {
       refining = false;
     }
@@ -551,14 +614,13 @@
     try {
       if (touched && !(await applyPending())) return;
       if (mode === "plan") {
-        run = await api.run({ kind: "fit" });
-        say("ref.fit(data, plan=…)");
+        await startRun({ kind: "fit" }, "p.fit()");
       } else {
-        run = await api.run({ kind: "stage", stage: { name: "cycle", turn_on: [] } });
-        say('ref.run_stage(Stage("cycle", turn_on=[]))');
+        await startRun({ kind: "stage", stage: { name: "cycle", turn_on: [] } },
+                       'p.run_stage(rx.Stage("cycle", turn_on=[]))');
       }
     } catch (error) {
-      say(`refused: ${(error as Error).message}`);
+      say("refusal", `refused: ${(error as Error).message}`);
     } finally {
       refining = false;
     }
@@ -568,8 +630,8 @@
     // a write still on the timer lands first, for the project it was made in
     await recoveryWriter.flush();
     try {
+      // opened() writes the session's first entry, the open among it
       await opened(await api.openProject(path));
-      say(`p = rx.Project.open(${JSON.stringify(path)})`);
       return "";
     } catch (error) {
       openError = (error as Error).message;
@@ -584,7 +646,6 @@
     try {
       const doc = reset ? await api.resetExample(name) : await api.openExample(name);
       await opened(doc);
-      say(`p = rx.Project.open(${JSON.stringify(doc.path)})  # the ${name} example`);
       return "";
     } catch (error) {
       openError = (error as Error).message;
@@ -629,7 +690,7 @@
     try {
       run = await api.cancel();
     } catch (error) {
-      say(`# ${(error as Error).message}`);
+      say("refusal", `refused: ${(error as Error).message}`);
     }
   }
 
@@ -768,7 +829,7 @@
      *  frame, so a reload does not reload for a run that ended before it. */
     let seen: string | null = null;
     const unfollow = follow(
-      (event: EngineEvent) => say(consoleLine(event)),
+      (event: EngineEvent) => write(eventLine(event)),
       (frame: RunState) => {
         run = frame;
         // a run just ended, keyed on its outcome rather than on having seen a
@@ -781,7 +842,7 @@
         }
         seen = key;
       },
-      { poll: (since) => api.events(since) },
+      { poll: (since) => api.events(since), onDropped: (n) => (dropped = n) },
     );
     return () => {
       unfollow();
@@ -815,7 +876,8 @@
     {workflow(wf).name}<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"
       ><path d="M4.5 6.5 8 10l3.5-3.5" /></svg></button>
   <span class="proj">
-    <FileMenu {project} {busy} {say} onnew={() => (newOpen = true)} onopen={open}
+    <FileMenu {project} {busy} say={sayShared} script={() => sessionScript(calls, project?.path ?? "")}
+      onnew={() => (newOpen = true)} onopen={open}
       onproject={(doc) => (project = doc)} onclosed={closed} />
   </span>
   <span class="gap"></span>
@@ -1002,7 +1064,7 @@
 {/if}
 
 {#if newOpen}
-  <NewProject {capabilities} {busy} {say} onclose={() => (newOpen = false)} onopened={opened} />
+  <NewProject {capabilities} {busy} say={sayShared} onclose={() => (newOpen = false)} onopened={opened} />
 {/if}
 
 {#if paletteOpen}
