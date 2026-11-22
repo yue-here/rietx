@@ -1,6 +1,6 @@
 # WP-2211 — the History table: Compare on the pattern, Restore as pending edits
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-21 — the maintainer's rulings recorded (§ Rulings); nothing built
+Milestone: gui-overhaul · Status: 🔄 2026-11-22 — claimed by ghostshift runner (MacBook-Air-9db21f)
 Depends on: 2214 (the rebuild's plan: it builds on piece R1's bottom panel)
 Priority: P2 2026-11-17 — was P3: R1's bottom panel landed with WP-2215 (#1534), so nothing blocks it; a feature the open milestone was opened for
 
