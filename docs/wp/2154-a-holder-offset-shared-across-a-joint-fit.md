@@ -1,6 +1,6 @@
 # WP-2154 — a holder offset shared across a joint fit
 
-Milestone: parametric · Status: ⬜
+Milestone: parametric · Status: 🔄 2026-11-22 — claimed by @yue-here (ghostshift runner)
 Depends on: 2103 soft (its joint `tie`, only if the expression route fails)
 Priority: P2 2026-11-22 — a feature the open milestone was opened for: the 2108 acceptance row asks for a series, and only single patterns were measured
 

@@ -59,6 +59,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-16 | P2 | [series](#series) |
 | [2081](2081-how-a-series-holds-what-the-setup-fixes.md) | How a series holds what the setup fixes (a design discussion) | 2026-11-18 | P2 | [series](#series) |
 | [2149](2149-a-reduced-panel-names-the-systems-searched.md) | INDEX_PANEL_REDUCED names the systems the run searched | 2026-11-17 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2154](2154-a-holder-offset-shared-across-a-joint-fit.md) | A holder offset shared across a joint fit | 2026-11-22 | P2 | [parametric](#parametric) |
 | [2211](2211-the-history-table.md) | The History table: Compare on the pattern, Restore as pending edits | 2026-11-22 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2212](2212-console-lines-by-kind.md) | Console lines by kind: the `>>>` prompt and the session as a script | 2026-11-22 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2220](2220-a-comparison-says-which-fits-it-rests-on.md) | A nested comparison says which fits it rests on, and which freed columns carried information | 2026-11-20 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
@@ -88,7 +89,6 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2140](2140-every-atom-is-named-by-its-unique-label.md) | Every atom is named by its unique label | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2148](2148-a-held-standard-cell-pins-the-wavelength.md) | A held standard's cell pins the wavelength, and a skipped λ is said | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2151](2151-the-zrp2o7-peak-equations-on-its-data.md) | The ZrP₂O₇ input's peak equations on its data | P2 | — | [parametric](#parametric) |
-| [2154](2154-a-holder-offset-shared-across-a-joint-fit.md) | A holder offset shared across a joint fit | P2 | — ([2103](2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) soft) | [parametric](#parametric) |
 | [2228](2228-a-reflection-past-the-range-end-keeps-its-tail.md) | A reflection centred past the range end keeps its tail | P2 | [2222](2222-the-closing-stage-off-by-default.md) ([2075](2075-the-result-records-its-fit-range-and-what-lies-outside-it.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 
 ## <a id="v0-3"></a>v0.3 — multi-phase workflows
@@ -509,7 +509,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2151](2151-the-zrp2o7-peak-equations-on-its-data.md) | The ZrP₂O₇ input's peak equations on its data | ⬜ | P2 | — |
 | [2152](2152-a-peak-equation-reads-the-wavelength.md) | A peak equation reads the wavelength | ⬜ | P3 | — |
 | [2153](2153-a-peak-equations-width-held-inside-the-step.md) | A peak equation's width held inside the step | ⬜ | P3 | — |
-| [2154](2154-a-holder-offset-shared-across-a-joint-fit.md) | A holder offset shared across a joint fit | ⬜ | P2 | — ([2103](2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) soft) |
+| [2154](2154-a-holder-offset-shared-across-a-joint-fit.md) | A holder offset shared across a joint fit | 🔄 2026-11-22 | P2 | — ([2103](2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) soft) |
 
 ## <a id="gui-overhaul"></a>gui-overhaul — the GUI redesigned around the pattern and the model
 
