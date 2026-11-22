@@ -23,7 +23,8 @@ WP carries the three nights and WP-2036 gets a note pointing here.
     (11 directory citations) and 9× `tests/test_docs_consistency.py::test_rulebook_paths_and_names_resolve`.
     Every miss is a directory (`docs/wp/`, `src/rietx/io/`, `static/`). The eleventh is
     `tests/test_discarded_direction.py::test_the_lab6_width_triple_has_no_esd_from_either_start[0.00015]`,
-    which got esds of 4.127 on all three triple members where it expects none.
+    which got esds of 4.127 on all three triple members where it expects none. It passed on
+    Windows the night before. This WP renames it `…_has_no_short_esd_from_either_start`.
   - `full suite (Linux, incl. slow acceptance)`: the Full suite step started at 14:27:07Z
     and never finished. The job ended at 16:24:50Z (1 h 58 min) with the annotation "The
     hosted runner lost communication with the server". The log endpoint answers 404.
@@ -39,7 +40,7 @@ WP carries the three nights and WP-2036 gets a note pointing here.
 builds the directory set with `str(p) for p in Path(f).parents`. On Windows `str()` of a
 `Path` uses backslashes, so the set holds `docs\wp` while `in_tree` looks up the POSIX form
 `docs/wp`. Every directory misses there, and no file does. Both tests landed with WP-2233
-on 11-21, so 11-22 was their first Windows night.
+on 2026-11-21 at 21:03Z, so 11-22 was their first Windows night.
 
 **The width triple.** W, `gauss_size` and `gauss_strain` are exactly degenerate
 (1/cos²θ = 1 + tan²θ), so the normal matrix has one eigenvalue at rounding level. The
@@ -65,7 +66,7 @@ behaviour.
 ## Tasks
 
 - [x] The directory set is built in POSIX form, so a cited directory resolves on Windows.
-- [ ] The single-fit width-triple test takes the joint-fit test's bar, measured under 1e-14
+- [x] The single-fit width-triple test takes the joint-fit test's bar, measured under 1e-14
       start nudges.
 - [ ] The two alarm-pin failures (11-20, 11-21) checked against `main`, and the full
       suite's death on 11-22 measured from what GitHub exposes and recorded.

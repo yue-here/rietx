@@ -332,21 +332,27 @@ def _triple_plan() -> RefinementPlan:
 
 
 @pytest.mark.parametrize("w_start", [5e-4, 1.5e-4])
-def test_the_lab6_width_triple_has_no_esd_from_either_start(w_start):
+def test_the_lab6_width_triple_has_no_short_esd_from_either_start(w_start):
     """WP-2028's case: synthetic LaB6 with W, ``gauss_size`` and
     ``gauss_strain`` free.  (δW, δsize, δstrain) = (1, −1, 1) changes no width
     at any angle; two starts landed 140 esd apart in W, each quoting ± 6.3e-7.
-    None of the three now quotes an esd."""
+    None of the three now quotes a short esd.  The direction's eigenvalue sits
+    at rounding level, and so does the cut, so rounding decides whether it is
+    discarded (WP-2241).  Measured on an arm64 Mac under 1e-14 nudges to the
+    start W: 16 of 20 starts gave no esd, and four gave 3.5-4.1 on a W of
+    2.5e-4.  Windows read the second from this start on 2026-11-22."""
     structure, ins = perturbed_models()
     ins.profile.w.value = w_start
     result = Refinement(structure, ins).fit(synthesize(), plan=_triple_plan())
     rows = {p.path: p for p in result.parameters}
-    assert [rows[p].stderr for p in _TRIPLE_PATHS] == [None, None, None]
+    for path in _TRIPLE_PATHS:
+        row = rows[path]
+        assert row.stderr is None or row.stderr > 1e3 * abs(row.value), (path, row)
     assert rows["phases.0.cell.a"].stderr > 0.0
     assert not result.stages[2].width_twins_held
 
 
-def test_the_lab6_width_triple_has_no_esd_in_a_joint_fit():
+def test_the_lab6_width_triple_has_no_short_esd_in_a_joint_fit():
     """Three patterns at one wavelength, W shared and each pattern's own
     Gaussian widths: every pattern's triple is the same flat direction.  Its
     eigenvalue lands on either side of the cut as rounding falls, so each
