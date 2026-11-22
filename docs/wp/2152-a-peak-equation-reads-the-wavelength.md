@@ -80,12 +80,15 @@ takes no TOPAS spelling as one.
 
 ## Tasks
 
-- [ ] Bind `wavelength` at every evaluation site, per emission line, read from `values`.
-- [ ] Refuse a condition on it, with the existing moving-condition message.
-- [ ] A test: a size term written as `y*wavelength/cos(theta)` on two patterns at two
+- [x] Bind `wavelength` at every evaluation site, per emission line, read from `values`.
+  Bound in one place, `ReflectionFrame.bindings`, as 2·d·sinθ off the line's Bragg
+  angle, so every phase site has it with no λ passed. The instrument level refuses
+  it (handover 2026-11-22).
+- [x] Refuse a condition on it, with the existing moving-condition message.
+- [x] A test: a size term written as `y*wavelength/cos(theta)` on two patterns at two
   wavelengths, one shared coefficient, against the built-in `lor_size` twin to 1e-12
   relative. A second test with λ free.
-- [ ] `tests/test_cross_backend.py`: the λ-free row.
+- [x] `tests/test_cross_backend.py`: the λ-free row (`peak_equations_wavelength`).
 - [ ] Record which version moves, with its reason. Bump it.
 - [ ] Bring the warning's silence question to the maintainer with its options, or record
   that it was left firing.

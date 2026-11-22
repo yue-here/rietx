@@ -79,6 +79,9 @@ def _rocksalt(**kw) -> Phase:
     (lambda: _eq("lor_fwhm", "h*tan(theta)", h=0.1), "that name is the reflection's"),
     (lambda: _eq("intensity_factor", "scale", scale=1.0), "phase scale"),
     (lambda: _eq("lor_fwhm", "if(d > 2, a, 0)", a=0.1), "frozen for the stage"),
+    (lambda: _eq("lor_fwhm", "if(wavelength > 1, a, 0)", a=0.1), "frozen for the stage"),
+    (lambda: _eq("lor_fwhm", "wavelength/cos(theta)", wavelength=0.1),
+     "that name is the reflection's"),
     (lambda: _eq("lor_fwhm", "if(h == 0, a, 0)*tan(th)", a=0.1), "reflection names are"),
     (lambda: _eq("lor_fwhm", "a*harmonic(3, 0)", a=0.1), "l is even and at least 2"),
     (lambda: _eq("lor_fwhm", "a*orbit_mean(orbit_mean(l^2))", a=0.1),
@@ -93,6 +96,7 @@ def test_a_malformed_equation_is_refused_at_construction(build, fragment):
 @pytest.mark.parametrize("equations, fragment", [
     ([_eq("lor_fwhm", "a*tan(theta)", a=0.1)], "belongs to a phase"),
     ([_eq("shift", "a*l", a=0.1)], "belong to a phase's reflections"),
+    ([_eq("shift", "a*wavelength", a=0.1)], "in hkl or wavelength goes on Phase"),
     ([_eq("shift", "a*cos(theta)", a=0.1), _eq("shift", "b", b=0.0)], "two equations"),
 ])
 def test_the_instrument_level_takes_a_shift_in_the_angle_alone(equations, fragment):
@@ -291,6 +295,71 @@ def test_a_coefficient_shared_across_wavelengths_is_a_warning():
     # a pure number reads no wavelength
     assert _shared_across_wavelengths(
         [_eq("intensity_factor", "if(l == 0, 1, p)", p=0.7)], [cu, _mo(cu)]) == []
+
+
+#: two single-line sources, so each pattern has one λ and the built-in size
+#: twin, which takes one number of degrees per pattern, is exact
+LAMS = (0.41390, 0.71070)
+
+
+def _joint_ycalc(phase, moved=None) -> list[np.ndarray]:
+    """Each pattern's curve under one joint table at :data:`LAMS`, the
+    coefficients shared.  ``moved`` overrides entries of pattern 1's values
+    after the decode, on the model compiled at :data:`LAMS`."""
+    from rietx.params.multi import MultiParameterTable
+
+    instruments = []
+    for lam in LAMS:
+        ins = rx.Instrument.debye_scherrer(wavelength=lam)
+        ins.source.dispersion = None
+        ins.profile.w.value = 2e-3
+        instruments.append(ins)
+    structure = Structure(phases=[phase])
+    mt = MultiParameterTable(structure, instruments)
+    values = mt.decode(mt.x0())
+    values[1].update(moved or {})
+    tt = np.arange(4.0, 60.0, 0.005)
+    blank = rx.PatternData(two_theta=tt.tolist(), intensity=np.zeros_like(tt).tolist())
+    # each pattern compiles from its own structure, as the joint fit does, so
+    # the twin's windows are sized at its converted size
+    return [np.asarray(compile_model(s, ins, blank).evaluate(v))
+            for s, ins, v in zip(mt.structures, instruments, values, strict=True)]
+
+
+def test_a_size_term_reading_wavelength_is_lor_size_at_two_wavelengths():
+    """WP-2152: ``y*wavelength/cos(theta)`` with one shared ``y`` is the
+    built-in ``lor_size`` shared across the two patterns, which the joint
+    table converts by λ_h/λ_0 (``params.multi.SIZE_LAMBDA_POWER``).  Written
+    in degrees instead, one shared number is the wrong width at the second
+    wavelength by the ratio of the two."""
+    size = 0.05
+    twin = brucite()
+    twin.lor_size.value = size
+    eq = brucite(peak_equations=[_eq("lor_fwhm", "y*wavelength/cos(theta)",
+                                     y=size / LAMS[0])])
+    for got, want in zip(_joint_ycalc(eq), _joint_ycalc(twin), strict=True):
+        assert _rel(got, want) < 1e-12
+    degrees = brucite(peak_equations=[_eq("lor_fwhm", "x/cos(theta)", x=size)])
+    assert _rel(_joint_ycalc(degrees)[1], _joint_ycalc(twin)[1]) > 1e-2
+
+
+def test_a_free_wavelength_moves_the_term_it_reads():
+    """λ is a table entry (WP-1134), and the equation reads it from the
+    values, never from the compile's copy.  Pattern 1's λ moved by 1 % in
+    its values widens the equation's term with it: the twin is ``lor_size``
+    at the moved λ's share, on the same compiled model."""
+    size, lam = 0.05, LAMS[1] * 1.01
+    path = "instrument.source.lines.0.wavelength"
+    eq = brucite(peak_equations=[_eq("lor_fwhm", "y*wavelength/cos(theta)",
+                                     y=size / LAMS[0])])
+    got = _joint_ycalc(eq, {path: lam})[1]
+    twin = brucite()
+    twin.lor_size.value = size
+    want = _joint_ycalc(twin, {path: lam, "phases.0.lor_size": size * lam / LAMS[0]})[1]
+    assert _rel(got, want) < 1e-12
+    # a term frozen at the compile's λ would stay at the old width
+    frozen = _joint_ycalc(twin, {path: lam})[1]
+    assert _rel(got, frozen) > 1e-3
 
 
 @pytest.mark.parametrize("build", [
