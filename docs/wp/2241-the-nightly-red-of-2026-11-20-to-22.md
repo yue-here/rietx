@@ -50,9 +50,24 @@ it the direction is discarded and the three report no esd. Above it they report 
 about 16 000 times W's value. The joint-fit test beside it already says so and asserts
 "no esd, or one more than 1000 times the value". The single-fit test asserted no esd only.
 
-**The full suite's death.** Only one of the last 40 nightly `full` jobs ended this way;
-the others ended by exit code or by the timeout. githubstatus.com lists no incident on
-2026-11-22. With no log, an out-of-memory runner and a lost host cannot be told apart.
+**The two alarm-pin failures are already fixed on `main`.** The 11-20 diff is the one
+WP-2225 re-pinned in `997816bfb` (2026-11-21 00:12Z), after that night's run started. The
+11-21 diff is fluorite's width-triple finding, which rounding decides. WP-2036's PR #1756
+(`6e3f83ced`) took it out of the pin through `tests.suite_alarms.ROUNDING`. The 11-22 run
+held both fixes, but its `full` job died before it reached the pin's row, so no Linux run
+has measured them yet.
+
+**The full suite's death.** What GitHub exposes: the job's steps show "Full suite"
+`in_progress` with no conclusion, the check run carries the one annotation quoted above,
+and the log endpoint answers 404. Only one of the last 40 nightly `full` jobs ended this
+way; the others ended by exit code, or by the timeout before it was raised to 300 min.
+githubstatus.com lists no incident on 2026-11-22. With no log, an out-of-memory runner and
+a lost host cannot be told apart, and nothing in this repo can make the next death leave
+one: a step after the suite, an artifact upload included, runs on the same lost runner.
+The job had been slow, not stuck: 11-20 and 11-21 ran 4:00:17 and 4:00:43 of the 5 h
+guard, 8230 s and 5586 s of it in the Le Bail wander row
+(`tests/test_lebail_alternation.py`), which PR #1756 also cut. The 11-22 job died at
+1 h 58 min, under half the guard.
 
 The tier of each rule this WP adds: none. It changes tests and a test helper, no package
 behaviour.
@@ -68,7 +83,7 @@ behaviour.
 - [x] The directory set is built in POSIX form, so a cited directory resolves on Windows.
 - [x] The single-fit width-triple test takes the joint-fit test's bar, measured under 1e-14
       start nudges.
-- [ ] The two alarm-pin failures (11-20, 11-21) checked against `main`, and the full
+- [x] The two alarm-pin failures (11-20, 11-21) checked against `main`, and the full
       suite's death on 11-22 measured from what GitHub exposes and recorded.
 - [ ] Tests: the touched files and the fast selection.
 - [ ] Skill: none. Nothing an agent driving rietx does changes.

@@ -136,8 +136,15 @@ and 2045 on 2026-10-25):
 
 ### Inherited
 
-None open. The three notes of 2026-11-05, 2026-11-06 and 2026-11-21 were consumed on
-2026-11-21 (handover entry of that date).
+- **2026-11-22, from WP-2241** (a ghostshift runner, filed separately because this WP's
+  claim is stale). The nightlies of 11-20, 11-21 and 11-22 were red. The two alarm-pin
+  failures are this WP's 11-21 items: the 11-20 diff was re-pinned by WP-2225 (`997816bfb`)
+  and the 11-21 diff is the `ROUNDING` set of PR #1756. The pin row passes on an arm64 Mac
+  at `f9adf0e57`, and no Linux full suite has run it yet. The 11-22 `full` job did not
+  finish: its runner "lost communication with the server" 1 h 58 min in, and it left no log.
+  It is the only such ending in the last 40 nightly `full` jobs, and githubstatus.com lists
+  no incident that day. WP-2241 fixed the 11-22 Windows failures. A second death at a similar
+  point would point at the suite, its memory say, rather than at the host.
 
 ## Non-goals
 
