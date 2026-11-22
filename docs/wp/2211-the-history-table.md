@@ -256,10 +256,20 @@ The browser files skip in CI (no playwright there), so the PR quotes their local
   *Not built*: WP-2214's inventory rows 155 (a node's details) and 158 (the diff panel, opened
   by Compare values… on the menu). R5 owns them, but this WP's tasks predate the inventory, so
   both are added as tasks for a second PR. Each needs a placement the prototype never drew.
-  *Measured* (macOS arm64, `[dev]` venv on Python 3.12): vitest 928 passed in 53 files;
+  *Review* (`/code-review high --fix`): nine findings, seven fixed in one commit. Restore had
+  dropped absolute DOFs (anisotropic strain, texture), skipping every `.dof.` path where only a
+  site's or a body origin's is relative. History now remounts per project, and an open or
+  close clears the compared curve and the count, since node ids repeat across projects.
+  Compare drops a late answer to an earlier press and is disabled during a run (its route
+  answers 409 then). The curves route thins past `CURVES_CEILING` as its neighbour does. The
+  preview and compared curves share one trace loop. The docstring now says replay uses the
+  project's current excluded regions, since a node records none; changing that is outside
+  this WP. Declined: the tab reads "History 0" while a load error shows, a cosmetic case.
+  *Measured* (macOS arm64, `[dev]` venv on Python 3.12): vitest 929 passed in 53 files;
   svelte-check 0 errors; every `tests/*_browser.py` 180 passed (layout and gui 53, compare
-  and peaks 8, recovery and html 17, rxplot and structure3d 49, watch 53); ruff clean; vale
-  0 errors and no warning on a changed line; `tests.reader_output` exit 0, unchanged.
+  and peaks 8, recovery and html 17, rxplot and structure3d 49, watch 53; layout and gui
+  rerun after the review, 53 again); ruff clean; vale 0 errors and no warning on a changed
+  line; `tests.reader_output` exit 0, unchanged.
   *Gotchas*: macOS folds case, so `History.test.ts` and `history.test.ts` are one file; the
   mount cases are `historyPanel.test.ts`. PR #1764 (WP-2212) was open throughout; its `say`
   change may need `History`'s single-string `say` wrapped once it merges.
