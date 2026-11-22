@@ -166,7 +166,7 @@ Pruned 2026-11-21 at start: all four entries still hold on `origin/main` (`d76e4
   screenshots retaken, each beside the prototype's at 1440 by 900 in the PR (milestone row 11).
 - [x] `follow()` reports the frames it lost on both paths, and the Console reads the count
   (#1656 item 1, folded above). One vitest case per path.
-- [ ] `instrument_patch` answers what `set_vary` returned (WP-2229 finding 8), and works from
+- [x] `instrument_patch` answers what `set_vary` returned (WP-2229 finding 8), and works from
   the registers when only the old table fails (finding 5). One server test each.
 - [ ] Skill: none. The GUI is a human surface, and an agent drives the python API.
 

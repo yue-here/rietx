@@ -383,6 +383,55 @@ def test_an_emission_line_removed_takes_its_hold_with_it(tmp_path_factory, tmp_p
     assert "instrument.source.lines.1.weight" not in held
 
 
+def test_the_answer_names_what_set_vary_changed(tmp_path_factory, tmp_path, monkeypatch):
+    """WP-2229's finding 8, closed by WP-2212: ``freed`` is what ``set_vary``
+    returned, not the list offered to it. ``set_vary`` can refuse a locked or
+    force-fixed path, and the console line, which the Console's script repeats,
+    would then name a path that stayed fixed."""
+    from rietx.refine import Refinement
+
+    project = _unfitted(tmp_path_factory)
+    session = GuiSession(project, state_dir=tmp_path)
+    _declared(project)
+    ins = session.instrument()["instrument"]
+    original = Refinement.set_vary
+
+    def partly(self, globs, vary=True):
+        # the verb declines the last path it is offered, as it declines a held one
+        globs = [globs] if isinstance(globs, str) else list(globs)
+        return original(self, globs[:-1], vary)
+
+    monkeypatch.setattr(Refinement, "set_vary", partly)
+    answer = session.instrument_patch({"instrument": _with_terms(ins, 8)})
+    assert answer["freed"] == ["instrument.background.c6"]
+    rows = _coefficients(project)
+    assert rows["instrument.background.c6"] == (True, False)
+    assert rows["instrument.background.c7"][0] is False
+
+
+def test_an_old_model_with_no_table_is_tidied_from_the_registers(tmp_path_factory, tmp_path):
+    """WP-2229's finding 5, closed by WP-2212. A ``vary`` set after
+    construction can leave the stored instrument with no parameter table (a
+    free capillary offset with no goniometer radius), and an edit that fixes it
+    still lands. The registers are then tidied without the old table: a held
+    path the new table lacks is released, so a later model's path of that name
+    does not inherit the hold."""
+    project = _unfitted(tmp_path_factory)
+    session = GuiSession(project, state_dir=tmp_path)
+    ins = session.instrument()["instrument"]
+    if len(ins["source"]["lines"]) < 2:
+        pytest.skip("the example's source has one emission line")
+    project.refinement.hold("instrument.source.lines.1.weight")
+    # the old model past its validator, as a vary set after construction leaves it
+    project.refinement.instrument.geometry.capillary_offset_along_beam.vary = True
+    single = {**ins, "source": {**ins["source"], "lines": ins["source"]["lines"][:1]}}
+    answer = session.instrument_patch({"instrument": single})
+    assert answer["released"] == ["instrument.source.lines.1.weight"]
+    assert answer["ended"] == ["instrument.source.lines.1.weight"]
+    assert answer["freed"] == [] and answer["fixed"] == []
+    assert project.refinement.snapshot().holds == []
+
+
 def test_a_refused_register_verb_leaves_everything_as_it_was(tmp_path_factory, tmp_path,
                                                              monkeypatch):
     """All or nothing (WP-2126's rule): the release, the edit and the free run
