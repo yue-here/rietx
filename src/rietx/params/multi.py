@@ -1405,8 +1405,10 @@ class MultiParameterTable:
         histogram's cone, which is all a seed needs, while seeding each
         histogram from its own cell would give one column several values and
         the last write would win ``x0``.  A block the sharing gives each
-        histogram (any DOF of it per-histogram makes it so) is seeded from
-        that histogram's own cell, as a single fit would seed it.
+        histogram whole (every DOF of it per-histogram) is seeded from that
+        histogram's own cell, as a single fit would seed it.  A block with
+        any DOF shared, freed or not, takes histogram 0's ray, since its
+        shared column can hold only one value.
         """
         if microstrain <= 0.0:
             return []
@@ -1420,9 +1422,15 @@ class MultiParameterTable:
         def base(p: str) -> str:
             return p.rpartition(".microstrain.dof.")[0]
 
-        # a block is one set of columns only when every DOF of it is shared
-        own = {base(p) for w in wants for p in w if not self.sharing.is_shared(p)}
-        shared = {base(p) for w in wants for p in w} - own
+        def per_histogram(b: str) -> bool:
+            # every DOF of the block, freed or not, is each histogram's own
+            n = max(len(t._strain_unit.get(b, ())) for t in self.tables)
+            return n > 0 and not any(
+                self.sharing.is_shared(f"{b}.microstrain.dof.{k}") for k in range(n))
+
+        bases = {base(p) for w in wants for p in w}
+        own = {b for b in bases if per_histogram(b)}
+        shared = bases - own
         declined = {b for b in shared for h, table in enumerate(self.tables)
                     if b not in table._stephens_seedable(
                         [p for p in wants[h] if base(p) == b])}

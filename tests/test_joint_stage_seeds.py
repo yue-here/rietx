@@ -137,6 +137,24 @@ def test_a_per_histogram_block_takes_each_histograms_own_ray():
                            rtol=1e-9)
 
 
+def test_a_partly_shared_block_takes_histogram_0s_ray():
+    """One DOF shared and one per histogram, over per-histogram cells: the
+    shared column holds one value, so the whole block takes histogram 0's ray
+    rather than each histogram writing its own and the last write winning."""
+    mt = MultiParameterTable(
+        [_structure(_zero(), 4.0), _structure(_zero(), 4.1)],
+        [_instrument(1.5406), _instrument(0.7107)],
+        sharing=SharingMap(per_histogram=["phases.*.cell.*",
+                                          "phases.*.microstrain.dof.1"]))
+    freed = mt.set_vary([_DOFS], True)
+    assert sorted(mt.seed_stephens(freed, 1000.0)) == sorted(freed)
+    ray0 = isotropic_coefficients(_cell(4.0).lengths_angles(), 1000.0)
+    x0 = mt.x0()
+    for h, table in enumerate(mt.tables):
+        assert np.allclose(_block(table), ray0, rtol=1e-9)
+        assert np.array_equal(x0[mt.col_map(h)], table.x0())
+
+
 def test_a_deliberate_shared_start_is_never_overwritten():
     start = rx.StephensStrain.isotropic(300.0, _cell())
     mt = MultiParameterTable(_structure(start),
@@ -172,7 +190,7 @@ def test_a_joint_lm_step_holds_the_strain_cone_in_every_histogram(monkeypatch):
     result = rx.MultiHistogramRefinement(
         _structure(_zero()), [_instrument(1.5406), _instrument(0.7107)]
     ).fit(patterns, plan=_seed_plan(60))
-    (outcome,) = outcomes
+    outcome = outcomes[0]               # the solve from the seeded ray
     assert outcome.truncated_by.get("hist.0 phases.0.microstrain", 0) >= 1
     assert outcome.truncated_by.get("hist.1 phases.0.microstrain", 0) >= 1
     assert result.stages[0].n_constraint_truncations >= 1
