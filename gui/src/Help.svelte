@@ -39,7 +39,7 @@
    * Hence `label = null`: the term's children are its name, which is what a
    * `<label>` wants anyway, and **`aria-haspopup="dialog"` is what says an
    * explanation opens** — that channel does not take part in a name.  Pass
-   * `label` only where the children are a *glyph* (`🔒`, `=`, `·`), which names
+   * `label` only where the children are a *glyph* (a padlock, `=`, `·`), which names
    * nothing, and only where no `<label>` or `<th>` encloses the term; there is
    * one such site, and `App.test.ts` fails on a second one that is enclosed.
    */
