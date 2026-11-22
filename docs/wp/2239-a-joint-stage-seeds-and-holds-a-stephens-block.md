@@ -1,9 +1,8 @@
 # WP-2239 — a joint stage seeds and holds a Stephens block as a single fit does
 
-Milestone: unscheduled · Status: 🔄 2026-11-22 — claimed by @yue-here (ghostshift runner)
+Milestone: unscheduled · Status: ✅ 2026-11-22 — a joint stage seeds a Stephens block and its LM step holds the cone and texture rows; PR #1781
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P3 2026-11-22 — a joint fit ignores `Stage.strain_seed` and holds no strain cone, and nothing says so; on a path few fits run, and a block declared on the isotropic ray by hand is the workaround
 
 ## Goal
 
@@ -96,8 +95,6 @@ shipped one is `lab_sample_refine`, whose sample stage carries
 `strain_seed=STRAIN_SEED_PPM` (`strategy/staged.py:751`). A golden that
 records such a fit moves, and the WP says which.
 
-### Inherited
-
 ## Non-goals
 
 - A formulation of the block that cannot leave the cone: WP-1946 tried it and
@@ -137,10 +134,13 @@ records such a fit moves, and the WP says which.
       `tests/test_joint_stage_seeds.py`, which also covers a per-histogram
       cell, a per-histogram block, a deliberate start, the texture rows and
       the rows' column mapping.
-- [ ] Measure which joint goldens and acceptance fits move, and by how much,
-      before and after, and record it in the handover.
-- [ ] Skill: none expected. `references/surprises.md` says a block needs
-      `Stage.strain_seed`; check it makes no joint-fit exception.
+- [x] Measure which joint goldens and acceptance fits move, and by how much,
+      before and after, and record it in the handover. None moves: see the
+      2026-11-22 handover entry, *Measured*.
+- [x] Skill: none expected. `references/surprises.md` says a block needs
+      `Stage.strain_seed`; check it makes no joint-fit exception. It makes
+      none. `references/abstention.md`'s `STEPHENS_STRAIN_NOT_POSITIVE` row
+      did ("in a joint fit, which builds no cone"), and was rewritten.
 
 ## Acceptance
 
@@ -158,6 +158,75 @@ records such a fit moves, and the WP says which.
   (the joint width rows).
 
 ## Handover log
+
+- **2026-11-22** (ghostshift runner, PR #1781) — A joint fit now starts a
+  freed anisotropic-strain block where a single fit starts it, and its default
+  solver keeps the block's widths and a texture's pole density non-negative
+  in every pattern, as a single fit's does. Before, a joint stage started the
+  block at zero, where the width's square root has unbounded slope, and the
+  solver could step to coefficients no pattern can carry. On the WP's own
+  fixture the answer is unchanged to the printed digit and the stage takes 5
+  iterations instead of 32. No fit the test suites run moves. Every
+  sentence in the package, manual and skill that said a joint fit holds no
+  cone now says it holds one.
+
+  *Done.* `ParameterTable.seed_stephens(..., ray_from=)` and
+  `_stephens_seedable`; `MultiParameterTable.seed_stephens`; the joint stage
+  loop's call and `multi._seeded_values`; `_joint_positivity_inequalities`
+  beside `_joint_width_inequalities`, both on `_on_joint_columns`; the
+  diagnostic's suggestion (`refine.py`) and the help entries; the manual
+  (`theory/microstructure.md`, `theory/profiles.md`, `reference/data.md`),
+  `practice.md`, root CLAUDE.md, the skill's `abstention.md` row (three
+  copies synced), and the `StephensStrain`, `strain_width_deg`,
+  `check_stephens_positive` and `StageResult.seeded` docstrings.
+  `tests/test_joint_stage_seeds.py`, 9 tests; 7 of them fail with the seed
+  and the rows switched off (the eighth, a deliberate start, passes either
+  way by design).
+
+  *Settled by Claude* (blind-reviewed by a fresh Sonnet agent given the
+  options and the evidence, not the pick: it chose the same, clear call).
+  (1) A shared block over per-histogram cells takes histogram 0's isotropic
+  ray in every histogram. Grounds: σ²(M) is the literal monomial sum, so any
+  cell's ray gives (hᵀG*h)² > 0 at every reflection of every histogram, and a
+  shared column holds one value (the size-sharing invariant's last-write
+  rule). Alternative: decline, which leaves the block at S ≡ 0. (2) A block
+  is per-histogram only when every DOF of it is; any shared DOF sends the
+  whole block to histogram 0's ray. This came from `/code-review high --fix`,
+  which measured the first version giving the shared column histogram 1's
+  value while `seeded` recorded histogram 0's (7077.7 against 7812.5).
+
+  *Measured* (`[dev]` venv, darwin arm64, numpy, main merged at
+  `a4187f92b`). The WP's fixture at 0.05° steps, 60 iterations, default LM:
+  with the change off, seeded `{}`, 32 iterations, dof.0 = 5043.7(1731.3),
+  dof.1 = 2526.9(540.2), Rwp 0.100954 and 0.072712; with it on, seeded
+  dof.0 = 7812.5 and dof.1 = 3906.25, 5 iterations, the same values, esds
+  and Rwp to the printed digits. A no-strain specimen from the seed presses
+  the cone in both histograms (`truncated_by` 1 each, Rwp 0.064489 and
+  0.030803 against 0.064710 and 0.030855 with the rows off). Which fits
+  move: a pytest plugin wrapping `MultiParameterTable.seed_stephens` and
+  `_joint_positivity_inequalities` logged every test where either acted.
+  Over the fast selection it fired only in the new file's tests. Over the
+  slow-marked tests of the 17 files that run a joint fit, with
+  `test_acceptance_stephens.py`, it fired in none (42 passed, 9 skipped,
+  2 xfailed). So no golden or acceptance number moves. Fast selection on
+  the merged tree: 15133 passed, 443 skipped, 32 xfailed in 748.51 s (+9
+  tests, all passing; the machine ran other suites before it). The added
+  tests cost 0.46 s locally, 0.16 s the slowest. The WP's acceptance files
+  with their neighbours: 609 passed, 197 skipped, 5 xfailed. Sphinx `-W`
+  clean. `tests.reader_output`: unchanged.
+
+  *Gotchas.* The cone builders skip a block whose start is already outside
+  the cone, so `STEPHENS_STRAIN_NOT_POSITIVE` can still fire under LM from
+  such a start, single or joint. That predates this WP, and the guard's
+  rows in the skill and manual still name only TRF. `/code-review` raised
+  it as pre-existing, and it was declined here as out of scope.
+  `HELP["texture"]` still says the texture record is empty in a joint fit,
+  which went to WP-2028's `### Inherited`.
+  The generality judge was not dispatched: the audit table is untouched
+  (`tests.audit_delta` clean), and the one new rule is a starting point
+  with no tunable value, reviewed blind above.
+
+  Next: none in this WP. WP-2028 owns the joint guards and records.
 
 - **2026-11-22** — created, from the 2026-11-22 issue triage (issue #1663).
   Checked against the tree at `f590981ab`: reproduced and measured as in
