@@ -2471,6 +2471,13 @@ def _snapshot_sinks(*candidates) -> list:
     return sinks
 
 
+def _compile_cut(model: CompiledModel) -> dict[str, float]:
+    """``model``'s peak cut as ``compile_model`` keywords: the area fraction
+    its windows drop and their slack, as the compile resolved them."""
+    return {"window_area_tol": model.window_area_tol,
+            "window_slack_deg": model.window_slack_deg}
+
+
 #: whether ``Refinement.__init__`` judges the magnetic groups of what it is given
 _JUDGE_GROUPS: ContextVar[bool] = ContextVar("rietx_judge_groups", default=True)
 
@@ -2703,6 +2710,11 @@ class Refinement:
         #: event carries as ``stage_report_seconds`` (WP-1335)
         self._stage_report_seconds = 0.0
         self._model: CompiledModel | None = None
+        #: the peak cut the last answer was measured at, as ``compile_model``
+        #: keywords, for :meth:`_peak_cut` on a tree with no history (WP-2235).
+        #: Set beside ``result_`` and, unlike it, kept through an edit: the
+        #: object has still fitted.  Never carried into a trial.
+        self._fit_cut: dict[str, float] = {}
         #: whether ``fit`` and ``run_stage`` compute the profile interval of
         #: each moment angle the stationary-angle test left out of the answer
         #: stage's covariance (WP-2002, B2;
@@ -2875,6 +2887,28 @@ class Refinement:
         if not (parent / PROJECT_JSON).exists():
             return None
         return parent / LIVE_DIR
+
+    def _peak_cut(self) -> dict[str, float]:
+        """The peak cut of the fit that produced the working state, as
+        ``compile_model`` keywords; empty where nothing has fitted (WP-2235).
+
+        With a history it is the nearest stage node at or above the head,
+        through :func:`recorded_window_tol` as ``refine.replay`` reads a stage
+        node's, so an edit, a checkout and a reopened project all read it.
+        Without one it is the last answer's compile, kept through an edit.
+        ``predict`` on a grid and the GUI preview both read it here.
+        """
+        tree, head = self.history, self._head_id
+        if tree is None or head is None:
+            return dict(self._fit_cut)
+        for node in reversed(tree.lineage(head)):
+            if node.action.kind == "stage":
+                cut = {"window_area_tol": recorded_window_tol(
+                    node.action.window_area_tol)}
+                if node.action.window_slack_deg is not None:
+                    cut["window_slack_deg"] = node.action.window_slack_deg
+                return cut
+        return {}
 
     def _invalidate_fit(self) -> None:
         """Drop everything that described the previous values.
@@ -6351,6 +6385,7 @@ class Refinement:
                 plan.run_stages()[-1], plan.stage_window_tols()[-1])
             diagnostics.extend(recompiled)
             self._model = model
+            self._fit_cut = _compile_cut(model)
 
             if mode == "pawley":
                 diagnostics.extend(_pawley_unresolved_diagnostics(model, self.structure))
@@ -7021,6 +7056,7 @@ class Refinement:
                 model, table, outcome, data, mode, ttl, stage, window_area_tol)
             diagnostics = diagnostics + recompiled
             self._model = model
+            self._fit_cut = _compile_cut(model)
 
             self.result_ = _build_result(
                 model, table, outcome.theta, mode=mode, status=outcome.status,
@@ -7104,12 +7140,21 @@ class Refinement:
         a fresh grid carries them over from the fitted model by hkl and there
         is nothing to carry before one exists.
 
-        **After a default fit the two forms agree bit for bit.**  ``predict()``
+        **After a fit, both forms draw the fit's own curve.**  ``predict()``
         evaluates the model the result was measured on, a compile at the
-        answer (#272, WP-1421), so it returns ``RefinementResult.y_calc``; a
-        grid compiles at the same values and windows.  Measured on the
-        fluorapatite tutorial under ``mccusker_default``: 0 of 5751 channels
-        differ.
+        answer (#272, WP-1421), so it returns ``RefinementResult.y_calc``.  A
+        grid compiles at the fit's peak cut: the ``window_area_tol`` and
+        ``window_slack_deg`` of the last stage at or above the working state
+        in the history, as the GUI preview reads them, or of the last fit
+        without a history (WP-2235).  An edit such as ``set_values`` keeps
+        that cut.  So ``predict(result.two_theta)`` returns ``y_calc`` bit for
+        bit too.  The
+        exception is a site the fit left on a special position
+        (``SITE_MULTIPLICITY_KEPT``).  ``y_calc`` keeps the solve's orbit
+        count there, and a grid counts the orbit afresh (WP-2052).  At
+        ``compile_model``'s default cut instead, that grid differs from
+        ``y_calc`` on all 5751 channels of the fluorapatite tutorial under
+        ``mccusker_default``, by up to 1.4e-3 of the strongest peak.
 
         **The free set reaches the curve in one case** (#774).  With both
         axial-divergence ratios at exactly zero and either refined, the
@@ -7120,15 +7165,16 @@ class Refinement:
         of the strongest peak (the issue's rutile reproducer, 2026-10-25).
         Every positive value is sized by value alone.
 
-        A grid compiles at ``compile_model``'s default windows whatever this
-        object has fitted, so a never-fitted twin carrying the same models
-        returns the same array.  That default is ``CLOSING_WINDOW_TOL``
-        (WP-2002, the seventh round's Q1), so a synthetic pattern carries
-        near-complete tails.  A default fit measures its answer at the declared
-        stages' ``forward.WINDOW_AREA_TOL`` since the closing stage went off by
-        default (WP-2222), so a grid differs from its ``y_calc`` by the tails;
-        redraw a fit's own curve with ``compile_model(...,
-        window_area_tol=recorded_window_tol(result.stages[-1].window_area_tol))``.
+        An object that has not been fitted compiles a grid at
+        ``compile_model``'s default cut, ``CLOSING_WINDOW_TOL`` (WP-2002, the
+        seventh round's Q1), so a synthetic pattern carries near-complete
+        tails.  A default fit measures its answer at the declared stages'
+        ``forward.WINDOW_AREA_TOL`` since the closing stage went off by default
+        (WP-2222).  So a never-fitted twin carrying the fitted models returns
+        the default-cut array, and differs from the fitted object by the tails.
+        ``compile_model(...,
+        window_area_tol=recorded_window_tol(result.stages[-1].window_area_tol))``
+        rebuilds a fit's curve from its record alone.
         """
         table = ParameterTable(self.structure, self.instrument)
         if two_theta is None:
@@ -7158,8 +7204,11 @@ class Refinement:
                 f"{mode} intensities are extracted by a fit, not computed from "
                 "the structure, so there is nothing to evaluate before one has "
                 "run. Fit first, or predict in rietveld mode.")
+        # the fit's own peak cut, so a grid draws the fit's curve (WP-2235,
+        # ruling A); before any fit, compile_model's default
         model = compile_model(self.structure, self.instrument, grid,
-                              mode=mode, moving_paths=set(table.moving_paths))
+                              mode=mode, moving_paths=set(table.moving_paths),
+                              **self._peak_cut())
         if mode in ("lebail", "pawley"):
             _carry_lebail(self._model, model)
         return model.evaluate(table.decode(table.x0()))
