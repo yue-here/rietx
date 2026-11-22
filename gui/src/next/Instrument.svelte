@@ -24,6 +24,7 @@
   import { instrumentScript, type Say } from "./console";
   import { ApiError, api, type InstrumentEdit } from "../api";
   import Help from "../Help.svelte";
+  import { py } from "../lib/py";
   import { GEOMETRIES, applyFields, axialWarning, editableValue, fieldParam, fieldText,
            endedBy, registerEcho, splitEdits, type InstrumentField } from "../lib/model";
   import type { ParamRow } from "../lib/table";
@@ -207,7 +208,7 @@
       if (gone.length) say("comment", `# typed values dropped: ${gone.sort().join(", ")}`);
       if (values.length) {
         await api.patchParams({ values: Object.fromEntries(values) });
-        say("call", `ref.set_values({${values.map(([k, v]) => `"${k}": ${v}`).join(", ")}})`);
+        say("call", `ref.set_values(${py(Object.fromEntries(values))})`);
         moved = true;
       }
       onlanded();
