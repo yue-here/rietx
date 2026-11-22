@@ -86,7 +86,7 @@ phases' negative v and w make that gap reachable here. Report each firing.
   more than 0.5 esd.
 - [x] Update the milestone's ZrP₂O₇ row with one sentence naming the result, and the
   record of the release in flight.
-- [ ] Skill: none expected. If the run shows a trap an agent porting this input would
+- [x] Skill: none expected. If the run shows a trap an agent porting this input would
   meet, add a row to `docs/skill/rietx/references/` for the series shape.
 
 ## Acceptance
