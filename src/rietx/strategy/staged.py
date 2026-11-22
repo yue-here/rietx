@@ -1618,8 +1618,8 @@ def check_stephens_positive(table, model) -> list[GuardFinding]:
     definiteness), which is why it cannot be a box bound.  The default LM
     driver carries it as a linear inequality (``optimize/lm.py``), and then
     this guard falls silent because there is nothing left to report.  It is
-    the only check under ``solver="trf"``, and in a joint fit under either
-    driver, since ``run_multi_least_squares`` builds no cone.
+    the only check under ``solver="trf"``.  A joint fit's LM step holds one
+    cone per histogram (``_joint_positivity_inequalities``, WP-2239).
 
     Zero is *inside* the physical set, and the test is one-sided for that
     reason: an all-zero block is the exact no-broadening identity, and a
