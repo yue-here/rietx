@@ -166,6 +166,13 @@ def _compare(s: GuiSession, q: dict, _body: dict) -> dict:
     return s.history_compare(ids)
 
 
+def _history_curves(s: GuiSession, q: dict, _body: dict) -> Packed:
+    node = q.get("node", [""])[0]
+    if not node:
+        raise GuiError("curves needs ?node=<node>", where=["node"])
+    return s.history_curves(node)
+
+
 def _structure3d(s: GuiSession, q: dict, body: dict | None) -> dict:
     """Geometry for one phase.  The knobs are *drawing* thresholds, not physics,
     which is why they ride here rather than in a settings document: the
@@ -343,6 +350,8 @@ ROUTES: dict[tuple[str, str], Any] = {
     ("GET", "/api/history"): lambda s, q, b: s.history(),
     ("GET", "/api/history/diff"): _diff,
     ("GET", "/api/history/compare"): _compare,
+    # one node's curve through replay, for the History tab's Compare (WP-2211)
+    ("GET", "/api/history/curves"): _history_curves,
     ("POST", "/api/history/checkout"): lambda s, q, b: s.history_checkout(b),
     ("POST", "/api/history/branch"): lambda s, q, b: s.history_branch(b),
     ("POST", "/api/history/tag"): lambda s, q, b: s.history_tag(b),

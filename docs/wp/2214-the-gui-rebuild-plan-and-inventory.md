@@ -552,7 +552,9 @@ The swap deletes today's shell and its panels, so its PR waits on the maintainer
   page a person gets by default. The `/next` route is listed among the route exclusions, with its
   reason. At the swap, `reference/gui-guide.md`, `reference/gui-power.md` and
   `start/gui-quickstart.md` are rewritten, `docs/docs/make_screenshots.py` drives `/`, and every
-  GUI screenshot is retaken.
+  GUI screenshot is retaken. That rewrite includes `reference/gui-guide.md` § History, for the
+  History tab's plain menu words and its Graph and Table views (WP-2211 ruling 5; the
+  maintainer placed it at the swap, 2026-11-22).
 - **The rulebooks.** `gui/CLAUDE.md` gains a `gui/src/next/` line in R1. Its sections on deleted
   panels are pruned at the swap. `gui/STYLE.md` changes only where a piece settles a rule, and
   says so.
