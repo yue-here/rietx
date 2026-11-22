@@ -1,6 +1,6 @@
 # WP-2239 — a joint stage seeds and holds a Stephens block as a single fit does
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-22 — claimed by @yue-here (ghostshift runner)
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-11-22 — a joint fit ignores `Stage.strain_seed` and holds no strain cone, and nothing says so; on a path few fits run, and a block declared on the isotropic ray by hand is the workaround
