@@ -1306,9 +1306,10 @@ ROWS: tuple[Row, ...] = (
                   "wavelengths (multi._peak_equation_sharing_diagnostics; maintainer's ruling "
                   "of 2026-11-20, option a, WP-2107), unless the expression reads "
                   "wavelength, which states the term's lambda dependence as a parametric "
-                  "coefficient does (WP-2152, settled by Claude under the maintainer's "
-                  "'your call', 2026-11-22; a degree-valued size term in that same "
-                  "expression goes unwarned)"),
+                  "equation states a driven coefficient's (WP-2152, settled by Claude under "
+                  "the maintainer's 'your call', 2026-11-22). The parametric silence is per "
+                  "coefficient and this one per equation, so a degree-valued size term or "
+                  "constant in that same expression goes unwarned"),
         response="warning",
         responds=("do not quote the named equation's coefficients as one size or width "
                   "for every pattern; unshare a wavelength-dependent term's coefficient with "

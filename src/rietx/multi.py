@@ -3408,11 +3408,12 @@ def _peak_equation_sharing_diagnostics(mtable) -> list[Diagnostic]:
     wavelength, with a source that declares no line, for an
     ``intensity_factor``, a pure number, and for an equation whose expression
     reads ``wavelength`` (WP-2152): the user wrote its λ dependence, as a
-    parametric coefficient states it.  The silence covers the whole
-    expression, and a phase holds one equation per target, so a strain term
-    beside the λ-reading one (``+ w*tan(theta)``), rightly shared, is silent,
-    and so is a size term in degrees there (``+ x/cos(theta)``), the known
-    limit.  Another target's degree-only equation on the same phase warns.
+    parametric equation states a driven coefficient's.  The parametric silence
+    is per coefficient, but this one covers the whole expression.  A phase
+    holds one equation per target, so a strain term beside the λ-reading one
+    (``+ w*tan(theta)``), rightly shared, is silent.  So is a size term in
+    degrees there (``+ x/cos(theta)``), the known limit.  Another target's
+    degree-only equation on the same phase warns.
     """
     lams = [_longest_wavelength(ins) for ins in mtable.instruments]
     if any(lam is None for lam in lams) or len(set(lams)) < 2:
