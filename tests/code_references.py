@@ -66,7 +66,7 @@ import tokenize
 from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import cache
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src" / "rietx"
@@ -447,11 +447,16 @@ def _committable() -> tuple[frozenset[str], frozenset[str]]:
     Read from git, never the disk: a build output or a run's file exists in a
     working checkout and not in CI's, so a disk check passes here and fails
     there.  Untracked files that are not ignored count, as a commit would
-    take them."""
+    take them.
+
+    Both sets are in git's POSIX form, as :func:`in_tree` asks.  A ``Path``
+    would print a Windows parent as ``docs\\wp``, and every cited directory
+    would miss there."""
     files = frozenset(subprocess.run(
         ["git", "-C", str(ROOT), "ls-files", "--cached", "--others", "--exclude-standard"],
         capture_output=True, encoding="utf-8", check=True).stdout.splitlines())
-    dirs = frozenset(str(p) for f in files for p in Path(f).parents if str(p) != ".")
+    dirs = frozenset(p.as_posix() for f in files for p in PurePosixPath(f).parents
+                     if p.as_posix() != ".")
     return files, dirs
 
 

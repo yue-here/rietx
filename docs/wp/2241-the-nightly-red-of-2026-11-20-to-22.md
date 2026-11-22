@@ -64,7 +64,7 @@ behaviour.
 
 ## Tasks
 
-- [ ] The directory set is built in POSIX form, so a cited directory resolves on Windows.
+- [x] The directory set is built in POSIX form, so a cited directory resolves on Windows.
 - [ ] The single-fit width-triple test takes the joint-fit test's bar, measured under 1e-14
       start nudges.
 - [ ] The two alarm-pin failures (11-20, 11-21) checked against `main`, and the full
