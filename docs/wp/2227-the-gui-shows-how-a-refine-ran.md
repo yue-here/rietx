@@ -1,6 +1,6 @@
 # WP-2227 — The GUI shows how a refine ran: in one stage or in stages
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-22 — options drawn; the three questions (and a fourth) wait on Yue
+Milestone: gui-overhaul · Status: 🔄 2026-11-22 — ruled (§ Rulings); building at `/next`
 Depends on: 2224 (the re-fit rule)
 Priority: P2 2026-11-19 — a ruling of Yue's waiting on the GUI; the rebuild's Plan tab (R4 of WP-2214) is where it lands
 
@@ -45,6 +45,23 @@ has no WP yet. Today's Plan panel is deleted at the swap, so the work belongs at
 2. What a one-stage re-fit's ladder looks like: one row standing in for the plan's stages, or
    the plan's rows with one Rwp spanning them.
 3. Whether a Refine that runs staged for a released parameter names that parameter on screen.
+
+## Rulings
+
+**Yue, 2026-11-22**, on the options in `2227-screenshots/` (the brief is the handover entry of
+the same date):
+
+1. **Where the feedback shows: (b) and (c).** Beside Rwp on the Pattern graph's title line
+   ("One stage: the model had converged", "In stages: …", "In stages: the one-stage re-fit
+   diverged"), and a Console comment after each fit carrying the plan line
+   `Refinement.summary()` prints.
+2. **The Plan tab after a one-stage re-fit: (a).** One stand-in row after the stages, drawn like
+   the closing stage. The stage rows keep their counts and leave Rwp blank.
+3. **A staged run for a released parameter: (a).** Name it in words where the feedback sits:
+   "In stages: Atom position shift was held".
+4. **The action bar keeps "Staged plan, 6 stages"** (consent line, no objection).
+5. **The status bar during a re-fit reads the title line's words**, not the internal stage name
+   `warm_refit (1/1)` (consent line, no objection).
 
 ## Tasks
 
