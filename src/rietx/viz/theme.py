@@ -404,7 +404,7 @@ def state_dir(override: str | Path | None = None) -> Path:
     moves (``_about.py`` holds that warning; the two are the same literal and
     no test can catch them being confused).
 
-    One expression, called by :class:`~rietx.gui.session.Session` and by the two
+    One expression, called by :class:`~rietx.gui.session.GuiSession` and by the two
     Python servers, because a theme read from a different directory than the one
     the GUI wrote to is a bug that looks like the choice not sticking.
     """
@@ -417,7 +417,7 @@ def theme_choice() -> str:
     """The theme the person chose, from ``settings.json``; ``system`` by default.
 
     Anything unreadable, missing or hand-mangled is ``"system"``, never an
-    error — the same grammar :meth:`~rietx.gui.session.Session.settings` uses,
+    error — the same grammar :meth:`~rietx.gui.session.GuiSession.settings` uses,
     and for the same reason: no setting here is worth refusing to start over.
 
     No directory argument: every caller wants the person's, and a parameter

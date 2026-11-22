@@ -1,0 +1,40 @@
+{
+ "fap": {
+  "last_stage": "biso",
+  "last_stage_tol_recorded": null,
+  "last_tol": 0.02,
+  "rwp_fit": 0.09249778036355344,
+  "n_points": 5750,
+  "ymax": 20310.459760904476,
+  "B_curves_rwp_1e3": 0.0937950884416263,
+  "B_curves_minus_fit_rwp": 0.0012973080780728646,
+  "B_curves_shift_frac_of_max": 0.001280707219797408,
+  "compile_ms_None": [
+   90.0,
+   97.9
+  ],
+  "compile_ms_0.02": [
+   38.8,
+   44.7
+  ]
+ },
+ "nac": {
+  "last_stage": "biso",
+  "last_stage_tol_recorded": null,
+  "last_tol": 0.02,
+  "rwp_fit": 0.09316970271831057,
+  "n_points": 22003,
+  "ymax": 264872.1729727943,
+  "B_curves_rwp_1e3": 0.09292237134498393,
+  "B_curves_minus_fit_rwp": -0.0002473313733266369,
+  "B_curves_shift_frac_of_max": 3.702177021113616e-05,
+  "compile_ms_None": [
+   69.9,
+   75.3
+  ],
+  "compile_ms_0.02": [
+   62.8,
+   78.3
+  ]
+ }
+}
