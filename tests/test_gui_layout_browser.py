@@ -18,6 +18,8 @@ CI.
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from rietx.gui import GuiSession
@@ -188,7 +190,9 @@ def test_a_pending_edit_moves_nothing_in_the_action_bar(browser, gui, state):
     value = page.locator(".params .row button.ink").first
     before = page.evaluate(SNAP, LANDMARKS)
     value.click()
-    page.keyboard.press("End")
+    # a leading digit changes any value: the editor opens on the full value,
+    # where a trailing one can sit past the double's last digit (WP-2223)
+    page.keyboard.press("Home")
     page.keyboard.type("1")
     page.keyboard.press("Enter")
     _frames(page)
@@ -987,14 +991,19 @@ def test_no_frame_control_moves_the_rebuilt_layout(browser, gui):
         page.close()
 
     page = _open_next(browser, url, 1300)
-    tabs = page.locator("section .tabs button").all_text_contents()
+    tabs = page.locator("section .tabs [role=tab]").all_text_contents()
     page.close()
     assert len(tabs) == 8, tabs
     for name in tabs:
-        pressing(name, lambda p, n=name: p.locator("section .tabs button", has_text=n).first.click())
+        pressing(name, lambda p, n=name: p.locator("section .tabs [role=tab]", has_text=n).first.click())
 
     def escape(p):
         p.keyboard.press("Escape")
+
+    # each strip's ? box floats over the page (the maintainer's look, 2026-11-21, item 6)
+    for strip, label in (("graphs", "About the Pattern graph"), ("model", "About the Parameters tab")):
+        pressing(f"{strip} ? box", lambda p, n=label: p.get_by_role("button", name=n, exact=True).click(),
+                 escape)
 
     def series(p):
         p.locator("button.mbtn.wf").click()
@@ -1169,7 +1178,9 @@ def test_a_pending_edit_moves_nothing_in_the_rebuilt_action_bar(browser, gui):
     _frames(page)
     before = page.evaluate(SNAP, WINDOW_LANDMARKS)
     page.locator(".params .row button.ink").first.click()
-    page.keyboard.press("End")
+    # a leading digit changes any value: the editor opens on the full value,
+    # where a trailing one can sit past the double's last digit (WP-2223)
+    page.keyboard.press("Home")
     page.keyboard.type("1")
     page.keyboard.press("Enter")
     _frames(page)
@@ -1264,6 +1275,10 @@ def test_a_slider_drag_previews_in_the_rebuilt_window_and_moves_nothing(browser,
     page.wait_for_selector(".rangepop")
     _frames(page)
     failures += [f"pop-up: {m}" for m in _moved(before, page.evaluate(SNAP, marks))]
+    # the ends read in the value box's digits, never at full precision (WP-2218)
+    for end in ("Lowest value", "Highest value"):
+        text = page.get_by_label(end, exact=True).input_value()
+        assert len(text) <= 12, f"{end} reads {text!r}"
     page.keyboard.press("Escape")
 
     redraws = page.evaluate(REDRAWS)
@@ -1278,3 +1293,729 @@ def test_a_slider_drag_previews_in_the_rebuilt_window_and_moves_nothing(browser,
     print(f"\n[next] {len(redraws)} preview redraws, drag to redraw "
           f"{min(redraws):.0f}-{max(redraws):.0f} ms")
     assert not failures, "\n".join(failures)
+
+
+def test_a_clicked_value_opens_on_its_full_value_and_enter_on_it_is_no_edit(browser, gui):
+    """WP-2223, the spreadsheet model: a value drawn as ×10ⁿ opens on its
+    stored value to the last digit, and Enter on that text records nothing,
+    in the Interactive tab's box and in the Parameters panel's editor. A
+    ×10ⁿ value typed into the box is a pending edit at that value."""
+    url, client = gui
+    stored = {r["path"]: r["value"] for r in client.get("/api/params")[1]["parameters"]}
+    page = _open_window(browser, url)
+    pending = page.locator(".actions .pending")
+
+    page.locator("section.model .tabs").get_by_role("tab", name="Interactive", exact=True).click()
+    page.wait_for_selector("section.model .interactive .slider")
+    # a nonzero value drawn as ×10ⁿ: a digit from 1 to 9 before the ×
+    shown = re.compile(r"^[^×]*[1-9][^×]*×10")
+    slider = page.locator("section.model .interactive .slider").filter(
+        has=page.locator("button.num", has_text=shown)).first
+    path = slider.locator("button.pname").get_attribute("data-pop")
+    box = slider.locator("button.num")
+    drawn = box.text_content()
+    box.click()
+    typed = page.locator("section.model .interactive input.typed")
+    typed.wait_for()
+    text = typed.input_value()
+    # the full value as typed text: it reads back as the stored double exactly
+    assert "×" not in text and float(text) == stored[path], (path, text, drawn, stored[path])
+    page.keyboard.press("Enter")
+    _frames(page)
+    assert not typed.count()
+    assert pending.text_content().strip() == "", pending.text_content()
+
+    # typed as the range fields read it
+    box.click()
+    typed.wait_for()
+    page.keyboard.type("1.5×10⁻³")
+    page.keyboard.press("Enter")
+    _frames(page)
+    assert pending.text_content().strip() == "1 pending", pending.text_content()
+    box.click()
+    typed.wait_for()
+    assert typed.input_value() == "0.0015", typed.input_value()
+    page.keyboard.press("Escape")
+    page.locator(".actions button", has_text="Revert").click()
+    _frames(page)
+
+    page.locator("section.model .tabs").get_by_role("tab", name="Parameters", exact=True).click()
+    cell = page.locator(".params .row button.ink", has_text=shown).first
+    cell.wait_for()
+    path = cell.get_attribute("data-path")
+    cell.click()
+    editor = page.locator("input.editor")
+    editor.wait_for()
+    assert float(editor.input_value()) == stored[path], (path, editor.input_value(), stored[path])
+    page.keyboard.press("Enter")
+    _frames(page)
+    assert not editor.count()
+    assert pending.text_content().strip() == "", pending.text_content()
+    assert not page.errors, page.errors
+    page.close()
+
+
+#: The rebuilt Peaks and Background graphs' own places (WP-2218): the title
+#: line, the windows, the plot and the block under it.
+NEXT_GRAPHS = NEXT_LANDMARKS + [
+    ".ghead", ".gctl", ".gctl > *", ".overview", "section.graphs figure", "section.graphs canvas",
+    "section.graphs .plot", ".bgctls", ".bgctl > *", ".chips .term",
+    ".actions", ".actions .go > *",
+]
+
+#: How many pixels of each 2D canvas in the graphs column carry paint.
+PAINTED = """() => [...document.querySelectorAll("section.graphs canvas")].map((c) => {
+  const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+  let n = 0;
+  for (let i = 3; i < d.length; i += 4) if (d[i]) n++;
+  return n;
+})"""
+
+
+def test_the_rebuilt_peaks_and_background_graphs_move_nothing(browser, tmp_path_factory):
+    """WP-2218 rows 59-68. The Peaks graph fills its grid with painted windows
+    of the last fit under an overview of the pattern that shades each window's
+    range, and its Show choice and a window's › repaint them in place. On the Background
+    graph a term chip is a pending hold: the action bar counts it, the title
+    says "Background preview", the head stays where it was, and the band is
+    refetched for it. Neither the chip nor "Band drawn" moves a place, and
+    Revert brings the title back. Every press is a real click. A project of its
+    own, since the call that frees the background terms is written."""
+    httpd, client = _serve(tmp_path_factory, "next-graphs")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    try:
+        # the fixture's stage freed the scale alone; free the terms, or no band
+        status, body = client.patch("/api/params", {"vary": {"instrument.background.*": True}})
+        assert status == 200, body
+        page = _open_window(browser, url)
+        failures = []
+
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Peaks", exact=True).click()
+        page.wait_for_selector("section.graphs figure canvas")
+        page.wait_for_function("document.querySelector('.gtitle b')?.textContent === 'Last fit'")
+        _frames(page, 4)
+        windows = page.locator("section.graphs figure").count()
+        assert windows >= 1, windows
+        assert page.locator(".overview .band").count() == windows
+        painted = page.evaluate(PAINTED)
+        # the overview's canvas, then one per window
+        assert len(painted) == windows + 1 and min(painted) > 0, painted
+        before = page.evaluate(SNAP, NEXT_GRAPHS)
+        bands = page.locator(".overview .band").evaluate_all("bs => bs.map((b) => b.style.left)")
+        step = page.locator('section.graphs button[aria-label="Next peak"]:not([disabled])').first
+        step.click()
+        _frames(page, 4)
+        assert page.locator(".overview .band").evaluate_all("bs => bs.map((b) => b.style.left)") != bands
+        failures += [f"Next peak: {m}" for m in _moved(before, page.evaluate(SNAP, NEXT_GRAPHS))]
+        before = page.evaluate(SNAP, NEXT_GRAPHS)
+        page.locator('[aria-label="Show"] button', has_text="Peak shape alone").click()
+        _frames(page, 4)
+        assert page.locator('[aria-label="Show"] button[aria-pressed="true"]').text_content() \
+            == "Peak shape alone"
+        failures += [f"Peak shape alone: {m}" for m in _moved(before, page.evaluate(SNAP, NEXT_GRAPHS))]
+        assert min(page.evaluate(PAINTED)) > 0
+
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Background", exact=True).click()
+        page.wait_for_selector(".chips .term:not([disabled])")
+        page.wait_for_function(
+            "document.querySelector('.gtitle b')?.textContent === 'Background at the current values'")
+        page.wait_for_selector('[aria-label="Band drawn"] button:not([disabled])')
+        _frames(page, 4)
+        before = page.evaluate(SNAP, NEXT_GRAPHS)
+        head = client.get("/api/project")[1]["head"]
+        page.get_by_role("button", name="Hold term 1", exact=True).click()
+        page.wait_for_function(
+            "document.querySelector('.gtitle b.pv')?.textContent === 'Background preview'")
+        page.wait_for_function(
+            "document.querySelector('.actions .pending')?.textContent === '1 pending'")
+        _frames(page, 4)
+        assert page.get_by_role("button", name="Hold term 1", exact=True).get_attribute(
+            "aria-pressed") == "true"
+        # pending, so nothing is written
+        assert client.get("/api/project")[1]["head"] == head
+        failures += [f"hold chip: {m}" for m in _moved(before, page.evaluate(SNAP, NEXT_GRAPHS))]
+        page.locator('[aria-label="Band drawn"] button', has_text="×5").click()
+        _frames(page)
+        failures += [f"Band drawn ×5: {m}" for m in _moved(before, page.evaluate(SNAP, NEXT_GRAPHS))]
+        assert page.evaluate(PAINTED)[0] > 0
+
+        page.locator(".actions button", has_text="Revert").click()
+        page.wait_for_function(
+            "document.querySelector('.gtitle b')?.textContent === 'Background at the current values'")
+
+        # A preview up while the Pattern graph is built again draws, at the
+        # last fit's view: a graph tab's trip once left it empty.
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Pattern", exact=True).click()
+        page.wait_for_selector("section.graphs .gutter .gut")
+        page.wait_for_timeout(500)
+        _frames(page, 4)
+        rest = page.evaluate(PAINTED)
+        page.locator("section.model .tabs").get_by_role("tab", name="Interactive", exact=True).click()
+        page.wait_for_selector("section.model .interactive .slider")
+        track = page.locator('section.model .interactive input[type="range"]').first
+        value = int(track.input_value()) / 1000
+        _drag(page, track, value, min(1.0, value + 0.3))
+        page.wait_for_function("document.querySelector('.gtitle b.pv')?.textContent === 'Preview, not refined'")
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Peaks", exact=True).click()
+        page.wait_for_selector("section.graphs figure canvas")
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Pattern", exact=True).click()
+        page.wait_for_function("document.querySelector('.gtitle b.pv')?.textContent === 'Preview, not refined'")
+        page.wait_for_timeout(500)
+        _frames(page, 4)
+        back = page.evaluate(PAINTED)
+        # the main pane's canvas carries the curves: at least half its paint at rest
+        assert len(back) == len(rest) and back[0] > rest[0] / 2, (rest, back)
+        page.locator(".actions button", has_text="Revert").click()
+        assert not page.errors, page.errors
+        page.close()
+    finally:
+        httpd.shutdown()
+    assert not failures, "\n".join(failures)
+
+
+def _colours(page, selector: str) -> int:
+    """Distinct colours in a screenshot of one element: a WebGL canvas cannot
+    be read back, so the picture is what is measured (browser-driving note)."""
+    import io
+
+    import numpy as np
+    from PIL import Image
+
+    png = page.locator(selector).screenshot()
+    # through numpy, which reads every Pillow; Pillow's own pixel list is
+    # `get_flattened_data` only on a recent release
+    pixels = np.asarray(Image.open(io.BytesIO(png)).convert("RGB").resize((160, 100)))
+    return len(np.unique(pixels.reshape(-1, 3), axis=0))
+
+
+def test_the_rebuilt_structure_graph_draws_a_preview_and_moves_nothing(browser, tmp_path_factory):
+    """WP-2218 rows 69-82. The Structure graph draws the working model and says
+    so; Look down, the draw mode and a colour-key switch move no place; a drag
+    turns the picture; a click on an atom opens its selection bar; and a
+    Lattice parameter a slider drawn in the Interactive tab redraws it as
+    "Preview, not refined" without writing, until Revert. Every press is real."""
+    httpd, client = _serve(tmp_path_factory, "next-structure")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    try:
+        page = _open_window(browser, url)
+        failures = []
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Structure", exact=True).click()
+        page.wait_for_selector(".structgraph .key .entry")
+        page.wait_for_function(
+            "document.querySelector('.gtitle b')?.textContent === 'Structure at the current values'")
+        page.wait_for_timeout(300)
+        _frames(page, 4)
+        rest = _colours(page, ".structgraph canvas")
+        assert rest > 20, rest
+        landmarks = NEXT_GRAPHS + [".key", ".key .entry", ".structgraph .view"]
+        before = page.evaluate(SNAP, landmarks)
+        for axis in ("a", "b", "c"):
+            page.locator(".structgraph .gctl button.axis", has_text=axis).click()
+            _frames(page, 2)
+        failures += [f"Look down: {m}" for m in _moved(before, page.evaluate(SNAP, landmarks))]
+        page.locator('[aria-label="Draw atoms as"] button', has_text="Ellipsoids").click()
+        _frames(page, 3)
+        assert "Ellipsoids at 50 %" in page.locator(".gtitle").inner_text()
+        failures += [f"Ellipsoids: {m}" for m in _moved(before, page.evaluate(SNAP, landmarks))]
+        entry = page.locator(".structgraph .key .entry").first
+        entry.click()
+        _frames(page, 2)
+        assert entry.get_attribute("aria-pressed") == "false"
+        failures += [f"key switch: {m}" for m in _moved(before, page.evaluate(SNAP, landmarks))]
+        entry.click()
+        page.locator('[aria-label="Draw atoms as"] button', has_text="Balls").click()
+        _frames(page, 3)
+
+        # a real drag turns the picture
+        shot = page.locator(".structgraph canvas").screenshot()
+        box = page.locator(".structgraph canvas").bounding_box()
+        cx, cy = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+        page.mouse.move(cx, cy)
+        page.mouse.down()
+        for k in range(1, 11):
+            page.mouse.move(cx + 8 * k, cy + 4 * k)
+            _frames(page, 1)
+        page.mouse.up()
+        _frames(page, 3)
+        assert page.locator(".structgraph canvas").screenshot() != shot
+
+        # a click on an atom selects it: hunt for one by hovering, as a person would
+        hit = None
+        for dx in range(-150, 151, 10):
+            for dy in range(-100, 101, 10):
+                page.mouse.move(cx + dx, cy + dy)
+                text = page.locator(".statusbar .right").inner_text()
+                if "(" in text and "Å" not in text:
+                    hit = (cx + dx, cy + dy)
+                    break
+            if hit:
+                break
+        assert hit, "no atom under any hovered point"
+        page.mouse.click(*hit)
+        page.wait_for_selector(".structgraph .selbar")
+        assert "Show coordination" in page.locator(".structgraph .selbar").inner_text()
+        page.keyboard.press("Escape")
+        page.wait_for_selector(".structgraph .selbar", state="detached")
+
+        # a structural slider value is drawn as a preview, and writes nothing
+        head = client.get("/api/project")[1]["head"]
+        page.locator("section.model .tabs").get_by_role("tab", name="Interactive", exact=True).click()
+        page.wait_for_selector("section.model .interactive .slider")
+        row = page.locator("section.model .slider",
+                           has=page.locator("button.pname", has_text="Lattice parameter a")).first
+        track = row.locator('input[type="range"]')
+        track.scroll_into_view_if_needed()
+        value = int(track.input_value()) / 1000
+        _drag(page, track, value, min(1.0, value + 0.3))
+        page.wait_for_function("document.querySelector('.gtitle b.pv')?.textContent === 'Preview, not refined'")
+        assert client.get("/api/project")[1]["head"] == head
+        page.locator(".actions button", has_text="Revert").click()
+        page.wait_for_function(
+            "document.querySelector('.gtitle b')?.textContent === 'Structure at the current values'")
+        assert not page.errors, page.errors
+        page.close()
+    finally:
+        httpd.shutdown()
+    assert not failures, "\n".join(failures)
+
+
+def _open_instrument(page) -> None:
+    page.get_by_role("button", name="Instrument actions", exact=True).click()
+    page.get_by_role("menuitem", name="Source and geometry…", exact=True).click()
+    page.wait_for_selector('[role="dialog"] [data-field="geometry.axial_sl"]')
+    _frames(page)
+
+
+def test_the_instrument_dialog_applies_what_it_shows_and_moves_nothing(browser, tmp_path_factory):
+    """WP-2218 rows 133-136. The Instrument band's ⋯ opens the Instrument
+    dialog over the window, which moves nothing. S/L typed equal to H/L shows
+    the warning beside the pair. The profile's shape waits under the Peak shape
+    row's Advanced, closed. Apply sends the wavelength and the shape in the
+    model and S/L through the table, then closes. Cancel writes nothing. Loading a
+    profile replaces the instrument at once. A project of its own, since
+    Apply writes."""
+    httpd, client = _serve(tmp_path_factory, "next-instrument")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    try:
+        status, saved = client.post("/api/export/instrument_profile", {})
+        assert status == 200, saved
+        page = _open_window(browser, url)
+        page.locator("section.model .tabs button", has_text="Parameters").first.click()
+        page.wait_for_selector("tr[data-atom]")
+        before = page.evaluate(SNAP, WINDOW_LANDMARKS)
+        _open_instrument(page)
+        failures = [f"open: {m}" for m in _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))]
+        assert page.locator('[role="dialog"] h2').inner_text() == "Instrument"
+
+        dialog = page.locator('[role="dialog"]')
+        dialog.locator('[data-field="geometry.axial_sl"]').fill("0.02")
+        dialog.locator('[data-field="geometry.axial_hl"]').fill("0.02")
+        _frames(page)
+        assert "S/L = H/L = 0.02" in dialog.locator(".warn").inner_text()
+        dialog.locator('[data-field="geometry.axial_sl"]').fill("0.015")
+        dialog.locator('[data-field="source.lines.0.wavelength"]').fill("0.4140")
+        _frames(page)
+        assert dialog.locator(".warn").count() == 0
+        # the shape under the Peak shape row's Advanced, closed until asked
+        row = dialog.locator(".nrow", has=page.locator(".nl", has_text="Peak shape"))
+        shape = row.locator('[data-field="profile.shape"]')
+        assert not shape.is_visible()
+        row.locator("summary", has_text="Advanced").click()
+        _frames(page)
+        assert shape.input_value() == "tchz_pv"
+        assert shape.locator("option").all_inner_texts() == ["TCHZ pseudo-Voigt", "Voigt"]
+        shape.select_option("voigt")
+        _frames(page)
+        head = client.get("/api/project")[1]["head"]
+        dialog.get_by_role("button", name="Apply", exact=True).click()
+        page.wait_for_selector('[role="dialog"]', state="detached")
+        ins = client.get("/api/instrument")[1]["instrument"]
+        assert ins["source"]["lines"][0]["wavelength"]["value"] == 0.414
+        assert ins["geometry"]["axial_sl"]["value"] == 0.015
+        assert ins["geometry"]["axial_hl"]["value"] == 0.02
+        assert ins["profile"]["shape"] == "voigt"
+        assert client.get("/api/project")[1]["head"] != head
+
+        # an anode choice, then Cancel: nothing is written
+        head = client.get("/api/project")[1]["head"]
+        _open_instrument(page)
+        dialog.locator("select").first.select_option("MoKa1")
+        _frames(page)
+        assert dialog.locator('[data-field="source.lines.0.wavelength"]').input_value().startswith("0.709")
+        dialog.get_by_role("button", name="Cancel", exact=True).click()
+        page.wait_for_selector('[role="dialog"]', state="detached")
+        assert client.get("/api/project")[1]["head"] == head
+
+        # a saved profile replaces the instrument at once, one node
+        _open_instrument(page)
+        dialog.locator('input[type="file"]').set_input_files(saved["path"])
+        page.wait_for_function(
+            "document.querySelector('[role=dialog] .reason')?.textContent.startsWith('Loaded')")
+        ins = client.get("/api/instrument")[1]["instrument"]
+        assert ins["source"]["lines"][0]["wavelength"]["value"] == 0.4139
+        assert dialog.locator('[data-field="source.lines.0.wavelength"]').input_value() == "0.4139"
+        page.keyboard.press("Escape")
+        page.wait_for_selector('[role="dialog"]', state="detached")
+        failures += [f"closed: {m}" for m in _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))]
+        assert not page.errors, page.errors
+        page.close()
+    finally:
+        httpd.shutdown()
+    assert not failures, "\n".join(failures)
+
+
+def _set_terms(page, n: int) -> None:
+    """Click the Terms slider where it reads ``n``, a real pointer press, and
+    wait for the edit to land: the slider is offered again at ``n``."""
+    track = page.locator('input[aria-label="Terms"]')
+    lo, hi = int(track.get_attribute("min")), int(track.get_attribute("max"))
+    box = track.bounding_box()
+    # the thumb's centre runs from half a thumb in from each end
+    x = box["x"] + 8 + (box["width"] - 16) * (n - lo) / (hi - lo)
+    page.mouse.click(x, box["y"] + box["height"] / 2)
+    page.wait_for_function(
+        f"document.querySelectorAll('.chips .term').length === {n}"
+        " && !document.querySelector('input[aria-label=\"Terms\"]').disabled")
+    _frames(page, 4)
+
+
+def test_the_background_graph_s_edits_leave_no_stale_hold_or_pending_edit(browser, tmp_path_factory):
+    """WP-2218 review, the two behaviour fixes. Terms grown frees the terms
+    they add. A Terms cut releases the committed hold on a term it removes, so
+    the term comes back free when the Terms grow again, and the Parameters
+    panel drops its pending edit on a removed term, so nothing is left for
+    Apply to refuse. A Type switch releases the Chebyshev's holds and starts
+    every new coefficient free. Every press is a real click. A project of its
+    own, since the edits are written."""
+    httpd, client = _serve(tmp_path_factory, "next-bg-edits")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    try:
+        status, body = client.patch("/api/params", {"vary": {"instrument.background.*": True}})
+        assert status == 200, body
+        status, body = client.patch("/api/params", {"hold": {"instrument.background.c1": True}})
+        assert status == 200, body
+        page = _open_window(browser, url)
+
+        def rows():
+            return {r["path"]: r for r in client.get("/api/params")[1]["parameters"]
+                    if r["path"].startswith("instrument.background.c")}
+
+        def pending() -> str:
+            note = page.locator(".actions .pending")
+            return note.text_content() if note.count() else ""
+
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Background", exact=True).click()
+        page.wait_for_selector('input[aria-label="Terms"]:not([disabled])')
+        _set_terms(page, 6)
+        grown = rows()
+        assert sorted(grown) == [f"instrument.background.c{k}" for k in range(6)]
+        assert all(grown[f"instrument.background.c{k}"]["vary"] for k in (3, 4, 5)), grown
+        assert grown["instrument.background.c1"]["held"]
+
+        # hold c5 by its chip and apply it: a committed hold on a term a cut removes
+        page.get_by_role("button", name="Hold term 5", exact=True).click()
+        page.wait_for_function(
+            "document.querySelector('.actions .pending')?.textContent === '1 pending'")
+        page.locator(".actions").get_by_role("button", name="Apply", exact=True).click()
+        page.wait_for_function(
+            "document.querySelector('.actions .pending')?.textContent !== '1 pending'")
+        assert rows()["instrument.background.c5"]["held"]
+
+        # pending flags on the free terms, c4 among them, by the Parameters
+        # panel's Background group box (its terms are drawn on the graph)
+        page.locator("section.model .tabs").get_by_role("tab", name="Parameters", exact=True).click()
+        page.locator('section.model input[aria-label="refine the background group"]').click()
+        page.wait_for_function(
+            "document.querySelector('.actions .pending')?.textContent === '4 pending'")
+
+        _set_terms(page, 4)
+        assert sorted(rows()) == [f"instrument.background.c{k}" for k in range(4)]
+        # the pending flag on c4 went with c4, and Apply sends the other three
+        page.wait_for_function(
+            "document.querySelector('.actions .pending')?.textContent === '3 pending'")
+        page.locator(".actions").get_by_role("button", name="Apply", exact=True).click()
+        page.wait_for_function(
+            "(document.querySelector('.actions .pending')?.textContent ?? '') === ''")
+        cut = rows()
+        assert [cut[f"instrument.background.c{k}"]["vary"] for k in (0, 2, 3)] == [False] * 3, cut
+        # free them again by the same box, for what follows
+        page.locator('section.model input[aria-label="refine the background group"]').click()
+        page.locator(".actions").get_by_role("button", name="Apply", exact=True).click()
+        page.wait_for_function(
+            "(document.querySelector('.actions .pending')?.textContent ?? '') === ''")
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Background", exact=True).click()
+        page.wait_for_selector('input[aria-label="Terms"]:not([disabled])')
+
+        _set_terms(page, 6)
+        back = rows()
+        assert not back["instrument.background.c5"]["held"], back["instrument.background.c5"]
+        assert back["instrument.background.c5"]["vary"] and back["instrument.background.c4"]["vary"]
+        assert back["instrument.background.c1"]["held"]
+
+        page.locator('[aria-label="Type"] button', has_text="P-spline").click()
+        page.wait_for_selector('input[aria-label="Stiffness"]')
+        _frames(page, 4)
+        spline = rows()
+        assert len(spline) > 6
+        assert all(r["vary"] and not r["held"] for r in spline.values()), \
+            [p for p, r in spline.items() if r["held"] or not r["vary"]]
+        assert not page.errors, page.errors
+        page.close()
+    finally:
+        httpd.shutdown()
+
+
+def test_today_s_terms_box_leaves_no_stale_hold(browser, tmp_path_factory):
+    """WP-2229 case 1, on today's page: its Model tab's Terms box sends the
+    instrument alone, and the server releases the hold on a term the cut
+    removes and frees the terms the extension adds. Before, the box sent no
+    arms and built an added term fixed, so the hold came back with the term.
+    Typed and committed with the keyboard, as a person does. A project of its
+    own, since the edits are written."""
+    httpd, client = _serve(tmp_path_factory, "today-terms")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    try:
+        status, body = client.patch("/api/params", {"vary": {"instrument.background.*": True}})
+        assert status == 200, body
+        status, body = client.patch("/api/params", {"hold": {"instrument.background.c2": True}})
+        assert status == 200, body
+        page = browser.new_page(viewport={"width": 1440, "height": 900})
+        errors: list[str] = []
+        page.on("pageerror", lambda exc: errors.append(str(exc)))
+        page.goto(url)
+        page.locator("nav.tabs").get_by_role("button", name="Model", exact=True).click()
+
+        def rows():
+            return {r["path"]: r for r in client.get("/api/params")[1]["parameters"]
+                    if r["path"].startswith("instrument.background.c")}
+
+        def terms(n: int) -> None:
+            box = page.locator("label.inline", has_text="terms").locator("input")
+            box.click()
+            page.keyboard.press("ControlOrMeta+A")
+            page.keyboard.type(str(n))
+            page.keyboard.press("Enter")
+            for _ in range(100):
+                if len(rows()) == n:
+                    return
+                page.wait_for_timeout(50)
+            raise AssertionError(f"the background never reached {n} terms: {sorted(rows())}")
+
+        before = len(rows())
+        assert rows()["instrument.background.c2"]["held"]
+        terms(2)
+        assert sorted(rows()) == ["instrument.background.c0", "instrument.background.c1"]
+        terms(before + 1)
+        back = rows()
+        assert not back["instrument.background.c2"]["held"], back["instrument.background.c2"]
+        assert all(back[f"instrument.background.c{k}"]["vary"]
+                   for k in range(2, before + 1)), back
+        assert not errors, errors
+        page.close()
+    finally:
+        httpd.shutdown()
+
+
+#: A five-stage plan, as acceptance row 8 asks, on the synthetic project.
+FIVE_STAGES = [
+    {"name": "scale", "turn_on": ["phases.*.scale"], "max_iter": 5},
+    {"name": "background", "turn_on": ["instrument.background.*"], "max_iter": 5},
+    {"name": "cell", "turn_on": ["phases.*.cell.*"], "max_iter": 5},
+    {"name": "zero", "turn_on": ["instrument.zero_shift"], "max_iter": 5},
+    {"name": "biso", "turn_on": ["phases.*.atoms.*.biso"], "max_iter": 5},
+]
+
+
+@pytest.fixture(scope="module")
+def next_plan(tmp_path_factory):
+    """A project whose stored plan has five stages, served as ``rietx gui`` serves it."""
+    httpd, client = _serve(tmp_path_factory, "next-plan")
+    status, body = client.put("/api/plan", {"plan": {"stages": FIVE_STAGES}})
+    assert status == 200, body
+    try:
+        yield f"http://127.0.0.1:{httpd.server_address[1]}/", client
+    finally:
+        httpd.shutdown()
+
+
+def _open_next_plan(browser, url: str):
+    page = _open_window(browser, url)
+    page.locator("section.model .tabs").get_by_role("tab", name="Plan", exact=True).click()
+    page.wait_for_selector("section[aria-label=plan] .stg .badge")
+    _frames(page)
+    return page
+
+
+def _next_names(page) -> list[str]:
+    return page.locator("section[aria-label=plan] input.sn").evaluate_all(
+        "els => els.map(e => e.value)")
+
+
+def test_the_rebuilt_plan_reorders_by_a_real_drag_and_moves_nothing_else(browser, next_plan):
+    """WP-2231 on a five-stage plan. A press on the grip with no drag moves
+    nothing. A real drag drops the stage where its centre crossed and is one
+    pending edit in the action bar, whose slot is reserved, so no landmark
+    moves. ⌘Z takes it back, ⇧⌘Z redoes it, and the bar's Revert restores
+    the stored plan."""
+    url, _ = next_plan
+    page = _open_next_plan(browser, url)
+    names = _next_names(page)
+    assert names == [s["name"] for s in FIVE_STAGES]
+
+    box = page.locator('[data-handle="2"]').bounding_box()
+    x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+    before = page.evaluate(SNAP, WINDOW_LANDMARKS)
+    page.mouse.move(x, y)
+    page.mouse.down()
+    page.mouse.up()
+    _frames(page)
+    assert _next_names(page) == names
+    assert not _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))
+
+    top = page.locator('[data-handle="0"]').bounding_box()
+    page.mouse.move(x, y)
+    page.mouse.down()
+    page.mouse.move(x, top["y"] - 12, steps=8)
+    page.mouse.up()
+    _frames(page)
+    assert _next_names(page) == [names[2], names[0], names[1], *names[3:]]
+    assert page.locator(".actions .pending").text_content().strip() == "1 pending"
+    moved = _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))
+
+    page.keyboard.press("ControlOrMeta+z")
+    _frames(page)
+    assert _next_names(page) == names
+    page.keyboard.press("ControlOrMeta+Shift+z")
+    _frames(page)
+    assert _next_names(page)[0] == names[2]
+    page.get_by_role("button", name="Revert", exact=True).click()
+    _frames(page)
+    assert _next_names(page) == names
+    assert page.locator(".actions .pending").text_content().strip() == ""
+    assert not page.errors, page.errors
+    page.close()
+    assert not moved, moved
+
+
+def test_the_rebuilt_plan_picker_adds_a_chip_and_moves_nothing(browser, next_plan):
+    """`+ Add` opens the grouped picker. The stage's own glob is offered
+    disabled, and a glob another stage frees says it moves from there. The
+    chosen one becomes a chip in the stage's Free row, one pending edit, and
+    neither the picker nor the chip moves a landmark."""
+    url, _ = next_plan
+    page = _open_next_plan(browser, url)
+    before = page.evaluate(SNAP, WINDOW_LANDMARKS)
+    zero = page.locator('section[aria-label=plan] .stg[data-stage="3"]')
+    zero.get_by_role("button", name="+ Add", exact=True).click()
+    dialog = page.get_by_role("dialog", name="Add to stage 4", exact=True)
+    dialog.get_by_role("textbox", name="Search parameters", exact=True).fill("zero")
+    own = dialog.locator('button.op[title="instrument.zero_shift"]')
+    assert own.is_disabled() and "in this stage" in own.text_content()
+    page.keyboard.press("Escape")
+    _frames(page)
+    assert not dialog.count()
+
+    stage = page.locator('section[aria-label=plan] .stg[data-stage="2"]')
+    stage.get_by_role("button", name="+ Add", exact=True).click()
+    dialog = page.get_by_role("dialog", name="Add to stage 3", exact=True)
+    dialog.get_by_role("textbox", name="Search parameters", exact=True).fill("zero")
+    choice = dialog.locator('button.op[title="instrument.zero_shift"]')
+    assert "moves from stage 4" in choice.text_content()
+    choice.click()
+    _frames(page)
+    free = stage.locator(".stg2").first.locator(".pt")
+    assert free.evaluate_all("els => els.map(e => e.title)") == [
+        "phases.*.cell.*", "instrument.zero_shift"]
+    assert page.locator(".actions .pending").text_content().strip() == "1 pending"
+
+    # the picker stays open after a choice, so a glob no group names is
+    # typed into it and entered as itself
+    assert dialog.count()
+    search = dialog.get_by_role("textbox", name="Search parameters", exact=True)
+    search.fill("phases.*.atoms.0.*")
+    search.press("Enter")
+    _frames(page)
+    assert free.evaluate_all("els => els.map(e => e.title)") == [
+        "phases.*.cell.*", "instrument.zero_shift", "phases.*.atoms.0.*"]
+    page.keyboard.press("Escape")
+    _frames(page)
+    moved = _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))
+    page.get_by_role("button", name="Revert", exact=True).click()
+    _frames(page)
+    assert not page.errors, page.errors
+    page.close()
+    assert not moved, moved
+
+
+def _biso(client) -> float:
+    rows = client.get("/api/params")[1]["parameters"]
+    return next(r["value"] for r in rows if r["path"] == "phases.0.atoms.0.biso")
+
+
+def _retype_line(page, line, text: str) -> None:
+    """A real click on the line, then Home, Shift+End and typing over it."""
+    line.scroll_into_view_if_needed()
+    line.click()
+    page.keyboard.press("Home")
+    page.keyboard.press("Shift+End")
+    page.keyboard.type(text)
+
+
+def test_the_rebuilt_text_tab_applies_a_typed_value_from_the_bar(browser, tmp_path_factory):
+    """WP-2231 rows 139-146. The Text tab names the file and its sync word. A
+    value typed into the editor marks its line, is one pending edit in the
+    action bar and moves no place; the bar's Apply stores it. ⌘⏎ inside the
+    editor applies a second value and starts no run. A project of its own,
+    since both applies are written."""
+    httpd, client = _serve(tmp_path_factory, "next-text")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    try:
+        page = _open_window(browser, url)
+        runs = []
+        page.on("request", lambda r: runs.append(r.url) if "/api/run" in r.url else None)
+        page.locator("section.model .tabs").get_by_role("tab", name="Text", exact=True).click()
+        text = page.locator("section[aria-label=text]")
+        page.wait_for_function(
+            "() => document.querySelector('section[aria-label=text] .sync')?.textContent === 'in sync'")
+        page.wait_for_selector("section[aria-label=text] .cm-content")
+        _frames(page)
+        assert text.locator(".bar .file").text_content() == "sample.rxt"
+        assert not text.get_by_role("button").count()
+        # ⌘⏎ in the editor is its Apply, so with nothing typed it refines nothing
+        text.locator(".cm-line", has_text="atoms.0.biso").click()
+        page.keyboard.press("ControlOrMeta+Enter")
+        _frames(page)
+        assert not runs, runs
+        before = page.evaluate(SNAP, WINDOW_LANDMARKS)
+
+        line = text.locator(".cm-line", has_text="atoms.0.biso")
+        _retype_line(page, line, "atoms.0.biso 0.7")
+        page.wait_for_function(
+            "() => document.querySelector('section[aria-label=text] .sync')?.textContent === 'edited'")
+        _frames(page)
+        assert page.locator(".actions .pending").text_content().strip() == "1 pending"
+        assert "atoms.0.biso 0.7" in text.locator(".cm-edited").all_text_contents()[0]
+        moved = _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))
+
+        page.get_by_role("button", name="Apply", exact=True).click()
+        page.wait_for_function(
+            "() => document.querySelector('section[aria-label=text] .sync')?.textContent === 'in sync'")
+        _frames(page)
+        assert _biso(client) == pytest.approx(0.7)
+        assert page.locator(".actions .pending").text_content().strip() == ""
+        assert not text.locator(".cm-edited").count()
+
+        _retype_line(page, text.locator(".cm-line", has_text="atoms.0.biso"), "atoms.0.biso 0.8")
+        page.wait_for_function(
+            "() => document.querySelector('section[aria-label=text] .sync')?.textContent === 'edited'")
+        page.keyboard.press("ControlOrMeta+Enter")
+        page.wait_for_function(
+            "() => document.querySelector('section[aria-label=text] .sync')?.textContent === 'in sync'")
+        _frames(page)
+        assert _biso(client) == pytest.approx(0.8)
+        assert not runs, runs
+        assert not page.errors, page.errors
+        page.close()
+        assert not moved, moved
+    finally:
+        httpd.shutdown()

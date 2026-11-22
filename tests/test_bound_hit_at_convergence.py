@@ -72,6 +72,7 @@ ZERO = "instrument.zero_shift"
 def data() -> PatternData:
     structure = make_lab6()
     structure.phases[0].cell.a.value = A_TRUE
+    structure.phases[0].cell.b.value = structure.phases[0].cell.c.value = structure.phases[0].cell.a.value  # the cell's ties follow a
     ins = Instrument.debye_scherrer(wavelength=1.5406)
     tt = np.arange(15.0, 110.0, 0.02)
     empty = PatternData(two_theta=tt.tolist(),
@@ -89,6 +90,7 @@ def _seeded():
     """LaB6 500 ppm large, so a free zero shift tries to absorb the error."""
     structure = make_lab6()
     structure.phases[0].cell.a.value = A_TRUE * 1.0005
+    structure.phases[0].cell.b.value = structure.phases[0].cell.c.value = structure.phases[0].cell.a.value  # the cell's ties follow a
     return structure
 
 

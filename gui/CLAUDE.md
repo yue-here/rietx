@@ -8,7 +8,7 @@ Each rule names its WP. The measurement, story or example behind it is in that W
 its § "Moved from gui/CLAUDE.md" holds the paragraph this file carried until WP-2134,
 verbatim. A rule enters here only as a standing rule with its identifiers and anchor
 (`docs/milestones/process.md` § The rule); its evidence goes to the WP.
-`tests/test_docs_consistency.py::test_gui_rulebook_paths_resolve` fails on a path written
+`tests/test_docs_consistency.py::test_rulebook_paths_and_names_resolve` fails on a path written
 here with a directory (`lib/plot.ts`, `gui/session.py`) that no longer exists, and on a
 `file:symbol` whose symbol has left the file. Write paths that way, so a rename breaks the
 test and never silently the rule.
@@ -442,7 +442,7 @@ visual rules in this section are listed in WP-2134 for the GUI style guide.
   hold, degenerate (`needs_held_cell`). An unknown reason still draws a mark.
   `tests/test_gui_server.py` reads `ParameterRow.refinable`'s fields and `lib/table.ts`'s
   branches, so a sixth fails on both sides (WP-1214).
-- **A typed number is compared to the rendered value** (WP-1011, WP-1009's rule).
+- **An editor opens on the stored value; its text as opened is no edit** (WP-2223, WP-1009).
 - **A flag is set beside the value it is about** (WP-1214), in the same
   `PATCH /api/params` as the value edits and before the model patches.
 - **A vary key is a path or a glob** (WP-1215): a site's DOFs are freed together as

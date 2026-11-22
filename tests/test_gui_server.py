@@ -32,6 +32,7 @@ from rietx.gui import ROUTES, UPLOAD_ROUTES, GuiSession, build_server
 from rietx.gui.imports import UPLOAD_DIR_PREFIX
 from rietx.gui.session import RESERVED_ROUTES, GuiError
 from rietx.history.events import read_events
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
 from tests.test_project import _write_xye
 from tests.test_refine_synthetic import perturbed_models, synthesize
 
@@ -2256,7 +2257,9 @@ def test_plan_resolve_names_what_a_stage_fixes(blank, tmp_path, pattern_file):
         {"name": "one", "turn_on": ["phases.*.scale", "instrument.background.*",
                                     "instrument.zero_shift"]},
         {"name": "two", "turn_on": ["phases.*.cell.*"],
-         "turn_off": ["instrument.zero_shift"]}]}
+         "turn_off": ["instrument.zero_shift"]}],
+        # declared, not inherited: off by default since WP-2222
+        "closing_window_tol": CLOSING_WINDOW_TOL}
     status, payload = client.put("/api/plan", {"plan": plan})
     assert status == 200, payload
     assert payload["plan"]["stages"][1]["turn_off"] == ["instrument.zero_shift"]
@@ -2271,6 +2274,29 @@ def test_plan_resolve_names_what_a_stage_fixes(blank, tmp_path, pattern_file):
     for stage in (one, two):
         assert (len(stage["frees"]) + len(stage["already"]) + len(stage["held"])
                 == stage["n_matched"]), stage["name"]
+
+
+def test_plan_resolve_names_what_no_stage_frees(blank, tmp_path, pattern_file):
+    """``never_freed`` (WP-2231, the Plan tab's last row) is every refinable row
+    outside every stage's frees, and nothing a stage frees or a row that cannot
+    be freed."""
+    session, client = blank
+    _open(session, tmp_path / "never.rex", pattern_file)
+    plan = {"stages": [{"name": "one", "turn_on": ["phases.*.scale"]},
+                       {"name": "two", "turn_on": ["phases.*.cell.*"]}],
+            "closing_window_tol": CLOSING_WINDOW_TOL}
+    status, payload = client.put("/api/plan", {"plan": plan})
+    assert status == 200, payload
+    ladder = _ladder(client)
+    status, params = client.get("/api/params")
+    assert status == 200
+    refinable = {row["path"] for row in params["parameters"] if row["refinable"]}
+    freed = {path for stage in ladder["stages"] for path in stage["frees"]}
+    assert freed == {"phases.0.scale", "phases.0.cell.a"}
+    assert set(ladder["never_freed"]) == refinable - freed
+    assert "instrument.zero_shift" in ladder["never_freed"]
+    # the cubic cell's tied lengths are held, never offered as unfreed
+    assert "phases.0.cell.b" not in ladder["never_freed"]
 
 
 def test_plan_resolve_matches_exactly_the_way_fnmatch_does(blank, tmp_path,
@@ -2431,6 +2457,11 @@ def test_the_closing_stage_is_the_ladders_last_rung(blank, tmp_path, pattern_fil
     last declared rung's is not (0.04179 there against the result's 0.04156)."""
     session, client = blank
     project = _open(session, tmp_path / "closing.rex", pattern_file)
+    # off by default since WP-2222, so no rung until the plan asks for one
+    assert _ladder(client)["closing"] is None
+    plan = client.get("/api/plan")[1]["plan"]
+    plan["closing_window_tol"] = CLOSING_WINDOW_TOL
+    assert client.put("/api/plan", {"plan": plan})[0] == 200
     assert client.post("/api/run", {"kind": "fit"})[0] == 200
     _wait_idle(client)
     closing = _ladder(client)["closing"]
@@ -2501,9 +2532,9 @@ def test_running_the_same_plan_twice_shows_the_second_run(blank, tmp_path,
     nodes = [n.metrics.statistics.rwp for n in
              project.refinement.history.lineage(project.refinement._head_id)
              if n.action.kind == "stage"]
-    # a run records its closing stage too, a node the ladder does not show
+    # no closing stage by default since WP-2222, so a run is the ladder's rungs
     n_run = len(project.doc.plan.to_plan().run_stages())
-    assert n_run == len(second) + 1
+    assert n_run == len(second)
     assert len(nodes) == 2 * n_run
     assert second == nodes[n_run:n_run + len(second)]     # run 2…
     assert first == nodes[:len(first)]       # …and run 1 is what run 1 showed
@@ -3056,6 +3087,52 @@ def test_a_series_member_has_curves_of_its_own(series):
     assert client.get("/api/series/curves")[0] == 400
     status, payload = client.get("/api/series/curves?index=9")
     assert status == 404 and payload["error"]["where"] == ["index"]
+
+
+def test_a_failed_pattern_does_not_shift_the_members_after_it(series, monkeypatch):
+    """``results_``/``trees_`` skip a failed pattern and the staged members do
+    not, so the routes find a member through its entry's ``SeriesEntry.index``
+    (#1396). Simulated by dropping member 1's entry, result and tree, which is
+    what a failure leaves: position 1 is then member 2."""
+    from types import SimpleNamespace
+
+    session, client, _ = series
+    entry = session._series_run
+    runner, result = entry["runner"], entry["result"]
+    keep = [0, 2]
+    monkeypatch.setattr(session, "_series_run", {
+        **entry,
+        "runner": SimpleNamespace(results_=[runner.results_[i] for i in keep],
+                                  trees_=[runner.trees_[i] for i in keep]),
+        "result": result.model_copy(update={
+            "entries": [result.entries[i] for i in keep]}),
+    })
+    got = _packed(client, "/api/series/curves?index=1")
+    member = entry["members"][2]
+    assert (got.header["index"], got.header["label"]) == (2, member["label"])
+    np.testing.assert_array_equal(got.arrays["two_theta"], entry["data"][2].tt())
+    status, tree = client.get("/api/series/history?index=1")
+    assert status == 200 and (tree["index"], tree["label"]) == (2, member["label"])
+
+
+def test_the_series_answer_carries_the_trace_it_is_scrubbed_along(series):
+    """WP-1317: the trace rides the answer, built by ``series.trace`` from the
+    run's own result and its staged members' coordinates, so the panel draws
+    nothing a second authority computed."""
+    import json
+
+    from rietx.gui.series import TRACE_VOCABULARY, trace
+
+    session, client, _ = series
+    status, payload = client.get("/api/series/result")
+    assert status == 200
+    entry = session._series_run
+    want = trace(entry["result"], [m["x"] for m in entry["members"]])
+    assert payload["trace"] == json.loads(json.dumps(want))
+    got = payload["trace"]
+    assert [p["label"] for p in got["points"]] == [m["label"] for m in entry["members"]]
+    assert [p["x"] for p in got["points"]] == [m["x"] for m in entry["members"]]
+    assert [r["key"] for r in got["vocabulary"]] == [r["key"] for r in TRACE_VOCABULARY]
 
 
 def test_the_result_says_when_a_fit_is_past_the_point_of_being_a_fit(fitted):

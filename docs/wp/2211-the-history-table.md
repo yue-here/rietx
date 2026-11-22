@@ -1,6 +1,6 @@
 # WP-2211 — the History table: Compare on the pattern, Restore as pending edits
 
-Milestone: gui-overhaul · Status: ⬜
+Milestone: gui-overhaul · Status: 🔄 2026-11-21 — the maintainer's rulings recorded (§ Rulings); nothing built
 Depends on: 2214 (the rebuild's plan: it builds on piece R1's bottom panel)
 Priority: P2 2026-11-17 — was P3: R1's bottom panel landed with WP-2215 (#1534), so nothing blocks it; a feature the open milestone was opened for
 
@@ -85,6 +85,32 @@ visual questions go to him first).
    mode a node's extracted intensities live in the node (`ReflectionState`), so its curve comes
    from replay as well.
 
+### Rulings
+
+Questions 1 and 2 went to the maintainer on 2026-11-21 as drawn options: whole windows of the
+prototype with the changed region boxed, on a private page.
+
+- **Question 1, 2026-11-21, the maintainer: a Table | Graph toggle in the tab, defaulting to
+  Graph.** The table is the design above. The graph is today's lanes view, rebuilt in the new
+  front end, and a branch leaves its lane with a rounded corner, never an angled step. Checkout,
+  Tag, Branch and Label stay reachable from a node's context menu in both views.
+- **Question 2, 2026-11-21, the maintainer: both verbs.** Restore loads values as pending edits;
+  Checkout moves the head at once and sits in the node's menu. The words a person reads are
+  open (question 5).
+- **Question 5, opened 2026-11-21 by the maintainer: the git words.** A person who has never
+  used git may not know Checkout, Tag or Branch. Teach the words, or rename them in the window?
+  Tooltips are the maintainer's first thought, with a link into the manual.
+  **Ruled 2026-11-21, the maintainer: plain words in the menu** (option B of two; A kept the git
+  words and taught them). Checkout reads **Make current**, matching the table's "current" mark.
+  Tag reads **Name…** and Label reads **Note…**, which also tells the two apart. Branch reads
+  **Branch from here**. Restore keeps its word. Each tooltip says what the click does, with the
+  Python call (`ref.checkout`, `history.tag`, `history.annotate`, `ref.branch`) on its second
+  line, and the console still echoes the call. The tab's `?` box links to the GUI chapter's
+  History section, rewritten in this WP, and no separate GUI how-to is written. Practice, from
+  recall and not checked: TOPAS, GSAS-II and FullProf have no history tree; Google Docs, Overleaf
+  and Figma say "Restore this version" and "Name this version"; "Branch" reaches non-programmers
+  in Onshape and Figma, while "Checkout" and "Tag" stay in programmers' tools.
+
 ### Seams
 
 - **Routes.** `GET /api/history` (`tree_payload` in `src/rietx/gui/session.py`) already serves
@@ -129,8 +155,11 @@ Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`
 
 ## Tasks
 
-- [ ] Questions 1 and 2 drawn as options and brought to the maintainer; the rulings recorded
-  here with their dates.
+- [x] Questions 1 and 2 drawn as options and brought to the maintainer; the rulings recorded
+  here (§ Rulings, 2026-11-21).
+- [x] Question 5, the git words: ruled 2026-11-21 (§ Rulings).
+- [ ] The Graph view with rounded branch corners, the Table | Graph toggle defaulting to Graph,
+  the node menu shared by both views. Vitest over a branched tree's lanes.
 - [ ] Questions 3 and 4 measured on the shipped examples: how many nodes differ from their head
   by more than values, and the replay cost of a node's curve. The decision written here.
 - [ ] The tab label carries `n_nodes`; `BOTTOM_TABS` and the panel corpus follow. Vitest.
@@ -165,6 +194,23 @@ The browser files skip in CI (no playwright there), so the PR quotes their local
   panel), WP-2209 (edit recovery).
 
 ## Handover log
+
+- **2026-11-21** — The maintainer has ruled the History panel's shape from drawn options, so
+  the session that builds it now knows what to build. The tab shows the nodes as a graph by
+  default, with a switch to the table, and branches turn with rounded corners. Both Restore
+  (values as pending edits) and Checkout (move to the node at once) stay. The menu speaks plain
+  words, Make current, Name…, Note… and Branch from here, with the Python call in each tooltip.
+  Nothing is built yet.
+  *Done*: § Rulings written (questions 1, 2 and 5); tasks ticked and two added (the Graph view,
+  question 5). The options were drawn on a copy of the private workshop prototype and shown as a
+  private page; menus, the Restore press and the fold were real clicks, while tooltips, the Graph
+  view and the console sessions were drawn by script. *Gotchas*: the practice line under question
+  5 is from recall, not checked against any program's documentation. Today's GUI chapter
+  (§ History, "When to branch") still describes today's graph and git verbs; this WP's chapter
+  task rewrites it with the new words. Next: measure questions 3 and 4 on the shipped examples
+  (how many nodes differ from their head by more than values, and what a node's curve costs
+  through replay), because their answer decides whether Restore needs the Checkout offer and
+  whether Compare needs a new route. Then build the table.
 
 - **2026-11-10** — created by a ghostshift runner from WP-2206's follow-ups. No open WP owns the
   History panel: a search of the open WPs for History, Restore and pending edits found none,

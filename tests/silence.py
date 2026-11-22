@@ -143,6 +143,29 @@ def _listed_twice_silent() -> list:
                      .format(extra="Ni2 Ni 0.5 0.5 0.0001 0.481\n"))
 
 
+def _cell_tie_fires() -> list:
+    """A cubic b printed 5.64101 beside a = 5.641: one value within the file's
+    digits, read as a and said (``cif.py``'s ``_correct_cell_ties``)."""
+    from tests.test_cell_ties import CIF, WITHIN_PRINT
+
+    symbol, printed, _, _ = WITHIN_PRINT[0]
+    return _read_cif(CIF.format(symbol=symbol, **printed))
+
+
+def _cell_tie_silent() -> list:
+    """The same cell printed equal; b printed 5.641 beside a = 5.64101, inside
+    b's own rounding; and b = 5.900, past every band, which the reader leaves
+    for the table to refuse."""
+    from tests.test_cell_ties import CIF, PAST_PRINT, WITHIN_PRINT
+
+    symbol, printed, _, _ = WITHIN_PRINT[0]
+    equal = dict(printed, b=printed["a"])
+    own = dict(printed, a="5.64101", b="5.641")
+    return (_read_cif(CIF.format(symbol=symbol, **equal))
+            + _read_cif(CIF.format(symbol=symbol, **own))
+            + _read_cif(CIF.format(symbol=PAST_PRINT[0][0], **PAST_PRINT[0][1])))
+
+
 # ---------------------------------------------------- the FullProf project reader
 
 
@@ -600,6 +623,77 @@ def _parametric_range_fires() -> list:
 def _parametric_range_silent() -> list:
     """The declared start, and a slope that keeps W positive over the ramp."""
     return _parametric_range(0.0) + _parametric_range(-2e-4)
+
+
+def _not_freed(freed: list[str]) -> list:
+    """``VARIABLE_NOT_FREED``'s two builders, after one stage that freed ``freed``.
+
+    The single fit's: ``vars.B`` sets two Biso by a linear tie and a formula, and
+    ``vars.spare`` sets nothing.  The joint fit's: one declaration whose
+    coefficients are ``vars.b_0`` and ``vars.b_1``."""
+    from types import SimpleNamespace
+
+    import rietx as rx
+    from rietx.multi import _parametric_not_freed_diagnostics
+    from rietx.refine import _variable_not_freed_diagnostics
+    from rietx.schemas.parametric import ParametricCoefficient
+    from rietx.schemas.results import StageResult
+    from tests.test_schemas import make_lab6
+
+    ref = rx.Refinement(make_lab6(), rx.Instrument.bragg_brentano(radiation="CuKa"))
+    ref.add_variable("B", 0.5, vary=True)
+    ref.add_variable("spare", 1.0, vary=True)
+    ref.tie("phases.0.atoms.0.biso", "vars.B")
+    ref.tie("phases.0.atoms.1.biso", expression="2 * B")
+    stage = StageResult(name="s", status="converged", n_iterations=1, cost_initial=1.0,
+                        cost_final=1.0, freed=freed)
+    line = SimpleNamespace(name="b", target="phases.0.atoms.0.biso",
+                           equation=SimpleNamespace(basis="polynomial"))
+    rows = [ParametricCoefficient(equation="b", target=line.target, term=term,
+                                  path=f"vars.b_{j}", value=0.4 * (1 - j), esd=None,
+                                  vary=False, unit=None, reference=None)
+            for j, term in enumerate(("1", "T"))]
+    mtable = SimpleNamespace(parametric=[line], expressions=[])
+    return (_variable_not_freed_diagnostics([stage], ref._working_table())
+            + _parametric_not_freed_diagnostics(mtable, rows, [stage]))
+
+
+def _not_freed_fires() -> list:
+    """No stage freed the variable or the coefficients."""
+    return _not_freed([])
+
+
+def _not_freed_silent() -> list:
+    """A stage freed the variable and both coefficients."""
+    return _not_freed(["vars.B", "vars.b_0", "vars.b_1"])
+
+
+def _width_held(*held: dict[str, list[str]]) -> list:
+    """``INSTRUMENT_WIDTH_HELD``'s builder on a two-stage plan whose stages held the
+    instrument widths ``held`` names, the last entry the answer's stage
+    (``tests/test_width_twin_hold.py``)."""
+    from rietx.refine import _instrument_width_held_diagnostics
+    from rietx.schemas.results import StageResult
+
+    stages = [StageResult(name=f"s{k}", status="converged", n_iterations=1,
+                          cost_initial=1.0, cost_final=1.0,
+                          freed=["instrument.profile.y"] if not beside else [],
+                          width_twins_held=beside)
+              for k, beside in enumerate(held)]
+    return _instrument_width_held_diagnostics(stages)
+
+
+def _width_held_fires() -> list:
+    """The last stage held Y against a free Lorentzian strain."""
+    return _width_held({}, {"instrument.profile.y": ["phases.0.lor_strain"]})
+
+
+def _width_held_silent() -> list:
+    """No stage held a width; an earlier stage held one and the last did not;
+    a result stored before the field."""
+    return (_width_held({}, {})
+            + _width_held({"instrument.profile.y": ["phases.0.lor_strain"]}, {})
+            + _width_held({}, None))
 
 
 def _reseed(**escalation) -> list:
@@ -1078,13 +1172,140 @@ def _sigma_nonpositive_silent() -> list:
                          nonpositive_sigma="poisson"))
 
 
+# ------------------------------------------------------------ peak equations
+
+
+def _peak_width(q: float) -> list:
+    """The width guard on brucite whose Gaussian variance equation is
+    ``q/cos(theta)^2`` beside a positive Lorentzian one, through the reader's
+    converter."""
+    from rietx.strategy.staged import check_peak_width_positive
+    from tests.test_peak_equations import _compiled, _eq, _instrument
+    from tests.test_stephens import brucite
+
+    phase = brucite(peak_equations=[
+        _eq("gauss_fwhm_squared", "q/cos(theta)^2", q=q),
+        _eq("lor_fwhm", "y*tan(theta)", y=0.02)])
+    model, table = _compiled([phase], _instrument())
+    return _guard(nonpositive_peak_width=check_peak_width_positive(table, model))
+
+
+def _peak_width_fires() -> list:
+    """A negative variance term larger than the instrument's own Γ_G²."""
+    return _peak_width(-0.01)
+
+
+def _peak_width_silent() -> list:
+    """A negative term the instrument's width still covers, and a positive one."""
+    return _peak_width(-2e-4) + _peak_width(2e-3)
+
+
+def _peak_eq_shared(mo: bool, per_histogram: list) -> list:
+    """The sharing note for brucite's ``w*tan(theta)`` over a Cu pattern and a
+    second pattern, at Mo Kα or at Cu again."""
+    from rietx.params.multi import SharingMap
+    from tests.test_peak_equations import (
+        _eq,
+        _instrument,
+        _mo,
+        _shared_across_wavelengths,
+    )
+
+    cu = _instrument()
+    other = _mo(cu) if mo else cu.model_copy(deep=True)
+    return _shared_across_wavelengths(
+        [_eq("lor_fwhm", "w*tan(theta)", w=0.02)], [cu, other],
+        sharing=SharingMap(per_histogram=per_histogram))
+
+
+def _peak_eq_shared_fires() -> list:
+    """One shared coefficient across Cu and Mo patterns."""
+    return _peak_eq_shared(True, [])
+
+
+def _peak_eq_shared_silent() -> list:
+    """Two Cu patterns sharing it, and Cu and Mo patterns each with its own."""
+    return (_peak_eq_shared(False, [])
+            + _peak_eq_shared(True, ["phases.*.peak_equations.*"]))
+
+
+def _qpa_factor(p: float, unmeasured: list) -> list:
+    """The QPA note for brucite carrying ``if(l == 0, 1, p)`` beside rocksalt."""
+    from rietx.refine import _qpa_intensity_factor_diagnostics
+    from rietx.schemas.structure import Structure
+    from tests.test_peak_equations import _compiled, _eq, _instrument, _rocksalt
+    from tests.test_stephens import brucite
+
+    phases = [brucite(peak_equations=[_eq("intensity_factor", "if(l == 0, 1, p)", p=p)]),
+              _rocksalt()]
+    phases[1].scale.value = 1e-3
+    model, table = _compiled(phases, _instrument())
+    values = table.decode(table.x0())
+    return _qpa_intensity_factor_diagnostics(Structure(phases=phases), values, model,
+                                             unmeasured, lambda path: path)
+
+
+def _qpa_factor_fires() -> list:
+    """Two measured phases, one with a factor from 0.7 to 1."""
+    return _qpa_factor(0.7, [])
+
+
+def _qpa_factor_silent() -> list:
+    """The same factor with the other phase unmeasured, whose fraction is 1
+    whatever the factor."""
+    return _qpa_factor(0.7, [1])
+
+
+# ------------------------------------------------------------ a nested comparison
+
+
+def _comparison(status_r: str, status_f: str, cost_r: float, cost_f: float) -> list:
+    """``COMPARISON_UNCONVERGED`` on a nested pair, as ``compare_freed``,
+    ``predict_then_verify`` and ``rigid_body_misfit`` build it: the ordering
+    read off each fit's last ``cost_final``, then the diagnostic.  Stub
+    results stand in for the two fits, which take seconds each in
+    ``tests/test_compare_freed.py``'s #1685 fixture."""
+    from types import SimpleNamespace as NS
+
+    from rietx.report.layer2 import _chi2_ordered, _comparison_unconverged
+
+    def fit(status, cost):
+        return NS(status=status, stages=[NS(cost_final=cost)])
+
+    restricted, full = fit(status_r, cost_r), fit(status_f, cost_f)
+    found = _comparison_unconverged(
+        restricted.status, full.status, cost_r, cost_f,
+        _chi2_ordered(restricted, full), where=["phases.0.atoms.0.biso"])
+    return [] if found is None else [found]
+
+
+def _comparison_fires() -> list:
+    """#1685's budget stop, 4365 above the restricted cost; a converged
+    fuller fit just past the margin of 2; a short restricted fit."""
+    return (_comparison("converged", "max_iter", 5886.2, 10251.4)
+            + _comparison("converged", "converged", 5886.2, 5888.201)
+            + _comparison("max_iter", "converged", 5886.2, 5800.0))
+
+
+def _comparison_silent() -> list:
+    """Both converged: the fuller fit below, level, or just inside the margin."""
+    return (_comparison("converged", "converged", 5886.2, 5622.1)
+            + _comparison("converged", "converged", 5886.2, 5886.2)
+            + _comparison("converged", "converged", 5886.2, 5888.199))
+
+
 SILENCE: dict[str, Pair] = {
+    "CIF_CELL_TIE_CORRECTED": Pair(
+        _cell_tie_fires, _cell_tie_silent, "tests/test_cell_ties.py"),
     "CIF_SITE_LISTED_TWICE": Pair(
         _listed_twice_fires, _listed_twice_silent, "tests/test_cif_sites_coincide.py"),
     "CIF_SITE_MULTIPLICITY_DISAGREES": Pair(
         _multiplicity_fires, _multiplicity_silent, "tests/test_cif_stated_columns.py"),
     "CIF_SITE_TWINS_MERGED": Pair(
         _twins_fires, _twins_silent, "tests/test_cif_sites_coincide.py"),
+    "COMPARISON_UNCONVERGED": Pair(
+        _comparison_fires, _comparison_silent,
+        "tests/test_compare_freed.py (stub fits: the #1685 pair's fits take seconds)"),
     "EXTINCTION_SCREEN_UNRELIABLE": Pair(
         _screen_unreliable_fires, _screen_unreliable_silent,
         "tests/test_extinction_gate.py (stub screens: the gate's fits are 20 s each)"),
@@ -1110,6 +1331,11 @@ SILENCE: dict[str, Pair] = {
         _unsupported_fires, _unsupported_silent, "tests/test_modulus_interval.py"),
     "PARAMETRIC_OUT_OF_RANGE": Pair(
         _parametric_range_fires, _parametric_range_silent, "tests/test_parametric_series.py"),
+    "VARIABLE_NOT_FREED": Pair(
+        _not_freed_fires, _not_freed_silent,
+        "tests/test_tie_expression.py, tests/test_parametric_expression.py"),
+    "INSTRUMENT_WIDTH_HELD": Pair(
+        _width_held_fires, _width_held_silent, "tests/test_width_twin_hold.py"),
     "PATTERN_NET_HAS_BACKGROUND": Pair(
         _net_background_fires, _net_background_silent, "tests/test_readers.py"),
     "PATTERN_SIGMA_NONPOSITIVE": Pair(
@@ -1119,6 +1345,10 @@ SILENCE: dict[str, Pair] = {
         _total_scattering_fires, _total_scattering_silent, "tests/test_readers.py"),
     "PATTERN_UNDERSAMPLED": Pair(
         _undersampled_fires, _undersampled_silent, "tests/test_data_support.py"),
+    "PEAK_EQUATION_SHARED_ACROSS_WAVELENGTHS": Pair(
+        _peak_eq_shared_fires, _peak_eq_shared_silent, "tests/test_peak_equations.py"),
+    "PEAK_WIDTH_NOT_POSITIVE": Pair(
+        _peak_width_fires, _peak_width_silent, "tests/test_peak_equations.py"),
     "PLAN_FREES_NO_MOMENT": Pair(
         functools.partial(_held_moment, "mccusker_structural"),
         lambda: (_held_moment("magnetic_structural")
@@ -1126,6 +1356,8 @@ SILENCE: dict[str, Pair] = {
         "tests/test_magnetic_structural_preset.py"),
     "PATTERN_WEIGHT_UNUSABLE": Pair(
         _weight_unusable_fires, _weight_unusable_silent, "tests/test_readers.py"),
+    "QPA_INTENSITY_FACTOR": Pair(
+        _qpa_factor_fires, _qpa_factor_silent, "tests/test_peak_equations.py"),
     "RESTRAINT_ON_FIXED_BODY_GEOMETRY": Pair(
         _fixed_body_fires, _fixed_body_silent, "tests/test_restraint_body_refusal.py"),
     "RESOLUTION_UNCONSTRAINED": Pair(

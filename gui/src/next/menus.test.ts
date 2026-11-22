@@ -18,6 +18,7 @@ let weighted = true;
 const patchStructure = vi.fn(async (_s: unknown, _label?: string) => ({}));
 const aniso = vi.fn(async (_p: string, _on: boolean) => ({}));
 const patchParams = vi.fn(async (_b: unknown) => ({ parameters: ROWS, n_free: 1 }));
+const patchInstrument = vi.fn(async (_m: unknown, _label?: string) => ({}));
 
 const STRUCTURE = {
   phases: [{ name: "fluorapatite", space_group: "P 63/m",
@@ -47,9 +48,18 @@ vi.mock("../api", () => ({
     symmetry: async () => ({ letters: [] }),
     patchStructure: (s: unknown, label?: string) => patchStructure(s, label),
     aniso: (p: string, on: boolean) => aniso(p, on),
+    patchInstrument: (m: unknown, label?: string) => patchInstrument(m, label),
+    instrument: async () => ({ instrument: {
+      source: { kind: "xray_cw", polarization: { value: 0.5, vary: false },
+                lines: [{ wavelength: { value: 1.5405, vary: false }, weight: { value: 1, vary: false } }] },
+      geometry: { kind: "debye_scherrer", mu_r: null, capillary_radius_mm: null, packing_fraction: 0.6,
+                  sample_displacement: { value: 0, vary: false },
+                  axial_sl: { value: 0, vary: false }, axial_hl: { value: 0, vary: false } },
+      zero_shift: { value: 0, vary: false } } }),
   },
 }));
 
+import Instrument from "./Instrument.svelte";
 import Params from "./Params.svelte";
 import Pattern from "./Pattern.svelte";
 
@@ -72,6 +82,7 @@ beforeEach(() => {
   patchStructure.mockClear();
   aniso.mockClear();
   patchParams.mockClear();
+  patchInstrument.mockClear();
 });
 
 afterEach(() => {
@@ -99,7 +110,7 @@ describe("the Pattern graph's axes", () => {
   it("hints each axis's unit, the intensity's on square root at first", async () => {
     await draw();
     const hints = [...document.querySelectorAll(".hint")].map((h) => h.textContent!.trim());
-    expect(hints).toEqual(["√", "σ", "° 2θ"]);
+    expect(hints).toEqual(["√", "Δ/σ", "° 2θ"]);
   });
 
   it("opens the intensity's three scales on a click and keeps the choice with the project", async () => {
@@ -122,7 +133,7 @@ describe("the Pattern graph's axes", () => {
     named("Difference in counts (Δ)")!.click();
     flushSync();
     expect(onui).toHaveBeenCalledWith({ difference: "delta" });
-    expect(document.querySelectorAll(".hint")[1].textContent!.trim()).toBe("counts");
+    expect(document.querySelectorAll(".hint")[1].textContent!.trim()).toBe("Δ");
   });
 
   it("opens on the project's remembered choices", async () => {
@@ -169,8 +180,77 @@ describe("the Parameters panel's menus", () => {
     named("fluorapatite actions")!.click();
     flushSync();
     expect(menuLabels()).toEqual(["Rename…", "Change space group…", "Add atom…", "Replace from CIF…"]);
-    // only a phase band carries one
-    expect(document.querySelectorAll(".band button.ib").length).toBe(1);
+    // a phase band and the Instrument band carry one each
+    expect(document.querySelectorAll(".band button.ib").length).toBe(2);
+  });
+
+  it("opens the Instrument dialog from the Instrument band's ⋯ (WP-2218)", async () => {
+    await open();
+    named("Instrument actions")!.click();
+    flushSync();
+    expect(menuLabels()).toEqual(["Source and geometry…"]);
+    named("Source and geometry…")!.click();
+    await settle();
+    expect(document.querySelector("[role=dialog] h2")!.textContent).toBe("Instrument");
+    expect(document.querySelector("[data-field='geometry.axial_sl']")).not.toBeNull();
+  });
+
+  describe("the Instrument dialog's Apply (WP-2218)", () => {
+    const onclose = vi.fn();
+    const onlanded = vi.fn();
+    function dialog() {
+      onclose.mockClear();
+      onlanded.mockClear();
+      app = mount(Instrument, { target: document.body,
+        props: { rows: [row("instrument.polarization") as any], onclose, onlanded } });
+    }
+    function typeInto(path: string, value: string) {
+      const input = document.querySelector<HTMLInputElement>(`[data-field='${path}']`)!;
+      input.value = value;
+      // svelte delegates `oninput` to the root, so the event must bubble
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      flushSync();
+    }
+    const submit = () => document.querySelector<HTMLFormElement>("[role=dialog] form")!.requestSubmit();
+    const escape = () => window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+
+    it("sends what landed once: a refused set_values leaves only the values to send again", async () => {
+      dialog();
+      await settle();
+      typeInto("geometry.axial_sl", "0.015");
+      typeInto("source.polarization", "0.6");
+      patchParams.mockRejectedValueOnce(new Error("refused"));
+      submit();
+      await settle();
+      expect(patchInstrument).toHaveBeenCalledTimes(1);
+      expect(document.querySelector("[role=dialog] .reason")!.textContent).toBe("refused");
+      expect(onlanded).toHaveBeenCalled();
+      expect(onclose).not.toHaveBeenCalled();
+      expect(document.querySelector("[data-field='geometry.axial_sl']")!.classList
+        .contains("edited")).toBe(false);
+      submit();
+      await settle();
+      expect(patchInstrument).toHaveBeenCalledTimes(1);
+      expect(patchParams).toHaveBeenCalledTimes(2);
+      expect(onclose).toHaveBeenCalled();
+    });
+
+    it("stays open while a verb is in flight, so its refusal has somewhere to land", async () => {
+      dialog();
+      await settle();
+      let release = () => {};
+      patchInstrument.mockImplementationOnce(() => new Promise((r) => { release = () => r({}); }));
+      typeInto("geometry.axial_sl", "0.015");
+      submit();
+      await settle();
+      escape();
+      expect(onclose).not.toHaveBeenCalled();
+      expect(document.querySelector<HTMLButtonElement>("[role=dialog] button.ghost")!.disabled)
+        .toBe(true);
+      release();
+      await settle();
+      expect(onclose).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("renames a phase through one whole-model edit", async () => {

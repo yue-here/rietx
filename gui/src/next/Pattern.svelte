@@ -10,7 +10,7 @@
    *   view menu;
    * - the view menu holds Show only the data and the two range gestures;
    * - the axes carry no titles. Each carries a muted unit hint by its tick
-   *   labels (`° 2θ`, `√` or `log` on the intensity, `σ` on the difference),
+   *   labels (`° 2θ`, `√` or `log` on the intensity, `Δ/σ` on the difference),
    *   a hover explains the hint, and a click on the intensity or the
    *   difference axis opens a small menu of that axis's choices, the one
    *   place each is chosen. The choice is kept per project in
@@ -135,7 +135,11 @@
   let hoverAt = $state<number | null>(null);
   let arm = $state<null | "limits" | "exclude">(null);
   let zoomed = $state(false);
-  let geom = $state.raw<Record<"main" | "ticks" | "resid", { top: number; height: number; pad: number }> | null>(null);
+  /** Each pane's plot area in the host: its top, height and top padding, and
+   *  where its top labelled tick and its zero sit from the plot area's top
+   *  (`mark`, `zero`; null where there is none in view). */
+  type PaneGeom = { top: number; height: number; pad: number; mark: number | null; zero: number | null };
+  let geom = $state.raw<Record<"main" | "ticks" | "resid", PaneGeom> | null>(null);
   /** The plot area's left edge and width in the host, shared by every pane. */
   let plotX = $state.raw<{ left: number; width: number } | null>(null);
   /** The axis whose menu is open, and where. */
@@ -146,6 +150,13 @@
   /** The x axis's tick labels take this height under the plot, and the strip
    *  uPlot keeps for a title sits under them (`rxplot.mjs`, X_LABELS, TITLE). */
   const X_TICKS = 24;
+  /** A scale mark's line height, and half a tick label plus the gap kept
+   *  under the mark, in CSS px; the axis labels are 11 px type. */
+  const MARK_LINE = 14;
+  const LABEL_HALF = 12;
+  /** The y tick labels end this far left of the plot area: uPlot's tick length
+   *  (10 px) and its label gap (5 px), neither of which the chart changes. */
+  const LABEL_INSET = 15;
   const X_STRIP = 18;
   let tipTimer: ReturnType<typeof setTimeout> | undefined;
   /** An SVG export redraws the panes from their spec, and a figure that
@@ -177,8 +188,23 @@
     loadError ? "The pattern could not be drawn"
     : !held ? "" : held.raw ? "Observed pattern" : "Last fit");
 
-  /** Whether the graph draws a preview: values nobody has applied (WP-2128). */
-  const previewing = $derived(!!preview && !!held && !loadError);
+  /** Whether a preview is in hand: values nobody has applied (WP-2128). */
+  const hasPreview = $derived(!!preview && !!held && !loadError);
+  /** Which of the two the graph draws while a preview is in hand: a view
+   *  choice, session-local like the knobs, back to the preview whenever the
+   *  preview goes (the maintainer's look, 2026-11-21, item 4: "a toggle
+   *  between last refined and preview"). The last fit is drawn whole, as with
+   *  no preview, so its difference, ticks and Rwp are the fit's. */
+  let shown = $state<"preview" | "last">("preview");
+  $effect(() => {
+    if (!hasPreview) untrack(() => (shown = "preview"));
+  });
+  const SHOWN: { id: "preview" | "last"; label: string; title: string }[] = [
+    { id: "preview", label: "Preview", title: "Draw the pattern at the values not yet applied" },
+    { id: "last", label: "Last fit", title: "Draw the last fit, as it was before the edit" },
+  ];
+  /** Whether the graph draws the preview. */
+  const previewing = $derived(hasPreview && shown === "preview");
   /** Data only also hides the preview, which has no toggle in `toggles`. */
   const dataOnly = $derived(isDataOnly(toggles, hidden)
     && (!previewing || hidden.includes("preview")));
@@ -229,7 +255,9 @@
       chart = new mod.PatternChart(host, c, overlayNow(), {
         scale: untrack(() => scale),
         kind: untrack(() => kind),
-        // no titles on screen (2026-11-11): each axis carries a hint instead
+        // no titles on screen (2026-11-11): each axis carries a hint instead,
+        // and the y axes keep no strip for one (the look of 2026-11-21, item 1)
+        titled: () => exporting,
         labels: {
           y: () => (!exporting ? "" : scale === "linear" ? "intensity"
             : `intensity (${scale === "sqrt" ? "√" : "log"})`),
@@ -249,8 +277,10 @@
       chart.fig.onSelect = (lo, hi) => { if (arm) armed(lo, hi); };
       chart.fig.setMode(arm ? "select" : "zoom");
       watchZoom(chart);
-      const p = untrack(() => preview);
-      if (p) chart.setPreview(p.curves);
+      // a chart built under a preview (the graph tab came back to Pattern)
+      // has no view yet to keep: keeping one drew an empty plot (WP-2218)
+      const p = untrack(() => (shown === "preview" ? preview : null));
+      if (p) chart.setPreview(p.curves, false);
     } else {
       chart.setCurves(c, keep);
       chart.update(overlayNow());
@@ -279,12 +309,33 @@
       const x = curves?.arrays?.two_theta ?? held?.two_theta;
       const n = x?.length ?? 0;
       zoomed = n > 1 && (lo > x![0] + 1e-9 || hi < x![n - 1] - 1e-9);
+      // the y range follows the x range, and the scale marks its top tick
+      relayout();
     };
+  }
+
+  /** Where `v` sits from the plot area's top in CSS px, or null out of view. */
+  function inView(u: any, v: number): number | null {
+    const y = u.valToPos(v, "y");
+    return Number.isFinite(y) && y >= -0.5 && y <= u.bbox.height / devicePixelRatio + 0.5 ? y : null;
+  }
+
+  /** The top labelled y tick's place, from the splits and labels uPlot drew. */
+  function topTick(u: any): number | null {
+    const axis = u.axes?.[1], splits: number[] = axis?._splits ?? [], values: unknown[] = axis?._values ?? [];
+    let top: number | null = null;
+    splits.forEach((v, i) => {
+      if (values[i] == null || values[i] === "") return;
+      const y = inView(u, v);
+      if (y != null && (top == null || y < top)) top = y;
+    });
+    return top;
   }
 
   /** Each pane's plot area from the top of the host, which places the legend
    *  beside the pane its curve is drawn in. Read after a draw, since a scale
-   *  switch builds a new pane. */
+   *  switch builds a new pane. A preview redraws at every slider answer, so
+   *  an unchanged layout is not published again. */
   function relayout() {
     requestAnimationFrame(() => {
       if (!chart) return;
@@ -293,14 +344,16 @@
         const u = chart.fig.panes[key];
         if (!u) continue;
         out[key] = { top: (u.root as HTMLElement).offsetTop + u.bbox.top / dpr,
-                     height: u.bbox.height / dpr, pad: u.bbox.top / dpr };
+                     height: u.bbox.height / dpr, pad: u.bbox.top / dpr,
+                     mark: topTick(u), zero: inView(u, 0) };
       }
-      geom = out;
+      if (JSON.stringify(out) !== JSON.stringify(geom)) geom = out;
       const main = chart.fig.panes.main;
       if (main && host) {
-        plotX = { left: (main.over as HTMLElement).getBoundingClientRect().left
-                    - host.getBoundingClientRect().left,
-                  width: main.bbox.width / dpr };
+        const x = { left: (main.over as HTMLElement).getBoundingClientRect().left
+                      - host.getBoundingClientRect().left,
+                    width: main.bbox.width / dpr };
+        if (x.left !== plotX?.left || x.width !== plotX?.width) plotX = x;
       }
     });
   }
@@ -337,7 +390,10 @@
     const o = untrack(overlayNow);
     untrack(() => {
       if (!chart || !applied) return;
-      if (applied.kind !== k) chart.fig.setResidual(k);
+      if (applied.kind !== k) {
+        chart.fig.setResidual(k);
+        relayout();
+      }
       if (applied.scale !== s) {
         chart.fig.setY(s === "linear" ? "lin" : s);
         relayout();
@@ -346,6 +402,8 @@
       applied = { kind: k, scale: s, theme: t };
       chart.fig.setHidden(h);
       chart.update(o);
+      // a hidden curve can move the y range, and the scale mark its top tick
+      relayout();
     });
   });
 
@@ -368,10 +426,11 @@
   // from the moment its values were set to the frame after it painted: the
   // drag-to-redraw latency the browser test reads, as on today's page.
   $effect(() => {
-    const p = preview;
+    const p = shown === "preview" ? preview : null;
     untrack(() => {
       if (!chart) return;
       chart.setPreview(p?.curves ?? null);
+      relayout();
       if (!p) performance.clearMeasures?.("rx-preview-redraw");
       else requestAnimationFrame(() => requestAnimationFrame(() =>
         performance.measure("rx-preview-redraw", { start: p.sentAt })));
@@ -448,12 +507,21 @@
     });
   });
 
+  /** A scale mark's top in its axis button (which starts at the pane's top):
+   *  its line's height plus half a tick label and a gap above the top labelled
+   *  tick, right-aligned with the labels, so it sits in their column and never
+   *  on one. `MARK_ROOM` (rxplot) is the padding that keeps a tick at the plot's
+   *  top edge clear of it; no tick in view puts it at the plot's top. */
+  function markTop(g: PaneGeom): number {
+    return Math.max(0, g.pad + (g.mark ?? 0) - MARK_LINE - LABEL_HALF);
+  }
+
   /** What each axis's hint says: a unit, or a scale's mark. Linear intensity
    *  has no mark, since counts are what an intensity axis is read in. */
   const hints = $derived({
     x: "° 2θ",
     y: scale === "sqrt" ? "√" : scale === "log" ? "log" : "",
-    resid: kind === "cumulative" ? "Σχ²" : kind === "delta" ? "counts" : "σ",
+    resid: kind === "cumulative" ? "Σχ²" : kind === "delta" ? "Δ" : "Δ/σ",
   });
 
   /** Where σ comes from, read off the route's `weighted` flag (WP-1029):
@@ -737,7 +805,11 @@
     for (const t of toggles) {
       const label = CURVE_WORDS[t.id] ?? t.label;
       if (t.id === "diff") {
-        out.push({ id: t.id, label, top: geom.resid.top + geom.resid.height / 2 - LEGEND_ROW / 2 });
+        // centred on the trace: its zero line, the ±3 esd band's middle,
+        // else the strip's (the maintainer's look, 2026-11-21, item 2)
+        const mid = kind !== "cumulative" && geom.resid.zero != null
+          ? geom.resid.zero : geom.resid.height / 2;
+        out.push({ id: t.id, label, top: geom.resid.top + mid - LEGEND_ROW / 2 });
       } else if (t.id.startsWith("ticks:")) {
         const row = geom.ticks.height / Math.max(phases, 1);
         out.push({ id: t.id, label, top: geom.ticks.top + row * (tick + 0.5) - LEGEND_ROW / 2 });
@@ -794,6 +866,16 @@
       {/if}
     </div>
     <div class="gctl">
+      <!-- laid out while no preview is in hand, unseen, so a preview
+           appearing moves no control (as the legend keeps the Preview slot) -->
+      <span class="vg" class:reserved={!hasPreview} aria-hidden={hasPreview ? undefined : "true"}>Show
+        <span class="segmented" role="group" aria-label="Show">
+          {#each SHOWN as s (s.id)}
+            <button class:on={shown === s.id} aria-pressed={shown === s.id} title={s.title}
+              disabled={!hasPreview} onclick={() => (shown = s.id)}>{s.label}</button>
+          {/each}
+        </span>
+      </span>
       <button class="ghost" disabled={!zoomed} onclick={showAll}
         title="Show the whole pattern">Show all</button>
       <button class="ib" bind:this={viewButton} aria-label="View" aria-haspopup="menu"
@@ -809,7 +891,8 @@
     {:else if loadError}
       <p class="empty bad">{loadError}</p>
     {/if}
-    <div class="plot" class:armed={!!arm} style:--gutter="{GUTTER}px">
+    <div class="plot" class:armed={!!arm} style:--gutter="{GUTTER}px"
+      style:--inset="{LABEL_INSET}px" style:--mark-line="{MARK_LINE}px">
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div class="host" bind:this={host} bind:clientWidth={hostWidth} onpointerdowncapture={down}
         onpointerupcapture={up} oncontextmenu={context}
@@ -827,7 +910,8 @@
           onpointerleave={hideTip}
           onfocus={(e) => showTip("y", e.currentTarget.firstElementChild as HTMLElement, true)}
           onblur={hideTip}>
-          <span class="hint" class:blank={!hints.y}>{hints.y || "\u00a0"}</span>
+          <span class="hint" class:blank={!hints.y} style:top="{markTop(geom.main)}px"
+            >{hints.y || "\u00a0"}</span>
         </button>
         {#if !held.raw}
           <button class="axis" bind:this={axisButtons.resid}
@@ -841,7 +925,7 @@
             onpointerleave={hideTip}
             onfocus={(e) => showTip("resid", e.currentTarget.firstElementChild as HTMLElement, true)}
             onblur={hideTip}>
-            <span class="hint">{hints.resid}</span>
+            <span class="hint" style:top="{markTop(geom.resid)}px">{hints.resid}</span>
           </button>
         {/if}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -935,56 +1019,6 @@
     flex-direction: column;
   }
 
-  /* one row: what the graph shows on the left, the view's controls on the
-     right; the title gives way first, with an ellipsis (B1, 2026-11-09) */
-  .ghead {
-    flex: none;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-height: 40px;
-    padding: 2px 16px;
-  }
-
-  .gtitle {
-    flex: 1 1 0;
-    min-width: 9em;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .gtitle b {
-    font-weight: 600;
-  }
-
-  .gtitle > span {
-    margin-left: 10px;
-    color: var(--muted);
-    font-size: var(--text-sm);
-  }
-
-  .gtitle .num {
-    font-family: var(--mono-family);
-  }
-
-  .gtitle .bad {
-    color: var(--bad);
-  }
-
-  .gtitle b.pv {
-    color: var(--accent-ink);
-  }
-
-  .gctl {
-    flex: none;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: var(--text-sm);
-    color: var(--muted);
-  }
-
   .view {
     flex: 1 1 auto;
     min-height: 0;
@@ -1048,11 +1082,11 @@
     background: color-mix(in srgb, var(--hover) 60%, transparent);
   }
 
-  /* the hint: muted and small, by the tick labels, in the strips the chart
-     keeps where a title used to be, so it moves nothing: a y axis's at the
-     plot's top in the strip left of its labels (over the top label it
-     collided with a tick at the plot's edge), the x axis's after its last
-     label in the strip under them */
+  /* the hint: muted and small, by the tick labels. A y axis's sits in its
+     tick-label column over the top labelled tick, in room the chart keeps
+     above the plot (`MARK_ROOM`), so it never lands on a label and costs no
+     column of its own (the maintainer's look, 2026-11-21, item 1); the x
+     axis's sits after its last label in the strip under them */
   .hint {
     display: inline-block;
     padding: 0 2px;
@@ -1062,10 +1096,13 @@
     white-space: nowrap;
   }
 
+  /* a scale mark: in the tick-label column, right-aligned with the labels,
+     its top set from the top labelled tick (`markTop`) */
   .axis .hint {
     position: absolute;
-    top: var(--pad);
-    left: 0;
+    right: var(--inset);
+    margin: 0;
+    line-height: var(--mark-line);
   }
 
   .hint.blank {
@@ -1153,6 +1190,11 @@
   .gut:disabled {
     color: var(--muted);
     cursor: default;
+  }
+
+  /* the Show choice's slot while no preview is in hand: laid out, unseen */
+  .vg.reserved {
+    visibility: hidden;
   }
 
   /* the Preview label's slot while no preview is drawn: laid out, unseen */
