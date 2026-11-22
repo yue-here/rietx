@@ -28,7 +28,7 @@ to b is refused although it agrees at the start: the fit would split it.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 
@@ -188,11 +188,8 @@ class ReflectionFrame:
         """This frame with its harmonics taken at ``cell``."""
         if not self.harmonics or self.cell is cell:
             return self
-        out = ReflectionFrame(self.hkl, self.multiplicity, self.group, self.members,
-                              self.seg, self.counts, self.harmonics)
-        out.cell = cell
-        out.wavelength = self.wavelength
-        return out
+        # ``replace`` carries every other field, so a new one is not dropped
+        return replace(self, cell=cell)
 
 
 @dataclass

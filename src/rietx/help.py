@@ -4060,8 +4060,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "and a strain-like one, such as a tan θ term, does not. The package "
             "converts its own size terms, but cannot tell which kind an equation "
             "holds. For a wavelength-dependent term, give each pattern its own "
-            "coefficient with SharingMap(per_histogram=[...]) and refit. TOPAS writes "
-            "such a term per pattern, or with Lam in the expression."
+            "coefficient with SharingMap(per_histogram=[...]) and refit. Or write the "
+            "λ into the expression, as y*wavelength/cos(theta), and keep y shared. The "
+            "warning still fires on such an equation, since it can carry a term that "
+            "does not scale with λ."
         ),
     ),
     "PEAK_WIDTH_NOT_POSITIVE": HelpEntry(
