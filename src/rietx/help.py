@@ -6571,15 +6571,16 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
         ),
     ),
     "SeriesEntry.held_values": HelpEntry(
-        title="Held values",
+        title="Values you held",
         description=(
-            "Every path you held on this pattern with `ref.hold` in the `constrain` "
-            "hook, with the value it was held at. A held parameter has no row in "
-            "`parameters`, so read its value along the series here. Every attempt "
-            "holds the last accepted pattern's value, the restart from your own "
-            "models included, unless `carry` leaves the path out. A value that "
+            "Each path you held on this pattern with `ref.hold` in the `constrain` "
+            "hook, named variables included, with the value it was held at. A site "
+            "coordinate DOF is left out, since its value is a step from where the fit "
+            "began; read the coordinate's own row. A held parameter has no row in "
+            "`parameters`, so read its value along the series here. A value that "
             "differs from its neighbours' was set for this pattern by a hook, or the "
-            "path was free on the pattern before. `None` where nothing was held."
+            "path was free on the pattern before. `None` where nothing was held, and "
+            "in a series saved before the field."
         ),
     ),
     "SeriesEntry.pattern_paths": HelpEntry(
