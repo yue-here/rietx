@@ -36,9 +36,9 @@ and no client; check that nothing reads `seq == 1` as "a fresh session" first.
 
 ## Tasks
 
-- [ ] Choose the fix (server-side monotonic `seq`, or the page re-following on open) and write
+- [x] Choose the fix (server-side monotonic `seq`, or the page re-following on open) and write
   why in the handover.
-- [ ] A server test: open a second project after a run of N events, run again, and the poll
+- [x] A server test: open a second project after a run of N events, run again, and the poll
   from the old cursor returns the new run's events.
 - [ ] A vitest case on `follow()` if the client changes.
 - [ ] Skill: none. The GUI is a human surface.

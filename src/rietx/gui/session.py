@@ -3607,8 +3607,11 @@ class GuiSession:
     def _adopt(self, project: Project) -> None:
         with self._cond:
             self.project = project
+            # the ring is the old project's and goes; ``_seq`` keeps rising, as
+            # it does across runs, because a page that stays open across the
+            # open holds a cursor into it (WP-2237): reset to 0, that cursor
+            # skipped the new project's events up to the old count
             self._events.clear()
-            self._seq = 0
             self._n_eval = 0
             self._run = _idle_run()
             self._index_result = None
