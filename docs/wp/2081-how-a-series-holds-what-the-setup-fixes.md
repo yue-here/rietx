@@ -488,13 +488,20 @@ Lower questions, still open:
 
 ## Tasks
 
-- [ ] The discussion with Yue on the open questions. Record each ruling in this file
-      with its grounds, and mark any call settled by Claude as such.
+- [x] The discussion with Yue on the open questions. Record each ruling in this file
+      with its grounds, and mark any call settled by Claude as such. (Done 2026-11-22:
+      the six rules, the default and both open decisions are ruled, and
+      [`../milestones/series.md`](../milestones/series.md) is their authority.)
+- [x] The audit label on the series default plan: `ambiguity` 1 → 3, tier 3, plan kept,
+      approved 2026-11-22 (`_audit.py`).
+- [x] Question 4, built: a hold keeps the last accepted pattern's value on every rung,
+      the cold one and the `verify_steps` refits included, and `SeriesEntry.held_values`
+      records each pattern's held values (`sequential._keep_held_values`,
+      `_held_values`).
 - [ ] Turn the rulings into work: fold each into this WP's tasks or the owning WP, or
       file a new WP, each with its practice row and the measurement it rests on.
-- [ ] Skill: decided with the rulings. Until then none, because the surface it would
-      describe is open. `references/series.md` already states the traditional route, so
-      the discussion also decides whether the guide moves to it.
+- [x] Skill: the hold line in `references/series.md`'s `constrain` bullet (2026-11-22).
+      The route for the typical temperature series moves to the WP filed for it.
 
 ## Acceptance
 

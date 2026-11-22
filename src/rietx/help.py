@@ -6570,6 +6570,18 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "`SEQUENTIAL_MOMENT_HOLD` names these patterns."
         ),
     ),
+    "SeriesEntry.held_values": HelpEntry(
+        title="Held values",
+        description=(
+            "Every path you held on this pattern with `ref.hold` in the `constrain` "
+            "hook, with the value it was held at. A held parameter has no row in "
+            "`parameters`, so read its value along the series here. Every attempt "
+            "holds the last accepted pattern's value, the restart from your own "
+            "models included, unless `carry` leaves the path out. A value that "
+            "differs from its neighbours' was set for this pattern by a hook, or the "
+            "path was free on the pattern before. `None` where nothing was held."
+        ),
+    ),
     "SeriesEntry.pattern_paths": HelpEntry(
         title="This pattern's own paths",
         description=(

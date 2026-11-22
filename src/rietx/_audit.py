@@ -2129,6 +2129,23 @@ ROWS: tuple[Row, ...] = (
                   "5x-median-and-3-sigma threshold. The summary prints one line naming the "
                   "largest and the field (2003-batch/batch.md, C4, settled by Claude "
                   "2026-10-26; its row written with C6's, ruled by the maintainer 2026-11-03)")),
+    Row("rietx.schemas.sequential.SeriesEntry.held_values", "action", tier=2, ambiguity=1,
+        evidence=("records the value each caller-held path had on the kept fit "
+                  "(sequential.py _held_values); the action is that a cold rung and a "
+                  "verify_steps refit hold the last accepted pattern's value (the pattern's "
+                  "own on a verify refit), limited by carry, where they held the caller's "
+                  "start before (sequential.py _keep_held_values). GSAS-II, FullProf, TOPAS "
+                  "and EasyDiffraction keep a fixed parameter fixed on every pattern of a "
+                  "series, and none restarts a pattern from the initial models "
+                  "(docs/practice.md § Sequential refinement). Measured on WP-2081's LaB6 "
+                  "ramp, frame 2 forced cold: zero shift 0.00797 on every frame and the cell "
+                  "within 2 ppm, against 0.0 and 546 ppm off before (2081-batch/"
+                  "measure_cold_rung.py)"),
+        grounds=("Series rule 6, accepted by the maintainer 2026-11-16: a retry does not "
+                 "change what value a fixed parameter has (docs/milestones/series.md "
+                 "§ The rules, and its acceptance row 'a fixed value stays fixed'). "
+                 "Settled by Claude 2026-11-22 as WP-2081 question 4's option A."),
+        approved="2026-11-16"),
     Row("rietx.schemas.sequential.SeriesEntry.rungs_tried", "action"),
     Row("rietx.schemas.sequential.SeriesEntry.rungs_raised", "action"),
     Row("rietx.schemas.sequential.SeriesEntry.seeded_from", "action", tier=3, ambiguity=1,
