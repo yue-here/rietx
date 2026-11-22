@@ -10,6 +10,7 @@ refusals to the message a user meets.  The derivative columns themselves are
 
 from __future__ import annotations
 
+from fnmatch import fnmatch
 from pathlib import Path
 
 import numpy as np
@@ -590,7 +591,7 @@ def test_a_free_equation_is_held_above_the_floor_and_lm_lands_on_trf():
     Γ_G² sat under the floor at 19 of 19 reflections, and the fit stopped at
     Rwp 0.195 against TRF's 0.0416, u, v and w 27-427 esd from TRF's.  With
     it LM lands within 0.0025 esd ([dev] macOS arm64, 2026-11-22).  The WP's
-    bar is 0.1 esd.
+    bar is 0.1 esd, 40 times that margin; the spread on Linux is not measured.
     """
     plan = rx.RefinementPlan(stages=[
         rx.Stage(name="scale", turn_on=_ROW_B),
@@ -610,7 +611,8 @@ def test_a_held_positive_term_lets_the_built_in_width_dip_where_the_total_does_n
     """Direction 2: the built-in Γ_G² dips to -1.4e-5 deg² at the truth, and a
     held equation term of 3e-5 keeps the total above it.  Without the term in
     the row LM held the built-in sum at ε and ended at Rwp 0.143 against
-    TRF's 0.0418, U, V, W and X 5-115 esd from TRF's (2026-11-22)."""
+    TRF's 0.0418, U, V, W and X 5-115 esd from TRF's.  With it LM lands
+    within 3e-5 esd ([dev] macOS arm64, 2026-11-22)."""
     plan = rx.RefinementPlan(stages=[
         rx.Stage(name="scale", turn_on=_ROW_B),
         rx.Stage(name="w", turn_on=_ROW_B + ["instrument.profile.w"]),
@@ -631,6 +633,8 @@ def _row_stage(gauss: str, coefficients: dict, free: list[str], lor=None):
         s.phases[0].peak_equations.append(_eq("lor_fwhm", ROW_LOR, **lor))
     model, table = _compiled(s.phases, ins, tt=_ROW_TT)
     table.set_vary(free, True)
+    free_paths = set(table.free_paths)
+    assert all(any(fnmatch(p, g) for p in free_paths) for g in free), free
     return model, table
 
 
@@ -735,7 +739,7 @@ def test_affinity_is_read_off_the_tree_and_agrees_with_the_gradient(expression, 
     from rietx.params.expression import Expression, names_in
 
     names = [n for n in names_in(Expression(expression, reflection=True).tree)
-             if n in "abuvwxy"]
+             if n in set("abuvwxy")]
     eq = _eq("lor_fwhm", expression, **{n: 0.3 + 0.1 * i for i, n in enumerate(names)})
     assert is_affine(compile_equation(eq, "phases.0", 0)) is affine
     if not affine:

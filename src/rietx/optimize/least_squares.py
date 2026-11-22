@@ -2697,12 +2697,13 @@ def texture_positivity_inequalities(model: CompiledModel, table: ParameterTable,
 
 def _equation_width_rows(model: CompiledModel, table: ParameterTable, C: np.ndarray,
                          derived, values: dict, x0: np.ndarray, ip: int, target: str,
-                         d, tt_lines, masks, *, squared: bool = False):
+                         d_refl, tt_lines, masks, *, squared: bool = False):
     """(T, c) of phase ip's ``target`` equation at the width rows' reflections,
     or ``None`` where it adds nothing exact (WP-2153).
 
     The rows are the reflections ``masks`` keeps on each emission line of
     ``tt_lines``, in that order, the order the calling builder stacks its own.
+    ``d_refl`` is the reflections' d-spacings at the stage's starting cell.
     The term is exact in two cases.  Where none of the equation's
     coefficients is free, its value at the frozen angles is a constant, and it
     goes into c as it stands (squared for ``gauss_fwhm``, which enters Γ_G² as
@@ -2741,7 +2742,7 @@ def _equation_width_rows(model: CompiledModel, table: ParameterTable, C: np.ndar
     for tt, keep in zip(tt_lines, masks, strict=True):
         tt = np.asarray(tt, dtype=np.float64)
         with np.errstate(all="ignore"):
-            f, parts = peq_gradient(eq, values, frame, d=d,
+            f, parts = peq_gradient(eq, values, frame, d=d_refl,
                                     theta=np.radians(0.5 * tt),
                                     two_theta=model.apparent_two_theta(tt, values))
         f_rows.append(f[keep])
@@ -2807,9 +2808,10 @@ def gaussian_width_inequalities(model: CompiledModel, table: ParameterTable,
     :func:`strain_cone_inequalities`' reason: the step keeps feasibility and
     cannot restore it.  So a stage starting with Γ_G² under ε at a reflection
     is not held there.  U = V = 0 with W on its floor sits exactly on every
-    row, and is held.  So is a peak equation's term that starts under the
-    floor at every reflection: its coefficients have no gradient, and the
-    stage leaves them where they are (WP-2151's silicon).
+    row, and is held.  A peak equation's term that starts under the floor at
+    every reflection drops every row too, and the clamp leaves its
+    coefficients without gradient, so the stage leaves them where they are
+    (WP-2151's silicon).
 
     A phase whose width rows are derived (``ParameterTable.derived_paths``) is
     skipped, since a derived row is written after C and is not affine in θ.
