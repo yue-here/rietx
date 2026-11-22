@@ -262,6 +262,9 @@ The browser files skip in CI (no playwright there), so the PR quotes their local
   now share one drawing and differ by ink, which gui/CLAUDE.md's held-mark rule now says.
   The maintainer's ruling asks for one padlock "for everything", and the rebuild already drew
   a hold as the padlock.
+  *Merge with main* (the steward, 2026-11-22): main's History tab merged in, dist rebuilt. CI's
+  rulebook-size step failed on this branch's gui/CLAUDE.md held-mark line (49 B over main's
+  budget), so that line is main's again; `gui/STYLE.md`'s Padlock row carries the rule.
   Next: none. WP-2237 (the event cursor across an open) is the Console's open follow-up.
 
 - **2026-11-22** — The Console at `/next` now reads as the session written in Python (PR #1764).

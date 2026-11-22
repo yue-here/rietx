@@ -437,9 +437,8 @@ rules in this section are listed in WP-2134 for the GUI style guide.
 - **The client's matcher is a preview only** (WP-1011): `lib/fnmatch.ts` ports
   `fnmatch.fnmatchcase`, held to Python by `fnmatch_cases.json`.
 - **A held row gets no vary checkbox** (WP-1011). `held_because` is its tooltip, and
-  each reason draws a mark from `lib/table.ts:heldGlyph`: locked, tied, mode-fixed, hold,
-  degenerate (`needs_held_cell`); lock and hold are one padlock in two inks (WP-2212). An
-  unknown reason still draws a mark.
+  each reason draws its own mark from `lib/table.ts:heldGlyph`: locked, tied, mode-fixed,
+  hold, degenerate (`needs_held_cell`). An unknown reason still draws a mark.
   `tests/test_gui_server.py` reads `ParameterRow.refinable`'s fields and `lib/table.ts`'s
   branches, so a sixth fails on both sides (WP-1214).
 - **An editor opens on the stored value; its text as opened is no edit** (WP-2223, WP-1009).
