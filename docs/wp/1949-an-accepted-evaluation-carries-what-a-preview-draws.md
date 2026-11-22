@@ -72,6 +72,15 @@ can reach the caller's callback and skip the recorder.
   the event's values compiles at the window the stage ran at, with the recipe
   in `predict`'s docstring (`compile_model(..., window_area_tol=...)`). A bar
   of 8e-6 against `predict(grid)` cannot pass today.
+  **Superseded in part, 2026-11-22 (WP-2235, Yue's ruling A).** On a fitted
+  `Refinement`, `predict(grid)` now compiles at the last fit's peak cut and
+  slack, so `predict(result.two_theta)` equals `result.y_calc` bit for bit
+  (0 of 5751 channels differ on the fluorapatite tutorial). The recipe is no
+  longer needed on the fitted object itself. A twin that has not been
+  fitted, such as a `_trial`, still compiles at 1e-3. What remains between
+  an `eval` event's curve and `predict` at its values is that the event's
+  windows were sized at the stage's start values: the class the stale
+  bullet's 36-of-4200 figure measured, not re-measured since.
 
 ## Non-goals
 

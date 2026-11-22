@@ -19,6 +19,7 @@ import {
   formatValue,
   groupOf,
   heldGlyph,
+  PADLOCK,
   leafName,
   heldKind,
   normalize,
@@ -199,7 +200,7 @@ describe("the refine flag", () => {
   it("marks each held reason and leaves a free row unmarked", () => {
     // two panels draw this now (WP-1214), which is why the glyphs are here and
     // not in either of them
-    expect(heldGlyph(row("a", { locked: true }))).toBe("🔒");
+    expect(heldGlyph(row("a", { locked: true }))).toBe(PADLOCK);
     expect(heldGlyph(row("a", { tie: { sources: ["b"] } }))).toBe("=");
     expect(heldGlyph(row("a", { mode_fixed: true }))).toBe("·");
     // the fourth, which the three-arm ternary this replaced drew as the third:
@@ -210,9 +211,10 @@ describe("the refine flag", () => {
       .toBe("≈");
     expect(heldKind(row("a", { needs_held_cell: true }))).toBe("degenerate");
     // the fifth: the caller declared this one with `Refinement.hold`, so a
-    // plan's turn_on glob loses to it (WP-1435).  A pin rather than a lock,
-    // because unhold() takes it back and a space group does not
-    expect(heldGlyph(row("a", { held: true, refinable: false }))).toBe("📌");
+    // plan's turn_on glob loses to it (WP-1435).  The same drawn padlock as a
+    // lock since WP-2212; `HeldMark.svelte` inks it as a hold, because unhold()
+    // takes it back and a space group does not
+    expect(heldGlyph(row("a", { held: true, refinable: false }))).toBe(PADLOCK);
     expect(heldKind(row("a", { held: true }))).toBe("hold");
     // and it loses in turn to the reasons above it, which unhold cannot lift
     expect(heldKind(row("a", { held: true, locked: true }))).toBe("locked");

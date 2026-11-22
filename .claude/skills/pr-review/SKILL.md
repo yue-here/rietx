@@ -447,26 +447,30 @@ line if the checkpoint ended it. Close with
    - **Post the proposed rows** in the PR's step-8 review, each with the
      judge's one-line verdict. In the `all` mode that review waits for the
      judge and goes out in the apply pass.
-   - **Settle the clear classes of tier-3 rows and tier-2 actions, and batch
-     the rest** (ruled 2026-11-22). A class is every row resting on the same
-     evidence (WP-2002 ruled 256 rows as 16 classes). A class whose answer is
-     clear, and which none of the maintainer's triggers reaches (the
-     maintainer's instructions, § "Before you bring me a decision"), is yours
-     to settle. Dispatch one fresh agent on Opus over the settled classes. Give
-     it each class's evidence and diff, and withhold your tier, your grounds
-     and the judge's verdict. A class it answers differently is not clear and
-     goes to the batch. List the settled classes under **Settled for you**,
+   - **Settle the clear classes of tier-3 constant and suggestion rows, and
+     batch the rest** (ruled 2026-11-22, WP-2238). A class is every row
+     resting on the same evidence (WP-2002 ruled 256 rows as 16 classes). A
+     class of constants or suggestions that the judge called `holds`, and
+     which none of the maintainer's triggers reaches (the maintainer's
+     instructions, § "Before you bring me a decision"; a constant setting a
+     warning's or an action's threshold is one), is approved by that verdict.
+     A tier-3 code, action or default row, and a tier-2 action, always goes
+     to the batch (`tests/test_audit_table.py` refuses `approved_by="checked"`
+     on one), and so does a class the judge did not call `holds`. List the
+     approved classes under **Settled for you**,
      and show the maintainer a random one in ten. Every other class goes to
      the batch as one question. After a settlement or a ruling, write
-     `grounds` and `approved` (that day's date) into the PR's rows. A settled
-     row's `grounds` ends "settled by Claude under <grounds>". Push them to
+     `grounds` and `approved` (that day's date) into the PR's rows, and
+     `approved_by="checked"` on a settled one. A settled row's `grounds` ends
+     "settled by Claude under <grounds>". Push them to
      its branch where
      `gh pr view N --json maintainerCanModify` says true; otherwise ask the
      contributor in the review.
 6c. **What a reader receives** (ruled 2026-11-01). The package should pass no
-   junk back to a reader, a person or an agent, so every change to what a
-   reader receives goes to the user before merge. A PR changes it when either
-   holds:
+   junk back to a reader, a person or an agent. Since 2026-11-22 (WP-2238)
+   each change is settled here, checked blind, and the user reads the whole
+   diff once per release (`docs/RELEASING.md` step 2). A PR changes it when
+   either holds:
    - `.venv/bin/python -m tests.reader_output`, run in the bench on the merged
      tree, exits 1. It prints the diff of one standard fit's printed result,
      report and diagnostics against the base (about 25 s).
@@ -474,8 +478,10 @@ line if the checkpoint ended it. Close with
      generated `docs/skill/rietx/references/api*.md`. A diagnostic code new
      to the audit table (step 6b's printout) counts too.
 
-   Either way it is a question for the batch: the before and after text, and
-   your reading of whether each added line tells this fit's reader something.
+   Either way, read whether each added line tells this fit's reader something,
+   then give a fresh subagent the before and after text without your reading
+   and have it judge the same. Agreement settles the PR; a disagreement goes
+   to the batch with both readings.
    A line that reads the same for every fit, repeats another field, or gives
    no action is the junk the ruling names. #1266 added 930 characters to every
    report that way, and it reached the user only because its author flagged it.
