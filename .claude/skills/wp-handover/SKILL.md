@@ -114,10 +114,13 @@ re-reading its own diff.
      one that never ran.
    - A finding outside this WP goes into that WP's `### Inherited` (step 5),
      not into this branch.
-7. **Audit this session's CLAUDE.md edits** (root, `gui/`, `tests/`,
-   `src/rietx/indexing/`): every added line must be a standing rule
-   (protocol rule 4 — evidence compressed to a clause plus a pointer), never
-   a dated finding. Counts and timings this session measured go **in the
+7. **Audit this session's rulebook edits** (every committed `CLAUDE.md`
+   and `AGENTS.md`, the files `tests/rulebook_limits.py` limits): every
+   added line must be a
+   standing rule with a one-clause reason and a pointer (protocol rule 4).
+   An incident, a sha, a dataset's number or a count of cases is evidence
+   and goes to the WP, never into the rulebook, numbered or not (ruled
+   2026-10-30, WP-2009). Counts and timings this session measured go **in the
    handover entry** (root CLAUDE.md § Numbers is a recipe, not a ledger),
    and run the count check there: passed+skipped moved by exactly the tests
    this session added, in both the fast and full selections, and any new

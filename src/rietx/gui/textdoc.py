@@ -1334,20 +1334,20 @@ def apply(project, delta: Delta, peak_editor=None) -> list[str]:
                 if "preset" in delta.plan
                 else PlanSpec.model_validate(delta.plan["plan"]))
         project.doc.plan = spec
-        calls.append("project.doc.plan = PlanSpec(…"
+        calls.append("p.doc.plan = rx.PlanSpec(…"
                      f"{len(spec.stages)} stage(s))")
     settings = delta.settings
     if "mode" in settings:
         project.doc.mode = settings["mode"]
-        calls.append(f"project.doc.mode = {settings['mode']!r}")
+        calls.append(f"p.doc.mode = {settings['mode']!r}")
     if "two_theta_limits" in settings:
         limits = settings["two_theta_limits"]
         project.doc.two_theta_limits = None if limits is None else tuple(limits)
-        calls.append(f"project.doc.two_theta_limits = {limits!r}")
+        calls.append(f"p.doc.two_theta_limits = {limits!r}")
     if "excluded_regions" in settings:
         regions = [tuple(r) for r in settings["excluded_regions"]]
         project.set_excluded_regions(regions)
-        calls.append(f"project.set_excluded_regions({regions!r})")
+        calls.append(f"p.set_excluded_regions({regions!r})")
     if settings or delta.plan is not None:
         project.save()  # settings persist on the verb, not on a Save button
     calls.extend(_apply_peaks(project, delta, peak_editor))
