@@ -200,8 +200,8 @@ SOLVE_D_MIN = 1.5
 #: subspace** (:func:`~rietx.crystallography.magnetic.moments.tilted_seed`,
 #: mostly along the allowed basis's first row and, since issue #390's tilt,
 #: with a small nonzero component on every other row too when the basis has
-#: more than one — see :data:`~rietx.crystallography.magnetic.moments.
-#: SEED_TILT`), which is the one thing a seed here must not get wrong.
+#: more than one — see
+#: :data:`~rietx.crystallography.magnetic.moments.SEED_TILT`), which is the one thing a seed here must not get wrong.
 SOLVE_SEED_MU_B = 2.0
 
 #: Alias of :data:`~rietx.crystallography.magnetic.moments.SEED_TILT`, kept

@@ -56,6 +56,8 @@ declare module "rxplot" {
     residual?: "weighted" | "delta" | "cumulative";
     hidden?: readonly string[];
     labels?: { y?: () => string; resid?: () => string };
+    /** whether the y axes keep a strip for their titles; false drops it */
+    titled?: () => boolean;
     layers?: Record<string, { under?: Layer[]; over?: Layer[] }>;
     rawResidual?: () => ArrayLike<number | null> | null;
   }

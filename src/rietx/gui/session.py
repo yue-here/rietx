@@ -160,7 +160,7 @@ def _utcnow() -> str:
 class GuiError(Exception):
     """A verb refused, carrying what the transport should report.
 
-    Same grammar as :class:`~rietx.schemas.diagnostics.Diagnostic` and the
+    Same grammar as :class:`~rietx.schemas.common.Diagnostic` and the
     agent envelope (WP-0602): a ``code`` to branch on, a message for a human,
     and ``where`` naming the paths at fault.  The HTTP status lives here rather
     than in the router because the reason is what decides it — a run in flight
@@ -175,7 +175,7 @@ class GuiError(Exception):
         self.code = code
         self.status = status
         self.where = list(where or [])
-        #: per-item failures, as ``AgentError.details`` does it — a text document
+        #: per-item failures: a text document
         #: apply reports every bad line at once, because fixing them one HTTP
         #: round trip at a time is not an editing experience
         self.details = list(details or [])

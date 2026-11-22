@@ -991,14 +991,19 @@ def test_no_frame_control_moves_the_rebuilt_layout(browser, gui):
         page.close()
 
     page = _open_next(browser, url, 1300)
-    tabs = page.locator("section .tabs button").all_text_contents()
+    tabs = page.locator("section .tabs [role=tab]").all_text_contents()
     page.close()
     assert len(tabs) == 8, tabs
     for name in tabs:
-        pressing(name, lambda p, n=name: p.locator("section .tabs button", has_text=n).first.click())
+        pressing(name, lambda p, n=name: p.locator("section .tabs [role=tab]", has_text=n).first.click())
 
     def escape(p):
         p.keyboard.press("Escape")
+
+    # each strip's ? box floats over the page (the maintainer's look, 2026-11-21, item 6)
+    for strip, label in (("graphs", "About the Pattern graph"), ("model", "About the Parameters tab")):
+        pressing(f"{strip} ? box", lambda p, n=label: p.get_by_role("button", name=n, exact=True).click(),
+                 escape)
 
     def series(p):
         p.locator("button.mbtn.wf").click()
@@ -1940,3 +1945,77 @@ def test_the_rebuilt_plan_picker_adds_a_chip_and_moves_nothing(browser, next_pla
     assert not page.errors, page.errors
     page.close()
     assert not moved, moved
+
+
+def _biso(client) -> float:
+    rows = client.get("/api/params")[1]["parameters"]
+    return next(r["value"] for r in rows if r["path"] == "phases.0.atoms.0.biso")
+
+
+def _retype_line(page, line, text: str) -> None:
+    """A real click on the line, then Home, Shift+End and typing over it."""
+    line.scroll_into_view_if_needed()
+    line.click()
+    page.keyboard.press("Home")
+    page.keyboard.press("Shift+End")
+    page.keyboard.type(text)
+
+
+def test_the_rebuilt_text_tab_applies_a_typed_value_from_the_bar(browser, tmp_path_factory):
+    """WP-2231 rows 139-146. The Text tab names the file and its sync word. A
+    value typed into the editor marks its line, is one pending edit in the
+    action bar and moves no place; the bar's Apply stores it. ⌘⏎ inside the
+    editor applies a second value and starts no run. A project of its own,
+    since both applies are written."""
+    httpd, client = _serve(tmp_path_factory, "next-text")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    try:
+        page = _open_window(browser, url)
+        runs = []
+        page.on("request", lambda r: runs.append(r.url) if "/api/run" in r.url else None)
+        page.locator("section.model .tabs").get_by_role("tab", name="Text", exact=True).click()
+        text = page.locator("section[aria-label=text]")
+        page.wait_for_function(
+            "() => document.querySelector('section[aria-label=text] .sync')?.textContent === 'in sync'")
+        page.wait_for_selector("section[aria-label=text] .cm-content")
+        _frames(page)
+        assert text.locator(".bar .file").text_content() == "sample.rxt"
+        assert not text.get_by_role("button").count()
+        # ⌘⏎ in the editor is its Apply, so with nothing typed it refines nothing
+        text.locator(".cm-line", has_text="atoms.0.biso").click()
+        page.keyboard.press("ControlOrMeta+Enter")
+        _frames(page)
+        assert not runs, runs
+        before = page.evaluate(SNAP, WINDOW_LANDMARKS)
+
+        line = text.locator(".cm-line", has_text="atoms.0.biso")
+        _retype_line(page, line, "atoms.0.biso 0.7")
+        page.wait_for_function(
+            "() => document.querySelector('section[aria-label=text] .sync')?.textContent === 'edited'")
+        _frames(page)
+        assert page.locator(".actions .pending").text_content().strip() == "1 pending"
+        assert "atoms.0.biso 0.7" in text.locator(".cm-edited").all_text_contents()[0]
+        moved = _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))
+
+        page.get_by_role("button", name="Apply", exact=True).click()
+        page.wait_for_function(
+            "() => document.querySelector('section[aria-label=text] .sync')?.textContent === 'in sync'")
+        _frames(page)
+        assert _biso(client) == pytest.approx(0.7)
+        assert page.locator(".actions .pending").text_content().strip() == ""
+        assert not text.locator(".cm-edited").count()
+
+        _retype_line(page, text.locator(".cm-line", has_text="atoms.0.biso"), "atoms.0.biso 0.8")
+        page.wait_for_function(
+            "() => document.querySelector('section[aria-label=text] .sync')?.textContent === 'edited'")
+        page.keyboard.press("ControlOrMeta+Enter")
+        page.wait_for_function(
+            "() => document.querySelector('section[aria-label=text] .sync')?.textContent === 'in sync'")
+        _frames(page)
+        assert _biso(client) == pytest.approx(0.8)
+        assert not runs, runs
+        assert not page.errors, page.errors
+        page.close()
+        assert not moved, moved
+    finally:
+        httpd.shutdown()

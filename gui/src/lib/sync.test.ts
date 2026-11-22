@@ -12,8 +12,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  EDITED_LINES_MAX_CELLS,
   STALE_NOTICE,
   canApply,
+  editedLines,
   initial,
   minimalChange,
   reduce,
@@ -289,5 +291,36 @@ describe("a buffer restored from the recovery copy (WP-2213)", () => {
     const state = run([{ kind: "restored", text: DOC, revision: "r2", buffer: DOC, kept: "r1" }]);
     expect(state.phase).toBe("clean");
     expect(state.stale).toBe(false);
+  });
+});
+
+describe("editedLines (WP-2231)", () => {
+  const BASE = "a\nb\nc\nd\n";
+
+  it("marks nothing when the buffer is the rendering", () => {
+    expect(editedLines(BASE, BASE)).toEqual([]);
+  });
+
+  it("marks a typed value's own line", () => {
+    expect(editedLines(BASE, "a\nB\nc\nd\n")).toEqual([2]);
+  });
+
+  it("marks an inserted line and not the lines after it", () => {
+    expect(editedLines(BASE, "a\nnew\nb\nc\nd\n")).toEqual([2]);
+  });
+
+  it("marks nothing for a deleted line, which has no line left to mark", () => {
+    expect(editedLines(BASE, "a\nc\nd\n")).toEqual([]);
+  });
+
+  it("marks two separate edits and the lines between them alone", () => {
+    expect(editedLines(BASE, "A\nb\nc\nD\n")).toEqual([1, 4]);
+  });
+
+  it("marks the whole middle when the table would be too large", () => {
+    const n = Math.ceil(Math.sqrt(EDITED_LINES_MAX_CELLS)) + 2;
+    const base = Array.from({ length: n }, (_, i) => `x${i}`).join("\n");
+    const buffer = Array.from({ length: n }, (_, i) => `y${i}`).join("\n");
+    expect(editedLines(base, buffer)).toHaveLength(n);
   });
 });
