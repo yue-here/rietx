@@ -221,7 +221,7 @@ assert 0.4 < rows["vars.offset"].stderr / result.parameter("vars.offset").stderr
 for k in range(len(heights)):
     assert any(d.code == "FLAT_DIRECTION" and set(d.where) == {"vars.zero", f"hist.{k}.vars.height"}
                for d in joint_result.diagnostics)
-# The page: the heights miss their values by nearly one amount, under a tenth of an esd apart.
+# The page: the heights miss their values by amounts that agree to under a tenth of an esd.
 misses = [rows[f"hist.{k}.vars.height"].value - h for k, h in enumerate(heights)]
 assert max(misses) - min(misses) < 0.1 * rows["hist.0.vars.height"].stderr
 assert round(joint_result.statistics.gof, 2) == 1.0

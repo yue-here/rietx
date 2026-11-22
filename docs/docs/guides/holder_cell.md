@@ -117,7 +117,7 @@ hist.4.vars.height   -0.0600(97)  made with -0.06
 Each variable is one number across the five patterns, unless `SharingMap.per_histogram` names it.
 Here only `height` is named, so it comes back as one row per pattern, `hist.<k>.vars.height`.
 The zero shift is one number too, because the five patterns come from one instrument.
-Every parameter under `instrument.` is otherwise one per pattern, so each line's area and width refine separately in each pattern.
+Every parameter under `instrument.` is otherwise one per pattern, so each pattern refines its own area and width for each line.
 `shared=["instrument.profile.*"]` gives the five patterns one instrument profile.
 
 The variables are declared with `vary=False`, so only the stages that name them free them.
@@ -128,7 +128,7 @@ Every recovered value lies within 1.5 esd of the value the patterns were made wi
 The offset's esd is 0.00096 mm, against 0.0021 mm from one pattern, close to the factor 1/√5 that five patterns give.
 The zero shift still trades against each height, and the fit reports each pair as `FLAT_DIRECTION`.
 The five heights and the zero shift move together.
-Here each height misses the value it was made with by nearly the same amount, under a tenth of its esd from the others.
+Here the five heights miss the values they were made with by amounts that agree to under a tenth of their esd.
 So the differences between the heights are measured better than the esd of each height says.
 
 [Parametric refinement](../reference/parametric.md#formula-equations) describes formula equations in a joint fit.
