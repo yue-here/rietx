@@ -96,8 +96,9 @@ inherits `rcond`'s tier, the 2 is tiered on its own evidence).
      action leaves the number no further from it. For a flag it is a known truth
      (an injected misfit, a weighed impurity), and the flag fires where the fault is and
      stays silent where it is not; and
-   - the judgement ground, answered by the implementing agent and approved by the
-     maintainer in a batch: **shown this statistic, would every competent refiner take
+   - the judgement ground, answered by the implementing agent and approved in a batch
+     (by Claude where the answer is clear, with a blind check; otherwise by the
+     maintainer; ruled 2026-11-22): **shown this statistic, would every competent refiner take
      this action?** This is DESIGN.md § Rules, 1's unanimity gate. An action is kept only
      where the answer is yes. Where two careful people could respond differently to the
      same number, the action moves to Rule 1's second or third kind. Where the
@@ -389,7 +390,7 @@ sharpens its own row here.
   2017 measures the single-fit thresholds' three families, 2018 the clash table).
   Every hold, carry, refit, fence and always-on correction that survives names its
   evidence (the families, or for tier 2 the citation or program), the record field that
-  says it fired, and the maintainer's dated approval; every other one is
+  says it fired, and its dated approval; every other one is
   demoted to a ranking or a number by its kind, or made opt-in. No default path calls a
   pick verb (§ A pick on top of a ranking).
 - **A new heuristic cannot land unaudited** (2001, 2014). A diff that adds a diagnostic code, a
