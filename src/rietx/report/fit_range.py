@@ -144,8 +144,8 @@ class _Reflection:
 def model_reflections(model, values: dict[str, float],
                       phase_names: list[str]) -> list[_Reflection]:
     """Every (line, reflection) the compiled ``model`` generated, at
-    ``values``: position from :meth:`phase_peaks`, the same walk the ticks
-    take, and (Γ, η) from :meth:`peak_gamma_eta`, the shape-agnostic reading
+    ``values``: position from :meth:`~rietx.model.forward.CompiledModel.phase_peaks`, the same walk the ticks
+    take, and (Γ, η) from :meth:`~rietx.model.forward.CompiledModel.peak_gamma_eta`, the shape-agnostic reading
     of the width pair."""
     from ..crystallography.symmetry import reflection_label_row
 
