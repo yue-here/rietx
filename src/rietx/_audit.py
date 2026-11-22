@@ -5,8 +5,8 @@ restated here beyond what a row needs.  Each part of a heuristic is tiered on
 its own: (1) physics or arithmetic; (2) established practice, a citation that
 tested it or the same choice made *by default* in an established Rietveld
 program (the seven rietx-bench runs: GSAS-II, FullProf, TOPAS, RIETAN-FP,
-BGMN, MAUD, EasyDiffraction), whatever the other six do; (3) rietx's own, kept only on the record's two grounds with the
-maintainer's dated approval.  ``invariant`` is the record's answer-invariant
+BGMN, MAUD, EasyDiffraction), whatever the other six do; (3) rietx's own, kept only on the record's two grounds with a
+dated approval (CONTRIBUTING.md § A heuristic needs its tier names who gives it).  ``invariant`` is the record's answer-invariant
 class.  ``caller`` is no evidence grade: it marks a row where the package
 decided nothing for the caller, since DESIGN.md § Rules, 1 governs what the
 package decides alone.  Both must hold: the caller asked for it by name (a flag
