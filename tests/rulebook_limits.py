@@ -28,8 +28,9 @@ document the base's table lacks is held to `NEW_BUDGET` and `NEW_CEILING`.
 
 **The pins.**  Each budget was pinned at the file's bytes on 2026-11-21, so
 every listed file is closed to growth: an addition pays for itself with a
-cut.  WP-2009's content pass re-pins them downward, and a cut needs no
-separate change.  Each ceiling is the budget plus twice the most that one day
+cut.  WP-2009's content pass re-pinned five of them downward on 2026-11-22,
+each ceiling lowered by the budget's own cut, and a cut needs no separate
+change.  Each ceiling is the budget plus twice the most that one day
 of `main`'s merges added to that file in the 30 days to 2026-11-21, the rule
 `skill_caps.REFERENCE_GAP_BYTES` was measured by.  A file that no merge grew
 in that window takes `REFERENCE_GAP_BYTES` itself.  The line-count caps these
@@ -57,13 +58,13 @@ DIARY = "docs/milestones/process.md"
 #: and src/rietx/gui/CLAUDE.md.
 LIMITS: dict[str, tuple[int, int]] = {
     "AGENTS.md": (2_009, 4_009),
-    "CLAUDE.md": (86_787, 87_623),
+    "CLAUDE.md": (77_188, 78_024),
     "docs/ROADMAP.md": (52_042, 55_314),
-    "gui/CLAUDE.md": (45_159, 46_545),
+    "gui/CLAUDE.md": (44_892, 46_278),
     "src/rietx/gui/CLAUDE.md": (155, 2_155),
-    "src/rietx/indexing/CLAUDE.md": (27_747, 30_753),
-    "src/rietx/io/CLAUDE.md": (55_732, 58_420),
-    "tests/CLAUDE.md": (19_733, 20_345),
+    "src/rietx/indexing/CLAUDE.md": (24_935, 27_941),
+    "src/rietx/io/CLAUDE.md": (49_292, 51_980),
+    "tests/CLAUDE.md": (17_707, 18_319),
 }
 
 #: Where a rulebook the base's table lacks enters: a short subsystem

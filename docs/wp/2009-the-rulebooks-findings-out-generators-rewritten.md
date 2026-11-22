@@ -77,14 +77,14 @@ plus a pointer.
 
 ## Tasks
 
-- [ ] The generator pass: every rule in the five files and the rubric that rewards a code
+- [x] The generator pass: every rule in the five files and the rubric that rewards a code
       that fires, listed with its rewrite to Rule 1's three outcomes; `TEMPLATE.md`'s
       rubric rewritten with the remedy named by kind.
-- [ ] The findings pass: every numbered clause classified rule or evidence; evidence
+- [x] The findings pass: every numbered clause classified rule or evidence; evidence
       compressed to a pointer, the number confirmed present at the pointer's target
       before it leaves.
-- [ ] The caps re-landed with diary lines.
-- [ ] `tests/test_docs_consistency.py` green; the rulebook word counts before and after in
+- [x] The caps re-landed with diary lines.
+- [x] `tests/test_docs_consistency.py` green; the rulebook word counts before and after in
       the handover.
 - [ ] `claude-config/workflow/LESSONS.md`: the lesson "a rulebook's incentives are audited,
       not only its facts", worded for the other projects, through `/workflow-sync`.
@@ -103,6 +103,21 @@ decision (`~/.claude/CLAUDE.md`: a plan sent for approval opens with its context
 
 - `docs/milestones/generality.md` § The two reviews; `docs/milestones/process.md` § The
   rule; ROADMAP § Session protocol rule 4; WP-1031, 1060, 1116 (the earlier consolidations).
+
+## Moved from the rulebooks, with no other home
+
+The findings pass confirmed each number at its pointer before cutting it. These four
+were absent there, or the target had moved on, so they are kept here verbatim.
+
+- Root `CLAUDE.md` (page-directory rule, WP-1461): "`.gitignore`, whose `*.html` has
+  swallowed eight committed files." WP-1461 records the seventh only.
+- Root `CLAUDE.md` (stacking rule, WP-1438): "at 420 px was nothing and 863 px of
+  horizontal document scroll." WP-1438 holds 420 px and "document scrolled to 1283 px".
+- Root `CLAUDE.md` (traced code, jax scoped fp64): a constant materialised outside the
+  scope "once cost the Pawley aux columns four orders of accuracy." Found in no WP.
+- `tests/CLAUDE.md` (measure the spread on the asserted quantity): "sized on `a` at
+  2.5e-6, the same bar fired 12 days later on `c`, 7x wider and bit-identical across two
+  runs." `tests/test_acceptance_srm676a.py` §3 now describes a different measurement.
 
 ## Handover log
 

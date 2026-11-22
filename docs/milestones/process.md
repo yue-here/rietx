@@ -1791,6 +1791,17 @@ SIZE_CAPS: dict[str, int | None] = {
 }
 ```
 
+### The byte limits, re-pinned by WP-2009 (2026-11-22)
+
+The findings pass moved each rulebook's evidence (incidents, shas, one
+dataset's numbers) to the WP or record its pointer names, and the five
+budgets it cut were re-pinned at the landed bytes, each ceiling lowered by the
+same amount so the gap stays the one WP-2233 measured.  Root `CLAUDE.md`
+86 787 -> 77 188 B, `src/rietx/io/` 55 732 -> 49 292 B, `gui/` 45 159 ->
+44 892 B (WP-2134 had already done its pass), `src/rietx/indexing/` 27 747 ->
+24 935 B, `tests/` 19 733 -> 17 707 B.  Each pass stopped where the next cut
+would have been a rule.
+
 ## What a session's reading costs
 
 Measured 2026-09-30 for `/pr-review`
