@@ -662,7 +662,9 @@
 
   async function start() {
     try {
-      run = await api.run({ kind: "fit" });
+      // in stages: this page has no view of a one-stage re-fit, which the
+      // rebuild at /next draws (WP-2227), so it keeps today's Refine until the swap
+      run = await api.run({ kind: "fit", refit: "stages" });
       say("ref.fit(data, plan=…)");
     } catch (error) {
       say(`refused: ${(error as Error).message}`);

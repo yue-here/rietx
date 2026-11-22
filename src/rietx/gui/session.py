@@ -75,6 +75,7 @@ from ..report.apply import api_call, describe_action, refusal, stage_for
 from ..schemas.instrument import Instrument
 from ..schemas.plan import PlanSpec, StageSpec
 from ..schemas.structure import Structure
+from ..strategy.refit import REFIT_MODES, WARM_REFIT_STAGE, _collapse
 from ..strategy.staged import PLAN_PRESETS, resolve_plan
 from ..viz import packed as _packed
 from ..viz import theme
@@ -220,6 +221,10 @@ class GuiSession:
         self._seq = 0
         self._n_eval = 0
         self._run: dict = _idle_run()
+        #: ``(result, how)``: how the last fit ran (:func:`_how_ran`), beside
+        #: the result it describes, so the result route serves it only while
+        #: that result is the refinement's (WP-2227)
+        self._how: tuple[Any, dict] | None = None
         #: the last completed indexing run's answer.  Session-scoped like
         #: ``refinement.result_``: peaks.json is the durable artifact, an
         #: IndexingResult is a computation over it.
@@ -1395,6 +1400,19 @@ class GuiSession:
         # every glob again at tight windows, read-only here, and its Rwp is
         # the answer's, which the last declared rung's is not
         closing = plan.closing_stage(list(rows))
+        # a one-stage re-fit of this plan (WP-2224) ran none of its rungs, so
+        # its node stands in for them as one row after the stages (WP-2227,
+        # the maintainer's ruling 2), matched by the same rule as a rung: the
+        # stage the plan collapses to, and its closing stage when it has one
+        one_stage = None
+        if stages and not any(s.turn_off for s in plan.stages):
+            tree, head = p.refinement.history, p.refinement._head_id
+            if tree is not None and head is not None and head in tree:
+                ran = self._aligned_rwp(tree, head, _collapse(plan).run_stages())
+                if ran[0] is not None:
+                    one_stage = {"n_free": stages[-1]["n_free"], "rwp": ran[0]}
+                    if len(ran) > 1:    # the closing stage's, the answer's
+                        rwps[-1] = ran[-1]
         # the rows the closing stage's fix takes back from its frees: a tied,
         # locked or held row its literals name was never free to keep fixed
         closing_entry = None if closing is None else {
@@ -1420,7 +1438,7 @@ class GuiSession:
                 "n_free_final": stages[-1]["n_free"] if stages else 0,
                 "set_aside": set_aside, "never_freed": never_freed,
                 "stages": stages,
-                "closing": closing_entry,
+                "closing": closing_entry, "one_stage": one_stage,
                 "head": p.refinement._head_id,
                 "live": self._state != "idle"}
 
@@ -2182,13 +2200,28 @@ class GuiSession:
             n_stages = len(setup.members)
         else:
             plan = self._effective_plan(body.get("plan"))
+            # the library's default unless the page names one: `/next` says
+            # how a Refine ran (WP-2227) and takes the default, a one-stage
+            # re-fit of a converged model; today's page has no such view, so
+            # it asks for the stages until the swap (WP-2224, with Yue)
+            refit = {}
+            if "refit" in body:
+                if body["refit"] not in REFIT_MODES:
+                    raise GuiError(f"refit must be one of {list(REFIT_MODES)}, "
+                                   f"not {body['refit']!r}", where=["refit"])
+                refit = {"refit": body["refit"]}
 
             def call(stream, token):
-                # staged until the stage ladder has a view of a one-stage
-                # re-fit: after one, no run on record matches the plan on
-                # screen and the Rwp column goes blank (WP-2224, with Yue)
-                return p.fit(plan=plan, events=stream, cancel=token,
-                             refit="stages")
+                tree = p.refinement.history
+                before = 0 if tree is None else len(tree.order)
+                result = p.fit(plan=plan, events=stream, cancel=token, **refit)
+                self._how = (result, _how_ran(p.refinement, before))
+                return result
+
+            def summarize(result, token):
+                how = self._how
+                return {**_summarize_refinement(result, token),
+                        "how": how[1] if how is not None and how[0] is result else None}
 
             label = ""
             n_stages = len(plan.run_stages())   # the closing stage counts
@@ -2223,7 +2256,7 @@ class GuiSession:
                          "started_utc": _utcnow(), "finished_utc": None,
                          "elapsed": None, "rwp": None, "gof": None,
                          "node_id": None, "completed_stages": [], "error": None,
-                         "lebail": None}
+                         "lebail": None, "how": None}
             self._worker = threading.Thread(
                 target=self._work, args=(call, stream, summarize),
                 name=f"{_about.SERVER_TOKEN}-gui-run", daemon=True)
@@ -2390,6 +2423,13 @@ class GuiSession:
             elif kind == "stage_start":
                 self._run["stage"] = data.get("stage") or data.get("name")
                 self._run["stage_index"] = data.get("index")
+                # a re-fit's one stage is said in words while it runs, as the
+                # graph's title says it after (WP-2227); a fallback's staged
+                # plan then starts a stage of another name, which clears it
+                if self._run["kind"] == "fit":
+                    self._run["how"] = (
+                        {"ran": "one_stage", "reason": "converged"}
+                        if self._run["stage"] == WARM_REFIT_STAGE else None)
                 if data.get("n_stages"):
                     self._run["n_stages"] = data["n_stages"]
             elif kind == "stage_end":
@@ -3180,6 +3220,10 @@ class GuiSession:
         for d, item in zip(res.diagnostics, payload["diagnostics"], strict=True):
             item["full"] = view[id(d)].full
             item["warning_under"] = list(view[id(d)].warning_under)
+        # how the fit ran (WP-2227), only while this result is that fit's: a
+        # stage run or a checkout since has replaced it
+        how = self._how
+        payload["how"] = how[1] if how is not None and how[0] is res else None
         payload["curves"] = {
             "n_points": len(res.two_theta),
             "two_theta_range": ([res.two_theta[0], res.two_theta[-1]]
@@ -3672,6 +3716,42 @@ def _summarize_refinement(result, _token) -> dict:
     return out
 
 
+def _how_ran(ref, before: int) -> dict:
+    """How the fit that just returned ran: in one stage or in stages, and why
+    (WP-2227, the maintainer's rulings of 2026-11-22).
+
+    Read off the one authority, the refinement's own record of the choice
+    ``fit`` made (``_refit_how``, WP-2224), which :meth:`Refinement.summary`
+    prints from too, and served with that line (``plan_line``) for the
+    Console.  ``ran`` is ``"one_stage"`` or ``"stages"``; ``reason`` is
+    ``"converged"``, ``"released"`` (``released`` the paths the last fit held,
+    ``families`` their help keys in order), ``"fallback"`` (``diverged``
+    whether the discarded one-stage fit diverged, read off its own nodes,
+    the ones this fit added past ``before``) or ``None``, a first fit's plan.
+    """
+    from ..help import help_key_for
+
+    how = ref._refit_how
+    out: dict = {"ran": "stages", "reason": None, "plan_line": ref._plan_line()}
+    if how == "single":
+        out.update(ran="one_stage", reason="converged")
+    elif how == "fallback":
+        tree = ref.history
+        discarded = ([] if tree is None else
+                     [tree.nodes[n] for n in tree.order[before:]
+                      if tree.nodes[n].notes.get("refit_discarded")])
+        out.update(reason="fallback", diverged=any(
+            n.metrics.status == "diverged" for n in discarded))
+    elif isinstance(how, list):
+        families: list[str] = []
+        for path in how:
+            key = help_key_for(path) or path
+            if key not in families:
+                families.append(key)
+        out.update(reason="released", released=list(how), families=families)
+    return out
+
+
 def _summarize_index(result, token) -> dict:
     """The run-record fields a finished indexing search supplies.
 
@@ -3765,7 +3845,7 @@ def _idle_run() -> dict:
             "stage_index": None, "n_stages": None, "started_utc": None,
             "finished_utc": None, "elapsed": None, "rwp": None, "gof": None,
             "node_id": None, "completed_stages": [], "error": None,
-            "lebail": None}
+            "lebail": None, "how": None}
 
 
 def _parse_utc(stamp: str) -> float:
