@@ -1,9 +1,8 @@
 # WP-2235 — predict on a grid says which peak cut it draws
 
-Milestone: unscheduled · Status: 🔄 2026-11-22 — claimed by ghostshift runner (Claude)
+Milestone: unscheduled · Status: ✅ 2026-11-22 — ruling A: after a fit `predict(grid)` compiles at the fit's peak cut, so it returns `y_calc` bit for bit; PR #PRNUM
 Track: A long run is not one fit
 Depends on: —
-Priority: P3 2026-11-21 — the manual and a docstring state a difference between `predict`'s two forms that is 200× too small; no fit moves, and the docstring's own recipe is the workaround
 
 ## Goal
 
@@ -76,12 +75,16 @@ that has never fitted keeps today's default, `CLOSING_WINDOW_TOL` (1e-3 of each 
   fitted with, which is what each of them does.
 - **What it gives up.** The grid form now depends on whether the object has fitted. A twin
   carrying the fitted models but no fit returns the 1e-3 array.
-- **Implementation choice, settled by Claude.** The cut is read off the compile the last
-  result was measured on (`Refinement._model`), which records both `window_area_tol` and
-  `window_slack_deg`. That compile is what `predict()` already evaluates, so the two forms
-  cannot disagree. Reading `result.stages[-1].window_area_tol` alone would drop a stage's
-  `window_slack_deg`, which `StageResult` does not record. The test pins that the two
-  readings agree after a default fit.
+- **Implementation choice, settled by Claude under the ruling's "as the GUI preview
+  does".** One method, `Refinement._peak_cut`, now answers for both `predict` and the GUI
+  preview. With a history it reads the nearest stage node at or above the head, the
+  preview's rule, so an edit, a checkout and a reopened project keep the fit's cut.
+  Without a history it reads the last answer's compile, kept through an edit and never
+  carried into a package trial. Both readings carry the window slack as well as the area
+  fraction. The alternative was reading the answer's compile alone (`Refinement._model`),
+  which the first commit did: the review found any edit clears it, so after a no-op
+  `set_values` the grid fell back to 1e-3 and differed on 2076 of 4200 channels of the
+  synthetic LaB₆ fit, and the GUI and `predict` read two authorities.
 
 ## Non-goals
 
@@ -119,17 +122,35 @@ that has never fitted keeps today's default, `CLOSING_WINDOW_TOL` (1e-3 of each 
   a fit no longer needs the `compile_model` recipe. A `Refinement` that has never fitted
   still draws the near-complete tails a synthetic pattern wants. The price is the one Yue
   accepted under ruling A: the grid form now depends on whether the object has fitted.
-  - *Done.* `Refinement.predict(grid)` compiles at the cut and slack of the compile the
-    last answer was measured on (§ Rulings). The docstring's bold paragraph and last
+  - *Done.* `Refinement.predict(grid)` compiles at the cut and slack of the fit that
+    produced the working state, read by one method the GUI preview now shares
+    (§ Rulings). The docstring's bold paragraph and last
     paragraph, the manual's § Evaluating the model in `exports.md`, the same claim in
     `refinement.md` § the closing stage and the `WINDOW_AREA_TOL` comment in `forward.py`
     now say so, with the number. `tests/test_refine_synthetic.py` replaces the old
-    "twin equals fitted" test with one pinning the new relation, Rietveld and Le Bail.
+    "twin equals fitted" test with one pinning the new relation: Rietveld with and
+    without a history, Le Bail without, and a no-op `set_values` keeping the cut.
+  - *Review* (`/code-review high --fix`, 7 findings). Fixed: the orbit-split exception
+    stated in the docstring and manual (its own edit); an edit or checkout cleared the
+    cut, and the GUI and `predict` read two authorities (fixed by `_peak_cut`, measured
+    2076 of 4200 channels before). Declined: the moment frames under a moved angle (not
+    measured, and magnetic work is Mike's); the suggest probe's `_plan_settings` cut drops
+    the slack (predates this WP, a stage declaring a slack only); a comment that would go
+    stale only under a fix not taken; the compiled-path rule for bit-identity tests (both
+    sides of each comparison run on one path in one process).
   - *Sibling fixed.* `report/distortion.py`'s detectability probe compared a fitted
     object's `predict` with a never-fitted trial's. Under the new rule the two compile at
     different cuts and every λ would gain the tails, so the baseline now comes from the
     trial too. That keeps its numbers where they were (both sides at the default cut, as
-    before). No other caller predicts on a fitted object against an unfitted one.
+    before). One test made the same comparison: `test_displacive_statement.py`'s BT-1
+    restatement check failed at its 1e-10 bar (13.2 counts against 6975) and now builds
+    both curves from unfitted objects.
+  - *Not generalised, deliberately.* The result's own compile also keeps the solve's orbit
+    split (WP-2052) and its moment frames (#598). A grid takes the cut only, so a site
+    reported as `SITE_MULTIPLICITY_KEPT` is counted afresh and differs from `y_calc` there;
+    the docstring and the manual say so. Passing the orbit split would break on a
+    structure edited after the fit. The moment frames should agree to roundoff, since the
+    written-back components are the solve's (not measured).
   - *Measured* (FAP tutorial, limits 15-130°, `history=False`, `[dev]`, darwin arm64,
     probe in the runner's scratch). Before: `predict(result.two_theta)` differed from
     `y_calc` on 5751 of 5751 channels, by at most 1.41e-3 (`mccusker_default`) and

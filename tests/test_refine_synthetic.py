@@ -183,25 +183,28 @@ def test_predict_needs_no_fit(synthetic_pattern):
     assert np.array_equal(y, ref.predict(np.asarray(synthetic_pattern.two_theta)))
 
 
-@pytest.mark.parametrize("mode", ["rietveld", "lebail"])
-def test_predict_on_the_fit_grid_returns_the_fit_curve(synthetic_pattern, mode):
+@pytest.mark.parametrize(("mode", "history"),
+                         [("rietveld", False), ("rietveld", True), ("lebail", False)])
+def test_predict_on_the_fit_grid_returns_the_fit_curve(synthetic_pattern, mode, history):
     """After a default fit a grid compiles at the fit's peak cut (WP-2235,
     ruling A), so both forms of ``predict`` return ``y_calc`` bit for bit.
+    An edit keeps the cut: the object has still fitted.
 
     A never-fitted twin carrying the fitted models still compiles at
     ``compile_model``'s default cut, so it returns that compile's array and
     differs from the fit's curve by the tails the fit's windows leave out.
     """
     structure, ins = perturbed_models()
-    fitted = Refinement(structure, ins, history=False)
+    fitted = Refinement(structure, ins, history=history)
     result = fitted.fit(synthetic_pattern, mode=mode)
     tt = np.asarray(result.two_theta)
     y_calc = np.asarray(result.y_calc)
 
     cut = recorded_window_tol(result.stages[-1].window_area_tol)
     assert cut == WINDOW_AREA_TOL
-    # predict reads the cut off the answer's compile; the record says the same
+    # the answer's compile, the record and the reading predict takes agree
     assert fitted._model.window_area_tol == cut
+    assert fitted._peak_cut()["window_area_tol"] == cut
     assert np.array_equal(fitted.predict(), y_calc)
     assert np.array_equal(fitted.predict(tt), y_calc)
     assert np.array_equal(fitted.predict(PatternData(
@@ -210,9 +213,14 @@ def test_predict_on_the_fit_grid_returns_the_fit_curve(synthetic_pattern, mode):
 
     out = Path(__file__).parent / "output"
     out.mkdir(exist_ok=True)
-    plot_result(result, path=str(out / f"predict_fit_grid_{mode}.png"))
+    plot_result(result, path=str(out / f"predict_fit_grid_{mode}_{history}.png"))
     if mode != "rietveld":
         return  # a Le Bail twin has no intensities to evaluate
+    # an edit that changes no value drops the result, never the fit's cut
+    scale = fitted.structure.phases[0].scale.value
+    fitted.set_values({"phases.0.scale": scale})
+    assert fitted.result_ is None
+    assert np.array_equal(fitted.predict(tt), y_calc)
 
     twin = Refinement(fitted.structure.model_copy(deep=True),
                       fitted.instrument.model_copy(deep=True), history=False)

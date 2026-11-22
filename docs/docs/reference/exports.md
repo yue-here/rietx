@@ -96,7 +96,10 @@ In Le Bail and Pawley mode the per-reflection intensities are extracted by a fit
 After a fit, both forms draw the fit's own curve.
 `predict()` evaluates the model the result was measured on, so it returns `RefinementResult.y_calc`.
 A grid compiles at the peak cut of the fit's last stage, whose windows leave out 2 % of each peak's area after a default fit.
+An edit such as `Refinement.set_values` keeps that cut, and so does a project reopened from its history.
 So `predict(result.two_theta)` returns `y_calc` bit for bit too.
+The exception is a site the fit left on a special position, reported as `SITE_MULTIPLICITY_KEPT`.
+There `y_calc` keeps the orbit count the fit solved at, and a grid counts the orbit afresh.
 
 A `Refinement` that has not been fitted compiles windows that leave out 0.1 % of each peak's area (`CLOSING_WINDOW_TOL`), so a synthetic pattern carries near-complete tails.
 A twin carrying the fitted values but no fit therefore draws a slightly different curve.
