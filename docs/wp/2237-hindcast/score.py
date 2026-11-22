@@ -4,13 +4,13 @@ import math
 import pathlib
 
 H = pathlib.Path(__file__).parent
-key = {int(k): v for k, v in json.loads((H / "key.json").read_text()).items()}
+key = {int(k): v for k, v in json.loads((H / "key.json").read_text(encoding="utf-8")).items()}
 DIRECTION = {3, 10, 11}  # also: 5 (reader default) - routing counted separately
 for arm in "APRF":
     f = H / f"arm_{arm}.json"
     if not f.exists():
         continue
-    rows = {r["case"]: r for r in json.loads(f.read_text())}
+    rows = {r["case"]: r for r in json.loads(f.read_text(encoding="utf-8"))}
     out = {}
     for subset, ids in (("all14", sorted(key)), ("clean9", [c for c in sorted(key) if not key[c]["leaked"]])):
         ps = [rows[c]["p"].get(key[c]["pick"], 0.0) for c in ids]
