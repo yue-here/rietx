@@ -570,7 +570,7 @@ def test_the_filled_controls_ink_legibly_on_their_fill(theme):
 #: and the panel for all of them, and the hover ground for the ink a ghost
 #: button's label is set in.
 TEXT_ON = {ink: ("--bg", "--panel")
-           for ink in ("--muted", "--accent-ink", "--ok", "--warn", "--bad")}
+           for ink in ("--muted", "--accent-ink", "--ok", "--warn", "--bad", "--code-string")}
 TEXT_ON["--fg"] = ("--bg", "--panel", "--hover")
 
 

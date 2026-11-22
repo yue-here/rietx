@@ -43,6 +43,7 @@
    * edit is a tint, a box and a padlock share one 18 px slot, and every
    * number sits in slots sized from the last fit, never from what is typed.
    */
+  import { structureScript, type Say } from "./console";
   import { ApiError, api } from "../api";
   import Help from "../Help.svelte";
   import { fnmatch } from "../lib/fnmatch";
@@ -68,7 +69,7 @@
     busy = false,
     corpus = null,
     anodes = [],
-    say = (_line: string) => {},
+    say = () => {},
     onpending = (_touched: number, _invalid: string) => {},
     onholds = (_holds: ReadonlyMap<string, boolean>) => {},
     onmoved = () => {},
@@ -78,7 +79,7 @@
     corpus?: HelpCorpus | null;
     /** `GET /api/capabilities`'s anodes, for the Instrument dialog */
     anodes?: readonly Anode[];
-    say?: (line: string) => void;
+    say?: Say;
     /** the pending edits, reported to the shell's action bar (WP-2123): how
      *  many, and the first invalid one's reason or "" */
     onpending?: (touched: number, invalid: string) => void;
@@ -315,8 +316,9 @@
   }
 
   async function bulkVary(vary: boolean) {
-    say(`ref.set_vary(${JSON.stringify(glob)}, ${vary ? "True" : "False"})`);
-    await patch({ vary: { [glob]: vary } });
+    // echoed once it lands: the console is what ran, and the script repeats it
+    if (await patch({ vary: { [glob]: vary } }))
+      say("call", `ref.set_vary(${JSON.stringify(glob)}, ${vary ? "True" : "False"})`);
   }
 
   /** Apply the pending edits; true when there were none or they all landed,
@@ -330,25 +332,33 @@
     if (holdEdits.size) body.hold = Object.fromEntries(holdEdits);
     if (limitEdits.size) body.limits = Object.fromEntries(limitEdits);
     if (restraintEdits.size) body.restraints = Object.fromEntries(restraintEdits);
-    if (Object.keys(values).length) say(`ref.set_values(${JSON.stringify(values)})`);
-    for (const [path, flag] of varyEdits) {
-      say(`ref.set_vary(${JSON.stringify(path)}, ${flag ? "True" : "False"})`);
-    }
-    for (const [path, flag] of holdEdits) {
-      say(`ref.${flag ? "hold" : "unhold"}(${JSON.stringify(path)})`);
-    }
-    if (limitEdits.size || restraintEdits.size) {
-      const onInstrument = [...limitEdits.keys()].some((p) => p.startsWith("instrument."));
-      const onStructure = restraintEdits.size > 0
-        || [...limitEdits.keys()].some((p) => !p.startsWith("instrument."));
-      const args = [onStructure ? "structure=…" : "", onInstrument ? "instrument=…" : ""]
-        .filter(Boolean).join(", ");
-      say(`ref.edit(${args})  # limits and restraints`);
-    }
     const needsPatch = Object.keys(values).length || varyEdits.size || holdEdits.size
       || limitEdits.size || restraintEdits.size;
     if (needsPatch) {
       if (!(await patch(body))) return false;
+      // landed, so echoed, in the order the route ran them
+      // (`session._apply_param_arms`): limits and restraints, the releases,
+      // values, the vary flags, the holds. The script repeats this order,
+      // and `set_vary` refuses a path still held.
+      // A refused patch ran nothing the script could repeat.
+      if (limitEdits.size || restraintEdits.size) {
+        const onInstrument = [...limitEdits.keys()].some((p) => p.startsWith("instrument."));
+        const onStructure = restraintEdits.size > 0
+          || [...limitEdits.keys()].some((p) => !p.startsWith("instrument."));
+        const args = [onStructure ? "structure=…" : "", onInstrument ? "instrument=…" : ""]
+          .filter(Boolean).join(", ");
+        say("call", `ref.edit(${args})  # limits and restraints`, null);
+      }
+      for (const [path, flag] of holdEdits) {
+        if (!flag) say("call", `ref.unhold(${JSON.stringify(path)})`);
+      }
+      if (Object.keys(values).length) say("call", `ref.set_values(${JSON.stringify(values)})`);
+      for (const [path, flag] of varyEdits) {
+        say("call", `ref.set_vary(${JSON.stringify(path)}, ${flag ? "True" : "False"})`);
+      }
+      for (const [path, flag] of holdEdits) {
+        if (flag) say("call", `ref.hold(${JSON.stringify(path)})`);
+      }
       // landed: a retry after a refused position below must not send these
       // again (an unhold of a path no longer held is refused)
       edits = new Map();
@@ -360,11 +370,12 @@
     for (const [atom, fields] of positionEdits) {
       const xyz = ["x", "y", "z"].map((axis) =>
         axis in fields ? Number(fields[axis]) : (byPath.get(`${atom}.${axis}`)?.value ?? 0));
-      // no verb of this name exists: the server projects the position onto
-      // the site's DOFs and records a set_values node (WP-1215)
-      say(`# ${atom} moved to ${JSON.stringify(xyz)}, set on its site's dof.k`);
       try {
-        await api.position(atom, xyz);
+        // the server projects the position onto the site's DOFs and records
+        // a set_values node (WP-1215); its answer names the values it set
+        const out = await api.position(atom, xyz);
+        if (out?.changed && out.values)
+          say("call", `ref.set_values(${JSON.stringify(out.values)})  # ${atom} to ${JSON.stringify(xyz)}`);
       } catch (exc) {
         // what landed before this changed the structure; the panel re-reads it
         await load();
@@ -413,7 +424,7 @@
     restraintEdits = keep(restraintEdits);
     positionEdits = keep(positionEdits,
                          (atom, fields) => Object.keys(fields).some((axis) => gone(`${atom}.${axis}`)));
-    if (dropped.length) say(`# pending edits dropped: ${[...new Set(dropped)].sort().join(", ")}`);
+    if (dropped.length) say("comment", `# pending edits dropped: ${[...new Set(dropped)].sort().join(", ")}`);
     return dropped;
   }
 
@@ -642,7 +653,7 @@
       const next = clone((await api.structure()).structure);
       change(next);
       await api.patchStructure(next, label);
-      say(echo);
+      say("call", echo, structureScript(next));
       refusal = "";
       await landed();
       return "";
@@ -670,7 +681,7 @@
   async function toggleAniso(base: string, on: boolean) {
     try {
       await api.aniso(base, on);
-      say(`# ${base}: aniso ${on ? "on, AnisoU.isotropic(Uiso, cell)" : "off, Biso from U_eq"}`);
+      say("comment", `# ${base}: aniso ${on ? "on, AnisoU.isotropic(Uiso, cell)" : "off, Biso from U_eq"}`);
       refusal = "";
       await landed();
     } catch (exc) {
@@ -686,7 +697,7 @@
     try {
       const preview = await api.uploadFile("cif", file);
       await api.patchStructure({ upload: preview.upload }, `structure from ${file.name}`);
-      say(`ref.edit(structure=structure_from_cif(${JSON.stringify(file.name)}))`);
+      say("call", `ref.edit(structure=structure_from_cif(${JSON.stringify(file.name)}))`, null);
       refusal = "";
       await landed();
     } catch (exc) {
@@ -1003,7 +1014,7 @@
     }
     edits = nextEdits;
     positionEdits = nextPositions;
-    if (editor.keys.length > 1) say(`# ${editor.keys.length} values set to ${text}`);
+    if (editor.keys.length > 1) say("comment", `# ${editor.keys.length} values set to ${text}`);
     return true;
   }
 

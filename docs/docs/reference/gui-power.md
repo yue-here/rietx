@@ -305,6 +305,7 @@ indices int32, so a browser reads each array without copying it.
 | `POST /api/export/cif` · `POST /api/export/html` · `POST /api/export/qpa` | the refined structure; the page `rietx html` writes; the phase fractions |
 | `POST /api/export/reflections` · `POST /api/export/result_json` | the reflection list; the whole result |
 | `POST /api/export/instrument_profile` | the instrument, answered from the project because it needs no result |
+| `POST /api/export/script` | the console as a Python script; the page holds the session's calls, so the body carries the text as `script` and the route only writes it |
 | `POST /api/upload/pattern` · `POST /api/upload/cif` · `POST /api/upload/instrument` | the three routes whose body is raw bytes rather than JSON: a file goes up as itself, with its name and reader options in the query string |
 | `GET /api/upload/pattern/scans` | what each scan in a multi-scan file is, fetched when the picker is opened |
 

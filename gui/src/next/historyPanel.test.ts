@@ -56,7 +56,7 @@ const text = (el: Element | null) => (el?.textContent ?? "").replace(/\s+/g, " "
 function open(props: Record<string, unknown> = {}) {
   const calls = { count: 0, compared: undefined as any, restored: null as any, moved: 0, said: [] as string[] };
   app = mount(History, { target: document.body, props: {
-    head: "n0004", say: (l: string) => calls.said.push(l),
+    head: "n0004", say: (_kind: string, l: string) => calls.said.push(l),
     oncount: (n: number) => (calls.count = n),
     oncompare: (c: any) => (calls.compared = c),
     onrestore: (p: any) => (calls.restored = p),

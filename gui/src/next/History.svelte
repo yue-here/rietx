@@ -19,6 +19,7 @@
    *   echoes the call.
    */
   import { api } from "../api";
+  import type { LineKind } from "./console";
   import { normalize, type ParamRow } from "../lib/table";
   import Ask, { type AskField } from "./Ask.svelte";
   import Menu, { type MenuAt, type MenuEntry } from "./Menu.svelte";
@@ -45,7 +46,7 @@
     view?: "graph" | "table";
     /** the node whose fit is overlaid on the pattern */
     compared?: string | null;
-    say: (line: string) => void;
+    say: (kind: LineKind, text: string, script?: string | null) => void;
     /** the node count, for the tab's label */
     oncount?: (n: number) => void;
     /** overlay a node's curve, or clear it with null */
@@ -141,7 +142,7 @@
       return;
     }
     onrestore(plan);
-    say(`# ${node.id}'s values loaded as ${count} pending edit${count === 1 ? "" : "s"}; Apply sets them`);
+    say("comment", `# ${node.id}'s values loaded as ${count} pending edit${count === 1 ? "" : "s"}; Apply sets them`);
   }
 
   /** The node a refused Restore offers to make current, in the note's button. */
@@ -154,7 +155,7 @@
     note = "";
     try {
       await api.checkout(id);
-      say(`ref.checkout(${JSON.stringify(id)})`);
+      say("call", `ref.checkout(${JSON.stringify(id)})`);
       onmoved();
     } catch (exc) {
       note = (exc as Error).message;
@@ -211,17 +212,17 @@
     try {
       if (a.verb === "note") {
         await api.annotate(id, { label: text });
-        say(`p.history.annotate(${call(id)}, label=${JSON.stringify(text)})`);
+        say("call", `p.history.annotate(${call(id)}, label=${JSON.stringify(text)})`);
         await load();
       } else if (a.verb === "name") {
         if (!text) return "A name is needed";
         await api.tag(id, text);
-        say(`p.history.tag(${call(id)}, ${JSON.stringify(text)})`);
+        say("call", `p.history.tag(${call(id)}, ${JSON.stringify(text)})`);
         await load();
       } else {
         await api.branch(id, text);
-        if (text) say(`p.history.tag(${call(id)}, ${JSON.stringify(text)})`);
-        say(`ref.checkout(${call(id)})`);
+        if (text) say("call", `p.history.tag(${call(id)}, ${JSON.stringify(text)})`);
+        say("call", `ref.checkout(${call(id)})`);
         onmoved();
       }
       return "";

@@ -70,8 +70,15 @@ describe("the File menu", () => {
     expect(exportBlocked(k("html"), { ...OPEN, busy: true })).toBe("A run is in flight");
     const sub = item(fileMenu({ ...OPEN, nPhases: 1 }), "export").sub!
       .filter((e): e is MenuItem => e !== "-");
-    expect(sub.map((e) => e.id)).toEqual(EXPORT_KINDS.map((e) => `export:${e.kind}`));
+    // the Console's script is offered only by a page that keeps the calls (WP-2212)
+    const kinds = EXPORT_KINDS.map((e) => `export:${e.kind}`);
+    expect(sub.map((e) => e.id)).toEqual(kinds.filter((id) => id !== "export:script"));
     expect(sub.find((e) => e.id === "export:qpa")!.disabled).toBe(true);
+    const scripted = item(fileMenu({ ...OPEN, hasResult: false, scriptable: true }), "export").sub!
+      .filter((e): e is MenuItem => e !== "-");
+    expect(scripted.map((e) => e.id)).toEqual(kinds);
+    // the script describes the session, so it needs no fit
+    expect(scripted.find((e) => e.id === "export:script")!.disabled).toBe(false);
   });
 
   it("reads ⌘O, ⇧⌘S and ⌘S, and leaves ⌘N, ⌘W and ⌥ to the browser", () => {

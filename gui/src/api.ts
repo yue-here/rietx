@@ -113,6 +113,8 @@ export interface InstrumentEdit {
   freed: string[];
   /** built paths the free register still named and the new model fixes */
   fixed: string[];
+  /** the release ran after the edit: the old model built no table (WP-2212) */
+  release_after?: boolean;
   ended: string[];
 }
 
@@ -405,7 +407,8 @@ export const api = {
 
   /** One export kind; with `directory` it is written there rather than into
    *  `exports/`, and an existing file is refused unless `overwrite` (WP-2133). */
-  export: (kind: string, body: { directory?: string; filename?: string; overwrite?: boolean } = {}) =>
+  export: (kind: string, body: { directory?: string; filename?: string; overwrite?: boolean;
+                                 script?: string } = {}) =>
     call("POST", `/api/export/${kind}`, body),
   events: (since: number) => call("GET", `/api/events?poll=1&since=${since}`),
 };
