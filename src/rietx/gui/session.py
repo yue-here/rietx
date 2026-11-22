@@ -141,6 +141,7 @@ EXPORT_DEFAULTS = {
     "html": "fit.html",
     "result_json": "result.json",
     "instrument_profile": "instrument_profile.json",
+    "script": "session.py",
 }
 
 #: Exports that describe the **model** rather than a fit, and are therefore
@@ -150,7 +151,10 @@ EXPORT_DEFAULTS = {
 #: calibration is frozen *from* — the file is written to be loaded into the next
 #: sample's project, and the fit that produced it has already been run and its
 #: numbers already stand in the model (WP-1214).
-_EXPORT_MODEL_ONLY = frozenset({"instrument_profile"})
+#: The Console's script (WP-2212) is the third kind of answer: the page holds
+#: the session's calls, so the request carries the text and the server only
+#: writes it, through the same destination rules.
+_EXPORT_MODEL_ONLY = frozenset({"instrument_profile", "script"})
 
 
 def _utcnow() -> str:
@@ -1812,7 +1816,13 @@ class GuiSession:
 
         The answer carries ``released``, ``freed`` and ``fixed`` for the
         console, and ``ended``: the paths whose old parameter the edit removed
-        or redefined, so a client drops its pending edits on them.
+        or redefined, so a client drops its pending edits on them. ``freed``
+        and ``fixed`` are what ``set_vary`` returned, never the lists offered
+        to it: it can refuse a locked or force-fixed path, and the console
+        line, which the Console's script repeats, must name only what changed
+        (WP-2212, WP-2229's finding 8). ``release_after`` says the release ran
+        after the edit, as it must on an old model with no table, so the
+        script repeats the two in that order.
         """
         self._require_idle()
         p = self._need_project()
@@ -1820,20 +1830,28 @@ class GuiSession:
             _need(body, "instrument"), lambda: p.data.metadata), self.uploads)
         label = body.get("label") or "instrument edited"
         arms = _register_arms(p.refinement, instrument)
+        #: what the two ``set_vary`` calls changed, on the last run of ``apply``
+        changed: dict[str, list[str]] = {"freed": [], "fixed": []}
 
         def apply(ref) -> str | None:
             if arms is None:  # no table: the edit's own refusal says why
                 return _edit_on(ref, instrument=instrument, label=label)
-            release, free, fix, _ = arms
+            release, free, fix, _, tableless = arms
+            changed["freed"], changed["fixed"] = [], []
             try:
-                if release:
+                # a release is a register verb, which builds the table: on an
+                # old model with none it waits for the edit (finding 5)
+                if release and not tableless:
                     ref.unhold(release)
                 node = _edit_on(ref, instrument=instrument, label=label)
+                if release and tableless:
+                    ref.unhold(release)
+                    node = ref._head_id
                 if free:
-                    ref.set_vary(free, True)
+                    changed["freed"] = sorted(ref.set_vary(free, True))
                     node = ref._head_id
                 if fix:
-                    ref.set_vary(fix, False)
+                    changed["fixed"] = sorted(ref.set_vary(fix, False))
                     node = ref._head_id
             except ValueError as exc:  # a register verb's refusal, in its words
                 raise GuiError(str(exc), where=release + free + fix) from None
@@ -1842,8 +1860,9 @@ class GuiSession:
         if arms and (arms[0] or arms[1] or arms[2]):
             rehearse(p.refinement, apply)
         node = apply(p.refinement)
-        release, free, fix, ended = arms or ([], [], [], [])
-        return {"node_id": node, "released": release, "freed": free, "fixed": fix,
+        release, _, _, ended, tableless = arms or ([], [], [], [], False)
+        return {"node_id": node, "released": release, "freed": changed["freed"],
+                "fixed": changed["fixed"], "release_after": tableless,
                 "ended": ended, **self.instrument()}
 
     def structure_position(self, body: dict) -> dict:
@@ -1887,7 +1906,9 @@ class GuiSession:
             # a locked DOF, or a bound — the message travels intact, as it does
             # through `params_patch`
             raise GuiError(str(exc), where=sorted(moved["values"])) from None
+        # the values set, so the console can echo the call that repeats it
         return {"node_id": p.refinement._head_id, "changed": True,
+                "values": {k: float(v) for k, v in moved["values"].items()},
                 "nearest": moved["nearest"], **self.structure()}
 
     def structure_aniso(self, body: dict) -> dict:
@@ -3435,6 +3456,9 @@ class GuiSession:
                            f"available: {sorted(EXPORT_DEFAULTS)}",
                            code="NOT_FOUND", status=404)
         res = None if kind in _EXPORT_MODEL_ONLY else self._need_result()
+        if kind == "script" and not isinstance(body.get("script"), str):
+            raise GuiError("a script export carries the script's text as `script`",
+                           where=["script"])
         filename = body.get("filename") or EXPORT_DEFAULTS[kind]
         if body.get("directory"):
             target = self._export_elsewhere(body["directory"], filename)
@@ -3444,7 +3468,9 @@ class GuiSession:
             target = self._export_target(filename)
         ref = p.refinement
         try:
-            if kind == "instrument_profile":
+            if kind == "script":
+                target.write_text(body["script"], encoding="utf-8")
+            elif kind == "instrument_profile":
                 from ..io.instrument_profile import save_instrument_profile
 
                 save_instrument_profile(ref.instrument, target)
@@ -3883,11 +3909,22 @@ _LEADING_PATH = re.compile(r"\b((?:phases|instrument)\.[\w.]*[\w])")
 
 
 def _register_arms(refinement, instrument: Instrument
-                   ) -> tuple[list[str], list[str], list[str], list[str]] | None:
+                   ) -> tuple[list[str], list[str], list[str], list[str], bool] | None:
     """What replacing the instrument asks of the hold and free registers (WP-2229).
 
-    Returns ``(release, free, fix, ended)``, or ``None`` when either model
-    builds no parameter table, whose refusal ``Refinement.edit`` gives.
+    Returns ``(release, free, fix, ended, tableless)``, or ``None`` when the
+    new model builds no parameter table, whose refusal ``Refinement.edit``
+    gives. ``tableless`` says the old model builds none.
+
+    When only the *old* model builds none (a free capillary offset with no
+    ``goniometer_radius_mm``, which a ``vary`` set after construction lets
+    through), the edit still lands, so the work is done from the registers
+    alone (WP-2229's finding 5): every held ``instrument.`` path the new table
+    lacks is released, and every held background path when the background's
+    kind or breakpoints change. Those are the paths known to have ended. The
+    free arm is left to the new model's ``vary``, since no comparison can say
+    which paths are built. A register verb builds the table too, so the
+    release runs after the edit there.
 
     The two tables are compared by path. A path the old one has and the new
     one lacks is *removed*. A background coefficient whose basis changes is
@@ -3918,15 +3955,22 @@ def _register_arms(refinement, instrument: Instrument
     from ..params.vector import ParameterTable
 
     try:
-        old = {e.path for e in ParameterTable(refinement.structure,
-                                              refinement.instrument).entries}
         new = {e.path: e for e in ParameterTable(refinement.structure, instrument).entries}
     except ValueError:
         return None
     before, after = refinement.instrument.background, instrument.background
+    rebased = (before.kind != after.kind
+               or getattr(before, "breakpoints", None) != getattr(after, "breakpoints", None))
+    try:
+        old = {e.path for e in ParameterTable(refinement.structure,
+                                              refinement.instrument).entries}
+    except ValueError:
+        release = sorted(h for h in refinement._user_holds if h.startswith("instrument.")
+                         and (h not in new
+                              or (rebased and h.startswith("instrument.background."))))
+        return release, [], [], release, True
     redefined: set[str] = set()
-    if (before.kind != after.kind
-            or getattr(before, "breakpoints", None) != getattr(after, "breakpoints", None)):
+    if rebased:
         redefined = {p for p in old if p.startswith("instrument.background.")}
     ended = (old - new.keys()) | redefined
     built = {p for p in new if p not in old or p in redefined}
@@ -3934,7 +3978,7 @@ def _register_arms(refinement, instrument: Instrument
     free = sorted(p for p in built if new[p].vary)
     declared = set(refinement._free_paths)
     fix = sorted(p for p in built if not new[p].vary and p in declared)
-    return release, free, fix, sorted(ended)
+    return release, free, fix, sorted(ended), False
 
 
 def rehearse(refinement, apply: Callable[[Any], Any]) -> None:
