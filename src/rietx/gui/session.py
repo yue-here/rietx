@@ -1887,7 +1887,9 @@ class GuiSession:
             # a locked DOF, or a bound — the message travels intact, as it does
             # through `params_patch`
             raise GuiError(str(exc), where=sorted(moved["values"])) from None
+        # the values set, so the console can echo the call that repeats it
         return {"node_id": p.refinement._head_id, "changed": True,
+                "values": {k: float(v) for k, v in moved["values"].items()},
                 "nearest": moved["nearest"], **self.structure()}
 
     def structure_aniso(self, body: dict) -> dict:

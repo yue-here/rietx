@@ -316,8 +316,9 @@
   }
 
   async function bulkVary(vary: boolean) {
-    say("call", `ref.set_vary(${JSON.stringify(glob)}, ${vary ? "True" : "False"})`);
-    await patch({ vary: { [glob]: vary } });
+    // echoed once it lands: the console is what ran, and the script repeats it
+    if (await patch({ vary: { [glob]: vary } }))
+      say("call", `ref.set_vary(${JSON.stringify(glob)}, ${vary ? "True" : "False"})`);
   }
 
   /** Apply the pending edits; true when there were none or they all landed,
@@ -331,25 +332,26 @@
     if (holdEdits.size) body.hold = Object.fromEntries(holdEdits);
     if (limitEdits.size) body.limits = Object.fromEntries(limitEdits);
     if (restraintEdits.size) body.restraints = Object.fromEntries(restraintEdits);
-    if (Object.keys(values).length) say("call", `ref.set_values(${JSON.stringify(values)})`);
-    for (const [path, flag] of varyEdits) {
-      say("call", `ref.set_vary(${JSON.stringify(path)}, ${flag ? "True" : "False"})`);
-    }
-    for (const [path, flag] of holdEdits) {
-      say("call", `ref.${flag ? "hold" : "unhold"}(${JSON.stringify(path)})`);
-    }
-    if (limitEdits.size || restraintEdits.size) {
-      const onInstrument = [...limitEdits.keys()].some((p) => p.startsWith("instrument."));
-      const onStructure = restraintEdits.size > 0
-        || [...limitEdits.keys()].some((p) => !p.startsWith("instrument."));
-      const args = [onStructure ? "structure=…" : "", onInstrument ? "instrument=…" : ""]
-        .filter(Boolean).join(", ");
-      say("call", `ref.edit(${args})  # limits and restraints`, null);
-    }
     const needsPatch = Object.keys(values).length || varyEdits.size || holdEdits.size
       || limitEdits.size || restraintEdits.size;
     if (needsPatch) {
       if (!(await patch(body))) return false;
+      // landed, so echoed: a refused patch ran nothing the script could repeat
+      if (Object.keys(values).length) say("call", `ref.set_values(${JSON.stringify(values)})`);
+      for (const [path, flag] of varyEdits) {
+        say("call", `ref.set_vary(${JSON.stringify(path)}, ${flag ? "True" : "False"})`);
+      }
+      for (const [path, flag] of holdEdits) {
+        say("call", `ref.${flag ? "hold" : "unhold"}(${JSON.stringify(path)})`);
+      }
+      if (limitEdits.size || restraintEdits.size) {
+        const onInstrument = [...limitEdits.keys()].some((p) => p.startsWith("instrument."));
+        const onStructure = restraintEdits.size > 0
+          || [...limitEdits.keys()].some((p) => !p.startsWith("instrument."));
+        const args = [onStructure ? "structure=…" : "", onInstrument ? "instrument=…" : ""]
+          .filter(Boolean).join(", ");
+        say("call", `ref.edit(${args})  # limits and restraints`, null);
+      }
       // landed: a retry after a refused position below must not send these
       // again (an unhold of a path no longer held is refused)
       edits = new Map();
@@ -361,11 +363,12 @@
     for (const [atom, fields] of positionEdits) {
       const xyz = ["x", "y", "z"].map((axis) =>
         axis in fields ? Number(fields[axis]) : (byPath.get(`${atom}.${axis}`)?.value ?? 0));
-      // no verb of this name exists: the server projects the position onto
-      // the site's DOFs and records a set_values node (WP-1215)
-      say("comment", `# ${atom} moved to ${JSON.stringify(xyz)}, set on its site's dof.k`);
       try {
-        await api.position(atom, xyz);
+        // the server projects the position onto the site's DOFs and records
+        // a set_values node (WP-1215); its answer names the values it set
+        const out = await api.position(atom, xyz);
+        if (out?.changed && out.values)
+          say("call", `ref.set_values(${JSON.stringify(out.values)})  # ${atom} to ${JSON.stringify(xyz)}`);
       } catch (exc) {
         // what landed before this changed the structure; the panel re-reads it
         await load();

@@ -77,7 +77,7 @@ describe("the Parameters panel's pending edits (WP-2229 case 3)", () => {
   it("drops every kind of pending edit on a gone path, positions and restraints included", async () => {
     const lines: string[] = [];
     app = mount(Params, { target: document.body, props: {
-      head: "n1", onmoved: () => {}, say: (line: string) => lines.push(line) } });
+      head: "n1", onmoved: () => {}, say: (_kind: string, line: string) => lines.push(line) } });
     await settle();
     const panel = app as any;
     panel.restoreDraft({
@@ -121,7 +121,7 @@ describe("a restored draft (review of #1683, finding 1)", () => {
   it("drops a pending edit on a path the head no longer has", async () => {
     const lines: string[] = [];
     app = mount(Params, { target: document.body, props: {
-      head: "n1", onmoved: () => {}, say: (line: string) => lines.push(line) } });
+      head: "n1", onmoved: () => {}, say: (_kind: string, line: string) => lines.push(line) } });
     await settle();
     const panel = app as any;
     // kept while the background had eight terms; the head now has c4 and c5
@@ -139,7 +139,7 @@ describe("the Instrument dialog's Load profile (WP-2229 case 1)", () => {
     const lines: string[] = [];
     const ondropped = vi.fn();
     app = mount(Instrument, { target: document.body, props: {
-      rows: ROWS, anodes: [], say: (line: string) => lines.push(line), ondropped,
+      rows: ROWS, anodes: [], say: (_kind: string, line: string) => lines.push(line), ondropped,
       onlanded: () => {}, onclose: () => {} } });
     await settle();
     const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
@@ -167,7 +167,7 @@ describe("the Instrument dialog's Apply (WP-2229 review)", () => {
     patchInstrument.mockImplementationOnce(async () => ({
       ...EDIT, released: [], freed: [], ended: ["instrument.geometry.axial_sl"] }));
     app = mount(Instrument, { target: document.body, props: {
-      rows, anodes: [], say: (line: string) => lines.push(line), ondropped: () => {},
+      rows, anodes: [], say: (_kind: string, line: string) => lines.push(line), ondropped: () => {},
       onlanded: () => {}, onclose: () => {} } });
     await settle();
     const typeInto = (field: string, value: string) => {

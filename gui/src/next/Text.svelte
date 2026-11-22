@@ -15,7 +15,7 @@
    * This component owns the debounce timer, the fetches and the DOM, and holds
    * no rule of its own.
    */
-  import { type Say } from "./console";
+  import { serverScript, type Say } from "./console";
   import { untrack } from "svelte";
   import { ApiError, api } from "../api";
   import { commentLines } from "../lib/rxt";
@@ -264,7 +264,7 @@
     try {
       const payload = await api.putTextdoc(text, sync.revision, false);
       const verbs: string[] = payload.applied ?? [];
-      for (const call of verbs) say("call", call);
+      for (const call of verbs) say("call", call, serverScript(call));
       dispatch({ kind: "applied", text: payload.text, revision: payload.revision, verbs });
       if (verbs.length) onmoved();
       return true;

@@ -153,7 +153,7 @@ Pruned 2026-11-21 at start: all four entries still hold on `origin/main` (`d76e4
 
 - [x] Questions 1 and 2 drawn and brought to the maintainer; the rulings recorded here with
   their dates (§ Rulings, 2026-11-21).
-- [ ] The tagged line type in `say()` and `consoleLine`, every writer passing its kind; the
+- [x] The tagged line type in `say()` and `consoleLine`, every writer passing its kind; the
   echoes spelled with one receiver per name, and each `…` echo made runnable or marked. Vitest
   over the kinds and over every writer's spelling.
 - [ ] `Console.svelte` draws by kind: the prompt gutter, the timestamp per entry, the muted and

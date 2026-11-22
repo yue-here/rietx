@@ -331,7 +331,6 @@
   export async function apply(): Promise<boolean> {
     if (!edits.size) return true;
     const values = Object.fromEntries(edits);
-    say("call", `ref.set_values(${JSON.stringify(values)})`);
     try {
       await api.patchParams({ values });
     } catch (exc) {
@@ -340,6 +339,7 @@
         : (exc as Error).message;
       return false;
     }
+    say("call", `ref.set_values(${JSON.stringify(values)})`);
     edits = new Map();
     error = "";
     ask();

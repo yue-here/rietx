@@ -265,9 +265,9 @@
 
   async function pick(name: string) {
     const before = snapshot();
-    say("call", `p.doc.plan = rx.PlanSpec.from_plan(resolve_plan(${JSON.stringify(name)}, p.doc.mode))`,
-        `p.doc.plan = rx.PlanSpec.from_plan(rx.strategy.staged.resolve_plan(${JSON.stringify(name)}, p.doc.mode))`);
     if (await put({ preset: name })) {
+      say("call", `p.doc.plan = rx.PlanSpec.from_plan(resolve_plan(${JSON.stringify(name)}, p.doc.mode))`,
+          `p.doc.plan = rx.PlanSpec.from_plan(rx.strategy.staged.resolve_plan(${JSON.stringify(name)}, p.doc.mode))`);
       history.record(before);
       typing = "";
       undoTick += 1;
@@ -279,9 +279,11 @@
   export async function save(): Promise<boolean> {
     if (!edited) return true;
     const plan = { ...extra, stages: $state.snapshot(stages), correlation_guard: guard };
-    say("call", `p.doc.plan = rx.PlanSpec(stages=[${stages.length}], correlation_guard=${guard})`,
-        `p.doc.plan = rx.PlanSpec.model_validate_json(${JSON.stringify(JSON.stringify(plan))})`);
-    return put({ plan });
+    const echo = `p.doc.plan = rx.PlanSpec(stages=[${stages.length}], correlation_guard=${guard})`;
+    if (!(await put({ plan }))) return false;
+    // echoed once stored: a refused plan ran nothing the script could repeat
+    say("call", echo, `p.doc.plan = rx.PlanSpec.model_validate_json(${JSON.stringify(JSON.stringify(plan))})`);
+    return true;
   }
 
   /** The edited plan, for the recovery copy (WP-2209), or `null`. */

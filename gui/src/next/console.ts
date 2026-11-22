@@ -99,3 +99,18 @@ export function structureScript(structure: unknown): string {
 export function instrumentScript(instrument: unknown): string {
   return `ref.edit(instrument=rx.Instrument.model_validate_json(${JSON.stringify(JSON.stringify(instrument))}))`;
 }
+
+/** The receivers the script's preamble binds: a call on any other cannot run
+ *  in it. */
+const BOUND = /^(p|ref|rx)\./;
+
+/**
+ * The runnable form of a call the server echoed (the Text tab's applied
+ * verbs): `undefined`, the text itself, when it names a bound receiver and
+ * elides nothing; `null` otherwise. `session.move_peak(…)` names the GUI's
+ * own session, and `rx.PlanSpec(…3 stage(s))` stands for a plan it does not
+ * spell out.
+ */
+export function serverScript(text: string): undefined | null {
+  return BOUND.test(text) && !text.includes("…") ? undefined : null;
+}
