@@ -221,9 +221,10 @@ from .restraints import (
 #: Since WP-2002 it is the **declared stages'** fraction only.  The answer is
 #: measured in the closing stage at ``schemas.plan.CLOSING_WINDOW_TOL``, and
 #: every compile that does not say otherwise uses that fraction too: a
-#: ``predict`` on a grid, a synthetic pattern, a stage run by hand (the
-#: seventh round's Q1).  The plan runner asks for this one by name, through
-#: :func:`recorded_window_tol`.
+#: ``predict`` on a grid before any fit, a synthetic pattern, a stage run by
+#: hand (the seventh round's Q1).  After a fit, ``predict`` on a grid compiles
+#: at the last stage's fraction (WP-2235).  The plan runner asks for this
+#: one by name, through :func:`recorded_window_tol`.
 WINDOW_AREA_TOL = 2e-2
 #: Absolute slack added to every half-width: windows are frozen per stage,
 #: so a peak must stay inside its window while zero-shift, displacement and
