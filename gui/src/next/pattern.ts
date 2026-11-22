@@ -96,6 +96,8 @@ export interface ChartOptions {
   scale: Scale;
   kind: ResidualKind;
   labels: { y: () => string; resid: () => string };
+  /** whether the y axes keep a strip for their titles: only while exporting */
+  titled?: () => boolean;
 }
 
 const Y: Record<Scale, "lin" | "sqrt" | "log"> = { linear: "lin", sqrt: "sqrt", log: "log" };
@@ -137,6 +139,7 @@ export class PatternChart {
       residual: opts.kind,
       hidden: overlay.hidden,
       labels: opts.labels,
+      titled: opts.titled,
       rawResidual: () => this.groupResidual(),
       layers: {
         main: { under: [shade, (u) => this.candidateLines(u)],
