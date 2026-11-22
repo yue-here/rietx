@@ -149,6 +149,29 @@ rules or amending one). The items quote private logs, so they live outside the r
 Cost: the gathering agent 311k tokens, six routing agents about 112k each; about 1.0M in
 all against a 0.5M estimate.
 
+**His batch sentence, added (2026-11-22).** In the parent session he asked to "rule on any
+clear-cut ones, think about any hard ones and only bring me the ones that really need my
+attention", and far fewer items reached him. Arms NY and MY open N and M with that request
+as a standing rule (check each call against the design rules, ethos and intended users;
+rule on the clear-cut ones; think a hard one through; bring only what really needs his
+attention), in place of "Settle every call you can". Two runs an arm, same items.
+
+| Arm | Brought (of 24) | Needless brings | Wrong settlements |
+|---|---|---|---|
+| NY | 9-10 | 3-4 | 2-4 (I17, I21; I13, I18 in one run) |
+| MY | 13-14 | 5-6 | 2-3 (I18, I21; I13 in one run) |
+
+- The sentence moves nothing beyond run-to-run noise. The drop in brings comes from
+  removing the approval-field trigger, which N and M already do; his batch request worked
+  the same way, by waiving that trigger for the batch.
+- Two wrong settlements are not routing errors: I21 is the rulebook misread every arm
+  makes, and I18 is a pick error between two settle options in every arm with a settle.
+  Without them, wrong settlements by routing are T 1, N 2-3, NY 1-2, M 0, MY 0-1.
+- I13 was scored right where the pick named the Geometry.kind preset, which his answer
+  built, and wrong where it kept tier 3 pending a comparison.
+
+Cost: four agents at about 114k tokens each, 457k against a 450k estimate.
+
 ## Tasks
 
 - [x] Hindcast test (above).
