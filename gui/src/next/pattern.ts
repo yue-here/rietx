@@ -325,25 +325,10 @@ export class PatternChart {
     const on = this.previewOn;
     if (!on) return;
     const hidden = this.overlay.hidden;
-    const { ctx } = u, dpr = devicePixelRatio, { min, max } = u.scales.x, log = u.scales.y.distr === 3;
-    const trace = (ys: ArrayLike<number>, colour: string, width: number) => {
-      ctx.strokeStyle = colour;
-      ctx.lineWidth = width * dpr;
-      ctx.setLineDash([]);
-      ctx.beginPath();
-      let pen = false;
-      for (let q = 0; q < on.tt.length; q++) {
-        const x = on.tt[q], y = ys[q];
-        if (x < min || x > max || !Number.isFinite(y) || (log && !(y > 0))) { pen = false; continue; }
-        const X = u.valToPos(x, "x", true), Y = u.valToPos(y, "y", true);
-        if (pen) ctx.lineTo(X, Y); else ctx.moveTo(X, Y);
-        pen = true;
-      }
-      ctx.stroke();
-    };
+    const { ctx } = u;
     ctx.save();
-    if (!hidden.includes("calc")) trace(on.last, this.colors.last, 1.2);
-    if (!hidden.includes("preview")) trace(on.calc, this.colors.calc, 1.4);
+    if (!hidden.includes("calc")) trace(u, on.tt, on.last, this.colors.last, 1.2, []);
+    if (!hidden.includes("preview")) trace(u, on.tt, on.calc, this.colors.calc, 1.4, []);
     ctx.restore();
   }
 
@@ -352,22 +337,9 @@ export class PatternChart {
   private compareLine(u: any): void {
     const on = this.compared;
     if (!on || this.overlay.hidden.includes("compare")) return;
-    const { ctx } = u, dpr = devicePixelRatio, { min, max } = u.scales.x, log = u.scales.y.distr === 3;
-    ctx.save();
-    ctx.strokeStyle = this.colors.compare;
-    ctx.lineWidth = 1.2 * dpr;
-    ctx.setLineDash([4 * dpr, 3 * dpr]);
-    ctx.beginPath();
-    let pen = false;
-    for (let q = 0; q < on.tt.length; q++) {
-      const x = on.tt[q], y = on.y[q];
-      if (x < min || x > max || !Number.isFinite(y) || (log && !(y > 0))) { pen = false; continue; }
-      const X = u.valToPos(x, "x", true), Y = u.valToPos(y, "y", true);
-      if (pen) ctx.lineTo(X, Y); else ctx.moveTo(X, Y);
-      pen = true;
-    }
-    ctx.stroke();
-    ctx.restore();
+    u.ctx.save();
+    trace(u, on.tt, on.y, this.colors.compare, 1.2, [4, 3]);
+    u.ctx.restore();
   }
 
   private candidateLines(u: any): void {
@@ -458,6 +430,27 @@ export class PatternChart {
     el.style.top = `${u.valToPos(h, "y")}px`;
     el.style.borderColor = this.colors.peak;
   }
+}
+
+/** A curve on its own 2θ channels over the main pane, at a width and a dash in
+ *  CSS pixels; the pen lifts outside the view and where the log scale cannot
+ *  place a value. The preview's two curves and a compared node's share it. */
+function trace(u: any, tt: ArrayLike<number>, ys: ArrayLike<number>, colour: string,
+               width: number, dash: number[]): void {
+  const { ctx } = u, dpr = devicePixelRatio, { min, max } = u.scales.x, log = u.scales.y.distr === 3;
+  ctx.strokeStyle = colour;
+  ctx.lineWidth = width * dpr;
+  ctx.setLineDash(dash.map((d) => d * dpr));
+  ctx.beginPath();
+  let pen = false;
+  for (let q = 0; q < tt.length; q++) {
+    const x = tt[q], y = ys[q];
+    if (x < min || x > max || !Number.isFinite(y) || (log && !(y > 0))) { pen = false; continue; }
+    const X = u.valToPos(x, "x", true), Y = u.valToPos(y, "y", true);
+    if (pen) ctx.lineTo(X, Y); else ctx.moveTo(X, Y);
+    pen = true;
+  }
+  ctx.stroke();
 }
 
 function readColors(): ReturnType<typeof curveColors> {

@@ -326,6 +326,10 @@
     interactivePanel?.revert();
     planPanel?.leave();
     textPanel?.forget();
+    // node ids repeat across projects (n0000, n0001, …), so a compared node
+    // is cleared here, never by looking for its id in the next history
+    compared = null;
+    historyCount = null;
   }
 
   /** Offer the open project's kept edits, or start keeping new ones. */
@@ -987,9 +991,13 @@
         <Console {lines} {dropped} shown={bottomTab === "console"} />
       </div>
       <div class="pane" class:gone={bottomTab !== "history"}>
-        <History {head} {busy} {say} view={historyView} compared={compared?.id ?? null}
-          oncount={(n) => (historyCount = n)} oncompare={(c) => (compared = c)}
-          onrestore={(plan) => paramsPanel?.loadRestore(plan)} onmoved={structureMoved} />
+        <!-- keyed on the project: two projects' heads can share an id, and
+             History re-reads only when its head changes -->
+        {#key project.path}
+          <History {head} {busy} {say} view={historyView} compared={compared?.id ?? null}
+            oncount={(n) => (historyCount = n)} oncompare={(c) => (compared = c)}
+            onrestore={(plan) => paramsPanel?.loadRestore(plan)} onmoved={structureMoved} />
+        {/key}
       </div>
     </section>
   {/if}

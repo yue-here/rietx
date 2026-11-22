@@ -93,8 +93,13 @@
     if (compared && payload && !payload.nodes.some((n) => n.id === compared)) oncompare(null);
   });
 
+  /** The last Compare pressed: an earlier press's answer arriving after it
+   *  is dropped, or it would draw a node the buttons do not show pressed. */
+  let comparing = 0;
+
   async function compare(node: HistoryNode) {
     note = "";
+    const seq = ++comparing;
     if (compared === node.id) {
       oncompare(null);
       return;
@@ -102,11 +107,13 @@
     try {
       const { unpack } = await import("./rxplot.mjs");
       const packed = unpack(await api.historyCurves(node.id));
+      if (seq !== comparing) return;
       oncompare({ id: node.id, label: stepName(node),
                   tt: Float64Array.from(packed.arrays.two_theta),
                   y: Float64Array.from(packed.arrays.y_calc) });
     } catch (exc) {
-      note = `Compare refused: ${(exc as Error).message}`;
+      if (seq !== comparing) return;
+      note = `Compare refused:${(exc as Error).message}`;
     }
   }
 
@@ -226,8 +233,9 @@
 
 {#snippet actions(node: HistoryNode)}
   {#if node.kind !== "root"}
-    <button class="ib act" aria-pressed={compared === node.id} title="Overlay this fit on the pattern"
-      onclick={() => compare(node)}>Compare</button>
+    <!-- a curve is a replay, refused while a run is in flight; taking one off is not -->
+    <button class="ib act" aria-pressed={compared === node.id} disabled={busy && compared !== node.id}
+      title="Overlay this fit on the pattern" onclick={() => compare(node)}>Compare</button>
     <button class="ib act" disabled={busy || node.id === current} title={node.id === current
       ? "This is the current state" : "Load this fit's values as pending edits"}
       onclick={() => restore(node)}>Restore</button>

@@ -3363,8 +3363,10 @@ class GuiSession:
         draws the same curve only for a node with the head's paths, no moved
         atom and no Le Bail intensities of its own (WP-2211 § Measured).
         Writes nothing. Idle-only, like every verb that compiles. The curve is
-        on the node's channels, which can differ from the head's, so a client
-        places it by 2θ.
+        on the node's 2θ range, which can differ from the head's, so a client
+        places it by 2θ. The excluded regions are the project's current ones:
+        a node records none of its own, so a region excluded since it ran
+        leaves a gap in its curve.
         """
         import numpy as np
 
@@ -3380,9 +3382,14 @@ class GuiSession:
             res = replay(p.history, node, p.data)
         except ValueError as exc:
             raise GuiError(str(exc), code="MODEL_REFUSED") from None
+        tt = np.asarray(res.two_theta, dtype=np.float64)
+        y = np.asarray(res.y_calc, dtype=np.float64)
+        # past the curves route's ceiling, thinned as that route thins (WP-1461)
+        if len(tt) > _packed.CURVES_CEILING:
+            keep = decimation_index(tt, [y], _packed.CURVES_CEILING)
+            tt, y = tt[keep], y[keep]
         return Packed({"node": node, "rwp": res.statistics.rwp},
-                      {"two_theta": np.asarray(res.two_theta, dtype=np.float64),
-                       "y_calc": np.asarray(res.y_calc, dtype=np.float64)})
+                      {"two_theta": tt, "y_calc": y})
 
     def history_checkout(self, body: dict) -> dict:
         """Restore a node's state as the working state (``git checkout``)."""

@@ -127,6 +127,10 @@ export function lanes(nodes: readonly HistoryNode[]): Lanes {
 // -- Restore --------------------------------------------------------------------
 
 const COORDINATE = /^(phases\.\d+\.atoms\.\d+)\.([xyz])$/;
+/** A site's displacement DOF or a body origin's: *relative*, rederived to zero
+ *  on every build, so its value is no state to restore (root CLAUDE.md
+ *  § Invariants). Strain, texture and ADP DOFs are absolute and are restored. */
+const ANCHORED_DOF = /\.(atoms\.\d+|origin)\.dof\.\d+$/;
 
 export interface RestorePlan {
   /** path → the node's value, as the text a typed edit holds */
@@ -145,7 +149,8 @@ export interface RestorePlan {
  * Every differing value goes in, as WP-2211 § Measured decided: a free or
  * fixed row as a value edit, a coordinate as its atom's position edit, since
  * a coordinate reaches the table through its site's directions. A tied or
- * locked row is left out, since it follows what is restored. The free set,
+ * locked row is left out, since it follows what is restored, and so is a
+ * site's displacement DOF, which is relative. The free set,
  * ties and holds stay as the working state has them. A path one side lacks
  * means the model itself differs, so nothing can be loaded and `missing`
  * names those paths.
@@ -166,7 +171,7 @@ export function restorePlan(diff: Record<string, Array<number | null>>,
       (out.positions[coordinate[1]] ??= {})[coordinate[2]] = String(node);
       continue;
     }
-    if (row.tie || row.locked || path.includes(".dof.")) continue;
+    if (row.tie || row.locked || ANCHORED_DOF.test(path)) continue;
     out.values[path] = String(node);
   }
   out.missing.sort();

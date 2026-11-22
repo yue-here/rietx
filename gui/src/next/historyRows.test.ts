@@ -114,6 +114,13 @@ describe("Restore", () => {
     expect(restoreCount(plan)).toBe(3);
   });
 
+  it("restores an absolute DOF and leaves out a site's relative one", () => {
+    const plan = restorePlan({
+      "phases.0.microstrain.dof.0": [12, 10], "phases.0.atoms.1.dof.0": [0.01, 0],
+    }, [...rows, row("phases.0.microstrain.dof.0")]);
+    expect(plan.values).toEqual({ "phases.0.microstrain.dof.0": "12" });
+  });
+
   it("names the paths either side lacks: the model itself differs", () => {
     const plan = restorePlan({
       "phases.0.atoms.4.biso": [0.5, null], "phases.0.scale": [1.5, 1.4],
