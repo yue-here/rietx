@@ -15,6 +15,7 @@
    * This component owns the debounce timer, the fetches and the DOM, and holds
    * no rule of its own.
    */
+  import { serverScript, type Say } from "./console";
   import { untrack } from "svelte";
   import { ApiError, api } from "../api";
   import { commentLines } from "../lib/rxt";
@@ -32,7 +33,7 @@
     active = false,
     dark = false,
     name = "project",
-    say = (_line: string) => {},
+    say = () => {},
     onmoved = () => {},
     onpending = (_edited: boolean, _why: string) => {},
     onapply = () => {},
@@ -45,7 +46,7 @@
     dark?: boolean;
     /** the project's name, which titles the file */
     name?: string;
-    say?: (line: string) => void;
+    say?: Say;
     onmoved?: () => void;
     /** whether the buffer differs from the rendering, and why it cannot be
      *  applied when it cannot ("" when it can) */
@@ -263,7 +264,7 @@
     try {
       const payload = await api.putTextdoc(text, sync.revision, false);
       const verbs: string[] = payload.applied ?? [];
-      for (const call of verbs) say(call);
+      for (const call of verbs) say("call", call, serverScript(call));
       dispatch({ kind: "applied", text: payload.text, revision: payload.revision, verbs });
       if (verbs.length) onmoved();
       return true;
