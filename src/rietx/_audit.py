@@ -4312,7 +4312,8 @@ ROWS: tuple[Row, ...] = (
                  "so an unlisted reflection has at most that share outside. Read on the issue's "
                  "synthetic families, SRM 1976a and 11-BM LaB6 660a. Where it fails: a "
                  "reflection past the model's generation margin is not listed (#1481), and "
-                 "reflections_searched is approximate.")),
+                 "reflections_searched is approximate."),
+        approved="2026-11-22", approved_by="checked"),
     Row("rietx.report.layer0.LAYER0_MATCH_TOL_DEG", "constant", value=0.08),
     Row("rietx.report.layer2.BACKGROUND_INCREASE_CAP", "constant", value=0.6),
     Row("rietx.report.layer2.IMPURITY_SIGMA", "constant", value=8.0),
