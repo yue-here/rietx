@@ -310,6 +310,27 @@ The Text tab (the second PR), most consequential first:
 
 ## Handover log
 
+- **2026-11-22** — the maintainer's look at R4, the third PR (branch `wp2231-gui-r4-look`, no
+  PR yet), paused by the shift's budget. Six of the eight look items landed, one commit each,
+  with the dist rebuilt and their pictures retaken under `docs/wp/2231-screenshots/`:
+  item 7 (the stale notice's words, and Re-read as a Button set apart from them), item 5
+  (Never freed as read-only chips), item 6 (a `?` box on the model strip for all four tabs,
+  in `gui/src/next/HelpBox.svelte` and `helpbox.ts`), item 1 (the √, log and Δ/σ marks in
+  the tick-label column, over the top labelled tick), item 2 (the Difference label on the
+  strip's zero line) and item 3 (horizontal gridlines on the intensity pane; `gui/STYLE.md`
+  § Plots updated for both).
+  - *Not done*: item 8 (a Text edit previews on the plot) was half-written and set aside
+    uncommitted: the validation route's `delta.values` feed a `PreviewQueue` in
+    `next/Text.svelte`, and the frame keeps the slider and text previews apart. The runner's
+    scratch holds the draft. Item 4 (the last refined or preview toggle) is not started; its
+    placement and words are in no design, so its options go to the maintainer in pictures.
+    The graph strip's `?` box is not built.
+  - *Measured so far*: vitest on the touched files, svelte-check not yet run; no fast suite,
+    browser files, lint steps or `tests.reader_output` yet. Nothing here changes what a fit
+    prints or returns.
+  - *Next*: item 8, then item 4, then § Settled 11 and 12 marked reversed, the pictures'
+    README, the gates and `/wp-handover`.
+
 - **2026-11-21** — the Text tab at `/next`, the second of R4's two PRs (#1763), and the
   screenshots and inventory for both tabs. The rebuilt page now shows the project as `.rxt`
   text. A typed change is one pending edit in the action bar beside the Parameters panel's,
