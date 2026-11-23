@@ -298,6 +298,7 @@ A `ValueRestraint` path with a `hist.<h>.` prefix is refused, because a restrain
 Each pattern's report lists the shared restraints too, so its `RestraintReport.restraint_chi2` counts them, and a sum over patterns counts a shared restraint once per pattern.
 `RESTRAINT_TENSION` follows the placement rule below.
 A restraint on the shared structure raises it once at the top level, and a per-pattern one on its pattern's list.
+`RESTRAINT_ON_FIXED_BODY_GEOMETRY` is about the declared restraints, which every pattern compiles alike, so it is raised once at the top level.
 
 ### Diagnostic placement
 

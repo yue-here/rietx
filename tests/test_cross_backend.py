@@ -1998,6 +1998,26 @@ def _multi_jacobian(backend: str, mode: str = "rietveld", kind: str = "plain"):
 
 @pytest.mark.parametrize("mode", MULTI_MODES)
 @pytest.mark.parametrize("kind", MULTI_STATES)
+def test_stacked_row_count_bounds_the_joint_residual(mode, kind):
+    """``_stacked_rows`` sizes the joint Jacobian for ``blocked.choose_layout``,
+    so it counts every block ``rows.block_sizes`` holds, Pawley's restraint rows
+    included (WP-1995).  A joint fit has no origin rows (it refuses a centroid
+    origin), so the count is every model's ``n_rows``.  It is a bound: the
+    residual holds a shared soft restraint once, and with none it is exact."""
+    from rietx.model import rows as row_layout
+    from rietx.optimize.least_squares import _stacked_rows
+
+    models, mtable, theta, _labels = _multi_state(mode, kind)
+    n_resid = _multi_closures(models, mtable)[0](theta).size
+    n_data, n_rows = _stacked_rows(models)
+    assert n_data == sum(m.tt.size for m in models)
+    assert n_rows == sum(row_layout.n_rows(m) for m in models) >= n_resid
+    if not any(m.restraints is not None and m.restraints.n_rows for m in models):
+        assert n_rows == n_resid
+
+
+@pytest.mark.parametrize("mode", MULTI_MODES)
+@pytest.mark.parametrize("kind", MULTI_STATES)
 @pytest.mark.parametrize("method", list(METHODS))
 def test_multi_histogram_stacked_jacobian_matches_analytic(method, mode, kind):
     """The same matrix over the stacked ``run_multi_least_squares`` layout.

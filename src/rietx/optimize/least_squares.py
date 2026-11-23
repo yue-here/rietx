@@ -3702,8 +3702,8 @@ def _stacked_rows(models: list[CompiledModel]) -> tuple[int, int]:
     once (:func:`_joint_restraint_rows`), so ``n_rows`` is a bound."""
     sizes = [row_layout.block_sizes(m) for m in models]
     n_data = sum(s["data"] for s in sizes)
-    return n_data, n_data + sum(s["background_penalty"] + s["soft_restraint"]
-                                for s in sizes)
+    return n_data, n_data + sum(s["background_penalty"] + s["pawley_restraint"]
+                                + s["soft_restraint"] for s in sizes)
 
 
 def _joint_aux_counts(models: list[CompiledModel]) -> list[int]:

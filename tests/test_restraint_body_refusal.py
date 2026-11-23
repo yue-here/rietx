@@ -250,3 +250,21 @@ def test_a_fit_runs_and_the_warning_reaches_the_result():
     found = [d for d in result.diagnostics if d.code == CODE]
     assert len(found) == 1 and found[0].level == "warning"
     assert "Drop the restraint" in found[0].suggestion
+
+
+def test_a_joint_fit_tells_the_warning_once_at_the_top_level():
+    """The joint twin of the test above (WP-1995): every pattern compiles the
+    one declaration and finds the same, so the warning is told once, on
+    ``RefinementResult.diagnostics``, and on no pattern's list."""
+    from rietx.multi import MultiHistogramRefinement
+
+    bond = BondRestraint(atom_i=_index("K0"), atom_j=_index("K1"), target=1.5, sigma=0.01)
+    tt = np.arange(10.0, 40.0, 0.05)
+    pattern = PatternData(two_theta=tt.tolist(), intensity=(100.0 + 0.0 * tt).tolist())
+    joint = MultiHistogramRefinement(Structure(phases=[_phase([bond])]),
+                                     [INS, INS.model_copy(deep=True)])
+    result = joint.fit([pattern, pattern])
+    found = [d for d in result.diagnostics if d.code == CODE]
+    assert len(found) == 1 and found[0].level == "warning"
+    assert "Drop the restraint" in found[0].suggestion
+    assert not [d for h in result.histograms for d in h.diagnostics if d.code == CODE]

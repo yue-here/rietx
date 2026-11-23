@@ -2764,6 +2764,11 @@ class MultiHistogramRefinement:
             diagnostics = diagnostics + _restraint_tension_diagnostics(
                 _restraint_rows_held(restraint_reports[0], models[0], shared,
                                      once=True), mt.structures[0])
+        # the compile-time findings about the declared rows (WP-1814 C1), as
+        # the single fit appends them: every histogram compiles the one
+        # declaration and finds the same, so they are told once (SPECIMEN)
+        if models[0].restraints is not None:
+            diagnostics = diagnostics + models[0].restraints.findings
         # each equation a coefficient of which no stage freed (WP-2101)
         diagnostics = diagnostics + _parametric_not_freed_diagnostics(
             mt, coefficients, stage_results)
