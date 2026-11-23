@@ -85,6 +85,21 @@ preset bundles this WP's declarations, rule 4); WP-2103 (a joint fit starting fr
 result, rule 2's other half); WP-1325 and WP-1964 (equations on the joint call); WP-1435 (the
 hold); WP-1441 (`constrain`).
 
+### Inherited
+
+- **2026-11-23, from the API review (WP-2302's batch, `2302-batch/plans.md`).** The trap this
+  WP's vocabulary settles reaches a single fit too. On the NAC example (`f9adf0e57`),
+  `Refinement.set_vary("instrument.zero_shift", False)` and then `fit()` refines zero shift
+  again, with no warning and no diagnostic, because a plan starts every fit from nothing free
+  (WP-1208). DESIGN Rule 4 now says a literal the call cannot honour raises before any work,
+  and Rule 5 that a convention letting the likeliest mistake pass in silence is found wrong
+  (both amended 2026-11-23). Three fixes were weighed and none taken outside this WP: a
+  diagnostic when a plan re-frees a path the caller fixed (withdrawn: it needs state outside
+  the models, and no `set_vary` node is recorded before the first fit); making
+  `set_vary(..., False)` a hold (changes the verb for every user); splitting the verb into two
+  named verbs (renames the top-level surface). Measure first which calls still read a vary
+  flag a caller set before a fit, then decide alongside the declaration's vocabulary.
+
 ## Non-goals
 
 - The common and equation kinds on the joint call: they exist there (`SharingMap`,
