@@ -38,6 +38,7 @@ from rietx.sequential import (
     _direction_gaps,
     _entry_from_result,
     _labels_for,
+    _PatternRaised,
     _reseed_diagnostics,
     _reseed_needed,
     _series_steps,
@@ -561,6 +562,125 @@ def test_a_hold_declared_in_constrain_reaches_every_pattern(thermal_patterns):
         plot_result(result, path=str(out / f"sequential_held_cell_p{k}.png"))
         plot_result(result, path=str(out / f"sequential_held_cell_p{k}_zoom.png"),
                     two_theta_range=(3.0, 10.0))
+
+
+class _ColdOnFrame(SequentialRefinement):
+    """A runner whose warm rungs raise on one pattern, so its cold rung is kept.
+
+    Issue #224's runaway neighbour, which made every warm rung raise, is what
+    sends a real pattern there; this forces it on WP-2081's four-pattern ramp.
+    """
+
+    cold_index = 2
+
+    def _fit_one(self, data, label, previous, previous_hkl, plan, mode,
+                 two_theta_limits, position, previous_tag, prepare, constrain,
+                 index, *args, **kw):
+        if index == self.cold_index and previous is not None:
+            raise _PatternRaised(RuntimeError("forced to the cold rung"))
+        return super()._fit_one(data, label, previous, previous_hkl, plan, mode,
+                                two_theta_limits, position, previous_tag,
+                                prepare, constrain, index, *args, **kw)
+
+
+def _hold_zero_after_the_first(index, ref):
+    if index > 0:
+        ref.hold("instrument.zero_shift")
+
+
+def test_a_hold_keeps_its_value_across_the_cold_rung(thermal_patterns):
+    """A held zero shift reads the last accepted pattern's value on the cold
+    rung, as on a warm one (WP-2081 question 4, series rule 6).
+
+    Before, the cold rung held the caller's 0.0: the cell absorbed the missing
+    zero shift 546 ppm short, and the next pattern carried 0.0 on.  The
+    acceptance row "a fixed value stays fixed" asks the cell within 2 ppm of
+    the truth on every pattern.
+    """
+    from pathlib import Path
+
+    from rietx.viz.plots import plot_result
+
+    runner = _ColdOnFrame(*_start_models())
+    series = runner.fit(thermal_patterns[:4], plan="mccusker_default",
+                        constrain=_hold_zero_after_the_first)
+
+    assert [e.rung for e in series.entries] == ["cold", "warm", "cold", "warm"]
+    calibrated = runner.fitted_instruments[0].zero_shift.value
+    assert abs(calibrated - TRUE_ZERO) < 1e-4
+    for k, ins in enumerate(runner.fitted_instruments):
+        assert ins.zero_shift.value == calibrated, k
+        a = runner.fitted_structures[k].phases[0].cell.a.value
+        truth = A0 * (1.0 + RAMP * k)
+        # the script reads 1.9-2.0 ppm, the acceptance row's "within 2 ppm";
+        # 3 leaves room for the platform's last digits
+        assert abs(a - truth) / truth < 3e-6, k
+    assert series.entries[0].held_values is None
+    assert [e.held_values for e in series.entries[1:]] == [
+        {"instrument.zero_shift": calibrated}] * 3
+
+    out = Path(__file__).parent / "output"
+    out.mkdir(exist_ok=True)
+    plot_result(runner.results_[2], path=str(out / "sequential_cold_hold_p2.png"))
+    plot_result(runner.results_[2], path=str(out / "sequential_cold_hold_p2_zoom.png"),
+                two_theta_range=(3.0, 10.0))
+
+
+class _FailOnFrame(_ColdOnFrame):
+    """Every rung of one pattern raises, so ``on_error`` decides its successor."""
+
+    def _fit_one(self, data, label, previous, previous_hkl, plan, mode,
+                 two_theta_limits, position, previous_tag, prepare, constrain,
+                 index, *args, **kw):
+        if index == self.cold_index:
+            raise _PatternRaised(RuntimeError("every rung raises"))
+        return SequentialRefinement._fit_one(
+            self, data, label, previous, previous_hkl, plan, mode,
+            two_theta_limits, position, previous_tag, prepare, constrain,
+            index, *args, **kw)
+
+
+def test_a_skip_fits_the_successor_cold_and_keeps_the_held_value(thermal_patterns):
+    """``on_error="skip"`` distrusts the warm state, and a held value is the
+    caller's rather than the warm state's, so the cold successor keeps it."""
+    runner = _FailOnFrame(*_start_models())
+    series = runner.fit(thermal_patterns[:4], plan="mccusker_default",
+                        on_error="skip", constrain=_hold_zero_after_the_first)
+    assert [e.index for e in series.entries] == [0, 1, 3]
+    assert series.entries[-1].rung == "cold" and series.entries[-1].seeded_from is None
+    calibrated = runner.fitted_instruments[0].zero_shift.value
+    assert series.entries[-1].held_values == {"instrument.zero_shift": calibrated}
+
+
+def test_a_value_a_hook_sets_on_the_cold_rung_wins_over_the_kept_hold(
+        thermal_patterns):
+    """``prepare`` writing a held value for one pattern on purpose keeps it:
+    the cold rung writes the kept value only over the caller's own, and
+    ``held_values`` shows where the value changed.  The pattern after it
+    warm-starts from it, so it carries the hook's value on."""
+
+    def prepare(index, data, structure, instrument):
+        if index == 2:
+            instrument.zero_shift.value = 0.005
+
+    runner = _ColdOnFrame(*_start_models())
+    series = runner.fit(thermal_patterns[:4], plan=_CHEAP, prepare=prepare,
+                        constrain=_hold_zero_after_the_first)
+
+    held = [(e.held_values or {}).get("instrument.zero_shift")
+            for e in series.entries]
+    assert held == [None, 0.0, 0.005, 0.005]
+
+
+def test_a_hold_the_carry_globs_exclude_restarts_on_every_rung(thermal_patterns):
+    """The kept value is limited by ``carry`` as the warm start is: a path no
+    glob carries holds the caller's value on the cold rung too."""
+    structure, instrument = _start_models()
+    runner = _ColdOnFrame(structure, instrument, carry=["phases.*"])
+    series = runner.fit(thermal_patterns[:4], plan=_CHEAP,
+                        constrain=_hold_zero_after_the_first)
+    assert [e.held_values for e in series.entries[1:]] == [
+        {"instrument.zero_shift": 0.0}] * 3
 
 
 def test_an_untied_series_leaves_the_same_pair_free_and_unequal(thermal_patterns):
@@ -1990,15 +2110,19 @@ class _StubColdFits(SequentialRefinement):
         self._values = values
         self.refits: list[str] = []
         self.hooks: list[object] = []
+        self.hold_sources: list[object] = []
+        self.hold_vars: list[object] = []
 
     def _fit_one(self, data, label, previous, previous_hkl, plan, mode,
                  two_theta_limits, position, previous_tag, prepare, constrain,
                  index, history_suffix="", *, previous_vars=None, stream=None,
-                 stamp=None, cancel=None):
+                 stamp=None, cancel=None, hold_source=None, hold_vars=None):
         assert previous is None and previous_hkl == []   # cold, by construction
         assert history_suffix == ".verify"
         self.refits.append(label)
         self.hooks.append(constrain)
+        self.hold_sources.append(hold_source)
+        self.hold_vars.append(hold_vars)
         return None, _fake_result(0.1, parameters=[
             RefinedParameter(path=p, value=v)
             for p, v in self._values[label].items()])
@@ -2070,6 +2194,22 @@ def test_verification_refits_carry_the_callers_constraints():
     runner._verify_steps(steps, [None] * 6, [f"p{i}" for i in range(6)],
                          "rietveld", _CHEAP, None, None, _tie_the_two_biso)
     assert runner.hooks == [_tie_the_two_biso, _tie_the_two_biso]
+
+
+def test_verification_refits_hold_what_the_chain_held_on_their_pattern():
+    """Each cold refit reads its held values from that pattern's own fitted
+    models (WP-2081), so a held zero shift is the chain's on that pattern and
+    never the caller's start."""
+    runner = _StubColdFits({"p2": {"phases.0.cell.a": 4.0},
+                            "p3": {"phases.0.cell.a": 4.002}})
+    fitted = {2: ("models of p2",), 3: ("models of p3",)}
+    held_vars = {2: {"t": 1.0}, 3: {"t": 2.0}}
+    runner._verify_steps([_flagged("phases.0.cell.a", 2e-3)], [None] * 6,
+                         [f"p{i}" for i in range(6)], "rietveld", _CHEAP, None,
+                         None, None, fitted=fitted, fitted_vars=held_vars)
+    assert runner.hold_sources == [fitted[2], fitted[3]]
+    # a held named variable is not in the models, so it rides beside them
+    assert runner.hold_vars == [held_vars[2], held_vars[3]]
 
 
 def _synthetic_series(path: str, values, stderr) -> SeriesResult:
