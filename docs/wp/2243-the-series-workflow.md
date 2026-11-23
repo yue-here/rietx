@@ -1,6 +1,6 @@
 # WP-2243 — the series workflow at `/next`: patterns, first fit, run, results, with Trends and Map
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-23 — claimed by ghostshift runner gui-r7
+Milestone: gui-overhaul · Status: 🔄 2026-11-23 — Patterns and Run steps built (PR #1794); Results next
 Depends on: 2240 soft (the workflow frame R6 builds on); 2300 soft (what each pattern refines)
 Priority: P2 2026-11-23 — a feature the open milestone was opened for: R7, the rebuild's last piece before the swap
 
@@ -198,3 +198,47 @@ The piece closes when every task is ticked and the maintainer has looked at its 
 the prototype's (WP-2214 § How the maintainer reviews).
 
 ## Handover log
+
+- **2026-11-23** — ghostshift runner gui-r7, first session; PR #1794. The rebuilt page at
+  `/next` now has a working Series workflow for its first and third steps. A person can load
+  many pattern files at once, type a coordinate for each, sort by it, choose the walk order,
+  and run the chain. The Run step shows each pattern's Rwp and where its fit started as the
+  fits land, and a page opened after the run reads the same table off the record. First fit
+  and Results are drawn in the strip and not built yet, so the strip says so. This PR is an
+  early piece and can merge on green; the maintainer's look waits for the last PR (task 13).
+
+  *Done.* Tasks 1-3. `gui/src/next/Series.svelte` holds both steps, `gui/src/next/seriesrun.ts`
+  their pure helpers (the span, the order check, the fold of the run's events into a table,
+  the record's merge). Tasks 2 and 3 landed as one commit because they share the component.
+  `/code-review high --fix` found ten issues and seven fixes landed as their own commit: the
+  record is no longer read mid-run or after a failed run, the Run table keeps the list and
+  walk that ran, a run started elsewhere starts an empty table, a panel mounted mid-run
+  replays the server's event buffer, and three smaller ones. Declined: a cold restart after a
+  quarantined or skipped pattern reads "previous" until the record lands, because no event
+  says it restarted cold (a stamp in `sequential._SeriesStream` would; that file is under
+  Mike's #1786, so it waits); and the panel unmounting on a workflow switch is only covered
+  by the replay, since keeping it mounted is a Frame layout change (task 5's question).
+  One choice settled here: the progress gauge's fill is an accent wash
+  (`color-mix` 70 % over `--line`), since `tests/test_gui_palette.py` refuses a solid accent
+  fill and the rebuilt pages lay the accent over an area only as a wash.
+
+  *Measured* (arm64 macOS, worktree venv `[dev]`, node 24.22.1). vitest 995 passed in 61
+  files, two of them new (`Series.test.ts`, `seriesrun.test.ts`). svelte-check 0 errors.
+  `tests/test_gui_*` python files named in Acceptance: 272 passed. Browser, local only:
+  `tests/test_gui_series_browser.py` 1 passed (new), `tests/test_gui_layout_browser.py` with
+  it 52 passed. Fast suite (`serial.py`, alone, playwright in the venv): 15358 passed, 438 skipped,
+  32 xfailed; the one added test costs 7.29 s in that run, not marked `slow` because CI
+  skips it (no playwright there) and the other `*_browser.py` files are unmarked too. Lint as CI runs it: ruff, ruff format on the tutorials,
+  Vale (0 errors; its warnings are on manual lines this branch does not touch), skill caps,
+  skill surface, audit delta, code references, rulebook limits all clean. Reader output
+  unchanged. No rulebook edit; no heuristic the audit table covers (GUI only).
+
+  *Gotchas.* `app.css` gives `.file` `display: inline-flex`, so a `td.file` stops being a
+  cell; the file column's class is `fname`. `lib/help.test.ts` counts `title=` by finding the
+  last `<` before it, so a `<` inside an attribute expression ahead of a title miscounts:
+  derive the boolean first (`few`). A step button's `inner_text` carries a newline between
+  its number and name.
+
+  Next: task 4 (Results), then task 5 (the selected pattern, which decides whether Series
+  stays mounted across a workflow switch), then Trends and Map (6, 7). Task 8's scrubber
+  placement is drawn and brought to the maintainer before it is built.

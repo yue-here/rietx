@@ -21,7 +21,11 @@ playwright = pytest.importorskip("playwright")
 from playwright.sync_api import sync_playwright  # noqa: E402
 
 from tests.test_gui_layout_browser import (  # noqa: E402
-    NEXT_LANDMARKS, SNAP, _frames, _moved, _open_next,
+    NEXT_LANDMARKS,
+    SNAP,
+    _frames,
+    _moved,
+    _open_next,
 )
 from tests.test_watch_browser import _chromium  # noqa: E402
 
