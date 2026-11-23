@@ -256,6 +256,50 @@ the prototype's (WP-2214 § How the maintainer reviews).
 
 ## Handover log
 
+- **2026-11-23 (seventh session)** — Yue's fourth-look ruling (§ Rulings, verbatim), on
+  PR #1792. The relation popover now gives one line with the target row filled in, then the
+  manual link, and the explanation moved to the manual. The WP stays 🔄 for Yue's look,
+  `~/.cache/ghostshift/rietx/gui-r6/look-r6d/index.html`.
+
+  *Done.* `lib/peaks.ts`: `candidateRelation` writes the summaries "Same cell as #k, another
+  lattice label", "Supercell of #k, twice its primitive cell" (three times, four times for
+  index 3 and 4) and "Indexes every line #k does, and predicts more". The popover and
+  Judge's relation line both print it. `HelpPopover.svelte` gains a summary form: `<Help
+  for=… title=…>` shows the title alone and keeps the entry's `in the manual →` link
+  (`gui/src/HelpPopover.test.ts`, two cases). `rietx.help`'s three `cell_relations` entries
+  are one sentence each and anchor
+  `reference/indexing-evidence.html#relations-between-candidates`. That manual section gives
+  each mark's meaning, the code behind it through `{source}` links, and the `fap` candidate
+  list (hexagonal and trigonal searched) as a worked example. `reference/settings.md`'s
+  printed arm list gains `cell_relations`, which the sixth session left out.
+
+  *Measured, by real clicks* (fap, 1440 × 900, light and dark, the sixth session's cached
+  hexagonal-trigonal answer). The popover's text on rows 2, 6 and 1 is the three summaries
+  above with `#1`, `#1` and `#4`, each followed by the link. A click on a mark does not
+  select its row. The twelve rows' marks match the manual's table. No page errors.
+
+  *Settled by Claude, for review.*
+  - `≡` reads "Same cell as #k, another lattice label" rather than Yue's example
+    "transformation of y". The two rows print identical numbers and differ only in the
+    Lattice column, so no transformation is involved. Alternative: "Transformation of #k".
+    On the look page as question 2.
+  - The section lives on `reference/indexing-evidence.md`. On `reference/indexing.md` beside
+    § A supercell and the cell inside it, it took that page to 52 486 characters against
+    `tests/test_manual.py`'s 50 000 cap. Alternative: the GUI chapter's § Indexing
+    (`reference/gui-guide.md`), which describes today's page and sits at 50 142 already.
+  - The summary keeps the entry's link through a `title` beside `for` on `<Help>`, rather
+    than a templated title in `rietx.help`. The summary is about one row, which is what
+    `<Help text=…>` was for, and `rietx.help` keeps the family's words.
+  - The TypeScript half of the code citations names the function and file without a line
+    number, which no check could keep current. The Python halves are `{source}` links.
+
+*Gates* (arm64 Mac, worktree venv `[dev]` + playwright, the tree merged with main at
+  ca1b54549). The fast suite: 15406 passed, 438 skipped, 32 xfailed, the sixth session's
+  counts exactly, since the new case is a vitest. vitest: 66 files, 1022 passed (two new
+  cases in a new file). svelte-check: 0 errors over 498 files. ruff clean. sphinx `-W`
+  clean. `tests/test_help.py`, `test_manual.py`, `test_manual_api.py`, `test_gui_manual.py`
+  and the candidate-table browser test passed.
+
 - **2026-11-23 (sixth session)** — Yue's third-look rulings (§ Rulings, verbatim), on #1792.
   The fifth session had read his "title left for text vs right for numbers" as the fix. He
   meant it as the defect: a head standing over white space beside its values. Every head in
