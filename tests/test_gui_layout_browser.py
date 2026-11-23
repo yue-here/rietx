@@ -2359,3 +2359,80 @@ def test_the_peak_lines_on_the_pattern_answer_the_object_grammar(browser, tmp_pa
     finally:
         page.close()
         httpd.shutdown()
+
+
+def test_the_fit_index_and_judge_steps_run_to_an_adopted_cell(browser, tmp_path_factory):
+    """The workflow's last three steps at ``/next``, by real clicks (WP-2240 tasks 6 to 8).
+
+    Fit peaks lists the groups and draws their windows in the Peaks graph, and a
+    window's Refit is one undo step. Index searches the systems the form leaves
+    on, lists the cells, and a row's click draws its lines on the Pattern graph.
+    Judge screens the chosen cell's extinctions, and Adopt waits for Apply,
+    which lands a Le Bail start and hands the window to Refinement.
+    """
+    httpd, client = _serve(tmp_path_factory, "next-judge")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    page = _open_next(browser, url, 1440)
+    steps = page.locator("nav.steps button.step")
+    try:
+        page.locator("button.mbtn.wf").click()
+        page.get_by_role("menuitemradio", name="Peaks and indexing", exact=True).click()
+        page.locator(".foot").get_by_role("button", name="Pick peaks", exact=True).click()
+        page.wait_for_selector("table.lines tbody tr")
+
+        # Fit peaks: the groups, their windows, and a Refit as one undo step
+        steps.filter(has_text="Fit peaks").click()
+        page.locator(".segmented button", has_text="All groups").click()
+        page.wait_for_selector("table.groups tbody tr")
+        page.get_by_role("tab", name="Peaks", exact=True).click()
+        page.wait_for_selector(".peakfits canvas")
+        assert page.locator(".peakfits canvas").count() >= 1
+        before = client.get("/api/peaks")[1]["undo"]
+        with page.expect_response("**/api/peaks/refit"):
+            page.locator(".peakfits button.refit").first.click()
+        _frames(page)
+        assert client.get("/api/peaks")[1]["undo"] == before + 1
+
+        # Index: leave cubic alone on, search, choose the first cell
+        steps.filter(has_text="Index").click()
+        page.get_by_role("tab", name="Pattern", exact=True).click()
+        systems = page.locator('[aria-label="Crystal systems"] button')
+        for name in systems.all_text_contents():
+            if name != "cubic":
+                with page.expect_response("**/api/project"):
+                    systems.filter(has_text=name).click()
+        assert client.get("/api/project")[1]["doc"]["indexing"]["search"]["systems"] == ["cubic"]
+        candidate = page.evaluate(
+            "getComputedStyle(document.documentElement).getPropertyValue('--plot-candidate')").strip()
+        drawn = _ink_pixels(page, candidate)
+        page.locator(".steppane:not(.gone) .foot").get_by_role(
+            "button", name="Index", exact=True).click()
+        page.wait_for_selector("table.cands tbody tr", timeout=180_000)
+        rows = page.locator("table.cands tbody tr")
+        assert "cubic" in rows.first.inner_text()
+        rows.first.click()
+        _frames(page)
+        assert "sel" in (rows.first.get_attribute("class") or "")
+        assert _ink_pixels(page, candidate) > drawn + 50
+
+        # Judge: screen the extinctions, choose a group, Adopt, then Apply
+        foot = page.locator(".steppane:not(.gone) .foot")
+        foot.get_by_role("button", name=re.compile(r"^Judge #1")).click()
+        assert "Å" in page.locator(".cellline").inner_text()
+        page.get_by_role("button", name="Screen extinctions", exact=True).click()
+        page.wait_for_selector("table.classes tbody tr", timeout=180_000)
+        assert page.locator("table.classes .mark").count() == 1
+        groups = page.locator(".sgs button")
+        assert groups.first.get_attribute("aria-pressed") == "true"
+        foot.get_by_role("button", name="Adopt as a Le Bail start", exact=True).click()
+        assert client.get("/api/project")[1]["doc"]["mode"] != "lebail"
+        assert foot.get_by_role("button", name="Revert", exact=True).count() == 1
+        with page.expect_response("**/api/index/adopt"):
+            foot.get_by_role("button", name="Apply", exact=True).click()
+        page.wait_for_function(
+            "document.querySelector('button.mbtn.wf').innerText.includes('Refinement')")
+        assert client.get("/api/project")[1]["doc"]["mode"] == "lebail"
+        assert not page.errors, page.errors
+    finally:
+        page.close()
+        httpd.shutdown()
