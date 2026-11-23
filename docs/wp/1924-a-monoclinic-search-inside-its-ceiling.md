@@ -1,9 +1,8 @@
 # WP-1924 — A monoclinic search stays inside its ceiling and its memory
 
-Milestone: unscheduled · Status: 🔄 2026-10-31 — dichotomy's memory bounded and a stop honoured in the dedup and in trial_error; the scheduling re-measure remains
+Milestone: unscheduled · Status: ✅ 2026-11-03 — memory bounded, stops honoured; the scheduling re-measure says a unit budget at the ceiling starves the other engines, and the share rule went to the maintainer as #1374
 Track: A long run is not one fit
 Depends on: 1959 (the grid compiled, this WP's last task); 1520 soft (the same units' leaf cost)
-Priority: P2 2026-10-08 — a defect that fires wrongly: a declared ceiling overrun and a multi-GB peak on a clean 61-line monoclinic pattern, with the workaround of capping the volume and the systems by hand; the reporter's 9 GB and 25.8 GB are the reason it is not P3
 
 ## Goal
 
@@ -56,31 +55,9 @@ The reporter's figures, not re-run here: the 2026-10-30 pattern is private and g
 
 *Decided 2026-10-30 by the maintainer* (issue reply issuecomment-6536104575): phase 2 keeps running on a truncated frontier for now. Once a row bound caps its memory it costs time only, which the budget bounds. The reporter is asked to count the overflowed units whose phase 2 accepted the true cell; if none did, the unit stops at overflow. Whether dichotomy's orthorhombic acceptance is loose is not judged; the reporter is asked for the unindexed-line distribution over the accepted leaves, the best ten's M₂₀ and the search window in effect.
 
-**The scheduling question after WP-1959** (2026-10-14). At load ~3 the grid cost 57 s of CPU, not the Profile's 157 s (load 110-180). WP-1959 compiled the box test and refused boxes outside the obliquity bound, and on #780 dichotomy now returns the cell at an 8 s CPU ceiling. svd still never starts under such ceilings, because dichotomy holds the whole ceiling until its unit completes, so the run's candidate has no second finder and cannot reach `high`. The reporter's 2026-10-14 measurements (numpy grid, before WP-1959) put the starvation in the per-unit budget equalling the run's ceiling, and propose capping each (engine × system) unit at a share of `total_budget_seconds` (per-engine thirds, or the 30 s slice, which behaved the same on ten lists). A d cut and fewer driving lines left dichotomy's grid unchanged (273 871 survivors under every rule). Two follow-ups they placed outside this WP: the consensus list's 12-cell cap can drop a cell its only finder ranks first (devitrite, COD 1535730), and trial_error's monoclinic unit reached 9.2 GB on glutaric acid-isonicotinamide Form II (COD 1567181).
+*Answered 2026-10-31 by the reporter* (folded from Inherited on 2026-11-03): 6 of 49 overflowed dichotomy units accepted the true lattice, all monoclinic, two inside the default 30 s budget, so phase 2 keeps running on a truncated frontier, as the maintainer confirmed the same day. None of the 28 triclinic overflows did: 18 could not hold the truth (volume ceiling), 5 lost it from the truncated frontier, 5 did not reach it in 600 s. The one monoclinic unit that reached the truth leaf and rejected it was #1258, fixed by WP-2066. On orthorhombic acceptance (276 lines, triclinic truth) 6 402 distinct lattices were accepted in 300 s, best M₂₀ 6.18 against 2243 for the truth; whether that is loose remains the maintainer's judgement. Private pattern, not re-run.
 
-### Inherited
-
-- 2026-10-31, from the issue triage (issue #780): the reporter answered the
-  2026-10-30 decision's two requests (reporter, 2026-10-31, on d35ffeda7,
-  corrected the same day). (1) 49 dichotomy units overflowed `MAX_GRID_CELLS`,
-  and phase 2 accepted the true lattice in 6 of them. All 6 were monoclinic
-  units, and two did so inside the default 30 s budget. So the answer is not
-  "none", and under the 2026-10-30 decision phase 2 keeps running on a
-  truncated frontier. None of the 28 triclinic overflows accepted the truth.
-  18 could not hold it (volume ceiling), 5 lost it from the truncated
-  frontier, and 5 did not reach it in 600 s. Triclinic phase 2 popped at most
-  about 800 of ~400 000 frontier cells. In one monoclinic unit `_accept`
-  reached the truth leaf and rejected it. All 30 of that unit's accepted
-  leaves are index-2 supercells; that is #1258. (2) Orthorhombic acceptance,
-  on a 276-line list with a triclinic truth: 6 402 distinct lattices were
-  accepted in 300 s. They leave a median of 12 of 276 lines unindexed, at a
-  median 7.6× the truth's volume. The best M₂₀ is 6.18, against 2243 for the
-  true cell. `INDEX_SHIFT_ALLOWANCE` fired with an assumed 0.0309° allowance,
-  so the window is about ±3 FWHM. Whether that acceptance is loose remains the
-  maintainer's judgement. Checked against the tree at d87c8cc91:
-  `MAX_GRID_BYTES` and `MAX_HARVEST` are on main (PR #1244), so the memory
-  half no longer rests on these counts. The figures were not re-run (private
-  pattern).
+**The scheduling question after WP-1959** (2026-10-14). At load ~3 the grid cost 57 s of CPU, not the Profile's 157 s (load 110-180). WP-1959 compiled the box test and refused boxes outside the obliquity bound, and on #780 dichotomy now returns the cell at an 8 s CPU ceiling. svd still never starts under such ceilings, because dichotomy holds the whole ceiling until its unit completes, so the run's candidate has no second finder and cannot reach `high`. The reporter's 2026-10-14 measurements (numpy grid, before WP-1959) put the starvation in the per-unit budget equalling the run's ceiling, and propose capping each (engine × system) unit at a share of `total_budget_seconds` (per-engine thirds, or the 30 s slice, which behaved the same on ten lists). A d cut and fewer driving lines left dichotomy's grid unchanged (273 871 survivors under every rule). Two follow-ups they placed outside this WP: the consensus list's 12-cell cap can drop a cell its only finder ranks first (devitrite, COD 1535730), and trial_error's monoclinic unit reached 9.2 GB on glutaric acid-isonicotinamide Form II (COD 1567181). *Superseded in part 2026-11-03* (the re-measure, handover entry of that date): with the unit budget at the ceiling, dichotomy holds it only when the truth's system is searched alone; over all seven systems svd's orthorhombic unit holds it and the run reaches no monoclinic unit. The two follow-ups are #1375 and #1376.
 
 ## Non-goals
 
@@ -101,7 +78,7 @@ The reporter's figures, not re-run here: the 2026-10-30 pattern is private and g
 - [x] A dichotomy unit's harvest is bounded inside `_search_one`; reaching the bound takes the capped path. Finished searches replay to their digests. Done 2026-10-31: `MAX_HARVEST` = 20 000 accepted leaves, tier 3 approved; the unit's count rides in `stats["<system>.harvest"]`.
 - [x] A cancel is honoured within seconds after a unit stops: the harvest's dedup and ranking read the token. Done 2026-10-31: `dedup_groups(cancel=, keep=)` ends its walk once the token is set and `keep` candidates are walked; dichotomy's between-system dedup and every engine's final `rank_candidates` pass the token. The in-loop dedups of svd and trial_error hold a unit `Budget`, not the token, and are left alone.
 - [x] trial_error reads its budget inside one base's work, so a unit stops within seconds of its slice; check dichotomy's phase 2 the same way. Done 2026-10-31: a read before each `_score` (the long step: 42 s of scoring against a 1.3 s solve in one synthetic triclinic base); a 60 s triclinic unit now stops at 60.17 s, longest gap 1.52 s. Dichotomy's phase 2 has no gap over 0.32 s on any public case, so it is unchanged; the reporter's dichotomy overrun is not reproduced.
-- [ ] Scheduling on the kernel path: re-measure whether a declared ceiling should cap each unit at a share (the reporter's 2026-10-14 proposal), so a second engine can corroborate inside it.
+- [x] Scheduling on the kernel path: re-measure whether a declared ceiling should cap each unit at a share (the reporter's 2026-10-14 proposal), so a second engine can corroborate inside it. Done 2026-11-03: on 15 synthetic rows a share (a third of the ceiling, or the 30 s slice) is never worse than a unit budget equal to the ceiling, finds the cell in 3 of the 5 rows where that returns nothing and adds a finder in 9 of the other 10. Which rule draws the share is a new tier-3 scheduling rule, so it went to the maintainer as #1374 rather than into the code.
 - [x] Skill: the indexing reference row for a monoclinic or hexagonal search with a large volume bound (cap the volume, search one system at a time, read `INDEX_SEARCH_INCOMPLETE` per engine), tagged Measured or Hypothesis.
 
 ## Acceptance
@@ -119,6 +96,38 @@ The reporter's figures, not re-run here: the 2026-10-30 pattern is private and g
 - WP-1508, WP-1509, WP-1519 (the unit replay harness), WP-1520.
 
 ## Handover log
+
+### 2026-11-03 — the scheduling re-measure, and the WP closes
+
+When a caller sets the per-unit time limit as high as the whole run's ceiling, one unit that does not finish takes the whole ceiling, and the run ends with one engine's answer or with none. The compiled grid has not removed this. It has moved it: over all seven systems the unit that holds the ceiling is now svd's orthorhombic one, and the run never reaches the monoclinic truth. Giving each unit a share of the ceiling, either a third or the default 30 s, was never worse on 15 synthetic rows. It found the cell in 3 of the 5 rows where today's behaviour returns nothing, and it added a second or third finder in 9 of the other 10. Default `quick` runs are not affected. Which rule should draw the share is a new scheduling rule and the maintainer's call, so it is issue #1374, not code. This branch changes no code. PR #1373.
+
+*Done.*
+- The last task is re-measured and ticked. Inherited was folded into § Unbounded routes as the reporter's 2026-10-31 answer and deleted. The § "scheduling question after WP-1959" paragraph carries a dated "superseded in part" note.
+- Three issues filed, because no open WP owns them (`grep -rln` over `docs/wp/`): #1374, the share rule, with the table below, three options ranked and the bethanechol check this WP still owes; #1375, the reported 12-cell cap dropping a single finder's rank 1 (devitrite); #1376, trial_error's monoclinic unit at 9.2 GB (glutaric acid–isonicotinamide). #1375 and #1376 carry the reporter's 2026-10-14 figures, not re-run.
+- #1258, which triage listed under this WP, is WP-2066's: its fix merged as PR #1301 and WP-2066 has closed. The issue was still open on 2026-11-03.
+
+*Measured* (`[dev]`, macOS arm64, compiled tier on, one BLAS thread, `main` at `4099cbd07`; load 3-137 from other sessions, so every ceiling is CPU seconds through `tests.repro_780.cpu_clock`):
+- Harness outside the tree: one `index_pattern(preset="full", validate=False)` per process. Arm a sets `budget_seconds = T`, b sets it to T/3 and d to 30 s. Lists: #780's (`max_volume=600`), and `tests/test_indexing_engines.CASES` monoclinic and orthorhombic with `spec_for`'s domains. "mono" is the truth's system alone, "all" is all seven.
+- Truth's rank and finders (D dichotomy, S svd, T trial_error; "–" no candidate), in the order a / b / d. d is a at T = 30.
+  - #780 mono: 30 s 1D / 1DS; 60 s 1D / 1DS / 1DS; 120 s 1D / 1DS / 1DS. Left alone (T = 600), dichotomy's unit finishes at 332 s, svd at 81 s and trial_error at 186 s, and all three find it.
+  - #780 all: 30 s – / –; 60 s – / – / –; 120 s – / 1D / 1DS.
+  - CASES monoclinic mono: 30 s 1DS / 1DST; 60 s 1DS / 1DST / 1DST; 120 s 1DST in all three.
+  - CASES monoclinic all: 30 s – / 1D; 60 s – / 1DS / 1DS; 120 s 1DS / 1DST / 1DST.
+  - CASES orthorhombic all: 30 s 1DS / 1DST; 60 s 1DS / 1DST / 1DST; 120 s 1DS / 1DS / 1DST.
+- The ceiling holder under a over all systems is svd's orthorhombic unit: 17, 49 and 112 s of the 30, 60 and 120 s ceilings on #780's list. Dichotomy's orthorhombic unit takes under 1 s.
+- Peak footprint was 0.82 GB or less in all 41 runs.
+- Acceptance line 1, `python -m tests.repro_780 120` (wall clock, load 10): wall 120.9 s, peak 0.77 GB, candidate 0 the true cell, found by dichotomy alone.
+- `python -m tests.reader_output`: exit 0, unchanged against `4099cbd07`.
+
+*Not run.*
+- The acceptance's pytest lines, and `tests/test_acceptance_indexing.py`: no engine or test changed on this branch, and the 2026-10-31 entry ran them on that session's tree.
+- `tests.bethanechol_benchmark`: an hour, alone, on a machine that reached load 137 today. It is in #1374.
+
+*Gotchas.*
+- `budget_seconds = total_budget_seconds` is how `tests/repro_780.py` runs. Read its single-finder answer as the starvation, not as the engines' reach.
+- svd's `<system>.seconds` is its first pass. When that pass finds nothing, the silence retry runs on the same budget, and `<system>.trim.seconds` is then the unit's clock. Adding the two counts the first pass twice (on #780 all at 120 s: 63 s and 112 s).
+
+*Next.* (1) The maintainer rules on #1374. If option 1 is chosen, it is a few lines in `workflow.run_units` and a tier-3 audit row, and finished units stay bit-identical. (2) The bethanechol default-mode run, before or with that change. (3) #1375 and #1376, each re-run on current `main` first.
 
 ### 2026-10-31 — dichotomy's memory bounded when the unit limit is lifted, and a stop honoured inside the dedup and inside one trial_error base
 
