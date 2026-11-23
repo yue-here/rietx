@@ -43,7 +43,7 @@
   import { applyTheme, readChoice, resolveTheme, type ThemeChoice } from "../lib/theme";
   import type { PeakRow, PeaksPayload } from "../lib/peaks";
   import type { CandidateOverlay } from "../lib/plot";
-  import { WORKFLOWS, isNotBuilt, menuLabel, stepGraph, workflow,
+  import { WORKFLOWS, isNotBuilt, menuLabel, panelWidth, stepGraph, workflow,
            type WorkflowId } from "../lib/workflows";
   import ActionBar from "./ActionBar.svelte";
   import Console from "./Console.svelte";
@@ -206,6 +206,11 @@
   const MODEL_DEFAULT = 785;
   const BOTTOM_DEFAULT = 200;
   let modelWidth = $state(MODEL_DEFAULT);
+  /** the person has sized the panel: a workflow's own width no longer opens it */
+  let sized = false;
+  /** the workflow's opening width, leaving the graphs the splitter's `keep` */
+  const opening = (id: WorkflowId) =>
+    panelWidth(id, appEl?.clientWidth || Infinity, MODEL_DEFAULT, 360);
   let bottomHeight = $state(BOTTOM_DEFAULT);
   let appEl: HTMLDivElement | undefined = $state();
   let mainEl: HTMLDivElement | undefined = $state();
@@ -819,6 +824,7 @@
 
   function chooseWorkflow(id: string) {
     wf = id as WorkflowId;
+    if (!sized) modelWidth = opening(wf);
     chooseStep(0);
     const shown = workflow(wf).graphs;
     if (shown && !shown.includes(graphTab)) graphTab = shown[0];
@@ -1103,7 +1109,8 @@
         {#if showGraphs && project}
           <Splitter size={modelWidth} grow="left" min={360} keep={360}
             extent={() => appEl?.clientWidth ?? 0}
-            onsize={(size) => (modelWidth = size)} onreset={() => (modelWidth = MODEL_DEFAULT)}
+            onsize={(size) => { modelWidth = size; sized = true; }}
+            onreset={() => { sized = false; modelWidth = opening(wf); }}
             title="Drag to resize the panels; double-click resets them" />
         {/if}
         {#if wfSteps}
