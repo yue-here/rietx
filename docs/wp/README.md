@@ -89,7 +89,9 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2140](2140-every-atom-is-named-by-its-unique-label.md) | Every atom is named by its unique label | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2148](2148-a-held-standard-cell-pins-the-wavelength.md) | A held standard's cell pins the wavelength, and a skipped λ is said | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2228](2228-a-reflection-past-the-range-end-keeps-its-tail.md) | A reflection centred past the range end keeps its tail | P2 | [2222](2222-the-closing-stage-off-by-default.md) ([2075](2075-the-result-records-its-fit-range-and-what-lies-outside-it.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [2242](2242-a-panel-forgets-the-last-project-on-an-open.md) | A panel forgets the last project when another opens in the same window | P2 | — | [gui-overhaul](#gui-overhaul) |
+| [2302](2302-a-wrong-choice-is-refused-at-the-call.md) | A wrong choice is refused at the call, and a requested window has one name | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2303](2303-a-glob-that-matches-nothing-says-so.md) | A glob a caller passes that matches nothing says so | P2 | — ([2300](2300-a-series-declares-each-parameter.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2304](2304-a-readers-repairs-reach-the-fits-diagnostics.md) | A reader's repairs reach the fit's diagnostics | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 
 ## <a id="v0-3"></a>v0.3 — multi-phase workflows
 
@@ -541,7 +543,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2231](2231-the-plan-and-text-tabs.md) | The Plan and Text tabs at `/next`: a plan read as a recipe with Free and Fix rows, and a text buffer whose edits ride the action bar | 🔄 2026-11-22 | P2 | [2218](2218-hand-fitting-and-the-other-graphs.md) |
 | [2237](2237-events-after-another-project-opens.md) | A project opened in the same window streams its events from the first | ✅ 2026-11-22 | — | — |
 | [2240](2240-the-peaks-and-indexing-workflow.md) | The peaks-and-indexing workflow at `/next`: pick peaks, fit peaks, index, judge | 🔄 2026-11-23 | P2 | [2218](2218-hand-fitting-and-the-other-graphs.md) |
-| [2242](2242-a-panel-forgets-the-last-project-on-an-open.md) | A panel forgets the last project when another opens in the same window | ⬜ | P2 | — |
+| [2242](2242-a-panel-forgets-the-last-project-on-an-open.md) | A panel forgets the last project when another opens in the same window | ✅ 2026-11-23 | — | — |
 
 ## <a id="series"></a>series — a series a scientist can predict and drive
 
@@ -720,6 +722,9 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2230](2230-an-estimable-combination-keeps-its-esd.md) | An estimable combination keeps its esd | 🔄 2026-11-21 | P3 | [2219](2219-a-direction-the-data-does-not-determine-has-no-esd.md) ([2062](2062-pawley-is-the-structure-free-default.md) soft) |
 | [2232](2232-a-size-near-no-broadening-is-a-bound.md) | A size near no broadening is quoted as a bound | ⬜ | P3 | — ([2060](2060-the-likelihood-interval-where-an-esd-cannot-be-read.md) soft) |
 | [2239](2239-a-joint-stage-seeds-and-holds-a-stephens-block.md) | A joint stage seeds and holds a Stephens block as a single fit does | ✅ 2026-11-22 | — | — |
+| [2302](2302-a-wrong-choice-is-refused-at-the-call.md) | A wrong choice is refused at the call, and a requested window has one name | ⬜ | P2 | — |
+| [2303](2303-a-glob-that-matches-nothing-says-so.md) | A glob a caller passes that matches nothing says so | ⬜ | P2 | — ([2300](2300-a-series-declares-each-parameter.md) soft) |
+| [2304](2304-a-readers-repairs-reach-the-fits-diagnostics.md) | A reader's repairs reach the fit's diagnostics | ⬜ | P2 | — |
 
 ### <a id="unscheduled-a-long-run-is-not-one-fit"></a>A long run is not one fit
 
