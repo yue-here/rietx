@@ -96,9 +96,11 @@ inherits `rcond`'s tier, the 2 is tiered on its own evidence).
      action leaves the number no further from it. For a flag it is a known truth
      (an injected misfit, a weighed impurity), and the flag fires where the fault is and
      stays silent where it is not; and
-   - the judgement ground, answered by the implementing agent and approved in a batch
-     (by Claude where the answer is clear, with a blind check; otherwise by the
-     maintainer; ruled 2026-11-22): **shown this statistic, would every competent refiner take
+   - the judgement ground, answered by the implementing agent and approved by the
+     maintainer in a batch on a code, action or default row. On a constant or a
+     suggestion the `generality-review` judge's agreement is the approval, the row says
+     so (`approved_by="checked"`), and a disagreement goes to the maintainer (ruled
+     2026-11-22, WP-2238: none of his reversals was a constant's value): **shown this statistic, would every competent refiner take
      this action?** This is DESIGN.md § Rules, 1's unanimity gate. An action is kept only
      where the answer is yes. Where two careful people could respond differently to the
      same number, the action moves to Rule 1's second or third kind. Where the
@@ -390,7 +392,8 @@ sharpens its own row here.
   2017 measures the single-fit thresholds' three families, 2018 the clash table).
   Every hold, carry, refit, fence and always-on correction that survives names its
   evidence (the families, or for tier 2 the citation or program), the record field that
-  says it fired, and its dated approval; every other one is
+  says it fired, and the maintainer's dated approval (a tier-3 constant or suggestion
+  carries the judge's, § The rule); every other one is
   demoted to a ranking or a number by its kind, or made opt-in. No default path calls a
   pick verb (§ A pick on top of a ranking).
 - **A new heuristic cannot land unaudited** (2001, 2014). A diff that adds a diagnostic code, a
@@ -794,12 +797,24 @@ reverse it knowing what it would be giving up.
   histograms' own. `SharingMap.is_shared`'s default is not settled here. Its tier needs a
   survey of what each program shares across histograms by default, and
   `docs/practice.md` has none.
-- **Awaiting the maintainer from the same pass, 2026-11-21.** Nothing below is recorded
-  as approved. (1) `SeriesEntry.rungs_tried` and `SeriesEntry.rungs_raised` at tier 3,
-  their approval dated to the maintainer's acceptance of series Rule 6 on 2026-11-16
-  ("each act is recorded"). (2) Whether the maintainer's merge of PR #1310 on 2026-11-04
-  closes the review of its series-panel sentences and of the joint fit's ten moved test
-  records. (3) The agent run that § The rule asks of a contested demotion, a spend.
+- **Three items from the same pass, answered 2026-11-22.** They waited on the maintainer
+  from 2026-11-21.
+
+  Answered 2026-11-22 under the maintainer's routing rules of that day (WP-2238): each item was
+  settled by Claude and checked by a fresh agent that did not see the pick, or brought to the
+  maintainer, who answered "All as recommended".
+
+  (1) `SeriesEntry.rungs_tried` and `SeriesEntry.rungs_raised` at tier 3, their approval
+  dated to the maintainer's acceptance of series Rule 6 on 2026-11-16 ("each act is
+  recorded"). **Ruled by Yue 2026-11-22:** tier 3 approved, dated 2026-11-22 (his own date, not one read from his
+  Rule 6 acceptance). (2) Whether the maintainer's merge of PR #1310 on 2026-11-04 closes
+  the review of its series-panel sentences and of the joint fit's ten moved test records.
+  **Settled by Claude 2026-11-22, checked blind:** closed: the merge of PR #1310 closes its review, and its printed sentences join the
+  once-per-release read of printed output (`docs/RELEASING.md` step 2). (3) The agent run
+  that § The rule asks of a contested demotion, a spend. **Ruled by Yue 2026-11-22:** deferred. The contested
+  demotions (`HIGH_CORRELATION` and this one) wait for one agent run on
+  `tests/eval_report_agent` after WP-2008 rewrites skill rule 7, so one spend measures both.
+  It flips if the warning is found causing harm in fits today.
 
 ## The two reviews at the open
 

@@ -1,8 +1,7 @@
 # WP-2212 — console lines by kind: the `>>>` prompt and the session as a script
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-21 — the maintainer's rulings recorded (§ Rulings); nothing built
+Milestone: gui-overhaul · Status: ✅ 2026-11-22 — the Console reads as the session in Python, and every padlock is the drawn one (PR #1764, PR #1775)
 Depends on: 2214 (the rebuild's plan: it builds on piece R1's bottom panel)
-Priority: P2 2026-11-17 — was P3: R1's bottom panel landed with WP-2215 (#1534), so nothing blocks it; a feature the open milestone was opened for
 
 ## Goal
 
@@ -82,6 +81,23 @@ prototype with the changed region boxed, on a private page.
   and `#8fc79d` in the dark, as drawn on the options page. It goes into
   `src/rietx/viz/theme.py`. It was offered as "this lands unless you object", and the
   maintainer answered the other questions without objecting.
+- **The look, 2026-11-22, the maintainer, on the six choices #1764 built conventionally**
+  (its handover entry lists them), judged on the screenshots:
+  1. Timestamps, prompts and comments keep `--muted`. Kept.
+  2. The Text tab's string literals take `--code-string`, the Console's green, in place of
+     `--warn`. Changed.
+  3. Timestamps and outputs stay indented past the prompt gutter. Kept.
+  4. The fold's wording ("47 engine events, 6 stages, 33 evaluations") stays. Kept.
+  5. An echo that holds a dict or a list is spaced as Python spaces it
+     (`{"instrument.zero_shift": 0.01}`), since it is a line of a Python script. Changed, for
+     every such echo and not only `set_values`.
+  6. The preamble's output line adds the free-parameter count, as the prototype does
+     ("6 free, 1 history node"; Rwp leads when the project has a fit). Changed.
+- **One padlock, 2026-11-22, the maintainer:** "I note the instrument padlocks are different
+  from the atom ones. we should use the simple non-emoji ones for everything." A locked
+  instrument row wore the emoji padlock, and an atom row the drawn one. Every padlock is now
+  the drawn one, and no source under `gui/src` may name an emoji character
+  (`gui/STYLE.md` § Components; `gui/src/lib/style.test.ts` checks it).
 
 ### Seams
 
@@ -101,7 +117,10 @@ prototype with the changed region boxed, on a private page.
 
 Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`.
 
-### Inherited
+### Folded in on arrival
+
+Pruned 2026-11-21 at start: all four entries still hold on `origin/main` (`d76e4dd48`), so each became a task below.
+
 
 - **2026-11-11, from WP-2214** (the rebuild's plan). The maintainer ruled the same night to
   rebuild the GUI's front end beside today's instead of porting it piece by piece. PR #1521
@@ -150,18 +169,27 @@ Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`
 
 - [x] Questions 1 and 2 drawn and brought to the maintainer; the rulings recorded here with
   their dates (§ Rulings, 2026-11-21).
-- [ ] The tagged line type in `say()` and `consoleLine`, every writer passing its kind; the
+- [x] The tagged line type in `say()` and `consoleLine`, every writer passing its kind; the
   echoes spelled with one receiver per name, and each `…` echo made runnable or marked. Vitest
   over the kinds and over every writer's spelling.
-- [ ] `Console.svelte` draws by kind: the prompt gutter, the timestamp per entry, the muted and
+- [x] `Console.svelte` draws by kind: the prompt gutter, the timestamp per entry, the muted and
   faint registers, the string token. Copy copies the calls. Vitest and the layout browser test.
-- [ ] The script: a preamble, the uncapped calls, the export kind on the server and in the
+- [x] The script: a preamble, the uncapped calls, the export kind on the server and in the
   Export submenu. A test drives a short session on a copy of a shipped example (a value set, a
   stage run), runs the exported script on a second copy, and asserts the two heads hold the
   same parameter values.
-- [ ] The GUI chapter on the Console and the File menu's Export, the screenshot driver, the
+- [x] The GUI chapter on the Console and the File menu's Export, the screenshot driver, the
   screenshots retaken, each beside the prototype's at 1440 by 900 in the PR (milestone row 11).
-- [ ] Skill: none. The GUI is a human surface, and an agent drives the python API.
+  The chapter waits for the swap, under WP-2214 § Tests and the manual, piece by piece. The new
+  route's row is in `reference/gui-power.md`, because `test_gui_manual` partitions routes now.
+  The shots are in `docs/wp/2212-screenshots/`. The prototype's stay out of the tree.
+- [x] `follow()` reports the frames it lost on both paths, and the Console reads the count
+  (#1656 item 1, folded above). One vitest case per path.
+- [x] `instrument_patch` answers what `set_vary` returned (WP-2229 finding 8), and works from
+  the registers when only the old table fails (finding 5). One server test each.
+- [x] Skill: none. The GUI is a human surface, and an agent drives the python API.
+- [x] The maintainer's look (§ Rulings, 2026-11-22): items 2, 5 and 6 changed, the one
+  padlock everywhere with its check, the screenshots retaken.
 
 ## Acceptance
 
@@ -183,6 +211,120 @@ The browser files skip in CI (no playwright there), so the PR quotes their local
   (the bottom panel).
 
 ## Handover log
+
+- **2026-11-22** — PR #1775, the look. The maintainer looked at the Console's screens and ruled on the
+  six choices the first PR had built conventionally, and this closes the WP. Three changed. An
+  echoed dict or list now reads as Python writes it, `{"instrument.zero_shift": 0.01}`, so
+  each Console line is a line of the script it exports. The session's first output line gives
+  the free-parameter count, as the prototype does. The Text tab's strings take the Console's
+  green, since `--warn` means a warning. He also asked for one padlock. A locked instrument row
+  wore the emoji padlock while an atom row wore the drawn one, so now every padlock in the GUI
+  is the drawn one, and a test fails on any emoji character in the GUI's source.
+  *Done*: § Rulings records all seven rulings. `lib/py.ts` writes a JSON value as its Python
+  literal (`True`, `False`, `None`, `float("inf")` included), and every dict or list echo in
+  the rebuild goes through it: `set_values` from Parameters, Interactive and the Instrument
+  form, the position comment, a stage's `turn_on` and `turn_off`, the excluded regions, the
+  view-kept comment, and `registerEcho`'s lists, which the first GUI's Model panel shares. A
+  string still takes `JSON.stringify`, whose escapes mean the same in Python. The preamble
+  reads `GET /api/params`' `n_free` before it writes its lines, so they share one entry.
+  `.tok-string` takes `--code-string` in `app.css`, which both pages load. The padlock:
+  `Padlock.svelte` holds the one drawing, moved out of `next/Params.svelte`; `heldGlyph`
+  answers `PADLOCK` for a lock and for a hold, and `HeldMark.svelte` draws it, muted for a
+  lock and in `--accent-ink` for a hold. Glyph sites changed: the rebuild's Parameters
+  (locked rows, which is what the instrument rows showed; the hold buttons and atom locks now
+  use the shared component), the first GUI's Parameters panel (lock and hold marks) and its
+  Model panel (two held-mark sites, scalar rows and atom DOFs). The first GUI's hold mark was a
+  pin emoji and is the accent padlock now. Left as they are, all text-presentation symbols,
+  which draw as text: ⚠ (History, Series, App), ✂ (Plot), ✓ and ○ (Checklist, Plan), ☀ ☾ ◐
+  (App's theme), ❄ and ↑ (stream). No emoji in `src/rietx/viz/static`, `watch/` or
+  `compare_app/` either. The check: `lib/style.test.ts` fails on any `Emoji_Presentation`
+  character or VS16 in a `.svelte`, `.css` or `.ts` file under `gui/src`; run against the
+  base's `table.ts` it names both glyphs. `gui/STYLE.md` says it in the Padlock row, the Icons
+  rule and § Checks. Screenshots in `docs/wp/2212-screenshots/`, whole windows at 1440 by 900,
+  light and dark, the changed region boxed: the eight earlier ones retaken, and
+  `padlock-instrument`, `padlock-atoms`, `text-strings` and `console-start` added. The
+  manual's `text-document` shot is retaken for the string colour; its `parameters` shot shows
+  no locked row, so it stays.
+  *Measured*: the fast suite on this branch (origin/main unmoved since the branch,
+  `133aa002f`), `[dev]` venv plus playwright, darwin/arm64, run alone through serial.py at
+  load 10-22: 15300 passed, 433 skipped, 32 xfailed. passed+skipped is the base entry's
+  15733 (15299 + 433 + its one failure, the stale index); no pytest test was added. The run
+  held every `tests/*_browser.py` file, all passing: 6, 4, 1, 46, 2, 5, 12, 41, 8 and 53.
+  vitest 941 passed (54 files), seven added (six `py`, one emoji check); svelte-check 0
+  errors. `python -m tests.reader_output`: exit 0, unchanged. CI's lint steps run locally:
+  ruff clean, tutorials formatted, Vale 0 errors.
+  *Review*: `/code-review high --fix` found seven. Fixed: a stale comment calling the hold a
+  pin, the `n_free` comment (it counts rows whose vary flag is set, which is not what a
+  staged Refine frees), `py` writing an undefined key as `None` where the request drops it,
+  the preamble's extra wait and a race it opened (the count is now read beside the result and
+  the preamble written in one turn, as before), and the emoji check's reach (it now reads
+  `next/rxplot.mjs` and the two page shells too). Settled rather than changed: lock and hold
+  now share one drawing and differ by ink, which gui/CLAUDE.md's held-mark rule now says.
+  The maintainer's ruling asks for one padlock "for everything", and the rebuild already drew
+  a hold as the padlock.
+  *Merge with main* (the steward, 2026-11-22): main's History tab merged in, dist rebuilt. CI's
+  rulebook-size step failed on this branch's gui/CLAUDE.md held-mark line (49 B over main's
+  budget), so that line is main's again; `gui/STYLE.md`'s Padlock row carries the rule.
+  Next: none. WP-2237 (the event cursor across an open) is the Console's open follow-up.
+
+- **2026-11-22** — The Console at `/next` now reads as the session written in Python (PR #1764).
+  Each line knows whether it is a call, an output, a comment, a refusal or an engine event. A
+  call shows behind `>>>`, and a fit's engine events fold into one muted line under the call
+  that started it. File › Export › "Console as a Python script" writes the calls as a `.py`
+  file. A browser test drives a short session by clicks, runs the exported script on a copy of
+  the project, and gets the same parameter values. Two defects folded in from WP-2229 and
+  #1656 are fixed too: the instrument form's answer names what `set_vary` really changed, and
+  the Console's dropped-frame count is no longer always zero. Six visual choices are built in
+  their most conventional form and wait for the maintainer's look.
+  *Done*: every task. The tagged line type (`gui/src/next/console.ts`) and its writers. A call
+  is echoed only once its verb lands, in the order the server ran the verbs, since the script
+  repeats that order. A run's call is written before the run and retracted on refusal, so its
+  events have an entry to fold under. `Console.svelte` draws entries with a timestamp, a 4ch
+  prompt gutter, `--code-string` strings and muted italic comments. Copy copies the calls. The
+  session opens with the prototype's preamble (`import rietx as rx`,
+  `p = rx.Project.open(...)`, `ref = p.refinement`) and where the project stands. The script
+  (`sessionScript`) opens `sys.argv[1]`, so it runs on whichever copy it is given. A call with
+  no runnable form is a counted `# not repeated: …` comment. Server: the `script` export kind
+  (`POST /api/export/script`, documented in `reference/gui-power.md`). `instrument_patch`
+  answers set_vary's returns, releases from the registers when only the old model builds no
+  table, and says so in `release_after`. `follow()` reports lost frames on the SSE and polling
+  paths (`onDropped`), counting from its first answer. The GUI chapter waits for the swap
+  (WP-2214 § Tests and the manual, piece by piece). Screenshots, light and dark, are in
+  `docs/wp/2212-screenshots/`. A race in WP-2229's Terms-box browser test is fixed: it read
+  the rows between the edit and its free arm, and failed once under load.
+  *Measured*: the fast suite on the merged tree (origin/main at its fetch of 2026-11-22),
+  `[dev]` venv plus playwright, darwin/arm64, run alone through serial.py: 15299 passed, 433
+  skipped, 32 xfailed, one failure (the WP index, stale from filing WP-2237, regenerated after).
+  Four pytest tests added, three node-free and the browser test, which skips in CI. Added cost,
+  one local run: the browser test 10.90 s, the other three 0.27 s together. vitest 934 passed
+  (53 files); svelte-check 0 errors. Every `tests/*_browser.py` file run locally, two or three a
+  command: 49+1 failed (the race above, passing after the fix), 8, 59 and 61 passed. `python -m
+  tests.reader_output`: exit 0, unchanged.
+  *Review*: `/code-review high --fix` found eight. Five fixed: the release order on a tableless
+  model, the Apply echo order, the drop count after an empty first poll, `pushLine`'s count,
+  and the prompts worked out once per entry. Its Apply order put values before releases; the
+  route runs releases first, so that was corrected by hand. Three declined: a value sent with a
+  new limit lands inside the limits edit, which the script writes as a comment (a fix needs a
+  runnable limits edit); Copy copies display text, as the prototype's Copy does; the echo loop
+  shared by Background and Instrument is a cleanup. One finding outside the diff is filed as
+  WP-2237: opening another project resets the server's event count while the page's cursor
+  keeps the old one, so the new project's first events never reach the Console.
+  *Ruling, 2026-11-22, the maintainer, on the prototype's screenshots*: "not that sensitive, I
+  just wanted to do the development outside first. whatever is fine." Commit 0ed76de7c added
+  two of them by mistake and e1c5ac238 removed them. They stay in the branch's history and
+  merge as usual. The rest stay in the runner's scratch.
+  *Open for the maintainer* (visual, built conventionally, not settled):
+  (1) timestamps, prompts and comments take `--muted`, where the prototype draws a fainter
+  ink: no mix of muted and panel fainter than 10 % clears 4.5:1 (light 4.73:1), STYLE's
+  contrast rule; (2) the Text tab's strings still take `--warn`, not the new `--code-string`;
+  (3) timestamps and outputs start after the prompt gutter, where the prototype starts them at
+  column 0; (4) the fold's wording, "47 engine events, 6 stages, 33 evaluations"; (5) the
+  `set_values` echo prints compact JSON (`{"instrument.zero_shift":0.01}`); (6) the preamble's
+  output line gives Rwp and the node count, where the prototype adds the free count.
+  *Gotchas*: macOS's filesystem is case-insensitive, so `Console.test.ts` overwrote
+  `console.test.ts`; the mount test is `consolePanel.test.ts`. The Console is mounted only
+  while the bottom panel shows (`footer button.console`).
+  Next: the maintainer's look at the six visual choices, against the screenshots; then close.
 
 - **2026-11-21** — The maintainer has ruled the console's two open visual questions from drawn
   options, so the session that builds it can start on the code. A fit's engine events fold
