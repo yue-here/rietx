@@ -144,6 +144,9 @@ And `untie` refuses a formula tie, because a pattern's table cannot take a formu
 
 `MultiHistogramRefinement.refit` compiles its stage at the window fraction the answer was solved at, so a converged fit restarted stops after one iteration of that one stage and moves no parameter by more than 0.01 esd (measured on the two LaB6 patterns below: 0.0 esd, in process and from a result saved to JSON).
 That is TOPAS's restart from stored values: a hold or a tie declared after the fit is honoured by the restart, so it is how a 100-pattern fit is rerun after one edit without starting again.
+The restart runs under the fit's own `weights` and `two_theta_limits` unless they are passed.
+A result keeps each pattern's weight but not its limits, so `refit(result=)` raises for a pattern the result fitted on fewer channels than the pattern holds, until `two_theta_limits` is passed.
+It raises too for a result of another pattern count, since a pattern the result lacks would restart with none of its rows freed.
 
 ## Two radiations
 
@@ -339,7 +342,7 @@ Each copy is the same finding about one pattern, so count it once.
 
 The rule is written as data.
 `rietx.multi.DIAGNOSTIC_SCOPES` places the output of each function that writes diagnostics, and `rietx.multi.GUARD_SCOPES` each field of a `GuardReport`, each row with its reason.
-Four rows are marked absent, for diagnostics a joint fit does not compute: `HOLD_BLOCKED_PLAN` (a joint fit has no hold verb), `RESTRAINT_TENSION` (restraints are refused), and the two magnetic-width checks, `STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT` and `MAGNETIC_WIDTH_MOVED_MOMENT`.
+Three rows are marked absent, for diagnostics a joint fit does not compute: `RESTRAINT_TENSION` (restraints are refused) and the two magnetic-width checks, `STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT` and `MAGNETIC_WIDTH_MOVED_MOMENT`.
 The magnetic-width checks read the single-pattern plan, so a joint fit's width-before-moment ordering is unchecked.
 `DATA_SUPPORT_LOW` is withheld on purpose.
 Its ratio of observations to parameters has no agreed definition across patterns, and one pattern's reflections counted against the shared columns would warn about a fit the other patterns support.

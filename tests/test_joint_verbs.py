@@ -476,3 +476,59 @@ def test_refit_from_a_differently_built_result_is_refused_naming_rows(pair):
     with pytest.raises(ValueError, match="has no row for") as err:
         _ref().refit(pair, result=saved, telemetry=False)
     assert "hist.0.phases.0.atoms" in str(err.value)
+
+
+def test_refit_of_a_result_of_another_pattern_count_is_refused(pair):
+    """Every row of a two-pattern result has a place on a three-pattern
+    object, so the row check passes; the restart would free none of pattern
+    2's rows and drag the shared ones after it (measured, macOS arm64:
+    ``converged``, pattern 0's Rwp 0.04 → 0.75).  Refused before any write."""
+    first = _ref().fit(pair, plan=_plan(), telemetry=False)
+    saved = RefinementResult.model_validate_json(first.model_dump_json())
+    structure, instruments = perturbed_inputs()
+    third = rx.Instrument.debye_scherrer(wavelength=0.56)
+    trio = MultiHistogramRefinement(structure, [*instruments, third])
+    before = _rows(trio)
+    data = [*pair, synthesize(0.56, 4.0, 34.0, scale=7e-4, zero=0.003,
+                              bkg=[55.0, 2.0, -1.0], seed=3)]
+    with pytest.raises(ValueError, match="fitted on 2 patterns and this joint "
+                                         "fit has 3: pattern 2 would restart"):
+        trio.refit(data, result=saved, telemetry=False)
+    assert {p: r.value for p, r in _rows(trio).items()} == {
+        p: r.value for p, r in before.items()}
+
+
+def test_refit_restarts_under_the_fits_own_weights(pair):
+    """A fit weighted 1:6 restarted bare ran under unit weights and moved
+    0.32 esd in 3 iterations (macOS arm64); the weights each
+    ``HistogramResult`` carries are now the restart's, in process and from
+    a saved result."""
+    weights = [1.0, 6.0]
+    ref = _ref()
+    first = ref.fit(pair, plan=_plan(), weights=weights, telemetry=False)
+    again = ref.refit(pair, telemetry=False)
+    assert [h.weight for h in again.histograms] == weights
+    assert again.stages[0].n_iterations == 1
+    assert _max_move(first, again) < 0.01
+    saved = RefinementResult.model_validate_json(first.model_dump_json())
+    restarted = _ref().refit(pair, result=saved, telemetry=False)
+    assert _max_move(first, restarted) < 0.01
+
+
+def test_refit_restarts_under_the_fits_own_limits(pair):
+    """In process the object keeps the limits; a saved result does not, so
+    ``refit(result=)`` refuses a range-limited pattern until they are passed."""
+    limits = [(4.0, 20.0), (8.0, 40.0)]
+    ref = _ref()
+    first = ref.fit(pair, plan=_plan(), two_theta_limits=limits, telemetry=False)
+    again = ref.refit(pair, telemetry=False)
+    assert [len(h.two_theta) for h in again.histograms] == [
+        len(h.two_theta) for h in first.histograms]
+    assert _max_move(first, again) < 0.01
+    saved = RefinementResult.model_validate_json(first.model_dump_json())
+    with pytest.raises(ValueError, match="pattern 0 on .* pass the ones it "
+                                         "was fitted with"):
+        _ref().refit(pair, result=saved, telemetry=False)
+    restarted = _ref().refit(pair, result=saved, two_theta_limits=limits,
+                             telemetry=False)
+    assert _max_move(first, restarted) < 0.01

@@ -1579,6 +1579,10 @@ class MultiHistogramRefinement:
         self._declared_wavelengths: list[list[float]] = [
             _declared_wavelengths(ins) for ins in self.mtable.instruments]
         self.result_: RefinementResult | None = None
+        #: the 2θ limits ``result_`` was fitted under, per histogram, which
+        #: :meth:`refit` restarts it under (WP-2103); a result keeps its
+        #: weights but not its limits
+        self._fit_limits: list[tuple[float, float] | None] | None = None
         self._models = None
         #: what :meth:`report` reads besides the models, per histogram, taken
         #: with the result it reports on (:meth:`_freeze_answer`)
@@ -1876,9 +1880,15 @@ class MultiHistogramRefinement:
         ``RefinementResult.model_validate_json``) is written in first by
         :meth:`set_values`: every row it refined that is neither tied nor held
         here (a value you set and held stays yours).  Construct the object from
-        the inputs that fit was built from: a refined row with no place here
-        raises, naming it.  A row the result did not refine keeps the
-        constructor's value.
+        the inputs that fit was built from: a result of another pattern count
+        raises, and so does a refined row with no place here, naming it.  A
+        row the result did not refine keeps the constructor's value.
+
+        The restart runs under the fit's own ``weights`` (each
+        ``HistogramResult.weight``) and ``two_theta_limits``, unless they are
+        passed.  A result does not keep its limits, so under ``result=`` a
+        pattern the result fitted on fewer channels than this one has raises
+        until ``two_theta_limits`` is passed.
 
         A restart of a converged fit stops in that one stage and moves nothing
         by more than 0.01 esd.  Holds and ties declared since are honoured,
@@ -1896,13 +1906,18 @@ class MultiHistogramRefinement:
         if start is None:
             raise ValueError("refit() needs a fit to restart from: fit() "
                              "first, or pass result=")
+        data = list(data)
         if result is not None:
+            _refuse_restart_shape(result, self.n_histograms, data, kw)
             self.mtable.set_values(_restart_values(self.mtable, result))
+        else:
+            kw.setdefault("two_theta_limits", self._fit_limits)
         free = [p.path for p in start.parameters if p.vary]
         last = start.stages[-1] if start.stages else None
         plan = _RestartPlan(stages=[Stage("restart", free)],
                             window_tol=None if last is None else last.window_area_tol)
         kw.setdefault("mode", start.mode)
+        kw.setdefault("weights", [h.weight for h in start.histograms])
         return self.fit(data, plan=plan, **kw)
 
     # ------------------------------------------------------------------
@@ -2008,6 +2023,7 @@ class MultiHistogramRefinement:
                                             for h in range(n)])
                 raise
             self._models = models
+            self._fit_limits = limits
             self.result_ = self._build_result(models, outcome, weights,
                                                plan.correlation_guard,
                                                stage_results, cell_runaway_diags,
@@ -3336,6 +3352,51 @@ class _RestartPlan(RefinementPlan):
 
     def stage_window_tols(self) -> list[float | None]:
         return [self.window_tol] * len(self.stages)
+
+def _refuse_restart_shape(result: RefinementResult, n: int,
+                          data: list[PatternData], kw: dict) -> None:
+    """Refuse a ``refit(result=)`` the object cannot restart as it was fitted
+    (WP-2103), before any value is written.
+
+    **The pattern count.**  A result of k patterns on an object of n: a
+    refined row of a pattern the object lacks has no place here, but a
+    pattern the result lacks has no row in it, so the restart frees none of
+    that pattern's rows and fits it at the constructor's values, dragging
+    the shared rows after it (a two-pattern LaB6 fit refitted with a third:
+    pattern 0's Rwp went from 0.04 to 0.75, under ``converged``).
+
+    **The 2θ limits.**  The result keeps each pattern's weight but not the
+    limits it was fitted under, only the channels they kept.  Without
+    ``two_theta_limits=`` a pattern whose result holds fewer channels than
+    this restart would fit was range-limited, and fitting its whole range
+    would move the answer: refused, with the range it was fitted over.
+    """
+    k = len(result.histograms)
+    if k != n:
+        if n > k:
+            which = (f"pattern {k}" if n == k + 1
+                     else f"patterns {k}-{n - 1}")
+            why = (f"{which} would restart with no row freed, at the "
+                   "constructor's values")
+        else:
+            which = (f"pattern {n}" if k == n + 1
+                     else f"patterns {n}-{k - 1}")
+            why = f"the result's {which} have no place here"
+        raise ValueError(
+            f"result= was fitted on {k} patterns and this joint fit has {n}: "
+            f"{why}; build the object from the inputs (histograms and sharing "
+            "map) the result was fitted with, or fit() this one with a plan")
+    if "two_theta_limits" in kw or len(data) != n:
+        return  # the caller's limits, or fit()'s refusal of the data
+    for h, (hist, d) in enumerate(zip(result.histograms, data, strict=True)):
+        kept = len(hist.two_theta)
+        if kept and kept < int(d.in_range_mask().sum()):
+            raise ValueError(
+                f"result= fitted pattern {h} on {kept} channels, "
+                f"{hist.two_theta[0]:g}-{hist.two_theta[-1]:g} deg 2θ, and this "
+                "pattern has more: a result keeps its weights but not its "
+                "two_theta_limits, so pass the ones it was fitted with")
+
 
 def _restart_values(mtable, result: RefinementResult) -> dict[str, float]:
     """The rows of ``result`` a restart writes back (WP-2103).

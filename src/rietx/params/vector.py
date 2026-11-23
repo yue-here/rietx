@@ -4819,8 +4819,8 @@ class ParameterTable:
         (the maintainer's answer (c) on #801).  A linear body has two
         directions, and one of them free is a turn about a fixed axis.
 
-        ``joint`` words the remedies for ``MultiHistogramRefinement``, which
-        has no hold or tie verb, so the stage's globs are the only lever.
+        ``joint`` words the remedies for ``MultiHistogramRefinement``, whose
+        ``hold``, ``tie_equal`` and ``tie`` are the single fit's (WP-2103).
         """
         turns = self.free_turn_directions()
         for bbase, _, block in self._bodies:
@@ -4835,17 +4835,14 @@ class ParameterTable:
                              + ("tied" if e.tie is not None
                                 else "free" if e.vary else "held"))
             glob = f"{bbase}.rotation.*"
-            if joint:
-                remedy = (f"Free all {k} ({glob}) or none of them in the stage's "
-                          "turn_on: a joint fit has no hold or tie verb")
-            else:
-                remedy = (f"Free all {k} ({glob}), hold all {k} "
-                          f"(Refinement.hold({glob!r})), or tie the turn to one axis "
-                          f"(Refinement.tie_equal({glob!r}), or Refinement.tie with "
-                          "scales for another axis)")
-                if pinned:
-                    remedy += ("; a held or tied DOF first needs Refinement.unhold "
-                               "or Refinement.untie")
+            who = "MultiHistogramRefinement" if joint else "Refinement"
+            remedy = (f"Free all {k} ({glob}), hold all {k} "
+                      f"({who}.hold({glob!r})), or tie the turn to one axis "
+                      f"({who}.tie_equal({glob!r}), or {who}.tie with "
+                      "scales for another axis)")
+            if pinned:
+                remedy += (f"; a held or tied DOF first needs {who}.unhold "
+                           f"or {who}.untie")
             raise ValueError(
                 f"RIGID_BODY_PARTIAL_TURN: rigid body {name!r} has {free} free turn "
                 f"directions of its {k} ({bbase}.rotation: {', '.join(state)}). "
