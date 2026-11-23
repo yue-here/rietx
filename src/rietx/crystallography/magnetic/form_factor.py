@@ -98,7 +98,8 @@ other rare-earth row (its ⟨j₀⟩ misses a Dirac-Fock Pr³⁺ curve by 23 tim
 printed fit error).  Brown's printed Pu³⁺ rows are fits to the **Pu⁵⁺** curve:
 against Desclaux & Freeman's (1978, *J. Magn. Magn. Mater.* **8**, 119-129,
 Table 6) Pu³⁺ block they score 20.6 (⟨j₀⟩) and 12.3 (⟨j₂⟩) times his printed
-fit error, against their Pu⁵⁺ curve about 1, and ⟨j₀⟩(0.2 Å⁻¹) is 0.627
+fit error, against a Dirac-Fock Pu⁵⁺ curve computed for rietx about 1 (their
+Pu⁵⁺ block was not read), and ⟨j₀⟩(0.2 Å⁻¹) is 0.627
 against 0.574.  Both ions are served from the computed Dirac-Fock tables
 below, on their neighbours' footing; the Pu³⁺ table reproduces Desclaux &
 Freeman's printed Pu³⁺ block to within 5.3 × 10⁻⁵ in all 84 cells.
@@ -180,8 +181,9 @@ References
   11-21 — the Dirac-Fock ⟨jₙ⟩ values Brown fitted for the rare-earth rows;
   the evidence that his "Ce²⁺" row is Ce³⁺.
 * Desclaux, J. P. & Freeman, A. J. (1978). *J. Magn. Magn. Mater.* **8**,
-  119-129 — the Dirac-Fock actinide values Brown fitted; Table 6 checks the
-  computed Pu³⁺ table and shows his printed Pu³⁺ row is the Pu⁵⁺ curve.
+  119-129 — the Dirac-Fock actinide values Brown fitted; Table 6's Pu³⁺ block
+  checks the computed Pu³⁺ table and shows his printed Pu³⁺ row is not Pu³⁺
+  (it matches a Pu⁵⁺ curve computed for rietx).
 * Clementi, E. & Roetti, C. (1974). *At. Data Nucl. Data Tables* **14**,
   177-478 — the Hartree-Fock wavefunctions Brown fitted the 3d/4d rows to.
 * Cowan, R. D. (1981). *The Theory of Atomic Structure and Spectra*
