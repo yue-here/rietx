@@ -4,14 +4,12 @@ Scope: the refinement GUI's rulebook. It loads when a session works under `gui/`
 `src/rietx/gui/CLAUDE.md` points here. The root CLAUDE.md holds the pipeline and the
 package-wide invariants. Sections follow the files a session edits.
 
-Each rule names its WP. The measurement, story or example behind it is in that WP file:
-its § "Moved from gui/CLAUDE.md" holds the paragraph this file carried until WP-2134,
-verbatim. A rule enters here only as a standing rule with its identifiers and anchor
+Each rule names its WP, which holds its evidence (since WP-2134, under § "Moved from
+gui/CLAUDE.md"). A rule enters here only as a standing rule with its identifiers and anchor
 (`docs/milestones/process.md` § The rule); its evidence goes to the WP.
-`tests/test_docs_consistency.py::test_rulebook_paths_and_names_resolve` fails on a path written
-here with a directory (`lib/plot.ts`, `gui/session.py`) that no longer exists, and on a
-`file:symbol` whose symbol has left the file. Write paths that way, so a rename breaks the
-test and never silently the rule.
+`tests/test_docs_consistency.py::test_rulebook_paths_and_names_resolve` fails on a path with
+a directory (`lib/plot.ts`) or a `file:symbol` that has gone. Write paths that way, so a
+rename breaks the test and never silently the rule.
 
 How the GUI looks and behaves, with each rule's motive, is `gui/STYLE.md` (WP-2142):
 read it before changing either.
@@ -45,9 +43,8 @@ read it before changing either.
   each copy's version in `VENDORED.json`: bump the pin in `gui/package.json`, then build.
 - **The node floor is the strictest `engines` entry in `gui/package-lock.json`**
   (WP-1442, WP-2134).
-  Under an older node, rolldown fails at import with a message naming neither node nor
-  a version. A `node_modules` installed under the old node fails under the new one, so
-  `npm ci` again after switching.
+  Under an older node, rolldown fails at import naming neither node nor a version. After
+  switching node, `npm ci` again.
 - **The rebuild is `gui/src/next/`, a second page built in a second pass**
   (`vite build --mode next`, served at `/next`, WP-2215): one multi-entry pass makes
   today's page load a shared chunk. A shared panel the new page must change moves
@@ -352,6 +349,9 @@ rules in this section are listed in WP-2134 for the GUI style guide.
 - **Hiding a curve is by exception** (WP-1032): `curveToggles`/`hidden`, unpersisted.
 - **A layer is drawn where it can be edited** (WP-1210): peak markers and their curve
   only while the Peaks tab is up, so `peaksActive` is a drawing input of the repaint.
+- **At `/next` a peak mark is a lens echoing the ticks** (WP-2240,
+  `lib/plot.ts:LENS_HEIGHT`): filled for a used line, none for an unused one, larger and
+  ringed in text ink when chosen. Today's Peaks tab keeps § House style's shapes.
 - **A curve that cannot be drawn is listed, disabled, with its reason** (WP-1210):
   `CurveToggle.absent`; `dataOnlyHidden` covers absent ids too.
 - **A hover link never repaints the pattern** (WP-1032): the ring is a DOM mark.
