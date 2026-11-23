@@ -51,22 +51,28 @@ Two acceptance rows of the milestone land here:
 - So the two calls name the same idea differently today, and the series call has no
   argument for it at all.
 
-**Open for the maintainer: the declaration's vocabulary.** This names something on the
-top-level API, where the field has no standard term. A session does not pick it. Candidates
-seen so far, each with what it costs:
+**Ruled: one declaration object for both calls** (the maintainer, 2026-11-23, "(d) one
+object", choosing among a `hold=[globs]` argument (b), a grown `SharingMap`, and this). One
+object names the four kinds by glob: per pattern, common, fixed and equation. The series call
+and the joint call both take it. The series call raises on a common or equation declaration
+and names the joint call, which the milestone's approved acceptance row needs (2026-11-18):
+under (b) the series call would carry arguments that exist only to raise. The joint call's
+`SharingMap` is replaced by the object rather than kept beside it, since rietx's users are few
+and in direct contact. Settled by Claude with the brief, and open to the maintainer's
+reversal:
 
-- Reuse `SharingMap` on the series call. Its two fields are `per_histogram` and `shared`. It
-  has no field for a fixed value or an equation, so it would grow two, and "histogram" is the
-  joint fit's word.
-- Reuse the `hold` verb. A `hold=[globs]` argument on `fit` and `refine_sequential` reads as
-  today's `ref.hold`, and covers the fixed kind only. The refusal then needs a second
-  argument, or the joint call's `SharingMap` passed in and refused.
-- A new declaration object naming the four kinds, shared by both calls, which the joint call's
-  `SharingMap` would then sit beside or be replaced by (a rename the joint call's users see).
+- A parameter left undeclared keeps each call's default today: per pattern in a series, and
+  in the joint call shared except `instrument.*` and `.scale`. One default for both would
+  change the joint call's default for every user.
+- "Fixed" takes its value from the models passed in, as `hold` does. The object carries globs
+  only.
+- The stand-in mistake (a fixed declaration meant as a common value) runs in silence under
+  any shape. Series rule 2 names it as the observation that reopens the two-call ruling, and
+  DESIGN Rule 4 does not reach it, since the call can honour what was written.
 
-Questions that go with the vocabulary: whether the declaration is one object used by both
-calls; whether "fixed" takes the value from the models passed in or from the declaration
-itself; and what the refusal's message says (reader output, so it is checked blind in the PR).
+**Open for the maintainer: the names.** The object, the argument that takes it, and the four
+fields are on the top-level API, where the field has no standard term. A session does not pick
+them. The refusal's message is reader output, so it is checked blind in the PR.
 
 **Practice** (`docs/practice.md` § Sequential refinement). GSAS-II, FullProf, TOPAS and
 EasyDiffraction keep the fixed flag on the parameter and honour it on every pattern of a
@@ -102,16 +108,18 @@ hold); WP-1441 (`constrain`).
 
 ## Non-goals
 
-- The common and equation kinds on the joint call: they exist there (`SharingMap`,
-  `ParametricEquation`). Whether that call adopts the new vocabulary is part of the
-  vocabulary ruling, and building it is this WP only if the ruling says so.
+- New behaviour for the common and equation kinds on the joint call: they exist there
+  (`SharingMap`, `ParametricEquation`). This WP changes only how the joint call is told
+  (ruled 2026-11-23).
 - A start from a series result (WP-2103).
 - The preset and the documentation route (WP-2301).
 
 ## Tasks
 
-- [ ] The maintainer's ruling on the vocabulary (§ Context, "Open for the maintainer"),
-      recorded here with his words.
+- [x] The maintainer's ruling on the vocabulary's shape (§ Context, "Ruled"), recorded with
+      his words.
+- [ ] The maintainer's names for the object, its argument and its four fields.
+- [ ] The joint call takes the object in place of `SharingMap`.
 - [ ] The declaration on `SequentialRefinement.fit` and `refine_sequential`: per pattern
       (the default) and fixed, the fixed kind held on every pattern and every rung.
 - [ ] The refusal: a common or equation declaration raises before the first fit, naming the
@@ -149,3 +157,11 @@ hold); WP-1441 (`constrain`).
   vocabulary), so they are one WP. Facts above checked on `f590981ab`.
 
   *Next:* put the vocabulary question to the maintainer.
+
+- **2026-11-23** — the maintainer ruled the declaration's shape: one object for both calls
+  ("(d) one object"). Recorded in § Context with the three calls settled alongside it. Read
+  first: DESIGN Rule 4's misuse test (amended 2026-11-23) does not decide the shape, since it
+  reaches only literals and patterns a call cannot honour; series.md § Acceptance's refusal row
+  does. Facts checked on `bacb7d58b`.
+
+  *Next:* the maintainer's names, then the build.
