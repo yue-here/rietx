@@ -215,6 +215,24 @@ def delete(project) -> bool:
     return False
 
 
+def snapshot(project) -> bytes | None:
+    """The stored list's bytes, or ``None`` when none was ever picked: one
+    step of the GUI's undo stack (WP-2240)."""
+    path = peaks_path(project)
+    return path.read_bytes() if path.is_file() else None
+
+
+def restore(project, raw: bytes | None) -> None:
+    """Put back a :func:`snapshot`, through the same replace as :func:`save`."""
+    if raw is None:
+        delete(project)
+        return
+    target = peaks_path(project)
+    tmp = target.with_suffix(".json.tmp")
+    tmp.write_bytes(raw)
+    os.replace(tmp, target)
+
+
 # ----------------------------------------------------------------------
 # flags — pure list surgery, no refit
 # ----------------------------------------------------------------------

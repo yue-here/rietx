@@ -27,6 +27,9 @@ import { joinCurves, type GroupCurve, type PeakRow } from "../lib/peaks";
 import {
   curveColors,
   lens,
+  LENS_GAP,
+  LENS_HEIGHT,
+  LENS_WIDTH,
   maskShapes,
   nearestIndex,
   type CandidateOverlay,
@@ -92,6 +95,9 @@ export interface Overlay {
    *  is drawn larger with a ring, or, for a line left out, a dotted line
    *  stands where it is (interaction rule 5) */
   selected?: number | null;
+  /** the line a drag is moving: the canvas leaves its mark out, and the page
+   *  draws it under the pointer as a DOM mark, so a drag repaints no pane */
+  dragging?: number | null;
   hidden: readonly string[];
   /** the payload in the readout's shape (`windowOf`), for a marker's height */
   held: Window | null;
@@ -128,6 +134,11 @@ export class PatternChart {
    *  node's own channels, or null while none is. */
   private compared: { tt: Float64Array; y: Float64Array } | null = null;
   private readonly ringEl: HTMLDivElement;
+  /** Each lens the last draw placed, in CSS px from the main pane's plot
+   *  area, for the gestures' hit test (`markAt`) and the bar's place. */
+  private marks: Array<{ index: number; x: number; y: number; h: number }> = [];
+  /** Whether the main pane keeps `HEADROOM` clear above the data. */
+  private roomy = false;
 
   constructor(host: HTMLElement, curves: Curves, overlay: Overlay, opts: ChartOptions) {
     this.overlay = overlay;
@@ -137,6 +148,7 @@ export class PatternChart {
     this.chrome = readChrome();
     this.ringEl = document.createElement("div");
     this.ringEl.className = "rx-ring";
+    this.roomy = PatternChart.wantsRoom(overlay);
     const shade = (u: any) => this.shade(u);
     this.fig = pattern(uPlot, host, curves, {
       // before a fit the lower pane is the peak groups' own residual, which
@@ -154,6 +166,7 @@ export class PatternChart {
       labels: opts.labels,
       titled: opts.titled,
       rawResidual: () => this.groupResidual(),
+      ranges: { main: (u: any, min: number, max: number) => this.mainRange(u, min, max) },
       layers: {
         main: { under: [shade, (u) => this.candidateLines(u)],
                 over: [(u) => this.previewLines(u), (u) => this.compareLine(u), (u) => this.peakFit(u), (u) => this.peakMarkers(u), (u) => this.placeRing(u)] },
@@ -246,7 +259,80 @@ export class PatternChart {
       // with a fit the pane is the model's residual, which a peak edit leaves alone
       if (!this.curves.header.fit) this.fig.refreshResidual();
     }
+    const roomy = PatternChart.wantsRoom(overlay);
+    if (roomy !== this.roomy) {
+      this.roomy = roomy;
+      // setting x at itself re-ranges y through `mainRange` (rxplot's `setData`)
+      const u = this.fig.panes.main;
+      u.setScale("x", { min: u.scales.x.min, max: u.scales.x.max });
+    }
     this.fig.redraw();
+  }
+
+  /** The headroom is kept while the peak layer has lines to mark. */
+  private static wantsRoom(o: Overlay): boolean {
+    return o.peaksActive && !!o.peaks?.length;
+  }
+
+  /**
+   * The main pane's y range: the chart module's own, with `HEADROOM` CSS px
+   * kept clear above the data while the peak layer is up, for the lenses and
+   * a selected line's bar (interaction rule 7, round 11c call 28). The room
+   * is made in the scale's own space (√ or log), so it is the same number of
+   * pixels on every scale. A y the reader zoomed to is pinned and never
+   * reaches here.
+   */
+  private mainRange(u: any, min: number, max: number): [number, number] {
+    const distr = u.scales?.y?.distr;
+    const [lo, hi] = distr === 3 ? uPlot.rangeLog(min, max, 10, true) as [number, number]
+      : uPlot.rangeNum(min, max, 0.1, true) as [number, number];
+    const height = (u.bbox?.height ?? 0) / devicePixelRatio;
+    if (!this.roomy || !(height > 2 * HEADROOM) || !(hi > lo)) return [lo, hi];
+    const fwd = distr === 3 ? Math.log10 : distr === 100
+      ? (v: number) => Math.sign(v) * Math.sqrt(Math.abs(v)) : (v: number) => v;
+    const bwd = distr === 3 ? (v: number) => 10 ** v : distr === 100
+      ? (v: number) => Math.sign(v) * v * v : (v: number) => v;
+    const a = fwd(lo), b = fwd(hi);
+    return [lo, bwd(a + (b - a) * height / (height - HEADROOM))];
+  }
+
+  /** The line whose lens is under a pointer at (`clientX`, `clientY`), or
+   *  null. A lens is 4.5 px wide, so the target is wider than the ink. */
+  markAt(clientX: number, clientY: number): number | null {
+    const box = this.fig.panes.main.over.getBoundingClientRect();
+    const x = clientX - box.left, y = clientY - box.top;
+    let best: number | null = null, gap = Infinity;
+    for (const m of this.marks) {
+      const dx = Math.abs(m.x - x);
+      if (dx <= MARK_REACH && Math.abs(m.y - y) <= m.h / 2 + 4 && dx < gap) {
+        best = m.index;
+        gap = dx;
+      }
+    }
+    return best;
+  }
+
+  /** Where the last draw put a line's lens, in CSS px from the plot area's
+   *  top left, with its height; null for a line with no lens in view. */
+  markOf(index: number): { x: number; y: number; h: number } | null {
+    return this.marks.find((m) => m.index === index) ?? null;
+  }
+
+  /** Where a new line's lens would stand at 2θ, in CSS px from the plot
+   *  area's top left: the hover's dashed mark and a dragged mark use it. */
+  lensAt(tt: number): { x: number; y: number } | null {
+    const u = this.fig.panes.main, { min, max } = u.scales.x;
+    if (tt < min || tt > max) return null;
+    const h = this.crest(tt);
+    if (h == null) return null;
+    const y = u.valToPos(h, "y") - LENS_GAP - LENS_HEIGHT / 2;
+    return { x: u.valToPos(tt, "x"), y: Math.max(LENS_HEIGHT / 2 + 2, y) };
+  }
+
+  /** A 2θ's place across the plot area, in CSS px, or null out of view. */
+  xOf(tt: number): number | null {
+    const u = this.fig.panes.main, { min, max } = u.scales.x;
+    return tt < min || tt > max ? null : u.valToPos(tt, "x");
   }
 
   /** The 2θ under a pointer at `clientX`, or null off the plot area. */
@@ -392,18 +478,20 @@ export class PatternChart {
    * crosses.
    */
   private peakMarkers(u: any): void {
-    const { peaks, peaksActive, hidden, selected } = this.overlay;
+    const { peaks, peaksActive, hidden, selected, dragging } = this.overlay;
+    this.marks = [];
     if (!peaksActive || !peaks?.length || hidden.includes("peaks")) return;
     const { ctx } = u, dpr = devicePixelRatio;
     const H = LENS_HEIGHT * dpr, W = LENS_WIDTH * dpr, gap = LENS_GAP * dpr;
     const row = (LENS_HEIGHT + 1) * dpr, near = 7 * dpr, top = u.bbox.top + H / 2 + 2 * dpr;
     const { min, max } = u.scales.x;
     const { halo, ink } = this.chrome;
-    const marks: Array<{ x: number; y: number; level: number; chosen: boolean }> = [];
+    const marks: Array<{ index: number; x: number; y: number; level: number; chosen: boolean }> = [];
     let dotted: number | null = null;
     for (const p of [...peaks].sort((a, b) => a.two_theta - b.two_theta)) {
       if (p.two_theta < min || p.two_theta > max) continue;
       const chosen = selected === p.index;
+      if (p.index === dragging) continue;
       if (!p.usable) {
         if (chosen) dotted = u.valToPos(p.two_theta, "x", true);
         continue;
@@ -422,8 +510,11 @@ export class PatternChart {
       // at the plot's top the stack turns downward, so a twin under the
       // strongest line still clears its partner rather than landing on it
       y = Math.max(top + level * row, y);
-      marks.push({ x, y, level, chosen });
+      marks.push({ index: p.index, x, y, level, chosen });
     }
+    this.marks = marks.map((m) => ({
+      index: m.index, x: (m.x - u.bbox.left) / dpr, y: (m.y - u.bbox.top) / dpr,
+      h: LENS_HEIGHT * (m.chosen ? 1.4 : 1) }));
     ctx.save();
     // uPlot leaves the last series' dash on the context (the background's)
     ctx.setLineDash([]);
@@ -521,11 +612,12 @@ function trace(u: any, tt: ArrayLike<number>, ys: ArrayLike<number>, colour: str
   ctx.stroke();
 }
 
-/** A peak mark's lens, in CSS pixels: 18 tall and 4.5 wide, its lower tip
- *  7 above the data (round 11c, 2026-11-08). */
-export const LENS_HEIGHT = 18;
-export const LENS_WIDTH = 4.5;
-export const LENS_GAP = 7;
+export { LENS_GAP, LENS_HEIGHT, LENS_WIDTH };
+/** The room kept clear above the data while the peak layer is up, in CSS px
+ *  (round 11c call 28: about an eighth of the plot in a 900 px window). */
+export const HEADROOM = 96;
+/** How far from a lens's axis a press still takes it, in CSS px. */
+export const MARK_REACH = 6;
 
 function readColors(): ReturnType<typeof curveColors> {
   const style = getComputedStyle(document.body);

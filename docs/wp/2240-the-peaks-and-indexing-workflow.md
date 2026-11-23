@@ -157,7 +157,7 @@ package. `src/rietx/_audit.py` is untouched.
   notes, Picking settings with Pick peaks again asking first); the Pattern graph's peak layer
   while the workflow is up, with a row click framing its line. A vitest mount case. The first
   PR.
-- [ ] 5. The peak gestures on the Pattern graph under interaction rules 1 to 12: click adds
+- [x] 5. The peak gestures on the Pattern graph under interaction rules 1 to 12: click adds
   with a dashed hover mark, a mark click selects with its bar (2θ, Used or Not used, Delete,
   ×), drag moves, Esc during and right after a drag, Option-click removes, right-click opens
   the menu; a typed add row at the table's foot (row 194); ⌘Z and ⇧⌘Z over peak edits.

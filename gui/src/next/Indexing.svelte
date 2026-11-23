@@ -20,7 +20,10 @@
    *
    * The peak list is a project artifact (`peaks.json`, WP-1027), so the panel
    * reads it from `GET /api/peaks` and every verb answers with the new list,
-   * which is handed up for the Pattern graph's marks.
+   * which is handed up for the Pattern graph's marks. The panel owns the
+   * verbs: the plot's gestures reach them through `edit`, and ⌘Z and ⇧⌘Z
+   * step through the server's stack of stored lists (interaction rule 10),
+   * since the list lives outside the history tree.
    */
   import { onMount } from "svelte";
 
@@ -28,8 +31,8 @@
   import Help from "../Help.svelte";
   import { labelFor, type HelpCorpus } from "../lib/help";
   import {
-    filterPeaks, formatIntensity, formatPosition, intensityScale,
-    type PeakFilter, type PeakRow, type PeaksPayload,
+    filterPeaks, formatIntensity, formatPosition, intensityScale, nearestRow,
+    type PeakEdit, type PeakFilter, type PeakRow, type PeaksPayload,
   } from "../lib/peaks";
   import type { Step } from "../lib/workflows";
   import type { Say } from "./console";
@@ -76,6 +79,9 @@
   let hi = $state("");
   let shoulders = $state(true);
   let contamination = $state(true);
+  /** the typed add row's 2θ (WP-1027: every pointer verb has a typed route) */
+  let addText = $state("");
+  let table: HTMLTableElement | undefined = $state();
 
   const rows = $derived(payload?.peaks ?? null);
   const unusable = $derived(new Set(payload?.unusable_flags ?? []));
@@ -122,10 +128,16 @@
     onpeaks(next);
   }
 
-  async function verb(run: () => Promise<unknown>): Promise<boolean> {
+  /** Run one verb. The chosen row follows its line by 2θ, since an add or a
+   *  removal renumbers the list; `follow` names the 2θ to choose instead. */
+  async function verb(run: () => Promise<unknown>, follow?: number | null): Promise<boolean> {
     working = true;
+    const was = selected == null ? null : rows?.find((r) => r.index === selected)?.two_theta ?? null;
     try {
       took(await run() as PeaksPayload);
+      const at = follow === undefined ? was : follow;
+      const hit = at == null || !rows ? null : nearestRow(rows, at);
+      selected = hit && Math.abs(hit.two_theta - at!) < 0.05 ? hit.index : null;
       return true;
     } catch (exc) {
       say("refusal", `refused: ${(exc as Error).message}`);
@@ -160,20 +172,88 @@
   }
 
   async function use(row: PeakRow, box: HTMLInputElement) {
-    const on = box.checked;
+    // a refusal leaves the list as it was, and `checked` is one-way: the box
+    // would otherwise keep the click and say the opposite of the stored line
+    if (!(await setUse(row, box.checked))) box.checked = row.usable;
+  }
+
+  async function setUse(row: PeakRow, on: boolean): Promise<boolean> {
     const hard = row.flags.filter((f) => unusable.has(f) && f !== "excluded");
     keep = new Set([...keep, row.index]);
-    if (await verb(() => api.flagPeak(row.index, { use_for_indexing: on }))) {
-      const next = new Map(overruled);
-      if (on && hard.length) next.set(row.index, hard);
-      else if (!on) next.delete(row.index);
-      overruled = next;
-    } else {
-      // a refusal leaves the list as it was, and `checked` is one-way: the box
-      // would otherwise keep the click and say the opposite of the stored line
-      box.checked = row.usable;
-    }
+    if (!(await verb(() => api.flagPeak(row.index, { use_for_indexing: on })))) return false;
+    const next = new Map(overruled);
+    if (on && hard.length) next.set(row.index, hard);
+    else if (!on) next.delete(row.index);
+    overruled = next;
+    return true;
   }
+
+  /** One edit from the plot or the typed row. A move chooses the line where
+   *  it landed; an add chooses nothing, since lines are placed many in a row
+   *  (interaction rule 3). */
+  export async function edit(e: PeakEdit): Promise<boolean> {
+    if (busy || working) return false;
+    if (e.kind === "add") return verb(() => api.addPeak(e.two_theta), selected == null ? null : undefined);
+    if (e.kind === "move") return verb(() => api.movePeak(e.index, e.two_theta), e.two_theta);
+    if (e.kind === "remove") {
+      return verb(() => api.removePeak(e.index), selected === e.index ? null : undefined);
+    }
+    const row = rows?.find((r) => r.index === e.index);
+    return row ? setUse(row, e.on) : false;
+  }
+
+  /** Step back or forward through the stored lists. The session's notes on
+   *  overruled lines are kept only for lines still used. */
+  async function travel(back: boolean): Promise<boolean> {
+    if (busy || working) return false;
+    const ok = await verb(back ? api.undoPeaks : api.redoPeaks);
+    if (ok) {
+      overruled = new Map([...overruled].filter(([i]) => rows?.find((r) => r.index === i)?.usable));
+      keep = new Set();
+    }
+    return ok;
+  }
+
+  export function undo(): Promise<boolean> {
+    return travel(true);
+  }
+
+  export function redo(): Promise<boolean> {
+    return travel(false);
+  }
+
+  export function canUndo(): boolean {
+    return !busy && !working && (payload?.undo ?? 0) > 0;
+  }
+
+  export function canRedo(): boolean {
+    return !busy && !working && (payload?.redo ?? 0) > 0;
+  }
+
+  /** ⌘Z and ⇧⌘Z while the workflow is up, outside a text field, which keeps
+   *  its own undo (as the Plan tab's keys do). */
+  function keydown(event: KeyboardEvent) {
+    if (!(event.metaKey || event.ctrlKey) || event.altKey || event.key.toLowerCase() !== "z") return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest?.("input, textarea, select, .cm-editor, [role=dialog]")) return;
+    event.preventDefault();
+    void travel(!event.shiftKey);
+  }
+
+  const addAt = $derived(addText.trim() === "" ? null : Number(addText));
+  async function typedAdd() {
+    if (addAt == null || !Number.isFinite(addAt)) return;
+    if (await edit({ kind: "add", two_theta: addAt })) addText = "";
+  }
+
+  // a line chosen on the plot brings its row into view, at the nearest edge
+  // and only when it is out of view (round 11b call 20)
+  $effect(() => {
+    const i = selected;
+    if (i == null || !table) return;
+    queueMicrotask(() => table?.querySelector(`tr[data-row="${i}"]`)
+      ?.scrollIntoView?.({ block: "nearest" }));
+  });
 
   function frame(row: PeakRow) {
     selected = row.index;
@@ -220,6 +300,8 @@
   {#if range === "bad"}<p class="bad">Type both ends of the 2θ range, or neither.</p>{/if}
 {/snippet}
 
+<svelte:window onkeydown={keydown} />
+
 <div class="steppane">
   {#if !steps[step]?.built}
     <div class="body"><p class="box">{steps[step]?.body}</p></div>
@@ -248,14 +330,14 @@
           {/each}
         </span>
       </div>
-      <table class="lines">
+      <table class="lines" bind:this={table}>
         <thead>
           <tr><th class="ck"></th><th class="r">2θ</th><th class="r">d</th>
             <th class="r">Intensity</th><th>Note</th></tr>
         </thead>
         <tbody>
           {#each shown as row (row.index)}
-            <tr class:off={!row.usable} class:sel={selected === row.index}
+            <tr class:off={!row.usable} class:sel={selected === row.index} data-row={row.index}
               onclick={(ev) => { if (!(ev.target as HTMLElement).closest("label")) frame(row); }}>
               <td class="ck"><label><input type="checkbox" checked={row.usable} {disabled}
                 aria-label="Use {formatPosition(row.two_theta, null).value}° in the search"
@@ -267,6 +349,18 @@
             </tr>
           {/each}
         </tbody>
+        <tfoot>
+          <!-- every pointer verb has a typed route (WP-1027, row 194) -->
+          <tr class="add">
+            <td class="ck"></td>
+            <td class="r"><input class="num" inputmode="decimal" placeholder="2θ" bind:value={addText}
+              aria-label="Add a line at 2θ" {disabled}
+              onkeydown={(e) => e.key === "Enter" && typedAdd()} /><span class="u">°</span></td>
+            <td colspan="3"><button class="ghost" {disabled} onclick={typedAdd}
+              title="Add a line at this 2θ and fit its group">Add</button>
+              {#if addAt != null && !Number.isFinite(addAt)}<span class="bad">Type a number.</span>{/if}</td>
+          </tr>
+        </tfoot>
       </table>
       {#if payload?.diagnostics?.length}
         <details class="notes">
@@ -413,6 +507,15 @@
     .lines tbody tr:hover td {
       background: var(--hover);
     }
+  }
+
+  .lines tr.add td {
+    padding-top: 6px;
+  }
+
+  .lines tr.add input {
+    width: 8ch;
+    text-align: right;
   }
 
   .lines tr.sel td {

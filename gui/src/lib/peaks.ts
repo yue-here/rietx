@@ -61,7 +61,32 @@ export interface PeaksPayload {
   pick_options?: { shoulders?: boolean; flag_contamination?: boolean;
                    two_theta_range?: [number, number] | null };
   created_utc?: string;
+  /** how many edits back ⌘Z reaches, and how many ⇧⌘Z can make again (WP-2240) */
+  undo?: number;
+  redo?: number;
 }
+
+/** One edit to the peak list, made on the plot or in the Pick step's table
+ *  (WP-2240): each is one verb, and each can be undone. */
+export type PeakEdit =
+  | { kind: "add"; two_theta: number }
+  | { kind: "move"; index: number; two_theta: number }
+  | { kind: "remove"; index: number }
+  | { kind: "use"; index: number; on: boolean };
+
+/** The row nearest 2θ in `rows`, or null for an empty list: how a choice
+ *  follows its line when an edit renumbers the list. */
+export function nearestRow(rows: readonly PeakRow[], twoTheta: number): PeakRow | null {
+  let best: PeakRow | null = null;
+  for (const r of rows) {
+    if (!best || Math.abs(r.two_theta - twoTheta) < Math.abs(best.two_theta - twoTheta)) best = r;
+  }
+  return best;
+}
+
+/** How near a click must land to a line left out of the search to choose
+ *  that line rather than add a twin (round 11d call 33), in degrees 2θ. */
+export const UNUSED_REACH_DEG = 0.02;
 
 /**
  * A chip's tone, in the app's one tone vocabulary (`app.css`).

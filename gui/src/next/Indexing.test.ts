@@ -3,7 +3,8 @@
 // three options before a list exists, the list after it with its filter and
 // tickboxes, a ticked row staying in a filtered list until the filter is chosen
 // again (round 11b call 22), a row's click framing its line, and picking again
-// saying first how many edits it replaces (round 11c call 29). Real clicks on
+// saying first how many edits it replaces (round 11c call 29); the typed add
+// row, the plot's edits through `edit`, and ⌘Z over them. Real clicks on
 // the plot and the table are `tests/test_gui_layout_browser.py`'s.
 import { flushSync, mount, tick, unmount } from "svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -36,12 +37,30 @@ const flagPeak = vi.fn(async (index: number, body: { use_for_indexing?: boolean 
   return stored;
 });
 
+let before: PeaksPayload[] = [];
+const keepBefore = () => before.push(stored);
+const addPeak = vi.fn(async (tt: number) => {
+  keepBefore();
+  const n = stored.peaks!.length;
+  return (stored = { ...stored, peaks: [...stored.peaks!, row(n, tt, { origin: "manual" })],
+                     undo: before.length, redo: 0, api_call: `session.add_peak(${tt})` });
+});
+const movePeak = vi.fn(async (index: number, tt: number) => {
+  keepBefore();
+  return (stored = { ...stored, peaks: stored.peaks!.map((p) => p.index !== index ? p
+    : { ...p, two_theta: tt + 0.004, origin: "edited" }), undo: before.length, redo: 0 });
+});
+const undoPeaks = vi.fn(async () => (stored = { ...before.pop()!, undo: before.length, redo: 1 }));
+
 vi.mock("../api", () => ({
   ApiError: class extends Error {},
   api: {
     peaks: () => peaks(),
     pickPeaks: (b: unknown) => pickPeaks(b),
     flagPeak: (i: number, b: { use_for_indexing?: boolean }) => flagPeak(i, b),
+    addPeak: (tt: number) => addPeak(tt),
+    movePeak: (i: number, tt: number) => movePeak(i, tt),
+    undoPeaks: () => undoPeaks(),
   },
 }));
 
@@ -79,6 +98,7 @@ afterEach(() => {
   said.length = 0;
   framed.length = 0;
   handed = null;
+  before = [];
   vi.clearAllMocks();
 });
 
@@ -152,6 +172,39 @@ describe("the Pick step", () => {
     button("Cancel").click();
     flushSync();
     expect(document.querySelector(".why")).toBeNull();
+  });
+
+  it("adds a typed line, follows a moved line, and takes both back with ⌘Z", async () => {
+    stored = listed();
+    await boot();
+    // the typed add row at the table's foot (row 194): a word for a placeholder
+    const add = document.querySelector<HTMLInputElement>("tr.add input")!;
+    expect(add.placeholder).toBe("2θ");
+    add.value = "28.5";
+    add.dispatchEvent(new Event("input", { bubbles: true }));
+    flushSync();
+    button("Add").click();
+    await settle();
+    expect(addPeak).toHaveBeenCalledWith(28.5);
+    expect(rowsShown()).toEqual(["20.1000°", "25.4000°", "28.5000°", "31.8000°"]);
+    expect(add.value).toBe("");
+    // a move from the plot chooses the line where it landed
+    await app.edit({ kind: "move", index: 0, two_theta: 20.3 });
+    await settle();
+    expect(movePeak).toHaveBeenCalledWith(0, 20.3);
+    expect(document.querySelector("tr.sel td.num")?.textContent).toContain("20.3040");
+    expect(app.canUndo()).toBe(true);
+    // ⌘Z over the plot steps back through the stored lists
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "z", metaKey: true }));
+    await settle();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "z", metaKey: true }));
+    await settle();
+    expect(undoPeaks).toHaveBeenCalledTimes(2);
+    expect(rowsShown()).toEqual(["20.1000°", "25.4000°", "31.8000°"]);
+    // a text field keeps its own undo
+    add.dispatchEvent(new KeyboardEvent("keydown", { key: "z", metaKey: true, bubbles: true }));
+    await settle();
+    expect(undoPeaks).toHaveBeenCalledTimes(2);
   });
 
   it("shows a step not built yet by its sentence", async () => {
