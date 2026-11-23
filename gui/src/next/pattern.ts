@@ -111,9 +111,9 @@ const Y: Record<Scale, "lin" | "sqrt" | "log"> = { linear: "lin", sqrt: "sqrt", 
 export class PatternChart {
   readonly fig: Pattern;
   private colors: ReturnType<typeof curveColors>;
-  /** the chrome inks the peak layer borrows: a lens's halo, the chosen
-   *  line's ring and a left-out line's dotted mark; read with `colors`, at
-   *  build and on `retheme`, never on a draw */
+  /** the chrome inks the peak layer borrows: a lens's halo and the chosen
+   *  line's ring; read with `colors`, at build and on `retheme`, never on a
+   *  draw */
   private chrome: Chrome;
   private overlay: Overlay;
   private curves: Curves;
@@ -398,7 +398,7 @@ export class PatternChart {
     const H = LENS_HEIGHT * dpr, W = LENS_WIDTH * dpr, gap = LENS_GAP * dpr;
     const row = (LENS_HEIGHT + 1) * dpr, near = 7 * dpr, top = u.bbox.top + H / 2 + 2 * dpr;
     const { min, max } = u.scales.x;
-    const { halo, ink, accent } = this.chrome;
+    const { halo, ink } = this.chrome;
     const marks: Array<{ x: number; y: number; level: number; chosen: boolean }> = [];
     let dotted: number | null = null;
     for (const p of [...peaks].sort((a, b) => a.two_theta - b.two_theta)) {
@@ -448,7 +448,9 @@ export class PatternChart {
       ctx.stroke();
     }
     if (dotted != null) {
-      ctx.strokeStyle = accent;
+      // the layer's own ink (WP-2240): `--accent` is the calculated curve's
+      // colour and hid the mark on it
+      ctx.strokeStyle = this.colors.peak;
       ctx.lineWidth = 1.2 * dpr;
       ctx.setLineDash([2 * dpr, 3 * dpr]);
       ctx.beginPath();
@@ -530,10 +532,10 @@ function readColors(): ReturnType<typeof curveColors> {
   return curveColors((name) => style.getPropertyValue(name));
 }
 
-interface Chrome { halo: string; ink: string; accent: string }
+interface Chrome { halo: string; ink: string }
 
 function readChrome(): Chrome {
   const style = getComputedStyle(document.body);
   const read = (name: string) => style.getPropertyValue(name).trim();
-  return { halo: read("--bg"), ink: read("--fg"), accent: read("--accent") };
+  return { halo: read("--bg"), ink: read("--fg") };
 }

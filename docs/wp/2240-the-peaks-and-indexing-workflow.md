@@ -131,6 +131,13 @@ package. `src/rietx/_audit.py` is untouched.
   that remembers which flags a person overruled (a `peaks.json` format change), and keeping the
   indexing result across a restart (a stored-format change).
 
+## Rulings
+
+- **The dotted mark for a chosen line left out of indexing is drawn in `--plot-peak`**, the
+  peak layer's own colour, not `--accent`, which is the calculated curve's colour and hid the
+  mark on it. Settled by Claude under `gui/CLAUDE.md`'s one-colour-per-layer, state-by-shape
+  rule (WP-1210); Yue delegated 2026-11-23; alternative `--fg`.
+
 ## Non-goals
 
 - Search these running a narrowed search; it waits on a route that starts a search over named
