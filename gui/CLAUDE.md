@@ -305,9 +305,6 @@ rules in this section are listed in WP-2134 for the GUI style guide.
 - **`Model` is mounted exactly once in `App.svelte`**, never per branch of
   `{#if project}` (WP-1205), and **every opener settles what is drawn over the project
   in the shell's `open`/`opened`** (WP-2131).
-- **A panel whose state is the project's sits inside `{#key opens}` on both pages**
-  (WP-2242): node ids repeat across projects, so `head` cannot tell two apart. One left
-  outside resets its project state from the shell's open handler.
 - **A stored size is not a settled size** (WP-1029): `fitColumns` re-clamps at render.
 - **A splitter reports a size and never writes one** (WP-1029): `onsize(size, done)`,
   persisted to `ProjectDoc.ui` on the verb, with an `inline` flow inside `overflow: auto`.
