@@ -89,6 +89,7 @@
 
   let {
     project = null,
+    opens = 0,
     capabilities = null,
     head = null,
     busy = false,
@@ -101,6 +102,9 @@
     onmoved = () => {},
   }: {
     project?: any;
+    /** the shell's count of projects opened, which tells two projects apart
+     *  where `head` cannot (WP-2242) */
+    opens?: number;
     capabilities?: any;
     head?: string | null;
     busy?: boolean;
@@ -334,13 +338,12 @@
    *  `projectKey`, not `project`: a `ui`-only PATCH (a theme, a pane width)
    *  replaces the project *object* without moving the head, and reading the
    *  object here made every such write reload three routes and refetch the 3D
-   *  geometry (WP-1029 q).  The *path* rather than a boolean, because the head
-   *  cannot tell two projects apart — node ids are sequential (`n0000`), so
-   *  two fresh projects share a head — and a switch must reload even when the
-   *  heads collide.  (Today `App.opened()` also forces `mode = "panes"`, so a
-   *  switch re-enters through `active` anyway; the key means this effect stays
-   *  correct the day that side effect changes.) */
-  const projectKey = $derived(project?.path ?? null);
+   *  geometry (WP-1029 q).  The shell's `opens` rather than a boolean, because
+   *  the head cannot tell two projects apart — node ids are sequential
+   *  (`n0000`), so two fresh projects share a head — and a switch must reload
+   *  even when the heads collide.  Not the path, which a reset example keeps
+   *  and a File-menu rename moves (WP-2242). */
+  const projectKey = $derived(project ? opens : null);
   $effect(() => {
     void head;
     if (projectKey !== null && active) load();
@@ -367,6 +370,9 @@
       const [s, i, p] = await Promise.all([api.structure(), api.instrument(),
                                            api.params()]);
       structure = s.structure;
+      // a phase removed since, or another project's index: the form reads
+      // `structure.phases[phase]` unguarded
+      if (phase >= (structure?.phases?.length ?? 0)) phase = 0;
       sites = s.sites ?? [];
       symmetry = s.symmetry ?? [];
       causes = s.causes ?? {};
@@ -450,6 +456,11 @@
     structure = null;
     instrument = null;
     rows = [];
+    // the chosen phase and the open ADP rows are this project's too: an index
+    // past the next project's last phase reads `structure.phases[phase]` as
+    // undefined (WP-2242)
+    phase = 0;
+    openAdp = new Set();
     symbolDraft = null;
     symPreview = null;
     symError = "";

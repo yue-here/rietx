@@ -174,9 +174,12 @@
     const at = head;
     untrack(() => recoveryWriter.schedule(path, at, draft));
   });
-  /** Bumped by every project opened, so the Plan tab starts over: its unsaved
-   *  stages and its undo stack belong to the project they were made in, and
-   *  `{#if project}` stays true across an open. */
+  /** The open project's identity on this page, bumped by `adopt` and nowhere
+   *  else (WP-2242). `head` cannot tell two projects apart, since node ids
+   *  repeat across them (`n0000`, `n0001`, …), and `{#if project}` stays true
+   *  across an open. So every panel whose state is the project's sits inside
+   *  `{#key opens}` and starts over, and anything the shell keeps for a project
+   *  carries the count it was made under. */
   let opens = $state(0);
   let simple = $state(true);
   /** The first-run checklist's own two pieces of state (WP-1017): whether it
@@ -404,8 +407,9 @@
   }
 
   /** Leave the open project's pending edits behind as its recovery copy, and
-   *  clear them from the panels, which stay mounted across an open: without
-   *  this, one project's pending values were the next project's Apply. */
+   *  clear them from the panels. The keyed panels start over on an open
+   *  (`opens`, WP-2242), but `Model` stays mounted across one, and without
+   *  this its pending values were the next project's Apply. */
   async function leaveEdits() {
     await recoveryWriter.flush();
     recoveryWriter.disarm();
@@ -505,15 +509,21 @@
   }
 
   async function loadResult() {
+    const read = await readResult();
+    result = read.result;
+    resultError = read.error;
+    if (read.result) plotKey += 1; // the curves moved: tell the plot to fetch them again
+  }
+
+  /** The last fit, read but not yet published (`readPeaks`' reason). */
+  async function readResult(): Promise<{ result: any; error: string }> {
     try {
-      result = (await api.result()).result;
-      resultError = "";
-      plotKey += 1; // the curves moved: tell the plot to fetch them again
+      return { result: (await api.result()).result, error: "" };
     } catch (error) {
-      result = null;
       // NO_RESULT is an empty state, not a failure: a fresh project has no
       // curves, and a `checkout` throws the last fit's away on purpose.
-      resultError = error instanceof ApiError && error.empty ? "" : (error as Error).message;
+      return { result: null,
+               error: error instanceof ApiError && error.empty ? "" : (error as Error).message };
     }
   }
 
@@ -524,9 +534,32 @@
    * the new project's root node supplies.
    */
   async function opened(doc: any) {
+    await adopt(doc);
+    say(`# project: ${doc.path}`);
+    run = await api.runState();
+    await offerRecovery();
+  }
+
+  /** Make `doc` the page's project: the one place every opener lands
+   *  (WP-2242). The panels keyed on `opens` start over by themselves; this
+   *  resets what the shell holds for the project beside them. What it leaves
+   *  is the session's on purpose: the theme, the layout, the Plot's view
+   *  knobs (it stays mounted for them, and is asked to redraw), the Console. */
+  async function adopt(doc: any) {
+    // after the edits are kept, so a pending value is saved for the project
+    // it was typed in before its panel goes
     await leaveEdits();
+    // the next project's fit and peak list are read before anything is
+    // published, so the keyed panels mount on them in the same flush: none
+    // offers the last project's diagnostics, and the plot fetches once
+    const [read, peaks] = await Promise.all([readResult(), readPeaks()]);
     project = doc;
     opens += 1;
+    result = read.result;
+    resultError = read.error;
+    peaksData = peaks;
+    // the curves are another project's, fit or no fit
+    plotKey += 1;
     readUi();
     openError = "";
     startOpen = false;
@@ -540,11 +573,21 @@
     indexAnswer = null;
     forgetCandidates();
     extinction = null;
-    say(`# project: ${doc.path}`);
-    run = await api.runState();
-    await loadResult();
-    await loadPeaks();
-    await offerRecovery();
+    indexSnapshots = [];
+    protocolError = "";
+    zoom = null;
+    hoveredPeak = null;
+    baseCurves = null;
+    // its undo is a node id, and node ids repeat across projects, so another
+    // project's would check out an unrelated node in this one's tree
+    applied = null;
+    // what the keyed panels hand up, which a fresh panel has not said yet
+    pendingTouched = 0;
+    pendingInvalid = "";
+    sliderTouched = 0;
+    previewAnswer = null;
+    previewError = "";
+    planPending = false;
   }
 
   /** Open another project **in place of** this one (WP-1034).
@@ -560,20 +603,7 @@
   async function open(path: string): Promise<string> {
     await recoveryWriter.flush();
     try {
-      const doc = await api.openProject(path);
-      await leaveEdits();
-      project = doc;
-      opens += 1;
-      readUi();
-      openError = "";
-      startOpen = false;
-      reportSeen = false;   // a different project — see `opened` (WP-1017)
-      tab = "params";
-      indexAnswer = null;
-      forgetCandidates();
-      extinction = null;
-      await loadResult();
-      await loadPeaks();
+      await adopt(await api.openProject(path));
       say(`project.open(${path})`);
       await offerRecovery();
       return "";
@@ -1511,10 +1541,12 @@
             active={graphTab === "single" && !hideGraphs} />
         </div>
         <div class="gview" class:hidden={graphTab !== "background"}>
-          <Background {head} {busy} {theme} {say} onmoved={moved}
-            protocol={JSON.stringify([project?.doc?.mode ?? null, protocol.limits,
-                                      protocol.regions])}
-            active={graphTab === "background" && !hideGraphs} />
+          {#key opens}
+            <Background {head} {busy} {theme} {say} onmoved={moved}
+              protocol={JSON.stringify([project?.doc?.mode ?? null, protocol.limits,
+                                        protocol.regions])}
+              active={graphTab === "background" && !hideGraphs} />
+          {/key}
         </div>
         {#if hideModel}{@render actions()}{/if}
       </div>
@@ -1563,13 +1595,16 @@
            and without a project, Model *is* the content, so it is always
            active and never hidden. -->
       <div class="panel" class:hidden={!!project && !modelTab}>
-        <Model bind:this={modelPanel} {project} {capabilities} {head} {busy} {simple}
+        <Model bind:this={modelPanel} {project} {opens} {capabilities} {head} {busy} {simple}
           {theme} {say} active={modelTab} columns={modelColumns}
           oncolumns={modelSized} onmoved={moved} />
       </div>
       {#if project}
         <!-- every tab stays mounted: switching must not throw away a filter, a
-             pending edit, an unsaved stage list or a two-node comparison -->
+             pending edit, an unsaved stage list or a two-node comparison. Each
+             is the project's, so another project's open starts each over
+             (`opens`, WP-2242) -->
+        {#key opens}
         <div class="panel" class:hidden={tab !== "params"}>
           <Params bind:this={paramsPanel} {head} {busy} {corpus} {say}
             onpending={(n, why) => { pendingTouched = n; pendingInvalid = why; }} />
@@ -1581,11 +1616,9 @@
             onpreview={(answer, why) => { previewAnswer = answer; previewError = why; }} />
         </div>
         <div class="panel" class:hidden={tab !== "plan"}>
-          {#key opens}
-            <Plan bind:this={planPanel} mode={project.doc.mode} {head} {busy} {simple}
-              noPhasesReason={noPhases ? NO_PHASES_REASON : null}
-              {say} onrun={runPlanStage} onpending={(edited) => (planPending = edited)} />
-          {/key}
+          <Plan bind:this={planPanel} mode={project.doc.mode} {head} {busy} {simple}
+            noPhasesReason={noPhases ? NO_PHASES_REASON : null}
+            {say} onrun={runPlanStage} onpending={(edited) => (planPending = edited)} />
         </div>
         <div class="panel" class:hidden={!textTab}>
           <Text bind:this={textPanel} {head} {busy} active={textTab} dark={theme === "dark"} {say} onmoved={moved} />
@@ -1619,6 +1652,7 @@
         <div class="panel" class:hidden={tab !== "build"}>
           <Stubs {capabilities} {project} />
         </div>
+        {/key}
         {#if !hideModel}{@render actions()}{/if}
         <Console {lines} {dropped} height={consoleHeight} onresize={setConsoleHeight} />
       {/if}
