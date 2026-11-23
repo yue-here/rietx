@@ -598,6 +598,7 @@
           {" "}{answer.result.quality.abstained_reason}{/if}</p>
       {:else}
         <h3>Candidates <span class="muted">{candidates.length}, ranked by rietx</span></h3>
+        <div class="candsw">
         <table class="lines cands">
           <thead>
             <!-- the cell as six columns, and a row's relation to another on its own
@@ -635,6 +636,7 @@
             {/each}
           </tbody>
         </table>
+        </div>
       {/if}
       {#if notes.length}
         <details class="notes">
@@ -965,6 +967,19 @@
 
   .cands td.rel {
     color: var(--muted);
+  }
+
+  /* fifteen columns share the model panel: a narrower gutter, and past
+     that the table scrolls in its own box (Params' atom table), never the
+     step's form with it */
+  .candsw {
+    overflow-x: auto;
+  }
+
+  .cands th,
+  .cands td {
+    padding-left: 4px;
+    padding-right: 4px;
   }
 
   .note {

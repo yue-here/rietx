@@ -519,7 +519,7 @@ export interface CellColumn { value: string; pad: string; fixed: boolean }
 
 /**
  * A candidate's cell as six columns, a, b, c, α, β, γ (the maintainer,
- * 2026-11-23). Lengths take four places and angles three, so each column
+ * 2026-11-23). Lengths take four places and angles two, so each column
  * aligns on the decimal point (`gui/STYLE.md` § Numbers). A value the
  * system sets is `fixed`: a length equal to another by symmetry keeps its
  * places, and a symmetry-fixed angle is written whole, `90` or `120`, with
@@ -539,7 +539,7 @@ export function cellColumns(c: Pick<Candidate, "cell" | "system">): CellColumn[]
   };
   const tiedAngles = rhombohedral ? [4, 5] : [];
   return cell.map((v, k) => {
-    const places = k < 3 ? 4 : 3;
+    const places = k < 3 ? 4 : 2;
     if ((setAngles[c.system] ?? []).includes(k)) {
       return { value: String(Math.round(v)), pad: `.${"0".repeat(places)}`, fixed: true };
     }

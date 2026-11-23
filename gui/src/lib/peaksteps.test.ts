@@ -72,11 +72,11 @@ describe("the candidate columns", () => {
     expect(show(cand())).toEqual(
       ["9.3750", "9.3750*", "6.8900", "90_*", "90_*", "120_*"]);
     expect(show(cand({ system: "monoclinic", cell: [5.1, 6.2, 7.3, 90, 101.25, 90] })))
-      .toEqual(["5.1000", "6.2000", "7.3000", "90_*", "101.250", "90_*"]);
+      .toEqual(["5.1000", "6.2000", "7.3000", "90_*", "101.25", "90_*"]);
     // rhombohedral axes: b and c follow a, β and γ follow α
     expect(show(cand({ system: "trigonal", cell: [5.2, 5.2, 5.2, 55.3, 55.3, 55.3] })))
-      .toEqual(["5.2000", "5.2000*", "5.2000*", "55.300", "55.300*", "55.300*"]);
-    expect(cellColumns(cand())[3].pad).toBe(".000");
+      .toEqual(["5.2000", "5.2000*", "5.2000*", "55.30", "55.30*", "55.30*"]);
+    expect(cellColumns(cand())[3].pad).toBe(".00");
   });
   it("count the unindexed lines and the absent share", () => {
     expect(unindexedOf(cand())).toBe(2);
