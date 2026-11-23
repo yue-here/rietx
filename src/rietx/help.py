@@ -1209,9 +1209,9 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "own. Unit: AMPLIMODES's, the mode normalised over a primitive cell of the "
             "child in the parent metric before any strain. The sign of the driving mode is a "
             "domain label; relative signs inside a basis are measured (Perez-Mato et al. "
-            "2010, § 7). At the parent every amplitude outside the "
-            "identity irrep has an exactly zero gradient, so a block freed there is "
-            "refused: start from the statement's seed."
+            "2010, § 7). A block of amplitudes outside the identity irrep is not freed "
+            "at the parent, since its gradient there is exactly zero or does not choose "
+            "the sign: start from the statement's seed."
         ),
         unit="Å", default=None,
         typical="0 to about 1.5 Å for an octahedral tilt",

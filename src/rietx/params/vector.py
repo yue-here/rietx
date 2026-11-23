@@ -1947,26 +1947,22 @@ class ParameterTable:
         the rule: the strain's column is then not forced to zero.  A k counted
         as Γ here is any integer one, which errs toward letting a stage run.
 
-        **A phase that carries a non-zero moment is not refused** (#1533,
-        found in pre-review).  Every argument above acts with a lost parent
-        operation on the block alone, so it holds only while everything else
-        in the pattern keeps that operation.  Moments that break the parent's
-        symmetry do not, and the magnetic intensity then gives the block a
-        first-order term at zero.  On LaMnO₃'s Pm child at k = (½, ½, 0)
-        with Mn moments of 0.98 μ_B, max|y(+s) − y(−s)|/max y is 2.3e-5 for
-        the strain at s = 1e-3 (1.1e-5 at 5e-4, so first order), and 2.2e-5
-        and 1.7e-5 for Mn amplitudes of two irreps outside the identity one,
-        against 1e-14 and below with the moments at zero.
-        A moment counts when its modulus row (``…moment.dof0``) is non-zero;
-        a phase whose moments happen to keep the parent's symmetry is let
-        through too, which errs toward letting a stage run.
+        **The refusal is a statement about the start, not about the
+        gradient** (#1533).  The arguments above act with a lost parent
+        operation on the block alone, so they hold only while everything
+        else in the pattern keeps that operation.  Moments, preferred
+        orientation, and unequal ADPs or occupancies on a split orbit break
+        it, and some of the block's columns then have a term at zero.  That
+        term does not choose the sign: on LaMnO₃'s Pm child at
+        k = (½, ½, 0) with Mn moments on, the strain's odd term is 2e-5 of
+        the top at s = 1e-3, and a fit freed from zero took the strain to
+        +0.00200 in 6 of 6 fits whatever the truth's sign.  So the block at
+        the parent is not freed whatever else the phase carries, and the
+        caller states the sign by seeding (Theory: *Distortion-mode
+        amplitudes*, for the measured sizes).
         """
         reach = np.asarray(abs(self._reach).sum(axis=1)).ravel()
-        magnetic = {e.path.split(".atoms.")[0] for e in self.entries
-                    if e.path.endswith(".moment.dof0") and e.value != 0.0}
         for base, (paths, invariant, at_gamma, strains) in self._distortion.items():
-            if base in magnetic:
-                continue
             broken = [i for i, inv in enumerate(invariant) if not inv]
             block = [self._paths[paths[i]] for i in broken] + [self._paths[p] for p in strains]
             freed = [i for i in block if reach[i] > 0.0]
@@ -1983,10 +1979,12 @@ class ParameterTable:
                     if not strained else
                     "every amplitude outside the identity irrep (the freed ones at k ≠ Γ)")
             raise ValueError(
-                f"{base}.distortion_modes: {what} is exactly zero, where the "
-                "pattern is invariant under every lost parent operation's action "
-                "on the block, so its gradient there is exactly zero and the stage "
-                "cannot move off the parent.  State the child with "
+                f"{base}.distortion_modes: {what} is exactly zero: the block "
+                "starts at the parent, where it is not freed.  Its gradient there is "
+                "exactly zero, or set only by what else in the pattern breaks the "
+                "parent's symmetry (moments, preferred orientation, unequal ADPs or "
+                "occupancies on a split orbit), which does not choose the sign, so "
+                "the sign is the caller's to state.  State the child with "
                 "displacive_statement, which seeds it, or set_values a small "
                 "non-zero amplitude (or strain) before freeing the block")
 

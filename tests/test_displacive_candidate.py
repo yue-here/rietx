@@ -23,6 +23,8 @@ allows, held.  What is pinned, and against what:
 * **Strains at the parent**: zero is stationary for every strain, and the
   pattern is even only in a strain a parent operation flips; the all-zero
   refusal covers a freed strain-only block, and a held strain narrows it.
+  A phase carrying moments is refused too: the refusal is a statement about
+  the start, and the caller states the sign by seeding.
 * **Row D over candidates**: every stated candidate's statement passes its
   per-mode check.
 
@@ -589,11 +591,12 @@ def test_zero_strain_is_stationary_and_even_only_where_an_operation_flips_it():
     assert odd(1e-3) / odd(5e-4) > 6.0  # s³; a first-order term would halve it
 
 
-def _free(phase, globs, values=None):
-    ref = rx.Refinement(Structure(phases=[phase.model_copy(deep=True)]), neutron(), history=False)
+def _free(phase, globs, values=None, instrument=None):
+    inst = neutron() if instrument is None else instrument
+    ref = rx.Refinement(Structure(phases=[phase.model_copy(deep=True)]), inst, history=False)
     if values:
         ref.set_values(values)
-    return ParameterTable(ref.structure, neutron()).set_vary(globs, True)
+    return ParameterTable(ref.structure, inst).set_vary(globs, True)
 
 
 def test_the_all_zero_refusal_covers_the_strains_and_a_held_strain_narrows_it():
@@ -633,10 +636,12 @@ def test_the_all_zero_refusal_covers_the_strains_and_a_held_strain_narrows_it():
     assert len(_free(p4mm, [AMPS], {"phases.0.parent_cell.strain.0": 1e-3})) == 3
 
 
+STRAIN0 = "phases.0.parent_cell.strain.0"
+
+
+@functools.cache
 def _lamno3_magnetic_child_at_zero():
-    """LaMnO₃'s Pm child at k = (½, ½, 0), Mn moments on, stated at A = 0;
-    and the same phase with every moment at zero and held (the control: a free
-    moment at zero is refused by the schema)."""
+    """LaMnO₃'s Pm child at k = (½, ½, 0), Mn moments on, stated at A = 0."""
     from rietx.crystallography.magnetic import supercell as sc
 
     parent = _lamno3()
@@ -647,49 +652,74 @@ def _lamno3_magnetic_child_at_zero():
     st = sc.magnetic_supercell(parent, cand, nuclear_group="magnetic",
                                magnetic_species=["Mn"], ion="Mn3+")
     phase = D.displacive_statement(parent, st.phase, _floats(st.transform), seed=0.0).phase
-
-    def zero(m):
-        return m.model_copy(update={c: getattr(m, c).model_copy(update={"value": 0.0, "vary": False})
-                                    for c in ("crystalaxis_x", "crystalaxis_y", "crystalaxis_z")})
-    bare = phase.model_copy(update={"atoms": [
-        a if a.moment is None else a.model_copy(update={"moment": zero(a.moment)})
-        for a in phase.atoms]})
-    return phase, bare
-
-
-def test_the_all_zero_refusal_does_not_fire_on_a_phase_carrying_moments():
-    """Found in our pre-review of #1533: moments that break the parent's symmetry void the rule.
-
-    The refusal rests on the pattern being invariant under each lost parent
-    operation acting on the block alone.  Mn moments on LaMnO₃'s Pm child do
-    not keep the parent's symmetry, so the strain's column at zero is not zero:
-    y(+s) − y(−s) is first order in s (measured 2.3e-5 of the top at s = 1e-3,
-    1.1e-5 at 5e-4), and freeing the strain or the amplitudes is let through.
-    Positive arm: the same phase with its moments at zero is even in the
-    strain to round-off, and both stages are refused as before.
-    """
-    phase, bare = _lamno3_magnetic_child_at_zero()
     assert phase.parent_cell.strain and phase.parent_cell.strain[0].value == 0.0
     assert all(m.amplitude.value == 0.0 for m in phase.distortion_modes.modes)
+    return phase
 
-    def odd(ph, s):
-        def y(v):
-            ref = rx.Refinement(Structure(phases=[ph.model_copy(deep=True)]), neutron(),
-                                history=False)
-            ref.set_values({"phases.0.parent_cell.strain.0": v})
-            return np.asarray(ref.predict(TT))
-        return float(np.max(np.abs(y(s) - y(-s))) / y(0.0).max())
 
-    big, small = odd(phase, 1e-3), odd(phase, 5e-4)
+def test_the_all_zero_refusal_fires_on_a_phase_carrying_moments():
+    """The likeliest misuse: freeing the block at the parent of a magnetic phase.
+
+    Mn moments break the parent's symmetry, so the refusal is a statement
+    about the start and not about the gradient (#1533): the
+    block at the parent is not freed, and the caller states the sign by
+    seeding.  Freeing the amplitudes or the strain is refused as on a phase
+    without moments, and the message names the remedy.
+    """
+    phase = _lamno3_magnetic_child_at_zero()
+    table = ParameterTable(Structure(phases=[phase.model_copy(deep=True)]), neutron())
+    assert any(e.path.endswith(".moment.dof0") and e.value != 0.0 for e in table.entries)
+    for globs in ([AMPS], [STRAINS]):
+        with pytest.raises(ValueError, match="and every strain is exactly zero") as err:
+            _free(phase, globs)
+        assert "does not choose the sign" in str(err.value)
+        assert "displacive_statement, which seeds it" in str(err.value)
+
+
+def test_moments_give_the_strain_a_term_at_zero_and_leave_an_oxygen_mode_dead():
+    """Characterisation: what the moments do to the block at the parent.
+
+    With Mn moments on, the strain's odd term max|y(+s) − y(−s)|/max y is
+    first order (about 2e-5 of the top at s = 1e-3, half that at 5e-4).  An
+    oxygen mode stays exactly zero: unpolarised neutrons add nuclear and
+    magnetic intensity with no cross term, and the magnetic intensity does not
+    see the O atoms.  Neither number is a reason to free the block (the term
+    does not choose the sign); it pins why the refusal's message conditions
+    its "exactly zero".
+    """
+    phase = _lamno3_magnetic_child_at_zero()
+
+    def y(path, v):
+        ref = rx.Refinement(Structure(phases=[phase.model_copy(deep=True)]), neutron(),
+                            history=False)
+        ref.set_values({path: v})
+        return np.asarray(ref.predict(TT))
+
+    top = y(STRAIN0, 0.0).max()
+
+    def odd(path, s):
+        return float(np.max(np.abs(y(path, s) - y(path, -s))) / top)
+
+    big, small = odd(STRAIN0, 1e-3), odd(STRAIN0, 5e-4)
     assert big > 1e-6 and small == pytest.approx(big / 2.0, rel=0.05)
-    assert odd(bare, 1e-3) < 1e-12
+    oxygen = next(i for i, m in enumerate(phase.distortion_modes.modes)
+                  if not m.parent_invariant and m.site == "O3")
+    assert odd(f"phases.0.distortion_modes.modes.{oxygen}.amplitude", 1e-3) < 1e-12
 
-    assert _free(phase, [STRAINS]) == ["phases.0.parent_cell.strain.0"]
-    assert _free(phase, [AMPS])
-    with pytest.raises(ValueError, match="and every strain is exactly zero"):
-        _free(bare, [STRAINS])
-    with pytest.raises(ValueError, match="and every strain is exactly zero"):
-        _free(bare, [AMPS])
+
+def test_a_hand_seeded_strain_frees_on_a_phase_carrying_moments():
+    """The remedy the refusal names works: a strain of ±1e-4 set by hand frees."""
+    phase = _lamno3_magnetic_child_at_zero()
+    for v in (1e-4, -1e-4):
+        assert _free(phase, [STRAINS], {STRAIN0: v}) == [STRAIN0]
+
+
+def test_the_all_zero_refusal_fires_on_a_phase_carrying_moments_under_x_rays():
+    """Under X-rays the moments scatter nothing, and the block is refused alike."""
+    phase = _lamno3_magnetic_child_at_zero()
+    for globs in ([AMPS], [STRAINS]):
+        with pytest.raises(ValueError, match="and every strain is exactly zero"):
+            _free(phase, globs, instrument=rx.Instrument.bragg_brentano())
 
 
 # --------------------------------------------------------------------------
