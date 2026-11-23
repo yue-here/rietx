@@ -142,7 +142,9 @@ class UnitRecord(Base):
 
 class RaceRound(Base):
     """One round of the assignment race: the assignments it ran, each one's
-    lowest J, and the ones that went on."""
+    lowest J, and the ones that went on.  ``sweeps`` is each chain's total at
+    the round's end, cumulative over the rounds before it
+    (``race_sweeps·2^round``), not the sweeps this round added."""
 
     round: int
     sweeps: int
@@ -165,11 +167,15 @@ class StructureCandidate(Base):
     """One distinct solution: the leader of a cluster, with its evidence.
 
     ``structure`` is the input phase with the leader's atoms, ready for the
-    Rietveld path; it is a candidate's, and the result has none.  ``seeds``
+    Rietveld path; it is a candidate's, and the result has none.  Its atoms
+    are new, so it carries none of the input's declarations that name atoms
+    (restraints, rigid bodies, distortion modes).  ``seeds``
     are the seed indices whose polished states joined the cluster, so
     ``n_finders`` is how many independent starts reached it, and
     ``finder_rmsd`` the largest member's RMSD from the leader after alignment
-    (Å).  ``chi2_ratio`` is χ²_data/χ²_floor.  ``control_rmsd_ang`` is the
+    (Å).  ``chi2_ratio`` is χ²_data/χ²_floor.  ``margin_to_next`` is
+    (χ²_next − χ²)/χ² to the next candidate of the answer, whatever its space
+    group, ``None`` for the last.  ``control_rmsd_ang`` is the
     leader's RMSD (Å) from the prior-off control arm's best leader and
     ``control_chi2_data`` that leader's χ²_data, both ``None`` when the run
     had no control seeds (:class:`~rietx.solve.cluster.RankedSolution`).

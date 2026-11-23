@@ -23,7 +23,8 @@ indexing's (engine × system) units are:
   :func:`~rietx.solve.cluster.rank`'s ``control=``;
 * ``consensus:<group>`` — the clusters of that group's seeds, ranked with
   their evidence, and streamed in the evidence row's shape
-  (:func:`~rietx.solve.solution.candidate_evidence`).
+  (:func:`~rietx.solve.solution.candidate_evidence`) once every group's are
+  merged, so each row carries its index and rank in the answer.
 
 Inside a unit, ``solve_step`` is the heartbeat every ``heartbeat_sweeps``
 sweeps, when the spec asks for one.  ``solve_start`` and ``solve_end`` bracket the run.
@@ -31,8 +32,9 @@ sweeps, when the spec asks for one.  ``solve_start`` and ``solve_end`` bracket t
 **The race** is successive halving (Karnin, Koren & Somekh 2013, *ICML*,
 Sequential Halving; Jamieson & Talwalkar 2016, *AISTATS*): every assignment
 runs ``race_sweeps`` sweeps of one seed; the better half by lowest J goes on,
-each continuing its own chain from where it stopped for twice the sweeps, until
-one is left.  Only the winner gets the seeds.  Nothing in it reads the
+each continuing its own chain from where it stopped until the chain's total
+reaches twice the previous round's (``race_sweeps·2^k`` in round k, so round 1
+adds as many sweeps as round 0 ran), until one is left.  Only the winner gets the seeds.  Nothing in it reads the
 deposited structure, so a recovery measured through it is a recovery from the
 composition alone.
 
@@ -50,8 +52,10 @@ every ``checkpoint_every_s`` and always when a unit finishes.  A call with an
 existing checkpoint resumes from it and returns the uninterrupted run's
 candidates and records, byte for byte
 (:meth:`~rietx.solve.solution.SolutionResult.comparable_json`); a checkpoint
-of another cost, another spec or another version is refused by name
-(:class:`CheckpointMismatch`).
+of another cost, another spec or another package version is refused by name
+(:class:`CheckpointMismatch`).  The version is the installed one, which every
+commit between two releases shares, so two trees of one ``.dev0`` are not told
+apart.
 
 **Seeds as processes.**  :func:`merge_seed_results` takes per-seed results
 (``spec.seeds=(k,)``, ``control_seeds=()`` and the reverse) and takes the
@@ -69,7 +73,7 @@ import math
 import os
 import time
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, fields, replace
+from dataclasses import dataclass, fields, is_dataclass, replace
 from pathlib import Path
 from typing import Literal
 
@@ -164,14 +168,29 @@ def _space_digest(space: SearchSpace) -> list:
     return out
 
 
+def _canonical(x):
+    """``x`` as plain JSON values that two equal objects share: a dataclass by
+    field, a mapping's items sorted by key (a lookup, whatever order it was
+    built in), a numpy scalar as its python value; a sequence keeps its order."""
+    if is_dataclass(x) and not isinstance(x, type):
+        return {f.name: _canonical(getattr(x, f.name)) for f in fields(x)}
+    if isinstance(x, Mapping):
+        return sorted([str(k), _canonical(v)] for k, v in x.items())
+    if isinstance(x, (list, tuple)):
+        return [_canonical(v) for v in x]
+    if isinstance(x, np.generic):
+        return x.item()
+    return x
+
+
 def spec_fingerprint(spec: SolveSpec, phase, searches, priors) -> str:
     """The settings side: the spec but :data:`_RESUMABLE_FIELDS`, the cell and
-    groups, every search's units and the priors."""
+    groups, every search's units and the priors (by value: :func:`_canonical`)."""
     s = {f.name: getattr(spec, f.name) for f in fields(spec) if f.name not in _RESUMABLE_FIELDS}
     cell = [float(getattr(phase.cell, k).value) for k in ("a", "b", "c", "alpha", "beta",
                                                           "gamma")]
     return _digest(s, cell, [[x.group, x.assignment, _space_digest(x.space)] for x in searches],
-                   repr(priors))
+                   _canonical(priors))
 
 
 def write_checkpoint(path: Path, payload: dict) -> None:
@@ -356,6 +375,7 @@ def _run_unit(run: _Run, search: _Search, kind: str, idx: int, sweeps: int, *,
         rng_seed = unit_seed(run.spec, kind, idx)
     if uid in run.finished:
         got = run.finished[uid]
+        run.progress.done += 1          # it keeps its place on the ladder: no pair, it ran before
         return UnitRecord.model_validate(got["record"]), got.get("end_state"), True
     problem, ladder = ((search.control, search.control_ladder) if kind == "control"
                        else (search.problem, search.ladder))
@@ -467,6 +487,9 @@ def race_assignments(run: _Run, searches: list[_Search]) -> tuple[RaceRecord, li
 # the consensus, from records alone
 # ----------------------------------------------------------------------
 def _candidate_structure(phase, group: str, layout: SearchLayout, xyz):
+    """``phase`` in ``group`` with the leader's atoms, and none of the input's
+    declarations that name its atoms (by index or label), since those atoms are
+    gone: no restraints, rigid bodies or distortion modes."""
     from ..schemas.common import Parameter
     from ..schemas.structure import Atom, Structure
 
@@ -475,8 +498,9 @@ def _candidate_structure(phase, group: str, layout: SearchLayout, xyz):
                   y=Parameter(value=float(x[1] % 1.0)), z=Parameter(value=float(x[2] % 1.0)),
                   occ=Parameter(value=a.occ), biso=Parameter(value=a.biso))
              for a, x in zip(layout.atoms, xyz, strict=True)]
-    return Structure(phases=[ph.model_copy(update={"atoms": atoms, "rigid_bodies": []},
-                                           deep=True)])
+    return Structure(phases=[ph.model_copy(update={"atoms": atoms, "rigid_bodies": [],
+                                                   "restraints": [],
+                                                   "distortion_modes": None}, deep=True)])
 
 
 def _equivalence(phase, group: str):
@@ -526,6 +550,22 @@ def _sort_records(records: list[UnitRecord], groups: list[str]) -> list[UnitReco
                                           -1 if r.round is None else r.round, r.seed_index))
 
 
+def _answer_order(candidates: list[StructureCandidate],
+                  groups: list[str]) -> list[StructureCandidate]:
+    """Every group's candidates in one list, best χ²_data first, ranked from 1,
+    each ``margin_to_next`` measured to the next candidate of this list,
+    whatever its group (``None`` for the last); :func:`~rietx.solve.cluster.rank`'s is the
+    next of its own group's."""
+    got = sorted(candidates, key=lambda c: (c.chi2_data, groups.index(c.space_group), c.rank))
+    out = []
+    for i, c in enumerate(got):
+        nxt = got[i + 1].chi2_data if i + 1 < len(got) else None
+        out.append(c.model_copy(update={
+            "rank": i + 1,
+            "margin_to_next": None if nxt is None else (nxt - c.chi2_data) / c.chi2_data}))
+    return out
+
+
 def _assemble(*, phase, spec: SolveSpec, n_reflections: int, floor: float,
               groups: list[str], races: list[RaceRecord], layouts: list[SearchLayout],
               records: list[UnitRecord], status: str, units_not_run: list[str],
@@ -535,22 +575,25 @@ def _assemble(*, phase, spec: SolveSpec, n_reflections: int, floor: float,
     partial = status != "done"
     winners = {r.space_group: r.winner for r in races}
     candidates: list[StructureCandidate] = []
+    took: list[str] = []
     for g in groups:
         lay = [x for x in layouts if x.space_group == g
                and (g not in winners or x.assignment == winners[g])]
         if not lay:
             continue
         ranked = _consensus(phase, g, lay[0], records, floor, spec.cluster_tol)
-        got = _candidates(phase, g, lay[0], ranked, partial)
-        if progress is not None:
+        candidates.extend(_candidates(phase, g, lay[0], ranked, partial))
+        took.append(g)
+    candidates = _answer_order(candidates, groups)
+    if progress is not None:
+        # streamed after the merge, so a row is the answer's (index, rank, margin)
+        for g in took:
+            rows = [candidate_evidence(i, c).model_dump(mode="json")
+                    for i, c in enumerate(candidates) if c.space_group == g]
             label = f"consensus:{g}"
             progress.start(label, space_group=g, consensus=True)
-            progress.end(label, space_group=g, consensus=True, n_candidates=len(got),
-                         candidates=[candidate_evidence(i, c).model_dump(mode="json")
-                                     for i, c in enumerate(got)])
-        candidates.extend(got)
-    candidates.sort(key=lambda c: (c.chi2_data, groups.index(c.space_group), c.rank))
-    candidates = [c.model_copy(update={"rank": i + 1}) for i, c in enumerate(candidates)]
+            progress.end(label, space_group=g, consensus=True, n_candidates=len(rows),
+                         candidates=rows)
     return SolutionResult(
         candidates=candidates, engines_run=[spec.engine], space_groups_searched=list(groups),
         races=races, layouts=layouts, records=records,
@@ -604,7 +647,7 @@ def solve_structure(cost, phase, *, instrument, priors, spec: SolveSpec | SolveS
                            f"{type(spec).__name__}")
     if spec.engine != "tempering":
         raise SolveRefused(f"engine {spec.engine!r} is not built yet; registered: tempering")
-    if spec.race_sweeps % tp.REFRESH_EVERY:
+    if composition is not None and spec.race_sweeps % tp.REFRESH_EVERY:
         raise SolveRefused(f"race_sweeps ({spec.race_sweeps}) must be a multiple of "
                            f"{tp.REFRESH_EVERY}, the boundary a race round continues from")
     groups = list(space_groups) if space_groups else [phase.space_group]

@@ -2163,7 +2163,8 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.solve.solution.RaceRecord.winner", "action", tier=2, ambiguity=2,
         evidence=("successive halving over a group's site-class assignments: every assignment "
                   "runs one seed of race_sweeps sweeps, the better half by lowest J continues "
-                  "each chain for twice the sweeps, until one is left, and only that winner "
+                  "each chain until its total is twice the last round's (race_sweeps*2^k "
+                  "in round k), until one is left, and only that winner "
                   "gets the seeds and a candidate (solve/workflow.py race_assignments, "
                   "_assemble); Karnin, Koren & Somekh 2013, ICML, Sequential Halving; "
                   "Jamieson & Talwalkar 2016, AISTATS"),

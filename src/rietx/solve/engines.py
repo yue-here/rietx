@@ -47,13 +47,22 @@ import numpy as np
 UNIT_KINDS = ("seed", "control", "race", "ladder", "control_ladder")
 
 
+def _whole(v, least: int) -> bool:
+    """``v`` is a whole number (an int, or a float that is one) of at least ``least``."""
+    try:
+        return v >= least and int(v) == v
+    except (TypeError, ValueError, OverflowError):
+        return False
+
+
 @dataclass(frozen=True)
 class SolveSpec:
     """What one solve run is asked to do (field meanings: ``help.SOLVE_FIELD_HELP``;
     module docstring for why the search settings have no default).
 
     ``sweeps`` is each seed's and control seed's length; ``race_sweeps`` the
-    first race round's, doubled each round; ``heartbeat_sweeps`` the
+    first race round's, and each chain's total doubles each round (round k
+    ends at ``race_sweeps·2^k``); ``heartbeat_sweeps`` the
     ``solve_step`` cadence, ``None`` for none; ``checkpoint_every_s`` the
     shortest interval between two checkpoint writes at the engine's
     boundaries (a finished unit always writes; 0 writes at every boundary);
@@ -85,20 +94,28 @@ class SolveSpec:
         if len(set(self.seeds)) != len(self.seeds) or len(set(self.control_seeds)) != len(
                 self.control_seeds):
             raise ValueError("a seed index appears twice")
-        if self.replicas < 2:
-            raise ValueError("a ladder needs at least two replicas")
+        for name in ("seeds", "control_seeds"):
+            for k in getattr(self, name):
+                if not _whole(k, 0):
+                    raise ValueError(f"{name} holds {k!r}: a seed index is a whole number, "
+                                     "0 or more")
+        if not _whole(self.seed, 0):
+            raise ValueError(f"seed {self.seed!r} must be a whole number, 0 or more")
+        if not _whole(self.replicas, 2):
+            raise ValueError(f"replicas {self.replicas!r}: a ladder needs at least two "
+                             "replicas, a whole number")
         for name in ("sweeps", "race_sweeps", "polish_maxiter"):
             v = getattr(self, name)
-            if not (v >= 1 and int(v) == v):
+            if not _whole(v, 1):
                 raise ValueError(f"{name} {v!r} must be a whole number, at least 1")
-        if self.heartbeat_sweeps is not None and not self.heartbeat_sweeps >= 1:
-            raise ValueError(f"heartbeat_sweeps {self.heartbeat_sweeps} must be at least 1, "
-                             "or None for no heartbeat")
+        if self.heartbeat_sweeps is not None and not _whole(self.heartbeat_sweeps, 1):
+            raise ValueError(f"heartbeat_sweeps {self.heartbeat_sweeps!r} must be a whole "
+                             "number, at least 1, or None for no heartbeat")
         if not self.span > 1.0:
             raise ValueError(f"span {self.span} must be above 1 (top over bottom temperature)")
         if len(self.step) != 2 or not (self.step[0] > 0.0 and self.step[1] > 0.0):
             raise ValueError(f"step {self.step} must be two positive move sizes (Å)")
-        if not (self.swap_every >= 1 and int(self.swap_every) == self.swap_every):
+        if not _whole(self.swap_every, 1):
             raise ValueError(f"swap_every {self.swap_every!r} must be a whole number of "
                              "sweeps, at least 1")
         if not 0.0 <= self.exchange <= 1.0:
@@ -125,7 +142,9 @@ def unit_seed(spec: SolveSpec, kind: str, index: int, group: int | None = None) 
 
     ``group`` is the space-group index a ladder belongs to, its own entry in
     the derived sequence, so ladders of different groups or kinds never share a
-    generator whatever the number of assignments: no stride bounds a group."""
+    seed entry whatever the number of assignments: no stride bounds a group.
+    The returned seed folds that sequence into 32 bits, so two units' seeds can
+    still coincide by chance: about n²/2³³ among n units (0.5 % at 6 336)."""
     entropy = [int(spec.seed), UNIT_KINDS.index(kind), int(index)]
     if group is not None:
         entropy.append(int(group))

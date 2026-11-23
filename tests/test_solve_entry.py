@@ -234,6 +234,87 @@ def test_a_run_with_no_control_seeds_reports_no_control_evidence(acr):
     assert all(c.n_finders == 1 for c in res.candidates)
 
 
+def _two_groups(res, factor=1.0005):
+    """``res``'s records and layouts with a copy of each under a second group,
+    every χ² of the copy × ``factor``, so the two groups' candidates interleave."""
+    g1, g2 = res.space_groups_searched[0], "P 1 21/c 1"
+    copy = [r.model_copy(update={"space_group": g2, "unit": r.unit.replace(g1, g2),
+                                 "polished": [p.model_copy(update={"chi2": p.chi2 * factor,
+                                                                   "j": p.j * factor})
+                                              for p in r.polished]}) for r in res.records]
+    return ([g1, g2], res.records + copy,
+            res.layouts + [x.model_copy(update={"space_group": g2}) for x in res.layouts])
+
+
+def test_the_margin_and_the_stream_are_the_answers_across_groups(acr_run):
+    """With two groups searched, ``margin_to_next`` is measured to the next
+    candidate of the answer whatever its group, and the ``consensus:<group>``
+    rows streamed are the answer's evidence rows (pre-review of 2026-11-23,
+    findings 1 and 12): the copy at χ² × 1.0005 sits 0.05 % behind each
+    original."""
+    res = acr_run[0]
+    groups, records, layouts = _two_groups(res)
+    events = []
+
+    class Stream:
+        def emit(self, kind, **data):
+            events.append((kind, data))
+
+    from rietx.indexing.engines import Progress
+    out = wf._assemble(phase=res.phase, spec=res.spec.to_spec(),
+                       n_reflections=res.n_reflections, floor=res.chi2_floor, groups=groups,
+                       races=[], layouts=layouts, records=records, status="done",
+                       units_not_run=[], timings={}, resumed=False, provenance=res.provenance,
+                       progress=Progress(Stream(), total=2))
+    c = out.candidates
+    assert len(c) == 2 * len(res.candidates) >= 4
+    assert [x.rank for x in c] == list(range(1, len(c) + 1))
+    assert {x.space_group for x in c[:2]} == set(groups)
+    for a, b in zip(c, c[1:]):
+        assert a.margin_to_next == pytest.approx((b.chi2_data - a.chi2_data) / a.chi2_data,
+                                                 rel=1e-12)
+    assert c[0].margin_to_next == pytest.approx(5e-4, rel=1e-6)
+    assert c[-1].margin_to_next is None
+    streamed = [row for kind, d in events if kind == "stage_end" for row in d["candidates"]]
+    assert sorted(streamed, key=lambda r: r["index"]) == [
+        r.model_dump(mode="json") for r in out.evidence()]
+    # one group: the answer's margin is cluster.rank's
+    assert [x.margin_to_next for x in res.candidates][:-1] == [
+        (b.chi2_data - a.chi2_data) / a.chi2_data
+        for a, b in zip(res.candidates, res.candidates[1:])]
+
+
+def test_a_candidate_carries_none_of_the_input_phases_atom_declarations(acr, acr_run):
+    """The input phase's restraints and rigid bodies name its own atoms, which a
+    candidate replaces, so none reaches the candidate's structure: in range
+    they would restrain unrelated atoms, out of range they raised after every
+    unit had run (pre-review of 2026-11-23, finding 2)."""
+    from rietx.schemas.common import Parameter
+    from rietx.schemas.structure import Atom, BondRestraint, Structure
+
+    res = acr_run[0]
+    atoms = [Atom(label=f"X{i}", species="C", x=Parameter(value=0.01 * i),
+                  y=Parameter(value=0.0), z=Parameter(value=0.0)) for i in range(20)]
+    n_placed = len(res.layouts[0].atoms)
+    assert n_placed < 19
+    for i, j in ((0, 1), (18, 19)):
+        ph = type(acr.phase).model_validate({
+            **acr.phase.model_dump(), "atoms": [a.model_dump() for a in atoms],
+            "restraints": [BondRestraint(atom_i=i, atom_j=j, target=1.4,
+                                         sigma=0.01).model_dump()]})
+        out = wf._assemble(phase=ph, spec=res.spec.to_spec(), n_reflections=res.n_reflections,
+                           floor=res.chi2_floor, groups=res.space_groups_searched, races=[],
+                           layouts=res.layouts, records=res.records, status="done",
+                           units_not_run=[], timings={}, resumed=False,
+                           provenance=res.provenance)
+        assert out.candidates
+        for cand in out.candidates:
+            p = cand.structure.phases[0]
+            assert len(p.atoms) == n_placed
+            assert p.restraints == [] and p.rigid_bodies == [] and p.distortion_modes is None
+            Structure.model_validate(cand.structure.model_dump())
+
+
 def test_the_control_seeds_run_prior_off_and_feed_the_rank(acr, acr_run, monkeypatch):
     """The control units run with every prior at zero weight, and their
     clusters reach ``rank(control=…)``: a planted control leader that is
@@ -338,6 +419,40 @@ def test_every_stated_setting_reaches_the_engine(acr, monkeypatch):
     assert seen == {"random_spread.n": {11}, "temper.swap_every": {7}, "temper.exchange": {0.25},
                     "polish.maxiter": {13}, "cluster.tol": {0.29},
                     "planned": {(4, 17.0, (0.07, 0.9))}}
+
+
+def test_a_seed_or_a_count_that_is_not_a_whole_number_is_refused_before_any_unit(acr):
+    """A negative seed index or base seed, or a fractional replica or heartbeat
+    count, is refused by ``SolveSpec`` by name, never by numpy's generator
+    once the unit starts (pre-review of 2026-11-23, finding 7)."""
+    full = {**SETTINGS, "seeds": (0,), "control_seeds": (), "sweeps": 1000}
+    bad = {"seeds": (-1,), "control_seeds": (-2,), "seed": -1, "replicas": 2.5,
+           "heartbeat_sweeps": 1.5}
+    for name, value in bad.items():
+        with pytest.raises(ValueError, match=name):
+            SolveSpec(**{**full, name: value})
+    # race_sweeps is the race's: a units= run never races, so it is not refused there
+    spec = _spec(seeds=(0,), control_seeds=(), sweeps=1000, race_sweeps=1500)
+    assert acr.solve(spec).status == "done"
+    with pytest.raises(wf.SolveRefused, match="race_sweeps"):
+        wf.solve_structure(acr.cost, acr.phase, instrument=acr.ins, priors=_priors(),
+                           composition={"C": 4}, biso=1.0, spec=spec)
+
+
+def test_equal_priors_fingerprint_alike(acr):
+    """The spec fingerprint reads the priors by value: two equal priors whose
+    ``cn`` was built in another order, or whose σ is a numpy float, resume
+    each other's checkpoint; another ``cn`` does not (finding 9)."""
+    spec = _spec(seeds=(0,), control_seeds=(), sweeps=1000)
+
+    def fp(**kw):
+        return wf.spec_fingerprint(spec, acr.phase, [], _priors(**kw))
+
+    one = fp(cn={"C": 3, "N": 3})
+    assert fp(cn={"N": 3, "C": 3}) == one
+    assert wf.spec_fingerprint(spec, acr.phase, [], dataclasses.replace(
+        _priors(cn={"C": 3, "N": 3}), sigma=np.float64(_priors().sigma))) == one
+    assert fp(cn={"C": 4, "N": 3}) != one
 
 
 def test_the_spec_and_its_request_chair_are_each_others_inverse():
@@ -483,9 +598,13 @@ def test_an_interrupted_run_resumes_byte_identical(acr, acr_run, tmp_path, unit,
     saved = json.loads(ck.read_text(encoding="utf-8"))
     assert saved["current"]["unit"] == target
     assert saved["current"]["state"]["done"] == (sweep // 1000) * 1000
-    again = acr.solve(checkpoint=ck)
+    events: list[dict] = []
+    again = acr.solve(checkpoint=ck, events=events.append)
     assert again.resumed and again.status == "done"
     assert again.comparable_json() == whole.comparable_json()
+    # the ladder counts the units the checkpoint held: the last pair is n of n
+    last = [e["data"] for e in events if e["kind"] == "stage_end"][-1]
+    assert last["index"] == last["n_stages"]
 
 
 def test_a_throttled_checkpoint_resumes_to_the_same_answer(acr, acr_run, tmp_path):

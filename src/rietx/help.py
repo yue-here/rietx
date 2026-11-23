@@ -6913,9 +6913,9 @@ SOLVE_FIELD_HELP: dict[str, HelpEntry] = {
     "race_sweeps": HelpEntry(
         title="First race round",
         description=("When a composition is declared, its site-class assignments race: each "
-                     "runs this many sweeps, the better half by lowest J continues for "
-                     "twice as many, until one is left. A multiple of 1 000, the boundary a "
-                     "round continues from."),
+                     "runs this many sweeps, the better half by lowest J continues until "
+                     "each chain's total is twice the last round's, until one is left. A "
+                     "multiple of 1 000, the boundary a round continues from."),
         typical="2 000 on NAC"),
     "span": HelpEntry(
         title="Ladder span",
