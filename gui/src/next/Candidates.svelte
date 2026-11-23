@@ -208,6 +208,12 @@
 
   /** A grade's caveats in words, from the corpus where it has them. */
   const caveat = (k: string) => k.replaceAll("_", " ");
+  /** the lines a refuted class forbids and the data shows, at most three */
+  const refutation = (cls: any) => {
+    const seen = (cls.forbidden_hkl ?? []).slice(0, 3).map((hkl: number[], j: number) =>
+      `${formatHkl(hkl)} at ${cls.forbidden_two_theta?.[j]?.toFixed(2) ?? "?"}°`);
+    return `This class forbids lines the data shows: ${seen.join(", ")}.`;
+  };
   const refuting = $derived<string[]>(answer?.refuting_caveats ?? []);
   const FOM: Record<string, { word: string; sub?: string; pct?: boolean }> = {
     m20: { word: "M", sub: "20" }, f_n: { word: "F", sub: "N" },
@@ -663,7 +669,7 @@
 
       <h3>Grade <span class="muted">{c.confidence}</span></h3>
       <p class="caveats">
-        {#each c.confidence_caveats as k, ki (k)}{#if ki}, {/if}<span
+        {#each c.confidence_caveats as k, ki (k)}{#if ki}{", "}{/if}<span
           class:bad={refuting.includes(k)}>{caveat(k)}</span>{:else}<span class="muted">no caveats</span>{/each}
       </p>
 
@@ -717,14 +723,15 @@
               <!-- a refuted class stays, muted, as evidence (call 17) -->
               <tr class:off={cls.refuted} class:sel={activeClass === k} data-class={k}
                 onclick={() => { chosenClass = k; chosenGroup = null; pending = null; }}>
-                <td>{@render sg(cls.symbol)}{#if extinction?.best === k}<span class="mark">rietx's pick</span>{/if}
-                  {#if cls.refuted && cls.n_present}<span class="rel">refuted by {#each (cls.forbidden_hkl ?? []).slice(0, 3)
-                    as hkl, j (j)}{j ? ", " : ""}<span class="nb">{formatHkl(hkl)} {cls.forbidden_two_theta?.[j]?.toFixed(2) ?? "?"}°</span>{/each}</span>{/if}</td>
+                <td>{@render sg(cls.symbol)}{#if extinction?.best === k}<span class="mark">rietx's pick</span>{/if}</td>
                 <td class="r num">{cls.screened ? cls.delta_bic.toFixed(1) : "–"}</td>
                 <td class="r num">{#if cls.n_absent}{cls.screened ? cls.n_testable ?? "–" : "–"}<span
                   class="u">{" "}of {cls.n_absent}</span>{:else}–{/if}</td>
-                <td class="note">{cls.refuted ? "refuted" : !cls.screened ? "not screened"
-                  : cls.space_groups.length === 1 ? "" : `${cls.space_groups.length} groups`}{#if
+                <!-- the lines that refute a class are one click away, so each row
+                     keeps one line as the prototype draws it -->
+                <td class="note">{#if cls.refuted && cls.n_present}<Help text={refutation(cls)}>refuted</Help>{:else}{cls.refuted
+                  ? "refuted" : !cls.screened ? "not screened"
+                  : cls.space_groups.length === 1 ? "" : `${cls.space_groups.length} groups`}{/if}{#if
                   !cls.refuted && cls.screened && cls.space_groups.length === 1}{@render sg(cls.space_groups[0])}{/if}</td>
               </tr>
             {/each}
@@ -1031,12 +1038,6 @@
 
   .classes tr.off td {
     color: var(--muted);
-  }
-
-  .classes .rel {
-    display: block;
-    color: var(--muted);
-    font-size: var(--text-sm);
   }
 
   .nb {

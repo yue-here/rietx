@@ -427,7 +427,7 @@
               <td class="r num">{g.lo.toFixed(2)}–{g.hi.toFixed(2)}<span class="u">°</span></td>
               <td class="r num">{g.n}</td>
               <td class="r num">{g.chi2_red.toFixed(1)}</td>
-              <td class="note">{#each g.flags as f, i (f)}{#if i}, {/if}<Help for="peak_flags:{f}"
+              <td class="note">{#each g.flags as f, i (f)}{#if i}{", "}{/if}<Help for="peak_flags:{f}"
                 >{labelFor(corpus, `peak_flags:${f}`)}</Help>{/each}</td>
             </tr>
           {:else}
@@ -465,7 +465,7 @@
               <td class="r num">{formatPosition(row.two_theta, null).value}<span class="u">°</span></td>
               <td class="r num">{row.d.toFixed(4)}{" "}<span class="u">Å</span></td>
               <td class="r num">{formatIntensity(row.intensity, imax, row.flags)}</td>
-              <td class="note">{#each note(row) as w, i (i)}{#if i}, {/if}{#if w.key}<Help for={w.key}>{w.text}</Help>{:else}{w.text}{/if}{/each}</td>
+              <td class="note">{#each note(row) as w, i (i)}{#if i}{", "}{/if}{#if w.key}<Help for={w.key}>{w.text}</Help>{:else}{w.text}{/if}{/each}</td>
             </tr>
           {/each}
         </tbody>

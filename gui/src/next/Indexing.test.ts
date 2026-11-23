@@ -228,7 +228,7 @@ describe("the Fit step", () => {
     chi2_red, n_components: 1 });
   const fitted = (): PeaksPayload => {
     const p = listed();
-    p.peaks![2].flags = ["unresolved_shoulder"];
+    p.peaks![2].flags = ["unresolved_shoulder", "duplicate_line"];
     return { ...p, groups: [group(0, 20, 1.2), group(1, 31.7, 14.2), group(2, 25.3, 2)] };
   };
 
@@ -240,6 +240,8 @@ describe("the Fit step", () => {
     // a χ²ᵣ over 10 or a flag that doubts the window fit (call 13), in 2θ order
     expect([...document.querySelectorAll("table.groups tbody tr")]
       .map((tr) => text(tr.querySelector("td")))).toEqual(["25.30–25.50°", "31.70–31.90°"]);
+    // two notes keep the space after their comma, which svelte trims from a bare text node
+    expect(text(document.querySelectorAll("table.groups td.note")[0])).toMatch(/\S, \S/);
     expect(fits.at(-1)).toEqual({ groups: [2, 1], focused: null, total: 2 });
     (document.querySelectorAll("table.groups tbody tr")[1] as HTMLElement).click();
     flushSync();

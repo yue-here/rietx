@@ -214,6 +214,7 @@ describe("the Judge step", () => {
     // a refuting caveat in the danger colour, a capping one plain
     const cav = [...document.querySelectorAll(".caveats > span")];
     expect(cav.map(text)).toEqual(["validation failed", "zero shift assumed"]);
+    expect(text(document.querySelector(".caveats"))).toBe("validation failed, zero shift assumed");
     expect(cav.map((e) => e.classList.contains("bad"))).toEqual([true, false]);
     expect(button("‹").disabled).toBe(true);
     // the extinction screen, then its classes with the gate's pick
@@ -231,6 +232,8 @@ describe("the Judge step", () => {
     expect(rows.map((r) => r.querySelector(".sg")!.getAttribute("aria-label"))).toEqual(["P 63 - -", "P - - -"]);
     expect(text(rows[0].querySelector(".mark"))).toBe("rietx's pick");
     expect(rows[1].classList.contains("off")).toBe(true);
+    // its refuting lines are one click away, so the row stays one line
+    expect(text(rows[1].querySelector("td.note [role=button]"))).toBe("refuted");
     // the class's space groups, its representative first and chosen (call 12)
     const sgs = [...document.querySelectorAll(".sgs button")];
     expect(sgs.map((b) => b.querySelector(".sg")!.getAttribute("aria-label"))).toEqual(["P 63/m", "P 63"]);
