@@ -27,6 +27,7 @@
   import Peaks from "./Peaks.svelte";
   import Structure from "./Structure.svelte";
   import Recovery from "../panels/Recovery.svelte";
+  import HelpPopover, { provideHelp } from "../HelpPopover.svelte";
   import { projectStem } from "../lib/filemenu";
   import type { HelpCorpus } from "../lib/help";
   import { RecoveryWriter, combine, readDraft, restoredText, type Draft,
@@ -82,6 +83,8 @@
   let openError = $state("");
   let newOpen = $state(false);
   let corpus = $state<HelpCorpus | null>(null);
+  /** the page's one help popover, which every `<Help>` term opens (WP-2244) */
+  const help = provideHelp();
 
   /** The last fit (`/api/result`), and a key bumped whenever its curves moved. */
   let result = $state.raw<any>(null);
@@ -1259,6 +1262,8 @@
   <Settings choice={themeChoice} onchoose={chooseTheme}
     version={version?.package_version ?? ""} onclose={() => (settingsOpen = false)} />
 {/if}
+
+<HelpPopover host={help} {corpus} />
 
 <style>
   .topbar,

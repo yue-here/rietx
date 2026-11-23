@@ -39,8 +39,8 @@ carries terms too.
 
 ## Tasks
 
-- [ ] 1. Survey what else only `/` mounts at its root that a `/next` control depends on.
-- [ ] 2. One shared popover component and opener, mounted by both `App.svelte` and
+- [x] 1. Survey what else only `/` mounts at its root that a `/next` control depends on.
+- [x] 2. One shared popover component and opener, mounted by both `App.svelte` and
   `next/Frame.svelte`; vitest for `/next`.
 - [ ] 3. A real-click browser test: a help term at `/next` opens its popover; the dist rebuilt.
 - [ ] Skill: none. The agent skill drives the Python API, never the GUI.

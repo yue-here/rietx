@@ -23,13 +23,14 @@
    * menu; the closing stage and "Never freed" end the list.
    */
   import { type Say } from "./console";
-  import { tick } from "svelte";
+  import { getContext, tick } from "svelte";
 
   import Help from "../Help.svelte";
   import { py } from "../lib/py";
   import { ApiError, api } from "../api";
   import type { HelpCorpus } from "../lib/help";
   import { resolve as helpEntry } from "../lib/help";
+  import { HELP_CONTEXT, type HelpOpener } from "../lib/helpContext";
   import {
     type Stage, Undo, dropIndex, moveStage, newStageName, planDiffers, resolvedPrefix, slideOffset,
   } from "../lib/plan";
@@ -532,6 +533,7 @@
                           values: Record<string, string | number | null>;
                           error: string } | null>(null);
   let settingsEl: HTMLFormElement | undefined = $state();
+  const help = getContext<HelpOpener | undefined>(HELP_CONTEXT);
 
   function openSettings(index: number | null, at: MenuAt) {
     const values: Record<string, string> = {};
@@ -679,6 +681,9 @@
 
   function away(event: PointerEvent) {
     const target = event.target as Node | null;
+    // the stage settings' labels are help terms, and their popover floats
+    // outside this layer: reading it is not a click away (WP-2244)
+    if (help?.contains(target)) return;
     if (picker && target && !pickerEl?.contains(target)
         && !(target as HTMLElement).closest?.(`[data-add="${picker.index}"]`)) picker = null;
     if (settings && target && !settingsEl?.contains(target)) settings = null;
