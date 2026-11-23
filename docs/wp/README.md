@@ -57,7 +57,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2072](2072-the-le-bail-and-pawley-cell-against-the-srm-660c-certificate.md) | The Le Bail and Pawley cell, validated against the SRM 660c certificate | 2026-11-16 | P3 | [Unscheduled](#unscheduled-the-fit-has-no-reference) |
 | [2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md) | The extinction screen names a wrong class at a correct cell | 2026-11-13 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-16 | P2 | [series](#series) |
-| [2081](2081-how-a-series-holds-what-the-setup-fixes.md) | How a series holds what the setup fixes (a design discussion) | 2026-11-18 | P2 | [series](#series) |
+| [2081](2081-how-a-series-holds-what-the-setup-fixes.md) | How a series holds what the setup fixes (a design discussion) | 2026-11-22 | P2 | [series](#series) |
 | [2149](2149-a-reduced-panel-names-the-systems-searched.md) | INDEX_PANEL_REDUCED names the systems the run searched | 2026-11-17 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2211](2211-the-history-table.md) | The History table: Compare on the pattern, Restore as pending edits | 2026-11-22 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2220](2220-a-comparison-says-which-fits-it-rests-on.md) | A nested comparison says which fits it rests on, and which freed columns carried information | 2026-11-20 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
@@ -66,6 +66,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2230](2230-an-estimable-combination-keeps-its-esd.md) | An estimable combination keeps its esd | 2026-11-21 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2231](2231-the-plan-and-text-tabs.md) | The Plan and Text tabs at `/next`: a plan read as a recipe with Free and Fix rows, and a text buffer whose edits ride the action bar | 2026-11-22 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2238](2238-the-decision-machinery.md) | The decision machinery: fewer calls reach the maintainer, and each ruling is reused | 2026-11-22 | P2 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
+| [2241](2241-the-nightly-red-of-2026-11-20-to-22.md) | The nightly red of 2026-11-20 to 11-22: Windows path checks, the width triple's esd, and a lost runner | 2026-11-22 | P1 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 
 ## Next, by priority
 
@@ -86,9 +87,8 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2110](2110-a-trial-error-unit-stays-inside-its-memory.md) | A trial_error unit stays inside its memory under a raised budget | P2 | — | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
 | [2140](2140-every-atom-is-named-by-its-unique-label.md) | Every atom is named by its unique label | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2148](2148-a-held-standard-cell-pins-the-wavelength.md) | A held standard's cell pins the wavelength, and a skipped λ is said | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [2151](2151-the-zrp2o7-peak-equations-on-its-data.md) | The ZrP₂O₇ input's peak equations on its data | P2 | — | [parametric](#parametric) |
-| [2154](2154-a-holder-offset-shared-across-a-joint-fit.md) | A holder offset shared across a joint fit | P2 | — ([2103](2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) soft) | [parametric](#parametric) |
 | [2228](2228-a-reflection-past-the-range-end-keeps-its-tail.md) | A reflection centred past the range end keeps its tail | P2 | [2222](2222-the-closing-stage-off-by-default.md) ([2075](2075-the-result-records-its-fit-range-and-what-lies-outside-it.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2242](2242-a-panel-forgets-the-last-project-on-an-open.md) | A panel forgets the last project when another opens in the same window | P2 | — | [gui-overhaul](#gui-overhaul) |
 
 ## <a id="v0-3"></a>v0.3 — multi-phase workflows
 
@@ -505,10 +505,10 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2107](2107-an-equation-over-a-reflection.md) | An equation over a reflection | ✅ 2026-11-22 | — | [1964](1964-a-parametric-equation-the-user-writes.md) |
 | [2108](2108-a-pawley-phase-beside-a-rietveld-phase.md) | A Pawley phase beside a Rietveld phase | ✅ 2026-11-15 | — | [1964](1964-a-parametric-equation-the-user-writes.md) ([2104](2104-a-parametric-cell-in-a-le-bail-or-pawley-joint-fit.md) soft) |
 | [2118](2118-one-formula-language-for-every-constraint.md) | One formula language for every constraint | ✅ 2026-11-07 | — | [1964](1964-a-parametric-equation-the-user-writes.md) ([2103](2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) soft) |
-| [2151](2151-the-zrp2o7-peak-equations-on-its-data.md) | The ZrP₂O₇ input's peak equations on its data | ⬜ | P2 | — |
-| [2152](2152-a-peak-equation-reads-the-wavelength.md) | A peak equation reads the wavelength | ⬜ | P3 | — |
-| [2153](2153-a-peak-equations-width-held-inside-the-step.md) | A peak equation's width held inside the step | ⬜ | P3 | — |
-| [2154](2154-a-holder-offset-shared-across-a-joint-fit.md) | A holder offset shared across a joint fit | ⬜ | P2 | — ([2103](2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) soft) |
+| [2151](2151-the-zrp2o7-peak-equations-on-its-data.md) | The ZrP₂O₇ input's peak equations on its data | ✅ 2026-11-22 | — | — |
+| [2152](2152-a-peak-equation-reads-the-wavelength.md) | A peak equation reads the wavelength | ✅ 2026-11-22 | — | — |
+| [2153](2153-a-peak-equations-width-held-inside-the-step.md) | A peak equation's width held inside the step | ✅ 2026-11-22 | — | — |
+| [2154](2154-a-holder-offset-shared-across-a-joint-fit.md) | A holder offset shared across a joint fit | ✅ 2026-11-22 | — | — ([2103](2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) soft) |
 
 ## <a id="gui-overhaul"></a>gui-overhaul — the GUI redesigned around the pattern and the model
 
@@ -538,14 +538,17 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2227](2227-the-gui-shows-how-a-refine-ran.md) | The GUI shows how a refine ran: in one stage or in stages | 🔄 2026-11-22 | P2 | [2224](2224-a-refit-of-a-converged-model-runs-one-stage.md) |
 | [2229](2229-every-background-shape-change-releases-its-holds.md) | Every change to the background's shape releases its holds, and no pending edit outlives its path | ✅ 2026-11-21 | — | [2218](2218-hand-fitting-and-the-other-graphs.md) |
 | [2231](2231-the-plan-and-text-tabs.md) | The Plan and Text tabs at `/next`: a plan read as a recipe with Free and Fix rows, and a text buffer whose edits ride the action bar | 🔄 2026-11-22 | P2 | [2218](2218-hand-fitting-and-the-other-graphs.md) |
-| [2237](2237-events-after-another-project-opens.md) | A project opened in the same window streams its events from the first | ⬜ | P3 | — |
+| [2237](2237-events-after-another-project-opens.md) | A project opened in the same window streams its events from the first | ✅ 2026-11-22 | — | — |
+| [2242](2242-a-panel-forgets-the-last-project-on-an-open.md) | A panel forgets the last project when another opens in the same window | ⬜ | P2 | — |
 
 ## <a id="series"></a>series — a series a scientist can predict and drive
 
 | WP | Title | Status | Priority | Depends on |
 |---|---|---|---|---|
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 🔄 2026-11-16 | P2 | [2003](2003-the-chain-actions.md) |
-| [2081](2081-how-a-series-holds-what-the-setup-fixes.md) | How a series holds what the setup fixes (a design discussion) | 🔄 2026-11-18 | P2 | — ([2003](2003-the-chain-actions.md) soft) |
+| [2081](2081-how-a-series-holds-what-the-setup-fixes.md) | How a series holds what the setup fixes (a design discussion) | 🔄 2026-11-22 | P2 | — ([2003](2003-the-chain-actions.md) soft) |
+| [2300](2300-a-series-declares-each-parameter.md) | A series declares each parameter, and refuses what it cannot honour | ⬜ | P3 | — |
+| [2301](2301-the-typical-temperature-series.md) | The typical temperature series: one route, a preset, and a Switching page | ⬜ | P3 | [2300](2300-a-series-declares-each-parameter.md) |
 
 ## <a id="unscheduled"></a>Unscheduled
 
@@ -714,7 +717,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2228](2228-a-reflection-past-the-range-end-keeps-its-tail.md) | A reflection centred past the range end keeps its tail | ⬜ | P2 | [2222](2222-the-closing-stage-off-by-default.md) ([2075](2075-the-result-records-its-fit-range-and-what-lies-outside-it.md) soft) |
 | [2230](2230-an-estimable-combination-keeps-its-esd.md) | An estimable combination keeps its esd | 🔄 2026-11-21 | P3 | [2219](2219-a-direction-the-data-does-not-determine-has-no-esd.md) ([2062](2062-pawley-is-the-structure-free-default.md) soft) |
 | [2232](2232-a-size-near-no-broadening-is-a-bound.md) | A size near no broadening is quoted as a bound | ⬜ | P3 | — ([2060](2060-the-likelihood-interval-where-an-esd-cannot-be-read.md) soft) |
-| [2239](2239-a-joint-stage-seeds-and-holds-a-stephens-block.md) | A joint stage seeds and holds a Stephens block as a single fit does | ⬜ | P3 | — |
+| [2239](2239-a-joint-stage-seeds-and-holds-a-stephens-block.md) | A joint stage seeds and holds a Stephens block as a single fit does | ✅ 2026-11-22 | — | — |
 
 ### <a id="unscheduled-a-long-run-is-not-one-fit"></a>A long run is not one fit
 
@@ -896,6 +899,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2233](2233-comments-and-rulebooks-checked-against-the-tree.md) | Comments and rulebooks checked against the tree, and their size limits held from main | ✅ 2026-11-21 | — | — |
 | [2236](2236-narration-trend-decides-gate-or-drop.md) | The narration trend, measured over six weeks, decides a gate or a drop | ⬜ | P4 | [2233](2233-comments-and-rulebooks-checked-against-the-tree.md) |
 | [2238](2238-the-decision-machinery.md) | The decision machinery: fewer calls reach the maintainer, and each ruling is reused | 🔄 2026-11-22 | P2 | — ([2009](2009-the-rulebooks-findings-out-generators-rewritten.md) soft) |
+| [2241](2241-the-nightly-red-of-2026-11-20-to-22.md) | The nightly red of 2026-11-20 to 11-22: Windows path checks, the width triple's esd, and a lost runner | 🔄 2026-11-22 | P1 | — |
 
 ### <a id="unscheduled-candidates-named-on-a-use-case-not-yet-on-a-measurement"></a>Candidates — named on a use case, not yet on a measurement
 

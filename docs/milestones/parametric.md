@@ -121,8 +121,10 @@ a WP sharpens its row here, because a bar set before reading a WP is a bar set t
   the instrument and a `gauss_fwhm_squared` and a `lor_fwhm` equation on each phase. A
   synthetic ramp of that shape recovers all twelve coefficients within 2 esd
   (`tests/test_peak_equations.py`), and the real-data run frees them beside the
-  calibration. That run is [2151](../wp/2151-the-zrp2o7-peak-equations-on-its-data.md),
-  not yet done.
+  calibration. [2151](../wp/2151-the-zrp2o7-peak-equations-on-its-data.md) ran it on all
+  37 patterns, seeded from the input, and the reported fit converged at Rwp 31.79 % (TOPAS
+  31.56 %). The stored silicon Gaussian is below zero at every reflection, so its
+  coefficients cannot move. Seeded above zero, it takes Rwp to 31.48 %.
 - **Every evaluator answers one conformance table** (1964). Each row of (expression,
   bindings, expected value or error) passes on numpy, jax and torch. A `polynomial` and
   the same form written as an expression agree to 0.01 esd.
@@ -155,8 +157,12 @@ a WP sharpens its row here, because a bar set before reading a WP is a bar set t
   The same fit with the second phase treated as a structure misses the truth, and the
   fixture is built so that it does. A height offset is what the holder is there to give.
   Met on single patterns on 2026-11-15 by declared peaks with formula centres, with no new
-  surface (`tests/test_holder_cell.py`). A joint fit sharing the offset is
-  [2154](../wp/2154-a-holder-offset-shared-across-a-joint-fit.md), not yet tried.
+  surface (`tests/test_holder_cell.py`). Met on a series on 2026-11-22
+  ([2154](../wp/2154-a-holder-offset-shared-across-a-joint-fit.md)), again with no new
+  surface: five patterns at five specimen heights, fitted jointly with one expression
+  equation per line centre, share the holder's cell, its offset and the zero shift. Over
+  12 seeds every mean z lies between −0.32 and +0.26, each height's included, and the
+  offset's esd is 0.42-0.49 of one pattern's.
 - **GSAS-II's practice has a home** (2106). An equation in the grammar fits a
   `SeriesResult` trajectory with its esds, the coefficients carry esds, and on a synthetic
   ramp the result agrees with the joint fit's coefficients within their combined esds. On a
