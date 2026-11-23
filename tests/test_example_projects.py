@@ -26,6 +26,7 @@ from rietx.examples import (
     examples_dir,
     list_examples,
 )
+from rietx.schemas.plan import CLOSING_WINDOW_TOL, PlanSpec
 from rietx.viz.compare import STANDARD_BY_KEY
 
 EXAMPLES = list_examples()
@@ -129,11 +130,14 @@ def test_an_example_records_the_protocol_its_standard_declares(name, tmp_path):
     assert project.doc.two_theta_limits == inputs.two_theta_limits
     assert [tuple(r) for r in project.doc.excluded_regions] == \
            [tuple(r) for r in inputs.data.excluded_regions]
-    assert [s.name for s in project.doc.plan.stages] == \
-           [s.name for s in inputs.plan.stages]
-    assert [list(s.turn_on) for s in project.doc.plan.stages] == \
-           [list(s.turn_on) for s in inputs.plan.stages]
-    assert project.doc.plan.intermediate_ftol == inputs.plan.intermediate_ftol
+    # every plan field the standard's, bar the closing stage: a first fit runs
+    # the package default there, and the standard declares its suite's (WP-2036)
+    got = project.doc.plan.model_dump()
+    want = PlanSpec.from_plan(inputs.plan).model_dump()
+    assert want["closing_window_tol"] == CLOSING_WINDOW_TOL
+    assert got.pop("closing_window_tol") == rx.RefinementPlan(stages=[]).closing_window_tol
+    want.pop("closing_window_tol")
+    assert got == want
 
     # the reader *call*, not merely the bytes: a pdCIF with a _meas and a _calc
     # block is a different pattern depending on `block`

@@ -11,7 +11,8 @@ click: a data directory inside the package, and a build that is a plain
 UI ranks corrections on, pinned field by field against the acceptance suites by
 ``tests/test_compare_ui.py``.  So an example's plan, held parameters and
 excluded regions are the ones the suite measures, and there is no second copy
-to drift.  What this module adds is a sentence for a person who has not
+to drift.  One field is the package's rather than the suite's: the closing
+stage, which a first fit runs only where the default does (WP-2036).  What this module adds is a sentence for a person who has not
 refined anything yet, which is a different reader from the one comparing
 corrections.
 
@@ -149,9 +150,27 @@ def build_example(name: str, into: str | Path) -> "Project":
         Path(into) / f"{name}{PROJECT_SUFFIX}",
         pattern=root / std.pattern,
         structure=inputs.structure, instrument=inputs.instrument,
-        plan=inputs.plan, two_theta_limits=inputs.two_theta_limits,
+        plan=_first_fit_plan(inputs.plan),
+        two_theta_limits=inputs.two_theta_limits,
         excluded_regions=list(inputs.data.excluded_regions) or None,
         reader_options=dict(std.reader_options) or None)
+
+
+def _first_fit_plan(plan):
+    """The standard's plan with the package's default closing stage.
+
+    A standard declares its suite's closing stage so that ``rietx compare``
+    reproduces the acceptance numbers.  An example is a person's first fit, and
+    a first fit runs the default, which has no closing stage since WP-2222
+    (ruled 2026-11-19: its time was too high for a default).  Every other field
+    is the standard's (WP-2036)."""
+    from dataclasses import fields, replace
+
+    from .strategy.staged import RefinementPlan
+
+    default = next(f.default for f in fields(RefinementPlan)
+                   if f.name == "closing_window_tol")
+    return replace(plan, closing_window_tol=default)
 
 
 @dataclass(frozen=True)
