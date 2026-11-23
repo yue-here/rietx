@@ -298,6 +298,29 @@ def test_a_coefficient_shared_across_wavelengths_is_a_warning():
         [_eq("intensity_factor", "if(l == 0, 1, p)", p=0.7)], [cu, _mo(cu)]) == []
 
 
+@pytest.mark.parametrize(("equations", "warned"), [
+    ({"lor_fwhm": ("y*wavelength/cos(theta)", "y")}, []),
+    ({"lor_fwhm": ("x/cos(theta)", "x")}, [0]),
+    # a strain term beside it is rightly shared; a size term in degrees there
+    # is the known limit, silent too
+    ({"lor_fwhm": ("y*wavelength/cos(theta) + w*tan(theta)", "yw")}, []),
+    ({"lor_fwhm": ("y*wavelength/cos(theta) + x/cos(theta)", "yx")}, []),
+    ({"lor_fwhm": ("y*wavelength/cos(theta)", "y"),
+      "gauss_fwhm_squared": ("(x/cos(theta))^2", "x")}, [1]),
+])
+def test_an_equation_reading_wavelength_is_not_warned(equations, warned):
+    """WP-2152, settled under the maintainer's "your call" of 2026-11-22: an
+    equation that reads ``wavelength`` states its λ dependence, so it is
+    silent, while another target's degree-only equation on the same phase
+    still warns."""
+    cu = _instrument()
+    equations = [_eq(t, e, **dict.fromkeys(names, 0.01))
+                 for t, (e, names) in equations.items()]
+    found = _shared_across_wavelengths(equations, [cu, _mo(cu)])
+    assert [d.where for d in found] == [[f"phases.0.peak_equations.{i}"]
+                                        for i in warned]
+
+
 #: two single-line sources, so each pattern has one λ and the built-in size
 #: twin, which takes one number of degrees per pattern, is exact
 LAMS = (0.41390, 0.71070)

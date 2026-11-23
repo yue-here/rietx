@@ -4061,9 +4061,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "converts its own size terms, but cannot tell which kind an equation "
             "holds. For a wavelength-dependent term, give each pattern its own "
             "coefficient with SharingMap(per_histogram=[...]) and refit. Or write the "
-            "λ into the expression, as y*wavelength/cos(theta), and keep y shared. The "
-            "warning still fires on such an equation, since it can carry a term that "
-            "does not scale with λ."
+            "λ into the expression, as y*wavelength/cos(theta), and keep y shared. This "
+            "warning skips an equation that reads wavelength. It then also skips a "
+            "size term written in degrees in that equation, as + x/cos(theta)."
         ),
     ),
     "PEAK_WIDTH_NOT_POSITIVE": HelpEntry(
