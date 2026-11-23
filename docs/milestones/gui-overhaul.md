@@ -58,7 +58,7 @@ prototype at 1440 × 900:
 | R4 | [WP-2231](../wp/2231-the-plan-and-text-tabs.md), in flight | the Plan tab with Free and Fix rows, and the Text tab whose edits ride the action bar |
 | R5 | [2211](../wp/2211-the-history-table.md), [2212](../wp/2212-console-lines-by-kind.md) | History as a table, Console lines by kind, and the report |
 | R6 | [WP-2240](../wp/2240-the-peaks-and-indexing-workflow.md), in flight | the peaks-and-indexing workflow in four steps |
-| R7 | — | the series workflow in four steps, with Trends and Map, and the scrubbing of WP-1317 redesigned into it, from loading the patterns to the output (§ R7 carries the series scrubber, § R7 is designed from loading to output) |
+| R7 | [WP-2243](../wp/2243-the-series-workflow.md), in flight | the series workflow in four steps, with Trends and Map, and the scrubbing of WP-1317 redesigned into it, from loading the patterns to the output (§ R7 carries the series scrubber, § R7 is designed from loading to output) |
 | Swap | — | `/` serves the new page; today's shell and the panels nothing imports are deleted; the manual's GUI chapters rewritten and their screenshots retaken; File › Export gains the structure image (inventory row 79), with the POV-Ray, glTF and SVG writers as they land (#1667 item 1), which R3 offers only on the canvas's menus while the File menu is today's panel. Its PR waits on the maintainer, since it deletes |
 
 The maintainer reviews whole screens beside the prototype at each piece's end, and never single
