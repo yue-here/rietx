@@ -112,8 +112,14 @@
 
   const entry = $derived(host.request?.key ? resolve(corpus, host.request.key) : null);
   const link = $derived(manualUrl(corpus, entry));
-  const title = $derived(entry?.title ?? host.request?.title ?? host.request?.key ?? "");
-  const body = $derived(entry?.description ?? host.request?.text ?? "");
+  /** a key and a title together: the title is a summary about one row, which
+   *  stands in for the entry's words while the entry still gives the manual
+   *  link (the candidate table's relations, the maintainer 2026-11-23) */
+  const summary = $derived(!!host.request?.key && !!host.request?.title);
+  const title = $derived(summary ? host.request!.title!
+    : entry?.title ?? host.request?.title ?? host.request?.key ?? "");
+  const body = $derived(summary ? host.request?.text ?? ""
+    : entry?.description ?? host.request?.text ?? "");
   /** the name behind a labelled term: a chip says `at bound`, and the flag it
    *  stands for is `position_at_bound`, which nothing else on screen shows
    *  (WP-1209) — so the popover carries it, and only where a label hid it:
@@ -207,7 +213,7 @@
     <h2>{title}</h2>
     {#if body}
       <p>{body}</p>
-    {:else}
+    {:else if !summary}
       <!-- a key that resolves to nothing. Saying so is the honest empty
            state: the corpus is where a description is owed, and inventing one
            here would put a wrong sentence under a real name. -->

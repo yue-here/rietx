@@ -15,7 +15,8 @@ export interface HelpRequest {
   key: string | null;
   /** a sentence the server wrote, for a fact no corpus can hold */
   text: string | null;
-  /** an optional heading for a `text` request */
+  /** an optional heading for a `text` request; beside a `key`, a summary
+   *  about one row that stands in for the entry's words (WP-2240) */
   title: string | null;
 }
 

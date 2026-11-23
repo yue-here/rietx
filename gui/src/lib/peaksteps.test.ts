@@ -94,17 +94,21 @@ describe("the candidate columns", () => {
     // the index counts primitive cells, which the V column does not
     expect(candidateRelation(list, 0)).toEqual(
       { mark: "2×", of: 2, kind: "sublattice", key: "cell_relations:sublattice",
-        text: "A supercell of #2: its primitive cell holds 2 of #2's." });
+        text: "Supercell of #2, twice its primitive cell" });
     expect(candidateRelation(list, 1)).toBeNull();
     expect(candidateRelation(list, 2)).toEqual(
       { mark: "≡", of: 2, kind: "same_cell", key: "cell_relations:same_cell",
-        text: "The same cell as #2, under another lattice label." });
+        text: "Same cell as #2, another lattice label" });
     // a containment pair has no index: its number is 0, never a volume ratio
     const dense = cand({ cell: [16.24, 16.24, 7.92, 90, 90, 120], supercell_checks: [
       { parent_cell: base.cell, index: 0, relation: "containment", verdict: "undecided" }] });
     expect(candidateRelation([base, dense], 1)).toEqual(
       { mark: "⊇", of: 1, kind: "containment", key: "cell_relations:containment",
-        text: "Indexes every line #1 indexes, and predicts more." });
+        text: "Indexes every line #1 does, and predicts more" });
+    const triple = cand({ cell: [16.24, 16.24, 6.888, 90, 90, 120], supercell_checks: [
+      { parent_cell: base.cell, index: 3, verdict: "refuted" }] });
+    expect(candidateRelation([base, triple], 1)?.text)
+      .toBe("Supercell of #1, three times its primitive cell");
   });
   it("write the clock as m:ss", () => {
     expect(clock(109.4)).toBe("1:49");

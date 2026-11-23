@@ -560,10 +560,14 @@ export type RelationKind = (typeof RELATION_KINDS)[number];
 /** How a candidate relates to another reported row, on the row's own line
  *  (the maintainer, 2026-11-23): the mark (`≡`, `⊇`, or the primitive-cell
  *  ratio `2×`), the row it points at as `#k` (`of`, counted from 1), the
- *  help key its popover opens (the maintainer, the third look), and the
- *  sentence Judge prints about this row. */
+ *  help key whose manual link its popover carries, and the summary the
+ *  popover and Judge both print, the target filled in (the maintainer,
+ *  2026-11-23: "just a summary of what it means"). */
 export interface Relation { mark: string; of: number; kind: RelationKind; key: string;
                             text: string }
+
+/** A sublattice index in words; `SupercellCheck.index` is 2 to 4. */
+const TIMES: Record<number, string> = { 2: "twice", 3: "three times", 4: "four times" };
 
 const relation = (kind: RelationKind, mark: string, of: number, text: string): Relation =>
   ({ mark, of, kind, key: `cell_relations:${kind}`, text });
@@ -584,7 +588,7 @@ export function candidateRelation(cands: readonly Candidate[], i: number): Relat
   for (let k = 0; k < i; k++) {
     if (cellText(cands[k].cell) === text) {
       return relation("same_cell", "≡", k + 1,
-                      `The same cell as #${k + 1}, under another lattice label.`);
+                      `Same cell as #${k + 1}, another lattice label`);
     }
   }
   for (const check of c.supercell_checks ?? []) {
@@ -594,9 +598,9 @@ export function candidateRelation(cands: readonly Candidate[], i: number): Relat
     // the index counts primitive cells, which the V column does not
     return check.relation !== "containment" && check.index >= 2
       ? relation("sublattice", `${check.index}×`, k + 1,
-                 `A supercell of #${k + 1}: its primitive cell holds ${check.index} of #${k + 1}'s.`)
+                 `Supercell of #${k + 1}, ${TIMES[check.index] ?? `${check.index} times`} its primitive cell`)
       : relation("containment", "⊇", k + 1,
-                 `Indexes every line #${k + 1} indexes, and predicts more.`);
+                 `Indexes every line #${k + 1} does, and predicts more`);
   }
   return null;
 }

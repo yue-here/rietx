@@ -1,6 +1,6 @@
 # Indexing evidence and the route to a phase
 
-This page gives the evidence view of an indexing result, `IndexingEvidence` with one `CandidateEvidence` per candidate and each caveat's kind as a `CaveatEvidence`, the figures `plot_indexing` draws from a result, and how a candidate cell becomes a phase to refine and to screen for its extinction symbol.
+This page gives the evidence view of an indexing result, `IndexingEvidence` with one `CandidateEvidence` per candidate and each caveat's kind as a `CaveatEvidence`, the relations the GUI marks between candidates, the figures `plot_indexing` draws from a result, and how a candidate cell becomes a phase to refine and to screen for its extinction symbol.
 
 The result these views are built from, and the confidence gate they feed, are in [The indexing search and its result](indexing.md).
 
@@ -80,6 +80,53 @@ That argues for showing Rwp, never for ranking on it.
 
 The result's own dump keeps the same shape: `IndexingResult` carries no top-level `cell` key, and the evidence view is the companion to dump beside it ([Answers as JSON](programs.md#answers-as-json)).
 The streamed per-system shortlists `index_pattern` sends on its event stream use the same `CandidateEvidence` shape.
+
+## Relations between candidates
+
+The GUI's candidate table marks a row that is related to another reported row.
+The mark sits in a column after `#` and names the other row as `#k`.
+A click on it gives a one-line summary with row k filled in.
+
+| Mark | Summary | Meaning | Computed by |
+|---|---|---|---|
+| `≡ #k` | Same cell as #k, another lattice label | The six cell values print the same as row k's, lengths to four places and angles to two. The search reported one cell twice, under two crystal systems or centrings. Row k is the higher-ranked of the two. | the GUI, `candidateRelation` in `gui/src/lib/peaks.ts` |
+| `N× #k` | Supercell of #k, twice its primitive cell | `SupercellCheck.relation` is `"sublattice"`. One primitive cell of this lattice holds N of row k's, where N is `SupercellCheck.index`, from 2 to 4. | {source}`rietx.indexing.ambiguity._parent_coordinates` |
+| `⊇ #k` | Indexes every line #k does, and predicts more | `SupercellCheck.relation` is `"containment"`. This cell indexes every observed line row k indexes, and its own line set is the denser. It is no 2-to-4 supercell of row k. | {source}`rietx.indexing.screen.contains` |
+
+The summary words N as "twice", "three times" or "four times".
+N counts primitive cells, and the V column gives conventional cells, so for a centred lattice the ratio of the two V values can differ from N.
+
+The search asks every pair of reported candidates in {source}`rietx.indexing.consensus.supercell_checks`.
+A pair whose larger cell indexes every observed line the smaller one indexes gets a `SupercellCheck` on the larger cell, from {source}`rietx.indexing.screen.containment_evidence`.
+That check carries the verdict, and [A supercell and the cell inside it](indexing.md#a-supercell-and-the-cell-inside-it) says how a verdict moves the order.
+The table looks for `≡` first, then takes the first check whose parent is another reported row.
+So a row carries at most one mark, and a row without one can still be related to another in a way rietx does not compute.
+
+The `fap` example project (fluorapatite, P6₃/m, Cu Kα), searched over the hexagonal and trigonal systems, returns twelve candidates.
+All twelve are primitive with α = β = 90° and γ = 120°, and 135 lines were used.
+
+| # | Mark | a (Å) | c (Å) | Lattice | V (Å³) | Lines indexed |
+|---|---|---|---|---|---|---|
+| 1 | `⊇ #4` | 9.3744 | 6.8875 | trigonal P | 524.2 | 128 |
+| 2 | `≡ #1` | 9.3744 | 6.8875 | hexagonal P | 524.2 | 128 |
+| 3 | | 9.3740 | 13.8252 | hexagonal P | 1052.1 | 117 |
+| 4 | | 9.3795 | 6.8881 | trigonal P | 524.8 | 110 |
+| 5 | `≡ #4` | 9.3795 | 6.8881 | hexagonal P | 524.8 | 110 |
+| 6 | `2× #1` | 9.3774 | 13.7754 | hexagonal P | 1049.1 | 130 |
+| 7 | `≡ #6` | 9.3774 | 13.7754 | trigonal P | 1049.1 | 130 |
+| 8 | `3× #1` | 16.2404 | 6.8880 | hexagonal P | 1573.3 | 132 |
+| 9 | `2× #1` | 9.3798 | 13.7656 | hexagonal P | 1048.9 | 127 |
+| 10 | `≡ #9` | 9.3798 | 13.7656 | trigonal P | 1048.9 | 127 |
+| 11 | | 9.3748 | 13.7772 | hexagonal P | 1048.6 | 130 |
+| 12 | `≡ #11` | 9.3748 | 13.7772 | trigonal P | 1048.6 | 130 |
+
+Rows 1 and 4 describe one lattice, with a values 0.005 Å apart.
+Row 1 indexes every line row 4 indexes and 18 more, so its mark is `⊇ #4`.
+Row 6 doubles c, and row 8 multiplies a by √3.
+Of row 6's 58 extra lines over row 1, 4 sit on an observed line, where chance gives 11.8, so its check is refuted.
+Row 8's check is refuted on 4 of 122.
+Row 3 doubles c too and carries no mark.
+It indexes 117 lines against row 1's 128, so it cannot index every line row 1 does, and the pair gets no check.
 
 ## Drawing the result
 

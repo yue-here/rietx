@@ -1737,40 +1737,35 @@ PEAK_ORIGIN_HELP: dict[str, HelpEntry] = {
 #: to another reported row (WP-2240): ``same_cell``, the GUI's own reading of
 #: two rows printing one cell, and each value of
 #: :attr:`~rietx.schemas.indexing.SupercellCheck.relation`.  The table writes
-#: the mark and the row it names (``≡ #1``, ``2× #1``, ``⊇ #1``), and the
-#: popover gives this entry.
+#: the mark and the row it names (``≡ #1``, ``2× #1``, ``⊇ #1``), and its
+#: popover gives that row's one-line summary with this entry's manual link,
+#: where the explanation lives (the maintainer, 2026-11-23).
+_CELL_RELATIONS = "reference/indexing-evidence.html#relations-between-candidates"
+
 CELL_RELATION_HELP: dict[str, HelpEntry] = {
     "same_cell": HelpEntry(
-        title="The same cell as another candidate",
+        title="Same cell as another candidate",
         description=(
-            "Written ≡ #k. This row's cell equals candidate k's to every place "
-            "the table prints. The search reported it twice, under two lattice "
-            "labels: a different crystal system or centring. Candidate k is the "
-            "one ranked higher."
+            "Written ≡ #k. This row prints candidate k's cell under another "
+            "lattice label."
         ),
+        anchor=_CELL_RELATIONS,
     ),
     "sublattice": HelpEntry(
-        title="A supercell of another candidate",
+        title="Supercell of another candidate",
         description=(
             "Written N× #k. One primitive cell of this lattice holds N of "
-            "candidate k's, with N from 2 to 4. So it predicts every line "
-            "candidate k predicts, and extra lines besides. The search asks "
-            "whether those extra lines are in the pattern. When they are seen no "
-            "more often than chance, this row ranks directly below candidate k. "
-            "The V column gives conventional cells, so for a centred lattice its "
-            "ratio can differ from N."
+            "candidate k's, with N from 2 to 4."
         ),
+        anchor=_CELL_RELATIONS,
     ),
     "containment": HelpEntry(
-        title="Indexes everything another candidate indexes",
+        title="Indexes every line another candidate does",
         description=(
             "Written ⊇ #k. This cell indexes every observed line candidate k "
-            "indexes, and it predicts more lines. It is not a 2-to-4 supercell "
-            "of candidate k. Examples are a body-centred cubic cell √2 times the "
-            "edge of a face-centred one, and a trigonal description of a cubic "
-            "cell. As for a supercell, the search asks whether the extra lines "
-            "are in the pattern."
+            "indexes, and predicts more lines."
         ),
+        anchor=_CELL_RELATIONS,
     ),
 }
 

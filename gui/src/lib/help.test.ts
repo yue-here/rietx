@@ -53,7 +53,7 @@ function corpus(): HelpCorpus {
     peak_flags: { excluded: entry("Excluded") },
     diagnostics: { PEAK_LIST_TOO_SHORT: entry("Too few lines") },
     peak_origins: { manual: entry("Placed by a person", { label: "manual" }) },
-    cell_relations: { same_cell: entry("The same cell as another candidate") },
+    cell_relations: { same_cell: entry("Same cell as another candidate") },
     stage_fields: { seed: entry("Stage seed"), max_iter: entry("Iteration cap") },
     reader_options: { block: entry("Data block") },
     instrument_fields: { radiation: entry("Anode") },

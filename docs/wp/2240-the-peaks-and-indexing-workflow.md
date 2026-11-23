@@ -1,6 +1,6 @@
 # WP-2240 — the peaks-and-indexing workflow at `/next`: pick peaks, fit peaks, index, judge
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-23 — tasks 1-9 built and both R6 looks' rulings applied; #1792 waits on the maintainer's third look
+Milestone: gui-overhaul · Status: 🔄 2026-11-23 — tasks 1-9 built and the fourth look's rulings applied; #1792 waits on the maintainer's look at the relation popover
 Depends on: 2218 (hand fitting and the other graphs)
 Priority: P2 2026-11-22 — a feature the open milestone was opened for: R6, the rebuild's next piece
 
@@ -193,6 +193,18 @@ package. `src/rietx/_audit.py` is untouched.
   each column as wide as its widest head or value; a unit under its name; a set angle
   written whole (`90`, `120`) with the room of its `.00` kept; the relation mark a `<Help>`
   term opening a `cell_relations` entry in `rietx.help`.
+
+- **Yue's ruling at the fourth look, 2026-11-23, verbatim (on `look-r6c`):** "the relation
+  popover is too didactic, I was thinking just a summary of what it means, e.g. supercell of
+  x or transformation of y. will need a manual link to as does everything in the gui as for
+  the old gui. (since other codes don't report this) the rest looks ok for now". Built (the
+  seventh session's entry): the popover gives one line with the target row filled in, then
+  `in the manual →`, and the explanation moved to the manual's
+  `reference/indexing-evidence.md` § Relations between candidates. "The rest looks ok for
+  now" accepts the built answers to the third look's questions: heads centred over their
+  values, a unit under its name, "Unindexed" as it is, the grade words centred, a
+  click-opened popover rather than a hover tooltip, the 488 px graph, and the mark for a
+  chosen line left out of indexing as built, a thin orange line.
 
 ## Non-goals
 

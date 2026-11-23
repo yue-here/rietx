@@ -662,8 +662,9 @@
                 <td class="num">{@render blk(String(r.i + 1), ch.i)}</td>
                 <!-- the mark right-aligned in a fixed room and the row it names
                      after it, so each lines up from row to row; a click opens
-                     the relation's explanation (`rietx.help`'s cell_relations) -->
-                <td class="rel num">{#if r.rel}<Help for={r.rel.key}><span
+                     the row's summary and the manual link of the relation's
+                     `cell_relations` entry (the maintainer, 2026-11-23) -->
+                <td class="rel num">{#if r.rel}<Help for={r.rel.key} title={r.rel.text}><span
                   class="relm">{r.rel.mark}</span><span class="relt"
                   style:min-width="{ch.rel}ch">#{r.rel.of}</span></Help>{/if}</td>
                 {#each r.cell as col, k (k)}
