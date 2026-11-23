@@ -285,6 +285,49 @@ def test_undo_puts_the_peak_list_back_byte_for_byte_and_redo_replays_it(
         httpd.shutdown()
 
 
+def test_a_peak_edit_typed_in_the_rxt_is_one_undo_step(
+        pattern_file, tmp_path_factory):
+    """WP-2240, interaction rule 10 through the second editing surface: a 2θ
+    typed into the `.rxt` peaks block is one step of the same stack, so ⌘Z
+    takes back that edit and not the one before it."""
+    structure, instrument = perturbed_models()
+    root = tmp_path_factory.mktemp("peaks-rxt-undo") / "u.rex"
+    project = rx.Project.create(root, pattern=pattern_file,
+                                structure=structure, instrument=instrument)
+    session = GuiSession(project,
+                         state_dir=tmp_path_factory.mktemp("peaks-rxt-state"))
+    httpd = build_server(session, port=0)
+    threading.Thread(target=httpd.serve_forever,
+                     kwargs={"poll_interval": 0.02}, daemon=True).start()
+    client = Client(httpd.server_address[1])
+    stored = project.path / "peaks.json"
+    try:
+        _, picked = client.post("/api/peaks", {})
+        assert (picked["undo"], picked["redo"]) == (1, 0)
+        after_pick = stored.read_bytes()
+
+        _, doc = client.get("/api/textdoc")
+        old = f"{picked['peaks'][1]['two_theta']:.6f}"
+        new = f"{picked['peaks'][1]['two_theta'] + 0.01:.6f}"
+        rows = [ln for ln in doc["text"].splitlines()
+                if ln.startswith("    ") and old in ln.split()]
+        assert len(rows) == 1, rows
+        text = doc["text"].replace(rows[0], rows[0].replace(old, new.rjust(len(old))))
+        status, applied = client.request("PUT", "/api/textdoc", {
+            "text": text, "base_revision": doc["revision"]})
+        assert status == 200, applied
+        assert stored.read_bytes() != after_pick
+
+        _, now = client.get("/api/peaks")
+        assert (now["undo"], now["redo"]) == (2, 0)
+        status, back = client.post("/api/peaks/undo")
+        assert status == 200 and stored.read_bytes() == after_pick
+        assert (back["undo"], back["redo"]) == (1, 1)
+    finally:
+        session.close()
+        httpd.shutdown()
+
+
 def test_mutating_peak_verbs_refuse_while_a_run_is_in_flight(served, client):
     session, _, _ = served
     with session._cond:
