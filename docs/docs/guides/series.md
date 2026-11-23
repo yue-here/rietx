@@ -131,16 +131,20 @@ A hold, a tie or a named variable belongs to one pattern's refinement, so declar
 A distortion product is often modelled as a subgroup of the parent phase, started at the group–subgroup identity point: for a face-centred cubic parent and its body-centred tetragonal subgroup, a<sub>t</sub> = a<sub>c</sub>/√2 and c<sub>t</sub> = a<sub>c</sub>.
 At that point every subgroup line sits under a parent line, so the data cannot judge the subgroup on its own.
 Its scale is collinear with the parent's, so whether it counts as seen, and is held, depends on where along that ridge the fit stands rather than on whether the specimen contains it.
-In one of the series below it was refined in patterns where it was absent, with no [`PHASE_UNCONSTRAINED`](../reference/diagnostics-refinement.md#phase_unconstrained).
-What named it there was `HIGH_CORRELATION` and `FLAT_DIRECTION` on the two scales, at ρ = −1.000.
+In every forward chain below it was refined in the patterns where it was absent, with no [`PHASE_UNCONSTRAINED`](../reference/diagnostics-refinement.md#phase_unconstrained).
+On the first noise draw, what named it there was `HIGH_CORRELATION` and `FLAT_DIRECTION` on the two scales, at |ρ| = 1.000.
 
-A fit started at the identity point has to leave it in one direction or the other, and on the series below it chose the wrong direction every time.
+A fit started at the identity point has to leave it in one direction or the other, and on the series below a single fit chose the wrong direction every time.
 The series is synthetic: a Cu parent, and its `I 4/m m m` subgroup present from the fifth of eight patterns with c/(a√2) − 1 = +6.0 × 10<sup>−3</sup>, at 0.15, 0.25 and 0.40 of the parent's scale, over seven noise draws.
 A single fit of a pattern with the subgroup present, started at the identity point, ended on the wrong side in 42 of 42 fits.
 With the distortion's sign reversed in the data, it ended on the wrong side in 42 of 42 again, so the data pulled the fit away from the truth rather than leaving the choice to chance.
-The chain ended on the wrong side in 17 of 21 forward chains and 21 of 21 backward ones.
-In 17 of the 21 series both directions agreed on the wrong side, so `SeriesResult.direction_gaps` showed no gap on the subgroup's cell.
-The subgroup was not held in any pattern where it was present, so the hold played no part in the failure.
+A chain started at the identity point did no better, and how it failed moved with the plan.
+Under the default plan, which runs no closing stage, the chain ended on the wrong side in 9 of 21 forward chains and 21 of 21 backward ones (14 and 21 of 21 with the distortion's sign reversed).
+In 5 of the 21 forward chains, for each sign, the subgroup's cell stayed at the identity point, with c/(a√2) − 1 within ±1 × 10<sup>−3</sup>, in every pattern where the subgroup was present.
+Where both directions ended on the wrong side, in 9 of the 21 series (14 with the sign reversed), `SeriesResult.direction_gaps` showed gaps under 0.03 esd on the subgroup's cell, so comparing the two directions does not reveal the error.
+Where the two directions disagreed, the gaps were 20 to 55 esd.
+In 4 of the 42 chains (6 with the sign reversed), all of them forward, the subgroup was held at its onset with `PHASE_UNCONSTRAINED` and re-entered at the next pattern, on the wrong side in 1 of the 4 (4 of the 6).
+With the closing stage on (`closing_window_tol=1e-3`), the same chains with the original sign ended on the wrong side in 17 of 21 forward and 21 of 21 backward, none stayed at the identity point, and none held the subgroup.
 
 Choose the side by fitting, not by chaining:
 
@@ -149,7 +153,9 @@ Choose the side by fitting, not by chaining:
 3. Chain outward from that pattern, carrying the kept fit's cell.
 
 A start off the identity point given to the chain's first pattern need not survive the patterns where the subgroup is absent, because its cell can drift there.
-Two forward chains, one from each side, kept both sides in 10 of the 21 series, and the lower Rwp of the pair was the true side in 13 of 21.
+Two forward chains, one from each side, each ended on its own side at the last pattern in 12 of the 21 series (9 with the sign reversed), and the chain with the lower mean Rwp ended on the true side in 18 of 21 (12 with the sign reversed).
+With the closing stage on, those counts were 10 and 13 of 21 for the original sign.
+The single fits of steps 1 and 2 picked the true side in 84 of 84 under either plan.
 
 This was measured on one parent–subgroup pair, with one distortion size, one instrument and one start offset (c/(a√2) − 1 = ±3 × 10<sup>−3</sup>), and it is untested beyond that.
 It applies to a distortion with one symmetry-breaking direction whose two sides are different structures.

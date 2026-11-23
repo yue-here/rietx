@@ -15,12 +15,16 @@ distortion.
 ``chains`` runs the series through ``SequentialRefinement`` with
 ``carry=("*",)``, from the identity point under ``direction="both"`` (or from
 ``--start`` off it, forward only), and prints the side per present pattern,
-the patterns where the subgroup carried ``PHASE_UNCONSTRAINED``, and the
-``SEQUENTIAL_PATH_DEPENDENT`` findings on its cell.
+the patterns where the subgroup carried ``PHASE_UNCONSTRAINED``, and, under
+``direction="both"``, the largest |gap_esd| on the subgroup's cell among the
+patterns where it is present (:func:`cell_gap_esd`, read from
+``SeriesResult.direction_gaps``; ``-`` for a forward-only run).
 
 The counts in ``docs/docs/guides/series.md`` § Start a subgroup off its
-parent's cell and in WP-1420's 2026-11-04 entry came from these runs
-(``[dev]``, darwin arm64); each takes a few minutes serially.
+parent's cell came from these runs (``[dev]``, darwin arm64, re-measured
+2026-11-23 after WP-2222 turned the closing stage off by default; WP-1420's
+2026-11-04 entry is the earlier measurement, with it on); each takes a few
+minutes serially.
 """
 
 from __future__ import annotations
@@ -81,6 +85,18 @@ def side(parameters) -> str:
     return "+" if t > 1e-3 else "-" if t < -1e-3 else "0"
 
 
+def cell_gap_esd(result) -> float | None:
+    """The largest |gap_esd| on ``phases.1.cell.*`` at or after the onset.
+
+    ``None`` where the series has no ``direction_gaps`` (a forward-only run)
+    or no row there carries an esd.
+    """
+    gaps = [abs(g.gap_esd) for g in result.direction_gaps or []
+            if g.path.startswith("phases.1.cell.") and g.index >= ONSET
+            and g.gap_esd is not None]
+    return max(gaps) if gaps else None
+
+
 def cold(sign: int) -> None:
     right = n = 0
     for fraction in FRACTIONS:
@@ -114,9 +130,7 @@ def chains(sign: int, offset: float | None) -> None:
                 runs = [("forward", result)]
                 if sr.backward_ is not None:
                     runs.append(("backward", sr.backward_))
-                cell_pd = sum(d.code == "SEQUENTIAL_PATH_DEPENDENT"
-                              and any(w.startswith("phases.1.cell") for w in d.where)
-                              for d in result.diagnostics)
+                gap = cell_gap_esd(result)
                 for name, s in runs:
                     sides = "".join(side(e.parameters) for e in s.entries[ONSET:])
                     held = [e.label for e in s.entries
@@ -127,7 +141,8 @@ def chains(sign: int, offset: float | None) -> None:
                     print(f"f={fraction:.2f} draw={draw:>8} start={tet:+.4f} "
                           f"{name:>8} sides={sides} rwp={rwp:.4f} "
                           f"unconstrained={','.join(held) or '-'} "
-                          f"cell_path_dependent={cell_pd}", flush=True)
+                          f"cell_gap_esd={'-' if gap is None else f'{gap:.3g}'}",
+                          flush=True)
 
 
 def main() -> None:

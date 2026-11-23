@@ -152,6 +152,10 @@ subgroup carried no `PHASE_UNCONSTRAINED`; `HIGH_CORRELATION` and
 construction is `tests/test_identity_point_seed.py`'s; the 2026-11-04
 handover entry says where the probe scripts are and what each ran.
 
+*2026-11-23: the chain counts above moved when WP-2222 (#1708) turned the
+closing stage off by default; the cold-fit counts did not. The 2026-11-23
+handover entry has the re-measurement.*
+
 ### Inherited
 
 - **2026-11-06, from the issue triage (issue #1439): a proposal to fix the
@@ -397,6 +401,44 @@ series golden is bit-identical.
   a bet), WP-1043 (never a confident singleton), WP-1333, WP-1342, WP-1419.
 
 ## Handover log
+
+- **2026-11-23** — **The chain counts moved with main; the two-start
+  recipe did not.** Our pre-review of PR #1401 re-ran `tests/repro_1420.py`
+  on the merged head (`6ea2b14d`, main `3fa08615a`) and the chain counts no
+  longer matched the guide. Bisected over main's first-parent commits
+  between `3dce54eae` (this branch's base) and `3fa08615a`, with the
+  branch's two test files laid over each, on one forward-and-backward pair
+  per commit: they moved at `c21868314`, #1708, WP-2222's closing stage off
+  by default (its parent `6bcd9a161` still gives the 2026-11-04 shapes). The
+  head with `closing_window_tol=1e-3` put back reproduces the 2026-11-04
+  chain counts line for line, so that one default is the whole cause.
+  *Measured* (`[dev]`, darwin arm64, py3.12, rietx-kernels 1.5.0, head
+  `6ea2b14d`, both signs; the counts are deterministic run to run):
+  - Cold single fit from the identity point: wrong side in 42 of 42 per
+    sign. Two cold starts from ±2e-3: each kept its side in 42 of 42, and
+    the lower Rwp was the true side in 84 of 84, wrong/right Rwp
+    1.019-1.034×, 1.051-1.077×, 1.141-1.172×. Unchanged.
+  - Chains from the identity point under `direction="both"`: forward wrong
+    at p007 in 9 of 21 (+) and 14 of 21 (−), backward 21 of 21 under both;
+    5 of 21 forward chains per sign stay at the identity point (`0000`).
+  - The subgroup was held at onset (p004, `PHASE_UNCONSTRAINED`) in 4 of
+    42 chains (+) and 6 of 42 (−), every one a forward chain, re-entering
+    at p005, on the wrong side in 1 of 4 and 4 of 6.
+  - Both directions wrong in 9 (+) and 14 (−) of 21 series, with the
+    largest |gap_esd| on `phases.1.cell.*` under 0.03; the disagreeing
+    series 20-55 esd.
+  - Two forward chains from ±2e-3: both ended on their own side at p007 in
+    12 (+) and 9 (−) of 21; the lower mean Rwp ended on the true side in 18
+    (+) and 12 (−) of 21 (closing stage on: 10 and 13, + only).
+  *Done:* the guide's counts rewritten to these; the skill row cut, since
+  DESIGN Rule 3 and Rule 4's skill-row test admit a practice only with a
+  source outside rietx's own runs and this one has none (the guide keeps
+  the recipe with its domain); `repro_1420 chains` now prints the largest
+  |gap_esd| on the subgroup's cell from `SeriesResult.direction_gaps` in
+  place of the removed `SEQUENTIAL_PATH_DEPENDENT` count, with
+  `tests/test_repro_1420.py` pinning the reader. *Next:* the maintainer's
+  answer on whether a hold at onset in 4-6 of 42 chains changes the #1402
+  ruling, whose premise was that the trigger fires in none.
 
 - **2026-11-21** — **The ruling on #1402: A now, then B1 once WP-1419's metric
   symmetry point lands; B2 is decided then.** The maintainer answered the

@@ -170,14 +170,6 @@ What an operator must know, all measured:
   the disagreement set.  A wrong basin at
   negligible Rwp cost is the case for `direction="both"` and for cold refits,
   not for the reseed ladder.
-- **A one-direction distortion started at its parent's cell is a bet on a
-  sign.**  At the group–subgroup identity point every subgroup line sits
-  under a parent line; a fit started there can leave it on the wrong side,
-  and both chain directions can agree on it, showing no gap in
-  `SeriesResult.direction_gaps`.  Multi-start it: fit one pattern where the
-  subgroup is present from each side, keep the lower Rwp, chain from it.
-  *(Measured: issue #267's fcc→bct construction only, untested beyond it;
-  counts in the manual's series guide.)*
 - **The `SEQUENTIAL_*` codes live on `SeriesResult.diagnostics`, one level up
   from the entries.**  Reading `entry.diagnostics` for them returns zero on
   every series, which presents as a clean run rather than as a lookup in the
