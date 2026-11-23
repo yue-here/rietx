@@ -350,9 +350,10 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "The Finger-Cox-Jephcoat axial-divergence ratio S/L. It is the illuminated "
             "specimen length divided by the goniometer radius. It sets how strongly "
             "low-angle peaks lean toward low 2θ. Refine it on a standard and hold "
-            "`axial_hl`: swapping the two gives the same pattern. Refined from zero, it "
-            "starts at 0.02, or at 0.01 when `axial_hl` already sits at 0.02, where the "
-            "fit can see which way to move it (see `axial_hl`)."
+            "`axial_hl`: swapping the two gives the same pattern. Refined from zero (or "
+            "from a positive lower bound it sits on), it starts at 0.02, or at 0.01 "
+            "when `axial_hl` already sits at 0.02, where the fit can see which way to "
+            "move it (see `axial_hl`)."
         ),
         unit=None, default="0.0",
         typical="0.01-0.05",
@@ -369,8 +370,9 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "asymmetry off. "
             "With both at zero and either refined, the peaks are computed with windows "
             "and integration points sized for a ratio of 0.02, so the curve differs from the same model with "
-            "both held by up to about 5e-5 of the strongest peak. Refined from zero, it "
-            "starts at 0.01, or at 0.02 when `axial_sl` already sits at 0.01."
+            "both held by up to about 5e-5 of the strongest peak. Refined from zero (or "
+            "from a positive lower bound it sits on), it starts at 0.01, or at 0.02 "
+            "when `axial_sl` already sits at 0.01."
         ),
         unit=None, default="0.0",
         typical="0.01-0.05",

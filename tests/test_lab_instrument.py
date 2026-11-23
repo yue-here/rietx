@@ -594,19 +594,41 @@ def test_an_aperture_an_earlier_stage_refined_is_not_lifted_again():
     a later stage naming it again (a plan's closing stage does) leaves it
     there.  ``run_stage`` has no earlier stage, so it lifts a hand-freed row
     (``test_an_aperture_the_caller_freed_by_hand_is_lifted_too``).
+
+    Only a row stage 1 leaves on zero tells the gate from its absence, so the
+    data carry no axial asymmetry (S/L = H/L = 0): stage 1, lifted to
+    (0.02, 0.01), walks H/L back onto its floor, and its last accepted
+    evaluation in the event stream says so.  With the gate removed
+    (``refined_before`` ignored) stage 2 lifts H/L to 0.01 again and this test
+    fails.  Its first version, on S/L = H/L = 0.03, left both apertures off
+    zero and passed with the gate removed (the review of #1372).
     """
     tt = np.arange(15.0, 80.0, 0.02)
-    y = np.asarray(_rutile_axial(0.03, False).predict(tt)) * 1e4 + 50.0
+    y = np.asarray(_rutile_axial(0.0, False).predict(tt)) * 1e4 + 50.0
     data = rx.PatternData(two_theta=tt.tolist(), intensity=y.tolist(),
                           sigma=np.sqrt(y).tolist())
     ref = _rutile_axial(0.0, False)
     ref.structure.phases[0].scale.value *= 1e4
     ref.instrument.background.coefficients[0].value = 50.0
     plan = rx.RefinementPlan(stages=[
-        rx.Stage("axial", list(_AXIAL), max_iter=2),
-        rx.Stage("axial again", list(_AXIAL), max_iter=2)])
-    res = ref.fit(data, plan=plan, telemetry=False)
+        rx.Stage("axial", list(_AXIAL), max_iter=5),
+        rx.Stage("axial again", list(_AXIAL), max_iter=5)])
+    seen: list[dict] = []
+    res = ref.fit(data, plan=plan, telemetry=False, events=seen.append)
     assert res.stages[0].seeded == {_SL: 0.02, _HL: 0.01}
+    # where stage 1 left the pair: its last accepted evaluation, read in the
+    # order of the stage's most recent ``stage_start.free_paths``
+    free_paths: list[str] = []
+    stage1_end: dict[str, float] = {}
+    for event in seen:
+        d = event["data"]
+        if d.get("stage") != "axial":
+            continue
+        if event["kind"] == "stage_start":
+            free_paths = d["free_paths"]
+        elif event["kind"] == "eval" and d["accepted"]:
+            stage1_end = dict(zip(free_paths, d["values"], strict=True))
+    assert stage1_end[_HL] == 0.0, stage1_end
     assert res.stages[1].seeded == {}
 
 
