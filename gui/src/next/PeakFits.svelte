@@ -14,9 +14,9 @@
    * part of the fit (call 34). Each window's Refit fits it again through the
    * peak list's verb, one undoable step.
    *
-   * The fit is the peak layer's second blue (`--plot-peakfit`), not the
-   * prototype's orange, which `gui/STYLE.md` § Plots keeps for the
-   * refinement's fit (principle 9). The curves are the server's
+   * The fit is drawn as the calculated curve is, in `--plot-calc`, as the
+   * prototype draws it: the workflow shows no refinement to confuse it with
+   * (the maintainer, 2026-11-23). The curves are the server's
    * (`PeakEditor.curves`), which sum to the group's fit less its envelope.
    */
   import { curveColors, lens } from "../lib/plot";
@@ -175,7 +175,7 @@
       }
     }
     // the group's fit
-    ctx.strokeStyle = c.peakfit;
+    ctx.strokeStyle = c.calc;
     ctx.lineWidth = 1.4;
     path(tt, g.y_fit);
     ctx.stroke();

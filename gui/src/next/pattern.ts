@@ -92,7 +92,7 @@ export interface Overlay {
   peaksActive: boolean;
   candidate: CandidateOverlay | null;
   /** the peak row a person chose in the Pick step's table (WP-2240): its mark
-   *  is drawn larger with a ring, or, for a line left out, a dotted line
+   *  is drawn larger with a ring, or, for a line left out, a thin line
    *  stands where it is (interaction rule 5) */
   selected?: number | null;
   /** the line a drag is moving: the canvas leaves its mark out, and the page
@@ -151,15 +151,15 @@ export class PatternChart {
     this.roomy = PatternChart.wantsRoom(overlay);
     const shade = (u: any) => this.shade(u);
     this.fig = pattern(uPlot, host, curves, {
-      // before a fit the lower pane is the peak groups' own residual, which
-      // wears the peak layer's ink (WP-1210), as its row in the strip does
-      // while a preview is drawn over a fit the model's own series keeps its
+      // before a fit the lower pane is the peak groups' own residual, in the
+      // difference curve's ink, as their fit takes the calculated curve's
+      // (the maintainer, 2026-11-23); while a preview is drawn over a fit the model's own series keeps its
       // place in the y range and paints nothing: the layer draws the last fit
       // in `--plot-last` and the preview in the calculated ink, so the scale
       // stays the last fit's
       colors: () => ({ ...this.colors, masked: this.colors.edge,
                        calc: this.previewOn ? "rgba(0, 0, 0, 0)" : this.colors.calc,
-                       diff: this.curves.header.fit ? this.colors.diff : this.colors.peakfit }),
+                       diff: this.colors.diff }),
       y: Y[opts.scale],
       residual: opts.kind,
       hidden: overlay.hidden,
@@ -444,15 +444,17 @@ export class PatternChart {
     if (lines?.length) vlines(u, lines, u.bbox.top, u.bbox.height, this.colors.candidate);
   }
 
-  /** Each group's fitted profile, dashed, on its own channels (D8). */
+  /** Each group's fitted profile on its own channels (D8), drawn as the
+   *  calculated curve is: its ink, solid, at its width. The workflow draws no
+   *  refinement over it to confuse it with (the maintainer, 2026-11-23). */
   private peakFit(u: any): void {
     const { groups, peaksActive, hidden } = this.overlay;
     if (!peaksActive || !groups?.length || hidden.includes("peakfit")) return;
     const { ctx } = u, dpr = devicePixelRatio, fit = joinCurves(groups, (g) => g.y_fit);
     ctx.save();
-    ctx.strokeStyle = this.colors.peakfit;
-    ctx.lineWidth = 1.4 * dpr;
-    ctx.setLineDash([4 * dpr, 3 * dpr]);
+    ctx.strokeStyle = this.colors.calc;
+    ctx.lineWidth = 1.2 * dpr;
+    ctx.setLineDash([]);
     ctx.beginPath();
     let pen = false;
     for (let i = 0; i < fit.x.length; i++) {
@@ -471,7 +473,8 @@ export class PatternChart {
    * standing just clear of the highest count near it (WP-2240, the
    * maintainer's rounds 11c and 11d, 2026-11-08). A line left out of the
    * search has no mark: its row in the table is its route, and choosing that
-   * row draws a dotted line where it is. Lines closer than a lens's width
+   * row draws a thin solid line where it is, in the fit's ink (the
+   * maintainer, 2026-11-23: no dotted line). Lines closer than a lens's width
    * stack upward, so a duplicate never hides under its twin. The chosen line's
    * lens is larger, with a ring in the text ink (`gui/STYLE.md` § Plots,
    * 2026-11-09). A halo of the page's background lets a lens read over the
@@ -487,13 +490,13 @@ export class PatternChart {
     const { min, max } = u.scales.x;
     const { halo, ink } = this.chrome;
     const marks: Array<{ index: number; x: number; y: number; level: number; chosen: boolean }> = [];
-    let dotted: number | null = null;
+    let leftOut: number | null = null;
     for (const p of [...peaks].sort((a, b) => a.two_theta - b.two_theta)) {
       if (p.two_theta < min || p.two_theta > max) continue;
       const chosen = selected === p.index;
       if (p.index === dragging) continue;
       if (!p.usable) {
-        if (chosen) dotted = u.valToPos(p.two_theta, "x", true);
+        if (chosen) leftOut = u.valToPos(p.two_theta, "x", true);
         continue;
       }
       const h = this.crest(p.two_theta);
@@ -538,15 +541,12 @@ export class PatternChart {
       lens(ctx, chosen.x, chosen.y, H * 1.4 + 6 * dpr, W * 1.4 + 5 * dpr);
       ctx.stroke();
     }
-    if (dotted != null) {
-      // the layer's own ink (WP-2240): `--accent` is the calculated curve's
-      // colour and hid the mark on it
-      ctx.strokeStyle = this.colors.peak;
-      ctx.lineWidth = 1.2 * dpr;
-      ctx.setLineDash([2 * dpr, 3 * dpr]);
+    if (leftOut != null) {
+      ctx.strokeStyle = this.colors.calc;
+      ctx.lineWidth = dpr;
       ctx.beginPath();
-      ctx.moveTo(dotted, u.bbox.top);
-      ctx.lineTo(dotted, u.bbox.top + u.bbox.height);
+      ctx.moveTo(leftOut, u.bbox.top);
+      ctx.lineTo(leftOut, u.bbox.top + u.bbox.height);
       ctx.stroke();
     }
     ctx.restore();
