@@ -100,6 +100,26 @@ Some evidence does not fit the three layers and is reported beside them:
 
 These still report when Layer 1 abstains.
 
+## Where to read about a symptom
+
+The report reads one fit, and the advice about what a reading means is spread through the manual.
+This table finds it by what you see.
+Each row names the passage that explains the check, and does not repeat it.
+
+| What you see | Where to read |
+|---|---|
+| The goodness of fit is far from 1 while the fit looks good | [Which esd weighted the fit](../reference/result.md#which-esd-weighted-the-fit) and [Arrays](../reference/data.md#arrays), because the goodness of fit is read against σ |
+| The peaks sit off, by the same amount or by an amount that changes with angle | [Trends across the pattern](#trends-across-the-pattern), which reads a constant, cos θ or tan θ shift as zero, displacement or cell |
+| Displacement parameters rise and phase scales fall while Rwp improves | [How flexible a background should be](parameters.md#how-flexible-a-background-should-be) |
+| A smooth residual runs between the peaks | [How flexible a background should be](parameters.md#how-flexible-a-background-should-be), from the stiff side |
+| A broad feature under the peaks belongs to no phase | [Humps](parameters.md#humps) |
+| A peak no phase accounts for | [Layer 0](#layer-0-where-the-misfit-is), and [Monochromator harmonics](../reference/instrument.md#monochromator-harmonics) for a beam that carries λ/n |
+| Some reflections are too strong and others too weak, by hkl | [Why parameters correlate](correlations.md#why-parameters-correlate), where preferred orientation and occupancy trade |
+| The correlation between two parameters is close to 1 | [What rietx reports](correlations.md#what-rietx-reports) and [What to do about a correlation](correlations.md#what-to-do-about-a-correlation) |
+| A parameter has no esd | [Why a direction the data do not move has no esd](correlations.md#why-a-direction-the-data-do-not-move-has-no-esd) |
+| A parameter ended on its bound | [Parameters on a bound](correlations.md#parameters-on-a-bound) and [How to quote a parameter that ended on its bound](../guides/interval.md) |
+| A refined Biso is negative | [`BISO_NEGATIVE`](../reference/diagnostics-refinement.md#biso_negative) |
+
 ## Reports at every stage
 
 A fit's final state is often the least informative one.
