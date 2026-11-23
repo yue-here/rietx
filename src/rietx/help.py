@@ -1714,7 +1714,7 @@ PEAK_ORIGIN_HELP: dict[str, HelpEntry] = {
     ),
     "manual": HelpEntry(
         title="Placed by a person",
-        label="manual",
+        label="added by you",
         description=(
             "Someone added this line from the plot or by typing a 2θ. Its position was "
             "still fitted, within the group it landed in. A person decided that a line "
@@ -1723,7 +1723,7 @@ PEAK_ORIGIN_HELP: dict[str, HelpEntry] = {
     ),
     "edited": HelpEntry(
         title="Moved by a person",
-        label="moved",
+        label="moved by you",
         description=(
             "Peak detection proposed this line, and a person dragged it or typed a new "
             "2θ. The group was refitted from the new starting position. The position "
