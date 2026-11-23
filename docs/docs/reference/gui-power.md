@@ -235,7 +235,7 @@ indices int32, so a browser reads each array without copying it.
 | `POST /api/recent/remove` | take one path off that list; a path that is not on it is no error |
 | `POST /api/recent/clear` | empty that list |
 | `GET /api/fs` | the filesystem browser's listing, confined to the home directory and the working directory |
-| `GET /api/examples` | the example projects shipped in the wheel |
+| `GET /api/examples` | the example projects included in the wheel |
 | `POST /api/examples/open` · `POST /api/examples/reset` | build one into the state directory and open it; throw a copy away and rebuild it |
 
 ### The project
@@ -280,6 +280,7 @@ indices int32, so a browser reads each array without copying it.
 | `GET /api/peaks` · `POST /api/peaks` | the picked list; pick it, with `pick_peaks`'s `shoulders`, `two_theta_range` and `flag_contamination` |
 | `POST /api/peaks/add` · `POST /api/peaks/remove` · `POST /api/peaks/move` | one line, added, removed, moved |
 | `POST /api/peaks/flag` · `POST /api/peaks/refit` | mark a line; refit its group |
+| `POST /api/peaks/undo` · `POST /api/peaks/redo` | put the list back as it was before the last edit; make that edit again |
 | `POST /api/index` · `GET /api/index/result` | search for a cell; the ranked candidates |
 | `GET /api/index/ticks` | one candidate's predicted lines, for the overlay |
 | `POST /api/index/adopt` | adopt any candidate as a Le Bail scaffold |
