@@ -276,8 +276,8 @@ rules in this section are listed in WP-2134 for the GUI style guide.
   `tests/data/gui/help_keys.json`. A field inventory derives its key from the field's
   name where the arm shares the vocabulary (`lib/controls.ts`, `lib/wizard.ts`) and
   carries it as data otherwise (`lib/model.ts`). `<Help text=…>` is for the
-  server's sentence about one row (`held_because`, a refutation); `for` with `title` is
-  a one-line summary about one row that keeps the entry's manual link (WP-2240).
+  server's sentence about one row (`held_because`, a refutation); `for` with `title`
+  is one row's one-line summary, keeping the entry's manual link (WP-2240).
 - **`title=` is what is left over** (WP-1203): a value the layout truncated, or a verb
   phrase on a `<button>`, never authored prose. `lib/help.test.ts` holds an exact
   per-file count, failing both ways.
@@ -351,8 +351,7 @@ rules in this section are listed in WP-2134 for the GUI style guide.
 - **A layer is drawn where it can be edited** (WP-1210): peak markers and their curve
   only while the Peaks tab is up, so `peaksActive` is a drawing input of the repaint.
 - **At `/next` a peak mark is a lens echoing the ticks** (WP-2240,
-  `lib/plot.ts:LENS_HEIGHT`): filled for a used line, none for an unused one, larger and
-  ringed in text ink when chosen. Today's Peaks tab keeps § House style's shapes.
+  `lib/plot.ts:LENS_HEIGHT`). Today's Peaks tab keeps § House style's shapes.
 - **A curve that cannot be drawn is listed, disabled, with its reason** (WP-1210):
   `CurveToggle.absent`; `dataOnlyHidden` covers absent ids too.
 - **A hover link never repaints the pattern** (WP-1032): the ring is a DOM mark.

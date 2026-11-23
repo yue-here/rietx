@@ -529,7 +529,9 @@ the prototype's (WP-2214 § How the maintainer reviews).
   Index and Judge by real clicks
   (`test_the_fit_index_and_judge_steps_run_to_an_adopted_cell`), the screenshots below, the
   inventory below, and the lens marks' line in `gui/CLAUDE.md` § Plot. Bytes for that line
-  came out of the file's intro and its node bullet, so the file stays under its budget. The
+  came out of the file's intro and its node bullet, so the file stays under its budget.
+  The line leaves the look (filled for a used line, none for an unused one, larger and ringed
+  in the text ink when chosen) to `gui/STYLE.md` § Plots, which the file's intro points at. The
   test the last review named is in: a peak edit typed into the `.rxt` document is one undo
   step (`test_a_peak_edit_typed_in_the_rxt_is_one_undo_step`).
 
