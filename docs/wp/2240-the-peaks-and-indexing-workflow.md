@@ -1,8 +1,7 @@
 # WP-2240 — the peaks-and-indexing workflow at `/next`: pick peaks, fit peaks, index, judge
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-23 — tasks 1-9 built and the fourth look's rulings applied; #1792 waits on the maintainer's look at the relation popover
+Milestone: gui-overhaul · Status: ✅ 2026-11-23 — #1788, #1791 and #1792 merged on 2026-11-23, after Yue's look (§ Rulings); the peaks-and-indexing workflow is served at `/next`
 Depends on: 2218 (hand fitting and the other graphs)
-Priority: P2 2026-11-22 — a feature the open milestone was opened for: R6, the rebuild's next piece
 
 ## Goal
 
@@ -120,20 +119,6 @@ view filter over the picker's own numbers. It changes which rows a person sees f
 which lines reach the search, so it is a display choice in the GUI and not a heuristic of the
 package. `src/rietx/_audit.py` is untouched.
 
-### Inherited
-
-- From the milestone's § Owed to the port: per-line curves need a route (#1526 serves them,
-  R6 takes that half), and peak edits have no undo though the maintainer adopted the rule on
-  2026-11-08 (R6 owes it). Peak edits live in `peaks.json`, outside the history tree, so the
-  undo is the workflow's own stack, as the Plan tab keeps one for plan edits (WP-2127).
-- Four owed items stay out of R6 and keep their lines there: the Le Bail check's absent lines
-  served as tick indices, lattice relations between candidates computed in rietx, an overrule
-  that remembers which flags a person overruled (a `peaks.json` format change), and keeping the
-  indexing result across a restart (a stored-format change).
-- From WP-2244 (2026-11-23): `/next` now mounts the help popover (`gui/src/HelpPopover.svelte`),
-  so a `<Help>` term there opens its explanation. The relation marks' sentence, written as
-  `title=` because no popover existed, can now be a `<Help text=…>`.
-
 ## Rulings
 
 - **Reversed by Yue at the R6 look, 2026-11-23: the dotted `--plot-peak` mark.** Claude had
@@ -206,6 +191,12 @@ package. `src/rietx/_audit.py` is untouched.
   click-opened popover rather than a hover tooltip, the 488 px graph, and the mark for a
   chosen line left out of indexing as built, a thin orange line.
 
+- **Yue's answer at the fifth look, 2026-11-23, verbatim (on `look-r6d`):** "1 yes". The look
+  page's first item asked whether `≡` should read "Same cell as #1, another lattice label"
+  rather than his example "transformation of y". The two rows print identical numbers and
+  differ only in the Lattice column. His yes keeps the wording as built. The rest of the
+  piece stands on his fourth-look "the rest looks ok for now", and PR #1792 merged after it.
+
 ## Non-goals
 
 - Search these running a narrowed search; it waits on a route that starts a search over named
@@ -240,7 +231,7 @@ package. `src/rietx/_audit.py` is untouched.
   dark, under `docs/wp/2240-screenshots/`, beside the prototype's in the runner's scratch, with
   an inventory of where each of today's Peaks features lives. The last PR waits on the
   maintainer's look.
-- [ ] Skill: none. The skill drives the Python API, and this piece changes only the GUI.
+- [x] Skill: none. The skill drives the Python API, and this piece changes only the GUI.
 
 ## Acceptance
 
@@ -255,6 +246,43 @@ The piece closes when every task is ticked and the maintainer has looked at its 
 the prototype's (WP-2214 § How the maintainer reviews).
 
 ## Handover log
+
+- **2026-11-23 (close)** — closed by a ghostshift runner, on a `main` that includes #1792.
+
+  R6 of the GUI rebuild is done. A person on `/next` can choose Peaks and indexing from the
+  workflow menu and walk its four steps. Pick peaks fills a table the Pattern graph edits by
+  click, drag and Option-click, with undo. Fit peaks draws each overlap group's fit with each
+  line's own curve. Index ends in the candidate table, with a cell in six columns and a
+  relation mark on each related row. Judge holds one candidate's evidence and its extinction
+  screen, and adopts it as a Pawley start. Yue looked at the screens five times on
+  2026-11-23. After the fourth he wrote "the rest looks ok for now", and after the fifth he
+  answered "1 yes" to the one open wording (§ Rulings). Every task is ticked and every
+  question is answered. The work goes out with v1.13.
+
+  - *Checked before closing*: the nine tasks and the skill line are ticked. `gh pr view`
+    shows the three PRs merged into `main` on 2026-11-23: #1788 at 01:18 UTC, #1791 at 02:14
+    UTC and #1792 at 23:37 UTC, as merge commit 886f96b1e.
+  - *Changed by this close*: Status ✅, the `Priority:` line removed, the skill line ticked
+    (a declared "none" is ticked at close, as WP-1401, WP-1402 and WP-1331 were), Yue's
+    fifth-look answer recorded in § Rulings, and the `### Inherited` section deleted. Its
+    three entries were consumed. The per-line curves and the undo over peak edits are tasks
+    2 and 5. The relation mark became a `<Help>` term in the sixth session. The four owed
+    items it named keep their lines in the milestone. The narrative moved to
+    `docs/milestones/v1.13.md`. The R6 row of `docs/milestones/gui-overhaul.md` § The
+    rebuild is marked merged, and the two owed lines R6 answered say so. The index is
+    regenerated. WP-2243 depends on this WP softly and is already in flight, so its
+    priority stands. The priority was P2, so no release is owed.
+  - *Leftovers, and where each lives*:
+    - Yue's ruling 2's question of how a chosen cell's lines are drawn was answered at the
+      second look (grey, `--line-strong`). Nothing is left of it.
+    - The four items R6 left out keep their lines in the milestone's § Owed to the port:
+      the Le Bail check's absent lines served as tick indices, lattice relations computed in
+      rietx, an overrule that remembers which flags were overruled, and the indexing result
+      kept across a restart.
+    - The structure-free defaults outside the workflow (ruling 5, the look entry's question
+      4) still pick Le Bail. WP-2062 (Pawley is the structure-free default) owns each of
+      them, the wizard's `modeFor` and the adopt route's default included.
+    - A narrowed search over named systems waits on a route (§ Non-goals).
 
 - **2026-11-23 (seventh session)** — Yue's fourth-look ruling (§ Rulings, verbatim), on
   PR #1792. The relation popover now gives one line with the target row filled in, then the
