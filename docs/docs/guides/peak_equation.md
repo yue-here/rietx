@@ -98,14 +98,15 @@ Give each pattern its own coefficient with `SharingMap(per_histogram=["phases.0.
 Or write the λ into the expression, as `y*wavelength/cos(theta)`, and keep `y` shared.
 `y` is then in degrees per Å, one number for one crystallite size at every wavelength.
 TOPAS does the same two ways: a term per pattern, or `Lam` in the expression.
-The fit still warns about a shared coefficient in an equation that reads `wavelength`, since such an equation can carry a term that does not scale with λ.
+The fit does not warn about a shared coefficient in an equation that reads `wavelength`.
+It then also misses a size term written in degrees in that equation, as `+ x/cos(theta)`.
 
 ## Read what the fit says
 
 Three diagnostics are specific to peak equations.
 `PEAK_WIDTH_NOT_POSITIVE` fires where a width equation takes Γ<sub>G</sub>² or Γ<sub>L</sub> below zero at a fitted reflection.
 A negative term is legal, but the total width is not.
-`PEAK_EQUATION_SHARED_ACROSS_WAVELENGTHS` fires in a joint fit where a width or shift coefficient is shared across patterns of different wavelengths.
+`PEAK_EQUATION_SHARED_ACROSS_WAVELENGTHS` fires in a joint fit where a width or shift coefficient is shared across patterns of different wavelengths, in an equation that does not read `wavelength`.
 `QPA_INTENSITY_FACTOR` fires on a mixture whose phase carries an intensity factor.
 The fraction is computed from the phase's scale, which absorbs the factor.
 A factor that averages 0.83 makes the fraction about 1/0.83 = 1.2× too high relative to the other phases.

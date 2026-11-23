@@ -4061,9 +4061,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "converts its own size terms, but cannot tell which kind an equation "
             "holds. For a wavelength-dependent term, give each pattern its own "
             "coefficient with SharingMap(per_histogram=[...]) and refit. Or write the "
-            "λ into the expression, as y*wavelength/cos(theta), and keep y shared. The "
-            "warning still fires on such an equation, since it can carry a term that "
-            "does not scale with λ."
+            "λ into the expression, as y*wavelength/cos(theta), and keep y shared. This "
+            "warning skips an equation that reads wavelength. It then also skips a "
+            "size term written in degrees in that equation, as + x/cos(theta)."
         ),
     ),
     "PEAK_WIDTH_NOT_POSITIVE": HelpEntry(
@@ -6572,6 +6572,19 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "floor, because the pattern it warm-started from did not support them. "
             "Empty when the kept attempt started cold and on a series with no moment. "
             "`SEQUENTIAL_MOMENT_HOLD` names these patterns."
+        ),
+    ),
+    "SeriesEntry.held_values": HelpEntry(
+        title="Values you held",
+        description=(
+            "Each path you held on this pattern with `ref.hold` in the `constrain` "
+            "hook, named variables included, with the value it was held at. A site "
+            "coordinate DOF is left out, since its value is a step from where the fit "
+            "began; read the coordinate's own row. A held parameter has no row in "
+            "`parameters`, so read its value along the series here. A value that "
+            "differs from its neighbours' was set for this pattern by a hook, or the "
+            "path was free on the pattern before. `None` where nothing was held, and "
+            "in a series saved before the field."
         ),
     ),
     "SeriesEntry.pattern_paths": HelpEntry(
