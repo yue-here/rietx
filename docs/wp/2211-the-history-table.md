@@ -363,6 +363,33 @@ The browser files skip in CI (no playwright there), so the PR quotes their local
 
 ## Handover log
 
+- **2026-11-23** (PR #1805, docs only) — The two History features still missing at `/next`, a
+  node's details and the table of values that differ between two nodes, now have three drawn
+  placements each, with what each costs. The maintainer can choose from pictures of the real
+  page instead of descriptions. The drawings show that a details block under a row hides three
+  of the eight rows the tab holds, and that the value table needs about 640 px. Nothing is
+  built, and the two tasks stay open until the answer.
+  *Done*: § Questions 6 and 7 in the decision-brief order; 16 pictures `q155-*` and `q158-*` in
+  `2211-screenshots/`, light and dark, at 1440 × 900 and two at 1000 × 900; that folder's README
+  lists them and updates rows 155 and 158 of its inventory; the Status line now names the
+  questions. The options were drawn by patching `next/History.svelte` in a scratch copy of the
+  tree (`git archive HEAD`), built there and served from it, so this branch carries no GUI code.
+  *Measured* (macOS arm64, `[dev]` venv on Python 3.12, chromium through python playwright, the
+  `fap` example with the fork the README describes and a note on n0004): the disclosure block is
+  114 px and leaves 5 of 8 rows in view; the details pane takes 440 px, leaving the list 1000 px
+  at 1440 wide and 560 px at 1000 wide; the diff pane takes 640 px, leaving 800 px and 360 px;
+  the diff shows 7 of its 20 rows in the tab or the pane and 14 in the 720 × 460 px window.
+  Diagnostics on nodes: none of `fap`'s 8 after its plan, one of `nac`'s 7 (`FLOOR_HIT` on its
+  last stage).
+  *Gotchas*: no `fap` node carries a diagnostic, so the pictured details show "No diagnostics".
+  The diff pane first drawn at 440 px cut off the change columns, which is how 640 px was found.
+  Beside a pane the rows wrapped into each other at 1000 px until the list was made to scroll
+  sideways; a build must do the same or narrow the pane. The practice lines in both questions
+  are from recall and not checked.
+  Next: the maintainer answers questions 6 and 7 (leans: the pane for both, so one pane holds
+  the details and the diff). Then build the chosen placements in a second code PR, with vitest
+  over the details and the diff and a browser case that opening either moves no row.
+
 - **2026-11-22** (after the maintainer's look) — The Graph view now reads across: a row's step
   name, Rwp, Compare and Restore sit together, so two fits can be compared at a glance, at
   1440 and at 1000 px alike. The maintainer kept the other four items as built, and the
