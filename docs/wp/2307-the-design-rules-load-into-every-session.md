@@ -1,9 +1,8 @@
 # WP-2307 — The design rules load into every session
 
-Milestone: unscheduled · Status: 🔄 2026-11-23 — the rules file and its import in one PR; the limits change in a second, stacked on it; a third closes the WP
+Milestone: unscheduled · Status: ✅ 2026-11-23 — the rules load into every session (#1809) and sit under the rulebook limits (#1812)
 Track: The repo's own process
 Depends on: —
-Priority: P4 2026-11-23 — process: no number and no fit moves
 
 ## Goal
 
@@ -57,9 +56,9 @@ import first, then a change touching only `tests/rulebook_limits.py` and
       points other harnesses at it within its budget.
 - [x] A fresh headless session and a subagent inside it each quote the new Rule 5
       bullet from loaded context, with no file read (2026-11-23).
-- [ ] `tests/rulebook_limits.py` counts a file an always-loaded document imports, with
+- [x] `tests/rulebook_limits.py` counts a file an always-loaded document imports, with
       a row for `docs/DESIGN-RULES.md` and a diary entry, in a change of its own.
-- [ ] Close this WP in a change after the limits change merges, since that change may
+- [x] Close this WP in a change after the limits change merges, since that change may
       touch only its two files. Merge order: this branch's PR, then the limits PR,
       whose base is this branch until then (against main it fails the raise rule).
 - [x] Skill: none; the rules govern changing the package, not driving it.
@@ -70,6 +69,13 @@ import first, then a change touching only `tests/rulebook_limits.py` and
 limits change `python -m tests.rulebook_limits` reports the new file under its budget.
 
 ## Handover log
+
+- **2026-11-23** — closed. The design rules reach every session and subagent, and their
+  size is held like the rulebooks'. #1809 merged the move and the two rulings. #1812
+  merged the limits change after its CI passed against main. It replaced #1810, closed
+  unmerged, whose single commit had picked up the wrong message in a botched amend. The
+  narrative is in the v1.13 record. Next: none. A rule that grows `DESIGN-RULES.md` now
+  pays for itself with a cut, as the rulebooks' additions do.
 
 - **2026-11-23** — handover. Every session and subagent now starts with the design rules
   in its context: why rietx exists and the five rules, which before loaded only when a
