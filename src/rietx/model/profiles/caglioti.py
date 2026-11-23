@@ -278,9 +278,16 @@ GAUSSIAN_VARIANCE_TO_FWHM_SQUARED = 8.0 * math.log(2.0)
 
 
 def gaussian_fwhm(theta_deg: np.ndarray, u: float, v: float, w: float,
-                  gauss_size: float = 0.0, gauss_strain: float = 0.0) -> np.ndarray:
+                  gauss_size: float = 0.0, gauss_strain: float = 0.0,
+                  extra_squared=None) -> np.ndarray:
     """Γ_G(θ) from the Caglioti law + sample Gaussian size/strain variances;
-    input θ (NOT 2θ) in degrees."""
+    input θ (NOT 2θ) in degrees.
+
+    ``extra_squared`` is a per-reflection term of Γ_G² (deg²) added before the
+    floor, the place a peak equation's Gaussian width enters (WP-2107): a
+    ``gauss_fwhm`` equation as its square, a ``gauss_fwhm_squared`` one as it
+    stands.  ``None`` leaves the expression as it was.
+    """
     xp = get_backend()
     th = xp.radians(theta_deg)
     t = xp.tan(th)
@@ -289,6 +296,8 @@ def gaussian_fwhm(theta_deg: np.ndarray, u: float, v: float, w: float,
     # variance floor below absorbs any −0.0 sign flip
     c = xp.cos(th)
     g2 = g2 + gauss_size / (c * c)
+    if extra_squared is not None:
+        g2 = g2 + extra_squared
     # the floor as a select, never ``maximum`` (WP-1955): at U = V = 0 with W
     # on its floor, g2 sits on the floor exactly, and a traced backend's
     # ``maximum`` gives each side of that tie half the derivative.  The

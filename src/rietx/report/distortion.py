@@ -118,7 +118,7 @@ def _largest_displacement(record, modes, amplitudes) -> float:
 
 
 def distortion_totals(table, theta, structure, values, *, stderr_internal=None,
-                      correlation=None) -> list[DistortionTotal] | None:
+                      correlation=None, discarded=None) -> list[DistortionTotal] | None:
     """One :class:`~rietx.schemas.results.DistortionTotal` per irrep block, at fit close.
 
     ``values`` is the table's decode at ``theta``.  A_τ = ‖A_B‖ (Perez-Mato,
@@ -130,6 +130,12 @@ def distortion_totals(table, theta, structure, values, *, stderr_internal=None,
     block's column is one the data cannot see (``unmeasured_rows``), where the
     block's covariance is singular (a held amplitude), or, for the esd, at
     A_τ = 0.  ``None`` when no phase carries ``distortion_modes``.
+
+    A block whose amplitudes a discarded direction touched still has an esd
+    on A_τ where c is estimable (``discarded``, WP-2230,
+    :meth:`~rietx.params.vector.ParameterTable.unmeasured_functions`); its
+    T² stays ``None``, since Cov⁻¹ of a block the data do not fully
+    determine does not exist.
     """
     out: list[DistortionTotal] = []
     any_modes = False
@@ -153,6 +159,14 @@ def distortion_totals(table, theta, structure, values, *, stderr_internal=None,
                     if t2 is not None and a_tau > 0.0:
                         c = a / a_tau
                         esd = float(math.sqrt(max(float(c @ cov @ c), 0.0)))
+                elif (a_tau > 0.0 and discarded is not None
+                      and not table.unmeasured_functions(
+                          theta, stderr_internal, rows, (a / a_tau)[None, :],
+                          correlation=correlation, discarded=discarded)[0]):
+                    c = a / a_tau
+                    cov = table.physical_covariance(theta, stderr_internal, correlation,
+                                                    paths, discarded=discarded)
+                    esd = float(math.sqrt(max(float(c @ cov @ c), 0.0)))
             if not tried:
                 # a report field never aborts the fit it describes: a record
                 # whose parent operations miss the reference structure has no
@@ -328,11 +342,14 @@ def _a_det(restricted, phase: int, modes: list[int], target: float,
     result = restricted.result_
     tt = np.asarray(result.two_theta)
     sigma = np.asarray(result.sigma)
-    y0 = np.asarray(restricted.predict(tt))
     even = _dist.amplitude_action(restricted.structure.phases[phase]).even(
         _amplitudes(restricted.structure.phases[phase]))
     lambdas, exponents = [], []
     probe = restricted._trial(record=False)
+    # the baseline from the probe too: it has not fitted, so it compiles at
+    # the default peak cut, while the fitted object compiles at its fit's
+    # (WP-2235) and every λ would gain the tails between the two
+    y0 = np.asarray(probe.predict(tt))
     for i in modes:
         path = _AMP.format(phase, i)
         probe.set_values({path: probe_amplitude})

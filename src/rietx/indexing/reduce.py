@@ -12,7 +12,7 @@ kind of number.**  gemmi's is a Le Page **obliquity in degrees**; spglib's is a
 distance **``symprec`` in Å**.  They parameterise the same question differently,
 so both are run and the tolerance is *swept* — and the reported answer is the
 highest symmetry **stable across the sweep**.  Symmetry that appears only at the
-loosest tolerance is :data:`INDEX_BRAVAIS_AMBIGUOUS`, not an answer.  The device
+loosest tolerance is ``INDEX_BRAVAIS_AMBIGUOUS``, not an answer.  The device
 is ``sequential.py``'s ``direction="both"`` and the cross-backend Jacobian matrix
 one rank up: agreement between two independent methods is the confidence, and
 disagreement is reported rather than averaged.

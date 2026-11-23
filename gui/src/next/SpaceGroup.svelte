@@ -13,6 +13,7 @@
    * Enter previews the typed symbol. Esc closes the dialog (interaction rule
    * 2), as a click on the scrim does.
    */
+  import { type Say } from "./console";
   import { api } from "../api";
   import { entryLines, noteTone, siteLines, symbolChanged } from "../lib/symmetry";
 
@@ -27,7 +28,7 @@
     phase: number;
     name: string;
     current: string;
-    say: (line: string) => void;
+    say: Say;
     onchanged: () => void;
     onclose: () => void;
   } = $props();
@@ -75,7 +76,8 @@
     error = "";
     try {
       await api.setSymmetry(phase, wanted);
-      say(`structure.phases[${phase}].space_group = "${wanted}"  # ref.edit(structure=…)`);
+      say("call", `structure.phases[${phase}].space_group = "${wanted}"  # ref.edit(structure=…)`,
+          null);
       onchanged();
       onclose();
     } catch (exc) {
