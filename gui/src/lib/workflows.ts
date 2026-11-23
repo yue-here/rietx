@@ -39,6 +39,9 @@ export interface Workflow {
   /** the graph tabs the workflow shows, when not all of them (the
    *  prototype's: peaks and indexing draws the pattern and the peak fits) */
   graphs?: readonly ("pattern" | "peaks" | "background" | "structure")[];
+  /** the model panel's opening width in px, where a step's widest table
+   *  needs more than the frame's default; measured, never chosen */
+  panel?: number;
 }
 
 export const WORKFLOWS: readonly Workflow[] = [
@@ -49,12 +52,18 @@ export const WORKFLOWS: readonly Workflow[] = [
     built: true,
     loop: "Back to Pick peaks",
     graphs: ["pattern", "peaks"],
+    // the candidate table, wide enough not to scroll (Yue, 2026-11-23): 915 px
+    // measured on fap's twelve cells at 1440 x 900, 12 px more for a "medium"
+    // grade than a "low" one, the step body's 24 px of padding and the
+    // panel's 1 px rule (WP-2240 § Handover log, fifth session)
+    panel: 952,
     steps: [
       { name: "Pick peaks", body: "Click the pattern to add a line; drag to move it.", built: true },
-      { name: "Fit peaks", body: "Each line fitted in its window, with its own esd." },
-      { name: "Index", body: "Engines, crystal systems, centrings, cell bounds, formula." },
+      { name: "Fit peaks", body: "Each line fitted in its window, with its own esd.", built: true },
+      { name: "Index", body: "Engines, crystal systems, centrings, cell bounds, formula.", built: true },
       { name: "Judge",
-        body: "Screen extinctions, check each candidate by a whole-pattern Pawley fit, then adopt one as a Le Bail start." },
+        body: "Screen extinctions, check each candidate by a whole-pattern Pawley fit, then adopt one as a Pawley start.",
+        built: true },
     ],
   },
   {
@@ -95,6 +104,15 @@ export const NOT_BUILT_MARK = "not built yet";
 
 export function workflow(id: WorkflowId): Workflow {
   return WORKFLOWS.find((w) => w.id === id)!;
+}
+
+/** The model panel's opening width for a workflow: its own where it
+ *  declares one (`Workflow.panel`), never below the frame's `fallback`, and
+ *  never leaving the graphs less than the splitter's `keep` of a `frame` that
+ *  wide (WP-2240). */
+export function panelWidth(id: WorkflowId, frame: number, fallback: number, keep: number): number {
+  const want = workflow(id).panel ?? fallback;
+  return Math.max(fallback, Math.min(want, frame - keep));
 }
 
 export function isNotBuilt(id: WorkflowId): boolean {

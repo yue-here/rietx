@@ -19,6 +19,8 @@
    * message — which no corpus can hold because it is about one row rather than
    * one name.  Those were `title=` attributes until this WP, which put them
    * out of reach of the keyboard the moment WP-1201 moved one off a `<button>`.
+   * `for` with `title` is a summary about one row that keeps the entry's
+   * manual link: the popover shows the title alone, then the link (WP-2240).
    *
    * The trigger is a `<span>` with `role="button"`, not a `<button>`: it wraps
    * running text (a table header, a field's label, a chip's words) and a real

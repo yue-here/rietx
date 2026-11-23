@@ -62,6 +62,7 @@ __all__ = [
     "DIAGNOSTIC_VIEW_OF",
     "PEAK_FLAG_HELP",
     "PEAK_ORIGIN_HELP",
+    "CELL_RELATION_HELP",
     "READER_OPTION_HELP",
     "SEARCH_FIELD_HELP",
     "RESULT_FIELD_HELP",
@@ -1729,6 +1730,42 @@ PEAK_ORIGIN_HELP: dict[str, HelpEntry] = {
             "2θ. The group was refitted from the new starting position. The position "
             "shown comes from the refit and can differ from where you put the line."
         ),
+    ),
+}
+
+#: One entry per way the GUI's candidate table relates one indexing candidate
+#: to another reported row (WP-2240): ``same_cell``, the GUI's own reading of
+#: two rows printing one cell, and each value of
+#: :attr:`~rietx.schemas.indexing.SupercellCheck.relation`.  The table writes
+#: the mark and the row it names (``≡ #1``, ``2× #1``, ``⊇ #1``), and its
+#: popover gives that row's one-line summary with this entry's manual link,
+#: where the explanation lives (the maintainer, 2026-11-23).
+_CELL_RELATIONS = "reference/indexing-evidence.html#relations-between-candidates"
+
+CELL_RELATION_HELP: dict[str, HelpEntry] = {
+    "same_cell": HelpEntry(
+        title="Same cell as another candidate",
+        description=(
+            "Written ≡ #k. This row prints candidate k's cell under another "
+            "lattice label."
+        ),
+        anchor=_CELL_RELATIONS,
+    ),
+    "sublattice": HelpEntry(
+        title="Supercell of another candidate",
+        description=(
+            "Written N× #k. One primitive cell of this lattice holds N of "
+            "candidate k's, with N from 2 to 4."
+        ),
+        anchor=_CELL_RELATIONS,
+    ),
+    "containment": HelpEntry(
+        title="Indexes every line another candidate does",
+        description=(
+            "Written ⊇ #k. This cell indexes every observed line candidate k "
+            "indexes, and predicts more lines."
+        ),
+        anchor=_CELL_RELATIONS,
     ),
 }
 
@@ -6974,6 +7011,7 @@ def help_registry() -> dict[str, object]:
         "peak_flags": {k: asdict(v) for k, v in PEAK_FLAG_HELP.items()},
         "diagnostics": {k: asdict(v) for k, v in DIAGNOSTIC_HELP.items()},
         "peak_origins": {k: asdict(v) for k, v in PEAK_ORIGIN_HELP.items()},
+        "cell_relations": {k: asdict(v) for k, v in CELL_RELATION_HELP.items()},
         "stage_fields": {k: asdict(v) for k, v in STAGE_FIELD_HELP.items()},
         "reader_options": {k: asdict(v) for k, v in READER_OPTION_HELP.items()},
         "instrument_fields": {k: asdict(v) for k, v in INSTRUMENT_FIELD_HELP.items()},
