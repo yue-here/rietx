@@ -362,10 +362,16 @@
 
   // -- the run -------------------------------------------------------------
 
+  /** the systems the shown run asked for, kept from its start, so a form
+   *  edited afterwards does not change what the coverage line says about it;
+   *  a run started before a reload falls back to the form */
+  let runAsked = $state<string[] | null>(null);
   async function startIndex() {
     failure = "";
     try {
+      const sent = [...asked];
       await api.index();
+      runAsked = sent;
       say("call", "result = rx.index_pattern(peaks, data=data, instrument=instrument)", null);
     } catch (exc) {
       failure = (exc as Error).message;
@@ -414,7 +420,7 @@
   const found = $derived(shortlists.flatMap((snap) => (snap.candidates ?? [])
     .map((c: any) => ({ cell: c.cell as number[], system: snap.system }))).reverse().slice(0, 8));
 
-  const coverage = $derived(coverageLine(answer?.result, asked));
+  const coverage = $derived(coverageLine(answer?.result, runAsked ?? asked));
   const notes = $derived<any[]>(answer?.result?.diagnostics ?? []);
   /** a run with a formula adds Z, the formula units each cell holds (WP-2030) */
   const zColumn = $derived(answer?.result?.formula != null);

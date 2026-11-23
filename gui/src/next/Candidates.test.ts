@@ -184,6 +184,22 @@ describe("the Index step", () => {
     expect(steps).toEqual([3]);
     expect(button("Index again").classList.contains("ghost")).toBe(true);
   });
+
+  it("says what the run asked for, whatever the form says after it", async () => {
+    doc = { indexing: indexing() };
+    await boot();
+    button("Index").click();
+    await settle();
+    // the form changes after the run started: tetragonal is left out now
+    button("tetragonal").click();
+    await settle();
+    answer = { ...answered, result: { ...answered.result, systems_searched: ["cubic", "hexagonal"],
+                                      search_complete: { cubic: true, hexagonal: true },
+                                      diagnostics: [] } };
+    app.ran("index");
+    await settle();
+    expect(text(document.querySelector(".coverage"))).toBe("Not searched: tetragonal.");
+  });
 });
 
 describe("the Judge step", () => {
