@@ -44,7 +44,7 @@ D32_IONS = ("Ru3+", "Ru4+", "Ru5+", "Ru6+", "Rh4+", "Tc4+", "Mo3+", "Mo4+", "Mo5
 def _reference() -> dict:
     """``{kind: {(key, order): (s array, value array)}}`` from the reference file."""
     out: dict = defaultdict(lambda: defaultdict(list))
-    with open(_REF) as fh:
+    with open(_REF, encoding="utf-8") as fh:
         for r in csv.DictReader(line for line in fh if not line.startswith("#")):
             out[r["kind"]][(r["key"], r["order"])].append((float(r["s"]), float(r["value"])))
     return {kind: {k: tuple(np.array(c) for c in zip(*v)) for k, v in rows.items()}
