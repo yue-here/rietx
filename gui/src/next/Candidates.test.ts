@@ -176,10 +176,11 @@ describe("the Index step", () => {
                 "41.3", "2", "34 of 189", "18.3 %", "low"]);
     // what the hexagonal system sets is muted: b, and every angle
     expect([...rows[0].querySelectorAll("td.fixed")].map(text)).toEqual(["9.3750", "90", "90", "120"]);
-    // a related row is marked on its own line, never merged (call 8), and
-    // its sentence is a click away
-    const rel = rows[1].querySelector("td.rel [role=button]")!;
+    // a related row is marked on its own line, never merged (call 8), with
+    // its sentence in the tooltip
+    const rel = rows[1].querySelector("td.rel")!;
     expect(text(rel)).toBe("≡ #1");
+    expect(rel.getAttribute("title")).toBe("The same cell as #1, under another lattice label.");
     expect(rows[1].querySelectorAll("td").length).toBe(15);
     expect(button("Judge ›").disabled).toBe(true);
     (rows[1] as HTMLElement).click();
@@ -239,6 +240,17 @@ describe("the Judge step", () => {
     expect(cav.map(text)).toEqual(["validation failed", "zero shift assumed"]);
     expect(text(document.querySelector(".caveats"))).toBe("validation failed, zero shift assumed");
     expect(cav.map((e) => e.classList.contains("bad"))).toEqual([true, false]);
+    // the check is named by the mode it ran: a record with none predates
+    // WP-2011's Pawley check
+    const heads = () => [...document.querySelectorAll(".steppane:not(.gone) h3")].map(text);
+    expect(heads()).toContain("Le Bail check");
+    answer = { ...answer, result: { ...answer.result, candidates: answer.result.candidates.map(
+      (c: any) => ({ ...c, lebail: { ...c.lebail, mode: "pawley" } })) } };
+    app.ran("index");
+    await settle();
+    app.judge(0);
+    await settle();
+    expect(heads()).toContain("Pawley check");
     expect(button("‹").disabled).toBe(true);
     // the extinction screen, then its classes with the gate's pick
     button("Screen extinctions").click();

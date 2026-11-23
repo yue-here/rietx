@@ -308,6 +308,8 @@ export interface Candidate {
     predicted_but_absent_uncancellable_in_window?: number | null;
     /** observed peaks no calculated line explains */
     unmatched_observed?: number;
+    /** the decomposition the check ran: "pawley" since WP-2011 */
+    mode?: "lebail" | "pawley";
   } | null;
   diagnostics: Array<{ level: string; code: string; message: string }>;
   supercell_checks?: Array<{ parent_cell: number[]; index: number; relation?: string;
@@ -551,8 +553,8 @@ const sameCell = (x: readonly number[], y: readonly number[]) =>
   && x.every((v, i) => Math.abs(v - y[i]) <= 1e-9 * Math.max(1, Math.abs(v)));
 
 /** How a candidate relates to another reported row: the compact mark its
- *  table column shows on the row's own line (`≡ #1`), and the sentence a
- *  click on the mark gives (the maintainer, 2026-11-23). */
+ *  table column shows on the row's own line (`≡ #1`), and the sentence its
+ *  tooltip gives (the maintainer, 2026-11-23). */
 export interface Relation { mark: string; text: string }
 
 /**

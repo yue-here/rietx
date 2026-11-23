@@ -20,7 +20,7 @@
    *
    * Judge (calls 10-12, 17). One candidate's evidence: its cell with esds,
    * its relation to another row, the grade and its caveats in words (a
-   * refuting one in the danger colour), the Le Bail check, every figure of
+   * refuting one in the danger colour), the Pawley check, every figure of
    * merit with its blind spot a click away, and the engines that found it.
    * Screen extinctions ranks the extinction classes by ΔBIC; a refuted class
    * stays, muted, as evidence, and "rietx's pick" marks the class the gate
@@ -518,7 +518,7 @@
             <span class="label"><Help for={searchHelp(field("validate_candidates"))}>Validation</Help></span>
             <label class="check"><input type="checkbox" disabled={busy} checked={draft.validate_candidates}
               onchange={(ev) => { draft!.validate_candidates = (ev.currentTarget as HTMLInputElement).checked;
-                                  void commit(); }} /> Check the best cells by a Le Bail fit</label>
+                                  void commit(); }} /> Check the best cells by a Pawley fit</label>
           </div>
           <div class="field">
             <span class="label"><Help for={searchHelp(field("check_top"))}>{label("check_top")}</Help></span>
@@ -601,7 +601,7 @@
         <table class="lines cands">
           <thead>
             <!-- the cell as six columns, and a row's relation to another on its own
-                 line, compact, its sentence a click away (the maintainer, 2026-11-23) -->
+                 line, compact, its sentence in a tooltip (the maintainer, 2026-11-23) -->
             <tr><th class="r">#</th><th aria-label="Relation"></th>
               {#each ["a", "b", "c", "α", "β", "γ"] as n (n)}<th class="r">{n}</th>{/each}
               <th>Lattice</th><th class="r">V</th>
@@ -616,7 +616,9 @@
               {@const rel = candidateRelation(candidates, i)}
               <tr class:sel={chosen === i} data-cand={i} onclick={() => { if (i !== chosen) judge(i); }}>
                 <td class="r num">{i + 1}</td>
-                <td class="rel num">{#if rel}<Help text={rel.text}>{rel.mark}</Help>{/if}</td>
+                <!-- the sentence rides in the tooltip: `/next` has no help opener yet,
+                     so a `<Help>` term here would answer no click -->
+                <td class="rel num" title={rel?.text}>{rel?.mark ?? ""}</td>
                 {#each cellColumns(c) as col, k (k)}
                   <td class="r num" class:fixed={col.fixed}>{col.value}{#if col.pad}<span
                     class="pad" style:width="{col.pad.length}ch"></span>{/if}</td>
@@ -689,7 +691,9 @@
           class:bad={refuting.includes(k)}>{caveat(k)}</span>{:else}<span class="muted">no caveats</span>{/each}
       </p>
 
-      <h3>Le Bail check</h3>
+      <!-- the check's own mode: a Pawley fit since WP-2011, a Le Bail one in a
+           record written before, which carries no mode (`IndexValidation.mode`) -->
+      <h3>{c.lebail && c.lebail.mode !== "pawley" ? "Le Bail" : "Pawley"} check</h3>
       {#if c.lebail}
         <dl class="kv">
           <dt>Rwp</dt><dd class="num">{(c.lebail.rwp * 100).toFixed(1)} %</dd>
@@ -698,7 +702,7 @@
           <dt>Peaks no line explains</dt><dd class="num">{c.lebail.unmatched_observed ?? "–"}</dd>
         </dl>
       {:else}
-        <p class="muted">Not checked by a Le Bail fit.</p>
+        <p class="muted">Not checked by a whole-pattern fit.</p>
       {/if}
 
       <h3>Figures of merit</h3>
