@@ -1,9 +1,8 @@
 # WP-1443 — Part 1 read by a newcomer: eleven passages, one word, and the version the manual describes
 
-Milestone: unscheduled · Status: 🔄 2026-11-16 — every task landed in #1589; closing issues #395–#407 is the maintainer's
+Milestone: unscheduled · Status: ✅ 2026-11-23 — every passage reworded in the new manual tree; PR #1589
 Track: The repo's own process
 Depends on: — (1409 is the shape)
-Priority: P3 2026-09-23 — twelve passages a newcomer stopped on; the text is wrong in words, never in a number
 
 ## Goal
 
@@ -236,6 +235,24 @@ Issues #395, #396, #397, #398, #399, #400, #401, #402, #403, #404, #406,
 WP-1435 (`hold`), `docs/RELEASING.md`, `docs/releases/1.5.1.md`.
 
 ## Handover log
+
+- **2026-11-23** — closed. PR #1589 merged today (merge `a2f1398ab`), so a
+  newcomer reading the manual in order now meets no passage of the twelve they
+  reported. Every task above was checked against the merged tree. The symptom
+  table is `concepts/report.md` § Where to read about a symptom. "Histogram" is
+  defined in `guides/joint.md`. Outside Theory, "shipped" survives only in an
+  HTML comment in `switching/gsas2.md`, as the entry below says.
+  - *Glossary*: the review of #1589 records the 2026-11-16 open question as
+    settled the way the PR has it. "Histogram" and "glob" are defined at first
+    use, and the manual keeps no word glossary.
+  - *Owed*: the twelve issues (#395–#404, #406, #407) are still open. Each
+    takes a one-line close naming #1589 and the commit that answered it:
+    `b22d50d4a` for #395, #397, #398 and #399; `d61c522ee` for #400 and
+    #403; `d5060a4f0` for #406; `f26642a6d` for #407. #396, #401, #402 and
+    #404 were answered by the manual rebuild (WP-1978) before this branch, so
+    their close names that. A close is a public act, so it waits for the
+    maintainer's batch.
+  - *Next*: none on this WP. The narrative is in `milestones/v1.13.md`.
 
 - **2026-11-16** — every passage the newcomer stopped on now reads plainly in
   the manual a reader actually gets, the new tree in `docs/docs/`, not the
