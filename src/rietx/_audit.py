@@ -6,7 +6,9 @@ its own: (1) physics or arithmetic; (2) established practice, a citation that
 tested it or the same choice made *by default* in an established Rietveld
 program (the seven rietx-bench runs: GSAS-II, FullProf, TOPAS, RIETAN-FP,
 BGMN, MAUD, EasyDiffraction), whatever the other six do; (3) rietx's own, kept only on the record's two grounds with a
-dated approval (CONTRIBUTING.md § A heuristic needs its tier names who gives it).  ``invariant`` is the record's answer-invariant
+dated approval: the maintainer's on a code, action or default row, the
+``generality-review`` judge's agreement on a constant or suggestion row
+(``approved_by``, ruled 2026-11-22 in WP-2238; CONTRIBUTING.md § A heuristic needs its tier).  ``invariant`` is the record's answer-invariant
 class.  ``caller`` is no evidence grade: it marks a row where the package
 decided nothing for the caller, since DESIGN.md § Rules, 1 governs what the
 package decides alone.  Both must hold: the caller asked for it by name (a flag
@@ -95,6 +97,7 @@ from typing import Literal
 Kind = Literal["code", "action", "constant", "default", "suggestion"]
 Tier = Literal[1, 2, 3, "invariant", "caller", "unaudited"]
 Ambiguity = Literal[1, 2, 3]
+Approver = Literal["maintainer", "checked"]
 Response = Literal["error", "warning", "info"]
 
 KINDS: tuple[str, ...] = Kind.__args__
@@ -107,7 +110,10 @@ _STATES_AMBIGUITY = ("code", "action", "default")
 @dataclasses.dataclass(frozen=True)
 class Row:
     """One heuristic.  ``grounds`` and ``approved`` are required on a tier-3
-    row and on a tier-2 action row; ``ambiguity`` is DESIGN.md § Rules, 1's
+    row and on a tier-2 action row, and ``approved_by`` says whose approval
+    the date is: ``"checked"`` (the ``generality-review`` judge agreed) is
+    allowed on a tier-3 constant or suggestion row only, and the field is
+    read only where ``approved`` is set; ``ambiguity`` is DESIGN.md § Rules, 1's
     kind, required on an audited code, action or default row (DESIGN.md
     § Rules, 4 asks a new default or action for it) and allowed on a
     suggestion row.  ``response``, ``responds`` and ``scope`` are a code
@@ -125,6 +131,7 @@ class Row:
     response: Response | None = None
     responds: str = ""
     scope: tuple[str, ...] = ()
+    approved_by: Approver = "maintainer"
 
 
 _PACKAGE = pathlib.Path(__file__).resolve().parent
@@ -1297,7 +1304,12 @@ ROWS: tuple[Row, ...] = (
                   "it warns rather than converts. Fires exactly where a degree-valued peak "
                   "equation's coefficient is one column across patterns declaring two or more "
                   "wavelengths (multi._peak_equation_sharing_diagnostics; maintainer's ruling "
-                  "of 2026-11-20, option a, WP-2107)"),
+                  "of 2026-11-20, option a, WP-2107), unless the expression reads "
+                  "wavelength, which states the term's lambda dependence as a parametric "
+                  "equation states a driven coefficient's (WP-2152, settled by Claude under "
+                  "the maintainer's 'your call', 2026-11-22). The parametric silence is per "
+                  "coefficient and this one per equation, so a degree-valued size term or "
+                  "constant in that same expression goes unwarned"),
         response="warning",
         responds=("do not quote the named equation's coefficients as one size or width "
                   "for every pattern; unshare a wavelength-dependent term's coefficient with "
@@ -2122,6 +2134,29 @@ ROWS: tuple[Row, ...] = (
                   "5x-median-and-3-sigma threshold. The summary prints one line naming the "
                   "largest and the field (2003-batch/batch.md, C4, settled by Claude "
                   "2026-10-26; its row written with C6's, ruled by the maintainer 2026-11-03)")),
+    Row("rietx.schemas.sequential.SeriesEntry.held_values", "action", tier=3, ambiguity=1,
+        evidence=("records the value each caller-held path had on the kept fit "
+                  "(sequential.py _held_values); the action is that a cold rung and a "
+                  "verify_steps refit (and the cold successor of an on_error='skip' "
+                  "failure) hold the value a warm rung would, the last accepted pattern's "
+                  "carry source (the pattern's own fit on a verify refit), limited by carry, "
+                  "where they held the caller's start before (sequential.py "
+                  "_keep_held_values). No program surveyed restarts a pattern from the "
+                  "initial models, so the question is rietx's alone; GSAS-II, FullProf, "
+                  "TOPAS and EasyDiffraction keep a fixed parameter fixed on every pattern "
+                  "(docs/practice.md § Sequential refinement). One family, the synthetic "
+                  "LaB6 thermal ramp of tests/test_sequential.py, frame 2 forced cold: zero "
+                  "shift 0.00797 on every frame and the cell 1.9-2.0 ppm from the truth, "
+                  "against 0.0 and 546 ppm off before (2081-batch/measure_cold_rung.py); a "
+                  "cold rung under a hold is rare, and no real series with one is on disk"),
+        grounds=("Series rule 6, accepted by the maintainer 2026-11-16: a retry does not "
+                 "change what value a fixed parameter has. His approval on 2026-11-18 of "
+                 "the milestone's acceptance row 'a fixed value stays fixed' names this "
+                 "fixture and value: 0.00797 on every pattern and every attempt "
+                 "(docs/milestones/series.md § Acceptance). The source, the warm rung's "
+                 "own, settled by Claude 2026-11-22 as WP-2081 question 4's option A and "
+                 "approved by the maintainer with PR #1778 on 2026-11-22."),
+        approved="2026-11-22"),
     Row("rietx.schemas.sequential.SeriesEntry.rungs_tried", "action"),
     Row("rietx.schemas.sequential.SeriesEntry.rungs_raised", "action"),
     Row("rietx.schemas.sequential.SeriesEntry.seeded_from", "action", tier=3, ambiguity=1,
@@ -5151,7 +5186,8 @@ ROWS: tuple[Row, ...] = (
         grounds=("B11 (ruled 2026-10-19): repeat until the intensities stop changing, with a cap, "
                  "judged against the true structure.  The number, FAP as its failing case and "
                  "LaMnO3's 150x cost were settled by Claude under the maintainer's delegation "
-                 "of 2026-11-05, and the date is that settlement's.  No "
+                 "of 2026-11-05, and the date is that settlement's, which he counted as his "
+                 "approval on 2026-11-22 (WP-2238).  No "
                  "surveyed program stops on the intensities at a fixed model, because each "
                  "extracts inside the solve (docs/practice.md); 1e-8 leaves FAP at 0.55 and "
                  "more than doubles LaMnO3's cycles."),
@@ -5487,15 +5523,23 @@ ROWS: tuple[Row, ...] = (
                   "(docs/practice.md): none defaults to Le Bail; FullProf, RIETAN-FP and TOPAS "
                   "make the user state it. GSAS-II fits each histogram of a series by RefineCore, "
                   "the single fit's solver (docs/practice.md § Sequential refinement, checked)")),
-    Row("rietx.sequential.SequentialRefinement.fit:plan", "default", tier=3, ambiguity=1,
+    Row("rietx.sequential.SequentialRefinement.fit:plan", "default", tier=3, ambiguity=3,
         value="mccusker_default",
         evidence=("the first pattern's plan and, collapsed, every warm refit's; the same "
                   "value as Refinement.fit:plan, whose row carries the evidence (McCusker et "
-                  "al. 1999, the order only; no program ships a default plan)"),
-        grounds=("B7's approval of the single fit's default plan (ruled 2026-10-19), "
-                 "extended to the series seat by the maintainer 2026-11-03 "
-                 "(2003-batch/batch.md, C9 q3)."),
-        approved="2026-11-03"),
+                  "al. 1999, the order only; no program ships a default plan). WP-2081 "
+                  "measured the alternatives: held setups carry frame 0's calibration "
+                  "error to every frame, outside every esd (synthetic LaB6, -1.83 ppm), and "
+                  "on the CuCr2O4 ramp holding every width put the transition near 60 K, "
+                  "230 K or nowhere, where this default closes it between 111 and 123 K"),
+        grounds=("the maintainer kept today's default on 2026-11-16 (docs/milestones/"
+                 "series.md § Ruled after the open; WP-2081 question 1, option a). The "
+                 "traditional sequential, which calibrates the instrument and holds it "
+                 "through the series, is a named dissent (WP-2081 § How a human expert "
+                 "runs a series), so the unanimity gate fails; whether the setup held "
+                 "still is a fact outside the pattern (series rule 4). Tier 3 with the "
+                 "plan kept, ruled 2026-11-22."),
+        approved="2026-11-22"),
     Row("rietx.sequential.SequentialRefinement.fit:refit", "default", value="single"),
     Row("rietx.sequential.SequentialRefinement.fit:two_theta_limits", "default", tier=2,
         ambiguity=1, value=None,
@@ -5589,7 +5633,8 @@ ROWS: tuple[Row, ...] = (
         value="carry",
         evidence=("consulted only once every rung of a pattern raised (sequential.py _chain): "
                   "'carry' records a SeriesFailure with SERIES_PATTERN_FAILED and warm-starts "
-                  "the successor from the last accepted pattern, 'skip' starts it cold, "
+                  "the successor from the last accepted pattern, 'skip' starts it cold "
+                  "(a held path keeping the last accepted value, WP-2081), "
                   "'raise' ends the chain keeping what completed; no case on disk outside "
                   "injected raises; GSAS-II and MAUD stop the chain, EasyDiffraction carries "
                   "on (docs/practice.md § Sequential refinement, checked)"),
