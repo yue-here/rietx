@@ -1,8 +1,7 @@
 # WP-2242 — a panel forgets the last project when another opens in the same window
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-23 — claimed by @yue-here (ghostshift runner)
+Milestone: gui-overhaul · Status: ✅ 2026-11-23 — every per-project panel on both pages is keyed on an open count; the Report undo cannot cross projects; PR #1793
 Depends on: —
-Priority: P2 2026-11-22 — Run, Apply and Undo can act on the last project's state in the new one, and nothing says so; a page reload is the workaround nobody knows to use
 
 ## Goal
 
@@ -94,9 +93,9 @@ The tier of each rule this WP adds: none. It adds no flag, threshold or automati
 - [x] Decide per item whether today's page earns the fix before the swap (WP-2214).
   `applied`'s Undo does: it moves the working state.
 - [x] Vitest: open two projects with equal head ids and assert each panel reloads.
-- [ ] A browser check per page: open A, open B with the same node count, and read each
+- [x] A browser check per page: open A, open B with the same node count, and read each
   panel. Run every `tests/*_browser.py` the change touches.
-- [ ] Skill: none. The GUI is a human surface.
+- [x] Skill: none. The GUI is a human surface.
 
 ## Acceptance
 
@@ -106,6 +105,79 @@ npm --prefix gui test && npm --prefix gui run check
 ```
 
 ## Handover log
+
+- **2026-11-23** — closed. Opening another project in the same window now shows that
+  project in every panel, on both pages, even when the two projects' histories are the same
+  length. Before, a panel that waited for the history head to change kept the last project's
+  numbers, and the Report tab could undo a suggestion by checking out a node from the last
+  project's history in the new one. Each page now counts the projects it has opened, and
+  every panel whose contents belong to the project is rebuilt when that count moves. The
+  next project's fit is read before any panel is rebuilt, so none shows the last project's
+  fit, even for a moment. A reload was the workaround before. PR #1793.
+
+  *Decision (task 1): rebuild the panels, rather than hand each one the count to reload
+  on.* Settled by Claude under the WP's own task 1, which names both, and the class rule
+  ("fix the class"). Rebuilding reaches state nobody listed (a selection index, a camera, a
+  slider range, a Series `loaded` flag) with no per-panel edit for a future panel to
+  forget; the runner-up needs about eighteen. Each page counts opens (`opens`, bumped in the
+  one function every opener lands in: `App.svelte:adopt` and `Frame.svelte:opened`), after
+  `leaveEdits` has kept the pending edits. `{#key opens}` wraps today's Background graph
+  and all ten side tabs (Plan's own key folded in), and at `/next` the graph pane, the
+  Indexing, Parameters, Interactive, Plan and Text panes, and History (two `{#key
+  project.path}` replaced, since a reset example keeps its path). Left mounted on purpose:
+  today's Plot, for its view knobs (scale, residual, hidden layers), which the open asks
+  to redraw through `plotKey`; Model, mounted once by WP-1205's rule, which now reloads on
+  `opens` rather than the path; the Console and the action bar.
+
+  *Done.* Resets beside the keyed panels. Today's page clears `applied` (so the Report's
+  undo node never reaches another project's checkout), `indexSnapshots`, `protocolError`,
+  the zoom, the hovered peak, the curves the sliders measure from, and the pending counts
+  and preview the keyed panels hand up. `/next` clears the same mirrors (pending counts,
+  holds, slider values and previews, the Text preview), `protocolError`, `baseCurves` and
+  the status readout. Both pages read the fit (today's also the peak list) before
+  publishing the project, so the keyed panels mount on the next project's in one flush.
+  Task 3: every item on today's page took the fix, since keying cost the same there as at
+  `/next`. `lib/stream.ts`'s `follow()` comment now says a reconnect sends `Last-Event-ID`.
+  The rule ("a panel whose state is the project's sits inside `{#key opens}`") went into
+  gui/CLAUDE.md and came out again: that file sits at its byte budget
+  (`tests.rulebook_limits`), and the vitest tour below is the check that keeps it, failing
+  on a panel that reads its routes once and keys on `head`.
+
+  *Review* (`/code-review high --fix`, eight findings). Six fixed: Model kept its chosen
+  phase index across an open, and a two-phase project's second phase then read past a
+  one-phase project's last (reset on `forget`, clamped on load); `adopt` clears `applied`
+  and the peak list outright, in place of a count tag on `applied`; the browser check waits
+  for the project's own name in the Text buffer; two comments. Two the reviewer left as
+  decisions, both fixed here by one change: the keyed panels mounted on the last project's
+  fit for one round trip (today's Report offered its diagnostics with live Apply buttons),
+  and `/next`'s Pattern graph fetched the curves twice per open. Reading the fit before
+  publishing the project fixed both (gui/CLAUDE.md's "two assignments either side of an
+  await are two flushes"); the `/next` vitest pins one curves request per open.
+
+  *Not generalised.* The server keeps no project identity of its own: a checkout carries no
+  token naming the project it was meant for, so a third client page would need the same
+  care. `tree_id` cannot serve, being the data's fingerprint, which two projects on one
+  pattern share; a session counter on the wire was dropped as a wire change for a case
+  the client now closes. A response from a panel the rebuild destroyed that lands after the
+  open is not guarded; an open waits on `leaveEdits`, the open request and the fit, and
+  none was seen.
+
+  *Measured* (`[dev]` + playwright 1.65.2, darwin/arm64, worktree venv, load average about
+  2, no other suite running). vitest 986 passed in 60 files (981 in 59 on `main`; +5 cases,
+  +1 file), svelte-check 487 files 0 errors. The five new vitest cases fail on `main`'s
+  pages (`/api/params 1 of 3` and `1 of 4` short; curves `1` against `2`; "applied
+  refine_cell" still shown). GUI browser files, run inside the fast selection on the final dist, all passed: test_gui_browser 4, test_gui_console_browser 1, test_gui_layout_browser 51, test_gui_peaks_browser 2, test_gui_recovery_browser 5, test_gui_switch_browser 2 (new), 65 in all; the same 65 passed alone before the review fixes.
+  `tests/test_gui_switch_browser.py`'s two rows fail on `main`'s dist (timed out waiting for
+  b's cell, 30 s). Fast selection, through ghostshift's `serial.py`, alone on the machine: 15359 passed, 438 skipped, 32 xfailed, 8:14 wall. This branch adds two pytest rows, both in the new browser file; `main` moved since WP-2237's count, so the delta is stated, not subtracted. Added-test cost (`tests.added_test_times`, this run): 4.08 s and 1.73 s, 5.81 s for the file, each a real chromium page; it skips in CI with every browser file.
+
+  *Gotchas.* In a worktree-isolated runner, a Bash command whose text mentions a git verb
+  in prose (a heredoc holding "checkout", or the word in a test name) is refused as git;
+  write the text to the scratch directory and apply it with a script. A Parameters number
+  is drawn in several spans, so `inner_text()` returns `4\n.\n1`; read `text_content()`.
+
+  Next: none on this WP. PR #1792 (WP-2240) edits `next/Frame.svelte` and
+  `next/Pattern.svelte` and rebuilds the dist, so whichever of #1792 and #1793 merges
+  second merges `main` and rebuilds.
 
 - **2026-11-22** — filed by WP-2237's handover from its sibling survey (one read-only
   agent, two of its claims re-checked at the line: `Report.svelte`'s reload reads `head`
