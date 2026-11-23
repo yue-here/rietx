@@ -130,6 +130,9 @@ package. `src/rietx/_audit.py` is untouched.
   served as tick indices, lattice relations between candidates computed in rietx, an overrule
   that remembers which flags a person overruled (a `peaks.json` format change), and keeping the
   indexing result across a restart (a stored-format change).
+- From WP-2244 (2026-11-23): `/next` now mounts the help popover (`gui/src/HelpPopover.svelte`),
+  so a `<Help>` term there opens its explanation. The relation marks' sentence, written as
+  `title=` because no popover existed, can now be a `<Help text=…>`.
 
 ## Rulings
 
