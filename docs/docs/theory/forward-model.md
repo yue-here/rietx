@@ -153,7 +153,10 @@ the ridge's and not the data's.
 
 A peak equation adds a term written by the user to reflection $k$ of phase $p$
 at emission line $l$, evaluated at that reflection's indices, multiplicity,
-d-spacing and Bragg angle {cite}`stinton2007`. With $g$, $q$, $\ell$, $s$ and
+d-spacing and Bragg angle {cite}`stinton2007`, and at the line's wavelength
+$\lambda_l = 2d\sin\theta$. A size term written as $y\lambda_l/\cos\theta$ is
+then Scherrer's {eq}`ms-scherrer` at every line and every wavelength with one
+$y$. With $g$, $q$, $\ell$, $s$ and
 $f$ the values of the `gauss_fwhm`, `gauss_fwhm_squared`, `lor_fwhm`, `shift`
 and `intensity_factor` equations, each zero (or one, for $f$) where it is not
 declared, the reflection's widths, position and intensity become
