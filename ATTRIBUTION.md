@@ -543,9 +543,10 @@ each with its licence text beside it.
     Spectra*, University of California Press, 1981, doi:10.1525/9780520906150), whose
     distribution terms say it "may be freely distributed gratis" and "may not be
     sold": Hartree-Fock (Hund's-rule term or configuration average) for the 3d and 4d
-    tails and the neutral Mo, Tc, Ru, Rh tables; Hartree-Fock-relativistic,
-    configuration average (IREL = 1, CORRF = 1, Kobayashi, Nagao & Ito's footing,
-    *Acta Cryst.* A **67**, 473-480, 2011, doi:10.1107/S010876731102633X) for the ten
+    tails and the neutral Mo, Tc, Ru, Rh tables; Hartree-Fock-relativistic (HFR, the
+    method Kobayashi, Nagao & Ito used for the 5d ions, *Acta Cryst.* A **67**,
+    473-480, 2011, doi:10.1107/S010876731102633X), configuration average (IREL = 1,
+    CORRF = 1), for the ten
     high-charge 4d tables Ru³⁺-Ru⁶⁺, Rh⁴⁺, Tc⁴⁺, Mo³⁺-Mo⁵⁺, Nb⁴⁺;
   - **GRASP2018** (MIT licence; Froese Fischer, Gaigalas, Jönsson & Bieroń, *Comput.
     Phys. Commun.* **237**, 184-187, 2019, doi:10.1016/j.cpc.2018.10.032), Dirac-Fock,

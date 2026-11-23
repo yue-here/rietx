@@ -130,7 +130,8 @@ and check it.  Two kinds of block, both ⟨jₙ⟩ on s = 0.01 Å⁻¹ steps to
 
 * **tables**, s = 0-6, which serve an ion on their own (:data:`_TABLE_KEY`):
   the ten high-charge 4d ions Ru³⁺-Ru⁶⁺, Rh⁴⁺, Tc⁴⁺, Mo³⁺-Mo⁵⁺, Nb⁴⁺ (Cowan
-  HFR, configuration average, the footing of Kobayashi, Nagao & Ito 2011);
+  HFR, the method of Kobayashi, Nagao & Ito 2011, on the configuration
+  average);
   the neutral Mo, Tc, Ru and Rh atoms; Pr³⁺ and Pu³⁺ (GRASP2018 Dirac-Fock).
   They carry ⟨j₄⟩ too, which nothing here evaluates.
 * **tails**, from the end of Brown's fitted range to s = 6, one per Brown
@@ -186,7 +187,7 @@ References
   *Comput. Phys. Commun.* **237**, 184-187 — GRASP2018, the code of the
   4f/5f curves.
 * Kobayashi, K., Nagao, T. & Ito, M. (2011). *Acta Cryst.* A **67**, 473-480
-  — the HFR configuration-average footing of the high-charge 4d tables.
+  — HFR, the method of the high-charge 4d tables.
 * Halpern, O. & Johnson, M. H. (1939). *Phys. Rev.* **55**, 898 — magnetic
   neutron scattering by an atom with a magnetization density.
 * Rodríguez-Carvajal, J. (1993). *Physica B* **192**, 55 — FullProf; the

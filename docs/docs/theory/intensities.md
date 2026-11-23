@@ -483,9 +483,9 @@ The weight $w$ has zero first and second derivatives at both ends, so the
 curve stays smooth as a refined cell moves a reflection across the join. Some
 ions are served from a computed curve over the whole range instead: the
 high-charge 4d ions Ru$^{3+}$-Ru$^{6+}$, Rh$^{4+}$, Tc$^{4+}$,
-Mo$^{3+}$-Mo$^{5+}$ and Nb$^{4+}$ (Cowan's relativistic Hartree-Fock,
-configuration average, the footing Kobayashi, Nagao and Ito used for the 5d
-ions {cite}`cowan1981,kobayashi2011`); the neutral Mo, Tc, Ru and Rh atoms,
+Mo$^{3+}$-Mo$^{5+}$ and Nb$^{4+}$ (Cowan's relativistic Hartree-Fock, the
+method Kobayashi, Nagao and Ito used for the 5d ions, here on the
+configuration average {cite}`cowan1981,kobayashi2011`); the neutral Mo, Tc, Ru and Rh atoms,
 since Brown's rows under those labels are singly charged ions' curves; and
 Pr$^{3+}$ and Pu$^{3+}$ (Dirac-Fock, GRASP2018 {cite}`froesefischer2019`).
 Brown carries no Pr row, and the older Pr$^{3+}$ fit {cite}`lisher1971` is on a
