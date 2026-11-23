@@ -2834,6 +2834,85 @@ def test_a_real_run_streams_its_events_to_disk_and_to_followers(fitted):
     assert [e["seq"] for e in later] == [s for s in seqs if s > half]
 
 
+def test_a_cursor_held_across_an_open_reads_the_new_projects_events(
+        blank, tmp_path, pattern_file):
+    """WP-2237: a page follows once, at mount, and keeps its cursor across an open.
+
+    Opening another project used to reset ``seq`` to 0, so the new project's
+    events up to the old count fell below the page's cursor: the poll returned
+    nothing for them and the SSE loop, which holds its own ``since``, did not
+    wake. ``oldest`` sat below the cursor, so no gap was counted either.
+    """
+    session, client = blank
+    stage = {"kind": "stage", "stage": {"name": "s", "turn_on": ["phases.*.scale"]}}
+    _open(session, tmp_path / "a.rex", pattern_file)
+    assert client.post("/api/run", stage)[0] == 200
+    _wait_idle(client)
+    cursor = client.get("/api/events?poll=1&since=0")[1]["next"]
+    assert cursor > 0
+
+    _open(session, tmp_path / "b.rex", pattern_file)
+    empty = client.get(f"/api/events?poll=1&since={cursor}")[1]
+    # the old project's events are gone, and nothing reads as a gap
+    assert empty["events"] == [] and empty["next"] == cursor
+    assert empty["oldest"] == cursor + 1
+
+    assert client.post("/api/run", stage)[0] == 200
+    _wait_idle(client)
+    batch = client.get(f"/api/events?poll=1&since={cursor}")[1]
+    seqs = [e["seq"] for e in batch["events"]]
+    kinds = [e["kind"] for e in batch["events"]]
+    assert seqs and seqs[0] == cursor + 1 and seqs == sorted(seqs)
+    assert batch["oldest"] == cursor + 1, "a fresh project's run is no gap"
+    assert kinds[0] == "stage_start" and kinds[-1] == "stage_end"
+    # the SSE route's loop reads the same cursor through ``follow``
+    events, nxt, _, _ = session.follow(cursor, "", timeout=0)
+    assert [e["seq"] for e in events] == seqs and nxt == seqs[-1]
+
+
+def _first_sse_event(port: int, path: str, headers: dict) -> dict:
+    conn = HTTPConnection("127.0.0.1", port, timeout=10)
+    conn.request("GET", path, headers={"Host": f"127.0.0.1:{port}", **headers})
+    response = conn.getresponse()
+    name = ""
+    try:
+        assert response.status == 200, response.read()[:300]
+        while True:
+            line = response.fp.readline().decode()
+            if not line:
+                raise AssertionError("the stream closed before an event frame")
+            if line.startswith("event: "):
+                name = line[7:].strip()
+            elif line.startswith("data: ") and name == "event":
+                return json.loads(line[6:])
+    finally:
+        conn.close()
+
+
+def test_a_reconnecting_stream_resumes_at_its_last_event_id(blank, tmp_path,
+                                                           pattern_file):
+    """WP-2237: EventSource re-opens its first URL and names the last id it read.
+
+    The URL's ``since`` is the cursor the page held when the stream opened, so
+    a server reading the URL alone replayed the whole ring after a dropped
+    connection, and the Console listed the run twice.
+    """
+    session, client = blank
+    _open(session, tmp_path / "a.rex", pattern_file)
+    assert client.post("/api/run", {"kind": "stage", "stage": {
+        "name": "s", "turn_on": ["phases.*.scale"]}})[0] == 200
+    _wait_idle(client)
+    n = client.get("/api/events?poll=1&since=0")[1]["next"]
+    assert n >= 2
+    port = client.port
+    got = _first_sse_event(port, "/api/events?since=0", {"Last-Event-ID": str(n - 1)})
+    assert got["seq"] == n
+    # an id this process never numbered is another server's, so the URL stands
+    got = _first_sse_event(port, "/api/events?since=0", {"Last-Event-ID": str(n + 50)})
+    assert got["seq"] == 1
+    assert _first_sse_event(port, "/api/events?since=0", {})["seq"] == 1
+
+
 def test_the_watcher_finds_a_gui_project_run_and_tails_it(fitted):
     """WP-1401's reader, now reading WP-1403's writer.
 
