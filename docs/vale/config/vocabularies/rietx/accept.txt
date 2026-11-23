@@ -3,6 +3,8 @@ Abramowitz
 [aA]bsorbers
 [aA]cridine
 [aA]ctinide
+[aA]ctinide
+[aA]ctinides
 [aA]dditively
 ADP
 ADPs
@@ -15,6 +17,7 @@ Altomare
 [aA]ntisite
 [aA]ragonite
 [aA]romaticity
+[aA]spherical
 [aA]symptote
 [aA]ttenuator
 [aA]utodiff
@@ -78,6 +81,7 @@ Conograph
 [cC]ontravariant
 [cC]onvolved
 [cC]oset
+[cC]ovalency
 [cC]ovariances
 Cracknell
 [cC]ryostat
@@ -180,6 +184,7 @@ Kissel
 [kK]lassengleiche
 Kleeberg
 Klyne
+Kobayashi
 Kovalev
 Landé
 Langford
@@ -226,6 +231,7 @@ Maxwellian
 [mM]ultimodal
 [mM]ultiplet
 [mM]ultiplets
+Nagao
 [nN]anocrystalline
 Negro
 NiAsS

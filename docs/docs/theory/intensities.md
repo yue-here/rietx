@@ -496,7 +496,7 @@ $1.5\times10^{-6}$ between the points. They are computed for rietx and not
 peer-reviewed, and `approximation_name` says so wherever one is in force.
 Past $s = 6$ Å$^{-1}$ every row is refused.
 
-**A free-ion curve is not a crystal's form factor at high $s$.** Beyond about
+A free-ion curve is not a crystal's form factor at high $s$. Beyond about
 $s = 1.2$ Å$^{-1}$ the two part company, for every row, published or computed:
 
 - covalency spreads the magnetisation density onto the ligands; even a crude
@@ -507,7 +507,7 @@ $s = 1.2$ Å$^{-1}$ the two part company, for every row, published or computed:
   $\langle j_0\rangle$ itself beyond $s \approx 0.3$-$0.8$ Å$^{-1}$ (5.5 times at
   $s = 0.8$ for Ni$^{2+}$); only high-spin $d^5$ has no such term
   {cite}`brown2004`;
-- no measured magnetic form factor we know of reaches past
+- no published measurement of a magnetic form factor found for this manual reaches past
   $s = 1.157$ Å$^{-1}$ (iron metal {cite}`shull1962`).
 
 So the curves are numerically right to $s = 6$, but a moment that leans on

@@ -417,3 +417,10 @@ Dal
 Negro
 Ungaretti
 ZrBeSi
+# Magnetic form factors computed for rietx (#1691): the theory page cites them.
+actinide
+actinides
+aspherical
+covalency
+Kobayashi
+Nagao

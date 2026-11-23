@@ -153,7 +153,7 @@ The components are written back from those at the end of each stage and carry no
 The neutron scattering length is keyed by nuclide and the form factor by oxidation state.
 An ion the table does not carry is refused by name rather than mapped to a neighbour.
 A bare element symbol is the neutral atom: `"Ru"` is neutral Ru, not Ru<sup>+</sup>, and bare `"Pd"` is refused, because neutral Pd carries no moment; write `"Pd1+"` for Pd<sup>+</sup>.
-The table serves every row on s = sinθ/λ ≤ 6 Å<sup>-1</sup> and refuses a reflection past it at the stage compile (the rows, their footing and the free-ion caveat are in {eq}`int-ff-tail`'s section of the theory page).
+The table serves every row on s = sinθ/λ ≤ 6 Å<sup>−1</sup> and refuses a reflection past it at the stage compile (the rows, their footing and the free-ion caveat are in {eq}`int-ff-tail`'s section of the theory page).
 Leave `Moment.g` as `None` for a 3d or 4d ion, where the spin-only g = 2 makes the ⟨j<sub>2</sub>⟩ term of the dipole approximation vanish.
 Set it for a 4f or 5f ion, where that term does not vanish: an absent g there is refused, because a default would drop a term worth tens of per cent at high angle.
 
