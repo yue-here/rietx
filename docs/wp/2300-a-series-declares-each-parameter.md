@@ -2,7 +2,7 @@
 
 Milestone: series · Status: ⬜
 Depends on: —
-Priority: P3 2026-11-22 — a feature the series milestone was opened for (P2), down a rung: its first task is the maintainer's ruling on the declaration's vocabulary; back to P2 when ruled
+Priority: P2 2026-11-23 — a feature the series milestone was opened for; the vocabulary and names are ruled, so it is ready to build
 
 ## Goal
 
@@ -70,9 +70,32 @@ reversal:
   any shape. Series rule 2 names it as the observation that reopens the two-call ruling, and
   DESIGN Rule 4 does not reach it, since the call can honour what was written.
 
-**Open for the maintainer: the names.** The object, the argument that takes it, and the four
-fields are on the top-level API, where the field has no standard term. A session does not pick
-them. The refusal's message is reader output, so it is checked blind in the PR.
+**The names** (chosen 2026-11-23 against DESIGN Rules 4 and 5, at the maintainer's request:
+"check against our rules and choose the best option"):
+
+```python
+rx.refine_multi(patterns, s, insts,
+                declare=rx.Declaration(per_pattern=["phases.*.scale"],
+                                       shared=["phases.0.cell.*"],
+                                       held=["instrument.*"],
+                                       parametric=[rx.ParametricEquation(...)]))
+```
+
+- `shared` and `parametric` keep the joint call's words for the same jobs (Rule 5, convention):
+  `SharingMap.shared`, and `refine_multi(parametric=...)`. "Parametric" is also the
+  literature's word (Stinton & Evans 2007). The literature's term for a shared parameter is
+  "global", which Python reserves, and TOPAS's `local` is one program's keyword (Rule 5,
+  conflicts).
+- `per_pattern` replaces `per_histogram`. "Histogram" is GSAS's word, and both calls take
+  `PatternData`. The joint call's `hist.` dot-path scope keeps its name: renaming it would
+  change a stored format.
+- `held`, not `fixed`: the kind is built on the hold (WP-1435), and its record already says
+  held (`Entry.held`, `SeriesEntry.held_values`, `held_because`). A field named `fixed` would
+  read as `vary=False`, which a plan overrides. That is the likeliest misuse (Rule 4), and
+  this WP inherits it.
+- `Declaration` and `declare=`: no existing name covers four kinds, and `SharingMap` would
+  call a held parameter and an equation shared. Series rule 1's accepted text says each
+  parameter "is declared", and no public name uses the word.
 
 **Practice** (`docs/practice.md` § Sequential refinement). GSAS-II, FullProf, TOPAS and
 EasyDiffraction keep the fixed flag on the parameter and honour it on every pattern of a
@@ -118,7 +141,7 @@ hold); WP-1441 (`constrain`).
 
 - [x] The maintainer's ruling on the vocabulary's shape (§ Context, "Ruled"), recorded with
       his words.
-- [ ] The maintainer's names for the object, its argument and its four fields.
+- [x] The names for the object, its argument and its four fields (§ Context, "The names").
 - [ ] The joint call takes the object in place of `SharingMap`.
 - [ ] The declaration on `SequentialRefinement.fit` and `refine_sequential`: per pattern
       (the default) and fixed, the fixed kind held on every pattern and every rung.
@@ -165,3 +188,11 @@ hold); WP-1441 (`constrain`).
   does. Facts checked on `bacb7d58b`.
 
   *Next:* the maintainer's names, then the build.
+
+- **2026-11-23** — names chosen at the maintainer's request, against DESIGN Rules 4 and 5:
+  `rx.Declaration(per_pattern=, shared=, held=, parametric=)`, taken as `declare=` by both
+  calls. Grounds in § Context. The alternative weighed was `rx.Sharing(..., shared=,
+  parametric=)` under `sharing=`, the smaller rename for joint-fit users; it names two of the
+  four kinds wrongly.
+
+  *Next:* the build (the tasks below the names).
