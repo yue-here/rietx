@@ -1,6 +1,6 @@
 # WP-2240 — the peaks-and-indexing workflow at `/next`: pick peaks, fit peaks, index, judge
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-23 — tasks 1-5 merged (#1788, #1791); tasks 6-9 claimed by a ghostshift runner
+Milestone: gui-overhaul · Status: 🔄 2026-11-23 — tasks 1-9 built; the last PR (#1792) waits on the maintainer's look at the screenshots
 Depends on: 2218 (hand fitting and the other graphs)
 Priority: P2 2026-11-22 — a feature the open milestone was opened for: R6, the rebuild's next piece
 
@@ -168,7 +168,7 @@ package. `src/rietx/_audit.py` is untouched.
   selected candidate's lines on the Pattern graph.
 - [x] 8. The Judge step: the candidate's evidence, the extinction screen with its space-group
   choice, and Adopt pending until Apply.
-- [ ] 9. Browser passes over the four steps by real clicks; screenshots at 1440 × 900, light and
+- [x] 9. Browser passes over the four steps by real clicks; screenshots at 1440 × 900, light and
   dark, under `docs/wp/2240-screenshots/`, beside the prototype's in the runner's scratch, with
   an inventory of where each of today's Peaks features lives. The last PR waits on the
   maintainer's look.
@@ -187,6 +187,118 @@ The piece closes when every task is ticked and the maintainer has looked at its 
 the prototype's (WP-2214 § How the maintainer reviews).
 
 ## Handover log
+
+- **2026-11-23 (third session)** — third PR, #1792: tasks 6 to 9. The four steps of the
+  workflow now work at `/next`. Fit peaks lists the overlap groups and draws their windows in
+  the Peaks graph, each with its lines' own curves and a Refit. Index holds the search form,
+  shows the search while it runs, says what it did not cover, and lists the cells; a row's
+  click draws that cell's lines on the Pattern graph. Judge shows one cell's evidence, screens
+  its extinctions, offers the class's space groups, and adopts the cell as a Le Bail start
+  once Apply is pressed. Apply hands the window to the Refinement workflow. The WP stays 🔄
+  until Yue has looked at the screens (§ For Yue to look at, below).
+
+  *Done.* Task 6: `next/PeakFits.svelte` (the windows, ported from #1526's drawing) and the
+  Fit step in `next/Indexing.svelte`. Tasks 7 and 8: `next/Candidates.svelte` holds both
+  steps, with `coverageLine` and `limitWord` in `lib/peaks.ts`; `next/Pattern.svelte` takes a
+  `candidate` overlay drawn by the existing candidate layer. Task 9: a browser pass over Fit,
+  Index and Judge by real clicks
+  (`test_the_fit_index_and_judge_steps_run_to_an_adopted_cell`), the screenshots below, the
+  inventory below, and the lens marks' line in `gui/CLAUDE.md` § Plot. Bytes for that line
+  came out of the file's intro and its node bullet, so the file stays under its budget. The
+  test the last review named is in: a peak edit typed into the `.rxt` document is one undo
+  step (`test_a_peak_edit_typed_in_the_rxt_is_one_undo_step`).
+
+  *Measured* (`[dev]` venv plus playwright, darwin/arm64). Fast suite `-m "not slow"`,
+  through the machine queue: 15 359 passed, 438 skipped, 32 xfailed, which is the last
+  entry's 15 357 plus this session's two tests. They take 10.29 s (the browser pass, whose
+  index runs on cubic alone) and 0.11 s. vitest 61 files, 993 passed; svelte-check 0 errors,
+  0 warnings over 490 files. The GUI python files and the two rulebook files: 373 passed.
+  Browser files run by hand, since CI runs none: `test_gui_layout_browser.py` and
+  `test_gui_console_browser.py`, 53 passed before the review fixes, and the layout file
+  again inside the fast suite on the reviewed tree. CI's lint and PR-delta steps exit 0.
+  Vale: 0 errors, 281 warnings, none on lines this PR wrote. `gui/CLAUDE.md` is 44 969
+  bytes against its 44 972 budget.
+
+  *Settled by Claude under the prototype (the 2026-11-11 ruling) and `gui/STYLE.md`.*
+  - χ²ᵣ is not coloured above 10, under STYLE.md's rule that no number is judged by colour.
+    The prototype draws it red.
+  - The window's fit curve is drawn in `--plot-peakfit`. The prototype draws it orange, which
+    is the calculated curve's colour.
+  - More settings holds the real controls from #1526's form. The prototype shows them as
+    text.
+  - A refuted class stays clickable, as in the prototype. Its refuting lines sit behind a
+    help popover on "refuted", so each class row is one line, as the prototype draws it.
+  - The candidate table carries no "rietx's pick" mark. The gate's pick is said beside Adopt
+    in the Judge step.
+  - Crystal systems, engines and centrings are toggle buttons, as in the prototype.
+  - Search these is left out. § Non-goals says why.
+
+  *Review.* `/code-review high --fix` found ten issues. Fixed: a row chosen in Index left an
+  earlier Adopt pending, so Apply could adopt another cell than the one Judge showed; a new
+  extinction screen left a pending Adopt on the old group; a streamed frame without an
+  elapsed time restarted the run clock; a hidden line curve came back after a Refit. Its fix
+  for the last one hid both lines of a pair 0.0007° apart, a pair the fluorapatite list has,
+  so the match is now to the nearest line, with a test that fails on the reviewer's version.
+  Two cleanups were also applied. The coverage line read the form's systems, so a form edited
+  after a run changed what the line said about it. It now keeps the systems the run was
+  started with, and falls back to the form only after a reload. Declined: ⌘Z still undoes peak
+  edits on the Index and Judge steps, since the workflow's undo covers every step; the
+  coverage sentence keeps its own "2-minute" adjective form; a hover redraws all six windows,
+  a small cost. A browser look also found and fixed a missing space after each comma in the
+  notes and caveats.
+
+  *For Yue to look at.* Screenshots at 1440 × 900, light and dark, in
+  `docs/wp/2240-screenshots/` (its README says how they were taken). Each `gui-*` picture has a
+  `prototype-*` partner at the same step. Four differences are worth a look.
+  1. A chosen cell's lines. The build draws them full height over the data, under the
+     written rule in `gui/CLAUDE.md` § Plot (WP-1211). The prototype draws them as a "#n" row
+     in the tick band, titles the graph "Ticks of #n", and marks absent and unexplained
+     lines in red. On the fluorapatite pattern the full-height lines cover most of the plot
+     (`gui-3-index-*.png`). The rule wins until Yue says otherwise. The red marks need the
+     Le Bail check's absent lines as tick indices, which § Inherited keeps out of R6.
+  2. Caveat and engine names. The build shows the code's words ("fom panel disagrees",
+     "trial_error"). The prototype has written words ("figures of merit disagree", "trial
+     and error"). Written words need a `rietx.help` arm, since names are described there and
+     nowhere else.
+  3. Search these, left out as § Non-goals says.
+  4. The χ²ᵣ colour and the fit curve's colour, settled above.
+
+  *Inventory: where each feature of today's Peaks tab lives at `/next`.*
+  - Pick peaks and the picker's settings: the Pick step, its foot and its Settings.
+  - "N of M lines usable": the Pick step's filter counts (All, Used, Not used).
+  - The σ-assumed chip: none. `PEAK_SIGMA_ASSUMED` reaches the Index step's notes after a
+    search.
+  - The picker's notes: "Notes from the picker" in the Pick step.
+  - A line's zoom button: a click on its row frames it, and Show all undoes the frame.
+  - Origin and flag chips: the Note column's words.
+  - The use tickbox: the same tickbox.
+  - A group's ↻ refit: the window's Refit in the Peaks graph, in the Fit step.
+  - A line's ×: Option-click, the right-click menu, or the line's bar.
+  - Add by click, move by drag, exclude by shift-click: the Pattern graph's gestures (rules 1
+    to 12). Exclusion is "Leave out of the search" in the menu, or the tickbox.
+  - The group windows: the Peaks graph tab while the Fit step is up.
+  - Index and its form: the Index step. Its short form holds the systems, the largest volume
+    and the time limit. More settings holds the rest.
+  - The run's progress and streamed shortlists: "Searching" with each system's state and the
+    cells found so far.
+  - What the search covered: the line above the candidates.
+  - The run's notes: "Notes from the search".
+  - A candidate's ▸ (caveats, ambiguity, lines through the data): a row's click draws the
+    lines; the Judge step shows the rest.
+  - The `best_or_none()` chip and a row's `why`: beside Adopt in the Judge step.
+  - The engines that found a cell: "Found by" in the Judge step.
+  - Adopt on each row: Adopt in the Judge step, pending until Apply.
+  - The extinction screen and its per-group adopt: the Judge step's Space group table and
+    its "Adopt in" choice.
+
+  *Gotchas.* Svelte trims the space from a bare `, ` text node inside a block, so a list
+  joined with `{#if i}, {/if}` reads "a,b". Write the separator as `{", "}`. A synthetic LaB₆
+  index with only cubic on takes seconds; the full quick search on fluorapatite takes its two
+  minutes.
+
+  *Next.* Yue's look at the screenshots, then any change it asks for. The swap (WP-2214
+  § The swap) retires today's Peaks tab and moves the `gui/CLAUDE.md` § Peaks lines that
+  describe it.
 
 - **2026-11-23 (second session)** — second PR, #1791: task 5 and the dotted-mark ruling. The
   Pattern graph is now the peak list's editing surface while the workflow is up. A person can
