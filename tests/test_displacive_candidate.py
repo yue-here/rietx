@@ -672,7 +672,7 @@ def test_the_all_zero_refusal_fires_on_a_phase_carrying_moments():
     for globs in ([AMPS], [STRAINS]):
         with pytest.raises(ValueError, match="and every strain is exactly zero") as err:
             _free(phase, globs)
-        assert "does not choose the sign" in str(err.value)
+        assert "has not been shown to choose the sign reliably" in str(err.value)
         assert "displacive_statement, which seeds it" in str(err.value)
 
 
@@ -684,7 +684,7 @@ def test_moments_give_the_strain_a_term_at_zero_and_leave_an_oxygen_mode_dead():
     oxygen mode stays exactly zero: unpolarised neutrons add nuclear and
     magnetic intensity with no cross term, and the magnetic intensity does not
     see the O atoms.  Neither number is a reason to free the block (the term
-    does not choose the sign); it pins why the refusal's message conditions
+    has not been shown to choose the sign reliably); it pins why the refusal's message conditions
     its "exactly zero".
     """
     phase = _lamno3_magnetic_child_at_zero()

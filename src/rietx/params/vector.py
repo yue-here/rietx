@@ -1953,10 +1953,13 @@ class ParameterTable:
         else in the pattern keeps that operation.  Moments, preferred
         orientation, and unequal ADPs or occupancies on a split orbit break
         it, and some of the block's columns then have a term at zero.  That
-        term does not choose the sign: on LaMnO₃'s Pm child at
-        k = (½, ½, 0) with Mn moments on, the strain's odd term is 2e-5 of
-        the top at s = 1e-3, and a fit freed from zero took the strain to
-        +0.00200 in 6 of 6 fits whatever the truth's sign.  So the block at
+        term has not been shown to choose the sign reliably: on LaMnO₃'s Pm
+        child at k = (½, ½, 0) with Mn moments on, the strain's odd term is
+        2e-5 of the top at s = 1e-3, and a fit freed from zero took the strain
+        to +0.00200 in 6 of 6 fits whatever the truth's sign.  That is
+        measured for one strain with moments on (6 of 6 fits went to the same
+        sign whichever was planted); it is not measured for preferred
+        orientation, ADP or occupancy breakers.  So the block at
         the parent is not freed whatever else the phase carries, and the
         caller states the sign by seeding (Theory: *Distortion-mode
         amplitudes*, for the measured sizes).
@@ -1983,7 +1986,7 @@ class ParameterTable:
                 "starts at the parent, where it is not freed.  Its gradient there is "
                 "exactly zero, or set only by what else in the pattern breaks the "
                 "parent's symmetry (moments, preferred orientation, unequal ADPs or "
-                "occupancies on a split orbit), which does not choose the sign, so "
+                "occupancies on a split orbit), which has not been shown to choose the sign reliably, so "
                 "the sign is the caller's to state.  State the child with "
                 "displacive_statement, which seeds it, or set_values a small "
                 "non-zero amplitude (or strain) before freeing the block")

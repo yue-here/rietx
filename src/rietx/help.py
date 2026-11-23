@@ -1210,8 +1210,8 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "child in the parent metric before any strain. The sign of the driving mode is a "
             "domain label; relative signs inside a basis are measured (Perez-Mato et al. "
             "2010, § 7). A block of amplitudes outside the identity irrep is not freed "
-            "at the parent, since its gradient there is exactly zero or does not choose "
-            "the sign: start from the statement's seed."
+            "at the parent, since its gradient there is exactly zero or has not been shown to choose "
+            "the sign reliably: start from the statement's seed."
         ),
         unit="Å", default=None,
         typical="0 to about 1.5 Å for an octahedral tilt",

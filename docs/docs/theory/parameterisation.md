@@ -614,15 +614,17 @@ every fit that keeps it held.
 The refusal is a statement about the start: the block at the parent is not
 freed, and its sign is stated by seeding it. Both arguments act with a
 parent operation on the block alone, so the gradient there is exactly zero, or
-set only by what else in the pattern breaks the parent's symmetry, which does
-not choose the sign. On LaMnO₃'s Pm child at $\mathbf{k} = (\tfrac12, \tfrac12, 0)$,
+set only by what else in the pattern breaks the parent's symmetry, which has
+not been shown to choose the sign reliably. On LaMnO₃'s Pm child at $\mathbf{k} = (\tfrac12, \tfrac12, 0)$,
 the strain's odd term $\max|y(+s) - y(-s)|/\max y$ at $s = 10^{-3}$ is
 $2\times10^{-5}$ with Mn moments on, $2.4\times10^{-2}$ with March–Dollase
 $r = 0.8$ along (1,1,1), $3.1\times10^{-3}$ with one La $B_{\text{iso}}$
 0.5 Å² off its orbit mates, and $1.5$ to $2.1\times10^{-3}$ with one O3 or Mn
 occupancy at 0.9, each with the moments at zero. With the moments on, a stage
 that freed the strain from zero ended at $+0.00200$ in 6 of 6 fits, whichever
-sign the planted strain had.
+sign the planted strain had. That is measured for one strain with moments on
+(6 of 6 fits went to the same sign whichever was planted); it is not measured
+for preferred orientation, ADP or occupancy breakers.
 
 ## Soft restraints
 
