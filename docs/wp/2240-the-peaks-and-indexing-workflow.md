@@ -1,6 +1,6 @@
 # WP-2240 — the peaks-and-indexing workflow at `/next`: pick peaks, fit peaks, index, judge
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-23 — tasks 1-4 in PR #1788 (the Pick step); tasks 5-9 left
+Milestone: gui-overhaul · Status: 🔄 2026-11-23 — tasks 1-4 in PR #1788 (merged), task 5 in PR #1791; tasks 6-9 left
 Depends on: 2218 (hand fitting and the other graphs)
 Priority: P2 2026-11-22 — a feature the open milestone was opened for: R6, the rebuild's next piece
 
@@ -187,6 +187,50 @@ The piece closes when every task is ticked and the maintainer has looked at its 
 the prototype's (WP-2214 § How the maintainer reviews).
 
 ## Handover log
+
+- **2026-11-23 (second session)** — second PR, #1791: task 5 and the dotted-mark ruling. The
+  Pattern graph is now the peak list's editing surface while the workflow is up. A person can
+  add a line by clicking empty space, see where it will land before clicking, choose a line by
+  its lens and get its bar, drag it to a new place, take a drag back with Esc, remove it with
+  Option-click or from its right-click menu, and type a 2θ into the table's foot to add one
+  without the mouse. Every edit to the list can be undone and redone with ⌘Z and ⇧⌘Z. Fit,
+  Index and Judge still show their placeholder sentence.
+
+  *Done.* The ruling Yue delegated on 2026-11-23 is applied and recorded in § Rulings: the
+  dotted mark for a chosen line left out of the search is drawn in `--plot-peak`. Task 5:
+  `POST /api/peaks/undo` and `/redo` over a session-local stack of `peaks.json`'s bytes
+  (`GuiSession._peak_step`, `peaks.snapshot`/`restore`; the payload carries `undo` and `redo`
+  counts); `next/pattern.ts` keeps 96 px of headroom through its own `ranges.main` and
+  reports where each lens went (`markAt`, `markOf`, `lensAt`); `next/Pattern.svelte` holds
+  the gestures, the line's bar and three DOM lens marks (hover, dragged or waiting, danger);
+  `next/Indexing.svelte` owns the verbs (`edit`, `undo`, `redo`), the ⌘Z keys and the typed
+  add row, and brings a chosen line's row into view; `next/Frame.svelte` wires the two and
+  adds "Undo the peak edit" and "Redo the peak edit" to the palette. The lens's size moved to
+  `lib/plot.ts`, so the page's DOM marks and the canvas share one number.
+
+  *Measured* (`[dev]` venv plus playwright, darwin/arm64). Fast suite `-m "not slow"`: 15 357 passed, 438 skipped, 32 xfailed; the two added tests take 5.75 s (the browser one) and 0.22 s. vitest 59 files, 981 passed; svelte-check 0 errors, 0 warnings over 486 files. Browser files run by hand, since CI runs none: `test_gui_layout_browser.py` and the three other GUI browser files, 58 passed before the review fixes, and passed again inside the fast suite on the final tree. CI's lint and PR-delta steps exit 0. Vale: 0 errors, 281 warnings, none on lines this PR wrote.
+
+  *Settled by Claude under the workshop's round-11 calls and STYLE.md.* Undo restores the stored
+  list's bytes rather than running an inverse verb, because a re-added line refits its group
+  from a new start and loses its flags (rule 10; alternative: inverse verbs, inexact). Pick
+  peaks is one undoable step, and the "replaces N edits" question before it stays, as call 29
+  has it. The lens's hit target is 6 px either side of its axis, wider than its 4.5 px ink. A
+  click while a region's bar is open only closes it (rule 3). The line's bar shows 2θ as text,
+  not a typed field: the typed route is the table's add row. The rulebook line for the undo
+  rule did not fit `gui/CLAUDE.md`'s byte budget, so the rule lives in `_peak_travel`'s
+  docstring.
+
+  *Review.* `/code-review high --fix` found ten issues and fixed seven; an eighth was fixed by hand (a click outside the workflow cleared its chosen line). Declined: the `gui/CLAUDE.md` § Peaks lines describe today's Peaks tab, which still behaves that way; an undo failure path no code reaches; the 300 ms add timer outliving an unmount. No test yet holds that a `.rxt` peak edit adds an undo step.
+
+  *Gotchas.* A row click chooses its line, so its lens is drawn 1.4× larger; a browser test
+  that sweeps for a lens lets the choice go first (Esc), or it finds the larger lens's tip.
+  Removing a line can leave the count unchanged: the group's refit re-judges its neighbours
+  and may report a line there again, so a test asserts the removed 2θ is gone, not the count.
+
+  *Next.* Task 6 (the Fit step and the group windows with per-line curves in the Peaks graph
+  tab, with refit), then 7 (Index), 8 (Judge) and 9 (screenshots beside the prototype's and
+  the `gui/CLAUDE.md` line for the lens marks, which needs bytes cut elsewhere in that file
+  first). The last PR waits on the maintainer's look.
 
 - **2026-11-23** — first PR, #1788: tasks 1-4. The peaks-and-indexing workflow now opens at
   `/next` from the workflow menu, under the prototype's numbered strip (Pick peaks › Fit peaks ›
