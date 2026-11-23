@@ -669,9 +669,18 @@ def _row(model, values, ip, j, cp, msites, phase_name, cell, held_set,
 def _magnetic_fraction(model, values, ip: int):
     """(⟨|F_N|²⟩, p²⟨|F_⊥|²⟩, magnetic fraction) per reflection of phase ``ip``.
 
-    The fraction is p²⟨|F_⊥|²⟩ / (⟨|F_N|²⟩ + p²⟨|F_⊥|²⟩), 0 where both vanish;
-    :func:`_classified_reflections` says why it, and not
-    ``CompiledPhase.nuclear_mask``, is what classifies a reflection.
+    The fraction is p²⟨|F_⊥|²⟩ / (⟨|F_N|²⟩ + p²⟨|F_⊥|²⟩), 0 where both vanish,
+    and **exactly 1 on a row the stated magnetic group gives no nuclear
+    structure factor** (``CompiledPhase.nuclear_absent``), whatever the
+    moments.  That row can only be magnetic, and the moments do not decide
+    it: in a Le Bail or Pawley fit with the moments at zero, the usual first
+    check of k, the intensity is extracted anyway and the line is still
+    seen, so a fraction read at the current moments (0/0, taken as 0) put
+    the magnetic (0 0 1) of a k ≠ 0 child on the nuclear side (Yue's review
+    of #1493).  :func:`_classified_reflections` says why the fraction, and
+    not ``CompiledPhase.nuclear_mask`` alone, is what classifies a
+    reflection.  A row whose nuclear and magnetic structure factors both
+    survive (a k = 0 line carrying both) still reads 0 at zero moments.
     """
     cp = model.phases[ip]
     cell = tuple(values[f"phases.{ip}.cell.{k}"]
@@ -682,6 +691,8 @@ def _magnetic_fraction(model, values, ip: int):
     total = f_nuc + f_mag
     with np.errstate(invalid="ignore", divide="ignore"):
         frac = np.where(total > 0.0, f_mag / total, 0.0)
+    if cp.nuclear_absent is not None:
+        frac = np.where(cp.nuclear_absent, 1.0, frac)
     return f_nuc, f_mag, frac
 
 
@@ -1241,7 +1252,8 @@ def _cot_through(lines):
     return float(np.sum(w * c * s) / info), float(1.0 / math.sqrt(info))
 
 
-def low_angle_asymmetry_findings(model, values, y_calc=None) -> list[Diagnostic]:
+def low_angle_asymmetry_findings(model, values, y_calc=None, *,
+                                 moving=()) -> list[Diagnostic]:
     """``LOW_ANGLE_ASYMMETRY_UNCALIBRATED`` — the lowest lines are magnetic.
 
     On a constant-wavelength pattern the axial-divergence asymmetry is
@@ -1272,6 +1284,14 @@ def low_angle_asymmetry_findings(model, values, y_calc=None) -> list[Diagnostic]
     differ, and a centroid also depends on the window it is taken over.
     ``y_calc`` is the drawn
     pattern where the caller already holds it.
+
+    ``moving`` is every path the fit could move (``ParameterTable.moving_paths``:
+    the free ones *and* their ties, so both halves of a tied S/L = H/L read
+    as refined): the closing sentence and the
+    suggestion branch three ways on the axial apertures — held at 0 (nothing
+    was set), **refined in this fit** (then on these lines, since nothing
+    below them is nuclear-only; "refined to 0" where one ended on its bound),
+    or set and held (from somewhere this finding cannot see).
     """
     out: list[Diagnostic] = []
     if getattr(model, "phases", None) is None or getattr(model, "tt", None) is None:
@@ -1330,14 +1350,28 @@ def low_angle_asymmetry_findings(model, values, y_calc=None) -> list[Diagnostic]
                 f"{1e3 * shape[0]:+.1f}({1e3 * shape[1]:.1f}) mdeg) predicts "
                 f"{1e3 * shape[0] * cot:+.1f}({1e3 * shape[1] * cot:.1f}) mdeg "
                 f"there.")
-    state = ("held at 0" if sl == 0.0 and hl == 0.0
-             else f"S/L {sl:.4g}, H/L {hl:.4g}")
-    message += f" The axial apertures are {state}."
-    # the name says what the geometry denies, not what the reader did: with
-    # the apertures held at 0 nothing was set, so the first sentence applies;
-    # with them nonzero something was set (the finding cannot tell from
-    # where), so the advice is to check it on the lowest line
-    if sl == 0.0 and hl == 0.0:
+    paths = ("instrument.geometry.axial_sl", "instrument.geometry.axial_hl")
+    refined = [p in set(moving) for p in paths]
+    if any(refined):
+        # refined here: say so per aperture, and print the bound a free one
+        # ended on as "refined to 0", never "held at 0"
+        said = [f"{name} was {'refined to' if r else 'held at'} {v:.4g}"
+                for name, r, v in zip(("S/L", "H/L"), refined, (sl, hl))]
+        message += f" In this fit the axial aperture {said[0]} and {said[1]}."
+        suggestion = (
+            "The axial asymmetry was refined in this fit, and the lowest "
+            "lines it was fitted on, where it is largest, are the "
+            "magnetic-only lines listed, whose shape also carries the "
+            "moment's form factor and any magnetic broadening. Hold it at "
+            "values from a standard measured on this instrument at this "
+            "wavelength, in the same container and fill, and compare the "
+            "lowest line's drawn and observed shape under them before "
+            "quoting the moment; if the refined values stand, quote the "
+            "shift above as a systematic on the moment.")
+    elif sl == 0.0 and hl == 0.0:
+        # the name says what the geometry denies, not what the reader did:
+        # with the apertures held at 0 nothing was set
+        message += " The axial apertures are held at 0."
         suggestion = (
             "Take the axial asymmetry from a standard measured on this "
             "instrument at this wavelength, in the same container and fill. "
@@ -1345,15 +1379,18 @@ def low_angle_asymmetry_findings(model, values, y_calc=None) -> list[Diagnostic]
             "refined on these magnetic lines, compare the lowest line's "
             "drawn and observed shape under it before quoting the moment.")
     else:
+        # set and held: something was set, and this fit cannot tell from
+        # where, so the advice is to check it on the lowest line
+        message += f" The axial apertures are held at S/L {sl:.4g}, H/L {hl:.4g}."
         suggestion = (
-            "The axial apertures are nonzero, so an asymmetry is already "
-            "drawn; this finding cannot tell whether it came from a standard "
-            "or an instrument file or was refined on these magnetic lines. "
-            "Only a standard measured on this instrument at this wavelength, "
-            "in the same container and fill, checks it. Compare the lowest "
-            "line's drawn and observed shape under it before quoting the "
-            "moment, and quote the shift above as a systematic on the "
-            "moment if it stays.")
+            "The axial apertures are held nonzero, so an asymmetry is "
+            "already drawn; this finding cannot tell whether it came from a "
+            "standard, an instrument file or an earlier fit on these "
+            "magnetic lines. Only a standard measured on this instrument at "
+            "this wavelength, in the same container and fill, checks it. "
+            "Compare the lowest line's drawn and observed shape under it "
+            "before quoting the moment, and quote the shift above as a "
+            "systematic on the moment if it stays.")
     out.append(Diagnostic(
         level="info", code="LOW_ANGLE_ASYMMETRY_UNCALIBRATED",
         where=["instrument.geometry.axial_sl", "instrument.geometry.axial_hl"],

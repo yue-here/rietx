@@ -58,6 +58,7 @@ References
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
 import gemmi
@@ -600,6 +601,32 @@ def merge_magnetic(nuclear: ReflectionSet, extra: ReflectionSet
                            operations=nuclear.operations,
                            extra=dict(nuclear.extra))
     return merged, nuc[sort].astype(np.float64)
+
+
+def anti_centring_absences(magnetic_group, hkl) -> np.ndarray:
+    """(N,) bool: the rows an anti-centring of the magnetic group gives no
+    nuclear structure factor, whatever the moments.
+
+    An anti-centring {1 | t}′ is a symmetry of the stated structure, and time
+    reversal does not act on a position, so the nuclear density is invariant
+    under the plain translation t: F_N(h) = e^{2πi h·t}·F_N(h), and F_N(h) is
+    zero unless h·t ∈ ℤ.  That is the k ≠ 0 supercell's case: its strongest
+    magnetic reflections sit in the child group's own list with
+    ``nuclear_mask`` at 1.0, and their nuclear |F|² is zero only to rounding
+    (about 1e-32 of the strongest on the CrSBr ``a,b,2c`` child).  The test
+    here is exact, on the operator list's own rationals, so it needs no
+    tolerance and no moment: at zero moments, the usual first check of k in a
+    Le Bail or Pawley fit, it still says which rows only a moment can light.
+    """
+    h = np.asarray(hkl, dtype=np.int64).reshape(-1, 3)
+    out = np.zeros(len(h), dtype=bool)
+    for c in magnetic_group.centerings:
+        if c.time_reversal > 0:
+            continue
+        den = math.lcm(*(int(v.denominator) for v in c.translation))
+        num = np.array([int(v * den) for v in c.translation], dtype=np.int64)
+        out |= (h @ num) % den != 0
+    return out
 
 
 # ---------------------------------------------------------------------------

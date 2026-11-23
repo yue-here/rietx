@@ -107,9 +107,9 @@ either's code; nothing is ported.
 - [x] Point 2: the diagnostic, with its audit row and `help.py` entry.
       `LOW_ANGLE_ASYMMETRY_UNCALIBRATED` (info), `report.magnetic.low_angle_asymmetry_findings`,
       called in the result build beside `magnetic_width_findings`. Fires on geometry alone: a
-      seen magnetic-only line below the lowest seen line that is not (WP-1343's
+      seen magnetic-only line below the lowest seen nuclear-only line (WP-1343's
       `MAGNETIC_WIDTH_PURITY` cut; "seen" is the line's own t ≥ `MIN_COEF_SIGNIFICANCE`). Says
-      each such line's position shift, the first other line's, and what a one-term cot 2θ
+      each such line's position shift, the first nuclear-only line's, and what a one-term cot 2θ
       shape through the magnetic lines predicts there; no threshold on any number, so no new
       tunable constant (one numerical step, `_SHIFT_STEP_FWHM`, tier 1). Rows: the code tier 1
       / ambiguity 3 / info, its suggestion tier 2 (asymmetry from a standard's calibration, the

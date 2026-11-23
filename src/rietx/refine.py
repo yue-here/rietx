@@ -10049,7 +10049,7 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # nuclear line in this sample checks the low-angle asymmetry; reports
     # their position shifts and decides nothing (issue #1090)
     diagnostics = diagnostics + low_angle_asymmetry_findings(
-        model, values, y_calc=y_calc)
+        model, values, y_calc=y_calc, moving=table.moving_paths)
 
     # WP-1929: the moment angles the answer stage's covariance left out at a
     # stationary direction, read off its own record.  The rows carry no

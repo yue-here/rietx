@@ -72,6 +72,7 @@ from ..crystallography.magnetic.scattering import (
     MAGNETIC_SOURCE_KINDS,
     NON_MAGNETIC_SOURCE_KINDS,
     MagneticSites,
+    anti_centring_absences,
     compile_magnetic_sites,
     d_magnetic_f2_d_dofs,
     magnetic_f2,
@@ -877,6 +878,16 @@ class CompiledPhase:
     # identically zero by the absence condition — so the mask is exact
     # arithmetic rather than a tolerance.
     magnetic: MagneticSites | None = None
+    # ``nuclear_absent`` is (N,) bool for a magnetic phase, ``None`` otherwise:
+    # the rows on which the stated magnetic group leaves **no** nuclear
+    # structure factor, whatever the moments — the ``nuclear_mask`` zeros, and
+    # the rows an anti-centring forbids (``anti_centring_absences``; a k ≠ 0
+    # supercell's magnetic reflections, which the mask leaves at 1.0).  Read
+    # by ``report.magnetic._magnetic_fraction`` only, so that a magnetic-only
+    # line stays magnetic-only at zero moments, where a Le Bail or Pawley fit
+    # still extracts its intensity (#1493).  Nothing in the forward model
+    # reads it.
+    nuclear_absent: np.ndarray | None = None
     mag_members: np.ndarray | None = None   # (M_total, 3) int
     mag_seg: np.ndarray | None = None       # (M_total,) int → reflection index
     mag_counts: np.ndarray | None = None    # (N,) int orbit sizes
@@ -4951,6 +4962,8 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
             cp.nuclear_mask = (~refl.is_satellite).astype(np.float64)
         if magnetic_mask is not None:
             cp.nuclear_mask = magnetic_mask
+            cp.nuclear_absent = (magnetic_mask == 0.0) | anti_centring_absences(
+                phase.magnetic_symmetry.group(), refl.hkl)
             cp.magnetic = compile_magnetic_sites(phase, sites.ops)
             # the Laue orbit of every reflection, frozen here: |F_⊥|² varies
             # over it, so the magnetic intensity is the orbit *average*.  The
