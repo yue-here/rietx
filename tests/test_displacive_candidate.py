@@ -284,26 +284,46 @@ def test_a_parent_whose_cell_moved_since_the_candidate_was_built_is_refused():
         D.displacive_statement(moved, candidate=cand)
 
 
-def test_a_tied_edge_written_a_hair_off_its_source_still_states():
-    """Yue's review of #1533, item 2: a call that worked in 1.12.0 must not start to refuse.
+def test_a_tied_edge_is_refused_as_the_parameter_table_refuses_it():
+    """Yue's review of #1533, round 2, item 1, second half: ``check_cell_ties``.
 
-    The P4/mbm child's ``b`` tied to ``a`` is discarded by the parameter table,
-    so a ``b`` a·(1 + 1e-5) away states as the exact tie does: the same derived
-    cell and the same strain.  Positive arm: a real difference between the
-    edges (a different cell, 1e-2) is the tie's to impose too, since the table
-    reads ``a`` for both.  A tied edge is the one half of the table's reading
-    that this statement still takes on trust: #1698 adds ``check_cell_ties``
-    to the table, and whichever PR merges second makes ``_tied_cell`` call it.
+    The P4/mbm child's ``b`` is tied to ``a``.  The table accepts a ``b``
+    within ``SYMMETRY_LENGTH_RTOL`` (1e-5, relative) of ``a`` and refuses one
+    beyond it (#1698); the statement agrees arm for arm, so a cell the table
+    refuses is not silently stated with ``b`` replaced by ``a``.  Positive arm:
+    1e-9 to 5e-6 (inside, clear of the tolerance's edge) state, and equal the
+    exact tie's statement (round 1, item 2).  The candidate route reads the
+    parent through the same check, so a cubic parent whose ``b`` is 1e-3 off
+    its ``a`` is refused there too, and a 1e-9 one states.
     """
+    from rietx.crystallography.symmetry import SYMMETRY_LENGTH_RTOL
+
     cell = natao3_child().cell
     exact = D.displacive_statement(natao3_parent(), natao3_child(), NATAO3_T).phase
-    for rel in (1e-9, 1e-7, 1e-5, 1e-2):
-        skewed = natao3_child(cell=cell.model_copy(update={
+    for rel in (1e-9, 1e-7, 5e-6, 2e-5, 1e-3, 1e-2):
+        child = natao3_child(cell=cell.model_copy(update={
             "b": cell.b.model_copy(update={"value": cell.a.value * (1.0 + rel)})}))
-        got = D.displacive_statement(natao3_parent(), skewed, NATAO3_T).phase
-        assert got.parent_cell == exact.parent_cell, rel
-        assert [got.cell.model_dump()[n]["value"] for n in ("a", "b", "c", "gamma")] == \
-            [exact.cell.model_dump()[n]["value"] for n in ("a", "b", "c", "gamma")], rel
+        if rel <= SYMMETRY_LENGTH_RTOL:
+            ParameterTable(Structure(phases=[child]), neutron())
+            got = D.displacive_statement(natao3_parent(), child, NATAO3_T).phase
+            assert got.parent_cell == exact.parent_cell, rel
+            assert [got.cell.model_dump()[n]["value"] for n in ("a", "b", "c", "gamma")] == \
+                [exact.cell.model_dump()[n]["value"] for n in ("a", "b", "c", "gamma")], rel
+        else:
+            with pytest.raises(ValueError, match="ties phases.0.cell.b to a"):
+                ParameterTable(Structure(phases=[child]), neutron())
+            with pytest.raises(ValueError, match="ties child.cell.b to a"):
+                D.displacive_statement(natao3_parent(), child, NATAO3_T)
+
+    parent, cand, _, _ = _natao3_route()
+    for rel, refused in ((1e-9, False), (1e-3, True)):
+        skewed = parent.model_copy(update={"cell": parent.cell.model_copy(update={
+            "b": parent.cell.b.model_copy(update={"value": parent.cell.a.value * (1.0 + rel)})})})
+        if refused:
+            with pytest.raises(ValueError, match="ties parent.cell.b to a"):
+                D.displacive_statement(skewed, candidate=cand)
+        else:
+            D.displacive_statement(skewed, candidate=cand)
 
 
 def test_a_symmetry_fixed_angle_is_refused_as_the_parameter_table_refuses_it():
@@ -362,14 +382,13 @@ def test_a_stated_child_keeps_its_own_cell_as_the_parents_plus_held_strain():
     skewed = natao3_child(0.0).model_copy(update={"cell": rx.Cell(
         a=P_(value=5.5503), b=P_(value=5.56), c=P_(value=3.9335), alpha=P_(value=90.0),
         beta=P_(value=90.0), gamma=P_(value=90.0))})
-    # the group's own ties are imposed on a child stated by symbol (the table
-    # discards the stored b), so this states as the exact tie does
-    # (Yue's review of #1533, item 2) ...
-    exact = D.displacive_statement(natao3_parent(), natao3_child(0.0), NATAO3_T).phase
-    got = D.displacive_statement(natao3_parent(), skewed, NATAO3_T).phase
-    assert got.parent_cell == exact.parent_cell
-    # ... but a child stated by an operator list has no symbol to tie from, so
-    # a cell its operations forbid is still refused
+    # b is 1.7e-3 (relative) off the a its group ties it to: refused as the
+    # child's own table refuses it (``check_cell_ties``, Yue's review of #1533,
+    # round 2, item 1) ...
+    with pytest.raises(ValueError, match="ties child.cell.b to a"):
+        D.displacive_statement(natao3_parent(), skewed, NATAO3_T)
+    # ... and a child stated by an operator list has no symbol to tie from, so
+    # a cell its operations forbid is refused by the decomposition instead
     import gemmi
 
     ops = [op.triplet() for op in gemmi.SpaceGroup("P 4/m b m").operations()]
@@ -612,6 +631,65 @@ def test_the_all_zero_refusal_covers_the_strains_and_a_held_strain_narrows_it():
     with pytest.raises(ValueError, match="exactly zero"):
         _free(p4mm, [AMPS])
     assert len(_free(p4mm, [AMPS], {"phases.0.parent_cell.strain.0": 1e-3})) == 3
+
+
+def _lamno3_magnetic_child_at_zero():
+    """LaMnO₃'s Pm child at k = (½, ½, 0), Mn moments on, stated at A = 0;
+    and the same phase with every moment at zero and held (the control: a free
+    moment at zero is refused by the schema)."""
+    from rietx.crystallography.magnetic import supercell as sc
+
+    parent = _lamno3()
+    mn = next(a for a in parent.atoms if a.species.startswith("Mn"))
+    (cand,) = [c for c in I.candidates(parent.space_group, (mn.x.value, mn.y.value, mn.z.value),
+                                       (0.5, 0.5, 0)).candidates
+               if c.irrep_label == "S1" and c.direction.label == "(rank 2)#3"]
+    st = sc.magnetic_supercell(parent, cand, nuclear_group="magnetic",
+                               magnetic_species=["Mn"], ion="Mn3+")
+    phase = D.displacive_statement(parent, st.phase, _floats(st.transform), seed=0.0).phase
+
+    def zero(m):
+        return m.model_copy(update={c: getattr(m, c).model_copy(update={"value": 0.0, "vary": False})
+                                    for c in ("crystalaxis_x", "crystalaxis_y", "crystalaxis_z")})
+    bare = phase.model_copy(update={"atoms": [
+        a if a.moment is None else a.model_copy(update={"moment": zero(a.moment)})
+        for a in phase.atoms]})
+    return phase, bare
+
+
+def test_the_all_zero_refusal_does_not_fire_on_a_phase_carrying_moments():
+    """Found in our pre-review of #1533: moments that break the parent's symmetry void the rule.
+
+    The refusal rests on the pattern being invariant under each lost parent
+    operation acting on the block alone.  Mn moments on LaMnO₃'s Pm child do
+    not keep the parent's symmetry, so the strain's column at zero is not zero:
+    y(+s) − y(−s) is first order in s (measured 2.3e-5 of the top at s = 1e-3,
+    1.1e-5 at 5e-4), and freeing the strain or the amplitudes is let through.
+    Positive arm: the same phase with its moments at zero is even in the
+    strain to round-off, and both stages are refused as before.
+    """
+    phase, bare = _lamno3_magnetic_child_at_zero()
+    assert phase.parent_cell.strain and phase.parent_cell.strain[0].value == 0.0
+    assert all(m.amplitude.value == 0.0 for m in phase.distortion_modes.modes)
+
+    def odd(ph, s):
+        def y(v):
+            ref = rx.Refinement(Structure(phases=[ph.model_copy(deep=True)]), neutron(),
+                                history=False)
+            ref.set_values({"phases.0.parent_cell.strain.0": v})
+            return np.asarray(ref.predict(TT))
+        return float(np.max(np.abs(y(s) - y(-s))) / y(0.0).max())
+
+    big, small = odd(phase, 1e-3), odd(phase, 5e-4)
+    assert big > 1e-6 and small == pytest.approx(big / 2.0, rel=0.05)
+    assert odd(bare, 1e-3) < 1e-12
+
+    assert _free(phase, [STRAINS]) == ["phases.0.parent_cell.strain.0"]
+    assert _free(phase, [AMPS])
+    with pytest.raises(ValueError, match="and every strain is exactly zero"):
+        _free(bare, [STRAINS])
+    with pytest.raises(ValueError, match="and every strain is exactly zero"):
+        _free(bare, [AMPS])
 
 
 # --------------------------------------------------------------------------

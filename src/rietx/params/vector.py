@@ -1946,9 +1946,27 @@ class ParameterTable:
         third order); zero is still stationary.  An amplitude off zero lifts
         the rule: the strain's column is then not forced to zero.  A k counted
         as Γ here is any integer one, which errs toward letting a stage run.
+
+        **A phase that carries a non-zero moment is not refused** (#1533,
+        found in pre-review).  Every argument above acts with a lost parent
+        operation on the block alone, so it holds only while everything else
+        in the pattern keeps that operation.  Moments that break the parent's
+        symmetry do not, and the magnetic intensity then gives the block a
+        first-order term at zero.  On LaMnO₃'s Pm child at k = (½, ½, 0)
+        with Mn moments of 0.98 μ_B, max|y(+s) − y(−s)|/max y is 2.3e-5 for
+        the strain at s = 1e-3 (1.1e-5 at 5e-4, so first order), and 2.2e-5
+        and 1.7e-5 for Mn amplitudes of two irreps outside the identity one,
+        against 1e-14 and below with the moments at zero.
+        A moment counts when its modulus row (``…moment.dof0``) is non-zero;
+        a phase whose moments happen to keep the parent's symmetry is let
+        through too, which errs toward letting a stage run.
         """
         reach = np.asarray(abs(self._reach).sum(axis=1)).ravel()
+        magnetic = {e.path.split(".atoms.")[0] for e in self.entries
+                    if e.path.endswith(".moment.dof0") and e.value != 0.0}
         for base, (paths, invariant, at_gamma, strains) in self._distortion.items():
+            if base in magnetic:
+                continue
             broken = [i for i, inv in enumerate(invariant) if not inv]
             block = [self._paths[paths[i]] for i in broken] + [self._paths[p] for p in strains]
             freed = [i for i in block if reach[i] > 0.0]

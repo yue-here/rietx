@@ -800,8 +800,7 @@ refines as before.  A bump rather than "also in 0.61" because 1.12.0 shipped
 0.61: a 1.12 build refuses a phase or instrument carrying the key, and the
 version now says why.
 
-Also in 0.62 (WP-1419 C3b, Yue's review of #1533): the first change after
-v1.12.0 shipped 0.61.  ``Phase`` refuses a phase whose ``distortion_modes``
+Also in 0.62 (WP-1419 C3b, Yue's review of #1533): ``Phase`` refuses a phase whose ``distortion_modes``
 and ``parent_cell`` name different parent groups, or whose two transforms
 differ by more than a parent lattice vector (``_one_parent_in_both_records``).
 A construction that used to succeed and now doesn't is a bump (the 0.17

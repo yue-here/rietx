@@ -611,6 +611,12 @@ leaves the metric alone. The seeded amplitudes lift the strain's stationary
 point, so no strain is seeded, since a held strain moved off zero would bias
 every fit that keeps it held.
 
+The argument acts with a parent operation on the amplitudes and the strains
+alone, so it needs everything else in the pattern to keep that operation. A
+phase that carries a non-zero moment is not refused, since moments that break
+the parent's symmetry give the strains and the amplitudes a first-order term
+at zero.
+
 ## Soft restraints
 
 A bond-length, angle or value restraint contributes one row to the residual

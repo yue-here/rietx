@@ -1190,27 +1190,31 @@ def _generic_seed(n: int) -> list[np.ndarray]:
     return out
 
 
-def _tied_cell(phase):
+def _tied_cell(phase, where: str):
     """``phase``'s cell with its group's own ties and fixed angles imposed (WP-1419).
 
-    The parameter table discards a tied edge's stored value, so a stated cell
-    is read the way the table reads it: ``b`` of a tetragonal group is ``a``
-    whatever ``b`` was written as.  A fixed angle is not normalised: the table
-    refuses one more than ``SYMMETRY_ANGLE_TOL_DEG`` from its value
-    (``check_cell_angles``, "refused, not normalised"), so this refuses it
-    first and imposes the value only within that tolerance (Yue's review of
-    #1533, round 2, item 1).  A phase stated by an operator list has no symbol
-    to take the constraints from and keeps its cell as written.  Returns an
-    object whose ``a`` … ``gamma`` are floats.
+    The cell is read the way the parameter table reads it, refusals
+    included, so the statement refuses what the phase's own table refuses
+    (Yue's review of #1533, round 2, item 1).  A fixed angle more than
+    ``SYMMETRY_ANGLE_TOL_DEG`` from its value is refused
+    (``check_cell_angles``, "refused, not normalised"), and so is a tied edge
+    more than ``SYMMETRY_LENGTH_RTOL`` (relative) from its source
+    (``check_cell_ties``, WP-2150); within those tolerances the group's value
+    is imposed, as the table builds a tied edge from its source and never
+    reads its stored value.  ``where`` (``"child.cell"``) names the cell in
+    the message.  A phase stated by an operator list has no symbol to take
+    the constraints from and keeps its cell as written.  Returns an object
+    whose ``a`` … ``gamma`` are floats.
     """
     from types import SimpleNamespace
 
-    from ..symmetry import cell_constraints, check_cell_angles
+    from ..symmetry import cell_constraints, check_cell_angles, check_cell_ties
 
     names = ("a", "b", "c", "alpha", "beta", "gamma")
     values = {n: _value(getattr(phase.cell, n)) for n in names}
     if phase.symmetry_operations is None:
         check_cell_angles(_group(phase), values)
+        check_cell_ties(_group(phase), values, prefix=where)
         cons = cell_constraints(_group(phase))
         for name, src in cons.ties.items():
             values[name] = values[src]
@@ -1256,7 +1260,7 @@ def _from_candidate(parent, candidate, reference: str):
         raise ValueError(
             f"candidate {name}'s basis was not built from this parent ({parent.name!r}): "
             "its atoms are not this parent's images in the child cell")
-    carried = big.T @ _cell_metric(_tied_cell(parent)) @ big
+    carried = big.T @ _cell_metric(_tied_cell(parent, "parent.cell")) @ big
     stated = _cell_metric(candidate.child.cell)
     drift = float(np.max(np.abs(carried - stated))) / float(np.max(np.abs(stated)))
     if drift > _RANK_TOL:
@@ -1283,9 +1287,10 @@ def _parent_cell_of(parent, child, big, small):
     exactly zero; a strained child keeps its own cell, now as strains.  The
     child cell returned is the derived one, which the parameter table then
     reproduces to the bit.  The child's cell is read with its own group's ties
-    and fixed angles imposed, as the parameter table reads it, so a tied edge
-    written a hair off its source states as it did before this derivation
-    (the table discards the stored value).  Campbell, Stokes, Tanner & Hatch
+    and fixed angles imposed, as the parameter table reads it: a tied edge
+    within ``SYMMETRY_LENGTH_RTOL`` of its source states as the exact tie
+    does, and one beyond it is refused, as the child's own table refuses it
+    (``_tied_cell``).  Campbell, Stokes, Tanner & Hatch
     (2006), *J. Appl. Cryst.* 39, 607, for the Γ strain as the part of a
     child's metric the parent's group does not fix.  ``None`` for a parent stated by an operator list,
     which ``ParentCell`` cannot name: that child keeps its own cell.
@@ -1303,9 +1308,9 @@ def _parent_cell_of(parent, child, big, small):
     names = ("a", "b", "c", "alpha", "beta", "gamma")
     parent_sg = get_spacegroup(parent.space_group)
     cons = cell_constraints(parent_sg)
-    # the child's cell as its table reads it: its own group's ties and fixed
-    # angles imposed (a tied edge's stored value is discarded there too)
-    tied = _tied_cell(child)
+    # the child's cell as its table reads it: refused where its table refuses
+    # it, and its own group's ties and fixed angles imposed within tolerance
+    tied = _tied_cell(child, "child.cell")
     values = dict(zip(names, metric.cell_from_metric(
         _parent_metric(parent, SimpleNamespace(cell=tied), big, "average")), strict=True))
     for name, src in cons.ties.items():
