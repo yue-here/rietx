@@ -704,7 +704,9 @@ def test_the_shipped_bt1_pattern_refines_alike_on_coordinates_and_on_modes(bt1):
     # the exact half: the coordinate fit's answer, restated, draws the same pattern
     restated = D.displacive_statement(lamno3_parent(), ref_c.structure.phases[0], LAMNO3_T)
     tt = np.asarray(res_c.two_theta)
-    y_c = np.asarray(ref_c.predict(tt))
+    # both from unfitted objects, so both compile at one peak cut: a fitted one
+    # compiles at its fit's (WP-2235)
+    y_c = np.asarray(rx.Refinement(ref_c.structure, ref_c.instrument).predict(tt))
     y_m = np.asarray(rx.Refinement(Structure(phases=[restated.phase]), ref_c.instrument)
                      .predict(tt))
     assert np.max(np.abs(y_m - y_c)) <= 1e-10 * np.max(y_c)
