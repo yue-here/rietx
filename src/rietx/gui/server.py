@@ -321,6 +321,8 @@ ROUTES: dict[tuple[str, str], Any] = {
     ("POST", "/api/peaks/move"): lambda s, q, b: s.peaks_move(b),
     ("POST", "/api/peaks/flag"): lambda s, q, b: s.peaks_flag(b),
     ("POST", "/api/peaks/refit"): lambda s, q, b: s.peaks_refit(b),
+    ("POST", "/api/peaks/undo"): lambda s, q, b: s.peaks_undo(b),
+    ("POST", "/api/peaks/redo"): lambda s, q, b: s.peaks_redo(b),
     # /api/index rides the one run state machine: same worker, same 409
     ("POST", "/api/index"): lambda s, q, b: s.run({**b, "kind": "index"}),
     ("GET", "/api/index/result"): lambda s, q, b: s.index_result(),

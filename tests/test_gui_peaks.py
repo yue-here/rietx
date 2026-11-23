@@ -129,8 +129,19 @@ def test_the_peak_verbs_round_trip_with_their_echoes(served, client):
     assert (project.path / "peaks.json").is_file()
     # every group curve is drawable state: window, fit, residual strip
     assert picked["groups"] and all(
-        len(g["two_theta"]) == len(g["y_fit"]) == len(g["delta"])
+        len(g["two_theta"]) == len(g["y_obs"]) == len(g["y_fit"]) == len(g["delta"])
         for g in picked["groups"])
+    # each line's own curve (WP-2240): one per component, naming its row, and
+    # together they are the group's model, since the model is linear in the
+    # areas: the lines sum to y_fit minus the envelope
+    rows = {p["index"]: p for p in picked["peaks"]}
+    for g in picked["groups"]:
+        assert len(g["lines"]) == g["n_components"]
+        assert all(rows[ln["index"]]["group"] == g["group"] for ln in g["lines"])
+        model = np.asarray(g["y_fit"]) - np.asarray(g["y_env"])
+        summed = np.sum([ln["y"] for ln in g["lines"]], axis=0)
+        np.testing.assert_allclose(summed, model, rtol=1e-9,
+                                   atol=1e-9 * max(1.0, float(np.max(np.abs(model)))))
 
     # add — between the first two lines, which lands in fresh window territory
     # or an existing group; either way the component is the human's
@@ -212,6 +223,63 @@ def test_a_peak_list_keyed_to_one_pattern_is_refused_against_another(
         assert status == 409
         assert payload["error"]["code"] == "PEAKS_WRONG_PATTERN"
         assert "different pattern" in payload["error"]["message"]
+    finally:
+        session.close()
+        httpd.shutdown()
+
+
+def test_undo_puts_the_peak_list_back_byte_for_byte_and_redo_replays_it(
+        pattern_file, tmp_path_factory):
+    """WP-2240, interaction rule 10: every peak edit can be undone. A step is
+    the stored file as it stood, so a removed line comes back with its flags
+    and its group's fit, which no inverse verb gives back."""
+    structure, instrument = perturbed_models()
+    root = tmp_path_factory.mktemp("peaks-undo") / "u.rex"
+    project = rx.Project.create(root, pattern=pattern_file,
+                                structure=structure, instrument=instrument)
+    session = GuiSession(project,
+                         state_dir=tmp_path_factory.mktemp("peaks-undo-state"))
+    httpd = build_server(session, port=0)
+    threading.Thread(target=httpd.serve_forever,
+                     kwargs={"poll_interval": 0.02}, daemon=True).start()
+    client = Client(httpd.server_address[1])
+    stored = project.path / "peaks.json"
+    try:
+        status, refused = client.post("/api/peaks/undo")
+        assert status == 409
+        assert refused["error"]["code"] == "NOTHING_TO_UNDO"
+
+        _, picked = client.post("/api/peaks", {})
+        assert (picked["undo"], picked["redo"]) == (1, 0)
+        after_pick = stored.read_bytes()
+        _, flagged = client.post("/api/peaks/flag",
+                                 {"index": 0, "use_for_indexing": False})
+        after_flag = stored.read_bytes()
+        _, removed = client.post("/api/peaks/remove", {"index": 0})
+        assert removed["n_total"] == picked["n_total"] - 1
+        assert (removed["undo"], removed["redo"]) == (3, 0)
+
+        status, back = client.post("/api/peaks/undo")
+        assert status == 200 and stored.read_bytes() == after_flag
+        assert back["peaks"] == flagged["peaks"]
+        assert (back["undo"], back["redo"]) == (2, 1)
+        client.post("/api/peaks/undo")
+        assert stored.read_bytes() == after_pick
+
+        _, again = client.post("/api/peaks/redo")
+        assert stored.read_bytes() == after_flag
+        assert (again["undo"], again["redo"]) == (2, 1)
+        # a new edit drops what redo could have replayed
+        _, moved = client.post("/api/peaks/move", {
+            "index": 1, "two_theta": picked["peaks"][1]["two_theta"] + 0.01})
+        assert (moved["undo"], moved["redo"]) == (3, 0)
+
+        # undoing the first pick leaves no list, as before it
+        for _ in range(3):
+            client.post("/api/peaks/undo")
+        _, empty = client.get("/api/peaks")
+        assert empty["peaks"] is None and not stored.exists()
+        assert (empty["undo"], empty["redo"]) == (0, 3)
     finally:
         session.close()
         httpd.shutdown()
