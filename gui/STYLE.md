@@ -86,7 +86,7 @@ The drawings live in `gui/src/app.css`. Each kind below means one thing (princip
 | Segmented choice | One of N views or modes | A sunken track with one raised option, so a choice never looks like an action (`.segmented`) | [Yue 2026-11-07] |
 | Tab | One of N panels | A word over a rule. The current word is ink over an accent underline | [inferred, from the site] |
 | Checkbox | A parameter refines | A pale accent tint with an accent tick. It sits by the parameter it controls, never by a follower | [Yue 2026-11-07] |
-| Padlock | A parameter is held | A cell with a checkbox cell's geometry, so locking moves no number. No column heading | [Yue 2026-11-07] |
+| Padlock | A parameter is held | The one stroked padlock, never an emoji, the same on every row. A cell with a checkbox cell's geometry, so locking moves no number. No column heading | [Yue 2026-11-07; Yue 2026-11-22 for one padlock] |
 | Editable value | A number you can change | A tinted cell, the whole cell the target. Its editor floats over the cell and shows the whole number | [Yue 2026-11-07] |
 | Dialog field | A value typed into a form | A bordered box, because it is a control. The label column fits the longest label | [inferred; Yue 2026-11-08 on the overlapping label] |
 | Link | Go somewhere | The accent's text role (`--accent-ink`), underlined where it sits in running text | [inferred, from the site] |
@@ -101,7 +101,7 @@ The drawings live in `gui/src/app.css`. Each kind below means one thing (princip
 - Every control shows the accent focus ring on keyboard focus. [inferred, from the site]
 - Hover styles apply only where the device hovers, because a touch screen keeps the hover on the last thing tapped. [inferred, from the site]
 - Motion is limited to a short fade or turn on a disclosure or tooltip, and none under a reduced-motion setting. [inferred, from the site]
-- Icons are one stroked SVG set in the site's stroke. Each is even and fits its box. A glyph appears only as text, such as ⌘ in a shortcut. [Yue 2026-11-08 on the cog; inferred for the set]
+- Icons are one stroked SVG set in the site's stroke. Each is even and fits its box. A glyph appears only as text, such as ⌘ in a shortcut, and never as an emoji, which draws in colour and in each platform's own picture. [Yue 2026-11-08 on the cog; Yue 2026-11-22 on the emoji padlock; inferred for the set]
 
 ## Layout and panels
 
@@ -158,13 +158,15 @@ Claude inferred rules 1 to 12 from the rulings on background points and peak pic
 - What a name means is a `rietx.help` entry, and a short label comes from that entry's label field. [inferred, WP-1203, WP-1209]
 - Text in prose takes the minus sign −, and a number a person may copy takes the hyphen-minus -. [inferred, WP-1213]
 - Any sentence the GUI shows (help, empty states, error text) is written under the house documentation style, in British spelling. [inferred, WP-1201]
+- The Refine choice that runs every ticked parameter together to convergence is called "As ticked", never "One cycle": in the field a cycle is one least-squares iteration. [Yue 2026-11-22]
 
 ## Plots
 
 - The pattern follows rietx's plot conventions in the GUI's colours. Observed points are crosses, sized by how densely they sit, and always clearly visible. The calculated curve is a solid line. The difference sits below on its own axis, in esd, over a band of ±3 esd. Reflection ticks are lenses in their own band at the foot, one row per phase, and never on the difference axis. [Yue 2026-11-07; inferred, WP-1032, for the band]
 - Every curve and the data can be hidden and shown. Their labels sit in a right-hand gutter and act as the switches. A hidden curve is not remembered, so a curve a later build adds arrives drawn. [Yue 2026-11-07; inferred, WP-1032]
 - A preview is drawn in the accent, and the last fit turns grey only while a preview exists. [inferred]
-- No gridlines, no title inside the plot, no shadow. [Yue 2026-11-07, adopting rietx's plot conventions]
+- Horizontal gridlines run from the intensity ticks across the pattern, as the prototype draws them. No vertical gridlines, no title inside the plot, no shadow. [Yue 2026-11-07, adopting rietx's plot conventions; Yue 2026-11-21 for the horizontal gridlines]
+- A scale's mark (√, log, Δ/σ) sits in its axis's tick-label column over the top labelled tick, never in a column of its own and never on a label. [Yue 2026-11-21]
 - Every curve and mark stays inside the plot area at any zoom. Nothing is drawn into the axis margins. [inferred, WP-2200]
 - A legend puts its symbols in one column on the left, with the labels aligned after them. A colour key goes in empty space inside the plot, never in a margin of its own. [Yue 2026-11-08]
 - The hover readout is a strip under the plot, never a box that follows the pointer. [inferred, WP-1213]
@@ -181,7 +183,7 @@ These tests hold the rules a machine can check cheaply. A new rule that a machin
 
 - `tests/test_gui_palette.py`: the token values and the generated `gui/src/tokens.css`, the plot palette's floor, every text colour's contrast on its grounds, and the ink on the primary fill.
 - `tests/test_gui_layout_browser.py`: no click moves the layout, collapse buttons stay where they were, and a phone-width window never scrolls sideways.
-- `gui/src/lib/style.test.ts`: no panel sets a register's size, padding or radius, and no size falls outside the steps.
+- `gui/src/lib/style.test.ts`: no panel sets a register's size, padding or radius, no size falls outside the steps, no source names an emoji character, and no source shows the words "One cycle".
 - `tests/test_gui_dist.py`: no built file names a remote host, so every font is the app's own.
 - `tests/test_gui_style_guide.py`: this guide names only tokens and tests that exist, carries a marker on every rule, and restates no colour or pixel value.
 
