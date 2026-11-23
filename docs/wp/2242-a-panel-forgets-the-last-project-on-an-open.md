@@ -72,7 +72,9 @@ browser re-opens the URL it first used and sends `Last-Event-ID`, which the serv
 since WP-2237.
 
 Overlap: WP-2211 (History table) and WP-2231 (Plan and Text tabs) are in flight on `/next`
-panels this WP touches. Read their branches before editing those panels.
+panels this WP touches. Read their branches before editing those panels. *Superseded
+2026-11-23:* both branches are merged into `main`; the open overlap is PR #1792 (WP-2240), which
+edits `next/Frame.svelte` and `next/Pattern.svelte` and rebuilds the dist.
 
 The tier of each rule this WP adds: none. It adds no flag, threshold or automatic action.
 
@@ -83,13 +85,13 @@ The tier of each rule this WP adds: none. It adds no flag, threshold or automati
 
 ## Tasks
 
-- [ ] One project identity in each page (the open handler bumps a counter beside
+- [x] One project identity in each page (the open handler bumps a counter beside
   `project.path`), passed to every panel whose reload reads `head`, or a `{#key}` around
   it placed after `leaveEdits` so pending edits are saved first.
-- [ ] Explicit resets at the open handler: App `applied`, `indexSnapshots`,
+- [x] Explicit resets at the open handler: App `applied`, `indexSnapshots`,
   `protocolError`, History comparison, Series `loaded`; `/next` `protocolError`,
   `baseCurves`, Pattern `selection`, Structure camera and toggles.
-- [ ] Decide per item whether today's page earns the fix before the swap (WP-2214).
+- [x] Decide per item whether today's page earns the fix before the swap (WP-2214).
   `applied`'s Undo does: it moves the working state.
 - [ ] Vitest: open two projects with equal head ids and assert each panel reloads.
 - [ ] A browser check per page: open A, open B with the same node count, and read each

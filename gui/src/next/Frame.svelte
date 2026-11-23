@@ -63,6 +63,12 @@
            type BottomTab, type GraphTab, type ModelTab } from "./tabs";
 
   let project = $state<any>(null);
+  /** The open project's identity on this page, bumped by `opened` and nowhere
+   *  else (WP-2242). `head` cannot tell two projects apart, since node ids
+   *  repeat across them (`n0000`, `n0001`, …), and neither can the path, which
+   *  a reset example keeps. Every panel whose state is the project's sits
+   *  inside `{#key opens}` and starts over. */
+  let opens = $state(0);
   let version = $state<any>(null);
   let run = $state<RunState | null>(null);
   let lines = $state.raw<Line[]>([]);
@@ -407,7 +413,13 @@
     }
   }
 
+  /** Every opener lands here. The panels keyed on `opens` start over by
+   *  themselves; this resets what the frame holds for the project beside
+   *  them. What it leaves is the session's on purpose: the theme, the layout,
+   *  the tab and workflow choices, the refine choice, the Console. */
   async function opened(doc: any) {
+    // after the edits are kept, so a pending value is saved for the project
+    // it was typed in before its panel goes
     await leaveEdits();
     // the script is this project's session: another project's calls are not
     calls = [];
@@ -416,7 +428,24 @@
     peaksPayload = null;
     selectedPeak = null;
     frameAt = null;
+    protocolError = "";
+    baseCurves = null;
+    reading = null;
+    // what the keyed panels hand up, which a fresh panel has not said yet
+    pendingTouched = 0;
+    pendingInvalid = "";
+    pendingHolds = new Map();
+    sliderTouched = 0;
+    sliderValues = null;
+    sliderPreview = null;
+    sliderPreviewError = "";
+    textPreview = null;
+    textPreviewError = "";
+    planEdited = false;
+    textEdited = false;
+    textWhy = "";
     project = doc;
+    opens += 1;
     openError = "";
     newOpen = false;
     const [, free] = await Promise.all([loadResult(), freeCount()]);
@@ -992,6 +1021,7 @@
           {/if}
         </div>
         <div class="pane">
+          {#key opens}
           {#if graphTab === "pattern"}
             <Pattern {result} {plotKey} {theme} {protocol} {extent} {wavelengths} {busy}
               {protocolError} onprotocol={setProtocol} onreadout={(r) => (reading = r)}
@@ -1017,6 +1047,7 @@
           {:else}
             <p class="unbuilt">Not built yet.</p>
           {/if}
+          {/key}
         </div>
       </section>
     {/if}
@@ -1069,17 +1100,16 @@
             {/if}
           </div>
         {/if}
-        <!-- mounted for the workflow's life, so a step switch keeps the list's
-             filter and the chosen row; keyed on the project, since the list
-             is read once on mount and its row numbers are that project's -->
+        <!-- each pane is the project's, so another project's open starts each
+             over (`opens`); the Indexing list is mounted for the workflow's
+             life, so a step switch keeps its filter and the chosen row -->
+        {#key opens}
         {#if wf === "index"}
-          {#key project.path}
-            <div class="pane wfsteps">
-              <Indexing bind:this={indexingPanel} {step} steps={wfSteps ?? []} {busy} {corpus} {say}
-                bind:selected={selectedPeak}
-                onpeaks={(p) => (peaksPayload = p)} onframe={framePeak} />
-            </div>
-          {/key}
+          <div class="pane wfsteps">
+            <Indexing bind:this={indexingPanel} {step} steps={wfSteps ?? []} {busy} {corpus} {say}
+              bind:selected={selectedPeak}
+              onpeaks={(p) => (peaksPayload = p)} onframe={framePeak} />
+          </div>
         {/if}
         <div class="pane" class:gone={!!wfSteps || modelTab !== "params"}>
           <Params bind:this={paramsPanel} {head} {busy} {corpus} {say} onmoved={structureMoved}
@@ -1116,6 +1146,7 @@
             }}
             onpending={(edited, why) => { textEdited = edited; textWhy = why; }} />
         </div>
+        {/key}
         {#if !wfSteps}
           <ActionBar bind:mode={refineMode} {touched} {invalid}
             {busy} {blocked} stats={barStats} stages={project?.doc?.plan?.stages?.length ?? null} onapply={() => applyPending()}
@@ -1155,7 +1186,7 @@
       <div class="pane" class:gone={bottomTab !== "history"}>
         <!-- keyed on the project: two projects' heads can share an id, and
              History re-reads only when its head changes -->
-        {#key project.path}
+        {#key opens}
           <History {head} {busy} {say} view={historyView} compared={compared?.id ?? null}
             oncount={(n) => (historyCount = n)} oncompare={(c) => (compared = c)}
             onrestore={(plan) => paramsPanel?.loadRestore(plan)} onmoved={structureMoved} />
