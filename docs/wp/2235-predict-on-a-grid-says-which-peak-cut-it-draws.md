@@ -1,9 +1,8 @@
 # WP-2235 — predict on a grid says which peak cut it draws
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: ✅ 2026-11-22 — ruling A: after a fit `predict(grid)` compiles at the fit's peak cut, so it returns `y_calc` bit for bit; PR #1773
 Track: A long run is not one fit
 Depends on: —
-Priority: P3 2026-11-21 — the manual and a docstring state a difference between `predict`'s two forms that is 200× too small; no fit moves, and the docstring's own recipe is the workaround
 
 ## Goal
 
@@ -56,7 +55,34 @@ against `predict` at 8e-6; its § Inherited carries a note. PR #1640 (WP-1947, o
 2026-11-21) adds a section to `exports.md` directly after this paragraph, so rebase on it if it
 merges first.
 
-### Inherited
+## Rulings
+
+**Ruled by Yue, 2026-11-22: option A.** He was brought the numbers in § Context and
+`docs/practice.md` § How far a peak is computed. Once a `Refinement` has fitted,
+`predict(grid)` compiles at the last fit's recorded peak cut, as WP-2226's GUI preview does
+since its own ruling A. So `predict(result.two_theta)` equals `result.y_calc`. A `Refinement`
+that has never fitted keeps today's default, `CLOSING_WINDOW_TOL` (1e-3 of each peak's area).
+
+- **Alternatives.** B kept the 1e-3 default for every grid and fixed only the two texts, so
+  a grid would keep differing from the fit's curve by the tails. C compiled every grid at
+  2 %, which also coarsens the synthetic patterns a never-fitted object draws.
+- **Practice.** Every program in the survey has one peak cut, used for fitting and for the
+  pattern it draws (TOPAS's `ymin_on_ymax`, GSAS-II's 50/75 FWHM, FullProf's `Wdt`). None
+  documents a second cut for evaluating a fitted model on a new grid (recall plus the
+  survey's table, not checked further). Option A makes rietx draw a fit's curve at the cut it
+  fitted with, which is what each of them does.
+- **What it gives up.** The grid form now depends on whether the object has fitted. A twin
+  carrying the fitted models but no fit returns the 1e-3 array.
+- **Implementation choice, settled by Claude under the ruling's "as the GUI preview
+  does".** One method, `Refinement._peak_cut`, now answers for both `predict` and the GUI
+  preview. With a history it reads the nearest stage node at or above the head, the
+  preview's rule, so an edit, a checkout and a reopened project keep the fit's cut.
+  Without a history it reads the last answer's compile, kept through an edit and never
+  carried into a package trial. Both readings carry the window slack as well as the area
+  fraction. The alternative was reading the answer's compile alone (`Refinement._model`),
+  which the first commit did: the review found any edit clears it, so after a no-op
+  `set_values` the grid fell back to 1e-3 and differed on 2076 of 4200 channels of the
+  synthetic LaB₆ fit, and the GUI and `predict` read two authorities.
 
 ## Non-goals
 
@@ -65,13 +91,16 @@ merges first.
 
 ## Tasks
 
-- [ ] Bring the question above to Yue with the numbers and the practice survey.
-- [ ] Implement the answer: either `predict(grid)` compiles at the last fit's recorded cut
+- [x] Bring the question above to Yue with the numbers and the practice survey.
+      (Ruled 2026-11-22: option A, § Rulings.)
+- [x] Implement the answer: either `predict(grid)` compiles at the last fit's recorded cut
       when one exists, or it stays at the default and says so.
-- [ ] Rewrite the docstring's bold paragraph and the manual's paragraph to the measured
+- [x] Rewrite the docstring's bold paragraph and the manual's paragraph to the measured
       relation, with the number.
-- [ ] A test on a small synthetic fit pinning the relation between the two forms as shipped.
-- [ ] Skill: none, unless the answer changes what an agent passes to redraw a fit's curve.
+- [x] A test on a small synthetic fit pinning the relation between the two forms as shipped.
+- [x] Skill: none, unless the answer changes what an agent passes to redraw a fit's curve.
+      (None: the skill never taught the recipe, and `predict(result.two_theta)` now needs
+      none.)
 
 ## Acceptance
 
@@ -85,6 +114,60 @@ merges first.
 - WP-2222 (the closing stage off by default), WP-2226 (the preview on the declared windows).
 
 ## Handover log
+
+- **2026-11-22** — closed (ghostshift runner, PR #1773). After a fit, `predict` on a
+  pattern's own grid now draws exactly the fitted curve, so a person or an agent redrawing
+  a fit no longer needs the `compile_model` recipe. A `Refinement` that has never fitted
+  still draws the near-complete tails a synthetic pattern wants. The price is the one Yue
+  accepted under ruling A: the grid form now depends on whether the object has fitted.
+  - *Done.* `Refinement.predict(grid)` compiles at the cut and slack of the fit that
+    produced the working state, read by one method the GUI preview now shares
+    (§ Rulings). The docstring's bold paragraph and last
+    paragraph, the manual's § Evaluating the model in `exports.md`, the same claim in
+    `refinement.md` § the closing stage and the `WINDOW_AREA_TOL` comment in `forward.py`
+    now say so, with the number. `tests/test_refine_synthetic.py` replaces the old
+    "twin equals fitted" test with one pinning the new relation: Rietveld with and
+    without a history, Le Bail without, and a no-op `set_values` keeping the cut.
+  - *Review* (`/code-review high --fix`, 7 findings). Fixed: the orbit-split exception
+    stated in the docstring and manual (its own edit); an edit or checkout cleared the
+    cut, and the GUI and `predict` read two authorities (fixed by `_peak_cut`, measured
+    2076 of 4200 channels before). Declined: the moment frames under a moved angle (not
+    measured, and magnetic work is Mike's); the suggest probe's `_plan_settings` cut drops
+    the slack (predates this WP, a stage declaring a slack only); a comment that would go
+    stale only under a fix not taken; the compiled-path rule for bit-identity tests (both
+    sides of each comparison run on one path in one process).
+  - *Sibling fixed.* `report/distortion.py`'s detectability probe compared a fitted
+    object's `predict` with a never-fitted trial's. Under the new rule the two compile at
+    different cuts and every λ would gain the tails, so the baseline now comes from the
+    trial too. That keeps its numbers where they were (both sides at the default cut, as
+    before). One test made the same comparison: `test_displacive_statement.py`'s BT-1
+    restatement check failed at its 1e-10 bar (13.2 counts against 6975) and now builds
+    both curves from unfitted objects.
+  - *Not generalised, deliberately.* The result's own compile also keeps the solve's orbit
+    split (WP-2052) and its moment frames (#598). A grid takes the cut only, so a site
+    reported as `SITE_MULTIPLICITY_KEPT` is counted afresh and differs from `y_calc` there;
+    the docstring and the manual say so. Passing the orbit split would break on a
+    structure edited after the fit. The moment frames should agree to roundoff, since the
+    written-back components are the solve's (not measured).
+  - *Measured* (FAP tutorial, limits 15-130°, `history=False`, `[dev]`, darwin arm64,
+    probe in the runner's scratch). Before: `predict(result.two_theta)` differed from
+    `y_calc` on 5751 of 5751 channels, by at most 1.41e-3 (`mccusker_default`) and
+    1.39e-3 (`mccusker_structural`) of the strongest peak, median 9.3e-5 and 9.2e-5.
+    After: 0 of 5751 under both. A never-fitted twin is unchanged: it equals the
+    default-cut compile on every channel. `predict()` equalled `y_calc` before and after.
+    The new test fails both cases when the cut line is reverted (checked once).
+    Fast selection on this branch merged with `origin/main` (`e0b7ca3fd`, `[dev]`,
+    darwin arm64): 15122 passed, 443 skipped, 32 xfailed, 2 failed. Both failures
+    were this branch's (`refinement.md` 113 characters over its 50 000-character page
+    cap, and this closed WP's `### Inherited`), fixed in `4b9773e74` and re-run green.
+    Full selection on `4b9773e74`, alone under the machine's suite lock: 16081 passed,
+    454 skipped, 52 xfailed, 0 failed, 38 min. The test change is +2 cases (one case
+    replaced by three), 1.42 s for the three on the local junit file.
+  - *Siblings in other WPs.* WP-1949's § Inherited note carries a dated "superseded in
+    part" paragraph. PR #1640 (WP-1947) was still open, so no rebase was needed.
+  - *Reader output.* `python -m tests.reader_output` exit 0, unchanged against
+    `ca0b72210`: the change moves an array `predict` returns, not printed text.
+  - Next: none. The WP closes with this PR, and with it item 2 of issue #1652.
 
 - **2026-11-21** — created, from the 2026-11-21 issue triage (issue #1652, item 2). Checked
   against the tree at `c1033a0e8`: measured as in § Context. No open WP owns it: WP-2226

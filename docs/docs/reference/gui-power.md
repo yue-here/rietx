@@ -280,6 +280,7 @@ indices int32, so a browser reads each array without copying it.
 | `GET /api/peaks` · `POST /api/peaks` | the picked list; pick it, with `pick_peaks`'s `shoulders`, `two_theta_range` and `flag_contamination` |
 | `POST /api/peaks/add` · `POST /api/peaks/remove` · `POST /api/peaks/move` | one line, added, removed, moved |
 | `POST /api/peaks/flag` · `POST /api/peaks/refit` | mark a line; refit its group |
+| `POST /api/peaks/undo` · `POST /api/peaks/redo` | put the list back as it was before the last edit; make that edit again |
 | `POST /api/index` · `GET /api/index/result` | search for a cell; the ranked candidates |
 | `GET /api/index/ticks` | one candidate's predicted lines, for the overlay |
 | `POST /api/index/adopt` | adopt any candidate as a Le Bail scaffold |
@@ -294,6 +295,7 @@ indices int32, so a browser reads each array without copying it.
 | `GET /api/series/curves` · `GET /api/series/history` | one member's channels and curves, as float64 arrays; one member's tree |
 | `GET /api/history` | the node graph |
 | `GET /api/history/diff` · `GET /api/history/compare` | one node against its parent; two nodes against each other |
+| `GET /api/history/curves` | one node's calculated curve, recomputed at its own values, for Compare |
 | `POST /api/history/checkout` · `POST /api/history/branch` | restore a state; fork from one |
 | `POST /api/history/tag` · `POST /api/history/annotate` | name a node; attach a note |
 

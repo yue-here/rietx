@@ -46,7 +46,10 @@
   import { structureScript, type Say } from "./console";
   import { ApiError, api } from "../api";
   import Help from "../Help.svelte";
+  import HeldMark from "../HeldMark.svelte";
+  import Padlock from "../Padlock.svelte";
   import { fnmatch } from "../lib/fnmatch";
+  import { py } from "../lib/py";
   import { clone, newAtom } from "../lib/model";
   import { paramKey, resolve, type HelpCorpus } from "../lib/help";
   import { editText, expText, numParts, slotWidth, slotsFor, type NumParts,
@@ -55,7 +58,7 @@
            type Section } from "../lib/paramtree";
   import type { ParamsDraft } from "../lib/recovery";
   import { typesetSpaceGroup } from "../lib/spacegroup";
-  import { asGlob, editState, heldGlyph, matches, normalize, selection,
+  import { asGlob, editState, matches, normalize, selection,
            validateEdit, varyEdit, varyOf, type ParamRow } from "../lib/table";
   import Ask, { type AskField } from "./Ask.svelte";
   import Instrument from "./Instrument.svelte";
@@ -352,7 +355,7 @@
       for (const [path, flag] of holdEdits) {
         if (!flag) say("call", `ref.unhold(${JSON.stringify(path)})`);
       }
-      if (Object.keys(values).length) say("call", `ref.set_values(${JSON.stringify(values)})`);
+      if (Object.keys(values).length) say("call", `ref.set_values(${py(values)})`);
       for (const [path, flag] of varyEdits) {
         say("call", `ref.set_vary(${JSON.stringify(path)}, ${flag ? "True" : "False"})`);
       }
@@ -375,7 +378,7 @@
         // a set_values node (WP-1215); its answer names the values it set
         const out = await api.position(atom, xyz);
         if (out?.changed && out.values)
-          say("call", `ref.set_values(${JSON.stringify(out.values)})  # ${atom} to ${JSON.stringify(xyz)}`);
+          say("call", `ref.set_values(${py(out.values)})  # ${atom} to ${py(xyz)}`);
       } catch (exc) {
         // what landed before this changed the structure; the panel re-reads it
         await load();
@@ -467,6 +470,16 @@
     // has, such as a hold on a cut background term; left pending, it gets
     // the band and every Apply refused (review of #1683, finding 1)
     dropUnknown();
+  }
+
+  /** A history node's values, from the History tab's Restore (WP-2211), in
+   *  place of the value and position edits on screen, as the design's Restore
+   *  does. The pending flags, holds, limits and restraints stay. */
+  export function loadRestore(plan: { values: Record<string, string>;
+                                      positions: Record<string, Record<string, string>> }) {
+    closeEditor(false);
+    edits = new Map(Object.entries(plan.values));
+    positionEdits = new Map(Object.entries(plan.positions));
   }
 
   /** A hold or release on one path from another panel: the Background graph's
@@ -1152,7 +1165,7 @@
     <button class="lock" class:on={isHeld(row)} aria-pressed={isHeld(row)}
       disabled={busy}
       onclick={() => toggleHold(row.path, isHeld(row), row.held)}
-      >{@render padlock(isHeld(row))}<span class="sr">{isHeld(row) ? "release" : "hold"}</span></button>
+      ><Padlock on={isHeld(row)} /><span class="sr">{isHeld(row) ? "release" : "hold"}</span></button>
   {:else if row.refinable || row.vary}
     <input type="checkbox" class="vary" checked={varyOf(row, varyEdits)} disabled={busy}
       aria-label="refine"
@@ -1163,22 +1176,13 @@
          one, and the mark says which reason holds it (WP-1214) -->
     <span class="mark muted">
       <Help text={row.held_because} title="This row is held"
-        label="why this row is held">{heldGlyph(row)}</Help>
+        label="why this row is held"><HeldMark {row} /></Help>
     </span>
   {/if}
 {/snippet}
 
 {#snippet dots()}
   <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1" /><circle cx="8" cy="8" r="1" /><circle cx="12.5" cy="8" r="1" /></svg>
-{/snippet}
-
-{#snippet padlock(on: boolean)}
-  <svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true">
-    <rect x="2.5" y="6" width="9" height="6.5" rx="1.5"
-      fill={on ? "currentColor" : "none"} stroke="currentColor" stroke-width="1.3" />
-    <path d={on ? "M4.5 6V4.5a2.5 2.5 0 0 1 5 0V6" : "M4.5 6V4.5a2.5 2.5 0 0 1 5 0"}
-      fill="none" stroke="currentColor" stroke-width="1.3" />
-  </svg>
 {/snippet}
 
 {#snippet rowLine(l: Line, top: boolean)}
@@ -1280,7 +1284,7 @@
                   title={atomHeld(atom) ? `release ${atom.label}'s position` : `hold ${atom.label}'s position`}
                   onclick={() => toggleHold(atomGlob(atom), atomHeld(atom),
                     atom.dofs.length > 0 && atom.dofs.every((d) => d.held))}
-                  >{@render padlock(atomHeld(atom))}</button>
+                  ><Padlock on={atomHeld(atom)} /></button>
               {/if}
             </td>
             {#each AXES as axis (axis)}

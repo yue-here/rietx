@@ -335,6 +335,10 @@ export const api = {
     call("GET", `/api/history/diff?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`),
   historyCompare: (ids: string[]) =>
     call("GET", `/api/history/compare?ids=${encodeURIComponent(ids.join(","))}`),
+  /** One node's calculated curve, recomputed at its own values on its own
+   *  channels, packed as the curves are (WP-2211). Writes nothing. */
+  historyCurves: (nodeId: string) =>
+    arrays(`/api/history/curves?node=${encodeURIComponent(nodeId)}`),
 
   textdoc: () => call("GET", "/api/textdoc"),
   putTextdoc: (text: string, baseRevision?: string, validateOnly = false) =>
@@ -347,13 +351,19 @@ export const api = {
   /** The stored peak list plus the decimated raw pattern — the one payload the
    *  plot can draw before any fit exists (WP-1027). */
   peaks: () => call("GET", "/api/peaks"),
-  pickPeaks: (body: { shoulders?: boolean } = {}) => call("POST", "/api/peaks", body),
+  /** `pick_peaks`'s three options (WP-2124); an absent one is the default. */
+  pickPeaks: (body: { shoulders?: boolean; flag_contamination?: boolean;
+                      two_theta_range?: [number, number] } = {}) =>
+    call("POST", "/api/peaks", body),
   addPeak: (twoTheta: number) => call("POST", "/api/peaks/add", { two_theta: twoTheta }),
   movePeak: (index: number, twoTheta: number) =>
     call("POST", "/api/peaks/move", { index, two_theta: twoTheta }),
   removePeak: (index: number) => call("POST", "/api/peaks/remove", { index }),
   flagPeak: (index: number, body: { use_for_indexing?: boolean; flags?: string[] }) =>
     call("POST", "/api/peaks/flag", { index, ...body }),
+  /** the peak list as it was before the last edit, and that edit again (WP-2240) */
+  undoPeaks: () => call("POST", "/api/peaks/undo", {}),
+  redoPeaks: () => call("POST", "/api/peaks/redo", {}),
   refitGroup: (group: number, nComponents?: number) =>
     call("POST", "/api/peaks/refit",
          nComponents === undefined ? { group } : { group, n_components: nComponents }),
