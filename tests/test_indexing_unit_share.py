@@ -231,12 +231,15 @@ def test_1374_cases_monoclinic_all_systems_finds_the_cell(monkeypatch):
     no longer separates the two rules there, since svd's orthorhombic unit
     took 16 s of CPU, not the issue's 49.
 
-    Sized for a macOS arm64 core (M-series, 2026-11-21).  The monoclinic unit
-    alone, on the same list, with a 2 s CPU budget: dichotomy and svd each
-    found the cell, so the unit has a margin of about 5 against its 10 s
-    share there.  A core twice as slow still has about 2.5.  Linux x86_64
-    (pearl, nearer the nightly runner) was unreachable when this was
-    measured, so the margin there is not shown."""
+    Sized for a macOS arm64 core (M-series, 2026-11-21) and checked on Linux
+    x86_64 (i9-14900K, Python 3.12, one pinned core, 2026-11-23).  The
+    monoclinic unit alone, on the same list, under a CPU budget: on the Mac
+    dichotomy and svd each found the cell at 2 s; on Linux svd found it at
+    1 s and dichotomy between 1 and 2 s.  Against the unit's 10 s share that
+    is a margin of 5 or more on both machines.  A core twice as slow still
+    has about 2.5.  The whole row took 31.8-33.5 s of wall clock against its
+    30 s ceiling on Linux (31.2 s on the Mac): it always spends the ceiling,
+    so that figure is not a margin."""
     from tests.test_indexing_engines import CASES, assert_same_lattice, spec_for
 
     _cpu_clock(monkeypatch)
@@ -261,7 +264,11 @@ def test_1374_780_monoclinic_gains_a_second_finder(monkeypatch):
     engines, 20 s, so svd has a margin of about 10 and dichotomy, the
     assertion's limiting finder, at least 2.5 (it found the cell by 8 s).
     That is thinner than tests/CLAUDE.md § Budgets asks, so a core more than
-    about 2.5 times slower fails this row.  Linux x86_64 was unreachable when this was measured."""
+    about 2.5 times slower fails this row.  On Linux x86_64 (i9-14900K,
+    Python 3.12, one pinned core, 2026-11-23) the numbers are the Mac's: svd
+    found the cell by 2 s of its 20 s share (margin 10 or more) and dichotomy
+    not at 6 s and at 8 s (margin 2.5 to 3.3).  The row took 61.7-62.8 s of
+    wall clock against its 60 s ceiling (61.4 s on the Mac)."""
     from tests.repro_780 import CELL, peaks, spec
     from tests.test_indexing_engines import assert_same_lattice
 
