@@ -42,15 +42,15 @@ carries terms too.
 - [x] 1. Survey what else only `/` mounts at its root that a `/next` control depends on.
 - [x] 2. One shared popover component and opener, mounted by both `App.svelte` and
   `next/Frame.svelte`; vitest for `/next`.
-- [ ] 3. A real-click browser test: a help term at `/next` opens its popover; the dist rebuilt.
-- [ ] Skill: none. The agent skill drives the Python API, never the GUI.
+- [x] 3. A real-click browser test: a help term at `/next` opens its popover; the dist rebuilt.
+- [x] Skill: none. The agent skill drives the Python API, never the GUI.
 
 ## Acceptance
 
 ```sh
 npm --prefix gui test && npm --prefix gui run check && npm --prefix gui run build
 git diff --exit-code src/rietx/gui/static
-.venv/bin/python -m pytest tests/test_gui_browser.py -k help -n 0
+.venv/bin/python -m pytest tests/test_gui_layout_browser.py -k help_term -n 0
 ```
 
 ## References
