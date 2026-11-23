@@ -1,6 +1,6 @@
 # WP-2240 — the peaks-and-indexing workflow at `/next`: pick peaks, fit peaks, index, judge
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-23 — tasks 1-9 built and the R6 look's rulings applied; #1792 waits on the maintainer's second look
+Milestone: gui-overhaul · Status: 🔄 2026-11-23 — tasks 1-9 built and both R6 looks' rulings applied; #1792 waits on the maintainer's third look
 Depends on: 2218 (hand fitting and the other graphs)
 Priority: P2 2026-11-22 — a feature the open milestone was opened for: R6, the rebuild's next piece
 
@@ -171,6 +171,17 @@ package. `src/rietx/_audit.py` is untouched.
   is now named for the mode it ran ("Pawley check"). The structure-free defaults outside the
   workflow are listed in the look entry's question 4 and left as they are.
 
+- **Yue's rulings at the second look, 2026-11-23, verbatim:** "r6: grey lines much better than
+  green. blue lenses on orange. line, not hollow lens. widen the candidate table. the current
+  table has lots of alignment issues, title left for text vs right for numbers, leading to
+  angle titles being offset and hard to read. think about the uiux here and consider good
+  practice." He attached a crop of the relation column, whose rows read "9 ⊇ #1 4" and
+  "10 2× #1 9": the mark does not line up from row to row and runs into the next column.
+  Built: a chosen cell's lines in `--line-strong` at `/next` (option (c) of the look); the
+  candidate table aligned by table practice; the workflow's panel opened wide enough for it.
+  Kept as built: the blue lenses over the orange fit, and the thin line for a chosen line left
+  out of indexing. The fifth session's entry says how "line, not hollow lens" was read.
+
 ## Non-goals
 
 - Search these running a narrowed search; it waits on a route that starts a search over named
@@ -220,6 +231,77 @@ The piece closes when every task is ticked and the maintainer has looked at its 
 the prototype's (WP-2214 § How the maintainer reviews).
 
 ## Handover log
+
+- **2026-11-23 (fifth session)** — Yue's second-look rulings (§ Rulings, verbatim), on #1792.
+  A chosen cell's lines on the Pattern graph are now grey. The candidate table is realigned by
+  established table practice and no longer scrolls, because the workflow opens its panel at
+  952 px. The lenses and the left-out line are unchanged. The WP stays 🔄 for Yue's third look,
+  `~/.cache/ghostshift/rietx/gui-r6/look-r6b/index.html`.
+
+  *Done.* `next/pattern.ts` draws the candidate lines in `--line-strong`, read with the other
+  chrome inks (`Chrome.rule`); today's Peaks tab keeps `--plot-candidate`. `gui/STYLE.md`
+  § Plots says so. In `lib/peaks.ts`, `cellColumns` writes every angle at two places, a set
+  one too (`90.00`, muted), and drops the `pad`; `Relation` is now `{mark, of, text}`. In
+  `next/Candidates.svelte` the head is two rows: "Lengths (Å)" and "Angles (°)" span their
+  three columns over a rule, and V (Å³) and Rwp (%) carry their units. Each head is aligned
+  as its column is. The relation is two cells (the mark right-aligned, `#k` left-aligned,
+  then a 14 px gap); the absent count and "of N" are two cells. A wider gutter sits between
+  the two cell groups, before a word column and before Rwp. `lib/workflows.ts` gains
+  `Workflow.panel` and `panelWidth`: the peaks workflow opens its panel at 952 px, kept under
+  the frame less the splitter's 360 px and never below 785 px. A person's drag wins until
+  the splitter's double-click resets it.
+
+  *Measured, by real clicks* (fap, 1440 × 900, light and dark, a hexagonal and monoclinic
+  search). Before: the table was 868 px in a 760 px box and scrolled; the α head ended 25 px
+  right of its numbers, and the relation's ink ended at two x positions. After: the table's
+  natural width is 915 px and it does not scroll in a 927 px box. Every numeric column's ink
+  ends at one x on all twelve rows, and each numeric head ends at its column's x; the word
+  heads start at their column's x. No cell's ink exceeds its room (a `Range` against
+  `clientWidth` less padding). 952 px is that 915, 12 px for a "medium" grade over a "low"
+  one, the body's 24 px of padding and the panel's 1 px rule. The graph keeps 488 px at
+  1440 × 900. No page errors.
+
+  *Settled under practice.* Each source was found by one web search this session or is quoted
+  from recall, as marked.
+  - Numbers right-aligned, text left-aligned, never centred, and each head aligned as its
+    column. Sources: Matt Ström, "Design better data tables" (2017,
+    mattstromawn.com/writing/tables); the EU data-visualisation guide's table chapter
+    (data.europa.eu/apps/data-visualisation-guide/table-design-scannability); Adobe
+    Spectrum's table page (spectrum.adobe.com/page/table). Found this session.
+  - Right alignment is decimal alignment when a column's places are equal; align on the
+    point otherwise (Ubuntu's Vanilla "Header row" guidance, discourse.ubuntu.com/t/19845,
+    found this session). So every angle takes two places, a fixed one too. Equal places in a
+    column is also APA 7's table rule (recall).
+  - Tabular figures, or a monospaced face as the fallback (the same sources). The numbers
+    are already IBM Plex Mono; `font-variant-numeric: tabular-nums` is set too.
+  - Units in the column head, never in each cell, and a spanner head over a group of
+    columns with a rule beneath it: the Chicago Manual of Style's tables chapter (recall,
+    not re-read). Parentheses for the unit, "a (Å)", follow IUCr journal tables (recall).
+    `gui/STYLE.md`'s "units follow the value" is read as a rule for value boxes in forms,
+    since its exception is the sliders.
+
+  *Settled by Claude, for review.*
+  - Keeping the lenses blue and the left-out line orange. "blue lenses on orange" answers the
+    first look's question 1 with what was built. "line, not hollow lens" answers its
+    question 2, whose only line option was the built orange one. The brief read both as one
+    request for a blue line, so the look page draws three blue readings beside the built one.
+  - Opening the panel wider for this workflow only, rather than widening every workflow's
+    default. Alternative: the Bravais symbol (`hP`), about 60 px narrower, which is a naming
+    choice on the main surface and so Yue's.
+  - Two relation cells, not three: no row has both a symbol and a count.
+
+  *For Yue to look at* (`look-r6b/index.html`). 1. Is a 488 px graph acceptable beside the
+  952 px panel, or should the table narrow instead? 2. Which mark for a chosen line left out
+  of indexing: the built orange line, or one of three blue readings? 3. The two judgement
+  calls in the table: `90.00` against `90`, and the two-cell relation.
+
+  *Gates* (arm64 Mac, worktree venv `[dev]` + playwright). The fast suite: 15404 passed,
+  438 skipped, 32 xfailed, 1 failed. The failure was
+  `test_gui_series_browser.py::test_a_series_is_loaded_sorted_walked_and_run`, a typed
+  coordinate not yet saved when the sort ran; the file passed alone (1 passed), and nothing in
+  this change reaches the Series workflow's panel width or its table. The browser files this
+  touches ran inside the suite and passed. vitest: 65 files, 1019 passed. svelte-check: 0
+  errors over 497 files. ruff clean.
 
 - **2026-11-23 (fourth session)** — Yue's R6 look rulings, on the same PR, #1792. Yue looked at
   the screenshots and ruled five things (§ Rulings, 1 to 5). The peak fit is now drawn like the
