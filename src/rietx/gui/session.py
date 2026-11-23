@@ -75,7 +75,8 @@ from ..report.apply import api_call, describe_action, refusal, stage_for
 from ..schemas.instrument import Instrument
 from ..schemas.plan import PlanSpec, StageSpec
 from ..schemas.structure import Structure
-from ..strategy.staged import PLAN_PRESETS, resolve_plan
+from ..strategy.refit import REFIT_MODES, WARM_REFIT_STAGE, _collapse
+from ..strategy.staged import CLOSING_STAGE_NAME, PLAN_PRESETS, resolve_plan
 from ..viz import packed as _packed
 from ..viz import theme
 from ..viz.compare import decimation_index
@@ -220,6 +221,10 @@ class GuiSession:
         self._seq = 0
         self._n_eval = 0
         self._run: dict = _idle_run()
+        #: ``(result, how)``: how the last fit ran (:func:`_how_ran`), beside
+        #: the result it describes, so the result route serves it only while
+        #: that result is the refinement's (WP-2227)
+        self._how: tuple[Any, dict] | None = None
         #: the last completed indexing run's answer.  Session-scoped like
         #: ``refinement.result_``: peaks.json is the durable artifact, an
         #: IndexingResult is a computation over it.
@@ -1395,6 +1400,17 @@ class GuiSession:
         # every glob again at tight windows, read-only here, and its Rwp is
         # the answer's, which the last declared rung's is not
         closing = plan.closing_stage(list(rows))
+        # a one-stage re-fit of this plan (WP-2224) ran none of its rungs, so
+        # its node stands in for them as one row after the stages (WP-2227,
+        # the maintainer's ruling 2), matched by the same rule as a rung: the
+        # stage the plan collapses to, and its closing stage when it has one
+        one_stage = None
+        if stages and not any(s.turn_off for s in plan.stages):
+            ran = self._stage_rwp(p, _collapse(plan))
+            if ran[0] is not None:
+                one_stage = {"n_free": stages[-1]["n_free"], "rwp": ran[0]}
+                if len(ran) > 1:    # the closing stage's, the answer's
+                    rwps[-1] = ran[-1]
         # the rows the closing stage's fix takes back from its frees: a tied,
         # locked or held row its literals name was never free to keep fixed
         closing_entry = None if closing is None else {
@@ -1420,7 +1436,7 @@ class GuiSession:
                 "n_free_final": stages[-1]["n_free"] if stages else 0,
                 "set_aside": set_aside, "never_freed": never_freed,
                 "stages": stages,
-                "closing": closing_entry,
+                "closing": closing_entry, "one_stage": one_stage,
                 "head": p.refinement._head_id,
                 "live": self._state != "idle"}
 
@@ -2182,13 +2198,28 @@ class GuiSession:
             n_stages = len(setup.members)
         else:
             plan = self._effective_plan(body.get("plan"))
+            # the library's default unless the page names one: `/next` says
+            # how a Refine ran (WP-2227) and takes the default, a one-stage
+            # re-fit of a converged model; today's page has no such view, so
+            # it asks for the stages until the swap (WP-2224, with Yue)
+            refit = {}
+            if "refit" in body:
+                if body["refit"] not in REFIT_MODES:
+                    raise GuiError(f"refit must be one of {list(REFIT_MODES)}, "
+                                   f"not {body['refit']!r}", where=["refit"])
+                refit = {"refit": body["refit"]}
 
             def call(stream, token):
-                # staged until the stage ladder has a view of a one-stage
-                # re-fit: after one, no run on record matches the plan on
-                # screen and the Rwp column goes blank (WP-2224, with Yue)
-                return p.fit(plan=plan, events=stream, cancel=token,
-                             refit="stages")
+                tree = p.refinement.history
+                before = 0 if tree is None else len(tree.order)
+                result = p.fit(plan=plan, events=stream, cancel=token, **refit)
+                self._how = (result, _how_ran(p.refinement, before))
+                return result
+
+            def summarize(result, token):
+                how = self._how
+                return {**_summarize_refinement(result, token),
+                        "how": how[1] if how is not None and how[0] is result else None}
 
             label = ""
             n_stages = len(plan.run_stages())   # the closing stage counts
@@ -2223,7 +2254,7 @@ class GuiSession:
                          "started_utc": _utcnow(), "finished_utc": None,
                          "elapsed": None, "rwp": None, "gof": None,
                          "node_id": None, "completed_stages": [], "error": None,
-                         "lebail": None}
+                         "lebail": None, "how": None}
             self._worker = threading.Thread(
                 target=self._work, args=(call, stream, summarize),
                 name=f"{_about.SERVER_TOKEN}-gui-run", daemon=True)
@@ -2278,6 +2309,18 @@ class GuiSession:
             return {"events": events, "next": self._seq, "oldest": oldest,
                     **self._state_frame_locked()}
 
+    def resume_at(self, since: int, last_id: int) -> int:
+        """Where a reconnecting stream picks up (WP-2237).
+
+        An EventSource re-opens the URL it was first given, whose ``since`` is
+        the cursor it held when it opened, and sends the last ``id:`` it read
+        beside it.  Read from the URL alone, a dropped connection replayed the
+        ring into the page a second time.  An id past ``_seq`` was numbered by
+        another process, a restarted server, so the URL's cursor stands.
+        """
+        with self._cond:
+            return last_id if since <= last_id <= self._seq else since
+
     def follow(self, since: int, last_state: str = "",
                timeout: float = 1.0) -> tuple[list[dict], int, dict | None, str]:
         """Block until something changed, then hand back what did.
@@ -2328,11 +2371,13 @@ class GuiSession:
             result = call(stream, token)
             finish = summarize(result, token)
         except RefinementCancelled as exc:
+            # ``how`` is said only of a fit that returned; a cancelled or
+            # failed one keeps none of what its one stage set while it ran
             finish = {"status": "cancelled", "stage": exc.stage,
-                      "node_id": exc.node_id,
+                      "node_id": exc.node_id, "how": None,
                       "completed_stages": [s.name for s in exc.completed_stages]}
         except Exception as exc:  # noqa: BLE001 — the run record IS the channel
-            finish = {"status": "failed",
+            finish = {"status": "failed", "how": None,
                       "error": {"code": "RUN_FAILED",
                                 "message": f"{type(exc).__name__}: {exc}"}}
         finally:
@@ -2390,6 +2435,15 @@ class GuiSession:
             elif kind == "stage_start":
                 self._run["stage"] = data.get("stage") or data.get("name")
                 self._run["stage_index"] = data.get("index")
+                # a re-fit's one stage is said in words while it runs, as the
+                # graph's title says it after (WP-2227); a fallback's staged
+                # plan then starts a stage of another name, which clears it.
+                # The closing stage ends either run, so it leaves the words be
+                if (self._run["kind"] == "fit"
+                        and self._run["stage"] != CLOSING_STAGE_NAME):
+                    self._run["how"] = (
+                        {"ran": "one_stage", "reason": "converged"}
+                        if self._run["stage"] == WARM_REFIT_STAGE else None)
                 if data.get("n_stages"):
                     self._run["n_stages"] = data["n_stages"]
             elif kind == "stage_end":
@@ -3180,6 +3234,10 @@ class GuiSession:
         for d, item in zip(res.diagnostics, payload["diagnostics"], strict=True):
             item["full"] = view[id(d)].full
             item["warning_under"] = list(view[id(d)].warning_under)
+        # how the fit ran (WP-2227), only while this result is that fit's: a
+        # stage run or a checkout since has replaced it
+        how = self._how
+        payload["how"] = how[1] if how is not None and how[0] is res else None
         payload["curves"] = {
             "n_points": len(res.two_theta),
             "two_theta_range": ([res.two_theta[0], res.two_theta[-1]]
@@ -3375,6 +3433,43 @@ class GuiSession:
         except KeyError as exc:
             raise GuiError(str(exc), code="NOT_FOUND", status=404) from None
 
+    def history_curves(self, node_id: str) -> Packed:
+        """One node's calculated curve, for the History tab's Compare (WP-2211).
+
+        Through :func:`refine.replay`, which compiles the node's own model at
+        its own values, 2θ range and extracted intensities, so it answers a
+        node the working table cannot express. A preview at the node's values
+        draws the same curve only for a node with the head's paths, no moved
+        atom and no Le Bail intensities of its own (WP-2211 § Measured).
+        Writes nothing. Idle-only, like every verb that compiles. The curve is
+        on the node's 2θ range, which can differ from the head's, so a client
+        places it by 2θ. The excluded regions are the project's current ones:
+        a node records none of its own, so a region excluded since it ran
+        leaves a gap in its curve.
+        """
+        import numpy as np
+
+        from ..refine import replay
+
+        self._require_idle()
+        p = self._need_project()
+        try:
+            node = p.history.resolve(node_id)
+        except KeyError as exc:
+            raise GuiError(str(exc), code="NOT_FOUND", status=404) from None
+        try:
+            res = replay(p.history, node, p.data)
+        except ValueError as exc:
+            raise GuiError(str(exc), code="MODEL_REFUSED") from None
+        tt = np.asarray(res.two_theta, dtype=np.float64)
+        y = np.asarray(res.y_calc, dtype=np.float64)
+        # past the curves route's ceiling, thinned as that route thins (WP-1461)
+        if len(tt) > _packed.CURVES_CEILING:
+            keep = decimation_index(tt, [y], _packed.CURVES_CEILING)
+            tt, y = tt[keep], y[keep]
+        return Packed({"node": node, "rwp": res.statistics.rwp},
+                      {"two_theta": tt, "y_calc": y})
+
     def history_checkout(self, body: dict) -> dict:
         """Restore a node's state as the working state (``git checkout``)."""
         self._require_idle()
@@ -3524,8 +3619,11 @@ class GuiSession:
     def _adopt(self, project: Project) -> None:
         with self._cond:
             self.project = project
+            # the ring is the old project's and goes; ``_seq`` keeps rising, as
+            # it does across runs, because a page that stays open across the
+            # open holds a cursor into it (WP-2237): reset to 0, that cursor
+            # skipped the new project's events up to the old count
             self._events.clear()
-            self._seq = 0
             self._n_eval = 0
             self._run = _idle_run()
             self._index_result = None
@@ -3672,6 +3770,45 @@ def _summarize_refinement(result, _token) -> dict:
     return out
 
 
+def _how_ran(ref, before: int) -> dict:
+    """How the fit that just returned ran: in one stage or in stages, and why
+    (WP-2227, the maintainer's rulings of 2026-11-22).
+
+    Read off the one authority, the refinement's own record of the choice
+    ``fit`` made (``_refit_how``, WP-2224), which :meth:`Refinement.summary`
+    prints from too, and served with that line (``plan_line``) for the
+    Console.  ``ran`` is ``"one_stage"`` or ``"stages"``; ``reason`` is
+    ``"converged"``, ``"released"`` (``released`` the paths the last fit held,
+    ``families`` their help keys in order), ``"fallback"`` (``diverged``
+    whether the discarded one-stage fit diverged, read off its last node of
+    the ones this fit added past ``before``: a result's status is its last
+    stage's, and ``WARM_REFIT_REJECTED`` says "diverged" off that one) or
+    ``None``, a first fit's plan.
+    """
+    from ..help import help_key_for
+
+    how = ref._refit_how
+    out: dict = {"ran": "stages", "reason": None, "plan_line": ref._plan_line()}
+    if how == "single":
+        out.update(ran="one_stage", reason="converged")
+    elif how == "fallback":
+        tree = ref.history
+        discarded = ([] if tree is None else
+                     [tree.nodes[n] for n in tree.order[before:]
+                      if tree.nodes[n].notes.get("refit_discarded")
+                      and tree.nodes[n].action.kind == "stage"])
+        out.update(reason="fallback", diverged=bool(discarded) and (
+            discarded[-1].metrics.status == "diverged"))
+    elif isinstance(how, list):
+        families: list[str] = []
+        for path in how:
+            key = help_key_for(path) or path
+            if key not in families:
+                families.append(key)
+        out.update(reason="released", released=list(how), families=families)
+    return out
+
+
 def _summarize_index(result, token) -> dict:
     """The run-record fields a finished indexing search supplies.
 
@@ -3765,7 +3902,7 @@ def _idle_run() -> dict:
             "stage_index": None, "n_stages": None, "started_utc": None,
             "finished_utc": None, "elapsed": None, "rwp": None, "gof": None,
             "node_id": None, "completed_stages": [], "error": None,
-            "lebail": None}
+            "lebail": None, "how": None}
 
 
 def _parse_utc(stamp: str) -> float:

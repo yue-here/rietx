@@ -804,3 +804,19 @@ Also in 0.62 (#562 S2b, WP-1997): ``Capabilities.solve_engines``, the
 structure-solution engines the build registers.  Additive and defaulted to
 an empty list, the same rule.  The solver stays unexported, so
 ``SolutionResult``'s own schema move waits until it is exported.
+
+Also in 0.62 (WP-2081): ``SeriesEntry.held_values``, every path the
+caller held on a pattern with the value it was held at.  Additive and
+defaulted to ``None``, the 0.25 → 0.26 rule; an older build refuses an entry
+carrying the key.
+
+Also in 0.62 (WP-2152): a phase's ``PeakEquation`` may read ``wavelength``,
+the emission line's λ in Å, beside ``h`` … ``two_theta``.  A build without the
+name refuses a stored equation that reads it, as "neither a coefficient nor a
+reflection name".  A coefficient named ``wavelength`` was legal and is now
+refused as the reflection's name; no test, example or fixture declared one.
+No new number: 0.62 is unreleased, so the change takes a line under it (the
+rule above the constant).  ``capabilities().expression_grammar_version`` does
+not move either.  The grammar parses any name, and the names a peak equation
+binds belong to the schema (``schemas.peak_equation.REFLECTION_NAMES``).
+WP-2107 moved the grammar for its two functions and the schema for its names.

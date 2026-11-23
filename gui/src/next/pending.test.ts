@@ -151,7 +151,7 @@ describe("the Instrument dialog's Load profile (WP-2229 case 1)", () => {
     expect(lines).toEqual([
       'ref.unhold(["instrument.background.c1"])',
       'ref.edit(instrument=load_instrument_profile("spline.json"))',
-      'ref.set_vary(["instrument.background.c0","instrument.background.c1"], True)',
+      'ref.set_vary(["instrument.background.c0", "instrument.background.c1"], True)',
     ]);
     expect(ondropped).toHaveBeenCalledTimes(1);
     const ended = ondropped.mock.calls[0][0] as (path: string) => boolean;
