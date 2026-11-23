@@ -12,7 +12,7 @@
  * kept.
  */
 import type { EngineEvent } from "../lib/stream";
-import type { Rung, SeriesEntry, SeriesPattern } from "../lib/series";
+import { sortByX, type Rung, type SeriesEntry, type SeriesPattern } from "../lib/series";
 
 /** The 2θ span every member covers between them, low end first. */
 export function spanOf(patterns: readonly SeriesPattern[]): [number, number] | null {
@@ -24,14 +24,8 @@ export function spanOf(patterns: readonly SeriesPattern[]): [number, number] | n
 /** Whether Sort by would change nothing: no member has a coordinate, or the
  *  members with one already rise and come first (`sortByX`'s order). */
 export function inOrder(patterns: readonly SeriesPattern[]): boolean {
-  let seenNull = false;
-  let last = -Infinity;
-  for (const p of patterns) {
-    if (p.x === null) { seenNull = true; continue; }
-    if (seenNull || p.x < last) return false;
-    last = p.x;
-  }
-  return true;
+  const order = sortByX([...patterns]);
+  return order.every((p, i) => p === patterns[i]);
 }
 
 /** The axis's first word, for "Sort by T": the name without its unit. */

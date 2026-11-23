@@ -73,6 +73,13 @@
   let changed = $state(false);
   let selected = $state<number | null>(null);
   let fileInput: HTMLInputElement | undefined = $state();
+  /** the list and the walk the last run ran over, taken when its record is
+   *  read: the Run step's rows are keyed by series index, so an edit after the
+   *  run must not re-label them. Null while a run is in flight, when the
+   *  server's list is the run's, since every edit is refused until it ends. */
+  let ranOver = $state.raw<{ patterns: SeriesPattern[]; direction: string } | null>(null);
+  /** this panel started the run now rising, so its progress is already reset */
+  let startedHere = false;
 
   const settings = $derived(setup?.settings ?? null);
   const axis = $derived(settings?.x_label ?? "index");
@@ -81,6 +88,9 @@
   const running = $derived(busy && run?.run?.kind === "series");
   const editable = $derived(!busy && !reading);
   const walks = $derived(walksOf(settings?.direction ?? "forward"));
+  const rows = $derived(ranOver?.patterns ?? patterns);
+  const runDirection = $derived(ranOver?.direction ?? settings?.direction ?? "forward");
+  const runWalks = $derived(walksOf(runDirection));
   /** a series needs two patterns to run */
   const few = $derived(patterns.length < 2);
   const heading = $derived(patterns.length
@@ -100,24 +110,52 @@
     }
   }
 
+  /** Forget the last run's table, for a run about to fill a new one. */
+  function clearRun() {
+    ranOver = null;
+    progress = emptyProgress();
+    entries = null;
+    cancelled = false;
+    backDone = new Set();
+  }
+
   // a series run ending reads its record: the entries replace the fold's guess
   let wasRunning = false;
   $effect(() => {
     const now = running;
     untrack(() => {
       if (now) ran = true;
-      if (wasRunning && !now) void load();
+      // a run another page started folds onto an empty table, never onto the
+      // last run's fits and rungs
+      if (now && !wasRunning && !startedHere) clearRun();
+      if (now) startedHere = false;
+      // a run that failed left the server's record at the run before it
+      if (wasRunning && !now) void load(run?.run?.status !== "failed");
       wasRunning = now;
     });
   });
 
-  async function load() {
+  async function load(answer = true) {
     try {
       absorb(await api.series() as SeriesSetup);
       failure = "";
-      if (setup?.has_result) await loadAnswer();
+      if (setup?.running) await replay();
+      // while a run is in flight the record is still the run before it
+      else if (answer && setup?.has_result) await loadAnswer();
     } catch (error) {
       failure = (error as Error).message;
+    }
+  }
+
+  /** A panel mounted mid-run folds the run's buffered events, which the
+   *  server clears when a run starts; the shell hands in the rest. */
+  async function replay() {
+    const { events } = await api.events(0) as { events: EngineEvent[] };
+    let p = progress;
+    for (const e of events) p = fold(p, e);
+    if (p !== progress) {
+      progress = p;
+      ran = true;
     }
   }
 
@@ -127,7 +165,12 @@
       entries = answer.result.entries as SeriesEntry[];
       cancelled = (answer.result.diagnostics ?? [])
         .some((d: { code: string }) => d.code === "SEQUENTIAL_CANCELLED");
-      progress = merged(progress, entries, settings?.direction ?? "forward");
+      // the list as the run left it (no edit lands while one is in flight),
+      // and the walk the record says ran
+      const direction = settings?.direction ?? "forward";
+      ranOver ??= { patterns, direction: answer.has_backward ? "both"
+        : direction === "both" ? "forward" : direction };
+      progress = merged(progress, entries, ranOver.direction);
       backDone = answer.has_backward
         ? secondWalkDone(entries, answer.trajectories?.[0]) : new Set();
       ran = true;
@@ -144,15 +187,17 @@
   }
 
   /** Send the list and the settings as one PUT: the order is the series. */
-  async function put(extra: Record<string, unknown> = {}) {
+  async function put(extra: Record<string, unknown> = {}): Promise<boolean> {
     failure = "";
     try {
       absorb(await api.putSeries({ patterns: asRequest(patterns), ...extra }) as SeriesSetup);
       if (ran) changed = true;
+      return true;
     } catch (error) {
       failure = (error as Error).message;
       // the list the server holds is still the series
       if (setup) patterns = [...setup.patterns];
+      return false;
     }
   }
 
@@ -184,14 +229,14 @@
     reading = "";
     if (added.length) {
       patterns = [...patterns, ...added];
-      await put();
-      say("comment", `# added ${added.length} pattern${added.length === 1 ? "" : "s"} to the series`);
+      if (await put()) say("comment", `# added ${added.length} pattern${added.length === 1 ? "" : "s"} to the series`);
     }
   }
 
   function remove(index: number) {
     patterns = patterns.filter((_, i) => i !== index);
     if (selected === index) selected = null;
+    else if (selected !== null && selected > index) selected -= 1;
     void put();
   }
 
@@ -244,18 +289,17 @@
 
   async function start() {
     failure = "";
-    const was = { progress, entries, cancelled, backDone };
-    progress = emptyProgress();
-    entries = null;
-    cancelled = false;
-    backDone = new Set();
+    const was = { progress, entries, cancelled, backDone, ranOver };
+    clearRun();
     changed = false;
+    startedHere = true;
     onstep(2);
     try {
       await onrun({ kind: "series" }, callText());
       ran = true;
     } catch (error) {
-      ({ progress, entries, cancelled, backDone } = was);
+      ({ progress, entries, cancelled, backDone, ranOver } = was);
+      startedHere = false;
       failure = (error as Error).message;
     }
   }
@@ -263,21 +307,21 @@
   /** A coordinate as the tables print it. */
   const xText = (x: number | null | undefined) => (x == null ? "" : String(x));
 
-  const nFits = $derived((progress.n ?? patterns.length) * walks);
+  const nFits = $derived((progress.n ?? rows.length) * runWalks);
   const nDone = $derived(fitsDone(progress));
-  const firstPass = $derived(progress.passes[0] ?? (settings?.direction === "backward" ? "backward" : "forward"));
-  const secondPass = $derived(walks > 1 ? (firstPass === "forward" ? "backward" : "forward") : null);
+  const firstPass = $derived(progress.passes[0] ?? (runDirection === "backward" ? "backward" : "forward"));
+  const secondPass = $derived(runWalks > 1 ? (firstPass === "forward" ? "backward" : "forward") : null);
   const nConverged = $derived(entries ? entries.filter((e) => e.status === "converged").length : 0);
   const status = $derived.by(() => {
     if (running) {
       const c = progress.current;
       if (!c) return `Fitting · ${nDone} of ${nFits}`;
-      const x = patterns[c.index]?.x;
-      const walk = walks > 1 ? ` · ${c.pass === firstPass ? "first walk" : "second walk"}` : "";
+      const x = rows[c.index]?.x;
+      const walk = runWalks > 1 ? ` · ${c.pass === firstPass ? "first walk" : "second walk"}` : "";
       return `Fitting ${c.label}${x == null ? "" : ` · ${x}`}${walk} · ${Math.min(nDone + 1, nFits)} of ${nFits}`;
     }
     if (cancelled) return `Stopped · ${nDone} of ${nFits} fits`;
-    if (entries) return `Finished · ${nConverged} of ${patterns.length} converged`;
+    if (entries) return `Finished · ${nConverged} of ${rows.length} converged`;
     return "";
   });
   /** a finished run is whole, even read by a page that did not follow it */
@@ -359,7 +403,7 @@
     </div>
     <div class="foot">
       <button disabled={few} onclick={() => onstep(1)}>First fit</button>
-      <button class="ghost" disabled={busy || few} onclick={start}
+      <button class="ghost" disabled={!editable || few} onclick={start}
         title="Run without a first fit: the first pattern starts from the model">Run series</button>
       <span class="muted">{#if reading}Reading {reading}…{:else if few}Needs two patterns{:else if changed}Changed since the last run{:else}{patterns.length} patterns · {walks === 2 ? "two walks" : "one walk"}{/if}</span>
     </div>
@@ -368,7 +412,7 @@
       <div class="body"><p class="muted empty">Not run yet.</p>
         {#if failure}<p class="bad">{failure}</p>{/if}</div>
       <div class="foot">
-        <button disabled={busy || few} onclick={start}>Run series</button>
+        <button disabled={!editable || few} onclick={start}>Run series</button>
       </div>
     {:else}
       <div class="body">
@@ -383,7 +427,7 @@
               {#if secondPass}<th class="r">Second walk</th>{/if}</tr>
           </thead>
           <tbody>
-            {#each patterns as p, i (p.upload + ":" + i)}
+            {#each rows as p, i (p.upload + ":" + i)}
               {@const fit = progress.fits[firstPass]?.[i]}
               {@const cur = running && progress.current?.index === i ? progress.current.pass : null}
               <tr class:sel={selected === i} onclick={() => (selected = i)}>
@@ -408,7 +452,7 @@
             title="Patterns already fitted keep their results">Stop</button>
         {:else}
           <button onclick={() => onstep(3)}>See results</button>
-          <button class="ghost" disabled={busy || few} onclick={start}
+          <button class="ghost" disabled={!editable || few} onclick={start}
             title="Replaces these results">Run again</button>
         {/if}
       </div>
