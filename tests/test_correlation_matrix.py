@@ -92,8 +92,11 @@ def _bare_result(identifiability=None) -> RefinementResult:
 def test_a_result_that_carries_no_matrix_is_refused_by_name():
     with pytest.raises(ValueError, match="not measured"):
         correlation_table_csv(_bare_result())
-    with pytest.raises(ValueError, match="not measured"):
+    with pytest.raises(ValueError, match="not measured") as refused:
         correlation_table_csv(_bare_result(Identifiability()))
+    # a joint fit carries its matrix (ruled on #1475), so the refusal does not
+    # offer one as a reason
+    assert "joint" not in str(refused.value)
 
 
 def _resolve(dotted: str) -> None:

@@ -220,7 +220,8 @@ Rwp and the residual differ, because anyone can recompute them from the arrays a
 The matrix is the one `top_correlations` is cut from, so a pair quoted there has the same value here.
 It is carried on the result and never on a history node, because at 300 free parameters the triangle is 45 150 numbers.
 `Refinement.write_correlation_table` writes it to a file ([Exports and derived tables](exports.md)).
-A joint multi-histogram fit carries the joint solve's matrix, over the joint free parameters; its other parameter-space tables stay empty.
+A joint multi-histogram fit carries the joint solve's matrix, over the joint free parameters, with an undetermined pair `None` as in a single fit; its other parameter-space tables stay empty.
+`RefinementResult.for_histogram` hands each histogram's view the block over its own rows and the shared ones, spelled as its `parameters` spell them.
 
 The two absorption tables partition the declared extra components by kind.
 A hump is in the background span and a declared sharp peak in its own.

@@ -333,8 +333,8 @@ def _correlation_of(source: RefinementResult | CorrelationMatrix) -> Correlation
     if ident is None or ident.correlation is None:
         raise ValueError(
             "this result carries no correlation matrix: it was not measured "
-            "(fewer than two free parameters, no correlation formed, a joint "
-            "multi-histogram fit, or a replayed node)")
+            "(fewer than two free parameters, no correlation formed, or a "
+            "replayed node)")
     return ident.correlation
 
 

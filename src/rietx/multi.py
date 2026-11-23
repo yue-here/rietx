@@ -52,6 +52,7 @@ from .optimize.least_squares import (
     _longest_line_wavelength,
     _multi_closures,
     covariance_estimates,
+    covariance_jacobian,
     rechart_outcome,
     run_multi_least_squares,
     stationary_columns,
@@ -59,6 +60,7 @@ from .optimize.least_squares import (
 from .optimize.statistics import (
     background_absorption,
     compute_statistics,
+    resolved_correlation,
     roughness_absorption,
 )
 from .params.multi import (
@@ -2487,12 +2489,15 @@ class MultiHistogramRefinement:
         stderr = outcome.stderr_internal
         corr = outcome.correlation
         # the joint solve's whole correlation matrix, the one ``_top_diagnostics``
-        # thresholds (WP-1990, ruled on #1475); ``None`` where it was not formed
+        # thresholds (WP-1990, ruled on #1475), with a pair the data do not
+        # determine blanked as ``check_guards`` blanks it (WP-2050); ``None``
+        # where it was not formed.  The esds below read the solver's own.
         free_joint = list(mt.free_paths)
+        resolved = _resolved_joint_correlation(outcome, free_joint)
         joint_correlation = (
-            CorrelationMatrix.from_square(free_joint, corr)
-            if corr is not None and len(free_joint) > 1
-            and np.shape(corr) == (len(free_joint),) * 2 else None)
+            CorrelationMatrix.from_square(free_joint, resolved)
+            if resolved is not None and len(free_joint) > 1
+            and np.shape(resolved) == (len(free_joint),) * 2 else None)
         n_data = [len(m.tt) for m in models]
         data_off = np.concatenate([[0], np.cumsum(n_data)]).astype(int)
 
@@ -2744,7 +2749,7 @@ class MultiHistogramRefinement:
         parameters = self._parameters(at_bounds, per_esds, answer_runaway,
                                       outcome.esd_inflation)
         diagnostics = list(opening_diags) + self._top_diagnostics(
-            outcome, correlation_guard, top_bg, at_bounds, models)
+            outcome, correlation_guard, top_bg, at_bounds, models, resolved)
         # what a parametric declaration did to each pattern's dependent that
         # no bound the solve saw could stop (WP-1325, FIT)
         diagnostics = diagnostics + _parametric_range_diagnostics(mt)
@@ -3061,7 +3066,7 @@ class MultiHistogramRefinement:
         return params
 
     def _top_diagnostics(self, outcome, correlation_guard, bg_scoped,
-                         at_bounds, models) -> list[Diagnostic]:
+                         at_bounds, models, resolved=None) -> list[Diagnostic]:
         mt = self.mtable
         free = mt.free_paths
         report = GuardReport(background_correlations=bg_scoped)
@@ -3077,12 +3082,12 @@ class MultiHistogramRefinement:
         report.nonpositive_texture = _texture_once(mt, models)
         report.nonpositive_peak_width = _first_per_path(
             mt, models, check_peak_width_positive)
-        if outcome.correlation is not None and len(free) > 1:
+        if resolved is not None and len(free) > 1:
             # the single fit's loop (``check_guards``' rule), on the joint
-            # correlation matrix
+            # correlation matrix the result carries (WP-1990), a pair the
+            # data do not determine never crossing the threshold (WP-2050)
             report.high_correlations, report.flat_directions = (
-                _correlation_findings(np.asarray(outcome.correlation), free,
-                                      correlation_guard))
+                _correlation_findings(resolved, free, correlation_guard))
         if outcome.jac is not None and len(free) > 1:
             try:
                 # the matrix the covariance cut (``check_guards``' rule)
@@ -3094,6 +3099,30 @@ class MultiHistogramRefinement:
         report.at_bounds = at_bounds
         return (_guard_diagnostics(report) + _size_sharing_diagnostics(mt)
                 + _peak_equation_sharing_diagnostics(mt))
+
+
+def _resolved_joint_correlation(outcome, free: list[str]) -> np.ndarray | None:
+    """The joint solve's correlation matrix as ``check_guards`` reads a single
+    fit's (WP-2050): every direction the Jacobian cannot resolve projected out,
+    so a pair the data do not determine is ``nan`` and never a number.  The
+    result's matrix and the ``HIGH_CORRELATION`` loop both read this one, so
+    they cannot disagree (WP-1990).  ``None`` where no correlation was formed.
+
+    The single fit's guards, word for word: a Pawley solve (``n_aux``) keeps
+    the solver's matrix, and a Gram that does not eigensolve is the stage's
+    ``COVARIANCE_UNAVAILABLE`` to report, not a second raise.
+    """
+    if outcome.correlation is None:
+        return None
+    corr = np.asarray(outcome.correlation)
+    if outcome.jac is None or outcome.n_aux or len(free) < 2:
+        return corr
+    try:
+        corr, _ = resolved_correlation(corr, covariance_jacobian(outcome, free))
+    except np.linalg.LinAlgError:
+        if getattr(outcome, "covariance_error", None) is None:
+            raise
+    return corr
 
 
 def _refuse_joint_mode(mtable, mode: str) -> None:

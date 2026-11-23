@@ -480,7 +480,8 @@ class Identifiability(Base):
     histogram's view its own rows, unscoped.  The joint path runs neither
     the declared-peak screen nor the parameter-space screens, so
     ``extra_peak_absorption`` and the three tables below it stay empty there
-    (``correlation`` is the exception: the joint solve's matrix, WP-1990),
+    (``correlation`` is the exception: the joint solve's matrix, WP-1990,
+    whose block over its own and the shared rows each view carries),
     a declared and freed peak included: not measured, the same reading as
     ``None``.
     """
@@ -505,7 +506,9 @@ class Identifiability(Base):
     #: The whole matrix ``top_correlations`` is cut from (WP-1990).  ``None``
     #: where it was not measured: fewer than two free parameters, no
     #: correlation formed.  A joint multi-histogram fit carries the joint
-    #: solve's matrix, over the joint free paths.  Export it with
+    #: solve's matrix, over the joint free paths, resolved as a single fit's
+    #: is; :meth:`RefinementResult.for_histogram` hands each view its own
+    #: block, unscoped.  Export it with
     #: :func:`rietx.io.exporters.write_correlation_table`.
     correlation: CorrelationMatrix | None = None
 
@@ -2567,7 +2570,10 @@ class RefinementResult(Base):
         Paths are spelled as a single fit spells them (WP-1341).  The joint
         result scopes a per-histogram row ``hist.<h>.``; the view keeps
         histogram ``h``'s rows, unscoped, and drops every other histogram's,
-        in ``parameters`` and in the background screen alike.  A shared row
+        in ``parameters``, in the background screen and in the correlation
+        matrix alike: the view's matrix is the joint one's block over the
+        rows its ``parameters`` keep, so ``correlation.rho`` takes the
+        view's own paths.  A shared row
         keeps the joint result's value, which for a WP-1131 size term is the
         coefficient at histogram 0's wavelength.  A negative ``h`` counts from
         the end, as list indexing does.
@@ -2630,8 +2636,21 @@ class RefinementResult(Base):
             mine = {k[len(prefix):]: v for k, v in
                     view.identifiability.background_absorption.items()
                     if k.startswith(prefix)}
+            update: dict = {"background_absorption": mine}
+            joint = view.identifiability.correlation
+            if joint is not None:
+                # and its block of the joint matrix, over the rows
+                # ``parameters`` keeps, spelled as they are (WP-1990): a
+                # pair with another histogram's own row stays on the joint
+                # result
+                keep = [i for i, p in enumerate(joint.paths)
+                        if p.startswith(prefix) or not p.startswith("hist.")]
+                update["correlation"] = (CorrelationMatrix.from_square(
+                    [joint.paths[i].removeprefix(prefix) for i in keep],
+                    joint.matrix()[np.ix_(keep, keep)])
+                    if len(keep) > 1 else None)
             view.identifiability = view.identifiability.model_copy(
-                update={"background_absorption": mine})
+                update=update)
         view.histograms = []
         return view
 

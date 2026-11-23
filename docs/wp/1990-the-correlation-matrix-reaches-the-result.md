@@ -1,6 +1,6 @@
 # WP-1990 — the correlation matrix reaches the result
 
-Milestone: unscheduled · Status: 🔄 2026-11-09 — six of seven tasks landed (#1475); the printed block and a joint fit's matrix wait on the maintainer
+Milestone: unscheduled · Status: 🔄 2026-11-23 — every task settled on #1475: the maintainer ruled no printed block and a joint fit carrying its matrix (2026-11-17), both built; waiting on review
 Track: Render what the fit already knows
 Depends on: 1318 soft (the strain-surface band only, issue #1624)
 Priority: P3 2026-10-16 — a view over what the fit already computes; the one defect in it is a suggestion naming a field that does not exist, which misleads but changes no number
@@ -103,24 +103,31 @@ disagree.
 - [x] `Identifiability.correlation` (paths in table order, packed lower
   triangle), `None` where not measured; `SCHEMA_VERSION` bump under WP-1117.
   Landed as a `CorrelationMatrix` (`paths`, `lower`; `matrix()`, `rho()`,
-  `from_square()`), filled from `GuardReport.measured_correlation`; 0.61 is
-  unreleased, so it is an "Also in 0.61" entry, not a new number.
+  `from_square()`), filled from `GuardReport.measured_correlation`; the
+  schema version was unreleased, so it is an "Also in" entry, not a new
+  number (0.61 when written, under 0.62 in `docs/contracts/schema.md` since
+  the 2026-11-21 merge of `main`).
 - [x] An export: a labelled table and a CSV writer beside the existing
   exports. `rietx.io.exporters.correlation_table_csv` /
   `write_correlation_table` and `Refinement.write_correlation_table`; not
   re-exported at the top level, which would have grown the skill's `api.md`.
-- [ ] The text FitReport's printed block, if the maintainer wants it on by
-  default: rows with at least one off-diagonal |ρ| over the guard only.
+- [x] ~~The text FitReport's printed block, if the maintainer wants it on by
+  default: rows with at least one off-diagonal |ρ| over the guard only.~~
+  No block (Yue, 2026-11-17): it would restate the `HIGH_CORRELATION`
+  findings beside it. Nothing to build.
 - [x] Correct the `HIGH_CORRELATION_OMITTED` suggestion to name the new
   field, with a test that the named attribute exists.
   The suggestion (shared with `FLAT_DIRECTION_OMITTED`) now names
-  `result.identifiability.correlation` and `.top_correlations`, and says a
-  joint fit carries neither; the test resolves every `result.…` name it
-  quotes through the declared fields, and failed on the old text.
-- [x] Tests (round-trip, the field equal to `LSQOutcome.correlation`, `None`
-  on a joint fit)
-  `tests/test_correlation_matrix.py` (11), plus the joint `None` asserted on
-  the fit `tests/test_joint_report.py` already runs.
+  `result.identifiability.correlation` and `.top_correlations`; the test
+  resolves every `result.…` name it quotes through the declared fields, and
+  failed on the old text. Its clause saying a joint fit carries neither went
+  with the 2026-11-17 ruling (`9d32fe7e0`).
+- [x] Tests (round-trip, the field equal to `LSQOutcome.correlation`, the
+  joint fit's matrix)
+  `tests/test_correlation_matrix.py` (11), plus the joint matrix and each
+  view's block asserted on the fit `tests/test_joint_report.py` already runs,
+  and the resolved joint matrix on brucite in `tests/test_suite_alarms.py`
+  (slow).
 - [x] Skill: the reference row for `HIGH_CORRELATION_OMITTED` names the
   field, or "none" if the package's own suggestion now carries it
   The suggestion carries it, so both `*_OMITTED` rows now point at the
@@ -141,6 +148,41 @@ disagree.
 - Issue #992.
 
 ## Handover log
+
+- **2026-11-23** (fix of the 2026-11-23 pre-review, PR #1475) — the
+  maintainer's two answers of 2026-11-17 are both in: no printed block
+  (task 4 struck), and the joint fit carries its matrix (`9d32fe7e0`,
+  2026-11-18). The pre-review found that second answer built short twice,
+  and this entry records the fix.
+
+  *Done.* (1) `RefinementResult.for_histogram` copied the joint matrix whole
+  onto each view, under joint paths, so `rho` on the view's own
+  `phases.0.scale` raised "was not a free parameter". The view now carries
+  the joint matrix's block over the rows its `parameters` keep, unscoped
+  (WP-1341's rule, as the background screen already did); a pair with
+  another histogram's own row stays on the joint result. (2) The joint
+  matrix was the solver's raw one, while `CorrelationMatrix` promises the
+  WP-2050-resolved one. `multi._resolved_joint_correlation` runs
+  `resolved_correlation` under `check_guards`' guards, and both the field
+  and `_top_diagnostics`' `HIGH_CORRELATION` loop read it, so they still
+  agree. `resolved_correlation` returned a `BlockJacobian` unprojected; it
+  now forms the same unit-column Gram block by block. Also: the exporter's
+  refusal no longer lists a joint fit; release-note fragments
+  `1475.new.md` and `1475.numbers-that-move.md`.
+
+  *Measured.* Brucite fitted jointly as two copies of its pattern (P = 35):
+  `resolved_correlation` names `gauss_size`, `gauss_strain` and both
+  histograms' W unresolved, and the old head stored all 124 of their pairs
+  with the other 31 columns as numbers (±0.0106 against the cell). None of
+  the 42 joint `HIGH_CORRELATION` rows was on such a pair there, so that
+  fit's findings do not move; the change is to what can fire.
+
+  *Gotcha.* This touches what `HIGH_CORRELATION` fires on, for joint fits
+  only, which § Non-goals sets aside for WP-1460's duplication question.
+  It is WP-2050's existing rule reaching the joint path, so that the field
+  and the guard cannot disagree; PR #1272's `_joint_identifiability` reads
+  `outcome.correlation` for `top_correlations` and would need the resolved
+  matrix too.
 
 - **2026-11-09** — six of the seven tasks landed (PR #1475); the printed
   block waits on the maintainer. A finished fit now carries every pair's
