@@ -191,6 +191,58 @@ transcriptions were deliberately not copied. TOPAS is a black box.
     in `tools/`, outside the wheel, so anyone can regenerate and check the rows. RCN itself
     stays out; only its output numbers ship. The other four questions, and the bare-row note,
     stay Mike's.
+  - **Ruled by Mike 2026-11-23** (#1691, comment of 08:43Z), on all four and the bare rows.
+    Q1: HFR footing, and the ten ions ship as computed ⟨j₀⟩, ⟨j₂⟩, ⟨j₄⟩ *tables* on
+    s = 0-6 at 0.01 Å⁻¹ read by cubic spline, refused past s = 6, replacing the
+    7-parameter rows in the issue body. Q2: the ten ions named in #1691 and no more. Q3: the
+    #1796 entry below. Q5: a user curve is declared once per phase under a label with a
+    colon (`Ru4+:SRO`), with a required `source`, picked by `Moment.ion`; a colon label is
+    looked up only in the phase and a bare one only in the tables, and a user label
+    shadowing a table name is refused. Bare `Mo`, `Tc`, `Ru`, `Rh`: true neutral rows,
+    computed on Brown's footing, which moves bare-`Ru` ⟨j₀⟩ at s = 0.2 Å⁻¹ from 0.491 to
+    0.416. Mike's order of work: the #1796 range check, then the data, then one rows-build
+    PR. The ruling names as the maintainer's: computed tails on published ITC rows, the
+    data-file format, the user-curve field name and the project schema version, the magCIF
+    writer's tags and how g travels, whether the label grammar fits CIF, the TOPAS exporter
+    refusing a user curve, and the release. None of those is decided here.
+
+- **2026-11-23, from the issue triage (issue #1796, mustachefeeling): every shipped ⟨j₀⟩ and
+  ⟨j₂⟩ row is evaluated at any s, past the range Brown fitted it on.** This is #1691's Q3 as
+  a defect, so it folds beside that entry: one table, one decision, and Mike's announced fix
+  PR is the first of the three above. `j0`, `j2`, `magnetic_form_factor` and the forward
+  model's `scattering._form_factor` have no range check, and nothing in the result or the
+  diagnostics says a reflection lies past the fit. The fitted ranges are s ≤ 1.5 Å⁻¹ for
+  3d, 4d and actinide rows and s ≤ 1.2 Å⁻¹ for rare earths (Brown, ITC Vol. C § 4.4.5,
+  p. 461), and s ≤ 1.3 Å⁻¹ for the Lisher & Forsyth Pr³⁺ row (1971, p. 548).
+  - Checked against the tree at 711acfc8d, every count in the issue reproduces. Mn²⁺ ⟨j₀⟩
+    is −0.00497 / 0.0272 / 0.1715 / 1.0105 / 73.30 / 1.43 × 10⁷ at s = 1.5 / 2 / 2.5 / 3 /
+    4 / 6 Å⁻¹, because its third exponent is negative (c = −0.609 Å²). Three of the 96 ⟨j₀⟩
+    rows carry a negative exponent (Cr²⁺ −0.0055, Mn²⁺ −0.609, Mn³⁺ −0.0088), and only
+    Mn²⁺'s runs away. At s = 6, 11 ⟨j₀⟩ rows exceed 0.05 in size. No ⟨j₂⟩ row has a
+    negative exponent, but the s² factor makes D·s² grow: 40 of 96 rows exceed 0.05 at
+    s = 3, and 15 exceed 1 at s = 6 (Am⁶⁺ 4.65 the largest).
+  - The reach inside a fit is small. TOF is fenced (ROADMAP § v2+), so a pattern reaches
+    s ≤ sin θ_max/λ, and only a neutron wavelength under 0.667 Å (0.833 Å for a rare earth)
+    gets past a range end. At λ = 0.5 Å to 2θ = 140°, s reaches 1.88 Å⁻¹. Over each row's
+    range end to 1.88, the largest |⟨j₀⟩| is 0.032 (Am⁷⁺) and Mn²⁺ reaches 0.015. The
+    largest |⟨j₂⟩| is 0.115 (Yb³⁺, past its 1.2 end), which is where a rare-earth moment
+    would pick up an error of unknown size. The forward model multiplies by
+    exp(−B·s²), which shrinks the runaway further: Mn²⁺ with B = 0.5 Å² gives 0.0026 at
+    s = 1.88. A direct call of `j0`, `j2` or `magnetic_form_factor` reaches any s it is
+    given, and that is where the 73 and the 1.4 × 10⁷ show.
+  - **Ruled by Mike 2026-11-23** (#1691 Q3): Brown's rows stay as printed inside the fitted
+    range. Past it, each row gets a computed tail on Brown's own footing (HF term-specific
+    for 3d and 4d, Dirac-Fock for rare earths and actinides), blended over 0.2 Å⁻¹,
+    labelled computed and announced by one warning. Until a row has its tail, a row whose
+    fitted form runs away is refused past its range (the fix PR's criterion lists which;
+    Mn²⁺ ⟨j₀⟩ is the clear case), and every other row warns once. The docs carry the
+    free-ion caveat beyond about s = 1.2. The criterion for "runs away", the warning's code
+    name and its `_audit` row are the fix PR's, and so Mike's.
+  - **For the maintainer, open:** whether rietx may put computed tails on rows with a
+    peer-reviewed ITC citation. That is a provenance change on published data, and the
+    data-file format with it (#1691's ruling names both as the maintainer's). The range
+    check itself does not wait on it, since a refusal or a warning changes no shipped
+    number inside the fitted range.
 
 ## Non-goals
 
