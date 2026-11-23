@@ -163,10 +163,10 @@ package. `src/rietx/_audit.py` is untouched.
   the menu; a typed add row at the table's foot (row 194); ⌘Z and ⇧⌘Z over peak edits.
 - [x] 6. The Fit step and the group windows with per-line curves in the Peaks graph tab while
   the workflow is up, with refit.
-- [ ] 7. The Index step: the short form and More settings, the progress with Stop and the cells
+- [x] 7. The Index step: the short form and More settings, the progress with Stop and the cells
   found so far, the coverage line, the eight-column candidate table with its relations, and the
   selected candidate's lines on the Pattern graph.
-- [ ] 8. The Judge step: the candidate's evidence, the extinction screen with its space-group
+- [x] 8. The Judge step: the candidate's evidence, the extinction screen with its space-group
   choice, and Adopt pending until Apply.
 - [ ] 9. Browser passes over the four steps by real clicks; screenshots at 1440 × 900, light and
   dark, under `docs/wp/2240-screenshots/`, beside the prototype's in the runner's scratch, with

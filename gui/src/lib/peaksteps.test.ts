@@ -7,6 +7,8 @@ import {
   LOOK_CHI2_RED,
   absentOf,
   candidateRelation,
+  coverageLine,
+  limitWord,
   cellLine,
   clock,
   filterPeaks,
@@ -87,5 +89,30 @@ describe("the candidate columns", () => {
   it("write the clock as m:ss", () => {
     expect(clock(109.4)).toBe("1:49");
     expect(clock(-3)).toBe("0:00");
+  });
+});
+
+describe("the Index step's coverage line", () => {
+  it("names what the ceiling left unreached or truncated, and the ceiling", () => {
+    const line = coverageLine({
+      systems_searched: ["cubic", "hexagonal", "orthorhombic"],
+      search_complete: { cubic: true, hexagonal: true, orthorhombic: false },
+      diagnostics: [{ code: "INDEX_BUDGET_EXHAUSTED",
+        message: "The run hit its declared ceiling of 120 s, so the answer covers what was reached.",
+        where: ["truncated: orthorhombic", "not reached: monoclinic, triclinic"] }],
+    }, ["cubic", "hexagonal", "orthorhombic", "monoclinic", "triclinic"]);
+    expect(line).toEqual({ notSearched: ["monoclinic", "triclinic"],
+                           stopped: ["orthorhombic"], ceiling: 120 });
+    expect(limitWord(line.ceiling)).toBe("2 minutes");
+    expect(limitWord(null)).toBe("None");
+  });
+
+  it("says a system a person's Stop left unsearched, and nothing for a full search", () => {
+    expect(coverageLine({ systems_searched: ["cubic"], search_complete: { cubic: true } },
+                        ["cubic", "tetragonal"]))
+      .toEqual({ notSearched: ["tetragonal"], stopped: [], ceiling: null });
+    expect(coverageLine({ systems_searched: ["cubic"], search_complete: { cubic: true } },
+                        ["cubic"]))
+      .toEqual({ notSearched: [], stopped: [], ceiling: null });
   });
 });

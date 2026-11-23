@@ -559,3 +559,37 @@ export function clock(seconds: number): string {
   const s = Math.max(0, Math.round(seconds));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
+
+/**
+ * The Index step's coverage line (round 11 call 6): the systems the search
+ * never reached, those it stopped early, and the whole-run ceiling when the
+ * clock stopped it. Read off the result's own words: `INDEX_BUDGET_EXHAUSTED`
+ * names what was not reached and what was truncated in its `where`, and is
+ * written only when the clock, not a person, stopped the run. A system asked
+ * for and neither searched nor named there (a person's Stop) is not searched
+ * too. Empty arrays and a null ceiling mean the search covered what was asked.
+ */
+export function coverageLine(result: {
+  systems_searched?: readonly string[];
+  search_complete?: Readonly<Record<string, boolean>>;
+  diagnostics?: ReadonlyArray<{ code: string; message: string; where?: readonly string[] }>;
+} | null | undefined, asked: readonly string[]): {
+  notSearched: string[]; stopped: string[]; ceiling: number | null;
+} {
+  const { searched, incomplete } = searchCoverage(result);
+  const hit = result?.diagnostics?.find((d) => d.code === "INDEX_BUDGET_EXHAUSTED");
+  const listed = (prefix: string) => (hit?.where ?? [])
+    .filter((w) => w.startsWith(prefix))
+    .flatMap((w) => w.slice(prefix.length).split(",").map((s) => s.trim()).filter(Boolean));
+  const stopped = [...new Set([...incomplete, ...listed("truncated: ")])];
+  const notSearched = [...new Set([...listed("not reached: "),
+    ...asked.filter((s) => !searched.includes(s))])].filter((s) => !stopped.includes(s));
+  const seconds = hit ? Number(/ceiling of ([\d.e+]+) s/.exec(hit.message)?.[1]) : NaN;
+  return { notSearched, stopped, ceiling: Number.isFinite(seconds) ? seconds : null };
+}
+
+/** A whole-run ceiling said as a time: `2 minutes`, `90 s`, or `None`. */
+export function limitWord(seconds: number | null | undefined): string {
+  if (seconds == null) return "None";
+  return seconds % 60 === 0 ? `${seconds / 60} minute${seconds === 60 ? "" : "s"}` : `${seconds} s`;
+}

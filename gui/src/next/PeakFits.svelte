@@ -324,8 +324,6 @@
   /* a line's toggle: its number, in the peak layer's blue while its curve
      shows, a faint dashed box while it is hidden (round 11c) */
   .line {
-    min-width: 20px;
-    height: 20px;
     font-family: var(--mono-family);
     border: 1px solid var(--plot-peak);
     color: var(--plot-peak);

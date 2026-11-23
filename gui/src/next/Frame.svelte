@@ -24,6 +24,7 @@
   import Palette from "../panels/Palette.svelte";
   import Interactive from "./Interactive.svelte";
   import Background from "./Background.svelte";
+  import Candidates from "./Candidates.svelte";
   import PeakFits from "./PeakFits.svelte";
   import Peaks from "./Peaks.svelte";
   import Structure from "./Structure.svelte";
@@ -40,6 +41,7 @@
   import { follow, type EngineEvent, type RunState } from "../lib/stream";
   import { applyTheme, readChoice, resolveTheme, type ThemeChoice } from "../lib/theme";
   import type { PeakRow, PeaksPayload } from "../lib/peaks";
+  import type { CandidateOverlay } from "../lib/plot";
   import { WORKFLOWS, isNotBuilt, menuLabel, stepGraph, workflow,
            type WorkflowId } from "../lib/workflows";
   import ActionBar from "./ActionBar.svelte";
@@ -176,6 +178,10 @@
   let peaksPayload = $state.raw<PeaksPayload | null>(null);
   /** the Fit peaks step's windows: the groups its list draws, the one chosen
    *  and how many the list holds (WP-2240 task 6) */
+  /** the Index and Judge steps' panel, which a run of theirs reports to */
+  let candidatesPanel: ReturnType<typeof Candidates> | undefined = $state();
+  /** the candidate whose lines the Pattern graph draws (round 11, call 9) */
+  let candidateLines = $state.raw<CandidateOverlay | null>(null);
   let fitGroups = $state.raw<{ groups: number[]; focused: number | null; total: number }>(
     { groups: [], focused: null, total: 0 });
   let selectedPeak = $state<number | null>(null);
@@ -909,7 +915,10 @@
      *  frame, so a reload does not reload for a run that ended before it. */
     let seen: string | null = null;
     const unfollow = follow(
-      (event: EngineEvent) => write(eventLine(event)),
+      (event: EngineEvent) => {
+        write(eventLine(event));
+        candidatesPanel?.event(event);
+      },
       (frame: RunState) => {
         run = frame;
         // a run just ended, keyed on its outcome rather than on having seen a
@@ -920,6 +929,7 @@
           // how the fit ran, as `Refinement.summary()` prints it (WP-2227)
           const comment = howComment(frame);
           if (comment) say("comment", comment);
+          candidatesPanel?.ran(frame.run?.kind ?? null);
           void loadResult();
           void api.project().then((doc) => (project = doc)).catch(() => {});
         }
@@ -1005,6 +1015,7 @@
               {compared} howText={howWords(result?.how, corpus)}
               peaksActive={wf === "index"} peaks={wf === "index" ? peaksPayload?.peaks ?? null : null}
               groups={wf === "index" ? peaksPayload?.groups ?? null : null}
+              candidate={wf === "index" ? candidateLines : null}
               bind:selectedPeak {frameAt}
               onpeakedit={(e) => indexingPanel?.edit(e) ?? Promise.resolve(false)}
               onpeakundo={() => indexingPanel?.undo() ?? Promise.resolve(false)} />
@@ -1090,6 +1101,11 @@
                 bind:selected={selectedPeak}
                 onpeaks={(p) => (peaksPayload = p)} onframe={framePeak} onstep={chooseStep}
                 onfitgroups={(groups, focused, total) => (fitGroups = { groups, focused, total })} />
+              <Candidates bind:this={candidatesPanel} {step} {busy} {run} {capabilities} {corpus} {say}
+                doc={project?.doc ?? null} nLines={peaksPayload?.peaks?.filter((p) => p.usable).length ?? 0}
+                onstep={chooseStep} onproject={(doc) => (project = doc)}
+                oncandidate={(c) => (candidateLines = c)}
+                onadopted={() => { chooseWorkflow("refine"); void structureMoved(); }} />
             </div>
           {/key}
         {/if}

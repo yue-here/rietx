@@ -384,7 +384,7 @@
 
 <svelte:window onkeydown={keydown} />
 
-<div class="steppane">
+<div class="steppane" class:gone={step >= 2}>
   {#if !steps[step]?.built}
     <div class="body"><p class="box">{steps[step]?.body}</p></div>
   {:else if loadError}
@@ -515,6 +515,12 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
+  }
+
+  /* the Index and Judge steps are `Candidates.svelte`'s; this pane stays
+     mounted under them, so the list keeps its filter and chosen row */
+  .steppane.gone {
+    display: none;
   }
 
   .body {

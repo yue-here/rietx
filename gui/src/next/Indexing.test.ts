@@ -265,10 +265,11 @@ describe("the Fit step", () => {
   });
 });
 
-describe("the steps not built yet", () => {
-  it("shows the Index step by its sentence", async () => {
+describe("the Index and Judge steps", () => {
+  it("leave this pane mounted and hidden, keeping the list's filter", async () => {
     stored = listed();
     await boot(2);
-    expect(text(document.querySelector(".box"))).toBe(workflow("index").steps![2].body);
+    expect(document.querySelector(".steppane")!.classList.contains("gone")).toBe(true);
+    expect(workflow("index").steps!.every((s) => s.built)).toBe(true);
   });
 });
