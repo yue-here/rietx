@@ -211,6 +211,12 @@ read, and the seven restraint kinds on labels.
 > If (A): are labels holding `.`, `*`, `?`, `[`, `]` or only digits renamed at read with a
 > `Diagnostic`, or refused? And may `events.jsonl` and a result's JSON stay in the old spelling?
 
+*2026-11-23:* the choice between (A) and (B) stays with Yue, as a stored-format change. One
+sub-call is settled. If (A) is chosen, `events.jsonl` keeps the old spelling, since
+`schemas/migrate.py:56-70` leaves its reader outside `READ_POINTS` on purpose. A result's JSON goes
+with Yue's call. Settled by Claude under DESIGN.md Rule 5 Convention and that comment, 2026-11-23;
+checked blind.
+
 ## Non-goals
 
 - Phase keys. Phases are matched by name where unique (WP-1991), and `phases.0` stays an index
