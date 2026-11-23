@@ -228,6 +228,63 @@ def test_a_peak_list_keyed_to_one_pattern_is_refused_against_another(
         httpd.shutdown()
 
 
+def test_undo_puts_the_peak_list_back_byte_for_byte_and_redo_replays_it(
+        pattern_file, tmp_path_factory):
+    """WP-2240, interaction rule 10: every peak edit can be undone. A step is
+    the stored file as it stood, so a removed line comes back with its flags
+    and its group's fit, which no inverse verb gives back."""
+    structure, instrument = perturbed_models()
+    root = tmp_path_factory.mktemp("peaks-undo") / "u.rex"
+    project = rx.Project.create(root, pattern=pattern_file,
+                                structure=structure, instrument=instrument)
+    session = GuiSession(project,
+                         state_dir=tmp_path_factory.mktemp("peaks-undo-state"))
+    httpd = build_server(session, port=0)
+    threading.Thread(target=httpd.serve_forever,
+                     kwargs={"poll_interval": 0.02}, daemon=True).start()
+    client = Client(httpd.server_address[1])
+    stored = project.path / "peaks.json"
+    try:
+        status, refused = client.post("/api/peaks/undo")
+        assert status == 409
+        assert refused["error"]["code"] == "NOTHING_TO_UNDO"
+
+        _, picked = client.post("/api/peaks", {})
+        assert (picked["undo"], picked["redo"]) == (1, 0)
+        after_pick = stored.read_bytes()
+        _, flagged = client.post("/api/peaks/flag",
+                                 {"index": 0, "use_for_indexing": False})
+        after_flag = stored.read_bytes()
+        _, removed = client.post("/api/peaks/remove", {"index": 0})
+        assert removed["n_total"] == picked["n_total"] - 1
+        assert (removed["undo"], removed["redo"]) == (3, 0)
+
+        status, back = client.post("/api/peaks/undo")
+        assert status == 200 and stored.read_bytes() == after_flag
+        assert back["peaks"] == flagged["peaks"]
+        assert (back["undo"], back["redo"]) == (2, 1)
+        client.post("/api/peaks/undo")
+        assert stored.read_bytes() == after_pick
+
+        _, again = client.post("/api/peaks/redo")
+        assert stored.read_bytes() == after_flag
+        assert (again["undo"], again["redo"]) == (2, 1)
+        # a new edit drops what redo could have replayed
+        _, moved = client.post("/api/peaks/move", {
+            "index": 1, "two_theta": picked["peaks"][1]["two_theta"] + 0.01})
+        assert (moved["undo"], moved["redo"]) == (3, 0)
+
+        # undoing the first pick leaves no list, as before it
+        for _ in range(3):
+            client.post("/api/peaks/undo")
+        _, empty = client.get("/api/peaks")
+        assert empty["peaks"] is None and not stored.exists()
+        assert (empty["undo"], empty["redo"]) == (0, 3)
+    finally:
+        session.close()
+        httpd.shutdown()
+
+
 def test_mutating_peak_verbs_refuse_while_a_run_is_in_flight(served, client):
     session, _, _ = served
     with session._cond:

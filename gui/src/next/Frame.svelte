@@ -174,6 +174,8 @@
    *  the Pattern graph draws them while the workflow is up. */
   let peaksPayload = $state.raw<PeaksPayload | null>(null);
   let selectedPeak = $state<number | null>(null);
+  /** the workflow panel, whose verbs the plot's peak gestures call */
+  let indexingPanel: ReturnType<typeof Indexing> | undefined = $state();
   let frameAt = $state.raw<{ two_theta: number; seq: number } | null>(null);
 
   /** The model panel's width and the bottom panel's height, session-local
@@ -803,6 +805,10 @@
       disabled: !planPanel?.canUndo(), run: () => planPanel?.undo() },
     { id: "plan-redo", label: "Redo the plan edit", echo: "",
       disabled: !planPanel?.canRedo(), run: () => planPanel?.redo() },
+    { id: "peaks-undo", label: "Undo the peak edit", echo: "",
+      disabled: wf !== "index" || !indexingPanel?.canUndo(), run: () => void indexingPanel?.undo() },
+    { id: "peaks-redo", label: "Redo the peak edit", echo: "",
+      disabled: wf !== "index" || !indexingPanel?.canRedo(), run: () => void indexingPanel?.redo() },
     { id: "new", label: "New project…", echo: "rx.Project.create(…)", disabled: busy,
       run: () => (newOpen = true) },
     ...WORKFLOWS.map((w): Command => ({
@@ -994,7 +1000,9 @@
               {compared} howText={howWords(result?.how, corpus)}
               peaksActive={wf === "index"} peaks={wf === "index" ? peaksPayload?.peaks ?? null : null}
               groups={wf === "index" ? peaksPayload?.groups ?? null : null}
-              selectedPeak={wf === "index" ? selectedPeak : null} {frameAt} />
+              bind:selectedPeak {frameAt}
+              onpeakedit={(e) => indexingPanel?.edit(e) ?? Promise.resolve(false)}
+              onpeakundo={() => indexingPanel?.undo() ?? Promise.resolve(false)} />
           {:else if graphTab === "peaks"}
             <Peaks {plotKey} {theme} preview={previewAnswer} {previewError}
               rwp={result?.statistics?.rwp ?? null} oncurves={(c) => (baseCurves = c)} />
@@ -1067,7 +1075,7 @@
         {#if wf === "index"}
           {#key project.path}
             <div class="pane wfsteps">
-              <Indexing {step} steps={wfSteps ?? []} {busy} {corpus} {say}
+              <Indexing bind:this={indexingPanel} {step} steps={wfSteps ?? []} {busy} {corpus} {say}
                 bind:selected={selectedPeak}
                 onpeaks={(p) => (peaksPayload = p)} onframe={framePeak} />
             </div>

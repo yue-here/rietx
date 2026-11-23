@@ -2229,3 +2229,133 @@ def test_the_pick_step_picks_frames_a_line_and_a_tick_moves_nothing(browser, tmp
     finally:
         page.close()
         httpd.shutdown()
+
+
+def _find_lens(page, x: float, top: float, bottom: float):
+    """Sweep the pointer down a column of the plot and return the middle of
+    the band where the page says a lens is under it (`.host.onmark`): the
+    lenses are canvas ink, so a person's pointer is the one way to find one."""
+    y, hits = top, []
+    while y < bottom:
+        page.mouse.move(x, y)
+        on = page.locator(".plot .host.onmark").count() > 0
+        if on:
+            hits.append(y)
+        elif hits:
+            break
+        y += 2
+    return (hits[0] + hits[-1]) / 2 if hits else None
+
+
+def test_the_peak_lines_on_the_pattern_answer_the_object_grammar(browser, tmp_path_factory):
+    """The Pattern graph is the peak list's editing surface while the workflow
+    is up (WP-2240 task 5, interaction rules 1 to 12), by real pointer events.
+
+    A framed line's lens is found under the pointer; a click on it opens its
+    bar; a drag moves it with the mark under the pointer, and Esc right after
+    takes the move back with the line still chosen (call 35); a click on empty
+    space shows where it lands and adds a line; ⌘Z takes the add back;
+    right-click opens the line's menu; Option-click removes the line.
+    """
+    httpd, _client = _serve(tmp_path_factory, "next-gestures")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    page = _open_next(browser, url, 1440)
+    try:
+        page.locator("button.mbtn.wf").click()
+        page.get_by_role("menuitemradio", name="Peaks and indexing", exact=True).click()
+        page.locator(".foot").get_by_role("button", name="Pick peaks", exact=True).click()
+        page.wait_for_selector("table.lines tbody tr")
+        rows = page.locator("table.lines tbody tr")
+        n = rows.count()
+        used = [i for i in range(n) if "off" not in (rows.nth(i).get_attribute("class") or "")]
+        target = used[len(used) // 2]
+        start = rows.nth(target).locator("td.num").first.inner_text()
+        rows.nth(target).locator("td.num").first.click()
+        _frames(page)
+        page.keyboard.press("Escape")
+        over = page.locator(".plot .u-over").first.bounding_box()
+        cx = over["x"] + over["width"] / 2
+        y = _find_lens(page, cx, over["y"] + 4, over["y"] + over["height"] * 0.8)
+        assert y is not None, "no lens under the framed line"
+        page.mouse.move(cx, y)
+        assert page.locator(".plot .host.onmark").count() == 1
+
+        # a click on the lens chooses it and opens its bar
+        page.mouse.click(cx, y)
+        _frames(page)
+        bar = page.locator(".peakbar")
+        assert bar.count() == 1 and "° 2θ" in bar.inner_text()
+        assert "sel" in (rows.nth(target).get_attribute("class") or "")
+        page.keyboard.press("Escape")
+        _frames(page)
+        assert bar.count() == 0
+
+        # a drag moves the line, its mark under the pointer the whole way
+        page.mouse.move(cx, y)
+        page.mouse.down()
+        for k in range(1, 9):
+            page.mouse.move(cx + 5 * k, y)
+        _frames(page)
+        assert page.locator(".lensmark.moving").count() == 1
+        with page.expect_response("**/api/peaks/move"):
+            page.mouse.up()
+        _frames(page)
+        chosen = page.locator("table.lines tbody tr.sel td.num").first
+        assert chosen.inner_text() != start
+        assert bar.count() == 1
+        # Esc right after the drag takes it back, and the line stays chosen
+        with page.expect_response("**/api/peaks/undo"):
+            page.keyboard.press("Escape")
+        _frames(page)
+        assert chosen.inner_text() == start
+        assert bar.count() == 1
+        page.keyboard.press("Escape")
+        _frames(page)
+        assert bar.count() == 0
+
+        # hover shows where a click lands; the click adds a line after its
+        # wait for a double-click, and ⌘Z takes it back
+        ex = over["x"] + over["width"] * 0.15
+        page.mouse.move(ex, over["y"] + over["height"] * 0.5)
+        _frames(page)
+        assert page.locator(".lensmark.ghost").count() == 1
+        with page.expect_response("**/api/peaks/add"):
+            page.mouse.click(ex, over["y"] + over["height"] * 0.5)
+        _frames(page)
+        assert rows.count() == n + 1
+        with page.expect_response("**/api/peaks/undo"):
+            page.keyboard.press("Meta+z")
+        _frames(page)
+        assert rows.count() == n
+
+        # right-click on the lens opens the line's menu
+        page.mouse.click(over["x"] + over["width"] * 0.9, over["y"] + 2)
+        rows.nth(target).locator("td.num").first.click()
+        _frames(page)
+        page.keyboard.press("Escape")
+        y = _find_lens(page, cx, over["y"] + 4, over["y"] + over["height"] * 0.8)
+        page.mouse.click(cx, y, button="right")
+        page.wait_for_selector(".rx-menu")
+        names = [t.strip() for t in page.locator(".rx-menu [role^=menuitem]").all_text_contents()]
+        assert names[:2] == ["Leave out of the search", "Delete the line"], names
+        page.keyboard.press("Escape")
+        _frames(page)
+
+        # Option-click removes the line at once
+        page.keyboard.down("Alt")
+        page.mouse.move(cx, y)
+        _frames(page)
+        assert page.locator(".lensmark.danger").count() == 1
+        with page.expect_response("**/api/peaks/remove") as gone:
+            page.mouse.click(cx, y)
+        page.keyboard.up("Alt")
+        _frames(page)
+        assert gone.value.request.post_data_json == {"index": target}
+        positions = page.evaluate(
+            "[...document.querySelectorAll('table.lines tbody tr')]"
+            ".map((tr) => tr.querySelectorAll('td')[1].innerText.trim())")
+        assert len(positions) >= n - 1 and start not in positions, (start, positions)
+        assert not page.errors, page.errors
+    finally:
+        page.close()
+        httpd.shutdown()

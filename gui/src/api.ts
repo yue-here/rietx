@@ -361,6 +361,9 @@ export const api = {
   removePeak: (index: number) => call("POST", "/api/peaks/remove", { index }),
   flagPeak: (index: number, body: { use_for_indexing?: boolean; flags?: string[] }) =>
     call("POST", "/api/peaks/flag", { index, ...body }),
+  /** the peak list as it was before the last edit, and that edit again (WP-2240) */
+  undoPeaks: () => call("POST", "/api/peaks/undo", {}),
+  redoPeaks: () => call("POST", "/api/peaks/redo", {}),
   refitGroup: (group: number, nComponents?: number) =>
     call("POST", "/api/peaks/refit",
          nComponents === undefined ? { group } : { group, n_components: nComponents }),
