@@ -67,6 +67,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2238](2238-the-decision-machinery.md) | The decision machinery: fewer calls reach the maintainer, and each ruling is reused | 2026-11-22 | P2 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2240](2240-the-peaks-and-indexing-workflow.md) | The peaks-and-indexing workflow at `/next`: pick peaks, fit peaks, index, judge | 2026-11-23 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2241](2241-the-nightly-red-of-2026-11-20-to-22.md) | The nightly red of 2026-11-20 to 11-22: Windows path checks, the width triple's esd, and a lost runner | 2026-11-22 | P1 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
+| [2243](2243-the-series-workflow.md) | The series workflow at `/next`: patterns, first fit, run, results, with Trends and Map | 2026-11-23 | P2 | [gui-overhaul](#gui-overhaul) |
 
 ## Next, by priority
 
@@ -545,6 +546,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2237](2237-events-after-another-project-opens.md) | A project opened in the same window streams its events from the first | ✅ 2026-11-22 | — | — |
 | [2240](2240-the-peaks-and-indexing-workflow.md) | The peaks-and-indexing workflow at `/next`: pick peaks, fit peaks, index, judge | 🔄 2026-11-23 | P2 | [2218](2218-hand-fitting-and-the-other-graphs.md) |
 | [2242](2242-a-panel-forgets-the-last-project-on-an-open.md) | A panel forgets the last project when another opens in the same window | ✅ 2026-11-23 | — | — |
+| [2243](2243-the-series-workflow.md) | The series workflow at `/next`: patterns, first fit, run, results, with Trends and Map | 🔄 2026-11-23 | P2 | — ([2240](2240-the-peaks-and-indexing-workflow.md), [2300](2300-a-series-declares-each-parameter.md) soft) |
 | [2244](2244-the-help-popover-at-next.md) | The help popover at `/next`: a help term there opens its explanation | ✅ 2026-11-23 | — | — |
 
 ## <a id="series"></a>series — a series a scientist can predict and drive

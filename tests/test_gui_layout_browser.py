@@ -1005,17 +1005,22 @@ def test_no_frame_control_moves_the_rebuilt_layout(browser, gui):
         pressing(f"{strip} ? box", lambda p, n=label: p.get_by_role("button", name=n, exact=True).click(),
                  escape)
 
-    def series(p):
-        p.locator("button.mbtn.wf").click()
-        p.get_by_role("menuitemradio", name="Series · not built yet").click()
+    def workflow(name):
+        def choose(p):
+            p.locator("button.mbtn.wf").click()
+            p.get_by_role("menuitemradio", name=name, exact=True).click()
+        return choose
 
     pressing("workflow menu", lambda p: p.locator("button.mbtn.wf").click(), escape)
     pressing("File menu", lambda p: p.locator("header .fm-name").click(), escape)
     pressing("Settings", lambda p: p.get_by_role("button", name="Settings", exact=True).click(),
              escape)
-    pressing("Series workflow", series, landmarks=[
-        s for s in NEXT_LANDMARKS if s != "header.topbar > *"] + [
-        "header.topbar > button.ib"])
+    # a workflow not built yet, and the series workflow, built (WP-2243)
+    for label, name in (("Structure solution workflow", "Structure solution · not built yet"),
+                        ("Series workflow", "Series")):
+        pressing(label, workflow(name), landmarks=[
+            s for s in NEXT_LANDMARKS if s != "header.topbar > *"] + [
+            "header.topbar > button.ib"])
     assert not failures, "\n".join(failures)
 
 
