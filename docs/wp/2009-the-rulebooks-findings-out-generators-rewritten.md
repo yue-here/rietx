@@ -131,7 +131,7 @@ three found by the blind check).
 
 ## Handover log
 
-- **2026-11-23 (close)** — closed by a ghostshift runner (batch close-2026-11-23, PR #PRNUM),
+- **2026-11-23 (close)** — closed by a ghostshift runner (batch close-2026-11-23, PR #1815),
   on a `main` that includes #1768.
 
   The rulebooks now hold rules and a one-clause reason, and the one-dataset evidence that
