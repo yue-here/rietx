@@ -204,6 +204,7 @@ The names differ as well.
 | `D_spacing` | `d` |
 | `Th` (radians) | `theta` (radians) |
 | `Xo` | `two_theta` (degrees, before the phase's own shift) |
+| `Lam` (Å) | `wavelength` (Å, the emission line the peak is drawn at), on a phase's equation only |
 | `If(L==0, a, b)` | `if(l == 0, a, b)` |
 | `Max(x, 0)` | `max(x, 0)` |
 
