@@ -329,14 +329,14 @@ def test_the_position_is_read_by_the_linear_sum_never_the_quadrature_sum(
         assert row.paired_with == [] and row.paired_magnitude is None
 
 
-def test_a_position_with_no_moment_fails_though_each_atom_passes(null_mn_mn):
-    """The negative arm.  Equal form factors make the pair exactly degenerate,
-    the pseudo-inverse drops the flat direction, and each modulus comes back
-    *above* ``MOMENT_SUPPORT_SIGMA`` of its own esd on a pattern with no
-    magnetic intensity: the per-site test would call it supported.  The
-    position's moment is what fails."""
+def test_a_position_with_no_moment_fails_and_no_atom_carries_an_esd(null_mn_mn):
+    """The negative arm.  Equal form factors make the pair exactly degenerate
+    and the pseudo-inverse drops the flat direction.  Main no longer reports
+    an esd on a direction the fit discards, so neither atom's modulus carries
+    one (it is not separately determined); only the position's combined moment
+    does, and that is what fails on a pattern with no magnetic intensity."""
     rows = _rows(null_mn_mn)
-    assert all(per_site_ratio(rows[p]) > MOMENT_SUPPORT_SIGMA for p in PAIR)
+    assert all(rows[p].magnitude_esd is None for p in PAIR)
     assert all(rows[p].supported is False for p in PAIR)
     assert not _trial(null_mn_mn).supported
     _o, _t, verdict, reason = _rank([_trial(null_mn_mn)], 6.0)
