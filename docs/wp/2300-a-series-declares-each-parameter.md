@@ -87,8 +87,12 @@ rx.refine_multi(patterns, s, insts,
   "global", which Python reserves, and TOPAS's `local` is one program's keyword (Rule 5,
   conflicts).
 - `per_pattern` replaces `per_histogram`. "Histogram" is GSAS's word, and both calls take
-  `PatternData`. The joint call's `hist.` dot-path scope keeps its name: renaming it would
-  change a stored format.
+  `PatternData`. The joint call's `hist.N.` dot-path scope becomes `pattern.N.` in this WP
+  (the maintainer, 2026-11-23, "Rename, with refusal"). No stored file holds these paths, since
+  a joint fit keeps no history or project. A path or glob that still starts with `hist.`
+  raises and names `pattern.`, because an old plan glob would otherwise match nothing in
+  silence (DESIGN Rule 4). The class `MultiHistogramRefinement` and the word in prose are not
+  part of this ruling.
 - `held`, not `fixed`: the kind is built on the hold (WP-1435), and its record already says
   held (`Entry.held`, `SeriesEntry.held_values`, `held_because`). A field named `fixed` would
   read as `vary=False`, which a plan overrides. That is the likeliest misuse (Rule 4), and
@@ -143,6 +147,10 @@ hold); WP-1441 (`constrain`).
       his words.
 - [x] The names for the object, its argument and its four fields (§ Context, "The names").
 - [ ] The joint call takes the object in place of `SharingMap`.
+- [ ] The joint fit's `hist.N.` path scope renamed `pattern.N.` across source, manual,
+      examples and tests (338 uses on `bacb7d58b`), and a `hist.` path or glob refused with a
+      message naming `pattern.`; its test, and the refusal's text checked blind as reader
+      output.
 - [ ] The declaration on `SequentialRefinement.fit` and `refine_sequential`: per pattern
       (the default) and fixed, the fixed kind held on every pattern and every rung.
 - [ ] The refusal: a common or equation declaration raises before the first fit, naming the
@@ -196,3 +204,10 @@ hold); WP-1441 (`constrain`).
   four kinds wrongly.
 
   *Next:* the build (the tasks below the names).
+
+- **2026-11-23** — the maintainer ruled the joint fit's `hist.N.` scope renamed `pattern.N.`,
+  with the old prefix refused ("Rename, with refusal"). An earlier note here said the rename
+  would change a stored format; it was wrong, since a joint fit stores none. Whether
+  `MultiHistogramRefinement` is renamed too is still open for the maintainer.
+
+  *Next:* the build.
