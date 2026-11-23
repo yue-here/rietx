@@ -15,10 +15,10 @@ Usage::
 
     python write_data_file.py --curves <dir> --d32 <dir> --out mff_computed.dat
 
-``--curves`` holds the long-format CSVs that ``build_tails.py`` writes
+``--curves`` holds the long-format CSVs that ``regenerate.py`` writes
 (``tails_3d.csv``, ``tails_4d.csv``, ``tails_4f.csv``, ``tails_5f.csv``,
 ``neutral_4d.csv``, ``bare_rows.csv``); ``--d32`` holds the ten
-``<ion>_HFR.csv`` tables ``compute_d32.py`` writes on a 0.005 Å⁻¹ grid, of
+``<ion>_HFR.csv`` tables it writes on a 0.005 Å⁻¹ grid (its ``d32/``), of
 which every second point is taken.
 
 Every value is written ``%.7f``: rounding moves it by at most 5 × 10⁻⁸, under
