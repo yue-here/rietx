@@ -93,7 +93,7 @@ The tier of each rule this WP adds: none. It adds no flag, threshold or automati
   `baseCurves`, Pattern `selection`, Structure camera and toggles.
 - [x] Decide per item whether today's page earns the fix before the swap (WP-2214).
   `applied`'s Undo does: it moves the working state.
-- [ ] Vitest: open two projects with equal head ids and assert each panel reloads.
+- [x] Vitest: open two projects with equal head ids and assert each panel reloads.
 - [ ] A browser check per page: open A, open B with the same node count, and read each
   panel. Run every `tests/*_browser.py` the change touches.
 - [ ] Skill: none. The GUI is a human surface.
