@@ -123,7 +123,9 @@ def _internals(a, b, c, d) -> tuple[float, float, float]:
     unit part of d − c perpendicular to û, w = a − b has angle
     atan2(|w⊥|, −w·û) and dihedral atan2(w⊥·(û × p̂), w⊥·p̂), so placing from
     them returns ``a`` to rounding whatever the frame.  ``d`` is ``None`` for
-    line 2, which ``zmatrix_points`` places in its reference half-plane.
+    line 2, which ``zmatrix_points`` places in its reference half-plane.  An
+    ``a`` on the line b–c (|w⊥| ≤ ``COLLINEAR_TOL``·|w|) reads exactly 0° or
+    180° with a dihedral of 0, whatever the line's direction.
     """
     from .fragments import COLLINEAR_TOL
 
@@ -132,6 +134,14 @@ def _internals(a, b, c, d) -> tuple[float, float, float]:
     u = (b - c) / np.linalg.norm(b - c)
     along = float(w @ u)
     perp = w - along * u
+    if float(np.linalg.norm(perp)) <= COLLINEAR_TOL * r:
+        # a on the line b–c (to ``COLLINEAR_TOL``, the dihedral's own test):
+        # exactly 0° or 180°, which ``zmatrix_points`` reads as on the line,
+        # in any direction; its dihedral then moves nothing and reads 0.  The
+        # rounding of a linear group not laid along a Cartesian axis would
+        # otherwise leave 180° − ε, and a later line over the collinear
+        # triple is refused (#1665)
+        return r, (0.0 if along < 0.0 else 180.0), 0.0
     angle = float(np.degrees(np.arctan2(np.linalg.norm(perp), -along)))
     if d is None:
         return r, angle, 0.0
@@ -280,6 +290,10 @@ def add_body(phase: Phase, name: str, labels: Sequence[str],
     call refuses ``RIGID_BODY_NOT_INVARIANT`` naming the first point that
     misses.  It then keeps the first listed point of each image set — the
     space group places the others — and warns naming the labels it dropped.
+    A Z-matrix keeps a dropped atom's line as a dummy, placed where the image
+    is at declaration and still a reference for later lines; a free internal
+    that would part it from the image is refused at stage start
+    (:func:`zmatrix_image_standins`).
     """
     c0 = np.zeros(3)
     if zmatrix is not None:
@@ -329,7 +343,10 @@ def add_body(phase: Phase, name: str, labels: Sequence[str],
         species = [species[k] for k in keep]
         frac = frac[keep]
         # a Z-matrix keeps every line: a dropped atom's line becomes a dummy,
-        # placed where the image is and still a reference for later lines
+        # placed where the image is at declaration and still a reference for
+        # later lines.  Nothing ties it to the image after that: a free
+        # internal that would part the two is refused at stage start
+        # (zmatrix_image_standins, ``ParameterTable.refuse_free_internals``)
         lines = [z.model_copy(update={"atom": z.atom if z.atom in labels else None})
                  for z in body.zmatrix]
         body = RigidBody.model_validate({
@@ -411,6 +428,65 @@ def _site_representatives(phase: Phase, name: str, labels, species, body,
                     "(body_from_atoms(..., origin=...))")
             first[k] = min(first[k], int(same[0]))
     return [k for k in range(len(labels)) if first[k] == k]
+
+
+def zmatrix_image_standins(phase: Phase, body: RigidBody
+                           ) -> list[tuple[int, int, int, np.ndarray]]:
+    """The dummy lines of a Z body on a special position that stand in for a site image.
+
+    :func:`add_body` keeps a dropped image's line as a dummy, placed where the
+    image is at declaration, and later lines may still be placed from it.
+    Nothing ties it to the image afterwards: a free internal that moves the
+    kept atom and not its stand-in (or the reverse) leaves every line placed
+    from the stand-in following a point that is no longer an atom, while that
+    line's held internals still read as if it were (WP-1814, #1665).
+
+    Read off the geometry at the record: a dummy line j stands in for the
+    image of member line k under g ∈ G_o when z_j − c₀ = W·(z_k − c₀) to
+    ``RIGID_BODY_INVARIANCE_TOL``, with W = R₀ᵀ·W_g·R₀ the site operation in
+    the body frame and the image not k itself.  A turn the site allows
+    commutes with G_o, so W does not change while the body turns.  Only a
+    stand-in some member line is placed from (as b, c or d, directly or
+    through other lines) is returned, as (j, k, m, W) with m the first such
+    member line.  Empty at a general origin.
+    """
+    from ..schemas.structure import RIGID_BODY_INVARIANCE_TOL
+    from .fragments import zmatrix_points
+    from .symmetry import resolve_group, site_orbit
+
+    if not body.zmatrix:
+        return []
+    sg = resolve_group(phase.space_group, phase.symmetry_operations)
+    orbit = site_orbit(sg, np.asarray(body.origin.values(), dtype=np.float64))
+    if len(orbit.stabilizer_ops) == 1:
+        return []
+    refs = [z.refs() for z in body.zmatrix]
+    z = zmatrix_points(refs, [tuple(p.value for _, p in ln.internals())
+                              for ln in body.zmatrix]) - np.asarray(body.zmatrix_origin)
+    members = [i for i, ln in enumerate(body.zmatrix) if ln.atom is not None]
+    m, minv = _frames(phase.cell.lengths_angles())
+    r0 = np.asarray(rotation.matrix_from_quaternion(np.array(body.orientation)),
+                    dtype=np.float64)
+    ops = [r0.T @ (m @ r.astype(np.float64) @ minv) @ r0 for r in orbit.stabilizer]
+    out = []
+    for j, line in enumerate(body.zmatrix):
+        if line.atom is not None:
+            continue
+        # the lines placed from j, directly or through other lines
+        placed = {j}
+        for i in range(j + 1, len(refs)):
+            if any(k in placed for k in refs[i]):
+                placed.add(i)
+        users = sorted(i for i in placed - {j} if body.zmatrix[i].atom is not None)
+        if not users:
+            continue
+        hit = next(((k, w) for w in ops for k in members
+                    if np.linalg.norm(w @ z[k] - z[k]) > RIGID_BODY_INVARIANCE_TOL
+                    and np.linalg.norm(z[j] - w @ z[k]) <= RIGID_BODY_INVARIANCE_TOL),
+                   None)
+        if hit is not None:
+            out.append((j, hit[0], users[0], hit[1]))
+    return out
 
 
 def place_body_atoms(phase: Phase) -> Phase:

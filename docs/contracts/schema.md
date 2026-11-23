@@ -806,7 +806,12 @@ and ``dihedral`` as refinable ``Parameter``s), and ``RigidBody.zmatrix_origin``
 (c₀, the Z-frame point the template is measured from).  Additive and
 defaulted to an empty list and the Z-frame origin, the 0.25 → 0.26 rule, so
 every stored body loads as the constant template it was; an older build
-refuses a body carrying either key.
+refuses a body carrying either key.  And ``SeriesResult.dihedral_paths``, the
+paths a run's models make dihedrals, which ``moved_paths`` wraps beside
+``.angle_paths``.  Additive and defaulted to ``None``, "not recorded", the
+0.25 → 0.26 rule;
+``SequentialRefinement.fit`` writes it on every result (``[]`` with no Z
+body), so an older build refuses every series result this one writes.
 
 Also in 0.62 (WP-2081): ``SeriesEntry.held_values``, every path the
 caller held on a pattern with the value it was held at.  Additive and

@@ -1202,7 +1202,7 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         description=(
             "The distance, in Å, at which one line of a rigid body's Z-matrix places "
             "its atom from the line it names first. Refined as the length itself, not "
-            "a step, and moves only the atoms the line reaches. Bounded below by zero."
+            "a step, and moves only the atoms the line reaches. Kept above zero."
         ),
         unit=None, default=None,
         typical="within a few hundredths of an Å of the template",
@@ -1213,7 +1213,7 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         description=(
             "The angle, in degrees, between a Z-matrix line's atom and the second "
             "line it names, seen from the first. Refined as the angle itself and "
-            "bounded to [0, 180]."
+            "kept inside (0, 180), short of both ends."
         ),
         unit=None, default=None,
         typical="within a few degrees of the template",

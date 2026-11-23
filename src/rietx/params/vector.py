@@ -1366,6 +1366,10 @@ class ParameterTable:
         #: position): what the stage-start refusals of a free internal read
         #: (:meth:`refuse_free_internals`)
         self._zmatrix_bodies: dict[str, tuple[object, frozenset[str]]] = {}
+        # per Z body on a special position, the dummy lines standing in for a
+        # site image that a member is placed from
+        # (``crystallography.bodies.zmatrix_image_standins``)
+        self._zmatrix_standins: dict[str, list] = {}
         #: a body origin's displacement DOFs (they are in ``_anchored_dofs``
         #: too, being an atom-like site): with the rotations, the increments
         #: that restart at every build while the record moves, which is what
@@ -2136,6 +2140,8 @@ class ParameterTable:
         self._zmatrix_paths[bbase] = zpaths
         if zpaths:
             self._zmatrix_bodies[bbase] = (body, on_site)
+            from ..crystallography.bodies import zmatrix_image_standins
+            self._zmatrix_standins[bbase] = zmatrix_image_standins(phase, body)
         self._bodies.append((bbase, body.name, block))
 
     def _refuse_body_off_its_sites(self, sg, phase, body, index, origin) -> frozenset[str]:
@@ -4956,7 +4962,12 @@ class ParameterTable:
           rigid set), so both free is refused whatever atoms each reaches.
         * ``RIGID_BODY_NOT_INVARIANT``: on a body whose origin sits on a
           special position, an internal that moves a member on a special
-          position (1807's rule for a torsion).
+          position (1807's rule for a torsion); or a free column (an internal,
+          or a tie driving several) that parts a dummy line standing in for a
+          site image from the image itself, where a member is placed from that
+          dummy (:func:`~rietx.crystallography.bodies.zmatrix_image_standins`).
+          Read on the column's exact tangent, so a tie that moves the two
+          together is not refused.
         * ``RIGID_BODY_COLLINEAR_ANGLE``: a free angle over a collinear
           reference triple (above).
         * ``RIGID_BODY_INERT_INTERNAL``: an internal that moves no atom (only
@@ -5039,6 +5050,58 @@ class ParameterTable:
                     raise ValueError(
                         f"RIGID_BODY_INERT_INTERNAL: {who}, and it moves nothing: every line it places is a "
                         f"dummy, so its column is zero; {fix}")
+            self._refuse_standin_drift(bbase, body, values, joint=joint)
+
+    def _refuse_standin_drift(self, bbase, body, values, *, joint) -> None:
+        """``RIGID_BODY_NOT_INVARIANT`` for a free column that parts a stand-in
+        from its site image (:meth:`refuse_free_internals`, #1665).
+
+        Each free column's tangent on the Z-matrix lines is the internals'
+        exact tangents (``fragments.zmatrix_points``) weighted by that column's
+        row of **C**, so a tie carrying both internals counts as the one
+        direction it is.  The stand-in j stays on the image of member line k
+        under the body-frame operation W exactly when ∂z_j = W·∂z_k.
+        """
+        from ..crystallography.fragments import zmatrix_points
+
+        standins = self._zmatrix_standins.get(bbase)
+        if not standins:
+            return
+        zpaths = self._zmatrix_paths[bbase]
+        col = {q: c for c, q in enumerate(zpaths)}
+        refs = [z.refs() for z in body.zmatrix]
+        vals, c = [], 0
+        for i in range(len(refs)):
+            w = min(i, 3)
+            vals.append(tuple(values[q] for q in zpaths[c:c + w]))
+            c += w
+        _, tan = zmatrix_points(refs, vals, tangents=True)
+        csc = self._reach.tocsc()
+        for t, path in enumerate(self.free_paths):
+            sl = slice(csc.indptr[t], csc.indptr[t + 1])
+            terms = [(col[self.entries[i].path], float(v))
+                     for i, v in zip(csc.indices[sl], csc.data[sl], strict=True)
+                     if v != 0.0 and self.entries[i].path in col]
+            if not terms:
+                continue
+            d = sum(v * tan[k] for k, v in terms)
+            for j, k, m, w in standins:
+                miss = float(np.linalg.norm(d[j] - w @ d[k]))
+                scale = max(1.0, float(np.linalg.norm(d[j])), float(np.linalg.norm(d[k])))
+                if miss <= 1e-9 * scale:
+                    continue
+                kept = body.zmatrix[k].atom
+                fix = ("drop it from the stage's turn_on: a joint fit has no hold verb"
+                       if joint else f"hold it (Refinement.hold({path!r}))")
+                raise ValueError(
+                    f"RIGID_BODY_NOT_INVARIANT: rigid body {body.name!r}: {path} is "
+                    f"free, and it parts Z-matrix line {j} (dummy), which stands in "
+                    f"for the site image of line {k} ({kept}), from that image. Line "
+                    f"{m} ({body.zmatrix[m].atom}) is placed from line {j}, so it "
+                    "would follow a point that is no longer an atom while its held "
+                    f"internals still read as if it were; {fix}, tie the internals "
+                    f"of lines {j} and {k} so that line {j} follows the image, or "
+                    f"place line {m} from lines the body lists as atoms")
 
     def restore_body_anchors(self, paths: Iterable[str]) -> list[str]:
         """Put back the anchor the last commit replaced, for bodies in ``paths``.

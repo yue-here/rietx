@@ -158,6 +158,33 @@ def test_the_tree_builder_reads_a_linear_group_without_nan():
     assert abs(body.zmatrix[3].angle.value - 180.0) < 1e-6
 
 
+@pytest.mark.parametrize("direction", [(1.0, 1.0, 1.0), (0.3, -0.7, 0.4)])
+@pytest.mark.parametrize("run", [(-1.66, -0.60, 0.60, 1.66),            # H–C≡C–H
+                                 (-2.72, -1.66, -0.60, 0.60, 1.76)])   # H–C≡C–C≡N
+def test_the_tree_builder_reads_a_linear_group_in_any_direction(direction, run):
+    """Yue's item 5, past a Cartesian axis (#1665): a collinear run of four or
+    more atoms along a general direction reads its angles as exactly 180°, so
+    each later line over the collinear triple is placed on the line rather
+    than refused; the body then reproduces the atoms."""
+    from rietx.params.derived import cartesian_frame
+
+    m = np.asarray(cartesian_frame(_cell().lengths_angles()))
+    u = np.asarray(direction) / np.linalg.norm(direction)
+    labels = [f"{el}{i}" for i, el in enumerate("HCCH" if len(run) == 4 else "HCCCN")]
+    atoms = [Atom(label=lab, species=lab[0],
+                  **{c: P(value=float(v)) for c, v in
+                     zip("xyz", np.linalg.solve(m, t * u + np.array([1.0, 2.0, 1.5])),
+                         strict=True)})
+             for lab, t in zip(labels, run, strict=True)]
+    phase = Phase(name="ln", space_group="P1", cell=_cell(), atoms=atoms,
+                  scale=P(value=1e-2, min=0.0))
+    body = zmatrix_body_from_atoms(phase, labels, "ln",
+                                   tree=list(zip(labels, labels[1:], strict=False)))
+    assert [z.angle.value for z in body.zmatrix[2:]] == [180.0] * (len(run) - 2)
+    new = Phase.model_validate({**phase.model_dump(), "rigid_bodies": [body.model_dump()]})
+    ParameterTable(Structure(phases=[new]), INS)   # drift-checked to 1e-6 Å
+
+
 def test_a_riding_h_rides_on_its_lines_b():
     """M13: on a Z body the parent is the H line's b, and the length is its r."""
     body = zbody_structure().phases[0].rigid_bodies[0]
@@ -460,6 +487,58 @@ def test_a_site_body_may_not_move_an_atom_on_its_site():
     with pytest.raises(ValueError, match=r"^RIGID_BODY_NOT_INVARIANT: .* moves 'O3'"):
         _refusal(s, [f"{B0}.zmatrix.{line['O3']}.r"])
     _refusal(s, [f"{B0}.zmatrix.{line['O5']}.r", f"{B0}.zmatrix.{line['O5']}.angle"])
+
+
+# a molecule on the P-1 centre, rooted at a dummy on it: A1's image is line 3
+# (dropped by add_body, so a dummy that stands in for it), and the kept atom N4
+# is placed from that stand-in (b = 3, r = 1.4 Å); O5 and N6 are the images of
+# O2 and N4.  Internals read off Cartesian points to 1e-6
+SITE = [("X",), ("C", 0, 0.707107), ("O", 1, 1.303840, 0, 140.363150),
+        ("C", 0, 0.707107, 1, 180.0, 2, 0.0), ("N", 3, 1.4, 0, 99.301195, 2, 11.212430),
+        ("O", 3, 1.303840, 0, 140.363150, 2, -180.0),
+        ("N", 1, 1.4, 0, 99.301195, 2, 168.787570)]
+
+
+def test_a_free_internal_may_not_part_an_image_standin_from_its_image():
+    """#1665: a free internal that moves A1 and not its stand-in (line 3), or
+    the reverse, leaves N4 placed from a point that is no longer A1's image,
+    so its held 1.4 Å bond stops describing the crystal.  A tie that moves the
+    two together keeps the stand-in on the image and is accepted."""
+    from rietx.crystallography.bodies import place_body_atoms
+    from rietx.params.derived import cartesian_frame
+    from rietx.params.vector import AffineTie
+
+    with pytest.warns(UserWarning, match="special position"):
+        s = zbody_structure(SITE, dummies=(0,), origin=(0.0, 0.0, 0.0))
+    body = s.phases[0].rigid_bodies[0]
+    assert body.atoms == ["C1", "O2", "N4"]
+    assert [k for k, z in enumerate(body.zmatrix) if z.atom is None] == [0, 3, 5, 6]
+
+    def bond(*steps):
+        # N4 to the crystal's image of C1, after the given steps of r
+        doc = s.phases[0].model_dump()
+        for k in steps:
+            doc["rigid_bodies"][0]["zmatrix"][k]["r"]["value"] += 0.05
+        doc["rigid_bodies"][0]["template"] = zmatrix_template(
+            [ZLine.model_validate(z) for z in doc["rigid_bodies"][0]["zmatrix"]],
+            body.zmatrix_origin)
+        phase = place_body_atoms(Phase.model_validate(doc))
+        m = np.asarray(cartesian_frame(phase.cell.lengths_angles()))
+        at = {a.label: m @ np.array([a.x.value, a.y.value, a.z.value]) for a in phase.atoms}
+        return float(np.linalg.norm(at["N4"] + at["C1"]))   # the image of C1 is −C1
+
+    assert abs(bond() - 1.4) < 1e-5
+    assert abs(bond(1) - 1.4) > 5e-3          # the drift the refusal prevents
+    assert abs(bond(1, 3) - bond()) < 1e-9    # the stand-in follows the image
+    for q in (f"{B0}.zmatrix.1.r", f"{B0}.zmatrix.3.r"):
+        with pytest.raises(ValueError, match=r"^RIGID_BODY_NOT_INVARIANT: .* line 3 \(dummy\), "
+                           r"which stands in for the site image of line 1 \(C1\).* Line 4 \(N4\)"):
+            _refusal(s, [q])
+    _refusal(s, [f"{B0}.zmatrix.2.r", f"{B0}.zmatrix.4.r", f"{B0}.zmatrix.4.angle",
+                 f"{B0}.zmatrix.4.dihedral"])
+    table = _table(s, [f"{B0}.zmatrix.1.r"])
+    table.set_tie(f"{B0}.zmatrix.3.r", AffineTie.identity(f"{B0}.zmatrix.1.r"))
+    table.refuse_free_internals()
 
 
 def test_the_refusals_run_at_stage_start_for_a_glob():
