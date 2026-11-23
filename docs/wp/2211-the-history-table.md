@@ -1,6 +1,6 @@
 # WP-2211 — the History table: Compare on the pattern, Restore as pending edits
 
-Milestone: gui-overhaul · Status: ⬜
+Milestone: gui-overhaul · Status: 🔄 2026-11-22 — in review (#1772); the maintainer's look at its pictures and the chapter's timing wait
 Depends on: 2214 (the rebuild's plan: it builds on piece R1's bottom panel)
 Priority: P2 2026-11-17 — was P3: R1's bottom panel landed with WP-2215 (#1534), so nothing blocks it; a feature the open milestone was opened for
 
@@ -22,6 +22,14 @@ with lanes on the left, and on the right a selected node's details, its verbs (C
 Branch, Label) and a two-node compare table (`⇄`). The tab strip is `BOTTOM_TABS` in
 `gui/src/lib/tabs.ts`, and its label carries no count. Read WP-2206's handover entry on `main`
 once it lands; its open visual question 1 is this WP's subject.
+
+That plan changed on 2026-11-11 (WP-2214, the rebuild's plan): the maintainer ruled to rebuild
+the GUI's front end beside today's instead of porting it piece by piece. PR #1521 (WP-2206,
+WP-2207) closed as a source and never merged, so this WP builds in the new front end at `/next`,
+on the bottom panel its piece R1 built, as part of piece R5. The design below stands; what it
+says about `panels/History.svelte` and `panels/Console.svelte` describes today's GUI, which the
+new page replaces at the swap. WP-2214's inventory rows 152-160 give the homes this WP keeps
+reachable.
 
 ### The design, and the rulings it rests on
 
@@ -85,6 +93,76 @@ visual questions go to him first).
    mode a node's extracted intensities live in the node (`ReflectionState`), so its curve comes
    from replay as well.
 
+### Rulings
+
+Questions 1 and 2 went to the maintainer on 2026-11-21 as drawn options: whole windows of the
+prototype with the changed region boxed, on a private page.
+
+- **Question 1, 2026-11-21, the maintainer: a Table | Graph toggle in the tab, defaulting to
+  Graph.** The table is the design above. The graph is today's lanes view, rebuilt in the new
+  front end, and a branch leaves its lane with a rounded corner, never an angled step. Checkout,
+  Tag, Branch and Label stay reachable from a node's context menu in both views.
+- **Question 2, 2026-11-21, the maintainer: both verbs.** Restore loads values as pending edits;
+  Checkout moves the head at once and sits in the node's menu. The words a person reads are
+  open (question 5).
+- **Question 5, opened 2026-11-21 by the maintainer: the git words.** A person who has never
+  used git may not know Checkout, Tag or Branch. Teach the words, or rename them in the window?
+  Tooltips are the maintainer's first thought, with a link into the manual.
+  **Ruled 2026-11-21, the maintainer: plain words in the menu** (option B of two; A kept the git
+  words and taught them). Checkout reads **Make current**, matching the table's "current" mark.
+  Tag reads **Name…** and Label reads **Note…**, which also tells the two apart. Branch reads
+  **Branch from here**. Restore keeps its word. Each tooltip says what the click does, with the
+  Python call (`ref.checkout`, `history.tag`, `history.annotate`, `ref.branch`) on its second
+  line, and the console still echoes the call. The tab's `?` box links to the GUI chapter's
+  History section, rewritten in this WP, and no separate GUI how-to is written. Practice, from
+  recall and not checked: TOPAS, GSAS-II and FullProf have no history tree; Google Docs, Overleaf
+  and Figma say "Restore this version" and "Name this version"; "Branch" reaches non-programmers
+  in Onshape and Figma, while "Checkout" and "Tag" stay in programmers' tools.
+- **The maintainer's look at PR #1772, 2026-11-22**, on the five items it listed
+  (pictures in `2211-screenshots/`):
+  1. The compared curve's dark ink, `#f5f5f5`: kept.
+  2. The Graph | Table choice and the `?` at the strip's right: kept.
+  3. The Graph view: "don't need more columns, but there is way too much white space. user
+     can't compare 2 entries at a single glance." Tightened: the view is one grid whose rows
+     are subgrids, every column as wide as its widest cell, so Rwp and the row's actions
+     follow the step name (292 px from the step's first letter to the end of Rwp, where it
+     was 1170 px at 1440 wide). The candidate not taken, each row capped at 760 px, is
+     `alt-graph-capped-*.png`.
+  4. Step names stay the stage's own for now.
+  5. The manual: WP-2214 holds, so nothing changes until the swap. The History section's
+     rewrite (ruling 5) is listed with the swap's manual work in WP-2214 § Tests and the
+     manual.
+
+### Measured: questions 3 and 4 (2026-11-22)
+
+Each shipped example was opened, fitted with its stored plan (seven nodes: the root and six
+stages), and every earlier node set against the head. Scripts and logs stay in the runner's
+scratch directory; the numbers are below.
+
+| | fap | nac |
+|---|---|---|
+| nodes whose parameter paths differ from the head's | 0 of 6 | 0 of 6 |
+| nodes whose free set differs from the head's | 6 of 6 | 6 of 6 |
+| rows Restore sets (untied, unlocked, differing) | 20 | 24 |
+| paths still differing after Restore and Apply | 0, on every node | 0, on every node |
+| a node's curve through `refine.replay` | 64-67 ms | 58-214 ms |
+| the same curve through `POST /api/preview` | 3-18 ms, 1e-14 σ from replay's | 2-29 ms, 9e-14 σ |
+| older nodes whose paths differ after one atom is removed | 7 of 7 | 7 of 7 |
+
+**Question 3, decided.** Restore loads values, as ruling 2 words it: the differing values of
+every untied row, and a moved atom as a position edit. It leaves the free set, ties and holds
+as the working state has them. Claude's lean would have offered Checkout on every node of a
+default fit, because each stage frees more than the last, so the free set always differs.
+A node whose parameter paths differ from the head's (an atom added or removed, a background
+of another type) cannot be loaded as pending edits: Restore says so and offers Make current.
+
+**Question 4, decided.** Compare draws `refine.replay`'s curve, served by one new route,
+`GET /api/history/curves?node=`. A preview at the node's values draws the same curve faster,
+but only for a node with the head's paths, no moved atom and no Le Bail intensities of its own.
+Replay answers every node, at its own 2θ range, in under a quarter of a second. The NAC root's
+curve is on a different 2θ range from the head's, so the client places a compared curve by
+2θ, never by index.
+
 ### Seams
 
 - **Routes.** `GET /api/history` (`tree_payload` in `src/rietx/gui/session.py`) already serves
@@ -113,14 +191,6 @@ Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`
 
 ### Inherited
 
-- **2026-11-11, from WP-2214** (the rebuild's plan). The maintainer ruled the same night to
-  rebuild the GUI's front end beside today's instead of porting it piece by piece. PR #1521
-  (WP-2206, WP-2207) closes as a source and never merges, so this WP builds in the new front
-  end, on the bottom panel its piece R1 builds, as part of piece R5. The design above stands;
-  what it says about `panels/History.svelte` and `panels/Console.svelte` describes today's GUI,
-  which the new page replaces at the swap. WP-2214's inventory gives the homes this WP must
-  keep reachable.
-
 ## Non-goals
 
 - Console lines tagged by kind and the console exported as a script: WP-2212.
@@ -129,21 +199,37 @@ Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`
 
 ## Tasks
 
-- [ ] Questions 1 and 2 drawn as options and brought to the maintainer; the rulings recorded
-  here with their dates.
-- [ ] Questions 3 and 4 measured on the shipped examples: how many nodes differ from their head
+- [x] Questions 1 and 2 drawn as options and brought to the maintainer; the rulings recorded
+  here (§ Rulings, 2026-11-21).
+- [x] Question 5, the git words: ruled 2026-11-21 (§ Rulings).
+- [x] The Graph view with rounded branch corners, the Table | Graph toggle defaulting to Graph,
+  the node menu shared by both views. Vitest over a branched tree's lanes.
+- [x] Questions 3 and 4 measured on the shipped examples: how many nodes differ from their head
   by more than values, and the replay cost of a node's curve. The decision written here.
-- [ ] The tab label carries `n_nodes`; `BOTTOM_TABS` and the panel corpus follow. Vitest.
-- [ ] `panels/History.svelte` as the table, with the verbs placed as ruled. Vitest over the
+- [x] The tab label carries `n_nodes`; `BOTTOM_TABS` and the panel corpus follow. Vitest.
+  Done at `/next`: the count is drawn by `next/Frame.svelte` beside the label, so `BOTTOM_TABS`
+  keeps the word, and the panel corpus waits for the swap (WP-2214 § Tests and the manual).
+- [x] `panels/History.svelte` as the table, with the verbs placed as ruled. Vitest over the
   rows a branched tree produces.
-- [ ] Compare: the dashed curve on the Pattern graph, its legend entry, its token. A browser
+  Built as `gui/src/next/History.svelte`, the rebuild's page (§ Where it starts).
+- [x] Compare: the dashed curve on the Pattern graph, its legend entry, its token. A browser
   test that Compare draws the node's curve and moves no element.
-- [ ] Restore: the node's values into the action bar's pending edits, the refusal or the
+- [x] Restore: the node's values into the action bar's pending edits, the refusal or the
   Checkout offer for a node that is more than values, the console echo. Vitest and a browser
   pass: Restore, then Apply, reaches the node's values; Restore, then Revert, changes nothing.
-- [ ] The GUI chapter on History, the screenshot driver, the screenshots retaken, each beside
+- [x] The GUI chapter on History, the screenshot driver, the screenshots retaken, each beside
   the prototype's at 1440 by 900 in the PR (milestone row 11).
-- [ ] Skill: none. The GUI is a human surface, and an agent drives the python API.
+  The pictures are `2211-screenshots/` (its README maps WP-2214's rows 152-160). The chapter and
+  `docs/docs/make_screenshots.py` stay as they are, under WP-2214 § Tests and the manual
+  ("unchanged until the swap"). The maintainer placed the chapter's History rewrite at the
+  swap, 2026-11-22 (§ Rulings, the look's item 5).
+- [x] Skill: none. The GUI is a human surface, and an agent drives the python API.
+- [ ] WP-2214's inventory row 158: the diff panel (filter, metrics, ranked paths; WP-1217),
+  opened by Compare values… on a node's menu. Where it opens is a placement the prototype
+  never drew, so it goes to the maintainer as drawn options first. Added 2026-11-22: R5 owns
+  rows 152-173, and this WP's tasks predate the inventory.
+- [ ] WP-2214's inventory row 155: a node's details (its diagnostics, notes and action) in the
+  row's disclosure. Same origin and the same placement question as row 158.
 
 ## Acceptance
 
@@ -165,6 +251,87 @@ The browser files skip in CI (no playwright there), so the PR quotes their local
   panel), WP-2209 (edit recovery).
 
 ## Handover log
+
+- **2026-11-22** (after the maintainer's look) — The Graph view now reads across: a row's step
+  name, Rwp, Compare and Restore sit together, so two fits can be compared at a glance, at
+  1440 and at 1000 px alike. The maintainer kept the other four items as built, and the
+  manual's History rewrite now waits for the swap, where WP-2214 lists it.
+  *Done*: the five answers in § Rulings; the Graph view as one grid of subgrid rows, columns
+  sized by their widest cell; `history-graph`, `history-compare` and `history-restore`
+  retaken in the Graph view, light and dark, with `history-graph-1000-*` and the candidate not
+  taken as `alt-graph-capped-*`; the rewrite added to WP-2214 § Tests and the manual. That WP
+  is closed, so this is a line in its swap plan, which the session filing the swap reads.
+  *Measured* (macOS arm64, `[dev]` venv, Python 3.12): vitest 952 passed in 55 files;
+  svelte-check 0 errors; the layout and gui browser files 53 passed; docs consistency, dist
+  and manual 83 passed.
+  Next: unchanged. Draw the placements for rows 155 and 158 for the maintainer, then build
+  them in a second PR.
+
+- **2026-11-22** — The History tab is built at `/next`, in review as PR #1772. A person can
+  now see every fit as a row, in the graph view it opens in or the table, overlay any earlier
+  fit on the pattern, and load an earlier fit's values as pending edits that Apply writes and
+  Revert drops. Measuring first changed the design: offering Make current whenever a node
+  differed by more than values would have offered it on every node of a default fit, so Restore
+  carries values and refuses only a node whose model differs. Compare needed one new route,
+  because only a replay can redraw a node with moved atoms or another 2θ range. Five choices
+  wait on the maintainer's look; none blocks the merge.
+  *Done*: questions 3 and 4 measured and decided (§ Measured); `GET /api/history/curves`; the
+  `--plot-compare` token and the dashed layer with its legend entry; `gui/src/next/History.svelte`
+  (Graph and Table views, Compare, Restore, the node menu in the ruled words, the `?` box);
+  the tab's count; `Params.loadRestore`; three browser cases; the shared menu now opens upward
+  where the window has no room below (a History row's menu showed one item of four, and every
+  menu built on it gains the turn); the pictures in `2211-screenshots/` with an inventory of
+  WP-2214's rows 152-160; § Inherited folded into § Where it starts.
+  *Not built*: WP-2214's inventory rows 155 (a node's details) and 158 (the diff panel, opened
+  by Compare values… on the menu). R5 owns them, but this WP's tasks predate the inventory, so
+  both are added as tasks for a second PR. Each needs a placement the prototype never drew.
+  *Review* (`/code-review high --fix`): nine findings, seven fixed in one commit. Restore had
+  dropped absolute DOFs (anisotropic strain, texture), skipping every `.dof.` path where only a
+  site's or a body origin's is relative. History now remounts per project, and an open or
+  close clears the compared curve and the count, since node ids repeat across projects.
+  Compare drops a late answer to an earlier press and is disabled during a run (its route
+  answers 409 then). The curves route thins past `CURVES_CEILING` as its neighbour does. The
+  preview and compared curves share one trace loop. The docstring now says replay uses the
+  project's current excluded regions, since a node records none; changing that is outside
+  this WP. Declined: the tab reads "History 0" while a load error shows, a cosmetic case.
+  *Measured* (macOS arm64, `[dev]` venv on Python 3.12, on this branch with origin/main merged
+  after #1764): the fast selection 15303 passed, 433 skipped, 32 xfailed in 11 min 04 s, with
+  playwright installed, so the browser files ran inside it. The three added tests are browser
+  cases, 15.05 s together locally (3.7-7.0 s each); CI skips them. vitest 952 passed in 55 files;
+  svelte-check 0 errors; every `tests/*_browser.py` 180 passed (layout and gui 53, compare,
+  peaks, recovery and html 25, rxplot and structure3d 49, watch 53); ruff clean; vale 0 errors
+  and no warning on a changed line; `tests.reader_output` exit 0, unchanged.
+  *Gotchas*: macOS folds case, so `History.test.ts` and `history.test.ts` are one file; the
+  mount cases are `historyPanel.test.ts`. #1764 merged mid-handover; History now writes
+  through its `say(kind, text, script?)`, the verbs as runnable calls and the Restore line as
+  a comment.
+  *For the maintainer* (pictures in `2211-screenshots/`, its README § Open):
+  (1) the compared curve's dark ink, `#f5f5f5`, since the prototype's equals the observed
+  points'; (2) the Graph | Table choice and `?` at the strip's right; (3) Graph rows carry Rwp
+  alone; (4) step names are the stage's own (`scale_bkg`), not the prototype's friendly names;
+  (5) **the chapter's timing**: ruling 5 says the GUI chapter's History section is rewritten in
+  this WP, while WP-2214 § Tests and the manual keeps the manual unchanged until the swap. This
+  PR follows WP-2214, so the chapter still describes today's page; say if ruling 5 should win.
+  Next: the maintainer's look at the pictures. Then draw the placements for rows 155 and 158
+  as options for the maintainer and build the chosen one in a second PR. If ruling 5 wins,
+  that PR also rewrites `reference/gui-guide.md` § History against `/next`.
+
+- **2026-11-21** — The maintainer has ruled the History panel's shape from drawn options, so
+  the session that builds it now knows what to build. The tab shows the nodes as a graph by
+  default, with a switch to the table, and branches turn with rounded corners. Both Restore
+  (values as pending edits) and Checkout (move to the node at once) stay. The menu speaks plain
+  words, Make current, Name…, Note… and Branch from here, with the Python call in each tooltip.
+  Nothing is built yet.
+  *Done*: § Rulings written (questions 1, 2 and 5); tasks ticked and two added (the Graph view,
+  question 5). The options were drawn on a copy of the private workshop prototype and shown as a
+  private page; menus, the Restore press and the fold were real clicks, while tooltips, the Graph
+  view and the console sessions were drawn by script. *Gotchas*: the practice line under question
+  5 is from recall, not checked against any program's documentation. Today's GUI chapter
+  (§ History, "When to branch") still describes today's graph and git verbs; this WP's chapter
+  task rewrites it with the new words. Next: measure questions 3 and 4 on the shipped examples
+  (how many nodes differ from their head by more than values, and what a node's curve costs
+  through replay), because their answer decides whether Restore needs the Checkout offer and
+  whether Compare needs a new route. Then build the table.
 
 - **2026-11-10** — created by a ghostshift runner from WP-2206's follow-ups. No open WP owns the
   History panel: a search of the open WPs for History, Restore and pending edits found none,

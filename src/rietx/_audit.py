@@ -5,8 +5,10 @@ restated here beyond what a row needs.  Each part of a heuristic is tiered on
 its own: (1) physics or arithmetic; (2) established practice, a citation that
 tested it or the same choice made *by default* in an established Rietveld
 program (the seven rietx-bench runs: GSAS-II, FullProf, TOPAS, RIETAN-FP,
-BGMN, MAUD, EasyDiffraction), whatever the other six do; (3) rietx's own, kept only on the record's two grounds with the
-maintainer's dated approval.  ``invariant`` is the record's answer-invariant
+BGMN, MAUD, EasyDiffraction), whatever the other six do; (3) rietx's own, kept only on the record's two grounds with a
+dated approval: the maintainer's on a code, action or default row, the
+``generality-review`` judge's agreement on a constant or suggestion row
+(``approved_by``, ruled 2026-11-22 in WP-2238; CONTRIBUTING.md § A heuristic needs its tier).  ``invariant`` is the record's answer-invariant
 class.  ``caller`` is no evidence grade: it marks a row where the package
 decided nothing for the caller, since DESIGN.md § Rules, 1 governs what the
 package decides alone.  Both must hold: the caller asked for it by name (a flag
@@ -95,6 +97,7 @@ from typing import Literal
 Kind = Literal["code", "action", "constant", "default", "suggestion"]
 Tier = Literal[1, 2, 3, "invariant", "caller", "unaudited"]
 Ambiguity = Literal[1, 2, 3]
+Approver = Literal["maintainer", "checked"]
 Response = Literal["error", "warning", "info"]
 
 KINDS: tuple[str, ...] = Kind.__args__
@@ -107,7 +110,10 @@ _STATES_AMBIGUITY = ("code", "action", "default")
 @dataclasses.dataclass(frozen=True)
 class Row:
     """One heuristic.  ``grounds`` and ``approved`` are required on a tier-3
-    row and on a tier-2 action row; ``ambiguity`` is DESIGN.md § Rules, 1's
+    row and on a tier-2 action row, and ``approved_by`` says whose approval
+    the date is: ``"checked"`` (the ``generality-review`` judge agreed) is
+    allowed on a tier-3 constant or suggestion row only, and the field is
+    read only where ``approved`` is set; ``ambiguity`` is DESIGN.md § Rules, 1's
     kind, required on an audited code, action or default row (DESIGN.md
     § Rules, 4 asks a new default or action for it) and allowed on a
     suggestion row.  ``response``, ``responds`` and ``scope`` are a code
@@ -125,6 +131,7 @@ class Row:
     response: Response | None = None
     responds: str = ""
     scope: tuple[str, ...] = ()
+    approved_by: Approver = "maintainer"
 
 
 _PACKAGE = pathlib.Path(__file__).resolve().parent
@@ -720,6 +727,21 @@ ROWS: tuple[Row, ...] = (
     Row("CIF_SITE_MULTIPLICITY_DISAGREES", "code"),
     Row("CIF_SITE_TWINS_MERGED", "code"),
     Row("CIF_SPECIES_NORMALISED", "code"),
+    Row("COMPARISON_UNCONVERGED", "code", tier=1, ambiguity=1,
+        response="warning",
+        responds=("read the comparison's delta_bic and t-ratios as not quotable, run the "
+                  "fit it names on to convergence and compare again"),
+        evidence=("arithmetic: fires exactly when either fit of a nested comparison has a "
+                  "status other than 'converged', or the fuller fit's minimised cost "
+                  "(the last stage's cost_final: data chi2 plus restraint and penalty rows) sits above the "
+                  "restricted one's by more than report.layer2.NESTED_COST_MARGIN (a model that "
+                  "contains another can reproduce it, so at both optima S_full <= "
+                  "S_restricted; the data chi2 alone carries no such bound; "
+                  "report.layer2._chi2_ordered, on distortion.py's restart precedent); "
+                  "the margin is tiered on its own row; flags and refuses nothing, since a budget stop can "
+                  "sit on the optimum (issue #1685: max_iter=2 from Biso 8 stops at the "
+                  "converged chi2); raised by compare_freed, predict_then_verify's "
+                  "comparison and rigid_body_misfit (WP-2220)")),
     Row("CONSTRAINT_ACTIVE", "code", tier=1, ambiguity=1,
         response="info",
         responds=("note which width the floor held; the next fit's start decides whether it "
@@ -732,7 +754,11 @@ ROWS: tuple[Row, ...] = (
     Row("COVARIANCE_DIRECTION_DISCARDED", "code", tier=1, ambiguity=1,
         evidence=("arithmetic: names the parameters sharing a direction the covariance build "
                   "dropped under PINV_RCOND (tier 1), a set no FLAT_DIRECTION pair already "
-                  "holds (staged.check_discarded_directions)")),
+                  "holds, whose esds the solve left absent (WP-2219; "
+                  "least_squares._guarded_covariance, staged.outcome_discarded_directions); "
+                  "a parameter that is not estimable has no standard error (Searle 1971 p. 169; "
+                  "R lm prints NA), where GSAS-II and TOPAS quote the truncated-SVD esd "
+                  "(docs/practice.md)")),
     Row("COVARIANCE_UNAVAILABLE", "code", tier=1, ambiguity=1,
         evidence=("arithmetic: fires exactly when the esd calculation raised after the "
                   "solver returned (refine.py _covariance_diagnostics), so the stage's "
@@ -1270,6 +1296,34 @@ ROWS: tuple[Row, ...] = (
                  "is info everywhere (Yue's ruling, #993 round 2, 2026-10-21: of the "
                  "19 usable above-bar components freed on 16 Oct, 12 moved away from "
                  "the lattice's line and 7 towards it)."),
+    Row("PEAK_EQUATION_SHARED_ACROSS_WAVELENGTHS", "code", tier=1, ambiguity=2,
+        evidence=("physics: a size-like width coefficient in degrees is (180/pi)K lambda/L, "
+                  "so one specimen needs coefficients in the ratio of the wavelengths, while "
+                  "a strain-like one reads no lambda (Scherrer; params/multi.py "
+                  "SIZE_LAMBDA_POWER); the package cannot tell which term the user wrote, so "
+                  "it warns rather than converts. Fires exactly where a degree-valued peak "
+                  "equation's coefficient is one column across patterns declaring two or more "
+                  "wavelengths (multi._peak_equation_sharing_diagnostics; maintainer's ruling "
+                  "of 2026-11-20, option a, WP-2107), unless the expression reads "
+                  "wavelength, which states the term's lambda dependence as a parametric "
+                  "equation states a driven coefficient's (WP-2152, settled by Claude under "
+                  "the maintainer's 'your call', 2026-11-22). The parametric silence is per "
+                  "coefficient and this one per equation, so a degree-valued size term or "
+                  "constant in that same expression goes unwarned"),
+        response="warning",
+        responds=("do not quote the named equation's coefficients as one size or width "
+                  "for every pattern; unshare a wavelength-dependent term's coefficient with "
+                  "SharingMap(per_histogram=...) and refit, and keep a term that reads no "
+                  "wavelength shared")),
+    Row("PEAK_WIDTH_NOT_POSITIVE", "code", tier=1, ambiguity=1,
+        evidence=("physics: a Gaussian variance and a Lorentzian FWHM cannot be negative; "
+                  "fires exactly where a phase's width peak equations take Γ_G² or Γ_L "
+                  "below zero at a fitted reflection (staged.check_peak_width_positive, "
+                  "WP-2107)"),
+        response="warning",
+        responds=("bound the named equation's coefficients or rewrite its term so it "
+                  "cannot go negative, refit, and do not quote the widths or coefficients "
+                  "until it is silent")),
     Row("PEAK_POSITION_PRECISION", "code"),
     Row("PEAK_SHOULDER_SEEDED", "code"),
     Row("PEAK_SIGMA_ASSUMED", "code"),
@@ -1311,6 +1365,15 @@ ROWS: tuple[Row, ...] = (
                   "with no threshold (B12 3(a), ruled 2026-10-19, replacing "
                   "QPA_FRACTION_UNDETERMINED); states the range and excess the profile "
                   "computed, whose cut is FRACTION_PROFILE_DCHI2's row")),
+    Row("QPA_INTENSITY_FACTOR", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: W_p reads S_p·(ZMV)_p as the phase's whole intensity, and "
+                  "intensity = scale × factor, so the fitted scale absorbs 1/mean factor "
+                  "and the fraction moves with it; fires exactly where a measured phase of two or more carries "
+                  "an intensity_factor equation that is not 1 everywhere in range "
+                  "(WP-2107)"),
+        response="warning",
+        responds=("read the named phase's weight fraction as scaled by its mean factor, "
+                  "or normalise the factor and refit, before quoting a fraction")),
     Row("QPA_UNAVAILABLE", "code", tier=1, ambiguity=1,
         evidence=("arithmetic: weight fractions divide by the sum of the weighted scales, "
                   "which is zero or less; fires exactly then (refine.py "
@@ -1707,6 +1770,30 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic: fires exactly when a wavelength was free, and states its "
                   "shift from the declared value in ppm with no test on its size; gates "
                   "nothing")),
+    Row("INSTRUMENT_WIDTH_HELD", "code", tier=1, ambiguity=1,
+        response="warning",
+        responds=("quote no specimen size or strain width named in where as a measurement "
+                  "of the specimen: it is the remainder of the split the plan's stage order "
+                  "chose; calibrate the instrument on a standard and refit with a "
+                  "sample-only plan"),
+        evidence=("arithmetic: fires exactly when the last stage's "
+                  "StageResult.width_twins_held is not empty, a record the hold writes "
+                  "itself (refine._instrument_width_held_diagnostics); no threshold; "
+                  "gates nothing, "
+                  "moves no number. Physics behind the reading: the data fix only each "
+                  "pair's sum (Gaussian variances add, Lorentzian FWHMs add; Caglioti, "
+                  "Paoletti & Ricci 1958), so the held instrument value sets the specimen "
+                  "value. Measured (WP-2225 task 1): two Biso starts on cpd-1a put fluorite "
+                  "lor_strain 5.11 reported esds apart under the hold; on the eight "
+                  "comparison standards it fires on zincite, fluorite, corundum and brucite, "
+                  "the four whose plan frees an instrument and a specimen width of one "
+                  "shape (tests/data/suite_alarms.json)"),
+        grounds=("Ruled by the maintainer 2026-11-20 (WP-2225, option 3): a package-made "
+                 "hold is said aloud with what it held, as PHASE_UNCONSTRAINED says the "
+                 "absent-phase hold; TOPAS 5 marks a parameter at its limit _LIMIT_MIN_# "
+                 "and GSAS-II prints a warning on a variable it freezes at a limit "
+                 "(docs/practice.md § When one twin reaches its limit, and a re-run)."),
+        approved="2026-11-20"),
     Row("XRDML_ATTENUATOR_APPLIED", "code"),
     Row("XYDATA_INTER_APPLIED", "code", tier=2, ambiguity=1,
         evidence=("info; a record of an act the file's own heading asks for. Two claims, "
@@ -1792,7 +1879,9 @@ ROWS: tuple[Row, ...] = (
                   "1/cos, Y with lor_strain in tan; gauss_size (1/cos^2 = 1 + tan^2) is flat with "
                   "U and W together and holding U alone removes it, so W, the constant width, is "
                   "never held (holding W too moved three CPD acceptance answers; the generality "
-                  "judge, WP-2002 9th session); "
+                  "judge, WP-2002 9th session; holding it on the triple W, gauss_size and "
+                  "gauss_strain alone moved the cpd-1 chain, WP-2219, so that triple is left "
+                  "to COVARIANCE_DIRECTION_DISCARDED and has no esd); "
                   "refine._width_twin_flats holds the instrument "
                   "terms on the null space of those totals read off C, so one seen phase with its "
                   "specimen width held holds nothing; a free Stephens block is Y's twin by rule "
@@ -2045,6 +2134,29 @@ ROWS: tuple[Row, ...] = (
                   "5x-median-and-3-sigma threshold. The summary prints one line naming the "
                   "largest and the field (2003-batch/batch.md, C4, settled by Claude "
                   "2026-10-26; its row written with C6's, ruled by the maintainer 2026-11-03)")),
+    Row("rietx.schemas.sequential.SeriesEntry.held_values", "action", tier=3, ambiguity=1,
+        evidence=("records the value each caller-held path had on the kept fit "
+                  "(sequential.py _held_values); the action is that a cold rung and a "
+                  "verify_steps refit (and the cold successor of an on_error='skip' "
+                  "failure) hold the value a warm rung would, the last accepted pattern's "
+                  "carry source (the pattern's own fit on a verify refit), limited by carry, "
+                  "where they held the caller's start before (sequential.py "
+                  "_keep_held_values). No program surveyed restarts a pattern from the "
+                  "initial models, so the question is rietx's alone; GSAS-II, FullProf, "
+                  "TOPAS and EasyDiffraction keep a fixed parameter fixed on every pattern "
+                  "(docs/practice.md § Sequential refinement). One family, the synthetic "
+                  "LaB6 thermal ramp of tests/test_sequential.py, frame 2 forced cold: zero "
+                  "shift 0.00797 on every frame and the cell 1.9-2.0 ppm from the truth, "
+                  "against 0.0 and 546 ppm off before (2081-batch/measure_cold_rung.py); a "
+                  "cold rung under a hold is rare, and no real series with one is on disk"),
+        grounds=("Series rule 6, accepted by the maintainer 2026-11-16: a retry does not "
+                 "change what value a fixed parameter has. His approval on 2026-11-18 of "
+                 "the milestone's acceptance row 'a fixed value stays fixed' names this "
+                 "fixture and value: 0.00797 on every pattern and every attempt "
+                 "(docs/milestones/series.md § Acceptance). The source, the warm rung's "
+                 "own, settled by Claude 2026-11-22 as WP-2081 question 4's option A and "
+                 "approved by the maintainer with PR #1778 on 2026-11-22."),
+        approved="2026-11-22"),
     Row("rietx.schemas.sequential.SeriesEntry.rungs_tried", "action"),
     Row("rietx.schemas.sequential.SeriesEntry.rungs_raised", "action"),
     Row("rietx.schemas.sequential.SeriesEntry.seeded_from", "action", tier=3, ambiguity=1,
@@ -3218,6 +3330,15 @@ ROWS: tuple[Row, ...] = (
         evidence=("numerical floor: eps^(1/3) = 6e-6 is the central-difference optimum; truncation "
                   "~1e-10 of the curvature (docstring); only the weights a_n, hence the covariance,"
                   " depend on it")),
+    Row("rietx.model.peak_equations.ORBIT_RTOL", "constant", tier=1, value=1e-09,
+        evidence=("numerical floor: images of a single-valued equation agree to rounding "
+                  "(order 1e-16 relative), and a branch on an index differs at the size of "
+                  "its own terms, so 1e-9 sits orders of magnitude from both (WP-2107)")),
+    Row("rietx.model.peak_equations.ORBIT_TRIALS", "constant", tier=1, value=3,
+        evidence=("numerical setting: random coefficient sets beside the stored one, since "
+                  "if(l == 0, a, b) at a = b agrees on every image; a branch-dependent "
+                  "equation agrees on a random set with probability zero, so one trial "
+                  "decides and three guard a coincidence (WP-2107)")),
     Row("rietx.model.preferred_orientation.TEXTURE_POSITIVITY_TOL", "constant", tier=1, value=1e-09,
         evidence=("numerical floor: roundoff of a quantity of order 1; lm stopped at min P -2.2e-16"
                   " on the face, trf at -0.45 (WP-1960 D4)")),
@@ -4177,6 +4298,17 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.report.layer0.LAYER0_MATCH_TOL_DEG", "constant", value=0.08),
     Row("rietx.report.layer2.BACKGROUND_INCREASE_CAP", "constant", value=0.6),
     Row("rietx.report.layer2.IMPURITY_SIGMA", "constant", value=8.0),
+    Row("rietx.report.layer2.NESTED_COST_MARGIN", "constant", tier=2, value=2.0,
+        evidence=("Kass & Raftery (1995) J. Am. Stat. Assoc. 90, 773: 2 ln B from 2 to 6 is "
+                  "'positive' evidence, so 2 is the band's lower edge and an excess of the "
+                  "fuller fit's minimised cost under it cannot move a delta_bic verdict; "
+                  "absolute, in the cost units delta_bic is read in; measured stopping noise "
+                  "between two converged fits of one nested pair is 1.1e-7 relative, about "
+                  "0.0006 cost units on issue #1685's fixture, so the margin holds until a "
+                  "cost near 1e7 (the docstring's known limit); replaces optimize.lm.FTOL "
+                  "(1e-9 relative, below that noise) and was chosen over GSAS-II 5.8.4's 1e-3 "
+                  "relative stop (about 6 cost units there, already 'strong'); ruled by the "
+                  "maintainer 2026-11-20 (WP-2220)")),
     Row("rietx.report.layer2.TEXTURE_AXIS_AMBIGUITY", "constant", value=0.8),
     Row("rietx.report.localisation.SPLIT_TOLERANCE_DEG", "constant", value=1e-06),
     Row("rietx.report.magnetic._MAGNETIC_WIDTH_FLOOR_DEG", "constant", value=1e-12),
@@ -5054,7 +5186,8 @@ ROWS: tuple[Row, ...] = (
         grounds=("B11 (ruled 2026-10-19): repeat until the intensities stop changing, with a cap, "
                  "judged against the true structure.  The number, FAP as its failing case and "
                  "LaMnO3's 150x cost were settled by Claude under the maintainer's delegation "
-                 "of 2026-11-05, and the date is that settlement's.  No "
+                 "of 2026-11-05, and the date is that settlement's, which he counted as his "
+                 "approval on 2026-11-22 (WP-2238).  No "
                  "surveyed program stops on the intensities at a fixed model, because each "
                  "extracts inside the solve (docs/practice.md); 1e-8 leaves FAP at 0.55 and "
                  "more than doubles LaMnO3's cycles."),
@@ -5390,15 +5523,23 @@ ROWS: tuple[Row, ...] = (
                   "(docs/practice.md): none defaults to Le Bail; FullProf, RIETAN-FP and TOPAS "
                   "make the user state it. GSAS-II fits each histogram of a series by RefineCore, "
                   "the single fit's solver (docs/practice.md § Sequential refinement, checked)")),
-    Row("rietx.sequential.SequentialRefinement.fit:plan", "default", tier=3, ambiguity=1,
+    Row("rietx.sequential.SequentialRefinement.fit:plan", "default", tier=3, ambiguity=3,
         value="mccusker_default",
         evidence=("the first pattern's plan and, collapsed, every warm refit's; the same "
                   "value as Refinement.fit:plan, whose row carries the evidence (McCusker et "
-                  "al. 1999, the order only; no program ships a default plan)"),
-        grounds=("B7's approval of the single fit's default plan (ruled 2026-10-19), "
-                 "extended to the series seat by the maintainer 2026-11-03 "
-                 "(2003-batch/batch.md, C9 q3)."),
-        approved="2026-11-03"),
+                  "al. 1999, the order only; no program ships a default plan). WP-2081 "
+                  "measured the alternatives: held setups carry frame 0's calibration "
+                  "error to every frame, outside every esd (synthetic LaB6, -1.83 ppm), and "
+                  "on the CuCr2O4 ramp holding every width put the transition near 60 K, "
+                  "230 K or nowhere, where this default closes it between 111 and 123 K"),
+        grounds=("the maintainer kept today's default on 2026-11-16 (docs/milestones/"
+                 "series.md § Ruled after the open; WP-2081 question 1, option a). The "
+                 "traditional sequential, which calibrates the instrument and holds it "
+                 "through the series, is a named dissent (WP-2081 § How a human expert "
+                 "runs a series), so the unanimity gate fails; whether the setup held "
+                 "still is a fact outside the pattern (series rule 4). Tier 3 with the "
+                 "plan kept, ruled 2026-11-22."),
+        approved="2026-11-22"),
     Row("rietx.sequential.SequentialRefinement.fit:refit", "default", value="single"),
     Row("rietx.sequential.SequentialRefinement.fit:two_theta_limits", "default", tier=2,
         ambiguity=1, value=None,
@@ -5492,7 +5633,8 @@ ROWS: tuple[Row, ...] = (
         value="carry",
         evidence=("consulted only once every rung of a pattern raised (sequential.py _chain): "
                   "'carry' records a SeriesFailure with SERIES_PATTERN_FAILED and warm-starts "
-                  "the successor from the last accepted pattern, 'skip' starts it cold, "
+                  "the successor from the last accepted pattern, 'skip' starts it cold "
+                  "(a held path keeping the last accepted value, WP-2081), "
                   "'raise' ends the chain keeping what completed; no case on disk outside "
                   "injected raises; GSAS-II and MAUD stop the chain, EasyDiffraction carries "
                   "on (docs/practice.md § Sequential refinement, checked)"),
@@ -5641,6 +5783,10 @@ ROWS: tuple[Row, ...] = (
     Row("CIF_SITE_LISTED_TWICE.suggestion", "suggestion", value=1),
     Row("CIF_SITE_MULTIPLICITY_DISAGREES.suggestion", "suggestion", value=1),
     Row("CIF_SITE_TWINS_MERGED.suggestion", "suggestion", value=1),
+    Row("COMPARISON_UNCONVERGED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: names the one remedy for a fit short of its optimum, running "
+                  "it on, and the two ways to start it (more iterations, or the other "
+                  "fit's values)")),
     Row("CONSTRAINT_ACTIVE.suggestion", "suggestion", value=1),
     Row("COVARIANCE_DIRECTION_DISCARDED.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence=("arithmetic: names three levers, fewer free, held known values, a wider "
@@ -5830,6 +5976,14 @@ ROWS: tuple[Row, ...] = (
                  "far past the bound the fit would have moved. It says nothing "
                  "of the line's true position, which the 16 Oct re-solve showed the "
                  "bound does not predict (Yue, #993 round 2, 2026-10-21)."),
+    Row("PEAK_EQUATION_SHARED_ACROSS_WAVELENGTHS.suggestion", "suggestion", tier=1,
+        ambiguity=3, value=1,
+        evidence=("arithmetic: names the SharingMap glob that gives each pattern its own "
+                  "coefficient, and says a term reading no wavelength can stay shared; "
+                  "picks neither")),
+    Row("PEAK_WIDTH_NOT_POSITIVE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: names a bound, a square or max(x, 0) as ways to keep the "
+                  "width positive; picks none")),
     Row("PEAK_POSITION_PRECISION.suggestion", "suggestion", value=1),
     Row("PEAK_SHOULDER_SEEDED.suggestion", "suggestion", value=1),
     Row("PEAK_SIGMA_ASSUMED.suggestion", "suggestion", value=1),
@@ -5848,6 +6002,10 @@ ROWS: tuple[Row, ...] = (
     Row("QPA_FRACTION_RANGE.suggestion", "suggestion", tier=2, ambiguity=3, value=1,
         evidence=("profile-likelihood interval in place of the Wald esd: Venzon & Moolgavkar (1988)"
                   " Appl. Statist. 37, 87; Hamilton (1965) (docstring)")),
+    Row("QPA_INTENSITY_FACTOR.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: a factor averaging 1 leaves the scale the phase's amount; "
+                  "multiplying the scale by the mean factor is the same correction after "
+                  "the fit; picks neither")),
     Row("QPA_UNAVAILABLE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence=("arithmetic: points at the model and the start, and at the run's other "
                   "findings; picks no cause")),
@@ -5988,6 +6146,13 @@ ROWS: tuple[Row, ...] = (
                   "intent")),
     Row("WAVELENGTH_CALIBRATION.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence="arithmetic: points at the instrument's own record; picks no verdict"),
+    Row("INSTRUMENT_WIDTH_HELD.suggestion", "suggestion", tier=2, ambiguity=1, value=1,
+        evidence=("practice: every program that separates instrument from specimen "
+                  "broadening fixes the instrument from a standard (FullProf's resolution "
+                  "file, BGMN's ray tracing, RIETAN-FP's advised protocol, GSAS-II's "
+                  "defaults; docs/practice.md § Instrument and specimen widths refined "
+                  "together); names rietx's route for it, lab_calibrate, "
+                  "load_instrument_profile and a sample-only plan")),
     Row("rietx.crystallography.scattering.written_neutral_diagnostics.suggestion", "suggestion", value=1),
     Row("rietx.crystallography.symmetry.rhombohedral_restated_diagnostic.suggestion", "suggestion", value=1),
     Row("rietx.refine._dedup_high_correlations.suggestion", "suggestion", value=1),

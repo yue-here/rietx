@@ -46,11 +46,17 @@
 
   let el: HTMLDivElement | undefined = $state();
   let width = $state(0);
+  let height = $state(0);
 
   /** The left edge, kept inside the window. */
   const left = $derived(Math.max(4, Math.min(
     at.align === "right" ? at.x - width : at.x,
     window.innerWidth - width - 4)));
+  /** The top edge: below the point, or above it where the window has no room
+   * below, as a desktop's context menu turns (a History row sits at the
+   * window's foot, WP-2211). */
+  const top = $derived(at.y + height + 4 > window.innerHeight
+    ? Math.max(4, at.y - height) : at.y);
 
   function choose(item: MenuItem) {
     if (item.disabled) return;
@@ -83,7 +89,7 @@
 <svelte:window onkeydowncapture={keydown} onpointerdowncapture={away} onresize={onclose} />
 
 <div class="rx-menu" role="menu" aria-label={label} bind:this={el} bind:offsetWidth={width}
-  style="left: {left}px; top: {at.y}px">
+  bind:offsetHeight={height} style="left: {left}px; top: {top}px">
   {#each items as entry, i (entry === "-" ? `-${i}` : entry.id)}
     {#if entry === "-"}
       <div class="sep" role="separator"></div>
