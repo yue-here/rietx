@@ -1,6 +1,6 @@
 # WP-2240 — the peaks-and-indexing workflow at `/next`: pick peaks, fit peaks, index, judge
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-22 — claimed by a ghostshift runner; tasks 1-4 are the first PR
+Milestone: gui-overhaul · Status: 🔄 2026-11-23 — tasks 1-4 in PR #1788 (the Pick step); tasks 5-9 left
 Depends on: 2218 (hand fitting and the other graphs)
 Priority: P2 2026-11-22 — a feature the open milestone was opened for: R6, the rebuild's next piece
 
@@ -180,6 +180,65 @@ The piece closes when every task is ticked and the maintainer has looked at its 
 the prototype's (WP-2214 § How the maintainer reviews).
 
 ## Handover log
+
+- **2026-11-23** — first PR, #1788: tasks 1-4. The peaks-and-indexing workflow now opens at
+  `/next` from the workflow menu, under the prototype's numbered strip (Pick peaks › Fit peaks ›
+  Index › Judge, with ↺ iterate back to the first). Its first step works end to end: a person
+  sets the picker's three options, picks, filters the list to the lines used or not used, ticks
+  a line in or out of indexing, and clicks a row to frame its line on the Pattern graph, where
+  the lines are drawn as the prototype's lens marks. Fit, Index and Judge still show their
+  one-sentence placeholder, and the peak gestures on the plot are not wired yet.
+
+  *Done.* Task 2 serves each group's per-line curves and observed counts
+  (`PeakEditor.curves`). Task 3 adds the steps' pure helpers to `lib/peaks.ts` with
+  `lib/peaksteps.test.ts`. Task 4 adds `next/Indexing.svelte`, the strip in `next/Frame.svelte`,
+  the lens layer in `next/pattern.ts` (`peakMarkers`, `LENS_*`), `WORKFLOW_HELP`, and the
+  `built`/`loop`/`graphs` fields and `stepGraph` in `lib/workflows.ts`. The corpus labels
+  `peak_origins:manual` and `:edited` now read "added by you" and "moved by you".
+
+  *Measured* (`[dev]` venv, darwin/arm64, playwright installed in the venv). vitest 59 files,
+  980 passed; svelte-check 0 errors, 0 warnings over 486 files. The GUI and docs pytest files
+  (`test_help`, `test_gui_peaks`, `test_gui_server`, `test_gui_dist`, `test_gui_manual`,
+  `test_gui_style_guide`, `test_gui_palette`, `test_docs_consistency`): 369 passed. Browser files
+  `test_gui_layout_browser.py`, `test_gui_console_browser.py`, `test_gui_peaks_browser.py`,
+  `test_gui_browser.py`: 57 passed, one of them new
+  (`test_the_pick_step_picks_frames_a_line_and_a_tick_moves_nothing`). The fast suite through the queue: 15343 passed, 438 skipped,
+  32 xfailed; the one added pytest costs 4.63 s on this machine.
+  ruff clean; Vale 0 errors, its 281 warnings on pages this branch does not touch.
+
+  *Settled by Claude under the 2026-11-11 ruling (the prototype is the ruling at `/next`) and
+  STYLE.md.* WP-2202's six open questions: the numbered strip as drawn; one filled action in each
+  step's foot, since the action bar hides while a workflow is up; the fit windows in the Peaks
+  graph tab; coverage stays and notes fold; no `why` column in the candidate table; "added by
+  you" through the corpus label. Smaller calls: the 2θ range placeholder is "default"; 2θ at four
+  places without its esd and intensity as I/Imax × 100 (WP-1209's column rule); "↺ iterate" is a
+  button back to Pick peaks, since a title on a bare span breaks the title rule; the "used by you
+  over …" note is session-local; the filter's counts reserve the longest count's width, so a tick
+  moves no button.
+
+  *Review* (`/code-review high --fix`, ten findings, five fixed in their own commit). Fixed: the
+  pane is keyed on the project, so opening another one drops the old list; the chosen row is one
+  bound value, cleared by a pick; a refused tick puts its box back; a stacked lens sits above the
+  twin it stacks on; the chrome inks are read with the plot colours rather than per draw; a dead
+  `removed` count is gone. Declined: the dotted mark for a chosen line left out strokes in
+  `--accent`, which equals `--plot-diff` on the light theme; it carries no quantity, so chrome
+  ink is the rule (WP-1213), and its colour is the prototype's, so task 9's look decides. The lens
+  marks drop the hollow, diamond and σ-whisker shapes `gui/CLAUDE.md` § House style states for
+  today's Peaks tab, because round 11's design replaced them; the rulebook line moves at the swap
+  (WP-2214), not here. The helpers for steps 6-8 stay, being this WP's next tasks. Per-line curves
+  refreeze each group once per line; a cheaper form needs `indexing/peakfit.py` and waits until a
+  measurement says it costs a click.
+
+  *Gotchas.* The selected lens at the plot's top is clamped until task 5 gives the plot its
+  headroom. The panel draws nothing until `GET /api/peaks` answers, a few milliseconds on a
+  local server; a probe waits for `.steppane h3`. In the worktree, Bash refuses any command
+  containing the letters g-i-t inside a word, so `digits` in a sed script is refused: run such
+  edits as python scripts from the scratch directory.
+
+  *Next.* Task 5 first: the gestures and the 96 px headroom, because the Fit and Index steps
+  frame and select lines through them. Then 6 (Fit with group windows), 7 (Index), 8 (Judge) and
+  9 (screenshots beside the prototype's). Task 9's PR also states the lens marks' rule in `gui/CLAUDE.md` § Plot beside
+  today's shapes, since no swap WP exists yet to move it. The last PR waits on the maintainer's look.
 
 - **2026-11-22** — filed by a ghostshift runner for the milestone's R6 row, which had no WP. No
   open WP owns the workflow at `/next`: WP-2202 built the same design inside today's Peaks tab,
