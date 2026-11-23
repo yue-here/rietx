@@ -66,6 +66,15 @@
   let node = $state<HTMLElement | null>(null);
   const open = $derived(!!node && opener?.isOpen(node) === true);
 
+  // a term that leaves the page takes its explanation with it: a layer that
+  // closed by a submit left the popover drawn over nothing (WP-2244)
+  $effect(() => {
+    const term = node;
+    return () => {
+      if (term && opener?.isOpen(term)) opener.close();
+    };
+  });
+
   function toggle(event: Event) {
     if (!node || !opener) return;
     // a term inside a row that is itself clickable must not run the row's verb
