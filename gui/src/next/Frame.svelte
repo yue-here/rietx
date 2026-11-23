@@ -27,6 +27,7 @@
   import Peaks from "./Peaks.svelte";
   import Structure from "./Structure.svelte";
   import Recovery from "../panels/Recovery.svelte";
+  import HelpPopover, { provideHelp } from "../HelpPopover.svelte";
   import { projectStem } from "../lib/filemenu";
   import type { HelpCorpus } from "../lib/help";
   import { RecoveryWriter, combine, readDraft, restoredText, type Draft,
@@ -47,6 +48,7 @@
            type LineKind } from "./console";
   import HelpBox from "./HelpBox.svelte";
   import Indexing from "./Indexing.svelte";
+  import Series from "./Series.svelte";
   import History from "./History.svelte";
   import { howComment, howWords } from "./howran";
   import { GRAPH_HELP, HISTORY_HELP, MODEL_HELP, WORKFLOW_HELP } from "./helpbox";
@@ -82,6 +84,8 @@
   let openError = $state("");
   let newOpen = $state(false);
   let corpus = $state<HelpCorpus | null>(null);
+  /** the page's one help popover, which every `<Help>` term opens (WP-2244) */
+  const help = provideHelp();
 
   /** The last fit (`/api/result`), and a key bumped whenever its curves moved. */
   let result = $state.raw<any>(null);
@@ -182,6 +186,8 @@
   let selectedPeak = $state<number | null>(null);
   /** the workflow panel, whose verbs the plot's peak gestures call */
   let indexingPanel: ReturnType<typeof Indexing> | undefined = $state();
+  /** the series workflow's panel, which folds the run's events (WP-2243) */
+  let seriesPanel: ReturnType<typeof Series> | undefined = $state();
   let frameAt = $state.raw<{ two_theta: number; seq: number } | null>(null);
 
   /** The model panel's width and the bottom panel's height, session-local
@@ -945,7 +951,7 @@
      *  frame, so a reload does not reload for a run that ended before it. */
     let seen: string | null = null;
     const unfollow = follow(
-      (event: EngineEvent) => write(eventLine(event)),
+      (event: EngineEvent) => { write(eventLine(event)); seriesPanel?.event(event); },
       (frame: RunState) => {
         run = frame;
         // a run just ended, keyed on its outcome rather than on having seen a
@@ -1123,6 +1129,14 @@
               onpeaks={(p) => (peaksPayload = p)} onframe={framePeak} />
           </div>
         {/if}
+        {#if wf === "series"}
+          {#key project.path}
+            <div class="pane wfsteps">
+              <Series bind:this={seriesPanel} {step} steps={wfSteps ?? []} {busy} {run} {say}
+                onstep={chooseStep} onrun={startRun} onstop={stop} />
+            </div>
+          {/key}
+        {/if}
         <div class="pane" class:gone={!!wfSteps || modelTab !== "params"}>
           <Params bind:this={paramsPanel} {head} {busy} {corpus} {say} onmoved={structureMoved}
             anodes={capabilities?.anodes ?? []}
@@ -1259,6 +1273,8 @@
   <Settings choice={themeChoice} onchoose={chooseTheme}
     version={version?.package_version ?? ""} onclose={() => (settingsOpen = false)} />
 {/if}
+
+<HelpPopover host={help} {corpus} />
 
 <style>
   .topbar,
