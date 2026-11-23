@@ -1,6 +1,6 @@
 # WP-2242 — a panel forgets the last project when another opens in the same window
 
-Milestone: gui-overhaul · Status: ⬜
+Milestone: gui-overhaul · Status: 🔄 2026-11-23 — claimed by @yue-here (ghostshift runner)
 Depends on: —
 Priority: P2 2026-11-22 — Run, Apply and Undo can act on the last project's state in the new one, and nothing says so; a page reload is the workaround nobody knows to use
 
