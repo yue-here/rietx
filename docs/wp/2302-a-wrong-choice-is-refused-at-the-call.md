@@ -67,10 +67,17 @@ or a sentinel, and rietx's few users are in direct contact. The changelog names 
 (`index_pattern`). They may not mean the same thing. Measure what each counts before renaming
 any.
 
-**Open for the maintainer, not a task here.** `path` names a file in every writer and a
-parameter dot-path in `tie`, `help_for` and `profile_interval`. Renaming either is a name on
-the top-level surface with no field standard. Options: keep it and say which in each
-docstring, or rename the dot-path arguments to `param`. A session does not pick it.
+**`path` keeps both meanings** (settled by Claude 2026-11-23, at the maintainer's instruction
+"you make the calls … only about building the best api"). `path` names a file in every writer
+and a parameter dot-path in `tie`, `help_for` and `profile_interval`. The dot-path is rietx's
+one term for a parameter's address, in arguments (`path_globs`, `paths`) and in fields
+(`ParameterRow.path`, `free_paths`), and a hierarchical address that globs match is a path
+across fields (a JSON or XML path, Python's dotted import path). Renaming only the arguments
+to `param` would spell one idea two ways, arguments against fields (Rule 5, convention), and
+renaming the concept would take a name ("parameter name") rietx already uses for variables,
+phases and atoms. Python's word for a file argument is also `path`. So each `path` argument's
+docstring and type say which: a file is `str | os.PathLike`, a dot-path is `str` and its
+docstring names it a parameter dot-path.
 
 Tier of what this WP adds: none. A refusal of a value outside a declared set is not a
 heuristic, so `_audit` gains no row.
@@ -97,6 +104,7 @@ heuristic, so `_audit` gains no row.
 - [ ] `two_theta_range` → `two_theta_limits` on the four calls that request a window; the
   docstrings state the describe/request split; the two schema fields measured against it.
   Manual, skill, examples and GUI callers follow.
+- [ ] Each `path` argument says which it is, in its type and its docstring's first mention.
 - [ ] Measure the "how many" family and rename only where two names count the same thing.
 - [ ] Tests for each refusal (the message names the argument; no compile reached).
 - [ ] Skill: none expected. The refusals name their own fix, and the renamed arguments reach
@@ -126,3 +134,7 @@ choices, with no compile. M1 passes and fails on a choice argument added without
 - **2026-11-23** — created from the API review (2302-batch/plans.md). No open WP owns
   refusing a choice at entry: WP-2005 tiers refine.py's codes and literals, and WP-2103 gives
   the joint fit the single fit's verbs. Next: the `mode` helper, then the survey.
+
+- **2026-11-23** — the `path` question settled by Claude at the maintainer's instruction:
+  keep `path` for both meanings, with each argument's type and docstring saying which
+  (§ Context). A task is added for it.
