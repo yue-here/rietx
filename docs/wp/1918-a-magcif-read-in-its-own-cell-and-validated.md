@@ -244,6 +244,55 @@ transcriptions were deliberately not copied. TOPAS is a black box.
     check itself does not wait on it, since a refusal or a warning changes no shipped
     number inside the fitted range.
 
+- **2026-11-23, from the issue triage (issue #1797, mustachefeeling): the magCIF reader's
+  "same number?" tolerances become the file's own print.** A proposal implementing Mike's
+  ruling on the magnetic rows of PR #1636 (WP-2006's audit, comment of 2026-11-23 09:04Z):
+  row 2 retires `magcif.MOMENT_FORM_AGREEMENT_MU_B` (0.02 µB) for a box of half a unit in
+  each printed number's last digit, carried through any operator or axis conversion; row 1's
+  tier-1 gate in `resolve_nuclear_symmetry` takes the same box instead of `_orbit_size`'s
+  hard-coded 1e-3 merge. Four uses: the snap onto a moment's allowed directions; two forms
+  of one moment, with the cell's printed precision carried through the conversion; a listed
+  copy of a site against the image of the original's moment; the parent-group gate. It also
+  carries the boundary tests for `INVARIANCE_MOMENT_TOL` and `INVARIANCE_POS_TOL`
+  (`magnetic/scattering.py`) and the owed case for `WITHIN_IRREP_DRAWS`
+  (`magnetic/isotropy.py`), #1636's rows 7, 8 and 4. Folded here because every use edits
+  the reader functions this WP owns (§ Context names the three tiers and the invariance
+  checks), and one session would build them together. WP-2006 owns the audit rows, and its
+  Inherited section is rewritten by the open PR #1636, so the record sits here; the PR that
+  lands this dates and retires those rows in `_audit.py` and lands after PR #1636 (which
+  tiers the same five rows).
+  - Checked against the tree at 711acfc8d, every "main" cell of the issue's tables that was
+    run reproduces. The parent gate: P m m 2 under parent P m m m, O at (0.25, 0.3, z),
+    c = 6 Å. Stated z = 0, 0.00004, 0.0002 and 0.0004 read under P m m m and store z as 0,
+    4e-5, **0** and **0**; the two set to 0 are reported only as `CIF_SITE_TWINS_MERGED`.
+    Stated z = 0.0008 reads under P m m 2 and keeps its z. The listed copy, on the MnF₂ fixture of
+    `tests/test_cif_sites_coincide.py`: 3.012 against an image of 3.021, a sign slip on
+    0.01, 3.00 against 3.01 and 3.000 against 3.015 all read, the copy dropped with
+    `CIF_SITE_LISTED_TWICE`. The MAGNDATA counts (0 of 2447 files flip) are the reporter's
+    and were not re-run, since the snapshot is not redistributed.
+  - What the proposal does not name, found here. (1) The box primitive exists:
+    `magcif._last_digit_half` (the D5 helper) and `wyckoff.nearest_allowed_within_print`
+    behind `moment_within_print`, and `cif._within_printed_rounding` for positions. (2)
+    `_last_digit_half("4")` is 0.5 today, and the D5 magnitude check
+    (`magcif.py:1343`, `:1358`) reads it, with its docstring's own case "`magnitude = 4`
+    against components giving 4.0497" passing on that 0.5. The ruling reads a number with
+    no decimal point as exact, so applied in the shared helper it would refuse that case.
+    (3) `_orbit_size` has a second caller, `io/projects/topas.py:4803`, which imports
+    magcif's, and `io/projects/fullprof.py:2513` keeps its own twin at
+    `_MAGNETIC_MATCH_ATOL`. (4) `_drop_listed_twice` lives in `crystallography/cif.py:534`,
+    not in `magcif.py`. (5) The docstring sentence the issue calls not borne out is at
+    `magcif.py:1507`.
+  - **For Mike, open** (magnetic-path design, #1075): whether "no decimal point is exact"
+    also governs the D5 magnitude check, which reverses that docstring's case, or only the
+    moment-component box of uses 1-3; and whether the TOPAS and FullProf project readers'
+    orbit counts take the print-box gate too, or keep their merge. The reporter's count of
+    MAGNDATA files that move from tier 1 to tier 2 under the use-4 gate is still to come,
+    on #1797.
+  - Who decides the rest: the ruling itself is Mike's, made on PR #1636. Each use changes
+    what the reader returns for some file, which is reader output on the magnetic path, so
+    Mike's under #1075, with the maintainer's per-release read of reader-output diffs as
+    for any other reader change.
+
 ## Non-goals
 
 - Modulated files and an irrational k (164 files): #678 and the v2+ fence.
