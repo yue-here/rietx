@@ -230,10 +230,6 @@
    *  out and the χ² it was applied at, which is what makes the *observed* Δχ²
    *  measurable beside the predicted one */
   let applied = $state<any>(null);
-  /** `applied` only while its project is open: its undo is a node id, and node
-   *  ids repeat across projects, so another project's would check out an
-   *  unrelated node in this one's tree (WP-2242). */
-  const appliedHere = $derived(applied?.opens === opens ? applied : null);
   /** the stored peak list plus the raw pattern (WP-1027); the plot draws it and
    *  the Peaks tab is its ledger, so the state lives here, once */
   let peaksData = $state<PeaksPayload | null>(null);
@@ -411,8 +407,9 @@
   }
 
   /** Leave the open project's pending edits behind as its recovery copy, and
-   *  clear them from the panels, which stay mounted across an open: without
-   *  this, one project's pending values were the next project's Apply. */
+   *  clear them from the panels. The keyed panels start over on an open
+   *  (`opens`, WP-2242), but `Model` stays mounted across one, and without
+   *  this its pending values were the next project's Apply. */
   async function leaveEdits() {
     await recoveryWriter.flush();
     recoveryWriter.disarm();
@@ -568,6 +565,12 @@
     zoom = null;
     hoveredPeak = null;
     baseCurves = null;
+    // the peak list is the project's (`peaks.json`): `loadOpened` reads the
+    // next one, and the plot draws none of this one's meanwhile
+    peaksData = null;
+    // its undo is a node id, and node ids repeat across projects, so another
+    // project's would check out an unrelated node in this one's tree
+    applied = null;
     // what the keyed panels hand up, which a fresh panel has not said yet
     pendingTouched = 0;
     pendingInvalid = "";
@@ -947,7 +950,6 @@
       chi2_before: payload.chi2_before,
       predicted: payload.applied.expected_delta_chi2,
       undo: payload.undo,
-      opens,
     };
     say(payload.api_call);
   }
@@ -1638,7 +1640,7 @@
             {say} active={seriesTab} />
         </div>
         <div class="panel" class:hidden={tab !== "report"}>
-          <Report {head} {busy} {simple} {say} applied={appliedHere}
+          <Report {head} {busy} {simple} {say} {applied}
             chi2={result?.statistics?.chi2 ?? null}
             diagnostics={result?.diagnostics ?? []}
             onzoom={(lo, hi) => (zoom = [lo, hi])}

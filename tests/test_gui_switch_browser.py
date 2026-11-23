@@ -80,11 +80,14 @@ def _cell(page, scope: str) -> str:
     return "".join(page.locator(f"{scope} {CELL}").first.text_content().split())
 
 
-def _text_buffer(page, tab) -> str:
+def _text_buffer(page, tab, name: str) -> str:
+    """The Text buffer once it names project ``name``: a wait on any project
+    line would pass on a buffer still loading, or on the last project's."""
     tab.click()
     page.wait_for_selector(".cm-content")
     page.wait_for_function(
-        "() => (document.querySelector('.cm-content')?.textContent ?? '').includes('project')")
+        "(want) => (document.querySelector('.cm-content')?.textContent ?? '').includes(want)",
+        arg=f'project "{name}"')
     return page.locator(".cm-content").first.inner_text()
 
 
@@ -93,7 +96,7 @@ def test_todays_page_shows_the_next_project_after_an_open(served, browser):
     page.wait_for_selector(f".params {CELL}")
     assert "4.1" in _cell(page, ".params")
     text_tab = page.get_by_role("button", name="Text", exact=True)
-    assert 'project "a"' in _text_buffer(page, text_tab)
+    assert 'project "a"' in _text_buffer(page, text_tab, "a")
 
     # the palette's "Open or create a project" lays the start screen over the
     # project, and b's row opens it in place
@@ -106,7 +109,7 @@ def test_todays_page_shows_the_next_project_after_an_open(served, browser):
         "() => (document.querySelector('.params " + CELL.replace('"', '\\"')
         + "')?.textContent ?? '').includes('4.3')")
     assert "4.3" in _cell(page, ".params")
-    assert 'project "b"' in _text_buffer(page, text_tab)
+    assert 'project "b"' in _text_buffer(page, text_tab, "b")
     assert not page.errors, page.errors
     page.close()
 
@@ -116,7 +119,7 @@ def test_the_rebuilt_page_shows_the_next_project_after_an_open(served, browser):
     page.wait_for_selector(f"section.model {CELL}")
     assert "4.1" in _cell(page, "section.model")
     text_tab = page.locator('section.model [role="tab"]', has_text="Text")
-    assert 'project "a"' in _text_buffer(page, text_tab)
+    assert 'project "a"' in _text_buffer(page, text_tab, "a")
     page.locator('section.model [role="tab"]', has_text="Parameters").click()
 
     # File › Open recent › b, from the project's name in the top bar
@@ -127,6 +130,6 @@ def test_the_rebuilt_page_shows_the_next_project_after_an_open(served, browser):
         "() => (document.querySelector('section.model " + CELL.replace('"', '\\"')
         + "')?.textContent ?? '').includes('4.3')")
     assert "4.3" in _cell(page, "section.model")
-    assert 'project "b"' in _text_buffer(page, text_tab)
+    assert 'project "b"' in _text_buffer(page, text_tab, "b")
     assert not page.errors, page.errors
     page.close()

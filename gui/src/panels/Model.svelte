@@ -370,6 +370,9 @@
       const [s, i, p] = await Promise.all([api.structure(), api.instrument(),
                                            api.params()]);
       structure = s.structure;
+      // a phase removed since, or another project's index: the form reads
+      // `structure.phases[phase]` unguarded
+      if (phase >= (structure?.phases?.length ?? 0)) phase = 0;
       sites = s.sites ?? [];
       symmetry = s.symmetry ?? [];
       causes = s.causes ?? {};
@@ -453,6 +456,11 @@
     structure = null;
     instrument = null;
     rows = [];
+    // the chosen phase and the open ADP rows are this project's too: an index
+    // past the next project's last phase reads `structure.phases[phase]` as
+    // undefined (WP-2242)
+    phase = 0;
+    openAdp = new Set();
     symbolDraft = null;
     symPreview = null;
     symError = "";

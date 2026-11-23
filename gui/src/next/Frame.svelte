@@ -454,7 +454,8 @@
   }
 
   /** Leave the open project's pending edits behind as its recovery copy, and
-   *  clear them from the panel, which stays mounted across an open. */
+   *  clear them from the panels before `opens` starts them over (WP-2242), so
+   *  the effect above never writes one project's edits under the next's path. */
   async function leaveEdits() {
     await recoveryWriter.flush();
     recoveryWriter.disarm();

@@ -4,7 +4,7 @@
 // be this one's: both fixtures stand at `n0001`, and a panel that reloads on
 // `head` alone keeps the last project's rows. Asserted through the requests,
 // as `App.test.ts` asserts today's page; what each panel draws is the browser
-// check's (`tests/test_gui_browser.py`).
+// check's (`tests/test_gui_switch_browser.py`).
 import { flushSync, mount, tick, unmount } from "svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
