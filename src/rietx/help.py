@@ -62,6 +62,7 @@ __all__ = [
     "DIAGNOSTIC_VIEW_OF",
     "PEAK_FLAG_HELP",
     "PEAK_ORIGIN_HELP",
+    "CELL_RELATION_HELP",
     "READER_OPTION_HELP",
     "SEARCH_FIELD_HELP",
     "RESULT_FIELD_HELP",
@@ -1728,6 +1729,47 @@ PEAK_ORIGIN_HELP: dict[str, HelpEntry] = {
             "Peak detection proposed this line, and a person dragged it or typed a new "
             "2θ. The group was refitted from the new starting position. The position "
             "shown comes from the refit and can differ from where you put the line."
+        ),
+    ),
+}
+
+#: One entry per way the GUI's candidate table relates one indexing candidate
+#: to another reported row (WP-2240): ``same_cell``, the GUI's own reading of
+#: two rows printing one cell, and each value of
+#: :attr:`~rietx.schemas.indexing.SupercellCheck.relation`.  The table writes
+#: the mark and the row it names (``≡ #1``, ``2× #1``, ``⊇ #1``), and the
+#: popover gives this entry.
+CELL_RELATION_HELP: dict[str, HelpEntry] = {
+    "same_cell": HelpEntry(
+        title="The same cell as another candidate",
+        description=(
+            "Written ≡ #k. This row's cell equals candidate k's to every place "
+            "the table prints. The search reported it twice, under two lattice "
+            "labels: a different crystal system or centring. Candidate k is the "
+            "one ranked higher."
+        ),
+    ),
+    "sublattice": HelpEntry(
+        title="A supercell of another candidate",
+        description=(
+            "Written N× #k. One primitive cell of this lattice holds N of "
+            "candidate k's, with N from 2 to 4. So it predicts every line "
+            "candidate k predicts, and extra lines besides. The search asks "
+            "whether those extra lines are in the pattern. When they are seen no "
+            "more often than chance, this row ranks directly below candidate k. "
+            "The V column gives conventional cells, so for a centred lattice its "
+            "ratio can differ from N."
+        ),
+    ),
+    "containment": HelpEntry(
+        title="Indexes everything another candidate indexes",
+        description=(
+            "Written ⊇ #k. This cell indexes every observed line candidate k "
+            "indexes, and it predicts more lines. It is not a 2-to-4 supercell "
+            "of candidate k. Examples are a body-centred cubic cell √2 times the "
+            "edge of a face-centred one, and a trigonal description of a cubic "
+            "cell. As for a supercell, the search asks whether the extra lines "
+            "are in the pattern."
         ),
     ),
 }
@@ -6974,6 +7016,7 @@ def help_registry() -> dict[str, object]:
         "peak_flags": {k: asdict(v) for k, v in PEAK_FLAG_HELP.items()},
         "diagnostics": {k: asdict(v) for k, v in DIAGNOSTIC_HELP.items()},
         "peak_origins": {k: asdict(v) for k, v in PEAK_ORIGIN_HELP.items()},
+        "cell_relations": {k: asdict(v) for k, v in CELL_RELATION_HELP.items()},
         "stage_fields": {k: asdict(v) for k, v in STAGE_FIELD_HELP.items()},
         "reader_options": {k: asdict(v) for k, v in READER_OPTION_HELP.items()},
         "instrument_fields": {k: asdict(v) for k, v in INSTRUMENT_FIELD_HELP.items()},
