@@ -7,6 +7,7 @@
  * what the rebuilt page does. `anchor` is the section of the manual's GUI
  * chapter (`reference/gui-guide.md`) the box links to.
  */
+import type { WorkflowId } from "../lib/workflows";
 import type { GraphTab, ModelTab } from "./tabs";
 
 export type HelpBoxEntry = {
@@ -96,5 +97,32 @@ export const GRAPH_HELP: Record<GraphTab, HelpBoxEntry> = {
       "It draws the last fit, or the preview while you move a position or the cell in Interactive.",
     ],
     anchor: "the-3d-view",
+  },
+};
+
+/** The bottom panel's History tab (WP-2211), in the design's words, with the
+ *  node's menu named where the screen cannot say it. */
+export const HISTORY_HELP: HelpBoxEntry = {
+  title: "History",
+  lead: "Each refinement adds a row, the newest at the bottom.",
+  items: [
+    "Compare overlays that fit on the pattern. Press it again to take it off.",
+    "Restore loads its values as pending edits. Nothing changes until Apply.",
+    "Right-click a row to make it current, branch from it, name it or write a note on it.",
+  ],
+  anchor: "history",
+};
+
+/** What a workflow's `?` box says, at the right of its step strip (WP-2240):
+ *  the prototype's words for the workflow (round 11), cut to the steps built. */
+export const WORKFLOW_HELP: Partial<Record<WorkflowId, HelpBoxEntry>> = {
+  index: {
+    title: "Peaks and indexing",
+    lead: "Find the cell of an unknown phase. Go back to Pick peaks whenever the ticks say a line is missing or extra.",
+    items: [
+      "Pick peaks: tick a line to use it in the search, untick it to leave it out. Click a row to frame its line on the pattern.",
+      "Picking again replaces the list, and says first how many of your edits it replaces.",
+    ],
+    anchor: "peaks",
   },
 };

@@ -183,6 +183,19 @@ Surveyed 2026-10-26 for WP-2052 (issue #1088); the GSAS-II lines re-read 2026-11
 | EasyDiffraction | none | H_G² floored at machine ε; a negative H_L passes | none |
 | BGMN | no Caglioti widths | fatal error | Profex writes B1 ≤ 0.01 and k2 ≤ 1e-4 into the files it creates |
 
+### A width an equation sets
+
+Read 2026-11-22 for WP-2153, TOPAS only. TOPAS 5's Technical Reference defines TCHZ's
+Gaussian width as G = (U tan²θ + V tanθ + W + Z/cos²θ)^0.5 (§ 6.2, p. 27; checked
+(manual)). It does not say what happens when the sum is negative. `force_positive_fwhm`
+is not in the v5 reference. So whether TOPAS clamps a negative Γ_G², takes its
+magnitude or stops is not checked. The ZrP₂O₇ input WP-2151 ran (Stinton & Evans 2007)
+stores a negative v and w for two of its three phases' TCHZ, and silicon's Γ_G² is
+negative at every reflection, so that input relies on whatever TOPAS does there.
+rietx's LM driver holds the total width, an equation's term included, inside the step
+wherever the term is exact at the stage's frozen angles (WP-2153). TRF and an inexact
+term are reported after the fit by `PEAK_WIDTH_NOT_POSITIVE`.
+
 ## Limits a control file declares
 
 Surveyed 2026-10-30 for PR #1199 (the `.pcr` reader's `Nre` limits), FullProf only, from its manual and runs.
@@ -982,7 +995,7 @@ first at ζ = 0 raised Rwp from 8.22 % to 10.81 % (his Table 2).
 
 | Program | Gaussian/Lorentzian split | σ²(M) < 0 |
 |---|---|---|
-| rietx | none: Λ is wholly Lorentzian (ζ = 1) | clamped to zero width; the default LM driver holds σ² ≥ 0, and `STEPHENS_STRAIN_NOT_POSITIVE` reports the clamped intensity share under TRF or a joint fit |
+| rietx | none: Λ is wholly Lorentzian (ζ = 1) | clamped to zero width; the default LM driver holds σ² ≥ 0, and `STEPHENS_STRAIN_NOT_POSITIVE` reports the clamped intensity share under TRF |
 | GSAS-II 5.8.4 | `Mustrain;mx`, Stephens' form: γ += Mγ·mx, σ² += (Mγ·(1−mx))² (`GSASIIstrMath.py:3330-3331`; checked (source)) | no clamp at the width: `np.sqrt(Sum)` (`GSASIIstrMath.py:3265`; checked (source)); what follows a negative sum was not traced |
 | TOPAS (shipped macros) | `eta`: `gauss_fwhm = 1.8/π·pp·(1−eta)·Tan(Th)`, `lor_fwhm = 1.8/π·pp·eta·Tan(Th)` | `Sqrt(Max(mhkl, 0))`, the same clamp, reported nowhere; `Stephens_tetragonal` takes `Abs()` first, folding a negative σ² back into a positive width (TOPAS wiki, read 2026-09-25 by the review) |
 
@@ -1588,6 +1601,56 @@ aberrations and sample broadening (table A) are the two families where practice 
 row but one. It refines a displacement and a transparency in mm, as GSAS-II and TOPAS do, while
 four programs refine angular coefficients. Its physical cell and Biso follow TOPAS, FullProf and
 MAUD.
+
+## How an API meets a caller's mistake
+
+Surveyed 2026-11-22 by the lead, asked whether DESIGN.md should gain a test for how hard the API
+is to misuse. The sources are software-engineering practice, since none of the seven programs
+publishes an API design rule. One agent checked each source against its own text. Where it read
+only a page fetcher's summary, the row says so.
+
+| Source | What it says | Read |
+|---|---|---|
+| Bloch (2006), "How to Design a Good API and Why it Matters", OOPSLA 2006 slides | Keep the API as small as possible ("when in doubt leave it out"). Fail fast: report an error at compile time, else at the first bad call. Don't make the client do what the module could do. Three or fewer parameters; same-typed runs get transposed. Return an empty collection, not null. "Hard to misuse" is in his list of a good API's traits | checked (manual) (an unofficial copy of the slides) |
+| Russell (2008), ozlabs.org/~rusty, "How Do I Make This Hard to Misuse?" (30 Mar) and "What If I Don't Actually Like My Users?" (1 Apr) | A scale from 10 to −10. 10 "impossible to get wrong", 9 the compiler or linker won't let you, 8 the compiler warns, 7 the obvious use is (probably) correct, 6 the name tells you how, 5 do it right or it always breaks at runtime, 4 follow convention, 3 read the documentation, 2 read the implementation, 1 read the right mailing-list thread. The negative half mirrors it, down to −7 "the obvious use is wrong" and −10 "impossible to get right". The rules first appeared in his OLS 2003 keynote | checked (manual) (the 2008 posts; the 2003 slide not read) |
+| Buitinck et al. (2013) arXiv:1309.0238, §2.1 (scikit-learn) | Five principles: consistency (one small set of methods, documented alike), inspection (parameters and learned values are public attributes), non-proliferation of classes (data are arrays, parameters plain strings and numbers), composition, sensible defaults | checked (manual) |
+| Thomson & Schinazi (2023) RFC 9413, "Maintaining Robust Protocols" | Postel's robustness principle ("be liberal in what you accept") entrenches the quirks it tolerates, so implementations become bug-for-bug compatible. It prefers active maintenance and "virtuous intolerance": error handling defined for bad input, fatal errors included. A tolerated workaround is documented and has a plan for removal | page summary |
+| Ousterhout (2018, 2nd ed. 2021), *A Philosophy of Software Design* | A module's interface should be much simpler than its implementation, so complexity moves inward. "Define errors out of existence": design the operation so the error case cannot arise (Tcl's `unset` guarantees absence instead of failing on a missing variable) | secondary (Larson's 2018 notes, the Tcl wiki); the book not read |
+| NumPy NEP 52 (2023), Python API cleanup for NumPy 2.0 | `dir(np)` held 562 public names. The NEP cut about 100, citing similar names a user cannot tell apart, unusable tab completion, a steeper learning curve and developers wary of adding anything. One function, one location. An allow-list test caps growth, and a removed name raises an `AttributeError` naming its replacement | checked (manual) |
+| Anthropic (2025), "Writing effective tools for agents: with agents" | Namespace tools by service or resource. Return high-signal fields such as names, not opaque IDs. Paginate, filter and truncate, and let a truncation message steer the next call. An error says what went wrong and how to fix it | page summary |
+| Fowler (2011), bliki "FlagArgument" | Generally prefer two named methods to a boolean argument that selects behaviour, so the call states its intent. A private flagged method behind two public ones is fine | page summary |
+| King (2019), "Parse, don't validate"; Minsky (2011), "Effective ML Revisited" | Check input at the boundary and return a more precise type that keeps what the check learned. Make illegal states unrepresentable, for example a record of optional fields becoming one type per state | page summary |
+| Hyrum's law (hyrumslaw.com) | With enough users, every observable behaviour is depended on by somebody, whatever the contract says | page summary |
+| lmfit, "Parameter and Parameters" (lmfit.github.io) | A `Parameter` carries `value`, `vary` (default True), `min`, `max`, `expr`, `brute_step`. `expr` is a string re-evaluated each step. An explicit value or `vary=True` clears an expression | page summary |
+| GSAS-II `GSASIIscriptable` (gsas-ii.readthedocs.io) | Refine flags are set from dicts: `set_refinements({...})` per histogram or phase, `set_HAP_refinements`, and a project-wide `{'set': ..., 'clear': ...}` recipe. The GUI's `Hold` constraint "Will not be varied, even if vary flag is set" (§ A stage that fixes a parameter) | page summary (first third of the page) |
+
+What it adds up to. The field has agreed on the goal since Bloch: a wrong call should fail at the
+first bad call and say how to fix it. Russell's scale is the ranked form, and it puts "the obvious
+use is wrong" near the bottom. Two sources pull the other way and are reconciled by Rule 1.
+Ousterhout's "define errors out of existence" is Rule 1's first kind applied to an API. It is
+right only where no intent of the caller is lost. RFC 9413 shows that the word "robust" names
+Postel's tolerance in the protocol literature, and that tolerance without defined, visible
+handling is what the field has moved away from. Long keyword lists and paired function-and-method
+spellings are common in scientific Python (lmfit's `minimize` and `Minimizer`), and keyword-only
+arguments remove the transposition risk Bloch names.
+
+Measured on rietx at `f9adf0e57` with the NAC example (11-BM, `cod_1000236.cif`):
+
+- A mode spelled wrong is refused by every fitting call, but late. `refine(mode="rietvled")` ran
+  2.8 s of a 4.1 s fit and then raised a pydantic error about `RefinementResult.mode`.
+  `Refinement.fit` and `run_stage` raise at once with an error about `RefinementState`. Only
+  `refine_multi` names the argument and its choices. `Refinement.parameters(mode="lebial")`
+  returns a list with no warning.
+- `set_vary("instrument.zero_shift", False)` and then `fit()`: the default plan frees zero shift
+  again, with no warning and no diagnostic. `hold` is the verb that holds.
+- `set_vary` and `hold` with a glob that matches nothing return `[]` in silence.
+- `read_pattern` reports its repairs only into a `diagnostics=` list the caller passed. The fit
+  repeats `PATTERN_DEAD_CHANNELS`; the attenuator and constant-σ notes reach nobody otherwise.
+- Of 138 public callables, 11 take `**kw`. The name `path` is used 34 times for both a file and a
+  parameter dot-path. The 2θ window is `two_theta_limits` in 10 calls and `two_theta_range` in 2.
+  The top level exports 209 names, about 120 of them result types.
+- A typo in a plan name, a solver, a reader option or a literal parameter path raises at the call
+  and names the valid choices or the nearest path.
 
 ## Sources
 

@@ -148,7 +148,12 @@ number. A sentence that nobody would use to make a choice does not belong here.
 
    *A new API.* It takes the shape the surface already has: a verb in, a typed result
    out, a raise on failure, documented or deferred with a reason. The signature and
-   docstring are enough for a first call to be right.
+   docstring are enough for a first call to be right. It names its likeliest misuse, and
+   a test makes that call. The mistake is removed where Rule 1's first kind allows.
+   Otherwise a literal the call cannot honour raises before any work, naming the argument
+   and the fix. A pattern the caller passed that matches nothing warns. A pattern skips
+   the rows it cannot change without a word when it changed others. The survey behind
+   this test is `docs/practice.md` § How an API meets a caller's mistake.
 
    *A new skill row.* It names a field, a verb, a code, or a trap or practice with a
    source outside rietx's own runs. Anything else is cut.
@@ -158,7 +163,9 @@ number. A sentence that nobody would use to make a choice does not belong here.
    *Convention.* A change takes the shape rietx already uses for the same job. One shape
    sets fewer traps for a person or an agent learning the package. A departure names in
    its WP the likely mistake or the wrong number the convention would cause. A convention
-   found wrong is changed everywhere in one change. It is never broken in one place.
+   found wrong is changed everywhere in one change. It is never broken in one place. A
+   convention that lets a caller's likeliest mistake pass in silence is a convention found
+   wrong, because new code copies the code around it.
 
    *Direction.* A design builds towards the stated direction of its milestone or of the
    project. Cases test it as acceptance rows. A design is not fitted to one case, and
