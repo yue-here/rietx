@@ -3604,9 +3604,9 @@ ROWS: tuple[Row, ...] = (
         value=0.2,
         evidence=("ours, ruled by the magnetic-path owner (rietx #1691, D46 (d1), 2026-11-23): "
                   "the width over which a Brown row is blended onto its computed tail; the "
-                  "largest join it absorbs is 0.010 (bare Mo, an M+ row now replaced), the "
-                  "rows kept join within 7.4e-3, so any width from 0.05 to 0.5 moves a value "
-                  "by under that join"),
+                  "largest fit-to-tail gap at s_end on the rows kept is 8.7e-3 (bare Nb <j0> "
+                  "at s = 1.5); the blend's value lies between the two, so the width moves a "
+                  "value only by a fraction of the gap there"),
         grounds=("a C2 quintic over 0.2 keeps the curve's slope change under the size of "
                  "Brown's own end-of-range residual; no published blend exists to adopt")),
     Row("rietx.crystallography.magnetic.isotropy.CROSS_IRREP_DRAWS", "constant", value=12,
