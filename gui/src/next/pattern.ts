@@ -117,9 +117,9 @@ const Y: Record<Scale, "lin" | "sqrt" | "log"> = { linear: "lin", sqrt: "sqrt", 
 export class PatternChart {
   readonly fig: Pattern;
   private colors: ReturnType<typeof curveColors>;
-  /** the chrome inks the peak layer borrows: a lens's halo and the chosen
-   *  line's ring; read with `colors`, at build and on `retheme`, never on a
-   *  draw */
+  /** the chrome inks the peak layer borrows: a lens's halo, the chosen
+   *  line's ring and a candidate cell's lines; read with `colors`, at build
+   *  and on `retheme`, never on a draw */
   private chrome: Chrome;
   private overlay: Overlay;
   private curves: Curves;
@@ -439,9 +439,12 @@ export class PatternChart {
     u.ctx.restore();
   }
 
+  /** A chosen cell's lines, full height and under everything, in the strong
+   *  rule's grey (the maintainer, 2026-11-23: "grey lines much better than
+   *  green"). Today's Peaks tab keeps `--plot-candidate`. */
   private candidateLines(u: any): void {
     const lines = this.overlay.candidate?.two_theta;
-    if (lines?.length) vlines(u, lines, u.bbox.top, u.bbox.height, this.colors.candidate);
+    if (lines?.length) vlines(u, lines, u.bbox.top, u.bbox.height, this.chrome.rule);
   }
 
   /** Each group's fitted profile on its own channels (D8), drawn as the
@@ -624,10 +627,10 @@ function readColors(): ReturnType<typeof curveColors> {
   return curveColors((name) => style.getPropertyValue(name));
 }
 
-interface Chrome { halo: string; ink: string }
+interface Chrome { halo: string; ink: string; rule: string }
 
 function readChrome(): Chrome {
   const style = getComputedStyle(document.body);
   const read = (name: string) => style.getPropertyValue(name).trim();
-  return { halo: read("--bg"), ink: read("--fg") };
+  return { halo: read("--bg"), ink: read("--fg"), rule: read("--line-strong") };
 }

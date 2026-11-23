@@ -172,6 +172,7 @@ Claude inferred rules 1 to 12 from the rulings on background points and peak pic
 - The hover readout is a strip under the plot, never a box that follows the pointer. [inferred, WP-1213]
 - Shading for an excluded region spans every pane and stops at the measured range. [inferred, WP-1033]
 - Peak marks are lenses that echo the reflection ticks, larger and higher above the peak. A used peak's mark is filled and an unused one has no mark on the pattern. They are blue, the complement of the orange fits. The picked peaks' fitted curve takes the calculated curve's colour, because indexing draws no refinement to confuse it with. [Yue 2026-11-08; Yue 2026-11-09 on the colour; Yue 2026-11-23 for the fitted curve]
+- A chosen candidate cell's lines run the plot's full height, under everything, in the strong rule's grey (`--line-strong`). [Yue 2026-11-23]
 - A selected mark is drawn larger, with a ring in the text ink (`--fg`). Red, the danger colour, marks only a peak no line explains, and it is the layer's only state colour. Orange stays the fit's alone. [Yue 2026-11-09, provisional]
 - A colour scale is perceptually uniform, and a residual map uses a diverging scale centred on zero. [inferred]
 - The 3D structure follows crystallography's drawing: its projection, cell edges, bonds and ellipsoids. The cell frame takes the accent, because a hairline vanishes in a scene. [inferred, WP-1015, WP-1462]

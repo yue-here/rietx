@@ -2484,8 +2484,9 @@ def test_the_fit_index_and_judge_steps_run_to_an_adopted_cell(browser, tmp_path_
                 with page.expect_response("**/api/project"):
                     systems.filter(has_text=name).click()
         assert client.get("/api/project")[1]["doc"]["indexing"]["search"]["systems"] == ["cubic"]
+        # a chosen cell's lines are the strong rule's grey at /next (Yue, 2026-11-23)
         candidate = page.evaluate(
-            "getComputedStyle(document.documentElement).getPropertyValue('--plot-candidate')").strip()
+            "getComputedStyle(document.body).getPropertyValue('--line-strong')").strip()
         drawn = _ink_pixels(page, candidate)
         page.locator(".steppane:not(.gone) .foot").get_by_role(
             "button", name="Index", exact=True).click()
