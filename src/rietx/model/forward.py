@@ -4624,14 +4624,14 @@ def _omit_reflections(refl):
                    multiplicity=refl.multiplicity[keep], d=refl.d[keep])
 
 
-def _form_factor_range_fix(rec, *, lam: float, tt_max: float,
+def _form_factor_range_fix(s_max: float, *, lam: float, tt_max: float,
                            hi_eff: float) -> str:
-    """The data-side remedy for a magnetic form factor refused past its fitted
-    range (``form_factor.past_range_action``): the 2θ at which this stage's
-    reflection list would stay inside ``rec.s_max``, at the shortest λ."""
+    """The data-side remedy for a magnetic form factor refused past the end
+    of its table (``form_factor.past_table_end``): the 2θ at which this
+    stage's reflection list would stay inside ``s_max``, at the shortest λ."""
     margin = hi_eff - tt_max
-    tt_lim = 2.0 * math.degrees(math.asin(min(lam * rec.s_max, 1.0)))
-    return (f"At λ = {lam:g} Å the range ends at 2θ = {tt_lim:.2f}°, and this "
+    tt_lim = 2.0 * math.degrees(math.asin(min(lam * s_max, 1.0)))
+    return (f"At λ = {lam:g} Å the table ends at 2θ = {tt_lim:.2f}°, and this "
             f"stage's reflection list runs to 2θ = {hi_eff:.2f}°: the data end "
             f"at {tt_max:.2f}° and reflections are kept {margin:.2f}° beyond "
             f"so their tails are modelled. End the fitted data at "

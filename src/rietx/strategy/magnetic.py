@@ -124,6 +124,7 @@ import numpy as np
 from ..crystallography.magnetic import isotropy as _isotropy
 from ..crystallography.magnetic import moments as _moments
 from ..crystallography.magnetic.form_factor import (
+    _no_row_error,
     assumed_lande_g,
     magnetic_ions,
     needs_explicit_g,
@@ -946,6 +947,12 @@ def _magnetic_sites(phase, sites, species, ion, g=None) -> tuple[
                     f"form-factor key. Pass ion= with the oxidation state; the "
                     f"table has {offered or 'nothing for this element'}.")
             continue
+        if caller_stated_ion and key not in table:
+            # a stated ion the table cannot serve (a typo, bare 'Pd', a
+            # retired 'Ce2+') is refused here, before any candidate is built
+            raise ValueError(
+                f"solve_magnetic(): ion={key!r} for {atom.label!r}: "
+                f"{_no_row_error(key).args[0]}")
         chosen.append((j, atom.label, key))
         if g_keys is not None and atom.label in g_keys:
             g_map[atom.label] = float(g_keys[atom.label])

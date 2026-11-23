@@ -10675,16 +10675,17 @@ def _symmetry_silence_diagnostics(structure: Structure,
 
 
 def _form_factor_range_diagnostics(model: CompiledModel) -> list[Diagnostic]:
-    """``MAGNETIC_FORM_FACTOR_EXTRAPOLATED``: the magnetic form-factor rows this
-    model's reflection list evaluates past the range their source fitted them
-    over, once per result.
+    """``MAGNETIC_FORM_FACTOR_COMPUTED_TAIL``: the Brown form-factor rows this
+    model's reflection list evaluates past the range he fitted them over,
+    where the value is the blend onto (then) the row's computed free-ion tail,
+    once per result.
 
     Read off ``MagneticSites.past_range``, which the stage compile wrote from
     the table's one range check (``form_factor.past_fitted_range``), so this is
-    a projection of that decision and never a second comparison.  Only the
-    rows ``form_factor.past_range_action`` serves with a warning reach here: a
-    refused row raised at compile, before any work.  ``where`` is the moment
-    parameters of every atom carrying such a row, ``value`` the largest s.
+    a projection of that decision and never a second comparison.  An ion
+    served from a computed table never appears: it is computed on its whole
+    range.  ``where`` is the moment parameters of every atom carrying such a
+    row, ``value`` the largest s.
     """
     rows: dict[tuple[str, int], object] = {}
     where: list[str] = []
@@ -10704,17 +10705,21 @@ def _form_factor_range_diagnostics(model: CompiledModel) -> list[Diagnostic]:
         return []
     recs = sorted(rows.values(), key=lambda r: (r.ion, r.order))
     named = "; ".join(
-        f"{r.ion} ⟨j{r.order}⟩ to s = {r.stol:.3g} Å⁻¹ (fitted to {r.s_max:g}, "
-        f"{r.source})" for r in recs)
+        f"{r.ion} ⟨j{r.order}⟩ to s = {r.stol:.3g} Å⁻¹ (Brown's fit ends at "
+        f"{r.s_max:g})" for r in recs)
     d_min = max(r.d_min for r in recs)
     return [Diagnostic(
-        level="warning", code="MAGNETIC_FORM_FACTOR_EXTRAPOLATED",
+        level="warning", code="MAGNETIC_FORM_FACTOR_COMPUTED_TAIL",
         where=where, value=max(r.stol for r in recs),
-        message=(f"the magnetic form factor is extrapolated past the range "
-                 f"its source fitted it over at the highest angles: {named}."),
-        suggestion=(f"Read the moments as resting partly on extrapolated "
-                    f"values; to keep every reflection inside the fitted "
-                    f"ranges, end the data at d ≥ {d_min:.3g} Å "
+        message=(f"past the range Brown fitted these magnetic form factors "
+                 f"over, their values at the highest angles come from "
+                 f"computed free-ion curves (computed for rietx, not "
+                 f"peer-reviewed): {named}. A crystal's form factor departs "
+                 f"from a free ion's out there (covalency, the aspherical "
+                 f"⟨j4⟩ term)."),
+        suggestion=(f"Read the moments as resting partly on computed "
+                    f"free-ion values at the highest angles; to fit only "
+                    f"inside Brown's ranges, end the data at d ≥ {d_min:.3g} Å "
                     f"(fit(two_theta_limits=...) or an excluded region)."))]
 
 

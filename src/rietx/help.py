@@ -3490,17 +3490,20 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "not choose between them."
         ),
     ),
-    "MAGNETIC_FORM_FACTOR_EXTRAPOLATED": HelpEntry(
-        title="Magnetic form factor used past its fitted range",
+    "MAGNETIC_FORM_FACTOR_COMPUTED_TAIL": HelpEntry(
+        title="Magnetic form factor on its computed tail",
         description=(
-            "Each magnetic form-factor row is a fit over a stated range of "
-            "s = sinθ/λ: 0–1.5 Å⁻¹ for Brown's 3d, 4d and actinide rows, 0–1.2 Å⁻¹ "
-            "for his rare-earth rows, 0–1.3 Å⁻¹ for Lisher & Forsyth's Pr³⁺. The "
-            "fit's reflection list reaches past that range for the rows named, so "
-            "their values there are an extrapolation of the fitted form, not a form "
-            "factor. A row whose fitted form grows past its range is refused "
-            "instead. Restrict the data to d ≥ 1/(2·s_max) to keep every "
-            "reflection inside."
+            "Each of Brown's magnetic form-factor rows is a fit over a stated "
+            "range of s = sinθ/λ: 0–1.5 Å⁻¹ for his 3d, 4d and actinide rows, "
+            "0–1.2 Å⁻¹ for his rare-earth rows. Past it a row is blended over "
+            "0.2 Å⁻¹ onto a free-ion curve computed for rietx on the row's own "
+            "footing (labelled computed, not peer-reviewed), which runs to "
+            "s = 6 Å⁻¹. The fit's reflection list reaches past the range for "
+            "the rows named. Out there a crystal's form factor departs from "
+            "any free ion's: covalency expands the density, and the aspherical "
+            "⟨j4⟩ term the dipole approximation drops can exceed ⟨j0⟩. "
+            "Restrict the data to d ≥ 1/(2·s_max) to fit inside Brown's "
+            "ranges."
         ),
     ),
     "MAGNETIC_ION_ASSUMED": HelpEntry(

@@ -66,10 +66,12 @@ import numpy as np
 from ..adp import cartesian_basis
 from ..symmetry import SITE_TOL, ReflectionSet, as_group, generate_reflections
 from .form_factor import (
+    TABLE_S_MAX,
     _j0_value,
     _j2_value,
     approximation_name,
     past_fitted_range,
+    past_table_end,
     resolve_g,
 )
 from .moments import moment_frame, moment_from_dofs
@@ -121,10 +123,10 @@ class MagneticSites:
     approximations: list[str | None]
     #: (n_asym,) bool, ``carries[j] == (mom_mat[j] is not None)``
     carries: list[bool] = field(default_factory=list)
-    #: the rows this stage's reflection list evaluates past their fitted
-    #: range and that :func:`~.form_factor.past_range_action` serves with a
-    #: warning, one per (ion, order); written at stage compile by
-    #: :func:`check_form_factor_range`, empty when every reflection is inside
+    #: the Brown rows this stage's reflection list evaluates past his fitted
+    #: range, on the blend onto their computed tails, one per (atom, order);
+    #: written at stage compile by :func:`check_form_factor_range`, empty
+    #: when every reflection is inside
     past_range: tuple = ()
 
     def __post_init__(self) -> None:
@@ -148,29 +150,32 @@ class MagneticSites:
 
 def check_form_factor_range(msites: MagneticSites, phase, stol_max: float,
                             fix) -> tuple:
-    """Ask the fitted-range check once for every moment-bearing atom of a phase
-    whose frozen reflection list reaches s = ``stol_max`` (Å⁻¹).
+    """Ask the form-factor table's two range checks once for every
+    moment-bearing atom of a phase whose frozen reflection list reaches
+    s = ``stol_max`` (Å⁻¹).
 
-    The decision is the table's (:func:`~.form_factor.past_fitted_range`,
-    :func:`~.form_factor.past_range_action`), made here at stage compile so it
-    is frozen with the reflection list and never re-asked mid-solve.  A
-    refused row raises before any work, naming the phase, the atom, the ion,
-    the ⟨jₙ⟩, the s, the fitted range and ``fix(record)``, the caller's own
-    way to bring the data inside it.  Returns ``((j, record), ...)`` for every
-    warned row, which the caller stores on ``MagneticSites.past_range`` for
-    the fit's once-per-fit diagnostic.
+    Both decisions are the table's (:func:`~.form_factor.past_table_end`,
+    :func:`~.form_factor.past_fitted_range`), made here at stage compile so
+    they are frozen with the reflection list and never re-asked mid-solve.
+    Past s = 6 Å⁻¹, where every curve ends, the row is refused before any
+    work, naming the phase, the atom, the ion, the s and ``fix(s_max)``, the
+    caller's own way to bring the data inside s_max.  Returns
+    ``((j, record), ...)`` for every Brown row the list reaches past his
+    fitted range, onto its computed tail, which the caller stores on
+    ``MagneticSites.past_range`` for the fit's once-per-fit diagnostic.
     """
-    warned = []
+    tails = []
     for j, ion in enumerate(msites.ions):
         if ion is None or not msites.carries[j]:
             continue
+        msg = past_table_end(ion, stol_max)
+        if msg is not None:
+            raise ValueError(
+                f"phase {phase.name!r}, atom {phase.atoms[j].label!r}: "
+                f"{msg} {fix(TABLE_S_MAX)}")
         for rec in past_fitted_range(ion, stol_max, msites.g_factors[j]):
-            if rec.action == "refuse":
-                raise ValueError(
-                    f"phase {phase.name!r}, atom {phase.atoms[j].label!r}: "
-                    f"{rec.message()} {fix(rec)}")
-            warned.append((j, rec))
-    return tuple(warned)
+            tails.append((j, rec))
+    return tuple(tails)
 
 
 def compile_magnetic_sites(phase, ops) -> MagneticSites | None:
@@ -872,12 +877,12 @@ def _form_factor(msites: MagneticSites, j: int, stol):
     """f_j(s) for the atom's ion and g, evaluated on the member-shaped ``stol``.
 
     Through the one evaluator of the table, :func:`~.form_factor.j0`/
-    :func:`~.form_factor.j2`, which dispatch an ion to whichever stored form
-    carries it (Brown's or Lisher & Forsyth's), which a local evaluation of
+    :func:`~.form_factor.j2`, which serve an ion from Brown's row (and its
+    computed tail) or from a computed table, which a local evaluation of
     :func:`~.form_factor.coefficients` could not.  Their unchecked spelling:
-    the fitted-range check ran once on the frozen reflection list at stage
-    compile (``MagneticSites.past_range``), and a per-evaluation check in the
-    residual would re-ask it every iteration.
+    the range checks ran once on the frozen reflection list at stage compile
+    (:func:`check_form_factor_range`), and a per-evaluation check in the
+    residual would re-ask them every iteration.
     """
     ion = msites.ions[j]
     g = msites.g_factors[j]

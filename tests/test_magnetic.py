@@ -43,7 +43,6 @@ from rietx.crystallography.magnetic.form_factor import (
     j0,
     j2,
     lande_g,
-    lisher_coefficients,
     magnetic_form_factor,
     magnetic_ions,
     needs_explicit_g,
@@ -115,11 +114,13 @@ def test_j0_is_one_at_the_origin_for_every_ion():
     normalised one, so the sum is 1 to about ±0.003 and not to roundoff — the
     tolerance below is the *fit's*, measured over all 96 rows (worst: Cr¹⁺ at
     0.0023).  It is still the check that catches a mistranscribed leading
-    digit, which is the failure mode a transcription actually has.
+    digit, which is the failure mode a transcription actually has.  Since
+    #1691 the table serves 89 Brown rows and 16 computed tables, whose
+    ⟨j₀⟩(0) is 1 to the data file's 5e-8 rounding.
     """
     worst = max((abs(float(j0(ion, 0.0)) - 1.0), ion) for ion in magnetic_ions())
     assert worst[0] < 3e-3, worst
-    assert len(magnetic_ions()) == 96
+    assert len(magnetic_ions()) == 105
 
 
 def test_j2_carries_its_s_squared_factor():
@@ -219,55 +220,34 @@ def test_five_rows_match_both_renderings_of_browns_table(ion, j0_published, j2_p
     assert got_j2 == pytest.approx(j2_published, abs=0.0, rel=0.0)
 
 
-def test_pr3_is_lisher_and_forsyth_in_both_orders():
-    """Pr³⁺, Lisher & Forsyth (1971) *Acta Cryst.* A27, Table 1 p. 545 (⟨j₀⟩)
-    and Table 2 p. 546 (⟨j₂⟩), A a B b C as printed (#626).
+def test_pr3_is_a_computed_dirac_fock_table():
+    """Pr³⁺ is served from the computed Dirac-Fock table (rietx #1691, D56),
+    the footing of the other rare-earth rows; Lisher & Forsyth's
+    non-relativistic 5-parameter row, held here from #626 until then, retired.
 
-    ITC Vol. C carries no Pr row; the ⟨j₀⟩ held here until 2026-10-01 was the
-    Pr³⁺ row of Brown's data file, the same curve to 0.05 %. Lisher & Forsyth
-    supply the matching ⟨j₂⟩, so a Pr³⁺ moment with g ≠ 2 now refines, and
-    every ion the table carries has both orders. The report names the source,
-    because its non-relativistic footing differs from the other 4f rows.
-    """
-    assert lisher_coefficients("Pr3+") == (
-        (0.2277, 16.11, 0.7923, 5.277, -0.0204),
-        (1.8655, 8.1948, 1.0779, 2.6641, 0.01199))
+    ITC Vol. C carries no Pr row. The table has both orders, so a Pr³⁺ moment
+    with g ≠ 2 refines, and the report names the code and footing.  Its ⟨r²⟩,
+    read off the ⟨j₀⟩ slope, sits between Ce³⁺ and Nd³⁺ as the lanthanide
+    contraction puts it; Lisher's row put it below Nd³⁺ (1.065 a.u.)."""
+    import rietx.crystallography.magnetic.form_factor as ff
     assert all(has_j2(i) for i in magnetic_ions())
-    with pytest.raises(KeyError, match="Lisher & Forsyth"):
+    with pytest.raises(KeyError, match="computed table"):
         coefficients("Pr3+")
-    with pytest.raises(KeyError, match=r"'Fe3\+' is stored in Brown's .* 7-parameter form"):
-        lisher_coefficients("Fe3+")      # the mirror refusal: in the table, in the other form (#630 review)
-    # the 5-parameter form, evaluated as printed, s² factor on <j2>
-    s = 0.3
-    A, a, B, b, C = lisher_coefficients("Pr3+")[0]
-    assert float(j0("Pr3+", s)) == pytest.approx(
-        A * np.exp(-a * s * s) + B * np.exp(-b * s * s) + C, rel=1e-15)
-    A, a, B, b, C = lisher_coefficients("Pr3+")[1]
-    assert float(j2("Pr3+", s)) == pytest.approx(
-        s * s * (A * np.exp(-a * s * s) + B * np.exp(-b * s * s) + C), rel=1e-15)
-    assert abs(float(j0("Pr3+", 0.0)) - 1.0) < 1e-3
-    assert approximation_name("Pr3+", 0.8).endswith("(Lisher & Forsyth 1971)")
-    assert "Lisher" not in approximation_name("Nd3+", 8 / 11)
+    assert not hasattr(ff, "lisher_coefficients")
+    assert float(j0("Pr3+", 0.0)) == pytest.approx(1.0, abs=1e-7)
+    assert float(j2("Pr3+", 0.0)) == 0.0
+    assert "GRASP2018, Dirac-Fock" in approximation_name("Pr3+", 0.8)
+    assert "Lisher" not in approximation_name("Pr3+", 0.8)
     with pytest.raises(ValueError, match="4f/5f ion"):
         magnetic_form_factor("Pr3+", 0.3)
     assert float(magnetic_form_factor("Pr3+", 0.3, g=0.8)) == pytest.approx(
         float(j0("Pr3+", 0.3)) + (2 / 0.8 - 1) * float(j2("Pr3+", 0.3)), rel=1e-15)
-
-
-def test_pr3_sits_on_a_non_relativistic_footing_and_the_docstring_says_so():
-    """⟨r²⟩ from the ⟨j₀⟩ slope, 3(Aa + Bb)/8π² for the 5-parameter form: Pr³⁺
-    is 1.065 a.u., below Nd³⁺'s Dirac-Fock 1.114, where the lanthanide
-    contraction would put it above (≈ 1.2). That is the footing the module
-    docstring states, pinned here so the statement and the row cannot drift."""
-    import rietx.crystallography.magnetic.form_factor as ff
     bohr2 = 0.529177210903 ** 2
-    A, a, B, b, _ = lisher_coefficients("Pr3+")[0]
-    r2_pr = 3 * (A * a + B * b) / (8 * np.pi ** 2) / bohr2
-    A, a, B, b, C, c, _ = coefficients("Nd3+")[0]
-    r2_nd = 3 * (A * a + B * b + C * c) / (8 * np.pi ** 2) / bohr2
-    assert r2_pr == pytest.approx(1.065, abs=2e-3)
-    assert r2_pr < r2_nd
-    assert "non-relativistic" in ff.__doc__ and "10 %" in ff.__doc__
+    s = 0.01
+    r2 = {ion: 6 * (1 - float(j0(ion, s))) / (4 * np.pi * s) ** 2 / bohr2
+          for ion in ("Ce3+", "Pr3+", "Nd3+")}
+    assert r2["Ce3+"] > r2["Pr3+"] > r2["Nd3+"]
+    assert r2["Pr3+"] == pytest.approx(1.203, abs=0.01)
 
 
 def test_ce2_is_retired_with_a_reason_and_ce3_carries_browns_row():
@@ -292,7 +272,8 @@ def test_ce2_is_retired_with_a_reason_and_ce3_carries_browns_row():
 
 def test_the_forward_model_evaluates_the_table_through_j0_and_j2():
     """``scattering._form_factor`` goes through ``j0``/``j2``, the one evaluator,
-    so an ion in either stored form reaches |F_M|² with its own curve."""
+    so an ion from a computed table or a Brown row reaches |F_M|² with its own
+    curve."""
     from types import SimpleNamespace
 
     from rietx.crystallography.magnetic.scattering import _form_factor
@@ -488,7 +469,7 @@ def test_g_defaults_to_two_for_3d_and_is_refused_absent_for_4f():
     """
     assert resolve_g("Cr3+", None) == 2.0
     assert not needs_explicit_g("Cr3+")
-    assert approximation_name("Cr3+", None) == J0_ONLY
+    assert approximation_name("Cr3+", None).startswith(J0_ONLY + "; ")
 
     assert needs_explicit_g("Ho3+") and needs_explicit_g("U4+")
     with pytest.raises(ValueError, match="4f/5f ion"):
@@ -1715,7 +1696,7 @@ def test_a_flat_moment_direction_is_held_and_named():
     assert "does not determine" in row.note
     assert row.magnitude == pytest.approx(abs(modulus.value), rel=1e-12)
     assert row.magnitude_from_components == pytest.approx(row.magnitude, rel=1e-9)
-    assert row.approximation == J0_ONLY
+    assert row.approximation.startswith(J0_ONLY + "; ")
     # and it round-trips through JSON with the new section
     again = type(report).model_validate_json(report.model_dump_json())
     assert again.magnetic[0].unmeasured_directions == ["polar", "azimuth"]
@@ -2088,8 +2069,9 @@ def test_the_report_names_the_approximation_per_ion():
 
     rows = analyse_moments(model, values, structure)
     assert [r.ion for r in rows] == ["Mn2+", "Ho3+"]
-    assert rows[0].approximation == J0_ONLY
-    assert rows[1].approximation == "dipole, <j0> + (2/g - 1)<j2>, g = 1.25"
+    assert rows[0].approximation == approximation_name("Mn2+", None)
+    assert rows[0].approximation.startswith(J0_ONLY + "; ")
+    assert rows[1].approximation.startswith("dipole, <j0> + (2/g - 1)<j2>, g = 1.25; ")
     assert model.phases[0].magnetic.named_approximations() == {
         "Mn2+": rows[0].approximation, "Ho3+": rows[1].approximation}
 

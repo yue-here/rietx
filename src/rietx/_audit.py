@@ -1696,15 +1696,14 @@ ROWS: tuple[Row, ...] = (
                   "and read the intensities and widths as unsettled until then"),
         scope=("all",)),
     Row("LOW_ANGLE_UNMODELLED", "code"),
-    Row("MAGNETIC_FORM_FACTOR_EXTRAPOLATED", "code", tier=1, ambiguity=1, response="warning",
-        responds=("read the moments as resting partly on extrapolated form-factor values at the "
-                  "highest angles; to keep every reflection inside, end the data at the d the "
-                  "suggestion names"),
+    Row("MAGNETIC_FORM_FACTOR_COMPUTED_TAIL", "code", tier=1, ambiguity=1, response="warning",
+        responds=("read the moments as resting partly on computed free-ion form-factor values "
+                  "at the highest angles; to fit inside Brown's ranges, end the data at the d "
+                  "the suggestion names"),
         evidence=("arithmetic: fires exactly when the stage's reflection list reaches an s past "
-                  "the row's fitted range, the source's own number (Brown ITC Vol. C p. 461; "
-                  "Lisher & Forsyth 1971 p. 548); a row whose fitted form grows past it "
-                  "(form_factor.GROWS_PAST_RANGE, a negative exponent) is refused at compile "
-                  "instead, the interim policy of form_factor.past_range_action")),
+                  "the end of a Brown row's fitted range, the source's own number (Brown ITC "
+                  "Vol. C p. 461), where the row's value is its computed tail (rietx #1691, "
+                  "ruling D46 (d1): one warning)")),
     Row("MAGNETIC_ION_ASSUMED", "code", tier=1, ambiguity=3,
         evidence=("arithmetic: fires exactly when the substitution was made (info); the "
                   "substitution's own tier is crystallography.magnetic.form_factor._ASSUMED_ION, "
@@ -3586,10 +3585,30 @@ ROWS: tuple[Row, ...] = (
         value=1.2,
         evidence=("source: Brown, ITC Vol. C sec. 4.4.5 (2004), p. 461, rare-earth rows fitted "
                   "over 0-0.5 and 0.5-1.2")),
-    Row("rietx.crystallography.magnetic.form_factor.S_MAX_LISHER", "constant", tier=1,
-        value=1.3,
-        evidence=("source: Lisher & Forsyth (1971) Acta Cryst. A27, p. 548, 'the tabulated "
-                  "range (sin theta/lambda = 1.3)'")),
+    Row("rietx.crystallography.magnetic.form_factor.TABLE_S_MAX", "constant", tier=3,
+        value=6.0,
+        evidence=("ours, ruled by the magnetic-path owner (rietx #1691, D46 (c), 2026-11-23): "
+                  "the end of every computed curve. Beyond it a free-ion curve is not a "
+                  "crystal's form factor anyway (covalency moves the tail past s = 1.5 by "
+                  "8-93 %; no measured form factor past s = 1.157), and CW neutrons reach s = 6 "
+                  "only at lambda < 0.167 A; past it every row is refused, never extrapolated"),
+        grounds=("chosen with margin past any constant-wavelength neutron pattern; a time-of-"
+                 "flight bank reaching d < 0.083 A would need it raised, a data change only")),
+    Row("rietx.crystallography.magnetic.form_factor.TABLE_STEP", "constant", tier=1,
+        value=0.01,
+        evidence=("measured: a cubic spline on this grid errs by <= 1.5e-6 on s = 0-1.5 and "
+                  "<= 7.8e-11 beyond against the same curves at 0.005 (rietx #1691, D46 (c)); "
+                  "decides only interpolation error, two orders under the curves' own accuracy "
+                  "(HFR vs Dirac-Fock 1.5e-4)")),
+    Row("rietx.crystallography.magnetic.form_factor.TAIL_BLEND_WIDTH", "constant", tier=3,
+        value=0.2,
+        evidence=("ours, ruled by the magnetic-path owner (rietx #1691, D46 (d1), 2026-11-23): "
+                  "the width over which a Brown row is blended onto its computed tail; the "
+                  "largest join it absorbs is 0.010 (bare Mo, an M+ row now replaced), the "
+                  "rows kept join within 7.4e-3, so any width from 0.05 to 0.5 moves a value "
+                  "by under that join"),
+        grounds=("a C2 quintic over 0.2 keeps the curve's slope change under the size of "
+                 "Brown's own end-of-range residual; no published blend exists to adopt")),
     Row("rietx.crystallography.magnetic.isotropy.CROSS_IRREP_DRAWS", "constant", value=12,
         evidence=("back to Mike, unaudited: he ruled tier 3 on PR #1636 (2026-11-23), and "
                   "the judge (2026-11-24) called it weak and an action's threshold: "
@@ -7507,7 +7526,7 @@ ROWS: tuple[Row, ...] = (
     Row("LEBAIL_CYCLES_AT_CAP.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence="arithmetic: names the stage setting that lifts the cap"),
     Row("LOW_ANGLE_UNMODELLED.suggestion", "suggestion", value=1),
-    Row("MAGNETIC_FORM_FACTOR_EXTRAPOLATED.suggestion", "suggestion", tier=1, ambiguity=1,
+    Row("MAGNETIC_FORM_FACTOR_COMPUTED_TAIL.suggestion", "suggestion", tier=1, ambiguity=1,
         value=1,
         evidence=("arithmetic: d >= 1/(2 s_max) is the data range inside every row's fitted "
                   "range; names the argument that sets it")),

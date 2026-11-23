@@ -1318,7 +1318,7 @@ SILENCE: dict[str, Pair] = {
     "LEBAIL_CYCLES_AT_CAP": Pair(
         functools.partial(_lebail_cap, False), _lebail_settled_or_unasked,
         "tests/test_lebail_cycles.py"),
-    "MAGNETIC_FORM_FACTOR_EXTRAPOLATED": Pair(
+    "MAGNETIC_FORM_FACTOR_COMPUTED_TAIL": Pair(
         _ff_range_fires, _ff_range_silent, "tests/test_magnetic_form_factor_range.py"),
     "MOMENT_UNSUPPORTED": Pair(
         _unsupported_fires, _unsupported_silent, "tests/test_modulus_interval.py"),

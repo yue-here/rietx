@@ -458,25 +458,59 @@ dipole amplitude is $[\langle j_0\rangle\,(L + 2S) + \langle j_2\rangle\,L] /
 $g = 2$, so a spin-only test cannot tell them apart. The output names which
 form was used per species, because a fit that does not say cannot be checked.
 
-Two rare-earth rows need a note. The row Brown's table labels Ce$^{2+}$ is a
-Ce$^{3+}$ calculation: it reproduces Freeman and Desclaux's Dirac-Fock Ce$^{3+}$
-values at Brown's own fit error, and they computed no Ce$^{2+}$
-{cite}`freeman1979`. So rietx keys it `Ce3+` and refuses `Ce2+` by name. Brown
-carries no Pr row of any charge, so Pr$^{3+}$ comes from an older fit with one
-exponential fewer {cite}`lisher1971`:
+Brown fitted {eq}`int-ff-dipole` over a stated range, $s \le 1.5$ Å$^{-1}$
+for his 3d, 4d and actinide rows and $s \le 1.2$ Å$^{-1}$ for the rare earths
+{cite}`brown2004`, and past it the fitted form is not a form factor: the
+$\langle j_2\rangle$ rows grow as $D s^2$, and Mn$^{2+}$ $\langle j_0\rangle$,
+whose third exponent is negative, reaches 1.01 at $s = 3$ Å$^{-1}$. So each of
+his rows is his formula up to $s_\text{end}$, then blended onto a free-ion
+curve computed for rietx on the row's own footing (Hartree-Fock for the 3d
+and 4d rows, Dirac-Fock for the rare earths and actinides
+{cite}`freeman1979,desclaux1978`):
 
 ```{math}
-:label: int-ff-lisher
+:label: int-ff-tail
 
-\langle j_0\rangle(s) = A e^{-a s^2} + B e^{-b s^2} + C,
+f(s) = (1 - w)\,f_\text{Brown}(s) + w\,f_\text{computed}(s),
 \qquad
-\langle j_2\rangle(s) = s^2\left[A e^{-a s^2} + B e^{-b s^2} + C\right].
+w = 10t^3 - 15t^4 + 6t^5,\quad
+t = \min\!\left(1, \max\!\left(0, \frac{s - s_\text{end}}{0.2\ \text{Å}^{-1}}\right)\right).
 ```
 
-{source}`rietx.crystallography.magnetic.form_factor`
+{source}`rietx.crystallography.magnetic.form_factor.TAIL_BLEND_WIDTH`
 
-That fit is to non-relativistic Hartree-Fock values, while every other
-rare-earth row is a fit to Dirac-Fock ones. Its $\langle r^2\rangle$ is about
-10 % smaller than a Dirac-Fock Pr$^{3+}$'s would be, so its form factor falls
-off a little more slowly with $s$. `approximation_name` names the source
-wherever this row is in force.
+The weight $w$ has zero first and second derivatives at both ends, so the
+curve stays smooth as a refined cell moves a reflection across the join. Some
+ions are served from a computed curve over the whole range instead: the
+high-charge 4d ions Ru$^{3+}$-Ru$^{6+}$, Rh$^{4+}$, Tc$^{4+}$,
+Mo$^{3+}$-Mo$^{5+}$ and Nb$^{4+}$ (Cowan's relativistic Hartree-Fock,
+configuration average, the footing Kobayashi, Nagao and Ito used for the 5d
+ions {cite}`cowan1981,kobayashi2011`); the neutral Mo, Tc, Ru and Rh atoms,
+since Brown's rows under those labels are singly charged ions' curves; and
+Pr$^{3+}$ and Pu$^{3+}$ (Dirac-Fock, GRASP2018 {cite}`froesefischer2019`).
+Brown carries no Pr row, and the older Pr$^{3+}$ fit {cite}`lisher1971` is on a
+non-relativistic footing; his printed Pu$^{3+}$ rows are fits to the Pu$^{5+}$
+curve. Every computed curve is tabulated on $0 \le s \le 6$ Å$^{-1}$ at
+0.01 Å$^{-1}$ and read with a cubic spline, which errs by at most
+$1.5\times10^{-6}$ between the points. They are computed for rietx and not
+peer-reviewed, and `approximation_name` says so wherever one is in force.
+Past $s = 6$ Å$^{-1}$ every row is refused.
+
+**A free-ion curve is not a crystal's form factor at high $s$.** Beyond about
+$s = 1.2$ Å$^{-1}$ the two part company, for every row, published or computed:
+
+- covalency spreads the magnetisation density onto the ligands; even a crude
+  model of it, a uniform 5 % radial expansion, moves the curve beyond
+  $s = 1.5$ Å$^{-1}$ by 8-93 % of its size (measured on the computed curves);
+- the dipole approximation drops the aspherical term $C_4\langle j_4\rangle$,
+  which for a pure $e_g$ or $t_{2g}$ density in a cubic field exceeds
+  $\langle j_0\rangle$ itself beyond $s \approx 0.3$-$0.8$ Å$^{-1}$ (5.5 times at
+  $s = 0.8$ for Ni$^{2+}$); only high-spin $d^5$ has no such term
+  {cite}`brown2004`;
+- no measured magnetic form factor we know of reaches past
+  $s = 1.157$ Å$^{-1}$ (iron metal {cite}`shull1962`).
+
+So the curves are numerically right to $s = 6$, but a moment that leans on
+reflections past $s \approx 1.2$ leans on the free-ion model. A fit whose
+reflections pass a Brown row's range says so once, as
+[`MAGNETIC_FORM_FACTOR_COMPUTED_TAIL`](../reference/diagnostics-refinement.md#magnetic_form_factor_computed_tail).

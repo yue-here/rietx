@@ -533,18 +533,43 @@ each with its licence text beside it.
   verified the same day against the print and against P. J. Brown's own data
   file (the McPhase manual's mirror, read for verification only; nothing
   copied).
-- Magnetic **form-factor coefficients for Pr³⁺** in
-  `src/rietx/crystallography/magnetic/form_factor.py` (`_J0_LISHER`, `_J2_LISHER`)
-  — Lisher, E. J. & Forsyth, J. B. (1971), *Acta Cryst.* A **27**, 545–549,
-  doi:10.1107/S0567739471001190, Table 1 (p. 545, ⟨j₀⟩) and Table 2 (p. 546,
-  ⟨j₂⟩), read from the page image (2026-09-22) and checked against the paper's
-  text layer. Ten numbers (A, a, B, b, C per order), in the paper's own
-  5-parameter form, not reshaped into Brown's. They replace the Pr³⁺ ⟨j₀⟩
-  previously carried from `periodictable`, which is the Pr³⁺ row of Brown's data
-  file and is not in the ITC print. Cite Lisher & Forsyth (1971). In the same
-  change (#626) the Brown row ITC prints as "Ce²⁺" is keyed `Ce3+`: it
-  reproduces Freeman & Desclaux (1979, *J. Magn. Magn. Mater.* **12**, 11–21)
-  Table 7's Ce³⁺ values at Brown's printed fit error, and they computed no Ce²⁺.
+- Magnetic **form factors computed for rietx** in `src/rietx/data/mff_computed.dat`
+  (read by `src/rietx/crystallography/magnetic/form_factor.py`; rietx #1689, #1691,
+  #1796, #1804). **Computed for rietx, not peer-reviewed**, and the file says so in
+  its header. ⟨j₀⟩, ⟨j₂⟩ (and ⟨j₄⟩ on a whole table) on s = sinθ/λ = 0-6 Å⁻¹ at
+  0.01 Å⁻¹, from free-ion radial wavefunctions computed with two codes, neither of
+  which is part of rietx or shipped with it:
+  - R. D. Cowan's **RCN** (Mod 36.2.5; Cowan, *The Theory of Atomic Structure and
+    Spectra*, University of California Press, 1981, doi:10.1525/9780520906150), whose
+    distribution terms say it "may be freely distributed gratis" and "may not be
+    sold": Hartree-Fock (Hund's-rule term or configuration average) for the 3d and 4d
+    tails and the neutral Mo, Tc, Ru, Rh tables; Hartree-Fock-relativistic,
+    configuration average (IREL = 1, CORRF = 1, Kobayashi, Nagao & Ito's footing,
+    *Acta Cryst.* A **67**, 473-480, 2011, doi:10.1107/S010876731102633X) for the ten
+    high-charge 4d tables Ru³⁺-Ru⁶⁺, Rh⁴⁺, Tc⁴⁺, Mo³⁺-Mo⁵⁺, Nb⁴⁺;
+  - **GRASP2018** (MIT licence; Froese Fischer, Gaigalas, Jönsson & Bieroń, *Comput.
+    Phys. Commun.* **237**, 184-187, 2019, doi:10.1016/j.cpc.2018.10.032), Dirac-Fock,
+    average level, for the rare-earth and actinide tails and the Pr³⁺ and Pu³⁺ tables.
+
+  The numbers are ours. They were checked against published values, which supplied
+  none of them: Brown's 3d/4d rows (ITC Vol. C § 4.4.5) at his printed fit error,
+  Freeman & Desclaux (1979) Table 7 (1508 of 1511 cells within 0.6 × 10⁻⁴) and
+  Desclaux & Freeman (1978, *J. Magn. Magn. Mater.* **8**, 119-129,
+  doi:10.1016/0304-8853(78)90111-7) Table 6. The input decks, the transform, the blend,
+  the footing check and the file writer are in `tools/magnetic_form_factors/`, outside
+  the wheel. **Two published rows are replaced by these tables, inside their own
+  range:** Brown's **Pu³⁺** rows, which are fits to the Pu⁵⁺ curve (against Desclaux &
+  Freeman's Pu³⁺ block they score 20.6 and 12.3 times his printed fit error; the
+  computed Pu³⁺ table reproduces that block to ≤ 5.3 × 10⁻⁵ in 84 of 84 cells), and
+  the **Pr³⁺** row of Lisher, E. J. & Forsyth, J. B. (1971), *Acta Cryst.* A **27**,
+  545-549, doi:10.1107/S0567739471001219, a 5-parameter fit to non-relativistic
+  Hartree-Fock values that this table carried from #626 (2026-09-22) until #1691,
+  replaced so Pr³⁺ shares its rare-earth neighbours' Dirac-Fock footing. Brown's bare
+  Mo, Tc, Ru, Rh and Pd rows, which are singly charged ions' curves, are dropped
+  (Pd: refused). Since #626 the Brown row ITC prints as "Ce²⁺" is
+  keyed `Ce3+`: it reproduces Freeman & Desclaux (1979, *J. Magn. Magn. Mater.*
+  **12**, 11–21) Table 7's Ce³⁺ values at Brown's printed fit error, and they
+  computed no Ce²⁺.
 - Element **colours** in `src/rietx/gui/structure3d.py` (`_CPK`) — the
   *assignments* are the CPK convention (Corey & Pauling, 1953, Rev. Sci. Instrum.
   24, 621; Koltun, 1965, US Patent 3,170,246): hydrogen white, carbon black,

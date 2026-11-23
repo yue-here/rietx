@@ -152,6 +152,8 @@ The components are written back from those at the end of each stage and carry no
 `Moment.ion` is not `Atom.species`.
 The neutron scattering length is keyed by nuclide and the form factor by oxidation state.
 An ion the table does not carry is refused by name rather than mapped to a neighbour.
+A bare element symbol is the neutral atom: `"Ru"` is neutral Ru, not Ru<sup>+</sup>, and bare `"Pd"` is refused, because neutral Pd carries no moment; write `"Pd1+"` for Pd<sup>+</sup>.
+The table serves every row on s = sinθ/λ ≤ 6 Å<sup>-1</sup> and refuses a reflection past it at the stage compile (the rows, their footing and the free-ion caveat are in {eq}`int-ff-tail`'s section of the theory page).
 Leave `Moment.g` as `None` for a 3d or 4d ion, where the spin-only g = 2 makes the ⟨j<sub>2</sub>⟩ term of the dipole approximation vanish.
 Set it for a 4f or 5f ion, where that term does not vanish: an absent g there is refused, because a default would drop a term worth tens of per cent at high angle.
 
@@ -188,7 +190,7 @@ print(row.magnitude, row.magnitude_esd, row.supported, row.unmeasured_directions
 | `MomentEvidence.magnitude`, `MomentEvidence.magnitude_esd` | the refined modulus and its esd, μ<sub>B</sub> | the esd is copied from `RefinementResult.parameters`, Bérar-Lelann inflated like every esd; `None` when the block did not refine |
 | `MomentEvidence.magnitude_from_components` | \|m\| recomputed from the components with the oblique metric | equal to the modulus unless the last stage moved a lattice parameter α, β or γ; a 41 % disagreement on a hexagonal cell is what a Euclidean norm gives |
 | `MomentEvidence.crystalaxis` | the three components the modulus and angles imply | derived, so no esd |
-| `MomentEvidence.approximation` | the form factor used, named | ⟨j<sub>0</sub>⟩ alone, or ⟨j<sub>0</sub>⟩ + (2/g − 1)⟨j<sub>2</sub>⟩ with g |
+| `MomentEvidence.approximation` | the form factor used, named, and its row's footing | ⟨j<sub>0</sub>⟩ alone, or ⟨j<sub>0</sub>⟩ + (2/g − 1)⟨j<sub>2</sub>⟩ with g; then Brown's row with its computed tail, or a computed table, with its code, and "computed for rietx, not peer-reviewed" |
 | `MomentEvidence.free_directions` | every direction the site symmetry leaves free | `"polar"`, `"azimuth"` |
 | `MomentEvidence.unmeasured_directions` | those the powder average did not determine | held, so they carry no esd |
 | `MomentEvidence.paired_with` | the paths of other sites this modulus is powder-degenerate with | empty for an ordinary site; [`MOMENT_PAIR_DEGENERATE`](diagnostics-structures.md#moment_pair_degenerate) names the pair |

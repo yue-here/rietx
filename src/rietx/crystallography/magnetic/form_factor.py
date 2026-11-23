@@ -8,8 +8,8 @@ package offers, and the one every powder Rietveld code uses —
     f(s) = ⟨j₀⟩(s) + (2/g − 1)·⟨j₂⟩(s)
 
 with g the Landé factor of the ion and ⟨jₙ⟩ the radial integrals of the 4f/3d
-wavefunction, each fitted to the analytic form (Brown, P. J., *International
-Tables for Crystallography* Vol. C, § 4.4.5)
+wavefunction, for most ions fitted to the analytic form (Brown, P. J.,
+*International Tables for Crystallography* Vol. C, § 4.4.5)
 
     ⟨j₀⟩(s) = A·e^(−a·s²) + B·e^(−b·s²) + C·e^(−c·s²) + D
     ⟨jₙ⟩(s) = s²·[A·e^(−a·s²) + B·e^(−b·s²) + C·e^(−c·s²) + D]   (n ≥ 2)
@@ -90,54 +90,75 @@ Cross-checked against published rows: Fe³⁺ ⟨j₀⟩ against Gupta *et al.*
 Mn²⁺ ⟨j₀⟩ against the MnF₂ polarised-neutron study of 2025 — seven of seven
 coefficients each.
 
-**Pr³⁺ is Lisher & Forsyth's (1971)** fit, both orders (*Acta Cryst.* A
-**27**, 545-549, Tables 1 and 2, pp. 545-546; issue #626).  ITC Vol. C
-carries no Pr row of any charge.  The Pr³⁺ ⟨j₀⟩ this table held until
-2026-10-01 was the Pr³⁺ row of P. J. Brown's data file (not in the print),
-which matches Lisher & Forsyth's curve to 0.05 % rms; Lisher & Forsyth also
-give the matching ⟨j₂⟩, so both orders now come from one citable fit.
-**Its footing differs from its neighbours'.**  Lisher & Forsyth fitted the
-non-relativistic Hartree-Fock values of Blume, Freeman & Watson (1962,
-*J. Chem. Phys.* **37**, 1245), while every other rare-earth row here is a fit
-to Dirac-Fock values.  The relativistic 4f shell is more extended: Pr³⁺'s
-⟨r²⟩ from this ⟨j₀⟩ is 1.065 a.u., about 10 % smaller than the ≈ 1.2 a.u.
-a Dirac-Fock Pr³⁺ would have between Freeman & Desclaux's Ce³⁺ (1.309) and
-Nd³⁺ (1.114).  A Pr³⁺ form factor here therefore falls off more slowly with
-s than a Dirac-Fock one would, and a refined Pr³⁺ moment can differ from one
-refined with a Dirac-Fock row by a few per cent at high angle.
-:func:`approximation_name` names Lisher & Forsyth wherever their fit is in
-force.
+**Pr³⁺ and Pu³⁺ are computed tables, not published rows** (rietx #1804,
+#1691).  ITC Vol. C carries no Pr row of any charge; the Pr³⁺ row this
+table held until 2026-11 was Lisher & Forsyth's (1971) 5-parameter fit to
+non-relativistic Hartree-Fock values, off the Dirac-Fock footing of every
+other rare-earth row (its ⟨j₀⟩ misses a Dirac-Fock Pr³⁺ curve by 23 times its
+printed fit error).  Brown's printed Pu³⁺ rows are fits to the **Pu⁵⁺** curve:
+against Desclaux & Freeman's (1978, *J. Magn. Magn. Mater.* **8**, 119-129,
+Table 6) Pu³⁺ block they score 20.6 (⟨j₀⟩) and 12.3 (⟨j₂⟩) times his printed
+fit error, against their Pu⁵⁺ curve about 1, and ⟨j₀⟩(0.2 Å⁻¹) is 0.627
+against 0.574.  Both ions are served from the computed Dirac-Fock tables
+below, on their neighbours' footing; the Pu³⁺ table reproduces Desclaux &
+Freeman's printed Pu³⁺ block to within 5.3 × 10⁻⁵ in all 84 cells.
 
-Fitted ranges
--------------
-**Every row is a least-squares fit over a stated range of s, and past that
-range it is not a form factor.**  Brown fitted the 3d and 4d rows over
-s = 0-1.5 Å⁻¹, the rare-earth rows over 0-1.2 Å⁻¹ and the actinide rows out
-to 1.5 Å⁻¹ (ITC Vol. C § 4.4.5, p. 461); Lisher & Forsyth's tabulated range
-for their fits ends at s = 1.3 Å⁻¹ (1971, p. 548).  :func:`fitted_range`
-returns each row's upper end, and :func:`past_fitted_range` is the one place
-that compares an s with it; :func:`j0`, :func:`j2`,
-:func:`magnetic_form_factor` and the forward model's stage compile all ask it,
-so no value past a row's range is returned silently.  What happens there is
-:func:`past_range_action`'s, a policy of one line: a row whose fitted form
-carries a *growing* exponential (an exponent below zero: Cr²⁺, Mn²⁺ and Mn³⁺
-⟨j₀⟩) rises without bound past its range, Mn²⁺ ⟨j₀⟩ reaching 1.01 at
-s = 3 Å⁻¹, and is refused there; every other row decays toward its constant
-term and is served with a warning.
+**A bare element symbol is the neutral atom**, and its row says which
+configuration it is.  Brown's bare ``Mo``, ``Tc``, ``Ru``, ``Rh`` and ``Pd``
+rows are fits to singly charged M⁺ curves (each matches an M⁺ 4dⁿ⁻³5s²
+configuration to his printed fit error and the neutral ground configuration
+to nothing), so ``Mo``, ``Tc``, ``Ru`` and ``Rh`` are served from computed
+neutral-atom tables (ground configuration, Hartree-Fock for the Hund's-rule
+term, Brown's own footing) and bare ``Pd`` is refused: neutral Pd is 4d¹⁰
+¹S and has no moment.  The other bare rows are kept, and
+:func:`approximation_name` names what each is: ``Sc`` and ``Nb`` are neutral
+atoms in an excited configuration, ``Ti`` the ground configuration in the
+non-Hund term ¹G (a state Clementi & Roetti 1974 list), ``V``, ``Mn``,
+``Fe``, ``Co``, ``Cu`` and ``Y`` configuration averages, and ``Cr`` and
+``Ni`` match no configuration tried (footing not identified).
 
-Two stored forms
-----------------
-Brown's coefficients (:data:`_J0`, :data:`_J2`) are the **7-parameter** form
-above.  Lisher & Forsyth (1971, eq. 1 and eq. 2) fit a **5-parameter** form,
-two exponentials and a constant, with the same argument s = sinθ/λ::
+Computed curves
+---------------
+:data:`COMPUTED_FILE` (``rietx/data/mff_computed.dat``) holds every curve
+this package computed for itself, and its header says so: **computed for
+rietx, not peer-reviewed**.  Each block names its code (Cowan's RCN, Mod
+36.2.5; GRASP2018), its footing and its configuration, and the repository's
+``tools/magnetic_form_factors/`` holds the decks and scripts that regenerate
+and check it.  Two kinds of block, both ⟨jₙ⟩ on s = 0.01 Å⁻¹ steps to
+:data:`TABLE_S_MAX` = 6 Å⁻¹, read with one cubic spline
+(:func:`tabulated_spline`):
 
-    ⟨j₀⟩(s) = A·e^(−a·s²) + B·e^(−b·s²) + C
-    ⟨jₙ⟩(s) = s²·[A·e^(−a·s²) + B·e^(−b·s²) + C]   (n ≥ 2)
+* **tables**, s = 0-6, which serve an ion on their own (:data:`_TABLE_KEY`):
+  the ten high-charge 4d ions Ru³⁺-Ru⁶⁺, Rh⁴⁺, Tc⁴⁺, Mo³⁺-Mo⁵⁺, Nb⁴⁺ (Cowan
+  HFR, configuration average, the footing of Kobayashi, Nagao & Ito 2011);
+  the neutral Mo, Tc, Ru and Rh atoms; Pr³⁺ and Pu³⁺ (GRASP2018 Dirac-Fock).
+  They carry ⟨j₄⟩ too, which nothing here evaluates.
+* **tails**, from the end of Brown's fitted range to s = 6, one per Brown
+  row, on that row's own footing: Hartree-Fock for the 3d and 4d rows
+  (Brown's own, Clementi & Roetti's), Dirac-Fock for the rare earths and
+  actinides (Freeman & Desclaux 1979; Desclaux & Freeman 1978).
 
-The two are separate least-squares fits, not two spellings of one table, so
-they are stored apart (:data:`_J0_LISHER`, :data:`_J2_LISHER`) and never
-reshaped into each other.  :func:`j0`/:func:`j2` dispatch per ion to
-whichever store carries it; :func:`coefficients` is Brown's store only.
+Fitted ranges and tails
+-----------------------
+**Every Brown row is a least-squares fit over a stated range of s, and past
+that range it is not a form factor** (Mn²⁺ ⟨j₀⟩ carries e^(+0.609·s²) and
+reached 1.01 at s = 3 Å⁻¹ and 1.4 × 10⁷ at s = 6, rietx #1796).  Brown
+fitted the 3d and 4d rows over s = 0-1.5 Å⁻¹, the rare-earth rows over
+0-1.2 Å⁻¹ and the actinide rows out to 1.5 Å⁻¹ (ITC Vol. C § 4.4.5,
+p. 461).  So a Brown row is his analytic form exactly up to that end
+(:func:`fitted_range`), then blended onto its computed tail over
+:data:`TAIL_BLEND_WIDTH` = 0.2 Å⁻¹ by the C² quintic 10t³ − 15t⁴ + 6t⁵, and
+the tail beyond.  A fit whose reflections pass a Brown row's range carries
+``MAGNETIC_FORM_FACTOR_COMPUTED_TAIL`` once (:func:`past_fitted_range` is
+the one comparison).  Past s = 6 Å⁻¹ every row is refused, before any work,
+by :func:`j0`, :func:`j2`, :func:`magnetic_form_factor` and the forward
+model's stage compile alike (:func:`past_table_end`).
+
+**Every curve here is a free-ion curve.**  Beyond about s = 1.2 Å⁻¹ a
+crystal's form factor departs from any free-ion one: covalency expands the
+radial density, and the aspherical ⟨j₄⟩ term the dipole approximation drops
+can exceed ⟨j₀⟩ there.  The manual's section on the dipole approximation
+states the sizes.
 
 ``periodictable`` also carries a pre-combined "J" entry for Ce²⁺, Ce³⁺ and
 Pr³⁺ (``add_form_factor("J", ...)``) that looks, at first glance, like it
@@ -154,8 +175,18 @@ References
 * Freeman, A. J. & Desclaux, J. P. (1979). *J. Magn. Magn. Mater.* **12**,
   11-21 — the Dirac-Fock ⟨jₙ⟩ values Brown fitted for the rare-earth rows;
   the evidence that his "Ce²⁺" row is Ce³⁺.
-* Lisher, E. J. & Forsyth, J. B. (1971). *Acta Cryst.* A **27**, 545-549 —
-  the 5-parameter form; Tables 1 and 2 (pp. 545-546) supply Pr³⁺.
+* Desclaux, J. P. & Freeman, A. J. (1978). *J. Magn. Magn. Mater.* **8**,
+  119-129 — the Dirac-Fock actinide values Brown fitted; Table 6 checks the
+  computed Pu³⁺ table and shows his printed Pu³⁺ row is the Pu⁵⁺ curve.
+* Clementi, E. & Roetti, C. (1974). *At. Data Nucl. Data Tables* **14**,
+  177-478 — the Hartree-Fock wavefunctions Brown fitted the 3d/4d rows to.
+* Cowan, R. D. (1981). *The Theory of Atomic Structure and Spectra*
+  (University of California Press) — RCN, the code of the 3d/4d curves.
+* Froese Fischer, C., Gaigalas, G., Jönsson, P. & Bieroń, J. (2019).
+  *Comput. Phys. Commun.* **237**, 184-187 — GRASP2018, the code of the
+  4f/5f curves.
+* Kobayashi, K., Nagao, T. & Ito, M. (2011). *Acta Cryst.* A **67**, 473-480
+  — the HFR configuration-average footing of the high-charge 4d tables.
 * Halpern, O. & Johnson, M. H. (1939). *Phys. Rev.* **55**, 898 — magnetic
   neutron scattering by an atom with a magnetization density.
 * Rodríguez-Carvajal, J. (1993). *Physica B* **192**, 55 — FullProf; the
@@ -166,20 +197,18 @@ References
 from __future__ import annotations
 
 import re
-import warnings
 from dataclasses import dataclass
+from functools import lru_cache
+from importlib.resources import files
 from typing import Literal
 
 import numpy as np
+from scipy.interpolate import CubicSpline
 
 from ...backend import get_backend
 
 #: (A, a, B, b, C, c, D) of one Brown-shaped ⟨jₙ⟩ fit.
 Coefficients = tuple[float, float, float, float, float, float, float]
-
-#: (A, a, B, b, C) of one Lisher & Forsyth (1971) ⟨jₙ⟩ fit: two exponentials
-#: and a constant (module docstring, "Two stored forms").
-LisherCoefficients = tuple[float, float, float, float, float]
 
 #: Atomic numbers whose ions need an explicit ``g``: the lanthanides (Ce-Lu)
 #: and the actinides (Th-Cm).  Not "f block" as a shell-filling statement — it
@@ -189,9 +218,11 @@ _G_REQUIRED_Z = frozenset(range(58, 72)) | frozenset(range(90, 97))
 
 _ION = re.compile(r"^([A-Z][a-z]?)(?:(\d+)([+-]))?$")
 
-#: ⟨j₀⟩ coefficients, keyed by ion (``"Cr"``, ``"Cr3+"``).  95 rows: the 3d
+#: ⟨j₀⟩ coefficients, keyed by ion (``"Cr"``, ``"Cr3+"``).  89 rows: the 3d
 #: and 4d transition series, the 4f rare earths and the 5f actinides Brown's
-#: table carries.
+#: table carries, less the rows served from a computed table instead
+#: (:data:`_TABLE_KEY`: his Pu³⁺, and his bare Mo, Tc, Ru and Rh, which are M⁺
+#: curves) and his bare Pd (an M⁺ curve too, refused: :data:`_RETIRED`).
 _J0: dict[str, Coefficients] = {
     "Sc": (0.2512, 90.0296, 0.329, 39.4021, 0.4235, 14.3222, -0.0043),
     "Sc1+": (0.4889, 51.1603, 0.5203, 14.0764, -0.0286, 0.1792, 0.0185),
@@ -240,15 +271,10 @@ _J0: dict[str, Coefficients] = {
     "Zr1+": (0.4532, 59.5948, 0.7834, 21.4357, -0.2451, 9.036, 0.0098),
     "Nb": (0.3946, 49.2297, 1.3197, 14.8216, -0.7269, 9.6156, 0.0129),
     "Nb1+": (0.4572, 49.9182, 1.0274, 15.7256, -0.4962, 9.1573, 0.0118),
-    "Mo": (0.1806, 49.0568, 1.2306, 14.7859, -0.4268, 6.9866, 0.0171),
     "Mo1+": (0.35, 48.0354, 1.0305, 15.0604, -0.3929, 7.479, 0.0139),
-    "Tc": (0.1298, 49.6611, 1.1656, 14.1307, -0.3134, 5.5129, 0.0195),
     "Tc1+": (0.2674, 48.9566, 0.9569, 15.1413, -0.2387, 5.4578, 0.016),
-    "Ru": (0.1069, 49.4238, 1.1912, 12.7417, -0.3176, 4.9125, 0.0213),
     "Ru1+": (0.441, 33.3086, 1.4775, 9.5531, -0.9361, 6.722, 0.0176),
-    "Rh": (0.0976, 49.8825, 1.1601, 11.8307, -0.2789, 4.1266, 0.0234),
     "Rh1+": (0.3342, 29.7564, 1.2209, 9.4384, -0.5755, 5.332, 0.021),
-    "Pd": (0.2003, 29.3633, 1.1446, 9.5993, -0.3689, 4.0423, 0.0251),
     "Pd1+": (0.5033, 24.5037, 1.9982, 6.9082, -1.524, 5.5133, 0.0213),
     "Ce3+": (0.2953, 17.6846, 0.2923, 6.7329, 0.4313, 5.3827, -0.0194),   # printed "Ce2+"
     "Nd2+": (0.1645, 25.0453, 0.2522, 11.9782, 0.6012, 4.9461, -0.018),
@@ -278,7 +304,6 @@ _J0: dict[str, Coefficients] = {
     "Np4+": (0.4206, 19.8046, 2.8004, 5.9783, -2.2436, 4.9848, 0.0228),
     "Np5+": (0.3692, 18.19, 3.151, 5.85, -2.5446, 4.9164, 0.0248),
     "Np6+": (0.2929, 17.5611, 3.4866, 5.7847, -2.8066, 4.8707, 0.0267),
-    "Pu3+": (0.384, 16.6793, 3.1049, 5.421, -2.5148, 4.5512, 0.0263),
     "Pu4+": (0.4934, 16.8355, 1.6394, 5.6384, -1.1581, 4.1399, 0.0248),
     "Pu5+": (0.3888, 16.5592, 2.0362, 5.6567, -1.4515, 4.2552, 0.0267),
     "Pu6+": (0.3172, 16.0507, 3.4654, 5.3507, -2.8102, 4.5133, 0.0281),
@@ -339,15 +364,10 @@ _J2: dict[str, Coefficients] = {
     "Zr1+": (11.8722, 34.92, 4.0502, 12.127, -0.0632, 2.828, 0.0034),
     "Nb": (7.4796, 33.179, 5.0884, 11.571, -0.0281, 1.564, 0.0047),
     "Nb1+": (8.7735, 33.285, 4.6556, 11.605, -0.0268, 1.539, 0.0044),
-    "Mo": (5.118, 23.422, 4.1809, 9.208, -0.0505, 1.743, 0.0053),
     "Mo1+": (7.2367, 28.128, 4.0705, 9.923, -0.0317, 1.455, 0.0049),
-    "Tc": (4.2441, 21.397, 3.9439, 8.375, -0.0371, 1.187, 0.0066),
     "Tc1+": (6.4056, 24.824, 3.54, 8.611, -0.0366, 1.485, 0.0044),
-    "Ru": (3.7445, 18.613, 3.4749, 7.42, -0.0363, 1.007, 0.0073),
     "Ru1+": (5.2826, 23.683, 3.5813, 8.152, -0.0257, 0.426, 0.0131),
-    "Rh": (3.3651, 17.344, 3.2121, 6.804, -0.035, 0.503, 0.0146),
     "Rh1+": (4.026, 18.95, 3.1663, 7.0, -0.0296, 0.486, 0.0127),
-    "Pd": (3.3105, 14.726, 2.6332, 5.862, -0.0437, 1.13, 0.0053),
     "Pd1+": (4.2749, 17.9, 2.7021, 6.354, -0.0258, 0.7, 0.0071),
     "Ce3+": (0.9809, 18.063, 1.8413, 7.769, 0.9905, 2.845, 0.012),   # printed "Ce2+"
     "Nd2+": (1.453, 18.34, 1.6196, 7.285, 0.8752, 2.622, 0.0126),
@@ -377,7 +397,6 @@ _J2: dict[str, Coefficients] = {
     "Np4+": (2.9203, 14.646, 2.5979, 5.559, -0.0301, 0.367, 0.0141),
     "Np5+": (2.3308, 13.654, 2.7219, 5.494, -0.1357, 0.049, 0.1224),
     "Np6+": (1.8245, 13.18, 2.8508, 5.407, -0.1579, 0.044, 0.1438),
-    "Pu3+": (2.0885, 12.871, 2.5961, 5.19, -0.1465, 0.039, 0.1343),
     "Pu4+": (2.7244, 12.926, 2.3387, 5.163, -0.13, 0.046, 0.1177),
     "Pu5+": (2.1409, 12.832, 2.5664, 5.152, -0.1338, 0.046, 0.121),
     "Pu6+": (1.7262, 12.324, 2.6652, 5.066, -0.1695, 0.041, 0.155),
@@ -389,17 +408,6 @@ _J2: dict[str, Coefficients] = {
     "Am7+": (1.8845, 9.161, 2.0746, 4.042, -0.1318, 1.723, 0.002),
 }
 
-#: Lisher & Forsyth (1971) ⟨j₀⟩, Table 1 p. 545, and ⟨j₂⟩, Table 2 p. 546, in
-#: their 5-parameter form (module docstring, "Two stored forms").  Pr³⁺ only:
-#: ITC Vol. C carries no Pr row.  The trailing ε is the paper's rms fit error,
-#: never a coefficient.
-_J0_LISHER: dict[str, LisherCoefficients] = {
-    "Pr3+": (0.2277, 16.11, 0.7923, 5.277, -0.0204),   # epsilon = 0.0802
-}
-_J2_LISHER: dict[str, LisherCoefficients] = {
-    "Pr3+": (1.8655, 8.1948, 1.0779, 2.6641, 0.01199),   # epsilon = 0.6399
-}
-
 #: Keys this table refuses with a reason rather than the generic "no row".
 _RETIRED: dict[str, str] = {
     "Ce2+": ("ITC Vol. C prints a row labelled Ce2+, but it is a Ce3+ "
@@ -409,6 +417,10 @@ _RETIRED: dict[str, str] = {
              "any source this table holds, so the key is refused rather than "
              "serve Ce3+ physics under a Ce2+ name. Write 'Ce3+' if the site "
              "is Ce3+"),
+    "Pd": ("the bare Pd row was a Pd+ curve (Brown's fit matches Pd+ 4d7 5s2 "
+           "4F to its printed fit error, and neutral Pd to nothing), and "
+           "neutral Pd is 4d10 1S, which carries no moment, so there is no "
+           "neutral Pd form factor to serve. Write 'Pd1+' if the site is Pd+"),
 }
 
 
@@ -426,8 +438,8 @@ def _element(ion: str) -> tuple[str, int]:
 
 
 def magnetic_ions() -> tuple[str, ...]:
-    """Every ion the table carries a ⟨j₀⟩ for, in either stored form, sorted."""
-    return tuple(sorted(set(_J0) | set(_J0_LISHER)))
+    """Every ion the table serves, Brown's rows and the computed tables, sorted."""
+    return tuple(sorted(set(_J0) | set(_TABLE_KEY)))
 
 
 def has_ion(ion: str) -> bool:
@@ -436,9 +448,9 @@ def has_ion(ion: str) -> bool:
     ``ion`` is matched verbatim (``"Dy"`` and ``"Dy3+"`` are different keys) —
     used to decide whether a bare element symbol resolves *neutrally* before
     :func:`resolve_assumed_ion` is tried (issue-magnetic-form-factor D1).
-    Either stored form counts.
+    A Brown row and a computed table both count.
     """
-    return ion in _J0 or ion in _J0_LISHER
+    return ion in _J0 or ion in _TABLE_KEY
 
 
 #: The majority oxidation state that is **magnetic**, for a bare element
@@ -589,9 +601,68 @@ def assumed_lande_g(ion: str) -> float | None:
     return lande_g(*slj)
 
 
+#: Every ion served from a whole computed table, public label -> key in
+#: ``mff_computed.dat`` (module docstring, "Computed curves").  The ten
+#: high-charge 4d ions (rietx #1691), the neutral Mo, Tc, Ru and Rh atoms
+#: (keyed ``Mo0`` ... in the file; the bare symbol is the public label), Pr³⁺
+#: and Pu³⁺ (#1804).  Held equal to the file's ``table`` blocks by test.
+_TABLE_KEY: dict[str, str] = {
+    "Mo": "Mo0", "Tc": "Tc0", "Ru": "Ru0", "Rh": "Rh0",
+    "Ru3+": "Ru3+", "Ru4+": "Ru4+", "Ru5+": "Ru5+", "Ru6+": "Ru6+",
+    "Rh4+": "Rh4+", "Tc4+": "Tc4+", "Mo3+": "Mo3+", "Mo4+": "Mo4+",
+    "Mo5+": "Mo5+", "Nb4+": "Nb4+", "Pr3+": "Pr3+", "Pu3+": "Pu3+",
+}
+
+#: The shipped data file of computed curves (module docstring, "Computed
+#: curves"): computed for rietx, not peer-reviewed, and says so in its header.
+COMPUTED_FILE = "mff_computed.dat"
+
+#: Every computed curve, table or tail, ends here: s = sinθ/λ in Å⁻¹ (rietx
+#: #1691, ruling D46 (c)).  Past it every row is refused.
+TABLE_S_MAX = 6.0
+#: The s step of every computed curve, Å⁻¹ (D46 (c)).
+TABLE_STEP = 0.01
+#: Width in s, Å⁻¹, of the blend from a Brown row onto its computed tail,
+#: starting at the end of his fitted range (D46 (d1)).
+TAIL_BLEND_WIDTH = 0.2
+
+#: Upper end, s = sinθ/λ in Å⁻¹, of the range Brown fitted his rows over, and
+#: so where each row's computed tail begins.  Brown, ITC Vol. C § 4.4.5
+#: (2004), p. 461: the 3d and 4d rows are fits to Clementi & Roetti's form
+#: factors "in the range (sin θ)/λ = 0 to 1.5 Å⁻¹"; the rare-earth rows to
+#: Freeman & Desclaux's values over 0-0.5 and 0.5-1.2 Å⁻¹; for the actinides
+#: "the calculations extend to 1.5 Å⁻¹".
+S_MAX_BROWN_3D_4D = 1.5
+S_MAX_BROWN_RARE_EARTH = 1.2
+S_MAX_BROWN_ACTINIDE = 1.5
+
+#: Element symbols of Brown's rare-earth tables (4.4.5.3/.7) and actinide
+#: tables (4.4.5.4/.8), so a row's range is read off its element without
+#: importing gemmi.
+_RARE_EARTHS = frozenset({"Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb",
+                          "Dy", "Ho", "Er", "Tm", "Yb", "Lu"})
+_ACTINIDES = frozenset({"Th", "Pa", "U", "Np", "Pu", "Am", "Cm"})
+
+_BROWN = "Brown, ITC Vol. C § 4.4.5 (2004), p. 461"
+
+
+def _range_of(ion: str) -> float:
+    sym, _ = _element(ion)
+    if sym in _RARE_EARTHS:
+        return S_MAX_BROWN_RARE_EARTH
+    if sym in _ACTINIDES:
+        return S_MAX_BROWN_ACTINIDE
+    return S_MAX_BROWN_3D_4D
+
+
+#: ``{ion: s_end}`` for every Brown row: where his fit ends and its computed
+#: tail begins.
+_FITTED_RANGE: dict[str, float] = {ion: _range_of(ion) for ion in sorted(_J0)}
+
+
 def has_j2(ion: str) -> bool:
-    """Whether the table carries ⟨j₂⟩ for this ion, in either stored form."""
-    return ion in _J2 or ion in _J2_LISHER
+    """Whether the table carries ⟨j₂⟩ for this ion (every row it serves does)."""
+    return ion in _J2 or ion in _TABLE_KEY
 
 
 def needs_explicit_g(ion: str) -> bool:
@@ -629,212 +700,242 @@ def _no_row_error(ion: str) -> KeyError:
         f"substitution would come back as a wrong moment with a small esd")
 
 
-def coefficients(ion: str) -> tuple[Coefficients, Coefficients | None]:
-    """``(⟨j₀⟩ coefficients, ⟨j₂⟩ coefficients or None)`` in Brown's 7-parameter
-    form, for one ion.
+def _require_row(ion: str) -> None:
+    """Refuse an ion the table does not serve, before any work is done."""
+    if ion not in _J0 and ion not in _TABLE_KEY:
+        raise _no_row_error(ion)
+
+
+def coefficients(ion: str) -> tuple[Coefficients, Coefficients]:
+    """``(⟨j₀⟩ coefficients, ⟨j₂⟩ coefficients)`` in Brown's 7-parameter form,
+    for one ion.
 
     Refuses an ion the table does not carry **by name**, listing the ions of
     the same element that are carried — the useful reply when someone typed
     ``Fe4+`` for a table that stops at Fe⁴⁺, or ``Mn3`` for ``Mn3+``.  An ion
-    stored only in Lisher & Forsyth's form (Pr³⁺) is refused here too, since
-    the forms are not interchangeable: :func:`lisher_coefficients` returns it,
-    and :func:`j0`/:func:`j2` evaluate either.
+    served from a computed table (:data:`_TABLE_KEY`) is refused too: it has
+    no coefficients, and :func:`j0`/:func:`j2` evaluate it.
     """
     if ion not in _J0:
-        if ion in _J0_LISHER:
+        if ion in _TABLE_KEY:
             raise KeyError(
-                f"{ion!r} is stored in Lisher & Forsyth's (1971) 5-parameter "
-                f"form, not Brown's 7-parameter one: use lisher_coefficients, "
-                f"or j0/j2 to evaluate it")
+                f"{ion!r} is served from a computed table ({COMPUTED_FILE}), "
+                f"not Brown's 7-parameter form, so it has no coefficients: "
+                f"use j0/j2 to evaluate it")
         raise _no_row_error(ion)
-    return _J0[ion], _J2.get(ion)
+    return _J0[ion], _J2[ion]
 
 
-def lisher_coefficients(ion: str) -> tuple[LisherCoefficients, LisherCoefficients]:
-    """``(⟨j₀⟩, ⟨j₂⟩)`` in Lisher & Forsyth's (1971) 5-parameter form (Table 1
-    p. 545, Table 2 p. 546), for the ions stored that way (Pr³⁺).
+def fitted_range(ion: str) -> float | None:
+    """The upper end, s = sinθ/λ in Å⁻¹, of the range Brown fitted ``ion``'s
+    rows over, where its computed tail begins; ``None`` for an ion served from
+    a computed table, which nothing was fitted to (module docstring,
+    "Computed curves").  Both orders of one ion share it."""
+    _require_row(ion)
+    return _FITTED_RANGE.get(ion)
 
-    An ion stored in Brown's 7-parameter form is refused naming that form,
-    the mirror of :func:`coefficients`' refusal of a Lisher ion.
+
+# --------------------------------------------------------- the computed curves
+
+@dataclass(frozen=True)
+class ComputedCurve:
+    """One block of :data:`COMPUTED_FILE`: a whole table or a tail.
+
+    ``stol`` is its grid (s = sinθ/λ, Å⁻¹), ``values`` maps ``"j0"``,
+    ``"j2"`` (and ``"j4"`` on a table) to the ⟨jₙ⟩ on it, and the three
+    strings are the block's own provenance lines; ``row`` is empty except on
+    a bare (neutral-labelled) Brown row.
     """
-    if ion not in _J0_LISHER:
-        if ion in _J0:
-            raise KeyError(
-                f"{ion!r} is stored in Brown's (ITC Vol. C § 4.4.5) "
-                f"7-parameter form, not Lisher & Forsyth's 5-parameter one: "
-                f"use coefficients, or j0/j2 to evaluate it")
-        raise _no_row_error(ion)
-    return _J0_LISHER[ion], _J2_LISHER[ion]
+
+    key: str
+    kind: Literal["table", "tail"]
+    stol: np.ndarray
+    values: dict
+    footing: str
+    configuration: str
+    row: str = ""
 
 
-#: Upper end, s = sinθ/λ in Å⁻¹, of the range each source fitted its rows
-#: over.  Brown, ITC Vol. C § 4.4.5 (2004), p. 461: the 3d and 4d rows are fits
-#: to Clementi & Roetti's form factors "in the range (sin θ)/λ = 0 to
-#: 1.5 Å⁻¹"; the rare-earth rows to Freeman & Desclaux's values over 0-0.5 and
-#: 0.5-1.2 Å⁻¹; for the actinides "the calculations extend to 1.5 Å⁻¹".
-#: Lisher & Forsyth (1971), p. 548: their tabulated range ends at
-#: sin θ/λ = 1.3 Å⁻¹.
-S_MAX_BROWN_3D_4D = 1.5
-S_MAX_BROWN_RARE_EARTH = 1.2
-S_MAX_BROWN_ACTINIDE = 1.5
-S_MAX_LISHER = 1.3
+@lru_cache(maxsize=None)
+def computed_curves() -> dict[str, ComputedCurve]:
+    """Parse :data:`COMPUTED_FILE` once: ``{key: ComputedCurve}``.
 
-#: Element symbols of Brown's rare-earth tables (4.4.5.3/.7) and actinide
-#: tables (4.4.5.4/.8), so a row's range is read off its element without
-#: importing gemmi.
-_RARE_EARTHS = frozenset({"Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb",
-                          "Dy", "Ho", "Er", "Tm", "Yb", "Lu"})
-_ACTINIDES = frozenset({"Th", "Pa", "U", "Np", "Pu", "Am", "Cm"})
-
-
-def _range_of(ion: str) -> tuple[float, str]:
-    """``(s_max, source)`` for a row the table carries."""
-    if ion in _J0_LISHER:
-        return S_MAX_LISHER, "Lisher & Forsyth (1971), p. 548"
-    sym, _ = _element(ion)
-    brown = "Brown, ITC Vol. C § 4.4.5 (2004), p. 461"
-    if sym in _RARE_EARTHS:
-        return S_MAX_BROWN_RARE_EARTH, brown
-    if sym in _ACTINIDES:
-        return S_MAX_BROWN_ACTINIDE, brown
-    return S_MAX_BROWN_3D_4D, brown
-
-
-#: ``{ion: (s_max, source)}`` for every row of both stores: each shipped row
-#: carries the fitted range of the source it came from.
-_FITTED_RANGE: dict[str, tuple[float, str]] = {
-    ion: _range_of(ion) for ion in sorted(set(_J0) | set(_J0_LISHER))}
-
-
-def fitted_range(ion: str) -> float:
-    """The upper end, s = sinθ/λ in Å⁻¹, of the range ``ion``'s rows were
-    fitted over (module docstring, "Fitted ranges").  Both orders of one ion
-    share it: each source fitted ⟨j₀⟩ and ⟨j₂⟩ over the same range."""
-    if ion not in _FITTED_RANGE:
-        raise _no_row_error(ion)
-    return _FITTED_RANGE[ion][0]
-
-
-def _exponents(ion: str, order: int) -> tuple[float, ...]:
-    if ion in _J0_LISHER:
-        c = (_J0_LISHER if order == 0 else _J2_LISHER)[ion]
-        return (c[1], c[3])
-    c = (_J0 if order == 0 else _J2)[ion]
-    return (c[1], c[3], c[5])
-
-
-#: ``(ion, order)`` of every row whose fitted form carries a growing
-#: exponential: an exponent below zero makes a term e^(+|c|·s²), which outruns
-#: every other term past the fitted range.  Derived from the coefficients, so a
-#: corrected row moves in or out of it by itself.  On this table: Cr²⁺, Mn²⁺
-#: and Mn³⁺ ⟨j₀⟩.
-GROWS_PAST_RANGE: frozenset[tuple[str, int]] = frozenset(
-    (ion, order) for ion in _FITTED_RANGE for order in (0, 2)
-    if (order == 0 or has_j2(ion)) and min(_exponents(ion, order)) < 0.0)
-
-
-PastRangeAction = Literal["refuse", "warn"]
-
-
-def past_range_action(ion: str, order: int) -> PastRangeAction:
-    """What an evaluation of ``ion``'s ⟨j_order⟩ past its fitted range gets.
-
-    **Interim policy, and the one place it is written.**  A row that grows past
-    its range (:data:`GROWS_PAST_RANGE`) is refused: no value it returns there
-    resembles a form factor.  Every other row decays toward its constant term,
-    an extrapolation rather than a fit, and is served with a warning.  A
-    different ruling is a change to this line.  Computed tails (the form
-    factor evaluated from the radial wavefunction past the fitted range, when
-    the package carries them) retire the refusal: past the range the value
-    would then come from the wavefunction rather than from the fit.
+    Each block's grid is checked to be s = s_first, s_first + 0.01, ..., 6, so
+    a malformed file fails here and never as a wrong value.
     """
-    return "refuse" if (ion, order) in GROWS_PAST_RANGE else "warn"
+    text = (files("rietx.data") / COMPUTED_FILE).read_text(encoding="utf-8")
+    out: dict[str, ComputedCurve] = {}
+    for chunk in text.split("\n@ ")[1:]:
+        head, *body = chunk.split("\n")
+        key, kind, *orders = head.split()
+        meta = {}
+        rows = []
+        for line in body:
+            if line.startswith("% "):
+                name, _, value = line[2:].partition(": ")
+                meta[name] = value
+            elif line.strip() and not line.startswith("#"):
+                rows.append(line)
+        data = np.array(" ".join(rows).split(), dtype=np.float64).reshape(
+            len(rows), 1 + len(orders))
+        stol = data[:, 0]
+        k0 = round(stol[0] / TABLE_STEP)
+        want = np.round(np.arange(k0, round(TABLE_S_MAX / TABLE_STEP) + 1)
+                        * TABLE_STEP, 2)
+        if stol.shape != want.shape or not np.array_equal(stol, want):
+            raise ValueError(f"{COMPUTED_FILE}: block {key!r} is not on "
+                             f"s = {stol[0]:g}-{TABLE_S_MAX:g} at {TABLE_STEP:g}")
+        out[key] = ComputedCurve(
+            key=key, kind=kind, stol=stol,
+            values={o: data[:, 1 + i] for i, o in enumerate(orders)},
+            footing=meta["footing"], configuration=meta["configuration"],
+            row=meta.get("row", ""))
+    return out
+
+
+def tabulated_spline(stol, values) -> CubicSpline:
+    """The one interpolant of a tabulated ⟨jₙ⟩(s): a cubic spline through
+    every point (not-a-knot end conditions; scipy's ``CubicSpline``).
+
+    ``stol`` is the grid, s = sinθ/λ in Å⁻¹, strictly increasing, and
+    ``values`` the ⟨jₙ⟩ on it.  On the shipped 0.01 Å⁻¹ grid the spline errs
+    by at most 1.5 × 10⁻⁶ between the points on s = 0-1.5 and 8 × 10⁻¹¹
+    beyond (measured against the same curves computed at 0.005 Å⁻¹, rietx
+    #1691); a linear interpolant on a 0.05 grid errs by up to 0.011 in ⟨j₀⟩.
+    The spline is C², so a refined cell moving s moves the value smoothly.
+    The caller keeps s inside the grid: this evaluates nothing outside it.
+    """
+    x = np.asarray(stol, dtype=np.float64)
+    y = np.asarray(values, dtype=np.float64)
+    if x.ndim != 1 or x.shape != y.shape or len(x) < 4:
+        raise ValueError(f"a tabulated form factor needs matching 1-D s and "
+                         f"value arrays of at least 4 points; got {x.shape} "
+                         f"and {y.shape}")
+    if not (np.all(np.isfinite(x)) and np.all(np.isfinite(y))):
+        raise ValueError("a tabulated form factor must be finite everywhere")
+    if not np.all(np.diff(x) > 0.0):
+        raise ValueError("a tabulated form factor's s grid must be strictly "
+                         "increasing")
+    return CubicSpline(x, y)
+
+
+@lru_cache(maxsize=None)
+def _spline(key: str, order: str) -> CubicSpline:
+    curve = computed_curves()[key]
+    return tabulated_spline(curve.stol, curve.values[order])
+
+
+def _smoothstep(t):
+    """The C² quintic 10t³ − 15t⁴ + 6t⁵ on [0, 1]: 0 → 1 with zero first and
+    second derivatives at both ends, so the blended curve is C² wherever its
+    two parts are."""
+    t = np.clip(t, 0.0, 1.0)
+    return t * t * t * (t * (6.0 * t - 15.0) + 10.0)
+
+
+def _blend_onto_tail(ion: str, order: int, stol: np.ndarray, brown) -> np.ndarray:
+    """Brown's value where s ≤ s_end, his row blended onto its computed tail
+    over [s_end, s_end + :data:`TAIL_BLEND_WIDTH`], the tail beyond."""
+    s_end = _FITTED_RANGE[ion]
+    out = np.array(brown, dtype=np.float64)
+    shape = out.shape
+    out = np.atleast_1d(out)
+    s = np.atleast_1d(stol)
+    past = s > s_end
+    w = _smoothstep((s[past] - s_end) / TAIL_BLEND_WIDTH)
+    tail = _spline(ion, f"j{order}")(s[past])
+    out[past] = np.where(w < 1.0, (1.0 - w) * out[past] + w * tail, tail)
+    return out.reshape(shape)
+
+
+def _value(ion: str, order: int, stol):
+    """⟨j_order⟩(s), unchecked: the one evaluator of every row."""
+    key = _TABLE_KEY.get(ion)
+    if key is not None:
+        return _spline(key, f"j{order}")(np.asarray(stol, dtype=np.float64))
+    coef = (_J0 if order == 0 else _J2).get(ion)
+    if coef is None:
+        raise _no_row_error(ion)
+    xp = get_backend()
+    s = xp.asarray(stol, dtype=np.float64)
+    brown = _jn(coef, s * s, stol2_factor=order > 0)
+    s_np = np.asarray(stol, dtype=np.float64)
+    if not np.any(s_np > _FITTED_RANGE[ion]):
+        return brown
+    return _blend_onto_tail(ion, order, s_np, brown)
 
 
 @dataclass(frozen=True)
 class PastFittedRange:
-    """One row asked for past the range its source fitted it over.
+    """One Brown row asked for past the range he fitted it over, where its
+    value is the blend onto (then) its computed tail.
 
-    ``stol`` is the largest s = sinθ/λ requested, ``value`` the fitted form's
-    value there, ``value_at_s_max`` its value at the range's end, and
-    ``action`` what :func:`past_range_action` decided.
+    ``stol`` is the largest s = sinθ/λ requested, ``s_max`` where Brown's fit
+    ends, ``footing`` the tail's code and footing.
     """
 
     ion: str
     order: int
     s_max: float
     stol: float
-    value: float
-    value_at_s_max: float
-    action: PastRangeAction
-    source: str
+    footing: str
 
     @property
     def d_min(self) -> float:
-        """The smallest d spacing, Å, inside the fitted range: 1/(2·s_max)."""
+        """The smallest d spacing, Å, inside Brown's fitted range."""
         return 1.0 / (2.0 * self.s_max)
-
-    def message(self) -> str:
-        """The fact, without a fix: the caller's context knows the fix."""
-        jn = f"⟨j{self.order}⟩"
-        head = (f"the {self.ion} {jn} magnetic form factor is evaluated at "
-                f"s = sinθ/λ = {self.stol:.3g} Å⁻¹ "
-                f"(d = {1.0 / (2.0 * self.stol):.3g} Å), past the "
-                f"0–{self.s_max:g} Å⁻¹ range its source fitted it over "
-                f"({self.source}).")
-        if self.action == "refuse":
-            c = min(_exponents(self.ion, self.order))
-            return (f"{head} Its fitted form carries a growing exponential "
-                    f"(an exponent of {c:g} Å²), so past that range it rises "
-                    f"without bound where a form factor falls toward zero: "
-                    f"{self.value_at_s_max:.3g} at s = {self.s_max:g} Å⁻¹, "
-                    f"{self.value:.3g} at s = {self.stol:.3g} Å⁻¹. No value it "
-                    f"returns there is a form factor.")
-        return (f"{head} Past that range the fitted form is an extrapolation, "
-                f"not a fit ({self.value:.3g} at s = {self.stol:.3g} Å⁻¹, "
-                f"{self.value_at_s_max:.3g} at the range's end).")
 
 
 def past_fitted_range(ion: str, stol, g: float | None = None,
                       *, orders: tuple[int, ...] | None = None,
                       ) -> tuple[PastFittedRange, ...]:
-    """Every row ``ion`` uses that ``stol`` (a scalar or an array, Å⁻¹) reaches
-    past its fitted range, with :func:`past_range_action`'s decision on each.
+    """Every Brown row ``ion`` uses that ``stol`` (a scalar or an array, Å⁻¹)
+    reaches past his fitted range, so onto its computed tail.
 
     The one comparison of an s with a row's range.  ``orders`` defaults to the
     rows :func:`magnetic_form_factor` evaluates at this ``g``: ⟨j₀⟩ always,
-    ⟨j₂⟩ when g ≠ 2.  Empty when every s is inside the range.  Raises nothing
-    itself: the caller decides how to refuse, since only it can name the fix.
+    ⟨j₂⟩ when g ≠ 2.  Empty when every s is inside the range, and always for
+    an ion served from a computed table.  Raises nothing for s ≤ 6.
     """
-    s_max, source = (_FITTED_RANGE[ion] if ion in _FITTED_RANGE
-                     else (fitted_range(ion), ""))
+    _require_row(ion)
+    s_max = _FITTED_RANGE.get(ion)
     s_hi = float(np.max(np.asarray(stol, dtype=np.float64)))
-    if not s_hi > s_max:
+    if s_max is None or not s_hi > s_max:
         return ()
     if orders is None:
         orders = (0,) if resolve_g(ion, g) == 2.0 else (0, 2)
-    out = []
-    for order in orders:
-        ev = _j0_value if order == 0 else _j2_value
-        out.append(PastFittedRange(
-            ion=ion, order=order, s_max=s_max, stol=s_hi,
-            value=float(ev(ion, s_hi)), value_at_s_max=float(ev(ion, s_max)),
-            action=past_range_action(ion, order), source=source))
-    return tuple(out)
+    footing = computed_curves()[ion].footing
+    return tuple(PastFittedRange(ion=ion, order=order, s_max=s_max,
+                                 stol=s_hi, footing=footing)
+                 for order in orders)
 
 
-def _checked(ion: str, order: int, stol) -> None:
-    """The bare evaluators' reading of :func:`past_fitted_range`: a refused
-    row raises, a warned one warns."""
-    for rec in past_fitted_range(ion, stol, orders=(order,)):
-        if rec.action == "refuse":
-            raise ValueError(
-                f"{rec.message()} Evaluate it only at s ≤ {rec.s_max:g} Å⁻¹ "
-                f"(d ≥ {rec.d_min:.3g} Å).")
-        warnings.warn(rec.message(), RuntimeWarning, stacklevel=3)
+def past_table_end(ion: str, stol) -> str | None:
+    """The fact, without a fix, when ``stol`` reaches past s = 6 Å⁻¹, where
+    every curve this table serves ends; ``None`` inside.  The caller names
+    the fix, since only it knows how the s arose."""
+    s_hi = float(np.max(np.asarray(stol, dtype=np.float64)))
+    if not s_hi > TABLE_S_MAX:
+        return None
+    return (f"the {ion} magnetic form factor is asked for at s = sinθ/λ = "
+            f"{s_hi:.3g} Å⁻¹ (d = {1.0 / (2.0 * s_hi):.3g} Å), past "
+            f"s = {TABLE_S_MAX:g} Å⁻¹, where every curve the form-factor "
+            f"table serves ends; no value is served beyond it.")
+
+
+def _checked(ion: str, stol) -> None:
+    """The direct evaluators' range check: an unknown ion, then s past the
+    table's end, each refused before any value is computed."""
+    _require_row(ion)
+    msg = past_table_end(ion, stol)
+    if msg is not None:
+        raise ValueError(
+            f"{msg} Evaluate it only at s ≤ {TABLE_S_MAX:g} Å⁻¹ "
+            f"(d ≥ {1.0 / (2.0 * TABLE_S_MAX):.4g} Å).")
 
 
 def _jn(coef: Coefficients, stol2, *, stol2_factor: bool):
+    """Brown's analytic form, ITC Vol. C § 4.4.5 eq. (4.4.5.2)."""
     xp = get_backend()
     a0, a1, b0, b1, c0, c1, d = coef
     out = (a0 * xp.exp(-a1 * stol2) + b0 * xp.exp(-b1 * stol2)
@@ -842,81 +943,83 @@ def _jn(coef: Coefficients, stol2, *, stol2_factor: bool):
     return stol2 * out if stol2_factor else out
 
 
-def _jn_lisher(coef: LisherCoefficients, stol2, *, stol2_factor: bool):
-    """Lisher & Forsyth's form: Lisher, E. J. & Forsyth, J. B. (1971),
-    *Acta Cryst.* A **27**, 545-549, eqs. (1) and (2), p. 545."""
-    xp = get_backend()
-    a0, a1, b0, b1, c = coef
-    out = a0 * xp.exp(-a1 * stol2) + b0 * xp.exp(-b1 * stol2) + c
-    return stol2 * out if stol2_factor else out
-
-
 def j0(ion: str, stol):
-    """⟨j₀⟩(s) for ``ion``; ``stol`` = s = sinθ/λ in Å⁻¹.  ⟨j₀⟩(0) = 1 to the fit.
+    """⟨j₀⟩(s) for ``ion``; ``stol`` = s = sinθ/λ in Å⁻¹.  ⟨j₀⟩(0) = 1.
 
-    Evaluates whichever stored form carries the ion (module docstring, "Two
-    stored forms"); this and :func:`j2` are the one evaluator of the table.
-    Past the row's fitted range it raises or warns, as
-    :func:`past_range_action` decides (module docstring, "Fitted ranges").
+    A Brown row is his analytic form up to the end of his fitted range, then
+    blended onto its computed tail; a computed-table ion is the table's cubic
+    spline (module docstring, "Computed curves").  Past s = 6 Å⁻¹, where
+    every curve ends, it raises before computing anything.
     """
-    if ion in _FITTED_RANGE:
-        _checked(ion, 0, stol)
-    return _j0_value(ion, stol)
+    _checked(ion, stol)
+    return _value(ion, 0, stol)
 
 
 def _j0_value(ion: str, stol):
     """:func:`j0` without the range check: the forward model's hot path, whose
     reflections were checked once at stage compile."""
-    stol = get_backend().asarray(stol, dtype=np.float64)
-    if ion in _J0:
-        return _jn(_J0[ion], stol * stol, stol2_factor=False)
-    if ion in _J0_LISHER:
-        return _jn_lisher(_J0_LISHER[ion], stol * stol, stol2_factor=False)
-    raise _no_row_error(ion)
+    return _value(ion, 0, stol)
 
 
 def j2(ion: str, stol):
-    """⟨j₂⟩(s), **including its s² factor**, so ⟨j₂⟩(0) = 0 exactly.
-
-    Range-checked as :func:`j0` is.
-    """
-    if has_j2(ion):
-        _checked(ion, 2, stol)
-    return _j2_value(ion, stol)
+    """⟨j₂⟩(s), **including its s² factor** on a Brown row, so ⟨j₂⟩(0) = 0
+    exactly.  Evaluated and range-checked as :func:`j0` is."""
+    _checked(ion, stol)
+    return _value(ion, 2, stol)
 
 
 def _j2_value(ion: str, stol):
     """:func:`j2` without the range check (see :func:`_j0_value`)."""
-    stol = get_backend().asarray(stol, dtype=np.float64)
-    if ion in _J2:
-        return _jn(_J2[ion], stol * stol, stol2_factor=True)
-    if ion in _J2_LISHER:
-        return _jn_lisher(_J2_LISHER[ion], stol * stol, stol2_factor=True)
-    if has_ion(ion):
-        raise KeyError(
-            f"the form-factor table carries ⟨j0⟩ for {ion!r} but no ⟨j2⟩, so "
-            f"the dipole approximation cannot be completed for it. Refine it "
-            f"with g = 2 (⟨j0⟩ alone) only if that is the physics you mean")
-    raise _no_row_error(ion)
+    return _value(ion, 2, stol)
 
 
 #: What ``magnetic_form_factor`` used, for the report and the diagnostics: the
 #: string is the approximation *in force*, not a label chosen per call site.
+#: :func:`approximation_name` adds the row's footing after a "; ".
 J0_ONLY = "dipole, <j0> only (g = 2)"
 J0_J2 = "dipole, <j0> + (2/g - 1)<j2>"
 
+#: Said of every computed curve wherever it is named (Yue, rietx #1691,
+#: 2026-11-21: the computed rows ship labelled).
+COMPUTED_LABEL = "computed for rietx, not peer-reviewed"
+
+
+def _short_footing(footing: str) -> str:
+    """A block's footing line without its parenthesised run settings."""
+    return re.sub(r" \([^)]*\)", "", footing)
+
+
+def footing_name(ion: str) -> str:
+    """What the row ``ion`` is, as :func:`approximation_name` names it: a
+    computed table's code and footing, or Brown's row with its computed tail's
+    footing, plus, for a bare (neutral-labelled) row, which configuration it
+    is.  Reads the data file's own provenance lines."""
+    _require_row(ion)
+    key = _TABLE_KEY.get(ion)
+    if key is not None:
+        c = computed_curves()[key]
+        return (f"computed table ({_short_footing(c.footing)}, "
+                f"{c.configuration}; {COMPUTED_LABEL})")
+    c = computed_curves()[ion]
+    out = (f"Brown ITC Vol. C § 4.4.5 to s = {_FITTED_RANGE[ion]:g} Å⁻¹, "
+           f"computed tail beyond ({_short_footing(c.footing)}; "
+           f"{COMPUTED_LABEL})")
+    return out + (f"; row: {c.row}" if c.row else "")
+
 
 def approximation_name(ion: str, g: float | None) -> str:
-    """The name of the approximation :func:`magnetic_form_factor` will use.
+    """The name of the approximation :func:`magnetic_form_factor` will use,
+    and the footing of the row it uses (:func:`footing_name`).
 
     Resolved without evaluating anything, so a report can name it before a fit
-    runs and a caller can compare two species' treatment.  An ion whose rows
-    are Lisher & Forsyth's (Pr³⁺) says so, since their footing differs from
-    the rest of the table (module docstring, "Pr³⁺").
+    runs and a caller can compare two species' treatment.  Every result that
+    uses a row carries this name, so a computed row, a bare row that is not
+    the neutral ground state, and a row whose footing is not identified are
+    each said where the moment is reported (rietx #1691).
     """
     gg = resolve_g(ion, g)
     name = J0_ONLY if gg == 2.0 else f"{J0_J2}, g = {gg:g}"
-    return name + (" (Lisher & Forsyth 1971)" if ion in _J0_LISHER else "")
+    return f"{name}; {footing_name(ion)}"
 
 
 def resolve_g(ion: str, g: float | None) -> float:
@@ -948,11 +1051,13 @@ def magnetic_form_factor(ion: str, stol, g: float | None = None):
     **not** Q, and it is not Q/4π expressed in some other unit.
 
     At g = 2 the ⟨j₂⟩ coefficient is exactly zero and the term is not
-    evaluated at all, so a 3d ion's f is ⟨j₀⟩ bit-for-bit.
+    evaluated at all, so a 3d ion's f is ⟨j₀⟩ bit-for-bit.  An unknown ion and
+    an s past 6 Å⁻¹ are refused before anything is evaluated.
     """
+    _checked(ion, stol)
     gg = resolve_g(ion, g)
     c2_weight = 2.0 / gg - 1.0
-    f = j0(ion, stol)
+    f = _value(ion, 0, stol)
     if c2_weight == 0.0:
         return f
-    return f + c2_weight * j2(ion, stol)
+    return f + c2_weight * _value(ion, 2, stol)
