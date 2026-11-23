@@ -1,6 +1,6 @@
 # WP-2227 — The GUI shows how a refine ran: in one stage or in stages
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-22 — options drawn; the three questions (and a fourth) wait on Yue
+Milestone: gui-overhaul · Status: 🔄 2026-11-22 — built at `/next` (PR #1776); the maintainer's look at the three states waits
 Depends on: 2224 (the re-fit rule)
 Priority: P2 2026-11-19 — a ruling of Yue's waiting on the GUI; the rebuild's Plan tab (R4 of WP-2214) is where it lands
 
@@ -46,15 +46,46 @@ has no WP yet. Today's Plan panel is deleted at the swap, so the work belongs at
    the plan's rows with one Rwp spanning them.
 3. Whether a Refine that runs staged for a released parameter names that parameter on screen.
 
+## Rulings
+
+**Yue, 2026-11-22**, on the options in `2227-screenshots/` (the brief is the handover entry of
+the same date):
+
+1. **Where the feedback shows: (b) and (c).** Beside Rwp on the Pattern graph's title line
+   ("One stage: the model had converged", "In stages: …", "In stages: the one-stage re-fit
+   diverged"), and a Console comment after each fit carrying the plan line
+   `Refinement.summary()` prints.
+2. **The Plan tab after a one-stage re-fit: (a).** One stand-in row after the stages, drawn like
+   the closing stage. The stage rows keep their counts and leave Rwp blank.
+3. **A staged run for a released parameter: (a).** Name it in words where the feedback sits:
+   "In stages: Atom position shift was held".
+4. **The action bar keeps "Staged plan, 6 stages"** (consent line, no objection).
+5. **The status bar during a re-fit reads the title line's words**, not the internal stage name
+   `warm_refit (1/1)` (consent line, no objection).
+
+**Yue, 2026-11-22**, two later rulings:
+
+6. **The Refine choice "One cycle" is renamed "As ticked".** It runs
+   `p.run_stage(rx.Stage("cycle", turn_on=[]))`: every ticked parameter together, to
+   convergence. That is a standard refinement, and its behaviour stays. In the field a cycle is
+   one least-squares iteration, so only the words were wrong. Its tooltip reads "Refine every
+   ticked parameter together until it converges.", with the Python call on the second line.
+7. **The "As ticked" tooltip names no other program**, such as GSAS-II or TOPAS. This is a
+   wording note on that one tooltip. On 2026-11-22 the branch first widened it into a rule for
+   all GUI text, with a `gui/STYLE.md` line, a vitest and VESTA cut from the 3D viewer's
+   tooltip. Yue withdrew that the same day: "program names isn't really a rule, it just felt
+   weird there." The rule, the check and the VESTA cut are undone.
+
 ## Tasks
 
 - [x] Draw the options in the workshop and take them to Yue. Drawn 2026-11-22 over the real
       `/next` page rather than in the frozen workshop (`2227-screenshots/`); not decided.
-- [ ] Serve how the last run went on the run and result routes, from one authority.
-- [ ] Build the chosen view at `/next`, and drop `refit="stages"` from the run route.
-- [ ] A vitest per state (one stage, staged for a released parameter, fallback) and a browser
+- [x] Serve how the last run went on the run and result routes, from one authority.
+- [x] Build the chosen view at `/next`, and drop `refit="stages"` from the run route.
+- [x] A vitest per state (one stage, staged for a released parameter, fallback) and a browser
       screenshot of each, light and dark.
-- [ ] The GUI chapter names the view.
+- [x] The GUI chapter names the view: listed in WP-2214 § Tests and the manual, for the swap,
+      since the manual stays unchanged until then (Yue, 2026-11-22, on WP-2211).
 
 ## Acceptance
 
@@ -62,6 +93,98 @@ has no WP yet. Today's Plan panel is deleted at the swap, so the work belongs at
 at the three states.
 
 ## Handover log
+
+### 2026-11-22 (2nd session) — built at `/next` on the rulings (PR #1776)
+
+The rebuilt GUI at `/next` now says how each Refine ran, in words beside Rwp on the Pattern
+graph, in the status bar while it runs, in a Console comment and in the Plan tab. Refine there
+now takes the library's default, so a second Refine on a converged model runs one stage. On the
+`fap` example that one stage took 0.167-0.180 s where the staged re-fit took 0.424-0.426 s, and
+both landed at Rwp 9.2498 %. Today's page `/` still runs in stages until the swap. The Show
+choice moved from the title line into the legend, because on the title line it cut the new
+words at 1440 px.
+
+*Done.* All five rulings above, built (tasks 2-5).
+- Server (`gui/session.py`): the run frame and `GET /api/result` carry `how`
+  (`ran`, `reason`, `plan_line`, plus `released`/`families` or `diverged`), read once at the
+  fit's end off `Refinement._refit_how` by `_how_ran`. The plan line is
+  `Refinement._plan_line()`, factored out of `summary()` with its text unchanged.
+  `GET /api/plan/resolve` gains `one_stage` (the re-fit's node, aligned to `_collapse(plan)` by
+  `_aligned_rwp`). The run route takes an optional `refit` from the body and validates it
+  against `REFIT_MODES`. `strategy.refit.WARM_REFIT_STAGE` names the one stage for the stream.
+- `/next`: `next/howran.ts` turns `how` into words; `Pattern.svelte` shows them after GoF and
+  hides them over a preview; `Frame.svelte` puts them in the status bar and the plan line in the
+  Console; `Plan.svelte` draws the stand-in row. `/` sends `refit: "stages"`.
+- The Show choice is a vertical pair in the graph's left gutter, under the main pane's curve
+  labels, shown only while a preview is in hand (the maintainer's fallback, WP-2231 § Rulings 10).
+- Pictures: `2227-screenshots/` § As built, 19 PNGs (three states light and dark, the Plan row,
+  the Console, the status bar, both Show layouts at 1440 and 1000 px).
+- WP-2231 § Rulings 9 and 10 record its Questions 1 and 2 as answered.
+- WP-2214 § Tests and the manual gains a two-line note naming this view for the swap's manual
+  rewrite. WP-2214 is closed, and `closed_wp_writes.py` flags it. It stays there on purpose: the
+  brief asked for it in WP-2214 as WP-2211 did, and the swap's manual rewrite has no open WP.
+
+*Measured* (arm64 Mac, worktree `.venv` `[dev]` + playwright, node v24).
+- `fap` through the GUI route, server elapsed: first fit 0.626-0.631 s (staged); re-fit with
+  `refit: "stages"` 0.424-0.426 s, 6 stages; default re-fit 0.167-0.180 s, 1 stage; Rwp
+  9.2498 % for both re-fits. Freeing a held Biso: 7 stages, Rwp 9.2314 %. A forced rejection:
+  7 stages, 0.78-1.0 s.
+- Title line at 1440 × 900 with a preview up: the Show toggle on the line left 311 px for words
+  needing 437-497 px (cut); in the legend, 494 px (not cut). At 1000 × 640 the graph panel is
+  about 215 px and the line is cut in both layouts, as before this PR.
+- Fast selection (`-m "not slow"`, through the shift's serial gate): 15301 passed, 433
+  skipped, 32 xfailed. One test added: `test_a_refine_says_how_it_ran_on_the_run_and_result_routes`,
+  1.64 s in this run (local junit), not in the slow tail.
+- vitest: 941 passed in 54 files (7 added: 5 in `next/howran.test.ts`, one each in
+  `Plan.test.ts` and `Preview.test.ts`). svelte-check: 0 errors. Browser files (`tests/*_browser.py`): 178
+  passed. `tests.reader_output`: exit 0, unchanged. CI's vale steps: exit 0. ruff clean.
+- `/code-review high --fix` found 8 and fixed 4, all in `gui/session.py` (commit `10618d9f1`):
+  `diverged` now reads the last discarded stage node, as `WARM_REFIT_REJECTED` does; the closing
+  stage keeps the one-stage words in the status bar; a cancelled or failed fit carries no `how`;
+  the Plan row reuses `_stage_rwp`. Declined: Le Bail pass progress under the words (a wording
+  call for Yue), the kept last result (one superseded result), a possible overlap of the Show
+  pair with the difference label on a short window (not reproduced), and a committed corpus for
+  the two-member `how` vocabulary (gui/CLAUDE.md's corpus rule; arguable at two members).
+- Generality: no trigger. The branch leaves `_audit.py`, the rulebooks and the skill alone and
+  adds no fitting heuristic.
+
+*Gotchas.*
+- A test that fits twice and expects stages now passes `refit: "stages"`
+  (`test_running_the_same_plan_twice_shows_the_second_run`).
+- `rietx.refine` the module is shadowed by the function at `rietx.refine`; a test patching
+  `_rejected` imports it with `importlib.import_module("rietx.refine")`.
+
+*Settled by Claude* (for the PR's reviewer to reverse):
+1. `/` keeps Refine in stages until the swap (`refit: "stages"`). Grounds: the 2026-11-19
+   ruling that a user must see which way a run went, which `/` cannot show, and WP-2214's
+   "nothing on the default page changes until the swap". Alternative: both pages take the
+   default, as task 3 reads literally.
+2. The Show choice is a vertical pair under the curve labels, with "Show" above it. Grounds: the
+   gutter is 112 px and a side-by-side pair needs about 137 px. Alternative: a row in the plot's
+   top margin.
+3. "diverged" only when the one stage diverged, "was discarded" when an error-level code
+   rejected it. Grounds: `schemas.sequential._rejected` rejects on either.
+4. A first fit reads "In stages". Grounds: the 2026-11-19 ruling asks every run to say which.
+5. `_refit_how` stays private and the server reads it, as it reads `_head_id`. Alternative: a
+   public `Refinement.refit_how`, a top-level API decision.
+6. More than two released families read "A, B and N more were held", for room.
+
+Next: Yue looks at `2227-screenshots/` § As built, the acceptance's last item. If #1775
+(WP-2212's Console) merges first, the Console comment moves to its line kinds. When both are
+settled, close this WP.
+
+*Merged and renamed* (PR #1776, the steward's pass of 2026-11-22). The branch takes #1775's
+branch (WP-2212, with main's History tab), so it stays clean once #1775 lands. The Console
+comment already used #1775's `comment` line kind. Rulings 6 and 7 are built: "As ticked" on both
+action bars and in `/`'s command menu, the tooltip on both bars naming no other program, one
+`gui/STYLE.md` line for the label, and a vitest in `lib/style.test.ts` that fails on "One cycle"
+in any non-test source under `gui/src`, comments stripped. The as-built pictures here and in
+`2231-screenshots/` are retaken. The option pictures keep the old label, since they record
+what the rulings were made on.
+The same pass had widened ruling 7 into a rule that GUI text never names another program: a
+`gui/STYLE.md` line, a program-name half in that vitest, and VESTA cut from the 3D viewer's
+"view down" tooltip on `/`. Yue withdrew it the same day (ruling 7 above). The STYLE line and
+the vitest half are removed, and the VESTA wording is back as on `main`.
 
 - **2026-11-22** — Task 1 is drawn and nothing is decided. Each option for the three questions
   is drawn over the real rebuilt page on the `fap` example, light and dark, in
