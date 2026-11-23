@@ -240,6 +240,7 @@ A series is where one unread warning multiplies: in the in-situ run this diagnos
 | `SeriesEntry.warm_gof_over_seed` | the first warm attempt's GoF over the GoF of the pattern its warm start came from, a record and no trigger: a high value is a reason to rerun that pattern with `refit="stages"` ([Restart ladder](series-ladder.md#restart-ladder)); `None` without a warm start or when that attempt raised |
 | `SeriesEntry.seeded_from` | the index of the pattern whose fitted state seeded this pattern's warm rungs: the last one accepted before it in the walk, which skips a quarantined pattern; `None` where there was no warm start |
 | `SeriesEntry.floored` | the moment modulus paths that reached the kept attempt at their floor, because the pattern it warm-started from did not support them; empty when the kept attempt started cold |
+| `SeriesEntry.held_values` | each path the `constrain` hook held on this pattern, with its value, site coordinate DOFs left out; `None` where nothing was held |
 | `SeriesEntry.pattern_paths` | this pattern's own path, where it differs |
 | `SeriesEntry.node_id`, `SeriesEntry.tree_id` | where this pattern's history lives |
 

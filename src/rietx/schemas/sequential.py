@@ -254,6 +254,18 @@ class SeriesEntry(Base):
     #: written before the field.  ``SEQUENTIAL_MOMENT_HOLD`` reads it.  Written
     #: by ``SequentialRefinement._chain``.
     floored: list[str] = Field(default_factory=list)
+    #: Every path the caller held on this pattern's kept fit
+    #: (``Refinement.hold``, through ``constrain``), with the value it was
+    #: held at, keyed in the series numbering (WP-2081).  A held parameter
+    #: is in no :attr:`parameters` row, so this is where its value along the
+    #: series is read.  Every rung holds the last accepted pattern's value,
+    #: the cold one included (series rule 6), so a value that differs from
+    #: its neighbours' was set for this pattern by a hook, or held here and
+    #: free on the pattern before.  A site DOF is left out, being a step from
+    #: where the fit began.  ``None`` where nothing was held, and in a
+    #: document written before the field.  Written by
+    #: ``SequentialRefinement._chain`` through ``sequential._held_values``.
+    held_values: dict[str, float] | None = None
     #: This pattern's own dot-path for each path of the entry that the series
     #: numbering names differently, keyed by the series path (WP-1991).  Every
     #: path of the entry reads the series numbering

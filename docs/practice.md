@@ -183,6 +183,19 @@ Surveyed 2026-10-26 for WP-2052 (issue #1088); the GSAS-II lines re-read 2026-11
 | EasyDiffraction | none | H_G² floored at machine ε; a negative H_L passes | none |
 | BGMN | no Caglioti widths | fatal error | Profex writes B1 ≤ 0.01 and k2 ≤ 1e-4 into the files it creates |
 
+### A width an equation sets
+
+Read 2026-11-22 for WP-2153, TOPAS only. TOPAS 5's Technical Reference defines TCHZ's
+Gaussian width as G = (U tan²θ + V tanθ + W + Z/cos²θ)^0.5 (§ 6.2, p. 27; checked
+(manual)). It does not say what happens when the sum is negative. `force_positive_fwhm`
+is not in the v5 reference. So whether TOPAS clamps a negative Γ_G², takes its
+magnitude or stops is not checked. The ZrP₂O₇ input WP-2151 ran (Stinton & Evans 2007)
+stores a negative v and w for two of its three phases' TCHZ, and silicon's Γ_G² is
+negative at every reflection, so that input relies on whatever TOPAS does there.
+rietx's LM driver holds the total width, an equation's term included, inside the step
+wherever the term is exact at the stage's frozen angles (WP-2153). TRF and an inexact
+term are reported after the fit by `PEAK_WIDTH_NOT_POSITIVE`.
+
 ## Limits a control file declares
 
 Surveyed 2026-10-30 for PR #1199 (the `.pcr` reader's `Nre` limits), FullProf only, from its manual and runs.
@@ -982,7 +995,7 @@ first at ζ = 0 raised Rwp from 8.22 % to 10.81 % (his Table 2).
 
 | Program | Gaussian/Lorentzian split | σ²(M) < 0 |
 |---|---|---|
-| rietx | none: Λ is wholly Lorentzian (ζ = 1) | clamped to zero width; the default LM driver holds σ² ≥ 0, and `STEPHENS_STRAIN_NOT_POSITIVE` reports the clamped intensity share under TRF or a joint fit |
+| rietx | none: Λ is wholly Lorentzian (ζ = 1) | clamped to zero width; the default LM driver holds σ² ≥ 0, and `STEPHENS_STRAIN_NOT_POSITIVE` reports the clamped intensity share under TRF |
 | GSAS-II 5.8.4 | `Mustrain;mx`, Stephens' form: γ += Mγ·mx, σ² += (Mγ·(1−mx))² (`GSASIIstrMath.py:3330-3331`; checked (source)) | no clamp at the width: `np.sqrt(Sum)` (`GSASIIstrMath.py:3265`; checked (source)); what follows a negative sum was not traced |
 | TOPAS (shipped macros) | `eta`: `gauss_fwhm = 1.8/π·pp·(1−eta)·Tan(Th)`, `lor_fwhm = 1.8/π·pp·eta·Tan(Th)` | `Sqrt(Max(mhkl, 0))`, the same clamp, reported nowhere; `Stephens_tetragonal` takes `Abs()` first, folding a negative σ² back into a positive width (TOPAS wiki, read 2026-09-25 by the review) |
 
