@@ -72,6 +72,7 @@ from ..crystallography.magnetic.scattering import (
     MAGNETIC_SOURCE_KINDS,
     NON_MAGNETIC_SOURCE_KINDS,
     MagneticSites,
+    check_form_factor_range,
     compile_magnetic_sites,
     d_magnetic_f2_d_dofs,
     magnetic_f2,
@@ -4623,6 +4624,21 @@ def _omit_reflections(refl):
                    multiplicity=refl.multiplicity[keep], d=refl.d[keep])
 
 
+def _form_factor_range_fix(rec, *, lam: float, tt_max: float,
+                           hi_eff: float) -> str:
+    """The data-side remedy for a magnetic form factor refused past its fitted
+    range (``form_factor.past_range_action``): the 2θ at which this stage's
+    reflection list would stay inside ``rec.s_max``, at the shortest λ."""
+    margin = hi_eff - tt_max
+    tt_lim = 2.0 * math.degrees(math.asin(min(lam * rec.s_max, 1.0)))
+    return (f"At λ = {lam:g} Å the range ends at 2θ = {tt_lim:.2f}°, and this "
+            f"stage's reflection list runs to 2θ = {hi_eff:.2f}°: the data end "
+            f"at {tt_max:.2f}° and reflections are kept {margin:.2f}° beyond "
+            f"so their tails are modelled. End the fitted data at "
+            f"2θ ≤ {tt_lim - margin:.2f}° (fit(two_theta_limits=...) or an "
+            f"excluded region).")
+
+
 def compile_model(structure: Structure, instrument: Instrument, pattern: PatternData,
                   *, mode: Mode = "rietveld",
                   two_theta_limits: tuple[float, float] | None = None,
@@ -5082,6 +5098,12 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         if magnetic_mask is not None:
             cp.nuclear_mask = magnetic_mask
             cp.magnetic = compile_magnetic_sites(phase, sites.ops)
+            if cp.magnetic is not None and len(refl.index):
+                cp.magnetic.past_range = check_form_factor_range(
+                    cp.magnetic, phase,
+                    0.5 / float(np.min(d_spacings(refl.index, *cell))),
+                    functools.partial(_form_factor_range_fix, lam=lam_gen,
+                                      tt_max=tt_max, hi_eff=hi_eff))
             # the Laue orbit of every reflection, frozen here: |F_⊥|² varies
             # over it, so the magnetic intensity is the orbit *average*.  The
             # same layout the March-Dollase correction uses, built from the

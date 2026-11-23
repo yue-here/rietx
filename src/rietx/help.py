@@ -3490,6 +3490,19 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "not choose between them."
         ),
     ),
+    "MAGNETIC_FORM_FACTOR_EXTRAPOLATED": HelpEntry(
+        title="Magnetic form factor used past its fitted range",
+        description=(
+            "Each magnetic form-factor row is a fit over a stated range of "
+            "s = sinθ/λ: 0–1.5 Å⁻¹ for Brown's 3d, 4d and actinide rows, 0–1.2 Å⁻¹ "
+            "for his rare-earth rows, 0–1.3 Å⁻¹ for Lisher & Forsyth's Pr³⁺. The "
+            "fit's reflection list reaches past that range for the rows named, so "
+            "their values there are an extrapolation of the fitted form, not a form "
+            "factor. A row whose fitted form grows past its range is refused "
+            "instead. Restrict the data to d ≥ 1/(2·s_max) to keep every "
+            "reflection inside."
+        ),
+    ),
     "MAGNETIC_ION_ASSUMED": HelpEntry(
         title="Magnetic ion chosen by the package",
         description=(

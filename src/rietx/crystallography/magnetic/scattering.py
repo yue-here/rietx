@@ -65,7 +65,13 @@ import numpy as np
 
 from ..adp import cartesian_basis
 from ..symmetry import SITE_TOL, ReflectionSet, as_group, generate_reflections
-from .form_factor import approximation_name, j0, j2, resolve_g
+from .form_factor import (
+    _j0_value,
+    _j2_value,
+    approximation_name,
+    past_fitted_range,
+    resolve_g,
+)
 from .moments import moment_frame, moment_from_dofs
 
 #: p = γ·r₀/2, the magnetic scattering length of one Bohr magneton, in **fm**
@@ -115,6 +121,11 @@ class MagneticSites:
     approximations: list[str | None]
     #: (n_asym,) bool, ``carries[j] == (mom_mat[j] is not None)``
     carries: list[bool] = field(default_factory=list)
+    #: the rows this stage's reflection list evaluates past their fitted
+    #: range and that :func:`~.form_factor.past_range_action` serves with a
+    #: warning, one per (ion, order); written at stage compile by
+    #: :func:`check_form_factor_range`, empty when every reflection is inside
+    past_range: tuple = ()
 
     def __post_init__(self) -> None:
         if not self.carries:
@@ -133,6 +144,33 @@ class MagneticSites:
         return {ion: name for ion, name in zip(self.ions, self.approximations,
                                                strict=True)
                 if ion is not None and name is not None}
+
+
+def check_form_factor_range(msites: MagneticSites, phase, stol_max: float,
+                            fix) -> tuple:
+    """Ask the fitted-range check once for every moment-bearing atom of a phase
+    whose frozen reflection list reaches s = ``stol_max`` (Å⁻¹).
+
+    The decision is the table's (:func:`~.form_factor.past_fitted_range`,
+    :func:`~.form_factor.past_range_action`), made here at stage compile so it
+    is frozen with the reflection list and never re-asked mid-solve.  A
+    refused row raises before any work, naming the phase, the atom, the ion,
+    the ⟨jₙ⟩, the s, the fitted range and ``fix(record)``, the caller's own
+    way to bring the data inside it.  Returns ``((j, record), ...)`` for every
+    warned row, which the caller stores on ``MagneticSites.past_range`` for
+    the fit's once-per-fit diagnostic.
+    """
+    warned = []
+    for j, ion in enumerate(msites.ions):
+        if ion is None or not msites.carries[j]:
+            continue
+        for rec in past_fitted_range(ion, stol_max, msites.g_factors[j]):
+            if rec.action == "refuse":
+                raise ValueError(
+                    f"phase {phase.name!r}, atom {phase.atoms[j].label!r}: "
+                    f"{rec.message()} {fix(rec)}")
+            warned.append((j, rec))
+    return tuple(warned)
 
 
 def compile_magnetic_sites(phase, ops) -> MagneticSites | None:
@@ -833,18 +871,21 @@ def magnetic_f2_angle_block(members, seg, counts, stol, msites: MagneticSites,
 def _form_factor(msites: MagneticSites, j: int, stol):
     """f_j(s) for the atom's ion and g, evaluated on the member-shaped ``stol``.
 
-    Through :func:`~.form_factor.j0`/:func:`~.form_factor.j2`, the one
-    evaluator of the table: they dispatch an ion to whichever stored form
+    Through the one evaluator of the table, :func:`~.form_factor.j0`/
+    :func:`~.form_factor.j2`, which dispatch an ion to whichever stored form
     carries it (Brown's or Lisher & Forsyth's), which a local evaluation of
-    :func:`~.form_factor.coefficients` could not.
+    :func:`~.form_factor.coefficients` could not.  Their unchecked spelling:
+    the fitted-range check ran once on the frozen reflection list at stage
+    compile (``MagneticSites.past_range``), and a per-evaluation check in the
+    residual would re-ask it every iteration.
     """
     ion = msites.ions[j]
     g = msites.g_factors[j]
-    f = np.asarray(j0(ion, stol), dtype=np.float64)
+    f = np.asarray(_j0_value(ion, stol), dtype=np.float64)
     weight = 2.0 / g - 1.0
     if weight == 0.0:
         return f
-    return f + weight * np.asarray(j2(ion, stol), dtype=np.float64)
+    return f + weight * np.asarray(_j2_value(ion, stol), dtype=np.float64)
 
 
 def _crystalaxis_to_cartesian(cell) -> np.ndarray:

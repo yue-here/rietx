@@ -10133,6 +10133,9 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # WP-2060: a modulus the data do not support, the FitReport's verdict on
     # the result, where its esd would otherwise read as an interval
     diagnostics = diagnostics + moment_unsupported_diagnostics(params)
+    # a form-factor row evaluated past its fitted range, read off the
+    # model's own compile-time check, once per result
+    diagnostics = diagnostics + _form_factor_range_diagnostics(model)
 
     # Specimen absorption: report what was applied and, crucially, the Biso
     # bias it removed — for a capillary Rwp is provably unchanged by it, so
@@ -10669,6 +10672,50 @@ def _symmetry_silence_diagnostics(structure: Structure,
             sites=([(a.species, a.x.value, a.y.value, a.z.value, a.occ.value)
                     for a in phase.atoms] if structural else None)))
     return out
+
+
+def _form_factor_range_diagnostics(model: CompiledModel) -> list[Diagnostic]:
+    """``MAGNETIC_FORM_FACTOR_EXTRAPOLATED``: the magnetic form-factor rows this
+    model's reflection list evaluates past the range their source fitted them
+    over, once per result.
+
+    Read off ``MagneticSites.past_range``, which the stage compile wrote from
+    the table's one range check (``form_factor.past_fitted_range``), so this is
+    a projection of that decision and never a second comparison.  Only the
+    rows ``form_factor.past_range_action`` serves with a warning reach here: a
+    refused row raised at compile, before any work.  ``where`` is the moment
+    parameters of every atom carrying such a row, ``value`` the largest s.
+    """
+    rows: dict[tuple[str, int], object] = {}
+    where: list[str] = []
+    for ip, cp in enumerate(model.phases):
+        msites = getattr(cp, "magnetic", None)
+        if msites is None or not msites.past_range:
+            continue
+        for j, rec in msites.past_range:
+            key = (rec.ion, rec.order)
+            if key not in rows or rec.stol > rows[key].stol:
+                rows[key] = rec
+            for k in range(msites.n_dofs(j)):
+                path = f"phases.{ip}.atoms.{j}.moment.dof{k}"
+                if path not in where:
+                    where.append(path)
+    if not rows:
+        return []
+    recs = sorted(rows.values(), key=lambda r: (r.ion, r.order))
+    named = "; ".join(
+        f"{r.ion} ⟨j{r.order}⟩ to s = {r.stol:.3g} Å⁻¹ (fitted to {r.s_max:g}, "
+        f"{r.source})" for r in recs)
+    d_min = max(r.d_min for r in recs)
+    return [Diagnostic(
+        level="warning", code="MAGNETIC_FORM_FACTOR_EXTRAPOLATED",
+        where=where, value=max(r.stol for r in recs),
+        message=(f"the magnetic form factor is extrapolated past the range "
+                 f"its source fitted it over at the highest angles: {named}."),
+        suggestion=(f"Read the moments as resting partly on extrapolated "
+                    f"values; to keep every reflection inside the fitted "
+                    f"ranges, end the data at d ≥ {d_min:.3g} Å "
+                    f"(fit(two_theta_limits=...) or an excluded region)."))]
 
 
 def _dispersion_diagnostics(structure: Structure,

@@ -261,11 +261,12 @@ def _printed_form(c, s, *, s2_factor: bool):
 def test_the_evaluator_and_the_forward_model_agree_with_the_printed_form_on_every_row():
     """``j0``/``j2`` are the one evaluator since #626, and the forward model's ``scattering._form_factor`` goes
     through them. Pin both, for every row of both stores, against the analytic form evaluated here; at g = 0.8 the
-    ⟨j₂⟩ term carries weight 1.5, so a ⟨j₂⟩ dispatched to the wrong store, or dropped, fails."""
+    ⟨j₂⟩ term carries weight 1.5, so a ⟨j₂⟩ dispatched to the wrong store, or dropped, fails. Each row on its own
+    fitted range, where the checked evaluator neither raises nor warns."""
     from types import SimpleNamespace
 
-    s = np.linspace(0.0, 1.5, 10)
     for ion in ff.magnetic_ions():
+        s = np.linspace(0.0, ff.fitted_range(ion), 10)
         f0 = _printed_form(_ALL_J0[ion], s, s2_factor=False)
         f2 = _printed_form(_ALL_J2[ion], s, s2_factor=True)
         np.testing.assert_allclose(np.asarray(ff.j0(ion, s)), f0, rtol=0, atol=1e-14)

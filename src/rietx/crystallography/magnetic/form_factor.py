@@ -108,6 +108,23 @@ refined with a Dirac-Fock row by a few per cent at high angle.
 :func:`approximation_name` names Lisher & Forsyth wherever their fit is in
 force.
 
+Fitted ranges
+-------------
+**Every row is a least-squares fit over a stated range of s, and past that
+range it is not a form factor.**  Brown fitted the 3d and 4d rows over
+s = 0-1.5 Å⁻¹, the rare-earth rows over 0-1.2 Å⁻¹ and the actinide rows out
+to 1.5 Å⁻¹ (ITC Vol. C § 4.4.5, p. 461); Lisher & Forsyth's tabulated range
+for their fits ends at s = 1.3 Å⁻¹ (1971, p. 548).  :func:`fitted_range`
+returns each row's upper end, and :func:`past_fitted_range` is the one place
+that compares an s with it; :func:`j0`, :func:`j2`,
+:func:`magnetic_form_factor` and the forward model's stage compile all ask it,
+so no value past a row's range is returned silently.  What happens there is
+:func:`past_range_action`'s, a policy of one line: a row whose fitted form
+carries a *growing* exponential (an exponent below zero: Cr²⁺, Mn²⁺ and Mn³⁺
+⟨j₀⟩) rises without bound past its range, Mn²⁺ ⟨j₀⟩ reaching 1.01 at
+s = 3 Å⁻¹, and is refused there; every other row decays toward its constant
+term and is served with a warning.
+
 Two stored forms
 ----------------
 Brown's coefficients (:data:`_J0`, :data:`_J2`) are the **7-parameter** form
@@ -149,6 +166,9 @@ References
 from __future__ import annotations
 
 import re
+import warnings
+from dataclasses import dataclass
+from typing import Literal
 
 import numpy as np
 
@@ -647,6 +667,173 @@ def lisher_coefficients(ion: str) -> tuple[LisherCoefficients, LisherCoefficient
     return _J0_LISHER[ion], _J2_LISHER[ion]
 
 
+#: Upper end, s = sinθ/λ in Å⁻¹, of the range each source fitted its rows
+#: over.  Brown, ITC Vol. C § 4.4.5 (2004), p. 461: the 3d and 4d rows are fits
+#: to Clementi & Roetti's form factors "in the range (sin θ)/λ = 0 to
+#: 1.5 Å⁻¹"; the rare-earth rows to Freeman & Desclaux's values over 0-0.5 and
+#: 0.5-1.2 Å⁻¹; for the actinides "the calculations extend to 1.5 Å⁻¹".
+#: Lisher & Forsyth (1971), p. 548: their tabulated range ends at
+#: sin θ/λ = 1.3 Å⁻¹.
+S_MAX_BROWN_3D_4D = 1.5
+S_MAX_BROWN_RARE_EARTH = 1.2
+S_MAX_BROWN_ACTINIDE = 1.5
+S_MAX_LISHER = 1.3
+
+#: Element symbols of Brown's rare-earth tables (4.4.5.3/.7) and actinide
+#: tables (4.4.5.4/.8), so a row's range is read off its element without
+#: importing gemmi.
+_RARE_EARTHS = frozenset({"Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb",
+                          "Dy", "Ho", "Er", "Tm", "Yb", "Lu"})
+_ACTINIDES = frozenset({"Th", "Pa", "U", "Np", "Pu", "Am", "Cm"})
+
+
+def _range_of(ion: str) -> tuple[float, str]:
+    """``(s_max, source)`` for a row the table carries."""
+    if ion in _J0_LISHER:
+        return S_MAX_LISHER, "Lisher & Forsyth (1971), p. 548"
+    sym, _ = _element(ion)
+    brown = "Brown, ITC Vol. C § 4.4.5 (2004), p. 461"
+    if sym in _RARE_EARTHS:
+        return S_MAX_BROWN_RARE_EARTH, brown
+    if sym in _ACTINIDES:
+        return S_MAX_BROWN_ACTINIDE, brown
+    return S_MAX_BROWN_3D_4D, brown
+
+
+#: ``{ion: (s_max, source)}`` for every row of both stores: each shipped row
+#: carries the fitted range of the source it came from.
+_FITTED_RANGE: dict[str, tuple[float, str]] = {
+    ion: _range_of(ion) for ion in sorted(set(_J0) | set(_J0_LISHER))}
+
+
+def fitted_range(ion: str) -> float:
+    """The upper end, s = sinθ/λ in Å⁻¹, of the range ``ion``'s rows were
+    fitted over (module docstring, "Fitted ranges").  Both orders of one ion
+    share it: each source fitted ⟨j₀⟩ and ⟨j₂⟩ over the same range."""
+    if ion not in _FITTED_RANGE:
+        raise _no_row_error(ion)
+    return _FITTED_RANGE[ion][0]
+
+
+def _exponents(ion: str, order: int) -> tuple[float, ...]:
+    if ion in _J0_LISHER:
+        c = (_J0_LISHER if order == 0 else _J2_LISHER)[ion]
+        return (c[1], c[3])
+    c = (_J0 if order == 0 else _J2)[ion]
+    return (c[1], c[3], c[5])
+
+
+#: ``(ion, order)`` of every row whose fitted form carries a growing
+#: exponential: an exponent below zero makes a term e^(+|c|·s²), which outruns
+#: every other term past the fitted range.  Derived from the coefficients, so a
+#: corrected row moves in or out of it by itself.  On this table: Cr²⁺, Mn²⁺
+#: and Mn³⁺ ⟨j₀⟩.
+GROWS_PAST_RANGE: frozenset[tuple[str, int]] = frozenset(
+    (ion, order) for ion in _FITTED_RANGE for order in (0, 2)
+    if (order == 0 or has_j2(ion)) and min(_exponents(ion, order)) < 0.0)
+
+
+PastRangeAction = Literal["refuse", "warn"]
+
+
+def past_range_action(ion: str, order: int) -> PastRangeAction:
+    """What an evaluation of ``ion``'s ⟨j_order⟩ past its fitted range gets.
+
+    **Interim policy, and the one place it is written.**  A row that grows past
+    its range (:data:`GROWS_PAST_RANGE`) is refused: no value it returns there
+    resembles a form factor.  Every other row decays toward its constant term,
+    an extrapolation rather than a fit, and is served with a warning.  A
+    different ruling is a change to this line.  Computed tails (the form
+    factor evaluated from the radial wavefunction past the fitted range, when
+    the package carries them) retire the refusal: past the range the value
+    would then come from the wavefunction rather than from the fit.
+    """
+    return "refuse" if (ion, order) in GROWS_PAST_RANGE else "warn"
+
+
+@dataclass(frozen=True)
+class PastFittedRange:
+    """One row asked for past the range its source fitted it over.
+
+    ``stol`` is the largest s = sinθ/λ requested, ``value`` the fitted form's
+    value there, ``value_at_s_max`` its value at the range's end, and
+    ``action`` what :func:`past_range_action` decided.
+    """
+
+    ion: str
+    order: int
+    s_max: float
+    stol: float
+    value: float
+    value_at_s_max: float
+    action: PastRangeAction
+    source: str
+
+    @property
+    def d_min(self) -> float:
+        """The smallest d spacing, Å, inside the fitted range: 1/(2·s_max)."""
+        return 1.0 / (2.0 * self.s_max)
+
+    def message(self) -> str:
+        """The fact, without a fix: the caller's context knows the fix."""
+        jn = f"⟨j{self.order}⟩"
+        head = (f"the {self.ion} {jn} magnetic form factor is evaluated at "
+                f"s = sinθ/λ = {self.stol:.3g} Å⁻¹ "
+                f"(d = {1.0 / (2.0 * self.stol):.3g} Å), past the "
+                f"0–{self.s_max:g} Å⁻¹ range its source fitted it over "
+                f"({self.source}).")
+        if self.action == "refuse":
+            c = min(_exponents(self.ion, self.order))
+            return (f"{head} Its fitted form carries a growing exponential "
+                    f"(an exponent of {c:g} Å²), so past that range it rises "
+                    f"without bound where a form factor falls toward zero: "
+                    f"{self.value_at_s_max:.3g} at s = {self.s_max:g} Å⁻¹, "
+                    f"{self.value:.3g} at s = {self.stol:.3g} Å⁻¹. No value it "
+                    f"returns there is a form factor.")
+        return (f"{head} Past that range the fitted form is an extrapolation, "
+                f"not a fit ({self.value:.3g} at s = {self.stol:.3g} Å⁻¹, "
+                f"{self.value_at_s_max:.3g} at the range's end).")
+
+
+def past_fitted_range(ion: str, stol, g: float | None = None,
+                      *, orders: tuple[int, ...] | None = None,
+                      ) -> tuple[PastFittedRange, ...]:
+    """Every row ``ion`` uses that ``stol`` (a scalar or an array, Å⁻¹) reaches
+    past its fitted range, with :func:`past_range_action`'s decision on each.
+
+    The one comparison of an s with a row's range.  ``orders`` defaults to the
+    rows :func:`magnetic_form_factor` evaluates at this ``g``: ⟨j₀⟩ always,
+    ⟨j₂⟩ when g ≠ 2.  Empty when every s is inside the range.  Raises nothing
+    itself: the caller decides how to refuse, since only it can name the fix.
+    """
+    s_max, source = (_FITTED_RANGE[ion] if ion in _FITTED_RANGE
+                     else (fitted_range(ion), ""))
+    s_hi = float(np.max(np.asarray(stol, dtype=np.float64)))
+    if not s_hi > s_max:
+        return ()
+    if orders is None:
+        orders = (0,) if resolve_g(ion, g) == 2.0 else (0, 2)
+    out = []
+    for order in orders:
+        ev = _j0_value if order == 0 else _j2_value
+        out.append(PastFittedRange(
+            ion=ion, order=order, s_max=s_max, stol=s_hi,
+            value=float(ev(ion, s_hi)), value_at_s_max=float(ev(ion, s_max)),
+            action=past_range_action(ion, order), source=source))
+    return tuple(out)
+
+
+def _checked(ion: str, order: int, stol) -> None:
+    """The bare evaluators' reading of :func:`past_fitted_range`: a refused
+    row raises, a warned one warns."""
+    for rec in past_fitted_range(ion, stol, orders=(order,)):
+        if rec.action == "refuse":
+            raise ValueError(
+                f"{rec.message()} Evaluate it only at s ≤ {rec.s_max:g} Å⁻¹ "
+                f"(d ≥ {rec.d_min:.3g} Å).")
+        warnings.warn(rec.message(), RuntimeWarning, stacklevel=3)
+
+
 def _jn(coef: Coefficients, stol2, *, stol2_factor: bool):
     xp = get_backend()
     a0, a1, b0, b1, c0, c1, d = coef
@@ -669,7 +856,17 @@ def j0(ion: str, stol):
 
     Evaluates whichever stored form carries the ion (module docstring, "Two
     stored forms"); this and :func:`j2` are the one evaluator of the table.
+    Past the row's fitted range it raises or warns, as
+    :func:`past_range_action` decides (module docstring, "Fitted ranges").
     """
+    if ion in _FITTED_RANGE:
+        _checked(ion, 0, stol)
+    return _j0_value(ion, stol)
+
+
+def _j0_value(ion: str, stol):
+    """:func:`j0` without the range check: the forward model's hot path, whose
+    reflections were checked once at stage compile."""
     stol = get_backend().asarray(stol, dtype=np.float64)
     if ion in _J0:
         return _jn(_J0[ion], stol * stol, stol2_factor=False)
@@ -679,7 +876,17 @@ def j0(ion: str, stol):
 
 
 def j2(ion: str, stol):
-    """⟨j₂⟩(s), **including its s² factor**, so ⟨j₂⟩(0) = 0 exactly."""
+    """⟨j₂⟩(s), **including its s² factor**, so ⟨j₂⟩(0) = 0 exactly.
+
+    Range-checked as :func:`j0` is.
+    """
+    if has_j2(ion):
+        _checked(ion, 2, stol)
+    return _j2_value(ion, stol)
+
+
+def _j2_value(ion: str, stol):
+    """:func:`j2` without the range check (see :func:`_j0_value`)."""
     stol = get_backend().asarray(stol, dtype=np.float64)
     if ion in _J2:
         return _jn(_J2[ion], stol * stol, stol2_factor=True)

@@ -112,6 +112,7 @@ from .refine import (
     _far_from_data_diagnostics,
     _fixed_literal_diagnostics,
     _flat_moment_scan,
+    _form_factor_range_diagnostics,
     _frozen_compile_diagnostics,
     _guard_diagnostics,
     _harmonic_diagnostics,
@@ -255,6 +256,9 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
                       "neutron histogram resolves species through another table"),
     "_harmonic_diagnostics": (
         (HISTOGRAM,), "a λ/n line is declared on one histogram's source"),
+    "_form_factor_range_diagnostics": (
+        (HISTOGRAM,), "the s a magnetic form factor is evaluated at is one "
+                      "histogram's reflection list, set by its λ and range"),
     "_wavelength_calibration_diagnostics": (
         (HISTOGRAM,), "each histogram declares and may free its own λ"),
     # -- per histogram: the pattern's instrument and specimen mount ----------
@@ -2702,6 +2706,7 @@ class MultiHistogramRefinement:
             diags.extend(_dispersion_diagnostics(struct, instrument))
             diags.extend(_resonant_absorber_diagnostics(struct, instrument))
             diags.extend(_species_fallback_diagnostics(struct, instrument))
+            diags.extend(_form_factor_range_diagnostics(model))
             diags.extend(_harmonic_diagnostics(
                 model, values, set(table.free_paths), esd_h))
             diags.extend(_roughness_regime_diagnostics(model, values))
