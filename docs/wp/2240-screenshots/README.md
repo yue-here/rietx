@@ -5,6 +5,7 @@ the rebuilt page at `/next` and the workshop prototype at the same step and the 
 1440 × 900 at one device pixel per CSS pixel, light and dark.
 
 - `gui-1-pick-*.png` beside `prototype-1-pick-*.png`: the Pick step after Pick peaks.
+  `gui-1-pick-full-*.png` shows the same step at the pattern's full range.
 - `gui-2-fit-*.png` beside `prototype-2-fit-*.png`: the Fit step with its third group
   chosen, the Peaks graph showing the windows from that group on. The GUI shows All groups.
   The prototype shows To look at.
@@ -21,6 +22,11 @@ The GUI ran the `fap` example project (the GSAS-II fluorapatite tutorial pattern
 2026-11-23 on macOS (arm64) with the chromium that `tests/test_watch_browser.py` finds,
 against the dist this branch commits, with `RIETX_STATE_DIR` pointed at a temporary
 directory. The script is `p3_shots.py` in the runner's scratch directory.
+
+Every `gui-*` picture with the Pattern graph in it shows 20-40° 2θ, zoomed by a real drag
+(Yue's request at the R6 look, 2026-11-23). The prototype pictures keep their full range.
+The `gui-*` pictures were retaken on 2026-11-23 after the R6 look's rulings, by `r6l_probe.py`
+in the runner's scratch directory.
 
 The pictures are a review aid, not a pixel test. The two searches ran separately and under a
 two-minute limit, so their candidate lists differ. Compare the layout, the words and the

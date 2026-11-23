@@ -1,6 +1,6 @@
 # WP-2240 — the peaks-and-indexing workflow at `/next`: pick peaks, fit peaks, index, judge
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-23 — tasks 1-9 built; the last PR (#1792) waits on the maintainer's look at the screenshots
+Milestone: gui-overhaul · Status: 🔄 2026-11-23 — tasks 1-9 built and the R6 look's rulings applied; #1792 waits on the maintainer's second look
 Depends on: 2218 (hand fitting and the other graphs)
 Priority: P2 2026-11-22 — a feature the open milestone was opened for: R6, the rebuild's next piece
 
@@ -133,10 +133,40 @@ package. `src/rietx/_audit.py` is untouched.
 
 ## Rulings
 
-- **The dotted mark for a chosen line left out of indexing is drawn in `--plot-peak`**, the
-  peak layer's own colour, not `--accent`, which is the calculated curve's colour and hid the
-  mark on it. Settled by Claude under `gui/CLAUDE.md`'s one-colour-per-layer, state-by-shape
-  rule (WP-1210); Yue delegated 2026-11-23; alternative `--fg`.
+- **Reversed by Yue at the R6 look, 2026-11-23: the dotted `--plot-peak` mark.** Claude had
+  settled the mark for a chosen line left out of indexing as a dotted line in `--plot-peak`,
+  under `gui/CLAUDE.md`'s one-colour-per-layer rule (WP-1210). Yue reversed it in ruling 1
+  below. Plot colours and mark styles in a GUI step are now a trigger: they go to Yue drawn.
+- **Yue's ruling 1, 2026-11-23 (the R6 look): the peak fit takes the fit line's token.** "I
+  don't like the blue-on-blue line with markers, or the dotted line. I think we should use the
+  same token as the regular fit line. Since this is indexing there's no risk of confusion."
+  Built: the picked lines' fitted curve on the Pattern graph and each window's fit in the
+  Peaks graph are drawn in `--plot-calc`, solid, at the calculated curve's width. The groups'
+  own residual takes the difference curve's ink. The mark for a chosen line left out of
+  indexing is a thin solid line in `--plot-calc`. The lens marks stay blue, as `gui/STYLE.md`
+  § Plots and the prototype have them (Yue 2026-11-09). The look entry's questions 1 and 2
+  (§ Handover log, fourth session) ask about both.
+- **Yue's ruling 2, 2026-11-23: the green candidate lines.** "The green index markers feel off
+  somehow but I can't articulate it." Not chosen: four ways to draw a chosen cell's lines are
+  drawn for Yue (the look entry's question 3). Nothing is built for it.
+- **Yue's ruling 3, 2026-11-23: a relation is a column on the row's own line.** "I like the
+  'same cell as #1' notification but I don't like that it's underneath the cell — looks messy.
+  Can we introduce a same-line equivalence column of some kind which indicates the
+  relationship? I'd like it compact, same-line and clear." Built: a column after # holds
+  `≡ #1` (the same cell under another lattice label), `2× #1` (a supercell with twice the
+  volume) or `⊇ #1` (indexes every line #1 does). Its tooltip gives the sentence, since
+  `/next` has no help popover yet.
+- **Yue's ruling 4, 2026-11-23: the cell in six columns.** "Cell results should be in 6
+  columns (a, b, c, angles)." Built: a, b, c at four places and α, β, γ at two, each column
+  aligned on the decimal point. A value the crystal system sets is muted, and a fixed angle is
+  written whole (`90`, `120`) in the column's alignment. The table is now wider than the Index
+  step at 1440 × 900 and scrolls in its own box; the look entry's question 5 asks how to fit it.
+- **Yue's ruling 5, 2026-11-23: Pawley is the structure-free default.** "The default
+  structure-free fit should be Pawley." Built for the workflow: Adopt in Judge reads "Adopt as
+  a Pawley start", and Apply sets the project's mode to `pawley`
+  (`POST /api/index/adopt` takes `mode`). The candidate check, a Pawley fit since WP-2011,
+  is now named for the mode it ran ("Pawley check"). The structure-free defaults outside the
+  workflow are listed in the look entry's question 4 and left as they are.
 
 ## Non-goals
 
@@ -187,6 +217,95 @@ The piece closes when every task is ticked and the maintainer has looked at its 
 the prototype's (WP-2214 § How the maintainer reviews).
 
 ## Handover log
+
+- **2026-11-23 (fourth session)** — Yue's R6 look rulings, on the same PR, #1792. Yue looked at
+  the screenshots and ruled five things (§ Rulings, 1 to 5). The peak fit is now drawn like the
+  calculated curve, orange and solid, on the Pattern graph and in each Peaks window. A chosen
+  line left out of indexing is marked by a thin solid line, not a dotted one. The candidate
+  table shows the cell as six columns, a, b, c, α, β, γ, and a related row says so in a compact
+  column on its own line (`≡ #1`) instead of a line under the cell. Adopt in Judge now lands a
+  Pawley start. The green candidate lines are unchanged: Yue asked for alternatives, which are
+  drawn below. The WP stays 🔄 for Yue's look at them.
+
+  *Done.* The branch took `main` first (WP-2242's `{#key opens}` around the workflow's panes;
+  the Frame now also forgets the chosen cell's lines and the Fit step's windows on an open).
+  Ruling 1: `next/pattern.ts` draws the groups' fit in `--plot-calc`, solid, at the calculated
+  curve's width, and their residual in `--plot-diff`; `next/PeakFits.svelte` draws each
+  window's fit in `--plot-calc`; `gui/STYLE.md` § Plots and interaction rule 5 say so. Rulings 3
+  and 4: `cellColumns` and a `Relation` (mark and sentence) in `lib/peaks.ts`, and the table in
+  `next/Candidates.svelte`. Ruling 5: `POST /api/index/adopt` takes `mode` (`lebail`, the
+  default, or `pawley`; anything else is refused), `/next` sends `pawley`, and the button reads
+  "Adopt as a Pawley start". The candidate check has been a Pawley fit since WP-2011
+  (`indexing.workflow.VALIDATION_MODE`), so Judge's heading now names the mode the check ran
+  ("Pawley check") and More settings says "Check the best cells by a Pawley fit". Every
+  screenshot in `docs/wp/2240-screenshots/` that shows the Pattern graph is retaken zoomed to
+  20-40° 2θ (Yue's addition), with a full-range Pick picture beside it.
+
+  *Checked by real clicks* (fap example, 1440 × 900, light and dark, `r6l_probe.py` in the runner's scratch). The
+  candidate table's header reads #, a blank relation column, a, b, c, α, β, γ, Lattice, V, M₂₀,
+  Unindexed, Absent, Rwp, Grade. Row 1 reads 9.3744 9.3744 6.8875 90 90 120 trigonal P, with
+  the tied b and the three set angles muted. Nine rows carry a relation (`≡` four times, `2×`
+  twice, `3×` three times), each with its sentence in the tooltip. Every row is 28 px, one
+  line. Judge's button reads "Adopt as a Pawley start". Apply moved the project's mode from
+  `rietveld` to `pawley`, and a fit then ran in 0.7 s and returned a `pawley` result. Every
+  zoom read 19.9-39.8° off the status bar after the drag. No page errors.
+
+  *Measured.* The same Pawley start fitted through the API converged in 6 stages at Rwp
+  8.10 %. The six-column table is 868 px wide against the Index step's 760 px at 1440 × 900,
+  so it now scrolls in its own box (question 5). Gates, on an arm64 Mac in the worktree venv:
+  the fast suite 15362 passed, 438 skipped, 32 xfailed; vitest 62 files, 999 passed;
+  svelte-check 0 errors over 491 files; the browser files this touches (layout, console,
+  switch) 55 passed; CI's lint steps all exit 0 (Vale 0 errors, 281 warnings).
+
+  *Settled by Claude.* Each is small and visible in the screenshots.
+  - The lens marks stay blue. Yue's words name the line ("the same token as the regular fit
+    line"), `gui/STYLE.md` § Plots rules the marks blue (Yue 2026-11-09), and the prototype
+    draws an orange fit under blue lenses. Question 1 shows the other reading.
+  - The groups' own residual, drawn before a fit, takes `--plot-diff`, the regular residual's
+    token, as its fit now takes the regular fit's. Alternative: keep `--plot-peakfit` there.
+  - The relation marks: `≡ #1` for the same cell under another lattice label, `2× #1` for a
+    supercell with twice the volume, `⊇ #1` for a cell indexing every line #1 does. The
+    column sits after #, so a row reads "2 ≡ #1". The sentence is the mark's tooltip
+    (`title=`). `gui/CLAUDE.md` keeps `title=` off authored prose and sends it to `<Help>`, but
+    `/next` mounts no help popover, so a `<Help>` term there opens nothing (found below).
+  - A value the crystal system sets is muted. A set angle is written whole (`90`, `120`) and
+    keeps the column's decimal alignment by empty room, so a copied row reads `90`. A tied
+    length keeps its four places. Angles take two places, which saves a column's width.
+    Alternative: `= a` in the tied column.
+  - The adopt route keeps `lebail` as its default, so today's Peaks tab is unchanged.
+
+  *For Yue to look at.* The look page is `~/.cache/ghostshift/rietx/gui-r6/look-index/index.html`,
+  every picture zoomed to 20-40° 2θ first.
+  1. The lens marks' colour. Built: blue lenses over the orange fit. Drawn beside it: orange
+     lenses too, a reading of ruling 1 that covers the marks.
+  2. The mark for a chosen line left out of indexing (ruling 1 drops the dotted line). Built:
+     a thin solid orange line through the pattern. Drawn beside it: a hollow orange lens at the
+     line's crest with the chosen ring, and a hollow blue lens, which is how the Peaks windows
+     already draw an unused line (round 11 call 34).
+  3. A chosen cell's lines (ruling 2, not chosen). Four are drawn: (a) today's green
+     full-height lines; (b) a row of tick lenses under the pattern in the observed points'
+     neutral ink, as the prototype draws "#n"; (c) full-height lines in the strong rule's grey
+     (`--line-strong`); (d) the tick row of (b) in the candidate green. (b) and (d) are a
+     probe-only mock: the row's "#n" label and the prototype's "Ticks of #n" title are left out.
+  4. Structure-free defaults outside the workflow, left as they are (ruling 5 names the
+     workflow):
+     - New project's typed cell gives Le Bail (`lib/wizard.ts` `modeFor`, today's page).
+     - `POST /api/index/adopt` defaults to `lebail` when no mode is sent (today's Peaks tab).
+     - The extinction screen's cell-only prefit is a Le Bail `profile_only` fit
+       (`indexing/extinction.py`).
+     - The report's `lebail_gap` comparison forces Le Bail (`report/layer0.py`).
+     - The agent skill calls Le Bail with `profile_only` the fit "for a cell without a trusted
+       structure" (`docs/skill/rietx/SKILL.md`).
+     - The candidate check is a Pawley fit already, but its function is still named
+       `validate_by_lebail`, and `IndexValidation.mode` reads `lebail` for an old record.
+  5. The candidate table at the default width (rulings 3 and 4). Built: it scrolls sideways in
+     its own box, so Rwp and Grade sit past the edge until scrolled. Other ways: the lattice as
+     its Bravais symbol (`hP`, `mP`), about 60 px; a wider default right pane; or Unindexed and
+     Absent moved to Judge.
+
+  *Found, not fixed.* `/next` mounts no help popover (`HELP_CONTEXT` is set only in
+  `App.svelte`), so every `<Help>` term there opens nothing: a refutation, the FOM blind spots,
+  the peak notes' flags and a held parameter's reason. It belongs to the rebuild's shell.
 
 - **2026-11-23 (third session)** — third PR, #1792: tasks 6 to 9. The four steps of the
   workflow now work at `/next`. Fit peaks lists the overlap groups and draws their windows in
