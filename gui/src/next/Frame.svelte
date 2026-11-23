@@ -18,6 +18,7 @@
   import { onMount, untrack } from "svelte";
 
   import { ApiError, api } from "../api";
+  import { py } from "../lib/py";
   import FileMenu from "../panels/FileMenu.svelte";
   import NewProject from "../panels/NewProject.svelte";
   import Palette from "../panels/Palette.svelte";
@@ -35,13 +36,17 @@
   import { peakWindows, widestFwhm } from "../lib/peakwin";
   import Splitter from "../panels/Splitter.svelte";
   import { modifier, runWords, toggleTitle } from "../lib/statusbar";
-  import { consoleLine, follow, type EngineEvent, type RunState } from "../lib/stream";
+  import { follow, type EngineEvent, type RunState } from "../lib/stream";
   import { applyTheme, readChoice, resolveTheme, type ThemeChoice } from "../lib/theme";
   import { WORKFLOWS, menuLabel, workflow, type WorkflowId } from "../lib/workflows";
   import ActionBar from "./ActionBar.svelte";
   import Console from "./Console.svelte";
+  import { eventLine, makeLine, pushLine, sessionScript, sharedSay, stageScript, type Line,
+           type LineKind } from "./console";
   import HelpBox from "./HelpBox.svelte";
-  import { GRAPH_HELP, MODEL_HELP } from "./helpbox";
+  import History from "./History.svelte";
+  import { howComment, howWords } from "./howran";
+  import { GRAPH_HELP, HISTORY_HELP, MODEL_HELP } from "./helpbox";
   import Keys from "./Keys.svelte";
   import Menu, { type MenuAt } from "./Menu.svelte";
   import Params from "./Params.svelte";
@@ -57,7 +62,9 @@
   let project = $state<any>(null);
   let version = $state<any>(null);
   let run = $state<RunState | null>(null);
-  let lines = $state<string[]>([]);
+  let lines = $state.raw<Line[]>([]);
+  /** Every call since the page loaded, uncapped: the script export reads it. */
+  let calls = $state.raw<Line[]>([]);
   let dropped = $state(0);
   let capabilities = $state<any>(null);
   let docsUrl = $state<string | null>(null);
@@ -151,6 +158,12 @@
   let graphTab = $state<GraphTab>("pattern");
   let modelTab = $state<ModelTab>("params");
   let bottomTab = $state<BottomTab>("console");
+  /** The History tab (WP-2211): its view, a view choice kept for the session
+   *  like the panels' layout; its node count, for the tab's label; and the
+   *  node whose fit is overlaid on the pattern. */
+  let historyView = $state<"graph" | "table">("graph");
+  let historyCount = $state<number | null>(null);
+  let compared = $state.raw<{ id: string; label: string; tt: Float64Array; y: Float64Array } | null>(null);
   let wf = $state<WorkflowId>("refine");
   let step = $state(0);
 
@@ -173,7 +186,9 @@
 
   const mod = modifier(typeof navigator === "undefined" ? "" : navigator.platform ?? "");
   const busy = $derived(run?.state === "running" || run?.state === "cancelling");
-  const runText = $derived(project && busy ? runWords(run) : "");
+  /** A re-fit's one stage is said in the title line's words, never by the
+   *  stage's internal name (WP-2227, the maintainer's consent of 2026-11-22). */
+  const runText = $derived(project && busy ? howWords(run?.run?.how, corpus) || runWords(run) : "");
   const unbuilt = $derived(workflow(wf).steps ?? null);
   const head = $derived(run?.head ?? project?.head ?? null);
   const noPhases = $derived(project ? (project.n_phases ?? 1) === 0 : false);
@@ -245,9 +260,48 @@
     untrack(() => recoveryWriter.schedule(path, at, draft));
   });
 
-  function say(line: string) {
-    lines = [...lines.slice(-400), line];
+  function say(kind: LineKind, text: string, script?: string | null) {
+    write(makeLine(kind, text, script));
   }
+
+  /**
+   * Start a run behind its call: the run's events fold under it. The call is
+   * written before the request, since the stream can deliver the run's first
+   * events before the route answers; a refused run takes it back, so neither
+   * the Console nor the script holds a call that never ran.
+   */
+  async function startRun(body: any, text: string, script?: string) {
+    const line = write({ ...makeLine("call", text, script), run: true });
+    try {
+      run = await api.run(body);
+    } catch (error) {
+      lines = lines.filter((l) => l !== line);
+      calls = calls.filter((l) => l !== line);
+      throw error;
+    }
+  }
+
+  /** The entry the lines written in this turn of the event loop share: one
+   *  action's echoes land together, so they draw under one timestamp. */
+  let entry = 0;
+  let entryOpen = false;
+
+  function write(line: Line): Line {
+    if (line.kind !== "event") {
+      if (!entryOpen) {
+        entry += 1;
+        entryOpen = true;
+        queueMicrotask(() => (entryOpen = false));
+      }
+      line = { ...line, entry };
+    }
+    lines = pushLine(lines, line);
+    if (line.kind === "call") calls = [...calls, line];
+    return line;
+  }
+
+  /** What the two shared panels write through (`console.ts:sharedSay`). */
+  const sayShared = sharedSay(say);
 
   $effect(() => {
     applyTheme(theme, document.documentElement);
@@ -272,10 +326,47 @@
     plotKey += 1;
   }
 
+  /**
+   * The session's first entry, as the prototype opens it: the lines that bind
+   * the names every later call uses, and where the project stands. The script
+   * writes its own preamble, so these lines are marked and it skips them.
+   * The output line reads as the prototype's: Rwp, the free count and the
+   * history nodes. The free count is `GET /api/params`' `n_free`, the rows
+   * whose vary flag is set, as the Parameters panel counts them; a plan's
+   * stages replace those flags, so it is not what a Refine frees. An
+   * unreadable table leaves it out. The count is read beside the result
+   * (`freeCount`), so the open waits for neither in turn, and the lines are
+   * written in one turn, so they share an entry.
+   */
+  async function freeCount(): Promise<number | null> {
+    try {
+      const n = (await api.params())?.n_free;
+      return typeof n === "number" ? n : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function sayPreamble(free: number | null) {
+    if (!project?.path) return;
+    const path = project.path;
+    const bind = (text: string) => write({ ...makeLine("call", text), preamble: true });
+    bind("import rietx as rx");
+    bind(`p = rx.Project.open(${JSON.stringify(path)})`);
+    bind("ref = p.refinement");
+    const rwp = result?.statistics?.rwp;
+    const nodes = project.n_nodes ?? 0;
+    say("output", [typeof rwp === "number" ? `Rwp ${(rwp * 100).toFixed(2)} %` : null,
+                   free === null ? null : `${free} free`,
+                   `${nodes} history node${nodes === 1 ? "" : "s"}`]
+      .filter(Boolean).join(", "));
+  }
+
   async function loadProject() {
     try {
       project = await api.project();
-      await loadResult();
+      const [, free] = await Promise.all([loadResult(), freeCount()]);
+      sayPreamble(free);
       await offerRecovery();
     } catch (error) {
       project = null;
@@ -301,10 +392,13 @@
 
   async function opened(doc: any) {
     await leaveEdits();
+    // the script is this project's session: another project's calls are not
+    calls = [];
     project = doc;
     openError = "";
     newOpen = false;
-    await loadResult();
+    const [, free] = await Promise.all([loadResult(), freeCount()]);
+    sayPreamble(free);
     await offerRecovery();
   }
 
@@ -319,6 +413,10 @@
     interactivePanel?.revert();
     planPanel?.leave();
     textPanel?.forget();
+    // node ids repeat across projects (n0000, n0001, …), so a compared node
+    // is cleared here, never by looking for its id in the next history
+    compared = null;
+    historyCount = null;
   }
 
   /** Offer the open project's kept edits, or start keeping new ones. */
@@ -355,7 +453,7 @@
     recoveryWriter.arm(o.path, o.draft);
     modelTab = o.draft.params ? "params" : o.draft.interactive ? "interactive"
       : o.draft.plan ? "plan" : "text";
-    say(restoredText(o.draft));
+    say("comment", restoredText(o.draft));
   }
 
   async function discardKept() {
@@ -365,7 +463,7 @@
     try {
       await api.putRecovery(o.path, null, null);
     } catch (error) {
-      say(`refused: ${(error as Error).message}`);
+      say("refusal", `refused: ${(error as Error).message}`);
       if (project?.path === o.path) {
         recoveryWriter.arm(o.path, o.draft);
         recoveryWriter.schedule(o.path, head, null);
@@ -382,7 +480,7 @@
   function setAsideKept() {
     if (!offer) return;
     offer = null;
-    say("# unapplied edits kept; offered again when the project next opens");
+    say("comment", "# unapplied edits kept; offered again when the project next opens");
   }
 
   function pageHidden() {
@@ -397,14 +495,14 @@
       project = await api.patchProject(patch);
       if ("two_theta_limits" in patch) {
         const limits = patch.two_theta_limits as number[] | null;
-        say(`project.doc.two_theta_limits = ${limits ? `(${limits.join(", ")})` : "None"}`);
+        say("call", `p.doc.two_theta_limits = ${limits ? `(${limits.join(", ")})` : "None"}`);
       }
       if ("excluded_regions" in patch)
-        say(`project.set_excluded_regions(${JSON.stringify(patch.excluded_regions)})`);
+        say("call", `p.set_excluded_regions(${py(patch.excluded_regions)})`);
       protocolError = "";
     } catch (error) {
       protocolError = (error as Error).message;
-      say(`refused: ${(error as Error).message}`);
+      say("refusal", `refused: ${(error as Error).message}`);
     }
   }
 
@@ -418,9 +516,9 @@
       const doc = await api.patchProject({ ui: patch });
       if (project?.path === path) project = doc;
       for (const [key, value] of Object.entries(patch))
-        say(`project.doc.ui[${JSON.stringify(key)}] = ${JSON.stringify(value)}`);
+        say("comment", `# view kept: ui[${py(key)}] = ${py(value)}`);
     } catch (error) {
-      say(`# not kept: ${(error as Error).message}`);
+      say("comment", `# not kept: ${(error as Error).message}`);
     }
   }
 
@@ -534,10 +632,9 @@
           return;
         }
       }
-      run = await api.run({ kind: "stage", stage });
-      say(echo);
+      await startRun({ kind: "stage", stage }, echo, stageScript(stage));
     } catch (error) {
-      say(`refused: ${(error as Error).message}`);
+      say("refusal", `refused: ${(error as Error).message}`);
     } finally {
       refining = false;
     }
@@ -551,14 +648,13 @@
     try {
       if (touched && !(await applyPending())) return;
       if (mode === "plan") {
-        run = await api.run({ kind: "fit" });
-        say("ref.fit(data, plan=…)");
+        await startRun({ kind: "fit" }, "p.fit()");
       } else {
-        run = await api.run({ kind: "stage", stage: { name: "cycle", turn_on: [] } });
-        say('ref.run_stage(Stage("cycle", turn_on=[]))');
+        await startRun({ kind: "stage", stage: { name: "cycle", turn_on: [] } },
+                       'p.run_stage(rx.Stage("cycle", turn_on=[]))');
       }
     } catch (error) {
-      say(`refused: ${(error as Error).message}`);
+      say("refusal", `refused: ${(error as Error).message}`);
     } finally {
       refining = false;
     }
@@ -568,8 +664,8 @@
     // a write still on the timer lands first, for the project it was made in
     await recoveryWriter.flush();
     try {
+      // opened() writes the session's first entry, the open among it
       await opened(await api.openProject(path));
-      say(`p = rx.Project.open(${JSON.stringify(path)})`);
       return "";
     } catch (error) {
       openError = (error as Error).message;
@@ -584,7 +680,6 @@
     try {
       const doc = reset ? await api.resetExample(name) : await api.openExample(name);
       await opened(doc);
-      say(`p = rx.Project.open(${JSON.stringify(doc.path)})  # the ${name} example`);
       return "";
     } catch (error) {
       openError = (error as Error).message;
@@ -629,7 +724,7 @@
     try {
       run = await api.cancel();
     } catch (error) {
-      say(`# ${(error as Error).message}`);
+      say("refusal", `refused: ${(error as Error).message}`);
     }
   }
 
@@ -768,7 +863,7 @@
      *  frame, so a reload does not reload for a run that ended before it. */
     let seen: string | null = null;
     const unfollow = follow(
-      (event: EngineEvent) => say(consoleLine(event)),
+      (event: EngineEvent) => write(eventLine(event)),
       (frame: RunState) => {
         run = frame;
         // a run just ended, keyed on its outcome rather than on having seen a
@@ -776,12 +871,15 @@
         // sends one idle frame with a new status (today's `App.svelte`)
         const key = `${frame.state}:${frame.run?.status ?? ""}:${frame.run?.node_id ?? ""}`;
         if (seen !== null && key !== seen && frame.state === "idle" && frame.run?.status) {
+          // how the fit ran, as `Refinement.summary()` prints it (WP-2227)
+          const comment = howComment(frame);
+          if (comment) say("comment", comment);
           void loadResult();
           void api.project().then((doc) => (project = doc)).catch(() => {});
         }
         seen = key;
       },
-      { poll: (since) => api.events(since) },
+      { poll: (since) => api.events(since), onDropped: (n) => (dropped = n) },
     );
     return () => {
       unfollow();
@@ -815,7 +913,8 @@
     {workflow(wf).name}<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"
       ><path d="M4.5 6.5 8 10l3.5-3.5" /></svg></button>
   <span class="proj">
-    <FileMenu {project} {busy} {say} onnew={() => (newOpen = true)} onopen={open}
+    <FileMenu {project} {busy} say={sayShared} script={() => sessionScript(calls, project?.path ?? "")}
+      onnew={() => (newOpen = true)} onopen={open}
       onproject={(doc) => (project = doc)} onclosed={closed} />
   </span>
   <span class="gap"></span>
@@ -856,7 +955,8 @@
             <Pattern {result} {plotKey} {theme} {protocol} {extent} {wavelengths} {busy}
               {protocolError} onprotocol={setProtocol} onreadout={(r) => (reading = r)}
               projectPath={project?.path ?? null} ui={project?.doc?.ui ?? null} onui={saveUi}
-              preview={previewAnswer} {previewError} oncurves={(c) => (baseCurves = c)} />
+              preview={previewAnswer} {previewError} oncurves={(c) => (baseCurves = c)}
+              {compared} howText={howWords(result?.how, corpus)} />
           {:else if graphTab === "peaks"}
             <Peaks {plotKey} {theme} preview={previewAnswer} {previewError}
               rwp={result?.statistics?.rwp ?? null} oncurves={(c) => (baseCurves = c)} />
@@ -960,13 +1060,33 @@
       <div class="tabs" role="tablist" aria-label="Console and history">
         {#each BOTTOM_TABS as t (t.id)}
           <button class="tab" role="tab" aria-selected={bottomTab === t.id}
-            onclick={() => (bottomTab = t.id)}>{t.label}</button>
+            onclick={() => (bottomTab = t.id)}>{t.label}{#if t.id === "history" && historyCount != null}<span
+              class="count">{historyCount}</span>{/if}</button>
         {/each}
+        {#if bottomTab === "history"}
+          <span class="hright">
+          <span class="segmented hview" role="group" aria-label="History view">
+            {#each [["graph", "Graph", "Draw the nodes as lanes"], ["table", "Table", "List the nodes with their numbers"]] as [id, label, tip] (id)}
+              <button class:on={historyView === id} aria-pressed={historyView === id} title={tip}
+                onclick={() => (historyView = id as "graph" | "table")}>{label}</button>
+            {/each}
+          </span>
+          <HelpBox entry={HISTORY_HELP} {docsUrl} label="About the History tab" />
+          </span>
+        {/if}
       </div>
       <div class="pane" class:gone={bottomTab !== "console"}>
         <Console {lines} {dropped} shown={bottomTab === "console"} />
       </div>
-      <div class="pane" class:gone={bottomTab !== "history"}></div>
+      <div class="pane" class:gone={bottomTab !== "history"}>
+        <!-- keyed on the project: two projects' heads can share an id, and
+             History re-reads only when its head changes -->
+        {#key project.path}
+          <History {head} {busy} {say} view={historyView} compared={compared?.id ?? null}
+            oncount={(n) => (historyCount = n)} oncompare={(c) => (compared = c)}
+            onrestore={(plan) => paramsPanel?.loadRestore(plan)} onmoved={structureMoved} />
+        {/key}
+      </div>
     </section>
   {/if}
 </div>
@@ -1002,7 +1122,7 @@
 {/if}
 
 {#if newOpen}
-  <NewProject {capabilities} {busy} {say} onclose={() => (newOpen = false)} onopened={opened} />
+  <NewProject {capabilities} {busy} say={sayShared} onclose={() => (newOpen = false)} onopened={opened} />
 {/if}
 
 {#if paletteOpen}
@@ -1108,6 +1228,21 @@
 
   .gone {
     display: none;
+  }
+
+  /* the History tab's node count, in the muted register (the design's
+     "History 8") */
+  .count {
+    margin-left: 6px;
+    color: var(--muted);
+  }
+
+  /* the History tab's view choice and ? box, at the strip's right */
+  .hright {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
   }
 
   .wfpane {

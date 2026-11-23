@@ -1504,8 +1504,10 @@ class StageResult(Base):
     #: all-zero Stephens block on the isotropic ray, and every DOF of that block
     #: is here at the value the seed wrote, a zero coefficient of the ray
     #: included (WP-2002, B14).  Those rows sit at zero rather than on a floor,
-    #: since a Stephens DOF is unbounded below.  The joint fit's runner seeds
-    #: no Stephens block, so its stages carry the first writer's rows alone.
+    #: since a Stephens DOF is unbounded below.  The joint fit's runner writes
+    #: both through :class:`~rietx.params.multi.MultiParameterTable`'s
+    #: twins, keyed by the joint column (WP-2239): a shared block's DOFs under
+    #: their bare paths, a per-histogram one's under ``hist.N.``.
     #: WP-1930's floor seed sized by unit went with WP-1938: it existed because
     #: a softplus column at its floor was twelve orders below its neighbours,
     #: and a row refined in its own units has its physical column there.

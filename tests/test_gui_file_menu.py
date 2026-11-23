@@ -245,6 +245,24 @@ def test_export_into_a_chosen_folder_asks_before_replacing(served, tmp_path_fact
     assert client.post("/api/export/instrument_profile")[0] == 200
 
 
+def test_the_console_script_is_written_as_the_page_sent_it(served):
+    """WP-2212. The page holds the session's calls, so the request carries the
+    script and the server writes it under the destination rules every export
+    keeps; a request without the text is refused, never an empty file."""
+    session, client, root = served
+    text = "import rietx as rx\np = rx.Project.open('x')\n"
+    status, payload = client.post("/api/export/script", {
+        "directory": str(root / "data"), "filename": "sample.py", "script": text})
+    assert status == 200, payload
+    assert (root / "data" / "sample.py").read_text(encoding="utf-8") == text
+    status, payload = client.post("/api/export/script", {
+        "directory": str(root / "data"), "filename": "sample.py", "script": text})
+    assert status == 409 and payload["error"]["code"] == "DESTINATION_EXISTS", payload
+    status, payload = client.post("/api/export/script", {"filename": "empty.py"})
+    assert status == 400 and payload["error"]["where"] == ["script"], payload
+    assert not (session.project.exports_dir / "empty.py").exists()
+
+
 def test_every_file_menu_verb_refuses_while_a_run_is_in_flight(served):
     """The 409 contract, which outranks body validation: each body here is
     invalid, so a 400 would mean the state check came second."""

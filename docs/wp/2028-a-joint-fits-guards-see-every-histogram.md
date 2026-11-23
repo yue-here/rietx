@@ -131,6 +131,12 @@ that caveat until 1421 lands.
 
 ### Inherited
 
+- 2026-11-22, from WP-2239 (PR #1781): a joint fit's LM step now holds the
+  Stephens cone and texture P ≥ 0 per histogram, and a joint stage honours
+  `Stage.strain_seed`. Two neighbouring claims were left for this WP,
+  unchecked: `help.py`'s `texture` record entry says the record is empty
+  in a joint fit, and the Stephens guard's skill and manual rows name only
+  TRF although LM skips a block whose start is outside the cone.
 - 2026-11-01, from WP-1951 (issue #896): a single fit now reports a stage
   glob that names one site (`phases.0.atoms.0.dof.*`) and frees nothing,
   through `refine._site_glob_diagnostics` beside

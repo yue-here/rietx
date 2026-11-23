@@ -36,6 +36,8 @@ export const EXPORT_KINDS = [
   { kind: "result_json", label: "Result (JSON)", file: "result.json", modelOnly: false },
   { kind: "instrument_profile", label: "Instrument profile (JSON)", file: "instrument_profile.json",
     modelOnly: true },
+  // the page's own record (WP-2212): offered only where the page keeps one
+  { kind: "script", label: "Console as a Python script", file: "session.py", modelOnly: true },
 ] as const;
 
 export type ExportKind = (typeof EXPORT_KINDS)[number];
@@ -50,6 +52,8 @@ export type MenuState = {
   recent: { path: string; name: string; missing?: boolean }[];
   /** the open project's folder, left off Open recent */
   current: string | null;
+  /** whether this page keeps the session's calls, so the script can be exported */
+  scriptable?: boolean;
   mac: boolean;
 };
 
@@ -85,7 +89,7 @@ export function fileMenu(s: MenuState): Entry[] {
     { id: "move", label: "Move to…", disabled: held, title: why },
     "-",
     { id: "export", label: "Export", disabled: none, title: none ? why : undefined,
-      sub: EXPORT_KINDS.map((k) => {
+      sub: EXPORT_KINDS.filter((k) => k.kind !== "script" || s.scriptable).map((k) => {
         const reason = exportBlocked(k, s);
         return { id: `export:${k.kind}`, label: `${k.label}…`, disabled: !!reason, title: reason };
       }) },

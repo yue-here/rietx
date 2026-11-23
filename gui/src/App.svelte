@@ -662,7 +662,9 @@
 
   async function start() {
     try {
-      run = await api.run({ kind: "fit" });
+      // in stages: this page has no view of a one-stage re-fit, which the
+      // rebuild at /next draws (WP-2227), so it keeps today's Refine until the swap
+      run = await api.run({ kind: "fit", refit: "stages" });
       say("ref.fit(data, plan=…)");
     } catch (error) {
       say(`refused: ${(error as Error).message}`);
@@ -1039,7 +1041,7 @@
     { id: "side", label: hideModel ? "Show the model panel" : "Hide the model panel",
       echo: "# a layout choice, not a setting", disabled: !project || hideGraphs,
       run: () => toggleSide("model") },
-    { id: "cycle", label: "Refine one cycle on the ticked parameters",
+    { id: "cycle", label: "Refine as ticked",
       echo: 'ref.run_stage(Stage("cycle", turn_on=[]))',
       disabled: busy || !project || noPhases || !!pendingInvalid,
       run: () => refine("cycle") },
@@ -1311,7 +1313,7 @@
         }
         seen = key;
       },
-      { poll: (since) => api.events(since) },
+      { poll: (since) => api.events(since), onDropped: (n) => (dropped = n) },
     );
   });
 </script>
