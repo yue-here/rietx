@@ -255,4 +255,20 @@ describe("the Judge step", () => {
     expect(said.at(-1)).toContain("structure_from_candidate(result.candidates[0]");
     expect(adopted).toEqual([1]);
   });
+
+  it("drops a pending Adopt when Index chooses another candidate", async () => {
+    doc = { indexing: indexing() };
+    answer = answered;
+    await boot({ step: 3 });
+    app.judge(0);
+    await settle();
+    button("Adopt as a Le Bail start").click();
+    flushSync();
+    expect(text(document.querySelector(".foot .why"))).toBe("Adopt #1 as a Le Bail start");
+    // the Index pane is mounted under Judge: its row is the same click
+    (document.querySelectorAll("table.cands tbody tr")[1] as HTMLElement).click();
+    await settle();
+    expect(document.querySelector(".nav b")!.textContent).toBe("#2");
+    expect(button("Adopt as a Le Bail start")).toBeTruthy();
+  });
 });

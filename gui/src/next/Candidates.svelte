@@ -33,7 +33,7 @@
    * after each run, and every index into it is dropped when a new answer
    * renumbers the candidates.
    */
-  import { onMount, untrack } from "svelte";
+  import { onMount } from "svelte";
 
   import { api } from "../api";
   import Help from "../Help.svelte";
@@ -156,6 +156,9 @@
     }
     chosenClass = null;
     chosenGroup = null;
+    // an Adopt pressed before this screen named a group from no screen, or
+    // from the last one
+    pending = null;
   }
 
   const classOrder = $derived.by(() => {
@@ -383,10 +386,16 @@
   let frameElapsed = $state(0);
   let frameAt = $state(0);
   let now = $state(0);
-  const stamped = $derived(run?.run?.elapsed ?? 0);
+  const stamped = $derived<number | null>(run?.run?.elapsed ?? null);
+  /** a run's frames over the stream carry no elapsed time (only the polled
+   *  state does), so a frame without one keeps the clock counting rather
+   *  than restarting it at zero */
+  let wasIndexing = false;
   $effect(() => {
-    void indexing;
-    frameElapsed = stamped;
+    const on = indexing, s = stamped;
+    if (s == null && on === wasIndexing) return;
+    wasIndexing = on;
+    frameElapsed = s ?? 0;
     frameAt = now = performance.now();
   });
   $effect(() => {
@@ -410,13 +419,6 @@
   /** a run with a formula adds Z, the formula units each cell holds (WP-2030) */
   const zColumn = $derived(answer?.result?.formula != null);
 
-  // a new answer renumbers the candidates: the chosen row is another cell now
-  $effect(() => {
-    void answer;
-    untrack(() => {
-      if (chosen !== null && !candidates[chosen]) void choose(null);
-    });
-  });
 </script>
 
 {#snippet toggles(names: string[], on: (n: string) => boolean, flip: (n: string) => void, aria: string)}
@@ -599,7 +601,7 @@
               {@const m20 = fomOf(c, "m20")}
               {@const ab = absentOf(c)}
               {@const rel = candidateRelation(candidates, i)}
-              <tr class:sel={chosen === i} data-cand={i} onclick={() => choose(i)}>
+              <tr class:sel={chosen === i} data-cand={i} onclick={() => { if (i !== chosen) judge(i); }}>
                 <td class="r num">{i + 1}</td>
                 <!-- a long cell breaks only between its parameters -->
                 <td class="cell"><span class="num">{#each cellLine(c).split(", ") as part, pi (pi)}{#if pi}{", "}{/if}<span

@@ -57,17 +57,35 @@
     });
   });
 
-  /** the lines whose own curve is hidden, by 2θ, so a refit that renumbers
-   *  the rows keeps the choice; session-local (call 23) */
-  let hidden = $state(new Set<string>());
-  const key = (p: PeakRow) => p.two_theta.toFixed(4);
+  /** the 2θ of each line whose own curve is hidden, so a refit that
+   *  renumbers the rows and moves each line by its fit keeps the choice;
+   *  session-local (call 23) */
+  let hidden = $state<number[]>([]);
+  const FOLLOW_DEG = 0.05;
+  /** the member nearest a hidden 2θ, within `FOLLOW_DEG`: nearest, because
+   *  two lines of one window can sit under a thousandth of a degree apart */
+  function nearest(members: PeakRow[], t: number): PeakRow | null {
+    let best: PeakRow | null = null;
+    for (const p of members) {
+      const d = Math.abs(p.two_theta - t);
+      if (d < FOLLOW_DEG && (!best || d < Math.abs(best.two_theta - t))) best = p;
+    }
+    return best;
+  }
+  /** the indices of a window's lines whose curve is hidden */
+  function hiddenIn(members: PeakRow[]): Set<number> {
+    const out = new Set<number>();
+    for (const t of hidden) {
+      const p = nearest(members, t);
+      if (p) out.add(p.index);
+    }
+    return out;
+  }
   /** the line whose toggle the pointer is on: its curve is drawn darker */
   let lit = $state<number | null>(null);
-  function toggle(p: PeakRow) {
-    const next = new Set(hidden);
-    if (next.has(key(p))) next.delete(key(p));
-    else next.add(key(p));
-    hidden = next;
+  function toggle(p: PeakRow, members: PeakRow[]) {
+    hidden = hiddenIn(members).has(p.index)
+      ? hidden.filter((t) => nearest(members, t) !== p) : [...hidden, p.two_theta];
   }
 
   let canvases: HTMLCanvasElement[] = $state([]);
@@ -137,9 +155,10 @@
     ctx.setLineDash([]);
     // each line's own curve over the envelope: a tinted fill and a line
     if (members.length > 1) {
+      const off = hiddenIn(members);
       for (const line of g.lines ?? []) {
         const row = members.find((p) => p.index === line.index);
-        if (!row || hidden.has(key(row))) continue;
+        if (!row || off.has(row.index)) continue;
         const on = lit === line.index;
         const ys = line.y.map((v, k) => g.y_env[k] + v);
         path(tt, ys);
@@ -236,6 +255,7 @@
       <p class="empty">No group in the list. Show all groups to see their fits.</p>
     {:else}
       {#each windows as { g, members }, slot (g.group)}
+        {@const off = hiddenIn(members)}
         <figure class:on={focused === g.group}>
           <figcaption>
             <span class="num">{range(g)}</span>
@@ -244,9 +264,9 @@
             {#if members.length > 1}
               <span class="toggles" role="group" aria-label="Each line's own curve">
                 {#each members as p, k (p.index)}
-                  <button class="ib line" aria-pressed={!hidden.has(key(p))}
+                  <button class="ib line" aria-pressed={!off.has(p.index)}
                     title="Show or hide the curve of line {k + 1}, at {p.two_theta.toFixed(3)}°"
-                    onclick={() => toggle(p)}
+                    onclick={() => toggle(p, members)}
                     onmouseenter={() => (lit = p.index)}
                     onmouseleave={() => (lit = null)}>{k + 1}</button>
                 {/each}

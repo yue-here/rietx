@@ -176,12 +176,12 @@
    *  the row chosen in its table, and a request to frame a line (WP-2240):
    *  the Pattern graph draws them while the workflow is up. */
   let peaksPayload = $state.raw<PeaksPayload | null>(null);
-  /** the Fit peaks step's windows: the groups its list draws, the one chosen
-   *  and how many the list holds (WP-2240 task 6) */
   /** the Index and Judge steps' panel, which a run of theirs reports to */
   let candidatesPanel: ReturnType<typeof Candidates> | undefined = $state();
   /** the candidate whose lines the Pattern graph draws (round 11, call 9) */
   let candidateLines = $state.raw<CandidateOverlay | null>(null);
+  /** the Fit peaks step's windows: the groups its list draws, the one chosen
+   *  and how many the list holds (WP-2240 task 6) */
   let fitGroups = $state.raw<{ groups: number[]; focused: number | null; total: number }>(
     { groups: [], focused: null, total: 0 });
   let selectedPeak = $state<number | null>(null);
