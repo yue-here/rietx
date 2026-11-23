@@ -5,8 +5,8 @@ rather than transcribed from a publication:
 
 * **tables**: ⟨j₀⟩, ⟨j₂⟩ and ⟨j₄⟩ on s = sinθ/λ = 0-6 Å⁻¹ at 0.01, for the ions
   served from a computed curve over their whole range (the ten high-charge 4d
-  ions of rietx issue #1691, the neutral Mo, Tc, Ru and Rh atoms, Pr³⁺ and
-  Pu³⁺);
+  ions of rietx issue #1691, the neutral Mo, Tc, Ru, Rh and Pd atoms, Pr³⁺
+  and Pu³⁺);
 * **tails**: ⟨j₀⟩ and ⟨j₂⟩ from the end of the range Brown fitted a row over
   (s_end = 1.5 Å⁻¹ for 3d, 4d and actinide rows, 1.2 for rare earths) to
   s = 6, for every other row rietx carries in Brown's analytic form.
@@ -50,14 +50,21 @@ D32_CONFIG = {"Ru3+": "4d5", "Ru4+": "4d4", "Ru5+": "4d3", "Ru6+": "4d2",
               "Mo5+": "4d1", "Nb4+": "4d1"}
 
 #: Neutral 4d rows: data-file key -> public label.
-NEUTRAL = {"Mo0": "Mo", "Tc0": "Tc", "Ru0": "Ru", "Rh0": "Rh"}
+NEUTRAL = {"Mo0": "Mo", "Tc0": "Tc", "Ru0": "Ru", "Rh0": "Rh", "Pd0": "Pd"}
+
+#: A neutral row not in its ground configuration, and what its configuration
+#: line says instead of "neutral ground configuration".  Pd's ground 4d10 1S
+#: has no open shell to carry a moment; the row is the lowest magnetic
+#: configuration, as Brown's bare Nb and Sc rows are excited configurations
+#: (rulings D56, D63 item 3).
+NEUTRAL_EXCITED = {"Pd0": "neutral, excited configuration; ground 4d10 1S"}
 
 #: Rows served from a whole computed table instead of a Brown row
 #: (rietx issue #1804 for Pu3+; Pr3+ replaces Lisher & Forsyth's row).
 WHOLE_FROM_TAILS = {"Pu3+": "5f", "Pr3+": "4f"}
 
-#: Bare labels with no row at all: Pd's bare row was a Pd+ curve, and neutral
-#: Pd 4d10 1S carries no moment.
+#: Brown's bare rows not carried: each is a singly charged ion's curve, and the
+#: bare label is served from its neutral table (NEUTRAL) instead.
 DROPPED = {"Mo", "Tc", "Ru", "Rh", "Pd"}
 
 RCN = "Cowan RCN Mod 36.2.5"
@@ -143,8 +150,10 @@ HEADER = """\
 #            row over (s_end = 1.5 for 3d, 4d and actinide rows, 1.2 for rare
 #            earths); rietx blends Brown's row onto it over s_end to
 #            s_end + 0.2.
-# A key ending in 0 (Mo0, Tc0, Ru0, Rh0) is the neutral atom in its ground
-# configuration; rietx serves it under the bare symbol. Values are %.7f.
+# A key ending in 0 (Mo0, Tc0, Ru0, Rh0, Pd0) is the neutral atom in the
+# configuration its block names: the ground configuration, except Pd0, the
+# excited 4d9 5s 3D (ground 4d10 1S has no open shell). rietx serves it under
+# the bare symbol. Values are %.7f.
 """
 
 
@@ -254,10 +263,11 @@ def main(argv=None) -> None:
     for key in NEUTRAL:
         rec = neutral[key]
         cols = [_check_curve(key, o, rec[o]) for o in ("j0", "j2", "j4")]
-        cfg = rec["config"].replace(" (neutral ground)", "").replace("5s1", "5s")
+        cfg = rec["config"].split(" (")[0].replace("5s1", "5s")
+        state = NEUTRAL_EXCITED.get(key, "neutral ground configuration")
         out += [""] + _block(key, "table", ("j0", "j2", "j4"), 0.0, cols,
                              f"{RCN}, Hartree-Fock (IREL=0, CORRF=0), Hund's-rule LS term",
-                             f"{cfg} (neutral ground configuration)")
+                             f"{cfg} ({state})")
     families = {f: _long(args.curves / f"tails_{f}.csv") for f in S_END}
     for ion, fam in WHOLE_FROM_TAILS.items():
         rec = families[fam][ion]

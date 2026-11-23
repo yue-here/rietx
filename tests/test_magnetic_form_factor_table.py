@@ -2,7 +2,7 @@
 
 ``tests/test_magnetic.py`` pins the dipole expression and a handful of rows. Until 2026-10-01 nothing compared the
 *whole* table with anything, and the Ni³⁺ pair had been CrysFML's rather than Brown's since the table was written
-(issue #593). Since #1691 the table is Brown's 7-parameter rows (``_J0``/``_J2``) plus sixteen ions served from
+(issue #593). Since #1691 the table is Brown's 7-parameter rows (``_J0``/``_J2``) plus seventeen ions served from
 computed tables in ``rietx/data/mff_computed.dat`` (``_TABLE_KEY``; their checks are in
 ``tests/test_magnetic_form_factor_range.py``). The tests here need no second copy of Brown's table:
 
@@ -195,7 +195,7 @@ def test_every_row_is_well_behaved_inside_browns_fit_range():
 #: Tables 4.4.5.1-4.4.5.8, pp. 454-457 (page image) and against P. J. Brown's data file (2013-09-19), row by row as
 #: curves on Brown's fit ranges (issue #593). Re-derived for issue #626 (keys moved, no digit of Brown's) and for
 #: #1691/#1804, which removed six rows and changed no digit of the rest: Pu³⁺ (a fit to the Pu⁵⁺ curve) and the
-#: bare Mo, Tc, Ru, Rh, Pd rows (M⁺ curves), the first five now served from computed tables, Pd refused; Lisher &
+#: bare Mo, Tc, Ru, Rh, Pd rows (M⁺ curves), all six now served from computed tables (ruling D63 item 3); Lisher &
 #: Forsyth's Pr³⁺ store retired for a computed table. ``test_browns_rows_are_unchanged_by_the_rekeying`` puts all of
 #: them back and recovers the #593 fingerprint. Any edit to any digit fails here. Re-derive it only together with a
 #: stated verification of the edited rows, and say which in the commit.
@@ -204,7 +204,7 @@ _TABLE_SHA256 = "bc35092c77fb1fa6233112525bed1ed5270ff3dba42d3ad871f0dd7ec879e98
 #: SHA-256 of ``rietx/data/mff_computed.dat``, the computed curves (rietx #1691): written by
 #: ``tools/magnetic_form_factors/write_data_file.py`` from the curves its README lists, and checked against them
 #: (every value within the file's 5e-8 rounding) when it was written. Any change to the file fails here.
-_DATA_SHA256 = "0988d0e440a3cb4def37ca56f5e258954f47764352099772ee2ed1041fc975b9"
+_DATA_SHA256 = "108807083129b3c80b50076deb252bb922c8b29234c297a37f79d094db33edc0"
 
 
 def _canonical_table() -> bytes:

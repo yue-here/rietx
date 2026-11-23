@@ -543,7 +543,7 @@ each with its licence text beside it.
     Spectra*, University of California Press, 1981, doi:10.1525/9780520906150), whose
     distribution terms say it "may be freely distributed gratis" and "may not be
     sold": Hartree-Fock (Hund's-rule term or configuration average) for the 3d and 4d
-    tails and the neutral Mo, Tc, Ru, Rh tables; Hartree-Fock-relativistic (HFR, the
+    tails and the neutral Mo, Tc, Ru, Rh, Pd tables; Hartree-Fock-relativistic (HFR, the
     method Kobayashi, Nagao & Ito used for the 5d ions, *Acta Cryst.* A **67**,
     473-480, 2011, doi:10.1107/S010876731102633X), configuration average (IREL = 1,
     CORRF = 1), for the ten
@@ -567,7 +567,7 @@ each with its licence text beside it.
   Hartree-Fock values that this table carried from #626 (2026-09-22) until #1691,
   replaced so Pr³⁺ shares its rare-earth neighbours' Dirac-Fock footing. Brown's bare
   Mo, Tc, Ru, Rh and Pd rows, which are singly charged ions' curves, are dropped
-  (Pd: refused). Since #626 the Brown row ITC prints as "Ce²⁺" is
+  for the neutral tables. Since #626 the Brown row ITC prints as "Ce²⁺" is
   keyed `Ce3+`: it reproduces Freeman & Desclaux (1979, *J. Magn. Magn. Mater.*
   **12**, 11–21) Table 7's Ce³⁺ values at Brown's printed fit error, and they
   computed no Ce²⁺.

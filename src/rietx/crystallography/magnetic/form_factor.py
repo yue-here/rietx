@@ -107,10 +107,12 @@ Freeman's printed Pu³⁺ block to within 5.3 × 10⁻⁵ in all 84 cells.
 configuration it is.  Brown's bare ``Mo``, ``Tc``, ``Ru``, ``Rh`` and ``Pd``
 rows are fits to singly charged M⁺ curves (each matches an M⁺ 4dⁿ⁻³5s²
 configuration to his printed fit error and the neutral ground configuration
-to nothing), so ``Mo``, ``Tc``, ``Ru`` and ``Rh`` are served from computed
-neutral-atom tables (ground configuration, Hartree-Fock for the Hund's-rule
-term, Brown's own footing) and bare ``Pd`` is refused: neutral Pd is 4d¹⁰
-¹S and has no moment.  The other bare rows are kept, and
+to nothing), so all five are served from computed neutral-atom tables
+(Hartree-Fock for the Hund's-rule term, Brown's own footing): ``Mo``, ``Tc``,
+``Ru`` and ``Rh`` in the ground configuration, ``Pd`` in the excited 4d⁹5s
+³D, since the 4d¹⁰ ¹S ground state has no open shell to carry a moment (its
+⟨jₙ⟩ curves exist all the same; ⟨j₀⟩ at s = 0.2 Å⁻¹ is 0.4646 against
+0.4965).  The other bare rows are kept, and
 :func:`approximation_name` names what each is: ``Sc`` and ``Nb`` are neutral
 atoms in an excited configuration, ``Ti`` the ground configuration in the
 non-Hund term ¹G (a state Clementi & Roetti 1974 list), ``V``, ``Mn``,
@@ -132,7 +134,8 @@ and check it.  Two kinds of block, both ⟨jₙ⟩ on s = 0.01 Å⁻¹ steps to
   the ten high-charge 4d ions Ru³⁺-Ru⁶⁺, Rh⁴⁺, Tc⁴⁺, Mo³⁺-Mo⁵⁺, Nb⁴⁺ (Cowan
   HFR, the method of Kobayashi, Nagao & Ito 2011, on the configuration
   average);
-  the neutral Mo, Tc, Ru and Rh atoms; Pr³⁺ and Pu³⁺ (GRASP2018 Dirac-Fock).
+  the neutral Mo, Tc, Ru, Rh and Pd atoms; Pr³⁺ and Pu³⁺ (GRASP2018
+  Dirac-Fock).
   They carry ⟨j₄⟩ too, which nothing here evaluates.
 * **tails**, from the end of Brown's fitted range to s = 6, one per Brown
   row, on that row's own footing: Hartree-Fock for the 3d and 4d rows
@@ -222,8 +225,8 @@ _ION = re.compile(r"^([A-Z][a-z]?)(?:(\d+)([+-]))?$")
 #: ⟨j₀⟩ coefficients, keyed by ion (``"Cr"``, ``"Cr3+"``).  89 rows: the 3d
 #: and 4d transition series, the 4f rare earths and the 5f actinides Brown's
 #: table carries, less the rows served from a computed table instead
-#: (:data:`_TABLE_KEY`: his Pu³⁺, and his bare Mo, Tc, Ru and Rh, which are M⁺
-#: curves) and his bare Pd (an M⁺ curve too, refused: :data:`_RETIRED`).
+#: (:data:`_TABLE_KEY`: his Pu³⁺, and his bare Mo, Tc, Ru, Rh and Pd, which
+#: are M⁺ curves).
 _J0: dict[str, Coefficients] = {
     "Sc": (0.2512, 90.0296, 0.329, 39.4021, 0.4235, 14.3222, -0.0043),
     "Sc1+": (0.4889, 51.1603, 0.5203, 14.0764, -0.0286, 0.1792, 0.0185),
@@ -418,10 +421,6 @@ _RETIRED: dict[str, str] = {
              "any source this table holds, so the key is refused rather than "
              "serve Ce3+ physics under a Ce2+ name. Write 'Ce3+' if the site "
              "is Ce3+"),
-    "Pd": ("the bare Pd row was a Pd+ curve (Brown's fit matches Pd+ 4d7 5s2 "
-           "4F to its printed fit error, and neutral Pd to nothing), and "
-           "neutral Pd is 4d10 1S, which carries no moment, so there is no "
-           "neutral Pd form factor to serve. Write 'Pd1+' if the site is Pd+"),
 }
 
 
@@ -604,11 +603,11 @@ def assumed_lande_g(ion: str) -> float | None:
 
 #: Every ion served from a whole computed table, public label -> key in
 #: ``mff_computed.dat`` (module docstring, "Computed curves").  The ten
-#: high-charge 4d ions (rietx #1691), the neutral Mo, Tc, Ru and Rh atoms
-#: (keyed ``Mo0`` ... in the file; the bare symbol is the public label), Pr³⁺
-#: and Pu³⁺ (#1804).  Held equal to the file's ``table`` blocks by test.
+#: high-charge 4d ions (rietx #1691), the neutral Mo, Tc, Ru, Rh and Pd
+#: atoms (keyed ``Mo0`` ... in the file; the bare symbol is the public label),
+#: Pr³⁺ and Pu³⁺ (#1804).  Held equal to the file's ``table`` blocks by test.
 _TABLE_KEY: dict[str, str] = {
-    "Mo": "Mo0", "Tc": "Tc0", "Ru": "Ru0", "Rh": "Rh0",
+    "Mo": "Mo0", "Tc": "Tc0", "Ru": "Ru0", "Rh": "Rh0", "Pd": "Pd0",
     "Ru3+": "Ru3+", "Ru4+": "Ru4+", "Ru5+": "Ru5+", "Ru6+": "Ru6+",
     "Rh4+": "Rh4+", "Tc4+": "Tc4+", "Mo3+": "Mo3+", "Mo4+": "Mo4+",
     "Mo5+": "Mo5+", "Nb4+": "Nb4+", "Pr3+": "Pr3+", "Pu3+": "Pu3+",

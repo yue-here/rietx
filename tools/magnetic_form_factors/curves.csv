@@ -13,6 +13,7 @@ Mo0,4d,table,RCN,42,0,4d5 5s1,4d,7S,0,0.0,,,,Mo 4d5 5s1 7S (neutral ground),
 Tc0,4d,table,RCN,43,0,4d5 5s2,4d,6S,0,0.0,,,,Tc 4d5 5s2 6S (neutral ground),
 Ru0,4d,table,RCN,44,0,4d7 5s1,4d,5F,0,0.0,,,,Ru 4d7 5s1 5F (neutral ground),
 Rh0,4d,table,RCN,45,0,4d8 5s1,4d,4F,0,0.0,,,,Rh 4d8 5s1 4F (neutral ground),
+Pd0,4d,table,RCN,46,0,4d9 5s1,4d,3D,0,0.0,,,,Pd 4d9 5s1 3D (neutral excited),
 Pu3+,5f,table,GRASP,94,3,,,,,,239,10 21 28 30 29 26 20 16 9 5 3 1,TF,Pu3+ [Xe]4f14 5d10 6s2 6p6 5f5,
 Pr3+,4f,table,GRASP,59,3,,,,,,141,2 1 3 1 3 1 2,TF,Pr3+ [Kr]4d10 5s2 5p6 4f2,
 Sc,3d,tail,RCN,21,0,3d2 4s1,3d,4F,0,0.0,,,,Sc 3d2 4s1 4F,NEUTRAL excited configuration 3d2 4s1 4F

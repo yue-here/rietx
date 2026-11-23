@@ -108,7 +108,7 @@ _D_HUND = {2: ("3F", -58 / 441, 5 / 441), 8: ("3F", -58 / 441, 5 / 441),
 #: Non-Hund d^2 (= d^8) terms relative to E_av.
 _D2_OTHER = {"1D": (-13 / 441, 50 / 441), "3P": (77 / 441, -70 / 441),
              "1G": (50 / 441, 15 / 441)}
-_S_CORE = {2: 1.0, 8: 1.0, 3: 1.5, 7: 1.5, 4: 2.0, 6: 2.0, 5: 2.5}
+_S_CORE = {1: 0.5, 9: 0.5, 2: 1.0, 8: 1.0, 3: 1.5, 7: 1.5, 4: 2.0, 6: 2.0, 5: 2.5}
 
 
 def term_card(orbitals: str, shell: str, term: str):
@@ -116,7 +116,8 @@ def term_card(orbitals: str, shell: str, term: str):
     for the configuration average (``term == 'avg'``).
 
     Hund term of the open d shell; with one electron in the outer s shell,
-    the high-spin d^n s term (d^n card plus -(S_core/5) G^2(d,s)); a non-Hund
+    the high-spin d^n s term (d^n card plus -(S_core/5) G^2(d,s); for the
+    single-term d^1 and d^9 shells the G^2 entry alone, d^9 s 3D); a non-Hund
     d^2/d^8 term by name.  The name the card produces must equal ``term``.
     """
     if term == "avg":
@@ -126,9 +127,12 @@ def term_card(orbitals: str, shell: str, term: str):
     if term in _D2_OTHER and nd in (2, 8):
         f2, f4 = _D2_OTHER[term]
         return term, [(f2, "F", 2, shell, shell), (f4, "F", 4, shell, shell)]
-    name, f2, f4 = _D_HUND[nd]
-    ints = [(f2, "F", 2, shell, shell), (f4, "F", 4, shell, shell)]
     s1 = [k for k, v in occ.items() if k.endswith("s") and v == 1]
+    if nd in (1, 9) and s1:  # d1, d9: one term, 2D at E_av, so no F^k card; only the d-s coupling
+        name, ints = "2D", []
+    else:
+        name, f2, f4 = _D_HUND[nd]
+        ints = [(f2, "F", 2, shell, shell), (f4, "F", 4, shell, shell)]
     if s1:
         s_core = _S_CORE[nd]
         name = f"{int(2 * (s_core + 0.5) + 1)}{name[1]}"

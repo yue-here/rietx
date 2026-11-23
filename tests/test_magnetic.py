@@ -115,12 +115,12 @@ def test_j0_is_one_at_the_origin_for_every_ion():
     tolerance below is the *fit's*, measured over all 96 rows (worst: Cr¹⁺ at
     0.0023).  It is still the check that catches a mistranscribed leading
     digit, which is the failure mode a transcription actually has.  Since
-    #1691 the table serves 89 Brown rows and 16 computed tables, whose
+    #1691 the table serves 89 Brown rows and 17 computed tables, whose
     ⟨j₀⟩(0) is 1 to the data file's 5e-8 rounding.
     """
     worst = max((abs(float(j0(ion, 0.0)) - 1.0), ion) for ion in magnetic_ions())
     assert worst[0] < 3e-3, worst
-    assert len(magnetic_ions()) == 105
+    assert len(magnetic_ions()) == 106
 
 
 def test_j2_carries_its_s_squared_factor():

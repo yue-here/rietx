@@ -948,7 +948,7 @@ def _magnetic_sites(phase, sites, species, ion, g=None) -> tuple[
                     f"table has {offered or 'nothing for this element'}.")
             continue
         if caller_stated_ion and key not in table:
-            # a stated ion the table cannot serve (a typo, bare 'Pd', a
+            # a stated ion the table cannot serve (a typo, a
             # retired 'Ce2+') is refused here, before any candidate is built
             raise ValueError(
                 f"solve_magnetic(): ion={key!r} for {atom.label!r}: "

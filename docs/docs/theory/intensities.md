@@ -485,8 +485,10 @@ ions are served from a computed curve over the whole range instead: the
 high-charge 4d ions Ru$^{3+}$-Ru$^{6+}$, Rh$^{4+}$, Tc$^{4+}$,
 Mo$^{3+}$-Mo$^{5+}$ and Nb$^{4+}$ (Cowan's relativistic Hartree-Fock, the
 method Kobayashi, Nagao and Ito used for the 5d ions, here on the
-configuration average {cite}`cowan1981,kobayashi2011`); the neutral Mo, Tc, Ru and Rh atoms,
-since Brown's rows under those labels are singly charged ions' curves; and
+configuration average {cite}`cowan1981,kobayashi2011`); the neutral Mo, Tc, Ru, Rh and Pd
+atoms, since Brown's rows under those labels are singly charged ions' curves (Pd in the
+excited 4d$^9$5s $^3$D, as its 4d$^{10}$ ground state has no open shell to carry a moment);
+and
 Pr$^{3+}$ and Pu$^{3+}$ (Dirac-Fock, GRASP2018 {cite}`froesefischer2019`).
 Brown carries no Pr row, and the older Pr$^{3+}$ fit {cite}`lisher1971` is on a
 non-relativistic footing; his printed Pu$^{3+}$ rows are fits to the Pu$^{5+}$

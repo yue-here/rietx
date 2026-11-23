@@ -1,6 +1,6 @@
 # Magnetic form factors computed for rietx: inputs, driver and checks
 
-Every curve in `src/rietx/data/mff_computed.dat` (105 blocks) was computed for rietx from free-ion radial
+Every curve in `src/rietx/data/mff_computed.dat` (106 blocks) was computed for rietx from free-ion radial
 wavefunctions. This folder holds what anyone with the two codes needs to regenerate each curve and check it. It is
 not part of the wheel. The codes themselves are not in rietx.
 
@@ -15,8 +15,8 @@ not part of the wheel. The codes themselves are not in rietx.
 | `brown_fit_errors.csv` | Brown's printed fit error e per row, ⟨j₀⟩ (ITC Vol. C Tables 4.4.5.1–4) and ⟨j₂⟩ (4.4.5.5–8) |
 | `write_data_file.py` | formats the long CSVs into `mff_computed.dat` (selects, checks, rounds to `%.7f`; computes nothing) |
 
-The generator reproduces the inputs of every curve **byte for byte**: 66 RCN `in36` decks and 39 × 5 GRASP2018
-stdin files, 261 of 261 identical to the runs that produced the shipped data. So no deck is copied here.
+The generator reproduces the inputs of every curve **byte for byte**: 67 RCN `in36` decks and 39 × 5 GRASP2018
+stdin files, 262 of 262 identical to the runs that produced the shipped data. So no deck is copied here.
 
 ## The codes
 
@@ -62,16 +62,17 @@ needed any more:
    on them. **Replaced by the compiler flag `-fdec-char-conversions`**, which accepts the original statements.
 
 **Proof:** the unmodified source, built as above, run from the decks in `curves.csv` through `regenerate.py`, gives
-back all 105 curves, and `write_data_file.py` turns them into a file **byte-identical** to the shipped
-`mff_computed.dat` (SHA-256 `0988d0e440a3cb4def37ca56f5e258954f47764352099772ee2ed1041fc975b9`). The per-order
-match against the shipped values is in "Checks" below.
+back all 106 curves, and `write_data_file.py` turns them into a file **byte-identical** to the shipped
+`mff_computed.dat` (SHA-256 `108807083129b3c80b50076deb252bb922c8b29234c297a37f79d094db33edc0`). The per-order
+match against the shipped values is in "Checks" below. (The neutral Pd table joined on 2026-11-23; its deck is
+byte-identical to the data job's, and its curve matches the data job's to 5 × 10⁻⁹, the `%.8f` print.)
 
 ## Footing of each family
 
 | family | curves | code and footing |
 |---|---|---|
 | 3d, 4d tails (52 rows) | ⟨j₀⟩, ⟨j₂⟩ from s_end = 1.5 | RCN Hartree–Fock (IREL = 0, CORRF = 0), the configuration identified behind each Brown row: Hund LS term for the ions; configuration average where that matched (bare V, Mn, Fe, Co, Cu, Y; Ti³⁺, Sc²⁺, V⁴⁺ and the other single-term d¹, d⁹, d¹⁰ shells); bare Ti in the non-Hund term 3d²4s² ¹G listed by Clementi & Roetti (1974). Bare Cr and Ni match no configuration tried: their tails use the best candidate, and their blocks say so. |
-| neutral Mo, Tc, Ru, Rh (tables) | ⟨j₀⟩, ⟨j₂⟩, ⟨j₄⟩, s = 0–6 | RCN HF, Hund term of the neutral ground configuration (Cowan 1981 Table 4-3): 4d⁵5s ⁷S, 4d⁵5s² ⁶S, 4d⁷5s ⁵F, 4d⁸5s ⁴F |
+| neutral Mo, Tc, Ru, Rh, Pd (tables) | ⟨j₀⟩, ⟨j₂⟩, ⟨j₄⟩, s = 0–6 | RCN HF, Hund term of the neutral ground configuration (Cowan 1981 Table 4-3): 4d⁵5s ⁷S, 4d⁵5s² ⁶S, 4d⁷5s ⁵F, 4d⁸5s ⁴F; for Pd, whose 4d¹⁰ ¹S ground state has no open shell to carry a moment, the lowest magnetic configuration 4d⁹5s ³D (the d⁹s card is the G²(d, s) term alone; ruling D63) |
 | ten high-charge 4d ions (tables) | ⟨j₀⟩, ⟨j₂⟩, ⟨j₄⟩, s = 0–6 | RCN Hartree–Fock-relativistic (IREL = 1, CORRF = 1), configuration average |
 | 4f (21 tails + Pr³⁺ table) | from s_end = 1.2 | GRASP2018 Dirac–Fock, single configuration [Kr]4d¹⁰5s²5p⁶4fⁿ, average level: EOL over every level of every J block with standard weights, the generalised average energy of Freeman & Desclaux (1979); finite nucleus, mass number A |
 | 5f (16 tails + Pu³⁺ table) | from s_end = 1.5 | as 4f, [Xe]4f¹⁴5d¹⁰6s²6p⁶5fⁿ (Desclaux & Freeman 1978) |
@@ -106,7 +107,7 @@ t = (s − s_end)/0.2 (`mff_lib.blend`; rietx's own copy is `_blend_onto_tail` i
 export RCN_EXE=<rcn executable> GRASP_BIN=<dir with the GRASP programs>
 python regenerate.py --work <scratch> --out <curves dir> --keys Mn2+ Ru4+ Gd3+ \
     --compare ../../src/rietx/data/mff_computed.dat --gate      # a few curves
-python regenerate.py --work <scratch> --out <curves dir> --code RCN    # all 66 RCN curves, ~4 min
+python regenerate.py --work <scratch> --out <curves dir> --code RCN    # all 67 RCN curves, ~4 min
 python regenerate.py --work <scratch> --out <curves dir> --code GRASP  # all 39 GRASP curves, ~2 min
 python write_data_file.py --curves <curves dir> --d32 <curves dir>/d32 --out mff_computed.dat
 python footing_gate.py --curves <curves dir>                           # needs rietx importable

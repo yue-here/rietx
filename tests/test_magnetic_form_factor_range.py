@@ -3,15 +3,15 @@
 Every Brown ⟨jₙ⟩ row is a least-squares fit over a stated range of s = sinθ/λ (Brown, ITC Vol. C § 4.4.5 (2004),
 p. 461), and past it the fitted form is not a form factor: Mn²⁺ ⟨j₀⟩ carries e^(+0.609·s²) and returned 1.0105 at
 s = 3 Å⁻¹ and 1.43 × 10⁷ at s = 6 (rietx #1796).  Since rietx #1691 (rulings D46, D56) each Brown row is his
-analytic form inside his range, blended over 0.2 Å⁻¹ onto a computed free-ion tail, and the tail to s = 6; sixteen
-ions are served from computed tables over the whole range; bare ``Pd`` is refused; and past s = 6 every row is
-refused.  These tests pin
+analytic form inside his range, blended over 0.2 Å⁻¹ onto a computed free-ion tail, and the tail to s = 6;
+seventeen ions are served from computed tables over the whole range, bare ``Pd`` among them (ruling D63 item 3);
+and past s = 6 every row is refused.  These tests pin
 
 * inside every Brown row's range, the evaluator is his formula bit for bit, and so is a magnetic fit there;
 * the blend reproduces the curve-builder's own blend to 1e-7, and fails when the width or the start is wrong;
 * the tables reproduce their source curves at the grid points and interpolate within the measured spline bound;
-* the user-visible numbers of #1796, #1804 and #1691 (Mn²⁺ past range, Pu³⁺, bare ``Ru``, ``Ru4+``);
-* the refusals, before any work, at every entry point: bare ``Pd``, and s past 6, direct and in a fit;
+* the user-visible numbers of #1796, #1804 and #1691 (Mn²⁺ past range, Pu³⁺, bare ``Ru`` and ``Pd``, ``Ru4+``);
+* the refusal, before any work, at every entry point: s past 6, direct and in a fit;
 * one ``MAGNETIC_FORM_FACTOR_COMPUTED_TAIL`` per fit past Brown's range, none inside;
 * ``approximation_name`` naming each row's footing.
 
@@ -118,11 +118,11 @@ def _brown(ion: str, order: int, s: np.ndarray) -> np.ndarray:
 
 # ============================================================= the rows and their ranges
 
-def test_the_table_serves_brown_rows_and_sixteen_computed_tables():
-    """89 Brown rows with a tail each, 16 tables (the ten D32 ions, neutral Mo/Tc/Ru/Rh, Pr³⁺, Pu³⁺), the data
+def test_the_table_serves_brown_rows_and_seventeen_computed_tables():
+    """89 Brown rows with a tail each, 17 tables (the ten D32 ions, neutral Mo/Tc/Ru/Rh/Pd, Pr³⁺, Pu³⁺), the data
     file's blocks exactly those, and every D32 ion listed (#1689's ``Ru4+`` KeyError gone)."""
     curves = ff.computed_curves()
-    assert len(ff._J0) == 89 and len(ff._TABLE_KEY) == 16
+    assert len(ff._J0) == 89 and len(ff._TABLE_KEY) == 17
     assert {k for k, c in curves.items() if c.kind == "tail"} == set(ff._J0)
     assert {k for k, c in curves.items() if c.kind == "table"} == set(ff._TABLE_KEY.values())
     assert set(ff.magnetic_ions()) == set(ff._J0) | set(ff._TABLE_KEY)
@@ -243,9 +243,51 @@ def test_bare_ru_is_the_neutral_atom_not_the_ru1_curve():
     assert float(ff.j0("Ru", 0.2)) == pytest.approx(want, abs=5.1e-8)
     assert float(ff.j0("Ru", 0.2)) == pytest.approx(0.4163, abs=1e-4)
     assert abs(float(ff.j0("Ru1+", 0.2)) - 0.4268) < 1e-4
-    for bare in ("Mo", "Tc", "Ru", "Rh"):
+    for bare in ("Mo", "Tc", "Ru", "Rh", "Pd"):
         assert bare in ff._TABLE_KEY and bare not in ff._J0
         assert not ff.needs_explicit_g(bare)
+
+
+def test_bare_pd_is_the_named_neutral_curve_at_every_direct_entry_point():
+    """Ruling D63 item 3 (reverses D56's refusal): a closed 4d¹⁰ shell still has ⟨jₙ⟩ curves, so bare ``Pd`` is
+    served like ``Nb`` and ``Sc``, as the computed neutral atom in a named configuration, 4d⁹5s ³D, the lowest one
+    with an open shell to carry a moment.  The likeliest misuse is now a bare label meant as an ion: the value is the
+    neutral atom's, not Pd⁺'s or the old bare row's, and ``approximation_name`` says which configuration it is."""
+    s, v = REF["grid"][("Pd0", "j0")]
+    want = float(v[np.isclose(s, 0.2)][0])
+    got = float(ff.j0("Pd", 0.2))
+    assert got == pytest.approx(want, abs=5.1e-8) and got == pytest.approx(0.4965, abs=1e-4)
+    assert abs(got - 0.4646) > 0.02  # the 4d10 1S ground-state curve, computed the same way
+    assert abs(got - 0.5528) > 0.02  # Brown's old bare row, a Pd+ 4d7 5s2 curve
+    assert abs(got - float(ff.j0("Pd1+", 0.2))) > 5e-3
+    assert float(ff.magnetic_form_factor("Pd", 0.2)) == got
+    assert float(ff.j2("Pd", 0.2)) == pytest.approx(float(REF["grid"][("Pd0", "j2")][1][np.isclose(s, 0.2)][0]),
+                                                    abs=5.1e-8)
+    assert ff.has_ion("Pd") and "Pd" in ff.magnetic_ions() and ff._TABLE_KEY["Pd"] == "Pd0"
+    assert ff.fitted_range("Pd") is None and ff.past_fitted_range("Pd", 2.0) == ()
+    with pytest.raises(KeyError, match="computed table"):
+        ff.coefficients("Pd")
+    name = ff.approximation_name("Pd", None)
+    assert name.startswith(ff.J0_ONLY + "; computed table (Cowan RCN Mod 36.2.5, Hartree-Fock, Hund's-rule LS term")
+    assert "Pd 4d9 5s 3D (neutral, excited configuration; ground 4d10 1S)" in name
+    assert ff.COMPUTED_LABEL in name and ff.footing_name("Pd") in name
+
+
+def test_bare_pd_builds_a_phase_reads_from_a_magcif_and_is_picked_by_the_solver(tmp_path):
+    """Where a fit, a reader and the solver take an ion, bare ``Pd`` now resolves to the neutral table, as bare
+    ``Mn`` does: the phase builds, the magCIF override takes, and the solver's site pick keys it ``Pd``."""
+    from rietx.crystallography.cif import structure_from_cif
+    from rietx.strategy.magnetic import _magnetic_sites
+    from tests.test_magcif import _fixture
+
+    assert _rutile("Pd", "Pd", MNF2_CELL).atoms[0].moment.ion == "Pd"
+    read = structure_from_cif(str(_fixture(tmp_path, "LaMnO3")), moment_ions={"Mn1": "Pd"})
+    assert [a.moment.ion for a in read.phases[0].atoms if a.moment is not None] == ["Pd"]
+    phase = _rutile("Mn", "Mn2+", MNF2_CELL).model_copy(update={"atoms": [
+        _atom("Pd1", "Pd", (0.0, 0.0, 0.0)), _atom("F", "F", (0.3050, 0.3050, 0.0))],
+        "magnetic_symmetry": None})
+    assert _magnetic_sites(phase, None, ["Pd"], "Pd")[0] == [(0, "Pd1", "Pd")]
+    assert _magnetic_sites(phase, None, ["Pd"], None)[0] == [(0, "Pd1", "Pd")]
 
 
 # ============================================================= refusals, before any work
@@ -259,39 +301,6 @@ def no_work(monkeypatch):
     monkeypatch.setattr(ff, "_jn", boom)
     monkeypatch.setattr(ff, "_spline", boom)
     monkeypatch.setattr(ff, "computed_curves", boom)
-
-
-def test_bare_pd_is_refused_before_any_work_at_every_direct_entry_point(no_work):
-    """Rule 4's likeliest misuse: bare ``Pd`` taken as a neutral row.  Its old row was a Pd⁺ curve and neutral Pd
-    is 4d¹⁰ ¹S, non-magnetic; every entry point raises naming ``Pd1+``."""
-    calls = (lambda: ff.j0("Pd", 0.2), lambda: ff.j2("Pd", 0.2),
-             lambda: ff.magnetic_form_factor("Pd", 0.2), lambda: ff.approximation_name("Pd", None),
-             lambda: ff.coefficients("Pd"), lambda: ff.fitted_range("Pd"),
-             lambda: ff.past_fitted_range("Pd", 2.0), lambda: ff.footing_name("Pd"))
-    for call in calls:
-        with pytest.raises(KeyError, match=r"Pd1\+") as err:
-            call()
-        assert "4d10 1S" in str(err.value)
-    assert not ff.has_ion("Pd") and "Pd" not in ff.magnetic_ions()
-
-
-def test_bare_pd_is_refused_on_a_phase_a_magcif_read_and_a_magnetic_solve(tmp_path):
-    """The same refusal where a fit, a reader and the solver take an ion: the phase is never built."""
-    from rietx.crystallography.cif import structure_from_cif
-    from rietx.strategy.magnetic import _magnetic_sites
-    from tests.test_magcif import _fixture
-
-    with pytest.raises(ValueError, match=r"Pd1\+"):
-        _rutile("Pd", "Pd", MNF2_CELL)
-    with pytest.raises(ValueError, match=r"Pd1\+"):
-        structure_from_cif(str(_fixture(tmp_path, "LaMnO3")), moment_ions={"Mn1": "Pd"})
-    phase = _rutile("Mn", "Mn2+", MNF2_CELL).model_copy(update={"atoms": [
-        _atom("Pd1", "Pd", (0.0, 0.0, 0.0)), _atom("F", "F", (0.3050, 0.3050, 0.0))],
-        "magnetic_symmetry": None})
-    with pytest.raises(ValueError, match=r"ion='Pd'.*Pd1\+"):
-        _magnetic_sites(phase, None, ["Pd"], "Pd")
-    with pytest.raises(ValueError, match=r"species 'Pd'.*Pd1\+"):
-        _magnetic_sites(phase, None, ["Pd"], None)
 
 
 def test_past_s_6_every_row_is_refused_before_any_work(no_work):
@@ -395,6 +404,7 @@ def test_approximation_name_names_every_rows_footing():
         assert "computed table (GRASP2018, Dirac-Fock" in name(ion, 0.8) and "Brown" not in name(ion, 0.8)
     assert "row: neutral Sc in an excited configuration, 3d2 4s 4F" in name("Sc", None)
     assert "row: neutral Nb in an excited configuration, 4d3 5s2 4F" in name("Nb", None)
+    assert "Pd 4d9 5s 3D (neutral, excited configuration; ground 4d10 1S)" in name("Pd", None)
     assert "non-Hund term 1G" in name("Ti", None)
     for ion in ("Cr", "Ni"):
         assert "row: footing not identified" in name(ion, None)

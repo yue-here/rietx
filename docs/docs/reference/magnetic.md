@@ -152,7 +152,7 @@ The components are written back from those at the end of each stage and carry no
 `Moment.ion` is not `Atom.species`.
 The neutron scattering length is keyed by nuclide and the form factor by oxidation state.
 An ion the table does not carry is refused by name rather than mapped to a neighbour.
-A bare element symbol is the neutral atom: `"Ru"` is neutral Ru, not Ru<sup>+</sup>, and bare `"Pd"` is refused, because neutral Pd carries no moment; write `"Pd1+"` for Pd<sup>+</sup>.
+State the charge: a bare d-block symbol is the neutral atom, in the configuration `approximation_name` names (`"Ru"` is neutral Ru 4d<sup>7</sup>5s, not Ru<sup>+</sup>; `"Pd"` is neutral Pd 4d<sup>9</sup>5s <sup>3</sup>D), a bare lanthanide or actinide symbol in a magCIF or a `solve_magnetic` site is read as its usual magnetic ion and reported as [`MAGNETIC_ION_ASSUMED`](diagnostics-structures.md#magnetic_ion_assumed) (as `Moment.ion` it is refused), and a site that is an ion is written as one, `"Fe3+"`.
 The table serves every row on s = sinθ/λ ≤ 6 Å<sup>−1</sup> and refuses a reflection past it at the stage compile (the rows, their footing and the free-ion caveat are in {eq}`int-ff-tail`'s section of the theory page).
 Leave `Moment.g` as `None` for a 3d or 4d ion, where the spin-only g = 2 makes the ⟨j<sub>2</sub>⟩ term of the dipole approximation vanish.
 Set it for a 4f or 5f ion, where that term does not vanish: an absent g there is refused, because a default would drop a term worth tens of per cent at high angle.
