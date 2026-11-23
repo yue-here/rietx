@@ -11,7 +11,8 @@ describe("the workflows", () => {
 
   it("mark every one not built in the rebuilt page, and only those", () => {
     expect(WORKFLOWS.filter((w) => isNotBuilt(w.id)).map((w) => w.id))
-      .toEqual(["series", "solve", "rigid"]);
+      .toEqual(["solve", "rigid"]);
+    expect(menuLabel(workflow("series"))).toBe("Series");
     expect(menuLabel(workflow("index"))).toBe("Peaks and indexing");
     expect(menuLabel(workflow("refine"))).toBe("Refinement");
     expect(menuLabel(workflow("solve"))).toBe("Structure solution · not built yet");

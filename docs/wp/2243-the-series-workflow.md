@@ -153,10 +153,10 @@ disagree on wavelength, range or step; a blank pattern) names its tier here befo
 ## Tasks
 
 - [x] 1. File this WP; the milestone's R7 row names it.
-- [ ] 2. The workflow built at `/next` with the Patterns step: Add files… for many files,
+- [x] 2. The workflow built at `/next` with the Patterns step: Add files… for many files,
   Sort by <axis>, the table with the typed coordinate and ×, the axis name, Order, More
   settings with the carried-over globs, and a foot with Run series. A vitest mount case.
-- [ ] 3. The Run step: Run series, the status line and progress bar, the table folded from the
+- [x] 3. The Run step: Run series, the status line and progress bar, the table folded from the
   run's events as fits land, Stop, and See results and Run again after.
 - [ ] 4. The Results step: the summary rows, the per-pattern table, the Plot list, the
   selected pattern's warnings, the series' warnings and the largest steps.

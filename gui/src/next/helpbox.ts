@@ -114,7 +114,8 @@ export const HISTORY_HELP: HelpBoxEntry = {
 };
 
 /** What a workflow's `?` box says, at the right of its step strip (WP-2240):
- *  the prototype's words for the workflow (round 11), cut to the steps built. */
+ *  the prototype's words for each workflow (rounds 11 and 12), cut to the
+ *  steps built. */
 export const WORKFLOW_HELP: Partial<Record<WorkflowId, HelpBoxEntry>> = {
   index: {
     title: "Peaks and indexing",
@@ -124,5 +125,14 @@ export const WORKFLOW_HELP: Partial<Record<WorkflowId, HelpBoxEntry>> = {
       "Picking again replaces the list, and says first how many of your edits it replaces.",
     ],
     anchor: "peaks",
+  },
+  series: {
+    title: "Series",
+    lead: "Refine many patterns in turn, each starting from its neighbour's result: a temperature ramp, an in-situ run.",
+    items: [
+      "Patterns: the files in series order and how to walk them. Type each pattern's value of the series axis; Sort by puts them in that order.",
+      "Run: each fit as it lands. Stop keeps the patterns already fitted.",
+    ],
+    anchor: "series",
   },
 };
