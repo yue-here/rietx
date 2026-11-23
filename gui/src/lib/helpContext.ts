@@ -24,11 +24,9 @@ export interface HelpOpener {
   toggle(node: HTMLElement, request: HelpRequest): void;
   /** whether the popover is currently anchored to this term */
   isOpen(node: HTMLElement): boolean;
-  /** whether a click landed in the open popover. A layer that closes on a
-   *  click away asks this first: the popover explains a term inside the
-   *  layer but is drawn outside it, so a click on it is not a click away
-   *  (WP-2244) */
-  contains(target: Node | null): boolean;
+  /** close whatever is open; a term that leaves the page calls it, so the
+   *  popover is never left anchored to nothing (WP-2244) */
+  close(): void;
 }
 
 export const HELP_CONTEXT = Symbol("rietx.help");

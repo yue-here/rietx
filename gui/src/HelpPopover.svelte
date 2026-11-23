@@ -36,10 +36,6 @@
       return this.node === node;
     }
 
-    contains(target: Node | null): boolean {
-      return !!target && this.el?.contains(target) === true;
-    }
-
     toggle(node: HTMLElement, request: HelpRequest): void {
       if (this.node === node) {
         this.close();
@@ -76,7 +72,14 @@
    *  so it runs first, and `stopImmediatePropagation` keeps the same Esc from
    *  also closing a dialog the term sits in or cancelling a run. Esc means
    *  "close the thing that just opened", and the popover is drawn over every
-   *  layer. */
+   *  layer.
+   *
+   *  A press inside the popover is held back from every later window listener
+   *  the same way. A layer closes on a press outside itself, and the popover
+   *  explaining one of its labels floats outside it, so without this the
+   *  stage settings closed when the person clicked the explanation. Holding
+   *  it here covers every layer, present and future; the press's default
+   *  action, a link's navigation or a text selection, is untouched. */
   export function provideHelp(): HelpHost {
     const host = new HelpHost();
     setContext<HelpOpener>(HELP_CONTEXT, host);
@@ -86,8 +89,16 @@
       event.preventDefault();
       host.close(true);
     };
+    const onpress = (event: Event) => {
+      if (host.el?.contains(event.target as Node | null)) event.stopImmediatePropagation();
+    };
+    const presses = ["pointerdown", "mousedown", "click"] as const;
     window.addEventListener("keydown", onkey, true);
-    onDestroy(() => window.removeEventListener("keydown", onkey, true));
+    for (const kind of presses) window.addEventListener(kind, onpress, true);
+    onDestroy(() => {
+      window.removeEventListener("keydown", onkey, true);
+      for (const kind of presses) window.removeEventListener(kind, onpress, true);
+    });
     return host;
   }
 </script>
@@ -159,9 +170,19 @@
   // there is nothing useful to do about it: re-measuring would chase a term
   // that may have left the screen entirely. Closing is honest and costs one
   // click.
-  function reanchor() {
+  function resized() {
     viewport = { width: window.innerWidth, height: window.innerHeight };
     if (host.request) host.close();
+  }
+
+  // Only a scroll of a box that holds the term moves it. The console follows a
+  // run by scrolling its own pane, and that scroll must not close an
+  // explanation open elsewhere.
+  function scrolled(event: Event) {
+    if (!host.request) return;
+    const box = event.target as Node | null;
+    if (box && host.node && !box.contains(host.node)) return;
+    host.close();
   }
 
   /** A click outside the popover and its own term closes it. */
@@ -173,7 +194,7 @@
   }
 </script>
 
-<svelte:window onclick={clickAway} onresize={reanchor} onscrollcapture={reanchor} />
+<svelte:window onclick={clickAway} onresize={resized} onscrollcapture={scrolled} />
 
 {#if host.request}
   <!-- `data-flipped` is the only way to tell a flip from a clamp that landed on

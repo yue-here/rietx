@@ -12,6 +12,8 @@ vi.mock("../lib/stream", async (original) => ({
   follow: () => () => {},
 }));
 
+import Help from "../Help.svelte";
+import { HELP_CONTEXT, type HelpOpener } from "../lib/helpContext";
 import Frame from "./Frame.svelte";
 
 const PROJECT = { path: "/tmp/fap.rex", name: "fap", head: "n0001", n_nodes: 2, n_phases: 1,
@@ -98,6 +100,24 @@ describe("the help popover at /next", () => {
     expect(document.activeElement).toBe(shown);
   });
 
+  it("stays open through a scroll that cannot move its term, and closes on one that can",
+     async () => {
+    app = mount(Frame, { target: document.body });
+    await settle();
+    term()!.click();
+    await settle();
+    // a pane beside the term, as the console is when it follows a run
+    const aside = document.createElement("div");
+    document.body.appendChild(aside);
+    aside.dispatchEvent(new Event("scroll"));
+    await settle();
+    expect(popover()).toBeTruthy();
+
+    document.dispatchEvent(new Event("scroll"));
+    await settle();
+    expect(popover()).toBeNull();
+  });
+
   it("closes on Esc before any other listener sees it, and gives focus back", async () => {
     app = mount(Frame, { target: document.body });
     await settle();
@@ -120,5 +140,42 @@ describe("the help popover at /next", () => {
     } finally {
       window.removeEventListener("keydown", later, true);
     }
+  });
+
+  it("is never a press away from a layer, which closes on a press outside itself",
+     async () => {
+    app = mount(Frame, { target: document.body });
+    await settle();
+    const away = vi.fn();
+    // a layer's click-away, added after the page as every layer's is
+    for (const kind of ["pointerdown", "mousedown", "click"]) {
+      window.addEventListener(kind, away, true);
+    }
+    try {
+      term()!.click();
+      await settle();
+      away.mockClear();
+      const inside = popover()!.querySelector("h2")!;
+      for (const kind of ["pointerdown", "mousedown", "click"]) {
+        inside.dispatchEvent(new MouseEvent(kind, { bubbles: true }));
+      }
+      expect(away).not.toHaveBeenCalled();
+      expect(popover()).toBeTruthy();
+    } finally {
+      for (const kind of ["pointerdown", "mousedown", "click"]) {
+        window.removeEventListener(kind, away, true);
+      }
+    }
+  });
+});
+
+describe("a help term", () => {
+  it("closes the popover it opened when it leaves the page", () => {
+    const opener: HelpOpener = { toggle: vi.fn(), isOpen: () => true, close: vi.fn() };
+    const term = mount(Help, { target: document.body, context: new Map([[HELP_CONTEXT, opener]]) });
+    flushSync();
+    unmount(term);
+    flushSync();
+    expect(opener.close).toHaveBeenCalledTimes(1);
   });
 });
