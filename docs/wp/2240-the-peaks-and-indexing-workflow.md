@@ -182,6 +182,18 @@ package. `src/rietx/_audit.py` is untouched.
   Kept as built: the blue lenses over the orange fit, and the thin line for a chosen line left
   out of indexing. The fifth session's entry says how "line, not hollow lens" was read.
 
+- **Yue's rulings at the third look, 2026-11-23, verbatim (his words, on `look-r6b`):**
+  "Numbers and their heads are right-aligned. Words and their heads are left-aligned.--I
+  meant this was the problem, not what I asked for--the heading is sometimes over white
+  space. no decimals on fixed angles (90 not 90.0). we'll need a tooltip over the cell
+  relationship mark." The fifth session read his second-look complaint ("title left for
+  text vs right for numbers") as the fix and built it, aligning each head as its column. He
+  meant it as the description of the defect: a head standing over white space beside its
+  values. Built (the sixth session's entry): every head centred over its column's values;
+  each column as wide as its widest head or value; a unit under its name; a set angle
+  written whole (`90`, `120`) with the room of its `.00` kept; the relation mark a `<Help>`
+  term opening a `cell_relations` entry in `rietx.help`.
+
 ## Non-goals
 
 - Search these running a narrowed search; it waits on a route that starts a search over named
@@ -231,6 +243,59 @@ The piece closes when every task is ticked and the maintainer has looked at its 
 the prototype's (WP-2214 § How the maintainer reviews).
 
 ## Handover log
+
+- **2026-11-23 (sixth session)** — Yue's third-look rulings (§ Rulings, verbatim), on #1792.
+  The fifth session had read his "title left for text vs right for numbers" as the fix. He
+  meant it as the defect: a head standing over white space beside its values. Every head in
+  the candidate table now sits centred over its values, a set angle reads `90` or `120`, and
+  the relation mark opens an explanation. The WP stays 🔄 for Yue's look,
+  `~/.cache/ghostshift/rietx/gui-r6/look-r6c/index.html`.
+
+  *Done.* `next/Candidates.svelte`: the table is `width: auto`, so each column is as wide as
+  its widest head or value; every head is centred; each number column's values sit
+  right-aligned in a block `ch` wide enough for its widest value, centred in the cell, so the
+  decimal points still line up; V and Rwp carry their unit on the head's second row; an
+  unchecked row's absent dash spans both absent cells. `lib/peaks.ts`: `cellColumns` writes a
+  set angle whole with `pad: ".00"`, kept as empty room (`.pad`); `Relation` gains `kind` and
+  `key` (`RELATION_KINDS`), and Judge's sentence for a supercell now says the index counts
+  primitive cells. `rietx.help` gains the `cell_relations` arm (`same_cell`, `sublattice`,
+  `containment`), crossed in `tests/test_help.py` against `SupercellCheck.relation`, and
+  wired through `help_registry`, `lib/help.ts`, `tests/test_gui_help.py` and the manual's
+  settings page. The mark is a `<Help for=…>` term: WP-2244 put the popover on `/next`, and
+  `gui/CLAUDE.md` sends authored prose there rather than to `title=`. A click on it does not
+  select the row. `tests/test_gui_layout_browser.py` asserts that every head's ink centre lies
+  inside its values' ink; on ed0224b35's build it fails naming M₂₀ and Unindexed.
+
+  *Measured, by real clicks* (fap, 1440 × 900, light and dark; one search answer served to
+  both builds, hexagonal and monoclinic). How far each head's ink ran past its values' ink,
+  over 12 rows. Before: Unindexed 53.6 px left, Rwp (%) 19.4 px left, Grade 17.8 px right,
+  V (Å³) 5.6 px left, and Absent's dash wholly beside the head on 9 of 12 rows; 97.9 px in
+  all, 53.6 px at worst on one side. After: Unindexed 26.8 px each side, Grade 8.9 px each
+  side, every other head 0; 71.4 px in all, 26.8 px at worst. Drawn and not built: the same
+  packed table with edge-aligned heads (71.4 px, 53.6 px worst) and with units on one line
+  (96.4 px, 26.8 px worst). Every number column's integer parts end at one x within 0.02 px.
+  The table is 894 px wide in a 927 px box, against 927 px before; neither scrolls. No page
+  errors.
+
+  *Settled by Claude, for review.*
+  - The tooltip is the click-opened `<Help>` popover, not a hover tooltip. `gui/CLAUDE.md`
+    names `<Help>` as the one way the GUI explains a name. Alternative: a hover-opened one,
+    which would be a second mechanism. On the look page as question 5.
+  - The relation's text lives in a new help arm rather than in `RESULT_FIELD_HELP`, which
+    would need an entry for each of `SupercellCheck`'s thirteen fields and has no home for
+    `same_cell`.
+
+  *For Yue to look at* (`look-r6c/index.html`). 1. Centred heads (built) or edge-aligned
+  heads on the packed table (drawn). 2. Units under their names (built) or on one line
+  (drawn). 3. "Unindexed" still overhangs its counts; removing that needs a shorter name, a
+  two-line head or a wider value. 4. Grade words centred while Lattice words stay left.
+  5. Whether a click-opened explanation is enough.
+
+  *Gates* (arm64 Mac, worktree venv `[dev]` + playwright, the merged tree). The fast suite:
+  15406 passed, 438 skipped, 32 xfailed, against the fifth session's 15404 passed and 1
+  failed. The one new test is the `cell_relations` crossing, and the fifth session's
+  Series browser failure passed. vitest: 65 files, 1020 passed (one new case).
+  svelte-check: 0 errors over 497 files. ruff clean. The candidate-table browser test passed.
 
 - **2026-11-23 (fifth session)** — Yue's second-look rulings (§ Rulings, verbatim), on #1792.
   A chosen cell's lines on the Pattern graph are now grey. The candidate table is realigned by
