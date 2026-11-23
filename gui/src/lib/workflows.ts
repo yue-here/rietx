@@ -50,7 +50,7 @@ export const WORKFLOWS: readonly Workflow[] = [
     graphs: ["pattern", "peaks"],
     steps: [
       { name: "Pick peaks", body: "Click the pattern to add a line; drag to move it.", built: true },
-      { name: "Fit peaks", body: "Each line fitted in its window, with its own esd." },
+      { name: "Fit peaks", body: "Each line fitted in its window, with its own esd.", built: true },
       { name: "Index", body: "Engines, crystal systems, centrings, cell bounds, formula." },
       { name: "Judge",
         body: "Screen extinctions, check each candidate by a whole-pattern Pawley fit, then adopt one as a Le Bail start." },

@@ -24,6 +24,7 @@
   import Palette from "../panels/Palette.svelte";
   import Interactive from "./Interactive.svelte";
   import Background from "./Background.svelte";
+  import PeakFits from "./PeakFits.svelte";
   import Peaks from "./Peaks.svelte";
   import Structure from "./Structure.svelte";
   import Recovery from "../panels/Recovery.svelte";
@@ -173,6 +174,10 @@
    *  the row chosen in its table, and a request to frame a line (WP-2240):
    *  the Pattern graph draws them while the workflow is up. */
   let peaksPayload = $state.raw<PeaksPayload | null>(null);
+  /** the Fit peaks step's windows: the groups its list draws, the one chosen
+   *  and how many the list holds (WP-2240 task 6) */
+  let fitGroups = $state.raw<{ groups: number[]; focused: number | null; total: number }>(
+    { groups: [], focused: null, total: 0 });
   let selectedPeak = $state<number | null>(null);
   /** the workflow panel, whose verbs the plot's peak gestures call */
   let indexingPanel: ReturnType<typeof Indexing> | undefined = $state();
@@ -1003,6 +1008,12 @@
               bind:selectedPeak {frameAt}
               onpeakedit={(e) => indexingPanel?.edit(e) ?? Promise.resolve(false)}
               onpeakundo={() => indexingPanel?.undo() ?? Promise.resolve(false)} />
+          {:else if graphTab === "peaks" && wf === "index"}
+            <!-- while the peaks-and-indexing workflow is up, the Peaks graph
+                 holds the picker's group fits (round 11, call 1) -->
+            <PeakFits peaks={peaksPayload} {theme} {busy} groups={fitGroups.groups}
+              focused={fitGroups.focused} total={fitGroups.total}
+              onrefit={(g) => void indexingPanel?.refit(g)} />
           {:else if graphTab === "peaks"}
             <Peaks {plotKey} {theme} preview={previewAnswer} {previewError}
               rwp={result?.statistics?.rwp ?? null} oncurves={(c) => (baseCurves = c)} />
@@ -1077,7 +1088,8 @@
             <div class="pane wfsteps">
               <Indexing bind:this={indexingPanel} {step} steps={wfSteps ?? []} {busy} {corpus} {say}
                 bind:selected={selectedPeak}
-                onpeaks={(p) => (peaksPayload = p)} onframe={framePeak} />
+                onpeaks={(p) => (peaksPayload = p)} onframe={framePeak} onstep={chooseStep}
+                onfitgroups={(groups, focused, total) => (fitGroups = { groups, focused, total })} />
             </div>
           {/key}
         {/if}

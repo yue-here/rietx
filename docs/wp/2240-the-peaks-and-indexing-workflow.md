@@ -161,7 +161,7 @@ package. `src/rietx/_audit.py` is untouched.
   with a dashed hover mark, a mark click selects with its bar (2θ, Used or Not used, Delete,
   ×), drag moves, Esc during and right after a drag, Option-click removes, right-click opens
   the menu; a typed add row at the table's foot (row 194); ⌘Z and ⇧⌘Z over peak edits.
-- [ ] 6. The Fit step and the group windows with per-line curves in the Peaks graph tab while
+- [x] 6. The Fit step and the group windows with per-line curves in the Peaks graph tab while
   the workflow is up, with refit.
 - [ ] 7. The Index step: the short form and More settings, the progress with Stop and the cells
   found so far, the coverage line, the eight-column candidate table with its relations, and the

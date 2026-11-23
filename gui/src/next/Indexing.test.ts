@@ -51,6 +51,11 @@ const movePeak = vi.fn(async (index: number, tt: number) => {
     : { ...p, two_theta: tt + 0.004, origin: "edited" }), undo: before.length, redo: 0 });
 });
 const undoPeaks = vi.fn(async () => (stored = { ...before.pop()!, undo: before.length, redo: 1 }));
+const refitGroup = vi.fn(async (group: number) => {
+  keepBefore();
+  return (stored = { ...stored, undo: before.length, redo: 0,
+                     api_call: `session.refit_group(${group})` });
+});
 
 vi.mock("../api", () => ({
   ApiError: class extends Error {},
@@ -61,6 +66,7 @@ vi.mock("../api", () => ({
     addPeak: (tt: number) => addPeak(tt),
     movePeak: (i: number, tt: number) => movePeak(i, tt),
     undoPeaks: () => undoPeaks(),
+    refitGroup: (g: number) => refitGroup(g),
   },
 }));
 
@@ -70,6 +76,8 @@ let app: any = null;
 const said: string[] = [];
 const framed: number[] = [];
 let handed: PeaksPayload | null = null;
+const fits: Array<{ groups: number[]; focused: number | null; total: number }> = [];
+const steps: number[] = [];
 
 async function settle() {
   for (let i = 0; i < 12; i++) await tick();
@@ -87,6 +95,9 @@ async function boot(step = 0) {
     step, steps: workflow("index").steps!, say: (_k: string, t: string) => said.push(t),
     onpeaks: (p: PeaksPayload | null) => (handed = p),
     onframe: (r: PeakRow) => framed.push(r.index),
+    onstep: (i: number) => steps.push(i),
+    onfitgroups: (groups: number[], focused: number | null, total: number) =>
+      fits.push({ groups, focused, total }),
   } });
   await settle();
 }
@@ -97,6 +108,8 @@ afterEach(() => {
   document.body.innerHTML = "";
   said.length = 0;
   framed.length = 0;
+  fits.length = 0;
+  steps.length = 0;
   handed = null;
   before = [];
   vi.clearAllMocks();
@@ -207,7 +220,53 @@ describe("the Pick step", () => {
     expect(undoPeaks).toHaveBeenCalledTimes(2);
   });
 
-  it("shows a step not built yet by its sentence", async () => {
+});
+
+describe("the Fit step", () => {
+  const group = (g: number, lo: number, chi2_red: number) => ({
+    group: g, two_theta: [lo, lo + 0.2], y_fit: [1, 1], y_env: [0, 0], delta: [0, 0],
+    chi2_red, n_components: 1 });
+  const fitted = (): PeaksPayload => {
+    const p = listed();
+    p.peaks![2].flags = ["unresolved_shoulder"];
+    return { ...p, groups: [group(0, 20, 1.2), group(1, 31.7, 14.2), group(2, 25.3, 2)] };
+  };
+
+  it("lists the groups worth a look, hands the windows up, and chooses one by its row", async () => {
+    stored = fitted();
+    await boot(1);
+    expect([...document.querySelectorAll(".segmented button")].map(text))
+      .toEqual(["To look at 2", "All groups 3"]);
+    // a χ²ᵣ over 10 or a flag that doubts the window fit (call 13), in 2θ order
+    expect([...document.querySelectorAll("table.groups tbody tr")]
+      .map((tr) => text(tr.querySelector("td")))).toEqual(["25.30–25.50°", "31.70–31.90°"]);
+    expect(fits.at(-1)).toEqual({ groups: [2, 1], focused: null, total: 2 });
+    (document.querySelectorAll("table.groups tbody tr")[1] as HTMLElement).click();
+    flushSync();
+    expect(fits.at(-1)).toEqual({ groups: [1], focused: 1, total: 2 });
+    expect(document.querySelectorAll("table.groups tbody tr")[1].classList.contains("sel")).toBe(true);
+    // choosing the filter again lets the chosen group go
+    button("All groups 3").click();
+    flushSync();
+    expect(fits.at(-1)).toEqual({ groups: [0, 2, 1], focused: null, total: 3 });
+    // Refit, from the graph's window, is one verb and one undo step
+    expect(await app.refit(1)).toBe(true);
+    await settle();
+    expect(refitGroup).toHaveBeenCalledWith(1);
+    expect(said).toContain("session.refit_group(1)");
+    expect(app.canUndo()).toBe(true);
+  });
+
+  it("sends a person with no list back to Pick peaks", async () => {
+    stored = { ...base, peaks: null } as PeaksPayload;
+    await boot(1);
+    button("Pick peaks first").click();
+    expect(steps).toEqual([0]);
+  });
+});
+
+describe("the steps not built yet", () => {
+  it("shows the Index step by its sentence", async () => {
     stored = listed();
     await boot(2);
     expect(text(document.querySelector(".box"))).toBe(workflow("index").steps![2].body);

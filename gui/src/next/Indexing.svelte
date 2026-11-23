@@ -31,7 +31,7 @@
   import Help from "../Help.svelte";
   import { labelFor, type HelpCorpus } from "../lib/help";
   import {
-    filterPeaks, formatIntensity, formatPosition, intensityScale, nearestRow,
+    filterPeaks, formatIntensity, formatPosition, groupRows, intensityScale, nearestRow,
     type PeakEdit, type PeakFilter, type PeakRow, type PeaksPayload,
   } from "../lib/peaks";
   import type { Step } from "../lib/workflows";
@@ -45,6 +45,8 @@
     say = () => {},
     onpeaks = () => {},
     onframe = () => {},
+    onstep = () => {},
+    onfitgroups = () => {},
     selected = $bindable(null),
   }: {
     step?: number;
@@ -56,6 +58,11 @@
     onpeaks?: (payload: PeaksPayload | null) => void;
     /** frame this row's line on the Pattern graph */
     onframe?: (row: PeakRow) => void;
+    /** go to another step */
+    onstep?: (step: number) => void;
+    /** the Fit step's windows: the groups to draw, the one chosen, and how
+     *  many the list holds */
+    onfitgroups?: (groups: number[], focused: number | null, total: number) => void;
     /** the row chosen in the table, bound to the shell, which marks its line
      *  on the Pattern graph; a pick clears it, as the rows are renumbered */
     selected?: number | null;
@@ -322,6 +329,36 @@
   }
 
   const disabled = $derived(busy || working);
+
+  // -- Fit peaks ---------------------------------------------------------
+
+  /** which groups the list shows: the ones worth a look (call 13), or all */
+  let groupFilter = $state<"look" | "all">("look");
+  /** the group chosen in the list; the windows draw six from it onward */
+  let focusedGroup = $state<number | null>(null);
+  const FIT_WINDOWS = 6;
+  const groupList = $derived(rows ? groupRows(payload?.groups ?? [], rows) : []);
+  const nLook = $derived(groupList.filter((g) => g.look).length);
+  const groupsShown = $derived(groupFilter === "all" ? groupList
+    : groupList.filter((g) => g.look));
+
+  function chooseGroups(f: "look" | "all") {
+    groupFilter = f;
+    focusedGroup = null;
+  }
+
+  $effect(() => {
+    const k = Math.max(0, groupsShown.findIndex((g) => g.group === focusedGroup));
+    onfitgroups(groupsShown.slice(k, k + FIT_WINDOWS).map((g) => g.group),
+                focusedGroup, groupsShown.length);
+  });
+
+  /** Fit one group's window again, from the Peaks graph's Refit: one verb,
+   *  so one step ⌘Z takes back. The group keeps its number. */
+  export function refit(group: number): Promise<boolean> {
+    if (busy || working) return Promise.resolve(false);
+    return verb(() => api.refitGroup(group));
+  }
 </script>
 
 {#snippet options()}
@@ -352,7 +389,7 @@
     <div class="body"><p class="box">{steps[step]?.body}</p></div>
   {:else if loadError}
     <div class="body"><p class="bad">The peak list could not be read: {loadError}</p></div>
-  {:else if payload && !rows}
+  {:else if step === 0 && payload && !rows}
     <div class="body">
       <h3>Picking settings</h3>
       {@render options()}
@@ -361,7 +398,45 @@
       <button onclick={pick} disabled={disabled || range === "bad"}>
         {working ? "Picking peaks…" : "Pick peaks"}</button>
     </div>
-  {:else if rows}
+  {:else if step > 0 && payload && !rows}
+    <div class="body">
+      <p class="empty"><button class="ghost" onclick={() => onstep(0)}>Pick peaks first</button></p>
+    </div>
+  {:else if step === 1 && rows}
+    <!-- 2. Fit peaks: each overlap group's window fit, drawn in the Peaks
+         graph; the step has no foot, since Refit is each window's own -->
+    <div class="body">
+      <div class="bar">
+        <span class="segmented" role="group" aria-label="Groups shown">
+          {#each [["look", "To look at", nLook], ["all", "All groups", groupList.length]] as [id, word, n] (id)}
+            <button class:on={groupFilter === id} aria-pressed={groupFilter === id}
+              onclick={() => chooseGroups(id as "look" | "all")}>{word}
+              <span class="count" style:min-width="{String(groupList.length).length}ch">{n}</span></button>
+          {/each}
+        </span>
+      </div>
+      <table class="lines groups">
+        <thead>
+          <tr><th class="r">2θ</th><th class="r">Lines</th>
+            <th class="r">χ²ᵣ</th><th>Note</th></tr>
+        </thead>
+        <tbody>
+          {#each groupsShown as g (g.group)}
+            <tr class:sel={focusedGroup === g.group} data-group={g.group}
+              onclick={() => (focusedGroup = g.group)}>
+              <td class="r num">{g.lo.toFixed(2)}–{g.hi.toFixed(2)}<span class="u">°</span></td>
+              <td class="r num">{g.n}</td>
+              <td class="r num">{g.chi2_red.toFixed(1)}</td>
+              <td class="note">{#each g.flags as f, i (f)}{#if i}, {/if}<Help for="peak_flags:{f}"
+                >{labelFor(corpus, `peak_flags:${f}`)}</Help>{/each}</td>
+            </tr>
+          {:else}
+            <tr><td colspan="4" class="note">No group needs a look.</td></tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+  {:else if step === 0 && rows}
     <div class="body">
       <div class="bar">
         <span class="segmented" role="group" aria-label="Show">
@@ -457,6 +532,10 @@
     gap: 10px;
     padding: 6px 12px;
     border-top: 1px solid var(--line);
+  }
+
+  .empty {
+    margin: 10px 0;
   }
 
   .box {
