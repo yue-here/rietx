@@ -275,11 +275,11 @@ rules in this section are listed in WP-2134 for the GUI style guide.
 - **GUI prose is written under `/yue-docs-style`** (WP-1201): help entries, wizard lines,
   empty states, error text.
 - **What a name means is an entry in `rietx.help`, reached through `<Help>`** (WP-1203).
-  One instance in `App.svelte`. A key is `arm:name`, crossed against
+  One per page, `HelpPopover.svelte`. A key is `arm:name`, crossed against
   `tests/data/gui/help_keys.json`. A field inventory derives its key from the field's
   name where the arm shares the vocabulary (`lib/controls.ts`, `lib/wizard.ts`) and
-  carries it as data otherwise (`lib/model.ts`). `<Help text=…>` is for a sentence the
-  server wrote about one row (`held_because`, a refutation).
+  carries it as data otherwise (`lib/model.ts`). `<Help text=…>` is for the
+  server's sentence about one row (`held_because`, a refutation).
 - **`title=` is what is left over** (WP-1203): a value the layout truncated, or a verb
   phrase on a `<button>`, never authored prose. `lib/help.test.ts` holds an exact
   per-file count, failing both ways.

@@ -1045,6 +1045,82 @@ def test_a_frame_toggle_stays_where_it_was(browser, gui):
     assert not moved, moved
 
 
+#: Whether the open help popover is the topmost thing at its own centre, so a
+#: click there reaches it rather than a panel or a layer under it.
+POPOVER_ON_TOP = """() => {
+  const pop = document.querySelector('.popover[role=dialog]');
+  if (!pop) return false;
+  const r = pop.getBoundingClientRect();
+  return !!document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)?.closest('.popover');
+}"""
+
+
+def test_a_help_term_at_next_opens_its_explanation(browser, gui):
+    """A parameter's name at /next opens its help popover (WP-2244).
+
+    Until this WP only today's page mounted the popover, so every help term at
+    /next did nothing when clicked. The click is a real one; the popover must be
+    on top, inside the window and holding focus, and Esc hands focus back."""
+    url, _ = gui
+    page = _open_next(browser, url, 1300)
+    term = page.locator("[data-row] .label .help").first
+    term.scroll_into_view_if_needed()
+    name = term.text_content().strip()
+    assert page.locator(".popover").count() == 0
+    term.click()
+    _frames(page)
+    popover = page.locator(".popover[role=dialog]")
+    assert popover.count() == 1, f"clicking {name!r} opened nothing"
+    title = popover.locator("h2").text_content().strip()
+    assert title and title == popover.get_attribute("aria-label")
+    assert "Not described yet" not in popover.text_content(), title
+    assert popover.locator("a", has_text="in the manual").count() == 1
+    assert term.get_attribute("aria-expanded") == "true"
+    assert page.evaluate(POPOVER_ON_TOP)
+    box = popover.bounding_box()
+    assert box["x"] >= 0 and box["y"] >= 0
+    assert box["x"] + box["width"] <= 1300 and box["y"] + box["height"] <= 900, box
+    assert page.evaluate("document.activeElement.matches('.popover')")
+    page.keyboard.press("Escape")
+    _frames(page)
+    assert popover.count() == 0
+    assert page.evaluate("document.activeElement.matches('[data-row] .label .help')")
+    assert not page.errors, page.errors
+    page.close()
+
+
+def test_a_help_term_in_the_stage_settings_leaves_them_open(browser, gui):
+    """The stage settings' labels are help terms, and their popover floats outside
+    the settings layer (WP-2244). A click in the popover is not a click away from
+    the layer, and the Esc that closes the popover closes nothing else."""
+    url, _ = gui
+    page = _open_next(browser, url, 1300)
+    page.locator("section .tabs [role=tab]", has_text="Plan").first.click()
+    page.get_by_role("button", name="Stage 1 actions", exact=True).click()
+    page.get_by_role("menuitem", name="Stage settings…").click()
+    layer = page.locator("form.float.settings")
+    layer.wait_for()
+    layer.locator(".help").first.click()
+    _frames(page)
+    popover = page.locator(".popover[role=dialog]")
+    assert popover.count() == 1
+    assert page.evaluate(POPOVER_ON_TOP)
+    box = popover.bounding_box()
+    page.mouse.click(box["x"] + 12, box["y"] + 8)
+    _frames(page)
+    assert layer.count() == 1, "a click in the popover closed the stage settings"
+    assert popover.count() == 1
+    page.keyboard.press("Escape")
+    _frames(page)
+    assert popover.count() == 0
+    assert layer.count() == 1, "the popover's Esc closed the stage settings too"
+    page.keyboard.press("Escape")
+    _frames(page)
+    assert layer.count() == 0
+    assert not page.errors, page.errors
+    page.close()
+
+
 #: The refinement window's own places (WP-2216): the graph's title line and its
 #: controls, the plot, the legend gutter, the action bar and the status bar.
 WINDOW_LANDMARKS = NEXT_LANDMARKS + [

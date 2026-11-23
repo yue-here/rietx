@@ -27,6 +27,7 @@
   import Peaks from "./Peaks.svelte";
   import Structure from "./Structure.svelte";
   import Recovery from "../panels/Recovery.svelte";
+  import HelpPopover, { provideHelp } from "../HelpPopover.svelte";
   import { projectStem } from "../lib/filemenu";
   import type { HelpCorpus } from "../lib/help";
   import { RecoveryWriter, combine, readDraft, restoredText, type Draft,
@@ -64,6 +65,12 @@
            type BottomTab, type GraphTab, type ModelTab } from "./tabs";
 
   let project = $state<any>(null);
+  /** The open project's identity on this page, bumped by `opened` and nowhere
+   *  else (WP-2242). `head` cannot tell two projects apart, since node ids
+   *  repeat across them (`n0000`, `n0001`, …), and neither can the path, which
+   *  a reset example keeps. Every panel whose state is the project's sits
+   *  inside `{#key opens}` and starts over. */
+  let opens = $state(0);
   let version = $state<any>(null);
   let run = $state<RunState | null>(null);
   let lines = $state.raw<Line[]>([]);
@@ -77,6 +84,8 @@
   let openError = $state("");
   let newOpen = $state(false);
   let corpus = $state<HelpCorpus | null>(null);
+  /** the page's one help popover, which every `<Help>` term opens (WP-2244) */
+  const help = provideHelp();
 
   /** The last fit (`/api/result`), and a key bumped whenever its curves moved. */
   let result = $state.raw<any>(null);
@@ -337,13 +346,19 @@
   }
 
   async function loadResult() {
+    result = await readResult();
+    plotKey += 1;
+  }
+
+  /** The last fit, read but not yet published, so an open can publish it with
+   *  the project it belongs to. */
+  async function readResult(): Promise<any> {
     try {
-      result = (await api.result()).result;
+      return (await api.result()).result;
     } catch {
       // no fit yet is an empty state; the graph says what it can draw
-      result = null;
+      return null;
     }
-    plotKey += 1;
   }
 
   /**
@@ -410,8 +425,17 @@
     }
   }
 
+  /** Every opener lands here. The panels keyed on `opens` start over by
+   *  themselves; this resets what the frame holds for the project beside
+   *  them. What it leaves is the session's on purpose: the theme, the layout,
+   *  the tab and workflow choices, the refine choice, the Console. */
   async function opened(doc: any) {
+    // after the edits are kept, so a pending value is saved for the project
+    // it was typed in before its panel goes
     await leaveEdits();
+    // the next project's fit is read before anything is published, so the
+    // keyed graphs mount on it in the same flush and fetch their curves once
+    const fit = await readResult();
     // the script is this project's session: another project's calls are not
     calls = [];
     // the peak list is the project's (`peaks.json`): another project's rows,
@@ -419,16 +443,36 @@
     peaksPayload = null;
     selectedPeak = null;
     frameAt = null;
+    protocolError = "";
+    baseCurves = null;
+    reading = null;
+    // what the keyed panels hand up, which a fresh panel has not said yet
+    pendingTouched = 0;
+    pendingInvalid = "";
+    pendingHolds = new Map();
+    sliderTouched = 0;
+    sliderValues = null;
+    sliderPreview = null;
+    sliderPreviewError = "";
+    textPreview = null;
+    textPreviewError = "";
+    planEdited = false;
+    textEdited = false;
+    textWhy = "";
     project = doc;
+    opens += 1;
+    result = fit;
+    plotKey += 1;
     openError = "";
     newOpen = false;
-    const [, free] = await Promise.all([loadResult(), freeCount()]);
+    const free = await freeCount();
     sayPreamble(free);
     await offerRecovery();
   }
 
   /** Leave the open project's pending edits behind as its recovery copy, and
-   *  clear them from the panel, which stays mounted across an open. */
+   *  clear them from the panels before `opens` starts them over (WP-2242), so
+   *  the effect above never writes one project's edits under the next's path. */
   async function leaveEdits() {
     await recoveryWriter.flush();
     recoveryWriter.disarm();
@@ -995,6 +1039,7 @@
           {/if}
         </div>
         <div class="pane">
+          {#key opens}
           {#if graphTab === "pattern"}
             <Pattern {result} {plotKey} {theme} {protocol} {extent} {wavelengths} {busy}
               {protocolError} onprotocol={setProtocol} onreadout={(r) => (reading = r)}
@@ -1020,6 +1065,7 @@
           {:else}
             <p class="unbuilt">Not built yet.</p>
           {/if}
+          {/key}
         </div>
       </section>
     {/if}
@@ -1072,17 +1118,16 @@
             {/if}
           </div>
         {/if}
-        <!-- mounted for the workflow's life, so a step switch keeps the list's
-             filter and the chosen row; keyed on the project, since the list
-             is read once on mount and its row numbers are that project's -->
+        <!-- each pane is the project's, so another project's open starts each
+             over (`opens`); the Indexing list is mounted for the workflow's
+             life, so a step switch keeps its filter and the chosen row -->
+        {#key opens}
         {#if wf === "index"}
-          {#key project.path}
-            <div class="pane wfsteps">
-              <Indexing bind:this={indexingPanel} {step} steps={wfSteps ?? []} {busy} {corpus} {say}
-                bind:selected={selectedPeak}
-                onpeaks={(p) => (peaksPayload = p)} onframe={framePeak} />
-            </div>
-          {/key}
+          <div class="pane wfsteps">
+            <Indexing bind:this={indexingPanel} {step} steps={wfSteps ?? []} {busy} {corpus} {say}
+              bind:selected={selectedPeak}
+              onpeaks={(p) => (peaksPayload = p)} onframe={framePeak} />
+          </div>
         {/if}
         {#if wf === "series"}
           {#key project.path}
@@ -1127,6 +1172,7 @@
             }}
             onpending={(edited, why) => { textEdited = edited; textWhy = why; }} />
         </div>
+        {/key}
         {#if !wfSteps}
           <ActionBar bind:mode={refineMode} {touched} {invalid}
             {busy} {blocked} stats={barStats} stages={project?.doc?.plan?.stages?.length ?? null} onapply={() => applyPending()}
@@ -1166,7 +1212,7 @@
       <div class="pane" class:gone={bottomTab !== "history"}>
         <!-- keyed on the project: two projects' heads can share an id, and
              History re-reads only when its head changes -->
-        {#key project.path}
+        {#key opens}
           <History {head} {busy} {say} view={historyView} compared={compared?.id ?? null}
             oncount={(n) => (historyCount = n)} oncompare={(c) => (compared = c)}
             onrestore={(plan) => paramsPanel?.loadRestore(plan)} onmoved={structureMoved} />
@@ -1227,6 +1273,8 @@
   <Settings choice={themeChoice} onchoose={chooseTheme}
     version={version?.package_version ?? ""} onclose={() => (settingsOpen = false)} />
 {/if}
+
+<HelpPopover host={help} {corpus} />
 
 <style>
   .topbar,
