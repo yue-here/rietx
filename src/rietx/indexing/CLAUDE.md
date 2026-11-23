@@ -204,13 +204,13 @@ roughly the shift.
 ## More rules, each learned the hard way
 
 - **A component that refines onto its zero intensity bound is not a line**
-  (WP-1110). A peak reaches its window only through `intensity × profile`, so
-  such a component has no gradient on its own position, and its esd cannot be
-  measured. `_prune` cannot reach them — it tests only *shoulder* seeds, by the
-  deliberate asymmetry in its docstring — so `no_intensity` is a flag in
-  `PEAK_UNUSABLE_FLAGS`, tested with the refinement's own `BOUND_HIT_RTOL`, and
-  **flagged rather than dropped** because a report must be able to say why a
-  line went and because a component a *human* placed is theirs to remove.
+  (WP-1110). A peak reaches its window only via `intensity × profile`, so it has
+  no gradient on its own position and no esd. `_prune` tests only
+  *shoulder* seeds, so `no_intensity` is a flag in `PEAK_UNUSABLE_FLAGS`, tested
+  with `BOUND_HIT_RTOL`, and **flagged rather than dropped**:
+  a report must say why a line went, and a component a *human* placed is theirs to
+  remove. Same under `PEAK_NO_INTENSITY_SIGMA` (WP-1909): **repair at the flag, never
+  the envelope**: it feeds the width census, `screen.py`, `extinction.py`.
 
 - **A filter inside a search fails with a wrong *answer*, so a silence indicts the
   filters before the tolerance.** `engines.solution_key` is the one dedup authority —
