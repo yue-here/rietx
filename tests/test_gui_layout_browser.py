@@ -2137,6 +2137,47 @@ def _row(page, step: str):
     return page.locator("table.hist tbody tr", has=page.locator("td.what", has_text=step))
 
 
+#: The candidate table's heads whose ink centre lies outside the ink of the
+#: values under them, as `[label, centre, left, right]` (WP-2240, the third
+#: look). Ink is a `Range` over the text, never a box: a head over white space
+#: sits inside its own cell. A head spanning several columns is read against
+#: the values of all of them.
+_HEADS_OVER_VALUES = r"""() => {
+  const t = document.querySelector('table.cands');
+  const ink = (el) => {
+    const r = document.createRange(); r.selectNodeContents(el);
+    const q = [...r.getClientRects()].filter((x) => x.width > 0.5);
+    return q.length ? [Math.min(...q.map((x) => x.left)), Math.max(...q.map((x) => x.right))] : null;
+  };
+  const grid = []; const heads = [];
+  [...t.tHead.rows].forEach((tr, ri) => {
+    grid[ri] = grid[ri] || []; let c = 0;
+    for (const th of tr.cells) {
+      while (grid[ri][c]) c++;
+      for (let dr = 0; dr < th.rowSpan; dr++) for (let dc = 0; dc < th.colSpan; dc++) {
+        grid[ri + dr] = grid[ri + dr] || []; grid[ri + dr][c + dc] = th; }
+      heads.push([th, c, th.colSpan]); c += th.colSpan;
+    }
+  });
+  const off = [];
+  for (const [th, first, n] of heads) {
+    const h = ink(th); if (!h) continue;
+    let l = Infinity, r = -Infinity;
+    for (const tr of t.tBodies[0].rows) {
+      let c = 0;
+      for (const td of tr.cells) {
+        const v = c >= first && c < first + n ? ink(td) : null;
+        if (v) { l = Math.min(l, v[0]); r = Math.max(r, v[1]); }
+        c += td.colSpan;
+      }
+    }
+    const mid = (h[0] + h[1]) / 2;
+    if (r > l && (mid < l || mid > r)) off.push([th.innerText, mid, l, r]);
+  }
+  return off;
+}"""
+
+
 def _ink_pixels(page, hex_colour: str) -> int:
     """Pixels of the plot within a small distance of one colour: what the
     canvas painted, never the option it was handed."""
@@ -2497,6 +2538,10 @@ def test_the_fit_index_and_judge_steps_run_to_an_adopted_cell(browser, tmp_path_
         _frames(page)
         assert "sel" in (rows.first.get_attribute("class") or "")
         assert _ink_pixels(page, candidate) > drawn + 50
+        # every head is centred over its column's values, never over white
+        # space beside them (Yue, the third look, 2026-11-23)
+        off = page.evaluate(_HEADS_OVER_VALUES)
+        assert off == [], off
 
         # Judge: screen the extinctions, choose a group, Adopt, then Apply
         foot = page.locator(".steppane:not(.gone) .foot")

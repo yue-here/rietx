@@ -170,28 +170,33 @@ describe("the Index step", () => {
     // angles under a spanner each, a unit in its head and never in a cell
     const heads = (k: number) =>
       [...document.querySelectorAll(`table.cands thead tr:nth-child(${k}) th`)].map(text);
-    expect(heads(1)).toEqual(["#", "", "Lengths (Å)", "Angles (°)", "Lattice", "V (Å³)", "M₂₀",
-                              "Unindexed", "Absent", "Rwp (%)", "Grade"]);
-    expect(heads(2)).toEqual(["a", "b", "c", "α", "β", "γ"]);
+    // a unit sits under its name, in the head's second row (the third look)
+    expect(heads(1)).toEqual(["#", "", "Lengths (Å)", "Angles (°)", "Lattice", "V", "M₂₀",
+                              "Unindexed", "Absent", "Rwp", "Grade"]);
+    expect(heads(2)).toEqual(["a", "b", "c", "α", "β", "γ", "(Å³)", "(%)"]);
     const rows = [...document.querySelectorAll("table.cands tbody tr")];
     expect([...rows[0].querySelectorAll("td")].map(text))
-      .toEqual(["1", "", "", "9.3750", "9.3750", "6.8900", "90.00", "90.00", "120.00",
+      .toEqual(["1", "", "9.3750", "9.3750", "6.8900", "90", "90", "120",
                 "hexagonal P", "524", "41.3", "2", "34", "of 189", "18.3", "low"]);
-    // what the hexagonal system sets is muted: b, and every angle
-    expect([...rows[0].querySelectorAll("td.fixed")].map(text))
-      .toEqual(["9.3750", "90.00", "90.00", "120.00"]);
-    // a head is aligned as its column: right over numbers, left over words
-    const align = (sel: string) => [...document.querySelectorAll(sel)]
-      .map((e) => (e.classList.contains("r") ? "r" : "l"));
-    expect(align("table.cands thead tr:nth-child(2) th")).toEqual(["r", "r", "r", "r", "r", "r"]);
-    expect(align("table.cands tbody tr:first-child td:nth-child(n+4):nth-child(-n+9)"))
-      .toEqual(["r", "r", "r", "r", "r", "r"]);
+    // what the hexagonal system sets is muted: b, and every angle. A set
+    // angle is written whole, and keeps the room of the `.00` it leaves out
+    // so its integer part sits under a refined angle's (the third look)
+    const fixed = [...rows[0].querySelectorAll("td.fixed")];
+    expect(fixed.map(text)).toEqual(["9.3750", "90", "90", "120"]);
+    expect(fixed.map((td) => (td.querySelector(".pad") as HTMLElement | null)?.style.width ?? null))
+      .toEqual([null, "3ch", "3ch", "3ch"]);
+    // the values sit in a block as wide as the column's widest, which is
+    // what centres them under the head and keeps their points aligned
+    const blk = (k: number) => (rows[0].querySelectorAll("td")[k]
+      .querySelector(".blk") as HTMLElement).style.minWidth;
+    expect([2, 5, 7, 9, 10, 11].map(blk)).toEqual(["6ch", "5ch", "6ch", "3ch", "4ch", "1ch"]);
     // a related row is marked on its own line, never merged (call 8): its
-    // mark and the row it names in two cells, the sentence in the tooltip
-    const [mark, target] = [...rows[1].querySelectorAll("td.rel")];
-    expect([text(mark), text(target)]).toEqual(["≡", "#1"]);
-    expect(mark.getAttribute("title")).toBe("The same cell as #1, under another lattice label.");
-    expect(rows[1].querySelectorAll("td").length).toBe(17);
+    // mark and the row it names, a click away from what the relation means
+    const rel = rows[1].querySelector("td.rel")!;
+    expect([text(rel.querySelector(".relm")), text(rel.querySelector(".relt"))]).toEqual(["≡", "#1"]);
+    expect(rel.querySelector(".help")?.getAttribute("aria-haspopup")).toBe("dialog");
+    expect(rel.hasAttribute("title")).toBe(false);
+    expect(rows[1].querySelectorAll("td").length).toBe(16);
     expect(button("Judge ›").disabled).toBe(true);
     (rows[1] as HTMLElement).click();
     await settle();

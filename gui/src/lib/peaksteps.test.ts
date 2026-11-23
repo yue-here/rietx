@@ -68,12 +68,12 @@ describe("the candidate columns", () => {
   });
   it("split the cell into six columns, marking what symmetry sets", () => {
     const show = (c: Parameters<typeof cellColumns>[0]) =>
-      cellColumns(c).map((x) => `${x.value}${x.fixed ? "*" : ""}`);
-    // equal places per kind, a set angle included, so right is decimal-aligned
+      cellColumns(c).map((x) => `${x.value}${x.pad ? `[${x.pad}]` : ""}${x.fixed ? "*" : ""}`);
+    // a set angle is written whole, its `.00` kept as room (the third look)
     expect(show(cand())).toEqual(
-      ["9.3750", "9.3750*", "6.8900", "90.00*", "90.00*", "120.00*"]);
+      ["9.3750", "9.3750*", "6.8900", "90[.00]*", "90[.00]*", "120[.00]*"]);
     expect(show(cand({ system: "monoclinic", cell: [5.1, 6.2, 7.3, 90, 101.25, 90] })))
-      .toEqual(["5.1000", "6.2000", "7.3000", "90.00*", "101.25", "90.00*"]);
+      .toEqual(["5.1000", "6.2000", "7.3000", "90[.00]*", "101.25", "90[.00]*"]);
     // rhombohedral axes: b and c follow a, β and γ follow α
     expect(show(cand({ system: "trigonal", cell: [5.2, 5.2, 5.2, 55.3, 55.3, 55.3] })))
       .toEqual(["5.2000", "5.2000*", "5.2000*", "55.30", "55.30*", "55.30*"]);
@@ -91,16 +91,20 @@ describe("the candidate columns", () => {
     const big = cand({ cell: [9.375, 9.375, 13.78, 90, 90, 120], supercell_checks: [
       { parent_cell: base.cell, index: 2, verdict: "undecided" }] });
     const list = [big, base, twin];
+    // the index counts primitive cells, which the V column does not
     expect(candidateRelation(list, 0)).toEqual(
-      { mark: "2×", of: 2, text: "A supercell of #2, with 2× its volume." });
+      { mark: "2×", of: 2, kind: "sublattice", key: "cell_relations:sublattice",
+        text: "A supercell of #2: its primitive cell holds 2 of #2's." });
     expect(candidateRelation(list, 1)).toBeNull();
     expect(candidateRelation(list, 2)).toEqual(
-      { mark: "≡", of: 2, text: "The same cell as #2, under another lattice label." });
+      { mark: "≡", of: 2, kind: "same_cell", key: "cell_relations:same_cell",
+        text: "The same cell as #2, under another lattice label." });
     // a containment pair has no index: its number is 0, never a volume ratio
     const dense = cand({ cell: [16.24, 16.24, 7.92, 90, 90, 120], supercell_checks: [
       { parent_cell: base.cell, index: 0, relation: "containment", verdict: "undecided" }] });
     expect(candidateRelation([base, dense], 1)).toEqual(
-      { mark: "⊇", of: 1, text: "Indexes every line #1 does." });
+      { mark: "⊇", of: 1, kind: "containment", key: "cell_relations:containment",
+        text: "Indexes every line #1 indexes, and predicts more." });
   });
   it("write the clock as m:ss", () => {
     expect(clock(109.4)).toBe("1:49");

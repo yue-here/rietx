@@ -513,17 +513,20 @@ export function cellLine(c: Pick<Candidate, "cell" | "cell_esd" | "system">,
   }
 }
 
-/** One of a cell's six columns: the value, and whether symmetry sets it. */
-export interface CellColumn { value: string; fixed: boolean }
+/** One of a cell's six columns: the value, the places it leaves out
+ *  (`pad`), and whether symmetry sets it. */
+export interface CellColumn { value: string; pad: string; fixed: boolean }
 
 /**
  * A candidate's cell as six columns, a, b, c, α, β, γ (the maintainer,
- * 2026-11-23). Every length takes four places and every angle two, a
- * symmetry-fixed one included (`90.00`), so a right-aligned column is
- * aligned on the decimal point too (`gui/STYLE.md` § Numbers; WP-2240 §
- * Handover log cites the table practice). A value the system sets is
- * `fixed`. A trigonal cell on rhombohedral axes ties b and c to a and β and
- * γ to α. A monoclinic cell's free angle is β, as `cellLine` writes it.
+ * 2026-11-23). Every length takes four places and a refined angle two. An
+ * angle the system sets is written whole, `90` or `120` (the maintainer, the
+ * third look, 2026-11-23). Its `pad` is the `.00` it leaves out, which the
+ * table keeps as empty room: the integer part then sits under a refined
+ * angle's, and the column stays aligned on the decimal point. A value the
+ * system sets is `fixed`. A trigonal cell on rhombohedral axes ties b and c
+ * to a and β and γ to α. A monoclinic cell's free angle is β, as `cellLine`
+ * writes it.
  */
 export function cellColumns(c: Pick<Candidate, "cell" | "system">): CellColumn[] {
   const cell = c.cell;
@@ -539,7 +542,8 @@ export function cellColumns(c: Pick<Candidate, "cell" | "system">): CellColumn[]
   return cell.map((v, k) => {
     const set = (setAngles[c.system] ?? []).includes(k);
     const fixed = set || (tiedLengths[c.system] ?? []).includes(k) || tiedAngles.includes(k);
-    return { value: (set ? Math.round(v) : v).toFixed(k < 3 ? 4 : 2), fixed };
+    if (set) return { value: String(Math.round(v)), pad: ".00", fixed };
+    return { value: v.toFixed(k < 3 ? 4 : 2), pad: "", fixed };
   });
 }
 
@@ -547,12 +551,22 @@ const sameCell = (x: readonly number[], y: readonly number[]) =>
   x.length === y.length
   && x.every((v, i) => Math.abs(v - y[i]) <= 1e-9 * Math.max(1, Math.abs(v)));
 
+/** The relations the candidate table names, each a `cell_relations` entry
+ *  in `rietx.help`: `same_cell` is this page's own reading, the other two
+ *  are `SupercellCheck.relation`'s values. */
+export const RELATION_KINDS = ["same_cell", "sublattice", "containment"] as const;
+export type RelationKind = (typeof RELATION_KINDS)[number];
+
 /** How a candidate relates to another reported row, on the row's own line
- *  (the maintainer, 2026-11-23): the mark (`≡`, `⊇`, or the volume ratio
- *  `2×`), the row it points at as `#k` (`of`, counted from 1), and the
- *  sentence its tooltip gives. The mark and the target are two table
- *  cells, so each lines up from row to row. */
-export interface Relation { mark: string; of: number; text: string }
+ *  (the maintainer, 2026-11-23): the mark (`≡`, `⊇`, or the primitive-cell
+ *  ratio `2×`), the row it points at as `#k` (`of`, counted from 1), the
+ *  help key its popover opens (the maintainer, the third look), and the
+ *  sentence Judge prints about this row. */
+export interface Relation { mark: string; of: number; kind: RelationKind; key: string;
+                            text: string }
+
+const relation = (kind: RelationKind, mark: string, of: number, text: string): Relation =>
+  ({ mark, of, kind, key: `cell_relations:${kind}`, text });
 
 /**
  * How candidate `i` relates to another reported row, or null.
@@ -569,18 +583,20 @@ export function candidateRelation(cands: readonly Candidate[], i: number): Relat
   const text = cellText(c.cell);
   for (let k = 0; k < i; k++) {
     if (cellText(cands[k].cell) === text) {
-      return { mark: "≡", of: k + 1,
-               text: `The same cell as #${k + 1}, under another lattice label.` };
+      return relation("same_cell", "≡", k + 1,
+                      `The same cell as #${k + 1}, under another lattice label.`);
     }
   }
   for (const check of c.supercell_checks ?? []) {
     const k = cands.findIndex((o) => sameCell(o.cell, check.parent_cell));
     if (k < 0 || k === i) continue;
-    // a containment pair is no sublattice, so its index is 0 (SupercellCheck)
-    return check.index >= 2
-      ? { mark: `${check.index}×`, of: k + 1,
-          text: `A supercell of #${k + 1}, with ${check.index}× its volume.` }
-      : { mark: "⊇", of: k + 1, text: `Indexes every line #${k + 1} does.` };
+    // a containment pair is no sublattice, so its index is 0 (SupercellCheck);
+    // the index counts primitive cells, which the V column does not
+    return check.relation !== "containment" && check.index >= 2
+      ? relation("sublattice", `${check.index}×`, k + 1,
+                 `A supercell of #${k + 1}: its primitive cell holds ${check.index} of #${k + 1}'s.`)
+      : relation("containment", "⊇", k + 1,
+                 `Indexes every line #${k + 1} indexes, and predicts more.`);
   }
   return null;
 }

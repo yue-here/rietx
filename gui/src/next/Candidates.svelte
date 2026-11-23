@@ -428,7 +428,44 @@
   /** a run with a formula adds Z, the formula units each cell holds (WP-2030) */
   const zColumn = $derived(answer?.result?.formula != null);
 
+  /**
+   * The candidate table's cells as text, and each number column's width in
+   * `ch`. A head sits centred over its column's values (the maintainer, the
+   * third look, 2026-11-23: a head over white space was the defect). The
+   * values keep their alignment inside a block as wide as the column's widest
+   * value, and the block is centred under the head, so a head wider than its
+   * numbers overhangs them evenly. The numbers are Plex Mono, where one `ch`
+   * is one character.
+   */
+  const rows = $derived(candidates.map((c, i) => {
+    const m20 = fomOf(c, "m20");
+    const ab = absentOf(c);
+    return {
+      c, i, rel: candidateRelation(candidates, i), cell: cellColumns(c),
+      v: c.volume.toFixed(0),
+      z: c.formula_units == null ? "–" : c.formula_units.toFixed(2),
+      m20: m20 === null ? "–" : m20.toFixed(1),
+      un: String(unindexedOf(c)),
+      abs: ab ? String(ab.absent) : null, of: ab ? `of ${ab.of}` : null,
+      rwp: c.lebail ? (c.lebail.rwp * 100).toFixed(1) : "–",
+    };
+  }));
+  const ch = $derived.by(() => {
+    const most = (f: (r: (typeof rows)[number]) => string | null) =>
+      Math.max(1, ...rows.map((r) => (f(r) ?? "").length));
+    return {
+      i: most((r) => String(r.i + 1)),
+      cell: [0, 1, 2, 3, 4, 5].map((k) => most((r) => r.cell[k].value + r.cell[k].pad)),
+      rel: most((r) => (r.rel ? `#${r.rel.of}` : "")),
+      v: most((r) => r.v), z: most((r) => r.z), m20: most((r) => r.m20),
+      un: most((r) => r.un), abs: most((r) => r.abs), of: most((r) => r.of),
+      rwp: most((r) => r.rwp),
+    };
+  });
+
 </script>
+
+{#snippet blk(text: string, width: number)}<span class="blk" style:min-width="{width}ch">{text}</span>{/snippet}
 
 {#snippet toggles(names: string[], on: (n: string) => boolean, flip: (n: string) => void, aria: string)}
   <span class="tgs" role="group" aria-label={aria}>
@@ -601,46 +638,53 @@
         <div class="candsw">
         <table class="lines cands">
           <!-- the cell as six columns, and a row's relation to another on its own
-               line, compact, its sentence in a tooltip (the maintainer, 2026-11-23).
-               Each head is aligned as its column is, a unit sits in the head and
-               never in a cell, and a spanner groups the lengths and the angles
-               (WP-2240 § Handover log, fifth session, cites the practice) -->
+               line, compact, its explanation one click away (the maintainer,
+               2026-11-23). Every head is centred over its column's values,
+               which keep their own alignment inside a block (the third look);
+               a unit sits in the head, under its name, and never in a cell;
+               a spanner groups the lengths and the angles -->
           <thead>
-            <tr><th class="r" rowspan="2">#</th><th colspan="2" rowspan="2" aria-label="Relation"></th>
+            <tr><th rowspan="2">#</th><th rowspan="2" aria-label="Relation"></th>
               <th class="span" colspan="3"><span>Lengths (Å)</span></th>
               <th class="span ang" colspan="3"><span>Angles (°)</span></th>
-              <th class="text" rowspan="2">Lattice</th><th class="r" rowspan="2">V (Å³)</th>
-              {#if zColumn}<th class="r" rowspan="2"><Help for={searchHelp(field("formula"))}>Z</Help></th>{/if}
-              <th class="r" rowspan="2">M₂₀</th><th class="r" rowspan="2">Unindexed</th>
-              <th class="r" colspan="2" rowspan="2">Absent</th>
-              <th class="r gap" rowspan="2">Rwp (%)</th><th class="text" rowspan="2">Grade</th></tr>
-            <tr>{#each ["a", "b", "c", "α", "β", "γ"] as n, k (n)}<th class="r" class:ang={k === 3}>{n}</th>{/each}</tr>
+              <th class="text" rowspan="2">Lattice</th><th>V</th>
+              {#if zColumn}<th rowspan="2"><Help for={searchHelp(field("formula"))}>Z</Help></th>{/if}
+              <th rowspan="2">M₂₀</th><th rowspan="2">Unindexed</th>
+              <th colspan="2" rowspan="2">Absent</th>
+              <th class="gap">Rwp</th><th class="text" rowspan="2">Grade</th></tr>
+            <tr>{#each ["a", "b", "c", "α", "β", "γ"] as n, k (n)}<th class:ang={k === 3}>{n}</th>{/each}
+              <th class="unit">(Å³)</th><th class="unit gap">(%)</th></tr>
           </thead>
           <tbody>
-            {#each candidates as c, i (i)}
-              {@const m20 = fomOf(c, "m20")}
-              {@const ab = absentOf(c)}
-              {@const rel = candidateRelation(candidates, i)}
-              <tr class:sel={chosen === i} data-cand={i} onclick={() => { if (i !== chosen) judge(i); }}>
-                <td class="r num">{i + 1}</td>
-                <!-- the sentence rides in the tooltip: `/next` has no help opener yet,
-                     so a `<Help>` term here would answer no click -->
-                <!-- the mark and the row it points at are two cells, so each
-                     lines up from row to row -->
-                <td class="rel relm num" title={rel?.text}>{rel?.mark ?? ""}</td>
-                <td class="rel relt num" title={rel?.text}>{rel ? `#${rel.of}` : ""}</td>
-                {#each cellColumns(c) as col, k (k)}
-                  <td class="r num" class:ang={k === 3} class:fixed={col.fixed}>{col.value}</td>
+            {#each rows as r (r.i)}
+              <tr class:sel={chosen === r.i} data-cand={r.i}
+                onclick={() => { if (r.i !== chosen) judge(r.i); }}>
+                <td class="num">{@render blk(String(r.i + 1), ch.i)}</td>
+                <!-- the mark right-aligned in a fixed room and the row it names
+                     after it, so each lines up from row to row; a click opens
+                     the relation's explanation (`rietx.help`'s cell_relations) -->
+                <td class="rel num">{#if r.rel}<Help for={r.rel.key}><span
+                  class="relm">{r.rel.mark}</span><span class="relt"
+                  style:min-width="{ch.rel}ch">#{r.rel.of}</span></Help>{/if}</td>
+                {#each r.cell as col, k (k)}
+                  <td class="num" class:ang={k === 3} class:fixed={col.fixed}><span class="blk"
+                    style:min-width="{ch.cell[k]}ch">{col.value}{#if col.pad}<span class="pad"
+                    style:width="{col.pad.length}ch"></span>{/if}</span></td>
                 {/each}
-                <td class="text">{c.system} {c.centring}</td>
-                <td class="r num">{c.volume.toFixed(0)}</td>
-                {#if zColumn}<td class="r num">{c.formula_units == null ? "–" : c.formula_units.toFixed(2)}</td>{/if}
-                <td class="r num">{m20 === null ? "–" : m20.toFixed(1)}</td>
-                <td class="r num">{unindexedOf(c)}</td>
-                <td class="r num abs">{ab ? ab.absent : "–"}</td>
-                <td class="r num of">{#if ab}<span class="u">of</span> {ab.of}{/if}</td>
-                <td class="r num gap">{c.lebail ? (c.lebail.rwp * 100).toFixed(1) : "–"}</td>
-                <td class="text">{c.confidence}</td>
+                <td class="text">{r.c.system} {r.c.centring}</td>
+                <td class="num">{@render blk(r.v, ch.v)}</td>
+                {#if zColumn}<td class="num">{@render blk(r.z, ch.z)}</td>{/if}
+                <td class="num">{@render blk(r.m20, ch.m20)}</td>
+                <td class="num">{@render blk(r.un, ch.un)}</td>
+                {#if r.abs === null}
+                  <td class="num" colspan="2">–</td>
+                {:else}
+                  <td class="num abs">{@render blk(r.abs, ch.abs)}</td>
+                  <td class="num of"><span class="blk" style:min-width="{ch.of}ch"><span
+                    class="u">of</span>{r.of?.slice(2)}</span></td>
+                {/if}
+                <td class="num gap">{@render blk(r.rwp, ch.rwp)}</td>
+                <td class="text grade">{r.c.confidence}</td>
               </tr>
             {/each}
           </tbody>
@@ -963,10 +1007,21 @@
     background: color-mix(in srgb, var(--accent) 14%, transparent);
   }
 
-  /* a value the crystal system sets is muted; every value of a kind keeps
-     its places, so a right-aligned column is decimal-aligned too */
+  /* each column as wide as its widest head or value and no wider, so no
+     column carries slack for a head to sit over (the third look) */
+  table.cands {
+    width: auto;
+  }
+
+  /* a value the crystal system sets is muted. A set angle is written whole,
+     and its missing places stay as empty room (`.pad`), so its integer part
+     sits under a refined angle's */
   .cands td.fixed {
     color: var(--muted);
+  }
+
+  .cands .pad {
+    display: inline-block;
   }
 
   /* tabular figures, so equal places put the points under each other */
@@ -974,15 +1029,41 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* a head sits on its column's baseline, aligned as its column is: right
-     over numbers, left over words */
+  /* every head is centred over its column on the column's baseline, and the
+     values sit in a block as wide as the widest of them, centred under it:
+     numbers right-aligned in the block, so the decimal points line up */
   .cands th {
     vertical-align: bottom;
+    text-align: center;
   }
 
-  .cands th.text,
+  .cands td.num {
+    text-align: center;
+  }
+
+  .cands .blk {
+    display: inline-block;
+    text-align: right;
+  }
+
+  /* a word column's values are as wide as the column, so they read from the
+     left; a grade is one short word and sits under its head */
   .cands td.text {
     text-align: left;
+  }
+
+  .cands td.grade {
+    text-align: center;
+  }
+
+  /* a unit under its name: one head over two rows, with no rule between */
+  .cands thead tr:first-child th:not([rowspan]):not(.span) {
+    border-bottom: none;
+    height: auto;
+  }
+
+  .cands th.unit {
+    height: auto;
   }
 
   /* a spanner names a group of columns, centred over them, with a rule
@@ -998,20 +1079,25 @@
     border-bottom: 1px solid var(--line-strong);
   }
 
-  /* the relation: its mark right against the row it names, the two in
-     cells of their own, then a gap before the cell */
+  /* the relation: its mark right-aligned in a room of its own, so a one-
+     glyph mark and `2×` end at one x, then the row it names, read from the
+     left, then a gap before the cell */
   .cands td.rel {
     color: var(--muted);
-  }
-
-  .cands td.relm {
-    text-align: right;
-    padding-right: 0;
-  }
-
-  .cands td.relt {
     text-align: left;
     padding-right: 14px;
+  }
+
+  .cands .relm {
+    display: inline-block;
+    min-width: 2.5ch;
+    text-align: right;
+  }
+
+  .cands .relt {
+    display: inline-block;
+    padding-left: 0.4ch;
+    text-align: left;
   }
 
   /* space separates the lengths from the angles (STYLE.md § Spacing), a
@@ -1027,7 +1113,8 @@
   }
 
   /* the absent count and the lines it is a share of: two cells, so each
-     number is right-aligned in its own column */
+     number is right-aligned in its own column; an unchecked row's dash spans
+     both, centred under the head */
   .cands td.abs {
     padding-right: 0;
   }
