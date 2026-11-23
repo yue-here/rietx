@@ -32,8 +32,10 @@
    *   project remembers another choice.
    *
    * The chart is today's `lib/pattern.ts` figure, through its `/next` copy
-   * (`next/pattern.ts`, drawn to the prototype by the polish), drawn without the peak layer,
-   * which the peaks-and-indexing workflow brings (R6). The three-effect split
+   * (`next/pattern.ts`, drawn to the prototype by the polish). Its peak layer
+   * shows while the peaks-and-indexing workflow is up (R6, WP-2240): the
+   * picked lines' lenses and their fitted curve, the line chosen in the Pick
+   * step's table, and a frame request that zooms to a line. The three-effect split
    * (fetch, knob, mode) is `panels/Plot.svelte`'s, for the same reasons.
    */
   import { untrack } from "svelte";
@@ -47,6 +49,7 @@
     type Protocol, type ResidualKind, type Scale, type Window,
   } from "../lib/plot";
   import type { PreviewAnswer } from "../lib/interactive";
+  import type { GroupCurve, PeakRow } from "../lib/peaks";
   import type { Curves, Overlay, PatternChart } from "./pattern";
   import type { Theme } from "../lib/theme";
   import Menu, { type MenuAt, type MenuEntry } from "./Menu.svelte";
@@ -72,6 +75,11 @@
     compared = null,
     oncurves = () => {},
     howText = "",
+    peaks = null,
+    groups = null,
+    peaksActive = false,
+    selectedPeak = null,
+    frameAt = null,
   }: {
     result: any;
     /** bumped when the curves moved: a run landed or the history moved */
@@ -108,6 +116,16 @@
     compared?: { label: string; tt: Float64Array; y: Float64Array } | null;
     /** how the last fit ran, in words (`./howran.ts`, WP-2227), said beside its Rwp */
     howText?: string;
+    /** the peak list's rows and its group fits (WP-2240), drawn while `peaksActive` */
+    peaks?: readonly PeakRow[] | null;
+    groups?: readonly GroupCurve[] | null;
+    /** the peaks-and-indexing workflow is up: the peak layer is drawn */
+    peaksActive?: boolean;
+    /** the row chosen in the Pick step's table */
+    selectedPeak?: number | null;
+    /** a request to frame a line: 2θ, with a count so the same line asked
+     *  twice frames twice */
+    frameAt?: { two_theta: number; seq: number } | null;
   } = $props();
 
   /** The difference axis's choices: the three today's page draws
@@ -230,9 +248,29 @@
   // -- the chart ---------------------------------------------------------
 
   function overlayNow(): Overlay {
-    return { protocol, extent, peaks: null, groups: null, peaksActive: false,
+    return { protocol, extent, peaks, groups, peaksActive, selected: selectedPeak,
              candidate: null, hidden: drawn, held: untrack(() => held) };
   }
+
+  // the peak layer is a repaint, never a refetch (gui/CLAUDE.md § Plot)
+  $effect(() => {
+    void peaks; void groups; void peaksActive; void selectedPeak;
+    untrack(() => chart?.update(overlayNow()));
+  });
+
+  /** A row click frames its line at 2° of 2θ, or keeps a narrower zoom
+   *  centred on it (round 11b), and leaves the line where it was asked for. */
+  const FRAME_DEG = 2;
+  $effect(() => {
+    const f = frameAt;
+    if (!f) return;
+    untrack(() => {
+      if (!chart) return;
+      const { min, max } = chart.fig.panes.main.scales.x;
+      const span = Math.min(FRAME_DEG, Math.abs(max - min) || FRAME_DEG);
+      chart.fig.setX(f.two_theta - span / 2, f.two_theta + span / 2);
+    });
+  });
 
   let fetchSeq = 0;
   let applied: { kind: ResidualKind; scale: Scale; theme: Theme } | null = null;
