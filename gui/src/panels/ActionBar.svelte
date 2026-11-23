@@ -3,7 +3,7 @@
    * The model panel's one row of actions (WP-2123).
    *
    * The maintainer's ruling of 2026-11-07: the panel ends in Apply and "Apply
-   * and refine", and refine offers one cycle or the staged plan; the bar merge
+   * and refine", and refine offers as ticked or the staged plan; the bar merge
    * approved the same day makes it one row. Left to right: the refine choice,
    * the pending count, Revert, Apply, and the filled primary.
    *
@@ -42,8 +42,9 @@
   } = $props();
 
   const CHOICES = [
-    { id: "cycle", label: "One cycle" },
-    { id: "plan", label: "Staged plan" },
+    { id: "cycle", label: "As ticked",
+      title: 'Refine every ticked parameter together until it converges.\nref.run_stage(Stage("cycle", turn_on=[]))' },
+    { id: "plan", label: "Staged plan", title: null },
   ] as const;
 
   const count = $derived(
@@ -63,7 +64,7 @@
   <div class="segmented" role="group" aria-label="refine">
     {#each CHOICES as choice (choice.id)}
       <button class:on={mode === choice.id} aria-pressed={mode === choice.id}
-        onclick={() => (mode = choice.id)}>{choice.label}</button>
+        title={choice.title} onclick={() => (mode = choice.id)}>{choice.label}</button>
     {/each}
   </div>
   <div class="go">

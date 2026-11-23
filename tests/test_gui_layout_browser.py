@@ -392,7 +392,7 @@ def test_a_refine_moves_nothing_while_it_runs_or_after(browser, tmp_path_factory
     url = f"http://127.0.0.1:{httpd.server_address[1]}/"
     try:
         page = _open(browser, url, WIDTHS["wide"])
-        page.locator(".actions button", has_text="One cycle").click()
+        page.locator(".actions button", has_text="As ticked").click()
         _frames(page)
         before = page.evaluate(SNAP, LANDMARKS)
         page.locator(".actions button.refine").click()
@@ -2022,4 +2022,160 @@ def test_the_rebuilt_text_tab_applies_a_typed_value_from_the_bar(browser, tmp_pa
         page.close()
         assert not moved, moved
     finally:
+        httpd.shutdown()
+
+
+# -- the History tab (WP-2211) --------------------------------------------------
+
+#: The History tab's own places, beside the window's: the tab strip, its view
+#: choice and every row with its two buttons.
+HISTORY_LANDMARKS = WINDOW_LANDMARKS + [
+    "section.bottom", "section.bottom > .tabs", "section.bottom > .tabs > *",
+    "table.hist tr", "table.hist button", ".gutter .gut",
+]
+
+
+def _history_window(browser, tmp_path_factory):
+    """A project with two fitted stages, its window open on the History table."""
+    httpd, client = _serve(tmp_path_factory, "history")
+    status, run = client.post("/api/run", {"kind": "stage", "stage": {
+        "name": "bkg", "turn_on": ["phases.*.scale", "instrument.background.*"], "max_iter": 5}})
+    assert status == 200, run
+    _wait_idle(client)
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    page = _open_window(browser, url)
+    page.get_by_role("button", name="Show the console", exact=True).click()
+    page.get_by_role("tab", name=re.compile(r"^History")).click()
+    page.locator('[aria-label="History view"] button', has_text="Table").click()
+    page.wait_for_selector("table.hist tbody tr")
+    _frames(page)
+    return httpd, client, page
+
+
+def _row(page, step: str):
+    return page.locator("table.hist tbody tr", has=page.locator("td.what", has_text=step))
+
+
+def _ink_pixels(page, hex_colour: str) -> int:
+    """Pixels of the plot within a small distance of one colour: what the
+    canvas painted, never the option it was handed."""
+    import io
+
+    import numpy as np
+    from PIL import Image
+
+    png = page.locator(".plot").screenshot()
+    pixels = np.asarray(Image.open(io.BytesIO(png)).convert("RGB")).astype(int)
+    want = np.array([int(hex_colour[i:i + 2], 16) for i in (1, 3, 5)])
+    return int((np.abs(pixels - want).sum(axis=-1) < 24).sum())
+
+
+def test_compare_draws_the_node_s_curve_and_moves_nothing(browser, tmp_path_factory):
+    """Compare overlays an earlier node's fit, dashed in its own ink, and names it
+    in the legend; a second press takes it off. Neither press moves a place."""
+    from rietx.viz.theme import TOKENS
+
+    httpd, client, page = _history_window(browser, tmp_path_factory)
+    try:
+        theme = page.evaluate("document.documentElement.dataset.theme")
+        ink = {**TOKENS["light"], **TOKENS[theme]}["--plot-compare"]
+        before = page.evaluate(SNAP, HISTORY_LANDMARKS)
+        drawn_before = _ink_pixels(page, ink)
+        row = _row(page, "scale")
+        compare = row.get_by_role("button", name="Compare", exact=True)
+        compare.click()
+        page.wait_for_selector(".gutter .gut:has-text('scale')")
+        _frames(page)
+        assert compare.get_attribute("aria-pressed") == "true"
+        moved = _moved(before, page.evaluate(SNAP, HISTORY_LANDMARKS))
+        drawn = _ink_pixels(page, ink)
+        assert drawn > drawn_before + 50, (drawn_before, drawn)
+        compare.click()
+        page.wait_for_function("() => ![...document.querySelectorAll('.gutter .gut')]"
+                               ".some((b) => b.textContent.trim() === 'scale')")
+        _frames(page)
+        moved += _moved(before, page.evaluate(SNAP, HISTORY_LANDMARKS))
+        # off again: back near where it started (the observed crosses'
+        # antialiased edges land a few pixels either way)
+        off = _ink_pixels(page, ink)
+        assert off - drawn_before < (drawn - drawn_before) / 4, (drawn_before, drawn, off)
+        assert not page.errors, page.errors
+        assert not moved, moved
+    finally:
+        page.close()
+        httpd.shutdown()
+
+
+PENDING = "() => /\\d+ pending/.test(document.querySelector('.actions .pending')?.textContent ?? '')"
+NONE_PENDING = "() => (document.querySelector('.actions .pending')?.textContent ?? '').trim() === ''"
+
+
+def test_restore_then_apply_reaches_the_node_and_revert_changes_nothing(
+        browser, tmp_path_factory):
+    """Restore loads an earlier node's values as pending edits, moving nothing;
+    Revert drops them and the head stays; Restore then Apply lands the node's
+    values, every one, on a new head."""
+    httpd, client, page = _history_window(browser, tmp_path_factory)
+    try:
+        nodes = client.get("/api/history")[1]
+        head = nodes["head"]
+        scale = next(n["id"] for n in nodes["nodes"] if n["name"] == "scale")
+        assert client.get(f"/api/history/diff?a={scale}&b={head}")[1]["diff"]
+
+        before = page.evaluate(SNAP, HISTORY_LANDMARKS)
+        _row(page, "scale").get_by_role("button", name="Restore", exact=True).click()
+        page.wait_for_function(PENDING)
+        _frames(page)
+        moved = _moved(before, page.evaluate(SNAP, HISTORY_LANDMARKS))
+        page.get_by_role("button", name="Revert", exact=True).click()
+        page.wait_for_function(NONE_PENDING)
+        assert client.get("/api/history")[1]["head"] == head
+
+        _row(page, "scale").get_by_role("button", name="Restore", exact=True).click()
+        page.wait_for_function(PENDING)
+        page.get_by_role("button", name="Apply", exact=True).click()
+        page.wait_for_function(NONE_PENDING)
+        after = client.get("/api/history")[1]["head"]
+        assert after != head
+        assert client.get(f"/api/history/diff?a={scale}&b={after}")[1]["diff"] == {}
+        assert not page.errors, page.errors
+        assert not moved, moved
+    finally:
+        page.close()
+        httpd.shutdown()
+
+
+def test_no_history_control_moves_the_window(browser, tmp_path_factory):
+    """The view choice asks for the panel to change; every other press of the
+    History tab moves no place: a row's menu, the ? box, Esc out of each."""
+    httpd, client, page = _history_window(browser, tmp_path_factory)
+    try:
+        before = page.evaluate(SNAP, HISTORY_LANDMARKS)
+        failures = []
+
+        def check(label):
+            _frames(page)
+            moved = _moved(before, page.evaluate(SNAP, HISTORY_LANDMARKS))
+            if moved:
+                failures.append(f"{label!r}: " + "; ".join(moved[:4]))
+
+        _row(page, "scale").click(button="right")
+        page.wait_for_selector(".rx-menu")
+        names = page.locator(".rx-menu [role^=menuitem]").all_text_contents()
+        assert [n.strip() for n in names] == ["Make current", "Branch from here…", "Name…", "Note…"]
+        menu = page.locator(".rx-menu").bounding_box()
+        assert menu["y"] >= 0 and menu["y"] + menu["height"] <= 900, menu
+        check("a row's menu")
+        page.keyboard.press("Escape")
+        page.get_by_role("button", name="About the History tab", exact=True).click()
+        page.wait_for_selector(".helpbox")
+        box = page.locator(".helpbox").bounding_box()
+        assert box["y"] + box["height"] <= 900, box
+        check("the ? box")
+        page.keyboard.press("Escape")
+        check("Esc")
+        assert not page.errors, page.errors
+        assert not failures, "\n".join(failures)
+    finally:
+        page.close()
         httpd.shutdown()

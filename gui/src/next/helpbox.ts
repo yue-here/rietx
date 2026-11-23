@@ -98,3 +98,16 @@ export const GRAPH_HELP: Record<GraphTab, HelpBoxEntry> = {
     anchor: "the-3d-view",
   },
 };
+
+/** The bottom panel's History tab (WP-2211), in the design's words, with the
+ *  node's menu named where the screen cannot say it. */
+export const HISTORY_HELP: HelpBoxEntry = {
+  title: "History",
+  lead: "Each refinement adds a row, the newest at the bottom.",
+  items: [
+    "Compare overlays that fit on the pattern. Press it again to take it off.",
+    "Restore loads its values as pending edits. Nothing changes until Apply.",
+    "Right-click a row to make it current, branch from it, name it or write a note on it.",
+  ],
+  anchor: "history",
+};

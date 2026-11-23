@@ -145,22 +145,28 @@ which. "Accepted" records the maintainer's answer in chat on 2026-11-16.
   "Closes #1214". An open issue would promise work the rules exclude. The alternative was
   to keep it open as a record of the two noise draws in 20 that keep a wrong cell. WP-2080
   names what would reopen it: evidence that agents or users do not read the field. A
-  comment for the issue is drafted and waits for the maintainer's approval of the batch.
+  comment for the issue was drafted and waited for the maintainer's approval of the batch.
+  **Ruled by Yue 2026-11-22:** posted
+  (https://github.com/yue-here/rietx/issues/1214#issuecomment-7078724868). The issue had
+  already closed on 2026-11-21; PR #1473 is still open.
 
-## Open decisions
+## Open decisions, answered 2026-11-22
 
-Two remain, and both are the maintainer's.
+Two were open, and both were the maintainer's. Answered 2026-11-22 under the maintainer's routing rules of that day (WP-2238): each item was settled by Claude and checked by a fresh agent that did not see the pick, or brought to the maintainer, who answered "All as recommended".
 
 - **`SEQUENTIAL_MOMENT_ONSET`** still fires on a tuned threshold, against rule 5. It is
-  magnetic, so the magnetic path's owner rules on it.
-- **The audit label on today's default plan**, awaiting the maintainer.
+  magnetic, so the magnetic path's owner rules on it. **Ruled by Yue 2026-11-22:** sent to Mike: posted as question
+  (3) on #1075 (https://github.com/yue-here/rietx/issues/1075#issuecomment-7078724635).
+- **The audit label on today's default plan.**
   `SequentialRefinement.fit:plan` is recorded as unanimous (`ambiguity=1`), and the
   traditional calibrate-then-hold route is a named dissent. A named dissent fails the
   unanimity gate of DESIGN Rule 1. Rule 4 above puts series strategy in Rule 1's third
   kind, since only the experimenter knows whether the instrument held still. The proposed
   correction (2026-11-21): `ambiguity` from 1 to 3; tier 3, the value and the plan kept;
   `grounds` rewritten to cite the 2026-11-16 ruling and its named dissent; `approved` set
-  to the maintainer's date. `_audit.py` is unchanged until the maintainer approves.
+  to the maintainer's date. `_audit.py` was unchanged until the maintainer approved.
+  **Settled by Claude 2026-11-22, checked blind:** the label correction (`ambiguity` 1 to 3, `grounds` citing the 2026-11-16 ruling and
+  its named dissent) is settled. **Ruled by Yue 2026-11-22:** tier 3 with the plan kept, approved 2026-11-22. Applied to `_audit.py` in WP-2081 the same day.
 
 ## The WPs
 
@@ -168,15 +174,17 @@ Two remain, and both are the maintainer's.
 |---|---|---|
 | [2081](../wp/2081-how-a-series-holds-what-the-setup-fixes.md) | the design discussion these rules came from, its measurements and its twelve questions | moved here 2026-11-16 |
 | [2080](../wp/2080-a-warm-fit-in-a-wrong-basin.md) | the goodness-of-fit ratio as a field, ruled 2026-11-16 | moved here 2026-11-16 |
-| [1420](../wp/1420-a-held-phase-re-enters-or-says-it-cannot.md) | a phase held on one pattern gets back in on a later one | proposed for this milestone with tasks 2 to 5 retired as written, awaiting the maintainer. Rules 4 to 6 exclude a series code and a retry of a converged fit (issue #1402's option A) |
-| [1453](../wp/1453-both-directions-name-the-lower-cost.md) | the two directions of a series compared by cost | proposed for this milestone, awaiting the maintainer. Option 1's cost pair is a rule 5 field whose names go to the maintainer, and rule 6 excludes option 3's cold rung |
+| [1420](../wp/1420-a-held-phase-re-enters-or-says-it-cannot.md) | a phase held on one pattern gets back in on a later one | proposed for this milestone with tasks 2 to 5 retired as written. Rules 4 to 6 exclude a series code and a retry of a converged fit (issue #1402's option A). **Settled by Claude 2026-11-22, checked blind:** the move stands as proposed (answered 2026-11-22 under the routing rules of WP-2238); the file's `Milestone` header is not touched here. |
+| [1453](../wp/1453-both-directions-name-the-lower-cost.md) | the two directions of a series compared by cost | proposed for this milestone. Option 1's cost pair is a rule 5 field whose names go to the maintainer, and rule 6 excludes option 3's cold rung. **Settled by Claude 2026-11-22, checked blind:** the move stands (answered 2026-11-22 under the routing rules of WP-2238); option 1's cost-pair field names go to the maintainer when WP-1453 is built. |
 | [1524](../wp/1524-the-step-scans-last-two-blind-spots.md) | the step list's two blind spots | not moved (2026-11-21): WP-2003 removed the scan it targets, and PR #1588 closes it with tests alone |
 | [1317](../wp/1317-series-scrubber.md) | the GUI's view of a finished series | not moved: [gui-overhaul](gui-overhaul.md) § R7 carries it (maintainer, 2026-11-21) |
 | [2103](../wp/2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) | hold, tie and restart on a joint fit | stays in parametric; rule 2's start from a series result depends on it |
 | [2003](../wp/2003-the-chain-actions.md) | the tiers of the series' automatic actions | stays in generality |
+| [2300](../wp/2300-a-series-declares-each-parameter.md) | rule 1's declaration on the series call, and rule 2's refusal | filed 2026-11-22; its vocabulary is the maintainer's |
+| [2301](../wp/2301-the-typical-temperature-series.md) | the typical temperature series: one documented route, its preset and a Switching page | filed 2026-11-22; the preset's name is the maintainer's |
 
-The two proposed rows keep `Milestone: unscheduled` in their files until the maintainer
-approves the move. Each has an open pull request that edits the same header line (#1401
+The two proposed rows keep `Milestone: unscheduled` in their files until their next edit
+carries the move (the moves were settled 2026-11-22). Each has an open pull request that edits the same header line (#1401
 and #1594). WP-1317's pull request, #1395, merged on 2026-11-21.
 
 WP-2081's twelve questions under the rules: 2 and 3 fall to rules 1 and 2; 4 to rule 6; 5 to
@@ -187,10 +195,10 @@ structural one, WP-2108) are work of their own.
 ## The order
 
 Rules 3 to 6 describe the code as it nearly stands, so their work is small: the field for
-WP-2080, a fixed value surviving a restart (WP-2081 question 4), and
-`SEQUENTIAL_MOMENT_ONSET` once ruled. `SEQUENTIAL_WIDTH_GROWTH` is removed. Rule 1 comes next, as a declaration on the series call. Rule 2's start
+WP-2080, a fixed value surviving a restart (WP-2081 question 4, built 2026-11-22), and
+`SEQUENTIAL_MOMENT_ONSET` once ruled. `SEQUENTIAL_WIDTH_GROWTH` is removed. Rule 1 comes next, as a declaration on the series call (WP-2300). Rule 2's start
 from a series result waits on WP-2103. The default is ruled, so a preset for the typical
-temperature series can be written. The documentation for a user arriving from another program's
+temperature series can be written (WP-2301). The documentation for a user arriving from another program's
 sequential mode is written with rule 1. Before rule 2 is built, a second real series that
 nobody who changes the package has run is named, with its independent measurement. Each
 WP's `Priority:` line outranks this paragraph.

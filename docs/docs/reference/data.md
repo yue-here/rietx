@@ -439,14 +439,17 @@ assert lab6.phases[0].cell.lengths_angles()[:3] == (4.15689, 4.15689, 4.15689)
 | `shift` | degrees 2θ | added to the peak position |
 | `intensity_factor` | 1 | multiplies the reflection's intensity |
 
-The expression reads the coefficients by name, and the reflection through seven names.
+The expression reads the coefficients by name, and the reflection through eight names.
 `h`, `k` and `l` are the Miller indices, `m` the multiplicity and `d` the d-spacing in Å.
 `theta` is the Bragg angle in radians, so `tan(theta)` works.
 `two_theta` is in degrees, where the peak sits before the phase's own equations act.
+`wavelength` is the λ in Å of the emission line the peak is drawn at, so each line's image reads its own.
+It follows a refined λ.
 `orbit_mean(x)` and `harmonic(l, n)` read the reflection's orbit and direction ([Expressions](expressions.md)).
 
 A phase holds at most one equation per target, so a sum goes in one expression.
 `Instrument.peak_equations` takes `shift` alone and reads only `theta` and `two_theta`, because it moves every phase's peaks.
+It cannot read `wavelength`, since it is also evaluated at angles no emission line owns, such as the window the reflections are generated over.
 Each coefficient is a parameter under its equation's path, such as `phases.0.peak_equations.0.w` or `instrument.peak_equations.0.sq`.
 The second index counts the equations in their list, and the last part is the coefficient's name.
 A plan frees it only by naming that path, since no preset does.
@@ -526,7 +529,7 @@ The block replaces it: the width reads zero for `lor_strain` while a block is de
 
 σ²(M) ≥ 0 couples all fifteen coefficients, so it cannot be a bound.
 The default solver holds it as a linear inequality.
-Under `solver="trf"`, and in a joint fit, [`STEPHENS_STRAIN_NOT_POSITIVE`](diagnostics-corrections.md#stephens_strain_not_positive) reports where it fails.
+Under `solver="trf"`, [`STEPHENS_STRAIN_NOT_POSITIVE`](diagnostics-corrections.md#stephens_strain_not_positive) reports where it fails.
 
 ### March-Dollase preferred orientation
 
