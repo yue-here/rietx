@@ -162,9 +162,6 @@
   const UI_SCALE = "intensity_scale";
   const UI_DIFFERENCE = "difference";
   const GUTTER = 112;
-  /** A lens's height and width in CSS px, the canvas's (`lib/plot.ts`). */
-  const LENS_H = LENS_HEIGHT;
-  const LENS_W = LENS_WIDTH;
   const LEGEND_ROW = 20;
 
   let host: HTMLDivElement | undefined = $state();
@@ -750,9 +747,10 @@
   const ADD_DELAY_MS = 300;
   const DOUBLE_MS = 350;
 
-  /** Whether the plot edits peak lines: the workflow is up with a list, and
-   *  no range gesture is armed. */
-  const peakMode = $derived(peaksActive && !!peaks?.length && !arm);
+  /** Whether the plot edits peak lines: the workflow is up with a list, its
+   *  layer is shown (a hidden layer would take lines nobody can see), and no
+   *  range gesture is armed. */
+  const peakMode = $derived(peaksActive && !!peaks?.length && !arm && !drawn.includes("peaks"));
   /** A lens being dragged: its line, where it started and where it is. */
   let drag = $state<{ index: number; from: number; at: number; x0: number; y0: number;
                       moved: boolean; pointer: number } | null>(null);
@@ -782,13 +780,15 @@
     return best;
   }
 
+  /** Any edit ends Esc's chance to take a drag's move back, since Esc
+   *  undoes the stack's last step, which is then this edit's. */
   async function peakEdit(e: PeakEdit): Promise<boolean> {
+    moved = null;
     return onpeakedit(e);
   }
 
   function removePeak(index: number) {
     if (selectedPeak === index) selectedPeak = null;
-    moved = null;
     void peakEdit({ kind: "remove", index });
   }
 
@@ -852,6 +852,7 @@
   /** A click, not a drag: select the object under it, or clear the selection. */
   function up(ev: PointerEvent) {
     if (drag) {
+      downAt = null;
       void dropLens(ev);
       return;
     }
@@ -866,7 +867,8 @@
     }
     if (!peakMode || hit || x === null) {
       selection = hit;
-      selectedPeak = null;
+      // the chosen line is the workflow's: outside it a click leaves it be
+      if (peaksActive) selectedPeak = null;
       return;
     }
     // a click elsewhere closes a region's bar and does nothing more (rule 3)
@@ -1169,8 +1171,8 @@
 <!-- a lens as a DOM mark, the canvas's `lens` (`lib/plot.ts`) at 18 by 4.5 px -->
 {#snippet lensMark(cls: string, left: number, top: number, scale: number)}
   <svg class="lensmark {cls}" style:left="{left}px" style:top="{top}px"
-    width={2 * LENS_W * scale + 4} height={LENS_H * scale + 4} aria-hidden="true">
-    <path d="M {LENS_W * scale + 2} 2 Q {2 * LENS_W * scale + 2} {LENS_H * scale / 2 + 2} {LENS_W * scale + 2} {LENS_H * scale + 2} Q 2 {LENS_H * scale / 2 + 2} {LENS_W * scale + 2} 2 Z" />
+    width={2 * LENS_WIDTH * scale + 4} height={LENS_HEIGHT * scale + 4} aria-hidden="true">
+    <path d="M {LENS_WIDTH * scale + 2} 2 Q {2 * LENS_WIDTH * scale + 2} {LENS_HEIGHT * scale / 2 + 2} {LENS_WIDTH * scale + 2} {LENS_HEIGHT * scale + 2} Q 2 {LENS_HEIGHT * scale / 2 + 2} {LENS_WIDTH * scale + 2} 2 Z" />
   </svg>
 {/snippet}
 
@@ -1222,7 +1224,7 @@
         onpointerleave={leave}></div>
       {#if hoverLens}{@render lensMark("ghost", hoverLens.left, hoverLens.top, 1)}{/if}
       {#if movingLens}{@render lensMark("moving", movingLens.left, movingLens.top, drag || landing ? 1.4 : 1)}{/if}
-      {#if dangerLens}{@render lensMark("danger", dangerLens.left, dangerLens.top, dangerLens.h / LENS_H)}{/if}
+      {#if dangerLens}{@render lensMark("danger", dangerLens.left, dangerLens.top, dangerLens.h / LENS_HEIGHT)}{/if}
       {#if geom && plotX && held}
         <!-- each axis is its own control: its tick labels and its hint open its
              choices, the hint's explanation shows on hover and on focus -->

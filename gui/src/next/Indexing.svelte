@@ -128,23 +128,57 @@
     onpeaks(next);
   }
 
-  /** Run one verb. The chosen row follows its line by 2θ, since an add or a
-   *  removal renumbers the list; `follow` names the 2θ to choose instead. */
-  async function verb(run: () => Promise<unknown>, follow?: number | null): Promise<boolean> {
+  /** How near, in degrees 2θ, a line must stand after an edit to be the
+   *  line a row number pointed at before it. */
+  const FOLLOW_DEG = 0.05;
+  /** The verb in flight, which a plot edit made meanwhile waits on. */
+  let inflight: Promise<unknown> = Promise.resolve();
+
+  /** The row standing at 2θ `tt` now, within `FOLLOW_DEG`, or null. */
+  function rowAt(tt: number | null | undefined): number | null {
+    const hit = tt == null || !rows ? null : nearestRow(rows, tt);
+    return hit && Math.abs(hit.two_theta - tt!) < FOLLOW_DEG ? hit.index : null;
+  }
+
+  /** Run one verb. An add or a removal renumbers the list, so everything
+   *  this panel keys by row number (the chosen row, the rows kept in a
+   *  filtered list, the overrule notes) follows its line by 2θ: `follow`
+   *  names the 2θ to choose instead, `moved` where a moved line went, and
+   *  `gone` a removed line. */
+  function verb(run: () => Promise<unknown>, follow?: number | null,
+                { moved, gone }: { moved?: { index: number; to: number }; gone?: number } = {},
+  ): Promise<boolean> {
     working = true;
-    const was = selected == null ? null : rows?.find((r) => r.index === selected)?.two_theta ?? null;
-    try {
-      took(await run() as PeaksPayload);
-      const at = follow === undefined ? was : follow;
-      const hit = at == null || !rows ? null : nearestRow(rows, at);
-      selected = hit && Math.abs(hit.two_theta - at!) < 0.05 ? hit.index : null;
-      return true;
-    } catch (exc) {
-      say("refusal", `refused: ${(exc as Error).message}`);
-      return false;
-    } finally {
-      working = false;
-    }
+    const at = new Map(rows?.map((r) => [r.index, r.two_theta]) ?? []);
+    if (moved) at.set(moved.index, moved.to);
+    if (gone != null) at.delete(gone);
+    const was = selected == null ? null : at.get(selected) ?? null;
+    const done = (async () => {
+      try {
+        took(await run() as PeaksPayload);
+        selected = rowAt(follow === undefined ? was : follow);
+        const kept = new Set<number>();
+        for (const i of keep) {
+          const j = rowAt(at.get(i));
+          if (j != null) kept.add(j);
+        }
+        keep = kept;
+        const notes = new Map<number, string[]>();
+        for (const [i, flags] of overruled) {
+          const j = rowAt(at.get(i));
+          if (j != null) notes.set(j, flags);
+        }
+        overruled = notes;
+        return true;
+      } catch (exc) {
+        say("refusal", `refused: ${(exc as Error).message}`);
+        return false;
+      } finally {
+        working = false;
+      }
+    })();
+    inflight = done;
+    return done;
   }
 
   async function pick() {
@@ -190,15 +224,24 @@
 
   /** One edit from the plot or the typed row. A move chooses the line where
    *  it landed; an add chooses nothing, since lines are placed many in a row
-   *  (interaction rule 3). */
+   *  (interaction rule 3). An edit made while the last one is still being
+   *  fitted waits its turn, its line found again by 2θ, rather than being
+   *  dropped. */
   export async function edit(e: PeakEdit): Promise<boolean> {
-    if (busy || working) return false;
+    const tt = e.kind === "add" ? null : rows?.find((r) => r.index === e.index)?.two_theta ?? null;
+    while (working) await inflight;
+    if (busy) return false;
     if (e.kind === "add") return verb(() => api.addPeak(e.two_theta), selected == null ? null : undefined);
-    if (e.kind === "move") return verb(() => api.movePeak(e.index, e.two_theta), e.two_theta);
-    if (e.kind === "remove") {
-      return verb(() => api.removePeak(e.index), selected === e.index ? null : undefined);
+    const index = rowAt(tt);
+    if (index == null) return false;
+    if (e.kind === "move") {
+      return verb(() => api.movePeak(index, e.two_theta), e.two_theta,
+                  { moved: { index, to: e.two_theta } });
     }
-    const row = rows?.find((r) => r.index === e.index);
+    if (e.kind === "remove") {
+      return verb(() => api.removePeak(index), selected === index ? null : undefined, { gone: index });
+    }
+    const row = rows?.find((r) => r.index === index);
     return row ? setUse(row, e.on) : false;
   }
 
@@ -237,7 +280,9 @@
     const target = event.target as HTMLElement | null;
     if (target?.closest?.("input, textarea, select, .cm-editor, [role=dialog]")) return;
     event.preventDefault();
-    void travel(!event.shiftKey);
+    // past either end of the stack the key does nothing, as in an editor,
+    // rather than asking the server for a refusal
+    if (event.shiftKey ? canRedo() : canUndo()) void travel(!event.shiftKey);
   }
 
   const addAt = $derived(addText.trim() === "" ? null : Number(addText));

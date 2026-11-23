@@ -201,9 +201,13 @@ def save(project, doc: PeakDoc) -> None:
         "peaks": json.loads(doc.peaks.model_dump_json()),
         "groups": {str(k): v.as_dict() for k, v in sorted(doc.groups.items())},
     }
+    _replace(project, json.dumps(payload, indent=1).encode("utf-8"))
+
+
+def _replace(project, raw: bytes) -> None:
     target = peaks_path(project)
     tmp = target.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(payload, indent=1), encoding="utf-8")
+    tmp.write_bytes(raw)
     os.replace(tmp, target)  # a crash leaves the previous list, not half of one
 
 
@@ -226,11 +230,8 @@ def restore(project, raw: bytes | None) -> None:
     """Put back a :func:`snapshot`, through the same replace as :func:`save`."""
     if raw is None:
         delete(project)
-        return
-    target = peaks_path(project)
-    tmp = target.with_suffix(".json.tmp")
-    tmp.write_bytes(raw)
-    os.replace(tmp, target)
+    else:
+        _replace(project, raw)
 
 
 # ----------------------------------------------------------------------

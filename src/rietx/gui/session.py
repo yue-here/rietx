@@ -1539,6 +1539,7 @@ class GuiSession:
         inventing an authority. ``validate_only`` runs everything except the
         apply, which is what a continuously-validating editor calls.
         """
+        from . import peaks as store
         from . import textdoc as td
 
         self._require_idle()
@@ -1567,8 +1568,11 @@ class GuiSession:
             return {"valid": True, "applied": [], "delta": delta.as_dict(),
                     "revision": td.revision(current), "would_change":
                     not delta.is_empty()}
-        editor = (self._peak_editor()
-                  if (delta.peak_moves or delta.peak_flags) else None)
+        touches_peaks = bool(delta.peak_moves or delta.peak_flags)
+        editor = self._peak_editor() if touches_peaks else None
+        # a peak edit typed here is one step of the peak list's undo stack
+        # too, or ⌘Z would take it back together with the edit before it
+        before = store.snapshot(project) if touches_peaks else None
         try:
             applied = td.apply(project, delta, peak_editor=editor)
         except ValueError as exc:
@@ -1576,6 +1580,8 @@ class GuiSession:
             # validates before writing, so nothing was applied
             raise GuiError(str(exc), code="TEXTDOC_INVALID",
                            details=[_locate(str(exc), text)]) from None
+        if touches_peaks:
+            self._peak_step(project, before)
         rendered = td.render(project)
         return {"valid": True, "applied": applied, "delta": delta.as_dict(),
                 "text": rendered, "revision": td.revision(rendered)}
