@@ -38,15 +38,18 @@
   import { modifier, runWords, toggleTitle } from "../lib/statusbar";
   import { follow, type EngineEvent, type RunState } from "../lib/stream";
   import { applyTheme, readChoice, resolveTheme, type ThemeChoice } from "../lib/theme";
-  import { WORKFLOWS, menuLabel, workflow, type WorkflowId } from "../lib/workflows";
+  import type { PeakRow, PeaksPayload } from "../lib/peaks";
+  import { WORKFLOWS, isNotBuilt, menuLabel, stepGraph, workflow,
+           type WorkflowId } from "../lib/workflows";
   import ActionBar from "./ActionBar.svelte";
   import Console from "./Console.svelte";
   import { eventLine, makeLine, pushLine, sessionScript, sharedSay, stageScript, type Line,
            type LineKind } from "./console";
   import HelpBox from "./HelpBox.svelte";
+  import Indexing from "./Indexing.svelte";
   import History from "./History.svelte";
   import { howComment, howWords } from "./howran";
-  import { GRAPH_HELP, HISTORY_HELP, MODEL_HELP } from "./helpbox";
+  import { GRAPH_HELP, HISTORY_HELP, MODEL_HELP, WORKFLOW_HELP } from "./helpbox";
   import Keys from "./Keys.svelte";
   import Menu, { type MenuAt } from "./Menu.svelte";
   import Params from "./Params.svelte";
@@ -166,6 +169,14 @@
   let compared = $state.raw<{ id: string; label: string; tt: Float64Array; y: Float64Array } | null>(null);
   let wf = $state<WorkflowId>("refine");
   let step = $state(0);
+  /** The peaks-and-indexing workflow's peak list, as its last answer gave it,
+   *  the row chosen in its table, and a request to frame a line (WP-2240):
+   *  the Pattern graph draws them while the workflow is up. */
+  let peaksPayload = $state.raw<PeaksPayload | null>(null);
+  let selectedPeak = $state<number | null>(null);
+  /** the workflow panel, whose verbs the plot's peak gestures call */
+  let indexingPanel: ReturnType<typeof Indexing> | undefined = $state();
+  let frameAt = $state.raw<{ two_theta: number; seq: number } | null>(null);
 
   /** The model panel's width and the bottom panel's height, session-local
    *  until a later piece keeps them with the project (inventory row 251). */
@@ -189,7 +200,13 @@
   /** A re-fit's one stage is said in the title line's words, never by the
    *  stage's internal name (WP-2227, the maintainer's consent of 2026-11-22). */
   const runText = $derived(project && busy ? howWords(run?.run?.how, corpus) || runWords(run) : "");
-  const unbuilt = $derived(workflow(wf).steps ?? null);
+  /** The workflow's steps across the model panel, or null for Refinement,
+   *  which shows the model's tabs. */
+  const wfSteps = $derived(workflow(wf).steps ?? null);
+  /** The graph tabs the workflow shows (the prototype's: peaks and indexing
+   *  draws the pattern and the peak fits). */
+  const graphTabs = $derived(GRAPH_TABS.filter((t) => !workflow(wf).graphs
+    || workflow(wf).graphs!.includes(t.id)));
   const head = $derived(run?.head ?? project?.head ?? null);
   const noPhases = $derived(project ? (project.n_phases ?? 1) === 0 : false);
   const blocked = $derived(noPhases ? "Add a phase before refining" : null);
@@ -394,6 +411,11 @@
     await leaveEdits();
     // the script is this project's session: another project's calls are not
     calls = [];
+    // the peak list is the project's (`peaks.json`): another project's rows,
+    // their chosen line and a frame request are not this one's
+    peaksPayload = null;
+    selectedPeak = null;
+    frameAt = null;
     project = doc;
     openError = "";
     newOpen = false;
@@ -736,7 +758,22 @@
 
   function chooseWorkflow(id: string) {
     wf = id as WorkflowId;
-    step = 0;
+    chooseStep(0);
+    const shown = workflow(wf).graphs;
+    if (shown && !shown.includes(graphTab)) graphTab = shown[0];
+  }
+
+  /** A step opens on its graph: the peak fits for Fit peaks, the pattern for
+   *  the others (the prototype's, round 11). */
+  function chooseStep(i: number) {
+    step = i;
+    const g = stepGraph(wf, i);
+    if (g) graphTab = g;
+  }
+
+  /** The chosen row itself arrives through `bind:selected`. */
+  function framePeak(row: PeakRow) {
+    frameAt = { two_theta: row.two_theta, seq: (frameAt?.seq ?? 0) + 1 };
   }
 
   /** The stage `.` runs, for the palette's label. */
@@ -768,6 +805,10 @@
       disabled: !planPanel?.canUndo(), run: () => planPanel?.undo() },
     { id: "plan-redo", label: "Redo the plan edit", echo: "",
       disabled: !planPanel?.canRedo(), run: () => planPanel?.redo() },
+    { id: "peaks-undo", label: "Undo the peak edit", echo: "",
+      disabled: wf !== "index" || !indexingPanel?.canUndo(), run: () => void indexingPanel?.undo() },
+    { id: "peaks-redo", label: "Redo the peak edit", echo: "",
+      disabled: wf !== "index" || !indexingPanel?.canRedo(), run: () => void indexingPanel?.redo() },
     { id: "new", label: "New project…", echo: "rx.Project.create(…)", disabled: busy,
       run: () => (newOpen = true) },
     ...WORKFLOWS.map((w): Command => ({
@@ -941,7 +982,7 @@
     {#if showGraphs}
       <section class="graphs" aria-label="Graphs">
         <div class="tabs" role="tablist" aria-label="Graphs">
-          {#each GRAPH_TABS as t (t.id)}
+          {#each graphTabs as t (t.id)}
             <button class="tab" role="tab" aria-selected={graphTab === t.id} disabled={!project}
               onclick={() => (graphTab = t.id)}>{t.label}</button>
           {/each}
@@ -956,7 +997,12 @@
               {protocolError} onprotocol={setProtocol} onreadout={(r) => (reading = r)}
               projectPath={project?.path ?? null} ui={project?.doc?.ui ?? null} onui={saveUi}
               preview={previewAnswer} {previewError} oncurves={(c) => (baseCurves = c)}
-              {compared} howText={howWords(result?.how, corpus)} />
+              {compared} howText={howWords(result?.how, corpus)}
+              peaksActive={wf === "index"} peaks={wf === "index" ? peaksPayload?.peaks ?? null : null}
+              groups={wf === "index" ? peaksPayload?.groups ?? null : null}
+              bind:selectedPeak {frameAt}
+              onpeakedit={(e) => indexingPanel?.edit(e) ?? Promise.resolve(false)}
+              onpeakundo={() => indexingPanel?.undo() ?? Promise.resolve(false)} />
           {:else if graphTab === "peaks"}
             <Peaks {plotKey} {theme} preview={previewAnswer} {previewError}
               rwp={result?.statistics?.rwp ?? null} oncurves={(c) => (baseCurves = c)} />
@@ -985,16 +1031,32 @@
             onsize={(size) => (modelWidth = size)} onreset={() => (modelWidth = MODEL_DEFAULT)}
             title="Drag to resize the panels; double-click resets them" />
         {/if}
-        {#if unbuilt}
-          <nav class="tabs steps" aria-label="Steps">
-            {#each unbuilt as s, i (s.name)}
-              <button class="tab" aria-current={step === i ? "step" : undefined}
-                onclick={() => (step = i)}>{s.name}</button>
+        {#if wfSteps}
+          <!-- the prototype's step strip (round 4, 2026-11-07; round 11): each
+               step its number in a ring and its name, the current one raised,
+               a › between them -->
+          <nav class="steps" aria-label="Steps">
+            {#each wfSteps as s, i (s.name)}
+              {#if i}<span class="ar" aria-hidden="true">›</span>{/if}
+              <button class="step" aria-current={step === i ? "step" : undefined}
+                onclick={() => chooseStep(i)}><b>{i + 1}</b><span class="sname">{s.name}</span></button>
             {/each}
+            <span class="sright">
+              {#if workflow(wf).loop}
+                <button class="step loop" onclick={() => chooseStep(0)}
+                  title={workflow(wf).loop}>↺ iterate</button>
+              {/if}
+              {#if WORKFLOW_HELP[wf]}
+                <HelpBox entry={WORKFLOW_HELP[wf]!} {docsUrl}
+                  label="About the {workflow(wf).name} workflow" />
+              {/if}
+            </span>
           </nav>
-          <div class="pane wfpane">
-            <p class="box">{unbuilt[step].body}</p>
-          </div>
+          {#if isNotBuilt(wf)}
+            <div class="pane wfpane">
+              <p class="box">{wfSteps[step].body}</p>
+            </div>
+          {/if}
         {:else}
           <div class="tabs" role="tablist" aria-label="Model">
             {#each MODEL_TABS as t (t.id)}
@@ -1007,14 +1069,26 @@
             {/if}
           </div>
         {/if}
-        <div class="pane" class:gone={!!unbuilt || modelTab !== "params"}>
+        <!-- mounted for the workflow's life, so a step switch keeps the list's
+             filter and the chosen row; keyed on the project, since the list
+             is read once on mount and its row numbers are that project's -->
+        {#if wf === "index"}
+          {#key project.path}
+            <div class="pane wfsteps">
+              <Indexing bind:this={indexingPanel} {step} steps={wfSteps ?? []} {busy} {corpus} {say}
+                bind:selected={selectedPeak}
+                onpeaks={(p) => (peaksPayload = p)} onframe={framePeak} />
+            </div>
+          {/key}
+        {/if}
+        <div class="pane" class:gone={!!wfSteps || modelTab !== "params"}>
           <Params bind:this={paramsPanel} {head} {busy} {corpus} {say} onmoved={structureMoved}
             anodes={capabilities?.anodes ?? []}
             onpending={(n, why) => { pendingTouched = n; pendingInvalid = why; }}
             onholds={(h) => (pendingHolds = h)} />
         </div>
         <!-- mounted while hidden too: its slider values are pending edits -->
-        <div class="pane" class:gone={!!unbuilt || modelTab !== "interactive"}>
+        <div class="pane" class:gone={!!wfSteps || modelTab !== "interactive"}>
           <Interactive bind:this={interactivePanel} {head} {busy} {corpus} {say}
             context={rangeContext} {phaseNames}
             onpending={(n) => (sliderTouched = n)}
@@ -1025,15 +1099,15 @@
             }} />
         </div>
         <!-- mounted while hidden too: an edited plan is a pending edit -->
-        <div class="pane" class:gone={!!unbuilt || modelTab !== "plan"}>
+        <div class="pane" class:gone={!!wfSteps || modelTab !== "plan"}>
           <Plan bind:this={planPanel} mode={project?.doc?.mode ?? "rietveld"} {head} {busy}
             noPhasesReason={blocked} {corpus} {phaseNames} {say} onrun={runStage}
             onpending={(edited) => (planEdited = edited)} onsaved={planSaved} />
         </div>
         <!-- mounted while hidden too: an edited buffer is a pending edit -->
-        <div class="pane" class:gone={!!unbuilt || modelTab !== "text"}>
+        <div class="pane" class:gone={!!wfSteps || modelTab !== "text"}>
           <Text bind:this={textPanel} {head} {busy} {say} dark={theme === "dark"}
-            active={!unbuilt && showModel && modelTab === "text"}
+            active={!wfSteps && showModel && modelTab === "text"}
             name={project?.path ? projectStem(project.path) : "project"}
             onmoved={structureMoved} onapply={applyFromText}
             onpreview={(answer, why) => {
@@ -1042,7 +1116,7 @@
             }}
             onpending={(edited, why) => { textEdited = edited; textWhy = why; }} />
         </div>
-        {#if !unbuilt}
+        {#if !wfSteps}
           <ActionBar bind:mode={refineMode} {touched} {invalid}
             {busy} {blocked} stats={barStats} stages={project?.doc?.plan?.stages?.length ?? null} onapply={() => applyPending()}
             onrevert={revertPending} onrefine={() => refine()} />
@@ -1247,6 +1321,11 @@
 
   .wfpane {
     padding: 16px;
+  }
+
+  /* the steps hold their own scroll and their foot */
+  .wfsteps {
+    overflow: hidden;
   }
 
   .box {
