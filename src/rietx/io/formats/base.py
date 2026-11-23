@@ -201,6 +201,10 @@ METADATA_KEYS: dict[str, str] = {
     "scan": "which scan was read, counting from 0",
     "scan_count": "how many scans the file holds. Carried from the single read "
                   "so a preview never parses a 60 MB file twice",
+    "probe": "the radiation the file states it was measured with, 'xray' or "
+             "'neutron' (the words of `_diffrn_radiation_probe`). Recorded, "
+             "never used by a fit; the import wizard pre-fills no X-ray "
+             "instrument for a neutron pattern. Absent means undeclared",
     "anode": "the X-ray target element the file names",
     "wavelength": "the primary wavelength in Å, as the file states it — "
                   "recorded, never used: the anode presets are the authority",
@@ -443,6 +447,28 @@ def _rows_dropped(name: str, x: np.ndarray, y: np.ndarray,
                     "wrote the file. A reduction that divides by a zero monitor "
                     "or detector efficiency writes NaN or infinity."),
         value=float(n))
+
+
+def excluded_runs(tt: np.ndarray, mask: np.ndarray) -> list[tuple[float, float]]:
+    """Each run of ``mask`` as a closed 2θ interval holding that run's points
+    and no other: an edge lies halfway to the neighbouring point, so a run of
+    one point is still an interval and a variable step cannot reach a used
+    point.
+
+    The one builder for a reader whose file marks points as contributing
+    nothing (pdCIF's and GSAS-II's zero weight), so both turn them into
+    ``excluded_regions`` the same way."""
+    idx = np.flatnonzero(mask)
+    breaks = np.flatnonzero(np.diff(idx) > 1)
+    starts = np.concatenate(([idx[0]], idx[breaks + 1]))
+    ends = np.concatenate((idx[breaks], [idx[-1]]))
+    last = tt.size - 1
+    out = []
+    for s, e in zip(starts, ends):
+        left = tt[s] - tt[s - 1] if s > 0 else tt[min(s + 1, last)] - tt[s]
+        right = tt[e + 1] - tt[e] if e < last else tt[e] - tt[max(e - 1, 0)]
+        out.append((float(tt[s] - 0.5 * left), float(tt[e] + 0.5 * right)))
+    return out
 
 
 def ascending(x: Any, intensity: Any, sigma: Any = None, *,

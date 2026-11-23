@@ -1,7 +1,7 @@
 {
  "citation": "Hill, R. J. (1992). Rietveld refinement round robin. I. Analysis of standard X-ray and neutron data for PbSO4. J. Appl. Cryst. 25, 589-610. doi:10.1107/S0021889892003649",
  "setting": "P n m a (No. 62), a 8.48, b 5.40, c 6.96 A; Pb, S, O1, O2 at (x, 1/4, z), O3 general (Table 7)",
- "transcribed": "2026-11-09 from page images of pp. 601 and 604 (200 dpi whole page, 400-500 dpi table crops), cross-checked against the PDF text layer and an earlier image-checked transcription; checks in tests/test_projects_gsas2.py",
+ "transcribed": "2026-11-09 from page images of pp. 601 and 604 (200 dpi whole page, 400-500 dpi table crops), cross-checked against the PDF text layer and an earlier image-checked transcription; checks in tests/test_round_robin_pbso4_tables.py",
  "determinations": {
   "xray": 16,
   "neutron": 17,

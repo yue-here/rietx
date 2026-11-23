@@ -15,7 +15,7 @@ import numpy as np
 
 from ...schemas.common import Diagnostic
 from ...schemas.pattern import PatternData
-from .base import PatternFormat, ascending, pattern_data
+from .base import PatternFormat, ascending, excluded_runs, pattern_data
 
 #: pdCIF tag alternatives, in preference order.  A refinement CIF this build
 #: writes states one grid and one intensity, the measured ones
@@ -144,7 +144,7 @@ def read_pdcif(path: str | Path, *, block: str | None = None,
     if sigma is not None and np.isinf(sigma).any():
         used = ~np.isinf(sigma)
         sigma = np.where(used, sigma, np.sqrt(np.maximum(y, 1.0)))
-        excluded = _runs(tt, ~used)
+        excluded = excluded_runs(tt, ~used)
         if diagnostics is not None:
             diagnostics.append(Diagnostic(
                 level="info", code="PATTERN_ZERO_WEIGHT_EXCLUDED",
@@ -165,24 +165,6 @@ def read_pdcif(path: str | Path, *, block: str | None = None,
     if excluded:
         data.excluded_regions = excluded
     return data
-
-
-def _runs(tt: np.ndarray, mask: np.ndarray) -> list[tuple[float, float]]:
-    """Each run of ``mask`` as a closed 2θ interval holding that run's points
-    and no other: an edge lies halfway to the neighbouring point, so a run of
-    one point is still an interval and a variable step cannot reach a used
-    point."""
-    idx = np.flatnonzero(mask)
-    breaks = np.flatnonzero(np.diff(idx) > 1)
-    starts = np.concatenate(([idx[0]], idx[breaks + 1]))
-    ends = np.concatenate((idx[breaks], [idx[-1]]))
-    last = tt.size - 1
-    out = []
-    for s, e in zip(starts, ends):
-        left = tt[s] - tt[s - 1] if s > 0 else tt[min(s + 1, last)] - tt[s]
-        right = tt[e + 1] - tt[e] if e < last else tt[e] - tt[max(e - 1, 0)]
-        out.append((float(tt[s] - 0.5 * left), float(tt[e] + 0.5 * right)))
-    return out
 
 
 def _net_findings(p: Path, tt: np.ndarray, y: np.ndarray,

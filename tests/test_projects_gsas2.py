@@ -1395,6 +1395,62 @@ def test_a_negative_weight_sets_the_column_aside(tmp_path):
     assert "1 negative weight(s)" in found[0].message
 
 
+def test_the_stated_radiation_rides_on_the_pattern_and_a_neutron_gets_no_xray_prefill():
+    """``Type`` ``PNC`` is the file saying neutron (pre-review of WP-1943,
+    2026-11-23).  The reader records it as ``probe``, and the import wizard,
+    which has no neutron preset, then pre-fills nothing, rather than an X-ray
+    ``debye_scherrer`` instrument at λ = 1.909 Å that looks as if it was read."""
+    from rietx.gui.imports import suggest_instrument
+    from rietx.io.formats import gpx
+    from rietx.io.projects import gsas2
+
+    assert set(gpx._PROBES) == set(gsas2.CW_TYPES)   # every type read states one
+    neutron = rx.read_pattern(PBSO4, scan=0)
+    xray = rx.read_pattern(PBSO4, scan=1)
+    assert (neutron.metadata["probe"], xray.metadata["probe"]) == ("neutron", "xray")
+    assert suggest_instrument(neutron.metadata) is None
+    # a neutron beam at a Cu-like wavelength is still no Cu anode
+    assert suggest_instrument({"probe": "neutron", "wavelength": "1.5406"}) is None
+    # the positive arm: the same file's X-ray histogram keeps its preset
+    assert suggest_instrument(xray.metadata)["radiation"] == "CuKa"
+
+
+@pytest.mark.parametrize("ratio,alpha2,radiation", [
+    (0.0, "0.0", "CuKa1"), (0.5, "1.5443", "CuKa")])
+def test_a_zero_alpha2_ratio_is_recorded_as_no_doublet(tmp_path, ratio, alpha2,
+                                                       radiation):
+    """``I(L2)/I(L1)`` = 0 is the file saying the beam has no Kα2, and
+    ``wavelength_alpha2``'s own convention for that is a recorded zero
+    (pre-review of WP-1943, 2026-11-23)."""
+    from rietx.gui.imports import suggest_instrument
+    from tests.writers_xrd import write_gpx
+
+    x = 10.0 + 0.02 * np.arange(12)
+    y = 500.0 + np.arange(12) % 7
+    doublet = {"Lam1": [1.5405, 1.5405, 0], "Lam2": [1.5443, 1.5443, 0],
+               "I(L2)/I(L1)": [ratio, ratio, 0]}
+    pat = rx.read_pattern(write_gpx(tmp_path / "k.gpx", [
+        dict(x=x, y=y, w=1.0 / y, instrument=doublet)]))
+    assert pat.metadata["wavelength_alpha2"] == alpha2
+    assert suggest_instrument(pat.metadata)["radiation"] == radiation
+
+
+def test_both_readers_build_excluded_regions_with_one_public_helper():
+    """pdCIF's zero weight and GSAS-II's are one rule, so one builder, public in
+    ``formats.base`` rather than borrowed through a private name (pre-review of
+    WP-1943, 2026-11-23).  Each run's edge sits halfway to its neighbour, so a
+    one-point run is still an interval and a variable step reaches no used
+    point."""
+    from rietx.io.formats import base, gpx, pdcif
+
+    assert gpx.excluded_runs is base.excluded_runs
+    assert pdcif.excluded_runs is base.excluded_runs
+    tt = np.array([10.0, 10.1, 10.2, 10.4, 10.5])
+    mask = np.array([False, True, False, True, True])
+    assert base.excluded_runs(tt, mask) == [pytest.approx((10.05, 10.15)),
+                                            pytest.approx((10.3, 10.55))]
+
+
 def test_a_project_can_point_at_a_gpx_histogram(tmp_path):
     """The reason for a registry entry rather than a method (issue #875): the
     ``.rex`` records which format read its pattern and with which ``scan``."""

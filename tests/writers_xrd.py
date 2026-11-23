@@ -324,7 +324,9 @@ def write_gpx(path: Path, histograms) -> Path:
     """A GSAS-II ``.gpx``: one ``pickle.dump`` per tree item, end to end.
 
     Each histogram is a dict with ``x``, ``y``, ``w`` and optionally ``type``
-    (``"PXC"`` by default) and ``label``.  The layout is the data tree's
+    (``"PXC"`` by default), ``label`` and ``instrument``, the wavelength
+    entries of ``Instrument Parameters`` (``{"Lam": [1.54, 1.54, False]}`` by
+    default; a doublet is ``Lam1``, ``Lam2`` and ``I(L2)/I(L1)``).  The layout is the data tree's
     (``objvarorg.rst`` § GSAS-II Data Tree; § Powder Diffraction Tree Items for
     ``data[1]``'s six arrays and the ``Instrument Parameters`` ``Type`` entry),
     written here from that description and not from the reader: a
@@ -349,6 +351,7 @@ def write_gpx(path: Path, histograms) -> Path:
                                      [float(x[0]), float(x[-1])]]],
                          ["Instrument Parameters",
                           [{"Type": [h.get("type", "PXC")] * 2,
-                            "Lam": [1.54, 1.54, False]}, {}]]],
+                            **h.get("instrument",
+                                    {"Lam": [1.54, 1.54, False]})}, {}]]],
                         fh, protocol=2)
     return path

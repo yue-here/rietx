@@ -553,13 +553,18 @@ def suggest_instrument(metadata: dict | None) -> dict | None:
       where the file does know better than any preset;
     * name and wavelength **disagreeing** → ``None``.  That file is one to look
       at, not to guess from, and a wrong pre-fill is worse than an empty form
-      because it looks like it was read.
+      because it looks like it was read;
+    * a file stating a **neutron** probe (``metadata["probe"]``) → ``None``,
+      whatever its wavelength: every preset here is an X-ray source, so any
+      pre-fill would be that wrong one.
 
     ``goniometer_radius_mm`` rides along where the file records one, which is
     the actual win: two of ``bragg_brentano``'s four numbers then come from the
     file instead of from a person.
     """
     metadata = metadata or {}
+    if metadata.get("probe") == "neutron":
+        return None
     wavelength = _number(metadata, "wavelength")
     named = _by_name(metadata.get("anode"))
     matched = _by_wavelength(wavelength)

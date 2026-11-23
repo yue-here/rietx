@@ -231,6 +231,7 @@ A reader refuses to write any other key, because the GUI's import wizard and a p
 | `declared_axis` | the abscissa the caller declared with the `axis` reader option; a declaration, not a finding |
 | `scan` | which scan was read, counting from 0 |
 | `scan_count` | how many scans the file holds |
+| `probe` | the radiation the file states, `xray` or `neutron`; the GUI's import wizard pre-fills no X-ray instrument for a neutron pattern |
 | `anode` | the X-ray target element the file names |
 | `wavelength` | the primary wavelength in Å the file states; recorded and never used |
 | `wavelength_alpha2` | the Kα2 wavelength in Å the file states; a stated zero says no doublet was used |
@@ -247,8 +248,8 @@ from rietx.io.formats.base import METADATA_KEYS
 
 assert list(METADATA_KEYS) == [
     "source_file", "format", "block", "title", "sample", "x_label",
-    "scan_axis", "declared_axis", "scan", "scan_count", "anode", "wavelength",
-    "wavelength_alpha2", "intensity_item", "intensity_unit", "count_time_s",
-    "temperature_k", "goniometer_radius_mm", "beam_optics",
+    "scan_axis", "declared_axis", "scan", "scan_count", "probe", "anode",
+    "wavelength", "wavelength_alpha2", "intensity_item", "intensity_unit",
+    "count_time_s", "temperature_k", "goniometer_radius_mm", "beam_optics",
     "diffracted_beam_optics"]
 ```

@@ -108,6 +108,13 @@ def test_the_row_counts_are_the_pages(tables):
     assert {r["atom"] for r in tables["table9"] if r["xray_range"]} == {"Pb", "S"}
 
 
+def test_the_provenance_names_the_file_holding_these_checks(tables):
+    """The json's ``transcribed`` field says where its transcription is checked,
+    and that is this file (pre-review of WP-1943, 2026-11-23)."""
+    named = tables["transcribed"].rsplit("checks in ", 1)[1].strip()
+    assert Path(__file__).parent.parent / named == Path(__file__)
+
+
 def test_every_mean_lies_inside_its_range(tables):
     assert _means_outside_range(tables) == []
 

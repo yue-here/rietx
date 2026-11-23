@@ -73,11 +73,16 @@ from .base import (
     PatternFormat,
     ScanInfo,
     ascending,
+    excluded_runs,
     head,
     multiscan_default,
     pattern_data,
 )
-from .pdcif import _runs
+
+#: The radiation each histogram type this entry reads states, in the words of
+#: ``METADATA_KEYS["probe"]``: the file says neutron in ``PNC`` and the import
+#: wizard must not pre-fill an X-ray instrument from its wavelength.
+_PROBES: dict[str, str] = {"PXC": "xray", "PNC": "neutron"}
 
 
 def _items(p: Path) -> list[tuple[str, Any, dict[str, Any]]]:
@@ -176,7 +181,7 @@ def read_gpx_pattern(path: str | Path, *, scan: int | None = None,
     if sig is not None and np.isinf(sig).any():
         unused = np.isinf(sig)
         sig = np.where(unused, np.sqrt(np.maximum(y, 1.0)), sig)
-        excluded = _runs(tt, unused)
+        excluded = excluded_runs(tt, unused)
         if diagnostics is not None:
             diagnostics.append(Diagnostic(
                 level="info", code="PATTERN_ZERO_WEIGHT_EXCLUDED",
@@ -196,11 +201,15 @@ def read_gpx_pattern(path: str | Path, *, scan: int | None = None,
     if primary is None:
         primary = _instrument_value(children, "Lam1")
         alpha2 = _instrument_value(children, "Lam2")
+        # a stated I(L2)/I(L1) of zero is the file saying the beam has no Kα2,
+        # which ``wavelength_alpha2`` records as a zero (``METADATA_KEYS``)
+        if alpha2 is not None and _instrument_value(children, "I(L2)/I(L1)") == 0:
+            alpha2 = 0.0
     data = pattern_data(
         p, tt, y, sig,
         source_file=p.name, format=GPX.name, scan=index, scan_count=len(items),
         title=(str(title).strip() or None) if title is not None else label,
-        wavelength=primary, wavelength_alpha2=alpha2,
+        probe=_PROBES[kind], wavelength=primary, wavelength_alpha2=alpha2,
         goniometer_radius_mm=(float(radius) if isinstance(radius, (int, float))
                               else None))
     if excluded:
