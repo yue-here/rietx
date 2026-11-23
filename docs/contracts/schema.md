@@ -806,3 +806,19 @@ label is empty, which is how every series diagnostic's ``where`` names its
 pattern.  No field moves; a stored series that gives two patterns one name no
 longer loads, and the error names both.  A run never wrote one except through
 the ``unique_labels`` collision fixed in the same change.
+
+Also in 0.62 (WP-2081): ``SeriesEntry.held_values``, every path the
+caller held on a pattern with the value it was held at.  Additive and
+defaulted to ``None``, the 0.25 → 0.26 rule; an older build refuses an entry
+carrying the key.
+
+Also in 0.62 (WP-2152): a phase's ``PeakEquation`` may read ``wavelength``,
+the emission line's λ in Å, beside ``h`` … ``two_theta``.  A build without the
+name refuses a stored equation that reads it, as "neither a coefficient nor a
+reflection name".  A coefficient named ``wavelength`` was legal and is now
+refused as the reflection's name; no test, example or fixture declared one.
+No new number: 0.62 is unreleased, so the change takes a line under it (the
+rule above the constant).  ``capabilities().expression_grammar_version`` does
+not move either.  The grammar parses any name, and the names a peak equation
+binds belong to the schema (``schemas.peak_equation.REFLECTION_NAMES``).
+WP-2107 moved the grammar for its two functions and the schema for its names.
