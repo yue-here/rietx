@@ -27,7 +27,8 @@
    * names. A class offers its space groups, its representative first. Adopt
    * takes any candidate (the maintainer's ruling B, 2026-11-08) with its
    * grade and caveats beside it, and is pending until Apply, which adopts the
-   * cell as a Le Bail start and returns the window to Refinement (call 11).
+   * cell as a Pawley start (the maintainer, 2026-11-23: Pawley is the
+   * structure-free default) and returns the window to Refinement (call 11).
    *
    * The answer outlives this page: it is read from the server on mount and
    * after each run, and every index into it is dropped when a new answer
@@ -45,7 +46,8 @@
   import { clone } from "../lib/model";
   import { typesetSpaceGroup } from "../lib/spacegroup";
   import {
-    absentOf, candidateRelation, cellLine, cellText, clock, collectTo, coverageLine, fomOf,
+    absentOf, candidateRelation, cellColumns, cellLine, cellText, clock, collectTo, coverageLine,
+    fomOf,
     formatHkl, limitWord,
     unindexedOf, type AdoptVerdict, type Candidate,
   } from "../lib/peaks";
@@ -200,7 +202,8 @@
     if (!pending) return;
     failure = "";
     try {
-      const a = await api.adoptCandidate(pending.index, pending.group ?? undefined);
+      // Pawley is the structure-free default (the maintainer, 2026-11-23)
+      const a = await api.adoptCandidate(pending.index, pending.group ?? undefined, "pawley");
       if (a?.api_call) say("call", a.api_call, serverScript(a.api_call));
       pending = null;
       onadopted();
@@ -597,7 +600,11 @@
         <h3>Candidates <span class="muted">{candidates.length}, ranked by rietx</span></h3>
         <table class="lines cands">
           <thead>
-            <tr><th class="r">#</th><th>Cell</th><th>Lattice</th><th class="r">V</th>
+            <!-- the cell as six columns, and a row's relation to another on its own
+                 line, compact, its sentence a click away (the maintainer, 2026-11-23) -->
+            <tr><th class="r">#</th><th aria-label="Relation"></th>
+              {#each ["a", "b", "c", "α", "β", "γ"] as n (n)}<th class="r">{n}</th>{/each}
+              <th>Lattice</th><th class="r">V</th>
               {#if zColumn}<th class="r"><Help for={searchHelp(field("formula"))}>Z</Help></th>{/if}
               <th class="r">M₂₀</th><th class="r">Unindexed</th><th class="r">Absent</th>
               <th class="r">Rwp</th><th>Grade</th></tr>
@@ -609,10 +616,11 @@
               {@const rel = candidateRelation(candidates, i)}
               <tr class:sel={chosen === i} data-cand={i} onclick={() => { if (i !== chosen) judge(i); }}>
                 <td class="r num">{i + 1}</td>
-                <!-- a long cell breaks only between its parameters -->
-                <td class="cell"><span class="num">{#each cellLine(c).split(", ") as part, pi (pi)}{#if pi}{", "}{/if}<span
-                  class="nb">{part}</span>{/each}</span>
-                  {#if rel}<span class="rel">{rel}</span>{/if}</td>
+                <td class="rel num">{#if rel}<Help text={rel.text}>{rel.mark}</Help>{/if}</td>
+                {#each cellColumns(c) as col, k (k)}
+                  <td class="r num" class:fixed={col.fixed}>{col.value}{#if col.pad}<span
+                    class="pad" style:width="{col.pad.length}ch"></span>{/if}</td>
+                {/each}
                 <td>{c.system} {c.centring}</td>
                 <td class="r num">{c.volume.toFixed(0)}</td>
                 {#if zColumn}<td class="r num">{c.formula_units == null ? "–" : c.formula_units.toFixed(2)}</td>{/if}
@@ -673,7 +681,7 @@
       <p class="num cellline">{cellLine(c, true)}, V = {c.volume.toFixed(1)} Å³</p>
       <!-- the relation line keeps its height when empty, so stepping between
            candidates moves nothing under it -->
-      <p class="relline">{candidateRelation(candidates, i) || " "}</p>
+      <p class="relline">{candidateRelation(candidates, i)?.text ?? " "}</p>
 
       <h3>Grade <span class="muted">{c.confidence}</span></h3>
       <p class="caveats">
@@ -767,12 +775,12 @@
     <div class="foot">
       {#if pending}
         <span class="why">Adopt #{pending.index + 1}{#if pending.group}{" "}in {@render sg(pending.group)}{/if}
-          {" "}as a Le Bail start</span>
+          {" "}as a Pawley start</span>
         <button class="ghost" onclick={() => (pending = null)}>Revert</button>
         <button disabled={busy} onclick={apply}>Apply</button>
       {:else}
         <button disabled={busy} onclick={() => (pending = { index: i, group: activeGroup })}
-          >Adopt as a Le Bail start</button>
+          >Adopt as a Pawley start</button>
         <!-- the grade and its caveats beside Adopt, and the gate's own
              sentence a click away (ruling B, WP-2124) -->
         <span class="why">{#if verdicts[i]?.picked}rietx's pick, grade {c.confidence}{:else}<Help
@@ -940,15 +948,19 @@
     background: color-mix(in srgb, var(--accent) 14%, transparent);
   }
 
-  /* a long cell wraps between its lengths, so the table fits the panel */
-  .cands td.cell {
-    white-space: normal;
+  /* a value the crystal system sets: muted, and a fixed angle written whole,
+     so the column still aligns on the point */
+  .cands td.fixed {
+    color: var(--muted);
   }
 
-  .cell .rel {
-    display: block;
+  /* room for a fixed angle's places, empty so a copy reads `90` */
+  .cands .pad {
+    display: inline-block;
+  }
+
+  .cands td.rel {
     color: var(--muted);
-    font-size: var(--text-sm);
   }
 
   .note {
@@ -1046,10 +1058,6 @@
 
   .classes tr.off td {
     color: var(--muted);
-  }
-
-  .nb {
-    white-space: nowrap;
   }
 
   /* "rietx's pick": the gate's class, in the accent's text role */

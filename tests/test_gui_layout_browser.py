@@ -2368,7 +2368,8 @@ def test_the_fit_index_and_judge_steps_run_to_an_adopted_cell(browser, tmp_path_
     window's Refit is one undo step. Index searches the systems the form leaves
     on, lists the cells, and a row's click draws its lines on the Pattern graph.
     Judge screens the chosen cell's extinctions, and Adopt waits for Apply,
-    which lands a Le Bail start and hands the window to Refinement.
+    which lands a Pawley start (the maintainer, 2026-11-23) and hands the
+    window to Refinement.
     """
     httpd, client = _serve(tmp_path_factory, "next-judge")
     url = f"http://127.0.0.1:{httpd.server_address[1]}/"
@@ -2424,14 +2425,14 @@ def test_the_fit_index_and_judge_steps_run_to_an_adopted_cell(browser, tmp_path_
         assert page.locator("table.classes .mark").count() == 1
         groups = page.locator(".sgs button")
         assert groups.first.get_attribute("aria-pressed") == "true"
-        foot.get_by_role("button", name="Adopt as a Le Bail start", exact=True).click()
-        assert client.get("/api/project")[1]["doc"]["mode"] != "lebail"
+        foot.get_by_role("button", name="Adopt as a Pawley start", exact=True).click()
+        assert client.get("/api/project")[1]["doc"]["mode"] != "pawley"
         assert foot.get_by_role("button", name="Revert", exact=True).count() == 1
         with page.expect_response("**/api/index/adopt"):
             foot.get_by_role("button", name="Apply", exact=True).click()
         page.wait_for_function(
             "document.querySelector('button.mbtn.wf').innerText.includes('Refinement')")
-        assert client.get("/api/project")[1]["doc"]["mode"] == "lebail"
+        assert client.get("/api/project")[1]["doc"]["mode"] == "pawley"
         assert not page.errors, page.errors
     finally:
         page.close()

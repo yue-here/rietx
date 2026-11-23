@@ -48,7 +48,7 @@ const answered = {
 let doc: any;
 let screen: any = null;
 const screenExtinctions = vi.fn(async (_i: number) => ({}));
-const adoptCandidate = vi.fn(async (i: number, sg?: string) => ({
+const adoptCandidate = vi.fn(async (i: number, sg?: string, _mode?: string) => ({
   api_call: `s = rx.structure_from_candidate(result.candidates[${i}], space_group="${sg}")` }));
 const adopted: number[] = [];
 let answer: any = null;
@@ -73,7 +73,7 @@ vi.mock("../api", () => ({
       return screen;
     },
     screenExtinctions: (i: number) => screenExtinctions(i),
-    adoptCandidate: (i: number, sg?: string) => adoptCandidate(i, sg),
+    adoptCandidate: (i: number, sg?: string, mode?: string) => adoptCandidate(i, sg, mode),
   },
 }));
 
@@ -166,14 +166,21 @@ describe("the Index step", () => {
     await boot();
     expect(text(document.querySelector(".coverage")))
       .toBe("Not searched: tetragonal. Stopped early: hexagonal. The 2-minute limit ran out.");
+    // the cell in six columns (the maintainer, 2026-11-23)
     expect([...document.querySelectorAll("table.cands th")].map(text))
-      .toEqual(["#", "Cell", "Lattice", "V", "M₂₀", "Unindexed", "Absent", "Rwp", "Grade"]);
+      .toEqual(["#", "", "a", "b", "c", "α", "β", "γ", "Lattice", "V", "M₂₀", "Unindexed",
+                "Absent", "Rwp", "Grade"]);
     const rows = [...document.querySelectorAll("table.cands tbody tr")];
     expect([...rows[0].querySelectorAll("td")].map(text))
-      .toEqual(["1", "a = 9.3750, c = 6.8900 Å", "hexagonal P", "524", "41.3", "2", "34 of 189",
-                "18.3 %", "low"]);
-    // a related row is marked, never merged (call 8)
-    expect(text(rows[1].querySelector(".rel"))).toBe("same cell as #1");
+      .toEqual(["1", "", "9.3750", "9.3750", "6.8900", "90", "90", "120", "hexagonal P", "524",
+                "41.3", "2", "34 of 189", "18.3 %", "low"]);
+    // what the hexagonal system sets is muted: b, and every angle
+    expect([...rows[0].querySelectorAll("td.fixed")].map(text)).toEqual(["9.3750", "90", "90", "120"]);
+    // a related row is marked on its own line, never merged (call 8), and
+    // its sentence is a click away
+    const rel = rows[1].querySelector("td.rel [role=button]")!;
+    expect(text(rel)).toBe("≡ #1");
+    expect(rows[1].querySelectorAll("td").length).toBe(15);
     expect(button("Judge ›").disabled).toBe(true);
     (rows[1] as HTMLElement).click();
     await settle();
@@ -257,17 +264,17 @@ describe("the Judge step", () => {
     (sgs[1] as HTMLElement).click();
     flushSync();
     // Adopt is pending until Apply (call 11)
-    button("Adopt as a Le Bail start").click();
+    button("Adopt as a Pawley start").click();
     flushSync();
     expect(adoptCandidate).not.toHaveBeenCalled();
-    expect(text(document.querySelector(".foot .why"))).toBe("Adopt #1 in P63 as a Le Bail start");
+    expect(text(document.querySelector(".foot .why"))).toBe("Adopt #1 in P63 as a Pawley start");
     button("Revert").click();
     flushSync();
-    button("Adopt as a Le Bail start").click();
+    button("Adopt as a Pawley start").click();
     flushSync();
     button("Apply").click();
     await settle();
-    expect(adoptCandidate).toHaveBeenCalledWith(0, "P 63");
+    expect(adoptCandidate).toHaveBeenCalledWith(0, "P 63", "pawley");
     expect(said.at(-1)).toContain("structure_from_candidate(result.candidates[0]");
     expect(adopted).toEqual([1]);
   });
@@ -278,13 +285,13 @@ describe("the Judge step", () => {
     await boot({ step: 3 });
     app.judge(0);
     await settle();
-    button("Adopt as a Le Bail start").click();
+    button("Adopt as a Pawley start").click();
     flushSync();
-    expect(text(document.querySelector(".foot .why"))).toBe("Adopt #1 as a Le Bail start");
+    expect(text(document.querySelector(".foot .why"))).toBe("Adopt #1 as a Pawley start");
     // the Index pane is mounted under Judge: its row is the same click
     (document.querySelectorAll("table.cands tbody tr")[1] as HTMLElement).click();
     await settle();
     expect(document.querySelector(".nav b")!.textContent).toBe("#2");
-    expect(button("Adopt as a Le Bail start")).toBeTruthy();
+    expect(button("Adopt as a Pawley start")).toBeTruthy();
   });
 });

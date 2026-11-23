@@ -53,7 +53,7 @@ export const WORKFLOWS: readonly Workflow[] = [
       { name: "Fit peaks", body: "Each line fitted in its window, with its own esd.", built: true },
       { name: "Index", body: "Engines, crystal systems, centrings, cell bounds, formula.", built: true },
       { name: "Judge",
-        body: "Screen extinctions, check each candidate by a whole-pattern Pawley fit, then adopt one as a Le Bail start.",
+        body: "Screen extinctions, check each candidate by a whole-pattern Pawley fit, then adopt one as a Pawley start.",
         built: true },
     ],
   },

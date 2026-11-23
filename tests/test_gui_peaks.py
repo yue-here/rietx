@@ -444,6 +444,25 @@ def test_any_candidate_can_be_adopted_and_an_unpicked_one_records_why(
         answer["adopt"][1]["why"])
 
 
+def test_adopt_takes_the_structure_free_mode_it_is_asked_for(served, client):
+    """`/next` adopts in Pawley mode, the maintainer's structure-free default
+    (2026-11-23, WP-2240); today's page sends no mode and keeps Le Bail, and
+    a Rietveld adoption over a dummy atom is refused before anything moves."""
+    session, project, _ = served
+    with session._cond:
+        session._index_result = _answer(_candidate("high", []))
+    head = project.history.head
+    status, refused = client.post("/api/index/adopt", {"candidate": 0, "mode": "rietveld"})
+    assert status == 400 and refused["error"]["where"] == ["mode"]
+    assert project.history.head == head
+    status, adopted = client.post("/api/index/adopt", {"candidate": 0, "mode": "pawley"})
+    assert status == 200, adopted
+    assert adopted["mode"] == "pawley" and project.doc.mode == "pawley"
+    assert adopted["api_call"] == "session.adopt_candidate(0, mode='pawley')"
+    status, adopted = client.post("/api/index/adopt", {"candidate": 0})
+    assert status == 200 and adopted["mode"] == "lebail"
+
+
 def test_adopting_the_one_high_candidate_is_a_model_edit(served, client):
     session, project, _ = served
     with session._cond:

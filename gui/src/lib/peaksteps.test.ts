@@ -9,6 +9,7 @@ import {
   candidateRelation,
   coverageLine,
   limitWord,
+  cellColumns,
   cellLine,
   clock,
   filterPeaks,
@@ -65,6 +66,18 @@ describe("the candidate columns", () => {
     expect(cellLine(cand({ system: "cubic", cell: [4.1568, 4.1568, 4.1568, 90, 90, 90] })))
       .toBe("a = 4.1568 Å");
   });
+  it("split the cell into six columns, marking what symmetry sets", () => {
+    const show = (c: Parameters<typeof cellColumns>[0]) =>
+      cellColumns(c).map((x) => `${x.value}${x.pad ? "_" : ""}${x.fixed ? "*" : ""}`);
+    expect(show(cand())).toEqual(
+      ["9.3750", "9.3750*", "6.8900", "90_*", "90_*", "120_*"]);
+    expect(show(cand({ system: "monoclinic", cell: [5.1, 6.2, 7.3, 90, 101.25, 90] })))
+      .toEqual(["5.1000", "6.2000", "7.3000", "90_*", "101.250", "90_*"]);
+    // rhombohedral axes: b and c follow a, β and γ follow α
+    expect(show(cand({ system: "trigonal", cell: [5.2, 5.2, 5.2, 55.3, 55.3, 55.3] })))
+      .toEqual(["5.2000", "5.2000*", "5.2000*", "55.300", "55.300*", "55.300*"]);
+    expect(cellColumns(cand())[3].pad).toBe(".000");
+  });
   it("count the unindexed lines and the absent share", () => {
     expect(unindexedOf(cand())).toBe(2);
     expect(absentOf(cand())).toBeNull();
@@ -78,13 +91,16 @@ describe("the candidate columns", () => {
     const big = cand({ cell: [9.375, 9.375, 13.78, 90, 90, 120], supercell_checks: [
       { parent_cell: base.cell, index: 2, verdict: "undecided" }] });
     const list = [big, base, twin];
-    expect(candidateRelation(list, 0)).toBe("#2 with 2× the volume");
-    expect(candidateRelation(list, 1)).toBe("");
-    expect(candidateRelation(list, 2)).toBe("same cell as #2");
+    expect(candidateRelation(list, 0)).toEqual(
+      { mark: "2× #2", text: "A supercell of #2, with 2× its volume." });
+    expect(candidateRelation(list, 1)).toBeNull();
+    expect(candidateRelation(list, 2)).toEqual(
+      { mark: "≡ #2", text: "The same cell as #2, under another lattice label." });
     // a containment pair has no index: its number is 0, never a volume ratio
     const dense = cand({ cell: [16.24, 16.24, 7.92, 90, 90, 120], supercell_checks: [
       { parent_cell: base.cell, index: 0, relation: "containment", verdict: "undecided" }] });
-    expect(candidateRelation([base, dense], 1)).toBe("indexes every line #1 does");
+    expect(candidateRelation([base, dense], 1)).toEqual(
+      { mark: "⊇ #1", text: "Indexes every line #1 does." });
   });
   it("write the clock as m:ss", () => {
     expect(clock(109.4)).toBe("1:49");
