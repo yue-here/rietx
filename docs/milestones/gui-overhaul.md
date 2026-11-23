@@ -6,7 +6,7 @@ the short prose, and the WP index lists the rows. The block 22xx is claimed for 
 the first. The first piece is WP-2123, numbered before this record was written.
 
 Narrative about the WPs below goes to the record of the release in flight,
-[v1.12](v1.12.md) today, as for every other WP (protocol rule 5).
+[v1.13](v1.13.md) today, as for every other WP (protocol rule 5).
 
 ## Scope
 
@@ -52,18 +52,74 @@ prototype at 1440 × 900:
 
 | Piece | WP | What it builds |
 |---|---|---|
-| R1 | [WP-2215](../wp/2215-the-frame.md), in flight | the frame: the `/next` page, top bar, status bar, side and bottom panels, the workflow and File menus, Settings, the command palette and keys, one menu and context-menu component; the start screen, New project and the Console mounted in it |
-| R2 | [WP-2216](../wp/2216-the-refinement-window.md), in flight | the refinement window: the Pattern graph (legend gutter, view menu, the fitted range and excluded regions as plot objects, the plot's context menu), the Parameters tab with the phase and atom menus, the action bar with one Apply, and the recovery offer for the edits it brings (moved from R1 by WP-2215) |
-| R3 | — | hand fitting and the other graphs: the Interactive tab, the Peaks, Background and Structure graphs, the Instrument dialog |
-| R4 | — | the Plan tab with Free and Fix rows, and the Text tab whose edits ride the action bar |
+| R1 | [WP-2215](../wp/2215-the-frame.md), merged 2026-11-11 (#1534) | the frame: the `/next` page, top bar, status bar, side and bottom panels, the workflow and File menus, Settings, the command palette and keys, one menu and context-menu component; the start screen, New project and the Console mounted in it |
+| R2 | [WP-2216](../wp/2216-the-refinement-window.md), merged 2026-11-11 (#1537), polish 2026-11-17 (#1538) | the refinement window: the Pattern graph (legend gutter, view menu, the fitted range and excluded regions as plot objects, the plot's context menu), the Parameters tab with the phase and atom menus, the action bar with one Apply, and the recovery offer for the edits it brings (moved from R1 by WP-2215) |
+| R3 | [WP-2218](../wp/2218-hand-fitting-and-the-other-graphs.md), merged 2026-11-18 (#1673) and 2026-11-19 (#1680, #1683, #1684) | hand fitting and the other graphs: the Interactive tab, the Peaks, Background and Structure graphs, the Instrument dialog |
+| R4 | [WP-2231](../wp/2231-the-plan-and-text-tabs.md), in flight | the Plan tab with Free and Fix rows, and the Text tab whose edits ride the action bar |
 | R5 | [2211](../wp/2211-the-history-table.md), [2212](../wp/2212-console-lines-by-kind.md) | History as a table, Console lines by kind, and the report |
-| R6 | — | the peaks-and-indexing workflow in four steps |
-| R7 | — | the series workflow in four steps, with Trends and Map |
-| Swap | — | `/` serves the new page; today's shell and the panels nothing imports are deleted; the manual's GUI chapters rewritten and their screenshots retaken. Its PR waits on the maintainer, since it deletes |
+| R6 | [WP-2240](../wp/2240-the-peaks-and-indexing-workflow.md), merged 2026-11-23 (#1788, #1791, #1792) | the peaks-and-indexing workflow in four steps |
+| R7 | [WP-2243](../wp/2243-the-series-workflow.md), in flight | the series workflow in four steps, with Trends and Map, and the scrubbing of WP-1317 redesigned into it, from loading the patterns to the output (§ R7 carries the series scrubber, § R7 is designed from loading to output) |
+| Swap | — | `/` serves the new page; today's shell and the panels nothing imports are deleted; the manual's GUI chapters rewritten and their screenshots retaken; File › Export gains the structure image (inventory row 79), with the POV-Ray, glTF and SVG writers as they land (#1667 item 1), which R3 offers only on the canvas's menus while the File menu is today's panel. Its PR waits on the maintainer, since it deletes |
 
 The maintainer reviews whole screens beside the prototype at each piece's end, and never single
 values. A small visual value is settled under `gui/STYLE.md` and listed in the PR. A piece's
 earlier PRs merge on green, and its last waits on his look.
+
+### R7 carries the series scrubber
+
+On 2026-11-21 the maintainer ran PR #1395 (WP-1317, the series scrubber) on a planted
+40-pattern series. The ruling, in the maintainer's words: "The fundamental idea is sound, but we need to bring it into the
+new gui." And: "We will need to fully re-design the UI however." So R7 delivers what WP-1317
+does, in a UI designed for the new GUI. It ports nothing from #1395's panel. The workshop's
+round 12 (8 November) predates that PR, so its Series design does not cover these features.
+
+The server half carries over, as the rebuild keeps the routes. Once #1395 merges, R7 reuses
+three things from it. The first is the `trace` key of `GET /api/series/result`. The second is
+`gui/series.TRACE_VOCABULARY`, the one statement of which result fields mark a pattern. The
+third is the curves and history routes' member lookup by the entry's own index (#1396). Before
+that fix, every pattern after a failed one showed its neighbour's fit.
+
+What WP-1317 does that the round-12 design lacks:
+
+| # | Feature in #1395 | The nearest thing in round 12 |
+|---|---|---|
+| S1 | The series coordinate drawn against the pattern index, failed patterns included | Trends' "Against" switch; the Map's rows |
+| S2 | Marks for failed, unrecovered and reseeded patterns, read from the result; a code with no row drawn under its own name | the per-pattern table's status; a warnings list |
+| S3 | A bar per pattern counting its own fit's findings, so a cluster shows where the fits changed | the selected pattern's warnings |
+| S4 | The shown parameter's largest step, shaded between its two patterns | a summary row naming the largest step, with Plot it |
+| S5 | Drag along the series to move the pattern view, with the zoom and hidden curves kept | selection by click, ‹ ›, ↑ ↓ and Map row; a 2θ zoom shared by Map and Pattern |
+| S6 | ← → step, Home and End jump to the ends, a key skips a pattern with no fit, and a note names a failed pattern a drag lands on | ↑ ↓ only |
+| S7 | A hover tip: label, coordinate, Rwp and findings | the Trends tooltip |
+| S8 | A key giving each mark's meaning and the field it reads | the Trends legend |
+| S9 | The trace is a slider to a screen reader, its value naming the pattern | not stated |
+
+Round 12 also draws a ring for the second walk's value (its call 4), while #1395 draws a ring
+for a reseeded pattern. The redesign gives each one glyph.
+
+What stays out: WP-1317's external annotations (a typed transition temperature, a beam dump),
+deferred until a series is saved with the project; and WP-1317's owed screenshots, which the
+swap retakes from `/next`.
+
+### R7 is designed from loading to output
+
+Also on 2026-11-21, in the maintainer's words: "we'll need to think carefully about
+user-friendly UIUX for the series feature, from soup to nuts. Off the top of my head (and these
+might already be in there), data loading and cleaning, pre-visualisation, visualisation against
+parameters, output formats such as interactive html." So R7's design round covers the whole
+path, and the gaps below are its starting list. Round 12 designed the fit and its results. On
+8 November the maintainer deferred file I/O ("we can massage the file i/o etc later").
+
+| Stage | In round 12 | Not yet designed |
+|---|---|---|
+| Loading | the Patterns list, Sort by temperature, Remove; temperatures read from file headers (flagged, since rietx takes them as typed) | adding a folder or many files at once; mixed formats in one series; a check before the run that the members agree on wavelength, range and step |
+| Cleaning | nothing | finding a bad pattern before fitting it (the demo's blank frame at pattern 14 showed only as a failed fit); excluded regions for the whole series; a 2θ range common to every member |
+| Pre-visualisation | Map and Waterfall of the observed patterns, with cuts | both come after a run, and the Patterns step draws nothing; they need every member's curves, which the route serves one at a time (flagged) |
+| Against parameters | Trends: any refined value or statistic against the coordinate or the pattern number, the walks' gap, the largest step | against another refined value (flagged, round 12 call 21); S1-S9 above |
+| Output | a CSV note in the ? box; `SeriesResult.to_table` in the package | an interactive HTML page for a series (`viz.write_html` takes one fit); saving the series with the project (round 12 decision 2); per-pattern CIFs |
+
+Practice, from the workshop's `review-series.md`: every program surveyed ends a series in a
+text table, and GSAS-II alone writes a CIF per pattern. The survey records no interactive page
+for a series.
 
 ## The port, until 2026-11-11
 
@@ -97,7 +153,7 @@ the 22xx block, or now lives in a rebuild piece. Where to find each since 2026-1
 | Settings dialog | theme, density and number format | 2026-11-07 | R1 for the theme; density and number format with the first piece that draws what they change |
 | Bottom panel and status bar | Console (the Python the window runs) and History, toggled from the status bar along the window's foot | 2026-11-07 | R1 and R5; PR #1521 (WP-2206, WP-2207) closes as a source |
 | Fixing plan stages | a plan stage that fixes as well as frees: `StageSpec.turn_off`, a `fix` clause in `.rxt` | 2026-11-09 | [WP-2208](../wp/2208-a-plan-stage-that-fixes.md), PR #1520, merged 2026-11-11; R4 draws it |
-| Edit recovery | unapplied edits kept across a close or crash in a recovery copy in rietx's state directory, apart from the project, as editors such as VS Code keep theirs | 2026-11-09 | [WP-2209](../wp/2209-unapplied-edits-survive-a-close.md), PR #1523, merged 2026-11-11; its follow-up [WP-2213](../wp/2213-text-and-model-edits-join-the-recovery-copy.md) (the Text buffer and Model forms join the copy) shrinks, since R4 makes a Text edit a pending edit |
+| Edit recovery | unapplied edits kept across a close or crash in a recovery copy in rietx's state directory, apart from the project, as editors such as VS Code keep theirs | 2026-11-09 | [WP-2209](../wp/2209-unapplied-edits-survive-a-close.md), PR #1523, merged 2026-11-11; its follow-up [WP-2213](../wp/2213-text-and-model-edits-join-the-recovery-copy.md) (PR #1633, merged 2026-11-18) adds the Text buffer and the Model forms to the copy for today's page; R4 reuses its `text` arm and `lib/sync.ts`'s `restored` event, and the Model arm goes with today's Model panel at the swap |
 | Fit statistics in the action bar | Rwp, GoF and the not-a-fit judgement beside Refine while the graphs are hidden ("try B") | 2026-11-09 | R2; PR #1518 (WP-2210) closes as a source |
 | The graph window | curves switched from a legend, a view menu, the fitted range and excluded regions as plot objects | 2026-11-10 | R2; the branch `wp2213-the-graph-window` is a source, and its WP number is retired because PR #1523 files WP-2213 |
 
@@ -136,7 +192,8 @@ rebuild piece that touches it, or a WP of its own.
   on 63d7c120a; naming the other four is WP-2124's follow-up); lattice relations between
   candidates ("c doubled", "a × √3", "same cell") belong in rietx.
 - `PeakEditor.curves` serves only each group's sum; per-line curves need a route. PR #1526
-  (WP-2202) serves them as `lines` on each group, and R6 takes that half.
+  (WP-2202) serves them as `lines` on each group, and R6 takes that half. R6 served them in
+  PR #1788 (WP-2240).
 - `set_flags(..., use_for_indexing=True)` forgets which flags a person overruled.
 - `--plot-peak` (purple) loses to the data crosses as a mark colour. WP-2130 measured the ruled
   blue against the palette and took the choice to the maintainer, who ruled on 2026-11-09 that it
@@ -146,7 +203,7 @@ rebuild piece that touches it, or a WP of its own.
   WP-2124 added both to the route, and `pick_options` records all three.
 - Right-click on a plot object opens no context menu, and peak edits have no undo, though the
   maintainer adopted both rules on 2026-11-08. R1 builds the context-menu service; R6 owes the
-  peak edits' undo.
+  peak edits' undo. R6 built it in PR #1791 (WP-2240).
 - A GUI series lives in session memory only; several series gaps wait on the series fitting
   now changing on `main`.
 - The Model and Text panels keep their own Apply beside the action bar's. R2 and R4 give the

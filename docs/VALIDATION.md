@@ -288,7 +288,7 @@ The absolute lab anchor. NIST's own SRM 660c certification measurement, refined 
 
 **Claims:** the absolute lab cell anchor: a, the Berar-Lelann esd inflation, the held zero shift, the sample displacement and the Ka2 ratio
 
-**Referenced to:** NIST's cell recomputed for this dataset's 20.85 C block, 4.156780 A, under an explicitly interim +-2e-4 A band; the certificate's own +-8e-6 at 22.5 C is NOT claimed and the residual is a characterised cotTheta/sin2Theta aberration (divergence, tube tails, monochromator passband) fenced to the v2 FPA work
+**Referenced to:** NIST's cell recomputed for this dataset's 20.85 C block, 4.156780 A, under an explicitly interim +-2e-4 A band; the certificate's own +-8e-5 A (k = 2, 19 ppm) at 22.5 C is NOT claimed and the residual is a characterised cotTheta/sin2Theta aberration (divergence, tube tails, monochromator passband) fenced to the v2 FPA work
 
 **Measured:** a = 4.156882(21) A, +24 ppm; Rwp 8.74 %, GoF 1.89; zero_shift held at exactly 0.0; displacement -0.0790 mm vs the CIF's -0.07877. The Gaussian width is real at all 60 reflections. 1.9.0 read +25 ppm (24.6 against 24.5), Rwp 8.75 % and -0.0791 mm, before WP-2002's closing stage (#1085). Before WP-1938 the width sat on its clamp at 12 reflections, and the fit read 4.156895 A, +28 ppm, Rwp 8.67 %
 
@@ -1756,6 +1756,30 @@ WP-1806: the rigid body on acridine form IX (COD 2242872, CC0), whose synchrotro
 
 **Measured:** worst |delta|/esd 38.7, 29 of 42 components over 4; Rwp 0.0389 against 0.0282, GoF 1.37
 
+#### `test_issue_1008s_stretched_body_fires_on_the_deposited_pattern`
+
+`characterisation` `ceiling` · dataset `acridine_ix` · survives 2 starts
+
+**Claims:** the body with C2-C3 stretched 0.3 A (H3 moved with C3), refined under the same plan, is rejected by the misfit check: Hamilton and Delta-BIC both fire with each riding H tied to its parent, and C2-C3 is named first; the same fits with every member freed (63 parameters, the arm 1.11.0 fitted) stay under the Delta-BIC threshold, so the verdict is the riding arm's
+
+**Referenced to:** MISFIT_ALPHA 1e-3 and MISFIT_BIC 10 (Kass & Raftery 1995, 'very strong'); the stretch is #1008's planted template error
+
+**Measured:** Hamilton p 9.3e-43, Delta-BIC +52.0 at N_eff 1191.5 (bar 10); C2-C3 1.705 -> 1.463 A, -12.1 sigma; all-freed Delta-BIC -111.3; the perturbed start reaches the same chi2 to 1e-9
+
+**Diagnostics:** `RIGID_BODY_MISFIT`
+
+#### `test_the_deposited_body_does_not_fire_on_the_deposited_pattern`
+
+`characterisation` · dataset `acridine_ix`
+
+**Claims:** the deposited body, under the same plan and check, is not rejected
+
+**Referenced to:** MISFIT_ALPHA 1e-3 and MISFIT_BIC 10, the thresholds the stretched row above fires on
+
+**Measured:** Hamilton p 0.40 (bar 1e-3), Delta-BIC -233.1 (bar 10)
+
+**Diagnostics:** `RIGID_BODY_MISFIT` asserted *absent*
+
 ## The one default this matrix decided
 
 `Source.dispersion` shipped opt-in through v0.6 so that landing it did not
@@ -1806,7 +1830,7 @@ should know about before trusting a number, each with what would close it.
 
 - **No dataset here can constrain a low-angle intensity correction.** The qarr phases first reflect at 25.6/28.3/31.8 deg and SRM 660c at 21.4, so surface roughness (WP-0502) has a negative acceptance result only: two of three phases collapse to the identity and raise ROUGHNESS_UNCONSTRAINED.  Closing it needs a pattern starting below ~15 deg with real low-angle reflections.
 
-- **The SRM 660c certificate band is not reached and is not claimed.** Measured +24 ppm against a certificate uncertainty of +-8e-6 A.  The residual is a characterised cotTheta/sin2Theta aberration — equatorial divergence, tube tails, monochromator passband — which is the fundamental-parameters territory fenced to v2, not a tuning gap.
+- **The SRM 660c certificate band is not reached and is not claimed.** Measured +24 +- 5 ppm at 20.85 C, against NIST's recompute 4.156780 A, and a certificate uncertainty of +-8e-5 A (k = 2, 19 ppm): outside the band by about one esd.  The residual is a characterised cotTheta/sin2Theta aberration — equatorial divergence, tube tails, monochromator passband — which is the fundamental-parameters territory fenced to v2, not a tuning gap.
 
 - **GoF does not reach 1 on lab data and should not be expected to.** Cline et al. (2015) put the floor for analytical-PSF fits on this instrument class at 1.5-1.9; FPA reaches 1.08.  Measured 1.63 on corundum with Rexp ~ 8.9 %, so Rwp 14.6 % is mostly counting statistics.  A policy demanding GoF -> 1 would be demanding FPA.
 

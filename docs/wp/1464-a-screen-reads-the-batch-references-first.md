@@ -1,9 +1,8 @@
 # WP-1464 — a screen reads the batch references first
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: ✅ 2026-11-19 — tasks 1-5 in PR #1681; task 6, the `rietx runs` verb, in PR #1695
 Track: A long run is not one fit
-Depends on: — (PR #385 soft: once it lands, a runaway cell stops raising in a screen)
-Priority: P3 2026-09-25 — the references exist and a reader who finds them is covered; one session waited 78 idle minutes on a screen they describe
+Depends on: — (PR #385, merged 2026-09-25: a runaway cell no longer raises in a screen)
 
 ## Goal
 
@@ -13,49 +12,6 @@ before it launches, not after the fits are in hand. And those references carry
 the two lessons one such screen paid for: a free cell lets an absent candidate
 take a present phase's peaks, and a process pool needs its kernel threads
 pinned.
-
-### Inherited
-
-- **2026-10-23, from [1322](1322-events-aggregator.md) (closed): a job of many
-  fits is many run directories, and nothing summarises them as one job.** This
-  comes from a 2026-09-25 transcript review of an agent session on `in-situ
-  series 1`. Asked to report its own metrics, the agent counted fits by hand
-  while 887 run directories sat in `.rietx/runs` (843 `done`, 44 `failed`), each
-  with its `meta.json`, `status.json` and log. It put its first screen at
-  "about 15 min", where the transcript's timeline says 89. `rietx events` (PR
-  #902) reads one log or one run directory. `runs.discover` lists the runs
-  under a root, `runs.read_run` reads each, and `label=`
-  ([1431](1431-a-caller-names-its-run.md)) can give a job's runs one name.
-  Still open: decide whether a job's count, failures, wall and slowest run
-  are a second mode of `rietx events` or another verb, and name the answer in
-  `batch-operating.md` either way.
-- **2026-10-11, from the issue triage (#898 (b)): a second user hit lesson
-  2, and asks for `OMP_NUM_THREADS` too.** An application runs rietx beside
-  other parallel work and sets `RIETX_COMPILED_THREADS=1`, because the
-  default oversubscribes. It asks that `NUMBA_NUM_THREADS` or
-  `OMP_NUM_THREADS` be read as well, for users who do not know rietx's
-  variable. Checked at `d80ca5f4`: `model.compiled.n_threads()`
-  (`compiled.py:195-208`) reads only `RIETX_COMPILED_THREADS` (an int ≥ 1,
-  anything else silently ignored), else `min(8, os.cpu_count())`. The pool
-  is a Python `ThreadPoolExecutor` over GIL-releasing Rust kernels, so
-  neither OpenMP nor numba ever controlled it. numba left with WP-1940, so
-  that half of the ask is moot. Whether `OMP_NUM_THREADS` is read as a
-  fallback is a small decision to take with task 1's default-in-a-pool
-  question (numexpr reads `NUMEXPR_NUM_THREADS`, then `OMP_NUM_THREADS`).
-  `os.cpu_count()` ignores CPU affinity and cgroup limits (inferred). The
-  variable is in no manual page either, and WP-1950's embedding section
-  will name it.
-
-- **2026-09-28, from [1338](1338-the-skills-own-gates.md): a body sentence is paid for by a cut.** The
-  body's budget is the specification's 5 000 tokens, 17 000 B, and it is at
-  30 509 B, so a change may not grow it (`tests/skill_caps.py`). Guidance
-  for one kind of fit goes in a reference row keyed by a name the agent
-  holds, which the body's grep sentence reaches (CONTRIBUTING.md § The
-  agent skill). The placement round saw Haiku and Sonnet open no reference
-  file in 12 cells, so a rule every fit needs stays in the body.
-  Measured there too: under the grep sentence Opus reached 17 of 18 fired
-  codes' rows against 4 under routing rows
-  (`tests/eval_skill_placement/PROTOCOL.md`).
 
 ## Context
 
@@ -82,8 +38,9 @@ a job past its budget as a diagnosis. That row's factor for independent jobs
 is still tagged a hypothesis. This screen is a measured point for it: the one
 job at 84× the median was a cell runaway.
 
-**Why the references were missed.** `SKILL.md`'s two §9c routing rows are keyed
-by topic: "§9c, deciding: ranking, differencing, auditing, identifiability" and
+**Why the references were missed.** `SKILL.md`'s two §9c routing rows were keyed
+by topic (superseded in part 2026-11-18: they have since merged into one row,
+"§9c a batch: deciding; operating", still keyed by topic): "§9c, deciding: ranking, differencing, auditing, identifiability" and
 "§9c, operating: budget, cost, timing, the log, inventory, fault tolerance".
 `batch.md` opens "Load it when a batch's fits are in hand". The rule for a
 routing row is to key it by the situation (root CLAUDE.md, the skill). This
@@ -109,8 +66,10 @@ than the smallest metric difference between candidates.
 
 **Lesson 2: threads in a process pool, not yet measured.** The compiled tier
 takes `model.compiled.n_threads()` threads per process, min(8, cores) unless
-`RIETX_COMPILED_THREADS` is set (`_about.py`). The skill names that variable
-nowhere. A 10-worker pool can therefore run up to 80 kernel threads, plus BLAS.
+`RIETX_COMPILED_THREADS` is set (`_about.py`). The skill named that variable
+nowhere (superseded in part 2026-11-18: `batch-operating.md` 9c.33, from
+WP-1325, now advises `RIETX_COMPILED_THREADS=1` per process and tags the
+one-thread pool a hypothesis that no batch has measured). A 10-worker pool can therefore run up to 80 kernel threads, plus BLAS.
 The agent saw a load of about 25 on 10 cores and pinned only the BLAS
 variables. Its later screens took 0.7 to 2.7 min, but those also changed the
 cell bounds, so they do not isolate the threads. Measure on a quiet machine
@@ -145,22 +104,36 @@ stands with or without #385.
 
 ## Tasks
 
-- [ ] Measure lesson 2 on a quiet machine: one screen-shaped job set under a
+- [x] Measure lesson 2 on a quiet machine: one screen-shaped job set under a
       10-worker pool, with `RIETX_COMPILED_THREADS` unset and set to 1, BLAS
       pinned in both, repeated. Quote walls as ranges. If the gap is large,
       decide whether a pool worker should default to one thread (prior art:
       joblib's loky backend limits its workers' inner threads; read how).
-- [ ] Re-key the two §9c routing rows by situation, and make `batch.md`'s
+      Decide with it whether `n_threads()` falls back to `OMP_NUM_THREADS`
+      (numexpr reads `NUMEXPR_NUM_THREADS`, then `OMP_NUM_THREADS`).
+- [x] Re-key the two §9c routing rows by situation, and make `batch.md`'s
       "Load it when" name a screen before its fits. No new body line: a
       rewritten row costs no cap.
-- [ ] `batch.md`: the imitation row beside §9c.2, tagged
+- [x] `batch.md`: the imitation row beside §9c.2, tagged
       `(Measured: in-situ series 1, second session)` for the evidence and
       `(Hypothesis: …)` for the width rule.
-- [ ] `batch-operating.md`: the threads row with lesson 2's numbers. And
+- [x] `batch-operating.md`: the threads row with lesson 2's numbers. And
       §9c.5 gains this screen as a measured point (one job at 84× the median,
       a cell runaway) and "time the failed jobs too", from the `nan` median
       above.
-- [ ] Re-sync the committed copies (`rietx skill --install . --copy`).
+- [x] Re-sync the committed copies (`rietx skill --install . --copy`).
+- [x] From Inherited (2026-11-18): decide whether a job's count, failures,
+      wall and slowest run are a second mode of `rietx events` or another
+      verb, and name the answer in `batch-operating.md`. A new CLI surface,
+      so the name goes to the maintainer.
+      **Decided 2026-11-19 by Yue: (b), a new verb, `rietx runs [root]
+      [--label NAME] [--json]`**, over (a) a second mode of `rietx events`
+      and (c) Python only. A person checks an overnight batch from the
+      shell; the verb names what it points at, `.rietx/runs`, and `runs.py`
+      already uses the word; (a) would branch on what a directory holds.
+      The verb is a thin printer over `runs.job_summary(root, label=None)`,
+      built on `runs.discover` and `runs.read_run`; the ratio to the median
+      is displayed and gates nothing.
 
 ## Acceptance
 
@@ -179,6 +152,270 @@ The routing rows name the situation, and the two new rows carry tags that
 - Issue #374, PR #385 (the runaway).
 
 ## Handover log
+
+### 2026-11-19 — the runs still going, on Yue's ruling (a); PR #1695
+
+`rietx runs` checked while a job runs now says how many of its runs are
+still going and how long the oldest has gone. Before this, a run with no
+end had no line, so the verb run mid-screen could not show the runaway this
+WP opened with. The previous entry left that question for Yue.
+
+*Ruled by Yue, 2026-11-19.* Option (a): show the runs in progress, with a
+line such as `running: 2, longest so far 12 min (40x the median)`. Yue also
+approved, as part of PR #1695, three things the previous entry had settled
+by Claude: the median on the slowest line, the second line naming the
+slowest run's label and directory, and `--label` as a glob.
+
+*Done.*
+- `JobSummary.running` lists the runs `liveness_of` reads as `running`,
+  earliest start first. Each `RunningRun` carries its label, its directory,
+  its recorded start (`started`, Unix seconds) and the liveness evidence.
+  It carries no elapsed time, because a field computed from the clock
+  differs on every call (WP-1427). `--json` therefore prints the same
+  bytes twice for a directory that has not changed.
+- The text view reads the clock. `JobSummary.__str__` calls `_text(now)`
+  with `time.time()`, the one clock read in the view, and its docstring
+  says so. Elapsed is `now` minus the oldest live run's start.
+- Running means live by `liveness_of`, with no second test. A run whose
+  writer died reads `abandoned` and stays off the running line.
+- The line's final wording, after the existing lines, which do not change:
+  `running: N, longest so far T (Rx the median, M)`, then an indented line
+  with that run's own label (where it differs from the job's) and its
+  directory. The median is over the timed runs. With none timed, the line
+  is `running: N, longest so far T`. With no live run recording a start, it
+  is `running: N, no start recorded`.
+- When a finished run is slower than every live one, both blocks print and
+  the live ratio is under 1 (`0.5x`). A ratio under 0.1 prints `<0.1x`.
+- Manual `reference/cli.md` § `rietx runs` gains the real example below and
+  says what the JSON carries. The verb's `--help`, skill 9c.5 (re-synced
+  copies), the release fragment `1695.new.md` and the v1.13 record each
+  gain a sentence.
+
+Real output, from six fits of the synthetic LaB6 pattern: four finished,
+one held at its first stage by a sleeping callback, one killed with
+`kill -9` partway (driver `~/.cache/ghostshift/rietx/wp-1464/live_demo.py`):
+
+```console
+$ rietx runs --label 'screen-2/*'
+screen-2/*: 6 runs, 4 done, 1 running, 1 abandoned
+wall 5.0 s, first start to last end (2 runs recorded no end)
+slowest: 0.3 s, done (1.4x the median, 0.2 s)
+  screen-2/lab6-1, .rietx/runs/20261119-094950-56387
+running: 1, longest so far 26 s (103x the median, 0.2 s)
+  screen-2/lab6-held, .rietx/runs/20261119-094956-56428
+```
+
+*Measured.* `[dev]` venv, arm64 Mac.
+- A job with nothing running prints as before, byte for byte: the text of
+  both demo roots of the previous entry, compared with `cmp` before and
+  after. Its JSON gains `"running": []`.
+- Tests: 4 added in `tests/test_runs.py` (a live run under a held lock, a
+  dead run with a free lock and a stale heartbeat, a live run with no
+  finished run through the pid rung, and nothing running with its JSON).
+  The file: 65 passed, 1 skipped.
+- Fast selection on `4de2cb70a` (the code commit, main merged since the
+  previous entry's count): 14 823 passed, 434 skipped, 32 xfailed,
+  through ghostshift's `serial.py`.
+- `python -m tests.reader_output` exit 0: a fit's printed text is
+  unchanged against the merge-base `d98250f96`.
+
+*Settled by Claude, for the maintainer to reverse.*
+- The running line carries the median's value, `(40x the median, 18 s)`,
+  as the slowest line does, beyond the ruling's example shape. With no
+  slowest line (one timed run) the median would otherwise print nowhere.
+- A second line names the longest-running run's label and directory, as
+  the approved slowest line does. A runaway seen is one to find.
+- A dead run keeps its existing word, `abandoned`, in the counts line, with
+  no extra line such as `stopped responding: 1`. The manual already defines
+  `abandoned` (`guides/watch.md`, `reference/cli.md`), and a second phrase
+  for one state would make two names.
+
+Next: none. The WP stays closed.
+
+### 2026-11-19 — task 6, `rietx runs`; WP closed, PR #1695
+
+A person or an agent checking an overnight batch can now ask the shell what
+it did. `rietx runs` reads the run directories under a directory and prints,
+per job, how many runs ended in each state, how long the job took from its
+first start to its last end, and which run was slowest against the median.
+A failed run is timed like any other, which is what the screen behind this
+WP lacked: its summary printed a `nan` median and never saw its 76-minute
+failure. Yue chose the verb over a second mode of `rietx events` on
+2026-11-19. With task 6 the WP closes.
+
+*Done.*
+- `runs.job_summary(root=None, *, label=None)` returns a `RunsSummary`
+  (the root, a list of `JobSummary`); `rietx runs [dir] [--label NAME]
+  [--json]` prints it, `--json` as `rietx events --json` does. Both types
+  carry a designed `__str__`.
+- A job is the runs sharing one `meta.json` label. A run with no
+  `meta.json` (legacy) forms a last `(no label)` block. A run nobody named
+  carries the recorder's default, the working directory's name.
+- `--label` is an `fnmatch` glob, and its matches are one job. 9c.32 tells
+  an agent to name each run after its candidate, so an exact label would
+  have made every candidate its own job. 9c.32 now says to put the job
+  first (`screen-1/zincite`), and 9c.5 names the verb.
+- Times are what a writer recorded. Start: `meta.json`'s `created`. End:
+  `status.json`'s `heartbeat` when the state is terminal and no recording
+  error was latched (`RunRecorder.close` writes that heartbeat last). A
+  running, abandoned or latched run has no end; the wall line then says how
+  many runs recorded none, and the wall is a lower bound.
+- `discover` is called with `max_runs=sys.maxsize`: its 500 is the
+  watcher's poll budget and would cut the 887-run job this view exists for.
+- The slowest line names the slowest run's own label and directory, and its
+  ratio to the median. The ratio gates nothing.
+- Manual: `reference/cli.md` § `rietx runs`, with real output; the help
+  block there was also one flag stale (`gui --new`). Release-note fragment
+  `docs/releases/unreleased/1695.new.md`.
+
+*Measured.* `[dev]` venv, arm64 Mac.
+- Demo root: 26 cold fits on public standards (the 2026-11-18 screen set,
+  six patterns alone and with each other CPD candidate, every cell free),
+  five spawn workers, each fit `label=f"screen-1/{pattern}+{candidate}"`.
+  `rietx runs --label 'screen-1/*'`: 26 done, wall 21 s, slowest 17 s
+  (fluorite + corundum, 9.6x the median of 1.8 s). Driver
+  `~/.cache/ghostshift/rietx/wp-1464/screen_demo.py`.
+- A second root of five synthetic LaB6 fits, one raising from its event
+  callback, shows `4 done, 1 failed` and the failed run timed.
+- Tests: 8 added in `tests/test_runs.py`, 0.67 s together locally, none
+  in the fast tier's tail. Fast selection on `cc5a68fa1` (`[dev]`, arm64
+  Mac, load ~21 from other sessions): 14 815 passed, 434 skipped,
+  32 xfailed in 11:24. The full suite did not run: no fit's number can
+  move.
+- `python -m tests.reader_output` exit 0: a fit's printed text is
+  unchanged.
+
+*Review.* `/code-review high --fix` made four fixes, committed as
+`cc5a68fa1`: an unmatched `--label` now prints `no runs labelled X under
+ROOT` rather than reading as an empty root (`RunsSummary.label`); a label
+equal to `--label` matches even when it holds a glob character
+(`Fe2O3 [2]`); `JobSummary` is built in one call; test spacing. It also
+caught `cli.md`'s example saying 12 fits where 26 ran, fixed by hand.
+Declined: a run whose `meta.json` lacks `created` but has an end counts
+under "recorded no end". The recorder always writes `created`, so only a
+hand-written meta reaches it.
+
+*Generality* (the `generality-review` judge, summarised; author's answer
+under each).
+- The ratio to the median: holds. Kind 3, a number with nothing acting on
+  it, tier 1. Two caveats: a fast failure pulls the median down, and 9c.5
+  compares against the median *converged* job. Author: 9c.5's new sentence
+  now says the verb's median is over every timed run, failed included.
+- When a run is timed: weak. The rule is right (WP-1076), but a run still
+  going has a true lower bound, `now − created`, and without it the verb run
+  mid-screen cannot show the runaway WP-1464 opened with. Author: left for
+  the maintainer, since it adds a clock-dependent field and a printed line.
+  See *Next*.
+- `--label` matching: holds. A defaulted label (the working directory)
+  groups every unnamed fit from one directory, across days; `meta.json`
+  does not record that the label was defaulted. Exact-or-glob is a union,
+  so `Fe2O3 [2]` also gathers `Fe2O3 2`. Author: both stand; the manual
+  says an unnamed run carries the directory's name.
+- 9c.32 and 9c.5: hold. `screen-1*` would also gather `screen-10/…`, so the
+  row's example keeps the slash.
+
+*Settled by Claude, for the maintainer to reverse.* The glob (above, on
+9c.32's naming). The slowest run's label and the median in parentheses on
+the slowest line, beyond the approved example's shape. Exit 0 when nothing
+matches, with a line saying so.
+
+Also forwarded: the open `os.cpu_count()` affinity note from this WP's
+Inherited, to WP-1950's Inherited, with WP-1950's non-goal updated.
+
+Next: the maintainer reads the verb's output in PR #1695 and decides whether
+a run still going should print how long it has been going (the judge's weak
+item). If yes, that is a follow-up on `runs.job_summary`, not this WP.
+
+### 2026-11-18 — tasks 1-5, PR #1681
+
+An agent about to run a screen of candidate fits is now sent to the batch
+references before it launches. Those references now carry both lessons, and one
+of them turned out the other way round. Pinning rietx's kernel pool to one
+thread per worker, which the skill advised, made a 10-worker screen about twice
+as slow, so the advice is reversed and the package keeps its default. The
+imitation lesson reproduces on public data: on the CPD zincite pattern an
+absent fluorite candidate shrank its cell 10.8 %, too little for any code to
+fire, and took 14 ± 12 wt %. A ±1 % cell bound did not stop it.
+
+*Done.*
+- Task 2: `SKILL.md`'s one §9c row (the two rows had merged since 2026-09-25)
+  now reads "§9c a screen or pool of fits, before launch". It grew the body by
+  11 B to exactly its 17 000 B budget. `batch.md`'s first line now says to load
+  it before a screen and again once the fits are in hand.
+- Task 3: `batch.md` 9c.35, the imitation row. It sits at the file's end,
+  because `test_skill.py` requires row numbers to increase, and 9c.2 now ends
+  with a pointer to it. Its tag opens `Measured: WP-1464` and names in-situ
+  series 1 inside: the corpus gate admits a `Measured` tag only when it opens
+  with `WP-` or the file's declared corpus, and the task's suggested
+  `(Measured: in-situ series 1, …)` fails it.
+- Task 4: 9c.33 reversed (leave `RIETX_COMPILED_THREADS` unset; pin BLAS only)
+  and 9c.5 gains the screen's 84× job and "time the jobs that raise".
+- Task 1's decision, settled by Claude on the measurement and joblib's
+  documented practice: no package change. A pool worker keeps
+  `min(8, cores)` kernel threads, and `n_threads()` does not fall back to
+  `OMP_NUM_THREADS`. loky sets that variable to `cpu_count() // n_jobs` in
+  each worker (1 for a 10-worker pool on 10 cores) and 9c.31's BLAS pinning
+  sets it to 1, so a fallback would select the setting measured slower.
+  Recorded in `docs/practice.md` § Inner threads in a process pool.
+
+*Measured.* All on this machine (arm64 Mac, 10 cores as 4 performance and 6
+efficiency, `[dev]` venv, rietx-kernels compiled tier on), never quiet: other
+sessions' suites held the load at 9-84 throughout. Driver and raw JSON lines
+in `~/.cache/ghostshift/rietx/wp-1464/` (`driver.py`, `screenjobs.py`,
+`series*.jsonl`, `imitation.py`/`.log`).
+- Job set: six patterns (CPD corundum, zincite, fluorite, brucite; GSAS-II
+  fluorapatite; 11-BM NAC) each fitted alone and with each other CPD phase
+  added, every cell free, the compare standards' plans: 26 cold fits, 10
+  spawn workers, BLAS and OpenMP variables at 1 in both arms.
+- Walls, default pool against `RIETX_COMPILED_THREADS=1`, interleaved:
+  23.6/44.0, 27.3/75.9 (a `find /` of mine overlapped the second), 49.6/117.6,
+  47.7/116.5 s. Ratio 1.9-2.8× over four pairs (1.9-2.4× in the three no other job of mine disturbed). Summed job time 1.17× in the one pair at load
+  9-13, 1.5-1.6× in the rest. 104 fits (the set ×4): 145.9/297.2 and
+  99.8/200.8 s, 2.0× both. Every fit ran the same iterations to the same Rwp
+  in both arms.
+- Splits: every job's kernel calls split across the pool, 187-4464 times a
+  fit, so the pool does work here.
+- Most of the wall gap is the slowest job (fluorite + corundum, 19.6-40.1 s
+  against 40.2-107.2 s), which the default pool spreads over the cores the
+  finished workers leave idle.
+- Imitation (CPD patterns, 12 pairs, free and at ±1 %): absent candidates
+  were held or sat at 0 wt % on 10 of 12 with the cell free. zincite + fluorite: cell −10.8 %,
+  Rwp 10.60 → 10.23 %, 14 ± 12 wt %; at ±1 %: on its bound, 10.07 %,
+  66 ± 24 wt %. fluorite + corundum: Rwp 17.64 → 16.01 %, 89 ± 40 wt %,
+  `CELL_RUNAWAY` fired; at ±1 %: 16.00 %, 89 ± 75 wt %.
+- Acceptance: `tests/test_skill.py tests/test_skill_cli.py
+  tests/test_docs_consistency.py` 222 passed (same venv and machine). ruff
+  clean. Vale: 0 errors, 272 warnings, none on a line of this branch (it
+  touches no `docs/docs` page). `python -m tests.reader_output` exit 0.
+
+*Generality* (the `generality-review` judge's verdicts, summarised, with the
+author's answer under each weak one).
+- 9c.33, weak: the row said six pairs at 1.9-2.4×, where `series.jsonl` holds
+  four at 1.9-2.8×, and "Pin BLAS (9c.31)" said more than 9c.31 does. One
+  machine under load; joblib's loky dissents (1 thread at `n_jobs = cores`);
+  without the one degenerate slow job the light-load pair's summed time is
+  1.01×. Author: figures and wording corrected; the quiet-machine gap stays a
+  hypothesis in the tag.
+- 9c.5, holds. 9c.35, holds: two families, both development data, and the
+  bound's width is rightly a hypothesis. Moved cells a refiner accepts
+  (thermal expansion, Vegard) bear on the width, never on the rule.
+- The practice decision, weak: strong for no `OMP_NUM_THREADS` fallback,
+  moderate for the default in general; the prune dropped the `os.cpu_count()`
+  note. Author: restored as open in Inherited.
+- The routing row is a routing key, not a heuristic.
+
+*Not done.* Task 6 (the job-summary verb) is a new CLI surface and stays open.
+No code changed, so neither the fast nor the full suite ran locally; CI runs
+the fast one. `/code-review` skipped: the branch is prose only.
+
+*Gotchas.* The machine was never quiet, so the ratios are measured under
+contention. The one pair at load 9-13 bounds the quiet-machine gap only
+loosely (1.17× summed, 1.86× wall); 9c.33's tag keeps that as a hypothesis.
+
+Also forwarded: the thread measurement to WP-1950's Inherited, for its
+embedding section.
+
+Next: task 6, after the maintainer names the surface. Then close.
 
 - **2026-09-25** — created by a transcript review of a second agent session on
   `in-situ series 1`. The screen's numbers are from that session's timeline and

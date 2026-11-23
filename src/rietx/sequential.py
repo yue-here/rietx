@@ -177,7 +177,7 @@ from .history.store import holds_a_log
 from .history.tree import RefinementTree
 from .optimize.cancel import RefinementCancelled
 from .optimize.least_squares import DEFAULT_SOLVER, NFEV_PER_ITERATION, SOLVERS
-from .params.vector import VAR_PREFIX, ParameterTable
+from .params.vector import VAR_PREFIX, ParameterTable, is_variable_path
 from .refine import (
     _VERSION,
     Refinement,
@@ -193,7 +193,7 @@ from .schemas.common import Diagnostic, Mode, Provenance
 from .schemas.history import ReflectionState
 from .schemas.instrument import Instrument
 from .schemas.pattern import PatternData, require_two_theta
-from .schemas.plan import PlanSpec
+from .schemas.plan import CLOSING_WINDOW_TOL, PlanSpec
 from .schemas.results import RefinementResult
 from .schemas.sequential import (
     _NAMED_PATH,
@@ -211,7 +211,8 @@ from .schemas.structure import (
     Structure,
 )
 from .strategy.parameter_interval import attach_stationary_intervals
-from .strategy.staged import CLOSING_STAGE_NAME, RefinementPlan, Stage, resolve_plan
+from .strategy.refit import REFIT_MODES, _collapse, _unseeded
+from .strategy.staged import CLOSING_STAGE_NAME, RefinementPlan, resolve_plan
 
 #: Converged first rungs needed before a caller's ``first_rung_factor`` bounds
 #: anything (WP-1127); read only once a factor is passed, the bound being off
@@ -250,63 +251,13 @@ NOISE_FLOOR_REL = 1e-9
 #: windows it was solved on is about where it started, not the model.
 NOT_A_SERIES_FINDING = frozenset({"FROZEN_COMPILE_STALE", "STAGE_WINDOWS_STALE"})
 
-#: A phase width is called a soak when it reaches this multiple of the first
-#: width the series measured **and** the fit's GoF reaches
-#: :data:`WIDTH_GROWTH_GOF_FACTOR` × its own at that pattern (WP-1465, issue
-#: #451).  3 is the reporter's, and it sits between the two soaks measured: the
-#: operando chain's widths were 3.4× their first scan at the onset, and the
-#: synthetic's one-phase chain passes 3.65× on its second soaked pattern (2.3×
-#: on its first, where GoF had risen 1.9×).  The width ratio does not separate
-#: on its own.  The round-robin chain ``tests/test_acceptance_sequential`` runs
-#: is a clean one, and its widths wander 4-946× across mixtures because a minor
-#: phase's width is barely determined: against each trajectory's first value,
-#: growth alone fires on 11 of its 24.  Against the first value the series
-#: *measured* (:data:`WIDTH_GROWTH_SIGMA`) it fires on none.
-WIDTH_GROWTH_FACTOR = 3.0
-
-#: The misfit half of the soak test: GoF at the flagged pattern over GoF at the
-#: reference.  **GoF rather than Rwp**, although the issue said Rwp: Rwp tracks
-#: Rexp, which rises as the counts fall, so a series losing intensity raises
-#: Rwp under a model that is right.  GoF divides that out, and on the
-#: synthetic, whose counts are constant, the two ratios are the same number.
-#: The value is set for margin, against the denominator it is applied to: the
-#: reference can be any pattern, so the clean bound is the largest GoF_j/GoF_i
-#: over every ordered pair of one chain.  Over the 75 multi-pattern series the
-#: suite runs that is **1.52**, on the thermal ramp's bounded-first-rung
-#: fixtures, whose model is right and some of whose fits stopped early (1.14
-#: on the round-robin chain, the one that frees widths).  1.5 would have had
-#: no margin.  The synthetic soak reads 3.05 where its width crosses 3×, so 2
-#: sits 1.3× clear of the one and 1.5× under the other.  This half is also what
-#: keeps a width that grows *for real* silent, and the suite has no such chain,
-#: so ``tests/test_sequential.py`` builds one: a correct model over a specimen
-#: whose strain grows 5×, GoF flat to within 2 %.
-WIDTH_GROWTH_GOF_FACTOR = 2.0
-
-#: How many of its own esds a width must be to serve as the reference, and how
-#: many combined esds its growth must be.  The first half is what keeps the
-#: ratio a ratio: the round-robin chain's first ``lor_strain`` is 5.85e-5 with
-#: an esd of 3e3, so any later value is "946×" it and means nothing.
-WIDTH_GROWTH_SIGMA = 3.0
-
-#: The phase widths the soak test reads, and whether each is a width or a
-#: variance.  The Gaussian pair are variance coefficients (deg² 2θ), so their
-#: ratio is taken on the square root, the width they contribute.  A Stephens
-#: block (``phases.i.microstrain.dof.k``) is not here: it has no single width,
-#: and while it is declared it locks ``lor_strain``, so a series refining one
-#: is not screened.
-_WIDTH_SUFFIXES = {".lor_strain": False, ".lor_size": False,
-                   ".gauss_strain": True, ".gauss_size": True}
-
 #: ``Diagnostic.level`` as an ordering, so a summary of many occurrences can
 #: carry the worst one rather than a fixed level of its own.
 _LEVEL_RANK = {"info": 0, "warning": 1, "error": 2}
 
-#: What ``refit=`` and ``direction=`` accept, as data rather than as two literals
-#: inside :meth:`SequentialRefinement.fit`.  A caller that has to *offer* the
-#: choices (the GUI's series panel, WP-1016) needs the same list this validates
-#: against, and a menu that could disagree with the validator would be a second
-#: authority — the ``capabilities()`` rule at a smaller scale.
-REFIT_MODES = ("single", "stages")
+#: What ``direction=`` accepts, as data, for :data:`REFIT_MODES`' reason
+#: (``REFIT_MODES`` itself is :mod:`rietx.strategy.refit`'s, shared with
+#: :meth:`~rietx.refine.Refinement.fit` since WP-2224).
 DIRECTIONS = ("forward", "backward", "both")
 
 #: How ``SequentialRefinement.fit`` reacts to a pattern on which **every
@@ -327,7 +278,9 @@ DIRECTIONS = ("forward", "backward", "both")
 #: refinements, and one that cannot be fitted is no reason to throw away the
 #: others, the same argument that makes a cancelled series *return*.
 #: ``"skip"`` records it the same way but fits the successor **cold**, for a
-#: caller who reads the failure as evidence against the warm state too.
+#: caller who reads the failure as evidence against the warm state too.  A
+#: path the caller held keeps the last accepted pattern's value there, as on
+#: any cold rung (WP-2081): a held value is the caller's, not the warm state's.
 #: ``"raise"`` ends the chain in the last rung's exception, with the partial
 #: results kept: ``SequentialRefinement.results_``/``.failures_`` and the
 #: exception's own ``series_results``/``series_failures``/``series_failed``.
@@ -450,87 +403,6 @@ def _labels_for(patterns: Sequence[PatternData],
             src = str(d.metadata.get("source_file", "") or "")
             out.append(Path(src).stem if src else f"p{i:03d}")
     return unique_labels(out)
-
-
-def _collapse(plan: RefinementPlan) -> RefinementPlan:
-    """One stage freeing everything the plan would free, in one solve.
-
-    Never for a plan that fixes (``Stage.turn_off``, WP-2208): one stage
-    frees then fixes, and cannot replay a fix that a later stage undid, so
-    :meth:`SequentialRefinement.fit` refits such a plan stage by stage.
-
-    The default ``refit="single"`` strategy: with a converged neighbour as the
-    starting point the staged turn-on order has already done its job of keeping
-    early stages well conditioned, so re-walking it per pattern is mostly
-    overhead.  Measured on the round-robin sample-1 series: 904 iterations
-    against 1623 for the staged refit and 2863 unchained, for the same weight
-    fractions to three decimals.
-
-    The warm refit carries no ``seed``.  ``seed_floored`` lifts every freed
-    row sitting exactly on its floor, and a warm start's rows on a floor are
-    the neighbour's converged answers.  A stage seed says where a cold solve
-    starts.  On a warm start it lifts that answer off its floor before the
-    solve begins.  Measured on the
-    four-pattern LaB₆ ramp of ``tests/test_sequential.py`` under
-    ``mccusker_structural``, the plan's 0.3 lifted pattern 1's converged
-    ``instrument.profile.y`` from 0 to 0.3° and ``phases.0.extinction`` from
-    0 to 0.3.  That refit ended at χ²_red 1.05828 in 15 iterations, against
-    1.05145 in 11 with no seed.  Patterns 2 and 3 lifted extinction alone and
-    ended at the same χ² either way.
-
-    ``strain_seed`` does carry over, as the maximum across the plan's
-    stages.  ``seed_stephens`` touches only a block that is still all zero,
-    and such a block cannot move without it, warm or cold.
-    """
-    turn_on: list[str] = []
-    for stage in plan.stages:
-        for glob in stage.turn_on:
-            if glob not in turn_on:
-                turn_on.append(glob)
-    # the cap below is the plan's largest, which a fixed count would run in full,
-    # so one stage's stop keeps the collapsed stage stopping
-    stops = [s.lebail_tol for s in plan.stages if s.lebail_tol > 0.0]
-    return RefinementPlan(
-        stages=[Stage("warm_refit", turn_on,
-                      max_iter=max((s.max_iter for s in plan.stages), default=100),
-                      lebail_cycles=max((s.lebail_cycles for s in plan.stages),
-                                        default=Stage.lebail_cycles),
-                      lebail_tol=min(stops, default=0.0 if plan.stages
-                                     else Stage.lebail_tol),
-                      seed=0.0,
-                      strain_seed=max((s.strain_seed for s in plan.stages),
-                                      default=0.0))],
-        correlation_guard=plan.correlation_guard,
-        # inert, the lone warm stage being the last declared one, which
-        # converges whether or not a closing stage follows (WP-2045: at 1e-6
-        # the hostile series' cpd-1b warm stage stopped on its frozen windows'
-        # plateau at axial_sl 555); carried anyway, because this is the
-        # compressed plan rather than a different protocol (WP-1123)
-        intermediate_ftol=plan.intermediate_ftol,
-        # and the closing stage itself, the protocol's like the two below
-        # (WP-2002, the sixth round's Q1 and Q2)
-        closing_window_tol=plan.closing_window_tol,
-        # the alternation is the protocol's, not a stage's: a collapsed warm
-        # refit under mode="lebail" would otherwise run one pass (WP-1323)
-        lebail_passes=plan.lebail_passes,
-        # the absent-phase hold is the protocol's too: a collapsed warm refit
-        # would otherwise hold at the default a phase the caller set free
-        # (WP-2002, B1)
-        phase_support_sigma=plan.phase_support_sigma)
-
-
-def _unseeded(plan: RefinementPlan) -> RefinementPlan:
-    """``plan`` with no stage ``seed``, for a solve that starts warm.
-
-    A stage seed says where a cold solve starts.  On a warm start a row on its
-    floor is the neighbour's converged answer, and seeding it lifts that
-    answer before the solve begins (:func:`_collapse` has the measurement).
-    ``strain_seed`` stays, for the reason it stays there.  ``plan`` itself
-    comes back when no stage seeds.
-    """
-    if not any(s.seed for s in plan.stages):
-        return plan
-    return replace(plan, stages=[replace(s, seed=0.0) for s in plan.stages])
 
 
 def _ladder(base_plan: RefinementPlan, warm_plan: RefinementPlan, *,
@@ -1034,6 +906,74 @@ def _carry_variables(ref: Refinement, previous: dict[str, float],
         ref.set_values(values)
 
 
+def _keep_held_values(ref: Refinement, source: tuple[Structure, Instrument] | None,
+                      source_vars: dict[str, float],
+                      declared: tuple[Structure, Instrument],
+                      carry: Sequence[str]) -> None:
+    """Give each path held on a cold fit the value ``source`` gave it (WP-2081).
+
+    A hold fixes whatever value reaches the fit (``Refinement.hold``).  A warm
+    rung receives the last accepted pattern's values through
+    :func:`_carry_into`, but a cold rung and a ``verify_steps`` refit start
+    from the initial models, so a hold there fixed the *caller's* value: on
+    WP-2081's LaB6 ramp a zero shift held at 0.00797° read 0.0 on the
+    restarted pattern, its cell 546 ppm off, and the next pattern carried it.
+    Series rule 6 says a retry does not change what value a fixed parameter
+    has, so this writes ``source``'s value onto every path the ``constrain``
+    hook held, after the hook, the order :func:`_carry_variables` uses.
+
+    ``source`` is the last accepted pattern's fitted models on a cold rung and
+    the pattern's own on a verify refit, so the hold reads what it would have
+    read warm.  Limited by ``carry`` as the warm start is.  A value a hook set
+    for this pattern on purpose wins: a held path whose value no longer equals
+    ``declared``'s (the caller's models) was moved by ``prepare`` or by
+    ``constrain``, and is left alone.  A hook that writes the caller's own
+    value cannot be told from one that wrote nothing, so that value is
+    replaced as if no hook had run.  A named variable has no declared value
+    to compare, so a held one takes ``source_vars``' value, as a warm rung's
+    does.  A site DOF is a step from where its fit began and a tied or locked
+    path follows something else, so neither is written.
+    """
+    holds = getattr(ref, "_user_holds", None)
+    if not holds or (source is None and not source_vars):
+        return
+    table = ref._working_table()
+    anchored = table.anchored_dof_paths
+    by_path = {e.path: e for e in table.entries}
+    kept = _values_onto(source, ref.structure) if source is not None else {}
+    kept.update({f"{VAR_PREFIX}{name}": v for name, v in source_vars.items()})
+    caller = _values_onto(declared, ref.structure)
+    values: dict[str, float] = {}
+    for path in sorted(holds):
+        e = by_path.get(path)
+        if (e is None or path not in kept or path in anchored or e.locked
+                or e.tie is not None
+                or not any(fnmatch.fnmatchcase(path, g) for g in carry)):
+            continue
+        if not is_variable_path(path) and e.value != caller.get(path):
+            continue
+        if e.value != kept[path]:
+            values[path] = kept[path]
+    if values:
+        ref.set_values(values)
+
+
+def _held_values(ref: Refinement, moves: dict[str, str | None]) -> dict[str, float] | None:
+    """Every path ``ref``'s caller held, at its value, in the series numbering.
+
+    The writer of :attr:`SeriesEntry.held_values`.  ``None`` where nothing was
+    held.  A site DOF is left out, since its value is a step from where the fit
+    began (WP-1333).
+    """
+    holds = getattr(ref, "_user_holds", None)
+    if not holds:
+        return None
+    table = ref._working_table()
+    anchored = table.anchored_dof_paths
+    return {renumber_path(e.path, moves) or e.path: float(e.value)
+            for e in table.entries if e.path in holds and e.path not in anchored}
+
+
 def _value_of(result: RefinementResult, path: str) -> float | None:
     """One path's fitted value on a result, or ``None`` where it has none.
 
@@ -1072,6 +1012,7 @@ def _moment_evidence(ref, result: RefinementResult) -> list[MomentEvidence]:
                                 for cp in model.phases):
         return []
     from .report.magnetic import analyse_moments
+    from .strategy.magnetic import _live_covariance
 
     table = ParameterTable(ref.structure, ref.instrument)
     # the model reads the moment DOFs in the last stage's frames (#598)
@@ -1087,7 +1028,10 @@ def _moment_evidence(ref, result: RefinementResult) -> list[MomentEvidence]:
                       if result.identifiability is not None else None),
         flat_axes=(result.stages[-1].moment_flat_axes if result.stages
                    else None),
-        turned=(result.stages[-1].moment_turned if result.stages else None))
+        turned=(result.stages[-1].moment_turned if result.stages else None),
+        # the pattern's own live covariance, so a pair on a discarded
+        # direction folds as on a single pattern (WP-2230)
+        covariance=_live_covariance(ref, result))
 
 
 def _floor_unsupported_moments(structure: Structure,
@@ -1462,7 +1406,8 @@ class SequentialRefinement:
             records the pattern on ``SeriesResult.failures`` (and this
             instance's ``.failures_``) with ``SERIES_PATTERN_FAILED`` and
             warm-starts its successor from the last accepted pattern;
-            ``"skip"`` starts the successor cold; ``"raise"`` ends the chain in
+            ``"skip"`` starts the successor cold, each held path still at the
+            last accepted pattern's value; ``"raise"`` ends the chain in
             the exception, keeping what completed on ``.results_``/``.trees_``
             and on the exception.  A chain that fitted no pattern at all raises
             whichever is chosen.  The caller's own ``prepare``/``constrain``
@@ -1526,6 +1471,20 @@ class SequentialRefinement:
         if x is not None and x_label == "index":
             x_label = "x"
         base_plan = resolve_plan(plan, mode)
+        if (mode == "pawley" and self.carry_hkl_intensities
+                and base_plan.closing_window_tol is None):
+            # Ruled 2026-11-19 (WP-2222) on a drift along a carried chain:
+            # on the ten-pattern ramp of tests/test_pawley.fap_series, Rwp
+            # rose to 0.0407 at pattern 5 against about 0.034 with the
+            # closing stage, and the cell moved up to 0.77 esd, recovering
+            # by pattern 7.  Its cause is the range end, not the carrying
+            # (WP-2228): (6 0 2), centred 0.4 deg past the data, has a 2 %
+            # window that reaches no channel, so its tail in the data goes
+            # unmodelled.  Cut the data at 72 deg and the carried chain
+            # without the closing stage lands within 0.05 esd.  WP-2228's
+            # fix replaces this rule.  A plan's None cannot be told from the
+            # default, so the way out is carry_hkl_intensities=False.
+            base_plan = replace(base_plan, closing_window_tol=CLOSING_WINDOW_TOL)
         # A plan that fixes is refit stage by stage (WP-2208): one stage cannot
         # replay a fix a later stage undoes, so the collapse would free what
         # the plan left fixed.  The entry's ``rung`` reads "warm_staged".
@@ -1641,12 +1600,15 @@ class SequentialRefinement:
             self._verify_steps(
                 series.steps[:verify_steps], patterns, names, mode, base_plan,
                 two_theta_limits, prepare, constrain, stream=stream,
-                cancel=cancel)
+                cancel=cancel,
+                fitted={e.index: m for e, m in zip(entries, models)},
+                fitted_vars={e.index: {p[len(VAR_PREFIX):]: v
+                                       for p, v in (e.held_values or {}).items()
+                                       if is_variable_path(p)}
+                             for e in entries})
         # what the per-pattern diagnostics could not say: "42 of 68" (WP-1110),
         # every count and no threshold (WP-2003, C6)
         series.code_counts = _code_counts(series)
-        # and a width that grew while the fit got worse (WP-1465)
-        diagnostics += _width_growth_diagnostics(series)
         # the moment along the chain: the hold, and the onset it locates.
         # Empty on any series whose entries carry no moment row at all, which
         # is every non-magnetic one (WP-1329).
@@ -1813,6 +1775,14 @@ class SequentialRefinement:
         #: one, and ``carry``'s default ``["*"]`` would be a claim nothing kept
         #: (WP-1441).
         previous_vars: dict[str, float] = {}
+        #: the last accepted pattern's carry source (``previous``, moments
+        #: floored) and variables, where a cold rung's held paths read their
+        #: values, so they read what a warm rung would (WP-2081, rule 6).
+        #: Beside ``previous`` and unlike it never cleared by
+        #: ``on_error="skip"``, since a skip stops a warm start and leaves a
+        #: fixed value fixed
+        hold_source: tuple[Structure, Instrument] | None = None
+        hold_vars: dict[str, float] = {}
         previous_tag: tuple[str | None, str | None] = (None, None)
         accepted_rwp: list[float] = []
         # WP-1127's sample: the dearest stage of every first rung that was
@@ -1889,7 +1859,9 @@ class SequentialRefinement:
                         previous_vars=previous_vars if rung_warm else {},
                         stream=stream, cancel=cancel,
                         stamp={**stamp,
-                               **_rung_stamp(rung, escalation=bool(tried))})
+                               **_rung_stamp(rung, escalation=bool(tried))},
+                        hold_source=None if rung_warm else hold_source,
+                        hold_vars=None if rung_warm else hold_vars)
                 except RefinementCancelled:
                     cancelled = True
                     break
@@ -1996,7 +1968,9 @@ class SequentialRefinement:
             # every path now in the series numbering, so a pattern whose
             # ``prepare`` added or removed a phase or an atom joins each
             # trajectory by name (WP-1991)
-            _into_series_numbering(entry, self._numbering.moves(best_ref.structure))
+            moves = self._numbering.moves(best_ref.structure)
+            _into_series_numbering(entry, moves)
+            entry.held_values = _held_values(best_ref, moves)
             if len(tried) > 1:
                 entry.rwp_warm = rwp_of.get(tried[0])
                 # only the *cold* rung breaks the chain — a staged refit from
@@ -2051,6 +2025,7 @@ class SequentialRefinement:
                 previous_hkl = _extract_reflections(best_ref._model)
                 previous_vars = {name: prm.value
                                  for name, prm in best_ref._variables.items()}
+                hold_source, hold_vars = previous, dict(previous_vars)
                 previous_tag = (entry.tree_id, entry.node_id)
                 if entry.statistics is not None:
                     accepted_rwp.append(entry.statistics.rwp)
@@ -2100,8 +2075,15 @@ class SequentialRefinement:
                  prepare, constrain, index: int, history_suffix: str = "", *,
                  previous_vars: dict[str, float] | None = None,
                  stream: EventStream | None = None,
-                 stamp: dict | None = None, cancel=None):
-        """One pattern: warm the models from ``previous``, then run ``plan``."""
+                 stamp: dict | None = None, cancel=None,
+                 hold_source: tuple[Structure, Instrument] | None = None,
+                 hold_vars: dict[str, float] | None = None):
+        """One pattern: warm the models from ``previous``, then run ``plan``.
+
+        ``hold_source`` and ``hold_vars`` are where a cold fit's held paths
+        read their values (:func:`_keep_held_values`); ``None`` leaves each
+        hold at the value the models brought.
+        """
         structure = self.structure.model_copy(deep=True)
         instrument = self.instrument.model_copy(deep=True)
         displaced: list[str] = []
@@ -2167,6 +2149,9 @@ class SequentialRefinement:
             _constrain_in_declared_numbering(ref, self.structure, constrain, index)
             if previous is not None:
                 _reanchor_carried(ref, displaced, previous, previous_vars or {})
+            if hold_source is not None or hold_vars:
+                _keep_held_values(ref, hold_source, hold_vars or {},
+                                  (self.structure, self.instrument), self.carry)
         _carry_variables(ref, previous_vars or {}, self.carry)
         try:
             result = ref.fit(data, mode=mode, plan=plan,
@@ -2187,7 +2172,10 @@ class SequentialRefinement:
                       names, mode, base_plan, two_theta_limits,
                       prepare, constrain, *,
                       stream: EventStream | None = None,
-                      cancel=None) -> None:
+                      cancel=None,
+                      fitted: dict[int, tuple[Structure, Instrument]] | None = None,
+                      fitted_vars: dict[int, dict[str, float]] | None = None,
+                      ) -> None:
         """Refit each given step's two patterns cold, and record the ratio.
 
         ``steps`` are the first ``verify_steps`` rows of
@@ -2218,6 +2206,13 @@ class SequentialRefinement:
         must be able to stop the check.  A cancel here leaves every row it had
         not reached at ``cold_ratio=None``, so a stopped check reports nothing
         about a step rather than a half-measured something.
+
+        ``fitted`` is each pattern's fitted models by series index: a path the
+        hook holds is held at the value the chain held it at on that pattern
+        (:func:`_keep_held_values`, WP-2081), since a refit holding the
+        caller's value instead would be a different model too.  ``fitted_vars``
+        is the same for a held named variable, by bare name, which the models
+        cannot carry.
         """
         cold: dict[int, RefinementResult | _PatternRaised] = {}
         result_structures: dict[int, Structure | None] = {}
@@ -2232,7 +2227,9 @@ class SequentialRefinement:
                         k, ".verify", stream=stream, cancel=cancel,
                         stamp={"series_index": k, "series_label": names[k],
                                "series_n": len(patterns),
-                               "series_pass": "verify"})
+                               "series_pass": "verify"},
+                        hold_source=(fitted or {}).get(k),
+                        hold_vars=(fitted_vars or {}).get(k))
                     # a stand-in fit (a test's) may hand back no ``Refinement``
                     result_structures[k] = getattr(_ref, "structure", None)
                 except _PatternRaised as exc:
@@ -2996,119 +2993,6 @@ def _code_counts(series: SeriesResult) -> list[SeriesCodeCount]:
                             n_patterns=n, level=levels[(code, path)])
             for (code, path), count in sorted(counts.items(),
                                               key=lambda kv: (-kv[1], kv[0]))]
-
-
-def _width_growth_diagnostics(series: SeriesResult) -> list[Diagnostic]:
-    """``SEQUENTIAL_WIDTH_GROWTH``: a phase width that grew while the fit got
-    worse (WP-1465, issue #451).
-
-    A phase broadened past what the specimen does turns into something else.
-    It becomes a second background, or it stands in for a phase the model
-    lacks, and a series is where that happens: the model was right on the
-    first patterns and stopped being right.  Each fit still converges, no
-    per-pattern code fires until ``STRAIN_UNUSUALLY_LARGE`` trips at 1.5°, and
-    a projection of the width onto the background block cannot see it either
-    (0.049 clean against 0.053 at a 15× soak, WP-1465 Finding 1).  What sees
-    it is the trajectory, which only the series has.
-
-    **A conjunction at one pattern.**  Against the first pattern that measured
-    the width, a later pattern must carry the width at
-    :data:`WIDTH_GROWTH_FACTOR` × or more, grown by more than
-    :data:`WIDTH_GROWTH_SIGMA` combined esds, **and** a GoF at
-    :data:`WIDTH_GROWTH_GOF_FACTOR` × or more.  The width may legitimately
-    grow (a coarsening specimen, strain building up); what separates that
-    from a soak is whether the model keeps up with the data, which is the
-    GoF.  So the finding reports and never judges, and its suggestion points
-    at the skill's "microstrain evolves" rule rather than past it.
-
-    One finding per trajectory, at its onset, the first pattern where the
-    conjunction holds; the message carries the largest ratio after it.  Widths
-    tied to one another (``tie_equal("phases.*.lor_strain")``) are one column
-    with one trajectory, so they share a finding whose ``where`` lists every
-    path, rather than one finding each about the same fact.  Grouped on the
-    trajectory itself, since a width driven by a ``vars.`` name is not
-    ``vary`` and ``paths(varied_only=True)`` would lose it.
-    Quarantined entries (``_rejected``: diverged, or carrying an
-    ``error``-level code) are skipped, as they are by every other fence here.  An entry whose Rwp sits high over the accepted median
-    (``rwp_over_median``) is **read**: a phase standing in for a missing one
-    is what lifts a pattern's Rwp, and every soaked pattern of the fixture in
-    ``tests/test_sequential.py`` sat above the 1.25× fence WP-2003 removed
-    (WP-1469), so skipping them would leave the finding nothing to fire on.
-    A width no pattern measured has no reference and is not judged.
-    """
-    out: list[Diagnostic] = []
-    by_trajectory: dict[tuple, Diagnostic] = {}
-    entries = series.entries
-    for path in series.paths():
-        if not path.startswith("phases."):
-            continue
-        suffix = next((s for s in _WIDTH_SUFFIXES if path.endswith(s)), None)
-        if suffix is None:
-            continue
-        variance = _WIDTH_SUFFIXES[suffix]
-        traj = series.trajectory(path)
-        _, value, sd = traj.arrays()
-        points = [(k, pos) for k, pos in enumerate(traj.positions)
-                  if not _rejected(entries[pos])
-                  and entries[pos].statistics is not None
-                  and np.isfinite(value[k])]
-        ref = next(((k, pos) for k, pos in points
-                    if np.isfinite(sd[k]) and sd[k] > 0
-                    and value[k] > WIDTH_GROWTH_SIGMA * sd[k]), None)
-        if ref is None:
-            continue
-        k0, p0 = ref
-        w0 = float(np.sqrt(value[k0]) if variance else value[k0])
-        gof0 = entries[p0].statistics.gof
-        if not (w0 > 0 and gof0 > 0):
-            continue
-
-        def width(k, variance=variance):
-            return float(np.sqrt(max(value[k], 0.0)) if variance else value[k])
-
-        flagged: list[tuple[int, int, float]] = []
-        for k, pos in points:
-            if pos <= p0 or not np.isfinite(sd[k]):
-                continue
-            ratio = width(k) / w0
-            grown = value[k] - value[k0]
-            combined = float(np.hypot(sd[k], sd[k0]))
-            if (ratio >= WIDTH_GROWTH_FACTOR
-                    and grown > WIDTH_GROWTH_SIGMA * combined
-                    and entries[pos].statistics.gof
-                    >= WIDTH_GROWTH_GOF_FACTOR * gof0):
-                flagged.append((k, pos, ratio))
-        if not flagged:
-            continue
-        key = (suffix, tuple(traj.positions), tuple(value.tolist()))
-        if key in by_trajectory:
-            by_trajectory[key].where.append(path)
-            continue
-        k1, p1, ratio1 = flagged[0]
-        kmax, _, ratio_max = max(flagged, key=lambda f: f[2])
-        # the patterns the conjunction could be tested on: one without an esd
-        # is skipped by the loop above, so it cannot count against it here
-        later = sum(1 for k, pos in points if pos > p1 and np.isfinite(sd[k]))
-        s0, s1 = entries[p0].statistics, entries[p1].statistics
-        as_width = " (as a width, the square root of the variance)" if variance else ""
-        peak = ("" if kmax == k1 else
-                f", reaching {ratio_max:.1f}× at {traj.labels[kmax]}")
-        by_trajectory[key] = finding = Diagnostic(
-            level="warning", code="SEQUENTIAL_WIDTH_GROWTH", where=[path],
-            value=ratio1,
-            message=(f"{path} grew {ratio1:.1f}×{as_width} from "
-                     f"{traj.labels[k0]} to {traj.labels[k1]} "
-                     f"({value[k0]:.4g} → {value[k1]:.4g}) while GoF rose "
-                     f"{s1.gof / s0.gof:.1f}× (Rwp {s0.rwp:.2%} → "
-                     f"{s1.rwp:.2%}). It passes both thresholds on "
-                     f"{len(flagged) - 1} of the {later} patterns after "
-                     f"it{peak}."),
-            suggestion=("Fit the pattern at the onset with the missing "
-                        "component before reading this width, or this phase's "
-                        "scale and cell, as physics."),
-        )
-        out.append(finding)
-    return out
 
 
 def _moment_diagnostics(series: SeriesResult) -> list[Diagnostic]:

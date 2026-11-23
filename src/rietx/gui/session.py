@@ -75,7 +75,8 @@ from ..report.apply import api_call, describe_action, refusal, stage_for
 from ..schemas.instrument import Instrument
 from ..schemas.plan import PlanSpec, StageSpec
 from ..schemas.structure import Structure
-from ..strategy.staged import PLAN_PRESETS, resolve_plan
+from ..strategy.refit import REFIT_MODES, WARM_REFIT_STAGE, _collapse
+from ..strategy.staged import CLOSING_STAGE_NAME, PLAN_PRESETS, resolve_plan
 from ..viz import packed as _packed
 from ..viz import theme
 from ..viz.compare import decimation_index
@@ -141,6 +142,7 @@ EXPORT_DEFAULTS = {
     "html": "fit.html",
     "result_json": "result.json",
     "instrument_profile": "instrument_profile.json",
+    "script": "session.py",
 }
 
 #: Exports that describe the **model** rather than a fit, and are therefore
@@ -150,7 +152,10 @@ EXPORT_DEFAULTS = {
 #: calibration is frozen *from* — the file is written to be loaded into the next
 #: sample's project, and the fit that produced it has already been run and its
 #: numbers already stand in the model (WP-1214).
-_EXPORT_MODEL_ONLY = frozenset({"instrument_profile"})
+#: The Console's script (WP-2212) is the third kind of answer: the page holds
+#: the session's calls, so the request carries the text and the server only
+#: writes it, through the same destination rules.
+_EXPORT_MODEL_ONLY = frozenset({"instrument_profile", "script"})
 
 
 def _utcnow() -> str:
@@ -160,7 +165,7 @@ def _utcnow() -> str:
 class GuiError(Exception):
     """A verb refused, carrying what the transport should report.
 
-    Same grammar as :class:`~rietx.schemas.diagnostics.Diagnostic` and the
+    Same grammar as :class:`~rietx.schemas.common.Diagnostic` and the
     agent envelope (WP-0602): a ``code`` to branch on, a message for a human,
     and ``where`` naming the paths at fault.  The HTTP status lives here rather
     than in the router because the reason is what decides it — a run in flight
@@ -175,7 +180,7 @@ class GuiError(Exception):
         self.code = code
         self.status = status
         self.where = list(where or [])
-        #: per-item failures, as ``AgentError.details`` does it — a text document
+        #: per-item failures: a text document
         #: apply reports every bad line at once, because fixing them one HTTP
         #: round trip at a time is not an editing experience
         self.details = list(details or [])
@@ -216,6 +221,10 @@ class GuiSession:
         self._seq = 0
         self._n_eval = 0
         self._run: dict = _idle_run()
+        #: ``(result, how)``: how the last fit ran (:func:`_how_ran`), beside
+        #: the result it describes, so the result route serves it only while
+        #: that result is the refinement's (WP-2227)
+        self._how: tuple[Any, dict] | None = None
         #: the last completed indexing run's answer.  Session-scoped like
         #: ``refinement.result_``: peaks.json is the durable artifact, an
         #: IndexingResult is a computation over it.
@@ -228,6 +237,12 @@ class GuiSession:
         #: ``(cache key, PeakEditor)`` — the editor holds the lazily built
         #: Detection; the key is everything a detection depends on
         self._peak_ed: tuple[tuple, Any] | None = None
+        #: ``(project, undo, redo)``: ``peaks.json``'s bytes before each edit
+        #: (``None`` before the first pick), so ⌘Z puts the list back byte
+        #: for byte (WP-2240, interaction rule 10). The list lives outside the
+        #: history tree, so this is its own stack, session-local as the Plan
+        #: tab's is (WP-2127), and it belongs to one ``Project`` object
+        self._peak_steps: tuple[Any, list, list] | None = None
         #: the staged series and its chain settings (WP-1016).  Session-scoped
         #: because its patterns are upload tokens, which die with ``close`` —
         #: a *persisted* series would need a document, which is WP-1003's to
@@ -524,6 +539,20 @@ class GuiSession:
             # it is a summary rather than a second authority — the phases live
             # in the history like every other model fact.
             "n_phases": len(p.refinement.structure.phases),
+            # What the readers repaired or assumed on the read this session
+            # holds (WP-1522): the pattern reader's (a reversed scan, dropped
+            # rows, a scaled intensity) and the history reader's (a declared
+            # range restored or left off, an earlier tree skipped).  A repair
+            # that changes how the next fit moves must be readable where that
+            # fit is started, and these are its only carrier: `Project` keeps
+            # them in memory, never in project.json.  On the document rather
+            # than on the open route's answer alone, so a reload's
+            # `GET /api/project` still says it; in the readers' order, as
+            # `Diagnostic` dumps, the order to show them being the panel's.
+            "data_diagnostics": [d.model_dump(mode="json")
+                                 for d in p.data_diagnostics],
+            "history_diagnostics": [d.model_dump(mode="json")
+                                    for d in p.history_diagnostics],
         }
 
     def project_patch(self, body: dict) -> dict:
@@ -1377,6 +1406,17 @@ class GuiSession:
         # every glob again at tight windows, read-only here, and its Rwp is
         # the answer's, which the last declared rung's is not
         closing = plan.closing_stage(list(rows))
+        # a one-stage re-fit of this plan (WP-2224) ran none of its rungs, so
+        # its node stands in for them as one row after the stages (WP-2227,
+        # the maintainer's ruling 2), matched by the same rule as a rung: the
+        # stage the plan collapses to, and its closing stage when it has one
+        one_stage = None
+        if stages and not any(s.turn_off for s in plan.stages):
+            ran = self._stage_rwp(p, _collapse(plan))
+            if ran[0] is not None:
+                one_stage = {"n_free": stages[-1]["n_free"], "rwp": ran[0]}
+                if len(ran) > 1:    # the closing stage's, the answer's
+                    rwps[-1] = ran[-1]
         # the rows the closing stage's fix takes back from its frees: a tied,
         # locked or held row its literals name was never free to keep fixed
         closing_entry = None if closing is None else {
@@ -1388,10 +1428,21 @@ class GuiSession:
         reached = {path for entry in stages for path in entry["frees"]}
         set_aside = [row.path for row in rows.values()
                      if row.vary and row.refinable and row.path not in reached]
+        # what a person could free and no stage does (WP-2231, the Plan tab's
+        # "Never freed" row): the refinable rows outside every stage's frees.
+        # A stage's ``held`` paths are absent from both sides: most are not
+        # refinable, and the rest (a column the mode fixes through a tie) a
+        # stage matched and could not free, which no plan edit changes. The
+        # closing stage frees only what the stages above it named
+        held = {row["path"] for entry in stages for row in entry["held"]}
+        never_freed = [row.path for row in rows.values()
+                       if row.refinable and row.path not in reached
+                       and row.path not in held]
         return {"mode": mode, "n_parameters": len(rows),
                 "n_free_final": stages[-1]["n_free"] if stages else 0,
-                "set_aside": set_aside, "stages": stages,
-                "closing": closing_entry,
+                "set_aside": set_aside, "never_freed": never_freed,
+                "stages": stages,
+                "closing": closing_entry, "one_stage": one_stage,
                 "head": p.refinement._head_id,
                 "live": self._state != "idle"}
 
@@ -1488,6 +1539,7 @@ class GuiSession:
         inventing an authority. ``validate_only`` runs everything except the
         apply, which is what a continuously-validating editor calls.
         """
+        from . import peaks as store
         from . import textdoc as td
 
         self._require_idle()
@@ -1516,8 +1568,11 @@ class GuiSession:
             return {"valid": True, "applied": [], "delta": delta.as_dict(),
                     "revision": td.revision(current), "would_change":
                     not delta.is_empty()}
-        editor = (self._peak_editor()
-                  if (delta.peak_moves or delta.peak_flags) else None)
+        touches_peaks = bool(delta.peak_moves or delta.peak_flags)
+        editor = self._peak_editor() if touches_peaks else None
+        # a peak edit typed here is one step of the peak list's undo stack
+        # too, or ⌘Z would take it back together with the edit before it
+        before = store.snapshot(project) if touches_peaks else None
         try:
             applied = td.apply(project, delta, peak_editor=editor)
         except ValueError as exc:
@@ -1525,6 +1580,8 @@ class GuiSession:
             # validates before writing, so nothing was applied
             raise GuiError(str(exc), code="TEXTDOC_INVALID",
                            details=[_locate(str(exc), text)]) from None
+        if touches_peaks:
+            self._peak_step(project, before)
         rendered = td.render(project)
         return {"valid": True, "applied": applied, "delta": delta.as_dict(),
                 "text": rendered, "revision": td.revision(rendered)}
@@ -1668,8 +1725,15 @@ class GuiSession:
     def structure3d(self, phase: int = 0, *, probability: float = 0.5,
                     bond_tolerance: float | None = None, disorder: str = "all",
                     centres: list[str] | None = None,
-                    ligands: list[str] | None = None) -> dict:
+                    ligands: list[str] | None = None,
+                    body: dict | None = None) -> dict:
         """The current model as drawable geometry (WP-1015).
+
+        ``body`` is that of ``POST /api/structure3d``: the same ``values`` map
+        ``POST /api/preview`` takes, so the Structure graph draws a person's
+        unapplied slider values as the Pattern graph does (WP-2218). Writing
+        nothing, and idle-only like that preview, since it reads the compiled
+        table the preview keeps.
 
         A route beside ``/api/structure`` rather than an arm of it, on WP-1008's
         test for a new one: it returns what the model does **not** already say —
@@ -1680,8 +1744,9 @@ class GuiSession:
         symmetry search may live that ``/api/structure`` refused (that route
         refetches on every head move; this one is opened deliberately).
 
-        Not idle-gated: it reads the model, like ``/api/structure``, and a fit in
-        flight does not move the values the working state holds.
+        Without a ``body`` it is not idle-gated: it reads the model, like
+        ``/api/structure``, and a fit in flight does not move the values the
+        working state holds. With one it is, as said above.
         """
         from . import structure3d as geometry
 
@@ -1694,7 +1759,13 @@ class GuiSession:
                     geometry.element_list(values, what)
             except ValueError as exc:
                 raise GuiError(str(exc), where=[what]) from None
-        structure = self._need_project().refinement.structure
+        if body is not None:
+            from . import preview
+
+            self._require_idle()
+            structure = preview.structure_at(self._need_project(), body)
+        else:
+            structure = self._need_project().refinement.structure
         try:
             built = geometry.build(
                 structure, int(phase), probability=float(probability),
@@ -1752,13 +1823,75 @@ class GuiSession:
         return {"node_id": node, **self.structure()}
 
     def instrument_patch(self, body: dict) -> dict:
+        """Replace the instrument: one ``edit_model`` node, and what it asks
+        of the hold and free registers.
+
+        The registers are declarations about a *path*, and ``Refinement.edit``
+        keeps them across an edit, so a checkout restores them. A Chebyshev
+        ``c3`` held would then hold a new P-spline's ``c3``, and a cut
+        ``c5``'s hold would come back on the ``c5`` a later extension adds.
+        Whatever sent the instrument, this verb therefore works out the
+        registers' part itself (:func:`_register_arms`, WP-2229): it releases
+        the holds on the paths the edit removes, redefines or rebuilds (one
+        ``set_hold`` node, before the edit). Each path it builds then takes
+        its new model's ``vary``: freed where that says so (one ``set_vary``
+        node, after it), and fixed where it does not and the free register
+        still names the path from its old parameter (one more). Every client
+        gets this, and so does a hold no row shows, such as one left on a path
+        an earlier cut removed. All the verbs run on a history-free copy first
+        (:func:`rehearse`), so a refusal from any leaves the holds, the model
+        and the history as they were.
+
+        The answer carries ``released``, ``freed`` and ``fixed`` for the
+        console, and ``ended``: the paths whose old parameter the edit removed
+        or redefined, so a client drops its pending edits on them. ``freed``
+        and ``fixed`` are what ``set_vary`` returned, never the lists offered
+        to it: it can refuse a locked or force-fixed path, and the console
+        line, which the Console's script repeats, must name only what changed
+        (WP-2212, WP-2229's finding 8). ``release_after`` says the release ran
+        after the edit, as it must on an old model with no table, so the
+        script repeats the two in that order.
+        """
         self._require_idle()
-        node = self._edit(
-            instrument=_as_instrument(_with_file_optics(
-                _need(body, "instrument"),
-                lambda: self._need_project().data.metadata), self.uploads),
-            label=body.get("label") or "instrument edited")
-        return {"node_id": node, **self.instrument()}
+        p = self._need_project()
+        instrument = _as_instrument(_with_file_optics(
+            _need(body, "instrument"), lambda: p.data.metadata), self.uploads)
+        label = body.get("label") or "instrument edited"
+        arms = _register_arms(p.refinement, instrument)
+        #: what the two ``set_vary`` calls changed, on the last run of ``apply``
+        changed: dict[str, list[str]] = {"freed": [], "fixed": []}
+
+        def apply(ref) -> str | None:
+            if arms is None:  # no table: the edit's own refusal says why
+                return _edit_on(ref, instrument=instrument, label=label)
+            release, free, fix, _, tableless = arms
+            changed["freed"], changed["fixed"] = [], []
+            try:
+                # a release is a register verb, which builds the table: on an
+                # old model with none it waits for the edit (finding 5)
+                if release and not tableless:
+                    ref.unhold(release)
+                node = _edit_on(ref, instrument=instrument, label=label)
+                if release and tableless:
+                    ref.unhold(release)
+                    node = ref._head_id
+                if free:
+                    changed["freed"] = sorted(ref.set_vary(free, True))
+                    node = ref._head_id
+                if fix:
+                    changed["fixed"] = sorted(ref.set_vary(fix, False))
+                    node = ref._head_id
+            except ValueError as exc:  # a register verb's refusal, in its words
+                raise GuiError(str(exc), where=release + free + fix) from None
+            return node
+
+        if arms and (arms[0] or arms[1] or arms[2]):
+            rehearse(p.refinement, apply)
+        node = apply(p.refinement)
+        release, _, _, ended, tableless = arms or ([], [], [], [], False)
+        return {"node_id": node, "released": release, "freed": changed["freed"],
+                "fixed": changed["fixed"], "release_after": tableless,
+                "ended": ended, **self.instrument()}
 
     def structure_position(self, body: dict) -> dict:
         """Move one atom to a typed position (WP-1215).
@@ -1801,7 +1934,9 @@ class GuiSession:
             # a locked DOF, or a bound — the message travels intact, as it does
             # through `params_patch`
             raise GuiError(str(exc), where=sorted(moved["values"])) from None
+        # the values set, so the console can echo the call that repeats it
         return {"node_id": p.refinement._head_id, "changed": True,
+                "values": {k: float(v) for k, v in moved["values"].items()},
                 "nearest": moved["nearest"], **self.structure()}
 
     def structure_aniso(self, body: dict) -> dict:
@@ -2075,9 +2210,28 @@ class GuiSession:
             n_stages = len(setup.members)
         else:
             plan = self._effective_plan(body.get("plan"))
+            # the library's default unless the page names one: `/next` says
+            # how a Refine ran (WP-2227) and takes the default, a one-stage
+            # re-fit of a converged model; today's page has no such view, so
+            # it asks for the stages until the swap (WP-2224, with Yue)
+            refit = {}
+            if "refit" in body:
+                if body["refit"] not in REFIT_MODES:
+                    raise GuiError(f"refit must be one of {list(REFIT_MODES)}, "
+                                   f"not {body['refit']!r}", where=["refit"])
+                refit = {"refit": body["refit"]}
 
             def call(stream, token):
-                return p.fit(plan=plan, events=stream, cancel=token)
+                tree = p.refinement.history
+                before = 0 if tree is None else len(tree.order)
+                result = p.fit(plan=plan, events=stream, cancel=token, **refit)
+                self._how = (result, _how_ran(p.refinement, before))
+                return result
+
+            def summarize(result, token):
+                how = self._how
+                return {**_summarize_refinement(result, token),
+                        "how": how[1] if how is not None and how[0] is result else None}
 
             label = ""
             n_stages = len(plan.run_stages())   # the closing stage counts
@@ -2112,7 +2266,7 @@ class GuiSession:
                          "started_utc": _utcnow(), "finished_utc": None,
                          "elapsed": None, "rwp": None, "gof": None,
                          "node_id": None, "completed_stages": [], "error": None,
-                         "lebail": None}
+                         "lebail": None, "how": None}
             self._worker = threading.Thread(
                 target=self._work, args=(call, stream, summarize),
                 name=f"{_about.SERVER_TOKEN}-gui-run", daemon=True)
@@ -2167,6 +2321,18 @@ class GuiSession:
             return {"events": events, "next": self._seq, "oldest": oldest,
                     **self._state_frame_locked()}
 
+    def resume_at(self, since: int, last_id: int) -> int:
+        """Where a reconnecting stream picks up (WP-2237).
+
+        An EventSource re-opens the URL it was first given, whose ``since`` is
+        the cursor it held when it opened, and sends the last ``id:`` it read
+        beside it.  Read from the URL alone, a dropped connection replayed the
+        ring into the page a second time.  An id past ``_seq`` was numbered by
+        another process, a restarted server, so the URL's cursor stands.
+        """
+        with self._cond:
+            return last_id if since <= last_id <= self._seq else since
+
     def follow(self, since: int, last_state: str = "",
                timeout: float = 1.0) -> tuple[list[dict], int, dict | None, str]:
         """Block until something changed, then hand back what did.
@@ -2217,11 +2383,13 @@ class GuiSession:
             result = call(stream, token)
             finish = summarize(result, token)
         except RefinementCancelled as exc:
+            # ``how`` is said only of a fit that returned; a cancelled or
+            # failed one keeps none of what its one stage set while it ran
             finish = {"status": "cancelled", "stage": exc.stage,
-                      "node_id": exc.node_id,
+                      "node_id": exc.node_id, "how": None,
                       "completed_stages": [s.name for s in exc.completed_stages]}
         except Exception as exc:  # noqa: BLE001 — the run record IS the channel
-            finish = {"status": "failed",
+            finish = {"status": "failed", "how": None,
                       "error": {"code": "RUN_FAILED",
                                 "message": f"{type(exc).__name__}: {exc}"}}
         finally:
@@ -2279,6 +2447,15 @@ class GuiSession:
             elif kind == "stage_start":
                 self._run["stage"] = data.get("stage") or data.get("name")
                 self._run["stage_index"] = data.get("index")
+                # a re-fit's one stage is said in words while it runs, as the
+                # graph's title says it after (WP-2227); a fallback's staged
+                # plan then starts a stage of another name, which clears it.
+                # The closing stage ends either run, so it leaves the words be
+                if (self._run["kind"] == "fit"
+                        and self._run["stage"] != CLOSING_STAGE_NAME):
+                    self._run["how"] = (
+                        {"ran": "one_stage", "reason": "converged"}
+                        if self._run["stage"] == WARM_REFIT_STAGE else None)
                 if data.get("n_stages"):
                     self._run["n_stages"] = data["n_stages"]
             elif kind == "stage_end":
@@ -2348,6 +2525,7 @@ class GuiSession:
         options = store.pick_settings(
             two_theta_range=limits if rng is None else rng, **flags)
         editor = self._peak_editor(options)
+        before = store.snapshot(p)
         try:
             doc = editor.pick()
         except ValueError as exc:
@@ -2357,6 +2535,7 @@ class GuiSession:
             raise GuiError(str(exc), where=[] if rng is None
                            else ["two_theta_range"]) from None
         self._save_peaks(p, doc)
+        self._peak_step(p, before)
         return self._peaks_payload(
             doc, editor=editor,
             api_call=store.pick_call(doc.pick_options, default_range=limits))
@@ -2417,9 +2596,12 @@ class GuiSession:
         a pick), a refused edit names its field, and the echo is the verb's own
         equivalent API line — the console transcript stays a script.
         """
+        from . import peaks as store
+
         self._require_idle()
         p = self._need_project()
         doc = self._need_peaks(p)
+        before = store.snapshot(p)
         editor = self._peak_editor(doc=doc)
         try:
             doc = edit(editor, doc)
@@ -2429,7 +2611,56 @@ class GuiSession:
         except ValueError as exc:
             raise GuiError(str(exc), where=where) from None
         self._save_peaks(p, doc)
+        self._peak_step(p, before)
         return self._peaks_payload(doc, editor=editor, api_call=api_call)
+
+    #: how many edits back ⌘Z reaches; a stored list is tens of kB
+    PEAK_UNDO_DEPTH = 100
+
+    def _peak_stacks(self, p) -> tuple[list, list]:
+        """This project's undo and redo stacks: another project starts empty."""
+        if self._peak_steps is None or self._peak_steps[0] is not p:
+            self._peak_steps = (p, [], [])
+        return self._peak_steps[1], self._peak_steps[2]
+
+    def _peak_step(self, p, before: bytes | None) -> None:
+        """Record the list an edit replaced; a new edit drops the redo side."""
+        undo, redo = self._peak_stacks(p)
+        undo.append(before)
+        del undo[:-self.PEAK_UNDO_DEPTH]
+        redo.clear()
+
+    def peaks_undo(self, body: dict) -> dict:
+        """Put the list back as it was before the last edit (WP-2240)."""
+        return self._peak_travel(back=True)
+
+    def peaks_redo(self, body: dict) -> dict:
+        """Make again the edit the last undo took back (WP-2240)."""
+        return self._peak_travel(back=False)
+
+    def _peak_travel(self, *, back: bool) -> dict:
+        """One step along the stack: the list as it stood, byte for byte.
+
+        A step is a stored file, never an inverse verb: re-adding a removed
+        line refits its group from a new start, and would not give back the
+        line, its flags or its neighbours as they were.
+        """
+        from . import peaks as store
+
+        self._require_idle()
+        p = self._need_project()
+        undo, redo = self._peak_stacks(p)
+        source, sink = (undo, redo) if back else (redo, undo)
+        if not source:
+            word = "undo" if back else "redo"
+            raise GuiError(f"nothing to {word} in the peak list",
+                           code=f"NOTHING_TO_{word.upper()}", status=409)
+        sink.append(store.snapshot(p))
+        store.restore(p, source.pop())
+        doc = self._load_peaks(p)
+        if doc is None:
+            return self._peaks_payload(None)
+        return self._peaks_payload(doc, editor=self._peak_editor(doc=doc))
 
     def _peaks_payload(self, doc, *, editor=None, api_call: str = "") -> dict:
         from typing import get_args as _get_args
@@ -2444,6 +2675,9 @@ class GuiSession:
             "flag_vocabulary": list(_get_args(PeakFlag)),
             "unusable_flags": sorted(PEAK_UNUSABLE_FLAGS),
         }
+        # how far ⌘Z and ⇧⌘Z reach, so the client offers neither past its end
+        undo, redo = self._peak_stacks(self._need_project())
+        out["undo"], out["redo"] = len(undo), len(redo)
         if api_call:
             out["api_call"] = api_call
         if doc is None:
@@ -2820,7 +3054,10 @@ class GuiSession:
         NodeKind): the structure becomes WP-1024's single-phase Le Bail scaffold
         (absence-free lattice group unless a ``space_group`` from the extinction
         screen is given, one dummy atom), and the document's mode follows to
-        ``lebail`` — a Rietveld fit over a dummy atom is not a thing to offer.
+        a structure-free one — a Rietveld fit over a dummy atom is not a thing
+        to offer.  ``mode`` names which, ``"lebail"`` (the default) or
+        ``"pawley"``, which `/next`'s workflow sends: the maintainer ruled
+        Pawley its structure-free default on 2026-11-23 (WP-2240).
         """
         self._require_idle()
         p = self._need_project()
@@ -2831,6 +3068,10 @@ class GuiSession:
                            code="NO_INDEX_RESULT", status=409)
         if body.get("candidate") is None:
             raise GuiError("'candidate' is required", where=["candidate"])
+        mode = body.get("mode") or "lebail"
+        if mode not in ("lebail", "pawley"):
+            raise GuiError(f"mode {mode!r}: a cell adopts in 'lebail' or "
+                           "'pawley' mode", where=["mode"])
         index = self._peak_number(body, "candidate", int)
         candidate = self._candidate_number(result, index)
         best = result.best_or_none()
@@ -2850,10 +3091,11 @@ class GuiSession:
         if not picked:
             label += f"; {_unpicked_note(candidate)}"
         node = p.refinement.edit(structure=structure, label=label)
-        if p.doc.mode != "lebail":
-            p.doc.mode = "lebail"
+        if p.doc.mode != mode:
+            p.doc.mode = mode
             p.save()
         sg = f", space_group={space_group!r}" if space_group else ""
+        sg += f", mode={mode!r}" if "mode" in body else ""
         return {"node_id": node, "mode": p.doc.mode, "picked": picked,
                 "api_call": f"session.adopt_candidate({index}{sg})",
                 **self.structure()}
@@ -2941,7 +3183,8 @@ class GuiSession:
         return series_mod.result_payload(
             entry["result"], entry["backward"], running=busy,
             curves=[bool(r.two_theta) for r in runner.results_],
-            relative=entry["relative"], angles=entry["angles"])
+            relative=entry["relative"], angles=entry["angles"],
+            coordinates=[m["x"] for m in entry["members"]])
 
     def _series_member_result(self, index: int):
         """The series entry and member ``index``'s result, which has curves, or a refusal."""
@@ -2974,15 +3217,21 @@ class GuiSession:
         the curves beside it, because a series member cannot be refitted under
         a new protocol without re-running the chain, which replaces the whole
         answer.
+
+        ``index`` is the entry's position, as ``runner.results_`` is kept, and
+        the staged member is found by the entry's own ``SeriesEntry.index``:
+        a failed pattern has no entry, so past one the two positions differ
+        and pairing them would draw one pattern's fit over another's data.
         """
         from ..project import fitted_mask
 
         entry, res = self._series_member_result(index)
-        data, member = entry["data"][index], entry["members"][index]
+        at = entry["result"].entries[index].index
+        data, member = entry["data"][at], entry["members"][at]
         return curve_arrays(
             data.tt(), data.y(), fitted_mask(data, entry["limits"]), res,
             weighted=bool(member["has_sigma"]),
-            header={"index": index, "label": member["label"], "x": member["x"]})
+            header={"index": at, "label": member["label"], "x": member["x"]})
 
     def series_history(self, index: int) -> dict:
         """One series member's own history tree — read-only, and that is the point.
@@ -3007,8 +3256,11 @@ class GuiSession:
         if tree is None:  # pragma: no cover - the GUI always runs with history
             raise GuiError("this series was run without history",
                            code="NO_HISTORY", status=409)
-        member = entry["members"][index]
-        return {"index": index, "label": member["label"],
+        # by the entry's own index, as ``series_curves`` finds its member:
+        # ``trees_`` skips a failed pattern and the staged members do not
+        at = entry["result"].entries[index].index
+        member = entry["members"][at]
+        return {"index": at, "label": member["label"],
                 "checkout": False, **tree_payload(tree)}
 
     def _series_entry(self) -> dict:
@@ -3059,6 +3311,10 @@ class GuiSession:
         for d, item in zip(res.diagnostics, payload["diagnostics"], strict=True):
             item["full"] = view[id(d)].full
             item["warning_under"] = list(view[id(d)].warning_under)
+        # how the fit ran (WP-2227), only while this result is that fit's: a
+        # stage run or a checkout since has replaced it
+        how = self._how
+        payload["how"] = how[1] if how is not None and how[0] is res else None
         payload["curves"] = {
             "n_points": len(res.two_theta),
             "two_theta_range": ([res.two_theta[0], res.two_theta[-1]]
@@ -3126,14 +3382,18 @@ class GuiSession:
         self._require_idle()
         return preview.evaluate(self._need_project(), body)
 
-    def background(self) -> Packed:
+    def background(self, hold: list[str] | None = None) -> Packed:
         """The background curve and the band it may move in, writing nothing
         (WP-2129). Idle-only, like every verb that compiles;
-        :mod:`rietx.gui.background` has the band's derivation."""
+        :mod:`rietx.gui.background` has the band's derivation. ``hold`` names
+        paths held for this answer alone, a person's pending holds (WP-2218)."""
         from . import background
 
         self._require_idle()
-        return background.answer(self._need_project())
+        try:
+            return background.answer(self._need_project(), hold)
+        except background.UnknownHold as exc:
+            raise GuiError(str(exc), where=exc.missing) from exc
 
     def report(self, plan: str | None = None) -> dict:
         """The three-layer :class:`FitReport` for the last fit, plus what applies.
@@ -3250,6 +3510,43 @@ class GuiSession:
         except KeyError as exc:
             raise GuiError(str(exc), code="NOT_FOUND", status=404) from None
 
+    def history_curves(self, node_id: str) -> Packed:
+        """One node's calculated curve, for the History tab's Compare (WP-2211).
+
+        Through :func:`refine.replay`, which compiles the node's own model at
+        its own values, 2θ range and extracted intensities, so it answers a
+        node the working table cannot express. A preview at the node's values
+        draws the same curve only for a node with the head's paths, no moved
+        atom and no Le Bail intensities of its own (WP-2211 § Measured).
+        Writes nothing. Idle-only, like every verb that compiles. The curve is
+        on the node's 2θ range, which can differ from the head's, so a client
+        places it by 2θ. The excluded regions are the project's current ones:
+        a node records none of its own, so a region excluded since it ran
+        leaves a gap in its curve.
+        """
+        import numpy as np
+
+        from ..refine import replay
+
+        self._require_idle()
+        p = self._need_project()
+        try:
+            node = p.history.resolve(node_id)
+        except KeyError as exc:
+            raise GuiError(str(exc), code="NOT_FOUND", status=404) from None
+        try:
+            res = replay(p.history, node, p.data)
+        except ValueError as exc:
+            raise GuiError(str(exc), code="MODEL_REFUSED") from None
+        tt = np.asarray(res.two_theta, dtype=np.float64)
+        y = np.asarray(res.y_calc, dtype=np.float64)
+        # past the curves route's ceiling, thinned as that route thins (WP-1461)
+        if len(tt) > _packed.CURVES_CEILING:
+            keep = decimation_index(tt, [y], _packed.CURVES_CEILING)
+            tt, y = tt[keep], y[keep]
+        return Packed({"node": node, "rwp": res.statistics.rwp},
+                      {"two_theta": tt, "y_calc": y})
+
     def history_checkout(self, body: dict) -> dict:
         """Restore a node's state as the working state (``git checkout``)."""
         self._require_idle()
@@ -3331,6 +3628,9 @@ class GuiSession:
                            f"available: {sorted(EXPORT_DEFAULTS)}",
                            code="NOT_FOUND", status=404)
         res = None if kind in _EXPORT_MODEL_ONLY else self._need_result()
+        if kind == "script" and not isinstance(body.get("script"), str):
+            raise GuiError("a script export carries the script's text as `script`",
+                           where=["script"])
         filename = body.get("filename") or EXPORT_DEFAULTS[kind]
         if body.get("directory"):
             target = self._export_elsewhere(body["directory"], filename)
@@ -3340,7 +3640,9 @@ class GuiSession:
             target = self._export_target(filename)
         ref = p.refinement
         try:
-            if kind == "instrument_profile":
+            if kind == "script":
+                target.write_text(body["script"], encoding="utf-8")
+            elif kind == "instrument_profile":
                 from ..io.instrument_profile import save_instrument_profile
 
                 save_instrument_profile(ref.instrument, target)
@@ -3394,8 +3696,11 @@ class GuiSession:
     def _adopt(self, project: Project) -> None:
         with self._cond:
             self.project = project
+            # the ring is the old project's and goes; ``_seq`` keeps rising, as
+            # it does across runs, because a page that stays open across the
+            # open holds a cursor into it (WP-2237): reset to 0, that cursor
+            # skipped the new project's events up to the old count
             self._events.clear()
-            self._seq = 0
             self._n_eval = 0
             self._run = _idle_run()
             self._index_result = None
@@ -3542,6 +3847,45 @@ def _summarize_refinement(result, _token) -> dict:
     return out
 
 
+def _how_ran(ref, before: int) -> dict:
+    """How the fit that just returned ran: in one stage or in stages, and why
+    (WP-2227, the maintainer's rulings of 2026-11-22).
+
+    Read off the one authority, the refinement's own record of the choice
+    ``fit`` made (``_refit_how``, WP-2224), which :meth:`Refinement.summary`
+    prints from too, and served with that line (``plan_line``) for the
+    Console.  ``ran`` is ``"one_stage"`` or ``"stages"``; ``reason`` is
+    ``"converged"``, ``"released"`` (``released`` the paths the last fit held,
+    ``families`` their help keys in order), ``"fallback"`` (``diverged``
+    whether the discarded one-stage fit diverged, read off its last node of
+    the ones this fit added past ``before``: a result's status is its last
+    stage's, and ``WARM_REFIT_REJECTED`` says "diverged" off that one) or
+    ``None``, a first fit's plan.
+    """
+    from ..help import help_key_for
+
+    how = ref._refit_how
+    out: dict = {"ran": "stages", "reason": None, "plan_line": ref._plan_line()}
+    if how == "single":
+        out.update(ran="one_stage", reason="converged")
+    elif how == "fallback":
+        tree = ref.history
+        discarded = ([] if tree is None else
+                     [tree.nodes[n] for n in tree.order[before:]
+                      if tree.nodes[n].notes.get("refit_discarded")
+                      and tree.nodes[n].action.kind == "stage"])
+        out.update(reason="fallback", diverged=bool(discarded) and (
+            discarded[-1].metrics.status == "diverged"))
+    elif isinstance(how, list):
+        families: list[str] = []
+        for path in how:
+            key = help_key_for(path) or path
+            if key not in families:
+                families.append(key)
+        out.update(reason="released", released=list(how), families=families)
+    return out
+
+
 def _summarize_index(result, token) -> dict:
     """The run-record fields a finished indexing search supplies.
 
@@ -3635,7 +3979,7 @@ def _idle_run() -> dict:
             "stage_index": None, "n_stages": None, "started_utc": None,
             "finished_utc": None, "elapsed": None, "rwp": None, "gof": None,
             "node_id": None, "completed_stages": [], "error": None,
-            "lebail": None}
+            "lebail": None, "how": None}
 
 
 def _parse_utc(stamp: str) -> float:
@@ -3776,6 +4120,79 @@ def _validate(model, payload, where: str):
 #: *searches* rather than anchors — it is what lets :meth:`GuiSession._edit`
 #: address the field without parsing a sentence it does not own.
 _LEADING_PATH = re.compile(r"\b((?:phases|instrument)\.[\w.]*[\w])")
+
+
+def _register_arms(refinement, instrument: Instrument
+                   ) -> tuple[list[str], list[str], list[str], list[str], bool] | None:
+    """What replacing the instrument asks of the hold and free registers (WP-2229).
+
+    Returns ``(release, free, fix, ended, tableless)``, or ``None`` when the
+    new model builds no parameter table, whose refusal ``Refinement.edit``
+    gives. ``tableless`` says the old model builds none.
+
+    When only the *old* model builds none (a free capillary offset with no
+    ``goniometer_radius_mm``, which a ``vary`` set after construction lets
+    through), the edit still lands, so the work is done from the registers
+    alone (WP-2229's finding 5): every held ``instrument.`` path the new table
+    lacks is released, and every held background path when the background's
+    kind or breakpoints change. Those are the paths known to have ended. The
+    free arm is left to the new model's ``vary``, since no comparison can say
+    which paths are built. A register verb builds the table too, so the
+    release runs after the edit there.
+
+    The two tables are compared by path. A path the old one has and the new
+    one lacks is *removed*. A background coefficient whose basis changes is
+    *redefined*: P-spline ``c3`` is a basis function at a knot, Chebyshev
+    ``c3`` a polynomial order, and they share only the name. So is a
+    P-spline's ``c3`` over other breakpoints, a function at another knot. A
+    path the new table has and the old one lacked, or redefined, is *built*:
+    its parameter starts with the edit.
+
+    - ``release``: every path in the hold register that the edit removes or
+      builds, read off the register and not off the rows, so a hold left on
+      a path an earlier edit removed is found too.
+    - ``free``: every built path whose new model says ``vary``. Once a stage
+      has declared the free set, a path outside it is built fixed whatever
+      its ``vary`` says, and the client that built ``Parameter(value=0.0,
+      vary=True)`` asked for it free.
+    - ``fix``: every built path whose new model says fixed and that the free
+      register still names, from the old parameter of that name or from one
+      an earlier cut removed. Kept, it would come back free.
+    - ``ended``: every path whose old parameter the edit removed or
+      redefined, where a pending edit typed against the old model no longer
+      applies.
+
+    Instrument paths only. A structure edit carries its holds through a
+    renumbering of atoms (``Refinement.edit``, #1264), which a comparison by
+    path would undo.
+    """
+    from ..params.vector import ParameterTable
+
+    try:
+        new = {e.path: e for e in ParameterTable(refinement.structure, instrument).entries}
+    except ValueError:
+        return None
+    before, after = refinement.instrument.background, instrument.background
+    rebased = (before.kind != after.kind
+               or getattr(before, "breakpoints", None) != getattr(after, "breakpoints", None))
+    try:
+        old = {e.path for e in ParameterTable(refinement.structure,
+                                              refinement.instrument).entries}
+    except ValueError:
+        release = sorted(h for h in refinement._user_holds if h.startswith("instrument.")
+                         and (h not in new
+                              or (rebased and h.startswith("instrument.background."))))
+        return release, [], [], release, True
+    redefined: set[str] = set()
+    if rebased:
+        redefined = {p for p in old if p.startswith("instrument.background.")}
+    ended = (old - new.keys()) | redefined
+    built = {p for p in new if p not in old or p in redefined}
+    release = sorted(refinement._user_holds & (ended | built))
+    free = sorted(p for p in built if new[p].vary)
+    declared = set(refinement._free_paths)
+    fix = sorted(p for p in built if not new[p].vary and p in declared)
+    return release, free, fix, sorted(ended), False
 
 
 def rehearse(refinement, apply: Callable[[Any], Any]) -> None:
@@ -3934,6 +4351,40 @@ def _stored_param(tree: dict, path: str) -> dict:
     return node
 
 
+def _follow_cell_ties(tree: dict, path: str, value: float) -> None:
+    """Move every cell entry its space group ties to ``path`` along with it.
+
+    ``set_values`` does this through ``ParameterTable.refresh_ties``.  A value
+    written into the dumped model has no table behind it, and since WP-2150
+    the table refuses a tied entry left behind its source, so b follows a here
+    as it does there.  A parent's cell (``phases.0.parent_cell.cell.a``) is
+    tied under the parent's group, as the table ties it.
+    """
+    from ..crystallography.symmetry import cell_constraints, resolve_group
+
+    match = re.fullmatch(r"phases\.(\d+)\.(parent_cell\.)?cell\.(\w+)", path)
+    if match is None:
+        return
+    phase = tree["phases"][int(match.group(1))]
+    declared = phase.get("parent_cell")
+    try:
+        if match.group(2):
+            if declared is None:
+                return
+            sg, cell = resolve_group(declared["space_group"]), declared["cell"]
+        elif declared is not None:
+            return                   # the child's own cell is derived and locked
+        else:
+            sg = resolve_group(phase["space_group"], phase.get("symmetry_operations"))
+            cell = phase["cell"]
+        ties = cell_constraints(sg).ties
+    except (RuntimeError, ValueError):
+        return                       # the table's own refusal names the group
+    for name, source in ties.items():
+        if source == match.group(3):
+            cell[name]["value"] = value
+
+
 def _limit_and_restraint_edit(refinement, limits: dict, restraints: dict,
                               values: dict) -> tuple[Structure | None,
                                                      Instrument | None]:
@@ -3977,6 +4428,7 @@ def _limit_and_restraint_edit(refinement, limits: dict, restraints: dict,
         stored["min"], stored["max"] = lo, hi
         if value is not None:
             stored["value"] = value
+            _follow_cell_ties(tree, path, value)
         touched["instrument" if path.startswith("instrument.") else "structure"] = True
     if restraints:
         from ..schemas.structure import ValueRestraint

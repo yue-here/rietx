@@ -53,7 +53,7 @@ for name in ("fap.inp", "fap.pcr"):
 
 # The page quotes every printed line and names the data file TOPAS's input points at.
 assert [n.code for n in notes] == ["GSAS_EXP_BACKGROUND_NOT_CARRIED"]
-assert f"{result.statistics.rwp:.4f}" == "0.0953"
+assert f"{result.statistics.rwp:.4f}" == "0.0948"
 # "The fit here declares no extinction, so the writer has none to refuse."
 assert ref.fitted_structure.phases[0].extinction is None
 assert model.stated.rwp == 0.1005

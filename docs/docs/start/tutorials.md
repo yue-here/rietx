@@ -26,7 +26,7 @@ laboratory Cu Kα pattern.
 Notebooks 03 to 05 build their patterns in the notebook, so each fit can be
 checked against the values it was built from.
 Notebook 06 is a template rather than a tutorial, committed without outputs.
-It runs on the fluorapatite files as shipped, and you replace them with your own.
+It runs on the fluorapatite files included with the package, and you replace them with your own.
 
 <!-- Guard note (WP-1916, WP-1986): tests/test_manual_api.py checks the names
 on this page and never in the notebooks, so a rietx name in a notebook's
