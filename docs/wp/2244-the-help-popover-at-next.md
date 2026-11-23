@@ -99,7 +99,10 @@ helper and moving `size` off the shared host, both cosmetic.
 
 *Measured* (arm64 Mac, `[dev]` venv plus `playwright` installed into it, Node v24.22.1): vitest
 61 files, 988 passed before the review fixes; svelte-check 489 files, 0 errors; the two new
-browser tests pass, and the stage-settings test fails with the click-away guard removed.
+browser tests pass, and the stage-settings test fails with the click-away guard removed. After the
+review: all six `tests/test_gui_*_browser.py` files, 67 passed; the fast suite (`-m "not slow"`,
+browser files included, load average 20-66 from other sessions) 15361 passed, 438 skipped, 32
+xfailed, the two added tests 2.89 s.
 
 *Not generalised.* WP-2240's relation marks (`≡ #1`) still carry their sentence as `title=`,
 because #1792 wrote them before a popover existed; that WP converts them. The shortcut and
