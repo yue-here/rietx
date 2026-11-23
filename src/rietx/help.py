@@ -1099,7 +1099,10 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "multiplies its intensity, as its `target` says. Its unit is whatever "
             "makes the expression come out in the target's unit: degrees 2θ for a "
             "width or a shift, deg² for `gauss_fwhm_squared`, and none for an "
-            "intensity factor. No preset plan frees it, so a stage names "
+            "intensity factor. An expression may read `wavelength`, the emission "
+            "line's λ in Å, so a size term written as `y*wavelength/cos(theta)` is "
+            "one coefficient, in degrees per Å, at every wavelength. No preset plan "
+            "frees it, so a stage names "
             "`phases.*.peak_equations.*` itself. A coefficient that is very small in "
             "its own unit refines better rescaled near 1, by writing its factor into "
             "the expression."
@@ -4068,8 +4071,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "and a strain-like one, such as a tan θ term, does not. The package "
             "converts its own size terms, but cannot tell which kind an equation "
             "holds. For a wavelength-dependent term, give each pattern its own "
-            "coefficient with SharingMap(per_histogram=[...]) and refit. TOPAS writes "
-            "such a term per pattern, or with Lam in the expression."
+            "coefficient with SharingMap(per_histogram=[...]) and refit. Or write the "
+            "λ into the expression, as y*wavelength/cos(theta), and keep y shared. This "
+            "warning skips an equation that reads wavelength. It then also skips a "
+            "size term written in degrees in that equation, as + x/cos(theta)."
         ),
     ),
     "PEAK_WIDTH_NOT_POSITIVE": HelpEntry(
@@ -6651,6 +6656,19 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "floor, because the pattern it warm-started from did not support them. "
             "Empty when the kept attempt started cold and on a series with no moment. "
             "`SEQUENTIAL_MOMENT_HOLD` names these patterns."
+        ),
+    ),
+    "SeriesEntry.held_values": HelpEntry(
+        title="Values you held",
+        description=(
+            "Each path you held on this pattern with `ref.hold` in the `constrain` "
+            "hook, named variables included, with the value it was held at. A site "
+            "coordinate DOF is left out, since its value is a step from where the fit "
+            "began; read the coordinate's own row. A held parameter has no row in "
+            "`parameters`, so read its value along the series here. A value that "
+            "differs from its neighbours' was set for this pattern by a hook, or the "
+            "path was free on the pattern before. `None` where nothing was held, and "
+            "in a series saved before the field."
         ),
     ),
     "SeriesEntry.pattern_paths": HelpEntry(

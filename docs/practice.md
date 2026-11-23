@@ -183,6 +183,19 @@ Surveyed 2026-10-26 for WP-2052 (issue #1088); the GSAS-II lines re-read 2026-11
 | EasyDiffraction | none | H_G² floored at machine ε; a negative H_L passes | none |
 | BGMN | no Caglioti widths | fatal error | Profex writes B1 ≤ 0.01 and k2 ≤ 1e-4 into the files it creates |
 
+### A width an equation sets
+
+Read 2026-11-22 for WP-2153, TOPAS only. TOPAS 5's Technical Reference defines TCHZ's
+Gaussian width as G = (U tan²θ + V tanθ + W + Z/cos²θ)^0.5 (§ 6.2, p. 27; checked
+(manual)). It does not say what happens when the sum is negative. `force_positive_fwhm`
+is not in the v5 reference. So whether TOPAS clamps a negative Γ_G², takes its
+magnitude or stops is not checked. The ZrP₂O₇ input WP-2151 ran (Stinton & Evans 2007)
+stores a negative v and w for two of its three phases' TCHZ, and silicon's Γ_G² is
+negative at every reflection, so that input relies on whatever TOPAS does there.
+rietx's LM driver holds the total width, an equation's term included, inside the step
+wherever the term is exact at the stage's frozen angles (WP-2153). TRF and an inexact
+term are reported after the fit by `PEAK_WIDTH_NOT_POSITIVE`.
+
 ## Limits a control file declares
 
 Surveyed 2026-10-30 for PR #1199 (the `.pcr` reader's `Nre` limits), FullProf only, from its manual and runs.

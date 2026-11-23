@@ -2309,6 +2309,18 @@ class GuiSession:
             return {"events": events, "next": self._seq, "oldest": oldest,
                     **self._state_frame_locked()}
 
+    def resume_at(self, since: int, last_id: int) -> int:
+        """Where a reconnecting stream picks up (WP-2237).
+
+        An EventSource re-opens the URL it was first given, whose ``since`` is
+        the cursor it held when it opened, and sends the last ``id:`` it read
+        beside it.  Read from the URL alone, a dropped connection replayed the
+        ring into the page a second time.  An id past ``_seq`` was numbered by
+        another process, a restarted server, so the URL's cursor stands.
+        """
+        with self._cond:
+            return last_id if since <= last_id <= self._seq else since
+
     def follow(self, since: int, last_state: str = "",
                timeout: float = 1.0) -> tuple[list[dict], int, dict | None, str]:
         """Block until something changed, then hand back what did.
@@ -3607,8 +3619,11 @@ class GuiSession:
     def _adopt(self, project: Project) -> None:
         with self._cond:
             self.project = project
+            # the ring is the old project's and goes; ``_seq`` keeps rising, as
+            # it does across runs, because a page that stays open across the
+            # open holds a cursor into it (WP-2237): reset to 0, that cursor
+            # skipped the new project's events up to the old count
             self._events.clear()
-            self._seq = 0
             self._n_eval = 0
             self._run = _idle_run()
             self._index_result = None
