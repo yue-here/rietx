@@ -143,9 +143,10 @@ export function advance(cursor: Cursor, batch: { events: EngineEvent[]; oldest?:
 
 /** Follow the stream: SSE when it works, `?poll=1` when it does not.
  *
- * EventSource cannot be told "resume at seq N" once it reconnects on its own,
- * so the query carries the cursor and a reconnect re-opens with the cursor we
- * hold — which is why the server accepts `?since=` on the SSE route too.
+ * The query carries the cursor the stream opens at, which is why the server
+ * accepts `?since=` on the SSE route too. A reconnect re-opens the URL it first
+ * used, so its `since` is the cursor at mount; the browser sends the last
+ * event's id as `Last-Event-ID`, and the server resumes there (WP-2237).
  *
  * `onDropped` hears the running count of frames the server's ring lost while
  * this page followed (#1656 item 1): the polling path reads it off each
