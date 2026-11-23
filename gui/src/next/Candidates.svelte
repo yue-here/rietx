@@ -600,15 +600,21 @@
         <h3>Candidates <span class="muted">{candidates.length}, ranked by rietx</span></h3>
         <div class="candsw">
         <table class="lines cands">
+          <!-- the cell as six columns, and a row's relation to another on its own
+               line, compact, its sentence in a tooltip (the maintainer, 2026-11-23).
+               Each head is aligned as its column is, a unit sits in the head and
+               never in a cell, and a spanner groups the lengths and the angles
+               (WP-2240 § Handover log, fifth session, cites the practice) -->
           <thead>
-            <!-- the cell as six columns, and a row's relation to another on its own
-                 line, compact, its sentence in a tooltip (the maintainer, 2026-11-23) -->
-            <tr><th class="r">#</th><th aria-label="Relation"></th>
-              {#each ["a", "b", "c", "α", "β", "γ"] as n (n)}<th class="r">{n}</th>{/each}
-              <th>Lattice</th><th class="r">V</th>
-              {#if zColumn}<th class="r"><Help for={searchHelp(field("formula"))}>Z</Help></th>{/if}
-              <th class="r">M₂₀</th><th class="r">Unindexed</th><th class="r">Absent</th>
-              <th class="r">Rwp</th><th>Grade</th></tr>
+            <tr><th class="r" rowspan="2">#</th><th colspan="2" rowspan="2" aria-label="Relation"></th>
+              <th class="span" colspan="3"><span>Lengths (Å)</span></th>
+              <th class="span ang" colspan="3"><span>Angles (°)</span></th>
+              <th class="text" rowspan="2">Lattice</th><th class="r" rowspan="2">V (Å³)</th>
+              {#if zColumn}<th class="r" rowspan="2"><Help for={searchHelp(field("formula"))}>Z</Help></th>{/if}
+              <th class="r" rowspan="2">M₂₀</th><th class="r" rowspan="2">Unindexed</th>
+              <th class="r" colspan="2" rowspan="2">Absent</th>
+              <th class="r gap" rowspan="2">Rwp (%)</th><th class="text" rowspan="2">Grade</th></tr>
+            <tr>{#each ["a", "b", "c", "α", "β", "γ"] as n, k (n)}<th class="r" class:ang={k === 3}>{n}</th>{/each}</tr>
           </thead>
           <tbody>
             {#each candidates as c, i (i)}
@@ -619,19 +625,22 @@
                 <td class="r num">{i + 1}</td>
                 <!-- the sentence rides in the tooltip: `/next` has no help opener yet,
                      so a `<Help>` term here would answer no click -->
-                <td class="rel num" title={rel?.text}>{rel?.mark ?? ""}</td>
+                <!-- the mark and the row it points at are two cells, so each
+                     lines up from row to row -->
+                <td class="rel relm num" title={rel?.text}>{rel?.mark ?? ""}</td>
+                <td class="rel relt num" title={rel?.text}>{rel ? `#${rel.of}` : ""}</td>
                 {#each cellColumns(c) as col, k (k)}
-                  <td class="r num" class:fixed={col.fixed}>{col.value}{#if col.pad}<span
-                    class="pad" style:width="{col.pad.length}ch"></span>{/if}</td>
+                  <td class="r num" class:ang={k === 3} class:fixed={col.fixed}>{col.value}</td>
                 {/each}
-                <td>{c.system} {c.centring}</td>
+                <td class="text">{c.system} {c.centring}</td>
                 <td class="r num">{c.volume.toFixed(0)}</td>
                 {#if zColumn}<td class="r num">{c.formula_units == null ? "–" : c.formula_units.toFixed(2)}</td>{/if}
                 <td class="r num">{m20 === null ? "–" : m20.toFixed(1)}</td>
                 <td class="r num">{unindexedOf(c)}</td>
-                <td class="r num">{#if ab}{ab.absent}<span class="u">{" "}of {ab.of}</span>{:else}–{/if}</td>
-                <td class="r num">{c.lebail ? `${(c.lebail.rwp * 100).toFixed(1)} %` : "–"}</td>
-                <td>{c.confidence}</td>
+                <td class="r num abs">{ab ? ab.absent : "–"}</td>
+                <td class="r num of">{#if ab}<span class="u">of</span> {ab.of}{/if}</td>
+                <td class="r num gap">{c.lebail ? (c.lebail.rwp * 100).toFixed(1) : "–"}</td>
+                <td class="text">{c.confidence}</td>
               </tr>
             {/each}
           </tbody>
@@ -954,24 +963,81 @@
     background: color-mix(in srgb, var(--accent) 14%, transparent);
   }
 
-  /* a value the crystal system sets: muted, and a fixed angle written whole,
-     so the column still aligns on the point */
+  /* a value the crystal system sets is muted; every value of a kind keeps
+     its places, so a right-aligned column is decimal-aligned too */
   .cands td.fixed {
     color: var(--muted);
   }
 
-  /* room for a fixed angle's places, empty so a copy reads `90` */
-  .cands .pad {
-    display: inline-block;
+  /* tabular figures, so equal places put the points under each other */
+  .cands td.num {
+    font-variant-numeric: tabular-nums;
   }
 
+  /* a head sits on its column's baseline, aligned as its column is: right
+     over numbers, left over words */
+  .cands th {
+    vertical-align: bottom;
+  }
+
+  .cands th.text,
+  .cands td.text {
+    text-align: left;
+  }
+
+  /* a spanner names a group of columns, centred over them, with a rule
+     under it that stops short of its neighbour's */
+  .cands th.span {
+    text-align: center;
+    border-bottom: none;
+  }
+
+  .cands th.span span {
+    display: block;
+    padding-bottom: 2px;
+    border-bottom: 1px solid var(--line-strong);
+  }
+
+  /* the relation: its mark right against the row it names, the two in
+     cells of their own, then a gap before the cell */
   .cands td.rel {
     color: var(--muted);
   }
 
-  /* fifteen columns share the model panel: a narrower gutter, and past
-     that the table scrolls in its own box (Params' atom table), never the
-     step's form with it */
+  .cands td.relm {
+    text-align: right;
+    padding-right: 0;
+  }
+
+  .cands td.relt {
+    text-align: left;
+    padding-right: 14px;
+  }
+
+  /* space separates the lengths from the angles (STYLE.md § Spacing), a
+     word from the right-aligned number before it, and the two-cell absent
+     column from Rwp */
+  .cands .ang,
+  .cands .text {
+    padding-left: 14px;
+  }
+
+  .cands .gap {
+    padding-left: 12px;
+  }
+
+  /* the absent count and the lines it is a share of: two cells, so each
+     number is right-aligned in its own column */
+  .cands td.abs {
+    padding-right: 0;
+  }
+
+  .cands td.of {
+    padding-left: 4px;
+  }
+
+  /* past the panel's width the table scrolls in its own box (Params' atom
+     table), never the step's form with it */
   .candsw {
     overflow-x: auto;
   }

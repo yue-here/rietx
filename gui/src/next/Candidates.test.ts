@@ -166,22 +166,32 @@ describe("the Index step", () => {
     await boot();
     expect(text(document.querySelector(".coverage")))
       .toBe("Not searched: tetragonal. Stopped early: hexagonal. The 2-minute limit ran out.");
-    // the cell in six columns (the maintainer, 2026-11-23)
-    expect([...document.querySelectorAll("table.cands th")].map(text))
-      .toEqual(["#", "", "a", "b", "c", "α", "β", "γ", "Lattice", "V", "M₂₀", "Unindexed",
-                "Absent", "Rwp", "Grade"]);
+    // the cell in six columns (the maintainer, 2026-11-23), lengths and
+    // angles under a spanner each, a unit in its head and never in a cell
+    const heads = (k: number) =>
+      [...document.querySelectorAll(`table.cands thead tr:nth-child(${k}) th`)].map(text);
+    expect(heads(1)).toEqual(["#", "", "Lengths (Å)", "Angles (°)", "Lattice", "V (Å³)", "M₂₀",
+                              "Unindexed", "Absent", "Rwp (%)", "Grade"]);
+    expect(heads(2)).toEqual(["a", "b", "c", "α", "β", "γ"]);
     const rows = [...document.querySelectorAll("table.cands tbody tr")];
     expect([...rows[0].querySelectorAll("td")].map(text))
-      .toEqual(["1", "", "9.3750", "9.3750", "6.8900", "90", "90", "120", "hexagonal P", "524",
-                "41.3", "2", "34 of 189", "18.3 %", "low"]);
+      .toEqual(["1", "", "", "9.3750", "9.3750", "6.8900", "90.00", "90.00", "120.00",
+                "hexagonal P", "524", "41.3", "2", "34", "of 189", "18.3", "low"]);
     // what the hexagonal system sets is muted: b, and every angle
-    expect([...rows[0].querySelectorAll("td.fixed")].map(text)).toEqual(["9.3750", "90", "90", "120"]);
-    // a related row is marked on its own line, never merged (call 8), with
-    // its sentence in the tooltip
-    const rel = rows[1].querySelector("td.rel")!;
-    expect(text(rel)).toBe("≡ #1");
-    expect(rel.getAttribute("title")).toBe("The same cell as #1, under another lattice label.");
-    expect(rows[1].querySelectorAll("td").length).toBe(15);
+    expect([...rows[0].querySelectorAll("td.fixed")].map(text))
+      .toEqual(["9.3750", "90.00", "90.00", "120.00"]);
+    // a head is aligned as its column: right over numbers, left over words
+    const align = (sel: string) => [...document.querySelectorAll(sel)]
+      .map((e) => (e.classList.contains("r") ? "r" : "l"));
+    expect(align("table.cands thead tr:nth-child(2) th")).toEqual(["r", "r", "r", "r", "r", "r"]);
+    expect(align("table.cands tbody tr:first-child td:nth-child(n+4):nth-child(-n+9)"))
+      .toEqual(["r", "r", "r", "r", "r", "r"]);
+    // a related row is marked on its own line, never merged (call 8): its
+    // mark and the row it names in two cells, the sentence in the tooltip
+    const [mark, target] = [...rows[1].querySelectorAll("td.rel")];
+    expect([text(mark), text(target)]).toEqual(["≡", "#1"]);
+    expect(mark.getAttribute("title")).toBe("The same cell as #1, under another lattice label.");
+    expect(rows[1].querySelectorAll("td").length).toBe(17);
     expect(button("Judge ›").disabled).toBe(true);
     (rows[1] as HTMLElement).click();
     await settle();

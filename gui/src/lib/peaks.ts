@@ -513,19 +513,17 @@ export function cellLine(c: Pick<Candidate, "cell" | "cell_esd" | "system">,
   }
 }
 
-/** One of a cell's six columns: the value, the hidden places that align a
- *  symmetry-fixed angle on the decimal point, and whether symmetry sets it. */
-export interface CellColumn { value: string; pad: string; fixed: boolean }
+/** One of a cell's six columns: the value, and whether symmetry sets it. */
+export interface CellColumn { value: string; fixed: boolean }
 
 /**
  * A candidate's cell as six columns, a, b, c, α, β, γ (the maintainer,
- * 2026-11-23). Lengths take four places and angles two, so each column
- * aligns on the decimal point (`gui/STYLE.md` § Numbers). A value the
- * system sets is `fixed`: a length equal to another by symmetry keeps its
- * places, and a symmetry-fixed angle is written whole, `90` or `120`, with
- * its places (`pad`) left as empty room. A trigonal cell on rhombohedral axes ties
- * b and c to a and β and γ to α. A monoclinic cell's free angle is β, as
- * `cellLine` writes it.
+ * 2026-11-23). Every length takes four places and every angle two, a
+ * symmetry-fixed one included (`90.00`), so a right-aligned column is
+ * aligned on the decimal point too (`gui/STYLE.md` § Numbers; WP-2240 §
+ * Handover log cites the table practice). A value the system sets is
+ * `fixed`. A trigonal cell on rhombohedral axes ties b and c to a and β and
+ * γ to α. A monoclinic cell's free angle is β, as `cellLine` writes it.
  */
 export function cellColumns(c: Pick<Candidate, "cell" | "system">): CellColumn[] {
   const cell = c.cell;
@@ -539,12 +537,9 @@ export function cellColumns(c: Pick<Candidate, "cell" | "system">): CellColumn[]
   };
   const tiedAngles = rhombohedral ? [4, 5] : [];
   return cell.map((v, k) => {
-    const places = k < 3 ? 4 : 2;
-    if ((setAngles[c.system] ?? []).includes(k)) {
-      return { value: String(Math.round(v)), pad: `.${"0".repeat(places)}`, fixed: true };
-    }
-    const fixed = (tiedLengths[c.system] ?? []).includes(k) || tiedAngles.includes(k);
-    return { value: v.toFixed(places), pad: "", fixed };
+    const set = (setAngles[c.system] ?? []).includes(k);
+    const fixed = set || (tiedLengths[c.system] ?? []).includes(k) || tiedAngles.includes(k);
+    return { value: (set ? Math.round(v) : v).toFixed(k < 3 ? 4 : 2), fixed };
   });
 }
 
@@ -552,10 +547,12 @@ const sameCell = (x: readonly number[], y: readonly number[]) =>
   x.length === y.length
   && x.every((v, i) => Math.abs(v - y[i]) <= 1e-9 * Math.max(1, Math.abs(v)));
 
-/** How a candidate relates to another reported row: the compact mark its
- *  table column shows on the row's own line (`≡ #1`), and the sentence its
- *  tooltip gives (the maintainer, 2026-11-23). */
-export interface Relation { mark: string; text: string }
+/** How a candidate relates to another reported row, on the row's own line
+ *  (the maintainer, 2026-11-23): the mark (`≡`, `⊇`, or the volume ratio
+ *  `2×`), the row it points at as `#k` (`of`, counted from 1), and the
+ *  sentence its tooltip gives. The mark and the target are two table
+ *  cells, so each lines up from row to row. */
+export interface Relation { mark: string; of: number; text: string }
 
 /**
  * How candidate `i` relates to another reported row, or null.
@@ -572,7 +569,7 @@ export function candidateRelation(cands: readonly Candidate[], i: number): Relat
   const text = cellText(c.cell);
   for (let k = 0; k < i; k++) {
     if (cellText(cands[k].cell) === text) {
-      return { mark: `≡ #${k + 1}`,
+      return { mark: "≡", of: k + 1,
                text: `The same cell as #${k + 1}, under another lattice label.` };
     }
   }
@@ -581,9 +578,9 @@ export function candidateRelation(cands: readonly Candidate[], i: number): Relat
     if (k < 0 || k === i) continue;
     // a containment pair is no sublattice, so its index is 0 (SupercellCheck)
     return check.index >= 2
-      ? { mark: `${check.index}× #${k + 1}`,
+      ? { mark: `${check.index}×`, of: k + 1,
           text: `A supercell of #${k + 1}, with ${check.index}× its volume.` }
-      : { mark: `⊇ #${k + 1}`, text: `Indexes every line #${k + 1} does.` };
+      : { mark: "⊇", of: k + 1, text: `Indexes every line #${k + 1} does.` };
   }
   return null;
 }
