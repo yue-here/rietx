@@ -87,20 +87,28 @@ The GUI's candidate table marks a row that is related to another reported row.
 The mark sits in a column after `#` and names the other row as `#k`.
 A click on it gives a one-line summary with row k filled in.
 
-| Mark | Summary | Meaning | Computed by |
-|---|---|---|---|
-| `≡ #k` | Same cell as #k, another lattice label | The six cell values print the same as row k's, lengths to four places and angles to two. The search reported one cell twice, under two crystal systems or centrings. Row k is the higher-ranked of the two. | the GUI, `candidateRelation` in `gui/src/lib/peaks.ts` |
-| `N× #k` | Supercell of #k, twice its primitive cell | `SupercellCheck.relation` is `"sublattice"`. One primitive cell of this lattice holds N of row k's, where N is `SupercellCheck.index`, from 2 to 4. | {source}`rietx.indexing.ambiguity._parent_coordinates` |
-| `⊇ #k` | Indexes every line #k does, and predicts more | `SupercellCheck.relation` is `"containment"`. This cell indexes every observed line row k indexes, and its own line set is the denser. It is no 2-to-4 supercell of row k. | {source}`rietx.indexing.screen.contains` |
+| Mark | Summary | Meaning |
+|---|---|---|
+| `≡ #k` | Same cell as #k, another lattice label | The six cell values print the same as row k's, lengths to four places and angles to two. The search reported one cell twice, under two crystal systems or centrings. Row k is the higher-ranked of the two. |
+| `N× #k` | Supercell of #k, twice its primitive cell | `SupercellCheck.relation` is `"sublattice"`. One primitive cell of this lattice holds N of row k's, where N is `SupercellCheck.index`, from 2 to 4. |
+| `⊇ #k` | Indexes every line #k does, and predicts more | `SupercellCheck.relation` is `"containment"`. This cell indexes every observed line row k indexes, and its own line set is the denser. It is no 2-to-4 supercell of row k. |
 
 The summary words N as "twice", "three times" or "four times".
 N counts primitive cells, and the V column gives conventional cells, so for a centred lattice the ratio of the two V values can differ from N.
 
-The search asks every pair of reported candidates in {source}`rietx.indexing.consensus.supercell_checks`.
-A pair whose larger cell indexes every observed line the smaller one indexes gets a `SupercellCheck` on the larger cell, from {source}`rietx.indexing.screen.containment_evidence`.
+The search asks every pair of reported candidates.
+A pair whose larger cell indexes every observed line the smaller one indexes gets a `SupercellCheck` on the larger cell.
 That check carries the verdict, and [A supercell and the cell inside it](indexing.md#a-supercell-and-the-cell-inside-it) says how a verdict moves the order.
 The table looks for `≡` first, then takes the first check whose parent is another reported row.
 So a row carries at most one mark, and a row without one can still be related to another in a way rietx does not compute.
+
+The code behind each part:
+
+- `≡`, the printed cells compared: the GUI's `candidateRelation`, in `gui/src/lib/peaks.ts`.
+- The pairs asked: {source}`rietx.indexing.consensus.supercell_checks`
+- Whether one cell's indexed lines contain the other's, for `⊇`: {source}`rietx.indexing.screen.contains`
+- The sublattice index N, for `N×`: {source}`rietx.indexing.ambiguity._parent_coordinates`
+- The extra lines and the verdict: {source}`rietx.indexing.screen.containment_evidence`
 
 The `fap` example project (fluorapatite, P6₃/m, Cu Kα), searched over the hexagonal and trigonal systems, returns twelve candidates.
 All twelve are primitive with α = β = 90° and γ = 120°, and 135 lines were used.
