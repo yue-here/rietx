@@ -3261,7 +3261,10 @@ ROWS: tuple[Row, ...] = (
                  "1e-8 and 1e-10."
                  "  WP-2017 group A, hard starts (2026-11-09): one answer at the answer from every start that"
                  " reaches it, on three families at 1e-8 and two at 1e-10, where fp64 stops the rest first; the"
-                 " failing case and start domain stated in the evidence."),
+                 " failing case and start domain stated in the evidence. The approval condition is not met on"
+                 " the tighter side: the maintainer ruled on 2026-11-17 that approved stays 2026-10-23 until"
+                 " a synthetic case reaches 1e-10, since an arm that changes nothing measures nothing (the"
+                 " ruling of 2026-11-05); that case is owed."),
         approved="2026-10-23"),
     Row("rietx.optimize.lm._CONVERGED_RUNS", "constant", tier=3, value=3,
         evidence=("Coelho (2018) J. Appl. Cryst. 51, 428 stops its NIST, Rosenbrock and AntiBump runs at an "

@@ -125,9 +125,10 @@ from tests import test_window_domain as w  # noqa: E402
 from tests.test_staged_start_invariance import _axial_pair_ordered  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
-# The JSONL files are not committed; the 2026-11-05 rows sit in ~/.cache/rietx/wp-2017/ on the
-# maintainer's machine.  ``WP2017_RAW`` names a directory outside the tree for the rows and the
-# summaries they rewrite; a rerun's summaries are copied in by hand once read.
+# The JSONL files are not committed; the 2026-11-05 rows were written to ~/.cache/rietx/wp-2017/
+# on the machine that ran that sweep.  ``WP2017_RAW`` names a directory outside the tree for the
+# rows and the summaries they rewrite; a rerun's summaries are copied in by hand once read, under
+# a dated name (group_a_20261109_summary.md, group_a_hard_20261109_summary.md).
 RAW = Path(os.environ.get("WP2017_RAW", HERE))
 RAW.mkdir(parents=True, exist_ok=True)
 JSONL = RAW / "group_a.jsonl"
@@ -916,7 +917,7 @@ def summary() -> None:
             f"{m['model_path']} | {m['background']:.4f} | {m['rwp_ratio']:.6f} | "
             f"{m['eval_ratio']:.3f} | {r['converged']} | "
             f"{'unreached' if m['unreached'] else 'yes'} | "
-            f"{_fmt(ref['worst_further_esd'])} | {ref['worst_name']} |")
+            f"{_fmt(ref['worst_further_esd'], '.2g')} | {ref['worst_name']} |")
     reads = [r for r in rows if r.get("kind") == "polish_read"]
     lines += ["", "## Polish", "",
               "| constant | arm | family | to shipped | to shipped polished | path | "
@@ -1050,7 +1051,7 @@ def hard_summary() -> None:
             f"{m['background']:.4g} | {m['rwp_ratio']:.6f} | {m['eval_ratio']:.3f} | "
             f"{r['converged']} | {'unreached' if m['unreached'] else 'yes'} | "
             f"{_yes(v['reaches_answer'])} | {_yes(v['changed'])} | "
-            f"{_fmt(ref['worst_further_esd'])} | {ref['worst_name']} |")
+            f"{_fmt(ref['worst_further_esd'], '.2g')} | {ref['worst_name']} |")
     reads = [r for r in rows if r.get("kind") == "polish_read"]
     polish_rows = [r for r in rows if r.get("kind") == "polish"]
     lines += ["", "## Polish", "",
