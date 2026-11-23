@@ -58,7 +58,8 @@ SIDECAR_GLOB = "indexing_*.gallery.json"
 #: ``tier`` says how far the reference may be trusted: ``certificate`` (a
 #: certified cell), ``cross-code`` (another program's converged answer),
 #: ``consistency`` (a literature cell for the mineral, not for this specimen),
-#: ``published`` (a printed benchmark), ``none`` (no known cell — the claim is
+#: ``published`` (a printed benchmark), ``synthetic`` (forward-modelled, so the
+#: cell is the one it was drawn from), ``none`` (no known cell — the claim is
 #: the abstention).
 SPECIMENS: dict[str, dict[str, str]] = {
     "lab6": {
@@ -202,6 +203,19 @@ SPECIMENS: dict[str, dict[str, str]] = {
                "and the reason is a measurement, not an omission \u2014 see the "
                "note under the figure.",
     },
+    "silicon_steep": {
+        "title": "Silicon on a falling background — synthetic",
+        "space_group": "F d -3 m (cubic, face-centred)",
+        "cell": "a = 5.43114 Å, the cell it was drawn from",
+        "tier": "synthetic",
+        "provenance": "tests/_synthetic_silicon.py (issue #718's generator): "
+                      "Cu Kα₁ + Kα₂, Poisson noise, seed 1, "
+                      "a background falling from ~2300 to ~800 counts over "
+                      "11–22°.",
+        "why": "Silicon has no line below 28.4°, so every line the picker "
+               "finds on the flank is false. Before #741 three of them were "
+               "usable at I/σ_I 0.33–0.38, and the cubic cell was lost.",
+    },
 }
 
 #: One entry per *run*. ``specimen`` keys into :data:`SPECIMENS` for the identity;
@@ -289,6 +303,15 @@ DATASETS: dict[str, dict[str, str]] = {
         "asserts": "12 candidates, nothing promoted, and the abstention is stable "
                    "across three budgets.",
     },
+    "silicon_steep_peaks": {
+        "specimen": "silicon_steep", "step": "The picked line list, before any search",
+        "asserts": "no usable line below 28°: each flank component is "
+                   "reported, flagged no_intensity (I under 1σ of its esd).",
+    },
+    "silicon_steep": {
+        "specimen": "silicon_steep", "step": "Indexed with the quick preset",
+        "asserts": "cubic F a = 5.431 Å ranked first.",
+    },
     "bethanechol": {
         "specimen": "bethanechol",
         "step": "The ten published peak sets, checked against the published cell",
@@ -334,6 +357,7 @@ TRUTHS: dict[str, tuple[tuple[float, ...], str, float]] = {
     "brucite": ((3.142, 3.142, 4.766, 90.0, 90.0, 120.0), "P", 3.0e-3),
     "magnetite": ((8.3941,) * 3 + (90.0, 90.0, 90.0), "F", 1.0e-3),
     "fluorite": ((5.4631,) * 3 + (90.0, 90.0, 90.0), "F", 1.0e-3),
+    "silicon_steep": ((5.43114,) * 3 + (90.0, 90.0, 90.0), "F", 2.0e-4),
 }
 #: Absolute tolerance (degrees) on the conventional cell's angles.  They are
 #: symmetry-fixed on every dataset here, so this only has to reject a different
@@ -745,25 +769,28 @@ def draw_benchmark_sets(stem: str, sets: dict, predicted: dict, *,
 # ----------------------------------------------------------------------
 #: The order datasets appear on the page.  Certified anchors first, then the
 #: consistency-tier minerals, then the rows whose claim is an abstention, then
-#: the published benchmark — which is the order of how much a reader may
+#: the published benchmark, then the synthetic rows, whose truth is exact but
+#: whose pattern no instrument measured — which is the order of how much a reader may
 #: conclude from each, not the order the suite happens to run them in.
 PAGE_ORDER = ("lab6_peaks", "lab6", "lab6_calibrated", "corundum_peaks",
               "corundum", "corundum_shift", "nac",
               "fap", "zincite", "zircon", "brucite", "magnetite",
-              "cpd1a", "fluorite", "hl2", "bethanechol")
+              "cpd1a", "fluorite", "hl2", "bethanechol",
+              "silicon_steep_peaks", "silicon_steep")
 
 #: Specimen order on the page — by how much may be concluded from each, which is
 #: not the order the suite runs them in.
 SPECIMEN_ORDER = ("lab6", "corundum", "nac", "fap", "zincite", "zircon",
                   "brucite", "magnetite", "cpd1a", "fluorite", "hl2",
-                  "bethanechol")
+                  "bethanechol", "silicon_steep")
 
 #: The scoreboard's datasets, one row each — the **known-cell** ones plus
 #: fluorite, whose whole result is that it is refused before any engine starts.
 #: ``corundum_shift`` and ``lab6_calibrated`` are deliberately absent: they are
 #: the *second step* of a two-step protocol on a dataset already counted, and
 #: counting a dataset twice is how the pre-WP-1041 scoreboard came to name nine
-#: datasets under a total of eight.
+#: datasets under a total of eight.  ``silicon_steep`` has a known cell and is
+#: absent too: it is synthetic, and the scoreboard counts measured patterns.
 SCOREBOARD_STEMS = ("lab6", "corundum", "nac", "fap", "zincite", "zircon",
                     "brucite", "magnetite", "fluorite")
 

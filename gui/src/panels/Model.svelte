@@ -36,6 +36,7 @@
    */
   import { ApiError, api } from "../api";
   import Help from "../Help.svelte";
+  import HeldMark from "../HeldMark.svelte";
   import {
     applyFields,
     atomRows,
@@ -48,6 +49,7 @@
     newAtom,
     phaseFields,
     positionEdits,
+    registerEcho,
     splitEdits,
     structureFields,
     xyzText,
@@ -71,7 +73,6 @@
     editState,
     formatEsd,
     formatValue,
-    heldGlyph,
     normalize,
     varyEdit,
     varyEditFor,
@@ -88,6 +89,7 @@
 
   let {
     project = null,
+    opens = 0,
     capabilities = null,
     head = null,
     busy = false,
@@ -100,6 +102,9 @@
     onmoved = () => {},
   }: {
     project?: any;
+    /** the shell's count of projects opened, which tells two projects apart
+     *  where `head` cannot (WP-2242) */
+    opens?: number;
     capabilities?: any;
     head?: string | null;
     busy?: boolean;
@@ -333,13 +338,12 @@
    *  `projectKey`, not `project`: a `ui`-only PATCH (a theme, a pane width)
    *  replaces the project *object* without moving the head, and reading the
    *  object here made every such write reload three routes and refetch the 3D
-   *  geometry (WP-1029 q).  The *path* rather than a boolean, because the head
-   *  cannot tell two projects apart — node ids are sequential (`n0000`), so
-   *  two fresh projects share a head — and a switch must reload even when the
-   *  heads collide.  (Today `App.opened()` also forces `mode = "panes"`, so a
-   *  switch re-enters through `active` anyway; the key means this effect stays
-   *  correct the day that side effect changes.) */
-  const projectKey = $derived(project?.path ?? null);
+   *  geometry (WP-1029 q).  The shell's `opens` rather than a boolean, because
+   *  the head cannot tell two projects apart — node ids are sequential
+   *  (`n0000`), so two fresh projects share a head — and a switch must reload
+   *  even when the heads collide.  Not the path, which a reset example keeps
+   *  and a File-menu rename moves (WP-2242). */
+  const projectKey = $derived(project ? opens : null);
   $effect(() => {
     void head;
     if (projectKey !== null && active) load();
@@ -366,6 +370,9 @@
       const [s, i, p] = await Promise.all([api.structure(), api.instrument(),
                                            api.params()]);
       structure = s.structure;
+      // a phase removed since, or another project's index: the form reads
+      // `structure.phases[phase]` unguarded
+      if (phase >= (structure?.phases?.length ?? 0)) phase = 0;
       sites = s.sites ?? [];
       symmetry = s.symmetry ?? [];
       causes = s.causes ?? {};
@@ -449,6 +456,11 @@
     structure = null;
     instrument = null;
     rows = [];
+    // the chosen phase and the open ADP rows are this project's too: an index
+    // past the next project's last phase reads `structure.phases[phase]` as
+    // undefined (WP-2242)
+    phase = 0;
+    openAdp = new Set();
     symbolDraft = null;
     symPreview = null;
     symError = "";
@@ -520,9 +532,9 @@
       }
       if (insDelta?.fields.length) {
         const fresh = (await api.instrument()).instrument;
-        await api.patchInstrument(applyFields(fresh, insDelta.fields, edits),
-                                  "instrument edited");
-        say("ref.edit(instrument=…)");
+        const answer = await api.patchInstrument(applyFields(fresh, insDelta.fields, edits),
+                                                 "instrument edited");
+        for (const line of registerEcho(answer, "ref.edit(instrument=…)")) say(line);
         moves.push(`${insDelta.fields.length} instrument field(s)`);
       }
       revert();
@@ -657,17 +669,20 @@
     }
   }
 
-  /** The Chebyshev term count is a *shape* change, so it is not a Field. */
+  /** The Chebyshev term count is a *shape* change, so it is not a Field. An
+   *  added term is built free, as `BackgroundChebyshev.with_terms` builds one;
+   *  the server releases the holds on the terms a cut removes and frees the
+   *  ones an extension adds (`GuiSession.instrument_patch`, WP-2229). */
   async function setBackgroundTerms(n: number) {
     const next = clone(instrument);
     const current = next.background.coefficients as any[];
     if (n === current.length || n < 1) return;
     next.background.coefficients = n < current.length
       ? current.slice(0, n)
-      : [...current, ...Array.from({ length: n - current.length }, () => ({ value: 0 }))];
+      : [...current, ...Array.from({ length: n - current.length }, () => ({ value: 0, vary: true }))];
     try {
-      await api.patchInstrument(next, `background: ${n} terms`);
-      say(`instrument.background = BackgroundChebyshev.with_terms(${n})`);
+      const answer = await api.patchInstrument(next, `background: ${n} terms`);
+      for (const line of registerEcho(answer, `instrument.background = BackgroundChebyshev.with_terms(${n})`)) say(line);
       error = "";
       onmoved();
       await load();
@@ -687,8 +702,11 @@
         await api.patchStructure({ upload: preview.upload }, `structure from ${file.name}`);
         say(`ref.edit(structure=structure_from_cif("${file.name}"))`);
       } else {
-        await api.patchInstrument({ upload: preview.upload }, `instrument from ${file.name}`);
-        say(`ref.edit(instrument=load_instrument_profile("${file.name}"))`);
+        const answer = await api.patchInstrument({ upload: preview.upload },
+                                                 `instrument from ${file.name}`);
+        for (const line of registerEcho(answer, `ref.edit(instrument=load_instrument_profile("${file.name}"))`)) {
+          say(line);
+        }
       }
       error = "";
       onmoved();
@@ -775,7 +793,7 @@
         onchange={(e) =>
           toggleVary(row, (e.currentTarget as HTMLInputElement).checked)} />
     {:else if row}
-      <span class="vary muted" data-vary={path} title={why(path)}>{heldGlyph(row)}</span>
+      <span class="vary muted" data-vary={path} title={why(path)}><HeldMark {row} /></span>
     {/if}
   {/snippet}
 
@@ -1126,7 +1144,7 @@
                            draws for every other flag in this row -->
                       <span class="vary muted" data-vary={glob}
                         title={why(row.dofs[0].path)}
-                        >{heldGlyph(row.dofs[0])}</span>
+                        ><HeldMark row={row.dofs[0]} /></span>
                     {/if}
                   {:else}
                     {@render varyBox(`${row.base}.x`)}
