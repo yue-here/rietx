@@ -1,6 +1,6 @@
 # WP-2036 — main is green on every nightly leg: a full suite that finishes, two Windows tooling tests, and answers that move with the platform
 
-Milestone: unscheduled · Status: 🔄 2026-11-21 — the alarm pin leaves out the findings rounding decides and the Le Bail wander row declares its closing stage (PR #1756); waits on a green nightly
+Milestone: unscheduled · Status: 🔄 2026-11-23 — claimed by ghostshift (runner): the comparison standards' closing stage
 Track: The repo's own process
 Depends on: 2045 (the `full` job cannot finish before it); 2048, 2049 and 2050 (three slow rows red by rounding until each lands); 2002 soft, the closing stage that moved most of these; 2012 soft, the LaB6 axial mirror
 Priority: P2 2026-11-05 — was P3: the `full` job is red on main again, on one pin WP-1944 moved (issue #1424), and the repin is small
