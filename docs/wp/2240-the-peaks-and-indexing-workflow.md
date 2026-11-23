@@ -1,6 +1,6 @@
 # WP-2240 — the peaks-and-indexing workflow at `/next`: pick peaks, fit peaks, index, judge
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-23 — tasks 1-4 in PR #1788 (merged), task 5 in PR #1791; tasks 6-9 left
+Milestone: gui-overhaul · Status: 🔄 2026-11-23 — tasks 1-5 merged (#1788, #1791); tasks 6-9 claimed by a ghostshift runner
 Depends on: 2218 (hand fitting and the other graphs)
 Priority: P2 2026-11-22 — a feature the open milestone was opened for: R6, the rebuild's next piece
 
