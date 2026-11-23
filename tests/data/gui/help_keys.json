@@ -491,6 +491,7 @@
   "result_fields:RefinementResult.y_obs",
   "result_fields:SeriesEntry.diagnostics",
   "result_fields:SeriesEntry.floored",
+  "result_fields:SeriesEntry.held_values",
   "result_fields:SeriesEntry.index",
   "result_fields:SeriesEntry.label",
   "result_fields:SeriesEntry.magnetic",
