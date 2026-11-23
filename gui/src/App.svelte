@@ -509,15 +509,21 @@
   }
 
   async function loadResult() {
+    const read = await readResult();
+    result = read.result;
+    resultError = read.error;
+    if (read.result) plotKey += 1; // the curves moved: tell the plot to fetch them again
+  }
+
+  /** The last fit, read but not yet published (`readPeaks`' reason). */
+  async function readResult(): Promise<{ result: any; error: string }> {
     try {
-      result = (await api.result()).result;
-      resultError = "";
-      plotKey += 1; // the curves moved: tell the plot to fetch them again
+      return { result: (await api.result()).result, error: "" };
     } catch (error) {
-      result = null;
       // NO_RESULT is an empty state, not a failure: a fresh project has no
       // curves, and a `checkout` throws the last fit's away on purpose.
-      resultError = error instanceof ApiError && error.empty ? "" : (error as Error).message;
+      return { result: null,
+               error: error instanceof ApiError && error.empty ? "" : (error as Error).message };
     }
   }
 
@@ -531,7 +537,6 @@
     await adopt(doc);
     say(`# project: ${doc.path}`);
     run = await api.runState();
-    await loadOpened();
     await offerRecovery();
   }
 
@@ -539,14 +544,22 @@
    *  (WP-2242). The panels keyed on `opens` start over by themselves; this
    *  resets what the shell holds for the project beside them. What it leaves
    *  is the session's on purpose: the theme, the layout, the Plot's view
-   *  knobs (it stays mounted for them, and `loadOpened` asks it to redraw),
-   *  the Console. */
+   *  knobs (it stays mounted for them, and is asked to redraw), the Console. */
   async function adopt(doc: any) {
     // after the edits are kept, so a pending value is saved for the project
     // it was typed in before its panel goes
     await leaveEdits();
+    // the next project's fit and peak list are read before anything is
+    // published, so the keyed panels mount on them in the same flush: none
+    // offers the last project's diagnostics, and the plot fetches once
+    const [read, peaks] = await Promise.all([readResult(), readPeaks()]);
     project = doc;
     opens += 1;
+    result = read.result;
+    resultError = read.error;
+    peaksData = peaks;
+    // the curves are another project's, fit or no fit
+    plotKey += 1;
     readUi();
     openError = "";
     startOpen = false;
@@ -565,9 +578,6 @@
     zoom = null;
     hoveredPeak = null;
     baseCurves = null;
-    // the peak list is the project's (`peaks.json`): `loadOpened` reads the
-    // next one, and the plot draws none of this one's meanwhile
-    peaksData = null;
     // its undo is a node id, and node ids repeat across projects, so another
     // project's would check out an unrelated node in this one's tree
     applied = null;
@@ -578,15 +588,6 @@
     previewAnswer = null;
     previewError = "";
     planPending = false;
-  }
-
-  /** The open's reads, once `adopt` has settled the panels. */
-  async function loadOpened() {
-    await loadResult();
-    // no fit on either side moves neither `result` nor `plotKey`, and the
-    // observed pattern is another project's: ask for it again
-    if (!result) plotKey += 1;
-    await loadPeaks();
   }
 
   /** Open another project **in place of** this one (WP-1034).
@@ -603,7 +604,6 @@
     await recoveryWriter.flush();
     try {
       await adopt(await api.openProject(path));
-      await loadOpened();
       say(`project.open(${path})`);
       await offerRecovery();
       return "";

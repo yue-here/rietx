@@ -340,13 +340,19 @@
   }
 
   async function loadResult() {
+    result = await readResult();
+    plotKey += 1;
+  }
+
+  /** The last fit, read but not yet published, so an open can publish it with
+   *  the project it belongs to. */
+  async function readResult(): Promise<any> {
     try {
-      result = (await api.result()).result;
+      return (await api.result()).result;
     } catch {
       // no fit yet is an empty state; the graph says what it can draw
-      result = null;
+      return null;
     }
-    plotKey += 1;
   }
 
   /**
@@ -421,6 +427,9 @@
     // after the edits are kept, so a pending value is saved for the project
     // it was typed in before its panel goes
     await leaveEdits();
+    // the next project's fit is read before anything is published, so the
+    // keyed graphs mount on it in the same flush and fetch their curves once
+    const fit = await readResult();
     // the script is this project's session: another project's calls are not
     calls = [];
     // the peak list is the project's (`peaks.json`): another project's rows,
@@ -446,9 +455,11 @@
     textWhy = "";
     project = doc;
     opens += 1;
+    result = fit;
+    plotKey += 1;
     openError = "";
     newOpen = false;
-    const [, free] = await Promise.all([loadResult(), freeCount()]);
+    const free = await freeCount();
     sayPreamble(free);
     await offerRecovery();
   }

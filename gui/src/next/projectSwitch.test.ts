@@ -137,7 +137,10 @@ describe("another project opened in the same window (WP-2242)", () => {
     expect(calls.some((c) => c.path === "/api/project/open")).toBe(true);
     await tour();
     const second = reads(mark);
-    const short = [...first].filter(([path, n]) => (second.get(path) ?? 0) < n)
+    // the curves are owed once, not as often: the first load asks for them on
+    // mount and again when the fit lands, an open in one flush (the test below)
+    const owed = (path: string, n: number) => (path === "/api/result/curves" ? 1 : n);
+    const short = [...first].filter(([path, n]) => (second.get(path) ?? 0) < owed(path, n))
       .map(([path, n]) => `${path} ${second.get(path) ?? 0} of ${n}`);
     expect(short).toEqual([]);
   });
@@ -158,5 +161,8 @@ describe("another project opened in the same window (WP-2242)", () => {
     const after = reads(mark);
     const missed = [...before.keys()].filter((path) => !after.has(path));
     expect(missed).toEqual([]);
+    // the fit is read before the project is published, so the Pattern graph
+    // mounts once on the next project's and asks for its curves once
+    expect(after.get("/api/result/curves")).toBe(1);
   });
 });
