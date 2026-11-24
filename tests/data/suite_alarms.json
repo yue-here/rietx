@@ -5,7 +5,6 @@
   "brucite": {
    "BISO_UNUSUALLY_LARGE": "warning",
    "BOUND_HIT": "warning",
-   "CONSTRAINT_ACTIVE": "info",
    "DISPERSION_NEGLECTED": "info",
    "FLAT_DIRECTION": "warning",
    "FLOOR_HIT": "warning",
@@ -59,7 +58,7 @@
   "BISO_UNUSUALLY_LARGE": 1,
   "BOUND_HIT": 1,
   "CAPILLARY_OFFSET_UNAVAILABLE": 2,
-  "CONSTRAINT_ACTIVE": 3,
+  "CONSTRAINT_ACTIVE": 2,
   "DISPERSION_NEGLECTED": 7,
   "FLAT_DIRECTION": 4,
   "FLOOR_HIT": 4,

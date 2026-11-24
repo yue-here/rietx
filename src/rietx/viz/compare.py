@@ -34,8 +34,10 @@ variant can win panel 3 and still be inadmissible (`STEPHENS_STRAIN_NOT_POSITIVE
 The standards mirror the acceptance suites' protocols exactly — same phases,
 same instrument, same staged plan — because a comparison run under a different
 protocol is not comparable to the recorded acceptance numbers.
-``tests/test_compare_ui.py`` asserts that equality field by field, so the two
-cannot drift.
+``tests/test_compare_ui.py`` asserts that equality field by field, the plan's
+own fields included, so the two cannot drift.  Each plan therefore declares the
+suites' closing stage, ``closing_window_tol = CLOSING_WINDOW_TOL``, which the
+package default leaves off since WP-2222 (WP-2036).
 
 Datasets live in ``tests/data`` and are **not** shipped in the wheel; every
 standard self-skips when its files are absent, exactly as the acceptance tests
@@ -67,6 +69,7 @@ from ..schemas.instrument import (
     RoughnessSuortti,
     Source,
 )
+from ..schemas.plan import CLOSING_WINDOW_TOL
 from ..schemas.structure import (
     Parameter,
     Phase,
@@ -185,7 +188,7 @@ def qpa_plan(*, texture: bool = False) -> RefinementPlan:
         # either orientation model's block; each glob matches only a declared one
         stages.append(Stage("po", ["phases.*.preferred_orientation.r",
                                    "phases.*.texture.*"]))
-    return RefinementPlan(stages=stages)
+    return RefinementPlan(stages=stages, closing_window_tol=CLOSING_WINDOW_TOL)
 
 
 def _seed_scales(structure: Structure, ins: Instrument, data) -> None:
@@ -286,7 +289,7 @@ def _build_srm660c(data_dir: Path) -> StandardInputs:
         Stage("lines_axial", ["instrument.source.lines.*.weight",
                               "instrument.geometry.axial_sl"]),
         Stage("biso", ["phases.*.atoms.*.biso"]),
-    ])
+    ], closing_window_tol=CLOSING_WINDOW_TOL)
     return StandardInputs(data=data, structure=structure, instrument=ins, plan=plan)
 
 
@@ -377,6 +380,7 @@ def _build_fap(data_dir: Path) -> StandardInputs:
         Stage("biso", ["phases.*.atoms.*.biso"]),
     ])
     plan.intermediate_ftol = 1e-6
+    plan.closing_window_tol = CLOSING_WINDOW_TOL
     return StandardInputs(data=data, structure=structure, instrument=ins,
                           plan=plan)
 
@@ -429,6 +433,7 @@ def _build_nac(data_dir: Path) -> StandardInputs:
     ins.background = BackgroundChebyshev.with_terms(6)
     plan = RefinementPlan.mccusker_default()
     plan.stages.append(Stage("biso", ["phases.*.atoms.*.biso"]))
+    plan.closing_window_tol = CLOSING_WINDOW_TOL
     return StandardInputs(data=data, structure=structure, instrument=ins,
                           plan=plan, two_theta_limits=(2.0, 24.0))
 
@@ -460,6 +465,7 @@ def _build_lab6_capillary(data_dir: Path) -> StandardInputs:
     ins.background = BackgroundChebyshev.with_terms(8)
     plan = RefinementPlan.mccusker_default()
     plan.stages.append(Stage("biso", ["phases.*.atoms.*.biso"]))
+    plan.closing_window_tol = CLOSING_WINDOW_TOL
     return StandardInputs(data=data, structure=structure, instrument=ins,
                           plan=plan, two_theta_limits=(2.0, 60.0))
 

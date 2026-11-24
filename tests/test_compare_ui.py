@@ -31,6 +31,7 @@ from rietx.schemas.instrument import (
     BackgroundChebyshev,
     BackgroundFixedPlusChebyshev,
 )
+from rietx.schemas.plan import CLOSING_WINDOW_TOL, PlanSpec
 from rietx.viz import compare as cmp
 from rietx.viz import theme
 
@@ -55,6 +56,25 @@ def _dump(model) -> dict:
     return json.loads(model.model_dump_json())
 
 
+def _plan_dump(plan) -> dict:
+    """Every field of a plan, its own and each stage's.
+
+    Comparing the stage lists alone missed the plan's own fields: after
+    WP-2222 turned the closing stage off by default, every standard ran
+    without it while each suite declared it (WP-2036)."""
+    return _dump(PlanSpec.from_plan(plan))
+
+
+def test_every_standard_declares_the_suites_closing_stage():
+    """``nac`` too, which has no builder to compare against: its suite,
+    ``tests/test_acceptance_nac``, declares the same closing stage."""
+    for standard in cmp.STANDARDS:
+        if not standard.available(DATA_DIR):
+            continue
+        plan = standard.build(DATA_DIR).plan
+        assert plan.closing_window_tol == CLOSING_WINDOW_TOL, standard.key
+
+
 @pytest.mark.parametrize("key, phase_fn", [
     ("corundum", corundum_phase),
     ("zincite", zincite_phase),
@@ -74,10 +94,7 @@ def test_qarr_standards_match_the_acceptance_builders(key, phase_fn):
     assert got == want
 
     assert _dump(inputs.instrument) == _dump(qarr_instrument())
-    assert [(s.name, list(s.turn_on), s.seed, s.strain_seed)
-            for s in inputs.plan.stages] == \
-           [(s.name, list(s.turn_on), s.seed, s.strain_seed)
-            for s in qpa_plan().stages]
+    assert _plan_dump(inputs.plan) == _plan_dump(qpa_plan())
 
 
 def test_srm660c_standard_matches_the_acceptance_builder():
@@ -90,10 +107,7 @@ def test_srm660c_standard_matches_the_acceptance_builder():
     assert _dump(inputs.structure) == _dump(structure)
     assert _dump(inputs.instrument) == _dump(instrument)
     assert np.allclose(inputs.data.two_theta, data.two_theta)
-    assert [(s.name, list(s.turn_on), s.seed, s.strain_seed)
-            for s in inputs.plan.stages] == \
-           [(s.name, list(s.turn_on), s.seed, s.strain_seed)
-            for s in _nist_calibrated_plan().stages]
+    assert _plan_dump(inputs.plan) == _plan_dump(_nist_calibrated_plan())
     # the calibrated-goniometer plan: zero_shift must never be freed
     freed = {g for s in inputs.plan.stages for g in s.turn_on}
     assert "instrument.zero_shift" not in freed
@@ -142,8 +156,7 @@ def test_lab6_capillary_standard_matches_the_acceptance_builder():
         got["geometry"][field] = want["geometry"][field] = None
     assert got == want
     assert inputs.two_theta_limits == LIMITS
-    assert [(s.name, list(s.turn_on)) for s in inputs.plan.stages] == \
-           [(s.name, list(s.turn_on)) for s in _plan().stages]
+    assert _plan_dump(inputs.plan) == _plan_dump(_plan())
 
 
 def test_fap_standard_matches_the_acceptance_builder():
@@ -166,9 +179,7 @@ def test_fap_standard_matches_the_acceptance_builder():
     assert inputs.data.excluded_regions == data.excluded_regions
     assert np.array_equal(inputs.data.intensity, data.intensity)
     assert inputs.two_theta_limits is None
-    assert [(s.name, list(s.turn_on)) for s in inputs.plan.stages] == \
-           [(s.name, list(s.turn_on)) for s in _gsas_protocol_plan().stages]
-    assert inputs.plan.intermediate_ftol == _gsas_protocol_plan().intermediate_ftol
+    assert _plan_dump(inputs.plan) == _plan_dump(_gsas_protocol_plan())
 
 
 def test_every_standard_declares_which_of_its_files_is_the_measurement():
