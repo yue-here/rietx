@@ -236,7 +236,13 @@ the prototype's (WP-2214 § How the maintainer reviews).
   reading every file took 930 ms before the cache; the grid 17 ms; the payload 1.2 MB.
   vitest 1040 passed in 68 files, two new (`seriesmap.test.ts`, `MapGraph.svelte.test.ts`).
   svelte-check 0 errors. Server tests: three new in `tests/test_gui_server.py`. Browser, local
-  only: BROWSER_COUNTS. Fast suite (`serial.py`): FAST_COUNTS. Lint as CI runs it: ruff, ruff
+  only: the seven `tests/test_gui_*_browser.py` files 70 passed, serially. Fast suite
+  (`serial.py`, playwright in the venv): 15911 passed, 440 skipped, 30 xfailed, 1 failed; the
+  four added tests cost 11.5 s, 11.3 of it the browser case. The failure is task 2's
+  `test_a_series_is_loaded_sorted_walked_and_run`, under `-n auto` only: Sort by index stayed
+  disabled, so the server never held the typed coordinates. It passed alone and in the serial
+  browser run. It is the coordinate race under Gotchas, and the test waits on the input's
+  value rather than the server's. Lint as CI runs it: ruff, ruff
   format on the tutorials, Vale (0 errors), skill caps, skill surface, audit delta, code
   references, rulebook limits, all clean. Reader output unchanged. Screenshots of the Map,
   Observed, Difference and Waterfall, light and dark, looked at in the runner's scratch.
