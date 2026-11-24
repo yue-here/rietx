@@ -1291,7 +1291,23 @@ def low_angle_asymmetry_findings(model, values, y_calc=None, *,
     suggestion branch three ways on the axial apertures — held at 0 (nothing
     was set), **refined in this fit** (then on these lines, since nothing
     below them is nuclear-only; "refined to 0" where one ended on its bound),
-    or set and held (from somewhere this finding cannot see).
+    or set and held (from somewhere this finding cannot see).  Each
+    suggestion carries the same test: one tied S/L = H/L, judged on the lowest
+    line's drawn and observed FWHM, pseudo-Voigt η and position, adopted where
+    the three agree and otherwise kept out with the shift quoted as a
+    systematic on the moment.
+
+    **One level, ``warning``, in every state in which it fires**: the reader
+    owes that comparison before quoting the moment, whatever the apertures'
+    state, and a level that followed the state would be one code at two
+    levels (``tests/test_audit_table.py``; ``docs/milestones/generality.md``
+    § The rule, clause 2).  ``where`` names the axial apertures and the
+    moment of every site of the phases whose magnetic-only lines are listed,
+    since the moment is the number the shift lands on: with the apertures
+    alone, :func:`~rietx.schemas.results.level_under` would read it ``info``
+    under ``deliverable="magnetic"``, whose result numbers name no aperture.
+    A line-shape check that passes out of sample would stop the finding
+    firing; it would not lower its level.
     """
     out: list[Diagnostic] = []
     if getattr(model, "phases", None) is None or getattr(model, "tt", None) is None:
@@ -1362,22 +1378,26 @@ def low_angle_asymmetry_findings(model, values, y_calc=None, *,
             "The axial asymmetry was refined in this fit, and the lowest "
             "lines it was fitted on, where it is largest, are the "
             "magnetic-only lines listed, whose shape also carries the "
-            "moment's form factor and any magnetic broadening. Hold it at "
-            "values from a standard measured on this instrument at this "
-            "wavelength, in the same container and fill, and compare the "
-            "lowest line's drawn and observed shape under them before "
-            "quoting the moment; if the refined values stand, quote the "
-            "shift above as a systematic on the moment.")
+            "moment's form factor and any magnetic broadening. Before "
+            "quoting the moment, refine it as one tied S/L = H/L and "
+            "compare the lowest line's drawn and observed FWHM, "
+            "pseudo-Voigt eta and position: adopt the refined value where "
+            "all three agree; otherwise hold the value you started from and "
+            "quote the shift above as a systematic on the moment. Judge by "
+            "the line's shape, not by Rwp.")
     elif sl == 0.0 and hl == 0.0:
         # the name says what the geometry denies, not what the reader did:
         # with the apertures held at 0 nothing was set
         message += " The axial apertures are held at 0."
         suggestion = (
             "Take the axial asymmetry from a standard measured on this "
-            "instrument at this wavelength, in the same container and fill. "
-            "Whatever the source, a standard, an instrument file or a value "
-            "refined on these magnetic lines, compare the lowest line's "
-            "drawn and observed shape under it before quoting the moment.")
+            "instrument at this wavelength, in the same container and fill, "
+            "or refine it here as one tied S/L = H/L. Whatever the source, "
+            "before quoting the moment compare the lowest line's drawn and "
+            "observed FWHM, pseudo-Voigt eta and position under it: adopt "
+            "the value where all three agree; otherwise keep it out and "
+            "quote the shift above as a systematic on the moment. Judge by "
+            "the line's shape, not by Rwp.")
     else:
         # set and held: something was set, and this fit cannot tell from
         # where, so the advice is to check it on the lowest line
@@ -1386,14 +1406,22 @@ def low_angle_asymmetry_findings(model, values, y_calc=None, *,
             "The axial apertures are held nonzero, so an asymmetry is "
             "already drawn; this finding cannot tell whether it came from a "
             "standard, an instrument file or an earlier fit on these "
-            "magnetic lines. Only a standard measured on this instrument at "
-            "this wavelength, in the same container and fill, checks it. "
-            "Compare the lowest line's drawn and observed shape under it "
-            "before quoting the moment, and quote the shift above as a "
-            "systematic on the moment if it stays.")
+            "magnetic lines. Before quoting the moment, refine one tied "
+            "S/L = H/L and compare the lowest line's drawn and observed "
+            "FWHM, pseudo-Voigt eta and position: adopt it where all three "
+            "agree; otherwise keep the held values and quote the shift "
+            "above as a systematic on the moment. Judge by the line's "
+            "shape, not by Rwp.")
+    # the moment is the number the shift lands on, so ``where`` names it:
+    # every moment-carrying site of the phases whose magnetic-only lines are
+    # listed (the apertures alone read ``info`` under the magnetic purpose)
+    moments = [f"phases.{ip}.atoms.{j}.moment" for ip in phases
+               for j in range(model.phases[ip].sites.n_asym)
+               if model.phases[ip].magnetic is not None
+               and model.phases[ip].magnetic.n_dofs(j) > 0]
     out.append(Diagnostic(
-        level="info", code="LOW_ANGLE_ASYMMETRY_UNCALIBRATED",
-        where=["instrument.geometry.axial_sl", "instrument.geometry.axial_hl"],
+        level="warning", code="LOW_ANGLE_ASYMMETRY_UNCALIBRATED",
+        where=[*paths, *moments],
         value=float(low[0][4]),
         message=message,
         suggestion=suggestion,

@@ -1707,14 +1707,16 @@ ROWS: tuple[Row, ...] = (
                   "covers the reported numbers; the firing rests on four constants "
                   "unaudited on main (MAGNETIC_WIDTH_PURITY, MIN_COEF_SIGNIFICANCE, "
                   "VALIDITY_RADIUS_FWHM, MAGNETIC_WIDTH_TAIL_FWHM), so the row follows "
-                  "their pending tier"),
+                  "their pending tier. One level in every state it fires in; where names "
+                  "the moment of each site of the phases whose lines are listed, so "
+                  "level_under reads warning under the magnetic purpose (ruled on #1493)"),
         grounds=("Rule 1's third kind: a number with its meaning. The same geometry needs "
                  "opposite treatment on the two measured samples (issue #1090), so the "
                  "finding decides nothing."),
-        response="info",
-        responds=("note that the asymmetry at low angle rests on magnetic lines alone, and "
-                  "decide its value from a standard or from the lowest line's shape before "
-                  "quoting the moment")),
+        response="warning",
+        responds=("before quoting the moment, compare the lowest line's drawn and observed "
+                  "FWHM, eta and position under the asymmetry used; where they disagree, "
+                  "quote the listed shift as a systematic on the moment")),
     Row("LOW_ANGLE_UNMODELLED", "code"),
     Row("MAGNETIC_ION_ASSUMED", "code", tier=1, ambiguity=3,
         evidence=("arithmetic: fires exactly when the substitution was made (info); the "
@@ -7516,8 +7518,11 @@ ROWS: tuple[Row, ...] = (
                   "container and fill, since S/L carries the specimen's axial length) is the "
                   "instrument-parameter workflow GSAS-II (.instprm) and FullProf (the "
                   "resolution file) run, and rietx's own lab_calibrate -> "
-                  "load_instrument_profile; the second sentence names the check, with no "
-                  "tolerance (WP-2056 ships the agreement test as a skill recipe)")),
+                  "load_instrument_profile. The check every branch names, one tied S/L = "
+                  "H/L judged on the lowest line's FWHM, eta and position with no "
+                  "tolerance, is the one measured on the two samples of issue #1090: "
+                  "LaMnO3 BT-1, where it matched the 11.5 deg line, and Ba2FeSbSe5 G4.1, "
+                  "where it drew a tail the 9.35 deg line lacks")),
     Row("LOW_ANGLE_UNMODELLED.suggestion", "suggestion", value=1),
     Row("MAGNETIC_ION_ASSUMED.suggestion", "suggestion", tier=1, ambiguity=3, value=2,
         evidence="arithmetic: names the argument that overrides the default"),

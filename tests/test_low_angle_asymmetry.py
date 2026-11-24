@@ -142,9 +142,12 @@ def test_an_asymmetry_the_model_lacks_shows_as_a_negative_shift_at_the_magnetic_
     assert pos == pytest.approx(8.9, abs=0.1) and frac == pytest.approx(1.0)
     assert shift < -3.0 * esd, (shift, esd)
     (d,) = _findings(res)
-    assert d.level == "info"
+    assert d.level == "warning"
     assert d.value == pytest.approx(shift)
-    assert d.where == ["instrument.geometry.axial_sl", "instrument.geometry.axial_hl"]
+    assert d.where[:2] == ["instrument.geometry.axial_sl", "instrument.geometry.axial_hl"]
+    moments = d.where[2:]
+    assert moments and all(w.startswith("phases.0.atoms.") and w.endswith(".moment")
+                           for w in moments), d.where
     assert "(0 0 1) " in d.message and "1 magnetic-only line of phase 0 does" in d.message
     assert "not determinable from this sample's nuclear lines" in d.message
     assert "held at 0" in d.message and "predicts" in d.message
@@ -170,9 +173,46 @@ def test_the_suggestion_follows_whether_an_asymmetry_is_already_drawn(arms):
     assert "held at S/L 0.03, H/L 0.03" in given.message
     assert not given.suggestion.startswith("Take the axial asymmetry")
     assert "already drawn" in given.suggestion
+    assert "Only a standard" not in given.suggestion
     # the numbers are the same finding's: with the asymmetry set, the lowest
     # line sits within three esds of the drawn one
     assert abs(given.value) < 3.0 * _lowest(arms["set"][0])[3]
+
+
+FIRING_ARMS = ("positive", "null", "set", "refined", "refined_to_zero",
+               "lebail_zero_moments", "pawley_zero_moments")
+
+
+def test_one_level_in_every_state_and_a_warning_under_the_magnetic_deliverable(arms):
+    """The ruling on #1493: one response, ``warning``, whatever the apertures'
+    state (held at 0, set and held, freed apart, tied, ended on the bound),
+    since a level that followed the state is one code at two levels, which
+    ``test_audit_table`` refuses.  The likeliest misuse is a fit with the
+    apertures held at a file's values (the ``set`` arm), quoted as a moment.
+    ``level_under`` must read the finding as a warning under the magnetic
+    deliverable, so ``where`` names the moments; the positive arm shows the
+    apertures alone would read ``info`` there."""
+    from rietx.schemas.results import level_under
+
+    for arm in FIRING_ARMS:
+        (d,) = _findings(arms[arm][1])
+        assert d.level == "warning", arm
+        assert level_under(d, "magnetic") == "warning", arm
+        apertures_only = d.model_copy(update={"where": d.where[:2]})
+        assert level_under(apertures_only, "magnetic") == "info", arm
+
+
+def test_every_suggestion_names_the_tied_lowest_line_test(arms):
+    """Each branch carries the one check measured on #1090's two samples: one
+    tied S/L = H/L, judged on the lowest line's FWHM, eta and position, adopted
+    where the three agree and otherwise quoted as a systematic on the moment.
+    Fails on the standard-only advice the branches gave before."""
+    for arm in FIRING_ARMS:
+        (d,) = _findings(arms[arm][1])
+        assert "one tied S/L = H/L" in d.suggestion, (arm, d.suggestion)
+        assert "FWHM, pseudo-Voigt eta and position" in d.suggestion, arm
+        assert "systematic on the moment" in d.suggestion, arm
+        assert "not by Rwp" in d.suggestion, arm
 
 
 def _derivative_error(arms, step):

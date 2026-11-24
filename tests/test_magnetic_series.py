@@ -1637,7 +1637,7 @@ def test_ba2fesbse5_the_report_names_the_low_angle_shift_the_protocol_holds(
     series = ba2fesbse5_ramp["series"]
     (d,) = [d for d in series.entries[0].diagnostics
             if d.code == "LOW_ANGLE_ASYMMETRY_UNCALIBRATED"]
-    assert d.level == "info"
+    assert d.level == "warning"
     assert -0.060 < d.value < -0.035, d.value
     assert "lies below 21.67 deg, where 3 magnetic-only lines of phase 0 do" in d.message
     assert "at 9.38 deg (1 0 1)/(1 0 0)" in d.message
