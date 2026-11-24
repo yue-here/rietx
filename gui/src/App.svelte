@@ -16,7 +16,7 @@
    * `ProjectDoc.ui`, whose keys the frontend owns (WP-1005): it is a property of
    * the project a user comes back to, not of this browser tab.
    */
-  import { onMount, setContext, untrack } from "svelte";
+  import { onMount, untrack } from "svelte";
 
   import { ApiError, api } from "./api";
   import Help from "./Help.svelte";
@@ -41,15 +41,11 @@
   import Start from "./panels/Start.svelte";
   import FileMenu from "./panels/FileMenu.svelte";
   import Recovery from "./panels/Recovery.svelte";
-  import { RecoveryWriter, combine, readDraft, type Draft } from "./lib/recovery";
+  import { RecoveryWriter, combine, readDraft, restoredText, type Draft } from "./lib/recovery";
   import Stubs from "./panels/Stubs.svelte";
   import Text from "./panels/Text.svelte";
-  import {
-    HELP_CONTEXT,
-    type HelpOpener,
-    type HelpRequest,
-  } from "./lib/helpContext";
-  import { manualUrl, place, resolve, splitKey, type HelpCorpus } from "./lib/help";
+  import HelpPopover, { provideHelp } from "./HelpPopover.svelte";
+  import type { HelpCorpus } from "./lib/help";
   import { isShortcutTarget, type Command } from "./lib/palette";
   import { cellText, type PeaksPayload } from "./lib/peaks";
   import { consoleLine, follow, type EngineEvent, type RunState } from "./lib/stream";
@@ -160,21 +156,26 @@
    *  it every change: the panels' `draft()` read their pending maps, so a
    *  retyped value is a change even where the count stays the same.  A
    *  switch of project disarms it first, so the panels' emptied maps never
-   *  overwrite the copy of the project just left. */
+   *  overwrite the copy of the project just left.  The Text buffer and the
+   *  Model forms join the copy uncounted, keeping their own Apply (WP-2213). */
   const recoveryWriter = new RecoveryWriter(
     (path, at, draft) => api.putRecovery(path, at, draft));
   let offer = $state.raw<{ path: string; draft: Draft; savedUtc: string | null;
                            moved: boolean } | null>(null);
   $effect(() => {
     const path = project?.path ?? null;
-    const draft = combine(pendingTotal, paramsPanel?.draft() ?? null,
-                          interactivePanel?.draft() ?? null, planPanel?.draft() ?? null);
+    const draft = combine(pendingTotal, {
+      params: paramsPanel?.draft(), interactive: interactivePanel?.draft(),
+      plan: planPanel?.draft(), text: textPanel?.draft(), model: modelPanel?.draft() });
     const at = head;
     untrack(() => recoveryWriter.schedule(path, at, draft));
   });
-  /** Bumped by every project opened, so the Plan tab starts over: its unsaved
-   *  stages and its undo stack belong to the project they were made in, and
-   *  `{#if project}` stays true across an open. */
+  /** The open project's identity on this page, bumped by `adopt` and nowhere
+   *  else (WP-2242). `head` cannot tell two projects apart, since node ids
+   *  repeat across them (`n0000`, `n0001`, …), and `{#if project}` stays true
+   *  across an open. So every panel whose state is the project's sits inside
+   *  `{#key opens}` and starts over, and anything the shell keeps for a project
+   *  carries the count it was made under. */
   let opens = $state(0);
   let simple = $state(true);
   /** The first-run checklist's own two pieces of state (WP-1017): whether it
@@ -217,6 +218,7 @@
   let interactivePanel = $state<any>(null);
   let planPanel = $state<any>(null);
   let modelPanel = $state<any>(null);
+  let textPanel = $state<any>(null);
   let seriesPanel = $state<any>(null);
   /** a 2θ window the report panel asked the plot to show, or null for all of it */
   let zoom = $state<[number, number] | null>(null);
@@ -401,14 +403,17 @@
   }
 
   /** Leave the open project's pending edits behind as its recovery copy, and
-   *  clear them from the panels, which stay mounted across an open: without
-   *  this, one project's pending values were the next project's Apply. */
+   *  clear them from the panels. The keyed panels start over on an open
+   *  (`opens`, WP-2242), but `Model` stays mounted across one, and without
+   *  this its pending values were the next project's Apply. */
   async function leaveEdits() {
     await recoveryWriter.flush();
     recoveryWriter.disarm();
     offer = null;
     paramsPanel?.revert();
     interactivePanel?.revert();
+    modelPanel?.forget();
+    textPanel?.forget();
   }
 
   /** Offer the open project's kept edits, or start keeping new ones. */
@@ -440,9 +445,11 @@
     if (o.draft.params) paramsPanel?.restoreDraft(o.draft.params);
     if (o.draft.interactive) interactivePanel?.restoreDraft(o.draft.interactive);
     if (o.draft.plan) planPanel?.restoreDraft(o.draft.plan);
+    if (o.draft.model) modelPanel?.restoreDraft(o.draft.model);
+    if (o.draft.text) void textPanel?.restoreDraft(o.draft.text);
     // the server holds exactly this, so it is not written again until it changes
     recoveryWriter.arm(o.path, o.draft);
-    say(`# ${o.draft.count === 1 ? "1 unapplied edit" : `${o.draft.count} unapplied edits`} restored`);
+    say(restoredText(o.draft));
   }
 
   async function discardKept() {
@@ -498,15 +505,21 @@
   }
 
   async function loadResult() {
+    const read = await readResult();
+    result = read.result;
+    resultError = read.error;
+    if (read.result) plotKey += 1; // the curves moved: tell the plot to fetch them again
+  }
+
+  /** The last fit, read but not yet published (`readPeaks`' reason). */
+  async function readResult(): Promise<{ result: any; error: string }> {
     try {
-      result = (await api.result()).result;
-      resultError = "";
-      plotKey += 1; // the curves moved: tell the plot to fetch them again
+      return { result: (await api.result()).result, error: "" };
     } catch (error) {
-      result = null;
       // NO_RESULT is an empty state, not a failure: a fresh project has no
       // curves, and a `checkout` throws the last fit's away on purpose.
-      resultError = error instanceof ApiError && error.empty ? "" : (error as Error).message;
+      return { result: null,
+               error: error instanceof ApiError && error.empty ? "" : (error as Error).message };
     }
   }
 
@@ -517,9 +530,32 @@
    * the new project's root node supplies.
    */
   async function opened(doc: any) {
+    await adopt(doc);
+    say(`# project: ${doc.path}`);
+    run = await api.runState();
+    await offerRecovery();
+  }
+
+  /** Make `doc` the page's project: the one place every opener lands
+   *  (WP-2242). The panels keyed on `opens` start over by themselves; this
+   *  resets what the shell holds for the project beside them. What it leaves
+   *  is the session's on purpose: the theme, the layout, the Plot's view
+   *  knobs (it stays mounted for them, and is asked to redraw), the Console. */
+  async function adopt(doc: any) {
+    // after the edits are kept, so a pending value is saved for the project
+    // it was typed in before its panel goes
     await leaveEdits();
+    // the next project's fit and peak list are read before anything is
+    // published, so the keyed panels mount on them in the same flush: none
+    // offers the last project's diagnostics, and the plot fetches once
+    const [read, peaks] = await Promise.all([readResult(), readPeaks()]);
     project = doc;
     opens += 1;
+    result = read.result;
+    resultError = read.error;
+    peaksData = peaks;
+    // the curves are another project's, fit or no fit
+    plotKey += 1;
     readUi();
     openError = "";
     startOpen = false;
@@ -533,11 +569,21 @@
     indexAnswer = null;
     forgetCandidates();
     extinction = null;
-    say(`# project: ${doc.path}`);
-    run = await api.runState();
-    await loadResult();
-    await loadPeaks();
-    await offerRecovery();
+    indexSnapshots = [];
+    protocolError = "";
+    zoom = null;
+    hoveredPeak = null;
+    baseCurves = null;
+    // its undo is a node id, and node ids repeat across projects, so another
+    // project's would check out an unrelated node in this one's tree
+    applied = null;
+    // what the keyed panels hand up, which a fresh panel has not said yet
+    pendingTouched = 0;
+    pendingInvalid = "";
+    sliderTouched = 0;
+    previewAnswer = null;
+    previewError = "";
+    planPending = false;
   }
 
   /** Open another project **in place of** this one (WP-1034).
@@ -553,20 +599,7 @@
   async function open(path: string): Promise<string> {
     await recoveryWriter.flush();
     try {
-      const doc = await api.openProject(path);
-      await leaveEdits();
-      project = doc;
-      opens += 1;
-      readUi();
-      openError = "";
-      startOpen = false;
-      reportSeen = false;   // a different project — see `opened` (WP-1017)
-      tab = "params";
-      indexAnswer = null;
-      forgetCandidates();
-      extinction = null;
-      await loadResult();
-      await loadPeaks();
+      await adopt(await api.openProject(path));
       say(`project.open(${path})`);
       await offerRecovery();
       return "";
@@ -655,7 +688,9 @@
 
   async function start() {
     try {
-      run = await api.run({ kind: "fit" });
+      // in stages: this page has no view of a one-stage re-fit, which the
+      // rebuild at /next draws (WP-2227), so it keeps today's Refine until the swap
+      run = await api.run({ kind: "fit", refit: "stages" });
       say("ref.fit(data, plan=…)");
     } catch (error) {
       say(`refused: ${(error as Error).message}`);
@@ -1032,7 +1067,7 @@
     { id: "side", label: hideModel ? "Show the model panel" : "Hide the model panel",
       echo: "# a layout choice, not a setting", disabled: !project || hideGraphs,
       run: () => toggleSide("model") },
-    { id: "cycle", label: "Refine one cycle on the ticked parameters",
+    { id: "cycle", label: "Refine as ticked",
       echo: 'ref.run_stage(Stage("cycle", turn_on=[]))',
       disabled: busy || !project || noPhases || !!pendingInvalid,
       run: () => refine("cycle") },
@@ -1068,12 +1103,6 @@
       }
       return;
     }
-    // help first: Esc means "close the thing that just opened", and cancelling
-    // a run because a popover was open is not recoverable by pressing it again
-    if (event.key === "Escape" && helpRequest) {
-      closeHelp(true);
-      return;
-    }
     if (event.key === "Escape" && busy) {
       cancel();
       return;
@@ -1086,134 +1115,15 @@
     }
   }
 
-  /* ---- the help popover (WP-1203) -------------------------------------
-   *
-   * One instance for the whole app, anchored to whichever `<Help>` term was
-   * last activated.  One rather than one-per-term because two open
-   * explanations is a state nobody asked for, and because the popover has to
-   * escape every panel's `overflow: auto` — it is `position: fixed` in
-   * viewport coordinates, which is exactly what `getBoundingClientRect`
-   * returns and what `lib/help.ts:place` consumes.
-   *
-   * The size is *measured* rather than declared: the flip decision needs the
-   * rendered height, and a max-width in CSS plus a paragraph of prose is not a
-   * height anything here could compute.  The effect that measures runs after
-   * the DOM update and before the browser paints, so the correction is not a
-   * frame the eye can see; under jsdom every measurement is zero, which is why
-   * the arithmetic is tested in `lib/help.test.ts` and not here. */
-  let helpNode = $state<HTMLElement | null>(null);
-  let helpRequest = $state<HelpRequest | null>(null);
-  let helpAnchor = $state<DOMRect | null>(null);
-  let popoverEl = $state<HTMLElement | null>(null);
-  let popoverSize = $state({ width: 0, height: 0 });
-  let viewport = $state({ width: 1024, height: 768 });
-
-  const helpEntry = $derived(
-    helpRequest?.key ? resolve(corpus, helpRequest.key) : null);
-  const helpLink = $derived(manualUrl(corpus, helpEntry));
-  const helpTitle = $derived(
-    helpEntry?.title ?? helpRequest?.title ?? helpRequest?.key ?? "");
-  const helpBody = $derived(helpEntry?.description ?? helpRequest?.text ?? "");
-  /** the name behind a labelled term: a chip says `at bound`, and the flag it
-   *  stands for is `position_at_bound`, which nothing else on screen shows
-   *  (WP-1209) — so the popover carries it, and only where a label hid it:
-   *  `excluded` labelled `excluded` hid nothing */
-  const helpCode = $derived.by(() => {
-    const name = helpRequest?.key ? splitKey(helpRequest.key)?.name ?? null : null;
-    return helpEntry?.label && name && helpEntry.label !== name ? name : null;
-  });
-  const placement = $derived(helpAnchor
-    ? place(helpAnchor, viewport, popoverSize)
-    : { left: 0, top: 0, flipped: false });
-
-  /** `refocus` is the caller's claim (Esc); holding focus is the popover's own.
-   *
-   *  A click away must not steal focus back from whatever was clicked, so the
-   *  second test is `contains(activeElement)` rather than "was open": the only
-   *  time closing owes the term its focus is when the popover had it, which
-   *  since the popover takes focus on open is every keyboard route out. */
-  function closeHelp(refocus = false) {
-    const held = popoverEl?.contains(document.activeElement) === true;
-    if (refocus || held) helpNode?.focus({ preventScroll: true });
-    helpNode = null;
-    helpRequest = null;
-    helpAnchor = null;
-    popoverSize = { width: 0, height: 0 };
-    focusedFor = null;
-  }
-
-  setContext<HelpOpener>(HELP_CONTEXT, {
-    isOpen: (node) => helpNode === node,
-    toggle(node, request) {
-      if (helpNode === node) {
-        closeHelp();
-        return;
-      }
-      helpNode = node;
-      helpRequest = request;
-      helpAnchor = node.getBoundingClientRect();
-      popoverSize = { width: 0, height: 0 };
-    },
-  });
-
-  $effect(() => {
-    if (!popoverEl || !helpRequest) return;
-    // the *rendered* body, not only the request: what `place` flips on is the
-    // height, and the height is whatever is drawn.  Today that is the same
-    // thing — `onMount` awaits `api.help()` before `loadProject`, so no term
-    // exists until the corpus has landed or failed, and holding `/api/help`
-    // for 15 s in a browser produced no term to click.  Declared here, that
-    // boot order stops being load-bearing: a corpus arriving late would grow
-    // the body under a height measured from "Not described yet.", and this
-    // effect would re-measure rather than leaving `place` a stale number.
-    void [helpTitle, helpBody, helpEntry, helpLink];
-    const width = popoverEl.offsetWidth;
-    const height = popoverEl.offsetHeight;
-    if (width !== popoverSize.width || height !== popoverSize.height) {
-      popoverSize = { width, height };
-    }
-  });
-
-  /* The popover takes focus, because it is a `role="dialog"` and a dialog
-   * nobody is in announces nothing: Tab from an activated term went to the next
-   * input in the row, leaving the popover open behind the cursor and its
-   * `in the manual →` link reachable only by tabbing the whole app.  Esc and a
-   * second activation hand focus back to the term (`closeHelp`).
-   *
-   * `preventScroll` is load-bearing rather than tidy — `onscrollcapture` closes
-   * the popover, so a focus that scrolled anything would close what it just
-   * opened.  `focusedFor` is a plain `let`, not `$state`: it must not be a
-   * dependency of the effect that writes it. */
-  let focusedFor: HTMLElement | null = null;
-  $effect(() => {
-    if (!popoverEl || !helpNode) return;
-    if (focusedFor === helpNode) return;
-    focusedFor = helpNode;
-    popoverEl.focus({ preventScroll: true });
-  });
-
-  // A resize or a scroll moves the anchor out from under the popover, and
-  // there is nothing useful to do about it: re-measuring would chase a term
-  // that may have left the screen entirely.  Closing is honest and costs one
-  // click.
-  function reanchor() {
-    viewport = { width: window.innerWidth, height: window.innerHeight };
-    if (helpRequest) closeHelp();
-  }
-
-  /** A click outside the popover and its own term closes it. */
-  function clickAway(event: MouseEvent) {
-    if (!helpRequest) return;
-    const target = event.target as Node | null;
-    if (target && (popoverEl?.contains(target) || helpNode?.contains(target))) return;
-    closeHelp();
-  }
+  /* The help popover (WP-1203, WP-2244): one for the page, opened by every
+   * `<Help>` term below. It takes Esc ahead of this page's keydown, so the Esc
+   * that closes it never cancels a run. */
+  const help = provideHelp();
 
   // "system" has to keep meaning system: a machine that switches at dusk must
   // take the app with it, which is only true if the query is *listened* to
   // rather than read once at boot
   onMount(() => {
-    viewport = { width: window.innerWidth, height: window.innerHeight };
     const query = window.matchMedia?.("(prefers-color-scheme: dark)");
     if (!query) return;
     systemDark = query.matches;
@@ -1304,7 +1214,7 @@
         }
         seen = key;
       },
-      { poll: (since) => api.events(since) },
+      { poll: (since) => api.events(since), onDropped: (n) => (dropped = n) },
     );
   });
 </script>
@@ -1321,8 +1231,7 @@
     onrefine={() => refine()} />
 {/snippet}
 
-<svelte:window onkeydown={keydown} onclick={clickAway} onresize={reanchor}
-  onscrollcapture={reanchor} onpagehide={pageHidden} bind:innerWidth={windowWidth} />
+<svelte:window onkeydown={keydown} onpagehide={pageHidden} bind:innerWidth={windowWidth} />
 
 {#if offer}
   <Recovery draft={offer.draft} savedUtc={offer.savedUtc} moved={offer.moved}
@@ -1502,10 +1411,12 @@
             active={graphTab === "single" && !hideGraphs} />
         </div>
         <div class="gview" class:hidden={graphTab !== "background"}>
-          <Background {head} {busy} {theme} {say} onmoved={moved}
-            protocol={JSON.stringify([project?.doc?.mode ?? null, protocol.limits,
-                                      protocol.regions])}
-            active={graphTab === "background" && !hideGraphs} />
+          {#key opens}
+            <Background {head} {busy} {theme} {say} onmoved={moved}
+              protocol={JSON.stringify([project?.doc?.mode ?? null, protocol.limits,
+                                        protocol.regions])}
+              active={graphTab === "background" && !hideGraphs} />
+          {/key}
         </div>
         {#if hideModel}{@render actions()}{/if}
       </div>
@@ -1554,13 +1465,16 @@
            and without a project, Model *is* the content, so it is always
            active and never hidden. -->
       <div class="panel" class:hidden={!!project && !modelTab}>
-        <Model bind:this={modelPanel} {project} {capabilities} {head} {busy} {simple}
+        <Model bind:this={modelPanel} {project} {opens} {capabilities} {head} {busy} {simple}
           {theme} {say} active={modelTab} columns={modelColumns}
           oncolumns={modelSized} onmoved={moved} />
       </div>
       {#if project}
         <!-- every tab stays mounted: switching must not throw away a filter, a
-             pending edit, an unsaved stage list or a two-node comparison -->
+             pending edit, an unsaved stage list or a two-node comparison. Each
+             is the project's, so another project's open starts each over
+             (`opens`, WP-2242) -->
+        {#key opens}
         <div class="panel" class:hidden={tab !== "params"}>
           <Params bind:this={paramsPanel} {head} {busy} {corpus} {say}
             onpending={(n, why) => { pendingTouched = n; pendingInvalid = why; }} />
@@ -1572,14 +1486,12 @@
             onpreview={(answer, why) => { previewAnswer = answer; previewError = why; }} />
         </div>
         <div class="panel" class:hidden={tab !== "plan"}>
-          {#key opens}
-            <Plan bind:this={planPanel} mode={project.doc.mode} {head} {busy} {simple}
-              noPhasesReason={noPhases ? NO_PHASES_REASON : null}
-              {say} onrun={runPlanStage} onpending={(edited) => (planPending = edited)} />
-          {/key}
+          <Plan bind:this={planPanel} mode={project.doc.mode} {head} {busy} {simple}
+            noPhasesReason={noPhases ? NO_PHASES_REASON : null}
+            {say} onrun={runPlanStage} onpending={(edited) => (planPending = edited)} />
         </div>
         <div class="panel" class:hidden={!textTab}>
-          <Text {head} {busy} active={textTab} dark={theme === "dark"} {say} onmoved={moved} />
+          <Text bind:this={textPanel} {head} {busy} active={textTab} dark={theme === "dark"} {say} onmoved={moved} />
         </div>
         <div class="panel" class:hidden={tab !== "peaks"}>
           <Peaks peaks={peaksData} {indexAnswer} {extinction} {run} {busy} {say}
@@ -1610,6 +1522,7 @@
         <div class="panel" class:hidden={tab !== "build"}>
           <Stubs {capabilities} {project} />
         </div>
+        {/key}
         {#if !hideModel}{@render actions()}{/if}
         <Console {lines} {dropped} height={consoleHeight} onresize={setConsoleHeight} />
       {/if}
@@ -1629,43 +1542,8 @@
 
 <!-- The app's one help popover (WP-1203).  It lives here, outside every panel,
      because `position: fixed` inside a scrolling column would still be clipped
-     by an ancestor that establishes a containing block, and because two open
-     explanations is a state nobody asked for. -->
-{#if helpRequest}
-  <!-- `data-flipped` is the only way to tell a flip from a clamp that landed on
-       the same pixel — a popover taller than the viewport is clamped to the top
-       margin, which is exactly where flipping it would also put it — so it is
-       what a browser pass reads to check the rule (WP-1203). -->
-  <div class="popover" bind:this={popoverEl} role="dialog" aria-label={helpTitle}
-       tabindex="-1" data-flipped={placement.flipped}
-       style="left: {placement.left}px; top: {placement.top}px">
-    <h2>{helpTitle}</h2>
-    {#if helpBody}
-      <p>{helpBody}</p>
-    {:else}
-      <!-- a key that resolves to nothing.  Saying so is the honest empty
-           state: the corpus is where a description is owed, and inventing one
-           here would put a wrong sentence under a real name. -->
-      <p class="muted">Not described yet.</p>
-    {/if}
-    {#if helpEntry && (helpEntry.unit || helpEntry.default || helpEntry.typical
-                       || helpEntry.modes?.length || helpCode)}
-      <dl>
-        {#if helpCode}<dt>Name</dt><dd class="mono">{helpCode}</dd>{/if}
-        {#if helpEntry.unit}<dt>Unit</dt><dd>{helpEntry.unit}</dd>{/if}
-        {#if helpEntry.default}<dt>Default</dt><dd class="mono">{helpEntry.default}</dd>{/if}
-        {#if helpEntry.modes?.length}
-          <dt>Modes</dt><dd class="mono">{helpEntry.modes.join(", ")}</dd>
-        {/if}
-        {#if helpEntry.typical}<dt>Typical</dt><dd>{helpEntry.typical}</dd>{/if}
-      </dl>
-    {/if}
-    {#if helpLink}
-      <a class="link" href={helpLink} target="_blank" rel="noreferrer noopener"
-        >in the manual →</a>
-    {/if}
-  </div>
-{/if}
+     by an ancestor that establishes a containing block. -->
+<HelpPopover host={help} {corpus} />
 
 <style>
   /* wraps rather than pushing a control off the window's edge — the tab strip's

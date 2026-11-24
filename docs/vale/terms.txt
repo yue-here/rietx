@@ -16,6 +16,7 @@
 # Crystallography and diffraction (the IUCr's vocabulary).
 absorber
 absorbers
+acridine
 actinide
 anisotropic
 anisotropy
@@ -152,6 +153,7 @@ translationengleiche
 triclinic
 trigonal
 trirutile
+unrecovered
 uncentred
 uniaxial
 unindexed
@@ -175,6 +177,7 @@ Uiso
 Abramowitz
 Altomare
 Avrami
+Bergmann
 Borda
 Brentano
 Brindley

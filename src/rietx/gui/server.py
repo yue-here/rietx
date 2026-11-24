@@ -166,7 +166,14 @@ def _compare(s: GuiSession, q: dict, _body: dict) -> dict:
     return s.history_compare(ids)
 
 
-def _structure3d(s: GuiSession, q: dict, _body: dict) -> dict:
+def _history_curves(s: GuiSession, q: dict, _body: dict) -> Packed:
+    node = q.get("node", [""])[0]
+    if not node:
+        raise GuiError("curves needs ?node=<node>", where=["node"])
+    return s.history_curves(node)
+
+
+def _structure3d(s: GuiSession, q: dict, body: dict | None) -> dict:
     """Geometry for one phase.  The knobs are *drawing* thresholds, not physics,
     which is why they ride here rather than in a settings document: the
     probability level an ellipsoid is drawn at, the radius-sum slack a bond is
@@ -178,7 +185,9 @@ def _structure3d(s: GuiSession, q: dict, _body: dict) -> dict:
                          bond_tolerance=_query_float(q, "bond_tolerance"),
                          disorder=(q.get("disorder") or ["all"])[0],
                          centres=_query_list(q, "centres"),
-                         ligands=_query_list(q, "ligands"))
+                         ligands=_query_list(q, "ligands"),
+                         # a POST carries unapplied values to draw (WP-2218)
+                         body=body if isinstance(body, dict) and body else None)
 
 
 def _query_list(q: dict, name: str) -> list[str] | None:
@@ -265,6 +274,7 @@ ROUTES: dict[tuple[str, str], Any] = {
     ("GET", "/api/plan/resolve"): lambda s, q, b: s.plan_resolve(),
     ("GET", "/api/structure"): lambda s, q, b: s.structure(),
     ("GET", "/api/structure3d"): _structure3d,
+    ("POST", "/api/structure3d"): _structure3d,
     ("PATCH", "/api/structure"): lambda s, q, b: s.structure_patch(b),
     ("POST", "/api/structure/aniso"): lambda s, q, b: s.structure_aniso(b),
     # a typed coordinate, projected onto the site's DOFs (WP-1215) — a
@@ -297,7 +307,7 @@ ROUTES: dict[tuple[str, str], Any] = {
     # the curves at values nobody has applied, writing nothing (WP-2125)
     ("POST", "/api/preview"): lambda s, q, b: s.preview(b),
     # the background curve and its band from the fit's covariance (WP-2129)
-    ("GET", "/api/background"): lambda s, q, b: s.background(),
+    ("GET", "/api/background"): lambda s, q, b: s.background(_query_list(q, "hold")),
     ("GET", "/api/report"): _report,
     ("POST", "/api/report/apply"): lambda s, q, b: s.report_apply(b),
 
@@ -311,6 +321,8 @@ ROUTES: dict[tuple[str, str], Any] = {
     ("POST", "/api/peaks/move"): lambda s, q, b: s.peaks_move(b),
     ("POST", "/api/peaks/flag"): lambda s, q, b: s.peaks_flag(b),
     ("POST", "/api/peaks/refit"): lambda s, q, b: s.peaks_refit(b),
+    ("POST", "/api/peaks/undo"): lambda s, q, b: s.peaks_undo(b),
+    ("POST", "/api/peaks/redo"): lambda s, q, b: s.peaks_redo(b),
     # /api/index rides the one run state machine: same worker, same 409
     ("POST", "/api/index"): lambda s, q, b: s.run({**b, "kind": "index"}),
     ("GET", "/api/index/result"): lambda s, q, b: s.index_result(),
@@ -340,6 +352,8 @@ ROUTES: dict[tuple[str, str], Any] = {
     ("GET", "/api/history"): lambda s, q, b: s.history(),
     ("GET", "/api/history/diff"): _diff,
     ("GET", "/api/history/compare"): _compare,
+    # one node's curve through replay, for the History tab's Compare (WP-2211)
+    ("GET", "/api/history/curves"): _history_curves,
     ("POST", "/api/history/checkout"): lambda s, q, b: s.history_checkout(b),
     ("POST", "/api/history/branch"): lambda s, q, b: s.history_branch(b),
     ("POST", "/api/history/tag"): lambda s, q, b: s.history_tag(b),
@@ -567,6 +581,11 @@ def _handler(session: GuiSession, holder: dict):
             if query.get("poll"):
                 self._json(session.events_since(since))
                 return
+            # a reconnecting EventSource re-opens the URL it was first given and
+            # says how far it read in this header, the SSE spec's resume cursor
+            last = self.headers.get("Last-Event-ID", "")
+            if last.isascii() and last.isdigit():  # "²" is a digit int() refuses
+                since = session.resume_at(since, int(last))
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream; charset=utf-8")
             self.send_header("Cache-Control", "no-store")

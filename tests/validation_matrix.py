@@ -506,7 +506,8 @@ CLAIMS: tuple[Claim, ...] = (
         "held zero shift, the sample displacement and the Ka2 ratio",
         reference="NIST's cell recomputed for this dataset's 20.85 C block, "
                   "4.156780 A, under an explicitly interim +-2e-4 A band; the "
-                  "certificate's own +-8e-6 at 22.5 C is NOT claimed and the "
+                  "certificate's own +-8e-5 A (k = 2, 19 ppm) at 22.5 C is NOT "
+                  "claimed and the "
                   "residual is a characterised cotTheta/sin2Theta aberration "
                   "(divergence, tube tails, monochromator passband) fenced to "
                   "the v2 FPA work",
@@ -2940,8 +2941,10 @@ CLAIMS: tuple[Claim, ...] = (
         reference="the planted (deposited) coordinates; four esds over 42 "
                   "components is a 0.3 % union false-alarm rate under "
                   "Gaussian errors",
-        measured="worst |delta|/esd 0.64 over 42 components (bar 4); "
-                 "Rwp 0.0282, GoF 0.995",
+        measured="worst |delta|/esd 0.64 over 42 components at seed 1806 "
+                 "(bar 4); 0.64 to 2.27 over seeds 1806 and 1 to 7, median "
+                 "1.5, so the margin is about 1.8x; Rwp 0.0282, GoF 0.995 at "
+                 "seed 1806",
     ),
     Claim(
         "test_acceptance_acridine_ix", "test_a_regular_hexagon_template_fails_the_known_answer_bound",
@@ -2953,6 +2956,33 @@ CLAIMS: tuple[Claim, ...] = (
                   "and start",
         measured="worst |delta|/esd 38.7, 29 of 42 components over 4; "
                  "Rwp 0.0389 against 0.0282, GoF 1.37",
+    ),
+    # ---- acridine form IX: the misfit check's verdict (WP-1989 part 2, #1008) ----
+    Claim(
+        "test_acceptance_acridine_ix", "test_issue_1008s_stretched_body_fires_on_the_deposited_pattern",
+        "acridine_ix", ("characterisation", "ceiling"),
+        "the body with C2-C3 stretched 0.3 A (H3 moved with C3), refined under "
+        "the same plan, is rejected by the misfit check: Hamilton and Delta-BIC "
+        "both fire with each riding H tied to its parent, and C2-C3 is named "
+        "first; the same fits with every member freed (63 parameters, the arm "
+        "1.11.0 fitted) stay under the Delta-BIC threshold, so the verdict is "
+        "the riding arm's",
+        reference="MISFIT_ALPHA 1e-3 and MISFIT_BIC 10 (Kass & Raftery 1995, "
+                  "'very strong'); the stretch is #1008's planted template error",
+        measured="Hamilton p 9.3e-43, Delta-BIC +52.0 at N_eff 1191.5 (bar 10); "
+                 "C2-C3 1.705 -> 1.463 A, -12.1 sigma; all-freed Delta-BIC "
+                 "-111.3; the perturbed start reaches the same chi2 to 1e-9",
+        starts=2,
+        diagnostics=("RIGID_BODY_MISFIT",),
+    ),
+    Claim(
+        "test_acceptance_acridine_ix", "test_the_deposited_body_does_not_fire_on_the_deposited_pattern",
+        "acridine_ix", ("characterisation",),
+        "the deposited body, under the same plan and check, is not rejected",
+        reference="MISFIT_ALPHA 1e-3 and MISFIT_BIC 10, the thresholds the "
+                  "stretched row above fires on",
+        measured="Hamilton p 0.40 (bar 1e-3), Delta-BIC -233.1 (bar 10)",
+        diagnostics=("!RIGID_BODY_MISFIT",),
     ),
 )
 
@@ -3011,7 +3041,7 @@ START_DEPENDENCE_RULE = 3
 INTERMEDIATE_FTOL_DEFAULT = 1e-6
 
 
-#: **The closing stage every acceptance number is produced with** (WP-2002, the
+#: **The closing stage's default, and the acceptance suites' declared 1e-3** (WP-2002, the
 #: sixth round's Q1 and Q2, ruled 2026-10-21).
 #:
 #: After the declared stages, a plan recompiles at the answer with peak windows
@@ -3033,7 +3063,12 @@ INTERMEDIATE_FTOL_DEFAULT = 1e-6
 #:   the shipped package reproduces, and each names the setting.
 #: * *Where it is declined.*  ``closing_window_tol = None`` reproduces every
 #:   fit before it, bit for bit.
-CLOSING_WINDOW_TOL_DEFAULT = 1e-3
+#: * *Off by default since WP-2222* (ruled 2026-11-19: users found the fit time
+#:   too high, and TOPAS's 2 % windows give accuracy its users find sufficient).
+#:   ``None`` is the live default recorded here.  The suites that pin numbers
+#:   at the closing stage name ``1e-3`` on their plans, so their numbers did
+#:   not move with the default.
+CLOSING_WINDOW_TOL_DEFAULT = None
 
 
 #: **The one default WP-1001 was chartered to decide, and how it went.**
@@ -3093,8 +3128,9 @@ GAPS: tuple[tuple[str, str], ...] = (
      "ROUGHNESS_UNCONSTRAINED.  Closing it needs a pattern starting below "
      "~15 deg with real low-angle reflections."),
     ("The SRM 660c certificate band is not reached and is not claimed.",
-     "Measured +24 ppm against a certificate uncertainty of +-8e-6 A.  The "
-     "residual is a characterised cotTheta/sin2Theta aberration — equatorial "
+     "Measured +24 +- 5 ppm at 20.85 C, against NIST's recompute "
+     "4.156780 A, and a certificate uncertainty of +-8e-5 A (k = 2, "
+     "19 ppm): outside the band by about one esd.  The residual is a characterised cotTheta/sin2Theta aberration — equatorial "
      "divergence, tube tails, monochromator passband — which is the "
      "fundamental-parameters territory fenced to v2, not a tuning gap."),
     ("GoF does not reach 1 on lab data and should not be expected to.",

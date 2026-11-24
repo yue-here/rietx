@@ -53,6 +53,7 @@ function corpus(): HelpCorpus {
     peak_flags: { excluded: entry("Excluded") },
     diagnostics: { PEAK_LIST_TOO_SHORT: entry("Too few lines") },
     peak_origins: { manual: entry("Placed by a person", { label: "manual" }) },
+    cell_relations: { same_cell: entry("Same cell as another candidate") },
     stage_fields: { seed: entry("Stage seed"), max_iter: entry("Iteration cap") },
     reader_options: { block: entry("Data block") },
     instrument_fields: { radiation: entry("Anode") },
@@ -303,6 +304,8 @@ describe("`title=` is no longer how this app explains a name", () => {
     "panels/Structure3D.svelte": 4,  // drawing thresholds, not physics
     "next/Console.svelte": 1,        // the event ring's size, as panels/Console's
     "next/Frame.svelte": 2,          // the two splitters' drag gesture
+    "next/Plan.svelte": 4,           // the reorder handle, the edited mark, an unapplied
+                                     // stage, the closing stage: panels/Plan's, carried (WP-2231)
   };
 
   function markupFiles(): Array<[string, string]> {

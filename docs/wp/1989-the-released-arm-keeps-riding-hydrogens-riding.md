@@ -1,9 +1,8 @@
 # WP-1989 — the rigid-body check's released arm keeps riding hydrogens riding
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: ✅ 2026-11-17 — the stretched acridine body fires and the deposited one does not, on the synthetic and the deposited pattern; skill row names the riding arm (part 1 #1280, part 2 PR #1655)
 Track: What fires, and what stays silent
 Depends on: — (1806 soft: the public case it shows on, and its pdCIF reader task)
-Priority: P2 2026-10-16 — a check that cannot fire on the commonest organic body, so a 0.3 Å bond error passes; a path few fits run, and the Hamilton p and ranked deviations are still printed
 
 ## Goal
 
@@ -48,38 +47,6 @@ Reproducing needs #1006's `_pd_proc_intensity_net` reader (WP-1806's first
 task, PR #1006 open) or another body with riding H on a pattern the tree
 reads.
 
-### Inherited
-
-- 2026-10-31, from the issue triage (issue #1008): the reporter (2026-10-30)
-  proposes splitting this WP in two and offers to build the first part. Part 1
-  is the arm: the released arm frees the heavy-atom members and each riding H
-  follows its parent, through `Refinement.tie(..., offset=)` at a held cell if
-  a check shows that suffices; Δk is read off the fit (36 on acridine IX, 14 ×
-  3 − 6); the arm is built by a public function that `check_rigid_bodies`
-  calls, so a caller can fit it by hand and choose which members are freed;
-  verified by the parameter count, each H–parent vector kept after the fit,
-  and the public arm's χ² equal to the same arm assembled by hand; the ΔBIC on
-  the stretched body measured and reported, not asserted. Part 2 is the
-  verdict: the stretched body fires, the deposited body does not, and the
-  skill row. Part 1 changes no `MISFIT_ALPHA`, `MISFIT_BIC` or `fires`. If
-  riding on a free atom (#759) is needed instead of ties, they will stop and
-  say so first. Checked against the tree at d87c8cc91: `Refinement.tie` takes
-  `scale` and `offset` (`refine.py:3429`); the released arm is still assembled
-  inside `report/body_misfit.rigid_body_misfit` (`released_phase`, line 256),
-  with no public builder. The public arm builder is a new public name.
-
-- 2026-11-12, from WP-1806 part 2 (PR #1545): the tie half of the proposal
-  above works on the real acridine pattern, measured. The free-atom control
-  in `tests/test_acceptance_acridine_ix.py` (`_fit` with the body removed)
-  frees the 14 heavy atoms' `dof.*` and ties each H's `dof.k` to its
-  carrier's, with no offset and the cell free. The H then takes its
-  carrier's shift and keeps its fractional C–H vector. It converges unrestrained (Rwp
-  0.05780 against the body's 0.05842), and two starts land 0.0002 Å apart.
-  The body's own H leave their carrier's shift by at most 0.0015 Å. So a
-  shift tie keeps riding H riding to that size, at a free cell, without
-  #759's riding-on-a-free-atom. The soft dependency on WP-1806 is
-  discharged: the public case and its pdCIF reader are on main.
-
 ## Non-goals
 
 - The "right body does not fire" arm, which the issue says is unaffected.
@@ -87,15 +54,15 @@ reads.
 
 ## Tasks
 
-- [ ] Reproduce on a pattern the tree reads (synthetic riding-H body if #1006 has not merged).
-- [ ] The released arm frees the heavy-atom members and keeps each hydrogen on its riding rule; measure ΔBIC on the issue's case.
-- [ ] Tests: the stretched body fires, the deposited body does not
-- [ ] Skill: the `RIGID_BODY_MISFIT` reference row, if its reading changes
+- [x] Reproduce on a pattern the tree reads (synthetic riding-H body if #1006 has not merged).
+- [x] The released arm frees the heavy-atom members and keeps each hydrogen on its riding rule; measure ΔBIC on the issue's case.
+- [x] Tests: the stretched body fires, the deposited body does not
+- [x] Skill: the `RIGID_BODY_MISFIT` reference row, if its reading changes
 
 ## Acceptance
 
 ```sh
-.venv/bin/python -m pytest tests/ -k rigid_bod -q
+.venv/bin/python -m pytest tests/ -k "rigid_bod or body_misfit or acridine_ix" -m "slow or not slow"
 .venv/bin/python -m ruff check src tests examples
 ```
 
@@ -106,6 +73,108 @@ reads.
 - Issues #1008, #775, #561.
 
 ## Handover log
+
+- **2026-11-17 (a ghostshift runner, part 2; closes the WP)** — The rigid-body
+  check now demonstrably catches #1008's wrong molecule. Acridine form IX
+  with one C–C bond 0.3 Å too long, fitted to its own deposited synchrotron
+  pattern, raises `RIGID_BODY_MISFIT` and names that bond first, while the
+  deposited molecule stays silent. The same holds on a synthetic pattern at
+  0.2 Å, in the fast tier. Both checks would fail had the check gone on
+  freeing the hydrogens, so they test part 1's riding arm and not only the
+  thresholds. No threshold, verdict or code moved; the WP is done, and
+  #1008 closes with PR #1655.
+
+  *Done (PR #1655):* `tests/test_body_misfit.py` gains three fast tests on
+  the synthetic acridine pattern: the body with C2–C3 stretched 0.2 Å (H3
+  moved with C3) fires on both tests, names C2–C3 first and raises one
+  warning; the same fits with every member freed (63 parameters, the arm
+  1.11.0 fitted, by hand through `released_arm(freed=...)`) stay under
+  `MISFIT_BIC`; the deposited body does not fire. Helper `_stretch_c2c3`.
+  `tests/test_acceptance_acridine_ix.py` gains two slow tests on the
+  deposited pattern under WP-1806's plan (`_fit`): #1008's 0.3 Å stretch
+  fires and names C2–C3 first, and its all-freed control stays under the
+  threshold; the deposited body (the `real_deposited` fixture, which the
+  check does not mutate) does not fire. Task 1 is ticked on that test. The
+  skill's `RIGID_BODY_MISFIT` row (`references/abstention.md`, both copies
+  synced) now says the riding H stay on their parents and names
+  `ref.released_arm(name)` as the builder of that arm, to fit by hand. Two
+  `tests/validation_matrix.py` rows (characterisation) record the slow
+  tests, and `docs/VALIDATION.md` is regenerated. The WP's Acceptance
+  command now selects the tests this WP added (`-k rigid_bod` matched none
+  of them) and drops its `-q`.
+
+  *Measured* (macOS arm64, Python 3.12, `[dev]` venv, branch on
+  `662d0b712`). Synthetic, 0.2 Å, fixture seed 1989: χ² 3111.8 → 1951.8,
+  36 added, N_eff 691.7, p 5.6e-45, C2–C3 1.605 → 1.449 Å (−7.8σ). Over seeds 1989, 7, 11, 23 the riding
+  arm's ΔBIC was +87.2, +77.2, +95.5, +81.9 and the all-freed arm's −85.3,
+  −99.7, −78.8, −93.9. At 0.3 Å the all-freed arm gave +25.2 (seed 1989)
+  and +9.5 (seed 7), so 0.3 Å on the synthetic pattern cannot tell the two
+  arms apart; that is why the fast test stretches 0.2 Å. Deposited body
+  over seeds 1989, 7, 11: p 0.80, 0.67, 0.98; ΔBIC −236.0, −234.1, −243.2.
+  Deposited pattern, WP-1806's plan: stretched body χ² 36852.7 → 28483.3,
+  N_eff 1191.5, Hamilton p 9.3e-43, ΔBIC +52.0, C2–C3 1.705 → 1.463 Å
+  (−12.1σ); all-freed χ² 27822.4, ΔBIC −111.3; the perturbed start reaches
+  the same χ² to 1e-9 relative. Deposited body p 0.40, ΔBIC −233.1. Part
+  1's +20.8 came from #1008's own script, whose body fit ends at χ²
+  36079.1; this plan ends at 36852.7, so the two ΔBIC are not one number.
+  Revert (default `freed` = every member): both stretched tests and the
+  deposited fast test fail, on the count first. Fast selection:
+  on the tree before the review fixes and matrix rows, 14697 passed / 432 skipped / 32 xfailed / 1 failed (`test_every_acceptance_test_has_a_matrix_row`, fixed by `d9aee3252`); on the final tree (`cd61e2ed5`), 14708 passed / 432 skipped / 32 xfailed / 0 failed in 573 s, 13 items more than main (3 tests, and 5 matrix checks for each of the 2 new rows); nothing new is skipped. The added fast tests cost 5.1 s, 3.1 s and 0.0 s on that run (8.2 s over `tests/test_body_misfit.py`; local, one run). Vale (`rietx_vale.sh`): 0 errors. The two slow tests, after the review fixes: 2 passed in 85 s. `tests.reader_output`:
+  exit 0, unchanged.
+
+  *Review:* a read-only Opus reviewer in this worktree (no
+  `/code-review`, which edits the main checkout) found no bug. Applied: the
+  all-freed controls assert convergence and a χ² under the body's, so a
+  stalled hand fit cannot pass for the wrong reason; each stretched test
+  pins its template C2–C3; the stretched body is called the positive arm;
+  `_by_hand` says it carries none of the caller's ties, holds or limits (the
+  reviewer measured `_by_hand` and the check's own `_fit` equal to every
+  digit on both patterns); the skill row's wording; the Acceptance command.
+  Declined: building the control through the private `_fit`, since the
+  public route is what the manual documents and gave the same χ².
+
+  *Generality:* not dispatched. The branch does not touch `_audit.py`, and
+  it adds no heuristic: tests, and a skill row that is API vocabulary.
+
+  *Next:* nothing in this WP. Nothing was left over for an issue.
+
+- **2026-11-17** — Part 1 is on main. Mike's PR #1280 merged as `f1187a062`.
+  The rigid-body check's released arm now frees the 14 heavy atoms of
+  acridine form IX and keeps its 9 riding hydrogens on their parents. It adds
+  36 parameters where 1.10.0 added 63. On #1008's case with a C2–C3 bond
+  stretched by 0.3 Å, ΔBIC is +20.8 under the riding arm, against −137.1 with
+  every member freed. The arm is also public, as `Refinement.released_arm`.
+  Whether the stretched body fires is part 2's to test. No threshold or
+  verdict changed. Entry by a ghostshift close-only runner (PR #1648).
+
+  *Done (PR #1280, Mike):* `report/body_misfit.released_arm` builds one
+  body's arm and `rigid_body_misfit` calls it. Each rider's coordinate DOFs
+  are tied to its parent's with offset 0, so the parent–H vector holds exactly
+  at a held cell and follows the cell as a fractional offset at a refined one.
+  `crystallography.riding.riding_parents` names each H's parent. Six tests in
+  `tests/test_body_misfit.py` on `tests/data/cod_2242872.cif` over a synthetic
+  Cu pattern; each fails on revert.
+
+  *Measured (PR #1280 body, deposited pattern COD 2242872, #1008's protocol;
+  ΔBIC at N/f²):* stretched body, riding arm: χ² 36079.1 → 28648.5,
+  n_added 36, N_eff 1196.7, Hamilton p 4.8e-37, ΔBIC +20.8. Stretched, all
+  freed: 63 added, ΔBIC −137.1 (#1008 had −135.0 on `d3a641e6`). Deposited
+  body, riding arm: p 0.41, ΔBIC −233.2. #1008's estimate of ≈ +300 compared
+  the stretched body with the right one at equal count, which the released
+  arm does not recover. The stretched body's deviations rank C2–C3 first, at
+  −11.3σ (1.705 → 1.479 Å). Review bench (2026-11-16, macOS arm64, Python
+  3.12, `[dev]`, stack of main + #1584 + #1580 + #1340 + #1280): fast
+  selection 14 694 passed / 433 skipped / 32 xfailed / 0 failed; released-arm
+  PNG flat residual, GoF 0.99. Full suite on main + #1340 + #1280: 15 643
+  passed, 1 failed (`test_pair_diagnostic_class`, a magnetic test that fails
+  identically on plain main on that Mac).
+
+  *Next:* part 2, after #1280. Test that the stretched body fires and the
+  deposited body does not (task 3), then the `RIGID_BODY_MISFIT` skill row if
+  its reading changes (task 4). Issue #1008 stays open for it. Task 1 stays
+  unticked because the review verdict ticked only task 2. The PR body's table
+  reproduces #1008 on the deposited pattern but no test asserts it, so part 2
+  decides whether that run counts.
 
 - **2026-10-16** — created, from the 2026-10-16 issue triage (issue #1008).
   Checked against the tree at `138d55dc`: the released arm frees
