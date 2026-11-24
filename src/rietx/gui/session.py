@@ -740,6 +740,7 @@ class GuiSession:
             self._peak_ed = None
             self._series = series_mod.SeriesSetup()
             self._series_run = None
+            self._series_reads = {}
             self._cond.notify_all()
         self._write_recent([
             {**_recent_entry(e), "closed": True} if str(e.get("path", "")) == path
@@ -3756,6 +3757,7 @@ class GuiSession:
             # from its models, so another project's series is not this one's
             self._series = series_mod.SeriesSetup()
             self._series_run = None
+            self._series_reads = {}
             self._cond.notify_all()
         self._remember(project)
 
