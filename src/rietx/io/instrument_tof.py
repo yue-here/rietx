@@ -658,9 +658,11 @@ def _profile(path: Path, bank: int, headers: dict[int, _Record],
                     f"never zero-padded or truncated — because the order of "
                     f"its slots would be a guess"
                     + (_LEGACY_POINTER if (ptyp, ncof) == (1, 8) else
-                       f". To read it, write all {want} in the manual's "
-                       f"order, with zero for each term the file's writer "
-                       f"left out" if ncof < want else ""))
+                       f". To read it, find which {ncof} terms the file's "
+                       f"writer wrote, then write all {want} in the manual's "
+                       f"order with zero for each one left out"
+                       if ncof < want and ptyp not in _PRCF_NOT_EVALUATED
+                       else ""))
         if n != 1:
             _note(diagnostics, "info", "GSAS_IPARM_PROFILE_DECLINED",
                   f"Bank {bank}: PRCF set {n} (profile function {ptyp}) was "

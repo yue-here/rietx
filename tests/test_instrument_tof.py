@@ -273,9 +273,9 @@ def test_a_prcf_block_with_the_wrong_ncof_is_refused_by_name(tmp_path, ptyp, nco
     if (ptyp, ncof) == (1, 8):
         assert "read_lansce_iparm" in str(e.value)
         assert "To read it" not in str(e.value)
-    elif ncof < {1: 12, 2: 15, 3: 21}[ptyp]:
-        assert "To read it, write all" in str(e.value)
-    else:   # a long block: no term was left out, so no padding advice
+    elif ncof < {1: 12, 2: 15, 3: 21}[ptyp] and ptyp != 2:
+        assert f"To read it, find which {ncof} terms" in str(e.value)
+    else:   # a long block left nothing out; a padded function 2 is refused
         assert "To read it" not in str(e.value)
 
 

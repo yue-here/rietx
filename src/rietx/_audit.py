@@ -1446,11 +1446,11 @@ ROWS: tuple[Row, ...] = (
         grounds="The format's overflow convention leaves no number to read."),
     Row("GSAS_IPARM_FIELD_DROPPED", "code", tier=1, ambiguity=1,
         evidence=('info; fires when a GSAS-I TOF .iparm holds a record or field the schema has '
-                  'no slot for, listing them (instrument_tof.py:944-948). The fields it names '
+                  'no slot for, listing them (instrument_tof.py:946-950). The fields it names '
                   'are CHKSUM (instrument_tof.py:516-518; the checksum algorithm is unpublished, '
                   'so it is read and never checked) and IECOR (no slot). A field the schema '
                   "could hold, or a non-zero slot beyond a function's coefficients, is refused "
-                  'rather than dropped (instrument_tof.py:527-546, 676-690). Fires exactly when '
+                  'rather than dropped (instrument_tof.py:527-546, 682-698). Fires exactly when '
                   'such a field is present'),
         grounds=('Arithmetic: a checksum or a correction record with no model meaning is read, '
                  'named and not carried; a number the model needs is never in this list.'),
@@ -1479,7 +1479,7 @@ ROWS: tuple[Row, ...] = (
                   'way GSAS-II reads them; nothing to do'),
         scope=('calibration',)),
     Row("GSAS_IPARM_PROFILE_DECLINED", "code", tier=1, ambiguity=1,
-        evidence=('five sites, one of them either level (instrument_tof.py:576-628 and 664-669), '
+        evidence=('five sites, one of them either level (instrument_tof.py:576-628 and 666-671), '
                   'so levels is two literals and no response is proposed. (a) An unnumbered PRCF '
                   'set beside a numbered set, or one of several unnumbered sets, is declined '
                   '(warning when the bank has no numbered set, info otherwise): the manual numbers '
@@ -1496,7 +1496,7 @@ ROWS: tuple[Row, ...] = (
                  'so.')),
     Row("GSAS_IPARM_PROFILE_READ", "code", tier=2, ambiguity=1,
         evidence=('info; fires once per bank when PRCF set 1 (function 1 or 3) is read '
-                  '(instrument_tof.py:705-713). The coefficients are read in the order the GSAS '
+                  '(instrument_tof.py:707-715). The coefficients are read in the order the GSAS '
                   'Technical Manual lists them (p. 144, 148), which the manual never says is the '
                   'record order, so the message calls it an assumption. Checked against GSAS-II: '
                   'v5.8.2 as a black box places slots 2,3,4,6,7 of function 1 as that order says '
