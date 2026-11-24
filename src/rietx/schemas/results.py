@@ -92,7 +92,9 @@ def require_two_theta_grid(result, where: str) -> np.ndarray:
     result raises, naming ``where``: the entry point is constant-wavelength
     only, and an axis-blind reader takes :meth:`RefinementResult.x` instead.
     """
-    if result.tof is not None:
+    # ``getattr``: a stand-in carrying only ``two_theta`` (a test's
+    # namespace, a hand-built record) is read as the 2θ result it is
+    if getattr(result, "tof", None) is not None:
         raise ValueError(
             f"{where} reads a fit's abscissa as 2θ in degrees, and this result "
             f"is a time-of-flight bank's: its abscissa is result.tof, a flight "

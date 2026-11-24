@@ -1197,6 +1197,27 @@ def _basis_assumed(basis) -> list:
     return _tof_intensity_basis_diagnostics(_BasisModel(basis))
 
 
+# ------------------------------------------------------- the TOPAS bank build
+
+
+def _topas_tof_flags(flag: str) -> list:
+    """``to_tof_refinement``'s diagnostics for the synthetic TOPAS bank of
+    ``tests/test_projects_topas_tof.py``, its ``TOF_PV`` width and fraction
+    carrying ``flag`` (``@`` refines them, ``!`` holds them)."""
+    from rietx.io.projects import topas_tof
+    from rietx.io.projects.topas import read_topas_inp
+    from tests.test_projects_topas_tof import _HEAD, _PHASE, _SHAPE
+
+    shape = _SHAPE.replace("TOF_PV(@, 50, @, 0.3", f"TOF_PV({flag}, 50, {flag}, 0.3")
+    found: list = []
+    with tempfile.TemporaryDirectory() as tmp:
+        path = pathlib.Path(tmp) / "tof.inp"
+        path.write_text(_HEAD + _PHASE + shape, encoding="utf-8")
+        topas_tof.to_tof_refinement(read_topas_inp(path), dataset=0,
+                                    two_theta_bank_deg=90.0, diagnostics=found)
+    return found
+
+
 # ------------------------------------------------------------ peak equations
 
 
@@ -1433,6 +1454,10 @@ SILENCE: dict[str, Pair] = {
         functools.partial(_basis_assumed, None),
         lambda: _basis_assumed("counts") + _basis_assumed("density"),
         "tests/test_tof_intensity_basis.py (a stub model: the fits there are 10 s)"),
+    "TOPAS_TOF_FLAG_HELD": Pair(
+        functools.partial(_topas_tof_flags, "@"),
+        functools.partial(_topas_tof_flags, "!"),
+        "tests/test_projects_topas_tof.py::test_a_refined_macro_argument_the_bank_cannot_carry_is_named"),
 }
 
 
