@@ -319,6 +319,15 @@ BANK_ABSENT_PATHS: tuple[str, ...] = (
 )
 
 
+#: The unit a ``neutron_tof`` table registers each sample **size** width in.
+#: The schema's ``deg`` and ``deg^2`` are the constant-wavelength reading,
+#: (180/π)·K·λ/L; a white beam has no λ, so on a bank ``lor_size`` holds K/L
+#: in Å⁻¹ and ``gauss_size`` its square
+#: (``model.forward_tof.sample_broadening_terms``).  The strain pair is
+#: λ-free and keeps the schema's unit on both arms (#1548 review, item 12).
+BANK_SIZE_UNITS: dict[str, str] = {"lor_size": "1/A", "gauss_size": "1/A^2"}
+
+
 def _bank_absent(instrument: Instrument, path: str) -> bool:
     """Whether ``path`` is one of :data:`BANK_ABSENT_PATHS` on a bank."""
     return (instrument.source.kind == "neutron_tof"
@@ -1509,14 +1518,16 @@ class ParameterTable:
 
     # -- collection ----------------------------------------------------
     def _add(self, path: str, p: Parameter, *, force_fixed: bool = False,
-             tie: AffineTie | None = None) -> None:
-        # every entry is refined in its own units (WP-1938)
+             tie: AffineTie | None = None, unit: str | None = None) -> None:
+        # every entry is refined in its own units (WP-1938); ``unit`` is the
+        # one this table's histogram gives it where that is not the schema's
+        # (a bank's size pair, #1548 review item 12)
         self.entries.append(Entry(
             path=path, value=p.value, vary=p.vary and not force_fixed and tie is None,
             lo=p.min, hi=p.max, tie=tie,
             locked=force_fixed,
         ))
-        self._units[path] = p.unit
+        self._units[path] = p.unit if unit is None else unit
 
     def _collect(self, structure: Structure, instrument: Instrument) -> None:
         # **What a time-of-flight bank cannot use, it does not register, or
@@ -1590,14 +1601,18 @@ class ParameterTable:
             # sharing the column would convert between the two units the way
             # WP-1131's map does between two wavelengths; that fit is not
             # written yet (``MultiHistogramRefinement`` refuses a bank).
-            self._add(f"{base}.lor_size", phase.lor_size)
+            # registered in the unit the bank holds, never the schema's deg
+            # (#1548 review, item 12): K/L in Å⁻¹ and its square in Å⁻²
+            self._add(f"{base}.lor_size", phase.lor_size,
+                      unit=BANK_SIZE_UNITS["lor_size"] if tof else None)
             # a Stephens block owns the tanθ Lorentzian channel outright: its
             # isotropic direction is the same column, so lor_strain is locked
             # and the width law reads zero for it (the Atom.aniso ⇒ biso
             # bargain, one level up; CompiledModel.lor_strain_term, WP-1467)
             self._add(f"{base}.lor_strain", phase.lor_strain,
                       force_fixed=phase.microstrain is not None)
-            self._add(f"{base}.gauss_size", phase.gauss_size)
+            self._add(f"{base}.gauss_size", phase.gauss_size,
+                      unit=BANK_SIZE_UNITS["gauss_size"] if tof else None)
             self._add(f"{base}.gauss_strain", phase.gauss_strain)
             # **The magnetic pair exists only on a phase that has a magnetic
             # component to broaden** (WP-1343).  Registering them on every

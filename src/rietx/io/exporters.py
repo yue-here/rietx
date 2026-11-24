@@ -39,6 +39,7 @@ from ..crystallography.lattice import d_spacings
 from ..model.components import COMPONENT_AGGREGATE
 from ..model.forward import CompiledModel
 from ..optimize.qpa import unmeasured_reason
+from ..params.vector import BANK_SIZE_UNITS
 from ..schemas.instrument import (
     BackgroundChebyshev,
     BackgroundFixedPlusChebyshev,
@@ -383,7 +384,7 @@ def _profile_description(instrument: Instrument, structure: Structure | None = N
             f"gamma = {v(p.gam0, t + 'gam0')} + {v(p.gam1, t + 'gam1')} d + "
             f"{v(p.gam2, t + 'gam2')} d^2 in us.",
         ]
-        units = {"lor_size": "1/A", "gauss_size": "1/A^2"}
+        units = dict(BANK_SIZE_UNITS)
     else:
         prof, geom = instrument.profile, instrument.geometry
         shape = ("Voigt (exact convolution)" if prof.shape == "voigt" else

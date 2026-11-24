@@ -974,7 +974,9 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "`BOUND_HIT` reports the range bound if reached. Setting max to any finite "
             "value is your own claim and switches that default off. A refined size "
             "below 5 nm raises `SIZE_UNUSUALLY_SMALL`. That flag marks the value and "
-            "does not bound it."
+            "does not bound it. On a time-of-flight bank the same parameter holds K/L "
+            "in Å⁻¹, because a white beam has no single wavelength to turn a size into "
+            "an angle, and the bank's parameter table records that unit."
         ),
         unit="deg 2θ", default="0.0",
         typical="0-0.3 deg; 0.1 deg is roughly a 100 nm domain at Cu Kα",
@@ -1007,7 +1009,8 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "Free this parameter when the peak shape is measurably more Gaussian than "
             "the standard's. It has the same default range bound as `lor_size`, "
             "squared. This parameter is a variance, so the limit on the width it "
-            "contributes applies to its square root."
+            "contributes applies to its square root. On a time-of-flight bank it holds "
+            "(K/L)² in Å⁻², the square of `lor_size`'s unit there."
         ),
         unit="deg² 2θ", default="0.0",
         typical="0-0.05 deg²",

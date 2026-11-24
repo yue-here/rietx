@@ -1208,3 +1208,18 @@ def test_a_hump_on_a_bank_says_the_width_guard_did_not_run():
     assert "narrowest" in got[0].suggestion
     assert _tof_background_peak_diagnostics(
         compile_tof_model(silicon(), bank(), _blank_bank())) == []
+
+
+def test_a_banks_size_pair_is_registered_in_the_unit_it_holds():
+    """Item 12.  On a bank ``lor_size`` holds K/L in Å⁻¹ and ``gauss_size``
+    its square, so the table registers those units and not the schema's
+    degrees; the strain pair is λ-free and keeps the schema's unit, and a
+    constant-wavelength table is unchanged."""
+    units = ParameterTable(silicon(), bank())._units
+    assert units["phases.0.lor_size"] == "1/A"
+    assert units["phases.0.gauss_size"] == "1/A^2"
+    assert units["phases.0.lor_strain"] == "deg"
+    assert units["phases.0.gauss_strain"] == "deg^2"
+    cw = ParameterTable(silicon(), rx.Instrument.bragg_brentano())._units
+    assert cw["phases.0.lor_size"] == "deg"
+    assert cw["phases.0.gauss_size"] == "deg^2"
