@@ -22,7 +22,8 @@ For any one parameter, `Refinement.profile_interval` refits with one parameter p
 
 Two parameters correlate when they change the calculated pattern in the same way.
 Over a wide angular range most effects have different shapes, and over a short one they do not.
-Between 20° and 40° 2θ, the constant, cos θ, tan θ and 1/cos θ curves are each a straight line to within 0.8 %.
+A zero shift moves every peak by a constant, a specimen displacement by a multiple of cos θ and the cell by a multiple of tan θ, and crystallite size widens a peak as 1/cos θ.
+Between 20° and 40° 2θ, each of these four curves is a straight line to within 0.8 %.
 
 | Correlated parameters | Shapes in 2θ | What goes wrong |
 |---|---|---|

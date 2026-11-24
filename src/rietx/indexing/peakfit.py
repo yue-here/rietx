@@ -746,9 +746,10 @@ def _fit_at(det: Detection, group: PeakGroup, instrument: Instrument,
         what="peak-group residual entering the covariance solve")
     esd = np.sqrt(np.maximum(np.diag(cov), 0.0))
     # the combined TCH Γ and η are the reported width and mixing under *both*
-    # shapes: Γ_TCH tracks the true Voigt FWHM to ~1 %, which is what the TCH
-    # quintic is fitted to, and one width summary keeps a peak list comparable
-    # across instruments that differ only in `profile.shape`
+    # shapes: Γ_TCH tracks the true Voigt FWHM to 0.43 % at worst (measured,
+    # tests/test_voigt.py), which is what the TCH quintic is fitted to, and one
+    # width summary keeps a peak list comparable across instruments that differ
+    # only in `profile.shape`
     fwhm, eta = tch_gamma_eta(gg, gl)
 
     lo, hi = m.bounds(pos)

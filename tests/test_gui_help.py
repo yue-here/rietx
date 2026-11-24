@@ -37,6 +37,7 @@ ARMS = (
     "peak_flags",
     "diagnostics",
     "peak_origins",
+    "cell_relations",
     "reader_options",
     "instrument_fields",
     "search_fields",
