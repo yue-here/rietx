@@ -75,7 +75,7 @@ export const WORKFLOWS: readonly Workflow[] = [
       { name: "Patterns", body: "The files in series order, and what each pattern after the first refines.", built: true },
       { name: "First fit", body: "Refine the walk's first pattern alone; the series starts from that result." },
       { name: "Run", body: "Each fit as it lands.", built: true },
-      { name: "Results", body: "One row per pattern, with trends and a map." },
+      { name: "Results", body: "One row per pattern, with trends and a map.", built: true },
     ],
   },
   {
