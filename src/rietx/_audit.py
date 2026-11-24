@@ -6097,8 +6097,9 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic: names the field that takes the value by hand, and the one "
                   "input that lets the estimate run")),
     Row("ABSORPTION_MU_R_OUT_OF_RANGE.suggestion", "suggestion", tier=1, ambiguity=3, value=2,
-        evidence=("arithmetic: names the three ways to lower muR and the call that prices "
-                  "each; picks none")),
+        evidence=("arithmetic: names the ways to lower muR (two sites: constant-wavelength, "
+                  "with the call that prices each; flight-time bank, adding a shortened "
+                  "window); picks none")),
     Row("ABSORPTION_THICKNESS_MATTERS.suggestion", "suggestion", value=1),
     Row("ADP_NOT_POSITIVE_DEFINITE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence="arithmetic: names three ways back to a defined tensor; picks none"),
