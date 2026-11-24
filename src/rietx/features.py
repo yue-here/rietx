@@ -539,6 +539,7 @@ FEATURES: dict[str, Feature] = {
             "subgroups § The k-subgroups over a prime field",
             "subgroups § Conjugacy classes",
             "subgroups § The transformation to a standard setting",
+            "subgroups § A phase in its standard setting",
             "subgroups § What the generator is checked against",
             "subgroups § Wyckoff positions from the operations",
             "subgroups § Splitting a Wyckoff position",
