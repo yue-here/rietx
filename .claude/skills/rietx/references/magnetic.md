@@ -100,6 +100,7 @@ On a `SeriesResult` (the series' own `diagnostics`, or a pattern's entry), from 
 | code | what you must not assume, and what to do |
 |---|---|
 | `CHILD_GROUP_UNNAMED` | (info — from `magnetic_supercell`, on the returned statement rather than on a `FitReport`; its `where` is `space_group`, relative to the returned phase) Read the child's `space_group` as a symbol. The group is `phase.symmetry_operations`, and every orbit, multiplicity and systematic absence comes from it; the cell's metric constraints come from the closest type's point group and lattice, which are this group's own. Quote the operation list, or the type **with the cell transform beside it**. Such a group has no Wyckoff letter (`site_constraints(...).wyckoff` is empty) and no `SPACE_GROUP_SETTING_ASSUMED` warning, both being properties of a tabulated setting. A published symbol for the same superstructure names a type in some other cell |
+| `CHILD_VARY_RESET` | (info — from `displacive_statement`, on the returned statement; `where` names the reset rows as `phases.0.*`) A stated child's free cell rows (under `Phase.parent_cell`) and moved atoms' x, y, z come back held, because the statement derives them. Do not read the cell as fixed: `phases.*.cell.*` frees the parent's edges, a strain only by naming `phases.*.parent_cell.strain.*`, and the amplitudes move the atoms. `DisplaciveStatement.held` pairs each reset row with what carries it |
 
 ## Interchange codes
 

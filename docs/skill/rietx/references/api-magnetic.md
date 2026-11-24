@@ -31,7 +31,7 @@ this; everything in `rx.` is `import rietx as rx`.*
 - `rietx.crystallography.representation.distortion.distortion_basis(parent, child, transform, *, reference: str = 'average') -> ModeBasis` — Every symmetry-adapted mode a child of `parent` admits, in Å.
 - `rietx.crystallography.representation.distortion.displacive_statement(parent, child=None, transform=None, *, candidate=None, seed: float = 0.01, reference: str = 'average', tolerance: float = 1.5) -> DisplaciveStatement` — State `child` as `parent` plus refinable mode amplitudes (WP-1419).
 - `rietx.crystallography.representation.distortion.DisplaciveStatement` — A child phase stated as its parent plus mode amplitudes (WP-1419).
-  Fields: `phase: object`, `basis: ModeBasis`, `transform: tuple[np.ndarray, np.ndarray]`, `site_map: tuple[int, ...]`, `biso_ties: tuple[tuple[str, str, float, float], ...]`, `seed: dict[str, float]`
+  Fields: `phase: object`, `basis: ModeBasis`, `transform: tuple[np.ndarray, np.ndarray]`, `site_map: tuple[int, ...]`, `biso_ties: tuple[tuple[str, str, float, float], ...]`, `seed: dict[str, float]`, `held: tuple[HeldVary, ...] = ()`, `diagnostics: tuple[Diagnostic, ...] = ()`
 
 ## What a fit on mode amplitudes reports
 

@@ -70,6 +70,7 @@ Two atoms and a default instrument make 41 rows, of which 24 could be freed.
 | `ParameterRow.mode_fixed` | `bool` | fixed by the Le Bail or Pawley mode |
 | `ParameterRow.needs_held_cell` | `bool` | a wavelength that cannot be freed while this pattern's cell is free |
 | `ParameterRow.origin_axis` | `(int, int, int)` or `None` | the direction along which this row holds a polar group's floating origin |
+| `ParameterRow.carried_by` | `tuple[str, ...]` or `None` | on a `Phase.parent_cell` child's cell row, the paths that refine it instead: the parent's edges and, where the child's group allows one, its strains |
 | `ParameterRow.help_key` | `str` or `None` | the [parameter map](parameters.md) or [instrument parameter map](parameters-instrument.md) entry that describes this row's family |
 
 The first eight fields mirror the solver's own row type field for field, and a test holds the two equal.
@@ -87,7 +88,7 @@ A row cannot be freed for one of five reasons, and the remedy differs.
 
 | Reason | Means | Lifted by |
 |---|---|---|
-| `locked` | fixed by the structure: a cell angle the space group fixes, a coordinate on a fully fixed special position, the first emission line's weight, a non-primary line's wavelength, `biso` on a site with an anisotropic tensor, an atom a rigid body places, a position correction the geometry does not have | nothing |
+| `locked` | fixed by the structure: a cell angle the space group fixes, a coordinate on a fully fixed special position, the first emission line's weight, a non-primary line's wavelength, `biso` on a site with an anisotropic tensor, an atom a rigid body places, a position correction the geometry does not have, a cell row derived through `Phase.parent_cell` (`ParameterRow.carried_by` names the rows that carry it) | nothing; free the carriers instead |
 | `tie` | an affine function of other rows, or a formula over named variables, so the freedom lives in its sources | `Refinement.untie`, if the tie is your own |
 | `mode_fixed` | refinable in principle, but the Le Bail or Pawley mode fixes it: every atom parameter, each phase's scale and a texture coefficient | switching back to `rietveld` |
 | `held` | you declared it does not move, whatever a plan frees; a coordinate held to fix a polar group's origin reads `held` too, and `ParameterRow.origin_axis` names the direction | `Refinement.unhold` |

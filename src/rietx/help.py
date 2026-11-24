@@ -1976,6 +1976,20 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "check the cell transform before you compare it with a published symbol."
         ),
     ),
+    "CHILD_VARY_RESET": HelpEntry(
+        title="A stated child's free rows come back held",
+        description=(
+            "`displacive_statement` derives some of the child's rows: the six cell "
+            "parameters when the cell is stated through the parent (`Phase.parent_cell`), "
+            "and the coordinates of every atom a distortion mode moves. A derived row is "
+            "not refined directly, so a `vary` flag the child carried on it (the GSAS and "
+            "GSAS-II importers set every refined cell parameter free) is reset. The "
+            "message names each reset row and what now refines it: `phases.*.cell.*` "
+            "frees the parent's cell edges, a strain is freed only by naming "
+            "`phases.*.parent_cell.strain.*`, and the mode amplitudes move the atoms. "
+            "`DisplaciveStatement.held` lists the same pairs."
+        ),
+    ),
     "CIF_ADP_SYMMETRY_PROJECTED": HelpEntry(
         title="Anisotropic displacement moved onto its symmetry-allowed form",
         description=(

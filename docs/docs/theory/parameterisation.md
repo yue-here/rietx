@@ -622,9 +622,9 @@ $r = 0.8$ along (1,1,1), $3.1\times10^{-3}$ with one La $B_{\text{iso}}$
 0.5 Å² off its orbit mates, and $1.5$ to $2.1\times10^{-3}$ with one O3 or Mn
 occupancy at 0.9, each with the moments at zero. With the moments on, a stage
 that freed the strain from zero ended at $+0.00200$ in 6 of 6 fits, whichever
-sign the planted strain had. That is measured for one strain with moments on
-(6 of 6 fits went to the same sign whichever was planted); it is not measured
-for preferred orientation, ADP or occupancy breakers.
+sign the planted strain had. The strongest live Mn mode, freed from zero with
+the planted amplitude at $\pm 0.03$ Å, took the planted sign in 5 of 6 fits.
+Neither is measured for preferred orientation, ADP or occupancy breakers.
 
 ## Soft restraints
 

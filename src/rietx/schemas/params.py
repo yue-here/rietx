@@ -200,6 +200,17 @@ class ParameterRow(Base):
     #: ``ParameterTable.origin_holds`` for every row, so ``None`` means "not
     #: holding an origin", never "not checked".
     origin_axis: tuple[int, int, int] | None = None
+    #: What refines this row's freedom when the row is derived from other
+    #: entries (WP-1419; Michael's ruling D59, 2026-11-24), or ``None``.  Set
+    #: on a ``Phase.parent_cell`` child's six cell rows, which the table holds:
+    #: ``phases.i.parent_cell.cell.*`` (reached by ``phases.*.cell.*``) and,
+    #: where the child's group allows one, ``phases.i.parent_cell.strain.*``,
+    #: freed only by naming it.  Written by ``Refinement.parameters`` from
+    #: ``ParameterTable.parent_cell_rows`` for every row, so ``None`` means "not
+    #: derived from a parent cell", never "not checked".  ``held_because`` names
+    #: it ahead of ``locked``, whose generic reason would send the caller
+    #: looking for a symmetry that is not there.
+    carried_by: tuple[str, ...] | None = None
     #: The :data:`rietx.help.PARAMETER_HELP` glob whose entry describes this
     #: path, or ``None`` when no family claims it.  The only extra that is not
     #: a held-reason: it says what the parameter *is*, and it is a key rather
@@ -240,6 +251,11 @@ class ParameterRow(Base):
                 return "force-fixed by the intensity mode (lebail/pawley)"
             return (f"placed by rigid body {self.body!r}: refine its origin "
                     "and rotation instead")
+        if self.carried_by:
+            edges, *strain = self.carried_by
+            return (f"derived from the parent's cell (Phase.parent_cell): free {edges}, "
+                    "which phases.*.cell.* reaches"
+                    + (f", and a strain only by naming {strain[0]}" if strain else ""))
         if self.locked:
             return "structurally fixed by symmetry or by the model"
         if self.tie is not None:

@@ -115,6 +115,7 @@ import itertools
 import math
 from dataclasses import dataclass
 from fractions import Fraction
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -123,6 +124,9 @@ from ..symmetry import _group_arrays, group_key, resolve_group, site_orbit
 from ..wyckoff import SPGLIB_REFUSALS
 from .irreps import canonical_kvector, equivalent_kvectors, small_irreps
 from .modes import basis_vectors, magnetic_representation
+
+if TYPE_CHECKING:
+    from ...schemas.common import Diagnostic
 
 #: Rank and residual tolerance on the projected subspaces.  Every matrix here
 #: is an average of permutation-times-rotation matrices in a well-conditioned
@@ -902,6 +906,24 @@ def _count(species) -> str:
 DISTORTION_SEED = 0.01
 
 
+@dataclass(frozen=True)
+class HeldVary:
+    """One stated ``vary=True`` the statement reset, and what carries it now (D59).
+
+    ``path`` is the child's row (``phases.0.cell.a``, ``phases.0.atoms.3.x``)
+    whose stored flag was ``True`` and is ``False`` on the returned phase,
+    because the row is derived: a cell row from ``Phase.parent_cell``, a
+    moved atom's coordinate from the mode amplitudes.  ``carried_by`` names
+    what refines that freedom instead, as paths a stage's ``turn_on`` takes:
+    ``phases.0.parent_cell.cell.*`` (which ``phases.*.cell.*`` reaches) and
+    ``phases.0.parent_cell.strain.*`` (freed only by naming it) for a cell
+    row, the amplitude paths whose vectors move the coordinate for an atom.
+    """
+
+    path: str
+    carried_by: tuple[str, ...]
+
+
 @dataclass(frozen=True, eq=False)
 class DisplaciveStatement:
     """A child phase stated as its parent plus mode amplitudes (WP-1419).
@@ -919,7 +941,11 @@ class DisplaciveStatement:
     constant)`` for ``Refinement.tie``.  ``seed`` maps each amplitude path to
     the value the statement seeded it with, and is empty when the child was
     already distorted (it starts at its own decomposition and is never
-    re-seeded).  Paths assume the phase is ``phases.0``.
+    re-seeded).  ``held`` lists every row the caller stated free that the
+    statement returns held, each with the paths that now carry it
+    (:class:`HeldVary`), and ``diagnostics`` holds one ``CHILD_VARY_RESET``
+    info row naming them when ``held`` is not empty (Michael's ruling D59,
+    2026-11-24).  Paths assume the phase is ``phases.0``.
     """
 
     phase: object
@@ -928,6 +954,8 @@ class DisplaciveStatement:
     site_map: tuple[int, ...]
     biso_ties: tuple[tuple[str, str, float, float], ...]
     seed: dict[str, float]
+    held: tuple[HeldVary, ...] = ()
+    diagnostics: tuple[Diagnostic, ...] = ()
 
 
 def parent_site_ties(site_map, *, phase_index: int = 0
@@ -1349,7 +1377,7 @@ def _parent_cell_of(parent, child, big, small):
     derived = metric.cell_from_metric(metric.child_metric(
         [values[n] for n in names], big, amps, basis))
     cell = child.cell.model_copy(update={
-        n: getattr(child.cell, n).model_copy(update={"value": float(v)})
+        n: getattr(child.cell, n).model_copy(update={"value": float(v), "vary": False})
         for n, v in zip(names, derived, strict=True)})
     return record, cell
 
@@ -1425,6 +1453,17 @@ def displacive_statement(parent, child=None, transform=None, *, candidate=None,
     group's constraints.  Drop the record (``phase.model_copy(update=
     {"parent_cell": None})``) to refine the child's six cell parameters
     instead.
+
+    **Stated free flags on derived rows** (Michael's ruling D59, 2026-11-24).
+    With ``parent_cell`` written the child's six cell rows come back held, and
+    a moved atom's x, y and z always do: those rows are derived, so the table
+    could never free them.  Every one the caller stated free is listed in
+    ``held`` with the paths that now carry it (``phases.*.cell.*`` frees the
+    parent's edges, a strain only by name, the amplitudes move the atoms),
+    and ``diagnostics`` says so once, as an ``info`` ``CHILD_VARY_RESET`` row.
+    Not a warning, since the GSAS and GSAS-II importers state every refined
+    child's cell free; not a refusal.  An operator-list parent's child keeps
+    its own cell flags.
 
     A mixed-occupancy parent site is refused (two parent atoms on one site,
     ``_reference``), as are atoms that do not pair one to one
@@ -1522,6 +1561,8 @@ def displacive_statement(parent, child=None, transform=None, *, candidate=None,
 
     # the record and the coordinates it derives
     placed = np.tensordot(amps, fields, axes=1) if len(modes) else np.zeros_like(disp)
+    amp_paths = [f"phases.0.distortion_modes.modes.{i}.amplitude" for i in range(len(modes))]
+    moved_held: list[HeldVary] = []
     atoms = []
     base_rows = []
     for j, atom in enumerate(child.atoms):
@@ -1536,6 +1577,13 @@ def displacive_statement(parent, child=None, transform=None, *, candidate=None,
             atoms.append(atom)
             continue
         new = origin + placed[n]
+        # a moved atom's coordinates are derived from the amplitudes, so a
+        # stated free flag is reset and said (D59); a coordinate no mode moves
+        # is fixed by the child's group, the basis being complete
+        moved_held.extend(
+            HeldVary(f"phases.0.atoms.{j}.{c}",
+                     tuple(amp_paths[i] for i, (*_, v) in enumerate(modes) if v[n][k] != 0.0))
+            for k, c in enumerate("xyz") if getattr(atom, c).vary)
         atoms.append(atom.model_copy(update={
             c: getattr(atom, c).model_copy(update={"value": float(new[k]), "vary": False})
             for k, c in enumerate("xyz")}))
@@ -1554,12 +1602,55 @@ def displacive_statement(parent, child=None, transform=None, *, candidate=None,
             for (comp, index, label, invariant, v), a in zip(modes, amps, strict=True)])
     update = {"atoms": atoms, "distortion_modes": record}
     parent_cell, cell = _parent_cell_of(parent, child, big, small)
+    held: list[HeldVary] = []
     if parent_cell is not None:
         update.update(parent_cell=parent_cell, cell=cell)
+        carriers = ("phases.0.parent_cell.cell.*",) + (
+            ("phases.0.parent_cell.strain.*",) if parent_cell.strain else ())
+        held = [HeldVary(f"phases.0.cell.{n}", carriers)
+                for n in ("a", "b", "c", "alpha", "beta", "gamma")
+                if getattr(child.cell, n).vary]
+    held.extend(moved_held)
     phase = child.model_copy(update=update)
     return DisplaciveStatement(
         phase=phase, basis=basis, transform=(big, small), site_map=site_map,
-        biso_ties=parent_site_ties(site_map), seed=seeded)
+        biso_ties=parent_site_ties(site_map), seed=seeded, held=tuple(held),
+        diagnostics=_vary_reset_diagnostics(held))
+
+
+def _vary_reset_diagnostics(held) -> tuple:
+    """``CHILD_VARY_RESET``: the stated free rows the statement returned held (D59).
+
+    One ``info`` row naming every reset path, grouped by what now carries
+    it, or nothing when no stated flag was reset.  Info, never a warning:
+    the GSAS and GSAS-II importers state all six cell flags free on every
+    refined child, so a warning would fire on every import, and the reset
+    changes nothing a fit could refine, the rows being derived (the
+    parameter table holds a ``Phase.parent_cell`` child's cell and refuses a
+    free coordinate on a mode-moved atom).  Michael's ruling D59, 2026-11-24.
+    """
+    from ...schemas.common import Diagnostic
+
+    if not held:
+        return ()
+    groups: dict[tuple[str, ...], list[str]] = {}
+    for h in held:
+        groups.setdefault(h.carried_by, []).append(h.path)
+    parts = [f"{', '.join(paths)} (carried by {', '.join(carriers)})" if carriers
+             else f"{', '.join(paths)} (fixed by the child's group: no mode moves it)"
+             for carriers, paths in groups.items()]
+    n = len(held)
+    return (Diagnostic(
+        level="info", code="CHILD_VARY_RESET",
+        where=[h.path for h in held], value=float(n),
+        message=(f"displacive_statement(): {n} row{'' if n == 1 else 's'} stated free "
+                 f"{'is' if n == 1 else 'are'} returned held, because the statement "
+                 f"derives {'it' if n == 1 else 'them'}: {'; '.join(parts)}."),
+        suggestion=("Free what carries each row instead (DisplaciveStatement.held "
+                    "pairs them): phases.*.cell.* reaches the parent's cell edges, a "
+                    "strain is freed only by naming phases.*.parent_cell.strain.*, and "
+                    "phases.*.distortion_modes.modes.*.amplitude moves the atoms."),
+    ),)
 
 
 # --------------------------------------------------------------------------

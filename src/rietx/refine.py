@@ -396,7 +396,7 @@ def mode_fixed_path(path: str, mode: Mode) -> bool:
 
 
 def _parameter_row(e, *, tie: "TieSpec | None", esd: float | None, mode: Mode,
-                   blocked, reach, owned, origin, path: str | None = None,
+                   blocked, reach, owned, origin, carried, path: str | None = None,
                    lo: float | None = None, hi: float | None = None) -> ParameterRow:
     """The one place an ``Entry`` becomes a :class:`ParameterRow` (WP-2028).
 
@@ -419,6 +419,7 @@ def _parameter_row(e, *, tie: "TieSpec | None", esd: float | None, mode: Mode,
         needs_held_cell=e.path in blocked,
         body=owned.get(e.path),
         origin_axis=origin[e.path][1] if e.path in origin else None,
+        carried_by=carried.get(e.path),
         help_key=help_key_for(e.path),
     )
     return ParameterRow(**kw)
@@ -3466,11 +3467,12 @@ class Refinement:
         reach = table.entry_reach()
         owned = table.body_rows()
         origin = table.origin_holds
+        carried = table.parent_cell_rows()
         rows = [_parameter_row(
             e, tie=(TieSpec._from_tie(e.tie, user=e.path in self._applied_ties)
                     if e.tie is not None else None),
             esd=esd.get(e.path), mode=mode, blocked=blocked, reach=reach,
-            owned=owned, origin=origin) for e in table.entries]
+            owned=owned, origin=origin, carried=carried) for e in table.entries]
         return self._formula_rows(table, rows)
 
     def _formula_rows(self, table: ParameterTable,

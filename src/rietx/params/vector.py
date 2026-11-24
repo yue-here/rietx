@@ -1956,9 +1956,9 @@ class ParameterTable:
         term has not been shown to choose the sign reliably: on LaMnO₃'s Pm
         child at k = (½, ½, 0) with Mn moments on, the strain's odd term is
         2e-5 of the top at s = 1e-3, and a fit freed from zero took the strain
-        to +0.00200 in 6 of 6 fits whatever the truth's sign.  That is
-        measured for one strain with moments on (6 of 6 fits went to the same
-        sign whichever was planted); it is not measured for preferred
+        to +0.00200 in 6 of 6 fits whatever the truth's sign; the strongest
+        live Mn mode, freed from zero with the truth at ±0.03 Å, took the
+        truth's sign in 5 of 6.  Neither is measured for preferred
         orientation, ADP or occupancy breakers.  So the block at
         the parent is not freed whatever else the phase carries, and the
         caller states the sign by seeding (Theory: *Distortion-mode
@@ -2353,6 +2353,28 @@ class ParameterTable:
                     "atoms' coordinates: move the body (its origin and "
                     "orientation), or rewrite the atoms from it with "
                     "rietx.crystallography.bodies.place_body_atoms")
+
+    def parent_cell_rows(self) -> dict[str, tuple[str, ...]]:
+        """Every child cell row a ``Phase.parent_cell`` block derives → what carries it.
+
+        The carriers are the globs a stage frees it through:
+        ``phases.i.parent_cell.cell.*``, which ``phases.*.cell.*`` reaches, and
+        ``phases.i.parent_cell.strain.*`` where the child's group allows a
+        strain, freed only by naming it (WP-1419; Michael's ruling D59,
+        2026-11-24).  Read off the blocks :meth:`_collect_parent_cell` built,
+        so ``ParameterRow.held_because`` names them rather than reading as a
+        symmetry-fixed row.
+        """
+        from .parent_cell import ParentCellBlock
+        out: dict[str, tuple[str, ...]] = {}
+        for block in self._cell_blocks:
+            if not isinstance(block, ParentCellBlock):
+                continue
+            edges = block.inputs[0].rsplit(".", 1)[0]
+            carriers = (f"{edges}.*",) + (
+                (f"{edges.rsplit('.', 1)[0]}.strain.*",) if len(block.inputs) > 6 else ())
+            out.update(dict.fromkeys(block.outputs, carriers))
+        return out
 
     def body_rows(self) -> dict[str, str]:
         """Every derived row a rigid body writes → that body's name (WP-1805)."""

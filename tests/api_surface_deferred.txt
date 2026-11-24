@@ -29,7 +29,6 @@ BodyTorsion.moves
 BodyTorsion.name
 BodyTorsion.vary
 ParameterRow.body
-Phase.parent_cell
 Phase.rigid_bodies
 RigidBody.atoms
 RigidBody.name

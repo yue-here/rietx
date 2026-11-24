@@ -412,6 +412,119 @@ def test_a_parent_stated_by_its_operations_leaves_the_child_its_own_cell():
     assert D.displacive_statement(parent, natao3_child(0.0), NATAO3_T).phase.parent_cell
 
 
+CELL = ("a", "b", "c", "alpha", "beta", "gamma")
+CARRIERS = ("phases.0.parent_cell.cell.*", "phases.0.parent_cell.strain.*")
+
+
+def _stated_free(child, moved=(3,)):
+    """``child`` as the GSAS and GSAS-II importers state a refined one: every
+    cell flag free (``111111``), and the coordinates of the atoms in ``moved``
+    free too (NaTaO₃'s O2; the other three sit on fully fixed positions)."""
+    def free(p):
+        return p.model_copy(update={"vary": True})
+    return child.model_copy(update={
+        "cell": child.cell.model_copy(update={n: free(getattr(child.cell, n)) for n in CELL}),
+        "atoms": [a.model_copy(update={c: free(getattr(a, c)) for c in "xyz"})
+                  if j in moved else a for j, a in enumerate(child.atoms)]})
+
+
+def test_an_imported_childs_free_flags_come_back_held_and_recorded():
+    """D59 (Michael, 2026-11-24): the importer shape states with no raise and no warning.
+
+    The child's six cell rows come back held, each recorded in
+    ``DisplaciveStatement.held`` with the parent's paths that carry it, and
+    the moved O2's x, y with the amplitude that moves them (its z is fixed by
+    the child's group, so nothing carries it).  One ``info`` row,
+    ``CHILD_VARY_RESET``, names every reset path.  Control: the same child
+    stated with every flag held resets nothing and says nothing.
+    """
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
+        statement = D.displacive_statement(
+            natao3_parent(), _stated_free(natao3_child()), NATAO3_T)
+    phase = statement.phase
+    assert not any(getattr(phase.cell, n).vary for n in CELL)
+    assert not any(getattr(phase.atoms[3], c).vary for c in "xyz")
+    amp = "phases.0.distortion_modes.modes.0.amplitude"
+    assert statement.held == (
+        *(D.HeldVary(f"phases.0.cell.{n}", CARRIERS) for n in CELL),
+        D.HeldVary("phases.0.atoms.3.x", (amp,)), D.HeldVary("phases.0.atoms.3.y", (amp,)),
+        D.HeldVary("phases.0.atoms.3.z", ()))
+    (note,) = statement.diagnostics
+    assert (note.level, note.code) == ("info", "CHILD_VARY_RESET")
+    assert note.where == [h.path for h in statement.held] and note.value == 9.0
+    for h in statement.held:
+        assert h.path in note.message
+    assert all(c in note.message for c in (*CARRIERS, amp))
+
+    quiet = D.displacive_statement(natao3_parent(), natao3_child(), NATAO3_T)
+    assert quiet.held == () and quiet.diagnostics == ()
+
+
+def test_held_because_names_what_carries_a_reset_cell_row_and_a_moved_coordinate():
+    """``ParameterRow.held_because`` on ``cell.a`` names the parent's paths (D59).
+
+    It used to read "structurally fixed by symmetry or by the model", which
+    sends a caller looking for a symmetry; a moved atom's x reads as its tie
+    onto the amplitude.  Control: the child stated on its own keeps a
+    refinable ``cell.a`` with no ``carried_by``.
+    """
+    statement = D.displacive_statement(natao3_parent(), _stated_free(natao3_child()), NATAO3_T)
+    ref = rx.Refinement(Structure(phases=[statement.phase]), neutron(), history=False)
+    rows = {r.path: r for r in ref.parameters()}
+    a = rows["phases.0.cell.a"]
+    assert not a.refinable and a.carried_by == CARRIERS
+    assert a.held_because == (
+        "derived from the parent's cell (Phase.parent_cell): free "
+        "phases.0.parent_cell.cell.*, which phases.*.cell.* reaches, and a strain "
+        "only by naming phases.0.parent_cell.strain.*")
+    x = rows["phases.0.atoms.3.x"]
+    assert not x.refinable and x.carried_by is None
+    assert "phases.0.distortion_modes.modes.0.amplitude" in x.held_because
+    assert rows["phases.0.parent_cell.cell.a"].carried_by is None
+
+    own = rx.Refinement(Structure(phases=[natao3_child()]), neutron(), history=False)
+    row = {r.path: r for r in own.parameters()}["phases.0.cell.a"]
+    assert row.refinable and row.carried_by is None and row.held_because == ""
+
+
+def test_a_parent_stated_by_its_operations_keeps_the_childs_cell_flags():
+    """An operator-list parent has no ``ParentCell``, so the child's own cell
+    refines under its own group, flags and all (D59).  Its moved atoms are
+    still derived, so their coordinates are reset and said."""
+    import gemmi
+
+    parent = natao3_parent()
+    ops = [op.triplet() for op in gemmi.SpaceGroup("P m -3 m").operations()]
+    listed = parent.model_copy(update={"symmetry_operations": ops})
+    child = _stated_free(natao3_child())
+    statement = D.displacive_statement(listed, child, NATAO3_T)
+    assert statement.phase.parent_cell is None
+    assert statement.phase.cell == child.cell
+    assert all(h.path.startswith("phases.0.atoms.3.") for h in statement.held)
+    (note,) = statement.diagnostics
+    assert "phases.0.cell" not in note.message
+    rows = {r.path: r for r in rx.Refinement(
+        Structure(phases=[statement.phase]), neutron(), history=False).parameters()}
+    assert rows["phases.0.cell.a"].vary and rows["phases.0.cell.a"].carried_by is None
+
+
+def test_the_cell_glob_frees_the_parents_edge_and_no_strain():
+    """``phases.*.cell.*`` on a stated child frees ``parent_cell.cell.a`` alone (D59).
+
+    The child's rows are derived and the strain is freed only by naming it,
+    which is what ``held`` and the info row tell a caller who stated the
+    child's cell free.  Positive arm: naming the strain frees it.
+    """
+    statement = D.displacive_statement(natao3_parent(), _stated_free(natao3_child()), NATAO3_T)
+    ref = rx.Refinement(Structure(phases=[statement.phase]), neutron(), history=False)
+    freed = ref.set_vary(["phases.*.cell.*"])
+    assert freed == ["phases.0.parent_cell.cell.a"]
+    assert ref.set_vary([STRAINS]) == ["phases.0.parent_cell.strain.0"]
+
+
 def test_the_two_records_name_one_parent_and_one_transform():
     """``distortion_modes`` and ``parent_cell`` agree, or the phase is refused by name.
 
