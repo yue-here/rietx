@@ -1447,8 +1447,49 @@ def _state_peak_equations():
     return model, table, {}
 
 
+def _state_peak_equations_wavelength():
+    """A phase's size and shift terms reading ``wavelength``, with λ free
+    beside their coefficients (WP-2152).
+
+    The λ column takes the scalar chain, which finite-differences the peak
+    scalars through ``decode``.  The equations read λ off the Bragg angle
+    (``ReflectionFrame.bindings``), so the column carries their share of the
+    width and position, and this row holds it to the whole-model difference
+    and to autodiff.  That the equation reads the moved λ at all is
+    ``test_peak_equations``' free-λ twin, since every method here would agree
+    on a residual that froze it.  The cell is held, since a free λ beside a
+    free cell is refused.
+    """
+    from rietx.schemas.peak_equation import PeakEquation
+
+    p = Parameter
+    structure = make_lab6()
+    structure.phases[0].peak_equations = [
+        PeakEquation(target="lor_fwhm", expression="y*wavelength/cos(theta)",
+                     coefficients={"y": p(value=0.03)}),
+        PeakEquation(target="shift", expression="z*wavelength*tan(theta)",
+                     coefficients={"z": p(value=0.01)}),
+    ]
+    ins = Instrument.debye_scherrer(wavelength=1.5406)
+    ins.source.dispersion = None
+    tt = np.arange(15.0, 95.0, 0.02)
+    rng = np.random.default_rng(2152)
+    pattern = PatternData(two_theta=tt.tolist(),
+                          intensity=(50.0 + 10.0 * rng.random(len(tt))).tolist())
+    table = ParameterTable(structure, ins)
+    table.set_vary(["*"], False)
+    for path in ("phases.0.scale", "instrument.source.lines.0.wavelength",
+                 "phases.0.peak_equations.*"):
+        assert table.set_vary([path], True), path
+    model = compile_model(structure, ins, pattern, mode="rietveld",
+                          moving_paths=set(table.moving_paths),
+                          window_area_tol=WINDOW_AREA_TOL)
+    return model, table, {}
+
+
 CONFIGS = {"families": _state_families,
            "peak_equations": _state_peak_equations,
+           "peak_equations_wavelength": _state_peak_equations_wavelength,
            "distortion_modes": _state_distortion_modes,
            "texture": _state_texture,
            "bodies": _state_bodies,
@@ -1500,6 +1541,7 @@ CONFIG_PARAMS = [
     _config("families_voigt"),
     _config("texture"),
     _config("peak_equations"),
+    _config("peak_equations_wavelength"),
     _config("axial_one_zero"),
     _config("sharp_widths"),
     _config("families_tied"),
