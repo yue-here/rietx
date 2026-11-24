@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   CIVIDIS, DIFF_HIGH, DIFF_LOW, bandRows, barPart, cividis, columnRanges, countLabel, cutValue,
-  diverging, hexRgb, labelStep, logFraction, lowerBound, roundWidth, rowColumns, shownRows,
+  diverging, hexRgb, labelStep, logFraction, lowerBound, nearest, roundWidth, rowColumns, shownRows,
 } from "./seriesmap";
 
 describe("the Map's colours (calls 8, 24)", () => {
@@ -53,6 +53,18 @@ describe("cells to pixels", () => {
     expect([...r]).toEqual([0, 2, 2, 4, 4, 6, 6, 8, 8, 10]);
     const fine = columnRanges(tt, 10, 11, 4);
     for (let c = 0; c < 4; c++) expect(fine[2 * c + 1] - fine[2 * c]).toBeGreaterThanOrEqual(1);
+    // a narrow pixel takes the cell nearest its middle, not the next one
+    expect([...fine]).toEqual([0, 1, 0, 1, 1, 2, 1, 2]);
+    // a view ending on the last cell still draws it
+    const end = columnRanges(tt, 10, 19, 3);
+    expect(end[end.length - 1]).toBe(10);
+  });
+
+  it("finds the nearest cell", () => {
+    expect(nearest(tt, 12.4)).toBe(2);
+    expect(nearest(tt, 12.6)).toBe(3);
+    expect(nearest(tt, 5)).toBe(0);
+    expect(nearest(tt, 99)).toBe(9);
   });
 
   it("takes a pixel's highest count, and its mean difference, skipping NaN", () => {
@@ -68,6 +80,8 @@ describe("cells to pixels", () => {
     const cells = Float64Array.from([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
     expect(cutValue(cells, 0, tt, 14, 2)).toBe(3.5);     // [13, 15): 13 and 14
     expect(cutValue(cells, 0, tt, 14, 0)).toBe(4);
+    expect(cutValue(cells, 0, tt, 14.2, 0)).toBe(4);
+    expect(cutValue(cells, 0, tt, 14.7, 0)).toBe(5);
     expect(cutValue(Float64Array.from(Array(10).fill(NaN)), 0, tt, 14, 2)).toBeNaN();
   });
 });

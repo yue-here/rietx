@@ -76,19 +76,34 @@ export function lowerBound(a: ArrayLike<number>, v: number): number {
   return lo;
 }
 
+/** The index of the cell whose 2θ is nearest `v`, in ascending `a`. */
+export function nearest(a: ArrayLike<number>, v: number): number {
+  const j = lowerBound(a, v);
+  if (j >= a.length) return a.length - 1;
+  return j > 0 && v - a[j - 1] <= a[j] - v ? j - 1 : j;
+}
+
 /** The cells under each of `width` pixel columns across [t0, t1], as
- *  half-open index ranges into the grid; a column narrower than a cell takes
- *  the cell it lies in. */
+ *  half-open index ranges into the grid, the last column closed at `t1`; a
+ *  column narrower than a cell takes the cell nearest its middle. */
 export function columnRanges(tt: ArrayLike<number>, t0: number, t1: number,
                              width: number): Int32Array {
   const w = Math.max(0, Math.floor(width)), out = new Int32Array(2 * w);
   if (!w || !tt.length) return out;
   for (let c = 0; c < w; c++) {
-    const a = lowerBound(tt, t0 + (c / w) * (t1 - t0));
-    const b = lowerBound(tt, t0 + ((c + 1) / w) * (t1 - t0));
-    const ja = Math.min(a, tt.length - 1);
-    out[2 * c] = ja;
-    out[2 * c + 1] = Math.max(ja + 1, Math.min(b, tt.length));
+    const x0 = t0 + (c / w) * (t1 - t0), x1 = t0 + ((c + 1) / w) * (t1 - t0);
+    const a = lowerBound(tt, x0);
+    // the last column keeps a cell sitting exactly on the view's right end
+    let b = lowerBound(tt, x1);
+    if (c === w - 1) while (b < tt.length && tt[b] <= x1) b += 1;
+    if (b > a) {
+      out[2 * c] = a;
+      out[2 * c + 1] = b;
+    } else {
+      const j = nearest(tt, (x0 + x1) / 2);
+      out[2 * c] = j;
+      out[2 * c + 1] = j + 1;
+    }
   }
   return out;
 }
@@ -118,10 +133,13 @@ export function rowColumns(cells: ArrayLike<number>, offset: number, ranges: Int
 export function cutValue(cells: ArrayLike<number>, offset: number, tt: ArrayLike<number>,
                          cut: number, width: number): number {
   if (!tt.length) return NaN;
-  const j0 = Math.min(tt.length - 1, lowerBound(tt, cut - width / 2));
-  const j1 = Math.max(j0 + 1, lowerBound(tt, cut + width / 2));
+  let j0 = lowerBound(tt, cut - width / 2), j1 = lowerBound(tt, cut + width / 2);
+  if (j1 <= j0) {
+    j0 = nearest(tt, cut);
+    j1 = j0 + 1;
+  }
   let sum = 0, n = 0;
-  for (let j = j0; j < Math.min(j1, tt.length); j++) {
+  for (let j = j0; j < j1; j++) {
     const v = cells[offset + j];
     if (Number.isNaN(v)) continue;
     sum += v;
