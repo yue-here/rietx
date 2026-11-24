@@ -371,7 +371,10 @@ gh run list --workflow nightly.yml --branch main --limit 1
   fluorite 0.14×, corundum 0.37×, brucite 0.0012×. Zincite's declared stages read
   0.07-0.14×. All 8 standards fit in 35 s for the re-pin. The five test files built on the
   standards: 130 passed, 26.6 s on 4 workers. Fast selection on the tree with main merged
-  in (`e67101f17`): 15217 passed, 450 skipped, 32 xfailed, in 9:19 after a 51-min wait for the suite lock. Full suite on the same tree: 16176 passed, 461 skipped, 53 xfailed, in 35:17. Each run's one failure was `test_the_wp_index_is_the_generators_output`, the index left stale by this close's header edit and regenerated after. The branch adds one fast test, which took 0.89 s (local junit), and one slow xfail case, zincite's, which was a pass before. CI's lint steps:
+  in (`e67101f17`): 15217 passed, 450 skipped, 32 xfailed, in 9:19 after a 51-min wait for the suite lock. Full suite on the same tree: 16176 passed, 461 skipped, 53 xfailed, in 35:17. Each run's one failure was `test_the_wp_index_is_the_generators_output`, the index left stale by this close's header edit and regenerated after. The branch adds one fast test, which took 0.89 s (local junit), and one slow xfail case, zincite's, which was a pass before. Main then moved by 11 code
+  files (profiles, texture, magCIF), so it was merged again (`ae501e922`). On that tree the
+  six files built on the standards or on the WP index gave 187 passed and 1 xfailed; the
+  full suite was not re-run. CI's lint steps:
   ruff and the tutorial format clean, Vale 0 errors, skill caps, audit delta, code
   references and rulebook limits all quiet. `tests.reader_output`: exit 0. Probes in
   `~/.cache/ghostshift/rietx/wp-2036/` (`probe_planfields.py`, `probe_nudge.py`,
