@@ -136,3 +136,13 @@ def test_the_decision_needs_no_floating_point(hkl, monkeypatch):
     monkeypatch.setattr(np.linalg, "svd", refuse)
     group = MagneticGroup.from_xyz(["x,y,z,+1"], ["x,y,z,+1", "x+1/2,y,z,-1"])
     assert magnetically_allowed(group, [hkl])[0] == (hkl[0] % 2 == 1)
+
+
+def test_the_cached_power_residues_cannot_be_written_into():
+    """The array is lru_cached and shared: a write by one caller would change every later answer."""
+    from rietx.crystallography.magnetic.operators import _power_residues
+
+    rows = _power_residues(6)
+    assert not rows.flags.writeable
+    with pytest.raises(ValueError):
+        rows[0, 0] = 99

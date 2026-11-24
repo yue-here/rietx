@@ -1518,6 +1518,8 @@ def _power_residues(n: int) -> np.ndarray:
             top = current[-1]
             current = [0] + current[:-1]
             current = [c - top * p for c, p in zip(current, phi[:deg])]
+    # the cache hands this one array to every caller: a write would change every later answer
+    rows.flags.writeable = False
     return rows
 
 
