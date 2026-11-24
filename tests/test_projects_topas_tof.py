@@ -370,3 +370,36 @@ def test_the_writer_refuses_what_it_cannot_state(update, needle):
     st, ins = update(*_model())
     with pytest.raises(ValueError, match=needle):
         TT.from_tof(st, ins, data_file="bank.xye", x_range=(5000.0, 30000.0))
+
+
+def test_a_refined_macro_argument_the_bank_cannot_carry_is_named(tmp_path):
+    """#1548 review, item 5.  ``TOF_PV(@, 50, @, 0.3, t1)`` refines the
+    width and the Lorentzian fraction, and the bank's σ and γ coefficients
+    are derived from them, with no one declaration whose flag they are; they
+    arrive held.  io/CLAUDE.md: a flag the model cannot honour is dropped at
+    warning, naming what it costs.  The control holds the same arguments
+    with ``!``, and nothing is reported."""
+    model, bank = _bank(tmp_path)
+    held = dict(bank.held)
+    assert held and all(p.startswith("instrument.source.profile_tof.")
+                        for p in held)
+    assert set(held) <= {f"instrument.source.profile_tof.{k}"
+                         for k in ("sig0", "sig1", "sig2", "gam0", "gam1", "gam2")}
+    diagnostics = []
+    _, ins = TT.to_tof_refinement(model, dataset=0, two_theta_bank_deg=90.0,
+                                  diagnostics=diagnostics)
+    (d,) = [d for d in diagnostics if d.code == "TOPAS_TOF_FLAG_HELD"]
+    assert d.level == "warning" and sorted(d.where) == sorted(held)
+    assert "fewer than the file's refinement" in d.message
+    for path in held:
+        assert not getattr(ins.source.profile_tof, path.rsplit(".", 1)[-1]).vary
+
+    (tmp_path / "held").mkdir()
+    model, bank = _bank(tmp_path / "held",
+                        phase=_PHASE + _SHAPE.replace("TOF_PV(@, 50, @, 0.3",
+                                                      "TOF_PV(!, 50, !, 0.3"))
+    assert bank.held == []
+    quiet = []
+    TT.to_tof_refinement(model, dataset=0, two_theta_bank_deg=90.0,
+                         diagnostics=quiet)
+    assert "TOPAS_TOF_FLAG_HELD" not in [d.code for d in quiet]

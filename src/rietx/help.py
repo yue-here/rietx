@@ -5068,6 +5068,17 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "Respell the site in TOPAS if you want to refine the ion."
         ),
     ),
+    "TOPAS_TOF_FLAG_HELD": HelpEntry(
+        title="A refined coefficient of the TOPAS bank arrives held",
+        description=(
+            "The file refines a time-of-flight width or calibration term through a "
+            "macro's arguments or an expression, such as the width in `TOF_PV`. The "
+            "bank's coefficient is derived from those arguments, so no one declaration "
+            "carries its refine flag, and it is built held at the file's value. The "
+            "built model then has fewer free parameters than the file's own refinement. "
+            "Free the named coefficients before you compare a fit with the file's."
+        ),
+    ),
     "VARIABLE_NOT_FREED": HelpEntry(
         title="A variable was never refined",
         description=(

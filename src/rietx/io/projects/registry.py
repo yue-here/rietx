@@ -412,7 +412,10 @@ PROJECT_FORMATS: tuple[ProjectFormat, ...] = (
                   "a line — never the suffix, which several unrelated programs "
                   "also write",
             carries=("phases", "sites", "refine flags", "the emission profile",
-                     "the run's own Rwp and GoF", "the data files it points at"),
+                     "the run's own Rwp and GoF", "the data files it points at",
+                     "a time-of-flight bank's calibration, peak shape, "
+                     "background and range, built by "
+                     "topas_tof.to_tof_refinement"),
             # "both" (dry-run merge finding, 2026-09-17): the magnetic chain's
             # TOPAS_MAGNETIC_GROUP_READ/TOPAS_MOMENT_* diagnostics
             # fire from to_structure(..., diagnostics=[]),

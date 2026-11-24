@@ -1799,6 +1799,18 @@ ROWS: tuple[Row, ...] = (
     Row("TOPAS_PHASE_TERM_READ", "code"),
     Row("TOPAS_SPECIES_NORMALISED", "code"),
     Row("TOPAS_SPECIES_WRITTEN_NEUTRAL", "code"),
+    Row("TOPAS_TOF_FLAG_HELD", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: fires exactly when a time-of-flight bank's coefficient is "
+                  "derived from macro arguments or an expression the file refines (@) and "
+                  "no one declaration carries its flag, so it is built held "
+                  "(io/projects/topas_tof.py TopasTOFBank.held, to_tof_refinement); the "
+                  "model has one free parameter fewer per coefficient than the file's "
+                  "refinement, and io/CLAUDE.md classes a flag the model cannot honour as "
+                  "dropped at warning, naming what it costs "
+                  "(tests/test_projects_topas_tof.py::test_a_refined_macro_argument_the_bank_cannot_carry_is_named)"),
+        response="warning",
+        responds=("quote no width or calibration from a fit of the built bank as the file's "
+                  "refinement: the named coefficients were held; free them and refit first")),
     Row("VARIABLE_NOT_FREED", "code", tier=1, ambiguity=1,
         response="warning",
         responds=("quote no value the named variable sets, nor the variable itself: it "
@@ -6515,6 +6527,10 @@ ROWS: tuple[Row, ...] = (
     Row("TOPAS_MOMENT_G_HELD.suggestion", "suggestion", value=1),
     Row("TOPAS_MOMENT_ION_UNCHARGED.suggestion", "suggestion", value=1),
     Row("TOPAS_PHASE_TERM_READ.suggestion", "suggestion", value=1),
+    Row("TOPAS_TOF_FLAG_HELD.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("read io/projects/topas_tof.py to_tof_refinement: names the call that "
+                  "frees the held coefficients (Refinement.set_vary) before a comparison "
+                  "with the file's own fit; ranks nothing")),
     Row("VARIABLE_NOT_FREED.suggestion", "suggestion", tier=1, ambiguity=3, value=2,
         evidence=("arithmetic: names the stage turn_on that frees the variable, the only "
                   "route a plan has, and picks nothing: holding it may be the caller's "

@@ -306,10 +306,38 @@ class TopasTOFBank:
     #: outside the range TOPAS generates reflections (default 0.5).
     extra_x: tuple | None = None
     refused: list = field(default_factory=list)
+    #: Which file names behind each derived group the file **refines** (``@``):
+    #: ``{"widths" | "exponentials" | "calibration": [name, ...]}``.  A
+    #: coefficient derived from them has no one declaration whose flag it is.
+    flagged: dict = field(default_factory=dict)
+    #: ``(rietx path, the refined names it is derived from)`` for every
+    #: coefficient the file refines and the bank carries held, so the build
+    #: names each (:func:`to_tof_refinement`, ``TOPAS_TOF_FLAG_HELD``) rather
+    #: than dropping the flag without a word (io/CLAUDE.md, #1548 review
+    #: item 5).
+    held: list = field(default_factory=list)
 
     def refuse(self, construct: str, why: str) -> None:
         if (construct, why) not in self.refused:
             self.refused.append((construct, why))
+
+    def flag(self, group: str, names) -> None:
+        for name in names:
+            if name and name not in self.flagged.setdefault(group, []):
+                self.flagged[group].append(name)
+
+
+def _refined_in(expr: str | None, reads: dict) -> list[str]:
+    """The names ``expr`` reads that the file declares refined (``@``)."""
+    if not expr:
+        return []
+    return [n for n in dict.fromkeys(re.findall(r"[A-Za-z_]\w*", expr))
+            if (r := reads.get(n)) is not None and r.vary]
+
+
+def _keyword_flagged(text: str, keyword: str) -> bool:
+    """Whether ``keyword`` carries the refine flag itself (``pv_fwhm @ 0.1``)."""
+    return re.search(rf"\b{keyword}\s*@", text) is not None
 
 
 #: Convolutions rietx's TOF peak has no counterpart for: the reference's
@@ -524,7 +552,7 @@ def _read_bank(k, constructs, span, bodies, file_reads) -> TopasTOFBank:
         text = _with_macros(one, head + "\n" + chunk, bodies)
         _read_calibration(one, text, names, symbols, reads)
         _read_scale(one, text)
-        _read_shape(one, text, names, symbols)
+        _read_shape(one, text, names, symbols, reads)
         per_phase.append(one)
     for one in per_phase:
         for c, why in one.refused:
@@ -543,6 +571,8 @@ def _read_bank(k, constructs, span, bodies, file_reads) -> TopasTOFBank:
                             "bank")
     bank.calibration, bank.profile = first.calibration, first.profile
     bank.sources = first.sources
+    bank.flagged = first.flagged
+    bank.held = list(first.held)
     bank.lorentz_d4 = all(one.lorentz_d4 for one in per_phase)
     _profile_flags(bank, [span_reads, file_reads])
 
@@ -604,6 +634,8 @@ def _read_calibration(bank, text, names, symbols, reads) -> None:
                         f"+ t3/d")
             return
         decl = _term_flags(pk[0], reads)
+        refined = _refined_in(pk[0], reads) + (
+            ["pk_xo"] if _keyword_flagged(text, "pk_xo") else [])
         for key, c, unit in zip(("tzero", "difc", "difa", "difb"), coef,
                                 ("us", "us/A", "us/A^2", "us*A")):
             read = decl.get(key)
@@ -615,6 +647,11 @@ def _read_calibration(bank, text, names, symbols, reads) -> None:
             else:
                 bank.calibration[key] = Parameter(value=float(c), vary=False,
                                                   unit=unit)
+                # a term the file refines through an expression this reader
+                # evaluates but cannot attribute to one declaration: held, and
+                # said so at the build (#1548 review, item 5)
+                if refined and c != 0.0:
+                    bank.held.append((f"instrument.source.{key}", refined))
         bank.sources["calibration"] = "pk_xo"
         return
     bank.refuse("calibration", "no TOF_x_axis_calibration or pk_xo this "
@@ -658,7 +695,7 @@ def _read_scale(bank, text) -> None:
                     "carries no d⁴ and rietx's always does")
 
 
-def _read_shape(bank, text, names, symbols) -> None:
+def _read_shape(bank, text, names, symbols, reads) -> None:
     difc = bank.calibration.get("difc")
     difc_name = bank.sources.get("difc_name")
     t1_value = difc.value if difc is not None else None
@@ -686,6 +723,7 @@ def _read_shape(bank, text, names, symbols) -> None:
                         "names, do not read")
         else:
             f, e = float(fw.value), float(lor.value)
+            bank.flag("widths", [r.name or "TOF_PV" for r in (fw, lor) if r.vary])
             fwhm_law = lambda d, f=f, t1=t1: 1e-5 * f * t1 * d  # noqa: E731
             eta_law = lambda d, e=e: e                            # noqa: E731
             bank.sources["widths"] = "TOF_PV"
@@ -696,6 +734,10 @@ def _read_shape(bank, text, names, symbols) -> None:
             bank.refuse("pv_fwhm / pv_lor", why or why2)
         else:
             fwhm_law, eta_law = fl, el
+            bank.flag("widths", _refined_in(fw_direct[0], reads)
+                      + (_refined_in(lor_direct[0], reads) if lor_direct else [])
+                      + [kw for kw in ("pv_fwhm", "pv_lor")
+                         if _keyword_flagged(text, kw)])
             bank.sources["widths"] = "pv_fwhm/pv_lor"
     else:
         bank.refuse("peak width", "no TOF_PV or pv_fwhm this reader can find")
@@ -721,6 +763,8 @@ def _read_shape(bank, text, names, symbols) -> None:
             bank.refuse("TOF_Exponential", "its arguments, or the calibration "
                         "constant it names, do not read")
             continue
+        bank.flag("exponentials",
+                  [r.name or "TOF_Exponential" for r in (a0, a1) if r.vary])
         sides[side].append(lambda d, a=a0.value, b=a1.value, w=w, t1=t1:
                            LN1000 * (a + b / d ** w) / t1)
     for expr in _keyword_values(text, "exp_conv_const"):
@@ -728,6 +772,9 @@ def _read_shape(bank, text, names, symbols) -> None:
         if law is None:
             bank.refuse("exp_conv_const", why)
             continue
+        bank.flag("exponentials", _refined_in(expr, reads)
+                  + (["exp_conv_const"] if _keyword_flagged(text, "exp_conv_const")
+                     else []))
         c1 = law(1.0)
         side = "late" if c1 > 0 else "early"
         sides[side].append(lambda d, law=law: LN1000 / abs(law(d)))
@@ -755,7 +802,9 @@ def _profile_flags(bank, scopes) -> None:
     :class:`~rietx.schemas.instrument.ProfileTOF` name with a ``_<tag>``
     suffix and the same value — how :func:`from_tof` writes them. A
     coefficient derived from a macro's arguments (``TOF_PV``'s width, say) has
-    no one declaration whose flag it is, and arrives held."""
+    no one declaration whose flag it is, and arrives held; where the file
+    refines what it is derived from, it is listed on :attr:`TopasTOFBank.held`
+    for the build to report."""
     out = {}
     for key, value in bank.profile.items():
         vary = False
@@ -770,6 +819,10 @@ def _profile_flags(bank, scopes) -> None:
                 value, vary = float(read.value), bool(read.vary)
                 break
         out[key] = Parameter(value=value, vary=vary)
+        group = "exponentials" if key.startswith(("alpha", "beta")) else "widths"
+        if not vary and value != 0.0 and bank.flagged.get(group):
+            bank.held.append((f"instrument.source.profile_tof.{key}",
+                              list(bank.flagged[group])))
     bank.profile = out
 
 
@@ -801,14 +854,22 @@ def _widths_to_profile(bank, fwhm_law, eta_law) -> None:
 
 # ------------------------------------------------------------ building rietx
 
-def to_tof_refinement(model, *, dataset: int, two_theta_bank_deg: float):
+def to_tof_refinement(model, *, dataset: int, two_theta_bank_deg: float,
+                      diagnostics: list | None = None):
     """``(Structure, Instrument)`` for one time-of-flight dataset.
 
     Refuses by name, listing every construct rietx cannot carry
     (:attr:`TopasTOFBank.refused`). The phase scale is converted on the way
     in, S_rietx = S_TOPAS · 0.01 / sin θ_bank (module docstring), which is
     why the bank angle — not in the file — is required.
+
+    Pass ``diagnostics=`` a list to hear about the refine flags the bank
+    cannot carry: a coefficient the file refines through a macro's arguments
+    or an expression (``TOF_PV``'s width, say) has no one declaration whose
+    flag it is, so it arrives held, and ``TOPAS_TOF_FLAG_HELD`` names each at
+    ``warning`` with what it costs (:attr:`TopasTOFBank.held`).
     """
+    from ...schemas.common import Diagnostic
     from ...schemas.instrument import BackgroundChebyshev, Instrument, ProfileTOF
 
     bank = getattr(model, "tof_banks", {}).get(dataset)
@@ -825,6 +886,23 @@ def to_tof_refinement(model, *, dataset: int, two_theta_bank_deg: float):
     if not 0.0 < two_theta_bank_deg < 180.0:
         raise ValueError(f"two_theta_bank_deg must lie in (0, 180), got "
                          f"{two_theta_bank_deg}")
+    if bank.held and diagnostics is not None:
+        diagnostics.append(Diagnostic(
+            level="warning", code="TOPAS_TOF_FLAG_HELD",
+            where=[path for path, _ in bank.held],
+            message=(f"{model.path or '<model>'}: dataset {dataset} refines "
+                     + "; ".join(f"{path.rsplit('.', 1)[-1]} (through "
+                                 f"{', '.join(names)})"
+                                 for path, names in bank.held)
+                     + ", and each is derived from a macro's arguments or an "
+                       "expression rather than one declaration, so it is "
+                       "read as held: the built model has "
+                     + f"{len(bank.held)} free parameter"
+                     + ("" if len(bank.held) == 1 else "s")
+                     + " fewer than the file's refinement."),
+            suggestion=("Free the named coefficients on the built instrument "
+                        "(Refinement.set_vary) before comparing a fit with "
+                        "the file's.")))
     template = ProfileTOF()
     profile = ProfileTOF(**{k: v.model_copy(update={
         "unit": getattr(template, k).unit, "min": getattr(template, k).min,
