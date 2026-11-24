@@ -213,7 +213,9 @@ NOT_WALKED: dict[str, str] = {
 #: and box are dicts the constant walk cannot see (WP-2002, B14);
 #: ``SequentialRefinement.fit`` and
 #: ``SearchSpec`` because a declared seat reaches them, through
-#: ``refine_sequential``'s ``**kw`` and ``index_pattern``'s ``spec=None``.
+#: ``refine_sequential``'s ``**kw`` and ``index_pattern``'s ``spec=None``;
+#: ``PatternData`` because its ``intensity_basis=None`` is a fallback the
+#: flight-time forward model acts on (#1548 review, item 17).
 DEFAULT_SEATS: dict[str, int] = {
     "rietx.schemas.plan.PlanSpec": 2002,
     "rietx.schemas.plan.StageSpec": 2002,
@@ -235,6 +237,7 @@ DEFAULT_SEATS: dict[str, int] = {
     "rietx.indexing.kvector.kgrid_null": 2007,
     "rietx.indexing.kvector.kvector_equivalents": 2007,
     "rietx.crystallography.representation.subgroups.maximal": 2006,
+    "rietx.schemas.pattern.PatternData": 2006,
 }
 
 #: The record schemas whose fields the guard holds.
@@ -1774,8 +1777,8 @@ ROWS: tuple[Row, ...] = (
                   "fit proceeded as 'density', what every flight-time fit before the option "
                   "did; which basis the bank holds is how it was reduced, a fact outside "
                   "the pattern, so it reports and ranks neither (DESIGN.md Rules, 1, third "
-                  "kind).  The fallback itself sits at no DEFAULT_SEATS seat (PatternData "
-                  "is not one), so this row is its only record in the table"),
+                  "kind).  The fallback itself is the PatternData:intensity_basis default "
+                  "row"),
         response="warning",
         responds=("quote no biso or adp from this bank until pattern.intensity_basis is "
                   "declared and the bank refit: a missing W(T) is a smooth rise across the "
@@ -5289,6 +5292,56 @@ ROWS: tuple[Row, ...] = (
                  "floors'; B9, no chosen limit on a quantity that stays physical); the far bound and "
                  "the ceiling are TCHZ_CEILING_DEG's (the sixth round's Q7, ruled 2026-10-21)."),
         approved="2026-10-23"),
+    Row("rietx.schemas.pattern.PatternData:two_theta", "default", tier=1, ambiguity=1, value=None,
+        evidence=("arithmetic: one of the pair of abscissae, exactly one of which the validator "
+                  "requires (PatternData._validate refuses neither and both); None is 'not this "
+                  "axis', never a value")),
+    Row("rietx.schemas.pattern.PatternData:tof", "default", tier=1, ambiguity=1, value=None,
+        evidence=("arithmetic: one of the pair of abscissae, exactly one of which the validator "
+                  "requires (PatternData._validate refuses neither and both); None is 'not this "
+                  "axis', never a value")),
+    Row("rietx.schemas.pattern.PatternData:intensity_basis", "default", tier=3, ambiguity=3,
+        value=None,
+        evidence=("None is 'the file did not say', and on a flight-time bank the forward model "
+                  "then fits the channels as 'density': no W(T) (compile_tof_model sets "
+                  "channel_width None), the model every flight-time fit had before the option, "
+                  "reported by TOF_INTENSITY_BASIS_ASSUMED.  The guess can be wrong either way "
+                  "and what a wrong one costs is measured: a counts bank fitted as a density "
+                  "moves Biso more than 0.1 A^2 off a true 0.5 and Rwp above 1.2x the right "
+                  "fit's, and a density fitted as counts the same the other way "
+                  "(tests/test_tof_intensity_basis.py::test_leaving_out_the_channel_width_biases_biso_and_costs_rwp, "
+                  "::test_declaring_counts_on_a_density_pattern_is_the_same_error_reversed).  "
+                  "The constant-wavelength arm does not read the field"),
+        grounds=("Which basis a bank holds is how it was reduced, a fact outside the pattern "
+                 "(DESIGN.md Rules, 1, third kind), and the fit proceeds on one reading of it "
+                 "and warns.  The row was asked for in the maintainer's review of #1548 "
+                 "(2026-11-23, item 17), which leaves open whether an undeclared basis is "
+                 "refused by name instead; the date below is that request, and the answer "
+                 "either keeps this row or replaces the fallback with a refusal and its test."),
+        approved="2026-11-23"),
+    Row("rietx.schemas.pattern.PatternData:sigma", "default", tier=2, ambiguity=1, value=None,
+        evidence=("a pattern with no esd column is weighted by sqrt(max(y, 1)) "
+                  "(PatternData.sig, schemas.pattern.POISSON_FLOOR_COUNTS): TOPAS weights a "
+                  "file without esds by 1/Max(Yobs, 1) (Technical Reference section 6.2, "
+                  "docs/wp/2002-batch/rulings.md B5); the floor is POISSON_FLOOR_COUNTS's row; "
+                  "RefinementResult.sigma_rule records which rule weighted each channel")),
+    Row("rietx.schemas.pattern.PatternData:nonpositive_sigma", "default", tier=2, ambiguity=1,
+        value="exclude",
+        evidence=("a stated esd of zero or below takes no weight by default: GSAS-II 5.8.4's "
+                  "fxye reader zero-weights such a channel (G2pwd_fxye.py:86-91, checked "
+                  "2026-10-19); its xye reader and FullProf 8.20 replace it and TOPAS is "
+                  "silent (docs/practice.md, A zero or negative esd); ruled 2026-10-19 "
+                  "(WP-2002 B5: no weight by default, warn at ingestion, an option to "
+                  "correct), built in WP-1952; PATTERN_SIGMA_NONPOSITIVE reports it and "
+                  "'poisson' is the option")),
+    Row("rietx.schemas.pattern.PatternData:excluded_regions", "default", tier=1, ambiguity=1,
+        value=(),
+        evidence="arithmetic: empty is 'nothing excluded', the identity of the mask"),
+    Row("rietx.schemas.pattern.PatternData:metadata", "default", tier=1, ambiguity=1,
+        value="{}",
+        evidence=("arithmetic: an empty record of the file's own keys, which presentation "
+                  "consumers match on (io/CLAUDE.md § Metadata); no module under model/, "
+                  "optimize/, strategy/ or refine.py reads it")),
     Row("rietx.schemas.plan.PlanSpec:stages", "default", tier=1, ambiguity=1, value=(),
         evidence="arithmetic: the empty container; resolve_plan supplies every plan a fit runs"),
     Row("rietx.schemas.plan.PlanSpec:correlation_guard", "default", value=0.98),
