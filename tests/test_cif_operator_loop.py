@@ -164,3 +164,16 @@ def test_another_contradiction_keeps_the_short_remedy(tmp_path):
         structure_from_cif(path)
     assert "write 'P 1'" not in str(info.value)
     assert str(info.value).endswith("correct the symbol or the loop")
+
+
+@pytest.mark.parametrize("hm", ["C 1 2/m 1", "C 1 2 1"])
+def test_a_centred_p1_loop_keeps_the_short_remedy(tmp_path, hm):
+    """A loop of ``x,y,z`` and ``x+1/2,y+1/2,z`` is type P1 too, but it is not
+    the identity alone: writing 'P 1' would drop its centred copies, so the
+    message must not offer that remedy (review of #1587)."""
+    path = tmp_path / "centred_p1.cif"
+    path.write_text(_cif(["x,y,z", "x+1/2,y+1/2,z"], hm, cell=_MONO), encoding="utf-8")
+    with pytest.raises(ValueError, match="a different group") as info:
+        structure_from_cif(path)
+    assert "write 'P 1'" not in str(info.value)
+    assert str(info.value).endswith("correct the symbol or the loop")

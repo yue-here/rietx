@@ -486,9 +486,11 @@ def _refuse_operators_against_symbol(path: str, block, hm: str, triplets) -> Non
                f" with {translations} pure translation"
                f"{'s' if translations != 1 else ''} a cell against the symbol's "
                f"{centring}")
-    # the loop lists x,y,z alone under a symbol that is not P 1: two shapes
-    # write it, and each has its own remedy (maintainer's ruling, 2026-11-18)
-    remedy = ("correct the symbol or the loop" if int(found.number) != 1 else
+    # the loop lists x,y,z alone (one operation) under a symbol that is not
+    # P 1: two shapes write it, and each has its own remedy (maintainer's
+    # ruling, 2026-11-18).  A centred P1 loop has type 1 too, but "write 'P 1'"
+    # would drop its centred copies, so it keeps the short remedy
+    remedy = ("correct the symbol or the loop" if len(triplets) != 1 else
               "if the listed atoms are the whole cell, write 'P 1' as the "
               "symbol or drop the symbol; if they are only the asymmetric "
               "unit, the loop was dropped: delete the loop and the structure "
