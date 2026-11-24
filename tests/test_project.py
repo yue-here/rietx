@@ -970,16 +970,16 @@ def test_a_stored_plan_holding_max_iter_0_still_opens(tmp_path, pattern_file):
     project = _create(root, pattern_file, plan=one)
     project.fit()
     project.save()
-    stored = json.loads((project.path / PROJECT_JSON).read_text())
+    stored = json.loads((project.path / PROJECT_JSON).read_text(encoding="utf-8"))
     stored["plan"]["stages"][0]["max_iter"] = 0
-    (project.path / PROJECT_JSON).write_text(json.dumps(stored))
+    (project.path / PROJECT_JSON).write_text(json.dumps(stored), encoding="utf-8")
     # the history header carries its own copy of the plan (a PlanSpec too)
     log = project.path / "history.jsonl"
-    lines = log.read_text().splitlines()
+    lines = log.read_text(encoding="utf-8").splitlines()
     first = json.loads(lines[0])
     assert first["record"] == "header"
     first["header"]["plan"] = stored["plan"]
-    log.write_text("\n".join([json.dumps(first), *lines[1:]]) + "\n")
+    log.write_text("\n".join([json.dumps(first), *lines[1:]]) + "\n", encoding="utf-8")
 
     reopened = rx.Project.open(project.path)
     assert reopened.doc.plan.stages[0].max_iter == 0
