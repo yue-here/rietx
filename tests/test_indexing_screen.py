@@ -901,3 +901,33 @@ def test_a_list_with_no_usable_line_reads_zero_width_rather_than_raising(si):
                               validated=True, search_complete={},
                               shift_allowance_assumed=False)
         assert "not_validated" in caveats
+
+
+def test_the_declined_state_is_not_printed_as_a_count_by_the_title_or_the_evidence(si):
+    """#1612 round 2: the declined state keeps ``predicted_but_absent`` at its
+    default 0, so the two readers that copied it printed "0/N predicted but
+    absent" (``plot_validation``'s title) and a 0 count in the agent-facing
+    ``CandidateEvidence``.  Both now say it was not screened / carry None; a
+    screened validation still prints its count."""
+    from rietx.indexing.workflow import validate_by_lebail
+    from rietx.schemas.indexing import candidate_evidence
+    from rietx.viz.indexing import _validation_title
+
+    data, ins, peaks_ok = si
+    y = np.asarray(data.y(), dtype=np.float64)
+    norm = rx.PatternData(two_theta=list(data.tt()), intensity=list(y / y.max()))
+    peaks = pick_peaks(norm, ins, two_theta_range=LIM)
+    assert not peaks.usable()
+    system, centring, cell = SI_CELLS["truth cF"]
+    cand = _candidate(system, centring, cell)
+    cand.lebail = validate_by_lebail(cand, norm, ins, peaks=peaks)
+    assert cand.lebail.predicted_but_absent == 0
+    title = _validation_title(cand.lebail)
+    assert "absences not screened (no usable line)" in title
+    assert "predicted but absent" not in title
+    assert candidate_evidence(0, cand).predicted_but_absent is None
+    # a screened validation keeps its count in both readers
+    cand.lebail = validate_by_lebail(cand, data, ins, peaks=peaks_ok)
+    assert "predicted but absent" in _validation_title(cand.lebail)
+    assert (candidate_evidence(0, cand).predicted_but_absent
+            == cand.lebail.predicted_but_absent)

@@ -513,10 +513,17 @@ def _compose_indexing(result, peaks, *, data, instrument, candidate, n,
 
 
 def _validation_title(validation) -> str:
+    # a peak list with no usable line was declined, not screened: the 0 in
+    # predicted_but_absent is its default, not a count (#1612)
+    if (validation.absent_source == "line_screen"
+            and validation.n_lines_screened is None):
+        absent = "absences not screened (no usable line)"
+    else:
+        absent = (f"{validation.predicted_but_absent}/{validation.n_reflections} "
+                  "predicted but absent")
     return (f"{_MODE_NAMES[validation.mode]} validation of {validation.space_group}: "
             f"Rwp={validation.rwp:.4f}, GoF={validation.gof:.2f}, "
-            f"{validation.predicted_but_absent}/{validation.n_reflections} "
-            f"predicted but absent, {validation.unmatched_observed} unmatched "
+            f"{absent}, {validation.unmatched_observed} unmatched "
             f"observed  [{validation.status}]")
 
 

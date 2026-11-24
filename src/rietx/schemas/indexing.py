@@ -1873,8 +1873,13 @@ def candidate_evidence(index: int, c: CellCandidate) -> CandidateEvidence:
         validated=c.lebail is not None,
         lebail_status=None if c.lebail is None else c.lebail.status,
         lebail_rwp=None if c.lebail is None else c.lebail.rwp,
-        predicted_but_absent=(None if c.lebail is None
-                              else c.lebail.predicted_but_absent),
+        # None where the screen was asked and measured nothing (no usable
+        # line): the validation's own 0 is a default there, not a count
+        predicted_but_absent=(
+            None if c.lebail is None
+            or (c.lebail.absent_source == "line_screen"
+                and c.lebail.n_lines_screened is None)
+            else c.lebail.predicted_but_absent),
         unmatched_observed=(None if c.lebail is None
                             else c.lebail.unmatched_observed),
         ambiguity_partners=len(c.ambiguity))
