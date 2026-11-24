@@ -3,7 +3,6 @@
 Milestone: unscheduled · Status: 🔄 2026-11-23 — claimed by ghostshift (runner): the comparison standards' closing stage
 Track: The repo's own process
 Depends on: 2045 (the `full` job cannot finish before it); 2048, 2049 and 2050 (three slow rows red by rounding until each lands); 2002 soft, the closing stage that moved most of these; 2012 soft, the LaB6 axial mirror
-Priority: P2 2026-11-05 — was P3: the `full` job is red on main again, on one pin WP-1944 moved (issue #1424), and the repin is small
 
 ## Goal
 
@@ -133,24 +132,6 @@ and 2045 on 2026-10-25):
 - **An indexing answer's axis order moves with the platform** (WP-2043):
   notebook 03's orthorhombic P cell printed a and c swapped on Linux. No prose
   quotes the order, so nothing fails.
-
-### Inherited
-
-- **2026-11-23, from WP-2241** (closed). The scheduled nightly 45219728102 on `3fd68b937`
-  passed all six jobs. This is the green nightly this WP's status waits on. The `full` job
-  ran 2 h 04 min (16340 passed, 285 skipped, 51 xfailed, 1 xpassed), against 4 h 00 min on
-  11-20 and 11-21, so PR #1756's cut to the Le Bail wander row shows. The tree holds the
-  alarm pin's `ROUNDING` set and WP-2225's re-pin, and the suite failed nothing.
-- **2026-11-22, from WP-2241** (a ghostshift runner, filed separately because this WP's
-  claim is stale). The nightlies of 11-20, 11-21 and 11-22 were red. The two alarm-pin
-  failures are this WP's 11-21 items: the 11-20 diff was re-pinned by WP-2225 (`997816bfb`)
-  and the 11-21 diff is the `ROUNDING` set of PR #1756. The pin row passes on an arm64 Mac
-  at `f9adf0e57`, and no Linux full suite has run it yet. The 11-22 `full` job did not
-  finish: its runner "lost communication with the server" 1 h 58 min in, and it left no log.
-  It is the only such ending in the last 40 nightly `full` jobs, and githubstatus.com lists
-  no incident that day. WP-2241 fixes the 11-22 Windows failures, and the next Windows
-  nightly measures the fix. A second death at a similar point would point at the suite,
-  its memory for example, rather than at the host.
 
 ## Non-goals
 
@@ -336,6 +317,76 @@ gh run list --workflow nightly.yml --branch main --limit 1
   (the two degeneracies); WP-1930 (the 1e-14 nudge).
 
 ## Handover log
+
+- **2026-11-24** — The WP closes. Its acceptance is met: the nightly of 2026-11-23 passed all
+  six jobs, and the full suite FULLVERDICT on an arm64 Mac. The last task is done too.
+  `rietx compare` and the diagnostics pin run each standard under its acceptance suite's
+  protocol again, closing stage included. Since 2026-11-19 they had run without it, because
+  the package default changed and the protocol test looked at the stage lists only. The
+  example projects keep the default, so nothing a first-time user, a guide or the GUI runs
+  has changed.
+
+  *Done* (ghostshift runner, PR #1816). Every standard in `viz/compare.py` declares
+  `closing_window_tol = CLOSING_WINDOW_TOL`, `nac` too. `test_compare_ui.py` compares each
+  standard's whole plan (the `PlanSpec` dump: every plan field and every stage field)
+  against its suite's builder. A new test checks that every standard, `nac` included,
+  declares the closing stage. `PlanSpec.from_plan` carries every `RefinementPlan` field, so
+  the comparison has no blind field left. `examples.build_example` resets that one field to
+  the package default (`_first_fit_plan`), and `test_example_projects.py` asserts every
+  other plan field equals the standard's. The alarm pin is re-pinned. Zincite's case of
+  `test_the_closing_stage_names_the_flat_width_triple_unresolved` is a non-strict xfail,
+  and the finding behind it went to WP-1460's Inherited. Inherited pruned: the 11-23 note
+  is this close's nightly, and the 11-22 note was consumed by PR #1756 and WP-2241.
+
+  *Settled by Claude* (a blind Opus reviewer saw the rules and the measurements, not the
+  picks; it agreed on five calls and differed on one).
+  1. The standards declare the closing stage. Grounds: the root CLAUDE.md rule that the
+     standards are the suites' protocols, field by field, and `compare.py`'s docstring.
+     WP-2222's ruling 2 also keeps the closing stage where one objective is compared, which
+     is what `rietx compare` does. Alternative: record that the standards follow the
+     default, which would have made the rule false.
+  2. The example projects keep the package default for that field. Grounds: WP-2222's
+     ruling of 2026-11-19 turned the stage off because of its time, ruling 2 names the
+     three guides that opt in, and ruling 3 accepted the GUI preview measured from the
+     fluorapatite example's default fit. Alternative: examples take the standard's plan
+     whole, as `examples.py` said ("quoted, never restated"). Then every example fit in the
+     GUI runs 1.2-1.9× longer, and the guides that fit an example project quote numbers a
+     user's default fit would not reproduce. The reviewer called this a lean, close to
+     clear. A ruling that an example must reproduce its suite's numbers would flip it.
+  3. Zincite's triple case is a non-strict xfail. The reviewer preferred a strict xfail, so
+     the case keeps running and an unexpected pass is seen. A strict one would turn the
+     nightly red if Linux reads the eigenvalue under the cut, and no Linux run has read
+     this protocol, so the mark is not strict. My first pick was dropping the case.
+  4. `ROUNDING` stays. One platform agreeing cannot retire a guard against two platforms
+     disagreeing. It can go once a Linux nightly under this protocol shows one set.
+
+  *Measured* (macOS arm64, worktree `[dev]` venv, compiled tier on, branch at `d6d9423dd`
+  to `f435e5099`). Under the closing stage the alarm pin moved by one finding: brucite's
+  `CONSTRAINT_ACTIVE` info (the LM driver held 4 steps on the profile cone in stage `biso`;
+  in the closing stage it held none), so that code fires on 2 standards, not 3. No warning
+  row moved. Seven 1e-14 nudges to the start W (k = 0, ±1, ±3, 7, 20) gave one finding set
+  per standard on fluorite, zincite, brucite and corundum. Without the closing stage
+  fluorite gave three sets and zincite two (the 11-21 entry). The width triple's smallest
+  eigenvalue against `resolved_correlation`'s cut, at the closing stage: zincite 105×,
+  fluorite 0.14×, corundum 0.37×, brucite 0.0012×. Zincite's declared stages read
+  0.07-0.14×. All 8 standards fit in 35 s for the re-pin. The five test files built on the
+  standards: 130 passed, 26.6 s on 4 workers. Fast selection on the tree with main merged
+  in (`e67101f17`): FASTCOUNTS. Full suite on the same tree: FULLCOUNTS. CI's lint steps:
+  ruff and the tutorial format clean, Vale 0 errors, skill caps, audit delta, code
+  references and rulebook limits all quiet. `tests.reader_output`: exit 0. Probes in
+  `~/.cache/ghostshift/rietx/wp-2036/` (`probe_planfields.py`, `probe_nudge.py`,
+  `read_nudge_1123.py`, `probe_triple.py`, `probe_constraint.py`), outside the tree.
+
+  *Review* (`/code-review high --fix`, 5 findings, 4 fixed in `f435e5099`). The xfail
+  expects only an `AssertionError`. The test's docstring quotes the range measured under
+  the closing stage. `_first_fit_plan` reads the default from a live `RefinementPlan`. A
+  docstring line reflowed. The fifth asked for this entry. Generality judge not run: the
+  branch touches no `_audit.py` row and adds no heuristic. No rulebook was edited.
+
+  Next: none in this WP. If a Linux nightly under the closing-stage protocol reads one
+  finding set on fluorite and zincite, `tests/suite_alarms.py`'s `ROUNDING` can go. If it
+  reads zincite's triple as unresolved, the xfail shows XPASS, and WP-1460 should read that
+  first.
 
 - **2026-11-21** — The nightly `full` job was red on 11-20 and 11-21 on one row, and that row
   was rounding's, not anyone's change. A 1e-14 nudge to the start turns two of fluorite's
