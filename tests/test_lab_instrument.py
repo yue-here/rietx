@@ -598,7 +598,7 @@ def test_an_aperture_an_earlier_stage_refined_is_not_lifted_again():
     Only a row stage 1 leaves on its floor tells the gate from its absence,
     since the lift writes only a row whose value equals its lower bound.  So
     the data carry no axial asymmetry (S/L = H/L = 0) and H/L's lower bound
-    is 0.005, a row on its floor as ``apertures_to_lift`` reads one: stage 1
+    is 0.005, a row on its floor as ``seed_floored`` reads one: stage 1
     lifts H/L to 0.01, the data pull it below its bound, and the bounded LM
     step lands it on 0.005 exactly, which its last accepted evaluation in the
     event stream shows.  With the gate removed (``refined_before`` ignored)
