@@ -217,6 +217,7 @@ The calibration that converts a flight time to a d-spacing is not in the data fi
 The ordinate follows the same rule as the axis.
 GSAS writes the intensity relation as $I_o = I'_o/(W\cdot I_i)$, where $I'_o$ is the number of counts observed in a channel of width $W$.
 A calculated Bragg sum is therefore an intensity *density*: a histogram whose channels hold counts owes it a factor of $W$, and one already divided by $W$ does not.
+The equation and how $W$ is measured are in [The channel width](../theory/corrections.md#the-channel-width).
 On a flight-time bank $W$ is not a constant.
 An ISIS GEM `RALF` bank is Δt/t = 0.004 throughout, so $W$ rises in proportion to the flight time across the whole window.
 The difference is a slope in flight time, not a scale, and a fit that gets it wrong pays for it in the displacement parameters rather than in the phase scale.

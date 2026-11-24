@@ -116,6 +116,45 @@ against an unknown structure moves $B_{\text{iso}}$ rather than measuring the
 spectrum. Freeing them on a standard, where $B_{\text{iso}}$ is known, is how
 the file's own calibration gets checked.
 
+(sec-tof-channel-width)=
+### The channel width
+
+The second factor of the same relation is the width of the channel. GSAS
+writes the observed intensity as $I_o = I'_o/(W\,I_i)$, where $I'_o$ is the
+number of counts in a channel of width $W$ {cite}`larson2004`. A calculated
+Bragg sum is a unit-area profile times a reflection intensity, an intensity
+*density*, so a histogram whose channels hold counts owes it a factor of $W$:
+
+```{math}
+:label: corr-tof-channel-width
+
+y_{\text{calc}}(T_i) \;=\; W_i\, I_i(T_i) \sum_{hkl} I_{hkl}\,
+    \Omega(T_i - T_{hkl}) \;+\; y_{\text{b}}(T_i),
+\qquad
+W_i \;=\; \tfrac{1}{2}\,(T_{i+1} - T_{i-1}),
+```
+
+{source}`rietx.model.forward_tof.CompiledTOFModel.channel_width_factor`
+
+with each channel's edges at the midpoints of its neighbours, so that the
+edges of adjacent channels agree, and the two end channels taking the one
+difference they have ($W_0 = T_1 - T_0$). $W$ is measured from the pattern's
+own flight times over the whole histogram, before the fit window is cut, and
+never taken from the instrument: a `TIME_MAP` bank tabulates its widths in the
+data file. It is applied only where `PatternData.intensity_basis` is
+`"counts"`; a `"density"` bank, one already divided by its widths, takes no
+factor, and an undeclared one is fitted as a density and says so
+([](../reference/pattern-files.md#what-a-channel-holds)). The factor carries a
+microsecond and is not normalised, so no hidden reference flight time enters
+the phase scale.
+
+On a flight-time bank $W$ is not a constant. An ISIS GEM `RALF` bank is
+$\Delta t/t = 0.004$ throughout, so $W$ rises in proportion to $T$, and with
+it to $d$ on a fixed-angle bank. Leaving it out is therefore a slope in $d$
+and not a scale: the model under-predicts the long-$d$ end, and the only
+smooth parameter that lifts it is a larger $B_{\text{iso}}$. As with the
+spectrum, the background takes no factor.
+
 ## Attenuation coefficients
 
 Specimen absorption needs $\mu$, computed from the refined cell contents
