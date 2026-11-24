@@ -120,6 +120,22 @@ hold); WP-1441 (`constrain`).
 
 ### Inherited
 
+- **2026-11-23, from WP-2081's close: a fixed value's own error reaches every pattern, and
+  the series has no row for it (issue #1556 § 5).** The reporter ran a synthetic LaB₆ ramp,
+  7 patterns × 150 noise replicates, holding zero and profile from pattern 1 on at pattern
+  0's fitted values. Free on every pattern, the cell's pull std is 0.79-0.93 and neighbouring
+  patterns' errors correlate at −0.09 to 0.04. Held, the pull std is 2.30-2.43 and the
+  correlation 0.85-0.90, so each cell esd is about 2.4× too small and a series mean's about
+  5.5× too small. Not rerun. Rule 2 answers the common case: a value common to all patterns
+  goes to the joint call, and the milestone's acceptance row "a common parameter gives honest
+  esds" is built on these numbers. The fixed kind this WP builds still carries a caller's
+  value whose error no esd includes. The reporter's candidate is a per-pattern score
+  statistic for each fixed parameter, a row with no threshold, which series rule 5 (a field,
+  never a code) would admit. Nobody has ruled on it. Decide it with the fixed kind's record.
+- **2026-11-23, from WP-2081's close: `docs/docs/reference/series.md` sits 13 characters
+  under the manual's 50 000-character page cap** (`tests/test_manual.py`). The next row added
+  there splits the page or fails the test, and this WP's manual task adds rows.
+
 - **2026-11-23, from the API review (WP-2302's batch, `2302-batch/plans.md`).** The trap this
   WP's vocabulary settles reaches a single fit too. On the NAC example (`f9adf0e57`),
   `Refinement.set_vary("instrument.zero_shift", False)` and then `fit()` refines zero shift
