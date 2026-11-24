@@ -29,6 +29,14 @@ vi.mock("../api", () => ({
     examples: async () => ({ examples: [{ name: "fap", title: "Fluorapatite", built: false }] }),
     cancel: () => cancel(),
     events: async () => ({ events: [] }),
+    history: async () => ({ head: "n0001", n_nodes: 2, nodes: [
+      { id: "n0000", parents: [], children: ["n0001"], label: "", created_utc: "2026-11-22T10:00:00+00:00",
+        kind: "root", name: "", action: {}, api_call: "", status: null, n_iterations: null, rwp: null,
+        gof: null, n_free: null, n_diagnostics: 0, diagnostics: [], tags: [], scores: {}, notes: {} },
+      { id: "n0001", parents: ["n0000"], children: [], label: "", created_utc: "2026-11-22T10:01:00+00:00",
+        kind: "stage", name: "scale_bkg", action: {}, api_call: "", status: "converged", n_iterations: 3,
+        rwp: 0.2, gof: 2, n_free: 4, n_diagnostics: 0, diagnostics: [], tags: [], scores: {}, notes: {} },
+    ] }),
   },
 }));
 vi.mock("../lib/stream", async (original) => ({
@@ -124,6 +132,28 @@ describe("the panels", () => {
     key("j");
     expect(bottom()).toBeNull();
   });
+
+  it("label the History tab with its node count and offer Graph or Table there (WP-2211)", async () => {
+    await boot();
+    byLabel("Show the console")!.click();
+    for (let i = 0; i < 16; i++) await tick();
+    flushSync();
+    const tab = [...document.querySelectorAll<HTMLButtonElement>('section[aria-label="Console and history"] [role="tab"]')]
+      .find((t) => t.textContent!.startsWith("History"))!;
+    expect(tab.textContent!.replace(/\s+/g, " ").trim()).toBe("History2");
+    expect(tab.querySelector(".count")!.textContent).toBe("2");
+    expect(document.querySelector('[aria-label="History view"]')).toBeNull();
+    tab.click();
+    flushSync();
+    const view = document.querySelector('[aria-label="History view"]')!;
+    expect([...view.querySelectorAll("button")].map((b) => [b.textContent, b.getAttribute("aria-pressed")]))
+      .toEqual([["Graph", "true"], ["Table", "false"]]);
+    // the graph by default, the table on request
+    expect(document.querySelectorAll(".grow").length).toBe(2);
+    (view.querySelectorAll("button")[1] as HTMLButtonElement).click();
+    flushSync();
+    expect(document.querySelectorAll("table.hist tbody tr").length).toBe(2);
+  });
 });
 
 describe("the workflow menu", () => {
@@ -133,16 +163,19 @@ describe("the workflow menu", () => {
     flushSync();
     const items = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]')];
     expect(items.map((b) => b.textContent!.trim())).toEqual([
-      "Refinement", "Peaks and indexing · not built yet", "Series · not built yet",
+      "Refinement", "Peaks and indexing", "Series",
       "Structure solution · not built yet", "Rigid bodies · not built yet"]);
     expect(items[0].getAttribute("aria-checked")).toBe("true");
     items[3].click();
     flushSync();
     expect(document.querySelector('[role="menu"]')).toBeNull();
     expect(document.querySelector("button.mbtn.wf")!.textContent).toContain("Structure solution");
-    const steps = [...document.querySelectorAll<HTMLButtonElement>('nav.steps button')];
-    expect(steps.map((b) => b.textContent)).toEqual(
+    // the prototype's strip: each step's number in a ring, then its name
+    const steps = [...document.querySelectorAll<HTMLButtonElement>("nav.steps button.step")];
+    expect(steps.map((b) => b.querySelector("b")!.textContent)).toEqual(["1", "2", "3", "4"]);
+    expect(steps.map((b) => b.querySelector(".sname")!.textContent)).toEqual(
       ["Cell and space group", "Composition", "Solve", "Complete"]);
+    expect(document.querySelectorAll("nav.steps .ar").length).toBe(3);
     steps[2].click();
     flushSync();
     expect(document.querySelector(".box")!.textContent).toContain("charge flipping");
@@ -175,7 +208,7 @@ describe("the palette and the keys", () => {
     expect(labels).toEqual(expect.arrayContaining([
       "Hide the graphs", "Hide the model", "Show the console", "Stop the run",
       "New project…", "Settings…", "Theme: Match system", "Keyboard shortcuts",
-      "Workflow: Series · not built yet"]));
+      "Workflow: Series"]));
     const console_ = [...document.querySelectorAll(".panel li")]
       .find((li) => li.querySelector(".label")!.textContent === "Show the console")!;
     expect(console_.querySelector("kbd")!.textContent).toMatch(/J$/);
