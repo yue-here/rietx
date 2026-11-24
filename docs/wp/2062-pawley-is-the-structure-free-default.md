@@ -353,6 +353,53 @@ above, which come from lab and synchrotron single-phase patterns
   was written to follow the site choice): WP-1542 drops one priority rung,
   P2 to P3. A user who picks `mode="lebail"` still meets its background.
 
+**The record, 2026-11-23.** The first entry is Yue's ruling. Claude settled the
+others. An earlier settlement by Claude is evidence for a later session, never a
+ruling.
+
+- **Ruled 2026-11-23 (Yue), on the indexing GUI:** "the default structure-free
+  fit should be pawley." Yue gave it during WP-2240's review of the indexing
+  workflow. It agrees with decisions 0 and 1 of 2026-11-01. Its text names no
+  site and no order of work.
+- **B2, B1 and C move to Pawley, after this WP's open bug tasks.** B2 is the
+  wizard's `modeFor` (`gui/src/lib/wizard.ts:313`), which picks `lebail` for a
+  typed cell. B1 is `POST /api/index/adopt` when the request names no mode
+  (`gui/session.py:3087`). C is `docs/skill/rietx/SKILL.md`'s advice that Le Bail
+  "is for a cell without a trusted structure" (`:84`). The bug tasks come first,
+  and the unit dependence comes first among them. The 2026-11-23 ruling does not
+  lift decision 0's bugs-first order. Reading it as a waiver would amend
+  decision 0, and that call is Yue's. Until the bugs are fixed, a skill row
+  sending agents to Pawley would send them to `compare_rivals`, which raises
+  there. Settled by Claude under decisions 0 and 1 and the 2026-11-23 ruling,
+  2026-11-23; checked blind.
+- **The extinction screen's cell-free prefit (part of A2) is measured before it
+  moves.** WP-2076 left the prefit on Le Bail and called its move a new
+  question, with eleven screens as its bar (§ Inherited, 2026-11-07). Decision 0
+  covers A2, so the direction is decided. Measure the prefit under Pawley on
+  those eleven screens first. It lands after the bug tasks, like every site. If
+  a ranking regresses, the move goes back to Yue. Settled by Claude under
+  decisions 0 and 1, with WP-2076's note as the bar, 2026-11-23; checked blind.
+- **Report layer 0's `lebail_gap` stays on Le Bail.** It is no fit a user is
+  given. It partitions the intensities once at the converged Rietveld state and
+  runs no least squares (`report/layer0.py:214-252`). § Context already lists it
+  among the names that stay true either way. Moving it would add a solve to every
+  Rietveld report and change a number on each, which changes a default for every
+  user. Settled by Claude under this WP's definition of a site, 2026-11-23;
+  checked blind.
+- **`validate_by_lebail` runs Pawley, and the whole `lebail` family is renamed
+  in one change.** The family is decision 3's list. No name in it is renamed
+  alone. The change lands after the unit-dependence task, because that task can
+  reopen decision 0 and return A1 to Le Bail. If a renamed field is stored in a
+  document, its migration is a stored-format change, and that goes to Yue.
+  Decision 3's reader-output step stands. Settled by Claude under the 2026-10-28
+  ruling that the names break once and the 2026-11-23 ruling that API naming is
+  Claude's call, 2026-11-23; checked blind.
+- **The three tier-3 Pawley constants reopen when the first of B1, B2, C or the
+  prefit lands.** They are `PAWLEY_OVERLAP_FWHM_FRAC`, `PAWLEY_OVERLAP_LAMBDA`
+  and `PAWLEY_OFF_DATA_SCALE_FLOOR`. This names the trigger for the last task
+  below. Settled by Claude under that task and the generality rule
+  (`docs/milestones/generality.md` § The rule), 2026-11-23; checked blind.
+
 ## Tasks
 
 - [x] Fill § Practice from the survey, and add its section to
@@ -402,6 +449,18 @@ green, and no ranking or class decision on the acceptance suites lost.
   issue #740, WP-1910, WP-1953 (large Pawley stages), WP-2011.
 
 ## Handover log
+
+- **2026-11-23** — decisions recorded, nothing run. Yue ruled on the indexing
+  GUI that the default structure-free fit should be Pawley. That agrees with
+  decisions 0 and 1. Claude settled five consequences, in § Decisions, the
+  record of 2026-11-23. Sites B1, B2 and C move after the bug tasks. The prefit
+  is measured on WP-2076's eleven screens first. `lebail_gap` stays. The
+  `lebail` names are renamed together after the unit-dependence task. The
+  Pawley constants reopen with the first site that lands. A first check and a
+  blind second check agreed on each (maintainer-local,
+  `~/.cache/ghostshift/rietx/decision-check-2026-11-23/`). Recorded by a
+  ghostshift runner. No task was ticked or reordered. *Next:* the unit
+  dependence, as before.
 
 - **2026-11-02** — the five decisions are recorded (§ Decisions, the record
   of 2026-11-01). The maintainer chose Pawley as the end state at every site

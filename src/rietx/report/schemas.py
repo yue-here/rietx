@@ -969,7 +969,7 @@ class SuggestedAction(Base):
     covers (measured: 16.16 predicted against 16.30 observed for ``refine_cell``).
     ``predict_then_verify`` in :mod:`.layer2` measures the real one and rolls back
     if it disagrees.  ``vetoed_by`` is set when the staged plan already refines the
-    parameter, or when a guard forbids it.
+    parameter, or when the refinement already frees it.
 
     ``execution`` is the recipe table's ``how`` (``report/apply.py``), stamped
     by :func:`~rietx.report.build_report` on every action it emits — the fact
@@ -1231,10 +1231,12 @@ class SplitLocalisation(Base):
     won every global statistic while the reflections it splits carried none of
     its gain: the improvement lived elsewhere.
 
-    **Report-only, no threshold** (decided 2026-09-03): how far above the
+    **Report-only, no threshold**: how far above the
     point share is far enough depends on the profile, the range and the
     counting statistics, so the package reports the share with the
     reflections behind it (``families``) and the reader judges.
+    *(Chosen: WP-1339, 2026-09-03 — a reported share over a thresholded
+    diagnostic)*
     ``split_share`` is ``None`` when the lower fit splits nothing in range,
     for instance a refined distortion of exactly zero.
     """

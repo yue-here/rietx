@@ -54,7 +54,7 @@ print(registry["peak_flags"]["axial_tail"]["title"])
 ```
 
 ```text
-['diagnostics', 'instrument_fields', 'parameters', 'peak_flags', 'peak_origins', 'plans', 'reader_options', 'result_fields', 'search_fields', 'stage_fields']
+['cell_relations', 'diagnostics', 'instrument_fields', 'parameters', 'peak_flags', 'peak_origins', 'plans', 'reader_options', 'result_fields', 'search_fields', 'stage_fields']
 Possibly a stronger line's axial tail
 ```
 

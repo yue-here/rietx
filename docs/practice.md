@@ -57,7 +57,7 @@ curve that depends on its free set, by 4.8e-5 of the strongest peak on 2026-10-2
 
 | Program | At zero | Does a refine flag reach the profile? |
 |---|---|---|
-| rietx | FCJ off when both are 0; sized at 0.02 when free (`forward.AXIAL_SIZING_FLOOR`) | yes, at exactly zero only |
+| rietx | FCJ off when both are 0; sized at 0.02 when free (`forward.AXIAL_SIZING_FLOOR`); a stage that frees one on zero starts S/L at 0.02 and H/L at 0.01 (`forward.AXIAL_SL_START`, `AXIAL_HL_START`; WP-1955), never both at one value, since the pattern is symmetric in the pair | yes, at exactly zero only |
 | GSAS-II | never computed: one parameter SH/L = (S+H)/L, floored at 0.002 by value for the profile and its window at every evaluation, refined or not; the Fortran's zero branch gives a stand-in derivative of 0.002·sign(Δ2θ) (checked (source)) | no; windows come from values each evaluation |
 | RIETAN-FP | not described; Gauss-Legendre N between 10 and 100 "depending on τmin", which follows rs and rd (§3.10.3, checked (manual)) | no flag named; the count follows the values |
 | FullProf | not described; S_L and D_L act only below `AsymLim`, an angle (LINE 30 notes, checked (manual)) | no flag named |
@@ -905,6 +905,15 @@ without failing on it.
 | `CELL_MIN_LENGTH_A` (1.5 Å) | TOPAS | none floor a cell length; the floor binds on no real cell |
 | `auto_background:seed` (not from the data) | all seven start from zero, a constant or the user's numbers | none |
 | `BRINDLEY_MU_R_FENCE` | the citation; FullProf prints the same classes as text | not asked of the others |
+| `FULLPROF_ORIGIN_CHOICE` (a bare symbol with two origins read as origin 2) | FullProf 8.20's manual, the note after the `.pcr` space-group line: "By default the program uses the setting with the inversion centre at the origin" | GSAS-II reads a bare symbol as origin 2 too; the others not checked |
+| `GSAS2_INSTPRM_CONVENTION_ASSUMED`, `RECIPE_CONVENTION_ASSUMED` (SH/L split evenly into S/L and H/L) | GSAS-II 5.8.4 evaluates exactly that split (`pypowder.for:146` passes SPH/2 for both; its `.prm` exporter does the same) | the others not checked |
+| `GSAS2_INSTPRM_GEOMETRY_ASSUMED` (no Diff-type: one wavelength is Debye-Scherrer, a doublet Bragg-Brentano) | GSAS-II 5.8.4's own rule (`GSASIIfiles.py:418-420`) | the others not checked; a Kα1-only flat-plate instrument is the case it reads wrong |
+| `GSAS_PRM_PROFILE_SET_DEFAULTED` (set 1 of several) | GSAS-II 5.8.4's `.prm` importer reads set 1 only (`GSASIIfiles.py:274-278`) | the others not checked |
+| `PATTERN_X_AXIS_ASSUMED` (an unlabelled x column read as 2θ) | GSAS-II 5.8.4's xye, Rigaku and PANalytical importers, with no label check | FullProf and TOPAS not checked |
+| `RAS_ATTENUATOR_PRESENT` (the attenuator column read as stored, not applied) | GSAS-II 5.8.4's Rigaku importer | the convention is not measured: every obtainable `.ras` holds the column constant |
+| `_PRM_CUTOFF` (0.001) | the value GSAS-II 5.8.4's `.prm` exporter writes (`G2export_pwdr.py:44`) | none |
+
+GSAS-II 5.8.4's CW `.prm` importer compares a string with an int (`v1[0] == 3`, `GSASIIfiles.py:269` and `:279`), so it never reads LX, LY or SH/L from PRCF12 and always takes 0, 0 and 0.002 (found by WP-2006's generality judge, 2026-11-17).
 
 ## Dropping candidates in a search race
 
@@ -1652,6 +1661,29 @@ Measured on rietx at `f9adf0e57` with the NAC example (11-BM, `cod_1000236.cif`)
 - A typo in a plan name, a solver, a reader option or a literal parameter path raises at the call
   and names the valid choices or the nearest path.
 
+## Naming an atom
+
+Surveyed 2026-11-16 for WP-2140's first task, one agent, manuals and documentation only (no
+source, no macro body). The TOPAS v6 Technical Reference PDF was read by page. The GSAS-II user
+help and its documentation site were read in place. The question is what keeps a reference on its
+atom when the atom list is reordered: a restraint, a refinable parameter's name, and a stored
+constraint.
+
+| Program | A restraint names its atoms by | A refinable per-atom parameter is named by | Duplicate labels | Selecting sites by pattern |
+|---|---|---|---|---|
+| rietx | index into `Phase.atoms` (`atom_i`, `atoms`, or an index dot-path in `ValueRestraint.path`); a rigid body by label | index: `phases.0.atoms.3.biso` | allowed, and a CIF with two `O1` reads with no diagnostic; refused only inside a series (`sequential._refuse_duplicate_names`) | fnmatch globs over the dot-path, which match indices |
+| TOPAS (Technical Reference v6) | site name. `sites_distance`, `sites_angle` and `sites_flatten` take a site name, optionally with an equivalent-position number and a lattice offset; the macro signatures `Distance_Restrain`, `Angle_Restrain` and `Flatten` take site names (checked (manual): p. 141-142 § 11.2; p. 160 § 12.2.9) | a name the user chooses (`beq b1 0.5`), or a unique internal one under `@`. It never derives from the site's place in the list, so a reorder cannot move it (checked (manual): p. 10-11 § 2.1, § 2.3) | not stated. A site name is "a User defined string"; `start_values_from_site` takes `$unique_site_name`, which implies uniqueness (checked (manual): p. 117, 140, 141) | site-identifying strings take `*` and `!`, several quoted together (`"O* !O3*"`), used by `operate_on_points`, `ai_sites_1`/`ai_sites_2` and anti-bump macros (checked (manual): p. 95 § 10.18, Table 10-3) |
+| GSAS-II (documentation) | atoms picked in the GUI; an imported MOGUL restraint is matched by atom name, case included; the scripting `addDistRestraint` takes an atom object, an index or a label. How a restraint is stored is not documented (checked (manual): help `phasedrawatoms.html` § Restraints menu, `commontreeitems.html` § Restraints; `GSASIIscriptable` § `G2Phase.addDistRestraint`) | atom number: `p::name:a`, "a is the atom number" (`0::AUiso:3`). A stored constraint holds random ids instead, so it survives renumbering of phases, histograms and atoms, and one whose item was deleted is dropped (checked (manual): `objvarorg` § 3.2, § 3.3.6.1; `GSASIIobj` § 5.1 `G2VarObj`; `GSASIImapvars` § 11.3, § 11.6). Scripts set refine flags by label (`{'Mn1': 'X'}`) | not stated. A name "can change to any text string"; `MakeUniqueLabel()` exists, and the documentation does not say it is applied to atoms (checked (manual): help `phaseatoms.html`; `GSASIIobj` § 5.1) | none for atoms; `*` stands only for a phase or histogram number (checked (manual): `commontreeitems.html` § Constraints) |
+
+### Practice adds up to
+
+Both programs keep a stored reference on its atom through a reorder, by different means. TOPAS
+uses the label everywhere a user writes one, restraints and site selections included, and names
+parameters by a user-chosen name with no index in it. GSAS-II shows and refines parameters by atom
+number, and keeps stored constraints on hidden random ids. Neither manual states what a duplicate
+label does. The survey informs WP-2140's choice between label paths and renumbered index paths;
+the WP holds the measurement.
+
 ## Sources
 
 Line numbers are at the versions above. RIETAN-FP's and FullProf's manuals are cited by
@@ -1720,3 +1752,9 @@ A named set of starting values, limits and refine flags (WP-2020, read 2026-11-1
 - MAUD 3.07, github `luttero/maud` tag v3.07, `src/it/unitn/ing/rista/`: `util/Constants.java:769`, `util/Misc.java:465-466`, `diffr/FilePar.java:64-188, 1620, 1676-1684, 2340-2431`, `diffr/XRDcat.java:2141-2155`, `diffr/DataFileSet.java:649-665`, `diffr/Sample.java:326-346`, `diffr/Parameter.java:1006-1036`, `awt/DataD.java:1665-1680`; `src/examples/instruments.mdb`, `src/examples/y2o3.par:182`
 - EasyDiffraction 0.21.1, `~/Code/rietx-bench/.pixi/envs/easydiff/lib/python3.12/site-packages/easydiffraction/`: `io/edi/serialize.py:8-45`, `io/cif/serialize.py:106-155, 790, 894-897, 982-988`, `project/project.py:462-640`, `datablocks/experiment/collection.py:70-118`, `analysis/categories/fit_parameters/default.py:24-97`, `analysis/analysis.py:687-748, 1939-1950`, `core/variable.py:32, 397-400, 573-620`, `utils/utils.py:221-262, 476-492, 564, 664-700`
 - rietx: `src/rietx/io/instrument_profile.py:107-200`, `src/rietx/schemas/common.py:1178-1196`, `src/rietx/gui/imports.py:448`, `src/rietx/strategy/staged.py` (`PLAN_PRESETS`, `PLAN_INFO`)
+
+Naming an atom (WP-2140, read 2026-11-16):
+
+- TOPAS Technical Reference v6 (PDF, read by page): p. 10-11 (§ 2.1, § 2.3), p. 95 (§ 10.18, Table 10-3), p. 105 (§ 10.22.7), p. 108 (§ 10.23.2), p. 117, p. 119-120 (`atomic_interaction`), p. 140-142 (§ 11.2), p. 160 (§ 12.2.9, signatures only)
+- GSAS-II user help pages (advancedphotonsource.github.io, the help directory): `phaseatoms.html`, `phasedrawatoms.html` (§ Atom Selection, § Restraints menu), `commontreeitems.html` (§ Constraints, § Restraints)
+- GSAS-II documentation, https://gsas-ii.readthedocs.io/en/latest/: `objvarorg.html` § 3.2, § 3.3.6.1; `GSASIIobj.html` § 5.1 (`G2VarObj`, `AtomIdLookup`, `MakeUniqueLabel`); `GSASIImapvars.html` § 11.3, § 11.6; `GSASIIscriptable.html` (`G2Phase.addDistRestraint`, `G2Phase.atom`, `set_refinements`)
