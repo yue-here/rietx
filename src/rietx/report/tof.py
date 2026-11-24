@@ -71,15 +71,26 @@ def _tof_background_peak_diagnostics(model) -> list[Diagnostic]:
 
     if not _is_tof(model) or not getattr(model, "component_paths", ()):
         return []
-    return [_tof_skip(
+    # ``_tof_skip``'s wording, built here with the code and the level written
+    # out so the audit walk reads this raise site (#1548 review, item 4): a
+    # code reaching ``Diagnostic`` only as an argument is invisible to it.
+    skip = _tof_skip(
         "BACKGROUND_PEAK_WIDTH_UNAVAILABLE",
         "the hump-width guard",
         "it asks whether a declared hump is narrower than a real reflection "
         "can be at its position, and the resolution it compares against is the "
         "Caglioti FWHM in deg 2θ; this bank's resolution is "
         "instrument.source.profile_tof's sigma(d) and gamma(d) and its hump is "
-        "in microseconds, so the two have no common unit",
-        [paths[2] for paths in model.component_paths])]
+        "in microseconds, so the two have no common unit")
+    return [Diagnostic(
+        level="info", code="BACKGROUND_PEAK_WIDTH_UNAVAILABLE",
+        where=[paths[2] for paths in model.component_paths],
+        message=skip.message,
+        suggestion=("judge the hump's width yourself against the narrowest "
+                    "reflection near it: a hump narrower than the reflections "
+                    "around it is modelling a peak, not a background; this "
+                    "line says the check did not run rather than that it ran "
+                    "and found nothing"))]
 
 
 def _tof_absorption_diagnostics(model) -> list[Diagnostic]:

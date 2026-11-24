@@ -1821,6 +1821,17 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "background."
         ),
     ),
+    "BACKGROUND_PEAK_WIDTH_UNAVAILABLE": HelpEntry(
+        title="The hump-width check did not run on this bank",
+        description=(
+            "A declared hump is checked against the narrowest real reflection at its "
+            "position, using the Caglioti width in degrees 2θ. A time-of-flight bank "
+            "states its resolution as σ(d) and γ(d) in microseconds, and its hump is in "
+            "microseconds too, so the two widths have no common unit and the check did "
+            "not run. A hump narrower than the reflections near it is modelling a peak, "
+            "not a background. Compare its width with theirs yourself."
+        ),
+    ),
     "BACKGROUND_SMOOTHING_AT_FLEXIBLE_END": HelpEntry(
         title="Baseline smoothing stopped at its most flexible setting",
         description=(

@@ -603,6 +603,13 @@ ROWS: tuple[Row, ...] = (
                   "2026-10-19); the pick verb is the caller's (auto_background); the code "
                   "tiers its own part and the threshold keeps its row, as STAGE_SLOW_DESCENT "
                   "does; settled by Claude 2026-11-17 (WP-2005)")),
+    Row("BACKGROUND_PEAK_WIDTH_UNAVAILABLE", "code", tier=1, ambiguity=1, response="info",
+        responds=("nothing; the hump-width guard did not run on this bank, so read the bank's "
+                  "own records"),
+        evidence=("arithmetic: the guard compares a hump's FWHM with the Caglioti FWHM in deg "
+                  "2theta, and a bank's resolution is sigma(d), gamma(d) in us, so there is no "
+                  "common unit; fires exactly when a flight-time model declares a hump, so an "
+                  "unrun check never reads as a clean one, as CAPILLARY_OFFSET_UNAVAILABLE")),
     Row("BACKGROUND_SMOOTHING_AT_FLEXIBLE_END", "code", tier=1, ambiguity=1,
         evidence=("a reading of the scan's own record: fires exactly when no candidate of "
                   "select_arpls_lambda's grid reached its Durbin-Watson floor, so the "
@@ -6035,6 +6042,12 @@ ROWS: tuple[Row, ...] = (
     Row("BACKGROUND_ORDER_AT_CAP.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence=("arithmetic: points at the finding that measures a too-flexible background "
                   "and at the other kind; picks neither")),
+    Row("BACKGROUND_PEAK_WIDTH_UNAVAILABLE.suggestion", "suggestion", tier=1, ambiguity=1,
+        value=1,
+        evidence=("arithmetic: names the comparison the guard would have made (the hump's "
+                  "width against the narrowest reflection near it) for the caller to make, "
+                  "and says the check did not run; ranks nothing and moves nothing "
+                  "(report/tof.py _tof_background_peak_diagnostics)")),
     Row("BACKGROUND_SMOOTHING_AT_FLEXIBLE_END.suggestion", "suggestion", tier=1, ambiguity=1,
         value=1,
         evidence=("arithmetic: names the argument that overrides the fallback and the "
@@ -6467,8 +6480,7 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.refine._dedup_high_correlations.suggestion", "suggestion", value=1),
     Row("rietx.report.tof._tof_skip.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence=("arithmetic: the one sentence of every check that abstains on a bank "
-                  "(BACKGROUND_PEAK_WIDTH_UNAVAILABLE, CAPILLARY_OFFSET_UNAVAILABLE through "
-                  "the same builder): it points at the records that did run and says the "
+                  "(CAPILLARY_OFFSET_UNAVAILABLE through the same builder): it points at the records that did run and says the "
                   "check did not, so an unrun check never reads as a clean one; moves "
                   "nothing")),
     Row("rietx.schemas.results._cap_one_code.suggestion", "suggestion", value=1),

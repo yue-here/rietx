@@ -1188,3 +1188,23 @@ def test_a_gaussian_branch_bank_with_no_gaussian_width_is_finite():
     assert np.all(np.isfinite(y)) and float(np.max(y)) > 0.0
     pv = rx.Refinement(silicon(), bank(sig1=0.0, gam0=5.0), history=False)
     assert np.all(np.isfinite(np.asarray(pv.predict(grid))))
+
+
+def test_a_hump_on_a_bank_says_the_width_guard_did_not_run():
+    """Items 4 and 16.  The hump-width guard compares against a Caglioti
+    width in deg 2θ, which a bank does not have, so it abstains there and
+    says so at info, naming the hump; with no hump it is silent."""
+    from rietx.model.forward_tof import compile_tof_model
+    from rietx.report.tof import _tof_background_peak_diagnostics
+
+    ins = bank()
+    ins.extra_components = [HumpComponent(position=P(value=20000.0))]
+    got = _tof_background_peak_diagnostics(
+        compile_tof_model(silicon(), ins, _blank_bank()))
+    assert [(d.code, d.level) for d in got] == [
+        ("BACKGROUND_PEAK_WIDTH_UNAVAILABLE", "info")]
+    assert got[0].where == ["instrument.extra_components.0.fwhm"]
+    assert "not evaluated" in got[0].message or "no common unit" in got[0].message
+    assert "narrowest" in got[0].suggestion
+    assert _tof_background_peak_diagnostics(
+        compile_tof_model(silicon(), bank(), _blank_bank())) == []
