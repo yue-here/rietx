@@ -98,6 +98,29 @@ export const GRAPH_HELP: Record<GraphTab, HelpBoxEntry> = {
     ],
     anchor: "the-3d-view",
   },
+  trends: {
+    title: "Trends",
+    lead: "Each panel is one value across the series, with its esd bar. Two values share a panel when they have the same unit and overlapping ranges.",
+    items: [
+      "Plot adds any refined value or fit statistic; × removes a panel. A value refined on only some patterns shows “7 of 17” and has points only there.",
+      "Dots are the first walk. Rings are the second walk, the other way along the series.",
+      "An esd bar longer than one spread of the values is cut at the panel's edge.",
+      "Against sets the horizontal axis: the series coordinate, or the pattern's place in the list. Click a point to select its pattern.",
+    ],
+    anchor: "series",
+  },
+  map: {
+    title: "Map",
+    lead: "Each row is one pattern of the series, the first at the top.",
+    items: [
+      "Map colours each row by its counts on a log scale; Waterfall draws each as a line on its row.",
+      "Difference colours each fitted pattern by (observed − calculated) / esd: red where the model is too low, blue where it is too high.",
+      "Drag across to zoom in 2θ, or down to show a window of rows. Double-click, or press Show all, to show everything.",
+      "With Cuts on, click to set a cut and select that pattern. Under the map is the selected pattern; shift-click another row to average the rows between. Beside it is each pattern at the cut.",
+      "Set the cut's width on the profile under the map: drag across it, drag the bar's edges, or drag the bar to move it. You can also type the width, or shift-drag an area of the map.",
+    ],
+    anchor: "series",
+  },
 };
 
 /** The bottom panel's History tab (WP-2211), in the design's words, with the
