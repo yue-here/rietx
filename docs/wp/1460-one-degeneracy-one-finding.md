@@ -92,9 +92,9 @@ reader that keys on `where` without naming the code is the one it misses.
   closing stage (macOS arm64, `[dev]`). So on zincite the guard reports ρ between
   the triple's members as determined, and the error premise behind the cut
   (`FD_COLUMN_ERROR` × `FD_STEP` per column) does not hold at that stage. The
-  findings did not move under seven 1e-14 start nudges. Zincite left the nightly
-  row `test_the_closing_stage_names_the_flat_width_triple_unresolved`; a
-  set-level finding built here should be checked against it.
+  findings did not move under seven 1e-14 start nudges. Zincite's case of the
+  nightly row `test_the_closing_stage_names_the_flat_width_triple_unresolved` is
+  a non-strict xfail; when this WP fixes the cut, remove the mark.
 - **From WP-1906 (2026-10-06), a count on a skill's worked example.** The
   P-spline default (`rx.auto_background(data)`) on FAP.XRA under
   `mccusker_structural` reports 770 `HIGH_CORRELATION` findings and two

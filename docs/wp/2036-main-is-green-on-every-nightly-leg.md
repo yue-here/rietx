@@ -296,8 +296,8 @@ nightly (run 41305369905, `f4db7763`): 3 failed, 14 146 passed, in 1:35:05.
       `CLOSING_WINDOW_TOL`, and the protocol tests compare whole plans. The example
       projects keep the package default for that one field, so a first fit, a guide
       and the GUI are unchanged. Settled by Claude; the grounds are in the handover
-      entry. The alarm pin lost brucite's `CONSTRAINT_ACTIVE` info, and zincite left
-      the triple row (WP-1460's Inherited).*
+      entry. The alarm pin lost brucite's `CONSTRAINT_ACTIVE` info, and zincite's case of
+      the triple row is an xfail (WP-1460's Inherited).*
 
 **Added 2026-11-21** (ghostshift runner), from the 2026-11-20 and 2026-11-21 nightlies
 (runs 44754238414 and 44910841692), each red on the alarm pin's row alone.

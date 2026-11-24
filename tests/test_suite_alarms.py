@@ -126,7 +126,12 @@ def test_brucites_correlation_findings_do_not_move_under_a_rounding_nudge():
 
 @pytest.mark.slow
 @pytest.mark.xdist_group("brucite-nudge")
-@pytest.mark.parametrize("key", ["brucite", "corundum", "fluorite"])
+@pytest.mark.parametrize("key", [
+    "brucite", "corundum", "fluorite",
+    # not strict: no Linux run has read this protocol, and the row must not
+    # turn the nightly red on a reading WP-1460 has yet to explain
+    pytest.param("zincite", marks=pytest.mark.xfail(
+        reason="the cut misses the triple at zincite's closing stage (WP-1460)"))])
 def test_the_closing_stage_names_the_flat_width_triple_unresolved(key, monkeypatch):
     """WP-2050, ruled 2026-11-01: no message says which correlations the guard
     withheld, so this is the developer's signal.  At each round-robin
@@ -134,9 +139,10 @@ def test_the_closing_stage_names_the_flat_width_triple_unresolved(key, monkeypat
     eigenvalue sat at 0.004-0.47x the cut, and on brucite leaves the zero-shift
     and sample-displacement pair resolved (>= 31x the cut).
 
-    Not zincite: at its closing stage the triple's eigenvalue reads 105x the
-    cut, against 0.07-0.14x at its declared stages (macOS arm64, 2026-11-23),
-    so the cut's premise fails there; WP-1460 holds the finding (WP-2036)."""
+    Zincite is expected to fail: at its closing stage the triple's eigenvalue
+    reads 105x the cut, against 0.07-0.14x at its declared stages (macOS
+    arm64, 2026-11-23), so the cut's premise fails there; WP-1460 holds the
+    finding (WP-2036)."""
     import sys
 
     import rietx as rx
