@@ -25,7 +25,7 @@
    */
   import { untrack } from "svelte";
 
-  import { api } from "../api";
+  import { ApiError, api } from "../api";
   import type { StatusReadout } from "./readout";
   import {
     CUT_WIDTH, DIFF_LIMIT, bandRows, barPart, cividis, columnRanges, countLabel, cutValue, diverging,
@@ -67,6 +67,8 @@
 
   let answer = $state.raw<MapAnswer | null>(null);
   let failure = $state("");
+  /** nothing is staged yet: the route's NO_SERIES, an empty state, not a failure */
+  let empty = $state(false);
   let mode = $state<"map" | "waterfall">("map");
   let show = $state<"obs" | "diff">("obs");
   let cuts = $state(true);
@@ -134,6 +136,7 @@
       const next = unpack(buffer) as unknown as MapAnswer;
       answer = next;
       failure = "";
+      empty = false;
       const n = next.header.n_rows;
       if (selected != null && selected >= n) selected = n ? n - 1 : null;
       if (band && Math.max(...band) >= n) band = null;
@@ -141,7 +144,8 @@
     } catch (error) {
       if (mine !== asked) return;
       answer = null;
-      failure = (error as Error).message;
+      empty = error instanceof ApiError && error.code === "NO_SERIES";
+      failure = empty ? "" : (error as Error).message;
     }
   }
 
@@ -742,6 +746,7 @@
     <div class="gtitle">
       {#if header}
         <b>{titleLabel}</b>{#if titleX}<span>{titleX}</span>{/if}
+      {:else if empty}<span>No patterns yet. Add them in the Patterns step.</span>
       {:else if failure}<span class="bad">{failure}</span>{/if}
     </div>
     <div class="gctl">
