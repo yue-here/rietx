@@ -2,7 +2,7 @@
   /**
    * The model panel's one row of actions in the rebuild (WP-2216, rows 18-24
    * of WP-2214's inventory), drawn as the prototype draws it: the word
-   * Refine and the choice of one cycle or the staged plan on the left; the
+   * Refine and the choice of as ticked or the staged plan on the left; the
    * pending count, Revert, Apply and the one filled button on the right.
    *
    * It is today's `panels/ActionBar.svelte` with one addition, which is why
@@ -43,7 +43,11 @@
 
   // the plan's choice names its length, as the prototype's does
   const CHOICES = $derived([
-    { id: "cycle", label: "One cycle", title: "One least-squares cycle on what is ticked" },
+    // "As ticked" runs one stage on the ticked parameters to convergence, a
+    // standard refinement; "cycle" in the field means one least-squares
+    // iteration, so the label never says it (the maintainer's ruling, 2026-11-22)
+    { id: "cycle", label: "As ticked",
+      title: 'Refine every ticked parameter together until it converges.\np.run_stage(rx.Stage("cycle", turn_on=[]))' },
     { id: "plan", label: stages ? `Staged plan, ${stages} stage${stages === 1 ? "" : "s"}` : "Staged plan",
       title: "The project's staged plan" },
   ] as const);
