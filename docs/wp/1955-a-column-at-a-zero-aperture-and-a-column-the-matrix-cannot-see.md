@@ -1,6 +1,6 @@
 # WP-1955 — a column at a zero aperture, and a column the agreement matrix cannot see
 
-Milestone: unscheduled · Status: 🔄 2026-11-24 — claimed by a ghostshift runner to fix main's red gate test; tasks 1-5 landed (PRs #1321, #1372); tasks 6-8 open
+Milestone: unscheduled · Status: 🔄 2026-11-24 — tasks 1-5 landed (PRs #1321, #1372; the gate test made deterministic, PR #PRNUM); tasks 6-8 open
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-11-03 — the stall and the collapse are fixed (tasks 2 and 5, PR #1372); left are the start value's evidence across families, the Gaussian-width floor and suggest's scoring of a zero aperture
@@ -213,6 +213,70 @@ alone.
   **27**, 892-900.
 
 ## Handover log
+
+- **2026-11-24** — Main went red after #1372 merged, on one test that
+  asserted a fit lands a value on exactly 0. Nothing in the package was
+  wrong. The test's data put the aperture's best value at the bound itself,
+  where the column vanishes, so the last step lands on 0 or on a few times
+  1e-9 by rounding. The test now gives H/L a positive lower bound the data
+  push against, which the fit lands on exactly whatever the rounding. It
+  still fails when the gate it guards is removed. This entry is a ghostshift
+  runner's, written so Mike can see what changed in his test; the PR is
+  #PRNUM. It is also the repair of the 2026-11-23 entry below, which the
+  session-start hook flagged as missing.
+
+  *Done.* `test_an_aperture_an_earlier_stage_refined_is_not_lifted_again`:
+  H/L's model parameter is `Parameter(value=0.005, min=0.005, vary=False)`
+  over data with S/L = H/L = 0. Stage 1 lifts H/L to 0.01 (the lift writes
+  a row whose value equals its lower bound, `seed_floored`). The data pull
+  H/L below its bound, and the bounded LM step lands it on 0.005 at the
+  first accepted step, where it stays for all five. The assert reads
+  `== floor` instead of `== 0.0`. The docstring says why. No package code
+  changed. No checklist item corresponds; tasks 6-8 are untouched.
+
+  *Measured* (macOS arm64, `[dev]`, Python 3.12.10, this branch).
+  - CI main run 45326385396 (merge of #1819), `fast py3.14 1/4`: stage 1
+    ended at H/L 4.36e-9, S/L 7.01e-5. The same code (PR head 318fae76f
+    differs from main only in WP-1418's docs) passed on the PR.
+    `gh run rerun --failed` (attempt 2 of the same run ID) passed. So it
+    flakes on one platform with no code change.
+  - Old design, stage 1's accepted H/L values: 0.0045, 0.0011, 1.0e-4,
+    8.4e-7, then 0, 0, 2.0e-11, 4.1e-11, 0, 8.6e-12, 0, 0, 3.9e-10,
+    1.5e-9, 0 (compiled path); the numpy path (`RIETX_COMPILED=0`) ends
+    0 after 2.3e-9. No state leaks between tests. The data's optimum is the
+    bound with a vanishing gradient, so steps hop on and off it.
+  - New design: H/L 0.005 exactly on all five accepted steps, compiled and
+    numpy paths. With `refined_before` ignored (monkeypatched
+    `_run_stage`) the test fails at `res.stages[1].seeded == {}`, on both
+    paths; stage 2 then seeds S/L 0.02 and H/L 0.01.
+  - `tests/test_lab_instrument.py` 71 passed, 21 xfailed. Fast suite
+    (`-m "not slow"`, through serial.py): 15719 passed, 452 skipped, 30
+    xfailed, no failures; it ran before the docstring-only review commit.
+    CI's vale steps: 0 errors. `tests.reader_output`: unchanged.
+  - `/code-review high --fix`: one nit applied (the docstring named
+    `apertures_to_lift` for the floor test, which lives in `seed_floored`).
+    The review edited `refine.py` in this tree to check the counterfactual
+    while the fast suite ran, and restored it. The suite started first, so
+    its workers had most likely imported the module already; the suite
+    showed no failure either way.
+
+  *Siblings.* Searched `tests/`, `src/`, `examples/` and the manual for an
+  aperture asserted exactly 0 after a fit, and for a lift assertion resting
+  on one. None: line 519's `axial_hl.value == 0.0` is a held row nothing
+  writes, the `test_gsas_prm.py` zeros are reader values, and the other
+  `seeded == {}` asserts are the roughness seed's.
+
+  *Not generalised.* The lift fires only on a value exactly on its bound, so
+  an aperture a fit leaves at 4e-9 instead of 0 is not lifted by a later
+  `run_stage` or a series warm start, where 0 would be. On noise-free rutile
+  (S/L = H/L = 0.03 in the data, both freed, `run_stage`, 40 iterations)
+  a start at 4.36e-9 still reached the answer, in 31 iterations against 14
+  from a lifted 0. Not measured on #1075's repro or X17's warm CPD refit,
+  the two cases that stalled. Next for task 6 or a successor: measure
+  whether those stall from 1e-9. If they do, "on its floor" needs a
+  tolerance, which is a new heuristic with an audit row.
+
+  *Next.* Tasks 6-8 as before, task 6 first.
 
 - **2026-11-23** (reconstructed post hoc) — One commit on PR #1372 after the
   last entry, 19f07b251 (Mike), recorded here by the 2026-11-24 repair.
