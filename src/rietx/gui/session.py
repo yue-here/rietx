@@ -253,6 +253,11 @@ class GuiSession:
         #: serializable ``SeriesResult``.  One object, so "is there an answer"
         #: cannot be two answers.
         self._series_run: dict | None = None
+        #: each staged member's pattern as the Map last read it, keyed by its
+        #: upload and reader options: a staged file never changes, and reading
+        #: one costs ~27 ms (an .xye of 4200 points), so a coordinate edit on a
+        #: 34-pattern list would otherwise cost the Map a second (WP-2243)
+        self._series_reads: dict[tuple, Any] = {}
         if project is not None:
             self._remember(project)
 
@@ -3238,7 +3243,8 @@ class GuiSession:
 
         Answers before any run, from the staged files alone: that is the
         series' pre-visualisation (WP-2243 task 7). The rows are the staged
-        list in series order, each file read again as the chain would read it.
+        list in series order, each file read as the chain would read it, once
+        while it stays staged under the same reader options.
         A row carries its fit's difference only while the last run's list is
         the staged one, member for member and reader option for option, so an
         edit after a run never draws one pattern's misfit over another's
@@ -3254,7 +3260,11 @@ class GuiSession:
         with self._cond:
             entry = self._series_run
             running = self._state != "idle" and self._run.get("kind") == "series"
-        data = [read_pattern(m.path, **m.options) for m in setup.members]
+        keys = [(m.token, tuple(sorted(m.options.items()))) for m in setup.members]
+        reads = {k: self._series_reads.get(k) or read_pattern(m.path, **m.options)
+                 for k, m in zip(keys, setup.members)}
+        self._series_reads = reads
+        data = [reads[k] for k in keys]
         fits, rwp = {}, {}
         staged = [(m.token, dict(m.options)) for m in setup.members]
         if (entry is not None and not running
