@@ -1539,7 +1539,8 @@ def check_hump_width(table, model) -> list[GuardFinding]:
     ``optimize.least_squares.gaussian_width_inequalities``).  This guard's
     floor of 10·√ε, 1e-3°, sits a decade above that, and the inequality also
     counts the phase's Gaussian terms, which this instrument-only width does
-    not.  So the abstention can still happen under LM.
+    not, nor a width peak equation's term (WP-2153).  So the abstention can
+    still happen under LM.
     """
     from ..model.profiles.caglioti import _MIN_GAMMA_G2
 
@@ -1618,8 +1619,8 @@ def check_stephens_positive(table, model) -> list[GuardFinding]:
     definiteness), which is why it cannot be a box bound.  The default LM
     driver carries it as a linear inequality (``optimize/lm.py``), and then
     this guard falls silent because there is nothing left to report.  It is
-    the only check under ``solver="trf"``, and in a joint fit under either
-    driver, since ``run_multi_least_squares`` builds no cone.
+    the only check under ``solver="trf"``.  A joint fit's LM step holds one
+    cone per histogram (``_joint_positivity_inequalities``, WP-2239).
 
     Zero is *inside* the physical set, and the test is one-sided for that
     reason: an all-zero block is the exact no-broadening identity, and a
@@ -1756,6 +1757,14 @@ def check_peak_width_positive(table, model) -> list[GuardFinding]:
     terms' floored value plus the equation's, so a dip the instrument's own
     U, V and W cause stays ``RESOLUTION_NOT_POSITIVE``'s.  Zero is a legal Γ_L,
     so that test is one-sided.  A phase with no width equation is skipped.
+
+    Under the default LM driver the total, the equation's term included, is
+    held inside the step wherever that term is exact at the stage's frozen
+    angles (WP-2153).  So there this fires on a term that function leaves
+    out (``optimize.least_squares._equation_width_rows`` lists the cases), on
+    a start already below zero, which no row can restore, and on what a
+    moving cell or zero shift does between the frozen angles and the answer.
+    Under TRF it is the only check.
     """
     import numpy as np
 
@@ -2104,9 +2113,10 @@ def check_resolution_positive(table, model) -> list[GuardFinding]:
     over zero does not make U, V, W quotable.  Read a firing as "this
     resolution function is not quotable", never as a verdict on the sample.
 
-    This is TRF's guard, and a joint fit's.  The LM driver on a single
-    histogram also holds the **total** Γ_G², each phase's Gaussian size and
-    strain included, at or above ``caglioti._MIN_GAMMA_G2`` at every
+    This is TRF's guard.  The LM driver, on a single histogram and on each
+    histogram of a joint fit, also holds the **total** Γ_G², each phase's
+    Gaussian size and strain included, and a width peak equation's term where
+    that term is exact (WP-2153), at or above ``caglioti._MIN_GAMMA_G2`` at every
     reflection, as a linear inequality (WP-1938 D7,
     ``optimize.least_squares.gaussian_width_inequalities``), and the total
     Γ_L at or above zero (``lorentzian_width_inequalities``).  That keeps the

@@ -161,6 +161,16 @@ the transposed rotation set is a group too and passes any dimension count.
 
 ### Inherited
 
+- **2026-11-23, from WP-2220 (closed; PR #1717): the restart test still orders at `FTOL`
+  relative.** Yue ruled on 2026-11-20 that a nested comparison's ordering flag
+  (`report.layer2._chi2_ordered`) allows the fuller fit an absolute margin of 2 cost units
+  (`NESTED_COST_MARGIN`, the lower edge of Kass & Raftery's "positive evidence" band).
+  `distortion_block_tests` triggers its restart when a restricted χ² sits below the full one
+  by more than `optimize.lm.FTOL` (1e-9) relative, and reads the data χ², not the minimised
+  cost. WP-2220 left it alone, since the ruling named only `chi2_ordered` and a restart
+  trigger is a different job. Whether the restart takes the same margin is a distortion-mode
+  decision, so it is Mike's.
+
 - **2026-11-01, from WP-2067: the purpose table reads every `distortion_modes`
   path as one that moves atoms.** `purposes._ATOM_DRIVERS` lists
   `phases.*.distortion_modes.*` whole. So a warning naming an amplitude keeps

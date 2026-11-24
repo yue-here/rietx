@@ -75,15 +75,15 @@ describe("the Pattern graph's title line", () => {
   it("toggles between the preview and the last fit, drawn whole", async () => {
     // the maintainer's look, 2026-11-21, item 4
     await draw({});
-    // laid out and unseen with no preview, so one appearing moves no control
-    expect(document.querySelector(".gctl .vg.reserved")).not.toBeNull();
-    expect([...document.querySelectorAll<HTMLButtonElement>(".gctl .segmented button")]
-      .every((b) => b.disabled)).toBe(true);
+    // in the legend, under the curves it chooses between, and only while a
+    // preview is in hand (WP-2227: the title line keeps its room)
+    expect(document.querySelector('[aria-label="Show"]')).toBeNull();
     app && unmount(app);
     document.body.innerHTML = "";
     const curves = { header: { rwp: 0.3001 }, arrays: {} };
     await draw({ preview: { curves, sentAt: 0 } });
-    const buttons = [...document.querySelectorAll<HTMLButtonElement>(".gctl .segmented button")];
+    expect(document.querySelector(".gctl .segmented")).toBeNull();
+    const buttons = [...document.querySelectorAll<HTMLButtonElement>(".gutter .segmented button")];
     expect(buttons.map((b) => b.textContent)).toEqual(["Preview", "Last fit"]);
     expect(buttons[0].getAttribute("aria-pressed")).toBe("true");
     setPreview.mockClear();
@@ -94,6 +94,18 @@ describe("the Pattern graph's title line", () => {
     buttons[0].click();
     flushSync();
     expect(setPreview).toHaveBeenLastCalledWith(curves);
+    expect(titleText()).toBe("Preview, not refined Rwp 30.01 %, last fit 9.28 %");
+  });
+
+  it("says how the last fit ran beside its Rwp, and not over a preview", async () => {
+    // WP-2227, the maintainer's ruling 1 of 2026-11-22
+    const howText = "One stage: the model had converged";
+    await draw({ howText });
+    expect(titleText()).toBe(`Last fit Rwp 9.28 % GoF 1.66 ${howText}`);
+    expect(document.querySelector(".gtitle")!.getAttribute("title")).toBe(`Last fit. ${howText}`);
+    app && unmount(app);
+    document.body.innerHTML = "";
+    await draw({ howText, preview: { curves: { header: { rwp: 0.3001 }, arrays: {} }, sentAt: 0 } });
     expect(titleText()).toBe("Preview, not refined Rwp 30.01 %, last fit 9.28 %");
   });
 

@@ -1199,8 +1199,9 @@ def _peak_width_silent() -> list:
     return _peak_width(-2e-4) + _peak_width(2e-3)
 
 
-def _peak_eq_shared(mo: bool, per_histogram: list) -> list:
-    """The sharing note for brucite's ``w*tan(theta)`` over a Cu pattern and a
+def _peak_eq_shared(mo: bool, per_histogram: list,
+                    expression: str = "w*tan(theta)") -> list:
+    """The sharing note for brucite's ``expression`` over a Cu pattern and a
     second pattern, at Mo Kα or at Cu again."""
     from rietx.params.multi import SharingMap
     from tests.test_peak_equations import (
@@ -1213,7 +1214,7 @@ def _peak_eq_shared(mo: bool, per_histogram: list) -> list:
     cu = _instrument()
     other = _mo(cu) if mo else cu.model_copy(deep=True)
     return _shared_across_wavelengths(
-        [_eq("lor_fwhm", "w*tan(theta)", w=0.02)], [cu, other],
+        [_eq("lor_fwhm", expression, w=0.02)], [cu, other],
         sharing=SharingMap(per_histogram=per_histogram))
 
 
@@ -1223,9 +1224,11 @@ def _peak_eq_shared_fires() -> list:
 
 
 def _peak_eq_shared_silent() -> list:
-    """Two Cu patterns sharing it, and Cu and Mo patterns each with its own."""
+    """Two Cu patterns sharing it, Cu and Mo patterns each with its own, and
+    Cu and Mo patterns sharing it in an equation that reads ``wavelength``."""
     return (_peak_eq_shared(False, [])
-            + _peak_eq_shared(True, ["phases.*.peak_equations.*"]))
+            + _peak_eq_shared(True, ["phases.*.peak_equations.*"])
+            + _peak_eq_shared(True, [], "w*wavelength/cos(theta)"))
 
 
 def _qpa_factor(p: float, unmeasured: list) -> list:

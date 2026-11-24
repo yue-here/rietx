@@ -24,7 +24,12 @@ published esds:
   converged to, plus Gaussian noise at the deposit's own σ, is refitted from
   the perturbed start and returns the deposited coordinates within
   ``KNOWN_ANSWER_BOUND`` of rietx's esds; a regular-hexagon template refitted
-  the same way does not.
+  the same way does not;
+* **the misfit check's verdict** (WP-1989 part 2, #1008) — the body with
+  C2–C3 stretched 0.3 Å, refined under the same plan, fires
+  ``RIGID_BODY_MISFIT`` and names C2–C3 first, while the same fits with
+  every member freed, the arm 1.11.0 fitted, fall short of its ΔBIC
+  threshold; the deposited body does not fire.
 
 The deposited coordinates are another model's answer under another protocol
 (``docs/DESIGN.md`` Rule 2), so they judge nothing here: the per-atom table
@@ -60,8 +65,11 @@ from rietx.crystallography.bodies import body_from_atoms, place_body_atoms
 from rietx.crystallography.cif import structure_from_cif
 from rietx.crystallography.riding import set_riding_lengths
 from rietx.model.forward import compile_model
+from rietx.optimize.statistics import _chi2_absolute
 from rietx.params.derived import cartesian_frame
 from rietx.params.vector import ParameterTable
+from rietx.report.body_misfit import MISFIT_ALPHA, MISFIT_BIC
+from rietx.report.layer2 import delta_bic
 from rietx.schemas.common import Parameter
 from rietx.schemas.instrument import BackgroundChebyshev, Dispersion, HumpComponent
 from rietx.schemas.structure import (
@@ -72,6 +80,7 @@ from rietx.schemas.structure import (
     Structure,
 )
 from rietx.strategy.staged import CLOSING_WINDOW_TOL, INTERMEDIATE_FTOL
+from tests.test_body_misfit import _by_hand, _stretch_c2c3
 from tests.test_rigid_body_special import DATA, OUT, _draw
 
 FIXTURE = DATA / "cod_2242872.cif"
@@ -489,6 +498,17 @@ def free_control(pattern):
 
 
 @pytest.fixture(scope="module")
+def real_stretched(pattern):
+    """#1008's positive arm: the deposited body with C3 moved 0.3 Å along
+    C2→C3 (H3 with it), refined under the same plan, then checked."""
+    phase = _deposited_phase()
+    body = _stretch_c2c3(_deposited_body(phase), 0.3)
+    ref, result = _fit(_start(_with(phase, body, perturb=False)), pattern)
+    _draw(result, "acridine_ix_real_stretched_c2c3")
+    return ref, ref.check_rigid_bodies(pattern, free=tuple(_BKG))
+
+
+@pytest.fixture(scope="module")
 def simulated(real_deposited, pattern):
     return _simulate(*real_deposited, pattern)
 
@@ -620,3 +640,40 @@ def test_a_regular_hexagon_template_fails_the_known_answer_bound(hexagon_arm):
     assert result.status == "converged"
     worst = max(max(r) for r in _ratios(ref.fitted_structure.phases[0]).values())
     assert worst > KNOWN_ANSWER_BOUND, worst
+
+
+@pytest.mark.slow
+@pytest.mark.xdist_group("acridine-ix")
+def test_issue_1008s_stretched_body_fires_on_the_deposited_pattern(pattern, real_stretched):
+    """#1008's case, which 1.11.0 left silent: with each H riding, the check
+    fires on both tests and names the stretched bond first.  The control is
+    the same fits with every member freed (63 parameters), whose ΔBIC falls
+    short of the threshold, so the verdict is the riding arm's."""
+    ref, out = real_stretched
+    (row,) = out.rows
+    assert row.n_added == 3 * len(HEAVY) - 6 == 36
+    assert row.fires
+    assert row.p_value < MISFIT_ALPHA and row.delta_bic > MISFIT_BIC
+    label, template, _, _ = row.deviations[0]
+    assert label == "C2–C3" and template == pytest.approx(1.7045, abs=1e-4)
+    arm = ref.released_arm("acridine", freed=HEAVY + HYDROGENS)
+    _, res = _by_hand(ref, pattern, arm, "acridine_ix_real_stretched_all_freed", globs=_BKG)
+    # a stalled control would pass the threshold below for the wrong reason
+    assert res.status == "converged"
+    assert _chi2_absolute(res.statistics) < row.chi2_body
+    added = res.statistics.n_free_parameters - row.n_free_body
+    assert added == 3 * len(HEAVY + HYDROGENS) - 6 == 63
+    assert delta_bic(row.chi2_body, _chi2_absolute(res.statistics), row.n_points, added,
+                     n_effective=row.n_effective) < MISFIT_BIC
+
+
+@pytest.mark.slow
+@pytest.mark.xdist_group("acridine-ix")
+def test_the_deposited_body_does_not_fire_on_the_deposited_pattern(pattern, real_deposited):
+    """The negative arm on the same data and plan."""
+    ref, _ = real_deposited
+    out = ref.check_rigid_bodies(pattern, free=tuple(_BKG))
+    (row,) = out.rows
+    assert row.n_added == 36
+    assert not row.fires and out.diagnostics == []
+    assert row.p_value > MISFIT_ALPHA

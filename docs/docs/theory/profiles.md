@@ -91,9 +91,12 @@ the data adds one row to its linear inequalities ({ref}`ch-estimation`,
 {source}`rietx.optimize.least_squares.gaussian_width_inequalities`
 
 $\Gamma_G^2$ here includes the phase's Gaussian size and strain terms, and the
-angles are those of the cell at the start of the stage. TRF and a joint fit
-build no rows, and neither does a reflection that starts under the clamp. The
-guard above stays the check for those.
+angles are those of the cell at the start of the stage. It includes a peak
+equation's Gaussian term wherever that term is exact at those angles: an
+equation whose coefficients are held, or one affine in its free coefficients.
+Any other equation term is left out of the row. A joint fit builds
+each histogram's rows. TRF builds no rows, and neither does a reflection that
+starts under the clamp. The guard above stays the check for those.
 
 ```{math}
 :label: prof-caglioti-l
@@ -120,7 +123,8 @@ data:
 
 {source}`rietx.optimize.least_squares.lorentzian_width_inequalities`
 
-$\Gamma_L$ here includes the phase's Lorentzian size and strain terms. An
+$\Gamma_L$ here includes the phase's Lorentzian size and strain terms, and a
+`lor_fwhm` peak equation's term under the same rule as the Gaussian row. An
 anisotropic strain block adds a term its own cone keeps at or above zero, so
 the row leaves it out. TRF builds no rows. Below zero the pseudo-Voigt mixing
 parameter turns negative and the line is no longer a peak shape, so
