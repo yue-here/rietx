@@ -302,6 +302,12 @@ the prototype's (WP-2214 § How the maintainer reviews).
   scrubber placement. Then task 9 (First fit), which makes First fit the filled button
   again.
 
+  *Main merged* (steward, 37d551db0). #1822's `padRight`/`OVERHANG` and this branch's
+  `source`/`nav` props merged clean in `Pattern.svelte`. Only the dist conflicted, and it
+  was rebuilt from source. vitest 1057 passed, svelte-check 0 errors, the seven browser
+  files 72 passed, `test_gui_dist.py` 16 passed, CI's lint steps clean (arm64 macOS,
+  worktree venv `[dev]` plus playwright, node 24.22.1).
+
 - **2026-11-24** — ghostshift runner wp-2243-a, second session; PR #1820. The Series
   workflow at `/next` now has a Results step. After a run, a person reads how many
   patterns converged, the largest walk gap and the largest step with their sizes in esds,
