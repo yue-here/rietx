@@ -174,6 +174,11 @@
   const UI_SCALE = "intensity_scale";
   const UI_DIFFERENCE = "difference";
   const GUTTER = 112;
+  /** How far the chart's canvas reaches into the gutter, as the plot's right
+   *  padding: the plot area ends at the gutter, and a 2θ label centred on that
+   *  edge is drawn whole, as the prototype's canvas spans its gutter (WP-2245).
+   *  Left to uPlot, the same 25 px sat outside the gutter, blank. */
+  const OVERHANG = 25;
   const LEGEND_ROW = 20;
 
   let host: HTMLDivElement | undefined = $state();
@@ -350,6 +355,7 @@
         // no titles on screen (2026-11-11): each axis carries a hint instead,
         // and the y axes keep no strip for one (the look of 2026-11-21, item 1)
         titled: () => exporting,
+        padRight: OVERHANG,
         labels: {
           y: () => (!exporting ? "" : scale === "linear" ? "intensity"
             : `intensity (${scale === "sqrt" ? "√" : "log"})`),
@@ -954,9 +960,11 @@
   });
   let barWidth = $state(0);
   let hostWidth = $state(0);
+  /** The host's width short of the gutter, which its canvas reaches into by `OVERHANG`. */
+  const columnWidth = $derived(hostWidth - OVERHANG);
   let peakBarWidth = $state(0);
   const peakBarLeft = $derived(peakSpot
-    ? Math.max(peakBarWidth / 2, Math.min(hostWidth - peakBarWidth / 2, peakSpot.left)) : 0);
+    ? Math.max(peakBarWidth / 2, Math.min(columnWidth - peakBarWidth / 2, peakSpot.left)) : 0);
 
   /** The DOM marks: a dashed lens where a click would add a line (rule 9),
    *  the dragged or pending lens, and the danger lens under Option. */
@@ -1122,7 +1130,7 @@
   const barLeft = $derived.by(() => {
     if (!span) return 0;
     const mid = span.left + span.width / 2;
-    return Math.max(barWidth / 2, Math.min(hostWidth - barWidth / 2, mid));
+    return Math.max(barWidth / 2, Math.min(columnWidth - barWidth / 2, mid));
   });
 
   // -- the legend ------------------------------------------------------------
@@ -1243,7 +1251,7 @@
     {:else if loadError}
       <p class="empty bad">{loadError}</p>
     {/if}
-    <div class="plot" class:armed={!!arm} style:--gutter="{GUTTER}px"
+    <div class="plot" class:armed={!!arm} style:--gutter="{GUTTER}px" style:--overhang="{OVERHANG}px"
       style:--inset="{LABEL_INSET}px" style:--mark-line="{MARK_LINE}px">
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div class="host" class:onmark={overMark != null && !altHeld} class:dragging={!!drag?.moved}
@@ -1445,7 +1453,7 @@
 
   .host {
     position: absolute;
-    inset: 0 var(--gutter) 0 0;
+    inset: 0 calc(var(--gutter) - var(--overhang)) 0 0;
   }
 
   .plot.armed .host :global(.u-over) {
