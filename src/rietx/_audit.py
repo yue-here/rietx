@@ -803,7 +803,30 @@ ROWS: tuple[Row, ...] = (
         response='info',
         responds=("note which sites' moments were read on their symmetry-allowed form and the "
                   'largest move; nothing to do')),
-    Row("CIF_MAGNETIC_NUCLEAR_GROUP", "code"),
+    Row("CIF_MAGNETIC_NUCLEAR_GROUP", "code", tier=3, ambiguity=2,
+        evidence=("read the raise site in magcif.resolve_nuclear_symmetry (nuclear_group='auto', "
+                  "the default): fires when the parent group the file names contains the file's "
+                  "operators and keeps every site's orbit, so positions refine under the parent "
+                  "and moments under the magnetic group; the suggestion names "
+                  "nuclear_group='file'. Practice: Gallego et al. (2016) J. Appl. Cryst. 49, "
+                  "1750, sec. 2.6, describe positions modelled under the paramagnetic phase's "
+                  "symmetry as the usual approximation, and MAGNDATA keeps the magnetic group's "
+                  "positional freedoms for magnetostructural work; GSAS-II 5.8.4 refines "
+                  "positions under the file's own operators (docs/practice.md, 'A magCIF in a "
+                  "non-standard orientation'). Measured (Mike, #1797, 2447 MAGNDATA snapshot "
+                  "files): 883 take this code, 777 of them at index 1 where nothing is chosen; "
+                  "in the 106 read under a parent strictly above the file's group (347 sites "
+                  "constrained more), no stated coordinate moves more than 3.1e-5 A. The orbit "
+                  "count's merge is _ORBIT_MERGE_TOL's row"),
+        grounds=("Not unanimous: a refiner looking for magnetostructural displacements would "
+                 "take the file's group (Gallego et al. 2016, sec. 2.6). Kept as a recorded "
+                 "departure: a reader builds one model before any data can rank the two, and "
+                 "the parent is the smaller of two nested models at the file's own "
+                 "coordinates, so it is where a fit starts; the code records the choice and "
+                 "names the switch. Ends when a fit can test the file group's extra "
+                 "positional freedoms (displacive modes at zero amplitude) against the data, "
+                 "which makes it Rule 1's second kind. Ruled by Mike on PR #1636 under #1075."),
+        approved="2026-11-23"),
     Row("CIF_MAGNETIC_NUCLEAR_SETTING", "code", tier=1, ambiguity=1,
         evidence=('read the raise sites at magcif.py:1186-1232: fires where the positions refine '
                   "under the file's own group instead of the parent it names, because the "
@@ -7551,7 +7574,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "BACKGROUND_ABSORPTION.suggestion",
     "BISO_UNUSUALLY_LARGE",
     "BISO_UNUSUALLY_LARGE.suggestion",
-    "CIF_MAGNETIC_NUCLEAR_GROUP",
     "CONSTRAINT_ACTIVE.suggestion",
     "COVARIANCE_UNAVAILABLE.suggestion",
     "DATA_SUPPORT_LOW",
