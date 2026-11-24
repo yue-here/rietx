@@ -379,9 +379,9 @@ export const api = {
    *  at a time.  Over the server's cap it is a sample — read `n_total`. */
   candidateTicks: (candidate: number) =>
     call("GET", `/api/index/ticks?candidate=${candidate}`),
-  adoptCandidate: (candidate: number, spaceGroup?: string) =>
-    call("POST", "/api/index/adopt",
-         spaceGroup ? { candidate, space_group: spaceGroup } : { candidate }),
+  adoptCandidate: (candidate: number, spaceGroup?: string, mode?: "lebail" | "pawley") =>
+    call("POST", "/api/index/adopt", {
+      candidate, ...(spaceGroup ? { space_group: spaceGroup } : {}), ...(mode ? { mode } : {}) }),
   /** Rank one candidate's extinction classes — the same run machine, and a
    *  measurement any candidate may ask for (the gate stays on adopt). */
   screenExtinctions: (candidate: number) =>
@@ -406,6 +406,13 @@ export const api = {
   /** One member's channels and curves, as `curves` sends the project's: built
    *  by the same function, so the σ and the residuals are the same arithmetic. */
   seriesCurves: (index: number) => arrays(`/api/series/curves?index=${index}`),
+  /** One member by its place in a list, the run's or the staged one, with
+   *  its fit wherever one has landed, mid-run too (WP-2243). */
+  seriesPattern: (pattern: number, of: "run" | "staged") =>
+    arrays(`/api/series/curves?pattern=${pattern}&of=${of}`),
+  /** Every staged pattern's counts on one 2θ grid, and each fitted one's
+   *  difference in esd, packed as the curves are (WP-2243). Before a run too. */
+  seriesMap: () => arrays("/api/series/map"),
   /** That pattern's own history tree — **read-only**: a tree is pinned to its
    *  data fingerprint, so its nodes cannot be checked out into this project. */
   seriesHistory: (index: number) =>

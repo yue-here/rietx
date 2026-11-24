@@ -137,6 +137,20 @@ down.
   and the code check at `a84379aac` are written out. Decide this WP's options
   and #1439 together. The issue also names #1402 (re-entry of a held phase)
   as related.
+  *2026-11-23, from WP-2081's close:* 2081's question 1 is ruled (the series
+  default stays, maintainer 2026-11-16), and no rule fixes the free set at
+  frame 0, so the #1439 decision now sits here alone. What 2081 held that this
+  entry did not: at `a84379aac`, `sequential._collapse` passes
+  `phase_support_sigma` into the collapsed warm plan, so the hold decides
+  afresh on every warm refit, and each entry records what its last stage held.
+  The effect has not been measured in `rietx.sequential`, and the reporter
+  offers a synthetic reproduction. The issue also proposes a companion check
+  over two `SeriesResult`s, one a declared restriction of the other, reporting
+  per frame free sets that differ beyond the declared holds and a larger model
+  ending at a higher χ²; WP-2220's `chi2_ordered` is that test for one pair of
+  fits. The issue says GSAS-II stops when the vary list changes; GSAS-II 5.8.4
+  prints the change and carries on (`GSASIIstrMain.py:1038-1058`,
+  `docs/practice.md` § Sequential refinement).
 - **2026-10-13 (2nd), from WP-1523's close: a subgroup at its parent's
   identity point is held only while its scale is near zero.** The scale
   significance is now conditional on every other phase's scale. So a phantom
