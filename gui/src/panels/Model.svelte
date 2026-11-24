@@ -36,6 +36,7 @@
    */
   import { ApiError, api } from "../api";
   import Help from "../Help.svelte";
+  import HeldMark from "../HeldMark.svelte";
   import {
     applyFields,
     atomRows,
@@ -48,6 +49,7 @@
     newAtom,
     phaseFields,
     positionEdits,
+    registerEcho,
     splitEdits,
     structureFields,
     xyzText,
@@ -71,7 +73,6 @@
     editState,
     formatEsd,
     formatValue,
-    heldGlyph,
     normalize,
     varyEdit,
     varyEditFor,
@@ -81,12 +82,14 @@
     type ParamRow,
   } from "../lib/table";
   import { MODEL_MIN, fitColumns, modelStacks } from "../lib/resize";
+  import type { ModelDraft } from "../lib/recovery";
   import type { Theme } from "../lib/theme";
   import Splitter from "./Splitter.svelte";
   import Structure3D from "./Structure3D.svelte";
 
   let {
     project = null,
+    opens = 0,
     capabilities = null,
     head = null,
     busy = false,
@@ -99,6 +102,9 @@
     onmoved = () => {},
   }: {
     project?: any;
+    /** the shell's count of projects opened, which tells two projects apart
+     *  where `head` cannot (WP-2242) */
+    opens?: number;
     capabilities?: any;
     head?: string | null;
     busy?: boolean;
@@ -252,7 +258,8 @@
    *  written from: an export moves no head, and every head move that follows
    *  makes the file a description of something else. */
   let profileSaved = $state("");
-  let draft = $state({ label: "", species: "", x: "0", y: "0", z: "0" });
+  const NO_ATOM = { label: "", species: "", x: "0", y: "0", z: "0" };
+  let atomRow = $state({ ...NO_ATOM });
   /** The 3D view is a **third column of this pane**, not a sixth tab and not a
    *  window of its own: it answers questions about the rows beside it (is that
    *  ADP a balloon? did that coordinate DOF move the atom off its axis?), and a
@@ -331,13 +338,12 @@
    *  `projectKey`, not `project`: a `ui`-only PATCH (a theme, a pane width)
    *  replaces the project *object* without moving the head, and reading the
    *  object here made every such write reload three routes and refetch the 3D
-   *  geometry (WP-1029 q).  The *path* rather than a boolean, because the head
-   *  cannot tell two projects apart — node ids are sequential (`n0000`), so
-   *  two fresh projects share a head — and a switch must reload even when the
-   *  heads collide.  (Today `App.opened()` also forces `mode = "panes"`, so a
-   *  switch re-enters through `active` anyway; the key means this effect stays
-   *  correct the day that side effect changes.) */
-  const projectKey = $derived(project?.path ?? null);
+   *  geometry (WP-1029 q).  The shell's `opens` rather than a boolean, because
+   *  the head cannot tell two projects apart — node ids are sequential
+   *  (`n0000`), so two fresh projects share a head — and a switch must reload
+   *  even when the heads collide.  Not the path, which a reset example keeps
+   *  and a File-menu rename moves (WP-2242). */
+  const projectKey = $derived(project ? opens : null);
   $effect(() => {
     void head;
     if (projectKey !== null && active) load();
@@ -364,6 +370,9 @@
       const [s, i, p] = await Promise.all([api.structure(), api.instrument(),
                                            api.params()]);
       structure = s.structure;
+      // a phase removed since, or another project's index: the form reads
+      // `structure.phases[phase]` unguarded
+      if (phase >= (structure?.phases?.length ?? 0)) phase = 0;
       sites = s.sites ?? [];
       symmetry = s.symmetry ?? [];
       causes = s.causes ?? {};
@@ -407,6 +416,54 @@
     varyEdits = new Map();
     error = "";
     note = "";
+  }
+
+  // -- the recovery copy (WP-2213) ------------------------------------
+  /** The typed fields as they stand, for the recovery copy, or `null` when
+   *  nothing is typed.  The maps themselves rather than the deltas: a restore
+   *  goes back through this form's own state, never by patching the model,
+   *  and the deltas are diffs against a project that may have moved.  Before
+   *  the first load the deltas read zero, so the count falls back to the
+   *  typed fields; the trigger is the typed fields either way, or a restore
+   *  made with this tab unopened would be written over at once. */
+  export function draft(): ModelDraft | null {
+    const typed = edits.size + pedits.size + xyzEdits.size + varyEdits.size;
+    const atom = Object.entries(NO_ATOM).some(([k, v]) => atomRow[k as keyof typeof NO_ATOM] !== v)
+      ? { ...atomRow } : null;
+    const shown = structure ? dirty : typed;
+    if (!shown && !atom) return null;
+    return { count: shown + (atom ? 1 : 0), edits: Object.fromEntries(edits),
+             params: Object.fromEntries(pedits), positions: Object.fromEntries(xyzEdits),
+             vary: Object.fromEntries(varyEdits), atom };
+  }
+
+  export function restoreDraft(kept: ModelDraft) {
+    const map = <T,>(x: Record<string, T> | undefined) => new Map(Object.entries(x ?? {}));
+    edits = map(kept.edits);
+    pedits = map(kept.params);
+    xyzEdits = map(kept.positions);
+    varyEdits = map(kept.vary);
+    if (kept.atom) atomRow = { ...NO_ATOM, ...kept.atom };
+  }
+
+  /** The open project changed: drop every typed field, which belongs to the
+   *  project left behind (and is in its recovery copy). */
+  export function forget() {
+    revert();
+    atomRow = { ...NO_ATOM };
+    // the model left behind too: `draft()` measures a restored form against
+    // `structure`, and the next project's edits are not diffs against this one
+    structure = null;
+    instrument = null;
+    rows = [];
+    // the chosen phase and the open ADP rows are this project's too: an index
+    // past the next project's last phase reads `structure.phases[phase]` as
+    // undefined (WP-2242)
+    phase = 0;
+    openAdp = new Set();
+    symbolDraft = null;
+    symPreview = null;
+    symError = "";
   }
 
   /** Free or hold one row, pending Apply. */
@@ -475,9 +532,9 @@
       }
       if (insDelta?.fields.length) {
         const fresh = (await api.instrument()).instrument;
-        await api.patchInstrument(applyFields(fresh, insDelta.fields, edits),
-                                  "instrument edited");
-        say("ref.edit(instrument=…)");
+        const answer = await api.patchInstrument(applyFields(fresh, insDelta.fields, edits),
+                                                 "instrument edited");
+        for (const line of registerEcho(answer, "ref.edit(instrument=…)")) say(line);
         moves.push(`${insDelta.fields.length} instrument field(s)`);
       }
       revert();
@@ -578,20 +635,20 @@
   }
 
   async function addAtom() {
-    if (!draft.label.trim() || !draft.species.trim()) {
+    if (!atomRow.label.trim() || !atomRow.species.trim()) {
       error = "a new atom needs a label and a species";
       return;
     }
-    const xyz = [draft.x, draft.y, draft.z].map(Number);
+    const xyz = [atomRow.x, atomRow.y, atomRow.z].map(Number);
     if (xyz.some((v) => !Number.isFinite(v))) {
       error = "a new atom's position must be three numbers";
       return;
     }
-    const atom = newAtom(draft.label.trim(), draft.species.trim(), xyz);
+    const atom = newAtom(atomRow.label.trim(), atomRow.species.trim(), xyz);
     await patchStructure(withAtom(structure, phase, atom), `added ${atom.label}`,
       `structure.phases[${phase}].atoms.append(Atom("${atom.label}", `
       + `"${atom.species}", ${xyz.join(", ")}))`);
-    draft = { label: "", species: "", x: "0", y: "0", z: "0" };
+    atomRow = { ...NO_ATOM };
   }
 
   async function removeAtom(index: number) {
@@ -612,17 +669,20 @@
     }
   }
 
-  /** The Chebyshev term count is a *shape* change, so it is not a Field. */
+  /** The Chebyshev term count is a *shape* change, so it is not a Field. An
+   *  added term is built free, as `BackgroundChebyshev.with_terms` builds one;
+   *  the server releases the holds on the terms a cut removes and frees the
+   *  ones an extension adds (`GuiSession.instrument_patch`, WP-2229). */
   async function setBackgroundTerms(n: number) {
     const next = clone(instrument);
     const current = next.background.coefficients as any[];
     if (n === current.length || n < 1) return;
     next.background.coefficients = n < current.length
       ? current.slice(0, n)
-      : [...current, ...Array.from({ length: n - current.length }, () => ({ value: 0 }))];
+      : [...current, ...Array.from({ length: n - current.length }, () => ({ value: 0, vary: true }))];
     try {
-      await api.patchInstrument(next, `background: ${n} terms`);
-      say(`instrument.background = BackgroundChebyshev.with_terms(${n})`);
+      const answer = await api.patchInstrument(next, `background: ${n} terms`);
+      for (const line of registerEcho(answer, `instrument.background = BackgroundChebyshev.with_terms(${n})`)) say(line);
       error = "";
       onmoved();
       await load();
@@ -642,8 +702,11 @@
         await api.patchStructure({ upload: preview.upload }, `structure from ${file.name}`);
         say(`ref.edit(structure=structure_from_cif("${file.name}"))`);
       } else {
-        await api.patchInstrument({ upload: preview.upload }, `instrument from ${file.name}`);
-        say(`ref.edit(instrument=load_instrument_profile("${file.name}"))`);
+        const answer = await api.patchInstrument({ upload: preview.upload },
+                                                 `instrument from ${file.name}`);
+        for (const line of registerEcho(answer, `ref.edit(instrument=load_instrument_profile("${file.name}"))`)) {
+          say(line);
+        }
       }
       error = "";
       onmoved();
@@ -730,7 +793,7 @@
         onchange={(e) =>
           toggleVary(row, (e.currentTarget as HTMLInputElement).checked)} />
     {:else if row}
-      <span class="vary muted" data-vary={path} title={why(path)}>{heldGlyph(row)}</span>
+      <span class="vary muted" data-vary={path} title={why(path)}><HeldMark {row} /></span>
     {/if}
   {/snippet}
 
@@ -1081,7 +1144,7 @@
                            draws for every other flag in this row -->
                       <span class="vary muted" data-vary={glob}
                         title={why(row.dofs[0].path)}
-                        >{heldGlyph(row.dofs[0])}</span>
+                        ><HeldMark row={row.dofs[0]} /></span>
                     {/if}
                   {:else}
                     {@render varyBox(`${row.base}.x`)}
@@ -1118,11 +1181,11 @@
         </div>
 
         <div class="add">
-          <input class="mono narrow" placeholder="label" bind:value={draft.label} />
-          <input class="mono narrow" placeholder="species" bind:value={draft.species} />
-          <input class="mono narrow" placeholder="x" bind:value={draft.x} />
-          <input class="mono narrow" placeholder="y" bind:value={draft.y} />
-          <input class="mono narrow" placeholder="z" bind:value={draft.z} />
+          <input class="mono narrow" placeholder="label" bind:value={atomRow.label} />
+          <input class="mono narrow" placeholder="species" bind:value={atomRow.species} />
+          <input class="mono narrow" placeholder="x" bind:value={atomRow.x} />
+          <input class="mono narrow" placeholder="y" bind:value={atomRow.y} />
+          <input class="mono narrow" placeholder="z" bind:value={atomRow.z} />
           <button class="ghost" disabled={busy} onclick={addAtom}>Add atom</button>
         </div>
         <p class="muted">

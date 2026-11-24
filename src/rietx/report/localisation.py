@@ -22,10 +22,11 @@ on the profile directly.  Issue #219 (a laboratory pattern fitted cubic and rhom
 model winning every global statistic) is the case that made it a function: no
 global statistic sees where the gain landed.
 
-**No threshold and no** ``Diagnostic`` (decided 2026-09-03, WP-1339).  How
+**No threshold and no** ``Diagnostic``.  How
 concentrated is concentrated enough depends on the profile, the range and the
 counting statistics; the package reports the share and the reflections behind
-it, and the reader judges.  The coexistence case (a second phase on the
+it, and the reader judges.  *(Chosen: WP-1339, 2026-09-03 — a reported share
+over a thresholded diagnostic)*  The coexistence case (a second phase on the
 parent, the 2026-09-04 comment on #219) transfers weakly, by degree and not by
 sign, and is not what this measures.
 """

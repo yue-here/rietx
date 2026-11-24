@@ -36,10 +36,11 @@ Hold the cell at the certificate's value.
 With the cell fixed, the peak positions measure the zero shift and the specimen displacement, which a free cell would absorb.
 `lab_calibrate` frees one group a stage: the scale and background, the zero shift and displacement, the width term W, the other four width terms, the emission-line weights and the axial-divergence ratio S/L, and the Biso.
 [Plan presets](../reference/plans.md#lab_calibrate) draws its stages.
+It then ends with the closing stage, which other presets leave off ([The closing stage](../reference/refinement.md#the-closing-stage)), because every fit that loads the calibrated profile inherits its error.
 
 `lab_calibrate` refines one of the two axial-divergence ratios, S/L, and holds the other, H/L, at the value you set.
 The two are interchangeable in the Finger-Cox-Jephcoat profile: swapping their values gives the same pattern to the last bit.
-Refined together on this standard, they came back as S/L 0.02476(78) and H/L 0.01542(87), against 0.025 and 0.015.
+Refined together on this standard, they came back as S/L 0.01542(87) and H/L 0.02476(78), the pattern's 0.025 and 0.015 exchanged.
 The exchanged pair gives the same pattern, so nothing in the data chose this order, and no finding names the pair.
 H/L is the receiving slit's height over the goniometer radius, 3 mm over 200 mm here, so take it from the instrument's dimensions.
 Left at 0, it gives a model with one axial ratio.
@@ -89,6 +90,7 @@ Give the loaded instrument a background of its own, and declare a holder line ag
 
 `load_instrument_profile` returns every parameter fixed.
 `lab_sample_refine` frees the sample's scale, background, displacement, cell, the four sample-broadening terms and Biso, and leaves the zero shift and instrument widths alone.
+The script asks for the closing stage on these fits too, because their size and strain are numbers to quote.
 Where the model declares them, it also frees anisotropic strain and surface roughness ([Plan presets](../reference/plans.md) draws each stage).
 Do not free the instrument widths on the sample, because the sample's own terms would then trade against them again.
 

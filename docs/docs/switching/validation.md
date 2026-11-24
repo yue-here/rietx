@@ -68,7 +68,7 @@ The page [Names in other programs](../reference/foreign-names.md) maps the param
 ## LaB6 and cBN against TOPAS
 
 The specimen is NIST SRM 660b LaB<sub>6</sub> mixed with cubic BN, measured at APS 11-BM.
-The reference is TOPAS's two shipped models of the same histogram.
+The reference is two TOPAS refinements of the same pattern, made by the data's owner.
 LaB<sub>6</sub>'s certified cell is held, so that the cBN cell is measured against it.
 
 The protocol check comes first.
@@ -194,7 +194,8 @@ These tests compare rietx with a known answer and with no other code.
 | Corundum, NIST SRM 676a, laboratory Cu Kα | the certified a and c | c/a +29 ppm; a and c −314 and −284 ppm |
 | Quantitative phase analysis, IUCr CPD round robin, sample 1 | the weighed composition of eight mixtures | worst 5.10 wt %, RMS 2.30 wt %, against the participants' spread of 6.0 wt % on a major phase |
 
-The certificate's own uncertainty on SRM 660c is ±8×10<sup>−6</sup> Å, and rietx does not reach it.
+The certificate's own uncertainty on SRM 660c is ±8×10<sup>−5</sup> Å (19 ppm, k = 2), and rietx does not reach it.
+At the measurement's temperature, 20.85 °C, rietx reads +24 ± 5 ppm against NIST's recomputed cell, which misses the band by about one esd.
 The remaining offset varies as cot θ and sin 2θ, which is the shape of instrument aberrations a fundamental-parameters peak would model.
 On corundum the two axes are off by the same fraction, within 3×10<sup>−5</sup> of each other.
 An offset equal on both axes is a lab d-scale error, so the ratio c/a is the figure the certificate checks.

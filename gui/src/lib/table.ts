@@ -100,6 +100,9 @@ export function heldKind(row: ParamRow): "" | "locked" | "tied" | "mode" | "hold
   return "";
 }
 
+/** What `heldGlyph` answers for a row the padlock marks: drawn, not typed. */
+export const PADLOCK = "padlock";
+
 /** The mark a held row wears where its vary checkbox would be, or "" if free.
  *
  * Here rather than in either panel because two of them draw it now (WP-1214):
@@ -113,12 +116,15 @@ export function heldKind(row: ParamRow): "" | "locked" | "tied" | "mode" | "hold
  * `refinable` is the server's answer and it knows reasons this client may not,
  * and a held row drawn with nothing in the box's place reads as a control that
  * failed to render — which is what the fourth reason did until WP-1214.
- * `tests/test_gui_server.py` fails when a fifth arrives. */
+ * `tests/test_gui_server.py` fails when a fifth arrives.
+ *
+ * A lock and a hold both answer `PADLOCK`, which `HeldMark.svelte` draws as
+ * the one stroked padlock (`Padlock.svelte`), never an emoji (the maintainer's
+ * look of 2026-11-22, WP-2212). The mark tells them apart by its ink. */
 export function heldGlyph(row: ParamRow): string {
   const kind = heldKind(row);
-  if (kind === "locked") return "🔒";
+  if (kind === "locked" || kind === "hold") return PADLOCK;
   if (kind === "tied") return "=";
-  if (kind === "hold") return "📌";
   if (kind === "degenerate") return "≈";
   return kind === "" && row.refinable ? "" : "·";
 }
@@ -363,16 +369,20 @@ export interface EditState {
 /**
  * What the grid's pending edits amount to.
  *
- * A cell counts as changed when its text differs from the **rendered** value,
- * not from the stored float — WP-1009's rule for the text document, and for the
- * same reason: values are displayed at the precision their esd justifies, so
- * comparing against the full float would turn "the user clicked into a cell and
- * clicked out again" into a `set_values` that quietly truncates the parameter.
+ * `against` says what a cell's text is compared with, and it follows what the
+ * cell's editor opened on. `"drawn"`, the default, compares with the
+ * **rendered** value: a field that opens on the value at the precision its esd
+ * justifies (the Model form) would otherwise turn "clicked in and out again"
+ * into a `set_values` that quietly truncates the parameter (WP-1009's rule for
+ * the text document). `"stored"` compares the number with the stored float:
+ * the Parameters panel's editor opens on the full value (WP-2223), so the
+ * drawn digits typed in are a different number and are sent.
  */
 export function editState(
   rows: readonly ParamRow[],
   edits: ReadonlyMap<string, string>,
   varyCount = 0,
+  against: "drawn" | "stored" = "drawn",
 ): EditState {
   const byPath = new Map(rows.map((row) => [row.path, row]));
   const values: Record<string, number> = {};
@@ -385,7 +395,8 @@ export function editState(
     if (why) {
       invalid.push({ path, why });
       touched += 1;
-    } else if (text.trim() !== formatValue(row.value, row.esd)) {
+    } else if (against === "stored" ? Number(text) !== row.value
+                                     : text.trim() !== formatValue(row.value, row.esd)) {
       values[path] = Number(text);
       touched += 1;
     }

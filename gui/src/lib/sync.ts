@@ -65,7 +65,10 @@ export type SyncEvent =
   | { kind: "checked"; seq: number; wouldChange: boolean }
   | { kind: "applying" }
   | { kind: "applied"; text: string; revision: string; verbs: string[] }
-  | { kind: "refused"; seq?: number; code: string; message: string; problems?: Problem[] };
+  | { kind: "refused"; seq?: number; code: string; message: string; problems?: Problem[] }
+  /** A buffer kept in the recovery copy (WP-2213) comes back over a fresh
+   *  rendering. `kept` is the revision it was typed against. */
+  | { kind: "restored"; text: string; revision: string; buffer: string; kept: string };
 
 export const STALE_NOTICE =
   "the project changed underneath this text — re-read it and re-apply your edit";
@@ -123,6 +126,18 @@ export function reduce(state: SyncState, event: SyncEvent): SyncState {
                    event.verbs.length
                      ? `applied ${event.verbs.length} change(s)`
                      : "nothing to apply");
+
+    case "restored": {
+      const fresh = adopt(state, event.text, event.revision, "");
+      if (event.buffer === event.text) return fresh;
+      // typed against this very rendering: a dirty buffer, as it was left
+      if (event.kept === event.revision) return { ...fresh, phase: "dirty", buffer: event.buffer };
+      // typed against another one, and there is no merge: the buffer comes back
+      // stale, on screen to copy from, with re-read the one way out.  It keeps
+      // the revision it was typed against, so kept again it is stale again.
+      return { ...fresh, phase: "dirty", buffer: event.buffer, revision: event.kept,
+               stale: true, notice: STALE_NOTICE };
+    }
 
     case "refused": {
       if (event.seq !== undefined && event.seq !== state.seq) return state;
@@ -186,4 +201,61 @@ export function minimalChange(before: string, after: string): DocChange | null {
     endAfter -= 1;
   }
   return { from: start, to: endBefore, insert: after.slice(start, endAfter) };
+}
+
+/** Past this many cells the line table is not built, and every line between
+ *  the common head and tail counts as edited (4 MB of table). */
+export const EDITED_LINES_MAX_CELLS = 1_000_000;
+
+/**
+ * The buffer's lines that the rendering does not have, 1-based: what the Text
+ * tab marks as edited (WP-2231). A longest common subsequence over lines,
+ * after the common head and tail are trimmed, so a typed value marks its own
+ * line and an inserted line does not mark every line after it.
+ */
+export function editedLines(base: string, buffer: string): number[] {
+  if (base === buffer) return [];
+  const a = base.split("\n");
+  const b = buffer.split("\n");
+  let head = 0;
+  while (head < a.length && head < b.length && a[head] === b[head]) head += 1;
+  let endA = a.length;
+  let endB = b.length;
+  while (endA > head && endB > head && a[endA - 1] === b[endB - 1]) {
+    endA -= 1;
+    endB -= 1;
+  }
+  const n = endA - head;
+  const m = endB - head;
+  const out: number[] = [];
+  // only deleted lines: nothing left in the buffer to mark
+  if (m === 0) return out;
+  if (n === 0 || (n + 1) * (m + 1) > EDITED_LINES_MAX_CELLS) {
+    for (let j = head; j < endB; j++) out.push(j + 1);
+    return out;
+  }
+  // t[i][j]: the common subsequence's length from a[head+i] and b[head+j] on
+  const w = m + 1;
+  const t = new Int32Array((n + 1) * w);
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      t[i * w + j] = a[head + i] === b[head + j]
+        ? t[(i + 1) * w + j + 1] + 1
+        : Math.max(t[(i + 1) * w + j], t[i * w + j + 1]);
+    }
+  }
+  let i = 0;
+  let j = 0;
+  while (j < m) {
+    if (i < n && a[head + i] === b[head + j]) {
+      i += 1;
+      j += 1;
+    } else if (i < n && t[(i + 1) * w + j] >= t[i * w + j + 1]) {
+      i += 1;
+    } else {
+      out.push(head + j + 1);
+      j += 1;
+    }
+  }
+  return out;
 }
