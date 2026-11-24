@@ -1,6 +1,6 @@
 # WP-2146 — The ISIS iparm files read, with each repair recorded
 
-Milestone: unscheduled · Status: 🔄 2026-11-17 — (a), (b), (d) and the `.gss` metadata landed (PR #1639); (c) waits on the GSAS Technical Manual, and one reconciliation waits on the maintainer
+Milestone: unscheduled · Status: 🔄 2026-11-24 — every task landed (PR #1639); one reconciliation waits on the maintainer, and reading the real files waits on his yes to download them
 Track: The specimen is not an angle, and the neutron follow-through
 Depends on: — (2032 soft, closed: the T-1 readers' last follow-ups; 1927 soft, closed: the T-1 cut)
 Priority: P3 2026-11-15 — a reader with a workaround (edit three columns of the file by hand); no TOF fit consumes the profile on main yet, but facility-written HRPD and POLARIS files are what TOF users bring
@@ -229,6 +229,98 @@ output, so its wording goes to the maintainer before merge.
 - Howieson 2023 (thesis dataset), Collins et al. 2021, *Angew. Chem.*
 
 ## Handover log
+
+- **2026-11-24** — PR #1639, brought up to date with main. The GSAS
+  Technical Manual turned out to be held locally after all, outside the paper
+  corpus, and it settles task (c): it describes no shorter block for profile
+  function 3, so the HRPD file's 14-coefficient block stays refused. The
+  refusal now cites the manual's page and tells a reader with a short block
+  how to make it readable. Every checklist item is now done. What is left is
+  one question for the maintainer and two things that need his yes or a
+  real file.
+  - *Done:* merged `origin/main` at `00f9c6bc3`. Main had retired the
+    rulebook line caps for byte budgets (WP-2233), so the branch's cap raise
+    and caps-diary paragraph were dropped, taking main's side of both
+    conflicts. The io rulebook's bullet then sat 264 bytes over its budget;
+    its refusal list went down a rank to `instrument_tof.py`'s docstring,
+    which already states each one, and the file landed at 49 324 bytes
+    against the 49 324 budget. Task (c): the manual (LAUR 86-748, 2004
+    edition, 231 pages) reads `(COF(I),I=1,NCOF)` (p. 223); function 3
+    "has 21 coefficients" (p. 148); only functions 4 and 5 give a count that
+    follows the Laue symmetry (14-27 and 14-21, p. 152). No documented
+    reading, so the WP-1047 rule allows no repair. The refusal cites the
+    function's page and, for a short block only, says to write the full
+    count in the manual's order with zero for each term left out. The
+    8-slot type-1 block keeps its legacy-reader pointer instead. The
+    practice survey's GSAS-I row and `reference/instrument-files.md` say
+    the same.
+  - *Review:* the session's diff is a CLAUDE.md, one message, one docstring
+    paragraph and a test; a fresh Sonnet reviewer judged the four calls
+    below blind. It agreed with three and found one defect: the padding
+    advice also fired for a block longer than documented, where no term was
+    left out. Fixed in `d408e5096`, with the long case tested. The code
+    from 2026-11-17 was reviewed then (`/code-review high`), and this
+    session did not re-run it.
+  - *Generality (generality-review agent, condensed):*
+    `SET_NUMBER_ASSUMED` **holds** (kind 1, GSAS-II's default agrees; one
+    family). `TRAILING_ZEROS_READ` **holds** (arithmetic).
+    `PROFILE_DECLINED` (evidence rewritten at the second merge, since main's
+    text said a blank set number is always declined) **weak**: beside a
+    numbered set GSAS-II reads the *unnumbered* set (`GSASIIfiles.py:308`)
+    where rietx reads the numbered set 1, and lone and numbered sets of
+    function 2 still differ. Author's answer: the beside-a-numbered-set
+    branch is PR #1503's, older than this WP; it is added to the
+    maintainer's question below. `PROFILE_READ` and `FIELD_DROPPED`
+    (citations moved) **hold**; one range was a line short, fixed. The
+    NCOF refusal's advice **weak**: padding a function-2 block leads to a
+    second refusal, and the advice hid the slot-order guess. Fixed in
+    `cb8a1e002`: the advice is given for functions 1 and 3 only and asks
+    the caller to find which terms the writer wrote. The judge could not
+    tell from the excerpts whether the cited pages are printed pages; they
+    are: each `PAGE N` line in the extracted text heads its page, and the
+    contents list puts TOF profile function 1 on p. 143, the page whose
+    header precedes it. Both merges also moved the two new rows to
+    `scope=('calibration',)`, as their sibling iparm rows have.
+  - *Measured:* fast selection (`-m "not slow"`), `[dev]` venv, macOS arm64, at `d408e5096` (this branch merged with origin/main at `00f9c6bc3`): 15231 passed, 450 skipped, 32 xfailed, 0 failed. No test was added this session; one parametrised test gained assertions. Main then moved 46 commits; after the second merge (`c9fc92873`) and the judge's fixes, only `test_audit_table.py`, `test_instrument_tof.py`, `test_tof_axis.py`, `test_manual.py` and `test_manual_api.py` ran here, all passing; CI's fast matrix is the count for the final tree. The branch's 14 tests from 2026-11-17 take 0.04 s together (`tests.added_test_times`, local junit). Lint as CI runs it: ruff, ruff format, skill_caps, skill_surface, audit_delta, code_references --delta, rulebook_limits all exit 0; Vale 0 errors.
+  - *Settled by Claude* (grounds, then the alternative):
+    1. Both merge conflicts take main's side, under WP-2233's retirement of
+       the line caps (`tests/rulebook_limits.py` docstring). Alternative:
+       carry the cap raise into the frozen diary.
+    2. The rulebook bullet pays for its addition by moving the refusal list
+       to the module docstring, under WP-2233's "an addition pays for itself
+       with a cut" and the io rulebook's existing practice of leaving
+       refusal wording to docstrings. Alternative: a separate budget-raise
+       PR.
+    3. (c) keeps the refusal, under the WP's own scope text ("if it says
+       nothing, the refusal stays") and root CLAUDE.md's reader-repair rule.
+       Alternative: zero-fill the seven missing terms, as GSAS-II's token
+       read effectively does.
+    4. The refusal names a fix for a short block only, under Rule 4's "a
+       literal the call cannot honour raises, naming the fix". Alternative:
+       no advice.
+    5. The two new audit rows take `scope=('calibration',)`, as main's
+       sibling iparm rows do, under Rule 5's convention test. Alternative:
+       keep `("all",)`, which raises the codes' level under every purpose.
+  - *Reader output for review:* `tests.reader_output` exit 0. The one
+    changed message, for a 14-coefficient function-3 block: "PRCF set 1
+    declares profile function 3 with 14 coefficients; the manual documents
+    21 for function 3 (p. 148) and no other length, and a block of another
+    length is refused — never zero-padded or truncated — because the order
+    of its slots would be a guess. To read it, write all 21 in the manual's
+    order, with zero for each term the file's writer left out" became,
+    after the judge, "… To read it, find which 14 terms the file's writer
+    wrote, then write all 21 in the manual's order with zero for each one
+    left out".
+  - *Question for the maintainer:* unchanged from 2026-11-17 (below): a
+    lone unnumbered set of function 2, 4 or 5 is declined, a numbered set 1
+    of the same is refused. Lean: decline everywhere. The judge adds a
+    related split, older than this WP: with both an unnumbered and a
+    numbered set, GSAS-II reads the unnumbered one and rietx the numbered.
+  - *Next:* (1) the maintainer rules on the question; (2) read both real
+    files on a local copy once the download is approved, which is the
+    acceptance's last line; (3) the #1446 how-to and named `.nxs` refusal in
+    `### Inherited`, now unblocked for POLARIS but not HRPD, whose (c)
+    refusal stands until someone writes its full 21-term block.
 
 - **2026-11-17** — PR #1639. The POLARIS instrument file's two refusals are
   gone: its unnumbered profile sets read as set 1, and its bank 5's negative
