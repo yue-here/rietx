@@ -1,9 +1,8 @@
 # WP-2009 — The rulebooks: findings out, and the rules that generate overfit rewritten
 
-Milestone: generality · Status: 🔄 2026-11-22 — every task landed; the blind check of the reworded rules ran and its findings are fixed (PR #1768)
+Milestone: generality · Status: ✅ 2026-11-23 — every task landed and the blind check's findings are fixed; PR #1768 merged on 2026-11-22
 Track: The prose
 Depends on: 2001 (2008 soft)
-Priority: P3 2026-10-30 — was P4: the 2026-10-30 Inherited entry measures a cost every session pays (root alone about 21k tokens a request); a cost-only item with no user at the wall
 
 ## Goal
 
@@ -131,6 +130,31 @@ three found by the blind check).
   only.
 
 ## Handover log
+
+- **2026-11-23 (close)** — closed by a ghostshift runner (batch close-2026-11-23, PR #1815),
+  on a `main` that includes #1768.
+
+  The rulebooks now hold rules and a one-clause reason, and the one-dataset evidence that
+  used to read as law lives in the WP or record each rule points at. The priority rubric no
+  longer rewards a session for adding a code that fires: it ranks the defect and names the
+  fix by Rule 1's kind. A fresh agent checked every rewording blind and found seven meanings
+  that had changed; all seven are restored. Nothing here changes what rietx computes.
+
+  - *Checked before closing*: all six tasks are ticked. `gh pr view 1768` shows it merged on
+    2026-11-22 at 10:55 UTC (merge commit ca0b72210), and the blind-check commit 96120fa8d
+    is on `main`. The acceptance's routing rule sends to the maintainer only a rewording
+    that amends one of his rules or rulings. None does: the blind check's seven changed
+    meanings were restored, and the narrowed refuse sentence states his 2026-11-03 ruling in
+    WP-1911 (read a bare R symbol on the cell's axes and report it), so it follows a ruling
+    rather than amending one.
+  - *Changed by this close*: Status ✅, the `Priority:` line removed (P3, a cost-only item,
+    so no release is owed), and the narrative moved to `docs/milestones/v1.13.md` § How v1.13
+    is getting here. No `### Inherited` section remained. WP-2238 depends on this WP softly
+    and keeps its P2, which rests on its own grounds.
+  - *Left alone*: the dormant worktree `ghostshift-wp-2009-644591`.
+
+  Next: none. The LESSONS.md paste text is the maintainer's to carry to a claude-config
+  session, as the 2026-11-22 entry says.
 
 - **2026-11-22** — the blind check (WP-2237's session, under the maintainer's new routing
   rules). A fresh Opus agent read the diff without the author's reading, about 140

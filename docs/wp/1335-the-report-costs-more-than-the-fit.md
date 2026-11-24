@@ -164,6 +164,10 @@ choice.
 - The solver's own cost, and the exhausted-budget stop rule — 1334.
 - A joint fit's `stage_reports=` (Inherited, from 1341): offered on top of
   this WP once the per-report cost is cut far enough.
+  *2026-11-23, raised in the review of PR #1364:* not built, and nothing filed.
+  This Non-goal keeps the reopen condition. Settled by Claude under DESIGN.md
+  Rule 5 Direction ("nothing is built before a case needs it"), 2026-11-23;
+  checked blind.
 - Removing the per-stage report. WP-1058's rule stands: **the report at every
   stage boundary, because a run's last state is routinely its least
   informative.** This WP makes it cheap and countable, not optional-by-stealth.

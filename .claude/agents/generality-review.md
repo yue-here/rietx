@@ -38,7 +38,7 @@ file. Judge the items named and nothing else.
 
 ## Read first, in full, at review time
 
-- `docs/DESIGN.md` § Rules. Rule 1 defines the three kinds of ambiguity and
+- `docs/DESIGN-RULES.md` § Rules. Rule 1 defines the three kinds of ambiguity and
   the unanimity gate. Rule 4 sets the test for each kind of change.
 - `docs/milestones/generality.md` § The rule: the three tiers, the two grounds
   a tier-3 item is kept on, and what demotion means.

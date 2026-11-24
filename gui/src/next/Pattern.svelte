@@ -58,7 +58,7 @@
     curveColors, curveToggles, dataOnlyHidden, isDataOnly, LENS_HEIGHT, LENS_WIDTH, mergeRegions,
     normalizeRegion,
     residual, shows, toggleCurve,
-    type Protocol, type ResidualKind, type Scale, type Window,
+    type CandidateOverlay, type Protocol, type ResidualKind, type Scale, type Window,
   } from "../lib/plot";
   import type { PreviewAnswer } from "../lib/interactive";
   import {
@@ -92,6 +92,7 @@
     peaks = null,
     groups = null,
     peaksActive = false,
+    candidate = null,
     selectedPeak = $bindable(null),
     frameAt = null,
     onpeakedit = async () => false,
@@ -137,6 +138,8 @@
     groups?: readonly GroupCurve[] | null;
     /** the peaks-and-indexing workflow is up: the peak layer is drawn */
     peaksActive?: boolean;
+    /** the candidate cell chosen in the Index step: its lines (round 11, call 9) */
+    candidate?: CandidateOverlay | null;
     /** the line chosen, in the Pick step's table or by a click on its lens */
     selectedPeak?: number | null;
     /** one edit to the peak list, through the workflow panel's verbs */
@@ -270,12 +273,12 @@
   function overlayNow(): Overlay {
     return { protocol, extent, peaks, groups, peaksActive, selected: selectedPeak,
              dragging: drag?.moved ? drag.index : landing?.index ?? null,
-             candidate: null, hidden: drawn, held: untrack(() => held) };
+             candidate, hidden: drawn, held: untrack(() => held) };
   }
 
   // the peak layer is a repaint, never a refetch (gui/CLAUDE.md § Plot)
   $effect(() => {
-    void peaks; void groups; void peaksActive; void selectedPeak;
+    void peaks; void groups; void peaksActive; void selectedPeak; void candidate;
     void drag?.moved; void landing;
     untrack(() => {
       chart?.update(overlayNow());
