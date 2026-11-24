@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import functools
 import itertools
+import math
 import re
 from dataclasses import dataclass, field
 
@@ -383,9 +384,15 @@ def _closest_type(xyz: tuple[str, ...]) -> gemmi.SpaceGroup | None:
     lattice *is* load-bearing — trigonal on rhombohedral axes, ``ext == "R"`` —
     is named by the **first** try, because an R centring is tabulated.
 
-    ``None`` only when even the point group does not resolve, which means the
-    list is not a crystallographic group in this setting — a caller error
-    rather than a naming problem.
+    ``None`` when even the point group does not resolve, which means no
+    tabulated setting has this point group with these axes.  That is a fact
+    about the **cell**, never about the group: NiO's magnetic child on
+    rhombohedral axes, BNS 2.7 in 2a,a+b,a+c, is a valid group of 24
+    operations with point group -3m, and this returns ``None`` for it (issue
+    #1688).  So nothing basis-free may be read off this lookup: the crystal
+    system comes from the operators (:func:`crystal_system_of`), and only the
+    setting-bound keys (the symbol, ``ext``, the monoclinic unique axis) are
+    undefined.
     """
     ops = _ops_from_xyz(xyz)
     found = gemmi.find_spacegroup_by_ops(ops.derive_symmorphic())
@@ -398,6 +405,62 @@ def _closest_type(xyz: tuple[str, ...]) -> gemmi.SpaceGroup | None:
         bare.tran = [0, 0, 0]
         seen.setdefault(tuple(v for row in op.rot for v in row), bare)
     return gemmi.find_spacegroup_by_ops(gemmi.GroupOps(list(seen.values())))
+
+
+def proper_rotations(rotations) -> list[np.ndarray]:
+    """The distinct proper parts of integer rotation matrices, in first-seen order.
+
+    An improper rotation R is replaced by −R, so −1, m, −3, −4 and −6 become
+    1, 2, 3, 4 and 6.  Shared by :func:`crystal_system_of` and the texture
+    frame (``spherical_harmonics``), which both read rotation orders.
+    """
+    seen, out = set(), []
+    for r in np.asarray(rotations, dtype=np.float64):
+        r = np.rint(r).astype(np.int64)
+        if round(np.linalg.det(r)) < 0:
+            r = -r
+        key = tuple(r.ravel())
+        if key not in seen:
+            seen.add(key)
+            out.append(r)
+    return out
+
+
+@functools.lru_cache(maxsize=256)
+def crystal_system_of(xyz: tuple[str, ...]) -> str:
+    """The crystal system of an operation list, read from its rotations alone.
+
+    The crystal system is a property of the point group, so it needs no
+    tabulated setting (issue #1688).  The trace of a rotation matrix is the
+    same in every basis, and for a proper rotation through φ it is 1 + 2 cos φ:
+    3, 2, 1, 0 and −1 for the 1-, 6-, 4-, 3- and 2-fold.  An improper operation
+    is read through its proper part, −R, which turns −1 into 1, m into 2, −4
+    into 4, −3 into 3 and −6 into 6.  The system is then the highest-symmetry
+    holohedry the distinct proper parts reach: four 3-fold axes (eight
+    elements) is cubic, a 6-fold hexagonal, a 3-fold trigonal, a 4-fold
+    tetragonal, three 2-folds orthorhombic, one monoclinic, none triclinic
+    (Hahn & Klapper, *International Tables for Crystallography* Vol. A, 2016,
+    ch. 3.2, the point groups and the crystal system each belongs to).
+
+    The words are gemmi's ``crystal_system_str()`` values, and
+    ``tests/test_unnamed_group_report.py`` holds the two equal over gemmi's
+    whole table, so a named group answers identically by either route.
+    """
+    traces = [int(np.trace(r))
+              for r in proper_rotations(_group_arrays(("ops", xyz))[1])]
+    n3 = traces.count(0)
+    n2 = traces.count(-1)
+    if n3 >= 8:
+        return "cubic"
+    if 2 in traces:
+        return "hexagonal"
+    if n3:
+        return "trigonal"
+    if 1 in traces:
+        return "tetragonal"
+    if n2 >= 3:
+        return "orthorhombic"
+    return "monoclinic" if n2 else "triclinic"
 
 
 @dataclass(frozen=True)
@@ -424,9 +487,13 @@ class OperatorGroup:
     :attr:`ext`, :meth:`crystal_system_str`, :meth:`monoclinic_unique_axis`) is
     what every consumer in this package already asks a ``gemmi.SpaceGroup``
     for, so :func:`resolve_group` can hand either object to any of them.  The
-    four *naming* members delegate to :attr:`closest_type` and the reason they
-    may is the one :func:`_closest_type` states: the symmorphic derivation has
-    this list's point group and lattice exactly.
+    setting-bound members (:attr:`hm`, :attr:`ext`, :attr:`number`,
+    :meth:`monoclinic_unique_axis`) delegate to :attr:`closest_type` and the
+    reason they may is the one :func:`_closest_type` states: the symmorphic
+    derivation has this list's point group and lattice exactly.  They raise
+    where no tabulated setting has this point group with these axes.
+    :meth:`crystal_system_str` is basis-free, so it reads the operators
+    (:func:`crystal_system_of`) and never raises (issue #1688).
     """
 
     label: str
@@ -445,10 +512,14 @@ class OperatorGroup:
         if found is None:
             raise ValueError(
                 f"the operation list of {self.label!r} ({len(self.xyz)} "
-                f"operations) has no symmorphic space group in gemmi's table, "
-                f"so it is not a crystallographic group in this setting and "
-                f"neither its crystal system nor its cell constraints are "
-                f"defined. Check the list: {', '.join(self.xyz[:4])}...")
+                f"operations) has no symmorphic space group in gemmi's table "
+                f"with this cell's axes, so it has no tabulated symbol, "
+                f"setting or monoclinic unique axis here, and its cell "
+                f"constraints cannot be read from the table. Its crystal "
+                f"system is {self.crystal_system_str()!r}, read from the "
+                f"operators. A cell stated through the parent's "
+                f"(Phase.parent_cell) needs none of this. Operations: "
+                f"{', '.join(self.xyz[:4])}...")
         return found
 
     @property
@@ -465,7 +536,8 @@ class OperatorGroup:
         return int(self.closest_type.number)
 
     def crystal_system_str(self) -> str:
-        return self.closest_type.crystal_system_str()
+        """Read from the operators, so it is defined in any cell (issue #1688)."""
+        return crystal_system_of(self.xyz)
 
     def monoclinic_unique_axis(self) -> str:
         return self.closest_type.monoclinic_unique_axis()
@@ -684,8 +756,15 @@ def cell_constraints(sg: gemmi.SpaceGroup) -> CellConstraints:
     Raises ``ValueError`` naming the symbol and the setting if the group is one
     this package cannot serve.  See :class:`CellConstraints` for why the crystal
     system alone is the wrong key.
+
+    An operation list is read through its :attr:`OperatorGroup.closest_type`,
+    which raises where no tabulated setting has the list's point group with
+    these axes.  Its own :meth:`~OperatorGroup.crystal_system_str` answers in
+    any cell (issue #1688), but conventional ties in unconventional axes would
+    be wrong, so the system is never read from the list here.
     """
-    system = sg.crystal_system_str()
+    setting = sg.closest_type if isinstance(sg, OperatorGroup) else sg
+    system = setting.crystal_system_str()
     right = {"alpha": 90.0, "beta": 90.0, "gamma": 90.0}
     if system == "cubic":
         return CellConstraints({"b": "a", "c": "a"}, right)
@@ -698,12 +777,12 @@ def cell_constraints(sg: gemmi.SpaceGroup) -> CellConstraints:
     if system == "triclinic":
         return CellConstraints({}, {})
     if system == "trigonal":
-        if sg.ext == "R":  # rhombohedral axes: one length, one angle
+        if setting.ext == "R":  # rhombohedral axes: one length, one angle
             return CellConstraints({"b": "a", "c": "a", "beta": "alpha",
                                     "gamma": "alpha"}, {})
         return CellConstraints({"b": "a"}, right | {"gamma": _GAMMA_HEX})
     if system == "monoclinic":
-        axis = sg.monoclinic_unique_axis()
+        axis = setting.monoclinic_unique_axis()
         free = {"a": "alpha", "b": "beta", "c": "gamma"}.get(axis)
         if free is None:
             raise ValueError(
@@ -749,6 +828,125 @@ def check_cell_angles(sg: gemmi.SpaceGroup,
                 f"{name} free.")
 
 
+#: Largest relative disagreement between a cell length its space group ties to
+#: another (b and c to a on a cubic cell) and that other, past which
+#: ``ParameterTable`` refuses the cell (WP-2150).  Chosen by consequence, as
+#: :data:`SYMMETRY_ANGLE_TOL_DEG` was.  The table builds a tied length from its
+#: source and never reads the stored value, so a stored length off by a
+#: relative ε is a cell whose d-spacings move by at most ε from the ones the
+#: caller wrote.  At 1e-5 that is 10 ppm, the size of the angle tolerance's
+#: 8.3 ppm and under SRM 660c's 48 ppm certificate band.  It clears the
+#: round-off an indexing candidate arrives with (measured in WP-2150's handover).
+SYMMETRY_LENGTH_RTOL = 1e-5
+
+_LENGTH_NAMES = ("a", "b", "c")
+
+
+def cell_tie_deviation(name: str, value: float, source: float) -> float:
+    """How far a tied cell parameter sits from its source, in the unit its
+    tolerance is stated in: relative for a length
+    (:data:`SYMMETRY_LENGTH_RTOL`), degrees for an angle
+    (:data:`SYMMETRY_ANGLE_TOL_DEG`)."""
+    if name in _LENGTH_NAMES:
+        return abs(value - source) / abs(source) if source else math.inf
+    return abs(value - source)
+
+
+def cell_tie_tolerance(name: str) -> float:
+    """The tolerance :func:`cell_tie_deviation` is compared against."""
+    return SYMMETRY_LENGTH_RTOL if name in _LENGTH_NAMES else SYMMETRY_ANGLE_TOL_DEG
+
+
+def check_cell_ties(sg: gemmi.SpaceGroup, cell: dict[str, float], *,
+                    prefix: str | None = None) -> None:
+    """Raise if a tied cell parameter disagrees with the one symmetry ties it to.
+
+    ``cell`` maps the six :data:`CELL_NAMES` to their stored values.  A tied
+    length is compared relative to its source, against
+    :data:`SYMMETRY_LENGTH_RTOL`.  A tied angle (β and γ to α on rhombohedral
+    axes) is compared in degrees, against :data:`SYMMETRY_ANGLE_TOL_DEG`.
+    ``prefix`` (``"phases.0.cell"``) names the entry in the message.
+
+    The sibling of :func:`check_cell_angles` and refused for its reason
+    (WP-2150, issue #1669).  The table builds a tied entry from its source and
+    never reads its own stored value, so before this check ``b = 5.9`` under
+    ``F m -3 m`` with ``a = 5.641`` built ``b = 5.641`` and said nothing.  The
+    table has no diagnostics channel to report a repair through, and cannot
+    tell which of the two numbers the caller meant.  A reader can repair a
+    disagreement within the file's printed precision and record it
+    (``CIF_CELL_TIE_CORRECTED``).  A non-finite value is left to the checks
+    that refuse it.
+    """
+    where = f"{prefix}." if prefix else ""
+    for name, source in cell_constraints(sg).ties.items():
+        value, target = float(cell[name]), float(cell[source])
+        if not (math.isfinite(value) and math.isfinite(target)):
+            continue
+        off = cell_tie_deviation(name, value, target)
+        allowed = cell_tie_tolerance(name)
+        if off <= allowed:
+            continue
+        unit = "" if name in _LENGTH_NAMES else "°"
+        size = (f"{off:.3g} relative, {allowed:g} allowed"
+                if name in _LENGTH_NAMES else f"{off:.6g}°, {allowed:g}° allowed")
+        raise ValueError(
+            f"space group {sg.xhm()!r} ties {where}{name} to {source} by "
+            f"symmetry, but the cell stores {name} = {value}{unit} and "
+            f"{source} = {target}{unit}, off by {size}. The table builds "
+            f"{name} from {source}, so the stored {name} would be dropped. "
+            f"Set {name} to {target}{unit}, or use a space group whose "
+            f"symmetry leaves {name} free.")
+
+
+def constrained_cell(phase):
+    """The cell ``ParameterTable`` ties by symmetry on a model ``Phase``.
+
+    Returns ``(path, group, cell)``: ``path`` is the cell's place under the
+    phase, ``"cell"`` for the phase's own and ``"parent_cell.cell"`` for a
+    phase stating its cell through a parent (``Phase.parent_cell``), whose own
+    six entries are derived and locked while the parent's are tied under the
+    parent's group (``ParameterTable._collect_parent_cell``).  ``None`` where
+    the group does not resolve, which the table refuses naming the symbol.
+    """
+    declared = getattr(phase, "parent_cell", None)
+    try:
+        if declared is not None:
+            sg = resolve_group(declared.space_group)
+            path, cell = "parent_cell.cell", declared.cell
+        else:
+            sg = resolve_group(phase.space_group, phase.symmetry_operations)
+            path, cell = "cell", phase.cell
+        cell_constraints(sg)
+    except (RuntimeError, ValueError):
+        return None
+    return path, sg, cell
+
+
+def check_phase_cell_ties(phase, *, prefix: str | None) -> None:
+    """:func:`check_cell_ties` on a model ``Phase``, for a project reader.
+
+    The one call a project reader makes (WP-2150), inside the boundary that
+    turns a refusal into one naming the file.  A reader refuses at read, so a
+    project converted from the file can never store a cell the table refuses.
+    Nothing is snapped here.  A ``.gpx`` or a recipe stores binary or JSON
+    floats with no printed digits, and the text formats' digits are not
+    carried this far, so within the table's own tolerance the cell builds as
+    it always did, and past it the file is refused.  The cell
+    checked is :func:`constrained_cell`'s, so a phase stating its cell through
+    a parent is checked under the parent's group.  ``prefix`` is the phase's
+    path (``"phases.0"``), and the message names the cell under it; with no
+    prefix it names a parent's cell as ``parent_cell.cell`` and its own not at
+    all.
+    """
+    found = constrained_cell(phase)
+    if found is None:
+        return
+    path, sg, cell = found
+    where = f"{prefix}.{path}" if prefix else (None if path == "cell" else path)
+    check_cell_ties(sg, {name: getattr(cell, name).value for name in CELL_NAMES},
+                    prefix=where)
+
+
 #: The cell parameters, in the order every surface in this package writes them.
 CELL_NAMES = ("a", "b", "c", "alpha", "beta", "gamma")
 
@@ -778,13 +976,13 @@ def complete_cell(sg: gemmi.SpaceGroup,
     violation is **unrepresentable rather than refused**.
 
     A parameter the symmetry determines is refused rather than checked against
-    what symmetry demands, and refused rather than quietly ignored.  Checking
-    would need a tolerance on a *length* — a constant nothing else in this
-    package needs, chosen from nothing — while ignoring is what the old
-    six-number route did: under ``P 4/m m m`` a typed ``b`` was tied away by
-    ``ParameterTable`` and the number the user read back was never the one they
-    entered.  The message names the source instead, so the refusal says what to
-    send.
+    what symmetry demands, and refused rather than quietly ignored.  Ignoring
+    is what the old six-number route did: under ``P 4/m m m`` a typed ``b`` was
+    tied away by ``ParameterTable`` and the number the user read back was never
+    the one they entered.  Checking would accept a typed ``b`` within
+    :data:`SYMMETRY_LENGTH_RTOL` of ``a``, the table's own tolerance since
+    WP-2150, and still store a number the table does not read.  The message
+    names the source instead, so the refusal says what to send.
     """
     cons = cell_constraints(sg)
     free = free_cell_names(sg)

@@ -2,7 +2,7 @@
   /**
    * The model panel's one row of actions in the rebuild (WP-2216, rows 18-24
    * of WP-2214's inventory), drawn as the prototype draws it: the word
-   * Refine and the choice of one cycle or the staged plan on the left; the
+   * Refine and the choice of as ticked or the staged plan on the left; the
    * pending count, Revert, Apply and the one filled button on the right.
    *
    * It is today's `panels/ActionBar.svelte` with one addition, which is why
@@ -21,6 +21,7 @@
     busy = false,
     blocked = null,
     stats = null,
+    stages = null,
     mode = $bindable("plan"),
     onapply = () => {},
     onrevert = () => {},
@@ -32,16 +33,24 @@
     blocked?: string | null;
     /** the fit's statistics, shown only while the graphs are hidden; null otherwise */
     stats?: { rwp: number | null; gof: number | null; immature: boolean } | null;
+    /** how many stages the project's plan declares; null where it declares none */
+    stages?: number | null;
     mode?: "cycle" | "plan";
     onapply?: () => void;
     onrevert?: () => void;
     onrefine?: () => void;
   } = $props();
 
-  const CHOICES = [
-    { id: "cycle", label: "One cycle", title: "One least-squares cycle on what is ticked" },
-    { id: "plan", label: "Staged plan", title: "The project's staged plan" },
-  ] as const;
+  // the plan's choice names its length, as the prototype's does
+  const CHOICES = $derived([
+    // "As ticked" runs one stage on the ticked parameters to convergence, a
+    // standard refinement; "cycle" in the field means one least-squares
+    // iteration, so the label never says it (the maintainer's ruling, 2026-11-22)
+    { id: "cycle", label: "As ticked",
+      title: 'Refine every ticked parameter together until it converges.\np.run_stage(rx.Stage("cycle", turn_on=[]))' },
+    { id: "plan", label: stages ? `Staged plan, ${stages} stage${stages === 1 ? "" : "s"}` : "Staged plan",
+      title: "The project's staged plan" },
+  ] as const);
 
   const count = $derived(touched ? `${touched} pending` : "");
   const note = $derived(invalid ? "invalid edit" : count);
@@ -85,10 +94,8 @@
     white-space: nowrap;
   }
 
+  /* the group's shape is next.css's; the bar's label reads secondary */
   .vg {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
     color: var(--muted);
     font-size: var(--text-sm);
   }

@@ -56,6 +56,7 @@ from rietx.schemas.instrument import (
     PeakComponent,
     RoughnessSuortti,
 )
+from rietx.schemas.peak_equation import PeakEquation
 from rietx.schemas.structure import AnisoU, StephensStrain
 from tests.api_surface import (
     DEFERRED_CEILING,
@@ -287,8 +288,16 @@ def _fully_declared() -> tuple[object, object]:
     # paths are compared with every index read as 0, so the second member's
     # `extra_components.1.center` answers for a page's `.0.center`
     line = PeakComponent(center=Parameter(value=44.6, min=44.4, max=44.9, unit="deg"))
+    # a peak equation's coefficients are named by the user, so the pages name
+    # these two (WP-2107)
+    structure.phases[0].peak_equations = [PeakEquation(
+        target="lor_fwhm", expression="w*tan(theta)",
+        coefficients={"w": Parameter(value=0.01)})]
+    shift = PeakEquation(target="shift", expression="sq*(two_theta - 60)^2",
+                         coefficients={"sq": Parameter(value=0.0)})
     return structure, instrument.model_copy(
-        update={"geometry": geometry, "extra_components": [peak, line]})
+        update={"geometry": geometry, "extra_components": [peak, line],
+                "peak_equations": [shift]})
 
 
 def _magnetic() -> tuple[object, object]:

@@ -1,0 +1,8 @@
+fap status quo scale x1.01 preview 9.444 %  last fit 9.250 %  shown change +0.194 points
+fap status quo zero +0.1 FWHM preview 15.486 %  last fit 9.250 %  shown change +6.237 points
+fap A scale x1.01 preview 9.279 %  last fit 9.250 %  shown change +0.029 points
+fap A zero +0.1 FWHM preview 15.384 %  last fit 9.250 %  shown change +6.134 points
+nac status quo scale x1.01 preview 9.331 %  last fit 9.317 %  shown change +0.014 points
+nac status quo zero +0.1 FWHM preview 18.676 %  last fit 9.317 %  shown change +9.359 points
+nac A scale x1.01 preview 9.354 %  last fit 9.317 %  shown change +0.037 points
+nac A zero +0.1 FWHM preview 18.687 %  last fit 9.317 %  shown change +9.370 points

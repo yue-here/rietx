@@ -367,6 +367,7 @@ def test_a_checkout_of_a_node_that_declared_nothing_keeps_the_model_flags(patter
     elif edit == "edit":
         new = ref.structure.model_copy(deep=True)
         new.phases[0].cell.a.value += 0.001
+        new.phases[0].cell.b.value = new.phases[0].cell.c.value = new.phases[0].cell.a.value  # the cell's ties follow a
         ref.edit(structure=new)
     elif edit == "add_variable":
         ref.add_variable("tilt", 0.1)
@@ -710,8 +711,8 @@ def test_a_blocked_stage_says_which_declaration_won(ref, pattern):
     result = ref.fit(pattern, plan=SHORT)
 
     blocked = {s.name: s.blocked_by_hold for s in result.stages if s.blocked_by_hold}
-    # the closing stage frees every glob the plan freed, the cell's too
-    assert blocked == {"cell": [CELL], "closing": [CELL]}
+    # no closing stage by default since WP-2222, so the cell stage alone
+    assert blocked == {"cell": [CELL]}
     assert all(CELL not in s.freed for s in result.stages)
 
     hit = [d for d in result.diagnostics if d.code == "HOLD_BLOCKED_PLAN"]
@@ -991,10 +992,9 @@ def test_a_literal_repeated_across_stages_is_one_finding_naming_both(pattern):
     assert set(unknown) == {WAVELENGTH_TYPO, "phases.0.cell.aa"}
     assert "Stages 'first', 'second'" in unknown[WAVELENGTH_TYPO].message
     assert "Did you mean 'phases.0.cell.a'" in unknown["phases.0.cell.aa"].message
-    # the closing stage asks for every glob the plan freed, the typos too
+    # one row per declared stage: no closing stage by default since WP-2222
     assert [s.unknown_paths for s in result.stages] == [
-        [WAVELENGTH_TYPO], [WAVELENGTH_TYPO, "phases.0.cell.aa"],
-        [WAVELENGTH_TYPO, "phases.0.cell.aa"]]
+        [WAVELENGTH_TYPO], [WAVELENGTH_TYPO, "phases.0.cell.aa"]]
 
 
 def test_a_single_stage_run_says_it_too(ref, pattern):

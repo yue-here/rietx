@@ -618,13 +618,13 @@ back between 1e-16 and 4e-15 of the largest. Before the change Linux raised no
 `HIGH_CORRELATION` there. On macOS a 1e-14 change to one start value left six
 widths at ± 0.
 
-`COVARIANCE_DIRECTION_DISCARDED` names the touched parameters and leaves their
-esds as they are. A touched set that is exactly a pair `FLAT_DIRECTION` already
-reported adds no row. On the acceptance fixtures 183 of 1 899 whole-pattern
-solves discarded such a direction, most of them within a factor of ten of the
-cut, over four to eight columns each. Marking those esds absent would blank the
-QPA, SRM 676a and brucite fixtures on a threshold that rounding sets, so the
-finding reports and the esd stays.
+A touched parameter has no esd: a generalised inverse's variance for it
+depends on the inverse taken {cite}`searle1971`. A tie or derived quantity
+on one keeps its esd where the test, asked of its gradient, does not fire. Two starts of one synthetic
+LaB₆ fit with W, `gauss_size` and `gauss_strain` free landed 140 esd apart in
+W. `COVARIANCE_DIRECTION_DISCARDED` names the touched parameters, unless
+`FLAT_DIRECTION` already reported them as a pair. The test runs on the matrix
+the covariance inverted, a Pawley intensity block included.
 
 ## Staged strategy and series
 

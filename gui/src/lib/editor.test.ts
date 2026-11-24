@@ -94,6 +94,19 @@ describe("the adapter", () => {
     editor.destroy();
   });
 
+  it("marks an edited line's text, replacing the previous marks (WP-2231)", () => {
+    const editor = open('rxt 1\n  project "doc"\nmode rietveld\n');
+    const marked = () => [...host.querySelectorAll(".cm-edited")].map((e) => e.textContent).join("");
+    editor.setEdited([2]);
+    // over the line's text, past its indent
+    expect(marked()).toBe('project "doc"');
+    editor.setEdited([3, 99]);
+    expect(marked()).toBe("mode rietveld");
+    editor.setEdited([]);
+    expect(marked()).toBe("");
+    editor.destroy();
+  });
+
   it("clamps a line number the buffer no longer has, rather than throwing", () => {
     const editor = open("rxt 1\n");
     expect(() => editor.setProblems([{ line: 99, message: "off the end" }])).not.toThrow();

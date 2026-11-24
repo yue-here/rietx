@@ -1,9 +1,8 @@
 # WP-2149 — INDEX_PANEL_REDUCED names the systems the run searched
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: ✅ 2026-11-23 — PR #1637 merged on 2026-11-18 after Yue accepted the wording; the indexing messages say what the list supports and what the run left out
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P3 2026-11-17 — a message that names crystal systems a run never searched, beside a neighbour that says so; `systems_searched` on the result is right, so a reader who checks it has the truth
 
 ## Goal
 
@@ -113,8 +112,6 @@ in `rietx._audit` (`INDEX_PANEL_REDUCED`, `INDEX_SYSTEMS_NOT_COVERED`). A
 message rewrite keeps their tier. If a code is added for the dropped systems,
 it needs its row.
 
-### Inherited
-
 ## Non-goals
 
 - `MIN_LINES_PER_DOF`, the 20-line bar or `_restrict_to_supported`'s choice of
@@ -123,19 +120,24 @@ it needs its row.
 
 ## Tasks
 
-- [ ] Rewrite `INDEX_PANEL_REDUCED`'s systems clause by one of the two routes
+- [x] Rewrite `INDEX_PANEL_REDUCED`'s systems clause by one of the two routes
       above. A test covers the three cases: a narrowed request, a disjoint
-      request, and `assess_peak_list` alone.
-- [ ] `INDEX_SYSTEMS_NOT_COVERED` names the systems the list could not
+      request, and `assess_peak_list` alone. Route 1 (a statement about the
+      list); `tests/test_indexing_quality.py` § What the messages say was
+      searched.
+- [x] `INDEX_SYSTEMS_NOT_COVERED` names the systems the list could not
       support apart from those not requested, and its suggestion fits each.
       Record which systems `_restrict_to_supported` dropped where the
-      diagnostic can read it.
-- [ ] The help entries (`help.py` 3101, 3220, 5202) and
+      diagnostic can read it. The split reads `quality.systems_supported`,
+      already on the result and the authority the restriction reads, so no
+      second record was added (handover entry says why).
+- [x] The help entries (`help.py` 3101, 3220, 5202) and
       `reference/peaks.md:431` say the same as the new messages.
-- [ ] Rebuild tutorial 03b, whose saved output prints both codes, and read
-      the new text in it.
-- [ ] Quote old and new text in the PR body for the maintainer.
-- [ ] Skill: none expected. `diagnostics-indexing.md`'s `INDEX_PANEL_REDUCED`
+- [x] Rebuild tutorial 03b, whose saved output prints both codes, and read
+      the new text in it. Tutorial 03 too, whose saved output prints
+      `INDEX_SYSTEMS_NOT_COVERED`; its markdown names neither code.
+- [x] Quote old and new text in the PR body for the maintainer.
+- [x] Skill: none expected. `diagnostics-indexing.md`'s `INDEX_PANEL_REDUCED`
       row does not repeat the systems claim. Revisit if the dropped-systems
       split adds a code.
 
@@ -157,6 +159,79 @@ for a search the list cannot support.
 - WP-1043, the split between "can be searched" and "can be scored".
 
 ## Handover log
+
+- **2026-11-23 (close)** — closed by a ghostshift runner (batch close-2026-11-23, PR #1815),
+  on a `main` that includes #1637.
+
+  On a short peak list the two indexing messages about crystal systems now say true things.
+  `INDEX_PANEL_REDUCED` names the systems the list has enough lines for, and no longer
+  claims a search ran over them. `INDEX_SYSTEMS_NOT_COVERED` separates the systems the run
+  left out that the list could support from those it could not, and asks for a search only
+  of the first kind. Yue accepted both texts on 2026-11-17. Nothing about the search moved.
+
+  - *Checked before closing*: all six tasks ticked. `gh pr view 1637` shows it merged on
+    2026-11-18 at 01:16 UTC (merge commit 3f5167863). Yue's ruling on the wording is recorded
+    at the end of the 2026-11-17 entry, so the stale Status line was the only thing left.
+  - *Changed by this close*: Status ✅, the `Priority:` line removed (P3, so no release is
+    owed), the empty `### Inherited` heading deleted, and the narrative moved to
+    `docs/milestones/v1.13.md`.
+
+  Next: none.
+
+- **2026-11-17** (ghostshift runner, PR #1637) — The two indexing messages
+  about crystal systems now say true things. On a short peak list,
+  `INDEX_PANEL_REDUCED` names the systems the list has enough lines for,
+  and no longer says a search ran over them. `INDEX_SYSTEMS_NOT_COVERED` now
+  separates the systems the run left out that the list could support from
+  those it could not. It asks for a search only of the first kind. For the
+  second it names the lines a cell needs. Nothing about the search moved,
+  only the text. The wording waits on Yue.
+
+  *Done.* Route 1 for the first task: `INDEX_PANEL_REDUCED` is a statement
+  about the list ("Only cubic, hexagonal, trigonal, tetragonal, orthorhombic
+  have at least 5 usable lines per metric degree of freedom, enough to
+  determine a cell."), in `SYSTEM_ORDER`. It stays in `quality_diagnostics`,
+  so a standalone `assess_peak_list` still says it. Route 2 would have lost
+  that for no gain. `INDEX_SYSTEMS_NOT_COVERED` (`diagnostics._not_covered_text`)
+  splits `missing` by `quality.systems_supported`. Its `where` is unchanged.
+  On an abstained list it points at `INDEX_DATA_INSUFFICIENT` and asks for no
+  search, a third member of the class the WP did not list. Help entries
+  (`INDEX_PANEL_REDUCED`, `INDEX_SYSTEMS_NOT_COVERED`, `SearchSpec.systems`)
+  and `reference/peaks.md` match. Tutorials 03 and 03b rebuilt, since 03's
+  saved output prints the second code too. `/code-review high --fix` found
+  seven items. Four were fixed (a shared `_ADD_LINES` remedy constant, a dead
+  branch, a format-then-parse list, a set rebuilt per pass) and one more by
+  hand (the help entry's abstained case). Declined: threading the
+  undeclared-instrument advice into this suggestion (a larger change, and
+  `INDEX_DATA_INSUFFICIENT` carries it where the list abstains). Declined
+  with a docstring note: gating the split on the scoring bar. At 25 lines a
+  budget-unreached triclinic is told it needs 30 lines, where a re-run would
+  search it. The goal sentence says no suggestion asks for a search the list
+  cannot support, and `systems_supported` is the package's definition of
+  support.
+
+  *Settled by Claude.* (1) Route 1 over route 2, on the smallest-change rule
+  and because `assess_peak_list` is public. (2) No record of the systems
+  `_restrict_to_supported` dropped, against the task's wording. The split
+  reads `quality.systems_supported`, already on the result and the authority
+  the restriction reads (root CLAUDE.md, one authority per fact; a second
+  surface is a projection). A record would let the message say "dropped from
+  your request". The message avoids "not requested" altogether, because a
+  system the budget left unreached was requested and is missing too.
+
+  *Measured.* `python -m tests.reader_output` exit 0 (it fits Rietveld only;
+  the WP said so). Before and after text for the reproduced case is in the
+  PR body. Fast suite and gate counts are in the PR body (venv `[dev]`,
+  macOS arm64).
+
+  *Question for Yue.* Do the new texts of `INDEX_PANEL_REDUCED` and
+  `INDEX_SYSTEMS_NOT_COVERED` belong, line by line? The PR body's "What a
+  reader receives" has the old and new text.
+
+  Next: Yue's ruling on the wording. Then merge, and close the WP.
+
+  Ruled by Yue 2026-11-17: the reworded `INDEX_PANEL_REDUCED` and
+  `INDEX_SYSTEMS_NOT_COVERED` accepted (reader output).
 
 - **2026-11-17** — created, from the 2026-11-17 issue triage round (no
   issue; the defect came from WP-2041's handover). Checked against the tree at

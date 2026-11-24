@@ -5,6 +5,7 @@ This page gives what a `RefinementResult` carries beside the refined values: the
 `Refinement.fit` and `refine` return a `RefinementResult`.
 [API: everyday calls](api.md#results) lists every field.
 The refined values are `RefinementResult.parameters`, one row per parameter with its esd, and `RefinementResult.parameter` looks one up by path.
+A row's esd is `None` where the data do not determine the parameter: it measured nothing, or it lies on a combination the covariance discards ([Why a direction the data do not move has no esd](../concepts/correlations.md#why-a-direction-the-data-do-not-move-has-no-esd)).
 [Derived quantities](derived.md) gives the distances, angles, cell volumes, sizes and strains a fit computes from them.
 
 The IUCr guidelines rank this evidence differently from a table of R values.
@@ -78,7 +79,7 @@ A joint fit records one per histogram, on `HistogramResult.sigma_rule`, and leav
 
 The statistics measure agreement, and agreement is not correctness.
 A background flexible enough to imitate the peaks biases displacement parameters up and phase fractions down while Rwp improves.
-Of the eight corrections shipped in v0.5, two provably cannot move Rwp, one moves it the wrong way when it is right, and the two largest accuracy wins are invisible in it.
+Of the eight corrections added in v0.5, two provably cannot move Rwp, one moves it the wrong way when it is right, and the two largest accuracy wins are invisible in it.
 That is what [the report](../concepts/report.md) is for.
 It is also why a correction in rietx ships with a record field or a diagnostic saying what it changed, such as the [absorption record](#absorption-correction), rather than with an Rwp comparison as its evidence.
 
@@ -323,9 +324,14 @@ Each entry is a `Diagnostic`:
 | `Diagnostic.where` | the parameter paths involved |
 | `Diagnostic.value` | the headline number where the code has one, such as a correlation's ρ or an absorption's block R²; `None` means no single number, not zero |
 | `Diagnostic.explanation` | what the code means and why it fires |
+| `Diagnostic.view` | the rendered view that shows the finding, such as `"plot_for_vlm.residual"`; `None` where no view has been checked for the code, which is most codes |
 
 `Diagnostic.explanation` is the same for every finding with that code, so it is looked up in `rietx.help.DIAGNOSTIC_HELP` when read.
 It is `None` for a code this version does not describe.
+`Diagnostic.view` is also looked up by code, in `rietx.help.DIAGNOSTIC_VIEW_OF`.
+Each name it returns is a panel of `rietx.viz.plot_for_vlm`, and `rietx.help.DIAGNOSTIC_VIEWS` says what that panel draws.
+The view is a name and never an image, so you decide whether to draw it.
+A code names a view only where a fit firing it was drawn and the finding could be read off that panel.
 [Diagnostic codes](diagnostics.md) lists every code.
 
 The codes are an open vocabulary on purpose, so a new correction ships with the diagnostic that states what it changed.
@@ -435,7 +441,7 @@ A series prints its own view.
 
 The fourth deliverable is the series' own, because no single pattern carries a `SEQUENTIAL_*` row.
 `series.summary(deliverable="series")` adds the rows that decide a parameter measured against the series axis.
-They say whether the ordering was checked at all (`direction="both"`, or a plain statement that it was not), and name the widths that grew with a worsening fit.
+They say whether the ordering was checked at all (`direction="both"`, or a plain statement that it was not).
 They give each step with what an independent cold pair reproduced, and the phases held for want of support.
 They also ask for the two things no diagnostic can supply: a stated 2θ-scale anchor and the split between precision and accuracy.
 The other three purposes are refused there by name, and `Refinement.summary(deliverable="series")` answers with where the series rows live:
@@ -545,6 +551,7 @@ It never calls `Refinement.summary`, which builds a report.
 A notebook asks for the text each time a cell displays the refinement.
 In a notebook, a `RefinementResult`, an `IndexingResult` and a `PeakList` add to their text.
 Under each diagnostic's `help:` line, a `means:` line gives its `Diagnostic.explanation`.
+Where the code has a view, a `see:` line under it names the panel that shows the finding.
 A result then lists `RefinementResult.parameters` in columns headed `path`, `value` and `at_bound`.
 An `equations` column follows when a parametric equation set a row.
 The display is one block of fixed-width text, so its columns stay aligned in GitHub's notebook viewer as well as in JupyterLab.
