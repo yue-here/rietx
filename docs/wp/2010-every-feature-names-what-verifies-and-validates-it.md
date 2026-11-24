@@ -1,6 +1,6 @@
 # WP-2010 — Every feature names what verifies it and what validates it
 
-Milestone: generality · Status: 🔄 2026-11-01 — the report sentence ruled out; the build, with the reversal's edits to this file, is in #1266
+Milestone: generality · Status: 🔄 2026-11-24 — the build merged (#1266); open: references for data already in the tree
 Track: The audits
 Depends on: —
 Priority: P3 2026-10-18 — outside the gate after 2004, so it waits on nothing
@@ -179,12 +179,16 @@ symbols, joint fits) and get one or a declared exception.
 - [x] The meta-test: the feature list partitions the help vocabulary and the Theory
       headings both ways; every claim and test a feature names exists; every
       `prediction` claim names its reference value's kind.
-- [x] Root CLAUDE.md § Invariants: the clause "Every physics function cites its
-      reference" names the meta-test.
+- [x] ~~Root CLAUDE.md § Invariants: the clause "Every physics function cites its
+      reference" names the meta-test.~~ Added, then removed 2026-11-22 (`401f75930`,
+      rulebook budget). The partition test names an unclaimed family or heading
+      instead, where a contributor meets the rule.
 - [x] 1327's `### Inherited` note updated: the moment's state now lives only in `docs/VALIDATION.md`.
 - [ ] Follow-ups filed: the ceria round robin as a microstructure measurement; references
       for data already in the tree (a Le Bail cell against the SRM 660c and 676a
       certificates, published space groups for the extinction symbols, LaMnO₃'s Pn′ma′).
+      *2026-11-24:* the ceria half is filed as WP-2306 (from #1724). The references
+      half is still open.
 - [x] Tests; the fast count moved by exactly the tests added.
 - [ ] Skill: none.
 
@@ -213,6 +217,55 @@ confirm the new test goes red naming it.
   patterns are served from the first author's University of Denver page.
 
 ## Handover log
+
+- **2026-11-24** — maintainer's post-merge entry, PR #1818, recording rounds 2 to 5
+  of #1266. Mike's PR #1266 merged on 2026-11-24 as `5cf100fd1`. The feature
+  registry, its join to the validation matrix and the retier by rule are now on
+  main. The fit report carries no validation sentence, as ruled 2026-11-01. Two
+  tasks stay open, so the WP does too.
+
+  - **Round 2.** Two items, both done in `06a9b22a8`: the `NOT_WALKED["features.py"]`
+    text no longer mentions the report, and the PR title lost "and the report
+    sentence". The fit's esd beside a validating row's mismatch gets no field.
+  - **Round 3** (2026-11-21, at `c1f9c9c4`). Main had moved 838 commits past
+    the branch's last merge of it. The PR still merged clean, but the merged tree
+    failed three partition tests. Mike's `543a700bd` fixed them:
+    - `peak_equations` is a new feature owning both `peak_equations` help
+      families and `forward-model § Peak equations`. Its `FEATURE_TESTS` entry
+      names four tests that check an equation against a built-in term, plus the
+      twelve-seed recovery.
+    - `parameterisation § Placing the origin` joins `rigid_bodies`.
+    - `parametric_refinement` claims `parametric § A formula equation` and drops
+      both `parameterisation § …` keys. `_theory_headings()` does not read a
+      page's H1, so that feature keeps one heading. Whether the collector should
+      read H1 is left for a later change.
+    - `docs/VALIDATION.md` was regenerated, carrying #1595's SRM 660c uncertainty.
+  - **Round 4** (2026-11-23, at `401f75930`). Nothing held the merge. Two
+    removals read right:
+    - `401f75930` took the root CLAUDE.md pointer back out. Main's rulebook
+      budget had no room for it. The partition test already names a new family
+      or heading that no feature claims. The task is struck above.
+    - The merge `88f431008` took main's `test_docs_consistency.py`, since WP-2233
+      replaced the line caps the PR had moved.
+
+    On the merged tree (main `4526efafd`, macOS arm64, Python 3.12,
+    `[dev,jax]`): fast suite 15 838 passed, 264 skipped, 32 xfailed, 0 failed.
+    `python -m tests.validation_matrix` rewrote `docs/VALIDATION.md` byte for byte.
+  - **Round 5** (head unchanged), the full suite round 4 owed. The review stacked
+    #1604, #1605, #1494 and #1266 onto main `00f9c6bc3` in merge order. On that
+    stack (macOS arm64, Python 3.12, `[dev,jax]`, nothing else running): 16 867
+    passed, 272 skipped, 52 xfailed, 0 failed. On main `c368ca3ba` the same stack
+    merged clean, and the targeted suites gave 1440 passed.
+  - **Gotcha for the next PR that adds Theory text.** Every new Theory heading and
+    help family now needs a feature, or `test_validation_matrix.py`'s partition
+    test fails. #1332 meets this first: stacked with #1266, its heading
+    `subgroups § A phase in its standard setting` was the only failure. Its
+    review asks for the claim.
+
+  Next: the references half of the follow-ups task. That means a Le Bail cell
+  against the SRM 660c and 676a certificates, published space groups for the
+  extinction symbols, and LaMnO₃'s Pn′ma′. Each is filed as a WP or folded into
+  an open one, per the template's fold-first rule.
 
 - **2026-11-01 (round 1 of #1266)** — the report sentence taken out, and the review's two
   findings fixed.
