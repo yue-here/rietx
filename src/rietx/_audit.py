@@ -3519,6 +3519,25 @@ ROWS: tuple[Row, ...] = (
                   'tests/test_fragments.py::test_the_rotation_dof_count_is_the_inertia_rank_with_a_near_linear_tolerance '
                   'holds a single atom and two coincident atoms at 0')),
     Row("rietx.crystallography.magcif.MOMENT_FORM_AGREEMENT_MU_B", "constant", value=0.02),
+    Row("rietx.crystallography.magcif._ORBIT_MERGE_TOL", "constant", tier=3, value=0.001,
+        evidence=("decides which group a magCIF's positions refine under: _orbit_size counts "
+                  "two images closer than 1e-3 in every fractional coordinate as one, so a "
+                  "site within half of it of a parent special position takes the parent "
+                  "(CIF_MAGNETIC_NUCLEAR_GROUP) and is stored on the position "
+                  "(CIF_SITE_TWINS_MERGED); topas.py imports the same count. Measured (Mike, "
+                  "#1797, 2447 MAGNDATA snapshot files): in the 106 read under a parent above "
+                  "their own group no stated coordinate moves more than 3.1e-5 A; a print-box "
+                  "gate in its place falsely refused one of them (entry 0.92, 1/3 printed "
+                  "0.33330). Injected case: tests/test_magcif.py::test_a_site_inside_the_"
+                  "orbit_merge_counts_as_on_the_parent_position (P m' m' 2 under P m m m, "
+                  "z = 0.4 tol merged, 0.6 tol kept). One family; untested beyond it"),
+        grounds=("Rare feature, kept at the value measured on its one family: it moved no "
+                 "MAGNDATA coordinate by more than 3.1e-5 A, and the stated displacement "
+                 "it erases below the merge is reported by name. Dissenter: a refiner "
+                 "stating a displacement under 5e-4 off a parent special position, who "
+                 "passes nuclear_group='file'. Tier 3 ruled by Mike on PR #1636 "
+                 "(2026-11-23, 11:47Z) under #1075."),
+        approved="2026-11-24", approved_by="checked"),
     Row("rietx.crystallography.magnetic.isotropy.CROSS_IRREP_DRAWS", "constant", value=12),
     Row("rietx.crystallography.magnetic.isotropy.DEFAULT_CELL_SCALE", "constant", value=5.0),
     Row("rietx.crystallography.magnetic.isotropy.DUAL_AFTER_RESTART", "constant", value=1),

@@ -1538,6 +1538,41 @@ def test_a_subgroup_magnetic_group_keeps_the_parent_where_no_orbit_shrinks(
         str(moved), moment_ions={"Fe1": "Fe3+"}).phases[0].space_group == "P 1"
 
 
+def test_a_site_inside_the_orbit_merge_counts_as_on_the_parent_position(
+        tmp_path):
+    """The injected case for ``_ORBIT_MERGE_TOL`` (WP-2006, Mike's ruling on
+    PR #1636). ``P m' m' 2`` under parent ``P m m m``, O at (0.25, 0.3, z): the
+    parent's mirror carries z to -z, so the two images are 2z apart. Inside
+    the merge they count as one position, the parent is taken and z is stored
+    at 0 with ``CIF_SITE_TWINS_MERGED``; outside it the file's own group is
+    taken and z is kept."""
+    tol = magcif._ORBIT_MERGE_TOL
+
+    def read(z):
+        path = _magcif(
+            tmp_path, f"pmm2_{z:.5f}", parent="P m m m", it=47, bns="25.60",
+            symbol="P m' m' 2", cell=(4.0, 5.0, 6.0, 90.0, 90.0, 90.0),
+            operations=("x,y,z,+1", "-x,-y,z,+1", "x,-y,z,-1", "-x,y,z,-1"),
+            sites=("Fe1 Fe 0.00000 0.00000 0.00000 1",
+                   f"O1 O 0.25000 0.30000 {z:.5f} 1"),
+            moment_loop=_moment_loop([("Fe1", "0.0", "0.0", "2.00000",
+                                       "0,0,mz")]),
+        )
+        diagnostics: list = []
+        phase = structure_from_cif(str(path), moment_ions={"Fe1": "Fe3+"},
+                                   diagnostics=diagnostics).phases[0]
+        (oxygen,) = [a for a in phase.atoms if a.label == "O1"]
+        return phase.space_group, oxygen.z.value, {d.code for d in diagnostics}
+
+    group, z, codes = read(0.4 * tol)
+    assert (group, z) == ("P m m m", 0.0)
+    assert "CIF_SITE_TWINS_MERGED" in codes
+    group, z, codes = read(0.6 * tol)
+    assert group == "P m m 2"
+    assert z == pytest.approx(0.6 * tol)
+    assert "CIF_SITE_TWINS_MERGED" not in codes
+
+
 def test_an_underscore_screw_axis_symbol_normalises_before_the_lookup(tmp_path):
     """D4, synthetic. MAGNDATA writes a parent H-M symbol's screw-axis
     subscript with an underscore (``P 2_1/c``) -- a standard IUCr spelling --

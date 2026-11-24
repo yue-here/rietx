@@ -954,6 +954,16 @@ def nuclear_operations(magnetic_symmetry) -> tuple[str, ...]:
     return tuple(out)
 
 
+#: Two images of a site closer than this, in every fractional coordinate, are
+#: counted as one position by :func:`_orbit_size`.  So a site stated within
+#: half of it of a parent special position counts as on it, and the parent is
+#: taken as the nuclear group; the site is then stored on the position and
+#: reported as ``CIF_SITE_TWINS_MERGED``.  Measured on the 106 MAGNDATA files
+#: read under a parent above their own group: no stated coordinate moves more
+#: than 3.1e-5 Å (#1797).  ``io/projects/topas.py`` imports the same count.
+_ORBIT_MERGE_TOL = 1e-3
+
+
 def _orbit_size(ops, xyz) -> int:
     """How many distinct positions (mod 1) the operations ``ops`` carry ``xyz`` to."""
     point = np.asarray(xyz, dtype=np.float64)
@@ -962,7 +972,7 @@ def _orbit_size(ops, xyz) -> int:
         image = (np.asarray(op.rot, dtype=np.float64) @ point
                  + np.asarray(op.tran, dtype=np.float64)) / op.DEN
         image = image - np.floor(image)
-        if not any(np.max(np.abs((image - q) - np.round(image - q))) < 1e-3
+        if not any(np.max(np.abs((image - q) - np.round(image - q))) < _ORBIT_MERGE_TOL
                    for q in images):
             images.append(image)
     return len(images)
