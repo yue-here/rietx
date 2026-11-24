@@ -239,6 +239,7 @@ A series is where one unread warning multiplies: in the in-situ run this diagnos
 | `SeriesEntry.rwp_over_median` | the kept attempt's Rwp over the median Rwp of the patterns accepted before it in the walk, with no threshold; `None` where no median existed, on the first pattern walked or after every earlier pattern was quarantined |
 | `SeriesEntry.seeded_from` | the index of the pattern whose fitted state seeded this pattern's warm rungs: the last one accepted before it in the walk, which skips a quarantined pattern; `None` where there was no warm start |
 | `SeriesEntry.floored` | the moment modulus paths that reached the kept attempt at their floor, because the pattern it warm-started from did not support them; empty when the kept attempt started cold |
+| `SeriesEntry.held_values` | each path the `constrain` hook held on this pattern, with its value, site coordinate DOFs left out; `None` where nothing was held |
 | `SeriesEntry.pattern_paths` | this pattern's own path, where it differs |
 | `SeriesEntry.node_id`, `SeriesEntry.tree_id` | where this pattern's history lives |
 

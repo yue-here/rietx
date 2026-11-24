@@ -444,6 +444,123 @@ def test_a_cut_budget_names_exactly_the_strata_left():
     assert null.strata_left == names[2:] and null.strata_searched == names[:2]
 
 
+class _ReadsLeft:
+    """A budget stub whose ``expired()`` turns true on its (n+1)-th call and
+    counts every call: deterministic, no clock."""
+
+    seconds = 60.0
+
+    def __init__(self, n):
+        self.n, self.calls = n, 0
+
+    def expired(self):
+        self.calls += 1
+        return self.calls > self.n
+
+
+def _blocks(strata, chunk):
+    """(stratum name, first row, rows) of every vectorised block, in search order."""
+    return [(st.name, c, min(chunk, st.n_points - c))
+            for st in strata for c in range(0, st.n_points, chunk)]
+
+
+def _main_rows(pk, strata):
+    """The pre-deadline loop, read only between strata (main at 8112e3b09)."""
+    tt = np.asarray(pk, dtype=np.float64)
+    lo, hi = PNMA.two_theta_min, PNMA.two_theta_max
+    out = []
+    for st in strata:
+        pos = kvector._positions(PNMA, st.kvectors, (1,))
+        for c in range(0, st.n_points, kvector._CHUNK):
+            block = pos[c:c + kvector._CHUNK]
+            _m, _p, n, big_p, score = kvector._score_rows(
+                kvector._windows(block, RADIUS, lo, hi), tt, lo, hi, BAND)
+            out += [(k, float(score[t]), float(big_p[t]), int(n[t]))
+                    for t, k in enumerate(st.kvectors[c:c + kvector._CHUNK])]
+    return out
+
+
+def test_a_budget_expiring_inside_a_stratum_stops_within_one_block(monkeypatch):
+    """The deadline is read before every block, so a cut lands inside a stratum."""
+    monkeypatch.setattr(kvector, "_CHUNK", 7)
+    strata = kgrid_strata("P n m a", denominator=8)
+    blocks = _blocks(strata, 7)
+    big = max(strata, key=lambda s: s.n_points)
+    # the third block of the largest stratum: two of its blocks scored, then the cut
+    stop = next(i for i, b in enumerate(blocks) if b[0] == big.name) + 2
+    assert big.n_points > 3 * 7
+    pk = _planted(PNMA, K_GENERAL, 8, 10, spurious=2)
+    full = score_kgrid(pk, PNMA, strata, radius=RADIUS, band_deg=BAND)
+    budget = _ReadsLeft(stop)
+    cut = score_kgrid(pk, PNMA, strata, radius=RADIUS, band_deg=BAND, budget=budget)
+    names = [s.name for s in strata]
+    at = names.index(big.name)
+    assert budget.calls == stop + 1                     # nothing read after the cut
+    assert len(cut.rows) == sum(b[2] for b in blocks[:stop])
+    assert cut.strata_cut == ((big.name, 14, big.n_points),)
+    assert cut.strata_searched == tuple(names[:at])
+    assert cut.strata_left == tuple(names[at + 1:])
+    assert cut.budget_expired and cut.budget_seconds == 60.0
+    assert f"stratum {big.name} cut after 14 of {big.n_points} points" in cut.coverage
+    assert "No claim is made about any k off this grid" in cut.coverage
+    # the rows scored are the uncapped search's first rows, exactly
+    assert [(r.k, r.score, r.matched) for r in cut.rows] == \
+        [(r.k, r.score, r.matched) for r in full.rows[:len(cut.rows)]]
+
+    null_budget = _ReadsLeft(stop)
+    kw = dict(radius=RADIUS, band_deg=BAND, exclude=_exclude(PNMA), n_shuffles=4,
+              percentile=99, seed=3)
+    null = kgrid_null(pk, PNMA, strata, budget=null_budget, **kw)
+    assert null_budget.calls == stop + 1
+    assert (null.strata_cut, null.strata_searched, null.strata_left) == \
+        (cut.strata_cut, cut.strata_searched, cut.strata_left)
+    assert null.budget_expired and "cut after 14" in null.coverage
+    # every shuffle stopped at the same k: its member is the maximum over those rows
+    for s_, row in enumerate(null.shuffles):
+        g = score_kgrid(row, PNMA, strata, radius=RADIUS, band_deg=BAND,
+                        budget=_ReadsLeft(stop))
+        assert null.sample[s_] == g.scores.max()
+
+
+def test_a_budget_expiring_at_a_stratum_boundary_cuts_nothing_part_way(monkeypatch):
+    monkeypatch.setattr(kvector, "_CHUNK", 7)
+    strata = kgrid_strata("P n m a", denominator=8)
+    blocks = _blocks(strata, 7)
+    first = next(i for i, b in enumerate(blocks) if b[0] == strata[2].name)
+    pk = _planted(PNMA, K_LINE, 6, 13)
+    cut = score_kgrid(pk, PNMA, strata, radius=RADIUS, band_deg=BAND,
+                      budget=_ReadsLeft(first))
+    assert cut.strata_cut == ()
+    assert cut.strata_searched == tuple(s.name for s in strata[:2])
+    assert cut.strata_left == tuple(s.name for s in strata[2:])
+    assert "cut after" not in cut.coverage
+
+
+def test_the_uncut_path_is_mains_bit_for_bit():
+    """With no cut, rows, null sample and words are those of the loop read
+    only between strata (main at 8112e3b09, reproduced here): exact equality."""
+    strata = kgrid_strata("P n m a", denominator=8)
+    pk = _planted(PNMA, K_GENERAL, 8, 10, spurious=2)
+    ref = _main_rows(pk, strata)
+    for budget in (None, _ReadsLeft(10 ** 6), Budget(3600.0)):
+        grid = score_kgrid(pk, PNMA, strata, radius=RADIUS, band_deg=BAND, budget=budget)
+        assert [(r.k, r.score, r.p_value, r.n_matched) for r in grid.rows] == ref
+        assert grid.strata_cut == () and grid.strata_left == ()
+        assert not grid.budget_expired
+        assert grid.coverage == (
+            f"rational k on the 1/8 grid (step 0.125 in conventional reciprocal coordinates) "
+            f"in {len(strata)} stratum(s) searched; 0 stratum(s) left unsearched. No claim is "
+            "made about any k off this grid: a general or incommensurate k between grid "
+            "points was not searched.")
+    kw = dict(radius=RADIUS, band_deg=BAND, exclude=_exclude(PNMA), n_shuffles=5,
+              percentile=99, seed=7)
+    a = kgrid_null(pk, PNMA, strata, **kw)
+    b = kgrid_null(pk, PNMA, strata, budget=_ReadsLeft(10 ** 6), **kw)
+    assert a.sample == b.sample and a.strata_cut == b.strata_cut == ()
+    for s_, row in enumerate(a.shuffles):
+        assert a.sample[s_] == max(score for _k, score, _p, _n in _main_rows(row, strata))
+
+
 def test_positions_built_once_give_the_same_rows():
     strata = kgrid_strata("P n m a", denominator=8)
     pk = _planted(PNMA, K_LINE, 7, 14)

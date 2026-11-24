@@ -19,6 +19,8 @@ const RESOLVE = {
   closing: { name: "closing", window_area_tol: 0.001, fixes: [], rwp: 0.0911 },
   set_aside: [], never_freed: ["instrument.profile.u", "instrument.profile.v", "instrument.zero_shift"],
 };
+/** what the resolve route answers; a case swaps it, and `afterEach` puts it back */
+let resolveAnswer: any = RESOLVE;
 const ROWS = [
   { path: "phases.0.scale", help_key: "phases.*.scale", refinable: true },
   { path: "phases.0.cell.a", help_key: "phases.*.cell.a", refinable: true },
@@ -35,7 +37,7 @@ vi.mock("../api", () => ({
     plan: async () => ({ plan: { stages: STAGES, correlation_guard: 0.98 }, preset: "mccusker_default" }),
     plans: async () => ({ plans: [{ name: "mccusker_default", title: "McCusker default",
                                     description: "", modes: ["rietveld"] }] }),
-    planResolve: async () => RESOLVE,
+    planResolve: async () => resolveAnswer,
     params: async () => ({ parameters: ROWS, n_free: 0 }),
     putPlan: (body: any) => putPlan(body),
   },
@@ -57,6 +59,7 @@ afterEach(() => {
   app = null;
   document.body.innerHTML = "";
   putPlan.mockClear();
+  resolveAnswer = RESOLVE;
 });
 
 describe("the Plan tab", () => {
@@ -152,6 +155,31 @@ describe("the Plan tab", () => {
     expect(document.querySelector("form.settings")).toBeNull();
     expect(await app.save()).toBe(true);
     expect(putPlan.mock.calls[0][0].plan.stages[1].max_iter).toBe(7);
+  });
+
+  it("after a one-stage re-fit, one row stands in for the stages (WP-2227)", async () => {
+    // the maintainer's ruling 2 of 2026-11-22: drawn like the closing stage,
+    // after the stages, which keep their counts and leave Rwp blank
+    resolveAnswer = { ...RESOLVE, stages: [step(["phases.0.scale"], 2, null), step(["phases.0.cell.a"], 3, null)],
+                      closing: null, one_stage: { n_free: 3, rwp: 0.0925 } };
+    app = mount(Plan, { target: document.body, props: {} });
+    await settle();
+    const blocks = [...document.querySelectorAll(".stg")];
+    expect(blocks).toHaveLength(4);                    // two stages, one stage, never freed
+    expect(text(blocks[0].querySelector(".facts"))).toBe("2 free");
+    expect(text(blocks[1].querySelector(".facts"))).toBe("3 free");
+    const one = document.querySelector("[data-one-stage]")!;
+    expect(one).toBe(blocks[2]);
+    expect(one.classList.contains("out")).toBe(true);  // drawn as the closing stage is
+    expect(text(one.querySelector(".stg1"))).toBe("1 One stage 3 free Rwp 9.25 %");
+    expect(text(one.querySelector(".stg2 .verb"))).toBe("Free");
+    expect(text(one.querySelector(".stg2 .muted"))).toBe("Everything above, at once");
+    // a run in stages draws no such row
+    unmount(app);
+    resolveAnswer = RESOLVE;
+    app = mount(Plan, { target: document.body, props: {} });
+    await settle();
+    expect(document.querySelector("[data-one-stage]")).toBeNull();
   });
 
   it("keeps the selected stage when a stage above it is deleted", async () => {

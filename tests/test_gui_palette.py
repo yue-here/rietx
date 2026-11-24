@@ -56,7 +56,7 @@ PLOT_TS = ROOT / "gui" / "src" / "lib" / "plot.ts"
 #: zero line, a wash over what is not fitted), and neither carries a quantity.
 #: The pairs that sit under the floor are named below in :data:`NAMED_PAIRS`.
 CURVES = ("--plot-obs", "--plot-calc", "--plot-bkg", "--plot-diff", "--plot-last",
-          "--plot-peak", "--plot-peakfit", "--plot-candidate")
+          "--plot-compare", "--plot-peak", "--plot-peakfit", "--plot-candidate")
 
 #: What a *layer's* colour must clear: every other curve, plus the two inks a
 #: mark can otherwise be mistaken for.
@@ -570,7 +570,7 @@ def test_the_filled_controls_ink_legibly_on_their_fill(theme):
 #: and the panel for all of them, and the hover ground for the ink a ghost
 #: button's label is set in.
 TEXT_ON = {ink: ("--bg", "--panel")
-           for ink in ("--muted", "--accent-ink", "--ok", "--warn", "--bad")}
+           for ink in ("--muted", "--accent-ink", "--ok", "--warn", "--bad", "--code-string")}
 TEXT_ON["--fg"] = ("--bg", "--panel", "--hover")
 
 
