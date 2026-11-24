@@ -50,6 +50,11 @@ from rietx.schemas.structure import (
     Structure,
 )
 
+#: ``tof_fit`` is a staged fit about seven tests read, and a module fixture
+#: several tests share pins its module (tests/CLAUDE.md § Shared fixtures and xdist groups), or each worker that
+#: draws one of them rebuilds the fit under ``--dist loadgroup``.
+pytestmark = pytest.mark.xdist_group("tof-refine")
+
 # ----------------------------------------------------------------------
 # the synthetic bank
 # ----------------------------------------------------------------------

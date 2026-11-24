@@ -38,6 +38,11 @@ from rietx.schemas.plan import (
 )
 from tests.test_tof_refine import A_GEN, TZERO_GEN, bank, silicon
 
+#: ``staged_pair`` is two staged fits five tests read, and a module fixture
+#: several tests share pins its module (tests/CLAUDE.md § Shared fixtures and xdist groups), or each worker that
+#: draws one of them rebuilds the fit under ``--dist loadgroup``.
+pytestmark = pytest.mark.xdist_group("tof-staged-window")
+
 #: 15000-30000 µs in 10 µs channels: d = 1.25-2.5 Å on the 12000 µs/Å bank, a
 #: dozen reflections, so the 1e-4 windows cost a few ms an evaluation.
 GRID = np.arange(15000.0, 30000.0 + 5.0, 10.0)
