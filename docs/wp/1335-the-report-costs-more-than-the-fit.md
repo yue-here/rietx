@@ -1,6 +1,6 @@
 # WP-1335 — the report costs more than the fit
 
-Milestone: unscheduled · Status: ✅ 2026-11-03 — a stage report costs about a third less on NAC and a sixth on the #250 shape, bit-identically on both, and its cost is in the event log (PR #1346); `summary(report=)` builds one report (PR #259); no further cut, by ruling; a joint fit's `stage_reports=` went back to the maintainer as a question (PR #1364)
+Milestone: unscheduled · Status: ✅ 2026-11-03 — a stage report costs about a third less on NAC and a sixth on the #250 shape, bit-identically on both, and its cost is in the event log (PR #1346); `summary(report=)` builds one report (PR #259); no further cut, by ruling; a joint fit's `stage_reports=` not built, settled 2026-11-23: it reopens when a user or an agent asks for a joint fit's stage trajectory (PR #1364)
 Track: A long run is not one fit
 Depends on: —
 
@@ -119,24 +119,29 @@ flag whose name suggests it only adds output. The reporter turned it on for
 every fit of a multi-hundred-pattern batch because it seemed the diligent
 choice.
 
-**Folded in from WP-2152 (2026-11-22): the strain report's θ may lag a refined λ.**
+**Folded in from WP-2152 (2026-11-22), checked 2026-11-24: the strain report's θ may lag a refined λ.**
 `report/strain.py::_components` takes each line's Bragg angle off
 `model.line_wavelengths`, which is frozen at compile, through a clipped arcsin. A phase
 peak equation reading `wavelength` binds 2·d·sinθ off that θ, so the report evaluates
 it at the compile-time λ too. On a fit with λ refined, the report's widths would then
-differ from the forward model's. Not measured: whether the model the report is built
-from is compiled at the answer, which would make the gap zero, is the first check. It
-lives in the function this WP's `_strain_errors` work already opens, so it is filed
-here rather than as a WP of its own.
+differ from the forward model's. The first check was whether the model the report is
+built from is compiled at the answer. Read from the code, not timed: the closing report
+is (`_final_compile`, #272, builds one more compile at the returned values for a
+Rietveld or Le Bail result, and `report()` reads it), so there the gap is zero. A stage
+rung (`_stage_report`) and a Pawley result read the stage's own compile, whose
+`line_wavelengths` are the λ the stage started from, so the gap there is the λ the
+stage moved. `CompiledModel.line_wavelengths` bounds that move at 215 ppm of λ, about
+8e-4 of a width at 2θ = 150°; that figure is the field's own, not a measurement on a fit.
 
 ## Non-goals
 
 - The solver's own cost, and the exhausted-budget stop rule — 1334.
-- A joint fit's `stage_reports=` (from 1341): offered on top of this WP once
-  the per-report cost is cut far enough. *Superseded in part 2026-11-03:* the
-  cut stopped at about a third by the 2026-11-02 ruling, so whether that is
-  far enough is a call, and the item has no owner (WP-2028's Non-goals point
-  back here). The question is in the 2026-11-03 handover entry.
+- A joint fit's `stage_reports=` (Inherited, from 1341): offered on top of
+  this WP once the per-report cost is cut far enough.
+  *2026-11-23, raised in the review of PR #1364:* not built, and nothing filed.
+  This Non-goal keeps the reopen condition. Settled by Claude under DESIGN.md
+  Rule 5 Direction ("nothing is built before a case needs it"), 2026-11-23;
+  checked blind.
 - Removing the per-stage report. WP-1058's rule stands: **the report at every
   stage boundary, because a run's last state is routinely its least
   informative.** This WP makes it cheap and countable, not optional-by-stealth.
@@ -220,9 +225,9 @@ with Rwp bit-identical; a `summary()` + `report()` pair builds one report.
   one item still named as open, a joint fit's `stage_reports=`, is one of this
   WP's Non-goals, offered "on top of this WP once the per-report cost is cut
   far enough". The cut stopped at about a third by the 2026-11-02 ruling, so
-  whether that is far enough is a call, not a task. The texts that said the
-  joint fit waits for this WP to land now say the cut stopped and the call is
-  open.
+  whether that is far enough was a call, not a task. The texts that said the
+  joint fit waits for this WP to land now say the cut stopped. *2026-11-24,
+  PR #1364 review:* the call is settled, not built (below).
 
   *Done.* `MultiHistogramRefinement.fit`'s docstring and the manual's
   `reference/joint.md` no longer say "until WP-1335 lands". The docstring
@@ -231,8 +236,9 @@ with Rwp bit-identical; a `summary()` + `report()` pair builds one report.
   phases, from a fraction of a second on NAC to seconds on 49 000 points,
   times the pattern count. The `### Inherited` section was consumed and
   deleted. Its #245 timings are the issue's own record. Its WP-1341 entry is
-  this question, also forwarded to WP-2028's `### Inherited`, whose Non-goals
-  still send the item here. The narrative went to `docs/milestones/v1.13.md`.
+  this question. It was forwarded to WP-2028's `### Inherited` on 2026-11-03;
+  2026-11-24 WP-2028's Non-goal states the answer and the note is dropped.
+  The narrative went to `docs/milestones/v1.13.md`.
 
   *Measured.* Nothing timed, since nothing that runs changed. `[dev]` venv,
   darwin arm64: the acceptance files with the docs and joint-fit tests
@@ -253,9 +259,10 @@ with Rwp bit-identical; a `summary()` + `report()` pair builds one report.
   placeholder (filled here); and "the docstring keeps the #245 figure", still
   true after the fix.
 
-  *Question for the maintainer.* Should a joint fit offer
-  `stage_reports=` now, and if so, where does the work live? No open WP owns
-  it: WP-2028's Non-goals give it to WP-1335, and WP-1335's Non-goals put it
+  *Question for the maintainer (answered 2026-11-23: not built, nothing
+  filed; see Next).* Should a joint fit offer
+  `stage_reports=` now, and if so, where does the work live? No open WP owned
+  it: WP-2028's Non-goals gave it to WP-1335, and WP-1335's Non-goals put it
   on top of this one. Three choices go with building it. (1) Whether the
   one-third cut is enough. The cost is opt-in and `fit_end` carries
   `stage_report_seconds`, the two grounds the 2026-11-02 ruling gave for
@@ -268,8 +275,10 @@ with Rwp bit-identical; a `summary()` + `report()` pair builds one report.
   artefact after a width stage, or would pay a fresh compile per histogram
   per stage.
 
-  *Next.* The maintainer's answer to the question above. If it is "offer
-  it", file it as its own WP or fold it into WP-2028. The build starts from
+  *Next.* Nothing is filed for a joint fit's `stage_reports=`. It reopens
+  when a user or an agent asks for a joint fit's stage trajectory, under
+  DESIGN-RULES Rule 5, Direction (nothing is built before a case needs it);
+  WP-2028's Non-goal says the same. If it reopens, the build starts from
   `MultiHistogramRefinement.report(h)` and `_run_plan`'s stage boundary.
 
 - **2026-11-02** (rulings, PR #1349) — The stage reports' cost is not
