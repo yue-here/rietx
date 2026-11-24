@@ -61,10 +61,13 @@ restraint rows. Stacked as they are, a restraint would count N times and
 weigh N× against the data. This is exactly why WP-1912 refuses
 `floating_origin="centroid"` in a joint fit (`multi._refuse_centroid_origin`),
 and that refusal names the same problem. So take the rows from one model,
-unweighted by any `√w_h`, and put them below every histogram's data and
-background rows. A restraint on a per-histogram parameter (a `ValueRestraint`
-on one pattern's zero) is the exception to settle: its rows belong to that
-histogram alone.
+put them below every histogram's data and background rows, and give them no
+`√w_h`: a shared row is a prior on the structure and no pattern's measurement.
+A restraint on a per-histogram parameter (a `ValueRestraint` on one pattern's
+zero) is the exception: its rows belong to that histogram alone and carry that
+histogram's `√w_h`, so each pattern minimises `w_h·(S_y + S_G)` and its
+minimiser is the single fit's (the maintainer's ruling of 2026-11-13; the
+first build carried no `√w_h` on them, which `5e5729dbc` corrected).
 
 **Statistics.** In a single fit, restraint rows are excluded from
 χ²/Rwp/DW/Bérar-Lelann and kept in JᵀJ (root CLAUDE.md, WP-1074's c_w). The
@@ -136,6 +139,43 @@ one per pattern.
 
 ## Handover log
 
+- **2026-11-24** — Rounds 2 and 3 of the review on PR #1492. A per-pattern
+  restraint row now carries that pattern's `√w_h`, a shared row does not, and a
+  joint fit tells `RESTRAINT_ON_FIXED_BODY_GEOMETRY`. The expression penalty
+  (task 6) is still not started.
+  - *Ruling.* The maintainer's 2026-11-13 ruling: per-pattern restraint rows
+    carry `√w_h`, shared rows do not. The 2026-11-09 entry and the first
+    version of § The one design decision said the opposite; both are
+    corrected above and the 2026-11-09 line is kept as history.
+  - *Done.* `5e5729dbc`: `restr_scale = where(own, sqrt_w[h], 1)` is built once
+    in `least_squares.py` and used by the residual, the dense Jacobian and
+    `block_jacobian`; `_joint_restraint_layout` returns, per histogram, the
+    rows held and whether each is per-pattern. The joint zero shift of the
+    two-pattern case moved from 0.001377 to 0.000764 (the single fit at weight
+    1). `3fd09a494`: `models[0].restraints.findings` goes once on
+    `RefinementResult.diagnostics` (every pattern compiles the one declaration,
+    so histogram 0's findings are the structure's); `_stacked_rows` counts the
+    Pawley-restraint rows; release fragment `1492.new.md`. This round: the
+    cost formula in the `run_multi_least_squares` docstring and in
+    `reference/joint.md` § Soft restraints reads `w_h·(S_y + S_G)`; the
+    `DIAGNOSTIC_SCOPES` reasons of `_restraint_pairs_stale_diagnostics` and
+    `_body_contacts_unchecked_diagnostics` say a per-pattern copy is not
+    searched.
+  - *Merges.* Main was merged in several times, including WP-2104's Pawley
+    fit. Soft restraints compile in Rietveld mode only, so a joint Pawley fit
+    carries no soft-restraint row; the cross-backend test pins that and the
+    `√w_h` on the Pawley-restraint rows.
+  - *Open gap, owned here.* The stale anti-bump pair search and the body-contact
+    check read histogram 0's copy only. With per-pattern coordinates
+    (`SharingMap(per_histogram=["phases.*.atoms.*.dof.*"])`), a contact that
+    comes inside r₀ only in a pattern h > 0 is never reported. Settled by the
+    maintainer (round-2 review): the two scope reasons say so now, and the
+    per-pattern search is built later, when a case reaches it. That later work
+    belongs to this WP.
+  - *Task 6.* Its two questions (the weight, and one row per pattern or once)
+    were settled in the 2026-11-16 decisions-walk note on #1492: an
+    expression penalty is held once when every path it reads is shared and
+    otherwise once per pattern with `√w_h`, scaled by c_w.
 - **2026-11-09** — A joint fit now takes a structure's soft restraints. Before,
   any restraint made a multi-pattern fit raise; now a restraint on the shared
   structure counts once, however many patterns see it, so it weighs against
@@ -150,7 +190,9 @@ one per pattern.
     decides once-or-per-histogram per compiled item: shared when every path it
     reads is bare under `MultiParameterTable.row_path` and no per-histogram row
     reaches it through `ParameterTable.entry_reach` (free or fixed, so the answer
-    does not move with the free set). Restraint rows carry no `√w_h`.
+    does not move with the free set). Restraint rows carry no `√w_h` (a shared row
+    still carries none; a per-pattern row has carried `√w_h` since `5e5729dbc`,
+    see the 2026-11-24 entry).
     `BlockJacobian` takes `n_restr`, a third stripe. Task 2's decision: a
     `ValueRestraint` on a per-histogram path is every histogram's own row; a
     `hist.N.`-scoped path is refused by name. `HistogramResult.restraints` gets
@@ -179,16 +221,14 @@ one per pattern.
     pattern's `restraint_chi2` counts the shared rows too. Declined: exact
     restraint rows in `_stacked_rows`, which only sizes the layout choice.
   - *Generality.* No `_audit.py` change, no threshold, code, field or default
-    added; the judge was not dispatched. Rows without `√w_h` are the WP's own
+    added; the judge was not dispatched. A shared row without `√w_h` is the WP's own
     design (§ The one design decision).
   - *Overlap.* `multi._build_result` is edited by open PRs #1477, #1405, #1272
     and #1108 at other lines; `test_cross_backend.py` by #1372 and #1108 at
     other lines. `reference/joint.md` is also WP-2103's manual task.
-  - Next: task 6, the expression penalty. Two questions decide its shape
-    before code: how its weight relates to the data's (root CLAUDE.md: a
-    penalty's λ is weighed against the data's, √(λ·m)/σ̄) and whether its rows
-    are one per pattern or once per fit; both are the maintainer's to rule if
-    the grammar does not settle them. It reuses `_JOINT_BLOCKS` and
+  - Next: task 6, the expression penalty. Its two questions (its weight against
+    the data's, and one row per pattern or once per fit) were settled in the
+    2026-11-16 walk note on #1492, as the 2026-11-24 entry says. It reuses `_JOINT_BLOCKS` and
     `n_restr`'s stripe, or adds a fourth.
 - **2026-11-04** — Moved into the `parametric` milestone and re-rated P2 on the
   maintainer's opening of it, with the expression penalty added. Next: the first task.

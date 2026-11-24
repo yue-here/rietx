@@ -289,7 +289,7 @@ It stays in the covariance and out of χ², Rwp and the Bérar-Lelann factor, as
 `Stage.restraint_weight_scale` scales it stage by stage, as in a single fit.
 
 A restraint that reads a per-pattern parameter restrains a different quantity in each pattern, so each pattern holds its own row.
-That row is a prior on the pattern's own parameter and pulls against data scaled by the pattern's weight, so it carries `√w_h` like the background penalty: each pattern minimises `w_h·S_y + S_G`.
+That row is a prior on the pattern's own parameter and pulls against data scaled by the pattern's weight, so it carries `√w_h` like the background penalty: each pattern minimises `w_h·(S_y + S_G)`, whose minimum is the single fit's.
 A `ValueRestraint` on `instrument.zero_shift` restrains every pattern's zero shift.
 A bond under a per-pattern or parametric cell restrains the bond as each pattern's cell gives it.
 A `ValueRestraint` path with a `hist.<h>.` prefix is refused, because a restraint on one pattern alone is not built.

@@ -3994,8 +3994,9 @@ def _multi_closures(models: list[CompiledModel], mtable: "MultiParameterTable",
     than once per histogram, being a prior on no pattern's measurement; a
     restraint row held per pattern (a prior on that pattern's own parameter,
     :func:`_joint_restraint_layout`) carries ``√w_h`` like the background
-    penalty, so each pattern minimises ``w_h·S_y,h + S_G,h`` and the prior's
-    strength against its data does not move with the weight.
+    penalty, so each pattern minimises ``w_h·(S_y,h + S_G,h)``, whose minimiser is the
+    single fit's: the prior's strength against its data does not move with
+    the weight.
     Everything past ``n_data_total`` is the penalty side, so the restraint
     rows are in JᵀJ and out of χ², Rwp and Bérar-Lelann, as in a single fit.
 

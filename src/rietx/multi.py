@@ -386,12 +386,16 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
     "_restraint_pairs_stale_diagnostics": (
         (SPECIMEN,), "the anti-bump pair list is the structure's, searched "
                      "once at the answer on histogram 0's copy, against that "
-                     "copy as the run started (WP-1809, WP-1995)"),
+                     "copy as the run started; a contact that comes inside "
+                     "r0 only in a pattern h > 0 whose coordinates or cell "
+                     "are per-pattern is not searched (WP-1809, WP-1995)"),
     "_body_contacts_unchecked_diagnostics": (
         (SPECIMEN,), "a torsion turned inside a body of the structure, whose "
                      "own contacts the anti-bump list does not search: read "
                      "once at the answer on histogram 0's copy, beside the "
-                     "stale-pair check (WP-2144, WP-1995)"),
+                     "stale-pair check; a body contact inside r0 only in a "
+                     "pattern h > 0 whose coordinates or cell are "
+                     "per-pattern is not searched (WP-2144, WP-1995)"),
     "_parametric_not_freed_diagnostics": (
         (FIT,), "joint-only (WP-2101): the plan's stages run once for every "
                 "pattern, so a coefficient no stage freed is told once per "
