@@ -315,7 +315,10 @@ def test_a_bank_declaring_no_spectrum_multiplies_by_nothing_at_all():
 
 def test_the_profile_kind_is_structural_and_switches_on_gamma():
     st = silicon()
-    assert compile_tof_model(st, bank(), blank_pattern()).profile_kind == "gaussian"
+    # an empty set claims nothing moves; None would claim nothing (#1548 item 2)
+    assert compile_tof_model(st, bank(), blank_pattern(),
+                             moving_paths=set()).profile_kind == "gaussian"
+    assert compile_tof_model(st, bank(), blank_pattern()).profile_kind == "pseudovoigt"
     with_gamma = bank(profile=dict(PROFILE, gam1=4.0))
     assert compile_tof_model(st, with_gamma,
                              blank_pattern()).profile_kind == "pseudovoigt"
@@ -343,7 +346,7 @@ def test_gamma_zero_makes_type_three_equal_type_one_to_one_ulp():
     arithmetic is a bar that fails on somebody else's data.
     """
     st = silicon()
-    g = compile_tof_model(st, bank(), blank_pattern())
+    g = compile_tof_model(st, bank(), blank_pattern(), moving_paths=set())
     pv = compile_tof_model(st, bank(), blank_pattern(),
                            moving_paths={P + "gam1"})
     assert (g.profile_kind, pv.profile_kind) == ("gaussian", "pseudovoigt")

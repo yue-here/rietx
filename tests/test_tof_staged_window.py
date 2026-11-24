@@ -162,8 +162,11 @@ def test_the_split_is_the_one_rule_on_a_pure_gaussian():
 # ----------------------------------------------------------------------
 def test_a_gaussian_bank_compiles_the_same_windows_bit_for_bit():
     """Every real bank obtainable declares γ = 0: the schedule must not reach it."""
-    y0, m0 = _curve(silicon(), bank())
-    y1, m1 = _curve(silicon(), bank(), lorentz_window_tol=1e-2)
+    # moving_paths=set(): a stage that can move no γ (None claims nothing and
+    # keeps the pseudo-Voigt branch, #1548 review item 2)
+    y0, m0 = _curve(silicon(), bank(), moving_paths=set())
+    y1, m1 = _curve(silicon(), bank(), lorentz_window_tol=1e-2,
+                    moving_paths=set())
     assert m0.profile_kind == m1.profile_kind == "gaussian"
     assert np.array_equal(m0.flat_windows[0][0], m1.flat_windows[0][0])
     assert np.array_equal(y0, y1)

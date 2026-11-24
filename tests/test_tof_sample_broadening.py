@@ -346,15 +346,16 @@ def test_a_lorentzian_sample_width_compiles_the_pseudovoigt_branch(tof_data):
     zero this stage".  A phase's Lorentzian width is a γ, so it decides it too
     — and a stage that frees the path decides it even at a value of zero."""
     ins = bank(**BANK_90)                       # gam0 = gam1 = gam2 = 0
-    assert compile_tof_model(silicon(), ins, tof_data).profile_kind == "gaussian"
-    assert compile_tof_model(broadened(lor_size=1e-4), ins,
-                             tof_data).profile_kind == "pseudovoigt"
+    assert compile_tof_model(silicon(), ins, tof_data,
+                             moving_paths=set()).profile_kind == "gaussian"
+    assert compile_tof_model(broadened(lor_size=1e-4), ins, tof_data,
+                             moving_paths=set()).profile_kind == "pseudovoigt"
     assert compile_tof_model(
         silicon(), ins, tof_data,
         moving_paths={"phases.0.lor_strain"}).profile_kind == "pseudovoigt"
     # a Gaussian-only sample width does not: it is a σ², not a γ
-    assert compile_tof_model(broadened(gauss_size=1e-8), ins,
-                             tof_data).profile_kind == "gaussian"
+    assert compile_tof_model(broadened(gauss_size=1e-8), ins, tof_data,
+                             moving_paths=set()).profile_kind == "gaussian"
 
 
 # ----------------------------------------------------------------------
@@ -432,8 +433,9 @@ def test_an_infinite_strain_free_crystal_is_the_tree_without_this_rung(tof_data)
     absent = _phase_hash(silicon(), ins, tof_data)
     explicit = _phase_hash(broadened(), ins, tof_data)
     assert absent == explicit
-    # and the shape branch is the pre-rung one
-    assert compile_tof_model(silicon(), ins, tof_data).profile_kind == "gaussian"
+    # and the shape branch is the pre-rung one, where nothing moves
+    assert compile_tof_model(silicon(), ins, tof_data,
+                             moving_paths=set()).profile_kind == "gaussian"
     # a size of 10 µm and a strain of 10⁻⁶ are *not* zero, and must not hash
     # equal — the control that the hash above can fail at all
     assert _phase_hash(broadened(lor_size=d_size_coefficient_for_size(1e5),

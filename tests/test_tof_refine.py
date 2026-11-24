@@ -849,7 +849,10 @@ def test_the_tof_forward_model_agrees_across_backends(backend, gam1):
     structure = silicon()
     instrument = bank(**({"gam1": gam1} if gam1 else {}))
     instrument.background.coefficients[0].value = 40.0
-    model = compile_tof_model(structure, instrument, _synthetic_pattern())
+    # an empty set claims nothing moves, so γ = 0 compiles the Gaussian branch;
+    # None would claim nothing and keep the pseudo-Voigt one (#1548 item 2)
+    model = compile_tof_model(structure, instrument, _synthetic_pattern(),
+                              moving_paths=set())
     assert model.profile_kind == ("pseudovoigt" if gam1 else "gaussian")
     table = ParameterTable(structure, instrument)
     values = table.decode(table.x0())

@@ -746,7 +746,11 @@ def test_extinction_is_refinable_on_a_bank_and_zero_is_skipped_not_multiplied():
     row = by_path["phases.0.extinction"]
     assert not row.locked, "extinction is refinable on a bank since T-3"
 
-    assert compile_tof_model(st, ins, blank_pattern()).phases[0].skip_extinction
+    # an empty set claims nothing moves; None claims nothing and skips
+    # nothing, as in compile_model (#1548 review, item 2)
+    assert compile_tof_model(st, ins, blank_pattern(),
+                             moving_paths=set()).phases[0].skip_extinction
+    assert not compile_tof_model(st, ins, blank_pattern()).phases[0].skip_extinction
     # a stage that *can* move it off zero compiles the chain in, even though
     # the stored value is still exactly zero — structural, from what can change
     moving = compile_tof_model(st, ins, blank_pattern(),
