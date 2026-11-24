@@ -37,6 +37,7 @@ from fractions import Fraction as F
 import numpy as np
 import pytest
 
+from rietx.crystallography.lattice import direct_metric_tensor
 from rietx.crystallography.representation.irreps import (
     canonical_kvector,
     equivalent_kvectors,
@@ -175,9 +176,12 @@ def test_each_stratum_order_is_the_little_groups_at_every_member(symbol, n):
             lg = little_group(sg, k)
             assert lg.order == st.little_group_order, (st, k)
             assert lg.indices == st.operation_indices, (st, k)
-        # the locus is what P_k fixes: a fixed component never moves along the
-        # stratum, it sits at a zone-centre or zone-boundary value (0, 1/2, 1;
-        # the same whatever n), so a component that ran over the grid fails
+        # the locus is what P_k fixes: a fixed component never moves along a
+        # line or plane, it sits at a zone-centre or zone-boundary value (0, 1/2,
+        # 1 in these three groups, whatever n; hexagonal K has 1/3), so a
+        # component that ran over the grid fails.  One value per component is
+        # not the claim: a stratum is one co-group, and on P n m a the co-group
+        # of (0, y, 0) is also (0, y, 1/2)'s, (1/2, y, 0)'s and (1/2, y, 1/2)'s
         for c, fixed in enumerate(st.fixed_components):
             if fixed:
                 assert {k[c] for k in st.kvectors} <= {F(0), F(1, 2), F(1)}, (st.kind, c)
@@ -440,6 +444,123 @@ def test_a_cut_budget_names_exactly_the_strata_left():
     assert null.strata_left == names[2:] and null.strata_searched == names[:2]
 
 
+class _ReadsLeft:
+    """A budget stub whose ``expired()`` turns true on its (n+1)-th call and
+    counts every call: deterministic, no clock."""
+
+    seconds = 60.0
+
+    def __init__(self, n):
+        self.n, self.calls = n, 0
+
+    def expired(self):
+        self.calls += 1
+        return self.calls > self.n
+
+
+def _blocks(strata, chunk):
+    """(stratum name, first row, rows) of every vectorised block, in search order."""
+    return [(st.name, c, min(chunk, st.n_points - c))
+            for st in strata for c in range(0, st.n_points, chunk)]
+
+
+def _main_rows(pk, strata):
+    """The pre-deadline loop, read only between strata (main at 8112e3b09)."""
+    tt = np.asarray(pk, dtype=np.float64)
+    lo, hi = PNMA.two_theta_min, PNMA.two_theta_max
+    out = []
+    for st in strata:
+        pos = kvector._positions(PNMA, st.kvectors, (1,))
+        for c in range(0, st.n_points, kvector._CHUNK):
+            block = pos[c:c + kvector._CHUNK]
+            _m, _p, n, big_p, score = kvector._score_rows(
+                kvector._windows(block, RADIUS, lo, hi), tt, lo, hi, BAND)
+            out += [(k, float(score[t]), float(big_p[t]), int(n[t]))
+                    for t, k in enumerate(st.kvectors[c:c + kvector._CHUNK])]
+    return out
+
+
+def test_a_budget_expiring_inside_a_stratum_stops_within_one_block(monkeypatch):
+    """The deadline is read before every block, so a cut lands inside a stratum."""
+    monkeypatch.setattr(kvector, "_CHUNK", 7)
+    strata = kgrid_strata("P n m a", denominator=8)
+    blocks = _blocks(strata, 7)
+    big = max(strata, key=lambda s: s.n_points)
+    # the third block of the largest stratum: two of its blocks scored, then the cut
+    stop = next(i for i, b in enumerate(blocks) if b[0] == big.name) + 2
+    assert big.n_points > 3 * 7
+    pk = _planted(PNMA, K_GENERAL, 8, 10, spurious=2)
+    full = score_kgrid(pk, PNMA, strata, radius=RADIUS, band_deg=BAND)
+    budget = _ReadsLeft(stop)
+    cut = score_kgrid(pk, PNMA, strata, radius=RADIUS, band_deg=BAND, budget=budget)
+    names = [s.name for s in strata]
+    at = names.index(big.name)
+    assert budget.calls == stop + 1                     # nothing read after the cut
+    assert len(cut.rows) == sum(b[2] for b in blocks[:stop])
+    assert cut.strata_cut == ((big.name, 14, big.n_points),)
+    assert cut.strata_searched == tuple(names[:at])
+    assert cut.strata_left == tuple(names[at + 1:])
+    assert cut.budget_expired and cut.budget_seconds == 60.0
+    assert f"stratum {big.name} cut after 14 of {big.n_points} points" in cut.coverage
+    assert "No claim is made about any k off this grid" in cut.coverage
+    # the rows scored are the uncapped search's first rows, exactly
+    assert [(r.k, r.score, r.matched) for r in cut.rows] == \
+        [(r.k, r.score, r.matched) for r in full.rows[:len(cut.rows)]]
+
+    null_budget = _ReadsLeft(stop)
+    kw = dict(radius=RADIUS, band_deg=BAND, exclude=_exclude(PNMA), n_shuffles=4,
+              percentile=99, seed=3)
+    null = kgrid_null(pk, PNMA, strata, budget=null_budget, **kw)
+    assert null_budget.calls == stop + 1
+    assert (null.strata_cut, null.strata_searched, null.strata_left) == \
+        (cut.strata_cut, cut.strata_searched, cut.strata_left)
+    assert null.budget_expired and "cut after 14" in null.coverage
+    # every shuffle stopped at the same k: its member is the maximum over those rows
+    for s_, row in enumerate(null.shuffles):
+        g = score_kgrid(row, PNMA, strata, radius=RADIUS, band_deg=BAND,
+                        budget=_ReadsLeft(stop))
+        assert null.sample[s_] == g.scores.max()
+
+
+def test_a_budget_expiring_at_a_stratum_boundary_cuts_nothing_part_way(monkeypatch):
+    monkeypatch.setattr(kvector, "_CHUNK", 7)
+    strata = kgrid_strata("P n m a", denominator=8)
+    blocks = _blocks(strata, 7)
+    first = next(i for i, b in enumerate(blocks) if b[0] == strata[2].name)
+    pk = _planted(PNMA, K_LINE, 6, 13)
+    cut = score_kgrid(pk, PNMA, strata, radius=RADIUS, band_deg=BAND,
+                      budget=_ReadsLeft(first))
+    assert cut.strata_cut == ()
+    assert cut.strata_searched == tuple(s.name for s in strata[:2])
+    assert cut.strata_left == tuple(s.name for s in strata[2:])
+    assert "cut after" not in cut.coverage
+
+
+def test_the_uncut_path_is_mains_bit_for_bit():
+    """With no cut, rows, null sample and words are those of the loop read
+    only between strata (main at 8112e3b09, reproduced here): exact equality."""
+    strata = kgrid_strata("P n m a", denominator=8)
+    pk = _planted(PNMA, K_GENERAL, 8, 10, spurious=2)
+    ref = _main_rows(pk, strata)
+    for budget in (None, _ReadsLeft(10 ** 6), Budget(3600.0)):
+        grid = score_kgrid(pk, PNMA, strata, radius=RADIUS, band_deg=BAND, budget=budget)
+        assert [(r.k, r.score, r.p_value, r.n_matched) for r in grid.rows] == ref
+        assert grid.strata_cut == () and grid.strata_left == ()
+        assert not grid.budget_expired
+        assert grid.coverage == (
+            f"rational k on the 1/8 grid (step 0.125 in conventional reciprocal coordinates) "
+            f"in {len(strata)} stratum(s) searched; 0 stratum(s) left unsearched. No claim is "
+            "made about any k off this grid: a general or incommensurate k between grid "
+            "points was not searched.")
+    kw = dict(radius=RADIUS, band_deg=BAND, exclude=_exclude(PNMA), n_shuffles=5,
+              percentile=99, seed=7)
+    a = kgrid_null(pk, PNMA, strata, **kw)
+    b = kgrid_null(pk, PNMA, strata, budget=_ReadsLeft(10 ** 6), **kw)
+    assert a.sample == b.sample and a.strata_cut == b.strata_cut == ()
+    for s_, row in enumerate(a.shuffles):
+        assert a.sample[s_] == max(score for _k, score, _p, _n in _main_rows(row, strata))
+
+
 def test_positions_built_once_give_the_same_rows():
     strata = kgrid_strata("P n m a", denominator=8)
     pk = _planted(PNMA, K_LINE, 7, 14)
@@ -586,6 +707,83 @@ def test_minus_k_rows_appear_only_without_inversion():
     assert not [r for r in with_inv.rows if r.relation == "-k"]
     assert len([r for r in without.rows if r.relation == "-k"]) == 4
     assert not with_inv.minus_k_is_k
+
+
+# a pseudo-cubic triclinic cell: its near-symmetries include 3- and 4-fold maps,
+# where W and W⁻¹ differ, and its reduced basis is the conventional one up to signs
+PSEUDO_CUBIC = KParent("P -1", (5.00, 5.03, 5.07, 90.4, 89.7, 90.2), LAMBDA, 10.0, 140.0)
+
+
+def _relative_deviation(e, g):
+    d = np.sqrt(np.diag(g))
+    return float(np.max(np.abs(e) / np.outer(d, d)))
+
+
+def test_a_partners_deviation_is_that_of_the_map_it_stores():
+    """#1549's review: the stored map A takes k to the partner; it is the action
+    on reciprocal components of the basis change B = A⁻¹, it carries the
+    reciprocal metric to (B·G·Bᵀ)⁻¹ exactly, and ``metric_deviation`` is B's.
+    On a 3-fold, A read as a basis change of its own (A·G·Aᵀ) gives another
+    number, which describes the inverse map and here lies outside ``tol``."""
+    tol = 0.0278
+    eq = kvector_equivalents(PSEUDO_CUBIC, (F(1, 8), F(1, 4), F(3, 8)), tol=tol)
+    g = np.asarray(direct_metric_tensor(*PSEUDO_CUBIC.cell))
+    partners = [r for r in eq.rows if r.relation == "partner"]
+    assert partners
+    other_reading = []
+    for r in partners:
+        a = np.array(r.operation, dtype=np.float64)
+        b = np.linalg.inv(a)
+        np.testing.assert_allclose(a.T @ np.linalg.inv(g) @ a, np.linalg.inv(b @ g @ b.T),
+                                   rtol=1e-12, atol=1e-15)
+        assert r.metric_deviation == pytest.approx(_relative_deviation(b @ g @ b.T - g, g),
+                                                   rel=1e-9)
+        assert r.metric_deviation <= tol
+        if np.allclose(np.linalg.matrix_power(a, 3), np.eye(3)):
+            other_reading.append(_relative_deviation(a @ g @ a.T - g, g))
+    # the 3-folds are listed, and there the other reading crosses tol
+    assert other_reading and max(other_reading) > tol
+
+
+# :R → :H on reciprocal components, k_H = Q·k_R (obverse: a_H = a_R − b_R,
+# b_H = b_R − c_R, c_H = a_R + b_R + c_R)
+_R_TO_H = ((1, -1, 0), (0, 1, -1), (1, 1, 1))
+
+
+def _to_hexagonal(k):
+    return tuple(sum(F(_R_TO_H[i][j]) * k[j] for j in range(3)) for i in range(3))
+
+
+def test_a_rhombohedral_setting_lists_what_the_hexagonal_one_does():
+    """#1549's review: a ``:R`` group is primitive on its rhombohedral cell.
+    One pseudo-cubic structure (α = 89°) in ``:R`` and ``:H`` lists the same
+    partner classes at the same deviations for every k of the 1/4 grid; read as
+    R-centred, the ``:R`` cell named a lattice of a third its volume and listed a
+    partner of k = (0, 0, 1/8) whose satellites are not k's."""
+    a_r, alpha, tol = 5.0, 89.0, 0.03
+    half = np.radians(alpha) / 2
+    a_h = 2 * a_r * np.sin(half)
+    c_h = a_r * np.sqrt(3 * (1 + 2 * np.cos(np.radians(alpha))))
+    rh = KParent("R -3 m:R", (a_r, a_r, a_r, alpha, alpha, alpha), 1.5, 5.0, 150.0)
+    hx = KParent("R -3 m:H", (a_h, a_h, c_h, 90.0, 90.0, 120.0), 1.5, 5.0, 150.0)
+    k = (F(0), F(0), F(1, 8))
+    # the map is right: one satellite set in either setting
+    d_r = satellite_d_spacings(rh.space_group, rh.cell, 1.5, 150.0, [k], 5.0)[0]
+    d_h = satellite_d_spacings(hx.space_group, hx.cell, 1.5, 150.0, [_to_hexagonal(k)], 5.0)[0]
+    np.testing.assert_allclose(np.sort(d_r), np.sort(d_h), rtol=1e-9)
+
+    def listed(parent, kk, to_h):
+        rows = [r for r in kvector_equivalents(parent, kk, tol=tol).rows
+                if r.relation == "partner"]
+        classes = {frozenset(canonical_kvector(hx.group, to_h(c))
+                             for c in _structural_class(parent.space_group, r.k)) for r in rows}
+        return classes, sorted(round(r.metric_deviation, 9) for r in rows)
+
+    assert listed(rh, k, _to_hexagonal) == listed(hx, _to_hexagonal(k), lambda c: c)
+    for t in itertools.product(range(4), repeat=3):
+        kk = tuple(F(x, 4) for x in t)
+        if any(kk):
+            assert listed(rh, kk, _to_hexagonal) == listed(hx, _to_hexagonal(kk), lambda c: c), kk
 
 
 # ============================== V4/V5 the 1/64 grid: planted k against the null

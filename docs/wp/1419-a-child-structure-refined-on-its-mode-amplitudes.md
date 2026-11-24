@@ -161,6 +161,16 @@ the transposed rotation set is a group too and passes any dimension count.
 
 ### Inherited
 
+- **2026-11-23, from WP-2220 (closed; PR #1717): the restart test still orders at `FTOL`
+  relative.** Yue ruled on 2026-11-20 that a nested comparison's ordering flag
+  (`report.layer2._chi2_ordered`) allows the fuller fit an absolute margin of 2 cost units
+  (`NESTED_COST_MARGIN`, the lower edge of Kass & Raftery's "positive evidence" band).
+  `distortion_block_tests` triggers its restart when a restricted χ² sits below the full one
+  by more than `optimize.lm.FTOL` (1e-9) relative, and reads the data χ², not the minimised
+  cost. WP-2220 left it alone, since the ruling named only `chi2_ordered` and a restart
+  trigger is a different job. Whether the restart takes the same margin is a distortion-mode
+  decision, so it is Mike's.
+
 - **2026-11-01, from WP-2067: the purpose table reads every `distortion_modes`
   path as one that moves atoms.** `purposes._ATOM_DRIVERS` lists
   `phases.*.distortion_modes.*` whole. So a warning naming an amplitude keeps
@@ -677,12 +687,63 @@ every shipped fixture are bit-identical.
 
 ## Handover log
 
+- **2026-11-24** — repair, by a ghostshift runner, PR #1817. The session-start hook
+  flagged this WP because a `WP-1419:` commit of 2026-11-21 was newer than the last entry
+  (2026-11-19). Two entries below are reconstructed from `git log`: the 2026-11-21 one,
+  and the 2026-11-17 one for PR #1532, which landed with no entry and which the hook could
+  not see, since its date was older than the 2026-11-19 entry. No task and no Status line
+  changed. Mike's PR #1533 (C3b, the candidate route) is open and in flight, so it is not
+  recorded here. *Next*: #1533's review under `/pr-review`. Since the 2026-11-21 ruling,
+  a question on this WP goes to Mike on #1075, including #1532's open choice on the
+  null-strain bound.
+
+- **2026-11-21** (reconstructed post hoc) — PR #1767 (Yue's session), one commit
+  `acfae54d`, merged the same day. It is docs only and touches `docs/milestones/magnetic.md`
+  alone, adding § Who decides. That section records two ownership rulings. The magnetic
+  path has been Mike's since 2026-11-04 (#1075). Yue's words on 2026-11-21 give him this
+  WP's distortion-mode work too: "let mike own the distortion modes work". That covers
+  `distortion_candidates`, `Phase.parent_cell`, `RefinementResult.distortion_totals` and
+  what follows from them. The section marks the terms as Claude's reading, for Yue to
+  correct. On that reading Mike holds the work and its design decisions, and Yue keeps
+  releases, stored formats, deletions and anything that reaches a fit with no distortion
+  model. No task in this file is ticked by it.
+
 - **2026-11-19** — Ruled by Yue 2026-11-19, in chat, answering a shift's
   brief on PR #1533 (C3b): approved. From release 1.13, under schema 0.62, a
   phase saved under 0.61 fails to open when its `distortion_modes` and its
   `parent_cell` name different parents or different (P, p) transforms. The
   refusal says how to restate the phase. Nothing else in this WP changes.
   Next: #1533's review and merge under `/pr-review`.
+
+- **2026-11-17** (reconstructed post hoc) — C2's follow-ups from the #1108 review were
+  merged from outside as PR #1532 (merge `2069fe91`). Its six `WP-1419:` commits are dated
+  2026-11-11, one of them a release note for the writers' refusal. They answer the 2026-11-10 entry's "Owed to this WP" list as follows.
+  - Built: `gui/symmetry.py`'s `held_causes` names the derivation for a parent-cell
+    child's cell. It no longer skips the whole phase for an unnamed child, so that phase's
+    atoms get their causes too.
+  - Built: a stage naming both `phases.<i>.cell.*` and `phases.<i>.parent_cell.cell.*`
+    stays silent, as the `biso`/`adp.*` pair does.
+  - Built: the TOPAS, GSAS and FullProf writers refuse `Phase.parent_cell` by name.
+    `crystallography.symmetry.refuse_parent_cell` sits beside `refuse_distortion_modes` at
+    all five sites.
+  - Built: `STAGE_PATH_NOT_FREE`'s three coverage lists name the cell arm.
+  - Built: `_parent_strain_held_diagnostics` moves out of `DIAGNOSTIC_SCOPES`' "deliberately
+    not computed" heading.
+  - Built: a joint-fit `PARENT_STRAIN_HELD` test, shown to fail.
+  - Measured, not changed: the null-strain bound of 1e-4. On the test's noise draw, 20
+    independent starts all land at |s| = 1.81557e-5, with a spread of 3.0e-10. That value
+    is the draw's own least-squares minimum. Twelve other draws reach at most 3.33e-5. The
+    numbers are in the test's docstring. The PR left one choice to the maintainer: keep the
+    bound, or widen it toward 3.3e-5. No answer is recorded in this file.
+  - Left: the joint fit's cell-glob report goes to WP-2028, whose `### Inherited` already
+    owns wiring `_site_glob_diagnostics` into `multi.py`.
+  - Dropped: the `Refinement.edit()` drift item and WP-2010's referent line. The PR found
+    both already recorded in the 2026-11-10 entry.
+
+  No task here is ticked. The PR's own gate ran on Mac arm64 (Python 3.12, `[dev,jax]`):
+  fast suite 14 721 passed, 248 skipped, 32 xfailed, 0 failed; ruff, `sphinx -W`, Vale and
+  `audit_delta` clean (1 changed, evidence text only). The commits do not record the
+  merge's own gate.
 
 - **2026-11-10** (`/pr-review`) — C2 merged from outside as PR #1108, landed through #1528 (`8764de9e`) after seven review rounds. `main` had moved 218 commits past the PR's last sync, and its fork branch could not be pushed from the session, so #1528 carried #1108's 45 commits unchanged plus three on top, and GitHub marks #1108 merged. A child phase now states its cell as `Phase.parent_cell`: the parent's group, the (P, p) transform, the parent's cell and one amplitude per Γ strain the child's group allows. The child's metric is G′ = Pᵀ(G + 2LEL)P, built by a second `DerivedBlock` kind (`params/parent_cell.py`), and the child's six cell entries are locked outputs. `phases.*.cell.*` frees the parent's edges and never a strain, and `PARENT_STRAIN_HELD` (tier 3, approved 2026-10-27) reports the held strain on every such stage. `magnetic_supercell` builds the 5 of 36 displacive LaMnO₃ Pnma children, and P4/mmm 63.466, that it refused before. Schema `Also in 0.61`. This ticks the metric-subspace task in the derived-cell form (2026-10-11's chunk 2, replacing #293's `MetricConstraints`). The span test covers 242 children and 11 settings, and the 95 children that build both ways predict bit-identically.
   - **The three commits on top.** `4de9bd62` merges main. Main's WP-2087 had already split the parameter map, so #1108's own `parameters-tof` page was dropped and its strain row kept in the Cell group. Both `STAGE_PATH_*` suggestion counts are now 3. `9694589b` puts `phases.*.parent_cell.strain.*` in `test_help.NOT_OPT_IN`, for WP-2087's opt-in test, which landed after the PR's last sync. `da3a2d30` trims `theory/estimation` back under the 50 000-character cap: the PR's `{cite}` in `peak-positions` renumbers Sphinx's global citation ids. That gotcha is general: a citation added early in the Theory tab can push any page sitting near the cap over it.

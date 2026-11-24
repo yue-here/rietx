@@ -166,6 +166,13 @@ def _compare(s: GuiSession, q: dict, _body: dict) -> dict:
     return s.history_compare(ids)
 
 
+def _history_curves(s: GuiSession, q: dict, _body: dict) -> Packed:
+    node = q.get("node", [""])[0]
+    if not node:
+        raise GuiError("curves needs ?node=<node>", where=["node"])
+    return s.history_curves(node)
+
+
 def _structure3d(s: GuiSession, q: dict, body: dict | None) -> dict:
     """Geometry for one phase.  The knobs are *drawing* thresholds, not physics,
     which is why they ride here rather than in a settings document: the
@@ -314,6 +321,8 @@ ROUTES: dict[tuple[str, str], Any] = {
     ("POST", "/api/peaks/move"): lambda s, q, b: s.peaks_move(b),
     ("POST", "/api/peaks/flag"): lambda s, q, b: s.peaks_flag(b),
     ("POST", "/api/peaks/refit"): lambda s, q, b: s.peaks_refit(b),
+    ("POST", "/api/peaks/undo"): lambda s, q, b: s.peaks_undo(b),
+    ("POST", "/api/peaks/redo"): lambda s, q, b: s.peaks_redo(b),
     # /api/index rides the one run state machine: same worker, same 409
     ("POST", "/api/index"): lambda s, q, b: s.run({**b, "kind": "index"}),
     ("GET", "/api/index/result"): lambda s, q, b: s.index_result(),
@@ -343,6 +352,8 @@ ROUTES: dict[tuple[str, str], Any] = {
     ("GET", "/api/history"): lambda s, q, b: s.history(),
     ("GET", "/api/history/diff"): _diff,
     ("GET", "/api/history/compare"): _compare,
+    # one node's curve through replay, for the History tab's Compare (WP-2211)
+    ("GET", "/api/history/curves"): _history_curves,
     ("POST", "/api/history/checkout"): lambda s, q, b: s.history_checkout(b),
     ("POST", "/api/history/branch"): lambda s, q, b: s.history_branch(b),
     ("POST", "/api/history/tag"): lambda s, q, b: s.history_tag(b),
@@ -570,6 +581,11 @@ def _handler(session: GuiSession, holder: dict):
             if query.get("poll"):
                 self._json(session.events_since(since))
                 return
+            # a reconnecting EventSource re-opens the URL it was first given and
+            # says how far it read in this header, the SSE spec's resume cursor
+            last = self.headers.get("Last-Event-ID", "")
+            if last.isascii() and last.isdigit():  # "²" is a digit int() refuses
+                since = session.resume_at(since, int(last))
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream; charset=utf-8")
             self.send_header("Cache-Control", "no-store")
