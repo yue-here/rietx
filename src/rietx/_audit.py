@@ -3541,9 +3541,10 @@ ROWS: tuple[Row, ...] = (
                  "MAGNDATA coordinate by more than 3.1e-5 A, and the stated displacement "
                  "it erases below the merge is reported by name. Dissenter: a refiner "
                  "stating a displacement under 5e-4 off a parent special position, who "
-                 "passes nuclear_group='file'. Tier 3 ruled by Mike on PR #1636 "
-                 "(2026-11-23, 11:47Z) under #1075."),
-        approved="2026-11-24", approved_by="checked"),
+                 "passes nuclear_group='file'. Kept at tier 3 by Mike's ruling on PR #1636 "
+                 "(2026-11-23, 11:47Z: the merge 'stays') under #1075; his, not the judge's, "
+                 "since it sets the threshold of the parent-group pick (WP-2238)."),
+        approved="2026-11-23"),
     Row("rietx.crystallography.magnetic.isotropy.CROSS_IRREP_DRAWS", "constant", tier=3, value=12,
         evidence=("of the cubic pairs 3 draws called equivalent, 8 % were refuted within 12 "
                   "draws, against 0.2 % at 12 (six synthetic cubic sets); case that reaches "
@@ -3641,9 +3642,10 @@ ROWS: tuple[Row, ...] = (
                   "fall between the measured values"),
         grounds=("Rare feature, kept at the value its one real family and the synthetic sets "
                  "bracket: it sets which moment angles a stage frees, and every esd "
-                 "correlated with them. No dissenter found. Tier 3 ruled by Mike on PR #1636 "
-                 "(2026-11-23) under #1075."),
-        approved="2026-11-24", approved_by="checked"),
+                 "correlated with them. No dissenter found. Kept at tier 3 by Mike's ruling "
+                 "on PR #1636 (2026-11-23) under #1075; his, not the judge's, since it sets "
+                 "the threshold of the moment-angle hold, an automatic action (WP-2238)."),
+        approved="2026-11-23"),
     Row("rietx.crystallography.magnetic.moments.SEED_TILT", "constant", tier=3, value=0.02,
         evidence=("WP-1418: on 20 simulated MAGNDATA structures 0.15 lost 2 exact recoveries "
                   "and 0.02 none. Case that reaches it: the slow test in "
