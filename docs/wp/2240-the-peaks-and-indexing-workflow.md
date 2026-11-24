@@ -1,8 +1,7 @@
 # WP-2240 — the peaks-and-indexing workflow at `/next`: pick peaks, fit peaks, index, judge
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-23 — tasks 1-4 in PR #1788 (merged), task 5 in PR #1791; tasks 6-9 left
+Milestone: gui-overhaul · Status: ✅ 2026-11-23 — #1788, #1791 and #1792 merged on 2026-11-23, after Yue's look (§ Rulings); the peaks-and-indexing workflow is served at `/next`
 Depends on: 2218 (hand fitting and the other graphs)
-Priority: P2 2026-11-22 — a feature the open milestone was opened for: R6, the rebuild's next piece
 
 ## Goal
 
@@ -120,23 +119,83 @@ view filter over the picker's own numbers. It changes which rows a person sees f
 which lines reach the search, so it is a display choice in the GUI and not a heuristic of the
 package. `src/rietx/_audit.py` is untouched.
 
-### Inherited
-
-- From the milestone's § Owed to the port: per-line curves need a route (#1526 serves them,
-  R6 takes that half), and peak edits have no undo though the maintainer adopted the rule on
-  2026-11-08 (R6 owes it). Peak edits live in `peaks.json`, outside the history tree, so the
-  undo is the workflow's own stack, as the Plan tab keeps one for plan edits (WP-2127).
-- Four owed items stay out of R6 and keep their lines there: the Le Bail check's absent lines
-  served as tick indices, lattice relations between candidates computed in rietx, an overrule
-  that remembers which flags a person overruled (a `peaks.json` format change), and keeping the
-  indexing result across a restart (a stored-format change).
-
 ## Rulings
 
-- **The dotted mark for a chosen line left out of indexing is drawn in `--plot-peak`**, the
-  peak layer's own colour, not `--accent`, which is the calculated curve's colour and hid the
-  mark on it. Settled by Claude under `gui/CLAUDE.md`'s one-colour-per-layer, state-by-shape
-  rule (WP-1210); Yue delegated 2026-11-23; alternative `--fg`.
+- **Reversed by Yue at the R6 look, 2026-11-23: the dotted `--plot-peak` mark.** Claude had
+  settled the mark for a chosen line left out of indexing as a dotted line in `--plot-peak`,
+  under `gui/CLAUDE.md`'s one-colour-per-layer rule (WP-1210). Yue reversed it in ruling 1
+  below. Plot colours and mark styles in a GUI step are now a trigger: they go to Yue drawn.
+- **Yue's ruling 1, 2026-11-23 (the R6 look): the peak fit takes the fit line's token.** "I
+  don't like the blue-on-blue line with markers, or the dotted line. I think we should use the
+  same token as the regular fit line. Since this is indexing there's no risk of confusion."
+  Built: the picked lines' fitted curve on the Pattern graph and each window's fit in the
+  Peaks graph are drawn in `--plot-calc`, solid, at the calculated curve's width. The groups'
+  own residual takes the difference curve's ink. The mark for a chosen line left out of
+  indexing is a thin solid line in `--plot-calc`. The lens marks stay blue, as `gui/STYLE.md`
+  § Plots and the prototype have them (Yue 2026-11-09). The look entry's questions 1 and 2
+  (§ Handover log, fourth session) ask about both.
+- **Yue's ruling 2, 2026-11-23: the green candidate lines.** "The green index markers feel off
+  somehow but I can't articulate it." Not chosen: four ways to draw a chosen cell's lines are
+  drawn for Yue (the look entry's question 3). Nothing is built for it.
+- **Yue's ruling 3, 2026-11-23: a relation is a column on the row's own line.** "I like the
+  'same cell as #1' notification but I don't like that it's underneath the cell — looks messy.
+  Can we introduce a same-line equivalence column of some kind which indicates the
+  relationship? I'd like it compact, same-line and clear." Built: a column after # holds
+  `≡ #1` (the same cell under another lattice label), `2× #1` (a supercell with twice the
+  volume) or `⊇ #1` (indexes every line #1 does). Its tooltip gives the sentence, since
+  `/next` has no help popover yet.
+- **Yue's ruling 4, 2026-11-23: the cell in six columns.** "Cell results should be in 6
+  columns (a, b, c, angles)." Built: a, b, c at four places and α, β, γ at two, each column
+  aligned on the decimal point. A value the crystal system sets is muted, and a fixed angle is
+  written whole (`90`, `120`) in the column's alignment. The table is now wider than the Index
+  step at 1440 × 900 and scrolls in its own box; the look entry's question 5 asks how to fit it.
+- **Yue's ruling 5, 2026-11-23: Pawley is the structure-free default.** "The default
+  structure-free fit should be Pawley." Built for the workflow: Adopt in Judge reads "Adopt as
+  a Pawley start", and Apply sets the project's mode to `pawley`
+  (`POST /api/index/adopt` takes `mode`). The candidate check, a Pawley fit since WP-2011,
+  is now named for the mode it ran ("Pawley check"). The structure-free defaults outside the
+  workflow are listed in the look entry's question 4 and left as they are.
+
+- **Yue's rulings at the second look, 2026-11-23, verbatim:** "r6: grey lines much better than
+  green. blue lenses on orange. line, not hollow lens. widen the candidate table. the current
+  table has lots of alignment issues, title left for text vs right for numbers, leading to
+  angle titles being offset and hard to read. think about the uiux here and consider good
+  practice." He attached a crop of the relation column, whose rows read "9 ⊇ #1 4" and
+  "10 2× #1 9": the mark does not line up from row to row and runs into the next column.
+  Built: a chosen cell's lines in `--line-strong` at `/next` (option (c) of the look); the
+  candidate table aligned by table practice; the workflow's panel opened wide enough for it.
+  Kept as built: the blue lenses over the orange fit, and the thin line for a chosen line left
+  out of indexing. The fifth session's entry says how "line, not hollow lens" was read.
+
+- **Yue's rulings at the third look, 2026-11-23, verbatim (his words, on `look-r6b`):**
+  "Numbers and their heads are right-aligned. Words and their heads are left-aligned.--I
+  meant this was the problem, not what I asked for--the heading is sometimes over white
+  space. no decimals on fixed angles (90 not 90.0). we'll need a tooltip over the cell
+  relationship mark." The fifth session read his second-look complaint ("title left for
+  text vs right for numbers") as the fix and built it, aligning each head as its column. He
+  meant it as the description of the defect: a head standing over white space beside its
+  values. Built (the sixth session's entry): every head centred over its column's values;
+  each column as wide as its widest head or value; a unit under its name; a set angle
+  written whole (`90`, `120`) with the room of its `.00` kept; the relation mark a `<Help>`
+  term opening a `cell_relations` entry in `rietx.help`.
+
+- **Yue's ruling at the fourth look, 2026-11-23, verbatim (on `look-r6c`):** "the relation
+  popover is too didactic, I was thinking just a summary of what it means, e.g. supercell of
+  x or transformation of y. will need a manual link to as does everything in the gui as for
+  the old gui. (since other codes don't report this) the rest looks ok for now". Built (the
+  seventh session's entry): the popover gives one line with the target row filled in, then
+  `in the manual →`, and the explanation moved to the manual's
+  `reference/indexing-evidence.md` § Relations between candidates. "The rest looks ok for
+  now" accepts the built answers to the third look's questions: heads centred over their
+  values, a unit under its name, "Unindexed" as it is, the grade words centred, a
+  click-opened popover rather than a hover tooltip, the 488 px graph, and the mark for a
+  chosen line left out of indexing as built, a thin orange line.
+
+- **Yue's answer at the fifth look, 2026-11-23, verbatim (on `look-r6d`):** "1 yes". The look
+  page's first item asked whether `≡` should read "Same cell as #1, another lattice label"
+  rather than his example "transformation of y". The two rows print identical numbers and
+  differ only in the Lattice column. His yes keeps the wording as built. The rest of the
+  piece stands on his fourth-look "the rest looks ok for now", and PR #1792 merged after it.
 
 ## Non-goals
 
@@ -161,18 +220,18 @@ package. `src/rietx/_audit.py` is untouched.
   with a dashed hover mark, a mark click selects with its bar (2θ, Used or Not used, Delete,
   ×), drag moves, Esc during and right after a drag, Option-click removes, right-click opens
   the menu; a typed add row at the table's foot (row 194); ⌘Z and ⇧⌘Z over peak edits.
-- [ ] 6. The Fit step and the group windows with per-line curves in the Peaks graph tab while
+- [x] 6. The Fit step and the group windows with per-line curves in the Peaks graph tab while
   the workflow is up, with refit.
-- [ ] 7. The Index step: the short form and More settings, the progress with Stop and the cells
+- [x] 7. The Index step: the short form and More settings, the progress with Stop and the cells
   found so far, the coverage line, the eight-column candidate table with its relations, and the
   selected candidate's lines on the Pattern graph.
-- [ ] 8. The Judge step: the candidate's evidence, the extinction screen with its space-group
+- [x] 8. The Judge step: the candidate's evidence, the extinction screen with its space-group
   choice, and Adopt pending until Apply.
-- [ ] 9. Browser passes over the four steps by real clicks; screenshots at 1440 × 900, light and
+- [x] 9. Browser passes over the four steps by real clicks; screenshots at 1440 × 900, light and
   dark, under `docs/wp/2240-screenshots/`, beside the prototype's in the runner's scratch, with
   an inventory of where each of today's Peaks features lives. The last PR waits on the
   maintainer's look.
-- [ ] Skill: none. The skill drives the Python API, and this piece changes only the GUI.
+- [x] Skill: none. The skill drives the Python API, and this piece changes only the GUI.
 
 ## Acceptance
 
@@ -187,6 +246,414 @@ The piece closes when every task is ticked and the maintainer has looked at its 
 the prototype's (WP-2214 § How the maintainer reviews).
 
 ## Handover log
+
+- **2026-11-23 (close)** — closed by a ghostshift runner, on a `main` that includes #1792.
+
+  R6 of the GUI rebuild is done. A person on `/next` can choose Peaks and indexing from the
+  workflow menu and walk its four steps. Pick peaks fills a table the Pattern graph edits by
+  click, drag and Option-click, with undo. Fit peaks draws each overlap group's fit with each
+  line's own curve. Index ends in the candidate table, with a cell in six columns and a
+  relation mark on each related row. Judge holds one candidate's evidence and its extinction
+  screen, and adopts it as a Pawley start. Yue looked at the screens five times on
+  2026-11-23. After the fourth he wrote "the rest looks ok for now", and after the fifth he
+  answered "1 yes" to the one open wording (§ Rulings). Every task is ticked and every
+  question is answered. The work goes out with v1.13.
+
+  - *Checked before closing*: the nine tasks and the skill line are ticked. `gh pr view`
+    shows the three PRs merged into `main` on 2026-11-23: #1788 at 01:18 UTC, #1791 at 02:14
+    UTC and #1792 at 23:37 UTC, as merge commit 886f96b1e.
+  - *Changed by this close*: Status ✅, the `Priority:` line removed, the skill line ticked
+    (a declared "none" is ticked at close, as WP-1401, WP-1402 and WP-1331 were), Yue's
+    fifth-look answer recorded in § Rulings, and the `### Inherited` section deleted. Its
+    three entries were consumed. The per-line curves and the undo over peak edits are tasks
+    2 and 5. The relation mark became a `<Help>` term in the sixth session. The four owed
+    items it named keep their lines in the milestone. The narrative moved to
+    `docs/milestones/v1.13.md`. The R6 row of `docs/milestones/gui-overhaul.md` § The
+    rebuild is marked merged, and the two owed lines R6 answered say so. The index is
+    regenerated. WP-2243 depends on this WP softly and is already in flight, so its
+    priority stands. The priority was P2, so no release is owed.
+  - *Leftovers, and where each lives*:
+    - Yue's ruling 2's question of how a chosen cell's lines are drawn was answered at the
+      second look (grey, `--line-strong`). Nothing is left of it.
+    - The four items R6 left out keep their lines in the milestone's § Owed to the port:
+      the Le Bail check's absent lines served as tick indices, lattice relations computed in
+      rietx, an overrule that remembers which flags were overruled, and the indexing result
+      kept across a restart.
+    - The structure-free defaults outside the workflow (ruling 5, the look entry's question
+      4) still pick Le Bail. WP-2062 (Pawley is the structure-free default) owns each of
+      them, the wizard's `modeFor` and the adopt route's default included.
+    - A narrowed search over named systems waits on a route (§ Non-goals).
+
+- **2026-11-23 (seventh session)** — Yue's fourth-look ruling (§ Rulings, verbatim), on
+  PR #1792. The relation popover now gives one line with the target row filled in, then the
+  manual link, and the explanation moved to the manual. The WP stays 🔄 for Yue's look,
+  `~/.cache/ghostshift/rietx/gui-r6/look-r6d/index.html`.
+
+  *Done.* `lib/peaks.ts`: `candidateRelation` writes the summaries "Same cell as #k, another
+  lattice label", "Supercell of #k, twice its primitive cell" (three times, four times for
+  index 3 and 4) and "Indexes every line #k does, and predicts more". The popover and
+  Judge's relation line both print it. `HelpPopover.svelte` gains a summary form: `<Help
+  for=… title=…>` shows the title alone and keeps the entry's `in the manual →` link
+  (`gui/src/HelpPopover.test.ts`, two cases). `rietx.help`'s three `cell_relations` entries
+  are one sentence each and anchor
+  `reference/indexing-evidence.html#relations-between-candidates`. That manual section gives
+  each mark's meaning, the code behind it through `{source}` links, and the `fap` candidate
+  list (hexagonal and trigonal searched) as a worked example. `reference/settings.md`'s
+  printed arm list gains `cell_relations`, which the sixth session left out.
+
+  *Measured, by real clicks* (fap, 1440 × 900, light and dark, the sixth session's cached
+  hexagonal-trigonal answer). The popover's text on rows 2, 6 and 1 is the three summaries
+  above with `#1`, `#1` and `#4`, each followed by the link. A click on a mark does not
+  select its row. The twelve rows' marks match the manual's table. No page errors.
+
+  *Settled by Claude, for review.*
+  - `≡` reads "Same cell as #k, another lattice label" rather than Yue's example
+    "transformation of y". The two rows print identical numbers and differ only in the
+    Lattice column, so no transformation is involved. Alternative: "Transformation of #k".
+    On the look page as question 2.
+  - The section lives on `reference/indexing-evidence.md`. On `reference/indexing.md` beside
+    § A supercell and the cell inside it, it took that page to 52 486 characters against
+    `tests/test_manual.py`'s 50 000 cap. Alternative: the GUI chapter's § Indexing
+    (`reference/gui-guide.md`), which describes today's page and sits at 50 142 already.
+  - The summary keeps the entry's link through a `title` beside `for` on `<Help>`, rather
+    than a templated title in `rietx.help`. The summary is about one row, which is what
+    `<Help text=…>` was for, and `rietx.help` keeps the family's words.
+  - The TypeScript half of the code citations names the function and file without a line
+    number, which no check could keep current. The Python halves are `{source}` links.
+
+*Gates* (arm64 Mac, worktree venv `[dev]` + playwright, the tree merged with main at
+  ca1b54549). The fast suite: 15406 passed, 438 skipped, 32 xfailed, the sixth session's
+  counts exactly, since the new case is a vitest. vitest: 66 files, 1022 passed (two new
+  cases in a new file). svelte-check: 0 errors over 498 files. ruff clean. sphinx `-W`
+  clean. `tests/test_help.py`, `test_manual.py`, `test_manual_api.py`, `test_gui_manual.py`
+  and the candidate-table browser test passed.
+
+- **2026-11-23 (sixth session)** — Yue's third-look rulings (§ Rulings, verbatim), on #1792.
+  The fifth session had read his "title left for text vs right for numbers" as the fix. He
+  meant it as the defect: a head standing over white space beside its values. Every head in
+  the candidate table now sits centred over its values, a set angle reads `90` or `120`, and
+  the relation mark opens an explanation. The WP stays 🔄 for Yue's look,
+  `~/.cache/ghostshift/rietx/gui-r6/look-r6c/index.html`.
+
+  *Done.* `next/Candidates.svelte`: the table is `width: auto`, so each column is as wide as
+  its widest head or value; every head is centred; each number column's values sit
+  right-aligned in a block `ch` wide enough for its widest value, centred in the cell, so the
+  decimal points still line up; V and Rwp carry their unit on the head's second row; an
+  unchecked row's absent dash spans both absent cells. `lib/peaks.ts`: `cellColumns` writes a
+  set angle whole with `pad: ".00"`, kept as empty room (`.pad`); `Relation` gains `kind` and
+  `key` (`RELATION_KINDS`), and Judge's sentence for a supercell now says the index counts
+  primitive cells. `rietx.help` gains the `cell_relations` arm (`same_cell`, `sublattice`,
+  `containment`), crossed in `tests/test_help.py` against `SupercellCheck.relation`, and
+  wired through `help_registry`, `lib/help.ts`, `tests/test_gui_help.py` and the manual's
+  settings page. The mark is a `<Help for=…>` term: WP-2244 put the popover on `/next`, and
+  `gui/CLAUDE.md` sends authored prose there rather than to `title=`. A click on it does not
+  select the row. `tests/test_gui_layout_browser.py` asserts that every head's ink centre lies
+  inside its values' ink; on ed0224b35's build it fails naming M₂₀ and Unindexed.
+
+  *Measured, by real clicks* (fap, 1440 × 900, light and dark; one search answer served to
+  both builds, hexagonal and monoclinic). How far each head's ink ran past its values' ink,
+  over 12 rows. Before: Unindexed 53.6 px left, Rwp (%) 19.4 px left, Grade 17.8 px right,
+  V (Å³) 5.6 px left, and Absent's dash wholly beside the head on 9 of 12 rows; 97.9 px in
+  all, 53.6 px at worst on one side. After: Unindexed 26.8 px each side, Grade 8.9 px each
+  side, every other head 0; 71.4 px in all, 26.8 px at worst. Drawn and not built: the same
+  packed table with edge-aligned heads (71.4 px, 53.6 px worst) and with units on one line
+  (96.4 px, 26.8 px worst). Every number column's integer parts end at one x within 0.02 px.
+  The table is 894 px wide in a 927 px box, against 927 px before; neither scrolls. No page
+  errors.
+
+  *Settled by Claude, for review.*
+  - The tooltip is the click-opened `<Help>` popover, not a hover tooltip. `gui/CLAUDE.md`
+    names `<Help>` as the one way the GUI explains a name. Alternative: a hover-opened one,
+    which would be a second mechanism. On the look page as question 5.
+  - The relation's text lives in a new help arm rather than in `RESULT_FIELD_HELP`, which
+    would need an entry for each of `SupercellCheck`'s thirteen fields and has no home for
+    `same_cell`.
+
+  *For Yue to look at* (`look-r6c/index.html`). 1. Centred heads (built) or edge-aligned
+  heads on the packed table (drawn). 2. Units under their names (built) or on one line
+  (drawn). 3. "Unindexed" still overhangs its counts; removing that needs a shorter name, a
+  two-line head or a wider value. 4. Grade words centred while Lattice words stay left.
+  5. Whether a click-opened explanation is enough.
+
+  *Gates* (arm64 Mac, worktree venv `[dev]` + playwright, the merged tree). The fast suite:
+  15406 passed, 438 skipped, 32 xfailed, against the fifth session's 15404 passed and 1
+  failed. The one new test is the `cell_relations` crossing, and the fifth session's
+  Series browser failure passed. vitest: 65 files, 1020 passed (one new case).
+  svelte-check: 0 errors over 497 files. ruff clean. The candidate-table browser test passed.
+
+- **2026-11-23 (fifth session)** — Yue's second-look rulings (§ Rulings, verbatim), on #1792.
+  A chosen cell's lines on the Pattern graph are now grey. The candidate table is realigned by
+  established table practice and no longer scrolls, because the workflow opens its panel at
+  952 px. The lenses and the left-out line are unchanged. The WP stays 🔄 for Yue's third look,
+  `~/.cache/ghostshift/rietx/gui-r6/look-r6b/index.html`.
+
+  *Done.* `next/pattern.ts` draws the candidate lines in `--line-strong`, read with the other
+  chrome inks (`Chrome.rule`); today's Peaks tab keeps `--plot-candidate`. `gui/STYLE.md`
+  § Plots says so. In `lib/peaks.ts`, `cellColumns` writes every angle at two places, a set
+  one too (`90.00`, muted), and drops the `pad`; `Relation` is now `{mark, of, text}`. In
+  `next/Candidates.svelte` the head is two rows: "Lengths (Å)" and "Angles (°)" span their
+  three columns over a rule, and V (Å³) and Rwp (%) carry their units. Each head is aligned
+  as its column is. The relation is two cells (the mark right-aligned, `#k` left-aligned,
+  then a 14 px gap); the absent count and "of N" are two cells. A wider gutter sits between
+  the two cell groups, before a word column and before Rwp. `lib/workflows.ts` gains
+  `Workflow.panel` and `panelWidth`: the peaks workflow opens its panel at 952 px, kept under
+  the frame less the splitter's 360 px and never below 785 px. A person's drag wins until
+  the splitter's double-click resets it.
+
+  *Measured, by real clicks* (fap, 1440 × 900, light and dark, a hexagonal and monoclinic
+  search). Before: the table was 868 px in a 760 px box and scrolled; the α head ended 25 px
+  right of its numbers, and the relation's ink ended at two x positions. After: the table's
+  natural width is 915 px and it does not scroll in a 927 px box. Every numeric column's ink
+  ends at one x on all twelve rows, and each numeric head ends at its column's x; the word
+  heads start at their column's x. No cell's ink exceeds its room (a `Range` against
+  `clientWidth` less padding). 952 px is that 915, 12 px for a "medium" grade over a "low"
+  one, the body's 24 px of padding and the panel's 1 px rule. The graph keeps 488 px at
+  1440 × 900. No page errors.
+
+  *Settled under practice.* Each source was found by one web search this session or is quoted
+  from recall, as marked.
+  - Numbers right-aligned, text left-aligned, never centred, and each head aligned as its
+    column. Sources: Matt Ström, "Design better data tables" (2017,
+    mattstromawn.com/writing/tables); the EU data-visualisation guide's table chapter
+    (data.europa.eu/apps/data-visualisation-guide/table-design-scannability); Adobe
+    Spectrum's table page (spectrum.adobe.com/page/table). Found this session.
+  - Right alignment is decimal alignment when a column's places are equal; align on the
+    point otherwise (Ubuntu's Vanilla "Header row" guidance, discourse.ubuntu.com/t/19845,
+    found this session). So every angle takes two places, a fixed one too. Equal places in a
+    column is also APA 7's table rule (recall).
+  - Tabular figures, or a monospaced face as the fallback (the same sources). The numbers
+    are already IBM Plex Mono; `font-variant-numeric: tabular-nums` is set too.
+  - Units in the column head, never in each cell, and a spanner head over a group of
+    columns with a rule beneath it: the Chicago Manual of Style's tables chapter (recall,
+    not re-read). Parentheses for the unit, "a (Å)", follow IUCr journal tables (recall).
+    `gui/STYLE.md`'s "units follow the value" is read as a rule for value boxes in forms,
+    since its exception is the sliders.
+
+  *Settled by Claude, for review.*
+  - Keeping the lenses blue and the left-out line orange. "blue lenses on orange" answers the
+    first look's question 1 with what was built. "line, not hollow lens" answers its
+    question 2, whose only line option was the built orange one. The brief read both as one
+    request for a blue line, so the look page draws three blue readings beside the built one.
+  - Opening the panel wider for this workflow only, rather than widening every workflow's
+    default. Alternative: the Bravais symbol (`hP`), about 60 px narrower, which is a naming
+    choice on the main surface and so Yue's.
+  - Two relation cells, not three: no row has both a symbol and a count.
+
+  *For Yue to look at* (`look-r6b/index.html`). 1. Is a 488 px graph acceptable beside the
+  952 px panel, or should the table narrow instead? 2. Which mark for a chosen line left out
+  of indexing: the built orange line, or one of three blue readings? 3. The two judgement
+  calls in the table: `90.00` against `90`, and the two-cell relation.
+
+  *Gates* (arm64 Mac, worktree venv `[dev]` + playwright). The fast suite: 15404 passed,
+  438 skipped, 32 xfailed, 1 failed. The failure was
+  `test_gui_series_browser.py::test_a_series_is_loaded_sorted_walked_and_run`, a typed
+  coordinate not yet saved when the sort ran; the file passed alone (1 passed), and nothing in
+  this change reaches the Series workflow's panel width or its table. The browser files this
+  touches ran inside the suite and passed. vitest: 65 files, 1019 passed. svelte-check: 0
+  errors over 497 files. ruff clean.
+
+- **2026-11-23 (fourth session)** — Yue's R6 look rulings, on the same PR, #1792. Yue looked at
+  the screenshots and ruled five things (§ Rulings, 1 to 5). The peak fit is now drawn like the
+  calculated curve, orange and solid, on the Pattern graph and in each Peaks window. A chosen
+  line left out of indexing is marked by a thin solid line, not a dotted one. The candidate
+  table shows the cell as six columns, a, b, c, α, β, γ, and a related row says so in a compact
+  column on its own line (`≡ #1`) instead of a line under the cell. Adopt in Judge now lands a
+  Pawley start. The green candidate lines are unchanged: Yue asked for alternatives, which are
+  drawn below. The WP stays 🔄 for Yue's look at them.
+
+  *Done.* The branch took `main` first (WP-2242's `{#key opens}` around the workflow's panes;
+  the Frame now also forgets the chosen cell's lines and the Fit step's windows on an open).
+  Ruling 1: `next/pattern.ts` draws the groups' fit in `--plot-calc`, solid, at the calculated
+  curve's width, and their residual in `--plot-diff`; `next/PeakFits.svelte` draws each
+  window's fit in `--plot-calc`; `gui/STYLE.md` § Plots and interaction rule 5 say so. Rulings 3
+  and 4: `cellColumns` and a `Relation` (mark and sentence) in `lib/peaks.ts`, and the table in
+  `next/Candidates.svelte`. Ruling 5: `POST /api/index/adopt` takes `mode` (`lebail`, the
+  default, or `pawley`; anything else is refused), `/next` sends `pawley`, and the button reads
+  "Adopt as a Pawley start". The candidate check has been a Pawley fit since WP-2011
+  (`indexing.workflow.VALIDATION_MODE`), so Judge's heading now names the mode the check ran
+  ("Pawley check") and More settings says "Check the best cells by a Pawley fit". Every
+  screenshot in `docs/wp/2240-screenshots/` that shows the Pattern graph is retaken zoomed to
+  20-40° 2θ (Yue's addition), with a full-range Pick picture beside it.
+
+  *Checked by real clicks* (fap example, 1440 × 900, light and dark, `r6l_probe.py` in the runner's scratch). The
+  candidate table's header reads #, a blank relation column, a, b, c, α, β, γ, Lattice, V, M₂₀,
+  Unindexed, Absent, Rwp, Grade. Row 1 reads 9.3744 9.3744 6.8875 90 90 120 trigonal P, with
+  the tied b and the three set angles muted. Nine rows carry a relation (`≡` four times, `2×`
+  twice, `3×` three times), each with its sentence in the tooltip. Every row is 28 px, one
+  line. Judge's button reads "Adopt as a Pawley start". Apply moved the project's mode from
+  `rietveld` to `pawley`, and a fit then ran in 0.7 s and returned a `pawley` result. Every
+  zoom read 19.9-39.8° off the status bar after the drag. No page errors.
+
+  *Measured.* The same Pawley start fitted through the API converged in 6 stages at Rwp
+  8.10 %. The six-column table is 868 px wide against the Index step's 760 px at 1440 × 900,
+  so it now scrolls in its own box (question 5). Gates, on an arm64 Mac in the worktree venv:
+  the fast suite 15362 passed, 438 skipped, 32 xfailed; vitest 62 files, 999 passed;
+  svelte-check 0 errors over 491 files; the browser files this touches (layout, console,
+  switch) 55 passed; CI's lint steps all exit 0 (Vale 0 errors, 281 warnings).
+
+  *Settled by Claude.* Each is small and visible in the screenshots.
+  - The lens marks stay blue. Yue's words name the line ("the same token as the regular fit
+    line"), `gui/STYLE.md` § Plots rules the marks blue (Yue 2026-11-09), and the prototype
+    draws an orange fit under blue lenses. Question 1 shows the other reading.
+  - The groups' own residual, drawn before a fit, takes `--plot-diff`, the regular residual's
+    token, as its fit now takes the regular fit's. Alternative: keep `--plot-peakfit` there.
+  - The relation marks: `≡ #1` for the same cell under another lattice label, `2× #1` for a
+    supercell with twice the volume, `⊇ #1` for a cell indexing every line #1 does. The
+    column sits after #, so a row reads "2 ≡ #1". The sentence is the mark's tooltip
+    (`title=`). `gui/CLAUDE.md` keeps `title=` off authored prose and sends it to `<Help>`, but
+    `/next` mounts no help popover, so a `<Help>` term there opens nothing (found below).
+  - A value the crystal system sets is muted. A set angle is written whole (`90`, `120`) and
+    keeps the column's decimal alignment by empty room, so a copied row reads `90`. A tied
+    length keeps its four places. Angles take two places, which saves a column's width.
+    Alternative: `= a` in the tied column.
+  - The adopt route keeps `lebail` as its default, so today's Peaks tab is unchanged.
+
+  *For Yue to look at.* The look page is `~/.cache/ghostshift/rietx/gui-r6/look-index/index.html`,
+  every picture zoomed to 20-40° 2θ first.
+  1. The lens marks' colour. Built: blue lenses over the orange fit. Drawn beside it: orange
+     lenses too, a reading of ruling 1 that covers the marks.
+  2. The mark for a chosen line left out of indexing (ruling 1 drops the dotted line). Built:
+     a thin solid orange line through the pattern. Drawn beside it: a hollow orange lens at the
+     line's crest with the chosen ring, and a hollow blue lens, which is how the Peaks windows
+     already draw an unused line (round 11 call 34).
+  3. A chosen cell's lines (ruling 2, not chosen). Four are drawn: (a) today's green
+     full-height lines; (b) a row of tick lenses under the pattern in the observed points'
+     neutral ink, as the prototype draws "#n"; (c) full-height lines in the strong rule's grey
+     (`--line-strong`); (d) the tick row of (b) in the candidate green. (b) and (d) are a
+     probe-only mock: the row's "#n" label and the prototype's "Ticks of #n" title are left out.
+  4. Structure-free defaults outside the workflow, left as they are (ruling 5 names the
+     workflow):
+     - New project's typed cell gives Le Bail (`lib/wizard.ts` `modeFor`, today's page).
+     - `POST /api/index/adopt` defaults to `lebail` when no mode is sent (today's Peaks tab).
+     - The extinction screen's cell-only prefit is a Le Bail `profile_only` fit
+       (`indexing/extinction.py`).
+     - The report's `lebail_gap` comparison forces Le Bail (`report/layer0.py`).
+     - The agent skill calls Le Bail with `profile_only` the fit "for a cell without a trusted
+       structure" (`docs/skill/rietx/SKILL.md`).
+     - The candidate check is a Pawley fit already, but its function is still named
+       `validate_by_lebail`, and `IndexValidation.mode` reads `lebail` for an old record.
+  5. The candidate table at the default width (rulings 3 and 4). Built: it scrolls sideways in
+     its own box, so Rwp and Grade sit past the edge until scrolled. Other ways: the lattice as
+     its Bravais symbol (`hP`, `mP`), about 60 px; a wider default right pane; or Unindexed and
+     Absent moved to Judge.
+
+  *Found, not fixed.* `/next` mounts no help popover (`HELP_CONTEXT` is set only in
+  `App.svelte`), so every `<Help>` term there opens nothing: a refutation, the FOM blind spots,
+  the peak notes' flags and a held parameter's reason. It belongs to the rebuild's shell.
+
+- **2026-11-23 (third session)** — third PR, #1792: tasks 6 to 9. The four steps of the
+  workflow now work at `/next`. Fit peaks lists the overlap groups and draws their windows in
+  the Peaks graph, each with its lines' own curves and a Refit. Index holds the search form,
+  shows the search while it runs, says what it did not cover, and lists the cells; a row's
+  click draws that cell's lines on the Pattern graph. Judge shows one cell's evidence, screens
+  its extinctions, offers the class's space groups, and adopts the cell as a Le Bail start
+  once Apply is pressed. Apply hands the window to the Refinement workflow. The WP stays 🔄
+  until Yue has looked at the screens (§ For Yue to look at, below).
+
+  *Done.* Task 6: `next/PeakFits.svelte` (the windows, ported from #1526's drawing) and the
+  Fit step in `next/Indexing.svelte`. Tasks 7 and 8: `next/Candidates.svelte` holds both
+  steps, with `coverageLine` and `limitWord` in `lib/peaks.ts`; `next/Pattern.svelte` takes a
+  `candidate` overlay drawn by the existing candidate layer. Task 9: a browser pass over Fit,
+  Index and Judge by real clicks
+  (`test_the_fit_index_and_judge_steps_run_to_an_adopted_cell`), the screenshots below, the
+  inventory below, and the lens marks' line in `gui/CLAUDE.md` § Plot. Bytes for that line
+  came out of the file's intro and its node bullet, so the file stays under its budget.
+  The line leaves the look (filled for a used line, none for an unused one, larger and ringed
+  in the text ink when chosen) to `gui/STYLE.md` § Plots, which the file's intro points at. The
+  test the last review named is in: a peak edit typed into the `.rxt` document is one undo
+  step (`test_a_peak_edit_typed_in_the_rxt_is_one_undo_step`).
+
+  *Measured* (`[dev]` venv plus playwright, darwin/arm64). Fast suite `-m "not slow"`,
+  through the machine queue: 15 359 passed, 438 skipped, 32 xfailed, which is the last
+  entry's 15 357 plus this session's two tests. They take 10.29 s (the browser pass, whose
+  index runs on cubic alone) and 0.11 s. vitest 61 files, 993 passed; svelte-check 0 errors,
+  0 warnings over 490 files. The GUI python files and the two rulebook files: 373 passed.
+  Browser files run by hand, since CI runs none: `test_gui_layout_browser.py` and
+  `test_gui_console_browser.py`, 53 passed before the review fixes, and the layout file
+  again inside the fast suite on the reviewed tree. CI's lint and PR-delta steps exit 0.
+  Vale: 0 errors, 281 warnings, none on lines this PR wrote. `gui/CLAUDE.md` is 44 969
+  bytes against its 44 972 budget.
+
+  *Settled by Claude under the prototype (the 2026-11-11 ruling) and `gui/STYLE.md`.*
+  - χ²ᵣ is not coloured above 10, under STYLE.md's rule that no number is judged by colour.
+    The prototype draws it red.
+  - The window's fit curve is drawn in `--plot-peakfit`. The prototype draws it orange, which
+    is the calculated curve's colour.
+  - More settings holds the real controls from #1526's form. The prototype shows them as
+    text.
+  - A refuted class stays clickable, as in the prototype. Its refuting lines sit behind a
+    help popover on "refuted", so each class row is one line, as the prototype draws it.
+  - The candidate table carries no "rietx's pick" mark. The gate's pick is said beside Adopt
+    in the Judge step.
+  - Crystal systems, engines and centrings are toggle buttons, as in the prototype.
+  - Search these is left out. § Non-goals says why.
+
+  *Review.* `/code-review high --fix` found ten issues. Fixed: a row chosen in Index left an
+  earlier Adopt pending, so Apply could adopt another cell than the one Judge showed; a new
+  extinction screen left a pending Adopt on the old group; a streamed frame without an
+  elapsed time restarted the run clock; a hidden line curve came back after a Refit. Its fix
+  for the last one hid both lines of a pair 0.0007° apart, a pair the fluorapatite list has,
+  so the match is now to the nearest line, with a test that fails on the reviewer's version.
+  Two cleanups were also applied. The coverage line read the form's systems, so a form edited
+  after a run changed what the line said about it. It now keeps the systems the run was
+  started with, and falls back to the form only after a reload. Declined: ⌘Z still undoes peak
+  edits on the Index and Judge steps, since the workflow's undo covers every step; the
+  coverage sentence keeps its own "2-minute" adjective form; a hover redraws all six windows,
+  a small cost. A browser look also found and fixed a missing space after each comma in the
+  notes and caveats.
+
+  *For Yue to look at.* Screenshots at 1440 × 900, light and dark, in
+  `docs/wp/2240-screenshots/` (its README says how they were taken). Each `gui-*` picture has a
+  `prototype-*` partner at the same step. Four differences are worth a look.
+  1. A chosen cell's lines. The build draws them full height over the data, under the
+     written rule in `gui/CLAUDE.md` § Plot (WP-1211). The prototype draws them as a "#n" row
+     in the tick band, titles the graph "Ticks of #n", and marks absent and unexplained
+     lines in red. On the fluorapatite pattern the full-height lines cover most of the plot
+     (`gui-3-index-*.png`). The rule wins until Yue says otherwise. The red marks need the
+     Le Bail check's absent lines as tick indices, which § Inherited keeps out of R6.
+  2. Caveat and engine names. The build shows the code's words ("fom panel disagrees",
+     "trial_error"). The prototype has written words ("figures of merit disagree", "trial
+     and error"). Written words need a `rietx.help` arm, since names are described there and
+     nowhere else.
+  3. Search these, left out as § Non-goals says.
+  4. The χ²ᵣ colour and the fit curve's colour, settled above.
+
+  *Inventory: where each feature of today's Peaks tab lives at `/next`.*
+  - Pick peaks and the picker's settings: the Pick step, its foot and its Settings.
+  - "N of M lines usable": the Pick step's filter counts (All, Used, Not used).
+  - The σ-assumed chip: none. `PEAK_SIGMA_ASSUMED` reaches the Index step's notes after a
+    search.
+  - The picker's notes: "Notes from the picker" in the Pick step.
+  - A line's zoom button: a click on its row frames it, and Show all undoes the frame.
+  - Origin and flag chips: the Note column's words.
+  - The use tickbox: the same tickbox.
+  - A group's ↻ refit: the window's Refit in the Peaks graph, in the Fit step.
+  - A line's ×: Option-click, the right-click menu, or the line's bar.
+  - Add by click, move by drag, exclude by shift-click: the Pattern graph's gestures (rules 1
+    to 12). Exclusion is "Leave out of the search" in the menu, or the tickbox.
+  - The group windows: the Peaks graph tab while the Fit step is up.
+  - Index and its form: the Index step. Its short form holds the systems, the largest volume
+    and the time limit. More settings holds the rest.
+  - The run's progress and streamed shortlists: "Searching" with each system's state and the
+    cells found so far.
+  - What the search covered: the line above the candidates.
+  - The run's notes: "Notes from the search".
+  - A candidate's ▸ (caveats, ambiguity, lines through the data): a row's click draws the
+    lines; the Judge step shows the rest.
+  - The `best_or_none()` chip and a row's `why`: beside Adopt in the Judge step.
+  - The engines that found a cell: "Found by" in the Judge step.
+  - Adopt on each row: Adopt in the Judge step, pending until Apply.
+  - The extinction screen and its per-group adopt: the Judge step's Space group table and
+    its "Adopt in" choice.
+
+  *Gotchas.* Svelte trims the space from a bare `, ` text node inside a block, so a list
+  joined with `{#if i}, {/if}` reads "a,b". Write the separator as `{", "}`. A synthetic LaB₆
+  index with only cubic on takes seconds; the full quick search on fluorapatite takes its two
+  minutes.
+
+  *Next.* Yue's look at the screenshots, then any change it asks for. The swap (WP-2214
+  § The swap) retires today's Peaks tab and moves the `gui/CLAUDE.md` § Peaks lines that
+  describe it.
 
 - **2026-11-23 (second session)** — second PR, #1791: task 5 and the dotted-mark ruling. The
   Pattern graph is now the peak list's editing surface while the workflow is up. A person can

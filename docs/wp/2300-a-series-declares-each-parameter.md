@@ -1,8 +1,8 @@
 # WP-2300 — A series declares each parameter, and refuses what it cannot honour
 
 Milestone: series · Status: ⬜
-Depends on: —
-Priority: P3 2026-11-22 — a feature the series milestone was opened for (P2), down a rung: its first task is the maintainer's ruling on the declaration's vocabulary; back to P2 when ruled
+Depends on: 2305 (the joint call's names, written once before the declaration reaches it)
+Priority: P2 2026-11-23 — a feature the series milestone was opened for; the vocabulary and names are ruled, so it is ready to build
 
 ## Goal
 
@@ -51,22 +51,55 @@ Two acceptance rows of the milestone land here:
 - So the two calls name the same idea differently today, and the series call has no
   argument for it at all.
 
-**Open for the maintainer: the declaration's vocabulary.** This names something on the
-top-level API, where the field has no standard term. A session does not pick it. Candidates
-seen so far, each with what it costs:
+**Ruled: one declaration object for both calls** (the maintainer, 2026-11-23, "(d) one
+object", choosing among a `hold=[globs]` argument (b), a grown `SharingMap`, and this). One
+object names the four kinds by glob: per pattern, common, fixed and equation. The series call
+and the joint call both take it. The series call raises on a common or equation declaration
+and names the joint call, which the milestone's approved acceptance row needs (2026-11-18):
+under (b) the series call would carry arguments that exist only to raise. The joint call's
+`SharingMap` is replaced by the object rather than kept beside it, since rietx's users are few
+and in direct contact. Settled by Claude with the brief, and open to the maintainer's
+reversal:
 
-- Reuse `SharingMap` on the series call. Its two fields are `per_histogram` and `shared`. It
-  has no field for a fixed value or an equation, so it would grow two, and "histogram" is the
-  joint fit's word.
-- Reuse the `hold` verb. A `hold=[globs]` argument on `fit` and `refine_sequential` reads as
-  today's `ref.hold`, and covers the fixed kind only. The refusal then needs a second
-  argument, or the joint call's `SharingMap` passed in and refused.
-- A new declaration object naming the four kinds, shared by both calls, which the joint call's
-  `SharingMap` would then sit beside or be replaced by (a rename the joint call's users see).
+- A parameter left undeclared keeps each call's default today: per pattern in a series, and
+  in the joint call shared except `instrument.*` and `.scale`. One default for both would
+  change the joint call's default for every user.
+- "Fixed" takes its value from the models passed in, as `hold` does. The object carries globs
+  only.
+- The stand-in mistake (a fixed declaration meant as a common value) runs in silence under
+  any shape. Series rule 2 names it as the observation that reopens the two-call ruling, and
+  DESIGN Rule 4 does not reach it, since the call can honour what was written.
 
-Questions that go with the vocabulary: whether the declaration is one object used by both
-calls; whether "fixed" takes the value from the models passed in or from the declaration
-itself; and what the refusal's message says (reader output, so it is checked blind in the PR).
+**The names** (chosen 2026-11-23 against DESIGN Rules 4 and 5, at the maintainer's request:
+"check against our rules and choose the best option"):
+
+```python
+rx.refine_multi(patterns, s, insts,
+                declare=rx.Declaration(per_pattern=["phases.*.scale"],
+                                       shared=["phases.0.cell.*"],
+                                       held=["instrument.*"],
+                                       parametric=[rx.ParametricEquation(...)]))
+```
+
+- `shared` and `parametric` keep the joint call's words for the same jobs (Rule 5, convention):
+  `SharingMap.shared`, and `refine_multi(parametric=...)`. "Parametric" is also the
+  literature's word (Stinton & Evans 2007). The literature's term for a shared parameter is
+  "global", which Python reserves, and TOPAS's `local` is one program's keyword (Rule 5,
+  conflicts).
+- `per_pattern` replaces `per_histogram`. "Histogram" is GSAS's word, and both calls take
+  `PatternData`. The joint call's `hist.N.` dot-path scope becomes `pattern.N.` (the
+  maintainer, 2026-11-23, "Rename, with refusal"), built in WP-2305. No stored file holds these paths, since
+  a joint fit keeps no history or project. A path or glob that still starts with `hist.`
+  raises and names `pattern.`, because an old plan glob would otherwise match nothing in
+  silence (DESIGN Rule 4). WP-2305 also renames the joint call `refine_joint` and
+  `JointRefinement`, so the calls below are written in its names once it lands.
+- `held`, not `fixed`: the kind is built on the hold (WP-1435), and its record already says
+  held (`Entry.held`, `SeriesEntry.held_values`, `held_because`). A field named `fixed` would
+  read as `vary=False`, which a plan overrides. That is the likeliest misuse (Rule 4), and
+  this WP inherits it.
+- `Declaration` and `declare=`: no existing name covers four kinds, and `SharingMap` would
+  call a held parameter and an equation shared. Series rule 1's accepted text says each
+  parameter "is declared", and no public name uses the word.
 
 **Practice** (`docs/practice.md` § Sequential refinement). GSAS-II, FullProf, TOPAS and
 EasyDiffraction keep the fixed flag on the parameter and honour it on every pattern of a
@@ -85,18 +118,51 @@ preset bundles this WP's declarations, rule 4); WP-2103 (a joint fit starting fr
 result, rule 2's other half); WP-1325 and WP-1964 (equations on the joint call); WP-1435 (the
 hold); WP-1441 (`constrain`).
 
+### Inherited
+
+- **2026-11-23, from WP-2081's close: a fixed value's own error reaches every pattern, and
+  the series has no row for it (issue #1556 § 5).** The reporter ran a synthetic LaB₆ ramp,
+  7 patterns × 150 noise replicates, holding zero and profile from pattern 1 on at pattern
+  0's fitted values. Free on every pattern, the cell's pull std is 0.79-0.93 and neighbouring
+  patterns' errors correlate at −0.09 to 0.04. Held, the pull std is 2.30-2.43 and the
+  correlation 0.85-0.90, so each cell esd is about 2.4× too small and a series mean's about
+  5.5× too small. Not rerun. Rule 2 answers the common case: a value common to all patterns
+  goes to the joint call, and the milestone's acceptance row "a common parameter gives honest
+  esds" is built on these numbers. The fixed kind this WP builds still carries a caller's
+  value whose error no esd includes. The reporter's candidate is a per-pattern score
+  statistic for each fixed parameter, a row with no threshold, which series rule 5 (a field,
+  never a code) would admit. Nobody has ruled on it. Decide it with the fixed kind's record.
+- **2026-11-23, from WP-2081's close: `docs/docs/reference/series.md` sits 13 characters
+  under the manual's 50 000-character page cap** (`tests/test_manual.py`). The next row added
+  there splits the page or fails the test, and this WP's manual task adds rows.
+
+- **2026-11-23, from the API review (WP-2302's batch, `2302-batch/plans.md`).** The trap this
+  WP's vocabulary settles reaches a single fit too. On the NAC example (`f9adf0e57`),
+  `Refinement.set_vary("instrument.zero_shift", False)` and then `fit()` refines zero shift
+  again, with no warning and no diagnostic, because a plan starts every fit from nothing free
+  (WP-1208). DESIGN Rule 4 now says a literal the call cannot honour raises before any work,
+  and Rule 5 that a convention letting the likeliest mistake pass in silence is found wrong
+  (both amended 2026-11-23). Three fixes were weighed and none taken outside this WP: a
+  diagnostic when a plan re-frees a path the caller fixed (withdrawn: it needs state outside
+  the models, and no `set_vary` node is recorded before the first fit); making
+  `set_vary(..., False)` a hold (changes the verb for every user); splitting the verb into two
+  named verbs (renames the top-level surface). Measure first which calls still read a vary
+  flag a caller set before a fit, then decide alongside the declaration's vocabulary.
+
 ## Non-goals
 
-- The common and equation kinds on the joint call: they exist there (`SharingMap`,
-  `ParametricEquation`). Whether that call adopts the new vocabulary is part of the
-  vocabulary ruling, and building it is this WP only if the ruling says so.
+- New behaviour for the common and equation kinds on the joint call: they exist there
+  (`SharingMap`, `ParametricEquation`). This WP changes only how the joint call is told
+  (ruled 2026-11-23).
 - A start from a series result (WP-2103).
 - The preset and the documentation route (WP-2301).
 
 ## Tasks
 
-- [ ] The maintainer's ruling on the vocabulary (§ Context, "Open for the maintainer"),
-      recorded here with his words.
+- [x] The maintainer's ruling on the vocabulary's shape (§ Context, "Ruled"), recorded with
+      his words.
+- [x] The names for the object, its argument and its four fields (§ Context, "The names").
+- [ ] The joint call takes the object in place of `SharingMap`.
 - [ ] The declaration on `SequentialRefinement.fit` and `refine_sequential`: per pattern
       (the default) and fixed, the fixed kind held on every pattern and every rung.
 - [ ] The refusal: a common or equation declaration raises before the first fit, naming the
@@ -134,3 +200,32 @@ hold); WP-1441 (`constrain`).
   vocabulary), so they are one WP. Facts above checked on `f590981ab`.
 
   *Next:* put the vocabulary question to the maintainer.
+
+- **2026-11-23** — the maintainer ruled the declaration's shape: one object for both calls
+  ("(d) one object"). Recorded in § Context with the three calls settled alongside it. Read
+  first: DESIGN Rule 4's misuse test (amended 2026-11-23) does not decide the shape, since it
+  reaches only literals and patterns a call cannot honour; series.md § Acceptance's refusal row
+  does. Facts checked on `bacb7d58b`.
+
+  *Next:* the maintainer's names, then the build.
+
+- **2026-11-23** — names chosen at the maintainer's request, against DESIGN Rules 4 and 5:
+  `rx.Declaration(per_pattern=, shared=, held=, parametric=)`, taken as `declare=` by both
+  calls. Grounds in § Context. The alternative weighed was `rx.Sharing(..., shared=,
+  parametric=)` under `sharing=`, the smaller rename for joint-fit users; it names two of the
+  four kinds wrongly.
+
+  *Next:* the build (the tasks below the names).
+
+- **2026-11-23** — the maintainer ruled the joint fit's `hist.N.` scope renamed `pattern.N.`,
+  with the old prefix refused ("Rename, with refusal"). An earlier note here said the rename
+  would change a stored format; it was wrong, since a joint fit stores none. Whether
+  `MultiHistogramRefinement` is renamed too is still open for the maintainer.
+
+  *Next:* the build.
+
+- **2026-11-23** — the `hist.` rename task moved to WP-2305, filed the same day with the
+  joint call's other renames (`refine_joint`, `JointRefinement`, "pattern" in prose), which the
+  maintainer handed to Claude ("you make the calls"). This WP now depends on it.
+
+  *Next:* WP-2305's build, then this one.

@@ -163,7 +163,7 @@ describe("the workflow menu", () => {
     flushSync();
     const items = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]')];
     expect(items.map((b) => b.textContent!.trim())).toEqual([
-      "Refinement", "Peaks and indexing", "Series · not built yet",
+      "Refinement", "Peaks and indexing", "Series",
       "Structure solution · not built yet", "Rigid bodies · not built yet"]);
     expect(items[0].getAttribute("aria-checked")).toBe("true");
     items[3].click();
@@ -208,7 +208,7 @@ describe("the palette and the keys", () => {
     expect(labels).toEqual(expect.arrayContaining([
       "Hide the graphs", "Hide the model", "Show the console", "Stop the run",
       "New project…", "Settings…", "Theme: Match system", "Keyboard shortcuts",
-      "Workflow: Series · not built yet"]));
+      "Workflow: Series"]));
     const console_ = [...document.querySelectorAll(".panel li")]
       .find((li) => li.querySelector(".label")!.textContent === "Show the console")!;
     expect(console_.querySelector("kbd")!.textContent).toMatch(/J$/);

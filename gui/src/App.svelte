@@ -16,7 +16,7 @@
    * `ProjectDoc.ui`, whose keys the frontend owns (WP-1005): it is a property of
    * the project a user comes back to, not of this browser tab.
    */
-  import { onMount, setContext, untrack } from "svelte";
+  import { onMount, untrack } from "svelte";
 
   import { ApiError, api } from "./api";
   import Help from "./Help.svelte";
@@ -44,12 +44,8 @@
   import { RecoveryWriter, combine, readDraft, restoredText, type Draft } from "./lib/recovery";
   import Stubs from "./panels/Stubs.svelte";
   import Text from "./panels/Text.svelte";
-  import {
-    HELP_CONTEXT,
-    type HelpOpener,
-    type HelpRequest,
-  } from "./lib/helpContext";
-  import { manualUrl, place, resolve, splitKey, type HelpCorpus } from "./lib/help";
+  import HelpPopover, { provideHelp } from "./HelpPopover.svelte";
+  import type { HelpCorpus } from "./lib/help";
   import { isShortcutTarget, type Command } from "./lib/palette";
   import { cellText, type PeaksPayload } from "./lib/peaks";
   import { consoleLine, follow, type EngineEvent, type RunState } from "./lib/stream";
@@ -1107,12 +1103,6 @@
       }
       return;
     }
-    // help first: Esc means "close the thing that just opened", and cancelling
-    // a run because a popover was open is not recoverable by pressing it again
-    if (event.key === "Escape" && helpRequest) {
-      closeHelp(true);
-      return;
-    }
     if (event.key === "Escape" && busy) {
       cancel();
       return;
@@ -1125,134 +1115,15 @@
     }
   }
 
-  /* ---- the help popover (WP-1203) -------------------------------------
-   *
-   * One instance for the whole app, anchored to whichever `<Help>` term was
-   * last activated.  One rather than one-per-term because two open
-   * explanations is a state nobody asked for, and because the popover has to
-   * escape every panel's `overflow: auto` — it is `position: fixed` in
-   * viewport coordinates, which is exactly what `getBoundingClientRect`
-   * returns and what `lib/help.ts:place` consumes.
-   *
-   * The size is *measured* rather than declared: the flip decision needs the
-   * rendered height, and a max-width in CSS plus a paragraph of prose is not a
-   * height anything here could compute.  The effect that measures runs after
-   * the DOM update and before the browser paints, so the correction is not a
-   * frame the eye can see; under jsdom every measurement is zero, which is why
-   * the arithmetic is tested in `lib/help.test.ts` and not here. */
-  let helpNode = $state<HTMLElement | null>(null);
-  let helpRequest = $state<HelpRequest | null>(null);
-  let helpAnchor = $state<DOMRect | null>(null);
-  let popoverEl = $state<HTMLElement | null>(null);
-  let popoverSize = $state({ width: 0, height: 0 });
-  let viewport = $state({ width: 1024, height: 768 });
-
-  const helpEntry = $derived(
-    helpRequest?.key ? resolve(corpus, helpRequest.key) : null);
-  const helpLink = $derived(manualUrl(corpus, helpEntry));
-  const helpTitle = $derived(
-    helpEntry?.title ?? helpRequest?.title ?? helpRequest?.key ?? "");
-  const helpBody = $derived(helpEntry?.description ?? helpRequest?.text ?? "");
-  /** the name behind a labelled term: a chip says `at bound`, and the flag it
-   *  stands for is `position_at_bound`, which nothing else on screen shows
-   *  (WP-1209) — so the popover carries it, and only where a label hid it:
-   *  `excluded` labelled `excluded` hid nothing */
-  const helpCode = $derived.by(() => {
-    const name = helpRequest?.key ? splitKey(helpRequest.key)?.name ?? null : null;
-    return helpEntry?.label && name && helpEntry.label !== name ? name : null;
-  });
-  const placement = $derived(helpAnchor
-    ? place(helpAnchor, viewport, popoverSize)
-    : { left: 0, top: 0, flipped: false });
-
-  /** `refocus` is the caller's claim (Esc); holding focus is the popover's own.
-   *
-   *  A click away must not steal focus back from whatever was clicked, so the
-   *  second test is `contains(activeElement)` rather than "was open": the only
-   *  time closing owes the term its focus is when the popover had it, which
-   *  since the popover takes focus on open is every keyboard route out. */
-  function closeHelp(refocus = false) {
-    const held = popoverEl?.contains(document.activeElement) === true;
-    if (refocus || held) helpNode?.focus({ preventScroll: true });
-    helpNode = null;
-    helpRequest = null;
-    helpAnchor = null;
-    popoverSize = { width: 0, height: 0 };
-    focusedFor = null;
-  }
-
-  setContext<HelpOpener>(HELP_CONTEXT, {
-    isOpen: (node) => helpNode === node,
-    toggle(node, request) {
-      if (helpNode === node) {
-        closeHelp();
-        return;
-      }
-      helpNode = node;
-      helpRequest = request;
-      helpAnchor = node.getBoundingClientRect();
-      popoverSize = { width: 0, height: 0 };
-    },
-  });
-
-  $effect(() => {
-    if (!popoverEl || !helpRequest) return;
-    // the *rendered* body, not only the request: what `place` flips on is the
-    // height, and the height is whatever is drawn.  Today that is the same
-    // thing — `onMount` awaits `api.help()` before `loadProject`, so no term
-    // exists until the corpus has landed or failed, and holding `/api/help`
-    // for 15 s in a browser produced no term to click.  Declared here, that
-    // boot order stops being load-bearing: a corpus arriving late would grow
-    // the body under a height measured from "Not described yet.", and this
-    // effect would re-measure rather than leaving `place` a stale number.
-    void [helpTitle, helpBody, helpEntry, helpLink];
-    const width = popoverEl.offsetWidth;
-    const height = popoverEl.offsetHeight;
-    if (width !== popoverSize.width || height !== popoverSize.height) {
-      popoverSize = { width, height };
-    }
-  });
-
-  /* The popover takes focus, because it is a `role="dialog"` and a dialog
-   * nobody is in announces nothing: Tab from an activated term went to the next
-   * input in the row, leaving the popover open behind the cursor and its
-   * `in the manual →` link reachable only by tabbing the whole app.  Esc and a
-   * second activation hand focus back to the term (`closeHelp`).
-   *
-   * `preventScroll` is load-bearing rather than tidy — `onscrollcapture` closes
-   * the popover, so a focus that scrolled anything would close what it just
-   * opened.  `focusedFor` is a plain `let`, not `$state`: it must not be a
-   * dependency of the effect that writes it. */
-  let focusedFor: HTMLElement | null = null;
-  $effect(() => {
-    if (!popoverEl || !helpNode) return;
-    if (focusedFor === helpNode) return;
-    focusedFor = helpNode;
-    popoverEl.focus({ preventScroll: true });
-  });
-
-  // A resize or a scroll moves the anchor out from under the popover, and
-  // there is nothing useful to do about it: re-measuring would chase a term
-  // that may have left the screen entirely.  Closing is honest and costs one
-  // click.
-  function reanchor() {
-    viewport = { width: window.innerWidth, height: window.innerHeight };
-    if (helpRequest) closeHelp();
-  }
-
-  /** A click outside the popover and its own term closes it. */
-  function clickAway(event: MouseEvent) {
-    if (!helpRequest) return;
-    const target = event.target as Node | null;
-    if (target && (popoverEl?.contains(target) || helpNode?.contains(target))) return;
-    closeHelp();
-  }
+  /* The help popover (WP-1203, WP-2244): one for the page, opened by every
+   * `<Help>` term below. It takes Esc ahead of this page's keydown, so the Esc
+   * that closes it never cancels a run. */
+  const help = provideHelp();
 
   // "system" has to keep meaning system: a machine that switches at dusk must
   // take the app with it, which is only true if the query is *listened* to
   // rather than read once at boot
   onMount(() => {
-    viewport = { width: window.innerWidth, height: window.innerHeight };
     const query = window.matchMedia?.("(prefers-color-scheme: dark)");
     if (!query) return;
     systemDark = query.matches;
@@ -1360,8 +1231,7 @@
     onrefine={() => refine()} />
 {/snippet}
 
-<svelte:window onkeydown={keydown} onclick={clickAway} onresize={reanchor}
-  onscrollcapture={reanchor} onpagehide={pageHidden} bind:innerWidth={windowWidth} />
+<svelte:window onkeydown={keydown} onpagehide={pageHidden} bind:innerWidth={windowWidth} />
 
 {#if offer}
   <Recovery draft={offer.draft} savedUtc={offer.savedUtc} moved={offer.moved}
@@ -1672,43 +1542,8 @@
 
 <!-- The app's one help popover (WP-1203).  It lives here, outside every panel,
      because `position: fixed` inside a scrolling column would still be clipped
-     by an ancestor that establishes a containing block, and because two open
-     explanations is a state nobody asked for. -->
-{#if helpRequest}
-  <!-- `data-flipped` is the only way to tell a flip from a clamp that landed on
-       the same pixel — a popover taller than the viewport is clamped to the top
-       margin, which is exactly where flipping it would also put it — so it is
-       what a browser pass reads to check the rule (WP-1203). -->
-  <div class="popover" bind:this={popoverEl} role="dialog" aria-label={helpTitle}
-       tabindex="-1" data-flipped={placement.flipped}
-       style="left: {placement.left}px; top: {placement.top}px">
-    <h2>{helpTitle}</h2>
-    {#if helpBody}
-      <p>{helpBody}</p>
-    {:else}
-      <!-- a key that resolves to nothing.  Saying so is the honest empty
-           state: the corpus is where a description is owed, and inventing one
-           here would put a wrong sentence under a real name. -->
-      <p class="muted">Not described yet.</p>
-    {/if}
-    {#if helpEntry && (helpEntry.unit || helpEntry.default || helpEntry.typical
-                       || helpEntry.modes?.length || helpCode)}
-      <dl>
-        {#if helpCode}<dt>Name</dt><dd class="mono">{helpCode}</dd>{/if}
-        {#if helpEntry.unit}<dt>Unit</dt><dd>{helpEntry.unit}</dd>{/if}
-        {#if helpEntry.default}<dt>Default</dt><dd class="mono">{helpEntry.default}</dd>{/if}
-        {#if helpEntry.modes?.length}
-          <dt>Modes</dt><dd class="mono">{helpEntry.modes.join(", ")}</dd>
-        {/if}
-        {#if helpEntry.typical}<dt>Typical</dt><dd>{helpEntry.typical}</dd>{/if}
-      </dl>
-    {/if}
-    {#if helpLink}
-      <a class="link" href={helpLink} target="_blank" rel="noreferrer noopener"
-        >in the manual →</a>
-    {/if}
-  </div>
-{/if}
+     by an ancestor that establishes a containing block. -->
+<HelpPopover host={help} {corpus} />
 
 <style>
   /* wraps rather than pushing a control off the window's edge — the tab strip's

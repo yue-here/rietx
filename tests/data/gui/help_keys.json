@@ -8,12 +8,16 @@
   "peak_flags",
   "diagnostics",
   "peak_origins",
+  "cell_relations",
   "reader_options",
   "instrument_fields",
   "search_fields",
   "result_fields"
  ],
  "keys": [
+  "cell_relations:containment",
+  "cell_relations:same_cell",
+  "cell_relations:sublattice",
   "diagnostics:ABSORPTION_ESTIMATE_UNAVAILABLE",
   "diagnostics:ABSORPTION_MU_R_OUT_OF_RANGE",
   "diagnostics:ABSORPTION_PLATE_THICKNESS",
