@@ -295,6 +295,48 @@ function axes(spec, gutter) {
   return [x, y];
 }
 
+/** Each pane's last answer from `drawsData`, with what it was computed from. */
+const viewed = new WeakMap();
+
+/**
+ * Whether pane `u` draws a value in view: a shown series holding a finite
+ * value between the channels in view. uPlot ranges a pane that draws none
+ * over 0 to 100, so the difference pane before a fit read 100 and 0 under
+ * the intensity's labels (WP-2245). The answer is kept until the view, the
+ * data or a series' visibility moves, since an axis asks three times a draw.
+ */
+function drawsData(u) {
+  const n = u.data[0]?.length ?? 0, idxs = u.series[0].idxs;
+  const i0 = idxs?.length ? idxs[0] : 0, i1 = idxs?.length ? idxs[1] : n - 1;
+  const key = [i0, i1, ...u.series.slice(1).map((s, k) => (s.show ? u.data[k + 1] : null))];
+  const last = viewed.get(u);
+  if (last && last.key.length === key.length && last.key.every((v, k) => v === key[k])) return last.value;
+  let value = false;
+  for (let k = 2; k < key.length && !value; k++) {
+    const d = key[k];
+    if (!d) continue;
+    for (let i = i0; i <= i1; i++) if (Number.isFinite(d[i])) { value = true; break; }
+  }
+  viewed.set(u, { key, value });
+  return value;
+}
+
+/**
+ * The y axis `y`, labelling nothing while its pane draws no value in view:
+ * no labels, no tick marks and no gridlines, since the range they would mark
+ * is uPlot's fallback rather than the data's. `uPlot` supplies the default
+ * labels of an axis that sets none, a log axis's.
+ */
+function quietWhenEmpty(uPlot, y) {
+  const values = y.values ?? ((u, s) => s.map((v) => (v == null ? "" : uPlot.fmtNum(v))));
+  const all = (u, s) => s;
+  const keep = (filter) => (u, s, ...rest) => (drawsData(u) ? filter(u, s, ...rest) : s.map(() => null));
+  return { ...y,
+           values: (u, s, ...rest) => (drawsData(u) ? values(u, s, ...rest) : s.map(() => "")),
+           ticks: { ...y.ticks, filter: keep(y.ticks?.filter ?? all) },
+           grid: { ...y.grid, filter: keep(y.grid?.filter ?? all) } };
+}
+
 /**
  * Panes stacked in `host`, sharing one x.
  *
@@ -314,6 +356,9 @@ function axes(spec, gutter) {
  * - `hooks`, merged into uPlot's.
  *
  * `series` and `data` leave out the x, which the group supplies.
+ *
+ * A pane with labels that draws no value in view prints no y labels, tick
+ * marks or gridlines (`quietWhenEmpty`).
  *
  * The group answers the gestures every page shares:
  *
@@ -423,7 +468,7 @@ export function panes(uPlot, host, spec) {
       width: copy ? copy.width : host.clientWidth, height: copy ? copy.height : heights()[key], legend: { show: false },
       scales: { x: copy ? { time: false, range: () => [copy.scales.x.min, copy.scales.x.max] } : { time: false },
                 y: yScale(uPlot, p.y ?? "lin", copy ? () => view : () => pins[key] ?? null, p.range, p.auto) },
-      axes: axes(p, gutter),
+      axes: ((ax) => (p.range || p.yLabels === false ? ax : [ax[0], quietWhenEmpty(uPlot, ax[1])]))(axes(p, gutter)),
       // A band has no y labels for uPlot's automatic top padding to make room
       // for, and that padding took 17 px of a one-phase band's 22.
       ...(p.yLabels === false ? { padding: [0, null, null, null] } : {}),
@@ -993,6 +1038,9 @@ export function pattern(uPlot, host, curves, spec) {
   const drawTicks = (u) => tickRows(u, state.c.ticks, spec.colors(), (phase) => state.hidden.has(`ticks:${phase}`));
 
   function drawZero(u) {
+    // a pane that draws nothing has uPlot's 0 to 100 for a range, and a zero
+    // line there sits on its foot for no reason the data gives (WP-2245)
+    if (!drawsData(u)) return;
     if (state.residual !== "cumulative") zeroLine(u, spec.colors().zero);
   }
 
@@ -1357,9 +1405,13 @@ export function trajectory(uPlot, host, traj, spec) {
   const none = () => ({ stroke: null, fill: null, clip: null, band: null, gaps: null, flags: 0 });
   const group = panes(uPlot, host, {
     x: xs,
+    // the backward chain rides as a second series, painting nothing too, so
+    // an axis asking whether the pane draws a value in view (`drawsData`) sees
+    // a stretch only the backward pass recovered
     panes: [{ key: "traj", share: 1, xLabels: true, xLabel: spec.xLabel ?? "", label: spec.yLabel ?? "",
-              auto: extent, series: [{ paths: none, points: { show: false } }],
-              data: [Array.from(order, (i) => value(i))], hooks: { draw: [draw] } }],
+              auto: extent, series: [{ paths: none, points: { show: false } }, { paths: none, points: { show: false } }],
+              data: [Array.from(order, (i) => value(i)), Array.from(order, (i) => back(i))],
+              hooks: { draw: [draw] } }],
   });
 
   group.onPoint = null;
@@ -1398,6 +1450,192 @@ export function trajectory(uPlot, host, traj, spec) {
       rows.push(t.backward ? [i, t.x[i], value(i), esd(i), back(i)] : [i, t.x[i], value(i), esd(i)]);
     }
     return { names: ["pattern", "x", "value", "esd", ...(t.backward ? ["backward"] : [])], rows };
+  };
+
+  return group;
+}
+
+// ---------------------------------------------------------------- the trace
+
+/** The glyphs a trace can draw for a series verdict, as `marks` names them. */
+const TRACE_GLYPHS = ["bar", "cross", "ring", "tick"];
+
+/**
+ * A series on the experiment's own axis, for scrubbing (WP-1317): the series
+ * coordinate against the pattern index, a row of glyphs over each pattern a
+ * verdict names, a bar per pattern for its own findings, the band of one
+ * step, and the cursor at the pattern on show.
+ *
+ * `data`:
+ *
+ * - `index`, ascending: every pattern's place in the chain.
+ * - `y`: each pattern's coordinate, null where it has none, or null for a
+ *   series on its index alone, whose trace is then the marks over a bare axis.
+ * - `marks`: per pattern, the glyphs to draw, each one of "bar", "cross",
+ *   "ring" and "tick", stacked down from the top in that order.
+ * - `findings`: per pattern, a count, drawn as a bar up from the bottom whose
+ *   height is its share of the largest count.
+ *
+ * `spec`:
+ *
+ * - `colors()`: `{ line, warn, muted, cursor }`, read at every draw.
+ * - `at`: the index on show, or null. `step`: `[i0, i1]` shaded, or null.
+ * - `xLabel`, `yLabel`: the axis titles.
+ *
+ * **A drag scrubs, and never zooms**: a press and every move after it call
+ * `onScrub(i)` with the pattern nearest the pointer, once per pattern
+ * crossed. The press is taken in the capture phase, as alt-drag's is, so
+ * uPlot never starts a select. The wheel and alt-drag still zoom and pan, and
+ * a double click resets.
+ *
+ * The figure is the pane group (`panes`) with `setAt`, `setStep`, `onScrub`
+ * and `onPoint`, which is called with `{ i, left, top }` for the pattern under
+ * the pointer, `i` its position in `index`, or with null.
+ */
+export function trace(uPlot, host, data, spec) {
+  const n = data.index.length, xs = Float64Array.from(data.index);
+  const y = (i) => (data.y ? finite(data.y[i]) : null);
+  const most = Math.max(1, ...data.findings);
+  const state = { at: spec.at ?? null, step: spec.step ?? null };
+
+  function extent() {
+    let min = Infinity, max = -Infinity;
+    for (let i = 0; i < n; i++) {
+      const v = y(i);
+      if (v != null) { min = Math.min(min, v); max = Math.max(max, v); }
+    }
+    return Number.isFinite(min) ? uPlot.rangeNum(min, max, 0.1, true) : [0, 1];
+  }
+
+  function draw(u) {
+    const c = spec.colors(), r = devicePixelRatio, { ctx } = u, { left, top, width, height } = u.bbox;
+    const X = (i) => u.valToPos(xs[i], "x", true);
+    const wide = n > 1 ? Math.abs(X(1) - X(0)) : width;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(left, top, width, height);
+    ctx.clip();
+    ctx.setLineDash([]);
+    if (state.step) {
+      const a = u.valToPos(state.step[0], "x", true), b = u.valToPos(state.step[1], "x", true);
+      ctx.globalAlpha = 0.16;
+      ctx.fillStyle = c.line;
+      ctx.fillRect(Math.min(a, b), top, Math.max(Math.abs(b - a), 2 * r), height);
+      ctx.globalAlpha = 1;
+    }
+    // the findings, up from the bottom, at most a third of the pane
+    ctx.fillStyle = c.muted;
+    const bar = Math.max(r, Math.min(6 * r, 0.6 * wide));
+    for (let i = 0; i < n; i++) {
+      const k = data.findings[i];
+      if (!k) continue;
+      const h = (k / most) * height / 3;
+      ctx.fillRect(X(i) - bar / 2, top + height - h, bar, h);
+    }
+    if (data.y) {
+      ctx.strokeStyle = c.line;
+      ctx.lineWidth = 1.4 * r;
+      ctx.beginPath();
+      let open = false;
+      for (let i = 0; i < n; i++) {
+        const v = y(i);
+        if (v == null) { open = false; continue; }
+        const Y = u.valToPos(v, "y", true);
+        if (open) ctx.lineTo(X(i), Y); else ctx.moveTo(X(i), Y);
+        open = true;
+      }
+      ctx.stroke();
+    }
+    // the verdicts, stacked down from the top in glyph order
+    ctx.strokeStyle = c.warn;
+    ctx.fillStyle = c.warn;
+    const d = 4 * r, gap = 11 * r;
+    for (let i = 0; i < n; i++) {
+      const glyphs = TRACE_GLYPHS.filter((g) => data.marks[i]?.includes(g));
+      glyphs.forEach((g, k) => {
+        const cx = X(i), cy = top + 7 * r + k * gap;
+        ctx.lineWidth = 1.6 * r;
+        ctx.beginPath();
+        if (g === "bar") {
+          ctx.globalAlpha = 0.35;
+          ctx.fillRect(cx - bar / 2, top, bar, height);
+          ctx.globalAlpha = 1;
+          return;
+        }
+        if (g === "ring") ctx.arc(cx, cy, d, 0, 2 * Math.PI);
+        else if (g === "cross") {
+          ctx.moveTo(cx - d, cy - d); ctx.lineTo(cx + d, cy + d); ctx.moveTo(cx - d, cy + d); ctx.lineTo(cx + d, cy - d);
+        } else { ctx.moveTo(cx, cy - d); ctx.lineTo(cx, cy + d); }
+        ctx.stroke();
+      });
+    }
+    if (state.at != null) {
+      const at = u.valToPos(state.at, "x", true);
+      ctx.strokeStyle = c.cursor;
+      ctx.lineWidth = 1.5 * r;
+      ctx.beginPath();
+      ctx.moveTo(at, top);
+      ctx.lineTo(at, top + height);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  const none = () => ({ stroke: null, fill: null, clip: null, band: null, gaps: null, flags: 0 });
+  const group = panes(uPlot, host, {
+    x: xs,
+    panes: [{ key: "trace", share: 1, xLabels: true, xLabel: spec.xLabel ?? "", label: spec.yLabel ?? "",
+              auto: extent, series: [{ paths: none, points: { show: false } }],
+              data: [Array.from({ length: n }, (_, i) => y(i))], hooks: { draw: [draw] } }],
+  });
+  const u = group.panes.trace;
+
+  group.onScrub = null;
+  group.onPoint = null;
+  /** The pattern nearest a pointer `clientX`, as its position in `index`. */
+  const under = (clientX) => {
+    const v = u.posToVal(clientX - u.over.getBoundingClientRect().left, "x");
+    return nearest(xs, v, (w) => w, Infinity);
+  };
+  u.root.addEventListener("mousedown", (e) => {
+    if (e.altKey || e.button !== 0) return;
+    if (!u.over.contains(e.target)) return;
+    e.stopPropagation();
+    e.preventDefault();
+    // the default a press would have done, and preventDefault cancels: a
+    // focusable host takes focus, so the keys step on from where the drag ended
+    if (host.tabIndex >= 0) host.focus({ preventScroll: true });
+    let last = -1;
+    const scrub = (ev) => {
+      const i = under(ev.clientX);
+      if (i >= 0 && i !== last) { last = i; group.onScrub?.(i); }
+    };
+    const up = () => { removeEventListener("mousemove", scrub); removeEventListener("mouseup", up); };
+    addEventListener("mousemove", scrub);
+    addEventListener("mouseup", up);
+    scrub(e);
+  }, true);
+
+  group.onCursor = (hit) => {
+    if (!group.onPoint) return;
+    if (!hit) { group.onPoint(null); return; }
+    const i = nearest(xs, hit.x, (w) => u.valToPos(w, "x"), Infinity);
+    const v = y(i);
+    group.onPoint({ i, left: u.valToPos(xs[i], "x"), top: v == null ? hit.top : u.valToPos(v, "y") });
+  };
+
+  /** Put the cursor on pattern `at` (an `index` value), or take it off with null. */
+  group.setAt = (at) => { state.at = at; u.redraw(false, true); };
+  /** Shade the step between two patterns, or none. */
+  group.setStep = (step) => { state.step = step; u.redraw(false, true); };
+
+  /** Every pattern in view: its index, its coordinate and its findings count. */
+  group.table = () => {
+    const { min, max } = u.scales.x, rows = [];
+    for (let i = 0; i < n; i++) {
+      if (xs[i] >= min && xs[i] <= max) rows.push([xs[i], y(i), data.findings[i]]);
+    }
+    return { names: ["pattern", "x", "findings"], rows };
   };
 
   return group;

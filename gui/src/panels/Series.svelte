@@ -39,6 +39,7 @@
   import {
     asRequest,
     axisTitle,
+    largestStep,
     esdText,
     gapLine,
     memberLegend,
@@ -46,19 +47,23 @@
     pointText,
     rankTrajectories,
     rejectedBecause,
-    reseededFlags,
     sortByX,
     stepCells,
     stepRows,
+    stepTo,
     topGapPath,
+    traceData,
+    traceKey,
+    traceText,
     trajectoryLegend,
+    trajectoryMarks,
     trajectoryNote,
-    unrecoveredFlags,
     type LegendEntry,
     type SeriesEntry,
     type SeriesPattern,
     type SeriesSetup,
     type SeriesStep,
+    type Trace,
     type Trajectory,
   } from "../lib/series";
   import type { RunState } from "../lib/stream";
@@ -124,6 +129,16 @@
       ?? trajectories[0] ?? null);
   const shownSteps = $derived(
     stepRows(allSteps, stepScope === "path" ? current?.path ?? "" : null));
+  /** the series on its own axis, with its marks (WP-1317, `series.trace`) */
+  const trace = $derived<Trace | null>(answer?.trace ?? null);
+  /** the trace position of the pattern on show, or null on the trajectory */
+  const tracePos = $derived.by(() => {
+    if (!trace || selectedPattern === null) return null;
+    const at = entries[selectedPattern]?.index;
+    const pos = trace.points.findIndex((p) => p.index === at);
+    return pos < 0 ? null : pos;
+  });
+  const keyRows = $derived(trace ? traceKey(trace, current?.path ?? null) : []);
   const running = $derived(busy && run?.run?.kind === "series");
   const settings = $derived(setup?.settings ?? null);
   const canRun = $derived(!busy && patterns.length >= 2);
@@ -177,6 +192,7 @@
   }
 
   async function loadAnswer() {
+    scrubNote = "";
     try {
       answer = await api.seriesResult();
       if (!selectedPath && answer.trajectories?.length) {
@@ -302,13 +318,21 @@
 
   /** Walk into one pattern: its own history tree, and the plot follows. */
   async function openPattern(index: number) {
-    if (selectedPattern === index) {
+    scrubNote = "";
+    // a scrub selects a pattern without its history: that row opens, not closes
+    if (selectedPattern === index && memberHistory) {
       selectedPattern = null;
       memberHistory = null;
       draw();
       return;
     }
     selectedPattern = index;
+    draw();
+    await openHistory(index);
+  }
+
+  /** One pattern's own history tree, the drill-down a scrub leaves one click away. */
+  async function openHistory(index: number) {
     failure = "";
     try {
       memberHistory = await api.seriesHistory(index);
@@ -318,13 +342,57 @@
       memberHistory = null;
       failure = (error as Error).message;
     }
+  }
+
+  /** What the trace says when the pattern under a scrub cannot be shown. */
+  let scrubNote = $state("");
+
+  /**
+   * Scrub to the pattern at trace position `pos` (WP-1317): the plot below
+   * becomes that pattern's own fit, the reader's zoom kept (`draw`), and
+   * nothing else is fetched — the history tree stays a click away, so a drag
+   * across forty patterns costs forty curve fetches at most and each only once.
+   */
+  function scrubTo(pos: number) {
+    const p = trace?.points[pos];
+    if (!p) return;
+    const k = entries.findIndex((e) => e.index === p.index);
+    if (k < 0 || !answer?.curves?.[k]) {
+      scrubNote = `${p.label}: ${p.status === "failed" ? "no fit" : "no curves"} to show`;
+      return;
+    }
+    scrubNote = "";
+    if (selectedPattern === k) return;
+    selectedPattern = k;
+    memberHistory = null;
     draw();
+  }
+
+  function traceKeys(event: KeyboardEvent) {
+    if (!trace) return;
+    const last = trace.points.length - 1;
+    const dir = { ArrowLeft: -1, ArrowRight: 1, Home: 1, End: -1 }[event.key];
+    if (dir === undefined) return;
+    event.preventDefault();
+    let to = event.key === "Home" ? 0 : event.key === "End" ? last
+      : stepTo(trace, tracePos, dir);
+    // a key steps over a pattern with nothing to show, where a drag shows the note
+    while (to >= 0 && to <= last && !showable(to)) to += dir;
+    if (to >= 0 && to <= last) scrubTo(to);
+  }
+
+  /** Whether trace position `pos` has a fit with curves this session holds. */
+  function showable(pos: number): boolean {
+    const p = trace?.points[pos];
+    const k = p ? entries.findIndex((e) => e.index === p.index) : -1;
+    return k >= 0 && !!answer?.curves?.[k];
   }
 
   function showTrajectory(path: string) {
     selectedPath = path;
     selectedPattern = null;
     memberHistory = null;
+    scrubNote = "";
     draw();
   }
 
@@ -346,13 +414,34 @@
   /** Each draw takes a ticket, and one that has been overtaken builds nothing. */
   let drawing = 0;
 
-  onDestroy(() => fig?.destroy());
+  /** The trace's figure (WP-1317), its host, and the pattern under the pointer. */
+  let traceFig: any = null;
+  let traceNode = $state<HTMLDivElement | undefined>();
+  let traceTip = $state<{ text: string; left: number; top: number } | null>(null);
+  let traceFrom: any = null;
+  let tracing = 0;
+
+  /**
+   * Each member's curves, fetched once per answer. A scrub crosses a pattern
+   * many times, and a member's curves cannot change without a new answer
+   * replacing the whole series (`session.series_curves`), so a second look
+   * is free and the only server cost of scrubbing is each pattern's first fetch.
+   */
+  let curveCache = new Map<number, Promise<any>>();
+  let cacheFor: any = null;
+  /** whether the member on show has σ from its file, for the residual's title */
+  let memberWeighted = false;
+  /** Which figure `fig` is, so a scrub can update a member's in place. */
+  let figKind: "member" | "trajectory" | null = null;
+
+  onDestroy(() => { fig?.destroy(); traceFig?.destroy(); });
 
   /** The inks, read when a figure is built and when the theme moves, never per paint. */
   function readColors() {
     const style = getComputedStyle(document.documentElement);
     const read = (name: string) => style.getPropertyValue(name);
-    return { ...curveColors(read), warn: read("--warn").trim() || "#7d5f00" };
+    return { ...curveColors(read), warn: read("--warn").trim() || "#7d5f00",
+             fg: read("--fg").trim() || "#222222" };
   }
   let colors = readColors();
 
@@ -366,6 +455,20 @@
     if (active && answer !== drawnFrom) draw();
   });
 
+  // …and a new trace
+  $effect(() => {
+    void traceNode;
+    if (active && answer !== traceFrom) drawTrace();
+  });
+
+  // the cursor follows the pattern on show, and the band the parameter on show
+  $effect(() => {
+    const at = tracePos === null ? null : trace?.points[tracePos]?.index ?? null;
+    const step = trace ? largestStep(trace, current?.path ?? null) : null;
+    traceFig?.setAt(at);
+    traceFig?.setStep(step);
+  });
+
   /** A canvas keeps the colours it was painted with, so a theme click
    *  repaints (WP-1029 q). One microtask first: the shell stamps the theme in
    *  an effect of the same flush (gui/CLAUDE.md). */
@@ -374,12 +477,56 @@
     Promise.resolve().then(() => {
       colors = readColors();
       fig?.redraw();
+      traceFig?.redraw();
     });
   });
 
   function toggle(id: string) {
     hidden = toggleCurve(hidden, id);
     fig?.setHidden(hidden);
+  }
+
+  /** The trace: the coordinate against the index, and the marks the answer serves. */
+  async function drawTrace() {
+    if (!traceNode || !answer || !trace) return;
+    const ticket = ++tracing;
+    const chart = await import("../lib/seriesChart");
+    if (ticket !== tracing || !traceNode || !trace) return;
+    traceFrom = answer;
+    traceFig?.destroy();
+    traceTip = null;
+    const t = trace;
+    traceFig = chart.mountTrace(traceNode, traceData(t) as any, {
+      colors: () => ({ line: colors.diff, warn: colors.warn, muted: colors.edge,
+                       cursor: colors.fg }),
+      at: tracePos === null ? null : t.points[tracePos]?.index ?? null,
+      step: largestStep(t, current?.path ?? null),
+      xLabel: "pattern",
+      yLabel: t.points.some((p) => p.x !== null) ? t.x_label : "",
+    });
+    traceFig.onScrub = (pos: number) => scrubTo(pos);
+    traceFig.onPoint = (hit: any) => {
+      if (!hit || !traceNode) { traceTip = null; return; }
+      const over = traceFig.panes.trace.over.getBoundingClientRect();
+      const box = traceNode.getBoundingClientRect();
+      traceTip = { text: traceText(t, hit.i),
+                   left: over.left - box.left + hit.left, top: over.top - box.top + hit.top };
+    };
+  }
+
+  /** One member's curves, from the cache when this answer has fetched them.
+   *  The *request* is kept, not its answer, so a drag that crosses a pattern
+   *  again before its first fetch lands waits on that fetch rather than
+   *  starting a second; a fetch that fails leaves the cache, to be retried. */
+  function memberCurves(chart: any, index: number): Promise<any> {
+    if (cacheFor !== answer) { curveCache = new Map(); cacheFor = answer; }
+    const held = curveCache.get(index);
+    if (held) return held;
+    const cache = curveCache;
+    const pending = api.seriesCurves(index).then((packed: any) => chart.unpack(packed));
+    cache.set(index, pending);
+    pending.catch(() => { if (cache.get(index) === pending) cache.delete(index); });
+    return pending;
   }
 
   async function draw() {
@@ -390,42 +537,62 @@
     const index = selectedPattern;
     if (index !== null) {
       try {
-        curves = chart.unpack(await api.seriesCurves(index));
+        curves = await memberCurves(chart, index);
       } catch (error) {
         failure = (error as Error).message;
         return;
       }
     }
     if (ticket !== drawing || !plotNode) return;
-    drawnFrom = answer;
-    fig?.destroy();
-    fig = null;
-    tip = null;
-    hidden = [];
-    colors = readColors();
     if (index !== null) {
       const { arrays, header } = curves;
-      legend = memberLegend(arrays.kept.length < arrays.two_theta.length,
-                            "y_background" in arrays);
+      const masked = arrays.kept.length < arrays.two_theta.length;
+      const background = "y_background" in arrays;
+      // A scrub from one member to the next keeps the figure, and with it the
+      // reader's zoom and hidden curves: watching a peak split across the
+      // series is the point, and a rebuilt figure would reset the view at
+      // every step (`rxplot.pattern`'s `setCurves(…, keep)`).
+      // read by the axis title at every paint: one member's σ can be measured
+      // and the next one's Poisson, and a kept figure must say which is drawn
+      memberWeighted = Boolean(header.weighted);
+      if (fig && figKind === "member" && drawnFrom === answer) {
+        tip = null;
+        legend = memberLegend(masked, background);
+        fig.setCurves(curves, true);
+        return;
+      }
+      drawnFrom = answer;
+      fig?.destroy();
+      tip = null;
+      hidden = [];
+      colors = readColors();
+      legend = memberLegend(masked, background);
+      figKind = "member";
       fig = chart.mountMember(plotNode, curves, {
         colors: () => ({ ...colors, masked: colors.edge }),
         residual: "weighted",
         labels: { y: () => "counts",
-                  resid: () => (header.weighted ? "Δ/σ" : "Δ/σ (Poisson)") },
+                  resid: () => (memberWeighted ? "Δ/σ" : "Δ/σ (Poisson)") },
       });
       return;
     }
+    drawnFrom = answer;
+    fig?.destroy();
+    fig = null;
+    figKind = null;
+    tip = null;
+    hidden = [];
+    colors = readColors();
     if (!current) return;
     const traj = current;
-    const reseeded = reseededFlags(traj, entries);
-    const unrecovered = unrecoveredFlags(traj, entries, rejected);
-    legend = trajectoryLegend(traj, reseeded, unrecovered);
+    const marks = trajectoryMarks(traj, trace, entries, rejected);
+    legend = trajectoryLegend(traj, marks, trace);
+    figKind = "trajectory";
     fig = chart.mountTrajectory(plotNode, traj, {
       // a refined value is data, so it wears the observed ink; the difference
       // grey is the backward chain's `--muted` on the light theme (WP-2200)
       colors: () => ({ tone: colors.obs, warn: colors.warn, muted: colors.edge }),
-      rings: reseeded,
-      crosses: unrecovered,
+      ...marks,
       xLabel: traj.x_label,
       yLabel: axisTitle(traj),
     });
@@ -614,10 +781,34 @@ plot's x-axis title, and the column above">
   {/if}
 
   {#if answer}
+    {#if trace}
+      <!-- the series on the experiment's own axis, scrubbed by dragging
+           (WP-1317); every mark is the answer's, served with its vocabulary -->
+      <h2>Trace</h2>
+      <div class="plotbox">
+        <div class="trace" bind:this={traceNode} role="slider" tabindex="0"
+          aria-label="the pattern on show — drag along the trace, or use the arrow keys"
+          aria-valuemin={0} aria-valuemax={trace.points.length - 1}
+          aria-valuenow={tracePos ?? 0}
+          aria-valuetext={tracePos === null ? "the trajectory" : traceText(trace, tracePos)}
+          onkeydown={traceKeys}></div>
+        {#if traceTip}
+          <div class="tip" style:left={`${traceTip.left}px`} style:top={`${traceTip.top}px`}>{traceTip.text}</div>
+        {/if}
+      </div>
+      {#if keyRows.length}
+        <ul class="key">
+          {#each keyRows as row (row.key)}
+            <li title={`${row.means} (${row.source})`}><i class={row.mark}></i>{row.label}</li>
+          {/each}
+        </ul>
+      {/if}
+      {#if scrubNote}<p class="muted">{scrubNote}</p>{/if}
+    {/if}
     <h2>
       {selectedPattern === null
         ? `Trajectory — ${current?.path ?? ""}`
-        : `Pattern ${selectedPattern} — ${entries[selectedPattern]?.label ?? ""}`}
+        : `Pattern ${entries[selectedPattern]?.index ?? selectedPattern} — ${entries[selectedPattern]?.label ?? ""}`}
     </h2>
     <!-- every control above the plot, WP-1015's shape for every panel here -->
     <div class="controls">
@@ -641,6 +832,11 @@ plot's x-axis title, and the column above">
       {#if selectedPattern !== null}
         <button class="ghost" onclick={() => showTrajectory(current?.path ?? "")}
           title="back to the trajectory across the series">Show trajectory</button>
+        {#if !memberHistory}
+          <button class="ghost" disabled={busy}
+            onclick={() => selectedPattern !== null && openHistory(selectedPattern)}
+            title="this pattern's own history tree, read-only">History</button>
+        {/if}
       {/if}
     </div>
     {#if selectedPattern === null && current}
@@ -779,7 +975,7 @@ different starting point could not fix">hard</span>
                 <button class="ghost" disabled={busy || !answer.curves[i]}
                   title="this pattern's own fit and its own history tree"
                   onclick={() => openPattern(i)}>
-                  {selectedPattern === i ? "▾" : "▸"}
+                  {selectedPattern === i && memberHistory ? "▾" : "▸"}
                 </button>
               </td>
             </tr>
@@ -997,6 +1193,82 @@ different starting point could not fix">hard</span>
     background:
       linear-gradient(45deg, transparent 43%, var(--ink) 43% 57%, transparent 57%),
       linear-gradient(-45deg, transparent 43%, var(--ink) 43% 57%, transparent 57%);
+  }
+
+  /* The trace's host: short, because it is a map of the series and the plot
+     under it is the view; the panes are sized from this box. */
+  .trace {
+    height: 128px;
+    overflow: hidden;
+  }
+
+  /* on the plot area, where a press scrubs, never on the axis margins
+     (gui/CLAUDE.md: an armed gesture says so under the pointer) */
+  .trace :global(.u-over) {
+    cursor: col-resize;
+  }
+
+  .trace:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  /* the key under the trace, each mark as the figure draws it, in its ink */
+  .key {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 12px;
+    font-size: var(--text-sm);
+    color: var(--muted);
+    flex: 0 0 auto;
+  }
+
+  .key i {
+    --ink: var(--warn);
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 5px;
+    width: 10px;
+    height: 10px;
+  }
+
+  .key i.ring {
+    width: 8px;
+    height: 8px;
+    border: 1.5px solid var(--ink);
+    border-radius: 50%;
+  }
+
+  .key i.cross {
+    background:
+      linear-gradient(45deg, transparent 43%, var(--ink) 43% 57%, transparent 57%),
+      linear-gradient(-45deg, transparent 43%, var(--ink) 43% 57%, transparent 57%);
+  }
+
+  .key i.bar {
+    width: 6px;
+    background: var(--ink);
+    opacity: 0.35;
+  }
+
+  .key i.tick {
+    width: 0;
+    border-left: 1.5px solid var(--ink);
+  }
+
+  .key i.count {
+    width: 6px;
+    background: var(--muted);
+    clip-path: inset(40% 0 0 0);
+  }
+
+  .key i.band {
+    width: 14px;
+    background: var(--plot-diff);
+    opacity: 0.25;
   }
 
   /* the point under the pointer, a DOM label over the canvas: pointing paints no curve */

@@ -404,7 +404,8 @@ def render(project) -> str:
         lines.extend(["", *_render_block(
             header.ljust(34) + f"# {note}" if note else header,
             f"phases.{index}.", rows, phase)])
-    lines.extend(["", *_render_block("instrument", "instrument.", rows, None)])
+    lines.extend(["", *_render_block("instrument", "instrument.", rows,
+                                     ref.instrument)])
     peaks = _render_peaks(project)
     if peaks:
         lines.extend(["", *peaks])
@@ -521,7 +522,7 @@ def _render_block(header: str, prefix: str, all_rows, phase) -> list[str]:
         body = f"  {local.ljust(path_width)} {mark} {_fmt(row.value).rjust(value_width)}"
         annotations = _render_annotations(row)
         line = f"{body}  {annotations}" if annotations else body
-        comment = _atom_comment(phase, local)
+        comment = _atom_comment(phase, local) or _equation_comment(phase, local)
         return_width = 12 + path_width + value_width + 44
         lines.append(line.rstrip() if not comment
                      else f"{line.ljust(return_width)}# {comment}")
@@ -563,6 +564,21 @@ def _phase_comment(phase) -> str:
                 f" · Laue {facts['laue_class']}")
     return (f"{facts['xhm']} · No. {facts['number']} · {facts['crystal_system']}"
             f" · Laue {facts['laue_class']}")
+
+
+def _equation_comment(owner, local: str) -> str:
+    """``# lor_fwhm = w*tan(theta)`` on a peak-equation coefficient row
+    (WP-2107): the equation the number belongs to.  Rendered, never editable,
+    like the space group on a phase header: the ``.rxt`` surface is
+    parameters and settings, and the comment mechanism keeps the grammar and
+    :data:`FORMAT_VERSION` as they were."""
+    if owner is None or not local.startswith("peak_equations."):
+        return ""
+    try:
+        eq = owner.peak_equations[int(local.split(".")[1])]
+    except (AttributeError, IndexError, ValueError):
+        return ""
+    return f"{eq.target} = {eq.expression}"
 
 
 def _atom_comment(phase, local: str) -> str:
@@ -1315,20 +1331,20 @@ def apply(project, delta: Delta, peak_editor=None) -> list[str]:
                 if "preset" in delta.plan
                 else PlanSpec.model_validate(delta.plan["plan"]))
         project.doc.plan = spec
-        calls.append("project.doc.plan = PlanSpec(…"
+        calls.append("p.doc.plan = rx.PlanSpec(…"
                      f"{len(spec.stages)} stage(s))")
     settings = delta.settings
     if "mode" in settings:
         project.doc.mode = settings["mode"]
-        calls.append(f"project.doc.mode = {settings['mode']!r}")
+        calls.append(f"p.doc.mode = {settings['mode']!r}")
     if "two_theta_limits" in settings:
         limits = settings["two_theta_limits"]
         project.doc.two_theta_limits = None if limits is None else tuple(limits)
-        calls.append(f"project.doc.two_theta_limits = {limits!r}")
+        calls.append(f"p.doc.two_theta_limits = {limits!r}")
     if "excluded_regions" in settings:
         regions = [tuple(r) for r in settings["excluded_regions"]]
         project.set_excluded_regions(regions)
-        calls.append(f"project.set_excluded_regions({regions!r})")
+        calls.append(f"p.set_excluded_regions({regions!r})")
     if settings or delta.plan is not None:
         project.save()  # settings persist on the verb, not on a Save button
     calls.extend(_apply_peaks(project, delta, peak_editor))
