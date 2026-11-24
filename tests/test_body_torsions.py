@@ -550,3 +550,27 @@ def test_a_zero_length_axis_is_refused_by_the_torsions_name():
     block(chained, [(0, 1, [2]), (2, 3, [0])], angles=(0.0, 0.0))       # builds at φ₀ = 0
     with pytest.raises(ValueError, match="'flap' has a zero-length axis"):
         block(chained, [(0, 1, [2]), (2, 3, [0])], angles=(90.0, 0.0))
+
+
+def test_a_fit_that_turns_a_torsion_under_anti_bump_warns_on_both_paths():
+    """WP-2144 (#1507): the biphenyl with an anti-bump list between molecules,
+    its twist freed.  ``fit`` and ``run_stage`` each say the body's own
+    contacts are not checked; the list has no row inside one copy of it."""
+    from rietx.model.restraints import anti_bump_restraints
+
+    code = "RESTRAINT_BODY_CONTACTS_UNCHECKED"
+    pattern = _synthesize(_structure(30.0))
+    twist = Stage("twist", ["phases.*.rigid_bodies.*.torsions.*.twist"], max_iter=10)
+
+    def listed() -> Structure:
+        s = _structure(0.0)
+        s.phases[0].restraints = anti_bump_restraints(s.phases[0], {("C", "C"): 3.0})
+        assert s.phases[0].restraints
+        return s
+
+    fitted = Refinement(listed(), INS, history=False).fit(
+        pattern, plan=RefinementPlan(stages=[twist]))
+    (d,) = [d for d in fitted.diagnostics if d.code == code]
+    assert "rigid body 'bp'" in d.message and "twist 0.0° →" in d.message
+    staged = Refinement(listed(), INS, history=False).run_stage(pattern, twist)
+    assert [d.code for d in staged.diagnostics].count(code) == 1

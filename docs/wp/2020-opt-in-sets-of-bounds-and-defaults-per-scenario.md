@@ -1,6 +1,6 @@
 # WP-2020 — Opt-in sets of bounds and defaults for a scenario, tested on the datasets they name
 
-Milestone: generality · Status: 🔄 2026-11-15 — survey, inventory and design brief landed (PR #1574); the build waits on the maintainer's ruling
+Milestone: generality · Status: 🔄 2026-11-22 — parked by the maintainer: the scenario-set file reopens when a WP-2017 demotion leaves a limit or a starting value with nowhere to go; the instrument-profile record reopens on a result whose calibration source mattered and could not be traced, or a user asking for it
 Track: The registry and the guard
 Depends on: —
 Priority: P2 2026-10-21 — the maintainer's concept, raised while declining a default backstop in WP-2002; it gives a demoted default somewhere to go other than away
@@ -134,7 +134,110 @@ datasets it was tested on.
 - `docs/wp/2002-batch/rulings.md` § Sixth round's answers (the maintainer's words).
 - `docs/milestones/generality.md` § The rule (tiers and demotion).
 
+## Rulings
+
+From the rulings triage of 2026-11-21, which checked the 2026-11-15 brief against the design
+rules. Items 3 and 4 were answered on 2026-11-22.
+
+Answered 2026-11-22 under the maintainer's routing rules of that day (WP-2238): each item was
+settled by Claude and checked by a fresh agent that did not see the pick, or brought to the
+maintainer, who answered "All as recommended".
+
+1. *The "tested on" line in each plan preset's help text* (half of the brief's option B) is
+   dropped. Settled by Claude under DESIGN.md § Rules, 2 (ruled 2026-10-27 and 2026-11-01),
+   2026-11-21: no surface an agent reads while choosing carries a validation verdict, and the
+   help entries are on that list. The alternative was to add the line.
+2. *`strain_cap` and `size_cap` stay package defaults* (the brief's consent line). Settled by
+   Claude under `generality.md` § The rule, 2026-11-21: both rows are tier 1 in `_audit.py`,
+   a tier-1 row is kept, and only a tier-3 row needs the maintainer's approval. The
+   alternative was to move them into a series set.
+3. *Park the scenario-set file* (the brief's option C) until a WP-2017 demotion leaves a limit
+   or a starting value with nowhere to go, under DESIGN.md Rule 5 (nothing is built before a
+   case needs it). It is the maintainer's own concept. **Ruled by Yue 2026-11-22:** parked, as
+   proposed; it reopens when a WP-2017 demotion leaves a limit or a starting value with
+   nowhere to go.
+4. *Record which instrument profile file a result was fitted under, or park the WP.* The
+   brief is in the 2026-11-21 handover entry. **Ruled by Yue 2026-11-22:** park WP-2020
+   (recommendation A), as recommended. It reopens on a result whose calibration source
+   mattered and could not be traced, or a user asking for it.
+
 ## Handover log
+
+- **2026-11-21** — A rulings triage, docs only (PR #1759). It
+  read the 2026-11-15 brief against the design rules and settled what a rule settles. One
+  half of that brief's lean is ruled out: DESIGN.md Rule 2 keeps a "tested on" line out of
+  the help text an agent reads while choosing a preset. So one small question is left for
+  the maintainer: whether a result should name the instrument profile file it ran under.
+  § Rulings above records what was settled and what waits.
+
+  #### Brief for the maintainer: record the loaded profile, or park
+
+  **The decision.** Whether WP-2020 builds one small thing now, a record in each result of
+  the instrument profile file it was fitted under, or parks until something needs a new
+  home. It comes to you because it changes what a result returns (your rule on reader
+  output), it changes a stored format, and its value rests on a guess about how scientists
+  read old results.
+
+  **Why it matters.** The survey and inventory found nothing in the tree that needs a
+  scenario-set file today, so the 2026-11-15 brief leaned to extending the two carriers
+  rietx has. Half of that lean was a "tested on" line in each preset's help text, which
+  Rule 2 now rules out. The other half is this. An instrument profile file is what
+  `save_instrument_profile` writes after a `lab_calibrate` fit: calibrated widths, zero
+  shift and polarisation. `load_instrument_profile` reads it back with every parameter
+  fixed. A result keeps the instrument values, and so does the history. It does not keep
+  the name, path or hash of the file they came from. Someone reading a result months later
+  sees the numbers but cannot tell whose calibration they were, or whether that file has
+  since been redone. No user has reported this. Importance: minor.
+
+  **Aim.** I read the aim as serving the person or agent who reads an old result and needs
+  to know what it assumed. Correct me if the reader you have in mind is a scientist picking
+  a ready-made set for a kind of measurement. That reader is served by the parked
+  scenario-set file, not by this.
+
+  **Options.**
+
+  - (A) Park WP-2020. Nothing is built. The status says it waits for a WP-2017 demotion of
+    a limit or starting value, or a user's request for a named set. Costs nothing and is
+    fully undoable. A result stays silent about which file its calibration came from.
+  - (B1) Record the loaded profile. `load_instrument_profile` stamps the instrument with
+    the file's name, path and sha256, and the result's `Provenance` and each history node
+    carry it. About half a day. It is a schema change on `Instrument` or `Provenance`. Old
+    files still open, and every result built from a profile gains a field. Undoable before
+    a release. After a release it is a stored-format change.
+  - Dropped: a "tested on" list inside the profile file. With no shipped profile to fill
+    it, it would be built before a case needs it (Rule 5).
+
+  **Practice.** From `docs/practice.md` § A named set of starting values, limits and refine
+  flags, checked from source or manual on 2026-11-15. None of the seven programs records
+  the loaded file in its result. GSAS-II prints the path once to the console. TOPAS writes
+  the expanded input to its log. FullProf keeps the IRF name in the rewritten `.pcr`.
+  Profex's refinement preset stores its files with checksums. In rietx, a project records
+  its pattern file by sha256 (`DataRef`), because there the bytes are the contract. A
+  profile's values are what a fit uses, and they are already recorded. Outside diffraction
+  (recall, not checked this session), Hydra saves the composed configuration beside every
+  run. It records the values, not the files they came from. My knowledge of these tools
+  ends in mid-2026.
+
+  **Recommendation.** A, as a lean. In your question order:
+
+  - Purpose: the WP's purpose has no case today. The provenance gap is a second purpose
+    the survey found.
+  - rietx convention: an input whose bytes matter is hashed. A profile's values are what
+    matter, and they are kept.
+  - Agents: an agent reading a result sees the instrument values. A file name adds only
+    who calibrated.
+  - TOPAS and GSAS-II: a log at most.
+  - Outside diffraction: Hydra keeps values.
+  - Design ethos: build nothing before a case needs it.
+
+  The crux is whether "which file" adds anything to "which values" for a real reader. I
+  think it does not yet. B1 loses there, because no program records it and nobody has
+  asked. The 2026-11-15 lean to B rested partly on the help-text half, and Rule 2 now
+  rules that half out. Two observations would flip me to B1: a result whose calibration
+  source mattered and could not be traced, or a user asking for it.
+
+  *Next.* The maintainer answers rulings 3 and 4. Under A the WP parks with its trigger in
+  the status line. Under B1 task 4 builds the record and its test.
 
 - **2026-11-15** — The survey and the inventory are done, and they point away from building a
   new kind of file now. Every one of the seven programs has a file for an instrument's values,
@@ -258,7 +361,8 @@ datasets it was tested on.
 
   **Consent line.** I will leave `strain_cap` and `size_cap` as package defaults, because
   their audit rows are tier 1 (a line wider than the scan carries no information) and the
-  generality rule keeps tier-1 defaults, unless you object.
+  generality rule keeps tier-1 defaults, unless you object. (Settled by Claude 2026-11-21,
+  § Rulings item 2: only a tier-3 row needs the maintainer, so this line no longer waits.)
 
   **Settled for you.**
 
