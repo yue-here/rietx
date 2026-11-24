@@ -237,6 +237,12 @@ class GuiSession:
         #: ``(cache key, PeakEditor)`` — the editor holds the lazily built
         #: Detection; the key is everything a detection depends on
         self._peak_ed: tuple[tuple, Any] | None = None
+        #: ``(project, undo, redo)``: ``peaks.json``'s bytes before each edit
+        #: (``None`` before the first pick), so ⌘Z puts the list back byte
+        #: for byte (WP-2240, interaction rule 10). The list lives outside the
+        #: history tree, so this is its own stack, session-local as the Plan
+        #: tab's is (WP-2127), and it belongs to one ``Project`` object
+        self._peak_steps: tuple[Any, list, list] | None = None
         #: the staged series and its chain settings (WP-1016).  Session-scoped
         #: because its patterns are upload tokens, which die with ``close`` —
         #: a *persisted* series would need a document, which is WP-1003's to
@@ -1533,6 +1539,7 @@ class GuiSession:
         inventing an authority. ``validate_only`` runs everything except the
         apply, which is what a continuously-validating editor calls.
         """
+        from . import peaks as store
         from . import textdoc as td
 
         self._require_idle()
@@ -1561,8 +1568,11 @@ class GuiSession:
             return {"valid": True, "applied": [], "delta": delta.as_dict(),
                     "revision": td.revision(current), "would_change":
                     not delta.is_empty()}
-        editor = (self._peak_editor()
-                  if (delta.peak_moves or delta.peak_flags) else None)
+        touches_peaks = bool(delta.peak_moves or delta.peak_flags)
+        editor = self._peak_editor() if touches_peaks else None
+        # a peak edit typed here is one step of the peak list's undo stack
+        # too, or ⌘Z would take it back together with the edit before it
+        before = store.snapshot(project) if touches_peaks else None
         try:
             applied = td.apply(project, delta, peak_editor=editor)
         except ValueError as exc:
@@ -1570,6 +1580,8 @@ class GuiSession:
             # validates before writing, so nothing was applied
             raise GuiError(str(exc), code="TEXTDOC_INVALID",
                            details=[_locate(str(exc), text)]) from None
+        if touches_peaks:
+            self._peak_step(project, before)
         rendered = td.render(project)
         return {"valid": True, "applied": applied, "delta": delta.as_dict(),
                 "text": rendered, "revision": td.revision(rendered)}
@@ -2513,6 +2525,7 @@ class GuiSession:
         options = store.pick_settings(
             two_theta_range=limits if rng is None else rng, **flags)
         editor = self._peak_editor(options)
+        before = store.snapshot(p)
         try:
             doc = editor.pick()
         except ValueError as exc:
@@ -2522,6 +2535,7 @@ class GuiSession:
             raise GuiError(str(exc), where=[] if rng is None
                            else ["two_theta_range"]) from None
         self._save_peaks(p, doc)
+        self._peak_step(p, before)
         return self._peaks_payload(
             doc, editor=editor,
             api_call=store.pick_call(doc.pick_options, default_range=limits))
@@ -2582,9 +2596,12 @@ class GuiSession:
         a pick), a refused edit names its field, and the echo is the verb's own
         equivalent API line — the console transcript stays a script.
         """
+        from . import peaks as store
+
         self._require_idle()
         p = self._need_project()
         doc = self._need_peaks(p)
+        before = store.snapshot(p)
         editor = self._peak_editor(doc=doc)
         try:
             doc = edit(editor, doc)
@@ -2594,7 +2611,56 @@ class GuiSession:
         except ValueError as exc:
             raise GuiError(str(exc), where=where) from None
         self._save_peaks(p, doc)
+        self._peak_step(p, before)
         return self._peaks_payload(doc, editor=editor, api_call=api_call)
+
+    #: how many edits back ⌘Z reaches; a stored list is tens of kB
+    PEAK_UNDO_DEPTH = 100
+
+    def _peak_stacks(self, p) -> tuple[list, list]:
+        """This project's undo and redo stacks: another project starts empty."""
+        if self._peak_steps is None or self._peak_steps[0] is not p:
+            self._peak_steps = (p, [], [])
+        return self._peak_steps[1], self._peak_steps[2]
+
+    def _peak_step(self, p, before: bytes | None) -> None:
+        """Record the list an edit replaced; a new edit drops the redo side."""
+        undo, redo = self._peak_stacks(p)
+        undo.append(before)
+        del undo[:-self.PEAK_UNDO_DEPTH]
+        redo.clear()
+
+    def peaks_undo(self, body: dict) -> dict:
+        """Put the list back as it was before the last edit (WP-2240)."""
+        return self._peak_travel(back=True)
+
+    def peaks_redo(self, body: dict) -> dict:
+        """Make again the edit the last undo took back (WP-2240)."""
+        return self._peak_travel(back=False)
+
+    def _peak_travel(self, *, back: bool) -> dict:
+        """One step along the stack: the list as it stood, byte for byte.
+
+        A step is a stored file, never an inverse verb: re-adding a removed
+        line refits its group from a new start, and would not give back the
+        line, its flags or its neighbours as they were.
+        """
+        from . import peaks as store
+
+        self._require_idle()
+        p = self._need_project()
+        undo, redo = self._peak_stacks(p)
+        source, sink = (undo, redo) if back else (redo, undo)
+        if not source:
+            word = "undo" if back else "redo"
+            raise GuiError(f"nothing to {word} in the peak list",
+                           code=f"NOTHING_TO_{word.upper()}", status=409)
+        sink.append(store.snapshot(p))
+        store.restore(p, source.pop())
+        doc = self._load_peaks(p)
+        if doc is None:
+            return self._peaks_payload(None)
+        return self._peaks_payload(doc, editor=self._peak_editor(doc=doc))
 
     def _peaks_payload(self, doc, *, editor=None, api_call: str = "") -> dict:
         from typing import get_args as _get_args
@@ -2609,6 +2675,9 @@ class GuiSession:
             "flag_vocabulary": list(_get_args(PeakFlag)),
             "unusable_flags": sorted(PEAK_UNUSABLE_FLAGS),
         }
+        # how far ⌘Z and ⇧⌘Z reach, so the client offers neither past its end
+        undo, redo = self._peak_stacks(self._need_project())
+        out["undo"], out["redo"] = len(undo), len(redo)
         if api_call:
             out["api_call"] = api_call
         if doc is None:
@@ -2985,7 +3054,10 @@ class GuiSession:
         NodeKind): the structure becomes WP-1024's single-phase Le Bail scaffold
         (absence-free lattice group unless a ``space_group`` from the extinction
         screen is given, one dummy atom), and the document's mode follows to
-        ``lebail`` — a Rietveld fit over a dummy atom is not a thing to offer.
+        a structure-free one — a Rietveld fit over a dummy atom is not a thing
+        to offer.  ``mode`` names which, ``"lebail"`` (the default) or
+        ``"pawley"``, which `/next`'s workflow sends: the maintainer ruled
+        Pawley its structure-free default on 2026-11-23 (WP-2240).
         """
         self._require_idle()
         p = self._need_project()
@@ -2996,6 +3068,10 @@ class GuiSession:
                            code="NO_INDEX_RESULT", status=409)
         if body.get("candidate") is None:
             raise GuiError("'candidate' is required", where=["candidate"])
+        mode = body.get("mode") or "lebail"
+        if mode not in ("lebail", "pawley"):
+            raise GuiError(f"mode {mode!r}: a cell adopts in 'lebail' or "
+                           "'pawley' mode", where=["mode"])
         index = self._peak_number(body, "candidate", int)
         candidate = self._candidate_number(result, index)
         best = result.best_or_none()
@@ -3015,10 +3091,11 @@ class GuiSession:
         if not picked:
             label += f"; {_unpicked_note(candidate)}"
         node = p.refinement.edit(structure=structure, label=label)
-        if p.doc.mode != "lebail":
-            p.doc.mode = "lebail"
+        if p.doc.mode != mode:
+            p.doc.mode = mode
             p.save()
         sg = f", space_group={space_group!r}" if space_group else ""
+        sg += f", mode={mode!r}" if "mode" in body else ""
         return {"node_id": node, "mode": p.doc.mode, "picked": picked,
                 "api_call": f"session.adopt_candidate({index}{sg})",
                 **self.structure()}
