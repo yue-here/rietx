@@ -626,8 +626,9 @@ def solve_structure(cost, phase, *, instrument, priors, spec: SolveSpec | SolveS
     radius fraction and weights are the caller's (#1016).  ``spec`` is a
     :class:`~rietx.solve.engines.SolveSpec` (or its request chair), with no
     default: every search setting is the caller's.  ``space_groups``
-    defaults to ``phase``'s own.  ``biso`` is every placed free site's B
-    (Å²), required with ``composition=`` (declared units carry their own).
+    defaults to ``phase``'s own; an empty list is refused, never read as that
+    default.  ``biso`` is every placed free site's B (Å²), required with
+    ``composition=`` (declared units carry their own).
     ``events``, ``cancel``, ``telemetry`` and ``label`` are ``fit``'s.
     ``checkpoint`` is a path: written as the run goes, resumed when it
     exists."""
@@ -650,7 +651,10 @@ def solve_structure(cost, phase, *, instrument, priors, spec: SolveSpec | SolveS
     if composition is not None and spec.race_sweeps % tp.REFRESH_EVERY:
         raise SolveRefused(f"race_sweeps ({spec.race_sweeps}) must be a multiple of "
                            f"{tp.REFRESH_EVERY}, the boundary a race round continues from")
-    groups = list(space_groups) if space_groups else [phase.space_group]
+    groups = [phase.space_group] if space_groups is None else list(space_groups)
+    if not groups:
+        raise SolveRefused("space_groups= is empty: name at least one group, or pass None to "
+                           "search the phase's own")
     if units is not None and any(g != phase.space_group for g in groups):
         raise SolveRefused("declared units sit on one group's site classes: search other "
                            "groups through composition=")

@@ -439,6 +439,18 @@ def test_a_seed_or_a_count_that_is_not_a_whole_number_is_refused_before_any_unit
                            composition={"C": 4}, biso=1.0, spec=spec)
 
 
+def test_an_empty_space_group_list_is_refused_not_read_as_the_default(acr):
+    """``space_groups=[]`` (a filter that matched nothing) is refused by name
+    before any unit runs, where ``None`` searches the phase's own group; an
+    empty generator is refused alike (round 3, item 1)."""
+    spec = _spec(seeds=(0,), control_seeds=(), sweeps=1000)
+    for empty in ([], (), iter(())):
+        with pytest.raises(wf.SolveRefused, match="space_groups"):
+            wf.solve_structure(acr.cost, acr.phase, instrument=acr.ins, priors=_priors(),
+                               composition={"C": 4}, biso=1.0, spec=spec,
+                               space_groups=empty)
+
+
 def test_equal_priors_fingerprint_alike(acr):
     """The spec fingerprint reads the priors by value: two equal priors whose
     ``cn`` was built in another order, or whose σ is a numpy float, resume
