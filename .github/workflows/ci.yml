@@ -226,7 +226,7 @@ jobs:
       - id: scope
         env:
           EVENT: ${{ github.event_name }}
-          PLANNING: '^(docs/(wp|milestones|releases)/|docs/(ROADMAP|DESIGN)\.md$|tests/test_docs_consistency\.py$|\.claude/(agents|skills/(issue-review|pr-review|steward|wp-handover|wp-start))/|\.claude/settings\.json$|\.claude/hooks/(handover_owed|no_top_level_cd|session_start|worktree_create|worktree_only|worktree_remove|wp_claim)\.py$)'
+          PLANNING: '^(docs/(wp|milestones|releases)/|docs/(ROADMAP|DESIGN|DESIGN-RULES)\.md$|tests/test_docs_consistency\.py$|\.claude/(agents|skills/(issue-review|pr-review|steward|wp-handover|wp-start))/|\.claude/settings\.json$|\.claude/hooks/(handover_owed|no_top_level_cd|session_start|worktree_create|worktree_only|worktree_remove|wp_claim)\.py$)'
         run: |
           scope=code
           if [ "$EVENT" = pull_request ]; then

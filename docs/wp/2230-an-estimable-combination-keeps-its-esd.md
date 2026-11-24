@@ -1,6 +1,6 @@
 # WP-2230 — An estimable combination keeps its esd
 
-Milestone: unscheduled · Status: 🔄 2026-11-21 — PR #1736 in review; every task done, the 535 found an artefact of the probe
+Milestone: unscheduled · Status: 🔄 2026-11-23 — PR #1736 merged on 2026-11-21 and every task done; waits on Mike's ruling on the moment-pair fold, the one call on his path that Claude settled
 Track: What fires, and what stays silent
 Depends on: 2219 (the no-esd rule this refines, PR #1718); 2062 soft (cross-phase overlap groups)
 Priority: P3 2026-11-21 — unblocked, WP-2219 merged (PR #1718); an esd the data do determine is withheld, and nothing wrong is printed; quoting the source parameters' combination by hand is the workaround
@@ -109,6 +109,37 @@ source column still reports none. The 535 are accounted for by cause.
 - WP-2062 (overlap groups built per phase).
 
 ## Handover log
+
+- **2026-11-23** — a close attempt by a ghostshift runner (batch close-2026-11-23, PR #1815),
+  which left the WP open.
+
+  The work is on `main` and every task is ticked, but one call in it belongs to Mike and he
+  has not ruled on it. Since PR #1736, a degenerate moment pair reports an esd on its
+  quadrature sum √(m_a² + m_b²) when the data determine that sum. That is what a magnetic fit
+  prints, and Mike rules the magnetic path's reader output (#1075, 2026-11-04). The
+  2026-11-21 entry settled it by Claude (*Settled by Claude* 3), and the generality judge
+  wrote that the ruling stays open for him. The WP closes once he rules, or once Yue says the
+  merge settles it.
+
+  - *Checked*: all seven tasks ticked. `gh pr view 1736` shows it merged on 2026-11-21 at
+    10:39 UTC by yue-here (merge commit 02d105ba1), with no comments or reviews. #1075 holds
+    no ruling of Mike's on the fold, and neither do `docs/milestones/magnetic.md` and
+    WP-2219.
+  - *Also on his side since*: Mike took the distortion-mode work on #1075 on 2026-11-22, after
+    the merge. A distortion block's total amplitude (`RefinementResult.distortion_totals`)
+    regained its esd in the same PR, so the question can name it too.
+  - *Changed*: the Status line only.
+  - *Question for Mike, drafted for Yue to post on #1075* (a public act, so the runner did not
+    post it): "@mustachefeeling, since PR #1736 a number the data determine keeps its esd even
+    when the parameters it is built from have none (Searle 1971, p. 169). Two of them are on
+    your side. A degenerate moment pair's quadrature sum √(m_a² + m_b²) now reports an esd,
+    and so does a distortion block's total amplitude. Each matches, to 0.02 %, the esd of a fit
+    of that number alone, and each source modulus or amplitude still reports none. Do you
+    accept both as they merged? _Written by Claude._"
+
+  Next: Yue posts the question, or rules that the merge settles it. On a yes the WP closes:
+  delete `Priority:`, move the 2026-11-21 entry's narrative to the v1.13 record, mark ✅. On a
+  no, a follow-up reverts the fold on `main`, and the strict xfail returns.
 
 - **2026-11-21** — A number the data determine now keeps its esd when the parameters it is
   built from have none. A zero shift tied to the sum of three variables, a cell volume or bond

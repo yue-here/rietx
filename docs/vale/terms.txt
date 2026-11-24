@@ -223,6 +223,7 @@ Maier
 Marquardt
 Maxwellian
 Olds
+Olivero
 Pawley
 Pitschke
 Prelog

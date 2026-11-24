@@ -62,6 +62,7 @@ __all__ = [
     "DIAGNOSTIC_VIEW_OF",
     "PEAK_FLAG_HELP",
     "PEAK_ORIGIN_HELP",
+    "CELL_RELATION_HELP",
     "READER_OPTION_HELP",
     "SEARCH_FIELD_HELP",
     "RESULT_FIELD_HELP",
@@ -350,9 +351,10 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "The Finger-Cox-Jephcoat axial-divergence ratio S/L. It is the illuminated "
             "specimen length divided by the goniometer radius. It sets how strongly "
             "low-angle peaks lean toward low 2θ. Refine it on a standard and hold "
-            "`axial_hl`: swapping the two gives the same pattern. With both at zero and "
-            "either refined, the peaks are computed with windows and integration points "
-            "sized for a ratio of 0.02 (see `axial_hl`)."
+            "`axial_hl`: swapping the two gives the same pattern. Refined from zero (or "
+            "from a positive lower bound it sits on), it starts at 0.02, or at 0.01 "
+            "when `axial_hl` already sits at 0.02, where the fit can see which way to "
+            "move it (see `axial_hl`)."
         ),
         unit=None, default="0.0",
         typical="0.01-0.05",
@@ -369,7 +371,9 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "asymmetry off. "
             "With both at zero and either refined, the peaks are computed with windows "
             "and integration points sized for a ratio of 0.02, so the curve differs from the same model with "
-            "both held by up to about 5e-5 of the strongest peak."
+            "both held by up to about 5e-5 of the strongest peak. Refined from zero (or "
+            "from a positive lower bound it sits on), it starts at 0.01, or at 0.02 "
+            "when `axial_sl` already sits at 0.01."
         ),
         unit=None, default="0.0",
         typical="0.01-0.05",
@@ -1734,6 +1738,42 @@ PEAK_ORIGIN_HELP: dict[str, HelpEntry] = {
     ),
 }
 
+#: One entry per way the GUI's candidate table relates one indexing candidate
+#: to another reported row (WP-2240): ``same_cell``, the GUI's own reading of
+#: two rows printing one cell, and each value of
+#: :attr:`~rietx.schemas.indexing.SupercellCheck.relation`.  The table writes
+#: the mark and the row it names (``≡ #1``, ``2× #1``, ``⊇ #1``), and its
+#: popover gives that row's one-line summary with this entry's manual link,
+#: where the explanation lives (the maintainer, 2026-11-23).
+_CELL_RELATIONS = "reference/indexing-evidence.html#relations-between-candidates"
+
+CELL_RELATION_HELP: dict[str, HelpEntry] = {
+    "same_cell": HelpEntry(
+        title="Same cell as another candidate",
+        description=(
+            "Written ≡ #k. This row prints candidate k's cell under another "
+            "lattice label."
+        ),
+        anchor=_CELL_RELATIONS,
+    ),
+    "sublattice": HelpEntry(
+        title="Supercell of another candidate",
+        description=(
+            "Written N× #k. One primitive cell of this lattice holds N of "
+            "candidate k's, with N from 2 to 4."
+        ),
+        anchor=_CELL_RELATIONS,
+    ),
+    "containment": HelpEntry(
+        title="Indexes every line another candidate does",
+        description=(
+            "Written ⊇ #k. This cell indexes every observed line candidate k "
+            "indexes, and predicts more lines."
+        ),
+        anchor=_CELL_RELATIONS,
+    ),
+}
+
 #: One entry per diagnostic code the package raises: what the code means and
 #: why it fires, written once per code and never once per finding (WP-1985).
 #: A :class:`~rietx.schemas.common.Diagnostic` carries the observation and the
@@ -2079,12 +2119,12 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         title="Magnetic group number contradicts the operators",
         description=(
             "The group number stated in the file names a different magnetic group from "
-            "the one that the file's operator lists make. The operators are what is "
-            "refined, so their numbers are stored and the stated name is dropped. Either "
+            "the one that the file's operator lists make, so the file is refused. Either "
             "side can be wrong. A typing error in the number leaves the operators right. "
             "A missing centring translation makes the operators a smaller group, and the "
-            "moments then refine under the wrong symmetry. Check the loops against the "
-            "source."
+            "moments would then refine under the wrong symmetry. The message names both "
+            "groups and how many operations each has per cell. Correct the one line that "
+            "disagrees with the file's source, and read the file again."
         ),
     ),
     "CIF_MAGNETIC_PARENT_TAG_UNDEFINED": HelpEntry(
@@ -6472,8 +6512,9 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
     "StageResult.seeded": HelpEntry(
         title="Rows lifted before solving",
         description=(
-            "Each row this stage moved before solving, with the value it started at. A "
-            "freed row sitting on a floor starts at the stage's `seed`, and an all-zero "
+            "Each row this stage moved before solving, with the value it started at. An "
+            "axial ratio the stage newly frees at zero starts at 0.02 (`axial_sl`) or 0.01 "
+            "(`axial_hl`), a freed row sitting on a floor starts at the stage's `seed`, and an all-zero "
             "Stephens block is put on its isotropic ray by `strain_seed`. An empty "
             "mapping lifted nothing; `None` means a result stored before the field."
         ),
@@ -7084,6 +7125,7 @@ def help_registry() -> dict[str, object]:
         "peak_flags": {k: asdict(v) for k, v in PEAK_FLAG_HELP.items()},
         "diagnostics": {k: asdict(v) for k, v in DIAGNOSTIC_HELP.items()},
         "peak_origins": {k: asdict(v) for k, v in PEAK_ORIGIN_HELP.items()},
+        "cell_relations": {k: asdict(v) for k, v in CELL_RELATION_HELP.items()},
         "stage_fields": {k: asdict(v) for k, v in STAGE_FIELD_HELP.items()},
         "reader_options": {k: asdict(v) for k, v in READER_OPTION_HELP.items()},
         "instrument_fields": {k: asdict(v) for k, v in INSTRUMENT_FIELD_HELP.items()},

@@ -136,6 +136,11 @@ and 2045 on 2026-10-25):
 
 ### Inherited
 
+- **2026-11-23, from WP-2241** (closed). The scheduled nightly 45219728102 on `3fd68b937`
+  passed all six jobs. This is the green nightly this WP's status waits on. The `full` job
+  ran 2 h 04 min (16340 passed, 285 skipped, 51 xfailed, 1 xpassed), against 4 h 00 min on
+  11-20 and 11-21, so PR #1756's cut to the Le Bail wander row shows. The tree holds the
+  alarm pin's `ROUNDING` set and WP-2225's re-pin, and the suite failed nothing.
 - **2026-11-22, from WP-2241** (a ghostshift runner, filed separately because this WP's
   claim is stale). The nightlies of 11-20, 11-21 and 11-22 were red. The two alarm-pin
   failures are this WP's 11-21 items: the 11-20 diff was re-pinned by WP-2225 (`997816bfb`)

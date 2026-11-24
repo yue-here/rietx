@@ -244,6 +244,7 @@ Niggli
 [oO]ctahedral
 [oO]ctahedron
 Olds
+Olivero
 [oO]perando
 [oO]rientational
 [oO]rthonormal

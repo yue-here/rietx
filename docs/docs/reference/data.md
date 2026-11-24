@@ -27,7 +27,7 @@ from rietx import Parameter
 
 a = Parameter(value=4.15689, min=4.0, max=4.3, vary=True, unit="A")
 width = Parameter.positive(1e-3, vary=True, unit="deg^2")
-assert width.min == 0.0
+assert width.min == 0.0   # positive() set the lower bound to 0.0
 ```
 
 `Parameter.positive` builds a quantity with no meaning below zero, such as a peak width, a scale or an absorption coefficient.
@@ -310,7 +310,7 @@ A `microstrain` block and a free `lor_strain` refine the same column.
 
 The four broadening terms are the specimen's half of the peak width.
 Gaussian variances add under convolution, and Lorentzian widths add, so the Gaussian pair is in deg² and the Lorentzian pair in deg.
-Each term has the same angular shape as an instrument term, so one pattern cannot separate the two halves, and no shipped plan frees both.
+Each term has the same angular shape as an instrument term, so one pattern cannot separate the two halves, and no built-in [plan](../concepts/plans.md) frees both.
 `mccusker_default` frees the instrument widths and none of these four.
 `lab_sample_refine` frees these four and none of the instrument's.
 [How to calibrate an instrument on a standard and reuse it](../guides/calibrate.md) gives the procedure.
@@ -436,7 +436,7 @@ A bound stated on the parent's cell carries over to the child's `parent_cell.cel
 
 Coordinates do not refine as x, y and z.
 The parameter table refines one shift per direction the site symmetry allows, and ties x, y and z to those shifts.
-A fully fixed special position therefore has no free entry, and `vary=True` on one of its coordinates raises.
+A fully fixed special position therefore has no free entry, and `vary=True` on one of its coordinates raises `ValueError` when the fit starts or `Refinement.parameters` is called, with a message that names the atom and says it sits on a fully fixed special position.
 The refusal names every such site at once, a rigid body's origin among them.
 `Refinement.fix_special_positions` clears `vary` on every such coordinate and returns their names.
 The [parameter map](parameters.md#atoms) gives the names of the shifts.
