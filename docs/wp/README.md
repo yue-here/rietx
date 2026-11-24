@@ -35,7 +35,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [1941](1941-a-release-note-is-a-file-per-change.md) | A release note is a file per change | 2026-11-17 | P3 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [1945](1945-the-peak-chain-columns-built-in-one-pass-per-phase.md) | The peak-chain columns of a Jacobian built in one pass per phase | 2026-11-16 | P3 | [Unscheduled](#unscheduled-candidates-named-on-a-use-case-not-yet-on-a-measurement) |
 | [1952](1952-the-xy-reader-says-what-it-skipped.md) | The xy reader says what it skipped | 2026-11-13 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [1955](1955-a-column-at-a-zero-aperture-and-a-column-the-matrix-cannot-see.md) | A column at a zero aperture, and a column the agreement matrix cannot see | 2026-11-03 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [1955](1955-a-column-at-a-zero-aperture-and-a-column-the-matrix-cannot-see.md) | A column at a zero aperture, and a column the agreement matrix cannot see | 2026-11-24 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1969](1969-an-exhaustive-search-that-ends-in-no-cell.md) | An exhaustive search that ends in no cell | 2026-10-24 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1974](1974-the-texture-screen-says-which-order-the-misfit-needs.md) | The texture screen says which order the misfit needs | 2026-11-24 | P3 | [Unscheduled](#unscheduled-candidates-named-on-a-use-case-not-yet-on-a-measurement) |
 | [1986](1986-guides-and-theory-move-over-and-the-old-tree-retires.md) | Guides and Theory move over, and the old tree retires | 2026-11-13 | P2 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
@@ -63,7 +63,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2230](2230-an-estimable-combination-keeps-its-esd.md) | An estimable combination keeps its esd | 2026-11-23 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2231](2231-the-plan-and-text-tabs.md) | The Plan and Text tabs at `/next`: a plan read as a recipe with Free and Fix rows, and a text buffer whose edits ride the action bar | 2026-11-22 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2238](2238-the-decision-machinery.md) | The decision machinery: fewer calls reach the maintainer, and each ruling is reused | 2026-11-22 | P2 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
-| [2243](2243-the-series-workflow.md) | The series workflow at `/next`: patterns, first fit, run, results, with Trends and Map | 2026-11-23 | P2 | [gui-overhaul](#gui-overhaul) |
+| [2243](2243-the-series-workflow.md) | The series workflow at `/next`: patterns, first fit, run, results, with Trends and Map | 2026-11-24 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2245](2245-the-pattern-graph-s-axis-and-gutter.md) | The Pattern graph's empty difference axis and its blank right margin | 2026-11-24 | P3 | [gui-overhaul](#gui-overhaul) |
 
 ## Next, by priority
@@ -542,7 +542,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2237](2237-events-after-another-project-opens.md) | A project opened in the same window streams its events from the first | ✅ 2026-11-22 | — | — |
 | [2240](2240-the-peaks-and-indexing-workflow.md) | The peaks-and-indexing workflow at `/next`: pick peaks, fit peaks, index, judge | ✅ 2026-11-23 | — | [2218](2218-hand-fitting-and-the-other-graphs.md) |
 | [2242](2242-a-panel-forgets-the-last-project-on-an-open.md) | A panel forgets the last project when another opens in the same window | ✅ 2026-11-23 | — | — |
-| [2243](2243-the-series-workflow.md) | The series workflow at `/next`: patterns, first fit, run, results, with Trends and Map | 🔄 2026-11-23 | P2 | — ([2240](2240-the-peaks-and-indexing-workflow.md), [2300](2300-a-series-declares-each-parameter.md) soft) |
+| [2243](2243-the-series-workflow.md) | The series workflow at `/next`: patterns, first fit, run, results, with Trends and Map | 🔄 2026-11-24 | P2 | — ([2240](2240-the-peaks-and-indexing-workflow.md), [2300](2300-a-series-declares-each-parameter.md) soft) |
 | [2244](2244-the-help-popover-at-next.md) | The help popover at `/next`: a help term there opens its explanation | ✅ 2026-11-23 | — | — |
 | [2245](2245-the-pattern-graph-s-axis-and-gutter.md) | The Pattern graph's empty difference axis and its blank right margin | 🔄 2026-11-24 | P3 | — |
 
@@ -663,7 +663,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1951](1951-a-glob-that-names-a-site-and-frees-nothing.md) | A glob that names a site and frees nothing | ✅ 2026-11-02 | — | — |
 | [1952](1952-the-xy-reader-says-what-it-skipped.md) | The xy reader says what it skipped | 🔄 2026-11-13 | P3 | — |
 | [1953](1953-a-large-pawley-stage-converges-under-the-default-driver.md) | A large Pawley stage converges under the default driver | ✅ 2026-10-13 | — | — |
-| [1955](1955-a-column-at-a-zero-aperture-and-a-column-the-matrix-cannot-see.md) | A column at a zero aperture, and a column the agreement matrix cannot see | 🔄 2026-11-03 | P3 | — |
+| [1955](1955-a-column-at-a-zero-aperture-and-a-column-the-matrix-cannot-see.md) | A column at a zero aperture, and a column the agreement matrix cannot see | 🔄 2026-11-24 | P3 | — |
 | [1956](1956-a-cell-pays-for-the-lines-it-predicts-and-the-pattern-lacks.md) | A cell pays for the lines it predicts and the pattern lacks | ✅ 2026-11-08 | — | — ([1449](1449-rank-on-what-the-screen-determined.md), [1511](1511-which-cell-does-this-powder-support.md) soft) |
 | [1958](1958-a-phase-with-no-reflection-walks-its-scale-under-trf.md) | A phase with no reflection in range walks its scale under TRF | ✅ 2026-10-31 | — | — |
 | [1968](1968-the-picker-offers-no-line-the-data-cannot-support.md) | The picker offers no line the data cannot support | ✅ 2026-11-01 | — | — ([1909](1909-a-line-on-a-falling-flank.md) soft) |
