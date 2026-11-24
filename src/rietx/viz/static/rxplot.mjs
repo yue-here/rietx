@@ -1038,6 +1038,9 @@ export function pattern(uPlot, host, curves, spec) {
   const drawTicks = (u) => tickRows(u, state.c.ticks, spec.colors(), (phase) => state.hidden.has(`ticks:${phase}`));
 
   function drawZero(u) {
+    // a pane that draws nothing has uPlot's 0 to 100 for a range, and a zero
+    // line there sits on its foot for no reason the data gives (WP-2245)
+    if (!drawsData(u)) return;
     if (state.residual !== "cumulative") zeroLine(u, spec.colors().zero);
   }
 
@@ -1402,9 +1405,13 @@ export function trajectory(uPlot, host, traj, spec) {
   const none = () => ({ stroke: null, fill: null, clip: null, band: null, gaps: null, flags: 0 });
   const group = panes(uPlot, host, {
     x: xs,
+    // the backward chain rides as a second series, painting nothing too, so
+    // an axis asking whether the pane draws a value in view (`drawsData`) sees
+    // a stretch only the backward pass recovered
     panes: [{ key: "traj", share: 1, xLabels: true, xLabel: spec.xLabel ?? "", label: spec.yLabel ?? "",
-              auto: extent, series: [{ paths: none, points: { show: false } }],
-              data: [Array.from(order, (i) => value(i))], hooks: { draw: [draw] } }],
+              auto: extent, series: [{ paths: none, points: { show: false } }, { paths: none, points: { show: false } }],
+              data: [Array.from(order, (i) => value(i)), Array.from(order, (i) => back(i))],
+              hooks: { draw: [draw] } }],
   });
 
   group.onPoint = null;

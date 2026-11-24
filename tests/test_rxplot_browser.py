@@ -614,6 +614,17 @@ def test_a_pane_that_draws_nothing_in_view_labels_no_range(page):
     assert any(_labels(page, "resid"))
 
 
+def test_a_trajectory_drawn_by_its_backward_chain_alone_keeps_its_labels(page):
+    """WP-2245's quiet axis asks the pane's series, and the trajectory's hook
+    draws a backward chain beside the forward one. Where only the backward pass
+    has values, the axis still labels the range they set."""
+    page.evaluate("""mountTrajectory({ rings: [], crosses: [] },
+        { x: [300, 350, 400], value: [null, null, null], stderr: [null, null, null],
+          backward: [1.0, 1.1, 1.2] })""")
+    _frames(page)
+    assert any(_labels(page, "traj"))
+
+
 # ---------------------------------------------------------------- the trajectory
 TONE, WARN = [0, 0, 255], [255, 128, 0]
 

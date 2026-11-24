@@ -1115,7 +1115,8 @@ const RESIDUAL_COLUMNS = { weighted: "delta_over_sigma", delta: "obs_minus_calc"
  *   observed points and the residual to a ladder of rungs, so neither moves
  *   while the fit does.
  * - `padRight`: the plot's right padding on screen, as `panes` takes it. The
- *   GUI's legend gutter is its right margin, so its plot reaches the gutter.
+ *   GUI's canvas reaches that far into its legend gutter, so the plot ends at
+ *   the gutter and a 2θ label on that edge is drawn whole.
  *
  * A cumulative χ² is re-based at every x zoom (`chi2Base`), so it starts at
  * zero at the view's left edge, as the window route's did.
@@ -1173,6 +1174,9 @@ export function pattern(uPlot, host, curves, spec) {
   const drawTicks = (u) => tickRows(u, state.c.ticks, spec.colors(), (phase) => state.hidden.has(`ticks:${phase}`));
 
   function drawZero(u) {
+    // a pane that draws nothing has uPlot's 0 to 100 for a range, and a zero
+    // line there sits on its foot for no reason the data gives (WP-2245)
+    if (!drawsData(u)) return;
     if (state.residual === "weighted" && state.c.header.fit) sigmaBand(u, token("--hover"));
     if (state.residual !== "cumulative") zeroLine(u, spec.colors().zero);
   }
@@ -1543,9 +1547,13 @@ export function trajectory(uPlot, host, traj, spec) {
   const none = () => ({ stroke: null, fill: null, clip: null, band: null, gaps: null, flags: 0 });
   const group = panes(uPlot, host, {
     x: xs,
+    // the backward chain rides as a second series, painting nothing too, so
+    // an axis asking whether the pane draws a value in view (`drawsData`) sees
+    // a stretch only the backward pass recovered
     panes: [{ key: "traj", share: 1, xLabels: true, xLabel: spec.xLabel ?? "", label: spec.yLabel ?? "",
-              auto: extent, series: [{ paths: none, points: { show: false } }],
-              data: [Array.from(order, (i) => value(i))], hooks: { draw: [draw] } }],
+              auto: extent, series: [{ paths: none, points: { show: false } }, { paths: none, points: { show: false } }],
+              data: [Array.from(order, (i) => value(i)), Array.from(order, (i) => back(i))],
+              hooks: { draw: [draw] } }],
   });
 
   group.onPoint = null;
