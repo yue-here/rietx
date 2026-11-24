@@ -1005,17 +1005,22 @@ def test_no_frame_control_moves_the_rebuilt_layout(browser, gui):
         pressing(f"{strip} ? box", lambda p, n=label: p.get_by_role("button", name=n, exact=True).click(),
                  escape)
 
-    def series(p):
-        p.locator("button.mbtn.wf").click()
-        p.get_by_role("menuitemradio", name="Series · not built yet").click()
+    def workflow(name):
+        def choose(p):
+            p.locator("button.mbtn.wf").click()
+            p.get_by_role("menuitemradio", name=name, exact=True).click()
+        return choose
 
     pressing("workflow menu", lambda p: p.locator("button.mbtn.wf").click(), escape)
     pressing("File menu", lambda p: p.locator("header .fm-name").click(), escape)
     pressing("Settings", lambda p: p.get_by_role("button", name="Settings", exact=True).click(),
              escape)
-    pressing("Series workflow", series, landmarks=[
-        s for s in NEXT_LANDMARKS if s != "header.topbar > *"] + [
-        "header.topbar > button.ib"])
+    # a workflow not built yet, and the series workflow, built (WP-2243)
+    for label, name in (("Structure solution workflow", "Structure solution · not built yet"),
+                        ("Series workflow", "Series")):
+        pressing(label, workflow(name), landmarks=[
+            s for s in NEXT_LANDMARKS if s != "header.topbar > *"] + [
+            "header.topbar > button.ib"])
     assert not failures, "\n".join(failures)
 
 
@@ -1038,6 +1043,82 @@ def test_a_frame_toggle_stays_where_it_was(browser, gui):
     assert not page.errors, page.errors
     page.close()
     assert not moved, moved
+
+
+#: Whether the open help popover is the topmost thing at its own centre, so a
+#: click there reaches it rather than a panel or a layer under it.
+POPOVER_ON_TOP = """() => {
+  const pop = document.querySelector('.popover[role=dialog]');
+  if (!pop) return false;
+  const r = pop.getBoundingClientRect();
+  return !!document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)?.closest('.popover');
+}"""
+
+
+def test_a_help_term_at_next_opens_its_explanation(browser, gui):
+    """A parameter's name at /next opens its help popover (WP-2244).
+
+    Until this WP only today's page mounted the popover, so every help term at
+    /next did nothing when clicked. The click is a real one; the popover must be
+    on top, inside the window and holding focus, and Esc hands focus back."""
+    url, _ = gui
+    page = _open_next(browser, url, 1300)
+    term = page.locator("[data-row] .label .help").first
+    term.scroll_into_view_if_needed()
+    name = term.text_content().strip()
+    assert page.locator(".popover").count() == 0
+    term.click()
+    _frames(page)
+    popover = page.locator(".popover[role=dialog]")
+    assert popover.count() == 1, f"clicking {name!r} opened nothing"
+    title = popover.locator("h2").text_content().strip()
+    assert title and title == popover.get_attribute("aria-label")
+    assert "Not described yet" not in popover.text_content(), title
+    assert popover.locator("a", has_text="in the manual").count() == 1
+    assert term.get_attribute("aria-expanded") == "true"
+    assert page.evaluate(POPOVER_ON_TOP)
+    box = popover.bounding_box()
+    assert box["x"] >= 0 and box["y"] >= 0
+    assert box["x"] + box["width"] <= 1300 and box["y"] + box["height"] <= 900, box
+    assert page.evaluate("document.activeElement.matches('.popover')")
+    page.keyboard.press("Escape")
+    _frames(page)
+    assert popover.count() == 0
+    assert page.evaluate("document.activeElement.matches('[data-row] .label .help')")
+    assert not page.errors, page.errors
+    page.close()
+
+
+def test_a_help_term_in_the_stage_settings_leaves_them_open(browser, gui):
+    """The stage settings' labels are help terms, and their popover floats outside
+    the settings layer (WP-2244). A click in the popover is not a click away from
+    the layer, and the Esc that closes the popover closes nothing else."""
+    url, _ = gui
+    page = _open_next(browser, url, 1300)
+    page.locator("section .tabs [role=tab]", has_text="Plan").first.click()
+    page.get_by_role("button", name="Stage 1 actions", exact=True).click()
+    page.get_by_role("menuitem", name="Stage settings…").click()
+    layer = page.locator("form.float.settings")
+    layer.wait_for()
+    layer.locator(".help").first.click()
+    _frames(page)
+    popover = page.locator(".popover[role=dialog]")
+    assert popover.count() == 1
+    assert page.evaluate(POPOVER_ON_TOP)
+    box = popover.bounding_box()
+    page.mouse.click(box["x"] + 12, box["y"] + 8)
+    _frames(page)
+    assert layer.count() == 1, "a click in the popover closed the stage settings"
+    assert popover.count() == 1
+    page.keyboard.press("Escape")
+    _frames(page)
+    assert popover.count() == 0
+    assert layer.count() == 1, "the popover's Esc closed the stage settings too"
+    page.keyboard.press("Escape")
+    _frames(page)
+    assert layer.count() == 0
+    assert not page.errors, page.errors
+    page.close()
 
 
 #: The refinement window's own places (WP-2216): the graph's title line and its
@@ -2056,6 +2137,47 @@ def _row(page, step: str):
     return page.locator("table.hist tbody tr", has=page.locator("td.what", has_text=step))
 
 
+#: The candidate table's heads whose ink centre lies outside the ink of the
+#: values under them, as `[label, centre, left, right]` (WP-2240, the third
+#: look). Ink is a `Range` over the text, never a box: a head over white space
+#: sits inside its own cell. A head spanning several columns is read against
+#: the values of all of them.
+_HEADS_OVER_VALUES = r"""() => {
+  const t = document.querySelector('table.cands');
+  const ink = (el) => {
+    const r = document.createRange(); r.selectNodeContents(el);
+    const q = [...r.getClientRects()].filter((x) => x.width > 0.5);
+    return q.length ? [Math.min(...q.map((x) => x.left)), Math.max(...q.map((x) => x.right))] : null;
+  };
+  const grid = []; const heads = [];
+  [...t.tHead.rows].forEach((tr, ri) => {
+    grid[ri] = grid[ri] || []; let c = 0;
+    for (const th of tr.cells) {
+      while (grid[ri][c]) c++;
+      for (let dr = 0; dr < th.rowSpan; dr++) for (let dc = 0; dc < th.colSpan; dc++) {
+        grid[ri + dr] = grid[ri + dr] || []; grid[ri + dr][c + dc] = th; }
+      heads.push([th, c, th.colSpan]); c += th.colSpan;
+    }
+  });
+  const off = [];
+  for (const [th, first, n] of heads) {
+    const h = ink(th); if (!h) continue;
+    let l = Infinity, r = -Infinity;
+    for (const tr of t.tBodies[0].rows) {
+      let c = 0;
+      for (const td of tr.cells) {
+        const v = c >= first && c < first + n ? ink(td) : null;
+        if (v) { l = Math.min(l, v[0]); r = Math.max(r, v[1]); }
+        c += td.colSpan;
+      }
+    }
+    const mid = (h[0] + h[1]) / 2;
+    if (r > l && (mid < l || mid > r)) off.push([th.innerText, mid, l, r]);
+  }
+  return off;
+}"""
+
+
 def _ink_pixels(page, hex_colour: str) -> int:
     """Pixels of the plot within a small distance of one colour: what the
     canvas painted, never the option it was handed."""
@@ -2355,6 +2477,89 @@ def test_the_peak_lines_on_the_pattern_answer_the_object_grammar(browser, tmp_pa
             "[...document.querySelectorAll('table.lines tbody tr')]"
             ".map((tr) => tr.querySelectorAll('td')[1].innerText.trim())")
         assert len(positions) >= n - 1 and start not in positions, (start, positions)
+        assert not page.errors, page.errors
+    finally:
+        page.close()
+        httpd.shutdown()
+
+
+def test_the_fit_index_and_judge_steps_run_to_an_adopted_cell(browser, tmp_path_factory):
+    """The workflow's last three steps at ``/next``, by real clicks (WP-2240 tasks 6 to 8).
+
+    Fit peaks lists the groups and draws their windows in the Peaks graph, and a
+    window's Refit is one undo step. Index searches the systems the form leaves
+    on, lists the cells, and a row's click draws its lines on the Pattern graph.
+    Judge screens the chosen cell's extinctions, and Adopt waits for Apply,
+    which lands a Pawley start (the maintainer, 2026-11-23) and hands the
+    window to Refinement.
+    """
+    httpd, client = _serve(tmp_path_factory, "next-judge")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    page = _open_next(browser, url, 1440)
+    steps = page.locator("nav.steps button.step")
+    try:
+        page.locator("button.mbtn.wf").click()
+        page.get_by_role("menuitemradio", name="Peaks and indexing", exact=True).click()
+        page.locator(".foot").get_by_role("button", name="Pick peaks", exact=True).click()
+        page.wait_for_selector("table.lines tbody tr")
+
+        # Fit peaks: the groups, their windows, and a Refit as one undo step
+        steps.filter(has_text="Fit peaks").click()
+        page.locator(".segmented button", has_text="All groups").click()
+        page.wait_for_selector("table.groups tbody tr")
+        page.get_by_role("tab", name="Peaks", exact=True).click()
+        page.wait_for_selector(".peakfits canvas")
+        assert page.locator(".peakfits canvas").count() >= 1
+        before = client.get("/api/peaks")[1]["undo"]
+        with page.expect_response("**/api/peaks/refit"):
+            page.locator(".peakfits button.refit").first.click()
+        _frames(page)
+        assert client.get("/api/peaks")[1]["undo"] == before + 1
+
+        # Index: leave cubic alone on, search, choose the first cell
+        steps.filter(has_text="Index").click()
+        page.get_by_role("tab", name="Pattern", exact=True).click()
+        systems = page.locator('[aria-label="Crystal systems"] button')
+        for name in systems.all_text_contents():
+            if name != "cubic":
+                with page.expect_response("**/api/project"):
+                    systems.filter(has_text=name).click()
+        assert client.get("/api/project")[1]["doc"]["indexing"]["search"]["systems"] == ["cubic"]
+        # a chosen cell's lines are the strong rule's grey at /next (Yue, 2026-11-23)
+        candidate = page.evaluate(
+            "getComputedStyle(document.body).getPropertyValue('--line-strong')").strip()
+        drawn = _ink_pixels(page, candidate)
+        page.locator(".steppane:not(.gone) .foot").get_by_role(
+            "button", name="Index", exact=True).click()
+        page.wait_for_selector("table.cands tbody tr", timeout=180_000)
+        rows = page.locator("table.cands tbody tr")
+        assert "cubic" in rows.first.inner_text()
+        rows.first.click()
+        _frames(page)
+        assert "sel" in (rows.first.get_attribute("class") or "")
+        assert _ink_pixels(page, candidate) > drawn + 50
+        # every head is centred over its column's values, never over white
+        # space beside them (Yue, the third look, 2026-11-23)
+        off = page.evaluate(_HEADS_OVER_VALUES)
+        assert off == [], off
+
+        # Judge: screen the extinctions, choose a group, Adopt, then Apply
+        foot = page.locator(".steppane:not(.gone) .foot")
+        foot.get_by_role("button", name=re.compile(r"^Judge #1")).click()
+        assert "Å" in page.locator(".cellline").inner_text()
+        page.get_by_role("button", name="Screen extinctions", exact=True).click()
+        page.wait_for_selector("table.classes tbody tr", timeout=180_000)
+        assert page.locator("table.classes .mark").count() == 1
+        groups = page.locator(".sgs button")
+        assert groups.first.get_attribute("aria-pressed") == "true"
+        foot.get_by_role("button", name="Adopt as a Pawley start", exact=True).click()
+        assert client.get("/api/project")[1]["doc"]["mode"] != "pawley"
+        assert foot.get_by_role("button", name="Revert", exact=True).count() == 1
+        with page.expect_response("**/api/index/adopt"):
+            foot.get_by_role("button", name="Apply", exact=True).click()
+        page.wait_for_function(
+            "document.querySelector('button.mbtn.wf').innerText.includes('Refinement')")
+        assert client.get("/api/project")[1]["doc"]["mode"] == "pawley"
         assert not page.errors, page.errors
     finally:
         page.close()

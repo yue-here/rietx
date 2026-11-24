@@ -1,9 +1,8 @@
 # WP-2241 — the nightly red of 2026-11-20 to 11-22: Windows path checks, the width triple's esd, and a lost runner
 
-Milestone: unscheduled · Status: 🔄 2026-11-22 — fixes in PR #1789; waits on the next scheduled nightly
+Milestone: unscheduled · Status: ✅ 2026-11-23 — the scheduled nightly 45219728102 on `3fd68b937` passed all six jobs, Windows included; PR #1789
 Track: The repo's own process
 Depends on: —
-Priority: P1 2026-11-22 — a required check red on main: the Windows fast job is the release pre-upload gate (`docs/RELEASING.md` step 4)
 
 ## Goal
 
@@ -109,6 +108,36 @@ gh run list --workflow nightly.yml --branch main --limit 1
   a discarded direction), WP-2225 (the triple's split is reported).
 
 ## Handover log
+
+- **2026-11-23** — Closed. The first scheduled nightly after PR #1789 merged passed all six
+  jobs. The Windows fast job is green, so the two Windows causes are fixed. The full suite
+  finished on Linux, so the alarm pin's two fixes now hold on Linux too. The full suite took
+  about 2 h, half the 4 h of 11-20 and 11-21, and did not lose its runner.
+
+  *Measured*. Run 45219728102, `schedule`, on `main` at `3fd68b937`, which holds #1789's
+  merge `e531c65f5`. It started at 16:43Z, 10.7 h after its 06:00Z cron time. Each job's
+  wall clock:
+  - `full suite (Linux, incl. slow acceptance)`: 16:43-18:47Z, 2 h 04 min. Pytest: 16340
+    passed, 285 skipped, 51 xfailed, 1 xpassed in 7405.80 s (2:03:25).
+  - `fast suite (Windows)`: 16:43-17:32Z, 49 min. Pytest: 15164 passed, 476 skipped,
+    32 xfailed in 2884.61 s.
+  - `fast suite (Linux, Python 3.12)`: 16:43-17:26Z, 42 min.
+  - `fast suite (Linux, Python 3.13)`: 16:43-17:10Z, 26 min.
+  - `macOS (goldens' capture platform)`: 16:43-17:26Z, 43 min.
+  - `torch agreement matrix (experimental)`: 16:43-17:06Z, 22 min.
+
+  An earlier run, 45205720253, was dispatched by hand at 15:29Z on `78e251396`. Its two
+  fast Linux jobs, its Windows job and the torch matrix passed. Its macOS job got no runner
+  ("not acquired by Runner of type hosted even after multiple attempts"). Its `full` job was
+  cancelled at 16:42Z, 73 min in, one minute before the scheduled run was created. The
+  annotation reads "The operation was canceled". `nightly.yml` sets no concurrency group, so
+  the record does not say who cancelled it. That run measured nothing about the full suite.
+
+  *Done*. Status ✅, the `Priority:` line removed, the index regenerated, the v1.13
+  narrative entry written. WP-2036's `### Inherited` gets this run, since that WP waits on a
+  green nightly.
+
+  *Next*: none on this WP. WP-2036 owns nightly health from here.
 
 - **2026-11-22** — The three red nightlies had four causes, and two are now fixed on this
   branch. The Windows fast job failed ten tooling tests because a helper wrote Windows

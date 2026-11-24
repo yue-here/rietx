@@ -204,13 +204,13 @@ roughly the shift.
 ## More rules, each learned the hard way
 
 - **A component that refines onto its zero intensity bound is not a line**
-  (WP-1110). A peak reaches its window only through `intensity × profile`, so
-  such a component has no gradient on its own position, and its esd cannot be
-  measured. `_prune` cannot reach them — it tests only *shoulder* seeds, by the
-  deliberate asymmetry in its docstring — so `no_intensity` is a flag in
-  `PEAK_UNUSABLE_FLAGS`, tested with the refinement's own `BOUND_HIT_RTOL`, and
-  **flagged rather than dropped** because a report must be able to say why a
-  line went and because a component a *human* placed is theirs to remove.
+  (WP-1110). A peak reaches its window only via `intensity × profile`, so it has
+  no gradient on its own position and no esd. `_prune` tests only
+  *shoulder* seeds, so `no_intensity` is a flag in `PEAK_UNUSABLE_FLAGS`, tested
+  with `BOUND_HIT_RTOL`, and **flagged rather than dropped**:
+  a report must say why a line went, and a component a *human* placed is theirs to
+  remove. Same under `PEAK_NO_INTENSITY_SIGMA` (WP-1909): **repair at the flag, never
+  the envelope**: it feeds the width census, `screen.py`, `extinction.py`.
 
 - **A filter inside a search fails with a wrong *answer*, so a silence indicts the
   filters before the tolerance.** `engines.solution_key` is the one dedup authority —
@@ -271,8 +271,8 @@ roughly the shift.
 - The known-cell scoreboard is *never wrong, and silent more often than right* —
   **never round it up**, and **keep the found-but-not-first bucket** (collapsing it
   into right-or-wrong miscounts the board). It is **generated** by
-  `tests/indexing_gallery.py` — re-measure by running
-  the suite; counts live in the v1.0 dossier, never retyped here (WP-1041). And
+  `tests/indexing_gallery.py` — counts live in the v1.0
+  dossier, never retyped here (WP-1041). And
   **say "high-symmetry" whenever the board is quoted** (WP-1043): until the corpus
   moves, every claim from it is about high-symmetry lattices.
 - **An ambiguity partner must be refuted by the lines it needs and the data lack**
@@ -295,16 +295,15 @@ roughly the shift.
 - **A candidate is reported in its conventional setting, at `to_cell_candidate`**
   (WP-1923): `engines.conventional_fit` re-sets af, `cov_af`, cell and esds in one map. A
   new surface showing an engine's cell goes through it too, or one search speaks two.
+- **A metric direction no line constrains is refused, never marked** (WP-1915): a dead
+  cross term enters every length.
 - **An assumed precision may never refuse to index** (`from_positions` lists get no
   `MAX_RELATIVE_SIGMA_Q` vote; the shift-allowance half is above).
 - **This package is not slow at indexing, it is silent** (WP-1037). Buy
   responsiveness with ordering and reporting, never by shrinking
-  the box. **`budget_seconds` is per (engine × system)** — probe and validation on
-  top — so the whole-run bound is `total_budget_seconds`, a `Deadline` that *is*
-  the cancel token; `estimate_ceiling` is the pre-run arithmetic,
-  `INDEX_BUDGET_EXHAUSTED` names the three states (searched/truncated/not reached),
-  and a truncated validation reads `not_validated`, never `validation_failed`
-  (1037). And **a Monte Carlo indexer must refine each proposal; raw random cells
+  the box. **`budget_seconds` is per (engine × system)**, so the whole-run bound is `total_budget_seconds`, a `Deadline` that *is*
+  the cancel token; `INDEX_BUDGET_EXHAUSTED` names the three states (searched/truncated/not reached),
+  and a truncated validation reads `not_validated`, never `validation_failed`. And **a Monte Carlo indexer must refine each proposal; raw random cells
   do not rank** (WP-1023).
 - **Coelho's N_c/N_o gate bounds the *volume*, it is not a per-trial verdict**
   (WP-1040, `svd.volume_window`): N_c ∝ V, so one probe gives κ and the gate is

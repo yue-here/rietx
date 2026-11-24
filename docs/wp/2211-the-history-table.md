@@ -1,6 +1,6 @@
 # WP-2211 — the History table: Compare on the pattern, Restore as pending edits
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-22 — in review (#1772); the maintainer's look at its pictures and the chapter's timing wait
+Milestone: gui-overhaul · Status: 🔄 2026-11-23 — first PR merged (#1772); rows 155 and 158 drawn as placement options, waiting on the maintainer (§ Questions 6 and 7)
 Depends on: 2214 (the rebuild's plan: it builds on piece R1's bottom panel)
 Priority: P2 2026-11-17 — was P3: R1's bottom panel landed with WP-2215 (#1534), so nothing blocks it; a feature the open milestone was opened for
 
@@ -163,6 +163,113 @@ Replay answers every node, at its own 2θ range, in under a quarter of a second.
 curve is on a different 2θ range from the head's, so the client places a compared curve by
 2θ, never by index.
 
+### Questions 6 and 7 for the maintainer (2026-11-23): where a node's details and the value diff open
+
+Two placements are left on the History tab. Both are layout on the main window, so they go to
+the maintainer with the options drawn (the standing rule of 2026-11-06). The prototype draws
+neither, so no option leads as the prototype's. The pictures are
+`2211-screenshots/q155-*.png` and `q158-*.png`, light and dark. Each is the real `/next` page at
+1440 by 900 (two at 1000 by 900) on the `fap` example with the fork described in that folder's
+README. Every click was a real pointer event. The dashed box marks the region that changes, and
+it was drawn afterwards. The options were drawn by a patch to the page that was never committed.
+
+**Question 6: where does a node's details open?** (WP-2214's inventory row 155)
+
+*The decision.* Where a person reads one node's details: the Python call that made it, its
+status, iterations, free count, Rwp, GoF and time, its note, and its diagnostics.
+
+*Why it matters.* Today's GUI shows these in a footer under the node list, for the selected node.
+At `/next` only the call is shown, in the row's tooltip. The details tell a person why a stage
+stopped and what a guard reported. On `nac` the last stage carries `FLOOR_HIT` (a parameter
+resting on its lower bound), and nothing in the row says so. A typical node's details run to
+three or four lines. On `fap` none of the eight nodes carries a diagnostic, and on `nac` one of
+seven does. A poor placement either costs rows of the list each time someone looks, or takes
+width when nobody is looking. Importance: moderate.
+
+*Aim.* A person going back through a fit reads why a step ended without losing sight of the
+other steps. This serves the look's ruling of 2026-11-22, that a person must compare two entries
+at a glance.
+
+*Options.* Dropped: a tooltip (diagnostics run long and cannot be copied) and the model panel
+(it holds the Parameters, Interactive, Plan and Text modes).
+
+- **A. A disclosure under the row** (`q155-a-disclosure-*`). This is the placement WP-2214's
+  inventory names, from `gui/STYLE.md`'s disclosure rule. A chevron hangs at the row's left, and
+  one click opens the details under the row. It takes no width. The open block for `sample_lor`
+  (a note, no diagnostics) is 114 px tall, and it pushed 3 of the 8 rows out of the 283 px tab.
+  It stays open while other things are clicked, as the style guide asks. In the Graph view the
+  lanes stretch through the block.
+- **B. A details pane at the tab's right** (`q155-b-pane-*`). The pane is always there and shows
+  the current node until a row is clicked. The clicked row takes an accent bar at its left edge.
+  It takes 440 px of width at all times. At 1440 px wide the list keeps 1000 px, against the
+  560 px its rows use, so the pane fills width that is empty today. At 1000 px wide the list
+  keeps 560 px, just enough for the rows.
+- **C. A popover beside the clicked row** (`q155-c-popover-*`). One click on a row opens a
+  floating box to the right of the row, and Esc closes it. It takes no space. It shows one node
+  at a time, and a click elsewhere would close it once built.
+- **Do nothing.** The details stay unreachable at `/next` except the call in the tooltip. That
+  breaks the milestone's rule that every feature of today's GUI stays reachable.
+
+Each option is a front-end change and can be undone in a later piece.
+
+*Practice.* From recall, not checked against documentation. The git applications (GitHub
+Desktop, Sourcetree, Fork, GitKraken) list commits and show the selected one's details in a pane
+beside or below the list. Figma's properties panel follows the selection (the workshop's
+interface survey, from Figma's help page). Expandable rows are common in data tables, such as
+IBM's Carbon design system. TOPAS, GSAS-II and FullProf keep no history tree. Today's rietx GUI
+uses the stacked form of the pane.
+
+*Recommendation: B, a lean.* The crux is whether looking at one node costs the person the rest
+of the list. Under B nothing moves. The pane fills the width the 2026-11-22 look found empty,
+and question 7's diff can open in the same pane. A loses on that crux: the bottom panel shows
+8 rows at this height, and one open node hides 3 of them. C loses on persistence, since the style
+guide asks a disclosure to stay open while other things are clicked and a popover cannot. If
+narrow windows matter more than the empty width, A wins, because it takes none.
+
+**Question 7: where does the value diff open?** (WP-2214's inventory row 158)
+
+*The decision.* Where Compare values… on a node's menu shows the parameters that differ between
+that node and the current state. It shows the two Rwp and free counts, a filter, and for each
+parameter its two values, the change and the change in per cent, largest first. It is drawn
+against the current state, as Restore is. Today's panel compares any two nodes, and a picker for
+the other node fits the header in every option.
+
+*Why it matters.* Compare draws how an earlier fit looked; the diff says which numbers moved.
+`sample_lor` against the current `biso` branch differs in 20 values: Lorentzian strain −34 %,
+Lorentzian size +43 %, and Biso by up to 21 %. A person checking which step moved a value wants
+the numbers and the overlaid curve together. The table's five columns need about 640 px.
+Importance: moderate.
+
+*Aim.* A person sees which values an earlier step held, beside the curve Compare overlays, and
+returns to the list in one click.
+
+*Options.* Dropped: a third bottom-panel tab (a tab for a view that is opened and closed) and a
+tab among the graphs (their four tabs were ruled on 2026-11-07).
+
+- **A. A pane at the tab's right** (`q158-a-pane-*`). Right-click, then Compare values…, opens
+  the pane, and × closes it. It takes 640 px while open. The list keeps 800 px at 1440 wide,
+  enough for its rows, and 360 px at 1000 wide, where the rows scroll sideways. It shows 7 of the
+  20 rows, and the plot stays in view.
+- **B. The diff replaces the list** (`q158-b-replace-*`). The same two clicks swap the list for
+  the diff, and ← All nodes brings the list back. It uses the tab's whole width and shows 7 of
+  the 20 rows. The list is out of sight while it is open.
+- **C. A floating window** (`q158-c-dialog-*`). The same two clicks open a 720 by 460 px window
+  over the page, and × closes it. It shows 14 of the 20 rows. It covers the middle of the plot
+  and part of the Parameters panel.
+- **Do nothing.** No diff at `/next`. Restore still loads a node's values as pending edits, and
+  the Parameters panel then shows them one row at a time.
+
+*Practice.* From recall, not checked against documentation. VS Code's Timeline opens a
+comparison in the main editor area. GitHub Desktop shows a commit's changes in the pane beside
+the commit list. JetBrains' Local History opens a separate window holding the list and the diff.
+Google Docs' version history keeps the list in a right sidebar and shows the version in the
+document's place.
+
+*Recommendation: A, a lean.* The crux is whether the person can read the numbers with the plot
+and the list in view. A keeps both. B hides the list and C covers the plot. If question 6 takes
+B, one pane holds both views and × on the diff returns to the node's details. If losing 640 px
+in a narrow window matters more, B is the choice that never takes width.
+
 ### Seams
 
 - **Routes.** `GET /api/history` (`tree_payload` in `src/rietx/gui/session.py`) already serves
@@ -228,8 +335,12 @@ Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`
   opened by Compare values… on a node's menu. Where it opens is a placement the prototype
   never drew, so it goes to the maintainer as drawn options first. Added 2026-11-22: R5 owns
   rows 152-173, and this WP's tasks predate the inventory.
+  Drawn 2026-11-23 as three options (§ Questions 6 and 7, question 7); building waits on the
+  maintainer's answer.
 - [ ] WP-2214's inventory row 155: a node's details (its diagnostics, notes and action) in the
   row's disclosure. Same origin and the same placement question as row 158.
+  Drawn 2026-11-23 as three options (§ Questions 6 and 7, question 6); building waits on the
+  maintainer's answer.
 
 ## Acceptance
 
@@ -251,6 +362,33 @@ The browser files skip in CI (no playwright there), so the PR quotes their local
   panel), WP-2209 (edit recovery).
 
 ## Handover log
+
+- **2026-11-23** (PR #1805, docs only) — The two History features still missing at `/next`, a
+  node's details and the table of values that differ between two nodes, now have three drawn
+  placements each, with what each costs. The maintainer can choose from pictures of the real
+  page instead of descriptions. The drawings show that a details block under a row hides three
+  of the eight rows the tab holds, and that the value table needs about 640 px. Nothing is
+  built, and the two tasks stay open until the answer.
+  *Done*: § Questions 6 and 7 in the decision-brief order; 16 pictures `q155-*` and `q158-*` in
+  `2211-screenshots/`, light and dark, at 1440 × 900 and two at 1000 × 900; that folder's README
+  lists them and updates rows 155 and 158 of its inventory; the Status line now names the
+  questions. The options were drawn by patching `next/History.svelte` in a scratch copy of the
+  tree (`git archive HEAD`), built there and served from it, so this branch carries no GUI code.
+  *Measured* (macOS arm64, `[dev]` venv on Python 3.12, chromium through python playwright, the
+  `fap` example with the fork the README describes and a note on n0004): the disclosure block is
+  114 px and leaves 5 of 8 rows in view; the details pane takes 440 px, leaving the list 1000 px
+  at 1440 wide and 560 px at 1000 wide; the diff pane takes 640 px, leaving 800 px and 360 px;
+  the diff shows 7 of its 20 rows in the tab or the pane and 14 in the 720 × 460 px window.
+  Diagnostics on nodes: none of `fap`'s 8 after its plan, one of `nac`'s 7 (`FLOOR_HIT` on its
+  last stage).
+  *Gotchas*: no `fap` node carries a diagnostic, so the pictured details show "No diagnostics".
+  The diff pane first drawn at 440 px cut off the change columns, which is how 640 px was found.
+  Beside a pane the rows wrapped into each other at 1000 px until the list was made to scroll
+  sideways; a build must do the same or narrow the pane. The practice lines in both questions
+  are from recall and not checked.
+  Next: the maintainer answers questions 6 and 7 (leans: the pane for both, so one pane holds
+  the details and the diff). Then build the chosen placements in a second code PR, with vitest
+  over the details and the diff and a browser case that opening either moves no row.
 
 - **2026-11-22** (after the maintainer's look) — The Graph view now reads across: a row's step
   name, Rwp, Compare and Restore sit together, so two fits can be compared at a glance, at

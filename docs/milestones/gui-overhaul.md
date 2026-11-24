@@ -57,8 +57,8 @@ prototype at 1440 × 900:
 | R3 | [WP-2218](../wp/2218-hand-fitting-and-the-other-graphs.md), merged 2026-11-18 (#1673) and 2026-11-19 (#1680, #1683, #1684) | hand fitting and the other graphs: the Interactive tab, the Peaks, Background and Structure graphs, the Instrument dialog |
 | R4 | [WP-2231](../wp/2231-the-plan-and-text-tabs.md), in flight | the Plan tab with Free and Fix rows, and the Text tab whose edits ride the action bar |
 | R5 | [2211](../wp/2211-the-history-table.md), [2212](../wp/2212-console-lines-by-kind.md) | History as a table, Console lines by kind, and the report |
-| R6 | [WP-2240](../wp/2240-the-peaks-and-indexing-workflow.md), in flight | the peaks-and-indexing workflow in four steps |
-| R7 | — | the series workflow in four steps, with Trends and Map, and the scrubbing of WP-1317 redesigned into it, from loading the patterns to the output (§ R7 carries the series scrubber, § R7 is designed from loading to output) |
+| R6 | [WP-2240](../wp/2240-the-peaks-and-indexing-workflow.md), merged 2026-11-23 (#1788, #1791, #1792) | the peaks-and-indexing workflow in four steps |
+| R7 | [WP-2243](../wp/2243-the-series-workflow.md), in flight | the series workflow in four steps, with Trends and Map, and the scrubbing of WP-1317 redesigned into it, from loading the patterns to the output (§ R7 carries the series scrubber, § R7 is designed from loading to output) |
 | Swap | — | `/` serves the new page; today's shell and the panels nothing imports are deleted; the manual's GUI chapters rewritten and their screenshots retaken; File › Export gains the structure image (inventory row 79), with the POV-Ray, glTF and SVG writers as they land (#1667 item 1), which R3 offers only on the canvas's menus while the File menu is today's panel. Its PR waits on the maintainer, since it deletes |
 
 The maintainer reviews whole screens beside the prototype at each piece's end, and never single
@@ -187,13 +187,23 @@ rebuild piece that touches it, or a WP of its own.
   WP-2121 made the refusal name a user tie's own verbs, `ref.untie()` and `ref.tie()`. The
   block for user variables is still owed.
 - The Le Bail check's absent lines arrive in its own refined frame, about 0.011° from the
-  candidate's ticks on fluorapatite; they should be served as tick indices.
+  candidate's ticks on fluorapatite; they should be served as tick indices. The Judge step's
+  red marks for the peaks no line explains wait on them too (the prototype's round 11d).
 - `supercell_checks` names a relation for 8 of fluorapatite's 12 candidates (measured by WP-2124
   on 63d7c120a; naming the other four is WP-2124's follow-up); lattice relations between
   candidates ("c doubled", "a × √3", "same cell") belong in rietx.
 - `PeakEditor.curves` serves only each group's sum; per-line curves need a route. PR #1526
-  (WP-2202) serves them as `lines` on each group, and R6 takes that half.
+  (WP-2202) serves them as `lines` on each group, and R6 takes that half. R6 served them in
+  PR #1788 (WP-2240).
 - `set_flags(..., use_for_indexing=True)` forgets which flags a person overruled.
+- The indexing result is lost when the GUI restarts. Keeping it is a stored-format change.
+- Search these, under the Index step's coverage line, waits on a route that searches named
+  crystal systems with the rest of the form unchanged (WP-2240 § Non-goals).
+- The Judge step prints a grade's caveats and the engine names as code words with the
+  underscores replaced (`next/Candidates.svelte`). The prototype's words ("figures of merit
+  disagree", "trial and error") need a `rietx.help` arm, since names are described there.
+  These three, and the red marks above, come from WP-2202's § Follow-ups, a file that exists
+  only on PR #1526's branch (folded 2026-11-24).
 - `--plot-peak` (purple) loses to the data crosses as a mark colour. WP-2130 measured the ruled
   blue against the palette and took the choice to the maintainer, who ruled on 2026-11-09 that it
   moves with the palette piece, since the blue was chosen as the complement of orange fits.
@@ -202,7 +212,7 @@ rebuild piece that touches it, or a WP of its own.
   WP-2124 added both to the route, and `pick_options` records all three.
 - Right-click on a plot object opens no context menu, and peak edits have no undo, though the
   maintainer adopted both rules on 2026-11-08. R1 builds the context-menu service; R6 owes the
-  peak edits' undo.
+  peak edits' undo. R6 built it in PR #1791 (WP-2240).
 - A GUI series lives in session memory only; several series gaps wait on the series fitting
   now changing on `main`.
 - The Model and Text panels keep their own Apply beside the action bar's. R2 and R4 give the

@@ -187,6 +187,7 @@ from .profiles.voigt import (
     voigt,
     voigt_basis,
     voigt_derivs,
+    voigt_fwhm,
 )
 from .restraints import (
     CompiledRestraints,
@@ -321,8 +322,90 @@ def window_fwhm_mult_interp(eta: np.ndarray, tol: float | None = None) -> np.nda
 #: ``predict()`` at given values does not depend on which parameters are free
 #: (#774); and, for the optimiser, when either is about to be *refined* from
 #: zero, so the finite-difference Jacobian sees a live parameter instead of a
-#: frozen zero-node profile
+#: frozen zero-node profile.  It is not where a lifted ratio starts: that is
+#: :data:`AXIAL_SL_START` / :data:`AXIAL_HL_START`, kept apart so that a
+#: change to this floor cannot move a start (WP-1955, the review of #1372).
 AXIAL_SIZING_FLOOR = 0.02
+
+#: Where a stage starts S/L, and H/L, when it frees one sitting on zero
+#: (:func:`axial_lift_start`, WP-1955).  Two numbers and not one, because the
+#: pattern is symmetric in the pair: at S/L = H/L the two columns are
+#: identical and a step keeps them equal, so a fit started on that line can
+#: stop on it, 0.005 to 0.017 from the truth, with an esd that excludes the
+#: truth (the review of #1372, synthetic rutile at lab counts).  No code needs
+#: either to equal :data:`AXIAL_SIZING_FLOOR`; ``compile_model`` reads
+#: ``max(value, AXIAL_SIZING_FLOOR)``.
+AXIAL_SL_START = 0.02
+AXIAL_HL_START = 0.01
+
+#: Step of the forward second-order difference that gives a node's derivative
+#: with respect to an aperture (:func:`_aperture_node_derivs`).
+AXIAL_NODE_STEP = 3e-6
+
+#: The two FCJ axial ratios, S/L and H/L.
+AXIAL_PATHS = ("instrument.geometry.axial_sl", "instrument.geometry.axial_hl")
+
+
+def apertures_to_lift(freed: list[str]) -> list[str]:
+    """The paths in ``freed`` that are an FCJ axial ratio, the rows a stage
+    may lift when they sit on zero (WP-1955), S/L's before H/L's.
+
+    A path may carry a multi-histogram scope (``hist.{h}.``).  The runner's
+    ``seed_floored`` then writes only a row on its floor: a row whose value
+    equals its lower bound is moved (a typed 0 and a value = min = 0.005 alike),
+    and one above its bound is not.
+
+    Why a lift.  The FCJ profile is quadratic in an aperture at zero, so the
+    exact column there is nearly zero: 0.047 against a largest of 1.8e6 with
+    the other aperture live, and smaller still with both at zero.
+    Gauss-Newton sees no way off the bound, and a step taken from it is tens
+    to thousands of units long.  Measured on this branch (WP-1955's handover
+    entry), **on the route that frees both ratios, which no shipped plan takes
+    since WP-2012**: #1075's repro 1 ends ``converged`` at S/L = H/L = 0 and
+    Rwp 0.0834, lifted at 0.0453 beside TRF's 0.0454.  On the shipped
+    ``lab_bragg_brentano`` route (S/L alone) it goes from S/L 0.00008 ± 1.29,
+    Rwp 0.0831, to 0.04531 ± 0.00018, Rwp 0.0630 (the review of #1372).
+    WP-2003 X17's warm CPD 1c collapses to Rwp 10.7, lifted converges at
+    0.10881 in 43 evaluations against the independent fit's 0.10901; and the
+    calibrate guide's second calibration stays on zero.  The review moved the
+    start alone over 0.001 to 0.05 on that one pattern (S/L alone, H/L held at
+    0) and every start returned the same answer: it is leaving zero that
+    cures the stall, not the value left to.  From the lift the fit can still
+    walk back to zero: CPD 1b does, ending on its floor.
+    """
+    return sorted((p for p in freed
+                   if (p.split(".", 2)[2] if p.startswith("hist.") else p)
+                   in AXIAL_PATHS),
+                  key=lambda p: p.endswith("axial_hl"))
+
+
+def axial_partner(path: str) -> str:
+    """The other FCJ axial ratio of ``path``'s own instrument or histogram."""
+    scope, name = path.rsplit(".", 1)
+    sl_name, hl_name = (p.rsplit(".", 1)[1] for p in AXIAL_PATHS)
+    return f"{scope}.{hl_name if name == sl_name else sl_name}"
+
+
+def axial_lift_start(path: str, partner_value: float) -> float:
+    """Where ``path`` (one of :func:`apertures_to_lift`'s answer) starts:
+    S/L at :data:`AXIAL_SL_START`, H/L at :data:`AXIAL_HL_START`, but never at
+    ``partner_value``, the value its partner ratio has when it is written
+    (WP-1955).
+
+    Equal values put the pair on the S/L = H/L line, where the two columns are
+    identical and a step keeps them so, and a fit there can end ``converged``
+    0.005 to 0.017 from the truth with an esd that excludes it (the review of
+    #1372).  A start that would meet the partner takes the other ratio's
+    number instead.  Callers write S/L first and read the partner's *live*
+    value, so a partner that was lifted counts at its start and one that
+    could not be (a start the caller chose, above its floor) at its own.  Both
+    lifted: S/L 0.02, H/L 0.01.  By the symmetry of the pair either order is a
+    valid answer, so two histograms of one instrument may land on opposite
+    orders in a joint fit.
+    """
+    own, other = ((AXIAL_SL_START, AXIAL_HL_START) if path.endswith("axial_sl")
+                  else (AXIAL_HL_START, AXIAL_SL_START))
+    return other if partner_value == own else own
 
 #: How far outside the fitted range, in °2θ, a reflection is still generated
 #: (``compile_model``, and the satellite report arm, through
@@ -451,6 +534,45 @@ def _cached_fcj_nodes(cp: "CompiledPhase", il: int, k: int, variant: int,
     phi, omega = fcj_offsets_weights(two_theta_deg, sl, hl, n_nodes)
     cache[key] = (tt, s, h, phi, omega)
     return phi, omega
+
+
+def _aperture_node_derivs(nodes, two_theta_deg, sl: float, hl: float, n: int,
+                          h: float, which: int) -> tuple[np.ndarray, np.ndarray]:
+    """∂(2φ_q, ω_q)/∂(S/L or H/L) for the FCJ nodes, by a forward
+    second-order difference (``which`` 0 is S/L, 1 is H/L).
+
+    (−3f(0) + 4f(h) − f(2h)) / 2h steps only into the feasible side, so it is
+    the same rule at an aperture on its bound of zero as above it.  A
+    first-order forward difference was not good enough there (WP-1955): at
+    one zero aperture the column is the residue of node terms about 1e5 times
+    its size, which cancel because the profile is quadratic in that aperture,
+    and the difference's O(h) error, 0.013 in norm, was 23 % of a column of
+    0.047.  The O(h²) form costs one more node evaluation per aperture.
+
+    The caller's step, 3e-6, is from a scan against jax's exact column: below
+    it rounding grows as 1/h, above it the h² term.  At one zero aperture
+    1e-7 sat 8.9e-3 rel-L2 off and 3e-6 sits 5.3e-4; at interior apertures
+    every step from 3e-7 to 1e-5 is under 2e-7.
+
+    The nodes have a kink at S/L = H/L (``min(sl, hl)`` in the overlap
+    weight).  An aperture lying under the other by at most 2h would step
+    across it, and the stencil would mix the two sides: 2.2e-3 rel-L2 off
+    jax's column at a gap of 1e-6, where the first-order rule sat at 3e-6.
+    There the stencil mirrors to (3f(0) − 4f(−h) + f(−2h)) / 2h, which stays
+    on the aperture's own side and is feasible whenever the aperture is at
+    least 2h.
+    """
+    own, other = (sl, hl) if which == 0 else (hl, sl)
+    step = -h if 0.0 < other - own <= 2.0 * h and own >= 2.0 * h else h
+
+    def at(k):
+        return fcj_offsets_weights_batch(
+            two_theta_deg, sl + (k if which == 0 else 0.0),
+            hl + (k if which == 1 else 0.0), n)
+
+    f1, f2 = at(step), at(2.0 * step)
+    return tuple((4.0 * b - 3.0 * a - c) / (2.0 * step)
+                 for a, b, c in zip(nodes, f1, f2, strict=True))
 
 
 @dataclass
@@ -1228,7 +1350,10 @@ class CompiledModel:
         because it answers a question about the *goniometer*: "how narrow can a
         real reflection be here?".  That is the scale a background peak's width
         is judged against (``strategy.staged.check_hump_width``), and
-        it must not depend on which phase one happens to ask about.
+        it must not depend on which phase one happens to ask about.  It reads
+        the TCH quintic under either shape, so under ``"voigt"`` it sits up to
+        0.43 % from :meth:`peak_fwhm`'s Olivero-Longbothum width (WP-1926): a
+        scale, not a reported width.
 
         Evaluate-only and off the hot path: plain floats in, the shared
         ``profiles`` functions through the active backend.
@@ -2111,23 +2236,30 @@ class CompiledModel:
         function need".  Under TCHZ ``w1`` already *is* Γ; under the true Voigt
         the pair is (σ, γ_HWHM), which inverts to the component FWHMs exactly
         (:func:`~rietx.model.profiles.voigt.fwhm_to_voigt_params` is two
-        divisions) and then goes through the same TCH quintic.  That last step
-        is the ~1 % approximation ``compile_model`` already relies on for
-        window sizing and FCJ node counts, and for the same reason: the quintic
-        is *fit* to the true Voigt FWHM.
+        divisions) and then goes through Olivero & Longbothum (1977)
+        (:func:`~rietx.model.profiles.voigt.voigt_fwhm`, 0.024 % worst), the width of
+        the shape actually evaluated (WP-1926, decided 2026-10-08).  The TCH
+        quintic (0.43 % worst against the Voigt) stays what
+        :meth:`peak_gamma_eta` returns, because window sizing and FCJ node
+        counts read it under either shape and are frozen per stage.
 
         Evaluate-only, and never in the hot loop — nothing in the residual
         needs a combined width.
         """
+        if self.shape == "voigt":
+            return voigt_fwhm(np.asarray(w1, dtype=np.float64) * GAUSS_FWHM_TO_SIGMA,
+                              2.0 * np.asarray(w2, dtype=np.float64))
         return self.peak_gamma_eta(w1, w2)[0]
 
     def peak_gamma_eta(self, w1: np.ndarray, w2: np.ndarray
                        ) -> tuple[np.ndarray, np.ndarray]:
         """TCHZ (Γ, η) from a :meth:`phase_peaks` width pair, under either shape.
 
-        :meth:`peak_fwhm`'s reading with the mixing parameter beside it, for a
+        The TCH quintic's reading with the mixing parameter beside it, for a
         consumer that sizes a window by ``compile_model``'s rule
-        (:func:`rewindow`).  Evaluate-only, like :meth:`peak_fwhm`.
+        (:func:`rewindow`).  Under ``"voigt"`` its Γ is the quintic, not
+        :meth:`peak_fwhm`'s Olivero-Longbothum width: window sizing keeps the
+        rule ``compile_model`` froze.  Evaluate-only, like :meth:`peak_fwhm`.
         """
         if self.shape == "voigt":
             gam_g = np.asarray(w1, dtype=np.float64) * GAUSS_FWHM_TO_SIGMA
@@ -3406,7 +3538,7 @@ class CompiledModel:
             axial_derivs = False
         sl = values["instrument.geometry.axial_sl"]
         hl = values["instrument.geometry.axial_hl"]
-        h_pos, h_ax = 1e-5, 1e-7
+        h_pos, h_ax = 1e-5, AXIAL_NODE_STEP
         # d_sl/d_hl exist only while the aberration acts; at both apertures
         # zero the axial columns fall back to FD (``axial_ok``)
         build_axial = axial_derivs and fcj_live(sl, hl)
@@ -3491,19 +3623,16 @@ class CompiledModel:
                     pos[rows_b] + h_pos, sl, hl, n)
                 axl = axh = None
                 if d_sl is not None:
-                    axl = fcj_offsets_weights_batch(
-                        pos[rows_b], sl + h_ax, hl, n)
-                    axh = fcj_offsets_weights_batch(
-                        pos[rows_b], sl, hl + h_ax, n)
+                    axl = _aperture_node_derivs(nodes, pos[rows_b], sl, hl,
+                                                n, h_ax, 0)
+                    axh = _aperture_node_derivs(nodes, pos[rows_b], sl, hl,
+                                                n, h_ax, 1)
                 if fast and compiled.bases_fcj(
                         omega, d_pos, d_gamma, d_eta, d_sl, d_hl, lay.x,
                         rows_b, w1, w2, lay.width, nodes[0], nodes[1],
                         (shift[0] - nodes[0]) / h_pos,
                         (shift[1] - nodes[1]) / h_pos,
-                        None if axl is None else
-                        ((axl[0] - nodes[0]) / h_ax, (axl[1] - nodes[1]) / h_ax,
-                         (axh[0] - nodes[0]) / h_ax,
-                         (axh[1] - nodes[1]) / h_ax)):
+                        None if axl is None else (*axl, *axh)):
                     continue
                 for a in range(0, len(rows_b), _BASES_CHUNK_ROWS):
                     rs = rows_b[a:a + _BASES_CHUNK_ROWS]
@@ -3524,8 +3653,7 @@ class CompiledModel:
                     for planes, var in ((d_sl, axl), (d_hl, axh)):
                         if planes is None:
                             continue
-                        dphi = (var[0][s] - phi) / h_ax
-                        dom = (var[1][s] - om) / h_ax
+                        dphi, dom = var[0][s], var[1][s]
                         planes[rs] = (_node_mix(dom, pv)
                                       - _node_mix(om * dphi, ddx))
             # Make the planes scatter-safe for the batched accumulators
@@ -4890,7 +5018,8 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                     l_est = np.maximum(l_est + extra_l, 0.0)
                 # TCHZ combined (Γ, η) is a compile-time proxy for window sizing
                 # and FCJ node counts under *both* shapes: it tracks the true
-                # Voigt FWHM to ~1 % (that is what the TCH quintic is fit to),
+                # Voigt FWHM to 0.43 % at worst (measured, tests/test_voigt.py;
+                # that is what the TCH quintic is fit to),
                 # far inside the area criterion's own resolution.
                 gamma_est, eta_est = tch_gamma_eta(g_est, l_est)
                 if primary:
@@ -5189,7 +5318,7 @@ def window_sizing(model: CompiledModel, values: dict[str, float],
     ``compile_model``'s rule: a half-width of k(η)·Γ plus the slack, plus the
     FCJ extent while the aberration acts.  It reads the peaks the forward
     model draws at ``values`` (``phase_peaks``) where the compile reads its
-    own width estimate, so the two agree to that estimate's ~1 % and not to
+    own width estimate, so the two agree to that estimate's 0.43 % and not to
     the bit; k(η) comes off :func:`window_fwhm_mult_interp`'s table.  The
     arrays have the compile's shapes, so a caller can compare them with
     ``CompiledPhase.win`` and ``.fcj_n`` before building anything.  The

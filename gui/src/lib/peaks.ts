@@ -308,6 +308,8 @@ export interface Candidate {
     predicted_but_absent_uncancellable_in_window?: number | null;
     /** observed peaks no calculated line explains */
     unmatched_observed?: number;
+    /** the decomposition the check ran: "pawley" since WP-2011 */
+    mode?: "lebail" | "pawley";
   } | null;
   diagnostics: Array<{ level: string; code: string; message: string }>;
   supercell_checks?: Array<{ parent_cell: number[]; index: number; relation?: string;
@@ -511,12 +513,67 @@ export function cellLine(c: Pick<Candidate, "cell" | "cell_esd" | "system">,
   }
 }
 
+/** One of a cell's six columns: the value, the places it leaves out
+ *  (`pad`), and whether symmetry sets it. */
+export interface CellColumn { value: string; pad: string; fixed: boolean }
+
+/**
+ * A candidate's cell as six columns, a, b, c, α, β, γ (the maintainer,
+ * 2026-11-23). Every length takes four places and a refined angle two. An
+ * angle the system sets is written whole, `90` or `120` (the maintainer, the
+ * third look, 2026-11-23). Its `pad` is the `.00` it leaves out, which the
+ * table keeps as empty room: the integer part then sits under a refined
+ * angle's, and the column stays aligned on the decimal point. A value the
+ * system sets is `fixed`. A trigonal cell on rhombohedral axes ties b and c
+ * to a and β and γ to α. A monoclinic cell's free angle is β, as `cellLine`
+ * writes it.
+ */
+export function cellColumns(c: Pick<Candidate, "cell" | "system">): CellColumn[] {
+  const cell = c.cell;
+  const rhombohedral = c.system === "trigonal" && Math.abs(cell[5] - 120) > 1e-6;
+  const tiedLengths: Record<string, number[]> = {
+    cubic: [1, 2], tetragonal: [1], hexagonal: [1], trigonal: rhombohedral ? [1, 2] : [1],
+  };
+  const setAngles: Record<string, number[]> = {
+    cubic: [3, 4, 5], tetragonal: [3, 4, 5], hexagonal: [3, 4, 5], orthorhombic: [3, 4, 5],
+    trigonal: rhombohedral ? [] : [3, 4, 5], monoclinic: [3, 5], triclinic: [],
+  };
+  const tiedAngles = rhombohedral ? [4, 5] : [];
+  return cell.map((v, k) => {
+    const set = (setAngles[c.system] ?? []).includes(k);
+    const fixed = set || (tiedLengths[c.system] ?? []).includes(k) || tiedAngles.includes(k);
+    if (set) return { value: String(Math.round(v)), pad: ".00", fixed };
+    return { value: v.toFixed(k < 3 ? 4 : 2), pad: "", fixed };
+  });
+}
+
 const sameCell = (x: readonly number[], y: readonly number[]) =>
   x.length === y.length
   && x.every((v, i) => Math.abs(v - y[i]) <= 1e-9 * Math.max(1, Math.abs(v)));
 
+/** The relations the candidate table names, each a `cell_relations` entry
+ *  in `rietx.help`: `same_cell` is this page's own reading, the other two
+ *  are `SupercellCheck.relation`'s values. */
+export const RELATION_KINDS = ["same_cell", "sublattice", "containment"] as const;
+export type RelationKind = (typeof RELATION_KINDS)[number];
+
+/** How a candidate relates to another reported row, on the row's own line
+ *  (the maintainer, 2026-11-23): the mark (`≡`, `⊇`, or the primitive-cell
+ *  ratio `2×`), the row it points at as `#k` (`of`, counted from 1), the
+ *  help key whose manual link its popover carries, and the summary the
+ *  popover and Judge both print, the target filled in (the maintainer,
+ *  2026-11-23: "just a summary of what it means"). */
+export interface Relation { mark: string; of: number; kind: RelationKind; key: string;
+                            text: string }
+
+/** A sublattice index in words; `SupercellCheck.index` is 2 to 4. */
+const TIMES: Record<number, string> = { 2: "twice", 3: "three times", 4: "four times" };
+
+const relation = (kind: RelationKind, mark: string, of: number, text: string): Relation =>
+  ({ mark, of, kind, key: `cell_relations:${kind}`, text });
+
 /**
- * How candidate `i` relates to another reported row, in words, or "".
+ * How candidate `i` relates to another reported row, or null.
  *
  * Marked, never merged (round 11 call 8): every candidate stays a row. Only
  * the relations rietx states are named. "Same cell" is the same numbers
@@ -525,20 +582,27 @@ const sameCell = (x: readonly number[], y: readonly number[]) =>
  * below it. Relations rietx does not compute
  * ("c doubled", "a × √3") are a follow-up (WP-2240 § Inherited).
  */
-export function candidateRelation(cands: readonly Candidate[], i: number): string {
+export function candidateRelation(cands: readonly Candidate[], i: number): Relation | null {
   const c = cands[i];
   const text = cellText(c.cell);
   for (let k = 0; k < i; k++) {
-    if (cellText(cands[k].cell) === text) return `same cell as #${k + 1}`;
+    if (cellText(cands[k].cell) === text) {
+      return relation("same_cell", "≡", k + 1,
+                      `Same cell as #${k + 1}, another lattice label`);
+    }
   }
   for (const check of c.supercell_checks ?? []) {
     const k = cands.findIndex((o) => sameCell(o.cell, check.parent_cell));
     if (k < 0 || k === i) continue;
-    // a containment pair is no sublattice, so its index is 0 (SupercellCheck)
-    return check.index >= 2 ? `#${k + 1} with ${check.index}× the volume`
-      : `indexes every line #${k + 1} does`;
+    // a containment pair is no sublattice, so its index is 0 (SupercellCheck);
+    // the index counts primitive cells, which the V column does not
+    return check.relation !== "containment" && check.index >= 2
+      ? relation("sublattice", `${check.index}×`, k + 1,
+                 `Supercell of #${k + 1}, ${TIMES[check.index] ?? `${check.index} times`} its primitive cell`)
+      : relation("containment", "⊇", k + 1,
+                 `Indexes every line #${k + 1} does, and predicts more`);
   }
-  return "";
+  return null;
 }
 
 /** Lines the search used that this cell leaves unindexed. */
@@ -558,4 +622,38 @@ export function absentOf(c: Candidate): { absent: number; of: number } | null {
 export function clock(seconds: number): string {
   const s = Math.max(0, Math.round(seconds));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/**
+ * The Index step's coverage line (round 11 call 6): the systems the search
+ * never reached, those it stopped early, and the whole-run ceiling when the
+ * clock stopped it. Read off the result's own words: `INDEX_BUDGET_EXHAUSTED`
+ * names what was not reached and what was truncated in its `where`, and is
+ * written only when the clock, not a person, stopped the run. A system asked
+ * for and neither searched nor named there (a person's Stop) is not searched
+ * too. Empty arrays and a null ceiling mean the search covered what was asked.
+ */
+export function coverageLine(result: {
+  systems_searched?: readonly string[];
+  search_complete?: Readonly<Record<string, boolean>>;
+  diagnostics?: ReadonlyArray<{ code: string; message: string; where?: readonly string[] }>;
+} | null | undefined, asked: readonly string[]): {
+  notSearched: string[]; stopped: string[]; ceiling: number | null;
+} {
+  const { searched, incomplete } = searchCoverage(result);
+  const hit = result?.diagnostics?.find((d) => d.code === "INDEX_BUDGET_EXHAUSTED");
+  const listed = (prefix: string) => (hit?.where ?? [])
+    .filter((w) => w.startsWith(prefix))
+    .flatMap((w) => w.slice(prefix.length).split(",").map((s) => s.trim()).filter(Boolean));
+  const stopped = [...new Set([...incomplete, ...listed("truncated: ")])];
+  const notSearched = [...new Set([...listed("not reached: "),
+    ...asked.filter((s) => !searched.includes(s))])].filter((s) => !stopped.includes(s));
+  const seconds = hit ? Number(/ceiling of ([\d.e+]+) s/.exec(hit.message)?.[1]) : NaN;
+  return { notSearched, stopped, ceiling: Number.isFinite(seconds) ? seconds : null };
+}
+
+/** A whole-run ceiling said as a time: `2 minutes`, `90 s`, or `None`. */
+export function limitWord(seconds: number | null | undefined): string {
+  if (seconds == null) return "None";
+  return seconds % 60 === 0 ? `${seconds / 60} minute${seconds === 60 ? "" : "s"}` : `${seconds} s`;
 }
