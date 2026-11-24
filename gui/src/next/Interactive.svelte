@@ -30,6 +30,8 @@
    * each range nobody set is rebuilt at the new values, and an edit equal to
    * the new value is no longer an edit.
    */
+  import { type Say } from "./console";
+  import { py } from "../lib/py";
   import { untrack } from "svelte";
   import type { Curves } from "rxplot";
 
@@ -77,7 +79,7 @@
     /** the last fit's widest window peak and highest angle, the ranges' unit */
     context: RangeContext;
     phaseNames?: readonly string[];
-    say?: (line: string) => void;
+    say?: Say;
     /** how many slider values are pending */
     onpending?: (n: number) => void;
     /** the preview to draw, or null when nothing is pending; `error` is a refusal */
@@ -330,7 +332,6 @@
   export async function apply(): Promise<boolean> {
     if (!edits.size) return true;
     const values = Object.fromEntries(edits);
-    say(`ref.set_values(${JSON.stringify(values)})`);
     try {
       await api.patchParams({ values });
     } catch (exc) {
@@ -339,6 +340,7 @@
         : (exc as Error).message;
       return false;
     }
+    say("call", `ref.set_values(${py(values)})`);
     edits = new Map();
     error = "";
     ask();

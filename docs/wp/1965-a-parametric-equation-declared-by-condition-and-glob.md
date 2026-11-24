@@ -64,6 +64,13 @@ one declaration per matched path, each with its own coefficients.
 
 ### Inherited
 
+- **2026-11-22, from the issue triage (#141): the planted-events generator
+  has shipped.** The entry below says #141 "still owes its generator". It
+  landed in PR #1011 (merged 2026-10-21) as `tests/planted_series.py`, a
+  seeded ramp with planted events and a null twin, runnable as
+  `.venv/bin/python -m tests.planted_series --length 248 --seed 0 --out DIR`.
+  Its outputs are in `tests/data/planted_series/` and its test is
+  `tests/test_planted_series.py`. Checked at `f590981ab`.
 - **2026-11-12, from [1325](1325-parametric-series.md) (closed): `rietx events`
   could print one line per parametric equation of a joint fit.** 1325 held this
   in its own § Inherited since 1322 closed without it, and moved it here at its

@@ -25,6 +25,10 @@ A method or a field is written under the class that defines it, not under the va
 `RefinementResult.plot` is the `plot` method of a `RefinementResult`, and in your own code that line reads `result.plot(...)`.
 Written this way the name resolves, so the test suite can check it against the package.
 
+A line beginning `assert` in an example is the manual checking itself.
+The test suite runs the example, and the line fails if the package stops doing what the page says.
+It is not part of the call, and your own code does not need it.
+
 Parameter dot-paths are the other dotted thing here, and they are never capitalised.
 `phases.0.cell.a` and `instrument.profile.w` are data: addresses into the parameter table, not attributes of a class.
 

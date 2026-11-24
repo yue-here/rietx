@@ -103,11 +103,12 @@ class Row:
     response: object = None
     responds: str = ""
     scope: tuple = ()
+    approved_by: str = "maintainer"
     line: int = 0
 
 
 FIELDS = ("name", "kind", "tier", "ambiguity", "evidence", "grounds", "approved", "value",
-          "response", "responds", "scope")
+          "response", "responds", "scope", "approved_by")
 
 
 class Table(NamedTuple):
@@ -330,7 +331,8 @@ def _describe(row: Row, code: Callable[[str], str]) -> str:
     if row.response is not None:
         bits.append(f"response {row.response}")
     if row.approved:
-        bits.append(f"approved {row.approved}")
+        who = "" if row.approved_by == "maintainer" else f" ({row.approved_by})"
+        bits.append(f"approved {row.approved}{who}")
     text = ", ".join(bits)
     return f"{text}: {_cut(row.evidence)}" if row.evidence.strip() else text
 

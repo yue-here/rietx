@@ -127,9 +127,9 @@ describe("the action bar", () => {
     expect(runFit).toHaveBeenCalledTimes(2);
   });
 
-  it("runs one cycle on what is ticked when One cycle is chosen", async () => {
+  it("runs one stage on what is ticked when As ticked is chosen", async () => {
     await boot();
-    button("One cycle")!.click();
+    button("As ticked")!.click();
     flushSync();
     button("Refine")!.click();
     for (let i = 0; i < 4; i++) await tick();

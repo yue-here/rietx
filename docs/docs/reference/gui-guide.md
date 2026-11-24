@@ -86,7 +86,7 @@ One row under the panel column, on every tab.
 
 | Control | Does |
 |---|---|
-| `One cycle \| Staged plan` | what a refine runs: one stage on exactly the ticked parameters, or the project's plan |
+| `As ticked \| Staged plan` | what a refine runs: one stage on exactly the ticked parameters, or the project's plan |
 | the pending count | how many Parameters and Interactive edits wait, plus one for an edited plan, and the first refusal if one is invalid |
 | `Revert` / `Apply` | drop or apply the pending edits: the Parameters edits first, then the Interactive values, then the plan |
 | `Refine` | run the choice; it reads `Apply and refine` while edits wait, and applies them first |
@@ -94,7 +94,7 @@ One row under the panel column, on every tab.
 `⌘⏎` (`Ctrl+Enter` off a Mac) presses `Refine`, except inside the Text
 document, where it applies the document. A refused edit runs nothing. A plan
 replaces the vary flags, so a parameter you ticked by hand stays free under
-`One cycle` and may be held again under `Staged plan`. The Plan tab's ladder
+`As ticked` and may be held again under `Staged plan`. The Plan tab's ladder
 shows which.
 
 There is no Save command, and that is not an omission. Settings
