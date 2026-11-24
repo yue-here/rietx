@@ -22,15 +22,19 @@ numbers are in each test's docstring.  Linux/x86-64 (numpy 2.5.3) gave the
 same outcome on every row: the same zeroed sets, profile widths within 1.1e-4
 relative of the forward difference's, coverage 20 of 20 and 33 of 40 in both
 arms, the same four on-axis stops at the same Δχ², and the six deep starts
-within 1e-10.  The fits run with the closing stage the fixture declares.
+within 1e-10 on the solve's full plan (they now stop before its last stage).
+The fits run with the closing stage the fixture declares.
 """
 from __future__ import annotations
 
+import os
+import platform
 from contextlib import contextmanager
 
 import pytest
 
 import rietx as rx
+import rietx.optimize.least_squares as LS
 from rietx.model.forward import CompiledModel
 from rietx.optimize.least_squares import STATIONARY_ANGLE_LEVEL
 from rietx.optimize.statistics import chi_bar_squared_quantile
@@ -42,21 +46,34 @@ TRUE_MOD2 = 0.7
 
 
 @contextmanager
-def _arm(exact: bool):
-    """``exact=False`` is the forward-difference arm: the moment branch off."""
+def _arm(exact: bool, floor: list | None = None):
+    """``exact=False`` is the forward-difference arm: the moment branch off.
+
+    ``floor``, when given, collects the floor test's answer at each angle
+    column it is asked about, so a row can say how many columns took the
+    forward difference."""
     real = CompiledModel.moment_grad_supported
+    real_floor = LS._moment_angle_on_floor
     if not exact:
         CompiledModel.moment_grad_supported = lambda self, ip: False
+    if floor is not None:
+        def spy(column_norm, modulus_norm):
+            on = real_floor(column_norm, modulus_norm)
+            floor.append(on)
+            return on
+        LS._moment_angle_on_floor = spy
     try:
         yield
     finally:
         CompiledModel.moment_grad_supported = real
+        LS._moment_angle_on_floor = real_floor
 
 
 def _fit(seed: int, *, exact: bool, tilt2: float | None, truth1=(3.5, 0.0, 0.0),
-         profile: bool = False) -> dict:
+         profile: bool = False, plan: rx.RefinementPlan | None = None) -> dict:
     """Mn1 at ``truth1`` (``_vec`` arguments), Mn2 at 0.7 μ_B tilted ``tilt2``
-    from **a** (``None``: one site); the start on **a** exactly."""
+    from **a** (``None``: one site); the start on **a** exactly.  ``plan``
+    defaults to the solve's (``S._plan()``)."""
     T, mag = S._solve(), S._magnetic()
     instrument = T.neutron()
     m2 = None if tilt2 is None else Moment.from_values(S._vec(TRUE_MOD2, tilt2), "Mn3+")
@@ -67,17 +84,22 @@ def _fit(seed: int, *, exact: bool, tilt2: float | None, truth1=(3.5, 0.0, 0.0),
         m2=(None if tilt2 is None
             else Moment.from_values((0.75, 0.0, 0.0), "Mn3+", vary=True)),
         magnetic=mag)
-    with _arm(exact):
+    floor: list[bool] = []
+    with _arm(exact, floor):
         ref = rx.Refinement(rx.Structure(phases=[start]), instrument)
         ref._auto_intervals = False
-        result = ref.fit(data, plan=S._plan(), telemetry=False)
+        result = ref.fit(data, plan=S._plan() if plan is None else plan,
+                         telemetry=False)
         interval = ref.profile_interval(data, MOD2) if profile else None
     rows = {p.path: p for p in result.parameters}
     st = result.statistics
     out = {"chi2r": st.chi2, "dof": st.n_points - st.n_free_parameters,
            "zeroed": frozenset(q for t in (result.stages[-1].moment_angle_tests or [])
                                if t.zeroed for q in t.paths),
-           "interval": interval}
+           "interval": interval,
+           "floor": (sum(floor), len(floor)),
+           "stages": [f"{s.name} {s.status}/{s.termination} nfev {s.n_iterations}"
+                      for s in result.stages]}
     if tilt2 is not None:
         out["m2"], out["s2"] = rows[MOD2].value, rows[MOD2].stderr
     return out
@@ -186,6 +208,36 @@ def test_on_axis_fits_stop_no_further_above_the_forward_difference_than_the_cut(
 
 # ============================================== WP-2068's deep starts
 
+def _deep_plan() -> rx.RefinementPlan:
+    """The solve's plan through its first two stages (the moduli, then the
+    moment stage with scale and background), closing stage kept."""
+    full = S._plan()
+    return rx.RefinementPlan(stages=full.stages[:2],
+                             closing_window_tol=full.closing_window_tol)
+
+
+def _machine() -> str:
+    """The CPU model, the core count and the xdist worker, for a row whose
+    reference arm has moved on one CI job and not on a repeat."""
+    model = platform.processor() or platform.machine()
+    try:
+        with open("/proc/cpuinfo") as fh:
+            model = next((line.split(":", 1)[1].strip() for line in fh
+                          if line.startswith("model name")), model)
+    except OSError:
+        pass
+    return (f"cpu {model!r}, nproc {os.cpu_count()}, "
+            f"PYTEST_XDIST_WORKER {os.environ.get('PYTEST_XDIST_WORKER')}")
+
+
+def _deep_line(name: str, fit: dict) -> str:
+    hits, checks = fit["floor"]
+    columns = (f"{hits} of {checks} angle-column builds by forward difference"
+               if checks else "every moment column by forward difference")
+    return (f"{name}: χ²_red {fit['chi2r']:.12f}; {columns}; "
+            f"stages {fit['stages']}; zeroed {sorted(fit['zeroed'])}")
+
+
 @pytest.mark.parametrize("kind", ["tilt", "azimuth"])
 @pytest.mark.parametrize("angle", [0.05, 0.2, 0.8])
 def test_a_deep_start_reaches_the_forward_difference_s_chi2(kind, angle):
@@ -194,15 +246,26 @@ def test_a_deep_start_reaches_the_forward_difference_s_chi2(kind, angle):
     the direction is a deep maximum along the angle.  Every one reaches the
     forward-difference fit's χ² to 1e-6 relative.
 
-    Measured 2026-11-20 (darwin/arm64): the six agree to 2e-10 relative, the
-    azimuth starts taking 5-15 forward-difference columns at the floor.  With
-    that fallback removed, the 0.2 rad tilt stops at χ²_red 1.0317209 against
-    1.0314580 (2.5e-4 relative, Δχ² ≈ 0.6), so the bar separates the rule
-    from the exact columns alone."""
+    The deep starts stop before the plan's last stage, which frees the cell,
+    zero, Biso and profile: there the reference arm's stop moved on one CI
+    job (py3.14, 2026-11-20) and not on a run of the same tree on
+    2026-11-24, and this row tests the angle rule, not that stage.
+
+    Measured 2026-11-24 (darwin/arm64): the six agree to 8.1e-11 relative,
+    the azimuth starts taking 3-12 of 30-46 angle-column builds by forward
+    difference and the tilt starts 2.  With that fallback removed, the 0.2 rad
+    tilt stops at χ²_red 1.0302671 against 1.0302484 (1.8e-5 relative, 18
+    times the bar), so the bar separates the rule from the exact columns
+    alone.  On the full plan (2026-11-20) the six agreed to 2e-10 and that
+    tilt missed by 2.5e-4.
+    """
     truth = (3.5, angle) if kind == "tilt" else (3.5, 0.0, angle)
-    exact = _fit(2, exact=True, tilt2=None, truth1=truth)
-    fd = _fit(2, exact=False, tilt2=None, truth1=truth)
+    exact = _fit(2, exact=True, tilt2=None, truth1=truth, plan=_deep_plan())
+    fd = _fit(2, exact=False, tilt2=None, truth1=truth, plan=_deep_plan())
     rel = abs(exact["chi2r"] - fd["chi2r"]) / fd["chi2r"]
-    print(f"{kind} {angle}: χ²_red {exact['chi2r']:.10f} vs {fd['chi2r']:.10f} "
-          f"({rel:.1e})")
-    assert rel < 1e-6, rel
+    message = "\n".join([
+        f"{kind} {angle}: relative difference {rel:.1e} (bar 1e-6)",
+        _deep_line("rule", exact), _deep_line("forward difference", fd),
+        _machine()])
+    print(message)
+    assert rel < 1e-6, message

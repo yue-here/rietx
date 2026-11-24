@@ -254,6 +254,13 @@ def cw_seed11():
     return instrument, data, scale
 
 
+#: the zeroed azimuth's standard error on ``cw_seed11``, read from its profile
+#: interval (±0.108 rad at 95 %, 2026-11-20, darwin/arm64): the scale the
+#: residual azimuth is printed against, not asserted, since the row runs
+#: without intervals
+AZIMUTH_SIGMA = 0.055
+
+
 @pytest.mark.parametrize("beta0", [101.1, 101.5, 103.0])
 def test_a_minimum_on_the_symmetric_direction_is_not_pushed_off(cw_seed11, beta0):
     """The angle floor rule's negative arm (issue #1404).
@@ -262,14 +269,20 @@ def test_a_minimum_on_the_symmetric_direction_is_not_pushed_off(cw_seed11, beta0
     difference the rule hands an angle on the floor must not walk a fit off
     it.  Each fit is compared with the forward-difference fit
     (``moment_grad_supported`` forced off, every moment column by the peak
-    chain): χ² within 1e-9 relative and |m| within 1e-4 of its esd, the
-    either-way bars, and the azimuth zeroed by the stationary-angle test in
-    both.  Neither lands on φ = 0 to round-off, and neither did before.  A
-    zeroed angle has no esd, so the residual is read against its profile
-    interval, ±0.108 rad at 95 % (σ ≈ 0.055 rad): from 103.0° it is
-    3.0e-4 rad (0.005σ) here against 1.2e-4 rad (0.002σ) for the forward
-    difference, and under 1e-6 rad from 101.1° and 101.5° in both
-    (2026-11-20, darwin/arm64).
+    chain): χ² no more than 5e-8 relative above it, |m| within 1.5e-3 of its
+    esd, and the azimuth zeroed by the stationary-angle test in both.  The
+    bars are ten times the largest spread measured between the arms across
+    platforms (4.4e-9 relative in χ² on CI py3.11, 1.4e-4 esd in |m| on CI
+    py3.14; tests/CLAUDE.md § Budgets), one-sided in χ² because a push off a
+    minimum can only raise it.  With the azimuth held at 1.1e-2 rad (0.2σ_φ)
+    in the rule arm from 103.0°, the row fails both: χ² 3.9e-7 above, |m|
+    4.9e-3 esd off (2026-11-24, darwin/arm64, read on χ² since the held
+    angle leaves one parameter fewer).  Neither arm lands on φ = 0 to round-off, and neither
+    did before.  A zeroed angle has no esd, so the residual is read against
+    its profile interval, ±0.108 rad at 95 % (σ_φ ≈ 0.055 rad), and printed
+    as that fraction, not asserted: from 103.0° it is 3.0e-4 rad (0.005σ_φ)
+    here against 1.2e-4 rad (0.002σ_φ) for the forward difference, and under
+    1e-6 rad from 101.1° and 101.5° in both (2026-11-20, darwin/arm64).
     """
     from rietx.model.forward import CompiledModel
 
@@ -292,13 +305,21 @@ def test_a_minimum_on_the_symmetric_direction_is_not_pushed_off(cw_seed11, beta0
                 azimuth, zeroed)
 
     a, b = arm(True), arm(False)
-    for result, m, _esd, azimuth, zeroed in (a, b):
+    lines = [f"β₀ {beta0}"]
+    for name, (result, m, esd, azimuth, zeroed) in (("rule", a), ("forward difference", b)):
         assert result.status == "converged"
         assert "phases.0.atoms.0.moment.dof2" in zeroed, zeroed
-        print(f"β₀ {beta0}: χ²_red {result.statistics.chi2:.12f}, |m| {m:.7f}, "
-              f"azimuth {azimuth.value:.1e} rad")
-    assert abs(a[0].statistics.chi2 - b[0].statistics.chi2) / b[0].statistics.chi2 < 1e-9
-    assert abs(a[1] - b[1]) < 1e-4 * b[2], (a[1], b[1], b[2])
+        lines.append(f"{name}: χ²_red {result.statistics.chi2:.12f}, |m| {m:.7f} "
+                     f"(esd {esd:.2e}), azimuth {azimuth.value:+.3e} rad = "
+                     f"{azimuth.value / AZIMUTH_SIGMA:+.4f} σ_φ")
+    rel = (a[0].statistics.chi2 - b[0].statistics.chi2) / b[0].statistics.chi2
+    dm = abs(a[1] - b[1]) / b[2]
+    lines.append(f"χ² rule above forward difference {rel:+.2e} relative (bar 5e-8), "
+                 f"|Δm| {dm:.2e} esd (bar 1.5e-3)")
+    message = "\n".join(lines)
+    print(message)
+    assert rel < 5e-8, message
+    assert dm < 1.5e-3, message
 
 
 # --------------------------------------------------------------------------
