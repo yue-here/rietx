@@ -1,9 +1,8 @@
 # WP-2149 — INDEX_PANEL_REDUCED names the systems the run searched
 
-Milestone: unscheduled · Status: 🔄 2026-11-17 — all tasks landed in PR #1637; the message wording waits on Yue
+Milestone: unscheduled · Status: ✅ 2026-11-23 — PR #1637 merged on 2026-11-18 after Yue accepted the wording; the indexing messages say what the list supports and what the run left out
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P3 2026-11-17 — a message that names crystal systems a run never searched, beside a neighbour that says so; `systems_searched` on the result is right, so a reader who checks it has the truth
 
 ## Goal
 
@@ -113,8 +112,6 @@ in `rietx._audit` (`INDEX_PANEL_REDUCED`, `INDEX_SYSTEMS_NOT_COVERED`). A
 message rewrite keeps their tier. If a code is added for the dropped systems,
 it needs its row.
 
-### Inherited
-
 ## Non-goals
 
 - `MIN_LINES_PER_DOF`, the 20-line bar or `_restrict_to_supported`'s choice of
@@ -162,6 +159,24 @@ for a search the list cannot support.
 - WP-1043, the split between "can be searched" and "can be scored".
 
 ## Handover log
+
+- **2026-11-23 (close)** — closed by a ghostshift runner (batch close-2026-11-23, PR #1815),
+  on a `main` that includes #1637.
+
+  On a short peak list the two indexing messages about crystal systems now say true things.
+  `INDEX_PANEL_REDUCED` names the systems the list has enough lines for, and no longer
+  claims a search ran over them. `INDEX_SYSTEMS_NOT_COVERED` separates the systems the run
+  left out that the list could support from those it could not, and asks for a search only
+  of the first kind. Yue accepted both texts on 2026-11-17. Nothing about the search moved.
+
+  - *Checked before closing*: all six tasks ticked. `gh pr view 1637` shows it merged on
+    2026-11-18 at 01:16 UTC (merge commit 3f5167863). Yue's ruling on the wording is recorded
+    at the end of the 2026-11-17 entry, so the stale Status line was the only thing left.
+  - *Changed by this close*: Status ✅, the `Priority:` line removed (P3, so no release is
+    owed), the empty `### Inherited` heading deleted, and the narrative moved to
+    `docs/milestones/v1.13.md`.
+
+  Next: none.
 
 - **2026-11-17** (ghostshift runner, PR #1637) — The two indexing messages
   about crystal systems now say true things. On a short peak list,

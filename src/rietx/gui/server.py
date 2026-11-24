@@ -166,6 +166,13 @@ def _compare(s: GuiSession, q: dict, _body: dict) -> dict:
     return s.history_compare(ids)
 
 
+def _history_curves(s: GuiSession, q: dict, _body: dict) -> Packed:
+    node = q.get("node", [""])[0]
+    if not node:
+        raise GuiError("curves needs ?node=<node>", where=["node"])
+    return s.history_curves(node)
+
+
 def _structure3d(s: GuiSession, q: dict, body: dict | None) -> dict:
     """Geometry for one phase.  The knobs are *drawing* thresholds, not physics,
     which is why they ride here rather than in a settings document: the
@@ -201,6 +208,12 @@ def _series_index(q: dict, what: str) -> int:
 
 
 def _series_curves(s: GuiSession, q: dict, _body: dict) -> Packed:
+    # ``pattern`` is the place in a list (``of``: the run's or the staged
+    # one), served before, during and after a run; ``index`` is the entry's
+    # position in the last run's record, which today's Series panel reads
+    if q.get("pattern") and q["pattern"][0] != "":
+        of = (q.get("of") or ["run"])[0]
+        return s.series_pattern_curves(_query_int(q, "pattern", 0), of)
     return s.series_curves(_series_index(q, "curves"))
 
 
@@ -314,6 +327,8 @@ ROUTES: dict[tuple[str, str], Any] = {
     ("POST", "/api/peaks/move"): lambda s, q, b: s.peaks_move(b),
     ("POST", "/api/peaks/flag"): lambda s, q, b: s.peaks_flag(b),
     ("POST", "/api/peaks/refit"): lambda s, q, b: s.peaks_refit(b),
+    ("POST", "/api/peaks/undo"): lambda s, q, b: s.peaks_undo(b),
+    ("POST", "/api/peaks/redo"): lambda s, q, b: s.peaks_redo(b),
     # /api/index rides the one run state machine: same worker, same 409
     ("POST", "/api/index"): lambda s, q, b: s.run({**b, "kind": "index"}),
     ("GET", "/api/index/result"): lambda s, q, b: s.index_result(),
@@ -338,11 +353,15 @@ ROUTES: dict[tuple[str, str], Any] = {
     ("POST", "/api/series/run"): lambda s, q, b: s.run({**b, "kind": "series"}),
     ("GET", "/api/series/result"): lambda s, q, b: s.series_result(),
     ("GET", "/api/series/curves"): _series_curves,
+    # every member on one grid, for the Map graph, before a run too (WP-2243)
+    ("GET", "/api/series/map"): lambda s, q, b: s.series_map(),
     ("GET", "/api/series/history"): _series_history,
 
     ("GET", "/api/history"): lambda s, q, b: s.history(),
     ("GET", "/api/history/diff"): _diff,
     ("GET", "/api/history/compare"): _compare,
+    # one node's curve through replay, for the History tab's Compare (WP-2211)
+    ("GET", "/api/history/curves"): _history_curves,
     ("POST", "/api/history/checkout"): lambda s, q, b: s.history_checkout(b),
     ("POST", "/api/history/branch"): lambda s, q, b: s.history_branch(b),
     ("POST", "/api/history/tag"): lambda s, q, b: s.history_tag(b),
@@ -570,6 +589,11 @@ def _handler(session: GuiSession, holder: dict):
             if query.get("poll"):
                 self._json(session.events_since(since))
                 return
+            # a reconnecting EventSource re-opens the URL it was first given and
+            # says how far it read in this header, the SSE spec's resume cursor
+            last = self.headers.get("Last-Event-ID", "")
+            if last.isascii() and last.isdigit():  # "²" is a digit int() refuses
+                since = session.resume_at(since, int(last))
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream; charset=utf-8")
             self.send_header("Cache-Control", "no-store")
