@@ -41,6 +41,7 @@
     onstep = () => {},
     onrun = async () => {},
     onstop = () => {},
+    onstaged = () => {},
   }: {
     step?: number;
     steps: readonly Step[];
@@ -53,6 +54,8 @@
     /** start a run behind its call (the shell's, so the Console holds it) */
     onrun?: (body: Record<string, unknown>, text: string) => Promise<void>;
     onstop?: () => void;
+    /** the server took a new list or walk, so the Map asks again */
+    onstaged?: () => void;
   } = $props();
 
   let setup = $state.raw<SeriesSetup | null>(null);
@@ -191,6 +194,7 @@
     failure = "";
     try {
       absorb(await api.putSeries({ patterns: asRequest(patterns), ...extra }) as SeriesSetup);
+      onstaged();
       if (ran) changed = true;
       return true;
     } catch (error) {

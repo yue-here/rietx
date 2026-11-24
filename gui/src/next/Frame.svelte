@@ -52,6 +52,7 @@
   import HelpBox from "./HelpBox.svelte";
   import Indexing from "./Indexing.svelte";
   import Series from "./Series.svelte";
+  import SeriesMap from "./SeriesMap.svelte";
   import History from "./History.svelte";
   import { howComment, howWords } from "./howran";
   import { GRAPH_HELP, HISTORY_HELP, MODEL_HELP, WORKFLOW_HELP } from "./helpbox";
@@ -199,6 +200,10 @@
   let indexingPanel: ReturnType<typeof Indexing> | undefined = $state();
   /** the series workflow's panel, which folds the run's events (WP-2243) */
   let seriesPanel: ReturnType<typeof Series> | undefined = $state();
+  /** the Map's selected pattern, and a count the staged list moves (WP-2243
+   *  task 7; task 5 links the selection to Pattern and the step's tables) */
+  let seriesSelected = $state<number | null>(null);
+  let seriesStamp = $state(0);
   let frameAt = $state.raw<{ two_theta: number; seq: number } | null>(null);
 
   /** The model panel's width and the bottom panel's height, session-local
@@ -233,8 +238,8 @@
   const wfSteps = $derived(workflow(wf).steps ?? null);
   /** The graph tabs the workflow shows (the prototype's: peaks and indexing
    *  draws the pattern and the peak fits). */
-  const graphTabs = $derived(GRAPH_TABS.filter((t) => !workflow(wf).graphs
-    || workflow(wf).graphs!.includes(t.id)));
+  const graphTabs = $derived(GRAPH_TABS.filter((t) => workflow(wf).graphs
+    ? workflow(wf).graphs!.includes(t.id) : !("workflowOnly" in t)));
   const head = $derived(run?.head ?? project?.head ?? null);
   const noPhases = $derived(project ? (project.n_phases ?? 1) === 0 : false);
   const blocked = $derived(noPhases ? "Add a phase before refining" : null);
@@ -1094,6 +1099,9 @@
           {:else if graphTab === "structure"}
             <Structure {head} {busy} {theme} {say} values={sliderValues}
               projectPath={project?.path ?? null} onreadout={(r) => (reading = r)} />
+          {:else if graphTab === "map" && wf === "series"}
+            <SeriesMap {theme} {busy} stamp={seriesStamp} bind:selected={seriesSelected}
+              onreadout={(r) => (reading = r)} />
           {:else}
             <p class="unbuilt">Not built yet.</p>
           {/if}
@@ -1172,7 +1180,8 @@
           {#key project.path}
             <div class="pane wfsteps">
               <Series bind:this={seriesPanel} {step} steps={wfSteps ?? []} {busy} {run} {say}
-                onstep={chooseStep} onrun={startRun} onstop={stop} />
+                onstep={chooseStep} onrun={startRun} onstop={stop}
+                onstaged={() => (seriesStamp += 1)} />
             </div>
           {/key}
         {/if}

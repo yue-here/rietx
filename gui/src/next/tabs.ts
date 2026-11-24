@@ -12,6 +12,9 @@ export const GRAPH_TABS = [
   { id: "peaks", label: "Peaks" },
   { id: "background", label: "Background" },
   { id: "structure", label: "Structure" },
+  // shown only by a workflow that lists it (`Workflow.graphs`): the series'
+  // Map (WP-2243), never in Refinement
+  { id: "map", label: "Map", workflowOnly: true },
 ] as const;
 
 export const MODEL_TABS = [

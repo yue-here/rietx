@@ -137,3 +137,120 @@ def test_a_series_is_loaded_sorted_walked_and_run(browser, gui, files):
     assert page.locator(".gauge").get_attribute("aria-valuenow") == "100"
     assert not page.errors, page.errors
     page.close()
+
+
+@pytest.fixture(scope="module")
+def map_gui(tmp_path_factory, files):
+    """A second project on the ramp, so the Map starts from a list nobody ran."""
+    project = _project(tmp_path_factory.mktemp("map-proj") / "ramp.rex", files[0])
+    session = GuiSession(project, state_dir=tmp_path_factory.mktemp("map-state"))
+    httpd = _start(session)
+    try:
+        yield f"http://127.0.0.1:{httpd.server_address[1]}/", session
+    finally:
+        session.close()
+        httpd.shutdown()
+
+
+#: Where the Map lays out its rows, in the component's own constants
+#: (`SeriesMap.svelte`'s frame, from the prototype): the left margin, the
+#: top, and with Cuts on the profile beside the map and the one under it.
+MAP_FRAME = """(cv) => {
+  const W = cv.clientWidth, H = cv.clientHeight, Vw = Math.min(170, Math.round(W * 0.2));
+  const R = W - Vw - 14 - 8, Hp = Math.max(90, Math.min(150, Math.round(H * 0.2)));
+  const Hm = H - 8 - 24 - Hp - 10;
+  return { L: 64, R, T: 8, Hm, pT: 8 + Hm + 10, Hp };
+}"""
+
+#: The colour drawn at a point of the canvas, in CSS px.
+PIXEL = """([cv, x, y]) => {
+  const d = devicePixelRatio || 1;
+  return [...cv.getContext("2d").getImageData(Math.round(x * d), Math.round(y * d), 1, 1).data];
+}"""
+
+
+def test_the_map_draws_every_pattern_before_and_after_a_run(browser, map_gui, files):
+    """WP-2243 task 7: the Map graph draws the staged counts before any run, a click
+    sets a cut and selects that pattern, a drag zooms and double-click shows all,
+    and after the run Difference colours every fitted row. No control in the
+    view's title line moves the frame (principle 4)."""
+    url, session = map_gui
+    page = _open_next(browser, url, 1440)
+    page.locator("button.mbtn.wf").click()
+    page.get_by_role("menuitemradio", name="Series", exact=True).click()
+    page.wait_for_selector(".wfsteps .empty")
+    graphs = page.locator("section.graphs > .tabs [role=tab]")
+    assert graphs.all_inner_texts() == ["Pattern", "Map"]
+    with page.expect_file_chooser() as chooser:
+        page.get_by_role("button", name="Add files…").click()
+    chooser.value.set_files([str(f) for f in files])
+    page.wait_for_function("document.querySelectorAll('table.rows tbody tr').length === 3")
+
+    page.get_by_role("tab", name="Map", exact=True).click()
+    page.wait_for_function("document.querySelector('.mapgraph .gtitle b')?.textContent === 'ramp0'")
+    _frames(page)
+    canvas = page.locator(".mapgraph canvas")
+    cv = canvas.element_handle()
+    frame = page.evaluate(MAP_FRAME, cv)
+    rh = frame["Hm"] / 3
+    ground = page.evaluate(PIXEL, [cv, frame["L"] / 2, frame["pT"] - 5])
+    # a row of counts is drawn in cividis, and differs from the plot's ground
+    row = page.evaluate(PIXEL, [cv, (frame["L"] + frame["R"]) / 2, frame["T"] + rh * 1.5])
+    assert row[3] == 255 and row[:3] != ground[:3], (row, ground)
+
+    box = canvas.bounding_box()
+    before = page.evaluate(SNAP, NEXT_LANDMARKS)
+    # a click on the third row sets a cut there and selects that pattern
+    x = box["x"] + frame["L"] + 0.4 * (frame["R"] - frame["L"])
+    page.mouse.click(x, box["y"] + frame["T"] + rh * 2.5)
+    page.wait_for_function("document.querySelector('.mapgraph .gtitle b')?.textContent === 'ramp2'")
+    assert page.locator(".mapgraph .width input").is_visible()
+    width = page.locator(".mapgraph .width input")
+    width.click()
+    width.fill("0.2")
+    width.press("Tab")
+    page.wait_for_function("document.querySelector('.mapgraph .width input').value === '0.2'")
+    # the readout is the status bar's strip, never a box at the pointer
+    page.mouse.move(x + 20, box["y"] + frame["T"] + rh * 0.5)
+    page.wait_for_function(
+        "document.querySelector('footer.statusbar .right')?.textContent.includes('ramp0')")
+
+    show_all = page.get_by_role("button", name="Show all", exact=True)
+    assert show_all.is_disabled()
+    y = box["y"] + frame["T"] + rh * 0.5
+    page.mouse.move(x, y)
+    page.mouse.down()
+    page.mouse.move(x + 60, y, steps=6)
+    page.mouse.move(x + 120, y, steps=6)
+    page.mouse.up()
+    page.wait_for_function("!document.querySelector('.mapgraph .ghost').disabled")
+    page.mouse.dblclick(x, y)
+    page.wait_for_function("document.querySelector('.mapgraph .ghost').disabled")
+
+    for name in ("Waterfall", "Difference", "Map", "Observed"):
+        page.get_by_role("button", name=name, exact=True).click()
+        _frames(page)
+    page.get_by_role("button", name="Flip vertically", exact=True).click()
+    page.get_by_role("button", name="Flip vertically", exact=True).click()
+    page.get_by_text("Cuts", exact=True).click()
+    page.get_by_text("Cuts", exact=True).click()
+    _frames(page)
+    assert not _moved(before, page.evaluate(SNAP, NEXT_LANDMARKS))
+
+    # before a run no row has a difference, so every row is the unfitted ground;
+    # after it, the map asks again and colours each fitted row
+    unfit = page.evaluate("getComputedStyle(document.body).getPropertyValue('--hover').trim()")
+    middle = [(frame["L"] + frame["R"]) / 2, frame["T"] + rh * 1.5]
+    drawn = ("([f, x, y, unfit]) => { const cv = document.querySelector('.mapgraph canvas');"
+             " const d = devicePixelRatio || 1; const p = cv.getContext('2d')"
+             ".getImageData(Math.round(x * d), Math.round(y * d), 1, 1).data;"
+             " const hex = '#' + [...p].slice(0, 3).map(v => v.toString(16).padStart(2, '0')).join('');"
+             " return (hex === unfit.toLowerCase()) === f; }")
+    page.get_by_role("button", name="Difference", exact=True).click()
+    page.wait_for_function(drawn, arg=[True, *middle, unfit])
+
+    page.get_by_role("button", name="Run series").click()
+    page.wait_for_selector(".wfsteps .foot >> text=See results", timeout=180_000)
+    page.wait_for_function(drawn, arg=[False, *middle, unfit])
+    assert not page.errors, page.errors
+    page.close()
