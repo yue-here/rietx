@@ -729,7 +729,7 @@ def test_the_absorption_remedies_hold_a_measured_blank_never_an_estimate():
 
     help_text = DIAGNOSTIC_HELP["BACKGROUND_ABSORPTION"].description
     note = RECIPES["decrease_background_flexibility"].note
-    source = " ".join(Path(refine_module.__file__).read_text().split())
+    source = " ".join(Path(refine_module.__file__).read_text(encoding="utf-8").split())
     assert "hold a measured blank fixed" in help_text
     assert "hold a measured blank additively" in " ".join(note.split())
     assert "hold a measured blank additively" in source.replace('" "', "")
