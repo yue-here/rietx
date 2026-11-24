@@ -59,9 +59,13 @@ const seriesPattern = vi.fn(async (_i: number, _of: string) => packed(false));
 
 import Series from "./Series.svelte";
 import type { SeriesView } from "./seriespattern";
+import type { TrendsView } from "./seriestrends";
 
 const views: (SeriesView | null)[] = [];
 const view = () => views[views.length - 1];
+const trendViews: (TrendsView | null)[] = [];
+const trendsView = () => trendViews[trendViews.length - 1];
+const graphs: string[] = [];
 
 let app: any = null;
 const steps: number[] = [];
@@ -84,6 +88,8 @@ async function boot(step = 0, run: RunState | null = null) {
     onstep: (i: number) => steps.push(i),
     onrun: async (body: Record<string, unknown>, t: string) => { runs.push([body, t]); },
     onview: (v: SeriesView | null) => views.push(v),
+    ontrends: (v: TrendsView | null) => trendViews.push(v),
+    ongraph: (g: string) => graphs.push(g),
   } });
   await settle();
 }
@@ -303,11 +309,11 @@ describe("the Results step", () => {
     await boot(3);
     expect([...document.querySelectorAll(".summary dt")].map(text)).toEqual(["Converged", "Largest step"]);
     expect([...document.querySelectorAll(".summary dd")].map(text))
-      .toEqual(["2 of 2", "LaB6 cell.a · 10 → 20 · 4.3 esd"]);
+      .toEqual(["2 of 2", "LaB6 cell.a · 10 → 20 · 4.3 esd Plot"]);
     expect(cells(0)).toEqual(["1", "10", "4.19", "1.90", "model", ""]);
     expect(cells(1)).toEqual(["2", "20", "4.34", "1.90", "previous", "1"]);
     const values = () => [...document.querySelectorAll(".values tbody tr")]
-      .map((r) => [...r.querySelectorAll("td")].map(text).join(" "));
+      .map((r) => [...r.querySelectorAll("td")].map(text).filter(Boolean).join(" "));
     expect(values()).toEqual(["Fit", "Rwp (%) 4.19", "GoF 1.90", "LaB6", "cell.a 4.15692"]);
     expect(text(document.querySelector(".body p.muted:not(.empty)"))).toBe("No warnings.");
     // a row click selects its pattern: its values and its warnings follow
@@ -316,6 +322,65 @@ describe("the Results step", () => {
     expect(values()).toContain("cell.a 4.15901");
     expect(text(document.querySelector(".body .dg"))).toBe("BOUND_HIT a hit its bound");
     expect(text(document.querySelector("details.notes summary"))).toBe("Warnings across the series");
+  });
+
+  it("plots on Trends: a tick per value under Plot, and each summary row's Plot (task 6)", async () => {
+    stored = { ...setupOf([pattern("T0", 10), pattern("T1", 20)]), has_result: true };
+    seriesResult.mockImplementationOnce(async () => ({
+      result: {
+        entries: [entry(0, 0.0419), entry(1, 0.0434)],
+        diagnostics: [],
+        steps: [{ path: "phases.0.scale", labels: ["T0", "T1"], indices: [0, 1], step: 0.1,
+                  size_esd: 6.1, cold_ratio: null }],
+        direction_gaps: [{ path: "phases.0.cell.a", label: "T1", index: 1, forward: 4.159,
+                           backward: 4.158, gap: 0.001, gap_esd: 2.5, forward_rung: "warm",
+                           backward_rung: "warm" }],
+        code_counts: [], phase_names: ["LaB6"], atom_labels: [[]],
+      },
+      trajectories: [
+        { path: "phases.0.cell.a", x: [10, 20], x_label: "T (K)", value: [4.15692, 4.15901],
+          stderr: [0.00002, 0.00003], labels: ["T0", "T1"], backward: [4.15690, 4.158],
+          n_sigma: 2.5, gap_at: null },
+        { path: "phases.0.scale", x: [10, 20], x_label: "T (K)", value: [1.2, 1.3],
+          stderr: [0.01, 0.01], labels: ["T0", "T1"], backward: null, n_sigma: null, gap_at: null },
+      ],
+      has_backward: true,
+    }) as any);
+    trendViews.length = 0;
+    graphs.length = 0;
+    await boot(3);
+    // the list is headed Plot, and names the pattern its values are at
+    const heads = () => [...document.querySelectorAll(".body h3")].map((h) => [h.firstChild?.textContent, text(h.querySelector(".nt"))].join(" ").trim());
+    expect(heads()).toContain("Plot values at T0, 10");
+    const box = (name: string) => document.querySelector<HTMLInputElement>(`input[aria-label="Plot ${name}"]`)!;
+    // Rwp and the first phase's cell are plotted by default (call 12)
+    expect([box("Rwp (%)").checked, box("GoF").checked, box("LaB6 cell.a").checked, box("LaB6 scale").checked])
+      .toEqual([true, false, true, false]);
+    expect(trendsView()).toMatchObject({ plotted: ["rwp", "phases.0.cell.a"], selected: 0, name: "T0", x: 10 });
+    // a tick plots on Trends and shows it
+    box("LaB6 scale").click();
+    flushSync();
+    expect(trendsView()!.plotted).toEqual(["rwp", "phases.0.cell.a", "phases.0.scale"]);
+    expect(graphs).toEqual(["trends"]);
+    box("Rwp (%)").click();
+    flushSync();
+    expect(trendsView()!.plotted).toEqual(["phases.0.cell.a", "phases.0.scale"]);
+    expect(box("Rwp (%)").checked).toBe(false);
+    // a summary row's Plot: the value plotted, its pattern selected, Trends shown
+    const plots = [...document.querySelectorAll<HTMLButtonElement>(".summary button")];
+    expect(plots.map(text)).toEqual(["Plot", "Plot"]);
+    app.plot(["phases.0.cell.a"], false);
+    flushSync();
+    plots[0].click();
+    flushSync();
+    expect(trendsView()).toMatchObject({ plotted: ["phases.0.scale", "phases.0.cell.a"], selected: 1, name: "T1" });
+    expect(graphs).toEqual(["trends", "trends", "trends"]);
+    expect(document.querySelectorAll("table.rows tbody tr")[1].classList.contains("sel")).toBe(true);
+    expect(heads()).toContain("Plot values at T1, 20");
+    // a point click on Trends selects its pattern through `select`
+    app.select(0);
+    flushSync();
+    expect(trendsView()!.selected).toBe(0);
   });
 });
 

@@ -204,8 +204,11 @@ disagree on wavelength, range or step; a blank pattern) names its tier here befo
   /api/series/curves?pattern=&of=` serves a member by its place, before a run from its
   file and mid-run from each fit `on_result` hands over. Series stays mounted under
   another workflow once chosen.
-- [ ] 6. The Trends graph tab: small panels, the Plot menu, Against, the second walk's rings,
-  the bars' span, a point click selecting its pattern.
+- [x] 6. The Trends graph tab: small panels, the Plot menu, Against, the second walk's rings,
+  the bars' span, a point click selecting its pattern. `seriestrends.ts` holds the rules,
+  `SeriesTrends.svelte` draws them. Results gains the ticks under the heading "Plot" and a
+  Plot link on its two summary rows. Trends draws the record only, so during a run it
+  waits for the run to end.
 - [ ] 7. The Map graph tab, with a route serving every member's observed counts and
   difference on one grid: Map and Waterfall, Observed and Difference, cuts and the two
   profiles, the averaging bar, the row window, area averaging, Flip and the colour key; drawn

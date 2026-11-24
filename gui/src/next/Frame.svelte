@@ -52,6 +52,8 @@
   import HelpBox from "./HelpBox.svelte";
   import Indexing from "./Indexing.svelte";
   import Series from "./Series.svelte";
+  import SeriesTrends from "./SeriesTrends.svelte";
+  import type { Against, TrendsView } from "./seriestrends";
   import { arrowStep, type SeriesView } from "./seriespattern";
   import History from "./History.svelte";
   import { howComment, howWords } from "./howran";
@@ -208,6 +210,11 @@
    *  and a run it started still folds into it */
   let seriesMounted = $state(false);
   const seriesShown = $derived(wf === "series" ? seriesView : null);
+  /** what the Trends graph draws (WP-2243 task 6), and its view choices,
+   *  kept here so a tab switch keeps them */
+  let seriesTrends = $state.raw<TrendsView | null>(null);
+  let trendsAgainst = $state<Against>("x");
+  let trendsHidden = $state<string[]>([]);
   let frameAt = $state.raw<{ two_theta: number; seq: number } | null>(null);
 
   /** The model panel's width and the bottom panel's height, session-local
@@ -242,8 +249,7 @@
   const wfSteps = $derived(workflow(wf).steps ?? null);
   /** The graph tabs the workflow shows (the prototype's: peaks and indexing
    *  draws the pattern and the peak fits). */
-  const graphTabs = $derived(GRAPH_TABS.filter((t) => !workflow(wf).graphs
-    || workflow(wf).graphs!.includes(t.id)));
+  const graphTabs = $derived(GRAPH_TABS.filter((t) => workflow(wf).graphs ? workflow(wf).graphs!.includes(t.id) : !("workflowOnly" in t)));
   const head = $derived(run?.head ?? project?.head ?? null);
   const noPhases = $derived(project ? (project.n_phases ?? 1) === 0 : false);
   const blocked = $derived(noPhases ? "Add a phase before refining" : null);
@@ -836,8 +842,9 @@
     if (wf === "series") seriesMounted = true;
     if (!sized) modelWidth = opening(wf);
     chooseStep(0);
-    const shown = workflow(wf).graphs;
-    if (shown && !shown.includes(graphTab)) graphTab = shown[0];
+    // the tabs `graphTabs` shows for this workflow, so a tab only another
+    // workflow lists never stays chosen behind the strip
+    const shown = graphTabs.map((t) => t.id); if (!shown.includes(graphTab)) graphTab = shown[0];
   }
 
   /** A step opens on its graph: the peak fits for Fit peaks, the pattern for
@@ -1117,6 +1124,12 @@
           {:else if graphTab === "structure"}
             <Structure {head} {busy} {theme} {say} values={sliderValues}
               projectPath={project?.path ?? null} onreadout={(r) => (reading = r)} />
+          {:else if graphTab === "trends" && wf === "series"}
+            <SeriesTrends trends={seriesTrends} running={busy && run?.run?.kind === "series"}
+              {corpus} {theme} bind:against={trendsAgainst} bind:hidden={trendsHidden}
+              onplot={(paths, on) => seriesPanel?.plot(paths, on)}
+              onselect={(i) => seriesPanel?.select(i)} onstep={(d) => seriesPanel?.move(d)}
+              onreadout={(r) => (reading = r)} />
           {:else}
             <p class="unbuilt">Not built yet.</p>
           {/if}
@@ -1197,7 +1210,8 @@
               <Series bind:this={seriesPanel} step={wf === "series" ? step : 0}
                 steps={workflow("series").steps ?? []} {busy} {run} {say}
                 onstep={chooseStep} onrun={startRun} onstop={stop}
-                onview={(v) => (seriesView = v)} />
+                onview={(v) => (seriesView = v)} ontrends={(t) => (seriesTrends = t)}
+                ongraph={(g) => { if (graphTabs.some((t) => t.id === g)) graphTab = g; }} />
             </div>
           {/key}
         {/if}

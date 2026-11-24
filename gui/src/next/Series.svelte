@@ -20,9 +20,12 @@
    * the run ends. Stop keeps what finished (call 10).
    *
    * Results. The record read whole (`seriesresults.ts`): three label-value
-   * rows with no verdict (call 11), one row per pattern, every value at the
-   * selected pattern, that pattern's warnings, and the series' warnings and
-   * largest steps under disclosures.
+   * rows with no verdict (call 11), the last two with Plot, one row per
+   * pattern, every value at the selected pattern with a tick that plots it
+   * on Trends (call 20), that pattern's warnings, and the series' warnings and
+   * largest steps under disclosures. A summary row's Plot, and a row of the
+   * largest steps, plots its value, selects the pattern it names and shows
+   * Trends (`ongraph`); what Trends plots is this panel's (`ontrends`).
    *
    * One selected pattern links the tables and the Pattern graph (round 12,
    * calls 2 and 9; `seriespattern.ts`). A row click, ‹ › in the graph's title
@@ -51,6 +54,7 @@
     drawnPlace, loadMember, markedIn, sameMembers, stepped, subText,
     type ListName, type Selection, type SeriesView,
   } from "./seriespattern";
+  import { defaultPlotted, type TrendsView } from "./seriestrends";
 
   let {
     step = 0,
@@ -62,6 +66,8 @@
     onrun = async () => {},
     onstop = () => {},
     onview = () => {},
+    ontrends = () => {},
+    ongraph = () => {},
   }: {
     step?: number;
     steps: readonly Step[];
@@ -76,6 +82,10 @@
     onstop?: () => void;
     /** what the Pattern graph draws for the series, or null with no pattern */
     onview?: (view: SeriesView | null) => void;
+    /** what the Trends graph draws, or null with no record (task 6) */
+    ontrends?: (view: TrendsView | null) => void;
+    /** show a graph tab: a summary row's Plot shows Trends */
+    ongraph?: (tab: "trends") => void;
   } = $props();
 
   let setup = $state.raw<SeriesSetup | null>(null);
@@ -110,6 +120,10 @@
   let ranOver = $state.raw<{ patterns: SeriesPattern[]; direction: string } | null>(null);
   /** this panel started the run now rising, so its progress is already reset */
   let startedHere = false;
+  /** the values Trends plots, in the order they were ticked; Rwp and the
+   *  first phase's cell until a tick changes them (call 12) */
+  let plotted = $state.raw<string[]>([]);
+  let plotTouched = false;
 
   const settings = $derived(setup?.settings ?? null);
   const axis = $derived(settings?.x_label ?? "index");
@@ -200,6 +214,9 @@
       const payload = await api.seriesResult();
       answer = answerOf(payload);
       entries = answer.entries;
+      // a run keeps what was ticked, less the values its record lacks
+      const has = new Set(["rwp", "gof", ...answer.trajectories.map((t) => t.path)]);
+      plotted = plotTouched ? plotted.filter((p) => has.has(p)) : defaultPlotted(answer);
       cancelled = (payload.result.diagnostics ?? [])
         .some((d: { code: string }) => d.code === "SEQUENTIAL_CANCELLED");
       // the list as the run left it (no edit lands while one is in flight),
@@ -417,7 +434,7 @@
   /** a coordinate where a line needs one, the pattern's number without */
   const xAt = (index: number) => xOf(index) ?? `#${index + 1}`;
   const atX = $derived(at === null ? null : xOf(at));
-  const atName = $derived(atEntry ? `${atEntry.label}${atX == null ? "" : ` · ${atX}`}` : "");
+  const atName = $derived(atEntry ? `${atEntry.label}${atX == null ? "" : `, ${atX}`}` : "");
   const view = $derived.by((): SeriesView | null => {
     if (!drawn) return null;
     const { of, index } = drawn;
@@ -442,6 +459,53 @@
     untrack(() => onview(v));
   });
   $effect(() => () => onview(null));
+
+  // -- Trends (task 6): the plotted values and the selection it marks -------
+
+  /** Plot the paths on Trends, or take them off. */
+  export function plot(paths: string[], on: boolean) {
+    plotTouched = true;
+    plotted = on ? [...plotted, ...paths.filter((p) => !plotted.includes(p))]
+      : plotted.filter((p) => !paths.includes(p));
+  }
+
+  /** Select a pattern of the run's list: a point click on Trends. */
+  export function select(index: number) {
+    choose("run", index);
+  }
+
+  /** A summary row's Plot: the value on Trends, the pattern it names
+   *  selected, and the graph switched to Trends (the prototype's). */
+  function show(path: string, index: number) {
+    plot([path], true);
+    choose("run", index);
+    ongraph("trends");
+  }
+
+  /** A tick in the Plot list plots on Trends and shows it (the prototype's). */
+  function tick(path: string, on: boolean) {
+    plot([path], on);
+    ongraph("trends");
+  }
+
+  const trends = $derived.by((): TrendsView | null => {
+    if (!answer) return null;
+    const selected = drawn?.of === "run" ? drawn.index : null;
+    const e = answer.entries.find((x) => x.index === selected);
+    return {
+      answer, plotted, selected,
+      name: selected === null ? "" : e?.label ?? rows[selected]?.label ?? "",
+      x: selected === null ? null : xOf(selected),
+      canPrev: selected !== null && selected > 0,
+      canNext: selected !== null && selected < rows.length - 1,
+      axis,
+    };
+  });
+  $effect(() => {
+    const t = trends;
+    untrack(() => ontrends(t));
+  });
+  $effect(() => () => ontrends(null));
 
   /** a finished run is whole, even read by a page that did not follow it */
   const fraction = $derived(!running && entries && !cancelled ? 1
@@ -599,12 +663,16 @@
           <dd><span class="num">{nConverged}</span> of <span class="num">{a.entries.length}</span>{#if a.entries.length < rows.length}{" "}fitted{/if}</dd>
           {#if gap}
             <dt>Largest walk gap</dt>
-            <dd>{pathName(gap.path, a)} · {xAt(gap.index)} · <span class="num">{esdText(gap.gap_esd!)}</span> esd</dd>
+            <dd>{pathName(gap.path, a)} · {xAt(gap.index)} · <span class="num">{esdText(gap.gap_esd!)}</span> esd
+              <button class="link" title="Plot this value on Trends"
+                onclick={() => show(gap.path, gap.index)}>Plot</button></dd>
           {/if}
           {#if bigSteps[0]}
             {@const s = bigSteps[0]}
             <dt>Largest step</dt>
-            <dd>{pathName(s.path, a)} · {xAt(s.indices[0])} → {xAt(s.indices[1])} · <span class="num">{esdText(s.size_esd!)}</span> esd</dd>
+            <dd>{pathName(s.path, a)} · {xAt(s.indices[0])} → {xAt(s.indices[1])} · <span class="num">{esdText(s.size_esd!)}</span> esd
+              <button class="link" title="Plot this value on Trends"
+                onclick={() => show(s.path, s.indices[1])}>Plot</button></dd>
           {/if}
         </dl>
         {#if changed}<p class="warn">Changed since this run</p>{/if}
@@ -629,13 +697,17 @@
             {/each}
           </tbody>
         </table>
-        <h3>Values{#if atName}<span class="nt">at {atName}</span>{/if}</h3>
+        <h3>Plot{#if atName}<span class="nt">values at {atName}</span>{/if}</h3>
         <table class="rows values">
           <tbody>
             {#each valueGroups(a, at) as g (g.key)}
-              <tr class="gh"><td colspan="2">{g.title}</td></tr>
+              <tr class="gh"><td colspan="3">{g.title}</td></tr>
               {#each g.rows as v (v.path)}
-                <tr>
+                {@const on = plotted.includes(v.path)}
+                <!-- a tick plots the value on Trends; the row is the target too -->
+                <tr onclick={(ev) => { if (!(ev.target as HTMLElement).closest("input")) tick(v.path, !on); }}>
+                  <td class="ck"><input type="checkbox" checked={on} aria-label="Plot {g.key === '#fit' ? v.name : pathName(v.path, a)}"
+                    onchange={(ev) => tick(v.path, ev.currentTarget.checked)} /></td>
                   <td>{v.name}{#if v.count < v.n}<span class="nt num">{v.count}/{v.n}</span>{/if}</td>
                   <td class="r num">{v.value}</td>
                 </tr>
@@ -665,7 +737,7 @@
             <table class="rows">
               <tbody>
                 {#each bigSteps.slice(0, 10) as s, k (k)}
-                  <tr onclick={() => choose("run", s.indices[1])}>
+                  <tr onclick={() => show(s.path, s.indices[1])}>
                     <td>{pathName(s.path, a)}</td>
                     <td class="muted">{xAt(s.indices[0])} → {xAt(s.indices[1])}</td>
                     <td class="r num">{esdText(s.size_esd!)} esd</td>
@@ -863,8 +935,16 @@
     color: var(--muted);
   }
 
-  .rows.values tbody tr {
-    cursor: default;
+  .rows .ck {
+    width: 26px;
+    padding: 0 0 0 2px;
+  }
+  .rows .ck input {
+    margin: 0;
+    vertical-align: middle;
+  }
+  .kv dd .link {
+    margin-left: 8px;
   }
 
   .rows .nt {

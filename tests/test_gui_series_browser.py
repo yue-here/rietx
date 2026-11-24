@@ -190,3 +190,70 @@ def test_one_selected_pattern_moves_on_the_graph_and_the_tables(browser, gui):
     assert "sel" in (page.locator(".wfsteps table.rows tbody tr").nth(0).get_attribute("class") or "")
     assert not page.errors, page.errors
     page.close()
+
+
+def _captions(page) -> list[str]:
+    return [" ".join(t.split()) for t in page.locator(".trends figcaption").all_inner_texts()]
+
+
+def test_trends_plots_the_ticked_values_and_a_point_selects_its_pattern(browser, gui):
+    """Task 6: the Trends tab, shown only under Series, draws Rwp and the first
+    phase's cell by default; a tick in Results adds a panel and × removes it;
+    Against switches the axis; a summary row's Plot shows Trends; a point
+    click selects its pattern on every view. Runs on the first test's run."""
+    url, session = gui
+    assert session.series_result()["result"]["entries"], "the run test above runs first"
+    page = _open_next(browser, url, 1440)
+    trends = page.get_by_role("tab", name="Trends", exact=True)
+    assert trends.count() == 0                      # Refinement lists no Trends
+    page.locator("button.mbtn.wf").click()
+    page.get_by_role("menuitemradio", name="Series", exact=True).click()
+    page.locator("nav.steps button.step", has_text="Results").click()
+    page.wait_for_selector(".wfsteps .summary")
+
+    # a summary row's Plot shows Trends
+    page.locator(".wfsteps .summary").get_by_role("button", name="Plot", exact=True).first.click()
+    page.wait_for_selector(".trends figure canvas")
+    assert trends.get_attribute("aria-selected") == "true"
+    captions = _captions(page)
+    assert captions[0] == "Rwp (%)", captions
+    assert any("cell.a" in c for c in captions), captions
+    n = len(captions)
+
+    # a tick in the Results list adds a panel, × removes it
+    page.get_by_role("checkbox", name="Plot GoF", exact=True).click()
+    page.wait_for_function(f"document.querySelectorAll('.trends figure').length === {n + 1}")
+    assert "GoF" in _captions(page)
+    page.locator(".trends figure", has_text="GoF").get_by_role(
+        "button", name="Remove this panel", exact=True).click()
+    page.wait_for_function(f"document.querySelectorAll('.trends figure').length === {n}")
+    assert not page.get_by_role("checkbox", name="Plot GoF", exact=True).is_checked()
+
+    # the Plot menu lists the values by group and stays open while ticking
+    page.locator(".trends .gctl").get_by_role("button", name="Plot", exact=True).click()
+    page.get_by_role("menu", name="Plot").get_by_role("menuitem", name="Fit").click()
+    page.get_by_role("menuitemcheckbox", name="GoF", exact=True).click()
+    page.wait_for_function(f"document.querySelectorAll('.trends figure').length === {n + 1}")
+    assert page.get_by_role("menuitemcheckbox", name="GoF", exact=True).is_visible()
+    page.keyboard.press("Escape")
+    page.keyboard.press("Escape")
+
+    # Against: the pattern number, then the coordinate again
+    page.get_by_role("group", name="Against").get_by_role("button", name="Pattern", exact=True).click()
+    page.wait_for_function("document.querySelector('.trends .xlabel')?.textContent === 'Pattern'")
+    page.get_by_role("group", name="Against").get_by_role("button", name="index", exact=True).click()
+    page.wait_for_function("document.querySelector('.trends .xlabel')?.textContent === 'index'")
+
+    # a point click selects its pattern: the last one, at the plot's right
+    box = page.locator(".trends .stack").bounding_box()
+    width = box["width"]
+    lo, hi, pad = 300.0, 500.0, 8.0                     # the coordinates, 4 % padding
+    x = 64 + (hi - (lo - pad)) / (hi - lo + 2 * pad) * (width - 74)
+    first = page.locator(".trends figure canvas").first.bounding_box()
+    page.mouse.click(box["x"] + x, first["y"] + first["height"] / 2)
+    page.wait_for_function("document.querySelector('.trends .gtitle')?.textContent.includes('ramp2')")
+    page.get_by_role("tab", name="Pattern", exact=True).click()
+    page.wait_for_function("document.querySelector('.pattern .gtitle')?.textContent.includes('ramp2')")
+    assert "500 · 3 of 3" in _title(page), _title(page)
+    assert not page.errors, page.errors
+    page.close()
