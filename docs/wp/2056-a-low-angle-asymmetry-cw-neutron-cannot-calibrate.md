@@ -182,10 +182,15 @@ term at P = 0 is bit-identical to today, and the cross-backend matrix covers its
   *Open, not blocking.*
   - **A k = 0 line carrying both a nuclear and a magnetic structure factor** still reads fraction 0
     at zero moments, so in a Le Bail fit it can anchor the finding although part of its extracted
-    intensity may be magnetic. A commensurate supercell with no anti-centring (k = 1/3) has the same
-    gap: its magnetic rows are nuclear-absent only by the stated positions, not by the group. This is
-    a magnetic-path design call and Michael's (ruled on #1075); it is recorded here and for #1499, and
-    nothing is built.
+    intensity may be magnetic. This is a magnetic-path design call and Michael's (ruled on #1075); it
+    is recorded here and for #1499, and nothing is built.
+  - **A commensurate supercell with no anti-centring (k = 1/3) is a different case** (corrected
+    2026-11-25; the 11-23 entry called it the same gap). Its magnetic rows are nuclear-absent only by
+    the stated positions, so at zero moments they read fraction 0, no line reaches the
+    magnetic-only cut, and the finding stays silent (round 1's item 1 for that class). Read from
+    `_magnetic_fraction` and `low_angle_asymmetry_findings`, not yet run: no k = 1/3 fixture exists. Owed
+    in the follow-ups PR unless the maintainer wants it here; whether stated positions count as
+    known in a structure-free fit is Michael's call.
   - `moving` is the answer-stage table's `moving_paths`: a plan that freed the apertures in an
     earlier stage and held them in the last would print "held at". No shipped preset does this under
     cumulative staging, so it is a docstring note, tracked as round 2's follow-up 5.
