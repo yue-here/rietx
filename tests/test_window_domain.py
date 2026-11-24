@@ -182,6 +182,7 @@ def _protocol(family):
     st.phases[0].scale.value = 1e-6
     st.phases.append(_caf2_phase())
     plan = rx.RefinementPlan.mccusker_default()
+    plan.closing_window_tol = CLOSING_WINDOW_TOL
     plan.stages.append(rx.Stage("biso", ["phases.*.atoms.*.biso"]))
     return data, st, ins, plan, kw
 

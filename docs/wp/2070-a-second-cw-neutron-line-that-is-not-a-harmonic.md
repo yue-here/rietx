@@ -131,6 +131,13 @@ weight seed and the calibrate-then-hold staging are named practice (`lab_calibra
 
 ## Handover log
 
+- **2026-11-17** — Ruled by Yue 2026-11-17: option (b). A second line is
+  `NeutronSource.extra_lines: list[NeutronLine]`, and the schema version is bumped.
+  Ground: the three consumers keyed on the harmonic mechanism stay untouched, which is why
+  the reporter and the triage both leaned (b). Recorded from Part B item 43 of the
+  2026-11-17 decisions batch (Ghostshift runner, no code changed). Next: the first task,
+  the schema, under this ruling.
+
 - **2026-10-31** — created by the issue triage from #1208. No open WP owns a second
   neutron line: WP-1132 (neutron µR) and WP-2056 (low-angle CW neutron asymmetry) share
   the track but not the mechanism, and WP-1312 (CW neutron follow-through) is ✅.

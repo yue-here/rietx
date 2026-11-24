@@ -29,7 +29,7 @@ from rietx.optimize.cancel import CancelToken, RefinementCancelled
 from rietx.optimize.least_squares import _cancel_check
 from rietx.params.vector import ParameterTable
 from rietx.refine import PAWLEY_SEED_CYCLES
-from rietx.schemas.plan import StageSpec
+from rietx.schemas.plan import CLOSING_WINDOW_TOL, StageSpec
 from rietx.sequential import _collapse
 from rietx.strategy.staged import Stage, resolve_plan
 from tests.test_auto_background_seed import _neutron, _phase
@@ -361,7 +361,10 @@ def test_a_settled_second_partition_does_not_undo_a_cut_first_one(pattern, monke
         return run, settled and len(calls) != 3    # the closing stage's first
 
     monkeypatch.setattr(CompiledModel, "lebail_update", cut_first)
-    plan = rx.RefinementPlan(stages=[Stage("bkg", ["instrument.background.*"])])
+    # declared, not inherited: off by default since WP-2222, and the cut lands
+    # on the closing stage's first partition
+    plan = rx.RefinementPlan(stages=[Stage("bkg", ["instrument.background.*"])],
+                             closing_window_tol=CLOSING_WINDOW_TOL)
     result = _refinement(pattern).fit(pattern, mode="lebail", plan=plan, telemetry=False)
     assert len(result.stages[-1].lebail_cycles_run) == 2
     assert result.stages[-1].lebail_settled is False
@@ -478,7 +481,9 @@ def _domain_fit(family, tol):
     data, structure, ins, limits = FAMILIES[family]()
     ref = rx.Refinement(structure, ins)
     plan = resolve_plan("profile_only", "lebail")
-    plan = dataclasses.replace(plan, stages=[
+    # the bars were measured behind the closing stage, declared since WP-2222:
+    # at the declared stages' 2 % windows LaMnO3's partition misses bar 1 by 0.30σ
+    plan = dataclasses.replace(plan, closing_window_tol=CLOSING_WINDOW_TOL, stages=[
         dataclasses.replace(s, lebail_cycles=REFERENCE_CAP if tol < TOL else CAP, lebail_tol=tol)
         for s in plan.stages])
     fitted = ref.fit(data, mode="lebail", plan=plan, two_theta_limits=limits, telemetry=False)

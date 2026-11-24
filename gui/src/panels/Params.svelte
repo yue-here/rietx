@@ -24,6 +24,7 @@
    */
   import { ApiError, api } from "../api";
   import Help from "../Help.svelte";
+  import HeldMark from "../HeldMark.svelte";
   import { paramKey, resolve, type HelpCorpus } from "../lib/help";
   import { editText, expText, numParts, slotWidth, slotsFor, type NumParts,
            type Slots } from "../lib/numslot";
@@ -31,7 +32,7 @@
            type Section } from "../lib/paramtree";
   import type { ParamsDraft } from "../lib/recovery";
   import { typesetSpaceGroup } from "../lib/spacegroup";
-  import { asGlob, editState, heldGlyph, matches, normalize, selection,
+  import { asGlob, editState, matches, normalize, selection,
            validateEdit, varyEdit, varyOf, type ParamRow } from "../lib/table";
 
   let {
@@ -84,6 +85,8 @@
 
   interface Editor {
     keys: string[];
+    /** the text the editor opened on: committing it is no edit (WP-2223) */
+    opened: string;
     left: number;
     top: number;
     width: number;
@@ -184,7 +187,7 @@
     return pair ? { ...r, lo: pair[0] ?? -Infinity, hi: pair[1] ?? Infinity } : r;
   }) : rows);
   const limitedByPath = $derived(new Map(limitedRows.map((r) => [r.path, r])));
-  const valueState = $derived(editState(limitedRows, edits, 0));
+  const valueState = $derived(editState(limitedRows, edits, 0, "stored"));
   const limitInvalid = $derived([...limitEdits].filter(([, [lo, hi]]) =>
     lo !== null && hi !== null && lo > hi)
     .map(([path]) => ({ path, why: "lower limit above the upper one" })));
@@ -614,7 +617,7 @@
     if (pending !== undefined) return pending;
     const row = byPath.get(key);
     if (!row) return "";
-    return editText(row.value, row.esd, !COORD.test(key) && !/\.atoms\.\d+\.(occ|biso)$/.test(key));
+    return editText(row.value);
   }
 
   function openEditor(target: HTMLElement, keys: string[]) {
@@ -625,7 +628,7 @@
     const width = Math.max(rect.width + 10, (Math.max(text.length + 4, 12)) * 8);
     const left = Math.min(Math.max(8, rect.left), window.innerWidth - width - 8);
     editorText = text;
-    editor = { keys, left, top: rect.top, width, height: rect.height,
+    editor = { keys, opened: text, left, top: rect.top, width, height: rect.height,
                below: rect.bottom + 180 < window.innerHeight, error: "" };
     queueMicrotask(() => {
       editorInput?.focus();
@@ -633,20 +636,20 @@
     });
   }
 
-  /** Write the editor's text into every key it edits, as pending edits. A
-   *  text equal to what the cell already drew is no edit (WP-1009). */
+  /** Write the editor's text into every key it edits, as pending edits. The
+   *  text it opened on is no edit (WP-1009's rule, WP-2223), and a text that
+   *  reads as a key's stored value drops that key's edit. */
   function commit(): boolean {
     if (!editor) return true;
     const text = editorText.trim();
+    if (text === editor.opened) return true;                  // untouched
     if (editor.keys.length > 1 && text === "") return true;   // "Mixed", untouched
     let nextEdits = edits;
     let nextPositions = positionEdits;
     for (const key of editor.keys) {
       const row = byPath.get(key);
       if (!row) continue;
-      const drawn = editText(row.value, row.esd,
-        !COORD.test(key) && !/\.atoms\.\d+\.(occ|biso)$/.test(key));
-      const same = text === drawn || (text !== "" && Number(text) === Number(drawn));
+      const same = text !== "" && Number(text) === row.value;
       const m = COORD.exec(key);
       if (m) {
         const fields = { ...(nextPositions.get(m[1]) ?? {}) };
@@ -822,7 +825,7 @@
          one, and the mark says which reason holds it (WP-1214) -->
     <span class="mark muted">
       <Help text={row.held_because} title="This row is held"
-        label="why this row is held">{heldGlyph(row)}</Help>
+        label="why this row is held"><HeldMark {row} /></Help>
     </span>
   {/if}
 {/snippet}

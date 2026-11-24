@@ -40,7 +40,7 @@ temporary directory.
 `rietx gui` with no project named reopens the project you had open last, unless
 you closed it from the File menu. Otherwise it shows the start screen. On the left are `New project…`, `Open…`, and
 links to this manual and its tutorials. On the right are the projects you opened
-recently and the example projects shipped inside the package. A first run has no
+recently and the example projects included in the package. A first run has no
 recent list, so it shows the examples alone. Start from an example if you have
 no data of your own.
 
@@ -61,12 +61,12 @@ refinement starts to need a plan rather than a button.
 
 ```{image} ../screenshots/empty-state-light.png
 :class: only-light
-:alt: The start screen: the wordmark, New project, Open and the two links on the left, and the shipped example projects with their descriptions on the right
+:alt: The start screen: the wordmark, New project, Open and the two links on the left, and the included example projects with their descriptions on the right
 ```
 
 ```{image} ../screenshots/empty-state-dark.png
 :class: only-dark
-:alt: The start screen: the wordmark, New project, Open and the two links on the left, and the shipped example projects with their descriptions on the right
+:alt: The start screen: the wordmark, New project, Open and the two links on the left, and the included example projects with their descriptions on the right
 ```
 
 ## What is on the screen
@@ -125,6 +125,20 @@ The header also carries the project's name and pattern, `Simple | Advanced` and
 a three-way theme control (`◐` follow the system, `☀` light, `☾` dark). Over the
 pattern, the `Pattern` tab and a title line say what the graph shows. Once a fit
 has run, `Rwp` and `GoF` sit on that line.
+
+### The trace
+
+On `Series`, a strip above the plot draws the series coordinate against the pattern index. Marks, from the series answer:
+
+| mark | label | meaning |
+|---|---|---|
+| `SERIES_PATTERN_FAILED` | failed | no fit |
+| `SEQUENTIAL_UNRECOVERED` | unrecovered | diverged |
+| `SEQUENTIAL_RESEED` | reseeded | fit cold |
+| `findings` | findings | bar: codes raised |
+| `largest_step` | largest step | a rank, no verdict |
+
+Drag the strip to scrub; the plot keeps your zoom.
 
 ## Run the fit
 

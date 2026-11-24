@@ -20,6 +20,7 @@ from pydantic import Field, ValidationInfo, field_validator, model_validator
 
 from ..model.profiles.caglioti import _MIN_GAMMA_G2
 from .common import Base, Parameter, _InheritsDeclaredDefaults, reading_stored_document
+from .peak_equation import PeakEquation, check_level
 
 if TYPE_CHECKING:  # the blank a measured background is built from
     from .pattern import PatternData
@@ -342,7 +343,7 @@ class NeutronSource(Base):
         degenerate with the phase scales in any case.  A harmonic's weight is
         the *stored* :class:`Parameter` off :attr:`harmonics`, passed by
         reference rather than copied, which is what makes a refined value
-        survive the write-back (``params.vector.ParameterTable.write_back``
+        survive the write-back (``params.vector.ParameterTable.apply_to_models``
         reaches it as ``instrument.source.lines.i.weight``).
 
         Building the list here rather than materialising the extra lines into a
@@ -896,8 +897,8 @@ class Source(_InheritsDeclaredDefaults):
     """
 
     kind: Literal["xray_cw"] = "xray_cw"
-    #: The *declared* lines.  Harmonics are appended by :attr:`spectrum`, not
-    #: stored here — see :attr:`harmonics`.
+    #: The *declared* lines.  Harmonics are refused on this radiation — see
+    #: :attr:`harmonics`.
     lines: list[EmissionLine]
     polarization: Parameter = Field(
         default_factory=lambda: Parameter(value=0.5, min=0.0, max=1.0)
@@ -2374,6 +2375,20 @@ class Instrument(_InheritsDeclaredDefaults):
     #: underscore puts the paths outside that glob by construction instead of
     #: by retightening seven presets.
     extra_components: list[ExtraComponent] = Field(default_factory=list)
+    #: Peak equations at the pattern level (WP-2107): a ``shift`` in θ and 2θ
+    #: that moves every phase's peaks, as a 2θ calibration curve does.  The
+    #: list holds at most one equation per target, and the instrument's takes
+    #: ``shift`` alone and reads no reflection (:func:`~rietx.schemas.
+    #: peak_equation.check_level`).  Coefficients are entries at
+    #: ``instrument.peak_equations.<j>.<name>``, a path no preset's glob
+    #: reaches, so only a stage the caller writes frees one.  Empty is exactly
+    #: off, as ``extra_components`` is.
+    peak_equations: list[PeakEquation] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _peak_equations_fit_the_instrument(self) -> "Instrument":
+        check_level(self.peak_equations, "instrument")
+        return self
 
     @model_validator(mode="before")
     @classmethod

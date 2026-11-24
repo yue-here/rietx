@@ -1,6 +1,7 @@
 Abramowitz
 [aA]bsorber
 [aA]bsorbers
+[aA]cridine
 [aA]ctinide
 [aA]dditively
 ADP
@@ -24,6 +25,7 @@ Avrami
 [bB]eamline
 [bB]eamstop
 [bB]eamtime
+Bergmann
 [bB]ijection
 [bB]intype
 [bB]intypes
@@ -375,6 +377,7 @@ Ungaretti
 [uU]nphysical
 [uU]npolarised
 [uU]nprimed
+[uU]nrecovered
 [uU]nscaled
 [uU]ntransposed
 Villars

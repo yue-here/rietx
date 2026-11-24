@@ -110,6 +110,10 @@ On a synthetic LaB₆ fit whose model lacks the data's Lorentzian width (21 400 
 | `FreedComparison.n_effective` | N/f² | `rietx.optimize.statistics.effective_sample_size` |
 | `FreedComparison.delta_bic` | ΔBIC charged at `n_effective` | positive favours the fuller model |
 | `FreedComparison.delta_bic_raw_n` | the same at the channel count | an upper bound on the evidence, kept so the gap is visible |
+| `FreedComparison.status_restricted`, `FreedComparison.status_full` | each fit's own `status` | a fit not `converged` may not sit at its optimum |
+| `FreedComparison.chi2_ordered` | whether the fuller fit's last `StageResult.cost_final`, the data χ² plus any restraint and penalty rows it minimised, is at or below the restricted fit's plus 2, the absolute margin `rietx.report.layer2.NESTED_COST_MARGIN` in cost units | `False` proves the fuller fit short of its minimum, since a model that contains another cannot fit worse at its optimum |
+| `FreedComparison.n_identified` | the freed parameters with an esd and off their bounds | fewer than `n_added` means some charged columns carried no information; `delta_bic` still charges `n_added` |
+| `FreedComparison.diagnostics` | [`COMPARISON_UNCONVERGED`](diagnostics-refinement.md#comparison_unconverged) when either status is not `converged` or the ordering fails | read it before quoting `delta_bic` |
 
 | Field | Is | Reads as |
 |---|---|---|
@@ -118,8 +122,16 @@ On a synthetic LaB₆ fit whose model lacks the data's Lorentzian width (21 400 
 | `FreedParameter.value` | the fuller fit's value | |
 | `FreedParameter.esd` | the fuller fit's esd | already inflated by that fit's Bérar-Lelann factor |
 | `FreedParameter.t_ratio` | `(value - held_at) / esd` | how far the parameter moved, in its own esds; `None` where either is |
+| `FreedParameter.at_bound` | the fuller fit's own `RefinedParameter.at_bound` for the row | `True` means a limit carried load, so the t-ratio is no Wald number |
+| `FreedParameter.t_reason` | why `t_ratio` is `None` | `None` wherever `t_ratio` is a number |
 
 There is no verdict field.
+A comparison that rests on a fit short of its optimum is flagged and not refused, because a fit stopped on its budget can still sit at its optimum.
+The ordering test lets the fuller fit's cost end up to 2 above the restricted fit's.
+That margin is the lower edge of the "positive evidence" band of Kass and Raftery (1995), so an excess inside it can't change a ΔBIC verdict.
+Two converged fits stop about 1e-7 of their cost apart, so above a cost of about 10⁷ a converged pair can read as unordered.
+On the synthetic LaB₆ pattern of `tests/test_compare_freed.py`, freeing La Biso gave ΔBIC +264 when the fuller fit converged.
+Stopped after one iteration from Biso = 4, the same comparison gave −1941, with `status_full` `max_iter`, `chi2_ordered` `False` and `COMPARISON_UNCONVERGED` on `diagnostics`.
 A pair that is not nested raises `ValueError`: a different channel count, different intensities or a different mode, a path the restricted fit frees and the fuller one does not, nothing added, or a free count that moved by other than the added paths.
 A refinement that has not been fitted raises `RuntimeError`.
 
@@ -135,11 +147,15 @@ It accepts the action when the reduced χ² falls by more than `min_improvement`
 | `VerificationOutcome.kind` | the action's kind |
 | `VerificationOutcome.predicted_delta_chi2` | the action's `expected_delta_chi2` |
 | `VerificationOutcome.observed_delta_chi2` | the fall in the reduced χ² the stage achieved |
-| `VerificationOutcome.accepted` | whether that fall passed the `min_improvement` rule, and nothing else |
+| `VerificationOutcome.accepted` | whether that fall passed the `min_improvement` rule; `None` where a fit short of its optimum could flip the rule, so the action was not judged |
 | `VerificationOutcome.reason` | the χ² before and after, as a sentence |
 | `VerificationOutcome.comparison` | the trial's `FreedComparison`; `None` when no trial fit ran, when the action freed nothing new, or when a hold in the stage broke the nesting |
 
 An action with no parameter paths, and a trial whose fit fails, come back rejected with the reason.
+A trial that stopped on its iteration budget and fell short of the rule comes back with `accepted` `None`, since more iterations could only lower its χ².
+A trial that diverged comes back rejected.
+A gain over your own fit that was itself short comes back `None` too, since the gain may be that fit continuing.
+The reason then says which fit was short.
 On a synthetic LaB₆ fit with the cell 0.0005 Å off, verifying `refine_cell` predicted 16.16 and observed 16.31, with the reason `χ² 16.93 → 0.6239 (+96.31%); accepted`.
 
 ## Where the improvement lives
@@ -215,9 +231,11 @@ The coexistence case, a second phase beside the parent, transfers weakly and is 
 
 A rigid body can converge to a good pose with the wrong shape, and nothing in the report names the body.
 `Refinement.check_rigid_bodies(data)` refits each body twice from the fitted state: as the body, and as free atoms held near the template by soft restraints on every template bond and bonded angle.
+In the released refit a riding hydrogen keeps riding: its coordinates are tied to its parent's, so only the other atoms add parameters, 3 per atom less the body's own.
 Both refits run under the refinement's own 2θ limits, ties, holds, backend and solver.
 It compares them on the data χ² with Hamilton's R-factor ratio test {cite}`hamilton1965` and with ΔBIC {cite}`schwarz1978`, both at the effective observation count.
 It warns ([`RIGID_BODY_MISFIT`](diagnostics-refinement.md#rigid_body_misfit)) only when both prefer the released atoms.
+It adds [`COMPARISON_UNCONVERGED`](diagnostics-refinement.md#comparison_unconverged) for a body whose refits did not both reach their optimum.
 It costs two refinements per body and is not part of `fit`.
 
 <!-- api-doc: no-exec — it needs a refinement of a rigid-body phase that has run -->
@@ -238,7 +256,8 @@ It returns a `rietx.report.body_misfit.BodyMisfitResult`, whose `rows` hold one 
 | `BodyMisfitRow.n_free_body`, `BodyMisfitRow.n_added` | the free parameters of the body refit, and how many the released refit adds |
 | `BodyMisfitRow.f_statistic`, `BodyMisfitRow.p_value` | Hamilton's test |
 | `BodyMisfitRow.delta_bic` | ΔBIC, positive favouring the released atoms |
-| `BodyMisfitRow.fires` | whether both tests prefer the released atoms |
+| `BodyMisfitRow.fires` | whether both tests prefer the released atoms; `None` where a refit short of its optimum could flip the answer |
+| `BodyMisfitRow.status_body`, `BodyMisfitRow.status_released`, `BodyMisfitRow.chi2_ordered` | each refit's `status`, and whether the released refit's cost, restraint rows included, is at or below the body refit's plus 2 |
 | `BodyMisfitRow.deviations` | (label, template value, released value, Δ/σ) for each template bond and angle, largest first |
 | `BodyMisfitRow.dropped` | your ties and holds that could not follow into the released refit |
 
@@ -248,3 +267,41 @@ Each message names the three template bonds or angles the released refit moved f
 
 A template bond wrong by more than the bonding criterion's slack is not found as a bond, so the check cannot see it.
 A tie or hold on the released body, or on a later body of its phase whose index the release shifts, is dropped from the released refit and listed in `dropped`.
+
+### The released arm by hand
+
+`Refinement.released_arm(body)` builds the released refit the check runs, so you can fit it yourself or free other atoms.
+It works on the refinement's current structure, so call it after `fit`, as the check does.
+It returns a `rietx.report.body_misfit.ReleasedArm`:
+
+| Field | Is |
+|---|---|
+| `ReleasedArm.structure` | the structure with the body removed and the restraints added |
+| `ReleasedArm.phase_index`, `ReleasedArm.body` | which phase, and the body's name |
+| `ReleasedArm.freed` | the member atoms whose coordinates the refit frees |
+| `ReleasedArm.riders` | each riding hydrogen that rides, and the parent it follows |
+| `ReleasedArm.restraints` | the bond and angle restraints added, at the geometry the body placed |
+| `ReleasedArm.free` | the coordinate globs of the freed atoms, for a stage |
+| `ReleasedArm.ties` | each rider coordinate and its source, for `Refinement.tie` |
+
+<!-- api-doc: no-exec — it needs a refinement of a rigid-body phase that has run -->
+```python
+arm = ref.released_arm("acridine")
+released = rx.Refinement(arm.structure, ref.instrument)
+for path, source in arm.ties.items():
+    released.tie(path, source)
+released.fit(pattern, plan=rx.RefinementPlan(stages=[
+    rx.Stage("released", ["phases.*.scale", "instrument.background.*", *arm.free])]))
+```
+
+The check's refit also carries your own ties, holds and 2θ limits; one built this way carries what you declare on it.
+By default every member that is not a riding hydrogen is freed.
+`freed=` names the members to free instead; a riding hydrogen it names is freed with them, and one it leaves out still rides.
+A member that is neither freed nor riding stays where the body placed it.
+`phase=` names the phase when two phases carry a body of that name, and `bond_sigma` and `angle_sigma` are the restraint widths, as in the check.
+
+A riding hydrogen's parent is the nearest template atom that does not ride.
+The tie gives the hydrogen its parent's every shift, so at a held cell the parent–hydrogen vector stays exactly as the body placed it.
+At a refined cell the vector follows the cell, as a fractional offset does.
+The hydrogen does not turn when its neighbours do, which the body's hydrogen does; re-placing it from its neighbours is riding on a free atom, which rietx does not do yet.
+A bond or angle with a riding hydrogen in it is not restrained.
