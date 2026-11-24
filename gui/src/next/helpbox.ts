@@ -7,6 +7,7 @@
  * what the rebuilt page does. `anchor` is the section of the manual's GUI
  * chapter (`reference/gui-guide.md`) the box links to.
  */
+import type { WorkflowId } from "../lib/workflows";
 import type { GraphTab, ModelTab } from "./tabs";
 
 export type HelpBoxEntry = {
@@ -110,4 +111,28 @@ export const HISTORY_HELP: HelpBoxEntry = {
     "Right-click a row to make it current, branch from it, name it or write a note on it.",
   ],
   anchor: "history",
+};
+
+/** What a workflow's `?` box says, at the right of its step strip (WP-2240):
+ *  the prototype's words for each workflow (rounds 11 and 12), cut to the
+ *  steps built. */
+export const WORKFLOW_HELP: Partial<Record<WorkflowId, HelpBoxEntry>> = {
+  index: {
+    title: "Peaks and indexing",
+    lead: "Find the cell of an unknown phase. Go back to Pick peaks whenever the ticks say a line is missing or extra.",
+    items: [
+      "Pick peaks: tick a line to use it in the search, untick it to leave it out. Click a row to frame its line on the pattern.",
+      "Picking again replaces the list, and says first how many of your edits it replaces.",
+    ],
+    anchor: "peaks",
+  },
+  series: {
+    title: "Series",
+    lead: "Refine many patterns in turn, each starting from its neighbour's result: a temperature ramp, an in-situ run.",
+    items: [
+      "Patterns: the files in series order and how to walk them. Type each pattern's value of the series axis; Sort by puts them in that order.",
+      "Run: each fit as it lands. Stop keeps the patterns already fitted.",
+    ],
+    anchor: "series",
+  },
 };

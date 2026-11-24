@@ -22,7 +22,7 @@ The matching reads `[0]` as a set of characters, so `phases[0].cell.a` matches n
 
 Some names exist only when the model declares the block they belong to.
 `phases.0.microstrain.dof.*` appears once the phase carries a `StephensStrain`, `phases.0.atoms.2.adp.*` once that atom carries an `AnisoU`, and `instrument.geometry.capillary_offset_along_beam` only on a capillary geometry.
-A wildcard over an absent block matches nothing, so the shipped plans' broad names are safe on any model.
+A wildcard over an absent block matches nothing, so the built-in plans' broad names are safe on any model.
 
 ## Rows
 
