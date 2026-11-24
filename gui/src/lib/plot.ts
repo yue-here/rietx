@@ -36,7 +36,7 @@ export type Scale = "linear" | "sqrt" | "log";
  * (jsdom); `read` is injected so this stays a pure function.
  */
 export function curveColors(read: (name: string) => string): {
-  obs: string; calc: string; bkg: string; diff: string; last: string; zero: string;
+  obs: string; calc: string; bkg: string; diff: string; last: string; compare: string; zero: string;
   mask: string; edge: string; peak: string; peakfit: string; candidate: string;
   phase: string[];
 } {
@@ -48,6 +48,8 @@ export function curveColors(read: (name: string) => string): {
     diff: pick("--plot-diff", "#6b6259"),
     // the last fit while a preview is drawn over it (WP-2218)
     last: pick("--plot-last", "#849499"),
+    // a node the History tab compares, dashed (WP-2211)
+    compare: pick("--plot-compare", "#403a35"),
     zero: pick("--plot-zero", "#cfcfcf"),
     // The peak layer's two (WP-1210).  It had none: the markers took `--accent`
     // and the fitted curve `--bad`, which on the light theme *are* `--plot-diff`
@@ -423,6 +425,26 @@ export function residual(kind: ResidualKind, w: Window): Residual {
     label: "Δ",
     zeroline: true,
   };
+}
+
+/** A peak mark's lens, in CSS pixels: 18 tall and 4.5 wide, its lower tip
+ *  7 above the data (round 11c, 2026-11-08). Here, off the chart chunk, so
+ *  the page's DOM marks (`next/Pattern.svelte`) draw the canvas's lens. */
+export const LENS_HEIGHT = 18;
+export const LENS_WIDTH = 4.5;
+export const LENS_GAP = 7;
+
+/** A lens centred on (x, y), pointed at both ends: two quadratic arcs whose
+ *  control points sit `w` either side of the axis. The shape of rietx's
+ *  reflection ticks, used for a peak mark on the pattern and in the group
+ *  fit windows (WP-2240); here, off the chart chunk, so both can import it. */
+export function lens(ctx: CanvasRenderingContext2D, x: number, y: number,
+                     h: number, w: number): void {
+  ctx.beginPath();
+  ctx.moveTo(x, y - h / 2);
+  ctx.quadraticCurveTo(x + w, y, x, y + h / 2);
+  ctx.quadraticCurveTo(x - w, y, x, y - h / 2);
+  ctx.closePath();
 }
 
 // ----------------------------------------------------------------------

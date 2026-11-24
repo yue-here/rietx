@@ -88,13 +88,28 @@ def _fit_from(m1_start, m2_start, data):
     return ref, ref.result_
 
 
+def single_moment_phase(m: float) -> Phase:
+    """The pair's two sites as one at occupancy 2: the nuclear part is the
+    pair's, and the magnetic amplitude is 2m, so the powder sees exactly the
+    pair's pattern at m = √(m1² + m2²)/2 and 2·σ(m) is the sum's own esd."""
+    phase = degenerate_pair_phase(m, 0.0)
+    phase.atoms[0].occ.value = 2.0
+    del phase.atoms[1]
+    return phase
+
+
 @pytest.mark.slow
 def test_two_starting_splits_report_the_same_quadrature_number(degenerate_pattern):
     """A 50/50-ish split and a lopsided split of the same total: both must
     converge to (near enough) the true total modulus and, more to Q5's
     point, both must report the *same* quadrature number within 1 sigma via
     the pairing mechanism, even though m1 and m2 themselves may differ
-    between the two runs (the flat direction the pairing exists for)."""
+    between the two runs (the flat direction the pairing exists for).
+
+    Since WP-2219 neither modulus has an esd (they lie on a discarded
+    direction), and since WP-2230 the sum keeps one through the fit's live
+    covariance, within 10 % of the esd a fit of one site carrying the
+    quadrature modulus gives."""
     ref_a, result_a = _fit_from(1.75, 1.75, degenerate_pattern)
     ref_b, result_b = _fit_from(2.4, 0.3, degenerate_pattern)
 
@@ -118,7 +133,8 @@ def test_two_starting_splits_report_the_same_quadrature_number(degenerate_patter
             ref._model, values, ref.structure,
             esd={p.path: p.stderr for p in result.parameters
                 if p.stderr is not None},
-            correlations=result.identifiability.top_correlations)
+            correlations=result.identifiability.top_correlations,
+            covariance=ref._answer_covariance)
         paired = [r for r in rows if r.paired_with]
         assert len(paired) == 2, rows
         return paired[0]
@@ -134,6 +150,24 @@ def test_two_starting_splits_report_the_same_quadrature_number(degenerate_patter
     assert abs(row_a.paired_magnitude - row_b.paired_magnitude) <= combined_sigma, (
         row_a.paired_magnitude, row_a.paired_magnitude_esd,
         row_b.paired_magnitude, row_b.paired_magnitude_esd)
+
+    # each modulus on its own has none, as WP-2219 rules for a column
+    for result in (result_a, result_b):
+        rows = {p.path: p for p in result.parameters}
+        for path in pair_key:
+            assert rows[path].stderr is None, path
+    # the report folds the pair through the same live covariance
+    paired = [r for r in ref_a.report().magnetic if r.paired_with]
+    assert len(paired) == 2
+    assert paired[0].paired_magnitude_esd == pytest.approx(row_a.paired_magnitude_esd)
+
+    one = rx.Refinement(rx.Structure(phases=[single_moment_phase(2.0)]), neutron())
+    one.fit(degenerate_pattern, plan=PLAN)
+    alone = one.result_.parameter("phases.0.atoms.0.moment.dof0")
+    assert 2 * abs(alone.value) == pytest.approx(row_a.paired_magnitude,
+                                                 abs=2 * alone.stderr)
+    for row in (row_a, row_b):
+        assert row.paired_magnitude_esd == pytest.approx(2 * alone.stderr, rel=0.1)
 
 
 def test_pair_degenerate_moments_quadrature_and_esd_are_correct():

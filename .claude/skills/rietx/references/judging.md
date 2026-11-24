@@ -223,11 +223,11 @@ c = rx.report.compare_freed(ref, trial)
 [(p.path, p.t_ratio) for p in c.freed], c.delta_bic, c.delta_bic_raw_n
 ```
 
-Read the t-ratios first. A disagreement between the pair is information. A
-block of several parameters can carry a positive joint ΔBIC while no member's
-|t| reaches 2, which says the block moves the fit and no single member is
-measured. A ΔBIC far from t² − ln N_eff for one parameter means f moved between
-the two fits. `predict_then_verify` carries the same record on
+Read `c.diagnostics` first: after `COMPARISON_UNCONVERGED`, quote neither
+number. Then the t-ratios; an `at_bound` row's t is no Wald number. A block can
+carry a positive ΔBIC while no member's |t| reaches 2, so the block moves the
+fit and none is measured. A ΔBIC far from t² − ln N_eff for one parameter means
+f moved between the two fits. `predict_then_verify` carries the same record on
 `VerificationOutcome.comparison`, beside its 1 % χ² rule.
 
 By hand, for a pair `compare_freed` refuses as not nested, remember that
