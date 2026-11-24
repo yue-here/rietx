@@ -455,3 +455,41 @@ def test_the_constant_wavelength_arm_reports_nothing_about_it():
     codes = [d.code for d in res.diagnostics]
     assert "TOF_CHANNEL_WIDTH_APPLIED" not in codes
     assert "TOF_INTENSITY_BASIS_ASSUMED" not in codes
+
+
+# ------------------------------------------- what a rebuilt grid carries
+def test_predict_and_the_summary_probe_keep_a_counts_banks_channel_width(
+        monkeypatch):
+    """#1548 review, item 11.  ``predict(data)`` and the ``summary()`` probe
+    both rebuild a pattern from bare arrays; without the bank's basis they
+    compiled a counts bank as a density, so ``predict(data)`` returned the
+    Bragg sum without W(T) — a slope in flight time — and no longer
+    reproduced ``y_calc``.  Both forms of ``predict`` must, and the probe must
+    be handed a counts pattern."""
+    data = _generated(silicon(0.5), bank(), "counts", seed=20260906)
+    ref = rx.Refinement(silicon(0.5), bank(), history=False)
+    plan = rx.RefinementPlan(stages=[
+        rx.Stage("scale_bkg", ["phases.*.scale", "instrument.background.c*"])])
+    result = ref.fit(data, plan=plan)
+    y_calc = np.asarray(result.y_calc)
+
+    # the pattern form and the bare-array form both carry W(T)
+    assert np.allclose(ref.predict(data), y_calc, rtol=1e-10, atol=1e-9)
+    assert np.allclose(ref.predict(np.asarray(result.x())), y_calc,
+                       rtol=1e-10, atol=1e-9)
+    # the control: the same grid as a density is a different curve, by the
+    # slope W(T) and not a scale, so the agreement above is not vacuous
+    as_density = ref.predict(data.model_copy(update={"intensity_basis": "density"}))
+    ratio = y_calc[y_calc > 1.0] / np.asarray(as_density)[y_calc > 1.0]
+    assert ratio.max() / ratio.min() > 5.0
+
+    seen = []
+    real_suggest = rx.Refinement.suggest
+
+    def spy(self, pattern, *a, **kw):
+        seen.append(pattern.intensity_basis)
+        return real_suggest(self, pattern, *a, **kw)
+
+    monkeypatch.setattr(rx.Refinement, "suggest", spy)
+    ref.summary()
+    assert seen == ["counts"]

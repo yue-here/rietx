@@ -7284,7 +7284,10 @@ class Refinement:
         in it are flight times in microseconds — the axis is a property of the
         instrument here, because a bare array declares nothing.  Passing a
         :class:`~rietx.PatternData` is the unambiguous form: it carries its own
-        axis, and a pair whose two halves disagree is refused by name.
+        axis, and a pair whose two halves disagree is refused by name.  On a
+        bank it carries its ``intensity_basis`` too, which decides whether the
+        channel width W(T) multiplies the curve; a bare array takes the basis
+        of the pattern the last fit ran on, and none before a fit.
 
         **It does not require a fit** (WP-1110 item 6).  Until then it did, and
         the refusal was ``RuntimeError: call fit() first`` on both forms, which
@@ -7351,9 +7354,16 @@ class Refinement:
             # the fitted model reads the moment DOFs in the last stage's frames
             table.pull_moment_frames(self._model)
             return self._model.evaluate(table.decode(table.x0()))
+        # What a bank's channels hold travels with the grid: a counts bank's
+        # Bragg sum carries W(T), a slope in flight time, so a grid rebuilt
+        # without it would not reproduce ``y_calc`` (#1548 review, item 11).
+        # From the pattern passed when there is one; for a bare array, from
+        # the model the last fit compiled, the pattern it ran on.
+        basis = getattr(self._model, "intensity_basis", None)
         if isinstance(two_theta, PatternData):
             require_matched_axis(two_theta, "Refinement.predict()",
                                  instrument=self.instrument)
+            basis = two_theta.intensity_basis
             two_theta = two_theta.x()
         tt = np.asarray(two_theta, dtype=np.float64)
         # A bare array carries no axis, so the instrument decides which field
@@ -7363,7 +7373,8 @@ class Refinement:
         grid = PatternData(
             two_theta=None if tof_grid else tt.tolist(),
             tof=tt.tolist() if tof_grid else None,
-            intensity=[0.0] * len(tt))
+            intensity=[0.0] * len(tt),
+            intensity_basis=basis if tof_grid else None)
         mode = self._mode
         if mode in ("lebail", "pawley") and self._model is None:
             raise RuntimeError(
@@ -7572,10 +7583,15 @@ class Refinement:
         model = self._model
         # rebuilt on the model's own axis — ``grid`` is ``tt`` on the
         # constant-wavelength arm and the flight times on a bank
+        # and with the bank's basis, or a counts bank would be probed without
+        # its W(T) and rank the next parameter against another model (#1548
+        # review, item 11)
         data = PatternData(
             two_theta=None if _is_tof(model) else model.grid.tolist(),
             tof=model.grid.tolist() if _is_tof(model) else None,
-            intensity=model.y_obs.tolist(), sigma=model.sigma.tolist())
+            intensity=model.y_obs.tolist(), sigma=model.sigma.tolist(),
+            intensity_basis=(model.intensity_basis if _is_tof(model)
+                             else None))
         s = self.suggest(data)
         if not s.groups:
             return (f"  next: nothing to free — no held parameter clears the "
