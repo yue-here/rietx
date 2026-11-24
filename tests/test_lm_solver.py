@@ -913,10 +913,11 @@ def test_a_stage_with_max_iter_0_is_refused_on_either_driver(solver, max_iter,
     with pytest.raises(ValueError, match="max_iter"):
         rx.Stage("evaluate", [], max_iter=max_iter)
 
-    # the stored mirror refuses it too, so a plan holding 0 is refused where
-    # it is read rather than stored and then refused at every conversion
-    with pytest.raises(ValueError, match="greater than or equal to 1"):
-        StageSpec(name="scale", turn_on=["phases.*.scale"], max_iter=max_iter)
+    # the stored mirror takes it, so an old project holding 0 still opens; the
+    # refusal comes where the stored stage becomes a runnable one
+    stored = StageSpec(name="scale", turn_on=["phases.*.scale"], max_iter=max_iter)
+    with pytest.raises(ValueError, match=r"max_iter=.*ref\.evaluate\(data\)"):
+        stored.to_stage()
 
     structure, instrument = perturbed_models()
     plan = rx.RefinementPlan(stages=[rx.Stage("scale", ["phases.*.scale"])])

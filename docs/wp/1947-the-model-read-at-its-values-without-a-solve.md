@@ -1,8 +1,9 @@
 # WP-1947 — the model read at its values, without a solve
 
-Milestone: unscheduled · Status: ✅ 2026-11-17 — PR #1640; `Refinement.evaluate`, `reflection_table(data)` and `background` read the model at its values without a fit or a write, and a stage refuses `max_iter < 1`; two follow-ups in issue #1652
+Milestone: unscheduled · Status: 🔄 2026-11-17 — built in PR #1640; `Refinement.evaluate`, `reflection_table(data)` and `background` read the model at its values without a fit or a write, and a new stage refuses `max_iter < 1`; two follow-ups in issue #1652
 Track: Render what the fit already knows
 Depends on: —
+Priority: P3 2026-10-11 — an application reads statistics, ticks and the background before a fit through an undocumented empty stage or by mutating its own refinement; each has a workaround
 
 ## Goal
 
@@ -148,6 +149,12 @@ displacement tick defect is fixed (WP-1908, ✅).
       then answered 500 on every read of it, and the mirror accepted what
       the dataclass refuses. Now the plan route answers 4xx at
       `plan.stages.0.max_iter` (probed on the `fap` example).
+      **Superseded in part 2026-11-24 (review of #1640):** `StageSpec` does
+      not carry `ge=1` after all. A stored plan or history header holding 0
+      must still open (every old file opens), so the refusal sits where new
+      input enters: `Stage.__post_init__`, and the plan route, which answers
+      4xx at `plan.stages.N.max_iter`. The plan read serves the stored spec,
+      so the editor shows a 0 it can correct.
 - [x] Reflections before a fit: `Refinement.reflection_table(data)` (or the
       verb's result) built on `phase_peaks`, the same rows as after a fit.
       Test: the rows before a fit equal the rows of an empty-stage fit.

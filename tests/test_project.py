@@ -953,3 +953,37 @@ def test_a_preset_name_is_stored_through_the_projects_mode(tmp_path, pattern_fil
     want = PlanSpec.from_plan(PLAN_PRESETS[expected]())
     assert project.doc.plan == want
     assert rx.Project.open(project.path).doc.plan == want
+
+
+def test_a_stored_plan_holding_max_iter_0_still_opens(tmp_path, pattern_file):
+    """Every old file opens (WP-1947, the review of #1640).
+
+    ``max_iter=0`` was a legal stage budget until WP-1947: the GUI's field had
+    no minimum and the agent skill taught ``run_stage(turn_on=[], max_iter=0)``
+    for an evaluation.  A project whose ``project.json`` plan, or whose history
+    header's plan, holds one must open as it did.  The refusal meets new input
+    where it enters, so running the stored stage says what to call instead.
+    """
+    one = rx.RefinementPlan(stages=[rx.Stage("scale", ["phases.*.scale"],
+                                             max_iter=5)])
+    root = tmp_path / "old.rex"
+    project = _create(root, pattern_file, plan=one)
+    project.fit()
+    project.save()
+    stored = json.loads((project.path / PROJECT_JSON).read_text())
+    stored["plan"]["stages"][0]["max_iter"] = 0
+    (project.path / PROJECT_JSON).write_text(json.dumps(stored))
+    # the history header carries its own copy of the plan (a PlanSpec too)
+    log = project.path / "history.jsonl"
+    lines = log.read_text().splitlines()
+    first = json.loads(lines[0])
+    assert first["record"] == "header"
+    first["header"]["plan"] = stored["plan"]
+    log.write_text("\n".join([json.dumps(first), *lines[1:]]) + "\n")
+
+    reopened = rx.Project.open(project.path)
+    assert reopened.doc.plan.stages[0].max_iter == 0
+    assert reopened.history.header.plan.stages[0].max_iter == 0
+    # run, the stored stage is refused in rietx's words, before any fit
+    with pytest.raises(ValueError, match=r"max_iter=0.*ref\.evaluate\(data\)"):
+        reopened.fit()

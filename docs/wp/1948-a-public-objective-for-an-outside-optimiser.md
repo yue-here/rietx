@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: ⬜
 Track: Candidates — named on a use case, not yet on a measurement
 Depends on: 1947 (the evaluation without a solve); 1938 (the parameter coordinates)
-Priority: P3 2026-11-17 — one embedder drives the pattern half through private names and pins `rietx<1.6`; back up the rung, since 1947 closes with this PR (the evaluation without a solve is `Refinement.evaluate`); 1938 settled θ as physical units (#883)
+Priority: P4 2026-10-11 — one embedder drives the pattern half through private names and pins `rietx<1.6` (P3 by the rubric), down a rung until 1947 lands; 1938 settled θ as physical units (#883)
 
 ## Goal
 
@@ -86,10 +86,6 @@ embedder pins an old version to reach private names.
 source run calling `predict()` at 20-35 ms an evaluation. A structure-solution
 search is the next caller of a cheap objective. WP-1513 carries a skill row
 for "writing your own search loop".
-
-### Inherited
-
-- **2026-11-17, from [1947](1947-the-model-read-at-its-values-without-a-solve.md) (closed, PR #1640): the evaluation without a solve is `Refinement.evaluate(data, *, mode=None, two_theta_limits=None)`.** It runs the empty stage on the private, history-free trial `Refinement._trial(record=False)` with `telemetry=False`, so it writes nothing and returns a `RefinementResult`; `reflection_table(data)` and `background(two_theta)` are its siblings. It is a whole fit's machinery (two compiles, statistics, diagnostics), about 20-45 ms on the synthetic LaB6, so it is not the per-evaluation path an optimiser wants: this WP's objective builds on `compile_model` + `ParameterTable.decode` as its Context says, and can borrow `_trial` for the declarations it must carry (ties, variables, holds). `Stage` and `StageSpec` now refuse `max_iter < 1`.
 
 ## Non-goals
 

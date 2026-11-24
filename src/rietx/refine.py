@@ -7176,6 +7176,11 @@ class Refinement:
 
         :meth:`predict` is the cheaper call when only the curve is wanted: one
         compile, no statistics, and no extraction.
+
+        **It records no run directory, though it runs a fit internally.** An
+        evaluation is not a fit (WP-1947), as :meth:`predict` is not one, and
+        a run directory for each call would only feed retention in a loop
+        that evaluates many times.
         """
         require_two_theta(data, "Refinement.evaluate()", instrument=self.instrument)
         _refuse_without_phases(self.structure, "evaluate")
