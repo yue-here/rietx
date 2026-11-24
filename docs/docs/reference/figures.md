@@ -135,11 +135,11 @@ Every view is fitted to the frame, and the projection is parallel.
 
 `size=` is the long side in pixels, 1000 by default, or a `(width, height)` pair.
 Line widths and letters grow with it, as they do in the GUI's export, so a larger picture is the same figure at a higher resolution.
-`dpi=` goes only into the PNG's `pHYs` chunk.
+`dpi=` goes into the PNG's `pHYs` chunk, or sets the SVG's printed size.
 A 17 cm figure at 300 dpi is `size=2008, dpi=300`.
 `supersample=` sets how many samples are taken along each side of a pixel, from 1 to 4, and 2 by default.
 More samples draw smoother edges.
-`path=` writes a PNG and refuses any other suffix.
+`path=` writes a PNG or, for a `.svg` suffix, an SVG (see Vector output below), and refuses any other suffix.
 `pad=` is the share of the frame's width and height left empty on each side, 0.05 by default as in ChimeraX's `view`.
 `pad=0` crops the picture to its ink, keeping only the room a line's half-width, the a, b and c, and any atom labels need.
 YBa₂Cu₃O₇ without its cell, at 1000 px, keeps 35 to 53 px of margin at the default and 3 px at `pad=0`, and fluorapatite with its cell keeps 15 px.
@@ -212,9 +212,21 @@ A site's `color` is `#rrggbb`, `"white"` or `"black"`.
 
 On an Apple M4 in October 2026, a render of the NAC cell took 35-41 ms at 1000 px and 89-117 ms at 3000 px.
 
+### Vector output
+
+A `path` ending `.svg` writes the same picture as vector shapes.
+Each atom is an ellipse, each stick a run of short pieces, each polyhedron face a polygon at the viewer's translucency, and the letters are text.
+Every element carries a class naming its kind and its site (`atom Ca1`, `stick Ca1`, `cell`, and `face` with the polyhedron's formula), so a CSS rule such as `.Ca1` or a search by class finds every element of one site.
+User units are the PNG's pixels, so `.atoms` and `.letters` hold for both files, and `dpi=` sets the printed size.
+The returned figure's `.image` and `.report` are the PNG's either way.
+
+The shapes are sorted back to front rather than depth-tested.
+Sticks and lines are cut into pieces so that a bond passing behind an atom is hidden where it passes, but where a translucent face cuts an atom, or two large ellipsoids overlap, one is drawn whole in front of the other.
+Shading is a gradient per atom and per stick, so a depth-cued picture fades each element as a whole rather than each pixel.
+
 ### Limits
 
-There is no SVG or PDF output, because a ray-caster has no shapes to write.
+There is no PDF writer: the SVG is the vector form, and a vector editor converts it.
 Perspective, shadows and ambient occlusion are not drawn either.
 The function follows the GUI's viewer, and the viewer is still changing, so its look and its keywords are {ref}`provisional <provisional-by-declaration>`.
 For a picture in another program's style, `Structure.to_cif` writes each phase with its anisotropic displacement loop, which VESTA and Jmol both read.

@@ -24,9 +24,12 @@
   import Palette from "../panels/Palette.svelte";
   import Interactive from "./Interactive.svelte";
   import Background from "./Background.svelte";
+  import Candidates from "./Candidates.svelte";
+  import PeakFits from "./PeakFits.svelte";
   import Peaks from "./Peaks.svelte";
   import Structure from "./Structure.svelte";
   import Recovery from "../panels/Recovery.svelte";
+  import HelpPopover, { provideHelp } from "../HelpPopover.svelte";
   import { projectStem } from "../lib/filemenu";
   import type { HelpCorpus } from "../lib/help";
   import { RecoveryWriter, combine, readDraft, restoredText, type Draft,
@@ -39,7 +42,8 @@
   import { follow, type EngineEvent, type RunState } from "../lib/stream";
   import { applyTheme, readChoice, resolveTheme, type ThemeChoice } from "../lib/theme";
   import type { PeakRow, PeaksPayload } from "../lib/peaks";
-  import { WORKFLOWS, isNotBuilt, menuLabel, stepGraph, workflow,
+  import type { CandidateOverlay } from "../lib/plot";
+  import { WORKFLOWS, isNotBuilt, menuLabel, panelWidth, stepGraph, workflow,
            type WorkflowId } from "../lib/workflows";
   import ActionBar from "./ActionBar.svelte";
   import Console from "./Console.svelte";
@@ -47,6 +51,11 @@
            type LineKind } from "./console";
   import HelpBox from "./HelpBox.svelte";
   import Indexing from "./Indexing.svelte";
+  import Series from "./Series.svelte";
+  import SeriesMap from "./SeriesMap.svelte";
+  import SeriesTrends from "./SeriesTrends.svelte";
+  import type { Against, TrendsView } from "./seriestrends";
+  import { arrowStep, type SeriesView } from "./seriespattern";
   import History from "./History.svelte";
   import { howComment, howWords } from "./howran";
   import { GRAPH_HELP, HISTORY_HELP, MODEL_HELP, WORKFLOW_HELP } from "./helpbox";
@@ -82,6 +91,8 @@
   let openError = $state("");
   let newOpen = $state(false);
   let corpus = $state<HelpCorpus | null>(null);
+  /** the page's one help popover, which every `<Help>` term opens (WP-2244) */
+  const help = provideHelp();
 
   /** The last fit (`/api/result`), and a key bumped whenever its curves moved. */
   let result = $state.raw<any>(null);
@@ -179,9 +190,37 @@
    *  the row chosen in its table, and a request to frame a line (WP-2240):
    *  the Pattern graph draws them while the workflow is up. */
   let peaksPayload = $state.raw<PeaksPayload | null>(null);
+  /** the Index and Judge steps' panel, which a run of theirs reports to */
+  let candidatesPanel: ReturnType<typeof Candidates> | undefined = $state();
+  /** the candidate whose lines the Pattern graph draws (round 11, call 9) */
+  let candidateLines = $state.raw<CandidateOverlay | null>(null);
+  /** the Fit peaks step's windows: the groups its list draws, the one chosen
+   *  and how many the list holds (WP-2240 task 6) */
+  let fitGroups = $state.raw<{ groups: number[]; focused: number | null; total: number }>(
+    { groups: [], focused: null, total: 0 });
   let selectedPeak = $state<number | null>(null);
   /** the workflow panel, whose verbs the plot's peak gestures call */
   let indexingPanel: ReturnType<typeof Indexing> | undefined = $state();
+  /** the series workflow's panel, which folds the run's events (WP-2243) */
+  let seriesPanel: ReturnType<typeof Series> | undefined = $state();
+  /** what the Pattern graph draws while Series is up: the selected member
+   *  (WP-2243 task 5), handed up by the panel */
+  let seriesView = $state.raw<SeriesView | null>(null);
+  /** Series has been chosen once: from then on it stays mounted, hidden under
+   *  another workflow, so its list, its run's table and the selection keep,
+   *  and a run it started still folds into it */
+  let seriesMounted = $state(false);
+  const seriesShown = $derived(wf === "series" ? seriesView : null);
+  /** what the Trends graph draws (WP-2243 task 6), and its view choices,
+   *  kept here so a tab switch keeps them */
+  let seriesTrends = $state.raw<TrendsView | null>(null);
+  let trendsAgainst = $state<Against>("x");
+  let trendsHidden = $state<string[]>([]);
+  /** the row the Map marks, handed up by the Series panel, which holds the
+   *  one selection; a count the staged list moves, so the Map asks again
+   *  (WP-2243 task 7) */
+  let seriesMark = $state<number | null>(null);
+  let seriesStamp = $state(0);
   let frameAt = $state.raw<{ two_theta: number; seq: number } | null>(null);
 
   /** The model panel's width and the bottom panel's height, session-local
@@ -189,6 +228,11 @@
   const MODEL_DEFAULT = 785;
   const BOTTOM_DEFAULT = 200;
   let modelWidth = $state(MODEL_DEFAULT);
+  /** the person has sized the panel: a workflow's own width no longer opens it */
+  let sized = false;
+  /** the workflow's opening width, leaving the graphs the splitter's `keep` */
+  const opening = (id: WorkflowId) =>
+    panelWidth(id, appEl?.clientWidth || Infinity, MODEL_DEFAULT, 360);
   let bottomHeight = $state(BOTTOM_DEFAULT);
   let appEl: HTMLDivElement | undefined = $state();
   let mainEl: HTMLDivElement | undefined = $state();
@@ -211,8 +255,8 @@
   const wfSteps = $derived(workflow(wf).steps ?? null);
   /** The graph tabs the workflow shows (the prototype's: peaks and indexing
    *  draws the pattern and the peak fits). */
-  const graphTabs = $derived(GRAPH_TABS.filter((t) => !workflow(wf).graphs
-    || workflow(wf).graphs!.includes(t.id)));
+  const graphTabs = $derived(GRAPH_TABS.filter((t) => workflow(wf).graphs
+    ? workflow(wf).graphs!.includes(t.id) : !("workflowOnly" in t)));
   const head = $derived(run?.head ?? project?.head ?? null);
   const noPhases = $derived(project ? (project.n_phases ?? 1) === 0 : false);
   const blocked = $derived(noPhases ? "Add a phase before refining" : null);
@@ -437,6 +481,9 @@
     peaksPayload = null;
     selectedPeak = null;
     frameAt = null;
+    // the Fit and Index steps hand these up from panels `opens` starts over
+    candidateLines = null;
+    fitGroups = { groups: [], focused: null, total: 0 };
     protocolError = "";
     baseCurves = null;
     reading = null;
@@ -799,9 +846,13 @@
 
   function chooseWorkflow(id: string) {
     wf = id as WorkflowId;
+    if (wf === "series") seriesMounted = true;
+    if (!sized) modelWidth = opening(wf);
     chooseStep(0);
-    const shown = workflow(wf).graphs;
-    if (shown && !shown.includes(graphTab)) graphTab = shown[0];
+    // the tabs `graphTabs` shows for this workflow, so a tab only another
+    // workflow lists (the series' Trends and Map) never stays chosen behind the strip
+    const shown = graphTabs.map((t) => t.id);
+    if (!shown.includes(graphTab)) graphTab = shown[0];
   }
 
   /** A step opens on its graph: the peak fits for Fit peaks, the pattern for
@@ -879,6 +930,16 @@
       keysOpen = true;
       return;
     }
+    // ↑ ↓ move the series' selected pattern on every view (round 12, call 2)
+    // never from inside an open menu (the Trends graph's Plot), whose rows
+    // the arrows belong to
+    const delta = wf === "series" && !layered && isShortcutTarget(event)
+      && !(event.target as Element | null)?.closest?.(".rx-menu") ? arrowStep(event) : 0;
+    if (delta) {
+      event.preventDefault();
+      seriesPanel?.move(delta);
+      return;
+    }
     // `.` runs the Plan tab's selected stage (WP-2214 row 232)
     if (event.key === "." && !event.metaKey && !event.ctrlKey && !event.altKey
         && isShortcutTarget(event)) {
@@ -945,7 +1006,11 @@
      *  frame, so a reload does not reload for a run that ended before it. */
     let seen: string | null = null;
     const unfollow = follow(
-      (event: EngineEvent) => write(eventLine(event)),
+      (event: EngineEvent) => {
+        write(eventLine(event));
+        candidatesPanel?.event(event);
+        seriesPanel?.event(event);
+      },
       (frame: RunState) => {
         run = frame;
         // a run just ended, keyed on its outcome rather than on having seen a
@@ -956,6 +1021,7 @@
           // how the fit ran, as `Refinement.summary()` prints it (WP-2227)
           const comment = howComment(frame);
           if (comment) say("comment", comment);
+          candidatesPanel?.ran(frame.run?.kind ?? null);
           void loadResult();
           void api.project().then((doc) => (project = doc)).catch(() => {});
         }
@@ -1035,16 +1101,29 @@
         <div class="pane">
           {#key opens}
           {#if graphTab === "pattern"}
-            <Pattern {result} {plotKey} {theme} {protocol} {extent} {wavelengths} {busy}
+            <!-- while Series is up the graph draws its selected member, not
+                 the project's fit (WP-2243 task 5): no preview, no compared
+                 node, and the sliders keep the project's curves -->
+            <Pattern result={seriesShown ? null : result} {plotKey} {theme} {protocol} {extent} {wavelengths} {busy}
               {protocolError} onprotocol={setProtocol} onreadout={(r) => (reading = r)}
               projectPath={project?.path ?? null} ui={project?.doc?.ui ?? null} onui={saveUi}
-              preview={previewAnswer} {previewError} oncurves={(c) => (baseCurves = c)}
-              {compared} howText={howWords(result?.how, corpus)}
+              preview={seriesShown ? null : previewAnswer} previewError={seriesShown ? "" : previewError}
+              oncurves={(c) => { if (!seriesShown) baseCurves = c; }}
+              source={seriesShown?.source ?? null}
+              nav={seriesShown ? { ...seriesShown, onstep: (d: number) => seriesPanel?.move(d) } : null}
+              compared={seriesShown ? null : compared} howText={howWords(result?.how, corpus)}
               peaksActive={wf === "index"} peaks={wf === "index" ? peaksPayload?.peaks ?? null : null}
               groups={wf === "index" ? peaksPayload?.groups ?? null : null}
+              candidate={wf === "index" ? candidateLines : null}
               bind:selectedPeak {frameAt}
               onpeakedit={(e) => indexingPanel?.edit(e) ?? Promise.resolve(false)}
               onpeakundo={() => indexingPanel?.undo() ?? Promise.resolve(false)} />
+          {:else if graphTab === "peaks" && wf === "index"}
+            <!-- while the peaks-and-indexing workflow is up, the Peaks graph
+                 holds the picker's group fits (round 11, call 1) -->
+            <PeakFits peaks={peaksPayload} {theme} {busy} groups={fitGroups.groups}
+              focused={fitGroups.focused} total={fitGroups.total}
+              onrefit={(g) => void indexingPanel?.refit(g)} />
           {:else if graphTab === "peaks"}
             <Peaks {plotKey} {theme} preview={previewAnswer} {previewError}
               rwp={result?.statistics?.rwp ?? null} oncurves={(c) => (baseCurves = c)} />
@@ -1056,6 +1135,16 @@
           {:else if graphTab === "structure"}
             <Structure {head} {busy} {theme} {say} values={sliderValues}
               projectPath={project?.path ?? null} onreadout={(r) => (reading = r)} />
+          {:else if graphTab === "trends" && wf === "series"}
+            <SeriesTrends trends={seriesTrends} running={busy && run?.run?.kind === "series"}
+              {corpus} {theme} bind:against={trendsAgainst} bind:hidden={trendsHidden}
+              onplot={(paths, on) => seriesPanel?.plot(paths, on)}
+              onselect={(i) => seriesPanel?.select(i)} onstep={(d) => seriesPanel?.move(d)}
+              onreadout={(r) => (reading = r)} />
+          {:else if graphTab === "map" && wf === "series"}
+            <SeriesMap {theme} {busy} stamp={seriesStamp} selected={seriesMark}
+              onselect={(i) => seriesPanel?.select(i, "staged")}
+              onreadout={(r) => (reading = r)} />
           {:else}
             <p class="unbuilt">Not built yet.</p>
           {/if}
@@ -1071,7 +1160,8 @@
         {#if showGraphs && project}
           <Splitter size={modelWidth} grow="left" min={360} keep={360}
             extent={() => appEl?.clientWidth ?? 0}
-            onsize={(size) => (modelWidth = size)} onreset={() => (modelWidth = MODEL_DEFAULT)}
+            onsize={(size) => { modelWidth = size; sized = true; }}
+            onreset={() => { sized = false; modelWidth = opening(wf); }}
             title="Drag to resize the panels; double-click resets them" />
         {/if}
         {#if wfSteps}
@@ -1120,8 +1210,26 @@
           <div class="pane wfsteps">
             <Indexing bind:this={indexingPanel} {step} steps={wfSteps ?? []} {busy} {corpus} {say}
               bind:selected={selectedPeak}
-              onpeaks={(p) => (peaksPayload = p)} onframe={framePeak} />
+              onpeaks={(p) => (peaksPayload = p)} onframe={framePeak} onstep={chooseStep}
+              onfitgroups={(groups, focused, total) => (fitGroups = { groups, focused, total })} />
+            <Candidates bind:this={candidatesPanel} {step} {busy} {run} {capabilities} {corpus} {say}
+              doc={project?.doc ?? null} nLines={peaksPayload?.peaks?.filter((p) => p.usable).length ?? 0}
+              onstep={chooseStep} onproject={(doc) => (project = doc)}
+              oncandidate={(c) => (candidateLines = c)}
+              onadopted={() => { chooseWorkflow("refine"); void structureMoved(); }} />
           </div>
+        {/if}
+        {#if seriesMounted}
+          {#key project.path}
+            <div class="pane wfsteps" class:gone={wf !== "series"}>
+              <Series bind:this={seriesPanel} step={wf === "series" ? step : 0}
+                steps={workflow("series").steps ?? []} {busy} {run} {say}
+                onstep={chooseStep} onrun={startRun} onstop={stop}
+                onview={(v) => (seriesView = v)} ontrends={(t) => (seriesTrends = t)}
+                ongraph={(g) => { if (graphTabs.some((t) => t.id === g)) graphTab = g; }}
+                onstaged={() => (seriesStamp += 1)} onmark={(m) => (seriesMark = m)} />
+            </div>
+          {/key}
         {/if}
         <div class="pane" class:gone={!!wfSteps || modelTab !== "params"}>
           <Params bind:this={paramsPanel} {head} {busy} {corpus} {say} onmoved={structureMoved}
@@ -1259,6 +1367,8 @@
   <Settings choice={themeChoice} onchoose={chooseTheme}
     version={version?.package_version ?? ""} onclose={() => (settingsOpen = false)} />
 {/if}
+
+<HelpPopover host={help} {corpus} />
 
 <style>
   .topbar,

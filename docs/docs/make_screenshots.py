@@ -108,7 +108,7 @@ SHOTS: tuple[Shot, ...] = (
     Shot(
         "empty-state",
         "The start screen, with no project open and no recent list yet: New "
-        "project, Open and the two links on the left, the shipped examples on "
+        "project, Open and the two links on the left, the included examples on "
         "the right.",
         selector=".start",
         when="empty",
