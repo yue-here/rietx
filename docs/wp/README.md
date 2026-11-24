@@ -16,7 +16,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [1317](1317-series-scrubber.md) | Scrub the series along its own trace | 2026-11-04 | P3 | [Unscheduled](#unscheduled-render-what-the-fit-already-knows) |
 | [1327](1327-magnetic-structure.md) | A magnetic structure: state it, refine it, report what the powder cannot see | 2026-11-04 | P2 | [magnetic](#magnetic) |
 | [1335](1335-the-report-costs-more-than-the-fit.md) | The report costs more than the fit | 2026-11-02 | P3 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
-| [1343](1343-the-moment-pays-for-the-width.md) | The magnetic peaks are broader, and the moment pays for it | 2026-10-25 | P2 | [magnetic](#magnetic) |
+| [1343](1343-the-moment-pays-for-the-width.md) | The magnetic peaks are broader, and the moment pays for it | 2026-11-24 | P2 | [magnetic](#magnetic) |
 | [1418](1418-the-magnetic-structure-is-determined.md) | The magnetic structure is determined, not only stated | 2026-11-24 | P2 | [magnetic](#magnetic) |
 | [1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md) | A child structure refined on its mode amplitudes | 2026-10-30 | P3 | [magnetic](#magnetic) |
 | [1453](1453-both-directions-name-the-lower-cost.md) | Both directions name the lower cost | 2026-11-16 | P3 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
@@ -405,7 +405,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1327](1327-magnetic-structure.md) | A magnetic structure: state it, refine it, report what the powder cannot see | 🔄 2026-11-04 | P2 | [1326](1326-satellites-without-a-moment.md) |
 | [1328](1328-magnetic-interchange.md) | Magnetic interchange: magCIF in and out, and the readers stop refusing | ✅ 2026-10-03 | — | [1327](1327-magnetic-structure.md) ([1118](1118-foreign-model-files.md) soft) |
 | [1329](1329-moment-in-a-series.md) | The moment in a series: the onset, the hold, the trajectory | ✅ 2026-11-01 | — | [1327](1327-magnetic-structure.md) ([1326](1326-satellites-without-a-moment.md) soft) |
-| [1343](1343-the-moment-pays-for-the-width.md) | The magnetic peaks are broader, and the moment pays for it | 🔄 2026-10-25 | P2 | [1327](1327-magnetic-structure.md) ([1326](1326-satellites-without-a-moment.md) soft) |
+| [1343](1343-the-moment-pays-for-the-width.md) | The magnetic peaks are broader, and the moment pays for it | 🔄 2026-11-24 | P2 | [1327](1327-magnetic-structure.md) ([1326](1326-satellites-without-a-moment.md) soft) |
 | [1418](1418-the-magnetic-structure-is-determined.md) | The magnetic structure is determined, not only stated | 🔄 2026-11-24 | P2 | #290, [1326](1326-satellites-without-a-moment.md), [1327](1327-magnetic-structure.md) |
 | [1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md) | A child structure refined on its mode amplitudes | 🔄 2026-10-30 | P3 | [1418](1418-the-magnetic-structure-is-determined.md) ([1327](1327-magnetic-structure.md) soft) |
 | [2034](2034-the-satellite-window-is-compile-models-window.md) | The satellite arm generates over `compile_model`'s window, not a copy of it | ✅ 2026-10-31 | — | — |
