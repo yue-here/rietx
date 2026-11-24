@@ -27,6 +27,7 @@
   --ok: #2a7d2a;
   --warn: #7d5f00;
   --bad: #b4271f;
+  --code-string: #2f6f3e;
   /* The pattern plot's curves (WP-1029, redrawn in the site's palette by
      WP-2200): observed points in the ink, the calculated curve in the
      accent, the background dashed in the figures' brown, the difference in
@@ -44,9 +45,22 @@
      takes the calculated curve's accent and the last fit turns grey, as
      the design rounds drew it (`gui/STYLE.md` § Plots). The round's greys
      (`#a79f94`, `#6f675b`) sat under the 0.13 floor from the background
-     brown and the dark peak fit, and the light one under 3:1 on the page,
-     so each is the nearest colour in OKLab that clears both. */
+     brown and the dark peak fit, and the light one under 3:1 on the page.
+     The light grey is the nearest colour in OKLab that clears both. The
+     dark one is the blue-grey the maintainer chose on 2026-11-19 ("since
+     they never intersect"): 0.023 from the difference curve, which draws
+     in its own strip below the pattern, and 0.056 from `--muted`, which
+     draws observed points only inside an excluded region, where no model
+     curve draws. It is at least 0.131 from every other plot colour and
+     5.25:1 on `--panel`. `tests/test_gui_palette.py` names both pairs. */
   --plot-last: #849499;
+  /* A node the History tab compares, drawn dashed over the pattern
+     (WP-2211). The design rounds drew it in the site's second ink,
+     `#403a35` light and `#d2c9bd` dark. The dark one is the observed
+     points' colour exactly, so the dark value here is the nearest neutral
+     that clears the 0.13 floor from every curve (0.132 from the observed
+     points). Both are the design's choice to confirm with the maintainer. */
+  --plot-compare: #403a35;
   --plot-zero: #cfcfcf;
   /* The picked-peak layer (WP-1210, recoloured by WP-2200). The marks take
      Okabe-Ito blue, the complement of the orange fits, which the
@@ -112,11 +126,13 @@
     --ok: #5fd45f;
     --warn: #e3c25b;
     --bad: #ff8f86;
+    --code-string: #8fc79d;
     --plot-obs: #d2c9bd;
     --plot-calc: #ff9d4d;
     --plot-bkg: #c99a6a;
     --plot-diff: #8f8f8f;
-    --plot-last: #776849;
+    --plot-last: #7f8f94;
+    --plot-compare: #f5f5f5;
     --plot-zero: #4a4a4a;
     --plot-peak: #008ad5;
     --plot-peakfit: #516494;
@@ -145,11 +161,13 @@
   --ok: #5fd45f;
   --warn: #e3c25b;
   --bad: #ff8f86;
+  --code-string: #8fc79d;
   --plot-obs: #d2c9bd;
   --plot-calc: #ff9d4d;
   --plot-bkg: #c99a6a;
   --plot-diff: #8f8f8f;
-  --plot-last: #776849;
+  --plot-last: #7f8f94;
+  --plot-compare: #f5f5f5;
   --plot-zero: #4a4a4a;
   --plot-peak: #008ad5;
   --plot-peakfit: #516494;

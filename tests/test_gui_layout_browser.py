@@ -18,6 +18,8 @@ CI.
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from rietx.gui import GuiSession
@@ -188,7 +190,9 @@ def test_a_pending_edit_moves_nothing_in_the_action_bar(browser, gui, state):
     value = page.locator(".params .row button.ink").first
     before = page.evaluate(SNAP, LANDMARKS)
     value.click()
-    page.keyboard.press("End")
+    # a leading digit changes any value: the editor opens on the full value,
+    # where a trailing one can sit past the double's last digit (WP-2223)
+    page.keyboard.press("Home")
     page.keyboard.type("1")
     page.keyboard.press("Enter")
     _frames(page)
@@ -388,7 +392,7 @@ def test_a_refine_moves_nothing_while_it_runs_or_after(browser, tmp_path_factory
     url = f"http://127.0.0.1:{httpd.server_address[1]}/"
     try:
         page = _open(browser, url, WIDTHS["wide"])
-        page.locator(".actions button", has_text="One cycle").click()
+        page.locator(".actions button", has_text="As ticked").click()
         _frames(page)
         before = page.evaluate(SNAP, LANDMARKS)
         page.locator(".actions button.refine").click()
@@ -987,26 +991,36 @@ def test_no_frame_control_moves_the_rebuilt_layout(browser, gui):
         page.close()
 
     page = _open_next(browser, url, 1300)
-    tabs = page.locator("section .tabs button").all_text_contents()
+    tabs = page.locator("section .tabs [role=tab]").all_text_contents()
     page.close()
     assert len(tabs) == 8, tabs
     for name in tabs:
-        pressing(name, lambda p, n=name: p.locator("section .tabs button", has_text=n).first.click())
+        pressing(name, lambda p, n=name: p.locator("section .tabs [role=tab]", has_text=n).first.click())
 
     def escape(p):
         p.keyboard.press("Escape")
 
-    def series(p):
-        p.locator("button.mbtn.wf").click()
-        p.get_by_role("menuitemradio", name="Series · not built yet").click()
+    # each strip's ? box floats over the page (the maintainer's look, 2026-11-21, item 6)
+    for strip, label in (("graphs", "About the Pattern graph"), ("model", "About the Parameters tab")):
+        pressing(f"{strip} ? box", lambda p, n=label: p.get_by_role("button", name=n, exact=True).click(),
+                 escape)
+
+    def workflow(name):
+        def choose(p):
+            p.locator("button.mbtn.wf").click()
+            p.get_by_role("menuitemradio", name=name, exact=True).click()
+        return choose
 
     pressing("workflow menu", lambda p: p.locator("button.mbtn.wf").click(), escape)
     pressing("File menu", lambda p: p.locator("header .fm-name").click(), escape)
     pressing("Settings", lambda p: p.get_by_role("button", name="Settings", exact=True).click(),
              escape)
-    pressing("Series workflow", series, landmarks=[
-        s for s in NEXT_LANDMARKS if s != "header.topbar > *"] + [
-        "header.topbar > button.ib"])
+    # a workflow not built yet, and the series workflow, built (WP-2243)
+    for label, name in (("Structure solution workflow", "Structure solution · not built yet"),
+                        ("Series workflow", "Series")):
+        pressing(label, workflow(name), landmarks=[
+            s for s in NEXT_LANDMARKS if s != "header.topbar > *"] + [
+            "header.topbar > button.ib"])
     assert not failures, "\n".join(failures)
 
 
@@ -1029,6 +1043,82 @@ def test_a_frame_toggle_stays_where_it_was(browser, gui):
     assert not page.errors, page.errors
     page.close()
     assert not moved, moved
+
+
+#: Whether the open help popover is the topmost thing at its own centre, so a
+#: click there reaches it rather than a panel or a layer under it.
+POPOVER_ON_TOP = """() => {
+  const pop = document.querySelector('.popover[role=dialog]');
+  if (!pop) return false;
+  const r = pop.getBoundingClientRect();
+  return !!document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)?.closest('.popover');
+}"""
+
+
+def test_a_help_term_at_next_opens_its_explanation(browser, gui):
+    """A parameter's name at /next opens its help popover (WP-2244).
+
+    Until this WP only today's page mounted the popover, so every help term at
+    /next did nothing when clicked. The click is a real one; the popover must be
+    on top, inside the window and holding focus, and Esc hands focus back."""
+    url, _ = gui
+    page = _open_next(browser, url, 1300)
+    term = page.locator("[data-row] .label .help").first
+    term.scroll_into_view_if_needed()
+    name = term.text_content().strip()
+    assert page.locator(".popover").count() == 0
+    term.click()
+    _frames(page)
+    popover = page.locator(".popover[role=dialog]")
+    assert popover.count() == 1, f"clicking {name!r} opened nothing"
+    title = popover.locator("h2").text_content().strip()
+    assert title and title == popover.get_attribute("aria-label")
+    assert "Not described yet" not in popover.text_content(), title
+    assert popover.locator("a", has_text="in the manual").count() == 1
+    assert term.get_attribute("aria-expanded") == "true"
+    assert page.evaluate(POPOVER_ON_TOP)
+    box = popover.bounding_box()
+    assert box["x"] >= 0 and box["y"] >= 0
+    assert box["x"] + box["width"] <= 1300 and box["y"] + box["height"] <= 900, box
+    assert page.evaluate("document.activeElement.matches('.popover')")
+    page.keyboard.press("Escape")
+    _frames(page)
+    assert popover.count() == 0
+    assert page.evaluate("document.activeElement.matches('[data-row] .label .help')")
+    assert not page.errors, page.errors
+    page.close()
+
+
+def test_a_help_term_in_the_stage_settings_leaves_them_open(browser, gui):
+    """The stage settings' labels are help terms, and their popover floats outside
+    the settings layer (WP-2244). A click in the popover is not a click away from
+    the layer, and the Esc that closes the popover closes nothing else."""
+    url, _ = gui
+    page = _open_next(browser, url, 1300)
+    page.locator("section .tabs [role=tab]", has_text="Plan").first.click()
+    page.get_by_role("button", name="Stage 1 actions", exact=True).click()
+    page.get_by_role("menuitem", name="Stage settings…").click()
+    layer = page.locator("form.float.settings")
+    layer.wait_for()
+    layer.locator(".help").first.click()
+    _frames(page)
+    popover = page.locator(".popover[role=dialog]")
+    assert popover.count() == 1
+    assert page.evaluate(POPOVER_ON_TOP)
+    box = popover.bounding_box()
+    page.mouse.click(box["x"] + 12, box["y"] + 8)
+    _frames(page)
+    assert layer.count() == 1, "a click in the popover closed the stage settings"
+    assert popover.count() == 1
+    page.keyboard.press("Escape")
+    _frames(page)
+    assert popover.count() == 0
+    assert layer.count() == 1, "the popover's Esc closed the stage settings too"
+    page.keyboard.press("Escape")
+    _frames(page)
+    assert layer.count() == 0
+    assert not page.errors, page.errors
+    page.close()
 
 
 #: The refinement window's own places (WP-2216): the graph's title line and its
@@ -1169,7 +1259,9 @@ def test_a_pending_edit_moves_nothing_in_the_rebuilt_action_bar(browser, gui):
     _frames(page)
     before = page.evaluate(SNAP, WINDOW_LANDMARKS)
     page.locator(".params .row button.ink").first.click()
-    page.keyboard.press("End")
+    # a leading digit changes any value: the editor opens on the full value,
+    # where a trailing one can sit past the double's last digit (WP-2223)
+    page.keyboard.press("Home")
     page.keyboard.type("1")
     page.keyboard.press("Enter")
     _frames(page)
@@ -1264,6 +1356,10 @@ def test_a_slider_drag_previews_in_the_rebuilt_window_and_moves_nothing(browser,
     page.wait_for_selector(".rangepop")
     _frames(page)
     failures += [f"pop-up: {m}" for m in _moved(before, page.evaluate(SNAP, marks))]
+    # the ends read in the value box's digits, never at full precision (WP-2218)
+    for end in ("Lowest value", "Highest value"):
+        text = page.get_by_label(end, exact=True).input_value()
+        assert len(text) <= 12, f"{end} reads {text!r}"
     page.keyboard.press("Escape")
 
     redraws = page.evaluate(REDRAWS)
@@ -1278,3 +1374,1193 @@ def test_a_slider_drag_previews_in_the_rebuilt_window_and_moves_nothing(browser,
     print(f"\n[next] {len(redraws)} preview redraws, drag to redraw "
           f"{min(redraws):.0f}-{max(redraws):.0f} ms")
     assert not failures, "\n".join(failures)
+
+
+def test_a_clicked_value_opens_on_its_full_value_and_enter_on_it_is_no_edit(browser, gui):
+    """WP-2223, the spreadsheet model: a value drawn as ×10ⁿ opens on its
+    stored value to the last digit, and Enter on that text records nothing,
+    in the Interactive tab's box and in the Parameters panel's editor. A
+    ×10ⁿ value typed into the box is a pending edit at that value."""
+    url, client = gui
+    stored = {r["path"]: r["value"] for r in client.get("/api/params")[1]["parameters"]}
+    page = _open_window(browser, url)
+    pending = page.locator(".actions .pending")
+
+    page.locator("section.model .tabs").get_by_role("tab", name="Interactive", exact=True).click()
+    page.wait_for_selector("section.model .interactive .slider")
+    # a nonzero value drawn as ×10ⁿ: a digit from 1 to 9 before the ×
+    shown = re.compile(r"^[^×]*[1-9][^×]*×10")
+    slider = page.locator("section.model .interactive .slider").filter(
+        has=page.locator("button.num", has_text=shown)).first
+    path = slider.locator("button.pname").get_attribute("data-pop")
+    box = slider.locator("button.num")
+    drawn = box.text_content()
+    box.click()
+    typed = page.locator("section.model .interactive input.typed")
+    typed.wait_for()
+    text = typed.input_value()
+    # the full value as typed text: it reads back as the stored double exactly
+    assert "×" not in text and float(text) == stored[path], (path, text, drawn, stored[path])
+    page.keyboard.press("Enter")
+    _frames(page)
+    assert not typed.count()
+    assert pending.text_content().strip() == "", pending.text_content()
+
+    # typed as the range fields read it
+    box.click()
+    typed.wait_for()
+    page.keyboard.type("1.5×10⁻³")
+    page.keyboard.press("Enter")
+    _frames(page)
+    assert pending.text_content().strip() == "1 pending", pending.text_content()
+    box.click()
+    typed.wait_for()
+    assert typed.input_value() == "0.0015", typed.input_value()
+    page.keyboard.press("Escape")
+    page.locator(".actions button", has_text="Revert").click()
+    _frames(page)
+
+    page.locator("section.model .tabs").get_by_role("tab", name="Parameters", exact=True).click()
+    cell = page.locator(".params .row button.ink", has_text=shown).first
+    cell.wait_for()
+    path = cell.get_attribute("data-path")
+    cell.click()
+    editor = page.locator("input.editor")
+    editor.wait_for()
+    assert float(editor.input_value()) == stored[path], (path, editor.input_value(), stored[path])
+    page.keyboard.press("Enter")
+    _frames(page)
+    assert not editor.count()
+    assert pending.text_content().strip() == "", pending.text_content()
+    assert not page.errors, page.errors
+    page.close()
+
+
+#: The rebuilt Peaks and Background graphs' own places (WP-2218): the title
+#: line, the windows, the plot and the block under it.
+NEXT_GRAPHS = NEXT_LANDMARKS + [
+    ".ghead", ".gctl", ".gctl > *", ".overview", "section.graphs figure", "section.graphs canvas",
+    "section.graphs .plot", ".bgctls", ".bgctl > *", ".chips .term",
+    ".actions", ".actions .go > *",
+]
+
+#: How many pixels of each 2D canvas in the graphs column carry paint.
+PAINTED = """() => [...document.querySelectorAll("section.graphs canvas")].map((c) => {
+  const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+  let n = 0;
+  for (let i = 3; i < d.length; i += 4) if (d[i]) n++;
+  return n;
+})"""
+
+
+def test_the_rebuilt_peaks_and_background_graphs_move_nothing(browser, tmp_path_factory):
+    """WP-2218 rows 59-68. The Peaks graph fills its grid with painted windows
+    of the last fit under an overview of the pattern that shades each window's
+    range, and its Show choice and a window's › repaint them in place. On the Background
+    graph a term chip is a pending hold: the action bar counts it, the title
+    says "Background preview", the head stays where it was, and the band is
+    refetched for it. Neither the chip nor "Band drawn" moves a place, and
+    Revert brings the title back. Every press is a real click. A project of its
+    own, since the call that frees the background terms is written."""
+    httpd, client = _serve(tmp_path_factory, "next-graphs")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    try:
+        # the fixture's stage freed the scale alone; free the terms, or no band
+        status, body = client.patch("/api/params", {"vary": {"instrument.background.*": True}})
+        assert status == 200, body
+        page = _open_window(browser, url)
+        failures = []
+
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Peaks", exact=True).click()
+        page.wait_for_selector("section.graphs figure canvas")
+        page.wait_for_function("document.querySelector('.gtitle b')?.textContent === 'Last fit'")
+        _frames(page, 4)
+        windows = page.locator("section.graphs figure").count()
+        assert windows >= 1, windows
+        assert page.locator(".overview .band").count() == windows
+        painted = page.evaluate(PAINTED)
+        # the overview's canvas, then one per window
+        assert len(painted) == windows + 1 and min(painted) > 0, painted
+        before = page.evaluate(SNAP, NEXT_GRAPHS)
+        bands = page.locator(".overview .band").evaluate_all("bs => bs.map((b) => b.style.left)")
+        step = page.locator('section.graphs button[aria-label="Next peak"]:not([disabled])').first
+        step.click()
+        _frames(page, 4)
+        assert page.locator(".overview .band").evaluate_all("bs => bs.map((b) => b.style.left)") != bands
+        failures += [f"Next peak: {m}" for m in _moved(before, page.evaluate(SNAP, NEXT_GRAPHS))]
+        before = page.evaluate(SNAP, NEXT_GRAPHS)
+        page.locator('[aria-label="Show"] button', has_text="Peak shape alone").click()
+        _frames(page, 4)
+        assert page.locator('[aria-label="Show"] button[aria-pressed="true"]').text_content() \
+            == "Peak shape alone"
+        failures += [f"Peak shape alone: {m}" for m in _moved(before, page.evaluate(SNAP, NEXT_GRAPHS))]
+        assert min(page.evaluate(PAINTED)) > 0
+
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Background", exact=True).click()
+        page.wait_for_selector(".chips .term:not([disabled])")
+        page.wait_for_function(
+            "document.querySelector('.gtitle b')?.textContent === 'Background at the current values'")
+        page.wait_for_selector('[aria-label="Band drawn"] button:not([disabled])')
+        _frames(page, 4)
+        before = page.evaluate(SNAP, NEXT_GRAPHS)
+        head = client.get("/api/project")[1]["head"]
+        page.get_by_role("button", name="Hold term 1", exact=True).click()
+        page.wait_for_function(
+            "document.querySelector('.gtitle b.pv')?.textContent === 'Background preview'")
+        page.wait_for_function(
+            "document.querySelector('.actions .pending')?.textContent === '1 pending'")
+        _frames(page, 4)
+        assert page.get_by_role("button", name="Hold term 1", exact=True).get_attribute(
+            "aria-pressed") == "true"
+        # pending, so nothing is written
+        assert client.get("/api/project")[1]["head"] == head
+        failures += [f"hold chip: {m}" for m in _moved(before, page.evaluate(SNAP, NEXT_GRAPHS))]
+        page.locator('[aria-label="Band drawn"] button', has_text="×5").click()
+        _frames(page)
+        failures += [f"Band drawn ×5: {m}" for m in _moved(before, page.evaluate(SNAP, NEXT_GRAPHS))]
+        assert page.evaluate(PAINTED)[0] > 0
+
+        page.locator(".actions button", has_text="Revert").click()
+        page.wait_for_function(
+            "document.querySelector('.gtitle b')?.textContent === 'Background at the current values'")
+
+        # A preview up while the Pattern graph is built again draws, at the
+        # last fit's view: a graph tab's trip once left it empty.
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Pattern", exact=True).click()
+        page.wait_for_selector("section.graphs .gutter .gut")
+        page.wait_for_timeout(500)
+        _frames(page, 4)
+        rest = page.evaluate(PAINTED)
+        page.locator("section.model .tabs").get_by_role("tab", name="Interactive", exact=True).click()
+        page.wait_for_selector("section.model .interactive .slider")
+        track = page.locator('section.model .interactive input[type="range"]').first
+        value = int(track.input_value()) / 1000
+        _drag(page, track, value, min(1.0, value + 0.3))
+        page.wait_for_function("document.querySelector('.gtitle b.pv')?.textContent === 'Preview, not refined'")
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Peaks", exact=True).click()
+        page.wait_for_selector("section.graphs figure canvas")
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Pattern", exact=True).click()
+        page.wait_for_function("document.querySelector('.gtitle b.pv')?.textContent === 'Preview, not refined'")
+        page.wait_for_timeout(500)
+        _frames(page, 4)
+        back = page.evaluate(PAINTED)
+        # the main pane's canvas carries the curves: at least half its paint at rest
+        assert len(back) == len(rest) and back[0] > rest[0] / 2, (rest, back)
+        page.locator(".actions button", has_text="Revert").click()
+        assert not page.errors, page.errors
+        page.close()
+    finally:
+        httpd.shutdown()
+    assert not failures, "\n".join(failures)
+
+
+def _colours(page, selector: str) -> int:
+    """Distinct colours in a screenshot of one element: a WebGL canvas cannot
+    be read back, so the picture is what is measured (browser-driving note)."""
+    import io
+
+    import numpy as np
+    from PIL import Image
+
+    png = page.locator(selector).screenshot()
+    # through numpy, which reads every Pillow; Pillow's own pixel list is
+    # `get_flattened_data` only on a recent release
+    pixels = np.asarray(Image.open(io.BytesIO(png)).convert("RGB").resize((160, 100)))
+    return len(np.unique(pixels.reshape(-1, 3), axis=0))
+
+
+def test_the_rebuilt_structure_graph_draws_a_preview_and_moves_nothing(browser, tmp_path_factory):
+    """WP-2218 rows 69-82. The Structure graph draws the working model and says
+    so; Look down, the draw mode and a colour-key switch move no place; a drag
+    turns the picture; a click on an atom opens its selection bar; and a
+    Lattice parameter a slider drawn in the Interactive tab redraws it as
+    "Preview, not refined" without writing, until Revert. Every press is real."""
+    httpd, client = _serve(tmp_path_factory, "next-structure")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    try:
+        page = _open_window(browser, url)
+        failures = []
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Structure", exact=True).click()
+        page.wait_for_selector(".structgraph .key .entry")
+        page.wait_for_function(
+            "document.querySelector('.gtitle b')?.textContent === 'Structure at the current values'")
+        page.wait_for_timeout(300)
+        _frames(page, 4)
+        rest = _colours(page, ".structgraph canvas")
+        assert rest > 20, rest
+        landmarks = NEXT_GRAPHS + [".key", ".key .entry", ".structgraph .view"]
+        before = page.evaluate(SNAP, landmarks)
+        for axis in ("a", "b", "c"):
+            page.locator(".structgraph .gctl button.axis", has_text=axis).click()
+            _frames(page, 2)
+        failures += [f"Look down: {m}" for m in _moved(before, page.evaluate(SNAP, landmarks))]
+        page.locator('[aria-label="Draw atoms as"] button', has_text="Ellipsoids").click()
+        _frames(page, 3)
+        assert "Ellipsoids at 50 %" in page.locator(".gtitle").inner_text()
+        failures += [f"Ellipsoids: {m}" for m in _moved(before, page.evaluate(SNAP, landmarks))]
+        entry = page.locator(".structgraph .key .entry").first
+        entry.click()
+        _frames(page, 2)
+        assert entry.get_attribute("aria-pressed") == "false"
+        failures += [f"key switch: {m}" for m in _moved(before, page.evaluate(SNAP, landmarks))]
+        entry.click()
+        page.locator('[aria-label="Draw atoms as"] button', has_text="Balls").click()
+        _frames(page, 3)
+
+        # a real drag turns the picture
+        shot = page.locator(".structgraph canvas").screenshot()
+        box = page.locator(".structgraph canvas").bounding_box()
+        cx, cy = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+        page.mouse.move(cx, cy)
+        page.mouse.down()
+        for k in range(1, 11):
+            page.mouse.move(cx + 8 * k, cy + 4 * k)
+            _frames(page, 1)
+        page.mouse.up()
+        _frames(page, 3)
+        assert page.locator(".structgraph canvas").screenshot() != shot
+
+        # a click on an atom selects it: hunt for one by hovering, as a person would
+        hit = None
+        for dx in range(-150, 151, 10):
+            for dy in range(-100, 101, 10):
+                page.mouse.move(cx + dx, cy + dy)
+                text = page.locator(".statusbar .right").inner_text()
+                if "(" in text and "Å" not in text:
+                    hit = (cx + dx, cy + dy)
+                    break
+            if hit:
+                break
+        assert hit, "no atom under any hovered point"
+        page.mouse.click(*hit)
+        page.wait_for_selector(".structgraph .selbar")
+        assert "Show coordination" in page.locator(".structgraph .selbar").inner_text()
+        page.keyboard.press("Escape")
+        page.wait_for_selector(".structgraph .selbar", state="detached")
+
+        # a structural slider value is drawn as a preview, and writes nothing
+        head = client.get("/api/project")[1]["head"]
+        page.locator("section.model .tabs").get_by_role("tab", name="Interactive", exact=True).click()
+        page.wait_for_selector("section.model .interactive .slider")
+        row = page.locator("section.model .slider",
+                           has=page.locator("button.pname", has_text="Lattice parameter a")).first
+        track = row.locator('input[type="range"]')
+        track.scroll_into_view_if_needed()
+        value = int(track.input_value()) / 1000
+        _drag(page, track, value, min(1.0, value + 0.3))
+        page.wait_for_function("document.querySelector('.gtitle b.pv')?.textContent === 'Preview, not refined'")
+        assert client.get("/api/project")[1]["head"] == head
+        page.locator(".actions button", has_text="Revert").click()
+        page.wait_for_function(
+            "document.querySelector('.gtitle b')?.textContent === 'Structure at the current values'")
+        assert not page.errors, page.errors
+        page.close()
+    finally:
+        httpd.shutdown()
+    assert not failures, "\n".join(failures)
+
+
+def _open_instrument(page) -> None:
+    page.get_by_role("button", name="Instrument actions", exact=True).click()
+    page.get_by_role("menuitem", name="Source and geometry…", exact=True).click()
+    page.wait_for_selector('[role="dialog"] [data-field="geometry.axial_sl"]')
+    _frames(page)
+
+
+def test_the_instrument_dialog_applies_what_it_shows_and_moves_nothing(browser, tmp_path_factory):
+    """WP-2218 rows 133-136. The Instrument band's ⋯ opens the Instrument
+    dialog over the window, which moves nothing. S/L typed equal to H/L shows
+    the warning beside the pair. The profile's shape waits under the Peak shape
+    row's Advanced, closed. Apply sends the wavelength and the shape in the
+    model and S/L through the table, then closes. Cancel writes nothing. Loading a
+    profile replaces the instrument at once. A project of its own, since
+    Apply writes."""
+    httpd, client = _serve(tmp_path_factory, "next-instrument")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    try:
+        status, saved = client.post("/api/export/instrument_profile", {})
+        assert status == 200, saved
+        page = _open_window(browser, url)
+        page.locator("section.model .tabs button", has_text="Parameters").first.click()
+        page.wait_for_selector("tr[data-atom]")
+        before = page.evaluate(SNAP, WINDOW_LANDMARKS)
+        _open_instrument(page)
+        failures = [f"open: {m}" for m in _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))]
+        assert page.locator('[role="dialog"] h2').inner_text() == "Instrument"
+
+        dialog = page.locator('[role="dialog"]')
+        dialog.locator('[data-field="geometry.axial_sl"]').fill("0.02")
+        dialog.locator('[data-field="geometry.axial_hl"]').fill("0.02")
+        _frames(page)
+        assert "S/L = H/L = 0.02" in dialog.locator(".warn").inner_text()
+        dialog.locator('[data-field="geometry.axial_sl"]').fill("0.015")
+        dialog.locator('[data-field="source.lines.0.wavelength"]').fill("0.4140")
+        _frames(page)
+        assert dialog.locator(".warn").count() == 0
+        # the shape under the Peak shape row's Advanced, closed until asked
+        row = dialog.locator(".nrow", has=page.locator(".nl", has_text="Peak shape"))
+        shape = row.locator('[data-field="profile.shape"]')
+        assert not shape.is_visible()
+        row.locator("summary", has_text="Advanced").click()
+        _frames(page)
+        assert shape.input_value() == "tchz_pv"
+        assert shape.locator("option").all_inner_texts() == ["TCHZ pseudo-Voigt", "Voigt"]
+        shape.select_option("voigt")
+        _frames(page)
+        head = client.get("/api/project")[1]["head"]
+        dialog.get_by_role("button", name="Apply", exact=True).click()
+        page.wait_for_selector('[role="dialog"]', state="detached")
+        ins = client.get("/api/instrument")[1]["instrument"]
+        assert ins["source"]["lines"][0]["wavelength"]["value"] == 0.414
+        assert ins["geometry"]["axial_sl"]["value"] == 0.015
+        assert ins["geometry"]["axial_hl"]["value"] == 0.02
+        assert ins["profile"]["shape"] == "voigt"
+        assert client.get("/api/project")[1]["head"] != head
+
+        # an anode choice, then Cancel: nothing is written
+        head = client.get("/api/project")[1]["head"]
+        _open_instrument(page)
+        dialog.locator("select").first.select_option("MoKa1")
+        _frames(page)
+        assert dialog.locator('[data-field="source.lines.0.wavelength"]').input_value().startswith("0.709")
+        dialog.get_by_role("button", name="Cancel", exact=True).click()
+        page.wait_for_selector('[role="dialog"]', state="detached")
+        assert client.get("/api/project")[1]["head"] == head
+
+        # a saved profile replaces the instrument at once, one node
+        _open_instrument(page)
+        dialog.locator('input[type="file"]').set_input_files(saved["path"])
+        page.wait_for_function(
+            "document.querySelector('[role=dialog] .reason')?.textContent.startsWith('Loaded')")
+        ins = client.get("/api/instrument")[1]["instrument"]
+        assert ins["source"]["lines"][0]["wavelength"]["value"] == 0.4139
+        assert dialog.locator('[data-field="source.lines.0.wavelength"]').input_value() == "0.4139"
+        page.keyboard.press("Escape")
+        page.wait_for_selector('[role="dialog"]', state="detached")
+        failures += [f"closed: {m}" for m in _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))]
+        assert not page.errors, page.errors
+        page.close()
+    finally:
+        httpd.shutdown()
+    assert not failures, "\n".join(failures)
+
+
+def _set_terms(page, n: int) -> None:
+    """Click the Terms slider where it reads ``n``, a real pointer press, and
+    wait for the edit to land: the slider is offered again at ``n``."""
+    track = page.locator('input[aria-label="Terms"]')
+    lo, hi = int(track.get_attribute("min")), int(track.get_attribute("max"))
+    box = track.bounding_box()
+    # the thumb's centre runs from half a thumb in from each end
+    x = box["x"] + 8 + (box["width"] - 16) * (n - lo) / (hi - lo)
+    page.mouse.click(x, box["y"] + box["height"] / 2)
+    page.wait_for_function(
+        f"document.querySelectorAll('.chips .term').length === {n}"
+        " && !document.querySelector('input[aria-label=\"Terms\"]').disabled")
+    _frames(page, 4)
+
+
+def test_the_background_graph_s_edits_leave_no_stale_hold_or_pending_edit(browser, tmp_path_factory):
+    """WP-2218 review, the two behaviour fixes. Terms grown frees the terms
+    they add. A Terms cut releases the committed hold on a term it removes, so
+    the term comes back free when the Terms grow again, and the Parameters
+    panel drops its pending edit on a removed term, so nothing is left for
+    Apply to refuse. A Type switch releases the Chebyshev's holds and starts
+    every new coefficient free. Every press is a real click. A project of its
+    own, since the edits are written."""
+    httpd, client = _serve(tmp_path_factory, "next-bg-edits")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    try:
+        status, body = client.patch("/api/params", {"vary": {"instrument.background.*": True}})
+        assert status == 200, body
+        status, body = client.patch("/api/params", {"hold": {"instrument.background.c1": True}})
+        assert status == 200, body
+        page = _open_window(browser, url)
+
+        def rows():
+            return {r["path"]: r for r in client.get("/api/params")[1]["parameters"]
+                    if r["path"].startswith("instrument.background.c")}
+
+        def pending() -> str:
+            note = page.locator(".actions .pending")
+            return note.text_content() if note.count() else ""
+
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Background", exact=True).click()
+        page.wait_for_selector('input[aria-label="Terms"]:not([disabled])')
+        _set_terms(page, 6)
+        grown = rows()
+        assert sorted(grown) == [f"instrument.background.c{k}" for k in range(6)]
+        assert all(grown[f"instrument.background.c{k}"]["vary"] for k in (3, 4, 5)), grown
+        assert grown["instrument.background.c1"]["held"]
+
+        # hold c5 by its chip and apply it: a committed hold on a term a cut removes
+        page.get_by_role("button", name="Hold term 5", exact=True).click()
+        page.wait_for_function(
+            "document.querySelector('.actions .pending')?.textContent === '1 pending'")
+        page.locator(".actions").get_by_role("button", name="Apply", exact=True).click()
+        page.wait_for_function(
+            "document.querySelector('.actions .pending')?.textContent !== '1 pending'")
+        assert rows()["instrument.background.c5"]["held"]
+
+        # pending flags on the free terms, c4 among them, by the Parameters
+        # panel's Background group box (its terms are drawn on the graph)
+        page.locator("section.model .tabs").get_by_role("tab", name="Parameters", exact=True).click()
+        page.locator('section.model input[aria-label="refine the background group"]').click()
+        page.wait_for_function(
+            "document.querySelector('.actions .pending')?.textContent === '4 pending'")
+
+        _set_terms(page, 4)
+        assert sorted(rows()) == [f"instrument.background.c{k}" for k in range(4)]
+        # the pending flag on c4 went with c4, and Apply sends the other three
+        page.wait_for_function(
+            "document.querySelector('.actions .pending')?.textContent === '3 pending'")
+        page.locator(".actions").get_by_role("button", name="Apply", exact=True).click()
+        page.wait_for_function(
+            "(document.querySelector('.actions .pending')?.textContent ?? '') === ''")
+        cut = rows()
+        assert [cut[f"instrument.background.c{k}"]["vary"] for k in (0, 2, 3)] == [False] * 3, cut
+        # free them again by the same box, for what follows
+        page.locator('section.model input[aria-label="refine the background group"]').click()
+        page.locator(".actions").get_by_role("button", name="Apply", exact=True).click()
+        page.wait_for_function(
+            "(document.querySelector('.actions .pending')?.textContent ?? '') === ''")
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Background", exact=True).click()
+        page.wait_for_selector('input[aria-label="Terms"]:not([disabled])')
+
+        _set_terms(page, 6)
+        back = rows()
+        assert not back["instrument.background.c5"]["held"], back["instrument.background.c5"]
+        assert back["instrument.background.c5"]["vary"] and back["instrument.background.c4"]["vary"]
+        assert back["instrument.background.c1"]["held"]
+
+        page.locator('[aria-label="Type"] button', has_text="P-spline").click()
+        page.wait_for_selector('input[aria-label="Stiffness"]')
+        _frames(page, 4)
+        spline = rows()
+        assert len(spline) > 6
+        assert all(r["vary"] and not r["held"] for r in spline.values()), \
+            [p for p, r in spline.items() if r["held"] or not r["vary"]]
+        assert not page.errors, page.errors
+        page.close()
+    finally:
+        httpd.shutdown()
+
+
+def test_today_s_terms_box_leaves_no_stale_hold(browser, tmp_path_factory):
+    """WP-2229 case 1, on today's page: its Model tab's Terms box sends the
+    instrument alone, and the server releases the hold on a term the cut
+    removes and frees the terms the extension adds. Before, the box sent no
+    arms and built an added term fixed, so the hold came back with the term.
+    Typed and committed with the keyboard, as a person does. A project of its
+    own, since the edits are written."""
+    httpd, client = _serve(tmp_path_factory, "today-terms")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    try:
+        status, body = client.patch("/api/params", {"vary": {"instrument.background.*": True}})
+        assert status == 200, body
+        status, body = client.patch("/api/params", {"hold": {"instrument.background.c2": True}})
+        assert status == 200, body
+        page = browser.new_page(viewport={"width": 1440, "height": 900})
+        errors: list[str] = []
+        page.on("pageerror", lambda exc: errors.append(str(exc)))
+        page.goto(url)
+        page.locator("nav.tabs").get_by_role("button", name="Model", exact=True).click()
+
+        def rows():
+            return {r["path"]: r for r in client.get("/api/params")[1]["parameters"]
+                    if r["path"].startswith("instrument.background.c")}
+
+        def terms(n: int) -> None:
+            box = page.locator("label.inline", has_text="terms").locator("input")
+            box.click()
+            page.keyboard.press("ControlOrMeta+A")
+            page.keyboard.type(str(n))
+            # wait for the answer: the edit's node lands before the free arm's
+            # set_vary in one request, so a row count alone can read between
+            with page.expect_response(lambda r: r.url.endswith("/api/instrument")
+                                      and r.request.method == "PATCH"):
+                page.keyboard.press("Enter")
+            for _ in range(100):
+                if len(rows()) == n:
+                    return
+                page.wait_for_timeout(50)
+            raise AssertionError(f"the background never reached {n} terms: {sorted(rows())}")
+
+        before = len(rows())
+        assert rows()["instrument.background.c2"]["held"]
+        terms(2)
+        assert sorted(rows()) == ["instrument.background.c0", "instrument.background.c1"]
+        terms(before + 1)
+        back = rows()
+        assert not back["instrument.background.c2"]["held"], back["instrument.background.c2"]
+        assert all(back[f"instrument.background.c{k}"]["vary"]
+                   for k in range(2, before + 1)), back
+        assert not errors, errors
+        page.close()
+    finally:
+        httpd.shutdown()
+
+
+#: A five-stage plan, as acceptance row 8 asks, on the synthetic project.
+FIVE_STAGES = [
+    {"name": "scale", "turn_on": ["phases.*.scale"], "max_iter": 5},
+    {"name": "background", "turn_on": ["instrument.background.*"], "max_iter": 5},
+    {"name": "cell", "turn_on": ["phases.*.cell.*"], "max_iter": 5},
+    {"name": "zero", "turn_on": ["instrument.zero_shift"], "max_iter": 5},
+    {"name": "biso", "turn_on": ["phases.*.atoms.*.biso"], "max_iter": 5},
+]
+
+
+@pytest.fixture(scope="module")
+def next_plan(tmp_path_factory):
+    """A project whose stored plan has five stages, served as ``rietx gui`` serves it."""
+    httpd, client = _serve(tmp_path_factory, "next-plan")
+    status, body = client.put("/api/plan", {"plan": {"stages": FIVE_STAGES}})
+    assert status == 200, body
+    try:
+        yield f"http://127.0.0.1:{httpd.server_address[1]}/", client
+    finally:
+        httpd.shutdown()
+
+
+def _open_next_plan(browser, url: str):
+    page = _open_window(browser, url)
+    page.locator("section.model .tabs").get_by_role("tab", name="Plan", exact=True).click()
+    page.wait_for_selector("section[aria-label=plan] .stg .badge")
+    _frames(page)
+    return page
+
+
+def _next_names(page) -> list[str]:
+    return page.locator("section[aria-label=plan] input.sn").evaluate_all(
+        "els => els.map(e => e.value)")
+
+
+def test_the_rebuilt_plan_reorders_by_a_real_drag_and_moves_nothing_else(browser, next_plan):
+    """WP-2231 on a five-stage plan. A press on the grip with no drag moves
+    nothing. A real drag drops the stage where its centre crossed and is one
+    pending edit in the action bar, whose slot is reserved, so no landmark
+    moves. ⌘Z takes it back, ⇧⌘Z redoes it, and the bar's Revert restores
+    the stored plan."""
+    url, _ = next_plan
+    page = _open_next_plan(browser, url)
+    names = _next_names(page)
+    assert names == [s["name"] for s in FIVE_STAGES]
+
+    box = page.locator('[data-handle="2"]').bounding_box()
+    x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+    before = page.evaluate(SNAP, WINDOW_LANDMARKS)
+    page.mouse.move(x, y)
+    page.mouse.down()
+    page.mouse.up()
+    _frames(page)
+    assert _next_names(page) == names
+    assert not _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))
+
+    top = page.locator('[data-handle="0"]').bounding_box()
+    page.mouse.move(x, y)
+    page.mouse.down()
+    page.mouse.move(x, top["y"] - 12, steps=8)
+    page.mouse.up()
+    _frames(page)
+    assert _next_names(page) == [names[2], names[0], names[1], *names[3:]]
+    assert page.locator(".actions .pending").text_content().strip() == "1 pending"
+    moved = _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))
+
+    page.keyboard.press("ControlOrMeta+z")
+    _frames(page)
+    assert _next_names(page) == names
+    page.keyboard.press("ControlOrMeta+Shift+z")
+    _frames(page)
+    assert _next_names(page)[0] == names[2]
+    page.get_by_role("button", name="Revert", exact=True).click()
+    _frames(page)
+    assert _next_names(page) == names
+    assert page.locator(".actions .pending").text_content().strip() == ""
+    assert not page.errors, page.errors
+    page.close()
+    assert not moved, moved
+
+
+def test_the_rebuilt_plan_picker_adds_a_chip_and_moves_nothing(browser, next_plan):
+    """`+ Add` opens the grouped picker. The stage's own glob is offered
+    disabled, and a glob another stage frees says it moves from there. The
+    chosen one becomes a chip in the stage's Free row, one pending edit, and
+    neither the picker nor the chip moves a landmark."""
+    url, _ = next_plan
+    page = _open_next_plan(browser, url)
+    before = page.evaluate(SNAP, WINDOW_LANDMARKS)
+    zero = page.locator('section[aria-label=plan] .stg[data-stage="3"]')
+    zero.get_by_role("button", name="+ Add", exact=True).click()
+    dialog = page.get_by_role("dialog", name="Add to stage 4", exact=True)
+    dialog.get_by_role("textbox", name="Search parameters", exact=True).fill("zero")
+    own = dialog.locator('button.op[title="instrument.zero_shift"]')
+    assert own.is_disabled() and "in this stage" in own.text_content()
+    page.keyboard.press("Escape")
+    _frames(page)
+    assert not dialog.count()
+
+    stage = page.locator('section[aria-label=plan] .stg[data-stage="2"]')
+    stage.get_by_role("button", name="+ Add", exact=True).click()
+    dialog = page.get_by_role("dialog", name="Add to stage 3", exact=True)
+    dialog.get_by_role("textbox", name="Search parameters", exact=True).fill("zero")
+    choice = dialog.locator('button.op[title="instrument.zero_shift"]')
+    assert "moves from stage 4" in choice.text_content()
+    choice.click()
+    _frames(page)
+    free = stage.locator(".stg2").first.locator(".pt")
+    assert free.evaluate_all("els => els.map(e => e.title)") == [
+        "phases.*.cell.*", "instrument.zero_shift"]
+    assert page.locator(".actions .pending").text_content().strip() == "1 pending"
+
+    # the picker stays open after a choice, so a glob no group names is
+    # typed into it and entered as itself
+    assert dialog.count()
+    search = dialog.get_by_role("textbox", name="Search parameters", exact=True)
+    search.fill("phases.*.atoms.0.*")
+    search.press("Enter")
+    _frames(page)
+    assert free.evaluate_all("els => els.map(e => e.title)") == [
+        "phases.*.cell.*", "instrument.zero_shift", "phases.*.atoms.0.*"]
+    page.keyboard.press("Escape")
+    _frames(page)
+    moved = _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))
+    page.get_by_role("button", name="Revert", exact=True).click()
+    _frames(page)
+    assert not page.errors, page.errors
+    page.close()
+    assert not moved, moved
+
+
+def _biso(client) -> float:
+    rows = client.get("/api/params")[1]["parameters"]
+    return next(r["value"] for r in rows if r["path"] == "phases.0.atoms.0.biso")
+
+
+def _retype_line(page, line, text: str) -> None:
+    """A real click on the line, then Home, Shift+End and typing over it."""
+    line.scroll_into_view_if_needed()
+    line.click()
+    page.keyboard.press("Home")
+    page.keyboard.press("Shift+End")
+    page.keyboard.type(text)
+
+
+def test_the_rebuilt_text_tab_applies_a_typed_value_from_the_bar(browser, tmp_path_factory):
+    """WP-2231 rows 139-146. The Text tab names the file and its sync word. A
+    value typed into the editor marks its line, is one pending edit in the
+    action bar and moves no place; the bar's Apply stores it. ⌘⏎ inside the
+    editor applies a second value and starts no run. A project of its own,
+    since both applies are written."""
+    httpd, client = _serve(tmp_path_factory, "next-text")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    try:
+        page = _open_window(browser, url)
+        runs = []
+        page.on("request", lambda r: runs.append(r.url) if "/api/run" in r.url else None)
+        page.locator("section.model .tabs").get_by_role("tab", name="Text", exact=True).click()
+        text = page.locator("section[aria-label=text]")
+        page.wait_for_function(
+            "() => document.querySelector('section[aria-label=text] .sync')?.textContent === 'in sync'")
+        page.wait_for_selector("section[aria-label=text] .cm-content")
+        _frames(page)
+        assert text.locator(".bar .file").text_content() == "sample.rxt"
+        assert not text.get_by_role("button").count()
+        # ⌘⏎ in the editor is its Apply, so with nothing typed it refines nothing
+        text.locator(".cm-line", has_text="atoms.0.biso").click()
+        page.keyboard.press("ControlOrMeta+Enter")
+        _frames(page)
+        assert not runs, runs
+        before = page.evaluate(SNAP, WINDOW_LANDMARKS)
+
+        line = text.locator(".cm-line", has_text="atoms.0.biso")
+        _retype_line(page, line, "atoms.0.biso 0.7")
+        page.wait_for_function(
+            "() => document.querySelector('section[aria-label=text] .sync')?.textContent === 'edited'")
+        _frames(page)
+        assert page.locator(".actions .pending").text_content().strip() == "1 pending"
+        assert "atoms.0.biso 0.7" in text.locator(".cm-edited").all_text_contents()[0]
+        moved = _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))
+
+        page.get_by_role("button", name="Apply", exact=True).click()
+        page.wait_for_function(
+            "() => document.querySelector('section[aria-label=text] .sync')?.textContent === 'in sync'")
+        _frames(page)
+        assert _biso(client) == pytest.approx(0.7)
+        assert page.locator(".actions .pending").text_content().strip() == ""
+        assert not text.locator(".cm-edited").count()
+
+        _retype_line(page, text.locator(".cm-line", has_text="atoms.0.biso"), "atoms.0.biso 0.8")
+        page.wait_for_function(
+            "() => document.querySelector('section[aria-label=text] .sync')?.textContent === 'edited'")
+        page.keyboard.press("ControlOrMeta+Enter")
+        page.wait_for_function(
+            "() => document.querySelector('section[aria-label=text] .sync')?.textContent === 'in sync'")
+        _frames(page)
+        assert _biso(client) == pytest.approx(0.8)
+        assert not runs, runs
+        assert not page.errors, page.errors
+        page.close()
+        assert not moved, moved
+    finally:
+        httpd.shutdown()
+
+
+# -- the History tab (WP-2211) --------------------------------------------------
+
+#: The History tab's own places, beside the window's: the tab strip, its view
+#: choice and every row with its two buttons.
+HISTORY_LANDMARKS = WINDOW_LANDMARKS + [
+    "section.bottom", "section.bottom > .tabs", "section.bottom > .tabs > *",
+    "table.hist tr", "table.hist button", ".gutter .gut",
+]
+
+
+def _history_window(browser, tmp_path_factory):
+    """A project with two fitted stages, its window open on the History table."""
+    httpd, client = _serve(tmp_path_factory, "history")
+    status, run = client.post("/api/run", {"kind": "stage", "stage": {
+        "name": "bkg", "turn_on": ["phases.*.scale", "instrument.background.*"], "max_iter": 5}})
+    assert status == 200, run
+    _wait_idle(client)
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    page = _open_window(browser, url)
+    page.get_by_role("button", name="Show the console", exact=True).click()
+    page.get_by_role("tab", name=re.compile(r"^History")).click()
+    page.locator('[aria-label="History view"] button', has_text="Table").click()
+    page.wait_for_selector("table.hist tbody tr")
+    _frames(page)
+    return httpd, client, page
+
+
+def _row(page, step: str):
+    return page.locator("table.hist tbody tr", has=page.locator("td.what", has_text=step))
+
+
+#: The candidate table's heads whose ink centre lies outside the ink of the
+#: values under them, as `[label, centre, left, right]` (WP-2240, the third
+#: look). Ink is a `Range` over the text, never a box: a head over white space
+#: sits inside its own cell. A head spanning several columns is read against
+#: the values of all of them.
+_HEADS_OVER_VALUES = r"""() => {
+  const t = document.querySelector('table.cands');
+  const ink = (el) => {
+    const r = document.createRange(); r.selectNodeContents(el);
+    const q = [...r.getClientRects()].filter((x) => x.width > 0.5);
+    return q.length ? [Math.min(...q.map((x) => x.left)), Math.max(...q.map((x) => x.right))] : null;
+  };
+  const grid = []; const heads = [];
+  [...t.tHead.rows].forEach((tr, ri) => {
+    grid[ri] = grid[ri] || []; let c = 0;
+    for (const th of tr.cells) {
+      while (grid[ri][c]) c++;
+      for (let dr = 0; dr < th.rowSpan; dr++) for (let dc = 0; dc < th.colSpan; dc++) {
+        grid[ri + dr] = grid[ri + dr] || []; grid[ri + dr][c + dc] = th; }
+      heads.push([th, c, th.colSpan]); c += th.colSpan;
+    }
+  });
+  const off = [];
+  for (const [th, first, n] of heads) {
+    const h = ink(th); if (!h) continue;
+    let l = Infinity, r = -Infinity;
+    for (const tr of t.tBodies[0].rows) {
+      let c = 0;
+      for (const td of tr.cells) {
+        const v = c >= first && c < first + n ? ink(td) : null;
+        if (v) { l = Math.min(l, v[0]); r = Math.max(r, v[1]); }
+        c += td.colSpan;
+      }
+    }
+    const mid = (h[0] + h[1]) / 2;
+    if (r > l && (mid < l || mid > r)) off.push([th.innerText, mid, l, r]);
+  }
+  return off;
+}"""
+
+
+def _ink_pixels(page, hex_colour: str) -> int:
+    """Pixels of the plot within a small distance of one colour: what the
+    canvas painted, never the option it was handed."""
+    import io
+
+    import numpy as np
+    from PIL import Image
+
+    png = page.locator(".plot").screenshot()
+    pixels = np.asarray(Image.open(io.BytesIO(png)).convert("RGB")).astype(int)
+    want = np.array([int(hex_colour[i:i + 2], 16) for i in (1, 3, 5)])
+    return int((np.abs(pixels - want).sum(axis=-1) < 24).sum())
+
+
+def test_compare_draws_the_node_s_curve_and_moves_nothing(browser, tmp_path_factory):
+    """Compare overlays an earlier node's fit, dashed in its own ink, and names it
+    in the legend; a second press takes it off. Neither press moves a place."""
+    from rietx.viz.theme import TOKENS
+
+    httpd, client, page = _history_window(browser, tmp_path_factory)
+    try:
+        theme = page.evaluate("document.documentElement.dataset.theme")
+        ink = {**TOKENS["light"], **TOKENS[theme]}["--plot-compare"]
+        before = page.evaluate(SNAP, HISTORY_LANDMARKS)
+        drawn_before = _ink_pixels(page, ink)
+        row = _row(page, "scale")
+        compare = row.get_by_role("button", name="Compare", exact=True)
+        compare.click()
+        page.wait_for_selector(".gutter .gut:has-text('scale')")
+        _frames(page)
+        assert compare.get_attribute("aria-pressed") == "true"
+        moved = _moved(before, page.evaluate(SNAP, HISTORY_LANDMARKS))
+        drawn = _ink_pixels(page, ink)
+        assert drawn > drawn_before + 50, (drawn_before, drawn)
+        compare.click()
+        page.wait_for_function("() => ![...document.querySelectorAll('.gutter .gut')]"
+                               ".some((b) => b.textContent.trim() === 'scale')")
+        _frames(page)
+        moved += _moved(before, page.evaluate(SNAP, HISTORY_LANDMARKS))
+        # off again: back near where it started (the observed crosses'
+        # antialiased edges land a few pixels either way)
+        off = _ink_pixels(page, ink)
+        assert off - drawn_before < (drawn - drawn_before) / 4, (drawn_before, drawn, off)
+        assert not page.errors, page.errors
+        assert not moved, moved
+    finally:
+        page.close()
+        httpd.shutdown()
+
+
+PENDING = "() => /\\d+ pending/.test(document.querySelector('.actions .pending')?.textContent ?? '')"
+NONE_PENDING = "() => (document.querySelector('.actions .pending')?.textContent ?? '').trim() === ''"
+
+
+def test_restore_then_apply_reaches_the_node_and_revert_changes_nothing(
+        browser, tmp_path_factory):
+    """Restore loads an earlier node's values as pending edits, moving nothing;
+    Revert drops them and the head stays; Restore then Apply lands the node's
+    values, every one, on a new head."""
+    httpd, client, page = _history_window(browser, tmp_path_factory)
+    try:
+        nodes = client.get("/api/history")[1]
+        head = nodes["head"]
+        scale = next(n["id"] for n in nodes["nodes"] if n["name"] == "scale")
+        assert client.get(f"/api/history/diff?a={scale}&b={head}")[1]["diff"]
+
+        before = page.evaluate(SNAP, HISTORY_LANDMARKS)
+        _row(page, "scale").get_by_role("button", name="Restore", exact=True).click()
+        page.wait_for_function(PENDING)
+        _frames(page)
+        moved = _moved(before, page.evaluate(SNAP, HISTORY_LANDMARKS))
+        page.get_by_role("button", name="Revert", exact=True).click()
+        page.wait_for_function(NONE_PENDING)
+        assert client.get("/api/history")[1]["head"] == head
+
+        _row(page, "scale").get_by_role("button", name="Restore", exact=True).click()
+        page.wait_for_function(PENDING)
+        page.get_by_role("button", name="Apply", exact=True).click()
+        page.wait_for_function(NONE_PENDING)
+        after = client.get("/api/history")[1]["head"]
+        assert after != head
+        assert client.get(f"/api/history/diff?a={scale}&b={after}")[1]["diff"] == {}
+        assert not page.errors, page.errors
+        assert not moved, moved
+    finally:
+        page.close()
+        httpd.shutdown()
+
+
+def test_no_history_control_moves_the_window(browser, tmp_path_factory):
+    """The view choice asks for the panel to change; every other press of the
+    History tab moves no place: a row's menu, the ? box, Esc out of each."""
+    httpd, client, page = _history_window(browser, tmp_path_factory)
+    try:
+        before = page.evaluate(SNAP, HISTORY_LANDMARKS)
+        failures = []
+
+        def check(label):
+            _frames(page)
+            moved = _moved(before, page.evaluate(SNAP, HISTORY_LANDMARKS))
+            if moved:
+                failures.append(f"{label!r}: " + "; ".join(moved[:4]))
+
+        _row(page, "scale").click(button="right")
+        page.wait_for_selector(".rx-menu")
+        names = page.locator(".rx-menu [role^=menuitem]").all_text_contents()
+        assert [n.strip() for n in names] == ["Make current", "Branch from here…", "Name…", "Note…"]
+        menu = page.locator(".rx-menu").bounding_box()
+        assert menu["y"] >= 0 and menu["y"] + menu["height"] <= 900, menu
+        check("a row's menu")
+        page.keyboard.press("Escape")
+        page.get_by_role("button", name="About the History tab", exact=True).click()
+        page.wait_for_selector(".helpbox")
+        box = page.locator(".helpbox").bounding_box()
+        assert box["y"] + box["height"] <= 900, box
+        check("the ? box")
+        page.keyboard.press("Escape")
+        check("Esc")
+        assert not page.errors, page.errors
+        assert not failures, "\n".join(failures)
+    finally:
+        page.close()
+        httpd.shutdown()
+
+
+def test_the_pick_step_picks_frames_a_line_and_a_tick_moves_nothing(browser, tmp_path_factory):
+    """The peaks-and-indexing workflow's Pick step at ``/next``, by real clicks (WP-2240).
+
+    Choosing the workflow from the menu shows its four steps and the two graph
+    tabs it draws; Pick peaks in the step's foot fills the table; a tickbox
+    leaves a line out without moving the table or the frame (round 11b call 22,
+    `gui/STYLE.md` principle 4); a row's click frames its line, so the Pattern
+    graph is zoomed and Show all is offered.
+    """
+    httpd, _client = _serve(tmp_path_factory, "next-index")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    page = _open_next(browser, url, 1440)
+    try:
+        page.locator("button.mbtn.wf").click()
+        page.get_by_role("menuitemradio", name="Peaks and indexing", exact=True).click()
+        page.wait_for_selector("nav.steps button.step")
+        assert page.locator("nav.steps button.step .sname").all_text_contents() == [
+            "Pick peaks", "Fit peaks", "Index", "Judge"]
+        assert page.locator("section.graphs .tabs [role=tab]").all_text_contents() == [
+            "Pattern", "Peaks"]
+        assert page.locator(".actions").count() == 0
+        page.locator(".foot").get_by_role("button", name="Pick peaks", exact=True).click()
+        page.wait_for_selector("table.lines tbody tr")
+        _frames(page)
+        n = page.locator("table.lines tbody tr").count()
+        assert n > 3, n
+        landmarks = NEXT_LANDMARKS + ["nav.steps", "nav.steps > *", ".segmented", "table.lines",
+                                      "table.lines thead th"]
+        before = page.evaluate(SNAP, landmarks)
+        first = page.locator("table.lines tbody tr").first
+        first.locator("input[type=checkbox]").scroll_into_view_if_needed()
+        with page.expect_response("**/api/peaks/flag"):
+            first.locator("input[type=checkbox]").click()
+        _frames(page)
+        assert "off" in (first.get_attribute("class") or "")
+        moved = _moved(before, page.evaluate(SNAP, landmarks))
+        assert not moved, moved
+        assert page.locator("table.lines tbody tr").count() == n
+        show_all = page.get_by_role("button", name="Show all", exact=True)
+        assert show_all.is_disabled()
+        page.locator("table.lines tbody tr").nth(1).locator("td.num").first.click()
+        _frames(page)
+        assert "sel" in (page.locator("table.lines tbody tr").nth(1).get_attribute("class") or "")
+        assert show_all.is_enabled()
+        assert not page.errors, page.errors
+    finally:
+        page.close()
+        httpd.shutdown()
+
+
+def _find_lens(page, x: float, top: float, bottom: float):
+    """Sweep the pointer down a column of the plot and return the middle of
+    the band where the page says a lens is under it (`.host.onmark`): the
+    lenses are canvas ink, so a person's pointer is the one way to find one."""
+    y, hits = top, []
+    while y < bottom:
+        page.mouse.move(x, y)
+        on = page.locator(".plot .host.onmark").count() > 0
+        if on:
+            hits.append(y)
+        elif hits:
+            break
+        y += 2
+    return (hits[0] + hits[-1]) / 2 if hits else None
+
+
+def test_the_peak_lines_on_the_pattern_answer_the_object_grammar(browser, tmp_path_factory):
+    """The Pattern graph is the peak list's editing surface while the workflow
+    is up (WP-2240 task 5, interaction rules 1 to 12), by real pointer events.
+
+    A framed line's lens is found under the pointer; a click on it opens its
+    bar; a drag moves it with the mark under the pointer, and Esc right after
+    takes the move back with the line still chosen (call 35); a click on empty
+    space shows where it lands and adds a line; ⌘Z takes the add back;
+    right-click opens the line's menu; Option-click removes the line.
+    """
+    httpd, _client = _serve(tmp_path_factory, "next-gestures")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    page = _open_next(browser, url, 1440)
+    try:
+        page.locator("button.mbtn.wf").click()
+        page.get_by_role("menuitemradio", name="Peaks and indexing", exact=True).click()
+        page.locator(".foot").get_by_role("button", name="Pick peaks", exact=True).click()
+        page.wait_for_selector("table.lines tbody tr")
+        rows = page.locator("table.lines tbody tr")
+        n = rows.count()
+        used = [i for i in range(n) if "off" not in (rows.nth(i).get_attribute("class") or "")]
+        target = used[len(used) // 2]
+        start = rows.nth(target).locator("td.num").first.inner_text()
+        rows.nth(target).locator("td.num").first.click()
+        _frames(page)
+        page.keyboard.press("Escape")
+        over = page.locator(".plot .u-over").first.bounding_box()
+        cx = over["x"] + over["width"] / 2
+        y = _find_lens(page, cx, over["y"] + 4, over["y"] + over["height"] * 0.8)
+        assert y is not None, "no lens under the framed line"
+        page.mouse.move(cx, y)
+        assert page.locator(".plot .host.onmark").count() == 1
+
+        # a click on the lens chooses it and opens its bar
+        page.mouse.click(cx, y)
+        _frames(page)
+        bar = page.locator(".peakbar")
+        assert bar.count() == 1 and "° 2θ" in bar.inner_text()
+        assert "sel" in (rows.nth(target).get_attribute("class") or "")
+        page.keyboard.press("Escape")
+        _frames(page)
+        assert bar.count() == 0
+
+        # a drag moves the line, its mark under the pointer the whole way
+        page.mouse.move(cx, y)
+        page.mouse.down()
+        for k in range(1, 9):
+            page.mouse.move(cx + 5 * k, y)
+        _frames(page)
+        assert page.locator(".lensmark.moving").count() == 1
+        with page.expect_response("**/api/peaks/move"):
+            page.mouse.up()
+        _frames(page)
+        chosen = page.locator("table.lines tbody tr.sel td.num").first
+        assert chosen.inner_text() != start
+        assert bar.count() == 1
+        # Esc right after the drag takes it back, and the line stays chosen
+        with page.expect_response("**/api/peaks/undo"):
+            page.keyboard.press("Escape")
+        _frames(page)
+        assert chosen.inner_text() == start
+        assert bar.count() == 1
+        page.keyboard.press("Escape")
+        _frames(page)
+        assert bar.count() == 0
+
+        # hover shows where a click lands; the click adds a line after its
+        # wait for a double-click, and ⌘Z takes it back
+        ex = over["x"] + over["width"] * 0.15
+        page.mouse.move(ex, over["y"] + over["height"] * 0.5)
+        _frames(page)
+        assert page.locator(".lensmark.ghost").count() == 1
+        with page.expect_response("**/api/peaks/add"):
+            page.mouse.click(ex, over["y"] + over["height"] * 0.5)
+        _frames(page)
+        assert rows.count() == n + 1
+        with page.expect_response("**/api/peaks/undo"):
+            page.keyboard.press("Meta+z")
+        _frames(page)
+        assert rows.count() == n
+
+        # right-click on the lens opens the line's menu
+        page.mouse.click(over["x"] + over["width"] * 0.9, over["y"] + 2)
+        rows.nth(target).locator("td.num").first.click()
+        _frames(page)
+        page.keyboard.press("Escape")
+        y = _find_lens(page, cx, over["y"] + 4, over["y"] + over["height"] * 0.8)
+        page.mouse.click(cx, y, button="right")
+        page.wait_for_selector(".rx-menu")
+        names = [t.strip() for t in page.locator(".rx-menu [role^=menuitem]").all_text_contents()]
+        assert names[:2] == ["Leave out of the search", "Delete the line"], names
+        page.keyboard.press("Escape")
+        _frames(page)
+
+        # Option-click removes the line at once
+        page.keyboard.down("Alt")
+        page.mouse.move(cx, y)
+        _frames(page)
+        assert page.locator(".lensmark.danger").count() == 1
+        with page.expect_response("**/api/peaks/remove") as gone:
+            page.mouse.click(cx, y)
+        page.keyboard.up("Alt")
+        _frames(page)
+        assert gone.value.request.post_data_json == {"index": target}
+        positions = page.evaluate(
+            "[...document.querySelectorAll('table.lines tbody tr')]"
+            ".map((tr) => tr.querySelectorAll('td')[1].innerText.trim())")
+        assert len(positions) >= n - 1 and start not in positions, (start, positions)
+        assert not page.errors, page.errors
+    finally:
+        page.close()
+        httpd.shutdown()
+
+
+def test_the_fit_index_and_judge_steps_run_to_an_adopted_cell(browser, tmp_path_factory):
+    """The workflow's last three steps at ``/next``, by real clicks (WP-2240 tasks 6 to 8).
+
+    Fit peaks lists the groups and draws their windows in the Peaks graph, and a
+    window's Refit is one undo step. Index searches the systems the form leaves
+    on, lists the cells, and a row's click draws its lines on the Pattern graph.
+    Judge screens the chosen cell's extinctions, and Adopt waits for Apply,
+    which lands a Pawley start (the maintainer, 2026-11-23) and hands the
+    window to Refinement.
+    """
+    httpd, client = _serve(tmp_path_factory, "next-judge")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    page = _open_next(browser, url, 1440)
+    steps = page.locator("nav.steps button.step")
+    try:
+        page.locator("button.mbtn.wf").click()
+        page.get_by_role("menuitemradio", name="Peaks and indexing", exact=True).click()
+        page.locator(".foot").get_by_role("button", name="Pick peaks", exact=True).click()
+        page.wait_for_selector("table.lines tbody tr")
+
+        # Fit peaks: the groups, their windows, and a Refit as one undo step
+        steps.filter(has_text="Fit peaks").click()
+        page.locator(".segmented button", has_text="All groups").click()
+        page.wait_for_selector("table.groups tbody tr")
+        page.get_by_role("tab", name="Peaks", exact=True).click()
+        page.wait_for_selector(".peakfits canvas")
+        assert page.locator(".peakfits canvas").count() >= 1
+        before = client.get("/api/peaks")[1]["undo"]
+        with page.expect_response("**/api/peaks/refit"):
+            page.locator(".peakfits button.refit").first.click()
+        _frames(page)
+        assert client.get("/api/peaks")[1]["undo"] == before + 1
+
+        # Index: leave cubic alone on, search, choose the first cell
+        steps.filter(has_text="Index").click()
+        page.get_by_role("tab", name="Pattern", exact=True).click()
+        systems = page.locator('[aria-label="Crystal systems"] button')
+        for name in systems.all_text_contents():
+            if name != "cubic":
+                with page.expect_response("**/api/project"):
+                    systems.filter(has_text=name).click()
+        assert client.get("/api/project")[1]["doc"]["indexing"]["search"]["systems"] == ["cubic"]
+        # a chosen cell's lines are the strong rule's grey at /next (Yue, 2026-11-23)
+        candidate = page.evaluate(
+            "getComputedStyle(document.body).getPropertyValue('--line-strong')").strip()
+        drawn = _ink_pixels(page, candidate)
+        page.locator(".steppane:not(.gone) .foot").get_by_role(
+            "button", name="Index", exact=True).click()
+        page.wait_for_selector("table.cands tbody tr", timeout=180_000)
+        rows = page.locator("table.cands tbody tr")
+        assert "cubic" in rows.first.inner_text()
+        rows.first.click()
+        _frames(page)
+        assert "sel" in (rows.first.get_attribute("class") or "")
+        assert _ink_pixels(page, candidate) > drawn + 50
+        # every head is centred over its column's values, never over white
+        # space beside them (Yue, the third look, 2026-11-23)
+        off = page.evaluate(_HEADS_OVER_VALUES)
+        assert off == [], off
+
+        # Judge: screen the extinctions, choose a group, Adopt, then Apply
+        foot = page.locator(".steppane:not(.gone) .foot")
+        foot.get_by_role("button", name=re.compile(r"^Judge #1")).click()
+        assert "Å" in page.locator(".cellline").inner_text()
+        page.get_by_role("button", name="Screen extinctions", exact=True).click()
+        page.wait_for_selector("table.classes tbody tr", timeout=180_000)
+        assert page.locator("table.classes .mark").count() == 1
+        groups = page.locator(".sgs button")
+        assert groups.first.get_attribute("aria-pressed") == "true"
+        foot.get_by_role("button", name="Adopt as a Pawley start", exact=True).click()
+        assert client.get("/api/project")[1]["doc"]["mode"] != "pawley"
+        assert foot.get_by_role("button", name="Revert", exact=True).count() == 1
+        with page.expect_response("**/api/index/adopt"):
+            foot.get_by_role("button", name="Apply", exact=True).click()
+        page.wait_for_function(
+            "document.querySelector('button.mbtn.wf').innerText.includes('Refinement')")
+        assert client.get("/api/project")[1]["doc"]["mode"] == "pawley"
+        assert not page.errors, page.errors
+    finally:
+        page.close()
+        httpd.shutdown()

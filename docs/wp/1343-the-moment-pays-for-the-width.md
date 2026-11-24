@@ -492,6 +492,24 @@ the cheaper of the two at the time; the skill row is required either way.
 
 ## Handover log
 
+- **2026-11-24** — repair, by a ghostshift runner, PR #1817. The session-start hook
+  flagged this WP because a `WP-1343:` commit of 2026-11-18 was newer than the last entry
+  (2026-10-25). The entry below reconstructs it from `git log`. Nothing else in this file
+  changed: no task, no Status line. Mike's PR #1706 (the magnetic-width family on the
+  allowed rows only) is open and in flight, so it is not recorded here. *Next*: unchanged.
+  The maintainer's choice among the three fixes for the k = 0 silence (2026-10-25 entry)
+  is still open, and #1706 is reviewed under `/pr-review`.
+
+- **2026-11-18** (reconstructed post hoc) — PR #1682 (outside contributor), one commit
+  `c4cc61e5`, merged on 2026-11-19. It is docs only. It adds a dated sub-bullet to the
+  2026-09-30 entry, beside PR #524's Pbcm measurement. Yue answered 3e on #193 on
+  2026-11-17 and asked for that note. The note says the round-trip bar is 2σ and 5 % of the
+  planted value, as `tests/test_magnetic_width.py` asserts, because a 1σ bar on one draw
+  fails about one time in three on the seed alone. It also says the freed width came back
+  low in all three draws, at 0.2466-0.2471° against a planted 0.25° (1.16-1.36 % low), and
+  that the "1.2 %" quoted there is the pooled figure. No task, status or code changed. The
+  commit does not say why the per-draw values were not tabulated.
+
 - **2026-10-25** — PR #1111 (outside contributor) merged as `942f8db4`. It
   adds `tests/test_magnetic_width_k_zero.py` and lands the last two Tasks rows:
   the identifiability row and the k = 0 half of the Tests + PNGs row. The k = 0
@@ -679,6 +697,16 @@ the cheaper of the two at the time; the skill row is required either way.
     separable, as the WP expected: size 0.0337 ± 0.0164, strain on its
     floor, both declared unmeasured. The in-suite round trip is MnF₂ at 2σ
     and 5 % bars rather than 1σ, and its docstring argues why.
+  - **2026-11-18, the bar and the offset on file** (maintainer's answer 3e
+    on #193, 2026-11-17, who asked for the note:
+    <https://github.com/yue-here/rietx/issues/193#issuecomment-6963319037>).
+    The bar is 2σ and 5 % of the planted value, as
+    `tests/test_magnetic_width.py` asserts, because a 1σ bar on one draw
+    fails about one time in three on the seed alone. The freed width came
+    back low in all three draws of the Pbcm measurement above: 0.2466-0.2471
+    against a planted 0.25°, which is 1.16-1.36 % low (the per-draw values
+    were not tabulated). The "1.2 %" in the entry above is the pooled
+    figure. The 2σ and 5 % bar holds on all three draws.
   - **What it deliberately does not do.** No real k ≠ 0 dataset
     (Ba₂FeSbSe₅ is not vendored and its licence is unchecked), and no PNGs
     to `tests/output/`. `multi.py`'s joint report emits none of the four

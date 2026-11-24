@@ -239,6 +239,7 @@ A series is where one unread warning multiplies: in the in-situ run this diagnos
 | `SeriesEntry.rwp_over_median` | the kept attempt's Rwp over the median Rwp of the patterns accepted before it in the walk, with no threshold; `None` where no median existed, on the first pattern walked or after every earlier pattern was quarantined |
 | `SeriesEntry.seeded_from` | the index of the pattern whose fitted state seeded this pattern's warm rungs: the last one accepted before it in the walk, which skips a quarantined pattern; `None` where there was no warm start |
 | `SeriesEntry.floored` | the moment modulus paths that reached the kept attempt at their floor, because the pattern it warm-started from did not support them; empty when the kept attempt started cold |
+| `SeriesEntry.held_values` | each path the `constrain` hook held on this pattern, with its value, site coordinate DOFs left out; `None` where nothing was held |
 | `SeriesEntry.pattern_paths` | this pattern's own path, where it differs |
 | `SeriesEntry.node_id`, `SeriesEntry.tree_id` | where this pattern's history lives |
 
@@ -464,7 +465,6 @@ These diagnostics fence that, and none of them alters a fitted value.
 | `SEQUENTIAL_UNRECOVERED` | the pattern's fit was rejected on every attempt; it seeded no successor and joined no median |
 | `SEQUENTIAL_PATH_CHECK_NOT_RUN` | under `direction="both"`, the comparison did not run |
 | `SEQUENTIAL_PATH_CHECK_INCOMPLETE` | under `direction="both"`, the comparison ran on fewer patterns or paths than the series has |
-| `SEQUENTIAL_WIDTH_GROWTH` | a phase width reached 3× its first measured value while GoF reached 2× its own at the same pattern; a width growing at a flat GoF fires nothing |
 | `SEQUENTIAL_MOMENT_HOLD` | how many patterns' moment came back unsupported, and which successors' modulus was reseeded to its floor |
 | `SEQUENTIAL_MOMENT_ONSET` | where along the axis the moment stops being supported, as a bracket |
 | `SEQUENTIAL_CANCELLED` | the series stopped before its last pattern ([Events, history and cancellation](#events-history-and-cancellation)) |

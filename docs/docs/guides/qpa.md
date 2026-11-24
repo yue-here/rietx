@@ -19,8 +19,8 @@ This refines both phases with `mccusker_structural`:
 
 <!-- output of examples/guides/qpa.py -->
 ```text
-NAC    98.66 ± 0.11 wt%
-CaF2    1.34 ± 0.11 wt%
+NAC    98.65 ± 0.12 wt%
+CaF2    1.35 ± 0.12 wt%
 ```
 
 Each row is a `PhaseQuantity`, with the fraction, its esd, the refined scale and the Z·M and V it was computed from.
@@ -44,7 +44,7 @@ A minor phase has few strong peaks, so read its diagnostics before you quote its
 
 <!-- output of examples/guides/qpa.py -->
 ```text
-FLOOR_HIT | phases.1.atoms.0.biso refined to its floor (ρ=+0.198).
+FLOOR_HIT | phases.1.atoms.0.biso refined to its floor (ρ=+0.197).
 ```
 
 The Ca Biso of CaF₂ went to 0, which no real crystal has.
@@ -62,8 +62,8 @@ NAC    98.59 ± 0.07 wt%
 CaF2    1.41 ± 0.07 wt%
 ```
 
-The esd falls from 0.11 to 0.07 wt %, and `mccusker_default`, which frees no structural parameter, gives 1.38 wt % for CaF₂.
-Rwp rose from 0.088 to 0.090 when the two Biso values were held.
+The esd falls from 0.12 to 0.07 wt %, and `mccusker_default`, which frees no structural parameter, gives 1.38 wt % for CaF₂.
+Rwp rose from 0.089 to 0.090 when the two Biso values were held.
 A Biso on its floor lowered Rwp, so Rwp cannot choose between the two fits.
 The fit reports the holds as `HOLD_BLOCKED_PLAN`, because the plan tried to free paths you held.
 [How to keep a parameter fixed whatever the plan frees](hold.md) explains holds.
@@ -82,14 +82,14 @@ Declared on the minor phase, it trades against the scale:
 
 <!-- output of examples/guides/qpa.py -->
 ```text
-NAC    96.31 ± 3.63 wt%
-CaF2    3.69 ± 3.63 wt%
-HIGH_CORRELATION | Correlated pair: phases.1.scale ~ phases.1.extinction (ρ=+0.998). Flagged in stages: extinction, roughness, closing.
+NAC    96.32 ± 3.71 wt%
+CaF2    3.68 ± 3.71 wt%
+HIGH_CORRELATION | Correlated pair: phases.1.scale ~ phases.1.extinction (ρ=+0.998). Flagged in stages: extinction, roughness.
 ```
 
 With a few weak peaks, the extinction and the scale can scale the same intensities.
-The fraction moves from 1.34 to 3.69 wt %, and its esd from 0.11 to 3.63 wt %.
-Rwp falls from 0.088 to 0.083, so Rwp would choose the fit with the meaningless fraction.
+The fraction moves from 1.35 to 3.68 wt %, and its esd from 0.12 to 3.71 wt %.
+Rwp falls from 0.089 to 0.083, so Rwp would choose the fit with the meaningless fraction.
 
 ## Check that the fraction has one answer
 
@@ -128,12 +128,12 @@ Set `Phase.particle_radius_um` on every phase before the fit:
 
 <!-- output of examples/guides/qpa.py -->
 ```text
-NAC   µR 0.0021  98.59 -> 98.59 wt%
-CaF2  µR 0.0014  1.41 -> 1.41 wt%
+NAC   µR 0.0021  98.59 -> 98.58 wt%
+CaF2  µR 0.0014  1.41 -> 1.42 wt%
 ```
 
 The radii here are assumed, to show the call.
-At 0.414 Å both phases absorb so little that the correction changes nothing.
+At 0.414 Å both phases absorb so little that the correction moves each fraction by 0.01 wt %.
 With Cu Kα and a heavy phase it can move a fraction by several wt %.
 
 The corrected fraction is reported beside the uncorrected one, and the esd belongs to the uncorrected one: the radii's uncertainty is not statistical.
@@ -142,7 +142,7 @@ Above µR = {{ BRINDLEY_MU_R_FENCE }} the correction is outside the regime Brind
 ## Write the table
 
 `Refinement.write_qpa_table` writes the fractions to a CSV with the crystalline-only caveat in it.
-A joint fit reports the fractions per histogram on `HistogramResult.qpa`, and a series per pattern on `SeriesEntry.qpa`.
+A joint fit reports the fractions for each of its patterns on `HistogramResult.qpa`, and a series per pattern on `SeriesEntry.qpa`.
 
 ## See also
 

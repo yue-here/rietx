@@ -496,8 +496,10 @@ def test_a_variable_survives_a_history_file_round_trip(ref, pattern, tmp_path):
 
 
 def test_a_dependent_that_becomes_symmetry_tied_is_reported_and_dropped(ref):
-    """Symmetry outranks a user tie, and a variable's dependents inherit that."""
-    ref.add_variable("L", 4.16, min=1.5, max=10.0)
+    """Symmetry outranks a user tie, and a variable's dependents inherit that.
+    The variable starts at ``a``, so the cell the edit hands back agrees with
+    the tie ``P m -3 m`` puts on b (WP-2150)."""
+    ref.add_variable("L", ref.structure.phases[0].cell.a.value, min=1.5, max=10.0)
     structure = ref.structure.model_copy(deep=True)
     structure.phases[0].space_group = "P 1"   # b is nobody's dependent here
     ref.edit(structure=structure)

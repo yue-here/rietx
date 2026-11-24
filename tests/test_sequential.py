@@ -38,11 +38,11 @@ from rietx.sequential import (
     _direction_gaps,
     _entry_from_result,
     _labels_for,
+    _PatternRaised,
     _reseed_diagnostics,
     _reseed_needed,
     _series_steps,
     _unrecovered_diagnostics,
-    _width_growth_diagnostics,
     refine_sequential,
 )
 from rietx.strategy import staged
@@ -562,6 +562,125 @@ def test_a_hold_declared_in_constrain_reaches_every_pattern(thermal_patterns):
         plot_result(result, path=str(out / f"sequential_held_cell_p{k}.png"))
         plot_result(result, path=str(out / f"sequential_held_cell_p{k}_zoom.png"),
                     two_theta_range=(3.0, 10.0))
+
+
+class _ColdOnFrame(SequentialRefinement):
+    """A runner whose warm rungs raise on one pattern, so its cold rung is kept.
+
+    Issue #224's runaway neighbour, which made every warm rung raise, is what
+    sends a real pattern there; this forces it on WP-2081's four-pattern ramp.
+    """
+
+    cold_index = 2
+
+    def _fit_one(self, data, label, previous, previous_hkl, plan, mode,
+                 two_theta_limits, position, previous_tag, prepare, constrain,
+                 index, *args, **kw):
+        if index == self.cold_index and previous is not None:
+            raise _PatternRaised(RuntimeError("forced to the cold rung"))
+        return super()._fit_one(data, label, previous, previous_hkl, plan, mode,
+                                two_theta_limits, position, previous_tag,
+                                prepare, constrain, index, *args, **kw)
+
+
+def _hold_zero_after_the_first(index, ref):
+    if index > 0:
+        ref.hold("instrument.zero_shift")
+
+
+def test_a_hold_keeps_its_value_across_the_cold_rung(thermal_patterns):
+    """A held zero shift reads the last accepted pattern's value on the cold
+    rung, as on a warm one (WP-2081 question 4, series rule 6).
+
+    Before, the cold rung held the caller's 0.0: the cell absorbed the missing
+    zero shift 546 ppm short, and the next pattern carried 0.0 on.  The
+    acceptance row "a fixed value stays fixed" asks the cell within 2 ppm of
+    the truth on every pattern.
+    """
+    from pathlib import Path
+
+    from rietx.viz.plots import plot_result
+
+    runner = _ColdOnFrame(*_start_models())
+    series = runner.fit(thermal_patterns[:4], plan="mccusker_default",
+                        constrain=_hold_zero_after_the_first)
+
+    assert [e.rung for e in series.entries] == ["cold", "warm", "cold", "warm"]
+    calibrated = runner.fitted_instruments[0].zero_shift.value
+    assert abs(calibrated - TRUE_ZERO) < 1e-4
+    for k, ins in enumerate(runner.fitted_instruments):
+        assert ins.zero_shift.value == calibrated, k
+        a = runner.fitted_structures[k].phases[0].cell.a.value
+        truth = A0 * (1.0 + RAMP * k)
+        # the script reads 1.9-2.0 ppm, the acceptance row's "within 2 ppm";
+        # 3 leaves room for the platform's last digits
+        assert abs(a - truth) / truth < 3e-6, k
+    assert series.entries[0].held_values is None
+    assert [e.held_values for e in series.entries[1:]] == [
+        {"instrument.zero_shift": calibrated}] * 3
+
+    out = Path(__file__).parent / "output"
+    out.mkdir(exist_ok=True)
+    plot_result(runner.results_[2], path=str(out / "sequential_cold_hold_p2.png"))
+    plot_result(runner.results_[2], path=str(out / "sequential_cold_hold_p2_zoom.png"),
+                two_theta_range=(3.0, 10.0))
+
+
+class _FailOnFrame(_ColdOnFrame):
+    """Every rung of one pattern raises, so ``on_error`` decides its successor."""
+
+    def _fit_one(self, data, label, previous, previous_hkl, plan, mode,
+                 two_theta_limits, position, previous_tag, prepare, constrain,
+                 index, *args, **kw):
+        if index == self.cold_index:
+            raise _PatternRaised(RuntimeError("every rung raises"))
+        return SequentialRefinement._fit_one(
+            self, data, label, previous, previous_hkl, plan, mode,
+            two_theta_limits, position, previous_tag, prepare, constrain,
+            index, *args, **kw)
+
+
+def test_a_skip_fits_the_successor_cold_and_keeps_the_held_value(thermal_patterns):
+    """``on_error="skip"`` distrusts the warm state, and a held value is the
+    caller's rather than the warm state's, so the cold successor keeps it."""
+    runner = _FailOnFrame(*_start_models())
+    series = runner.fit(thermal_patterns[:4], plan="mccusker_default",
+                        on_error="skip", constrain=_hold_zero_after_the_first)
+    assert [e.index for e in series.entries] == [0, 1, 3]
+    assert series.entries[-1].rung == "cold" and series.entries[-1].seeded_from is None
+    calibrated = runner.fitted_instruments[0].zero_shift.value
+    assert series.entries[-1].held_values == {"instrument.zero_shift": calibrated}
+
+
+def test_a_value_a_hook_sets_on_the_cold_rung_wins_over_the_kept_hold(
+        thermal_patterns):
+    """``prepare`` writing a held value for one pattern on purpose keeps it:
+    the cold rung writes the kept value only over the caller's own, and
+    ``held_values`` shows where the value changed.  The pattern after it
+    warm-starts from it, so it carries the hook's value on."""
+
+    def prepare(index, data, structure, instrument):
+        if index == 2:
+            instrument.zero_shift.value = 0.005
+
+    runner = _ColdOnFrame(*_start_models())
+    series = runner.fit(thermal_patterns[:4], plan=_CHEAP, prepare=prepare,
+                        constrain=_hold_zero_after_the_first)
+
+    held = [(e.held_values or {}).get("instrument.zero_shift")
+            for e in series.entries]
+    assert held == [None, 0.0, 0.005, 0.005]
+
+
+def test_a_hold_the_carry_globs_exclude_restarts_on_every_rung(thermal_patterns):
+    """The kept value is limited by ``carry`` as the warm start is: a path no
+    glob carries holds the caller's value on the cold rung too."""
+    structure, instrument = _start_models()
+    runner = _ColdOnFrame(structure, instrument, carry=["phases.*"])
+    series = runner.fit(thermal_patterns[:4], plan=_CHEAP,
+                        constrain=_hold_zero_after_the_first)
+    assert [e.held_values for e in series.entries[1:]] == [
+        {"instrument.zero_shift": 0.0}] * 3
 
 
 def test_an_untied_series_leaves_the_same_pair_free_and_unequal(thermal_patterns):
@@ -1420,7 +1539,10 @@ def test_the_first_rung_bound_moves_no_accepted_value(thermal_series,
 #: `_CHEAP_WIDE` at twice its budget, so that `_CRAWL_FACTOR` times a first rung
 #: of about 9 evaluations lowers the budget and stays above the crawl's stop
 _CHEAP_ROOMY = staged.RefinementPlan(stages=[
-    staged.Stage("quick", ["phases.*.scale", "phases.*.cell.*"], max_iter=200)])
+    staged.Stage("quick", ["phases.*.scale", "phases.*.cell.*"], max_iter=200)],
+    # declared, not inherited: off by default since WP-2222, and the test
+    # below crawls this plan's closing stage
+    closing_window_tol=staged.CLOSING_WINDOW_TOL)
 _CRAWL_FACTOR = 40.0
 
 
@@ -1988,15 +2110,19 @@ class _StubColdFits(SequentialRefinement):
         self._values = values
         self.refits: list[str] = []
         self.hooks: list[object] = []
+        self.hold_sources: list[object] = []
+        self.hold_vars: list[object] = []
 
     def _fit_one(self, data, label, previous, previous_hkl, plan, mode,
                  two_theta_limits, position, previous_tag, prepare, constrain,
                  index, history_suffix="", *, previous_vars=None, stream=None,
-                 stamp=None, cancel=None):
+                 stamp=None, cancel=None, hold_source=None, hold_vars=None):
         assert previous is None and previous_hkl == []   # cold, by construction
         assert history_suffix == ".verify"
         self.refits.append(label)
         self.hooks.append(constrain)
+        self.hold_sources.append(hold_source)
+        self.hold_vars.append(hold_vars)
         return None, _fake_result(0.1, parameters=[
             RefinedParameter(path=p, value=v)
             for p, v in self._values[label].items()])
@@ -2068,6 +2194,22 @@ def test_verification_refits_carry_the_callers_constraints():
     runner._verify_steps(steps, [None] * 6, [f"p{i}" for i in range(6)],
                          "rietveld", _CHEAP, None, None, _tie_the_two_biso)
     assert runner.hooks == [_tie_the_two_biso, _tie_the_two_biso]
+
+
+def test_verification_refits_hold_what_the_chain_held_on_their_pattern():
+    """Each cold refit reads its held values from that pattern's own fitted
+    models (WP-2081), so a held zero shift is the chain's on that pattern and
+    never the caller's start."""
+    runner = _StubColdFits({"p2": {"phases.0.cell.a": 4.0},
+                            "p3": {"phases.0.cell.a": 4.002}})
+    fitted = {2: ("models of p2",), 3: ("models of p3",)}
+    held_vars = {2: {"t": 1.0}, 3: {"t": 2.0}}
+    runner._verify_steps([_flagged("phases.0.cell.a", 2e-3)], [None] * 6,
+                         [f"p{i}" for i in range(6)], "rietveld", _CHEAP, None,
+                         None, None, fitted=fitted, fitted_vars=held_vars)
+    assert runner.hold_sources == [fitted[2], fitted[3]]
+    # a held named variable is not in the models, so it rides beside them
+    assert runner.hold_vars == [held_vars[2], held_vars[3]]
 
 
 def _synthetic_series(path: str, values, stderr) -> SeriesResult:
@@ -2192,6 +2334,19 @@ def test_a_run_of_quarantined_patterns_is_never_bridged():
     steps = _series_steps(_fenced_series(
         "phases.0.cell.a", ramp, [6.6e-6] * 10, diverged={2, 3, 4, 5}))
     assert sorted(s.indices for s in steps) == [(0, 1), (6, 7), (7, 8), (8, 9)]
+
+
+def test_a_path_with_two_planted_steps_lists_both():
+    """Two transitions on one ramp (WP-1524 shape 2).  The removed scan kept
+    one flag per path, the argmax, so the smaller transition went unreported;
+    every step is a row since WP-2003, so both lead the list, larger first."""
+    ramp = [4.1566 + 2.7e-4 * k + (2e-3 if k >= 3 else 0.0)
+            + (3e-3 if k >= 7 else 0.0) for k in range(10)]
+    steps = _series_steps(_fenced_series("phases.0.cell.a", ramp, [6.6e-6] * 10))
+    assert len(steps) == 9
+    assert [s.indices for s in steps[:2]] == [(6, 7), (2, 3)]
+    assert [s.step for s in steps[:2]] == pytest.approx([3.27e-3, 2.27e-3])
+    assert all(abs(s.step) == pytest.approx(2.7e-4) for s in steps[2:])
 
 
 @pytest.mark.parametrize("above", [{3}, set()])
@@ -3220,10 +3375,18 @@ def test_pawley_chain_carried_intensities_refit_as_far_as_cleared():
     the Rwp of the same chain re-seeded.  ``carry_hkl_intensities=False`` is
     the re-seeded chain; the two must agree to 1e-3 relative on every pattern
     (measured: identical to five digits), and the switch must actually clear
-    what the carried chain hands on."""
+    what the carried chain hands on.
+
+    Both chains declare the closing stage.  A carried Pawley chain runs it by
+    default since WP-2222 and a re-seeded one does not, so without the
+    declaration the two would compare different windows."""
+    from rietx.schemas.plan import CLOSING_WINDOW_TOL
+    from rietx.strategy.staged import PLAN_PRESETS
     from tests.test_pawley import FAP_CIF, _fap_instrument, fap_series
 
     patterns = fap_series(4)
+    plan = PLAN_PRESETS["pawley_default"]()
+    plan.closing_window_tol = CLOSING_WINDOW_TOL
     seen: dict[bool, list[int]] = {True: [], False: []}
     rwp = {}
     for carry in (True, False):
@@ -3233,7 +3396,7 @@ def test_pawley_chain_carried_intensities_refit_as_far_as_cleared():
         sr = SequentialRefinement(rx.Structure.from_cif(str(FAP_CIF)),
                                   _fap_instrument(False),
                                   carry_hkl_intensities=carry)
-        series = sr.fit(patterns, mode="pawley", plan="pawley_default",
+        series = sr.fit(patterns, mode="pawley", plan=plan,
                         reseed=False, constrain=hook)
         assert all(e.status == "converged" for e in series.entries)
         rwp[carry] = [e.statistics.rwp for e in series.entries]
@@ -3242,252 +3405,37 @@ def test_pawley_chain_carried_intensities_refit_as_far_as_cleared():
     np.testing.assert_allclose(rwp[True], rwp[False], rtol=1e-3)
 
 
-# -- a width that grew while the fit got worse (WP-1465, issue #451) -------
 
-def _width_series(path: str, values, stderr, gof, *, diverged=()) -> SeriesResult:
-    """A hand-built series carrying one width path and each pattern's GoF.
+def test_a_carried_pawley_chain_runs_the_closing_stage(monkeypatch):
+    """WP-2222, ruled 2026-11-19: a chain that carries Pawley intensities runs
+    the closing stage when its plan has none; a chain that re-seeds does not,
+    and a plan's own value is kept.  The drift it answers comes from a
+    reflection centred past the data's end (WP-2228), whose fix replaces it."""
+    from rietx.refine import Refinement
+    from rietx.schemas.plan import CLOSING_WINDOW_TOL
+    from rietx.strategy.staged import PLAN_PRESETS
+    from tests.test_pawley import FAP_CIF, _fap_instrument, fap_series
 
-    Rwp is GoF × 1 %, so the message's Rwp pair is checkable too; only GoF
-    enters the test."""
-    return SeriesResult(entries=[
-        SeriesEntry(index=k, label=f"p{k}",
-                    status="diverged" if k in diverged else "converged",
-                    statistics=Statistics(rwp=0.01 * g, rp=0.01 * g, rexp=0.01,
-                                          chi2=990.0 * g * g, gof=g,
-                                          n_points=1000, n_free_parameters=10),
-                    parameters=[RefinedParameter(path=path, value=v, stderr=s)])
-        for k, (v, s, g) in enumerate(zip(values, stderr, gof, strict=True))])
+    ran: list[float | None] = []
+    real_fit = Refinement.fit
 
+    def spy(self, data, *args, plan=None, **kw):
+        ran.append(plan.closing_window_tol)
+        return real_fit(self, data, *args, plan=plan, **kw)
 
-_GROWING = [0.020, 0.021, 0.070, 0.100, 0.150]
-_WORSENING = [1.0, 1.02, 2.0, 3.0, 4.0]
-
-
-def test_a_width_that_grows_while_the_fit_worsens_is_named_at_its_onset():
-    path = "phases.0.lor_strain"
-    found = _width_growth_diagnostics(
-        _width_series(path, _GROWING, [1e-3] * 5, _WORSENING))
-    assert [d.code for d in found] == ["SEQUENTIAL_WIDTH_GROWTH"]
-    (d,) = found
-    assert d.level == "warning" and d.where == [path]
-    # the onset is p2, the first pattern past 3× *and* past 1.5× in GoF
-    assert d.value == pytest.approx(0.070 / 0.020)
-    assert "from p0 to p2" in d.message and "GoF rose 2.0×" in d.message
-    assert "Rwp 1.00% → 2.00%" in d.message
-    assert "2 of the 2 patterns after it" in d.message
-    assert "reaching 7.5× at p4" in d.message
-
-
-def test_a_width_that_grows_under_a_flat_fit_is_not_named():
-    """The misfit half is what keeps a real broadening silent: the same
-    growth, GoF flat."""
-    assert _width_growth_diagnostics(_width_series(
-        "phases.0.lor_strain", _GROWING, [1e-3] * 5,
-        [1.0, 1.1, 1.05, 1.2, 1.1])) == []
-
-
-def test_the_reference_is_the_first_width_the_series_measured():
-    """The round-robin chain's first ``lor_strain`` is 5.85e-5 with an esd of
-    3e3, which makes any later width "946×" it.  The reference is the first
-    width over WIDTH_GROWTH_SIGMA of its own esds, here p1 at 0.02; against
-    that p3 is 2.5×, under the factor, so nothing is named."""
-    assert _width_growth_diagnostics(_width_series(
-        "phases.0.lor_strain", [5.85e-5, 0.020, 0.030, 0.050],
-        [3043.8, 1e-3, 1e-3, 1e-3], [1.0, 1.0, 2.0, 3.0])) == []
-
-
-def test_a_growth_within_its_esds_is_not_named():
-    assert _width_growth_diagnostics(_width_series(
-        "phases.0.lor_size", [0.02, 0.03, 0.07, 0.10],
-        [6e-3, 0.02, 0.02, 0.03], [1.0, 1.2, 2.0, 3.0])) == []
-
-
-def test_a_gaussian_width_is_judged_on_its_square_root():
-    """``gauss_strain`` is a variance coefficient: 4× in it is 2× in width,
-    under the factor, and 16× is 4×, over it."""
-    path = "phases.0.gauss_strain"
-    assert _width_growth_diagnostics(_width_series(
-        path, [0.001, 0.004], [1e-5, 1e-5], [1.0, 2.0])) == []
-    (d,) = _width_growth_diagnostics(_width_series(
-        path, [0.001, 0.016], [1e-5, 1e-5], [1.0, 2.0]))
-    assert d.value == pytest.approx(4.0)
-    assert "square root" in d.message
-
-
-def test_a_quarantined_pattern_neither_references_nor_fires():
-    path = "phases.0.lor_strain"
-    assert _width_growth_diagnostics(_width_series(
-        path, [0.02, 0.5, 0.021], [1e-3] * 3, [1.0, 9.0, 1.0],
-        diverged={1})) == []
-    # and a diverged *first* pattern is no reference: p1 is, and p3 fires
-    (d,) = _width_growth_diagnostics(_width_series(
-        path, [0.001, 0.02, 0.03, 0.08], [1e-4, 1e-3, 1e-3, 1e-3],
-        [0.5, 1.0, 1.2, 2.0], diverged={0}))
-    assert "from p1 to p3" in d.message
-
-
-def test_a_pattern_at_a_high_rwp_is_still_read():
-    """WP-1465's handover asked for a pattern over the old Rwp fence to join
-    the quarantine skip.  Declined, measured: every soaked pattern of the chain
-    below sat over it, since a phase standing in for a missing one is what
-    lifts the Rwp, so the skip would leave the finding nothing to fire on
-    (WP-1469).  WP-2003 removed the fence; the ratio is recorded and read."""
-    series = _width_series("phases.0.lor_strain", _GROWING, [1e-3] * 5,
-                           _WORSENING)
-    for entry in series.entries[1:]:
-        entry.rwp_over_median = 4.0
-    (d,) = _width_growth_diagnostics(series)
-    assert "from p0 to p2" in d.message
-
-
-def test_widths_tied_to_one_column_share_one_finding():
-    """``tie_equal("phases.*.lor_strain")`` makes two paths one trajectory; a
-    finding each would say one fact twice (the code review's catch)."""
-    one = _width_series("phases.0.lor_strain", _GROWING, [1e-3] * 5, _WORSENING)
-    for entry in one.entries:
-        (row,) = entry.parameters
-        entry.parameters.append(row.model_copy(
-            update={"path": "phases.1.lor_strain"}))
-    (d,) = _width_growth_diagnostics(one)
-    assert d.where == ["phases.0.lor_strain", "phases.1.lor_strain"]
-
-
-def test_a_path_that_is_not_a_phase_width_is_never_judged():
-    """The instrument's own widths and a Stephens block are not screened (the
-    constant's docstring says why)."""
-    for path in ("instrument.profile.y", "phases.0.microstrain.dof.0",
-                 "phases.0.cell.a"):
-        assert _width_growth_diagnostics(_width_series(
-            path, _GROWING, [1e-3] * 5, _WORSENING)) == []
-
-
-SOAK_WAVELENGTH = 0.4139
-SOAK_BKG = [3000.0, -400.0, 100.0]
-SOAK_SCALE = 1e-3
-#: phase B's fraction along the series: the issue's first five patterns
-SOAK_FRACTIONS = [0.0, 0.05, 0.10, 0.15, 0.20]
-
-
-def _soak_instrument(background):
-    ins = rx.Instrument.debye_scherrer(wavelength=SOAK_WAVELENGTH)
-    ins.profile.w.value = 4e-3
-    ins.background = background
-    return ins
-
-
-def _soak_pattern(fb: float, *, seed: int, strain: float = 0.02) -> rx.PatternData:
-    """Issue #451's synthetic: phase B, the LaB6 model with its cell 0.4 %
-    larger, at weight fraction ``fb`` beside phase A, both at ``strain``."""
-    structure = make_lab6()
-    b = structure.phases[0].model_copy(deep=True)
-    b.name = "LaB6_expanded"
-    for name in "abc":
-        getattr(b.cell, name).value = A0 * 1.004
-    structure.phases[0].scale.value = SOAK_SCALE * (1 - fb)
-    b.scale.value = SOAK_SCALE * fb
-    for phase in (structure.phases[0], b):
-        phase.lor_strain.value = strain
-        for atom in phase.atoms:
-            atom.biso.value = 0.4
-    structure.phases.append(b)
-    ins = _soak_instrument(BackgroundChebyshev(
-        coefficients=[Parameter(value=v) for v in SOAK_BKG]))
-    tt = np.arange(3.0, 30.0, 0.01)
-    blank = rx.PatternData(two_theta=tt.tolist(),
-                           intensity=np.zeros_like(tt).tolist())
-    model = compile_model(structure, ins, blank, mode="rietveld")
-    table = ParameterTable(structure, ins)
-    y = model.evaluate(table.decode(table.x0()))
-    y = np.random.default_rng(seed).poisson(np.maximum(y, 1.0)).astype(float)
-    return rx.PatternData(two_theta=model.tt.tolist(), intensity=y.tolist())
-
-
-def _soak_models(two_phase: bool):
-    structure = make_lab6()
-    structure.phases[0].scale.value = SOAK_SCALE
-    structure.phases[0].lor_strain.value = 0.03
-    if two_phase:
-        b = structure.phases[0].model_copy(deep=True)
-        b.name = "B"
-        for name in "abc":
-            getattr(b.cell, name).value = A0 * 1.004
-        b.scale.value = SOAK_SCALE * 0.3
-        structure.phases.append(b)
-    ins = _soak_instrument(BackgroundChebyshev.with_terms(13))
-    ins.background.coefficients[0].value = 2500.0
-    return structure, ins
-
-
-_SOAK_PLAN = staged.RefinementPlan(stages=[
-    staged.Stage("bkg", ["instrument.background.*"]),
-    staged.Stage("cell", ["phases.*.cell.*"]),
-    staged.Stage("width", ["phases.*.lor_strain"]),
-])
-
-
-def _soak_pngs(runner, stem):
-    from pathlib import Path
-
-    from rietx.viz.plots import plot_result
-
-    out = Path(__file__).parent / "output"
-    out.mkdir(exist_ok=True)
-    for k, result in enumerate(runner.results_):
-        plot_result(result, path=str(out / f"{stem}_p{k}.png"))
-        plot_result(result, path=str(out / f"{stem}_p{k}_zoom.png"),
-                    two_theta_range=(20.0, 30.0))
-
-
-def test_a_phase_standing_in_for_a_missing_one_is_named_from_its_onset():
-    """Issue #451's synthetic as a chain: a one-phase model over a specimen
-    growing a second phase 0.4 % larger.  The width takes the second phase
-    (measured 2.3×, 3.65×, 5.15×, 6.8× the first pattern's over the soaked
-    four, GoF 1.9×, 3.1×, 4.2×, 5.1×) and nothing per-pattern says so.  The
-    finding names the width at fB = 0.10, the first pattern past both
-    thresholds, and the two-phase control names nothing."""
-    patterns = [_soak_pattern(fb, seed=100 + k)
-                for k, fb in enumerate(SOAK_FRACTIONS)]
-    labels = [f"fB={fb:.2f}" for fb in SOAK_FRACTIONS]
-
-    one = SequentialRefinement(*_soak_models(two_phase=False))
-    soaked = one.fit(patterns, labels=labels, mode="pawley", plan=_SOAK_PLAN)
-    found = [d for d in soaked.diagnostics
-             if d.code == "SEQUENTIAL_WIDTH_GROWTH"]
-    assert [d.where for d in found] == [["phases.0.lor_strain"]]
-    assert "from fB=0.00 to fB=0.10" in found[0].message
-    assert found[0].value > 3.0
-    # nothing warning-level fires on the soaked patterns themselves
-    for entry in soaked.entries:
-        assert not [d for d in entry.diagnostics
-                    if d.level in ("warning", "error")], entry.label
-
-    two = SequentialRefinement(*_soak_models(two_phase=True))
-    control = two.fit(patterns, labels=labels, mode="pawley", plan=_SOAK_PLAN)
-    assert not [d for d in control.diagnostics
-                if d.code == "SEQUENTIAL_WIDTH_GROWTH"]
-
-    _soak_pngs(one, "wp1465_soak_one_phase")
-    _soak_pngs(two, "wp1465_soak_two_phase")
-
-
-def test_a_width_that_grows_for_real_is_not_named():
-    """The clean series the suite had none of: one phase, a correct model,
-    and a strain that grows 5× along the series.  The width passes the
-    factor and GoF stays flat, so the finding stays silent — the
-    "microstrain evolves" rule the skill keeps."""
-    strains = [0.02, 0.04, 0.06, 0.08, 0.10]
-    patterns = [_soak_pattern(0.0, seed=200 + k, strain=s)
-                for k, s in enumerate(strains)]
-    runner = SequentialRefinement(*_soak_models(two_phase=False))
-    series = runner.fit(patterns, mode="pawley", plan=_SOAK_PLAN)
-    _, value, _ = series.trajectory("phases.0.lor_strain").arrays()
-    assert value[-1] / value[0] > 4.0          # the width half is met
-    gof = [e.statistics.gof for e in series.entries]
-    assert max(gof) / gof[0] < 1.2, gof        # the misfit half is not
-    assert not [d for d in series.diagnostics
-                if d.code == "SEQUENTIAL_WIDTH_GROWTH"]
-    _soak_pngs(runner, "wp1465_real_growth")
-
+    monkeypatch.setattr(Refinement, "fit", spy)
+    patterns = fap_series(2)
+    loose = PLAN_PRESETS["pawley_default"]()
+    loose.closing_window_tol = 5e-3
+    for carry, plan, want in ((True, "pawley_default", CLOSING_WINDOW_TOL),
+                              (False, "pawley_default", None),
+                              (True, loose, 5e-3)):
+        ran.clear()
+        SequentialRefinement(rx.Structure.from_cif(str(FAP_CIF)), _fap_instrument(False),
+                             carry_hkl_intensities=carry).fit(
+            patterns, mode="pawley", plan=plan, reseed=False)
+        assert ran and set(ran) == {want}
+    assert loose.closing_window_tol == 5e-3  # the caller's plan is not written to
 
 # --------------------------------------------------------------------------- #
 # SeriesResult.direction_gaps (WP-2003, C5): the gaps recorded, no threshold

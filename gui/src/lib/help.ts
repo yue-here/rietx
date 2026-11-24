@@ -47,6 +47,8 @@ export interface HelpCorpus {
   peak_flags: Record<string, HelpEntry>;
   diagnostics: Record<string, HelpEntry>;
   peak_origins: Record<string, HelpEntry>;
+  /** how one indexing candidate relates to another reported row (WP-2240) */
+  cell_relations: Record<string, HelpEntry>;
   stage_fields: Record<string, HelpEntry>;
   reader_options: Record<string, HelpEntry>;
   instrument_fields: Record<string, HelpEntry>;
@@ -66,6 +68,7 @@ export const ARMS = [
   "peak_flags",
   "diagnostics",
   "peak_origins",
+  "cell_relations",
   "reader_options",
   "instrument_fields",
   "search_fields",

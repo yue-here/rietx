@@ -55,10 +55,11 @@ assert len({(p.value, p.stderr) for p in tied_b}) == 1
 assert tied_b[0].stderr < min(p.stderr for p in free_b)
 assert abs(tied_result.statistics.rwp - free_result.statistics.rwp) < 5e-4
 assert max(gaps) < 2.0
-# The printed block, as the page quotes it.
+# The printed block, as the page quotes it.  Moved with WP-2222 (closing stage off
+# by default, 2026-11-19): Rwp 0.0898 -> 0.0893 and 0.0894, tied Biso 0.360 -> 0.377.
 assert [free_result.statistics.n_free_parameters, tied_result.statistics.n_free_parameters] == [34, 32]
-assert [f"{r.statistics.rwp:.4f}" for r in (free_result, tied_result)] == ["0.0898", "0.0898"]
+assert [f"{r.statistics.rwp:.4f}" for r in (free_result, tied_result)] == ["0.0893", "0.0894"]
 assert [f"{p.value:.3f} ± {p.stderr:.3f}" for p in free_b] == [
-    "0.242 ± 0.150", "0.467 ± 0.159", "0.363 ± 0.110"]
-assert f"{tied_b[0].value:.3f} ± {tied_b[0].stderr:.3f}" == "0.360 ± 0.077"
-assert [f"{g:.2f}" for g in gaps] == ["1.03", "0.65", "0.53"]
+    "0.264 ± 0.149", "0.467 ± 0.157", "0.385 ± 0.109"]
+assert f"{tied_b[0].value:.3f} ± {tied_b[0].stderr:.3f}" == "0.377 ± 0.076"
+assert [f"{g:.2f}" for g in gaps] == ["0.94", "0.66", "0.43"]

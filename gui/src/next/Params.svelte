@@ -35,15 +35,21 @@
    * Each acts at once, one history node through today's verb (interaction
    * rules 11 and 12), and waits while edits are pending, since a deleted atom
    * renumbers the paths a pending edit names. The filter row's ⋯ holds the
-   * bulk Free and Fix.
+   * bulk Free and Fix. The Instrument band's ⋯ holds Source and geometry…,
+   * which opens the Instrument dialog (WP-2218, rows 133-136).
    *
    * The layout rule (2026-11-07): no click moves the layout unless it asks
    * to. So the editor and its popover float (`position: fixed`), a pending
    * edit is a tint, a box and a padlock share one 18 px slot, and every
    * number sits in slots sized from the last fit, never from what is typed.
    */
+  import { structureScript, type Say } from "./console";
   import { ApiError, api } from "../api";
   import Help from "../Help.svelte";
+  import HeldMark from "../HeldMark.svelte";
+  import Padlock from "../Padlock.svelte";
+  import { fnmatch } from "../lib/fnmatch";
+  import { py } from "../lib/py";
   import { clone, newAtom } from "../lib/model";
   import { paramKey, resolve, type HelpCorpus } from "../lib/help";
   import { editText, expText, numParts, slotWidth, slotsFor, type NumParts,
@@ -52,9 +58,11 @@
            type Section } from "../lib/paramtree";
   import type { ParamsDraft } from "../lib/recovery";
   import { typesetSpaceGroup } from "../lib/spacegroup";
-  import { asGlob, editState, heldGlyph, matches, normalize, selection,
+  import { asGlob, editState, matches, normalize, selection,
            validateEdit, varyEdit, varyOf, type ParamRow } from "../lib/table";
   import Ask, { type AskField } from "./Ask.svelte";
+  import Instrument from "./Instrument.svelte";
+  import type { Anode } from "./instrument";
   import Menu, { type MenuAt, type MenuEntry } from "./Menu.svelte";
   import SpaceGroup from "./SpaceGroup.svelte";
   import { shortTitle, unitText } from "./words";
@@ -63,17 +71,24 @@
     head = null,
     busy = false,
     corpus = null,
-    say = (_line: string) => {},
+    anodes = [],
+    say = () => {},
     onpending = (_touched: number, _invalid: string) => {},
+    onholds = (_holds: ReadonlyMap<string, boolean>) => {},
     onmoved = () => {},
   }: {
     head?: string | null;
     busy?: boolean;
     corpus?: HelpCorpus | null;
-    say?: (line: string) => void;
+    /** `GET /api/capabilities`'s anodes, for the Instrument dialog */
+    anodes?: readonly Anode[];
+    say?: Say;
     /** the pending edits, reported to the shell's action bar (WP-2123): how
      *  many, and the first invalid one's reason or "" */
     onpending?: (touched: number, invalid: string) => void;
+    /** the pending holds and releases, path or glob → held, reported so the
+     *  Background graph's term chips share them (WP-2218) */
+    onholds?: (holds: ReadonlyMap<string, boolean>) => void;
     /** a structural edit landed: the head moved under the shell */
     onmoved?: () => void;
   } = $props();
@@ -112,6 +127,8 @@
 
   interface Editor {
     keys: string[];
+    /** the text the editor opened on: committing it is no edit (WP-2223) */
+    opened: string;
     left: number;
     top: number;
     width: number;
@@ -212,7 +229,7 @@
     return pair ? { ...r, lo: pair[0] ?? -Infinity, hi: pair[1] ?? Infinity } : r;
   }) : rows);
   const limitedByPath = $derived(new Map(limitedRows.map((r) => [r.path, r])));
-  const valueState = $derived(editState(limitedRows, edits, 0));
+  const valueState = $derived(editState(limitedRows, edits, 0, "stored"));
   const limitInvalid = $derived([...limitEdits].filter(([, [lo, hi]]) =>
     lo !== null && hi !== null && lo > hi)
     .map(([path]) => ({ path, why: "lower limit above the upper one" })));
@@ -236,12 +253,21 @@
     onpending(touched, first ? `${first.path.split(".").pop()}: ${first.why}` : "");
   });
 
+  $effect(() => {
+    onholds(holdEdits);
+  });
+
   async function load() {
     loading = true;
     try {
       const [p, s] = await Promise.all([api.params(), api.structure()]);
       rows = normalize(p.parameters);
       nFree = p.n_free;
+      // a pending edit on a path the working state no longer has can never
+      // apply, and would get every Apply refused (and the Background band, a
+      // hold): the head moved under it, by a checkout, the text editor or a
+      // structural edit (WP-2218 review)
+      dropUnknown();
       structure = s.structure;
       sites = s.sites ?? [];
       symmetry = s.symmetry ?? [];
@@ -293,8 +319,9 @@
   }
 
   async function bulkVary(vary: boolean) {
-    say(`ref.set_vary(${JSON.stringify(glob)}, ${vary ? "True" : "False"})`);
-    await patch({ vary: { [glob]: vary } });
+    // echoed once it lands: the console is what ran, and the script repeats it
+    if (await patch({ vary: { [glob]: vary } }))
+      say("call", `ref.set_vary(${JSON.stringify(glob)}, ${vary ? "True" : "False"})`);
   }
 
   /** Apply the pending edits; true when there were none or they all landed,
@@ -308,25 +335,33 @@
     if (holdEdits.size) body.hold = Object.fromEntries(holdEdits);
     if (limitEdits.size) body.limits = Object.fromEntries(limitEdits);
     if (restraintEdits.size) body.restraints = Object.fromEntries(restraintEdits);
-    if (Object.keys(values).length) say(`ref.set_values(${JSON.stringify(values)})`);
-    for (const [path, flag] of varyEdits) {
-      say(`ref.set_vary(${JSON.stringify(path)}, ${flag ? "True" : "False"})`);
-    }
-    for (const [path, flag] of holdEdits) {
-      say(`ref.${flag ? "hold" : "unhold"}(${JSON.stringify(path)})`);
-    }
-    if (limitEdits.size || restraintEdits.size) {
-      const onInstrument = [...limitEdits.keys()].some((p) => p.startsWith("instrument."));
-      const onStructure = restraintEdits.size > 0
-        || [...limitEdits.keys()].some((p) => !p.startsWith("instrument."));
-      const args = [onStructure ? "structure=…" : "", onInstrument ? "instrument=…" : ""]
-        .filter(Boolean).join(", ");
-      say(`ref.edit(${args})  # limits and restraints`);
-    }
     const needsPatch = Object.keys(values).length || varyEdits.size || holdEdits.size
       || limitEdits.size || restraintEdits.size;
     if (needsPatch) {
       if (!(await patch(body))) return false;
+      // landed, so echoed, in the order the route ran them
+      // (`session._apply_param_arms`): limits and restraints, the releases,
+      // values, the vary flags, the holds. The script repeats this order,
+      // and `set_vary` refuses a path still held.
+      // A refused patch ran nothing the script could repeat.
+      if (limitEdits.size || restraintEdits.size) {
+        const onInstrument = [...limitEdits.keys()].some((p) => p.startsWith("instrument."));
+        const onStructure = restraintEdits.size > 0
+          || [...limitEdits.keys()].some((p) => !p.startsWith("instrument."));
+        const args = [onStructure ? "structure=…" : "", onInstrument ? "instrument=…" : ""]
+          .filter(Boolean).join(", ");
+        say("call", `ref.edit(${args})  # limits and restraints`, null);
+      }
+      for (const [path, flag] of holdEdits) {
+        if (!flag) say("call", `ref.unhold(${JSON.stringify(path)})`);
+      }
+      if (Object.keys(values).length) say("call", `ref.set_values(${py(values)})`);
+      for (const [path, flag] of varyEdits) {
+        say("call", `ref.set_vary(${JSON.stringify(path)}, ${flag ? "True" : "False"})`);
+      }
+      for (const [path, flag] of holdEdits) {
+        if (flag) say("call", `ref.hold(${JSON.stringify(path)})`);
+      }
       // landed: a retry after a refused position below must not send these
       // again (an unhold of a path no longer held is refused)
       edits = new Map();
@@ -338,11 +373,12 @@
     for (const [atom, fields] of positionEdits) {
       const xyz = ["x", "y", "z"].map((axis) =>
         axis in fields ? Number(fields[axis]) : (byPath.get(`${atom}.${axis}`)?.value ?? 0));
-      // no verb of this name exists: the server projects the position onto
-      // the site's DOFs and records a set_values node (WP-1215)
-      say(`# ${atom} moved to ${JSON.stringify(xyz)}, set on its site's dof.k`);
       try {
-        await api.position(atom, xyz);
+        // the server projects the position onto the site's DOFs and records
+        // a set_values node (WP-1215); its answer names the values it set
+        const out = await api.position(atom, xyz);
+        if (out?.changed && out.values)
+          say("call", `ref.set_values(${py(out.values)})  # ${atom} to ${py(xyz)}`);
       } catch (exc) {
         // what landed before this changed the structure; the panel re-reads it
         await load();
@@ -368,6 +404,42 @@
     refusal = "";
   }
 
+  /** Drop every pending edit whose key `gone` names: an edit on another
+   *  surface removed or redefined those paths (the Background graph's Type
+   *  and Terms, WP-2218 review; any instrument edit's `ended`, WP-2229), so
+   *  Apply would be refused on them, or land on the new model's path of the
+   *  same name. All six kinds go: values, flags, holds, limits, restraints,
+   *  and positions, which are keyed by atom and asked about by the
+   *  coordinate paths they set. Returns the keys dropped. */
+  export function dropPending(gone: (key: string) => boolean): string[] {
+    const dropped: string[] = [];
+    const keep = <V,>(m: Map<string, V>, ended = (key: string, _v: V) => gone(key)
+                     ): Map<string, V> => {
+      const hit = [...m].filter(([k, v]) => ended(k, v)).map(([k]) => k);
+      if (!hit.length) return m;
+      dropped.push(...hit);
+      return new Map([...m].filter(([k]) => !hit.includes(k)));
+    };
+    edits = keep(edits);
+    varyEdits = keep(varyEdits);
+    holdEdits = keep(holdEdits);
+    limitEdits = keep(limitEdits);
+    restraintEdits = keep(restraintEdits);
+    positionEdits = keep(positionEdits,
+                         (atom, fields) => Object.keys(fields).some((axis) => gone(`${atom}.${axis}`)));
+    if (dropped.length) say("comment", `# pending edits dropped: ${[...new Set(dropped)].sort().join(", ")}`);
+    return dropped;
+  }
+
+  /** Drop the pending edits on paths the loaded rows no longer have: the
+   *  reload's question, asked also of a restored draft. Before the first
+   *  load the rows are empty and say nothing about any path. */
+  function dropUnknown() {
+    if (!rows.length) return;
+    const known = rows.map((r) => r.path);
+    dropPending((key) => !known.some((path) => fnmatch(path, key)));
+  }
+
   /** The pending edits as plain data, for the recovery copy (WP-2209), or
    *  `null` when nothing is pending.  Reading the six maps here is what lets
    *  the shell's writer follow every change, a retyped value included. */
@@ -384,7 +456,8 @@
     };
   }
 
-  /** Put recovered edits back as pending edits, in place of any on screen. */
+  /** Put recovered edits back as pending edits, in place of any on screen,
+   *  less those on a path the rows no longer have. */
   export function restoreDraft(d: ParamsDraft) {
     closeEditor(false);
     edits = new Map(Object.entries(d.edits ?? {}));
@@ -393,6 +466,30 @@
     limitEdits = new Map(Object.entries(d.limits ?? {})) as Map<string, Limits>;
     restraintEdits = new Map(Object.entries(d.restraints ?? {})) as Map<string, Restraint>;
     positionEdits = new Map(Object.entries(d.positions ?? {}));
+    // a draft kept across a head move can name a path the head no longer
+    // has, such as a hold on a cut background term; left pending, it gets
+    // the band and every Apply refused (review of #1683, finding 1)
+    dropUnknown();
+  }
+
+  /** A history node's values, from the History tab's Restore (WP-2211), in
+   *  place of the value and position edits on screen, as the design's Restore
+   *  does. The pending flags, holds, limits and restraints stay. */
+  export function loadRestore(plan: { values: Record<string, string>;
+                                      positions: Record<string, Record<string, string>> }) {
+    closeEditor(false);
+    edits = new Map(Object.entries(plan.values));
+    positionEdits = new Map(Object.entries(plan.positions));
+  }
+
+  /** A hold or release on one path from another panel: the Background graph's
+   *  "Hold at last fit" chips (WP-2218). One pending set, so the action bar
+   *  counts it once, Apply sends it once, and the recovery copy carries it. */
+  export function setHold(path: string, held: boolean, serverHeld: boolean) {
+    const next = new Map(holdEdits);
+    if (held === serverHeld) next.delete(path);
+    else next.set(path, held);
+    holdEdits = next;
   }
 
   export function focusFilter() {
@@ -404,9 +501,11 @@
 
   // ---------------------------------------------------------------- menus
 
-  /** The menu open: the filter row's, a phase band's, or an atom row's. */
+  /** The menu open: the filter row's, a phase band's, the Instrument band's,
+   *  or an atom row's. */
   type Open =
     | { kind: "filter"; at: MenuAt; anchor: HTMLElement }
+    | { kind: "instrument"; at: MenuAt; anchor: HTMLElement }
     | { kind: "phase"; phase: number; at: MenuAt; anchor: HTMLElement }
     | { kind: "atom"; phase: number; atom: number; at: MenuAt; anchor: HTMLElement | null };
   let menu = $state<Open | null>(null);
@@ -414,6 +513,7 @@
   let ask = $state<{ at: { x: number; y: number }; label: string; fields: AskField[];
                      submit: string; send: (v: Record<string, string>) => Promise<string> } | null>(null);
   let sgFor = $state<number | null>(null);
+  let instrumentOpen = $state(false);
   let cifInput: HTMLInputElement | undefined = $state();
 
   /** Why a structural edit waits, or "" when it can go. */
@@ -463,6 +563,9 @@
         { id: "fix", label: bulkLabel("Fix", bulk.toFix), disabled: busy || !bulk.toFix, title: why },
       ];
     }
+    if (m.kind === "instrument") {
+      return [{ id: "instrument", label: "Source and geometry…", ...gate }];
+    }
     if (m.kind === "phase") {
       return [
         { id: "rename", label: "Rename…", ...gate },
@@ -492,6 +595,10 @@
     if (m.kind === "filter") {
       if (id === "free") void bulkVary(true);
       else if (id === "fix") void bulkVary(false);
+      return;
+    }
+    if (m.kind === "instrument") {
+      if (id === "instrument") instrumentOpen = true;
       return;
     }
     const r = m.anchor?.getBoundingClientRect();
@@ -549,7 +656,7 @@
       const next = clone((await api.structure()).structure);
       change(next);
       await api.patchStructure(next, label);
-      say(echo);
+      say("call", echo, structureScript(next));
       refusal = "";
       await landed();
       return "";
@@ -577,7 +684,7 @@
   async function toggleAniso(base: string, on: boolean) {
     try {
       await api.aniso(base, on);
-      say(`# ${base}: aniso ${on ? "on, AnisoU.isotropic(Uiso, cell)" : "off, Biso from U_eq"}`);
+      say("comment", `# ${base}: aniso ${on ? "on, AnisoU.isotropic(Uiso, cell)" : "off, Biso from U_eq"}`);
       refusal = "";
       await landed();
     } catch (exc) {
@@ -593,7 +700,7 @@
     try {
       const preview = await api.uploadFile("cif", file);
       await api.patchStructure({ upload: preview.upload }, `structure from ${file.name}`);
-      say(`ref.edit(structure=structure_from_cif(${JSON.stringify(file.name)}))`);
+      say("call", `ref.edit(structure=structure_from_cif(${JSON.stringify(file.name)}))`, null);
       refusal = "";
       await landed();
     } catch (exc) {
@@ -861,7 +968,7 @@
     if (pending !== undefined) return pending;
     const row = byPath.get(key);
     if (!row) return "";
-    return editText(row.value, row.esd, !COORD.test(key) && !/\.atoms\.\d+\.(occ|biso)$/.test(key));
+    return editText(row.value);
   }
 
   function openEditor(target: HTMLElement, keys: string[]) {
@@ -872,7 +979,7 @@
     const width = Math.max(rect.width + 10, (Math.max(text.length + 4, 12)) * 8);
     const left = Math.min(Math.max(8, rect.left), window.innerWidth - width - 8);
     editorText = text;
-    editor = { keys, left, top: rect.top, width, height: rect.height,
+    editor = { keys, opened: text, left, top: rect.top, width, height: rect.height,
                below: rect.bottom + 180 < window.innerHeight, error: "" };
     queueMicrotask(() => {
       editorInput?.focus();
@@ -880,20 +987,20 @@
     });
   }
 
-  /** Write the editor's text into every key it edits, as pending edits. A
-   *  text equal to what the cell already drew is no edit (WP-1009). */
+  /** Write the editor's text into every key it edits, as pending edits. The
+   *  text it opened on is no edit (WP-1009's rule, WP-2223), and a text that
+   *  reads as a key's stored value drops that key's edit. */
   function commit(): boolean {
     if (!editor) return true;
     const text = editorText.trim();
+    if (text === editor.opened) return true;                  // untouched
     if (editor.keys.length > 1 && text === "") return true;   // "Mixed", untouched
     let nextEdits = edits;
     let nextPositions = positionEdits;
     for (const key of editor.keys) {
       const row = byPath.get(key);
       if (!row) continue;
-      const drawn = editText(row.value, row.esd,
-        !COORD.test(key) && !/\.atoms\.\d+\.(occ|biso)$/.test(key));
-      const same = text === drawn || (text !== "" && Number(text) === Number(drawn));
+      const same = text !== "" && Number(text) === row.value;
       const m = COORD.exec(key);
       if (m) {
         const fields = { ...(nextPositions.get(m[1]) ?? {}) };
@@ -910,7 +1017,7 @@
     }
     edits = nextEdits;
     positionEdits = nextPositions;
-    if (editor.keys.length > 1) say(`# ${editor.keys.length} values set to ${text}`);
+    if (editor.keys.length > 1) say("comment", `# ${editor.keys.length} values set to ${text}`);
     return true;
   }
 
@@ -1058,7 +1165,7 @@
     <button class="lock" class:on={isHeld(row)} aria-pressed={isHeld(row)}
       disabled={busy}
       onclick={() => toggleHold(row.path, isHeld(row), row.held)}
-      >{@render padlock(isHeld(row))}<span class="sr">{isHeld(row) ? "release" : "hold"}</span></button>
+      ><Padlock on={isHeld(row)} /><span class="sr">{isHeld(row) ? "release" : "hold"}</span></button>
   {:else if row.refinable || row.vary}
     <input type="checkbox" class="vary" checked={varyOf(row, varyEdits)} disabled={busy}
       aria-label="refine"
@@ -1069,22 +1176,13 @@
          one, and the mark says which reason holds it (WP-1214) -->
     <span class="mark muted">
       <Help text={row.held_because} title="This row is held"
-        label="why this row is held">{heldGlyph(row)}</Help>
+        label="why this row is held"><HeldMark {row} /></Help>
     </span>
   {/if}
 {/snippet}
 
 {#snippet dots()}
   <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1" /><circle cx="8" cy="8" r="1" /><circle cx="12.5" cy="8" r="1" /></svg>
-{/snippet}
-
-{#snippet padlock(on: boolean)}
-  <svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true">
-    <rect x="2.5" y="6" width="9" height="6.5" rx="1.5"
-      fill={on ? "currentColor" : "none"} stroke="currentColor" stroke-width="1.3" />
-    <path d={on ? "M4.5 6V4.5a2.5 2.5 0 0 1 5 0V6" : "M4.5 6V4.5a2.5 2.5 0 0 1 5 0"}
-      fill="none" stroke="currentColor" stroke-width="1.3" />
-  </svg>
 {/snippet}
 
 {#snippet rowLine(l: Line, top: boolean)}
@@ -1186,7 +1284,7 @@
                   title={atomHeld(atom) ? `release ${atom.label}'s position` : `hold ${atom.label}'s position`}
                   onclick={() => toggleHold(atomGlob(atom), atomHeld(atom),
                     atom.dofs.length > 0 && atom.dofs.every((d) => d.held))}
-                  >{@render padlock(atomHeld(atom))}</button>
+                  ><Padlock on={atomHeld(atom)} /></button>
               {/if}
             </td>
             {#each AXES as axis (axis)}
@@ -1273,6 +1371,11 @@
               title="Rename, change the space group, add an atom"
               onclick={(e) => toggleMenu({ kind: "phase", phase: phaseOf(section),
                 at: below(e.currentTarget, true), anchor: e.currentTarget })}>{@render dots()}</button>
+          {:else if section.kind === "instrument"}
+            <button class="ib" aria-label="Instrument actions" aria-haspopup="menu"
+              aria-expanded={menu?.kind === "instrument"} title="Source and geometry"
+              onclick={(e) => toggleMenu({ kind: "instrument", at: below(e.currentTarget, true),
+                anchor: e.currentTarget })}>{@render dots()}</button>
           {:else}
             <!-- the ⋯'s slot, kept so every band's count sits in one column -->
             <span class="ibslot" aria-hidden="true"></span>
@@ -1291,8 +1394,14 @@
 </section>
 
 {#if menu}
-  <Menu at={menu.at} label={menu.kind === "filter" ? "Free or fix" : menu.kind === "phase" ? "Phase" : "Atom"}
+  <Menu at={menu.at} label={menu.kind === "filter" ? "Free or fix" : menu.kind === "phase" ? "Phase"
+    : menu.kind === "instrument" ? "Instrument" : "Atom"}
     anchor={menu.anchor} items={menuItems} onchoose={chooseMenu} onclose={() => (menu = null)} />
+{/if}
+
+{#if instrumentOpen}
+  <Instrument {rows} {anodes} {busy} {say} onlanded={landed} ondropped={dropPending}
+    onclose={() => (instrumentOpen = false)} />
 {/if}
 
 {#if ask}

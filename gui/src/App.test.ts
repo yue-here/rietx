@@ -556,6 +556,23 @@ const SERIES_ANSWER = {
   curves: [true, true],
   rejected: [false, false],
   running: false,
+  // `rietx.gui.series.trace` over the result above (WP-1317)
+  trace: {
+    x_label: "T",
+    points: [
+      { index: 0, label: "T300", x: 300, status: "converged", rwp: 0.091, marks: [],
+        findings: [] },
+      { index: 1, label: "T400", x: 400, status: "converged", rwp: 0.094,
+        marks: ["SEQUENTIAL_RESEED"], findings: [{ code: "BOUND_HIT", level: "warning" }] },
+    ],
+    largest_steps: { "phases.0.cell.a": { indices: [0, 1], size_esd: 21, cold_ratio: null } },
+    vocabulary: [
+      ["SERIES_PATTERN_FAILED", "bar", "failed"], ["SEQUENTIAL_UNRECOVERED", "cross", "unrecovered"],
+      ["SEQUENTIAL_RESEED", "ring", "reseeded"],
+      ["findings", "count", "findings"], ["largest_step", "band", "largest step"],
+    ].map(([key, mark, label]) => ({ key, mark, label, source: "", means: "" })),
+    other_mark: "tick",
+  },
 };
 
 /** What `GET /api/examples` answers (WP-1204): the shipped example projects,
@@ -1140,14 +1157,26 @@ describe("the parameter table", () => {
     });
   });
 
-  it("treats a value typed back as it was drawn as no edit", async () => {
+  it("opens a value on its stored digits, and Enter on them is no edit (WP-2223)", async () => {
     vi.stubGlobal("fetch", server(boot(ADVANCED)).fetcher);
     app = mount(App, { target: host });
     await flush();
 
-    // WP-1009's rule: the drawn value is compared, so a click in and out of a
-    // cell cannot truncate a parameter
+    // drawn as 4.1568(2), edited in full, as a spreadsheet cell is
+    numberAt("phases.0.cell.a").click();
+    await flush();
+    const editor = document.querySelector<HTMLInputElement>("input.editor")!;
+    expect(editor.value).toBe("4.15678");
+    // WP-1009's rule against the text the editor opened on: Enter on it, or a
+    // click in and out, cannot truncate a parameter
+    editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await flush();
+    expect(host.textContent).not.toContain("pending edit");
+    // the drawn digits typed in are a different number, so they are an edit
     await editValue("phases.0.cell.a", "4.1568");
+    expect(host.textContent).toContain("1 pending edit");
+    // and the stored value typed back takes the edit away
+    await editValue("phases.0.cell.a", "4.15678");
     expect(host.textContent).not.toContain("pending edit");
   });
 
@@ -1243,10 +1272,10 @@ describe("the parameter table", () => {
     const order = stub.calls.filter((c) => c.method === "PATCH" || c.path === "/api/run")
       .map((c) => c.path);
     expect(order).toEqual(["/api/params", "/api/run"]);
-    expect(stub.calls.find((c) => c.path === "/api/run")?.body).toEqual({ kind: "fit" });
+    expect(stub.calls.find((c) => c.path === "/api/run")?.body).toEqual({ kind: "fit", refit: "stages" });
 
-    // one cycle is one stage on the ticked rows: an empty turn_on
-    button("One cycle")!.click();
+    // As ticked is one stage on the ticked rows: an empty turn_on
+    button("As ticked")!.click();
     await flush();
     refineButton()!.click();
     await flush();
@@ -2360,7 +2389,7 @@ describe("disclosure and the command palette", () => {
     expect(order).toEqual(["/api/params", "/api/run"]);
     expect(stub.calls.find((c) => c.method === "PATCH")?.body)
       .toEqual({ values: { "phases.0.cell.a": 4.157 }, vary: {} });
-    expect(stub.calls.find((c) => c.path === "/api/run")?.body).toEqual({ kind: "fit" });
+    expect(stub.calls.find((c) => c.path === "/api/run")?.body).toEqual({ kind: "fit", refit: "stages" });
 
     // an invalid edit blocks `r` as it disables the button
     await editValue("phases.0.cell.a", "abc");
@@ -3379,7 +3408,7 @@ describe("the model editor", () => {
     // and the fully fixed atom gets the mark rather than a box
     expect(host.querySelector('[data-vary="phases.0.atoms.0.dof.*"]')).toBeNull();
     expect(host.querySelector<HTMLElement>(
-      '[data-vary="phases.0.atoms.0.x"]')!.textContent).toBe("🔒");
+      '[data-vary="phases.0.atoms.0.x"] svg.padlock')).toBeTruthy();
 
     box.checked = true;
     box.dispatchEvent(new Event("change", { bubbles: true }));
@@ -3541,7 +3570,7 @@ describe("the model editor", () => {
     const mark = (path: string) => host.querySelector(`[data-vary="${path}"]`);
     expect(mark("phases.0.cell.b")!.tagName).toBe("SPAN");
     expect(mark("phases.0.cell.b")!.textContent).toBe("=");
-    expect(mark("phases.0.cell.alpha")!.textContent).toBe("🔒");
+    expect(mark("phases.0.cell.alpha")!.querySelector("svg.padlock")).toBeTruthy();
     // …and a mode-fixed row keeps its editable value: `set_values` still takes
     // one, it is only `set_vary` that the mode overrules
     expect(mark("phases.0.atoms.0.biso")!.textContent).toBe("·");
@@ -5675,8 +5704,10 @@ describe("the series panel", () => {
 
   /** The Series panel's figure's pane `key`, never the pattern panel's. */
   function seriesPane(key: string): StubPlot {
-    const box = host.querySelector(".plotbox");
-    const u = StubPlot.instances.find((p) => p.key === key && !p.destroyed && box?.contains(p.root));
+    // the trace's box and the plot's: the panel has two figures since WP-1317
+    const boxes = [...host.querySelectorAll(".plotbox")];
+    const u = StubPlot.instances.find((p) => p.key === key && !p.destroyed
+                                      && boxes.some((b) => b.contains(p.root)));
     if (!u) throw new Error(`no ${key} pane is drawn in the series panel`);
     return u;
   }
@@ -5828,6 +5859,90 @@ describe("the series panel", () => {
     expect(curves?.url).toContain("index=1");
     expect([...seriesPane("main").data[0]]).toEqual([9, 9.4]);
     expect(() => seriesPane("traj")).toThrow();
+  });
+
+  it("scrubs along the trace: one figure, each pattern fetched once", async () => {
+    // WP-1317: dragging along the trace shows each pattern's own fit, keeping
+    // the reader's view, and the only server cost is each pattern's first fetch
+    const stub = await openSeries({
+      "/api/series": () => ({ body: { ...SERIES_STAGED, has_result: true } }),
+      "/api/series/result": () => ({ body: SERIES_ANSWER }),
+      "/api/series/curves": fitCurves({ header: { index: 1, label: "T400", x: 400 } }),
+    });
+    const trace = seriesPane("trace");
+    // the verdict the answer serves is drawn: T400's reseed, a ring in --warn
+    expect(trace.marks.some((m) => m.op === "stroke" && m.style === WARN)).toBe(true);
+    expect([...host.querySelectorAll(".key li")].map((li) => li.textContent?.trim()))
+      .toEqual(["reseeded", "findings"]);   // no band: the panel opens on the zero shift, which has no esd step in this answer
+
+    const fetched = () => stub.calls.filter((c) => c.path === "/api/series/curves")
+      .map((c) => c.url.split("index=")[1]);
+    // after the press the drag is the window's, as a drag off the strip still scrubs
+    const at = (clientX: number, type: string) =>
+      window.dispatchEvent(new MouseEvent(type, { clientX, button: 0 }));
+    // a press on the plot area, inside `over`, at T400's end of the axis
+    trace.over.dispatchEvent(new MouseEvent("mousedown", { clientX: 1000, button: 0,
+                                                           bubbles: true }));
+    await flush();
+    expect(host.textContent).toContain("Pattern 1 — T400");
+    const member = seriesPane("main");
+    at(0, "mousemove");
+    await flush();
+    expect(host.textContent).toContain("Pattern 0 — T300");
+    at(1000, "mousemove");
+    at(1000, "mouseup");
+    await flush();
+    expect(host.textContent).toContain("Pattern 1 — T400");
+    // back over a pattern already seen: no second fetch, and the same figure
+    expect(fetched()).toEqual(["1", "0"]);
+    expect(seriesPane("main")).toBe(member);
+    // scrubbing fetched no history tree: that stays a click away
+    expect(stub.calls.some((c) => c.path === "/api/series/history")).toBe(false);
+    expect(button("History")).toBeTruthy();
+
+    // the arrow keys step one pattern, and stop at the end
+    const strip = host.querySelector<HTMLElement>(".trace")!;
+    strip.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+    await flush();
+    expect(host.textContent).toContain("Pattern 0 — T300");
+    strip.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+    await flush();
+    expect(host.textContent).toContain("Pattern 0 — T300");
+    expect(fetched()).toEqual(["1", "0"]);
+  });
+
+  it("opens a scrubbed pattern's history from its row, which a scrub left unopened", async () => {
+    // review of #1395: a scrub selects a pattern and leaves its tree unloaded, so
+    // the row's button must open it (it read the selection as "already open" and
+    // closed back to the trajectory) and must not show the open glyph meanwhile
+    const stub = await openSeries({
+      "/api/series": () => ({ body: { ...SERIES_STAGED, has_result: true } }),
+      "/api/series/result": () => ({ body: SERIES_ANSWER }),
+      "/api/series/curves": fitCurves({ header: { index: 1, label: "T400", x: 400 } }),
+      "/api/series/history": () => ({ body: { index: 1, label: "T400",
+        checkout: false, tree_id: "t2", head: "n0000", root: "n0000",
+        n_nodes: 1, nodes: [
+          { id: "n0000", parents: [], label: "root", kind: "root", name: "",
+            action: {}, api_call: "", status: null, n_iterations: 0, rwp: null,
+            gof: null, n_free: null, n_diagnostics: 0, diagnostics: [],
+            tags: [], children: [], scores: {}, notes: {} }] } }),
+    });
+    seriesPane("trace").over.dispatchEvent(new MouseEvent("mousedown",
+      { clientX: 1000, button: 0, bubbles: true }));
+    window.dispatchEvent(new MouseEvent("mouseup", { clientX: 1000, button: 0 }));
+    await flush();
+    expect(host.textContent).toContain("Pattern 1 — T400");
+    expect(stub.calls.some((c) => c.path === "/api/series/history")).toBe(false);
+    expect(icons("▾")).toHaveLength(0);
+    icons("▸").at(-1)!.click();
+    await flush();
+    expect(stub.calls.some((c) => c.path === "/api/series/history")).toBe(true);
+    expect(host.textContent).toContain("History — T400");
+    expect(icons("▾")).toHaveLength(1);
+    // and a second click closes it, as before
+    icons("▾")[0].click();
+    await flush();
+    expect(host.textContent).not.toContain("History — T400");
   });
 
   it("lists the steps between neighbouring patterns, largest first, and calls none a jump", async () => {
@@ -6435,6 +6550,49 @@ describe("the Interactive tab (WP-2128)", () => {
     expect(stub.calls.some((c) => c.method === "PATCH")).toBe(false);
   });
 
+  it("opens a typed value on its stored digits, and Enter on them is no edit (WP-2223)", async () => {
+    // a w with 14 significant figures: a 12-digit box would read back different
+    const W = 0.0011090354888959;
+    const params = { ...PARAMS, parameters: PARAMS.parameters.map((p) =>
+      p.path === "instrument.profile.w" ? { ...p, value: W } : p) };
+    const stub = server({ ...boot(), ...FITTED, "/api/params": () => ({ body: params }),
+                          "/api/preview": preview });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    button("Interactive")!.click();
+    await flush();
+    const box = () => panel().querySelector<HTMLButtonElement>("button.num")!;
+    const typedInput = () => panel().querySelector<HTMLInputElement>("input.typed")!;
+    const enter = async (text?: string) => {
+      box().click();
+      await flush();
+      if (text !== undefined) {
+        typedInput().value = text;
+        typedInput().dispatchEvent(new Event("input", { bubbles: true }));
+        await flush();
+      }
+      typedInput().dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      await flush();
+    };
+
+    box().click();
+    await flush();
+    expect(typedInput().value).toBe("0.0011090354888959");
+    typedInput().dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await flush();
+    expect(stub.calls.some((c) => c.path === "/api/preview")).toBe(false);
+    expect(host.querySelector(".actions .pending")?.textContent ?? "").toBe("");
+
+    // the box reads ×10ⁿ as the range fields do
+    await enter("1.5×10⁻³");
+    expect(stub.calls.filter((c) => c.path === "/api/preview").at(-1)!.body.values)
+      .toEqual({ "instrument.profile.w": 0.0015 });
+    // leave nothing pending, or its recovery copy is written into the next test
+    bar("Revert").click();
+    await flush();
+  });
+
   it("frames single peaks in a graph tab of their own", async () => {
     await openInteractive();
     button("Single peaks")!.click();
@@ -6768,5 +6926,127 @@ describe("the Text buffer and the Model forms join the recovery copy (WP-2213)",
     await flush();
     expect(editorView().state.doc.toString()).toBe(TEXTDOC);
     expect(host.textContent).toContain("in sync");
+  });
+});
+
+describe("another project opened in the same window (WP-2242)", () => {
+  // Node ids repeat across projects (`n0000`, `n0001`, …), so the next
+  // project's head can be this one's: both fixtures stand at `n0000`, and a
+  // panel that reloads on `head` alone keeps the last project's rows.
+  const RECENT = [
+    { path: "/tmp/nac.rex", name: "nac.rex", opened_utc: "2026-11-08T10:00:00+00:00",
+      phases: [["NAC", "I 21 3"]], missing: false },
+  ];
+  const OTHER = { ...PROJECT, path: "/tmp/nac.rex",
+                  data: { ...PROJECT.data, filename: "nac.fxye" } };
+  /** Routes an open need not read again: the session's or the person's, the
+   *  document the open's own answer carries, and the indexing answer and
+   *  extinction screen, which the server drops on an open (`_adopt`). */
+  const SESSION = new Set(["/api/settings", "/api/version", "/api/capabilities",
+                           "/api/help", "/api/recent", "/api/examples", "/api/events",
+                           "/api/run/state", "/api/project", "/api/index/result",
+                           "/api/index/extinction"]);
+  const TOUR = ["Parameters", "Interactive", "Plan", "Peaks", "Model", "Text", "Series",
+                "Report", "History", "Build", "Single peaks", "Background", "Pattern"];
+
+  async function tour() {
+    for (const name of TOUR) {
+      button(name)!.click();
+      await flush();
+    }
+  }
+
+  async function openOther() {
+    await toStart();
+    [...host.querySelectorAll<HTMLLIElement>(".start li")]
+      .find((li) => li.querySelector(".name")?.textContent === "nac")!
+      .querySelector<HTMLButtonElement>("button.row")!.click();
+    await flush();
+  }
+
+  /** How often each project route was read, from `calls[from]` on. */
+  function reads(calls: Call[], from = 0): Map<string, number> {
+    const out = new Map<string, number>();
+    for (const c of calls.slice(from)) {
+      if (c.method !== "GET" || SESSION.has(c.path)) continue;
+      out.set(c.path, (out.get(c.path) ?? 0) + 1);
+    }
+    return out;
+  }
+
+  it("reads every project route again, as often as it did for the first", async () => {
+    const stub = server({
+      ...boot(), ...FITTED,
+      "/api/recent": () => ({ body: { recent: RECENT } }),
+      "/api/project/open": () => ({ body: OTHER }),
+    });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    await tour();
+    const first = reads(stub.calls);
+    const mark = stub.calls.length;
+
+    await openOther();
+    await tour();
+    const second = reads(stub.calls, mark);
+    const short = [...first].filter(([path, n]) => (second.get(path) ?? 0) < n)
+      .map(([path, n]) => `${path} ${second.get(path) ?? 0} of ${n}`);
+    expect(short).toEqual([]);
+    expect(host.textContent).toContain("nac.fxye");
+  });
+
+  it("asks for the pattern again when neither project has a fit", async () => {
+    const stub = server({
+      ...boot(), ...RAW,
+      "/api/peaks": () => ({ body: PEAKS_PAYLOAD }),
+      "/api/recent": () => ({ body: { recent: RECENT } }),
+      "/api/project/open": () => ({ body: OTHER }),
+    });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    const fetched = curvesFetched(stub);
+    expect(fetched).toBeGreaterThan(0);
+    await openOther();
+    expect(curvesFetched(stub)).toBe(fetched + 1);
+  });
+
+  it("never offers the last project's Undo in the next one", async () => {
+    // the applied stage finishes, so Undo is live, then another project opens:
+    // the undo node `n0003` names an unrelated node in the next project's tree
+    let done = false;
+    const finished = { state: "idle", project: PROJECT.path, head: "n0004",
+                       run: { ...IDLE_RUN.run, kind: "stage", status: "converged",
+                              node_id: "n0004" } };
+    const stub = await openTab("Report", PROJECT, {
+      ...FITTED,
+      "/api/recent": () => ({ body: { recent: RECENT } }),
+      "/api/project/open": () => ({ body: OTHER }),
+      "/api/events": () => ({ body: { events: [], next: 0, oldest: 1,
+                                      ...(done ? finished : IDLE_RUN) } }),
+      "/api/report/apply": () => {
+        done = true;
+        return { body: {
+          applied: { kind: "refine_cell", expected_delta_chi2: 16.19,
+                     stage: { name: "apply:refine_cell" } },
+          api_call: "ref.run_stage(data, rx.Stage('apply:refine_cell'))",
+          undo: "n0003", chi2_before: 16.96,
+          state: "running", run: { ...IDLE_RUN.run, kind: "stage" }, head: "n0003" } };
+      },
+      "/api/history/checkout": () => ({ body: { head: "n0003", parameters: [], n_free: 0 } }),
+    });
+    button("Apply")!.click();
+    await flush();
+    await new Promise((resolve) => setTimeout(resolve, 800)); // one poll interval
+    await flush();
+    expect(button("Undo")?.disabled).toBe(false);
+
+    await openOther();
+    button("Report")!.click();
+    await flush();
+    expect(host.textContent).not.toContain("applied refine_cell");
+    expect(button("Undo")).toBeUndefined();
+    expect(stub.calls.some((c) => c.path === "/api/history/checkout")).toBe(false);
   });
 });
