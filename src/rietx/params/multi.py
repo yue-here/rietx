@@ -531,6 +531,10 @@ class MultiParameterTable:
         #: :meth:`unhold` reads, so a hold a table derives (the floating
         #: origin, WP-1912) is never the caller's to release here
         self.user_holds: set[str] = set()
+        # (histogram, bare path) of every row ``set_values`` wrote, which
+        # ``refit(result=)`` reads: a held row is the caller's value only if
+        # the caller set it (WP-2103, round 2)
+        self.user_set: set[tuple[int, str]] = set()
         #: the caller's ties (WP-2103), joint target name → its spec, sources
         #: spelled as the caller wrote them: the register :meth:`untie` reads
         #: and the joint ``parameters()`` marks ``user=True`` from
@@ -1334,9 +1338,12 @@ class MultiParameterTable:
         for h, table in enumerate(self.tables):
             for e in table.entries:
                 canon = self._canonical(h, e.path)
-                if any(fnmatch.fnmatchcase(canon, g)
+                row = self.row_path(h, e)
+                if any(fnmatch.fnmatchcase(canon, g) or fnmatch.fnmatchcase(row, g)
                        or fnmatch.fnmatchcase(e.path, g) for g in path_globs):
-                    hits.setdefault(canon, []).append((h, e.path))
+                    # keyed by the name ``parameters()`` prints, so a row tied
+                    # onto per-pattern sources is one pattern's row to hold
+                    hits.setdefault(row, []).append((h, e.path))
         return hits
 
     def _refuse_unknown_literals(self, globs: list[str]) -> None:
@@ -1364,7 +1371,7 @@ class MultiParameterTable:
             h = int(parts[1]) if len(parts) == 3 and parts[1].isdigit() else -1
             if not 0 <= h < self.n_histograms or parts[2] not in self.tables[h]._paths:
                 raise ValueError(f"unknown parameter path {name!r} in this joint fit")
-            if self.sharing.is_shared(parts[2]):
+            if row_shared(self.sharing, self._entry(h, parts[2])):
                 raise ValueError(
                     f"{parts[2]!r} is one column every pattern shares, so it has "
                     f"no row of pattern {h}'s own; name it bare, or make it a row "
@@ -1373,7 +1380,7 @@ class MultiParameterTable:
         where = [(h, name) for h, t in enumerate(self.tables) if name in t._paths]
         if not where:
             raise ValueError(f"unknown parameter path {name!r} in this joint fit")
-        if not every and not self.sharing.is_shared(name):
+        if not every and not row_shared(self.sharing, self._entry(where[0][0], name)):
             raise ValueError(
                 f"{name!r} is a row per pattern; name one, 'hist.<h>.{name}'")
         return where
@@ -1392,7 +1399,16 @@ class MultiParameterTable:
         holds it: a locked row is structurally fixed, a tied one names its
         sources, a value off the row's bounds would start the solver
         infeasible.  A shared size row is written in each histogram's own
-        units, as construction writes it (WP-1131).  Dependents follow.
+        units, as construction writes it (WP-1131).  Dependents follow.  The
+        rows written are recorded in :attr:`user_set`.
+        """
+        self.write_values(values, record=True)
+
+    def write_values(self, values: dict[str, float], *, record: bool) -> None:
+        """:meth:`set_values`' body; ``record`` says whether the caller wrote it.
+
+        ``refit(result=)`` writes a saved answer back with ``record=False``,
+        so its values never read as ones the caller set.
         """
         writes: list[tuple[int, str, float]] = []
         for name, value in values.items():
@@ -1419,6 +1435,8 @@ class MultiParameterTable:
                 writes.append((h, path, v))
         for h, path, v in writes:
             self._entry(h, path).value = v
+            if record:
+                self.user_set.add((h, path))
         for h in sorted({h for h, _, _ in writes}):
             self.tables[h].refresh_ties()
         self.apply_to_models()
@@ -1436,6 +1454,11 @@ class MultiParameterTable:
         globs = [path_globs] if isinstance(path_globs, str) else list(path_globs)
         self._refuse_unknown_literals(globs)
         hits = self._matches(globs)
+        for glob in globs:
+            if is_literal_path(glob) and not any(
+                    fnmatch.fnmatchcase(n, glob) or fnmatch.fnmatchcase(_unscoped(n), glob)
+                    for n in hits):
+                raise ValueError(f"{glob!r} names no row of this joint fit")
         for name, where in hits.items():
             for h, path in where:
                 owner = self.tables[h].body_rows().get(path)

@@ -469,6 +469,50 @@ def test_refit_keeps_a_value_the_caller_set_and_held(pair):
     assert fresh.fitted_instruments[0].zero_shift.value == 0.0
 
 
+def test_refit_writes_the_saved_value_into_a_row_held_but_never_set(pair):
+    """The calibrate-hold-rerun workflow (2026-11-03 ruling): a fresh object
+    holds the setup and restarts from the saved answer.  Skipping every held
+    row left the constructor's value there, held, with nothing saying the
+    calibration was dropped.  Only a value the caller set wins."""
+    first = _ref().fit(pair, plan=_cheap_joint_plan(), telemetry=False)
+    saved = RefinementResult.model_validate_json(first.model_dump_json())
+    zero = {p.path: p.value for p in saved.parameters}["hist.0.instrument.zero_shift"]
+    assert zero != 0.0
+    fresh = _ref()
+    fresh.hold("hist.0.instrument.zero_shift")
+    fresh.refit(pair, result=saved, telemetry=False)
+    assert fresh.fitted_instruments[0].zero_shift.value == pytest.approx(zero)
+    assert _rows(fresh)["hist.0.instrument.zero_shift"].held is True
+
+
+def _per_pattern_a() -> MultiHistogramRefinement:
+    return _ref(sharing=SharingMap(per_histogram=["phases.0.cell.a"]))
+
+
+def test_a_scoped_name_of_a_row_tied_onto_per_pattern_sources_is_that_patterns_row():
+    """Cubic ``cell.b`` follows ``cell.a``; with ``cell.a`` per pattern,
+    ``parameters()`` prints ``hist.1.phases.0.cell.b``.  That name held
+    nothing and ``set_values`` called it 'one column every pattern shares'."""
+    ref = _per_pattern_a()
+    assert "hist.1.phases.0.cell.b" in _rows(ref)
+    assert ref.hold("hist.1.phases.0.cell.b") == ["hist.1.phases.0.cell.b"]
+    assert _rows(ref)["hist.1.phases.0.cell.b"].held is True
+    assert _rows(ref)["hist.0.phases.0.cell.b"].held is False
+    assert ref.hold("hist.0.phases.0.cell.b") == ["hist.0.phases.0.cell.b"]
+    assert ref.unhold("hist.1.phases.0.cell.b") == ["hist.1.phases.0.cell.b"]
+    with pytest.raises(ValueError, match="affine tie") as err:
+        ref.set_values({"hist.1.phases.0.cell.b": 4.0})
+    assert "shares" not in str(err.value)
+
+
+def test_hold_of_an_unknown_literal_raises():
+    ref = _per_pattern_a()
+    with pytest.raises(ValueError, match="unknown parameter path"):
+        ref.hold("hist.1.phases.0.cell.nope")
+    with pytest.raises(ValueError, match="unknown parameter path"):
+        ref.hold("hist.1.phases.0.cell.b.extra")
+
+
 def test_refit_from_a_differently_built_result_is_refused_naming_rows(pair):
     per_pattern = _ref(sharing=SharingMap(per_histogram=["phases.0.atoms.*.biso"]))
     first = per_pattern.fit(pair, plan=_plan(), telemetry=False)

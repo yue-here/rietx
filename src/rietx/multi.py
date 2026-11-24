@@ -1878,8 +1878,10 @@ class MultiHistogramRefinement:
         ``result`` that is this object's last fit, whose values the tables
         still hold.  A ``result`` (a saved one, read back with
         ``RefinementResult.model_validate_json``) is written in first by
-        :meth:`set_values`: every row it refined that is neither tied nor held
-        here (a value you set and held stays yours).  Construct the object from
+        :meth:`set_values`: every row it refined that is neither tied nor one
+        you both set and held here (that value stays yours; a row you held
+        without setting takes the saved value, so a calibration carries into
+        a held setup).  Construct the object from
         the inputs that fit was built from: a result of another pattern count
         raises, and so does a refined row with no place here, naming it.  A
         row the result did not refine keeps the constructor's value.
@@ -1909,7 +1911,7 @@ class MultiHistogramRefinement:
         data = list(data)
         if result is not None:
             _refuse_restart_shape(result, self.n_histograms, data, kw)
-            self.mtable.set_values(_restart_values(self.mtable, result))
+            self.mtable.write_values(_restart_values(self.mtable, result), record=False)
         else:
             kw.setdefault("two_theta_limits", self._fit_limits)
         free = [p.path for p in start.parameters if p.vary]
@@ -3402,8 +3404,10 @@ def _restart_values(mtable, result: RefinementResult) -> dict[str, float]:
     """The rows of ``result`` a restart writes back (WP-2103).
 
     Every row it refined that names a free-able row here: not tied, not
-    locked, and not held by the caller (a value the caller set and held is
-    the caller's, and wins over the saved one).  A parametric target is a
+    locked, and not a row the caller both set (:meth:`set_values`) and held
+    (that value is the caller's, and wins over the saved one).  A row held but
+    never set takes the saved value, so the calibrate-hold-rerun workflow
+    carries the calibration.  A parametric target is a
     tied row, so its coefficients carry it.  A refined row this object has
     no place for means it was built differently from the fit that made
     ``result`` (another sharing map, another histogram count): refused,
@@ -3422,7 +3426,8 @@ def _restart_values(mtable, result: RefinementResult) -> dict[str, float]:
         if any(mtable._entry(h, p).tie is not None or mtable._entry(h, p).locked
                for h, p in where):
             continue
-        if mtable.held_by(row.path) == "caller":
+        if mtable.held_by(row.path) == "caller" and any(
+                place in mtable.user_set for place in where):
             continue
         out[row.path] = float(row.value)
     if unplaced:

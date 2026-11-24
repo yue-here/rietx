@@ -1,6 +1,6 @@
 # WP-2103 — a joint fit has the verbs a single fit has
 
-Milestone: parametric · Status: ✅ 2026-11-17 — a joint fit holds, ties, sets values and restarts from its answer in one stage (PR #1643; follow-ups #1649)
+Milestone: parametric · Status: 🔄 2026-11-24 — a joint fit holds, ties, sets values and restarts from its answer in one stage; all tasks ticked, PR #1643 in review (closes with the maintainer after it merges; follow-ups #1649)
 Depends on: 2102 soft; 2081 soft (how a series holds what the setup fixes)
 
 ## Goal
@@ -125,6 +125,32 @@ rerun from stored values, `load_save_locals`), and the WO₃ protocol of
 - WP-1325 (the joint path), WP-1435 (the hold), WP-1070 (user ties), WP-2081.
 
 ## Handover log
+
+- **2026-11-22/23 (review rounds on #1643)** — Round 1 (d338b5147): a tie whose source is
+  a scaled size row is refused in `MultiParameterTable.tie` with `apply_value_scale`'s
+  sentence (the coefficient it wrote decoded short by the source's scale in every pattern
+  after the first); `refit(result=)` leaves a value the caller set and held; it refuses a
+  refined row with no place on the object; `user_variables` removed. Round 2 (fced1628a):
+  `refit(result=)` refuses a result of another pattern count; `refit` restarts under the
+  fit's own `HistogramResult.weight` and `two_theta_limits`; `RIGID_BODY_PARTIAL_TURN`'s
+  joint remedy names `hold`, `tie_equal` and `tie`; `reference/joint.md` lost a stale
+  `HOLD_BLOCKED_PLAN` row; the release fragment `1643.new.md` added. Round 3, Yue's two
+  answers: (1) a held row the caller never set takes the saved value under
+  `refit(result=)`; the value the caller set wins. `MultiParameterTable.set_values` records
+  the rows it wrote in `user_set`, and the restart writes through `write_values(record=False)`
+  so its own writes never count. Test `test_refit_writes_the_saved_value_into_a_row_held_but_never_set`.
+  (2) A scoped name of a row tied onto per-pattern sources (`SharingMap(per_histogram=[
+  "phases.0.cell.a"])` on cubic LaB6, where `parameters()` prints `hist.1.phases.0.cell.b`)
+  resolves through `row_path` in `places()` and `hold`, so `set_values` and `tie` give
+  that row's own reasons instead of "one column every pattern shares", and `hold` holds
+  pattern 1's row alone. `hold` of a literal that names no row raises. Tests
+  `test_a_scoped_name_of_a_row_tied_onto_per_pattern_sources_is_that_patterns_row` and
+  `test_hold_of_an_unknown_literal_raises` (the second already held on the parent: a guard).
+  Carried, not built here: the restart stage copies the last stage's window fraction but
+  not its `restraint_weight_scale` or `ftol`, harmless while a joint fit refuses restraints;
+  it is owed to whichever of this PR and #1492 merges second, tracked in WP-1995's
+  `### Inherited` or #1492's description. Round 1's point 4 (a stale esd beside a
+  `set_values` value) stays the follow-up, needing a private restart handle.
 
 - **2026-11-20 (post-close, WP-2101's owed item)** — A coefficient the caller holds in a
   joint fit is no longer named by `VARIABLE_NOT_FREED`, as in a single fit; one nobody
