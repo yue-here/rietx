@@ -33,6 +33,7 @@ from contextvars import ContextVar
 import numpy as np
 
 from ..schemas.indexing import _MODE_NAMES
+from ..schemas.results import require_two_theta_grid
 from .plots import PALETTES, _palette
 
 # The roles, in PALETTES per ground: ``index_obs`` and ``index_calc`` for
@@ -365,7 +366,7 @@ def plot_validation(validation, result=None, *, path: str | None = None,
                 fig.savefig(path)
         return _handed_back(fig, style)
 
-    tt = np.asarray(result.two_theta)
+    tt = require_two_theta_grid(result, "plot_validation()")
     y_obs = np.asarray(result.y_obs)
     y_calc = np.asarray(result.y_calc)
     y_bkg = np.asarray(result.y_background)

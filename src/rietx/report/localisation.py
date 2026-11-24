@@ -34,7 +34,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..schemas.results import RefinementResult
+from ..schemas.results import RefinementResult, require_two_theta_grid
 from .schemas import DeltaChi2Profile, DeltaChi2Quantile, SplitFamily, SplitLocalisation
 
 #: Two child reflections closer than this in 2θ (degrees) are one position:
@@ -66,12 +66,13 @@ def _same_pattern(a: RefinementResult, b: RefinementResult) -> None:
     own fit's :meth:`~RefinementResult.sig`, which depends on the declared
     model (a measured background widens it at compile, WP-1309).
     """
-    if not a.two_theta:
+    tt_a = require_two_theta_grid(a, "the Δχ² localisation")
+    tt_b = require_two_theta_grid(b, "the Δχ² localisation")
+    if not tt_a.size:
         raise ValueError("the results carry no curves")
-    if len(a.two_theta) != len(b.two_theta) or not np.array_equal(
-            np.asarray(a.two_theta), np.asarray(b.two_theta)):
+    if len(tt_a) != len(tt_b) or not np.array_equal(tt_a, tt_b):
         raise ValueError(
-            f"the fits saw {len(a.two_theta)} and {len(b.two_theta)} channels "
+            f"the fits saw {len(tt_a)} and {len(tt_b)} channels "
             "on different 2θ grids; a Δχ² by channel needs one pattern fitted "
             "over the same limits and exclusions")
     if not np.array_equal(np.asarray(a.y_obs), np.asarray(b.y_obs)):
@@ -107,7 +108,7 @@ def cumulative_delta_chi2(result_a: RefinementResult, result_b: RefinementResult
     _same_pattern(result_a, result_b)
     if n_quantiles < 1:
         raise ValueError("n_quantiles must be at least 1")
-    tt = np.asarray(result_a.two_theta, dtype=np.float64)
+    tt = require_two_theta_grid(result_a, "cumulative_delta_chi2()")
     step = weighted_residual(result_b) ** 2 - weighted_residual(result_a) ** 2
     cumulative = np.cumsum(step)
     total = float(cumulative[-1])
@@ -248,7 +249,7 @@ def split_localisation(higher: RefinementResult, lower: RefinementResult, *,
     _same_pattern(higher, lower)
     kh = _phase_key(higher, higher_phase, "higher")
     kl = _phase_key(lower, lower_phase, "lower")
-    tt = np.asarray(higher.two_theta, dtype=np.float64)
+    tt = require_two_theta_grid(higher, "split_localisation()")
     step = weighted_residual(lower) ** 2 - weighted_residual(higher) ** 2
     total = float(step.sum())
     bragg = (np.asarray(higher.y_calc, dtype=np.float64)

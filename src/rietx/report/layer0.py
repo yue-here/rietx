@@ -27,7 +27,7 @@ import numpy as np
 from scipy.signal import find_peaks, peak_prominences, peak_widths
 
 from ..schemas.pattern import TOF_NOT_EVALUATED
-from ..schemas.results import RefinementResult
+from ..schemas.results import RefinementResult, require_two_theta_grid
 from .background import assess_background
 from .schemas import (
     BACKGROUND_ABSORPTION_NOTABLE,
@@ -355,7 +355,8 @@ def build_layer0(result: RefinementResult, *, top_n: int = 15,
     """
     if result.axis == "tof":
         return _layer0_abstained(result)
-    tt = np.asarray(result.two_theta)
+    # empty, never a NaN scalar, for a result with no curve (#1548 item 13)
+    tt = require_two_theta_grid(result, "build_layer0()")
     y_obs = np.asarray(result.y_obs)
     y_calc = np.asarray(result.y_calc)
     if len(tt) == 0:

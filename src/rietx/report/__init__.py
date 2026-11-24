@@ -12,7 +12,7 @@ from __future__ import annotations
 import numpy as np
 
 from ..schemas.pattern import TOF_NOT_EVALUATED, PatternData
-from ..schemas.results import RefinementResult
+from ..schemas.results import RefinementResult, require_two_theta_grid
 from .apply import RECIPES, Recipe, describe_action, recipe, stage_for
 from .background import assess_background
 from .distortion import (
@@ -543,7 +543,7 @@ def build_report(result: RefinementResult, *, model=None, values=None,
     # every positive residual peak, not Layer 0's ``unmatched_obs`` subset: the
     # arm sorts them itself so one radius decides both the tick test and the
     # satellite test (``report/satellites.py``'s docstring has the measurement)
-    tt_res = np.asarray(result.two_theta)
+    tt_res = require_two_theta_grid(result, "build_report()")
     resid = _resid_norm(result)
     peak_idx = residual_peak_indices(resid, min_peak_sigma=min_peak_sigma)
     report.satellites = analyse_satellites(

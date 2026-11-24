@@ -138,6 +138,7 @@ from ..schemas.indexing import (
 )
 from ..schemas.instrument import Instrument
 from ..schemas.pattern import PatternData, require_two_theta
+from ..schemas.results import require_two_theta_grid
 from .fom import LINE_COINCIDENCE_RTOL, lattice_group
 from .workflow import (
     ABSENT_SIGMA,
@@ -1143,7 +1144,7 @@ def _reference_net_rwp(result) -> tuple[float | None, float | None]:
     """
     from .peaks import _debiased_envelope
 
-    tt = np.asarray(result.two_theta, dtype=np.float64)
+    tt = require_two_theta_grid(result, "determine_extinction_symbol()")
     y_obs = np.asarray(result.y_obs, dtype=np.float64)
     w = 1.0 / np.asarray(result.sigma, dtype=np.float64) ** 2
     net = y_obs - _debiased_envelope(tt, y_obs)
@@ -1338,7 +1339,8 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
         # lattice that does predict lines in range reaches the gate here.
         from ..crystallography.symmetry import generate_reflections
 
-        tt_data = np.asarray(ref_result.two_theta, dtype=np.float64)
+        tt_data = require_two_theta_grid(ref_result,
+                                         "determine_extinction_symbol()")
         screen.two_theta_range = (float(tt_data.min()), float(tt_data.max()))
         predicted = len(generate_reflections(
             symbol, tuple(candidate.cell), wavelength, screen.two_theta_range[1],
@@ -1377,7 +1379,7 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
         [[True], np.diff(labels[by_line]) > 0]))
     first_row_of_line = by_line[starts]
     fwhm_all = predicted_fwhm(tt_all, frozen)
-    tt_data = np.asarray(ref_result.two_theta, dtype=np.float64)
+    tt_data = require_two_theta_grid(ref_result, "determine_extinction_symbol()")
 
     screen.two_theta_range = (float(tt_data.min()), float(tt_data.max()))
     screen.reference_rwp = float(ref_result.statistics.rwp)

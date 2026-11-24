@@ -81,6 +81,28 @@ def _axis_of(result) -> AxisKind | None:
     return "tof" if result.tof is not None else None
 
 
+def require_two_theta_grid(result, where: str) -> np.ndarray:
+    """A result's 2θ grid as float64, refusing a bank's by name.
+
+    For a reader that does arithmetic in degrees: Scherrer widths, a
+    wavelength, a satellite radius, a pattern loop.  Empty where the result
+    carries no curve, so a ``size`` guard fires as it did when the field's
+    default was ``[]`` (``np.asarray(None)`` is a one-element NaN array, and
+    #1548's review item 13 found readers running on it).  A time-of-flight
+    result raises, naming ``where``: the entry point is constant-wavelength
+    only, and an axis-blind reader takes :meth:`RefinementResult.x` instead.
+    """
+    if result.tof is not None:
+        raise ValueError(
+            f"{where} reads a fit's abscissa as 2θ in degrees, and this result "
+            f"is a time-of-flight bank's: its abscissa is result.tof, a flight "
+            f"time in microseconds. {where} is constant-wavelength only (the "
+            f"time-of-flight track, yue-here/rietx issue #193); read result.x() "
+            f"for the bank's own axis.")
+    return np.asarray([] if result.two_theta is None else result.two_theta,
+                      dtype=np.float64)
+
+
 def _x_of(result) -> np.ndarray:
     """Whichever abscissa is set, as float64 — empty where neither is.
 

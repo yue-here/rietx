@@ -1223,3 +1223,43 @@ def test_a_banks_size_pair_is_registered_in_the_unit_it_holds():
     cw = ParameterTable(silicon(), rx.Instrument.bragg_brentano())._units
     assert cw["phases.0.lor_size"] == "deg"
     assert cw["phases.0.gauss_size"] == "deg^2"
+
+
+def test_a_two_theta_reader_refuses_a_bank_and_reads_no_curve_as_empty():
+    """Item 13.  ``two_theta`` defaults to ``None`` now, and
+    ``np.asarray(None, dtype=float)`` is a one-element NaN array, so a
+    reader's size guard passed and it ran on a NaN grid.  Every 2θ reader
+    now goes through ``require_two_theta_grid``: empty for a result with no
+    curve, a refusal naming the entry point for a bank."""
+    from rietx.report.layer0 import build_layer0
+    from rietx.report.localisation import cumulative_delta_chi2
+    from rietx.schemas.results import require_two_theta_grid
+
+    bare = _bare_result()
+    assert np.asarray(None, dtype=float).size == 1       # the trap itself
+    grid = require_two_theta_grid(bare, "here")
+    assert grid.size == 0 and grid.dtype == np.float64
+    with pytest.raises(ValueError, match="no pattern arrays"):
+        build_layer0(bare)              # was a TypeError on len() of a NaN
+    with pytest.raises(ValueError, match="carry no curves"):
+        cumulative_delta_chi2(bare, bare)
+
+    bank_result = _bare_result(tof=[1000.0, 1005.0], y_obs=[1.0, 2.0],
+                               y_calc=[1.0, 2.0], sigma=[1.0, 1.0])
+    with pytest.raises(ValueError, match=r"cumulative_delta_chi2\(\)|"
+                                         r"Δχ² localisation"):
+        cumulative_delta_chi2(bank_result, bank_result)
+    with pytest.raises(ValueError, match=r"here reads a fit's abscissa as 2θ"):
+        require_two_theta_grid(bank_result, "here")
+
+
+def test_the_recipe_fit_profile_refuses_a_bank_by_name(tof_fit, tmp_path):
+    """Item 13, a reader with 2θ arithmetic (d from 2θ and the primary
+    wavelength): on a bank it reached ``source.lines[0]``, which a bank's
+    source does not have, and wrote a NaN column for a curve-less result."""
+    from rietx.io.recipe import _write_fit_profile
+
+    ref, result = tof_fit
+    with pytest.raises(ValueError, match=r"write_recipe_tables\(\) reads a "
+                                         r"fit's abscissa as 2θ"):
+        _write_fit_profile(ref, result, tmp_path)

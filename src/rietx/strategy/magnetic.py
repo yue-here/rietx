@@ -139,6 +139,7 @@ from ..crystallography.magnetic.supercell import (
 from ..crystallography.symmetry import resolve_group
 from ..schemas.common import Diagnostic
 from ..schemas.plan import CLOSING_WINDOW_TOL
+from ..schemas.results import require_two_theta_grid
 from ..schemas.structure import MagneticSymmetry, Moment, Structure
 from .staged import RefinementPlan, Stage
 
@@ -776,7 +777,7 @@ def magnetic_channels(model, values, result, *,
     from ..report.satellites import _FWHM_FALLBACK_DEG
     from ..report.schemas import VALIDITY_RADIUS_FWHM
 
-    x = np.asarray(result.two_theta, dtype=np.float64)
+    x = require_two_theta_grid(result, "magnetic_channels()")
     mask = np.zeros(x.size, dtype=bool)
     idx = residual_peak_indices(_resid_norm(result),
                                 min_peak_sigma=min_peak_sigma)
@@ -2255,8 +2256,8 @@ def solve_magnetic(refinement, data, *, phase: int = 0,
     mask = magnetic_channels(refinement._model, values, refinement.result_)
     # every trial and every reference is fitted over exactly these channels —
     # the ones the mask was taken on and the ones ΔBIC's N counts
-    axis = refinement.result_.two_theta
-    limits = (float(min(axis)), float(max(axis)))
+    axis = require_two_theta_grid(refinement.result_, "solve_magnetic()")
+    limits = (float(axis.min()), float(axis.max()))
 
     # --- the k step ---------------------------------------------------------
     evidence = None
@@ -2265,12 +2266,12 @@ def solve_magnetic(refinement, data, *, phase: int = 0,
         # ``FitReport``: the workflow needs this one section, the generator is
         # a *parameter* of it (issue #257 A1) and ``build_report`` does not
         # take one.
-        if refinement.result_.two_theta is not None:
+        if axis.size:
             from ..report import _resid_norm
             from ..report.layer0 import residual_peak_indices
             from ..report.satellites import analyse_satellites
 
-            tt = np.asarray(refinement.result_.two_theta, dtype=np.float64)
+            tt = axis
             ticks = np.asarray([t for positions in
                                 refinement.result_.ticks.values()
                                 for t in positions], dtype=np.float64)
