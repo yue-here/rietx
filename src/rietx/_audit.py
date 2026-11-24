@@ -7132,7 +7132,8 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.indexing.kvector.kgrid_null:budget", "default", tier="caller", ambiguity=1,
         value=None,
         evidence=("opt-in: budget=None sets no cap; a Budget or Deadline is passed by name, and "
-                  "a cut stops every shuffle at one stratum boundary and names strata_left")),
+                  "it is read before every block of _CHUNK k, so a cut stops every shuffle at "
+                  "the same k, inside a stratum if need be, and names strata_cut and strata_left")),
     Row("rietx.indexing.kvector.kgrid_null:harmonics", "default", tier=1, ambiguity=1,
         value=(1,),
         evidence=("definition: (1,) is the first-order hypothesis H ± k; another order is "
@@ -7140,7 +7141,8 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.indexing.kvector.score_kgrid:budget", "default", tier="caller", ambiguity=1,
         value=None,
         evidence=("opt-in: budget=None sets no cap; a Budget or Deadline is passed by name, and "
-                  "a cut is reported as strata_left, never as a smaller search called complete")),
+                  "it is read before every block of _CHUNK k, and a cut is reported as "
+                  "strata_cut and strata_left, never as a smaller search called complete")),
     Row("rietx.indexing.kvector.score_kgrid:harmonics", "default", tier=1, ambiguity=1,
         value=(1,),
         evidence=("definition: (1,) is the first-order hypothesis H ± k; another order is "
