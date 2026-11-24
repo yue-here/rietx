@@ -79,7 +79,6 @@ from ..model.forward import (
     CompiledModel,
     compile_model,
     orbit_split_of,
-    recorded_window_tol,
 )
 from ..optimize.statistics import compute_statistics
 from ..params.vector import ParameterTable
@@ -117,18 +116,13 @@ _CACHE_LOCK = threading.Lock()
 
 def _cut(refinement) -> tuple[float, float | None]:
     """The window area fraction and window slack the last fit's last stage
-    ran at: the nearest stage node at or above the head, through
-    :func:`recorded_window_tol` as ``refine.replay`` reads a stage node's
-    (replay itself compiles a non-stage node at the defaults). A head with
-    no stage above it takes ``WINDOW_AREA_TOL``, the cut a default fit will
-    use, and the default slack."""
-    tree, head = refinement.history, refinement._head_id
-    if tree is not None and head is not None:
-        for node in reversed(tree.lineage(head)):
-            if node.action.kind == "stage":
-                return (recorded_window_tol(node.action.window_area_tol),
-                        node.action.window_slack_deg)
-    return WINDOW_AREA_TOL, None
+    ran at: ``Refinement._peak_cut``, the reading ``predict`` on a grid
+    shares (WP-2235). A head with no stage above it takes
+    ``WINDOW_AREA_TOL``, the cut a default fit will use, and the default
+    slack."""
+    cut = refinement._peak_cut()
+    return (cut.get("window_area_tol", WINDOW_AREA_TOL),
+            cut.get("window_slack_deg"))
 
 
 def _key(project) -> tuple:
