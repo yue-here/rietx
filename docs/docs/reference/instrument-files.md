@@ -277,7 +277,7 @@ Several banks are what a time-of-flight instrument is, so none is picked.
 The reader holds to the layout the GSAS manual documents and refuses anything else by name:
 
 - The first `PRCF` set is the default whatever its profile function, and it is the only set read. A later set of any type is skipped with [`GSAS_IPARM_PROFILE_DECLINED`](diagnostics-files.md#gsas_iparm_profile_declined).
-- A type-1 default set must carry the documented 12 coefficients and a type-3 set 21. A block of another length is refused, never padded or truncated.
+- A type-1 default set must carry the documented 12 coefficients and a type-3 set 21. A block of another length is refused, never padded or truncated. The manual describes no shorter block for these functions. To read a short one, write the full count in the manual's order, with zero for each term the file's writer left out.
 - The coefficients are read in the order the manual lists their names. The manual never states the record order, so [`GSAS_IPARM_PROFILE_READ`](diagnostics-files.md#gsas_iparm_profile_read) says the order is an assumption. The cut-off `CTOF` is read and not used.
 - A default set of profile function 2, 4 or 5, which this package does not evaluate, is refused.
 - A non-zero anisotropic or peak-shift coefficient is refused rather than dropped.

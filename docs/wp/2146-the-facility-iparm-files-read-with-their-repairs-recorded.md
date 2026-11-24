@@ -159,15 +159,19 @@ output, so its wording goes to the maintainer before merge.
       last field belong to no field, so the one-reading argument is the
       same on all of them. A spill into the next field's columns stays
       refused.*
-- [ ] (c): read the GSAS manual on a declared NTERMS below the full count.
+- [x] (c): read the GSAS manual on a declared NTERMS below the full count.
       Write the finding here, then repair with a record or keep the refusal.
-      *Blocked 2026-11-17 on the manual: `find_paper.py GSAS larson` finds
-      the Zotero record with no file, and `86-748` finds nothing. The
-      refusal stays as it was. GSAS-II 5.8.4 ignores NCOF and reads the
-      first seven slots by token (`docs/practice.md` § A GSAS-I
-      time-of-flight instrument file's profile set); that is GSAS-II's
-      practice and says nothing about GSAS-I. Next: the PDF from the
-      maintainer, pages 144, 148 and 221-223.*
+      *Done 2026-11-24: **the refusal stays.** The manual (LAUR 86-748,
+      2004 edition, 231 pages; a local copy outside the paper corpus, found
+      by a Spotlight search for `GSAS`) says nothing of a short
+      block. The record reads `(COF(I),I=1,NCOF)` (p. 223). Function 3
+      "has 21 coefficients" (p. 148). Only functions 4 and 5 state a count
+      that follows the Laue symmetry (14-27 and 14-21, p. 152). So a
+      14-coefficient function-3 block has no documented reading, and the
+      WP-1047 rule allows no repair. The refusal now cites the page and
+      names the fix: write all 21 in the manual's order, with zero for each
+      term the writer left out. The 2026-11-17 note stands that GSAS-II
+      5.8.4 ignores NCOF and reads the first seven slots by token.*
 - [x] (d): replace the per-coefficient sign test on sig-2 with σ²(d) > 0
       over the bank's d range. Write the no-range case's choice here.
       *Done 2026-11-17. The range is the `I ITYP` window mapped through

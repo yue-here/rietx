@@ -81,7 +81,11 @@ sig-2 gam-0 gam-1 gam-2 g1ec g2ec gsf rstr rsta rsca L11 L22 L33 L12 L13 L23``)
 but never says that is the order in the record.  It is the only ordering the
 documentation offers and it is adopted as such.  A block whose NCOF is not the
 documented 12 / 15 / 21 for PTYP 1 / 2 / 3 is refused, never padded or
-truncated.  Profile functions 2 (Ikeda-Carpenter), 4 and 5 are documented but
+truncated.  The manual says nothing of a shorter block for these three.  Its
+record reads ``COF(I), I=1,NCOF`` (p. 223), and only functions 4 and 5 state
+a count that follows the Laue symmetry (14-27 and 14-21, p. 152), so a
+14-coefficient function-3 block has no documented reading (checked against
+the 2004 edition, WP-2146).  Profile functions 2 (Ikeda-Carpenter), 4 and 5 are documented but
 not evaluated by this package: a default set of one of them is refused by
 name; a non-default one is reported and skipped.  The anisotropic and
 peak-shift coefficients of functions 1 and 3 belong with the microstructure
@@ -196,6 +200,9 @@ PRCF_COEFFICIENT_NAMES: dict[int, tuple[str, ...]] = {
         "gam-2", "g1ec", "g2ec", "gsf", "rstr", "rsta", "rsca",
         "L11", "L22", "L33", "L12", "L13", "L23"),
 }
+
+#: The page listing each function's coefficients, which a refusal cites.
+_PRCF_NAMES_PAGE: dict[int, int] = {1: 144, 2: 147, 3: 148}
 
 #: Which documented names land on which :class:`ProfileTOF` field.
 _PRCF_TO_PROFILE: dict[int, dict[str, str]] = {
@@ -646,10 +653,14 @@ def _profile(path: Path, bank: int, headers: dict[int, _Record],
                 raise rec.fail(
                     f"PRCF set {n} declares profile function {ptyp} with {ncof} "
                     f"coefficients; the manual documents {want} for function "
-                    f"{ptyp}, and a block of another length is refused — never "
+                    f"{ptyp} (p. {_PRCF_NAMES_PAGE[ptyp]}) and no shorter "
+                    f"block, and a block of another length is refused — never "
                     f"zero-padded or truncated — because the order of its "
                     f"slots would be a guess"
-                    + (_LEGACY_POINTER if (ptyp, ncof) == (1, 8) else ""))
+                    + (_LEGACY_POINTER if (ptyp, ncof) == (1, 8) else
+                       f". To read it, write all {want} in the manual's "
+                       f"order, with zero for each term the file's writer "
+                       f"left out"))
         if n != 1:
             _note(diagnostics, "info", "GSAS_IPARM_PROFILE_DECLINED",
                   f"Bank {bank}: PRCF set {n} (profile function {ptyp}) was "

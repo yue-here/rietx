@@ -606,7 +606,7 @@ short block read?
 |---|---|
 | rietx | A bank's one unnumbered set is read as set 1 and `GSAS_IPARM_SET_NUMBER_ASSUMED` says so; beside a numbered set it is declined. A declared NCOF other than 12 / 15 / 21 is refused by name (checked (source), `io/instrument_tof.py`) |
 | GSAS-II 5.8.4 | Reads the unnumbered key as the bank's profile when present and the numbered `PRCF1 ` key otherwise (`GSASIIfiles.py:308-342`). NCOF is never read: the first seven slots are split by whitespace and mapped by function type, so a short block reads like a full one (checked (source) by reading, not run) |
-| GSAS-I | Not checked: the Technical Manual (LAUR 86-748) is not in the corpus, and whether GSAS-I reads a short block with the missing terms as zero is WP-2146's open question (c) |
+| GSAS-I | The Technical Manual (LAUR 86-748, 2004 edition) reads `(COF(I),I=1,NCOF)`, and the first set is the default (p. 223). It describes no short block: function 3 "has 21 coefficients" (p. 148), and only functions 4 and 5 give a count that follows the Laue symmetry (14-27 and 14-21, p. 152). What GSAS-I does with a 14-coefficient function-3 block is not documented (checked (manual) 2026-11-24, WP-2146) |
 | FullProf, TOPAS, RIETAN-FP, BGMN, MAUD | Not checked |
 
 ## A magCIF in a non-standard orientation
