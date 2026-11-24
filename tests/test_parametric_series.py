@@ -2005,3 +2005,42 @@ def test_a_pawley_joint_ramp_recovers_its_line_without_bias():
             z[c.term].append((c.value - truth[c.term]) / c.esd)
     for term, zs in z.items():
         assert abs(float(np.mean(zs))) < 0.5, (term, zs)
+
+
+# -- the review of #1619, round 2 --------------------------------------------
+
+def test_a_glob_path_locked_on_some_patterns_only_does_not_depend_on_their_order():
+    """A path the capillary locks and the flat plate frees can be driven on the
+    plate, so the glob is refused naming the capillary in either order, rather
+    than the path being skipped in silence when the capillary comes first."""
+    s = rx.Structure(phases=[perturbed_inputs()[0].phases[0]])
+    plate = rx.Instrument.bragg_brentano(radiation="CuKa")
+    capillary = rx.Instrument.debye_scherrer(wavelength=0.41390)
+    glob = _equation(name="g", target="instrument.geometry.*", basis="constant", terms=None)
+    for instruments in ([plate, capillary], [capillary, plate]):
+        with pytest.raises(ValueError, match=r"instrument\.geometry\.sample_displacement"
+                                              r".*histogram|histogram.*instrument\.geometry"):
+            MultiParameterTable(s, instruments, parametric=[glob])
+
+
+@pytest.mark.parametrize("where, temps, expect", [
+    # the NaN sits in an if() condition: the two spellings must not disagree
+    ("if(sqrt(T - 350) < 10, 1, 2) < 1.5", (300.0, 400.0), "not finite at pattern 0"),
+    ("if(not (sqrt(T - 350) >= 10), 1, 2) < 1.5", (300.0, 400.0), "not finite at pattern 0"),
+])
+def test_a_comparison_inside_an_if_is_checked_for_a_value_that_is_not_finite(
+        where, temps, expect):
+    with pytest.raises(ValueError, match=expect):
+        resolve_parametric(_equation(where=where), _coords(*temps), 2)
+
+
+@pytest.mark.parametrize("where, holds", [
+    ("T > 0 and log(T) < 5", [1, 2]),       # False and ... is False at T = 0
+    ("T <= 0 or log(T) < 5", [0, 1, 2]),  # True or ... is True at T = 0
+    ("if(T > 0, log(T), 0) < 5", [0, 1, 2]),
+])
+def test_an_and_or_an_or_that_one_operand_settles_is_not_refused(where, holds):
+    """With T = [0, 10, 100], ``log(T)`` is -inf at the first pattern only; a
+    condition whose other operand already decides the answer there is decided."""
+    r = resolve_parametric(_equation(where=where), _coords(0.0, 10.0, 100.0), 3)
+    assert list(r.patterns) == holds

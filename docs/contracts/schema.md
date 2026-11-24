@@ -800,13 +800,6 @@ refines as before.  A bump rather than "also in 0.61" because 1.12.0 shipped
 0.61: a 1.12 build refuses a phase or instrument carrying the key, and the
 version now says why.
 
-Also in 0.62 (WP-1965): ``ParametricEquation.where``, a subset stated as a
-condition on the coordinate columns, stored as written and re-evaluated at
-every resolution.  Additive and defaulted to ``None``, the 0.25 → 0.26 rule;
-an older build refuses a declaration carrying the key.  A glob ``target`` is
-expanded at resolution into one declaration per matched path, so a result
-stores bare targets and nothing new.
-
 Also in 0.62 (WP-2081): ``SeriesEntry.held_values``, every path the
 caller held on a pattern with the value it was held at.  Additive and
 defaulted to ``None``, the 0.25 → 0.26 rule; an older build refuses an entry
@@ -822,3 +815,10 @@ rule above the constant).  ``capabilities().expression_grammar_version`` does
 not move either.  The grammar parses any name, and the names a peak equation
 binds belong to the schema (``schemas.peak_equation.REFLECTION_NAMES``).
 WP-2107 moved the grammar for its two functions and the schema for its names.
+
+Also in 0.62 (WP-1965): ``ParametricEquation.where``, a subset stated as a
+condition on the coordinate columns, stored as written and re-evaluated at
+every resolution.  Additive and defaulted to ``None``, the 0.25 → 0.26 rule;
+an older build refuses a declaration carrying the key.  A glob ``target`` is
+expanded at resolution into one declaration per matched path, so a result
+stores bare targets and nothing new.

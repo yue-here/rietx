@@ -629,23 +629,34 @@ class MultiParameterTable:
             if not is_glob(equation.target):
                 out.append(equation)
                 continue
-            owner: dict[str, tuple[ParameterTable, object]] = {}
+            owner: dict[str, list[tuple[ParameterTable, object]]] = {}
             for h in subset_of(equation, coordinates, n):
                 if h not in scratch:
                     scratch[h] = ParameterTable(starts[h].model_copy(deep=True),
                                                 instruments[h].model_copy(deep=True),
                                                 joint=True)
                 for e in scratch[h].entries:
-                    owner.setdefault(e.path, (scratch[h], e))
+                    owner.setdefault(e.path, []).append((scratch[h], e))
 
             def skip_reason(path: str, eq=equation, owner=owner) -> str | None:
-                table, e = owner[path]
-                why = _target_refusal(table, e)
-                if why is None or e.locked or e.held or e.tie is not None:
-                    return why
-                raise ValueError(
-                    f"parametric equation {eq.name!r}: target glob {eq.target!r} "
-                    f"matches {path}, which {why}. Narrow the glob to leave it out")
+                # judged over every table of the subset that has the path: a
+                # path is skipped only where every one refuses it.  A lock on
+                # some patterns only (a capillary's sample displacement) is a
+                # path the caller can drive on the others, so it stays a
+                # member and the per-pattern refusal names the histogram.
+                # Pattern order must not decide between skipping and refusing
+                # (the review of #1619, round 2).
+                whys = [(e, _target_refusal(table, e)) for table, e in owner[path]]
+                refused = [(e, why) for e, why in whys if why is not None]
+                if len(refused) < len(whys):
+                    return None
+                for e, why in refused:
+                    if not (e.locked or e.held or e.tie is not None):
+                        raise ValueError(
+                            f"parametric equation {eq.name!r}: target glob "
+                            f"{eq.target!r} matches {path}, which {why}. "
+                            "Narrow the glob to leave it out")
+                return refused[0][1]
 
             members, record = expand_glob(equation, list(owner), skip_reason)
             # Only a skip the caller could not foresee is kept on the record
@@ -657,7 +668,7 @@ class MultiParameterTable:
             # the package puts on a path the caller did not name.
             record.skipped = [
                 (path, "is held (Phase.floating_origin fixes it)")
-                for path, _ in record.skipped if owner[path][1].held]
+                for path, _ in record.skipped if any(e.held for _, e in owner[path])]
             out.extend(members)
             self.glob_expansions.append(record)
         return out

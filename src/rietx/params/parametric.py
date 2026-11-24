@@ -166,8 +166,9 @@ class GlobExpansion:
     """What one glob target expanded to (WP-1965).
 
     ``members`` are the declarations' names, one per matched path an equation
-    can drive, in table order; ``skipped`` each matched path no equation can
-    drive with the reason, ``_target_refusal``'s wording.
+    can drive, in table order; ``skipped`` the matched paths no equation can
+    drive that the caller could not foresee skipping, each with the reason,
+    ``_target_refusal``'s wording (a skip the space group forces is left out).
     """
 
     name: str
@@ -183,12 +184,14 @@ def expand_glob(equation: ParametricEquation, paths: list[str],
 
     ``paths`` are a model's parameter paths in table order and
     ``refusal(path)`` the reason a path cannot be a target, or ``None``.  A
-    matched path that is refused is **skipped and recorded**, never silent
-    (root CLAUDE.md § A hold): ``phases.0.cell.*`` on a cubic phase drives
-    ``a`` and skips ``b`` and ``c`` (tied to ``a``) and the three locked
-    angles.  Each member is the declaration with its own name
-    (:func:`glob_member_name`) and one bare target, so the declaration as
-    resolved, and a result read back, holds bare targets only.
+    matched path that is refused is **skipped**: ``phases.0.cell.*`` on a
+    cubic phase drives ``a`` and skips ``b`` and ``c`` (tied to ``a``) and the
+    three locked angles.  The record returned lists every skip with its
+    reason; the joint table then keeps on :attr:`GlobExpansion.skipped` only
+    the skips the caller could not foresee (the maintainer's ruling on #1619,
+    2026-11-17), so a cubic cell reports nothing.  Each member is the declaration with
+    its own name (:func:`glob_member_name`) and one bare target, so the
+    declaration as resolved, and a result read back, holds bare targets only.
 
     Refused: a glob matching no path, or only paths no equation can drive
     (each named with why); and a member name that is not an identifier, or

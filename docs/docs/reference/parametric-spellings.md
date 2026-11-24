@@ -14,6 +14,7 @@ A condition names the specimens by where they sit, so the equation covers the sa
 The reference and scale are still fixed at the first resolution ([Reference and scale](parametric.md#reference-and-scale)), so a coefficient keeps its meaning while the subset follows the campaign.
 
 A pattern with no value for a column the condition reads is refused, since its membership is undecided.
+So is a pattern where a comparison, inside an `if(...)` too, meets a value that is not finite, unless `and` or `or` is settled by its other operand there.
 So is a condition that holds at no pattern.
 A design basis takes no condition, because its rows follow the subset's order, one per pattern.
 
@@ -56,6 +57,7 @@ A member named like another declaration is refused, as two declarations of one n
 A glob may match paths that no equation can drive: on a cubic phase, `phases.0.cell.*` matches `b` and `c`, which are tied to `a`, and three locked angles.
 Those paths are skipped, silently: the space group fixes them, and the declarations the result carries show which paths moved.
 A skip you could not foresee, a path held for the floating origin, is named in [`PARAMETRIC_GLOB_SKIPPED`](diagnostics-series.md#parametric_glob_skipped), an info.
+A path is skipped only where every pattern of the subset refuses it. One that the capillary locks and the flat plate frees can be driven on the plate, so the glob is refused, naming the pattern, whatever order the patterns come in.
 A glob that matches nothing, or matches only such paths, is refused.
 So is a glob that matches a path refused for another reason, such as a rigid body's increment or a moment component, since that is a path you may have meant to drive.
 The glob is matched against the model of every pattern of the subset, so a path that only some of them have, such as a background term, is a member, and the patterns without it are refused by name.

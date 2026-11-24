@@ -1137,30 +1137,63 @@ class Condition:
         return np.asarray(v, dtype=bool)
 
     def undecided(self, bindings: Mapping[str, Any]) -> np.ndarray:
-        """Where a comparison in the condition meets a value that is not finite.
+        """Where the condition's truth rests on a comparison with a value that
+        is not finite.
 
         IEEE reads every comparison with a NaN as false, so ``sqrt(T - 350) <
         100`` and ``not (sqrt(T - 350) >= 100)`` would disagree at T = 300.
         A caller deciding membership refuses these places rather than reading
         the NaN as an answer.  Each side of each comparison is evaluated on
-        its own, numpy, element-wise.
+        its own, numpy, element-wise, and the walk goes into the operands of
+        ``if(...)``: a comparison inside one decides which branch is taken, so
+        its NaN moves the value just as a top-level one does.
+
+        ``and`` and ``or`` are decided wherever one operand alone decides them
+        (``False and …``, ``True or …``): the other operand's NaN cannot move
+        the answer there, so it is not refused.
         """
         xp = _numpy_xp()
         ev = _Eval(xp, bindings, ())
-        out = np.asarray(False)
 
-        def walk(n):
-            nonlocal out
+        def truth(n):
+            return np.asarray(ev.cond(rewrite(n)), dtype=bool)
+
+        def bad(n):
+            """Where the numeric node's own value is not finite, or an ``if``
+            inside it is undecided."""
+            v, _ = ev(rewrite(n))
+            return (~np.isfinite(np.asarray(v, dtype=np.float64))) | nested(n)
+
+        def nested(n):
+            """Where a condition inside the numeric node ``n`` is undecided."""
+            if isinstance(n, Neg):
+                return nested(n.arg)
+            if isinstance(n, BinOp):
+                return nested(n.left) | nested(n.right)
+            if isinstance(n, Call):
+                if n.func == "if":
+                    c = und(n.args[0])
+                    t = truth(n.args[0])
+                    return (c | np.where(t, nested(n.args[1]), nested(n.args[2])))
+                out = np.asarray(False)
+                for a in n.args:
+                    out = out | nested(a)
+                return out
+            return np.asarray(False)
+
+        def und(n):
             if isinstance(n, Compare):
-                for side in (n.left, n.right):
-                    v, _ = ev(rewrite(side))
-                    out = out | ~np.isfinite(np.asarray(v, dtype=np.float64))
-            elif isinstance(n, BoolOp):
-                walk(n.left)
-                walk(n.right)
-            elif isinstance(n, Not):
-                walk(n.arg)
+                return bad(n.left) | bad(n.right)
+            if isinstance(n, BoolOp):
+                ul, ur = und(n.left), und(n.right)
+                tl, tr = truth(n.left), truth(n.right)
+                # the value that decides: False for ``and``, True for ``or``
+                decide = False if n.op == "and" else True
+                settled = ((~ul) & (tl == decide)) | ((~ur) & (tr == decide))
+                return (ul | ur) & ~settled
+            if isinstance(n, Not):
+                return und(n.arg)
+            return np.asarray(False)
 
         with np.errstate(all="ignore"):
-            walk(self.tree)
-        return np.asarray(out, dtype=bool)
+            return np.asarray(und(self.tree), dtype=bool)
