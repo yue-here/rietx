@@ -1,6 +1,6 @@
 # WP-2245 — the Pattern graph's empty difference axis and its blank right margin
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-24 — claimed by @yue-here
+Milestone: gui-overhaul · Status: 🔄 2026-11-24 — both fixes landed (PR #1822); two visual questions wait on the maintainer
 Depends on: —
 Priority: P3 2026-11-24 — two defects on the graph every refinement opens on
 
@@ -29,10 +29,11 @@ No open WP owned the graph: WP-2216 built it and is closed, and the open GUI WPs
   is null.
 - **The margin.** The prototype's plot ends `Rr` = 112 px from the canvas edge and its legend
   labels start 10 px right of the plot. `/next` insets the chart host by `GUTTER` = 112 px for
-  the legend, and uPlot then pads the plot's right by half the y axis's width (its default for
-  a side with no axis), 25 px more. Measured at 1500 × 950: plot area 80-562 px, host edge
+  the legend, and uPlot then pads the plot's right by 25 px more (`autoPadSide`: half its
+  default y axis width, for a side with no axis). Measured at 1500 × 950: plot area 80-562 px, host edge
   587 px, pane edge 699 px, legend labels from 591 px. The blank right of the plot is 137 px,
-  20 % of the pane, against the prototype's 112 px.
+  20 % of the pane, against the prototype's 112 px. The 25 px also hold a 2θ label centred on
+  the plot's right edge, which the canvas would otherwise cut in half.
 - `rietx watch` and `rietx compare` draw with the shared module and have no legend gutter, so
   uPlot's right padding is their plot's only margin there. The margin fix is `/next`'s alone.
 - The tier of each rule this WP adds: none. It adds no flag, threshold or automatic action.
@@ -79,3 +80,65 @@ node --test tests/rxplot.test.mjs tests/watch_core.test.mjs tests/compare_core.t
 WP-2216 (the Pattern graph at `/next`), WP-1461 (the chart module), WP-2243's look of 2026-11-23.
 
 ## Handover log
+
+- **2026-11-24** — both defects fixed; two visual questions wait on the maintainer (PR #1822)
+
+  The Pattern graph no longer labels a pane that has nothing in it. Before a fit, the difference
+  pane's axis read 100 and 0, a range uPlot invents for a pane with no data; now it is blank, with
+  no tick marks, gridlines or zero line. Today's page `/` and any zoom onto channels the fit
+  skipped had the same fault, and both are fixed too. At `/next` the plot now ends where the
+  legend gutter starts: the blank right of the plot fell from 137 px (20 % of a 683 px pane) to
+  the prototype's 112 px. The gutter itself still holds one label before a fit. Whether it should
+  shrink is § Questions 1, and the √ axis's foot label 1 is § Questions 2.
+
+  *Done.*
+
+  - Both copies of `rxplot.mjs`: `drawsData(u)` asks whether any shown series holds a finite value
+    between the channels in view, cached per pane until the view, data or visibility moves.
+    `quietWhenEmpty` wraps every labelled y axis without a fixed `range`: blank labels, and null
+    from the ticks' and grid's filters. `drawZero` returns early on such a pane.
+  - `/next`: `Pattern.svelte`'s `OVERHANG` = 25 px is passed as the panes' `padRight`, and the host
+    is inset by `GUTTER − OVERHANG`, so the canvas reaches 25 px into the gutter. The plot ends at
+    the gutter and a 2θ label centred on its right edge is drawn whole. The floating bars clamp to
+    `columnWidth`, the host short of the gutter, as before. An export keeps uPlot's own padding.
+  - `/code-review high --fix` found three things, all taken. It added the trajectory fix: a
+    trajectory pane whose forward chain is null in view carried no series for the backward points
+    it draws, so it now carries the backward chain as a second, unpainted series in both copies.
+    The cut edge label it found led to `OVERHANG`; a first version set the padding to 0. Its third
+    finding, the zero line at the foot of the empty pane, is the `drawZero` change. It called the
+    last two visual calls. They are not: each restores what the graph drew before or what the
+    prototype draws.
+  - Tests: `test_a_pane_that_draws_nothing_in_view_labels_no_range` and the review's
+    `test_a_trajectory_drawn_by_its_backward_chain_alone_keeps_its_labels` in
+    `tests/test_rxplot_browser.py`; `test_the_rebuilt_plot_reaches_its_gutter_and_labels_only_what_it_draws`
+    in `tests/test_gui_layout_browser.py`. The first and third failed on the unfixed code (checked by
+    reverting the fix in place and rebuilding).
+
+  *Measured* (`.venv` `[dev]` plus playwright 1.65.2, macOS arm64, Python 3.12, node v24.22.1;
+  load average 21-60 from other sessions throughout).
+
+  - vitest 67 files, 1030 tests passed; svelte-check 500 files, 0 errors; `node --test` over
+    `rxplot`, `watch_core` and `compare_core`, 77 passed. All on the tree with main merged.
+  - Every `tests/*_browser.py` file, `-n 4`, before the merge: 191 passed, 1 failed. The failure was
+    `test_structure3d_browser.py`'s WebGL draw, which passed 8 of 8 run alone. The series browser
+    test timed out once at load 60 and passed on the rerun.
+  - Fast selection on the merged tree (`-n auto --dist loadgroup -m "not slow"`, playwright
+    installed, so the browser files join it): 15911 passed, 440 skipped, 30 xfailed, in 15 min 57 s
+    after 30 min queued behind two other runners' suites. The 3 added tests cost 4.4 s on this
+    run (layout 2.1 s, the two rxplot cases 1.4 s and 0.9 s), none in the slow tail. No baseline
+    run on main, so passed+skipped is not compared against one.
+  - The CI lint job's steps run locally: ruff, ruff format on the tutorials, Vale (0 errors),
+    `skill_caps`, `skill_surface`, `audit_delta`, `code_references --delta`, `rulebook_limits`,
+    all exit 0. `tests.reader_output` exit 0.
+  - Screenshots before and after, light theme, `nac` example:
+    `~/.cache/ghostshift/rietx/gui-pattern-ticks/` (`before-*.png`, `after-*.png`, `after2-*.png`).
+
+  *Gotchas.* uPlot draws axis labels on its canvas, so a browser test reads `axes[1]._values` or
+  the canvas's pixels, never the DOM. uPlot's right padding is `autoPadSide`, half its default
+  y axis size of 50, whatever size the axis is given.
+
+  *Generality.* Not dispatched: no change to `_audit.py`, and no threshold, fallback chain or
+  data correction. The rule added is about drawing.
+
+  Next: the maintainer answers § Questions. Each answer is a small change to `Pattern.svelte` or
+  `decadeSplits`. With both answered, this WP closes.
