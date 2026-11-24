@@ -161,10 +161,11 @@ disagree on wavelength, range or step; a blank pattern) names its tier here befo
 - [ ] 4. The Results step: the summary rows, the per-pattern table, the Plot list, the
   selected pattern's warnings, the series' warnings and the largest steps.
 - [ ] 5. The selected pattern: Pattern draws its fit while Series is up, ‹ › in the title,
-  ↑ ↓, and the graphs following the run until a row click.
+  ↑ ↓, the graphs following the run until a row click, and Map and Pattern sharing one 2θ
+  zoom (§ The design, Map; task 7 left it because it moves Pattern).
 - [ ] 6. The Trends graph tab: small panels, the Plot menu, Against, the second walk's rings,
   the bars' span, a point click selecting its pattern.
-- [ ] 7. The Map graph tab, with a route serving every member's observed counts and
+- [x] 7. The Map graph tab, with a route serving every member's observed counts and
   difference on one grid: Map and Waterfall, Observed and Difference, cuts and the two
   profiles, the averaging bar, the row window, area averaging, Flip and the colour key; drawn
   from the observed counts before a run too (pre-visualisation).
@@ -177,12 +178,15 @@ disagree on wavelength, range or step; a blank pattern) names its tier here befo
 - [ ] 11. Loading and cleaning: a check before the run that the members agree on wavelength,
   range and step; a pattern with no signal found before it is fitted; excluded regions and a
   2θ range for the whole series; the coordinate from file headers where the reader has it.
+  The step check also decides the Map on mixed steps: a coarser member fills every k-th
+  cell of the finest grid, and a map zoomed past its step draws the cells between as gaps.
 - [ ] 12. Output: Save table… (`SeriesResult.to_table`), an interactive page for a series,
   and saving the series with the project (a stored-format change, to the maintainer first).
 - [ ] 13. Browser passes over the four steps and both graphs by real clicks; screenshots at
   1440 × 900, light and dark, under `docs/wp/2243-screenshots/`, beside the prototype's in the
   runner's scratch, with an inventory of where each of today's Series features lives. The
   last PR waits on the maintainer's look.
+  Measure the Map's hover on a large series: each pointer move redraws the whole raster.
 - [ ] Skill: none. The skill drives the Python API, and this piece changes only the GUI.
 
 ## Acceptance
@@ -198,6 +202,57 @@ The piece closes when every task is ticked and the maintainer has looked at its 
 the prototype's (WP-2214 § How the maintainer reviews).
 
 ## Handover log
+
+- **2026-11-24** — ghostshift runner, task 7 alone; PR #1823. Beside it a second runner works
+  tasks 4-6 on `wp2243-r7-results`. The Series workflow at `/next` now has its Map graph. Every
+  staged pattern is a row of colour on one 2θ axis, drawn from the observed counts as soon as
+  the files are staged, before any fit. After a run the Difference view shows where each
+  pattern's model misses, in esd. A click sets a cut and selects the pattern. The profile
+  under the map and the profile beside it read the selected pattern and every pattern at the
+  cut. The task can merge on green; the maintainer's look waits for task 13.
+
+  *Done.* Task 7. `GET /api/series/map` (`GuiSession.series_map`, with the grid in
+  `gui/series.py` `map_grid`, `binned`, `map_payload`) sends every staged member as packed
+  float64. Members that share their channels keep them. Others go onto one uniform grid at the
+  finest member's step, each cell the mean of the channels in it. Past `MAP_CELLS` (1.5 M) the
+  columns merge. `diff` rides only when the staged list is the one that ran and no run is in
+  flight. Each staged file is read once while it stays staged (`_series_reads`), dropped on a
+  project close or open. The manual's route table (`reference/gui-power.md`) has the row.
+  The client is `gui/src/next/SeriesMap.svelte` with its arithmetic in `seriesmap.ts`. Every
+  control in § The design, Map is built, at the prototype's frame constants. It sits as the
+  Map tab in `next/tabs.ts`, `workflowOnly`, listed by the series in `lib/workflows.ts`, with
+  a help entry. **Of the other runner's files**, `Frame.svelte` gained the import, two state
+  lines (`seriesSelected`, `seriesStamp`), the `graphTabs` filter that hides a `workflowOnly`
+  tab from a workflow without a `graphs` list, the reset in `chooseWorkflow` reading that
+  filter, the Map branch, and `onstaged` on `<Series>`. `Series.svelte` gained the `onstaged`
+  prop, called after a PUT lands. `/code-review high --fix` found seven issues; five fixes
+  landed as their own commits (the workflow-switch tab reset, the empty state before any
+  pattern, the nearest cell in three helpers, the cache reset). Two went forward: task 11
+  (mixed steps) and task 13 (hover cost). Map and Pattern sharing one 2θ zoom went to task 5,
+  since it moves Pattern.
+
+  *Measured* (arm64 macOS, worktree venv `[dev]` plus playwright, node 24.22.1; the WP's
+  node 22 floor is met, and no 22 is installed here). Route, 34 patterns of 4 200 channels:
+  reading every file took 930 ms before the cache; the grid 17 ms; the payload 1.2 MB.
+  vitest 1040 passed in 68 files, two new (`seriesmap.test.ts`, `MapGraph.svelte.test.ts`).
+  svelte-check 0 errors. Server tests: three new in `tests/test_gui_server.py`. Browser, local
+  only: BROWSER_COUNTS. Fast suite (`serial.py`): FAST_COUNTS. Lint as CI runs it: ruff, ruff
+  format on the tutorials, Vale (0 errors), skill caps, skill surface, audit delta, code
+  references, rulebook limits, all clean. Reader output unchanged. Screenshots of the Map,
+  Observed, Difference and Waterfall, light and dark, looked at in the runner's scratch.
+
+  *Gotchas.* macOS folds case, so `SeriesMap.test.ts` overwrites `seriesmap.test.ts`; the
+  mount test is `MapGraph.svelte.test.ts`. A test using `$state` must be named
+  `*.svelte.test.ts`. Typing twelve coordinates fast in the Patterns table kept four on the
+  server: concurrent PUTs, and a stale response absorbed over a newer edit. That is
+  `Series.svelte`, task 4-6's file, so it is reported here and not fixed.
+
+  *For the maintainer.* One visual choice the design does not make: in Difference, a row with
+  no fit (every row before a run, or a pattern the run quarantined) is drawn in the `--hover`
+  token. Zero difference is the plot's ground, so an unfitted row must differ from it, and
+  `--hover` is the nearest token the pages already lay over an area. Built that way; it comes to the maintainer at task 13's look.
+
+  Next: tasks 4-6 on the other branch; task 5 takes the shared zoom.
 
 - **2026-11-23** — ghostshift runner gui-r7, first session; PR #1794. The rebuilt page at
   `/next` now has a working Series workflow for its first and third steps. A person can load
