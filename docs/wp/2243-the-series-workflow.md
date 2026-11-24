@@ -1,6 +1,6 @@
 # WP-2243 — the series workflow at `/next`: patterns, first fit, run, results, with Trends and Map
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-24 — claimed by @yue-here (ghostshift runner); Patterns, Run and Results built; the selected pattern next
+Milestone: gui-overhaul · Status: 🔄 2026-11-24 — Patterns, Run and Results built (PRs #1794, #1820); the selected pattern next
 Depends on: 2240 soft (the workflow frame R6 builds on); 2300 soft (what each pattern refines)
 Priority: P2 2026-11-23 — a feature the open milestone was opened for: R7, the rebuild's last piece before the swap
 
@@ -235,6 +235,54 @@ The piece closes when every task is ticked and the maintainer has looked at its 
 the prototype's (WP-2214 § How the maintainer reviews).
 
 ## Handover log
+
+- **2026-11-24** — ghostshift runner wp-2243-a, second session; PR #1820. The Series
+  workflow at `/next` now has a Results step. After a run, a person reads how many
+  patterns converged, the largest walk gap and the largest step with their sizes in esds,
+  one row per pattern, every refined value at the selected pattern, and the warnings. The
+  five defects the 11-23 look found on Patterns and Run are fixed. One more was found and
+  fixed here: typing coordinates quickly could lose one, and then the whole run lost its
+  axis. Task 5 (the selected pattern on the Pattern graph) was not started.
+
+  *Done.* Task 3b (the look's defects, listed in the task), task 4 (`seriesresults.ts`,
+  the Results branch of `Series.svelte`). `/code-review high --fix` found seven issues;
+  five fixes landed as their own commit: a refused PUT now reverts to the list an earlier
+  PUT left on the server, every refused PUT says so, Results says a run is in progress
+  instead of "Not run yet.", the value groups key on their path rather than their title,
+  and the browser test fails with its rows rather than a ValueError. Declined: the one
+  `selected` index shared by the three steps drifts when a pattern is removed after a
+  run, since Results reads it against the list as the run left it. That linking is task
+  5's. Also declined as speculative: a verify refit after both walks could leave the
+  status naming the last pattern.
+
+  *Measured* (arm64 macOS, worktree venv `[dev]` plus playwright, node 24.22.1, load
+  average 42-48 from other sessions). vitest 1030 passed in 67 files (995 before task 3's
+  merge, 1028 after this session's first two commits). svelte-check 0 errors in 500
+  files. The Python files named in Acceptance plus `test_docs_consistency.py`: 329
+  passed. GUI browser files (`test_gui_*_browser.py`, seven files): 68 passed and 1
+  failed, the series test pinning the old ✓; after its update it passes alone. Not run:
+  `test_compare_browser.py`, `test_html_browser.py`, `test_rxplot_browser.py`,
+  `test_structure3d_browser.py`, `test_watch_browser.py`, which this branch does not
+  reach, and the fast suite, since no Python source changed. Lint as CI runs it: ruff,
+  ruff format, Vale (0 errors), skill caps, skill surface, audit delta, code references,
+  rulebook limits all exit 0. `python -m tests.reader_output` exit 0, reader output
+  unchanged. The probe (ten-pattern ramp, both walks, 0.8 s pause per fit) and its
+  screenshots are in the runner's scratch: the status line read "second walk · 7 of 10"
+  beside the Console's "(7/10)", all ten coordinates survived, no page errors.
+
+  *Gotchas.* A page opened after the run shows ✓ in the second-walk column, since the
+  record keeps no second-walk fits; `gui/series.py` could serve them once #1786 merges.
+  `GET /api/series/curves` serves a member only after the run ends, and its `index` is
+  the entry's position, which differs from the series index past a failed pattern: task
+  5's "graphs follow the run" needs a server arm for a member mid-run. The tied cell
+  edges (b and c under a cubic a) are listed as values of their own, because
+  `trajectories` lists every path, not only the free ones.
+
+  Next: Q1 above waits on the maintainer. Then task 5: Series reports its selection to
+  the frame, Pattern takes a fetcher for a member's curves and a title with ‹ ›, and
+  Series stays mounted across a workflow switch (the frame's convention for a panel
+  holding state, as the model pane is). Then task 6, which also adds the Plot ticks and
+  the summary rows' Plot buttons that task 4 left out.
 
 - **2026-11-23** — ghostshift runner gui-r7, first session; PR #1794. The rebuilt page at
   `/next` now has a working Series workflow for its first and third steps. A person can load
