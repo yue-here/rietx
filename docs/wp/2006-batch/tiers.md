@@ -2,7 +2,7 @@
 
 Made from the three tiering lanes of the 2026-11-17 session (`/wp-handover` names it). The rows the session tiered are in `src/rietx/_audit.py` itself. This page holds the rest: the tier-3 candidates that need the maintainer's approval, the rows left at `unaudited` with what would close each, and the reader decisions audited by hand. Nothing here is a ruling.
 
-A row marked **magnetic** is a magnetic-path decision, which is Mike's since 2026-11-04 (#1075).
+A row marked **magnetic** is a magnetic-path decision, which is Mike's since 2026-11-04 (#1075). Mike ruled the ten magnetic candidates on PR #1636 on 2026-11-23. Where each row landed is in its row in `src/rietx/_audit.py`, and the rows below are kept as the batch he read.
 
 ## Tier-3 candidates (36)
 

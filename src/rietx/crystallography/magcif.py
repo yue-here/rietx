@@ -956,9 +956,13 @@ def nuclear_operations(magnetic_symmetry) -> tuple[str, ...]:
 
 #: Two images of a site closer than this, in every fractional coordinate, are
 #: counted as one position by :func:`_orbit_size`.  So a site stated within
-#: half of it of a parent special position counts as on it, and the parent is
-#: taken as the nuclear group; the site is then stored on the position and
-#: reported as ``CIF_SITE_TWINS_MERGED``.  Measured on the 106 MAGNDATA files
+#: half of it of a parent mirror, 2-fold axis or inversion centre (two images
+#: 2d apart) counts as on it, and the parent is taken as the nuclear group; the
+#: site is then stored on the position and reported as
+#: ``CIF_SITE_TWINS_MERGED``.  Off a 4-fold axis neighbouring images are only
+#: d apart, so a site 5e-4 < d < 1e-3 off one takes the parent and is *not*
+#: moved, expanding to images the file does not state (WP-1918, open).
+#: Measured on the 106 MAGNDATA files
 #: read under a parent above their own group: no stated coordinate moves more
 #: than 3.1e-5 Å (#1797).  ``io/projects/topas.py`` imports the same count.
 _ORBIT_MERGE_TOL = 1e-3

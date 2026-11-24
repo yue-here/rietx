@@ -1546,15 +1546,19 @@ def test_a_site_inside_the_orbit_merge_counts_as_on_the_parent_position(
     the merge they count as one position, the parent is taken and z is stored
     at 0 with ``CIF_SITE_TWINS_MERGED``; outside it the file's own group is
     taken and z is kept."""
+    from rietx.crystallography.symmetry import TWIN_COORD_TOL
+
     tol = magcif._ORBIT_MERGE_TOL
+    # the merged arm also needs the twin step to reach z, the kept arm not
+    assert 0.4 * tol <= TWIN_COORD_TOL < 0.6 * tol
 
     def read(z):
         path = _magcif(
-            tmp_path, f"pmm2_{z:.5f}", parent="P m m m", it=47, bns="25.60",
+            tmp_path, f"pmm2_{z:.8f}", parent="P m m m", it=47, bns="25.60",
             symbol="P m' m' 2", cell=(4.0, 5.0, 6.0, 90.0, 90.0, 90.0),
             operations=("x,y,z,+1", "-x,-y,z,+1", "x,-y,z,-1", "-x,y,z,-1"),
             sites=("Fe1 Fe 0.00000 0.00000 0.00000 1",
-                   f"O1 O 0.25000 0.30000 {z:.5f} 1"),
+                   f"O1 O 0.25000 0.30000 {z:.8f} 1"),
             moment_loop=_moment_loop([("Fe1", "0.0", "0.0", "2.00000",
                                        "0,0,mz")]),
         )

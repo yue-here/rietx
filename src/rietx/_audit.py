@@ -805,7 +805,8 @@ ROWS: tuple[Row, ...] = (
                   'largest move; nothing to do')),
     Row("CIF_MAGNETIC_NUCLEAR_GROUP", "code", tier=3, ambiguity=2,
         evidence=("read the raise site in magcif.resolve_nuclear_symmetry (nuclear_group='auto', "
-                  "the default): fires when the parent group the file names contains the file's "
+                  "the default, or 'parent'; under 'file' only where the two groups are the "
+                  "same operations): fires when the parent group the file names contains the file's "
                   "operators and keeps every site's orbit, so positions refine under the parent "
                   "and moments under the magnetic group; the suggestion names "
                   "nuclear_group='file'. Practice: Gallego et al. (2016) J. Appl. Cryst. 49, "
@@ -828,7 +829,11 @@ ROWS: tuple[Row, ...] = (
                  "group's extra positional freedoms (displacive modes at zero amplitude) "
                  "against the data and rank the two. The MAGNDATA counts are development "
                  "data. Ruled by Mike on PR #1636 under #1075."),
-        approved="2026-11-23"),
+        approved="2026-11-23",
+        response='info',
+        responds=("note that positions refine under the parent the file names; pass "
+                  "nuclear_group='file' where the file group's extra positional freedoms "
+                  "are what the fit is for")),
     Row("CIF_MAGNETIC_NUCLEAR_SETTING", "code", tier=1, ambiguity=1,
         evidence=('read the raise sites at magcif.py:1186-1232: fires where the positions refine '
                   "under the file's own group instead of the parent it names, because the "
@@ -8268,7 +8273,6 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "BRINDLEY_OUTSIDE_REGIME",
     "CELL_RUNAWAY",
     "CIF_CELL_ANGLE_CORRECTED",
-    "CIF_MAGNETIC_NUCLEAR_GROUP",
     "CIF_MAGNETIC_NUMBER_MISMATCH",
     "CIF_MAGNETIC_SYMMFORM",
     "COVARIANCE_DIRECTION_DISCARDED",
