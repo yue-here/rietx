@@ -583,3 +583,23 @@ def test_a_traced_backend_agrees_with_the_analytic_partials():
         assert _worst_rel(ref_g[2 + k], jac_g[:, k]) <= 1e-11
     # at γ = 0 the Gaussian value is selected; its α, β, σ columns stay finite
     assert np.all(np.isfinite(jac_0[:, :3]))
+
+
+def test_a_zero_gaussian_width_is_the_pure_exponential_pair():
+    """σ = 0 is legal (``sig0 = sig1 = sig2 = 0``, "no Gaussian broadening",
+    each floored at 0), and the kernel divides by σ² — without the floor
+    every channel is NaN (#1548 review, item 14).  At ``_MIN_SIGMA_US`` the
+    kernel is the σ → 0 limit, :func:`back_to_back_exponential`, to 1e-8 of
+    the peak once a channel is ten floors from the cusp, and both branches
+    stay finite."""
+    dt = np.linspace(-200.0, 200.0, 4001)
+    off_cusp = np.abs(dt) >= 10.0 * tof._MIN_SIGMA_US
+    for a in (0.05, 0.3, 1.0):
+        for b in (0.02, 0.2, 1.0):
+            h = back_to_back_gaussian(dt, a, b, 0.0)
+            assert np.all(np.isfinite(h))
+            pure = back_to_back_exponential(dt, a, b)
+            peak = float(np.max(pure))
+            assert float(np.max(np.abs(h - pure)[off_cusp])) <= 1e-8 * peak
+            pv = back_to_back_pseudovoigt(dt, a, b, 0.0, np.zeros_like(dt))
+            assert np.all(np.isfinite(pv))

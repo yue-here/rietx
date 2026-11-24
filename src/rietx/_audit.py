@@ -3612,6 +3612,15 @@ ROWS: tuple[Row, ...] = (
                   "relative of a contour-integral oracle over 220 radii in [1e-4, 3e3] x "
                   "121 arguments filling (-pi, pi) (measured 8.4e-13; "
                   "tests/test_profile_tof.py::test_scaled_exp1_over_the_complex_plane)")),
+    Row("rietx.model.profiles.tof._MIN_SIGMA_US", "constant", tier=1, value=0.0001,
+        evidence=("numerical floor: sig0 = sig1 = sig2 = 0 is a legal bank (each floored at 0, "
+                  "'no Gaussian broadening') and the back-to-back Gaussian kernel divides by "
+                  "sigma^2, so at sigma = 0 every channel was NaN (#1548 review, item 14); at "
+                  "sigma = 1e-4 us the kernel is its sigma -> 0 limit, the pure exponential "
+                  "pair, to 5e-9 of the peak more than 1e-3 us from the cusp and 2e-5 at it "
+                  "(tests/test_profile_tof.py::test_a_zero_gaussian_width_is_the_pure_exponential_pair); "
+                  "real banks' sigma sit at microseconds, four decades above, and pass "
+                  "through unchanged; the flight-time twin of caglioti._MIN_GAMMA_G2")),
     Row("rietx.model.profiles.tof._SERIES_RADIUS", "constant", tier=1, value=60.0,
         evidence=("numerical setting with a domain test: scaled_exp1 takes the A&S 5.1.11 "
                   "power series only where |z| <= 60 as well as inside the wedge, the "

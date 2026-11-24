@@ -103,6 +103,19 @@ _LENTZ_STEPS = 200
 _LENTZ_TOL = 1e-15
 _LENTZ_TINY = 1e-300
 
+#: The Gaussian standard deviation the back-to-back kernel evaluates at no
+#: less than, in µs (σ² ≥ 1e-8 µs²): the flight-time twin of
+#: ``caglioti._MIN_GAMMA_G2``.  ``sig0 = sig1 = sig2 = 0`` is a legal bank
+#: ("no Gaussian broadening", their floor is 0 and the driver can land
+#: there), and the kernel divides by σ² — at σ = 0 every channel is NaN.  At
+#: this floor the kernel is the pure back-to-back exponential pair (the σ → 0
+#: limit) to within 1e-8 of the peak for α, β ≤ 1 µs⁻¹ wherever a channel is
+#: more than ten floors (1e-3 µs) from the pulse's cusp (measured 5e-9;
+#: ``tests/test_profile_tof.py::test_a_zero_gaussian_width_is_the_pure_exponential_pair``),
+#: and 2e-5 of the peak at the cusp itself; σ at or above it passes through
+#: ``maximum`` unchanged.
+_MIN_SIGMA_US = 1e-4
+
 
 def _concrete(x):
     """``x`` as a numpy array when it is plainly a value, else ``None``.
@@ -361,6 +374,9 @@ def _gauss_parts(dt, alpha, beta, sigma):
     """
     xp = get_backend()
     dt = xp.asarray(dt, dtype=np.float64)
+    # floored, never zero: σ = 0 is a legal declaration and the terms below
+    # divide by σ² (see ``_MIN_SIGMA_US``); a no-op for every σ above it
+    sigma = xp.maximum(sigma, _MIN_SIGMA_US)
     s2 = sigma * sigma
     rt = sigma * _SQRT2
     y = (alpha * s2 + dt) / rt

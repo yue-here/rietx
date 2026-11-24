@@ -952,7 +952,13 @@ class CompiledTOFModel:
         if spectrum is not None:
             y = y * spectrum
         width = self.channel_width_factor()
-        return y if width is None else y * width
+        if width is None:
+            return y
+        # Lifted onto the backend before the product: ``tensor * ndarray``
+        # routes through numpy's deprecated ``__array_wrap__`` and fails under
+        # a functorch transform (root CLAUDE.md), and ``width`` is the frozen
+        # numpy array compiled from the pattern's abscissa.
+        return y * get_backend().asarray(width, dtype=np.float64)
 
     def _phase_component_batched(self, ip: int, values: dict[str, float],
                                  hkl_intensity: np.ndarray | None = None
@@ -1090,9 +1096,12 @@ def compile_tof_model(structure: Structure, instrument: Instrument,
 
     ``tof_limits`` is a ``(lo, hi)`` window in **microseconds**, the flight-time
     spelling of ``two_theta_limits``.  ``moving_paths`` is every parameter the
-    coming stage can move, or ``None`` for "no claim made"; it is used for one
-    structural decision — whether the type-3 pseudo-Voigt shape is compiled in
-    because a γ coefficient can move off zero this stage.  ``orbit_split`` is
+    coming stage can move, or ``None`` for "no claim made"; it is used for two
+    off-state freezes — whether the type-3 pseudo-Voigt shape is compiled in
+    because a γ coefficient can move off zero this stage, and whether a phase
+    whose extinction is zero skips the Sabine series.  ``None`` gates neither,
+    exactly as in :func:`~rietx.model.forward.compile_model`: an empty set
+    claims nothing moves, ``None`` claims nothing.  ``orbit_split`` is
     :func:`~rietx.model.forward.compile_model`'s, with the same meaning: the
     split a fit decided at its start (WP-2052), so a stage that drives a
     half-occupied atom onto a mirror keeps its multiplicity on a bank too.
@@ -1110,8 +1119,10 @@ def compile_tof_model(structure: Structure, instrument: Instrument,
     What this refuses, by name
     --------------------------
     Specimen absorption declared as a scalar µR, preferred orientation, surface
-    roughness, anisotropic (Stephens) strain and soft restraints are all
-    **refused when declared**, naming T-3, rather than dropped.  Each has a
+    roughness, anisotropic (Stephens) strain, soft restraints, a peak equation
+    on a phase or on the instrument (WP-2107) and a sharp ``PeakComponent`` in
+    ``instrument.extra_components`` are all **refused when declared**, naming
+    T-3, rather than dropped.  Each has a
     definite reason: µ varies within one histogram because λ does (WP-1132's
     own scope note says so); March-Dollase and Stephens are both written in
     deg 2θ and would need their time-of-flight forms derived, not
@@ -1209,6 +1220,44 @@ def compile_tof_model(structure: Structure, instrument: Instrument,
                  f"and this arm does not assemble the restraint rows yet. "
                  f"They are radiation-blind and will transfer unchanged; "
                  f"refusing rather than dropping them is the point.")
+        # WP-2107's peak equations: the bank builds no ``CompiledPhase.peq``,
+        # so a declared equation would be read by nothing while
+        # ``ParameterTable`` still registers its coefficients — a free column
+        # that moves nothing (root CLAUDE.md: a parameter the forward branch
+        # skips is force-fixed, not merely unfree).  Refused by name until a
+        # later cut gives the bank a reading of one.
+        _require(not phase.peak_equations,
+                 f"compile_tof_model(): phases.{ip} declares "
+                 f"{len(phase.peak_equations)} peak equation(s) and this arm "
+                 f"cannot evaluate one: the time-of-flight model builds no "
+                 f"compiled equation for a phase, so its coefficients "
+                 f"(phases.{ip}.peak_equations.*) would be free columns that "
+                 f"move nothing. Clear phases[{ip}].peak_equations; an "
+                 f"equation on a bank is a later rung of the time-of-flight "
+                 f"track (yue-here/rietx issue #193).")
+    _require(not instrument.peak_equations,
+             f"compile_tof_model(): the instrument declares "
+             f"{len(instrument.peak_equations)} peak equation(s) and this arm "
+             f"cannot evaluate one: the time-of-flight model builds no "
+             f"compiled equation, so its coefficients "
+             f"(instrument.peak_equations.*) would be free columns that move "
+             f"nothing. Clear instrument.peak_equations; an equation on a "
+             f"bank is a later rung of the time-of-flight track "
+             f"(yue-here/rietx issue #193).")
+    sharp = [i for i, comp in enumerate(instrument.extra_components)
+             if comp.kind != "hump"]
+    _require(not sharp,
+             f"compile_tof_model(): instrument.extra_components "
+             f"{', '.join(str(i) for i in sharp)} "
+             f"{'is a' if len(sharp) == 1 else 'are'} sharp PeakComponent"
+             f"{'' if len(sharp) == 1 else 's'} and this arm builds only the "
+             f"hump-kind members: a sharp peak is a windowed tick placed and "
+             f"shaped in deg 2θ (CompiledExtraPeak, constant-wavelength "
+             f"only), so it would be dropped from the model while its "
+             f"parameters stayed free. Remove "
+             f"{'it' if len(sharp) == 1 else 'them'}, or model the feature as "
+             f"a HumpComponent; a sharp extra peak on a bank is a later rung "
+             f"of the time-of-flight track (yue-here/rietx issue #193).")
 
     mask = pattern.in_range_mask()
     x_all, y_all, s_all = pattern.tof_us(), pattern.y(), pattern.sig()
@@ -1239,10 +1288,18 @@ def compile_tof_model(structure: Structure, instrument: Instrument,
     channel_width = (np.gradient(x_all)[mask]
                      if pattern.intensity_basis == "counts" else None)
 
+    # ``None`` is "the caller made no claim", which is not "nothing moves":
+    # ``compile_model``'s own gate (``gate_off_states``), taken over whole.  An
+    # empty set claims nothing moves and licenses both off-state freezes below
+    # (the Gaussian branch and the extinction skip); ``None`` licenses neither,
+    # so a direct call that later frees a zero γ or a zero extinction still
+    # gets a live column.
+    gate_off_states = moving_paths is not None
     moving = set() if moving_paths is None else set(moving_paths)
     prof = src.profile_tof
     p = "instrument.source.profile_tof."
-    gamma_can_move = (prof.gam0.value != 0.0 or prof.gam1.value != 0.0
+    gamma_can_move = (not gate_off_states
+                      or prof.gam0.value != 0.0 or prof.gam1.value != 0.0
                       or prof.gam2.value != 0.0
                       or any(p + g in moving for g in ("gam0", "gam1", "gam2")))
     # T-3c: a phase's Lorentzian sample broadening is a γ this bank carries,
@@ -1408,7 +1465,8 @@ def compile_tof_model(structure: Structure, instrument: Instrument,
         # value that provably cannot change before the next compile.  A phase
         # that declares none (WP-1944's ``None``) has no row to move.
         cp.skip_extinction = (phase.extinction is None
-                              or (phase.extinction.value == 0.0
+                              or (gate_off_states
+                                  and phase.extinction.value == 0.0
                                   and f"phases.{ip}.extinction" not in moving))
         phases.append(cp)
         widths = (i1 - i0).astype(np.int64)
@@ -1424,7 +1482,7 @@ def compile_tof_model(structure: Structure, instrument: Instrument,
     # the returned array is what ``CompiledTOFModel.sigma`` below must use.
     bkg_paths, design, fixed, penalty, sigma = compile_background(
         instrument.background, tof, tof_min, tof_max,
-        gate_off_states=moving_paths is not None, moving_paths=moving,
+        gate_off_states=gate_off_states, moving_paths=moving,
         sigma=sigma)
     _require("instrument.background.air" not in bkg_paths,
              "compile_tof_model(): a P-spline background carries a 1/x air "

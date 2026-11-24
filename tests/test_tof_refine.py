@@ -1108,3 +1108,83 @@ def test_a_stored_negative_variance_coefficient_is_now_refused_at_the_schema():
         ProfileTOF(sig2=-6.09544)
     with pytest.raises(ValueError, match=r"outside bounds \[0.0"):
         ProfileTOF(sig1=rx.Parameter(value=-1.0, min=0.0))
+
+
+# ----------------------------------------------------------------------
+# #1548 review, round 1
+# ----------------------------------------------------------------------
+def _blank_bank() -> PatternData:
+    grid = np.arange(TOF_LO, TOF_HI + 0.5 * TOF_STEP, TOF_STEP)
+    return PatternData(tof=grid.tolist(), intensity=[1.0] * len(grid))
+
+
+def test_no_claim_about_what_moves_freezes_nothing():
+    """Item 2.  ``moving_paths=None`` is "no claim made" and gates nothing,
+    as in ``compile_model``; an empty set claims nothing moves.  So on a bank
+    with γ = 0 and extinction = 0, ``None`` keeps the pseudo-Voigt branch
+    and the Sabine series live (a caller that later frees either gets a live
+    column), and only an explicit set freezes them."""
+    from rietx.model.forward_tof import compile_tof_model
+
+    structure = silicon()
+    structure.phases[0].extinction = P(value=0.0, min=0.0)
+    no_claim = compile_tof_model(structure, bank(), _blank_bank())
+    assert no_claim.profile_kind == "pseudovoigt"
+    assert no_claim.phases[0].skip_extinction is False
+
+    nothing = compile_tof_model(structure, bank(), _blank_bank(),
+                                moving_paths=set())
+    assert nothing.profile_kind == "gaussian"
+    assert nothing.phases[0].skip_extinction is True
+
+    freed = compile_tof_model(
+        structure, bank(), _blank_bank(),
+        moving_paths={"instrument.source.profile_tof.gam1",
+                      "phases.0.extinction"})
+    assert freed.profile_kind == "pseudovoigt"
+    assert freed.phases[0].skip_extinction is False
+
+
+def test_a_declared_peak_equation_or_sharp_extra_peak_is_refused_on_a_bank():
+    """Item 3.  The bank builds no compiled equation and only the hump-kind
+    extra components, so each of these would be dropped while its
+    parameters stayed free columns; each is refused by name instead."""
+    from rietx.model.forward_tof import compile_tof_model
+    from rietx.schemas.instrument import PeakComponent
+
+    eq = rx.PeakEquation(target="lor_fwhm", expression="y*tan(theta)",
+                         coefficients={"y": P(value=0.01)})
+    structure = silicon()
+    structure.phases[0].peak_equations = [eq]
+    with pytest.raises(ValueError, match=r"phases\.0 declares 1 peak equation"):
+        compile_tof_model(structure, bank(), _blank_bank())
+
+    ins = bank()
+    ins.peak_equations = [rx.PeakEquation(
+        target="shift", expression="z", coefficients={"z": P(value=0.0)})]
+    with pytest.raises(ValueError, match="instrument declares 1 peak equation"):
+        compile_tof_model(silicon(), ins, _blank_bank())
+
+    ins = bank()
+    ins.extra_components = [PeakComponent(
+        center=P(value=20000.0, min=19000.0, max=21000.0))]
+    with pytest.raises(ValueError, match=r"extra_components 0 is a sharp "
+                                         r"PeakComponent"):
+        compile_tof_model(silicon(), ins, _blank_bank())
+    # the control: a hump on the same bank still compiles
+    ins.extra_components = [HumpComponent(position=P(value=20000.0))]
+    compile_tof_model(silicon(), ins, _blank_bank())
+
+
+def test_a_gaussian_branch_bank_with_no_gaussian_width_is_finite():
+    """Item 14.  sig0 = sig1 = sig2 = 0 is legal ("no Gaussian
+    broadening"); on the Gaussian branch (γ = 0) the kernel divided by
+    σ² = 0 and ``predict`` returned NaN on every channel inside a window.
+    The pseudo-Voigt branch at the same σ is the control that was always
+    finite."""
+    grid = np.arange(TOF_LO, TOF_HI + 0.5 * TOF_STEP, TOF_STEP)
+    gaussian = rx.Refinement(silicon(), bank(sig1=0.0), history=False)
+    y = np.asarray(gaussian.predict(grid))
+    assert np.all(np.isfinite(y)) and float(np.max(y)) > 0.0
+    pv = rx.Refinement(silicon(), bank(sig1=0.0, gam0=5.0), history=False)
+    assert np.all(np.isfinite(np.asarray(pv.predict(grid))))
