@@ -256,20 +256,20 @@ The last is the producer's plan, and what a rietx fit frees is set by its stages
 
 The magnetic ion is not in the file.
 The magnetic dictionary has no item for it, and MAGNDATA writes a bare `Mn` for a site that is chemically Mn³⁺.
-Without `moment_ions=`, the neutral atom's ⟨j<sub>0</sub>⟩ is used and [`CIF_MAGNETIC_ION_UNCHARGED`](diagnostics-structures.md#cif_magnetic_ion_uncharged) says so.
-The two curves differ, and a moment refined under the wrong one absorbs the difference into its size.
+Without `moment_ions=`, a bare type symbol is read as its element's most common oxidation state in one census of the ICSD {cite}`ding2020`, and [`MAGNETIC_ION_ASSUMED`](diagnostics-structures.md#magnetic_ion_assumed) reports it as a warning naming the pick, its share of the element's reports and the alternatives.
+The pick is often wrong, and a moment refined under the wrong ion absorbs the difference into its size, so state the ion before quoting the moment.
 
-A bare lanthanide or actinide symbol has no neutral-atom row.
-There the reader takes the element's majority oxidation state that is magnetic, and reports [`MAGNETIC_ION_ASSUMED`](diagnostics-structures.md#magnetic_ion_assumed):
-
-| Element | Ion assumed |
+| Element | Ion read |
 |---|---|
-| Ce, Pr, Nd, Sm, Gd, Tb, Dy, Ho, Er, Tm, Yb | the 3+ ion |
-| Eu | Eu²⁺ |
-| U, Np | the 4+ ion |
-| Pu | Pu³⁺ |
+| Cr, Fe, Gd, Tb, Dy, Ho, Er, Tm, Yb, Ce, Pr, Nd, Sm | the 3+ ion |
+| Mn, Co, Ni, Cu | the 2+ ion |
+| Ru, Pu | the 4+ ion |
+| Np | Np⁵⁺ |
 
-A bare symbol of any other lanthanide or actinide is refused.
+Where the common ion carries no moment (Sc³⁺, Ti⁴⁺, V⁵⁺, Y³⁺, Zr⁴⁺, Nb⁵⁺, Mo⁶⁺, Eu³⁺, U⁶⁺, Am³⁺), or the table has no form factor for it (Tc³⁺, Rh³⁺, Pd²⁺), a bare symbol on a moment is refused, naming the ions to state.
+The neutral atom is written with a 0, `"Fe0"`.
+A bare symbol of an element the table carries no row of is refused.
+The X-ray scattering factor of a bare symbol is the neutral atom's, as before.
 
 `moment_g=` states the Landé g a 4f or 5f moment needs.
 Where the ion was assumed, its free-ion Hund's-rule g<sub>J</sub> is assumed too, and [`LANDE_G_ASSUMED`](diagnostics-structures.md#lande_g_assumed) reports it.
@@ -362,7 +362,7 @@ A crystal-axis reading misses the median pair by about 58 %, and a Cartesian one
 With the moment along b alone, where the three readings coincide, all three match.
 So the comparison can tell the readings apart.
 
-A moment-bearing site whose species has no charge (`occ Cr` rather than `Cr+3`) takes the neutral atom's form factor, reported as [`TOPAS_MOMENT_ION_UNCHARGED`](diagnostics-projects.md#topas_moment_ion_uncharged).
+A moment-bearing site whose species has no charge (`occ Cr` rather than `Cr+3`) keeps the bare symbol as its moment's ion, which the fit reads as the element's most common oxidation state and reports as [`MAGNETIC_ION_ASSUMED`](diagnostics-structures.md#magnetic_ion_assumed).
 
 `mg` is the site's Landé g, which enters only the ⟨j<sub>2</sub>⟩ weight of the magnetic form factor.
 TOPAS can refine it (Technical Reference § 9, p. 66), and `Moment.g` is a fixed number.

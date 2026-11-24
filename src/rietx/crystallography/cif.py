@@ -806,10 +806,12 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
     ``moment_ions`` and ``moment_g`` state, per site label, the two quantities
     no magnetic dictionary carries: the ion whose form factor the moment
     scatters with (``{"Mn1": "Mn3+"}``) and the Landé g a 4f moment needs.
-    Where ``moment_ions`` says nothing the site's own type symbol is used and a
-    ``CIF_MAGNETIC_ION_UNCHARGED`` diagnostic reports it, because MAGNDATA
-    writes a bare ``Mn`` for a site that is chemically Mn³⁺ and the two form
-    factors differ.  A key of either that names no ``_atom_site_moment`` row is
+    Where ``moment_ions`` says nothing the site's own type symbol is used.  A
+    bare one (MAGNDATA writes ``Mn`` for a site that is chemically Mn³⁺) is
+    read as its element's most common ICSD oxidation state and reported as
+    ``MAGNETIC_ION_ASSUMED``, a warning naming the alternatives (ruling D67);
+    one whose common ion carries no moment (``Ti``: Ti⁴⁺) is refused, naming
+    the ions to state.  A key of either that names no ``_atom_site_moment`` row is
     refused (:class:`~rietx.crystallography.magcif.MagCifError`), since a
     misspelled label would leave its site on that default in silence.
 
@@ -1100,33 +1102,35 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
                         suggestion=None))
             # The ion is the one quantity a magCIF cannot state (there is no
             # such item in ``cif_mag.dic``), so it falls back on the site's own
-            # type symbol and ``magnetic_diagnostics`` reports that it did. A
-            # bare element symbol this table cannot resolve *neutrally* -- every
-            # lanthanide/actinide it carries only ionic <j0> curves for -- gets
-            # one further fallback: the element's majority oxidation state that
-            # is magnetic (WP-1327 D1; issue-magnetic-form-factor option (b)),
-            # reported as MAGNETIC_ION_ASSUMED rather than
-            # CIF_MAGNETIC_ION_UNCHARGED, since it is a stronger substitution
-            # than the neutral-atom one.
+            # type symbol. A bare one is read as its element's most common
+            # ICSD oxidation state (ruling D67) and ``magnetic_diagnostics``
+            # reports MAGNETIC_ION_ASSUMED; one whose common ion carries no
+            # moment, or has no row, is refused here, naming the ions to state.
             ion = moment.ion or atom.species
             g = moment.g
-            if not moment.ion and not form_factor.has_ion(ion):
-                assumed = form_factor.resolve_assumed_ion(ion)
-                if assumed is not None:
-                    assumed_ions[label] = assumed
-                    ion = assumed[0]
-                    # g is the second quantity magCIF cannot state, and the
-                    # same reasoning applies one step further: an ion this
-                    # module *assumed* (never one a caller stated) that turns
-                    # out to need an explicit g (every lanthanide/actinide
-                    # here does) gets its free-ion Hund's-rule g_J defaulted
-                    # too, rather than refusing on a quantity the file could
-                    # never have carried either way (WP-1327 D-lande-g).
-                    if g is None and form_factor.needs_explicit_g(ion):
-                        default_g = form_factor.assumed_lande_g(ion)
-                        if default_g is not None:
-                            assumed_g[label] = default_g
-                            g = default_g
+            if not moment.ion and form_factor.is_bare(ion):
+                try:
+                    reading = form_factor.read_bare_label(ion)
+                except (KeyError, ValueError) as exc:
+                    raise magcif.MagCifError(
+                        f"{path}: site {label!r} carries a moment and its "
+                        f"type symbol {ion!r} states no charge. {exc.args[0]} "
+                        f"Pass moment_ions={{{label!r}: '<ion>'}} to "
+                        f"Structure.from_cif.") from exc
+                assumed_ions[label] = (reading.ion, reading.text())
+                ion = reading.ion
+                # g is the second quantity magCIF cannot state, and the
+                # same reasoning applies one step further: an ion this
+                # module *assumed* (never one a caller stated) that turns
+                # out to need an explicit g (every lanthanide/actinide
+                # here does) gets its free-ion Hund's-rule g_J defaulted
+                # too, rather than refusing on a quantity the file could
+                # never have carried either way (WP-1327 D-lande-g).
+                if g is None and form_factor.needs_explicit_g(ion):
+                    default_g = form_factor.assumed_lande_g(ion)
+                    if default_g is not None:
+                        assumed_g[label] = default_g
+                        g = default_g
             atoms[j] = atom.model_copy(update={
                 "moment": moment.model_copy(update={"ion": ion, "g": g})})
         if diagnostics is not None and magnetic_symmetry is not None:

@@ -152,7 +152,8 @@ The components are written back from those at the end of each stage and carry no
 `Moment.ion` is not `Atom.species`.
 The neutron scattering length is keyed by nuclide and the form factor by oxidation state.
 An ion the table does not carry is refused by name rather than mapped to a neighbour.
-State the charge: a bare d-block symbol is the neutral atom, in the configuration `approximation_name` names (`"Ru"` is neutral Ru 4d<sup>7</sup>5s, not Ru<sup>+</sup>; `"Pd"` is neutral Pd 4d<sup>9</sup>5s <sup>3</sup>D), a bare lanthanide or actinide symbol in a magCIF or a `solve_magnetic` site is read as its usual magnetic ion and reported as [`MAGNETIC_ION_ASSUMED`](diagnostics-structures.md#magnetic_ion_assumed) (as `Moment.ion` it is refused), and a site that is an ion is written as one, `"Fe3+"`.
+State the charge: a site that is an ion is written as one, `"Fe3+"`, and the neutral atom with a 0, in the configuration `approximation_name` names (`"Ru0"` is neutral Ru 4d<sup>7</sup>5s, not Ru<sup>+</sup>; `"Pd0"` is neutral Pd 4d<sup>9</sup>5s <sup>3</sup>D).
+A bare symbol (`"Fe"`) is read as its element's most common oxidation state in one ICSD census {cite}`ding2020`, in a magCIF, a `solve_magnetic` site and `Moment.ion` alike, and reported as the warning [`MAGNETIC_ION_ASSUMED`](diagnostics-structures.md#magnetic_ion_assumed) naming the alternatives; where that ion carries no moment (Ti⁴⁺, Nb⁵⁺, Eu³⁺, U⁶⁺) a bare symbol on a moment is refused.
 The table serves every row on s = sinθ/λ ≤ 6 Å<sup>−1</sup> and refuses a reflection past it at the stage compile (the rows, their footing and the free-ion caveat are in {eq}`int-ff-tail`'s section of the theory page).
 Leave `Moment.g` as `None` for a 3d or 4d ion, where the spin-only g = 2 makes the ⟨j<sub>2</sub>⟩ term of the dipole approximation vanish.
 Set it for a 4f or 5f ion, where that term does not vanish: an absent g there is refused, because a default would drop a term worth tens of per cent at high angle.
@@ -338,7 +339,7 @@ solution.write_magcifs("candidates/")
 |---|---|---|
 | `phase` | 0 | the phase to solve |
 | `sites`, `species` | every site whose species is a magnetic form-factor key | the sites that carry a moment, by label or by species |
-| `ion`, `g` | the site's species where the form-factor table carries it, else its usual magnetic ion; g = 2 for a 3d or 4d ion and the free-ion g for an assumed 4f or 5f ion | the form-factor key and Landé g, one value or a mapping from label or species; an ion or g it had to assume is reported as [`MAGNETIC_ION_ASSUMED`](diagnostics-structures.md#magnetic_ion_assumed) or [`LANDE_G_ASSUMED`](diagnostics-structures.md#lande_g_assumed) |
+| `ion`, `g` | the site's species where the form-factor table carries it, else, for a bare symbol, its most common ICSD ion (none for a d⁰ one, which is not a magnetic site); g = 2 for a 3d or 4d ion and the free-ion g for an assumed 4f or 5f ion | the form-factor key and Landé g, one value or a mapping from label or species; an ion or g it had to assume is reported as [`MAGNETIC_ION_ASSUMED`](diagnostics-structures.md#magnetic_ion_assumed) or [`LANDE_G_ASSUMED`](diagnostics-structures.md#lande_g_assumed) |
 | `k` | chosen from the satellite evidence | the propagation vector, when a single crystal has given it |
 | `top_k`, `k_trials`, `k_tie_width` | 3, 2, 10.0 | how many ranked k to carry, how many to refine in full, and the ΔBIC gap below which two k are not separated |
 | `d_min` | 1.5 Å | the d limit the equivalence classes are a statement about |

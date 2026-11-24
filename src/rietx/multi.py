@@ -94,10 +94,12 @@ from .refine import (
     _absorption_record,
     _air_scatter_undeclared_diagnostics,
     _axis_in_crystal_axes,
+    _bare_magnetic_ion_diagnostics,
     _capillary_offset_diagnostics,
     _carry_lebail,
     _cell_runaway_diagnostic,
     _cell_runaway_withheld,
+    _charge_not_stated_diagnostics,
     _column_separation,
     _constraint_diagnostics,
     _covariance_diagnostics,
@@ -256,6 +258,9 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
                       "neutron histogram resolves species through another table"),
     "_harmonic_diagnostics": (
         (HISTOGRAM,), "a λ/n line is declared on one histogram's source"),
+    "_charge_not_stated_diagnostics": (
+        (HISTOGRAM,), "the neutral-atom X-ray scattering factor is asked of an "
+                      "X-ray histogram only"),
     "_form_factor_range_diagnostics": (
         (HISTOGRAM,), "the s a magnetic form factor is evaluated at is one "
                       "histogram's reflection list, set by its λ and range"),
@@ -312,6 +317,9 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
                           "hump width per histogram, correlations, bounds and "
                           "ADPs for the joint solve"),
     # -- once: the shared structure ------------------------------------------
+    "_bare_magnetic_ion_diagnostics": (
+        (SPECIMEN,), "a moment's ion is the one structure's, whatever "
+                     "radiation looks at it, so its reading is told once"),
     "_symmetry_silence_diagnostics": (
         (SPECIMEN,), "a snapped site or an assumed setting is a fact about the "
                      "one structure, asked of it as declared, before any stage"),
@@ -1991,6 +1999,7 @@ class MultiHistogramRefinement:
         opening_diags = (
             self._drain_twin_findings()
             + _symmetry_silence_diagnostics(self.mtable.structures[0], mode)
+            + _bare_magnetic_ion_diagnostics(self.mtable.structures[0])
             + _joint_fixed_literals(plan.stages, self.mtable))
         self.mtable.set_vary(["*"], False)
         # each histogram's orbit split, decided once from the coordinates the
@@ -2706,6 +2715,7 @@ class MultiHistogramRefinement:
             diags.extend(_dispersion_diagnostics(struct, instrument))
             diags.extend(_resonant_absorber_diagnostics(struct, instrument))
             diags.extend(_species_fallback_diagnostics(struct, instrument))
+            diags.extend(_charge_not_stated_diagnostics(struct, instrument))
             diags.extend(_form_factor_range_diagnostics(model))
             diags.extend(_harmonic_diagnostics(
                 model, values, set(table.free_paths), esd_h))

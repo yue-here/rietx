@@ -68,7 +68,7 @@ def _r2_from_table(ion: str) -> float:
 def test_every_brown_ion_has_both_orders_and_no_ion_is_served_twice():
     assert set(ff._J0) == set(ff._J2)
     assert not set(ff._J0) & set(ff._TABLE_KEY)
-    assert set(ff.magnetic_ions()) == set(_ALL_J0) | set(ff._TABLE_KEY)
+    assert set(ff.magnetic_ions()) == {ff._public(k) for k in set(_ALL_J0) | set(ff._TABLE_KEY)}
 
 
 # ============================================================= A. normalisation
@@ -278,7 +278,7 @@ def test_ni3_rows_are_browns_as_printed():
 
 def test_v_j2_is_the_printed_row():
     """V ⟨j₂⟩, Table 4.4.5.5 p. 456. CrysFML carries a refit within 5 × 10⁻⁴ of it in f; the print is what is cited."""
-    assert ff.coefficients("V")[1] == (3.7600, 21.831, 2.4026, 7.546, 0.4464, 2.663, 0.0017)
+    assert ff.coefficients("V0")[1] == (3.7600, 21.831, 2.4026, 7.546, 0.4464, 2.663, 0.0017)
 
 
 def _printed_form(c, s, *, s2_factor: bool):
@@ -296,15 +296,16 @@ def test_the_evaluator_and_the_forward_model_agree_with_the_printed_form_on_ever
     from types import SimpleNamespace
 
     for ion in ff.magnetic_ions():
-        if ion not in _ALL_J0:
+        key = ff._key(ion)
+        if key not in _ALL_J0:
             s = np.linspace(0.0, 6.0, 25)
             for g in (2.0, 0.8):
                 msites = SimpleNamespace(ions=[ion], g_factors=[g])
                 np.testing.assert_array_equal(_form_factor(msites, 0, s), ff.magnetic_form_factor(ion, s, g=g))
             continue
         s = np.linspace(0.0, ff.fitted_range(ion), 10)
-        f0 = _printed_form(_ALL_J0[ion], s, s2_factor=False)
-        f2 = _printed_form(_ALL_J2[ion], s, s2_factor=True)
+        f0 = _printed_form(_ALL_J0[key], s, s2_factor=False)
+        f2 = _printed_form(_ALL_J2[key], s, s2_factor=True)
         np.testing.assert_allclose(np.asarray(ff.j0(ion, s)), f0, rtol=0, atol=1e-14)
         np.testing.assert_allclose(np.asarray(ff.j2(ion, s)), f2, rtol=0, atol=1e-14)
         for g in (2.0, 0.8):

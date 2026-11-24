@@ -35,8 +35,8 @@ from pydantic import ValidationError
 from rietx.crystallography.magnetic.form_factor import (
     J0_ONLY,
     approximation_name,
-    assumed_ion_for_element,
     assumed_lande_g,
+    carries_moment,
     coefficients,
     has_ion,
     has_j2,
@@ -46,7 +46,7 @@ from rietx.crystallography.magnetic.form_factor import (
     magnetic_form_factor,
     magnetic_ions,
     needs_explicit_g,
-    resolve_assumed_ion,
+    read_bare_label,
     resolve_g,
 )
 from rietx.crystallography.magnetic.operators import (
@@ -313,7 +313,7 @@ def test_an_absent_ion_is_refused_by_name_never_mapped_to_a_neighbour():
     element the table does carry, which is the reply someone who typed
     ``Fe7+`` or ``Mn3`` needs.
     """
-    with pytest.raises(KeyError, match=r"Fe, Fe1\+, Fe2\+, Fe3\+, Fe4\+"):
+    with pytest.raises(KeyError, match=r"Fe0, Fe1\+, Fe2\+, Fe3\+, Fe4\+"):
         coefficients("Fe7+")
     with pytest.raises(KeyError, match="no Xx at all"):
         coefficients("Xx3+")
@@ -324,60 +324,78 @@ def test_an_absent_ion_is_refused_by_name_never_mapped_to_a_neighbour():
     assert abs(float(j0("Fe2+", 0.3)) - float(j0("Fe3+", 0.3))) > 0.02
 
 
-def test_a_bare_lanthanide_or_actinide_defaults_to_its_majority_magnetic_ion():
-    """WP-1327 D1 / issue-magnetic-form-factor option (b): a bare element
-    symbol this table cannot resolve *neutrally* (every lanthanide and
-    actinide it carries — only ionic ⟨jₙ⟩ curves exist for them) falls back
-    one step further, to the majority oxidation state that is *magnetic*.
+def test_a_bare_label_reads_as_its_most_common_icsd_ion():
+    """Ruling D67 (2026-11-24): a bare element label states no charge, so it is
+    read as the element's most common oxidation state in one ICSD census (Ding,
+    Kumagai, Oba & Burton 2020, SI Table 1), never the neutral atom, which is
+    stated ``"Mn0"``.  The pick, its share and the moment-carrying alternatives
+    travel with it.
 
-    This is the table-level unit test; :mod:`tests.test_magcif`'s
-    ``test_a_bare_lanthanide_with_no_neutral_row_defaults_to_its_majority_ion``
-    is the same fallback exercised through a magCIF read and its diagnostic.
+    This is the table-level unit test; :mod:`tests.test_magcif` and
+    :mod:`tests.test_magnetic_bare_label` exercise it through a read and a fit.
     """
-    assert has_ion("Mn") and not has_ion("Dy") and has_ion("Ce3+")
+    assert has_ion("Mn0") and not has_ion("Mn") and not has_ion("Dy") and has_ion("Ce3+")
+    picks = {"Cr": "Cr3+", "Mn": "Mn2+", "Fe": "Fe3+", "Co": "Co2+", "Ni": "Ni2+",
+             "Cu": "Cu2+", "Ru": "Ru4+", "Ce": "Ce3+", "Pr": "Pr3+", "Nd": "Nd3+",
+             "Sm": "Sm3+", "Gd": "Gd3+", "Tb": "Tb3+", "Dy": "Dy3+", "Ho": "Ho3+",
+             "Er": "Er3+", "Tm": "Tm3+", "Yb": "Yb3+", "Np": "Np5+", "Pu": "Pu4+"}
+    for element, ion in picks.items():
+        reading = read_bare_label(element)
+        assert reading.ion == ion and has_ion(ion), element
+        assert ion not in dict(reading.alternatives)
+    fe = read_bare_label("Fe")
+    assert fe.share == pytest.approx(14439 / 25374)
+    assert fe.alternatives[0] == ("Fe2+", pytest.approx(10580 / 25374))
+    assert "ICSD census, Ding et al. 2020" in fe.text()
+    # the reading is the one every evaluator uses
+    assert float(j0("Fe", 0.3)) == float(j0("Fe3+", 0.3)) != float(j0("Fe0", 0.3))
 
-    # the plain Ln3+ rule
-    for element, ion in (("Ce", "Ce3+"), ("Pr", "Pr3+"), ("Nd", "Nd3+"), ("Sm", "Sm3+"),
-                         ("Gd", "Gd3+"), ("Tb", "Tb3+"), ("Dy", "Dy3+"),
-                         ("Ho", "Ho3+"), ("Er", "Er3+"), ("Tm", "Tm3+")):
-        got_ion, reason = resolve_assumed_ion(element)
-        assert got_ion == ion
-        assert has_ion(got_ion)
-
-    # the two elements whose *magnetic* majority ion is not the plain 3+ one
-    assert resolve_assumed_ion("Eu") == (
-        "Eu2+", "Eu3+ is 4f6 (J=0, non-magnetic); Eu2+ (4f7, S=7/2) is the "
-                "state reported for magnetically ordered Eu compounds "
-                "(EuO, EuS, EuTe and similar)")
-    assert resolve_assumed_ion("Yb")[0] == "Yb3+"
-
-    # the actinides this table's own <j0> rows carry a majority ion for
-    assert resolve_assumed_ion("U")[0] == "U4+"
-    assert resolve_assumed_ion("Np")[0] == "Np4+"
-    assert resolve_assumed_ion("Pu")[0] == "Pu3+"
-
-    # an element already resolving neutrally is untouched: no default is
-    # declared for the 3d/4d block this table carries a neutral row for
-    assert resolve_assumed_ion("Mn") is None
-    assert resolve_assumed_ion("Cr") is None
-
-    # an element with no table entry at all (neutral or ionic) has no
-    # sensible default either, and stays exactly as unresolved as before
-    assert resolve_assumed_ion("Re") is None
-    assert resolve_assumed_ion("Ga") is None
+    # an element the census or the table does not cover keeps its refusal
+    for element in ("Re", "Ga", "La"):
+        with pytest.raises(KeyError, match="no magnetic form factor"):
+            read_bare_label(element)
 
 
-def test_ce_declares_ce3_and_it_now_resolves():
-    """Ce is declared as Ce3+ (Ce4+ is 4f0, non-magnetic) for the same reason
-    every other lanthanide is. Until #626 the default did not resolve,
-    because Brown's Ce³⁺ row was keyed by its misprinted label "Ce2+"; it now
-    resolves, and never to Ce2+."""
-    declared_ion, reason = assumed_ion_for_element("Ce")
-    assert declared_ion == "Ce3+"
-    assert has_ion(declared_ion)
-    assert resolve_assumed_ion("Ce") == (declared_ion, reason)
+@pytest.mark.parametrize("element, ion, why", [
+    ("Sc", "Sc3+", "3d0"), ("Ti", "Ti4+", "3d0"), ("V", "V5+", "3d0"),
+    ("Y", "Y3+", "4d0"), ("Zr", "Zr4+", "4d0"), ("Nb", "Nb5+", "4d0"),
+    ("Mo", "Mo6+", "4d0"), ("Eu", "Eu3+", "4f6"), ("U", "U6+", "5f0"),
+    ("Am", "Am3+", "5f6"),
+    ("Tc", "Tc3+", "no magnetic form factor"), ("Rh", "Rh3+", "no magnetic form factor"),
+    ("Pd", "Pd2+", "no magnetic form factor"),
+])
+def test_a_bare_label_whose_common_ion_has_no_moment_or_row_is_refused(element, ion, why):
+    """D67 4(b): where the census ion carries no moment (d0, f0, the J = 0 f6),
+    or the table has no row for it, a bare label on a moment is refused,
+    listing the moment-carrying ions to state and the neutral curve where the
+    table has one.  The computed neutral curves stay available stated."""
+    with pytest.raises(ValueError) as err:
+        read_bare_label(element)
+    text = str(err.value)
+    assert ion in text and why in text, text
+    assert "Ding, Kumagai, Oba & Burton (2020)" in text
+    if has_ion(f"{element}0"):
+        assert f"'{element}0'" in text
+        assert float(j0(f"{element}0", 0.0)) == pytest.approx(1.0, abs=2e-2)
+    with pytest.raises(ValueError, match=ion.replace("+", r"\+")):
+        j0(element, 0.1)
+
+
+def test_carries_moment_follows_the_open_shell():
+    for ion in ("Fe3+", "Cu2+", "Ni2+", "Dy3+", "Gd3+", "Eu2+", "U4+", "Np5+", "Pu4+"):
+        assert carries_moment(ion), ion
+    for ion in ("Sc3+", "Ti4+", "Nb5+", "Mo6+", "Cu1+", "Eu3+", "Sm2+", "Yb2+", "U6+", "Am3+"):
+        assert not carries_moment(ion), ion
+
+
+def test_ce_reads_as_ce3_and_never_ce2():
+    """Ce is read as Ce3+ (75 % of Ce reports; Ce4+ 23 % is 4f0).  Until #626
+    Brown's Ce³⁺ row was keyed by its misprinted label "Ce2+"; it now resolves,
+    and never to Ce2+."""
+    reading = read_bare_label("Ce")
+    assert reading.ion == "Ce3+" and has_ion("Ce3+")
+    assert "Ce2+" not in dict(reading.alternatives)
     assert assumed_lande_g("Ce3+") == pytest.approx(6 / 7)
-
 
 def test_assumed_lande_g_matches_the_free_ion_hunds_rule_value():
     """WP-1327 D-lande-g: derive each (S, L, J) independently here — never
@@ -413,6 +431,8 @@ def test_assumed_lande_g_matches_the_free_ion_hunds_rule_value():
         ("U4+", 1, 5, 4, Fr(4, 5)),                      # 5f2,  3H4
         ("Np4+", Fr(3, 2), 6, Fr(9, 2), Fr(8, 11)),      # 5f3,  4I9/2
         ("Pu3+", Fr(5, 2), 5, Fr(5, 2), Fr(2, 7)),       # 5f5,  6H5/2
+        ("Np5+", 1, 5, 4, Fr(4, 5)),                     # 5f2,  3H4
+        ("Pu4+", 2, 6, 4, Fr(3, 5)),                     # 5f4,  5I4
     ]
     for ion, S, L, J, g_fraction in cases:
         g_expected = float(g_fraction)
@@ -431,8 +451,8 @@ def test_assumed_lande_g_matches_the_free_ion_hunds_rule_value():
 def test_lande_g_raises_on_a_nonmagnetic_j_equals_zero_ground_state():
     """Sm2+ and Eu3+ (both 4f6) are J = 0 — no orbital-plus-spin moment, so
     g_J is undefined rather than some fallback number. This is also *why*
-    neither is ever the assumed ion for Sm/Eu (`_ASSUMED_ION` picks Sm3+ and
-    Eu2+, the states with an unpaired-electron ground term), so
+    a bare Sm label reads as Sm3+ and a bare Eu label (census Eu3+) is
+    refused (D67), so
     :func:`assumed_lande_g` never needs to raise this in practice — it is
     checked directly here rather than through a caller."""
     with pytest.raises(ValueError, match="J = 0"):
@@ -441,23 +461,23 @@ def test_lande_g_raises_on_a_nonmagnetic_j_equals_zero_ground_state():
     assert assumed_lande_g("Eu3+") is None
 
 
-def test_assumed_lande_g_is_declared_only_for_ions_the_ion_default_can_produce():
-    """The g table's keys are exactly the ions :func:`resolve_assumed_ion`
-    can hand back — never wider, since a g declared for an ion nothing ever
-    assumes would be dead code no caller exercises. And every one of them
-    genuinely needs an explicit g, or this default would never fire at all."""
-    produced = {resolve_assumed_ion(e)[0] for e in
-               ("Ce", "Pr", "Nd", "Sm", "Gd", "Tb", "Dy", "Ho", "Er", "Tm",
-                "Eu", "Yb", "U", "Np", "Pu")}
+def test_assumed_lande_g_is_declared_for_every_f_ion_a_bare_label_can_read_as():
+    """Every 4f/5f ion :func:`read_bare_label` can hand back has its g
+    declared, and genuinely needs one, or the default would never fire."""
+    produced = set()
+    for e in ("Ce", "Pr", "Nd", "Sm", "Gd", "Tb", "Dy", "Ho", "Er", "Tm",
+              "Eu", "Yb", "U", "Np", "Pu", "Am"):
+        try:
+            produced.add(read_bare_label(e).ion)
+        except ValueError:
+            pass
     assert produced == {"Ce3+", "Pr3+", "Nd3+", "Sm3+", "Gd3+", "Tb3+", "Dy3+",
-                        "Ho3+", "Er3+", "Tm3+", "Eu2+", "Yb3+",
-                        "U4+", "Np4+", "Pu3+"}
+                        "Ho3+", "Er3+", "Tm3+", "Yb3+", "Np5+", "Pu4+"}
     for ion in produced:
         assert assumed_lande_g(ion) is not None
         assert needs_explicit_g(ion)
     assert assumed_lande_g("Mn3+") is None           # not a 4f/5f default at all
     assert assumed_lande_g("Sc2+") is None           # a 3d/4d ion never needs one
-
 
 def test_g_defaults_to_two_for_3d_and_is_refused_absent_for_4f():
     """Issue #257 A5: a silent g = 2 on a rare earth drops the ⟨j₂⟩ term.

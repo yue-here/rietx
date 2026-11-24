@@ -769,7 +769,7 @@ def test_a_widened_tie_of_equally_free_classes_is_an_abstention(a_type, a_type_s
 # candidate class regardless of what structure_from_cif's own g/ion defaults
 # would have done for it (WP-1327; found on a MAGNDATA sweep, where most
 # 4f/5f entries abstained this way).  These tests are the positive arm (both
-# the direct ion-in-species shape the sweep measured, and the bare-element resolve_assumed_ion fallback
+# the direct ion-in-species shape the sweep measured, and the bare-element read_bare_label fallback
 # the CIF reader already had) and the negative controls: a caller-stated ion
 # still needs an explicit g (issue #257 A5, carried over unchanged), a
 # caller-stated g always wins, and a 3d ion's behaviour never moves.
@@ -813,7 +813,7 @@ DY_G = assumed_lande_g("Dy3+")  # Hund's rule, 4f9 6H15/2: g_J = 4/3
 def dy_charged_type():
     """A 4f site whose nuclear species already states its charge (``"Dy3+"``)
     — the shape most of the sweep's g-abstentions took: the
-    ion needs no ``resolve_assumed_ion`` fallback at all, only a Landé g."""
+    ion needs no ``read_bare_label`` fallback at all, only a Landé g."""
     instrument = neutron()
     truth = candidate_named("P n m a", MN_SITE, (0, 0, 0), A_TYPE_BNS)
     data = simulate(
@@ -824,7 +824,7 @@ def dy_charged_type():
 @pytest.fixture(scope="module")
 def dy_bare_element():
     """A 4f site whose nuclear species is the bare element (``"Dy"``, no
-    neutral-atom ⟨j0⟩ row at all) — needs both the ``resolve_assumed_ion``
+    neutral-atom ⟨j0⟩ row at all) — needs both the ``read_bare_label``
     fallback and the Landé g default."""
     instrument = neutron()
     truth = candidate_named("P n m a", MN_SITE, (0, 0, 0), A_TYPE_BNS)
@@ -864,7 +864,7 @@ def test_a_charged_rare_earth_species_defaults_g_and_recovers_the_moment(
 def test_a_bare_rare_earth_element_resolves_through_the_cif_readers_own_fallback(
         dy_bare_element):
     """The sweep's second shape: a bare 4f element with no neutral-atom row
-    at all resolves through the same ``resolve_assumed_ion`` the CIF reader
+    at all resolves through the same ``read_bare_label`` the CIF reader
     already applies at read, and its Landé g defaults alongside it."""
     ref, data, truth = dy_bare_element
     solution = rx.solve_magnetic(ref, data)
@@ -885,7 +885,7 @@ def test_a_bare_rare_earth_element_resolves_through_the_cif_readers_own_fallback
 def test_a_caller_stated_ion_still_needs_an_explicit_g_issue_257_a5(dy_charged_type):
     """A caller who names the ion explicitly gets the pre-existing refusal,
     unchanged: the g default is only for an ion this call inferred itself
-    (from the table or from ``resolve_assumed_ion``), never for one the
+    (from the table or from ``read_bare_label``), never for one the
     caller stated — mirroring issue #257 A5's rule for
     ``structure_from_cif``'s ``moment_ions=``.  Every candidate class fails
     to build (the g requirement is a validation error, not a raise from this

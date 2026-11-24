@@ -104,21 +104,34 @@ against 0.574.  Both ions are served from the computed Dirac-Fock tables
 below, on their neighbours' footing; the Pu³⁺ table reproduces Desclaux &
 Freeman's printed Pu³⁺ block to within 5.3 × 10⁻⁵ in all 84 cells.
 
-**A bare element symbol is the neutral atom**, and its row says which
-configuration it is.  Brown's bare ``Mo``, ``Tc``, ``Ru``, ``Rh`` and ``Pd``
-rows are fits to singly charged M⁺ curves (each matches an M⁺ 4dⁿ⁻³5s²
-configuration to his printed fit error and the neutral ground configuration
-to nothing), so all five are served from computed neutral-atom tables
-(Hartree-Fock for the Hund's-rule term, Brown's own footing): ``Mo``, ``Tc``,
-``Ru`` and ``Rh`` in the ground configuration, ``Pd`` in the excited 4d⁹5s
-³D, since the 4d¹⁰ ¹S ground state has no open shell to carry a moment (its
-⟨jₙ⟩ curves exist all the same; ⟨j₀⟩ at s = 0.2 Å⁻¹ is 0.4646 against
-0.4965).  The other bare rows are kept, and
-:func:`approximation_name` names what each is: ``Sc`` and ``Nb`` are neutral
-atoms in an excited configuration, ``Ti`` the ground configuration in the
-non-Hund term ¹G (a state Clementi & Roetti 1974 list), ``V``, ``Mn``,
-``Fe``, ``Co``, ``Cu`` and ``Y`` configuration averages, and ``Cr`` and
-``Ni`` match no configuration tried (footing not identified).
+**A bare element label is read as its element's most common oxidation
+state** (ruling D67 of the magnetic-path owner, 2026-11-24, reversing D63's
+"a bare label is the neutral atom"): most magnetic sites are ions, so ``"Fe"``
+is read as Fe³⁺, the commonest Fe charge in one census of the ICSD (Ding,
+Kumagai, Oba & Burton 2020, SI Table 1; :data:`_ICSD_REPORTS`,
+:func:`read_bare_label`).  The pick is often wrong, so whoever reads a bare
+label for a moment reports ``MAGNETIC_ION_ASSUMED`` as a warning naming it
+and the alternatives, and :func:`approximation_name` says it on every result.
+Where the common ion carries no moment (Sc³⁺, Ti⁴⁺, V⁵⁺, Y³⁺, Zr⁴⁺, Nb⁵⁺,
+Mo⁶⁺, Eu³⁺, U⁶⁺, Am³⁺) or has no row (Tc³⁺, Rh³⁺, Pd²⁺), a bare label with a
+moment is refused, listing the ions to state.  The X-ray scattering factor
+of a bare label is not touched: it stays the neutral atom.
+
+**The neutral atom is stated with a 0**: ``"Fe0"``.  Brown's bare ``Mo``,
+``Tc``, ``Ru``, ``Rh`` and ``Pd`` rows are fits to singly charged M⁺ curves
+(each matches an M⁺ 4dⁿ⁻³5s² configuration to his printed fit error and the
+neutral ground configuration to nothing), so ``Mo0`` to ``Pd0`` are served
+from computed neutral-atom tables (Hartree-Fock for the Hund's-rule term,
+Brown's own footing): ``Mo0``, ``Tc0``, ``Ru0`` and ``Rh0`` in the ground
+configuration, ``Pd0`` in the excited 4d⁹5s ³D, since the 4d¹⁰ ¹S ground
+state has no open shell to carry a moment (its ⟨jₙ⟩ curves exist all the
+same; ⟨j₀⟩ at s = 0.2 Å⁻¹ is 0.4646 against 0.4965).  Brown's other neutral
+rows are kept, and :func:`approximation_name` names what each is: ``Sc0``
+and ``Nb0`` are neutral atoms in an excited configuration, ``Ti0`` the
+ground configuration in the non-Hund term ¹G (a state Clementi & Roetti 1974
+list), ``V0``, ``Mn0``, ``Fe0``, ``Co0``, ``Cu0`` and ``Y0`` configuration
+averages, and ``Cr0`` and ``Ni0`` match no configuration tried (footing not
+identified).
 
 Computed curves
 ---------------
@@ -193,6 +206,10 @@ References
   4f/5f curves.
 * Kobayashi, K., Nagao, T. & Ito, M. (2011). *Acta Cryst.* A **67**, 473-480
   — HFR, the method of the high-charge 4d tables.
+* Ding, Y., Kumagai, Y., Oba, F. & Burton, L. A. (2020). *J. Phys. Chem.
+  Lett.* **11**, 8264-8267, https://doi.org/10.1021/acs.jpclett.0c02072 —
+  the ICSD census of oxidation states (SI Table 1) a bare label is read
+  through.
 * Halpern, O. & Johnson, M. H. (1939). *Phys. Rev.* **55**, 898 — magnetic
   neutron scattering by an atom with a magnetization density.
 * Rodríguez-Carvajal, J. (1993). *Physica B* **192**, 55 — FullProf; the
@@ -222,7 +239,7 @@ Coefficients = tuple[float, float, float, float, float, float, float]
 #: and La (Z 57) is excluded because nothing here carries a La row anyway.
 _G_REQUIRED_Z = frozenset(range(58, 72)) | frozenset(range(90, 97))
 
-_ION = re.compile(r"^([A-Z][a-z]?)(?:(\d+)([+-]))?$")
+_ION = re.compile(r"^([A-Z][a-z]?)(?:(\d+)([+-])|(0))?$")
 
 #: ⟨j₀⟩ coefficients, keyed by ion (``"Cr"``, ``"Cr3+"``).  89 rows: the 3d
 #: and 4d transition series, the 4f rare earths and the 5f actinides Brown's
@@ -427,105 +444,238 @@ _RETIRED: dict[str, str] = {
 
 
 def _element(ion: str) -> tuple[str, int]:
-    """``("Cr3+")`` → ``("Cr", 3)``; raises on anything this table cannot key."""
+    """``("Cr3+")`` → ``("Cr", 3)``, ``("Cr0")`` and bare ``("Cr")`` →
+    ``("Cr", 0)``; raises on anything this table cannot key."""
     m = _ION.match(ion.strip())
     if m is None:
         raise ValueError(
             f"{ion!r} is not a magnetic-ion spelling. Write the element symbol "
             f"with its charge — 'Cr3+', 'Fe2+', 'Ho3+' — or the neutral atom "
-            f"'Cr'. Available: {', '.join(magnetic_ions())}")
-    sym, n, sign = m.groups()
-    charge = 0 if n is None else int(n) * (1 if sign == "+" else -1)
+            f"with a 0 — 'Cr0'. Available: {', '.join(magnetic_ions())}")
+    sym, n, sign = m.group(1), m.group(2), m.group(3)
+    charge = 0 if n is None or sign is None else int(n) * (1 if sign == "+" else -1)
     return sym, charge
 
 
+def is_bare(label: str) -> bool:
+    """Whether ``label`` is a bare element symbol (``"Fe"``): no charge and no
+    explicit ``0``.  A bare label is read as its element's most common
+    oxidation state (:func:`read_bare_label`)."""
+    m = _ION.match(label.strip())
+    return m is not None and m.group(2) is None and m.group(4) is None
+
+
+def _public(key: str) -> str:
+    """The spelling a caller writes for an internal key: a neutral row (keyed
+    by the bare symbol inside this module) is written ``"Fe0"``."""
+    return key + "0" if is_bare(key) else key
+
+
 def magnetic_ions() -> tuple[str, ...]:
-    """Every ion the table serves, Brown's rows and the computed tables, sorted."""
-    return tuple(sorted(set(_J0) | set(_TABLE_KEY)))
+    """Every ion the table serves, Brown's rows and the computed tables,
+    sorted, as a caller spells it (a neutral atom as ``"Fe0"``)."""
+    return tuple(sorted({_public(k) for k in set(_J0) | set(_TABLE_KEY)}))
+
+
+#: Reports per positive oxidation state in the ICSD, for every element this
+#: table carries a row of: Ding, Kumagai, Oba & Burton (2020), Supporting
+#: Information Table 1 ("number of matches returned from ICSD repository",
+#: 169 800 entries scanned, charges −4 to +8; read from the arXiv:2007.02085
+#: v1 SI).  The one census a bare element label is read through
+#: (:func:`read_bare_label`; ruling D67 of the magnetic-path owner,
+#: 2026-11-24).  Zero counts are omitted.
+_ICSD_REPORTS: dict[str, dict[int, int]] = {
+    "Sc": {1: 36, 2: 38, 3: 1795},
+    "Ti": {1: 5, 2: 220, 3: 789, 4: 12191},
+    "V": {1: 16, 2: 194, 3: 1509, 4: 2613, 5: 5405, 6: 1},
+    "Cr": {1: 11, 2: 597, 3: 4364, 4: 213, 5: 174, 6: 965},
+    "Mn": {1: 95, 2: 9504, 3: 3188, 4: 1399, 5: 53, 6: 15, 7: 89},
+    "Fe": {1: 119, 2: 10580, 3: 14439, 4: 222, 5: 6, 6: 8},
+    "Co": {1: 93, 2: 5655, 3: 2215, 4: 102},
+    "Ni": {1: 102, 2: 5319, 3: 652, 4: 84},
+    "Cu": {1: 6773, 2: 8924, 3: 375, 4: 2},
+    "Y": {1: 14, 2: 51, 3: 5468, 4: 16},
+    "Zr": {1: 28, 2: 97, 3: 110, 4: 4398},
+    "Nb": {1: 18, 2: 92, 3: 315, 4: 576, 5: 6940, 6: 3},
+    "Mo": {1: 18, 2: 409, 3: 455, 4: 549, 5: 1947, 6: 11523, 7: 6},
+    "Tc": {1: 13, 2: 15, 3: 80, 4: 56, 5: 7, 6: 1, 7: 73},
+    "Ru": {1: 14, 2: 310, 3: 258, 4: 774, 5: 533, 6: 93, 7: 1, 8: 6},
+    "Rh": {1: 27, 2: 81, 3: 549, 4: 104, 5: 12},
+    "Pd": {1: 88, 2: 1452, 3: 31, 4: 95},
+    "Ce": {2: 87, 3: 3313, 4: 1043},
+    "Pr": {2: 51, 3: 3213, 4: 114},
+    "Nd": {2: 97, 3: 4899, 4: 11, 5: 1},
+    "Sm": {1: 1, 2: 165, 3: 2464, 4: 5},
+    "Eu": {1: 2, 2: 1230, 3: 1712, 4: 7},
+    "Gd": {1: 3, 2: 49, 3: 2866, 4: 6},
+    "Tb": {1: 11, 2: 34, 3: 1309, 4: 104},
+    "Dy": {2: 59, 3: 1712, 4: 3},
+    "Ho": {2: 18, 3: 1702, 4: 2},
+    "Er": {2: 28, 3: 1971, 4: 3},
+    "Tm": {2: 37, 3: 943, 4: 2},
+    "Yb": {2: 281, 3: 1734, 4: 4},
+    "U": {1: 1, 2: 66, 3: 325, 4: 1002, 5: 160, 6: 4382},
+    "Np": {2: 6, 3: 40, 4: 114, 5: 176, 6: 59, 7: 21},
+    "Pu": {2: 13, 3: 89, 4: 92, 5: 3, 6: 30, 7: 7},
+    "Am": {2: 6, 3: 47, 4: 11, 5: 2, 6: 1},
+}
+
+#: The census :data:`_ICSD_REPORTS` is read from, as every message cites it.
+CENSUS = ("Ding, Kumagai, Oba & Burton (2020), J. Phys. Chem. Lett. 11, "
+          "8264-8267, SI Table 1 (ICSD reports per oxidation state)")
+_CENSUS_SHORT = "ICSD census, Ding et al. 2020"
+
+
+def _open_shell(sym: str, charge: int) -> tuple[str, int] | None:
+    """``("d", n)`` or ``("f", n)``: the open shell of the ion ``sym``
+    ``charge``+ and its electron count, from the atomic number alone (the
+    group count less the charge); ``None`` outside the 3d, 4d, 4f and 5f
+    rows this table carries."""
+    import gemmi
+
+    z = gemmi.Element(sym).atomic_number
+    for lo, hi, base, shell in ((21, 30, 18, "d"), (39, 48, 36, "d"),
+                                (58, 71, 54, "f"), (90, 103, 86, "f")):
+        if lo <= z <= hi:
+            return shell, z - base - charge
+    return None
+
+
+def carries_moment(ion: str) -> bool:
+    """Whether the free ion ``ion`` has a moment: an open d shell (d¹-d⁹), or
+    an open f shell whose Hund's-rule ground term has J > 0 (every fⁿ but f⁰,
+    f⁶ (⁷F₀: Eu³⁺, Sm²⁺, Am³⁺) and f¹⁴).  Sc³⁺, Ti⁴⁺, Nb⁵⁺, Mo⁶⁺ (d⁰), Cu⁺
+    (d¹⁰) and U⁶⁺ (f⁰) carry none."""
+    sym, charge = _element(ion)
+    shell = _open_shell(sym, charge)
+    if shell is None:
+        return False
+    kind, n = shell
+    if kind == "d":
+        return 0 < n < 10
+    return 0 < n < 14 and n != 6
+
+
+def _shell_text(ion: str) -> str:
+    """``"3d0"``, ``"4f6"``: the ion's open shell and its count."""
+    import gemmi
+
+    sym, charge = _element(ion)
+    kind, n = _open_shell(sym, charge)
+    z = gemmi.Element(sym).atomic_number
+    level = (3 if z < 39 else 4) if kind == "d" else (4 if z < 90 else 5)
+    return f"{level}{kind}{max(n, 0)}"
+
+
+@dataclass(frozen=True)
+class BareLabelReading:
+    """How a bare element label was read: the census's most common ion.
+
+    ``share`` is that ion's fraction of the element's ICSD reports and
+    ``alternatives`` every other ion with a moment this table serves for the element, with
+    its share, largest first (:data:`CENSUS`).
+    """
+
+    label: str
+    ion: str
+    share: float
+    alternatives: tuple[tuple[str, float], ...]
+
+    def text(self) -> str:
+        """One clause naming the pick, its share and the alternatives."""
+        sym = self.label
+        others = "; ".join(f"{ion} {_pct(share)}" for ion, share in self.alternatives)
+        return (f"{self.ion}, the most common {sym} oxidation state in the "
+                f"ICSD ({_pct(self.share)} of {sym} reports"
+                + (f"; {others}" if others else "") + f"; {_CENSUS_SHORT})")
+
+
+def _pct(share: float) -> str:
+    return "<1%" if 0.0 < share < 0.005 else f"{share:.0%}"
+
+
+def _ions_of(sym: str) -> list[str]:
+    """The ions this table serves for ``sym`` that carry a moment."""
+    return [i for i in magnetic_ions() if _element(i)[0] == sym
+            and _element(i)[1] > 0 and carries_moment(i)]
+
+
+def _state_it(sym: str) -> str:
+    ions = _ions_of(sym)
+    neutral = f"{sym}0" if f"{sym}0" in magnetic_ions() else None
+    out = (f"this table carries {', '.join(ions)} with a moment for {sym}" if ions
+           else f"this table carries no {sym} ion")
+    if neutral:
+        out += f", and the neutral atom as {neutral!r}"
+    return out
+
+
+def read_bare_label(label: str) -> BareLabelReading:
+    """The ion a bare element label is read as on the magnetic path: its
+    element's most common oxidation state in the ICSD (:data:`CENSUS`; ruling
+    D67, 2026-11-24).  The pick is often wrong, so whoever reads a bare label
+    for a moment reports ``MAGNETIC_ION_ASSUMED`` (a warning) naming it and
+    the alternatives.
+
+    Refused (``ValueError``), naming the ions to state instead, when the
+    common ion carries no moment (:func:`carries_moment`: Sc³⁺, Ti⁴⁺, V⁵⁺, Y³⁺,
+    Zr⁴⁺, Nb⁵⁺, Mo⁶⁺, Eu³⁺, U⁶⁺, Am³⁺), when the table has no row for it
+    (Tc³⁺, Rh³⁺, Pd²⁺), and for an element the census or the table does not
+    cover.  The neutral atom is never the reading of a bare label; it is
+    stated as ``"Fe0"``.
+    """
+    sym, _ = _element(label)
+    if not is_bare(label):
+        raise ValueError(f"{label!r} states its charge; only a bare element "
+                         f"symbol is read through the census")
+    counts = _ICSD_REPORTS.get(sym)
+    if counts is None:
+        raise _no_row_error(label)
+    total = sum(counts.values())
+    charge = max(counts, key=counts.__getitem__)
+    ion = f"{sym}{charge}+"
+    head = (f"{label!r} states no charge, and a bare element label is read as "
+            f"its most common oxidation state in the ICSD: {ion} "
+            f"({counts[charge] / total:.0%} of {sym} reports; {CENSUS})")
+    if not carries_moment(ion):
+        raise ValueError(
+            f"{head}. {ion} is {_shell_text(ion)} and carries no moment, so a "
+            f"site with a moment must state its ion: {_state_it(sym)}.")
+    if ion not in _J0 and ion not in _TABLE_KEY:
+        raise ValueError(
+            f"{head}, which this table carries no magnetic form factor for. "
+            f"State the ion: {_state_it(sym)}.")
+    alternatives = tuple(sorted(
+        ((i, counts.get(_element(i)[1], 0) / total)
+         for i in _ions_of(sym) if i != ion),
+        key=lambda t: (-t[1], t[0])))
+    return BareLabelReading(label=label, ion=ion,
+                            share=counts[charge] / total,
+                            alternatives=alternatives)
+
+
+@lru_cache(maxsize=None)
+def _key(label: str) -> str:
+    """The internal row key of a caller's label: a charged ion is itself,
+    ``"Fe0"`` the neutral row (keyed ``"Fe"`` here), and a bare ``"Fe"`` the
+    ion :func:`read_bare_label` reads it as (refusing as it does)."""
+    if is_bare(label):
+        return read_bare_label(label).ion
+    sym, charge = _element(label)
+    return sym if charge == 0 else label.strip()
 
 
 def has_ion(ion: str) -> bool:
-    """Whether the table carries a ⟨j₀⟩ row for this exact ion string.
+    """Whether the table carries a ⟨j₀⟩ row for this ion as spelled.
 
-    ``ion`` is matched verbatim (``"Dy"`` and ``"Dy3+"`` are different keys) —
-    used to decide whether a bare element symbol resolves *neutrally* before
-    :func:`resolve_assumed_ion` is tried (issue-magnetic-form-factor D1).
-    A Brown row and a computed table both count.
+    ``"Fe0"`` is the neutral atom and ``"Fe3+"`` the ion; a bare ``"Fe"`` is
+    not an ion string (it is read through :func:`read_bare_label`), so it is
+    ``False`` here.  A Brown row and a computed table both count.
     """
-    return ion in _J0 or ion in _TABLE_KEY
-
-
-#: The majority oxidation state that is **magnetic**, for a bare element
-#: symbol whose neutral atom this table cannot resolve (every lanthanide and
-#: actinide it carries: only ionic ⟨jₙ⟩ curves exist for them, Brown, *ITC*
-#: Vol. C § 4.4.5).  Keyed by element, not by ion, and deliberately not "the
-#: commonest state in general chemistry" — Ce⁴⁺ and Eu³⁺ are both extremely
-#: common, and neither is what a magnetically ordered site of that element is
-#: reported against.  One reason per row; an element absent here has no
-#: sensible default and the caller's original refusal is unchanged
-#: (issue-magnetic-form-factor option (b); WP-1327 D1).
-_ASSUMED_ION: dict[str, tuple[str, str]] = {
-    # Lanthanides: Ln3+ is the ion reported for the overwhelming majority of
-    # magnetically ordered rare-earth sites (Ce and the two exceptions below
-    # are the only members where the 3+ ion is *not* the one this generality
-    # would predict).
-    "Pr": ("Pr3+", "Ln3+ default; Pr3+ (4f2) is the reported magnetic state"),
-    "Nd": ("Nd3+", "Ln3+ default; Nd3+ (4f3) is the reported magnetic state"),
-    "Sm": ("Sm3+", "Ln3+ default; Sm2+ is 4f6 (J=0, non-magnetic)"),
-    "Gd": ("Gd3+", "Ln3+ default; Gd3+ (4f7, S=7/2) is the reported magnetic state"),
-    "Tb": ("Tb3+", "Ln3+ default; Tb3+ (4f8) is the reported magnetic state"),
-    "Dy": ("Dy3+", "Ln3+ default; Dy3+ (4f9) is the reported magnetic state"),
-    "Ho": ("Ho3+", "Ln3+ default; Ho3+ (4f10) is the reported magnetic state"),
-    "Er": ("Er3+", "Ln3+ default; Er3+ (4f11) is the reported magnetic state"),
-    "Tm": ("Tm3+", "Ln3+ default; Tm3+ (4f12) is the reported magnetic state"),
-    # The three lanthanides where the plain Ln3+ rule needs its own line,
-    # because a *different* oxidation state of the same element is at least
-    # as common and is the one with no unpaired 4f electron:
-    "Ce": ("Ce3+", "Ce4+ is 4f0 (non-magnetic); Ce3+ (4f1) is the reported "
-                    "magnetic state"),
-    "Eu": ("Eu2+", "Eu3+ is 4f6 (J=0, non-magnetic); Eu2+ (4f7, S=7/2) is the "
-                    "state reported for magnetically ordered Eu compounds "
-                    "(EuO, EuS, EuTe and similar)"),
-    "Yb": ("Yb3+", "Yb2+ is 4f14 (closed shell, non-magnetic); Yb3+ (4f13) is "
-                    "the reported magnetic state"),
-    # Actinides: only the ions Brown's table itself carries ⟨j0⟩/⟨j2⟩ rows
-    # for are offered, and only the majority state among those.
-    "U": ("U4+", "the common default in actinide oxide/intermetallic "
-                  "magnetism (e.g. UO2); U3+ and U5+ occur but less often"),
-    "Np": ("Np4+", "the common default in actinide oxide/intermetallic "
-                    "magnetism, by analogy with U4+"),
-    "Pu": ("Pu3+", "the majority oxidation state reported for magnetically "
-                    "ordered Pu intermetallics/pnictides (PuSb, PuAs); Pu4+ "
-                    "dominates only in oxides"),
-}
-
-
-def assumed_ion_for_element(element: str) -> tuple[str, str] | None:
-    """The declared majority-magnetic-oxidation-state default for ``element``.
-
-    Returns ``(ion, reason)`` from :data:`_ASSUMED_ION`, or ``None`` when this
-    table declares no default for it at all.  This is the *declared* table —
-    it does not check that the declared ion actually has a ⟨j₀⟩ row;
-    :func:`resolve_assumed_ion` is the one that checks and is what a caller
-    should use.
-    """
-    return _ASSUMED_ION.get(element)
-
-
-def resolve_assumed_ion(element: str) -> tuple[str, str] | None:
-    """:func:`assumed_ion_for_element`, but only when the default resolves.
-
-    ``None`` both when ``element`` has no declared default at all (every 3d/4d
-    element, and every f-block element this table's ionic rows do not cover)
-    and when it has one that does not resolve — a designed-but-unavailable
-    default must come back exactly like "no default", never silently succeed
-    for a different ion than the one recorded as the reason.
-    """
-    entry = assumed_ion_for_element(element)
-    if entry is None:
-        return None
-    ion, _reason = entry
-    return entry if has_ion(ion) else None
+    if is_bare(ion) or _ION.match(ion.strip()) is None:
+        return False
+    k = _key(ion)
+    return k in _J0 or k in _TABLE_KEY
 
 
 def lande_g(S: float, L: float, J: float) -> float:
@@ -545,9 +695,11 @@ def lande_g(S: float, L: float, J: float) -> float:
     return 1.0 + (J * (J + 1) + S * (S + 1) - L * (L + 1)) / (2.0 * J * (J + 1))
 
 
-#: (S, L, J) Hund's-rule ground-term quantum numbers for every ion
-#: :data:`_ASSUMED_ION` can produce, keyed by the *assumed ion* (not the bare
-#: element) so a caller need not re-derive the term itself.  Source: the
+#: (S, L, J) Hund's-rule ground-term quantum numbers for every 4f/5f ion
+#: :func:`read_bare_label` can read a bare label as, and for the 4f/5f ions an
+#: earlier default produced (Eu2+, U4+, Np4+, Pu3+), which a site may still
+#: carry as its species, keyed by the ion (not the bare element) so a caller
+#: need not re-derive the term itself.  Source: the
 #: standard rare-earth 4fⁿ ground terms tabulated in Ashcroft & Mermin,
 #: *Solid State Physics* (1976) Table 31.3 (S, L, J and g_J for every
 #: trivalent lanthanide plus Eu2+/Gd3+'s shared 4f7 term); the actinide 5fⁿ
@@ -579,16 +731,18 @@ _ASSUMED_ION_SLJ: dict[str, tuple[float, float, float]] = {
     # rules place them at the same term).
     "U4+": (1.0, 5.0, 4.0),    # 5f2,  3H4    (== Pr3+'s term)
     "Np4+": (1.5, 6.0, 4.5),   # 5f3,  4I9/2  (== Nd3+'s term)
+    "Np5+": (1.0, 5.0, 4.0),   # 5f2,  3H4    (== Pr3+'s term)
     "Pu3+": (2.5, 5.0, 2.5),   # 5f5,  6H5/2  (== Sm3+'s term)
+    "Pu4+": (2.0, 6.0, 4.0),   # 5f4,  5I4    (== Nd2+'s 4f4 term)
 }
 
 
 def assumed_lande_g(ion: str) -> float | None:
     """The free-ion Hund's-rule g_J for ``ion``, or ``None`` if not declared.
 
-    Declared only for the ions :func:`resolve_assumed_ion` can produce (WP-1327
-    D-lande-g): a bare lanthanide/actinide site whose ion this module itself
-    assumed has no way to state a Landé g either (magCIF carries no item for
+    Declared for the 4f/5f ions :func:`read_bare_label` can produce (WP-1327
+    D-lande-g; ruling D67): a bare lanthanide/actinide site whose ion this
+    module itself read from the census has no way to state a Landé g either (magCIF carries no item for
     it, exactly as it carries none for the ion), so the same "assume it from
     the physics rather than refuse" choice applies to g once it already
     applies to the ion. **Not** offered for an ion a caller *stated*
@@ -664,7 +818,8 @@ _FITTED_RANGE: dict[str, float] = {ion: _range_of(ion) for ion in sorted(_J0)}
 
 def has_j2(ion: str) -> bool:
     """Whether the table carries ⟨j₂⟩ for this ion (every row it serves does)."""
-    return ion in _J2 or ion in _TABLE_KEY
+    k = _key(ion)
+    return k in _J2 or k in _TABLE_KEY
 
 
 def needs_explicit_g(ion: str) -> bool:
@@ -703,8 +858,11 @@ def _no_row_error(ion: str) -> KeyError:
 
 
 def _require_row(ion: str) -> None:
-    """Refuse an ion the table does not serve, before any work is done."""
-    if ion not in _J0 and ion not in _TABLE_KEY:
+    """Refuse an ion the table does not serve, before any work is done: a
+    bare label whose census ion has no moment or no row is refused here too
+    (:func:`read_bare_label`)."""
+    k = _key(ion)
+    if k not in _J0 and k not in _TABLE_KEY:
         raise _no_row_error(ion)
 
 
@@ -718,6 +876,8 @@ def coefficients(ion: str) -> tuple[Coefficients, Coefficients]:
     served from a computed table (:data:`_TABLE_KEY`) is refused too: it has
     no coefficients, and :func:`j0`/:func:`j2` evaluate it.
     """
+    _require_row(ion)
+    ion = _key(ion)
     if ion not in _J0:
         if ion in _TABLE_KEY:
             raise KeyError(
@@ -734,7 +894,7 @@ def fitted_range(ion: str) -> float | None:
     a computed table, which nothing was fitted to (module docstring,
     "Computed curves").  Both orders of one ion share it."""
     _require_row(ion)
-    return _FITTED_RANGE.get(ion)
+    return _FITTED_RANGE.get(_key(ion))
 
 
 # --------------------------------------------------------- the computed curves
@@ -852,6 +1012,7 @@ def _blend_onto_tail(ion: str, order: int, stol: np.ndarray, brown) -> np.ndarra
 
 def _value(ion: str, order: int, stol):
     """⟨j_order⟩(s), unchecked: the one evaluator of every row."""
+    ion = _key(ion)
     key = _TABLE_KEY.get(ion)
     if key is not None:
         return _spline(key, f"j{order}")(np.asarray(stol, dtype=np.float64))
@@ -900,14 +1061,15 @@ def past_fitted_range(ion: str, stol, g: float | None = None,
     an ion served from a computed table.  Raises nothing for s ≤ 6.
     """
     _require_row(ion)
-    s_max = _FITTED_RANGE.get(ion)
+    k = _key(ion)
+    s_max = _FITTED_RANGE.get(k)
     s_hi = float(np.max(np.asarray(stol, dtype=np.float64)))
     if s_max is None or not s_hi > s_max:
         return ()
     if orders is None:
         orders = (0,) if resolve_g(ion, g) == 2.0 else (0, 2)
-    footing = computed_curves()[ion].footing
-    return tuple(PastFittedRange(ion=ion, order=order, s_max=s_max,
+    footing = computed_curves()[k].footing
+    return tuple(PastFittedRange(ion=_public(k), order=order, s_max=s_max,
                                  stol=s_hi, footing=footing)
                  for order in orders)
 
@@ -997,6 +1159,7 @@ def footing_name(ion: str) -> str:
     footing, plus, for a bare (neutral-labelled) row, which configuration it
     is.  Reads the data file's own provenance lines."""
     _require_row(ion)
+    ion = _key(ion)
     key = _TABLE_KEY.get(ion)
     if key is not None:
         c = computed_curves()[key]
@@ -1021,7 +1184,10 @@ def approximation_name(ion: str, g: float | None) -> str:
     """
     gg = resolve_g(ion, g)
     name = J0_ONLY if gg == 2.0 else f"{J0_J2}, g = {gg:g}"
-    return f"{name}; {footing_name(ion)}"
+    out = f"{name}; {footing_name(ion)}"
+    if is_bare(ion):
+        out += f"; bare {ion!r} read as {read_bare_label(ion).text()}"
+    return out
 
 
 def resolve_g(ion: str, g: float | None) -> float:

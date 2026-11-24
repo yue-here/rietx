@@ -512,7 +512,9 @@ $s = 1.2$ Å$^{-1}$ the two part company, for every row, published or computed:
 - no published measurement of a magnetic form factor found for this manual reaches past
   $s = 1.157$ Å$^{-1}$ (iron metal {cite}`shull1962`).
 
-So the curves are numerically right to $s = 6$, but a moment that leans on
-reflections past $s \approx 1.2$ leans on the free-ion model. A fit whose
-reflections pass a Brown row's range says so once, as
+So the curves are numerically right to $s = 6$, though out there they are a
+free-ion model. Little rests on it: past Brown's ranges $f^2$ is
+$6 \times 10^{-5}$ (Mn$^{2+}$) to $7 \times 10^{-3}$ (Nd$^{3+}$) of its
+low-angle value. A fit whose reflections pass a Brown row's range records it
+once, as the `info` row
 [`MAGNETIC_FORM_FACTOR_COMPUTED_TAIL`](../reference/diagnostics-refinement.md#magnetic_form_factor_computed_tail).

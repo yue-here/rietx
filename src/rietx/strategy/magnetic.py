@@ -126,9 +126,10 @@ from ..crystallography.magnetic import moments as _moments
 from ..crystallography.magnetic.form_factor import (
     _no_row_error,
     assumed_lande_g,
+    is_bare,
     magnetic_ions,
     needs_explicit_g,
-    resolve_assumed_ion,
+    read_bare_label,
 )
 from ..crystallography.magnetic.isotropy import MagneticCandidate, analyse
 from ..crystallography.magnetic.moments import tilted_seed, warm_seed
@@ -862,21 +863,21 @@ def _magnetic_sites(phase, sites, species, ion, g=None) -> tuple[
     A species is magnetic here when the form-factor table has a key for it;
     the *ion* is the key, and it is not ``Atom.species`` — the nuclear
     scattering length is keyed by nuclide and the form factor by oxidation
-    state.  Where the species is itself a key (``"Mn"``, the neutral atom) it
-    is used and the caveat says so; where it is not, the caller must name the
-    ion, and the refusal lists the keys the table actually has for that
-    element rather than picking one — *unless* the bare element resolves
-    through :func:`~.crystallography.magnetic.form_factor.resolve_assumed_ion`
-    (WP-1327), the same fallback
-    :func:`~rietx.crystallography.cif.structure_from_cif` applies at read,
-    which this candidate builder never called before.
+    state.  Where the species is itself a key (``"Mn3+"``, or ``"Mn0"`` for
+    the neutral atom) it is used.  A bare element (``"Mn"``) is read as its
+    most common ICSD oxidation state
+    (:func:`~.crystallography.magnetic.form_factor.read_bare_label`, ruling
+    D67), the same reading
+    :func:`~rietx.crystallography.cif.structure_from_cif` applies at read; one
+    whose common ion carries no moment (``"Ti"``: Ti⁴⁺) is not a magnetic
+    site, and is refused, with the ions to state, when the caller named it.
 
     ``g_map`` is ``{label: g or None}`` for every site in the returned list —
     what to pass as ``Moment.g`` for it.  A caller-stated ``g`` (mirroring
     ``ion``: one float for every site, or a mapping from label or species)
     always wins.  Otherwise, when the site's ion was **not** itself stated by
     the caller (it came from the table directly, or from
-    ``resolve_assumed_ion`` above) and needs an explicit Landé g
+    ``read_bare_label`` above) and needs an explicit Landé g
     (:func:`~.crystallography.magnetic.form_factor.needs_explicit_g`), its
     free-ion Hund's-rule g_J
     (:func:`~.crystallography.magnetic.form_factor.assumed_lande_g`) is used
@@ -932,11 +933,34 @@ def _magnetic_sites(phase, sites, species, ion, g=None) -> tuple[
             caller_stated_ion = True
         elif atom.species in table:
             key = atom.species
-        else:
-            assumed = resolve_assumed_ion(atom.species)
-            if assumed is not None:
-                key, reason = assumed
-                ion_assumed[atom.label] = (key, reason)
+        elif is_bare(atom.species):
+            # a bare element is read as its most common ICSD oxidation state
+            # (ruling D67); one with no moment there is not a magnetic site
+            # unless the caller named it, when the refusal says what to state
+            try:
+                reading = read_bare_label(atom.species)
+            except KeyError:
+                reading = None  # no row of this element: refused below
+            except ValueError as exc:
+                if sites is not None or species is not None:
+                    raise ValueError(
+                        f"solve_magnetic(): {atom.label!r} was named as a "
+                        f"magnetic site: {exc.args[0]} Pass ion= with the "
+                        f"oxidation state.") from exc
+                continue
+            if reading is not None:
+                key = reading.ion
+                ion_assumed[atom.label] = (key, reading.text())
+        if key is not None and caller_stated_ion and is_bare(key):
+            # a bare ion= is read the same way, and said
+            try:
+                reading = read_bare_label(key)
+            except (KeyError, ValueError) as exc:
+                raise ValueError(
+                    f"solve_magnetic(): ion={key!r} for {atom.label!r}: "
+                    f"{exc.args[0]}") from exc
+            key = reading.ion
+            ion_assumed[atom.label] = (key, reading.text())
         if key is None:
             if sites is not None or species is not None:
                 element = "".join(c for c in atom.species if c.isalpha())
@@ -2112,10 +2136,10 @@ def solve_magnetic(refinement, data, *, phase: int = 0,
     — and is **not** ``Atom.species``.  Where a site's ion is not stated by the
     caller here, the same fallback :func:`~rietx.crystallography.cif.
     structure_from_cif` applies at read is applied to the candidate builder
-    too (WP-1327): a bare element with no neutral-atom ``<j0>``
-    resolves through :func:`~.crystallography.magnetic.form_factor.
-    resolve_assumed_ion` to its majority magnetic oxidation state, reported as
-    ``MAGNETIC_ION_ASSUMED`` on :attr:`MagneticSolution.diagnostics`.
+    too (WP-1327, ruling D67): a bare element is read through
+    :func:`~.crystallography.magnetic.form_factor.read_bare_label` as its
+    most common ICSD oxidation state, reported as ``MAGNETIC_ION_ASSUMED``
+    (a warning) on :attr:`MagneticSolution.diagnostics`.
 
     ``g`` is the Landé factor that ion needs — one float for every magnetic
     site, or a mapping from label or species to one, mirroring ``ion``.
@@ -2123,7 +2147,7 @@ def solve_magnetic(refinement, data, *, phase: int = 0,
     **refused** for a 4f/5f one (:func:`~.crystallography.magnetic.
     form_factor.needs_explicit_g`) *unless* that ion was itself not stated by
     the caller (came from the table directly, or from the
-    ``resolve_assumed_ion`` fallback above) — there its free-ion Hund's-rule
+    ``read_bare_label`` reading above) — there its free-ion Hund's-rule
     g_J (:func:`~.crystallography.magnetic.form_factor.assumed_lande_g`) is
     used instead of leaving every 4f/5f candidate to abstain with no route
     around it, reported as ``LANDE_G_ASSUMED``.  A caller-stated ``ion`` or
@@ -2218,25 +2242,18 @@ def solve_magnetic(refinement, data, *, phase: int = 0,
     caveats: list[str] = []
     magnetic, g_map, ion_assumed, g_assumed = _magnetic_sites(
         parent, sites, species, ion, g)
-    for _j, label, key in magnetic:
-        if key == parent.atoms[_j].species and key.isalpha():
-            caveats.append(
-                f"{label}: the neutral-atom form factor {key!r} was used "
-                f"because no oxidation state was named; pass "
-                f"ion={{{label!r}: 'X3+'}} if the ion's own coefficients matter")
     ion_g_diagnostics: list[Diagnostic] = []
     for _j, label, _key in magnetic:
         if label in ion_assumed:
             assumed_ion, reason = ion_assumed[label]
             ion_g_diagnostics.append(Diagnostic(
-                level="info", code="MAGNETIC_ION_ASSUMED",
+                level="warning", code="MAGNETIC_ION_ASSUMED",
                 where=[f"phases.{phase}.atoms.{_j}.moment.ion"],
                 message=(f"solve_magnetic(): site {label!r} states no "
-                         f"oxidation state and this table has no "
-                         f"neutral-atom ⟨j0⟩ for it. Its form factor "
-                         f"defaulted to {assumed_ion!r} ({reason})."),
-                suggestion=(f"Pass ion={{{label!r}: '<ion>'}} to "
-                            f"solve_magnetic() to state the ion.")))
+                         f"oxidation state, so its magnetic form factor is "
+                         f"{reason}. The moment depends on that pick."),
+                suggestion=(f"State the ion before quoting the moment: pass "
+                            f"ion={{{label!r}: '<ion>'}} to solve_magnetic().")))
         if label in g_assumed:
             g_value = g_assumed[label]
             ion_g_diagnostics.append(Diagnostic(
