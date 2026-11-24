@@ -437,4 +437,24 @@ describe("the selected pattern", () => {
     flushSync();
     expect(view()).toMatchObject({ name: "T2", sub: "30 · 3 of 3 · fitting…" });
   });
+
+  it("reads the run's list off the record when the staged list was edited after it", async () => {
+    // the run fitted T0, T1 and T2; T0 was removed, and the page reloaded
+    stored = { ...setupOf([pattern("T1", 20), pattern("T2", 30)]), has_result: true };
+    const fitted = (index: number) => ({ index, label: `T${index}`, x: 10 * (index + 1),
+      status: "converged", statistics: { rwp: 0.04, gof: 1.9 }, rung: index ? "warm" : "cold",
+      rungs_tried: [], diagnostics: [] });
+    seriesResult.mockImplementationOnce(async () => ({
+      result: { entries: [0, 1, 2].map(fitted), diagnostics: [], steps: [], direction_gaps: null,
+                code_counts: [], phase_names: [], atom_labels: [] },
+      trajectories: [], has_backward: false,
+    }) as any);
+    await boot(2);
+    expect([...document.querySelectorAll("table.rows tbody tr")].map((r) => cells(
+      [...document.querySelectorAll("table.rows tbody tr")].indexOf(r))[1])).toEqual(["T0", "T1", "T2"]);
+    // the graph draws the run's first member, under its own name
+    expect(view()).toMatchObject({ name: "T0" });
+    await view()!.source.load();
+    expect(seriesPattern).toHaveBeenLastCalledWith(0, "run");
+  });
 });

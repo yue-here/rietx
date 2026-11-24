@@ -21,6 +21,7 @@
    * last one carries the shared axis. The hovered pattern is read in the
    * status bar, the readout's one place (gui/CLAUDE.md § Plot).
    */
+  import { untrack } from "svelte";
   import type { HelpCorpus } from "../lib/help";
   import { curveColors } from "../lib/plot";
   import Menu, { type MenuAt, type MenuEntry } from "./Menu.svelte";
@@ -243,6 +244,12 @@
     hover = null;
     onreadout(null);
   }
+
+  // a graph taken down under the pointer (⌘1, a tab switch by key) gets no
+  // pointerleave, so its line would stay in the status bar (Structure's rule)
+  $effect(() => () => {
+    if (untrack(() => hover) !== null) onreadout(null);
+  });
 
   function click(ev: MouseEvent) {
     const i = patternAt(ev as PointerEvent);

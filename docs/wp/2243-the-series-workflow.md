@@ -1,6 +1,6 @@
 # WP-2243 — the series workflow at `/next`: patterns, first fit, run, results, with Trends and Map
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-24 — Patterns, Run and Results built (PRs #1794, #1820); the selected pattern next
+Milestone: gui-overhaul · Status: 🔄 2026-11-24 — the selected pattern and Trends built (PR #1825); Q1-Q3 and the scrubber placement wait on the maintainer
 Depends on: 2240 soft (the workflow frame R6 builds on); 2300 soft (what each pattern refines)
 Priority: P2 2026-11-23 — a feature the open milestone was opened for: R7, the rebuild's last piece before the swap
 
@@ -152,6 +152,15 @@ disagree on wavelength, range or step; a blank pattern) names its tier here befo
   column, "Walk gap (esd)", after the second walk's Rwp; (b) both numbers in one cell,
   "4.31 · 0.8 esd"; (c) no gap in Run, only in Results and Trends. Built so far: the Rwp
   alone, which is (c).
+- **Q2 (2026-11-24, task 6). Which inks tell apart two to four values sharing a Trends
+  panel?** The prototype uses four Okabe-Ito hues. The page has no free plot hue
+  (gui/CLAUDE.md § House style), so it reuses `--plot-obs`, `--plot-peak`, `--phase-0`
+  and `--phase-1`, skipping `--plot-calc` because it is the accent. Options: (a) keep
+  these; (b) add a small series palette to `viz/theme.py`, held apart by
+  `test_gui_palette.py`; (c) one ink and a different mark shape per value.
+- **Q3 (2026-11-24, task 6). Where do the summary rows' Plot buttons sit?** The prototype
+  puts them in a third, right-hand column of the summary. Built: a `.link` "Plot" at the
+  end of each row's value, as the page's other inline actions sit.
 
 ## Non-goals
 
@@ -243,6 +252,36 @@ The piece closes when every task is ticked and the maintainer has looked at its 
 the prototype's (WP-2214 § How the maintainer reviews).
 
 ## Handover log
+
+- **2026-11-24** — ghostshift runner wp-2243-d, third session; PR #1825. One selected
+  pattern now links the Series steps and the graphs. The Pattern graph draws the selected
+  member's fit, before a run from its file alone and during a run as each fit lands, and
+  follows the pattern being fitted until a person clicks a row. A new Trends tab plots any
+  refined value against the series coordinate, and Results ticks choose what it plots.
+  Trends draws only the record, so it stays empty until a run ends.
+
+  *Done.* Task 5 (`seriespattern.ts`, the selection in `Series.svelte`, `source` and `nav`
+  on `Pattern.svelte`, ↑ ↓ and the Series mount in `Frame.svelte`; `GuiSession`'s
+  `series_pattern_curves` and the `pattern`/`of` arm of `GET /api/series/curves`). The two
+  findings #1820 declined are fixed: a selection names the list it was made on, so a
+  removal after a run moves no mark onto another file; Series stays mounted under another
+  workflow once chosen. Task 6 (`seriestrends.ts`, `SeriesTrends.svelte`, submenus in
+  `Menu.svelte`, the Plot ticks and summary Plot links in Results), built by a lane and
+  read here before its commit. Trends joins the tab strip the way #1823 adds Map
+  (`workflowOnly` in `tabs.ts`, the same `graphTabs` filter), so their merge is a
+  two-line union.
+
+  *Gotchas.* A pattern's `fit_end` event can reach the page before the chain hands the
+  result over (`on_result` runs after the ladder picks a rung), so the page asks up to
+  four times, 250 ms apart, while it expects a fit (`seriespattern.ts:loadMember`). The
+  second walk of "Both" keeps no fits, so a member's drawn fit is always the reported
+  walk's. #1823's Map keeps its own `seriesSelected` in the frame; whichever PR merges
+  second points the Map at `Series.select`/`move` so all three views share one selection.
+
+  *Open questions for the maintainer*: Q2 and Q3 above, two visual choices built on the
+  nearest existing pattern. Next: Q1 to Q3 wait on the maintainer. Task 8 waits on the
+  scrubber placement. Then task 9 (First fit), which makes First fit the filled button
+  again.
 
 - **2026-11-24** — ghostshift runner wp-2243-a, second session; PR #1820. The Series
   workflow at `/next` now has a Results step. After a run, a person reads how many

@@ -29,6 +29,10 @@ from tests.test_gui_layout_browser import (  # noqa: E402
 )
 from tests.test_watch_browser import _chromium  # noqa: E402
 
+#: the project, the browser and the run the first test leaves are module
+#: fixtures every later test reads, so the file runs on one worker
+pytestmark = pytest.mark.xdist_group("series-browser")
+
 
 @pytest.fixture(scope="module")
 def files(tmp_path_factory):

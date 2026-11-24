@@ -923,7 +923,10 @@
       return;
     }
     // ↑ ↓ move the series' selected pattern on every view (round 12, call 2)
-    const delta = wf === "series" && !layered && isShortcutTarget(event) ? arrowStep(event) : 0;
+    // never from inside an open menu (the Trends graph's Plot), whose rows
+    // the arrows belong to
+    const delta = wf === "series" && !layered && isShortcutTarget(event)
+      && !(event.target as Element | null)?.closest?.(".rx-menu") ? arrowStep(event) : 0;
     if (delta) {
       event.preventDefault();
       seriesPanel?.move(delta);

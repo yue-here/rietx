@@ -2186,8 +2186,9 @@ class GuiSession:
                     live["results"][k] = res
 
             def call(stream, token):
-                with self._cond:
-                    self._series_live = live
+                # ``self._series_live`` was set under the lock that published
+                # the running state, so no request sees a run in flight
+                # without its members
                 try:
                     result = runner.fit(
                         data, x=setup.x, x_label=setup.axis_label,
@@ -2291,6 +2292,10 @@ class GuiSession:
                          "elapsed": None, "rwp": None, "gof": None,
                          "node_id": None, "completed_stages": [], "error": None,
                          "lebail": None, "how": None}
+            # in the block that publishes the running state, so a member asked
+            # for the moment a series run is seen is the run's, never the last
+            # record's (WP-2243); ``None`` for every other kind, as between runs
+            self._series_live = live if kind == "series" else None
             self._worker = threading.Thread(
                 target=self._work, args=(call, stream, summarize),
                 name=f"{_about.SERVER_TOKEN}-gui-run", daemon=True)

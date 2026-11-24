@@ -178,8 +178,12 @@
       if (now) startedHere = false;
       // a run that failed left the server's record at the run before it
       if (wasRunning && !now) {
-        awaiting = true;
-        void load(run?.run?.status !== "failed").finally(() => (awaiting = false));
+        // only a run whose record will be read keeps its list meanwhile: a
+        // failed one left the server at the run before it, which is not the
+        // list this panel shows
+        const read = run?.run?.status !== "failed";
+        awaiting = read;
+        void load(read).finally(() => (awaiting = false));
       }
       wasRunning = now;
     });
@@ -222,7 +226,7 @@
       // the list as the run left it (no edit lands while one is in flight),
       // and the walk the record says ran
       const direction = settings?.direction ?? "forward";
-      ranOver ??= { patterns, direction: payload.has_backward ? "both"
+      ranOver ??= { patterns: runList(payload), direction: payload.has_backward ? "both"
         : direction === "both" ? "forward" : direction };
       progress = merged(progress, entries, ranOver.direction);
       backDone = payload.has_backward
@@ -231,6 +235,26 @@
     } catch {
       // nothing has run in this session: the Run step's empty state
     }
+  }
+
+  /** The list the record's run fitted, for a page that did not follow it:
+   *  the staged list while the record's labels agree with it place by place,
+   *  else the record's own labels and coordinates. After an edit and a
+   *  reload the staged list is not the run's, and the graph's run-list fetch
+   *  must not draw one file under another's name. */
+  function runList(payload: any): SeriesPattern[] {
+    const named = new Map<number, { label: string; x: number | null }>();
+    for (const e of [...(payload.result.entries ?? []), ...(payload.result.failures ?? [])]) {
+      named.set(e.index, { label: e.label, x: e.x ?? null });
+    }
+    const agree = [...named].every(([k, m]) => patterns[k]?.label === m.label);
+    if (agree) return patterns;
+    const n = Math.max(...named.keys()) + 1;
+    return Array.from({ length: n }, (_, k) => ({
+      upload: `run:${k}`, filename: named.get(k)?.label ?? `#${k + 1}`,
+      label: named.get(k)?.label ?? `#${k + 1}`, x: named.get(k)?.x ?? null,
+      reader: "", reader_options: {}, n_points: 0, two_theta_range: [0, 0], has_sigma: false,
+    }));
   }
 
   /** The server's list becomes this panel's, never merged (WP-1016). */

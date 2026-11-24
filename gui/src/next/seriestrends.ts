@@ -279,7 +279,7 @@ export function unitText(unit: string | null, power: number): string {
   return [p, unit ?? ""].filter(Boolean).join(" ");
 }
 
-/** The pattern nearest a pointer, within `reach` px: `xs` are the patterns'
+/** The pattern nearest a pointer, within `within` px: `xs` are the patterns'
  *  pixel positions, keyed by series index. */
 export function nearestPattern(xs: ReadonlyMap<number, number>, px: number, within = 24): number | null {
   let best: number | null = null, d = Infinity;
