@@ -439,8 +439,7 @@ class MagneticGroup:
         with no check that a later match would agree, so picking a different
         representative can silently pick a different, sign-disagreeing
         operation for that image (Q23 measured exactly this with an unordered
-        ``set()`` in ``_close_operations``, on
-        ``test_moment_path_is_clean_by_design``).  Sorting here, once, before
+        ``set()`` in ``_close_operations``).  Sorting here, once, before
         the coset split, makes ``.operations``/``.centerings`` (and therefore
         ``.all_operations()``) bit-identical for any input order of the same
         set — the representative is now a property of the group, not of the

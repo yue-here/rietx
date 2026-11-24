@@ -7,11 +7,16 @@
 //
 // - the reflection ticks sit at the foot, under the difference, and carry the
 //   2θ labels; each tick is a lens, as rietx's figures draw them;
-// - the difference pane is a fixed 76 px, over a ±3 esd band under Δ/σ;
+// - the difference pane is a fixed height (`RESID_HEIGHT`), over a ±3 esd
+//   band under Δ/σ;
 // - observed points are crosses, smaller where they sit densely;
-// - no gridlines (`gui/STYLE.md` § Plots), and tick labels in the mono face;
+// - horizontal gridlines on the intensity pane alone, as the prototype draws
+//   them (`gui/STYLE.md` § Plots), and tick labels in the mono face;
+// - no y axis title strip on screen: the GUI marks each scale over its top
+//   tick label, in room each pane keeps above its plot (`MARK_ROOM`);
 // - intensity tick labels abbreviate thousands (20k), and a √ or log axis
-//   takes 1, 2 and 5 times a power of ten, 22 px apart at least.
+//   takes 1, 2 and 5 times a power of ten, 22 px apart at least;
+// - `padRight`, so the plot reaches the legend gutter beside it (WP-2245).
 //
 // rxplot: the chart module rietx's browser pages draw with (WP-1461, D3).
 //
@@ -325,14 +330,18 @@ function decadeSplits(u, min, max, gap = 22) {
 function axes(spec, gutter) {
   const ink = () => token("--fg"), line = () => token("--line");
   const text = { font: FONT, labelFont: FONT };
-  // no gridlines (`gui/STYLE.md` § Plots)
+  // no vertical gridlines; horizontal ones only on a pane that asks (`grid`),
+  // the intensity's, as the prototype draws them (`gui/STYLE.md` § Plots)
   const x = { ...text, stroke: ink, grid: { show: false }, ticks: { stroke: line } };
   // a bare x axis carries no tick marks either: the 2θ ticks sit at the foot
   if (!spec.xLabels) Object.assign(x, { values: (u, s) => s.map(() => ""), size: X_BARE, ticks: { show: false } });
   else Object.assign(x, { size: X_LABELS, values: (u, s) => tickLabels(s) },
                      spec.xLabel == null ? {} : { label: spec.xLabel, labelSize: TITLE, labelGap: X_TITLE_GAP });
-  const y = { ...text, stroke: ink, grid: { show: false }, ticks: { stroke: line }, size: gutter,
-              label: spec.label ?? "", labelSize: TITLE };
+  // `titled()` false leaves no strip for a title: the GUI's scale marks sit in
+  // the tick-label column instead, and only an exported figure has titles
+  const y = { ...text, stroke: ink, grid: spec.grid ? { stroke: line, width: 1 } : { show: false },
+              ticks: { stroke: line }, size: gutter,
+              label: spec.label ?? "", labelSize: spec.titled && !spec.titled() ? 0 : TITLE };
   if (spec.yLabels === false) {
     // a band, like the reflection ticks, whose y means nothing and whose grid would cross every row
     return [{ ...x, grid: { show: false } },
@@ -346,6 +355,48 @@ function axes(spec, gutter) {
   }
   y.values = (u, splits) => shortLabels(splits);
   return [x, y];
+}
+
+/** Each pane's last answer from `drawsData`, with what it was computed from. */
+const viewed = new WeakMap();
+
+/**
+ * Whether pane `u` draws a value in view: a shown series holding a finite
+ * value between the channels in view. uPlot ranges a pane that draws none
+ * over 0 to 100, so the difference pane before a fit read 100 and 0 under
+ * the intensity's labels (WP-2245). The answer is kept until the view, the
+ * data or a series' visibility moves, since an axis asks three times a draw.
+ */
+function drawsData(u) {
+  const n = u.data[0]?.length ?? 0, idxs = u.series[0].idxs;
+  const i0 = idxs?.length ? idxs[0] : 0, i1 = idxs?.length ? idxs[1] : n - 1;
+  const key = [i0, i1, ...u.series.slice(1).map((s, k) => (s.show ? u.data[k + 1] : null))];
+  const last = viewed.get(u);
+  if (last && last.key.length === key.length && last.key.every((v, k) => v === key[k])) return last.value;
+  let value = false;
+  for (let k = 2; k < key.length && !value; k++) {
+    const d = key[k];
+    if (!d) continue;
+    for (let i = i0; i <= i1; i++) if (Number.isFinite(d[i])) { value = true; break; }
+  }
+  viewed.set(u, { key, value });
+  return value;
+}
+
+/**
+ * The y axis `y`, labelling nothing while its pane draws no value in view:
+ * no labels, no tick marks and no gridlines, since the range they would mark
+ * is uPlot's fallback rather than the data's. `uPlot` supplies the default
+ * labels of an axis that sets none, a log axis's.
+ */
+function quietWhenEmpty(uPlot, y) {
+  const values = y.values ?? ((u, s) => s.map((v) => (v == null ? "" : uPlot.fmtNum(v))));
+  const all = (u, s) => s;
+  const keep = (filter) => (u, s, ...rest) => (drawsData(u) ? filter(u, s, ...rest) : s.map(() => null));
+  return { ...y,
+           values: (u, s, ...rest) => (drawsData(u) ? values(u, s, ...rest) : s.map(() => "")),
+           ticks: { ...y.ticks, filter: keep(y.ticks?.filter ?? all) },
+           grid: { ...y.grid, filter: keep(y.grid?.filter ?? all) } };
 }
 
 /**
@@ -362,11 +413,19 @@ function axes(spec, gutter) {
  *   chosen one, in place of the data's padded extent. uPlot calls it at every
  *   x range, with `u.series[0].idxs` the channels in view;
  * - `label`, the y axis title, a string or a function uPlot reads at each draw;
- *   `yLabels: false` for a band whose y means nothing;
+ *   `yLabels: false` for a band whose y means nothing; `titled()`, false to
+ *   leave no strip for that title;
+ * - `grid`, horizontal gridlines at the y ticks; `padTop`, the plot area's top
+ *   padding in CSS px, in place of uPlot's own;
  * - `xLabels`, and `xLabel` the x axis title under them;
  * - `hooks`, merged into uPlot's.
  *
- * `series` and `data` leave out the x, which the group supplies.
+ * `series` and `data` leave out the x, which the group supplies. `spec.padRight`
+ * is every pane's right padding on screen in CSS px, in place of uPlot's own
+ * half y axis width, for a page that keeps a margin of its own at the right.
+ *
+ * A pane with labels that draws no value in view prints no y labels, tick
+ * marks or gridlines (`quietWhenEmpty`).
  *
  * The group answers the gestures every page shares:
  *
@@ -476,10 +535,13 @@ export function panes(uPlot, host, spec) {
       width: copy ? copy.width : host.clientWidth, height: copy ? copy.height : heights()[key], legend: { show: false },
       scales: { x: copy ? { time: false, range: () => [copy.scales.x.min, copy.scales.x.max] } : { time: false },
                 y: yScale(uPlot, p.y ?? "lin", copy ? () => view : () => pins[key] ?? null, p.range, p.auto) },
-      axes: axes(p, gutter),
+      axes: ((ax) => (p.range || p.yLabels === false ? ax : [ax[0], quietWhenEmpty(uPlot, ax[1])]))(axes(p, gutter)),
       // A band has no y labels for uPlot's automatic top padding to make room
-      // for, and that padding took 17 px of a one-phase band's 22.
-      ...(p.yLabels === false ? { padding: [0, null, null, null] } : {}),
+      // for, and that padding took 17 px of a one-phase band's 22. A page with
+      // a margin of its own at the right sets `padRight` for the screen; an
+      // export has no such margin and keeps uPlot's.
+      padding: [p.yLabels === false ? 0 : p.padTop ?? null,
+                copy ? null : spec.padRight ?? null, null, null],
       // A line is a line. uPlot rings every point of a series whose points sit
       // far enough apart, which a zoom always reaches, and a ringed calculated
       // curve reads as observed points. A series that wants marks says so.
@@ -838,8 +900,18 @@ export function tickHeight(rows) {
   return 6 + X_BARE + 16 * rows;
 }
 
-/** The difference pane's height in CSS px: the prototype's 70 px plot over a bare x axis. */
-const RESID_HEIGHT = 70 + X_BARE;
+/**
+ * Room above a pane's plot area for the scale mark the GUI sets over the top
+ * tick label (√, Δ/σ): the mark's line and half a label, so a top tick at the
+ * plot's edge still leaves the mark clear of it (the maintainer's look,
+ * 2026-11-21, item 1).
+ */
+export const MARK_ROOM = 28;
+
+/** The difference pane's height in CSS px: the prototype's 70 px pane over a
+ *  bare x axis, plus what `MARK_ROOM` adds over uPlot's own 17 px of top
+ *  padding, so the difference keeps its plot area. */
+const RESID_HEIGHT = 70 + X_BARE + (MARK_ROOM - 17);
 
 /** The tick band at the foot, in CSS px: its rows, the 2θ labels and their title. */
 export function footHeight(rows) {
@@ -1030,6 +1102,8 @@ const RESIDUAL_COLUMNS = { weighted: "delta_over_sigma", delta: "obs_minus_calc"
  * - `hidden`: the curves not drawn, as "obs", "masked", "calc", "bkg", "diff"
  *   and "ticks:<phase>".
  * - `labels`: `{ y, resid }`, the two y axis titles, as functions.
+ *   `titled()`: whether the y axes keep a strip for them; false drops it (the
+ *   GUI on screen, which marks each scale in the tick-label column).
  * - `layers`: per pane key ("main", "ticks", "resid"), `{ under, over }` lists
  *   of `(u) => void`, run before the grid and after the series, each clipped
  *   to its pane's plot area (`clipped`).
@@ -1040,6 +1114,9 @@ const RESIDUAL_COLUMNS = { weighted: "delta_over_sigma", delta: "obs_minus_calc"
  *   page whose y ranges are its own. The watcher holds the intensity to the
  *   observed points and the residual to a ladder of rungs, so neither moves
  *   while the fit does.
+ * - `padRight`: the plot's right padding on screen, as `panes` takes it. The
+ *   GUI's canvas reaches that far into its legend gutter, so the plot ends at
+ *   the gutter and a 2θ label on that edge is drawn whole.
  *
  * A cumulative χ² is re-based at every x zoom (`chi2Base`), so it starts at
  * zero at the view's left edge, as the window route's did.
@@ -1097,6 +1174,9 @@ export function pattern(uPlot, host, curves, spec) {
   const drawTicks = (u) => tickRows(u, state.c.ticks, spec.colors(), (phase) => state.hidden.has(`ticks:${phase}`));
 
   function drawZero(u) {
+    // a pane that draws nothing has uPlot's 0 to 100 for a range, and a zero
+    // line there sits on its foot for no reason the data gives (WP-2245)
+    if (!drawsData(u)) return;
     if (state.residual === "weighted" && state.c.header.fit) sigmaBand(u, token("--hover"));
     if (state.residual !== "cumulative") zeroLine(u, spec.colors().zero);
   }
@@ -1110,9 +1190,10 @@ export function pattern(uPlot, host, curves, spec) {
 
   state.c = prepare(curves);
   const group = panes(uPlot, host, {
-    x: curves.arrays.two_theta,
+    x: curves.arrays.two_theta, padRight: spec.padRight,
     panes: [
       { key: "main", share: 1, y: state.y, auto: spec.ranges?.main, label: () => spec.labels?.y?.() ?? "",
+        grid: true, padTop: MARK_ROOM, titled: spec.titled,
         series: [markers("obs"), markers("masked"),
                  { show: !state.hidden.has("calc"), stroke: ink("calc"), width: 1.2 },
                  { show: !state.hidden.has("bkg"), stroke: ink("bkg"), width: 1, dash: [3, 3] }],
@@ -1120,10 +1201,11 @@ export function pattern(uPlot, host, curves, spec) {
       // the difference, then the reflection ticks at the foot carrying the x
       // axis, as the prototype stacks them
       { key: "resid", height: RESID_HEIGHT, auto: spec.ranges?.resid,
-        label: () => spec.labels?.resid?.() ?? "",
+        label: () => spec.labels?.resid?.() ?? "", padTop: MARK_ROOM, titled: spec.titled,
         series: [{ show: residShown(), stroke: ink("diff"), width: 1 }],
         data: residData(), hooks: hooks("resid", { drawAxes: [drawZero] }) },
       { key: "ticks", height: footHeight(Object.keys(state.c.ticks).length), range: [0, 1], yLabels: false,
+        titled: spec.titled,
         xLabels: true, xLabel: "2θ (°)",
         series: [{ show: false }], data: nulls(), hooks: hooks("ticks", { draw: [drawTicks] }) },
     ],
@@ -1465,9 +1547,13 @@ export function trajectory(uPlot, host, traj, spec) {
   const none = () => ({ stroke: null, fill: null, clip: null, band: null, gaps: null, flags: 0 });
   const group = panes(uPlot, host, {
     x: xs,
+    // the backward chain rides as a second series, painting nothing too, so
+    // an axis asking whether the pane draws a value in view (`drawsData`) sees
+    // a stretch only the backward pass recovered
     panes: [{ key: "traj", share: 1, xLabels: true, xLabel: spec.xLabel ?? "", label: spec.yLabel ?? "",
-              auto: extent, series: [{ paths: none, points: { show: false } }],
-              data: [Array.from(order, (i) => value(i))], hooks: { draw: [draw] } }],
+              auto: extent, series: [{ paths: none, points: { show: false } }, { paths: none, points: { show: false } }],
+              data: [Array.from(order, (i) => value(i)), Array.from(order, (i) => back(i))],
+              hooks: { draw: [draw] } }],
   });
 
   group.onPoint = null;

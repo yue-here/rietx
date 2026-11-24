@@ -189,3 +189,62 @@ def test_the_stage_record_names_the_hold_and_the_value_stays(twin_fit):
     # held for the stage, never for good: the declared free set keeps it
     assert "instrument.profile.u" in ref._free_paths
     assert np.isfinite(result.statistics.rwp)
+
+
+def test_the_answer_says_which_widths_the_hold_kept_and_whose_values(twin_fit):
+    """``INSTRUMENT_WIDTH_HELD`` (WP-2225, ruled 2026-11-20): read off the last
+    stage's record, exactly, so it names U, the specimen width beside it and where U's value came
+    from, which here is the start: no earlier stage freed U."""
+    _, result = twin_fit
+    (found,) = [d for d in result.diagnostics if d.code == "INSTRUMENT_WIDTH_HELD"]
+    last = result.stages[-1]
+    assert found.where == sorted(last.width_twins_held) + ["phases.0.gauss_strain"]
+    assert found.where[0] == "instrument.profile.u"
+    assert found.level == "warning" and found.value == 1.0
+    assert f"The last stage, {last.name!r}" in found.message
+    # ruled 2026-11-21: the message names the term, and says no "twin"
+    assert "held the instrument width term U fixed" in found.message
+    assert "U with phases.0.gauss_strain" in found.message
+    assert "twin" not in (found.message + found.suggestion).lower()
+    assert "the ones the fit started from" not in found.message
+    assert "The held value is the one the fit started from" in found.message
+    assert "lab_calibrate" in found.suggestion
+
+
+def test_a_width_seeded_then_held_names_the_seed_and_not_an_earlier_stage():
+    """A stage seeds a floored width before the hold reads it, so a Y lifted
+    off 0 and held keeps the seed: the stage that seeded it is the source,
+    even where it is the last stage and an earlier one refined X."""
+    from rietx.refine import _instrument_width_held_diagnostics
+    from rietx.schemas.results import StageResult
+
+    common = dict(status="converged", n_iterations=1, cost_initial=1.0, cost_final=1.0)
+    first = StageResult(name="widths", freed=["instrument.profile.x"], **common)
+    last = StageResult(name="sample", freed=[], seeded={"instrument.profile.y": 1e-4},
+                       width_twins_held={"instrument.profile.x": ["phases.0.lor_size"],
+                                         "instrument.profile.y": ["phases.0.lor_strain"]},
+                       **common)
+    (found,) = _instrument_width_held_diagnostics([first, last])
+    assert ("the ones stage 'widths' left for X; "
+            "the ones stage 'sample' seeded for Y") in found.message
+
+
+def test_a_fit_whose_last_stage_held_no_instrument_width_says_nothing():
+    data = synthesize()
+    structure, ins = perturbed_models()
+    ins.profile.u.value = 2e-3
+    plan = RefinementPlan(stages=[  # twin_fit's, with no specimen width freed
+        Stage(name="scale+bkg", turn_on=["phases.*.scale", "instrument.background.*"]),
+        Stage(name="cell", turn_on=["phases.*.cell.*", "instrument.zero_shift"]),
+        Stage(name="widths", turn_on=["instrument.profile.u", "instrument.profile.w"]),
+    ])
+    result = Refinement(structure, ins).fit(data, plan=plan, telemetry=False)
+    from pathlib import Path
+
+    from rietx.viz.plots import plot_result
+    out = Path(__file__).parent / "output"
+    out.mkdir(exist_ok=True)
+    plot_result(result, path=str(out / "wp2225_no_width_held.png"))
+    assert all(not s.width_twins_held for s in result.stages)
+    assert result.statistics.rwp < 0.2
+    assert "INSTRUMENT_WIDTH_HELD" not in {d.code for d in result.diagnostics}

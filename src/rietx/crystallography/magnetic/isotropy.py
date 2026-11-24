@@ -937,9 +937,9 @@ def _candidate_group(little: LittleGroup, cell: MagneticCell,
     structure).  The earlier text of this paragraph argued that a displacive
     stabiliser is "always grey" and therefore right with the parent lattice;
     grey is right, the parent lattice is not.  The groups are checked against
-    the stabiliser of the candidate's own field (``tests/
-    test_magnetic_isotropy.py::test_every_candidates_declared_group_is_the_
-    stabiliser_of_its_own_field``).
+    the stabiliser of the candidate's own field
+    (``tests/test_magnetic_isotropy.py``,
+    ``test_every_candidates_declared_group_is_the_stabiliser_of_its_own_field``).
 
     **The Q23 correction, kind-independent.** The seed set built from
     ``stabilizer`` times ``cell.translations`` is not always already closed

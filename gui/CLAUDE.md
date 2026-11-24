@@ -4,14 +4,12 @@ Scope: the refinement GUI's rulebook. It loads when a session works under `gui/`
 `src/rietx/gui/CLAUDE.md` points here. The root CLAUDE.md holds the pipeline and the
 package-wide invariants. Sections follow the files a session edits.
 
-Each rule names its WP. The measurement, story or example behind it is in that WP file:
-its § "Moved from gui/CLAUDE.md" holds the paragraph this file carried until WP-2134,
-verbatim. A rule enters here only as a standing rule with its identifiers and anchor
+Each rule names its WP, which holds its evidence (since WP-2134, under § "Moved from
+gui/CLAUDE.md"). A rule enters here only as a standing rule with its identifiers and anchor
 (`docs/milestones/process.md` § The rule); its evidence goes to the WP.
-`tests/test_docs_consistency.py::test_gui_rulebook_paths_resolve` fails on a path written
-here with a directory (`lib/plot.ts`, `gui/session.py`) that no longer exists, and on a
-`file:symbol` whose symbol has left the file. Write paths that way, so a rename breaks the
-test and never silently the rule.
+`tests/test_docs_consistency.py::test_rulebook_paths_and_names_resolve` fails on a path with
+a directory (`lib/plot.ts`) or a `file:symbol` that has gone. Write paths that way, so a
+rename breaks the test and never silently the rule.
 
 How the GUI looks and behaves, with each rule's motive, is `gui/STYLE.md` (WP-2142):
 read it before changing either.
@@ -20,7 +18,7 @@ read it before changing either.
 
 - **Every choice the GUI offers ships a default that suits most phases; a setting is for
   the rest** (the maintainer's rule, WP-1462). A user who never opens a drawer sees the
-  conventional picture (ellipsoids at 50 %, bonds at 1.15×(rᵢ+rⱼ)). A default is measured
+  conventional picture. A default is measured
   across phases, and the measurement is kept where the choice is made. A setting most
   users would change means the default is wrong.
 
@@ -44,10 +42,9 @@ read it before changing either.
   `src/rietx/viz/static` by `gui/scripts/vendor.py`, the build's first step, which records
   each copy's version in `VENDORED.json`: bump the pin in `gui/package.json`, then build.
 - **The node floor is the strictest `engines` entry in `gui/package-lock.json`**
-  (WP-1442; re-read 2026-11-09 by WP-2134: jsdom 30 asks `^22.22.2 || ^24.15.0 || >=26`).
-  Under an older node, rolldown fails at import with a message naming neither node nor
-  a version. A `node_modules` installed under the old node fails under the new one, so
-  `npm ci` again after switching.
+  (WP-1442, WP-2134).
+  Under an older node, rolldown fails at import naming neither node nor a version. After
+  switching node, `npm ci` again.
 - **The rebuild is `gui/src/next/`, a second page built in a second pass**
   (`vite build --mode next`, served at `/next`, WP-2215): one multi-entry pass makes
   today's page load a shared chunk. A shared panel the new page must change moves
@@ -81,8 +78,7 @@ read it before changing either.
   `lib/resize.test.ts`'s `ported cases` block equal to `tests/watch_core.test.mjs`,
   comments included. Edit one and the other fails until it follows.
 - **Drive a real browser for any layout, cursor, hover or paint change.** jsdom has no
-  layout, no hover and no cursor; most traps in this file were found only in a browser.
-  The chromium binaries are cached even without playwright: `npm i playwright-core` in a
+  layout, no hover and no cursor. The chromium binaries are cached even without playwright: `npm i playwright-core` in a
   scratch directory, never in `gui/` (the lockfile is committed), and point it at the
   cached executable. When a browser pass reports the impossible, suspect the harness
   first (headless playwright auto-dismisses dialogs).
@@ -217,8 +213,8 @@ Each was found in a browser, and jsdom cannot see it.
 
 ## House style and help
 
-`gui/src/app.css`, `gui/src/tokens.css`, `gui/src/Help.svelte`, `lib/help.ts`. The
-visual rules in this section are listed in WP-2134 for the GUI style guide.
+`gui/src/app.css`, `gui/src/tokens.css`, `gui/src/Help.svelte`, `lib/help.ts`. The visual
+rules in this section are listed in WP-2134 for the GUI style guide.
 
 - **The token values are Python and `gui/src/tokens.css` is generated** (WP-1429;
   root § Conventions). Regenerate with `python -m rietx.viz.theme > gui/src/tokens.css`,
@@ -276,11 +272,12 @@ visual rules in this section are listed in WP-2134 for the GUI style guide.
 - **GUI prose is written under `/yue-docs-style`** (WP-1201): help entries, wizard lines,
   empty states, error text.
 - **What a name means is an entry in `rietx.help`, reached through `<Help>`** (WP-1203).
-  One instance in `App.svelte`. A key is `arm:name`, crossed against
+  One per page, `HelpPopover.svelte`. A key is `arm:name`, crossed against
   `tests/data/gui/help_keys.json`. A field inventory derives its key from the field's
   name where the arm shares the vocabulary (`lib/controls.ts`, `lib/wizard.ts`) and
-  carries it as data otherwise (`lib/model.ts`). `<Help text=…>` is for a sentence the
-  server wrote about one row (`held_because`, a refutation).
+  carries it as data otherwise (`lib/model.ts`). `<Help text=…>` is for the
+  server's sentence about one row (`held_because`, a refutation); `for` with `title`
+  is one row's one-line summary, keeping the entry's manual link (WP-2240).
 - **`title=` is what is left over** (WP-1203): a value the layout truncated, or a verb
   phrase on a `<button>`, never authored prose. `lib/help.test.ts` holds an exact
   per-file count, failing both ways.
@@ -353,6 +350,8 @@ visual rules in this section are listed in WP-2134 for the GUI style guide.
 - **Hiding a curve is by exception** (WP-1032): `curveToggles`/`hidden`, unpersisted.
 - **A layer is drawn where it can be edited** (WP-1210): peak markers and their curve
   only while the Peaks tab is up, so `peaksActive` is a drawing input of the repaint.
+- **At `/next` a peak mark is a lens echoing the ticks** (WP-2240,
+  `lib/plot.ts:LENS_HEIGHT`). Today's Peaks tab keeps § House style's shapes.
 - **A curve that cannot be drawn is listed, disabled, with its reason** (WP-1210):
   `CurveToggle.absent`; `dataOnlyHidden` covers absent ids too.
 - **A hover link never repaints the pattern** (WP-1032): the ring is a DOM mark.
@@ -401,7 +400,7 @@ visual rules in this section are listed in WP-2134 for the GUI style guide.
 - **`/api/index` and `/api/index/extinction` are run kinds on the one machine** (WP-1027).
   A cancelled search returns what it has; its status is read off the token. The screen is
   gated on neither the adopt verdict nor a phase.
-- **Any candidate can be adopted** (the maintainer's ruling B, 2026-11-08, WP-2124). The
+- **Any candidate can be adopted** (the maintainer's ruling, WP-2124). The
   arm's `picked` is the gate's pick; its `why` is written into the `edit_model` node when
   another row is adopted. Badges follow the server (`adopt`, `best`). The panel enables
   Adopt on every row, prints `why` under the grade and badges only `picked` (WP-2130).
