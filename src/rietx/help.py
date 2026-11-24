@@ -1803,7 +1803,7 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "structural parameter, such as a scale or a displacement parameter. The fit "
             "can then trade intensity between them, and Rwp still improves. The scales, "
             "displacement parameters and phase fractions come out biased. Stiffen the "
-            "background, or hold an estimated curve fixed."
+            "background, or hold a measured blank fixed."
         ),
     ),
     "BACKGROUND_ORDER_AT_CAP": HelpEntry(
