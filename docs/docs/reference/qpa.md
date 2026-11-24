@@ -6,7 +6,7 @@ A Rietveld fit refines one scale per phase, and the scales are proportional to h
 The Hill-Howard relation {cite}`hill1987` turns them into weight fractions, W<sub>p</sub> ∝ S<sub>p</sub>·(ZMV)<sub>p</sub>, renormalised to sum to 1 across the phases {eq}`corr-qpa`.
 Every Rietveld fit reports them on `RefinementResult.qpa`, and a single phase reads 100 % (unless it has no reflection in range, which leaves it none).
 A Le Bail or Pawley fit reports none, because its scales are degenerate with the extracted intensities.
-[How to find the weight fraction of each phase in a mixture](../guides/qpa.md) gives the procedure on a shipped pattern.
+[How to find the weight fraction of each phase in a mixture](../guides/qpa.md) gives the procedure on a pattern included with the package.
 
 <!-- api-doc: no-exec — it refines a three-phase mixture -->
 ```python
