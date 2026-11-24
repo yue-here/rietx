@@ -3267,11 +3267,12 @@ FEATURE_TESTS: dict[str, tuple[str, ...]] = {
     ),
     "tof_calibration": (
         "test_tof_axis.py::test_a_synthetic_bank_converts_back_to_the_d_spacings_it_was_built_from",
-        "test_tof_axis.py::test_fit_refuses_a_tof_pattern_against_a_cw_instrument",
+        "test_tof_refine.py::test_the_engine_recovers_the_generating_bank",
     ),
     "tof_profile": (
         "test_instrument_tof.py::test_the_default_type_three_block_is_read_in_the_manuals_order",
-        "test_tof_axis.py::test_fit_refuses_a_tof_pattern_against_a_cw_instrument",
+        "test_profile_tof.py::test_a_zero_gaussian_width_is_the_pure_exponential_pair",
+        "test_tof_intensity_basis.py::test_leaving_out_the_channel_width_biases_biso_and_costs_rwp",
     ),
     "bragg_intensities": (
         "test_crystallography.py::test_structure_factor_against_reference",

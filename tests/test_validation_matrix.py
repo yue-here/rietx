@@ -430,8 +430,9 @@ def test_the_partition_check_names_a_new_family_and_a_dead_key() -> None:
 
 
 def test_a_feature_with_no_theory_heading_declares_why() -> None:
-    """The four featureless topics: a heading or a declared exception, not
-    both and not neither."""
+    """The three featureless topics: a heading or a declared exception, not
+    both and not neither.  ``tof_profile`` left the list when a bank began to
+    refine (#1548): its equations are on the Theory tab now."""
     from rietx.features import FEATURES
 
     for name, f in FEATURES.items():
@@ -439,8 +440,7 @@ def test_a_feature_with_no_theory_heading_declares_why() -> None:
             f"{name}: give it Theory headings or a no_theory reason, never "
             "both or neither")
     assert sorted(n for n, f in FEATURES.items() if f.no_theory) == [
-        "extinction_symbols", "joint_refinement", "peak_picking_and_fitting",
-        "tof_profile"]
+        "extinction_symbols", "joint_refinement", "peak_picking_and_fitting"]
 
 
 @pytest.mark.parametrize("claim", CLAIMS, ids=lambda c: c.test)
