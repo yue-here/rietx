@@ -115,7 +115,7 @@ from ..schemas.instrument import (
     BackgroundPSpline,
     Instrument,
 )
-from ..schemas.pattern import PatternData, require_two_theta
+from ..schemas.pattern import PatternData, SigmaRule, require_two_theta
 
 # PHASE_SUPPORT_SIGMA is re-exported beside the screen it is read against
 # (``phase_support``); the plan carries the number since WP-2002 B1, so it is
@@ -143,6 +143,17 @@ from .corrections import (
 )
 from .extinction import sabine_extinction, sabine_extinction_and_dx
 from .origin import CompiledOrigin, origin_residual
+from .peak_equations import (
+    WIDTH_TARGETS,
+    CompiledPeakEquation,
+    PhasePeakEquations,
+    check_orbits,
+    compile_equation,
+    compile_frame,
+    evaluate_angle,
+)
+from .peak_equations import evaluate as evaluate_peak_equation
+from .peak_equations import gradient as peak_equation_gradient
 from .preferred_orientation import (
     TEXTURE_SAMPLE_PSI_DEG,
     TEXTURE_SPHERE_SAMPLES,
@@ -154,7 +165,7 @@ from .preferred_orientation import (
     texture_index,
     texture_term_weights,
 )
-from .profiles.caglioti import gaussian_fwhm, lorentzian_fwhm
+from .profiles.caglioti import _MIN_GAMMA_G2, gaussian_fwhm, lorentzian_fwhm
 from .profiles.fcj import (
     fcj_extent_deg,
     fcj_live,
@@ -168,6 +179,7 @@ from .profiles.pseudovoigt import (
     pseudo_voigt_basis,
     pseudo_voigt_derivs,
     tch_gamma_eta,
+    tch_gamma_eta_partials,
 )
 from .profiles.voigt import (
     GAUSS_FWHM_TO_SIGMA,
@@ -175,6 +187,7 @@ from .profiles.voigt import (
     voigt,
     voigt_basis,
     voigt_derivs,
+    voigt_fwhm,
 )
 from .restraints import (
     CompiledRestraints,
@@ -209,9 +222,10 @@ from .restraints import (
 #: Since WP-2002 it is the **declared stages'** fraction only.  The answer is
 #: measured in the closing stage at ``schemas.plan.CLOSING_WINDOW_TOL``, and
 #: every compile that does not say otherwise uses that fraction too: a
-#: ``predict`` on a grid, a synthetic pattern, a stage run by hand (the
-#: seventh round's Q1).  The plan runner asks for this one by name, through
-#: :func:`recorded_window_tol`.
+#: ``predict`` on a grid before any fit, a synthetic pattern, a stage run by
+#: hand (the seventh round's Q1).  After a fit, ``predict`` on a grid compiles
+#: at the last stage's fraction (WP-2235).  The plan runner asks for this
+#: one by name, through :func:`recorded_window_tol`.
 WINDOW_AREA_TOL = 2e-2
 #: Absolute slack added to every half-width: windows are frozen per stage,
 #: so a peak must stay inside its window while zero-shift, displacement and
@@ -342,10 +356,41 @@ REFLECTION_MARGIN_DEG = 0.5
 #: always the refined one.
 MAGNETIC_SIZING_FLOOR = 0.1
 
-#: Distinct keys :meth:`CompiledModel._memo` holds per slot.  Two, because a
-#: Jacobian column alternates between the expansion point and one perturbed
-#: state; see that method for the measurement and for why this is capped.
+#: Recent keys :meth:`CompiledModel._memo` holds per slot, *beside* the pinned
+#: expansion point (:class:`_MemoSlot`).  The pin is what a Jacobian's
+#: alternation needs; this list is only the residual's trail between
+#: Jacobians, and that method carries the measurement sizing it.
 _MEMO_DEPTH = 2
+
+#: Set while :meth:`CompiledModel.derivative_bases` builds the expansion
+#: point's peaks, so :meth:`CompiledModel._memo` pins what it hands back there
+#: (WP-1945).  Private and scoped by :func:`_pinning_expansion_point`.
+_MEMO_PIN: ContextVar[bool] = ContextVar("_MEMO_PIN", default=False)
+
+
+@contextmanager
+def _pinning_expansion_point():
+    """Every memo lookup inside the block pins its entry (WP-1945)."""
+    token = _MEMO_PIN.set(True)
+    try:
+        yield
+    finally:
+        _MEMO_PIN.reset(token)
+
+
+class _MemoSlot:
+    """One memo slot: the pinned expansion point and the recent keys.
+
+    ``pin`` is the ``(key, value)`` the last :meth:`derivative_bases` asked
+    for, and no run of other keys evicts it; ``recent`` is a most-recent-first
+    list of at most :data:`_MEMO_DEPTH` other entries.
+    """
+
+    __slots__ = ("pin", "recent")
+
+    def __init__(self) -> None:
+        self.pin: tuple | None = None
+        self.recent: list[tuple] = []
 
 
 def _freeze(value) -> None:
@@ -569,7 +614,7 @@ def _line_image_deg(tt_primary, lam_ratio: float, xp):
 
     sin θ_l = (λ_l/λ_0)·sin θ_0, which is the same ghost transform
     ``background.diagnostics`` uses and the same one
-    ``indexing.peakfit._line_pos`` applies to a fitted position.  Written in
+    ``indexing.peakfit._GroupModel._line_pos`` applies to a fitted position.  Written in
     ``xp`` ops because ``tt_primary`` is θ-derived: this is on the traced path
     for every backend.
 
@@ -802,7 +847,7 @@ class CompiledPhase:
     # profile width leaves both the cell block and |F|² alone.  ``None`` keeps
     # the hot loop exactly as it was; numpy path only, for the reason the FCJ
     # memo is numpy-only.
-    scalar_cache: dict[str, tuple] | None = None
+    scalar_cache: dict[str, _MemoSlot] | None = None
     # WP-1326.  ``satellites`` is the second ReflectionSet, frozen at stage
     # compile beside the nuclear one, kept whole so a caller can ask what was
     # generated and from which k; ``reflections`` above is the **merge** of the
@@ -867,6 +912,11 @@ class CompiledPhase:
     win_mag: np.ndarray | None = None       # (n_lines, N, 2) int
     fcj_n_mag: np.ndarray | None = None     # (n_lines, N) int
     batch_mag: BatchLayout | None = None
+    # WP-2107.  The phase's peak equations by target, and the frozen frame
+    # (hkl, multiplicity, orbit images, harmonic coefficients) they are
+    # evaluated on.  ``None`` is exactly off: a phase declaring none reaches
+    # every expression below as it always did.
+    peq: PhasePeakEquations | None = None
 
 
 @dataclass
@@ -1024,16 +1074,25 @@ class CompiledModel:
     # ``compile_model`` resolved it (``WINDOW_MIN_DEG`` unless a stage set
     # ``window_slack_deg``), so ``rewindow`` sizes by the compile's rule.
     window_slack_deg: float = WINDOW_MIN_DEG
+    # WP-2107.  The instrument's ``shift`` equation, which moves every phase's
+    # peaks and reads only the angle, so it sits in ``_position_shift_deg``
+    # beside the zero and the geometry's shifts.  ``None`` is exactly off.
+    inst_shift: CompiledPeakEquation | None = None
     # The origin restraint of a ``Phase.floating_origin = "centroid"`` phase
     # (WP-1912, Flack & Schwarzenbach 1988; ``model.origin``): one row per
     # direction this solve's free set can slide the phase along.  ``None``
     # everywhere else, and then no row exists.  Written by the stage runner
-    # (``refine._attach_origin``) once the stage's free set is final, since
+    # (``model.origin.compile_origin``) once the stage's free set is final, since
     # the rows depend on it and ``compile_model`` sees only what may move; so
     # frozen per solve, never per evaluation.  Its own block below the soft
     # restraints, and deliberately NOT scaled by ``restraint_weight_scale``:
     # c_w = 0 silences the restraints the caller declared, never the origin.
     origin: "CompiledOrigin | None" = None
+    # Which σ rule weighted the fitted channels, counted over this compile's own
+    # window (``PatternData.sigma_rule``, WP-1952): what
+    # ``RefinementResult.sigma_rule`` carries.  ``None`` only on a model built
+    # without ``compile_model``.
+    sigma_rule: SigmaRule | None = None
     meta: dict = field(default_factory=dict)
 
     # ------------------------------------------------------------------
@@ -1170,7 +1229,10 @@ class CompiledModel:
         because it answers a question about the *goniometer*: "how narrow can a
         real reflection be here?".  That is the scale a background peak's width
         is judged against (``strategy.staged.check_hump_width``), and
-        it must not depend on which phase one happens to ask about.
+        it must not depend on which phase one happens to ask about.  It reads
+        the TCH quintic under either shape, so under ``"voigt"`` it sits up to
+        0.43 % from :meth:`peak_fwhm`'s Olivero-Longbothum width (WP-1926): a
+        scale, not a reported width.
 
         Evaluate-only and off the hot path: plain floats in, the shared
         ``profiles`` functions through the active backend.
@@ -1221,6 +1283,13 @@ class CompiledModel:
                 values[f"instrument.geometry.{CAPILLARY_OFFSETS[0]}"],
                 values[f"instrument.geometry.{CAPILLARY_OFFSETS[1]}"],
                 self.radius_mm)
+        if self.inst_shift is not None:
+            # WP-2107: the instrument's equation reads the Bragg θ (radians)
+            # and the 2θ every term above has already moved the peak to
+            xp = get_backend()
+            shift = shift + evaluate_angle(
+                self.inst_shift, values, theta=xp.radians(theta),
+                two_theta=tt_bragg + shift)
         return shift
 
     def generation_window(self, values: dict[str, float]) -> tuple[float, float]:
@@ -1239,12 +1308,20 @@ class CompiledModel:
                                                              values))
 
     def apparent_two_theta(self, tt_bragg: np.ndarray,
-                           values: dict[str, float]) -> np.ndarray:
+                           values: dict[str, float], *, phase: int | None = None,
+                           d=None) -> np.ndarray:
         """Where a reflection at Bragg angle ``tt_bragg`` is drawn, in °2θ.
 
         The Bragg angle plus :meth:`_position_shift_deg`.  Pass one emission
         line's angles at a time: each line has its own θ, so a Kα2 image takes
         a different shift from its Kα1 partner.
+
+        ``phase`` adds that phase's ``shift`` equation (WP-2107), and then
+        ``tt_bragg`` must be the phase's own reflection list at one line, since
+        the equation reads each reflection's indices.  ``d`` is that list's
+        d-spacings, taken off the cell when not given.  A caller holding angles
+        that are no reflection list (the satellite report's lattice) passes no
+        phase and reads the pattern level.
 
         It is one function because the forward model and every builder of a
         position owe each other the same answer to *where is the peak*.  The
@@ -1255,8 +1332,13 @@ class CompiledModel:
         2·s·cosθ/R (0.26° at 27° for s = 0.5 mm on a 217.5 mm circle) while
         the calculated curve sat on the data.
         """
-        return tt_bragg + self._position_shift_deg(0.5 * tt_bragg, tt_bragg,
-                                                   values)
+        drawn = tt_bragg + self._position_shift_deg(0.5 * tt_bragg, tt_bragg,
+                                                    values)
+        peq = None if phase is None else self.phases[phase].peq
+        if peq is None or not peq.has("shift"):
+            return drawn
+        return drawn + self.phase_term(phase, "shift", values, tt_bragg, d=d,
+                                       drawn=drawn)
 
     def reflection_positions(self, ip: int, values: dict[str, float]
                              ) -> tuple[np.ndarray, np.ndarray]:
@@ -1304,7 +1386,7 @@ class CompiledModel:
         out = []
         for lam in self.line_lambdas(values):
             bragg = cp.reflections.two_theta(cell, lam)
-            out.append((bragg, self.apparent_two_theta(bragg, values)))
+            out.append((bragg, self.apparent_two_theta(bragg, values, phase=ip)))
         return out
 
     def _absorption(self, tt_bragg: np.ndarray) -> np.ndarray | float:
@@ -1367,11 +1449,58 @@ class CompiledModel:
         elif self.geometry_kind == "debye_scherrer" and self.radius_mm:
             key.extend(float(values[f"instrument.geometry.{name}"])
                        for name in CAPILLARY_OFFSETS)
+        if self.inst_shift is not None:
+            key.extend(self.inst_shift.key(values))
         return tuple(key)
 
+    def _phase_cell(self, ip: int, values: dict[str, float]) -> tuple:
+        return tuple(values[f"phases.{ip}.cell.{k}"]
+                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+
+    def phase_term(self, ip: int, target: str, values: dict[str, float],
+                   tt_bragg, *, d=None, drawn=None):
+        """Phase ip's ``target`` equation at one emission line's reflections.
+
+        ``tt_bragg`` is that line's Bragg 2θ of every reflection; ``d`` the
+        reflections' d-spacings (taken off the cell when not given); ``drawn``
+        the 2θ the pattern-level terms draw them at (taken from
+        :meth:`apparent_two_theta` when not given), which is what ``two_theta``
+        reads (WP-2107).  The value is on the active backend, one per
+        reflection.
+        """
+        cp = self.phases[ip]
+        eq = cp.peq.equations[target]
+        cell = self._phase_cell(ip, values)
+        if d is None:
+            d = d_spacings(cp.reflections.index, *cell)
+        if drawn is None:
+            drawn = self.apparent_two_theta(tt_bragg, values)
+        xp = get_backend()
+        return evaluate_peak_equation(
+            eq, values, cp.peq.frame.at(cell), d=d,
+            theta=xp.radians(0.5 * tt_bragg), two_theta=drawn)
+
+    def _peq_key(self, ip: int, values: dict[str, float], targets) -> tuple:
+        """What phase ip's ``targets`` equations read beyond the cell and λ:
+        their coefficients, and the pattern-level shift their ``two_theta``
+        follows.  ``()`` for a phase with none of them."""
+        peq = self.phases[ip].peq
+        if peq is None or not peq.has(*targets):
+            return ()
+        return (peq.key(values, targets), self._shift_key(values))
+
     def _width_block(self, ip: int, values: dict[str, float],
-                     tt_bragg_lines: list, aniso, *, magnetic: bool = False):
+                     tt_bragg_lines: list, aniso, *, magnetic: bool = False,
+                     d=None):
         """The (w₁, w₂) pair of every emission line, at the current widths.
+
+        A phase's width equations (WP-2107) add where the built-in terms do:
+        a ``gauss_fwhm`` equation's square and a ``gauss_fwhm_squared`` one's
+        value to Γ_G² before its floor, a ``lor_fwhm`` one's value to Γ_L.
+        They read the reflection list, so ``tt_bragg_lines`` must be the
+        phase's own (``d`` its d-spacings, taken off the cell when not given)
+        whenever the phase carries one.  Both components take them: the
+        magnetic one is the nuclear one widened (WP-1343).
 
         ``magnetic=True`` returns the **magnetic component's** pair (WP-1343):
         the same two laws with ``magnetic_lor_size`` added to the 1/cosθ
@@ -1392,7 +1521,25 @@ class CompiledModel:
         ``+ 0.0``, so that a phase with no magnetic component reaches the same
         expression it always did.
         """
-        out = []
+        return [self._peak_widths(*self._line_fwhms(ip, values, tt_bragg, aniso,
+                                                    magnetic=magnetic, d=d))
+                for tt_bragg in tt_bragg_lines]
+
+    def _line_fwhms(self, ip: int, values: dict[str, float], tt_bragg, aniso, *,
+                    magnetic: bool = False, d=None):
+        """(Γ_G, Γ_L) of phase ip at one emission line: :meth:`_width_block`'s
+        arithmetic, which :meth:`peak_equation_partials` reads too."""
+        theta = 0.5 * tt_bragg  # Bragg angle drives the widths
+        extra_g2 = extra_l = None
+        peq = self.phases[ip].peq
+        if peq is not None and peq.has(*WIDTH_TARGETS):
+            extra_g2, extra_l = self._width_terms(ip, values, tt_bragg, d)
+        gam_g = gaussian_fwhm(theta, values["instrument.profile.u"],
+                              values["instrument.profile.v"],
+                              values["instrument.profile.w"],
+                              values[f"phases.{ip}.gauss_size"],
+                              values[f"phases.{ip}.gauss_strain"],
+                              extra_squared=extra_g2)
         if magnetic:
             x_l = (values["instrument.profile.x"]
                    + values[f"phases.{ip}.lor_size"]
@@ -1400,23 +1547,119 @@ class CompiledModel:
             y_l = (values["instrument.profile.y"]
                    + self.lor_strain_term(ip, values)
                    + values[f"phases.{ip}.magnetic_lor_strain"])
-        for tt_bragg in tt_bragg_lines:
-            theta = 0.5 * tt_bragg  # Bragg angle drives the widths
-            gam_g = gaussian_fwhm(theta, values["instrument.profile.u"],
-                                  values["instrument.profile.v"],
-                                  values["instrument.profile.w"],
-                                  values[f"phases.{ip}.gauss_size"],
-                                  values[f"phases.{ip}.gauss_strain"])
-            if magnetic:
-                gam_l = lorentzian_fwhm(theta, x_l, y_l, aniso)
+            gam_l = lorentzian_fwhm(theta, x_l, y_l, aniso)
+        else:
+            gam_l = lorentzian_fwhm(
+                theta,
+                values["instrument.profile.x"] + values[f"phases.{ip}.lor_size"],
+                values["instrument.profile.y"] + self.lor_strain_term(ip, values),
+                aniso)
+        if extra_l is not None:
+            gam_l = gam_l + extra_l
+        return gam_g, gam_l
+
+    def peak_equation_partials(self, ip: int, values: dict[str, float], path: str
+                               ) -> list[tuple] | None:
+        """Exact ∂(pos, w₁, w₂, intensity)/∂c per emission line for one phase
+        coefficient ``path`` (WP-2107), numpy, or ``None`` where it is not one
+        of phase ip's or the exact form does not hold.
+
+        The equation's own gradient (:func:`~rietx.model.peak_equations.gradient`)
+        carried through the one seam its target enters at:
+
+        * ``shift`` adds to the drawn position, so ∂pos = ∂f.
+        * ``lor_fwhm`` adds to Γ_L, so ∂Γ_L = ∂f.
+        * ``gauss_fwhm_squared`` adds to Γ_G² before the floor, so
+          ∂Γ_G = ∂f/(2Γ_G), and 0 on the floor, where Γ_G is constant.
+          ``gauss_fwhm`` adds f², so ∂Γ_G = f·∂f/Γ_G.
+        * Γ_G and Γ_L reach (w₁, w₂) through TCHZ's partials
+          (:func:`~rietx.model.profiles.pseudovoigt.tch_gamma_eta_partials`)
+          or the true Voigt's two divisions, which are linear.
+        * ``intensity_factor`` multiplies, so ∂I = (I/F)·∂F.  At F = 0 the
+          quotient is 0/0, so the method returns ``None`` and the caller
+          takes the scalar chain, which stays correct there.
+
+        No target reads another's value, and ``two_theta`` reads the position
+        before the phase's own ``shift``, so a phase coefficient reaches
+        nothing else.  Only the nuclear component: a phase whose magnetic
+        component is drawn on its own family (:meth:`mag_split`) carries the
+        equations there too, so ``_make_jacobian`` sends its coefficients to
+        the scalar chain instead, as it does the March and texture columns.
+        """
+        cp = self.phases[ip]
+        peq = cp.peq
+        if peq is None:
+            return None
+        hit = next(((target, k) for target, eq in peq.equations.items()
+                    for k, (_, p) in enumerate(eq.paths) if p == path), None)
+        if hit is None:
+            return None
+        target, k = hit
+        eq = peq.equations[target]
+        cell = self._phase_cell(ip, values)
+        d, tt_lines = self._cell_block(cp, cell, self.line_lambdas(values))
+        frame = peq.frame.at(cell)
+        peaks = (self.phase_peaks(ip, values) if target == "intensity_factor"
+                 else None)
+        aniso = (self.strain_width(ip, values, d)
+                 if target in WIDTH_TARGETS else None)
+        out = []
+        for il, tt in enumerate(tt_lines):
+            f, parts = peak_equation_gradient(
+                eq, values, frame, d=d, theta=np.radians(0.5 * tt),
+                two_theta=self.apparent_two_theta(tt, values))
+            g = parts[k]
+            zero = np.zeros_like(g)
+            if target == "shift":
+                out.append((g, zero, zero, zero))
+                continue
+            if target == "intensity_factor":
+                inten = np.asarray(peaks[il][3], dtype=np.float64)
+                live = inten != 0.0
+                if np.any(live & (f == 0.0)):
+                    return None
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    out.append((zero, zero, zero,
+                                np.where(live, inten / f * g, 0.0)))
+                continue
+            gam_g, gam_l = self._line_fwhms(ip, values, tt, aniso, d=d)
+            gam_g = np.asarray(gam_g, dtype=np.float64)
+            d_g = d_l = zero
+            if target == "lor_fwhm":
+                d_l = g
             else:
-                gam_l = lorentzian_fwhm(
-                    theta,
-                    values["instrument.profile.x"] + values[f"phases.{ip}.lor_size"],
-                    values["instrument.profile.y"] + self.lor_strain_term(ip, values),
-                    aniso)
-            out.append(self._peak_widths(gam_g, gam_l))
+                d_g2 = g if target == "gauss_fwhm_squared" else 2.0 * f * g
+                floored = gam_g == np.sqrt(_MIN_GAMMA_G2)
+                d_g = np.where(floored, 0.0, d_g2 / (2.0 * gam_g))
+            if self.shape == "voigt":
+                d_w1, d_w2 = fwhm_to_voigt_params(d_g, d_l)
+            else:
+                pg, pl, eg, el = tch_gamma_eta_partials(
+                    gam_g, np.asarray(gam_l, dtype=np.float64))
+                d_w1, d_w2 = pg * d_g + pl * d_l, eg * d_g + el * d_l
+            out.append((zero, d_w1, d_w2, zero))
         return out
+
+    def _width_terms(self, ip: int, values: dict[str, float], tt_bragg, d=None):
+        """(term of Γ_G², term of Γ_L) phase ip's width equations add at one
+        line, each ``None`` where the phase has no such equation (WP-2107).
+
+        A ``gauss_fwhm`` value g enters Γ_G² as g², a ``gauss_fwhm_squared``
+        value as it stands; both sum when both are declared.
+        """
+        peq = self.phases[ip].peq
+        drawn = self.apparent_two_theta(tt_bragg, values)
+        g2 = lor = None
+        if "gauss_fwhm" in peq.equations:
+            g = self.phase_term(ip, "gauss_fwhm", values, tt_bragg, d=d, drawn=drawn)
+            g2 = g * g
+        if "gauss_fwhm_squared" in peq.equations:
+            sq = self.phase_term(ip, "gauss_fwhm_squared", values, tt_bragg, d=d,
+                                 drawn=drawn)
+            g2 = sq if g2 is None else g2 + sq
+        if "lor_fwhm" in peq.equations:
+            lor = self.phase_term(ip, "lor_fwhm", values, tt_bragg, d=d, drawn=drawn)
+        return g2, lor
 
     def line_lambdas(self, values: dict[str, float]) -> list:
         """λ per emission line, from θ where it is a row and frozen otherwise.
@@ -1493,47 +1736,71 @@ class CompiledModel:
         this repository.  Freezing the arrays costs nothing per call and turns
         the corruption into a ``ValueError`` naming the write.
 
-        **Two keys deep, because a Jacobian alternates between exactly two**
-        (WP-1121).  A column perturbs one parameter and leaves the rest at the
-        expansion point, so a run of columns that do not touch this block all
-        want the *same* base key — and one cell column between two of them is
-        enough to evict it from a one-deep slot, which then rebuilds a block
-        the perturbation could not have changed.  Measured on the trigger cold
-        fit: 63.6 % of column-seam lookups hit at depth 1 against 72.9 % with
-        an unbounded cache, the gap worth 0.29 s of 8.8 s, and |F|² alone —
-        145 µs a build — carrying 0.17 s of it.
+        **The expansion point is pinned, because no depth holds it** (WP-1945,
+        correcting WP-1121).  A column perturbs one parameter and leaves the
+        rest at the expansion point, so a run of columns that do not touch
+        this block all want the *same* base key.  WP-1121 read that as an
+        alternation of two arms and kept two keys, least recently used first.
+        But a phase with two cell columns pushes the base out of two slots, so
+        the next column of that phase rebuilt every block at a state the memo
+        had already built: 129 of trigger's 172 ``lor_size`` columns rebuilt
+        the cell block and |F|², and none does pinned.  A deeper list only
+        moves the edge, since trigger's monoclinic phase has four cell
+        columns.  So
+        :meth:`derivative_bases`, which builds the peaks every column is
+        differenced against, runs its ``phase_peaks`` calls under
+        :func:`_pinning_expansion_point`, and the entry each lookup there
+        returns becomes the slot's ``pin``: replaced by the next expansion
+        point, never by a column.  An entry already on the recent trail moves
+        to the pin unbuilt, which is the accepted step's case (residual at the
+        trial point, then the Jacobian there).
 
-        Depth is capped rather than unbounded because the keys are decoded θ:
-        an unbounded map grows one entry per distinct parameter vector and a
-        fit visits thousands, so it is a leak wearing a cache's clothes.  Two
-        is what the *access pattern* asks for, not a tuning constant — the
-        alternation has two arms, and **depth 8 was measured to build exactly
-        the same 35 596 blocks as depth 2** on the trigger fit, to the call.
-        What the remaining 8 pp of the unbounded figure would take is a key
-        last seen in an *earlier Jacobian*, thousands of lookups ago; no cache
-        that is not a leak reaches it, and reading that gap as headroom is the
-        mistake this note exists to stop.
+        **The two-key measurement that sized the old depth could not have
+        come out any other way.**  The lookup then compared ``held[0]`` and
+        ``held[1]`` and nothing else, whatever ``_MEMO_DEPTH`` was, so depth
+        8 held six keys no lookup ever returned and built exactly the blocks
+        depth 2 built.  For the same reason the gap between depth 1 and an
+        unbounded cache was not keys from an *earlier Jacobian*: it was mostly
+        this one's evicted expansion point.  The lookup now scans every entry.
+
+        What remains is ``recent``, the trail of other keys, capped because
+        the keys are decoded θ: an unbounded map grows one entry per distinct
+        parameter vector and a fit visits thousands, so it is a leak wearing a
+        cache's clothes.  With the pin in place the trail's depth barely
+        matters, measured over nac, cpd-1a, cpd-2 and trigger by WP-1945's
+        replay probe (its handover names the script and holds the tables):
+        9732, 9724 and 9631 block builds on trigger at depth 1, 2 and 8,
+        against 11 428 for the shipped two-key memo.  It stays at 2.  Every count, Rwp and
+        refined value was bit-identical at all three depths, as a memo hit
+        must be.
         """
         cache = cp.scalar_cache
         if cache is None or get_backend().name != "numpy":
             return build()
         key = key_fn()
         held = cache.get(slot)
-        if held is not None:
-            if held[0][0] == key:
-                return held[0][1]
-            if len(held) > 1 and held[1][0] == key:
-                # promote, so an alternation keeps hitting rather than
-                # evicting the arm it is about to want again
-                held[0], held[1] = held[1], held[0]
-                return held[0][1]
+        if held is None:
+            held = cache[slot] = _MemoSlot()
+        pinning = _MEMO_PIN.get()
+        if held.pin is not None and held.pin[0] == key:
+            return held.pin[1]
+        recent = held.recent
+        for i, entry in enumerate(recent):
+            if entry[0] == key:
+                del recent[i]
+                if pinning:
+                    held.pin = entry
+                else:
+                    # most recent first, so the trail evicts its oldest key
+                    recent.insert(0, entry)
+                return entry[1]
         value = build()
         _freeze(value)
-        if held is None:
-            cache[slot] = [(key, value)]
+        if pinning:
+            held.pin = (key, value)
         else:
-            held.insert(0, (key, value))
-            del held[_MEMO_DEPTH:]
+            recent.insert(0, (key, value))
+            del recent[_MEMO_DEPTH:]
         return value
 
     def _atom_key(self, ip: int, values: dict[str, float]) -> tuple:
@@ -1819,6 +2086,20 @@ class CompiledModel:
         return surface_roughness_pitschke(tt_bragg, values[f"{base}.c"],
                                           values[f"{base}.tau"])
 
+    def _intensity_factor(self, ip: int, values: dict[str, float], tt_bragg, d):
+        """Phase ip's ``intensity_factor`` equation at one line, or ``None``.
+
+        **Every site that folds intensity by hand must call this**, for the
+        reason :meth:`_roughness_factor` states: the analytic coordinate, ADP,
+        March and texture columns bypass :meth:`phase_peaks`, and one that
+        skips the factor comes back short by exactly 1/F − 1 (43 % at F = 0.7
+        in the probe that scoped WP-2107).
+        """
+        peq = self.phases[ip].peq
+        if peq is None or not peq.has("intensity_factor"):
+            return None
+        return self.phase_term(ip, "intensity_factor", values, tt_bragg, d=d)
+
     def _peak_widths(self, gam_g: np.ndarray, gam_l: np.ndarray
                      ) -> tuple[np.ndarray, np.ndarray]:
         """(w₁, w₂) from component FWHMs: (Γ, η) for TCHZ, (σ, γ_HWHM) for Voigt."""
@@ -1834,23 +2115,30 @@ class CompiledModel:
         function need".  Under TCHZ ``w1`` already *is* Γ; under the true Voigt
         the pair is (σ, γ_HWHM), which inverts to the component FWHMs exactly
         (:func:`~rietx.model.profiles.voigt.fwhm_to_voigt_params` is two
-        divisions) and then goes through the same TCH quintic.  That last step
-        is the ~1 % approximation ``compile_model`` already relies on for
-        window sizing and FCJ node counts, and for the same reason: the quintic
-        is *fit* to the true Voigt FWHM.
+        divisions) and then goes through Olivero & Longbothum (1977)
+        (:func:`~rietx.model.profiles.voigt.voigt_fwhm`, 0.024 % worst), the width of
+        the shape actually evaluated (WP-1926, decided 2026-10-08).  The TCH
+        quintic (0.43 % worst against the Voigt) stays what
+        :meth:`peak_gamma_eta` returns, because window sizing and FCJ node
+        counts read it under either shape and are frozen per stage.
 
         Evaluate-only, and never in the hot loop — nothing in the residual
         needs a combined width.
         """
+        if self.shape == "voigt":
+            return voigt_fwhm(np.asarray(w1, dtype=np.float64) * GAUSS_FWHM_TO_SIGMA,
+                              2.0 * np.asarray(w2, dtype=np.float64))
         return self.peak_gamma_eta(w1, w2)[0]
 
     def peak_gamma_eta(self, w1: np.ndarray, w2: np.ndarray
                        ) -> tuple[np.ndarray, np.ndarray]:
         """TCHZ (Γ, η) from a :meth:`phase_peaks` width pair, under either shape.
 
-        :meth:`peak_fwhm`'s reading with the mixing parameter beside it, for a
+        The TCH quintic's reading with the mixing parameter beside it, for a
         consumer that sizes a window by ``compile_model``'s rule
-        (:func:`rewindow`).  Evaluate-only, like :meth:`peak_fwhm`.
+        (:func:`rewindow`).  Under ``"voigt"`` its Γ is the quintic, not
+        :meth:`peak_fwhm`'s Olivero-Longbothum width: window sizing keeps the
+        rule ``compile_model`` froze.  Evaluate-only, like :meth:`peak_fwhm`.
         """
         if self.shape == "voigt":
             gam_g = np.asarray(w1, dtype=np.float64) * GAUSS_FWHM_TO_SIGMA
@@ -2090,8 +2378,9 @@ class CompiledModel:
         # exactly what it depends on, which is what a Jacobian column's
         # perturbation is compared against.
         positions = self._memo(
-            cp, "pos", lambda: (cell_key(), self._shift_key(values)),
-            lambda: [self.apparent_two_theta(tt, values)
+            cp, "pos", lambda: (cell_key(), self._shift_key(values),
+                                self._peq_key(ip, values, ("shift",))),
+            lambda: [self.apparent_two_theta(tt, values, phase=ip, d=d)
                      for tt in tt_bragg_lines])
 
         def width_key():
@@ -2104,12 +2393,14 @@ class CompiledModel:
                     float(values[f"phases.{ip}.gauss_size"]),
                     float(values[f"phases.{ip}.gauss_strain"]),
                     float(values[f"phases.{ip}.lor_size"]),
-                    float(self.lor_strain_term(ip, values)))
+                    float(self.lor_strain_term(ip, values)),
+                    self._peq_key(ip, values, WIDTH_TARGETS))
 
         if component == 0:
             widths = self._memo(cp, "widths", width_key,
                                 lambda: self._width_block(ip, values,
-                                                          tt_bragg_lines, aniso))
+                                                          tt_bragg_lines, aniso,
+                                                          d=d))
         else:
             widths = self._memo(
                 cp, "widths_mag",
@@ -2117,7 +2408,7 @@ class CompiledModel:
                          float(values[f"phases.{ip}.magnetic_lor_size"]),
                          float(values[f"phases.{ip}.magnetic_lor_strain"])),
                 lambda: self._width_block(ip, values, tt_bragg_lines, aniso,
-                                          magnetic=True))
+                                          magnetic=True, d=d))
         if self.mode in ("lebail", "pawley"):
             lp_lines = absorb_lines = None
         else:
@@ -2131,6 +2422,17 @@ class CompiledModel:
             absorb_lines = self._memo(
                 cp, "abs", cell_key,
                 lambda: [self._absorption(tt) for tt in tt_bragg_lines])
+        # WP-2107: an ``intensity_factor`` equation, per line since it may
+        # read θ.  Rietveld only: compile refuses one under Le Bail or Pawley,
+        # whose extracted intensities would absorb it.
+        factor_lines = None
+        if cp.peq is not None and cp.peq.has("intensity_factor"):
+            factor_lines = self._memo(
+                cp, "peq_intensity",
+                lambda: (cell_key(),
+                         self._peq_key(ip, values, ("intensity_factor",))),
+                lambda: [self.phase_term(ip, "intensity_factor", values, tt, d=d)
+                         for tt in tt_bragg_lines])
 
         out = []
         for il, lam in enumerate(lams):
@@ -2165,6 +2467,8 @@ class CompiledModel:
                 rough = self._roughness_factor(tt_bragg, values)
                 if rough is not None:
                     intensity = intensity * rough
+                if factor_lines is not None:
+                    intensity = intensity * factor_lines[il]
             # a reflection pushed off the sphere (λ/2d > 1 → NaN position)
             # carries exactly zero intensity: Lp of a NaN angle is NaN, and the
             # masked profile (purity (c)) would otherwise multiply NaN·0
@@ -2849,6 +3153,11 @@ class CompiledModel:
             rough = self._roughness_factor(tt_bragg, values)
             if rough is not None:
                 col = col * rough
+            # a peak equation's intensity factor reads no coordinate, so it
+            # chains through unchanged, as roughness does (WP-2107)
+            factor = self._intensity_factor(ip, values, tt_bragg, d)
+            if factor is not None:
+                col = col * factor
             out.append(col)
         return out
 
@@ -2936,6 +3245,11 @@ class CompiledModel:
             rough = self._roughness_factor(tt_bragg, values)
             if rough is not None:
                 col = col * rough
+            # a peak equation's intensity factor reads no coordinate, so it
+            # chains through unchanged, as roughness does (WP-2107)
+            factor = self._intensity_factor(ip, values, tt_bragg, d)
+            if factor is not None:
+                col = col * factor
             out.append(col)
         return out
 
@@ -2947,24 +3261,26 @@ class CompiledModel:
         axial ratios (they move the quadrature nodes — see
         ``derivative_bases``), and anything unknown (falls back to FD).
         """
-        # A background peak is outside **every** analytic branch's reach, and
-        # this line is the declaration rather than the accident.  The default
-        # for an unrecognised path is already False, so this changes no
-        # dispatch; what it changes is that the exclusion is now stated where
-        # the reach is claimed, next to the ``surface_roughness`` clause that
-        # exists for the mirror-image reason (an unstated *inclusion* costs a
-        # slow test, an unstated *exclusion* is the class of bug WP-1070 filed
-        # — a column that comes back **short** rather than raising).
+        # An extra component is outside the per-peak scalar chain, and this
+        # line is the declaration rather than the accident.  Its columns have
+        # their own branch in ``optimize.least_squares._component_columns``
+        # (WP-2116): a hump's closed form, a declared peak's difference of its
+        # own curve, and the whole-model FD for a tie reaching anything else.
+        # The exclusion is stated where the reach is claimed, next to the
+        # ``surface_roughness`` clause that exists for the mirror-image reason
+        # (an unstated *inclusion* costs a slow test, an unstated *exclusion*
+        # is the class of bug WP-1070 filed — a column that comes back
+        # **short** rather than raising).
         #
-        # Short is exactly what does not happen here, and that is checkable
-        # rather than hopeful: the whole-model FD writes ``J[:n_data, c]`` only,
-        # and a peak parameter's derivative on every row below the data block is
-        # *identically* zero — the P-spline penalty rows are w·D₂·c in the
-        # background *coefficients*, the Pawley rows are in the intensity block,
-        # and a restraint row is a function of coordinates and cell.  So the
-        # rows the FD leaves at their zero initialisation are the rows whose
-        # true value is zero, and the FD column is exact because it decodes
-        # through C like the residual does.
+        # Short is what the component routes cannot be, and that is checkable
+        # rather than hopeful: each writes ``J[:n_data, c]`` only, and a
+        # component parameter's derivative on every row below the data block
+        # is *identically* zero — the P-spline penalty rows are w·D₂·c in the
+        # background *coefficients*, the Pawley rows are in the intensity
+        # block, and a restraint row is a function of coordinates and cell.
+        # A tie can carry a column onto a background coefficient as well,
+        # and then the whole-model FD writes that coefficient's penalty rows
+        # from the penalty matrix (``bkg_part`` in ``_make_jacobian``).
         if path.startswith("instrument.extra_components."):
             return False
         # A *declared sharp peak* widens what two instrument names reach, and
@@ -2987,6 +3303,12 @@ class CompiledModel:
         if path.startswith("phases."):
             return True
         if path in ("instrument.zero_shift", "instrument.polarization"):
+            return True
+        # an instrument peak equation (WP-2107) moves the drawn position of
+        # every phase's reflections, and through ``two_theta`` whatever a
+        # phase equation reads of it, all per-peak scalars; a declared peak
+        # is drawn where it is declared and never reads it
+        if path.startswith("instrument.peak_equations."):
             return True
         if path.startswith("instrument.geometry.sample_"):
             return True
@@ -3114,9 +3436,13 @@ class CompiledModel:
             if cp.batch_mag is not None:
                 jobs.append((ip, cp, 1, cp.batch_mag))
         for ip, cp, component, lay in jobs:
-            peaks = self.phase_peaks(
-                ip, values, None if intensities is None else intensities[ip],
-                component=component)
+            # the expansion point every peak-chain column of this Jacobian
+            # differences against: pinned, so no run of columns evicts it
+            # (``_memo``, WP-1945)
+            with _pinning_expansion_point():
+                peaks = self.phase_peaks(
+                    ip, values, None if intensities is None else intensities[ip],
+                    component=component)
             if component:
                 peaks_mag[ip] = peaks
             else:
@@ -4215,9 +4541,11 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
 
     ``window_area_tol`` is the area each window may drop from its peak, for the
     phase windows and the declared sharp peaks alike.  ``None`` is
-    ``schemas.plan.CLOSING_WINDOW_TOL``, the fraction an answer is measured
-    at, so a model evaluated outside a fit is the model a default fit's answer
-    came from (WP-2002, the seventh round's Q1).  The plan runner passes
+    ``schemas.plan.CLOSING_WINDOW_TOL``, so a model evaluated outside a fit
+    carries near-complete tails (WP-2002, the seventh round's Q1).  A default
+    fit's answer comes from ``WINDOW_AREA_TOL`` windows since the closing
+    stage went off by default (WP-2222), so rebuilding a fit's own curve
+    passes :func:`recorded_window_tol` of its last stage's record.  The plan runner passes
     ``WINDOW_AREA_TOL`` for a declared stage and the plan's
     ``closing_window_tol`` for its closing stage; a caller rebuilding a stage
     from its record passes :func:`recorded_window_tol` of the recorded value.
@@ -4275,14 +4603,22 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                          or window_area_tol < WINDOW_AREA_TOL)
     mask = pattern.in_range_mask()
     tt_all, y_all, s_all = pattern.tt(), pattern.y(), pattern.sig()
+    window = None
     if two_theta_limits is not None:
         lo, hi = two_theta_limits
         # inverted, it used to fail below as "fewer than 10 points" (WP-1986)
         check_interval("two_theta_limits", lo, hi)
-        mask &= (tt_all >= lo) & (tt_all <= hi)
+        window = (tt_all >= lo) & (tt_all <= hi)
+        mask &= window
     tt, y_obs, sigma = tt_all[mask], y_all[mask], s_all[mask]
+    sigma_rule = pattern.sigma_rule(window)
     if len(tt) < 10:
-        raise ValueError("fewer than 10 points remain in the fit range")
+        why = ""
+        if sigma_rule.n_nonpositive_excluded:
+            why = (f"; {sigma_rule.n_nonpositive_excluded} of them were left out "
+                   "because their σ is zero or below (nonpositive_sigma='exclude'), "
+                   "so set nonpositive_sigma='poisson' or sigma=None to weight them")
+        raise ValueError(f"fewer than 10 points remain in the fit range{why}")
     tt_min, tt_max = float(tt[0]), float(tt[-1])
 
     lams = tuple(line.wavelength.value for line in instrument.source.lines)
@@ -4329,7 +4665,25 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         hl_eff = max(hl_eff, AXIAL_SIZING_FLOOR)
     fcj_on = fcj_live(sl_eff, hl_eff)
 
+    # WP-2107: the instrument's shift equation, evaluated at the values the
+    # stage compiles from wherever the compile places a peak
+    inst_shift = None
+    inst_values: dict[str, float] = {}
+    for j, eq in enumerate(instrument.peak_equations):
+        inst_shift = compile_equation(eq, "instrument", j)
+        inst_values = {path: eq.coefficients[name].value
+                       for name, path in inst_shift.paths}
+
     def _shift_est(theta: np.ndarray, tt_bragg: np.ndarray) -> np.ndarray | float:
+        shift = _geometry_shift_est(theta, tt_bragg)
+        if inst_shift is not None:
+            shift = shift + evaluate_angle(inst_shift, inst_values,
+                                           theta=np.radians(theta),
+                                           two_theta=tt_bragg + shift)
+        return shift
+
+    def _geometry_shift_est(theta: np.ndarray, tt_bragg: np.ndarray
+                            ) -> np.ndarray | float:
         shift = zero
         if geom.kind == "bragg_brentano":
             s = geom.sample_displacement.value
@@ -4359,6 +4713,7 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
 
     phases: list[CompiledPhase] = []
     restraint_items: list = []
+    restraint_findings: list = []
     for ip, phase in enumerate(structure.phases):
         cell = phase.cell.lengths_angles()
         # The phase's own operation list when it carries one: a child cell
@@ -4370,6 +4725,40 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         group = resolve_group(phase.space_group, phase.symmetry_operations)
         refl = _omit_reflections(generate_reflections(
             group, cell, lam_gen, two_theta_max=hi_eff, two_theta_min=gen_min))
+        # WP-2107: the phase's peak equations, compiled against this list
+        eqs: dict[str, CompiledPeakEquation] = {}
+        peq_values: dict[str, float] = {}
+        if phase.peak_equations:
+            _refuse_peak_equations(phase, ip, mode)
+            for j, eq in enumerate(phase.peak_equations):
+                eqs[eq.target] = compile_equation(eq, f"phases.{ip}", j)
+                peq_values.update({path: eq.coefficients[name].value
+                                   for name, path in eqs[eq.target].paths})
+
+        def _term(target, refl, frame, tt_bragg, drawn):
+            return np.asarray(evaluate_peak_equation(
+                eqs[target], peq_values, frame, d=d_spacings(refl.index, *cell),
+                theta=np.radians(0.5 * tt_bragg), two_theta=drawn), dtype=np.float64)
+
+        if "shift" in eqs and len(refl):
+            # ``generation_window`` runs before any reflection exists, so it
+            # cannot bound a shift in hkl.  The margin is the largest shift
+            # the equation gives over the list generated without it, applied
+            # to both edges and generated once more; every reader filters on
+            # the drawn position, so a superset costs nothing.
+            frame0 = compile_frame(group, refl, cell, list(eqs.values()))
+            widest = 0.0
+            for lam in lams:
+                tt_b = refl.two_theta(cell, lam)
+                moved = _term("shift", refl, frame0, tt_b,
+                              tt_b + _shift_est(0.5 * tt_b, tt_b))
+                moved = moved[np.isfinite(moved)]
+                if moved.size:
+                    widest = max(widest, float(np.max(np.abs(moved))))
+            if widest > 0.0:
+                refl = _omit_reflections(generate_reflections(
+                    group, cell, lam_gen, two_theta_max=min(hi_eff + widest, 180.0),
+                    two_theta_min=max(gen_min - widest, 0.05)))
         # WP-1326: a declared propagation vector adds the satellites at
         # Q = H ± k as a second ReflectionSet, frozen here with the nuclear one
         # and merged into a single list (see ``CompiledPhase.satellites``).
@@ -4476,9 +4865,25 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                 tt_bragg = refl.two_theta(cell, lam)
                 theta = 0.5 * tt_bragg
                 pos = tt_bragg + _shift_est(theta, tt_bragg)
+                # WP-2107: the windows follow the phase's equations, read at
+                # the values the stage compiles from (the forward's own
+                # evaluation, ``model.peak_equations.evaluate``)
+                extra_g2 = extra_l = None
+                if eqs:
+                    drawn = pos
+                    if "shift" in eqs:
+                        pos = pos + _term("shift", refl, frame, tt_bragg, drawn)
+                    if "gauss_fwhm" in eqs:
+                        extra_g2 = _term("gauss_fwhm", refl, frame, tt_bragg, drawn) ** 2
+                    if "gauss_fwhm_squared" in eqs:
+                        sq = _term("gauss_fwhm_squared", refl, frame, tt_bragg, drawn)
+                        extra_g2 = sq if extra_g2 is None else extra_g2 + sq
+                    if "lor_fwhm" in eqs:
+                        extra_l = _term("lor_fwhm", refl, frame, tt_bragg, drawn)
                 g_est = gaussian_fwhm(theta, instrument.profile.u.value,
                                       instrument.profile.v.value, instrument.profile.w.value,
-                                      phase.gauss_size.value, phase.gauss_strain.value)
+                                      phase.gauss_size.value, phase.gauss_strain.value,
+                                      extra_squared=extra_g2)
                 x_l = instrument.profile.x.value + phase.lor_size.value
                 # a Stephens block replaces lor_strain (WP-1467,
                 # CompiledModel.lor_strain_term), so it sizes nothing here
@@ -4489,9 +4894,15 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                     y_l = y_l + extra_strain
                 l_est = lorentzian_fwhm(theta, x_l, y_l,
                                         0.0 if aniso_est is None else aniso_est)
+                if extra_l is not None:
+                    # floored for sizing alone: a negative Γ_L gives a NaN
+                    # width, which would size an empty window and drop the
+                    # reflection unseen (PEAK_WIDTH_NOT_POSITIVE reports it)
+                    l_est = np.maximum(l_est + extra_l, 0.0)
                 # TCHZ combined (Γ, η) is a compile-time proxy for window sizing
                 # and FCJ node counts under *both* shapes: it tracks the true
-                # Voigt FWHM to ~1 % (that is what the TCH quintic is fit to),
+                # Voigt FWHM to 0.43 % at worst (measured, tests/test_voigt.py;
+                # that is what the TCH quintic is fit to),
                 # far inside the area criterion's own resolution.
                 gamma_est, eta_est = tch_gamma_eta(g_est, l_est)
                 if primary:
@@ -4512,6 +4923,16 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                             fcj_n[il, k] = fcj_node_count(float(pos[k]), float(gamma_est[k]),
                                                           sl_eff, hl_eff, closing=closing_precision)
 
+        frame = None
+        if eqs:
+            frame = compile_frame(group, refl, cell, list(eqs.values()))
+            tt_b = refl.two_theta(cell, lams[0])
+            drawn0 = tt_b + _shift_est(0.5 * tt_b, tt_b)
+            for j, eq in enumerate(phase.peak_equations):
+                check_orbits(eqs[eq.target], peq_values, frame,
+                             d=d_spacings(refl.index, *cell),
+                             theta=np.radians(0.5 * tt_b), two_theta=drawn0,
+                             where=f"phases.{ip}.peak_equations.{j} ({eq.target})")
         _size_family(win, fcj_n, 0.0, 0.0, primary=True)
         if mag_split:
             # The widths the stage can *reach*, not the ones it starts at: a
@@ -4537,7 +4958,8 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         cp = CompiledPhase(reflections=refl, sites=sites, win=win, fcj_n=fcj_n,
                            strain_monomials=strain_monomials,
                            satellites=satellites,
-                           win_mag=win_mag, fcj_n_mag=fcj_n_mag)
+                           win_mag=win_mag, fcj_n_mag=fcj_n_mag,
+                           peq=None if frame is None else PhasePeakEquations(eqs, frame))
         if satellites is not None:
             cp.nuclear_mask = (~refl.is_satellite).astype(np.float64)
         if magnetic_mask is not None:
@@ -4595,7 +5017,8 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         # intensities and never compute the coordinates a bond would need.  The
         # PBC image is frozen for the stage here, at the compile-time cell/coords.
         if mode == "rietveld" and phase.restraints:
-            restraint_items.extend(resolve_phase_restraints(phase, ip, sites, cell))
+            restraint_items.extend(resolve_phase_restraints(
+                phase, ip, sites, cell, restraint_findings))
         phases.append(cp)
 
     # background compilation — always linear: paths + design rows (+ penalty)
@@ -4706,11 +5129,13 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                     "PeakComponent.")
 
     pawley = _build_pawley_block(phases) if mode == "pawley" else None
-    restraints = CompiledRestraints(restraint_items) if restraint_items else None
+    restraints = (CompiledRestraints(restraint_items, restraint_findings)
+                  if restraint_items else None)
 
     return CompiledModel(
         tt=tt, y_obs=y_obs, sigma=sigma, tt_min=tt_min, tt_max=tt_max,
         sigma_measured=pattern.sigma is not None,
+        sigma_rule=sigma_rule,
         wavelength=instrument.source.primary_wavelength,
         line_wavelengths=lams,
         harmonic_orders=harmonic_orders,
@@ -4738,7 +5163,30 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         window_area_tol=float(window_area_tol),
         window_slack_deg=float(WINDOW_MIN_DEG if window_slack_deg is None
                                else window_slack_deg),
+        inst_shift=inst_shift,
     )
+
+
+def _refuse_peak_equations(phase, ip: int, mode: str) -> None:
+    """Refuse a phase's peak equations where the compile cannot honour them.
+
+    An ``intensity_factor`` under Le Bail or Pawley would be absorbed by the
+    extracted intensities and leave its coefficients flat, so it is refused
+    there.  A satellite reflection is labelled by its order, not by an hkl the
+    orbit images and ``harmonic`` could read, so a phase with a propagation
+    vector takes none (WP-2107).
+    """
+    if mode != "rietveld" and any(eq.target == "intensity_factor"
+                                  for eq in phase.peak_equations):
+        raise ValueError(
+            f"phases.{ip} ({phase.name!r}): an intensity_factor peak equation "
+            f"under {mode}, whose extracted intensities would absorb it. Drop "
+            "the equation for this fit, or fit in Rietveld mode")
+    if phase.propagation_vector is not None:
+        raise ValueError(
+            f"phases.{ip} ({phase.name!r}): peak equations on a phase with a "
+            "propagation vector. A satellite reflection carries no hkl of the "
+            "phase's lattice for the equation to read")
 
 
 def window_sizing(model: CompiledModel, values: dict[str, float],
@@ -4753,7 +5201,7 @@ def window_sizing(model: CompiledModel, values: dict[str, float],
     ``compile_model``'s rule: a half-width of k(η)·Γ plus the slack, plus the
     FCJ extent while the aberration acts.  It reads the peaks the forward
     model draws at ``values`` (``phase_peaks``) where the compile reads its
-    own width estimate, so the two agree to that estimate's ~1 % and not to
+    own width estimate, so the two agree to that estimate's 0.43 % and not to
     the bit; k(η) comes off :func:`window_fwhm_mult_interp`'s table.  The
     arrays have the compile's shapes, so a caller can compare them with
     ``CompiledPhase.win`` and ``.fcj_n`` before building anything.  The

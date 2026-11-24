@@ -87,6 +87,24 @@ the chain, and its answer on what "held" means should govern here. Read it first
   `_install_parametric` does for a `ParametricEquation`. WP-2118 left `multi.py` and
   `params/multi.py` untouched.
 
+- **From WP-2101 (2026-11-15): WO₃'s one B per pattern spells without the tie.** A
+  formula equation on each site's `biso`, `"<site's B> + b"`, with `vars.b` named in
+  `SharingMap.per_histogram`, gives one refined B per pattern on every site today
+  (`switching/topas.md`'s overall-B block). On a seven-pattern synthetic LaB₆ ramp six
+  patterns returned b within 0.04 Å² of the truth 0, esd 0.10 Å², and the seventh failed
+  the same way with or without the formula (a probe-plan local minimum). So the mirrored
+  WO₃ run may not need this WP's tie. Decide whether it moves out of this WP, and say
+  which spelling the milestone row should judge.
+
+- **From WP-2101 (2026-11-19): a joint fit's hold must silence `VARIABLE_NOT_FREED`.**
+  The code names each parametric equation whose coefficients no plan stage freed. In a
+  single fit, a coefficient the caller holds is left out, read off the table with
+  `ParameterTable.held_by` (maintainer's ruling 2026-11-19, option (a)). A joint fit has
+  no hold verb yet, so `multi._parametric_not_freed_diagnostics` names every unfreed
+  coefficient, and its docstring says so. When this WP adds `hold` to a joint fit, that
+  builder leaves out a held coefficient the same way, with a test that fails when the
+  filter is removed.
+
 ## Non-goals
 
 - A history DAG for a joint fit.

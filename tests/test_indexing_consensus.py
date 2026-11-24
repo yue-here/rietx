@@ -1083,6 +1083,14 @@ def test_a_short_clean_list_is_searched_ranked_and_capped():
     codes = {d.code for d in result.diagnostics}
     assert "INDEX_DATA_INSUFFICIENT" not in codes
     assert "INDEX_PANEL_REDUCED" in codes
+    # the narrowing is said by the run-level message, and its suggestion asks
+    # for no search the list cannot support (WP-2149): monoclinic is named
+    # with the lines it needs, never as a system to search
+    not_covered = next(d for d in result.diagnostics
+                       if d.code == "INDEX_SYSTEMS_NOT_COVERED")
+    assert "monoclinic" in not_covered.message
+    asked = not_covered.suggestion.split(" before ")[0]
+    assert asked.startswith("Search ") and "monoclinic" not in asked
     # ranked by the reduced panel, the truth first, reasons on the report
     assert result.candidates
     top = result.candidates[0]

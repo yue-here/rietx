@@ -1,6 +1,6 @@
 # Parametric refinement
 
-This page gives how a parameter is declared as an equation of each pattern's coordinates and refined across every pattern at once: the coordinate table and the declaration, the reference and scale, what is refused before a fit, the coefficients a fit reports, the test of the declared form, and the equation evaluated at any coordinate.
+This page gives how a parameter is declared as an equation of each pattern's coordinates and refined across every pattern at once: the coordinate table and the declaration, the targets it accepts, the reference and scale, what is refused before a fit, the coefficients a fit reports, the test of the declared form, and the equation evaluated at any coordinate.
 
 A chain measures a parameter once per pattern ([Sequential refinement](series.md)), and a joint fit shares it as one number ([Joint refinement](joint.md)).
 Between the two is a parameter that differs from pattern to pattern by an equation you can write down: a cell edge linear in temperature down a ramp, or a cell edge that follows the composition across a combinatorial library.
@@ -151,6 +151,72 @@ assert surface.n_coefficients == 5
 assert surface.coordinates_used() == ["x", "y"]
 ```
 
+## Targets
+
+A target is any parameter that moves on its own in every pattern of the subset.
+These kinds are accepted:
+
+| Kind | Target, for example | Note |
+|---|---|---|
+| a lattice parameter | `phases.0.cell.a`, `phases.0.cell.beta` | only one the space group leaves free; a cubic `b` follows `a` |
+| a phase scale | `phases.0.scale` | |
+| an atomic coordinate | `phases.0.atoms.1.dof.0` | the site-symmetry degree of freedom, never `x`, `y` or `z` ([Site-symmetry degrees of freedom](../theory/parameterisation.md#site-symmetry-degrees-of-freedom)) |
+| a displacement parameter | `phases.0.atoms.0.biso` | |
+| an occupancy | `phases.0.atoms.1.occ` | |
+| a size or strain term | `phases.0.lor_size`, `phases.0.gauss_strain` | a size term only over patterns at one wavelength |
+| the zero shift | `instrument.zero_shift` | |
+| the specimen displacement | `instrument.geometry.sample_displacement` | not on a capillary, whose geometry locks it |
+| axial divergence | `instrument.geometry.axial_sl` | |
+| a peak-width term | `instrument.profile.w`, `instrument.profile.y` | |
+| a background coefficient | `instrument.background.c1` | |
+| a wavelength | `instrument.source.lines.0.wavelength` | it moves every peak as the cell does, so free one of the two |
+
+A path the model ties to another, or one it locks, is refused ([Refusals](#refusals)).
+So is a formula's variable, which is not a target.
+
+A plan frees an equation's coefficients only where one of its stages reaches the target.
+`mccusker_default` reaches the scales, the background, the zero shift, the cell and the peak widths.
+`mccusker_structural` adds the coordinates and B.
+An equation on any other kind needs a `PlanSpec` stage naming its target.
+Otherwise its coefficients stay at their starting values, and the result has no row for them.
+[`VARIABLE_NOT_FREED`](diagnostics-series.md#variable_not_freed) then names the equation and those coefficients.
+
+```python
+import rietx as rx
+
+lab6 = rx.Structure(phases=[rx.Phase(
+    name="LaB6", space_group="P m -3 m", cell=rx.Cell.cubic(4.15689),
+    atoms=[rx.Atom(label="La", species="La", x=rx.Parameter(value=0.0),
+                   y=rx.Parameter(value=0.0), z=rx.Parameter(value=0.0)),
+           rx.Atom(label="B", species="B", x=rx.Parameter(value=0.1975),
+                   y=rx.Parameter(value=0.5), z=rx.Parameter(value=0.5))],
+)])
+coordinates = rx.CoordinateTable(columns={"T": [300.0, 450.0, 600.0, 750.0, 900.0]})
+
+
+def accepted(target):
+    instruments = [rx.Instrument.bragg_brentano(radiation="CuKa") for _ in range(5)]
+    for instrument in instruments:
+        instrument.background = rx.BackgroundChebyshev.with_terms(3)
+    line = rx.ParametricEquation(name="p", target=target, basis="polynomial", terms=[[], ["T"]])
+    try:
+        rx.MultiHistogramRefinement(lab6, instruments, coordinates=coordinates, parametric=[line])
+    except ValueError:
+        return False
+    return True
+
+
+assert all(accepted(path) for path in [
+    "phases.0.cell.a", "phases.0.scale", "phases.0.atoms.1.dof.0", "phases.0.atoms.0.biso",
+    "phases.0.atoms.1.occ", "phases.0.lor_size", "phases.0.gauss_strain",
+    "instrument.zero_shift", "instrument.geometry.sample_displacement",
+    "instrument.geometry.axial_sl", "instrument.profile.w", "instrument.profile.y",
+    "instrument.background.c1", "instrument.source.lines.0.wavelength"])
+assert not any(accepted(path) for path in [
+    "phases.0.cell.b", "phases.0.cell.alpha", "phases.0.atoms.1.x", "phases.0.atoms.0.x",
+    "instrument.source.lines.0.weight"])
+```
+
 ## Formula equations
 
 An `"expression"` equation is a formula in the grammar of [Expressions](expressions.md).
@@ -161,6 +227,7 @@ The variables are the refined numbers, declared by the `variables` keyword of `M
   A Debye temperature read by a cell formula and a Biso formula is one number.
 - A stage that frees a formula's target frees the variables it names.
   A variable declared `vary=False` stays fixed there, and a glob naming `vars.<name>` frees it.
+  A variable no stage freed is named by `VARIABLE_NOT_FREED` ([Range and visibility warnings](#range-and-visibility-warnings)).
 - A variable may not share its name with a coordinate column, and a variable no formula names is refused.
 - A formula equation with `target=None` drives nothing.
   It is an intermediate that a later formula names, such as a temperature calibration that the cell formulas read.
@@ -343,6 +410,20 @@ Each of those rows names the declaration in `RefinedParameter.equations`, and so
 A target row's value and esd are the equation's at that pattern's coordinates, and can be far tighter than the pattern measures on its own.
 A coefficient that drives a phase no pattern can see is held like the cell it drives, and [`PHASE_UNCONSTRAINED`](diagnostics-refinement.md#phase_unconstrained) names the coefficient.
 
+A cell series is often fitted before a structure is known.
+`mode="pawley"` refines the same declaration with each pattern's reflection intensities its own ([Modes](joint.md#modes)):
+
+<!-- api-doc: no-exec — it refines the reader's own patterns -->
+```python
+result = rx.refine_multi(patterns, lab6, instruments, mode="pawley",
+                         coordinates=coordinates, parametric=[expansion])
+```
+
+`"mccusker_default"` becomes `pawley_default` in that mode, as for a single fit.
+An equation on a parameter Pawley cannot refine, such as a `biso` or a scale, is refused before the fit.
+Over twelve seeds of a ten-pattern synthetic LaB6 ramp, the mean of (value − truth)/esd was 0.20 for the intercept and 0.13 for the slope.
+Its spread was 0.65 and 1.01, so neither coefficient's esd understates its scatter.
+
 ### Large libraries
 
 Under the default `solver="lm"`, once the stacked Jacobian would pass 256 MiB (`rietx.optimize.blocked.DENSE_JACOBIAN_MAX_BYTES`), a joint fit keeps one block per pattern, against that pattern's own columns, and never builds the stacked matrix.
@@ -422,6 +503,13 @@ There the target's value and esd come from the patterns that do see the phase, c
 Quote the equation's coefficients rather than the target in those patterns.
 If the equation should hold only where the phase is measured, narrow the subset to those patterns.
 When no subset pattern sees the phase, the warning says the equation itself is not measured, and its coefficients stay where they started.
+
+[`VARIABLE_NOT_FREED`](diagnostics-series.md#variable_not_freed) is a warning, one per declaration, when no stage of the plan freed one of its coefficients.
+This happens when no stage reaches the target, or when a formula's variable was declared `vary=False`.
+`where` names each such coefficient, and `value` counts them.
+Each kept its starting value, so the equation's value at each pattern is not a measurement.
+A stage whose `turn_on` names the target frees the coefficients, and a stage naming `vars.<name>` frees a variable declared `vary=False`.
+On the same held variable, the suggestion of [`PARAMETRIC_FORM_REJECTED`](diagnostics-series.md#parametric_form_rejected) names it before it suggests revising the formula.
 
 ## Form test
 

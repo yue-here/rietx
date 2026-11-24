@@ -191,6 +191,58 @@ and have no free factor to measure, so this file's old list named them without c
   the refit measures that scatter. The CPD QPA plan frees exact pairs (X with `lor_size`, Y with
   `lor_strain`, zero with displacement), so read those rows as one sum.
 
+### Inherited
+
+- **From WP-2020 (2026-11-15).** WP-2020's design brief, which waits on the maintainer, leans
+  towards extending the instrument profile file and the plan presets, because no setting in
+  the tree needs a new carrier. A demotion here of a limit, a starting value or a plan setting
+  is one of the two observations that would flip that pick to a new scenario-set file. Name
+  any such demotion in WP-2020's handover log when it lands.
+- **From WP-2225 (2026-11-19).** The width twin hold reads no bound. On the four comparison
+  standards that run the QPA plan (zincite, fluorite, corundum, brucite) the specimen twins end on
+  their floor, U, X and Y stay at the instrument-only stage's values, and a staged re-fit lowers
+  χ² by re-solving them (zincite: V +3.3 esd, Zn Biso +0.51 esd at the converged chain). Row R's
+  real families (cpd-1a, LaB₆ + cBN, SRM 660c) are WP-2225's task 1 too; a session working either
+  reads the other's measurements. WP-2225 also re-measured the swap prototype on the four
+  single-phase standards (`docs/wp/2225-batch/swap_summary.txt`).
+- **From WP-2225 (2026-11-20), task 1.** The hold measured on row R's real families with
+  `docs/wp/2225-batch/families.py` (§ Task 1 there). With the hold off, cpd-1a's answers from the
+  Biso starts 0.5 and 1.5 Å² agree to 0.01 reported esd on every row that keeps one, against 5.11
+  with it on. The hold-off fit
+  gets there with U = −0.138 deg² and Y = −0.198°, and it walks on corundum, brucite and brucite
+  with a Stephens block. On LaB₆ + cBN's twin plan, a staged re-fit moves La Biso 1.76 reported
+  esd with the hold on. The hold costs no weight fraction on either sample: cpd-1a's arms differ by
+  at most 0.33 wt %, and LaB₆ + cBN reads 16.79 wt % with the hold and 16.85 without, against TOPAS's
+  17.907-17.950. A probe of a staged re-fit must pass `refit="stages"` since WP-2224. WP-2225's
+  2026-11-19 reading that the reorder met its bar was a one-stage measurement.
+- **From WP-2225 (2026-11-20), the ruling.** The maintainer chose option 3: the hold stays as it
+  is, and a fit whose last stage held an instrument width carries the warning `INSTRUMENT_WIDTH_HELD`
+  (named on the 2026-11-21 ruling), naming the
+  held widths and the stage whose values they keep. Row R's verdict on the hold's tier is
+  unchanged by it. The code fires on 4 of the 8 comparison standards (pinned). By task 1's
+  records of the hold it also fires on cpd-1a and on LaB₆ + cBN's twin plan; not run there.
+- **For group R, from a side investigation (2026-11-19).** The simulated `trigger` case in
+  `examples/bench_refinement.py` fitted to Rwp 0.01998 on v1.9.0 and reached 0.0276 on
+  main (closing stage off), against 0.0195 for the truth model. The cause is the width twin
+  hold (`1a4f5c52e`): 0.02036 at its parent, 0.02784 at it, and 0.02035 with the floors
+  removed alone (`879fb1bcc`). The two trees simulate slightly different patterns (truth
+  curves up to 0.45 % apart), but v1.9.0 fits either to about 0.020 and main either to about
+  0.0275. `qpa_plan` freed U, V, X and Y in `profile`, before `lines_axial`. With the axial
+  ratio at 0.02 against a truth of 0.03, the widths absorbed the asymmetry (U 0.037 against
+  0.008, Y −0.035 against 0), and the hold froze them from `sample_broadening` on. Y's
+  deficit reappeared as `lor_strain` 0.023-0.081 on four phases whose truth is 0.
+  **The maintainer kept the reorder (2026-11-19):** `qpa_plan` now runs `lines_axial`
+  before `sample_broadening`, in the tests, in `viz.compare` and in the Stephens acceptance
+  plan, the order `lab_bragg_brentano` already uses. The trigger case then lands at Rwp
+  0.0204 with the widths near truth (`lor_size` starts at its true value there, which
+  flatters it). Sample 1's weight fractions move at most 0.038 wt % (RMS error against the
+  weighed values 2.301 → 2.311). Three test rows moved: cpd-1a's axial-floor invariance row
+  reads 0.116 esd and corundum's roughness fence b = 4.92 ± 3.52 (both non-strict xfails),
+  and the WP-2047 runaway test pins the old order. The reorder does not touch the
+  start-dependent X/Y split behind cpd-1a's Biso row: in a sample-only plan the data fix only
+  each twin pair's sum. The hold's design is WP-2225's. Reproduce the trigger arms with
+  `2017-batch/trigger_twin_hold.py` (about 10 s, macOS arm64, worktree `[dev]` venv).
+
 ## Non-goals
 
 - New actions or new thresholds. A measurement that suggests one goes to the maintainer.

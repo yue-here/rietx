@@ -99,10 +99,9 @@ placement, link resolution, and the size caps on this file and CLAUDE.md.
 
 ## Current focus
 
-**The next release is 1.12** (`pyproject.version` `1.12.0.dev0`), cut from what `main` holds
-([record](milestones/v1.12.md), [staged notes](releases/1.12.0.md)). 1.11.0 shipped 2026-11-04 ([notes](releases/1.11.0.md)).
+**The next release is 1.13** (`pyproject.version` `1.13.0.dev0`), cut from what `main` holds ([record](milestones/v1.13.md), [staged notes](releases/1.13.0.md)). 1.12.0 shipped 2026-11-18 ([notes](releases/1.12.0.md)).
 
-**Four milestones are open and three are queued, by name.** [magnetic](#magnetic--the-magnetic-structure)
+**Five milestones are open and three are queued, by name.** [series](#series--a-series-a-scientist-can-predict-and-drive) opened 2026-11-16; [magnetic](#magnetic--the-magnetic-structure)
 opened 2026-09-18 as v1.6; [generality](#generality--every-decision-rietx-makes-holds-beyond-the-data-it-was-tuned-on)
 opened 2026-10-18; [parametric](#parametric--a-parametric-refinement-written-by-hand-ports-to-rietx)
 opened 2026-11-04; [gui-overhaul](#gui-overhaul--the-gui-redesigned-around-the-pattern-and-the-model) opened 2026-11-08; rietview, rigid-bodies and structure-solution were queued as v1.7, v1.8 and v1.9. Threads #286, #426, #561 and #562 quote those
@@ -150,7 +149,8 @@ covers (1119 § Gotchas).
 | v1.9 | A parameter as a function of each pattern's coordinates: what `main` held on 2026-10-14, completing no milestone | ✅ **shipped 2026-10-14** ([record](milestones/v1.9.md), [notes](releases/1.9.0.md)) | 41 pull requests since v1.8.0, every user-facing change named in the notes or dispositioned in WP-1961's handover; cut early at the maintainer's ask, once WP-1959's kernel wheel was on PyPI and rietx's floor rose to it; VALIDATION.md re-measured on the release tree; suite counts in the record's ship appendix |
 | v1.10 | Every fit ends in a closing stage: what `main` held on 2026-10-24, completing no milestone | ✅ **shipped 2026-10-24** ([record](milestones/v1.10.md), [notes](releases/1.10.0.md)) | 128 pull requests since v1.9.0, every user-facing change named in the notes or dispositioned in WP-2043's handover; the tag waited on WP-2044, a P1 fix for an esd that depended on the platform; the Windows pre-upload gate, red since 2026-10-20, fixed twice more on the day (#1151) and its suite green on the release commit, the job cut off by its limit in cleanup; VALIDATION.md re-measured on the release tree; suite counts in the record's ship appendix |
 | v1.11 | An indexing candidate is validated by a fit: what `main` held on 2026-11-04, completing no milestone | ✅ **shipped 2026-11-04** ([record](milestones/v1.11.md), [notes](releases/1.11.0.md)) | 183 pull requests since v1.10.0, every user-facing change named in the notes; the tag waited on WP-2086, the noise check that gave tutorial 05's 2 % step back; every nightly job green on the release commit, `full` included; cut on kernel wheel 1.3; suite counts in the record's ship appendix |
-| v1.12 | The next release: what `main` carries when it is cut, and the milestones complete by then | 🔄 **accumulating since 2026-11-04** ([record](milestones/v1.12.md)) | written at the cut |
+| v1.12 | Extinction is declared per phase, and a formula sets a parameter: what `main` held on 2026-11-18, completing no milestone | ✅ **shipped 2026-11-18** ([record](milestones/v1.12.md), [notes](releases/1.12.0.md)) | 150 pull requests since v1.11.0, every user-facing change named in the notes; the files 1.11.0 refuses measured both ways against its PyPI wheel; the three gate jobs green on the release commit, `full` red on WP-1418's known swapped minimum and macOS given no runner; cut on kernel wheel 1.5; suite counts in the record's ship appendix |
+| v1.13 | The next release: what `main` carries when it is cut, and the milestones complete by then | 🔄 **accumulating since 2026-11-18** ([record](milestones/v1.13.md)) | written at the cut |
 | magnetic | The magnetic structure (was v1.6): the satellite, the moment, the determination, the mode amplitude — [§ magnetic](#magnetic--the-magnetic-structure) | 🔄 **opened 2026-09-18** ([record](milestones/magnetic.md)) | eleven rows written at the open, the record's § Acceptance; the measured half is still to come |
 | rietview | rietview (was v1.7): the structure figure an agent composes — cuts, extents, a figure that reports on itself, a real-agent measurement, the split — [§ rietview](#rietview--the-structure-figure-an-agent-composes) | ⬜ **queued 2026-09-27** | written at the open |
 | rigid-bodies | Rigid bodies (was v1.8): a fragment refined as one body, its atoms reported with esds — [WPs](wp/README.md#rigid-bodies): 1801-1813, the seam decided by 1803 and the rest cut from its record | ⬜ **queued 2026-09-30** | written at the open |
@@ -158,6 +158,7 @@ covers (1119 § Gotchas).
 | generality | Every decision rietx makes holds beyond the data it was tuned on: every verdict, action and threshold tiered, the unproven demoted, a guard against the next one — [§ generality](#generality--every-decision-rietx-makes-holds-beyond-the-data-it-was-tuned-on) | 🔄 **opened 2026-10-18** ([record](milestones/generality.md)) | eight rows written at the open, the record's § Acceptance |
 | parametric | A parametric refinement written by hand ports to rietx: equations as text, shared variables, a joint fit with a single fit's verbs, equations over a reflection, and the documentation an agent ports an input from — [§ parametric](#parametric--a-parametric-refinement-written-by-hand-ports-to-rietx) | 🔄 **opened 2026-11-04** ([record](milestones/parametric.md)) | fourteen rows, the first thirteen written at the open, the record's § Acceptance |
 | gui-overhaul | The GUI redesigned around the pattern and the model, ported into `rietx gui` in five pieces (the layout shell, the Parameters panel, the Plan tab, previews, the Background tab), then rebuilt beside it from 2026-11-11 — [§ gui-overhaul](#gui-overhaul--the-gui-redesigned-around-the-pattern-and-the-model) | 🔄 **opened 2026-11-08** ([record](milestones/gui-overhaul.md)) | ten rows written at the open, the record's § Acceptance |
+| series | A series a scientist can predict and drive: each parameter declared per pattern, common, fixed or by equation, a series call and a joint call each taking the kinds it can honour, strategy left to the caller, problems reported as numbers — [§ series](#series--a-series-a-scientist-can-predict-and-drive) | 🔄 **opened 2026-11-16** ([record](milestones/series.md)) | six rows drafted at the open, the record's § Acceptance |
 | v2+ | FPA (with the peaks buffer), neutron TOF, modulated structures, PDF — [§ v2+](#v2--fenced) | ⬜ fenced | — |
 
 ## Work packages
@@ -401,7 +402,7 @@ own view (1503), the surface measured with real agents before more is added
 (1504), and the code leaving as `rietview` when a named trigger fires
 (1505). The name was chosen on 2026-09-27; the survey and the trigger are in
 1505. The maintainer asked on 2026-10-02 for an SVG (1536), POV-Ray and glTF
-(1537), and ambient occlusion (1538). 1504 is costed and closed (2026-10-23, 40 of 42 on the fixed surface), so it opens by the maintainer's word.
+(1537) and ambient occlusion (1538), and on 2026-11-12 for depth cueing and filled rings and faces (1548). 1504 is costed and closed (2026-10-23, 40 of 42 on the fixed surface), so it opens by the maintainer's word.
 
 The WPs are in [the index](wp/README.md#rietview).
 
@@ -443,6 +444,10 @@ Opened 2026-11-04 by the maintainer ([record](milestones/parametric.md)). The re
 ### gui-overhaul — the GUI redesigned around the pattern and the model
 
 Opened 2026-11-08 by the maintainer ([record](milestones/gui-overhaul.md)), on twelve rounds of prototypes reviewed on screen between 2026-11-06 and 2026-11-08. It redesigns today's `rietx gui` before agent access, the desktop app and the browser build, in that order. Five pieces port it: the layout shell first (2123), then the Parameters panel (2126), the Plan tab (2127), previews (the route 2125, the sliders and graphs 2128) and the Background tab (2129, whose band is rietx's own covariance of the background curve). Each WP restates the designs it builds with the ruling behind each, and every merge leaves every panel reachable. The block 22xx is claimed for the pieces after the first. 2130 repairs two gaps the design rounds found in today's Peaks panel before its own redesign: the search's coverage said whatever the run found, and Adopt on every row. The palette piece (2200) moves the GUI to the site's palette, light and dark, and carries the peak-mark colour (ruled 2026-11-09). The start screen and the New project dialog (2131) port the round-9 design of 2026-11-08, outside the five pieces. Every piece is judged against the style guide, `gui/STYLE.md` (2142), and the record lists the designed pieces not yet filed. The File menu on the project name (2133) ports the file-and-project I/O ruling of 2026-11-07: autosave with no Save command, and the folder copied, renamed, moved or closed on server routes. On 2026-11-11 the maintainer ruled to rebuild the front end from the prototype beside today's, keeping the server, `gui/src/lib`, the chart module and the tokens, and to swap it in at parity; 2214 holds the plan and an inventory giving every old feature a home, and 2215 builds its first piece, the frame, at `/next`. [The WPs](wp/README.md#gui-overhaul).
+
+### series — a series a scientist can predict and drive
+
+Opened 2026-11-16 by the maintainer ([record](milestones/series.md)), beside parametric and separate from it. The record holds six rules for series work, each accepted by the maintainer, and the decisions still open. The default stays as it is, and a joint fit starting from a series result waits on 2103. The block 23xx is claimed. [The WPs](wp/README.md#series).
 
 ### Unscheduled
 
@@ -566,8 +571,8 @@ scope creep. Each item names what fenced it.
 - **Physics.** Fundamental Parameters as a differentiable convolution stack
   (Cheary-Coelho 1992) — **with** the peaks buffer, never before
   ([1122](wp/1122-compiled-peaks-buffer.md) measured shape reuse below break-even
-  without one); neutron **TOF** (CW landed in 1134; issue #193; the energy-dependent
-  resonant absorption at S(Q), #113) — **built through rather than deferred**: the
+  without one); neutron **TOF** (CW landed in 1134; issue #193; the energy-dependent resonant absorption at S(Q) is #193's rung T-4, from #113;
+  raw TOF reduction (per-pixel NeXus, vanadium, empty can, grouping) is out of scope, not fenced: ruled 2026-11-16 on #1446, and [2146](wp/2146-the-facility-iparm-files-read-with-their-repairs-recorded.md) carries the how-to and the refusal) — **built through rather than deferred**: the
   fork's branch is visible (`tof-cleanroom-20260923`); **decided 2026-09-24: held until magnetic
   closes**, then cut T-1, T-2/T-3, T-5; **amended 2026-10-08: T-1 (axis, readers) cut as
   [1927](wp/1927-tof-t1-the-axis-and-its-readers.md)**, closed 2026-10-23 with T-2's inheritance in its Context; the rest still waiting, with #442 (a bank's CW

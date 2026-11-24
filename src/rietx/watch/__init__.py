@@ -90,8 +90,10 @@ STATIC_FILES = {
 #: (WP-1428). Three launches on a 48 kB project took 0.58-0.89 s, of which the
 #: copy is 1.1 ms and the rest is the interpreter; the ceiling is for a project
 #: whose pattern file is large enough that ``copytree`` is the term that
-#: matters. An unbounded wait would hold a request thread for the life of the
-#: server every time a spawn went wrong.
+#: matters. Load moves the interpreter term far more than size does: the same
+#: launch took 11.7-14.9 s on a Mac at load average 54-91 (WP-2145). An
+#: unbounded wait would hold a request thread for the life of the server every
+#: time a spawn went wrong.
 GUI_BOOT_TIMEOUT = 60.0
 
 #: Every GUI this watcher spawned. Held only so the :class:`subprocess.Popen`

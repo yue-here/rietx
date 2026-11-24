@@ -18,8 +18,8 @@ This fits a straight line a(T) = a₀ + a₁(T − T<sub>ref</sub>) to the seven
 
 <!-- output of examples/guides/equation.py -->
 ```text
-[1] 4.1628327119 +/- 1.6e-06 Å
-[T] 0.0000207819 +/- 8.0e-09 Å/K
+[1] 4.1628327080 +/- 1.6e-06 Å
+[T] 0.0000207819 +/- 8.2e-09 Å/K
 form rejected: False (statistic 9.3, cut 11.1)
 ```
 
@@ -53,7 +53,7 @@ To show a rejection, the script fits a second ramp whose true cell edge bows 9.4
 
 <!-- output of examples/guides/equation.py -->
 ```text
-form rejected: True (statistic 501.5, cut 11.1)
+form rejected: True (statistic 498.3, cut 11.1)
 ['PARAMETRIC_FORM_REJECTED']
 ```
 
@@ -76,10 +76,64 @@ A pattern that cannot see the phase adds nothing to the statistic, and `PARAMETR
 
 <!-- output of examples/guides/equation.py -->
 ```text
-a: phases.0.cell.a at T=293 = 4.1564527(29) Å (extrapolating in T; form not rejected)
+a: phases.0.cell.a at T=293 = 4.1564527(30) Å (extrapolating in T; form not rejected)
 ```
 
 293 K lies below the fitted range of 300-900 K, so the line says it is extrapolating.
+
+## Check that every coefficient refined
+
+A coefficient refines only where a stage frees it.
+A row of `result.parametric` with `vary` False did not refine, so its esd is `None` and its value is the one it started from.
+An esd of `None` alone does not say this, because a freed coefficient the data cannot see has none either.
+Two declarations leave a coefficient at its start.
+
+A formula equation's variable is held when it is declared with `vary=False`, which is the default of `rx.Parameter`.
+This writes the same line as a formula and leaves the slope held at 0:
+
+```{literalinclude} ../../../examples/guides/equation.py
+:language: python
+:start-after: "# guide: held start"
+:end-before: "# guide: held end"
+```
+
+<!-- output of examples/guides/equation.py -->
+```text
+Rwp 0.568 against 0.041 with the slope free
+slope 0.0 +/- None
+['PARAMETRIC_FORM_REJECTED', 'VARIABLE_NOT_FREED']
+```
+
+With the slope held at 0, every pattern has the same lattice parameter.
+The form test then rejects the line.
+[`VARIABLE_NOT_FREED`](../reference/diagnostics-series.md#variable_not_freed) names `vars.a1` as the coefficient no stage freed.
+The rejection's suggestion names it too, before it suggests revising the expression.
+Free the variable and refit before changing the formula.
+[Formula equations](../reference/parametric.md#formula-equations) says which stage frees a variable.
+
+A plan also frees an equation's coefficients only where one of its stages reaches the target.
+`mccusker_default` reaches the scales, the background, the zero shift, the cell and the peak widths.
+This adds a line on La's B to the cell line and fits under that plan:
+
+```{literalinclude} ../../../examples/guides/equation.py
+:language: python
+:start-after: "# guide: reach start"
+:end-before: "# guide: reach end"
+```
+
+<!-- output of examples/guides/equation.py -->
+```text
+a [1] 4.16283 +/- 1.6e-06
+a [T] 2.07819e-05 +/- 8.2e-09
+b [1] 0.4 +/- None
+b [T] 0 +/- None
+['VARIABLE_NOT_FREED']
+```
+
+The cell line refines and the B line keeps its starting values.
+`VARIABLE_NOT_FREED` names the equation `b` and its two coefficients, and `result.parameters` has no row for them.
+`mccusker_structural` adds the coordinates and B.
+An equation on any other kind of target needs a `PlanSpec` stage that names it ([Targets](../reference/parametric.md#targets)).
 
 ## When to declare an equation instead of fitting a series
 

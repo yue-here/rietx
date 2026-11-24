@@ -20,7 +20,7 @@ from .parametric import (
     ParametricValue,
     RefinedParametricEquation,
 )
-from .pattern import POISSON_FLOOR_COUNTS, _floor_sigma
+from .pattern import POISSON_FLOOR_COUNTS, SigmaRule, _poisson_where_nonpositive
 
 
 class RefinedParameter(Base):
@@ -364,9 +364,9 @@ class Identifiability(Base):
     a new field on an existing shape not being a new shape.  **That is no
     longer the rule.**  Since WP-1117 the only question is whether a consumer
     could *notice*, and a new field on a result is noticeable, so an addition
-    of this shape now bumps the version like any other: the comment beside
-    :data:`~rietx.schemas.common.SCHEMA_VERSION` is the changelog, and three of
-    its entries are additive defaulted fields.  Corrected here rather than
+    of this shape now bumps the version like any other: the notes for
+    :data:`~rietx.schemas.common.SCHEMA_VERSION` in ``docs/contracts/schema.md``
+    are the changelog, and three of them are additive defaulted fields.  Corrected here rather than
     deleted because this is the sentence that talked a later reader out of a
     bump it owed.
 
@@ -732,7 +732,10 @@ class GeometryDistance(Base):
     information, not σ = 0.  The two causes deliberately share one ``None``
     (WP-1003): a consumer never needs σ's *reason* to use the number, and if
     one ever does, a per-row cause field is the additive fix — never a
-    reinterpreted zero.
+    reinterpreted zero.  ``stderr_diagonal`` alone is ``None`` when the row
+    draws on a parameter a discarded direction touched while the data still
+    determine the row (WP-2230): that parameter's own variance is not
+    measured, so a diagonal sum would quote it.
     """
 
     phase_index: int
@@ -1238,7 +1241,7 @@ class StageResult(Base):
     #: and 0 only means this particular stage never reached one.
     #: Additive field, defaulted to 0 (the honest "never happened" state);
     #: bumped with this change, ``SCHEMA_VERSION`` 0.19 → 0.20 (see the
-    #: changelog entry in ``schemas/common.py``).
+    #: note in ``docs/contracts/schema.md``).
     n_degenerate_cell_probes: int = 0
     #: decompositions this stage's solve and esds repeated with LAPACK's
     #: QR-iteration driver because the divide-and-conquer driver stopped
@@ -1422,8 +1425,10 @@ class StageResult(Base):
     #: all-zero Stephens block on the isotropic ray, and every DOF of that block
     #: is here at the value the seed wrote, a zero coefficient of the ray
     #: included (WP-2002, B14).  Those rows sit at zero rather than on a floor,
-    #: since a Stephens DOF is unbounded below.  The joint fit's runner seeds
-    #: no Stephens block, so its stages carry the first writer's rows alone.
+    #: since a Stephens DOF is unbounded below.  The joint fit's runner writes
+    #: both through :class:`~rietx.params.multi.MultiParameterTable`'s
+    #: twins, keyed by the joint column (WP-2239): a shared block's DOFs under
+    #: their bare paths, a per-histogram one's under ``hist.N.``.
     #: WP-1930's floor seed sized by unit went with WP-1938: it existed because
     #: a softplus column at its floor was twelve orders below its neighbours,
     #: and a row refined in its own units has its physical column there.
@@ -1548,8 +1553,8 @@ class HistogramResult(Base):
     #: Which reflection each of those ticks is, index for index, as the orbit
     #: representative ``h k l`` (WP-1438).  A **companion**, not a change of
     #: shape: :attr:`ticks` has four readers that want a list of positions and
-    #: none of them wants this, so the pairing is by index and
-    #: ``tests/test_ticks.py`` pins the two lengths equal per phase.
+    #: none of them wants this, so the pairing is by index, one entry per
+    #: position for each phase.
     #:
     #: Absent for a phase's key rather than empty when there is nothing to
     #: say, which is the case the reserved declared-peaks key is in: a peak
@@ -1571,6 +1576,10 @@ class HistogramResult(Base):
     restraints: "RestraintReport | None" = None
     #: this histogram's own R_Bragg/R_F — the partition is of *these* counts
     phase_agreement: list[PhaseAgreement] = Field(default_factory=list)
+    #: which σ rule weighted this histogram's channels, counted (WP-1952);
+    #: :meth:`RefinementResult.for_histogram` swaps it in.  ``None`` on a
+    #: result written before the field existed.
+    sigma_rule: SigmaRule | None = None
     diagnostics: list[Diagnostic] = Field(default_factory=list)
 
 
@@ -2112,7 +2121,7 @@ _LEGACY_COUNT_FIELD = "n_background_peaks"
 #: reader of any one pattern must see.  ``for_histogram`` copies each once.
 FINDINGS_IN_EVERY_VIEW = frozenset({
     "SCALE_B_INSEPARABLE", "PARAMETRIC_OUT_OF_RANGE",
-    "PARAMETRIC_FORM_REJECTED", "STAGE_PATH_UNKNOWN"})
+    "PARAMETRIC_FORM_REJECTED", "STAGE_PATH_UNKNOWN", "VARIABLE_NOT_FREED"})
 
 
 def _names_histogram(d: Diagnostic, h: int) -> bool:
@@ -2182,8 +2191,8 @@ class RefinementResult(Base):
     #: Which reflection each of those ticks is, index for index, as the orbit
     #: representative ``h k l`` (WP-1438).  A **companion**, not a change of
     #: shape: :attr:`ticks` has four readers that want a list of positions and
-    #: none of them wants this, so the pairing is by index and
-    #: ``tests/test_ticks.py`` pins the two lengths equal per phase.
+    #: none of them wants this, so the pairing is by index, one entry per
+    #: position for each phase.
     #:
     #: Absent for a phase's key rather than empty when there is nothing to
     #: say, which is the case the reserved declared-peaks key is in: a peak
@@ -2339,6 +2348,14 @@ class RefinementResult(Base):
     #: a ``replay`` carries it.  ``None`` means nothing counted, never "none
     #: declared", which is ``0``.
     n_background_components: int | None = None
+    #: Which σ rule weighted the fitted channels, counted (WP-1952; WP-2002
+    #: B14): the file's esd, the Poisson fallback √max(y, 1), and the channels
+    #: inside the range whose σ ≤ 0 left the fit.  Written from
+    #: ``CompiledModel.sigma_rule``, which :meth:`PatternData.sigma_rule` built
+    #: at compile with the fit's own window, so a ``replay`` carries it too.
+    #: ``None`` means nothing here counted: a joint fit (each histogram has its
+    #: own), or a result recorded before the field existed.
+    sigma_rule: SigmaRule | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -2439,21 +2456,21 @@ class RefinementResult(Base):
         * results recorded before v0.2 carry no σ at all, and get the same
           Poisson ``√max(y,1)`` fallback the fit itself would have used
           (CLAUDE.md, Weights);
-        * non-positive entries are floored by :meth:`PatternData.sig`'s own
-          rule, so a zero esd is a small σ rather than an ``inf`` that loses
-          the whole trace.
+        * non-positive entries take :meth:`PatternData.sig`'s own rule,
+          √max(y, 1), so a zero esd is a finite σ rather than an ``inf`` that
+          loses the whole trace.  A fit never stores one (WP-1952 leaves such a
+          channel out, or weights it so), so only a hand-built result has any.
 
         Note this says nothing about *where* σ came from: by the time a result
         exists, a file esd column and a Poisson estimate are the same array of
         floats.  ``DataRef.has_sigma`` is the fact that survives, and it is what
         the GUI and the text document both label the residual from.
         """
+        y = np.asarray(self.y_obs, dtype=np.float64)
         if self.sigma:
-            s = np.asarray(self.sigma, dtype=np.float64)
-        else:
-            s = np.sqrt(np.maximum(np.asarray(self.y_obs, dtype=np.float64),
-                                   POISSON_FLOOR_COUNTS))
-        return _floor_sigma(s)
+            return _poisson_where_nonpositive(
+                np.asarray(self.sigma, dtype=np.float64), y)
+        return np.sqrt(np.maximum(y, POISSON_FLOOR_COUNTS))
 
     def for_histogram(self, h: int) -> "RefinementResult":
         """A single-histogram-shaped view of histogram ``h`` for reporting/plots.
@@ -2503,6 +2520,8 @@ class RefinementResult(Base):
         view.y_calc = list(hr.y_calc)
         view.y_background = list(hr.y_background)
         view.sigma = list(hr.sigma)
+        view.sigma_rule = (hr.sigma_rule.model_copy()
+                           if hr.sigma_rule is not None else None)
         view.ticks = dict(hr.ticks)
         view.radiation = (hr.radiation.model_copy(deep=True)
                           if hr.radiation is not None else None)

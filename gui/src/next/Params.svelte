@@ -6,7 +6,11 @@
    * move. What differs from today's, each as the prototype writes it: the
    * filter's placeholder and face, units with a degree sign (`° 2θ`, never
    * `deg 2θ`), and the broadening rows' short names (`Lorentzian size`, one
-   * line). Everything else is today's panel, and the swap deletes that one.
+   * line). The polish PR (2026-11-11, "Merge, then polish") draws it to the
+   * prototype: the filter box, the row under it whose links jump to each
+   * band, the band, 32 px rows that indent once under a group, the group's
+   * free count, the quiet checkbox, 22 px value boxes and the atom table's
+   * header. Everything else is today's panel, and the swap deletes that one.
    *
    * Every row of the θ vector, read as a crystallographer reads a refinement.
    *
@@ -31,15 +35,21 @@
    * Each acts at once, one history node through today's verb (interaction
    * rules 11 and 12), and waits while edits are pending, since a deleted atom
    * renumbers the paths a pending edit names. The filter row's ⋯ holds the
-   * bulk Free and Fix.
+   * bulk Free and Fix. The Instrument band's ⋯ holds Source and geometry…,
+   * which opens the Instrument dialog (WP-2218, rows 133-136).
    *
    * The layout rule (2026-11-07): no click moves the layout unless it asks
    * to. So the editor and its popover float (`position: fixed`), a pending
    * edit is a tint, a box and a padlock share one 18 px slot, and every
    * number sits in slots sized from the last fit, never from what is typed.
    */
+  import { structureScript, type Say } from "./console";
   import { ApiError, api } from "../api";
   import Help from "../Help.svelte";
+  import HeldMark from "../HeldMark.svelte";
+  import Padlock from "../Padlock.svelte";
+  import { fnmatch } from "../lib/fnmatch";
+  import { py } from "../lib/py";
   import { clone, newAtom } from "../lib/model";
   import { paramKey, resolve, type HelpCorpus } from "../lib/help";
   import { editText, expText, numParts, slotWidth, slotsFor, type NumParts,
@@ -48,9 +58,11 @@
            type Section } from "../lib/paramtree";
   import type { ParamsDraft } from "../lib/recovery";
   import { typesetSpaceGroup } from "../lib/spacegroup";
-  import { asGlob, editState, heldGlyph, matches, normalize, selection,
+  import { asGlob, editState, matches, normalize, selection,
            validateEdit, varyEdit, varyOf, type ParamRow } from "../lib/table";
   import Ask, { type AskField } from "./Ask.svelte";
+  import Instrument from "./Instrument.svelte";
+  import type { Anode } from "./instrument";
   import Menu, { type MenuAt, type MenuEntry } from "./Menu.svelte";
   import SpaceGroup from "./SpaceGroup.svelte";
   import { shortTitle, unitText } from "./words";
@@ -59,17 +71,24 @@
     head = null,
     busy = false,
     corpus = null,
-    say = (_line: string) => {},
+    anodes = [],
+    say = () => {},
     onpending = (_touched: number, _invalid: string) => {},
+    onholds = (_holds: ReadonlyMap<string, boolean>) => {},
     onmoved = () => {},
   }: {
     head?: string | null;
     busy?: boolean;
     corpus?: HelpCorpus | null;
-    say?: (line: string) => void;
+    /** `GET /api/capabilities`'s anodes, for the Instrument dialog */
+    anodes?: readonly Anode[];
+    say?: Say;
     /** the pending edits, reported to the shell's action bar (WP-2123): how
      *  many, and the first invalid one's reason or "" */
     onpending?: (touched: number, invalid: string) => void;
+    /** the pending holds and releases, path or glob → held, reported so the
+     *  Background graph's term chips share them (WP-2218) */
+    onholds?: (holds: ReadonlyMap<string, boolean>) => void;
     /** a structural edit landed: the head moved under the shell */
     onmoved?: () => void;
   } = $props();
@@ -108,6 +127,8 @@
 
   interface Editor {
     keys: string[];
+    /** the text the editor opened on: committing it is no edit (WP-2223) */
+    opened: string;
     left: number;
     top: number;
     width: number;
@@ -208,7 +229,7 @@
     return pair ? { ...r, lo: pair[0] ?? -Infinity, hi: pair[1] ?? Infinity } : r;
   }) : rows);
   const limitedByPath = $derived(new Map(limitedRows.map((r) => [r.path, r])));
-  const valueState = $derived(editState(limitedRows, edits, 0));
+  const valueState = $derived(editState(limitedRows, edits, 0, "stored"));
   const limitInvalid = $derived([...limitEdits].filter(([, [lo, hi]]) =>
     lo !== null && hi !== null && lo > hi)
     .map(([path]) => ({ path, why: "lower limit above the upper one" })));
@@ -232,12 +253,21 @@
     onpending(touched, first ? `${first.path.split(".").pop()}: ${first.why}` : "");
   });
 
+  $effect(() => {
+    onholds(holdEdits);
+  });
+
   async function load() {
     loading = true;
     try {
       const [p, s] = await Promise.all([api.params(), api.structure()]);
       rows = normalize(p.parameters);
       nFree = p.n_free;
+      // a pending edit on a path the working state no longer has can never
+      // apply, and would get every Apply refused (and the Background band, a
+      // hold): the head moved under it, by a checkout, the text editor or a
+      // structural edit (WP-2218 review)
+      dropUnknown();
       structure = s.structure;
       sites = s.sites ?? [];
       symmetry = s.symmetry ?? [];
@@ -289,8 +319,9 @@
   }
 
   async function bulkVary(vary: boolean) {
-    say(`ref.set_vary(${JSON.stringify(glob)}, ${vary ? "True" : "False"})`);
-    await patch({ vary: { [glob]: vary } });
+    // echoed once it lands: the console is what ran, and the script repeats it
+    if (await patch({ vary: { [glob]: vary } }))
+      say("call", `ref.set_vary(${JSON.stringify(glob)}, ${vary ? "True" : "False"})`);
   }
 
   /** Apply the pending edits; true when there were none or they all landed,
@@ -304,25 +335,33 @@
     if (holdEdits.size) body.hold = Object.fromEntries(holdEdits);
     if (limitEdits.size) body.limits = Object.fromEntries(limitEdits);
     if (restraintEdits.size) body.restraints = Object.fromEntries(restraintEdits);
-    if (Object.keys(values).length) say(`ref.set_values(${JSON.stringify(values)})`);
-    for (const [path, flag] of varyEdits) {
-      say(`ref.set_vary(${JSON.stringify(path)}, ${flag ? "True" : "False"})`);
-    }
-    for (const [path, flag] of holdEdits) {
-      say(`ref.${flag ? "hold" : "unhold"}(${JSON.stringify(path)})`);
-    }
-    if (limitEdits.size || restraintEdits.size) {
-      const onInstrument = [...limitEdits.keys()].some((p) => p.startsWith("instrument."));
-      const onStructure = restraintEdits.size > 0
-        || [...limitEdits.keys()].some((p) => !p.startsWith("instrument."));
-      const args = [onStructure ? "structure=…" : "", onInstrument ? "instrument=…" : ""]
-        .filter(Boolean).join(", ");
-      say(`ref.edit(${args})  # limits and restraints`);
-    }
     const needsPatch = Object.keys(values).length || varyEdits.size || holdEdits.size
       || limitEdits.size || restraintEdits.size;
     if (needsPatch) {
       if (!(await patch(body))) return false;
+      // landed, so echoed, in the order the route ran them
+      // (`session._apply_param_arms`): limits and restraints, the releases,
+      // values, the vary flags, the holds. The script repeats this order,
+      // and `set_vary` refuses a path still held.
+      // A refused patch ran nothing the script could repeat.
+      if (limitEdits.size || restraintEdits.size) {
+        const onInstrument = [...limitEdits.keys()].some((p) => p.startsWith("instrument."));
+        const onStructure = restraintEdits.size > 0
+          || [...limitEdits.keys()].some((p) => !p.startsWith("instrument."));
+        const args = [onStructure ? "structure=…" : "", onInstrument ? "instrument=…" : ""]
+          .filter(Boolean).join(", ");
+        say("call", `ref.edit(${args})  # limits and restraints`, null);
+      }
+      for (const [path, flag] of holdEdits) {
+        if (!flag) say("call", `ref.unhold(${JSON.stringify(path)})`);
+      }
+      if (Object.keys(values).length) say("call", `ref.set_values(${py(values)})`);
+      for (const [path, flag] of varyEdits) {
+        say("call", `ref.set_vary(${JSON.stringify(path)}, ${flag ? "True" : "False"})`);
+      }
+      for (const [path, flag] of holdEdits) {
+        if (flag) say("call", `ref.hold(${JSON.stringify(path)})`);
+      }
       // landed: a retry after a refused position below must not send these
       // again (an unhold of a path no longer held is refused)
       edits = new Map();
@@ -334,11 +373,12 @@
     for (const [atom, fields] of positionEdits) {
       const xyz = ["x", "y", "z"].map((axis) =>
         axis in fields ? Number(fields[axis]) : (byPath.get(`${atom}.${axis}`)?.value ?? 0));
-      // no verb of this name exists: the server projects the position onto
-      // the site's DOFs and records a set_values node (WP-1215)
-      say(`# ${atom} moved to ${JSON.stringify(xyz)}, set on its site's dof.k`);
       try {
-        await api.position(atom, xyz);
+        // the server projects the position onto the site's DOFs and records
+        // a set_values node (WP-1215); its answer names the values it set
+        const out = await api.position(atom, xyz);
+        if (out?.changed && out.values)
+          say("call", `ref.set_values(${py(out.values)})  # ${atom} to ${py(xyz)}`);
       } catch (exc) {
         // what landed before this changed the structure; the panel re-reads it
         await load();
@@ -364,6 +404,42 @@
     refusal = "";
   }
 
+  /** Drop every pending edit whose key `gone` names: an edit on another
+   *  surface removed or redefined those paths (the Background graph's Type
+   *  and Terms, WP-2218 review; any instrument edit's `ended`, WP-2229), so
+   *  Apply would be refused on them, or land on the new model's path of the
+   *  same name. All six kinds go: values, flags, holds, limits, restraints,
+   *  and positions, which are keyed by atom and asked about by the
+   *  coordinate paths they set. Returns the keys dropped. */
+  export function dropPending(gone: (key: string) => boolean): string[] {
+    const dropped: string[] = [];
+    const keep = <V,>(m: Map<string, V>, ended = (key: string, _v: V) => gone(key)
+                     ): Map<string, V> => {
+      const hit = [...m].filter(([k, v]) => ended(k, v)).map(([k]) => k);
+      if (!hit.length) return m;
+      dropped.push(...hit);
+      return new Map([...m].filter(([k]) => !hit.includes(k)));
+    };
+    edits = keep(edits);
+    varyEdits = keep(varyEdits);
+    holdEdits = keep(holdEdits);
+    limitEdits = keep(limitEdits);
+    restraintEdits = keep(restraintEdits);
+    positionEdits = keep(positionEdits,
+                         (atom, fields) => Object.keys(fields).some((axis) => gone(`${atom}.${axis}`)));
+    if (dropped.length) say("comment", `# pending edits dropped: ${[...new Set(dropped)].sort().join(", ")}`);
+    return dropped;
+  }
+
+  /** Drop the pending edits on paths the loaded rows no longer have: the
+   *  reload's question, asked also of a restored draft. Before the first
+   *  load the rows are empty and say nothing about any path. */
+  function dropUnknown() {
+    if (!rows.length) return;
+    const known = rows.map((r) => r.path);
+    dropPending((key) => !known.some((path) => fnmatch(path, key)));
+  }
+
   /** The pending edits as plain data, for the recovery copy (WP-2209), or
    *  `null` when nothing is pending.  Reading the six maps here is what lets
    *  the shell's writer follow every change, a retyped value included. */
@@ -380,7 +456,8 @@
     };
   }
 
-  /** Put recovered edits back as pending edits, in place of any on screen. */
+  /** Put recovered edits back as pending edits, in place of any on screen,
+   *  less those on a path the rows no longer have. */
   export function restoreDraft(d: ParamsDraft) {
     closeEditor(false);
     edits = new Map(Object.entries(d.edits ?? {}));
@@ -389,6 +466,30 @@
     limitEdits = new Map(Object.entries(d.limits ?? {})) as Map<string, Limits>;
     restraintEdits = new Map(Object.entries(d.restraints ?? {})) as Map<string, Restraint>;
     positionEdits = new Map(Object.entries(d.positions ?? {}));
+    // a draft kept across a head move can name a path the head no longer
+    // has, such as a hold on a cut background term; left pending, it gets
+    // the band and every Apply refused (review of #1683, finding 1)
+    dropUnknown();
+  }
+
+  /** A history node's values, from the History tab's Restore (WP-2211), in
+   *  place of the value and position edits on screen, as the design's Restore
+   *  does. The pending flags, holds, limits and restraints stay. */
+  export function loadRestore(plan: { values: Record<string, string>;
+                                      positions: Record<string, Record<string, string>> }) {
+    closeEditor(false);
+    edits = new Map(Object.entries(plan.values));
+    positionEdits = new Map(Object.entries(plan.positions));
+  }
+
+  /** A hold or release on one path from another panel: the Background graph's
+   *  "Hold at last fit" chips (WP-2218). One pending set, so the action bar
+   *  counts it once, Apply sends it once, and the recovery copy carries it. */
+  export function setHold(path: string, held: boolean, serverHeld: boolean) {
+    const next = new Map(holdEdits);
+    if (held === serverHeld) next.delete(path);
+    else next.set(path, held);
+    holdEdits = next;
   }
 
   export function focusFilter() {
@@ -400,9 +501,11 @@
 
   // ---------------------------------------------------------------- menus
 
-  /** The menu open: the filter row's, a phase band's, or an atom row's. */
+  /** The menu open: the filter row's, a phase band's, the Instrument band's,
+   *  or an atom row's. */
   type Open =
     | { kind: "filter"; at: MenuAt; anchor: HTMLElement }
+    | { kind: "instrument"; at: MenuAt; anchor: HTMLElement }
     | { kind: "phase"; phase: number; at: MenuAt; anchor: HTMLElement }
     | { kind: "atom"; phase: number; atom: number; at: MenuAt; anchor: HTMLElement | null };
   let menu = $state<Open | null>(null);
@@ -410,6 +513,7 @@
   let ask = $state<{ at: { x: number; y: number }; label: string; fields: AskField[];
                      submit: string; send: (v: Record<string, string>) => Promise<string> } | null>(null);
   let sgFor = $state<number | null>(null);
+  let instrumentOpen = $state(false);
   let cifInput: HTMLInputElement | undefined = $state();
 
   /** Why a structural edit waits, or "" when it can go. */
@@ -459,6 +563,9 @@
         { id: "fix", label: bulkLabel("Fix", bulk.toFix), disabled: busy || !bulk.toFix, title: why },
       ];
     }
+    if (m.kind === "instrument") {
+      return [{ id: "instrument", label: "Source and geometry…", ...gate }];
+    }
     if (m.kind === "phase") {
       return [
         { id: "rename", label: "Rename…", ...gate },
@@ -488,6 +595,10 @@
     if (m.kind === "filter") {
       if (id === "free") void bulkVary(true);
       else if (id === "fix") void bulkVary(false);
+      return;
+    }
+    if (m.kind === "instrument") {
+      if (id === "instrument") instrumentOpen = true;
       return;
     }
     const r = m.anchor?.getBoundingClientRect();
@@ -545,7 +656,7 @@
       const next = clone((await api.structure()).structure);
       change(next);
       await api.patchStructure(next, label);
-      say(echo);
+      say("call", echo, structureScript(next));
       refusal = "";
       await landed();
       return "";
@@ -573,7 +684,7 @@
   async function toggleAniso(base: string, on: boolean) {
     try {
       await api.aniso(base, on);
-      say(`# ${base}: aniso ${on ? "on, AnisoU.isotropic(Uiso, cell)" : "off, Biso from U_eq"}`);
+      say("comment", `# ${base}: aniso ${on ? "on, AnisoU.isotropic(Uiso, cell)" : "off, Biso from U_eq"}`);
       refusal = "";
       await landed();
     } catch (exc) {
@@ -589,7 +700,7 @@
     try {
       const preview = await api.uploadFile("cif", file);
       await api.patchStructure({ upload: preview.upload }, `structure from ${file.name}`);
-      say(`ref.edit(structure=structure_from_cif(${JSON.stringify(file.name)}))`);
+      say("call", `ref.edit(structure=structure_from_cif(${JSON.stringify(file.name)}))`, null);
       refusal = "";
       await landed();
     } catch (exc) {
@@ -673,6 +784,19 @@
     const next = new Set(unfolded);
     if (!next.delete(key)) next.add(key);
     unfolded = next;
+  }
+
+  /** A group's head reads how many of its rows are free, as a band's does. */
+  function freeIn(members: ParamRow[]): string {
+    const n = members.filter((m) => varyOf(m, varyEdits)).length;
+    return n ? `${n} free` : "";
+  }
+
+  /** Scroll a band to the top of the list: the links row's jump. */
+  function jumpTo(key: string) {
+    const anchor = scroller?.querySelector<HTMLElement>(`[data-anchor="${CSS.escape(key)}"]`);
+    if (!anchor || !scroller) return;
+    scroller.scrollTop += anchor.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
   }
 
   function freeCount(section: Section): number {
@@ -844,7 +968,7 @@
     if (pending !== undefined) return pending;
     const row = byPath.get(key);
     if (!row) return "";
-    return editText(row.value, row.esd, !COORD.test(key) && !/\.atoms\.\d+\.(occ|biso)$/.test(key));
+    return editText(row.value);
   }
 
   function openEditor(target: HTMLElement, keys: string[]) {
@@ -855,7 +979,7 @@
     const width = Math.max(rect.width + 10, (Math.max(text.length + 4, 12)) * 8);
     const left = Math.min(Math.max(8, rect.left), window.innerWidth - width - 8);
     editorText = text;
-    editor = { keys, left, top: rect.top, width, height: rect.height,
+    editor = { keys, opened: text, left, top: rect.top, width, height: rect.height,
                below: rect.bottom + 180 < window.innerHeight, error: "" };
     queueMicrotask(() => {
       editorInput?.focus();
@@ -863,20 +987,20 @@
     });
   }
 
-  /** Write the editor's text into every key it edits, as pending edits. A
-   *  text equal to what the cell already drew is no edit (WP-1009). */
+  /** Write the editor's text into every key it edits, as pending edits. The
+   *  text it opened on is no edit (WP-1009's rule, WP-2223), and a text that
+   *  reads as a key's stored value drops that key's edit. */
   function commit(): boolean {
     if (!editor) return true;
     const text = editorText.trim();
+    if (text === editor.opened) return true;                  // untouched
     if (editor.keys.length > 1 && text === "") return true;   // "Mixed", untouched
     let nextEdits = edits;
     let nextPositions = positionEdits;
     for (const key of editor.keys) {
       const row = byPath.get(key);
       if (!row) continue;
-      const drawn = editText(row.value, row.esd,
-        !COORD.test(key) && !/\.atoms\.\d+\.(occ|biso)$/.test(key));
-      const same = text === drawn || (text !== "" && Number(text) === Number(drawn));
+      const same = text !== "" && Number(text) === row.value;
       const m = COORD.exec(key);
       if (m) {
         const fields = { ...(nextPositions.get(m[1]) ?? {}) };
@@ -893,7 +1017,7 @@
     }
     edits = nextEdits;
     positionEdits = nextPositions;
-    if (editor.keys.length > 1) say(`# ${editor.keys.length} values set to ${text}`);
+    if (editor.keys.length > 1) say("comment", `# ${editor.keys.length} values set to ${text}`);
     return true;
   }
 
@@ -1041,7 +1165,7 @@
     <button class="lock" class:on={isHeld(row)} aria-pressed={isHeld(row)}
       disabled={busy}
       onclick={() => toggleHold(row.path, isHeld(row), row.held)}
-      >{@render padlock(isHeld(row))}<span class="sr">{isHeld(row) ? "release" : "hold"}</span></button>
+      ><Padlock on={isHeld(row)} /><span class="sr">{isHeld(row) ? "release" : "hold"}</span></button>
   {:else if row.refinable || row.vary}
     <input type="checkbox" class="vary" checked={varyOf(row, varyEdits)} disabled={busy}
       aria-label="refine"
@@ -1052,22 +1176,13 @@
          one, and the mark says which reason holds it (WP-1214) -->
     <span class="mark muted">
       <Help text={row.held_because} title="This row is held"
-        label="why this row is held">{heldGlyph(row)}</Help>
+        label="why this row is held"><HeldMark {row} /></Help>
     </span>
   {/if}
 {/snippet}
 
 {#snippet dots()}
   <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1" /><circle cx="8" cy="8" r="1" /><circle cx="12.5" cy="8" r="1" /></svg>
-{/snippet}
-
-{#snippet padlock(on: boolean)}
-  <svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true">
-    <rect x="2.5" y="6" width="9" height="6.5" rx="1.5"
-      fill={on ? "currentColor" : "none"} stroke="currentColor" stroke-width="1.3" />
-    <path d={on ? "M4.5 6V4.5a2.5 2.5 0 0 1 5 0V6" : "M4.5 6V4.5a2.5 2.5 0 0 1 5 0"}
-      fill="none" stroke="currentColor" stroke-width="1.3" />
-  </svg>
 {/snippet}
 
 {#snippet rowLine(l: Line, top: boolean)}
@@ -1097,7 +1212,7 @@
                                   (e.currentTarget as HTMLInputElement).checked)} />
       {/if}
     </span>
-    <span class="muted hs">{g.summary ?? ""}</span>
+    <span class="muted hs">{g.summary ?? (g.members.length ? freeIn(g.members) : "")}</span>
   </div>
   {#if isOpen(g.key)}
     {#each g.lines as l (l.key)}{@render rowLine(l, false)}{/each}
@@ -1134,28 +1249,26 @@
         <tr>
           <th class="aname">Atom</th>
           <th>Species</th>
-          <th>Site</th>
+          <th>Wyckoff</th>
           <th class="lk" aria-label="hold"></th>
-          <th colspan="3" class="thc">
+          <th colspan="3"><span class="thc">
             <span class="slot">{#if allDofs.length}<input type="checkbox" class="vary"
               checked={posState === true} use:indeterminate={posState} disabled={busy}
               aria-label="refine every position"
               onclick={(e) => setVary(allDofs, (e.currentTarget as HTMLInputElement).checked)} />{/if}</span>Position
-          </th>
-          <th class="thc">
+          </span></th>
+          <th><span class="thc">
             <span class="slot">{#if occs.length}<input type="checkbox" class="vary"
               checked={occState === true} use:indeterminate={occState} disabled={busy}
               aria-label="refine every occupancy"
               onclick={(e) => setVary(occs, (e.currentTarget as HTMLInputElement).checked)} />{/if}</span>Occ
-          </th>
-          <th class="thc">
+          </span></th>
+          <th><span class="thc">
             <span class="slot">{#if bisos.length}<input type="checkbox" class="vary"
               checked={bisoState === true} use:indeterminate={bisoState} disabled={busy}
               aria-label="refine every Biso"
-              onclick={(e) => setVary(bisos, (e.currentTarget as HTMLInputElement).checked)} />{/if}</span>B<sub>iso</sub>
-            <span class="unit muted">Å²</span>
-          </th>
-          <th class="mult">Mult</th>
+              onclick={(e) => setVary(bisos, (e.currentTarget as HTMLInputElement).checked)} />{/if}</span>Biso Å²
+          </span></th>
         </tr>
       </thead>
       <tbody>
@@ -1163,7 +1276,7 @@
           <tr data-atom={atom.path} oncontextmenu={(e) => atomMenu(e, item.phase, atom.index)}>
             <td class="aname">{atom.label}</td>
             <td>{atom.species}</td>
-            <td title={atom.siteSymmetry ? `site symmetry ${atom.siteSymmetry}` : null}>{atom.wyckoff}</td>
+            <td class="site" title={atom.siteSymmetry ? `site symmetry ${atom.siteSymmetry}` : null}>{atom.wyckoff}</td>
             <td class="lk">
               {#if atom.dofs.length}
                 <button class="lock" class:on={atomHeld(atom)} aria-pressed={atomHeld(atom)}
@@ -1171,25 +1284,24 @@
                   title={atomHeld(atom) ? `release ${atom.label}'s position` : `hold ${atom.label}'s position`}
                   onclick={() => toggleHold(atomGlob(atom), atomHeld(atom),
                     atom.dofs.length > 0 && atom.dofs.every((d) => d.held))}
-                  >{@render padlock(atomHeld(atom))}</button>
+                  ><Padlock on={atomHeld(atom)} /></button>
               {/if}
             </td>
             {#each AXES as axis (axis)}
               {@const cell = atom[axis]}
-              <td class="v" class:faint={atomHeld(atom)}>
+              <td class="v" class:faint={atomHeld(atom)}><span class="cv">
                 <span class="slot">{@render cellBox(atom, cell.dof, `${item.key}:${axis}`)}</span>
                 {#if cell.row}{@render value(cell.row, `${item.key}:${axis}`, false)}{/if}
-              </td>
+              </span></td>
             {/each}
-            <td class="v">
+            <td class="v"><span class="cv">
               <span class="slot">{#if atom.occ}{@render box(atom.occ, `${item.key}:occ`)}{/if}</span>
               {#if atom.occ}{@render value(atom.occ, `${item.key}:occ`, false)}{/if}
-            </td>
-            <td class="v">
+            </span></td>
+            <td class="v"><span class="cv">
               <span class="slot">{#if atom.biso}{@render box(atom.biso, `${item.key}:biso`)}{/if}</span>
               {#if atom.biso}{@render value(atom.biso, `${item.key}:biso`, false)}{/if}
-            </td>
-            <td class="mult mono">{atom.multiplicity ?? ""}</td>
+            </span></td>
           </tr>
         {/each}
       </tbody>
@@ -1200,14 +1312,22 @@
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <section class="params" onkeydown={panelKey} aria-label="parameters">
   <header>
-    <input id="param-filter" placeholder="Filter, for example biso or Ca1"
-      bind:value={query} disabled={!rows.length} />
-    <span class="muted count">{nFree} free of {rows.length}</span>
-    <button class="ib" aria-label="Free or fix" aria-haspopup="menu"
-      aria-expanded={menu?.kind === "filter"} disabled={!rows.length}
-      title="Free or fix what the filter matches"
-      onclick={(e) => toggleMenu({ kind: "filter", at: below(e.currentTarget, true), anchor: e.currentTarget })}
-      >{@render dots()}</button>
+    <div class="qrow">
+      <input id="param-filter" placeholder="Filter, for example biso or Ca1"
+        bind:value={query} disabled={!rows.length} />
+      <span class="muted count">{nFree} free of {rows.length}</span>
+      <button class="ib" aria-label="Free or fix" aria-haspopup="menu"
+        aria-expanded={menu?.kind === "filter"} disabled={!rows.length}
+        title="Free or fix what the filter matches"
+        onclick={(e) => toggleMenu({ kind: "filter", at: below(e.currentTarget, true), anchor: e.currentTarget })}
+        >{@render dots()}</button>
+    </div>
+    <!-- a link per band, as the prototype's: a jump asks to move the view -->
+    <nav class="jump" aria-label="Go to">
+      {#each tree as section (section.key)}
+        <button class="link" onclick={() => jumpTo(section.key)}>{section.title}</button>
+      {/each}
+    </nav>
   </header>
 
   {#if error || refusal}<p class="bad">{refusal || error}</p>{/if}
@@ -1225,6 +1345,7 @@
       <p class="muted pad">Nothing matches <span class="mono">{glob}</span>.</p>
     {:else}
       {#each tree as section, si (section.key)}
+        <span class="anc" data-anchor={section.key}></span>
         <div class="band" class:first={si === 0} data-section={section.key}>
           <button class="pick bt" aria-expanded={isOpen(section.key)} onclick={() => toggleOpen(section.key)}>
             <span class="chev" class:down={isOpen(section.key)} aria-hidden="true">›</span>
@@ -1250,6 +1371,11 @@
               title="Rename, change the space group, add an atom"
               onclick={(e) => toggleMenu({ kind: "phase", phase: phaseOf(section),
                 at: below(e.currentTarget, true), anchor: e.currentTarget })}>{@render dots()}</button>
+          {:else if section.kind === "instrument"}
+            <button class="ib" aria-label="Instrument actions" aria-haspopup="menu"
+              aria-expanded={menu?.kind === "instrument"} title="Source and geometry"
+              onclick={(e) => toggleMenu({ kind: "instrument", at: below(e.currentTarget, true),
+                anchor: e.currentTarget })}>{@render dots()}</button>
           {:else}
             <!-- the ⋯'s slot, kept so every band's count sits in one column -->
             <span class="ibslot" aria-hidden="true"></span>
@@ -1268,8 +1394,14 @@
 </section>
 
 {#if menu}
-  <Menu at={menu.at} label={menu.kind === "filter" ? "Free or fix" : menu.kind === "phase" ? "Phase" : "Atom"}
+  <Menu at={menu.at} label={menu.kind === "filter" ? "Free or fix" : menu.kind === "phase" ? "Phase"
+    : menu.kind === "instrument" ? "Instrument" : "Atom"}
     anchor={menu.anchor} items={menuItems} onchoose={chooseMenu} onclose={() => (menu = null)} />
+{/if}
+
+{#if instrumentOpen}
+  <Instrument {rows} {anodes} {busy} {say} onlanded={landed} ondropped={dropPending}
+    onclose={() => (instrumentOpen = false)} />
 {/if}
 
 {#if ask}
@@ -1339,39 +1471,73 @@
     flex-direction: column;
     min-height: 0;
     flex: 1 1 auto;
-    /* the label column, then a 26 px box column, as the prototype measured */
-    --label-w: 12.5em;
+    /* the prototype's geometry at its default density: a label column that
+       ends at --L for every row, a 26 px box column, 32 px rows. A row's
+       --pad is its indent: top-level rows and group names sit at 26 px with
+       the chevrons in the gutter, a group's rows once further in */
+    --L: calc(26px + 12.5em);
     --box-w: 26px;
-    --row-h: 30px;
+    --row-h: 32px;
+    --pad: 44px;
   }
 
   header {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    padding: 6px 8px;
-    font-size: var(--text-sm);
+    padding: 8px 12px 4px;
   }
 
-  header input {
+  .qrow {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .qrow input {
     flex: 1 1 auto;
     min-width: 0;
-    border: 1px solid var(--line);
-    background: var(--bg);
+    height: 32px;
+    box-sizing: border-box;
+    padding: 0 10px;
+    border: 1px solid var(--line-strong);
+    border-radius: 8px;
+    background: var(--panel);
     color: var(--fg);
+    font-size: var(--text);
   }
 
   .count {
     white-space: nowrap;
+    font-size: var(--text-sm);
+  }
+
+  /* the links row: a word per band, each a jump to it */
+  .jump {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    min-height: 26px;
+    margin-top: 4px;
+    padding-top: 3px;
+    box-sizing: border-box;
+    font-size: var(--text-sm);
+  }
+
+  .jump .link {
+    padding: 2px 0;
+    color: var(--accent-ink);
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }
 
   .scroller {
     flex: 1 1 auto;
     overflow: auto;
-    border-top: 1px solid var(--line);
     min-height: 120px;
-    font-size: var(--text-sm);
     padding-bottom: 12px;
+  }
+
+  .anc {
+    display: block;
+    height: 0;
   }
 
   .pad {
@@ -1392,12 +1558,11 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    min-height: 34px;
+    min-height: 44px;
     margin-top: 14px;
-    padding: 0 8px 0 0;
-    border-top: 2px solid var(--line);
-    background: color-mix(in srgb, var(--fg) 4%, var(--panel));
-    font-size: var(--text);
+    padding: 0 12px 0 0;
+    border-top: 2px solid var(--line-strong);
+    background: var(--hover);
   }
 
   .band.first {
@@ -1406,16 +1571,36 @@
 
   .bt {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: 8px;
     flex: 1 1 auto;
     min-width: 0;
+    min-height: 42px;
+    padding-left: 8px;
+    font-size: var(--text-band);
     font-weight: 600;
+  }
+
+  .bt .chev {
+    color: var(--fg);
+  }
+
+  /* the space group and the crystal system after the name, at the words' size */
+  .bt .sg {
+    font-size: calc(var(--text) * 1.06);
+  }
+
+  .bt .muted {
+    margin-left: 4px;
+    font-size: var(--text);
+    font-weight: 400;
+    color: color-mix(in srgb, var(--fg) 82%, var(--muted));
   }
 
   .nfree {
     font-size: var(--text-sm);
     white-space: nowrap;
+    color: color-mix(in srgb, var(--fg) 82%, var(--muted));
   }
 
   .ibslot {
@@ -1460,36 +1645,32 @@
   .row,
   .head {
     display: grid;
-    grid-template-columns: calc(var(--label-w) - 8px) var(--box-w) max-content 1fr;
+    grid-template-columns: calc(var(--L) - var(--pad)) var(--box-w) max-content minmax(0, 1fr);
     align-items: center;
     min-height: var(--row-h);
-    padding-left: 8px;
+    padding: 0 12px 0 var(--pad);
   }
 
   .row.top {
-    grid-template-columns: var(--label-w) var(--box-w) max-content 1fr;
-    padding-left: 0;
+    --pad: 26px;
   }
 
   /* overflow is wrap, never truncation (WP-1034): a long name takes a second
      line and its row grows, which a reader expects of a name */
   .row .label {
-    padding-left: 26px;
     padding-block: 3px;
     overflow-wrap: anywhere;
     min-width: 0;
-  }
-
-  .row:not(.top) .label {
-    padding-left: 18px;
   }
 
   .row.held .label {
     color: var(--muted);
   }
 
-  /* a gap and a rule above each group: grouping B (2026-11-07) */
+  /* a gap and a rule above each group: grouping B (2026-11-07). The name sits
+     at 26 px, its chevron hanging in the gutter before it */
   .head {
+    --pad: 8px;
     margin-top: 10px;
     border-top: 1px solid var(--line);
   }
@@ -1498,19 +1679,22 @@
     display: flex;
     align-items: center;
     gap: 6px;
+    min-height: var(--row-h);
     font-weight: 600;
   }
 
   .hs {
-    padding-left: 6px;
+    padding-left: 4px;
+    font-size: var(--text-sm);
   }
 
   .fold {
     display: flex;
     align-items: center;
     gap: 6px;
+    width: 100%;
     min-height: var(--row-h);
-    margin-left: 8px;
+    padding-left: 26px;
     color: var(--muted);
   }
 
@@ -1529,7 +1713,10 @@
     gap: 6px;
   }
 
+  /* a unit is quieter and smaller than the number it qualifies */
   .unit {
+    color: var(--muted);
+    font-size: 0.87em;
     white-space: nowrap;
   }
 
@@ -1539,12 +1726,14 @@
     display: inline-flex;
     align-items: baseline;
     min-width: var(--inkw);
-    min-height: 22px;
+    /* a button: next.css's 30 px control height is not a value box's */
+    height: auto;
     box-sizing: border-box;
     padding: 1px 4px;
     border: 1px solid transparent;
     border-radius: 4px;
-    background: color-mix(in srgb, var(--fg) 5%, var(--panel));
+    line-height: 1.35;
+    background: color-mix(in srgb, var(--hover) 55%, var(--panel));
     color: var(--fg);
     font-family: var(--mono-family);
     font-size: var(--text-sm);
@@ -1556,7 +1745,7 @@
   }
 
   .ink:hover {
-    background: color-mix(in srgb, var(--fg) 9%, var(--panel));
+    background: var(--hover);
   }
 
   .ink.fixed {
@@ -1566,7 +1755,7 @@
   }
 
   .ink.edited {
-    background: color-mix(in srgb, var(--accent) 16%, var(--panel));
+    background: color-mix(in srgb, var(--accent) 12%, var(--panel));
     color: var(--accent-ink, var(--accent));
   }
 
@@ -1630,12 +1819,58 @@
     color: var(--accent-ink, var(--accent));
   }
 
-  /* a ticked box is a pale accent tint with an accent tick (round 6) */
+  /* a ticked box is a pale accent tint with an accent tick (round 6, and the
+     quiet ticks of 2026-11-07): drawn, since a native box fills itself */
   input.vary {
+    appearance: none;
+    -webkit-appearance: none;
+    display: inline-grid;
+    place-content: center;
+    flex: none;
     width: 16px;
     height: 16px;
     margin: 0;
-    accent-color: color-mix(in srgb, var(--accent) 35%, var(--panel));
+    box-sizing: border-box;
+    border: 1.5px solid var(--muted);
+    border-radius: 4px;
+    background: var(--bg);
+    cursor: pointer;
+  }
+
+  input.vary::before {
+    content: "";
+    width: 12px;
+    height: 12px;
+    background: var(--accent-ink);
+    -webkit-mask: var(--tick) center / 12px 12px no-repeat;
+    mask: var(--tick) center / 12px 12px no-repeat;
+    visibility: hidden;
+  }
+
+  input.vary:checked,
+  input.vary:indeterminate {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+  }
+
+  input.vary:checked::before {
+    visibility: visible;
+  }
+
+  input.vary:indeterminate::before {
+    --tick: var(--dash);
+    visibility: visible;
+  }
+
+  input.vary:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  .params,
+  .popover-panel {
+    --tick: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2l2.3 2.3 4.7-5' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    --dash: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 6h6' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
   }
 
   .mark {
@@ -1682,65 +1917,68 @@
   }
 
   table.atomtab {
+    width: 100%;
     border-collapse: collapse;
     white-space: nowrap;
   }
 
-  /* the table is measured to fit the panel at a 1440 px window (546 px) with
-     six-decimal coordinates (fluorapatite), so the gaps are the tight ones */
+  /* the prototype's table: 32 px rows, 18 px between columns, the header in
+     the muted colour at a label's weight */
   .atomtab th,
   .atomtab td {
     height: var(--row-h);
-    padding: 0 2px 0 0;
+    padding: 0 18px 0 0;
     text-align: left;
     font-weight: 400;
   }
 
   .atomtab th {
     color: var(--muted);
+    font-size: var(--text-sm);
+    font-weight: 500;
+  }
+
+  .atomtab th:last-child,
+  .atomtab td:last-child {
+    padding-right: 12px;
   }
 
   .atomtab .aname {
     position: sticky;
     left: 0;
     z-index: 1;
-    padding-left: 4px;
-    background: var(--panel);
+    padding-left: 26px;
+    background: var(--bg);
   }
 
-  .atomtab td.v {
-    white-space: nowrap;
+  .atomtab td.aname {
+    font-weight: 500;
   }
 
-  .atomtab td.v > * {
-    vertical-align: middle;
+  .atomtab td.site {
+    color: var(--muted);
+  }
+
+  /* a cell is a box slot and its number, as a row's are; a header is a box
+     slot and its word */
+  .atomtab .cv,
+  .atomtab .thc {
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
 
   .atomtab td.faint .ink {
     color: var(--muted);
   }
 
-  .atomtab .thc {
-    white-space: nowrap;
+  /* a column's boxes take its own numbers' width, never the rows' one width */
+  .atomtab .ink {
+    min-width: 0;
   }
 
   .atomtab .lk {
-    width: 22px;
-  }
-
-  .atomtab .ink {
-    min-width: 0;
-    padding-inline: 2px;
-  }
-
-  .atomtab .slot {
-    width: 16px;
-    flex-basis: 16px;
-    margin-right: 2px;
-  }
-
-  .atomtab .mult {
-    text-align: right;
+    padding-right: 10px;
   }
 
   /* the editor floats over its cell, so opening it moves nothing, and is wide
