@@ -26,7 +26,7 @@ from pathlib import Path
 import numpy as np
 
 from ..theme import TOKENS
-from . import cut, glyphs, raster, rings, views
+from . import cut, glyphs, raster, rings, vector, views
 from . import report as rp
 from . import scene as sc
 from .report import FigureReport
@@ -60,6 +60,8 @@ NOTEBOOK_COLOURS = 256
 #: held equal by the same test.
 NOTEBOOK_DARK_GROUND = "#1d1813"
 MODES = ("ball", "ellipsoid")
+#: What ``path=`` writes, by its suffix (WP-1536 D1); the raster runs either way.
+WRITERS = (".png", ".svg")
 #: The places tried for a site label, in order, as (right, up) signs: up and
 #: to the right first, which is where every label went before #666.
 LABEL_ANCHORS = ((1, 1), (1, 0), (0, 1), (-1, 1), (-1, 0), (1, -1), (0, -1), (-1, -1))
@@ -809,8 +811,13 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
     other as its convex hull (``rings.face_fill``).  ``atom_labels=True`` writes each site
     label beside its atom, in the first of eight places around it clear of
     atoms, bonds and the labels before it.  The report counts what each label
-    still meets.  ``path`` writes a PNG, with ``dpi`` only in its ``pHYs``
-    chunk.
+    still meets.  ``path`` writes the picture, its suffix picking the format:
+    ``.png`` the array, with ``dpi`` only in its ``pHYs`` chunk, and ``.svg``
+    the same picture as vector shapes (:mod:`.vector`, WP-1536), one element
+    per atom, stick piece, face and letter, each classed by its site, in user
+    units that are the PNG's pixels and with ``dpi`` setting its physical
+    size.  The array, ``atoms``, ``letters`` and ``report`` are the PNG's
+    either way.
     """
     from ...gui import structure3d as s3
 
@@ -822,9 +829,11 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
     s = int(supersample)
     if not 1 <= s <= MAX_SUPERSAMPLE:
         raise ValueError(f"supersample {supersample!r}: 1 to {MAX_SUPERSAMPLE}")
-    if path is not None and Path(path).suffix.lower() != ".png":
-        raise ValueError("render_structure writes PNG only: JPEG's block artifacts "
-                         "smear the thin rings and lines a structure figure is read by")
+    if path is not None and Path(path).suffix.lower() not in WRITERS:
+        raise ValueError(f"path {str(path)!r}: render_structure writes "
+                         f"{' or '.join(WRITERS)}, picked by the suffix; JPEG's block "
+                         "artifacts smear the thin rings and lines a structure figure "
+                         "is read by")
     if (isinstance(pad, bool) or not isinstance(pad, (int, float, np.integer, np.floating))
             or not 0 <= pad < 0.5):
         raise ValueError(f"pad {pad!r}: the share of each side left empty, from 0 "
@@ -978,7 +987,14 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
     written = None
     if path is not None:
         target = Path(path)
-        _png(target, image, dpi)
+        if target.suffix.lower() == ".svg":
+            items = vector.display_list(
+                scene, geometry, R, frame, labels=labels, em=LETTER_EM_CSS * frame.px_scale,
+                accent=sc.rgb(tokens["--accent"]), ink=sc.rgb(tokens["--fg"]), fog=fog)
+            target.write_text(vector.svg(items, frame, background=bg, dpi=dpi, outline=ol),
+                              encoding="utf-8")
+        else:
+            _png(target, image, dpi)
         written = str(target)
     seen = rp.look(probe, R)
     warnings = list(fill_warnings)
