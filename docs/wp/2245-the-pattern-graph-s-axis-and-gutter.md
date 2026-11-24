@@ -46,11 +46,11 @@ No open WP owned the graph: WP-2216 built it and is closed, and the open GUI WPs
 
 ## Tasks
 
-- [ ] 1. Reproduce both in a real browser on a real project, with screenshots.
-- [ ] 2. A pane that draws no value in view labels no range: both copies of `rxplot.mjs`, with a
+- [x] 1. Reproduce both in a real browser on a real project, with screenshots.
+- [x] 2. A pane that draws no value in view labels no range: both copies of `rxplot.mjs`, with a
   case in `tests/test_rxplot_browser.py`.
-- [ ] 3. The `/next` plot area meets the legend gutter, its labels 10 px from the plot as the
-  prototype draws them; a `/next` browser case; the dist rebuilt.
+- [x] 3. The `/next` plot area meets the legend gutter; a `/next` browser case; the dist
+  rebuilt.
 - [x] Skill: none. The agent skill drives the Python API, never the GUI.
 
 ## Questions
