@@ -150,6 +150,7 @@ from .params.vector import (
 )
 from .report.distortion import distortion_totals as _distortion_totals
 from .report.magnetic import (
+    _magnetic_fraction,
     low_angle_asymmetry_findings,
     magnetic_width_findings,
     moment_angle_stationary_diagnostics,
@@ -9862,8 +9863,6 @@ def _tick_rows(model: CompiledModel, structure: Structure,
     tick_support = {}
     for ip, cp in enumerate(model.phases):
         name = structure.phases[ip].name
-        cell = tuple(values[f"phases.{ip}.cell.{k}"]
-                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
         # where the forward model puts each peak, and which reflection each
         # position is, from the one walk every tick builder shares
         # (`CompiledModel.reflection_positions`, WP-1908): the zero shift and
@@ -9887,14 +9886,12 @@ def _tick_rows(model: CompiledModel, structure: Structure,
             # ``tick_hkl`` and ``tick_support`` are carried through the same
             # mask and the same sort as the positions, so a split row keeps its
             # Miller indices and its support.
-            d = np.asarray(cp.reflections.d, dtype=np.float64)
-            f_nuc = np.asarray(model._nuclear_f2(ip, d, values, cell),
-                               dtype=np.float64)
-            f_mag = np.asarray(model._magnetic_f2(ip, d, values, cell),
-                               dtype=np.float64)
-            total = f_nuc + f_mag
-            with np.errstate(invalid="ignore", divide="ignore"):
-                frac = np.where(total > 0.0, f_mag / total, 0.0)
+            # the fraction is the finding's own (`_magnetic_fraction`, one
+            # reader for both): a row the stated group gives no nuclear
+            # structure factor is magnetic whatever the moments, so the
+            # tick row and the low-angle finding agree on it at zero moments
+            # (Yue's review of #1493, before-merge item 3)
+            frac = _magnetic_fraction(model, values, ip)[2]
             mag_hkl = frac >= 1.0 - MAGNETIC_TICK_PURITY
             mag_row = np.tile(mag_hkl, n_lines)
             rows_out = ((name, keep & ~mag_row),

@@ -230,9 +230,14 @@ def test_apertures_refined_in_this_fit_are_named_refined_and_not_held(arms):
     arms fail on the value-only branch."""
     (refined,) = _findings(arms["refined"][1])
     ref = arms["refined"][0]
-    assert ref.instrument.geometry.axial_sl.value == pytest.approx(ASYMMETRY, abs=0.005)
-    assert "S/L was refined to 0.03" in refined.message
-    assert "H/L was refined to 0.03" in refined.message
+    geo = ref.instrument.geometry
+    assert geo.axial_sl.value == pytest.approx(ASYMMETRY, abs=0.005)
+    assert geo.axial_hl.value == pytest.approx(ASYMMETRY, abs=0.005)
+    # the text is checked against the values the fit returned, not a literal:
+    # where the solver stops inside the 0.005 band moves with the platform
+    # (Yue's review of #1493, before-merge item 1: Linux ended at S/L 0.02841)
+    assert f"S/L was refined to {geo.axial_sl.value:.4g}" in refined.message
+    assert f"H/L was refined to {geo.axial_hl.value:.4g}" in refined.message
     assert "held" not in refined.message
     assert refined.suggestion.startswith("The axial asymmetry was refined in this fit")
     assert "cannot tell" not in refined.suggestion
@@ -262,6 +267,21 @@ def test_a_magnetic_only_line_stays_magnetic_at_zero_moments(arms, mode):
     assert shift < -3.0 * esd, (shift, esd)
     (d,) = _findings(res)
     assert "at 8.88 deg (0 0 1)" in d.message and d.value == pytest.approx(shift)
+
+
+@pytest.mark.parametrize("mode", ["lebail", "pawley"])
+def test_the_tick_rows_agree_with_the_finding_at_zero_moments(arms, mode):
+    """Yue's review of #1493, before-merge item 3: the tick builder had its own
+    0/0 fraction, so at zero moments the magnetic (0 0 1) drew on the nuclear
+    tick row while the finding called it magnetic-only.  Both now read
+    ``_magnetic_fraction``.  Fails on the tick builder's own fraction (the
+    8.88 deg tick is on the nuclear row)."""
+    _, res = arms[f"{mode}_zero_moments"]
+    (nuc_key,) = [k for k in res.ticks if not k.endswith("(magnetic)")]
+    mag = np.asarray(res.ticks[f"{nuc_key} (magnetic)"], dtype=float)
+    nuc = np.asarray(res.ticks[nuc_key], dtype=float)
+    assert np.any(np.abs(mag - 8.88) < 0.1), mag[:5]
+    assert not np.any(np.abs(nuc - 8.88) < 0.1), nuc[:5]
 
 
 def test_the_anti_centring_rows_are_the_odd_l_rows_of_the_child():

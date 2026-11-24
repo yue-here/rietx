@@ -153,6 +153,46 @@ term at P = 0 is bit-identical to today, and the cross-backend matrix covers its
 
 ## Handover log
 
+- **2026-11-24** — review rounds 1 to 3 on #1493 (WP closed 2026-11-09; this entry is the record Yue's
+  round 2 asked for, item 4). *Ruling.* Yue ruled on 2026-11-17 that the PR closes the WP and that
+  point 1 (the Bérar–Baldinozzi term) moved to #1499, so "Next" item 1 of the 2026-11-09 entry is
+  answered. Our 18 November reply misread his before-merge item 1 as that point 1; it is a separate
+  item and was built in `c8ca0d618`.
+
+  *Done since the close.*
+  - **A magnetic-only line at zero moments** (`c8ca0d618`). `compile_model` records
+    `CompiledPhase.nuclear_absent`, the rows on which the stated magnetic group leaves no nuclear
+    structure factor: the `nuclear_mask` zeros and the rows an anti-centring {1 | t}′ forbids
+    (h·t ∉ ℤ, tested exactly on the operator list's rationals by `anti_centring_absences`).
+    `_magnetic_fraction` reads 1 on those rows whatever the moments, so a Le Bail or Pawley fit
+    that starts every moment at 0 still anchors the finding on the magnetic (0 0 1) as a
+    magnetic-only line. The mask alone was not enough: on the CrSBr a,b,2c child the (0 0 1) row has
+    `nuclear_mask` 1.0 and a nuclear |F|² of 5e-29, which is rounding.
+  - **The aperture branch reads the fit** (`b222caaf3`, finished in `c8ca0d618`). The finding takes
+    `moving=table.moving_paths`, so a tied S/L = H/L counts, and says one of three things: held at
+    0, refined in this fit (with the values), or set and held.
+  - **Platform-independent test text** (round 2, item 1). The refined-aperture test asserts the
+    message against the values the fit returned, not a literal 0.03: Linux stops at S/L 0.02841.
+  - **The tick rows read the same fraction** (round 2, item 3). The tick builder in
+    `refine._build_result` had its own 0/0 fraction, so at zero moments the magnetic (0 0 1) drew on
+    the nuclear tick row while the finding called it magnetic-only. It now calls
+    `_magnetic_fraction`; `test_the_tick_rows_agree_with_the_finding_at_zero_moments` fails on the
+    old builder.
+
+  *Open, not blocking.*
+  - **A k = 0 line carrying both a nuclear and a magnetic structure factor** still reads fraction 0
+    at zero moments, so in a Le Bail fit it can anchor the finding although part of its extracted
+    intensity may be magnetic. A commensurate supercell with no anti-centring (k = 1/3) has the same
+    gap: its magnetic rows are nuclear-absent only by the stated positions, not by the group. This is
+    a magnetic-path design call and Michael's (ruled on #1075); it is recorded here and for #1499, and
+    nothing is built.
+  - `moving` is the answer-stage table's `moving_paths`: a plan that freed the apertures in an
+    earlier stage and held them in the last would print "held at". No shipped preset does this under
+    cumulative staging, so it is a docstring note, tracked as round 2's follow-up 5.
+  - The anti-translation extinction in `anti_centring_absences` has no citation (round 2's follow-up
+    6; Litvin, *Magnetic Group Tables*, IUCr 2013, is Yue's suggestion). It joins round 1's
+    follow-up 7. Round 1's follow-ups 4 to 8 stand.
+
 - **2026-11-09** — closed (ghostshift runner, one session; PR #1493; remainder issue #1499).
   On a constant-wavelength neutron pattern whose lowest lines are magnetic, the fit report now
   says so. It also says that no nuclear line in the sample can check the axial asymmetry there,
