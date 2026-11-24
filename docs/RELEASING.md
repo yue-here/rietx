@@ -52,11 +52,25 @@ which is the backlog this rule exists to prevent.
    so it is written for a reader upgrading, not for a maintainer. The
    precedents are [1.0.0](releases/1.0.0.md), a milestone, and
    [1.0.1](releases/1.0.1.md), a patch that changed no source file.
+   Start by joining the notes staged as fragments in
+   [releases/unreleased/](releases/unreleased/README.md) (WP-1941):
+   `python -m tests.release_notes --write` places every fragment in the
+   directory under its heading of the staged file, `pyproject.version`'s, and
+   deletes it. A patch release has no staged file, so write one first with
+   the headings its fragments name. Then edit the result as a reader's
+   document, like any other draft: order, merge, reword, and replace the
+   staging notice with the release's framing.
    In the same change, read the names the manual still owes prose for, in
    `tests/api_surface_deferred.txt`. `python -m tests.api_surface` prints the
    count beside its ceiling. Record the count in the release record's ship
    block, and lower `DEFERRED_CEILING` in `tests/api_surface.py` to it, so no
    later change can defer a name without a reviewed edit (WP-1981).
+   Then show the maintainer what a reader now receives:
+   `RIETX_CAPS_BASE=vA.B.C .venv/bin/python -m tests.reader_output`, with the
+   last release's tag, prints the change in a standard fit's printed text
+   since then. A line he rejects is fixed before the tag. Each PR's change was
+   settled and checked blind, so this is where he reads them (ruled 2026-11-22,
+   WP-2238).
 3. Land both on `main` and let CI go green. Branch protection requires `lint`
    and `ci-ok`, which passes only when the fast suite passed on py3.11, py3.14
    and jax (WP-1506, WP-1547). So a commit on `main` has already passed them,
@@ -131,7 +145,8 @@ They land on `main` as one pull request.
     follow-ons: the reinstall, the skill's `metadata.version` and its two
     copies, and the rebuilt tutorial notebooks. Then open that version's
     record. That means `docs/milestones/vX.Y.md` and its staged notes
-    `docs/releases/X.Y.0.md`, plus its row in ROADMAP's milestone table and
+    `docs/releases/X.Y.0.md`, whose headings are the sections a fragment can
+    name, plus its row in ROADMAP's milestone table and
     the "next release" line in its Current focus. The precedents are
     `2163a4a85` (1.10) and `e67490927` (1.11).
 

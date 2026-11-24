@@ -6,7 +6,7 @@ can actually do, each with a confidence, the alternatives it could not rule
 out, and a predicted Δχ².  Three rules keep it honest:
 
 1. **The strategy engine holds the veto.**  :func:`apply_strategy_veto` marks
-   any action the staged plan already performs (or a guard forbids); a vetoed
+   any action the staged plan already performs or the refinement already frees; a vetoed
    action stays in the report — silently dropping it would hide the reasoning
    — but ``active`` is False and an agent must not execute it.
 2. **Ambiguity is reported, never resolved by fiat.**  Over a short 2θ range
@@ -36,6 +36,7 @@ import math
 import numpy as np
 
 from ..model.profiles.caglioti import SCHERRER_K, apparent_size_from_size_coefficient
+from ..schemas.common import Diagnostic
 from ..schemas.results import RefinementResult
 from .schemas import (
     BACKGROUND_ABSORPTION_NOTABLE,
@@ -343,25 +344,138 @@ def _freed_comparison(restricted: RefinementResult, held: dict[str, float],
             return None
         return p.value - (values[row] - held[row]) / b
 
+    # the authorities that withhold an esd, read off the fuller result: a
+    # direction the solve discarded (WP-1535, and WP-2219's None), and a
+    # result built with no covariance at all
+    discarded = {q for d in fr.diagnostics
+                 if d.code == "COVARIANCE_DIRECTION_DISCARDED" for q in d.where}
+    no_covariance = all(q.stderr is None for q in fr.parameters)
+
+    def t_reason(p, start) -> str | None:
+        if start is None:
+            return ("no coordinate row follows this DOF alone, so where the "
+                    "restricted fit held it is not known"
+                    if p.path in relative else
+                    "the restricted model has no such entry")
+        if p.stderr:
+            return None
+        if no_covariance:
+            return "the fuller fit carries no covariance, so no esd"
+        if p.path in discarded:
+            return ("no esd: the parameter lies on a direction the data do "
+                    "not determine (COVARIANCE_DIRECTION_DISCARDED)")
+        return ("no esd: the data carry no gradient in this column at the "
+                "fuller fit's answer")
+
     freed = []
     for p in added:
         start = held_at(p)
         t = (None if start is None or not p.stderr
              else (p.value - start) / p.stderr)
         freed.append(FreedParameter(path=p.path, held_at=start, value=p.value,
-                                    esd=p.stderr, t_ratio=t))
+                                    esd=p.stderr, t_ratio=t,
+                                    at_bound=p.at_bound,
+                                    t_reason=t_reason(p, start)))
     # ``Statistics.chi2`` is reduced, over N − P, and the two P differ by
     # n_added: its ratio would carry (N − P_f)/(N − P_r), about −n_added of
     # ΔBIC at raw N.  delta_bic wants the sums.
     chi2_r, chi2_f = _chi2_absolute(rs), _chi2_absolute(fs)
     n_eff = effective_sample_size(rs.n_points, rs.esd_inflation)
+    ordered = _chi2_ordered(restricted, fr)
+    short = _comparison_unconverged(
+        restricted.status, fr.status, chi2_r, chi2_f, ordered,
+        where=[p.path for p in added])
     return FreedComparison(
         freed=freed, n_added=n_added, n_points=rs.n_points,
         chi2_restricted=chi2_r, chi2_full=chi2_f,
         esd_inflation=rs.esd_inflation, n_effective=n_eff,
         delta_bic=delta_bic(chi2_r, chi2_f, rs.n_points, n_added,
                             n_effective=n_eff),
-        delta_bic_raw_n=delta_bic(chi2_r, chi2_f, rs.n_points, n_added))
+        delta_bic_raw_n=delta_bic(chi2_r, chi2_f, rs.n_points, n_added),
+        status_restricted=restricted.status, status_full=fr.status,
+        chi2_ordered=ordered,
+        n_identified=sum(1 for q in freed
+                         if q.esd and q.at_bound is not True),
+        diagnostics=[] if short is None else [short])
+
+
+#: How far a fuller nested fit's minimised cost may end above the restricted
+#: fit's and still count as ordered, in cost units (WP-2220, ruled by the
+#: maintainer 2026-11-20).  The cost is what the solver minimised: the data
+#: χ², Σw·Δ², plus any restraint and penalty rows.  The margin is absolute, so
+#: it is in the units ΔBIC is read in.  2 is the lower edge of the "positive
+#: evidence" band of Kass & Raftery (1995, *J. Am. Stat. Assoc.* **90**, 773),
+#: 2 ln B from 2 to 6.  An excess the margin hides is therefore smaller than
+#: the weakest difference that band counts as evidence, and cannot change a
+#: ΔBIC verdict.  Measured stopping noise between two converged fits of one
+#: nested pair is far smaller: 1.1e-7 relative on issue #1685's fixture, about
+#: 0.0006 cost units.  **Known limit:** that noise is relative, so it reaches 2
+#: near a cost of 10⁷, where a converged pair can read unordered.  Rejected:
+#: the solver's ``optimize.lm.FTOL``, 1e-9 relative, which sits below the
+#: measured noise between independently fitted arms; and GSAS-II's 1e-3
+#: relative stop, about 6 cost units on that fixture, already "strong"
+#: evidence, so it could hide a verdict flip.
+NESTED_COST_MARGIN = 2.0
+
+
+def _chi2_ordered(restricted: RefinementResult, full: RefinementResult) -> bool:
+    """Whether a fuller nested fit's cost sits at or below the restricted one's.
+
+    A model that contains another can always reproduce it, so at both optima
+    S_full ≤ S_restricted.  S is what the solver minimised,
+    the last stage's ``StageResult.cost_final``: the data χ² **plus** any restraint and
+    penalty rows.  The data χ² alone carries no such guarantee, since a fuller
+    model may trade data misfit against a restraint (generality review,
+    WP-2220).  The fuller cost may exceed the restricted one by up to
+    :data:`NESTED_COST_MARGIN`, an absolute margin in cost units, and still
+    read as ordered.
+    """
+    from ..optimize.statistics import _chi2_absolute
+
+    if restricted.stages and full.stages:
+        return (full.stages[-1].cost_final
+                <= restricted.stages[-1].cost_final + NESTED_COST_MARGIN)
+    # a hand-built result records no stage: the data sums are all there is
+    return (_chi2_absolute(full.statistics)
+            <= _chi2_absolute(restricted.statistics) + NESTED_COST_MARGIN)
+
+
+def _comparison_unconverged(status_restricted: str, status_full: str,
+                           chi2_restricted: float, chi2_full: float,
+                           ordered: bool, *, where: list[str],
+                           names: tuple[str, str] = ("restricted", "fuller"),
+                           ) -> Diagnostic | None:
+    """``COMPARISON_UNCONVERGED`` when a nested comparison rests on a fit short
+    of its optimum, else ``None`` (WP-2220, issue #1685).
+
+    Short means a status other than ``"converged"``, or a fuller cost more
+    than :data:`NESTED_COST_MARGIN` above the restricted one
+    (:func:`_chi2_ordered`).  The second catches what status
+    misses: the LM driver calls a slow-descent stop ``converged`` (#222).
+    ``names`` are the two fits' names in the message, restricted first.
+    """
+    parts = [f"the {name} fit stopped with status {status!r}"
+             for name, status in zip(names, (status_restricted, status_full),
+                                     strict=True)
+             if status != "converged"]
+    if not ordered:
+        parts.append(
+            f"the {names[1]} fit ended at a cost more than "
+            f"{NESTED_COST_MARGIN:g} above the {names[0]} fit's "
+            f"(data χ² {chi2_full:.6g} against {chi2_restricted:.6g}), and a model "
+            "that contains another cannot fit worse at its optimum")
+    if not parts:
+        return None
+    return Diagnostic(
+        level="warning", code="COMPARISON_UNCONVERGED",
+        message=("This comparison rests on a fit short of its optimum: "
+                 + "; ".join(parts) + ". Its ΔBIC and t-ratios then measure "
+                 "where the fits stopped, not two optima."),
+        where=list(where),
+        suggestion=("Run the short fit on to convergence, with more iterations "
+                    "or from the other fit's values, and compare again before "
+                    "quoting ΔBIC."),
+        value=chi2_full - chi2_restricted)
 
 
 def _significant(templates, name: str) -> tuple[float, float] | None:
@@ -1140,7 +1254,9 @@ def predict_then_verify(refinement, data, action: SuggestedAction, *,
     Runs on a *branch* of the refinement history when one is available, so a
     rejected action leaves no trace in the working state — the rollback is
     structural, not a manual undo.  ``min_improvement`` is the fractional χ²
-    reduction required to accept.
+    reduction required to accept.  Where a fit short of its optimum could
+    flip that rule, ``accepted`` is ``None`` and ``reason`` names the fit
+    (:func:`_judged`, WP-2220).
     """
     from ..strategy.staged import Stage
 
@@ -1180,18 +1296,48 @@ def predict_then_verify(refinement, data, action: SuggestedAction, *,
 
     after = result.statistics.chi2
     observed = before - after
-    accepted = observed > min_improvement * abs(before)
+    passes = observed > min_improvement * abs(before)
     try:
         comparison = _freed_comparison(restricted, held, trial)
     except ValueError:      # nothing newly freed, or a stage hold moved
         comparison = None
+    ordered = _chi2_ordered(restricted, result)
+    accepted, short = _judged(passes, restricted.status, result.status, ordered,
+                             names=("caller's", "trial"))
+    verdict = ("accepted" if accepted else "rolled back" if accepted is False
+               else f"rolled back, not judged: {short}")
     return VerificationOutcome(
         kind=action.kind, predicted_delta_chi2=action.expected_delta_chi2,
-        observed_delta_chi2=float(observed), accepted=bool(accepted),
+        observed_delta_chi2=float(observed), accepted=accepted,
         reason=(f"χ² {before:.4g} → {after:.4g} "
-                f"({observed / abs(before):+.2%}); "
-                f"{'accepted' if accepted else 'rolled back'}"),
+                f"({observed / abs(before):+.2%}); {verdict}"),
         comparison=comparison)
+
+
+def _judged(passes: bool, status_restricted: str, status_full: str,
+           ordered: bool, *, names: tuple[str, str] = ("restricted", "fuller"),
+           ) -> tuple[bool | None, str | None]:
+    """A nested test's verdict, or ``None`` where a short fit could flip it.
+
+    Returns ``(verdict, why)``.  The direction of the bias decides (WP-2220).
+    A fuller fit short of its optimum (status, or a χ² above the restricted
+    one) understates the gain, so a pass stands and a fail is not judged.  A
+    restricted fit short of its optimum overstates it, so a fail stands and a
+    pass is not judged.  ``why`` names the short fit where the verdict is
+    ``None``.  A fuller fit that ``"diverged"`` is a failed trial, not a
+    budget stop: the solver handed back its start, and more iterations would
+    not continue it, so its fail stands.
+    """
+    full_short = status_full == "max_iter" or (status_full == "converged"
+                                               and not ordered)
+    if passes and status_restricted != "converged":
+        return None, (f"the {names[0]} fit stopped with status "
+                      f"{status_restricted!r}, so the gain may be it continuing")
+    if not passes and full_short:
+        why = (f"stopped with status {status_full!r}" if status_full != "converged"
+               else "ended above the fit it contains")
+        return None, f"the {names[1]} fit {why}, so more iterations could still gain"
+    return passes, None
 
 
 def _rival_trial(refinement):

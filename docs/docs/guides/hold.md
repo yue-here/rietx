@@ -17,6 +17,7 @@ A hold lasts across every plan.
 
 Pass `hold` a parameter's name, such as `phases.0.cell.a`, or a list of names.
 A `*` in a name matches any run of characters, dots included, so `phases.0.cell.*` is every lattice parameter of the first phase.
+A name with `*`, `?` or `[` in it is called a glob, and the messages use that word.
 [Parameter map](../reference/parameters.md) and [Instrument parameter map](../reference/parameters-instrument.md) list every name.
 It returns the paths it held.
 
@@ -50,18 +51,16 @@ The `lab_bragg_brentano` plan has a `cell` stage that frees the lattice paramete
 ```text
 9.3717
 cell ['phases.0.cell.a', 'phases.0.cell.c']
-closing ['phases.0.cell.a', 'phases.0.cell.c']
-2 held parameters were matched by the turn_on glob of stages 'cell', 'closing' and stayed fixed: phases.0.cell.a, phases.0.cell.c.
+2 held parameters were matched by the turn_on glob of stage 'cell' and stayed fixed: phases.0.cell.a, phases.0.cell.c.
 ```
 
 The lattice parameter `a` ends at the value the CIF gave it.
 `StageResult.blocked_by_hold` names what each stage tried to free and could not.
-The closing stage that ends every plan names every parameter the plan's stages named, so the hold blocks it too.
 The fit also reports [`HOLD_BLOCKED_PLAN`](../reference/diagnostics-stages.md#hold_blocked_plan) at level `info`.
 Nothing is wrong when it appears.
 It records that your hold overrode the plan.
 
-Without the hold, the same plan moves `a` by about 300 ppm.
+Without the hold, the same plan moves `a` by about 230 ppm.
 The figure differs between platforms by tens of ppm, so the script prints the floor they all clear:
 
 <!-- output of examples/guides/hold.py -->

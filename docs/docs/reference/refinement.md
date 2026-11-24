@@ -1,6 +1,6 @@
 # The refinement
 
-This page gives the calls that run a refinement, where each setting goes, the fit modes, the plan and stage objects and their storage, what each stage records, the guard findings, the event stream, cancellation, and what a result records about the run.
+This page gives the calls that run a refinement, where each setting goes, the fit modes, plans and stages and their storage, what each stage records, guards, events, cancellation, and what a result records about the run.
 
 [About a fit](../concepts/fit.md) follows one stage from freeing its parameters to committing its history node.
 [Plan presets](plans.md) draws each preset's stages, and [Stage settings, flags and options](settings.md#stage-settings) gives each stage setting with its meaning.
@@ -33,7 +33,7 @@ A setting about one pattern, or one run in flight, belongs to the call.
 | `backend`, `solver` | `Refinement(...)` and `refine` | `"numpy"` and `"lm"` |
 | `history` | `Refinement(...)` and `refine` | on for `Refinement`, off for `refine`, which discards the tree with the object ([The refinement history](history.md)) |
 | `mode`, `two_theta_limits` | `Refinement.fit`, `Refinement.run_stage` and `refine` | `"rietveld"` and the whole pattern; `run_stage` reuses the last call's when given `None` |
-| `plan` | `Refinement.fit` and `refine` | `"mccusker_default"` |
+| `plan`, `refit` | `Refinement.fit` and `refine` | `"mccusker_default"`, `"single"` (one-stage re-fit) |
 | `events`, `cancel`, `telemetry`, `label` | `Refinement.fit`, `Refinement.run_stage` and `refine` | none; a run records itself unless told not to ([How to watch or stop a running fit](../guides/watch.md)) |
 | `stage_reports`, `progress` | `Refinement.fit` | off ([Reports at every stage](report.md#reports-at-every-stage), [Progress lines](result.md#progress-lines)) |
 | `correlation_guard`, `phase_support_sigma` | `Refinement.run_stage` | 0.98 and 3, since no plan supplies them; `Project.run_stage` passes the `phase_support_sigma` of the plan the project stores |
@@ -154,7 +154,7 @@ A `RefinementPlan` holds its stages and five settings.
 | `RefinementPlan.intermediate_ftol` | 1e-6 | the tolerance every declared stage but the last stops at ([Stage tolerances](#stage-tolerances)) |
 | `RefinementPlan.lebail_passes` | 1 | the cap on Le Bail passes ([Le Bail passes](#le-bail-passes)) |
 | `RefinementPlan.phase_support_sigma` | 3 | the number of esds a phase's scale must sit from zero for the stage to treat the phase as seen; `None` skips the test ([Held parameters](#held-parameters)) |
-| `RefinementPlan.closing_window_tol` | 1e-3 | the fraction of each peak's area the closing stage's windows may drop; `None` runs no closing stage ([The closing stage](#the-closing-stage)) |
+| `RefinementPlan.closing_window_tol` | `None` | `None` runs no closing stage; a fraction asks for one whose windows drop that much of each peak's area, 1e-3 for an answer to publish ([The closing stage](#the-closing-stage)) |
 
 ```python
 import rietx as rx
@@ -218,14 +218,14 @@ assert plan.intermediate_ftol == 1e-6
 
 ftols = plan.stage_ftols()
 assert len(ftols) == len(plan.run_stages())
-assert set(ftols[:-2]) == {1e-6} and ftols[-2:] == [None, None]
+assert set(ftols[:-1]) == {1e-6} and ftols[-1] is None
 ```
 
-The list is parallel to `RefinementPlan.run_stages`: the declared stages, then the closing stage ([The closing stage](#the-closing-stage)).
+The list is parallel to `RefinementPlan.run_stages`: the declared stages, then the closing stage when the plan asks for one ([The closing stage](#the-closing-stage)).
 Three rules decide a stage's tolerance, in this order.
 
 1. A stage that declares `Stage.ftol` runs at it.
-2. The last declared stage runs at the solver's default of 1e-9, shown as `None`, because it produces the answer. The closing stage after it runs at 1e-9 too.
+2. The last declared stage runs at the solver's default of 1e-9, shown as `None`, because it produces the answer. A closing stage after it runs at 1e-9 too.
 3. Every other stage runs at `RefinementPlan.intermediate_ftol`.
 
 A one-stage plan is therefore all last stage, and nothing is loosened.
@@ -276,15 +276,22 @@ Use it for a number going into a paper, for a number reproduced from an earlier 
 
 ## The closing stage
 
-Every plan ends with one more stage than it declares.
+A plan can end with one more stage than it declares.
 The closing stage compiles the model again at the answer, with peak windows that drop `RefinementPlan.closing_window_tol` of each peak's area, and solves once more with every pattern any declared stage freed.
+It is off by default since 1.13: `closing_window_tol` is `None`, and a plan runs its declared stages alone.
+`lab_calibrate` keeps it, since every later fit inherits a calibration's error.
+So does a Pawley series carrying intensities, since each pattern would start from the last one's error; `carry_hkl_intensities=False` turns both off.
+Ask for it with `CLOSING_WINDOW_TOL`, 1e-3, for an answer you will publish:
 
 ```python
 import rietx as rx
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
 
 plan = rx.RefinementPlan.lab_bragg_brentano()
-assert plan.closing_window_tol == 1e-3
+assert plan.closing_window_tol is None
+assert plan.run_stages() == plan.stages
 
+plan.closing_window_tol = CLOSING_WINDOW_TOL
 stages = plan.run_stages()
 assert len(stages) == len(plan.stages) + 1
 assert stages[-1].name == "closing"
@@ -295,7 +302,7 @@ assert plan.stage_window_tols()[-1] == 1e-3
 `RefinementPlan.stage_window_tols` lists the window fraction of each stage in `run_stages`, with `None` for a declared stage's 2 %.
 
 A stage fixes its peak windows, its reflection list and its axial-divergence sample points at the values it starts from, and holds them while the solver runs ([The forward model](../theory/forward-model.md)).
-Each window drops 2 % of its peak's area, and more once a peak widens during the stage.
+Each window drops 2 % of its peak's area, as TOPAS's default does, and more once a peak widens during the stage.
 Two errors reach the answer of a plan without a closing stage:
 
 - The missing tails move refined values. Computed out to 5e-5 of the area, lab answers moved by up to 0.97 esd (the zincite scale on CPD cpd-1a, the Lorentzian size on the GSAS-II fluorapatite), and the background coefficients by 2 to 5 esd.
@@ -304,19 +311,20 @@ Two errors reach the answer of a plan without a closing stage:
 The closing stage takes the last declared stage's iteration budget, Le Bail cycles, restraint weight, window slack and `Stage.ftol`, and seeds nothing.
 It takes the solver's default tolerance, as the last declared stage does.
 `RefinementResult.stages` ends with it under the name `closing`, and `StageResult.window_area_tol` and `NodeAction.window_area_tol` record the fraction.
-A model rebuilt from `RefinementResult.parameters` reproduces the result's χ² when compiled at the default windows, which are the closing stage's: `compile_model` and `Refinement.predict` evaluate outside a fit at `CLOSING_WINDOW_TOL`.
-A declared stage records `None`, the declared stages' 2 %, so a fit run without a closing stage is rebuilt with `window_area_tol=recorded_window_tol(result.stages[-1].window_area_tol)` (`rietx.model.forward.recorded_window_tol`).
+A declared stage records `None`, the declared stages' 2 %.
+`compile_model`, and `Refinement.predict` before a fit, evaluate at `CLOSING_WINDOW_TOL`, so a synthetic pattern carries near-complete tails.
+After a fit, `Refinement.predict` draws the fit's own curve, as `compile_model` does given `window_area_tol=recorded_window_tol(result.stages[-1].window_area_tol)`.
 At any window fraction under the declared stages' 2 %, the axial-divergence asymmetry is sampled at a finer node rule as well.
-So a `closing_window_tol` loosened past 1e-3 for speed loosens the windows alone.
+So a `closing_window_tol` loosened past 1e-3 loosens the windows alone.
 
-Measured on SRM 660c LaB6, the fluorapatite, cpd-1a and 11-BM NAC, each under its acceptance protocol (macOS arm64, `[dev]`; times from 2026-10-21):
+What the closing stage costs and moves, measured on the benchmark harness's cases (macOS arm64, `[dev]`, 2026-11-19, three interleaved rounds):
 
-| | Fluorapatite | cpd-1a | NAC | LaB6 |
+| | 11-BM NAC | cpd-1a | cpd-2 | simulated `trigger` |
 |---|---|---|---|---|
-| Two Biso starts, largest difference in plain esd, without → with | 0.119 → 0.000 | 15.3 → 15.7 | 0.008 → 0.000 | 0.20 → 1.16 |
-| Fit time with the closing stage | 2.20-2.33× | 1.60-1.62× | 1.2× | 1.42-1.44× |
+| Fit time with the closing stage | 1.2-1.3× | 1.7× | 1.7× | 1.9× |
+| Largest change in the answer, plain esd | 0.16 | 0.92 | 2.0 | 1.24 |
 
-cpd-1a's starts differ on fluorite's Lorentzian strain, through the X and Y split its plan holds (`StageResult.width_twins_held`).
+In physical units, on the patterns WP-2002 measured, the closing stage moved cpd-1a's phase fractions by up to 0.12 wt%, the fluorapatite's Lorentzian size by 2.5 % and its strain by 3 %, LaB6's widths by 1-2 %, and NAC's values by under 0.4 %.
 `tests/test_window_domain.py` holds the closing answer within 0.1 plain esd of the answer with converged tails on the fluorapatite, cpd-1a and NAC (0.008 to 0.019 esd).
 LaB6 misses it by 0.9 esd on `instrument.profile.u`.
 Its highest-angle reflections end with a Gaussian variance under the floor the width is clamped to, and there a recompile moves `u` by an esd at any window.
@@ -325,24 +333,11 @@ BGMN ends its refinements the same way, with every parameter free and restarted 
 RIETAN-FP's automatic mode ends with everything refining together, and moves its windows at every evaluation.
 1e-3 drops less of a Lorentzian peak than TOPAS (2.0 %), MAUD (2.1 %), RIETAN-FP and FullProf, and more than GSAS-II (0.5 %), BGMN and EasyDiffraction, which compute the whole peak.
 
-Set `closing_window_tol` to `None` to run the declared stages alone, for speed:
-
-```python
-import rietx as rx
-
-plan = rx.RefinementPlan.lab_bragg_brentano()
-plan.closing_window_tol = None
-assert plan.run_stages() == plan.stages
-```
-
-The answer is then that of every fit before the setting, to the bit.
-On the four patterns above it lands 0.15 to 0.96 plain esd from the closing stage's answer.
-In physical units, cpd-1a's phase fractions move by up to 0.12 wt%, the fluorapatite's Lorentzian size by 2.5 % and its strain by 3 %, LaB6's widths by 1-2 %, and NAC's values by under 0.4 %.
-A long series or a large batch is the case for it: each pattern pays the closing stage's cost.
-Its FitReport still reads the misfit at the closing precision ([Region attribution](report.md#region-attribution)).
+The FitReport reads the misfit at the closing precision whether or not the fit ran a closing stage ([Region attribution](report.md#region-attribution)).
 On the fluorapatite and cpd-1a, a reading at the fit's own 2 % printed the same report.
 `PlanSpec.closing_window_tol` carries the setting into a project file, and the GUI's text document writes it as the `closing` line.
-`Refinement.run_stage` runs no closing stage, so its `window_area_tol` defaults to the closing stage's fraction; pass `rietx.model.forward.WINDOW_AREA_TOL` for the declared stages' faster windows.
+A project that saved its plan under 1.10-1.12 stored `0.001` and keeps its closing stage until the line is set to `none`.
+`Refinement.run_stage` runs no closing stage, and its `window_area_tol` defaults to the declared stages' 2 %; pass `CLOSING_WINDOW_TOL` for near-complete tails.
 
 ## Stage fields
 
@@ -369,7 +364,7 @@ A stage that reaches it ends with status `max_iter` and reports [`STAGE_MAX_ITER
 
 `Stage.seed` and `Stage.strain_seed` both start a parameter away from an exact zero, and they are not interchangeable.
 
-- `Stage.seed` lifts each parameter the stage frees that sits exactly on a lower bound of 0 or above to the given value. A value already above its bound starts where it is, and a parameter that can go negative, such as Caglioti `U` and `V` or the zero shift, is never seeded. The surface-roughness stage seeds at 0.3, because Suortti roughness has no effect at b = 0 and the data see it best near b = 0.2 to 0.5. It is the only shipped stage that seeds. Extinction and the two magnetic widths are freed from 0 with no seed, since each one's column at 0 is its physical one. `StageResult.seeded` lists every row a stage lifted.
+- `Stage.seed` lifts each parameter the stage frees that sits exactly on a lower bound of 0 or above to the given value. A value already above its bound starts where it is, and a parameter that can go negative, such as Caglioti `U` and `V` or the zero shift, is never seeded. The surface-roughness stage seeds at 0.3, because Suortti roughness has no effect at b = 0 and the data see it best near b = 0.2 to 0.5. It is the only built-in stage that seeds. Extinction and the two magnetic widths are freed from 0 with no seed, since each one's column at 0 is its physical one. `StageResult.seeded` lists every row a stage lifted.
 - `Stage.strain_seed` puts a freed, all-zero Stephens block on a small isotropic microstrain, in ppm of ΔM/M. Those coefficients can go negative, so `Stage.seed` does not reach them, and at zero the square root in their width law has unbounded slope.
 
 `Stage.lebail_cycles` caps the Le Bail cycles run before and after each solve, and `Stage.lebail_tol` ends them early ([the stop](../theory/forward-model.md#le-bail-mode)).
@@ -474,7 +469,7 @@ Both drivers accept a step only when it lowers the cost, so `cost_final` never e
 ### Names that free nothing
 
 `StageResult.freed` is the field to read when a stage did nothing.
-A pattern that matches no parameter is not an error, because that is how the shipped plans reach a component your model may not declare.
+A pattern that matches no parameter is not an error, because that is how the built-in plans reach a component your model may not declare.
 `lab_sample_refine` frees `phases.*.microstrain.dof.*` whether or not a phase carries a Stephens block.
 
 A literal name, with no `*`, `?` or `[`, names one parameter.
@@ -493,7 +488,7 @@ An atom's coordinates refine along the directions its site symmetry allows, as `
 A cubic cell's `b` follows `a`.
 A stage naming such a parameter frees nothing for it, so [`STAGE_PATH_NOT_FREE`](diagnostics-stages.md#stage_path_not_free) reports it at `warning` before the first stage runs, with the names that would free it.
 For an oxygen on 16h in I4<sub>1</sub>/amd, `phases.0.atoms.2.x` is fixed at 0, and `y` and `z` follow `dof.0` and `dof.1`.
-A name you tied yourself is not reported, and neither is an instrument name: the shipped plans name `instrument.geometry.sample_displacement`, which a capillary geometry locks.
+A name you tied yourself is not reported, and neither is an instrument name: the built-in plans name `instrument.geometry.sample_displacement`, which a capillary geometry locks.
 A pattern can reach too far the other way: `phases.0.atoms.2.*` frees the site's `occ` and `biso` beside its directions, so write `phases.0.atoms.2.dof.*` for the position alone.
 
 A joint fit has one more way to do nothing, which is to do it on one histogram only ([How to fit an X-ray and a neutron pattern together](../guides/joint.md)).
@@ -605,7 +600,7 @@ Each kind has one constructor, so each format string is written once:
 |---|---|---|---|
 | `GuardFinding.correlation` | `HIGH_CORRELATION` | two free parameters correlate above the plan's `correlation_guard` | ρ |
 | `GuardFinding.flat_direction` | `FLAT_DIRECTION` | a correlated pair reaches \|ρ\| = 1.000 to the three decimals the message prints, so the data do not separate them | ρ |
-| `GuardFinding.discarded_direction` | `COVARIANCE_DIRECTION_DISCARDED` | three or more parameters share a direction the covariance solve discards, which no pairwise correlation shows, so each esd is at least √2 too small | the number of directions |
+| `GuardFinding.discarded_direction` | `COVARIANCE_DIRECTION_DISCARDED` | three or more parameters share a direction the covariance solve discards, which no pairwise correlation shows, so none of them has an esd | the number of directions |
 | `GuardFinding.at_bound`, `GuardFinding.tied_at_bound` | `BOUND_HIT`, or `FLOOR_HIT` on a lower bound at 0 | a bound carried load at the answer, on a free or a tied parameter | the residual's cosine with the column, or `None` |
 | `GuardFinding.background_absorption` | `BACKGROUND_ABSORPTION` | the background could largely reproduce a structural parameter's column | the block R² |
 | `GuardFinding.roughness_absorption` | `ROUGHNESS_ABSORPTION` | the surface-roughness correction could | the block R² |

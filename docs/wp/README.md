@@ -13,24 +13,26 @@ names hard dependencies, and *soft* marks a preferred order.
 
 | WP | Title | Since | Priority | Section |
 |---|---|---|---|---|
-| [1317](1317-series-scrubber.md) | Scrub the series along its own trace | 2026-10-21 | P3 | [Unscheduled](#unscheduled-render-what-the-fit-already-knows) |
+| [1317](1317-series-scrubber.md) | Scrub the series along its own trace | 2026-11-04 | P3 | [Unscheduled](#unscheduled-render-what-the-fit-already-knows) |
 | [1327](1327-magnetic-structure.md) | A magnetic structure: state it, refine it, report what the powder cannot see | 2026-11-04 | P2 | [magnetic](#magnetic) |
 | [1335](1335-the-report-costs-more-than-the-fit.md) | The report costs more than the fit | 2026-11-02 | P3 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
 | [1343](1343-the-moment-pays-for-the-width.md) | The magnetic peaks are broader, and the moment pays for it | 2026-10-25 | P2 | [magnetic](#magnetic) |
-| [1418](1418-the-magnetic-structure-is-determined.md) | The magnetic structure is determined, not only stated | 2026-11-01 | P2 | [magnetic](#magnetic) |
+| [1418](1418-the-magnetic-structure-is-determined.md) | The magnetic structure is determined, not only stated | 2026-11-20 | P2 | [magnetic](#magnetic) |
 | [1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md) | A child structure refined on its mode amplitudes | 2026-10-30 | P3 | [magnetic](#magnetic) |
-| [1468](1468-what-the-polyhedra-still-miss.md) | What the polyhedra still miss, and the controls a chemist would reach for | 2026-11-02 | P3 | [Unscheduled](#unscheduled-render-what-the-fit-already-knows) |
+| [1453](1453-both-directions-name-the-lower-cost.md) | Both directions name the lower cost | 2026-11-16 | P3 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
+| [1522](1522-the-gui-says-what-the-read-repaired.md) | The GUI says what reading the project repaired | 2026-11-16 | P3 | [Unscheduled](#unscheduled-render-what-the-fit-already-knows) |
 | [1539](1539-the-declared-optics-reach-every-caller.md) | The declared optics reach every caller and every reader | 2026-10-03 | P4 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [1805](1805-the-rigid-body.md) | `RigidBody`: schema, collector, anchored rotation, the body's own rows | 2026-10-08 | P2 | [rigid-bodies](#rigid-bodies) |
+| [1812](1812-gui-textdoc-skill-and-manual-for-bodies.md) | GUI, textdoc, skill and manual for bodies | 2026-11-17 | P4 | [rigid-bodies](#rigid-bodies) |
 | [1814](1814-refinable-z-matrix-internals.md) | Refinable internal geometry: Z-matrix lengths, angles and dihedrals | 2026-11-09 | P3 | [rigid-bodies](#rigid-bodies) |
-| [1909](1909-a-line-on-a-falling-flank.md) | A line on a falling flank, at a third of its own esd | 2026-10-12 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1910](1910-the-extinction-screen-at-a-small-cell-error.md) | The extinction screen at a small cell error, and the other centring | 2026-11-01 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1911](1911-the-foreign-writers-state-what-the-other-program-reads.md) | The foreign writers state what the other program reads: the setting, the scale, the free set | 2026-11-03 | P3 | [Unscheduled](#unscheduled-coming-from-another-code) |
-| [1913](1913-what-the-benchmark-agents-wrote-by-hand.md) | What the benchmark agents wrote by hand: a mixed site, a special-position retry loop, and `.esd` | 2026-10-08 | P3 | [Unscheduled](#unscheduled-data-and-metadata-in-a-structure-out) |
+| [1913](1913-what-the-benchmark-agents-wrote-by-hand.md) | What the benchmark agents wrote by hand: a mixed site, a special-position retry loop, and `.esd` | 2026-11-18 | P3 | [Unscheduled](#unscheduled-data-and-metadata-in-a-structure-out) |
 | [1918](1918-a-magcif-read-in-its-own-cell-and-validated.md) | A magCIF the reader refuses today is read in its own cell, and one validator checks it on the way in and out | 2026-11-03 | P2 | [Unscheduled](#unscheduled-coming-from-another-code) |
 | [1924](1924-a-monoclinic-search-inside-its-ceiling.md) | A monoclinic search stays inside its ceiling and its memory | 2026-10-31 | P2 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
 | [1931](1931-the-background-order-scan-runs-to-its-cap.md) | The background order scan runs to its cap | 2026-11-03 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1933](1933-the-cif-module-beyond-the-structure-block.md) | The CIF module beyond the structure block: the pattern block, the multi-block layout, and the validation hook | 2026-10-09 | P2 | [Unscheduled](#unscheduled-coming-from-another-code) |
+| [1941](1941-a-release-note-is-a-file-per-change.md) | A release note is a file per change | 2026-11-17 | P3 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
+| [1945](1945-the-peak-chain-columns-built-in-one-pass-per-phase.md) | The peak-chain columns of a Jacobian built in one pass per phase | 2026-11-16 | P3 | [Unscheduled](#unscheduled-candidates-named-on-a-use-case-not-yet-on-a-measurement) |
 | [1952](1952-the-xy-reader-says-what-it-skipped.md) | The xy reader says what it skipped | 2026-11-13 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1955](1955-a-column-at-a-zero-aperture-and-a-column-the-matrix-cannot-see.md) | A column at a zero aperture, and a column the agreement matrix cannot see | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1969](1969-an-exhaustive-search-that-ends-in-no-cell.md) | An exhaustive search that ends in no cell | 2026-10-24 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
@@ -39,24 +41,28 @@ names hard dependencies, and *soft* marks a preferred order.
 | [1988](1988-a-pr-put-up-for-review-is-watched.md) | A PR put up for review is watched by the session that opened it | 2026-10-23 | P4 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [1997](1997-the-direct-space-solver-on-main.md) | The direct-space solver on main: site classes, kernels, chemistry, engine and entry point | 2026-11-05 | P2 | [structure-solution](#structure-solution) |
 | [2003](2003-the-chain-actions.md) | The chain actions: what a series decides between patterns | 2026-11-03 | P2 | [generality](#generality-the-audits) |
-| [2005](2005-refine-py-codes-and-literals.md) | `refine.py`'s codes and its inline literals | 2026-11-09 | P3 | [generality](#generality-the-audits) |
-| [2006](2006-readers-crystallography-gui-and-the-dead-surface.md) | Readers, crystallography and GUI codes, and the dead surface | 2026-10-24 | P3 | [generality](#generality-the-audits) |
+| [2005](2005-refine-py-codes-and-literals.md) | `refine.py`'s codes and its inline literals | 2026-11-21 | P3 | [generality](#generality-the-audits) |
+| [2006](2006-readers-crystallography-gui-and-the-dead-surface.md) | Readers, crystallography and GUI codes, and the dead surface | 2026-11-24 | P3 | [generality](#generality-the-audits) |
+| [2008](2008-the-skill-read-against-the-table.md) | The skill slimmed to the API, the feedback surface and sourced traps | 2026-11-19 | P3 | [generality](#generality-the-prose) |
 | [2010](2010-every-feature-names-what-verifies-and-validates-it.md) | Every feature names what verifies it and what validates it | 2026-11-01 | P3 | [generality](#generality-the-audits) |
 | [2012](2012-the-axial-ratios-are-interchangeable.md) | The two axial-divergence ratios are interchangeable, and a fit reports one branch | 2026-11-03 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2017](2017-the-second-pass-every-tier-3-threshold-on-three-families.md) | The second pass: every surviving tier-3 threshold measured on three families | 2026-11-05 | P2 | [generality](#generality-the-audits) |
 | [2018](2018-the-clash-table-measured.md) | The clash table: actions that read or move the same parameter, measured both ways | 2026-11-09 | P3 | [generality](#generality-the-audits) |
-| [2019](2019-each-fast-leg-runs-what-only-it-can-see.md) | Each fast leg runs what only it can see, and the tail is cut again | 2026-11-02 | P2 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
-| [2020](2020-opt-in-sets-of-bounds-and-defaults-per-scenario.md) | Opt-in sets of bounds and defaults for a scenario, tested on the datasets they name | 2026-11-15 | P2 | [generality](#generality-the-registry-and-the-guard) |
-| [2028](2028-a-joint-fits-guards-see-every-histogram.md) | A joint fit's guards see every histogram | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [2036](2036-main-is-green-on-every-nightly-leg.md) | Main is green on every nightly leg: a full suite that finishes, two Windows tooling tests, and answers that move with the platform | 2026-11-02 | P2 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
+| [2020](2020-opt-in-sets-of-bounds-and-defaults-per-scenario.md) | Opt-in sets of bounds and defaults for a scenario, tested on the datasets they name | 2026-11-22 | P2 | [generality](#generality-the-registry-and-the-guard) |
+| [2028](2028-a-joint-fits-guards-see-every-histogram.md) | A joint fit's guards see every histogram | 2026-11-18 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2036](2036-main-is-green-on-every-nightly-leg.md) | Main is green on every nightly leg: a full suite that finishes, two Windows tooling tests, and answers that move with the platform | 2026-11-21 | P2 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2058](2058-the-pcr-reader-takes-npatt-and-jbt-10.md) | The FullProf `.pcr` reader takes three control flags, `Jbt ±10` and `NPATT` | 2026-11-01 | P3 | [Unscheduled](#unscheduled-coming-from-another-code) |
-| [2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md) | The extinction screen names a wrong class at a correct cell | 2026-11-07 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) | Weak lines from another phase push the true cell off rank 1 | 2026-11-12 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [2101](2101-the-parametric-surface-as-it-stands-in-the-manual.md) | The parametric surface as it stands, in the manual | 2026-11-15 | P2 | [parametric](#parametric) |
-| [2200](2200-the-palette.md) | The palette | 2026-11-10 | P2 | [gui-overhaul](#gui-overhaul) |
-| [2215](2215-the-frame.md) | The frame: the rebuild's first piece, served at `/next` | 2026-11-11 | P2 | [gui-overhaul](#gui-overhaul) |
-| [2216](2216-the-refinement-window.md) | The refinement window: the Pattern graph, Parameters and the action bar at `/next` | 2026-11-11 | P2 | [gui-overhaul](#gui-overhaul) |
+| [2072](2072-the-le-bail-and-pawley-cell-against-the-srm-660c-certificate.md) | The Le Bail and Pawley cell, validated against the SRM 660c certificate | 2026-11-16 | P3 | [Unscheduled](#unscheduled-the-fit-has-no-reference) |
+| [2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md) | The extinction screen names a wrong class at a correct cell | 2026-11-13 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-16 | P2 | [series](#series) |
+| [2140](2140-every-atom-is-named-by-its-unique-label.md) | Every atom is named by its unique label | 2026-11-16 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2211](2211-the-history-table.md) | The History table: Compare on the pattern, Restore as pending edits | 2026-11-23 | P2 | [gui-overhaul](#gui-overhaul) |
+| [2221](2221-a-group-with-no-tabulated-type-reaches-the-report.md) | A phase whose group has no tabulated type still gets its report and its CIF | 2026-11-21 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2227](2227-the-gui-shows-how-a-refine-ran.md) | The GUI shows how a refine ran: in one stage or in stages | 2026-11-22 | P2 | [gui-overhaul](#gui-overhaul) |
+| [2230](2230-an-estimable-combination-keeps-its-esd.md) | An estimable combination keeps its esd | 2026-11-23 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2231](2231-the-plan-and-text-tabs.md) | The Plan and Text tabs at `/next`: a plan read as a recipe with Free and Fix rows, and a text buffer whose edits ride the action bar | 2026-11-22 | P2 | [gui-overhaul](#gui-overhaul) |
+| [2238](2238-the-decision-machinery.md) | The decision machinery: fewer calls reach the maintainer, and each ruling is reused | 2026-11-22 | P2 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
+| [2243](2243-the-series-workflow.md) | The series workflow at `/next`: patterns, first fit, run, results, with Trends and Map | 2026-11-23 | P2 | [gui-overhaul](#gui-overhaul) |
 
 ## Next, by priority
 
@@ -67,20 +73,21 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1420](1420-a-held-phase-re-enters-or-says-it-cannot.md) | A held phase re-enters, or the chain says it cannot | P2 | — ([1333](1333-a-series-survives-one-pattern.md), [1342](1342-a-freeze-that-reads-names.md), [1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md) soft) | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
 | [1514](1514-scoping-rigid-bodies.md) | Scoping rigid bodies: the milestone that makes the parameter map nonlinear | P2 | — ([1319](1319-structure-interchange.md), [1515](1515-scoping-structure-solution.md), [1516](1516-scoping-stacking-faults.md) soft) | [Unscheduled](#unscheduled-data-and-metadata-in-a-structure-out) |
 | [1515](1515-scoping-structure-solution.md) | Scoping structure solution: which routes, which corpus, how many milestones | P2 | — ([1514](1514-scoping-rigid-bodies.md), [1511](1511-which-cell-does-this-powder-support.md), [1513](1513-the-contacts-a-chemist-checks-by-eye.md) soft) | [Unscheduled](#unscheduled-data-and-metadata-in-a-structure-out) |
-| [1989](1989-the-released-arm-keeps-riding-hydrogens-riding.md) | The rigid-body check's released arm keeps riding hydrogens riding | P2 | — ([1806](1806-first-public-case-acridine-form-ix.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1995](1995-soft-restraints-in-a-joint-fit.md) | Soft restraints in a joint fit | P2 | [1964](1964-a-parametric-equation-the-user-writes.md) | [parametric](#parametric) |
 | [1998](1998-a-suggestion-past-its-bound.md) | A suggestion whose gain lies past its bound | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2004](2004-the-fitreport-reasons-for-the-caller.md) | The FitReport reasons for the caller: its gates, actions and thresholds | P2 | [2002](2002-the-single-fit-actions.md), [2003](2003-the-chain-actions.md) | [generality](#generality-the-audits) |
 | [2015](2015-the-declared-geometry-picks-the-plan.md) | The declared geometry picks the plan, and a geometry can be unstated | P2 | — | [generality](#generality-the-audits) |
 | [2062](2062-pawley-is-the-structure-free-default.md) | Pawley is the structure-free default | P2 | [2011](2011-a-candidate-is-judged-on-a-fit-that-converged.md) ([1910](1910-the-extinction-screen-at-a-small-cell-error.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [2081](2081-how-a-series-holds-what-the-setup-fixes.md) | How a series holds what the setup fixes (a design discussion) | P2 | — ([2003](2003-the-chain-actions.md) soft) | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
 | [2103](2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) | A joint fit has the verbs a single fit has | P2 | — ([2102](2102-a-joint-fit-takes-a-planspec.md), [2081](2081-how-a-series-holds-what-the-setup-fixes.md) soft) | [parametric](#parametric) |
 | [2106](2106-an-equation-fitted-to-a-series-trajectory.md) | An equation fitted to a series trajectory | P2 | [1964](1964-a-parametric-equation-the-user-writes.md) | [parametric](#parametric) |
-| [2107](2107-an-equation-over-a-reflection.md) | An equation over a reflection | P2 | [1964](1964-a-parametric-equation-the-user-writes.md) | [parametric](#parametric) |
 | [2110](2110-a-trial-error-unit-stays-inside-its-memory.md) | A trial_error unit stays inside its memory under a raised budget | P2 | — | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
-| [2140](2140-every-atom-is-named-by-its-unique-label.md) | Every atom is named by its unique label | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2148](2148-a-held-standard-cell-pins-the-wavelength.md) | A held standard's cell pins the wavelength, and a skipped λ is said | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [2213](2213-text-and-model-edits-join-the-recovery-copy.md) | The Text buffer and the Model forms join the recovery copy | P2 | [2209](2209-unapplied-edits-survive-a-close.md), #1523 | [gui-overhaul](#gui-overhaul) |
+| [2228](2228-a-reflection-past-the-range-end-keeps-its-tail.md) | A reflection centred past the range end keeps its tail | P2 | [2222](2222-the-closing-stage-off-by-default.md) ([2075](2075-the-result-records-its-fit-range-and-what-lies-outside-it.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2300](2300-a-series-declares-each-parameter.md) | A series declares each parameter, and refuses what it cannot honour | P2 | [2305](2305-the-joint-call-speaks-of-patterns.md) | [series](#series) |
+| [2302](2302-a-wrong-choice-is-refused-at-the-call.md) | A wrong choice is refused at the call, and a requested window has one name | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2303](2303-a-glob-that-matches-nothing-says-so.md) | A glob a caller passes that matches nothing says so | P2 | — ([2300](2300-a-series-declares-each-parameter.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2304](2304-a-readers-repairs-reach-the-fits-diagnostics.md) | A reader's repairs reach the fit's diagnostics | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2305](2305-the-joint-call-speaks-of-patterns.md) | The joint call speaks of patterns and is named a joint refinement | P2 | — | [series](#series) |
 
 ## <a id="v0-3"></a>v0.3 — multi-phase workflows
 
@@ -396,7 +403,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1328](1328-magnetic-interchange.md) | Magnetic interchange: magCIF in and out, and the readers stop refusing | ✅ 2026-10-03 | — | [1327](1327-magnetic-structure.md) ([1118](1118-foreign-model-files.md) soft) |
 | [1329](1329-moment-in-a-series.md) | The moment in a series: the onset, the hold, the trajectory | ✅ 2026-11-01 | — | [1327](1327-magnetic-structure.md) ([1326](1326-satellites-without-a-moment.md) soft) |
 | [1343](1343-the-moment-pays-for-the-width.md) | The magnetic peaks are broader, and the moment pays for it | 🔄 2026-10-25 | P2 | [1327](1327-magnetic-structure.md) ([1326](1326-satellites-without-a-moment.md) soft) |
-| [1418](1418-the-magnetic-structure-is-determined.md) | The magnetic structure is determined, not only stated | 🔄 2026-11-01 | P2 | #290, [1326](1326-satellites-without-a-moment.md), [1327](1327-magnetic-structure.md) |
+| [1418](1418-the-magnetic-structure-is-determined.md) | The magnetic structure is determined, not only stated | 🔄 2026-11-20 | P2 | #290, [1326](1326-satellites-without-a-moment.md), [1327](1327-magnetic-structure.md) |
 | [1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md) | A child structure refined on its mode amplitudes | 🔄 2026-10-30 | P3 | [1418](1418-the-magnetic-structure-is-determined.md) ([1327](1327-magnetic-structure.md) soft) |
 | [2034](2034-the-satellite-window-is-compile-models-window.md) | The satellite arm generates over `compile_model`'s window, not a copy of it | ✅ 2026-10-31 | — | — |
 
@@ -423,17 +430,18 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1802](1802-the-fragment-type.md) | The fragment: a body template with a frame and declared bonds | ✅ 2026-10-01 | — | — ([1801](1801-rotation-mathematics.md) soft) |
 | [1803](1803-the-body-seam-spike.md) | The body seam: a derived block, or a linearisation inside C | ✅ 2026-10-06 | — | [1801](1801-rotation-mathematics.md) |
 | [1804](1804-the-derived-block.md) | The derived block: a nonlinear map applied after the affine one | ✅ 2026-10-23 | — | [1801](1801-rotation-mathematics.md), [1803](1803-the-body-seam-spike.md) |
-| [1805](1805-the-rigid-body.md) | `RigidBody`: schema, collector, anchored rotation, the body's own rows | 🔄 2026-10-08 | P2 | [1802](1802-the-fragment-type.md), [1804](1804-the-derived-block.md) |
+| [1805](1805-the-rigid-body.md) | `RigidBody`: schema, collector, anchored rotation, the body's own rows | ✅ 2026-11-03 | — | [1802](1802-the-fragment-type.md), [1804](1804-the-derived-block.md) |
 | [1806](1806-first-public-case-acridine-form-ix.md) | First public case: acridine form IX | ✅ 2026-11-12 | — | [1805](1805-the-rigid-body.md) |
 | [1807](1807-a-body-on-a-special-position.md) | A body on a special position | ✅ 2026-10-31 | — | [1805](1805-the-rigid-body.md) |
 | [1808](1808-torsions-on-named-rotatable-bonds.md) | Torsions on named rotatable bonds | ✅ 2026-10-11 | — | [1802](1802-the-fragment-type.md), [1805](1805-the-rigid-body.md) |
 | [1809](1809-tether-planarity-and-anti-bump-restraints.md) | Tether, planarity and anti-bump restraints, pairs frozen per plan | ✅ 2026-11-01 | — | — |
 | [1810](1810-hydrogens-riding-on-a-body.md) | Hydrogens riding on a body, CIF flags | ✅ 2026-10-23 | — | [1805](1805-the-rigid-body.md) ([1806](1806-first-public-case-acridine-form-ix.md) soft) |
 | [1811](1811-bodies-in-a-series.md) | Bodies in a series | ⬜ | P3 | [1805](1805-the-rigid-body.md), [1333](1333-a-series-survives-one-pattern.md) |
-| [1812](1812-gui-textdoc-skill-and-manual-for-bodies.md) | GUI, textdoc, skill and manual for bodies | ⬜ | P4 | [1805](1805-the-rigid-body.md) |
+| [1812](1812-gui-textdoc-skill-and-manual-for-bodies.md) | GUI, textdoc, skill and manual for bodies | 🔄 2026-11-17 | P4 | [1805](1805-the-rigid-body.md) |
 | [1813](1813-fragment-io.md) | Fragment I/O: XYZ, Z-matrix write, SMILES behind an extra | ⬜ | P4 | [1802](1802-the-fragment-type.md) |
 | [1814](1814-refinable-z-matrix-internals.md) | Refinable internal geometry: Z-matrix lengths, angles and dihedrals | 🔄 2026-11-09 | P3 | [1815](1815-derived-geometry-torsions-and-a-request-form.md), [1805](1805-the-rigid-body.md) |
 | [1815](1815-derived-geometry-torsions-and-a-request-form.md) | Derived geometry: torsions, a request form, one table every writer reads | ✅ 2026-11-02 | — | [1804](1804-the-derived-block.md) |
+| [1816](1816-a-body-keeps-its-declared-bonds.md) | A rigid body keeps its declared bonds, and anti-bump checks the pairs a torsion folds | ⬜ | P3 | [2144](2144-the-anti-bump-same-body-skip-under-a-torsion.md) ([1814](1814-refinable-z-matrix-internals.md) soft) |
 
 ## <a id="structure-solution"></a>structure-solution — a map, a cost and a search
 
@@ -452,7 +460,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 |---|---|---|---|---|
 | [2001](2001-the-rule-the-table-and-the-guard.md) | The rule, the audit table and the guard | ✅ 2026-10-19 | — | — |
 | [2014](2014-a-heuristic-meets-the-judge-on-every-path.md) | A heuristic meets the judge on every path into main | ✅ 2026-10-20 | — | [2001](2001-the-rule-the-table-and-the-guard.md) |
-| [2020](2020-opt-in-sets-of-bounds-and-defaults-per-scenario.md) | Opt-in sets of bounds and defaults for a scenario, tested on the datasets they name | 🔄 2026-11-15 | P2 | — |
+| [2020](2020-opt-in-sets-of-bounds-and-defaults-per-scenario.md) | Opt-in sets of bounds and defaults for a scenario, tested on the datasets they name | 🔄 2026-11-22 | P2 | — |
 | [2037](2037-attention-is-a-cost.md) | Attention is a cost: two channels, a response per code, relevance by purpose | ✅ 2026-10-24 | — | [2001](2001-the-rule-the-table-and-the-guard.md) |
 | [2038](2038-the-softening-a-brief-not-a-change.md) | The softening: unanimity for a recorded, cheap-to-undo default, a brief and not a change | ⬜ | P4 | — ([2037](2037-attention-is-a-cost.md) soft) |
 
@@ -463,21 +471,22 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2002](2002-the-single-fit-actions.md) | The single-fit actions: what one stage decides for the caller | ✅ 2026-10-23 | — | [2001](2001-the-rule-the-table-and-the-guard.md) |
 | [2003](2003-the-chain-actions.md) | The chain actions: what a series decides between patterns | 🔄 2026-11-03 | P2 | [2002](2002-the-single-fit-actions.md), [2037](2037-attention-is-a-cost.md) |
 | [2004](2004-the-fitreport-reasons-for-the-caller.md) | The FitReport reasons for the caller: its gates, actions and thresholds | ⬜ | P2 | [2002](2002-the-single-fit-actions.md), [2003](2003-the-chain-actions.md) |
-| [2005](2005-refine-py-codes-and-literals.md) | `refine.py`'s codes and its inline literals | 🔄 2026-11-09 | P3 | [2002](2002-the-single-fit-actions.md) |
-| [2006](2006-readers-crystallography-gui-and-the-dead-surface.md) | Readers, crystallography and GUI codes, and the dead surface | 🔄 2026-10-24 | P3 | [2001](2001-the-rule-the-table-and-the-guard.md) |
+| [2005](2005-refine-py-codes-and-literals.md) | `refine.py`'s codes and its inline literals | 🔄 2026-11-21 | P3 | [2002](2002-the-single-fit-actions.md) |
+| [2006](2006-readers-crystallography-gui-and-the-dead-surface.md) | Readers, crystallography and GUI codes, and the dead surface | 🔄 2026-11-24 | P3 | [2001](2001-the-rule-the-table-and-the-guard.md) |
 | [2007](2007-indexing-codes-constants-and-gates.md) | Indexing: its codes, constants and gates | ⬜ | P3 | [2001](2001-the-rule-the-table-and-the-guard.md) |
 | [2010](2010-every-feature-names-what-verifies-and-validates-it.md) | Every feature names what verifies it and what validates it | 🔄 2026-11-01 | P3 | — |
 | [2015](2015-the-declared-geometry-picks-the-plan.md) | The declared geometry picks the plan, and a geometry can be unstated | ⬜ | P2 | — |
 | [2016](2016-a-cif-adp-off-symmetry-by-rounding-is-projected.md) | A literature CIF's U^ij that breaks site symmetry only by rounding is projected, and says so | ✅ 2026-11-02 | — | — |
 | [2017](2017-the-second-pass-every-tier-3-threshold-on-three-families.md) | The second pass: every surviving tier-3 threshold measured on three families | 🔄 2026-11-05 | P2 | [2002](2002-the-single-fit-actions.md) |
 | [2018](2018-the-clash-table-measured.md) | The clash table: actions that read or move the same parameter, measured both ways | 🔄 2026-11-09 | P3 | — |
+| [2225](2225-a-held-instrument-width-stops-a-staged-fit-short.md) | A held instrument width stops a staged fit short of its own plan's point | ✅ 2026-11-20 | — | [2002](2002-the-single-fit-actions.md) ([2017](2017-the-second-pass-every-tier-3-threshold-on-three-families.md), [2224](2224-a-refit-of-a-converged-model-runs-one-stage.md) soft) |
 
 ### <a id="generality-the-prose"></a>The prose
 
 | WP | Title | Status | Priority | Depends on |
 |---|---|---|---|---|
-| [2008](2008-the-skill-read-against-the-table.md) | The skill slimmed to the API, the feedback surface and sourced traps | ⬜ | P3 | [2001](2001-the-rule-the-table-and-the-guard.md), [2002](2002-the-single-fit-actions.md), [2003](2003-the-chain-actions.md), [2004](2004-the-fitreport-reasons-for-the-caller.md) ([2005](2005-refine-py-codes-and-literals.md), [2006](2006-readers-crystallography-gui-and-the-dead-surface.md), [2007](2007-indexing-codes-constants-and-gates.md) soft) |
-| [2009](2009-the-rulebooks-findings-out-generators-rewritten.md) | The rulebooks: findings out, and the rules that generate overfit rewritten | ⬜ | P3 | [2001](2001-the-rule-the-table-and-the-guard.md) ([2008](2008-the-skill-read-against-the-table.md) soft) |
+| [2008](2008-the-skill-read-against-the-table.md) | The skill slimmed to the API, the feedback surface and sourced traps | 🔄 2026-11-19 | P3 | [2001](2001-the-rule-the-table-and-the-guard.md), [2002](2002-the-single-fit-actions.md), [2003](2003-the-chain-actions.md), [2004](2004-the-fitreport-reasons-for-the-caller.md) ([2005](2005-refine-py-codes-and-literals.md), [2006](2006-readers-crystallography-gui-and-the-dead-surface.md), [2007](2007-indexing-codes-constants-and-gates.md) soft) |
+| [2009](2009-the-rulebooks-findings-out-generators-rewritten.md) | The rulebooks: findings out, and the rules that generate overfit rewritten | ✅ 2026-11-23 | — | [2001](2001-the-rule-the-table-and-the-guard.md) ([2008](2008-the-skill-read-against-the-table.md) soft) |
 
 ## <a id="parametric"></a>parametric — a parametric refinement written by hand ports to rietx
 
@@ -487,14 +496,18 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1964](1964-a-parametric-equation-the-user-writes.md) | A parametric equation the user writes | ✅ 2026-11-06 | — | [1804](1804-the-derived-block.md) ([1325](1325-parametric-series.md), [2103](2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) soft) |
 | [1965](1965-a-parametric-equation-declared-by-condition-and-glob.md) | A parametric equation declared by condition and glob | ⬜ | P3 | [1325](1325-parametric-series.md) ([1964](1964-a-parametric-equation-the-user-writes.md) soft) |
 | [1995](1995-soft-restraints-in-a-joint-fit.md) | Soft restraints in a joint fit | ⬜ | P2 | [1964](1964-a-parametric-equation-the-user-writes.md) |
-| [2101](2101-the-parametric-surface-as-it-stands-in-the-manual.md) | The parametric surface as it stands, in the manual | 🔄 2026-11-15 | P2 | — |
+| [2101](2101-the-parametric-surface-as-it-stands-in-the-manual.md) | The parametric surface as it stands, in the manual | ✅ 2026-11-19 | — | — |
 | [2102](2102-a-joint-fit-takes-a-planspec.md) | A joint fit takes a PlanSpec | ✅ 2026-11-05 | — | — |
 | [2103](2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) | A joint fit has the verbs a single fit has | ⬜ | P2 | — ([2102](2102-a-joint-fit-takes-a-planspec.md), [2081](2081-how-a-series-holds-what-the-setup-fixes.md) soft) |
 | [2104](2104-a-parametric-cell-in-a-le-bail-or-pawley-joint-fit.md) | A parametric cell in a Le Bail or Pawley joint fit | ✅ 2026-11-13 | — | — ([1325](1325-parametric-series.md), [1964](1964-a-parametric-equation-the-user-writes.md) soft) |
 | [2106](2106-an-equation-fitted-to-a-series-trajectory.md) | An equation fitted to a series trajectory | ⬜ | P2 | [1964](1964-a-parametric-equation-the-user-writes.md) |
-| [2107](2107-an-equation-over-a-reflection.md) | An equation over a reflection | ⬜ | P2 | [1964](1964-a-parametric-equation-the-user-writes.md) |
+| [2107](2107-an-equation-over-a-reflection.md) | An equation over a reflection | ✅ 2026-11-22 | — | [1964](1964-a-parametric-equation-the-user-writes.md) |
 | [2108](2108-a-pawley-phase-beside-a-rietveld-phase.md) | A Pawley phase beside a Rietveld phase | ✅ 2026-11-15 | — | [1964](1964-a-parametric-equation-the-user-writes.md) ([2104](2104-a-parametric-cell-in-a-le-bail-or-pawley-joint-fit.md) soft) |
 | [2118](2118-one-formula-language-for-every-constraint.md) | One formula language for every constraint | ✅ 2026-11-07 | — | [1964](1964-a-parametric-equation-the-user-writes.md) ([2103](2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) soft) |
+| [2151](2151-the-zrp2o7-peak-equations-on-its-data.md) | The ZrP₂O₇ input's peak equations on its data | ✅ 2026-11-22 | — | — |
+| [2152](2152-a-peak-equation-reads-the-wavelength.md) | A peak equation reads the wavelength | ✅ 2026-11-22 | — | — |
+| [2153](2153-a-peak-equations-width-held-inside-the-step.md) | A peak equation's width held inside the step | ✅ 2026-11-22 | — | — |
+| [2154](2154-a-holder-offset-shared-across-a-joint-fit.md) | A holder offset shared across a joint fit | ✅ 2026-11-22 | — | — ([2103](2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) soft) |
 
 ## <a id="gui-overhaul"></a>gui-overhaul — the GUI redesigned around the pattern and the model
 
@@ -510,15 +523,35 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2131](2131-the-start-screen-and-new-project.md) | The start screen and the New project dialog | ✅ 2026-11-10 | — | [2123](2123-the-layout-shell.md) |
 | [2133](2133-the-file-menu.md) | The File menu on the project name | ✅ 2026-11-10 | — | [2131](2131-the-start-screen-and-new-project.md) |
 | [2142](2142-the-gui-style-guide.md) | The GUI style guide | ✅ 2026-11-10 | — | — |
-| [2200](2200-the-palette.md) | The palette | 🔄 2026-11-10 | P2 | [2142](2142-the-gui-style-guide.md) |
+| [2200](2200-the-palette.md) | The palette | ✅ 2026-11-17 | — | [2142](2142-the-gui-style-guide.md) |
 | [2208](2208-a-plan-stage-that-fixes.md) | A plan stage that fixes as well as frees | ✅ 2026-11-13 | — | [2127](2127-the-plan-tab.md) |
 | [2209](2209-unapplied-edits-survive-a-close.md) | Unapplied edits survive a close or a crash | ✅ 2026-11-13 | — | [2133](2133-the-file-menu.md) |
-| [2211](2211-the-history-table.md) | The History table: Compare on the pattern, Restore as pending edits | ⬜ | P3 | [2214](2214-the-gui-rebuild-plan-and-inventory.md) |
-| [2212](2212-console-lines-by-kind.md) | Console lines by kind: the `>>>` prompt and the session as a script | ⬜ | P3 | [2214](2214-the-gui-rebuild-plan-and-inventory.md) |
-| [2213](2213-text-and-model-edits-join-the-recovery-copy.md) | The Text buffer and the Model forms join the recovery copy | ⬜ | P2 | [2209](2209-unapplied-edits-survive-a-close.md), #1523 |
+| [2211](2211-the-history-table.md) | The History table: Compare on the pattern, Restore as pending edits | 🔄 2026-11-23 | P2 | [2214](2214-the-gui-rebuild-plan-and-inventory.md) |
+| [2212](2212-console-lines-by-kind.md) | Console lines by kind: the `>>>` prompt and the session as a script | ✅ 2026-11-22 | — | [2214](2214-the-gui-rebuild-plan-and-inventory.md) |
+| [2213](2213-text-and-model-edits-join-the-recovery-copy.md) | The Text buffer and the Model forms join the recovery copy | ✅ 2026-11-19 | — | [2209](2209-unapplied-edits-survive-a-close.md), #1523 |
 | [2214](2214-the-gui-rebuild-plan-and-inventory.md) | The GUI rebuild: its plan, and a home for every feature of today's GUI | ✅ 2026-11-11 | — | — |
-| [2215](2215-the-frame.md) | The frame: the rebuild's first piece, served at `/next` | 🔄 2026-11-11 | P2 | [2214](2214-the-gui-rebuild-plan-and-inventory.md) |
-| [2216](2216-the-refinement-window.md) | The refinement window: the Pattern graph, Parameters and the action bar at `/next` | 🔄 2026-11-11 | P2 | [2215](2215-the-frame.md) |
+| [2215](2215-the-frame.md) | The frame: the rebuild's first piece, served at `/next` | ✅ 2026-11-17 | — | [2214](2214-the-gui-rebuild-plan-and-inventory.md) |
+| [2216](2216-the-refinement-window.md) | The refinement window: the Pattern graph, Parameters and the action bar at `/next` | ✅ 2026-11-18 | — | [2215](2215-the-frame.md) |
+| [2218](2218-hand-fitting-and-the-other-graphs.md) | Hand fitting and the other graphs: the Interactive tab, the Peaks, Background and Structure graphs, and the Instrument dialog at `/next` | ✅ 2026-11-21 | — | [2216](2216-the-refinement-window.md) |
+| [2223](2223-a-clicked-value-opens-on-its-full-stored-value.md) | A clicked value opens on its full stored value, and an unchanged one is no edit | ✅ 2026-11-19 | — | [2218](2218-hand-fitting-and-the-other-graphs.md) |
+| [2227](2227-the-gui-shows-how-a-refine-ran.md) | The GUI shows how a refine ran: in one stage or in stages | 🔄 2026-11-22 | P2 | [2224](2224-a-refit-of-a-converged-model-runs-one-stage.md) |
+| [2229](2229-every-background-shape-change-releases-its-holds.md) | Every change to the background's shape releases its holds, and no pending edit outlives its path | ✅ 2026-11-21 | — | [2218](2218-hand-fitting-and-the-other-graphs.md) |
+| [2231](2231-the-plan-and-text-tabs.md) | The Plan and Text tabs at `/next`: a plan read as a recipe with Free and Fix rows, and a text buffer whose edits ride the action bar | 🔄 2026-11-22 | P2 | [2218](2218-hand-fitting-and-the-other-graphs.md) |
+| [2237](2237-events-after-another-project-opens.md) | A project opened in the same window streams its events from the first | ✅ 2026-11-22 | — | — |
+| [2240](2240-the-peaks-and-indexing-workflow.md) | The peaks-and-indexing workflow at `/next`: pick peaks, fit peaks, index, judge | ✅ 2026-11-23 | — | [2218](2218-hand-fitting-and-the-other-graphs.md) |
+| [2242](2242-a-panel-forgets-the-last-project-on-an-open.md) | A panel forgets the last project when another opens in the same window | ✅ 2026-11-23 | — | — |
+| [2243](2243-the-series-workflow.md) | The series workflow at `/next`: patterns, first fit, run, results, with Trends and Map | 🔄 2026-11-23 | P2 | — ([2240](2240-the-peaks-and-indexing-workflow.md), [2300](2300-a-series-declares-each-parameter.md) soft) |
+| [2244](2244-the-help-popover-at-next.md) | The help popover at `/next`: a help term there opens its explanation | ✅ 2026-11-23 | — | — |
+
+## <a id="series"></a>series — a series a scientist can predict and drive
+
+| WP | Title | Status | Priority | Depends on |
+|---|---|---|---|---|
+| [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 🔄 2026-11-16 | P2 | [2003](2003-the-chain-actions.md) |
+| [2081](2081-how-a-series-holds-what-the-setup-fixes.md) | How a series holds what the setup fixes (a design discussion) | ✅ 2026-11-23 | — | — ([2003](2003-the-chain-actions.md) soft) |
+| [2300](2300-a-series-declares-each-parameter.md) | A series declares each parameter, and refuses what it cannot honour | ⬜ | P2 | [2305](2305-the-joint-call-speaks-of-patterns.md) |
+| [2301](2301-the-typical-temperature-series.md) | The typical temperature series: one route, a preset, and a Switching page | ⬜ | P3 | [2300](2300-a-series-declares-each-parameter.md) |
+| [2305](2305-the-joint-call-speaks-of-patterns.md) | The joint call speaks of patterns and is named a joint refinement | ⬜ | P2 | — |
 
 ## <a id="unscheduled"></a>Unscheduled
 
@@ -549,7 +582,8 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | WP | Title | Status | Priority | Depends on |
 |---|---|---|---|---|
 | [1130](1130-background-reference.md) | The fit has no reference: a background level it cannot argue with | 🛑 2026-09-04 | — | — |
-| [2072](2072-the-le-bail-and-pawley-cell-against-the-srm-660c-certificate.md) | The Le Bail and Pawley cell, validated against the SRM 660c certificate | ⬜ | P3 | [2010](2010-every-feature-names-what-verifies-and-validates-it.md) ([2015](2015-the-declared-geometry-picks-the-plan.md) soft) |
+| [2072](2072-the-le-bail-and-pawley-cell-against-the-srm-660c-certificate.md) | The Le Bail and Pawley cell, validated against the SRM 660c certificate | 🔄 2026-11-16 | P3 | [2010](2010-every-feature-names-what-verifies-and-validates-it.md) ([2015](2015-the-declared-geometry-picks-the-plan.md) soft) |
+| [2306](2306-crystallite-size-against-the-ceria-round-robin.md) | Crystallite size, validated against the IUCr ceria size-strain round robin | ⬜ | P3 | [2010](2010-every-feature-names-what-verifies-and-validates-it.md) |
 
 ### <a id="unscheduled-the-specimen-is-not-an-angle-and-the-neutron-follow-through"></a>The specimen is not an angle, and the neutron follow-through
 
@@ -557,7 +591,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 |---|---|---|---|---|
 | [1131](1131-sample-broadening-is-a-specimen-property.md) | Sample broadening is a specimen property, not an angular coefficient | ✅ 2026-09-02 | — | — |
 | [1132](1132-neutron-specimen-absorption.md) | A neutron µR, from the table this package already ships | ✅ 2026-11-08 | — | — |
-| [1133](1133-diagnostic-names-its-view.md) | A diagnostic names the view that shows it | ⬜ | P3 | — |
+| [1133](1133-diagnostic-names-its-view.md) | A diagnostic names the view that shows it | ✅ 2026-11-18 | — | — |
 | [1312](1312-neutron-followthrough.md) | CW neutron follow-through: the seed, the resonant flag, the joint fit | ✅ 2026-10-02 | — | — |
 | [1927](1927-tof-t1-the-axis-and-its-readers.md) | TOF T-1: the time-of-flight axis and its readers | ✅ 2026-10-23 | — | — |
 | [2032](2032-the-tof-readers-t1-follow-ups.md) | The TOF readers' T-1 follow-ups: a time map read as data, and names with no writer | ✅ 2026-10-23 | — | — ([1927](1927-tof-t1-the-axis-and-its-readers.md) soft) |
@@ -601,17 +635,17 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1518](1518-dedup-weighs-a-difference-in-its-own-frame.md) | The dedup χ² test weighs a difference in the frame it was taken in | ✅ 2026-09-28 | — | — |
 | [1521](1521-compiled-kernels-active-means-they-ran.md) | `compiled_kernels_active` says the kernels ran, per tier, or says it does not know | 🛑 2026-10-10 | — | — |
 | [1523](1523-a-phase-fitted-to-noise-passes-the-support-test.md) | A phase fitted to noise passes the support test | ✅ 2026-10-13 | — | — ([1420](1420-a-held-phase-re-enters-or-says-it-cannot.md) soft) |
-| [1528](1528-the-cell-box-is-declined-where-the-cell-is-declared.md) | The cell box is declined where the cell is declared | ⬜ | P4 | — |
+| [1528](1528-the-cell-box-is-declined-where-the-cell-is-declared.md) | The cell box is declined where the cell is declared | ✅ 2026-11-03 | — | — |
 | [1534](1534-a-scale-and-a-b-the-range-cannot-separate.md) | A scale and a B the fitted range cannot separate | ✅ 2026-10-04 | — | — |
 | [1535](1535-a-discarded-direction-reads-as-measured.md) | A direction the covariance discards reads as measured | ✅ 2026-10-02 | — | — |
 | [1539](1539-the-declared-optics-reach-every-caller.md) | The declared optics reach every caller and every reader | 🔄 2026-10-03 | P4 | — |
 | [1542](1542-a-le-bail-background-left-at-its-seed.md) | A Le Bail background left at its seed | ✅ 2026-11-05 | — | — |
 | [1908](1908-a-tick-misses-the-displacement-shift.md) | A tick misses the displacement shift | ✅ 2026-10-15 | — | — |
-| [1909](1909-a-line-on-a-falling-flank.md) | A line on a falling flank, at a third of its own esd | 🔄 2026-10-12 | P2 | — |
+| [1909](1909-a-line-on-a-falling-flank.md) | A line on a falling flank, at a third of its own esd | ✅ 2026-11-03 | — | — |
 | [1910](1910-the-extinction-screen-at-a-small-cell-error.md) | The extinction screen at a small cell error, and the other centring | 🔄 2026-11-01 | P2 | — |
 | [1912](1912-a-polar-axis-has-no-origin.md) | A polar axis has no origin, and the fit walks along it | ✅ 2026-10-23 | — | — |
 | [1914](1914-a-size-read-off-a-coefficient-at-its-floor.md) | A size read off a coefficient at its floor | ✅ 2026-11-09 | — | — |
-| [1915](1915-an-unmeasured-direction-poisons-a-candidates-esds.md) | An unmeasured direction poisons every esd of an indexing candidate | ⬜ | P3 | — |
+| [1915](1915-an-unmeasured-direction-poisons-a-candidates-esds.md) | An unmeasured direction poisons every esd of an indexing candidate | ✅ 2026-11-03 | — | — |
 | [1922](1922-a-rigid-body-the-data-reject-is-named.md) | A rigid body the data reject is named | ✅ 2026-10-15 | — | [1805](1805-the-rigid-body.md) |
 | [1923](1923-a-candidate-in-its-conventional-setting.md) | A candidate is reported as a lattice in its conventional setting, and the reduction is an exact change of basis | ✅ 2026-10-11 | — | — ([1915](1915-an-unmeasured-direction-poisons-a-candidates-esds.md) soft) |
 | [1929](1929-an-esd-follows-where-the-solver-stopped-beside-a-flat-column.md) | An esd follows where the solver stopped beside a flat column | ✅ 2026-10-12 | — | [1938](1938-every-parameter-refined-in-its-own-units.md) |
@@ -633,12 +667,12 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1969](1969-an-exhaustive-search-that-ends-in-no-cell.md) | An exhaustive search that ends in no cell | 🔄 2026-10-24 | P2 | — ([1956](1956-a-cell-pays-for-the-lines-it-predicts-and-the-pattern-lacks.md) soft) |
 | [1976](1976-a-correction-summary-judged-at-the-drawn-angle.md) | A correction summary judged at the drawn angle | ✅ 2026-10-15 | — | — |
 | [1977](1977-a-flank-lobe-read-as-an-unindexed-peak.md) | A flank lobe read as an unindexed peak | ✅ 2026-11-02 | — | — |
-| [1989](1989-the-released-arm-keeps-riding-hydrogens-riding.md) | The rigid-body check's released arm keeps riding hydrogens riding | ⬜ | P2 | — ([1806](1806-first-public-case-acridine-form-ix.md) soft) |
+| [1989](1989-the-released-arm-keeps-riding-hydrogens-riding.md) | The rigid-body check's released arm keeps riding hydrogens riding | ✅ 2026-11-17 | — | — ([1806](1806-first-public-case-acridine-form-ix.md) soft) |
 | [1991](1991-a-site-and-its-own-image-are-one-atom.md) | A site and its own image are one atom on every route | ✅ 2026-11-06 | — | — |
 | [1998](1998-a-suggestion-past-its-bound.md) | A suggestion whose gain lies past its bound | ⬜ | P2 | — |
 | [2011](2011-a-candidate-is-judged-on-a-fit-that-converged.md) | A candidate is judged on a fit that converged | ✅ 2026-10-29 | — | [1956](1956-a-cell-pays-for-the-lines-it-predicts-and-the-pattern-lacks.md) |
 | [2012](2012-the-axial-ratios-are-interchangeable.md) | The two axial-divergence ratios are interchangeable, and a fit reports one branch | 🔄 2026-11-03 | P3 | — |
-| [2028](2028-a-joint-fits-guards-see-every-histogram.md) | A joint fit's guards see every histogram | 🔄 2026-11-02 | P2 | — ([1325](1325-parametric-series.md), [1421](1421-the-result-reproduces-its-own-number.md) soft) |
+| [2028](2028-a-joint-fits-guards-see-every-histogram.md) | A joint fit's guards see every histogram | 🔄 2026-11-18 | P2 | — ([1325](1325-parametric-series.md), [1421](1421-the-result-reproduces-its-own-number.md) soft) |
 | [2029](2029-whether-the-centroid-fixes-a-polar-origin-by-default.md) | Whether the centroid fixes a polar origin by default | ⬜ | P3 | — ([1912](1912-a-polar-axis-has-no-origin.md) soft) |
 | [2035](2035-a-reduced-cell-is-its-inputs-exact-image.md) | A reduced cell is its input's exact image, near a right angle too | ✅ 2026-11-01 | — | — |
 | [2044](2044-the-sabine-laue-factor-is-continuous.md) | The Sabine Laue factor is continuous at x = 1 | ✅ 2026-10-24 | — | — |
@@ -659,10 +693,9 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2068](2068-the-stationary-angle-test-reads-the-curvature-s-sign.md) | The stationary-angle test builds its angle block analytically | ✅ 2026-11-02 | — | — ([1327](1327-magnetic-structure.md) soft) |
 | [2071](2071-a-peak-list-refuses-a-q-esd-its-two-theta-esd-does-not-give.md) | A peak list refuses a q_esd that its two_theta_esd does not give | ✅ 2026-11-01 | — | — |
 | [2075](2075-the-result-records-its-fit-range-and-what-lies-outside-it.md) | The result records its fit range, and what lies outside it | ⬜ | P3 | — ([2005](2005-refine-py-codes-and-literals.md) soft) |
-| [2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md) | The extinction screen names a wrong class at a correct cell | 🔄 2026-11-07 | P2 | — ([1910](1910-the-extinction-screen-at-a-small-cell-error.md), [2062](2062-pawley-is-the-structure-free-default.md) soft) |
-| [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) | Weak lines from another phase push the true cell off rank 1 | 🔄 2026-11-12 | P2 | — ([1969](1969-an-exhaustive-search-that-ends-in-no-cell.md), [2066](2066-a-complete-dichotomy-search-holds-every-centred-lattice.md) soft) |
+| [2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md) | The extinction screen names a wrong class at a correct cell | 🔄 2026-11-13 | P2 | — ([1910](1910-the-extinction-screen-at-a-small-cell-error.md), [2062](2062-pawley-is-the-structure-free-default.md) soft) |
+| [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) | Weak lines from another phase push the true cell off rank 1 | ✅ 2026-11-13 | — | — ([1969](1969-an-exhaustive-search-that-ends-in-no-cell.md), [2066](2066-a-complete-dichotomy-search-holds-every-centred-lattice.md) soft) |
 | [2079](2079-a-non-finite-count-is-dropped-and-said.md) | A non-finite count or σ in a pattern file is dropped, and the reader says so | ✅ 2026-11-03 | — | — |
-| [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 🔄 2026-11-02 | P2 | [2003](2003-the-chain-actions.md) |
 | [2082](2082-a-stated-prior-is-not-an-engine-in-the-grade.md) | A stated prior is not an engine in the grade | ✅ 2026-11-02 | — | — |
 | [2084](2084-lab6-has-two-minima-in-the-widths.md) | The SRM 660c protocol has two minima in the Gaussian widths, and the shipped start reaches the shallower | ⬜ | P3 | — |
 | [2086](2086-a-zero-scale-holds-the-instrument-only-where-the-residual-is-noise.md) | A zero scale holds the instrument only where the residual is noise | ✅ 2026-11-04 | — | — |
@@ -675,11 +708,23 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2117](2117-a-recipe-ties-the-axial-pair.md) | A recipe ties the axial pair instead of holding H/L | ⬜ | P4 | [2012](2012-the-axial-ratios-are-interchangeable.md) |
 | [2120](2120-a-tail-shoulder-offered-as-a-line.md) | A tail shoulder on its position bound is offered as a line | ⬜ | P3 | — |
 | [2121](2121-a-restraint-follows-its-atoms-through-an-edit.md) | A restraint follows its atoms through an edit | ✅ 2026-11-09 | — | — |
-| [2140](2140-every-atom-is-named-by-its-unique-label.md) | Every atom is named by its unique label | ⬜ | P2 | — |
-| [2141](2141-a-declared-peak-on-its-floor-reads-the-bound-test.md) | A declared peak on its floor reads the bound test | ⬜ | P3 | — ([1914](1914-a-size-read-off-a-coefficient-at-its-floor.md) soft) |
-| [2144](2144-the-anti-bump-same-body-skip-under-a-torsion.md) | The anti-bump same-body skip, now that a torsion moves the pair | ⬜ | P3 | — ([1814](1814-refinable-z-matrix-internals.md) soft) |
-| [2147](2147-the-weak-line-retry-on-a-superlattice-with-a-trace.md) | The weak-line retry on a superlattice that also carries a trace phase | ⬜ | P3 | [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) |
+| [2140](2140-every-atom-is-named-by-its-unique-label.md) | Every atom is named by its unique label | 🔄 2026-11-16 | P2 | — |
+| [2141](2141-a-declared-peak-on-its-floor-reads-the-bound-test.md) | A declared peak on its floor reads the bound test | ✅ 2026-11-13 | — | — ([1914](1914-a-size-read-off-a-coefficient-at-its-floor.md) soft) |
+| [2144](2144-the-anti-bump-same-body-skip-under-a-torsion.md) | The anti-bump same-body skip, now that a torsion moves the pair | ✅ 2026-11-13 | — | — |
+| [2147](2147-the-weak-line-retry-on-a-superlattice-with-a-trace.md) | The weak-line retry on a superlattice that also carries a trace phase | ✅ 2026-11-18 | — | [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) |
 | [2148](2148-a-held-standard-cell-pins-the-wavelength.md) | A held standard's cell pins the wavelength, and a skipped λ is said | ⬜ | P2 | — |
+| [2149](2149-a-reduced-panel-names-the-systems-searched.md) | INDEX_PANEL_REDUCED names the systems the run searched | ✅ 2026-11-23 | — | — |
+| [2150](2150-a-tied-cell-value-that-contradicts-its-symmetry.md) | A tied cell value that contradicts its space group is repaired at read or refused | ✅ 2026-11-19 | — | — |
+| [2219](2219-a-direction-the-data-does-not-determine-has-no-esd.md) | A direction the data does not determine has no esd | ✅ 2026-11-21 | — | — ([2028](2028-a-joint-fits-guards-see-every-histogram.md) soft) |
+| [2220](2220-a-comparison-says-which-fits-it-rests-on.md) | A nested comparison says which fits it rests on, and which freed columns carried information | ✅ 2026-11-23 | — | — ([2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md), [2053](2053-a-split-site-the-data-cannot-tell-says-so.md) soft) |
+| [2221](2221-a-group-with-no-tabulated-type-reaches-the-report.md) | A phase whose group has no tabulated type still gets its report and its CIF | 🔄 2026-11-21 | P2 | — ([1918](1918-a-magcif-read-in-its-own-cell-and-validated.md) soft) |
+| [2228](2228-a-reflection-past-the-range-end-keeps-its-tail.md) | A reflection centred past the range end keeps its tail | ⬜ | P2 | [2222](2222-the-closing-stage-off-by-default.md) ([2075](2075-the-result-records-its-fit-range-and-what-lies-outside-it.md) soft) |
+| [2230](2230-an-estimable-combination-keeps-its-esd.md) | An estimable combination keeps its esd | 🔄 2026-11-23 | P3 | [2219](2219-a-direction-the-data-does-not-determine-has-no-esd.md) ([2062](2062-pawley-is-the-structure-free-default.md) soft) |
+| [2232](2232-a-size-near-no-broadening-is-a-bound.md) | A size near no broadening is quoted as a bound | ⬜ | P3 | — ([2060](2060-the-likelihood-interval-where-an-esd-cannot-be-read.md) soft) |
+| [2239](2239-a-joint-stage-seeds-and-holds-a-stephens-block.md) | A joint stage seeds and holds a Stephens block as a single fit does | ✅ 2026-11-22 | — | — |
+| [2302](2302-a-wrong-choice-is-refused-at-the-call.md) | A wrong choice is refused at the call, and a requested window has one name | ⬜ | P2 | — |
+| [2303](2303-a-glob-that-matches-nothing-says-so.md) | A glob a caller passes that matches nothing says so | ⬜ | P2 | — ([2300](2300-a-series-declares-each-parameter.md) soft) |
+| [2304](2304-a-readers-repairs-reach-the-fits-diagnostics.md) | A reader's repairs reach the fit's diagnostics | ⬜ | P2 | — |
 
 ### <a id="unscheduled-a-long-run-is-not-one-fit"></a>A long run is not one fit
 
@@ -689,22 +734,25 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1334](1334-the-stage-that-ran-out-of-budget.md) | The stage that ran out of budget | ✅ 2026-11-05 | — | — |
 | [1335](1335-the-report-costs-more-than-the-fit.md) | The report costs more than the fit | 🔄 2026-11-02 | P3 | — |
 | [1420](1420-a-held-phase-re-enters-or-says-it-cannot.md) | A held phase re-enters, or the chain says it cannot | ⬜ | P2 | — ([1333](1333-a-series-survives-one-pattern.md), [1342](1342-a-freeze-that-reads-names.md), [1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md) soft) |
-| [1453](1453-both-directions-name-the-lower-cost.md) | Both directions name the lower cost | ⬜ | P3 | — ([1420](1420-a-held-phase-re-enters-or-says-it-cannot.md) soft) |
+| [1453](1453-both-directions-name-the-lower-cost.md) | Both directions name the lower cost | 🔄 2026-11-16 | P3 | — ([1420](1420-a-held-phase-re-enters-or-says-it-cannot.md) soft) |
 | [1459](1459-a-pawley-intensity-past-the-data.md) | A Pawley intensity past the end of the data | ✅ 2026-09-25 | — | — ([1336](1336-the-fit-does-not-say-it-is-unusable.md) soft) |
-| [1464](1464-a-screen-reads-the-batch-references-first.md) | A screen reads the batch references first | ⬜ | P3 | — (#385 soft) |
+| [1464](1464-a-screen-reads-the-batch-references-first.md) | A screen reads the batch references first | ✅ 2026-11-19 | — | — |
 | [1469](1469-what-the-series-fences-cannot-see.md) | What the series fences cannot see | ✅ 2026-09-29 | — | — ([1420](1420-a-held-phase-re-enters-or-says-it-cannot.md) soft) |
 | [1508](1508-compiled-dichotomy-spike.md) | Compiled dichotomy spike (gated: build only if the box traversal is the unit's cost) | ✅ 2026-09-28 | — | — |
 | [1509](1509-dichotomy-leaves-pay-for-the-whole-trial-set.md) | A dichotomy leaf pays for the whole trial set | ✅ 2026-09-28 | — | — ([1508](1508-compiled-dichotomy-spike.md) soft) |
 | [1519](1519-distinct-lattice-tests-as-one-stacked-solve.md) | The distinct-lattice χ² tests run as one stacked solve | ✅ 2026-09-29 | — | — ([1518](1518-dedup-weighs-a-difference-in-its-own-frame.md) soft) |
 | [1520](1520-a-search-refines-each-assignment-once.md) | A search refines each line assignment once (gated: build only if assignments repeat) | ⬜ | P3 | — |
-| [1524](1524-the-step-scans-last-two-blind-spots.md) | The step scan's last two blind spots | ⬜ | P3 | — |
+| [1524](1524-the-step-scans-last-two-blind-spots.md) | The step scan's last two blind spots | ✅ 2026-11-16 | — | — |
 | [1924](1924-a-monoclinic-search-inside-its-ceiling.md) | A monoclinic search stays inside its ceiling and its memory | 🔄 2026-10-31 | P2 | [1959](1959-the-dichotomy-grid-compiled-again.md) ([1520](1520-a-search-refines-each-assignment-once.md) soft) |
 | [1959](1959-the-dichotomy-grid-compiled-again.md) | The dichotomy grid compiled again, so a ceiling reaches svd | ✅ 2026-10-14 | — | — |
 | [1999](1999-a-held-cells-ties-leave-the-answer-with-it.md) | A held cell's ties leave the answer with it | ✅ 2026-11-01 | — | — |
 | [2045](2045-a-runaway-fit-ends-without-an-expensive-closing-stage.md) | A runaway fit ends without an expensive closing stage | ✅ 2026-11-06 | — | — |
-| [2081](2081-how-a-series-holds-what-the-setup-fixes.md) | How a series holds what the setup fixes (a design discussion) | ⬜ | P2 | — ([2003](2003-the-chain-actions.md) soft) |
 | [2110](2110-a-trial-error-unit-stays-inside-its-memory.md) | A trial_error unit stays inside its memory under a raised budget | ⬜ | P2 | — |
 | [2116](2116-an-extra-components-columns-cost-no-bragg-evaluation.md) | An extra component's columns cost no Bragg evaluation | ✅ 2026-11-12 | — | — |
+| [2222](2222-the-closing-stage-off-by-default.md) | The closing stage off by default | ✅ 2026-11-19 | — | — |
+| [2224](2224-a-refit-of-a-converged-model-runs-one-stage.md) | A re-fit of a converged model runs one stage | ✅ 2026-11-19 | — | — ([2222](2222-the-closing-stage-off-by-default.md) soft) |
+| [2226](2226-the-preview-on-the-declared-windows.md) | The preview on the declared windows | ✅ 2026-11-21 | — | [2222](2222-the-closing-stage-off-by-default.md) |
+| [2235](2235-predict-on-a-grid-says-which-peak-cut-it-draws.md) | Predict on a grid says which peak cut it draws | ✅ 2026-11-22 | — | — |
 
 ### <a id="unscheduled-one-file-many-patterns"></a>One file, many patterns
 
@@ -725,7 +773,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 
 | WP | Title | Status | Priority | Depends on |
 |---|---|---|---|---|
-| [1317](1317-series-scrubber.md) | Scrub the series along its own trace | 🔄 2026-10-21 | P3 | — |
+| [1317](1317-series-scrubber.md) | Scrub the series along its own trace | 🔄 2026-11-04 | P3 | — |
 | [1318](1318-strain-surface.md) | The Stephens strain surface, rendered | ⬜ | P3 | — |
 | [1322](1322-events-aggregator.md) | The run is instrumentable, and nothing says so | ✅ 2026-10-23 | — | — |
 | [1339](1339-where-the-improvement-lives.md) | Where the improvement lives | ✅ 2026-11-02 | — | — |
@@ -735,9 +783,9 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1461](1461-every-browser-chart-draws-with-uplot.md) | Every browser chart draws with uPlot | ✅ 2026-09-26 | — | — |
 | [1462](1462-the-structure-viewer-draws-with-its-own-webgl2-renderer.md) | The structure viewer draws with its own WebGL2 renderer | ✅ 2026-09-26 | — | — ([1461](1461-every-browser-chart-draws-with-uplot.md) soft) |
 | [1466](1466-the-structure-viewer-draws-coordination-polyhedra.md) | The structure viewer draws coordination polyhedra | ✅ 2026-09-26 | — | [1462](1462-the-structure-viewer-draws-with-its-own-webgl2-renderer.md) |
-| [1468](1468-what-the-polyhedra-still-miss.md) | What the polyhedra still miss, and the controls a chemist would reach for | 🔄 2026-11-02 | P3 | [1466](1466-the-structure-viewer-draws-coordination-polyhedra.md) |
+| [1468](1468-what-the-polyhedra-still-miss.md) | What the polyhedra still miss, and the controls a chemist would reach for | ✅ 2026-11-02 | — | [1466](1466-the-structure-viewer-draws-coordination-polyhedra.md) |
 | [1470](1470-a-structure-figure-without-a-browser.md) | A structure figure from Python, drawn without a browser | ✅ 2026-09-27 | — | — |
-| [1522](1522-the-gui-says-what-the-read-repaired.md) | The GUI says what reading the project repaired | ⬜ | P3 | — |
+| [1522](1522-the-gui-says-what-the-read-repaired.md) | The GUI says what reading the project repaired | 🔄 2026-11-16 | P3 | — |
 | [1531](1531-what-the-promo-figures-found.md) | What the promo figures found: a trimmed cell the report calls fine, a bond through a face, labels on atoms, polyhedra without their far ends | ✅ 2026-10-02 | — | — |
 | [1533](1533-what-the-promo-agent-reached-around.md) | What the promo agent reached around: a cell frame with no switch, a stick width in a module constant, a score that argues against the axis view, and the furniture every script rebuilds | ✅ 2026-10-02 | — | — ([1531](1531-what-the-promo-figures-found.md) soft) |
 | [1544](1544-a-model-reads-in-a-notebook.md) | A model reads in a notebook | ✅ 2026-10-07 | — | — |
@@ -752,13 +800,14 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1971](1971-a-returned-figure-survives-a-zoom-and-a-pickle.md) | A returned figure survives a caller's zoom and a pickle | ✅ 2026-10-15 | — | — |
 | [1972](1972-the-indexing-figures-take-a-dark-palette.md) | The indexing figures take a dark palette | ✅ 2026-10-15 | — | — |
 | [1985](1985-report-and-diagnostic-text-in-one-voice.md) | Report and diagnostic text, rewritten in one voice | ✅ 2026-10-16 | — | — ([1133](1133-diagnostic-names-its-view.md) soft) |
-| [1990](1990-the-correlation-matrix-reaches-the-result.md) | The correlation matrix reaches the result | ⬜ | P3 | — |
+| [1990](1990-the-correlation-matrix-reaches-the-result.md) | The correlation matrix reaches the result | ⬜ | P3 | — ([1318](1318-strain-surface.md) soft) |
 | [2031](2031-a-history-log-holds-one-tree.md) | A history log holds one tree, and a stage is timed in one place | ✅ 2026-11-03 | — | — ([1322](1322-events-aggregator.md) soft) |
 | [2042](2042-a-result-names-its-radiation.md) | A result names its radiation | ✅ 2026-10-24 | — | — |
 | [2073](2073-the-qpa-record-says-what-its-fraction-rests-on.md) | The QPA record says what its fraction rests on, and QPA at given values has a route | ⬜ | P3 | — ([2060](2060-the-likelihood-interval-where-an-esd-cannot-be-read.md) soft) |
 | [2074](2074-the-report-says-where-the-residual-is-structured.md) | The report says where the residual is structured: a coherent-residual scan, the background's bulge, a replica scan on isolated lines | ⬜ | P3 | — ([2004](2004-the-fitreport-reasons-for-the-caller.md), [1931](1931-the-background-order-scan-runs-to-its-cap.md) soft) |
 | [2111](2111-what-the-structure-figure-still-misleads.md) | What the structure figure still misleads a reader with, and the ORTEP controls asked for | ⬜ | P3 | [1468](1468-what-the-polyhedra-still-miss.md) |
 | [2124](2124-the-gui-port-server-defects.md) | The indexing routes the GUI port needs: an ungated screen, any cell adopted, the pick's options | ✅ 2026-11-09 | — | — |
+| [2234](2234-the-strain-surface-in-the-gui.md) | The strain surface in the GUI | ⬜ | P4 | [1318](1318-strain-surface.md) |
 
 ### <a id="unscheduled-data-and-metadata-in-a-structure-out"></a>Data and metadata in, a structure out
 
@@ -766,13 +815,13 @@ Not started and rated P1 or P2. The rest are in the tables below.
 |---|---|---|---|---|
 | [1510](1510-what-the-chemist-knows-reaches-the-search.md) | What the chemist knows reaches the indexing search | ✅ 2026-10-23 | — | — ([1449](1449-rank-on-what-the-screen-determined.md), [1508](1508-compiled-dichotomy-spike.md) soft) |
 | [1511](1511-which-cell-does-this-powder-support.md) | Which of these cells does this powder support? | ⬜ | P3 | [2062](2062-pawley-is-the-structure-free-default.md) ([1323](1323-lebail-stop-rule.md), [1510](1510-what-the-chemist-knows-reaches-the-search.md) soft) |
-| [1512](1512-a-simulated-diffuse-curve-is-a-component.md) | A simulated diffuse curve is a component, and its amplitude rides on the phase scale | ⬜ | P3 | — |
+| [1512](1512-a-simulated-diffuse-curve-is-a-component.md) | A simulated diffuse curve rides on the phase scale, through the fixed-background slot and a tie | ✅ 2026-11-18 | — | — |
 | [1513](1513-the-contacts-a-chemist-checks-by-eye.md) | The contacts a chemist checks by eye | ⬜ | P3 | — |
 | [1514](1514-scoping-rigid-bodies.md) | Scoping rigid bodies: the milestone that makes the parameter map nonlinear | ⬜ | P2 | — ([1319](1319-structure-interchange.md), [1515](1515-scoping-structure-solution.md), [1516](1516-scoping-stacking-faults.md) soft) |
 | [1515](1515-scoping-structure-solution.md) | Scoping structure solution: which routes, which corpus, how many milestones | ⬜ | P2 | — ([1514](1514-scoping-rigid-bodies.md), [1511](1511-which-cell-does-this-powder-support.md), [1513](1513-the-contacts-a-chemist-checks-by-eye.md) soft) |
 | [1516](1516-scoping-stacking-faults.md) | Scoping stacking faults: DIFFaX files first, a native model when it earns one | ⬜ | P3 | [1512](1512-a-simulated-diffuse-curve-is-a-component.md) ([1514](1514-scoping-rigid-bodies.md), [1515](1515-scoping-structure-solution.md) soft) |
 | [1517](1517-the-eight-steers-replayed.md) | The eight steers, replayed: does the package raise what the person caught? | ⬜ | P3 | — |
-| [1913](1913-what-the-benchmark-agents-wrote-by-hand.md) | What the benchmark agents wrote by hand: a mixed site, a special-position retry loop, and `.esd` | 🔄 2026-10-08 | P3 | — |
+| [1913](1913-what-the-benchmark-agents-wrote-by-hand.md) | What the benchmark agents wrote by hand: a mixed site, a special-position retry loop, and `.esd` | 🔄 2026-11-18 | P3 | — |
 | [1919](1919-maximal-subgroups-generated-from-the-operators.md) | Maximal subgroups, their conjugacy classes, (P, p) and Wyckoff splittings, generated from the group's own operators | ✅ 2026-11-01 | — | — ([1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md) soft) |
 | [1921](1921-the-users-own-structure-database-indexed.md) | The user's own structure database, indexed: is this phase or this cell already known? | ⬜ | P3 | — |
 | [1967](1967-what-the-chemist-declares-reaches-the-extinction-screen.md) | What the chemist declares reaches the extinction screen | ✅ 2026-10-23 | — | — ([1910](1910-the-extinction-screen-at-a-small-cell-error.md) soft) |
@@ -794,8 +843,8 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1408](1408-the-manual-reads-like-a-manual.md) | The theory manual reads like a manual | ✅ 2026-09-14 | — | — |
 | [1409](1409-part-one-reads-like-a-manual.md) | Part 1 reads like a manual | ✅ 2026-09-14 | — | [1408](1408-the-manual-reads-like-a-manual.md) |
 | [1410](1410-worktree-gate-scope.md) | The worktree gate guards this checkout, not every repository | ✅ 2026-09-14 | — | — |
-| [1443](1443-part-one-read-by-a-newcomer.md) | Part 1 read by a newcomer: eleven passages, one word, and the version the manual describes | ⬜ | P3 | — |
-| [1448](1448-a-number-somebody-chose.md) | A number somebody chose says so, and says where the argument is | ⬜ | P4 | — |
+| [1443](1443-part-one-read-by-a-newcomer.md) | Part 1 read by a newcomer: eleven passages, one word, and the version the manual describes | ✅ 2026-11-23 | — | — |
+| [1448](1448-a-number-somebody-chose.md) | A number somebody chose says so, and says where the argument is | ✅ 2026-11-23 | — | — |
 | [1450](1450-a-collaborators-dataset-stays-unnamed.md) | A collaborator's dataset stays unnamed | ✅ 2026-10-04 | — | — |
 | [1451](1451-the-extinction-a-powder-has.md) | The extinction a powder has | ✅ 2026-10-04 | — | — |
 | [1452](1452-spglib-to-moyo.md) | Spglib to moyo, once | ⬜ | P3 | [1327](1327-magnetic-structure.md), [1418](1418-the-magnetic-structure-is-determined.md), [1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md) |
@@ -813,7 +862,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1907](1907-the-skill-stays-in-sync.md) | The skill stays in sync: constants and formulas pinned to the package, a changed-surface check at review, the judge-free tier nightly | ✅ 2026-10-07 | — | — ([1905](1905-the-skill-eval-suite.md) soft) |
 | [1920](1920-the-api-index-splits-by-shape.md) | The API index splits by shape: another program's files go to `api-io.md` | ✅ 2026-10-11 | — | — |
 | [1928](1928-the-toy-anomalous-golden-reads-a-frozen-y-obs.md) | The toy_anomalous golden reads a frozen y_obs | ✅ 2026-10-08 | — | — |
-| [1941](1941-a-release-note-is-a-file-per-change.md) | A release note is a file per change | ⬜ | P3 | — |
+| [1941](1941-a-release-note-is-a-file-per-change.md) | A release note is a file per change | 🔄 2026-11-17 | P3 | — |
 | [1954](1954-cut-1-8-0.md) | Cut 1.8.0 from what main holds | ✅ 2026-10-12 | — | [1546](1546-cut-1-7-0.md), [1929](1929-an-esd-follows-where-the-solver-stopped-beside-a-flat-column.md) |
 | [1961](1961-cut-1-9-0.md) | Cut 1.9.0 from what main holds | ✅ 2026-10-14 | — | [1954](1954-cut-1-8-0.md), [1959](1959-the-dichotomy-grid-compiled-again.md) |
 | [1975](1975-manual-rebuild-findings.md) | The manual rebuilt: findings brief | ✅ 2026-10-16 | — | — |
@@ -830,7 +879,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1994](1994-a-note-into-a-closed-wp-is-caught-at-handover.md) | A note written into a closed WP is caught at handover | ✅ 2026-10-16 | — | — |
 | [1996](1996-the-switching-tab-says-only-what-its-tests-show.md) | The Switching tab says only what its tests show | ✅ 2026-10-17 | — | [1984](1984-the-switching-tab.md) |
 | [2013](2013-stale-text-in-the-code-the-manual-move-found.md) | Stale text in the code that the manual move found | ✅ 2026-11-03 | — | — |
-| [2019](2019-each-fast-leg-runs-what-only-it-can-see.md) | Each fast leg runs what only it can see, and the tail is cut again | 🔄 2026-11-02 | P2 | — |
+| [2019](2019-each-fast-leg-runs-what-only-it-can-see.md) | Each fast leg runs what only it can see, and the tail is cut again | ✅ 2026-11-02 | — | — |
 | [2021](2021-the-manual-and-the-landing-page-are-one-site.md) | The manual and the landing page are one site | ✅ 2026-10-22 | — | — ([1986](1986-guides-and-theory-move-over-and-the-old-tree-retires.md) soft) |
 | [2022](2022-the-api-reference-renders-as-python-objects.md) | The API reference renders as Python objects | ✅ 2026-10-23 | — | — |
 | [2023](2023-api-signatures-coloured-like-the-code-under-them.md) | API signatures coloured like the code under them | ✅ 2026-10-23 | — | — |
@@ -838,7 +887,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2025](2025-parameters-for-the-everyday-calls.md) | Parameters for the everyday calls | ⬜ | P4 | [2024](2024-a-parameters-list-under-each-call.md) |
 | [2026](2026-parameters-for-the-technique-calls.md) | Parameters for the technique calls | ⬜ | P4 | [2024](2024-a-parameters-list-under-each-call.md) ([2025](2025-parameters-for-the-everyday-calls.md) soft) |
 | [2027](2027-a-meaning-beside-each-field.md) | A meaning beside each field of a model | ⬜ | P4 | — ([2024](2024-a-parameters-list-under-each-call.md) soft) |
-| [2036](2036-main-is-green-on-every-nightly-leg.md) | Main is green on every nightly leg: a full suite that finishes, two Windows tooling tests, and answers that move with the platform | 🔄 2026-11-02 | P2 | [2045](2045-a-runaway-fit-ends-without-an-expensive-closing-stage.md), [2048](2048-a-non-finite-step-ends-a-stage-rather-than-the-fit.md), [2049](2049-a-frame-no-phase-is-seen-in-holds-the-instrument-too.md), [2050](2050-a-correlation-with-a-flat-direction-is-not-reported.md) ([2002](2002-the-single-fit-actions.md), [2012](2012-the-axial-ratios-are-interchangeable.md) soft) |
+| [2036](2036-main-is-green-on-every-nightly-leg.md) | Main is green on every nightly leg: a full suite that finishes, two Windows tooling tests, and answers that move with the platform | 🔄 2026-11-21 | P2 | [2045](2045-a-runaway-fit-ends-without-an-expensive-closing-stage.md), [2048](2048-a-non-finite-step-ends-a-stage-rather-than-the-fit.md), [2049](2049-a-frame-no-phase-is-seen-in-holds-the-instrument-too.md), [2050](2050-a-correlation-with-a-flat-direction-is-not-reported.md) ([2002](2002-the-single-fit-actions.md), [2012](2012-the-axial-ratios-are-interchangeable.md) soft) |
 | [2039](2039-a-tutorial-reads-without-decoding.md) | A tutorial reads without decoding: the maintainer's notes as rules, the quickstart's fixes, and the checks that hold them | ✅ 2026-10-24 | — | — ([1986](1986-guides-and-theory-move-over-and-the-old-tree-retires.md) soft) |
 | [2040](2040-the-tutorials-link-the-manual-at-first-mention.md) | The tutorials link the manual at each concept's first mention | ✅ 2026-10-24 | — | — ([1986](1986-guides-and-theory-move-over-and-the-old-tree-retires.md) soft) |
 | [2041](2041-a-tutorial-shows-the-indexer-abstain.md) | A tutorial shows the indexer abstain | ✅ 2026-11-15 | — | [1956](1956-a-cell-pays-for-the-lines-it-predicts-and-the-pattern-lacks.md) |
@@ -854,6 +903,11 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2143](2143-a-case-only-rename-works-on-windows.md) | A case-only rename works on Windows, and its recovery copy follows the folder | ✅ 2026-11-12 | — | — |
 | [2145](2145-the-gui-boot-test-waits-as-long-as-the-boot.md) | The `rietx watch` GUI boot test waits as long as the watcher does | ✅ 2026-11-13 | — | — |
 | [2217](2217-source-read-records.md) | Records of what was read in another program's source | ✅ 2026-11-13 | — | — |
+| [2233](2233-comments-and-rulebooks-checked-against-the-tree.md) | Comments and rulebooks checked against the tree, and their size limits held from main | ✅ 2026-11-21 | — | — |
+| [2236](2236-narration-trend-decides-gate-or-drop.md) | The narration trend, measured over six weeks, decides a gate or a drop | ⬜ | P4 | [2233](2233-comments-and-rulebooks-checked-against-the-tree.md) |
+| [2238](2238-the-decision-machinery.md) | The decision machinery: fewer calls reach the maintainer, and each ruling is reused | 🔄 2026-11-22 | P2 | — ([2009](2009-the-rulebooks-findings-out-generators-rewritten.md) soft) |
+| [2241](2241-the-nightly-red-of-2026-11-20-to-22.md) | The nightly red of 2026-11-20 to 11-22: Windows path checks, the width triple's esd, and a lost runner | ✅ 2026-11-23 | — | — |
+| [2307](2307-the-design-rules-load-into-every-session.md) | The design rules load into every session | ✅ 2026-11-23 | — | — |
 
 ### <a id="unscheduled-candidates-named-on-a-use-case-not-yet-on-a-measurement"></a>Candidates — named on a use case, not yet on a measurement
 
@@ -863,7 +917,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1926](1926-the-exact-voigt-is-a-supported-shape.md) | The exact Voigt is a supported shape: its cost, its width, its exports and its bound | ⬜ | P3 | — (#815 soft) |
 | [1939](1939-an-ahead-of-time-kernel-spike.md) | An ahead-of-time kernel spike: Rust, C or Cython against numba | ✅ 2026-10-10 | — | — |
 | [1940](1940-the-kernel-tier-in-a-wheel.md) | The kernel tier in a wheel: Rust kernels, threaded on work, with a vector exponential | ✅ 2026-10-11 | — | [1939](1939-an-ahead-of-time-kernel-spike.md) |
-| [1945](1945-the-peak-chain-columns-built-in-one-pass-per-phase.md) | The peak-chain columns of a Jacobian built in one pass per phase | ⬜ | P3 | — ([1938](1938-every-parameter-refined-in-its-own-units.md) soft) |
+| [1945](1945-the-peak-chain-columns-built-in-one-pass-per-phase.md) | The peak-chain columns of a Jacobian built in one pass per phase | 🔄 2026-11-16 | P3 | — ([1938](1938-every-parameter-refined-in-its-own-units.md) soft) |
 | [1948](1948-a-public-objective-for-an-outside-optimiser.md) | A public objective for an outside optimiser | ⬜ | P4 | [1947](1947-the-model-read-at-its-values-without-a-solve.md), [1938](1938-every-parameter-refined-in-its-own-units.md) |
 | [1950](1950-rietx-inside-an-application.md) | Rietx inside an application | ⬜ | P3 | — |
 | [1960](1960-spherical-harmonics-texture.md) | Spherical-harmonics texture: preferred orientation with no single axis | ✅ 2026-10-15 | — | — |
