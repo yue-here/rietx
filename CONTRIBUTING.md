@@ -95,14 +95,20 @@ A name new to the table may not enter at `unaudited`. CI's lint job fails a
 pull request that adds one, and prints every row the pull request adds,
 changes or deletes. At review the `generality-review` agent drafts the case
 against each of those rows, and the case for any action the change removes
-or leaves to the caller. A tier-3 row, and a tier-2 automatic action, waits
-for the maintainer's dated ruling in its `approved` field. The maintainer
-may write that field into your branch.
+or leaves to the caller. A tier-3 row, and a tier-2 automatic action, needs
+a dated ruling in its `approved` field. On a tier-3 constant or
+suggestion row, the `generality-review` judge's `holds` is that ruling: a
+Claude session writes it with `approved_by="checked"`, and any other verdict
+sends the row to the maintainer. The other rows wait for him: every tier-3
+code, action or default row, every tier-2 action, a constant that sets the
+threshold of a warning or an automatic action, every change to a value that
+alters what a default does for every user, and every row whose crux is a value
+judgement. Either may write the field into your branch. Ruled 2026-11-22.
 
 **Land the machinery first.** Machinery is what a caller operates: a model,
 a fit, a reported quantity. A heuristic is a choice rietx makes for the
-caller. A pull request that adds a tier-3 row waits on the maintainer's
-ruling, so a machinery pull request adds none. A number the machinery needs
+caller. A pull request that adds a tier-3 row waits on that ruling, so a
+machinery pull request adds none. A number the machinery needs
 is physics or arithmetic (tier 1), established practice (tier 2), or a
 required argument on a verb no default path calls (`caller`). The tier-3
 default follows in its own pull request. Adopted 2026-10-30 from #1224.

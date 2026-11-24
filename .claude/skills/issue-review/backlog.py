@@ -83,6 +83,7 @@ PLACEMENT = (
     "docs/wp/",
     "docs/ROADMAP.md",
     "docs/DESIGN.md",
+    "docs/DESIGN-RULES.md",
     "docs/milestones/",
     "docs/releases/",
     ".claude/",

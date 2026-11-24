@@ -8,7 +8,9 @@ package's own model-comparison functions, pinned rather than re-derived.
 The released arm with riding hydrogens (WP-1989, #1008) is checked on acridine
 form IX's deposited structure over a synthetic pattern: its parameter count,
 each rider's parent vector, and the check fitting the public builder's arm.
-Whether the stretched body then fires is WP-1989's second part.
+Then the verdict (WP-1989 part 2): the body with C2–C3 stretched fires and
+names that bond, the same stretch does not fire with every member freed, and
+the deposited body does not fire.
 """
 
 from __future__ import annotations
@@ -22,7 +24,7 @@ from scipy.stats import f as f_dist
 import tests.test_rigid_body as trb
 from rietx import Refinement
 from rietx.optimize.statistics import _chi2_absolute
-from rietx.report.body_misfit import _element, rigid_body_misfit
+from rietx.report.body_misfit import MISFIT_ALPHA, MISFIT_BIC, _element, rigid_body_misfit
 from rietx.report.layer2 import _hamilton_f, delta_bic, hamilton_justified
 from rietx.strategy.staged import RefinementPlan, Stage
 
@@ -261,7 +263,9 @@ def acridine():
 
 def _by_hand(ref, pattern, arm, stem, globs=RIDING_GLOBS):
     """The arm fitted through the public verbs only, as the manual spells it;
-    its obs/calc/diff goes to ``tests/output/{stem}.png``."""
+    its obs/calc/diff goes to ``tests/output/{stem}.png``.  It carries none of
+    ``ref``'s own ties, holds, 2θ limits or plan settings, so it matches the
+    check's arm only where those are defaults or not refined."""
     hand = Refinement(arm.structure, ref.instrument, history=False)
     for path, source in arm.ties.items():
         hand.tie(path, source)
@@ -354,6 +358,88 @@ def test_the_builder_refuses_what_it_cannot_build(acridine):
         ref.released_arm("benzene")
     with pytest.raises(ValueError, match="not members"):
         ref.released_arm("acridine", freed=["C1", "Q7"])
+
+
+# ------------------------------------- the verdict with riding H (WP-1989 part 2)
+#: How far C3 moves along C2→C3 on the synthetic pattern.  #1008 stretched
+#: 0.3 Å, but on this cleaner pattern 0.3 Å also fires with every member freed
+#: (ΔBIC +25 at the fixture's seed, +9 at seed 7), so only a smaller stretch
+#: tells the riding arm from the 63-parameter one.  At 0.2 Å the riding arm gave
+#: ΔBIC +77 to +95 and the all-freed arm −79 to −100 over seeds 1989, 7, 11
+#: and 23.  #1008's own 0.3 Å on the deposited pattern is asserted in
+#: ``tests/test_acceptance_acridine_ix.py``.
+ACRIDINE_STRETCH = 0.2
+
+
+def _stretch_c2c3(body, stretch: float):
+    """``body`` with C3 moved ``stretch`` Å along C2→C3 in its template and H3
+    moved with it, so the C3–H3 vector is kept: #1008's positive arm."""
+    tpl = np.array(body.template, dtype=float)
+    i2, i3, ih3 = (body.atoms.index(lab) for lab in ("C2", "C3", "H3"))
+    u = (tpl[i3] - tpl[i2]) / np.linalg.norm(tpl[i3] - tpl[i2])
+    tpl[[i3, ih3]] += stretch * u
+    return body.model_copy(update={"template": [tuple(map(float, t)) for t in tpl]})
+
+
+@pytest.fixture(scope="module")
+def acridine_stretched(acridine):
+    """The deposited structure's synthetic pattern, fitted with a body whose
+    C2–C3 is ``ACRIDINE_STRETCH`` Å too long."""
+    from rietx.crystallography.bodies import place_body_atoms
+
+    _, pattern, _, _ = acridine
+    ph = _acridine().phases[0]
+    ph = place_body_atoms(ph.model_copy(update={
+        "rigid_bodies": [_stretch_c2c3(ph.rigid_bodies[0], ACRIDINE_STRETCH)]}))
+    ref = Refinement(trb.Structure(phases=[ph]), trb.INS, history=False)
+    ref.fit(pattern, plan=RefinementPlan(stages=[Stage("body", trb.BODY_GLOBS, max_iter=200)]))
+    out = ref.check_rigid_bodies(pattern, free=RIDING_GLOBS,
+                                 on_arm=_png([], "body_misfit_acridine_stretched"))
+    return ref, pattern, out
+
+
+def test_a_stretched_body_with_riding_h_fires_and_names_its_bond(acridine_stretched):
+    """#1008's verdict: with each H riding, the stretched body fires on both
+    tests and its stretched bond is named first."""
+    _, _, out = acridine_stretched
+    (row,) = out.rows
+    assert row.n_added == 36
+    assert row.fires
+    assert row.p_value < MISFIT_ALPHA and row.delta_bic > MISFIT_BIC
+    label, template, released, dev = row.deviations[0]
+    assert label == "C2–C3"
+    assert template == pytest.approx(1.4045 + ACRIDINE_STRETCH, abs=1e-4)
+    # the data pull it most of the way back to the deposited 1.405 Å
+    assert released < template - ACRIDINE_STRETCH / 2 and dev < -5.0
+    (diag,) = out.diagnostics
+    assert diag.code == "RIGID_BODY_MISFIT" and diag.level == "warning"
+    assert "C2–C3" in diag.message and diag.value == pytest.approx(row.delta_bic)
+
+
+def test_the_stretch_does_not_fire_with_every_member_freed(acridine_stretched):
+    """The control for the test above: the arm 1.11.0 fitted, with the H freed
+    too, charges 63 parameters and falls short of the threshold on the same
+    fits, so the verdict is the riding arm's."""
+    ref, pattern, out = acridine_stretched
+    (row,) = out.rows
+    arm = ref.released_arm("acridine", freed=ACRIDINE_HEAVY + ACRIDINE_H)
+    _, res = _by_hand(ref, pattern, arm, "body_misfit_acridine_stretched_all_freed")
+    # a stalled control would pass the threshold below for the wrong reason
+    assert res.status == "converged"
+    assert _chi2_absolute(res.statistics) < row.chi2_body
+    added = res.statistics.n_free_parameters - row.n_free_body
+    assert added == 63
+    assert delta_bic(row.chi2_body, _chi2_absolute(res.statistics), row.n_points, added,
+                     n_effective=row.n_effective) < MISFIT_BIC
+
+
+def test_the_deposited_body_with_riding_h_does_not_fire(acridine):
+    """The negative arm: the body the pattern was made from stays silent."""
+    _, _, out, _ = acridine
+    (row,) = out.rows
+    assert row.n_added == 36
+    assert not row.fires and out.diagnostics == []
+    assert row.p_value > MISFIT_ALPHA and row.delta_bic < 0.0
 
 
 # ---------------------------- a rider and its parent on different sites (review)

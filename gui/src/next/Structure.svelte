@@ -28,6 +28,7 @@
    * "Preview, not refined" as the Pattern graph's does (`gui/STYLE.md` § Layout:
    * a preview never reads as a changed fit).
    */
+  import { type Say } from "./console";
   import { onDestroy, untrack } from "svelte";
 
   import { ApiError, api } from "../api";
@@ -78,7 +79,7 @@
     busy = false,
     theme = "light",
     values = null,
-    say = (_line: string) => {},
+    say = () => {},
     onreadout = () => {},
   }: {
     /** the working state's node: a run, a checkout or an edit moves it */
@@ -91,7 +92,7 @@
     theme?: string;
     /** the Interactive tab's unapplied slider values, or null */
     values?: Record<string, number> | null;
-    say?: (line: string) => void;
+    say?: Say;
     onreadout?: (reading: StatusReadout | null) => void;
   } = $props();
 
@@ -493,7 +494,7 @@
     level = key;
     if (!geo) return;
     geo = at(geo, key);
-    say(`# ellipsoids at ${(Number(key) * 100).toFixed(0)} % `
+    say("comment", `# ellipsoids at ${(Number(key) * 100).toFixed(0)} % `
       + `(k = ${geo.scale.toFixed(4)} = √χ²₃(${key}))`);
   }
 
@@ -510,7 +511,7 @@
                font: style?.font || "600 12px sans-serif" };
     });
     const png = await renderer.exportPng(view, { background: onClear ? null : background(), labels });
-    if (!png) say("# the image could not be rendered at any size this GPU allows");
+    if (!png) say("comment", "# the image could not be rendered at any size this GPU allows");
     return png;
   }
 
@@ -524,7 +525,7 @@
     link.download = name;
     link.click();
     setTimeout(() => URL.revokeObjectURL(link.href), 0);
-    say(`# saved ${name}, ${png.width} × ${png.height} px`
+    say("comment", `# saved ${name}, ${png.width} × ${png.height} px`
       + (transparent ? " on a transparent background" : "")
       + (transparent && depthCue ? ", without the depth cue" : ""));
   }
@@ -534,9 +535,9 @@
     if (!png) return;
     try {
       await navigator.clipboard.write([new ClipboardItem({ "image/png": png.blob })]);
-      say(`# copied the structure, ${png.width} × ${png.height} px`);
+      say("comment", `# copied the structure, ${png.width} × ${png.height} px`);
     } catch (exc) {
-      say(`# the image could not be copied: ${(exc as Error).message}`);
+      say("comment", `# the image could not be copied: ${(exc as Error).message}`);
     }
   }
 

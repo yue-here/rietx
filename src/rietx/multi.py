@@ -36,6 +36,9 @@ from .crystallography.twins import merge_site_twins
 from .history.events import _attach_progress, as_event_stream
 from .model.forward import (
     PHASE_SUPPORT_SIGMA,
+    apertures_to_lift,
+    axial_lift_start,
+    axial_partner,
     compile_model,
     orbit_split_of,
     recorded_window_tol,
@@ -113,6 +116,7 @@ from .refine import (
     _guard_diagnostics,
     _harmonic_diagnostics,
     _held_scale_phases,
+    _instrument_width_held_diagnostics,
     _judge_magnetic_groups,
     _lineless_phases,
     _low_angle_diagnostics,
@@ -387,6 +391,10 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
         (FIT,), "a parent-cell phase's strains are shared model parameters, "
                 "so the held-strain record is the fit's, read off the plan's "
                 "freed paths (WP-1419)"),
+    "_instrument_width_held_diagnostics": (
+        (FIT,), "the instrument width hold is one test over every histogram's sums "
+                "(_hold_width_twins_multi), so the held widths are the fit's, "
+                "read off the answer's stage (WP-2225)"),
     # -- deliberately not computed ---------------------------------------------
     "_site_glob_diagnostics": (
         (ABSENT,), "not called from multi.py yet: a single fit reports a glob "
@@ -876,6 +884,21 @@ def _joint_reach_beyond_self(columns: list[str], reach: dict[str, list[str]]
         other = [q for q in reach.get(c, [c]) if q != c]
         if other:
             out[c] = other
+    return out
+
+
+def _seeded_values(mtable, columns: list[str]) -> dict[str, float]:
+    """Each seeded column at the value its seed wrote, read off the entry.
+
+    ``StageResult.seeded``'s second writer, as in ``refine._run_stage``: the
+    isotropic ray gives every Stephens DOF its own coefficient.  A shared
+    column holds one value in every histogram, so histogram 0's is read.
+    """
+    out: dict[str, float] = {}
+    for c in columns:
+        h = mtable._owner(c) or 0
+        table = mtable.tables[h]
+        out[c] = table.entries[table._paths[mtable._unscope(h, c)]].value
     return out
 
 
@@ -1996,6 +2019,8 @@ class MultiHistogramRefinement:
         # for the closing stage of a plan that fixes (WP-2208)
         stages = plan.run_stages(paths=self.mtable.row_names())
         n_stages = len(stages)
+        # what an earlier stage left free: the aperture lift's gate (WP-1955)
+        refined_before: set[str] = set()
         for index, (stage, ftol, window_tol) in enumerate(
                 zip(stages, plan.stage_ftols(), plan.stage_window_tols(),
                     strict=True), start=1):
@@ -2053,9 +2078,32 @@ class MultiHistogramRefinement:
                 for tab in self.mtable.tables:
                     tab.refuse_partial_turns(joint=True)
                 seeded: dict[str, float] = {}
+                # the single-histogram runner's lift (``_run_stage``,
+                # WP-1955): an FCJ aperture this stage frees on zero starts
+                # off it, unless an earlier stage already refined it, before
+                # the plan's seed
+                for path in apertures_to_lift([p for p in freed
+                                               if p not in refined_before]):
+                    # the partner's live value, so S/L's lift is already in it
+                    mt = self.mtable
+                    partner = axial_partner(path)
+                    h = mt._owner(partner) or 0
+                    start = axial_lift_start(
+                        path, mt.decode(mt.x0())[h][mt._unscope(h, partner)])
+                    seeded.update(dict.fromkeys(
+                        mt.seed_floored([path], start), start))
+                refined_before.update(self.mtable.free_paths)
                 if stage.seed:
-                    seeded = dict.fromkeys(
-                        self.mtable.seed_floored(freed, stage.seed), stage.seed)
+                    seeded.update(dict.fromkeys(
+                        self.mtable.seed_floored(freed, stage.seed), stage.seed))
+                if stage.strain_seed:
+                    # the single runner's second seed (``_run_stage``): the
+                    # Stephens DOFs are unbounded below, so the seed above
+                    # never sees them; each enters ``seeded`` at the value
+                    # written, before the support hold reads it
+                    seeded.update(_seeded_values(
+                        self.mtable,
+                        self.mtable.seed_stephens(freed, stage.strain_seed)))
                 self.mtable.apply_to_models()
                 # the single-histogram runner's rule (``_run_stage``, #598): the
                 # moment frames follow the cell this stage starts from, and the
@@ -2809,6 +2857,9 @@ class MultiHistogramRefinement:
         diagnostics = diagnostics + _parent_strain_held_diagnostics(
             stage_results, [_unscoped(p) for p in mt.free_paths],
             self.mtable.structures[0])
+        # the held instrument widths of the answer's stage, which hold one
+        # sum across every histogram (WP-2225)
+        diagnostics = diagnostics + _instrument_width_held_diagnostics(stage_results)
         # a phase whose scales and B no histogram's range can separate, and
         # what its fraction is conditional on (WP-1534)
         diagnostics = diagnostics + _scale_b_ridge_diagnostics(
@@ -3374,8 +3425,15 @@ def _peak_equation_sharing_diagnostics(mtable) -> list[Diagnostic]:
     joint fit, :func:`~rietx.params.multi.row_shared`, and no parametric
     equation's target), whose target carries degrees, in a joint fit whose
     patterns declare at least two different wavelengths.  Silent with one
-    wavelength, with a source that declares no line, and for an
-    ``intensity_factor``, a pure number.
+    wavelength, with a source that declares no line, for an
+    ``intensity_factor``, a pure number, and for an equation whose expression
+    reads ``wavelength`` (WP-2152): the user wrote its λ dependence, as a
+    parametric equation states a driven coefficient's.  The parametric silence
+    is per coefficient, but this one covers the whole expression.  A phase
+    holds one equation per target, so a strain term beside the λ-reading one
+    (``+ w*tan(theta)``), rightly shared, is silent.  So is a size term in
+    degrees there (``+ x/cos(theta)``), the known limit.  Another target's
+    degree-only equation on the same phase warns.
     """
     lams = [_longest_wavelength(ins) for ins in mtable.instruments]
     if any(lam is None for lam in lams) or len(set(lams)) < 2:
@@ -3397,7 +3455,7 @@ def _peak_equation_sharing_diagnostics(mtable) -> list[Diagnostic]:
             phase = mtable.structures[0].phases[int(base.split(".")[1])]
             eq = phase.peak_equations[int(index)]
             owner = f"Phase {base.split('.')[1]} ({phase.name})"
-        if eq.target == "intensity_factor":
+        if eq.target == "intensity_factor" or "wavelength" in eq.reads():
             continue
         unit = "deg²" if eq.target == "gauss_fwhm_squared" else "degrees"
         noun = "its coefficient" if len(names) == 1 else "its coefficients"
