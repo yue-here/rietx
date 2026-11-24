@@ -34,7 +34,7 @@ const putSeries = vi.fn(async (body: any) => {
   const { patterns: _p, ...settings } = body;
   return (stored = setupOf(patterns, { ...stored.settings, ...settings }));
 });
-const seriesResult = vi.fn(async () => { throw new Error("no series has completed"); });
+const seriesResult = vi.fn(async (): Promise<any> => { throw new Error("no series has completed"); });
 
 vi.mock("../api", () => ({
   ApiError: class extends Error {},
@@ -133,6 +133,35 @@ describe("the Patterns step", () => {
     expect(putSeries.mock.calls.at(-1)![0].carry).toEqual(["phases.*", "instrument.background.*"]);
   });
 
+  it("keeps a coordinate typed while an earlier PUT is on the wire", async () => {
+    stored = setupOf([pattern("a", null), pattern("b", null), pattern("c", null)]);
+    await boot();
+    // the first PUT's answer waits until the second edit is typed
+    let release!: () => void;
+    const held = new Promise<void>((r) => (release = r));
+    putSeries.mockImplementationOnce(async (body: any) => {
+      await held;
+      const byToken = new Map(stored.patterns.map((p) => [p.upload, p]));
+      return (stored = setupOf(body.patterns.map((m: any) => ({ ...byToken.get(m.upload)!, x: m.x ?? null })),
+                               stored.settings));
+    });
+    const box = (i: number) => document.querySelectorAll<HTMLInputElement>("input.coord")[i];
+    box(0).value = "300";
+    box(0).dispatchEvent(new Event("change", { bubbles: true }));
+    await settle();
+    box(1).value = "400";
+    box(1).dispatchEvent(new Event("change", { bubbles: true }));
+    await settle();
+    release();
+    await settle();
+    box(2).value = "500";
+    box(2).dispatchEvent(new Event("change", { bubbles: true }));
+    await settle();
+    expect(putSeries.mock.calls.at(-1)![0].patterns.map((p: any) => p.x)).toEqual([300, 400, 500]);
+    expect([...document.querySelectorAll<HTMLInputElement>("input.coord")].map((b) => b.value))
+      .toEqual(["300", "400", "500"]);
+  });
+
   it("fills Run series while First fit is not built, and First fit once it is", async () => {
     stored = setupOf([pattern("a", 1), pattern("b", 2)]);
     await boot();
@@ -196,5 +225,55 @@ describe("the Run step", () => {
     expect(text(document.querySelector(".status"))).toBe("Fitting T0 · 10 · second walk · 1 of 2");
     expect(cells(1)).toEqual(["2", "T1", "20", "23.02", "previous", "22.99"]);
     expect(cells(0)[5]).toBe("…");
+  });
+});
+
+describe("the Results step", () => {
+  const entry = (index: number, rwp: number, diagnostics: any[] = []) => ({
+    index, label: `T${index}`, x: 10 * (index + 1), status: "converged",
+    statistics: { rwp, gof: 1.9 }, n_iterations: 8, reseeded: false, rwp_warm: null,
+    rung: index ? "warm" : "cold", rungs_tried: [], node_id: null, tree_id: null, diagnostics,
+  });
+
+  it("says it has not run, with Run series in its foot", async () => {
+    stored = setupOf([pattern("T0", 10), pattern("T1", 20)]);
+    await boot(3);
+    expect(text(document.querySelector(".empty"))).toBe("Not run yet.");
+    expect(button("Run series").closest(".foot")).not.toBeNull();
+  });
+
+  it("reads the record: the summary, a row per pattern, the values and warnings at the selected one", async () => {
+    stored = { ...setupOf([pattern("T0", 10), pattern("T1", 20)]), has_result: true };
+    seriesResult.mockImplementationOnce(async () => ({
+      result: {
+        entries: [entry(0, 0.0419), entry(1, 0.0434, [{ level: "warning", code: "BOUND_HIT", message: "a hit its bound" }])],
+        diagnostics: [],
+        steps: [{ path: "phases.0.cell.a", labels: ["T0", "T1"], indices: [0, 1], step: 0.002,
+                  size_esd: 4.26, cold_ratio: null }],
+        direction_gaps: null,
+        code_counts: [{ code: "BOUND_HIT", path: "phases.0.cell.a", count: 1, n_patterns: 2, level: "warning" }],
+        phase_names: ["LaB6"], atom_labels: [[]],
+      },
+      trajectories: [{ path: "phases.0.cell.a", x: [10, 20], x_label: "T (K)", value: [4.15692, 4.15901],
+                       stderr: [0.00002, 0.00003], labels: ["T0", "T1"], backward: null,
+                       n_sigma: null, gap_at: null }],
+      has_backward: false,
+    }) as any);
+    await boot(3);
+    expect([...document.querySelectorAll(".summary dt")].map(text)).toEqual(["Converged", "Largest step"]);
+    expect([...document.querySelectorAll(".summary dd")].map(text))
+      .toEqual(["2 of 2", "LaB6 cell.a · 10 → 20 · 4.3 esd"]);
+    expect(cells(0)).toEqual(["1", "10", "4.19", "1.90", "model", ""]);
+    expect(cells(1)).toEqual(["2", "20", "4.34", "1.90", "previous", "1"]);
+    const values = () => [...document.querySelectorAll(".values tbody tr")]
+      .map((r) => [...r.querySelectorAll("td")].map(text).join(" "));
+    expect(values()).toEqual(["Fit", "Rwp (%) 4.19", "GoF 1.90", "LaB6", "cell.a 4.15692"]);
+    expect(text(document.querySelector(".body p.muted:not(.empty)"))).toBe("No warnings.");
+    // a row click selects its pattern: its values and its warnings follow
+    (document.querySelectorAll("table.rows tbody tr")[1] as HTMLElement).click();
+    flushSync();
+    expect(values()).toContain("cell.a 4.15901");
+    expect(text(document.querySelector(".body .dg"))).toBe("BOUND_HIT a hit its bound");
+    expect(text(document.querySelector("details.notes summary"))).toBe("Warnings across the series");
   });
 });

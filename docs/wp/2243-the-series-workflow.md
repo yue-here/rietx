@@ -185,8 +185,15 @@ disagree on wavelength, range or step; a blank pattern) names its tier here befo
     headed "Second walk Rwp (%)". A page opened after the run still shows ✓, because the
     record keeps no second-walk fits; `gui/series.py` could serve them, and that file waits
     for #1786. Where each pattern's walk gap goes is a placement question, open below.
-- [ ] 4. The Results step: the summary rows, the per-pattern table, the Plot list, the
+  - Found by this session's look, a sibling: coordinates typed one after another lost two
+    of ten. An earlier PUT's answer, lacking an edit typed while it was on the wire,
+    replaced the list, and the next PUT sent the list without that edit. The PUTs now go
+    one after another and only the last one's answer replaces the list.
+- [x] 4. The Results step: the summary rows, the per-pattern table, the Plot list, the
   selected pattern's warnings, the series' warnings and the largest steps.
+  `seriesresults.ts` reads the record. The list is headed "Values at <pattern>" and has
+  no ticks yet: a tick plots on Trends, so the ticks, the heading "Plot", and the summary
+  rows' Plot buttons land with task 6.
 - [ ] 5. The selected pattern: Pattern draws its fit while Series is up, ‹ › in the title,
   ↑ ↓, and the graphs following the run until a row click.
 - [ ] 6. The Trends graph tab: small panels, the Plot menu, Against, the second walk's rings,
