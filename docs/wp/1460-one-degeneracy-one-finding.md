@@ -121,6 +121,34 @@ reader that keys on `where` without naming the code is the one it misses.
   the mask is a developer signal a nightly test asserts). Two unresolved directions leave ρ
   between members of different ones set by rounding (by construction; not
   measured).
+- **From the 2026-11-19 issue triage (issue #1704), a flat direction whose third member is the
+  cell.** Checked against the tree at `dccc45bdb` (macOS arm64, `[dev]` venv) with the
+  `lab6` protocol of `tests/test_window_domain.py`: SRM 660c over 20.3-84.6° 2θ, the zero shift
+  freed in the displacement's stage. Reproduced to the digit of the issue's Linux numbers. The
+  cell lands −984 ppm from the CIF, 6.48 reported esds (17.6 plain). Its reported esd is
+  152 ppm, 16× the zero-held fit's 9.6 ppm, so the esd did grow, but not enough to cover the walk.
+  The zero lands at −0.344 ± 0.052° and the displacement at −0.690 ± 0.093 mm against the CIF's
+  −0.079 mm. `FLAT_DIRECTION` names only `zero_shift ~ sample_displacement` (ρ = 0.99991). The
+  cell sits in two `HIGH_CORRELATION` rows, ρ 0.99887 with the zero and 0.99817 with the
+  displacement, just under `FLAT_DIRECTION_RHO`. So the finding a reader sees names the pair and
+  not the number the reader quotes. A grouping by component would report {zero, displacement,
+  cell} as one finding; that is this WP's task 2 with a real fixture. Over the full range
+  (20.3-150.9°) the same arm is −23 ppm, 1.76 reported esds, with no `FLAT_DIRECTION`.
+  The walk is larger than the esd because the esd measures counting noise only, and a nearly
+  flat direction amplifies any systematic misfit along it. That is not WP-2219's case: no
+  direction falls under `PINV_RCOND`, and every esd here is finite. Three texts promise more
+  than the fit gives, and the grouping's skill task should fix them together:
+  `help.py`'s `sample_displacement` entry ("the cell's esd grows to show it", rendered into
+  `reference/parameters.md`), which PR #1577 does not touch while it corrects the manual's twin
+  sentence in `reference/instrument.md`; `help.py`'s `FLAT_DIRECTION` entry ("Each esd is
+  conditional on the other parameter being right"), whereas `statistics.normal_covariance`
+  inverts the whole matrix, so the esds are marginal; and the skill's `FLAT_DIRECTION` row
+  ("Quote either member as measured, and do not read the esds"), which never reaches a third
+  parameter outside the pair. The preset is not this WP's to change: the `lab_bragg_brentano`
+  plan text already says to free both only where something pins one. Priority stays P3: a flag
+  fired, on the pair. To reproduce: `test_window_domain._protocol("lab6")`, append
+  `instrument.zero_shift` to the stage whose `turn_on` holds the displacement, and fit with
+  `two_theta_limits=(20.3, 84.6)` (about a minute).
 
 ## Non-goals
 
