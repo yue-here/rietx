@@ -24,7 +24,11 @@
   let open = $state(false);
   let button: HTMLButtonElement | undefined = $state();
   let box: HTMLDivElement | undefined = $state();
-  let at = $state({ right: 0, top: 0 });
+  /** `top` below the button, or `bottom` above it where the window has no
+   *  room below, as on the bottom panel's strip (WP-2211) */
+  let at = $state<{ right: number; top?: number; bottom?: number }>({ right: 0, top: 0 });
+  /** the room the box wants below its button before it opens above instead */
+  const ROOM_PX = 280;
 
   // the box takes focus as it opens, as every help popover does (gui/CLAUDE.md)
   $effect(() => {
@@ -37,7 +41,9 @@
   function toggle(event: MouseEvent) {
     if (open) { open = false; return; }
     const r = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    at = { right: Math.max(8, window.innerWidth - r.right), top: r.bottom + 6 };
+    const right = Math.max(8, window.innerWidth - r.right);
+    at = window.innerHeight - r.bottom < ROOM_PX && r.top > ROOM_PX
+      ? { right, bottom: window.innerHeight - r.top + 6 } : { right, top: r.bottom + 6 };
     open = true;
   }
 
@@ -69,7 +75,8 @@
 
 {#if open}
   <div class="helpbox" role="dialog" tabindex="-1" aria-label={entry.title} bind:this={box}
-    style="right: {at.right}px; top: {at.top}px">
+    style:right="{at.right}px" style:top={at.top != null ? `${at.top}px` : null}
+    style:bottom={at.bottom != null ? `${at.bottom}px` : null}>
     <p class="title">{entry.title}</p>
     {#if entry.lead}<p>{entry.lead}</p>{/if}
     <ul>

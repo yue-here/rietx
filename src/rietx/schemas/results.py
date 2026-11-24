@@ -1416,7 +1416,13 @@ class StageResult(Base):
     #: reason.  It feeds ``STAGE_FREED_NOTHING``.
     unreached_histograms: dict[int, list[str]] | None = None
     #: each row this stage lifted before solving, and the value it started at
-    #: in column units (WP-1930).  Two writers put a row here.  The stage's own
+    #: in column units (WP-1930).  Three writers put a row here.  The runner
+    #: itself starts an FCJ axial ratio the stage newly frees on zero at
+    #: :data:`~rietx.model.forward.AXIAL_SL_START` (S/L) or
+    #: :data:`~rietx.model.forward.AXIAL_HL_START` (H/L), never at its
+    #: partner's value
+    #: (:func:`~rietx.model.forward.apertures_to_lift`, WP-1955), on every
+    #: stage and in both runners.  The stage's own
     #: :attr:`~rietx.strategy.staged.Stage.seed`, through
     #: :meth:`~rietx.params.vector.ParameterTable.seed_floored`, starts a
     #: freed row sitting exactly on a floor of 0 or above at the seed.  Its
@@ -1425,8 +1431,10 @@ class StageResult(Base):
     #: all-zero Stephens block on the isotropic ray, and every DOF of that block
     #: is here at the value the seed wrote, a zero coefficient of the ray
     #: included (WP-2002, B14).  Those rows sit at zero rather than on a floor,
-    #: since a Stephens DOF is unbounded below.  The joint fit's runner seeds
-    #: no Stephens block, so its stages carry the first writer's rows alone.
+    #: since a Stephens DOF is unbounded below.  The joint fit's runner writes
+    #: both seeds through :class:`~rietx.params.multi.MultiParameterTable`'s
+    #: twins, keyed by the joint column (WP-2239): a shared block's DOFs under
+    #: their bare paths, a per-histogram one's under ``hist.N.``.
     #: WP-1930's floor seed sized by unit went with WP-1938: it existed because
     #: a softplus column at its floor was twelve orders below its neighbours,
     #: and a row refined in its own units has its physical column there.

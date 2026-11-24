@@ -262,9 +262,9 @@ so a protocol that refines the split cannot be mirrored here.
 $\sigma^2(M) \ge 0$ for every $hkl$ is a cone coupling all fifteen coefficients,
 so it cannot be a box bound. The default bounded-LM driver carries it as a
 linear inequality, and the guard (`STEPHENS_STRAIN_NOT_POSITIVE`) falls silent
-with nothing left to report ({ref}`ch-estimation`). Under `solver="trf"` the
-guard is the only check. A joint fit builds no cone under either driver, so the
-guard fires there too. The width law clamps a negative $\sigma^2(M)$ to zero
+with nothing left to report ({ref}`ch-estimation`). A joint fit holds each
+histogram's cone. Under `solver="trf"` the guard is the only
+check, in a single fit and a joint one. The width law clamps a negative $\sigma^2(M)$ to zero
 width, so a fit outside the cone has leaned on the clamp. The reflections past
 it lost all strain width, and the solver can use that set as a free hinge. Read
 a firing as "these coefficients are not quotable, and the fit leaned on the

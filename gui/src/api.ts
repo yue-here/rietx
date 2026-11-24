@@ -113,6 +113,8 @@ export interface InstrumentEdit {
   freed: string[];
   /** built paths the free register still named and the new model fixes */
   fixed: string[];
+  /** the release ran after the edit: the old model built no table (WP-2212) */
+  release_after?: boolean;
   ended: string[];
 }
 
@@ -333,6 +335,10 @@ export const api = {
     call("GET", `/api/history/diff?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`),
   historyCompare: (ids: string[]) =>
     call("GET", `/api/history/compare?ids=${encodeURIComponent(ids.join(","))}`),
+  /** One node's calculated curve, recomputed at its own values on its own
+   *  channels, packed as the curves are (WP-2211). Writes nothing. */
+  historyCurves: (nodeId: string) =>
+    arrays(`/api/history/curves?node=${encodeURIComponent(nodeId)}`),
 
   textdoc: () => call("GET", "/api/textdoc"),
   putTextdoc: (text: string, baseRevision?: string, validateOnly = false) =>
@@ -345,13 +351,19 @@ export const api = {
   /** The stored peak list plus the decimated raw pattern — the one payload the
    *  plot can draw before any fit exists (WP-1027). */
   peaks: () => call("GET", "/api/peaks"),
-  pickPeaks: (body: { shoulders?: boolean } = {}) => call("POST", "/api/peaks", body),
+  /** `pick_peaks`'s three options (WP-2124); an absent one is the default. */
+  pickPeaks: (body: { shoulders?: boolean; flag_contamination?: boolean;
+                      two_theta_range?: [number, number] } = {}) =>
+    call("POST", "/api/peaks", body),
   addPeak: (twoTheta: number) => call("POST", "/api/peaks/add", { two_theta: twoTheta }),
   movePeak: (index: number, twoTheta: number) =>
     call("POST", "/api/peaks/move", { index, two_theta: twoTheta }),
   removePeak: (index: number) => call("POST", "/api/peaks/remove", { index }),
   flagPeak: (index: number, body: { use_for_indexing?: boolean; flags?: string[] }) =>
     call("POST", "/api/peaks/flag", { index, ...body }),
+  /** the peak list as it was before the last edit, and that edit again (WP-2240) */
+  undoPeaks: () => call("POST", "/api/peaks/undo", {}),
+  redoPeaks: () => call("POST", "/api/peaks/redo", {}),
   refitGroup: (group: number, nComponents?: number) =>
     call("POST", "/api/peaks/refit",
          nComponents === undefined ? { group } : { group, n_components: nComponents }),
@@ -367,9 +379,9 @@ export const api = {
    *  at a time.  Over the server's cap it is a sample — read `n_total`. */
   candidateTicks: (candidate: number) =>
     call("GET", `/api/index/ticks?candidate=${candidate}`),
-  adoptCandidate: (candidate: number, spaceGroup?: string) =>
-    call("POST", "/api/index/adopt",
-         spaceGroup ? { candidate, space_group: spaceGroup } : { candidate }),
+  adoptCandidate: (candidate: number, spaceGroup?: string, mode?: "lebail" | "pawley") =>
+    call("POST", "/api/index/adopt", {
+      candidate, ...(spaceGroup ? { space_group: spaceGroup } : {}), ...(mode ? { mode } : {}) }),
   /** Rank one candidate's extinction classes — the same run machine, and a
    *  measurement any candidate may ask for (the gate stays on adopt). */
   screenExtinctions: (candidate: number) =>
@@ -394,6 +406,10 @@ export const api = {
   /** One member's channels and curves, as `curves` sends the project's: built
    *  by the same function, so the σ and the residuals are the same arithmetic. */
   seriesCurves: (index: number) => arrays(`/api/series/curves?index=${index}`),
+  /** One member by its place in a list, the run's or the staged one, with
+   *  its fit wherever one has landed, mid-run too (WP-2243). */
+  seriesPattern: (pattern: number, of: "run" | "staged") =>
+    arrays(`/api/series/curves?pattern=${pattern}&of=${of}`),
   /** That pattern's own history tree — **read-only**: a tree is pinned to its
    *  data fingerprint, so its nodes cannot be checked out into this project. */
   seriesHistory: (index: number) =>
@@ -401,7 +417,8 @@ export const api = {
 
   /** One export kind; with `directory` it is written there rather than into
    *  `exports/`, and an existing file is refused unless `overwrite` (WP-2133). */
-  export: (kind: string, body: { directory?: string; filename?: string; overwrite?: boolean } = {}) =>
+  export: (kind: string, body: { directory?: string; filename?: string; overwrite?: boolean;
+                                 script?: string } = {}) =>
     call("POST", `/api/export/${kind}`, body),
   events: (since: number) => call("GET", `/api/events?poll=1&since=${since}`),
 };

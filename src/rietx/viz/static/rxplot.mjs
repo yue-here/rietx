@@ -295,6 +295,48 @@ function axes(spec, gutter) {
   return [x, y];
 }
 
+/** Each pane's last answer from `drawsData`, with what it was computed from. */
+const viewed = new WeakMap();
+
+/**
+ * Whether pane `u` draws a value in view: a shown series holding a finite
+ * value between the channels in view. uPlot ranges a pane that draws none
+ * over 0 to 100, so the difference pane before a fit read 100 and 0 under
+ * the intensity's labels (WP-2245). The answer is kept until the view, the
+ * data or a series' visibility moves, since an axis asks three times a draw.
+ */
+function drawsData(u) {
+  const n = u.data[0]?.length ?? 0, idxs = u.series[0].idxs;
+  const i0 = idxs?.length ? idxs[0] : 0, i1 = idxs?.length ? idxs[1] : n - 1;
+  const key = [i0, i1, ...u.series.slice(1).map((s, k) => (s.show ? u.data[k + 1] : null))];
+  const last = viewed.get(u);
+  if (last && last.key.length === key.length && last.key.every((v, k) => v === key[k])) return last.value;
+  let value = false;
+  for (let k = 2; k < key.length && !value; k++) {
+    const d = key[k];
+    if (!d) continue;
+    for (let i = i0; i <= i1; i++) if (Number.isFinite(d[i])) { value = true; break; }
+  }
+  viewed.set(u, { key, value });
+  return value;
+}
+
+/**
+ * The y axis `y`, labelling nothing while its pane draws no value in view:
+ * no labels, no tick marks and no gridlines, since the range they would mark
+ * is uPlot's fallback rather than the data's. `uPlot` supplies the default
+ * labels of an axis that sets none, a log axis's.
+ */
+function quietWhenEmpty(uPlot, y) {
+  const values = y.values ?? ((u, s) => s.map((v) => (v == null ? "" : uPlot.fmtNum(v))));
+  const all = (u, s) => s;
+  const keep = (filter) => (u, s, ...rest) => (drawsData(u) ? filter(u, s, ...rest) : s.map(() => null));
+  return { ...y,
+           values: (u, s, ...rest) => (drawsData(u) ? values(u, s, ...rest) : s.map(() => "")),
+           ticks: { ...y.ticks, filter: keep(y.ticks?.filter ?? all) },
+           grid: { ...y.grid, filter: keep(y.grid?.filter ?? all) } };
+}
+
 /**
  * Panes stacked in `host`, sharing one x.
  *
@@ -314,6 +356,9 @@ function axes(spec, gutter) {
  * - `hooks`, merged into uPlot's.
  *
  * `series` and `data` leave out the x, which the group supplies.
+ *
+ * A pane with labels that draws no value in view prints no y labels, tick
+ * marks or gridlines (`quietWhenEmpty`).
  *
  * The group answers the gestures every page shares:
  *
@@ -423,7 +468,7 @@ export function panes(uPlot, host, spec) {
       width: copy ? copy.width : host.clientWidth, height: copy ? copy.height : heights()[key], legend: { show: false },
       scales: { x: copy ? { time: false, range: () => [copy.scales.x.min, copy.scales.x.max] } : { time: false },
                 y: yScale(uPlot, p.y ?? "lin", copy ? () => view : () => pins[key] ?? null, p.range, p.auto) },
-      axes: axes(p, gutter),
+      axes: ((ax) => (p.range || p.yLabels === false ? ax : [ax[0], quietWhenEmpty(uPlot, ax[1])]))(axes(p, gutter)),
       // A band has no y labels for uPlot's automatic top padding to make room
       // for, and that padding took 17 px of a one-phase band's 22.
       ...(p.yLabels === false ? { padding: [0, null, null, null] } : {}),
@@ -993,6 +1038,9 @@ export function pattern(uPlot, host, curves, spec) {
   const drawTicks = (u) => tickRows(u, state.c.ticks, spec.colors(), (phase) => state.hidden.has(`ticks:${phase}`));
 
   function drawZero(u) {
+    // a pane that draws nothing has uPlot's 0 to 100 for a range, and a zero
+    // line there sits on its foot for no reason the data gives (WP-2245)
+    if (!drawsData(u)) return;
     if (state.residual !== "cumulative") zeroLine(u, spec.colors().zero);
   }
 
@@ -1357,9 +1405,13 @@ export function trajectory(uPlot, host, traj, spec) {
   const none = () => ({ stroke: null, fill: null, clip: null, band: null, gaps: null, flags: 0 });
   const group = panes(uPlot, host, {
     x: xs,
+    // the backward chain rides as a second series, painting nothing too, so
+    // an axis asking whether the pane draws a value in view (`drawsData`) sees
+    // a stretch only the backward pass recovered
     panes: [{ key: "traj", share: 1, xLabels: true, xLabel: spec.xLabel ?? "", label: spec.yLabel ?? "",
-              auto: extent, series: [{ paths: none, points: { show: false } }],
-              data: [Array.from(order, (i) => value(i))], hooks: { draw: [draw] } }],
+              auto: extent, series: [{ paths: none, points: { show: false } }, { paths: none, points: { show: false } }],
+              data: [Array.from(order, (i) => value(i)), Array.from(order, (i) => back(i))],
+              hooks: { draw: [draw] } }],
   });
 
   group.onPoint = null;

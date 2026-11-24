@@ -215,8 +215,8 @@ def strain_width_deg(monomials: np.ndarray, s: np.ndarray, d: np.ndarray) -> np.
     than cached; ``monomials`` is the frozen compile-time matrix.
 
     σ² < 0 is outside the physical cone.  The default LM driver holds the
-    cone, and ``STEPHENS_STRAIN_NOT_POSITIVE`` reports a fit that left it,
-    under ``solver="trf"`` or in a joint fit.  A negative σ² would make the √
+    cone, in a joint fit too, and ``STEPHENS_STRAIN_NOT_POSITIVE`` reports a
+    fit that left it under ``solver="trf"``.  A negative σ² would make the √
     complex, so it is masked to zero width —
     with the *double* ``where`` that keeps an autodiff backend away from the
     ``sqrt`` at the origin, whose derivative is infinite.  The mask is on a
