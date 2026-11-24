@@ -49,6 +49,25 @@ Recorded in `../2211-the-history-table.md` § Rulings. The compared curve's dark
 switch's place and the stage's own step names are kept. The Graph view was tightened (above).
 The manual stays as it is until the swap.
 
+## Placement options for rows 155 and 158 (2026-11-23)
+
+The briefs are `../2211-the-history-table.md` § Questions 6 and 7. The same tree as above, with
+a note added to `sample_lor` (n0004). Each picture shows one option after real clicks, at
+1440 × 900 unless the name says 1000. The options were drawn by a patch to the page that was
+never committed, built in a scratch copy of the tree. The dashed box was drawn afterwards to mark
+the region that changes.
+
+- `q155-a-disclosure-*.png`: the chevron on `sample_lor` clicked. Its details open under the
+  row, 114 px tall, and three rows leave the tab.
+- `q155-b-pane-*.png`: `sample_lor` clicked. A 440 px pane at the tab's right shows its details.
+  `q155-b-pane-1000-*.png` is the same at 1000 wide.
+- `q155-c-popover-*.png`: `sample_lor` clicked. A floating box beside the row shows its details.
+- `q158-a-pane-*.png`: Compare values… on `sample_lor`'s menu. A 640 px pane at the tab's right
+  shows the 20 values that differ from the current node. `q158-a-pane-1000-*.png` is the same at
+  1000 wide, where the list scrolls sideways.
+- `q158-b-replace-*.png`: the same diff in place of the list, with ← All nodes to return.
+- `q158-c-dialog-*.png`: the same diff in a 720 × 460 px window over the page.
+
 ## Where each of today's features lives
 
 Rows are WP-2214's inventory rows 152-160 (the bottom panel's History).
@@ -58,9 +77,9 @@ Rows are WP-2214's inventory rows 152-160 (the bottom panel's History).
 | 152 | The history graph with lanes | the Graph view, the default; the Table view on request; the node count on the tab | `history-graph`, `history-table` |
 | 153 | Select a node; its API call | the call in the row's tooltip | not pictured (a tooltip) |
 | 154 | ⇄ compare | Compare on the row overlays its fit on the pattern | `history-compare` |
-| 155 | The selected node's details | not built in this PR | — |
+| 155 | The selected node's details | not built yet; three placements drawn (question 6) | `q155-*` |
 | 156 | Checkout, Tag, Branch, Label | the row's context menu in plain words; Restore loads a node as pending edits | `history-menu`, `history-restore` |
 | 157 | The checkout warning | removed; Restore is undone by Revert | `history-restore` |
-| 158 | The diff panel | not built in this PR (Compare values… on the menu, per row 154) | — |
+| 158 | The diff panel | not built yet (Compare values… on the menu, per row 154); three placements drawn (question 7) | `q158-*` |
 | 159 | "No history yet" | unreachable: a project always has its root node | — |
 | 160 | `h` opens History | dropped (rows 238-240) | — |

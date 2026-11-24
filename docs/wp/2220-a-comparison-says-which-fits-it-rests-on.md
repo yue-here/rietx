@@ -1,9 +1,8 @@
 # WP-2220 — A nested comparison says which fits it rests on, and which freed columns carried information
 
-Milestone: unscheduled · Status: 🔄 2026-11-20 — both rulings made and built; PR #1717 waits on CI
+Milestone: unscheduled · Status: ✅ 2026-11-23 — PR #1717 merged on 2026-11-21 with both of Yue's rulings built; a comparison says which fits it rests on
 Track: What fires, and what stays silent
 Depends on: — (2076 soft: its extinction-screen nesting finding fences that caller out; 2053 soft: the same stationary-point t)
-Priority: P2 2026-11-19 — a ΔBIC of the wrong sign is quoted beside a fit that stopped on its budget, and nothing on the comparison says so; a path few fits run
 
 ## Goal
 
@@ -76,15 +75,6 @@ The first two are this WP's. The extinction screen is fenced below.
 go to the maintainer before merge (the maintainer's standing rule). Their names sit on `rietx.report`'s
 public surface.
 
-### Inherited
-
-- **2026-11-21, from WP-2219 (PR #1718, merged): a second source of a missing esd.** Context
-  above lists WP-2219 as not started; it has shipped. A free column on a direction the data do
-  not determine now gets an esd of `inf` in `least_squares._guarded_covariance`, and
-  `unmeasured_rows` reads an infinite esd as absent. So a freed column can lack an esd for two
-  reasons: it carries no gradient, or it lies on a discarded direction
-  (`COVARIANCE_DIRECTION_DISCARDED` names it). A `t_reason` quotes whichever applies.
-
 ## Non-goals
 
 - **The extinction screen.** WP-2076 measured that its class fit sits below the absence-free
@@ -134,6 +124,40 @@ at its bound. Every existing `compare_freed` number is unchanged.
 - Issues #1685, #1686; related #270 (WP-1417), #222, #538, #831, #1008, #1010 (WP-2053).
 
 ## Handover log
+
+- **2026-11-23 (close, and a repair)** — closed by a ghostshift runner (batch
+  close-2026-11-23, PR #1815), on a `main` that includes #1717.
+
+  A reader of a ΔBIC comparison can now tell when it rests on a fit that stopped short, and
+  which freed parameters carried no information. Both of Yue's 2026-11-20 rulings are built:
+  the new fields and the `COMPARISON_UNCONVERGED` warning belong, and the ordering margin is
+  2 cost units. Every task is ticked, and the work goes out with v1.13. This entry is also a
+  repair. The session-start scan flagged the WP because one commit landed after the WP file
+  was last touched, so the entry below reconstructs it.
+
+  - *Checked before closing*: all seven tasks ticked. `gh pr view 1717` shows it merged on
+    2026-11-21 at 00:37 UTC (merge commit a3c3acdc7). The one Inherited entry (WP-2219: a
+    freed column can lack an esd because it lies on a discarded direction) is consumed:
+    `report.layer2`'s `t_reason` names `COVARIANCE_DIRECTION_DISCARDED` in that case.
+  - *Changed by this close*: Status ✅, the `Priority:` line removed (P2, so no release is
+    owed), the consumed `### Inherited` section deleted, and the narrative moved to
+    `docs/milestones/v1.13.md`.
+  - *Siblings re-checked*: the 2026-11-20 entry left two unconverted. The magnetic search's
+    ΔBIC now reads both fits' status (`MagneticTrial.fit_status` and the reference's, since
+    #592), so that one is stale. `report.distortion.distortion_block_tests` still triggers
+    its restart at `FTOL` relative on the data χ². That is a distortion-mode decision, Mike's
+    since 2026-11-22, so it went to WP-1419's `### Inherited`.
+
+  Next: none.
+
+- **2026-11-21 (reconstructed post hoc)** — one commit after the 2026-11-20 entry, ced4338ef,
+  from the session that ran PR #1717 to merge. Its message says CI run 44839377449 failed two
+  tree-wide checks that the touched-area selection missed. `tests/silence.py` gained
+  `COMPARISON_UNCONVERGED`'s pair. Stub fits through `_chi2_ordered` and
+  `_comparison_unconverged` fire on a budget stop, a cost 2.001 over and a short restricted
+  fit. They stay silent below, level and 1.999 over. `tests/data/gui/help_keys.json` gained
+  the new help key. The diff is two test files, 42 lines added. The commit records no counts,
+  and the PR merged at 00:37 UTC the same night.
 
 - **2026-11-20** — both rulings made; the ordering margin is now 2 cost units (ghostshift
   runner). Main merged in at 8112e3b09 with no conflicts.

@@ -163,16 +163,19 @@ describe("the workflow menu", () => {
     flushSync();
     const items = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]')];
     expect(items.map((b) => b.textContent!.trim())).toEqual([
-      "Refinement", "Peaks and indexing · not built yet", "Series · not built yet",
+      "Refinement", "Peaks and indexing", "Series",
       "Structure solution · not built yet", "Rigid bodies · not built yet"]);
     expect(items[0].getAttribute("aria-checked")).toBe("true");
     items[3].click();
     flushSync();
     expect(document.querySelector('[role="menu"]')).toBeNull();
     expect(document.querySelector("button.mbtn.wf")!.textContent).toContain("Structure solution");
-    const steps = [...document.querySelectorAll<HTMLButtonElement>('nav.steps button')];
-    expect(steps.map((b) => b.textContent)).toEqual(
+    // the prototype's strip: each step's number in a ring, then its name
+    const steps = [...document.querySelectorAll<HTMLButtonElement>("nav.steps button.step")];
+    expect(steps.map((b) => b.querySelector("b")!.textContent)).toEqual(["1", "2", "3", "4"]);
+    expect(steps.map((b) => b.querySelector(".sname")!.textContent)).toEqual(
       ["Cell and space group", "Composition", "Solve", "Complete"]);
+    expect(document.querySelectorAll("nav.steps .ar").length).toBe(3);
     steps[2].click();
     flushSync();
     expect(document.querySelector(".box")!.textContent).toContain("charge flipping");
@@ -205,7 +208,7 @@ describe("the palette and the keys", () => {
     expect(labels).toEqual(expect.arrayContaining([
       "Hide the graphs", "Hide the model", "Show the console", "Stop the run",
       "New project…", "Settings…", "Theme: Match system", "Keyboard shortcuts",
-      "Workflow: Series · not built yet"]));
+      "Workflow: Series"]));
     const console_ = [...document.querySelectorAll(".panel li")]
       .find((li) => li.querySelector(".label")!.textContent === "Show the console")!;
     expect(console_.querySelector("kbd")!.textContent).toMatch(/J$/);
