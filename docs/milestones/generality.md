@@ -83,7 +83,12 @@ inherits `rcond`'s tier, the 2 is tiered on its own evidence).
    is either **demoted** or **kept on two grounds together**:
    - the mechanical ground: it holds across at least three unrelated dataset families,
      counted by laboratory, instrument and material rather than by file (a 1 213-record
-     archive from one source is one family), with a stated case where it fails. *Holds*
+     archive from one source is one family), with a stated case where it fails. Whether
+     two datasets are unrelated is judged for each row, by whether they differ in what
+     that row depends on (ruled 2026-11-21, WP-2017 questions 36 and 38). For a profile
+     row, three chemically different materials with similar peak profiles from one
+     beamline are one family. For a row about the specimen, they can be three. The row
+     names what its families differ in. *Holds*
      is measured against each family's reference (DESIGN.md § Rules, 2). For a number
      the reference is a certified or independently measured value, which validates, or a
      published refinement and the cross-code envelope under their protocol, which only
@@ -92,7 +97,10 @@ inherits `rcond`'s tier, the 2 is tiered on its own evidence).
      (an injected misfit, a weighed impurity), and the flag fires where the fault is and
      stays silent where it is not; and
    - the judgement ground, answered by the implementing agent and approved by the
-     maintainer in a batch: **shown this statistic, would every competent refiner take
+     maintainer in a batch on a code, action or default row. On a constant or a
+     suggestion the `generality-review` judge's agreement is the approval, the row says
+     so (`approved_by="checked"`), and a disagreement goes to the maintainer (ruled
+     2026-11-22, WP-2238: none of his reversals was a constant's value): **shown this statistic, would every competent refiner take
      this action?** This is DESIGN.md § Rules, 1's unanimity gate. An action is kept only
      where the answer is yes. Where two careful people could respond differently to the
      same number, the action moves to Rule 1's second or third kind. Where the
@@ -384,7 +392,8 @@ sharpens its own row here.
   2017 measures the single-fit thresholds' three families, 2018 the clash table).
   Every hold, carry, refit, fence and always-on correction that survives names its
   evidence (the families, or for tier 2 the citation or program), the record field that
-  says it fired, and the maintainer's dated approval; every other one is
+  says it fired, and the maintainer's dated approval (a tier-3 constant or suggestion
+  carries the judge's, § The rule); every other one is
   demoted to a ranking or a number by its kind, or made opt-in. No default path calls a
   pick verb (§ A pick on top of a ranking).
 - **A new heuristic cannot land unaudited** (2001, 2014). A diff that adds a diagnostic code, a
@@ -725,6 +734,87 @@ reverse it knowing what it would be giving up.
   reported parameters on `examples/srm660c_lab.py` in 930 characters (macOS arm64; the
   PR measured 21 and 970 on Linux). The sentence goes. The record stays in the matrix
   and its generated page.
+- **WP-2003's remaining calls, triaged 2026-11-21.** A rulings pass read what WP-2003
+  still had waiting (issue #1411, items 2 and 3) against the rules above, DESIGN.md
+  § Rules and the series record's rules. Five calls had a written rule, a ruling or
+  practice behind them, and the next five entries record them. Each is a settlement by
+  Claude. It is evidence, and it stands until the maintainer reverses it. None of the
+  five is built yet. The audit rows and the one code change are owed to the WP's holder.
+- **The series' warm rung fits in one stage, tier 2.** Settled by Claude under
+  established practice, 2026-11-21. The row is `SequentialRefinement.fit:refit`, value
+  `"single"`. GSAS-II and EasyDiffraction fit every pattern of a series with one vary
+  list (checked in source), and FullProf reuses one set of codes for every pattern
+  (inferred; `docs/practice.md` § Sequential refinement and § A stage that fixes a
+  parameter). No surveyed program stages each pattern of a series. A warm fit that fails
+  still climbs the ladder to the staged plan (series Rule 6, accepted 2026-11-16). The
+  call agrees with the maintainer's ruling of 2026-11-19 on WP-2224. There a re-fit is
+  staged when it frees a parameter the converged fit left fixed. A warm series rung frees
+  the set its neighbour's fit converged, so it frees nothing new. The alternative was
+  tier 3 with McCusker et al. (1999), BGMN and MAUD as the dissent. They stage a first
+  fit, and none of them speaks to a series.
+- **A pattern's attempts rank by the full least-squares cost, and `max_iter` ties
+  `converged`.** Settled by Claude under the objective's definition and DESIGN.md
+  § Rules, 5 (a number follows accuracy), 2026-11-21. This is the batch's C2 question 3,
+  left to Claude on 2026-11-02. Between two attempts that minimised one objective, the
+  lower cost S is the better fit by definition, which is tier 1. A `max_iter` attempt at
+  a lower S than a converged one is the nearer of the two to the least-squares answer, so
+  it is kept. The entry still says `max_iter`, and `RefinementResult.usable` reads
+  `False` on it, so a reader is told. The alternative was rietx's own `usable`
+  convention: a converged attempt beats an unconverged one at any cost. No case on disk
+  separates the two (CPD sample 1, 22 forced attempts, 2026-11-03). It reopens if a
+  `max_iter` attempt with the lower S is measured further from its family's reference
+  value than the converged attempt.
+- **Two attempts whose σ differ rank under one σ.** Settled by Claude under the root
+  `CLAUDE.md` invariant on weighted residuals and DESIGN.md § Rules, 4, 2026-11-21.
+  `sequential._better` falls back on Rwp where two attempts did not minimise one
+  objective. A measured background's scale widens σ at compile (WP-1309), so a warm rung
+  and a cold rung can carry different σ. Rwp under two σ compares two weightings, and the
+  invariant says such a column ranks nothing until one σ is chosen for all of it. So the
+  fallback compares the data rows' χ² under the pattern's own σ (`PatternData.sig()`,
+  before the widening). That σ is the same on every rung of a pattern. Where the two σ
+  agree, the order is today's Rwp order, so only the case of differing σ changes. The
+  alternative was to keep Rwp, since no case on disk reaches the fallback (σ never
+  differed over the 22 CPD attempts). A second alternative was the widened σ at one
+  chosen background scale. It needs a choice of scale, and the pattern's own σ does not.
+  The code change is owed.
+- **`SeriesResult.relative_paths` and `SeriesResult.angle_paths` become tier-1 action
+  rows.** Settled by Claude under arithmetic and the audit table's own rule, 2026-11-21.
+  Each field decides how a comparison across patterns reads a path. A relative path (a
+  coordinate DOF measured from where its fit began, or a rigid-body rotation) has no
+  position to compare, so it leaves `direction_gaps`. A moment angle is compared modulo
+  a turn. `_audit.OTHER_RECORD_FIELDS` holds fields that report no action, and an audit
+  that finds one reporting an action moves it into `ROWS`. The generality judge found
+  these two on 2026-11-03. The alternative was to leave them where they are.
+- **The joint fit's holds are covered by the single fit's rows (C10 question 1).** Settled
+  by Claude under the batch's assignment of 2026-11-02 and the consent list the
+  maintainer approved on 2026-11-03, 2026-11-21. Six joint holds each write the single
+  runner's record field from the single runner's statistic, so WP-2002's rows cover them
+  (`docs/wp/2003-batch/batch.md`, C10). The joint absent-phase hold and its release now
+  read `refine._answer_significance` under B1's 3σ (C10 question 2 (a), landed
+  2026-11-03), so B1's rows cover them as well. The batch had proposed a tier-3 hand row
+  for that hold, before the alignment landed. `MultiHistogramRefinement.fit:weights`
+  (`None`, read as 1.0 for every histogram) takes a hand row at tier 1: under unit weights the joint χ² is the sum of the
+  histograms' own. `SharingMap.is_shared`'s default is not settled here. Its tier needs a
+  survey of what each program shares across histograms by default, and
+  `docs/practice.md` has none.
+- **Three items from the same pass, answered 2026-11-22.** They waited on the maintainer
+  from 2026-11-21.
+
+  Answered 2026-11-22 under the maintainer's routing rules of that day (WP-2238): each item was
+  settled by Claude and checked by a fresh agent that did not see the pick, or brought to the
+  maintainer, who answered "All as recommended".
+
+  (1) `SeriesEntry.rungs_tried` and `SeriesEntry.rungs_raised` at tier 3, their approval
+  dated to the maintainer's acceptance of series Rule 6 on 2026-11-16 ("each act is
+  recorded"). **Ruled by Yue 2026-11-22:** tier 3 approved, dated 2026-11-22 (his own date, not one read from his
+  Rule 6 acceptance). (2) Whether the maintainer's merge of PR #1310 on 2026-11-04 closes
+  the review of its series-panel sentences and of the joint fit's ten moved test records.
+  **Settled by Claude 2026-11-22, checked blind:** closed: the merge of PR #1310 closes its review, and its printed sentences join the
+  once-per-release read of printed output (`docs/RELEASING.md` step 2). (3) The agent run
+  that § The rule asks of a contested demotion, a spend. **Ruled by Yue 2026-11-22:** deferred. The contested
+  demotions (`HIGH_CORRELATION` and this one) wait for one agent run on
+  `tests/eval_report_agent` after WP-2008 rewrites skill rule 7, so one spend measures both.
+  It flips if the warning is found causing harm in fits today.
 
 ## The two reviews at the open
 

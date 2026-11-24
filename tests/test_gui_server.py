@@ -2276,6 +2276,29 @@ def test_plan_resolve_names_what_a_stage_fixes(blank, tmp_path, pattern_file):
                 == stage["n_matched"]), stage["name"]
 
 
+def test_plan_resolve_names_what_no_stage_frees(blank, tmp_path, pattern_file):
+    """``never_freed`` (WP-2231, the Plan tab's last row) is every refinable row
+    outside every stage's frees, and nothing a stage frees or a row that cannot
+    be freed."""
+    session, client = blank
+    _open(session, tmp_path / "never.rex", pattern_file)
+    plan = {"stages": [{"name": "one", "turn_on": ["phases.*.scale"]},
+                       {"name": "two", "turn_on": ["phases.*.cell.*"]}],
+            "closing_window_tol": CLOSING_WINDOW_TOL}
+    status, payload = client.put("/api/plan", {"plan": plan})
+    assert status == 200, payload
+    ladder = _ladder(client)
+    status, params = client.get("/api/params")
+    assert status == 200
+    refinable = {row["path"] for row in params["parameters"] if row["refinable"]}
+    freed = {path for stage in ladder["stages"] for path in stage["frees"]}
+    assert freed == {"phases.0.scale", "phases.0.cell.a"}
+    assert set(ladder["never_freed"]) == refinable - freed
+    assert "instrument.zero_shift" in ladder["never_freed"]
+    # the cubic cell's tied lengths are held, never offered as unfreed
+    assert "phases.0.cell.b" not in ladder["never_freed"]
+
+
 def test_plan_resolve_matches_exactly_the_way_fnmatch_does(blank, tmp_path,
                                                            pattern_file):
     """The route's matcher is the corpus's, over the corpus's own globs.
@@ -2499,7 +2522,9 @@ def test_running_the_same_plan_twice_shows_the_second_run(blank, tmp_path,
     project = _open(session, tmp_path / "twice.rex", pattern_file)
     rwps = []
     for _ in range(2):
-        assert client.post("/api/run", {"kind": "fit"})[0] == 200
+        # in stages, as today's page asks: the default re-fits a converged
+        # model in one stage, whose ladder WP-2227's test below reads
+        assert client.post("/api/run", {"kind": "fit", "refit": "stages"})[0] == 200
         _wait_idle(client)
         rwps.append([s["rwp"] for s in _ladder(client)["stages"]])
     first, second = rwps
@@ -2809,6 +2834,85 @@ def test_a_real_run_streams_its_events_to_disk_and_to_followers(fitted):
     assert [e["seq"] for e in later] == [s for s in seqs if s > half]
 
 
+def test_a_cursor_held_across_an_open_reads_the_new_projects_events(
+        blank, tmp_path, pattern_file):
+    """WP-2237: a page follows once, at mount, and keeps its cursor across an open.
+
+    Opening another project used to reset ``seq`` to 0, so the new project's
+    events up to the old count fell below the page's cursor: the poll returned
+    nothing for them and the SSE loop, which holds its own ``since``, did not
+    wake. ``oldest`` sat below the cursor, so no gap was counted either.
+    """
+    session, client = blank
+    stage = {"kind": "stage", "stage": {"name": "s", "turn_on": ["phases.*.scale"]}}
+    _open(session, tmp_path / "a.rex", pattern_file)
+    assert client.post("/api/run", stage)[0] == 200
+    _wait_idle(client)
+    cursor = client.get("/api/events?poll=1&since=0")[1]["next"]
+    assert cursor > 0
+
+    _open(session, tmp_path / "b.rex", pattern_file)
+    empty = client.get(f"/api/events?poll=1&since={cursor}")[1]
+    # the old project's events are gone, and nothing reads as a gap
+    assert empty["events"] == [] and empty["next"] == cursor
+    assert empty["oldest"] == cursor + 1
+
+    assert client.post("/api/run", stage)[0] == 200
+    _wait_idle(client)
+    batch = client.get(f"/api/events?poll=1&since={cursor}")[1]
+    seqs = [e["seq"] for e in batch["events"]]
+    kinds = [e["kind"] for e in batch["events"]]
+    assert seqs and seqs[0] == cursor + 1 and seqs == sorted(seqs)
+    assert batch["oldest"] == cursor + 1, "a fresh project's run is no gap"
+    assert kinds[0] == "stage_start" and kinds[-1] == "stage_end"
+    # the SSE route's loop reads the same cursor through ``follow``
+    events, nxt, _, _ = session.follow(cursor, "", timeout=0)
+    assert [e["seq"] for e in events] == seqs and nxt == seqs[-1]
+
+
+def _first_sse_event(port: int, path: str, headers: dict) -> dict:
+    conn = HTTPConnection("127.0.0.1", port, timeout=10)
+    conn.request("GET", path, headers={"Host": f"127.0.0.1:{port}", **headers})
+    response = conn.getresponse()
+    name = ""
+    try:
+        assert response.status == 200, response.read()[:300]
+        while True:
+            line = response.fp.readline().decode()
+            if not line:
+                raise AssertionError("the stream closed before an event frame")
+            if line.startswith("event: "):
+                name = line[7:].strip()
+            elif line.startswith("data: ") and name == "event":
+                return json.loads(line[6:])
+    finally:
+        conn.close()
+
+
+def test_a_reconnecting_stream_resumes_at_its_last_event_id(blank, tmp_path,
+                                                           pattern_file):
+    """WP-2237: EventSource re-opens its first URL and names the last id it read.
+
+    The URL's ``since`` is the cursor the page held when the stream opened, so
+    a server reading the URL alone replayed the whole ring after a dropped
+    connection, and the Console listed the run twice.
+    """
+    session, client = blank
+    _open(session, tmp_path / "a.rex", pattern_file)
+    assert client.post("/api/run", {"kind": "stage", "stage": {
+        "name": "s", "turn_on": ["phases.*.scale"]}})[0] == 200
+    _wait_idle(client)
+    n = client.get("/api/events?poll=1&since=0")[1]["next"]
+    assert n >= 2
+    port = client.port
+    got = _first_sse_event(port, "/api/events?since=0", {"Last-Event-ID": str(n - 1)})
+    assert got["seq"] == n
+    # an id this process never numbered is another server's, so the URL stands
+    got = _first_sse_event(port, "/api/events?since=0", {"Last-Event-ID": str(n + 50)})
+    assert got["seq"] == 1
+    assert _first_sse_event(port, "/api/events?since=0", {})["seq"] == 1
+
+
 def test_the_watcher_finds_a_gui_project_run_and_tails_it(fitted):
     """WP-1401's reader, now reading WP-1403's writer.
 
@@ -3066,6 +3170,52 @@ def test_a_series_member_has_curves_of_its_own(series):
     assert status == 404 and payload["error"]["where"] == ["index"]
 
 
+def test_a_failed_pattern_does_not_shift_the_members_after_it(series, monkeypatch):
+    """``results_``/``trees_`` skip a failed pattern and the staged members do
+    not, so the routes find a member through its entry's ``SeriesEntry.index``
+    (#1396). Simulated by dropping member 1's entry, result and tree, which is
+    what a failure leaves: position 1 is then member 2."""
+    from types import SimpleNamespace
+
+    session, client, _ = series
+    entry = session._series_run
+    runner, result = entry["runner"], entry["result"]
+    keep = [0, 2]
+    monkeypatch.setattr(session, "_series_run", {
+        **entry,
+        "runner": SimpleNamespace(results_=[runner.results_[i] for i in keep],
+                                  trees_=[runner.trees_[i] for i in keep]),
+        "result": result.model_copy(update={
+            "entries": [result.entries[i] for i in keep]}),
+    })
+    got = _packed(client, "/api/series/curves?index=1")
+    member = entry["members"][2]
+    assert (got.header["index"], got.header["label"]) == (2, member["label"])
+    np.testing.assert_array_equal(got.arrays["two_theta"], entry["data"][2].tt())
+    status, tree = client.get("/api/series/history?index=1")
+    assert status == 200 and (tree["index"], tree["label"]) == (2, member["label"])
+
+
+def test_the_series_answer_carries_the_trace_it_is_scrubbed_along(series):
+    """WP-1317: the trace rides the answer, built by ``series.trace`` from the
+    run's own result and its staged members' coordinates, so the panel draws
+    nothing a second authority computed."""
+    import json
+
+    from rietx.gui.series import TRACE_VOCABULARY, trace
+
+    session, client, _ = series
+    status, payload = client.get("/api/series/result")
+    assert status == 200
+    entry = session._series_run
+    want = trace(entry["result"], [m["x"] for m in entry["members"]])
+    assert payload["trace"] == json.loads(json.dumps(want))
+    got = payload["trace"]
+    assert [p["label"] for p in got["points"]] == [m["label"] for m in entry["members"]]
+    assert [p["x"] for p in got["points"]] == [m["x"] for m in entry["members"]]
+    assert [r["key"] for r in got["vocabulary"]] == [r["key"] for r in TRACE_VOCABULARY]
+
+
 def test_the_result_says_when_a_fit_is_past_the_point_of_being_a_fit(fitted):
     """WP-1029 item (c): one honest signal, in the report's own vocabulary."""
     from rietx.report.schemas import MATURITY_MAX_RWP
@@ -3209,6 +3359,18 @@ def test_report_and_history_read_the_fitted_session(fitted):
     assert diff and all(len(pair) == 2 for pair in diff.values())
     assert client.get("/api/history/diff?a=n0000")[0] == 400
     assert client.get("/api/history/diff?a=n0000&b=nope")[0] == 404
+
+    # WP-2211: a node's own curve, for Compare, writing nothing. At the head
+    # it is the fit's curve on the fit's channels
+    n_before = len(project.history)
+    got = _packed(client, f"/api/history/curves?node={payload['head']}")
+    res = project.refinement.result_
+    assert got.header["node"] == payload["head"]
+    np.testing.assert_array_equal(got.arrays["two_theta"], res.two_theta)
+    np.testing.assert_allclose(got.arrays["y_calc"], res.y_calc, rtol=1e-6)
+    assert len(project.history) == n_before
+    assert client.get("/api/history/curves")[0] == 400
+    assert client.get("/api/history/curves?node=nope")[0] == 404
 
 
 def test_two_text_writers_race_and_the_second_is_refused_whole(
@@ -5082,3 +5244,85 @@ def test_a_refused_text_apply_runs_none_of_its_verbs(blank, tmp_path,
     with pytest.raises(ValueError, match="unhold it first"):
         td.apply(project, delta)
     assert _untouched(project) == before
+
+
+# ----------------------------------------------------------------------
+# how a Refine ran (WP-2227)
+# ----------------------------------------------------------------------
+def _refine(client, **body) -> dict:
+    status, run = client.post("/api/run", {"kind": "fit", **body})
+    assert status == 200, run
+    state = _wait_idle(client)
+    assert state["run"]["status"] == "converged", state
+    return state["run"]
+
+
+def test_a_refine_says_how_it_ran_on_the_run_and_result_routes(
+        blank, tmp_path, pattern_file, monkeypatch):
+    """The three ways a second Refine runs, each served from the one record.
+
+    The run route takes the library's default, so a Refine on a converged
+    model runs one stage; a plan freeing what the last fit held runs in
+    stages and names it; a rejected one stage runs the plan from the same
+    start. The run frame, the result route and the plan ladder say the same.
+    """
+    import importlib
+
+    # the module, which `rietx.refine` (the function) shadows as an attribute
+    refine_mod = importlib.import_module("rietx.refine")
+    session, client = blank
+    project = _open(session, tmp_path / "how.rex", pattern_file)
+
+    first = _refine(client)
+    assert first["how"]["ran"] == "stages" and first["how"]["reason"] is None
+    assert first["how"]["plan_line"] == project.refinement._plan_line()
+
+    # one stage: the model the last fit converged
+    run = _refine(client)
+    assert run["completed_stages"] == ["warm_refit"]
+    assert (run["how"]["ran"], run["how"]["reason"]) == ("one_stage", "converged")
+    assert run["how"]["plan_line"].startswith("plan: one stage (warm_refit)")
+    assert client.get("/api/result")[1]["result"]["how"] == run["how"]
+    ladder = _ladder(client)
+    assert ladder["one_stage"]["rwp"] == pytest.approx(run["rwp"])
+    assert ladder["one_stage"]["n_free"] == ladder["stages"][-1]["n_free"]
+    assert all(stage["rwp"] is None for stage in ladder["stages"])
+    assert ladder["stages"][0]["n_free"] > 0     # the rows keep their counts
+
+    # asked for the stages, the page with no view of one stage gets them
+    run = _refine(client, refit="stages")
+    assert len(run["completed_stages"]) > 1 and run["how"]["reason"] is None
+    assert _ladder(client)["one_stage"] is None
+    assert client.post("/api/run", {"kind": "fit", "refit": "staged"})[0] == 400
+
+    # in stages: the plan frees what the last fit held
+    plan = client.get("/api/plan")[1]["plan"]
+    plan["stages"].append({"name": "biso", "turn_on": ["phases.*.atoms.*.biso"]})
+    assert client.put("/api/plan", {"plan": plan})[0] == 200
+    run = _refine(client)
+    assert run["how"]["reason"] == "released"
+    assert run["how"]["families"] == ["phases.*.atoms.*.biso"]
+    assert run["how"]["released"] == sorted(run["how"]["released"])
+    assert "which the last fit held" in run["how"]["plan_line"]
+
+    # in stages: the one stage was rejected, so the plan ran from its start
+    real = refine_mod._rejected
+    calls: list = []
+
+    def rejected_once(result):
+        calls.append(result)
+        return len(calls) == 1 or real(result)
+
+    monkeypatch.setattr(refine_mod, "_rejected", rejected_once)
+    run = _refine(client)
+    assert (run["how"]["ran"], run["how"]["reason"]) == ("stages", "fallback")
+    assert run["how"]["diverged"] is False
+    assert len(run["completed_stages"]) == len(plan["stages"])
+    assert client.get("/api/result")[1]["result"]["how"] == run["how"]
+
+    # a stage run replaces the result, and the fit's words go with it
+    status, _ = client.post("/api/run", {"kind": "stage", "stage": {
+        "name": "scale", "turn_on": ["phases.*.scale"], "max_iter": 3}})
+    assert status == 200
+    assert _wait_idle(client)["run"]["how"] is None
+    assert client.get("/api/result")[1]["result"]["how"] is None

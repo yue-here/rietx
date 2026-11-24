@@ -176,6 +176,14 @@ opt-in switch, so it is tiered in the batch before it lands (the judge's item 5,
 
 ### Inherited
 
+- **2026-11-03, from WP-1955 (PR #1372).** X17's floored-aperture collapse is
+  fixed by a lift: a stage that newly frees an FCJ axial ratio sitting on zero
+  starts it at 0.02 (`forward.apertures_to_lift`), warm collapsed refits
+  included. Re-measured on X17's probe (independent 1b under `qpa_plan()`, then
+  a warm 1c): closing stage off, Rwp 10.73 → 0.10881 in 43 evaluations
+  (independent 1c 0.10901); on, 0.10495 (independent 0.10518). 1b itself still
+  walks back to its floor. X17's row can say fixed; C2 question 5 and the fence
+  are untouched, since they catch other collapses.
 - **2026-11-19, from WP-2222: does a carried Le Bail chain drift without the closing
   stage?** WP-2222 turned the closing stage off by default. A Pawley series that carries
   per-hkl intensities then drifted: Rwp 0.0339, 0.0345, 0.0347, 0.0372 down the four-pattern
@@ -1297,3 +1305,5 @@ Author's answers: items 4 and 5's wording corrections are applied (`db61420`); i
 - **2026-10-18** — created, from the milestone's opening session. 1317 (the series
   scrubber) and 1325 (parametric series) are open and adjacent; neither owns the fences,
   and this WP changes no view.
+
+*Pointer, 2026-11-21:* a rulings pass settled the ranking criterion, `fit:refit`, `relative_paths`/`angle_paths` and C10 q1, and listed what still awaits the maintainer, in `../milestones/generality.md` § Decisions (its last seven entries).
