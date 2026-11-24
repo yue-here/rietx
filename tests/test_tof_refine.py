@@ -357,23 +357,23 @@ def test_a_result_carrying_both_abscissae_is_refused():
 
 
 def test_a_histogram_slice_carries_its_own_axis():
-    """``for_histogram`` must swap *both* fields, or a joint fit over banks of
-    different kinds hands histogram h the previous one's axis."""
+    """A histogram is angular until the joint bank fit (T-5) writes a flight
+    time (#1548 review, item 15: a field nothing writes is dropped), so
+    ``for_histogram`` hands back a 2θ view and never a stale ``tof``; an
+    empty histogram reads as no curve, as a single fit's result does."""
     from rietx.schemas.results import HistogramResult, Statistics
 
     st = Statistics(rwp=0.1, rp=0.08, rexp=0.09, gof=1.1, chi2=1.2,
                     n_points=100, n_free_parameters=3)
+    assert "tof" not in HistogramResult.model_fields
     joint = _bare_result(two_theta=[1.0, 2.0])
     joint.histograms = [
         HistogramResult(label="cw", statistics=st, two_theta=[1.0, 2.0]),
-        HistogramResult(label="bank", statistics=st, tof=[1000.0, 1010.0]),
+        HistogramResult(label="empty", statistics=st),
     ]
-    cw, tof = joint.for_histogram(0), joint.for_histogram(1)
+    cw, empty = joint.for_histogram(0), joint.for_histogram(1)
     assert (cw.axis, cw.two_theta, cw.tof) == ("two_theta", [1.0, 2.0], None)
-    assert (tof.axis, tof.two_theta, tof.tof) == ("tof", None,
-                                                  [1000.0, 1010.0])
-    assert joint.histograms[1].axis == "tof"
-    assert joint.histograms[1].axis_unit == "microseconds (µs)"
+    assert (empty.axis, empty.two_theta, empty.tof) == (None, None, None)
 
 
 def test_the_schema_version_moved_with_the_field():

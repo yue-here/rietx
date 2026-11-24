@@ -1654,16 +1654,14 @@ class HistogramResult(Base):
     label: str = ""
     weight: float = 1.0
     statistics: Statistics
-    #: This histogram's abscissa — the axis rules are :class:`PatternData`'s.  Exactly one of
-    #: the two is set on a histogram that carries a curve at all.
-    two_theta: list[float] | None = None
-    tof: list[float] | None = None
+    #: Degrees 2θ: a joint fit refuses a bank, so every histogram is angular.
+    #: The flight-time abscissa arrives with the joint bank fit (T-5), the
+    #: first writer it would have (#1548 review, item 15).
+    two_theta: list[float] = Field(default_factory=list)
     y_obs: list[float] = Field(default_factory=list)
     y_calc: list[float] = Field(default_factory=list)
     y_background: list[float] = Field(default_factory=list)
     sigma: list[float] = Field(default_factory=list)
-    #: Reflection tick positions per phase, **on this histogram's own axis** —
-    #: deg 2θ where :attr:`two_theta` is set, µs where :attr:`tof` is.
     ticks: dict[str, list[float]] = Field(default_factory=dict)
     #: Which reflection each of those ticks is, index for index, as the orbit
     #: representative ``h k l`` (WP-1438).  A **companion**, not a change of
@@ -1696,25 +1694,6 @@ class HistogramResult(Base):
     #: result written before the field existed.
     sigma_rule: SigmaRule | None = None
     diagnostics: list[Diagnostic] = Field(default_factory=list)
-
-    @model_validator(mode="after")
-    def _at_most_one_abscissa(self) -> "HistogramResult":
-        return _refuse_two_abscissae(self)
-
-    @property
-    def axis(self) -> AxisKind | None:
-        """``"two_theta"``, ``"tof"``, or ``None`` — see :func:`_axis_of`."""
-        return _axis_of(self)
-
-    @property
-    def axis_unit(self) -> str | None:
-        """The unit :attr:`axis` is measured in, for a label or a message."""
-        a = _axis_of(self)
-        return None if a is None else AXIS_UNITS[a]
-
-    def x(self) -> np.ndarray:
-        """This histogram's abscissa, whichever it is — see :func:`_x_of`."""
-        return _x_of(self)
 
 
 # ----------------------------------------------------------------------
@@ -2693,17 +2672,12 @@ class RefinementResult(Base):
         # the joint solve's convergence figure belongs to the stages the view
         # keeps, so it travels with them (WP-1341)
         view.statistics.max_shift_over_esd = self.statistics.max_shift_over_esd
-        # The slice's own abscissa — both fields, so a joint fit over banks of
-        # different kinds cannot hand histogram h the previous one's axis.
-        # Cleared before either is written, because this model validates on
-        # assignment and refuses both at once: writing the new axis over a view
-        # still holding the old one would raise on exactly the mixed case.
-        view.two_theta = None
+        # The slice's own abscissa.  A histogram is angular until the joint
+        # bank fit (T-5) writes a flight time; ``tof`` is cleared so a view of
+        # a joint result never keeps one, and an empty histogram reads as no
+        # curve, as a single fit's result does.
         view.tof = None
-        if hr.two_theta is not None:
-            view.two_theta = list(hr.two_theta)
-        if hr.tof is not None:
-            view.tof = list(hr.tof)
+        view.two_theta = list(hr.two_theta) or None
         view.y_obs = list(hr.y_obs)
         view.y_calc = list(hr.y_calc)
         view.y_background = list(hr.y_background)

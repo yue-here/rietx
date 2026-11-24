@@ -38,8 +38,8 @@ A tick list is a set of positions on the curve beside it, never a second quantit
 `RefinementResult.x` is what axis-blind code wants: plotting, windowing, counting channels.
 Code that does arithmetic on the abscissa branches on `axis` first, so that a path which can only do trigonometry refuses a flight time instead of returning a plausible wrong answer.
 
-`HistogramResult` carries the same members per histogram ([Joint result](joint.md#joint-result)): `HistogramResult.tof`, `HistogramResult.axis`, `HistogramResult.axis_unit` and `HistogramResult.x`.
-A joint fit refuses a bank today, so a joint result's histograms are all on 2θ.
+A joint fit refuses a bank today, so a joint result's histograms are all on 2θ, and `HistogramResult` has only `two_theta` ([Joint result](joint.md#joint-result)).
+The flight-time members arrive on it with the joint bank fit, the first code that would write them.
 
 ## Fit statistics
 

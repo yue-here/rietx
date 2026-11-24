@@ -804,9 +804,11 @@ Also in 0.62 (issue #193, the time-of-flight profile, spectrum and
 corrections), the first change after 1.12.0 shipped 0.61: a bank is **refined**, the forward half of the 0.52 → 0.53
 entry, and five observable changes land together because they are one
 feature.
-(a) the **result's** abscissa: ``RefinementResult.tof`` and
-``HistogramResult.tof`` added (µs), and ``two_theta`` on both becomes
-optional, defaulting to ``None`` rather than to ``[]``.  A consumer reading
+(a) the **result's** abscissa: ``RefinementResult.tof`` added (µs), and
+``RefinementResult.two_theta`` becomes optional, defaulting to ``None``
+rather than to ``[]``.  ``HistogramResult`` is unchanged: a joint fit
+refuses a bank, so nothing would write a histogram's flight time, and the
+field arrives with the joint bank fit (T-5) that writes it.  A consumer reading
 ``result.two_theta`` unconditionally now has a ``None`` case — and not only
 on a bank: a result built without curves used to report an empty list,
 which reads as "measured nothing on an angular axis", and now reports
