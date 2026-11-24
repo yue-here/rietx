@@ -253,6 +253,15 @@ class GuiSession:
         #: serializable ``SeriesResult``.  One object, so "is there an answer"
         #: cannot be two answers.
         self._series_run: dict | None = None
+        #: the series run in flight: its members, their data and each
+        #: reported-chain fit as it lands (``on_result``), so a member's fit is
+        #: served before the run ends. ``None`` between runs (WP-2243).
+        self._series_live: dict | None = None
+        #: each staged member's pattern as the Map last read it, keyed by its
+        #: upload and reader options: a staged file never changes, and reading
+        #: one costs ~27 ms (an .xye of 4200 points), so a coordinate edit on a
+        #: 34-pattern list would otherwise cost the Map a second (WP-2243)
+        self._series_reads: dict[tuple, Any] = {}
         if project is not None:
             self._remember(project)
 
@@ -735,6 +744,8 @@ class GuiSession:
             self._peak_ed = None
             self._series = series_mod.SeriesSetup()
             self._series_run = None
+            self._series_live = None
+            self._series_reads = {}
             self._cond.notify_all()
         self._write_recent([
             {**_recent_entry(e), "closed": True} if str(e.get("path", "")) == path
@@ -2174,19 +2185,39 @@ class GuiSession:
                 # can interpret on the next open (see gui/series.py)
                 history=True)
             members = [m.as_dict() for m in setup.members]
+            live = {"members": members, "data": data, "limits": limits,
+                    "results": {}}
+
+            def landed(k, res):
+                # the reported chain's fit of series pattern k, as it lands
+                with self._cond:
+                    live["results"][k] = res
 
             def call(stream, token):
-                result = runner.fit(
-                    data, x=setup.x, x_label=setup.axis_label,
-                    labels=setup.labels, mode=p.doc.mode, plan=plan,
-                    refit=setup.refit, direction=setup.direction,
-                    two_theta_limits=limits, events=stream, cancel=token,
-                    # named, because a SequentialRefinement has no project to
-                    # derive one from: its trees are in memory and belong to
-                    # patterns this project does not own, so the fallback would
-                    # put a GUI series' run under the working directory
-                    telemetry=p.live_dir)
+                # ``self._series_live`` was set under the lock that published
+                # the running state, so no request sees a run in flight
+                # without its members
+                try:
+                    result = runner.fit(
+                        data, x=setup.x, x_label=setup.axis_label,
+                        labels=setup.labels, mode=p.doc.mode, plan=plan,
+                        refit=setup.refit, direction=setup.direction,
+                        two_theta_limits=limits, events=stream, cancel=token,
+                        on_result=landed,
+                        # named, because a SequentialRefinement has no project
+                        # to derive one from: its trees are in memory and
+                        # belong to patterns this project does not own, so the
+                        # fallback would put a GUI series' run under the
+                        # working directory
+                        telemetry=p.live_dir)
+                except BaseException:
+                    with self._cond:
+                        self._series_live = None
+                    raise
                 with self._cond:
+                    # one block, so a member is served from the live fits or
+                    # from the record and never from neither
+                    self._series_live = None
                     self._series_run = {"runner": runner, "result": result,
                                         "backward": runner.backward_,
                                         "members": members, "data": data,
@@ -2269,6 +2300,10 @@ class GuiSession:
                          "elapsed": None, "rwp": None, "gof": None,
                          "node_id": None, "completed_stages": [], "error": None,
                          "lebail": None, "how": None}
+            # in the block that publishes the running state, so a member asked
+            # for the moment a series run is seen is the run's, never the last
+            # record's (WP-2243); ``None`` for every other kind, as between runs
+            self._series_live = live if kind == "series" else None
             self._worker = threading.Thread(
                 target=self._work, args=(call, stream, summarize),
                 name=f"{_about.SERVER_TOKEN}-gui-run", daemon=True)
@@ -3235,6 +3270,116 @@ class GuiSession:
             weighted=bool(member["has_sigma"]),
             header={"index": at, "label": member["label"], "x": member["x"]})
 
+    def series_pattern_curves(self, pattern: int, of: str = "run") -> Packed:
+        """Series pattern ``pattern``'s channels, by its place in the series,
+        with its fit wherever one has landed (WP-2243).
+
+        :meth:`series_curves` serves an entry once the run has ended. The page
+        at ``/next`` draws the selected pattern before, during and after a run,
+        so this verb addresses the place in a list and says whether the
+        pattern was fitted (``fitted`` in the header):
+
+        - ``of="run"``: the list the run in flight is fitting, with each
+          reported-chain fit from the moment ``on_result`` hands it over; with
+          no run in flight, the last run's list and its entries' fits. A
+          pattern the walk has not reached, or that failed, is drawn alone.
+          The second walk of ``direction="both"`` keeps no fits
+          (:class:`~rietx.sequential.SequentialRefinement`), so a pattern's fit
+          is the reported walk's.
+        - ``of="staged"``: the list as staged now, read from its file, with no
+          fit: after an edit the staged list is not the one any run fitted.
+
+        The σ policy and the mask are :meth:`series_curves`'s.
+        """
+        from ..project import fitted_mask
+
+        if of not in ("run", "staged"):
+            raise GuiError(f'of must be "run" or "staged", not {of!r}',
+                           where=["of"])
+        p = self._need_project()
+        with self._cond:
+            live, entry, setup = self._series_live, self._series_run, self._series
+            res = None if live is None else live["results"].get(pattern)
+        if of == "staged":
+            if not 0 <= pattern < len(setup.members):
+                raise GuiError(f"no staged series pattern {pattern}; "
+                               f"{len(setup.members)} staged",
+                               code="NOT_FOUND", status=404, where=["pattern"])
+            member = setup.members[pattern]
+            # read as the chain will read it, the project's regions added
+            data = series_mod.read_members(
+                series_mod.SeriesSetup(members=[member]),
+                p.doc.excluded_regions)[0]
+            limits = (tuple(p.doc.two_theta_limits)
+                      if p.doc.two_theta_limits else None)
+            return curve_arrays(
+                data.tt(), data.y(), fitted_mask(data, limits), None,
+                weighted=bool(member.has_sigma),
+                header={"index": pattern, "label": member.label,
+                        "x": member.x, "fitted": False})
+        if live is None:
+            if entry is None:
+                raise GuiError("no series has run in this session yet",
+                               code="NO_SERIES_RESULT", status=409)
+            live = entry
+            runner = entry["runner"]
+            res = next((runner.results_[j] for j, e
+                        in enumerate(entry["result"].entries)
+                        if e.index == pattern), None)
+        if not 0 <= pattern < len(live["members"]):
+            raise GuiError(f"no series pattern {pattern}; the run has "
+                           f"{len(live['members'])}", code="NOT_FOUND",
+                           status=404, where=["pattern"])
+        if res is not None and not res.two_theta:
+            res = None
+        data, member = live["data"][pattern], live["members"][pattern]
+        return curve_arrays(
+            data.tt(), data.y(), fitted_mask(data, live["limits"]), res,
+            weighted=bool(member["has_sigma"]),
+            header={"index": pattern, "label": member["label"],
+                    "x": member["x"], "fitted": res is not None})
+
+    def series_map(self) -> Packed:
+        """Every staged member's counts and difference on one grid, for the Map graph.
+
+        Answers before any run, from the staged files alone: that is the
+        series' pre-visualisation (WP-2243 task 7). The rows are the staged
+        list in series order, each file read as the chain would read it, once
+        while it stays staged under the same reader options.
+        A row carries its fit's difference only while the last run's list is
+        the staged one, member for member and reader option for option, so an
+        edit after a run never draws one pattern's misfit over another's
+        counts. While a series run is in flight no row has one: the record is
+        still the run before it (:meth:`series_result`), and the Map asks
+        again when the run ends.
+        """
+        self._need_project()
+        setup = self._series
+        if not setup.members:
+            raise GuiError("no series is staged; add patterns with PUT /api/series",
+                           code="NO_SERIES", status=409, where=["patterns"])
+        with self._cond:
+            entry = self._series_run
+            running = self._state != "idle" and self._run.get("kind") == "series"
+        keys = [(m.token, tuple(sorted(m.options.items()))) for m in setup.members]
+        reads = {k: self._series_reads.get(k) or read_pattern(m.path, **m.options)
+                 for k, m in zip(keys, setup.members)}
+        self._series_reads = reads
+        data = [reads[k] for k in keys]
+        fits, rwp = {}, {}
+        staged = [(m.token, dict(m.options)) for m in setup.members]
+        if (entry is not None and not running
+                and [(m["upload"], m["reader_options"]) for m in entry["members"]]
+                == staged):
+            runner, result = entry["runner"], entry["result"]
+            for k, row in enumerate(result.entries):
+                res = runner.results_[k] if k < len(runner.results_) else None
+                if res is not None and res.two_theta:
+                    fits[row.index] = res
+                    rwp[row.index] = (row.statistics.rwp
+                                      if row.statistics is not None else None)
+        return series_mod.map_payload(setup, data, fits, running=running, rwp=rwp)
+
     def series_history(self, index: int) -> dict:
         """One series member's own history tree — read-only, and that is the point.
 
@@ -3712,6 +3857,8 @@ class GuiSession:
             # from its models, so another project's series is not this one's
             self._series = series_mod.SeriesSetup()
             self._series_run = None
+            self._series_live = None
+            self._series_reads = {}
             self._cond.notify_all()
         self._remember(project)
 
