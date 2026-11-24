@@ -902,12 +902,12 @@ clause here only if it changes behavior outside `indexing/`.** Three do:
   the fast indexing tests have stayed green over a real ranking regression (WP-1030).
 
 **Backends (v0.4).** `backend=` takes `"numpy"` (the default and the only one anyone needs),
-`"jax"`, or the **experimental** `"torch"` (CPU fp64) / `"torch-mps"` (Apple GPU, necessarily fp32)
+`"jax"`, or the experimental `"torch"` (CPU fp64) / `"torch-mps"` (Apple GPU, necessarily fp32)
 — never installed by default, kept as an independent opinion in the agreement matrix. Every backend
 is held to per-column agreement with the analytic Jacobian in `tests/test_cross_backend.py` —
 **whose configs must grow whenever a new derivative path does**, or no backend row covers it.
-Apple-GPU execution is *slower* than numpy (launch-latency-bound), so `torch-mps` buys precision
+Apple-GPU execution is slower than numpy (launch-latency-bound), so `torch-mps` buys precision
 verification, not speed (v0.4 record). Also since v0.4: true Voigt (`shape="voigt"`, TCHZ still
-the default), soft restraints, the Bérar-Lelann esd inflation. v2 fence: FPA, neutron **TOF** —
-and the **peaks buffer with FPA**, never before, since shape reuse needs more than 2.8-4.2 FCJ
+the default), soft restraints, the Bérar-Lelann esd inflation. v2 fence: FPA, multi-bank and magnetic TOF —
+and the peaks buffer with FPA, never before, since shape reuse needs more than 2.8-4.2 FCJ
 images a window point (WP-1122).
