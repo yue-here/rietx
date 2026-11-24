@@ -262,8 +262,8 @@ def test_a_type_one_block_maps_its_gaussian_terms(tmp_path):
 def test_a_prcf_block_with_the_wrong_ncof_is_refused_by_name(tmp_path, ptyp, ncof):
     """NCOF must be 12 / 15 / 21 for PTYP 1 / 2 / 3; a short
     block is not padded and a long one is not truncated.  The refusal cites
-    the manual's page and names the fix; an 8-slot type-1 block names the
-    legacy reader instead."""
+    the manual's page, and a short block's names the fix; an 8-slot type-1
+    block names the legacy reader instead."""
     coeffs = [0.1] * ncof
     text = iparm(bank(1, profile=prcf(1, 1, ptyp, coeffs)))
     with pytest.raises(ValueError, match=f"function {ptyp} with {ncof} coefficients") as e:
@@ -273,8 +273,10 @@ def test_a_prcf_block_with_the_wrong_ncof_is_refused_by_name(tmp_path, ptyp, nco
     if (ptyp, ncof) == (1, 8):
         assert "read_lansce_iparm" in str(e.value)
         assert "To read it" not in str(e.value)
-    else:
+    elif ncof < {1: 12, 2: 15, 3: 21}[ptyp]:
         assert "To read it, write all" in str(e.value)
+    else:   # a long block: no term was left out, so no padding advice
+        assert "To read it" not in str(e.value)
 
 
 def test_a_non_zero_anisotropic_term_is_refused_not_dropped(tmp_path):

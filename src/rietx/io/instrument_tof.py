@@ -653,14 +653,14 @@ def _profile(path: Path, bank: int, headers: dict[int, _Record],
                 raise rec.fail(
                     f"PRCF set {n} declares profile function {ptyp} with {ncof} "
                     f"coefficients; the manual documents {want} for function "
-                    f"{ptyp} (p. {_PRCF_NAMES_PAGE[ptyp]}) and no shorter "
-                    f"block, and a block of another length is refused — never "
-                    f"zero-padded or truncated — because the order of its "
-                    f"slots would be a guess"
+                    f"{ptyp} (p. {_PRCF_NAMES_PAGE[ptyp]}) and no other "
+                    f"length, and a block of another length is refused — "
+                    f"never zero-padded or truncated — because the order of "
+                    f"its slots would be a guess"
                     + (_LEGACY_POINTER if (ptyp, ncof) == (1, 8) else
                        f". To read it, write all {want} in the manual's "
                        f"order, with zero for each term the file's writer "
-                       f"left out"))
+                       f"left out" if ncof < want else ""))
         if n != 1:
             _note(diagnostics, "info", "GSAS_IPARM_PROFILE_DECLINED",
                   f"Bank {bank}: PRCF set {n} (profile function {ptyp}) was "
