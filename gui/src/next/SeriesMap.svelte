@@ -22,6 +22,11 @@
    * record covers it, and the route withholds it while a run is in flight.
    * The arithmetic is `seriesmap.ts`; the hover readout goes to the status
    * bar, never a box (`gui/STYLE.md` § Plots).
+   *
+   * The selected pattern is the Series panel's, one selection for every view
+   * (round 12, call 2; `seriespattern.ts`): the map marks the row it is
+   * handed and a click asks for another (`onselect`), never holding one of
+   * its own.
    */
   import { untrack } from "svelte";
 
@@ -52,7 +57,8 @@
     theme = "light",
     busy = false,
     stamp = 0,
-    selected = $bindable(null),
+    selected = null,
+    onselect = () => {},
     onreadout = () => {},
   }: {
     theme?: string;
@@ -60,8 +66,11 @@
     busy?: boolean;
     /** moves whenever the staged list does, so the map asks again */
     stamp?: number;
-    /** the one selected pattern, by series index (call 2) */
+    /** the one selected pattern, by its place in the staged list (call 2);
+     *  null marks the first */
     selected?: number | null;
+    /** a click chose a row: the Series panel moves the selection */
+    onselect?: (row: number) => void;
     onreadout?: (r: StatusReadout | null) => void;
   } = $props();
 
@@ -112,7 +121,8 @@
   }
 
   const header = $derived(answer?.header ?? null);
-  const sel = $derived(selected ?? 0);
+  /** the marked row, inside the list the map last read */
+  const sel = $derived(Math.max(0, Math.min(selected ?? 0, (answer?.header.n_rows ?? 1) - 1)));
   const step = $derived.by(() => {
     const tt = answer?.arrays.two_theta;
     return tt && tt.length > 1 ? (tt[tt.length - 1] - tt[0]) / (tt.length - 1) : 0.001;
@@ -138,7 +148,6 @@
       failure = "";
       empty = false;
       const n = next.header.n_rows;
-      if (selected != null && selected >= n) selected = n ? n - 1 : null;
       if (band && Math.max(...band) >= n) band = null;
       if (rowWindow && Math.max(...rowWindow) >= n) rowWindow = null;
     } catch (error) {
@@ -595,7 +604,7 @@
   }
 
   function choose(row: number) {
-    selected = row;
+    onselect(row);
   }
 
   function down(e: PointerEvent) {

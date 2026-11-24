@@ -406,6 +406,10 @@ export const api = {
   /** One member's channels and curves, as `curves` sends the project's: built
    *  by the same function, so the σ and the residuals are the same arithmetic. */
   seriesCurves: (index: number) => arrays(`/api/series/curves?index=${index}`),
+  /** One member by its place in a list, the run's or the staged one, with
+   *  its fit wherever one has landed, mid-run too (WP-2243). */
+  seriesPattern: (pattern: number, of: "run" | "staged") =>
+    arrays(`/api/series/curves?pattern=${pattern}&of=${of}`),
   /** Every staged pattern's counts on one 2θ grid, and each fitted one's
    *  difference in esd, packed as the curves are (WP-2243). Before a run too. */
   seriesMap: () => arrays("/api/series/map"),

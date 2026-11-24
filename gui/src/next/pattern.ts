@@ -46,6 +46,9 @@ export async function fetchCurves(): Promise<Curves> {
   return unpack(await api.curves());
 }
 
+/** A payload fetched elsewhere (a series member, WP-2243), unpacked as the project's is. */
+export const unpackCurves = (buffer: ArrayBuffer): Curves => unpack(buffer);
+
 /** Two payloads over the same channels, so a view on one is a view on the other. */
 export function sameGrid(a: Curves | null, b: Curves): boolean {
   const x = a?.arrays.two_theta, y = b.arrays.two_theta;

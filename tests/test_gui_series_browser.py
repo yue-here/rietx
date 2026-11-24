@@ -29,6 +29,10 @@ from tests.test_gui_layout_browser import (  # noqa: E402
 )
 from tests.test_watch_browser import _chromium  # noqa: E402
 
+#: the project, the browser and the run the first test leaves are module
+#: fixtures every later test reads, so the file runs on one worker
+pytestmark = pytest.mark.xdist_group("series-browser")
+
 
 @pytest.fixture(scope="module")
 def files(tmp_path_factory):
@@ -140,6 +144,125 @@ def test_a_series_is_loaded_sorted_walked_and_run(browser, gui, files):
     page.close()
 
 
+def _title(page) -> str:
+    return " ".join(page.locator(".pattern .gtitle").inner_text().split())
+
+
+def test_one_selected_pattern_moves_on_the_graph_and_the_tables(browser, gui):
+    """Task 5: the Pattern graph draws the selected member's fit, ‹ › in its
+    title, ↑ ↓ and a row click all move it, and Series keeps its state across
+    a workflow switch. Runs after the test above, on the run it left."""
+    url, session = gui
+    assert session.series_result()["result"]["entries"], "the run test above runs first"
+    page = _open_next(browser, url, 1440)
+    page.locator("button.mbtn.wf").click()
+    page.get_by_role("menuitemradio", name="Series", exact=True).click()
+    page.wait_for_function(
+        "document.querySelector('.pattern .gtitle')?.textContent.includes('ramp0')")
+    page.wait_for_function("document.querySelector('.pattern .gtitle')?.textContent.includes('Rwp')")
+    assert _title(page).startswith("‹ › ramp0") and "300 · 1 of 3 · Rwp " in _title(page), _title(page)
+    prev = page.get_by_role("button", name="Previous pattern", exact=True)
+    nxt = page.get_by_role("button", name="Next pattern", exact=True)
+    assert prev.is_disabled() and not nxt.is_disabled()
+    # the member's fit is drawn: its calculated curve has a legend switch
+    page.wait_for_selector(".pattern .view canvas")
+
+    nxt.click()
+    page.wait_for_function("document.querySelector('.pattern .gtitle')?.textContent.includes('ramp1')")
+    assert "400 · 2 of 3" in _title(page)
+    # ↓ with the focus on a step button, as after a click on it
+    page.locator("nav.steps button.step", has_text="Results").click()
+    page.locator("nav.steps button.step", has_text="Results").press("ArrowDown")
+    page.wait_for_function("document.querySelector('.pattern .gtitle')?.textContent.includes('ramp2')")
+    assert nxt.is_disabled()
+    rows = page.locator(".wfsteps table.rows").first.locator("tbody tr")
+    assert "sel" in (rows.nth(2).get_attribute("class") or "")
+
+    # a row click moves it too
+    rows.nth(0).click()
+    page.wait_for_function("document.querySelector('.pattern .gtitle')?.textContent.includes('ramp0')")
+
+    # another workflow draws the project's fit; back on Series nothing is lost
+    page.locator("button.mbtn.wf").click()
+    page.get_by_role("menuitemradio", name="Refinement", exact=True).click()
+    page.wait_for_function("!document.querySelector('.pattern .gtitle')?.textContent.includes('ramp0')")
+    page.locator("button.mbtn.wf").click()
+    page.get_by_role("menuitemradio", name="Series", exact=True).click()
+    page.wait_for_function("document.querySelector('.pattern .gtitle')?.textContent.includes('ramp0')")
+    page.locator("nav.steps button.step", has_text="Run").click()
+    page.wait_for_selector(".wfsteps .status >> text=Finished")
+    assert "sel" in (page.locator(".wfsteps table.rows tbody tr").nth(0).get_attribute("class") or "")
+    assert not page.errors, page.errors
+    page.close()
+
+
+def _captions(page) -> list[str]:
+    return [" ".join(t.split()) for t in page.locator(".trends figcaption").all_inner_texts()]
+
+
+def test_trends_plots_the_ticked_values_and_a_point_selects_its_pattern(browser, gui):
+    """Task 6: the Trends tab, shown only under Series, draws Rwp and the first
+    phase's cell by default; a tick in Results adds a panel and × removes it;
+    Against switches the axis; a summary row's Plot shows Trends; a point
+    click selects its pattern on every view. Runs on the first test's run."""
+    url, session = gui
+    assert session.series_result()["result"]["entries"], "the run test above runs first"
+    page = _open_next(browser, url, 1440)
+    trends = page.get_by_role("tab", name="Trends", exact=True)
+    assert trends.count() == 0                      # Refinement lists no Trends
+    page.locator("button.mbtn.wf").click()
+    page.get_by_role("menuitemradio", name="Series", exact=True).click()
+    page.locator("nav.steps button.step", has_text="Results").click()
+    page.wait_for_selector(".wfsteps .summary")
+
+    # a summary row's Plot shows Trends
+    page.locator(".wfsteps .summary").get_by_role("button", name="Plot", exact=True).first.click()
+    page.wait_for_selector(".trends figure canvas")
+    assert trends.get_attribute("aria-selected") == "true"
+    captions = _captions(page)
+    assert captions[0] == "Rwp (%)", captions
+    assert any("cell.a" in c for c in captions), captions
+    n = len(captions)
+
+    # a tick in the Results list adds a panel, × removes it
+    page.get_by_role("checkbox", name="Plot GoF", exact=True).click()
+    page.wait_for_function(f"document.querySelectorAll('.trends figure').length === {n + 1}")
+    assert "GoF" in _captions(page)
+    page.locator(".trends figure", has_text="GoF").get_by_role(
+        "button", name="Remove this panel", exact=True).click()
+    page.wait_for_function(f"document.querySelectorAll('.trends figure').length === {n}")
+    assert not page.get_by_role("checkbox", name="Plot GoF", exact=True).is_checked()
+
+    # the Plot menu lists the values by group and stays open while ticking
+    page.locator(".trends .gctl").get_by_role("button", name="Plot", exact=True).click()
+    page.get_by_role("menu", name="Plot").get_by_role("menuitem", name="Fit").click()
+    page.get_by_role("menuitemcheckbox", name="GoF", exact=True).click()
+    page.wait_for_function(f"document.querySelectorAll('.trends figure').length === {n + 1}")
+    assert page.get_by_role("menuitemcheckbox", name="GoF", exact=True).is_visible()
+    page.keyboard.press("Escape")
+    page.keyboard.press("Escape")
+
+    # Against: the pattern number, then the coordinate again
+    page.get_by_role("group", name="Against").get_by_role("button", name="Pattern", exact=True).click()
+    page.wait_for_function("document.querySelector('.trends .xlabel')?.textContent === 'Pattern'")
+    page.get_by_role("group", name="Against").get_by_role("button", name="index", exact=True).click()
+    page.wait_for_function("document.querySelector('.trends .xlabel')?.textContent === 'index'")
+
+    # a point click selects its pattern: the last one, at the plot's right
+    box = page.locator(".trends .stack").bounding_box()
+    width = box["width"]
+    lo, hi, pad = 300.0, 500.0, 8.0                     # the coordinates, 4 % padding
+    x = 64 + (hi - (lo - pad)) / (hi - lo + 2 * pad) * (width - 74)
+    first = page.locator(".trends figure canvas").first.bounding_box()
+    page.mouse.click(box["x"] + x, first["y"] + first["height"] / 2)
+    page.wait_for_function("document.querySelector('.trends .gtitle')?.textContent.includes('ramp2')")
+    page.get_by_role("tab", name="Pattern", exact=True).click()
+    page.wait_for_function("document.querySelector('.pattern .gtitle')?.textContent.includes('ramp2')")
+    assert "500 · 3 of 3" in _title(page), _title(page)
+    assert not page.errors, page.errors
+    page.close()
+
+
 @pytest.fixture(scope="module")
 def map_gui(tmp_path_factory, files):
     """A second project on the ramp, so the Map starts from a list nobody ran."""
@@ -181,7 +304,7 @@ def test_the_map_draws_every_pattern_before_and_after_a_run(browser, map_gui, fi
     page.get_by_role("menuitemradio", name="Series", exact=True).click()
     page.wait_for_selector(".wfsteps .empty")
     graphs = page.locator("section.graphs > .tabs [role=tab]")
-    assert graphs.all_inner_texts() == ["Pattern", "Map"]
+    assert graphs.all_inner_texts() == ["Pattern", "Trends", "Map"]
     with page.expect_file_chooser() as chooser:
         page.get_by_role("button", name="Add files…").click()
     chooser.value.set_files([str(f) for f in files])
@@ -206,6 +329,19 @@ def test_the_map_draws_every_pattern_before_and_after_a_run(browser, map_gui, fi
     page.mouse.click(x, box["y"] + frame["T"] + rh * 2.5)
     page.wait_for_function("document.querySelector('.mapgraph .gtitle b')?.textContent === 'ramp2'")
     assert page.locator(".mapgraph .width input").is_visible()
+    # one selection for every view (round 12, call 2): the Map's click marks
+    # the Patterns table's row and moves the Pattern graph, and a row click
+    # there moves the Map
+    staged = page.locator(".wfsteps table.rows").first.locator("tbody tr")
+    assert "sel" in (staged.nth(2).get_attribute("class") or "")
+    page.get_by_role("tab", name="Pattern", exact=True).click()
+    page.wait_for_function("document.querySelector('.pattern .gtitle')?.textContent.includes('ramp2')")
+    staged.nth(1).locator("td.fname").click()
+    page.wait_for_function("document.querySelector('.pattern .gtitle')?.textContent.includes('ramp1')")
+    page.get_by_role("tab", name="Map", exact=True).click()
+    page.wait_for_function("document.querySelector('.mapgraph .gtitle b')?.textContent === 'ramp1'")
+    page.mouse.click(x, box["y"] + frame["T"] + rh * 2.5)
+    page.wait_for_function("document.querySelector('.mapgraph .gtitle b')?.textContent === 'ramp2'")
     width = page.locator(".mapgraph .width input")
     width.click()
     width.fill("0.2")

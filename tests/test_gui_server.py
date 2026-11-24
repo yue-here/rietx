@@ -3275,6 +3275,49 @@ def test_a_failed_pattern_does_not_shift_the_members_after_it(series, monkeypatc
     status, tree = client.get("/api/series/history?index=1")
     assert status == 200 and (tree["index"], tree["label"]) == (2, member["label"])
 
+    # ``pattern`` addresses the place in the series, never the entry, so the
+    # failed member is drawn alone and the one after it keeps its fit
+    alone = _packed(client, "/api/series/curves?pattern=1")
+    assert alone.header["fitted"] is False and alone.header["label"] == entry["members"][1]["label"]
+    assert "y_calc" not in alone.arrays
+    after = _packed(client, "/api/series/curves?pattern=2")
+    assert after.header["fitted"] is True
+    np.testing.assert_array_equal(after.arrays["two_theta"][after.arrays["fitted"]],
+                                  runner.results_[2].two_theta)
+
+
+def test_a_series_member_is_drawn_by_its_place_before_during_and_after_a_run(series):
+    """WP-2243: ``?pattern=`` serves any member of a list by its place. The
+    staged list draws from the file with no fit; the run's list draws each
+    reported-chain fit from the moment ``on_result`` hands it over, which a
+    live entry stands in for here."""
+    session, client, _ = series
+    entry = session._series_run
+    staged = _packed(client, "/api/series/curves?pattern=1&of=staged")
+    assert staged.header["fitted"] is False and staged.header["label"] == "T400"
+    np.testing.assert_array_equal(staged.arrays["two_theta"], entry["data"][1].tt())
+    assert "y_calc" not in staged.arrays
+    done = _packed(client, "/api/series/curves?pattern=1")
+    assert done.header["fitted"] is True
+    np.testing.assert_array_equal(done.arrays["y_calc"],
+                                  _packed(client, "/api/series/curves?index=1").arrays["y_calc"])
+
+    # mid-run: only the fits that have landed carry a curve, and the live run
+    # outranks the last record
+    session._series_live = {**{k: entry[k] for k in ("members", "data", "limits")},
+                            "results": {0: entry["runner"].results_[0]}}
+    try:
+        assert _packed(client, "/api/series/curves?pattern=0").header["fitted"] is True
+        assert _packed(client, "/api/series/curves?pattern=1").header["fitted"] is False
+    finally:
+        session._series_live = None
+
+    status, payload = client.get("/api/series/curves?pattern=9")
+    assert status == 404 and payload["error"]["where"] == ["pattern"]
+    status, payload = client.get("/api/series/curves?pattern=9&of=staged")
+    assert status == 404 and payload["error"]["where"] == ["pattern"]
+    assert client.get("/api/series/curves?pattern=0&of=both")[0] == 400
+
 
 def test_the_series_answer_carries_the_trace_it_is_scrubbed_along(series):
     """WP-1317: the trace rides the answer, built by ``series.trace`` from the

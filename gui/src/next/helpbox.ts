@@ -98,6 +98,17 @@ export const GRAPH_HELP: Record<GraphTab, HelpBoxEntry> = {
     ],
     anchor: "the-3d-view",
   },
+  trends: {
+    title: "Trends",
+    lead: "Each panel is one value across the series, with its esd bar. Two values share a panel when they have the same unit and overlapping ranges.",
+    items: [
+      "Plot adds any refined value or fit statistic; × removes a panel. A value refined on only some patterns shows “7 of 17” and has points only there.",
+      "Dots are the first walk. Rings are the second walk, the other way along the series.",
+      "An esd bar longer than one spread of the values is cut at the panel's edge.",
+      "Against sets the horizontal axis: the series coordinate, or the pattern's place in the list. Click a point to select its pattern.",
+    ],
+    anchor: "series",
+  },
   map: {
     title: "Map",
     lead: "Each row is one pattern of the series, the first at the top.",

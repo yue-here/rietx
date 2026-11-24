@@ -97,6 +97,8 @@
     frameAt = null,
     onpeakedit = async () => false,
     onpeakundo = async () => false,
+    source = null,
+    nav = null,
   }: {
     result: any;
     /** bumped when the curves moved: a run landed or the history moved */
@@ -149,6 +151,13 @@
     /** a request to frame a line: 2θ, with a count so the same line asked
      *  twice frames twice */
     frameAt?: { two_theta: number; seq: number } | null;
+    /** where the curves come from instead of the project's: a series member
+     *  (WP-2243). The graph fetches again when its `key` moves. */
+    source?: { key: string; load: () => Promise<ArrayBuffer> } | null;
+    /** the title line for a member of a series: its name, the rest of the
+     *  line, and ‹ › stepping the selection (round 12, call 2) */
+    nav?: { name: string; sub: string; canPrev: boolean; canNext: boolean;
+            onstep: (delta: number) => void } | null;
   } = $props();
 
   /** The difference axis's choices: the three today's page draws
@@ -268,7 +277,8 @@
   const pct = (x: number | null | undefined) => (x == null ? "" : `${(x * 100).toFixed(2)} %`);
   /** The whole title line as its tooltip, since the title is what gives way
    *  (B1); a refused preview's reason is said there, in the route's words. */
-  const titleTip = $derived(previewing ? "Preview, not refined"
+  const titleTip = $derived(nav ? `${nav.name} · ${nav.sub}`
+    : previewing ? "Preview, not refined"
     : previewError ? `${title}. Preview refused: ${previewError}`
     : (held as Window | null)?.stale ? `${title}, fitted over other channels`
     : fitShown && howText ? `${title}. ${howText}` : title);
@@ -318,7 +328,8 @@
     let c: Curves;
     try {
       mod = chartModule ??= await import("./pattern");
-      c = await mod.fetchCurves();
+      const from = untrack(() => source);
+      c = from ? mod.unpackCurves(await from.load()) : await mod.fetchCurves();
     } catch (exc) {
       if (seq !== fetchSeq) return;
       dropChart();
@@ -464,11 +475,15 @@
   const protocolKey = $derived(JSON.stringify([protocol.limits, protocol.regions]));
   const extentKey = $derived(JSON.stringify(extent));
 
-  // fetch on what moves the curves: a run, a move in the history, the mask
+  const sourceKey = $derived(source?.key ?? null);
+
+  // fetch on what moves the curves: a run, a move in the history, the mask,
+  // another series member or its fit landing
   $effect(() => {
     void plotKey;
     void protocolKey;
     void result;
+    void sourceKey;
     untrack(() => drawChart());
   });
 
@@ -1197,6 +1212,16 @@
         <b class="pv">Preview, not refined</b>
         <span class="stat">Rwp <span class="num">{pct(preview?.curves?.header?.rwp)}</span>{#if stats?.rwp != null},
           last fit <span class="num">{pct(stats.rwp)}</span>{/if}</span>
+      {:else if nav}
+        <!-- a series member: ‹ › step the one selection every view shares,
+             then its name and the prototype's line (round 12, call 2) -->
+        <span class="sstep">
+          <button class="ib" aria-label="Previous pattern" title="Previous pattern (↑)"
+            disabled={!nav.canPrev} onclick={() => nav.onstep(-1)}>‹</button>
+          <button class="ib" aria-label="Next pattern" title="Next pattern (↓)"
+            disabled={!nav.canNext} onclick={() => nav.onstep(1)}>›</button>
+        </span>
+        <b>{nav.name}</b><span class="stat">{nav.sub}</span>
       {:else}
       {#if title}<b>{title}</b>{/if}
       {#if previewError}<span class="bad">Preview refused</span>{/if}
@@ -1384,6 +1409,15 @@
 {/if}
 
 <style>
+  /* ‹ › before a series member's name, the prototype's place for them */
+  .gtitle > .sstep {
+    display: inline-flex;
+    gap: 2px;
+    margin: 0 8px 0 0;
+    color: var(--fg);
+    vertical-align: middle;
+  }
+
   .pattern {
     flex: 1 1 auto;
     min-height: 0;
