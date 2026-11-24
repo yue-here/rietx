@@ -63,6 +63,18 @@ maximum over N draws grows with N and would make the threshold a function of
 how many draws were taken. p = (1 + #{control ≥ observed}) / (1 + K), report
 when p ≤ α. At K = 199 the smallest achievable p is 0.005.
 
+### Inherited
+
+From **WP-1448** (closed 2026-11-23, PR #1628): the comment above
+`GHOST_MIN_PARENTS` in `background/diagnostics.py` now ends with the tag
+`*(Chosen: WP-1447, 2026-09-22 — a fixed bar over a control run per
+pattern)*`. It replaced the words "decided 2026-09-22 with the maintainer".
+PR #1609 rewrites the same comment, so its merge with `main` conflicts
+there. Keep the tag and add #1609's sentence. `tests/test_chosen_values.py`
+fails a tag whose record is wrong, but a dropped tag fails nothing. If this
+WP later replaces the fixed bar as the default, the tag gets a new date and
+the 2026-09-22 entry stays.
+
 ## Non-goals
 
 - Changing what the screen looks for, the ratio window, or the prominence gate

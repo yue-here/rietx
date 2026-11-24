@@ -1802,6 +1802,16 @@ same amount so the gap stays the one WP-2233 measured.  Root `CLAUDE.md`
 24 935 B, `tests/` 19 733 -> 17 707 B.  Each pass stopped where the next cut
 would have been a rule.
 
+### `docs/DESIGN-RULES.md` enters  13 680 B (WP-2307  2026-11-23)
+
+The root `CLAUDE.md` imports this file with an `@` line, so every session and
+subagent loads it, and `documents()` now follows such an import, as Claude Code
+does: past code, up to five hops, and only to a committed `.md` file. The file holds
+DESIGN.md's Why paragraph and its five rules, moved out of a file that loaded
+only when a session opened it. The budget is its bytes as WP-2307 landed it;
+the ceiling takes `REFERENCE_GAP_BYTES`, since no merge has grown it. The row
+needs the file on the tree, so it lands after the file, alone.
+
 ## What a session's reading costs
 
 Measured 2026-09-30 for `/pr-review`

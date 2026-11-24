@@ -75,10 +75,14 @@ from .model.absorption import (
 )
 from .model.components import EXTRA_TICK_KEY
 from .model.forward import (
+    AXIAL_PATHS,
     PHASE_SUPPORT_SIGMA,
     WINDOW_AREA_TOL,
     CompiledModel,
     Mode,
+    apertures_to_lift,
+    axial_lift_start,
+    axial_partner,
     compile_model,
     orbit_split_of,
     recorded_window_tol,
@@ -1611,14 +1615,6 @@ def _only_moves(reached: list[str], prefixes: tuple[str, ...],
         for p in moved)
 
 
-#: The FCJ axial ratios.  They shape every phase reflection and nothing else
-#: (``extra_peak_curve`` applies no FCJ), so they reach the pattern through
-#: phase peaks alone.  Named here because ``scalar_chain_supported`` leaves
-#: them out for a different reason: they move the quadrature nodes, so their
-#: Jacobian column is not the per-peak chain's.
-_AXIAL_PATHS = ("instrument.geometry.axial_sl", "instrument.geometry.axial_hl")
-
-
 def _peak_only_instrument_path(model: CompiledModel, path: str) -> bool:
     """Whether instrument entry ``path`` reaches the pattern only through the
     phases' reflections (WP-2049).
@@ -1633,8 +1629,14 @@ def _peak_only_instrument_path(model: CompiledModel, path: str) -> bool:
     chain does not claim (a TOF bank's calibration, say) stays free: the
     conservative answer, since a wrong hold freezes a measurement.
     """
+    # The FCJ axial ratios (``forward.AXIAL_PATHS``) shape every phase
+    # reflection and nothing else (``extra_peak_curve`` applies no FCJ), so
+    # they reach the pattern through phase peaks alone.  Named here because
+    # ``scalar_chain_supported`` leaves them out for a different reason: they
+    # move the quadrature nodes, so their Jacobian column is not the per-peak
+    # chain's.
     return path.startswith("instrument.") and (
-        path in _AXIAL_PATHS or model.scalar_chain_supported(path))
+        path in AXIAL_PATHS or model.scalar_chain_supported(path))
 
 
 def _residual_is_noise(model: CompiledModel, table: ParameterTable) -> bool:
@@ -2467,6 +2469,13 @@ def _snapshot_sinks(*candidates) -> list:
     return sinks
 
 
+def _compile_cut(model: CompiledModel) -> dict[str, float]:
+    """``model``'s peak cut as ``compile_model`` keywords: the area fraction
+    its windows drop and their slack, as the compile resolved them."""
+    return {"window_area_tol": model.window_area_tol,
+            "window_slack_deg": model.window_slack_deg}
+
+
 #: whether ``Refinement.__init__`` judges the magnetic groups of what it is given
 _JUDGE_GROUPS: ContextVar[bool] = ContextVar("rietx_judge_groups", default=True)
 
@@ -2699,6 +2708,11 @@ class Refinement:
         #: event carries as ``stage_report_seconds`` (WP-1335)
         self._stage_report_seconds = 0.0
         self._model: CompiledModel | None = None
+        #: the peak cut the last answer was measured at, as ``compile_model``
+        #: keywords, for :meth:`_peak_cut` on a tree with no history (WP-2235).
+        #: Set beside ``result_`` and, unlike it, kept through an edit: the
+        #: object has still fitted.  Never carried into a trial.
+        self._fit_cut: dict[str, float] = {}
         #: whether ``fit`` and ``run_stage`` compute the profile interval of
         #: each moment angle the stationary-angle test left out of the answer
         #: stage's covariance (WP-2002, B2;
@@ -2871,6 +2885,28 @@ class Refinement:
         if not (parent / PROJECT_JSON).exists():
             return None
         return parent / LIVE_DIR
+
+    def _peak_cut(self) -> dict[str, float]:
+        """The peak cut of the fit that produced the working state, as
+        ``compile_model`` keywords; empty where nothing has fitted (WP-2235).
+
+        With a history it is the nearest stage node at or above the head,
+        through :func:`recorded_window_tol` as ``refine.replay`` reads a stage
+        node's, so an edit, a checkout and a reopened project all read it.
+        Without one it is the last answer's compile, kept through an edit.
+        ``predict`` on a grid and the GUI preview both read it here.
+        """
+        tree, head = self.history, self._head_id
+        if tree is None or head is None:
+            return dict(self._fit_cut)
+        for node in reversed(tree.lineage(head)):
+            if node.action.kind == "stage":
+                cut = {"window_area_tol": recorded_window_tol(
+                    node.action.window_area_tol)}
+                if node.action.window_slack_deg is not None:
+                    cut["window_slack_deg"] = node.action.window_slack_deg
+                return cut
+        return {}
 
     def _invalidate_fit(self) -> None:
         """Drop everything that described the previous values.
@@ -5146,7 +5182,8 @@ class Refinement:
                    ftol: float | None = None,
                    prior_significance: np.ndarray | None = None,
                    phase_support_sigma: float | None = PHASE_SUPPORT_SIGMA,
-                   window_area_tol: float | None = None):
+                   window_area_tol: float | None = None,
+                   refined_before: frozenset[str] = frozenset()):
         """One stage: free params, recompile, solve, commit, guard.
 
         The recompile is what keeps the residual smooth *within* the stage —
@@ -5166,6 +5203,12 @@ class Refinement:
         release, its collapse and the default cell window.  ``None`` switches all four off, and the answer's
         significance is then read against the default for
         ``PHASE_UNCONSTRAINED`` alone.
+
+        ``refined_before`` is every path an earlier stage of this fit left
+        free (WP-1955): the aperture lift below skips those, since a ratio an
+        earlier stage walked back to zero is where the data put it.  A row the
+        caller freed by hand before the call is *not* in it, so
+        :meth:`run_stage`, which passes none, lifts it.
         """
         # the threshold the answer's significance is read against: the hold's
         # own, or the default where there is no hold and only the report reads
@@ -5236,13 +5279,25 @@ class Refinement:
         # caller's holds and ties and the mode's force-fix have all settled
         # the free set and before anything is written (WP-1805, answer (c))
         table.refuse_partial_turns()
+        # an FCJ aperture this stage frees on zero starts off it, since its
+        # column there is nearly zero; before the plan's own seed, which then
+        # finds it off its floor.  Not one an earlier stage of this fit
+        # refined, so a closing stage that names it again leaves it where the
+        # data put it, while a row freed by hand and then run is lifted
+        # (WP-1955)
+        lift = apertures_to_lift([p for p in freed if p not in refined_before])
         seeded: dict[str, float] = {}
+        for path in lift:
+            # the partner's live value, so S/L's lift is already in it
+            start = axial_lift_start(
+                path, table.decode(table.x0())[axial_partner(path)])
+            seeded.update(dict.fromkeys(table.seed_floored([path], start), start))
         if stage.seed:
             # start a freed row sitting on its floor where the plan says:
             # roughness at b = 0 is the identity, and its stage starts b in
             # the band the data can see (WP-1938)
-            seeded = dict.fromkeys(table.seed_floored(freed, stage.seed),
-                                   stage.seed)
+            seeded.update(dict.fromkeys(
+                table.seed_floored(freed, stage.seed), stage.seed))
         strain_seeded: list[str] = []
         if stage.strain_seed:
             # the Stephens DOFs are unbounded below, so the seed above never
@@ -6347,6 +6402,7 @@ class Refinement:
                 plan.run_stages()[-1], plan.stage_window_tols()[-1])
             diagnostics.extend(recompiled)
             self._model = model
+            self._fit_cut = _compile_cut(model)
 
             if mode == "pawley":
                 diagnostics.extend(_pawley_unresolved_diagnostics(model, self.structure))
@@ -6546,6 +6602,9 @@ class Refinement:
         #: the closing stage does for every finding the last declared stage
         #: made (WP-2002).  Each stage's own list stays on its report and node.
         restated: dict[tuple, Diagnostic] = {}
+        #: what an earlier stage of this fit left free (the aperture lift's
+        #: gate, WP-1955)
+        refined_before: set[str] = set()
         for k, (stage, ftol, window_tol) in enumerate(
                 zip(stages, ftols, window_tols, strict=True), start=1):
             with self._abandon_on_cancel(cancel, stage.name, stage_results, stream):
@@ -6557,7 +6616,9 @@ class Refinement:
                     # starts from that answer as well as the screen (WP-1523)
                     prior_significance=answer_significance,
                     phase_support_sigma=phase_support_sigma,
-                    window_area_tol=window_tol)
+                    window_area_tol=window_tol,
+                    refined_before=frozenset(refined_before))
+            refined_before.update(table.free_paths)
             # WP-1343: the moment's rung at this boundary, and the shift the
             # moment took when the widths were released.  Gated on what the
             # stage actually freed, so an ordinary fit never pays for the
@@ -7017,6 +7078,7 @@ class Refinement:
                 model, table, outcome, data, mode, ttl, stage, window_area_tol)
             diagnostics = diagnostics + recompiled
             self._model = model
+            self._fit_cut = _compile_cut(model)
 
             self.result_ = _build_result(
                 model, table, outcome.theta, mode=mode, status=outcome.status,
@@ -7100,12 +7162,21 @@ class Refinement:
         a fresh grid carries them over from the fitted model by hkl and there
         is nothing to carry before one exists.
 
-        **After a default fit the two forms agree bit for bit.**  ``predict()``
+        **After a fit, both forms draw the fit's own curve.**  ``predict()``
         evaluates the model the result was measured on, a compile at the
-        answer (#272, WP-1421), so it returns ``RefinementResult.y_calc``; a
-        grid compiles at the same values and windows.  Measured on the
-        fluorapatite tutorial under ``mccusker_default``: 0 of 5751 channels
-        differ.
+        answer (#272, WP-1421), so it returns ``RefinementResult.y_calc``.  A
+        grid compiles at the fit's peak cut: the ``window_area_tol`` and
+        ``window_slack_deg`` of the last stage at or above the working state
+        in the history, as the GUI preview reads them, or of the last fit
+        without a history (WP-2235).  An edit such as ``set_values`` keeps
+        that cut.  So ``predict(result.two_theta)`` returns ``y_calc`` bit for
+        bit too.  The
+        exception is a site the fit left on a special position
+        (``SITE_MULTIPLICITY_KEPT``).  ``y_calc`` keeps the solve's orbit
+        count there, and a grid counts the orbit afresh (WP-2052).  At
+        ``compile_model``'s default cut instead, that grid differs from
+        ``y_calc`` on all 5751 channels of the fluorapatite tutorial under
+        ``mccusker_default``, by up to 1.4e-3 of the strongest peak.
 
         **The free set reaches the curve in one case** (#774).  With both
         axial-divergence ratios at exactly zero and either refined, the
@@ -7116,15 +7187,16 @@ class Refinement:
         of the strongest peak (the issue's rutile reproducer, 2026-10-25).
         Every positive value is sized by value alone.
 
-        A grid compiles at ``compile_model``'s default windows whatever this
-        object has fitted, so a never-fitted twin carrying the same models
-        returns the same array.  That default is ``CLOSING_WINDOW_TOL``
-        (WP-2002, the seventh round's Q1), so a synthetic pattern carries
-        near-complete tails.  A default fit measures its answer at the declared
-        stages' ``forward.WINDOW_AREA_TOL`` since the closing stage went off by
-        default (WP-2222), so a grid differs from its ``y_calc`` by the tails;
-        redraw a fit's own curve with ``compile_model(...,
-        window_area_tol=recorded_window_tol(result.stages[-1].window_area_tol))``.
+        An object that has not been fitted compiles a grid at
+        ``compile_model``'s default cut, ``CLOSING_WINDOW_TOL`` (WP-2002, the
+        seventh round's Q1), so a synthetic pattern carries near-complete
+        tails.  A default fit measures its answer at the declared stages'
+        ``forward.WINDOW_AREA_TOL`` since the closing stage went off by default
+        (WP-2222).  So a never-fitted twin carrying the fitted models returns
+        the default-cut array, and differs from the fitted object by the tails.
+        ``compile_model(...,
+        window_area_tol=recorded_window_tol(result.stages[-1].window_area_tol))``
+        rebuilds a fit's curve from its record alone.
         """
         table = ParameterTable(self.structure, self.instrument)
         if two_theta is None:
@@ -7154,8 +7226,11 @@ class Refinement:
                 f"{mode} intensities are extracted by a fit, not computed from "
                 "the structure, so there is nothing to evaluate before one has "
                 "run. Fit first, or predict in rietveld mode.")
+        # the fit's own peak cut, so a grid draws the fit's curve (WP-2235,
+        # ruling A); before any fit, compile_model's default
         model = compile_model(self.structure, self.instrument, grid,
-                              mode=mode, moving_paths=set(table.moving_paths))
+                              mode=mode, moving_paths=set(table.moving_paths),
+                              **self._peak_cut())
         if mode in ("lebail", "pawley"):
             _carry_lebail(self._model, model)
         return model.evaluate(table.decode(table.x0()))
@@ -7456,29 +7531,35 @@ class Refinement:
                 f"{', '.join(repr(d) for d in DELIVERABLES)}")
         return lines
 
+    def _plan_line(self) -> str | None:
+        """The ``plan:`` line of :meth:`summary`: the stages the last run ran,
+        and whether in one stage or in stages and why (WP-2224), or ``None``
+        before a plan has run.  The GUI's Console quotes it (WP-2227)."""
+        plan = self._last_plan
+        how = self._refit_how
+        if plan is None:
+            return None
+        if how == "single" and self._refit_plan is not None:
+            return (f"plan: one stage ({', '.join(s.name for s in plan.stages)}), "
+                    f"because the model had already converged on this pattern. "
+                    f"refit=\"stages\" runs "
+                    f"{', '.join(s.name for s in self._refit_plan.stages)} in turn.")
+        if how == "fallback":
+            return (f"plan: {', '.join(s.name for s in plan.stages)}, in stages, "
+                    f"after the one-stage re-fit was discarded.")
+        if isinstance(how, list):
+            return (f"plan: {', '.join(s.name for s in plan.stages)}, in stages, "
+                    f"because this fit frees {_name_paths(how)}, which the last "
+                    f"fit held.")
+        return f"plan: {', '.join(s.name for s in plan.stages)}"
+
     def _protocol_lines(self) -> list[str]:
         """Section 4 (minus provenance, appended separately — the one clause
         a bare result can also answer): the protocol actually run."""
-        plan = self._last_plan
         lines = ["  protocol:"]
-        how = self._refit_how
-        if plan is not None and how == "single" and self._refit_plan is not None:
-            lines.append(
-                f"    plan: one stage ({', '.join(s.name for s in plan.stages)}), "
-                f"because the model had already converged on this pattern. "
-                f"refit=\"stages\" runs "
-                f"{', '.join(s.name for s in self._refit_plan.stages)} in turn.")
-        elif plan is not None and how == "fallback":
-            lines.append(
-                f"    plan: {', '.join(s.name for s in plan.stages)}, in stages, "
-                f"after the one-stage re-fit was discarded.")
-        elif plan is not None and isinstance(how, list):
-            lines.append(
-                f"    plan: {', '.join(s.name for s in plan.stages)}, in stages, "
-                f"because this fit frees {_name_paths(how)}, which the last "
-                f"fit held.")
-        elif plan is not None:
-            lines.append(f"    plan: {', '.join(s.name for s in plan.stages)}")
+        plan_line = self._plan_line()
+        if plan_line is not None:
+            lines.append(f"    {plan_line}")
         rows = self.parameters()
         # exhaustive over ParameterRow.held_because's four reasons, minus
         # "tied" (excluded above: a tied path moves with its source, so it
@@ -7919,10 +8000,8 @@ def _guard_diagnostics(guard) -> list[Diagnostic]:
             message=f"The Stephens strain coefficients of {msg} lie outside "
                     f"the physical cone.{finding.detail}",
             suggestion="Under solver='trf', refit with the default LM "
-                       "driver, which holds σ²(M) ≥ 0 at every reflection; "
-                       "a joint fit holds it under neither driver, so fit "
-                       "each histogram alone or drop the block from the "
-                       "joint fit. That makes the coefficients "
+                       "driver, which holds σ²(M) ≥ 0 at every reflection, "
+                       "in a joint fit too. That makes the coefficients "
                        "admissible, not measured, so compare a few starts "
                        "(StephensStrain.isotropic at different "
                        "microstrains). Do not report the S_HKL as measured. "
