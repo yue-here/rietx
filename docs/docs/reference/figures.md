@@ -252,6 +252,9 @@ The import brings an orthographic camera with the figure's framing, one sun lamp
 Set the render engine to Cycles, make the imported camera the scene's camera, and set the output size to the figure's pixels.
 One glTF unit is one ångström: glTF's unit is the metre, so the cell arrives a few metres wide, which changes nothing in an orthographic view.
 glTF has no background, so the world colour in Blender is the background.
+The key light's intensity is written in lux, `diffuse·π·683`, for Blender's default "Standard" import, which divides by 683 and gets the intended 0.6·π W/m².
+A viewer that takes the lux at face value, such as three.js's `GLTFLoader`, the `Khronos` sample viewer or Blender's `Unitless` mode, draws the scene about 400 times too bright and mostly white.
+The PNG's ambient term has no counterpart in the `.glb`, so the world colour stands in for it, and unlit sides are darker than in the PNG under Blender's default world.
 
 The PNG shades its sRGB colours directly, as the GUI does, and a ray tracer shades in linear light.
 POV-Ray is given the sRGB values and glTF their linear equivalents, so a line or a letter keeps the PNG's colour exactly and the shading of a lit surface differs.

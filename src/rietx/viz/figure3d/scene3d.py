@@ -555,6 +555,14 @@ def glb(scene: dict, R, frame, text: Sequence = ()) -> bytes:
     frame in Å, and the light is ``KHR_lights_punctual``'s directional light,
     pointed as ``LOOK['light']`` is from the camera.  Lines and letters are
     thin cylinders under ``KHR_materials_unlit``.
+
+    The light's intensity is calibrated for Blender's default "Standard"
+    glTF import, which divides lux by 683 and so gets ``diffuse``·π W/m².
+    A viewer that takes the lux at face value (three.js's GLTFLoader, the
+    Khronos sample viewer, Blender's "Unitless" mode) draws the scene about
+    400 times too bright.  The PNG's ``ambient`` term has no counterpart in
+    the file: the importer's world colour stands in for it, so unlit sides
+    are darker than in the PNG under Blender's default world.
     """
     v = _View(scene, R, frame)
     g = _Glb()

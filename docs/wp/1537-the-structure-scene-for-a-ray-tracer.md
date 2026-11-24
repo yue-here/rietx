@@ -1,7 +1,8 @@
 # WP-1537 — the structure scene for a ray tracer: POV-Ray and glTF
 
-Milestone: rietview · Status: ✅ 2026-11-17 — the .pov and .glb writers (PR #1666); the GUI menu, the one-off renders and the validator run moved to #1667
+Milestone: rietview · Status: 🔄 2026-11-24 — the .pov and .glb writers landed (PR #1666); the GUI menu, the one-off renders and the validator run wait, with #1667 as the pointer; the close is decided at the post-merge handover
 Depends on: 1536 soft (the GUI menu lists SVG once it lands)
+Priority: P3 2026-10-02 — a workaround covers it: a CIF opened in Blender's atomic add-on or in VESTA, which loses rietx's bond rules, polyhedra and colours
 
 ## Goal
 
@@ -155,18 +156,21 @@ change.
   unrendered text comparison against a committed small case, and each
   atom's `matrix`, read in POV-Ray's column order, mapping the unit sphere
   onto `pos + M·u` on an ellipsoid whose M is not symmetric.
-- [x] The `.glb` writer. Test: the file parses as GLB (magic, version,
+- [ ] The `.glb` writer. Test: the file parses as GLB (magic, version,
   chunk lengths), node transforms reproduce each atom's `shape` to 1e-12,
   and the validator reports no errors on the corpus. *2026-11-17: built and
-  tested; the Khronos validator's own run moved to #1667.*
+  tested; the Khronos validator's own run waits (#1667): `npx gltf-validator`
+  has no command-line entry point, so it needs a Node script calling
+  `validateBytes`.*
 - [ ] Render the fluorapatite and NAC figures once with POV-Ray and once in
   Blender (Cycles, the imported camera). Commit each beside the PNG under
   `docs/wp/1537-renders/` and record the commands in the handover.
-  *Moved to #1667, 2026-11-17: neither program was installed.*
+  *Waits (#1667, 2026-11-17): neither program was installed on any machine the runner could use.*
 - [ ] The GUI: the route, the export menu (PNG, SVG once 1536 lands,
   POV-Ray, glTF), the manual chapter and a browser test that downloads a
-  `.glb` and checks its header. Rebuild the dist. *Moved to #1667,
-  2026-11-17.*
+  `.glb` and checks its header. Rebuild the dist. *Waits (#1667,
+  2026-11-17): the route must carry the panel's client-side drawing state
+  besides its `View`.*
 - [x] Docs: `docs/manual/using/exports.md` gains a section on ray-tracer
   input, with the POV-Ray command and the Blender import steps. The
   `render_structure` docstring names each suffix. *2026-11-17: that page is
@@ -203,7 +207,7 @@ camera and renders it in Cycles.
 
 ## Handover log
 
-### 2026-11-17 — the .pov and .glb writers; closed (PR #1666, rest to #1667)
+### 2026-11-17 — the .pov and .glb writers (PR #1666, rest waits on #1667)
 
 A structure figure can now leave rietx for a ray tracer: `render_structure`
 with a `.pov` path writes a POV-Ray scene and with a `.glb` path a glTF
@@ -213,8 +217,9 @@ structure's atoms, carried through the written camera as POV-Ray reads it,
 land on the PNG's pixels at the PNG's depths, and the test fails without
 the mirror. Nothing was ray-traced, because neither POV-Ray nor Blender was
 installed on any machine the runner could use, and the GUI menu was not
-started; both moved to issue #1667 with the validator run, and the WP closes
-on the writers.
+started; both wait, with the validator run, behind issue #1667. The WP stays
+open: the maintainer closes it at the post-merge handover (review of #1666,
+2026-11-23).
 
 - **Done**: `viz/figure3d/scene3d.py` (`pov`, `glb`, `ring_sphere`, `trs`);
   `render.py`'s suffix dispatch (`WRITERS`), refusing `outline`/`depth_cue`

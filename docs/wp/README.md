@@ -21,6 +21,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md) | A child structure refined on its mode amplitudes | 2026-10-30 | P3 | [magnetic](#magnetic) |
 | [1453](1453-both-directions-name-the-lower-cost.md) | Both directions name the lower cost | 2026-11-16 | P3 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
 | [1522](1522-the-gui-says-what-the-read-repaired.md) | The GUI says what reading the project repaired | 2026-11-16 | P3 | [Unscheduled](#unscheduled-render-what-the-fit-already-knows) |
+| [1537](1537-the-structure-scene-for-a-ray-tracer.md) | The structure scene for a ray tracer: POV-Ray and glTF | 2026-11-24 | P3 | [rietview](#rietview) |
 | [1539](1539-the-declared-optics-reach-every-caller.md) | The declared optics reach every caller and every reader | 2026-10-03 | P4 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1812](1812-gui-textdoc-skill-and-manual-for-bodies.md) | GUI, textdoc, skill and manual for bodies | 2026-11-17 | P4 | [rigid-bodies](#rigid-bodies) |
 | [1814](1814-refinable-z-matrix-internals.md) | Refinable internal geometry: Z-matrix lengths, angles and dihedrals | 2026-11-09 | P3 | [rigid-bodies](#rigid-bodies) |
@@ -419,7 +420,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1505](1505-rietview-the-figure-leaves-the-package.md) | rietview: the figure leaves the package | ⬜ | P3 | [1504](1504-the-figure-surface-measured-with-real-agents.md) |
 | [1529](1529-what-round-b-found-in-the-figure-surface.md) | What round B found in the figure surface: the skill names figures, a cell draws no bare centre, the report counts every stub | ✅ 2026-10-01 | — | — |
 | [1536](1536-the-structure-figure-as-an-svg.md) | The structure figure as an SVG | ⬜ | P3 | — |
-| [1537](1537-the-structure-scene-for-a-ray-tracer.md) | The structure scene for a ray tracer: POV-Ray and glTF | ✅ 2026-11-17 | — | — ([1536](1536-the-structure-figure-as-an-svg.md) soft) |
+| [1537](1537-the-structure-scene-for-a-ray-tracer.md) | The structure scene for a ray tracer: POV-Ray and glTF | 🔄 2026-11-24 | P3 | — ([1536](1536-the-structure-figure-as-an-svg.md) soft) |
 | [1538](1538-ambient-occlusion-in-the-structure-figure.md) | Ambient occlusion in the structure figure | ⬜ | P3 | — |
 | [1548](1548-depth-cueing-and-filled-faces.md) | Depth cueing, and filled rings and faces, in the structure figure | ✅ 2026-11-13 | — | — ([2111](2111-what-the-structure-figure-still-misleads.md) soft) |
 
