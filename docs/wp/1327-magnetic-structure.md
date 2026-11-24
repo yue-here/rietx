@@ -1,6 +1,6 @@
 # WP-1327 — a magnetic structure: state it, refine it, report what the powder cannot see
 
-Milestone: magnetic · Status: 🔄 2026-11-04 — every task but the Jacobian's has landed; the analytic angle branch exists on request (PR #1403), and turning it on in the solve path waits on issue #1404's design questions
+Milestone: magnetic · Status: 🔄 2026-11-24 — every task has landed or is in review: PR #1731 turns the exact angle columns on in the solve path, as issue #1404's ruling describes; closing the WP is the maintainer's once it merges
 Depends on: 1326 (the satellite reflection list)
 Priority: P2 2026-09-23 — the open milestone's core; the moment and its hold start without 1326's list
 
@@ -532,7 +532,7 @@ rule above applies to the form factors.
       operators and form factors beside `PhaseSites.f_anom`.
 - [x] The flat-direction hold: `moving_paths` and `StageResult.held` for a
       moment block at its floor, re-measured at the answer as 1301 does.
-- [ ] The Jacobian: FD first, then the analytic branch with its
+- [x] The Jacobian: FD first, then the analytic branch with its
       `_column_extras` reach declared, cross-backend rows, the traced twin.
       **FD and the cross-backend `magnetic` row landed. A magnetic phase's
       structural columns take the peak-chain FD column by declared
@@ -544,6 +544,12 @@ rule above applies to the form factors.
       `magnetic_angles_analytic` row; the traced twin declines both by name.
       Open: no solve asks for the angle branch yet, which waits on the escape
       from a symmetry-fixed maximum (issue #1404, a design question).
+      2026-11-24 (PR #1731): every solve builds the angle columns exactly,
+      and a column at most `MOMENT_DIRECTION_SUPPORT` of its sites' modulus
+      column takes the forward difference for that build
+      (`least_squares._moment_angle_on_floor`, issue #1404's ruling); the
+      `moment_angles` keyword is gone. The traced twins still decline a
+      magnetic model by name, so no traced form is owed.
 - [x] The report: moment magnitudes and esds in the parameter table, the
       unmeasured direction named, the approximation named, the hold named;
       QPA untouched, asserted.
@@ -609,6 +615,12 @@ rule above applies to the form factors.
   [1312](1312-neutron-followthrough.md) the joint-fit audit this term joins.
 
 ## Handover log
+
+- **2026-11-24** (Mike, PR #1731, issue #1404) — the exact moment-angle columns are on in every solve. An angle whose exact column is at most `MOMENT_DIRECTION_SUPPORT` (1e-6) of its sites' largest modulus column takes the forward difference for that build, so a start on a direction the symmetry fixes still moves off it. That is the ruling on #1404 (2026-11-06, posted 2026-11-20), and this entry ticks the Jacobian task.
+  *Done.* `least_squares._moment_angle_on_floor` holds the test, `_make_jacobian` asks it per angle column per build, and the `moment_angles` keyword is gone from `_make_jacobian`, `_jacobian_for` and `_moment_reach_ok`. The evidence is the ruling's thirteen rows, in `tests/test_moment_angle_floor.py`, `test_moment_jacobian.py` and `test_magnetic_moment_frame.py`, with the numbers in the PR description.
+  *Measured* (darwin/arm64, `[dev]`, Python 3.12; and linux/x86-64 for rows 4-7). Two rows failed CI on 2026-11-20 because their bars sat under the spread between two independently converged fits (tests/CLAUDE.md § Budgets). Row 3, a minimum on the symmetric direction, now bars χ² at 5e-8 relative above the forward difference, one-sided, and |m| at 1.5e-3 esd: ten times the largest spread measured on CI (4.4e-9 on py3.11, 1.4e-4 esd on py3.14). With the azimuth held at 1.1e-2 rad in the rule arm, it fails both bars (3.9e-7 and 4.9e-3 esd). Row 6, the six deep starts, keeps 1e-6 and stops before the solve plan's last stage, which frees the cell, zero, Biso and profile: the six agree to 8.1e-11, and exact columns alone at the 0.2 rad tilt miss by 1.8e-5. The bars are Mike's provisional call (2026-11-24), for his review.
+  *Gotchas.* χ² along the azimuth on the frame fixture is flat near φ = 0 (near quadratic below about 1e-2 rad, quartic from about 0.07 rad), so a fit's stop wanders along it, and either arm can be the one that wanders: on CI py3.11 it was the forward-difference arm, 1.5e-3 rad off. A bar between two such fits carries the measured spread, never a tighter one.
+  Next: the maintainer reviews #1731 and closes the WP after it merges. `MOMENT_DIRECTION_SUPPORT` gains a third reader, whose audit row belongs with #1636's tiering. #1730 (a cell + moment stage that stops "converged" without the closing stage) stays open. #1611 also names this WP; whichever merges second re-reads this log.
 
 - **2026-11-05** (post-merge record) — PR #1403 merged at `2adc98c70`. Its own entry is below and lacked the sha. Status stays 🔄, and the Jacobian task stays unticked until a solve uses the branch.
 
