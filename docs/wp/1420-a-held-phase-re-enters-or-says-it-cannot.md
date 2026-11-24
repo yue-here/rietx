@@ -1,6 +1,6 @@
 # WP-1420 — a held phase re-enters, or the chain says it cannot
 
-Milestone: unscheduled · Status: 🔄 2026-11-04 — docs landed (#1401); tasks 2-5 wait on #1402
+Milestone: unscheduled · Status: 🔄 2026-11-24 — docs landed (#1401); #1402 ruled 2026-11-21, B1 waits on WP-1419's metric symmetry point
 Track: A long run is not one fit
 Depends on: — (1301 shipped, the hold this is about; 1333 soft, the same
 chain's other silent shape; 1342 soft, the freeze's blind tie; 1419 soft,
@@ -436,9 +436,16 @@ series golden is bit-identical.
   the recipe with its domain); `repro_1420 chains` now prints the largest
   |gap_esd| on the subgroup's cell from `SeriesResult.direction_gaps` in
   place of the removed `SEQUENTIAL_PATH_DEPENDENT` count, with
-  `tests/test_repro_1420.py` pinning the reader. *Next:* the maintainer's
-  answer on whether a hold at onset in 4-6 of 42 chains changes the #1402
-  ruling, whose premise was that the trigger fires in none.
+  `tests/test_repro_1420.py` pinning the reader. *Answered 2026-11-24
+  (maintainer, review of PR #1401):* the hold at onset in 4-6 of 42 chains
+  does not change the #1402 ruling. The trigger tasks 2-5 were built on is a
+  phase held over a run of patterns with Rwp rising; this hold lasts the
+  onset pattern alone and the phase re-enters at the next pattern without
+  help, which is the behaviour this WP asks for. The failure that does
+  reproduce is the wrong side, which B1 keys on. The one-pattern hold is
+  evidence for B1, with no new task; `PHASE_UNCONSTRAINED` already reports
+  it on the entry and `SeriesResult.code_counts` tallies it. *Next:* B1
+  after WP-1419's metric symmetry point lands.
 
 - **2026-11-21** — **The ruling on #1402: A now, then B1 once WP-1419's metric
   symmetry point lands; B2 is decided then.** The maintainer answered the
