@@ -93,7 +93,7 @@ on demand only (a function a caller or agent runs), or the bulge alone always on
   replica table are built as on-demand functions with no always-printed rows
   (#1215, #1216, #1218, and #1568 by this fold), since on all four real patterns
   the scan is never quiet and the replica count is never zero, WP-2037 made
-  quiet the default, and her 2026-11-03 reversal ruled out summary lines
+  quiet the default, and the maintainer's 2026-11-03 reversal ruled out summary lines
   restating what a reader inspects. Their tier-3 constants come back as rows
   later. This settles the "always on, on demand, or the bulge alone" decision
   above for the per-region rows too.
