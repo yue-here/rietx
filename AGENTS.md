@@ -1,11 +1,12 @@
 # Agent instructions
 
 This repository's agent instructions live in `CLAUDE.md` files. The name is
-historical; the content is vendor-neutral, and every rule in them binds any
-agent — and any human — changing this code.
+historical; the content is vendor-neutral, and every rule in them binds anyone
+changing this code.
 
-- Start with the root [`CLAUDE.md`](CLAUDE.md): the package map, the
-  invariants, and the conventions.
+- Start with the root [`CLAUDE.md`](CLAUDE.md): the package map,
+  invariants and conventions. Read the design rules it imports,
+  [`docs/DESIGN-RULES.md`](docs/DESIGN-RULES.md).
 - Subsystem rulebooks apply within their subtrees and do not restate the
   root: [`gui/CLAUDE.md`](gui/CLAUDE.md), [`tests/CLAUDE.md`](tests/CLAUDE.md),
   [`src/rietx/io/CLAUDE.md`](src/rietx/io/CLAUDE.md),
@@ -14,8 +15,7 @@ agent — and any human — changing this code.
   read the agent skill [`docs/skill/rietx/SKILL.md`](docs/skill/rietx/SKILL.md)
   first (it is also installed at `.agents/skills/rietx/` and
   `.claude/skills/rietx/`, so your harness may have loaded it already), then the
-  manual (`docs/docs/`). Nothing in the rulebooks substitutes
-  for either.
+  manual (`docs/docs/`).
 - Learned something *running* it — a rule a batch, a series or a phase type
   needs and a single fit does not? It goes into the skill's reference file for
   that task shape, in the form [`CONTRIBUTING.md`](CONTRIBUTING.md) § The
