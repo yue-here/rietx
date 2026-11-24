@@ -187,6 +187,7 @@ from .profiles.voigt import (
     voigt,
     voigt_basis,
     voigt_derivs,
+    voigt_fwhm,
 )
 from .restraints import (
     CompiledRestraints,
@@ -221,9 +222,10 @@ from .restraints import (
 #: Since WP-2002 it is the **declared stages'** fraction only.  The answer is
 #: measured in the closing stage at ``schemas.plan.CLOSING_WINDOW_TOL``, and
 #: every compile that does not say otherwise uses that fraction too: a
-#: ``predict`` on a grid, a synthetic pattern, a stage run by hand (the
-#: seventh round's Q1).  The plan runner asks for this one by name, through
-#: :func:`recorded_window_tol`.
+#: ``predict`` on a grid before any fit, a synthetic pattern, a stage run by
+#: hand (the seventh round's Q1).  After a fit, ``predict`` on a grid compiles
+#: at the last stage's fraction (WP-2235).  The plan runner asks for this
+#: one by name, through :func:`recorded_window_tol`.
 WINDOW_AREA_TOL = 2e-2
 #: Absolute slack added to every half-width: windows are frozen per stage,
 #: so a peak must stay inside its window while zero-shift, displacement and
@@ -612,7 +614,7 @@ def _line_image_deg(tt_primary, lam_ratio: float, xp):
 
     sin θ_l = (λ_l/λ_0)·sin θ_0, which is the same ghost transform
     ``background.diagnostics`` uses and the same one
-    ``indexing.peakfit._line_pos`` applies to a fitted position.  Written in
+    ``indexing.peakfit._GroupModel._line_pos`` applies to a fitted position.  Written in
     ``xp`` ops because ``tt_primary`` is θ-derived: this is on the traced path
     for every backend.
 
@@ -1080,7 +1082,7 @@ class CompiledModel:
     # (WP-1912, Flack & Schwarzenbach 1988; ``model.origin``): one row per
     # direction this solve's free set can slide the phase along.  ``None``
     # everywhere else, and then no row exists.  Written by the stage runner
-    # (``refine._attach_origin``) once the stage's free set is final, since
+    # (``model.origin.compile_origin``) once the stage's free set is final, since
     # the rows depend on it and ``compile_model`` sees only what may move; so
     # frozen per solve, never per evaluation.  Its own block below the soft
     # restraints, and deliberately NOT scaled by ``restraint_weight_scale``:
@@ -1227,7 +1229,10 @@ class CompiledModel:
         because it answers a question about the *goniometer*: "how narrow can a
         real reflection be here?".  That is the scale a background peak's width
         is judged against (``strategy.staged.check_hump_width``), and
-        it must not depend on which phase one happens to ask about.
+        it must not depend on which phase one happens to ask about.  It reads
+        the TCH quintic under either shape, so under ``"voigt"`` it sits up to
+        0.43 % from :meth:`peak_fwhm`'s Olivero-Longbothum width (WP-1926): a
+        scale, not a reported width.
 
         Evaluate-only and off the hot path: plain floats in, the shared
         ``profiles`` functions through the active backend.
@@ -2110,23 +2115,30 @@ class CompiledModel:
         function need".  Under TCHZ ``w1`` already *is* Γ; under the true Voigt
         the pair is (σ, γ_HWHM), which inverts to the component FWHMs exactly
         (:func:`~rietx.model.profiles.voigt.fwhm_to_voigt_params` is two
-        divisions) and then goes through the same TCH quintic.  That last step
-        is the ~1 % approximation ``compile_model`` already relies on for
-        window sizing and FCJ node counts, and for the same reason: the quintic
-        is *fit* to the true Voigt FWHM.
+        divisions) and then goes through Olivero & Longbothum (1977)
+        (:func:`~rietx.model.profiles.voigt.voigt_fwhm`, 0.024 % worst), the width of
+        the shape actually evaluated (WP-1926, decided 2026-10-08).  The TCH
+        quintic (0.43 % worst against the Voigt) stays what
+        :meth:`peak_gamma_eta` returns, because window sizing and FCJ node
+        counts read it under either shape and are frozen per stage.
 
         Evaluate-only, and never in the hot loop — nothing in the residual
         needs a combined width.
         """
+        if self.shape == "voigt":
+            return voigt_fwhm(np.asarray(w1, dtype=np.float64) * GAUSS_FWHM_TO_SIGMA,
+                              2.0 * np.asarray(w2, dtype=np.float64))
         return self.peak_gamma_eta(w1, w2)[0]
 
     def peak_gamma_eta(self, w1: np.ndarray, w2: np.ndarray
                        ) -> tuple[np.ndarray, np.ndarray]:
         """TCHZ (Γ, η) from a :meth:`phase_peaks` width pair, under either shape.
 
-        :meth:`peak_fwhm`'s reading with the mixing parameter beside it, for a
+        The TCH quintic's reading with the mixing parameter beside it, for a
         consumer that sizes a window by ``compile_model``'s rule
-        (:func:`rewindow`).  Evaluate-only, like :meth:`peak_fwhm`.
+        (:func:`rewindow`).  Under ``"voigt"`` its Γ is the quintic, not
+        :meth:`peak_fwhm`'s Olivero-Longbothum width: window sizing keeps the
+        rule ``compile_model`` froze.  Evaluate-only, like :meth:`peak_fwhm`.
         """
         if self.shape == "voigt":
             gam_g = np.asarray(w1, dtype=np.float64) * GAUSS_FWHM_TO_SIGMA
@@ -4889,7 +4901,8 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                     l_est = np.maximum(l_est + extra_l, 0.0)
                 # TCHZ combined (Γ, η) is a compile-time proxy for window sizing
                 # and FCJ node counts under *both* shapes: it tracks the true
-                # Voigt FWHM to ~1 % (that is what the TCH quintic is fit to),
+                # Voigt FWHM to 0.43 % at worst (measured, tests/test_voigt.py;
+                # that is what the TCH quintic is fit to),
                 # far inside the area criterion's own resolution.
                 gamma_est, eta_est = tch_gamma_eta(g_est, l_est)
                 if primary:
@@ -5188,7 +5201,7 @@ def window_sizing(model: CompiledModel, values: dict[str, float],
     ``compile_model``'s rule: a half-width of k(η)·Γ plus the slack, plus the
     FCJ extent while the aberration acts.  It reads the peaks the forward
     model draws at ``values`` (``phase_peaks``) where the compile reads its
-    own width estimate, so the two agree to that estimate's ~1 % and not to
+    own width estimate, so the two agree to that estimate's 0.43 % and not to
     the bit; k(η) comes off :func:`window_fwhm_mult_interp`'s table.  The
     arrays have the compile's shapes, so a caller can compare them with
     ``CompiledPhase.win`` and ``.fcj_n`` before building anything.  The

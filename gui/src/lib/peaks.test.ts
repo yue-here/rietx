@@ -28,6 +28,7 @@ import {
   intensityScale,
   joinCurves,
   nearestPeak,
+  RELATION_KINDS,
   searchCoverage,
   type Candidate,
   type GroupCurve,
@@ -285,5 +286,13 @@ describe("what the search covered (WP-1042, WP-2130)", () => {
   it("says nothing was searched rather than failing on an empty result", () => {
     expect(searchCoverage(null)).toEqual({ searched: [], incomplete: [] });
     expect(searchCoverage({})).toEqual({ searched: [], incomplete: [] });
+  });
+});
+
+describe("the candidate table's relations (WP-2240, the third look)", () => {
+  it("open a corpus entry python wrote, one per relation the table names", () => {
+    for (const kind of RELATION_KINDS) expect(HELP_KEYS).toContain(`cell_relations:${kind}`);
+    expect(HELP_KEYS.filter((k) => k.startsWith("cell_relations:")).length)
+      .toBe(RELATION_KINDS.length);
   });
 });
