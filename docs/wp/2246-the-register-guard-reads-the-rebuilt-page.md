@@ -94,7 +94,7 @@ acceptance row 3 names this WP.
 
 ## Handover log
 
-- **2026-11-24** — created, from the 2026-11-24 issue triage (issue #1656 item 2). Checked
+- **2026-11-24** — created, from the 2026-11-24 issue triage (issue #1656 item 2; PR #1827). Checked
   against the tree at `ce9f2de00`: `styledFiles()` still lists `App.svelte` and
   `panels/*.svelte` only, and the measurement above reproduces WP-2231's geometry and
   font-size counts exactly (6 and 2) while the filled-button count has grown from 45 to 69
