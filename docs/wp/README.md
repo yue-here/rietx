@@ -43,7 +43,6 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2005](2005-refine-py-codes-and-literals.md) | `refine.py`'s codes and its inline literals | 2026-11-21 | P3 | [generality](#generality-the-audits) |
 | [2006](2006-readers-crystallography-gui-and-the-dead-surface.md) | Readers, crystallography and GUI codes, and the dead surface | 2026-10-24 | P3 | [generality](#generality-the-audits) |
 | [2008](2008-the-skill-read-against-the-table.md) | The skill slimmed to the API, the feedback surface and sourced traps | 2026-11-19 | P3 | [generality](#generality-the-prose) |
-| [2009](2009-the-rulebooks-findings-out-generators-rewritten.md) | The rulebooks: findings out, and the rules that generate overfit rewritten | 2026-11-22 | P3 | [generality](#generality-the-prose) |
 | [2010](2010-every-feature-names-what-verifies-and-validates-it.md) | Every feature names what verifies it and what validates it | 2026-11-01 | P3 | [generality](#generality-the-audits) |
 | [2012](2012-the-axial-ratios-are-interchangeable.md) | The two axial-divergence ratios are interchangeable, and a fit reports one branch | 2026-11-03 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2017](2017-the-second-pass-every-tier-3-threshold-on-three-families.md) | The second pass: every surviving tier-3 threshold measured on three families | 2026-11-05 | P2 | [generality](#generality-the-audits) |
@@ -55,14 +54,11 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2072](2072-the-le-bail-and-pawley-cell-against-the-srm-660c-certificate.md) | The Le Bail and Pawley cell, validated against the SRM 660c certificate | 2026-11-16 | P3 | [Unscheduled](#unscheduled-the-fit-has-no-reference) |
 | [2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md) | The extinction screen names a wrong class at a correct cell | 2026-11-13 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-16 | P2 | [series](#series) |
-| [2081](2081-how-a-series-holds-what-the-setup-fixes.md) | How a series holds what the setup fixes (a design discussion) | 2026-11-22 | P2 | [series](#series) |
 | [2140](2140-every-atom-is-named-by-its-unique-label.md) | Every atom is named by its unique label | 2026-11-16 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [2149](2149-a-reduced-panel-names-the-systems-searched.md) | INDEX_PANEL_REDUCED names the systems the run searched | 2026-11-17 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2211](2211-the-history-table.md) | The History table: Compare on the pattern, Restore as pending edits | 2026-11-23 | P2 | [gui-overhaul](#gui-overhaul) |
-| [2220](2220-a-comparison-says-which-fits-it-rests-on.md) | A nested comparison says which fits it rests on, and which freed columns carried information | 2026-11-20 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2221](2221-a-group-with-no-tabulated-type-reaches-the-report.md) | A phase whose group has no tabulated type still gets its report and its CIF | 2026-11-21 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2227](2227-the-gui-shows-how-a-refine-ran.md) | The GUI shows how a refine ran: in one stage or in stages | 2026-11-22 | P2 | [gui-overhaul](#gui-overhaul) |
-| [2230](2230-an-estimable-combination-keeps-its-esd.md) | An estimable combination keeps its esd | 2026-11-21 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2230](2230-an-estimable-combination-keeps-its-esd.md) | An estimable combination keeps its esd | 2026-11-23 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2231](2231-the-plan-and-text-tabs.md) | The Plan and Text tabs at `/next`: a plan read as a recipe with Free and Fix rows, and a text buffer whose edits ride the action bar | 2026-11-22 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2238](2238-the-decision-machinery.md) | The decision machinery: fewer calls reach the maintainer, and each ruling is reused | 2026-11-22 | P2 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2243](2243-the-series-workflow.md) | The series workflow at `/next`: patterns, first fit, run, results, with Trends and Map | 2026-11-23 | P2 | [gui-overhaul](#gui-overhaul) |
@@ -489,7 +485,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | WP | Title | Status | Priority | Depends on |
 |---|---|---|---|---|
 | [2008](2008-the-skill-read-against-the-table.md) | The skill slimmed to the API, the feedback surface and sourced traps | 🔄 2026-11-19 | P3 | [2001](2001-the-rule-the-table-and-the-guard.md), [2002](2002-the-single-fit-actions.md), [2003](2003-the-chain-actions.md), [2004](2004-the-fitreport-reasons-for-the-caller.md) ([2005](2005-refine-py-codes-and-literals.md), [2006](2006-readers-crystallography-gui-and-the-dead-surface.md), [2007](2007-indexing-codes-constants-and-gates.md) soft) |
-| [2009](2009-the-rulebooks-findings-out-generators-rewritten.md) | The rulebooks: findings out, and the rules that generate overfit rewritten | 🔄 2026-11-22 | P3 | [2001](2001-the-rule-the-table-and-the-guard.md) ([2008](2008-the-skill-read-against-the-table.md) soft) |
+| [2009](2009-the-rulebooks-findings-out-generators-rewritten.md) | The rulebooks: findings out, and the rules that generate overfit rewritten | ✅ 2026-11-23 | — | [2001](2001-the-rule-the-table-and-the-guard.md) ([2008](2008-the-skill-read-against-the-table.md) soft) |
 
 ## <a id="parametric"></a>parametric — a parametric refinement written by hand ports to rietx
 
@@ -551,7 +547,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | WP | Title | Status | Priority | Depends on |
 |---|---|---|---|---|
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 🔄 2026-11-16 | P2 | [2003](2003-the-chain-actions.md) |
-| [2081](2081-how-a-series-holds-what-the-setup-fixes.md) | How a series holds what the setup fixes (a design discussion) | 🔄 2026-11-22 | P2 | — ([2003](2003-the-chain-actions.md) soft) |
+| [2081](2081-how-a-series-holds-what-the-setup-fixes.md) | How a series holds what the setup fixes (a design discussion) | ✅ 2026-11-23 | — | — ([2003](2003-the-chain-actions.md) soft) |
 | [2300](2300-a-series-declares-each-parameter.md) | A series declares each parameter, and refuses what it cannot honour | ⬜ | P2 | [2305](2305-the-joint-call-speaks-of-patterns.md) |
 | [2301](2301-the-typical-temperature-series.md) | The typical temperature series: one route, a preset, and a Switching page | ⬜ | P3 | [2300](2300-a-series-declares-each-parameter.md) |
 | [2305](2305-the-joint-call-speaks-of-patterns.md) | The joint call speaks of patterns and is named a joint refinement | ⬜ | P2 | — |
@@ -716,13 +712,13 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2144](2144-the-anti-bump-same-body-skip-under-a-torsion.md) | The anti-bump same-body skip, now that a torsion moves the pair | ✅ 2026-11-13 | — | — |
 | [2147](2147-the-weak-line-retry-on-a-superlattice-with-a-trace.md) | The weak-line retry on a superlattice that also carries a trace phase | ✅ 2026-11-18 | — | [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) |
 | [2148](2148-a-held-standard-cell-pins-the-wavelength.md) | A held standard's cell pins the wavelength, and a skipped λ is said | ⬜ | P2 | — |
-| [2149](2149-a-reduced-panel-names-the-systems-searched.md) | INDEX_PANEL_REDUCED names the systems the run searched | 🔄 2026-11-17 | P3 | — |
+| [2149](2149-a-reduced-panel-names-the-systems-searched.md) | INDEX_PANEL_REDUCED names the systems the run searched | ✅ 2026-11-23 | — | — |
 | [2150](2150-a-tied-cell-value-that-contradicts-its-symmetry.md) | A tied cell value that contradicts its space group is repaired at read or refused | ✅ 2026-11-19 | — | — |
 | [2219](2219-a-direction-the-data-does-not-determine-has-no-esd.md) | A direction the data does not determine has no esd | ✅ 2026-11-21 | — | — ([2028](2028-a-joint-fits-guards-see-every-histogram.md) soft) |
-| [2220](2220-a-comparison-says-which-fits-it-rests-on.md) | A nested comparison says which fits it rests on, and which freed columns carried information | 🔄 2026-11-20 | P2 | — ([2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md), [2053](2053-a-split-site-the-data-cannot-tell-says-so.md) soft) |
+| [2220](2220-a-comparison-says-which-fits-it-rests-on.md) | A nested comparison says which fits it rests on, and which freed columns carried information | ✅ 2026-11-23 | — | — ([2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md), [2053](2053-a-split-site-the-data-cannot-tell-says-so.md) soft) |
 | [2221](2221-a-group-with-no-tabulated-type-reaches-the-report.md) | A phase whose group has no tabulated type still gets its report and its CIF | 🔄 2026-11-21 | P2 | — ([1918](1918-a-magcif-read-in-its-own-cell-and-validated.md) soft) |
 | [2228](2228-a-reflection-past-the-range-end-keeps-its-tail.md) | A reflection centred past the range end keeps its tail | ⬜ | P2 | [2222](2222-the-closing-stage-off-by-default.md) ([2075](2075-the-result-records-its-fit-range-and-what-lies-outside-it.md) soft) |
-| [2230](2230-an-estimable-combination-keeps-its-esd.md) | An estimable combination keeps its esd | 🔄 2026-11-21 | P3 | [2219](2219-a-direction-the-data-does-not-determine-has-no-esd.md) ([2062](2062-pawley-is-the-structure-free-default.md) soft) |
+| [2230](2230-an-estimable-combination-keeps-its-esd.md) | An estimable combination keeps its esd | 🔄 2026-11-23 | P3 | [2219](2219-a-direction-the-data-does-not-determine-has-no-esd.md) ([2062](2062-pawley-is-the-structure-free-default.md) soft) |
 | [2232](2232-a-size-near-no-broadening-is-a-bound.md) | A size near no broadening is quoted as a bound | ⬜ | P3 | — ([2060](2060-the-likelihood-interval-where-an-esd-cannot-be-read.md) soft) |
 | [2239](2239-a-joint-stage-seeds-and-holds-a-stephens-block.md) | A joint stage seeds and holds a Stephens block as a single fit does | ✅ 2026-11-22 | — | — |
 | [2302](2302-a-wrong-choice-is-refused-at-the-call.md) | A wrong choice is refused at the call, and a requested window has one name | ⬜ | P2 | — |
