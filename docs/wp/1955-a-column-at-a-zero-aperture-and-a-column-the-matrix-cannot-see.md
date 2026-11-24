@@ -1,6 +1,6 @@
 # WP-1955 — a column at a zero aperture, and a column the agreement matrix cannot see
 
-Milestone: unscheduled · Status: 🔄 2026-11-03 — tasks 1-5 landed (PRs #1321, #1372): the exact column and the lift off a zero aperture; tasks 6-8 open
+Milestone: unscheduled · Status: 🔄 2026-11-24 — claimed by a ghostshift runner to fix main's red gate test; tasks 1-5 landed (PRs #1321, #1372); tasks 6-8 open
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-11-03 — the stall and the collapse are fixed (tasks 2 and 5, PR #1372); left are the start value's evidence across families, the Gaussian-width floor and suggest's scoring of a zero aperture
@@ -213,6 +213,19 @@ alone.
   **27**, 892-900.
 
 ## Handover log
+
+- **2026-11-23** (reconstructed post hoc) — One commit on PR #1372 after the
+  last entry, 19f07b251 (Mike), recorded here by the 2026-11-24 repair.
+  `test_an_aperture_an_earlier_stage_refined_is_not_lifted_again` had run on
+  data with S/L = H/L = 0.03, so stage 1 left both apertures off zero and the
+  test passed with the `refined_before` gate removed. It now runs on data
+  with no axial asymmetry, reads where stage 1 left H/L off the event
+  stream's last accepted evaluation, asserts that value is exactly 0, and
+  asserts stage 2 seeded nothing. The same commit stopped the release note
+  calling the aperture columns exact (a second-order difference, within 5e-4
+  of the exact column at one zero aperture), and the note and both help
+  entries now say the lift also moves a row sitting on a positive lower
+  bound. The commit message gives these reasons; nothing else is known.
 
 - **2026-11-05** — Yue's review of #1372, six items before merge (ghostshift
   autopilot `ap_1372_1`, Sonnet; Yue's checks quoted below are his).
