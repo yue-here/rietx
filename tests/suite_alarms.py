@@ -60,7 +60,9 @@ FLAT_TRIPLE = ("phases.0.gauss_size", "phases.0.gauss_strain", "instrument.profi
 #: ``gauss_strain`` at four starts.  Corundum and brucite gave one set at all
 #: seven.  The pin holds what the platforms share, so :func:`firing_table`
 #: leaves these findings out, and every other finding on these standards is
-#: still pinned.
+#: still pinned.  Those starts ran without the closing stage.  With it
+#: declared, as the standards do since 2026-11-23, all four gave one set at
+#: all seven on macOS arm64; the set stays until Linux has read that protocol.
 ROUNDING = {"fluorite": frozenset({"COVARIANCE_DIRECTION_DISCARDED", "FLOOR_HIT"}),
             "zincite": frozenset({"FLOOR_HIT"})}
 

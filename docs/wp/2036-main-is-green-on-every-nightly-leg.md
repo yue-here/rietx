@@ -287,12 +287,17 @@ nightly (run 41305369905, `f4db7763`): 3 failed, 14 146 passed, in 1:35:05.
       slowest pass, on the Windows job's precedent above.*
 - [x] The suite alarm pin red on main since #1707: bisect, explain each moved code,
       re-pin. *Done 2026-11-20 (PR #1723); the reasons are in the handover entry.*
-- [ ] The comparison standards' plans run no closing stage since #1708, while all seven
+- [x] The comparison standards' plans run no closing stage since #1708, while all seven
       acceptance suites they mirror declare `closing_window_tol = 1e-3`.
       `test_compare_ui.py` compares stage lists only, so nothing caught it. Waits on the
       maintainer: declare it in `viz.compare` (moves the example projects and every
       test that builds on the standards), or record that the standards follow
-      the package default.
+      the package default. *Done 2026-11-23 (PR #1816). Every standard declares
+      `CLOSING_WINDOW_TOL`, and the protocol tests compare whole plans. The example
+      projects keep the package default for that one field, so a first fit, a guide
+      and the GUI are unchanged. Settled by Claude; the grounds are in the handover
+      entry. The alarm pin lost brucite's `CONSTRAINT_ACTIVE` info, and zincite left
+      the triple row (WP-1460's Inherited).*
 
 **Added 2026-11-21** (ghostshift runner), from the 2026-11-20 and 2026-11-21 nightlies
 (runs 44754238414 and 44910841692), each red on the alarm pin's row alone.
