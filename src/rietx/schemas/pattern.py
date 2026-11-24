@@ -41,6 +41,20 @@ AXIS_UNITS: dict[str, str] = {"two_theta": "degrees", "tof": "microseconds (µs)
 TOF_NOT_EVALUATED = "not evaluated for a time-of-flight histogram"
 
 
+def is_tof_model(model) -> bool:
+    """Whether a compiled model's grid is a flight time.
+
+    Asked of the *model*, never of the instrument or the pattern: by the time a
+    diagnostic runs, the compiled model is the authority on which forward
+    branch produced the numbers it is about.  ``getattr`` with the
+    constant-wavelength default, so a stand-in in a test needs no field.  The
+    one spelling of the test (#1548 review, follow-up 9); here rather than in
+    ``refine`` so ``model``, ``optimize``, ``report`` and ``strategy`` can
+    import it without a cycle.
+    """
+    return getattr(model, "axis", "two_theta") == "tof"
+
+
 #: The count under which the Poisson fallback stops falling: σ = √max(y, 1),
 #: so a channel that counted zero is weighted as one count, as TOPAS weights
 #: a file without esds, 1/Max(Yobs, 1) (Technical Reference § 6.2).

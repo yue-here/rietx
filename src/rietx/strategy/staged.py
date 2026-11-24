@@ -21,6 +21,7 @@ from typing import Literal
 
 from .._nearmiss import did_you_mean
 from ..schemas.common import Mode
+from ..schemas.pattern import is_tof_model
 
 # INTERMEDIATE_FTOL, INTERMEDIATE_LORENTZ_WINDOW_TOL, CORRELATION_GUARD,
 # PHASE_SUPPORT_SIGMA and CLOSING_WINDOW_TOL are defined beside the mirror
@@ -1611,7 +1612,7 @@ def check_hump_width(table, model) -> list[GuardFinding]:
 
     if model is None or not model.component_paths:
         return []
-    if getattr(model, "axis", "two_theta") != "two_theta":
+    if is_tof_model(model):
         return []  # see the docstring: no common unit, and the caller says so
     values = {e.path: e.value for e in table.entries}
     out: list[GuardFinding] = []
@@ -1937,7 +1938,7 @@ def check_resolution_supported(table, model) -> list[GuardFinding]:
 
     if model is None:
         return []
-    if getattr(model, "axis", "two_theta") != "two_theta":
+    if is_tof_model(model):
         return []  # a bank's resolution is ProfileTOF's, not Caglioti's
     moving = set(table.moving_paths)
     freed = tuple(p for p in GAUSSIAN_RESOLUTION_PATHS if p in moving)
@@ -2198,7 +2199,7 @@ def check_resolution_positive(table, model) -> list[GuardFinding]:
 
     if model is None:
         return []
-    if getattr(model, "axis", "two_theta") != "two_theta":
+    if is_tof_model(model):
         return []  # a bank's resolution is ProfileTOF's, not Caglioti's
     tt = np.asarray(model.tt, dtype=np.float64)
     if tt.size == 0:

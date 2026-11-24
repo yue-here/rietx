@@ -116,7 +116,7 @@ from ..schemas.instrument import (
     BackgroundPSpline,
     Instrument,
 )
-from ..schemas.pattern import PatternData, SigmaRule, require_two_theta
+from ..schemas.pattern import PatternData, SigmaRule, is_tof_model, require_two_theta
 
 # PHASE_SUPPORT_SIGMA is re-exported beside the screen it is read against
 # (``phase_support``); the plan carries the number since WP-2002 B1, so it is
@@ -5386,7 +5386,7 @@ def window_loss(model: CompiledModel, values: dict[str, float]) -> float | None:
     pseudo-Voigt windows in 2θ, and a bank's windows are sized per side by
     ``forward_tof.TOF_WINDOW_AREA_TOL`` at compile, with no twin of it here.
     """
-    if getattr(model, "axis", "two_theta") != "two_theta":
+    if is_tof_model(model):
         return None
     fresh = np.asarray(rewindow(model, values).bragg_component(values),
                        dtype=np.float64).sum()

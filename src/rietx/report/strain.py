@@ -68,6 +68,7 @@ from ..crystallography.stephens import monomial_matrix, stephens_basis
 from ..crystallography.symmetry import resolve_group
 from ..model.forward import CompiledModel
 from ..optimize import lapack
+from ..schemas.pattern import is_tof_model
 from .schemas import (
     STRAIN_MAX_GRAM_CONDITION,
     STRAIN_MIN_ANISOTROPY,
@@ -348,7 +349,7 @@ def analyse_strain(model: CompiledModel, values: dict[str, float], *,
     # block outright, so there is nothing to look for here either — but this is
     # the boundary, and a check at the boundary is what stops the module being
     # reached with the wrong quantity.
-    if model.mode != "rietveld" or getattr(model, "axis", "two_theta") != "two_theta":
+    if model.mode != "rietveld" or is_tof_model(model):
         return []
     out: list[StrainAnalysis] = []
     for ip, cp in enumerate(model.phases):

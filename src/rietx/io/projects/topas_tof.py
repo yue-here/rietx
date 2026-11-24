@@ -80,6 +80,10 @@ from dataclasses import dataclass, field, replace
 
 import numpy as np
 
+# The TCH coefficients rietx's pseudo-Voigt uses (Thompson, Cox & Hastings,
+# 1987, J. Appl. Cryst. 20, 79, eqs. 4-5), imported rather than restated so a
+# `.inp` carries exactly the Γ and η the model computes.
+from ...model.profiles.pseudovoigt import _TCH_ETA, _TCH_GAMMA
 from ...schemas.common import Parameter
 from . import topas as _topas
 from .topas import TopasInpError
@@ -88,12 +92,6 @@ from .topas import TopasInpError
 LN1000 = math.log(1000.0)
 #: b² in barn per b² in fm² — the unit factor between the two codes' |F|².
 BARN_PER_FM2 = 0.01
-#: The TCH coefficients rietx's pseudo-Voigt uses (Thompson, Cox & Hastings,
-#: 1987, *J. Appl. Cryst.* **20**, 79, eqs. 4-5), restated so a ``.inp`` can
-#: carry the same Γ and η as an equation.
-_TCH_GAMMA = (2.69269, 2.42843, 4.47163, 0.07842)
-_TCH_ETA = (1.36603, -0.47719, 0.11116)
-_SQRT_8LN2 = math.sqrt(8.0 * math.log(2.0))
 #: Where a law is sampled to decide whether rietx's reproduces it: the d range
 #: of every bank in the archive and beyond, so a term that matters anywhere a
 #: reflection could be is seen.

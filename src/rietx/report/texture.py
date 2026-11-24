@@ -36,6 +36,7 @@ from ..crystallography.lattice import reciprocal_metric_tensor
 from ..crystallography.symmetry import reflection_orbits, resolve_group
 from ..model.forward import CompiledModel
 from ..model.preferred_orientation import cos2_alpha, march_term, orbit_layout
+from ..schemas.pattern import is_tof_model
 from .schemas import (
     TEXTURE_MIN_R2,
     TEXTURE_MIN_REFLECTIONS,
@@ -201,7 +202,7 @@ def analyse_texture(model: CompiledModel, values: dict[str, float], *,
     # time-of-flight bank every reflection shares one — the correction has a
     # different form there, not a different value, and ``compile_tof_model``
     # refuses a declared block outright.
-    if model.mode != "rietveld" or getattr(model, "axis", "two_theta") != "two_theta":
+    if model.mode != "rietveld" or is_tof_model(model):
         return []
     corrections = _extracted_corrections(model, values)
     axes = _candidate_axes(max_index)

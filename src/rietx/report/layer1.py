@@ -41,6 +41,7 @@ import numpy as np
 
 from ..model.forward import CompiledModel, DerivativeBases
 from ..optimize import lapack
+from ..schemas.pattern import is_tof_model
 from .schemas import (
     CONTENTS_MAX_TEMPLATE_R2,
     CONTENTS_MIN_INTENSITY_SHARE,
@@ -290,7 +291,7 @@ def attribute_regions(model: CompiledModel, values: dict[str, float],
     this is the module's own boundary, so calling it directly cannot produce
     the silent nonsense either.
     """
-    if getattr(model, "axis", "two_theta") != "two_theta":
+    if is_tof_model(model):
         return []
     y_calc = model.evaluate(values)
     delta = model.y_obs - y_calc

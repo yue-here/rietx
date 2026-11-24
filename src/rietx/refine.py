@@ -171,6 +171,7 @@ from .schemas.interval import PARAMETER_INTERVAL_LEVEL, PARAMETER_INTERVAL_MAX_R
 from .schemas.params import ParameterRow, TieSpec
 from .schemas.pattern import (
     PatternData,
+    is_tof_model,
     require_matched_axis,
     require_two_theta,
 )
@@ -620,7 +621,7 @@ def _is_tof(model) -> bool:
     branch produced the numbers it is about.  ``getattr`` with the
     constant-wavelength default so a stand-in in a test needs no field.
     """
-    return getattr(model, "axis", "two_theta") == "tof"
+    return is_tof_model(model)
 
 
 def _recorded_stage_window_tol(model, tol: float | None) -> float | None:
@@ -12343,7 +12344,7 @@ def _range_text(*models) -> str:
     """
     lo = min(m.x_min for m in models)
     hi = max(m.x_max for m in models)
-    if all(getattr(m, "axis", "two_theta") == "two_theta" for m in models):
+    if not any(is_tof_model(m) for m in models):
         return f"{lo:.4g}-{hi:.4g}°"
     return f"{lo:.4g}-{hi:.4g} µs"
 

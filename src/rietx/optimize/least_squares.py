@@ -62,6 +62,7 @@ from ..params.vector import (
     tof_size_cap,
     tof_strain_cap,
 )
+from ..schemas.pattern import is_tof_model
 from ..schemas.results import MomentAngleTest
 from . import blocked, lapack
 from .blocked import BlockJacobian
@@ -3497,7 +3498,7 @@ def _freeze_strain_cap(model: CompiledModel, table: ParameterTable) -> None:
     A model carrying no frozen d range or DIFC still declares nothing, and
     "no bound" and "a bound that happens to be infinite" stay different facts.
     """
-    if getattr(model, "axis", "two_theta") != "two_theta":
+    if is_tof_model(model):
         table.freeze_strain_cap(_tof_model_strain_cap(model))
         return
     table.freeze_strain_cap(strain_cap(model.tt_min, model.tt_max))
@@ -3528,7 +3529,7 @@ def _freeze_strain_cap_multi(models: list[CompiledModel],
     column by the scans alone.
     """
     caps = [strain_cap(m.tt_min, m.tt_max)
-            if getattr(m, "axis", "two_theta") == "two_theta"
+            if not is_tof_model(m)
             else _tof_model_strain_cap(m)
             for m in models]
     caps = [c for c in caps if c is not None]
@@ -3605,7 +3606,7 @@ def _freeze_size_cap(model: CompiledModel, table: ParameterTable) -> None:
     the strain rule with d² for d (:func:`~rietx.params.vector.tof_size_cap`).
     Reusing the angular cap would have been a bound whose units do not match.
     """
-    if getattr(model, "axis", "two_theta") != "two_theta":
+    if is_tof_model(model):
         table.freeze_size_cap(_tof_model_size_cap(model))
         return
     table.freeze_size_cap(size_cap(model.tt_min, model.tt_max))
