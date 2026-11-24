@@ -123,6 +123,7 @@ from .sequential import SequentialRefinement, refine_sequential
 from .strategy.magnetic import (
     MagneticSolution,
     MagneticTrial,
+    MomentMinimum,
     MomentRow,
     solve_magnetic,
 )
@@ -167,6 +168,7 @@ __all__ = [
     "MagneticTrajectory",
     "MagneticSolution",
     "MagneticTrial",
+    "MomentMinimum",
     "MomentRow",
     "Parameter",
     "ParameterCandidate",

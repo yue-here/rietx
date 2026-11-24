@@ -484,7 +484,7 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
                 "`references/magnetic.md` for what each reading must not be "
                 "taken to mean. Provisional: the criterion may still move.",
                 ("rx.solve_magnetic", "rx.MagneticSolution", "rx.MagneticTrial",
-                 "rx.MomentRow"),
+                 "rx.MomentMinimum", "rx.MomentRow"),
             ),
             (
                 "Displacive mode amplitudes",

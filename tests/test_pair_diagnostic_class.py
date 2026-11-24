@@ -207,6 +207,12 @@ def test_distinct_minima_are_counted_by_moduli_not_by_rwp():
     step = rtol * 3.5
     assert count(truth, {"Mn1": 3.5, "Mn2": 0.7 + 0.9 * step}) == [("s0", "s1")]
     assert count(truth, {"Mn1": 3.5, "Mn2": 0.7 + 1.1 * step}) == [("s0",), ("s1",)]
+    # the tolerance is read against the largest |m|, so a weak site beside a
+    # strong one cannot separate two minima by itself: 0.3 against 0.6 beside
+    # 3.5 differs by 0.3, under 0.1 * 3.5, and counts as one (the documented
+    # limit in the constant's comment, not a measured property of real data)
+    assert count({"Mn1": 3.5, "Mn2": 0.3},
+                 {"Mn1": 3.5, "Mn2": 0.6}) == [("s0", "s1")]
     # two removed moments are one minimum; a removed and a kept one are two
     floor = MOMENT_FLOOR_MU_B
     assert count({"Mn1": 0.2 * floor, "Mn2": 0.0},

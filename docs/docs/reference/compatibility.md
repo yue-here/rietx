@@ -136,7 +136,7 @@ to move are declared rather than left to be inferred:
   than refused, and an unknown key in one of the JSON sidecars is ignored.
 - Magnetic structure *determination* is provisional as a subsystem.
   `solve_magnetic` and the answer it returns (`rietx.strategy.magnetic`:
-  `MagneticSolution`, `MagneticTrial`, `MomentRow`) are listed in
+  `MagneticSolution`, `MagneticTrial`, `MomentMinimum`, `MomentRow`) are listed in
   [API: techniques](api-techniques.md). The *chain* is settled (a propagation vector, candidate
   models per k, one trial refinement per powder-equivalence class, a ranked
   list with an abstention) and the criterion is not: it is a ΔBIC

@@ -280,6 +280,11 @@ SOLVE_RELEASE_FRACTION = 0.05
 #: different minima by at least 0.147, and the value sits in that gap.  A
 #: modulus at or below :data:`~rietx.schemas.structure.MOMENT_FLOOR_MU_B` reads
 #: as the floor, so two starts that both removed a moment are one minimum.
+#: Out of scope: the tolerance is read against the largest |m| of the pair, so a
+#: weak site beside a strong one cannot separate two minima by itself.  With
+#: 3.5 μ_B on one site, a second site at 0.3 and at 0.6 μ_B differs by 0.3, under
+#: 0.1 × 3.5, and the two starts count as one minimum with no caveat.  No draw in
+#: the evidence has that shape, and the value is measured on that one family.
 SOLVE_MINIMUM_MODULUS_RTOL = 0.1
 
 #: How many times :func:`_fit` continues a fit that stopped on its iteration
