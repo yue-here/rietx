@@ -406,6 +406,10 @@ export const api = {
   /** One member's channels and curves, as `curves` sends the project's: built
    *  by the same function, so the σ and the residuals are the same arithmetic. */
   seriesCurves: (index: number) => arrays(`/api/series/curves?index=${index}`),
+  /** One member by its place in a list, the run's or the staged one, with
+   *  its fit wherever one has landed, mid-run too (WP-2243). */
+  seriesPattern: (pattern: number, of: "run" | "staged") =>
+    arrays(`/api/series/curves?pattern=${pattern}&of=${of}`),
   /** That pattern's own history tree — **read-only**: a tree is pinned to its
    *  data fingerprint, so its nodes cannot be checked out into this project. */
   seriesHistory: (index: number) =>
