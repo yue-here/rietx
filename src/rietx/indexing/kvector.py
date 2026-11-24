@@ -38,8 +38,9 @@ on a CW-neutron pattern resolves a line k to about ±0.004 (measured on the
 synthetic patterns this module's tests are built from), so a general k between
 grid points can score near chance on every grid point.  Every grid-level record
 (:class:`KGridScores`, :class:`KNull`) therefore carries the grid step as a
-number, the strata it searched and the strata a budget left, and states in its
-``coverage`` field that it makes **no claim about any k off the grid**.
+number, the strata it searched, a stratum a budget cut part-way and the strata
+it left, and states in its ``coverage`` field that it makes **no claim about
+any k off the grid**.
 
 **Every class of k is reduced modulo the phase's own reciprocal lattice,
 centring included** (#1071): on F m m m, (1, 0, 0) and (0, 1, 1) are one k, and
@@ -810,14 +811,24 @@ def _grid_source(parent: KParent, strata, harmonics) -> tuple[tuple[KStratum, ..
     return _check_strata(strata, parent), orders, None
 
 
-def _coverage(strata: Sequence[KStratum], searched: Sequence[str], left: Sequence[str]) -> str:
+def _coverage(strata: Sequence[KStratum], searched: Sequence[str], left: Sequence[str],
+              cut: Sequence[tuple[str, int, int]] = ()) -> str:
     dens = sorted({s.denominator for s in strata})
     grid = " and ".join(f"1/{d}" for d in dens)
     step = max(1.0 / d for d in dens)
+    part = "".join(f"stratum {name} cut after {done} of {total} points; "
+                   for name, done, total in cut)
     return (f"rational k on the {grid} grid (step {step:.4g} in conventional reciprocal "
-            f"coordinates) in {len(searched)} stratum(s) searched; {len(left)} stratum(s) "
+            f"coordinates) in {len(searched)} stratum(s) searched; {part}{len(left)} stratum(s) "
             "left unsearched. No claim is made about any k off this grid: a general or "
             "incommensurate k between grid points was not searched.")
+
+
+def _grid_step(strata: Sequence[KStratum], searched: Sequence[str],
+               cut: Sequence[tuple[str, int, int]]) -> float:
+    """The coarsest step among the strata scored, whole or cut (all given, if none)."""
+    scored = set(searched) | {name for name, _, _ in cut}
+    return max(s.grid_step for s in ([s for s in strata if s.name in scored] or strata))
 
 
 def _expired(budget) -> bool:
@@ -871,12 +882,17 @@ class KGridScores:
     columns in row order.
 
     The grid-level facts (issue #795, the maintainer's condition):
-    ``grid_step`` is the coarsest step of the strata searched (1/n, in
-    conventional reciprocal coordinates; ``denominators`` per stratum),
-    ``strata_searched`` and ``strata_left`` name what was and was not scored
-    (a budget stops at a stratum boundary), and ``coverage`` says in words that
-    **nothing is claimed about any k off the grid**: a general k between grid
-    points can score near chance at every grid point.
+    ``grid_step`` is the coarsest step of the strata scored (1/n, in
+    conventional reciprocal coordinates; ``denominators`` per stratum
+    searched), and three fields partition the strata given: ``strata_searched``
+    were scored whole, ``strata_cut`` holds a stratum a budget stopped part-way
+    as ``(name, points scored, points in the stratum)`` (its first rows, in its
+    own order, are in ``rows``), and ``strata_left`` were not started.  A
+    budget is read before every block of ``_CHUNK`` k, so it stops a search
+    inside a stratum, and at most one stratum is ever cut.  ``coverage`` says
+    all of this in words, and that **nothing is claimed about any k
+    off the grid**: a general k between grid points can score near chance at
+    every grid point.
     """
 
     parent: KParent
@@ -888,6 +904,7 @@ class KGridScores:
     grid_step: float
     denominators: tuple[int, ...]
     strata_searched: tuple[str, ...]
+    strata_cut: tuple[tuple[str, int, int], ...]
     strata_left: tuple[str, ...]
     coverage: str
     budget_seconds: float | None
@@ -923,10 +940,16 @@ def score_kgrid(peaks, parent: KParent, strata, *, radius: float, band_deg: floa
     Every row equals what :func:`score_kvector` returns for its k.
 
     ``budget`` is an :class:`~rietx.indexing.engines.Budget` or
-    :class:`~rietx.indexing.engines.Deadline` read between strata; ``None``
-    sets no cap.  A budget that expires stops the search at the next stratum
-    boundary, and ``strata_left`` names every stratum not scored, as
-    ``INDEX_BUDGET_EXHAUSTED`` does for a cell search.
+    :class:`~rietx.indexing.engines.Deadline` read before every vectorised
+    block of k (``_CHUNK`` = 2048 rows, the block that bounds working memory;
+    the deadline adds no block size of its own); ``None`` sets no cap.  A
+    budget that expires stops the search at the next block boundary, so a
+    deadline also bounds a stratum of tens of thousands of k, overshooting it
+    by at most one block's scoring.  A stratum stopped part-way is reported in
+    ``strata_cut`` with the points it scored, ``strata_left`` names every
+    stratum not started, as ``INDEX_BUDGET_EXHAUSTED`` does for a cell search,
+    and ``coverage`` says both in words.  With no cut the rows are those of an
+    uncapped search.
 
     What this does **not** do: it does not sort, rank, pick or threshold; it
     does not score absent lines; and it claims nothing about k off the grid
@@ -940,13 +963,19 @@ def score_kgrid(peaks, parent: KParent, strata, *, radius: float, band_deg: floa
     strata_, orders, built = _grid_source(parent, strata, harmonics)
     lo, hi = parent.two_theta_min, parent.two_theta_max
     rows: list[KGridRow] = []
-    searched, left = [], []
+    searched, left, cut = [], [], []
     for i, st in enumerate(strata_):
-        if _expired(budget):
-            left.extend(s.name for s in strata_[i:])
-            break
-        pos = _stratum_positions(parent, st, orders, built, i)
+        pos = None
         for c in range(0, st.n_points, _CHUNK):
+            if _expired(budget):
+                if c:
+                    cut.append((st.name, c, st.n_points))
+                    left.extend(s.name for s in strata_[i + 1:])
+                else:
+                    left.extend(s.name for s in strata_[i:])
+                break
+            if pos is None:
+                pos = _stratum_positions(parent, st, orders, built, i)
             block = pos[c:c + _CHUNK]
             matched, _p, n, big_p, score = _score_rows(_windows(block, r, lo, hi), tt, lo, hi, band)
             for t, kk in enumerate(st.kvectors[c:c + _CHUNK]):
@@ -956,16 +985,17 @@ def score_kgrid(peaks, parent: KParent, strata, *, radius: float, band_deg: floa
                     n_matched=int(n[t]), matched=tuple(int(x) for x in np.flatnonzero(m)),
                     unmatched=tuple(int(x) for x in np.flatnonzero(~m)),
                     n_positions=len(block[t]), space_group=parent.space_group))
+        if left or cut:
+            break
         searched.append(st.name)
-    done = [s for s in strata_ if s.name in set(searched)] or list(strata_)
     return KGridScores(
         parent=parent, peaks=kp, radius=r, band_deg=band, harmonics=orders,
-        rows=tuple(rows), grid_step=max(s.grid_step for s in done),
+        rows=tuple(rows), grid_step=_grid_step(strata_, searched, cut),
         denominators=tuple(s.denominator for s in strata_ if s.name in set(searched)),
-        strata_searched=tuple(searched), strata_left=tuple(left),
-        coverage=_coverage(strata_, searched, left),
+        strata_searched=tuple(searched), strata_cut=tuple(cut), strata_left=tuple(left),
+        coverage=_coverage(strata_, searched, left, cut),
         budget_seconds=None if budget is None else float(budget.seconds),
-        budget_expired=bool(left), elapsed_seconds=time.perf_counter() - t0)
+        budget_expired=bool(left or cut), elapsed_seconds=time.perf_counter() - t0)
 
 
 # --------------------------------------------------------------------------
@@ -986,10 +1016,12 @@ class KNull:
     threshold.
 
     The grid-level facts are :class:`KGridScores`'s: ``grid_step``,
-    ``denominators``, ``strata_searched``, ``strata_left`` and ``coverage``
-    (no claim about any k off the grid).  A budget that stops the null stops
-    every shuffle at the same stratum, so every sample member is a maximum over
-    the same strata.
+    ``denominators``, ``strata_searched``, ``strata_cut``, ``strata_left`` and
+    ``coverage`` (no claim about any k off the grid).  The budget is read
+    before every block of ``_CHUNK`` k, and a block is scored under every
+    shuffle before the next read, so a budget that stops the null stops every
+    shuffle at the same k: every sample member is a maximum over the same
+    points, a cut stratum's first ``points scored`` included.
     """
 
     parent: KParent
@@ -1009,6 +1041,7 @@ class KNull:
     grid_step: float
     denominators: tuple[int, ...]
     strata_searched: tuple[str, ...]
+    strata_cut: tuple[tuple[str, int, int], ...]
     strata_left: tuple[str, ...]
     coverage: str
     budget_seconds: float | None
@@ -1080,6 +1113,11 @@ def kgrid_null(peaks, parent: KParent, strata, *, radius: float, band_deg: float
     effect; its count and percentile have no default (100 and 99 are the
     values the design measured, on synthetic CW-neutron patterns only).
 
+    ``budget`` is read as :func:`score_kgrid` reads it, before every block of
+    ``_CHUNK`` k; a block is scored under all ``n_shuffles`` shuffles before
+    the next read, so the overshoot is at most one block times the shuffle
+    count, and ``strata_cut``/``strata_left`` report the cut.
+
     What this does **not** do: no margin, no comparison of any candidate with
     the threshold, no verdict.  It claims nothing about k off the grid.
     """
@@ -1103,13 +1141,19 @@ def kgrid_null(peaks, parent: KParent, strata, *, radius: float, band_deg: float
     best = np.full(n_sh, -np.inf)
     at_best = np.zeros(n_sh, dtype=np.int64)
     most = np.zeros(n_sh, dtype=np.int64)
-    searched, left = [], []
+    searched, left, cut = [], [], []
     for i, st in enumerate(strata_):
-        if _expired(budget):
-            left.extend(s.name for s in strata_[i:])
-            break
-        pos = _stratum_positions(parent, st, orders, built, i)
+        pos = None
         for c in range(0, st.n_points, _CHUNK):
+            if _expired(budget):
+                if c:
+                    cut.append((st.name, c, st.n_points))
+                    left.extend(s.name for s in strata_[i + 1:])
+                else:
+                    left.extend(s.name for s in strata_[i:])
+                break
+            if pos is None:
+                pos = _stratum_positions(parent, st, orders, built, i)
             win = _windows(pos[c:c + _CHUNK], r, lo, hi)
             for s_ in range(n_sh):
                 _m, _p, n, _bp, score = _score_rows(win, draws[s_], lo, hi, band)
@@ -1117,26 +1161,27 @@ def kgrid_null(peaks, parent: KParent, strata, *, radius: float, band_deg: float
                 if score[t] > best[s_]:
                     best[s_], at_best[s_] = score[t], n[t]
                 most[s_] = max(most[s_], int(n.max()) if len(n) else 0)
+        if left or cut:
+            break
         searched.append(st.name)
-    if searched:
+    if searched or cut:
         threshold = float(np.percentile(best, pct))
         sample = tuple(float(x) for x in best)
     else:
         threshold = float("nan")
         sample = tuple(float("nan") for _ in best)
-    done = [s for s in strata_ if s.name in set(searched)] or list(strata_)
     return KNull(
         parent=parent, n_peaks=big_n, radius=r, band_deg=band, harmonics=orders,
         exclude=pairs, seed=seed_, n_shuffles=n_sh, percentile=pct, threshold=threshold,
         sample=sample, matched_at_max=tuple(int(x) for x in at_best),
         max_matched=tuple(int(x) for x in most),
         shuffles=tuple(tuple(float(x) for x in row) for row in draws),
-        grid_step=max(s.grid_step for s in done),
+        grid_step=_grid_step(strata_, searched, cut),
         denominators=tuple(s.denominator for s in strata_ if s.name in set(searched)),
-        strata_searched=tuple(searched), strata_left=tuple(left),
-        coverage=_coverage(strata_, searched, left),
+        strata_searched=tuple(searched), strata_cut=tuple(cut), strata_left=tuple(left),
+        coverage=_coverage(strata_, searched, left, cut),
         budget_seconds=None if budget is None else float(budget.seconds),
-        budget_expired=bool(left), elapsed_seconds=time.perf_counter() - t0)
+        budget_expired=bool(left or cut), elapsed_seconds=time.perf_counter() - t0)
 
 
 # --------------------------------------------------------------------------

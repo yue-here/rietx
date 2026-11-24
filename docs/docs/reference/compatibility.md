@@ -169,7 +169,7 @@ to move are declared rather than left to be inferred:
   `rietx.schemas.structure` beside stable ones. `RigidBody`, `BodyOrigin`,
   the phase field that holds them, the parameter row's field that names a
   row's body, and the builders in
-  `rietx.crystallography.bodies` shipped in 1.7.0 as the first piece of a
+  `rietx.crystallography.bodies` were released in 1.7.0 as the first piece of a
   milestone that is still open. Torsions inside a body and
   `Refinement.check_rigid_bodies` joined them in 1.8.0. Riding hydrogens and a fragment library are still to come, and each
   may add fields or change what a body refines. A document that carries a body
@@ -182,7 +182,7 @@ to move are declared rather than left to be inferred:
   [](../guides/foreign.md) and are expected to move: the registry over them has
   four formats and one more queued, each of which is evidence about the shape it
   should have. The third format is already why `ProjectFormat.reports_at`
-  has a `"both"` value it did not have when it shipped. A format's own model mirrors that format, so
+  has a `"both"` value it did not have when it was released. A format's own model mirrors that format, so
   its fields move when the reader's coverage does. What a reader refuses is the
   stable part: a construct this package cannot represent raises naming the file,
   in this release and in the next.
