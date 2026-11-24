@@ -379,9 +379,9 @@ export const api = {
    *  at a time.  Over the server's cap it is a sample — read `n_total`. */
   candidateTicks: (candidate: number) =>
     call("GET", `/api/index/ticks?candidate=${candidate}`),
-  adoptCandidate: (candidate: number, spaceGroup?: string) =>
-    call("POST", "/api/index/adopt",
-         spaceGroup ? { candidate, space_group: spaceGroup } : { candidate }),
+  adoptCandidate: (candidate: number, spaceGroup?: string, mode?: "lebail" | "pawley") =>
+    call("POST", "/api/index/adopt", {
+      candidate, ...(spaceGroup ? { space_group: spaceGroup } : {}), ...(mode ? { mode } : {}) }),
   /** Rank one candidate's extinction classes — the same run machine, and a
    *  measurement any candidate may ask for (the gate stays on adopt). */
   screenExtinctions: (candidate: number) =>

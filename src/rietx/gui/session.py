@@ -3056,7 +3056,10 @@ class GuiSession:
         NodeKind): the structure becomes WP-1024's single-phase Le Bail scaffold
         (absence-free lattice group unless a ``space_group`` from the extinction
         screen is given, one dummy atom), and the document's mode follows to
-        ``lebail`` — a Rietveld fit over a dummy atom is not a thing to offer.
+        a structure-free one — a Rietveld fit over a dummy atom is not a thing
+        to offer.  ``mode`` names which, ``"lebail"`` (the default) or
+        ``"pawley"``, which `/next`'s workflow sends: the maintainer ruled
+        Pawley its structure-free default on 2026-11-23 (WP-2240).
         """
         self._require_idle()
         p = self._need_project()
@@ -3067,6 +3070,10 @@ class GuiSession:
                            code="NO_INDEX_RESULT", status=409)
         if body.get("candidate") is None:
             raise GuiError("'candidate' is required", where=["candidate"])
+        mode = body.get("mode") or "lebail"
+        if mode not in ("lebail", "pawley"):
+            raise GuiError(f"mode {mode!r}: a cell adopts in 'lebail' or "
+                           "'pawley' mode", where=["mode"])
         index = self._peak_number(body, "candidate", int)
         candidate = self._candidate_number(result, index)
         best = result.best_or_none()
@@ -3086,10 +3093,11 @@ class GuiSession:
         if not picked:
             label += f"; {_unpicked_note(candidate)}"
         node = p.refinement.edit(structure=structure, label=label)
-        if p.doc.mode != "lebail":
-            p.doc.mode = "lebail"
+        if p.doc.mode != mode:
+            p.doc.mode = mode
             p.save()
         sg = f", space_group={space_group!r}" if space_group else ""
+        sg += f", mode={mode!r}" if "mode" in body else ""
         return {"node_id": node, "mode": p.doc.mode, "picked": picked,
                 "api_call": f"session.adopt_candidate({index}{sg})",
                 **self.structure()}

@@ -259,8 +259,8 @@ def parameter_map(body: str = "parameters.md") -> str:
 # ----------------------------------------------------------------------
 # The other vocabularies
 #
-# `rietx.help` holds ten.  Parameters, plans, diagnostic codes and result
-# fields have pages of their own, and the other six share
+# `rietx.help` holds eleven.  Parameters, plans, diagnostic codes and result
+# fields have pages of their own, and the other seven share
 # `reference/settings.md`, in the
 # order and under the lead sentences `_VOCABULARIES` gives (the old tree's
 # glossary, WP-1986).  That list is the one hand-written thing here, so an arm
@@ -284,6 +284,10 @@ _VOCABULARIES = [
     ("peak_origins", "Peak origins",
      "Where one line came from: detection, or a person. It records provenance "
      "and makes no judgement, and no gate in the package branches on it."),
+    ("cell_relations", "Candidate cell relations",
+     "How the GUI's candidate table relates one indexing candidate to another "
+     "reported row. The table writes a mark and the row it names, such as "
+     "`2× #1`."),
     ("reader_options", "Reader options",
      "Keyword arguments `read_pattern` accepts. A project records which ones "
      "claimed its file, because the same file can hold more than one pattern."),
