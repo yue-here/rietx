@@ -39,7 +39,7 @@ def test_a_bare_moment_ion_is_read_as_the_census_ion_and_warned_once_per_site():
     (hit,) = hits
     assert hit.level == "warning"
     assert hit.where == ["phases.0.atoms.0.moment.ion"]
-    assert "Fe3+, the most common Fe oxidation state in the ICSD (57% of Fe reports; Fe2+ 42%" in hit.message
+    assert "Fe3+, the most common Fe oxidation state in the ICSD (57% of Fe cation reports; Fe2+ 42%" in hit.message
     assert "'Fe3+'" in hit.suggestion and "'Fe0'" in hit.suggestion
     assert hit.explanation is not None
 

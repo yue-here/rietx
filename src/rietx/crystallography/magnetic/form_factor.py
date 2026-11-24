@@ -481,7 +481,10 @@ def magnetic_ions() -> tuple[str, ...]:
 #: table carries a row of: Ding, Kumagai, Oba & Burton (2020), Supporting
 #: Information Table 1 ("number of matches returned from ICSD repository",
 #: 169 800 entries scanned, charges −4 to +8; read from the arXiv:2007.02085
-#: v1 SI).  The one census a bare element label is read through
+#: v1 SI; the published SI was not compared).  The most common state is the
+#: largest count, which is not always the paper's own recommended state (its
+#: SI Table 2 recommends both +2 and +3 for Fe and Eu, +1 and +2 for Cu).  The
+#: one census a bare element label is read through
 #: (:func:`read_bare_label`; ruling D67 of the magnetic-path owner,
 #: 2026-11-24).  Zero counts are omitted.
 _ICSD_REPORTS: dict[str, dict[int, int]] = {
@@ -571,7 +574,9 @@ def _shell_text(ion: str) -> str:
 class BareLabelReading:
     """How a bare element label was read: the census's most common ion.
 
-    ``share`` is that ion's fraction of the element's ICSD reports and
+    ``share`` is that ion's fraction of the element's positive-charge (cation)
+    ICSD reports (the census's negative charges are under 1 % of them for
+    every element here) and
     ``alternatives`` every other ion with a moment this table serves for the element, with
     its share, largest first (:data:`CENSUS`).
     """
@@ -586,7 +591,7 @@ class BareLabelReading:
         sym = self.label
         others = "; ".join(f"{ion} {_pct(share)}" for ion, share in self.alternatives)
         return (f"{self.ion}, the most common {sym} oxidation state in the "
-                f"ICSD ({_pct(self.share)} of {sym} reports"
+                f"ICSD ({_pct(self.share)} of {sym} cation reports"
                 + (f"; {others}" if others else "") + f"; {_CENSUS_SHORT})")
 
 
@@ -636,7 +641,7 @@ def read_bare_label(label: str) -> BareLabelReading:
     ion = f"{sym}{charge}+"
     head = (f"{label!r} states no charge, and a bare element label is read as "
             f"its most common oxidation state in the ICSD: {ion} "
-            f"({counts[charge] / total:.0%} of {sym} reports; {CENSUS})")
+            f"({counts[charge] / total:.0%} of {sym} cation reports; {CENSUS})")
     if not carries_moment(ion):
         raise ValueError(
             f"{head}. {ion} is {_shell_text(ion)} and carries no moment, so a "
