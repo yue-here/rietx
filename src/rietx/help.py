@@ -6294,9 +6294,10 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
         description=(
             "Time-of-flight only. The fraction of each peak's Lorentzian component, "
             "per side, this stage's windows were sized to leave outside, read off "
-            "the model it ran on: the plan's `intermediate_lorentz_window_tol` on "
-            "an intermediate stage, 1e-4 on the last declared stage and the closing "
-            "stage. `None` where no Lorentzian window was sized, on a 2θ pattern or "
+            "the model it ran on: the stage's own `lorentz_window_tol` where it "
+            "declares one, otherwise the plan's `intermediate_lorentz_window_tol` on "
+            "an intermediate stage and 1e-4 on the last declared stage and the "
+            "closing stage. `None` where no Lorentzian window was sized, on a 2θ pattern or "
             "a Gaussian-branch bank."
         ),
     ),

@@ -376,8 +376,9 @@ class PlanSpec(Base):
             "time-of-flight only: the per-side area fraction of a peak's "
             "Lorentzian component every declared stage but the last may leave "
             "outside its frozen window, unless it declares its own "
-            "lorentz_window_tol; the last declared stage and the closing "
-            "stage always run at 1e-4.  null = 1e-4 in every stage, bit for "
+            "lorentz_window_tol; the last declared stage runs at 1e-4 unless "
+            "it sets its own, and the closing stage always does.  null = 1e-4 "
+            "in every stage that sets none, bit for "
             "bit the unscheduled windows (issue #193)"))
 
     @field_validator("phase_support_sigma")
