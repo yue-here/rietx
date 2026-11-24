@@ -28,8 +28,8 @@
   import type { Step } from "../lib/workflows";
   import type { Say } from "./console";
   import {
-    ORDER, axisWord, emptyProgress, fitsDone, fold, inOrder, merged, rwpText, secondWalkDone,
-    spanOf, startedFrom, walksOf, type RunProgress,
+    ORDER, axisWord, emptyProgress, fitsDone, fittingText, fold, inOrder, merged, rwpText,
+    secondWalkDone, spanOf, startedFrom, walksOf, type RunProgress,
   } from "./seriesrun";
 
   let {
@@ -91,6 +91,7 @@
   const rows = $derived(ranOver?.patterns ?? patterns);
   const runDirection = $derived(ranOver?.direction ?? settings?.direction ?? "forward");
   const runWalks = $derived(walksOf(runDirection));
+  const firstFitBuilt = $derived(!!steps[1]?.built);
   /** a series needs two patterns to run */
   const few = $derived(patterns.length < 2);
   const heading = $derived(patterns.length
@@ -313,13 +314,7 @@
   const secondPass = $derived(runWalks > 1 ? (firstPass === "forward" ? "backward" : "forward") : null);
   const nConverged = $derived(entries ? entries.filter((e) => e.status === "converged").length : 0);
   const status = $derived.by(() => {
-    if (running) {
-      const c = progress.current;
-      if (!c) return `Fitting · ${nDone} of ${nFits}`;
-      const x = rows[c.index]?.x;
-      const walk = runWalks > 1 ? ` · ${c.pass === firstPass ? "first walk" : "second walk"}` : "";
-      return `Fitting ${c.label}${x == null ? "" : ` · ${x}`}${walk} · ${Math.min(nDone + 1, nFits)} of ${nFits}`;
-    }
+    if (running) return fittingText(progress, runWalks, firstPass, (i) => rows[i]?.x);
     if (cancelled) return `Stopped · ${nDone} of ${nFits} fits`;
     if (entries) return `Finished · ${nConverged} of ${rows.length} converged`;
     return "";
@@ -402,8 +397,10 @@
       {#if failure}<p class="bad">{failure}</p>{/if}
     </div>
     <div class="foot">
-      <button disabled={few} onclick={() => onstep(1)}>First fit</button>
-      <button class="ghost" disabled={!editable || few} onclick={start}
+      <!-- First fit is the view's one primary once its step is built; until
+           then Run series is, as in the Run step's foot -->
+      <button class:ghost={!firstFitBuilt} disabled={few} onclick={() => onstep(1)}>First fit</button>
+      <button class:ghost={firstFitBuilt} disabled={!editable || few} onclick={start}
         title="Run without a first fit: the first pattern starts from the model">Run series</button>
       <span class="muted">{#if reading}Reading {reading}…{:else if few}Needs two patterns{:else if changed}Changed since the last run{:else}{patterns.length} patterns · {walks === 2 ? "two walks" : "one walk"}{/if}</span>
     </div>
@@ -424,7 +421,7 @@
           <thead>
             <tr><th class="r">#</th><th>Pattern</th><th class="r">{axis}</th>
               <th class="r">Rwp (%)</th><th>Started from</th>
-              {#if secondPass}<th class="r">Second walk</th>{/if}</tr>
+              {#if secondPass}<th class="r">Second walk Rwp (%)</th>{/if}</tr>
           </thead>
           <tbody>
             {#each rows as p, i (p.upload + ":" + i)}
@@ -437,7 +434,11 @@
                 <td class="r num">{fit ? rwpText(fit.rwp) : cur === firstPass ? "…" : ""}</td>
                 <td>{fit ? startedFrom(fit.rung) : ""}</td>
                 {#if secondPass}
-                  <td class="r">{progress.fits[secondPass]?.[i] || backDone.has(i) ? "✓"
+                  {@const back = progress.fits[secondPass]?.[i]}
+                  <!-- the second walk's Rwp as its fit lands; a page that did
+                       not follow the run reads only that the walk fitted it,
+                       since the record keeps no second-walk fits -->
+                  <td class="r num">{back ? rwpText(back.rwp) || "✓" : backDone.has(i) ? "✓"
                     : cur === secondPass ? "…" : ""}</td>
                 {/if}
               </tr>
@@ -517,8 +518,9 @@
     color: var(--muted);
   }
 
+  /* as wide as the carried-over globs' box, so "Temperature (K)" shows whole */
   input.axis {
-    width: 12ch;
+    width: 20ch;
   }
 
   input.carry {

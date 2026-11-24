@@ -1,6 +1,6 @@
 # WP-2243 — the series workflow at `/next`: patterns, first fit, run, results, with Trends and Map
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-23 — Patterns and Run steps built (PR #1794); Results next
+Milestone: gui-overhaul · Status: 🔄 2026-11-24 — claimed by @yue-here (ghostshift runner); Results next
 Depends on: 2240 soft (the workflow frame R6 builds on); 2300 soft (what each pattern refines)
 Priority: P2 2026-11-23 — a feature the open milestone was opened for: R7, the rebuild's last piece before the swap
 
@@ -142,6 +142,17 @@ disagree on wavelength, range or step; a blank pattern) names its tier here befo
 
 ## Rulings
 
+## Open questions for the maintainer
+
+- **Q1 (2026-11-24, from the 11-23 look). Where does each pattern's walk gap show in the
+  Run step?** The look asked for the second-walk column to carry the gap as well as the
+  Rwp. The gap per pattern is the largest |gap| over the paths, in combined esds, read off
+  `SeriesResult.direction_gaps`. The prototype's Run table shows only ✓ there, and puts the
+  gap in Results ("Largest walk gap") and on Trends (rings). Three placements: (a) a sixth
+  column, "Walk gap (esd)", after the second walk's Rwp; (b) both numbers in one cell,
+  "4.31 · 0.8 esd"; (c) no gap in Run, only in Results and Trends. Built so far: the Rwp
+  alone, which is (c).
+
 ## Non-goals
 
 - WP-1317's external annotations (a typed transition temperature, a beam dump), deferred by
@@ -158,6 +169,22 @@ disagree on wavelength, range or step; a blank pattern) names its tier here befo
   settings with the carried-over globs, and a foot with Run series. A vitest mount case.
 - [x] 3. The Run step: Run series, the status line and progress bar, the table folded from the
   run's events as fits land, Stop, and See results and Run again after.
+- [x] 3b. The five defects a look at the Patterns and Run steps found on 2026-11-23 (a
+  ten-pattern ramp, both walks, a 1.2 s pause per fit), fixed:
+  - The Axis box cut its label "Temperature (K)" at 12 characters. It is now as wide as
+    the Carried over box beside it (20 characters).
+  - The status line counted the fits of both walks ("14 of 20") while the Console counts
+    the pattern's place in the series per walk ("7/10"). It now counts as the Console does
+    (`seriesrun.ts:fittingText`).
+  - The status line counted the fit still running as done, and lost the pattern's name
+    between two fits ("Fitting · 5 of 20"). It now names the pattern that started last
+    until the next one starts.
+  - First fit was the filled button while its step showed only a sentence. Until task 9
+    builds that step, Run series is the filled one, as in the Run step's foot.
+  - The second-walk column showed only ✓. It now shows that walk's Rwp as each fit lands,
+    headed "Second walk Rwp (%)". A page opened after the run still shows ✓, because the
+    record keeps no second-walk fits; `gui/series.py` could serve them, and that file waits
+    for #1786. Where each pattern's walk gap goes is a placement question, open below.
 - [ ] 4. The Results step: the summary rows, the per-pattern table, the Plot list, the
   selected pattern's warnings, the series' warnings and the largest steps.
 - [ ] 5. The selected pattern: Pattern draws its fit while Series is up, ‹ › in the title,

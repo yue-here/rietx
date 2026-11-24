@@ -133,12 +133,21 @@ describe("the Patterns step", () => {
     expect(putSeries.mock.calls.at(-1)![0].carry).toEqual(["phases.*", "instrument.background.*"]);
   });
 
-  it("puts First fit in the foot as the view's one primary, and Run series beside it", async () => {
+  it("fills Run series while First fit is not built, and First fit once it is", async () => {
     stored = setupOf([pattern("a", 1), pattern("b", 2)]);
     await boot();
     const first = button("First fit");
     expect(first.closest(".foot")).not.toBeNull();
-    expect(first.classList.contains("ghost")).toBe(false);
+    expect(first.classList.contains("ghost")).toBe(true);
+    expect(button("Run series").classList.contains("ghost")).toBe(false);
+    unmount(app);
+    document.body.innerHTML = "";
+    const built = workflow("series").steps!.map((s, i) => (i === 1 ? { ...s, built: true } : s));
+    app = mount(Series, { target: document.body, props: {
+      step: 0, steps: built, onstep: (i: number) => steps.push(i),
+      onrun: async (body: Record<string, unknown>, t: string) => { runs.push([body, t]); } } });
+    await settle();
+    expect(button("First fit").classList.contains("ghost")).toBe(false);
     expect(button("Run series").classList.contains("ghost")).toBe(true);
     button("Run series").click();
     await settle();
@@ -167,12 +176,25 @@ describe("the Run step", () => {
     app.event(ev(2, "fit_end", 0, "forward", { rwp: 0.2241, gof: 1.9, status: "converged" }));
     app.event(ev(3, "fit_start", 1, "forward"));
     flushSync();
-    expect(text(document.querySelector(".status"))).toBe("Fitting T1 · 20 · first walk · 2 of 4");
+    // counted per walk, as the Console counts: the pattern's place in the series
+    expect(text(document.querySelector(".status"))).toBe("Fitting T1 · 20 · first walk · 2 of 2");
     expect([...document.querySelectorAll(".rows th")].map(text))
-      .toEqual(["#", "Pattern", "T (K)", "Rwp (%)", "Started from", "Second walk"]);
+      .toEqual(["#", "Pattern", "T (K)", "Rwp (%)", "Started from", "Second walk Rwp (%)"]);
     expect(cells(0)).toEqual(["1", "T0", "10", "22.41", "model", ""]);
     expect(cells(1)).toEqual(["2", "T1", "20", "…", "", ""]);
     expect(document.querySelector(".gauge")!.getAttribute("aria-valuenow")).toBe("25");
     expect(button("Stop").title).toBe("Patterns already fitted keep their results");
+    // between two fits the line still names the pattern that started last
+    app.event(ev(4, "fit_end", 1, "forward", { rwp: 0.2302, gof: 2.0, status: "converged" }));
+    flushSync();
+    expect(text(document.querySelector(".status"))).toBe("Fitting T1 · 20 · first walk · 2 of 2");
+    // the second walk, backward from the last pattern, prints its Rwp
+    app.event(ev(5, "fit_start", 1, "backward"));
+    app.event(ev(6, "fit_end", 1, "backward", { rwp: 0.2299, gof: 2.0, status: "converged" }));
+    app.event(ev(7, "fit_start", 0, "backward"));
+    flushSync();
+    expect(text(document.querySelector(".status"))).toBe("Fitting T0 · 10 · second walk · 1 of 2");
+    expect(cells(1)).toEqual(["2", "T1", "20", "23.02", "previous", "22.99"]);
+    expect(cells(0)[5]).toBe("…");
   });
 });
