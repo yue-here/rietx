@@ -74,6 +74,9 @@ export interface RunProgress {
   passes: string[];
   /** the fit running now; null between fits and after the last */
   current: { index: number; label: string; pass: string } | null;
+  /** the fit that started last, kept between fits, so the status line still
+   *  names a pattern while the next one starts */
+  last: { index: number; label: string; pass: string } | null;
   /** each walk's finished fits by series index */
   fits: Record<string, Record<number, RunFit>>;
   /** the rung each pattern's fit is on now, per walk */
@@ -81,7 +84,7 @@ export interface RunProgress {
 }
 
 export const emptyProgress = (): RunProgress =>
-  ({ n: null, passes: [], current: null, fits: {}, rungs: {} });
+  ({ n: null, passes: [], current: null, last: null, fits: {}, rungs: {} });
 
 /**
  * Fold one event into the progress. An event with no `series_index` is not a
@@ -102,7 +105,8 @@ export function fold(p: RunProgress, event: EngineEvent): RunProgress {
     const known = p.rungs[pass] ?? {};
     const rung: Rung = d.series_rung ?? known[index]
       ?? (Object.keys(known).length === 0 ? "cold" : "warm");
-    return { ...p, n, passes, current: { index, label, pass },
+    const current = { index, label, pass };
+    return { ...p, n, passes, current, last: current,
              rungs: { ...p.rungs, [pass]: { ...p.rungs[pass], [index]: rung } } };
   }
   if (event.kind === "fit_end") {
@@ -116,6 +120,21 @@ export function fold(p: RunProgress, event: EngineEvent): RunProgress {
              fits: { ...p.fits, [pass]: { ...p.fits[pass], [index]: fit } } };
   }
   return n === p.n && passes === p.passes ? p : { ...p, n, passes };
+}
+
+/** The status line while a series runs, counted as the Console counts: the
+ *  pattern's place in the series over the series' length, per walk, never the
+ *  fits finished across both walks (`lib/stream.ts:seriesPrefix`). Between two
+ *  fits it names the pattern that started last. `xOf` is the coordinate a
+ *  pattern's row prints, `firstPass` the walk that ran first. */
+export function fittingText(p: RunProgress, walks: number, firstPass: string,
+                            xOf: (index: number) => number | null | undefined): string {
+  const c = p.current ?? p.last;
+  if (!c) return "Fitting";
+  const x = xOf(c.index);
+  const walk = walks > 1 ? ` · ${c.pass === firstPass ? "first walk" : "second walk"}` : "";
+  const n = p.n ? ` · ${c.index + 1} of ${p.n}` : "";
+  return `Fitting ${c.label}${x == null ? "" : ` · ${x}`}${walk}${n}`;
 }
 
 /** How many fits have finished, across the walks. */

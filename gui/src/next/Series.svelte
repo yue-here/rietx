@@ -18,6 +18,11 @@
    * Run. The run's table fills as fits land, folded from the events the page
    * already follows (`seriesrun.ts`), and the record replaces the fold once
    * the run ends. Stop keeps what finished (call 10).
+   *
+   * Results. The record read whole (`seriesresults.ts`): three label-value
+   * rows with no verdict (call 11), one row per pattern, every value at the
+   * selected pattern, that pattern's warnings, and the series' warnings and
+   * largest steps under disclosures.
    */
   import { onMount, untrack } from "svelte";
 
@@ -28,8 +33,13 @@
   import type { Step } from "../lib/workflows";
   import type { Say } from "./console";
   import {
-    ORDER, axisWord, emptyProgress, fitsDone, fold, inOrder, merged, rwpText, secondWalkDone,
-    spanOf, startedFrom, walksOf, type RunProgress,
+    answerOf, countText, largestGap, pathName, seriesWarnings, sizedSteps, valueGroups,
+    warningsOf, type SeriesAnswer,
+  } from "./seriesresults";
+  import { esdText } from "../lib/series";
+  import {
+    ORDER, axisWord, emptyProgress, fitsDone, fittingText, fold, inOrder, merged, rwpText,
+    secondWalkDone, spanOf, startedFrom, walksOf, type RunProgress,
   } from "./seriesrun";
 
   let {
@@ -66,6 +76,8 @@
   let moreOpen = $state(false);
   /** the record of the last series run in this session */
   let entries = $state.raw<SeriesEntry[] | null>(null);
+  /** the record's answer whole, which the Results step reads */
+  let answer = $state.raw<SeriesAnswer | null>(null);
   let cancelled = $state(false);
   /** the patterns the second walk fitted, from the record (`secondWalkDone`) */
   let backDone = $state.raw<Set<number>>(new Set());
@@ -94,6 +106,7 @@
   const rows = $derived(ranOver?.patterns ?? patterns);
   const runDirection = $derived(ranOver?.direction ?? settings?.direction ?? "forward");
   const runWalks = $derived(walksOf(runDirection));
+  const firstFitBuilt = $derived(!!steps[1]?.built);
   /** a series needs two patterns to run */
   const few = $derived(patterns.length < 2);
   const heading = $derived(patterns.length
@@ -118,6 +131,7 @@
     ranOver = null;
     progress = emptyProgress();
     entries = null;
+    answer = null;
     cancelled = false;
     backDone = new Set();
   }
@@ -164,18 +178,19 @@
 
   async function loadAnswer() {
     try {
-      const answer = await api.seriesResult();
-      entries = answer.result.entries as SeriesEntry[];
-      cancelled = (answer.result.diagnostics ?? [])
+      const payload = await api.seriesResult();
+      answer = answerOf(payload);
+      entries = answer.entries;
+      cancelled = (payload.result.diagnostics ?? [])
         .some((d: { code: string }) => d.code === "SEQUENTIAL_CANCELLED");
       // the list as the run left it (no edit lands while one is in flight),
       // and the walk the record says ran
       const direction = settings?.direction ?? "forward";
-      ranOver ??= { patterns, direction: answer.has_backward ? "both"
+      ranOver ??= { patterns, direction: payload.has_backward ? "both"
         : direction === "both" ? "forward" : direction };
       progress = merged(progress, entries, ranOver.direction);
-      backDone = answer.has_backward
-        ? secondWalkDone(entries, answer.trajectories?.[0]) : new Set();
+      backDone = payload.has_backward
+        ? secondWalkDone(entries, payload.trajectories?.[0]) : new Set();
       ran = true;
     } catch {
       // nothing has run in this session: the Run step's empty state
@@ -189,16 +204,36 @@
     carryText = next.settings.carry.join(" ");
   }
 
-  /** Send the list and the settings as one PUT: the order is the series. */
+  /** the PUTs this panel has sent, and the one now on the wire */
+  let sent = 0;
+  let wire: Promise<unknown> = Promise.resolve();
+
+  /** Send the list and the settings as one PUT: the order is the series.
+   *  The body is the list as it stands now. The PUTs go one after another,
+   *  and only the last one's answer becomes the panel's list: an earlier
+   *  answer lacks an edit typed while it was on the wire, and absorbing it
+   *  would drop that edit from every later PUT (gui/CLAUDE.md § Svelte and
+   *  browser traps, a stale response is dropped). */
   async function put(extra: Record<string, unknown> = {}): Promise<boolean> {
     failure = "";
+    const mine = ++sent;
+    const body = { patterns: asRequest(patterns), ...extra };
+    const answer = wire.then(() => api.putSeries(body));
+    wire = answer.catch(() => {});
     try {
-      absorb(await api.putSeries({ patterns: asRequest(patterns), ...extra }) as SeriesSetup);
+      const next = await answer as SeriesSetup;
+      // an earlier answer is still what the server holds until the next one
+      // lands, so a later PUT that fails reverts to it, never to the list
+      // before it
+      if (mine === sent) absorb(next);
+      else setup = next;
       onstaged();
       if (ran) changed = true;
       return true;
     } catch (error) {
       failure = (error as Error).message;
+      // a later PUT carries this one's list, so only the last reverts it
+      if (mine !== sent) return false;
       // the list the server holds is still the series
       if (setup) patterns = [...setup.patterns];
       return false;
@@ -293,7 +328,7 @@
 
   async function start() {
     failure = "";
-    const was = { progress, entries, cancelled, backDone, ranOver };
+    const was = { progress, entries, answer, cancelled, backDone, ranOver };
     clearRun();
     changed = false;
     startedHere = true;
@@ -302,7 +337,7 @@
       await onrun({ kind: "series" }, callText());
       ran = true;
     } catch (error) {
-      ({ progress, entries, cancelled, backDone, ranOver } = was);
+      ({ progress, entries, answer, cancelled, backDone, ranOver } = was);
       startedHere = false;
       failure = (error as Error).message;
     }
@@ -317,17 +352,22 @@
   const secondPass = $derived(runWalks > 1 ? (firstPass === "forward" ? "backward" : "forward") : null);
   const nConverged = $derived(entries ? entries.filter((e) => e.status === "converged").length : 0);
   const status = $derived.by(() => {
-    if (running) {
-      const c = progress.current;
-      if (!c) return `Fitting · ${nDone} of ${nFits}`;
-      const x = rows[c.index]?.x;
-      const walk = runWalks > 1 ? ` · ${c.pass === firstPass ? "first walk" : "second walk"}` : "";
-      return `Fitting ${c.label}${x == null ? "" : ` · ${x}`}${walk} · ${Math.min(nDone + 1, nFits)} of ${nFits}`;
-    }
+    if (running) return fittingText(progress, runWalks, firstPass, (i) => rows[i]?.x);
     if (cancelled) return `Stopped · ${nDone} of ${nFits} fits`;
     if (entries) return `Finished · ${nConverged} of ${rows.length} converged`;
     return "";
   });
+  /** the pattern the Results step reads, the first until a row is clicked */
+  const at = $derived(selected ?? entries?.[0]?.index ?? null);
+  const atEntry = $derived(entries?.find((e) => e.index === at) ?? null);
+  const gap = $derived(answer ? largestGap(answer.gaps) : null);
+  const bigSteps = $derived(answer ? sizedSteps(answer.steps) : []);
+  /** a pattern's coordinate: the record's, else the list's as it ran */
+  const xOf = (index: number) => entries?.find((e) => e.index === index)?.x ?? rows[index]?.x ?? null;
+  /** a coordinate where a line needs one, the pattern's number without */
+  const xAt = (index: number) => xOf(index) ?? `#${index + 1}`;
+  const atX = $derived(at === null ? null : xOf(at));
+  const atName = $derived(atEntry ? `${atEntry.label}${atX == null ? "" : ` · ${atX}`}` : "");
   /** a finished run is whole, even read by a page that did not follow it */
   const fraction = $derived(!running && entries && !cancelled ? 1
     : nFits ? Math.min(1, nDone / nFits) : 0);
@@ -406,8 +446,10 @@
       {#if failure}<p class="bad">{failure}</p>{/if}
     </div>
     <div class="foot">
-      <button disabled={few} onclick={() => onstep(1)}>First fit</button>
-      <button class="ghost" disabled={!editable || few} onclick={start}
+      <!-- First fit is the view's one primary once its step is built; until
+           then Run series is, as in the Run step's foot -->
+      <button class:ghost={!firstFitBuilt} disabled={few} onclick={() => onstep(1)}>First fit</button>
+      <button class:ghost={firstFitBuilt} disabled={!editable || few} onclick={start}
         title="Run without a first fit: the first pattern starts from the model">Run series</button>
       <span class="muted">{#if reading}Reading {reading}…{:else if few}Needs two patterns{:else if changed}Changed since the last run{:else}{patterns.length} patterns · {walks === 2 ? "two walks" : "one walk"}{/if}</span>
     </div>
@@ -428,7 +470,7 @@
           <thead>
             <tr><th class="r">#</th><th>Pattern</th><th class="r">{axis}</th>
               <th class="r">Rwp (%)</th><th>Started from</th>
-              {#if secondPass}<th class="r">Second walk</th>{/if}</tr>
+              {#if secondPass}<th class="r">Second walk Rwp (%)</th>{/if}</tr>
           </thead>
           <tbody>
             {#each rows as p, i (p.upload + ":" + i)}
@@ -441,7 +483,11 @@
                 <td class="r num">{fit ? rwpText(fit.rwp) : cur === firstPass ? "…" : ""}</td>
                 <td>{fit ? startedFrom(fit.rung) : ""}</td>
                 {#if secondPass}
-                  <td class="r">{progress.fits[secondPass]?.[i] || backDone.has(i) ? "✓"
+                  {@const back = progress.fits[secondPass]?.[i]}
+                  <!-- the second walk's Rwp as its fit lands; a page that did
+                       not follow the run reads only that the walk fitted it,
+                       since the record keeps no second-walk fits -->
+                  <td class="r num">{back ? rwpText(back.rwp) || "✓" : backDone.has(i) ? "✓"
                     : cur === secondPass ? "…" : ""}</td>
                 {/if}
               </tr>
@@ -459,6 +505,100 @@
           <button class="ghost" disabled={!editable || few} onclick={start}
             title="Replaces these results">Run again</button>
         {/if}
+      </div>
+    {/if}
+  {:else if step === 3}
+    {#if !answer}
+      <div class="body"><p class="muted empty">{running ? "Running. The results appear when the run ends." : "Not run yet."}</p>
+        {#if failure}<p class="bad">{failure}</p>{/if}</div>
+      <div class="foot">
+        <button disabled={!editable || few} onclick={start}>Run series</button>
+      </div>
+    {:else}
+      {@const a = answer}
+      <div class="body">
+        <dl class="kv summary">
+          <dt>Converged</dt>
+          <dd><span class="num">{nConverged}</span> of <span class="num">{a.entries.length}</span>{#if a.entries.length < rows.length}{" "}fitted{/if}</dd>
+          {#if gap}
+            <dt>Largest walk gap</dt>
+            <dd>{pathName(gap.path, a)} · {xAt(gap.index)} · <span class="num">{esdText(gap.gap_esd!)}</span> esd</dd>
+          {/if}
+          {#if bigSteps[0]}
+            {@const s = bigSteps[0]}
+            <dt>Largest step</dt>
+            <dd>{pathName(s.path, a)} · {xAt(s.indices[0])} → {xAt(s.indices[1])} · <span class="num">{esdText(s.size_esd!)}</span> esd</dd>
+          {/if}
+        </dl>
+        {#if changed}<p class="warn">Changed since this run</p>{/if}
+        <h3>Patterns</h3>
+        <table class="rows">
+          <thead>
+            <tr><th class="r">#</th><th class="r">{axis}</th><th class="r">Rwp (%)</th>
+              <th class="r">GoF</th><th>Started from</th><th class="r">Warnings</th></tr>
+          </thead>
+          <tbody>
+            {#each rows as p, i (p.upload + ":" + i)}
+              {@const e = a.entries.find((x) => x.index === i)}
+              {@const nw = warningsOf(e).length}
+              <tr class:sel={at === i} onclick={() => (selected = i)}>
+                <td class="r num muted">{i + 1}</td>
+                <td class="r num">{xText(e?.x ?? p.x)}</td>
+                <td class="r num">{e?.statistics ? rwpText(e.statistics.rwp) : "—"}</td>
+                <td class="r num">{e?.statistics ? e.statistics.gof.toFixed(2) : ""}</td>
+                <td>{e ? startedFrom(e.rung) : "not fitted"}</td>
+                <td class="r num">{nw || ""}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+        <h3>Values{#if atName}<span class="nt">at {atName}</span>{/if}</h3>
+        <table class="rows values">
+          <tbody>
+            {#each valueGroups(a, at) as g (g.key)}
+              <tr class="gh"><td colspan="2">{g.title}</td></tr>
+              {#each g.rows as v (v.path)}
+                <tr>
+                  <td>{v.name}{#if v.count < v.n}<span class="nt num">{v.count}/{v.n}</span>{/if}</td>
+                  <td class="r num">{v.value}</td>
+                </tr>
+              {/each}
+            {/each}
+          </tbody>
+        </table>
+        {#if atEntry}
+          <h3>{atEntry.label}{#if atX != null}<span class="nt">{atX}</span>{/if}</h3>
+          {#each warningsOf(atEntry) as d, k (k)}
+            <p class="dg"><b>{d.code}</b> {d.message}</p>
+          {:else}
+            <p class="muted">No warnings.</p>
+          {/each}
+        {/if}
+        {#if seriesWarnings(a.codes).length}
+          <details class="notes">
+            <summary>Warnings across the series</summary>
+            {#each seriesWarnings(a.codes).slice(0, 8) as c, k (k)}
+              <p class="dg"><b>{c.code}</b>{#if c.path}{" "}<span class="muted">{c.path}</span>{/if}: {countText(c)}</p>
+            {/each}
+          </details>
+        {/if}
+        {#if bigSteps.length}
+          <details class="notes">
+            <summary>Largest steps between neighbours</summary>
+            <table class="rows">
+              <tbody>
+                {#each bigSteps.slice(0, 10) as s, k (k)}
+                  <tr onclick={() => (selected = s.indices[1])}>
+                    <td>{pathName(s.path, a)}</td>
+                    <td class="muted">{xAt(s.indices[0])} → {xAt(s.indices[1])}</td>
+                    <td class="r num">{esdText(s.size_esd!)} esd</td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </details>
+        {/if}
+        {#if failure}<p class="bad">{failure}</p>{/if}
       </div>
     {/if}
   {/if}
@@ -521,8 +661,9 @@
     color: var(--muted);
   }
 
+  /* as wide as the carried-over globs' box, so "Temperature (K)" shows whole */
   input.axis {
-    width: 12ch;
+    width: 20ch;
   }
 
   input.carry {
@@ -621,6 +762,51 @@
 
   .status {
     margin: 10px 0 6px;
+  }
+
+  /* the label-value rows, as the Candidates step's checks draw them */
+  .kv {
+    display: grid;
+    grid-template-columns: max-content auto;
+    gap: 4px 16px;
+    margin: 10px 0 0;
+  }
+
+  .kv dt {
+    color: var(--muted);
+  }
+
+  .kv dd {
+    margin: 0;
+  }
+
+  .rows tr.gh td {
+    padding-top: 10px;
+    font-weight: 500;
+    color: var(--muted);
+  }
+
+  .rows.values tbody tr {
+    cursor: default;
+  }
+
+  .rows .nt {
+    margin-left: 8px;
+    color: var(--muted);
+  }
+
+  .dg {
+    margin: 6px 0 0;
+  }
+
+  details.notes {
+    margin: 12px 0;
+    color: var(--muted);
+  }
+
+  details.notes summary {
+    cursor: pointer;
+    color: var(--fg);
   }
 
   /* the run's progress: a hairline track, filled in the accent */

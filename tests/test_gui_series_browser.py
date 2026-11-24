@@ -121,7 +121,8 @@ def test_a_series_is_loaded_sorted_walked_and_run(browser, gui, files):
     assert [r[1] for r in rows] == ["ramp0", "ramp1", "ramp2"]
     assert all(r[3] for r in rows), rows                      # every Rwp landed
     assert rows[0][4] == "model" and rows[1][4].startswith("previous"), rows
-    assert [r[5] for r in rows] == ["✓", "✓", "✓"]            # the second walk
+    # the second walk's Rwp, followed live, so every one landed as a number
+    assert all(r[5] not in ("", "✓", "…") and float(r[5]) > 0 for r in rows), rows
     assert page.locator(".gauge").get_attribute("aria-valuenow") == "100"
     assert not page.errors, page.errors
     page.close()
