@@ -88,6 +88,8 @@ export interface ValueRow {
 }
 
 export interface ValueGroup {
+  /** the group's path prefix, unique where two titles may read alike */
+  key: string;
   title: string;
   rows: ValueRow[];
 }
@@ -99,7 +101,7 @@ export function valueGroups(a: SeriesAnswer, at: number | null): ValueGroup[] {
   const n = a.entries.length;
   const entry = a.entries.find((e) => e.index === at) ?? null;
   const fitted = a.entries.filter((e) => e.statistics).length;
-  const groups: ValueGroup[] = [{ title: "Fit", rows: [
+  const groups: ValueGroup[] = [{ key: "#fit", title: "Fit", rows: [
     { path: "rwp", name: "Rwp (%)", count: fitted, n,
       value: entry?.statistics ? (entry.statistics.rwp * 100).toFixed(2) : "" },
     { path: "gof", name: "GoF", count: fitted, n,
@@ -110,7 +112,7 @@ export function valueGroups(a: SeriesAnswer, at: number | null): ValueGroup[] {
     const key = groupOfPath(t.path);
     let g = byGroup.get(key);
     if (!g) {
-      g = { title: groupTitle(key, a), rows: [] };
+      g = { key, title: groupTitle(key, a), rows: [] };
       byGroup.set(key, g);
       groups.push(g);
     }

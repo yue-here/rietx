@@ -1,6 +1,6 @@
 # WP-2243 — the series workflow at `/next`: patterns, first fit, run, results, with Trends and Map
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-24 — claimed by @yue-here (ghostshift runner); Results next
+Milestone: gui-overhaul · Status: 🔄 2026-11-24 — claimed by @yue-here (ghostshift runner); Patterns, Run and Results built; the selected pattern next
 Depends on: 2240 soft (the workflow frame R6 builds on); 2300 soft (what each pattern refines)
 Priority: P2 2026-11-23 — a feature the open milestone was opened for: R7, the rebuild's last piece before the swap
 

@@ -219,12 +219,17 @@
     wire = answer.catch(() => {});
     try {
       const next = await answer as SeriesSetup;
+      // an earlier answer is still what the server holds until the next one
+      // lands, so a later PUT that fails reverts to it, never to the list
+      // before it
       if (mine === sent) absorb(next);
+      else setup = next;
       if (ran) changed = true;
       return true;
     } catch (error) {
-      if (mine !== sent) return false;
       failure = (error as Error).message;
+      // a later PUT carries this one's list, so only the last reverts it
+      if (mine !== sent) return false;
       // the list the server holds is still the series
       if (setup) patterns = [...setup.patterns];
       return false;
@@ -500,7 +505,7 @@
     {/if}
   {:else if step === 3}
     {#if !answer}
-      <div class="body"><p class="muted empty">Not run yet.</p>
+      <div class="body"><p class="muted empty">{running ? "Running. The results appear when the run ends." : "Not run yet."}</p>
         {#if failure}<p class="bad">{failure}</p>{/if}</div>
       <div class="foot">
         <button disabled={!editable || few} onclick={start}>Run series</button>
@@ -546,7 +551,7 @@
         <h3>Values{#if atName}<span class="nt">at {atName}</span>{/if}</h3>
         <table class="rows values">
           <tbody>
-            {#each valueGroups(a, at) as g (g.title)}
+            {#each valueGroups(a, at) as g (g.key)}
               <tr class="gh"><td colspan="2">{g.title}</td></tr>
               {#each g.rows as v (v.path)}
                 <tr>

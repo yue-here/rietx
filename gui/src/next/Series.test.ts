@@ -162,6 +162,30 @@ describe("the Patterns step", () => {
       .toEqual(["300", "400", "500"]);
   });
 
+  it("reverts a refused PUT to the list an earlier PUT left on the server", async () => {
+    stored = setupOf([pattern("a", null), pattern("b", null)]);
+    await boot();
+    let release!: () => void;
+    const held = new Promise<void>((r) => (release = r));
+    const first = putSeries.getMockImplementation()!;
+    putSeries.mockImplementationOnce(async (body: any) => { await held; return first(body); });
+    putSeries.mockImplementationOnce(async () => { throw new Error("refused"); });
+    const box = (i: number) => document.querySelectorAll<HTMLInputElement>("input.coord")[i];
+    box(0).value = "300";
+    box(0).dispatchEvent(new Event("change", { bubbles: true }));
+    await settle();
+    box(1).value = "400";
+    box(1).dispatchEvent(new Event("change", { bubbles: true }));
+    await settle();
+    release();
+    await settle();
+    // the server holds the first edit, so the panel shows it, and says why the second went
+    expect(stored.patterns.map((p) => p.x)).toEqual([300, null]);
+    expect([...document.querySelectorAll<HTMLInputElement>("input.coord")].map((b) => b.value))
+      .toEqual(["300", ""]);
+    expect(text(document.querySelector(".bad"))).toBe("refused");
+  });
+
   it("fills Run series while First fit is not built, and First fit once it is", async () => {
     stored = setupOf([pattern("a", 1), pattern("b", 2)]);
     await boot();
