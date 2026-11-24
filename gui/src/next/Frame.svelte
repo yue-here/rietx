@@ -52,6 +52,7 @@
   import HelpBox from "./HelpBox.svelte";
   import Indexing from "./Indexing.svelte";
   import Series from "./Series.svelte";
+  import { arrowStep, type SeriesView } from "./seriespattern";
   import History from "./History.svelte";
   import { howComment, howWords } from "./howran";
   import { GRAPH_HELP, HISTORY_HELP, MODEL_HELP, WORKFLOW_HELP } from "./helpbox";
@@ -199,6 +200,14 @@
   let indexingPanel: ReturnType<typeof Indexing> | undefined = $state();
   /** the series workflow's panel, which folds the run's events (WP-2243) */
   let seriesPanel: ReturnType<typeof Series> | undefined = $state();
+  /** what the Pattern graph draws while Series is up: the selected member
+   *  (WP-2243 task 5), handed up by the panel */
+  let seriesView = $state.raw<SeriesView | null>(null);
+  /** Series has been chosen once: from then on it stays mounted, hidden under
+   *  another workflow, so its list, its run's table and the selection keep,
+   *  and a run it started still folds into it */
+  let seriesMounted = $state(false);
+  const seriesShown = $derived(wf === "series" ? seriesView : null);
   let frameAt = $state.raw<{ two_theta: number; seq: number } | null>(null);
 
   /** The model panel's width and the bottom panel's height, session-local
@@ -824,6 +833,7 @@
 
   function chooseWorkflow(id: string) {
     wf = id as WorkflowId;
+    if (wf === "series") seriesMounted = true;
     if (!sized) modelWidth = opening(wf);
     chooseStep(0);
     const shown = workflow(wf).graphs;
@@ -903,6 +913,13 @@
       if (layered) return;
       event.preventDefault();
       keysOpen = true;
+      return;
+    }
+    // ↑ ↓ move the series' selected pattern on every view (round 12, call 2)
+    const delta = wf === "series" && !layered && isShortcutTarget(event) ? arrowStep(event) : 0;
+    if (delta) {
+      event.preventDefault();
+      seriesPanel?.move(delta);
       return;
     }
     // `.` runs the Plan tab's selected stage (WP-2214 row 232)
@@ -1066,11 +1083,17 @@
         <div class="pane">
           {#key opens}
           {#if graphTab === "pattern"}
-            <Pattern {result} {plotKey} {theme} {protocol} {extent} {wavelengths} {busy}
+            <!-- while Series is up the graph draws its selected member, not
+                 the project's fit (WP-2243 task 5): no preview, no compared
+                 node, and the sliders keep the project's curves -->
+            <Pattern result={seriesShown ? null : result} {plotKey} {theme} {protocol} {extent} {wavelengths} {busy}
               {protocolError} onprotocol={setProtocol} onreadout={(r) => (reading = r)}
               projectPath={project?.path ?? null} ui={project?.doc?.ui ?? null} onui={saveUi}
-              preview={previewAnswer} {previewError} oncurves={(c) => (baseCurves = c)}
-              {compared} howText={howWords(result?.how, corpus)}
+              preview={seriesShown ? null : previewAnswer} previewError={seriesShown ? "" : previewError}
+              oncurves={(c) => { if (!seriesShown) baseCurves = c; }}
+              source={seriesShown?.source ?? null}
+              nav={seriesShown ? { ...seriesShown, onstep: (d: number) => seriesPanel?.move(d) } : null}
+              compared={seriesShown ? null : compared} howText={howWords(result?.how, corpus)}
               peaksActive={wf === "index"} peaks={wf === "index" ? peaksPayload?.peaks ?? null : null}
               groups={wf === "index" ? peaksPayload?.groups ?? null : null}
               candidate={wf === "index" ? candidateLines : null}
@@ -1168,11 +1191,13 @@
               onadopted={() => { chooseWorkflow("refine"); void structureMoved(); }} />
           </div>
         {/if}
-        {#if wf === "series"}
+        {#if seriesMounted}
           {#key project.path}
-            <div class="pane wfsteps">
-              <Series bind:this={seriesPanel} {step} steps={wfSteps ?? []} {busy} {run} {say}
-                onstep={chooseStep} onrun={startRun} onstop={stop} />
+            <div class="pane wfsteps" class:gone={wf !== "series"}>
+              <Series bind:this={seriesPanel} step={wf === "series" ? step : 0}
+                steps={workflow("series").steps ?? []} {busy} {run} {say}
+                onstep={chooseStep} onrun={startRun} onstop={stop}
+                onview={(v) => (seriesView = v)} />
             </div>
           {/key}
         {/if}

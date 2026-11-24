@@ -42,11 +42,26 @@ vi.mock("../api", () => ({
     series: () => series(),
     putSeries: (b: unknown) => putSeries(b),
     seriesResult: () => seriesResult(),
+    seriesPattern: (i: number, of: string) => seriesPattern(i, of),
     uploadFile: vi.fn(),
   },
 }));
 
+/** A curves payload whose header says whether it carries a fit. */
+const packed = (fitted: boolean) => {
+  const head = new TextEncoder().encode(JSON.stringify({ fitted, arrays: [] }));
+  const buffer = new ArrayBuffer(4 + head.length);
+  new DataView(buffer).setUint32(0, head.length, true);
+  new Uint8Array(buffer, 4).set(head);
+  return buffer;
+};
+const seriesPattern = vi.fn(async (_i: number, _of: string) => packed(false));
+
 import Series from "./Series.svelte";
+import type { SeriesView } from "./seriespattern";
+
+const views: (SeriesView | null)[] = [];
+const view = () => views[views.length - 1];
 
 let app: any = null;
 const steps: number[] = [];
@@ -68,6 +83,7 @@ async function boot(step = 0, run: RunState | null = null) {
     step, steps: workflow("series").steps!, busy: run?.state === "running", run,
     onstep: (i: number) => steps.push(i),
     onrun: async (body: Record<string, unknown>, t: string) => { runs.push([body, t]); },
+    onview: (v: SeriesView | null) => views.push(v),
   } });
   await settle();
 }
@@ -78,6 +94,7 @@ afterEach(() => {
   document.body.innerHTML = "";
   steps.length = 0;
   runs.length = 0;
+  views.length = 0;
   vi.clearAllMocks();
 });
 
@@ -299,5 +316,60 @@ describe("the Results step", () => {
     expect(values()).toContain("cell.a 4.15901");
     expect(text(document.querySelector(".body .dg"))).toBe("BOUND_HIT a hit its bound");
     expect(text(document.querySelector("details.notes summary"))).toBe("Warnings across the series");
+  });
+});
+
+describe("the selected pattern", () => {
+  const ev = (seq: number, kind: string, index: number, data: Record<string, unknown> = {}): EngineEvent =>
+    ({ seq, kind, t: seq, data: { series_index: index, series_label: `T${index}`, series_n: 3,
+                                   series_pass: "forward", ...data } });
+
+  it("draws the first staged pattern, and a row click and the steps move it", async () => {
+    stored = setupOf([pattern("T0", 10), pattern("T1", 20), pattern("T2", 30)]);
+    await boot();
+    expect(view()).toMatchObject({ name: "T0", sub: "10 · 1 of 3 · not fitted",
+                                   canPrev: false, canNext: true });
+    await view()!.source.load();
+    expect(seriesPattern).toHaveBeenLastCalledWith(0, "staged");
+    (document.querySelectorAll("table.rows tbody tr")[2] as HTMLElement).click();
+    flushSync();
+    expect(view()).toMatchObject({ name: "T2", canNext: false });
+    expect(document.querySelectorAll("table.rows tbody tr")[2].classList.contains("sel")).toBe(true);
+    // ‹ and ↑ step back, held at the ends
+    app.move(-1);
+    flushSync();
+    expect(view()!.name).toBe("T1");
+    app.move(-5);
+    flushSync();
+    expect(view()!.name).toBe("T0");
+  });
+
+  it("follows the pattern being fitted until a row click, and Follow the run resumes", async () => {
+    stored = setupOf([pattern("T0", 10), pattern("T1", 20), pattern("T2", 30)]);
+    await boot(2, { state: "running", run: { kind: "series" } } as RunState);
+    app.event(ev(1, "fit_start", 0));
+    flushSync();
+    expect(view()).toMatchObject({ name: "T0", sub: "10 · 1 of 3 · fitting…" });
+    app.event(ev(2, "fit_end", 0, { rwp: 0.2241, gof: 1.9, status: "converged" }));
+    flushSync();
+    // the fit has landed: the key moves, so the graph asks again, expecting it
+    expect(view()!.sub).toBe("10 · 1 of 3 · Rwp 22.41 %");
+    seriesPattern.mockImplementationOnce(async () => packed(true));
+    await view()!.source.load();
+    expect(seriesPattern).toHaveBeenLastCalledWith(0, "run");
+    app.event(ev(3, "fit_start", 1));
+    flushSync();
+    expect(view()!.name).toBe("T1");
+    expect(button("Follow the run")).toBeUndefined();
+    // a row click stops following
+    (document.querySelectorAll("table.rows tbody tr")[0] as HTMLElement).click();
+    flushSync();
+    app.event(ev(4, "fit_end", 1, { rwp: 0.23, gof: 2, status: "converged" }));
+    app.event(ev(5, "fit_start", 2));
+    flushSync();
+    expect(view()!.name).toBe("T0");
+    button("Follow the run").click();
+    flushSync();
+    expect(view()).toMatchObject({ name: "T2", sub: "30 · 3 of 3 · fitting…" });
   });
 });

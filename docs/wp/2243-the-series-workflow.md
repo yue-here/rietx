@@ -197,8 +197,13 @@ disagree on wavelength, range or step; a blank pattern) names its tier here befo
   `seriesresults.ts` reads the record. The list is headed "Values at <pattern>" and has
   no ticks yet: a tick plots on Trends, so the ticks, the heading "Plot", and the summary
   rows' Plot buttons land with task 6.
-- [ ] 5. The selected pattern: Pattern draws its fit while Series is up, ‹ › in the title,
-  ↑ ↓, and the graphs following the run until a row click.
+- [x] 5. The selected pattern: Pattern draws its fit while Series is up, ‹ › in the title,
+  ↑ ↓, and the graphs following the run until a row click. `seriespattern.ts` holds the
+  rules. A selection names the list it was made on, the staged one or the run's, so a
+  removal after a run moves neither table's mark onto another file. `GET
+  /api/series/curves?pattern=&of=` serves a member by its place, before a run from its
+  file and mid-run from each fit `on_result` hands over. Series stays mounted under
+  another workflow once chosen.
 - [ ] 6. The Trends graph tab: small panels, the Plot menu, Against, the second walk's rings,
   the bars' span, a point click selecting its pattern.
 - [ ] 7. The Map graph tab, with a route serving every member's observed counts and

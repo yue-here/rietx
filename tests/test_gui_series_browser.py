@@ -138,3 +138,55 @@ def test_a_series_is_loaded_sorted_walked_and_run(browser, gui, files):
     assert page.locator(".gauge").get_attribute("aria-valuenow") == "100"
     assert not page.errors, page.errors
     page.close()
+
+
+def _title(page) -> str:
+    return " ".join(page.locator(".pattern .gtitle").inner_text().split())
+
+
+def test_one_selected_pattern_moves_on_the_graph_and_the_tables(browser, gui):
+    """Task 5: the Pattern graph draws the selected member's fit, ‹ › in its
+    title, ↑ ↓ and a row click all move it, and Series keeps its state across
+    a workflow switch. Runs after the test above, on the run it left."""
+    url, session = gui
+    assert session.series_result()["result"]["entries"], "the run test above runs first"
+    page = _open_next(browser, url, 1440)
+    page.locator("button.mbtn.wf").click()
+    page.get_by_role("menuitemradio", name="Series", exact=True).click()
+    page.wait_for_function(
+        "document.querySelector('.pattern .gtitle')?.textContent.includes('ramp0')")
+    page.wait_for_function("document.querySelector('.pattern .gtitle')?.textContent.includes('Rwp')")
+    assert _title(page).startswith("‹ › ramp0") and "300 · 1 of 3 · Rwp " in _title(page), _title(page)
+    prev = page.get_by_role("button", name="Previous pattern", exact=True)
+    nxt = page.get_by_role("button", name="Next pattern", exact=True)
+    assert prev.is_disabled() and not nxt.is_disabled()
+    # the member's fit is drawn: its calculated curve has a legend switch
+    page.wait_for_selector(".pattern .view canvas")
+
+    nxt.click()
+    page.wait_for_function("document.querySelector('.pattern .gtitle')?.textContent.includes('ramp1')")
+    assert "400 · 2 of 3" in _title(page)
+    # ↓ with the focus on a step button, as after a click on it
+    page.locator("nav.steps button.step", has_text="Results").click()
+    page.locator("nav.steps button.step", has_text="Results").press("ArrowDown")
+    page.wait_for_function("document.querySelector('.pattern .gtitle')?.textContent.includes('ramp2')")
+    assert nxt.is_disabled()
+    rows = page.locator(".wfsteps table.rows").first.locator("tbody tr")
+    assert "sel" in (rows.nth(2).get_attribute("class") or "")
+
+    # a row click moves it too
+    rows.nth(0).click()
+    page.wait_for_function("document.querySelector('.pattern .gtitle')?.textContent.includes('ramp0')")
+
+    # another workflow draws the project's fit; back on Series nothing is lost
+    page.locator("button.mbtn.wf").click()
+    page.get_by_role("menuitemradio", name="Refinement", exact=True).click()
+    page.wait_for_function("!document.querySelector('.pattern .gtitle')?.textContent.includes('ramp0')")
+    page.locator("button.mbtn.wf").click()
+    page.get_by_role("menuitemradio", name="Series", exact=True).click()
+    page.wait_for_function("document.querySelector('.pattern .gtitle')?.textContent.includes('ramp0')")
+    page.locator("nav.steps button.step", has_text="Run").click()
+    page.wait_for_selector(".wfsteps .status >> text=Finished")
+    assert "sel" in (page.locator(".wfsteps table.rows tbody tr").nth(0).get_attribute("class") or "")
+    assert not page.errors, page.errors
+    page.close()

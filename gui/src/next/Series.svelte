@@ -23,6 +23,12 @@
    * rows with no verdict (call 11), one row per pattern, every value at the
    * selected pattern, that pattern's warnings, and the series' warnings and
    * largest steps under disclosures.
+   *
+   * One selected pattern links the tables and the Pattern graph (round 12,
+   * calls 2 and 9; `seriespattern.ts`). A row click, ‹ › in the graph's title
+   * and ↑ ↓ move it; during a run it follows the pattern being fitted until a
+   * row click, and "Follow the run" resumes. The panel hands the frame what
+   * the graph draws (`onview`), mid-run too.
    */
   import { onMount, untrack } from "svelte";
 
@@ -41,6 +47,10 @@
     ORDER, axisWord, emptyProgress, fitsDone, fittingText, fold, inOrder, merged, rwpText,
     secondWalkDone, spanOf, startedFrom, walksOf, type RunProgress,
   } from "./seriesrun";
+  import {
+    drawnPlace, loadMember, markedIn, sameMembers, stepped, subText,
+    type ListName, type Selection, type SeriesView,
+  } from "./seriespattern";
 
   let {
     step = 0,
@@ -51,6 +61,7 @@
     onstep = () => {},
     onrun = async () => {},
     onstop = () => {},
+    onview = () => {},
   }: {
     step?: number;
     steps: readonly Step[];
@@ -63,6 +74,8 @@
     /** start a run behind its call (the shell's, so the Console holds it) */
     onrun?: (body: Record<string, unknown>, text: string) => Promise<void>;
     onstop?: () => void;
+    /** what the Pattern graph draws for the series, or null with no pattern */
+    onview?: (view: SeriesView | null) => void;
   } = $props();
 
   let setup = $state.raw<SeriesSetup | null>(null);
@@ -83,7 +96,12 @@
   let ran = $state(false);
   /** the list or the walk changed after the last run (call 13) */
   let changed = $state(false);
-  let selected = $state<number | null>(null);
+  /** the pattern chosen, on the list it was chosen on; null draws the first */
+  let sel = $state.raw<Selection | null>(null);
+  /** the selection moves with the pattern being fitted (call 9) */
+  let follow = $state(false);
+  /** a run has ended and its record is being read: the run's list still holds */
+  let awaiting = $state(false);
   let fileInput: HTMLInputElement | undefined = $state();
   /** the list and the walk the last run ran over, taken when its record is
    *  read: the Run step's rows are keyed by series index, so an edit after the
@@ -142,9 +160,13 @@
       // a run another page started folds onto an empty table, never onto the
       // last run's fits and rungs
       if (now && !wasRunning && !startedHere) clearRun();
+      if (now && !wasRunning) follow = true;
       if (now) startedHere = false;
       // a run that failed left the server's record at the run before it
-      if (wasRunning && !now) void load(run?.run?.status !== "failed");
+      if (wasRunning && !now) {
+        awaiting = true;
+        void load(run?.run?.status !== "failed").finally(() => (awaiting = false));
+      }
       wasRunning = now;
     });
   });
@@ -270,8 +292,9 @@
 
   function remove(index: number) {
     patterns = patterns.filter((_, i) => i !== index);
-    if (selected === index) selected = null;
-    else if (selected !== null && selected > index) selected -= 1;
+    // a place on the run's list stays: that list did not change
+    if (sel?.of === "staged" && sel.index === index) sel = null;
+    else if (sel?.of === "staged" && sel.index > index) sel = { of: "staged", index: sel.index - 1 };
     void put();
   }
 
@@ -290,7 +313,7 @@
 
   function sort() {
     patterns = sortByX(patterns);
-    selected = null;
+    if (sel?.of === "staged") sel = null;
     void put();
   }
 
@@ -353,8 +376,39 @@
     if (entries) return `Finished · ${nConverged} of ${rows.length} converged`;
     return "";
   });
+  // -- the selected pattern (seriespattern.ts) ---------------------------
+
+  /** the run's list is the one in flight, or the last run's */
+  const hasRun = $derived(running || awaiting || ranOver !== null);
+  /** the staged list holds the files the run fitted, in its places */
+  const same = $derived(!ranOver || sameMembers(ranOver.patterns, patterns));
+  const drawn = $derived(drawnPlace(sel, hasRun, same, rows.length, patterns.length));
+  const markStaged = $derived(markedIn(drawn, "staged", same));
+  const markRun = $derived(markedIn(drawn, "run", same));
+
+  function choose(of: ListName, index: number) {
+    sel = { of, index };
+    follow = false;
+  }
+
+  /** ‹ › and ↑ ↓: the next pattern or the one before, in the list drawn. */
+  export function move(delta: number) {
+    if (!drawn) return;
+    const n = drawn.of === "run" ? rows.length : patterns.length;
+    choose(drawn.of, stepped(drawn.index, delta, n));
+  }
+
+  // during a run the selection is the pattern being fitted (call 9)
+  $effect(() => {
+    const c = progress.current ?? progress.last;
+    if (!running || !follow || !c) return;
+    untrack(() => {
+      if (sel?.of !== "run" || sel.index !== c.index) sel = { of: "run", index: c.index };
+    });
+  });
+
   /** the pattern the Results step reads, the first until a row is clicked */
-  const at = $derived(selected ?? entries?.[0]?.index ?? null);
+  const at = $derived(drawn?.of === "run" ? drawn.index : entries?.[0]?.index ?? null);
   const atEntry = $derived(entries?.find((e) => e.index === at) ?? null);
   const gap = $derived(answer ? largestGap(answer.gaps) : null);
   const bigSteps = $derived(answer ? sizedSteps(answer.steps) : []);
@@ -364,6 +418,31 @@
   const xAt = (index: number) => xOf(index) ?? `#${index + 1}`;
   const atX = $derived(at === null ? null : xOf(at));
   const atName = $derived(atEntry ? `${atEntry.label}${atX == null ? "" : ` · ${atX}`}` : "");
+  const view = $derived.by((): SeriesView | null => {
+    if (!drawn) return null;
+    const { of, index } = drawn;
+    const list = of === "run" ? rows : patterns;
+    const p = list[index];
+    if (!p) return null;
+    const fit = of === "run" ? progress.fits[firstPass]?.[index] ?? null : null;
+    const fitting = of === "run" && running && progress.current?.index === index;
+    return {
+      // the key moves when the fit lands or the record replaces it, so the
+      // graph asks again then and never on a redraw
+      source: { key: `${of}:${index}:${p.upload}:${fit ? `${fit.rwp}:${fit.rung}` : "-"}`,
+                load: () => loadMember(() => api.seriesPattern(index, of), !!fit) },
+      name: p.label,
+      sub: subText(of === "run" ? xOf(index) : p.x, index, list.length, fit?.rwp, fitting),
+      canPrev: index > 0,
+      canNext: index < list.length - 1,
+    };
+  });
+  $effect(() => {
+    const v = view;
+    untrack(() => onview(v));
+  });
+  $effect(() => () => onview(null));
+
   /** a finished run is whole, even read by a page that did not follow it */
   const fraction = $derived(!running && entries && !cancelled ? 1
     : nFits ? Math.min(1, nDone / nFits) : 0);
@@ -392,8 +471,8 @@
           </thead>
           <tbody>
             {#each patterns as p, i (p.upload + ":" + i)}
-              <tr class:sel={selected === i} onclick={(ev) => {
-                if (!(ev.target as HTMLElement).closest("input, button")) selected = i; }}>
+              <tr class:sel={markStaged === i} onclick={(ev) => {
+                if (!(ev.target as HTMLElement).closest("input, button")) choose("staged", i); }}>
                 <td class="r num muted">{i + 1}</td>
                 <td class="fname" title={p.filename}>{p.filename}</td>
                 <td class="r"><input class="num coord" inputmode="decimal" value={xText(p.x)}
@@ -458,7 +537,9 @@
       </div>
     {:else}
       <div class="body">
-        <p class="status">{status}</p>
+        <p class="status">{status}{#if running && !follow}{" · "}<button class="link"
+            title="Move the selection with the pattern being fitted"
+            onclick={() => (follow = true)}>Follow the run</button>{/if}</p>
         <div class="gauge" role="progressbar" aria-label="Series progress" aria-valuemin="0"
           aria-valuemax="100" aria-valuenow={Math.round(fraction * 100)}>
           <i style:width="{(fraction * 100).toFixed(1)}%"></i></div>
@@ -472,7 +553,7 @@
             {#each rows as p, i (p.upload + ":" + i)}
               {@const fit = progress.fits[firstPass]?.[i]}
               {@const cur = running && progress.current?.index === i ? progress.current.pass : null}
-              <tr class:sel={selected === i} onclick={() => (selected = i)}>
+              <tr class:sel={markRun === i} onclick={() => choose("run", i)}>
                 <td class="r num muted">{i + 1}</td>
                 <td class="fname">{p.label}</td>
                 <td class="r num">{xText(p.x)}</td>
@@ -537,7 +618,7 @@
             {#each rows as p, i (p.upload + ":" + i)}
               {@const e = a.entries.find((x) => x.index === i)}
               {@const nw = warningsOf(e).length}
-              <tr class:sel={at === i} onclick={() => (selected = i)}>
+              <tr class:sel={at === i} onclick={() => choose("run", i)}>
                 <td class="r num muted">{i + 1}</td>
                 <td class="r num">{xText(e?.x ?? p.x)}</td>
                 <td class="r num">{e?.statistics ? rwpText(e.statistics.rwp) : "—"}</td>
@@ -584,7 +665,7 @@
             <table class="rows">
               <tbody>
                 {#each bigSteps.slice(0, 10) as s, k (k)}
-                  <tr onclick={() => (selected = s.indices[1])}>
+                  <tr onclick={() => choose("run", s.indices[1])}>
                     <td>{pathName(s.path, a)}</td>
                     <td class="muted">{xAt(s.indices[0])} → {xAt(s.indices[1])}</td>
                     <td class="r num">{esdText(s.size_esd!)} esd</td>
