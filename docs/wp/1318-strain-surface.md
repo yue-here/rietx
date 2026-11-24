@@ -1,8 +1,9 @@
 # WP-1318 — the Stephens strain surface, rendered
 
-Milestone: unscheduled · Status: ✅ 2026-11-16 — `rx.viz.plot_strain_surface` over `stephens.directional_sigma2`; GUI view and esd band left to #1624 (PR #1620)
+Milestone: unscheduled · Status: 🔄 2026-11-16 — every task done in PR #1620 (`rx.viz.plot_strain_surface` over `stephens.directional_sigma2`); GUI view and esd band left to #1624; closes at the handover after the merge
 Track: Render what the fit already knows
 Depends on: —
+Priority: P3 2026-09-23 — a view over coefficients already refined
 
 ## Goal
 

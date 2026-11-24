@@ -154,6 +154,7 @@ def outside_the_cone():
     return brucite(_strain_from_coef(coef, vary=False)), diags
 
 
+@pytest.mark.xdist_group("strain-surface")
 @pytest.mark.parametrize("style", ["light", "dark"])
 def test_a_block_outside_the_cone_draws_its_region_and_the_finding(
         outside_the_cone, style):
@@ -193,6 +194,7 @@ def test_a_block_outside_the_cone_draws_its_region_and_the_finding(
     assert np.linalg.norm(top) == pytest.approx(np.sqrt(-sigma2_c), rel=1e-3)
 
 
+@pytest.mark.xdist_group("strain-surface")
 def test_a_silent_guard_is_said_to_be_silent(outside_the_cone):
     """Passed diagnostics with no finding for this block: the note says the
     guard reported nothing, and claims nothing about where the region lies."""
@@ -211,6 +213,7 @@ def test_a_silent_guard_is_said_to_be_silent(outside_the_cone):
     plt.close(fig)
 
 
+@pytest.mark.xdist_group("strain-surface")
 def test_another_phases_finding_is_not_quoted(outside_the_cone):
     import matplotlib.pyplot as plt
 
