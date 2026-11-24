@@ -905,6 +905,15 @@ without failing on it.
 | `CELL_MIN_LENGTH_A` (1.5 Å) | TOPAS | none floor a cell length; the floor binds on no real cell |
 | `auto_background:seed` (not from the data) | all seven start from zero, a constant or the user's numbers | none |
 | `BRINDLEY_MU_R_FENCE` | the citation; FullProf prints the same classes as text | not asked of the others |
+| `FULLPROF_ORIGIN_CHOICE` (a bare symbol with two origins read as origin 2) | FullProf 8.20's manual, the note after the `.pcr` space-group line: "By default the program uses the setting with the inversion centre at the origin" | GSAS-II reads a bare symbol as origin 2 too; the others not checked |
+| `GSAS2_INSTPRM_CONVENTION_ASSUMED`, `RECIPE_CONVENTION_ASSUMED` (SH/L split evenly into S/L and H/L) | GSAS-II 5.8.4 evaluates exactly that split (`pypowder.for:146` passes SPH/2 for both; its `.prm` exporter does the same) | the others not checked |
+| `GSAS2_INSTPRM_GEOMETRY_ASSUMED` (no Diff-type: one wavelength is Debye-Scherrer, a doublet Bragg-Brentano) | GSAS-II 5.8.4's own rule (`GSASIIfiles.py:418-420`) | the others not checked; a Kα1-only flat-plate instrument is the case it reads wrong |
+| `GSAS_PRM_PROFILE_SET_DEFAULTED` (set 1 of several) | GSAS-II 5.8.4's `.prm` importer reads set 1 only (`GSASIIfiles.py:274-278`) | the others not checked |
+| `PATTERN_X_AXIS_ASSUMED` (an unlabelled x column read as 2θ) | GSAS-II 5.8.4's xye, Rigaku and PANalytical importers, with no label check | FullProf and TOPAS not checked |
+| `RAS_ATTENUATOR_PRESENT` (the attenuator column read as stored, not applied) | GSAS-II 5.8.4's Rigaku importer | the convention is not measured: every obtainable `.ras` holds the column constant |
+| `_PRM_CUTOFF` (0.001) | the value GSAS-II 5.8.4's `.prm` exporter writes (`G2export_pwdr.py:44`) | none |
+
+GSAS-II 5.8.4's CW `.prm` importer compares a string with an int (`v1[0] == 3`, `GSASIIfiles.py:269` and `:279`), so it never reads LX, LY or SH/L from PRCF12 and always takes 0, 0 and 0.002 (found by WP-2006's generality judge, 2026-11-17).
 
 ## Dropping candidates in a search race
 
