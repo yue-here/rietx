@@ -278,6 +278,25 @@ the prototype's (WP-2214 § How the maintainer reviews).
   walk's. #1823's Map keeps its own `seriesSelected` in the frame; whichever PR merges
   second points the Map at `Series.select`/`move` so all three views share one selection.
 
+  *Review.* `/code-review high --fix` found five issues, all fixed in their own commit:
+  the live run is published in the block that publishes the running state, so a member
+  asked for the moment a run is seen is never the last record's; ↑ ↓ leave an open menu
+  alone; `awaiting` is set only when the record will be read; the series browser module
+  keeps one worker (`xdist_group`). A sixth, older than this branch, is fixed too: a
+  reload after the staged list was re-ordered drew the record against the wrong files,
+  so Results now builds its run list from the record when the labels disagree
+  (`Series.svelte:runList`). None declined.
+
+  *Measured* (arm64 macOS, worktree venv `[dev]` plus playwright, node 24.22.1, on
+  298f63c3e). vitest 1057 passed in 70 files (1030 at #1820). svelte-check 0 errors in
+  506 files. Dist rebuilt from source; `test_gui_dist.py` passes. The seven
+  `test_gui_*_browser.py` files: 71 passed (68 + 1 failed at #1820; this branch adds two
+  series tests). Fast suite (`-m "not slow"`, through `serial.py`): 15911 passed, 440
+  skipped, 30 xfailed. `test_docs_consistency.py` 57 passed. ruff clean, Vale 0 errors.
+  `python -m tests.reader_output` exit 0, reader output unchanged. Not measured: the
+  lane's token use, since `session_usage.py lanes` keys on the parent session and found
+  none.
+
   *Open questions for the maintainer*: Q2 and Q3 above, two visual choices built on the
   nearest existing pattern. Next: Q1 to Q3 wait on the maintainer. Task 8 waits on the
   scrubber placement. Then task 9 (First fit), which makes First fit the filled button
