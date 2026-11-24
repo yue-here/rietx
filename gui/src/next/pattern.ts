@@ -109,6 +109,8 @@ export interface ChartOptions {
   labels: { y: () => string; resid: () => string };
   /** whether the y axes keep a strip for their titles: only while exporting */
   titled?: () => boolean;
+  /** the plot's right padding on screen, the part of the canvas reaching into the legend gutter */
+  padRight?: number;
 }
 
 const Y: Record<Scale, "lin" | "sqrt" | "log"> = { linear: "lin", sqrt: "sqrt", log: "log" };
@@ -167,6 +169,7 @@ export class PatternChart {
       titled: opts.titled,
       rawResidual: () => this.groupResidual(),
       ranges: { main: (u: any, min: number, max: number) => this.mainRange(u, min, max) },
+      padRight: opts.padRight,
       layers: {
         main: { under: [shade, (u) => this.candidateLines(u)],
                 over: [(u) => this.previewLines(u), (u) => this.compareLine(u), (u) => this.peakFit(u), (u) => this.peakMarkers(u), (u) => this.placeRing(u)] },

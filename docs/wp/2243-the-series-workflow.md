@@ -280,7 +280,7 @@ the prototype's (WP-2214 § How the maintainer reviews).
   dist rebuilt from the merged source: vitest 1048 passed in 69 files, two of them new here
   (`seriesmap.test.ts`, `MapGraph.svelte.test.ts`); svelte-check 0 errors over 504 files;
   the Acceptance GUI python files with `test_docs_consistency.py` 332 passed; the seven
-  `tests/test_gui_*_browser.py` files, serially, 70 passed. Server tests: three new in `tests/test_gui_server.py`. Lint as CI runs it: ruff, ruff
+  `tests/test_gui_*_browser.py` files, serially, 71 passed (after #1822 too). Server tests: three new in `tests/test_gui_server.py`. Lint as CI runs it: ruff, ruff
   format on the tutorials, Vale (0 errors), skill caps, skill surface, audit delta, code
   references, rulebook limits, all clean. Reader output unchanged. Screenshots of the Map,
   Observed, Difference and Waterfall, light and dark, looked at in the runner's scratch.
