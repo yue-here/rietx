@@ -866,8 +866,8 @@ def _magnetic_sites(phase, sites, species, ion, g=None) -> tuple[
     state.  Where the species is itself a key (``"Mn3+"``, or ``"Mn0"`` for
     the neutral atom) it is used.  A bare element (``"Mn"``) is read as its
     most common ICSD oxidation state
-    (:func:`~.crystallography.magnetic.form_factor.read_bare_label`, ruling
-    D67), the same reading
+    (:func:`~.crystallography.magnetic.form_factor.read_bare_label`, the
+    #1806 ruling), the same reading
     :func:`~rietx.crystallography.cif.structure_from_cif` applies at read; one
     whose common ion carries no moment (``"Ti"``: Ti⁴⁺) is not a magnetic
     site, and is refused, with the ions to state, when the caller named it.
@@ -935,7 +935,7 @@ def _magnetic_sites(phase, sites, species, ion, g=None) -> tuple[
             key = atom.species
         elif is_bare(atom.species):
             # a bare element is read as its most common ICSD oxidation state
-            # (ruling D67); one with no moment there is not a magnetic site
+            # (the #1806 ruling); one with no moment there is not a magnetic site
             # unless the caller named it, when the refusal says what to state
             try:
                 reading = read_bare_label(atom.species)
@@ -2136,7 +2136,7 @@ def solve_magnetic(refinement, data, *, phase: int = 0,
     — and is **not** ``Atom.species``.  Where a site's ion is not stated by the
     caller here, the same fallback :func:`~rietx.crystallography.cif.
     structure_from_cif` applies at read is applied to the candidate builder
-    too (WP-1327, ruling D67): a bare element is read through
+    too (WP-1327, the #1806 ruling): a bare element is read through
     :func:`~.crystallography.magnetic.form_factor.read_bare_label` as its
     most common ICSD oxidation state, reported as ``MAGNETIC_ION_ASSUMED``
     (a warning) on :attr:`MagneticSolution.diagnostics`.

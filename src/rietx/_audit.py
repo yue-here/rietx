@@ -1687,7 +1687,7 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic: fires exactly when the stage's reflection list reaches an s past "
                   "the end of a Brown row's fitted range, the source's own number (Brown ITC "
                   "Vol. C p. 461), where the row's value is its computed tail (rietx #1691). "
-                  "Level by ruling D67 (2026-11-24, reversing D46's warning): past Brown's "
+                  "Level by the #1806 ruling (2026-11-24, reversing the 2026-11-23 warning): past Brown's "
                   "range f^2 is 6e-5 (Mn2+) to 7e-3 (Nd3+) of its low-angle value, so the "
                   "record is info and the advice to cut the data is dropped")),
     Row("MAGNETIC_ION_ASSUMED", "code", tier=1, ambiguity=3, response="warning",
@@ -1699,8 +1699,8 @@ ROWS: tuple[Row, ...] = (
                   "form_factor._ICSD_REPORTS, a hand row: a dict the walk cannot see), at "
                   "the CIF read (magcif.py), in solve_magnetic and at the fit "
                   "(refine._bare_magnetic_ion_diagnostics); the message names the pick, its "
-                  "share and the alternatives. Ruling D67 (2026-11-24): keep-and-warn, "
-                  "reversing D63's neutral-atom reading; a census ion with no moment is "
+                  "share and the alternatives. The #1806 ruling (2026-11-24): keep-and-warn, "
+                  "reversing the 2026-11-23 neutral-atom reading; a census ion with no moment is "
                   "refused instead (tests/test_magnetic_bare_label.py)")),
     Row("MAGNETIC_SITE_CHARGE_NOT_STATED", "code", tier=1, ambiguity=1, response="info",
         responds=("note that the moment site's X-ray scattering factor is the neutral atom "
@@ -1709,7 +1709,7 @@ ROWS: tuple[Row, ...] = (
                   "moment has a bare element species, whose X-ray scattering factor is the "
                   "neutral atom (International Tables Vol. C Table 6.1.1.4 and every "
                   "Rietveld program read a bare symbol so) while its magnetic form factor "
-                  "reads an ion; ruling D67 (2026-11-24) item 4(a), read for moment sites "
+                  "reads an ion; the #1806 ruling (2026-11-24), read for moment sites "
                   "only (tests/test_magnetic_bare_label.py)")),
     Row("MAGNETIC_SUBGROUP_PREFERRED", "code", tier=3, ambiguity=2,
         evidence=("warning; fires when a maximal subgroup refit from the winner beats it by "
@@ -3588,8 +3588,9 @@ ROWS: tuple[Row, ...] = (
                   "8-93 %; no measured form factor past s = 1.157), and CW neutrons reach s = 6 "
                   "only at lambda < 0.167 A; past it every row is refused, never extrapolated"),
         grounds=("chosen with margin past any constant-wavelength neutron pattern; a time-of-"
-                 "flight bank reaching d < 0.083 A would need it raised, a data change only"),
-        approved="2026-11-23"),
+                 "flight bank reaching d < 0.083 A would need it raised, a data change only; settled by Claude under the "
+                 "magnetic-path owner's ruling on #1691 (#1075)"),
+        approved="2026-11-23", approved_by="checked"),
     Row("rietx.crystallography.magnetic.form_factor.TABLE_STEP", "constant", tier=1,
         value=0.01,
         evidence=("measured: a cubic spline on this grid errs by <= 1.5e-6 on s = 0-1.5 and "
@@ -3604,8 +3605,9 @@ ROWS: tuple[Row, ...] = (
                   "at s = 1.5); the blend's value lies between the two, so the width moves a "
                   "value only by a fraction of the gap there"),
         grounds=("a C2 quintic over 0.2 keeps the curve's slope change under the size of "
-                 "Brown's own end-of-range residual; no published blend exists to adopt"),
-        approved="2026-11-23"),
+                 "Brown's own end-of-range residual; no published blend exists to adopt; settled by Claude under the "
+                 "magnetic-path owner's ruling on #1691 (#1075)"),
+        approved="2026-11-23", approved_by="checked"),
     Row("rietx.crystallography.magnetic.isotropy.CROSS_IRREP_DRAWS", "constant", value=12,
         evidence=("back to Mike, unaudited: he ruled tier 3 on PR #1636 (2026-11-23), and "
                   "the judge (2026-11-24) called it weak and an action's threshold: "
@@ -7523,7 +7525,7 @@ ROWS: tuple[Row, ...] = (
     Row("MAGNETIC_FORM_FACTOR_COMPUTED_TAIL.suggestion", "suggestion", tier=1, ambiguity=1,
         value=1,
         evidence=("arithmetic: says nothing is owed, since past Brown's ranges f^2 is under "
-                  "1 % of its low-angle value (6e-5 Mn2+ to 7e-3 Nd3+; ruling D67)")),
+                  "1 % of its low-angle value (6e-5 Mn2+ to 7e-3 Nd3+; the #1806 ruling)")),
     Row("MAGNETIC_ION_ASSUMED.suggestion", "suggestion", tier=1, ambiguity=3, value=3,
         evidence=("arithmetic: names the argument or field that states the ion, at each of "
                   "the three raise sites")),

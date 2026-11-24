@@ -424,6 +424,6 @@ aspherical
 covalency
 Kobayashi
 Nagao
-# The ICSD oxidation-state census a bare magnetic label is read through (D67, #1806).
+# The ICSD oxidation-state census a bare magnetic label is read through (#1806).
 Kumagai
 Oba

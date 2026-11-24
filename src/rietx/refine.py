@@ -10682,7 +10682,7 @@ def _form_factor_range_diagnostics(model: CompiledModel) -> list[Diagnostic]:
     model's reflection list evaluates past the range he fitted them over,
     where the value is the blend onto (then) the row's computed free-ion tail,
     once per result, as ``info``: it records that the computed tail was used
-    (ruling D67: past Brown's range f² is 6 × 10⁻⁵ (Mn²⁺) to 7 × 10⁻³ (Nd³⁺)
+    (the #1806 ruling: past Brown's range f² is 6 × 10⁻⁵ (Mn²⁺) to 7 × 10⁻³ (Nd³⁺)
     of its low-angle value, so nothing is owed), which
     :func:`~.crystallography.magnetic.form_factor.approximation_name` also
     names on every result.
@@ -10732,7 +10732,7 @@ def _form_factor_range_diagnostics(model: CompiledModel) -> list[Diagnostic]:
 def _bare_magnetic_ion_diagnostics(structure: Structure) -> list[Diagnostic]:
     """``MAGNETIC_ION_ASSUMED``: a moment whose ion is a bare element label
     (``Moment(ion="Fe")``), which the form-factor table reads as the
-    element's most common ICSD oxidation state (ruling D67,
+    element's most common ICSD oxidation state (the #1806 ruling,
     :func:`~.crystallography.magnetic.form_factor.read_bare_label`).  A
     warning, one row per site: the moment depends on the pick.  A label the
     census cannot read was refused when the phase was built, so every bare
@@ -10768,8 +10768,8 @@ def _charge_not_stated_diagnostics(structure: Structure,
     carries a moment and whose species is a bare element.  Its X-ray
     scattering factor is the neutral atom's, as every program and the
     International Tables read a bare label, while its magnetic form factor
-    (on a neutron histogram) is read as the most common ICSD ion (ruling
-    D67).  An ``info`` record: the X-ray reading is the standard one and
+    (on a neutron histogram) is read as the most common ICSD ion (the
+    #1806 ruling).  An ``info`` record: the X-ray reading is the standard one and
     nothing is owed.  Read narrowly (moment sites only), since a row on every
     bare species would fire on nearly every X-ray fit (WP-2037, "Attention
     is a cost", clause 1).

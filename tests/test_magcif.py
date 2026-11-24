@@ -2238,7 +2238,7 @@ def test_other_magnetic_spellings_beside_the_dictionary_items_still_read(
 def test_an_uncharged_type_symbol_is_read_as_the_census_ion_and_warned(tmp_path):
     """MAGNDATA writes a bare ``Mn`` for a site that is chemically Mn3+, and
     <j0> for the two is a different curve.  A bare label is read as the
-    element's most common ICSD oxidation state (ruling D67), Mn2+ here, which
+    element's most common ICSD oxidation state (the #1806 ruling), Mn2+ here, which
     is wrong for LaMnO3: so the read warns, naming the pick, its share and the
     alternatives, and stating the ion silences it."""
     diagnostics: list = []
@@ -2262,7 +2262,7 @@ def test_an_uncharged_type_symbol_is_read_as_the_census_ion_and_warned(tmp_path)
 
 def test_a_bare_lanthanide_with_no_neutral_row_defaults_to_its_majority_ion(
         tmp_path):
-    """WP-1327 D1; ruling D67.  A bare ``Dy`` is read as Dy3+, the census's
+    """WP-1327 D1; the #1806 ruling (2026-11-24).  A bare ``Dy`` is read as Dy3+, the census's
     Dy ion, and reported as ``MAGNETIC_ION_ASSUMED``, as a bare ``Mn`` is.
 
     LaMnO3's own real, cited geometry and operator list are reused verbatim
@@ -2303,7 +2303,7 @@ def test_a_bare_lanthanide_with_no_neutral_row_defaults_to_its_majority_ion(
 
 
 def test_a_bare_d0_label_on_a_moment_is_refused_naming_the_ions(tmp_path):
-    """Ruling D67 4(b): a bare ``Ti`` reads as Ti4+, the census's Ti ion,
+    """The #1806 ruling (2026-11-24): a bare ``Ti`` reads as Ti4+, the census's Ti ion,
     which is 3d0 and carries no moment, so a moment on it is refused at read,
     naming the ions to state and the neutral curve ``Ti0``."""
     sites = ("La1 La 0.54900 0.25000 0.01000 1",

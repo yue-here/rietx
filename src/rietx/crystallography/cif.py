@@ -809,7 +809,7 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
     Where ``moment_ions`` says nothing the site's own type symbol is used.  A
     bare one (MAGNDATA writes ``Mn`` for a site that is chemically Mn³⁺) is
     read as its element's most common ICSD oxidation state and reported as
-    ``MAGNETIC_ION_ASSUMED``, a warning naming the alternatives (ruling D67);
+    ``MAGNETIC_ION_ASSUMED``, a warning naming the alternatives (the #1806 ruling);
     one whose common ion carries no moment (``Ti``: Ti⁴⁺) is refused, naming
     the ions to state.  A key of either that names no ``_atom_site_moment`` row is
     refused (:class:`~rietx.crystallography.magcif.MagCifError`), since a
@@ -1103,7 +1103,7 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
             # The ion is the one quantity a magCIF cannot state (there is no
             # such item in ``cif_mag.dic``), so it falls back on the site's own
             # type symbol. A bare one is read as its element's most common
-            # ICSD oxidation state (ruling D67) and ``magnetic_diagnostics``
+            # ICSD oxidation state (the #1806 ruling) and ``magnetic_diagnostics``
             # reports MAGNETIC_ION_ASSUMED; one whose common ion carries no
             # moment, or has no row, is refused here, naming the ions to state.
             ion = moment.ion or atom.species

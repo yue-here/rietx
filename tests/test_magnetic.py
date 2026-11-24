@@ -325,7 +325,7 @@ def test_an_absent_ion_is_refused_by_name_never_mapped_to_a_neighbour():
 
 
 def test_a_bare_label_reads_as_its_most_common_icsd_ion():
-    """Ruling D67 (2026-11-24): a bare element label states no charge, so it is
+    """The #1806 ruling (2026-11-24): a bare element label states no charge, so it is
     read as the element's most common oxidation state in one ICSD census (Ding,
     Kumagai, Oba & Burton 2020, SI Table 1), never the neutral atom, which is
     stated ``"Mn0"``.  The pick, its share and the moment-carrying alternatives
@@ -365,7 +365,7 @@ def test_a_bare_label_reads_as_its_most_common_icsd_ion():
     ("Pd", "Pd2+", "no magnetic form factor"),
 ])
 def test_a_bare_label_whose_common_ion_has_no_moment_or_row_is_refused(element, ion, why):
-    """D67 4(b): where the census ion carries no moment (d0, f0, the J = 0 f6),
+    """The #1806 ruling (2026-11-24): where the census ion carries no moment (d0, f0, the J = 0 f6),
     or the table has no row for it, a bare label on a moment is refused,
     listing the moment-carrying ions to state and the neutral curve where the
     table has one.  The computed neutral curves stay available stated."""
@@ -452,7 +452,7 @@ def test_lande_g_raises_on_a_nonmagnetic_j_equals_zero_ground_state():
     """Sm2+ and Eu3+ (both 4f6) are J = 0 — no orbital-plus-spin moment, so
     g_J is undefined rather than some fallback number. This is also *why*
     a bare Sm label reads as Sm3+ and a bare Eu label (census Eu3+) is
-    refused (D67), so
+    refused (#1806 ruling), so
     :func:`assumed_lande_g` never needs to raise this in practice — it is
     checked directly here rather than through a caller."""
     with pytest.raises(ValueError, match="J = 0"):

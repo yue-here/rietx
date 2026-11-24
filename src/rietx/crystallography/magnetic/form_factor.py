@@ -105,7 +105,7 @@ below, on their neighbours' footing; the Pu³⁺ table reproduces Desclaux &
 Freeman's printed Pu³⁺ block to within 5.3 × 10⁻⁵ in all 84 cells.
 
 **A bare element label is read as its element's most common oxidation
-state** (ruling D67 of the magnetic-path owner, 2026-11-24, reversing D63's
+state** (the magnetic-path owner's ruling on #1806, 2026-11-24, reversing his
 "a bare label is the neutral atom"): most magnetic sites are ions, so ``"Fe"``
 is read as Fe³⁺, the commonest Fe charge in one census of the ICSD (Ding,
 Kumagai, Oba & Burton 2020, SI Table 1; :data:`_ICSD_REPORTS`,
@@ -485,8 +485,8 @@ def magnetic_ions() -> tuple[str, ...]:
 #: largest count, which is not always the paper's own recommended state (its
 #: SI Table 2 recommends both +2 and +3 for Fe and Eu, +1 and +2 for Cu).  The
 #: one census a bare element label is read through
-#: (:func:`read_bare_label`; ruling D67 of the magnetic-path owner,
-#: 2026-11-24).  Zero counts are omitted.
+#: (:func:`read_bare_label`; the magnetic-path owner's ruling on
+#: #1806, 2026-11-24).  Zero counts are omitted.
 _ICSD_REPORTS: dict[str, dict[int, int]] = {
     "Sc": {1: 36, 2: 38, 3: 1795},
     "Ti": {1: 5, 2: 220, 3: 789, 4: 12191},
@@ -617,8 +617,8 @@ def _state_it(sym: str) -> str:
 
 def read_bare_label(label: str) -> BareLabelReading:
     """The ion a bare element label is read as on the magnetic path: its
-    element's most common oxidation state in the ICSD (:data:`CENSUS`; ruling
-    D67, 2026-11-24).  The pick is often wrong, so whoever reads a bare label
+    element's most common oxidation state in the ICSD (:data:`CENSUS`; the
+    #1806 ruling, 2026-11-24).  The pick is often wrong, so whoever reads a bare label
     for a moment reports ``MAGNETIC_ION_ASSUMED`` (a warning) naming it and
     the alternatives.
 
@@ -746,7 +746,7 @@ def assumed_lande_g(ion: str) -> float | None:
     """The free-ion Hund's-rule g_J for ``ion``, or ``None`` if not declared.
 
     Declared for the 4f/5f ions :func:`read_bare_label` can produce (WP-1327
-    D-lande-g; ruling D67): a bare lanthanide/actinide site whose ion this
+    D-lande-g; the #1806 ruling): a bare lanthanide/actinide site whose ion this
     module itself read from the census has no way to state a Landé g either (magCIF carries no item for
     it, exactly as it carries none for the ion), so the same "assume it from
     the physics rather than refuse" choice applies to g once it already

@@ -1805,7 +1805,7 @@ class Phase(_InheritsDeclaredDefaults):
             try:
                 # existence only; j0 searches both stored forms.  A bare
                 # label is read as its census ion here too, and one whose
-                # census ion has no moment or no row is refused (D67)
+                # census ion has no moment or no row is refused (#1806 ruling)
                 j0(atom.moment.ion, 0.0)
             except (KeyError, ValueError) as exc:
                 # pydantic wraps a ValueError into its own report and lets a

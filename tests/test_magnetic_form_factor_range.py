@@ -4,7 +4,7 @@ Every Brown ⟨jₙ⟩ row is a least-squares fit over a stated range of s = sin
 p. 461), and past it the fitted form is not a form factor: Mn²⁺ ⟨j₀⟩ carries e^(+0.609·s²) and returned 1.0105 at
 s = 3 Å⁻¹ and 1.43 × 10⁷ at s = 6 (rietx #1796).  Since rietx #1691 (rulings D46, D56) each Brown row is his
 analytic form inside his range, blended over 0.2 Å⁻¹ onto a computed free-ion tail, and the tail to s = 6;
-seventeen ions are served from computed tables over the whole range, neutral ``Pd0`` among them (rulings D63 item 3, D67);
+seventeen ions are served from computed tables over the whole range, neutral ``Pd0`` among them (rulings on #1806 of 2026-11-23 and 2026-11-24);
 and past s = 6 every row is refused.  These tests pin
 
 * inside every Brown row's range, the evaluator is his formula bit for bit, and so is a magnetic fit there;
@@ -225,7 +225,7 @@ def test_mn2_j0_past_its_range_is_its_computed_tail():
 
 def test_pu3_and_pr3_are_their_dirac_fock_tables_and_the_bare_symbols_follow():
     """#1804: Pu³⁺ ⟨j₀⟩(0.2) is the Dirac-Fock 0.574, not Brown's Pu⁵⁺-curve 0.627.  Pr³⁺ likewise, from its DF
-    table, not Lisher & Forsyth's fit, and bare ``Pr`` reads as it (D67: Pr³⁺ is the ICSD census's Pr ion; bare
+    table, not Lisher & Forsyth's fit, and bare ``Pr`` reads as it (#1806 ruling: Pr³⁺ is the ICSD census's Pr ion; bare
     ``Pu`` reads as Pu⁴⁺, the census's)."""
     assert ff.read_bare_label("Pu").ion == "Pu4+"
     for ion, bare in (("Pu3+", None), ("Pr3+", "Pr")):
@@ -240,7 +240,7 @@ def test_pu3_and_pr3_are_their_dirac_fock_tables_and_the_bare_symbols_follow():
 
 def test_neutral_ru_is_the_neutral_atom_not_the_ru1_curve():
     """#1691: ``Ru0`` ⟨j₀⟩(0.2) is the neutral 4d⁷5s ⁵F table's 0.4163, not Brown's old bare M⁺ row's 0.4907; and it
-    differs from ``Ru1+`` (0.4268) too, so the bare row was dropped, not relabelled.  A bare ``Ru`` is Ru⁴⁺ (D67)."""
+    differs from ``Ru1+`` (0.4268) too, so the bare row was dropped, not relabelled.  A bare ``Ru`` is Ru⁴⁺ (#1806 ruling)."""
     s, v = REF["grid"][("Ru0", "j0")]
     want = float(v[np.isclose(s, 0.2)][0])
     assert float(ff.j0("Ru0", 0.2)) == pytest.approx(want, abs=5.1e-8)
@@ -253,9 +253,9 @@ def test_neutral_ru_is_the_neutral_atom_not_the_ru1_curve():
 
 
 def test_neutral_pd_is_the_named_neutral_curve_at_every_direct_entry_point():
-    """Ruling D63 item 3: a closed 4d¹⁰ shell still has ⟨jₙ⟩ curves, so neutral Pd is served like Nb and Sc, as the
+    """The 2026-11-23 ruling (#1806, comment of 22:17Z): a closed 4d¹⁰ shell still has ⟨jₙ⟩ curves, so neutral Pd is served like Nb and Sc, as the
     computed neutral atom in a named configuration, 4d⁹5s ³D, the lowest one with an open shell to carry a moment.
-    Since D67 it is stated ``"Pd0"``; a bare ``"Pd"`` reads as the census's Pd²⁺, which has no row, and is refused."""
+    Since the #1806 ruling (2026-11-24) it is stated ``"Pd0"``; a bare ``"Pd"`` reads as the census's Pd²⁺, which has no row, and is refused."""
     s, v = REF["grid"][("Pd0", "j0")]
     want = float(v[np.isclose(s, 0.2)][0])
     got = float(ff.j0("Pd0", 0.2))
@@ -282,7 +282,7 @@ def test_neutral_pd_is_the_named_neutral_curve_at_every_direct_entry_point():
 def test_neutral_pd_builds_a_phase_reads_from_a_magcif_and_is_picked_by_the_solver(tmp_path):
     """Where a fit, a reader and the solver take an ion, ``Pd0`` resolves to the neutral table: the phase builds,
     the magCIF override takes, and the solver's site pick keys it ``Pd0``.  A bare ``Pd`` named as a magnetic site
-    is refused with the ions to state (D67)."""
+    is refused with the ions to state (#1806 ruling)."""
     from rietx.crystallography.cif import structure_from_cif
     from rietx.strategy.magnetic import _magnetic_sites
     from tests.test_magcif import _fixture
@@ -339,7 +339,7 @@ def test_a_fit_reaching_past_s_6_is_refused_at_compile():
 
 def test_a_fit_past_browns_range_carries_one_diagnostic():
     """FeF₂ at λ = 0.55 Å reaches s ≈ 1.7 Å⁻¹, onto Fe²⁺ ⟨j₀⟩'s blend: the fit runs and carries one
-    ``MAGNETIC_FORM_FACTOR_COMPUTED_TAIL``, however many stages, as ``info`` (ruling D67: past Brown's range f² is
+    ``MAGNETIC_FORM_FACTOR_COMPUTED_TAIL``, however many stages, as ``info`` (the #1806 ruling: past Brown's range f² is
     under 1 % of its low-angle value, so nothing is owed and the advice to cut the data is gone)."""
     phase = _rutile("Fe", "Fe2+", FEF2_CELL)
     data = _pattern(phase, 0.55)

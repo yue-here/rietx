@@ -1964,7 +1964,7 @@ def magnetic_diagnostics(path: str, moments, magnetic, atoms_by_label,
       from ``_atom_site_type_symbol`` and that symbol states no oxidation
       state (MAGNDATA writes a bare ``Mn`` for a site that is chemically
       Mn³⁺), so it was read as the element's most common ICSD oxidation state
-      (:func:`~.magnetic.form_factor.read_bare_label`, ruling D67). The
+      (:func:`~.magnetic.form_factor.read_bare_label`, the #1806 ruling). The
       moment depends on the pick, and the message names the alternatives —
       ``label`` is in ``assumed_ions`` exactly when
       :func:`.cif.structure_from_cif` made it.

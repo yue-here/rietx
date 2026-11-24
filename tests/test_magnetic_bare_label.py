@@ -1,4 +1,4 @@
-"""A bare element label on a moment (ruling D67 of the magnetic-path owner, 2026-11-24).
+"""A bare element label on a moment (the magnetic-path owner's ruling on #1806, 2026-11-24).
 
 A bare label (``"Fe"``) states no charge.  On the magnetic path it is read as the element's most common oxidation
 state in one ICSD census (Ding, Kumagai, Oba & Burton 2020, *J. Phys. Chem. Lett.* 11, 8264, SI Table 1;
@@ -64,7 +64,7 @@ def test_the_forward_model_uses_the_census_ion_for_a_bare_label():
     ("Ti", "Ti4+", "Ti3+"), ("Nb", "Nb5+", "Nb4+"), ("Eu", "Eu3+", "Eu2+"), ("U", "U6+", "U4+"),
 ])
 def test_a_bare_label_whose_census_ion_has_no_moment_is_refused_when_the_phase_is_built(element, ion, alternative):
-    """D67 4(b), Rule 4's literal refusal: a moment on a bare d⁰/f⁰/J = 0 label cannot be honoured, so the phase is
+    """The #1806 ruling (2026-11-24), Rule 4's literal refusal: a moment on a bare d⁰/f⁰/J = 0 label cannot be honoured, so the phase is
     refused before any work, with the census ion and the moment-carrying ions to state."""
     with pytest.raises(ValidationError) as err:
         _rutile(element, element, FEF2_CELL)
@@ -78,7 +78,7 @@ def _xray():
 
 
 def test_the_xray_info_row_fires_on_a_moment_site_with_a_bare_species_only():
-    """D67 4(a): on an X-ray histogram a moment site's bare species keeps the neutral X-ray scattering factor and the
+    """The #1806 ruling (2026-11-24): on an X-ray histogram a moment site's bare species keeps the neutral X-ray scattering factor and the
     fit records it as ``info``; a charged species, a site with no moment, and a neutron histogram are silent.  Read
     for moment sites only, so a bare ``F`` on the same phase never fires (WP-2037, "Attention is a cost", clause 1)."""
     bare = rx.Structure(phases=[_rutile("Fe", "Fe3+", FEF2_CELL)])

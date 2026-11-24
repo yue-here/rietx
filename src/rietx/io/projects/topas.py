@@ -4080,7 +4080,7 @@ def _magnetic_build_diagnostics(model: TopasModel, phases_in, specs,
     A site written ``occ Cr`` (no charge) keeps that species as its moment's
     ion; the form-factor table reads a bare label as the element's most common
     ICSD oxidation state, and the fit reports that as ``MAGNETIC_ION_ASSUMED``
-    (ruling D67), so the reader adds no code of its own.
+    (the #1806 ruling), so the reader adds no code of its own.
     """
     out: list[Diagnostic] = []
     path = model.path or "<model>"
