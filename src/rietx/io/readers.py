@@ -229,11 +229,9 @@ def _not_counts_diagnostics(data: PatternData, name: str) -> list[Diagnostic]:
     return [Diagnostic(
         level="warning", code="PATTERN_INTENSITY_NOT_COUNTS",
         message=(f"{name}: the pattern carries no usable σ, so each point is "
-                 f"weighted by the Poisson σ = √max(y, 1), which holds for raw "
-                 f"counts. "
+                 f"weighted by the Poisson σ = √max(y, 1). "
                  f"{n} of {y.size} points {has} an intensity no count can "
-                 f"take ({' and '.join(parts)}), at {label} {shown}, and the "
-                 f"fallback gives each of them σ = 1."),
+                 f"take ({' and '.join(parts)}), at {label} {shown}."),
         where=[f"{lo:.3f}-{hi:.3f}" for lo, hi in spans],
         value=float(n),
         suggestion=("If the intensities were scaled or had a background "

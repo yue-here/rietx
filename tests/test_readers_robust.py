@@ -1131,6 +1131,8 @@ def test_a_pattern_normalised_below_one_count_is_reported(tmp_path):
     assert d.level == "warning" and d.value == 12.0
     assert "12 of 12 points have an intensity no count can take (12 between 0 and 1)" in d.message
     assert "at 2θ 10-10.22°" in d.message
+    # Round 1 (#1659): the message states the weighting once and never restates it.
+    assert "which holds for raw counts" not in d.message and "σ = 1" not in d.message
     assert d.where == ["10.000-10.220"]
 
 
