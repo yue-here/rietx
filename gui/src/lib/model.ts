@@ -24,7 +24,9 @@
  * would silently revert every field it did not touch.
  */
 
+import type { InstrumentEdit } from "../api";
 import { formatValue, num, type ParamRow } from "./table";
+import { py } from "./py";
 // the two geometry fields both forms offer: one wording, so the wizard and the
 // editor cannot explain the same quantity two ways (WP-1032)
 
@@ -262,6 +264,31 @@ export function splitEdits(
  */
 export function clone<T>(model: T): T {
   return JSON.parse(JSON.stringify(model));
+}
+
+/** The console lines for an instrument edit (`PATCH /api/instrument`), the
+ *  registers' part the server answered included (WP-2229): a release runs
+ *  before the edit and a free after it. On an old model with no table the
+ *  release runs after the edit (`release_after`), and the lines follow the
+ *  server's order, since the Console's script repeats them. */
+export function registerEcho(answer: Partial<InstrumentEdit>, edit: string): string[] {
+  const released = answer.released ?? [], freed = answer.freed ?? [];
+  const fixed = answer.fixed ?? [];
+  const release = released.length ? [`ref.unhold(${py(released)})`] : [];
+  return [
+    ...(answer.release_after ? [] : release),
+    edit,
+    ...(answer.release_after ? release : []),
+    ...(freed.length ? [`ref.set_vary(${py(freed)}, True)`] : []),
+    ...(fixed.length ? [`ref.set_vary(${py(fixed)}, False)`] : []),
+  ];
+}
+
+/** The paths an instrument edit ended (`InstrumentEdit.ended`), as the test
+ *  a pending edit's key is asked, or `null` when it ended none (WP-2229). */
+export function endedBy(answer: Partial<InstrumentEdit>): ((path: string) => boolean) | null {
+  const ended = new Set(answer.ended ?? []);
+  return ended.size ? (path) => ended.has(path) : null;
 }
 
 /** A deep copy of a model with the non-parameter edits written into it. */

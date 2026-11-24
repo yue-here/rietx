@@ -51,6 +51,7 @@ from ..crystallography.stephens import S_NAMES, isotropic_coefficients, strain_b
 from ..crystallography.symmetry import (
     cell_constraints,
     check_cell_angles,
+    check_cell_ties,
     resolve_group,
     rotation_matrices,
     site_orbit,
@@ -64,6 +65,7 @@ from ..crystallography.wyckoff import (
     stabilizer_rotations,
 )
 from ..optimize import lapack
+from ..optimize.statistics import DiscardedSubspace
 from ..schemas.common import Parameter
 from ..schemas.instrument import (
     CAPILLARY_OFFSETS,
@@ -1196,6 +1198,65 @@ def _candidate_sites(rec: _OriginPhase, f: tuple[int, int, int]) -> set[str]:
     return {d.rsplit(".dof.", 1)[0] for d in rec.candidates[f]}
 
 
+def _mode_moved_atoms(phase) -> set[int]:
+    """The indices of the atoms some distortion mode of ``phase`` moves."""
+    modes = phase.distortion_modes
+    if modes is None:
+        return set()
+    return {j for j in range(len(phase.atoms))
+            if any(any(v != 0.0 for v in mode.vectors[j]) for mode in modes.modes)}
+
+
+def fixed_sites_asking_to_vary(structure: Structure) -> list[tuple[str, object]]:
+    """Every site whose coordinates its symmetry fixes, while one asks to vary.
+
+    The one authority for which sites those are, read by the table's refusal
+    and by ``Refinement.fix_special_positions`` (WP-1913), because the verb
+    once walked atoms alone and missed a rigid body's origin.  It routes as
+    :meth:`ParameterTable._collect` does: an atom a rigid body places or a
+    distortion mode moves is checked by that owner's own refusal, and every
+    other atom and every body origin against its stabiliser.  Returns
+    ``(base path, site)`` pairs in walk order, the site being the structure's
+    own ``Atom`` or ``BodyOrigin``.
+    """
+    found: list[tuple[str, object]] = []
+    for ip, phase in enumerate(structure.phases):
+        sg = resolve_group(phase.space_group, phase.symmetry_operations)
+        placed = {label for body in phase.rigid_bodies for label in body.atoms}
+        moved = _mode_moved_atoms(phase)
+        sites = [(f"phases.{ip}.atoms.{j}", atom) for j, atom in enumerate(phase.atoms)
+                 if atom.label not in placed and j not in moved]
+        sites += [(f"phases.{ip}.rigid_bodies.{b}.origin", body.origin)
+                  for b, body in enumerate(phase.rigid_bodies)]
+        for base, site in sites:
+            if not any(getattr(site, c).vary for c in ("x", "y", "z")):
+                continue
+            xyz = np.array([site.x.value, site.y.value, site.z.value])
+            if len(coordinate_basis(stabilizer_rotations(sg, xyz))) == 0:
+                found.append((base, site))
+    return found
+
+
+def _refuse_fixed_but_free(bases: list[str]) -> None:
+    """Refuse every site that asks for a free coordinate it cannot have.
+
+    One site keeps the sentence it always had, byte for byte.  Several are
+    named together, in walk order, so one ``vary=False`` pass fixes them all.
+    """
+    if not bases:
+        return
+    fix = ("set vary=False (Refinement.fix_special_positions() does it for "
+           "every such site)")
+    if len(bases) == 1:
+        raise ValueError(
+            f"{bases[0]} sits on a fully fixed special position; its site "
+            f"symmetry allows no positional freedom — {fix}")
+    named = ", ".join(bases[:-1]) + f" and {bases[-1]}"
+    raise ValueError(
+        f"{named} sit on fully fixed special positions; their site symmetry "
+        f"allows no positional freedom — {fix}")
+
+
 class ParameterTable:
     """The tree-to-flat-θ machinery behind a fit — internal, not the agent surface.
 
@@ -1334,6 +1395,9 @@ class ParameterTable:
         #: :meth:`_collect_distortion_modes`; read by
         #: :meth:`_refuse_unseeded_distortion`.  Empty for every other table.
         self._distortion: dict[str, tuple[tuple[str, ...], tuple[bool, ...]]] = {}
+        # every fixed site at once, before the walk, which would stop at the
+        # first (WP-1913, #728 item 4)
+        _refuse_fixed_but_free([base for base, _ in fixed_sites_asking_to_vary(structure)])
         self._collect(structure, instrument)
         self._rebuild()
         if self._origin:
@@ -1381,6 +1445,11 @@ class ParameterTable:
                 self._add(f"{base}.preferred_orientation.r",
                           phase.preferred_orientation.r)
             self._collect_texture(base, sg, phase)
+            # peak equations (WP-2107): each coefficient is an ordinary entry,
+            # so bounds, holds, ties and esds need no new path
+            for j, eq in enumerate(phase.peak_equations):
+                for name, p in eq.coefficients.items():
+                    self._add(f"{base}.peak_equations.{j}.{name}", p)
             self._add(f"{base}.lor_size", phase.lor_size)
             # a Stephens block owns the tanθ Lorentzian channel outright: its
             # isotropic direction is the same column, so lor_strain is locked
@@ -1443,6 +1512,8 @@ class ParameterTable:
         constraints = cell_constraints(sg)
         check_cell_angles(sg, {name: getattr(cell, name).value
                                for name in ("alpha", "beta", "gamma")})
+        stored = {name: getattr(cell, name).value for name in _CELL_NAMES}
+        check_cell_ties(sg, stored, prefix=prefix)
         for name in _CELL_NAMES:
             p: Parameter = getattr(cell, name)
             if name in constraints.ties:
@@ -1698,7 +1769,9 @@ class ParameterTable:
         allowed direction (``crystallography.wyckoff``) — and x, y, z become
         affine rows x = x₀ + Σₖ Bₖ·θₖ anchored at the compile-time position.
         Fully fixed special positions contribute none (their coordinates are
-        locked); ``vary=True`` on any coordinate of such a site is an error.
+        locked); ``vary=True`` on any coordinate of such a site is an error,
+        which ``__init__`` raises for every such site before the walk
+        (:func:`fixed_sites_asking_to_vary`).
         A vary request on a constrained-but-free site frees *all* of the
         site's DOFs — per-axis intent does not map onto rows such as [1,1,0].
         DOFs are unbounded displacements; bounds declared on x/y/z do not
@@ -1708,11 +1781,7 @@ class ParameterTable:
         basis = coordinate_basis(stabilizer_rotations(sg, xyz))
         want_vary = any(getattr(atom, c).vary for c in ("x", "y", "z"))
         if len(basis) == 0 and want_vary:
-            raise ValueError(
-                f"{base} sits on a fully fixed special position; its site "
-                "symmetry allows no positional freedom — set vary=False "
-                "(Refinement.fix_special_positions() does it for every such "
-                "site)")
+            _refuse_fixed_but_free([base])
         dof_paths = [f"{base}.dof.{k}" for k in range(len(basis))]
         for c_idx, c in enumerate(("x", "y", "z")):
             p: Parameter = getattr(atom, c)
@@ -1750,8 +1819,7 @@ class ParameterTable:
             paths.append(path)
         self._distortion[base] = (tuple(paths),
                                   tuple(mode.parent_invariant for mode in modes.modes))
-        return {j for j in range(len(phase.atoms))
-                if any(any(v != 0.0 for v in mode.vectors[j]) for mode in modes.modes)}
+        return _mode_moved_atoms(phase)
 
     def _collect_mode_atom_coords(self, base: str, sg, phase, j: int) -> None:
         """An atom a distortion mode moves: x, y, z derived from the amplitudes.
@@ -1972,7 +2040,7 @@ class ParameterTable:
         body that straddles a symmetry element.
         """
         from ..schemas.structure import RIGID_BODY_ROTATION_BOUND
-        from .bodies import RigidBodyBlock
+        from .bodies import RigidBodyBlock, site_reach
         from .derived import cartesian_frame
 
         bbase = f"{base}.rigid_bodies.{b}"
@@ -1985,11 +2053,12 @@ class ParameterTable:
         # Cartesian frame at the stored cell: cell-independent in every
         # setting the check above lets through, so fixed for the table's life
         axial = axial_basis(list(origin.stabilizer))
-        site_axes = None
+        site_axes, reach = None, 0.0
         if len(axial) < 3:
             m = np.asarray(cartesian_frame(phase.cell.lengths_angles()), dtype=np.float64)
             w = (m @ axial.T.astype(np.float64)).reshape(3, len(axial))
             site_axes = w / np.linalg.norm(w, axis=0) if len(axial) else w
+            reach = site_reach(m)
         member = {label: i for i, label in enumerate(body.atoms)}
         try:
             block = RigidBodyBlock(
@@ -2000,7 +2069,8 @@ class ParameterTable:
                 torsions=[(member[t.axis[0]], member[t.axis[1]],
                            [member[m] for m in t.moves]) for t in body.torsions],
                 angles=[t.angle for t in body.torsions],
-                names=[t.name for t in body.torsions], site_axes=site_axes)
+                names=[t.name for t in body.torsions], site_axes=site_axes,
+                site_reach=reach, labels=list(body.atoms))
         except ValueError as exc:
             code, sep, rest = str(exc).partition(": ")
             if sep and code.startswith("RIGID_BODY_"):
@@ -2672,6 +2742,9 @@ class ParameterTable:
         # union.
         for sub, cp in extra_component_parameters(instrument.extra_components):
             self._add(f"instrument.extra_components.{sub}", cp)
+        for j, eq in enumerate(instrument.peak_equations):
+            for name, p in eq.coefficients.items():
+                self._add(f"instrument.peak_equations.{j}.{name}", p)
 
     def _add_instrument_row(self, instrument: Instrument, path: str,
                             p: Parameter, *, force_fixed: bool = False) -> None:
@@ -4145,7 +4218,8 @@ class ParameterTable:
             return target
         return None
 
-    def seed_stephens(self, paths: list[str], microstrain: float) -> list[str]:
+    def seed_stephens(self, paths: list[str], microstrain: float, *,
+                      ray_from: ParameterTable | None = None) -> list[str]:
         """Put a freed but still all-zero Stephens block on the isotropic ray.
 
         The counterpart of :meth:`seed_floored` for the anisotropic-strain
@@ -4158,29 +4232,45 @@ class ParameterTable:
         Only phases whose *whole* block is still zero are touched, so a
         deliberate starting model is never overwritten.  Returns the paths
         actually seeded.
+
+        ``ray_from`` reads the ray off another table's cell, for a joint fit
+        sharing one block across histograms whose cells differ
+        (:meth:`MultiParameterTable.seed_stephens`).  Any point of one cell's
+        ray is inside every histogram's cone, since σ²(M) is the literal
+        monomial sum and the ray makes it (hᵀG*h)², positive for any metric.
         """
         if microstrain <= 0.0:
             return []
-        wanted: dict[str, set[int]] = {}
-        for path in paths:
-            base, _, tail = path.rpartition(".microstrain.dof.")
-            if base and tail.isdigit():
-                wanted.setdefault(base, set()).add(int(tail))
+        rays = (self if ray_from is None else ray_from)._strain_unit
         seeded: list[str] = []
-        for base, _ in wanted.items():
-            unit = self._strain_unit.get(base)
-            if unit is None:
+        for base in self._stephens_seedable(paths):
+            unit = rays.get(base)
+            if unit is None or len(unit) != len(self._strain_unit[base]):
                 continue
-            dofs = [(k, self._paths[f"{base}.microstrain.dof.{k}"])
-                    for k in range(len(unit))]
-            if any(self.entries[i].value != 0.0 for _, i in dofs):
-                continue
-            for k, i in dofs:
-                self.entries[i].value = float(microstrain) ** 2 * float(unit[k])
+            for k, u in enumerate(unit):
+                i = self._paths[f"{base}.microstrain.dof.{k}"]
+                self.entries[i].value = float(microstrain) ** 2 * float(u)
                 seeded.append(self.entries[i].path)
         if seeded:
             self._rebuild()
         return seeded
+
+    def _stephens_seedable(self, paths: list[str]) -> list[str]:
+        """The phase bases :meth:`seed_stephens` would seed from ``paths``:
+        each named by a ``.microstrain.dof.k`` path, with its whole block
+        still zero."""
+        out: list[str] = []
+        for path in paths:
+            base, _, tail = path.rpartition(".microstrain.dof.")
+            if not (base and tail.isdigit()) or base in out:
+                continue
+            unit = self._strain_unit.get(base)
+            if unit is None:
+                continue
+            if all(self.entries[self._paths[f"{base}.microstrain.dof.{k}"]].value
+                   == 0.0 for k in range(len(unit))):
+                out.append(base)
+        return out
 
     # -- optimiser interface -------------------------------------------
     @property
@@ -4217,7 +4307,7 @@ class ParameterTable:
         phase's cell, and the only free *name* is then the variable's.
 
         One column-wise read of the same **C** that :attr:`moving_paths` reads
-        row-wise and that ``optimize._column_extras`` reads for the Jacobian's
+        row-wise and that ``optimize.least_squares._column_extras`` reads for the Jacobian's
         own reach gate — never a second derivation, which could disagree with
         the matrix the residual is actually built from.  An explicitly stored
         zero coefficient is not reach, matching ``moving_paths``' test rather
@@ -4797,7 +4887,9 @@ class ParameterTable:
         return done
 
     def stderr_physical(self, theta: np.ndarray, stderr_internal: np.ndarray,
-                        correlation: np.ndarray | None = None) -> dict[str, float]:
+                        correlation: np.ndarray | None = None, *,
+                        discarded: DiscardedSubspace | None = None
+                        ) -> dict[str, float]:
         """Physical esds for every free or tied parameter.
 
         σ²_phys = diag(C · Cov_free · Cᵀ), where Cov_free is the covariance
@@ -4814,6 +4906,16 @@ class ParameterTable:
         *absent* rather than zero — this is that rule one rank down, and it
         reaches the tied rows as well, since a tie whose source measured
         nothing measured nothing.
+
+        **Except where the row is a combination the data determine**
+        (WP-2230).  With ``discarded``, the solve's
+        :class:`~rietx.optimize.statistics.DiscardedSubspace`, and a
+        ``correlation``, a row drawing on a column a discarded direction
+        touched is kept when :func:`~rietx.optimize.statistics.estimable`
+        says so, at the variance the pseudo-inverse gives it: a tie
+        ``zero_shift = za + zb + zc`` over three columns on one discarded
+        direction reports the sum's esd while each term reports none.  A
+        gradient-free source still empties every row it reaches.
         """
         # C itself without a derived block; with one, each derived row is the
         # block's local Jacobian at θ chained through its inputs (WP-1804)
@@ -4833,9 +4935,28 @@ class ParameterTable:
         # rows with any free source, read off the declared reach: a derived
         # row whose Jacobian is zero at this θ still has its sources
         touched = np.diff(self._reach.indptr) > 0
+        blind = self.unmeasured_rows(theta, stderr_internal)
+        kept = np.zeros_like(blind)
+        if discarded is not None and correlation is not None and blind.any():
+            # only the blind rows are asked, each as its own function
+            idx = np.flatnonzero(blind)
+            still = self.unmeasured_functions(
+                theta, stderr_internal, idx,
+                sparse.identity(len(idx), format="csr"),
+                correlation=correlation, discarded=discarded)
+            kept[idx] = ~still
+            blind = blind & ~kept
+        if kept.any():
+            # only those rows re-read, through the pseudo-inverse's own esds:
+            # every other row keeps its bits
+            cov = self._cov_free(theta, discarded.stderr, correlation)
+            sub = jac[kept]
+            with np.errstate(over="ignore", invalid="ignore"):
+                var[kept] = np.maximum(np.asarray(
+                    sub.multiply(sub @ cov).sum(axis=1)).ravel(), 0.0)
         # a propagated variance past the double range is an infinite one, and
         # absent for the same reason (WP-1463; ``_phys_sigma_free``)
-        blind = self.unmeasured_rows(theta, stderr_internal) | ~np.isfinite(var)
+        blind = blind | ~np.isfinite(var)
         return {e.path: float(np.sqrt(var[i]))
                 for i, e in enumerate(self.entries) if touched[i] and not blind[i]}
 
@@ -4911,23 +5032,77 @@ class ParameterTable:
         return ~np.isfinite(self._phys_sigma_free(theta, stderr_internal))
 
     def unmeasured_rows(self, theta: np.ndarray, stderr_internal: np.ndarray,
-                        rows: np.ndarray | None = None) -> np.ndarray:
+                        rows: np.ndarray | None = None, *,
+                        correlation: np.ndarray | None = None,
+                        discarded: DiscardedSubspace | None = None
+                        ) -> np.ndarray:
         """Boolean over ``C``'s rows (or ``rows`` of it): which are unmeasured.
 
         A row is unmeasured when it draws on any column
         :meth:`unmeasured_free` names — the propagated variance would be
         infinite, and an infinite esd is the absent one, not a large one.
+        With ``discarded`` and ``correlation``, a row whose only such sources
+        are columns a discarded direction touched is measured when its
+        combination is estimable (:meth:`unmeasured_functions`, WP-2230).
         """
+        n = self._C.shape[0] if rows is None else len(rows)
         bad = self.unmeasured_free(theta, stderr_internal)
         if not bad.any():
-            n = self._C.shape[0] if rows is None else len(rows)
             return np.zeros(n, dtype=bool)
         c = self._reach if rows is None else self._reach[rows, :]
-        return np.asarray(abs(c) @ bad.astype(np.float64)).ravel() > 0.0
+        blind = np.asarray(abs(c) @ bad.astype(np.float64)).ravel() > 0.0
+        if discarded is None or correlation is None or not blind.any():
+            return blind
+        idx = np.arange(n) if rows is None else np.asarray(rows)
+        return self.unmeasured_functions(
+            theta, stderr_internal, idx, sparse.identity(len(idx), format="csr"),
+            correlation=correlation, discarded=discarded)
+
+    def unmeasured_functions(self, theta: np.ndarray, stderr_internal: np.ndarray,
+                             rows, grad, *,
+                             correlation: np.ndarray | None = None,
+                             discarded: DiscardedSubspace | None = None
+                             ) -> np.ndarray:
+        """Boolean over the functions ``grad`` (``(m, len(rows))``, each row a
+        gradient over the entries ``rows``): which have no measured esd.
+
+        One reading for a table row (``grad`` the identity) and a geometry
+        row (its partials).  A function is unmeasured when its reach
+        includes a column :meth:`unmeasured_free` names, read off the
+        declared reach so a source whose partial happens to vanish at this θ
+        still counts.  The exception is WP-2230's: with ``discarded`` and
+        ``correlation``, a function whose only such sources are columns a
+        discarded direction touched (none gradient-free) keeps its esd when
+        :func:`~rietx.optimize.statistics.estimable` says the data
+        determine it.  A function that moves one column alone is that
+        column, and stays unmeasured as the solve marked it.
+        """
+        g = grad.tocsr() if sparse.issparse(grad) else sparse.csr_matrix(grad)
+        bad = self.unmeasured_free(theta, stderr_internal)
+        if not bad.any():
+            return np.zeros(g.shape[0], dtype=bool)
+        reach = abs(g) @ abs(self._reach[np.asarray(rows), :])
+        blind = np.asarray(reach @ bad.astype(np.float64)).ravel() > 0.0
+        if discarded is None or correlation is None or not blind.any():
+            return blind
+        dead = self.unmeasured_free(theta, discarded.stderr)
+        cand = blind & ~(np.asarray(reach @ dead.astype(np.float64)).ravel() > 0.0)
+        if not cand.any():
+            return blind
+        from ..optimize.statistics import estimable
+
+        c = (g[np.flatnonzero(cand)]
+             @ self.local_jacobian(theta)[np.asarray(rows), :]).toarray()
+        cov = self._cov_free(theta, discarded.stderr, correlation)
+        ok = estimable(c, cov, discarded.lost) & ((c != 0.0).sum(axis=1) > 1)
+        blind[np.flatnonzero(cand)[ok]] = False
+        return blind
 
     def physical_covariance(self, theta: np.ndarray, stderr_internal: np.ndarray,
                             correlation: np.ndarray | None,
-                            paths: list[str]) -> np.ndarray:
+                            paths: list[str], *,
+                            discarded: DiscardedSubspace | None = None
+                            ) -> np.ndarray:
         """Physical covariance sub-block for ``paths`` (free or tied entries).
 
         Generalises :meth:`stderr_physical` (which returns only the diagonal)
@@ -4936,10 +5111,18 @@ class ParameterTable:
         fractions from the phase scales.  A parameter that was never freed has
         an all-zero ``C`` row, hence a zero covariance row/column (no
         uncertainty), which the caller handles naturally.
+
+        With ``discarded`` (and a ``correlation``) a column a discarded
+        direction touched enters at its pseudo-inverse esd rather than as
+        zero (WP-2230).  That block is only meaningful for a function the
+        data determine, so a caller pairs it with
+        :meth:`unmeasured_functions` and quotes nothing else from it.
         """
         rows = [self._paths[p] for p in paths]
         if not self._free_idx:
             return np.zeros((len(paths), len(paths)), dtype=np.float64)
+        if discarded is not None and correlation is not None:
+            stderr_internal = discarded.stderr
         cov_free = self._cov_free(theta, stderr_internal, correlation)
         c_rows = self.local_jacobian(theta)[rows, :].toarray()
         return c_rows @ cov_free @ c_rows.T
@@ -5044,6 +5227,9 @@ class ParameterTable:
             put(phase.lor_strain, f"{base}.lor_strain")
             put(phase.gauss_size, f"{base}.gauss_size")
             put(phase.gauss_strain, f"{base}.gauss_strain")
+            for j, eq in enumerate(phase.peak_equations):
+                for name, p in eq.coefficients.items():
+                    put(p, f"{base}.peak_equations.{j}.{name}")
             if phase.magnetic_symmetry is not None:
                 put(phase.magnetic_lor_size, f"{base}.magnetic_lor_size")
                 put(phase.magnetic_lor_strain, f"{base}.magnetic_lor_strain")
@@ -5108,6 +5294,9 @@ class ParameterTable:
         # stage's recompile
         for sub, cp in extra_component_parameters(instrument.extra_components):
             put(cp, f"instrument.extra_components.{sub}")
+        for j, eq in enumerate(instrument.peak_equations):
+            for name, p in eq.coefficients.items():
+                put(p, f"instrument.peak_equations.{j}.{name}")
         # the walk is over.  Check every value against the schema *before*
         # assigning any of them, so the refusal below leaves the models exactly
         # as it found them; the assignment pass keeps the guard as a backstop
