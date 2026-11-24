@@ -301,9 +301,8 @@ roughly the shift.
   `MAX_RELATIVE_SIGMA_Q` vote; the shift-allowance half is above).
 - **This package is not slow at indexing, it is silent** (WP-1037). Buy
   responsiveness with ordering and reporting, never by shrinking
-  the box. **`budget_seconds` is per (engine × system)**, so the whole-run bound is `total_budget_seconds`, a `Deadline` that *is*
-  the cancel token, and **under it a unit runs at most the search's time over the engines** (`unit_share_seconds`, #1374);
-  `INDEX_BUDGET_EXHAUSTED` names the three states (searched/truncated/not reached),
+  the box. **`budget_seconds` is per (engine × system)**, split under a ceiling; the whole-run bound is `total_budget_seconds`, a `Deadline` (the
+  cancel token); `INDEX_BUDGET_EXHAUSTED` names the three states (searched/truncated/not reached),
   and a truncated validation reads `not_validated`, never `validation_failed`. And **a Monte Carlo indexer must refine each proposal; raw random cells
   do not rank** (WP-1023).
 - **Coelho's N_c/N_o gate bounds the *volume*, it is not a per-trial verdict**

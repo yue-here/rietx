@@ -254,26 +254,29 @@ def test_1374_cases_monoclinic_all_systems_finds_the_cell(monkeypatch):
 
 @pytest.mark.slow
 def test_1374_780_monoclinic_gains_a_second_finder(monkeypatch):
-    """#1374's row "#780, mono, T = 60": with each unit at the ceiling,
-    dichotomy held it and its cell had one finder; with the share svd also
-    finds it, and the cell can reach the agreement gate.
+    """#1374's row "#780, mono": with each unit at the ceiling, dichotomy
+    held it and its cell had one finder; with the share svd also finds it,
+    and the cell can reach the agreement gate.
 
-    Sized for a macOS arm64 core (M-series, 2026-11-21).  The monoclinic unit
-    alone, on this list, under a CPU budget: svd found the cell at 2 s,
-    dichotomy not at 6 s and at 8 s.  The share here is 60 s over three
-    engines, 20 s, so svd has a margin of about 10 and dichotomy, the
-    assertion's limiting finder, at least 2.5 (it found the cell by 8 s).
-    That is thinner than tests/CLAUDE.md § Budgets asks, so a core more than
-    about 2.5 times slower fails this row.  On Linux x86_64 (i9-14900K,
-    Python 3.12, one pinned core, 2026-11-23) the numbers are the Mac's: svd
-    found the cell by 2 s of its 20 s share (margin 10 or more) and dichotomy
-    not at 6 s and at 8 s (margin 2.5 to 3.3).  The row took 61.7-62.8 s of
-    wall clock against its 60 s ceiling (61.4 s on the Mac)."""
+    The ceiling is 120 s, not the issue's 60 s (#1700 review, round 2): the
+    share is then 40 s over three engines.  The monoclinic unit alone, on this
+    list, under a CPU budget: svd found the cell at 2 s, dichotomy not at 6 s
+    and at 8 s, on macOS arm64 (M-series, 2026-11-21) and on Linux x86_64
+    (i9-14900K, Python 3.12, one pinned core, 2026-11-23) alike.  Against a
+    40 s share svd has a margin of 20 or more and dichotomy, the assertion's
+    limiting finder, 5 (it found the cell by 8 s); at 60 s the share was 20 s
+    and dichotomy's margin 2.5 to 3.3.  A core more than about 5 times slower
+    fails this row.  GitHub's ubuntu-latest, which runs the nightly ``slow``
+    tier, is not measured: a core 1.5 to 2 times slower leaves a margin of
+    2.5 to 3.3.  The row spends its whole ceiling, so its wall clock
+    (about 122 s on the Mac) is not a margin.  It still separates the rules:
+    without the share dichotomy's unit holds the ceiling and svd finds nothing
+    (the revert check of 2026-11-24 is in the WP's handover log)."""
     from tests.repro_780 import CELL, peaks, spec
     from tests.test_indexing_engines import assert_same_lattice
 
     _cpu_clock(monkeypatch)
-    res = index_pattern(peaks(), spec=spec(60.0), preset="full",
+    res = index_pattern(peaks(), spec=spec(120.0), preset="full",
                         validate=False)
     assert res.candidates
     top = res.candidates[0]
