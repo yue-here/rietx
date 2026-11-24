@@ -1,6 +1,6 @@
 # WP-1926 — the exact Voigt is a supported shape: its cost, its width, its exports and its bound
 
-Milestone: unscheduled · Status: 🔄 2026-11-16 — the Voigt FWHM landed (#1605); next: the manual's pattern-level bias
+Milestone: unscheduled · Status: 🔄 2026-11-24 — the Voigt FWHM merged (#1605); next: the manual's pattern-level bias
 Track: Candidates — named on a use case, not yet on a measurement
 Depends on: — (PR #815 soft: the TOPAS whole-input writer the TOPAS task extends)
 Priority: P3 2026-10-08 — opt-in and correct today; what it lacks is speed, an exact reported width and one writer's statement, and the default stays TCH either way
@@ -154,6 +154,36 @@ states the shape or refuses it by name.
   peaks buffer and the FPA fence).
 
 ## Handover log
+
+- **2026-11-24** — maintainer's post-merge entry, PR #1818. Mike's PR #1605
+  merged on 2026-11-24 as `7b4ed1d45`. A peak drawn with the exact Voigt now
+  reports its Olivero & Longbothum width on main. The default shape is
+  untouched. Six tasks stay open, so the WP does too.
+
+  - **Round 2 of review** (head `66cb4bde6`). Round 1 (2026-11-17, at
+    `0477bb98`) had no findings. The one commit since set this file's Status
+    and regenerated the index, and `wp_index.py --check` agreed with it.
+  - **What ran before the merge.** The review stacked #1604, #1605, #1494 and
+    #1266 onto main `00f9c6bc3` in merge order. The full suite on that stack
+    (macOS arm64, Python 3.12, `[dev,jax]`, nothing else running) gave
+    16 867 passed, 272 skipped, 52 xfailed and 0 failed. On main `c368ca3ba`
+    the same stack merged clean, and the targeted suites gave 1440 passed.
+  - **The tier of `_OLIVERO_FWHM` is settled at 2.** The 2026-11-16 entry left
+    it open for the maintainer. Settled by Claude under Rule 5's convention:
+    the same job sits at tier 2 in `pseudovoigt._TCH_GAMMA`, `_TCH_ETA` and
+    Rouse et al.'s `absorption._A1`.. `_B2`. Each is an empirical closed form
+    for a quantity rietx could compute, with an in-repo test of its error.
+    The PR's reviewer recommended tier 2, and the generality judge found it
+    holds there. A blind check, given the evidence without the pick, also
+    chose tier 2. The judge called tier 1 defensible, and that is the
+    alternative. Neither tier changes behaviour, and tier 2 needs no
+    `approved` field.
+  - **Still unread:** `olivero1977` itself (FETCH row 381). The coefficients
+    are checked by measurement only, as the 2026-11-16 entry says.
+
+  Next: the manual's pattern-level bias (the first open task), then the
+  `voigt` compare readings on the four standards. Those readings decide
+  whether the deferred kernel pair is worth building.
 
 - **2026-11-16** — review fix-ups, PR #1605. The manual now says the Olivero
   width is what a Voigt *model* peak reports (`CompiledModel.peak_fwhm`), and
