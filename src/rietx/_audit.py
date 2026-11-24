@@ -823,9 +823,11 @@ ROWS: tuple[Row, ...] = (
                  "departure: a reader builds one model before any data can rank the two, and "
                  "the parent is the smaller of two nested models at the file's own "
                  "coordinates, so it is where a fit starts; the code records the choice and "
-                 "names the switch. Ends when a fit can test the file group's extra "
-                 "positional freedoms (displacive modes at zero amplitude) against the data, "
-                 "which makes it Rule 1's second kind. Ruled by Mike on PR #1636 under #1075."),
+                 "names the switch. A second-kind question answered with a pick outside "
+                 "Rule 1's two cases, so a departure: it ends when a fit can test the file "
+                 "group's extra positional freedoms (displacive modes at zero amplitude) "
+                 "against the data and rank the two. The MAGNDATA counts are development "
+                 "data. Ruled by Mike on PR #1636 under #1075."),
         approved="2026-11-23"),
     Row("CIF_MAGNETIC_NUCLEAR_SETTING", "code", tier=1, ambiguity=1,
         evidence=('read the raise sites at magcif.py:1186-1232: fires where the positions refine '
@@ -3536,29 +3538,34 @@ ROWS: tuple[Row, ...] = (
                   "gate in its place falsely refused one of them (entry 0.92, 1/3 printed "
                   "0.33330). Injected case: tests/test_magcif.py::test_a_site_inside_the_"
                   "orbit_merge_counts_as_on_the_parent_position (P m' m' 2 under P m m m, "
-                  "z = 0.4 tol merged, 0.6 tol kept). One family; untested beyond it"),
-        grounds=("Rare feature, kept at the value measured on its one family: it moved no "
-                 "MAGNDATA coordinate by more than 3.1e-5 A, and the stated displacement "
-                 "it erases below the merge is reported by name. Dissenter: a refiner "
+                  "z = 0.4 tol merged, 0.6 tol kept). The move onto the position "
+                  "(_merge_twins, TWIN_COORD_TOL 5e-4) matches the merge only where two "
+                  "images are 2d apart (a mirror, a 2-fold axis, an inversion centre). Off a "
+                  "4-fold axis neighbouring images are d apart: probed 2026-11-24, P m m m "
+                  "under P 4/m m m with O at (7e-4, 0, 0) reads under the parent unmoved, "
+                  "4 images where the file's group gives 2, with only the info code; sent to "
+                  "Mike and WP-1918. One family, never inside the band (development data)"),
+        grounds=("Rare feature, kept at a value its one family never exercises: it moved "
+                 "no MAGNDATA coordinate by more than 3.1e-5 A, and on a mirror the stated "
+                 "displacement it erases is reported by name. Dissenter: a refiner "
                  "stating a displacement under 5e-4 off a parent special position, who "
                  "passes nuclear_group='file'. Kept at tier 3 by Mike's ruling on PR #1636 "
                  "(2026-11-23, 11:47Z: the merge 'stays') under #1075; his, not the judge's, "
                  "since it sets the threshold of the parent-group pick (WP-2238)."),
         approved="2026-11-23"),
-    Row("rietx.crystallography.magnetic.isotropy.CROSS_IRREP_DRAWS", "constant", tier=3, value=12,
-        evidence=("of the cubic pairs 3 draws called equivalent, 8 % were refuted within 12 "
+    Row("rietx.crystallography.magnetic.isotropy.CROSS_IRREP_DRAWS", "constant", value=12,
+        evidence=("back to Mike, unaudited: he ruled tier 3 on PR #1636 (2026-11-23), and "
+                  "the judge (2026-11-24) called it weak and an action's threshold: "
+                  "solve_magnetic calls analyse with no draws= (strategy/magnetic.py:2374) and "
+                  "refines only each class's smallest member, so a false join drops a candidate "
+                  "and the caller cannot change the count; and nothing on disk runs the known "
+                  "answer at 3 draws. Measured: "
+                  "of the cubic pairs 3 draws called equivalent, 8 % were refuted within 12 "
                   "draws, against 0.2 % at 12 (six synthetic cubic sets); case that reaches "
                   "it: "
                   "tests/test_magnetic_isotropy.py::test_the_cubic_known_answer_has_four_classes_at_the_default_draws "
                   "(P n -3 m:1, four classes at 12 draws, two at 3). Synthetic cubic sets "
-                  "only; untested beyond"),
-        grounds=("Rare feature, kept at the measured value: which magnetic models join one "
-                 "class (4 against 2 on the known answer). On the action no dissenter found: "
-                 "the verdict says sampled and gives its draw count, and draws= is the "
-                 "caller's. On the count, a fast screen would take fewer draws and a quoted "
-                 "class count more. Tier 3 ruled by Mike on PR #1636 (2026-11-23) under "
-                 "#1075."),
-        approved="2026-11-24", approved_by="checked"),
+                  "only; untested beyond")),
     Row("rietx.crystallography.magnetic.isotropy.DEFAULT_CELL_SCALE", "constant", value=5.0),
     Row("rietx.crystallography.magnetic.isotropy.DUAL_AFTER_RESTART", "constant", value=1),
     Row("rietx.crystallography.magnetic.isotropy.FARKAS_FLOOR", "constant", tier=1, value=1e-12,
@@ -3602,8 +3609,8 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.crystallography.magnetic.isotropy.TRANSFER_FLOAT_STACK", "constant", value=1e-08),
     Row("rietx.crystallography.magnetic.isotropy.WITHIN_IRREP_DRAWS", "constant", value=3,
         evidence=("unaudited until its case lands: Mike rules tier 3 on PR #1636 "
-                  "(2026-11-23), with one case owed, since no case on disk reaches the "
-                  "constant (generality.md: a guard no ordinary fit reaches is recorded kept "
+                  "(2026-11-23), with one case owed, since no case on disk makes 3 and 12 "
+                  "draws differ (pairs at 3 run in tests/test_magnetic_isotropy.py) (generality.md: a guard no ordinary fit reaches is recorded kept "
                   "on an injected case). Measured: on the P n -3 m:1 known answer, 3 and 12 "
                   "draws give the same 4 classes and 24 within-irrep verdicts. The owed case "
                   "(a set where 3 draws join two directions of one irrep and 12 separate "
@@ -3676,8 +3683,13 @@ ROWS: tuple[Row, ...] = (
         evidence=('arithmetic: after x % 1.0 a coordinate within 1e-12 of 1 is the lattice point '
                   '0 (-1e-17 % 1.0 is 1.0 in floating point, outside [0, 1)); the two values '
                   'name one point to 1e-12 of an edge, eight orders under SITE_TOL (p1.py:68-83)')),
-    Row("rietx.crystallography.magnetic.scattering.INVARIANCE_MOMENT_TOL", "constant", tier=3, value=0.001,
-        evidence=("1e-3 x max(1, |m|): fires on 0 of 2447 MAGNDATA files (Mike, #1797), since "
+    Row("rietx.crystallography.magnetic.scattering.INVARIANCE_MOMENT_TOL", "constant", value=0.001,
+        evidence=("back to Mike, unaudited: he ruled tier 3 on PR #1636 (2026-11-23), and "
+                  "the judge (2026-11-24) called it weak: Mike's own FYI is a dissent, since an "
+                  "honest 2-decimal pair (gap 0.01) reads as a magCIF and is refused as "
+                  "explicit copies, and this bar does not follow the printed-digit convention "
+                  "the reader rows are moving to; the boundary case is not on disk. Measured: "
+                  "1e-3 x max(1, |m|): fires on 0 of 2447 MAGNDATA files (Mike, #1797), since "
                   "a magCIF lists one atom per orbit and the reader drops a listed copy "
                   "before this check; it acts only where the phase's group lacks the "
                   "operation relating two listed atoms (explicit copies from FullProf, TOPAS, "
@@ -3685,13 +3697,14 @@ ROWS: tuple[Row, ...] = (
                   "tests/test_magnetic_group_symmetry.py::test_explicit_copies_the_group_does_not_relate_are_refused "
                   "(6 mu_B, far past the bar); a boundary case (a P -1 pair in P 1, |m| 3.16, "
                   "passes at 0.002 and is refused at 0.01) is in #1797. Synthetic pairs; "
-                  "untested beyond"),
-        grounds=("Rare feature, kept at its value: whether a phase stated with explicit "
-                 "copies loads. No dissenter found. Tier 3 ruled by Mike on PR #1636 "
-                 "(2026-11-23) under #1075."),
-        approved="2026-11-24", approved_by="checked"),
-    Row("rietx.crystallography.magnetic.scattering.INVARIANCE_POS_TOL", "constant", tier=3, value=0.001,
-        evidence=("two related atoms listed separately and printed to three decimals pass, "
+                  "untested beyond")),
+    Row("rietx.crystallography.magnetic.scattering.INVARIANCE_POS_TOL", "constant", value=0.001,
+        evidence=("back to Mike, unaudited: he ruled tier 3 on PR #1636 (2026-11-23), and "
+                  "the judge (2026-11-24) called it weak: on hexagonal axes an operation such "
+                  "as (-y, x-y, z) adds two roundings in one coordinate, so an honest 3-decimal "
+                  "pair can be 1.5e-3 apart and refused, and the refusal names no nearest atom; "
+                  "the boundary case is not on disk. Measured: "
+                  "two related atoms listed separately and printed to three decimals pass, "
                   "their images differing by at most 1e-3; at two decimals they do not. Fires "
                   "on 0 of 2447 MAGNDATA files for the reason INVARIANCE_MOMENT_TOL's row "
                   "gives, so MAGNDATA's print precision is not evidence for it. Injected "
@@ -3699,11 +3712,7 @@ ROWS: tuple[Row, ...] = (
                   "tests/test_magnetic_group_symmetry.py::test_mnf2_with_its_group_at_a_shifted_origin_is_refused "
                   "and the origin-choice test, far past the bar; a boundary case (a P 1 pair, "
                   "a = 4 A, 9e-4 passes, 1.1e-3 refused) is in #1797. Synthetic pairs; "
-                  "untested beyond"),
-        grounds=("Rare feature, kept at its value: whether a phase stated with explicit "
-                 "copies loads. No dissenter found. Tier 3 ruled by Mike on PR #1636 "
-                 "(2026-11-23) under #1075."),
-        approved="2026-11-24", approved_by="checked"),
+                  "untested beyond")),
     Row("rietx.crystallography.magnetic.scattering.METRIC_TOL", "constant", value=0.001),
     Row("rietx.crystallography.magnetic.scattering.P_MAGNETIC_FM", "constant", tier=1, value=2.695,
         evidence=('physical constant: p = gamma r_0 / 2 = 0.2695e-12 cm = 2.695 fm, the magnetic '
@@ -7905,6 +7914,7 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.crystallography.dispersion.LINE_DISPERSION_TOL",
     "rietx.crystallography.dispersion.NEAR_EDGE_EV",
     "rietx.crystallography.magcif.MOMENT_FORM_AGREEMENT_MU_B",
+    "rietx.crystallography.magnetic.isotropy.CROSS_IRREP_DRAWS",
     "rietx.crystallography.magnetic.isotropy.DEFAULT_CELL_SCALE",
     "rietx.crystallography.magnetic.isotropy.DUAL_AFTER_RESTART",
     "rietx.crystallography.magnetic.isotropy.INTENSITY_RTOL",
@@ -7912,6 +7922,8 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.crystallography.magnetic.isotropy.WITHIN_IRREP_DRAWS",
     "rietx.crystallography.magnetic.isotropy._CLOSURE_LIMIT",
     "rietx.crystallography.magnetic.isotropy._SPAN_GAP",
+    "rietx.crystallography.magnetic.scattering.INVARIANCE_MOMENT_TOL",
+    "rietx.crystallography.magnetic.scattering.INVARIANCE_POS_TOL",
     "rietx.crystallography.magnetic.scattering.METRIC_TOL",
     "rietx.crystallography.magnetic.supercell.CHILD_SITE_TOL",
     "rietx.crystallography.representation.distortion._POSITION_TOL",
