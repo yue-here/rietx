@@ -147,14 +147,18 @@ from .workflow import (
     structure_from_candidate,
 )
 
-#: ΔBIC below which two classes are **not** separated.  Kass & Raftery (1995),
-#: *J. Am. Stat. Assoc.* **90**, 773, call a difference above 10 "very strong"
-#: evidence; anything less is reported as an ambiguity rather than resolved,
-#: which is the same posture ``ShiftScreen.separable`` takes one module over.
+#: The floor of the ΔBIC lead two classes need to be separated.  Kass & Raftery
+#: (1995), *J. Am. Stat. Assoc.* **90**, 773, call a difference above 10 "very
+#: strong" evidence; anything less is reported as an ambiguity rather than
+#: resolved, which is the same posture ``ShiftScreen.separable`` takes one module
+#: over.  Since WP-2076 the bar is max(this, :data:`SILENT_POSITIONS_UNDECIDED`·ln N
+#: + d) (:func:`_decisive_margin`), so this floor binds only where 2·ln N + d < 10,
+#: about N < 150 points.
 DECISIVE_DELTA_BIC = 10.0
 
-#: Silent positions whose count alone never decides between two extinction
-#: classes (WP-2076, ruled 2026-11-13).  Under the nested scoring a tested
+#: The number of silent positions' worth of ln N that never decides between two
+#: extinction classes (the factor on ln N, not a count of positions; WP-2076,
+#: ruled 2026-11-13).  Under the nested scoring a tested
 #: forbidden position moves its class's ΔBIC by z² − ln N (Schwarz 1978), so a
 #: position that shows nothing buys ln N and nothing else, and the d positions
 #: where two classes differ carry χ²_d by chance, whose mean is d.

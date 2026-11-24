@@ -232,7 +232,8 @@ def test_a_lead_of_exactly_two_silent_positions_plus_d_abstains():
     assert at_bar.best_or_none() is None
     ambiguous = next(d for d in extinction_diagnostics(at_bar)
                      if d.code == "EXTINCTION_SYMBOL_AMBIGUOUS")
-    assert f"decisive is {need:.1f}, 2·ln N + d with d = 2" in ambiguous.message
+    assert (f"decisive is {need:.1f}, 2·ln N + d with N = {n} points and d = 2"
+            in ambiguous.message), ambiguous.message
     assert "(0, 1, 0) at 20.123°" in ambiguous.message, ambiguous.message
 
     above = _margin_screen(n, need * (1 + 1e-9), SILENT)

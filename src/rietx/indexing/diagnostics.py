@@ -1216,7 +1216,8 @@ def extinction_diagnostics(screen, fit_errors=None) -> list[Diagnostic]:
                if len(rivals) > 1 else (DECISIVE_DELTA_BIC, 0))
     if len(rivals) > 1 and not rivals[1].delta_bic - top.delta_bic > need:
         undecided = _undecided_positions(top, rivals[1])
-        bar = (f"decisive is {need:.1f}, 2·ln N + d with d = {d}"
+        bar = (f"decisive is {need:.1f}, 2·ln N + d with "
+               f"N = {screen.n_points} points and d = {d}"
                if need > DECISIVE_DELTA_BIC else f"decisive is {need:g}")
         reasons.append(f"{rivals[1].symbol} is within ΔBIC "
                        f"{rivals[1].delta_bic - top.delta_bic:.1f} of it "

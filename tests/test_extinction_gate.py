@@ -342,7 +342,8 @@ def test_pbso4_xray_abstains_on_two_silent_positions():
     assert screen.status == "converged"
     ambiguous = next(d for d in screen.diagnostics
                      if d.code == "EXTINCTION_SYMBOL_AMBIGUOUS")
-    assert "2·ln N + d with d = 2" in ambiguous.message, ambiguous.message
+    assert (f"2·ln N + d with N = {screen.n_points} points and d = 2"
+            in ambiguous.message), ambiguous.message
     assert "tested position" in ambiguous.message, ambiguous.message
 
     held = determine_extinction_symbol(data, candidate, instrument, peaks=peaks,

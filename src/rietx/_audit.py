@@ -4198,9 +4198,12 @@ ROWS: tuple[Row, ...] = (
                   "is the mean of the χ²_d chance gives d silent positions: arithmetic. The value is "
                   "ours: PbSO4 X-ray (Hill 1992) names P c - a over P c - n on two silent positions "
                   "(17.0 at N 5800). Rebuilt WP-2076 sweep, 974 rows within 600 ppm: right/none/"
-                  "wrong 858/105/11 at 10, 634/339/1 here. Real: PbSO4 wrong -> None; Si 640c (11-BM, N 40 001) right -> None; corundum (SRM 676a), "
-                  "NAC keep. Measured on one synthetic family (rietx forward model, Cu Bragg-Brentano, "
-                  "Ca/Si/O) and thirteen real patterns, untested beyond."),
+                  "wrong 858/105/11 at 10, 634/339/1 here. Real: PbSO4 X-ray (Hill 1992) and CuCr2O4 289 K "
+                  "(11-BM) wrong -> None; Si 640c (11-BM, N 40 001) right -> None; corundum (SRM 676a), "
+                  "NAC keep; the other real patterns unchanged at every margin. Fails: synthetic "
+                  "P 2_1/c x0.995 stays wrong (three silent positions, lead 23.6 over 18.8). All "
+                  "development data. Measured on one synthetic family (rietx forward model, Cu "
+                  "Bragg-Brentano, Ca/Si/O) and thirteen real patterns, untested beyond."),
         grounds="Ruled by Yue 2026-11-13: 2·ln N + d, strictly exceeded, as max(DECISIVE_DELTA_BIC, 2·ln N + d)",
         approved="2026-11-13"),
     Row("rietx.indexing.extinction.REFERENCE_NET_RWP_MAX", "constant", tier=3, value=0.7071,
