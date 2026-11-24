@@ -1,6 +1,6 @@
 # WP-2036 — main is green on every nightly leg: a full suite that finishes, two Windows tooling tests, and answers that move with the platform
 
-Milestone: unscheduled · Status: 🔄 2026-11-23 — claimed by ghostshift (runner): the comparison standards' closing stage
+Milestone: unscheduled · Status: ✅ 2026-11-24 — the nightly of 11-23 passed all six jobs and the Mac full suite passes; the comparison standards declare their suites' closing stage (PR #1816)
 Track: The repo's own process
 Depends on: 2045 (the `full` job cannot finish before it); 2048, 2049 and 2050 (three slow rows red by rounding until each lands); 2002 soft, the closing stage that moved most of these; 2012 soft, the LaB6 axial mirror
 
@@ -319,7 +319,7 @@ gh run list --workflow nightly.yml --branch main --limit 1
 ## Handover log
 
 - **2026-11-24** — The WP closes. Its acceptance is met: the nightly of 2026-11-23 passed all
-  six jobs, and the full suite FULLVERDICT on an arm64 Mac. The last task is done too.
+  six jobs, and the full suite passed on an arm64 Mac. The last task is done too.
   `rietx compare` and the diagnostics pin run each standard under its acceptance suite's
   protocol again, closing stage included. Since 2026-11-19 they had run without it, because
   the package default changed and the protocol test looked at the stage lists only. The
@@ -371,7 +371,7 @@ gh run list --workflow nightly.yml --branch main --limit 1
   fluorite 0.14×, corundum 0.37×, brucite 0.0012×. Zincite's declared stages read
   0.07-0.14×. All 8 standards fit in 35 s for the re-pin. The five test files built on the
   standards: 130 passed, 26.6 s on 4 workers. Fast selection on the tree with main merged
-  in (`e67101f17`): FASTCOUNTS. Full suite on the same tree: FULLCOUNTS. CI's lint steps:
+  in (`e67101f17`): 15217 passed, 450 skipped, 32 xfailed, in 9:19 after a 51-min wait for the suite lock. Full suite on the same tree: 16176 passed, 461 skipped, 53 xfailed, in 35:17. Each run's one failure was `test_the_wp_index_is_the_generators_output`, the index left stale by this close's header edit and regenerated after. The branch adds one fast test, which took 0.89 s (local junit), and one slow xfail case, zincite's, which was a pass before. CI's lint steps:
   ruff and the tutorial format clean, Vale 0 errors, skill caps, audit delta, code
   references and rulebook limits all quiet. `tests.reader_output`: exit 0. Probes in
   `~/.cache/ghostshift/rietx/wp-2036/` (`probe_planfields.py`, `probe_nudge.py`,
