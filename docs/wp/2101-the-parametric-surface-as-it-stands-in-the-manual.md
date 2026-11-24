@@ -1,8 +1,7 @@
 # WP-2101 — the parametric surface as it stands, in the manual
 
-Milestone: parametric · Status: 🔄 2026-11-17 — second slice in review (#1632): porting, the GSAS-II sequential map, coefficient traps; two rulings owed
+Milestone: parametric · Status: ✅ 2026-11-19 — every task done; the last slice merged as #1714
 Depends on: —
-Priority: P2 2026-11-04 — a feature the open milestone was opened for, and it needs no machinery
 
 ## Goal
 
@@ -33,9 +32,10 @@ Measured on 2026-11-03, on a seven-pattern synthetic LaB₆ ramp and by reading 
   `mccusker_default` left the coefficients of a coordinate, B, occupancy, size,
   strain, axial and wavelength equation at their starts, absent from
   `result.parameters`, with no diagnostic naming them. That is the held-slope trap's
-  sibling.
+  sibling. *Superseded 2026-11-19:* `VARIABLE_NOT_FREED` names it.
 - Freeing only `vars.a_0` holds the slope at its start of 0. Rwp went from 0.49 to 0.86
   on the ramp and nothing was reported. This is undocumented.
+  *Superseded 2026-11-19:* `VARIABLE_NOT_FREED` names the held slope.
 - Equations nonlinear in one scalar already work by scanning that scalar through
   `design` rows. Holding θ at 200, 400 and 800 K gave χ² of 150.1, 150.5 and 155.7, at
   about 0.4 s a fit. The scan gives no esd on θ. That example is not in the manual.
@@ -44,20 +44,7 @@ Measured on 2026-11-03, on a seven-pattern synthetic LaB₆ ramp and by reading 
   So the scan task below may now be moot; the next session decides.
 - The refusal for an unknown target points at the private
   `mtable.tables[h].entries`, where `.parameters()` is the public answer.
-
-### Inherited
-
-- 2026-11-09, from [1325](1325-parametric-series.md): `reference/parametric.md`
-  § Range and visibility warnings describes `PARAMETRIC_OUT_OF_RANGE` as a warning
-  after the fit. In a real fit it never fires. A target past its own bound makes the
-  write-back after the solve raise `ValueError`, naming the target and the equation,
-  before any result exists. Under the default LM driver a linear equation's target is
-  now held inside its bounds at every step, so the raise is left to TRF and to an
-  `"expression"` equation. 1325's handover entry asks the maintainer whether the
-  warning stays, goes, or replaces the raise. Rewrite that section once they rule.
-  Done in 1325's PR #1497 (2026-11-09): the warning replaces the raise, settled by
-  Claude, and that section and `help.py`'s entry now say a TRF or expression fit
-  finishes with it. Nothing is left here.
+  *Superseded 2026-11-19:* it names `.parameters()`.
 
 ## Non-goals
 
@@ -73,10 +60,11 @@ Measured on 2026-11-03, on a seven-pattern synthetic LaB₆ ramp and by reading 
   written the core table; this slice added the constructs the two Durham inputs use and
   a list of the four with no spelling yet. 1964 is closed, so the list names the
   missing pieces, not WPs.
-- [ ] The inventory, moved from the parked 2105. Every parametric construct in the two
+- [x] The inventory, moved from the parked 2105. Every parametric construct in the two
   Durham inputs, each with its rietx spelling, its WP or a named non-goal, and each
   input's free-parameter and channel counts. The milestone's agent row is judged against
-  it.
+  it. *Done 2026-11-17:* § Inventory below, with four rows added to `switching/topas.md`
+  for the constructs that had none.
 - [x] `switching/topas.md` § Porting what does not read: the recipe an agent follows.
   *Done 2026-11-17* as § Porting an input that does not read, five steps, under
   § Moving a file across.
@@ -104,15 +92,21 @@ Measured on 2026-11-03, on a seven-pattern synthetic LaB₆ ramp and by reading 
 - [x] Document the held-slope trap where a reader meets it, in `guides/equation.md`.
   *Done 2026-11-17:* § Check that every coefficient refined, with the plan-reach
   sibling beside it, both executed by `examples/guides/equation.py`.
-- [ ] Decide whether the two traps earn a diagnostic, under Rule 1 of DESIGN.md. A new
+- [x] Decide whether the two traps earn a diagnostic, under Rule 1 of DESIGN.md. A new
   diagnostic changes what a fit prints, so the maintainer rules first (handover entry
-  2026-11-17 has the brief).
+  2026-11-17 has the brief). *Ruled by the maintainer 2026-11-19:* option (b). A new
+  code names each parametric equation whose coefficients no plan stage freed, listing
+  them, printed only when it happens, and `PARAMETRIC_FORM_REJECTED`'s suggestion names
+  a held variable in `where` before suggesting a rewrite. It reports the fact and its
+  meaning, with no automatic fix (DESIGN.md Rules 1 and 4). *Done 2026-11-19:*
+  `VARIABLE_NOT_FREED`, in the joint fit and in a single fit (handover entry).
 - [x] A worked `design` scan over a held scalar, in `examples/`, included into
   `guides/equation.md`, with its missing esd stated. *Withdrawn 2026-11-17:* a formula
   equation now refines the nonlinear scalar itself, with an esd (`guides/formula.md`,
   θ = 500.17 ± 0.61 K), so the scan is a weaker spelling of a fit the manual already
   shows.
-- [ ] The refusal message names `.parameters()`.
+- [x] The refusal message names `.parameters()`. *Ruled by the maintainer 2026-11-19:*
+  the consent item stood. *Done 2026-11-19.*
 - [x] Skill: the series reference's parametric row, or "none" and why. *Done
   2026-11-17:* the existing row in `series.md` carries the plan-reach rule, tightened to
   stay inside the file's budget, and `diagnostics.md`'s `PARAMETRIC_FORM_REJECTED` row
@@ -131,7 +125,238 @@ Measured on 2026-11-03, on a seven-pattern synthetic LaB₆ ramp and by reading 
 - WP-1325 (the surface), WP-1964 (what comes next), WP-1996 (the Switching tab says
   only what its tests show).
 
+## Inventory
+
+The two Durham inputs the milestone's port rows name, both public downloads registered in
+`tests/local_data.py` and held in the local data root: WO₃'s `parametric_06.inp` (inside
+`parametric_06.zip`, tutorials 9.3 and 9.4) and ZrP₂O₇'s `d8_02999_35_annotate_04.inp`
+(tutorial 9.5). "Row" means a row of the table in `switching/topas.md` § A parametric
+equation is a formula. "List" means the list of constructs with no spelling under that
+table.
+
+### Counts
+
+Free parameters are counted from each input's text by TOPAS's naming rules. A value after
+`@` is one anonymous parameter. A named value without `!` is refined, and a name is one
+parameter wherever it recurs. `local` gives each pattern its own. An `= ...;` is an
+equation and refines nothing. Channels are the points of each `range` inside
+`start_X`..`finish_X`, read with `rx.read_pattern(path, scan=range - 1)`. No point lies on
+either limit, so inclusive and exclusive counts agree. Neither input excludes a region.
+
+| | WO₃ `parametric_06.inp` | ZrP₂O₇ `d8_02999_35_annotate_04.inp` |
+| --- | --- | --- |
+| patterns | 100 (ranges 1-100 of `d9_02592.raw`) | 37 (ranges 1, 26, ..., 871 of `d8_02999.raw`, from the 37 `#define use_t_*` lines) |
+| fitted 2θ | 20-80° | 15-90° (the file ends at 89.99°) |
+| channels | 5844 a pattern, 584 400 in all | 4409 a pattern, 163 133 in all |
+| shared free parameters | 63 | 20 |
+| free parameters a pattern | 11 | 31 |
+| free parameters in all | 1163 | 1167 |
+| check | the input's header states 1163 for 100 data sets and 184 for 11; the count gives 184 for 11 | none in the input. Stinton & Evans (2007), Example 2, count 53 a pattern for independent fits, and 53 less 3 cells, 18 profile terms and 1 asymmetry is 31 |
+
+WO₃'s 63 shared: 34 cell coefficients (9 `zero_*`, 9 `grad_*`, `theta_ma`, and 15 angle
+coefficients), 23 W coordinates (6 in P2₁/n, 12 in P-1, 5 in Pc, where `xW31` is held), and
+6 strains (`Strain_G` and `Strain_L` per phase). Its 11 a pattern: `height`,
+`individual_b`, six `bkg` terms and three phase scales. Every one has a rietx spelling, so
+a port that mirrors the protocol frees 1163.
+
+ZrP₂O₇'s 20 shared: `step_error` and `square`, the two refined coefficients of the 2θ
+curve in `Xo`, and 18 `TCHZ_Peak_Type` terms (six per phase). Its 31 a pattern: 18 `bkg`
+terms, three scales, the ZrP₂O₇ cell, one height, the P coordinate and seven B. A port
+today spells 1159 of the 1167. The 2θ curve's 2 and each phase's own TCHZ V and W (6) wait
+on 2107. The Al₂O₃ coordinates count nothing: the `B1`-`B3` macros drop their `param`
+argument, so the file's `!` on them is inert and the values are fixed either way. Every
+temperature-calibration and cell coefficient carries `!`, so the 1167 frees none of them.
+
+### WO₃ `parametric_06.inp`
+
+| Construct | What it does | rietx | Status |
+| --- | --- | --- | --- |
+| `#list Files T_val Range_val` and `Create_XDDs(#list_n T_val)` | one pattern per row | row `#list` | spelled |
+| `#define param_cell`, `write_out`; `#ifdef refine_some ... #else` | pick the live text | row `#define` | spelled |
+| `for xdds { ... }`, `prm i = 0;`, `existing_prm i += 1;`, `#Files(i)`, `#T_val(i)`, `#Range_val(i)` | the per-pattern body | row `for xdds` | spelled |
+| `range = #Range_val(i);` | the scan inside the RAW file | row `range 3` | spelled |
+| `local !te = #T_val(i);` | each pattern's temperature | the `T` column of the `CoordinateTable` | spelled |
+| `fn cell_fT(...)`, `fn angle_fT(...)` | a user function | row `fn` (added by this slice) | spelled |
+| `prm zero_ma 7.298...`` and the other 33 coefficients | refined shared coefficients | row `prm zero_a` | spelled |
+| `prm !theta_mb = theta_ma;` (eight of them) | one θ for nine edges | row `prm !theta_b = theta_a;` | spelled |
+| `a = cell_fT(zero_ma, grad_ma, theta_ma, te);` (nine edges) | an Einstein edge | row `a = zero_a + ...` | spelled |
+| `be = angle_fT(...)`, and P-1's `al`, `be`, `ga` | a quadratic angle | row `be = b0*(1 + ...)`, on `cell.alpha`, `beta` or `gamma` | spelled |
+| `local height`, `th2_offset = -2 57.2957795 (height) Cos(Th) / Rs;` | a height per pattern | row `local height` (added) | spelled |
+| `local individual_b`, `scale_pks = Exp(-2*individual_b/(2 D_spacing)^2);` with `beq !bval 0` on every site | one B per pattern | row `scale_pks`, with `expression="b"` since every site's B is 0 | spelled |
+| `local bkg0` ... `bkg5`, `bkg = bkg0; = bkg1; ...` | a background per pattern | row `local` on a `bkg` term | spelled |
+| `macro Phase_Common(n, scv) { local sc scv min 1e-10; scale = sc; ... }` | a scale per phase per pattern | rows `#define` and `local` on a scale | spelled |
+| `A1(xW1, ...)` and the other W coordinates, one name in every `xdd` | shared coordinates | row "a phase's parameter under one name" | spelled; their `min`/`max` window on a coordinate is not checked |
+| `A1(!xO3, ...)` and every other O, and `!xW31` | held coordinates on general positions | row `!` on a coordinate | spelled |
+| `Strain_G(strainG_p21n, ...)`, `Strain_L(...)`, per phase | shared strains | `gauss_strain` = e² and `lor_strain` = e, shared by default (§ The peak shape is the instrument plus the sample) | spelled |
+| `val_on_continue = ...`, `vcstrain`, `continue_after_convergence` | restarts from perturbed values | row `val_on_continue` | no equivalent, by design |
+| `load_save_locals` | starts each `local` from the last run | row `load_save_locals` (added) | a restart from a result: 2103 |
+| `Zero_Error(!zero, 0)`, `Simple_Axial_Model(!axial, 5.74444)`, `LP_Factor(!th2_monochromator, 0)`, `CuKa2(0.0001)` | fixed instrument terms | single-fit vocabulary; `Simple_Axial_Model` has no equal, and FCJ (`axial_sl`, `axial_hl`) is the nearest | no parameter, not parametric |
+| `x_calculation_step = Yobs_dx_at(Xo)`, `convolution_step 2`, `extra_X_right 2`, `iters`, `chi2_convergence_criteria` | numerics | nothing to write | not parametric |
+| `Out(...)`, `Out_String`, `Get(r_wp)`, `out ... append`, `Backup_INP`, `system_before_save_OUT`, `#if (Run_Number == 0)`, `xdd_out` | output | row `Get(r_wp)` | output only |
+| `weight_percent`, `Phase_Density_g_on_cm3`, `r_bragg`, `local plpvol = Get(cell_volume);` | reported values | row `Get(r_wp)` | output only |
+
+### ZrP₂O₇ `d8_02999_35_annotate_04.inp`
+
+| Construct | What it does | rietx | Status |
+| --- | --- | --- | --- |
+| `#define use_t_0303 prm !set_t_0303 303 macro r_t_0303 { 1 }` (37 lines) | a flag, a set temperature and a range per pattern | row `#define`, and the `T` column | spelled |
+| `#ifdef use_t_0303 ... #endif` (37 blocks) and `RAW(d8_02999)` | one written-out block per pattern | row `#define` | spelled |
+| `range r_t_0303` | the scan | row `range 3` | spelled |
+| `macro information { ... }` | text shared by every block | row `#define` | spelled |
+| `th2_offset = (Xo-data_middle)^2*(square/1000) + (Xo-data_middle) (step_error/1000) + zero;` | a 2θ curve, two shared coefficients | list, "`th2_offset` written in `Xo`" | 2107 |
+| `prm !T_calibration_b` ... `_d`, `prm !T_calibration_a = 0 - (...);` | a cubic calibration, its constant set by the others | row `prm !calib = ...`, `target=None` | spelled |
+| `prm !delta_t_0303 = ...;`, `prm !t_0303 = set_t_0303 + delta_t_0303;` | each pattern's temperature through the calibration | row `prm !calib`, one equation feeding the cell formulas | spelled |
+| `prm lpa_si_t_0303 = Exp(Ln(a0) + ...);` and `Cubic(=lpa_si_t_0303;)` | Si's three Einstein terms | row `a = zero_a + ...`, written in `T` | spelled |
+| `prm !lpa_al2o3_t_0303 = a_al2o3_offset + a0_al2o3 (1 + ax1_al2o3 (t_0303-273) + ...);`, and `c` | Al₂O₃'s polynomial cell | rows `a0 (1 + ax1 (T - 273))` and `a = ...` | spelled |
+| `scale scale_zrp2o7_t_0303 ...`, `Cubic(lpa_zrp2o7_t_0303 ...)`, `xp1_t_0303`, `bvalue*_t_0303`, one name per block | per-pattern parameters by name | row `local` on a phase's parameter (`per_histogram`) | spelled |
+| `Specimen_Displacement(height_zrp2o7_t_0303, ...)`, and `=height_zrp2o7_t_0303;` in the other two phases | one height per pattern | row `Specimen_Displacement` | spelled |
+| `TCHZ_Peak_Type(pku_zrpo7, ...)`, one name per phase in every block | a phase's six width terms, shared | row `TCHZ_Peak_Type` (added) | U, Z, X, Y spelled; V and W 2107 |
+| `B1(!xAl1, 0.0000, 0.0000)` ... `B3(...)` | fixed Al₂O₃ coordinates | nothing to write | the coordinates are fixed |
+| `bkg @` with 18 values in each block | a background per pattern | row `local` on a `bkg` term | spelled |
+| `MVW(...)`, `Out(...)`, `out "temp.res" append`, `prm !correction_at_30_deg2th = ...;`, `prm !calc_delta_t_0300 = ...;` | reported values | row `Get(r_wp)` | output only |
+| `Simple_Axial_Model(!axial, =ax_overall;)`, `LP_Factor(!th2_monochromator, 27.26)`, `CuKa1(0.001)` | fixed instrument terms | single-fit vocabulary | no parameter, not parametric |
+| `chi2_convergence_criteria`, `iters`, `seed`, `Rietveld_Plot` | numerics and output | nothing to write | not parametric |
+
 ## Handover log
+
+- **2026-11-19 (closed)** — The last slice, PR #1714, merged as `8aaaf54c3` at 22:09Z,
+  merged by the maintainer. Every task was already ticked, and the entry below said the
+  WP closes once #1714 merged. This close was done by a ghostshift runner in the
+  close-only PR #1719: the Priority line and the consumed `### Inherited` section went
+  (its one note was done in WP-1325's PR #1497), and the narrative moved to the v1.13
+  record. One follow-up went to WP-2103's `### Inherited`: once a joint fit has a
+  `hold` verb, its `VARIABLE_NOT_FREED` builder leaves out a held coefficient, as the
+  single fit's does.
+
+- **2026-11-19 (the rulings; PR #1714)** — A fit now says when a variable never
+  refined. In a joint fit, an equation whose coefficients no stage freed is named with
+  those coefficients and their starting values. A form rejection caused by a held
+  variable names that variable before it suggests rewriting the formula. Measuring the
+  rulings found the same trap in a single fit, and wider: no preset plan frees a
+  variable there, so a variable that parameters are tied to keeps its start unless a
+  stage names it. The same code covers that case. The refusal of an unknown target
+  points at the public `.parameters()`.
+
+  *Ruled by the maintainer 2026-11-19.* (1) Option (b): a new code naming each
+  parametric equation whose coefficients no plan stage freed, listing them, printed
+  only when it happens; and `PARAMETRIC_FORM_REJECTED`'s suggestion names a held
+  variable before suggesting a rewrite. It reports the fact and its meaning and offers
+  no automatic fix (DESIGN.md Rules 1 and 4). (2) The consent item stood: the refusal
+  names `.parameters()`. Yue ruled for the added reader output, so the handover did not
+  ask again.
+
+  *Done.* `VARIABLE_NOT_FREED`, a warning. Joint fit:
+  `multi._parametric_not_freed_diagnostics`, one per equation, `where` the coefficients
+  no stage's `freed` or `held` names, `value` their count, carried into every
+  histogram's view (`FINDINGS_IN_EVERY_VIEW`). Single fit:
+  `refine._variable_not_freed_diagnostics`, one finding naming each untied variable
+  that something follows (`ParameterTable.entry_reach`) and no stage freed, with its
+  start and its followers. It leaves out a variable whose followers the mode
+  force-fixes, and names `unhold` for a variable `hold` holds. It is called from `fit()`
+  only, since a lone `run_stage` is not a plan. The form rejection's suggestion opens
+  with each `where` coefficient no stage freed, read off the same stage record. Both
+  refusal sites in `params/multi.py` name `.parameters()`. Rows: `rietx._audit` (code
+  tier 1, response warning; suggestion tier 1, value 2), `help.py`, the skill's
+  diagnostics row, `DIAGNOSTIC_SCOPES` (two rows), a silence pair, the GUI help-key
+  fixture, `reference/joint.md`, `reference/parametric.md`, `guides/equation.md` (both
+  traps now print the code; `examples/guides/equation.py` asserts it),
+  `guides/formula.md`, and `guides/tie.md`, whose "the fit refines `vars.thD`" was
+  false under every preset plan. `tests/test_compare_ui.py` does not apply: no
+  correction landed.
+
+  *Measured* (`[dev]` venv, macOS arm64). Single fit on one LaB6 ramp pattern, a
+  variable at `vary=True` set by a formula and a linear tie: under `mccusker_default`,
+  `mccusker_structural` and the default plan it stayed at 0.5 with no row in
+  `result.parameters`; a stage on `vars.*` refined it. Joint fit: held slope Rwp 0.568
+  against 0.041 free on the equation guide's ramp, 0.82 against 0.043 on the tests'
+  five-pattern line ramp. Fast suite, `-m "not slow"` on 8fb1475dc: 1 failed, 14916
+  passed, 433 skipped, 32 xfailed. The one failure,
+  `test_examples.py::...[moment]`, fails with the same numbers on an `origin/main`
+  snapshot. Added tests (local junit): 6.38 s, 0.82 s and 0.36 s; the first does two
+  joint fits and stays in the fast tier beside its file's other fits.
+
+  *Level.* Warning, under `docs/milestones/generality.md` § The rule clause 2: the
+  coefficient and every target it sets are result numbers that are not measurements,
+  and the plan did not reach what the declaration asked.
+
+  *Generality* (judge, condensed). The code: holds, tier 1. Its suggestion: holds. The
+  form prefix: weak, since "held at the answer" disagreed with the code's own reading;
+  fixed to read the stage record. The level: weak, because a deliberate `vary=False`
+  hold (ZrP₂O₇'s calibration coefficients) also warns. Author: kept, because the ruled
+  held-slope case is a `vary=False` declaration no code can tell from a deliberate one,
+  and the skill row says a deliberate hold is the caller's constant. The skill row:
+  weak; fixed to keep the deliberate-hold reading and the `vars.` path route.
+
+  *Review.* `/code-review high --fix` found seven. Fixed: the mode-fixed follower, the
+  held variable's `unhold`, `entry_reach` called only when needed, the form prefix
+  naming a support-held coefficient. Declined: a per-pattern variable counts one row
+  per pattern; a variable two formulas read is named under each equation, as the
+  ruling asks per equation; `run_stage` raises nothing.
+
+  *Settled by Claude 2026-11-19:* the code is `VARIABLE_NOT_FREED`, one name for both
+  fits since every coefficient is a `vars.` row; the alternative was a
+  `PARAMETRIC_`-prefixed name, which misreads a single fit's tie. *Settled by Claude
+  2026-11-19:* the single fit is covered, under the ruling's "wherever the trap occurs"
+  and the measured preset behaviour; the alternative was the joint fit alone.
+
+  *Ruled by the maintainer 2026-11-19: (a), a hold silences it.* The single fit's
+  builder leaves out a variable the caller holds (`ref.hold`), read off the table with
+  `ParameterTable.held_by`, never re-derived. A variable at `vary=False` without a hold
+  still warns. The message wording stands. The suggestion's `unhold` sentence went with
+  it, since a held variable is no longer named. A joint fit has no hold verb yet (WP-2103
+  is not on this branch), so every unfreed coefficient there still warns; the joint
+  builder's docstring says so. `guides/tie.md`, `help.py` and the skill row say to hold
+  the variable when its start is meant. Test:
+  `test_a_held_variable_is_not_named_and_an_unheld_fixed_one_still_is`, which fails on
+  `where` with the filter removed.
+
+  Next: none in this WP's tasks. The WP can close once #1714 merges.
+
+- **2026-11-17 (inventory)** — Task 2, by a ghostshift runner, in PR #1654, stacked on
+  #1632. The milestone's agent-port row now has numbers to judge against. WO₃'s input fits
+  584 400 channels with 1163 free parameters, and ZrP₂O₇'s fits 163 133 with 1167. Every
+  WO₃ parameter has a rietx spelling. Eight of ZrP₂O₇'s wait on 2107: the two
+  coefficients of its 2θ curve in `Xo`, and each phase's own TCHZ V and W.
+
+  *Done.* § Inventory: a counts table and one construct table per input. In
+  `switching/topas.md`, four rows for constructs that had none (`fn`, a phase's
+  `TCHZ_Peak_Type`, a height written in `Cos(Th)`, `load_save_locals`), the list's
+  reflection bullet naming a phase's V and W, and the `Strain_G`/`Strain_L` conversion
+  under § The peak shape. The old row "a phase's parameter under one name ..., such as its
+  `TCHZ_Peak_Type` terms" was wrong: rietx has no per-phase V or W, so its example is now
+  a strain or a coordinate.
+
+  *Measured* (runner's scratch scripts, `[dev]` venv, macOS arm64, not in the repo).
+  Channels from `rx.read_pattern(..., scan=range - 1)`: 5844 a pattern in 20-80° on
+  `d9_02592.raw`, 4409 a pattern in 15-90° on `d8_02999.raw`, with no point on a limit.
+  Free parameters from each input's text by TOPAS's naming rules. The WO₃ count gives 1163
+  for 100 data sets and 184 for 11, the two figures its header states. ZrP₂O₇'s input
+  states none, and its 31 a pattern equals Stinton & Evans's (2007) 53 for an
+  independent fit less the 22 terms the input shares or fixes. The TCHZ and `Strain_G`
+  forms were read from the TOPAS 5 Technical Reference.
+
+  *Gotchas.* The Al₂O₃ `B1`-`B3` macros drop their `param` argument, so those
+  coordinates are fixed whatever the `!` says. WO₃'s input states no `Rs`, so a port
+  sets `goniometer_radius_mm` to TOPAS's default. ZrP₂O₇'s count includes no
+  temperature-calibration coefficient, because the input holds all of them. The
+  milestone's run that frees them is a different protocol.
+
+  *Settled by Claude 2026-11-17:* the inventory lives in this WP file, because the
+  milestone's row names "2101's inventory"; the alternative was a manual page, which would
+  publish a judge's answer key. *Settled by Claude 2026-11-17:* a phase's TCHZ V and W and
+  the `Xo` curve are marked 2107, under the milestone's ZrP₂O₇ row ("join the protocol
+  once 2107 lands"); the alternative was a non-goal. *Settled by Claude 2026-11-17:* the
+  four missing rows went into `switching/topas.md` in this slice, under the milestone's
+  agent row (a line per construct or a named non-goal); the alternative was listing the
+  gaps here for a later slice.
+
+  *Gates* (on this branch, `[dev]` venv, macOS arm64). `tests/test_docs_consistency.py
+  tests/test_manual.py tests/test_manual_api.py`: 110 passed. Sphinx `-W`: clean. CI's lint
+  steps from the top level: ruff check and the tutorials' format check clean; Vale 0 errors,
+  and its one warning on `topas.md` is on line 82, which this slice did not write. No code
+  changed, so no other suite ran.
+
+  Next: the maintainer's two rulings in the entry below, then task 9.
 
 - **2026-11-17** — Second slice, by a ghostshift runner, in PR #1632. A TOPAS user whose
   parametric input does not read now has a five-step route from the reader's error to a

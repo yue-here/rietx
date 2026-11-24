@@ -1,6 +1,6 @@
 # WP-2028 — a joint fit's guards see every histogram
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — tasks 1-3, 5, 6 merged from outside as PR #1128 (`1ba6c216`), 7's census as PR #1205 (`d0d4831d`) and the joint `parameters()` as PR #1270 (`2d6e3e0b`); 4 measured, not wired; 8 measured on #1124, its two wording edits merged as PR #1277 (`e0cb41ea`); the joint identifiability screens are open as PR #1272
+Milestone: unscheduled · Status: 🔄 2026-11-18 — the inherited W-esd finding fixed in the blocked covariance (PR #1668), its WP-1535 question with the maintainer; earlier: tasks 1-3, 5, 6 merged from outside as PR #1128 (`1ba6c216`), 7's census as PR #1205 (`d0d4831d`) and the joint `parameters()` as PR #1270 (`2d6e3e0b`); 4 measured, not wired; 8 measured on #1124, its two wording edits merged as PR #1277 (`e0cb41ea`); the joint identifiability screens are open as PR #1272
 Track: What fires, and what stays silent
 Depends on: — (1341 closed: it built the joint report this WP completes; 1325
 soft: its parametric codes and per-pattern holds are what tasks 3 and 6
@@ -131,6 +131,12 @@ that caveat until 1421 lands.
 
 ### Inherited
 
+- 2026-11-22, from WP-2239 (PR #1781): a joint fit's LM step now holds the
+  Stephens cone and texture P ≥ 0 per histogram, and a joint stage honours
+  `Stage.strain_seed`. Two neighbouring claims were left for this WP,
+  unchecked: `help.py`'s `texture` record entry says the record is empty
+  in a joint fit, and the Stephens guard's skill and manual rows name only
+  TRF although LM skips a block whose start is outside the cone.
 - 2026-11-01, from WP-1951 (issue #896): a single fit now reports a stage
   glob that names one site (`phases.0.atoms.0.dof.*`) and frees nothing,
   through `refine._site_glob_diagnostics` beside
@@ -200,6 +206,13 @@ that caveat until 1421 lands.
   field with no code; whether the field is findable enough is the question.
   *Not checked against the tree beyond the run:* neither finding was
   reproduced small, and no code was read past the function's name.
+  *Superseded in part, 2026-11-17 (this WP's session of that day):* the
+  first finding is investigated. The 1e-12 came from the blocked covariance
+  (`optimize.blocked._Schur`), which handed the whole discarded direction to
+  the shared W; that is fixed, and the blocked esds now equal the dense ones.
+  What remains is WP-1535's 2026-10-02 decision to leave a short esd beside
+  `COVARIANCE_DIRECTION_DISCARDED`, which the handover entry of 2026-11-17
+  puts to the maintainer (dated 2026-11-18, the session ran across midnight). The second finding is untouched.
 
 ## Non-goals
 
@@ -291,6 +304,29 @@ shows the findings that name histogram h.
   WP-2001 and WP-2004 (the tier rule).
 
 ## Handover log
+
+- **2026-11-18** — the 1e-12 esd on W in WP-2081's joint ramp was a defect in the joint fit's covariance, and it is fixed. When a combination of parameters is exactly flat, the covariance drops it and reports each parameter's spread along the directions the data did measure. The joint fit's block inverse put that entire dropped direction onto the shared parameter, so W read as measured to twelve decimal places while two starts disagreed on it by 6.5e-6. Now the joint fit gives the same esds as one dense inverse of the whole matrix: on the ramp W reads ± 5.6e-6, the size of the disagreement between starts. A narrower question stays open and goes to the maintainer. WP-1535 chose to keep a short esd beside a warning for such a direction, and a single fit's W is still ± 6.3e-7 while two starts land 9e-5 apart.
+
+  *Done.* `optimize.blocked._Schur` (the joint covariance's Schur-complement inverse) now projects its generalised inverse off every discarded direction: E⁺ = P·G·P, exact for any generalised inverse of a symmetric matrix. A fit that discards nothing keeps its bits. `blocked.discarded_directions` reads the projector's diagonal for its touched test, as the dense test does; before, it read the unnormalised direction [u; −Y_h u]. Test `test_a_direction_the_schur_form_discards_is_the_dense_pseudo_inverses` (`tests/test_parametric_series.py`, three cases) fails on `main` at the esd assertion and passes here.
+
+  *Measured* (`[dev]` venv, macOS arm64, Python 3.12; script `repro_w_esd.py` in the session scratchpad, not committed). The direction is exact: Γ_G² = W + `gauss_size`/cos²θ + `gauss_strain`·tan²θ, and 1/cos²θ = 1 + tan²θ, so (δW, δsize, δstrain) = (+1, −1, +1) moves nothing whether U is held or not. The three readings the brief named are each ruled out. It is not WP-1929's marginal esd at a bound: the second start's W is off its floor and read 3.7e-12 too. It is not the equilibration, since W's column is live. It is not `_cov_free`, which only drops gradient-free columns and is right to leave W. It is not `normal_covariance`, the multi-table mapping or Bérar-Lelann either: the dense path on the same Jacobian gives the min-norm number. Synthetic LaB6 at λ = 0.7107 Å, W, `gauss_size` and `gauss_strain` free:
+  - Single fit: smallest equilibrated eigenvalue 2.2e-16 to 8.3e-16 of the largest, under the 1e-15 cut, so the direction is always discarded. W ± 6.3e-7 at both starts, which land at 3.94e-4 and 3.04e-4: 140 esd apart. `COVARIANCE_DIRECTION_DISCARDED` names all three.
+  - Joint, 3 patterns, W and the zero shift shared, dense layout: start 1 discards (2.7e-16), W ± 3.9e-7; start 2 keeps (1.6e-15), every member ± 5.5. The starts land 9e-5 apart in W.
+  - Same, blocked layout, before the fix: start 1 W ± 2.7e-17 against the per-pattern `gauss_size` ± 1.2e-6, and a rounding ρ fired `FLAT_DIRECTION` for zero shift ~ W. After: ± 3.924e-7, equal to dense in every digit printed, and that `FLAT_DIRECTION` is gone.
+  - Synthetic arrow, shared column = a combination of two own columns in every block, six seeds: shared column 1e-21 to 1e-20 blocked against 9e-5 to 2.6e-4 dense before; 9e-16 to 1.4e-15 relative after.
+  - WP-2081's ramp, arm B, rerun after the fix (redirected output, `joint_ramp.json` untouched): χ² 274072.4542606912, the same digits, so the solve did not move. W 1e-8 ± 5.57e-6, was ± 7.28e-12. The first pattern's `gauss_size` reads ± 3.18e-5, was ± 3.31e-5, and V ± 1.956e-4 is unchanged. The V ~ W `FLAT_DIRECTION` (ρ = −1.000) no longer fires. `FLOOR_HIT` and `COVARIANCE_DIRECTION_DISCARDED` still name W. It ran 63 min under load, against ~10 min alone.
+
+  *Gate* (`[dev]` venv, macOS arm64, Python 3.12, branch on `main` `1b9d4f7cc`). The four joint-fit files, slow rows included, gave 314 passed. The fast selection gave 14 719 passed, 433 skipped, 32 xfailed, and 23 errors. All 23 errors were the manual-build fixture's Sphinx build hitting its 300 s timeout while five other sessions' suites ran, and the run took 48 min. That group alone (`tests/test_manual.py`, `tests/test_help.py`) then gave 102 passed. Added: one test, three cases, 0.01 s together. No baseline was run, so the delta is not checked here; CI's fast matrix is the count. The full suite was not run. The blocked layout is reached only past 256 MiB of dense Jacobian, or where a test forces it, and every such test is in `tests/test_parametric_series.py`, which ran whole. `tests.reader_output` reports no change, since its fixtures never reach the blocked layout.
+
+  *Review* (`/code-review high --fix`): four findings. Fixed: W = [I; −Y] is now built once, and a case with an own block's discard beside the border's. No change needed: the touched set's normalisation is intended dense parity, and `_projection` reads g·G·g with g in the range of E, where the projection changes nothing past rounding. *Generality*: no rule, threshold or audit row added; judge not dispatched. *Skill*: the `COVARIANCE_DIRECTION_DISCARDED` row already says to quote none of the named esds; unchanged.
+
+  *Not generalised, deliberately.* (1) The dense path's own choice (WP-1535: a discarded direction keeps a short esd beside a warning) is untouched. It is the maintainer's question below. (2) `statistics.resolved_correlation` (WP-2050) still returns a joint fit's correlations unprojected ("a joint fit's BlockJacobian is left as it is"). After this fix the rounding pair it was built for no longer comes from the block inverse, but a joint fit's near-cut direction can still give a rounding ρ. That is this WP's joint-identifiability task. (3) The cut itself still differs per block (module docstring), so near 1e-15 the two layouts can still discard different directions: start 2 above kept in both layouts.
+
+  *Gotchas.* `refine.WIDTH_TERMS`' comment says holding U alone removes the size flat. That holds only while `gauss_strain` is held; with it free, (W, size, strain) stays flat. This is why the ramp kept the direction after `_hold_width_twins_multi` held U, X and Y, and it bears on this entry's second inherited finding, which is untouched.
+
+  *Practice.* The survey for the open question is `docs/practice.md` § The esd of a parameter on a direction the data does not determine (written by the parent session; one sentence of this session's measurements added).
+
+  *Next.* The maintainer rules on the brief: whether a parameter on an exactly flat discarded direction reports no esd instead of a short one (reopens WP-1535). If yes, that is its own WP, measured first on the acceptance fixtures' width esds. This WP's open tasks (4, 8, the identifiability screens, the second inherited finding) are as they were.
 
 - **2026-11-02** (ghostshift close batch) — the read-only joint `parameters()` merged from outside as PR #1270 (`2d6e3e0b`, head `6c5abbfd`). A joint fit now lists every parameter with the single fit's row type, each path spelled as the joint table spells it. The contributor's 2026-10-31 entry, its tick and its `Status:` addendum stand as written, so this entry adds the merge record. Round 2 of the review found both round-1 items fixed. A shared row's bounds are the intersection over its histograms, and both listings build their rows through `refine._parameter_row`. Three texts a joint fit's reader receives changed, and the maintainer approved them on the PR. *Gate*: #1270 and #1271 stacked on `main` `b54c27b28`, `[dev]` venv, macOS arm64. Fast selection 13 318 passed, 310 skipped, 32 xfailed, 0 failed. Slow selection 912 passed, 21 skipped, 18 xfailed, 0 failed. `python -m tests.reader_output` exited 0. A targeted re-run on `main` `ed8c75808` gave 169 passed. Gap, not blocking: `STAGE_FREED_NOTHING`'s suggestion still names `ref.mtable.tables[h].entries` and not `ref.parameters()`. This entry is recorded by PR #1336. Next: PR #1272 (the joint identifiability screens) is the open follow-up. It adds a handover entry at the same place in this log, so its branch needs that hunk rebased before it merges. Task 4 (WP-1523's test on the joint path) is unbuilt, and task 8's box waits on the maintainer.
 

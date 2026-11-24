@@ -1,6 +1,6 @@
 # WP-1814 — refinable internal geometry: Z-matrix lengths, angles and dihedrals
 
-Milestone: rigid-bodies · Status: 🔄 2026-11-09 — the placement's exact tangent built; the table, block and refusals wait on #1388
+Milestone: rigid-bodies · Status: 🔄 2026-11-09 — the placement's exact tangent built; design adjudicated (four chunks); chunk C1, the restraint refusal on bodies with no Z-matrix, is on branch `wp1814/c1-restrain-or-refine`; the table, block and refusals wait on #1388
 Depends on: 1815 (the derived-geometry table its esds are reported through); 1805
 Priority: P3 2026-10-16 — TOPAS users expect it, and a refined bond with its esd is what a paper reports; nothing is wrong without it
 
@@ -68,6 +68,27 @@ The proposal (#759 § 1), taken as the plan on 2026-10-16:
 
 ## Handover log
 
+- **2026-11-24** — repair, by a ghostshift runner, PR #1817. The session-start hook
+  flagged this WP because a `WP-1814:` commit of 2026-11-13 was newer than the last entry
+  (2026-11-09). The entry below reconstructs it from `git log` and the two merged PRs. No
+  task is ticked, because each merge did half of a task. The Status line was left as it
+  was. Its words "chunk C1 … is on branch `wp1814/c1-restrain-or-refine`" are stale:
+  C1 merged on 2026-11-17. Mike's PR #1665 (C2b, Z-matrix bodies refine their internals)
+  is open and in flight, so it is not recorded here. *Next*: #1665's review under
+  `/pr-review`.
+
+- **2026-11-13** (reconstructed post hoc) — Both 2026-11-09 chunks are on `main`. The
+  placement and its exact tangent merged as PR #1509 on 2026-11-12. Chunk C1 merged as PR
+  #1510 on 2026-11-17, carrying commit `1269d900` of 2026-11-13. That commit applies Yue's
+  ruling of 2026-11-13 on #1510's two questions. (b): warn and keep the row, so
+  `RESTRAINT_ON_FIXED_BODY_GEOMETRY` became a `level="warning"` diagnostic on
+  `CompiledRestraints.findings`, carried to `result.diagnostics`, with no
+  `RestraintRefused` raise. (a): the structural reading. The commit also updates the audit
+  row (tier 1, ambiguity 3, response warning), the skill's diagnostics row in all three
+  copies, `help.py` and the suggestion, which gains a fourth way out: keep the row. It
+  rewrote the 2026-11-09 C1 entry below in place to say so, and added no dated entry,
+  which is what the hook flagged. The commits do not record #1510's merge gate.
+
 ### 2026-11-09 — the placement and its exact tangent
 
 A Z-matrix can now be differentiated exactly: `fragments.zmatrix_points`
@@ -101,6 +122,42 @@ Nothing refines yet: no schema, table, block or reader change.
 - *Next*: the table chunk (schema, paths, block, write-back, every
   stage-start refusal), after #1388 merges; the restraint refusal on bodies
   with no Z-matrix is its own chunk.
+
+- **2026-11-09** — A restraint can no longer sit on geometry a rigid body
+  holds fixed without anyone noticing. A bond, angle, torsion or planarity
+  restraint whose atoms all lie in one copy of one body, where no declared
+  torsion turns some of those atoms and not the others, used to compile into a
+  constant row that restrained nothing; the compile now warns with
+  `RESTRAINT_ON_FIXED_BODY_GEOMETRY` (first built as a refusal, ruled a warning, see below), naming the restraint, its atoms and the
+  body. This is the first half of the third task (chunk C1 of the adjudicated
+  design); the half for Z-matrix bodies and the torsion-reach refusal come
+  with the Z-matrix itself.
+  *Done*: the set rule in `model.restraints._fixed_body_findings`,
+  called from `resolve_phase_restraints` per restraint after its images are
+  frozen, returned as a warning `Diagnostic` on `CompiledRestraints.findings`
+  and carried to `result.diagnostics` (built first as a `RestraintRefused`
+  error, changed on the ruling below); `help.py` entry; `_audit` rows for the
+  code (tier 1, ambiguity 3, response warning), its suggestion and
+  `_SAME_IMAGE_TOL`.
+  The rule reads the declared torsions, never `vary`: read off `vary` it
+  would report every restraint in a stage that holds the internals. One
+  copy means one frozen image (R, t + n) shared by every entry. Tether and
+  anti-bump rows are not checked. *Measured*: over all 546 bonds, angles and
+  torsions of a generic seven-atom body with a chained torsion, the rule
+  reports the 45 that stay put (within 1e-13, Å or degrees) when every
+  torsion twists and the pose and cell move, and no other; the other 501
+  moved by at least 0.021.
+  `tests/test_restraint_body_refusal.py`, 18 tests; with the rule removed
+  10 fail, and with the torsion test loosened to "turns any of them" 2 fail.
+  *Ruled by Yue 2026-11-13*: warn, keep the row. The refusal became
+  `level="warning"` (audit row tier 1, ambiguity 3, response `warning`), the
+  row stays in the fit and the finding reaches `result.diagnostics`; the one
+  dissenter, a refiner keeping a restraint set across a with-body and a
+  without-body comparison, is why. The scope is the structural reading (the
+  declared torsions decide, on bodies with no Z-matrix, none on a Z-matrix
+  body), settled on the held-parameter precedent: rietx accepts a constant row
+  of a held parameter everywhere else. *Next*: chunk C2a (placement and tangents), then
+  C2b (Z-matrix bodies) after C2a and #1388.
 
 - **2026-10-16** — created, from the 2026-10-16 issue triage (issue #759),
   behind WP-1815 as the maintainer decided. Checked against the tree at

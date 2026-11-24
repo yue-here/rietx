@@ -221,7 +221,9 @@ def _solo_refinement(which: int, nudge: int = 0, *,
         ref.set_values({row.path: row.value * (1.0 + nudge * 1e-14)
                         for row in ref.parameters()
                         if row.refinable and row.value != 0.0})
-    ref.fit(data, plan="mccusker_structural", two_theta_limits=lim)
+    plan = PLAN_PRESETS["mccusker_structural"]()
+    plan.closing_window_tol = 1e-3   # the pinned values were measured behind it
+    ref.fit(data, plan=plan, two_theta_limits=lim)
     return ref
 
 
