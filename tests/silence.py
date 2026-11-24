@@ -1222,6 +1222,39 @@ def _qpa_factor_silent() -> list:
     return _qpa_factor(0.7, [1])
 
 
+# ------------------------------------------------------------ the low-angle asymmetry
+
+
+def _low_angle(ref, res) -> list:
+    """``low_angle_asymmetry_findings`` on a fitted model, read at its answer
+    (``tests/test_low_angle_asymmetry.py`` reads the line shifts the same way)."""
+    from rietx.report.magnetic import low_angle_asymmetry_findings
+
+    return low_angle_asymmetry_findings(ref._model, ref._answer["values"])
+
+
+def _low_angle_fires() -> list:
+    """CrSBr's child with an axial asymmetry the start model lacks: the lowest
+    lines the data sees are magnetic-only."""
+    from tests import test_low_angle_asymmetry as T
+
+    return _low_angle(*T._fit(T._truth(T.ASYMMETRY)))
+
+
+def _low_angle_silent() -> list:
+    """The same data cut above 12°, where the lowest line is nuclear, and the
+    paramagnetic pattern fitted with no moment."""
+    import rietx as rx
+    from tests import _synthetic_crsbr as G
+    from tests import test_low_angle_asymmetry as T
+
+    nuc = rx.Refinement(rx.Structure(phases=[G.nuclear_phase()]), G.instrument())
+    res = nuc.fit(G.pattern("paramagnetic"), plan=rx.RefinementPlan(stages=[rx.Stage(
+        "nuclear", ["phases.*.scale", "instrument.background.c*"])]))
+    return (_low_angle(*T._fit(T._truth(T.ASYMMETRY), limits=(12.0, 130.0)))
+            + _low_angle(nuc, res))
+
+
 # ------------------------------------------------------------ a nested comparison
 
 
@@ -1289,6 +1322,8 @@ SILENCE: dict[str, Pair] = {
     "LEBAIL_CYCLES_AT_CAP": Pair(
         functools.partial(_lebail_cap, False), _lebail_settled_or_unasked,
         "tests/test_lebail_cycles.py"),
+    "LOW_ANGLE_ASYMMETRY_UNCALIBRATED": Pair(
+        _low_angle_fires, _low_angle_silent, "tests/test_low_angle_asymmetry.py"),
     "MOMENT_UNSUPPORTED": Pair(
         _unsupported_fires, _unsupported_silent, "tests/test_modulus_interval.py"),
     "PARAMETRIC_OUT_OF_RANGE": Pair(
