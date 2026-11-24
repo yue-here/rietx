@@ -355,6 +355,7 @@ FEATURES: dict[str, Feature] = {
             "microstructure § Stephens anisotropic strain",
             "microstructure § Symmetry and the allowed coefficients",
             "microstructure § The positivity cone, the seed and the guard",
+            "microstructure § The strain surface",
         ),
     ),
     "magnetic_structure": Feature(
