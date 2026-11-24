@@ -595,19 +595,32 @@ def test_an_aperture_an_earlier_stage_refined_is_not_lifted_again():
     there.  ``run_stage`` has no earlier stage, so it lifts a hand-freed row
     (``test_an_aperture_the_caller_freed_by_hand_is_lifted_too``).
 
-    Only a row stage 1 leaves on zero tells the gate from its absence, so the
-    data carry no axial asymmetry (S/L = H/L = 0): stage 1, lifted to
-    (0.02, 0.01), walks H/L back onto its floor, and its last accepted
-    evaluation in the event stream says so.  With the gate removed
-    (``refined_before`` ignored) stage 2 lifts H/L to 0.01 again and this test
-    fails.  Its first version, on S/L = H/L = 0.03, left both apertures off
-    zero and passed with the gate removed (the review of #1372).
+    Only a row stage 1 leaves on its floor tells the gate from its absence,
+    since the lift writes only a row whose value equals its lower bound.  So
+    the data carry no axial asymmetry (S/L = H/L = 0) and H/L's lower bound
+    is 0.005, a row on its floor as ``apertures_to_lift`` reads one: stage 1
+    lifts H/L to 0.01, the data pull it below its bound, and the bounded LM
+    step lands it on 0.005 exactly, which its last accepted evaluation in the
+    event stream shows.  With the gate removed (``refined_before`` ignored)
+    stage 2 lifts H/L to 0.01 again and this test fails.
+
+    Its first version, on S/L = H/L = 0.03, left both apertures off zero and
+    passed with the gate removed (the review of #1372).  Its second, with
+    H/L's bound at 0, asserted stage 1 ended on exactly 0, and failed on
+    CI's Linux py3.14 shard at 4.36e-9 (run 45326385396).  The data's own
+    H/L is then the bound itself, where the column vanishes, and the
+    accepted steps hop between 0 and 1e-11 to 1.5e-9 (macOS arm64, py3.12),
+    so rounding decides the last one.  A bound the data push against carries
+    load, and that landing does not depend on rounding (WP-1938).
     """
+    floor = 0.005
     tt = np.arange(15.0, 80.0, 0.02)
     y = np.asarray(_rutile_axial(0.0, False).predict(tt)) * 1e4 + 50.0
     data = rx.PatternData(two_theta=tt.tolist(), intensity=y.tolist(),
                           sigma=np.sqrt(y).tolist())
     ref = _rutile_axial(0.0, False)
+    ref.instrument.geometry.axial_hl = rx.Parameter(value=floor, min=floor,
+                                                 vary=False)
     ref.structure.phases[0].scale.value *= 1e4
     ref.instrument.background.coefficients[0].value = 50.0
     plan = rx.RefinementPlan(stages=[
@@ -628,7 +641,7 @@ def test_an_aperture_an_earlier_stage_refined_is_not_lifted_again():
             free_paths = d["free_paths"]
         elif event["kind"] == "eval" and d["accepted"]:
             stage1_end = dict(zip(free_paths, d["values"], strict=True))
-    assert stage1_end[_HL] == 0.0, stage1_end
+    assert stage1_end[_HL] == floor, stage1_end
     assert res.stages[1].seeded == {}
 
 
