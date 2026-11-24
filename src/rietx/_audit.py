@@ -3518,7 +3518,13 @@ ROWS: tuple[Row, ...] = (
                   'DOF (fragments.py:101-102, 190); '
                   'tests/test_fragments.py::test_the_rotation_dof_count_is_the_inertia_rank_with_a_near_linear_tolerance '
                   'holds a single atom and two coincident atoms at 0')),
-    Row("rietx.crystallography.magcif.MOMENT_FORM_AGREEMENT_MU_B", "constant", value=0.02),
+    Row("rietx.crystallography.magcif.MOMENT_FORM_AGREEMENT_MU_B", "constant", value=0.02,
+        evidence=("unaudited by ruling: Mike retires the constant on PR #1636 (2026-11-23, "
+                  "corrected 11:47Z). A number within half a unit of its last printed digit "
+                  "reads as the same number (tier 1); a refusal outside that box is tier 3, "
+                  "at max(box, stated s.u.) with no floor, for the snap, two forms of one "
+                  "moment and a listed copy. Measured (Mike, #1797): 0 of 2447 MAGNDATA "
+                  "snapshot files change outcome. WP-1918 builds it and retires this row")),
     Row("rietx.crystallography.magcif._ORBIT_MERGE_TOL", "constant", tier=3, value=0.001,
         evidence=("decides which group a magCIF's positions refine under: _orbit_size counts "
                   "two images closer than 1e-3 in every fractional coordinate as one, so a "
@@ -3538,7 +3544,20 @@ ROWS: tuple[Row, ...] = (
                  "passes nuclear_group='file'. Tier 3 ruled by Mike on PR #1636 "
                  "(2026-11-23, 11:47Z) under #1075."),
         approved="2026-11-24", approved_by="checked"),
-    Row("rietx.crystallography.magnetic.isotropy.CROSS_IRREP_DRAWS", "constant", value=12),
+    Row("rietx.crystallography.magnetic.isotropy.CROSS_IRREP_DRAWS", "constant", tier=3, value=12,
+        evidence=("of the cubic pairs 3 draws called equivalent, 8 % were refuted within 12 "
+                  "draws, against 0.2 % at 12 (six synthetic cubic sets); case that reaches "
+                  "it: "
+                  "tests/test_magnetic_isotropy.py::test_the_cubic_known_answer_has_four_classes_at_the_default_draws "
+                  "(P n -3 m:1, four classes at 12 draws, two at 3). Synthetic cubic sets "
+                  "only; untested beyond"),
+        grounds=("Rare feature, kept at the measured value: which magnetic models join one "
+                 "class (4 against 2 on the known answer). On the action no dissenter found: "
+                 "the verdict says sampled and gives its draw count, and draws= is the "
+                 "caller's. On the count, a fast screen would take fewer draws and a quoted "
+                 "class count more. Tier 3 ruled by Mike on PR #1636 (2026-11-23) under "
+                 "#1075."),
+        approved="2026-11-24", approved_by="checked"),
     Row("rietx.crystallography.magnetic.isotropy.DEFAULT_CELL_SCALE", "constant", value=5.0),
     Row("rietx.crystallography.magnetic.isotropy.DUAL_AFTER_RESTART", "constant", value=1),
     Row("rietx.crystallography.magnetic.isotropy.FARKAS_FLOOR", "constant", tier=1, value=1e-12,
@@ -3580,7 +3599,14 @@ ROWS: tuple[Row, ...] = (
                   'tests/test_magnetic_isotropy.py::test_the_full_stack_guard_refuses_a_kernel_the_quoted_margin_cannot_cover '
                   'holds the refusing arm (rho ~ 0.03) and the issuing arm')),
     Row("rietx.crystallography.magnetic.isotropy.TRANSFER_FLOAT_STACK", "constant", value=1e-08),
-    Row("rietx.crystallography.magnetic.isotropy.WITHIN_IRREP_DRAWS", "constant", value=3),
+    Row("rietx.crystallography.magnetic.isotropy.WITHIN_IRREP_DRAWS", "constant", value=3,
+        evidence=("unaudited until its case lands: Mike rules tier 3 on PR #1636 "
+                  "(2026-11-23), with one case owed, since no case on disk reaches the "
+                  "constant (generality.md: a guard no ordinary fit reaches is recorded kept "
+                  "on an injected case). Measured: on the P n -3 m:1 known answer, 3 and 12 "
+                  "draws give the same 4 classes and 24 within-irrep verdicts. The owed case "
+                  "(a set where 3 draws join two directions of one irrep and 12 separate "
+                  "them, or evidence none can be built) is in #1797 and WP-1918")),
     Row("rietx.crystallography.magnetic.isotropy._CLOSURE_LIMIT", "constant", value=4096),
     Row("rietx.crystallography.magnetic.isotropy._PROBE_DRAWS", "constant", tier=1, value=3,
         evidence=("probability: a false DISTORTION_CHILD_LARGER needs every draw to keep an accidental "
@@ -3604,8 +3630,34 @@ ROWS: tuple[Row, ...] = (
                   "same children at Gamma, R, X and M, no false DISTORTION_CHILD_LARGER); "
                   "tests/test_distortion_candidates.py::test_a_tolerance_at_the_probe_scale_finds_extra_operations its positive arm")),
     Row("rietx.crystallography.magnetic.isotropy._SPAN_GAP", "constant", value=(1e-12, 1e-06)),
-    Row("rietx.crystallography.magnetic.moments.MOMENT_DIRECTION_SUPPORT", "constant", value=1e-06),
-    Row("rietx.crystallography.magnetic.moments.SEED_TILT", "constant", value=0.02),
+    Row("rietx.crystallography.magnetic.moments.MOMENT_DIRECTION_SUPPORT", "constant", tier=3, value=1e-06,
+        evidence=("a direction's response to the MOMENT_PROBE_ANGLE_RAD turn relative to the "
+                  "modulus's is ~1e-15 on the synthetic cubic collinear structure and ~1 on "
+                  "Cr2WO6 4 K (HB-2A); the cut sits between them. Cases that reach it: the "
+                  "ratio tests in tests/test_magnetic.py (below the cut at a 1e-6 step, above "
+                  "1e3 x the cut at the probe angle) and "
+                  "tests/test_stationary_moment_angle.py. Cr2WO6 4 K plus synthetic cubic and "
+                  "two-site Pnma sets; untested beyond, and a pseudo-symmetric cell could "
+                  "fall between the measured values"),
+        grounds=("Rare feature, kept at the value its one real family and the synthetic sets "
+                 "bracket: it sets which moment angles a stage frees, and every esd "
+                 "correlated with them. No dissenter found. Tier 3 ruled by Mike on PR #1636 "
+                 "(2026-11-23) under #1075."),
+        approved="2026-11-24", approved_by="checked"),
+    Row("rietx.crystallography.magnetic.moments.SEED_TILT", "constant", tier=3, value=0.02,
+        evidence=("WP-1418: on 20 simulated MAGNDATA structures 0.15 lost 2 exact recoveries "
+                  "and 0.02 none. Case that reaches it: the slow test in "
+                  "tests/test_magnetic_solve.py that sets the tilt to 0, where the second "
+                  "component stays at 0; tests/test_magnetic_supercell.py pins the geometry "
+                  "(tan theta = SEED_TILT). It also seeds the moments magnetic_supercell "
+                  "builds, as a starting point the next fit refines. One simulated family; "
+                  "untested beyond. The alias strategy.magnetic.SOLVE_SEED_TILT keeps its own "
+                  "row"),
+        grounds=("Rare feature, kept at the measured value: which local minimum a magnetic "
+                 "solve lands in (2 of 20 lost at 0.15), and where a built supercell's "
+                 "moments start. No dissenter found. Tier 3 ruled by Mike on PR #1636 "
+                 "(2026-11-23) under #1075."),
+        approved="2026-11-24", approved_by="checked"),
     Row("rietx.crystallography.magnetic.operators.N_MAGNETIC_SPACE_GROUPS", "constant", tier=2, value=1651,
         evidence=('published count: Litvin (2013) Magnetic Group Tables, IUCr, the 1651 magnetic '
                   'space groups in UNI numbering; '
@@ -3622,8 +3674,34 @@ ROWS: tuple[Row, ...] = (
         evidence=('arithmetic: after x % 1.0 a coordinate within 1e-12 of 1 is the lattice point '
                   '0 (-1e-17 % 1.0 is 1.0 in floating point, outside [0, 1)); the two values '
                   'name one point to 1e-12 of an edge, eight orders under SITE_TOL (p1.py:68-83)')),
-    Row("rietx.crystallography.magnetic.scattering.INVARIANCE_MOMENT_TOL", "constant", value=0.001),
-    Row("rietx.crystallography.magnetic.scattering.INVARIANCE_POS_TOL", "constant", value=0.001),
+    Row("rietx.crystallography.magnetic.scattering.INVARIANCE_MOMENT_TOL", "constant", tier=3, value=0.001,
+        evidence=("1e-3 x max(1, |m|): fires on 0 of 2447 MAGNDATA files (Mike, #1797), since "
+                  "a magCIF lists one atom per orbit and the reader drops a listed copy "
+                  "before this check; it acts only where the phase's group lacks the "
+                  "operation relating two listed atoms (explicit copies from FullProf, TOPAS, "
+                  "a hand-built Phase or a P 1 supercell). Injected case: "
+                  "tests/test_magnetic_group_symmetry.py::test_explicit_copies_the_group_does_not_relate_are_refused "
+                  "(6 mu_B, far past the bar); a boundary case (a P -1 pair in P 1, |m| 3.16, "
+                  "passes at 0.002 and is refused at 0.01) is in #1797. Synthetic pairs; "
+                  "untested beyond"),
+        grounds=("Rare feature, kept at its value: whether a phase stated with explicit "
+                 "copies loads. No dissenter found. Tier 3 ruled by Mike on PR #1636 "
+                 "(2026-11-23) under #1075."),
+        approved="2026-11-24", approved_by="checked"),
+    Row("rietx.crystallography.magnetic.scattering.INVARIANCE_POS_TOL", "constant", tier=3, value=0.001,
+        evidence=("two related atoms listed separately and printed to three decimals pass, "
+                  "their images differing by at most 1e-3; at two decimals they do not. Fires "
+                  "on 0 of 2447 MAGNDATA files for the reason INVARIANCE_MOMENT_TOL's row "
+                  "gives, so MAGNDATA's print precision is not evidence for it. Injected "
+                  "cases: "
+                  "tests/test_magnetic_group_symmetry.py::test_mnf2_with_its_group_at_a_shifted_origin_is_refused "
+                  "and the origin-choice test, far past the bar; a boundary case (a P 1 pair, "
+                  "a = 4 A, 9e-4 passes, 1.1e-3 refused) is in #1797. Synthetic pairs; "
+                  "untested beyond"),
+        grounds=("Rare feature, kept at its value: whether a phase stated with explicit "
+                 "copies loads. No dissenter found. Tier 3 ruled by Mike on PR #1636 "
+                 "(2026-11-23) under #1075."),
+        approved="2026-11-24", approved_by="checked"),
     Row("rietx.crystallography.magnetic.scattering.METRIC_TOL", "constant", value=0.001),
     Row("rietx.crystallography.magnetic.scattering.P_MAGNETIC_FM", "constant", tier=1, value=2.695,
         evidence=('physical constant: p = gamma r_0 / 2 = 0.2695e-12 cm = 2.695 fm, the magnetic '
@@ -3631,7 +3709,11 @@ ROWS: tuple[Row, ...] = (
                   'nuclear magnetons, r_0 = 2.818 fm the classical electron radius, CODATA), in '
                   'the unit of the Sears table (scattering.py:70-76); tests/test_magnetic.py '
                   'pins the magnetic-to-nuclear scale')),
-    Row("rietx.crystallography.magnetic.supercell.CHILD_SITE_TOL", "constant", value=0.0001),
+    Row("rietx.crystallography.magnetic.supercell.CHILD_SITE_TOL", "constant", value=0.0001,
+        evidence=("an alias, CHILD_SITE_TOL = SITE_TOL, with no free factor: the child "
+                  "positions are the parent's pushed through an exact rational transform. "
+                  "Takes symmetry.SITE_TOL's tier when that row is given one (Mike on PR "
+                  "#1636, 2026-11-23: not tier 3 on its own)")),
     Row("rietx.crystallography.metric.COSINE_SNAP", "constant", tier=1, value=1e-12,
         evidence=("numerical floor: P^T.G.P puts a symmetry-forced cosine within ~2e-16 of 0 or +-1/2 "
                   "(hexagonal gamma 119.99999999999999 unsnapped); 1e-12 on a cosine is 6e-11 deg at 90, "
@@ -3668,7 +3750,22 @@ ROWS: tuple[Row, ...] = (
                   'denominator-3/4/6 k sets, so every check at 1e-8 passes there, and asserts '
                   'the worst character orthonormality under 1e-10, two orders inside it')),
     Row("rietx.crystallography.representation.irreps.K_FLOAT_TOL", "constant", value=1e-09),
-    Row("rietx.crystallography.representation.irreps.K_MAX_DENOMINATOR", "constant", value=64),
+    Row("rietx.crystallography.representation.irreps.K_MAX_DENOMINATOR", "constant", tier=3, value=64,
+        evidence=("over MAGNDATA's 2278 commensurate entries the largest k denominator is 8. "
+                  "Injected cases: "
+                  "tests/test_magnetic_irreps.py::test_an_incommensurate_k_is_refused_by_name "
+                  "(a float 0.3123 at as_kvector), "
+                  "tests/test_satellites.py::test_a_generator_that_returns_an_unusable_k_is_refused "
+                  "(an exact 1/97 on the satellite rung), "
+                  "tests/test_indexing_kvector.py::test_the_denominator_is_required_and_bounded "
+                  "(a grid denominator of 65); "
+                  "tests/test_incommensurate_irreps.py::test_door_refusals pins the value. "
+                  "MAGNDATA only; untested beyond"),
+        grounds=("A refusal only, and one step fixes the input: 1/96 is refused on the "
+                 "satellite rung and in the k grid whatever its form, and only as_kvector "
+                 "admits it exactly, as a Fraction; the float refusal says to pass one. No "
+                 "dissenter found. Tier 3 ruled by Mike on PR #1636 (2026-11-23) under #1075."),
+        approved="2026-11-24", approved_by="checked"),
     Row("rietx.crystallography.representation.irreps._H", "constant", tier=1, value=0.5,
         evidence=('arithmetic: the exact rational Fraction(1, 2) used to write the '
                   'primitive-basis tables (irreps.py:333)')),
@@ -7806,7 +7903,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.crystallography.dispersion.LINE_DISPERSION_TOL",
     "rietx.crystallography.dispersion.NEAR_EDGE_EV",
     "rietx.crystallography.magcif.MOMENT_FORM_AGREEMENT_MU_B",
-    "rietx.crystallography.magnetic.isotropy.CROSS_IRREP_DRAWS",
     "rietx.crystallography.magnetic.isotropy.DEFAULT_CELL_SCALE",
     "rietx.crystallography.magnetic.isotropy.DUAL_AFTER_RESTART",
     "rietx.crystallography.magnetic.isotropy.INTENSITY_RTOL",
@@ -7814,10 +7910,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.crystallography.magnetic.isotropy.WITHIN_IRREP_DRAWS",
     "rietx.crystallography.magnetic.isotropy._CLOSURE_LIMIT",
     "rietx.crystallography.magnetic.isotropy._SPAN_GAP",
-    "rietx.crystallography.magnetic.moments.MOMENT_DIRECTION_SUPPORT",
-    "rietx.crystallography.magnetic.moments.SEED_TILT",
-    "rietx.crystallography.magnetic.scattering.INVARIANCE_MOMENT_TOL",
-    "rietx.crystallography.magnetic.scattering.INVARIANCE_POS_TOL",
     "rietx.crystallography.magnetic.scattering.METRIC_TOL",
     "rietx.crystallography.magnetic.supercell.CHILD_SITE_TOL",
     "rietx.crystallography.representation.distortion._POSITION_TOL",
@@ -7825,7 +7917,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.crystallography.representation.distortion._PROBE_SYMPREC",
     "rietx.crystallography.representation.distortion._RANK_TOL",
     "rietx.crystallography.representation.irreps.K_FLOAT_TOL",
-    "rietx.crystallography.representation.irreps.K_MAX_DENOMINATOR",
     "rietx.crystallography.representation.irreps._SEEDS",
     "rietx.crystallography.representation.modes.MODE_ATOL",
     "rietx.crystallography.representation.modes.POSITION_ATOL",
