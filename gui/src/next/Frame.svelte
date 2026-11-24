@@ -831,8 +831,10 @@
     wf = id as WorkflowId;
     if (!sized) modelWidth = opening(wf);
     chooseStep(0);
-    const shown = workflow(wf).graphs;
-    if (shown && !shown.includes(graphTab)) graphTab = shown[0];
+    // the tabs `graphTabs` shows for this workflow, so a tab only another
+    // workflow lists (the series' Map) never stays chosen behind the strip
+    const shown = graphTabs.map((t) => t.id);
+    if (!shown.includes(graphTab)) graphTab = shown[0];
   }
 
   /** A step opens on its graph: the peak fits for Fit peaks, the pattern for
