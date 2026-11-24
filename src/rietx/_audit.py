@@ -4856,6 +4856,12 @@ ROWS: tuple[Row, ...] = (
         evidence="arithmetic: sqrt(2), the Voigt argument z = (x + i gamma)/(sigma sqrt 2)"),
     Row("rietx.model.profiles.voigt._SQRT2PI", "constant", tier=1, value=2.5066282746310002,
         evidence="arithmetic: sqrt(2 pi)"),
+    Row("rietx.model.profiles.voigt._OLIVERO_FWHM", "constant", tier=2, value=(0.5346, 0.2166),
+        evidence=("Olivero & Longbothum (1977) J. Quant. Spectrosc. Radiat. Transfer 17, 233 "
+                  "(docstring); the reported FWHM of shape='voigt' only, never window sizing; "
+                  "measured within 0.024 % of the bisected Faddeeva FWHM over the whole mixing "
+                  "range, tests/test_voigt.py::"
+                  "test_olivero_reproduces_the_voigt_fwhm_to_the_bound_the_manual_quotes (WP-1926)")),
     Row("rietx.model.restraints.MIN_IMAGE_SHELL", "constant", tier=1, value=1,
         evidence=("numerical setting (tier 1's domain clause): the first pass of the minimum-image "
                   "search, which only bounds the second, sized per cell by geometry._shell; "

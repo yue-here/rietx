@@ -455,6 +455,29 @@ real and $\operatorname{Re}[w] = e^{-z^2}$ (the unit Gaussian); $\sigma \to
 0$ sends $|z| \to \infty$ where $w(z) \to i/(\sqrt{\pi} z)$ (the unit
 Lorentzian).
 
+The width a Voigt *model* peak reports (`rietx.model.forward.CompiledModel.peak_fwhm`, read by the low-angle
+and width diagnostics, the observation count, the satellite and magnetic
+reports and the magnetic-only region candidates are scored on) is Olivero and Longbothum's {cite}`olivero1977`:
+
+```{math}
+:label: prof-voigt-fwhm
+
+\Gamma_V \approx 0.5346\,\Gamma_L + \sqrt{0.2166\,\Gamma_L^2 + \Gamma_G^2}.
+```
+
+{source}`rietx.model.profiles.voigt.voigt_fwhm`
+
+Against the bisected Faddeeva FWHM it is within 0.024 % across the whole
+mixing range, worst near $\Gamma_L \approx 0.28\,\Gamma_G$, exact in the
+Gaussian limit and $3 \times 10^{-6}$ high in the Lorentzian one
+(`tests/test_voigt.py`). That is eighteen times tighter than
+{eq}`prof-tch-gamma`. The window sizes and FCJ node counts still read
+{eq}`prof-tch-gamma` under either shape: they are frozen per stage, and one
+sizing rule keeps a `"voigt"` fit's windows those of the same `"tchz_pv"` fit.
+The indexing peak list (`rietx.indexing.peakfit`) keeps reporting
+{eq}`prof-tch-gamma` under `"voigt"` too, on purpose: one width summary keeps a
+peak list comparable across instruments that differ only in the shape.
+
 The Faddeeva function $w(z) = e^{-z^2}\operatorname{erfc}(-iz)$
 ($\operatorname{Im} z \ge 0$) is computed by the Weideman rational
 approximation {cite}`weideman1994`: the conformal map of the upper
