@@ -293,6 +293,7 @@ indices int32, so a browser reads each array without copying it.
 | `GET /api/series` · `PUT /api/series` | the staged pattern list; replace it whole |
 | `POST /api/series/run` · `GET /api/series/result` | run the chain; its per-pattern answers and trajectories |
 | `GET /api/series/curves` · `GET /api/series/history` | one member's channels and curves, as float64 arrays; one member's tree |
+| `GET /api/series/map` | every staged pattern's counts on one 2θ grid, and each fitted one's difference in esd, as float64 arrays |
 | `GET /api/history` | the node graph |
 | `GET /api/history/diff` · `GET /api/history/compare` | one node against its parent; two nodes against each other |
 | `GET /api/history/curves` | one node's calculated curve, recomputed at its own values, for Compare |

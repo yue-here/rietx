@@ -3233,6 +3233,42 @@ class GuiSession:
             weighted=bool(member["has_sigma"]),
             header={"index": at, "label": member["label"], "x": member["x"]})
 
+    def series_map(self) -> Packed:
+        """Every staged member's counts and difference on one grid, for the Map graph.
+
+        Answers before any run, from the staged files alone: that is the
+        series' pre-visualisation (WP-2243 task 7). The rows are the staged
+        list in series order, each file read again as the chain would read it.
+        A row carries its fit's difference only while the last run's list is
+        the staged one, member for member and reader option for option, so an
+        edit after a run never draws one pattern's misfit over another's
+        counts. While a series run is in flight no row has one: the record is
+        still the run before it (:meth:`series_result`), and the Map asks
+        again when the run ends.
+        """
+        self._need_project()
+        setup = self._series
+        if not setup.members:
+            raise GuiError("no series is staged; add patterns with PUT /api/series",
+                           code="NO_SERIES", status=409, where=["patterns"])
+        with self._cond:
+            entry = self._series_run
+            running = self._state != "idle" and self._run.get("kind") == "series"
+        data = [read_pattern(m.path, **m.options) for m in setup.members]
+        fits, rwp = {}, {}
+        staged = [(m.token, dict(m.options)) for m in setup.members]
+        if (entry is not None and not running
+                and [(m["upload"], m["reader_options"]) for m in entry["members"]]
+                == staged):
+            runner, result = entry["runner"], entry["result"]
+            for k, row in enumerate(result.entries):
+                res = runner.results_[k] if k < len(runner.results_) else None
+                if res is not None and res.two_theta:
+                    fits[row.index] = res
+                    rwp[row.index] = (row.statistics.rwp
+                                      if row.statistics is not None else None)
+        return series_mod.map_payload(setup, data, fits, running=running, rwp=rwp)
+
     def series_history(self, index: int) -> dict:
         """One series member's own history tree — read-only, and that is the point.
 
