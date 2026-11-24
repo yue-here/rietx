@@ -13,6 +13,12 @@ ruling. It follows WP-2006's and WP-2005's part 1 (`../2006-batch/`, `../2005-ba
 
 Run it with `.venv/bin/python docs/wp/2007-batch/collate_inventory.py`.
 
+**The script now stops on twelve items.** The counts below are those of `94a35558b` (2026-11-16). Twelve
+items that landed since have no judgement yet, so the command exits 1 with `no judgement for:` until
+they are added: the codes `INDEX_WEAK_LINE_RETRY` and `K_SEARCH_PARTNER`, `engines.WEAK_LINE_RETRY_FLOOR`,
+`kvector._BLOCK`, `_CHUNK` and `_PAD`, and the `budget` and `harmonics` defaults of `kgrid_null`,
+`kgrid_positions`, `score_kgrid` and `score_kvector`. The inventory is refreshed before the batch is sent.
+
 ## The counts, at `94a35558b` (2026-11-16)
 
 - **50 codes**, not the WP's 48, at 60 raise sites: 45 `unaudited`, 3 tier 3, 2 tier 1. Kind: 26 the

@@ -176,9 +176,8 @@ ranking over one population and is the regression gate, not a family.
   asks, and because open PR #1579 edits the same file. No generality judge: the branch touches no
   row of `_audit.py` and adds no heuristic; the proposals go to the judge with the batch.
   *Questions for the maintainer* (task 5's batch; each has its `file:line` in `judgements.json` or
-  `clashes.md`): (1) the milestone's gate after WP-2004 (`generality.md` § The order) is still
-  shut by its letter, since 2004 is ⬜; this part ran on the WP's own Priority line ("2001 closed,
-  so nothing blocks it"). Does the batch wait for the gate? (2) `IndexingResult.best_or_none()` on five
+  `clashes.md`): (1) *Ruled by Yue 2026-11-16: "(a) RUN 2005-2007 now"
+  (`docs/milestones/generality.md:368`), so the batch does not wait for the gate after WP-2004.* (2) `IndexingResult.best_or_none()` on five
   default paths (README § Task 3): keep the printed `CELL:` line, the CLI's exit code and the GUI's
   badges, or show the ranking alone? And `EXTINCTION_SCREEN_UNRELIABLE`'s approved grounds ("no
   default path calls the pick", `_audit.py:684`): one user-requested GUI route calls
@@ -190,7 +189,9 @@ ranking over one population and is the regression gate, not a family.
   `fom_panel_disagrees` is one fact about the list that refutes every candidate on it (K9). (6)
   `INDEX_DATA_INSUFFICIENT`'s per-degree-of-freedom and σ(Q)/Q arms still refuse a search on a
   fitted list, against "gates report, never refuse". (7) The `quick` budgets are tier 3, measured
-  on high-symmetry families only; #1374's share rule under a declared ceiling. (8) `MIN_AGREEMENT`
+  on high-symmetry families only. *Answered in part:* Yue accepted #1374's share rule on 2026-11-17 (each
+  (engine × system) unit is capped at `min(budget_seconds, T / n_engines)`, WP-1924); the budgets'
+  tier is still open. (8) `MIN_AGREEMENT`
   as the grade floor is an action with a named dissenter (a one-program indexer accepting on
   M₂₀). (9) Do the indexing programs' published defaults (DICVOL, ITO, TREOR, McMaille) count as
   tier 2 when the rule names seven Rietveld programs? Six tier-2 proposals cite them. (10) The B13
@@ -200,10 +201,18 @@ ranking over one population and is the regression gate, not a family.
   trial cell longer than about 40 d_min without a report.
   *Gotchas*: the indexing programs' manuals are cited through `docs/practice.md` only. A lane's
   `read_by` list is by full name since the review: a bare-name match merged unrelated modules.
-  Next: the maintainer answers (1) and then the batch, in that order, since (1) decides whether the
-  batch is sent at all; then enter the ruled tiers into `_audit.py` (deleting each from
+  Next: refresh the inventory (twelve items landed before this branch's base `6c3a2db5e` have no judgement;
+  see the 2026-11-24 note below), then the maintainer answers (2) to (11) in the batch; then enter the ruled tiers into `_audit.py` (deleting each from
   `UNAUDITED_BASELINE`), demote what is ruled demoted, and run the acceptance file and the
   benchmark once more on that tree.
+  *2026-11-24 (review round on #1591):* questions (1) and (7) are settled as marked above, so the next
+  session does not ask them again. The inventory is a snapshot of `94a35558b` (2026-11-16): on the
+  current tree `collate_inventory.py` stops with `no judgement for:` on twelve items, namely the codes
+  `INDEX_WEAK_LINE_RETRY` (WP-2078) and `K_SEARCH_PARTNER` (WP-1418), `engines.WEAK_LINE_RETRY_FLOOR`,
+  `kvector._BLOCK`, `_CHUNK` and `_PAD`, and the `budget` and `harmonics` defaults of `kgrid_null`,
+  `kgrid_positions`, `score_kgrid` and `score_kvector`. Owed before task 5 is sent: judgements for
+  those twelve (the `K_SEARCH_PARTNER` and `kvector` tiers are the contributor's to write), a rerun,
+  and updated counts, as WP-2005's inventory was refreshed (`3d24c97dc`).
 
 - **2026-10-18** — created, from the milestone's opening session, split out of the
   readers' WP on the second review's sizing.
