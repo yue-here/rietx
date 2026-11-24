@@ -1,6 +1,6 @@
 # WP-1926 — the exact Voigt is a supported shape: its cost, its width, its exports and its bound
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-16 — the Voigt FWHM landed (#1605); next: the manual's pattern-level bias
 Track: Candidates — named on a use case, not yet on a measurement
 Depends on: — (PR #815 soft: the TOPAS whole-input writer the TOPAS task extends)
 Priority: P3 2026-10-08 — opt-in and correct today; what it lacks is speed, an exact reported width and one writer's statement, and the default stays TCH either way
@@ -56,6 +56,9 @@ a PV peak type is a pseudo-Voigt approximation too (Technical Reference
   inverts (σ, γ) to the component FWHMs exactly and then applies the TCH
   quintic (`model/forward.py:1462`). It is evaluate-only and never in the
   residual. Olivero & Longbothum (1977) is 0.02 % by the issue's account.
+  *Superseded in part 2026-11-16:* `peak_fwhm` under `voigt` now applies
+  Olivero & Longbothum (`profiles.voigt.voigt_fwhm`, measured 0.024 % worst);
+  `peak_gamma_eta` keeps the quintic for window sizing and FCJ node counts.
 - *The compare row: present, unread.* `viz/compare.py` registers a `voigt`
   variant ("+ true Voigt peak shape"), and `tests/test_compare_ui.py`
   asserts every variant is reachable. No reading of it on the standards is
@@ -76,30 +79,23 @@ a PV peak type is a pseudo-Voigt approximation too (Technical Reference
 **Licensing.** TOPAS is closed: its Technical Reference and black-box runs
 only. Weideman (1994) and Olivero & Longbothum (1977) are papers.
 
-### Inherited
+**The compiled tier is the `rietx-kernels` Rust crate now** (folded from
+`### Inherited` on 2026-11-16; WP-1940, closed). `_kernels_numba.py` is gone
+and `kernels/src/` holds one module per kernel family (`fcj.rs`,
+`raster.rs`, …), so a Voigt kernel takes a module of its own, ships as a
+minor kernel release and raises rietx's pin floor to it (`docs/RELEASING.md`
+§ The kernel wheel). Its bar is `compiled.py`'s rule 3: 1e-13 relative where
+it calls the C library's transcendental; a ulp bound asserted on every wheel
+where it carries its own, as the FCJ `exp` does
+(`test_the_fcj_exponential_holds_its_stated_bound`), plus a slow whole-fit
+guard comparing the two paths.
 
-- **2026-10-11, from WP-1940 (closed).** The relaxed rule is written, in
-  `compiled.py`'s rule 3 and root CLAUDE.md's compiled-tier rule (3). A kernel
-  calling the C library's transcendental is held to 1e-13 relative. A kernel
-  carrying its own states a ulp bound and asserts it on every wheel, as
-  1.2.0's FCJ `exp` does through a test-only binding
-  (`test_the_fcj_exponential_holds_its_stated_bound`), and a slow whole-fit
-  guard compares the two paths. The crate now holds its kernels in modules
-  (`fcj.rs`, `raster.rs`), so a Voigt kernel takes one of its own.
-- **2026-10-10, from WP-1940 (3rd session).** The compiled tier is moving
-  from numba to the `rietx-kernels` Rust wheel (1940 § Decisions). A Voigt
-  kernel written after that migration goes into `kernels/src/lib.rs`, ships
-  as a minor kernel release, and raises rietx's pin floor to that release
-  (`docs/RELEASING.md` § The kernel wheel). The 1e-13 bar here is then the
-  relaxed rule's transcendental bound, which 1940 writes.
-
-- **2026-10-11, from the issue triage (#790): the last task is met in code
-  and pinned by no test.** `io/projects/topas_input.py:257-262` refuses any
-  `profile.shape` other than `tchz_pv` by name (PR #815), as this file's own
-  Context says. No test in `test_topas_whole_input.py` or
-  `test_projects_topas.py` passes `shape="voigt"` to `write_topas_inp`, so the
-  task reduces to that test. Checked against the tree at 7d9be3cb: the lines
-  above and a grep of `tests/`.
+**The TOPAS refusal is in code and pinned by no test** (folded from
+`### Inherited` on 2026-11-16; the 2026-10-11 issue triage of #790).
+`io/projects/topas_input.py:373-379` refuses any `profile.shape` other than
+`tchz_pv` by name; checked against the tree at bc77a934, no test in
+`test_topas_whole_input.py` or `test_projects_topas.py` passes
+`shape="voigt"`, so the TOPAS task reduces to that test.
 
 ## Non-goals
 
@@ -122,13 +118,16 @@ only. Weideman (1994) and Olivero & Longbothum (1977) are papers.
       beside the three it has
 - [ ] Read the `voigt` compare variant on srm660c, srm676a, lab6_cbn and nac,
       and record the cumulative Δχ² panel in the handover
-- [ ] `peak_fwhm` under `voigt` by Olivero & Longbothum (1977); window sizing
+- [x] `peak_fwhm` under `voigt` by Olivero & Longbothum (1977); window sizing
       and `fcj_node_count` keep the quintic. A test against a bisected
-      Faddeeva FWHM
+      Faddeeva FWHM — `profiles.voigt.voigt_fwhm`, 0.024 % worst
+      (`MANUAL_OLIVERO_FWHM_ERROR_PCT`), equation `prof-voigt-fwhm` in the
+      manual, audit row `_OLIVERO_FWHM` at tier 2 (2026-11-16)
 - [ ] Deferred until the compare readings show the shape in use: the kernel pair (symmetric and FCJ, forward and bases) in
-      `_kernels_numba.py`, dispatched in `compiled.py`, held to 1e-13
-      relative by `tests/test_compiled_kernels.py`'s pattern
-- [ ] The TOPAS whole-input writer refuses a `voigt` model by name, after #815
+      a `kernels/src/` module of its own, dispatched in `compiled.py`, held
+      to rule 3's bar by `tests/test_compiled_kernels.py`'s pattern
+- [ ] The TOPAS whole-input writer refuses a `voigt` model by name, after
+      #815 — in code; what is left is the test
 - [ ] Tests + obs/calc/diff PNGs to `tests/output/` for the compare readings
 - [ ] Skill: none expected; a `references/` row only if the default moves or
       a writer gains a diagnostic code
@@ -155,6 +154,96 @@ states the shape or refuses it by name.
   peaks buffer and the FPA fence).
 
 ## Handover log
+
+- **2026-11-16** — review fix-ups, PR #1605. The manual now says the Olivero
+  width is what a Voigt *model* peak reports (`CompiledModel.peak_fwhm`), and
+  that the indexing peak list (`indexing/peakfit.py`, `_fit_at`) still reports
+  the TCH Γ under `shape="voigt"` on purpose, for comparability. The three
+  "~1 %" comments on the quintic (`forward.py` `compile_model` and
+  `window_sizing`, `peakfit.py` `_fit_at`) now give the measured 0.43 %.
+  *Provenance:* `olivero1977` is not held (FETCH row 381, no open copy), so
+  nobody here has read the paper's statement of the coefficients or its stated
+  accuracy. They are checked by our own measurement only: the test's
+  121-point sweep, and the reviewer's independent SciPy `voigt_profile`
+  sweep (4001 ratios, 1e-4..1e4, worst 0.02367 % at Γ_L/Γ_G = 0.290).
+  *Open for Yue:* the tier of `_OLIVERO_FWHM`. The row says tier 2; the
+  reviewer recommends keeping tier 2, the same kind as
+  `pseudovoigt._TCH_GAMMA`/`_TCH_ETA` and Rouse et al.'s `absorption._A1.._B2`
+  (an empirical closed form fitted to a quantity rietx computes exactly, with
+  an in-repo test of its error). Neither tier changes any behaviour.
+
+- **2026-11-16** — ghostshift runner, one task, PR #1605. A peak drawn with
+  the exact Voigt now reports its own width: the number the diagnostics, the
+  observation count and the magnetic reports read is within 0.024 % of the
+  true Voigt FWHM, where it was up to 0.43 % off through the pseudo-Voigt's
+  formula. Nothing changes for the default shape, and the windows and FCJ
+  sizing a Voigt fit uses are unchanged too, so no fitted value can move.
+  *Done:* `profiles.voigt.voigt_fwhm` (Olivero & Longbothum), used by
+  `CompiledModel.peak_fwhm` under `"voigt"`; `peak_gamma_eta` keeps the
+  quintic. Manual equation `prof-voigt-fwhm` with bib `olivero1977` (Crossref
+  and OpenAlex agree; the paper is not held, FETCH row 381). Audit row
+  `_OLIVERO_FWHM`, tier 2. `### Inherited` folded into Context and Tasks: the
+  kernel task now points at `kernels/src/` (the Rust crate), and the TOPAS
+  task is the missing test only (`topas_input.py:373-379` refuses).
+  *Measured:* 121 log-spaced Γ_L/Γ_G in 1e-3..1e3 plus both limits against a
+  bisected Faddeeva FWHM: Olivero 0.0237 % worst at 0.28, TCH 0.432 % at
+  0.45; Gaussian limit exact, Lorentzian +3.1e-6. Fast suite on a Linux workstation (`[dev]` venv, Linux x86_64 under WSL,
+  commit 12f6336cc, `-m "not slow" -n 8`, shared with another job at load 15-27):
+  14852 passed / 280 skipped / 32 xfailed / 0 failed, 1002 s. The two added tests
+  cost 0.21 s together in that run's junit; they are the only tests added, so the
+  count should be the merge-base's +2 (not measured on it). Canary (test_voigt, audit_table,
+  help, low_angle_region, derivative_bases_batched, `-n 4`): 104 passed. The
+  full selection was not run: under `"tchz_pv"` the change is bit-identical
+  (pinned), and no slow test reads a Voigt peak width.
+  reader_output exit 0 (unchanged against bc77a934e).
+  *Review:* a read-only review subagent found no defect; two notes applied
+  (the manual's reader list gained the magnetic-only region;
+  `instrument_fwhm_deg` says it stays on the quintic, so the width
+  diagnostic compares Olivero phase widths with a quintic instrument scale,
+  up to 0.43 % apart, which sets a scale and nothing else). Not applied: the
+  old "~1 %" comment at `forward.py` `compile_model`'s quintic (0.43 %
+  measured), out of this diff.
+  *Generality:* two items, both **holds** (judge's sections, unedited):
+
+  #### `rietx.model.profiles.voigt._OLIVERO_FWHM` (constant, tier 2, value (0.5346, 0.2166))
+
+  **Verdict: holds.** The case for it is stronger. It decides nothing. It is a closed-form approximation to a number the package could compute exactly. It applies only under a shape the caller chose. Its error is measured in this repository across the whole mixing range. The case against found nothing.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What it decides that the caller did not ask for | "the reported FWHM of shape='voigt' only, never window sizing" (row `evidence`, `_audit.py`) | It picks no action. `CompiledModel.peak_fwhm` reaches it only when `self.shape == "voigt"`, which is opt-in; the default `tchz_pv` path is unchanged, and `test_peak_fwhm_under_voigt_is_olivero_and_window_sizing_keeps_the_quintic` pins that bit for bit. Under voigt the reported width moves by at most about 0.4 % (from the TCH quintic's 0.43 % error to 0.024 %). That width feeds the existing thresholds in `refine.py:10859` (the low-angle diagnostic), `refine.py:11918` (the width census), `optimize/statistics.py:1364` (the observation count), the satellite and magnetic reports, and `strategy/magnetic.py:749`. Those thresholds have their own rows, and this change only makes their input more accurate. | holds |
+  | 2. Rule 1's kind, and the row's `ambiguity` | none given (a constant row needs no `ambiguity` field, per the `Row` docstring) | No ambiguity of any of the three kinds. The exact Voigt FWHM is a definite number; the coefficients only approximate it. | holds |
+  | 3. Case against | — | none found. A refiner who wanted the exact width could bisect the Faddeeva function. At 0.024 %, no width-based diagnostic level could plausibly change. | none found |
+  | 4. Case for | "measured within 0.024 % of the bisected Faddeeva FWHM over the whole mixing range" (row `evidence`); manual equation `prof-voigt-fwhm` | Confirmed in the diff: `test_olivero_reproduces_the_voigt_fwhm_to_the_bound_the_manual_quotes` sweeps 121 ratios Γ_L/Γ_G (Lorentzian over Gaussian width) from 1e-3 to 1e3, plus both pure limits. It asserts the 0.024 % ceiling, a floor at half of it, and that the worst case falls at a ratio between 0.2 and 0.4. Keeping the TCH quintic instead leaves the reported width off the shape actually evaluated by up to 0.43 %. | holds |
+  | 5. Tier and source | Tier 2: Olivero & Longbothum (1977), JQSRT 17, 233 (docstring, `references.bib`) | A tier-2 citation that tested the formula. I did not check what the seven programs report as a Voigt FWHM by default: `docs/practice.md` has no entry on it, and I do not recall it reliably. Arguably this is tier 1 under the numerical-setting clause, since it controls how accurately rietx computes a number, not what it decides, and a test bounds its error over every input it claims. Either tier keeps it. | holds (tier 1 also defensible; maintainer's call) |
+  | 6. Unrelated dataset families | none given (none needed) | No dataset is involved. The reference is the exact Faddeeva computation, so the test is verification by arithmetic identity, not validation. | n/a |
+  | 7. Record field or code that says it fired | none given | No field is needed for an approximation that takes no action. The shape choice is already on the instrument profile (`profile.shape`). | holds |
+
+  Evidence that would change the verdict: a consumer that sets an action's threshold from `peak_fwhm` in a way that is sensitive at the 0.4 % level, or a program default that reports a different Voigt width and that rietx output is meant to match.
+
+  #### Second trigger: heuristics the table cannot see
+
+  **Verdict: holds.** No unseen heuristic was added. The case against found nothing.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What it decides that the caller did not ask for | `peak_gamma_eta` keeps the quintic for window sizing and FCJ node counts (the quadrature node counts for the axial-divergence correction), while `peak_fwhm` uses Olivero; "decided 2026-10-08" (`forward.py` docstring; manual; WP checklist) | The `if self.shape == "voigt"` branch in `peak_fwhm` dispatches on a shape the caller named. It is not an ordering or fallback chain the package chooses. Window sizing under voigt is unchanged from before the diff (bit-identical, pinned by test). So no action, threshold or default moved, and nothing new is always-on. The inline literals are `2.0 *` (half-width to full width) and `GAUSS_FWHM_TO_SIGMA`, both arithmetic. No skill prose was added. | holds |
+  | 2. Kind of ambiguity | — | None; this is pure arithmetic. | holds |
+  | 3. Case against | — | none found | none found |
+  | 4. Case for | "one sizing rule keeps a `"voigt"` fit's windows those of the same `"tchz_pv"` fit" (manual, `profiles.md`) | Sound. The sizing is frozen per stage and approximate by design, and it is already governed by existing sizing rows. | holds |
+  | 5. Tier or source of the decision | maintainer, 2026-10-08 (dispatch) | Partly on record. The WP's "Decided 2026-10-08 (maintainer)" item names only #790's three questions: TCH stays the default, TOPAS refuses voigt, the kernels wait. The split between the reported width and the sizing width is in the checklist task written when the WP was created that day ("window sizing and `fcj_node_count` keep the quintic"), not in that decided item. | weak provenance, no effect on the verdict |
+  | 6. Dataset families | — | n/a | n/a |
+  | 7. Record field or code | — | None is needed: nothing fires. | holds |
+
+  Evidence that would change the verdict: a later consumer that reads `peak_gamma_eta`'s Γ as a reported width under voigt, or a sizing rule that diverges between the two shapes.
+
+  Author's answer: no `fails`. On item 5 of the first section, tier 2 is kept as written; tier 1 is the maintainer's call.
+
+  *Next:* the manual's pattern-level bias on a committed synthetic case
+  (first, since it is self-contained); then the TOPAS refusal test (one
+  `pytest.raises` passing `shape="voigt"` to `write_topas_inp`); then the
+  compare readings on srm660c, srm676a, lab6_cbn and nac, which decide
+  whether the deferred kernel pair is wanted.
 
 - **2026-10-08** — created, from the 2026-10-08 issue triage (issue #790).
   Checked against the tree at 5d1f5f67: the Voigt has a cross-backend row, a

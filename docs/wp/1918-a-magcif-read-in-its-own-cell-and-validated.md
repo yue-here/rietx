@@ -293,6 +293,28 @@ transcriptions were deliberately not copied. TOPAS is a black box.
     Mike's under #1075, with the maintainer's per-release read of reader-output diffs as
     for any other reader change.
 
+- **2026-11-24, from [2006](2006-readers-crystallography-gui-and-the-dead-surface.md) (PR #1636):
+  the orbit merge builds atoms the file does not state off a 4-fold axis.** PR #1636 named
+  `_orbit_size`'s 1e-3 merge `magcif._ORBIT_MERGE_TOL` and gave it a tier-3 row, with an
+  injected mirror case in `tests/test_magcif.py`. Its generality judge found a band by reading
+  the code, and a probe on the branch confirmed it. Setup: a magCIF in `P m m m` (BNS 47.249)
+  under parent `P 4/m m m`, a = b = 4 Å, O at (7e-4, 0, 0). The reader takes the parent and
+  leaves O where it is: the twin merge's `TWIN_COORD_TOL` is 5e-4 and `SITE_TOL` is 1e-4. O
+  then expands to 4 images where the file's group gives 2, and only the info code fires. On a
+  mirror two images are 2d apart, so the merge and the twin step agree. On a 4-fold axis
+  neighbouring images are d apart, which opens the band 5e-4 < d < 1e-3. At d = 3e-4 the site
+  is merged onto the axis, and at 1.2e-3 the file's group is taken. The probe script is
+  ghostshift scratch, not committed. A fix changes reader output on the magnetic path, so it is
+  Mike's (drafted to him with the PR #1636 reply). `topas.py` imports the same count.
+  `fullprof.py` keeps its own copy.
+- **2026-11-24, from 2006 (PR #1636): three magnetic rows went back to Mike.** The judge called
+  `CROSS_IRREP_DRAWS`, `INVARIANCE_MOMENT_TOL` and `INVARIANCE_POS_TOL` weak. Each is at
+  `unaudited` with the reason in its evidence. In short: the class merge's draw count is out of
+  the caller's reach on `solve_magnetic`. The 2-decimal pair reads as a magCIF but is refused as
+  explicit copies. And an honest 3-decimal hexagonal pair can be 1.5e-3 apart. The boundary
+  tests owed on #1797 bear on the last two. The PR that lands the print box re-tiers them
+  with Mike's answer.
+
 ## Non-goals
 
 - Modulated files and an irrational k (164 files): #678 and the v2+ fence.
