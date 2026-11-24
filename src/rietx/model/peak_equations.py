@@ -10,7 +10,8 @@ points when the compile ignored a width equation).
 **What is frozen.**  ``h``, ``k``, ``l`` and ``m`` of every representative,
 and, where an equation calls ``orbit_mean``, every image of each reflection's
 Laue orbit (``crystallography.symmetry.reflection_orbits``).  ``d``, ``theta``
-and ``two_theta`` follow the parameters and are passed in.  A
+and ``two_theta`` follow the parameters and are passed in, and ``wavelength``
+is taken off the first two (:meth:`ReflectionFrame.bindings`).  A
 ``harmonic(l, n)`` term keeps its symmetrised coefficients on the real
 harmonics of degree l; its value follows the cell through the frame, exactly
 as the texture's does (``crystallography.spherical_harmonics``).
@@ -27,7 +28,7 @@ to b is refused although it agrees at the start: the fit would split it.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 
@@ -39,7 +40,7 @@ from ..crystallography.spherical_harmonics import (
     texture_basis,
 )
 from ..crystallography.symmetry import reflection_orbits
-from ..params.expression import Call, Expression
+from ..params.expression import BinOp, Call, Expression, Name, Neg, names_in
 from ..schemas.peak_equation import PeakEquation, _walk, harmonic_args
 from .preferred_orientation import orbit_layout
 
@@ -119,16 +120,30 @@ class ReflectionFrame:
     harmonics: dict = field(default_factory=dict)
     #: the cell the harmonic values below were taken at, and the values
     cell: tuple | None = None
+    #: whether an equation on this frame reads ``wavelength`` (WP-2152), so
+    #: a phase whose equations do not pays nothing for it
+    wavelength: bool = False
 
     def bindings(self, d, theta, two_theta) -> dict:
-        """The reflection names, bound at the representatives."""
+        """The reflection names, bound at the representatives.
+
+        ``wavelength`` is the emission line's λ, recovered as 2·d·sinθ from
+        the Bragg angle the caller passes (WP-2152).  Every caller holds one
+        line's Bragg angles, which ``two_theta_deg`` took off that line's λ in
+        ``values``, so the binding is that λ to rounding and follows it when
+        λ refines.  Deriving it here means no evaluation site has to carry the
+        line beside its angles.
+        """
         xp = get_backend()
         f64 = np.float64
-        return {"h": xp.asarray(self.hkl[:, 0].astype(f64)),
-                "k": xp.asarray(self.hkl[:, 1].astype(f64)),
-                "l": xp.asarray(self.hkl[:, 2].astype(f64)),
-                "m": xp.asarray(self.multiplicity),
-                "d": d, "theta": theta, "two_theta": two_theta}
+        out = {"h": xp.asarray(self.hkl[:, 0].astype(f64)),
+               "k": xp.asarray(self.hkl[:, 1].astype(f64)),
+               "l": xp.asarray(self.hkl[:, 2].astype(f64)),
+               "m": xp.asarray(self.multiplicity),
+               "d": d, "theta": theta, "two_theta": two_theta}
+        if self.wavelength:
+            out["wavelength"] = 2.0 * d * xp.sin(theta)
+        return out
 
     # -- the protocol Expression's evaluator reads ----------------------------
     def image_bindings(self, bindings):
@@ -141,7 +156,7 @@ class ReflectionFrame:
         f64 = np.float64
         for i, name in enumerate(("h", "k", "l")):
             out[name] = xp.asarray(self.members[:, i].astype(f64))
-        for name in ("m", "d", "theta", "two_theta"):
+        for name in ("m", "d", "theta", "two_theta", "wavelength"):
             v = bindings.get(name)
             if v is not None and np.ndim(v):
                 out[name] = v[self.seg]
@@ -173,10 +188,8 @@ class ReflectionFrame:
         """This frame with its harmonics taken at ``cell``."""
         if not self.harmonics or self.cell is cell:
             return self
-        out = ReflectionFrame(self.hkl, self.multiplicity, self.group, self.members,
-                              self.seg, self.counts, self.harmonics)
-        out.cell = cell
-        return out
+        # ``replace`` carries every other field, so a new one is not dropped
+        return replace(self, cell=cell)
 
 
 @dataclass
@@ -207,7 +220,9 @@ def compile_frame(group, refl, cell, equations: list[CompiledPeakEquation]
     hkl = np.asarray(refl.hkl, dtype=np.int64)
     frame = ReflectionFrame(hkl=hkl,
                             multiplicity=np.asarray(refl.multiplicity, dtype=np.float64),
-                            group=group)
+                            group=group,
+                            wavelength=any("wavelength" in eq.expression.names
+                                           for eq in equations))
     if len(hkl):
         frame.members, frame.seg, frame.counts = orbit_layout(
             reflection_orbits(group, hkl))
@@ -264,6 +279,48 @@ def gradient(eq: CompiledPeakEquation, values, frame: ReflectionFrame, *, d, the
     shape = np.shape(theta)
     return (np.broadcast_to(v, shape).astype(np.float64),
             [np.broadcast_to(p, shape).astype(np.float64) for p in parts])
+
+
+def is_affine(eq: CompiledPeakEquation) -> bool:
+    """Whether ``eq`` is affine in its coefficients, read off the tree (WP-2153).
+
+    Then its value at frozen angles is f₀ + Σₖ gₖ·(cₖ − cₖ₀) exactly, with
+    gₖ the gradient :func:`gradient` returns, so a width row built from it is
+    exact (``least_squares.gaussian_width_inequalities``).  The test is
+    structural and sufficient: a sum or difference of affine parts, an affine
+    part times or over a coefficient-free one, ``orbit_mean`` of an affine
+    part (a mean is linear), or ``if`` with a coefficient-free condition and
+    affine branches.  Anything else that reads a coefficient is not affine,
+    so ``c - c`` inside a ``sin`` reads as not affine although it is.
+    """
+    coefficients = {name for name, _path in eq.paths}
+
+    def free(node) -> bool:
+        return not coefficients.intersection(names_in(node))
+
+    def affine(node) -> bool:
+        if free(node) or isinstance(node, Name):
+            return True
+        if isinstance(node, Neg):
+            return affine(node.arg)
+        if isinstance(node, BinOp):
+            if node.op in "+-":
+                return affine(node.left) and affine(node.right)
+            if node.op == "*":
+                return ((free(node.left) and affine(node.right))
+                        or (free(node.right) and affine(node.left)))
+            if node.op == "/":
+                return free(node.right) and affine(node.left)
+            return False
+        if isinstance(node, Call):
+            if node.func == "orbit_mean":
+                return affine(node.args[0])
+            if node.func == "if":
+                cond, a, b = node.args
+                return free(cond) and affine(a) and affine(b)
+        return False
+
+    return affine(eq.expression.tree)
 
 
 def check_orbits(eq: CompiledPeakEquation, values, frame: ReflectionFrame, *, d,
