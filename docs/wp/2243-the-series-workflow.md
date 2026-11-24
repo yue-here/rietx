@@ -188,7 +188,10 @@ disagree on wavelength, range or step; a blank pattern) names its tier here befo
   - Found by this session's look, a sibling: coordinates typed one after another lost two
     of ten. An earlier PUT's answer, lacking an edit typed while it was on the wire,
     replaced the list, and the next PUT sent the list without that edit. The PUTs now go
-    one after another and only the last one's answer replaces the list.
+    one after another and only the last one's answer replaces the list. The task-8 runner
+    saw the same loss staging 40 files (one coordinate of 40). Its cost is larger than one
+    cell: with any coordinate missing the run passes no `x`, so the record holds none for
+    any pattern and the axis reads "index".
 - [x] 4. The Results step: the summary rows, the per-pattern table, the Plot list, the
   selected pattern's warnings, the series' warnings and the largest steps.
   `seriesresults.ts` reads the record. The list is headed "Values at <pattern>" and has
