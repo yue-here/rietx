@@ -186,6 +186,7 @@ Kleeberg
 Klyne
 Kobayashi
 Kovalev
+Kumagai
 Landé
 Langford
 LANSCE
@@ -244,6 +245,7 @@ Niggli
 [nN]uclides
 [nN]ullspace
 [nN]umpy
+Oba
 [oO]ccupancies
 [oO]ctahedra
 [oO]ctahedral
