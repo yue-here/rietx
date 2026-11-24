@@ -5,7 +5,9 @@ schemas, gemmi for CIF/symmetry. Import name `rietx`, aliased `rx` (`import riet
 
 **This file is for changing the package.** To *use* it (refine someone's data):
 `docs/skill/rietx/SKILL.md` (the agent skill) + the manual, `docs/docs/`. Nothing here
-substitutes for either.
+substitutes for either. The design rules load with this file, and every change answers
+to them:
+@docs/DESIGN-RULES.md
 
 Each rule below is stated with its identifiers, a one-clause reason and a pointer; the
 derivation, the run that found it and the numbers behind it stay in the WP file, module
@@ -456,12 +458,9 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   the *scale-normalised* Gram, 0.4·FWHM validity radius) and share-based global maturity. Collinear angular templates are compared
   as *nested single fits* and reported non-separable. Confidence weights importance (share of χ²),
   not just statistical significance.
-- **A new correction, default or automatic action answers by its kind** (DESIGN.md § Rules, 1 and
-  4): where every competent refiner would act, act and record it in a field; where the data can
-  rank the alternatives, rank them with evidence, picking only in Rule 1's two cases; otherwise
-  report the number with its meaning.
-  **Never an Rwp comparison as its evidence**: several corrections cannot move Rwp, or move it the
-  wrong way when right (`docs/milestones/v0.5.md`). **Nor an R_Bragg comparison** (WP-1069): I(obs) is
+- **A new correction, default or automatic action answers by its kind** (Rules 1 and 4). **Never
+  an Rwp comparison as its evidence**: several corrections cannot move Rwp, or move it the wrong
+  way when right (`docs/milestones/v0.5.md`). **Nor an R_Bragg comparison** (WP-1069): I(obs) is
   I(calc) times the reflection's own obs/calc ratio, so it flatters whatever model partitioned it.
 - **Every heuristic has a row in `rietx._audit` with its tier** (WP-2001, `docs/milestones/
   generality.md` § The rule): each diagnostic code, action-reporting record field, number under
@@ -485,12 +484,12 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
 ## Conventions
 
 - **Never spell the distribution name, a format token or the state dir — import it from
-  `_about.py`** (WP-1062, 1066): its docstring says which is which, and why no test can enforce
-  it.
+  `_about.py`** (WP-1062, 1066): its docstring says which.
+- **A chosen value is tagged `*(Chosen: WP-NNNN, YYYY-MM-DD — …)*`** (WP-1448).
 - **What a name *is* is written in `src/rietx/help.py` and nowhere else** (WP-1202): parameters,
   peak flags, stage fields, reader options, instrument preset fields, with unit, default and
   typical range. Every arm is crossed against its live vocabulary **both ways**
-  (`tests/test_help.py`), so neither a new member nor a rename slips past. `unit`/`default` are
+  (`tests/test_help.py`). `unit`/`default` are
   the schema's own through `UNIT_DISPLAY`; `typical` and `label` (the short words a chip carries,
   WP-1209) are the only authored fields. A `ParameterRow` carries `help_key`, the family glob,
   never the entry, since an entry describes a *family*. The manual's `reference/parameters.md`
@@ -714,7 +713,7 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   S = ε²·[M²] is both the seed and the only legal start: at S ≡ 0 the √ has unbounded slope, so
   `Stage.strain_seed`, not `Stage.seed`, which lifts only a row sitting on a floor at or above 0.
   σ²(M) ≥ 0 is a *cone* coupling all fifteen, so it cannot be a box bound. The default LM driver
-  holds it as a linear inequality. Under `solver="trf"`, and in a joint fit (no cone), it is a
+  holds it as a linear inequality, per histogram in a joint fit. Under `solver="trf"` it is a
   guard (`STEPHENS_STRAIN_NOT_POSITIVE`). Read a firing as "not quotable, and the fit leaned on
   the clamp" (σ² < 0 → zero strain width, a free hinge; `detail` carries the m·|F|² share), never
   as evidence *of* anisotropy. **Zero is on the cone, not outside it**: the guard's test is
@@ -810,7 +809,7 @@ Planning docs are split so a session loads only what it needs; do not read all:
   each WP section's prose. The WP index is `docs/wp/README.md`, **generated** (`wp_index.py`, WP-1507).
 - `docs/wp/NNNN-*.md` — one **self-contained** WP per task (context, commit-sized checklist,
   acceptance command, handover log); its header lines are what the index reads, never hand-copied.
-- `docs/DESIGN.md` — design record; read only the section a WP links.
+- `docs/DESIGN.md` — design record beyond the rules; read only the section a WP links.
 - `docs/practice.md` — the seven programs' defaults by topic, cited: read before designing a default, add each survey.
 - `docs/milestones/vX.Y.md` — one record per release: the measured ship block, plus (while in
   flight) the running "How vX.Y is getting here" narrative; `<name>.md` holds a named milestone's

@@ -136,8 +136,21 @@ and 2045 on 2026-10-25):
 
 ### Inherited
 
-None open. The three notes of 2026-11-05, 2026-11-06 and 2026-11-21 were consumed on
-2026-11-21 (handover entry of that date).
+- **2026-11-23, from WP-2241** (closed). The scheduled nightly 45219728102 on `3fd68b937`
+  passed all six jobs. This is the green nightly this WP's status waits on. The `full` job
+  ran 2 h 04 min (16340 passed, 285 skipped, 51 xfailed, 1 xpassed), against 4 h 00 min on
+  11-20 and 11-21, so PR #1756's cut to the Le Bail wander row shows. The tree holds the
+  alarm pin's `ROUNDING` set and WP-2225's re-pin, and the suite failed nothing.
+- **2026-11-22, from WP-2241** (a ghostshift runner, filed separately because this WP's
+  claim is stale). The nightlies of 11-20, 11-21 and 11-22 were red. The two alarm-pin
+  failures are this WP's 11-21 items: the 11-20 diff was re-pinned by WP-2225 (`997816bfb`)
+  and the 11-21 diff is the `ROUNDING` set of PR #1756. The pin row passes on an arm64 Mac
+  at `f9adf0e57`, and no Linux full suite has run it yet. The 11-22 `full` job did not
+  finish: its runner "lost communication with the server" 1 h 58 min in, and it left no log.
+  It is the only such ending in the last 40 nightly `full` jobs, and githubstatus.com lists
+  no incident that day. WP-2241 fixes the 11-22 Windows failures, and the next Windows
+  nightly measures the fix. A second death at a similar point would point at the suite,
+  its memory for example, rather than at the host.
 
 ## Non-goals
 

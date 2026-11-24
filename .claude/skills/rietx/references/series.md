@@ -109,7 +109,9 @@ What an operator must know, all measured:
   `ref.add_variable(...)` / `ref.tie(...)` inside it, against that
   pattern's own table.  It fires once per **fit** and not once per pattern —
   every escalation rung and the `verify_steps` refit get it — so a
-  hook that counts its own calls counts fits.  The variable's *value* then
+  hook that counts its own calls counts fits.  A `ref.hold` keeps the last
+  accepted pattern's value on every rung, the cold one too, and
+  `entry.held_values` records it.  The variable's *value* then
   rides the `carry` globs like any other path (`vars.<name>`) and warm-starts
   from the last **accepted** pattern, a quarantined one seeding no successor
   here either.  *(Measured: WP-1441, issue #376 — before it, the tie holding

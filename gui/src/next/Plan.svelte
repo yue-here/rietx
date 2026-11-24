@@ -26,6 +26,7 @@
   import { tick } from "svelte";
 
   import Help from "../Help.svelte";
+  import { py } from "../lib/py";
   import { ApiError, api } from "../api";
   import type { HelpCorpus } from "../lib/help";
   import { resolve as helpEntry } from "../lib/help";
@@ -108,6 +109,9 @@
    *  list) describe the plan on screen. */
   const current = $derived(!edited && !planDiffers(resolvedFor, saved));
   const closing = $derived(resolved?.closing ?? null);
+  /** A one-stage re-fit of this plan (WP-2224): its node stands in for the
+   *  stages as one row after them (WP-2227, the maintainer's ruling 2). */
+  const oneStage = $derived(current ? resolved?.one_stage ?? null : null);
   const setAside = $derived((resolved?.set_aside ?? []) as string[]);
   const neverFreed = $derived((resolved?.never_freed ?? []) as string[]);
   const chosen = $derived(presets.find((p) => p.name === preset) ?? null);
@@ -444,10 +448,10 @@
     const stage = stages[index];
     if (!stage || busy || noPhasesReason) return;
     selected = index;
-    const off = stage.turn_off?.length ? `, turn_off=${JSON.stringify(stage.turn_off)}` : "";
+    const off = stage.turn_off?.length ? `, turn_off=${py(stage.turn_off)}` : "";
     // the shell prints it once the run starts: it can still refuse
     onrun($state.snapshot(stage),
-          `p.run_stage(rx.Stage(${JSON.stringify(stage.name)}, ${JSON.stringify(stage.turn_on)}${off}))`);
+          `p.run_stage(rx.Stage(${py(stage.name)}, ${py(stage.turn_on)}${off}))`);
   }
 
   /** The stage `.` would run, for the palette's label: "" when there is none. */
@@ -815,6 +819,26 @@
         </div>
       {/each}
     </div>
+
+    {#if oneStage}
+      <!-- a re-fit of a converged model ran the plan in one stage (WP-2224):
+           one row stands in for the stages, drawn like the closing stage, and
+           the stage rows keep their counts with no Rwp of their own (WP-2227) -->
+      <div class="stg out" data-one-stage>
+        <div class="stg1">
+          <span class="gripslot"></span>
+          <span class="badge none">1</span>
+          <b class="title">One stage</b>
+          <span class="facts">
+            <span class="muted">{oneStage.n_free} free</span>
+            {@render rwp(oneStage.rwp)}
+          </span>
+        </div>
+        <div class="stg2">
+          <span class="verb">Free</span><span class="muted">Everything above, at once</span>
+        </div>
+      </div>
+    {/if}
 
     {#if closing}
       <!-- the stage every plan ends with (WP-2002): not editable, and its Rwp

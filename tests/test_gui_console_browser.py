@@ -1,6 +1,6 @@
 """The Console's script, end to end in a real browser (WP-2212).
 
-A session at ``/next`` sets a value and runs one cycle on one copy of a
+A session at ``/next`` sets a value and refines as ticked on one copy of a
 project; File › Export › Console as a Python script writes the session; the
 script runs on a second copy, made before the session started. The two heads
 must then hold the same parameter values, which is what "the session as a
@@ -68,10 +68,10 @@ def test_the_exported_script_repeats_the_session_on_a_copy(browser, tmp_path,  #
         page.keyboard.press("Enter")
         _frames(page)
 
-        # one cycle, which applies the pending edit first, with the Console open
+        # As ticked, which applies the pending edit first, with the Console open
         page.locator("footer button.console").click()
         head = client.get("/api/project")[1]["head"]
-        page.locator(".actions button", has_text="One cycle").click()
+        page.locator(".actions button", has_text="As ticked").click()
         page.locator(".actions button.refine").click()
         page.wait_for_function(
             "document.querySelector('section.console')?.textContent.includes('p.run_stage')")

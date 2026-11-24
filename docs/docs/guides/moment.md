@@ -7,7 +7,7 @@ On the one specimen below it did, by about two esds.
 
 [`solve_magnetic`](../reference/magnetic.md#solve_magnetic) does neither for you.
 It refits its own nuclear reference under the stages you give it, so the nuclear model it starts from is the one you hand it, and it never goes back to refit that model with the moment present.
-Both routes below do that by hand with the shipped API.
+Both routes below do that by hand with the calls rietx already has.
 
 ## Why the order matters
 
