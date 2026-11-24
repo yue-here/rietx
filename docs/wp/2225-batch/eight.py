@@ -19,6 +19,7 @@ import time
 import warnings
 
 from rietx.refine import Refinement
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
 from rietx.viz import compare
 
 warnings.simplefilter("ignore")
@@ -35,8 +36,8 @@ def hold(on):
 
 def plan(std, closing):
     p = std.build(dd).plan
-    if not closing:
-        p.closing_window_tol = None
+    # the standards' plans ship no closing stage since WP-2222, so "shipped" declares it
+    p.closing_window_tol = CLOSING_WINDOW_TOL if closing else None
     return p
 
 
@@ -56,7 +57,10 @@ def row(std, tag, ref, res, dt):
 
 def fit(std, inp, ref, closing):
     t0 = time.perf_counter()
-    res = ref.fit(inp.data, plan=plan(std, closing), two_theta_limits=inp.two_theta_limits)
+    # "stages": a second fit is otherwise one stage since WP-2224, and a re-fit here means
+    # the staged plan (eight_summary_axial_first.txt was measured before this line)
+    res = ref.fit(inp.data, plan=plan(std, closing), two_theta_limits=inp.two_theta_limits,
+                  refit="stages")
     return res, time.perf_counter() - t0
 
 

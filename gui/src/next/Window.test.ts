@@ -20,6 +20,9 @@ let kept: any = { draft: null };
 // an idle answer, so a second Refine is not refused as a run in flight
 const runFit = vi.fn(async (_body: unknown) => ({ state: "idle", run: {} }));
 const putRecovery = vi.fn(async () => ({}));
+const TEXT = 'rxt 1\nproject "fap"\n';
+const putTextdoc = vi.fn(async (text: string, _rev: string, validateOnly: boolean) =>
+  validateOnly ? { would_change: true } : { text, revision: "r2", applied: ["ref.set_values({...})"] });
 
 vi.mock("../api", () => ({
   ApiError: class extends Error { code = ""; empty = false; },
@@ -41,7 +44,14 @@ vi.mock("../api", () => ({
     params: async () => ({ head: "n1", rows: [] }),
     structure: async () => ({ phases: [] }),
     run: (body: unknown) => runFit(body),
+    textdoc: async () => ({ text: TEXT, revision: "r1" }),
+    putTextdoc: (t: string, r: string, v: boolean) => putTextdoc(t, r, v),
   },
+}));
+// CodeMirror lays out with ranges jsdom lacks; the Text tab's wiring is what is pinned here
+vi.mock("../lib/editor", () => ({
+  createEditor: () => ({ setDoc() {}, setProblems() {}, setTheme() {}, setEdited() {},
+                         refresh() {}, destroy() {}, goToLine() {} }),
 }));
 vi.mock("../lib/stream", async (original) => ({
   ...(await original<typeof import("../lib/stream")>()),
@@ -117,9 +127,9 @@ describe("the action bar", () => {
     expect(runFit).toHaveBeenCalledTimes(2);
   });
 
-  it("runs one cycle on what is ticked when One cycle is chosen", async () => {
+  it("runs one stage on what is ticked when As ticked is chosen", async () => {
     await boot();
-    button("One cycle")!.click();
+    button("As ticked")!.click();
     flushSync();
     button("Refine")!.click();
     for (let i = 0; i < 4; i++) await tick();
@@ -145,7 +155,7 @@ describe("the recovery offer", () => {
   });
 
   it("names the Text and Model parts beside the Parameters edits, so Discard is understood", async () => {
-    // WP-2213 (ruled 2026-11-17): this page has no Text or Model tab yet, and the
+    // WP-2213 (ruled 2026-11-17): this page has no Model tab yet, and the
     // dialog still says what Discard would drop
     kept = { draft: { count: 1, params: { values: { "phases.0.scale": "2" } },
                       text: { buffer: "rxt 1\n# note\n", revision: "r1" },
@@ -167,9 +177,46 @@ describe("the recovery offer", () => {
     expect(document.body.textContent).not.toMatch(/Unapplied edits/);
   });
 
-  it("offers nothing for a kept Text buffer or Model forms, and leaves that copy alone", async () => {
-    // WP-2213: this page has no panel for either arm; the copy is shared with today's page
-    kept = { draft: { count: 0, text: { buffer: "rxt 1\n# note\n", revision: "r1" },
+  it("restores a kept Text buffer into the Text tab as one pending edit (WP-2231)", async () => {
+    kept = { draft: { count: 0, text: { buffer: TEXT + "limits none\n", revision: "r1" } },
+             saved_utc: null, head: "n1", head_now: "n1" };
+    await boot();
+    expect(document.querySelector(".rc-dialog p")!.textContent)
+      .toBe("Not applied when the project closed: the Text document.");
+    button("Restore")!.click();
+    for (let i = 0; i < 24; i++) await tick();
+    flushSync();
+    const tab = [...document.querySelectorAll<HTMLButtonElement>("section.model .tabs button")]
+      .find((b) => b.textContent!.trim() === "Text")!;
+    expect(tab.getAttribute("aria-selected")).toBe("true");
+    expect(document.querySelector("section[aria-label=text] .file")!.textContent).toBe("fap.rxt");
+    expect(document.querySelector("section[aria-label=text] .sync")!.textContent).toBe("edited");
+    expect(document.querySelector(".actions .pending")!.textContent!.trim()).toBe("1 pending");
+  });
+
+  it("applies the Text buffer from the bar's Apply, before anything else", async () => {
+    kept = { draft: { count: 0, text: { buffer: TEXT + "limits none\n", revision: "r1" } },
+             saved_utc: null, head: "n1", head_now: "n1" };
+    putTextdoc.mockClear();
+    await boot();
+    button("Restore")!.click();
+    for (let i = 0; i < 24; i++) await tick();
+    flushSync();
+    button("Apply")!.click();
+    for (let i = 0; i < 24; i++) await tick();
+    flushSync();
+    expect(putTextdoc.mock.calls.filter((c) => c[2] === false))
+      .toEqual([[TEXT + "limits none\n", "r1", false]]);
+    expect(document.querySelector(".actions .pending")!.textContent!.trim()).toBe("");
+    // the applied buffer clears the copy, after the writer's delay
+    putRecovery.mockClear();
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    expect(putRecovery).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers nothing for kept Model forms, and leaves that copy alone", async () => {
+    // WP-2213: this page has no panel for the arm; the copy is shared with today's page
+    kept = { draft: { count: 0,
                       model: { count: 1, edits: { "phases.0.name": "x" }, params: {},
                                positions: {}, vary: {}, atom: null } },
              saved_utc: null, head: "n1", head_now: "n1" };

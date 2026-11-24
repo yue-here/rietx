@@ -153,6 +153,7 @@ translationengleiche
 triclinic
 trigonal
 trirutile
+unrecovered
 uncentred
 uniaxial
 unindexed
@@ -221,6 +222,7 @@ Maier
 Marquardt
 Maxwellian
 Olds
+Olivero
 Pawley
 Pitschke
 Prelog

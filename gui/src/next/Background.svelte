@@ -30,15 +30,16 @@
    * - **Type, Terms and Stiffness change the model's shape**, so each is one
    *   instrument edit committed at once, as a structural edit is
    *   (gui/CLAUDE.md: a background family goes as a whole validated model).
-   *   The hold and free registers keep their paths across it, so the edit
-   *   also releases the holds it removes or redefines and frees the terms it
-   *   adds (`./background.ts`' `kindArms`, `termsArms`), and the Parameters
-   *   panel drops its pending edits on those paths (`ondropped`). The head
-   *   moves and the band refetches.
+   *   The hold and free registers keep their paths across it, so the server
+   *   releases the holds the edit removes or redefines and frees the terms it
+   *   adds (`GuiSession.instrument_patch`, WP-2229), and the Parameters panel
+   *   drops its pending edits on the paths the answer says it `ended`
+   *   (`ondropped`). The head moves and the band refetches.
    *
    * Nothing a click here changes may move the layout (interaction rule 8):
    * the controls keep their rows, and a refusal is the title's state.
    */
+  import { instrumentScript, type Say } from "./console";
   import { ApiError, api } from "../api";
   import {
     BAND_MULTIPLIERS,
@@ -55,9 +56,10 @@
     type BackgroundHeader,
     type Multiplier,
   } from "../lib/background";
+  import { endedBy, registerEcho } from "../lib/model";
   import { curveColors } from "../lib/plot";
-  import { LAMBDA_STOPS, TERMS_MAX, TERMS_MIN, heldWith, kindArms, kindEcho, lambdaStop,
-           pendingHolds, switchKind, termsArms, termsEcho, withTerms, type Arms } from "./background";
+  import { LAMBDA_STOPS, TERMS_MAX, TERMS_MIN, heldWith, kindEcho, lambdaStop,
+           pendingHolds, switchKind, termsEcho, withTerms } from "./background";
 
   let {
     head = null,
@@ -65,7 +67,7 @@
     theme = "light",
     protocol = "",
     holds = new Map(),
-    say = (_line: string) => {},
+    say = () => {},
     onhold = (_path: string, _held: boolean, _serverHeld: boolean) => {},
     ondropped = (_gone: (path: string) => boolean) => {},
     onmoved = () => {},
@@ -78,7 +80,7 @@
     protocol?: string;
     /** the Parameters panel's pending holds and releases, path → held */
     holds?: ReadonlyMap<string, boolean>;
-    say?: (line: string) => void;
+    say?: Say;
     /** a chip pressed: hold or release one term, pending until Apply */
     onhold?: (path: string, held: boolean, serverHeld: boolean) => void;
     /** an instrument edit removed or redefined these paths: the pending
@@ -140,22 +142,23 @@
     return heldWith(path, serverHeld, holds);
   }
 
-  /** Type, Terms and Stiffness: one instrument edit, committed at once, with
-   *  what it asks of the registers (`arms`). Once it lands, the pending edits
-   *  on the paths it removed or redefined are dropped, or the band and Apply
-   *  would both be refused on a path the table no longer has. */
-  async function editInstrument(build: (instrument: any) => any, label: string, echo: string,
-                                arms: Arms = { unhold: [], free: [], gone: () => false }) {
+  /** Type, Terms and Stiffness: one instrument edit, committed at once. The
+   *  server answers what it asked of the registers. Once it lands, the
+   *  pending edits on the paths it ended are dropped, or the band and Apply
+   *  would both be refused on a path the table no longer has, or land on the
+   *  new model's path of the same name. */
+  async function editInstrument(build: (instrument: any) => any, label: string, echo: string) {
     if (pending) return;
     pending = true;
     try {
       const { instrument } = await api.instrument();
-      await api.patchInstrument(build(instrument), label, { unhold: arms.unhold, free: arms.free });
-      if (arms.unhold.length) say(`ref.unhold(${JSON.stringify(arms.unhold)})`);
-      say(echo);
-      if (arms.free.length) say(`ref.set_vary(${JSON.stringify(arms.free)}, True)`);
+      const next = build(instrument);
+      const answer = await api.patchInstrument(next, label);
+      for (const line of registerEcho(answer, echo))
+        say("call", line, line === echo ? instrumentScript(next) : undefined);
       error = "";
-      ondropped(arms.gone);
+      const ended = endedBy(answer);
+      if (ended) ondropped(ended);
       onmoved();
     } catch (exc) {
       error = (exc as Error).message;
@@ -169,7 +172,7 @@
     const tt = answer.arrays.two_theta;
     const lo = tt[0], hi = tt[tt.length - 1];
     void editInstrument((ins) => switchKind(ins, next, lo, hi), `background: ${next}`,
-      kindEcho(next, lo, hi), kindArms());
+      kindEcho(next, lo, hi));
   }
 
   /** The Terms slider's value while it is dragged; committed on release. */
@@ -180,7 +183,7 @@
     termsDrag = null;
     if (n === terms.length) return;
     void editInstrument((ins) => withTerms(ins, n), `background: ${n} terms`,
-      termsEcho(terms.length, n), termsArms(terms, n));
+      termsEcho(terms.length, n));
   }
 
   let stopDrag = $state<number | null>(null);

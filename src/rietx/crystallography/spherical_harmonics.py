@@ -66,7 +66,13 @@ import numpy as np
 
 from ..backend import get_backend
 from .adp import cartesian_basis
-from .symmetry import as_group, cell_constraints, group_key, rotation_matrices
+from .symmetry import (
+    as_group,
+    cell_constraints,
+    group_key,
+    proper_rotations,
+    rotation_matrices,
+)
 
 #: Tolerance on a projector check.  The projector is built by least squares
 #: on exact samples, so a member of its range comes back to about 1e-14.
@@ -146,19 +152,6 @@ class FrameRule:
     cubic: bool
 
 
-def _proper_rotations(rotations) -> list[np.ndarray]:
-    seen, out = set(), []
-    for r in np.asarray(rotations, dtype=np.float64):
-        r = np.rint(r).astype(np.int64)
-        if round(np.linalg.det(r)) < 0:
-            r = -r
-        key = tuple(r.ravel())
-        if key not in seen:
-            seen.add(key)
-            out.append(r)
-    return out
-
-
 def _axis(r: np.ndarray) -> tuple[int, int, int]:
     """The rotation's axis as a primitive integer [uvw] with a positive leading entry."""
     w, v = np.linalg.eig(r.astype(np.float64))
@@ -178,7 +171,7 @@ def _order(r: np.ndarray) -> int:
 def frame_rule(rotations) -> FrameRule:
     """The :class:`FrameRule` the operators imply (module docstring, § The frame)."""
     axes: dict[tuple[int, int, int], int] = {}
-    for r in _proper_rotations(rotations):
+    for r in proper_rotations(rotations):
         order = _order(r)
         if order > 1:
             ax = _axis(r)
@@ -258,7 +251,7 @@ def frame_rotations(rotations, rule: FrameRule, cell) -> list[np.ndarray]:
     m_inv = np.linalg.inv(m)
     f = frame_matrix(rule, cell)
     out = []
-    for r in _proper_rotations(rotations):
+    for r in proper_rotations(rotations):
         q = (m @ r @ m_inv).T
         if not np.allclose(q @ q.T, np.eye(3), atol=1e-8):
             raise ValueError("the cell does not have the symmetry of the operators")

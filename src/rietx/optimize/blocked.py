@@ -619,7 +619,7 @@ def normal_factors(bj: BlockJacobian, resid: np.ndarray, n_free: int, *,
     return k, inv_d, chi2_red
 
 
-def discarded_directions(bj: BlockJacobian) -> tuple[int, np.ndarray]:
+def discarded_directions(bj: BlockJacobian, *, basis: bool = False):
     """:func:`.statistics.discarded_directions` for a :class:`BlockJacobian`.
 
     The directions are the ones the blocked covariance discards: an own
@@ -627,9 +627,11 @@ def discarded_directions(bj: BlockJacobian) -> tuple[int, np.ndarray]:
     the Schur complement's, which reach the border directly and each own
     block's columns through −Y_h.  Touched is the dense test, read on that
     inverse: column i is touched when Σ_gone wᵢ²/cut is at least the variance
-    the blocked solve reports for it.
+    the blocked solve reports for it.  ``basis=True`` adds the dense
+    function's third element, built from the orthonormal ``Q`` in θ's order.
     """
-    none = (0, np.zeros(0, dtype=np.intp))
+    none = ((0, np.zeros(0, dtype=np.intp), np.zeros((bj.n_cols, 0)))
+            if basis else (0, np.zeros(0, dtype=np.intp)))
     sch = _schur(bj)
     arrow = sch.arrow
     if int(arrow.live.sum()) < 2 or sch.cut <= 0.0:
@@ -643,7 +645,14 @@ def discarded_directions(bj: BlockJacobian) -> tuple[int, np.ndarray]:
     lost = (sch.q ** 2).sum(axis=1) / sch.cut
     order = arrow.order()
     touched = np.sort(order[lost >= kept])
-    return (n_gone, touched) if len(touched) >= 1 else none
+    if len(touched) < 1:
+        return none
+    if not basis:
+        return n_gone, touched
+    to_eq = arrow.inv_d_eq if arrow.s is None else arrow.inv_d_eq * arrow.s
+    q = np.zeros((bj.n_cols, sch.q.shape[1]), dtype=np.float64)
+    q[order] = sch.q
+    return n_gone, touched, to_eq[:, None] * q / np.sqrt(sch.cut)
 
 
 def refitted_increase(bj: BlockJacobian, angles: list[int], r_stop: np.ndarray,

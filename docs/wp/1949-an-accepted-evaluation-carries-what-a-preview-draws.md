@@ -59,6 +59,29 @@ per-stage charge is judged on the shortest fit (WP-1413). The recorder is
 attached beside a caller's stream, never inside it (WP-1403), so a payload
 can reach the caller's callback and skip the recorder.
 
+### Inherited
+
+- **2026-11-21, issue triage (#1652 item 2): the "36 of 4200 channels at up
+  to 8e-6" bullet above is stale.** At `c1033a0e8`, after a default fit on
+  the fluorapatite tutorial, `predict()` equals `result.y_calc` bit for bit,
+  and `predict(grid)` differs from it on every channel by up to 1.6e-3 of the
+  strongest peak. The cause is the window cut: a grid compiles at 1e-3 of
+  each peak's area, and the fit measured at the declared stages' 2 %
+  (WP-2222). The measurement and the docs fix sit in WP-2235. So
+  the Acceptance's comparison of an `eval` event's curve with `predict` at
+  the event's values compiles at the window the stage ran at, with the recipe
+  in `predict`'s docstring (`compile_model(..., window_area_tol=...)`). A bar
+  of 8e-6 against `predict(grid)` cannot pass today.
+  **Superseded in part, 2026-11-22 (WP-2235, Yue's ruling A).** On a fitted
+  `Refinement`, `predict(grid)` now compiles at the last fit's peak cut and
+  slack, so `predict(result.two_theta)` equals `result.y_calc` bit for bit
+  (0 of 5751 channels differ on the fluorapatite tutorial). The recipe is no
+  longer needed on the fitted object itself. A twin that has not been
+  fitted, such as a `_trial`, still compiles at 1e-3. What remains between
+  an `eval` event's curve and `predict` at its values is that the event's
+  windows were sized at the stage's start values: the class the stale
+  bullet's 36-of-4200 figure measured, not re-measured since.
+
 ## Non-goals
 
 - The per-stage `snapshot.json` and `rietx watch` (unchanged).
