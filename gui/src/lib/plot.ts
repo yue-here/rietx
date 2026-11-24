@@ -427,6 +427,26 @@ export function residual(kind: ResidualKind, w: Window): Residual {
   };
 }
 
+/** A peak mark's lens, in CSS pixels: 18 tall and 4.5 wide, its lower tip
+ *  7 above the data (round 11c, 2026-11-08). Here, off the chart chunk, so
+ *  the page's DOM marks (`next/Pattern.svelte`) draw the canvas's lens. */
+export const LENS_HEIGHT = 18;
+export const LENS_WIDTH = 4.5;
+export const LENS_GAP = 7;
+
+/** A lens centred on (x, y), pointed at both ends: two quadratic arcs whose
+ *  control points sit `w` either side of the axis. The shape of rietx's
+ *  reflection ticks, used for a peak mark on the pattern and in the group
+ *  fit windows (WP-2240); here, off the chart chunk, so both can import it. */
+export function lens(ctx: CanvasRenderingContext2D, x: number, y: number,
+                     h: number, w: number): void {
+  ctx.beginPath();
+  ctx.moveTo(x, y - h / 2);
+  ctx.quadraticCurveTo(x + w, y, x, y + h / 2);
+  ctx.quadraticCurveTo(x - w, y, x, y - h / 2);
+  ctx.closePath();
+}
+
 // ----------------------------------------------------------------------
 // the readout strip (WP-1213)
 // ----------------------------------------------------------------------

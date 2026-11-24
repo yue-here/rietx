@@ -7,7 +7,8 @@ X-rays scatter from electrons, so heavy atoms dominate an X-ray pattern.
 Neutrons scatter from nuclei, and the scattering length b follows no such order, so a neutron pattern weights the same atoms differently.
 Corundum ranks its two sites oppositely: f(0) is 13 electrons for Al and 8 for O, while b is 3.449 fm for Al and 5.803 fm for O.
 A joint fit refines one structure against both patterns at once, in one residual {cite}`vondreele1997`.
-GSAS-II calls this a combined refinement over several histograms.
+GSAS-II calls this a combined refinement over several histograms, histogram being its word for one pattern in a fit.
+rietx keeps the word where it needs a name for one of several patterns, as in `MultiHistogramRefinement` and `SharingMap.per_histogram`.
 
 ## Compare the patterns' cells first
 

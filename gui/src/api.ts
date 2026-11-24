@@ -351,13 +351,19 @@ export const api = {
   /** The stored peak list plus the decimated raw pattern — the one payload the
    *  plot can draw before any fit exists (WP-1027). */
   peaks: () => call("GET", "/api/peaks"),
-  pickPeaks: (body: { shoulders?: boolean } = {}) => call("POST", "/api/peaks", body),
+  /** `pick_peaks`'s three options (WP-2124); an absent one is the default. */
+  pickPeaks: (body: { shoulders?: boolean; flag_contamination?: boolean;
+                      two_theta_range?: [number, number] } = {}) =>
+    call("POST", "/api/peaks", body),
   addPeak: (twoTheta: number) => call("POST", "/api/peaks/add", { two_theta: twoTheta }),
   movePeak: (index: number, twoTheta: number) =>
     call("POST", "/api/peaks/move", { index, two_theta: twoTheta }),
   removePeak: (index: number) => call("POST", "/api/peaks/remove", { index }),
   flagPeak: (index: number, body: { use_for_indexing?: boolean; flags?: string[] }) =>
     call("POST", "/api/peaks/flag", { index, ...body }),
+  /** the peak list as it was before the last edit, and that edit again (WP-2240) */
+  undoPeaks: () => call("POST", "/api/peaks/undo", {}),
+  redoPeaks: () => call("POST", "/api/peaks/redo", {}),
   refitGroup: (group: number, nComponents?: number) =>
     call("POST", "/api/peaks/refit",
          nComponents === undefined ? { group } : { group, n_components: nComponents }),
@@ -373,9 +379,9 @@ export const api = {
    *  at a time.  Over the server's cap it is a sample — read `n_total`. */
   candidateTicks: (candidate: number) =>
     call("GET", `/api/index/ticks?candidate=${candidate}`),
-  adoptCandidate: (candidate: number, spaceGroup?: string) =>
-    call("POST", "/api/index/adopt",
-         spaceGroup ? { candidate, space_group: spaceGroup } : { candidate }),
+  adoptCandidate: (candidate: number, spaceGroup?: string, mode?: "lebail" | "pawley") =>
+    call("POST", "/api/index/adopt", {
+      candidate, ...(spaceGroup ? { space_group: spaceGroup } : {}), ...(mode ? { mode } : {}) }),
   /** Rank one candidate's extinction classes — the same run machine, and a
    *  measurement any candidate may ask for (the gate stays on adopt). */
   screenExtinctions: (candidate: number) =>
