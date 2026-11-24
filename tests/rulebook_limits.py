@@ -3,9 +3,10 @@
     python -m tests.rulebook_limits     # the report, against this change's base
 
 **What is limited.**  Every committed `CLAUDE.md`, `AGENTS.md` and
-`docs/ROADMAP.md`: the documents a session loads before it reads anything it
-chose.  Each costs its size on every request of every session.  Bytes are
-counted, because reflowing a paragraph changes its line count and not its cost.
+`docs/ROADMAP.md`, and every committed file one of them imports with `@path`:
+the documents a session loads before it reads anything it chose.  Each costs
+its size on every request of every session.  Bytes are counted, because
+reflowing a paragraph changes its line count and not its cost.
 
 **Two numbers per file**, as `tests/skill_caps.py` has them.  The *ceiling*
 fails any tree, `main` included, in `tests/test_docs_consistency.py`.  The
@@ -43,6 +44,7 @@ from __future__ import annotations
 
 import ast
 import os
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -55,10 +57,12 @@ DIARY = "docs/milestones/process.md"
 #: (budget, ceiling) in bytes per always-loaded document.  Gaps from the
 #: 30-day worst day of growth on main, doubled: CLAUDE.md 418, ROADMAP 1636,
 #: gui/CLAUDE.md 693, indexing 1503, io 1344, tests 306; none for AGENTS.md
-#: and src/rietx/gui/CLAUDE.md.
+#: and src/rietx/gui/CLAUDE.md, nor for docs/DESIGN-RULES.md, which CLAUDE.md
+#: imports (WP-2307).
 LIMITS: dict[str, tuple[int, int]] = {
     "AGENTS.md": (2_009, 4_009),
     "CLAUDE.md": (77_573, 78_409),
+    "docs/DESIGN-RULES.md": (13_680, 15_680),
     "docs/ROADMAP.md": (52_042, 55_314),
     "gui/CLAUDE.md": (44_972, 46_358),
     "src/rietx/gui/CLAUDE.md": (155, 2_155),
@@ -78,11 +82,43 @@ WHERE_IT_GOES = (
     "measured it (docs/ROADMAP.md § Session protocol, rule 4).")
 
 
+IMPORT = re.compile(r"(?<![\w`])@([\w./-]+\.md)\b")
+IMPORT_HOPS = 5   # Claude Code follows imports this many levels deep
+
+
+def imports(text: str) -> list[str]:
+    """The ``@path`` targets in a document, as Claude Code reads them.
+
+    Code blocks and code spans import nothing, so both are stripped first."""
+    text = re.sub(r"^[ \t]*(```|~~~).*?^[ \t]*\1", "", text, flags=re.M | re.S)
+    text = re.sub(r"(`+)[^\n]*?\1", "", text)
+    return IMPORT.findall(text)
+
+
 def documents() -> list[str]:
-    """Every committed always-loaded document, by repo-relative path."""
-    found = subprocess.run(
-        ["git", "-C", str(ROOT), "ls-files", "*CLAUDE.md", "AGENTS.md", "docs/ROADMAP.md"],
-        capture_output=True, encoding="utf-8", check=True).stdout.split()
+    """Every committed always-loaded document, by repo-relative path.
+
+    The named rulebooks, and every committed ``.md`` file they import with
+    ``@path``, followed as Claude Code follows them: from the importing file's directory,
+    up to ``IMPORT_HOPS`` deep.  A target outside the repository or not
+    committed is not counted, since no limit here can hold it."""
+    committed = set(subprocess.run(
+        ["git", "-C", str(ROOT), "ls-files", "-z"],
+        capture_output=True, encoding="utf-8", check=True).stdout.split("\0")) - {""}
+    found = {rel for rel in committed
+             if rel.endswith("CLAUDE.md") or rel in ("AGENTS.md", "docs/ROADMAP.md")}
+    frontier = sorted(found)
+    for _ in range(IMPORT_HOPS):
+        reached = []
+        for rel in frontier:
+            for target in imports((ROOT / rel).read_text(encoding="utf-8")):
+                path = ((ROOT / rel).parent / target).resolve()
+                if path.is_relative_to(ROOT):
+                    name = path.relative_to(ROOT).as_posix()
+                    if name in committed and name not in found:
+                        found.add(name)
+                        reached.append(name)
+        frontier = reached
     return sorted(found)
 
 

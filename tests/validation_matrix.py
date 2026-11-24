@@ -3195,6 +3195,33 @@ CLAIMS: tuple[Claim, ...] = (
         measured="worst |delta|/esd 38.7, 29 of 42 components over 4; "
                  "Rwp 0.0389 against 0.0282, GoF 1.37",
     ),
+    # ---- acridine form IX: the misfit check's verdict (WP-1989 part 2, #1008) ----
+    Claim(
+        "test_acceptance_acridine_ix", "test_issue_1008s_stretched_body_fires_on_the_deposited_pattern",
+        "acridine_ix", ("characterisation", "ceiling"),
+        "the body with C2-C3 stretched 0.3 A (H3 moved with C3), refined under "
+        "the same plan, is rejected by the misfit check: Hamilton and Delta-BIC "
+        "both fire with each riding H tied to its parent, and C2-C3 is named "
+        "first; the same fits with every member freed (63 parameters, the arm "
+        "1.11.0 fitted) stay under the Delta-BIC threshold, so the verdict is "
+        "the riding arm's",
+        reference="MISFIT_ALPHA 1e-3 and MISFIT_BIC 10 (Kass & Raftery 1995, "
+                  "'very strong'); the stretch is #1008's planted template error",
+        measured="Hamilton p 9.3e-43, Delta-BIC +52.0 at N_eff 1191.5 (bar 10); "
+                 "C2-C3 1.705 -> 1.463 A, -12.1 sigma; all-freed Delta-BIC "
+                 "-111.3; the perturbed start reaches the same chi2 to 1e-9",
+        starts=2,
+        diagnostics=("RIGID_BODY_MISFIT",),
+    ),
+    Claim(
+        "test_acceptance_acridine_ix", "test_the_deposited_body_does_not_fire_on_the_deposited_pattern",
+        "acridine_ix", ("characterisation",),
+        "the deposited body, under the same plan and check, is not rejected",
+        reference="MISFIT_ALPHA 1e-3 and MISFIT_BIC 10, the thresholds the "
+                  "stretched row above fires on",
+        measured="Hamilton p 0.40 (bar 1e-3), Delta-BIC -233.1 (bar 10)",
+        diagnostics=("!RIGID_BODY_MISFIT",),
+    ),
 )
 
 

@@ -1272,10 +1272,10 @@ describe("the parameter table", () => {
     const order = stub.calls.filter((c) => c.method === "PATCH" || c.path === "/api/run")
       .map((c) => c.path);
     expect(order).toEqual(["/api/params", "/api/run"]);
-    expect(stub.calls.find((c) => c.path === "/api/run")?.body).toEqual({ kind: "fit" });
+    expect(stub.calls.find((c) => c.path === "/api/run")?.body).toEqual({ kind: "fit", refit: "stages" });
 
-    // one cycle is one stage on the ticked rows: an empty turn_on
-    button("One cycle")!.click();
+    // As ticked is one stage on the ticked rows: an empty turn_on
+    button("As ticked")!.click();
     await flush();
     refineButton()!.click();
     await flush();
@@ -2389,7 +2389,7 @@ describe("disclosure and the command palette", () => {
     expect(order).toEqual(["/api/params", "/api/run"]);
     expect(stub.calls.find((c) => c.method === "PATCH")?.body)
       .toEqual({ values: { "phases.0.cell.a": 4.157 }, vary: {} });
-    expect(stub.calls.find((c) => c.path === "/api/run")?.body).toEqual({ kind: "fit" });
+    expect(stub.calls.find((c) => c.path === "/api/run")?.body).toEqual({ kind: "fit", refit: "stages" });
 
     // an invalid edit blocks `r` as it disables the button
     await editValue("phases.0.cell.a", "abc");
@@ -3408,7 +3408,7 @@ describe("the model editor", () => {
     // and the fully fixed atom gets the mark rather than a box
     expect(host.querySelector('[data-vary="phases.0.atoms.0.dof.*"]')).toBeNull();
     expect(host.querySelector<HTMLElement>(
-      '[data-vary="phases.0.atoms.0.x"]')!.textContent).toBe("🔒");
+      '[data-vary="phases.0.atoms.0.x"] svg.padlock')).toBeTruthy();
 
     box.checked = true;
     box.dispatchEvent(new Event("change", { bubbles: true }));
@@ -3570,7 +3570,7 @@ describe("the model editor", () => {
     const mark = (path: string) => host.querySelector(`[data-vary="${path}"]`);
     expect(mark("phases.0.cell.b")!.tagName).toBe("SPAN");
     expect(mark("phases.0.cell.b")!.textContent).toBe("=");
-    expect(mark("phases.0.cell.alpha")!.textContent).toBe("🔒");
+    expect(mark("phases.0.cell.alpha")!.querySelector("svg.padlock")).toBeTruthy();
     // …and a mode-fixed row keeps its editable value: `set_values` still takes
     // one, it is only `set_vary` that the mode overrules
     expect(mark("phases.0.atoms.0.biso")!.textContent).toBe("·");
@@ -6926,5 +6926,127 @@ describe("the Text buffer and the Model forms join the recovery copy (WP-2213)",
     await flush();
     expect(editorView().state.doc.toString()).toBe(TEXTDOC);
     expect(host.textContent).toContain("in sync");
+  });
+});
+
+describe("another project opened in the same window (WP-2242)", () => {
+  // Node ids repeat across projects (`n0000`, `n0001`, …), so the next
+  // project's head can be this one's: both fixtures stand at `n0000`, and a
+  // panel that reloads on `head` alone keeps the last project's rows.
+  const RECENT = [
+    { path: "/tmp/nac.rex", name: "nac.rex", opened_utc: "2026-11-08T10:00:00+00:00",
+      phases: [["NAC", "I 21 3"]], missing: false },
+  ];
+  const OTHER = { ...PROJECT, path: "/tmp/nac.rex",
+                  data: { ...PROJECT.data, filename: "nac.fxye" } };
+  /** Routes an open need not read again: the session's or the person's, the
+   *  document the open's own answer carries, and the indexing answer and
+   *  extinction screen, which the server drops on an open (`_adopt`). */
+  const SESSION = new Set(["/api/settings", "/api/version", "/api/capabilities",
+                           "/api/help", "/api/recent", "/api/examples", "/api/events",
+                           "/api/run/state", "/api/project", "/api/index/result",
+                           "/api/index/extinction"]);
+  const TOUR = ["Parameters", "Interactive", "Plan", "Peaks", "Model", "Text", "Series",
+                "Report", "History", "Build", "Single peaks", "Background", "Pattern"];
+
+  async function tour() {
+    for (const name of TOUR) {
+      button(name)!.click();
+      await flush();
+    }
+  }
+
+  async function openOther() {
+    await toStart();
+    [...host.querySelectorAll<HTMLLIElement>(".start li")]
+      .find((li) => li.querySelector(".name")?.textContent === "nac")!
+      .querySelector<HTMLButtonElement>("button.row")!.click();
+    await flush();
+  }
+
+  /** How often each project route was read, from `calls[from]` on. */
+  function reads(calls: Call[], from = 0): Map<string, number> {
+    const out = new Map<string, number>();
+    for (const c of calls.slice(from)) {
+      if (c.method !== "GET" || SESSION.has(c.path)) continue;
+      out.set(c.path, (out.get(c.path) ?? 0) + 1);
+    }
+    return out;
+  }
+
+  it("reads every project route again, as often as it did for the first", async () => {
+    const stub = server({
+      ...boot(), ...FITTED,
+      "/api/recent": () => ({ body: { recent: RECENT } }),
+      "/api/project/open": () => ({ body: OTHER }),
+    });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    await tour();
+    const first = reads(stub.calls);
+    const mark = stub.calls.length;
+
+    await openOther();
+    await tour();
+    const second = reads(stub.calls, mark);
+    const short = [...first].filter(([path, n]) => (second.get(path) ?? 0) < n)
+      .map(([path, n]) => `${path} ${second.get(path) ?? 0} of ${n}`);
+    expect(short).toEqual([]);
+    expect(host.textContent).toContain("nac.fxye");
+  });
+
+  it("asks for the pattern again when neither project has a fit", async () => {
+    const stub = server({
+      ...boot(), ...RAW,
+      "/api/peaks": () => ({ body: PEAKS_PAYLOAD }),
+      "/api/recent": () => ({ body: { recent: RECENT } }),
+      "/api/project/open": () => ({ body: OTHER }),
+    });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    const fetched = curvesFetched(stub);
+    expect(fetched).toBeGreaterThan(0);
+    await openOther();
+    expect(curvesFetched(stub)).toBe(fetched + 1);
+  });
+
+  it("never offers the last project's Undo in the next one", async () => {
+    // the applied stage finishes, so Undo is live, then another project opens:
+    // the undo node `n0003` names an unrelated node in the next project's tree
+    let done = false;
+    const finished = { state: "idle", project: PROJECT.path, head: "n0004",
+                       run: { ...IDLE_RUN.run, kind: "stage", status: "converged",
+                              node_id: "n0004" } };
+    const stub = await openTab("Report", PROJECT, {
+      ...FITTED,
+      "/api/recent": () => ({ body: { recent: RECENT } }),
+      "/api/project/open": () => ({ body: OTHER }),
+      "/api/events": () => ({ body: { events: [], next: 0, oldest: 1,
+                                      ...(done ? finished : IDLE_RUN) } }),
+      "/api/report/apply": () => {
+        done = true;
+        return { body: {
+          applied: { kind: "refine_cell", expected_delta_chi2: 16.19,
+                     stage: { name: "apply:refine_cell" } },
+          api_call: "ref.run_stage(data, rx.Stage('apply:refine_cell'))",
+          undo: "n0003", chi2_before: 16.96,
+          state: "running", run: { ...IDLE_RUN.run, kind: "stage" }, head: "n0003" } };
+      },
+      "/api/history/checkout": () => ({ body: { head: "n0003", parameters: [], n_free: 0 } }),
+    });
+    button("Apply")!.click();
+    await flush();
+    await new Promise((resolve) => setTimeout(resolve, 800)); // one poll interval
+    await flush();
+    expect(button("Undo")?.disabled).toBe(false);
+
+    await openOther();
+    button("Report")!.click();
+    await flush();
+    expect(host.textContent).not.toContain("applied refine_cell");
+    expect(button("Undo")).toBeUndefined();
+    expect(stub.calls.some((c) => c.path === "/api/history/checkout")).toBe(false);
   });
 });
