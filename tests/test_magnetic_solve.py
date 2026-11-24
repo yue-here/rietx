@@ -1930,7 +1930,7 @@ def test_the_kept_covariance_is_the_answer_stages():
         rx.Stage("all", ["phases.*.scale", "instrument.background.c*",
                          "phases.*.cell.*", "phases.*.atoms.*.biso"])])
     result = ref.fit(data, plan=plan)
-    kept, table, theta, stderr_internal, correlation = ref._answer_covariance
+    kept, table, theta, stderr_internal, correlation = ref._answer_covariance[:5]
     assert kept is result
     top = result.identifiability.top_correlations[0]
     cov = table.physical_covariance(theta, stderr_internal, correlation,

@@ -123,20 +123,50 @@ which. "Accepted" records the maintainer's answer in chat on 2026-11-16.
   growth exceeded 3 esds, on three unaudited constants. The width trajectory and each
   pattern's GoF are already in the result, so rule 5 is met without it. Removed in WP-2081
   on 2026-11-17, with no field added, under `THRESHOLDS_VERSION` 1.15.
+- **No skill line says that holding every width invents a transition** (settled by Claude
+  under DESIGN Rule 3 and Rule 4's test for a skill row, 2026-11-21). The claim rests on one
+  run on the CuCr2O4 ramp, which is development data (WP-2081). A search of the maintainer's
+  paper stores found no paper that tests it. The terms were sequential refinement,
+  parametric, broadening, splitting beside broadening, pseudosymmetry, Suchomel and Kemei.
+  Stinton & Evans (2007) and Stephens (1999) are held, and neither states it. From recall,
+  phase-transition studies often report a small distortion first as broadening that
+  depends on hkl. That is the mechanism WP-2081 infers, and no paper is named because none
+  was read. The practice the trap follows from is already in the skill:
+  `references/series.md` § Microstrain evolves along a chain says to hold the instrument
+  and leave each phase's widths free. The measurement stays in WP-2081. The alternative was
+  a row tagged `(Measured: …)` on the one run. What would reopen it: a published sequential
+  or parametric study in which a held profile moves or creates a distortion.
+- **Issue #1214 closes when PR #1473 merges** (settled by Claude under rule 6 and the
+  maintainer's WP-2080 ruling of 2026-11-16, 2026-11-21). The issue reports a warm fit
+  kept in a wrong minimum under a fence that cannot see it. Its options 1 to 3 escalate a
+  converged fit on a comparison of fit quality. Rule 6 says the series does not retry such
+  a fit, and WP-2003 removed the fence. Its option 4 is documentation, and the reworked PR
+  lands it beside the field `SeriesEntry.warm_gof_over_seed`. The PR's body already says
+  "Closes #1214". An open issue would promise work the rules exclude. The alternative was
+  to keep it open as a record of the two noise draws in 20 that keep a wrong cell. WP-2080
+  names what would reopen it: evidence that agents or users do not read the field. A
+  comment for the issue was drafted and waited for the maintainer's approval of the batch.
+  **Ruled by Yue 2026-11-22:** posted
+  (https://github.com/yue-here/rietx/issues/1214#issuecomment-7078724868). The issue had
+  already closed on 2026-11-21; PR #1473 is still open.
 
-## Open decisions
+## Open decisions, answered 2026-11-22
 
-Each is the maintainer's. None is ruled.
+Two were open, and both were the maintainer's. Answered 2026-11-22 under the maintainer's routing rules of that day (WP-2238): each item was settled by Claude and checked by a fresh agent that did not see the pick, or brought to the maintainer, who answered "All as recommended".
 
 - **`SEQUENTIAL_MOMENT_ONSET`** still fires on a tuned threshold, against rule 5. It is
-  magnetic, so the magnetic path's owner rules on it.
-- **The audit label on today's default plan.** `SequentialRefinement.fit:plan` is recorded
-  as unanimous, and the traditional calibrate-then-hold route is a named dissent. With the
-  default kept, the row's kind is corrected and brought to the maintainer for approval.
-- **A skill trap with no outside source.** "Holding every width invents a transition" rests
-  on one run on development data (WP-2081, the CuCr2O4 ramp). DESIGN Rule 3 cuts a skill
-  line whose only evidence is rietx's own run, so it needs a source from the literature.
-- **Whether issue #1214 stays open** once PR #1473 is reworked to a field.
+  magnetic, so the magnetic path's owner rules on it. **Ruled by Yue 2026-11-22:** sent to Mike: posted as question
+  (3) on #1075 (https://github.com/yue-here/rietx/issues/1075#issuecomment-7078724635).
+- **The audit label on today's default plan.**
+  `SequentialRefinement.fit:plan` is recorded as unanimous (`ambiguity=1`), and the
+  traditional calibrate-then-hold route is a named dissent. A named dissent fails the
+  unanimity gate of DESIGN Rule 1. Rule 4 above puts series strategy in Rule 1's third
+  kind, since only the experimenter knows whether the instrument held still. The proposed
+  correction (2026-11-21): `ambiguity` from 1 to 3; tier 3, the value and the plan kept;
+  `grounds` rewritten to cite the 2026-11-16 ruling and its named dissent; `approved` set
+  to the maintainer's date. `_audit.py` was unchanged until the maintainer approved.
+  **Settled by Claude 2026-11-22, checked blind:** the label correction (`ambiguity` 1 to 3, `grounds` citing the 2026-11-16 ruling and
+  its named dissent) is settled. **Ruled by Yue 2026-11-22:** tier 3 with the plan kept, approved 2026-11-22. Applied to `_audit.py` in WP-2081 the same day.
 
 ## The WPs
 
@@ -144,15 +174,19 @@ Each is the maintainer's. None is ruled.
 |---|---|---|
 | [2081](../wp/2081-how-a-series-holds-what-the-setup-fixes.md) | the design discussion these rules came from, its measurements and its twelve questions | moved here 2026-11-16 |
 | [2080](../wp/2080-a-warm-fit-in-a-wrong-basin.md) | the goodness-of-fit ratio as a field, ruled 2026-11-16 | moved here 2026-11-16 |
-| [1420](../wp/1420-a-held-phase-re-enters-or-says-it-cannot.md) | a phase held on one pattern gets back in on a later one | proposed for this milestone |
-| [1453](../wp/1453-both-directions-name-the-lower-cost.md) | the two directions of a series compared by cost | proposed for this milestone |
-| [1524](../wp/1524-the-step-scans-last-two-blind-spots.md) | the step list's two blind spots | proposed for this milestone |
-| [1317](../wp/1317-series-scrubber.md) | the GUI's view of a finished series | proposed for this milestone |
+| [1420](../wp/1420-a-held-phase-re-enters-or-says-it-cannot.md) | a phase held on one pattern gets back in on a later one | proposed for this milestone with tasks 2 to 5 retired as written. Rules 4 to 6 exclude a series code and a retry of a converged fit (issue #1402's option A). **Settled by Claude 2026-11-22, checked blind:** the move stands as proposed (answered 2026-11-22 under the routing rules of WP-2238); the file's `Milestone` header is not touched here. |
+| [1453](../wp/1453-both-directions-name-the-lower-cost.md) | the two directions of a series compared by cost | proposed for this milestone. Option 1's cost pair is a rule 5 field whose names go to the maintainer, and rule 6 excludes option 3's cold rung. **Settled by Claude 2026-11-22, checked blind:** the move stands (answered 2026-11-22 under the routing rules of WP-2238); option 1's cost-pair field names go to the maintainer when WP-1453 is built. |
+| [1524](../wp/1524-the-step-scans-last-two-blind-spots.md) | the step list's two blind spots | not moved (2026-11-21): WP-2003 removed the scan it targets, and PR #1588 closes it with tests alone |
+| [1317](../wp/1317-series-scrubber.md) | the GUI's view of a finished series | not moved: [gui-overhaul](gui-overhaul.md) § R7 carries it (maintainer, 2026-11-21) |
 | [2103](../wp/2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) | hold, tie and restart on a joint fit | stays in parametric; rule 2's start from a series result depends on it |
 | [2003](../wp/2003-the-chain-actions.md) | the tiers of the series' automatic actions | stays in generality |
+| [2300](../wp/2300-a-series-declares-each-parameter.md) | rule 1's declaration on the series call, and rule 2's refusal | filed 2026-11-22; its shape ruled 2026-11-23 (one object for both calls) and its names settled the same day |
+| [2305](../wp/2305-the-joint-call-speaks-of-patterns.md) | the joint call says pattern and is named `refine_joint`; old names and the `hist.` prefix refused | filed 2026-11-23; the `hist.` rename ruled by the maintainer, the rest settled by Claude at his instruction |
+| [2301](../wp/2301-the-typical-temperature-series.md) | the typical temperature series: one documented route, its preset and a Switching page | filed 2026-11-22; the preset's name is the maintainer's |
 
-The four proposed rows keep `Milestone: unscheduled` in their files until the maintainer
-approves the move. Each has an open pull request that edits the same header line.
+The two proposed rows keep `Milestone: unscheduled` in their files until their next edit
+carries the move (the moves were settled 2026-11-22). Each has an open pull request that edits the same header line (#1401
+and #1594). WP-1317's pull request, #1395, merged on 2026-11-21.
 
 WP-2081's twelve questions under the rules: 2 and 3 fall to rules 1 and 2; 4 to rule 6; 5 to
 rule 4; 7 and 9 to rule 5; 11 to rule 2, which keeps the two calls separate. Question 1 is
@@ -162,10 +196,10 @@ structural one, WP-2108) are work of their own.
 ## The order
 
 Rules 3 to 6 describe the code as it nearly stands, so their work is small: the field for
-WP-2080, a fixed value surviving a restart (WP-2081 question 4), and
-`SEQUENTIAL_MOMENT_ONSET` once ruled. `SEQUENTIAL_WIDTH_GROWTH` is removed. Rule 1 comes next, as a declaration on the series call. Rule 2's start
+WP-2080, a fixed value surviving a restart (WP-2081 question 4, built 2026-11-22), and
+`SEQUENTIAL_MOMENT_ONSET` once ruled. `SEQUENTIAL_WIDTH_GROWTH` is removed. Rule 1 comes next, as a declaration on the series call (WP-2300). Rule 2's start
 from a series result waits on WP-2103. The default is ruled, so a preset for the typical
-temperature series can be written. The documentation for a user arriving from another program's
+temperature series can be written (WP-2301). The documentation for a user arriving from another program's
 sequential mode is written with rule 1. Before rule 2 is built, a second real series that
 nobody who changes the package has run is named, with its independent measurement. Each
 WP's `Priority:` line outranks this paragraph.

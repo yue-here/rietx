@@ -22,7 +22,8 @@ For any one parameter, `Refinement.profile_interval` refits with one parameter p
 
 Two parameters correlate when they change the calculated pattern in the same way.
 Over a wide angular range most effects have different shapes, and over a short one they do not.
-Between 20° and 40° 2θ, the constant, cos θ, tan θ and 1/cos θ curves are each a straight line to within 0.8 %.
+A zero shift moves every peak by a constant, a specimen displacement by a multiple of cos θ and the cell by a multiple of tan θ, and crystallite size widens a peak as 1/cos θ.
+Between 20° and 40° 2θ, each of these four curves is a straight line to within 0.8 %.
 
 | Correlated parameters | Shapes in 2θ | What goes wrong |
 |---|---|---|
@@ -42,7 +43,7 @@ rietx reports a correlation at three strengths:
 - `FLAT_DIRECTION`, for a pair at |ρ| = 1.000 to three decimals.
   The data measure only one combination, and each esd holds only if the other parameter is right.
 - `COVARIANCE_DIRECTION_DISCARDED`, for a combination of several parameters the data do not constrain.
-  Every esd in the group is too small, by at least a factor of √2.
+  No parameter in the group has an esd.
 
 `FitReport.identifiability` lists the strongest correlations and the combinations the data fix least well.
 
@@ -63,7 +64,12 @@ rietx prevents this in three ways:
 - A phase whose reflections in range cannot separate its scale from its displacement parameters has those parameters fixed for the stage, and `SCALE_B_INSEPARABLE` reports it.
 
 A combination the data move a little, but below that cutoff, is still discarded.
-Its parameters keep esds, and those esds are too small, so `COVARIANCE_DIRECTION_DISCARDED` marks them.
+The pseudo-inverse would give each parameter on it the spread along the directions the data did measure, which is too small by a factor nothing bounds.
+On synthetic LaB₆ with W, `gauss_size` and `gauss_strain` free, two starts landed 140 esd apart in W.
+So each parameter on a discarded direction has no esd either, and `COVARIANCE_DIRECTION_DISCARDED` names them.
+This is the rule of linear models: a parameter the data cannot estimate has no standard error {cite}`searle1971`.
+A parameter tied to one of them, and a quantity derived from one, has no esd, even where the combination itself is determined.
+The CIF writes `?`, unknown, in such a value's standard-uncertainty item.
 
 The [scale-and-B section](../theory/estimation.md#a-scale-and-a-b-the-range-cannot-separate) derives the test.
 

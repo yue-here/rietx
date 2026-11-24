@@ -6,6 +6,10 @@ Q1 asks whether the package should make this call at all: shown the number, woul
 competent refiner act before quoting a result? Q2 asks, only for a code that passes Q1,
 whether its threshold holds beyond the data it was tuned on.
 
+*2026-11-21:* each of the 31 codes is answered in `rulings.md`. Nine are settled by Claude,
+19 wait on the maintainer as consent lines, `HIGH_CORRELATION` has a full brief, and the two
+magnetic codes are Mike's. Nothing below is approved yet.
+
 ## What is already done, and what is left
 
 75 codes are in this WP's inventory (`inventory.json`). 11 were tiered before this session.

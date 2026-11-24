@@ -5,6 +5,7 @@ This page gives what a `RefinementResult` carries beside the refined values: the
 `Refinement.fit` and `refine` return a `RefinementResult`.
 [API: everyday calls](api.md#results) lists every field.
 The refined values are `RefinementResult.parameters`, one row per parameter with its esd, and `RefinementResult.parameter` looks one up by path.
+A row's esd is `None` where the data do not determine the parameter: it measured nothing, or it lies on a combination the covariance discards ([Why a direction the data do not move has no esd](../concepts/correlations.md#why-a-direction-the-data-do-not-move-has-no-esd)).
 [Derived quantities](derived.md) gives the distances, angles, cell volumes, sizes and strains a fit computes from them.
 
 The IUCr guidelines rank this evidence differently from a table of R values.
@@ -78,7 +79,7 @@ A joint fit records one per histogram, on `HistogramResult.sigma_rule`, and leav
 
 The statistics measure agreement, and agreement is not correctness.
 A background flexible enough to imitate the peaks biases displacement parameters up and phase fractions down while Rwp improves.
-Of the eight corrections shipped in v0.5, two provably cannot move Rwp, one moves it the wrong way when it is right, and the two largest accuracy wins are invisible in it.
+Of the eight corrections added in v0.5, two provably cannot move Rwp, one moves it the wrong way when it is right, and the two largest accuracy wins are invisible in it.
 That is what [the report](../concepts/report.md) is for.
 It is also why a correction in rietx ships with a record field or a diagnostic saying what it changed, such as the [absorption record](#absorption-correction), rather than with an Rwp comparison as its evidence.
 
