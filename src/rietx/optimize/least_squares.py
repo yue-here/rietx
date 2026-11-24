@@ -2695,6 +2695,69 @@ def texture_positivity_inequalities(model: CompiledModel, table: ParameterTable,
     return out
 
 
+def _equation_width_rows(model: CompiledModel, table: ParameterTable, C: np.ndarray,
+                         derived, values: dict, x0: np.ndarray, ip: int, target: str,
+                         d_refl, tt_lines, masks, *, squared: bool = False):
+    """(T, c) of phase ip's ``target`` equation at the width rows' reflections,
+    or ``None`` where it adds nothing exact (WP-2153).
+
+    The rows are the reflections ``masks`` keeps on each emission line of
+    ``tt_lines``, in that order, the order the calling builder stacks its own.
+    ``d_refl`` is the reflections' d-spacings at the stage's starting cell.
+    The term is exact in two cases.  Where none of the equation's
+    coefficients is free, its value at the frozen angles is a constant, and it
+    goes into c as it stands (squared for ``gauss_fwhm``, which enters Γ_G² as
+    f²).  Where the equation is affine in its coefficients
+    (:func:`~rietx.model.peak_equations.is_affine`), its value is
+    f₀ + G·(p − p₀) exactly, G its coefficient gradient and p the
+    coefficients' rows of C·θ + d, so the block is T = G·C and
+    c = f₀ − T·θ₀.  Otherwise ``None``: a ``gauss_fwhm`` term with a free
+    coefficient (f² is never affine, and since it cannot be negative the row
+    without it stays a sufficient condition), a non-affine term with a free
+    coefficient, a coefficient that is a derived row, or a value that is not
+    finite at some reflection.  The caller then keeps the row of the built-in
+    terms alone, as before WP-2153, and ``PEAK_WIDTH_NOT_POSITIVE`` reports
+    the total at the answer.
+
+    Exact at the frozen angles, like the built-in terms: an equation reading
+    ``d``, ``theta`` or ``two_theta`` follows a free cell, λ or zero shift
+    in the forward model, and the row stays where the stage started.
+    """
+    from ..model.peak_equations import gradient as peq_gradient
+    from ..model.peak_equations import is_affine
+
+    peq = model.phases[ip].peq
+    if peq is None or target not in peq.equations:
+        return None
+    eq = peq.equations[target]
+    if any(path in derived for _name, path in eq.paths):
+        return None
+    idx = [table._paths[path] for _name, path in eq.paths]
+    held = not np.any(C[idx, :]) if idx else True
+    if not held and (squared or not is_affine(eq)):
+        return None
+    cell = model._phase_cell(ip, values)
+    frame = peq.frame.at(cell)
+    f_rows, g_rows = [], []
+    for tt, keep in zip(tt_lines, masks, strict=True):
+        tt = np.asarray(tt, dtype=np.float64)
+        with np.errstate(all="ignore"):
+            f, parts = peq_gradient(eq, values, frame, d=d_refl,
+                                    theta=np.radians(0.5 * tt),
+                                    two_theta=model.apparent_two_theta(tt, values))
+        f_rows.append(f[keep])
+        if not held:
+            g_rows.append(np.column_stack(parts)[keep] if parts
+                          else np.zeros((int(np.count_nonzero(keep)), 0)))
+    f = np.concatenate(f_rows) if f_rows else np.empty(0)
+    if not np.all(np.isfinite(f)):              # no row is better than a NaN one
+        return None
+    if held:
+        return np.zeros((f.size, C.shape[1])), (f * f if squared else f)
+    T = np.vstack(g_rows) @ C[idx, :]
+    return T, f - T @ x0
+
+
 def gaussian_width_inequalities(model: CompiledModel, table: ParameterTable,
                                 x0: np.ndarray) -> list["lm_mod.LinearInequality"]:
     """Γ_G² ≥ ``caglioti._MIN_GAMMA_G2`` at every reflection, one block per phase.
@@ -2729,17 +2792,32 @@ def gaussian_width_inequalities(model: CompiledModel, table: ParameterTable,
     started, as the Stephens cone's d-spacings do.  Exact duplicate rows go,
     and so do rows no free column reaches.
 
+    **A peak equation's term is in the row** (WP-2153).  A ``gauss_fwhm`` or
+    ``gauss_fwhm_squared`` equation adds to Γ_G² before the floor, and either
+    may be negative.  Its term enters wherever it is exact at the frozen
+    angles (:func:`_equation_width_rows`): its value as a constant when its
+    coefficients are held, its exact affine block when they are free and it
+    is affine in them.  Without the term a free coefficient stepped Γ_G² under
+    ε at 19 of 19 reflections and stalled the stage at Rwp 0.195 against
+    TRF's 0.0416 (a LaB₆ fixture, ``tests/test_peak_equations.py``), and a
+    held positive term let the built-in row bind where the total did not,
+    leaving U, V, W and X 5-115 esd from TRF's.  Any other term is left out,
+    and the row is then that of the built-in terms alone.
+
     A row the start already violates is dropped, for
     :func:`strain_cone_inequalities`' reason: the step keeps feasibility and
     cannot restore it.  So a stage starting with Γ_G² under ε at a reflection
     is not held there.  U = V = 0 with W on its floor sits exactly on every
-    row, and is held.
+    row, and is held.  A peak equation's term that starts under the floor at
+    every reflection drops every row too, and the clamp leaves its
+    coefficients without gradient, so the stage leaves them where they are
+    (WP-2151's silicon).
 
     A phase whose width rows are derived (``ParameterTable.derived_paths``) is
     skipped, since a derived row is written after C and is not affine in θ.
 
-    Single-histogram only, like the cone: :func:`run_multi_least_squares`
-    builds no inequality.  TRF never sees these rows, and
+    A joint fit asks it of each histogram (:func:`_joint_width_inequalities`).
+    TRF never sees these rows, and
     ``RESOLUTION_NOT_POSITIVE`` stays its guard
     (:func:`~rietx.strategy.staged.check_resolution_positive`).
     """
@@ -2766,8 +2844,8 @@ def gaussian_width_inequalities(model: CompiledModel, table: ParameterTable,
             continue
         cell = tuple(values[f"phases.{ip}.cell.{k}"]
                      for k in ("a", "b", "c", "alpha", "beta", "gamma"))
-        _d, tt_lines = model._cell_block(cp, cell, lams)
-        theta = []
+        d_refl, tt_lines = model._cell_block(cp, cell, lams)
+        theta, masks = [], []
         for il, tt in enumerate(tt_lines):
             tt = np.asarray(tt, dtype=np.float64)
             win = cp.win[il]
@@ -2775,6 +2853,7 @@ def gaussian_width_inequalities(model: CompiledModel, table: ParameterTable,
             if cp.win_mag is not None:          # a magnetic peak's, drawn wider
                 used |= cp.win_mag[il][:, 1] > cp.win_mag[il][:, 0]
             used &= np.isfinite(tt)
+            masks.append(used)
             theta.append(np.radians(0.5 * tt[used]))
         th = np.concatenate(theta) if theta else np.empty(0)
         if not th.size:
@@ -2785,6 +2864,13 @@ def gaussian_width_inequalities(model: CompiledModel, table: ParameterTable,
                                  1.0 / (np.cos(th) ** 2)])
         T = basis @ C[rows, :]
         c = basis @ d[rows] - _MIN_GAMMA_G2
+        # a peak equation's terms, added before the floor (WP-2153)
+        for target in ("gauss_fwhm", "gauss_fwhm_squared"):
+            term = _equation_width_rows(model, table, C, derived, values, x0, ip,
+                                        target, d_refl, tt_lines, masks,
+                                        squared=target == "gauss_fwhm")
+            if term is not None:
+                T, c = T + term[0], c + term[1]
         Tc = np.unique(np.column_stack([T, c]), axis=0)
         T, c = Tc[:, :-1], Tc[:, -1]
         # violated beyond rounding, so a row a previous stage left on its
@@ -2820,7 +2906,10 @@ def lorentzian_width_inequalities(model: CompiledModel, table: ParameterTable,
     zero (:func:`strain_cone_inequalities`), so it is left out of the row.
     It also replaces ``lor_strain`` (WP-1467), whose value leaves the row with
     it.  The row is then a sufficient condition, never a necessary one.  The
-    phase terms have floors of 0, so a row can bind only through X and Y.
+    phase terms have floors of 0, so without an equation a row can bind only
+    through X and Y.  A ``lor_fwhm`` peak equation adds to Γ_L in both
+    components, and its term is in every row wherever it is exact
+    (:func:`_equation_width_rows`, WP-2153).
 
     **A row at every reflection of the frozen list**, where the Gaussian rows
     take only those whose window holds data.  Γ_G² has a clamp under it
@@ -2873,7 +2962,11 @@ def lorentzian_width_inequalities(model: CompiledModel, table: ParameterTable,
             d_ph[table._paths[f"phases.{ip}.lor_strain"]] = 0.0
         cell = tuple(values[f"phases.{ip}.cell.{k}"]
                      for k in ("a", "b", "c", "alpha", "beta", "gamma"))
-        _d, tt_lines = model._cell_block(cp, cell, lams)
+        d_refl, tt_lines = model._cell_block(cp, cell, lams)
+        # a lor_fwhm equation adds to Γ_L in both components (WP-2153)
+        term = _equation_width_rows(
+            model, table, C, derived, values, x0, ip, "lor_fwhm", d_refl, tt_lines,
+            [np.isfinite(np.asarray(tt, dtype=np.float64)) for tt in tt_lines])
         blocks_T, blocks_c = [], []
         for _windows, idx in families:
             theta = []
@@ -2887,8 +2980,11 @@ def lorentzian_width_inequalities(model: CompiledModel, table: ParameterTable,
             # magnetic_lor_size) go as 1/cosθ, the strain terms as tanθ
             inv_cos, t = 1.0 / np.cos(th), np.tan(th)
             basis = np.column_stack([inv_cos, t] * (len(idx) // 2))
-            blocks_T.append(basis @ C[idx, :])
-            blocks_c.append(basis @ d_ph[idx])
+            T_f, c_f = basis @ C[idx, :], basis @ d_ph[idx]
+            if term is not None:
+                T_f, c_f = T_f + term[0], c_f + term[1]
+            blocks_T.append(T_f)
+            blocks_c.append(c_f)
         if not blocks_T:
             continue
         Tc = np.unique(np.column_stack([np.vstack(blocks_T),
@@ -2915,6 +3011,29 @@ def _joint_width_inequalities(models: list[CompiledModel], mtable, x0: np.ndarra
     reads its own histogram's table, whose C already carries the λ factor a
     shared size column takes (WP-1131), so a row needs only its columns moved.
     """
+    return _on_joint_columns((gaussian_width_inequalities,
+                              lorentzian_width_inequalities), models, mtable, x0)
+
+
+def _joint_positivity_inequalities(models: list[CompiledModel], mtable,
+                                   x0: np.ndarray) -> list["lm_mod.LinearInequality"]:
+    """The single fit's Stephens strain cone and texture P ≥ 0 rows, asked of
+    each histogram and laid on the joint columns (WP-2239).
+
+    A shared Stephens block gets a cone per histogram, since each histogram's
+    reflections are its own monomials; a point inside all of them is a block
+    no histogram's width reads as negative.  Each builder's skip rules hold
+    per histogram: nothing free in the direction, or a start already outside.
+    """
+    return _on_joint_columns((strain_cone_inequalities,
+                              texture_positivity_inequalities), models, mtable, x0)
+
+
+def _on_joint_columns(builders, models: list[CompiledModel], mtable, x0: np.ndarray
+                      ) -> list["lm_mod.LinearInequality"]:
+    """Each single-fit builder asked of each histogram's own model and table,
+    its rows moved onto the joint columns (``mtable.col_map``) and labelled
+    ``"hist.<h> <label>"``."""
     from . import lm as lm_mod
 
     out: list[lm_mod.LinearInequality] = []
@@ -2922,12 +3041,12 @@ def _joint_width_inequalities(models: list[CompiledModel], mtable, x0: np.ndarra
     for h, (model, table, local) in enumerate(
             zip(models, mtable.tables, mtable.split(x0), strict=True)):
         cols = np.asarray(mtable.col_map(h), dtype=np.intp)
-        for block in (gaussian_width_inequalities(model, table, local)
-                      + lorentzian_width_inequalities(model, table, local)):
-            T = np.zeros((block.T.shape[0], n), dtype=np.float64)
-            T[:, cols] = block.T
-            out.append(lm_mod.LinearInequality(T=T, c=block.c,
-                                               label=f"hist.{h} {block.label}"))
+        for build in builders:
+            for block in build(model, table, local):
+                T = np.zeros((block.T.shape[0], n), dtype=np.float64)
+                T[:, cols] = block.T
+                out.append(lm_mod.LinearInequality(T=T, c=block.c,
+                                                   label=f"hist.{h} {block.label}"))
     return out
 
 
@@ -3882,10 +4001,9 @@ def run_multi_least_squares(models: list[CompiledModel],
     ``solver`` selects the driver exactly as in :func:`run_least_squares` —
     this is the *second* entry point WP-0308 warned about, and a solver swap
     that reached only the single-histogram one would leave joint refinements
-    silently on scipy.  The Stephens cone is not built here: its rows are
-    per-model and the stacked column map would have to scatter each phase's T
-    into the joint vector.  Deferred rather than half-done — a joint refinement
-    with `solver="lm"` gets the bounded driver, not the cone.  The width rows
+    silently on scipy.  Under it the single fit's rows are built per
+    histogram on the joint columns: the Stephens cone and texture positivity
+    (:func:`_joint_positivity_inequalities`, WP-2239), the width rows
     (:func:`_joint_width_inequalities`) and each tied entry's own bounds, a
     parametric target's in every subset pattern among them
     (:func:`_joint_tied_bound_inequalities`, WP-1325), are built, and the
@@ -3998,7 +4116,9 @@ def run_multi_least_squares(models: list[CompiledModel],
             res = _lm_outcome(residual, jacobian, x0, lo, hi, max_nfev=max_nfev,
                               ftol=ftol,
                               inequalities=_pad_inequalities(
-                                  _joint_width_inequalities(models, mtable, x0[:n_table])
+                                  _joint_positivity_inequalities(
+                                      models, mtable, x0[:n_table])
+                                  + _joint_width_inequalities(models, mtable, x0[:n_table])
                                   + _joint_tied_bound_inequalities(
                                       mtable, x0[:n_table], lo[:n_table],
                                       hi[:n_table]), n_aux),

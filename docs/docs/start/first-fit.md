@@ -1,6 +1,6 @@
 # A first fit in Python
 
-This tutorial runs a refinement from Python, from a shipped example project to a two-phase Rietveld fit of synchrotron data.
+This tutorial runs a refinement from Python, from an example project included with the package to a two-phase Rietveld fit of synchrotron data.
 
 A fit takes three objects and returns one. You supply a `PatternData` from
 `read_pattern`, a `Structure` from a CIF, and an `Instrument` that describes the

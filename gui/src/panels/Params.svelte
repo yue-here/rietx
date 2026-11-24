@@ -24,6 +24,7 @@
    */
   import { ApiError, api } from "../api";
   import Help from "../Help.svelte";
+  import HeldMark from "../HeldMark.svelte";
   import { paramKey, resolve, type HelpCorpus } from "../lib/help";
   import { editText, expText, numParts, slotWidth, slotsFor, type NumParts,
            type Slots } from "../lib/numslot";
@@ -31,7 +32,7 @@
            type Section } from "../lib/paramtree";
   import type { ParamsDraft } from "../lib/recovery";
   import { typesetSpaceGroup } from "../lib/spacegroup";
-  import { asGlob, editState, heldGlyph, matches, normalize, selection,
+  import { asGlob, editState, matches, normalize, selection,
            validateEdit, varyEdit, varyOf, type ParamRow } from "../lib/table";
 
   let {
@@ -824,7 +825,7 @@
          one, and the mark says which reason holds it (WP-1214) -->
     <span class="mark muted">
       <Help text={row.held_because} title="This row is held"
-        label="why this row is held">{heldGlyph(row)}</Help>
+        label="why this row is held"><HeldMark {row} /></Help>
     </span>
   {/if}
 {/snippet}
