@@ -1,6 +1,6 @@
 # WP-1955 — a column at a zero aperture, and a column the agreement matrix cannot see
 
-Milestone: unscheduled · Status: 🔄 2026-11-24 — tasks 1-5 landed (PRs #1321, #1372; the gate test made deterministic, PR #PRNUM); tasks 6-8 open
+Milestone: unscheduled · Status: 🔄 2026-11-24 — tasks 1-5 landed (PRs #1321, #1372; the gate test made deterministic, PR #1821); tasks 6-8 open
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-11-03 — the stall and the collapse are fixed (tasks 2 and 5, PR #1372); left are the start value's evidence across families, the Gaussian-width floor and suggest's scoring of a zero aperture
@@ -222,7 +222,7 @@ alone.
   push against, which the fit lands on exactly whatever the rounding. It
   still fails when the gate it guards is removed. This entry is a ghostshift
   runner's, written so Mike can see what changed in his test; the PR is
-  #PRNUM. It is also the repair of the 2026-11-23 entry below, which the
+  #1821. It is also the repair of the 2026-11-23 entry below, which the
   session-start hook flagged as missing.
 
   *Done.* `test_an_aperture_an_earlier_stage_refined_is_not_lifted_again`:
