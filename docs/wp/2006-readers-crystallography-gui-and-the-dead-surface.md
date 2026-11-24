@@ -1,6 +1,6 @@
 # WP-2006 — Readers, crystallography and GUI codes, and the dead surface
 
-Milestone: generality · Status: 🔄 2026-11-17 — part 2's tiers in PR #1636: 218 rows tiered; 36 tier-3 candidates, the FullProf occupancy repair and three writer warnings wait on the maintainer
+Milestone: generality · Status: 🔄 2026-11-24 — PR #1636 merged with main and carries Mike's magnetic rows; three rows and a 4-fold reader defect back to Mike, a read-time tier question to Yue; the successor writes the 2026-11-21/22 rulings
 Track: The audits
 Depends on: 2001
 Priority: P3 2026-10-19 — 2001 closed, so nothing blocks it; expected mostly tier 1 (records of what was done to a file); the fast one
@@ -205,6 +205,144 @@ brief is in the 2026-11-21 handover entry).
 reading defaults.
 
 ## Handover log
+
+- **2026-11-24** — part 2 brought to merge, by a ghostshift runner. PR #1636.
+  The branch now merges cleanly with main, and Mike's ruling on its ten magnetic rows is in
+  the table as he gave it, after one pass of the generality judge. Six of those rows are now
+  tier 3 with a dated approval. Three are back with Mike, because the judge found each weak.
+  Three stay unaudited by his own ruling. The review also found a real defect on the magCIF
+  reader's path. A site 5e-4 to 1e-3 off a parent 4-fold axis is read under the parent and
+  built with twice the atoms the file states, with only an info note. It is recorded for
+  WP-1918 and is Mike's to rule. Mike's question about which ground wins for a read-time
+  default is a brief for Yue below. The PR does not wait on it.
+
+  *Done*: merged `origin/main` twice. The first merge had 19 conflicting hunks in
+  `_audit.py`. Each row was taken from the side that tiered it, and every hunk had one such
+  side. The two shrink-only baselines were merged as sets against the merge-base (a name stays
+  only if neither side dropped it). The five `SEQUENTIAL_WIDTH_GROWTH` rows main deleted
+  stayed deleted. The WP file's two handover entries were both kept, and the index
+  regenerated. Triage's "lint is red" was stale: the PR's last run (11-17, `5afc3cc3d`) was
+  green throughout. Mike's rows (comment of 2026-11-23 09:04Z, corrected 11:47Z):
+  `CIF_MAGNETIC_NUCLEAR_GROUP` is tier 3 and kind 2 with his approval, recorded as a
+  departure, and has its info response. The 1e-3 merge in `magcif._orbit_size` is now
+  `_ORBIT_MERGE_TOL` with a tier-3 row on his ruling that it "stays" and an injected mirror
+  case (`tests/test_magcif.py`, 1 test added). `MOMENT_DIRECTION_SUPPORT` is tier 3 on his
+  ruling. `SEED_TILT` (with his supercell clause) and `K_MAX_DENOMINATOR` (with his corrected
+  stakes) are tier 3, judge-checked. Back to Mike at `unaudited`, each with its reason in
+  the evidence: `CROSS_IRREP_DRAWS`, `INVARIANCE_MOMENT_TOL`, `INVARIANCE_POS_TOL`. Left
+  unaudited as he ruled: `MOMENT_FORM_AGREEMENT_MU_B` (retired, WP-1918 builds the box),
+  `WITHIN_IRREP_DRAWS` (its case is owed first), `CHILD_SITE_TOL` (takes `SITE_TOL`'s tier).
+  WP-1918's Inherited gained the 4-fold finding and the three returned rows.
+  `/code-review high --fix` found 9 items and fixed 5 nits. It declined 4: the 4-fold band
+  (Mike's), stale `magcif.py:` line citations in about 15 rows (a class-wide rewrite, left),
+  fullprof's own 1e-4 orbit count (another reader), and whether a refusal threshold such as
+  `K_MAX_DENOMINATOR` needs Mike rather than the judge (in the reply to Mike).
+  *Measured* (Darwin arm64, `[dev]`, merged with `origin/main` at `00f9c6bc3`): fast
+  selection 15 218 passed, 450 skipped, 32 xfailed in 565 s, 0 failed (one test added). Added-test cost: the one added test, 0.11 s locally. A first run on a tree I was still
+  editing failed `test_audit_delta.py::test_the_reader_agrees_with_the_import` once. It passed
+  alone and on the final tree. `tests.reader_output` exits 0. CI's lint steps run
+  locally against the merge-base: ruff, tutorial format, skill caps, skill surface, audit
+  delta (1 added, 228 changed, 0 new at `unaudited`), code references and rulebook limits
+  pass, and Vale reports 0 errors (282 warnings) over the manual and the tutorials. Probe of the 4-fold case: `P m m m` (BNS 47.249) under
+  `P 4/m m m`, a = b = 4 Å, O at d along x. At d = 3e-4 it is merged onto the axis. At d =
+  7e-4 it is read under the parent with O unmoved, 4 images where the file's group gives 2.
+  At d = 1.2e-3 it is read under the file's own group, `P m m m`.
+  *Generality* (judge, 2026-11-24, on this session's eleven rows), verdicts:
+  `CIF_MAGNETIC_NUCLEAR_GROUP` **weak** ("the keep rests on an unwritten class"; it holds once
+  a sentence admits a recorded read-time keep, which is Mike's question to Yue). Author:
+  Mike's approval stands, and the grounds now say it is a second-kind pick outside Rule 1's
+  two cases. `_ORBIT_MERGE_TOL` **weak** (the 4-fold band; "unexercised", not "measured").
+  Author: agreed. The evidence names the band and the grounds say "never exercises", and the
+  finding went to Mike. `CROSS_IRREP_DRAWS` **weak** ("`draws=` is the caller's" is false on
+  `solve_magnetic`, so it is an action's threshold). Author: agreed, back to Mike.
+  `MOMENT_DIRECTION_SUPPORT` **holds**. `SEED_TILT` **holds**. `INVARIANCE_MOMENT_TOL`
+  **weak** (Mike's 2-decimal FYI is a dissent). Author: agreed, back to Mike.
+  `INVARIANCE_POS_TOL` **weak** (a 3-decimal hexagonal pair can be 1.5e-3 apart). Author:
+  agreed, back to Mike. `K_MAX_DENOMINATOR` **holds**. The three left unaudited **hold**
+  (`WITHIN_IRREP_DRAWS` reworded: pairs at 3 draws do run, and what is missing is a case
+  where 3 and 12 differ). These are the verdicts and reasons only: the judge's full tables (about 10 kB) stay in the shift's scratch, a deliberate departure from pasting them whole.
+  *Settled by Claude* (most important first; checked blind by a fresh agent, which agreed on
+  all seven):
+  (1) `MOMENT_DIRECTION_SUPPORT` and `_ORBIT_MERGE_TOL` carry Mike's dated ruling, not the
+  judge's check. Grounds: each sets an automatic action's threshold, and WP-2238 keeps such
+  a constant off the judge (`CONTRIBUTING.md`, `/wp-handover` step 7). Alternative: the
+  judge's check, as his review routed rows 3-8.
+  (2) The merge was named and tiered in this PR. Grounds: Mike asked for its row, and a new
+  name may not enter at `unaudited`. Alternative: leave the literal and owe the row to
+  WP-1918.
+  (3) The three weak rows went back to Mike. Grounds: § The rule, "a disagreement goes to
+  the maintainer", and his "if the judge disagrees on one, send it back to me". Alternative:
+  keep them checked.
+  (4) `WITHIN_IRREP_DRAWS` stays unaudited until its case lands. Grounds: § The rule, a guard
+  no ordinary fit reaches is "recorded kept" only on its injected case. Alternative: tier 3
+  now.
+  (5) `MOMENT_FORM_AGREEMENT_MU_B` stays unaudited. Grounds: Mike retires it. Alternative:
+  tier it until WP-1918 lands.
+  (6) Kind 2 for the nuclear-group row. Grounds: Rule 1, two nested models the data could
+  score. Alternative: kind 3.
+  (7) The 4-fold defect was reported, not fixed. Grounds: it changes magnetic-path reader
+  output, which is Mike's (#1075). Alternative: fix it in this PR.
+  *For Mike* (draft reply in the shift's batch): the three returned rows; the 4-fold band;
+  whether a refusal threshold (`INVARIANCE_*`, `K_MAX_DENOMINATOR`) is an "action" for
+  WP-2238's exception; his FYI that the nuclear-group code fires at index 1 with nothing
+  chosen (777 of 883 MAGNDATA files on his count).
+
+  #### Brief for the maintainer: which ground wins for a read-time default
+
+  **The decision.** When a file reader fills an open choice by default, and some established
+  program makes the same choice while another program or a named competent refiner would
+  not, is the audit row tier 2 or tier 3? Mike asked for one sentence in `generality.md`
+  § The rule to settle it. It comes to you because it reads into your rule a meaning the
+  text does not state.
+
+  **Why it matters.** Tier 2 means the field already does this: a citation, or the same
+  default in one of the seven programs. Tier 3 means rietx chose it, and a tier-3 code row
+  needs a dated approval. The rule says two things that pull apart here. A program default
+  stays tier 2 even if another program does otherwise. And a default that switches on an
+  action still faces the judgement ground, where a named dissenter outweighs it. A reader's
+  pick is both a default and an act on the model. `SPACE_GROUP_SETTING_ASSUMED` is the live
+  case. A bare `F d -3 m` reads as origin 1, as TOPAS and gemmi do. GSAS-II 5.8.4 takes
+  origin 2, and the wrong origin swaps a spinel's A and B sites. You approved that row
+  "as it stands" on 2026-11-21, but its tier is unwritten and depends on this answer. Mike's
+  `CIF_MAGNETIC_NUCLEAR_GROUP` is the other: he ruled it tier 3 on the judgement ground. No
+  reader output or warning text changes either way. What changes is which rows need a dated
+  approval. Without a sentence, each such row comes back as a question, as these two did.
+  Importance: minor.
+
+  **Aim.** I read it as keeping the table honest about who decided: a pick a competent
+  refiner would make differently should not be filed as settled by the field. Correct me
+  if you see tier as provenance alone, kept apart from the approval gate.
+
+  **Options.** (1) The judgement ground wins at read time. A read-time default that changes
+  what is refined, with a named dissenter, is tier 3 with a dated approval, and the program's
+  default is cited as evidence. `SPACE_GROUP_SETTING_ASSUMED` becomes tier 3 under your
+  2026-11-21 approval. (2) Tier 2 wins at read time. The dissent goes in the row's
+  `ambiguity`, and the reader still surfaces the choice, as Rule 1's last paragraph requires.
+  `SPACE_GROUP_SETTING_ASSUMED` becomes tier 2 on TOPAS and gemmi, with GSAS-II named. (3) Do
+  nothing, and argue each row. Each option costs one sentence or none, and each can be undone.
+
+  **Practice.** This is a rule about rietx's own record, so no diffraction program has a
+  practice to follow. `generality.md` already says "an action here still faces the judgement
+  ground under tier 3 ... a named dissenter outweighs it" (ruled 2026-10-19). Rule 1's last
+  paragraph (ruled 2026-11-21) says a reader surfaces an open choice. Neither says whether
+  reading is acting.
+
+  **Recommendation.** Option 1, a lean. The crux is whether a read-time pick is an action. It
+  decides which parameters refine, or which atoms sit where, so it acts on the model in the
+  2026-10-19 ruling's sense. Option 2 lets one program's default stand for a choice Rule 1's
+  unanimity test fails. If you see tier as provenance alone, with the dissent recorded in
+  `ambiguity`, option 2 is the cleaner split. That part of the crux is a value judgement.
+
+  **Can PR #1636 merge without the answer?** Yes. No row the PR writes depends on it.
+  `CIF_MAGNETIC_NUCLEAR_GROUP` is tier 3 either way, since GSAS-II does not share rietx's
+  default. The PR's tier-2 reader rows name no dissenting program. The answer sets
+  `SPACE_GROUP_SETTING_ASSUMED`'s tier, which the PR leaves unaudited, and rows written later.
+
+  *Next*: Yue answers the brief, and Mike answers the reply (three rows, the 4-fold band,
+  the refusal-threshold reading). Then the successor PR writes those answers and the 2026-11-21
+  and 2026-11-22 rulings into `_audit.py` (§ Rulings 7-23), builds the consent lines' changes
+  with their tests, and closes the 36 rows left at `unaudited`. WP-1918 builds the print box
+  and settles the 4-fold band.
 
 - **2026-11-21** — A rulings triage, docs only (PR #1759), over this file and PR #1636's
   batch. The gate ruling this WP waited on was made on 2026-11-16, and PR #1636 has since
