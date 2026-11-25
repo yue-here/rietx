@@ -1,6 +1,6 @@
 # WP-2075 — The result records its fit range, and what lies outside it
 
-Milestone: unscheduled · Status: 🔄 2026-11-09 — tasks 1-4, 6 and 7 landed in PR #1480; task 5 and four rulings wait on the maintainer
+Milestone: unscheduled · Status: 🔄 2026-11-09 — tasks 1-4, 6 and 7 landed in PR #1480; task 5 and three rulings wait on the maintainer
 Track: What fires, and what stays silent
 Depends on: — (2005 soft: `LOW_ANGLE_UNMODELLED`'s retext points at this field)
 Priority: P3 2026-10-31 — a fact the result says less about than it could: the caller chose the cut, but after it nothing in the result says a cut happened or what it removed (42 % of the counts on the issue's planted case, 22.5 % on SRM 1976a)
@@ -79,8 +79,8 @@ chunk 2 is computed there.
       excluded regions declared and applied, counts in the file and in the fitted channels.
       JSON round-trip; `_audit` row at tier `caller`; `SCHEMA_VERSION` as ruled. (2026-11-09:
       `schemas.results.FitRange`, built by `report.fit_range.fit_range_record` in `_fit_pass`;
-      the schema rule is WP-1117's, so it joins 0.61, the version in flight since v1.11 shipped
-      0.60; `tests/test_fit_range.py`.)
+      the schema rule is WP-1117's, so it joins 0.62, the version in flight since v1.12 shipped
+      0.61; `tests/test_fit_range.py`.)
 - [x] `summary()`'s protocol block prints one line from it (in place of, or beside,
       `excluded:`, as ruled). (2026-11-09: beside it, the reversible choice, until ruled;
       `FitRange.line()`; the NAC termination golden gains the line.)
@@ -128,6 +128,18 @@ Cryst. 24, 1. Issue #1219; WP-1517 row 6; WP-1033 (the fitted mask).
 
 ## Handover log
 
+- **2026-11-25** — review fixes (the maintainer's review of 2026-11-24, PR #1480).
+  - `summary()` prints the `fit range:` line only where `fit_range.outside` is non-empty. An
+    uncut fit, or one that lost only σ ≤ 0 channels, prints none.
+  - `OutsideSpan.reflections` is `None` where no reflection list was read, and a list wherever
+    `fit` or `run_stage` read one.
+  - The two acceptance rows are tiered `identity` and `characterisation`.
+  - A test now holds the spans, the fitted channels and the σ ≤ 0 channels to a partition of the
+    file.
+  - Question (a) is answered: `CUT_WINDOW_DEG` was approved 2026-11-17 and `STRADDLE_FWHM`
+    2026-11-22. So `test_an_audited_row_carries_its_evidence` is green, and the 2026-11-09
+    Gotcha and its first Next step are done. Questions (b) to (d) and task 5 still wait.
+
 - **2026-11-09** — ghostshift runner, PR #1480; follow-ups in issue #1481.
   A fit's result now says which part of its file it fitted. It records the file's range, the limits
   and excluded regions as asked and as applied, and the counts on each side. For every stretch the
@@ -139,8 +151,8 @@ Cryst. 24, 1. Issue #1219; WP-1517 row 6; WP-1033 (the fitted mask).
   limit at the (420) centre puts 47 % of that reflection outside. SRM 1976a has 22.5 % below 20°.
   11-BM LaB6 660a has an 11.6σ feature at 62.8°. Nothing reads any of it to decide anything.
 
-  *Done.* `schemas.results.FitRange` / `OutsideSpan` / `ReflectionOutside` (schema 0.61, WP-1117's
-  rule, beside the other 0.61 entries); `report/fit_range.py` (`fit_range_record`, chunk 1;
+  *Done.* `schemas.results.FitRange` / `OutsideSpan` / `ReflectionOutside` (schema 0.62, WP-1117's
+  rule, beside the other 0.62 entries); `report/fit_range.py` (`fit_range_record`, chunk 1;
   `describe_outside` + `model_reflections`, chunk 2); `Refinement._attach_fit_range`, called by
   `fit`'s pass and by `run_stage` (the review found `run_stage` dropped the record); the summary line
   beside `excluded:`; `io/cif/powder.py`; `_audit` rows: `RefinementResult.fit_range` (action,
@@ -221,7 +233,8 @@ Cryst. 24, 1. Issue #1219; WP-1517 row 6; WP-1033 (the fitted mask).
     empty list there means nothing further out (#1481 item 2).
 
   *Questions for the maintainer* (also in the PR body):
-  - (a) The dated approval, or a retier, for `CUT_WINDOW_DEG` and `STRADDLE_FWHM`.
+  - (a) The dated approval, or a retier, for `CUT_WINDOW_DEG` and `STRADDLE_FWHM`. (Answered:
+    `CUT_WINDOW_DEG` approved 2026-11-17, `STRADDLE_FWHM` 2026-11-22.)
   - (b) Should the summary line replace `excluded:`? It now sits beside it.
   - (c) Should `fit_range` share one type with `ProjectDoc.two_theta_limits` and the recipe's
     `fit_range`? It now uses plain tuples (#1219 question 1).

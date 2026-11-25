@@ -720,11 +720,11 @@ A correction that provably cannot improve the fit, on real data. The whole of it
 
 #### `test_the_result_records_both_cuts_and_the_lines_above_60_degrees`
 
-`identity` · dataset `srm660a_capillary`
+`identity` `characterisation` · dataset `srm660a_capillary`
 
 **Claims:** the result's fit_range restates the suite's own limits against the file's range, and the stretch above the upper limit is reported with its share of the counts and its largest excess (WP-2075)
 
-**Referenced to:** the file's own first and last channels and the suite's limits (identity); the fitted count against len(result.two_theta)
+**Referenced to:** the file's own first and last channels and the suite's limits (identity); the fitted count against len(result.two_theta); the largest excess above 60 deg against the same statistic below 2 deg and against the refined cell's LaB6 lines (characterisation)
 
 **Measured:** 116001 of 132992 points; above 60 deg: share 0.030, an 11.6 sigma excess at 62.82 deg
 
@@ -1644,11 +1644,11 @@ The spherical-harmonics texture (WP-1960) on a sintered NIST SRM 1976a corundum 
 
 #### `test_the_result_records_the_range_cut_below_20_degrees`
 
-`identity` · dataset `srm1976a_plate`
+`identity` `characterisation` · dataset `srm1976a_plate`
 
 **Claims:** the result's fit_range restates the suite's limits (the upper one clipped to the scan's end) and reports the stretch below 20 deg with its share of the counts and its level at the cut (WP-2075)
 
-**Referenced to:** the file's own first and last channels and the suite's limits (identity); statistics.n_points
+**Referenced to:** the file's own first and last channels and the suite's limits (identity); statistics.n_points; the level at the cut against the fitted channels' median, and no corundum reflection listed below the cut (characterisation)
 
 **Measured:** 11793 of 13528 points; below 20 deg: share 0.225, level at the cut 2.80x the fitted median
 
