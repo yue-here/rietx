@@ -10,7 +10,7 @@ This page gives the pattern formats `read_pattern` opens, how it recognises each
 
 `read_pattern` identifies the format from the file's contents and passes the file to that format's reader.
 Pass a list as `diagnostics=` and every repair or assumption the reader made comes back in it.
-The same notes are kept on `PatternData.diagnostics` whether or not a list was passed, and every fit on the pattern repeats in its own `diagnostics` each note that still bears on that fit. A lossless repair (a reversed scan, a dropped repeat) and a note whose advice the caller has already taken are not repeated.
+The same notes are kept on `PatternData.diagnostics` whether or not a list was passed, and every fit on the pattern repeats in its own `diagnostics` each note that still bears on that fit. A lossless repair (a reversed scan, a dropped repeat) and a note whose advice was taken before the fit are not repeated.
 
 ```python
 import rietx as rx
