@@ -1,6 +1,6 @@
 # WP-2302 — A wrong choice is refused at the call, and a requested window has one name
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-25 — claimed by ghostshift runner
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P2 2026-11-23 — a defect that fires wrongly: a misspelt `mode` raises late with an error naming an internal schema, and `Refinement.parameters(mode=...)` answers silently
