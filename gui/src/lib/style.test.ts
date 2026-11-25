@@ -31,7 +31,9 @@
  * matches no register name.  Nothing in `gui/` nests today; a panel that
  * starts to needs this parser replaced, not extended.
  *
- * `app.css` itself is exempt: it is where the argument is had.
+ * `app.css` itself is exempt: it is where the argument is had.  So, until the
+ * rebuilt page replaces today's, is `next/next.css`, which draws the
+ * rebuild's registers and their variants (WP-2246).
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -40,15 +42,19 @@ import { describe, expect, it } from "vitest";
 
 const SRC = fileURLToPath(new URL("../", import.meta.url));
 
-/** `App.svelte` and every panel — the files a register can be redeclared in. */
+/** The `.svelte` files directly under one directory of `src/`, sorted. */
+const svelteIn = (dir: string) =>
+  readdirSync(`${SRC}${dir}`)
+    .filter((f) => f.endsWith(".svelte"))
+    .sort()
+    .map((f) => `${dir}/${f}`);
+
+/**
+ * `App.svelte`, every panel and every component of the rebuilt page
+ * (`next/`, WP-2246) — the files a register can be redeclared in.
+ */
 function styledFiles(): string[] {
-  return [
-    "App.svelte",
-    ...readdirSync(`${SRC}panels`)
-      .filter((f) => f.endsWith(".svelte"))
-      .sort()
-      .map((f) => `panels/${f}`),
-  ];
+  return ["App.svelte", ...svelteIn("panels"), ...svelteIn("next")];
 }
 
 /** Every file a class name can be *used* in. */
@@ -89,7 +95,10 @@ interface Rule {
   declarations: string[];
 }
 
-/** Flat rules — the panels' style blocks carry no at-rules and no nesting. */
+/**
+ * Flat rules.  A rule inside an `@media` block is still read, because the
+ * match starts after the at-rule's brace; nesting is not (see above).
+ */
 function rules(block: string): Rule[] {
   const out: Rule[] = [];
   for (const m of block.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
@@ -112,6 +121,9 @@ const REGISTERS: Array<[string, RegExp]> = [
   // the label-as-button: `app.css` draws it, and it is here because it is the
   // one register that *was* written twice at two geometries before WP-1201
   [".file", /\.file(?![\w-])/],
+  // the icon button, a kind in `gui/STYLE.md` § Components (WP-2246); the
+  // rebuild draws it in `next/next.css`
+  [".ib", /\.ib(?![\w-])/],
 ];
 
 // `font` is the shorthand and sets a size; the long-hand paddings and corner
@@ -126,7 +138,8 @@ describe("the control registers are declared once, in app.css", () => {
     // guard's coverage is a silent property of a regex.
     const empty = styledFiles().filter((rel) => styleBlock(read(rel)).trim() === "");
     expect(empty).toEqual([]);
-    expect(styledFiles().length).toBeGreaterThanOrEqual(14);
+    expect(styledFiles().filter((rel) => rel.startsWith("panels/")).length).toBeGreaterThanOrEqual(13);
+    expect(styledFiles().filter((rel) => rel.startsWith("next/")).length).toBeGreaterThanOrEqual(26);
   });
 
   it("no panel gives a register its own size, padding or radius", () => {
@@ -159,7 +172,17 @@ describe("the control registers are declared once, in app.css", () => {
     // Three steps: --text (prose), --text-sm (a control and its row),
     // --text-xs (a chip and a section heading).  A fourth is a decision, and
     // it is taken in app.css or not at all.
-    expect(found).toEqual([]);
+    //
+    // Two sizes in the rebuild are no step, and each is a visual question
+    // for the maintainer (WP-2246), so they are listed rather than moved:
+    // the space group after a phase's name in Parameters, 6 % over the
+    // words, and a unit beside its number, at 0.87 of it.  Ruling either
+    // removes its line here.
+    const OFF_SCALE = [
+      "next/Params.svelte: font-size: calc(var(--text) * 1.06)",
+      "next/Params.svelte: font-size: 0.87em",
+    ];
+    expect(found).toEqual(OFF_SCALE);
   });
 });
 
@@ -255,17 +278,51 @@ describe("one filled primary per view", () => {
       "panels/NewProject.svelte": 1,
       "panels/Recovery.svelte": 1,
       "panels/Start.svelte": 1,
+      // The rebuild, as it draws today (WP-2246, measured in a browser:
+      // a bare button there is the accent fill, and every classed one this
+      // test lets through draws no fill).  Its action bar's Refine and its
+      // start screen's New project… are the two above, moved.  The rest are
+      // a step's or a form's own primary, each in a branch of its own:
+      // Ask's send, Candidates' Judge ›, Index, Apply and Adopt as a Pawley
+      // start, Indexing's Pick peaks twice, Instrument's Apply, Plan's
+      // Done, Series' Run series twice and See results, SpaceGroup's
+      // Change and Structure's Save.  Whether each may stand beside the
+      // action bar's filled Refine is the maintainer's look, not this
+      // test's; the table holds the count so a new one is seen.
+      "next/ActionBar.svelte": 1,
+      "next/Ask.svelte": 1,
+      "next/Candidates.svelte": 4,
+      "next/Indexing.svelte": 2,
+      "next/Instrument.svelte": 1,
+      "next/Plan.svelte": 1,
+      "next/Series.svelte": 3,
+      "next/SpaceGroup.svelte": 1,
+      "next/Start.svelte": 1,
+      "next/Structure.svelte": 1,
     };
     // `.ink` is the Parameters panel's number (WP-2126): the value itself,
     // tinted because it can be edited, whose press opens the editor over it.
     // It carries no fill of the accent, so it is no second primary.
     const OTHER = /\bclass="[^"]*\b(ghost|tab|pick|link|help|ink)\b/;
+    // The rebuild's icon, menu and step buttons are drawn unfilled in
+    // `next.css`, and many a piece draws a button of its own class on a
+    // ground of its own (Interactive's `.pname`, Pattern's `.axis`).  A class
+    // is read as unfilled where a rule whose last compound is that class
+    // alone, in the file or in `next.css`, sets a background that is not the
+    // accent, or unsets everything.
+    const nextCss = read("next/next.css").replace(/\/\*[\s\S]*?\*\//g, "");
     const filled: Record<string, number> = {};
     const tags: string[] = [];
     for (const rel of styledFiles()) {
-      for (const tag of buttonTags(read(rel))) {
+      const source = read(rel);
+      const own = styleBlock(source) + (rel.startsWith("next/") ? nextCss : "");
+      const grounded = groundedClasses(own);
+      for (const tag of buttonTags(source)) {
         tags.push(tag);
-        if (OTHER.test(tag) || /\bclass:(ghost|on)=/.test(tag)) continue;
+        if (OTHER.test(tag) || /\bclass:(ghost|on)\b/.test(tag)) continue;
+        const classes = (tag.match(/\bclass="([^"]*)"/)?.[1] ?? "")
+          .replace(/\{[^{}]*\}/g, " ").split(/\s+/).filter(Boolean);
+        if (classes.some((c) => grounded.has(c))) continue;
         filled[rel] = (filled[rel] ?? 0) + 1;
       }
     }
@@ -273,7 +330,38 @@ describe("one filled primary per view", () => {
     expect(tags.some((tag) => tag.includes("=>"))).toBe(true);
     expect(filled).toEqual(ALLOWED);
   });
+
+  it("reads a class as unfilled only where its own rule grounds it", () => {
+    const css = `
+      .a { background: none } .b { all: unset } .p .c { background: var(--hover) }
+      .d { background: var(--accent-ink) } .e:hover { background: none }
+      .f[aria-pressed="true"] { background: none } .g { color: red }`;
+    expect([...groundedClasses(css)].sort()).toEqual(["a", "b", "c"]);
+  });
 });
+
+/**
+ * The classes a stylesheet gives a ground of their own: a rule whose last
+ * compound selector is a bare class (an element name may lead it), with no
+ * state, setting a background other than the accent or unsetting every
+ * property.  Such a button is not the register's filled primary.
+ */
+function groundedClasses(css: string): Set<string> {
+  const out = new Set<string>();
+  for (const rule of rules(css)) {
+    const grounds = rule.declarations.some(
+      (d) => /^all\s*:\s*unset/.test(d)
+        || (/^background(-color)?\s*:/.test(d) && !/accent/.test(d)),
+    );
+    if (!grounds) continue;
+    for (const selector of rule.selectors) {
+      const last = selector.split(/[\s>+~]+/).pop() ?? "";
+      const m = /^(?:[a-z]+)?((?:\.[\w-]+)+)$/.exec(last);
+      if (m) for (const c of m[1].slice(1).split(".")) out.add(c);
+    }
+  }
+  return out;
+}
 
 /**
  * A glyph whose default presentation is emoji draws in colour, at the emoji

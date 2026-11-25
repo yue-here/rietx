@@ -53,6 +53,42 @@ new page, which the milestone record says it must be for every rebuild piece.
 - Rulebook: `gui/CLAUDE.md` and `gui/STYLE.md`. Commands: `npm --prefix gui test && npm
   --prefix gui run check`, then rebuild the committed dist if any `.svelte` or `.css` moved.
 
+### Measured (2026-11-25, at `0e79e455f`)
+
+- (1) and (2) over the 26 `next/*.svelte` files reproduce the counts above: 4 geometry
+  overrides, 6 with `.ib`, and the same 2 literal sizes. Adding `.mbtn` to `REGISTERS` adds
+  none, since no piece sets a menu button's size, padding or radius.
+- (3): a browser pass over `/next` (example `fap`, every Graphs, Model and bottom tab)
+  read the computed background of 188 distinct buttons. Two drew the accent fill: the start
+  screen's New project… and the action bar's Refine, both bare buttons. Every classed button
+  it saw drew no fill: `.ib`, `.mbtn`, `.step` from `next.css`, and the pieces' own classes
+  (`.pname`, `.axis`, `.gut`, `.x`, `.term`, `.entry`, `.facts`, `.reset`, `.num`), each
+  with a background rule of its own. The test's old reading counted 69 of these as filled.
+  Read the way the page draws them, 16 buttons in 10 files are filled. Each is a step's or
+  a form's own primary, mostly in `{#if}` branches of each other (list in
+  `lib/style.test.ts`'s `ALLOWED`).
+- The old check skipped `class:on=…` but not the shorthand `class:on`, so Candidates'
+  time-limit options, a segmented choice, counted as filled.
+
+### Questions for the maintainer
+
+1. **Is the menu button (`.mbtn`) a register?** `gui/STYLE.md` § Components has no row for
+   it. It is a word and a chevron on the top bar (`next/Frame.svelte`, the workflow menu) and
+   the Plan's name (`next/Plan.svelte`). Making it one adds a Components row and one line to
+   `REGISTERS`, and today fails nothing.
+2. **Where do the rebuild's drawings live?** STYLE.md says "The drawings live in
+   `gui/src/app.css`". The rebuild draws `.ib`, `.mbtn` and `.step` in `next/next.css`, and
+   this WP moved three variants there: `.ib.words` (the Plan's "+ Stage", from
+   `next/Plan.svelte`), `button.op` (the Plan add dialog's option rows, from
+   `next/Plan.svelte`) and `.jump .link` (Parameters' links row, from `next/Params.svelte`).
+   Either the sentence names `next.css` until the swap, or these drawings move into `app.css`
+   now. Neither changes a pixel.
+3. **Two type sizes are off the scale**, both in `next/Params.svelte`. The space group after
+   a phase's name (`.bt .sg`, line 1583) is `calc(var(--text) * 1.06)`, 14.8 px beside 14 px
+   words. A unit beside its number (`.unit`, line 1712) is `0.87em`, about 12.2 px beside a
+   14 px number. Moving them to `--text` (14 px) and `--text-sm` (13 px) changes what is
+   drawn, so they wait on `OFF_SCALE` in `lib/style.test.ts`.
+
 ### Inherited
 
 ## Non-goals
@@ -64,16 +100,17 @@ new page, which the milestone record says it must be for every rebuild piece.
 
 ## Tasks
 
-- [ ] `styledFiles()` reads `next/*.svelte`; the parse-coverage assertion counts them.
-- [ ] `.ib` joins `REGISTERS`; `.mbtn` and the `app.css`-only sentence of STYLE.md go to the
+- [x] `styledFiles()` reads `next/*.svelte`; the parse-coverage assertion counts them.
+- [x] `.ib` joins `REGISTERS`; `.mbtn` and the `app.css`-only sentence of STYLE.md go to the
       maintainer as questions, with the overrides listed.
-- [ ] The geometry overrides and literal font sizes found are moved or ruled, so (1) and (2)
-      pass over `next/`.
-- [ ] The one-filled-primary check restated for `/next` from what the page draws, with its
+- [x] The geometry overrides and literal font sizes found are moved or ruled, so (1) and (2)
+      pass over `next/`. The six geometry overrides moved to `next.css`; the two font sizes
+      sit on the test's `OFF_SCALE` list until the maintainer rules (§ Questions 3).
+- [x] The one-filled-primary check restated for `/next` from what the page draws, with its
       `ALLOWED` table.
-- [ ] Tests: the vitest suite and svelte-check green; a deliberately added override in a
+- [x] Tests: the vitest suite and svelte-check green; a deliberately added override in a
       `next/` file fails the guard (run red once).
-- [ ] Skill: none. The guard is a test over the GUI's source and changes nothing an agent
+- [x] Skill: none. The guard is a test over the GUI's source and changes nothing an agent
       driving rietx reads.
 
 ## Acceptance

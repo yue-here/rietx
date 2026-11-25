@@ -332,3 +332,53 @@ button.ghost:not(.pick, .tab, .link, .ib, .mbtn, .step) {
   gap: 8px;
   white-space: nowrap;
 }
+
+/* Variants of a register that one piece draws at its own geometry. They are
+   declared here rather than in the piece, because `lib/style.test.ts` fails a
+   piece that sets a register's size, padding or radius (WP-2246). Each was
+   moved from its piece unchanged. */
+
+/* an icon button that carries a word instead of an icon: the Plan's
+   "+ Stage" and each stage's add */
+.ib.words {
+  padding: 0 8px;
+  font-size: var(--text);
+}
+
+/* an option row in the Plan's add dialog: a button laid out as a list row */
+button.op {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: auto;
+  min-height: 28px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--fg);
+  font-size: var(--text-sm);
+  font-weight: 400;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.op:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+
+@media (hover: hover) {
+  button.op:hover:not(:disabled) {
+    background: var(--hover);
+  }
+}
+
+/* the Parameters links row: a word per band, underlined at rest */
+.jump .link {
+  padding: 2px 0;
+  color: var(--accent-ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
