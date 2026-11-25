@@ -99,7 +99,7 @@ Written once the question is answered.
 
 ## Handover log
 
-- **2026-11-25** (ghostshift runner, filed). The tutorial outputs on `main` are 1.12.0's,
+- **2026-11-25** (ghostshift runner, filed in PR #1846). The tutorial outputs on `main` are 1.12.0's,
   on purpose. Main's code has since changed the stages or diagnostics six of the seven executed notebooks
   print. Tutorial 01's prose and one cell of 04's are now untrue for anyone who runs them
   against `main`. Nothing was regenerated. Regenerating is option B's first step, and which
