@@ -2779,10 +2779,12 @@ ROWS: tuple[Row, ...] = (
                   "derived from macro arguments or an expression the file refines (@) and "
                   "no one declaration carries its flag, so it is built held "
                   "(io/projects/topas_tof.py TopasTOFBank.held, to_tof_refinement); the "
-                  "model has one free parameter fewer per coefficient than the file's "
-                  "refinement, and io/CLAUDE.md classes a flag the model cannot honour as "
+                  "model has one free parameter fewer per name the file refines (one name "
+                  "can feed several coefficients), and io/CLAUDE.md classes a flag the "
+                  "model cannot honour as "
                   "dropped at warning, naming what it costs "
-                  "(tests/test_projects_topas_tof.py::test_a_refined_macro_argument_the_bank_cannot_carry_is_named)"),
+                  "(tests/test_projects_topas_tof.py::test_a_refined_macro_argument_the_bank_cannot_carry_is_named, "
+                  "::test_the_held_flag_counts_the_files_refined_names_not_the_coefficients)"),
         response="warning",
         responds=("quote no width or calibration from a fit of the built bank as the file's "
                   "refinement: the named coefficients were held; free them and refit first")),
@@ -8175,8 +8177,10 @@ ROWS: tuple[Row, ...] = (
                   'convention, ranks nothing')),
     Row("TOPAS_TOF_FLAG_HELD.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence=("read io/projects/topas_tof.py to_tof_refinement: names the call that "
-                  "frees the held coefficients (Refinement.set_vary) before a comparison "
-                  "with the file's own fit; ranks nothing")),
+                  "frees the held coefficients (Refinement.set_vary) and says what that "
+                  "refines against the file: a larger space where the coefficients "
+                  "outnumber the file's refined names, the same size in other parameters "
+                  "otherwise; ranks nothing")),
     Row("VARIABLE_NOT_FREED.suggestion", "suggestion", tier=1, ambiguity=3, value=2,
         evidence=("arithmetic: names the stage turn_on that frees the variable, the only "
                   "route a plan has, and picks nothing: holding it may be the caller's "

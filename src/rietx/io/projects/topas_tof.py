@@ -731,7 +731,11 @@ def _read_shape(bank, text, names, symbols, reads) -> None:
                         "names, do not read")
         else:
             f, e = float(fw.value), float(lor.value)
-            bank.flag("widths", [r.name or "TOF_PV" for r in (fw, lor) if r.vary])
+            # an unnamed refined argument is labelled by its place, so two of
+            # them count as the two names the file refines, not as one
+            bank.flag("widths", [r.name or label for r, label in (
+                (fw, "TOF_PV's FWHM"), (lor, "TOF_PV's Lorentzian fraction"))
+                if r.vary])
             fwhm_law = lambda d, f=f, t1=t1: 1e-5 * f * t1 * d  # noqa: E731
             eta_law = lambda d, e=e: e                            # noqa: E731
             bank.sources["widths"] = "TOF_PV"
@@ -772,7 +776,8 @@ def _read_shape(bank, text, names, symbols, reads) -> None:
                         "constant it names, do not read")
             continue
         bank.flag("exponentials",
-                  [r.name or "TOF_Exponential" for r in (a0, a1) if r.vary])
+                  [r.name or f"the {side} TOF_Exponential's {which} coefficient"
+                   for r, which in ((a0, "first"), (a1, "second")) if r.vary])
         sides[side].append(lambda d, a=a0.value, b=a1.value, w=w, t1=t1:
                            LN1000 * (a + b / d ** w) / t1)
     for expr in _keyword_values(text, "exp_conv_const"):
@@ -895,22 +900,46 @@ def to_tof_refinement(model, *, dataset: int, two_theta_bank_deg: float,
         raise ValueError(f"two_theta_bank_deg must lie in (0, 180), got "
                          f"{two_theta_bank_deg}")
     if bank.held and diagnostics is not None:
+        # what the file refines is its names, and what the bank holds is its
+        # coefficients; the two counts differ (one TOF_PV width feeds σ and γ),
+        # so the gap in free parameters is the names' count (#1548 round-2,
+        # item 5)
+        names = list(dict.fromkeys(n for _, ns in bank.held for n in ns))
+        n_names, n_held = len(names), len(bank.held)
+        plural = "" if n_names == 1 else "s"
+        if n_held > n_names:
+            space = (f"a larger space than the file's: {n_held} coefficients "
+                     f"each free on its own, where the file refines "
+                     f"{n_names} name{plural} that "
+                     f"{'moves them' if n_names == 1 else 'move them'} "
+                     f"together, so a fit freed that way is not the file's "
+                     f"refinement either")
+        else:
+            space = (f"{n_held} coefficient{'' if n_held == 1 else 's'} "
+                     f"where the file refines {n_names} name{plural}: no "
+                     f"larger a space than the file's, but in other "
+                     f"parameters, so the esds and correlations are the "
+                     f"coefficients' and not the file's names'")
         diagnostics.append(Diagnostic(
             level="warning", code="TOPAS_TOF_FLAG_HELD",
             where=[path for path, _ in bank.held],
             message=(f"{model.path or '<model>'}: dataset {dataset} refines "
-                     + "; ".join(f"{path.rsplit('.', 1)[-1]} (through "
-                                 f"{', '.join(names)})"
-                                 for path, names in bank.held)
-                     + ", and each is derived from a macro's arguments or an "
-                       "expression rather than one declaration, so it is "
-                       "read as held: the built model has "
-                     + f"{len(bank.held)} free parameter"
-                     + ("" if len(bank.held) == 1 else "s")
-                     + " fewer than the file's refinement."),
-            suggestion=("Free the named coefficients on the built instrument "
-                        "(Refinement.set_vary) before comparing a fit with "
-                        "the file's.")))
+                     f"{n_names} name{plural} ({', '.join(names)}) through a "
+                     f"macro's arguments or an expression, and this bank "
+                     f"derives {n_held} coefficient"
+                     f"{'' if n_held == 1 else 's'} from "
+                     f"{'it' if n_names == 1 else 'them'} rather than reading "
+                     f"each from one declaration ("
+                     + "; ".join(f"{path.rsplit('.', 1)[-1]} from "
+                                 f"{', '.join(ns)}"
+                                 for path, ns in bank.held)
+                     + f"). Each is read as held, so the built model has "
+                       f"{n_names} free parameter{plural} fewer than the "
+                       f"file's refinement."),
+            suggestion=("Freeing the named coefficients on the built "
+                        "instrument (Refinement.set_vary) refines "
+                        f"{space}; compare with the file's fit with that in "
+                        "mind.")))
     template = ProfileTOF()
     profile = ProfileTOF(**{k: v.model_copy(update={
         "unit": getattr(template, k).unit, "min": getattr(template, k).min,

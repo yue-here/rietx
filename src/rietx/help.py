@@ -5105,8 +5105,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "macro's arguments or an expression, such as the width in `TOF_PV`. The "
             "bank's coefficient is derived from those arguments, so no one declaration "
             "carries its refine flag, and it is built held at the file's value. The "
-            "built model then has fewer free parameters than the file's own refinement. "
-            "Free the named coefficients before you compare a fit with the file's."
+            "built model then has one free parameter fewer per name the file refines. "
+            "Freeing the named coefficients is not the file's refinement either: where "
+            "one name feeds several coefficients, it frees a larger space than the "
+            "file's. Compare a fit with the file's with that in mind."
         ),
     ),
     "VARIABLE_NOT_FREED": HelpEntry(

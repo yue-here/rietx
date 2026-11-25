@@ -424,3 +424,37 @@ def test_a_refined_macro_argument_the_bank_cannot_carry_is_named(tmp_path):
     TT.to_tof_refinement(model, dataset=0, two_theta_bank_deg=90.0,
                          diagnostics=quiet)
     assert "TOPAS_TOF_FLAG_HELD" not in [d.code for d in quiet]
+
+
+def test_the_held_flag_counts_the_files_refined_names_not_the_coefficients(
+        tmp_path):
+    """#1548 round-2 item 5.  What the file refines is its names, and what the
+    bank holds is its coefficients; on the fixture's ``TOF_PV(@, 50, @, 0.3)``
+    both are two, so a message counting coefficients passed by coincidence.
+    ``TOF_PV(@fw, 50, !lor, 0.3)`` refines one name that feeds two
+    coefficients (σ₁ and γ₁ both follow the FWHM): the built model is one
+    free parameter short of the file's, not two, and freeing both
+    coefficients is a larger space than the file's one name."""
+    model, bank = _bank(tmp_path, phase=_PHASE + _SHAPE.replace(
+        "TOF_PV(@, 50, @, 0.3", "TOF_PV(@fw, 50, !lor, 0.3"))
+    assert len(bank.held) == 2
+    assert {n for _, names in bank.held for n in names} == {"fw"}
+    diagnostics = []
+    TT.to_tof_refinement(model, dataset=0, two_theta_bank_deg=90.0,
+                         diagnostics=diagnostics)
+    (d,) = [d for d in diagnostics if d.code == "TOPAS_TOF_FLAG_HELD"]
+    assert len(d.where) == 2
+    assert "refines 1 name (fw)" in d.message
+    assert "1 free parameter fewer" in d.message
+    assert "larger space than the file's" in d.suggestion
+
+    # two unnamed refined arguments are two names, not one ``TOF_PV``
+    (tmp_path / "unnamed").mkdir()
+    model, bank = _bank(tmp_path / "unnamed")
+    diagnostics = []
+    TT.to_tof_refinement(model, dataset=0, two_theta_bank_deg=90.0,
+                         diagnostics=diagnostics)
+    (d,) = [d for d in diagnostics if d.code == "TOPAS_TOF_FLAG_HELD"]
+    assert "refines 2 names" in d.message
+    assert "2 free parameters fewer" in d.message
+    assert "larger space" not in d.suggestion
