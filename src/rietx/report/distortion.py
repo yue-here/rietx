@@ -342,11 +342,14 @@ def _a_det(restricted, phase: int, modes: list[int], target: float,
     result = restricted.result_
     tt = np.asarray(result.two_theta)
     sigma = np.asarray(result.sigma)
-    y0 = np.asarray(restricted.predict(tt))
     even = _dist.amplitude_action(restricted.structure.phases[phase]).even(
         _amplitudes(restricted.structure.phases[phase]))
     lambdas, exponents = [], []
     probe = restricted._trial(record=False)
+    # the baseline from the probe too: it has not fitted, so it compiles at
+    # the default peak cut, while the fitted object compiles at its fit's
+    # (WP-2235) and every λ would gain the tails between the two
+    y0 = np.asarray(probe.predict(tt))
     for i in modes:
         path = _AMP.format(phase, i)
         probe.set_values({path: probe_amplitude})

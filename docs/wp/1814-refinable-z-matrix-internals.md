@@ -68,6 +68,27 @@ The proposal (#759 § 1), taken as the plan on 2026-10-16:
 
 ## Handover log
 
+- **2026-11-24** — repair, by a ghostshift runner, PR #1817. The session-start hook
+  flagged this WP because a `WP-1814:` commit of 2026-11-13 was newer than the last entry
+  (2026-11-09). The entry below reconstructs it from `git log` and the two merged PRs. No
+  task is ticked, because each merge did half of a task. The Status line was left as it
+  was. Its words "chunk C1 … is on branch `wp1814/c1-restrain-or-refine`" are stale:
+  C1 merged on 2026-11-17. Mike's PR #1665 (C2b, Z-matrix bodies refine their internals)
+  is open and in flight, so it is not recorded here. *Next*: #1665's review under
+  `/pr-review`.
+
+- **2026-11-13** (reconstructed post hoc) — Both 2026-11-09 chunks are on `main`. The
+  placement and its exact tangent merged as PR #1509 on 2026-11-12. Chunk C1 merged as PR
+  #1510 on 2026-11-17, carrying commit `1269d900` of 2026-11-13. That commit applies Yue's
+  ruling of 2026-11-13 on #1510's two questions. (b): warn and keep the row, so
+  `RESTRAINT_ON_FIXED_BODY_GEOMETRY` became a `level="warning"` diagnostic on
+  `CompiledRestraints.findings`, carried to `result.diagnostics`, with no
+  `RestraintRefused` raise. (a): the structural reading. The commit also updates the audit
+  row (tier 1, ambiguity 3, response warning), the skill's diagnostics row in all three
+  copies, `help.py` and the suggestion, which gains a fourth way out: keep the row. It
+  rewrote the 2026-11-09 C1 entry below in place to say so, and added no dated entry,
+  which is what the hook flagged. The commits do not record #1510's merge gate.
+
 ### 2026-11-09 — the placement and its exact tangent
 
 A Z-matrix can now be differentiated exactly: `fragments.zmatrix_points`
