@@ -64,7 +64,9 @@ Tier: none. The notes are the reader's existing codes, already in `_audit`.
   histogram in a joint fit). A series fits each pattern through `refine`, so it inherits the
   seam. The joint fit calls the helper in its per-histogram loop, with a `DIAGNOSTIC_SCOPES`
   row.
-- [x] `src/rietx/io/CLAUDE.md` § the repairs: the notes reach the fit.
+- [x] Rulebook: none. The rule lives in `read_pattern`'s and `refine._reader_diagnostics`'
+  docstrings. A paragraph in `src/rietx/io/CLAUDE.md` overran its byte budget by 514 B
+  (`tests.rulebook_limits`), and a reader needs no wiring beyond the list it is handed.
 - [x] Tests: one fixture per repair code, read without a list, asserting the code in
   `result.diagnostics`. `tests/test_reader_notes.py`, seven cases.
 - [x] Skill: none. The codes already have rows; they now arrive where the skill already sends
@@ -109,7 +111,7 @@ carries that code in `result.diagnostics` exactly once.
   once the fit has no measured σ). An exact repeat is dropped; two reader notes sharing a code
   with different messages both pass. `Project.create` puts its option pre-filter's
   `READER_OPTION_IGNORED` on the pattern too, and `rietx compare`'s FAP standard keeps the notes
-  when it rebuilds its pattern. `read_pattern`'s docstring, `io/CLAUDE.md`, the manual
+  when it rebuilds its pattern. `read_pattern`'s docstring, the manual
   (`reference/data.md` field row, one sentence in `reference/pattern-files.md`), the
   `PATTERN_SCAN_REVERSED` skill row and the generated skill API index name the new channel; the
   skill copies are re-synced.
