@@ -82,6 +82,34 @@ docstring names it a parameter dot-path.
 Tier of what this WP adds: none. A refusal of a value outside a declared set is not a
 heuristic, so `_audit` gains no row.
 
+### Inherited
+
+- **2026-11-25, from the issue triage (issue #1837): the "did you mean" hint quotes every
+  suggestion as one name.** `_nearmiss.did_you_mean` (`src/rietx/_nearmiss.py:83`) applies
+  `!r` to the joined string, so `rx.read_patern` answers `did you mean 'read_pattern,
+  index_pattern, read_topas_inp'?`. A caller who copies the quoted text gets a name that does
+  not exist. Expected: `'read_pattern', 'index_pattern' or 'read_topas_inp'`. Every hint goes
+  through this one function (11 call sites), so the refusals this WP adds inherit the fix.
+  One suggestion prints as before. Tests matching the hint text: `test_params_surface.py`,
+  `test_expression.py`, `test_derived_block.py`, `test_schemas.py`,
+  `test_parametric_expression.py`. Checked against the tree at `21c574dc6`: line 83 as
+  quoted. A sibling seen while probing: `rx.structure_from_cif` suggests
+  `MicrostructureTerm`, because the near-miss ranks spelling over the top-level namespace and
+  the name lives in `rietx.crystallography.cif`. Not generalised here: whether a hint should
+  name a submodule's match is this WP's message-form survey to weigh.
+- **2026-11-25, from the issue triage (issue #1835): a symbol whose other origin matches the
+  operator list is refused with the doubled-cell remedy.** `Phase(space_group="F d -3 m",
+  symmetry_operations=<origin choice 2's 192>)` is refused by `_operation_list_refusal`
+  (`src/rietx/schemas/structure.py:122-135`): 168 of each side's operations are missing from
+  the other, and the message tells the caller to bracket the label as a doubled cell would.
+  The list is the same type in its other setting, and `F d -3 m:2` accepts it (probed at
+  `21c574dc6`). The fix: when the list equals the operations of another tabulated setting of
+  the same symbol, the refusal names that setting. **Decided 2026-11-25** (settled by Claude
+  under CLAUDE.md § Invariants, "a silent correction is a reader's to make, never a
+  table's"): the constructor keeps refusing, because the schema has no diagnostics channel
+  to record a relabel. The reader path already settles it: `structure_from_cif` reads a CIF
+  printing the bare symbol over an origin-2 symop loop as `F d -3 m:2` (probed, same sha).
+
 ## Non-goals
 
 - Glob verbs that return `[]` in silence: WP-2303.
