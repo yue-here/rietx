@@ -262,30 +262,37 @@ SOLVE_STAGE_NAMES: tuple[str, ...] = ("moduli", "moment", "all")
 #: not vendored).
 SOLVE_RELEASE_FRACTION = 0.05
 
-#: Separation of the **moduli** above which two starts of one candidate ended
-#: in different minima rather than in one minimum reached twice
-#: (:func:`_distinct_minima`): some site's |m| differs by more than this
-#: fraction of the largest |m| either start carries.  Moduli and not Rwp,
-#: because two minima of one model can sit at one Rwp: on the two-site Pnma
-#: set (Mn1 4b and Mn2 4a related by c/2, 3.5 and 0.7 μ_B, issue #1424; 24
-#: noise draws) the swapped assignment's Rwp differs from the truth's by 1.0e-4
-#: relative (median) and one minimum's own stopped starts by 1.1e-4, so the
-#: Rwp test that stood here until 1.x (1e-4, never measured) miscounted the
-#: solve's three starts on 15 of 24 draws.  In moduli the two separate: the
-#: minima differ by at least 2.79 μ_B, 0.80 of the largest, and one minimum's
-#: stopped starts by at most 0.011 μ_B, 3.2e-3 of it.  The edge is a candidate
-#: whose moduli all sit near zero (a wrong group answering ~0.1 μ_B), where a
-#: hundredth of a μ_B is a few percent: over every class of those draws and of
-#: eight with B(Mn2) = 1.2, one minimum's starts differ by at most 0.058 and
-#: different minima by at least 0.147, and the value sits in that gap.  A
-#: modulus at or below :data:`~rietx.schemas.structure.MOMENT_FLOOR_MU_B` reads
-#: as the floor, so two starts that both removed a moment are one minimum.
-#: Out of scope: the tolerance is read against the largest |m| of the pair, so a
-#: weak site beside a strong one cannot separate two minima by itself.  With
-#: 3.5 μ_B on one site, a second site at 0.3 and at 0.6 μ_B differs by 0.3, under
-#: 0.1 × 3.5, and the two starts count as one minimum with no caveat.  No draw in
-#: the evidence has that shape, and the value is measured on that one family.
-SOLVE_MINIMUM_MODULUS_RTOL = 0.1
+#: How many **combined esds** some site's |m| must differ by for two starts of
+#: one candidate to have ended in different minima rather than in one minimum
+#: reached twice (:func:`_same_minimum`): |m_a − m_b| > this × √(σ_a² + σ_b²)
+#: on some site, each start's esd read at the ranking's windows.  It equals
+#: :data:`~rietx.report.schemas.MOMENT_SUPPORT_SIGMA`, the multiple a modulus
+#: already needs over its own esd to read as supported, applied to a
+#: difference: two starts count apart when their moduli differ by more than
+#: their own stated precision.  An esd multiple, not a value placed where one
+#: family's fits landed.  Written out rather than imported, because
+#: ``report.schemas`` imports from this package at module level; a test holds
+#: the two equal, so a change to one fails CI until both move, and patching one
+#: at run time does not move the other.
+#:
+#: Moduli and not Rwp, because two minima of one model can sit at one Rwp: on
+#: the two-site Pnma set (Mn1 4b and Mn2 4a related by c/2, 3.5 and 0.7 μ_B,
+#: issue #1424; 24 noise draws) the swapped assignment's Rwp differs from the
+#: truth's by 1.0e-4 relative (median) and one minimum's own stopped starts by
+#: 1.1e-4, so the Rwp test that stood here until 1.x (1e-4, never measured)
+#: miscounted the solve's three starts on 15 of 24 draws.  Per site and in
+#: esds, not as a fraction of the largest |m|: on a four-site Pnma set whose
+#: weak pair (0.6 and 0.3 μ_B beside 3.5) swaps under an exact c/2 symmetry, the
+#: two weak orderings sit 0.052-0.089 of the largest |m| apart, overlapping the
+#: 0.058 that one group's starts spread by on the two-site set (a wrong class
+#: answering about 0.13 μ_B), so no fraction of the largest |m| separates both
+#: families; they sit 3.7-14
+#: combined esds apart, and the fraction this replaced (0.1) counted them as
+#: one minimum on 12 of 12 draws.  A site without a finite esd at either start agrees
+#: only when both read at or below
+#: :data:`~rietx.schemas.structure.MOMENT_FLOOR_MU_B`.  Measured on synthetic
+#: k = 0 neutron P n m a sets of two and four magnetic sites only.
+SOLVE_MINIMUM_MODULUS_SIGMA = 3.0
 
 #: How many times :func:`_fit` continues a fit that stopped on its iteration
 #: budget (``max_iter``), each continuation from where the last one stopped,
@@ -376,7 +383,7 @@ class MomentRow:
 
 @dataclass(frozen=True)
 class MomentMinimum:
-    """One distinct minimum the moment stage's starts reached (issue #1424).
+    """One place the moment stage's starts stopped (issue #1424).
 
     A class with several magnetic sites is refined from several starts
     (:func:`_starts`), and they need not end in one place.  Two minima of one
@@ -384,15 +391,19 @@ class MomentMinimum:
     and not by their Rwp, which two minima can share: when two sites are
     related by a translation that leaves |F_m|² invariant at equal Biso, the
     pattern measures m₁ + m₂ and m₁ − m₂ and swapping the two moduli moves the
-    fit by about one χ² unit, either way (:data:`SOLVE_MINIMUM_MODULUS_RTOL`).
+    fit by about one χ² unit, either way (:data:`SOLVE_MINIMUM_MODULUS_SIGMA`).
 
     ``chi2`` is the absolute weighted residual sum of squares at the
     declared stages' windows, the precision every trial is ranked at — never
     the winner's closing stage.  Every minimum of a trial is the same model
-    with the same free count, so the difference of two minima's ``chi2`` is
-    their ΔBIC.  ``moduli`` is each moment-carrying site's |m| in μ_B under
-    the crystal-axis cosine metric (:attr:`MomentRow.magnitude`'s), read at
-    the best of ``starts``.
+    with the same free count, so two minima's ΔBIC is N_eff·ln(χ²_b/χ²_a) at
+    the ranking's N/f² (:func:`rietx.report.layer2.delta_bic`).  The raw
+    difference of their ``chi2`` is about χ²_red·f² times that, and is not a
+    ΔBIC.  ``moduli`` is each moment-carrying site's |m| in μ_B under the
+    crystal-axis cosine metric (:attr:`MomentRow.magnitude`'s), and ``esds``
+    each one's esd (``None`` where the fit gave none), both read at the best of
+    ``starts`` at the ranking's windows.  ``start_chi2`` is every start's
+    ``chi2``, in the order of ``starts``.
 
     Two minima that differ only in the moments' *directions* or relative
     signs, at the same moduli, are one entry here: a direction the powder
@@ -404,6 +415,8 @@ class MomentMinimum:
     starts: tuple[str, ...]
     chi2: float
     moduli: tuple[tuple[str, float], ...]
+    esds: tuple[tuple[str, float | None], ...]
+    start_chi2: tuple[float, ...]
 
 
 @dataclass(frozen=True)
@@ -454,15 +467,19 @@ class MagneticTrial:
     #: how many seeds the moment stage was started from — one for a class with
     #: a single magnetic site, one per site plus the flat start otherwise
     n_starts: int | None = None
-    #: how many *distinct* converged minima those starts found, counted by
-    #: their moduli (:attr:`minima`, ``len`` of it).  More than one is a
-    #: reportable fact about the candidate and not about the run: it says the
-    #: moment stage of this model is multimodal, so the answer below is the
-    #: best of several and a different seed would have reported another
+    #: how many places those starts stopped, two counted apart when some
+    #: site's |m| differs by more than :data:`SOLVE_MINIMUM_MODULUS_SIGMA`
+    #: combined esds, a site without an esd counting apart unless both starts
+    #: removed its moment (:attr:`minima`, ``len`` of it).  More than one means a
+    #: single start could have reported another answer; one does not show a
+    #: single minimum, only that ``n_starts`` starts agreed
     n_minima: int | None = None
-    #: every distinct minimum those starts reached, lowest χ² first — the
-    #: first is the one the moments below come from.  Each names the starts
-    #: that ended there, its χ² and every site's |m|, so two assignments of
+    #: every place those starts stopped, counted as :attr:`n_minima` counts,
+    #: lowest χ² first — the first is the start the moments below continue
+    #: from (they are after the winner's closing stage, so their |m| and esds
+    #: differ slightly from its entry).  Each names the starts that ended
+    #: there, its χ², every start's χ² and every site's |m| and esd, so two
+    #: assignments of
     #: the moduli the pattern cannot tell apart are both on the record, not
     #: only the one a start happened to reach first (issue #1424).  ``None`` on
     #: a refused trial, like :attr:`n_minima`
@@ -1652,46 +1669,73 @@ def _start_moduli(structure) -> tuple[tuple[str, float], ...]:
                  for a in phase.atoms if a.moment is not None)
 
 
-def _same_minimum(a, b) -> bool:
-    """Whether two starts' moduli are one minimum reached twice.
+def _start_esds(ref, result) -> dict[str, float | None]:
+    """Every moment-carrying site's |m| esd at a start's stop, by label, from
+    the report's own moment arm (:func:`_moment_rows`) at the windows the
+    start was ranked on."""
+    rows, _n, _pairs = _moment_rows(ref, result, ref.fitted_structure)
+    return {row.label: row.esd for row in rows}
 
-    Every site's |m| within :data:`SOLVE_MINIMUM_MODULUS_RTOL` of the larger
-    of the two starts' largest |m|, each read no lower than
-    ``MOMENT_FLOOR_MU_B`` (a moment the fit removed is at the floor whatever
-    digit it stopped on).  Starts of one trial carry the same sites in the
-    same order; a pair that does not is two minima, never one.
+
+def _start_sites(ref, result) -> tuple[tuple[str, float, float | None], ...]:
+    """Every moment-carrying site's (label, |m|, esd) at a start's stop."""
+    esds = _start_esds(ref, result)
+    return tuple((label, m, esds.get(label))
+                 for label, m in _start_moduli(ref.fitted_structure))
+
+
+def _same_minimum(a, b) -> bool:
+    """Whether two starts' sites are one minimum reached twice.
+
+    On every site, |m_a − m_b| ≤ :data:`SOLVE_MINIMUM_MODULUS_SIGMA` ×
+    √(σ_a² + σ_b²), each |m| read no lower than ``MOMENT_FLOOR_MU_B`` (a
+    moment the fit removed is at the floor whatever digit it stopped on).  A
+    site without a finite esd at either start agrees only when both read the
+    floor; a modulus that is not a number never agrees.
+    Starts of one trial carry the same sites in the same order; a pair that
+    does not is two minima, never one.
     """
     from ..schemas.structure import MOMENT_FLOOR_MU_B
 
-    if [label for label, _m in a] != [label for label, _m in b]:
+    if [site[0] for site in a] != [site[0] for site in b]:
         return False
-    ma = [max(m, MOMENT_FLOOR_MU_B) for _label, m in a]
-    mb = [max(m, MOMENT_FLOOR_MU_B) for _label, m in b]
-    scale = max(ma + mb, default=MOMENT_FLOOR_MU_B)
-    return all(abs(x - y) <= SOLVE_MINIMUM_MODULUS_RTOL * scale
-               for x, y in zip(ma, mb))
+    for (_label, m_a, s_a), (_label_b, m_b, s_b) in zip(a, b):
+        m_a, m_b = max(m_a, MOMENT_FLOOR_MU_B), max(m_b, MOMENT_FLOOR_MU_B)
+        measured = (s_a is not None and s_b is not None
+                    and math.isfinite(s_a) and math.isfinite(s_b))
+        if not measured:
+            if not (m_a <= MOMENT_FLOOR_MU_B and m_b <= MOMENT_FLOOR_MU_B):
+                return False
+        elif not abs(m_a - m_b) <= SOLVE_MINIMUM_MODULUS_SIGMA * math.hypot(s_a, s_b):
+            return False
+    return True
 
 
 def _distinct_minima(ranked) -> tuple[MomentMinimum, ...]:
     """The distinct minima of starts already sorted by χ², lowest first.
 
-    Each start joins the first minimum, in χ² order, whose best start's moduli
+    Each start joins the first minimum, in χ² order, whose best start's sites
     it matches (:func:`_same_minimum`), or opens a new one.  So every
-    minimum's moduli and χ² are its best start's, and the first minimum is the
-    one :func:`_best_start` picks.
+    minimum's moduli, esds and χ² are its best start's, and the first minimum
+    is the one :func:`_best_start` picks.
     """
-    groups: list[tuple[list[str], float, tuple[tuple[str, float], ...]]] = []
+    groups: list[tuple[list[str], list[float], tuple]] = []
     for name, ref, result in ranked:
-        moduli = _start_moduli(ref.fitted_structure)
-        for names, _chi2, kept in groups:
-            if _same_minimum(kept, moduli):
+        sites = _start_sites(ref, result)
+        chi2 = float(_chi2_absolute(result.statistics))
+        for names, chi2s, kept in groups:
+            if _same_minimum(kept, sites):
                 names.append(name)
+                chi2s.append(chi2)
                 break
         else:
-            groups.append(([name], _chi2_absolute(result.statistics), moduli))
-    return tuple(MomentMinimum(starts=tuple(names), chi2=float(chi2),
-                               moduli=moduli)
-                 for names, chi2, moduli in groups)
+            groups.append(([name], [chi2], sites))
+    return tuple(MomentMinimum(
+        starts=tuple(names), chi2=chi2s[0],
+        moduli=tuple((label, m) for label, m, _s in sites),
+        esds=tuple((label, s) for label, _m, s in sites),
+        start_chi2=tuple(chi2s))
+        for names, chi2s, sites in groups)
 
 
 def _dead_globs(plan, result) -> tuple[str, ...]:
@@ -2608,12 +2652,14 @@ def solve_magnetic(refinement, data, *, phase: int = 0,
                 n_minima = len(minima)
                 if n_minima > 1:
                     caveats.append(
-                        f"class {index}: {n_starts} starts found {n_minima} "
-                        f"distinct minima of the moment stage (best from "
-                        f"{start!r}); this candidate's moment problem is "
-                        f"multimodal and a single seed would have reported a "
-                        f"different answer; each minimum is in the trial's "
-                        f"minima")
+                        f"class {index}: {n_starts} starts stopped at "
+                        f"{n_minima} places whose moduli differ by more than "
+                        f"{SOLVE_MINIMUM_MODULUS_SIGMA:g} combined esds on some "
+                        f"site, or carry no esd there (best from {start!r}); a "
+                        f"single start could have reported any of them. Each is in "
+                        f"the trial's minima with its χ². This count is measured "
+                        f"only on synthetic k = 0 neutron P n m a sets of two and "
+                        f"four magnetic sites; untested beyond them")
                 if not zero:
                     drift = anti_translation_residual(
                         ref.fitted_structure.phases[0])

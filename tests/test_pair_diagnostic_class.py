@@ -123,7 +123,13 @@ def test_the_two_site_winner_measures_the_sum_and_difference(monkeypatch):
         ["flat", "Mn1 only, then released", "Mn2 only, then released"])
     assert winner.minima[0].starts[0] == winner.start
     assert winner.minima[0].chi2 <= winner.minima[1].chi2
-    assert any("class 0:" in c and "2 distinct minima" in c
+    # each entry carries its sites' esds, measured, and its best start's χ²
+    # first among every start's
+    for entry in winner.minima:
+        assert all(esd is not None for _label, esd in entry.esds), entry
+        assert entry.start_chi2[0] == entry.chi2
+        assert len(entry.start_chi2) == len(entry.starts)
+    assert any("class 0:" in c and "stopped at 2 places" in c
                for c in solution.caveats), solution.caveats
     # esds and rho matched by size, not by site
     assert sorted(r.esd for r in winner.moments) == pytest.approx(
@@ -139,9 +145,11 @@ def test_the_two_site_winner_measures_the_sum_and_difference(monkeypatch):
     assert "MOMENT_ANGLE_STATIONARY" in {d.code for d in winner._result.diagnostics}
 
 
-def _start(label, chi2_red, n_free, rwp, moduli):
-    """A constructed start: its statistics, and a fitted structure carrying
-    a moment along **a** of each given size on an orthorhombic cell."""
+def _start(label, chi2_red, n_free, rwp, moduli, esds=None):
+    """A constructed start: its statistics, a fitted structure carrying a
+    moment along **a** of each given size on an orthorhombic cell, and each
+    site's |m| esd (0.01 μ_B unless given; ``None`` for a site without one),
+    which :func:`_constructed_esds` hands the grouping."""
     from types import SimpleNamespace as NS
 
     stats = NS(chi2=chi2_red, n_points=1000, n_free_parameters=n_free, rwp=rwp)
@@ -152,10 +160,22 @@ def _start(label, chi2_red, n_free, rwp, moduli):
              for site, m in moduli.items()]
     atoms.append(NS(label="O1", moment=None))
     structure = NS(phases=[NS(cell=cell, atoms=atoms)])
-    return (label, NS(fitted_structure=structure), NS(statistics=stats))
+    esd = {site: 0.01 for site in moduli} | dict(esds or {})
+    return (label, NS(fitted_structure=structure, esds=esd),
+            NS(statistics=stats))
 
 
-def test_best_start_picks_the_lowest_absolute_chi2_not_the_lowest_rwp():
+@pytest.fixture
+def _constructed_esds(monkeypatch):
+    """The grouping reads each start's esds from the report's moment arm,
+    which a constructed start has no model for: hand it the given ones."""
+    from rietx.strategy import magnetic as solve
+
+    monkeypatch.setattr(solve, "_start_esds", lambda ref, result: ref.esds)
+
+
+def test_best_start_picks_the_lowest_absolute_chi2_not_the_lowest_rwp(
+        _constructed_esds):
     """``_best_start`` ranks starts by absolute weighted chi², the quantity the
     ranking compares (#1424).  Constructed starts, where the lowest Rwp and the
     lowest chi² disagree, so a pick by ``rwp``, by reduced chi² or by list order
@@ -175,25 +195,35 @@ def test_best_start_picks_the_lowest_absolute_chi2_not_the_lowest_rwp():
     assert [m.chi2 for m in minima] == pytest.approx([981.96, 990.0])
     assert dict(minima[0].moduli) == pytest.approx({"Mn1": 3.50, "Mn2": 0.70})
     assert dict(minima[1].moduli) == pytest.approx({"Mn1": 0.70, "Mn2": 3.50})
+    # each entry carries its sites' esds and every start's chi², in order
+    assert dict(minima[0].esds) == pytest.approx({"Mn1": 0.01, "Mn2": 0.01})
+    assert minima[1].start_chi2 == pytest.approx((990.0, 990.495))
     best, _, _ = solve._best_start([truth, swap, flat])
     assert best[0] == "truth"
 
 
-def test_distinct_minima_are_counted_by_moduli_not_by_rwp():
+def test_distinct_minima_are_counted_by_moduli_in_esds_not_by_rwp(
+        _constructed_esds):
     """D8's machinery (#1424): two starts are one minimum when every site's
-    |m| agrees to ``SOLVE_MINIMUM_MODULUS_RTOL`` of the largest, whatever
+    |m| agrees within ``SOLVE_MINIMUM_MODULUS_SIGMA`` combined esds, whatever
     their Rwp.  The swapped assignment at one Rwp is two minima, which the
     Rwp test this replaced counted as one; one minimum reached at two Rwp is
-    one, which it counted as two; and moments the fit removed are one
-    minimum whatever digit each stopped on."""
+    one, which it counted as two; a weak site beside a strong one separates
+    two minima by itself, which the 0.1 x largest |m| test it replaced could
+    not; and moments the fit removed are one minimum whatever digit each
+    stopped on."""
+    from rietx.report.schemas import MOMENT_SUPPORT_SIGMA
     from rietx.schemas.structure import MOMENT_FLOOR_MU_B
     from rietx.strategy import magnetic as solve
 
-    rtol = solve.SOLVE_MINIMUM_MODULUS_RTOL
+    # an esd multiple, the one a modulus needs over its own esd to be supported
+    k = solve.SOLVE_MINIMUM_MODULUS_SIGMA
+    assert k == MOMENT_SUPPORT_SIGMA
 
-    def count(*moduli, rwps=None):
+    def count(*moduli, rwps=None, esds=None):
         starts = [_start(f"s{i}", 1.0 + 1e-3 * i, 10,
-                         (rwps or [0.05] * len(moduli))[i], m)
+                         (rwps or [0.05] * len(moduli))[i], m,
+                         (esds or [None] * len(moduli))[i])
                   for i, m in enumerate(moduli)]
         return [m.starts for m in solve._best_start(starts)[2]]
 
@@ -203,18 +233,51 @@ def test_distinct_minima_are_counted_by_moduli_not_by_rwp():
     # one minimum at Rwp 2 % apart: one
     assert count(truth, {"Mn1": 3.49, "Mn2": 0.71},
                  rwps=[0.050, 0.051]) == [("s0", "s1")]
-    # the tolerance is the boundary, read against the largest |m|
-    step = rtol * 3.5
-    assert count(truth, {"Mn1": 3.5, "Mn2": 0.7 + 0.9 * step}) == [("s0", "s1")]
-    assert count(truth, {"Mn1": 3.5, "Mn2": 0.7 + 1.1 * step}) == [("s0",), ("s1",)]
-    # the tolerance is read against the largest |m|, so a weak site beside a
-    # strong one cannot separate two minima by itself: 0.3 against 0.6 beside
-    # 3.5 differs by 0.3, under 0.1 * 3.5, and counts as one (the documented
-    # limit in the constant's comment, not a measured property of real data)
-    assert count({"Mn1": 3.5, "Mn2": 0.3},
-                 {"Mn1": 3.5, "Mn2": 0.6}) == [("s0", "s1")]
-    # two removed moments are one minimum; a removed and a kept one are two
+    # the boundary is k combined esds, on each site by itself: esds 0.03 and
+    # 0.04 combine to 0.05
+    sig = {"Mn1": 0.03, "Mn2": 0.03}, {"Mn1": 0.04, "Mn2": 0.04}
+    step = k * 0.05
+    assert count(truth, {"Mn1": 3.5, "Mn2": 0.7 + 0.9 * step},
+                 esds=sig) == [("s0", "s1")]
+    assert count(truth, {"Mn1": 3.5, "Mn2": 0.7 + 1.1 * step},
+                 esds=sig) == [("s0",), ("s1",)]
+    # a weak site beside a strong one separates two minima by itself: 0.3
+    # against 0.6 beside 3.5 is 0.086 of the largest |m| (the 0.1 x largest
+    # test counted it as one) but 5.3 combined esds at 0.04 each.  Measured
+    # 12/12 on a planted four-site set whose weak pair swaps under an exact
+    # c/2 symmetry (3.7-14 combined esds apart there)
+    weak = {"Mn1": 0.04, "Mn2": 0.04}
+    assert count({"Mn1": 3.5, "Mn2": 0.3}, {"Mn1": 3.5, "Mn2": 0.6},
+                 esds=[weak, weak]) == [("s0",), ("s1",)]
+    # ...and the same difference inside a wide esd is one: the data do not
+    # state the two moduli apart
+    wide = {"Mn1": 0.04, "Mn2": 0.2}
+    assert count({"Mn1": 3.5, "Mn2": 0.3}, {"Mn1": 3.5, "Mn2": 0.6},
+                 esds=[wide, wide]) == [("s0", "s1")]
+    # a site without an esd agrees only when both starts read the floor
     floor = MOMENT_FLOOR_MU_B
+    assert count({"Mn1": 3.5, "Mn2": 0.70}, {"Mn1": 3.5, "Mn2": 0.70},
+                 esds=[{"Mn2": None}, {}]) == [("s0",), ("s1",)]
+    assert count({"Mn1": 3.5, "Mn2": 0.5 * floor}, {"Mn1": 3.5, "Mn2": 0.0},
+                 esds=[{"Mn2": None}, {"Mn2": None}]) == [("s0", "s1")]
+    assert count({"Mn1": 3.5, "Mn2": 0.5 * floor}, {"Mn1": 3.5, "Mn2": 0.0},
+                 esds=[{"Mn2": None}, {}]) == [("s0", "s1")]
+    assert count({"Mn1": 3.5, "Mn2": 0.5 * floor}, {"Mn1": 3.5, "Mn2": 0.3},
+                 esds=[{"Mn2": None}, {}]) == [("s0",), ("s1",)]
+    # an esd or a modulus that is not a finite number never merges two starts
+    for bad in (float("nan"), float("inf")):
+        assert count({"Mn1": 3.5, "Mn2": 0.3}, {"Mn1": 3.5, "Mn2": 0.6},
+                     esds=[{"Mn2": bad}, {}]) == [("s0",), ("s1",)]
+    # (a moment refuses a NaN component, so the modulus case is the rule's own)
+    assert not solve._same_minimum((("Mn1", 3.5, 0.01), ("Mn2", float("nan"), 0.01)),
+                                   (("Mn1", 3.5, 0.01), ("Mn2", 0.3, 0.01)))
+    # each start is compared with its entry's best start only: A agrees with
+    # B and B with C, A not with C, so C opens an entry of its own
+    chain = [{"Mn1": 3.5, "Mn2": 0.70}, {"Mn1": 3.5, "Mn2": 0.73},
+             {"Mn1": 3.5, "Mn2": 0.76}]
+    tight = [{"Mn2": 0.01}] * 3   # 3 x hypot(0.01, 0.01) = 0.042
+    assert count(*chain, esds=tight) == [("s0", "s1"), ("s2",)]
+    # two removed moments are one minimum; a removed and a kept one are two
     assert count({"Mn1": 0.2 * floor, "Mn2": 0.0},
                  {"Mn1": 0.9 * floor, "Mn2": 0.5 * floor}) == [("s0", "s1")]
     assert count({"Mn1": 0.0, "Mn2": 0.0},

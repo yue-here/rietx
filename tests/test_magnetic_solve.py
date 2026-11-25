@@ -638,10 +638,10 @@ def test_a_class_with_two_magnetic_sites_is_started_from_every_one_of_them():
     assert winner.start in ("flat", "Mn1 only, then released",
                             "Mn2 only, then released")
     assert winner.n_minima == len(winner.minima) >= 1
-    # a multimodal class says so in the answer, not only in a log
+    # a class whose starts stopped apart says so in the answer, not only in a log
     multimodal = [t for t in solution.trials if (t.n_minima or 0) > 1]
     if multimodal:
-        assert any(f"class {t.class_index}" in c and "distinct minima" in c
+        assert any(f"class {t.class_index}" in c and "places whose moduli differ" in c
                    for t in multimodal for c in solution.caveats)
     # and the sweep did not cost correctness: the stated arrangement still wins
     assert solution.verdict == "solved", solution.reason
