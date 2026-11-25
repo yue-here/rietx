@@ -69,7 +69,8 @@ Tier: none. The notes are the reader's existing codes, already in `_audit`.
 - [x] Tests: one fixture per repair code, read without a list, asserting the code in
   `result.diagnostics`. `tests/test_reader_notes.py`, seven cases.
 - [x] Skill: none. The codes already have rows; they now arrive where the skill already sends
-  the agent.
+  the agent. One row named only the reader's list as its channel (`PATTERN_SCAN_REVERSED`)
+  and now names both; the manual's pattern-files page says the same in one sentence.
 
 ## Acceptance
 
