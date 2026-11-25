@@ -321,3 +321,33 @@ def test_a_near_miss_names_the_choice_it_was_close_to(ctx, no_compile):
     with pytest.raises(ValueError, match=r"unknown mode 'rietvled'; mode takes "
                                          r"'rietveld', 'lebail' or 'pawley'"):
         rx.refine(ctx.data, *perturbed_models(), mode="rietvled")
+
+
+#: callables whose ``path`` is a parameter dot-path and whose docstring is not
+#: the place to say so, with why
+PATH_DOC_EXEMPT = {
+    "GuardFinding": "factories the package's own guards call; a finding's "
+                    "``paths`` field documents the dot-paths it carries",
+}
+
+
+def test_every_path_argument_says_which_path_it_is():
+    """``path`` names a file in the writers and a parameter dot-path in the
+    verbs (settled 2026-11-23).  A file is typed with ``Path``; a dot-path is
+    a bare ``str`` whose docstring says "dot-path"."""
+    import inspect
+
+    unclear = []
+    for name, obj in _callables():
+        parameter = inspect.signature(obj).parameters.get("path")
+        if parameter is None or name.split(".")[0] in PATH_DOC_EXEMPT:
+            continue
+        annotation = _resolved(obj, parameter.annotation)
+        if "Path" in str(annotation):
+            continue
+        if annotation is str and "dot-path" in (inspect.getdoc(obj) or ""):
+            continue
+        unclear.append(f"{name} ({annotation})")
+    assert not unclear, (
+        "a `path` argument that does not say which path it is: type a file "
+        "`str | Path`, or name a dot-path in the docstring: " + ", ".join(unclear))

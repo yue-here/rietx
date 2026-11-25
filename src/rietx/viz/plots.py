@@ -56,6 +56,7 @@ second one.
 from __future__ import annotations
 
 from functools import partial
+from pathlib import Path
 
 import numpy as np
 
@@ -771,7 +772,7 @@ def _intensity_axis(ax, y_scale: str, forward, inverse, base: float, top: float,
     return u_bottom
 
 
-def plot_result(result: RefinementResult, *, path: str | None = None,
+def plot_result(result: RefinementResult, *, path: str | Path | None = None,
                 two_theta_limits: tuple[float, float] | None = None,
                 show_background: bool = True, weighted: bool = False,
                 style: str = "light", wavelength: float | None = None,
@@ -1165,7 +1166,7 @@ def _stated_radiation(model, data, recorded=None) -> tuple[float | None, str | N
             name)
 
 
-def plot_pattern(data, *, path: str | None = None,
+def plot_pattern(data, *, path: str | Path | None = None,
                  two_theta_limits: tuple[float, float] | None = None,
                  x_axis: str = "two_theta", wavelength: float | None = None,
                  y_scale: str = "linear", style: str = "light",
@@ -1465,7 +1466,7 @@ def plot_for_vlm(result: RefinementResult, report=None, *,
     return _handed_back(fig)
 
 
-def plot_trajectory(series, paths, *, path: str | None = None,
+def plot_trajectory(series, paths, *, path: str | Path | None = None,
                     dpi: int = 150, mark_diagnostics: bool = True,
                     title: str | None = None, style: str = "light"):
     """Parameter trajectories across a sequential series (WP-0505).

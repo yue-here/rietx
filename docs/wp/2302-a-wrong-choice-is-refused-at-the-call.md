@@ -132,7 +132,7 @@ heuristic, so `_audit` gains no row.
 - [x] `two_theta_range` → `two_theta_limits` on the four calls that request a window; the
   docstrings state the describe/request split; the two schema fields measured against it.
   Manual, skill, examples and GUI callers follow.
-- [ ] Each `path` argument says which it is, in its type and its docstring's first mention.
+- [x] Each `path` argument says which it is, in its type and its docstring's first mention.
 - [ ] Measure the "how many" family and rename only where two names count the same thing.
 - [x] Tests for each refusal (the message names the argument; no compile reached).
 - [ ] Skill: none expected. The refusals name their own fix, and the renamed arguments reach

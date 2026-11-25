@@ -4082,7 +4082,7 @@ class Refinement:
             source: "str | dict[str, float] | Sequence[tuple[str, float]] | None" = None,
             *, scale: float = 1.0, offset: float = 0.0,
             expression: str | None = None) -> str:
-        """Constrain ``path`` to ``scale·source + offset``, or to ``expression=``: a formula over ``add_variable`` names, trig in radians.
+        """Constrain the parameter dot-path ``path`` to ``scale·source + offset``, or to ``expression=``: a formula over ``add_variable`` names, trig in radians.
 
         The general affine form, of which :meth:`tie_equal` is the ``scale=1,
         offset=0`` case.  Complementary occupancies on a shared site are the
@@ -4919,6 +4919,8 @@ class Refinement:
                          max_refits: int = PARAMETER_INTERVAL_MAX_REFITS
                          ) -> "ParameterInterval":
         """The profile-likelihood interval for one parameter of the last fit.
+
+        ``path`` is that parameter's dot-path.
 
         An esd read as an interval is symmetric, and on a bound it is not an
         interval at all: an estimate there has no symmetric sampling
@@ -7690,14 +7692,15 @@ class Refinement:
         answer = self._answer
         return reflection_table(self._model, answer["values"], answer["structure"])
 
-    def write_reflection_table(self, path, **kw) -> None:
-        """Write the reflection table to CSV/TSV (delimiter from the suffix)."""
+    def write_reflection_table(self, path: str | Path, **kw) -> None:
+        """Write the reflection table to the file ``path``, CSV or TSV by its
+        suffix."""
         from .io.exporters import write_reflection_table
 
         write_reflection_table(self.reflection_table(), path, **kw)
 
-    def write_cif(self, path) -> None:
-        """Write a refinement CIF: structure with esds, R-factors, wavelength,
+    def write_cif(self, path: str | Path) -> None:
+        """Write a refinement CIF to the file ``path``: structure with esds, R-factors, wavelength,
         profile/background description, and the observed/calculated pattern.
 
         The pattern loop carries every point of the pattern the last fit was
@@ -7717,8 +7720,9 @@ class Refinement:
                                           instrument, pattern=self._fit_pattern,
                                           reflections=self.reflection_table()), path)
 
-    def write_qpa_table(self, path, **kw) -> None:
-        """Write the QPA weight-fraction table (crystalline-only caveat included)."""
+    def write_qpa_table(self, path: str | Path, **kw) -> None:
+        """Write the QPA weight-fraction table to the file ``path``
+        (crystalline-only caveat included)."""
         from .io.exporters import write_qpa_table
 
         if self.result_ is None or self.result_.qpa is None:
