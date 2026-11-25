@@ -313,7 +313,7 @@ def _defined_below(name: str) -> str:
 
     A name that exists in an imported submodule but is not exported was
     answered with the closest *spelling* on the top-level surface:
-    ``rietx.structure_from_cif`` suggested ``MicrostructureTerm`` (issue
+    the CIF reader asked for at top level suggested ``MicrostructureTerm`` (issue
     #1837).  The exact name in the module that defines it is the better
     answer.  Only modules already imported are read, so this imports nothing.
     """
