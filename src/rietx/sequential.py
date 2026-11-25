@@ -177,7 +177,7 @@ from .history.store import holds_a_log
 from .history.tree import RefinementTree
 from .optimize.cancel import RefinementCancelled
 from .optimize.least_squares import DEFAULT_SOLVER, NFEV_PER_ITERATION, SOLVERS
-from .params.vector import VAR_PREFIX, ParameterTable
+from .params.vector import VAR_PREFIX, ParameterTable, is_variable_path
 from .refine import (
     _VERSION,
     Refinement,
@@ -278,7 +278,9 @@ DIRECTIONS = ("forward", "backward", "both")
 #: refinements, and one that cannot be fitted is no reason to throw away the
 #: others, the same argument that makes a cancelled series *return*.
 #: ``"skip"`` records it the same way but fits the successor **cold**, for a
-#: caller who reads the failure as evidence against the warm state too.
+#: caller who reads the failure as evidence against the warm state too.  A
+#: path the caller held keeps the last accepted pattern's value there, as on
+#: any cold rung (WP-2081): a held value is the caller's, not the warm state's.
 #: ``"raise"`` ends the chain in the last rung's exception, with the partial
 #: results kept: ``SequentialRefinement.results_``/``.failures_`` and the
 #: exception's own ``series_results``/``series_failures``/``series_failed``.
@@ -910,6 +912,74 @@ def _carry_variables(ref: Refinement, previous: dict[str, float],
         ref.set_values(values)
 
 
+def _keep_held_values(ref: Refinement, source: tuple[Structure, Instrument] | None,
+                      source_vars: dict[str, float],
+                      declared: tuple[Structure, Instrument],
+                      carry: Sequence[str]) -> None:
+    """Give each path held on a cold fit the value ``source`` gave it (WP-2081).
+
+    A hold fixes whatever value reaches the fit (``Refinement.hold``).  A warm
+    rung receives the last accepted pattern's values through
+    :func:`_carry_into`, but a cold rung and a ``verify_steps`` refit start
+    from the initial models, so a hold there fixed the *caller's* value: on
+    WP-2081's LaB6 ramp a zero shift held at 0.00797° read 0.0 on the
+    restarted pattern, its cell 546 ppm off, and the next pattern carried it.
+    Series rule 6 says a retry does not change what value a fixed parameter
+    has, so this writes ``source``'s value onto every path the ``constrain``
+    hook held, after the hook, the order :func:`_carry_variables` uses.
+
+    ``source`` is the last accepted pattern's fitted models on a cold rung and
+    the pattern's own on a verify refit, so the hold reads what it would have
+    read warm.  Limited by ``carry`` as the warm start is.  A value a hook set
+    for this pattern on purpose wins: a held path whose value no longer equals
+    ``declared``'s (the caller's models) was moved by ``prepare`` or by
+    ``constrain``, and is left alone.  A hook that writes the caller's own
+    value cannot be told from one that wrote nothing, so that value is
+    replaced as if no hook had run.  A named variable has no declared value
+    to compare, so a held one takes ``source_vars``' value, as a warm rung's
+    does.  A site DOF is a step from where its fit began and a tied or locked
+    path follows something else, so neither is written.
+    """
+    holds = getattr(ref, "_user_holds", None)
+    if not holds or (source is None and not source_vars):
+        return
+    table = ref._working_table()
+    anchored = table.anchored_dof_paths
+    by_path = {e.path: e for e in table.entries}
+    kept = _values_onto(source, ref.structure) if source is not None else {}
+    kept.update({f"{VAR_PREFIX}{name}": v for name, v in source_vars.items()})
+    caller = _values_onto(declared, ref.structure)
+    values: dict[str, float] = {}
+    for path in sorted(holds):
+        e = by_path.get(path)
+        if (e is None or path not in kept or path in anchored or e.locked
+                or e.tie is not None
+                or not any(fnmatch.fnmatchcase(path, g) for g in carry)):
+            continue
+        if not is_variable_path(path) and e.value != caller.get(path):
+            continue
+        if e.value != kept[path]:
+            values[path] = kept[path]
+    if values:
+        ref.set_values(values)
+
+
+def _held_values(ref: Refinement, moves: dict[str, str | None]) -> dict[str, float] | None:
+    """Every path ``ref``'s caller held, at its value, in the series numbering.
+
+    The writer of :attr:`SeriesEntry.held_values`.  ``None`` where nothing was
+    held.  A site DOF is left out, since its value is a step from where the fit
+    began (WP-1333).
+    """
+    holds = getattr(ref, "_user_holds", None)
+    if not holds:
+        return None
+    table = ref._working_table()
+    anchored = table.anchored_dof_paths
+    return {renumber_path(e.path, moves) or e.path: float(e.value)
+            for e in table.entries if e.path in holds and e.path not in anchored}
+
+
 def _value_of(result: RefinementResult, path: str) -> float | None:
     """One path's fitted value on a result, or ``None`` where it has none.
 
@@ -1342,7 +1412,8 @@ class SequentialRefinement:
             records the pattern on ``SeriesResult.failures`` (and this
             instance's ``.failures_``) with ``SERIES_PATTERN_FAILED`` and
             warm-starts its successor from the last accepted pattern;
-            ``"skip"`` starts the successor cold; ``"raise"`` ends the chain in
+            ``"skip"`` starts the successor cold, each held path still at the
+            last accepted pattern's value; ``"raise"`` ends the chain in
             the exception, keeping what completed on ``.results_``/``.trees_``
             and on the exception.  A chain that fitted no pattern at all raises
             whichever is chosen.  The caller's own ``prepare``/``constrain``
@@ -1535,7 +1606,12 @@ class SequentialRefinement:
             self._verify_steps(
                 series.steps[:verify_steps], patterns, names, mode, base_plan,
                 two_theta_limits, prepare, constrain, stream=stream,
-                cancel=cancel)
+                cancel=cancel,
+                fitted={e.index: m for e, m in zip(entries, models)},
+                fitted_vars={e.index: {p[len(VAR_PREFIX):]: v
+                                       for p, v in (e.held_values or {}).items()
+                                       if is_variable_path(p)}
+                             for e in entries})
         # what the per-pattern diagnostics could not say: "42 of 68" (WP-1110),
         # every count and no threshold (WP-2003, C6)
         series.code_counts = _code_counts(series)
@@ -1705,6 +1781,14 @@ class SequentialRefinement:
         #: one, and ``carry``'s default ``["*"]`` would be a claim nothing kept
         #: (WP-1441).
         previous_vars: dict[str, float] = {}
+        #: the last accepted pattern's carry source (``previous``, moments
+        #: floored) and variables, where a cold rung's held paths read their
+        #: values, so they read what a warm rung would (WP-2081, rule 6).
+        #: Beside ``previous`` and unlike it never cleared by
+        #: ``on_error="skip"``, since a skip stops a warm start and leaves a
+        #: fixed value fixed
+        hold_source: tuple[Structure, Instrument] | None = None
+        hold_vars: dict[str, float] = {}
         previous_tag: tuple[str | None, str | None] = (None, None)
         accepted_rwp: list[float] = []
         # WP-1127's sample: the dearest stage of every first rung that was
@@ -1781,7 +1865,9 @@ class SequentialRefinement:
                         previous_vars=previous_vars if rung_warm else {},
                         stream=stream, cancel=cancel,
                         stamp={**stamp,
-                               **_rung_stamp(rung, escalation=bool(tried))})
+                               **_rung_stamp(rung, escalation=bool(tried))},
+                        hold_source=None if rung_warm else hold_source,
+                        hold_vars=None if rung_warm else hold_vars)
                 except RefinementCancelled:
                     cancelled = True
                     break
@@ -1888,7 +1974,9 @@ class SequentialRefinement:
             # every path now in the series numbering, so a pattern whose
             # ``prepare`` added or removed a phase or an atom joins each
             # trajectory by name (WP-1991)
-            _into_series_numbering(entry, self._numbering.moves(best_ref.structure))
+            moves = self._numbering.moves(best_ref.structure)
+            _into_series_numbering(entry, moves)
+            entry.held_values = _held_values(best_ref, moves)
             if len(tried) > 1:
                 entry.rwp_warm = rwp_of.get(tried[0])
                 # only the *cold* rung breaks the chain — a staged refit from
@@ -1943,6 +2031,7 @@ class SequentialRefinement:
                 previous_hkl = _extract_reflections(best_ref._model)
                 previous_vars = {name: prm.value
                                  for name, prm in best_ref._variables.items()}
+                hold_source, hold_vars = previous, dict(previous_vars)
                 previous_tag = (entry.tree_id, entry.node_id)
                 if entry.statistics is not None:
                     accepted_rwp.append(entry.statistics.rwp)
@@ -1992,8 +2081,15 @@ class SequentialRefinement:
                  prepare, constrain, index: int, history_suffix: str = "", *,
                  previous_vars: dict[str, float] | None = None,
                  stream: EventStream | None = None,
-                 stamp: dict | None = None, cancel=None):
-        """One pattern: warm the models from ``previous``, then run ``plan``."""
+                 stamp: dict | None = None, cancel=None,
+                 hold_source: tuple[Structure, Instrument] | None = None,
+                 hold_vars: dict[str, float] | None = None):
+        """One pattern: warm the models from ``previous``, then run ``plan``.
+
+        ``hold_source`` and ``hold_vars`` are where a cold fit's held paths
+        read their values (:func:`_keep_held_values`); ``None`` leaves each
+        hold at the value the models brought.
+        """
         structure = self.structure.model_copy(deep=True)
         instrument = self.instrument.model_copy(deep=True)
         displaced: list[str] = []
@@ -2059,6 +2155,9 @@ class SequentialRefinement:
             _constrain_in_declared_numbering(ref, self.structure, constrain, index)
             if previous is not None:
                 _reanchor_carried(ref, displaced, previous, previous_vars or {})
+            if hold_source is not None or hold_vars:
+                _keep_held_values(ref, hold_source, hold_vars or {},
+                                  (self.structure, self.instrument), self.carry)
         _carry_variables(ref, previous_vars or {}, self.carry)
         try:
             result = ref.fit(data, mode=mode, plan=plan,
@@ -2079,7 +2178,10 @@ class SequentialRefinement:
                       names, mode, base_plan, two_theta_limits,
                       prepare, constrain, *,
                       stream: EventStream | None = None,
-                      cancel=None) -> None:
+                      cancel=None,
+                      fitted: dict[int, tuple[Structure, Instrument]] | None = None,
+                      fitted_vars: dict[int, dict[str, float]] | None = None,
+                      ) -> None:
         """Refit each given step's two patterns cold, and record the ratio.
 
         ``steps`` are the first ``verify_steps`` rows of
@@ -2110,6 +2212,13 @@ class SequentialRefinement:
         must be able to stop the check.  A cancel here leaves every row it had
         not reached at ``cold_ratio=None``, so a stopped check reports nothing
         about a step rather than a half-measured something.
+
+        ``fitted`` is each pattern's fitted models by series index: a path the
+        hook holds is held at the value the chain held it at on that pattern
+        (:func:`_keep_held_values`, WP-2081), since a refit holding the
+        caller's value instead would be a different model too.  ``fitted_vars``
+        is the same for a held named variable, by bare name, which the models
+        cannot carry.
         """
         cold: dict[int, RefinementResult | _PatternRaised] = {}
         result_structures: dict[int, Structure | None] = {}
@@ -2124,7 +2233,9 @@ class SequentialRefinement:
                         k, ".verify", stream=stream, cancel=cancel,
                         stamp={"series_index": k, "series_label": names[k],
                                "series_n": len(patterns),
-                               "series_pass": "verify"})
+                               "series_pass": "verify"},
+                        hold_source=(fitted or {}).get(k),
+                        hold_vars=(fitted_vars or {}).get(k))
                     # a stand-in fit (a test's) may hand back no ``Refinement``
                     result_structures[k] = getattr(_ref, "structure", None)
                 except _PatternRaised as exc:

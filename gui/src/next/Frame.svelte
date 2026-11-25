@@ -18,14 +18,18 @@
   import { onMount, untrack } from "svelte";
 
   import { ApiError, api } from "../api";
+  import { py } from "../lib/py";
   import FileMenu from "../panels/FileMenu.svelte";
   import NewProject from "../panels/NewProject.svelte";
   import Palette from "../panels/Palette.svelte";
   import Interactive from "./Interactive.svelte";
   import Background from "./Background.svelte";
+  import Candidates from "./Candidates.svelte";
+  import PeakFits from "./PeakFits.svelte";
   import Peaks from "./Peaks.svelte";
   import Structure from "./Structure.svelte";
   import Recovery from "../panels/Recovery.svelte";
+  import HelpPopover, { provideHelp } from "../HelpPopover.svelte";
   import { projectStem } from "../lib/filemenu";
   import type { HelpCorpus } from "../lib/help";
   import { RecoveryWriter, combine, readDraft, restoredText, type Draft,
@@ -37,13 +41,24 @@
   import { modifier, runWords, toggleTitle } from "../lib/statusbar";
   import { follow, type EngineEvent, type RunState } from "../lib/stream";
   import { applyTheme, readChoice, resolveTheme, type ThemeChoice } from "../lib/theme";
-  import { WORKFLOWS, menuLabel, workflow, type WorkflowId } from "../lib/workflows";
+  import type { PeakRow, PeaksPayload } from "../lib/peaks";
+  import type { CandidateOverlay } from "../lib/plot";
+  import { WORKFLOWS, isNotBuilt, menuLabel, panelWidth, stepGraph, workflow,
+           type WorkflowId } from "../lib/workflows";
   import ActionBar from "./ActionBar.svelte";
   import Console from "./Console.svelte";
   import { eventLine, makeLine, pushLine, sessionScript, sharedSay, stageScript, type Line,
            type LineKind } from "./console";
   import HelpBox from "./HelpBox.svelte";
-  import { GRAPH_HELP, MODEL_HELP } from "./helpbox";
+  import Indexing from "./Indexing.svelte";
+  import Series from "./Series.svelte";
+  import SeriesMap from "./SeriesMap.svelte";
+  import SeriesTrends from "./SeriesTrends.svelte";
+  import type { Against, TrendsView } from "./seriestrends";
+  import { arrowStep, type SeriesView } from "./seriespattern";
+  import History from "./History.svelte";
+  import { howComment, howWords } from "./howran";
+  import { GRAPH_HELP, HISTORY_HELP, MODEL_HELP, WORKFLOW_HELP } from "./helpbox";
   import Keys from "./Keys.svelte";
   import Menu, { type MenuAt } from "./Menu.svelte";
   import Params from "./Params.svelte";
@@ -57,6 +72,12 @@
            type BottomTab, type GraphTab, type ModelTab } from "./tabs";
 
   let project = $state<any>(null);
+  /** The open project's identity on this page, bumped by `opened` and nowhere
+   *  else (WP-2242). `head` cannot tell two projects apart, since node ids
+   *  repeat across them (`n0000`, `n0001`, …), and neither can the path, which
+   *  a reset example keeps. Every panel whose state is the project's sits
+   *  inside `{#key opens}` and starts over. */
+  let opens = $state(0);
   let version = $state<any>(null);
   let run = $state<RunState | null>(null);
   let lines = $state.raw<Line[]>([]);
@@ -70,6 +91,8 @@
   let openError = $state("");
   let newOpen = $state(false);
   let corpus = $state<HelpCorpus | null>(null);
+  /** the page's one help popover, which every `<Help>` term opens (WP-2244) */
+  const help = provideHelp();
 
   /** The last fit (`/api/result`), and a key bumped whenever its curves moved. */
   let result = $state.raw<any>(null);
@@ -155,14 +178,61 @@
   let graphTab = $state<GraphTab>("pattern");
   let modelTab = $state<ModelTab>("params");
   let bottomTab = $state<BottomTab>("console");
+  /** The History tab (WP-2211): its view, a view choice kept for the session
+   *  like the panels' layout; its node count, for the tab's label; and the
+   *  node whose fit is overlaid on the pattern. */
+  let historyView = $state<"graph" | "table">("graph");
+  let historyCount = $state<number | null>(null);
+  let compared = $state.raw<{ id: string; label: string; tt: Float64Array; y: Float64Array } | null>(null);
   let wf = $state<WorkflowId>("refine");
   let step = $state(0);
+  /** The peaks-and-indexing workflow's peak list, as its last answer gave it,
+   *  the row chosen in its table, and a request to frame a line (WP-2240):
+   *  the Pattern graph draws them while the workflow is up. */
+  let peaksPayload = $state.raw<PeaksPayload | null>(null);
+  /** the Index and Judge steps' panel, which a run of theirs reports to */
+  let candidatesPanel: ReturnType<typeof Candidates> | undefined = $state();
+  /** the candidate whose lines the Pattern graph draws (round 11, call 9) */
+  let candidateLines = $state.raw<CandidateOverlay | null>(null);
+  /** the Fit peaks step's windows: the groups its list draws, the one chosen
+   *  and how many the list holds (WP-2240 task 6) */
+  let fitGroups = $state.raw<{ groups: number[]; focused: number | null; total: number }>(
+    { groups: [], focused: null, total: 0 });
+  let selectedPeak = $state<number | null>(null);
+  /** the workflow panel, whose verbs the plot's peak gestures call */
+  let indexingPanel: ReturnType<typeof Indexing> | undefined = $state();
+  /** the series workflow's panel, which folds the run's events (WP-2243) */
+  let seriesPanel: ReturnType<typeof Series> | undefined = $state();
+  /** what the Pattern graph draws while Series is up: the selected member
+   *  (WP-2243 task 5), handed up by the panel */
+  let seriesView = $state.raw<SeriesView | null>(null);
+  /** Series has been chosen once: from then on it stays mounted, hidden under
+   *  another workflow, so its list, its run's table and the selection keep,
+   *  and a run it started still folds into it */
+  let seriesMounted = $state(false);
+  const seriesShown = $derived(wf === "series" ? seriesView : null);
+  /** what the Trends graph draws (WP-2243 task 6), and its view choices,
+   *  kept here so a tab switch keeps them */
+  let seriesTrends = $state.raw<TrendsView | null>(null);
+  let trendsAgainst = $state<Against>("x");
+  let trendsHidden = $state<string[]>([]);
+  /** the row the Map marks, handed up by the Series panel, which holds the
+   *  one selection; a count the staged list moves, so the Map asks again
+   *  (WP-2243 task 7) */
+  let seriesMark = $state<number | null>(null);
+  let seriesStamp = $state(0);
+  let frameAt = $state.raw<{ two_theta: number; seq: number } | null>(null);
 
   /** The model panel's width and the bottom panel's height, session-local
    *  until a later piece keeps them with the project (inventory row 251). */
   const MODEL_DEFAULT = 785;
   const BOTTOM_DEFAULT = 200;
   let modelWidth = $state(MODEL_DEFAULT);
+  /** the person has sized the panel: a workflow's own width no longer opens it */
+  let sized = false;
+  /** the workflow's opening width, leaving the graphs the splitter's `keep` */
+  const opening = (id: WorkflowId) =>
+    panelWidth(id, appEl?.clientWidth || Infinity, MODEL_DEFAULT, 360);
   let bottomHeight = $state(BOTTOM_DEFAULT);
   let appEl: HTMLDivElement | undefined = $state();
   let mainEl: HTMLDivElement | undefined = $state();
@@ -177,8 +247,16 @@
 
   const mod = modifier(typeof navigator === "undefined" ? "" : navigator.platform ?? "");
   const busy = $derived(run?.state === "running" || run?.state === "cancelling");
-  const runText = $derived(project && busy ? runWords(run) : "");
-  const unbuilt = $derived(workflow(wf).steps ?? null);
+  /** A re-fit's one stage is said in the title line's words, never by the
+   *  stage's internal name (WP-2227, the maintainer's consent of 2026-11-22). */
+  const runText = $derived(project && busy ? howWords(run?.run?.how, corpus) || runWords(run) : "");
+  /** The workflow's steps across the model panel, or null for Refinement,
+   *  which shows the model's tabs. */
+  const wfSteps = $derived(workflow(wf).steps ?? null);
+  /** The graph tabs the workflow shows (the prototype's: peaks and indexing
+   *  draws the pattern and the peak fits). */
+  const graphTabs = $derived(GRAPH_TABS.filter((t) => workflow(wf).graphs
+    ? workflow(wf).graphs!.includes(t.id) : !("workflowOnly" in t)));
   const head = $derived(run?.head ?? project?.head ?? null);
   const noPhases = $derived(project ? (project.n_phases ?? 1) === 0 : false);
   const blocked = $derived(noPhases ? "Add a phase before refining" : null);
@@ -306,37 +384,62 @@
   }
 
   async function loadResult() {
+    result = await readResult();
+    plotKey += 1;
+  }
+
+  /** The last fit, read but not yet published, so an open can publish it with
+   *  the project it belongs to. */
+  async function readResult(): Promise<any> {
     try {
-      result = (await api.result()).result;
+      return (await api.result()).result;
     } catch {
       // no fit yet is an empty state; the graph says what it can draw
-      result = null;
+      return null;
     }
-    plotKey += 1;
   }
 
   /**
    * The session's first entry, as the prototype opens it: the lines that bind
    * the names every later call uses, and where the project stands. The script
    * writes its own preamble, so these lines are marked and it skips them.
+   * The output line reads as the prototype's: Rwp, the free count and the
+   * history nodes. The free count is `GET /api/params`' `n_free`, the rows
+   * whose vary flag is set, as the Parameters panel counts them; a plan's
+   * stages replace those flags, so it is not what a Refine frees. An
+   * unreadable table leaves it out. The count is read beside the result
+   * (`freeCount`), so the open waits for neither in turn, and the lines are
+   * written in one turn, so they share an entry.
    */
-  function sayPreamble() {
+  async function freeCount(): Promise<number | null> {
+    try {
+      const n = (await api.params())?.n_free;
+      return typeof n === "number" ? n : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function sayPreamble(free: number | null) {
     if (!project?.path) return;
+    const path = project.path;
     const bind = (text: string) => write({ ...makeLine("call", text), preamble: true });
     bind("import rietx as rx");
-    bind(`p = rx.Project.open(${JSON.stringify(project.path)})`);
+    bind(`p = rx.Project.open(${JSON.stringify(path)})`);
     bind("ref = p.refinement");
     const rwp = result?.statistics?.rwp;
     const nodes = project.n_nodes ?? 0;
-    say("output", `${typeof rwp === "number" ? `Rwp ${(rwp * 100).toFixed(2)} %, ` : ""}`
-      + `${nodes} history node${nodes === 1 ? "" : "s"}`);
+    say("output", [typeof rwp === "number" ? `Rwp ${(rwp * 100).toFixed(2)} %` : null,
+                   free === null ? null : `${free} free`,
+                   `${nodes} history node${nodes === 1 ? "" : "s"}`]
+      .filter(Boolean).join(", "));
   }
 
   async function loadProject() {
     try {
       project = await api.project();
-      await loadResult();
-      sayPreamble();
+      const [, free] = await Promise.all([loadResult(), freeCount()]);
+      sayPreamble(free);
       await offerRecovery();
     } catch (error) {
       project = null;
@@ -360,20 +463,57 @@
     }
   }
 
+  /** Every opener lands here. The panels keyed on `opens` start over by
+   *  themselves; this resets what the frame holds for the project beside
+   *  them. What it leaves is the session's on purpose: the theme, the layout,
+   *  the tab and workflow choices, the refine choice, the Console. */
   async function opened(doc: any) {
+    // after the edits are kept, so a pending value is saved for the project
+    // it was typed in before its panel goes
     await leaveEdits();
+    // the next project's fit is read before anything is published, so the
+    // keyed graphs mount on it in the same flush and fetch their curves once
+    const fit = await readResult();
     // the script is this project's session: another project's calls are not
     calls = [];
+    // the peak list is the project's (`peaks.json`): another project's rows,
+    // their chosen line and a frame request are not this one's
+    peaksPayload = null;
+    selectedPeak = null;
+    frameAt = null;
+    // the Fit and Index steps hand these up from panels `opens` starts over
+    candidateLines = null;
+    fitGroups = { groups: [], focused: null, total: 0 };
+    protocolError = "";
+    baseCurves = null;
+    reading = null;
+    // what the keyed panels hand up, which a fresh panel has not said yet
+    pendingTouched = 0;
+    pendingInvalid = "";
+    pendingHolds = new Map();
+    sliderTouched = 0;
+    sliderValues = null;
+    sliderPreview = null;
+    sliderPreviewError = "";
+    textPreview = null;
+    textPreviewError = "";
+    planEdited = false;
+    textEdited = false;
+    textWhy = "";
     project = doc;
+    opens += 1;
+    result = fit;
+    plotKey += 1;
     openError = "";
     newOpen = false;
-    await loadResult();
-    sayPreamble();
+    const free = await freeCount();
+    sayPreamble(free);
     await offerRecovery();
   }
 
   /** Leave the open project's pending edits behind as its recovery copy, and
-   *  clear them from the panel, which stays mounted across an open. */
+   *  clear them from the panels before `opens` starts them over (WP-2242), so
+   *  the effect above never writes one project's edits under the next's path. */
   async function leaveEdits() {
     await recoveryWriter.flush();
     recoveryWriter.disarm();
@@ -383,6 +523,10 @@
     interactivePanel?.revert();
     planPanel?.leave();
     textPanel?.forget();
+    // node ids repeat across projects (n0000, n0001, …), so a compared node
+    // is cleared here, never by looking for its id in the next history
+    compared = null;
+    historyCount = null;
   }
 
   /** Offer the open project's kept edits, or start keeping new ones. */
@@ -464,7 +608,7 @@
         say("call", `p.doc.two_theta_limits = ${limits ? `(${limits.join(", ")})` : "None"}`);
       }
       if ("excluded_regions" in patch)
-        say("call", `p.set_excluded_regions(${JSON.stringify(patch.excluded_regions)})`);
+        say("call", `p.set_excluded_regions(${py(patch.excluded_regions)})`);
       protocolError = "";
     } catch (error) {
       protocolError = (error as Error).message;
@@ -482,7 +626,7 @@
       const doc = await api.patchProject({ ui: patch });
       if (project?.path === path) project = doc;
       for (const [key, value] of Object.entries(patch))
-        say("comment", `# view kept: ui[${JSON.stringify(key)}] = ${JSON.stringify(value)}`);
+        say("comment", `# view kept: ui[${py(key)}] = ${py(value)}`);
     } catch (error) {
       say("comment", `# not kept: ${(error as Error).message}`);
     }
@@ -702,7 +846,26 @@
 
   function chooseWorkflow(id: string) {
     wf = id as WorkflowId;
-    step = 0;
+    if (wf === "series") seriesMounted = true;
+    if (!sized) modelWidth = opening(wf);
+    chooseStep(0);
+    // the tabs `graphTabs` shows for this workflow, so a tab only another
+    // workflow lists (the series' Trends and Map) never stays chosen behind the strip
+    const shown = graphTabs.map((t) => t.id);
+    if (!shown.includes(graphTab)) graphTab = shown[0];
+  }
+
+  /** A step opens on its graph: the peak fits for Fit peaks, the pattern for
+   *  the others (the prototype's, round 11). */
+  function chooseStep(i: number) {
+    step = i;
+    const g = stepGraph(wf, i);
+    if (g) graphTab = g;
+  }
+
+  /** The chosen row itself arrives through `bind:selected`. */
+  function framePeak(row: PeakRow) {
+    frameAt = { two_theta: row.two_theta, seq: (frameAt?.seq ?? 0) + 1 };
   }
 
   /** The stage `.` runs, for the palette's label. */
@@ -734,6 +897,10 @@
       disabled: !planPanel?.canUndo(), run: () => planPanel?.undo() },
     { id: "plan-redo", label: "Redo the plan edit", echo: "",
       disabled: !planPanel?.canRedo(), run: () => planPanel?.redo() },
+    { id: "peaks-undo", label: "Undo the peak edit", echo: "",
+      disabled: wf !== "index" || !indexingPanel?.canUndo(), run: () => void indexingPanel?.undo() },
+    { id: "peaks-redo", label: "Redo the peak edit", echo: "",
+      disabled: wf !== "index" || !indexingPanel?.canRedo(), run: () => void indexingPanel?.redo() },
     { id: "new", label: "New project…", echo: "rx.Project.create(…)", disabled: busy,
       run: () => (newOpen = true) },
     ...WORKFLOWS.map((w): Command => ({
@@ -761,6 +928,16 @@
       if (layered) return;
       event.preventDefault();
       keysOpen = true;
+      return;
+    }
+    // ↑ ↓ move the series' selected pattern on every view (round 12, call 2)
+    // never from inside an open menu (the Trends graph's Plot), whose rows
+    // the arrows belong to
+    const delta = wf === "series" && !layered && isShortcutTarget(event)
+      && !(event.target as Element | null)?.closest?.(".rx-menu") ? arrowStep(event) : 0;
+    if (delta) {
+      event.preventDefault();
+      seriesPanel?.move(delta);
       return;
     }
     // `.` runs the Plan tab's selected stage (WP-2214 row 232)
@@ -829,7 +1006,11 @@
      *  frame, so a reload does not reload for a run that ended before it. */
     let seen: string | null = null;
     const unfollow = follow(
-      (event: EngineEvent) => write(eventLine(event)),
+      (event: EngineEvent) => {
+        write(eventLine(event));
+        candidatesPanel?.event(event);
+        seriesPanel?.event(event);
+      },
       (frame: RunState) => {
         run = frame;
         // a run just ended, keyed on its outcome rather than on having seen a
@@ -837,6 +1018,10 @@
         // sends one idle frame with a new status (today's `App.svelte`)
         const key = `${frame.state}:${frame.run?.status ?? ""}:${frame.run?.node_id ?? ""}`;
         if (seen !== null && key !== seen && frame.state === "idle" && frame.run?.status) {
+          // how the fit ran, as `Refinement.summary()` prints it (WP-2227)
+          const comment = howComment(frame);
+          if (comment) say("comment", comment);
+          candidatesPanel?.ran(frame.run?.kind ?? null);
           void loadResult();
           void api.project().then((doc) => (project = doc)).catch(() => {});
         }
@@ -904,7 +1089,7 @@
     {#if showGraphs}
       <section class="graphs" aria-label="Graphs">
         <div class="tabs" role="tablist" aria-label="Graphs">
-          {#each GRAPH_TABS as t (t.id)}
+          {#each graphTabs as t (t.id)}
             <button class="tab" role="tab" aria-selected={graphTab === t.id} disabled={!project}
               onclick={() => (graphTab = t.id)}>{t.label}</button>
           {/each}
@@ -914,11 +1099,31 @@
           {/if}
         </div>
         <div class="pane">
+          {#key opens}
           {#if graphTab === "pattern"}
-            <Pattern {result} {plotKey} {theme} {protocol} {extent} {wavelengths} {busy}
+            <!-- while Series is up the graph draws its selected member, not
+                 the project's fit (WP-2243 task 5): no preview, no compared
+                 node, and the sliders keep the project's curves -->
+            <Pattern result={seriesShown ? null : result} {plotKey} {theme} {protocol} {extent} {wavelengths} {busy}
               {protocolError} onprotocol={setProtocol} onreadout={(r) => (reading = r)}
               projectPath={project?.path ?? null} ui={project?.doc?.ui ?? null} onui={saveUi}
-              preview={previewAnswer} {previewError} oncurves={(c) => (baseCurves = c)} />
+              preview={seriesShown ? null : previewAnswer} previewError={seriesShown ? "" : previewError}
+              oncurves={(c) => { if (!seriesShown) baseCurves = c; }}
+              source={seriesShown?.source ?? null}
+              nav={seriesShown ? { ...seriesShown, onstep: (d: number) => seriesPanel?.move(d) } : null}
+              compared={seriesShown ? null : compared} howText={howWords(result?.how, corpus)}
+              peaksActive={wf === "index"} peaks={wf === "index" ? peaksPayload?.peaks ?? null : null}
+              groups={wf === "index" ? peaksPayload?.groups ?? null : null}
+              candidate={wf === "index" ? candidateLines : null}
+              bind:selectedPeak {frameAt}
+              onpeakedit={(e) => indexingPanel?.edit(e) ?? Promise.resolve(false)}
+              onpeakundo={() => indexingPanel?.undo() ?? Promise.resolve(false)} />
+          {:else if graphTab === "peaks" && wf === "index"}
+            <!-- while the peaks-and-indexing workflow is up, the Peaks graph
+                 holds the picker's group fits (round 11, call 1) -->
+            <PeakFits peaks={peaksPayload} {theme} {busy} groups={fitGroups.groups}
+              focused={fitGroups.focused} total={fitGroups.total}
+              onrefit={(g) => void indexingPanel?.refit(g)} />
           {:else if graphTab === "peaks"}
             <Peaks {plotKey} {theme} preview={previewAnswer} {previewError}
               rwp={result?.statistics?.rwp ?? null} oncurves={(c) => (baseCurves = c)} />
@@ -930,9 +1135,20 @@
           {:else if graphTab === "structure"}
             <Structure {head} {busy} {theme} {say} values={sliderValues}
               projectPath={project?.path ?? null} onreadout={(r) => (reading = r)} />
+          {:else if graphTab === "trends" && wf === "series"}
+            <SeriesTrends trends={seriesTrends} running={busy && run?.run?.kind === "series"}
+              {corpus} {theme} bind:against={trendsAgainst} bind:hidden={trendsHidden}
+              onplot={(paths, on) => seriesPanel?.plot(paths, on)}
+              onselect={(i) => seriesPanel?.select(i)} onstep={(d) => seriesPanel?.move(d)}
+              onreadout={(r) => (reading = r)} />
+          {:else if graphTab === "map" && wf === "series"}
+            <SeriesMap {theme} {busy} stamp={seriesStamp} selected={seriesMark}
+              onselect={(i) => seriesPanel?.select(i, "staged")}
+              onreadout={(r) => (reading = r)} />
           {:else}
             <p class="unbuilt">Not built yet.</p>
           {/if}
+          {/key}
         </div>
       </section>
     {/if}
@@ -944,19 +1160,36 @@
         {#if showGraphs && project}
           <Splitter size={modelWidth} grow="left" min={360} keep={360}
             extent={() => appEl?.clientWidth ?? 0}
-            onsize={(size) => (modelWidth = size)} onreset={() => (modelWidth = MODEL_DEFAULT)}
+            onsize={(size) => { modelWidth = size; sized = true; }}
+            onreset={() => { sized = false; modelWidth = opening(wf); }}
             title="Drag to resize the panels; double-click resets them" />
         {/if}
-        {#if unbuilt}
-          <nav class="tabs steps" aria-label="Steps">
-            {#each unbuilt as s, i (s.name)}
-              <button class="tab" aria-current={step === i ? "step" : undefined}
-                onclick={() => (step = i)}>{s.name}</button>
+        {#if wfSteps}
+          <!-- the prototype's step strip (round 4, 2026-11-07; round 11): each
+               step its number in a ring and its name, the current one raised,
+               a › between them -->
+          <nav class="steps" aria-label="Steps">
+            {#each wfSteps as s, i (s.name)}
+              {#if i}<span class="ar" aria-hidden="true">›</span>{/if}
+              <button class="step" aria-current={step === i ? "step" : undefined}
+                onclick={() => chooseStep(i)}><b>{i + 1}</b><span class="sname">{s.name}</span></button>
             {/each}
+            <span class="sright">
+              {#if workflow(wf).loop}
+                <button class="step loop" onclick={() => chooseStep(0)}
+                  title={workflow(wf).loop}>↺ iterate</button>
+              {/if}
+              {#if WORKFLOW_HELP[wf]}
+                <HelpBox entry={WORKFLOW_HELP[wf]!} {docsUrl}
+                  label="About the {workflow(wf).name} workflow" />
+              {/if}
+            </span>
           </nav>
-          <div class="pane wfpane">
-            <p class="box">{unbuilt[step].body}</p>
-          </div>
+          {#if isNotBuilt(wf)}
+            <div class="pane wfpane">
+              <p class="box">{wfSteps[step].body}</p>
+            </div>
+          {/if}
         {:else}
           <div class="tabs" role="tablist" aria-label="Model">
             {#each MODEL_TABS as t (t.id)}
@@ -969,14 +1202,43 @@
             {/if}
           </div>
         {/if}
-        <div class="pane" class:gone={!!unbuilt || modelTab !== "params"}>
+        <!-- each pane is the project's, so another project's open starts each
+             over (`opens`); the Indexing list is mounted for the workflow's
+             life, so a step switch keeps its filter and the chosen row -->
+        {#key opens}
+        {#if wf === "index"}
+          <div class="pane wfsteps">
+            <Indexing bind:this={indexingPanel} {step} steps={wfSteps ?? []} {busy} {corpus} {say}
+              bind:selected={selectedPeak}
+              onpeaks={(p) => (peaksPayload = p)} onframe={framePeak} onstep={chooseStep}
+              onfitgroups={(groups, focused, total) => (fitGroups = { groups, focused, total })} />
+            <Candidates bind:this={candidatesPanel} {step} {busy} {run} {capabilities} {corpus} {say}
+              doc={project?.doc ?? null} nLines={peaksPayload?.peaks?.filter((p) => p.usable).length ?? 0}
+              onstep={chooseStep} onproject={(doc) => (project = doc)}
+              oncandidate={(c) => (candidateLines = c)}
+              onadopted={() => { chooseWorkflow("refine"); void structureMoved(); }} />
+          </div>
+        {/if}
+        {#if seriesMounted}
+          {#key project.path}
+            <div class="pane wfsteps" class:gone={wf !== "series"}>
+              <Series bind:this={seriesPanel} step={wf === "series" ? step : 0}
+                steps={workflow("series").steps ?? []} {busy} {run} {say}
+                onstep={chooseStep} onrun={startRun} onstop={stop}
+                onview={(v) => (seriesView = v)} ontrends={(t) => (seriesTrends = t)}
+                ongraph={(g) => { if (graphTabs.some((t) => t.id === g)) graphTab = g; }}
+                onstaged={() => (seriesStamp += 1)} onmark={(m) => (seriesMark = m)} />
+            </div>
+          {/key}
+        {/if}
+        <div class="pane" class:gone={!!wfSteps || modelTab !== "params"}>
           <Params bind:this={paramsPanel} {head} {busy} {corpus} {say} onmoved={structureMoved}
             anodes={capabilities?.anodes ?? []}
             onpending={(n, why) => { pendingTouched = n; pendingInvalid = why; }}
             onholds={(h) => (pendingHolds = h)} />
         </div>
         <!-- mounted while hidden too: its slider values are pending edits -->
-        <div class="pane" class:gone={!!unbuilt || modelTab !== "interactive"}>
+        <div class="pane" class:gone={!!wfSteps || modelTab !== "interactive"}>
           <Interactive bind:this={interactivePanel} {head} {busy} {corpus} {say}
             context={rangeContext} {phaseNames}
             onpending={(n) => (sliderTouched = n)}
@@ -987,15 +1249,15 @@
             }} />
         </div>
         <!-- mounted while hidden too: an edited plan is a pending edit -->
-        <div class="pane" class:gone={!!unbuilt || modelTab !== "plan"}>
+        <div class="pane" class:gone={!!wfSteps || modelTab !== "plan"}>
           <Plan bind:this={planPanel} mode={project?.doc?.mode ?? "rietveld"} {head} {busy}
             noPhasesReason={blocked} {corpus} {phaseNames} {say} onrun={runStage}
             onpending={(edited) => (planEdited = edited)} onsaved={planSaved} />
         </div>
         <!-- mounted while hidden too: an edited buffer is a pending edit -->
-        <div class="pane" class:gone={!!unbuilt || modelTab !== "text"}>
+        <div class="pane" class:gone={!!wfSteps || modelTab !== "text"}>
           <Text bind:this={textPanel} {head} {busy} {say} dark={theme === "dark"}
-            active={!unbuilt && showModel && modelTab === "text"}
+            active={!wfSteps && showModel && modelTab === "text"}
             name={project?.path ? projectStem(project.path) : "project"}
             onmoved={structureMoved} onapply={applyFromText}
             onpreview={(answer, why) => {
@@ -1004,7 +1266,8 @@
             }}
             onpending={(edited, why) => { textEdited = edited; textWhy = why; }} />
         </div>
-        {#if !unbuilt}
+        {/key}
+        {#if !wfSteps}
           <ActionBar bind:mode={refineMode} {touched} {invalid}
             {busy} {blocked} stats={barStats} stages={project?.doc?.plan?.stages?.length ?? null} onapply={() => applyPending()}
             onrevert={revertPending} onrefine={() => refine()} />
@@ -1022,13 +1285,33 @@
       <div class="tabs" role="tablist" aria-label="Console and history">
         {#each BOTTOM_TABS as t (t.id)}
           <button class="tab" role="tab" aria-selected={bottomTab === t.id}
-            onclick={() => (bottomTab = t.id)}>{t.label}</button>
+            onclick={() => (bottomTab = t.id)}>{t.label}{#if t.id === "history" && historyCount != null}<span
+              class="count">{historyCount}</span>{/if}</button>
         {/each}
+        {#if bottomTab === "history"}
+          <span class="hright">
+          <span class="segmented hview" role="group" aria-label="History view">
+            {#each [["graph", "Graph", "Draw the nodes as lanes"], ["table", "Table", "List the nodes with their numbers"]] as [id, label, tip] (id)}
+              <button class:on={historyView === id} aria-pressed={historyView === id} title={tip}
+                onclick={() => (historyView = id as "graph" | "table")}>{label}</button>
+            {/each}
+          </span>
+          <HelpBox entry={HISTORY_HELP} {docsUrl} label="About the History tab" />
+          </span>
+        {/if}
       </div>
       <div class="pane" class:gone={bottomTab !== "console"}>
         <Console {lines} {dropped} shown={bottomTab === "console"} />
       </div>
-      <div class="pane" class:gone={bottomTab !== "history"}></div>
+      <div class="pane" class:gone={bottomTab !== "history"}>
+        <!-- keyed on the project: two projects' heads can share an id, and
+             History re-reads only when its head changes -->
+        {#key opens}
+          <History {head} {busy} {say} view={historyView} compared={compared?.id ?? null}
+            oncount={(n) => (historyCount = n)} oncompare={(c) => (compared = c)}
+            onrestore={(plan) => paramsPanel?.loadRestore(plan)} onmoved={structureMoved} />
+        {/key}
+      </div>
     </section>
   {/if}
 </div>
@@ -1084,6 +1367,8 @@
   <Settings choice={themeChoice} onchoose={chooseTheme}
     version={version?.package_version ?? ""} onclose={() => (settingsOpen = false)} />
 {/if}
+
+<HelpPopover host={help} {corpus} />
 
 <style>
   .topbar,
@@ -1172,8 +1457,28 @@
     display: none;
   }
 
+  /* the History tab's node count, in the muted register (the design's
+     "History 8") */
+  .count {
+    margin-left: 6px;
+    color: var(--muted);
+  }
+
+  /* the History tab's view choice and ? box, at the strip's right */
+  .hright {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+
   .wfpane {
     padding: 16px;
+  }
+
+  /* the steps hold their own scroll and their foot */
+  .wfsteps {
+    overflow: hidden;
   }
 
   .box {

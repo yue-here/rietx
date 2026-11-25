@@ -392,7 +392,7 @@ def test_a_refine_moves_nothing_while_it_runs_or_after(browser, tmp_path_factory
     url = f"http://127.0.0.1:{httpd.server_address[1]}/"
     try:
         page = _open(browser, url, WIDTHS["wide"])
-        page.locator(".actions button", has_text="One cycle").click()
+        page.locator(".actions button", has_text="As ticked").click()
         _frames(page)
         before = page.evaluate(SNAP, LANDMARKS)
         page.locator(".actions button.refine").click()
@@ -1005,17 +1005,22 @@ def test_no_frame_control_moves_the_rebuilt_layout(browser, gui):
         pressing(f"{strip} ? box", lambda p, n=label: p.get_by_role("button", name=n, exact=True).click(),
                  escape)
 
-    def series(p):
-        p.locator("button.mbtn.wf").click()
-        p.get_by_role("menuitemradio", name="Series · not built yet").click()
+    def workflow(name):
+        def choose(p):
+            p.locator("button.mbtn.wf").click()
+            p.get_by_role("menuitemradio", name=name, exact=True).click()
+        return choose
 
     pressing("workflow menu", lambda p: p.locator("button.mbtn.wf").click(), escape)
     pressing("File menu", lambda p: p.locator("header .fm-name").click(), escape)
     pressing("Settings", lambda p: p.get_by_role("button", name="Settings", exact=True).click(),
              escape)
-    pressing("Series workflow", series, landmarks=[
-        s for s in NEXT_LANDMARKS if s != "header.topbar > *"] + [
-        "header.topbar > button.ib"])
+    # a workflow not built yet, and the series workflow, built (WP-2243)
+    for label, name in (("Structure solution workflow", "Structure solution · not built yet"),
+                        ("Series workflow", "Series")):
+        pressing(label, workflow(name), landmarks=[
+            s for s in NEXT_LANDMARKS if s != "header.topbar > *"] + [
+            "header.topbar > button.ib"])
     assert not failures, "\n".join(failures)
 
 
@@ -1038,6 +1043,82 @@ def test_a_frame_toggle_stays_where_it_was(browser, gui):
     assert not page.errors, page.errors
     page.close()
     assert not moved, moved
+
+
+#: Whether the open help popover is the topmost thing at its own centre, so a
+#: click there reaches it rather than a panel or a layer under it.
+POPOVER_ON_TOP = """() => {
+  const pop = document.querySelector('.popover[role=dialog]');
+  if (!pop) return false;
+  const r = pop.getBoundingClientRect();
+  return !!document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)?.closest('.popover');
+}"""
+
+
+def test_a_help_term_at_next_opens_its_explanation(browser, gui):
+    """A parameter's name at /next opens its help popover (WP-2244).
+
+    Until this WP only today's page mounted the popover, so every help term at
+    /next did nothing when clicked. The click is a real one; the popover must be
+    on top, inside the window and holding focus, and Esc hands focus back."""
+    url, _ = gui
+    page = _open_next(browser, url, 1300)
+    term = page.locator("[data-row] .label .help").first
+    term.scroll_into_view_if_needed()
+    name = term.text_content().strip()
+    assert page.locator(".popover").count() == 0
+    term.click()
+    _frames(page)
+    popover = page.locator(".popover[role=dialog]")
+    assert popover.count() == 1, f"clicking {name!r} opened nothing"
+    title = popover.locator("h2").text_content().strip()
+    assert title and title == popover.get_attribute("aria-label")
+    assert "Not described yet" not in popover.text_content(), title
+    assert popover.locator("a", has_text="in the manual").count() == 1
+    assert term.get_attribute("aria-expanded") == "true"
+    assert page.evaluate(POPOVER_ON_TOP)
+    box = popover.bounding_box()
+    assert box["x"] >= 0 and box["y"] >= 0
+    assert box["x"] + box["width"] <= 1300 and box["y"] + box["height"] <= 900, box
+    assert page.evaluate("document.activeElement.matches('.popover')")
+    page.keyboard.press("Escape")
+    _frames(page)
+    assert popover.count() == 0
+    assert page.evaluate("document.activeElement.matches('[data-row] .label .help')")
+    assert not page.errors, page.errors
+    page.close()
+
+
+def test_a_help_term_in_the_stage_settings_leaves_them_open(browser, gui):
+    """The stage settings' labels are help terms, and their popover floats outside
+    the settings layer (WP-2244). A click in the popover is not a click away from
+    the layer, and the Esc that closes the popover closes nothing else."""
+    url, _ = gui
+    page = _open_next(browser, url, 1300)
+    page.locator("section .tabs [role=tab]", has_text="Plan").first.click()
+    page.get_by_role("button", name="Stage 1 actions", exact=True).click()
+    page.get_by_role("menuitem", name="Stage settings…").click()
+    layer = page.locator("form.float.settings")
+    layer.wait_for()
+    layer.locator(".help").first.click()
+    _frames(page)
+    popover = page.locator(".popover[role=dialog]")
+    assert popover.count() == 1
+    assert page.evaluate(POPOVER_ON_TOP)
+    box = popover.bounding_box()
+    page.mouse.click(box["x"] + 12, box["y"] + 8)
+    _frames(page)
+    assert layer.count() == 1, "a click in the popover closed the stage settings"
+    assert popover.count() == 1
+    page.keyboard.press("Escape")
+    _frames(page)
+    assert popover.count() == 0
+    assert layer.count() == 1, "the popover's Esc closed the stage settings too"
+    page.keyboard.press("Escape")
+    _frames(page)
+    assert layer.count() == 0
+    assert not page.errors, page.errors
+    page.close()
 
 
 #: The refinement window's own places (WP-2216): the graph's title line and its
@@ -1101,6 +1182,50 @@ def test_no_pattern_control_moves_the_refinement_window(browser, gui):
     assert not page.errors, page.errors
     page.close()
     assert not failures, "\n".join(failures)
+
+
+#: The ink a canvas region holds: how many of its pixels anything painted.
+_INK = """([i, x0, x1, y0, y1]) => {
+    const u = document.querySelectorAll('.host .uplot')[i], c = u.querySelector('canvas');
+    const r = c.getBoundingClientRect(), s = c.width / r.width;
+    const img = c.getContext('2d').getImageData(Math.round((x0 - r.left) * s), Math.round((y0 - r.top) * s),
+        Math.round((x1 - x0) * s), Math.round((y1 - y0) * s)).data;
+    let n = 0;
+    for (let k = 3; k < img.length; k += 4) if (img[k] > 0) n++;
+    return n;
+}"""
+
+
+def test_the_rebuilt_plot_reaches_its_gutter_and_labels_only_what_it_draws(browser, tmp_path_factory):
+    """WP-2245, on a project that has never been fitted. The plot area ends where
+    the legend gutter starts, as the prototype's does: uPlot padded it 25 px
+    short, a fifth of the pane blank with the gutter. The difference pane draws
+    nothing before a fit, so its axis prints nothing: it read 100 and 0, the
+    range uPlot gives a pane with no data, under the intensity's labels."""
+    from tests.test_project import _write_xye
+    from tests.test_refine_synthetic import synthesize
+
+    data = _write_xye(tmp_path_factory.mktemp("prefit-data") / "synth.xye", synthesize())
+    project = _project(tmp_path_factory.mktemp("prefit") / "sample.rex", data)
+    httpd = _start(GuiSession(project, state_dir=tmp_path_factory.mktemp("prefit-state")))
+    try:
+        page = _open_window(browser, f"http://127.0.0.1:{httpd.server_address[1]}/")
+        boxes = page.evaluate("""() => {
+            const r = (e) => { const b = e.getBoundingClientRect(); return [b.left, b.top, b.right, b.bottom]; };
+            return { over: [...document.querySelectorAll('.host .u-over')].map(r),
+                     uplot: [...document.querySelectorAll('.host .uplot')].map(r),
+                     gutter: r(document.querySelector('.gutter')) }; }""")
+        for over in boxes["over"]:
+            assert abs(over[2] - boxes["gutter"][0]) <= 1, (over, boxes["gutter"])
+        # the tick-label column left of each plot area: the intensity's holds
+        # its labels, the empty difference pane's holds no ink at all
+        main, resid = boxes["over"][0], boxes["over"][1]
+        assert page.evaluate(_INK, [0, boxes["uplot"][0][0], main[0] - 1, main[1], main[3]]) > 0
+        assert page.evaluate(_INK, [1, boxes["uplot"][1][0], resid[0] - 1, boxes["uplot"][1][1], resid[3]]) == 0
+        assert not page.errors, page.errors
+        page.close()
+    finally:
+        httpd.shutdown()
 
 
 def test_a_region_is_drawn_selected_and_deleted_in_place(browser, gui):
@@ -2022,4 +2147,464 @@ def test_the_rebuilt_text_tab_applies_a_typed_value_from_the_bar(browser, tmp_pa
         page.close()
         assert not moved, moved
     finally:
+        httpd.shutdown()
+
+
+# -- the History tab (WP-2211) --------------------------------------------------
+
+#: The History tab's own places, beside the window's: the tab strip, its view
+#: choice and every row with its two buttons.
+HISTORY_LANDMARKS = WINDOW_LANDMARKS + [
+    "section.bottom", "section.bottom > .tabs", "section.bottom > .tabs > *",
+    "table.hist tr", "table.hist button", ".gutter .gut",
+]
+
+
+def _history_window(browser, tmp_path_factory):
+    """A project with two fitted stages, its window open on the History table."""
+    httpd, client = _serve(tmp_path_factory, "history")
+    status, run = client.post("/api/run", {"kind": "stage", "stage": {
+        "name": "bkg", "turn_on": ["phases.*.scale", "instrument.background.*"], "max_iter": 5}})
+    assert status == 200, run
+    _wait_idle(client)
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    page = _open_window(browser, url)
+    page.get_by_role("button", name="Show the console", exact=True).click()
+    page.get_by_role("tab", name=re.compile(r"^History")).click()
+    page.locator('[aria-label="History view"] button', has_text="Table").click()
+    page.wait_for_selector("table.hist tbody tr")
+    _frames(page)
+    return httpd, client, page
+
+
+def _row(page, step: str):
+    return page.locator("table.hist tbody tr", has=page.locator("td.what", has_text=step))
+
+
+#: The candidate table's heads whose ink centre lies outside the ink of the
+#: values under them, as `[label, centre, left, right]` (WP-2240, the third
+#: look). Ink is a `Range` over the text, never a box: a head over white space
+#: sits inside its own cell. A head spanning several columns is read against
+#: the values of all of them.
+_HEADS_OVER_VALUES = r"""() => {
+  const t = document.querySelector('table.cands');
+  const ink = (el) => {
+    const r = document.createRange(); r.selectNodeContents(el);
+    const q = [...r.getClientRects()].filter((x) => x.width > 0.5);
+    return q.length ? [Math.min(...q.map((x) => x.left)), Math.max(...q.map((x) => x.right))] : null;
+  };
+  const grid = []; const heads = [];
+  [...t.tHead.rows].forEach((tr, ri) => {
+    grid[ri] = grid[ri] || []; let c = 0;
+    for (const th of tr.cells) {
+      while (grid[ri][c]) c++;
+      for (let dr = 0; dr < th.rowSpan; dr++) for (let dc = 0; dc < th.colSpan; dc++) {
+        grid[ri + dr] = grid[ri + dr] || []; grid[ri + dr][c + dc] = th; }
+      heads.push([th, c, th.colSpan]); c += th.colSpan;
+    }
+  });
+  const off = [];
+  for (const [th, first, n] of heads) {
+    const h = ink(th); if (!h) continue;
+    let l = Infinity, r = -Infinity;
+    for (const tr of t.tBodies[0].rows) {
+      let c = 0;
+      for (const td of tr.cells) {
+        const v = c >= first && c < first + n ? ink(td) : null;
+        if (v) { l = Math.min(l, v[0]); r = Math.max(r, v[1]); }
+        c += td.colSpan;
+      }
+    }
+    const mid = (h[0] + h[1]) / 2;
+    if (r > l && (mid < l || mid > r)) off.push([th.innerText, mid, l, r]);
+  }
+  return off;
+}"""
+
+
+def _ink_pixels(page, hex_colour: str) -> int:
+    """Pixels of the plot within a small distance of one colour: what the
+    canvas painted, never the option it was handed."""
+    import io
+
+    import numpy as np
+    from PIL import Image
+
+    png = page.locator(".plot").screenshot()
+    pixels = np.asarray(Image.open(io.BytesIO(png)).convert("RGB")).astype(int)
+    want = np.array([int(hex_colour[i:i + 2], 16) for i in (1, 3, 5)])
+    return int((np.abs(pixels - want).sum(axis=-1) < 24).sum())
+
+
+def test_compare_draws_the_node_s_curve_and_moves_nothing(browser, tmp_path_factory):
+    """Compare overlays an earlier node's fit, dashed in its own ink, and names it
+    in the legend; a second press takes it off. Neither press moves a place."""
+    from rietx.viz.theme import TOKENS
+
+    httpd, client, page = _history_window(browser, tmp_path_factory)
+    try:
+        theme = page.evaluate("document.documentElement.dataset.theme")
+        ink = {**TOKENS["light"], **TOKENS[theme]}["--plot-compare"]
+        before = page.evaluate(SNAP, HISTORY_LANDMARKS)
+        drawn_before = _ink_pixels(page, ink)
+        row = _row(page, "scale")
+        compare = row.get_by_role("button", name="Compare", exact=True)
+        compare.click()
+        page.wait_for_selector(".gutter .gut:has-text('scale')")
+        _frames(page)
+        assert compare.get_attribute("aria-pressed") == "true"
+        moved = _moved(before, page.evaluate(SNAP, HISTORY_LANDMARKS))
+        drawn = _ink_pixels(page, ink)
+        assert drawn > drawn_before + 50, (drawn_before, drawn)
+        compare.click()
+        page.wait_for_function("() => ![...document.querySelectorAll('.gutter .gut')]"
+                               ".some((b) => b.textContent.trim() === 'scale')")
+        _frames(page)
+        moved += _moved(before, page.evaluate(SNAP, HISTORY_LANDMARKS))
+        # off again: back near where it started (the observed crosses'
+        # antialiased edges land a few pixels either way)
+        off = _ink_pixels(page, ink)
+        assert off - drawn_before < (drawn - drawn_before) / 4, (drawn_before, drawn, off)
+        assert not page.errors, page.errors
+        assert not moved, moved
+    finally:
+        page.close()
+        httpd.shutdown()
+
+
+PENDING = "() => /\\d+ pending/.test(document.querySelector('.actions .pending')?.textContent ?? '')"
+NONE_PENDING = "() => (document.querySelector('.actions .pending')?.textContent ?? '').trim() === ''"
+
+
+def test_restore_then_apply_reaches_the_node_and_revert_changes_nothing(
+        browser, tmp_path_factory):
+    """Restore loads an earlier node's values as pending edits, moving nothing;
+    Revert drops them and the head stays; Restore then Apply lands the node's
+    values, every one, on a new head."""
+    httpd, client, page = _history_window(browser, tmp_path_factory)
+    try:
+        nodes = client.get("/api/history")[1]
+        head = nodes["head"]
+        scale = next(n["id"] for n in nodes["nodes"] if n["name"] == "scale")
+        assert client.get(f"/api/history/diff?a={scale}&b={head}")[1]["diff"]
+
+        before = page.evaluate(SNAP, HISTORY_LANDMARKS)
+        _row(page, "scale").get_by_role("button", name="Restore", exact=True).click()
+        page.wait_for_function(PENDING)
+        _frames(page)
+        moved = _moved(before, page.evaluate(SNAP, HISTORY_LANDMARKS))
+        page.get_by_role("button", name="Revert", exact=True).click()
+        page.wait_for_function(NONE_PENDING)
+        assert client.get("/api/history")[1]["head"] == head
+
+        _row(page, "scale").get_by_role("button", name="Restore", exact=True).click()
+        page.wait_for_function(PENDING)
+        page.get_by_role("button", name="Apply", exact=True).click()
+        page.wait_for_function(NONE_PENDING)
+        after = client.get("/api/history")[1]["head"]
+        assert after != head
+        assert client.get(f"/api/history/diff?a={scale}&b={after}")[1]["diff"] == {}
+        assert not page.errors, page.errors
+        assert not moved, moved
+    finally:
+        page.close()
+        httpd.shutdown()
+
+
+def test_no_history_control_moves_the_window(browser, tmp_path_factory):
+    """The view choice asks for the panel to change; every other press of the
+    History tab moves no place: a row's menu, the ? box, Esc out of each."""
+    httpd, client, page = _history_window(browser, tmp_path_factory)
+    try:
+        before = page.evaluate(SNAP, HISTORY_LANDMARKS)
+        failures = []
+
+        def check(label):
+            _frames(page)
+            moved = _moved(before, page.evaluate(SNAP, HISTORY_LANDMARKS))
+            if moved:
+                failures.append(f"{label!r}: " + "; ".join(moved[:4]))
+
+        _row(page, "scale").click(button="right")
+        page.wait_for_selector(".rx-menu")
+        names = page.locator(".rx-menu [role^=menuitem]").all_text_contents()
+        assert [n.strip() for n in names] == ["Make current", "Branch from here…", "Name…", "Note…"]
+        menu = page.locator(".rx-menu").bounding_box()
+        assert menu["y"] >= 0 and menu["y"] + menu["height"] <= 900, menu
+        check("a row's menu")
+        page.keyboard.press("Escape")
+        page.get_by_role("button", name="About the History tab", exact=True).click()
+        page.wait_for_selector(".helpbox")
+        box = page.locator(".helpbox").bounding_box()
+        assert box["y"] + box["height"] <= 900, box
+        check("the ? box")
+        page.keyboard.press("Escape")
+        check("Esc")
+        assert not page.errors, page.errors
+        assert not failures, "\n".join(failures)
+    finally:
+        page.close()
+        httpd.shutdown()
+
+
+def test_the_pick_step_picks_frames_a_line_and_a_tick_moves_nothing(browser, tmp_path_factory):
+    """The peaks-and-indexing workflow's Pick step at ``/next``, by real clicks (WP-2240).
+
+    Choosing the workflow from the menu shows its four steps and the two graph
+    tabs it draws; Pick peaks in the step's foot fills the table; a tickbox
+    leaves a line out without moving the table or the frame (round 11b call 22,
+    `gui/STYLE.md` principle 4); a row's click frames its line, so the Pattern
+    graph is zoomed and Show all is offered.
+    """
+    httpd, _client = _serve(tmp_path_factory, "next-index")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    page = _open_next(browser, url, 1440)
+    try:
+        page.locator("button.mbtn.wf").click()
+        page.get_by_role("menuitemradio", name="Peaks and indexing", exact=True).click()
+        page.wait_for_selector("nav.steps button.step")
+        assert page.locator("nav.steps button.step .sname").all_text_contents() == [
+            "Pick peaks", "Fit peaks", "Index", "Judge"]
+        assert page.locator("section.graphs .tabs [role=tab]").all_text_contents() == [
+            "Pattern", "Peaks"]
+        assert page.locator(".actions").count() == 0
+        page.locator(".foot").get_by_role("button", name="Pick peaks", exact=True).click()
+        page.wait_for_selector("table.lines tbody tr")
+        _frames(page)
+        n = page.locator("table.lines tbody tr").count()
+        assert n > 3, n
+        landmarks = NEXT_LANDMARKS + ["nav.steps", "nav.steps > *", ".segmented", "table.lines",
+                                      "table.lines thead th"]
+        before = page.evaluate(SNAP, landmarks)
+        first = page.locator("table.lines tbody tr").first
+        first.locator("input[type=checkbox]").scroll_into_view_if_needed()
+        with page.expect_response("**/api/peaks/flag"):
+            first.locator("input[type=checkbox]").click()
+        _frames(page)
+        assert "off" in (first.get_attribute("class") or "")
+        moved = _moved(before, page.evaluate(SNAP, landmarks))
+        assert not moved, moved
+        assert page.locator("table.lines tbody tr").count() == n
+        show_all = page.get_by_role("button", name="Show all", exact=True)
+        assert show_all.is_disabled()
+        page.locator("table.lines tbody tr").nth(1).locator("td.num").first.click()
+        _frames(page)
+        assert "sel" in (page.locator("table.lines tbody tr").nth(1).get_attribute("class") or "")
+        assert show_all.is_enabled()
+        assert not page.errors, page.errors
+    finally:
+        page.close()
+        httpd.shutdown()
+
+
+def _find_lens(page, x: float, top: float, bottom: float):
+    """Sweep the pointer down a column of the plot and return the middle of
+    the band where the page says a lens is under it (`.host.onmark`): the
+    lenses are canvas ink, so a person's pointer is the one way to find one."""
+    y, hits = top, []
+    while y < bottom:
+        page.mouse.move(x, y)
+        on = page.locator(".plot .host.onmark").count() > 0
+        if on:
+            hits.append(y)
+        elif hits:
+            break
+        y += 2
+    return (hits[0] + hits[-1]) / 2 if hits else None
+
+
+def test_the_peak_lines_on_the_pattern_answer_the_object_grammar(browser, tmp_path_factory):
+    """The Pattern graph is the peak list's editing surface while the workflow
+    is up (WP-2240 task 5, interaction rules 1 to 12), by real pointer events.
+
+    A framed line's lens is found under the pointer; a click on it opens its
+    bar; a drag moves it with the mark under the pointer, and Esc right after
+    takes the move back with the line still chosen (call 35); a click on empty
+    space shows where it lands and adds a line; ⌘Z takes the add back;
+    right-click opens the line's menu; Option-click removes the line.
+    """
+    httpd, _client = _serve(tmp_path_factory, "next-gestures")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    page = _open_next(browser, url, 1440)
+    try:
+        page.locator("button.mbtn.wf").click()
+        page.get_by_role("menuitemradio", name="Peaks and indexing", exact=True).click()
+        page.locator(".foot").get_by_role("button", name="Pick peaks", exact=True).click()
+        page.wait_for_selector("table.lines tbody tr")
+        rows = page.locator("table.lines tbody tr")
+        n = rows.count()
+        used = [i for i in range(n) if "off" not in (rows.nth(i).get_attribute("class") or "")]
+        target = used[len(used) // 2]
+        start = rows.nth(target).locator("td.num").first.inner_text()
+        rows.nth(target).locator("td.num").first.click()
+        _frames(page)
+        page.keyboard.press("Escape")
+        over = page.locator(".plot .u-over").first.bounding_box()
+        cx = over["x"] + over["width"] / 2
+        y = _find_lens(page, cx, over["y"] + 4, over["y"] + over["height"] * 0.8)
+        assert y is not None, "no lens under the framed line"
+        page.mouse.move(cx, y)
+        assert page.locator(".plot .host.onmark").count() == 1
+
+        # a click on the lens chooses it and opens its bar
+        page.mouse.click(cx, y)
+        _frames(page)
+        bar = page.locator(".peakbar")
+        assert bar.count() == 1 and "° 2θ" in bar.inner_text()
+        assert "sel" in (rows.nth(target).get_attribute("class") or "")
+        page.keyboard.press("Escape")
+        _frames(page)
+        assert bar.count() == 0
+
+        # a drag moves the line, its mark under the pointer the whole way
+        page.mouse.move(cx, y)
+        page.mouse.down()
+        for k in range(1, 9):
+            page.mouse.move(cx + 5 * k, y)
+        _frames(page)
+        assert page.locator(".lensmark.moving").count() == 1
+        with page.expect_response("**/api/peaks/move"):
+            page.mouse.up()
+        _frames(page)
+        chosen = page.locator("table.lines tbody tr.sel td.num").first
+        assert chosen.inner_text() != start
+        assert bar.count() == 1
+        # Esc right after the drag takes it back, and the line stays chosen
+        with page.expect_response("**/api/peaks/undo"):
+            page.keyboard.press("Escape")
+        _frames(page)
+        assert chosen.inner_text() == start
+        assert bar.count() == 1
+        page.keyboard.press("Escape")
+        _frames(page)
+        assert bar.count() == 0
+
+        # hover shows where a click lands; the click adds a line after its
+        # wait for a double-click, and ⌘Z takes it back
+        ex = over["x"] + over["width"] * 0.15
+        page.mouse.move(ex, over["y"] + over["height"] * 0.5)
+        _frames(page)
+        assert page.locator(".lensmark.ghost").count() == 1
+        with page.expect_response("**/api/peaks/add"):
+            page.mouse.click(ex, over["y"] + over["height"] * 0.5)
+        _frames(page)
+        assert rows.count() == n + 1
+        with page.expect_response("**/api/peaks/undo"):
+            page.keyboard.press("Meta+z")
+        _frames(page)
+        assert rows.count() == n
+
+        # right-click on the lens opens the line's menu
+        page.mouse.click(over["x"] + over["width"] * 0.9, over["y"] + 2)
+        rows.nth(target).locator("td.num").first.click()
+        _frames(page)
+        page.keyboard.press("Escape")
+        y = _find_lens(page, cx, over["y"] + 4, over["y"] + over["height"] * 0.8)
+        page.mouse.click(cx, y, button="right")
+        page.wait_for_selector(".rx-menu")
+        names = [t.strip() for t in page.locator(".rx-menu [role^=menuitem]").all_text_contents()]
+        assert names[:2] == ["Leave out of the search", "Delete the line"], names
+        page.keyboard.press("Escape")
+        _frames(page)
+
+        # Option-click removes the line at once
+        page.keyboard.down("Alt")
+        page.mouse.move(cx, y)
+        _frames(page)
+        assert page.locator(".lensmark.danger").count() == 1
+        with page.expect_response("**/api/peaks/remove") as gone:
+            page.mouse.click(cx, y)
+        page.keyboard.up("Alt")
+        _frames(page)
+        assert gone.value.request.post_data_json == {"index": target}
+        positions = page.evaluate(
+            "[...document.querySelectorAll('table.lines tbody tr')]"
+            ".map((tr) => tr.querySelectorAll('td')[1].innerText.trim())")
+        assert len(positions) >= n - 1 and start not in positions, (start, positions)
+        assert not page.errors, page.errors
+    finally:
+        page.close()
+        httpd.shutdown()
+
+
+def test_the_fit_index_and_judge_steps_run_to_an_adopted_cell(browser, tmp_path_factory):
+    """The workflow's last three steps at ``/next``, by real clicks (WP-2240 tasks 6 to 8).
+
+    Fit peaks lists the groups and draws their windows in the Peaks graph, and a
+    window's Refit is one undo step. Index searches the systems the form leaves
+    on, lists the cells, and a row's click draws its lines on the Pattern graph.
+    Judge screens the chosen cell's extinctions, and Adopt waits for Apply,
+    which lands a Pawley start (the maintainer, 2026-11-23) and hands the
+    window to Refinement.
+    """
+    httpd, client = _serve(tmp_path_factory, "next-judge")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    page = _open_next(browser, url, 1440)
+    steps = page.locator("nav.steps button.step")
+    try:
+        page.locator("button.mbtn.wf").click()
+        page.get_by_role("menuitemradio", name="Peaks and indexing", exact=True).click()
+        page.locator(".foot").get_by_role("button", name="Pick peaks", exact=True).click()
+        page.wait_for_selector("table.lines tbody tr")
+
+        # Fit peaks: the groups, their windows, and a Refit as one undo step
+        steps.filter(has_text="Fit peaks").click()
+        page.locator(".segmented button", has_text="All groups").click()
+        page.wait_for_selector("table.groups tbody tr")
+        page.get_by_role("tab", name="Peaks", exact=True).click()
+        page.wait_for_selector(".peakfits canvas")
+        assert page.locator(".peakfits canvas").count() >= 1
+        before = client.get("/api/peaks")[1]["undo"]
+        with page.expect_response("**/api/peaks/refit"):
+            page.locator(".peakfits button.refit").first.click()
+        _frames(page)
+        assert client.get("/api/peaks")[1]["undo"] == before + 1
+
+        # Index: leave cubic alone on, search, choose the first cell
+        steps.filter(has_text="Index").click()
+        page.get_by_role("tab", name="Pattern", exact=True).click()
+        systems = page.locator('[aria-label="Crystal systems"] button')
+        for name in systems.all_text_contents():
+            if name != "cubic":
+                with page.expect_response("**/api/project"):
+                    systems.filter(has_text=name).click()
+        assert client.get("/api/project")[1]["doc"]["indexing"]["search"]["systems"] == ["cubic"]
+        # a chosen cell's lines are the strong rule's grey at /next (Yue, 2026-11-23)
+        candidate = page.evaluate(
+            "getComputedStyle(document.body).getPropertyValue('--line-strong')").strip()
+        drawn = _ink_pixels(page, candidate)
+        page.locator(".steppane:not(.gone) .foot").get_by_role(
+            "button", name="Index", exact=True).click()
+        page.wait_for_selector("table.cands tbody tr", timeout=180_000)
+        rows = page.locator("table.cands tbody tr")
+        assert "cubic" in rows.first.inner_text()
+        rows.first.click()
+        _frames(page)
+        assert "sel" in (rows.first.get_attribute("class") or "")
+        assert _ink_pixels(page, candidate) > drawn + 50
+        # every head is centred over its column's values, never over white
+        # space beside them (Yue, the third look, 2026-11-23)
+        off = page.evaluate(_HEADS_OVER_VALUES)
+        assert off == [], off
+
+        # Judge: screen the extinctions, choose a group, Adopt, then Apply
+        foot = page.locator(".steppane:not(.gone) .foot")
+        foot.get_by_role("button", name=re.compile(r"^Judge #1")).click()
+        assert "Å" in page.locator(".cellline").inner_text()
+        page.get_by_role("button", name="Screen extinctions", exact=True).click()
+        page.wait_for_selector("table.classes tbody tr", timeout=180_000)
+        assert page.locator("table.classes .mark").count() == 1
+        groups = page.locator(".sgs button")
+        assert groups.first.get_attribute("aria-pressed") == "true"
+        foot.get_by_role("button", name="Adopt as a Pawley start", exact=True).click()
+        assert client.get("/api/project")[1]["doc"]["mode"] != "pawley"
+        assert foot.get_by_role("button", name="Revert", exact=True).count() == 1
+        with page.expect_response("**/api/index/adopt"):
+            foot.get_by_role("button", name="Apply", exact=True).click()
+        page.wait_for_function(
+            "document.querySelector('button.mbtn.wf').innerText.includes('Refinement')")
+        assert client.get("/api/project")[1]["doc"]["mode"] == "pawley"
+        assert not page.errors, page.errors
+    finally:
+        page.close()
         httpd.shutdown()
