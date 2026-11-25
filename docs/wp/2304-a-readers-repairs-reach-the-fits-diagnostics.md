@@ -47,10 +47,14 @@ Tier: none. The notes are the reader's existing codes, already in `_audit`.
 
 ## Tasks
 
-- [ ] List every place a `PatternData` is serialised or compared, and confirm a new field
-  breaks none of them.
-- [ ] `PatternData` carries the reader's notes; `read_pattern` fills it whether or not a list
-  was passed, and still extends the list when one was.
+- [x] List every place a `PatternData` is serialised or compared, and confirm a new field
+  breaks none of them. No schema field holds a `PatternData`. Every fingerprint hashes the
+  arrays alone: `TreeHeader.data_fingerprint`, `DataRef.fingerprint` and `refine._refit_key`.
+  A `model_dump`/`model_validate` round trip (`test_tof_axis.py`, the report-eval fixtures)
+  loads an old dump with the default empty list.
+- [x] `PatternData` carries the reader's notes; `read_pattern` fills it whether or not a list
+  was passed, and still extends the list when one was. The caller's list is extended in a
+  `finally`, so a refusal's notes still reach it. `crop` carries the notes.
 - [ ] Each fit entry point copies the notes into `result.diagnostics`, one per code;
   `PATTERN_DEAD_CHANNELS` appears once.
 - [ ] A series and a joint fit carry each pattern's notes (per pattern in a series, per

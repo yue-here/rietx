@@ -63,6 +63,7 @@ It is `None` on a parameter that was never free, and on a free one whose esd cou
 | `PatternData.sigma` | `list[float]` or `None` | `None` | per-point esd from the file; `None` selects the Poisson fallback |
 | `PatternData.excluded_regions` | `list[tuple[float, float]]` | `[]` | intervals left out of the fit, on whichever axis is set |
 | `PatternData.metadata` | `dict[str, str]` | `{}` | what the reader found in the file header |
+| `PatternData.diagnostics` | `list[Diagnostic]` | `[]` | what the reader repaired or noticed in the file; every fit on the pattern repeats them in its own `diagnostics` |
 
 Exactly one of `two_theta` and `tof` is set, and a pattern that sets both or neither is refused.
 A pattern needs at least two points, and `sigma` needs one value per point.
