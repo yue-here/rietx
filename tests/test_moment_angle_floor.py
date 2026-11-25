@@ -221,7 +221,7 @@ def _machine() -> str:
     reference arm has moved on one CI job and not on a repeat."""
     model = platform.processor() or platform.machine()
     try:
-        with open("/proc/cpuinfo") as fh:
+        with open("/proc/cpuinfo", encoding="utf-8") as fh:
             model = next((line.split(":", 1)[1].strip() for line in fh
                           if line.startswith("model name")), model)
     except OSError:
