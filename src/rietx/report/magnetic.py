@@ -191,6 +191,11 @@ def cosited_moments(model, values, esd: dict[str, float],
     equal form factors puts both moduli there) keeps the position's esd where
     the data determine the combination, read through the pseudo-inverse's
     covariance (:func:`_cosited_sigma`).
+
+    Source: the atom sum of the magnetic structure factor, F_m(Q) = Σ_j occ_j·f_j(Q)·T_j·m_j
+    (Halpern & Johnson, 1939, *Phys. Rev.* **55**, 898, the same F_m
+    :mod:`~rietx.crystallography.magnetic.scattering` evaluates); the
+    linearised esd is the standard propagation gᵀ·Cov·g.
     """
     from ..crystallography.magnetic.moments import _coefficients
 

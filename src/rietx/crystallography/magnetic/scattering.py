@@ -215,6 +215,10 @@ def cosited_groups(positions, mom_mat, frames, ops) -> tuple[tuple[int, ...], ..
     Σ_j occ_j·f_j(s)·T_j·m_j (the module's F_m with the sum over j split by
     position), and only that combination is measured (issue #1692).
 
+    Source: the magnetic structure factor's atom sum F_m = Σ_j occ_j·f_j·T_j·m_j
+    (Halpern & Johnson, 1939, *Phys. Rev.* **55**, 898), which depends on the
+    atoms of one position only through that sum.
+
     Read **at compile**, from the stored coordinates, like every other frozen
     per-stage fact here: whether two atoms share a position is decided before
     the fit and never re-decided inside it.  An atom listed at a different

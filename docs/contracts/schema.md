@@ -805,6 +805,13 @@ caller held on a pattern with the value it was held at.  Additive and
 defaulted to ``None``, the 0.25 → 0.26 rule; an older build refuses an entry
 carrying the key.
 
+Also in 0.62 (#1692): ``MomentEvidence.cosited_with``,
+``MomentEvidence.cosited_magnitude`` and ``MomentEvidence.cosited_magnitude_esd``,
+the moment per position of a mixed-occupancy magnetic site and its esd.
+``MomentEvidence`` rides in ``FitReport`` and in ``SeriesEntry.magnetic``, so
+both carry the fields.  Additive and defaulted (empty, or ``None``), the 0.25 → 0.26
+rule; an older build refuses a record carrying the keys.
+
 Also in 0.62 (WP-2152): a phase's ``PeakEquation`` may read ``wavelength``,
 the emission line's λ in Å, beside ``h`` … ``two_theta``.  A build without the
 name refuses a stored equation that reads it, as "neither a coefficient nor a
