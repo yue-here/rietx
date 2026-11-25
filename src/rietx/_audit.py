@@ -4714,9 +4714,13 @@ ROWS: tuple[Row, ...] = (
                   "starts spread by (a wrong class answering ~0.13 muB), so the 0.1 x largest "
                   "|m| test this replaces counted them as one on 12/12 draws; the same set at "
                   "0.45/0.45 is one minimum on 12/12; one assignment's stops also fall into a "
-                  "third group on 3 of 48 true-class cases. Counts are the recorded stops of a "
-                  "probe run, regrouped by this rule (288/288 calls identical to an offline "
-                  "replica); the end-to-end rerun is pending. Gates the reported n_minima, "
+                  "third group on 3 of 48 true-class cases in the probe's recorded stops. End to "
+                  "end at this rule (56 draws, macOS arm64 and x86-64 Linux): the grouping "
+                  "equals an offline replica of the rule on 320/320 calls; two-site both "
+                  "assignments 24/24, two-site B(Mn2) = 1.2 truth first 8/8, four-site weak "
+                  "0.6/0.3 both orderings 12/12, 0.45/0.45 one entry 12/12; where a third "
+                  "entry lands differs by platform, which assignments are recorded does not. "
+                  "Gates the reported n_minima, "
                   "MagneticTrial.minima and the stopped-at-N-places caveat, never the pick (the "
                   "lowest chi2 start wins); synthetic P n m a sets only, untested beyond them"),
         grounds=("Rare feature inside solve_magnetic, a pick verb whose whole ranking travels "
@@ -4725,8 +4729,8 @@ ROWS: tuple[Row, ...] = (
                  "stated before these fits and not read off them; the count says the starts "
                  "ended apart, not that the data choose between them. Provisional, untested "
                  "beyond synthetic k = 0 neutron P n m a sets of two and four magnetic sites "
-                 "(the B12 clause, ruled 2026-10-19)."),
-        ),
+                 "(the B12 clause, ruled 2026-10-19; this row ruled 2026-11-25)."),
+        approved="2026-11-25"),
     Row("rietx.strategy.magnetic.SOLVE_RELEASE_FRACTION", "constant", tier=3, value=0.05,
         evidence=("WP-1327: Ba6Co6 (GSAS-II Magnetic-III tutorial, not vendored), released from "
                   "the one-site leg: Rwp 0.08752 (the published answer) against 0.08952 flat; one "
