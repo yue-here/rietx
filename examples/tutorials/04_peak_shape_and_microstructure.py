@@ -110,7 +110,7 @@ standard_data = rx.PatternData(
     two_theta=two_theta,
     intensity=rng.poisson(y).astype(float),
 )
-standard_data.plot(two_theta_range=(15, 70))
+standard_data.plot(two_theta_limits=(15, 70))
 
 # %% [markdown]
 # Measure the sample the same way, with a crystallite size and a microstrain added.

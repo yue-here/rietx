@@ -1,9 +1,8 @@
 # WP-2302 — A wrong choice is refused at the call, and a requested window has one name
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: ✅ 2026-11-25 — PR #1845
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P2 2026-11-23 — a defect that fires wrongly: a misspelt `mode` raises late with an error naming an internal schema, and `Refinement.parameters(mode=...)` answers silently
 
 ## Goal
 
@@ -82,34 +81,6 @@ docstring names it a parameter dot-path.
 Tier of what this WP adds: none. A refusal of a value outside a declared set is not a
 heuristic, so `_audit` gains no row.
 
-### Inherited
-
-- **2026-11-25, from the issue triage (issue #1837): the "did you mean" hint quotes every
-  suggestion as one name.** `_nearmiss.did_you_mean` (`src/rietx/_nearmiss.py:83`) applies
-  `!r` to the joined string, so `rx.read_patern` answers `did you mean 'read_pattern,
-  index_pattern, read_topas_inp'?`. A caller who copies the quoted text gets a name that does
-  not exist. Expected: `'read_pattern', 'index_pattern' or 'read_topas_inp'`. Every hint goes
-  through this one function (11 call sites), so the refusals this WP adds inherit the fix.
-  One suggestion prints as before. Tests matching the hint text: `test_params_surface.py`,
-  `test_expression.py`, `test_derived_block.py`, `test_schemas.py`,
-  `test_parametric_expression.py`. Checked against the tree at `21c574dc6`: line 83 as
-  quoted. A sibling seen while probing: `rx.structure_from_cif` suggests
-  `MicrostructureTerm`, because the near-miss ranks spelling over the top-level namespace and
-  the name lives in `rietx.crystallography.cif`. Not generalised here: whether a hint should
-  name a submodule's match is this WP's message-form survey to weigh.
-- **2026-11-25, from the issue triage (issue #1835): a symbol whose other origin matches the
-  operator list is refused with the doubled-cell remedy.** `Phase(space_group="F d -3 m",
-  symmetry_operations=<origin choice 2's 192>)` is refused by `_operation_list_refusal`
-  (`src/rietx/schemas/structure.py:122-135`): 168 of each side's operations are missing from
-  the other, and the message tells the caller to bracket the label as a doubled cell would.
-  The list is the same type in its other setting, and `F d -3 m:2` accepts it (probed at
-  `21c574dc6`). The fix: when the list equals the operations of another tabulated setting of
-  the same symbol, the refusal names that setting. **Decided 2026-11-25** (settled by Claude
-  under CLAUDE.md § Invariants, "a silent correction is a reader's to make, never a
-  table's"): the constructor keeps refusing, because the schema has no diagnostics channel
-  to record a relabel. The reader path already settles it: `structure_from_cif` reads a CIF
-  printing the bare symbol over an origin-2 symop loop as `F d -3 m:2` (probed, same sha).
-
 ## Non-goals
 
 - Glob verbs that return `[]` in silence: WP-2303.
@@ -123,19 +94,19 @@ heuristic, so `_audit` gains no row.
 
 ## Tasks
 
-- [ ] `mode` checked on entry in every public call that takes it, through one helper with
+- [x] `mode` checked on entry in every public call that takes it, through one helper with
   `refine_multi`'s message form; `Refinement.parameters(mode=)` refuses too.
-- [ ] Survey the other choice arguments: list which refuse at the call today, and check the
+- [x] Survey the other choice arguments: list which refuse at the call today, and check the
   rest against their registry on entry.
-- [ ] M1: `tests/test_api_choices.py`, registry-driven, `compile_model` patched; the CLAUDE.md
+- [x] M1: `tests/test_api_choices.py`, registry-driven, `compile_model` patched; the CLAUDE.md
   Invariants entry.
-- [ ] `two_theta_range` → `two_theta_limits` on the four calls that request a window; the
+- [x] `two_theta_range` → `two_theta_limits` on the four calls that request a window; the
   docstrings state the describe/request split; the two schema fields measured against it.
   Manual, skill, examples and GUI callers follow.
-- [ ] Each `path` argument says which it is, in its type and its docstring's first mention.
-- [ ] Measure the "how many" family and rename only where two names count the same thing.
-- [ ] Tests for each refusal (the message names the argument; no compile reached).
-- [ ] Skill: none expected. The refusals name their own fix, and the renamed arguments reach
+- [x] Each `path` argument says which it is, in its type and its docstring's first mention.
+- [x] Measure the "how many" family and rename only where two names count the same thing.
+- [x] Tests for each refusal (the message names the argument; no compile reached).
+- [x] Skill: none expected. The refusals name their own fix, and the renamed arguments reach
   the generated `api.md`. Re-check at handover.
 
 ## Acceptance
@@ -158,6 +129,92 @@ choices, with no compile. M1 passes and fails on a choice argument added without
 - NumPy NEP 52 (2023), Python API cleanup for NumPy 2.0.
 
 ## Handover log
+
+- **2026-11-25** — closed (PR #1845; ghostshift runner, one session). A misspelt choice now
+  fails at the call that took it, before any work, with a message that names the argument,
+  every valid choice and the nearest one. Before, `refine(mode="rietvled")` ran most of a
+  fit and then raised a pydantic error about an internal schema, and `parameters(mode=...)`
+  answered without a word. A test now finds every choice argument on the public surface by
+  itself and calls each with a bad value, so a new one cannot arrive unchecked. The window
+  argument is `two_theta_limits` everywhere it requests a window. Both issues the triage
+  folded in are fixed: the did-you-mean hint quotes each suggestion on its own (#1837), and
+  an origin-2 operation list under the bare symbol is refused naming `F d -3 m:2` (#1835).
+  Next: nothing in this WP. If #1838 (WP-2305) merges first, `tests/test_api_choices.py`'s
+  three joint-fit keys need its new names, and the test's failure message says so.
+
+  *Done.*
+  - One helper, `_nearmiss.check_choice(argument, value, choices)`, with
+    `schemas.common.check_mode` and `backend.api.check_backend` over it. `mode` is checked
+    on entry by `refine`, `Refinement.fit`, `run_stage`, `parameters`, `suggest`,
+    `SequentialRefinement.fit`, `Project.create` and the joint `parameters`.
+  - Survey (probe with `compile_model` patched to raise): `refit`, `direction`, `on_error`,
+    `solver`, `plan`, `deliverable`, `radiation`, `p1_expand` and `Structure.from_cif`'s
+    `nuclear_group` already refused at the call. These did not: `mode` (seven calls);
+    `auto_background(kind)` (after the pattern diagnosis, listing no choices);
+    `index_pattern(preset)` (after picking peaks) and `engines` (no check);
+    `merge(prefer)` (after resolving the other branch); `RefinementTree.best(metric)`
+    (answered "no node carries statistics yet" for a misspelt metric);
+    `solve_magnetic(nuclear_group)` (late, inside `magnetic_supercell`);
+    `GuardFinding.nonpositive_resolution(width)` (any other word gave the Gaussian
+    finding). All now refuse at entry through the helper. An unknown backend is a
+    `ValueError`, not `NotImplementedError`; the manual's sentence moved with it.
+  - M1: `tests/test_api_choices.py`. A choice argument is a `Literal` annotation, or a
+    name in `CHOICE_NAMES` whose type admits `str`; 52 rows, one `NOT_CHOICES` entry
+    (`FitReport.action(kind)`, a lookup). Failed on purpose once (the `parameters` and
+    `suggest` checks removed: 3 failures, `CompileReached` among them). CLAUDE.md
+    § Invariants gained one entry; the 1.0.2 sentence was shortened to pay for it.
+  - #1837: `_nearmiss.quoted` joins `'a', 'b' or 'c'`. Its sibling, an unexported name
+    answered with the nearest spelling (`rx.structure_from_cif` → `MicrostructureTerm`),
+    now names the defining module ("import it from rietx.crystallography.cif"), read
+    off the already-imported submodules.
+  - #1835: `schemas.structure._setting_matching` compares the list with every gemmi
+    setting of the symbol's number; a match is named in the refusal. The constructor
+    still refuses, because the schema has no channel to record a relabel (settled by Claude
+    2026-11-25 under CLAUDE.md § Invariants, "a silent correction is a reader's to make").
+  - `two_theta_limits` on `pick_peaks`, `pick_peaks_with_state`, `fit_peaks`,
+    `detect_peaks`, `rx.viz.plot_result`, `plot_pattern`, and the `plot` methods that
+    forward to them. Measured against the split: `ExtinctionScreen.two_theta_range`,
+    `SuggestedAction.two_theta_range`, `DataRef.two_theta_range`, a reader scan's and
+    `GsasHistogram`'s each describe a span, so they keep the name. The GUI's stored
+    `pick_options` key and the `/api/peaks` body key stay `two_theta_range`: renaming
+    them is a stored-format change. Release note `docs/releases/unreleased/1845.code-to-check.md`.
+  - `path`: file arguments are typed `str | Path` (the untyped writers, the `plot`
+    methods and `plot_trajectory` gained it); dot-path arguments say "dot-path" in their
+    docstrings. `test_every_path_argument_says_which_path_it_is` holds both;
+    `GuardFinding`'s factories are exempt with a reason.
+  - "How many" family, measured: `top_n` counts the rows returned or listed in full
+    (`build_report`'s misfit regions, `suggest`'s groups), the same thing under one name
+    already. `check_top` (cells given ambiguity and validation), `top_k` (propagation
+    vectors carried to trial fits) and `max_classes` (extinction classes fitted) each cap
+    the candidates given expensive work in a different search. No rename (settled by
+    Claude under this WP's rule, "rename only where two names count the same thing").
+    `top_k` is on the magnetic path, which is Mike's to rename if ever.
+  - Skill: no row named the old messages or `two_theta_range`; `api*.md` regenerated and
+    the two copies re-synced.
+
+  *Measured.* Fast suite `[dev]` venv, darwin/arm64: 15789 passed, 452 skipped, 30 xfailed, 3 failed in 9.5 min (a stale generated API index, a docstring naming a non-name, a test matching the old nuclear_group message); fixed in `2cf2e1821` and those files re-run green (557 passed). The review's fixes re-ran their files (405 and 258 passed).
+  This session adds 56 tests (55 in `test_api_choices.py`, one in
+  `test_operator_list_phase.py`). `python -m tests.reader_output`: exit 0, unchanged.
+  CI's lint steps run locally: ruff, format, skill caps, skill surface, audit delta (no
+  row changed), code references, rulebook limits, release notes, Vale (0 errors).
+
+  *Review* (`/code-review high --fix`, seven findings, four fixed in `f5cee3a99`):
+  `Project.create`/`open` now check backend and solver before writing the directory (a
+  bad backend had left a half-made project that refused a retry); the joint `fit` and
+  `refine_multi` call `check_mode`; the module hint never names a private module;
+  `engines="dicvol"` is refused as a string, not letter by letter. Declined: the GUI
+  console's `session.pick_peaks(two_theta_range=...)` echo is the GUI session's own verb
+  and wire key, kept with them; no shim for the old keyword (the WP's ruling, the release
+  note names it); `viz`'s choice arguments are off the derived surface (adding their names
+  to `CHOICE_NAMES` found nothing) and already refuse by name.
+
+  *Gotchas.* Rebuilding tutorials 01, 04 and 06 on this machine changed text outputs that
+  the rename did not touch (04: a `FLOOR_HIT` row gone, a stage at 18 evaluations, not 3),
+  so the outputs on `main` have drifted from the code. Only the source cells were edited
+  here; `build.py --check` compares cells, not outputs, so nothing flags the drift.
+  Not deliberately generalised: `viz`'s `style`, `y_scale`, `x_axis` and
+  `render_structure`'s `disorder` take choices but sit outside the derived surface; each
+  already refuses with "must be one of".
 
 - **2026-11-23** — created from the API review (2302-batch/plans.md). No open WP owns
   refusing a choice at entry: WP-2005 tiers refine.py's codes and literals, and WP-2103 gives

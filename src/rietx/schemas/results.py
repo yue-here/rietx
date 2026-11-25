@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import functools
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, ClassVar, Literal
 
 import numpy as np
@@ -2557,12 +2558,16 @@ class RefinementResult(Base):
         view.histograms = []
         return view
 
-    def plot(self, path: str | None = None, **kw):
+    def plot(self, path: str | Path | None = None, **kw):
+        """Draw this result, writing it to the file ``path`` when given:
+        :func:`rietx.viz.plots.plot_result`, forwarding ``**kw``."""
         from ..viz.plots import plot_result
 
         return plot_result(self, path=path, **kw)
 
     def parameter(self, path: str) -> RefinedParameter:
+        """The refined row at the parameter dot-path ``path``; ``KeyError``
+        when no row carries it."""
         for p in self.parameters:
             if p.path == path:
                 return p

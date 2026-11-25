@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 
 from . import runs
 from ._about import DIST_NAME
-from ._nearmiss import did_you_mean
+from ._nearmiss import check_choice, did_you_mean
 from .backend.api import backend_dtype_note
 from .background.diagnostics import (
     STEPS_PER_FWHM_MIN,
@@ -160,7 +160,7 @@ from .report.schemas import (
     FitReport,
     StageReport,
 )
-from .schemas.common import Diagnostic, Parameter, Provenance
+from .schemas.common import Diagnostic, Parameter, Provenance, check_mode
 from .schemas.history import NodeAction, NodeMetrics, RefinementState, ReflectionState
 from .schemas.instrument import CAPILLARY_OFFSETS, Instrument
 from .schemas.interval import PARAMETER_INTERVAL_LEVEL, PARAMETER_INTERVAL_MAX_REFITS
@@ -2620,18 +2620,10 @@ class Refinement:
     def __init__(self, structure: Structure, instrument: Instrument, *,
                  backend: str = "numpy", solver: str = DEFAULT_SOLVER,
                  history: bool | str | Path | RefinementTree = True):
-        if backend != "numpy":
-            # fail fast (with the install hint) instead of at the first stage;
-            # resolve_backend caches the instance, so this costs one import
-            from .backend import resolve_backend
+        from .backend.api import check_backend
 
-            try:
-                resolve_backend(backend)
-            except ValueError as exc:
-                raise NotImplementedError(str(exc)) from exc
-        if solver not in SOLVERS:
-            raise ValueError(f"unknown solver {solver!r}; "
-                             f"available: {', '.join(SOLVERS)}")
+        check_backend(backend)
+        check_choice("solver", solver, SOLVERS)
         # Before the copies below, because what this constructor goes on to
         # read (the declared wavelengths, the specimen absorption) is a
         # wavelength a TOF bank does not carry — so without this the refusal
@@ -3449,6 +3441,8 @@ class Refinement:
         say so, or a Le Bail project's atom rows come back looking editable,
         which is the one thing ``mode_fixed`` exists to prevent.
         """
+        if mode is not None:
+            check_mode(mode)
         esd = ({p.path: p.stderr for p in self.result_.parameters}
                if self.result_ is not None else {})
         mode = mode or self._mode
@@ -4088,7 +4082,7 @@ class Refinement:
             source: "str | dict[str, float] | Sequence[tuple[str, float]] | None" = None,
             *, scale: float = 1.0, offset: float = 0.0,
             expression: str | None = None) -> str:
-        """Constrain ``path`` to ``scale·source + offset``, or to ``expression=``: a formula over ``add_variable`` names, trig in radians.
+        """Constrain the parameter dot-path ``path`` to ``scale·source + offset``, or to ``expression=``: a formula over ``add_variable`` names, trig in radians.
 
         The general affine form, of which :meth:`tie_equal` is the ``scale=1,
         offset=0`` case.  Complementary occupancies on a shared site are the
@@ -4744,6 +4738,8 @@ class Refinement:
         ``action_kind`` (an instrument width, an atom DOF) is an expected
         disagreement, not an inconsistency.
         """
+        if mode is not None:
+            check_mode(mode)
         require_two_theta(data, "Refinement.suggest()",
                           instrument=self.instrument)
         from .strategy.suggest import (
@@ -4924,6 +4920,8 @@ class Refinement:
                          ) -> "ParameterInterval":
         """The profile-likelihood interval for one parameter of the last fit.
 
+        ``path`` is that parameter's dot-path.
+
         An esd read as an interval is symmetric, and on a bound it is not an
         interval at all: an estimate there has no symmetric sampling
         distribution (Self & Liang, 1987).  A row the fit left on its bound
@@ -4997,6 +4995,7 @@ class Refinement:
         merging a phase-added branch into a phase-removed one path-by-path is
         not meaningful.  Returns the merge node's id.
         """
+        check_choice("prefer", prefer, ("ours", "theirs"))
         tree = self._require_history()
         ours_id = self._head_id
         if ours_id is None:
@@ -5005,8 +5004,6 @@ class Refinement:
         base = tree.common_ancestor(ours_id, theirs_id)
         if base is None:
             raise ValueError(f"{ours_id} and {theirs_id} share no ancestor")
-        if prefer not in ("ours", "theirs"):
-            raise ValueError("prefer must be 'ours' or 'theirs'")
 
         values_base = tree._values(tree[base])
         values_ours = tree._values(tree[ours_id])
@@ -5926,9 +5923,9 @@ class Refinement:
         McCusker turn-on order *is* the bootstrap ladder — so prepending one
         reproduced stage 1's report to three decimals.)
         """
+        check_mode(mode)
         plan = resolve_plan(plan, mode)
-        if refit not in REFIT_MODES:
-            raise ValueError(f"refit must be one of {REFIT_MODES}, not {refit!r}")
+        check_choice("refit", refit, REFIT_MODES)
         # read before anything moves, then dropped: a fit that raises part way
         # has moved the values, and one that returns writes its own below
         converged_here = (refit == "single" and self._refit_key is not None
@@ -6911,6 +6908,8 @@ class Refinement:
         recorded node's.  The stage's ``window_area_tol`` records the fraction
         it ran at.
         """
+        if mode is not None:
+            check_mode(mode)
         _refuse_without_phases(self.structure, "run_stage")
         phase_support_sigma = check_phase_support_sigma(phase_support_sigma)
         if window_area_tol is not None:
@@ -7693,14 +7692,15 @@ class Refinement:
         answer = self._answer
         return reflection_table(self._model, answer["values"], answer["structure"])
 
-    def write_reflection_table(self, path, **kw) -> None:
-        """Write the reflection table to CSV/TSV (delimiter from the suffix)."""
+    def write_reflection_table(self, path: str | Path, **kw) -> None:
+        """Write the reflection table to the file ``path``, CSV or TSV by its
+        suffix."""
         from .io.exporters import write_reflection_table
 
         write_reflection_table(self.reflection_table(), path, **kw)
 
-    def write_cif(self, path) -> None:
-        """Write a refinement CIF: structure with esds, R-factors, wavelength,
+    def write_cif(self, path: str | Path) -> None:
+        """Write a refinement CIF to the file ``path``: structure with esds, R-factors, wavelength,
         profile/background description, and the observed/calculated pattern.
 
         The pattern loop carries every point of the pattern the last fit was
@@ -7720,8 +7720,9 @@ class Refinement:
                                           instrument, pattern=self._fit_pattern,
                                           reflections=self.reflection_table()), path)
 
-    def write_qpa_table(self, path, **kw) -> None:
-        """Write the QPA weight-fraction table (crystalline-only caveat included)."""
+    def write_qpa_table(self, path: str | Path, **kw) -> None:
+        """Write the QPA weight-fraction table to the file ``path``
+        (crystalline-only caveat included)."""
         from .io.exporters import write_qpa_table
 
         if self.result_ is None or self.result_.qpa is None:
@@ -13291,6 +13292,7 @@ def refine(data: PatternData, structure: Structure, instrument: Instrument,
     derive a project from, so the run lands under the working directory unless
     ``telemetry=`` names somewhere else.
     """
+    check_mode(mode)
     ref = Refinement(structure, instrument, backend=backend, solver=solver,
                      history=history)
     return ref.fit(data, mode=mode, plan=plan, two_theta_limits=two_theta_limits,
