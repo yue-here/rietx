@@ -1,6 +1,6 @@
 # WP-2304 — A reader's repairs reach the fit's diagnostics
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-25 — claimed by @yue-here (ghostshift runner)
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P2 2026-11-23 — a reader that rescales intensities and withholds σ says so only into a list the caller passed; a fit on it changes weights with no word in `result.diagnostics`
