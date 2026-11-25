@@ -12,7 +12,6 @@ invariant — they stay frozen *within* a stage).
 from __future__ import annotations
 
 import dataclasses
-import enum
 import fnmatch
 import functools
 import re
@@ -389,20 +388,29 @@ def fixed_at_end(stages: Iterable[Stage],
     return out
 
 
-class _Unset(enum.Enum):
-    """The one value meaning "the caller set no ``closing_window_tol``" (PEP 661's sentinel shape)."""
+class _Unset:
+    """The one value meaning "the caller set no ``closing_window_tol``" (PEP 661's sentinel shape).
 
-    CLOSING_WINDOW_TOL = "closing_window_tol: not set"
+    A singleton that pickles and copies as itself (``__reduce__`` names it),
+    and whose ``repr`` says what an unset field reads as, since that is what
+    a signature, ``help()`` and the skill's API index show.
+    """
 
-    def __repr__(self) -> str:          # what a signature shows
-        return "<unset: 0.001 where a stage frees a magnetic width, else None>"
+    def __repr__(self) -> str:
+        return "(0.001 if a stage frees a magnetic width, else None)"
+
+    def __reduce__(self) -> str:
+        return "_UNSET"
+
+
+_UNSET = _Unset()
 
 
 class _ClosingWindowTol:
     """:attr:`RefinementPlan.closing_window_tol`, its default read off the stages when asked (#1850).
 
     A dataclass descriptor field: the generated ``__init__`` stores what the
-    caller passed, or :class:`_Unset` when nothing was passed, and every read
+    caller passed, or ``_UNSET`` when nothing was passed, and every read
     of an unset field answers :func:`~rietx.schemas.plan.default_closing_window_tol`
     over the stages the plan holds *then*.  So a stage appended in place after
     the plan was built (``plan.stages.append``, the way ``examples/nac_11bm.py``
@@ -417,9 +425,9 @@ class _ClosingWindowTol:
 
     def __get__(self, plan, owner=None):
         if plan is None:                # the dataclass machinery asking the default
-            return _Unset.CLOSING_WINDOW_TOL
-        value = plan.__dict__.get(self._slot, _Unset.CLOSING_WINDOW_TOL)
-        if value is _Unset.CLOSING_WINDOW_TOL:
+            return _UNSET
+        value = plan.__dict__.get(self._slot, _UNSET)
+        if value is _UNSET:
             return default_closing_window_tol(
                 g for stage in plan.stages for g in stage.turn_on)
         return value
