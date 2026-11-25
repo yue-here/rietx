@@ -177,7 +177,7 @@ joint_result = joint.fit(series, plan=plan, two_theta_limits=(15, 90))
 rows = {p.path: p for p in joint_result.parameters}
 for path, true in (("vars.a_holder", A_HOLDER), ("vars.offset", OFFSET), ("vars.zero", ZERO),
                    *((f"pattern.{k}.vars.height", h) for k, h in enumerate(heights))):
-    print(f"{path:<20} {rx.format_su(rows[path].value, rows[path].stderr):<12} made with {true}")
+    print(f"{path:<21} {rx.format_su(rows[path].value, rows[path].stderr):<12} made with {true}")
 # guide: series end
 
 
