@@ -69,6 +69,7 @@ def _tof_background_peak_diagnostics(model) -> list[Diagnostic]:
     constant-wavelength histogram, where the guard did run.
     """
     from ..refine import _is_tof  # refine imports this module
+    from ..strategy.staged import HUMP_MIN_WIDTH_MULT
 
     if not _is_tof(model) or not getattr(model, "component_paths", ()):
         return []
@@ -87,11 +88,14 @@ def _tof_background_peak_diagnostics(model) -> list[Diagnostic]:
         level="info", code="BACKGROUND_PEAK_WIDTH_UNAVAILABLE",
         where=[paths[2] for paths in model.component_paths],
         message=skip.message,
-        suggestion=("judge the hump's width yourself against the narrowest "
-                    "reflection near it: a hump narrower than the reflections "
-                    "around it is modelling a peak, not a background; this "
-                    "line says the check did not run rather than that it ran "
-                    "and found nothing"))]
+        suggestion=(f"judge the hump's width yourself against the narrowest "
+                    f"reflection near it: the constant-wavelength guard calls "
+                    f"a hump narrower than {HUMP_MIN_WIDTH_MULT:g} times the "
+                    f"instrument's FWHM at its position a peak, not a "
+                    f"background (strategy.staged.HUMP_MIN_WIDTH_MULT); a "
+                    f"bank's instrument FWHM is that of sigma(d) and gamma(d), "
+                    f"in µs. This line says the check did not run rather than "
+                    f"that it ran and found nothing"))]
 
 
 def _tof_absorption_diagnostics(model) -> list[Diagnostic]:

@@ -1216,6 +1216,10 @@ def test_a_hump_on_a_bank_says_the_width_guard_did_not_run():
     assert got[0].where == ["instrument.extra_components.0.fwhm"]
     assert "not evaluated" in got[0].message or "no common unit" in got[0].message
     assert "narrowest" in got[0].suggestion
+    # the constant-wavelength guard's own factor, quoted from the constant
+    # (#1548 round-2 item 6), so the two cannot drift
+    from rietx.strategy.staged import HUMP_MIN_WIDTH_MULT
+    assert f"{HUMP_MIN_WIDTH_MULT:g} times" in got[0].suggestion
     assert _tof_background_peak_diagnostics(
         compile_tof_model(silicon(), bank(), _blank_bank())) == []
 

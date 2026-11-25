@@ -1871,8 +1871,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "position, using the Caglioti width in degrees 2θ. A time-of-flight bank "
             "states its resolution as σ(d) and γ(d) in microseconds, and its hump is in "
             "microseconds too, so the two widths have no common unit and the check did "
-            "not run. A hump narrower than the reflections near it is modelling a peak, "
-            "not a background. Compare its width with theirs yourself."
+            "not run. The constant-wavelength check calls a hump a peak, not a "
+            "background, when it is narrower than several times the instrument's width "
+            "at its position (`HUMP_MIN_WIDTH_MULT`, quoted in the suggestion). Compare "
+            "its width with the reflections near it yourself."
         ),
     ),
     "BACKGROUND_SMOOTHING_AT_FLEXIBLE_END": HelpEntry(

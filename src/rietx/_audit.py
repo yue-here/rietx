@@ -7626,9 +7626,10 @@ ROWS: tuple[Row, ...] = (
     Row("BACKGROUND_PEAK_WIDTH_UNAVAILABLE.suggestion", "suggestion", tier=1, ambiguity=1,
         value=1,
         evidence=("arithmetic: names the comparison the guard would have made (the hump's "
-                  "width against the narrowest reflection near it) for the caller to make, "
-                  "and says the check did not run; ranks nothing and moves nothing "
-                  "(report/tof.py _tof_background_peak_diagnostics)")),
+                  "width against HUMP_MIN_WIDTH_MULT times the instrument FWHM at its "
+                  "position, the factor imported from strategy.staged so the two cannot "
+                  "drift) for the caller to make, and says the check did not run; ranks "
+                  "nothing and moves nothing (report/tof.py _tof_background_peak_diagnostics)")),
     Row("BACKGROUND_SMOOTHING_AT_FLEXIBLE_END.suggestion", "suggestion", tier=1, ambiguity=1,
         value=1,
         evidence=("arithmetic: names the argument that overrides the fallback and the "
