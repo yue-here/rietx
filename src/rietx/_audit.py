@@ -7612,9 +7612,11 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic: names the field that takes the value by hand, and the one "
                   "input that lets the estimate run")),
     Row("ABSORPTION_MU_R_OUT_OF_RANGE.suggestion", "suggestion", tier=1, ambiguity=3, value=2,
-        evidence=("arithmetic: names the ways to lower muR (two sites: constant-wavelength, "
-                  "with the call that prices each; flight-time bank, adding a shortened "
-                  "window); picks none")),
+        evidence=("arithmetic: names the ways to lower muR at each of two sites, and picks "
+                  "none: constant-wavelength, dilute, a narrower capillary or a shorter "
+                  "wavelength, with the call that prices each (refine.py); flight-time bank, "
+                  "dilute, a narrower capillary or a window shortened at the long-flight-time "
+                  "end (report/tof.py), a bank having no wavelength to shorten")),
     Row("ABSORPTION_THICKNESS_MATTERS.suggestion", "suggestion", value=1),
     Row("ADP_NOT_POSITIVE_DEFINITE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence="arithmetic: names three ways back to a defined tensor; picks none"),
