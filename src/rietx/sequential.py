@@ -2,8 +2,8 @@
 
 An in-situ ramp, a parametric sweep, a tray of related specimens: N patterns
 refined one at a time, each warm-started from its predecessor's converged
-state.  **Not** one joint residual — that is :mod:`rietx.multi`, which stacks
-histograms that *share* structural parameters.  Here nothing is shared; the
+state.  **Not** one joint residual — that is :mod:`rietx.joint`, which stacks
+patterns that *share* structural parameters.  Here nothing is shared; the
 only thing that crosses a pattern boundary is the starting point.
 
 Two consequences shape this module.

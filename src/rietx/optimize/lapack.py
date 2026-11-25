@@ -23,7 +23,7 @@ converge`` out of the covariance's ``eigh`` at a converged fit.
 Every decomposition on the fit path goes through here, which
 ``tests/test_lapack_fallback.py`` holds: ``optimize/``, ``model/``,
 ``params/``, ``report/``, ``background/``, ``solve/``, ``refine.py``,
-``multi.py`` and ``sequential.py``.
+``joint.py`` and ``sequential.py``.
 Every fallback is counted on the calling thread (:func:`retries`).  A stage
 records those its solve and its esds took (``StageResult.n_lapack_fallbacks``);
 one taken elsewhere on the fit path (a table build, the scale-B hold, a

@@ -458,10 +458,10 @@ def test_a_commit_that_skips_the_re_exponentiation_is_refused(monkeypatch):
 
 def test_a_joint_commit_one_histogram_refuses_leaves_every_table_as_it_was(
         monkeypatch):
-    """``MultiParameterTable.commit`` is one commit, not one per histogram: a
+    """``MultiParameterTable.commit`` is one commit, not one per pattern: a
     table that refuses (#801's guard) puts back every table committed before
     it — entries, rotation anchor, and the anchor a later restore steps back
-    to — so the histograms never disagree on a shared column."""
+    to — so the patterns never disagree on a shared column."""
     from rietx.params.multi import MultiParameterTable
 
     ins2 = Instrument.debye_scherrer(wavelength=0.7107)
@@ -1151,12 +1151,12 @@ def test_the_remedies_the_refusal_names_each_run():
 
 
 def test_the_joint_runner_refuses_a_partial_turn_too():
-    from rietx.multi import MultiHistogramRefinement
+    from rietx.joint import JointRefinement
 
     structure = body_structure(Q_TRUE)
     data = [synthesize(structure), synthesize(structure, seed=4)]
     ins2 = INS.model_copy(deep=True)
-    joint = MultiHistogramRefinement(body_structure(_turned(Q_TRUE, 2.0)), [INS, ins2])
+    joint = JointRefinement(body_structure(_turned(Q_TRUE, 2.0)), [INS, ins2])
     plan = RefinementPlan(stages=[Stage("body", [*ORIGIN_GLOBS, f"{ROT}.0", f"{ROT}.1"])])
     with pytest.raises(ValueError, match="RIGID_BODY_PARTIAL_TURN: rigid body 'c6br'"):
         joint.fit(data, plan=plan)

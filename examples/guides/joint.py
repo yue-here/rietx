@@ -26,11 +26,11 @@ for name, result in zip(["X-ray", "neutron"], alone):
 
 # guide: joint start
 plan = rx.RefinementPlan.mccusker_structural()
-plan.stages.append(rx.Stage("wavelength", ["hist.1.instrument.source.lines.0.wavelength"]))
+plan.stages.append(rx.Stage("wavelength", ["pattern.1.instrument.source.lines.0.wavelength"]))
 
-joint = rx.MultiHistogramRefinement(corundum(), [xray, neutron])
+joint = rx.JointRefinement(corundum(), [xray, neutron])
 result = joint.fit(patterns, plan=plan)
-for d in result.histograms[1].diagnostics:
+for d in result.patterns[1].diagnostics:
     if d.code == "WAVELENGTH_CALIBRATION":
         print(d)
 # guide: joint end
@@ -48,14 +48,14 @@ from _corundum_pair import CELL, NEUTRON_TRUE, TRUTH  # noqa: E402
 cells = [r.parameter("phases.0.cell.a") for r in alone]
 assert [rx.format_su(p.value, p.stderr) for p in cells] == ["4.7588824(41)", "4.757487(31)"]
 assert round((cells[1].value / cells[0].value - 1) * 1e6) == -293  # "293 ppm short"
-lam = result.parameter("hist.1.instrument.source.lines.0.wavelength")
+lam = result.parameter("pattern.1.instrument.source.lines.0.wavelength")
 # The page: within an esd of the 300 ppm the pattern was made with, 5.1 ppm a esd.
 assert abs(lam.value - NEUTRON_TRUE) < lam.stderr
 assert round(lam.stderr / LAM_N * 1e6, 1) == 5.1
 # "and the shared cell 1.4 esd from the true one"
 a = result.parameter("phases.0.cell.a")
 assert f"{abs(a.value - CELL[0]) / a.stderr:.1f}" == "1.4"
-assert [d.code for d in result.histograms[1].diagnostics if d.code == "WAVELENGTH_CALIBRATION"] == [
+assert [d.code for d in result.patterns[1].diagnostics if d.code == "WAVELENGTH_CALIBRATION"] == [
     "WAVELENGTH_CALIBRATION"]
 # The page: every coordinate within 2 esd of the truth, and the esd ratios.
 for path in ("phases.0.atoms.0.z", "phases.0.atoms.1.x"):
@@ -68,17 +68,17 @@ assert round(n_al / x_al, 1) == 3.4 and round(n_o / x_o, 2) == 0.89
 assert round(j_al / x_al, 2) == 0.96 and round(j_o / x_o, 2) == 0.66
 # The page: with the neutron wavelength held, a ends 2.6 esd off and both
 # coordinates' esds are worse than the X-ray pattern's alone, with nothing said.
-held = rx.MultiHistogramRefinement(corundum(), [xray, neutron]).fit(patterns, plan="mccusker_structural")
+held = rx.JointRefinement(corundum(), [xray, neutron]).fit(patterns, plan="mccusker_structural")
 held_a = held.parameter("phases.0.cell.a")
 assert round(abs(held_a.value - CELL[0]) / held_a.stderr, 1) == 2.6
 assert round(held.parameter("phases.0.atoms.1.x").stderr / x_o, 1) == 1.2
 assert round(held.parameter("phases.0.atoms.0.z").stderr / x_al, 1) == 1.7
-assert "WAVELENGTH_CALIBRATION" not in {d.code for h in held.histograms for d in h.diagnostics}
+assert "WAVELENGTH_CALIBRATION" not in {d.code for h in held.patterns for d in h.diagnostics}
 # The page: freeing both wavelengths is refused.
 both = rx.RefinementPlan.mccusker_structural()
-both.stages.append(rx.Stage("wavelength", ["hist.*.instrument.source.lines.0.wavelength"]))
+both.stages.append(rx.Stage("wavelength", ["pattern.*.instrument.source.lines.0.wavelength"]))
 try:
-    rx.MultiHistogramRefinement(corundum(), [xray, neutron]).fit(patterns, plan=both)
+    rx.JointRefinement(corundum(), [xray, neutron]).fit(patterns, plan=both)
 except ValueError as refusal:
     assert str(refusal).startswith("2 of 2 wavelengths are free; hold one.")
 else:

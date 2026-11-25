@@ -334,7 +334,7 @@ def test_a_take_back_restores_the_vary_a_glob_asked_for():
 
 
 def test_the_declaration_is_in_the_model_so_it_travels_with_it():
-    """JSON, a joint table's per-histogram copies, and history all carry it."""
+    """JSON, a joint table's per-pattern copies, and history all carry it."""
     from rietx.params.multi import MultiParameterTable
 
     structure = rx.Structure(phases=[_declared(_zno())])
@@ -539,14 +539,14 @@ def test_hold_floating_origin_declines_where_nothing_is_holdable(zincite_data):
 
 
 def test_a_joint_fit_says_once_which_atom_holds_the_origin(zincite_data):
-    """Review of #929, item 8: two histograms, one structure, one hold, one
-    ``ORIGIN_FIXED_ON_POLAR_AXIS`` at top level and none per histogram."""
+    """Review of #929, item 8: two patterns, one structure, one hold, one
+    ``ORIGIN_FIXED_ON_POLAR_AXIS`` at top level and none per pattern."""
     instruments = []
     for _ in range(2):
         ins = _zincite_instrument()
         ins.background = rx.auto_background(zincite_data).background
         instruments.append(ins)
-    result = rx.refine_multi(
+    result = rx.refine_joint(
         [zincite_data, zincite_data],
         rx.Structure(phases=[_zincite(Z_O + 0.02, "hold")]), instruments,
         plan=PLAN)
@@ -559,7 +559,7 @@ def test_a_joint_fit_says_once_which_atom_holds_the_origin(zincite_data):
         ["phases.0.atoms.0.dof.0"]] * (len(PLAN.run_stages()) - 1)
     codes = {d.code for d in result.diagnostics}
     assert not codes & {"HOLD_BLOCKED_PLAN", "ORIGIN_NOT_FIXED"}
-    for h in result.histograms:
+    for h in result.patterns:
         assert not {d.code for d in h.diagnostics} & {
             "ORIGIN_FIXED_ON_POLAR_AXIS", "ORIGIN_NOT_FIXED"}
 
@@ -1121,7 +1121,7 @@ def test_a_joint_fit_refuses_the_centroid_by_name(zincite_data):
     """One restraint per structure is not built for a stacked residual yet."""
     ins = _zincite_instrument()
     with pytest.raises(ValueError, match=r"phase 0 \('zincite'\).*'centroid'"):
-        rx.refine_multi([zincite_data, zincite_data],
+        rx.refine_joint([zincite_data, zincite_data],
                         rx.Structure(phases=[_zincite(Z_O, "centroid")]),
                         [ins, ins.model_copy(deep=True)], plan=PLAN)
 
@@ -1135,5 +1135,5 @@ def test_a_joint_fit_accepts_a_centroid_where_nothing_floats():
                      atoms=[_atom("Si", "Si", 0.11, 0.23, 0.37)],
                      floating_origin="centroid")
     ins = _zincite_instrument()
-    rx.MultiHistogramRefinement(rx.Structure(phases=[phase]),
+    rx.JointRefinement(rx.Structure(phases=[phase]),
                                 [ins, ins.model_copy(deep=True)])

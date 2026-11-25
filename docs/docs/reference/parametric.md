@@ -8,7 +8,7 @@ Declaring the equation puts every pattern in one residual with the equation's co
 Pattern k's value of the target is p<sub>k</sub> = Σ<sub>j</sub> Φ<sub>k,j</sub> c<sub>j</sub>, with Φ built from each pattern's coordinates ({ref}`par-parametric-section`), and each coefficient comes back with an esd from the joint covariance.
 [How to refine a cell edge as a function of temperature](../guides/equation.md) runs one from start to finish.
 
-A declaration is a joint fit, so [Joint refinement](joint.md) applies unchanged: Rietveld mode only, one `MultiHistogramRefinement` or `refine_multi` call, an `Instrument` per pattern, and a `SharingMap` deciding what else is shared.
+A declaration is a joint fit, so [Joint refinement](joint.md) applies unchanged: Rietveld mode only, one `JointRefinement` or `refine_joint` call, an `Instrument` per pattern, and a `SharingMap` deciding what else is shared.
 The declaration adds two keywords to both: `coordinates`, a `CoordinateTable`, and `parametric`, a list of `ParametricEquation`.
 `coordinates` with no `parametric` is ignored.
 
@@ -43,7 +43,7 @@ Pin the variable at values either side, refit everything else, and read where χ
 
 <!-- api-doc: no-exec — it refits a joint fit at each pinned value -->
 ```python
-best = refine_multi(patterns, structure, instruments, plan="mccusker_default",
+best = refine_joint(patterns, structure, instruments, plan="mccusker_default",
                     coordinates=coords, variables=variables, parametric=equations)
 row = next(p for p in best.parameters if p.path == "vars.Tc")
 st = best.statistics
@@ -51,7 +51,7 @@ cut = 4.0 * st.chi2 / (st.n_points - st.n_free_parameters) * st.esd_inflation **
 profile = {}
 for m in (-3, -2, -1, 1, 2, 3):
     pinned = dict(variables, Tc=rx.Parameter(value=row.value + m * row.stderr, vary=False))
-    fit = refine_multi(patterns, structure, instruments, plan="mccusker_default",
+    fit = refine_joint(patterns, structure, instruments, plan="mccusker_default",
                        coordinates=coords, variables=pinned, parametric=equations)
     profile[m] = fit.statistics.chi2
 ```
@@ -86,9 +86,9 @@ The coordinates need not be compositions or temperatures: a position on the subs
 | Field | Holds |
 |---|---|
 | `ParametricEquation.name` | the declaration's name, a single identifier; its coefficients are named variables, `vars.<name>_0`, `vars.<name>_1`, one per term |
-| `ParametricEquation.target` | one bare dot-path under `phases.` or `instrument.`, with no glob and no `hist.` scope; `None` only on an expression equation, which is then an intermediate that a later expression names |
+| `ParametricEquation.target` | one bare dot-path under `phases.` or `instrument.`, with no glob and no `pattern.` scope; `None` only on an expression equation, which is then an intermediate that a later expression names |
 | `ParametricEquation.basis` | `"constant"`, `"polynomial"`, `"design"` or `"expression"` |
-| `ParametricEquation.expression` | an expression basis's text, in the grammar of [Expressions](expressions.md), over the variables `refine_multi(variables=…)` declares, the coordinate columns and the names of earlier expression equations |
+| `ParametricEquation.expression` | an expression basis's text, in the grammar of [Expressions](expressions.md), over the variables `refine_joint(variables=…)` declares, the coordinate columns and the names of earlier expression equations |
 | `ParametricEquation.terms` | a polynomial's terms, each a list of coordinate names: `[]` is the intercept, and a repeated name is a power |
 | `ParametricEquation.design` | a design basis's rows, one per pattern of the subset, in subset order |
 | `ParametricEquation.patterns` | the subset the equation holds over, by index into the patterns as passed; `None` is every pattern |
@@ -126,7 +126,7 @@ instruments = [rx.Instrument.debye_scherrer(wavelength=0.4139) for _ in temperat
 coordinates = rx.CoordinateTable(columns={"T": temperatures}, units={"T": "K"})
 expansion = rx.ParametricEquation(name="a", target="phases.0.cell.a",
                                   basis="polynomial", terms=[[], ["T"]])
-joint = rx.MultiHistogramRefinement(lab6, instruments, coordinates=coordinates,
+joint = rx.JointRefinement(lab6, instruments, coordinates=coordinates,
                                     parametric=[expansion])
 
 (resolved,) = joint.parametric
@@ -200,7 +200,7 @@ def accepted(target):
         instrument.background = rx.BackgroundChebyshev.with_terms(3)
     line = rx.ParametricEquation(name="p", target=target, basis="polynomial", terms=[[], ["T"]])
     try:
-        rx.MultiHistogramRefinement(lab6, instruments, coordinates=coordinates, parametric=[line])
+        rx.JointRefinement(lab6, instruments, coordinates=coordinates, parametric=[line])
     except ValueError:
         return False
     return True
@@ -221,7 +221,7 @@ assert not any(accepted(path) for path in [
 
 An `"expression"` equation is a formula in the grammar of [Expressions](expressions.md).
 It names variables, coordinate columns and earlier formula equations.
-The variables are the refined numbers, declared by the `variables` keyword of `MultiHistogramRefinement` and `refine_multi` as a dict of `Parameter`.
+The variables are the refined numbers, declared by the `variables` keyword of `JointRefinement` and `refine_joint` as a dict of `Parameter`.
 
 - Each variable is one column of the fit, `vars.<name>`, however many formulas name it.
   A Debye temperature read by a cell formula and a Biso formula is one number.
@@ -236,7 +236,7 @@ The variables are the refined numbers, declared by the `variables` keyword of `M
 A variable named in `SharingMap.per_histogram` is one free number per pattern.
 This is Stinton and Evans's temperature offset, refined in every pattern and fed to each phase's cell formula {cite}`stinton2007`.
 The name is matched as a glob, like every other path in the map, so `vars.*` makes every variable per-pattern.
-Each pattern's value is the row `hist.<h>.vars.<name>`.
+Each pattern's value is the row `pattern.<h>.vars.<name>`.
 
 <!-- api-doc: no-exec — it refines the reader's own patterns -->
 ```python
@@ -250,7 +250,7 @@ equations = [
     rx.ParametricEquation(name="smp", target="phases.1.cell.a", basis="expression",
                           expression="b0 + gb*(T + dT - 300)"),
 ]
-result = refine_multi(patterns, structure, instruments, plan="mccusker_default",
+result = refine_joint(patterns, structure, instruments, plan="mccusker_default",
                       coordinates=coords, variables=variables, parametric=equations,
                       sharing=rx.SharingMap(per_histogram=["vars.dT"]))
 ```
@@ -265,7 +265,7 @@ So `RefinedParametricEquation.evaluate` refuses a formula that reads one, and ea
 
 A polynomial's terms are evaluated on (z − reference)/scale for each coordinate z.
 Left out, the reference is the subset's mid-range and the scale its half-range.
-They are computed once, when `MultiHistogramRefinement` resolves the declaration at construction, and stored in the resolved declaration that `MultiHistogramRefinement.parametric` returns.
+They are computed once, when `JointRefinement` resolves the declaration at construction, and stored in the resolved declaration that `JointRefinement.parametric` returns.
 Centring makes the intercept the target's value at the reference rather than an extrapolation to T = 0 K.
 It also removes the correlation between intercept and slope that an off-centre coordinate creates.
 
@@ -300,7 +300,7 @@ with_intercept = rx.ParametricEquation(name="a", target="phases.0.cell.a",
                                        basis="polynomial",
                                        terms=[[], ["xa"], ["xb"], ["xc"]])
 try:
-    rx.MultiHistogramRefinement(lab6, instruments, coordinates=ternary,
+    rx.JointRefinement(lab6, instruments, coordinates=ternary,
                                 parametric=[with_intercept])
 except ValueError as exc:
     assert "Scheffé" in str(exc)
@@ -311,7 +311,7 @@ scheffe = rx.ParametricEquation(name="a", target="phases.0.cell.a", basis="polyn
                                 terms=[["xa"], ["xb"], ["xc"]],
                                 reference={"xa": 0.0, "xb": 0.0, "xc": 0.0},
                                 scale={"xa": 1.0, "xb": 1.0, "xc": 1.0})
-joint = rx.MultiHistogramRefinement(lab6, instruments, coordinates=ternary,
+joint = rx.JointRefinement(lab6, instruments, coordinates=ternary,
                                     parametric=[scheffe])
 assert joint.parametric[0].reference == {"xa": 0.0, "xb": 0.0, "xc": 0.0}
 ```
@@ -320,13 +320,13 @@ assert joint.parametric[0].reference == {"xa": 0.0, "xb": 0.0, "xc": 0.0}
 
 `structure` may be a list, one `Structure` per pattern, wherever the patterns should start from different values: a library whose cells span a few per cent, or a ramp whose first and last patterns are far apart.
 The structures are one model with different values.
-They must agree on phase count, space group, sites and every shared path, and may differ only where a path is per-histogram: the scales, anything under `instrument.`, a `SharingMap.per_histogram` override, or a parametric target.
+They must agree on phase count, space group, sites and every shared path, and may differ only where a path is per-pattern: the scales, anything under `instrument.`, a `SharingMap.per_histogram` override, or a parametric target.
 The coefficients start from the least-squares fit of the declared form to the targets' starting values, so starting cells placed on the expected line start the coefficients on it.
-A shared path whose starting values differ is refused, naming the path, the histograms and the three ways out.
+A shared path whose starting values differ is refused, naming the path, the patterns and the three ways out.
 
 ## Preview without a fit
 
-`MultiHistogramRefinement.preview_equations` evaluates every equation at the starting values, at every pattern it holds over, and fits nothing.
+`JointRefinement.preview_equations` evaluates every equation at the starting values, at every pattern it holds over, and fits nothing.
 It returns one `EquationPreview` per equation with a target, linear and `expression` equations alike, in declaration order.
 `EquationPreview.name` is the equation's name and `EquationPreview.target` the path it drives.
 `EquationPreview.values` holds the target's value at each of `EquationPreview.patterns`, and `EquationPreview.span` the lowest and highest finite one.
@@ -350,7 +350,7 @@ einstein = rx.ParametricEquation(name="a", target="phases.0.cell.a", basis="expr
 variables = {"a0": rx.Parameter(value=4.15, vary=True),
              "k": rx.Parameter(value=0.02, vary=True),
              "theta": rx.Parameter(value=0.0)}
-joint = rx.MultiHistogramRefinement(lab6, instruments, coordinates=coordinates,
+joint = rx.JointRefinement(lab6, instruments, coordinates=coordinates,
                                     parametric=[einstein], variables=variables)
 (preview,) = joint.preview_equations()
 assert preview.variables == ["vars.a0", "vars.k", "vars.theta"]
@@ -360,8 +360,8 @@ assert preview.nonfinite == [0, 1, 2]   # theta = 0 divides by exp(0) - 1 at eve
 
 ## Refusals
 
-Every refusal is a `ValueError`, raised when the declaration or the `MultiHistogramRefinement` is built, and most name their fix.
-A malformed declaration is refused on its own: a name that is not an identifier, a target with a glob, a `hist.` scope or a root other than `phases.` or `instrument.`, an empty `terms` list, a repeated term (in any order of its names), an empty subset or a negative or repeated subset index, a non-positive scale, a `reference` or `scale` naming a coordinate no term uses, design rows of unequal length, a non-finite number, or a field the basis does not take (`terms` on a constant or design basis, `design` on a polynomial one).
+Every refusal is a `ValueError`, raised when the declaration or the `JointRefinement` is built, and most name their fix.
+A malformed declaration is refused on its own: a name that is not an identifier, a target with a glob, a `pattern.` scope or a root other than `phases.` or `instrument.`, an empty `terms` list, a repeated term (in any order of its names), an empty subset or a negative or repeated subset index, a non-positive scale, a `reference` or `scale` naming a coordinate no term uses, design rows of unequal length, a non-finite number, or a field the basis does not take (`terms` on a constant or design basis, `design` on a polynomial one).
 The rest need the patterns:
 
 | Refused | Fix |
@@ -380,16 +380,16 @@ The rest need the patterns:
 | a `"constant"` basis whose subset targets' own bounds have no value in common | bounds that overlap |
 | a coordinate degree of freedom whose atom the starting structures place differently | start every pattern with the atom in one place |
 | two declarations with one name, a coefficient path that already exists, or two declarations on one target with overlapping subsets | a name each, and disjoint `patterns` per target |
-| a list of starting structures whose length is not the instrument count, or which differ in phases, space group or atoms | one `Structure`, or one per histogram of one model |
-| starting structures that differ in a field that is not a parameter, such as a texture axis, a declared extinction or Stephens block, the restraints or a rigid body's orientation | the same field in every structure wherever it shapes a shared parameter, or that part made per-histogram; parameter values, bounds and vary flags, the phase's `name` and `particle_radius_um` may always differ |
-| starting structures that disagree on a shared path | one value, a per-histogram override, or a declaration on that path |
-| a `SharingMap` that makes a linear equation's coefficient per-histogram | keep its `vars.<name>_<j>` shared; a formula's variable may be per-pattern |
+| a list of starting structures whose length is not the instrument count, or which differ in phases, space group or atoms | one `Structure`, or one per pattern of one model |
+| starting structures that differ in a field that is not a parameter, such as a texture axis, a declared extinction or Stephens block, the restraints or a rigid body's orientation | the same field in every structure wherever it shapes a shared parameter, or that part made per-pattern; parameter values, bounds and vary flags, the phase's `name` and `particle_radius_um` may always differ |
+| starting structures that disagree on a shared path | one value, a per-pattern override, or a declaration on that path |
+| a `SharingMap` that makes a linear equation's coefficient per-pattern | keep its `vars.<name>_<j>` shared; a formula's variable may be per-pattern |
 
 The coefficients are unbounded, unless the basis is `"constant"`, whose one coefficient carries the target's own bounds.
 A sum of terms has no box that holds every pattern's target.
 The default LM driver holds each pattern's target inside its own `min` and `max` at every step instead, as one linear constraint per pattern.
 A target the answer leaves on a bound is named in the `CONSTRAINT_ACTIVE` finding, as `parametric equation '<name>' (<target> bounds)`.
-Each pattern whose target sits on its bound also gets a `FLOOR_HIT` or `BOUND_HIT` warning, with `where` naming that pattern's `hist.<h>.` path, as a free parameter on its bound does.
+Each pattern whose target sits on its bound also gets a `FLOOR_HIT` or `BOUND_HIT` warning, with `where` naming that pattern's `pattern.<h>.` path, as a free parameter on its bound does.
 TRF takes no such constraint, and neither does an `"expression"` equation, which is not linear in its variables.
 There a target can leave its range.
 The fit then finishes and carries `PARAMETRIC_OUT_OF_RANGE`, below.
@@ -398,13 +398,13 @@ The fit then finishes and carries `PARAMETRIC_OUT_OF_RANGE`, below.
 
 <!-- api-doc: no-exec — it refines the reader's own patterns -->
 ```python
-result = rx.refine_multi(patterns, lab6, instruments, plan="mccusker_default",
+result = rx.refine_joint(patterns, lab6, instruments, plan="mccusker_default",
                          coordinates=coordinates, parametric=[expansion])
 ```
 
 A plan frees the coefficients wherever a stage's glob reaches the target.
 So `mccusker_default`'s cell stage, which frees `phases.*.cell.*`, refines `vars.a_0` and `vars.a_1` in the cell's place, and its `StageResult.freed` lists them.
-The target is per-histogram in every pattern, so each pattern reports its own value as `hist.<h>.phases.0.cell.a`, with an esd propagated from the coefficients.
+The target is per-pattern in every pattern, so each pattern reports its own value as `pattern.<h>.phases.0.cell.a`, with an esd propagated from the coefficients.
 What the target drives follows it, such as a cubic cell's `b` and `c`.
 Each of those rows names the declaration in `RefinedParameter.equations`, and so does each coefficient's `vars.` row.
 A target row's value and esd are the equation's at that pattern's coordinates, and can be far tighter than the pattern measures on its own.
@@ -415,7 +415,7 @@ A cell series is often fitted before a structure is known.
 
 <!-- api-doc: no-exec — it refines the reader's own patterns -->
 ```python
-result = rx.refine_multi(patterns, lab6, instruments, mode="pawley",
+result = rx.refine_joint(patterns, lab6, instruments, mode="pawley",
                          coordinates=coordinates, parametric=[expansion])
 ```
 
@@ -490,7 +490,7 @@ print(series.summary(deliverable="series", parametric=result))
 ### Range and visibility warnings
 
 [`PARAMETRIC_OUT_OF_RANGE`](diagnostics-series.md#parametric_out_of_range) is a warning on `RefinementResult.diagnostics`, one per declaration, when the fitted coefficients put the target outside its own `min` or `max` on some pattern.
-`where` names each such pattern's `hist.<h>.` path, and `value` counts them.
+`where` names each such pattern's `pattern.<h>.` path, and `value` counts them.
 It fires under TRF and for an `"expression"` equation, since the default LM driver holds a linear equation's target inside its range.
 The result's rows keep the equation's value, and that pattern's model holds the bound the value crossed.
 Do not quote the target there as a measurement.
@@ -499,7 +499,7 @@ Narrow the subset to where the equation holds, lower the polynomial's order, or 
 [`PARAMETRIC_TARGET_UNSEEN`](diagnostics-series.md#parametric_target_unseen) is a warning, one per declaration, when the equation sets its target in patterns that cannot see the target's phase.
 A pattern cannot see a phase when its scale is under the support screen that holds a phase's structure in a stage.
 There the target's value and esd come from the patterns that do see the phase, carried along the equation, and the form test leaves the pattern out.
-`where` names each such pattern's `hist.<h>.` path, and `value` counts them.
+`where` names each such pattern's `pattern.<h>.` path, and `value` counts them.
 Quote the equation's coefficients rather than the target in those patterns.
 If the equation should hold only where the phase is measured, narrow the subset to those patterns.
 When no subset pattern sees the phase, the warning says the equation itself is not measured, and its coefficients stay where they started.
@@ -645,7 +645,7 @@ a: phases.0.cell.a at T=293 = 4.1564579(29) Å (extrapolating in T; form not rej
 | `RefinedParametricEquation.covariance` | the coefficients' covariance in your units, in coefficient order; `None` when a coefficient has no esd, or when the solve kept no correlation between several coefficients |
 
 The diagonal of `RefinedParametricEquation.covariance` is each `ParametricCoefficient.esd` squared, exactly.
-At a pattern's own coordinates the value and esd are that pattern's `hist.<h>.` row.
+At a pattern's own coordinates the value and esd are that pattern's `pattern.<h>.` row.
 `RefinedParametricEquation.evaluate` is the same computation, given the coefficients, the form test, the coordinates or design row, and the joint reading directly.
 `RefinementResult.parametric_value` raises `KeyError` for a name no declaration has.
 

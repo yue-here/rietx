@@ -39,7 +39,7 @@ SHORT = rx.RefinementPlan(stages=[
 #: The first three are held-reasons an ``Entry`` cannot carry, for the same
 #: reason: they are not facts about the parameter.  ``esd`` comes from the last
 #: fit, ``mode_fixed`` from the intensity mode, and ``needs_held_cell`` from
-#: whether this histogram's *cell* is currently free — the only one that changes
+#: whether this pattern's *cell* is currently free — the only one that changes
 #: with another parameter's state, which is why it cannot be an ``Entry.locked``
 #: flag and has to be recomputed each time the surface is read.
 #:
@@ -961,8 +961,8 @@ def test_a_turn_on_that_reached_nothing_says_so_when_it_can(pattern, path, n_fre
         assert stage.unknown_paths == [] and not unknown
     if says is not None:
         assert says in codes
-    # a single-histogram fit has no elsewhere to have reached
-    assert stage.unreached_histograms == {}
+    # a single-pattern fit has no elsewhere to have reached
+    assert stage.unreached_patterns == {}
     assert "STAGE_FREED_NOTHING" not in codes
 
 
@@ -976,7 +976,7 @@ def test_a_stored_stage_record_says_nobody_looked_rather_than_nothing_missing():
     old = rx.StageResult.model_validate_json(
         '{"name": "cell", "status": "converged", "n_iterations": 3, '
         '"cost_initial": 2.0, "cost_final": 1.0}')
-    assert old.unknown_paths is None and old.unreached_histograms is None
+    assert old.unknown_paths is None and old.unreached_patterns is None
 
 
 def test_a_literal_repeated_across_stages_is_one_finding_naming_both(pattern):
@@ -1260,11 +1260,11 @@ def test_roughness_on_a_plate_names_its_declaration():
 def test_a_joint_fits_scoped_path_carries_its_histogram():
     from rietx.help import undeclared_opt_in
 
-    known = ["hist.1.phases.0.scale", "phases.0.cell.a"]
-    row, owner = undeclared_opt_in("hist.1.phases.0.extinction", known)
-    assert (row.name, owner) == ("extinction", "hist.1.phases.0")
-    assert undeclared_opt_in("hist.1.phases.0.extinction",
-                             [*known, "hist.1.phases.0.extinction"]) is None
+    known = ["pattern.1.phases.0.scale", "phases.0.cell.a"]
+    row, owner = undeclared_opt_in("pattern.1.phases.0.extinction", known)
+    assert (row.name, owner) == ("extinction", "pattern.1.phases.0")
+    assert undeclared_opt_in("pattern.1.phases.0.extinction",
+                             [*known, "pattern.1.phases.0.extinction"]) is None
 
 
 def test_a_declared_opt_in_answers_a_typo_with_the_nearest_path():

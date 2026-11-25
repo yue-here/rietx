@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 
 import rietx as rx
-import rietx.multi as multi_mod
+import rietx.joint as multi_mod
 import rietx.optimize.least_squares as ls
 from rietx.crystallography.stephens import S_NAMES, isotropic_coefficients
 from rietx.model.forward import compile_model
@@ -81,7 +81,7 @@ def test_a_one_histogram_joint_stage_records_the_single_fits_seed():
     data = _pattern(_instrument(1.5406), 15.0, 80.0, truth)
     single = rx.Refinement(_structure(_zero()), _instrument(1.5406),
                            history=False).fit(data, plan=_seed_plan(1))
-    joint = rx.MultiHistogramRefinement(
+    joint = rx.JointRefinement(
         _structure(_zero()), [_instrument(1.5406)]).fit([data], plan=_seed_plan(1))
     want = single.stages[0].seeded
     assert sorted(want) == ["phases.0.microstrain.dof.0", "phases.0.microstrain.dof.1"]
@@ -101,7 +101,7 @@ def test_a_shared_block_starts_on_the_isotropic_ray_in_every_histogram():
         assert np.allclose(_block(table),
                            isotropic_coefficients(_cell().lengths_angles(), 1200.0),
                            rtol=1e-9)
-    # the column carries one value, which every histogram's copy agrees on
+    # the column carries one value, which every pattern's copy agrees on
     x0 = mt.x0()
     for h, table in enumerate(mt.tables):
         assert np.array_equal(x0[mt.col_map(h)], table.x0())
@@ -109,7 +109,7 @@ def test_a_shared_block_starts_on_the_isotropic_ray_in_every_histogram():
 
 def test_a_shared_block_over_per_histogram_cells_takes_histogram_0s_ray():
     """Each cell has its own ray, and one shared column can hold only one value:
-    the block takes histogram 0's, which is inside every histogram's cone."""
+    the block takes pattern 0's, which is inside every pattern's cone."""
     mt = MultiParameterTable(
         [_structure(_zero(), 4.0), _structure(_zero(), 4.1)],
         [_instrument(1.5406), _instrument(0.7107)],
@@ -138,9 +138,9 @@ def test_a_per_histogram_block_takes_each_histograms_own_ray():
 
 
 def test_a_partly_shared_block_takes_histogram_0s_ray():
-    """One DOF shared and one per histogram, over per-histogram cells: the
-    shared column holds one value, so the whole block takes histogram 0's ray
-    rather than each histogram writing its own and the last write winning."""
+    """One DOF shared and one per pattern, over per-pattern cells: the
+    shared column holds one value, so the whole block takes pattern 0's ray
+    rather than each pattern writing its own and the last write winning."""
     mt = MultiParameterTable(
         [_structure(_zero(), 4.0), _structure(_zero(), 4.1)],
         [_instrument(1.5406), _instrument(0.7107)],
@@ -183,16 +183,16 @@ def _spy_outcomes(monkeypatch) -> list:
 def test_a_joint_lm_step_holds_the_strain_cone_in_every_histogram(monkeypatch):
     """A specimen with no strain, fitted from the seeded ray: the fit drives
     σ²(M) toward zero, and the box-only step crosses the cone in each
-    histogram, so each histogram's cone block is counted."""
+    pattern, so each pattern's cone block is counted."""
     patterns = [_pattern(_instrument(1.5406), 15.0, 80.0, _zero()),
                 _pattern(_instrument(0.7107), 7.0, 36.0, _zero())]
     outcomes = _spy_outcomes(monkeypatch)
-    result = rx.MultiHistogramRefinement(
+    result = rx.JointRefinement(
         _structure(_zero()), [_instrument(1.5406), _instrument(0.7107)]
     ).fit(patterns, plan=_seed_plan(60))
     outcome = outcomes[0]               # the solve from the seeded ray
-    assert outcome.truncated_by.get("hist.0 phases.0.microstrain", 0) >= 1
-    assert outcome.truncated_by.get("hist.1 phases.0.microstrain", 0) >= 1
+    assert outcome.truncated_by.get("pattern.0 phases.0.microstrain", 0) >= 1
+    assert outcome.truncated_by.get("pattern.1 phases.0.microstrain", 0) >= 1
     assert result.stages[0].n_constraint_truncations >= 1
 
 
@@ -214,17 +214,17 @@ def test_a_joint_lm_step_holds_texture_positivity(monkeypatch):
         "texture": SphericalHarmonicTexture(order=2, coefficients={
             "c2_0": p(value=0.0, vary=True)})})
     outcomes = _spy_outcomes(monkeypatch)
-    rx.MultiHistogramRefinement(rx.Structure(phases=[start]), [ins.model_copy(deep=True)]
+    rx.JointRefinement(rx.Structure(phases=[start]), [ins.model_copy(deep=True)]
                                 ).fit([data], plan=rx.RefinementPlan(stages=[
                                     rx.Stage("texture", ["phases.*.scale",
                                                          "instrument.background.c*",
                                                          "phases.*.texture.*"])],
                                     closing_window_tol=None))
-    assert any(o.truncated_by.get("hist.0 phases.0.texture", 0) >= 1 for o in outcomes)
+    assert any(o.truncated_by.get("pattern.0 phases.0.texture", 0) >= 1 for o in outcomes)
 
 
 def test_the_joint_rows_are_the_single_fits_rows_on_the_joint_columns():
-    """One histogram's joint rows are its single-fit rows, column for column."""
+    """One pattern's joint rows are its single-fit rows, column for column."""
     truth = rx.StephensStrain.isotropic(800.0, _cell())
     ins = _instrument(1.5406)
     data = _pattern(ins, 15.0, 80.0, truth)
@@ -236,7 +236,7 @@ def test_the_joint_rows_are_the_single_fits_rows_on_the_joint_columns():
     x0 = mt.x0()
     (joint,) = ls._joint_positivity_inequalities([model], mt, x0)
     (single,) = ls.strain_cone_inequalities(model, table, table.x0())
-    assert joint.label == "hist.0 phases.0.microstrain"
+    assert joint.label == "pattern.0 phases.0.microstrain"
     assert np.array_equal(joint.T[:, mt.col_map(0)], single.T)
     assert np.array_equal(joint.c, single.c)
     assert joint.T @ x0 + joint.c == pytest.approx(single.T @ table.x0() + single.c)

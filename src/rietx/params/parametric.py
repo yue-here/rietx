@@ -330,7 +330,7 @@ def least_squares_start(resolved: ResolvedParametric, values: np.ndarray) -> np.
     A subset that starts at one value is represented **exactly** where the
     basis can: the intercept takes it and every other term zero, so a
     ``constant`` declaration starts from bit-for-bit the number a plain shared
-    parameter would, which the equivalence with ``refine_multi`` rests on.
+    parameter would, which the equivalence with ``refine_joint`` rests on.
     """
     values = np.asarray(values, dtype=np.float64)
     m = resolved.phi.shape[1]

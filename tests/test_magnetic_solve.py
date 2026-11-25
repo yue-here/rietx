@@ -21,7 +21,7 @@ so each block below turns on something specific:
 * a **tie is an abstention**, and the abstention names every member of it;
 * the null test is a **gate**: a pattern with no magnetic intensity produces no
   winner, whatever ΔBIC says;
-* a **non-neutron histogram is refused by name**;
+* a **non-neutron pattern is refused by name**;
 * the magnetic-only R is computed over the channels the nuclear model puts
   nothing on and nowhere else, which is what makes it comparable between
   candidates;
@@ -496,7 +496,7 @@ def test_an_xray_histogram_is_refused_by_name():
     instrument = rx.Instrument.debye_scherrer(1.5406)
     data = simulate(perovskite(), instrument, background=200.0)
     ref = nuclear_fit(perovskite(), data, instrument)
-    with pytest.raises(ValueError, match="neutron histogram and nothing else"):
+    with pytest.raises(ValueError, match="neutron pattern and nothing else"):
         rx.solve_magnetic(ref, data, sites=["Mn1"], ion="Mn3+")
 
 

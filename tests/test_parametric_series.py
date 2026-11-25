@@ -10,7 +10,7 @@ What is checked here, and on what:
 * the joint table's wiring — per-pattern starting structures, the coupling
   that lets a plan's glob on a target free its coefficients, and the
   absent-phase hold reading what a coefficient's column *moves* (WP-1342);
-* the claim that a ``constant`` declaration **is** ``refine_multi`` with the
+* the claim that a ``constant`` declaration **is** ``refine_joint`` with the
   target shared, bit for bit, on the two-wavelength LaB6 pair of
   ``test_multi_histogram``;
 * (slow) a ten-pattern LaB6 ramp with a known a(T), whose parametric
@@ -40,16 +40,16 @@ import pytest
 from pydantic import ValidationError
 
 import rietx as rx
-from rietx.model import compiled
-from rietx.model.forward import compile_model
-from rietx.multi import (
-    MultiHistogramRefinement,
+from rietx.joint import (
+    JointRefinement,
     _equation_rows,
     _joint_fixed_literals,
     _parametric_range_diagnostics,
     _unsupported_paths_multi,
-    refine_multi,
+    refine_joint,
 )
+from rietx.model import compiled
+from rietx.model.forward import compile_model
 from rietx.optimize import blocked, lm
 from rietx.optimize.blocked import BlockJacobian
 from rietx.optimize.least_squares import (
@@ -141,7 +141,7 @@ def test_a_1_9_coefficient_row_opens_with_its_tie_key_read_as_equation():
 @pytest.mark.parametrize("kw, fragment", [
     (dict(name="a.b"), "single identifier"),
     (dict(target="phases.*.cell.a"), "not a glob"),
-    (dict(target="hist.0.phases.0.cell.a"), "model parameter"),
+    (dict(target="pattern.0.phases.0.cell.a"), "model parameter"),
     (dict(target="vars.x"), "model parameter"),
     (dict(basis="constant"), "takes no terms"),
     (dict(terms=[]), "needs terms"),
@@ -314,13 +314,13 @@ def test_each_row_an_equation_sets_names_it_and_no_other_row_does():
     mt = MultiParameterTable(s, _lab6_instruments(5), parametric=[lo, hi])
     want = {"vars.lo_0": ["lo"], "vars.hi_0": ["hi"]}
     for h, equation in [(0, "lo"), (1, "lo"), (2, "hi"), (3, "hi")]:
-        want.update({f"hist.{h}.phases.0.cell.{k}": [equation] for k in "abc"})
+        want.update({f"pattern.{h}.phases.0.cell.{k}": [equation] for k in "abc"})
     assert _equation_rows(mt) == want
 
 
 def test_a_size_target_across_wavelengths_is_refused():
     """A size coefficient goes as λ (WP-1131): shared, it carries the factor
-    into each histogram; a parametric target is per-histogram and would not."""
+    into each pattern; a parametric target is per-pattern and would not."""
     s, ins = perturbed_inputs()                  # 0.41390 and 0.71070 Å
     equation = _equation(name="L", target="phases.0.lor_size", basis="constant", terms=None)
     with pytest.raises(ValueError, match=r"crystallite-size.*0\.4139, 0\.7107 Å"):
@@ -332,7 +332,7 @@ def test_a_size_target_across_wavelengths_is_refused():
 
 def test_a_sharing_map_that_splits_a_coefficient_is_refused():
     s, _ = perturbed_inputs()
-    with pytest.raises(ValueError, match="makes vars.a_0 per-histogram"):
+    with pytest.raises(ValueError, match="makes vars.a_0 per-pattern"):
         MultiParameterTable(s, _lab6_instruments(2),
                             sharing=SharingMap(per_histogram=["vars.*"]),
                             parametric=[_equation(basis="constant", terms=None)])
@@ -350,7 +350,7 @@ def _ramp_table(n: int = 3, **kw) -> MultiParameterTable:
 def test_the_target_follows_the_declared_line_in_every_table():
     mt = _ramp_table()
     assert [r.target for r in mt.parametric] == ["phases.0.cell.a"]
-    # the target and what follows it are per-histogram; the coefficients shared
+    # the target and what follows it are per-pattern; the coefficients shared
     assert not mt.sharing.is_shared("phases.0.cell.c")
     assert all(mt.sharing.is_shared(p) for p in ("vars.a_0", "vars.a_1"))
     for t in mt.tables:
@@ -368,8 +368,8 @@ def test_a_glob_on_the_target_frees_its_coefficients_and_names_them():
     assert mt.set_vary(["phases.*.cell.*"], True) == ["vars.a_0", "vars.a_1"]
     assert mt.shared_paths == ["vars.a_0", "vars.a_1"]
     assert mt.set_vary(["phases.0.cell.a"], False) == ["vars.a_0", "vars.a_1"]
-    # scoped to a subset histogram, the glob still reaches the declaration
-    assert mt.set_vary(["hist.2.phases.0.cell.a"], True) == ["vars.a_0", "vars.a_1"]
+    # scoped to a subset pattern, the glob still reaches the declaration
+    assert mt.set_vary(["pattern.2.phases.0.cell.a"], True) == ["vars.a_0", "vars.a_1"]
     # a plan's literal on the target is not "a tied row the stage cannot free"
     assert _joint_fixed_literals([Stage(name="cell", turn_on=["phases.0.cell.a"])],
                                  mt) == []
@@ -393,7 +393,7 @@ def test_a_column_is_held_only_when_every_phase_it_moves_is_unseen():
     # by name the coefficient carries no phase; by reach it is phase 1's cell
     assert _unsupported_paths_multi(mt, [{1}, {1}]) == ["vars.b_0"]
     assert _unsupported_paths_multi(mt, [{0}, {0}]) == ["phases.0.cell.a"]
-    # it drives phase 1's cell in both histograms, so one that sees the phase
+    # it drives phase 1's cell in both patterns, so one that sees the phase
     # gives it gradient
     assert _unsupported_paths_multi(mt, [{1}, set()]) == []
     # the same coefficient made to drive phase 0's cell too: one visible
@@ -424,12 +424,12 @@ def test_per_pattern_starting_structures_differ_only_where_a_path_is_per_histogr
     t0 = mt.tables[0]
     assert t0.entries[t0._paths["vars.a_0"]].value == pytest.approx(4.16, abs=1e-12)
     assert t0.entries[t0._paths["vars.a_1"]].value == pytest.approx(0.01, abs=1e-12)
-    # a per-histogram scale may differ too
+    # a per-pattern scale may differ too
     other = start(4.15)
     other.phases[0].scale.value = 7.0
     MultiParameterTable([start(4.15), other], _lab6_instruments(2))
-    # a shared value may not, and the refusal names the path and the histogram
-    with pytest.raises(ValueError, match=r"disagree on phases.0.atoms.0.biso.*histogram 1"):
+    # a shared value may not, and the refusal names the path and the pattern
+    with pytest.raises(ValueError, match=r"disagree on phases.0.atoms.0.biso.*pattern 1"):
         MultiParameterTable([start(4.15), start(4.15, biso=0.7)], _lab6_instruments(2))
     with pytest.raises(ValueError, match="disagree on phases.0.cell.a"):
         MultiParameterTable([start(4.15), start(4.17)], _lab6_instruments(2))
@@ -476,7 +476,7 @@ def test_two_texture_axes_under_one_r_column_are_refused():
         MultiParameterTable([_start_with(axis((0, 0, 1))), _start_with(axis((1, 1, 1)))],
                             _lab6_instruments(2))
     # each pattern its own r: the axes may differ, as GSAS-II keeps texture
-    # per histogram
+    # per pattern
     MultiParameterTable([_start_with(axis((0, 0, 1))), _start_with(axis((1, 1, 1)))],
                         _lab6_instruments(2),
                         sharing=SharingMap(per_histogram=["phases.*.preferred_orientation.*"]))
@@ -523,8 +523,8 @@ def test_a_dependent_the_coefficients_put_out_of_range_is_named():
         t.refresh_ties()
     (d,) = _parametric_range_diagnostics(mt)
     assert d.code == "PARAMETRIC_OUT_OF_RANGE" and d.level == "warning"
-    assert d.where == ["hist.2.instrument.profile.w"] and d.value == 1.0
-    assert "histogram 2" in d.message
+    assert d.where == ["pattern.2.instrument.profile.w"] and d.value == 1.0
+    assert "pattern 2" in d.message
     # the write-back finishes: the model holds the bound the value crossed,
     # and the table keeps the equation's value the warning quotes
     bad = mt.tables[2].entries[mt.tables[2]._paths["instrument.profile.w"]].value
@@ -600,7 +600,7 @@ def test_an_equation_evaluates_in_user_units_with_the_covariance_its_esds_came_f
         design_eq.evaluate([dc], coordinates={"T": 1.0})
 
 
-# -- the joint fit: a constant declaration is refine_multi -------------------
+# -- the joint fit: a constant declaration is refine_joint -------------------
 
 @pytest.fixture(scope="module")
 def lab6_pair() -> list[rx.PatternData]:
@@ -622,7 +622,7 @@ def test_a_constant_declaration_is_refine_multi_bit_for_bit(lab6_pair, target, f
                                                             compiled_path):
     """The WP's equivalence bar, met exactly rather than to a tolerance.
 
-    A ``constant`` equation makes the target per-histogram and ties it in each
+    A ``constant`` equation makes the target per-pattern and ties it in each
     table to one shared coefficient at coefficient 1, against a plain joint
     fit that shares the target (the cell by default, the width by
     ``SharingMap.shared``).  The coefficient takes the column the shared target
@@ -635,29 +635,29 @@ def test_a_constant_declaration_is_refine_multi_bit_for_bit(lab6_pair, target, f
     was = compiled.set_enabled(compiled_path)
     try:
         s, ins = perturbed_inputs()
-        plain = refine_multi(lab6_pair, s, ins, plan="mccusker_default",
+        plain = refine_joint(lab6_pair, s, ins, plan="mccusker_default",
                              sharing=SharingMap(shared=[target]))
         s, ins = perturbed_inputs()
-        ref = MultiHistogramRefinement(
+        ref = JointRefinement(
             s, ins, parametric=[ParametricEquation(name="t", target=target, basis="constant")])
         tied = ref.fit(lab6_pair, plan="mccusker_default")
     finally:
         compiled.set_enabled(was)
     OUT.mkdir(exist_ok=True)
-    tied.for_histogram(1).plot(OUT / f"parametric_constant_h1_{target}_{compiled_path}.png")
+    tied.for_pattern(1).plot(OUT / f"parametric_constant_h1_{target}_{compiled_path}.png")
     a = {p.path: p for p in plain.parameters}
     b = {p.path: p for p in tied.parameters}
     shared = a.pop(target)
     assert (b["vars.t_0"].value, b["vars.t_0"].stderr) == (shared.value, shared.stderr)
     for path, row in a.items():
         if path in follows:
-            continue          # follow the target, per histogram now
+            continue          # follow the target, per pattern now
         assert (b[path].value, b[path].stderr) == (row.value, row.stderr), path
     for h in range(2):
         for path in (target, *follows):
-            assert b[f"hist.{h}.{path}"].value == shared.value
+            assert b[f"pattern.{h}.{path}"].value == shared.value
     assert tied.statistics == plain.statistics
-    for hp, ht in zip(plain.histograms, tied.histograms, strict=True):
+    for hp, ht in zip(plain.patterns, tied.patterns, strict=True):
         assert ht.statistics == hp.statistics
         assert ht.y_calc == hp.y_calc
     (coef,) = tied.parametric
@@ -665,11 +665,11 @@ def test_a_constant_declaration_is_refine_multi_bit_for_bit(lab6_pair, target, f
         shared.value, shared.stderr, "1", True)
     assert plain.parametric is None
     # the equation's rows name it, every other row and every plain row nothing
-    equation_set = {"vars.t_0"} | {f"hist.{h}.{p}" for h in range(2) for p in (target, *follows)}
+    equation_set = {"vars.t_0"} | {f"pattern.{h}.{p}" for h in range(2) for p in (target, *follows)}
     assert {p for p, row in b.items() if row.equations} == equation_set
     assert all(b[p].equations == ["t"] for p in equation_set)
     assert not any(row.equations for row in plain.parameters)
-    assert tied.for_histogram(1).parameter(target).equations == ["t"]
+    assert tied.for_pattern(1).parameter(target).equations == ["t"]
     v = tied.parametric_value("t")
     assert (v.value, v.esd, v.outside) == (shared.value, shared.stderr, [])
     assert not any(d.code == "PARAMETRIC_TARGET_UNSEEN" for d in tied.diagnostics)
@@ -699,19 +699,19 @@ def test_a_joint_fit_holds_a_coefficient_whose_phase_no_pattern_sees(lab6_pair):
     and would release it at once if it had.
 
     Measured on this fixture: the NaCl scale fits noise to 1.6e-8 in
-    histogram 0 by the cell stage, so the cell refines there, and the support
+    pattern 0 by the cell stage, so the cell refines there, and the support
     hold takes it from ``profile_w`` on.  The parametric fit decides exactly
     as the plain one does, stage by stage, and lands on the same cell.
     """
     _, ins = perturbed_inputs()
-    plain_ref = MultiHistogramRefinement(_with_an_unseen_phase(), ins)
+    plain_ref = JointRefinement(_with_an_unseen_phase(), ins)
     plain = plain_ref.fit(lab6_pair, plan="mccusker_default")
     _, ins = perturbed_inputs()
     equation = ParametricEquation(name="b", target="phases.1.cell.a", basis="constant")
-    result = refine_multi(lab6_pair, _with_an_unseen_phase(), ins, parametric=[equation],
+    result = refine_joint(lab6_pair, _with_an_unseen_phase(), ins, parametric=[equation],
                           plan="mccusker_default")
     OUT.mkdir(exist_ok=True)
-    result.for_histogram(0).plot(OUT / "parametric_unseen_phase_h0.png")
+    result.for_pattern(0).plot(OUT / "parametric_unseen_phase_h0.png")
     rename = {"phases.1.cell.a": "vars.b_0"}
     assert ([[rename.get(p, p) for p in st.held] for st in plain.stages]
             == [st.held for st in result.stages])
@@ -720,7 +720,7 @@ def test_a_joint_fit_holds_a_coefficient_whose_phase_no_pattern_sees(lab6_pair):
     for st in held:
         assert "vars.b_0" not in st.freed
         assert set(st.held_reach["vars.b_0"]) == {
-            f"hist.{h}.phases.1.cell.{k}" for h in range(2) for k in "abc"}
+            f"pattern.{h}.phases.1.cell.{k}" for h in range(2) for k in "abc"}
     (coef,) = result.parametric
     assert coef.vary is False and coef.esd is None
     # the held cell and its followers leave the plain answer (WP-1999), so the
@@ -733,7 +733,7 @@ def test_a_joint_fit_holds_a_coefficient_whose_phase_no_pattern_sees(lab6_pair):
     # neither pattern sees NaCl, so the equation sets its cell in both and says so
     (blind,) = [d for d in result.diagnostics if d.code == "PARAMETRIC_TARGET_UNSEEN"]
     assert blind.level == "warning" and blind.value == 2.0
-    assert blind.where == ["hist.0.phases.1.cell.a", "hist.1.phases.1.cell.a"]
+    assert blind.where == ["pattern.0.phases.1.cell.a", "pattern.1.phases.1.cell.a"]
     # the held coefficient moves no cell, so no cell row of phase 1 is reported
     # (WP-1999); the warning above and ``result.parametric`` say what set it
     assert not [p.path for p in result.parameters if ".phases.1.cell." in p.path]
@@ -758,7 +758,7 @@ def test_a_parametric_slope_recovers_a_known_expansion_within_its_esd():
                 for k, t in enumerate(temps)]
     truth = A0 * RAMP / 100.0
     structure, ins = _start_models()
-    result = refine_multi(
+    result = refine_joint(
         patterns, structure, [ins] * len(temps), plan="mccusker_default",
         sharing=SharingMap(shared=["instrument.zero_shift", "instrument.profile.*"]),
         coordinates=CoordinateTable(columns={"T": temps}, units={"T": "K"}),
@@ -766,7 +766,7 @@ def test_a_parametric_slope_recovers_a_known_expansion_within_its_esd():
                                        basis="polynomial", terms=[[], ["T"]])])
     OUT.mkdir(exist_ok=True)
     for h in (0, len(temps) - 1):
-        result.for_histogram(h).plot(OUT / f"parametric_ramp_h{h}.png")
+        result.for_pattern(h).plot(OUT / f"parametric_ramp_h{h}.png")
     assert result.status == "converged"
     intercept, slope = result.parametric
     assert (intercept.term, slope.term) == ("1", "T")
@@ -811,7 +811,7 @@ def test_a_line_equation_is_rejected_by_a_ramp_that_bends(bow, rejected):
     a = A0 * (1.0 + RAMP * (temps - 300.0) / 100.0) + bow * A0 * RAMP * 4.5 * (u * u - 1.0)
     patterns = [_simulate(float(a[k]), seed=k) for k in range(10)]
     structure, ins = _start_models()
-    result = refine_multi(
+    result = refine_joint(
         patterns, structure, [ins] * 10, plan="mccusker_default",
         sharing=SharingMap(shared=["instrument.zero_shift", "instrument.profile.*"]),
         coordinates=CoordinateTable(columns={"T": temps.tolist()}, units={"T": "K"}),
@@ -833,11 +833,11 @@ def test_a_line_equation_is_rejected_by_a_ramp_that_bends(bow, rejected):
     p = "p < 0.001" if rejected else f"p = {tied.p_value:.2g}"
     assert f"({p}) for 8 directions over 10 of 10 patterns" in text
     # every pattern's cell and both coefficients are the equation's, in the joint
-    # rows, in a histogram's view and in the notebook table
+    # rows, in a pattern's view and in the notebook table
     assert {p.path for p in result.parameters if p.equations} == (
         {"vars.a_0", "vars.a_1"}
-        | {f"hist.{h}.phases.0.cell.{k}" for h in range(10) for k in "abc"})
-    assert result.for_histogram(3).parameter("phases.0.cell.a").equations == ["a"]
+        | {f"pattern.{h}.phases.0.cell.{k}" for h in range(10) for k in "abc"})
+    assert result.for_pattern(3).parameter("phases.0.cell.a").equations == ["a"]
     assert ["path", "value", "at_bound", "equations"] in [
         line.split() for line in result._repr_html_().splitlines()]
     # the equation's covariance: its diagonal is each esd squared, bit for bit, and
@@ -852,7 +852,7 @@ def test_a_line_equation_is_rejected_by_a_ramp_that_bends(bow, rejected):
     assert equation.covariance[0][1] == equation.covariance[1][0] != 0.0
     for h in (0, 4, 9):
         v = result.parametric_value("a", {"T": float(temps[h])})
-        row = result.parameter(f"hist.{h}.phases.0.cell.a")
+        row = result.parameter(f"pattern.{h}.phases.0.cell.a")
         assert v.value == pytest.approx(row.value, rel=1e-13, abs=0.0)
         assert v.esd == pytest.approx(row.stderr, rel=1e-9)
         assert (v.outside, v.form_rejected, v.unit) == ([], rejected, "Å")
@@ -926,7 +926,7 @@ def library_truth(reference: dict[str, float]) -> dict[str, float]:
             "x*y": A0 * p["x*y"]}
 
 
-class _Probe(MultiHistogramRefinement):
+class _Probe(JointRefinement):
     """Keeps the last stage's solver outcome, which the result does not carry."""
 
     def _build_result(self, models, outcome, *args, **kwargs):
@@ -1435,7 +1435,7 @@ def test_an_equation_the_freed_reading_rejects_is_printed_and_warned_as_such():
     and says what the tied one read."""
     from types import SimpleNamespace
 
-    from rietx.multi import _parametric_form_diagnostics
+    from rietx.joint import _parametric_form_diagnostics
     from rietx.schemas.parametric import ParametricFormTest
     from rietx.schemas.results import _form_line
 
@@ -1465,7 +1465,7 @@ def test_equations_the_joint_reading_alone_rejects_are_warned_together_naming_no
     printed block closes on the joint reading either way."""
     from types import SimpleNamespace
 
-    from rietx.multi import _parametric_form_diagnostics
+    from rietx.joint import _parametric_form_diagnostics
     from rietx.schemas.parametric import (
         ParametricCoefficient,
         ParametricFormReading,
@@ -1509,7 +1509,7 @@ def test_a_verdict_beside_a_rejected_equation_is_marked_provisional():
     verdict provisional and tells the reader to read the others again."""
     from types import SimpleNamespace
 
-    from rietx.multi import _parametric_form_diagnostics
+    from rietx.joint import _parametric_form_diagnostics
     from rietx.schemas.parametric import ParametricFormTest
     from rietx.schemas.results import _form_line
 
@@ -1536,7 +1536,7 @@ def test_an_equation_with_no_direction_beside_the_others_is_named_by_the_joint_w
     quotes the tied reading, since no other warning carries it."""
     from types import SimpleNamespace
 
-    from rietx.multi import _parametric_form_diagnostics
+    from rietx.joint import _parametric_form_diagnostics
     from rietx.schemas.parametric import ParametricFormReading, ParametricFormTest
 
     mt = SimpleNamespace(expressions=[], parametric=[SimpleNamespace(name=n, paths=[f"vars.{n}_0"])
@@ -1595,7 +1595,7 @@ def test_a_value_carries_the_provisional_mark_and_the_joint_verdict():
 
 def test_a_patterns_own_target_column_is_read_off_the_coefficients():
     """``target_columns``: in pattern k, J_coef·Φ_kᵀ/‖Φ_k‖² is the target's
-    own column, the one an untied table's ``hist.k.`` path carries; a
+    own column, the one an untied table's ``pattern.k.`` path carries; a
     skipped pattern has none, and an equation whose coefficient is not free has no
     columns at all."""
     from tests.test_sequential import _start_models
@@ -1612,7 +1612,7 @@ def test_a_patterns_own_target_column_is_read_off_the_coefficients():
     bju = jac_u(untied.x0())
     for k in range(6):
         own = list(bju.col_maps[k]).index(
-            untied.free_paths.index(f"hist.{k}.phases.0.cell.a"))
+            untied.free_paths.index(f"pattern.{k}.phases.0.cell.a"))
         want = bju.blocks[k][:, own]
         # the two are finite differences on different steps, the coefficient's
         # and the target's: 1.8e-7 to 8.1e-7 of the column measured (macOS
@@ -1653,7 +1653,7 @@ def test_a_library_surface_over_a_hundred_patterns_through_the_blocked_solver():
     result = ref.fit(patterns, plan="mccusker_default")
     OUT.mkdir(exist_ok=True)
     for h in (0, n - 1):
-        result.for_histogram(h).plot(OUT / f"parametric_library_h{h}.png")
+        result.for_pattern(h).plot(OUT / f"parametric_library_h{h}.png")
     assert ref.outcome_.jacobian_layout == "blocked"
     assert blocked.dense_jacobian_bytes(3000 * n, 4 + 10 * n) > (
         blocked.DENSE_JACOBIAN_MAX_BYTES)
@@ -1704,18 +1704,18 @@ def _pawley_joint(n: int, *, seed: int = 0, tt_max: float = 24.0):
 def test_a_pawley_joint_fit_shares_a_parametric_cell():
     """Three patterns, each with its own intensity block, one a(T) line.
 
-    The intensities are each histogram's own columns, so the solve, the
+    The intensities are each pattern's own columns, so the solve, the
     statistics and the parameter listing all count them, and nothing an
     intensity model force-fixes is refined."""
     n = 3
     ref, result, truth = _pawley_joint(n, tt_max=14.0)
     OUT.mkdir(exist_ok=True)
     for h in (0, n - 1):
-        result.for_histogram(h).plot(OUT / f"pawley_joint_h{h}.png")
+        result.for_pattern(h).plot(OUT / f"pawley_joint_h{h}.png")
     assert (result.status, result.mode) == ("converged", "pawley")
     for c in result.parametric:
         assert abs(c.value - truth[c.term]) < 3.0 * c.esd, (c.term, c.value, c.esd)
-    # every histogram solved its own block, esds and all
+    # every pattern solved its own block, esds and all
     blocks = [m.pawley for m in ref._models]
     assert all(b is not None and b.n > 0 and b.stderr is not None for b in blocks)
     assert ref.outcome_.n_aux == sum(b.n for b in blocks)
@@ -1725,11 +1725,11 @@ def test_a_pawley_joint_fit_shares_a_parametric_cell():
     assert not [p.path for p in result.parameters
                 if p.path.endswith(".scale") or ".atoms." in p.path]
     rows = {r.path: r for r in ref.parameters()}
-    assert rows["hist.0.phases.0.scale"].mode_fixed
+    assert rows["pattern.0.phases.0.scale"].mode_fixed
     assert not rows["vars.a_1"].mode_fixed
     # no fraction off a force-fixed scale, the single Pawley fit's rule
-    assert all(result.for_histogram(h).qpa is None for h in range(n))
-    # the Pawley findings are each histogram's own, never the fit's
+    assert all(result.for_pattern(h).qpa is None for h in range(n))
+    # the Pawley findings are each pattern's own, never the fit's
     assert not {d.code for d in result.diagnostics} & {
         "PAWLEY_OVERLAP_UNRESOLVED", "PAWLEY_OFF_DATA_RIDGED"}
 
@@ -1738,18 +1738,18 @@ def test_a_pawley_joint_stage_drops_what_it_cannot_fit(monkeypatch):
     """A plan that frees scales and atoms under ``mode="pawley"`` runs without
     them, the single runner's drop (``_joint_mode_fixed``).  The default
     Pawley plan frees neither, so this stage names them to make the drop fire."""
-    from rietx import multi
+    from rietx import joint
     from rietx.strategy.staged import RefinementPlan
 
     dropped: list[str] = []
-    real = multi._joint_mode_fixed
+    real = joint._joint_mode_fixed
 
     def spy(mtable, mode):
         out = real(mtable, mode)
         dropped.extend(out)
         return out
 
-    monkeypatch.setattr(multi, "_joint_mode_fixed", spy)
+    monkeypatch.setattr(joint, "_joint_mode_fixed", spy)
     from tests.test_sequential import _start_models
 
     patterns, coords, equation, _ = pawley_ramp(3, tt_max=10.0)
@@ -1767,7 +1767,7 @@ def test_a_pawley_joint_stage_drops_what_it_cannot_fit(monkeypatch):
 
 
 def test_a_pawley_joint_step_on_blocks_is_the_dense_one():
-    """The intensity blocks are each histogram's own columns of the arrow
+    """The intensity blocks are each pattern's own columns of the arrow
     (``optimize/blocked.py``), so the blocked solve lands where the dense one
     does."""
     answers = []
@@ -1792,14 +1792,14 @@ def test_a_joint_fit_refuses_what_an_intensity_model_cannot_fit():
 
     dummy = rx.PatternData(two_theta=[1.0, 2.0], intensity=[1.0, 1.0])
     s, ins = _start_models()
-    ref = MultiHistogramRefinement(s, [ins, ins])
+    ref = JointRefinement(s, [ins, ins])
     with pytest.raises(NotImplementedError, match="mode='pawley'"):
         ref.fit([dummy, dummy], mode="lebail")
-    alone = MultiHistogramRefinement(s, [ins, ins],
+    alone = JointRefinement(s, [ins, ins],
                                      sharing=SharingMap(per_histogram=["phases.*"]))
     with pytest.raises(NotImplementedError, match="2 single Pawley fits"):
         alone.fit([dummy, dummy], mode="pawley")
-    on_b = MultiHistogramRefinement(
+    on_b = JointRefinement(
         s, [ins, ins], coordinates=_coords(300.0, 400.0),
         parametric=[_equation(target="phases.0.atoms.0.biso")])
     with pytest.raises(ValueError, match="force-fixes phases.0.atoms.0.biso"):
@@ -1816,7 +1816,7 @@ def test_a_pawley_joint_ramp_recovers_its_line_without_bias():
         _ref, result, truth = _pawley_joint(10, seed=seed)
         if seed == 0:
             OUT.mkdir(exist_ok=True)
-            result.for_histogram(9).plot(OUT / "pawley_joint_ramp_h9.png")
+            result.for_pattern(9).plot(OUT / "pawley_joint_ramp_h9.png")
         assert result.status == "converged", seed
         for c in result.parametric:
             z[c.term].append((c.value - truth[c.term]) / c.esd)

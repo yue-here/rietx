@@ -273,7 +273,7 @@ def resolve(species: list[str], wavelengths: tuple[float, ...],
                     f"({LINE_DISPERSION_TOL:.0%} of Z = {z:.0f} is the limit), "
                     "so one structure factor cannot serve both: an absorption "
                     "edge lies between them.  Refine the lines as separate "
-                    "histograms, drop the distant line, or supply a measured "
+                    "patterns, drop the distant line, or supply a measured "
                     "pair through the source's dispersion overrides")
         out[label] = complex(*primary)
     return out

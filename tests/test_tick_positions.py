@@ -15,9 +15,9 @@ re-derived the shift from the same expression would certify the shift and not
 the tick.  Peaks are noise-free and narrow, so the apex of a three-point
 parabola on the 0.01 deg grid is good to well under the 0.01 deg bar.
 
-Three builders owe the same answer and each has a test: the single-histogram
+Three builders owe the same answer and each has a test: the single-pattern
 result (``refine._build_result``), the joint runner's
-(``multi.MultiHistogramRefinement._build_result``, through
+(``joint.JointRefinement._build_result``, through
 ``refine._tick_rows``) and the live view's
 (``viz.snapshot.stage_ticks``).
 """
@@ -278,8 +278,8 @@ def test_a_result_places_its_ticks_by_every_geometry(make_instrument, request):
 def test_the_joint_runners_ticks_follow_each_histograms_displacement():
     """``multi`` keeps its own tick builder, so it owes the same position.
 
-    Two histograms of one specimen carrying different displacements: a tick
-    list shared between them, or one that read the wrong histogram's shift,
+    Two patterns of one specimen carrying different displacements: a tick
+    list shared between them, or one that read the wrong pattern's shift,
     would be off by the difference.
     """
     truths = (0.5, -0.3)
@@ -287,17 +287,17 @@ def test_the_joint_runners_ticks_follow_each_histograms_displacement():
     instruments = [_flat_plate(displacement=s) for s in truths]
     plan = RefinementPlan(stages=[Stage(
         "scale_bkg", ["phases.*.scale", "instrument.background.*"])])
-    result = rx.MultiHistogramRefinement(_rutile(), instruments).fit(
+    result = rx.JointRefinement(_rutile(), instruments).fit(
         patterns, plan=plan)
 
-    for h, hist in enumerate(result.histograms):
+    for h, hist in enumerate(result.patterns):
         rows = _tick_offsets(hist.two_theta, hist.y_calc,
                              hist.ticks["rutile"], half=0.4, isolation=0.9)
         assert len(rows) >= 10, h
         worst = float(np.max(np.abs(rows[:, 1])))
         assert worst < BAR_DEG, (
-            f"histogram {h}: a tick sits {worst:.4f} deg from its peak")
-        _plot_with_zoom(result.for_histogram(h), f"tick_positions_joint_{h}",
+            f"pattern {h}: a tick sits {worst:.4f} deg from its peak")
+        _plot_with_zoom(result.for_pattern(h), f"tick_positions_joint_{h}",
                         _zoom_about(rows))
 
 

@@ -1,6 +1,6 @@
 """The joint X-ray + neutron path holds the moment directions a powder cannot see.
 
-Issue #600.  The single-histogram runner holds a moment direction the
+Issue #600.  The single-pattern runner holds a moment direction the
 calculated pattern does not respond to (WP-1327, ``refine._hold_flat_moments``)
 and the joint runner did not: on a cubic collinear ferromagnet — where a
 powder cannot see the moment direction at all (Shirane 1959) — a joint fit of
@@ -8,11 +8,11 @@ one X-ray and one neutron pattern came back ``converged`` with the polar angle
 at ±1.4e9 rad and the azimuth at ±1.5e10 rad, nothing held, and a modulus esd
 1.88× the one the same fit gives with the angles held.
 
-The joint rule is the intersection (``multi._flat_moments_multi``): a
-direction is held only when **every** histogram that carries it finds it flat,
-since a direction one histogram sees is seen by the joint fit.  An X-ray
-histogram does not see a moment at all, so it never vetoes the neutron
-histogram's answer — and the Pmmm control is what fails a union.
+The joint rule is the intersection (``joint._flat_moments_multi``): a
+direction is held only when **every** pattern that carries it finds it flat,
+since a direction one pattern sees is seen by the joint fit.  An X-ray
+pattern does not see a moment at all, so it never vetoes the neutron
+pattern's answer — and the Pmmm control is what fails a union.
 
 Synthetic, noise-free, small grids: the assertions are about the hold, not
 about a specimen.
@@ -79,7 +79,7 @@ def _joint(space_group: str, truth, start, *, moment_globs=None):
         # declared, not inherited: off by default since WP-2222, and the
         # noise-free truth is drawn on compile_model's closing windows
         closing_window_tol=CLOSING_WINDOW_TOL)
-    joint = rx.MultiHistogramRefinement(
+    joint = rx.JointRefinement(
         rx.Structure(phases=[_phase(space_group, start)]), _instruments())
     return joint, joint.fit(data, plan=plan)
 
@@ -116,7 +116,7 @@ def test_the_joint_fit_holds_a_flat_rotation_across_two_angles():
     R-3m:R is uniaxial about [111], which the n = 3 frame's pole is not.  The
     start (3.0, 0.2, 0.2) is the one where holding the azimuth *without* the
     turn leaves the polar angle unable to reach the truth's angle to [111]
-    (measured on the single-histogram path: ψ = 27.84° at ``max_iter``
+    (measured on the single-pattern path: ψ = 27.84° at ``max_iter``
     against 10.20°), so this is also the joint path's turn.
     """
     truth = (1.5, 2.0, 3.0)
@@ -148,8 +148,8 @@ def test_the_joint_fit_holds_a_flat_rotation_across_two_angles():
 def test_the_joint_fit_holds_nothing_a_neutron_pattern_can_see():
     """The control: on Pmmm every direction is measured, and nothing is held.
 
-    The X-ray histogram finds every moment direction flat — it does not see a
-    moment — so a joint rule that took the union of the histograms' answers
+    The X-ray pattern finds every moment direction flat — it does not see a
+    moment — so a joint rule that took the union of the patterns' answers
     instead of the intersection would hold both angles here.
     """
     truth = (1.5, 2.0, 3.0)
@@ -172,10 +172,10 @@ def test_a_turn_after_the_solve_reads_the_answers_angle_not_the_stage_starts():
     about the flat axis, so it keeps the angle to that axis; written from the
     stage-start angles it would hand the answer the start's angle instead.
     """
-    from rietx.multi import MultiHistogramRefinement, _flat_moments_multi, _turn_flat_axes_multi
+    from rietx.joint import JointRefinement, _flat_moments_multi, _turn_flat_axes_multi
     from rietx.refine import _direction
 
-    joint = MultiHistogramRefinement(
+    joint = JointRefinement(
         rx.Structure(phases=[_phase("R -3 m:R", (3.0, 0.2, 0.2))]),
         _instruments())
     mtable = joint.mtable

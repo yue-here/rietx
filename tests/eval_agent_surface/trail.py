@@ -42,7 +42,7 @@ from pathlib import Path
 # or plotting.  R1 sets a run's wall clock against this sum and R7 counts Bash
 # calls per entry in it.
 FIT_CALLS = frozenset({
-    "refine", "refine_sequential", "refine_multi", "replay",
+    "refine", "refine_sequential", "refine_joint", "replay",
     "Refinement.fit", "Refinement.run_stage", "SequentialRefinement.fit",
 })
 

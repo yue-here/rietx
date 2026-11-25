@@ -1,9 +1,9 @@
-"""Multi-histogram joint refinement (WP-0308).
+"""Joint refinement (WP-0308).
 
 Synthesize two LaB6 patterns of the *same* crystal at two wavelengths, refine
 them jointly, and check the shared cell is recovered — better than either
-pattern alone — with per-histogram Rwp reported separately.  A second test
-corrupts one histogram and checks its own Rwp exposes it rather than the pooled
+pattern alone — with per-pattern Rwp reported separately.  A second test
+corrupts one pattern and checks its own Rwp exposes it rather than the pooled
 number masking it.
 """
 
@@ -16,11 +16,11 @@ import pytest
 
 from rietx import (
     Instrument,
-    MultiHistogramRefinement,
+    JointRefinement,
     Parameter,
     PatternData,
     Refinement,
-    refine_multi,
+    refine_joint,
 )
 from rietx.model.forward import compile_model, recorded_window_tol
 from rietx.model.profiles.caglioti import (
@@ -96,7 +96,7 @@ def two_patterns() -> list[PatternData]:
 
 
 def _single_cell_esd(pattern: PatternData, wavelength: float) -> float:
-    """esd(a) from refining one histogram alone (for the joint-vs-single check)."""
+    """esd(a) from refining one pattern alone (for the joint-vs-single check)."""
     structure = make_lab6()
     for k in ("a", "b", "c"):
         getattr(structure.phases[0].cell, k).value = TRUE_A + 0.004
@@ -108,17 +108,17 @@ def _single_cell_esd(pattern: PatternData, wavelength: float) -> float:
 
 def test_joint_recovers_shared_cell(two_patterns):
     structure, instruments = perturbed_inputs()
-    ref = MultiHistogramRefinement(structure, instruments)
+    ref = JointRefinement(structure, instruments)
     result = ref.fit(two_patterns, plan="mccusker_default")
 
     assert result.status == "converged"
-    assert len(result.histograms) == 2
+    assert len(result.patterns) == 2
 
-    # per-histogram Rwp is reported separately and both fit well
-    for h, hist in enumerate(result.histograms):
+    # per-pattern Rwp is reported separately and both fit well
+    for h, hist in enumerate(result.patterns):
         assert hist.statistics.rwp < 0.12, f"hist {h} Rwp {hist.statistics.rwp}"
         OUT.mkdir(exist_ok=True)
-        result.for_histogram(h).plot(OUT / f"multihist_joint_h{h}.png")
+        result.for_pattern(h).plot(OUT / f"multihist_joint_h{h}.png")
 
     # the shared cell is one refined number, recovered within esds
     a = ref.fitted_structures[0].phases[0].cell.a.value
@@ -126,36 +126,36 @@ def test_joint_recovers_shared_cell(two_patterns):
     assert a_esd is not None and a_esd > 0
     assert a == pytest.approx(TRUE_A, abs=max(5 * a_esd, 5e-5))
 
-    # …and every histogram's structure carries the *same* shared cell
+    # …and every pattern's structure carries the *same* shared cell
     assert ref.fitted_structures[1].phases[0].cell.a.value == pytest.approx(a, rel=1e-12)
     # cubic tie still holds inside the shared structure
     assert ref.fitted_structures[0].phases[0].cell.b.value == pytest.approx(a, rel=1e-12)
 
-    # joint esd beats either histogram alone (two measurements of one quantity)
+    # joint esd beats either pattern alone (two measurements of one quantity)
     esd_single = [_single_cell_esd(two_patterns[0], 0.41390),
                   _single_cell_esd(two_patterns[1], 0.71070)]
     assert a_esd < min(esd_single), f"joint {a_esd} vs singles {esd_single}"
 
-    # per-histogram scales are genuinely independent columns (different values)
-    s0 = result.parameter("hist.0.phases.0.scale").value
-    s1 = result.parameter("hist.1.phases.0.scale").value
+    # per-pattern scales are genuinely independent columns (different values)
+    s0 = result.parameter("pattern.0.phases.0.scale").value
+    s1 = result.parameter("pattern.1.phases.0.scale").value
     assert s0 != s1
     # provenance records the (unit) weighting explicitly
-    assert "histogram_weights" in result.provenance.notes
+    assert "pattern_weights" in result.provenance.notes
 
 
 def test_every_histograms_ticks_name_their_reflections(two_patterns):
-    """`multi.py` keeps its own tick builder, so it owes the same pairing.
+    """`joint.py` keeps its own tick builder, so it owes the same pairing.
 
     CLAUDE.md names this exact shape — a second builder of anything is the
     miss — and the failure it prevents is the one surface where pointing at a
     tick tells the reader nothing (WP-1438).
     """
     structure, instruments = perturbed_inputs()
-    ref = MultiHistogramRefinement(structure, instruments)
+    ref = JointRefinement(structure, instruments)
     result = ref.fit(two_patterns, plan="mccusker_default")
 
-    for h, hist in enumerate(result.histograms):
+    for h, hist in enumerate(result.patterns):
         assert hist.ticks, f"hist {h} has no ticks"
         assert set(hist.tick_hkl) <= set(hist.ticks), h
         for phase, positions in hist.ticks.items():
@@ -164,30 +164,30 @@ def test_every_histograms_ticks_name_their_reflections(two_patterns):
             assert len(hist.tick_hkl[phase]) == len(positions), (h, phase)
             assert all(len(k) == 3 for k in hist.tick_hkl[phase]), (h, phase)
             assert positions == sorted(positions), (h, phase)
-    # the two histograms see the same phase and so name the same reflections,
+    # the two patterns see the same phase and so name the same reflections,
     # each at its own wavelength's angles
-    first, second = result.histograms
+    first, second = result.patterns
     assert set(first.tick_hkl) == set(second.tick_hkl)
 
 
 def test_each_histograms_view_names_its_own_radiation(two_patterns):
-    """The other half of a second builder (WP-2042): ``for_histogram(h)``
+    """The other half of a second builder (WP-2042): ``for_pattern(h)``
     copies the top-level fields, so a radiation recorded only there would label
-    histogram 1's figure with histogram 0's λ."""
+    pattern 1's figure with pattern 0's λ."""
     structure, instruments = perturbed_inputs()
-    result = MultiHistogramRefinement(structure, instruments).fit(
+    result = JointRefinement(structure, instruments).fit(
         two_patterns, plan="mccusker_default")
-    assert result.radiation == result.histograms[0].radiation   # mirrors hist 0
+    assert result.radiation == result.patterns[0].radiation   # mirrors hist 0
     for h, lam in enumerate((0.41390, 0.71070)):
-        assert result.histograms[h].radiation.wavelengths == [lam]
-        label = result.for_histogram(h).plot().get_axes()[0].get_xlabel()
+        assert result.patterns[h].radiation.wavelengths == [lam]
+        label = result.for_pattern(h).plot().get_axes()[0].get_xlabel()
         assert label.endswith(rf"$\lambda$ = {lam:g} Å"), (h, label)
 
 
 def test_bad_histogram_shows_in_its_own_rwp(two_patterns):
     # corrupt the second pattern with a large unmodelled impurity peak: the
-    # shared model can still fit histogram 0, so a pooled Rwp would understate
-    # the damage — the per-histogram Rwp must expose it.
+    # shared model can still fit pattern 0, so a pooled Rwp would understate
+    # the damage — the per-pattern Rwp must expose it.
     good = two_patterns[0]
     tt = np.asarray(two_patterns[1].two_theta)
     y = np.asarray(two_patterns[1].intensity, dtype=float)
@@ -195,27 +195,27 @@ def test_bad_histogram_shows_in_its_own_rwp(two_patterns):
     bad = PatternData(two_theta=tt.tolist(), intensity=y.tolist())
 
     structure, instruments = perturbed_inputs()
-    result = refine_multi([good, bad], structure, instruments, plan="mccusker_default")
+    result = refine_joint([good, bad], structure, instruments, plan="mccusker_default")
 
-    r_good = result.histograms[0].statistics.rwp
-    r_bad = result.histograms[1].statistics.rwp
+    r_good = result.patterns[0].statistics.rwp
+    r_bad = result.patterns[1].statistics.rwp
     assert r_good < 0.12
     assert r_bad > 2.0 * r_good, f"bad hist Rwp {r_bad} did not stand out from {r_good}"
-    # the pooled number sits below the bad histogram's own — i.e. it *would*
-    # have masked it without the per-histogram breakdown
+    # the pooled number sits below the bad pattern's own — i.e. it *would*
+    # have masked it without the per-pattern breakdown
     assert result.statistics.rwp < r_bad
 
     OUT.mkdir(exist_ok=True)
     for h in range(2):
-        result.for_histogram(h).plot(OUT / f"multihist_bad_h{h}.png")
+        result.for_pattern(h).plot(OUT / f"multihist_bad_h{h}.png")
 
 
 def test_a_narrow_declared_peak_is_flagged_per_histogram(two_patterns):
     """The joint path runs the width guard too (candidate 2).
 
     A disguised-Bragg background peak — free position/height/width with a fitted
-    width at the resolution — declared on one histogram surfaces
-    ``HUMP_TOO_NARROW`` in *that histogram's* own diagnostics, the
+    width at the resolution — declared on one pattern surfaces
+    ``HUMP_TOO_NARROW`` in *that pattern's* own diagnostics, the
     channel a joint fit reports degeneracy evidence through.  Before this the
     joint path was the only one that never called ``check_hump_width``,
     so such a peak produced no warning anywhere.
@@ -230,32 +230,32 @@ def test_a_narrow_declared_peak_is_flagged_per_histogram(two_patterns):
                          transform="softplus", vary=False),
         fwhm=Parameter(value=0.02, min=0.01, unit="deg",
                        transform="softplus", vary=False))]
-    result = refine_multi(two_patterns, structure, instruments,
+    result = refine_joint(two_patterns, structure, instruments,
                           plan="mccusker_default")
 
-    codes0 = {d.code for d in result.histograms[0].diagnostics}
-    codes1 = {d.code for d in result.histograms[1].diagnostics}
+    codes0 = {d.code for d in result.patterns[0].diagnostics}
+    codes1 = {d.code for d in result.patterns[1].diagnostics}
     assert "HUMP_TOO_NARROW" in codes0
     assert "HUMP_TOO_NARROW" not in codes1   # no peak declared there
 
 
 def test_every_row_carries_a_bound_answer_or_says_it_has_none(two_patterns):
-    """`multi.py` builds its own rows, so it needs its own at_bound pin.
+    """`joint.py` builds its own rows, so it needs its own at_bound pin.
 
-    The WP-1076 rules are asserted on the single-histogram path in
+    The WP-1076 rules are asserted on the single-pattern path in
     `test_result_rows.py`; this is the second builder, and the thing it can get
     wrong that the first cannot is the *key*.  A row's path is the combined
-    path — shared rows unprefixed, per-histogram rows `hist.h.…` — and that is
+    path — shared rows unprefixed, per-pattern rows `pattern.h.…` — and that is
     also how `MultiParameterTable.free_paths` spells them, so a projection
-    keyed on anything else would silently mark every per-histogram row
+    keyed on anything else would silently mark every per-pattern row
     unmeasured while every assertion about counts still passed.
     """
     structure, instruments = perturbed_inputs()
-    ref = MultiHistogramRefinement(structure, instruments)
+    ref = JointRefinement(structure, instruments)
     result = ref.fit(two_patterns, plan="mccusker_default")
 
     # both codes: a row on a floor of 0 is ``FLOOR_HIT`` (WP-1929); here both
-    # histograms' profile.y, held exactly on 0 by the LM driver's active set
+    # patterns' profile.y, held exactly on 0 by the LM driver's active set
     named = {p for d in result.diagnostics if d.code in ("BOUND_HIT", "FLOOR_HIT")
              for p in d.where}
     assert {p.path for p in result.parameters if p.at_bound is True} == named
@@ -263,7 +263,7 @@ def test_every_row_carries_a_bound_answer_or_says_it_has_none(two_patterns):
     measured = {p.path for p in result.parameters if p.at_bound is not None}
     free_rows = set(ref.mtable.free_paths) & {p.path for p in result.parameters}
     # a free row goes unmeasured only on its transform's floor, where nothing
-    # could test it (WP-1463): here both histograms' profile.y, at 4e-69 and
+    # could test it (WP-1463): here both patterns' profile.y, at 4e-69 and
     # 4e-24, neither of which has an esd on main either
     rows = {p.path: p for p in result.parameters}
     for path in free_rows - measured:
@@ -271,18 +271,18 @@ def test_every_row_carries_a_bound_answer_or_says_it_has_none(two_patterns):
         assert 0.0 <= p.value and (
             p.value <= 1e-10 or (p.stderr and p.value <= 0.01 * p.stderr)), path
     assert measured <= free_rows and len(free_rows - measured) <= 2
-    # both halves of the key are exercised: shared rows and per-histogram rows
-    assert any(p.startswith("hist.") for p in measured)
-    assert any(not p.startswith("hist.") for p in measured)
+    # both halves of the key are exercised: shared rows and per-pattern rows
+    assert any(p.startswith("pattern.") for p in measured)
+    assert any(not p.startswith("pattern.") for p in measured)
     # the unmeasured rows are the tied ones (cubic b←a, c←a), not an empty set
     unmeasured = {p.path for p in result.parameters if p.at_bound is None}
     assert {"phases.0.cell.b", "phases.0.cell.c"} <= unmeasured
 
 
 def _hump_on_histogram_0():
-    """The joint inputs with a hump declared on histogram 0 only.
+    """The joint inputs with a hump declared on pattern 0 only.
 
-    The one family on ``main`` that exists on one histogram and not the other
+    The one family on ``main`` that exists on one pattern and not the other
     without being an emission line, so the nearest a constant-wavelength
     fixture comes to issue #265's banks, whose profile rows went by other
     names.
@@ -301,53 +301,53 @@ def _hump_on_histogram_0():
 
 
 def test_a_glob_that_reached_one_histogram_is_told_apart_from_the_rest():
-    """What ``unreached_histograms`` reports, and the three silences (WP-1414).
+    """What ``unreached_patterns`` reports, and the three silences (WP-1414).
 
-    Reported: a glob that matched rows of one histogram and none of another.
-    Silent: a glob scoped to the histogram it reached (deliberate), a row
+    Reported: a glob that matched rows of one pattern and none of another.
+    Silent: a glob scoped to the pattern it reached (deliberate), a row
     that exists on both and is force-fixed on both (reached, then declined),
-    and a glob matching nowhere (the single-histogram healthy case).
+    and a glob matching nowhere (the single-pattern healthy case).
     """
     structure, instruments = _hump_on_histogram_0()
     mt = MultiParameterTable(structure, instruments)
     humps = "instrument.extra_components.*"
 
-    assert mt.unreached_histograms([humps]) == {1: [humps]}
-    assert mt.unreached_histograms(["phases.*.scale", humps]) == {}, (
-        "a glob that reaches histogram 1 elsewhere in the stage reaches it")
-    assert mt.unreached_histograms([f"hist.0.{humps}"]) == {}
-    # scoped by what it matched rather than by its prefix: only histogram 1's
-    # scoped name answers it, so it is aimed there and histogram 0 is no miss
-    assert mt.unreached_histograms(["*.1.instrument.zero_shift"]) == {}
-    assert mt.unreached_histograms(["hist.*.instrument.extra_components.*"]) == {
-        1: ["hist.*.instrument.extra_components.*"]}
-    assert mt.unreached_histograms(["instrument.geometry.sample_displacement"]) == {}
-    assert mt.unreached_histograms(["phases.*.microstrain.dof.*"]) == {}
-    assert mt.unreached_histograms(["instrument.profile.*"]) == {}
+    assert mt.unreached_patterns([humps]) == {1: [humps]}
+    assert mt.unreached_patterns(["phases.*.scale", humps]) == {}, (
+        "a glob that reaches pattern 1 elsewhere in the stage reaches it")
+    assert mt.unreached_patterns([f"pattern.0.{humps}"]) == {}
+    # scoped by what it matched rather than by its prefix: only pattern 1's
+    # scoped name answers it, so it is aimed there and pattern 0 is no miss
+    assert mt.unreached_patterns(["*.1.instrument.zero_shift"]) == {}
+    assert mt.unreached_patterns(["pattern.*.instrument.extra_components.*"]) == {
+        1: ["pattern.*.instrument.extra_components.*"]}
+    assert mt.unreached_patterns(["instrument.geometry.sample_displacement"]) == {}
+    assert mt.unreached_patterns(["phases.*.microstrain.dof.*"]) == {}
+    assert mt.unreached_patterns(["instrument.profile.*"]) == {}
 
-    # known means a bare path of some histogram or a scoped one of a real one
+    # known means a bare path of some pattern or a scoped one of a real one
     assert mt.unknown_paths([
-        "hist.7.instrument.zero_shift", "hist.1.instrument.zero_shift",
-        "instrument.zero_shift", "instrument.zero", "hist.0.instrument.extra_components.0.fwhm",
-        "hist.1.instrument.extra_components.0.fwhm",
-    ]) == ["hist.7.instrument.zero_shift", "instrument.zero",
-           "hist.1.instrument.extra_components.0.fwhm"]
+        "pattern.7.instrument.zero_shift", "pattern.1.instrument.zero_shift",
+        "instrument.zero_shift", "instrument.zero", "pattern.0.instrument.extra_components.0.fwhm",
+        "pattern.1.instrument.extra_components.0.fwhm",
+    ]) == ["pattern.7.instrument.zero_shift", "instrument.zero",
+           "pattern.1.instrument.extra_components.0.fwhm"]
     # a pattern is unknown only under a retired spelling (WP-1102's rename),
-    # scoped or bare; the current spelling reaching histogram 0 is answered
+    # scoped or bare; the current spelling reaching pattern 0 is answered
     assert mt.unknown_paths([
-        "instrument.background_peaks.*", "hist.0.instrument.background_peaks.*",
+        "instrument.background_peaks.*", "pattern.0.instrument.background_peaks.*",
         humps, "phases.*.microstrain.dof.*",
-    ]) == ["instrument.background_peaks.*", "hist.0.instrument.background_peaks.*"]
+    ]) == ["instrument.background_peaks.*", "pattern.0.instrument.background_peaks.*"]
 
 
 def test_a_shared_parameter_is_freed_once_however_many_histograms_carry_it():
     """``StageResult.freed`` is a record of columns, not of table copies (WP-1312).
 
-    Each histogram's table holds its own copy of a shared entry, and until
+    Each pattern's table holds its own copy of a shared entry, and until
     this test the joint ``set_vary`` returned one name per copy: a stage
-    freeing a two-histogram fit's cubic cell recorded ``phases.0.cell.a``
+    freeing a two-pattern fit's cubic cell recorded ``phases.0.cell.a``
     twice, so every shared parameter in a joint fit's record was counted once
-    per histogram.  Per-histogram paths are scoped, so each histogram's is
+    per pattern.  Per-pattern paths are scoped, so each pattern's is
     its own name and stays.
     """
     structure, instruments = perturbed_inputs()
@@ -356,9 +356,9 @@ def test_a_shared_parameter_is_freed_once_however_many_histograms_carry_it():
 
     freed = mt.set_vary(["phases.*.cell.*", "phases.*.scale",
                          "instrument.zero_shift"], True)
-    assert freed == ["phases.0.cell.a", "hist.0.phases.0.scale",
-                     "hist.0.instrument.zero_shift", "hist.1.phases.0.scale",
-                     "hist.1.instrument.zero_shift"]
+    assert freed == ["phases.0.cell.a", "pattern.0.phases.0.scale",
+                     "pattern.0.instrument.zero_shift", "pattern.1.phases.0.scale",
+                     "pattern.1.instrument.zero_shift"]
     assert len(freed) == len(set(freed))
     # the record and the solver agree on how many columns were freed
     assert len(freed) == len(mt.free_paths)
@@ -368,10 +368,10 @@ def test_a_joint_plan_that_reaches_one_histogram_says_which_it_missed(two_patter
     """Issue #265's comment, on the fixture ``main`` can build.
 
     The fork's case was ``instrument.profile.*`` freeing the one
-    constant-wavelength histogram and none of the banks; the result said
+    constant-wavelength pattern and none of the banks; the result said
     ``converged`` and cost a refinement.  Here a stage's glob reaches a hump
-    declared on histogram 0 only, and the record and the diagnostic both
-    name histogram 1.  A literal no histogram has is the other finding, and
+    declared on pattern 0 only, and the record and the diagnostic both
+    name pattern 1.  A literal no pattern has is the other finding, and
     a joint fit reports it the way a single one does.
     """
     structure, instruments = _hump_on_histogram_0()
@@ -382,9 +382,9 @@ def test_a_joint_plan_that_reaches_one_histogram_says_which_it_missed(two_patter
         Stage("humps", ["instrument.extra_components.*", "instrument.zero"],
               max_iter=5),
     ], closing_window_tol=None)
-    result = refine_multi(two_patterns, structure, instruments, plan=plan)
+    result = refine_joint(two_patterns, structure, instruments, plan=plan)
 
-    assert [s.unreached_histograms for s in result.stages] == [
+    assert [s.unreached_patterns for s in result.stages] == [
         {}, {1: ["instrument.extra_components.*"]}]
     freed_nothing = [d for d in result.diagnostics
                      if d.code == "STAGE_FREED_NOTHING"]
@@ -392,22 +392,22 @@ def test_a_joint_plan_that_reaches_one_histogram_says_which_it_missed(two_patter
     d = freed_nothing[0]
     assert d.level == "info" and d.value == 1.0
     assert d.where == ["instrument.extra_components.*"]
-    assert "'humps'" in d.message and "histogram 1" in d.message
+    assert "'humps'" in d.message and "pattern 1" in d.message
 
     assert result.stages[1].unknown_paths == ["instrument.zero"]
     unknown = [d for d in result.diagnostics if d.code == "STAGE_PATH_UNKNOWN"]
     assert [u.where for u in unknown] == [["instrument.zero"]]
     assert "Did you mean 'instrument.zero_shift'" in unknown[0].message
 
-    # the record round-trips: histogram keys are ints in JSON's string keys
+    # the record round-trips: pattern keys are ints in JSON's string keys
     again = type(result).model_validate_json(result.model_dump_json())
-    assert again.stages[1].unreached_histograms == {
+    assert again.stages[1].unreached_patterns == {
         1: ["instrument.extra_components.*"]}
 
 
 def test_a_joint_fit_refuses_lebail():
     structure, instruments = perturbed_inputs()
-    ref = MultiHistogramRefinement(structure, instruments)
+    ref = JointRefinement(structure, instruments)
     dummy = PatternData(two_theta=[1.0, 2.0], intensity=[1.0, 1.0])
     with pytest.raises(NotImplementedError):
         ref.fit([dummy, dummy], mode="lebail")
@@ -506,7 +506,7 @@ def test_a_joint_result_is_measured_on_a_compile_at_its_answer(size_fixture):
     patterns, _ = size_fixture
     structure, _ = _width_start(0.41390)
     instruments = [_width_start(lam)[1] for lam in (0.41390, 0.71070)]
-    ref = MultiHistogramRefinement(structure, instruments)
+    ref = JointRefinement(structure, instruments)
     plan = dataclasses.replace(_width_plan("lor_size"), closing_window_tol=None)
     result = ref.fit(patterns, plan=plan)
     tol = recorded_window_tol(result.stages[-1].window_area_tol)
@@ -515,24 +515,24 @@ def test_a_joint_result_is_measured_on_a_compile_at_its_answer(size_fixture):
                               patterns[h], mode="rietveld",
                               moving_paths=set(table.moving_paths),
                               window_area_tol=tol)
-        np.testing.assert_allclose(result.histograms[h].y_calc,
+        np.testing.assert_allclose(result.patterns[h].y_calc,
                                    fresh.evaluate(table.decode(table.x0())),
                                    rtol=1e-12, atol=1e-9)
         assert ref.report(h).unmatched == [], f"hist {h}: cut tails read as peaks"
     # the gap is tested per pattern and the finding names the worst one
     stale = [d for d in result.diagnostics if d.code == "FROZEN_COMPILE_STALE"]
     assert len(stale) == 1 and stale[0].value > FROZEN_COMPILE_CHI2_REL
-    assert "histogram 1" in stale[0].message
+    assert "pattern 1" in stale[0].message
 
 
 def test_a_joint_fit_recovers_one_crystallite_at_both_wavelengths(size_fixture):
     """The WP-1131 acceptance: one specimen, one size, two coefficients.
 
-    Before the fix this fit served one ``lor_size`` column to both histograms
+    Before the fix this fit served one ``lor_size`` column to both patterns
     and landed −2.2 % / −43.0 % from the two truths — 408.8 Å against 702.0 Å
     for one specimen, the two implied sizes exactly ``LAM_RATIO`` apart — while
-    reporting ``converged`` and taking histogram 1's Rwp from 0.137 to 0.245.
-    Now the column is the coefficient at λ₀ and each histogram carries its own.
+    reporting ``converged`` and taking pattern 1's Rwp from 0.137 to 0.245.
+    Now the column is the coefficient at λ₀ and each pattern carries its own.
 
     The size agreement is asserted **tight**, because after the fix it is
     structural rather than statistical: the two coefficients are one number
@@ -543,7 +543,7 @@ def test_a_joint_fit_recovers_one_crystallite_at_both_wavelengths(size_fixture):
     patterns, truths = size_fixture
     structure, _ = _width_start(0.41390)
     instruments = [_width_start(lam)[1] for lam in (0.41390, 0.71070)]
-    ref = MultiHistogramRefinement(structure, instruments)
+    ref = JointRefinement(structure, instruments)
     result = ref.fit(patterns, plan=_width_plan("lor_size"))
 
     assert result.status == "converged"
@@ -555,16 +555,16 @@ def test_a_joint_fit_recovers_one_crystallite_at_both_wavelengths(size_fixture):
     for h, size in enumerate(sizes):
         assert size == pytest.approx(TRUE_SIZE_A, rel=0.05), f"hist {h}: {size} Å"
 
-    # each histogram's *coefficient* differs by exactly the wavelength ratio
+    # each pattern's *coefficient* differs by exactly the wavelength ratio
     coeffs = [ref.fitted_structures[h].phases[0].lor_size.value for h in (0, 1)]
     assert coeffs[1] / coeffs[0] == pytest.approx(LAM_RATIO, rel=1e-12)
 
     # and the fit is as good as each pattern alone, where sharing the degrees
-    # left histogram 1 at Rwp 0.245
-    for h, hist in enumerate(result.histograms):
+    # left pattern 1 at Rwp 0.245
+    for h, hist in enumerate(result.patterns):
         assert hist.statistics.rwp < 0.16, f"hist {h} Rwp {hist.statistics.rwp}"
         OUT.mkdir(exist_ok=True)
-        result.for_histogram(h).plot(OUT / f"wp1131_size_joint_h{h}.png")
+        result.for_pattern(h).plot(OUT / f"wp1131_size_joint_h{h}.png")
 
     codes = [d.code for d in result.diagnostics]
     assert "SIZE_NORMALISED_ACROSS_WAVELENGTHS" in codes
@@ -578,7 +578,7 @@ def test_the_lambda_free_strain_control_is_shared_exactly_as_before():
     """The control that makes the size result a measurement, not an argument.
 
     Microstrain has no λ in it, so ``SharingMap`` is right about it and this WP
-    must not touch it: one column, both histograms, and the value the joint fit
+    must not touch it: one column, both patterns, and the value the joint fit
     lands on is the one each pattern gives alone.  Run with the same machinery
     and the same wavelengths as the size case, which is the point — the
     difference between the two tests is the physics, not the fixture.
@@ -587,7 +587,7 @@ def test_the_lambda_free_strain_control_is_shared_exactly_as_before():
                 _broadened("lor_strain", 0.71070, 5.0, 42.0, seed=2)[0]]
     structure, _ = _width_start(0.41390)
     instruments = [_width_start(lam)[1] for lam in (0.41390, 0.71070)]
-    ref = MultiHistogramRefinement(structure, instruments)
+    ref = JointRefinement(structure, instruments)
     result = ref.fit(patterns, plan=_width_plan("lor_strain"))
 
     assert result.status == "converged"
@@ -637,7 +637,7 @@ def test_equal_wavelengths_declare_no_scaling_at_all():
     structure = make_lab6()
     same = [Instrument.debye_scherrer(wavelength=0.41390) for _ in range(3)]
     assert size_value_scales(structure, same, SharingMap()) == [{}, {}, {}]
-    # one histogram has nothing to normalise against
+    # one pattern has nothing to normalise against
     assert size_value_scales(structure, same[:1], SharingMap()) == [{}]
 
 
@@ -647,13 +647,13 @@ def test_the_scale_map_is_the_wavelength_ratio_and_its_square():
     instruments = [Instrument.debye_scherrer(wavelength=lam)
                    for lam in (0.41390, 0.71070)]
     scales = size_value_scales(structure, instruments, SharingMap())
-    assert scales[0] == {}, "histogram 0 carries the reference wavelength"
+    assert scales[0] == {}, "pattern 0 carries the reference wavelength"
     assert scales[1]["phases.0.lor_size"] == pytest.approx(LAM_RATIO, rel=1e-15)
     assert scales[1]["phases.0.gauss_size"] == pytest.approx(LAM_RATIO ** 2,
                                                              rel=1e-15)
     assert "phases.0.lor_strain" not in scales[1]
     assert "phases.0.gauss_strain" not in scales[1]
-    # a caller who wants an independent size per histogram says so, and then
+    # a caller who wants an independent size per pattern says so, and then
     # there is nothing shared to normalise
     per_hist = SharingMap(per_histogram=["phases.*.lor_size"])
     scales = size_value_scales(structure, instruments, per_hist)
@@ -682,7 +682,7 @@ def test_the_gaussian_size_variance_is_normalised_as_lambda_squared():
 
     Measured on this fixture with the normalisation switched off: +11.9 % /
     −62.1 % against the two truths, implied sizes 378.2 Å and 649.3 Å, and
-    histogram 1's Rwp 0.0817 → 0.3807 — against ``lor_size``'s 0.2450, because
+    pattern 1's Rwp 0.0817 → 0.3807 — against ``lor_size``'s 0.2450, because
     the error in the width is squared into the variance.  With it, 400.2 Å in
     both and both Rwp exactly what each pattern gives alone.
 
@@ -694,7 +694,7 @@ def test_the_gaussian_size_variance_is_normalised_as_lambda_squared():
     p1, _ = _broadened("gauss_size", 0.71070, 5.0, 42.0, seed=2)
     structure, _ = _width_start(0.41390)
     instruments = [_width_start(lam)[1] for lam in (0.41390, 0.71070)]
-    ref = MultiHistogramRefinement(structure, instruments)
+    ref = JointRefinement(structure, instruments)
     result = ref.fit([p0, p1], plan=_width_plan("gauss_size"))
 
     assert result.status == "converged"
@@ -705,10 +705,10 @@ def test_the_gaussian_size_variance_is_normalised_as_lambda_squared():
     assert sizes[0] == pytest.approx(sizes[1], rel=1e-9)
     for h, size in enumerate(sizes):
         assert size == pytest.approx(TRUE_SIZE_A, rel=0.05), f"hist {h}: {size} Å"
-    for h, hist in enumerate(result.histograms):
+    for h, hist in enumerate(result.patterns):
         assert hist.statistics.rwp < 0.12, f"hist {h} Rwp {hist.statistics.rwp}"
         OUT.mkdir(exist_ok=True)
-        result.for_histogram(h).plot(OUT / f"wp1131_gauss_size_joint_h{h}.png")
+        result.for_pattern(h).plot(OUT / f"wp1131_gauss_size_joint_h{h}.png")
 
     row = next(d for d in result.diagnostics
                if d.code == "SIZE_NORMALISED_ACROSS_WAVELENGTHS")
@@ -718,13 +718,13 @@ def test_the_gaussian_size_variance_is_normalised_as_lambda_squared():
 
 
 def test_a_seed_lands_on_one_number_in_the_shared_column():
-    """A scaled entry is seeded in *column* units, so the histograms agree.
+    """A scaled entry is seeded in *column* units, so the patterns agree.
 
     ``Stage.seed`` lifts a coefficient off its zero floor before solving.
-    Seeded as a physical value it would put the two histograms at
+    Seeded as a physical value it would put the two patterns at
     different internal coordinates for one shared column, and
-    ``_rebuild_columns``'s "identical values from each histogram" would silently
-    stop holding — the last write would win and the reference histogram would
+    ``_rebuild_columns``'s "identical values from each pattern" would silently
+    stop holding — the last write would win and the reference pattern would
     end up seeded to the *other* one's number.
     """
     structure = make_lab6()
@@ -735,7 +735,7 @@ def test_a_seed_lands_on_one_number_in_the_shared_column():
     mt.seed_floored(["phases.0.lor_size"], 1e-3)
 
     values = mt.decode(mt.x0())
-    # each histogram's own physical value is the seed times its own factor …
+    # each pattern's own physical value is the seed times its own factor …
     assert values[0]["phases.0.lor_size"] == pytest.approx(1e-3, rel=1e-12)
     assert values[1]["phases.0.lor_size"] == pytest.approx(1e-3 * LAM_RATIO,
                                                            rel=1e-12)
@@ -747,7 +747,7 @@ def test_a_seed_lands_on_one_number_in_the_shared_column():
 
 
 def test_a_seed_one_histogram_cannot_hold_is_written_in_none():
-    """A shared column is seeded in every histogram or in none.
+    """A shared column is seeded in every pattern or in none.
 
     A caller may share an instrument row across mounts (``SharingMap.shared``),
     and each instrument declares its own box.  Here the seed fits under the
@@ -780,7 +780,7 @@ def test_a_scaled_column_is_the_jacobian_the_residual_actually_has():
     ``_peak_chain_column`` finite-differences θ *through* ``decode``, which is
     why the analytic column picks it up with no edit to any derivative branch.
     That is an argument, and this is the measurement: every column of the
-    stacked multi-histogram Jacobian against a central difference of the
+    stacked joint Jacobian against a central difference of the
     stacked residual, with the two scaled columns (λ and λ²) among them.
 
     Un-checked, a wrong factor here would be a column short by 1.72× or 2.95×
@@ -842,19 +842,19 @@ def test_a_joint_fit_reports_its_microstructure(size_fixture):
     ``RefinementResult.microstructure`` defaults to an empty list, and an empty
     list reads as *no microstructure* — the WP-1076 shape — so a joint fit that
     never filled it would say that about a specimen it had just measured a
-    crystallite size for. Read off histogram 0, whose value scale is exactly
+    crystallite size for. Read off pattern 0, whose value scale is exactly
     1.0, so its coefficients are the shared column and the size behind them is
     the specimen's one number.
     """
     patterns, _ = size_fixture
     structure, _ = _width_start(0.41390)
     instruments = [_width_start(lam)[1] for lam in (0.41390, 0.71070)]
-    ref = MultiHistogramRefinement(structure, instruments)
+    ref = JointRefinement(structure, instruments)
     result = ref.fit(patterns, plan=_width_plan("lor_size"))
 
     assert len(result.microstructure) == 1
     block = result.microstructure[0]
-    assert block.wavelength == pytest.approx(0.41390), "the reference histogram"
+    assert block.wavelength == pytest.approx(0.41390), "the reference pattern"
     size = block.term("lor_size")
     assert size.unavailable is None
     assert size.esd is not None and size.esd > 0.0
@@ -868,16 +868,16 @@ def test_a_joint_fit_reports_its_microstructure(size_fixture):
 
 
 # ----------------------------------------------------------------------
-# review of #385 (2026-09-22): the joint runner (multi.py:301-318, per that
-# review) has the single-histogram stage runner's shape line for line and had
-# no cell-runaway check at all -- extended in rietx.multi, now as
+# review of #385 (2026-09-22): the joint runner (joint.py:301-318, per that
+# review) has the single-pattern stage runner's shape line for line and had
+# no cell-runaway check at all -- extended in rietx.joint, now as
 # _reset_cell_runaway_multi (WP-2002, B8: put back at the stage start and held).
 # ----------------------------------------------------------------------
 def _degenerate_pair_structure(decoy_scale: float) -> Structure:
-    """The single-histogram degenerate-pair construction
+    """The single-pattern degenerate-pair construction
     (``test_cell_runaway_safety._degenerate_pair``): two LaB6-shaped phases
     sharing one starting cell, one at full scale and one at a trace.  Reused
-    here because the joint runner shares the cell across histograms by
+    here because the joint runner shares the cell across patterns by
     default, and the same joint degeneracy trips it there too."""
     real = make_lab6()
     for n in "abc":
@@ -903,12 +903,12 @@ def _degenerate_pair_instruments() -> list[Instrument]:
 
 def test_the_joint_reset_fires_on_a_shared_degenerate_cell():
     """Unit-level, at the level ``test_cell_runaway_safety.py`` tests the
-    single-histogram function: escape the shared cell directly on both
-    histograms' own tables -- exactly what ``mtable.commit(outcome.theta)``
+    single-pattern function: escape the shared cell directly on both
+    patterns' own tables -- exactly what ``mtable.commit(outcome.theta)``
     after a runaway joint TRF step leaves behind -- rather than driving a
     real solve there, which needs ~20 unwindowed iterations on purpose
-    (the single-histogram fixture's own docstring)."""
-    from rietx.multi import _reset_cell_runaway_multi
+    (the single-pattern fixture's own docstring)."""
+    from rietx.joint import _reset_cell_runaway_multi
     from rietx.refine import _cell_runaway_diagnostic
 
     structure = _degenerate_pair_structure(5e-4)
@@ -916,18 +916,18 @@ def test_the_joint_reset_fires_on_a_shared_degenerate_cell():
     mtable.set_vary(["phases.*.cell.a"], True)
     start_values = mtable.decode(mtable.x0())
 
-    escaped = TRUE_A * 50.0  # far outside +/-15%, same escape as the single-histogram tests
+    escaped = TRUE_A * 50.0  # far outside +/-15%, same escape as the single-pattern tests
     for table in mtable.tables:
         table.entries[table._paths["phases.0.cell.a"]].value = escaped
 
     found = _reset_cell_runaway_multi(mtable, start_values)
-    assert len(found) == 1, found  # shared -> named once, not once per histogram
+    assert len(found) == 1, found  # shared -> named once, not once per pattern
     path, old, new = found[0]
-    assert path == "phases.0.cell.a"   # bare: shared, never hist.h.-scoped
+    assert path == "phases.0.cell.a"   # bare: shared, never pattern.h.-scoped
     assert old == pytest.approx(escaped)
     assert new == start_values[0][path] == start_values[1][path]
 
-    # both histograms' own entries were actually put back, not just the report
+    # both patterns' own entries were actually put back, not just the report
     for table in mtable.tables:
         assert table.entries[table._paths["phases.0.cell.a"]].value == new
     # the other phase's shared cell never escaped and is left where it was
@@ -941,9 +941,9 @@ def test_the_joint_reset_fires_on_a_shared_degenerate_cell():
 
 
 def test_a_shared_cell_inside_the_window_is_left_alone_jointly():
-    """The bit-identity companion: nothing escaped in either histogram is
+    """The bit-identity companion: nothing escaped in either pattern is
     nothing changed in either."""
-    from rietx.multi import _reset_cell_runaway_multi
+    from rietx.joint import _reset_cell_runaway_multi
 
     structure = _degenerate_pair_structure(5e-4)
     mtable = MultiParameterTable(structure, _degenerate_pair_instruments())
@@ -960,18 +960,18 @@ def test_a_shared_cell_inside_the_window_is_left_alone_jointly():
 
 @pytest.fixture(scope="module")
 def degenerate_pair_multi_fit():
-    """The joint-runner analogue of the single-histogram ``degenerate_pair_fit``
-    fixture: two histograms sharing the degenerate-pair structure, scale+cell
+    """The joint-runner analogue of the single-pattern ``degenerate_pair_fit``
+    fixture: two patterns sharing the degenerate-pair structure, scale+cell
     of both phases freed together in one stage, then a second stage forcing
-    the next compile -- the construction that crashed the single-histogram
-    runner before its own fix, reused here to reach ``multi.py``'s equivalent
+    the next compile -- the construction that crashed the single-pattern
+    runner before its own fix, reused here to reach ``joint.py``'s equivalent
     gap (review of #385 finding 2)."""
     structure = _degenerate_pair_structure(1e-5)
     instruments = _degenerate_pair_instruments()
     data = [synthesize(lam, 3.0, 24.0, scale=1e-5, zero=0.0,
                        bkg=[40.0, 0.0, 0.0], seed=s)
             for lam, s in ((0.41390, 11), (0.71070, 12))]
-    ref = MultiHistogramRefinement(structure, instruments)
+    ref = JointRefinement(structure, instruments)
     plan = RefinementPlan(stages=[
         Stage("both", ["phases.*.scale", "phases.*.cell.*"], max_iter=20),
         Stage("zero", ["instrument.zero_shift"], max_iter=20),
@@ -1028,7 +1028,7 @@ def test_the_joint_runner_reports_and_resets_the_runaway(monkeypatch):
     [stage] = result.stages
     assert stage.cell_reset == [ESCAPED]
     assert ESCAPED not in stage.freed and ESCAPED not in stage.held
-    # every histogram's own structure copy holds the stage-start cell exactly
+    # every pattern's own structure copy holds the stage-start cell exactly
     for structure in ref.fitted_structures:
         assert structure.phases[1].cell.a.value == pytest.approx(
             TRUE_A * CUBIC_TWIN, rel=1e-14)
@@ -1042,7 +1042,7 @@ def test_the_joint_runner_reports_and_resets_the_runaway(monkeypatch):
     for phase in ref.fitted_structures[0].phases:
         a = phase.cell.a.value
         assert 1.0 < a < 100.0, f"{phase.name}: a = {a:.6g} Å ran away"
-    # every histogram's own structure copy carries the same cell
+    # every pattern's own structure copy carries the same cell
     assert ref.fitted_structures[1].phases[1].cell.a.value == pytest.approx(
         ref.fitted_structures[0].phases[1].cell.a.value, rel=1e-9)
 
@@ -1051,7 +1051,7 @@ def test_the_joint_runners_reported_parameters_agree_with_its_statistics(
         monkeypatch):
     """The finding-1 regression, replayed at the joint level: a firing reset
     must leave ``result.parameter(...)``/``fitted_structures`` and
-    ``result.histograms[h].y_calc``/``statistics`` agreeing about the *same*
+    ``result.patterns[h].y_calc``/``statistics`` agreeing about the *same*
     cell -- never the reported parameter at the restored value while the
     curve and Rwp were built from the escaped one.
 
@@ -1062,13 +1062,13 @@ def test_the_joint_runners_reported_parameters_agree_with_its_statistics(
     stage, past every reflection window the stage froze, so the curve cannot
     tell the escaped cell from the restored one.  So the test is the single
     runner's: the θ ``_build_result`` receives must decode to what each
-    histogram's table holds.  Made to fail on purpose once: without the
+    pattern's table holds.  Made to fail on purpose once: without the
     joint runner's ``dataclasses.replace(second, theta=self.mtable.x0())``
     after that reset, θ decodes to phase 0's escaped 5.4036 Å."""
     from tests.test_cell_runaway_safety import CUBIC_TWIN, ESCAPED
 
     captured = {}
-    real_build_result = MultiHistogramRefinement._build_result
+    real_build_result = JointRefinement._build_result
 
     def spy(self, models, outcome, *args, **kwargs):
         captured["decoded"] = [t.decode(th) for t, th in
@@ -1077,7 +1077,7 @@ def test_the_joint_runners_reported_parameters_agree_with_its_statistics(
                                for t in self.mtable.tables]
         return real_build_result(self, models, outcome, *args, **kwargs)
 
-    monkeypatch.setattr(MultiHistogramRefinement, "_build_result", spy)
+    monkeypatch.setattr(JointRefinement, "_build_result", spy)
     late = "phases.0.cell.a"
     ref, result, _ = _joint_cubic_pair_fit(
         monkeypatch, [_JOINT_BOTH], {0: "escape", 1: f"escape:{late}"}, full=True)
@@ -1089,7 +1089,7 @@ def test_the_joint_runners_reported_parameters_agree_with_its_statistics(
     assert row.vary is True and row.stderr is None
     a = row.value
     assert a == pytest.approx(TRUE_A, rel=1e-14)
-    for h in range(len(result.histograms)):
+    for h in range(len(result.patterns)):
         assert ref.fitted_structures[h].phases[0].cell.a.value == pytest.approx(
             a, rel=1e-9)
         assert ref.fitted_structures[h].phases[1].cell.a.value == pytest.approx(
@@ -1097,13 +1097,13 @@ def test_the_joint_runners_reported_parameters_agree_with_its_statistics(
         decoded, entries = captured["decoded"][h], captured["entries"][h]
         for path, value in entries.items():
             assert decoded[path] == pytest.approx(value, abs=1e-9), (
-                f"histogram {h}: {path} decodes to {decoded[path]!r} against "
+                f"pattern {h}: {path} decodes to {decoded[path]!r} against "
                 f"the table's {value!r} -- the joint runner's theta was not "
                 "re-derived after the reset fired")
 
 
 def _joint_cubic_pair_fit(monkeypatch, stages, script, *, full=False, log=None):
-    """``MultiHistogramRefinement`` on the single-histogram file's
+    """``JointRefinement`` on the single-pattern file's
     ``_cubic_pair`` at two wavelengths, the joint solve's answer for the
     shared ``phases.1.cell.a`` replaced on the solves ``script`` names (by
     call index): ``"escape"`` puts it at ``ESCAPE`` times what the solve
@@ -1121,7 +1121,7 @@ def _joint_cubic_pair_fit(monkeypatch, stages, script, *, full=False, log=None):
     instead, and the rule under test is the reset's."""
     import dataclasses
 
-    from rietx import multi as multi_module
+    from rietx import joint as joint_module
     from tests.test_cell_runaway_safety import (
         ESCAPE,
         ESCAPED,
@@ -1129,7 +1129,7 @@ def _joint_cubic_pair_fit(monkeypatch, stages, script, *, full=False, log=None):
         _cubic_pair_pattern,
     )
 
-    real = multi_module.run_multi_least_squares
+    real = joint_module.run_multi_least_squares
     solved: list = log if log is not None else []
     calls: list[int] = []
     found: dict[str, float] = {}
@@ -1150,7 +1150,7 @@ def _joint_cubic_pair_fit(monkeypatch, stages, script, *, full=False, log=None):
         action, _, path = action.partition(":")
         path = path or ESCAPED
         mtable.commit(outcome.theta)
-        # a shared cell is a separate Entry in every histogram's own table
+        # a shared cell is a separate Entry in every pattern's own table
         for table in mtable.tables:
             entry = table.entries[table._paths[path]]
             if action == "escape":
@@ -1162,10 +1162,10 @@ def _joint_cubic_pair_fit(monkeypatch, stages, script, *, full=False, log=None):
         mtable._rebuild_columns()
         return dataclasses.replace(outcome, theta=mtable.x0())
 
-    monkeypatch.setattr(multi_module, "run_multi_least_squares", solve)
-    monkeypatch.setattr(multi_module, "_hold_unsupported_phases_multi",
+    monkeypatch.setattr(joint_module, "run_multi_least_squares", solve)
+    monkeypatch.setattr(joint_module, "_hold_unsupported_phases_multi",
                         lambda models, *a, **k: ([], [set() for _ in models]))
-    monkeypatch.setattr(multi_module, "_rehold_multi", lambda *a, **k: ([], []))
+    monkeypatch.setattr(joint_module, "_rehold_multi", lambda *a, **k: ([], []))
     instruments = []
     for lam in (0.41390, 0.71070):
         ins = Instrument.debye_scherrer(wavelength=lam)
@@ -1173,14 +1173,14 @@ def _joint_cubic_pair_fit(monkeypatch, stages, script, *, full=False, log=None):
         instruments.append(ins)
     data = [_cubic_pair_pattern(lam, seed) for lam, seed in ((0.41390, 11),
                                                              (0.71070, 12))]
-    ref = MultiHistogramRefinement(_cubic_pair(), instruments)
+    ref = JointRefinement(_cubic_pair(), instruments)
     # the declared stages' reset; the closing stage is tests/test_closing_stage.py's
     result = ref.fit(data, plan=RefinementPlan(stages=stages, closing_window_tol=None))
     assert len(calls) == len(stages) + len(extra), solved
     OUT.mkdir(exist_ok=True)
     name = "_".join(s.name for s in stages)
     for h in range(len(data)):
-        result.for_histogram(h).plot(OUT / f"joint_injected_escape_{name}_h{h}.png")
+        result.for_pattern(h).plot(OUT / f"joint_injected_escape_{name}_h{h}.png")
     return (ref, result, data) if full else result
 
 
@@ -1212,7 +1212,7 @@ def test_the_joint_runner_withholds_an_esd_by_the_single_histogram_rule(
         with pytest.raises(KeyError):
             end.parameter(f"phases.1.cell.{n}")
     # no row reports the value the reset held, so it is read off each
-    # histogram's working model, as the single-histogram test reads it
+    # pattern's working model, as the single-pattern test reads it
     for structure in ref.fitted_structures:
         held = structure.phases[1].cell
         for n in "abc":
@@ -1251,9 +1251,9 @@ def _joint_answer(result) -> tuple:
             [(p.path, p.value, p.stderr) for p in result.parameters],
             result.statistics.rwp,
             [s.name for s in result.stages],
-            [h.statistics.rwp for h in result.histograms],
-            [tuple(result.for_histogram(h).y_calc)
-             for h in range(len(result.histograms))])
+            [h.statistics.rwp for h in result.patterns],
+            [tuple(result.for_pattern(h).y_calc)
+             for h in range(len(result.patterns))])
 
 
 @pytest.fixture(scope="module")
@@ -1266,16 +1266,16 @@ def plan_and_spec_fits(two_patterns):
     fits = {}
     for key, given in (("plan", plan), ("spec", spec)):
         structure, instruments = perturbed_inputs()
-        ref = MultiHistogramRefinement(structure, instruments)
+        ref = JointRefinement(structure, instruments)
         fits[key] = (ref, ref.fit(two_patterns, plan=given, telemetry=False))
     OUT.mkdir(exist_ok=True)
     for h in range(2):
-        fits["spec"][1].for_histogram(h).plot(OUT / f"multihist_planspec_h{h}.png")
+        fits["spec"][1].for_pattern(h).plot(OUT / f"multihist_planspec_h{h}.png")
     return plan, spec, fits
 
 
 def test_a_joint_fit_driven_by_a_spec_answers_as_its_plan_does(plan_and_spec_fits):
-    """``refine_multi(plan=PlanSpec(...))`` raised ``AttributeError`` until
+    """``refine_joint(plan=PlanSpec(...))`` raised ``AttributeError`` until
     the joint fit crossed the mirror at ``resolve_plan`` (WP-2102).  The spec
     and the plan it was built from drive one fit, so every number agrees to
     the bit."""
@@ -1289,17 +1289,17 @@ def test_refine_multi_takes_a_spec(two_patterns, plan_and_spec_fits):
     """The functional wrapper is the entry the WP was filed on."""
     _, spec, fits = plan_and_spec_fits
     structure, instruments = perturbed_inputs()
-    result = refine_multi(two_patterns, structure, instruments, plan=spec,
+    result = refine_joint(two_patterns, structure, instruments, plan=spec,
                           telemetry=False)
     OUT.mkdir(exist_ok=True)
     for h in range(2):
-        result.for_histogram(h).plot(OUT / f"multihist_refine_multi_spec_h{h}.png")
+        result.for_pattern(h).plot(OUT / f"multihist_refine_multi_spec_h{h}.png")
     assert _joint_answer(result) == _joint_answer(fits["plan"][1])
 
 
 def test_a_joint_fit_refuses_an_unknown_preset_by_name():
     structure, instruments = perturbed_inputs()
-    ref = MultiHistogramRefinement(structure, instruments)
+    ref = JointRefinement(structure, instruments)
     dummy = PatternData(two_theta=[10.0, 11.0], intensity=[1.0, 1.0])
     with pytest.raises(ValueError, match="unknown plan preset 'no_such_plan'"):
         ref.fit([dummy, dummy], plan="no_such_plan")
@@ -1362,3 +1362,76 @@ def test_a_single_report_reads_a_preset_name_for_the_results_mode(
         (s.name, s.turn_on) for s in expected.stages]
     assert (by_name.model_dump(mode="json")
             == by_substitute.model_dump(mode="json"))
+
+
+# -- WP-2305: the joint call's old names raise, naming their replacements -----
+
+@pytest.mark.parametrize(("old", "new"), [
+    ("refine_multi", "rietx.refine_joint"),
+    ("MultiHistogramRefinement", "rietx.JointRefinement"),
+    ("multi", "rietx.joint"),
+])
+def test_an_old_joint_name_raises_naming_its_replacement(old, new):
+    import rietx
+
+    with pytest.raises(AttributeError, match=new.replace(".", r"\.")):
+        getattr(rietx, old)
+    assert not hasattr(rietx, old)
+
+
+def test_importing_the_old_module_names_the_new_one():
+    with pytest.raises(ModuleNotFoundError, match=r"rietx\.joint"):
+        import rietx.multi  # noqa: F401
+
+
+def test_an_old_result_field_names_the_new_one():
+    from rietx.schemas.results import RefinementResult
+
+    with pytest.raises(AttributeError, match="'patterns'"):
+        RefinementResult.model_construct().histograms  # noqa: B018
+
+
+def test_a_plan_glob_in_the_old_scope_is_refused_before_the_fit(two_patterns):
+    structure, instruments = perturbed_inputs()
+    plan = RefinementPlan(stages=[Stage("zero", turn_on=["hist.*.instrument.zero_shift"])])
+    ref = JointRefinement(structure, instruments)
+    with pytest.raises(ValueError, match=r"'pattern\.\*\.instrument\.zero_shift'"):
+        ref.fit(two_patterns, plan=plan)
+    assert ref.result_ is None
+
+
+def test_set_vary_in_the_old_scope_is_refused():
+    structure, instruments = perturbed_inputs()
+    table = JointRefinement(structure, instruments).mtable
+    with pytest.raises(ValueError, match=r"'pattern\.0\.instrument\.zero_shift'"):
+        table.set_vary(["hist.0.instrument.zero_shift"], True)
+    assert table.set_vary(["pattern.0.instrument.zero_shift"], True) == [
+        "pattern.0.instrument.zero_shift"]
+
+
+def test_a_result_lookup_in_the_old_scope_names_the_new_one():
+    from rietx.schemas.results import RefinementResult
+
+    result = RefinementResult.model_construct(parameters=[])
+    with pytest.raises(KeyError, match=r"'pattern\.1\.instrument\.zero_shift'"):
+        result.parameter("hist.1.instrument.zero_shift")
+
+
+def test_a_result_written_before_the_rename_still_opens(plan_and_spec_fits):
+    """A result JSON carrying ``histograms`` and ``unreached_histograms`` reads
+    under the new names (WP-2305), as every renamed field's document does, and
+    its ``hist.<h>.`` paths read as ``pattern.<h>.``."""
+    import json
+    import re
+
+    from rietx.schemas.results import RefinementResult
+
+    result = plan_and_spec_fits[2]["plan"][1]
+    text = result.model_dump_json()
+    assert '"pattern.1.' in text      # a scoped row the repair must reach
+    doc = json.loads(re.sub(r"\bpattern\.(?=\d+[. ])", "hist.", text))
+    doc["histograms"] = doc.pop("patterns")
+    for stage in doc["stages"]:
+        stage["unreached_histograms"] = stage.pop("unreached_patterns")
+    reopened = RefinementResult.model_validate(doc)
+    assert reopened.model_dump(mode="json") == result.model_dump(mode="json")

@@ -455,14 +455,14 @@ for stage in result.stages:
 | `StageResult.width_twins_held` | per instrument width held beside its free specimen twin, that twin |
 | `StageResult.blocked_by_hold` | parameters the patterns matched and a `Refinement.hold` kept fixed ([How to keep a parameter fixed whatever the plan frees](../guides/hold.md)) |
 | `StageResult.unknown_paths` | literal names in `turn_on` naming no parameter of this model, or under a retired spelling |
-| `StageResult.unreached_histograms` | joint fits: per histogram, the patterns that freed parameters of another histogram and matched none of this one; `{}` on a single histogram |
+| `StageResult.unreached_patterns` | joint fits: per pattern, the patterns that freed parameters of another pattern and matched none of this one; `{}` on a single pattern |
 | `StageResult.seeded` | each parameter this stage lifted before solving, with the value it started from, `Stage.strain_seed`'s Stephens DOFs included |
 | `StageResult.cell_reset` | the free cell parameters this stage put back at their starting values because their phase's cell left the safety window ([`CELL_RUNAWAY`](diagnostics-refinement.md#cell_runaway) says more) |
 | `StageResult.collapsed` | the parameters in `held` put back at their starting values because the stage's first solve found them flat ([Held parameters](#held-parameters)) |
 | `StageResult.moment_flat_axes`, `StageResult.moment_turned` | magnetic sites whose moment direction the stage held about a flat axis ([Magnetic refinement](magnetic.md#directions-a-powder-cannot-see)) |
 | `StageResult.moment_angle_tests` | each round of the stationary-angle test, one `MomentAngleTest` per round; `None` when no test ran ([Magnetic refinement](magnetic.md#an-angle-at-a-symmetry-direction)) |
 
-`StageResult.scale_b_held`, `unknown_paths`, `unreached_histograms`, `seeded`, `cell_reset`, `collapsed` and `width_twins_held` are `None` on a result stored before the field existed, meaning that nothing looked.
+`StageResult.scale_b_held`, `unknown_paths`, `unreached_patterns`, `seeded`, `cell_reset`, `collapsed` and `width_twins_held` are `None` on a result stored before the field existed, meaning that nothing looked.
 The status type also admits `diverged`, which neither driver produces today.
 Both drivers accept a step only when it lowers the cost, so `cost_final` never exceeds `cost_initial`.
 
@@ -491,10 +491,10 @@ For an oxygen on 16h in I4<sub>1</sub>/amd, `phases.0.atoms.2.x` is fixed at 0, 
 A name you tied yourself is not reported, and neither is an instrument name: the built-in plans name `instrument.geometry.sample_displacement`, which a capillary geometry locks.
 A pattern can reach too far the other way: `phases.0.atoms.2.*` frees the site's `occ` and `biso` beside its directions, so write `phases.0.atoms.2.dof.*` for the position alone.
 
-A joint fit has one more way to do nothing, which is to do it on one histogram only ([How to fit an X-ray and a neutron pattern together](../guides/joint.md)).
-A pattern written for one instrument's parameter names reaches only the histograms that have them.
-A stage whose patterns freed parameters of histogram 0 and matched none of histogram 1 records `StageResult.unreached_histograms == {1: [the patterns]}`, and [`STAGE_FREED_NOTHING`](diagnostics-series.md#stage_freed_nothing) reports it at `info`, once per histogram.
-A pattern scoped to one histogram, `hist.0.…`, is not reported, and neither is a parameter that exists and is fixed.
+A joint fit has one more way to do nothing, which is to do it on one pattern only ([How to fit an X-ray and a neutron pattern together](../guides/joint.md)).
+A pattern written for one instrument's parameter names reaches only the patterns that have them.
+A stage whose globs freed parameters of pattern 0 and matched none of pattern 1 records `StageResult.unreached_patterns == {1: [the globs]}`, and [`STAGE_FREED_NOTHING`](diagnostics-series.md#stage_freed_nothing) reports it at `info`, once per pattern.
+A pattern scoped to one pattern, `pattern.0.…`, is not reported, and neither is a parameter that exists and is fixed.
 
 ### Held parameters
 

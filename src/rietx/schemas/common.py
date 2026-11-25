@@ -291,6 +291,24 @@ def legacy_transform_bounds(kind: str, lo: float, hi: float) -> tuple[float, flo
         "softplus, exp or logit, and since schema 0.46 it is read as bounds")
 
 
+def refuse_retired_scope(paths, where: str, error: type[Exception] = ValueError) -> None:
+    """Raise when a caller's path or glob uses the joint fit's ``hist.`` scope.
+
+    WP-2305 renamed a joint fit's per-pattern scope ``hist.N.`` to
+    ``pattern.N.``.  A stored value under the old name fails loudly anyway,
+    but a glob does not: ``"hist.*.instrument.*"`` matches nothing and frees
+    nothing, and the fit returns a plausible answer (DESIGN Rule 4).  No stored
+    document holds a joint path, since a joint fit keeps no history or project,
+    so this refuses at the call rather than migrating text at a read point.
+    ``where`` names the call, and ``error`` lets a lookup raise ``KeyError``.
+    """
+    old = [p for p in paths if isinstance(p, str) and p.startswith("hist.")]
+    if old:
+        raise error(
+            f"{where}: {old[0]!r} uses the joint fit's 'hist.' scope, renamed in "
+            f"v1.13; write {'pattern.' + old[0][len('hist.'):]!r}")
+
+
 #: What a bare ``Parameter`` holds for each attribute a field's declared
 #: default can carry.  In a document written before a class inherited
 #: (:class:`_InheritsDeclaredDefaults`), an attribute holding this value is the

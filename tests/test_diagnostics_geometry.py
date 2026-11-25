@@ -112,27 +112,27 @@ def test_the_diagnostic_names_the_field_that_opens_the_door():
 
 def test_a_joint_fit_surfaces_it_per_capillary_histogram():
     """A joint refinement's whole point is one cell drawing from every
-    histogram, so two radius-less capillaries fold both held offsets into that
+    pattern, so two radius-less capillaries fold both held offsets into that
     one shared cell — the WP-1073 misreading at its worst.  The diagnostic is
-    wired into ``refine_multi`` per histogram, beside the absorption and
+    wired into ``refine_joint`` per pattern, beside the absorption and
     wavelength ones it shares a geometry with, so each capillary that could not
-    express its offsets says so on its own ``HistogramResult``.
+    express its offsets says so on its own ``PatternResult``.
     """
     inst = rx.Instrument.debye_scherrer(_XRAY_LAMBDA)
-    result = rx.refine_multi(
+    result = rx.refine_joint(
         [_flat_pattern(), _flat_pattern()], _corundum(), [inst, inst],
         plan="profile_only")
-    assert len(result.histograms) == 2
-    for hist in result.histograms:
+    assert len(result.patterns) == 2
+    for hist in result.patterns:
         assert CODE in {d.code for d in hist.diagnostics}
 
 
 def test_a_joint_fit_with_the_radius_declared_is_silent():
-    """Same gate as the single-histogram case, one rank up: the missing field,
-    not the geometry, so declaring the radius silences every histogram."""
+    """Same gate as the single-pattern case, one rank up: the missing field,
+    not the geometry, so declaring the radius silences every pattern."""
     inst = rx.Instrument.debye_scherrer(_XRAY_LAMBDA, goniometer_radius_mm=1711.0)
-    result = rx.refine_multi(
+    result = rx.refine_joint(
         [_flat_pattern(), _flat_pattern()], _corundum(), [inst, inst],
         plan="profile_only")
-    for hist in result.histograms:
+    for hist in result.patterns:
         assert CODE not in {d.code for d in hist.diagnostics}

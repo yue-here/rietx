@@ -916,7 +916,7 @@ def test_a_joint_stage_with_max_iter_0_is_refused_on_either_driver(solver):
     plan = rx.RefinementPlan(stages=[rx.Stage("scale", ["phases.*.scale"],
                                               max_iter=0)])
     with pytest.raises(ValueError, match="max_nfev"):
-        rx.refine_multi([_flat(20.0, 80.0), _flat(20.0, 80.0)],
+        rx.refine_joint([_flat(20.0, 80.0), _flat(20.0, 80.0)],
                         rx.Structure(phases=[corundum()]), [_xray(), _neutron()],
                         plan=plan, solver=solver)
 

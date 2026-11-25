@@ -50,6 +50,13 @@ the chain, and its answer on what "held" means should govern here. Read it first
 
 ### Inherited
 
+- **From WP-2305 (2026-11-25): the joint call's names changed.** `MultiHistogramRefinement`
+  is `JointRefinement` (module `rietx.joint`), `n_histograms` is `n_patterns`, and the
+  per-pattern scope is `pattern.N.`. A caller's path or glob starting with `hist.` is
+  refused by `schemas.common.refuse_retired_scope`, called today from `JointRefinement.fit`,
+  `MultiParameterTable.set_vary` and `RefinementResult.parameter`. Each verb this WP adds
+  that takes a path (`tie`, `set_values`, `hold`, …) calls it too, or an old `hist.` path
+  given to it is the silent miss that function exists to stop.
 - **From WP-2102 (2026-11-05): the soft dependency is discharged.**
   `MultiHistogramRefinement.fit` and `.report` read every plan through
   `resolve_plan`, as `Refinement` does, and `multi.py` no longer imports

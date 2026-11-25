@@ -1,4 +1,4 @@
-"""Acceptance: two-phase QPA on an 11-BM LaB6 + cBN histogram.
+"""Acceptance: two-phase QPA on an 11-BM LaB6 + cBN pattern.
 
 Real data, real esds, and a solved TOPAS refinement to check against —
 ``11BM_LaB6_cBN_mg2044.xye``, APS 11-BM, λ = 0.413680 Å from the ``.prm``
@@ -19,7 +19,7 @@ which is the whole reason every claim below is cross-code.
 *derived output*, not an input, and the folder's ``simulation_quant.txt``
 records 17.907 from a second run.  Nothing states how the specimen was made.
 So this suite is referenced to TOPAS, at the resolution TOPAS agrees with
-itself: its two shipped models of this histogram (``…_cs_mustr`` and
+itself: its two shipped models of this pattern (``…_cs_mustr`` and
 ``…_IB-size-strain``) give **LaB6 17.950 and 17.907 wt %** — a 0.043 wt %
 model-to-model spread — and **cBN a = 3.616463 and 3.616466 Å**, 0.8 ppm apart.
 That spread, not an invented tolerance, is what "agreement" has to mean here.
@@ -105,7 +105,7 @@ TOPAS = {
 #: is what "scooped" looks like and is why no target is recoverable from it.
 COMPOSITION_SOURCE = "simulation_quant.txt"
 
-#: TOPAS's **own** spread across its two shipped models of this histogram —
+#: TOPAS's **own** spread across its two shipped models of this pattern —
 #: ``…_cs_mustr`` and ``…_IB-size-strain``.  Quoted rather than averaged,
 #: because the gap between them is the reference's resolution: no comparison
 #: here can mean anything tighter, and a bar inside it would be measuring
@@ -211,7 +211,7 @@ _TAIL = [
 #: the PVII/FPA gap below rather than at a different held number.
 #:
 #: **The Gaussian triple is held** (WP-1930, issue #832).  With ``u, v, w``
-#: free, this histogram had two minima and rounding chose between them: a
+#: free, this pattern had two minima and rounding chose between them: a
 #: 3e-14 relative change to ``w``'s start moved χ²_red from 9.69 to 12.48, with
 #: ``instrument.profile.y`` left on its softplus floor, and Linux and macOS
 #: reported one each.  WP-1930's floor seed gave one
@@ -390,7 +390,7 @@ def test_the_correlation_diagnostic_separates_the_two(shared, degenerate):
     width carries a finite esd; the identifiable fit is unchanged.
 
     **Silence is the bar again since WP-1930.**  Until then this plan freed
-    the Gaussian triple ``u, v, w``, which is flat on this histogram, and the
+    the Gaussian triple ``u, v, w``, which is flat on this pattern, and the
     assertion was a separation: ρ(u, v) sat at −0.9793 against a 0.98 guard
     before the bounds fix of issue #204 and at −0.9918 after it, two stopping
     points in one flat valley.  TRF scales each direction by its distance to

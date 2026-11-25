@@ -105,7 +105,7 @@ snapshot too; `runs.liveness_of` weighs them.
 **Series** = N refinements chained by warm start (in-situ ramp, parametric sweep, tray of
 related specimens). `sequential.py` (`SequentialRefinement`/`refine_sequential`) →
 `SeriesResult`: per-pattern summaries + parameter *trajectories*, one history tree per pattern
-(pinned by `TreeHeader.data_fingerprint`), linked by annotation notes. Not `multi.py`, which
+(pinned by `TreeHeader.data_fingerprint`), linked by annotation notes. Not `joint.py`, which
 stacks patterns into **one joint residual**. Chaining buys iterations, not accuracy (v1.1
 record), and its trajectory is path-dependent → `direction="both"` runs the chain each way and
 records every path's gap, unthresholded (`SeriesResult.direction_gaps`), the only check
@@ -524,7 +524,7 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   is the axis still untested (a Debye term proves it). A reader of the list can be right only
   while the union has one kind, and no single-kind test sees it (WP-1103: `n_extra_components`
   and **one of the two tick builders** among them), so **a third member audits every reader of
-  the list before writing an evaluator**; a second builder of anything (`multi.py` keeps its
+  the list before writing an evaluator**; a second builder of anything (`joint.py` keeps its
   own) is the miss.
 - **A renamed dot-path is migrated on the document *text*, at the read points** (WP-1102,
   `schemas/migrate.py`, `READ_POINTS`). A stored **value** under a vanished name fails loudly; a

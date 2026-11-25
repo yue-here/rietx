@@ -1,7 +1,7 @@
 (guide-formula)=
 # How to refine cell edges as Einstein functions of temperature
 
-Write each cell edge as a formula with `rietx.ParametricEquation(basis="expression")`, declare the numbers it refines as variables, and fit every pattern at once with `rietx.MultiHistogramRefinement`.
+Write each cell edge as a formula with `rietx.ParametricEquation(basis="expression")`, declare the numbers it refines as variables, and fit every pattern at once with `rietx.JointRefinement`.
 A variable that two formulas name is one refined number, so the two edges below share one Einstein temperature θ.
 
 A straight line in temperature is linear in its coefficients, and [How to refine a cell edge as a function of temperature](equation.md) fits one.
@@ -55,7 +55,7 @@ theta = 500.1693 +/- 0.61
 
 Each variable is a row `vars.<name>` in `result.parameters`, in its own unit.
 θ came back 500.17 ± 0.61 K, 0.3 esd from its truth, and every other variable lies within 2 esd of its own.
-Each pattern's own cell edges are the rows `hist.<k>.phases.0.cell.a` and `hist.<k>.phases.0.cell.c`, with esds through the variables' covariance.
+Each pattern's own cell edges are the rows `pattern.<k>.phases.0.cell.a` and `pattern.<k>.phases.0.cell.c`, with esds through the variables' covariance.
 The last line is the form test of each formula.
 `False` means freeing the cell edge in every pattern would not have improved the fit by more than chance.
 

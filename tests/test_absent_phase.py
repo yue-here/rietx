@@ -713,7 +713,7 @@ def test_a_scale_on_its_floor_is_at_its_bound_and_is_not_told_to_widen_it(
 
 
 def _joint_inputs(*, empty: bool, seed: int = 1):
-    """``seed`` draws histogram 0's noise; histogram 1 keeps seed 2."""
+    """``seed`` draws pattern 0's noise; pattern 1 keeps seed 2."""
     from tests import test_multi_histogram as tmh
 
     structure, instruments = tmh.perturbed_inputs()
@@ -736,57 +736,57 @@ def _joint_inputs(*, empty: bool, seed: int = 1):
 
 
 def test_a_joint_fit_withholds_a_blind_scale_and_names_it():
-    """``multi.py`` had its own QPA builder, and it skipped the blind-scale rule.
+    """``joint.py`` had its own QPA builder, and it skipped the blind-scale rule.
 
     So a joint fit with a blind scale propagated the other fractions as if
     that phase were known, which is the confident wrong number the single fit
     had been refusing since WP-1110.  Both now call one builder.  The row path
-    is the joint surface's own: the absent scale is per histogram here, so
-    ``hist.h.`` prefixes it.
+    is the joint surface's own: the absent scale is per pattern here, so
+    ``pattern.h.`` prefixes it.
     """
-    from rietx import MultiHistogramRefinement
+    from rietx import JointRefinement
 
     structure, instruments, patterns = _joint_inputs(empty=True)
-    result = MultiHistogramRefinement(structure, instruments).fit(
+    result = JointRefinement(structure, instruments).fit(
         patterns, plan="mccusker_default")
 
-    for h, hist in enumerate(result.histograms):
+    for h, hist in enumerate(result.patterns):
         assert [q.weight_fraction_stderr for q in hist.qpa.phases] == [None, None]
         fired = [d for d in hist.diagnostics if d.code == "QPA_ESD_UNAVAILABLE"]
-        assert [d.where for d in fired] == [[f"hist.{h}.phases.1.scale"]]
+        assert [d.where for d in fired] == [[f"pattern.{h}.phases.1.scale"]]
 
 
 def test_a_joint_fit_tests_a_scale_on_its_floor_like_the_single_fit():
     """The joint runner's bound test has no floor exemption either (WP-1938).
 
-    Histogram 0's absent scale stops on 0.0 and reads ``at_bound=True`` with
+    Pattern 0's absent scale stops on 0.0 and reads ``at_bound=True`` with
     its marginal esd, and ``FLOOR_HIT`` names it by its joint row path
     (WP-1929).
-    Histogram 1's noise holds its own copy 0.1σ off the floor, so only the
+    Pattern 1's noise holds its own copy 0.1σ off the floor, so only the
     fractions are asserted there.
 
     Whether the absent scale lands on its floor is the noise's call, so the
     draw is chosen for it: drawn at the closing stage's windows (WP-2002),
-    seed 1 holds histogram 0's copy 0.53σ off the floor, and seed 2 is the
+    seed 1 holds pattern 0's copy 0.53σ off the floor, and seed 2 is the
     first that puts it on.
     """
-    from rietx import MultiHistogramRefinement
+    from rietx import JointRefinement
     from rietx.refine import _ZERO_FLOOR_SUGGESTION
 
     structure, instruments, patterns = _joint_inputs(empty=False, seed=2)
-    result = MultiHistogramRefinement(structure, instruments).fit(
+    result = JointRefinement(structure, instruments).fit(
         patterns, plan="mccusker_default")
     OUT.mkdir(exist_ok=True)
     for h in range(len(patterns)):
-        result.for_histogram(h).plot(OUT / f"absent_phase_joint_floor_h{h}.png")
+        result.for_pattern(h).plot(OUT / f"absent_phase_joint_floor_h{h}.png")
 
-    row = _row(result, "hist.0.phases.1.scale")
+    row = _row(result, "pattern.0.phases.1.scale")
     assert row.value == 0.0 and row.at_bound is True
     assert row.stderr is not None and row.stderr > 0.0
     hits = [d for d in result.diagnostics
-            if d.code == "FLOOR_HIT" and "hist.0.phases.1.scale" in d.where]
+            if d.code == "FLOOR_HIT" and "pattern.0.phases.1.scale" in d.where]
     assert [d.suggestion for d in hits] == [_ZERO_FLOOR_SUGGESTION]
-    for hist in result.histograms:
+    for hist in result.patterns:
         assert all(q.weight_fraction_stderr is not None for q in hist.qpa.phases)
 
 

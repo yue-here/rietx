@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from rietx import MultiHistogramRefinement, Refinement, Stage, runs
+from rietx import JointRefinement, Refinement, Stage, runs
 from rietx.history.events import as_event_stream, read_events
 from rietx.optimize.cancel import CancelToken, RefinementCancelled
 from rietx.optimize.statistics import MAX_SHIFT_CONVERGED
@@ -50,8 +50,8 @@ def two_patterns():
 
 def _plot(result, stem: str) -> None:
     OUT.mkdir(exist_ok=True)
-    for h in range(len(result.histograms)):
-        result.for_histogram(h).plot(OUT / f"{stem}_h{h}.png")
+    for h in range(len(result.patterns)):
+        result.for_pattern(h).plot(OUT / f"{stem}_h{h}.png")
 
 
 # ---------------------------------------------------- the convergence figure --
@@ -65,22 +65,22 @@ def test_a_joint_fit_measures_how_far_it_was_still_moving(two_patterns, solver):
     senses where a solver happened to stop.
     """
     structure, instruments = perturbed_inputs()
-    ref = MultiHistogramRefinement(structure, instruments, solver=solver)
+    ref = JointRefinement(structure, instruments, solver=solver)
     done = ref.fit(two_patterns, plan="mccusker_default", weights=[1.0, 4.0])
     assert done.status == "converged"
     shift = done.statistics.max_shift_over_esd
     assert shift is not None and shift < MAX_SHIFT_CONVERGED
     _plot(done, f"joint_report_shift_{solver}")
 
-    # whole-fit: the per-histogram statistics have no writer for it, and the
+    # whole-fit: the per-pattern statistics have no writer for it, and the
     # view that keeps the joint stages carries the joint figure beside them
-    for h, hist in enumerate(done.histograms):
+    for h, hist in enumerate(done.patterns):
         assert hist.statistics.max_shift_over_esd is None
-        assert done.for_histogram(h).statistics.max_shift_over_esd == shift
+        assert done.for_pattern(h).statistics.max_shift_over_esd == shift
     assert f"max|Δθ|/esd={shift:.3f}" in str(done)
 
     structure, instruments = perturbed_inputs()
-    ref = MultiHistogramRefinement(structure, instruments, solver=solver)
+    ref = JointRefinement(structure, instruments, solver=solver)
     starved = ref.fit(two_patterns, plan=RefinementPlan(
         stages=[Stage("starved", turn_on=TURN_ON, max_iter=1)]))
     assert starved.status == "max_iter"
@@ -89,15 +89,15 @@ def test_a_joint_fit_measures_how_far_it_was_still_moving(two_patterns, solver):
 
 # ------------------------------------------------------------- the event log --
 def test_a_joint_event_log_partitions_by_histogram(two_patterns, tmp_path):
-    """Issue #252's first ask: an event log a reader can split by histogram.
+    """Issue #252's first ask: an event log a reader can split by pattern.
 
     The joint solve is one solve, so each kind is emitted once per fit, stage
-    or evaluation, and a per-histogram fact rides in a ``histograms`` row
-    stamped with its ``histogram_index``.
+    or evaluation, and a per-pattern fact rides in a ``patterns`` row
+    stamped with its ``pattern_index``.
     """
     progress = io.StringIO()
     structure, instruments = perturbed_inputs()
-    ref = MultiHistogramRefinement(structure, instruments)
+    ref = JointRefinement(structure, instruments)
     result = ref.fit(two_patterns, plan="mccusker_default",
                      events=tmp_path / "joint.jsonl", progress=progress)
     _plot(result, "joint_report_events")
@@ -112,22 +112,22 @@ def test_a_joint_event_log_partitions_by_histogram(two_patterns, tmp_path):
     for kind, data in log:
         if kind == "eval":
             continue
-        assert data["n_histograms"] == 2, kind
-        rows = data["histograms"]
-        assert [r["histogram_index"] for r in rows] == [0, 1], kind
+        assert data["n_patterns"] == 2, kind
+        rows = data["patterns"]
+        assert [r["pattern_index"] for r in rows] == [0, 1], kind
         if kind == "stage_end":
             for r in rows:
-                by_hist[r["histogram_index"]].append(r)
+                by_hist[r["pattern_index"]].append(r)
     for h, rows in by_hist.items():
         assert len(rows) == n_stages
         # the last stage's reading is the as-optimised one, on that stage's
         # compile; the result's is a compile at the answer (WP-1421), so the
         # two differ by the frozen windows alone, under FROZEN_COMPILE_STALE's 1 %
         assert rows[-1]["rwp"] == pytest.approx(
-            result.histograms[h].statistics.rwp, rel=FROZEN_COMPILE_CHI2_REL / 2)
+            result.patterns[h].statistics.rwp, rel=FROZEN_COMPILE_CHI2_REL / 2)
 
     start = log[0][1]
-    assert start["n_points"] == sum(r["n_points"] for r in start["histograms"])
+    assert start["n_points"] == sum(r["n_points"] for r in start["patterns"])
     ends = [d for k, d in log if k == "stage_end"]
     assert log[-1][1]["rwp"] == result.statistics.rwp
     # the record carries the pooled number each stage_end emitted (WP-1334)
@@ -137,7 +137,7 @@ def test_a_joint_event_log_partitions_by_histogram(two_patterns, tmp_path):
     assert "FROZEN_COMPILE_STALE" not in {d.code for d in result.diagnostics}
 
     # an eval's values align with the most recent stage_start's free paths,
-    # and those split by histogram on their ``hist.<h>.`` scope
+    # and those split by pattern on their ``pattern.<h>.`` scope
     free, last = None, None
     for kind, data in log:
         if kind == "stage_start":
@@ -145,9 +145,9 @@ def test_a_joint_event_log_partitions_by_histogram(two_patterns, tmp_path):
         elif kind == "eval":
             assert len(data["values"]) == len(free)
             last = data
-    owned = {h: [p for p in free if p.startswith(f"hist.{h}.")] for h in (0, 1)}
-    assert "hist.0.instrument.zero_shift" in owned[0]
-    assert "hist.1.instrument.zero_shift" in owned[1]
+    owned = {h: [p for p in free if p.startswith(f"pattern.{h}.")] for h in (0, 1)}
+    assert "pattern.0.instrument.zero_shift" in owned[0]
+    assert "pattern.1.instrument.zero_shift" in owned[1]
     assert "phases.0.cell.a" in free            # shared, so bare
     values = dict(zip(free, last["values"], strict=True))
     assert values["phases.0.cell.a"] == pytest.approx(
@@ -164,7 +164,7 @@ def test_a_monitoring_hook_that_raises_is_the_callers_to_see(two_patterns):
             raise RuntimeError("the caller's own bug")
 
     structure, instruments = perturbed_inputs()
-    ref = MultiHistogramRefinement(structure, instruments)
+    ref = JointRefinement(structure, instruments)
     with pytest.raises(RuntimeError, match="the caller's own bug"):
         ref.fit(two_patterns, plan="mccusker_default", events=hook)
 
@@ -172,7 +172,7 @@ def test_a_monitoring_hook_that_raises_is_the_callers_to_see(two_patterns):
 def test_a_raised_joint_fit_closes_the_stream_it_built(two_patterns, tmp_path,
                                                        monkeypatch):
     """A stream built from a path is the fit's to close, on every exit."""
-    import rietx.multi as multi_mod
+    import rietx.joint as multi_mod
 
     built = []
 
@@ -185,9 +185,9 @@ def test_a_raised_joint_fit_closes_the_stream_it_built(two_patterns, tmp_path,
         raise RuntimeError("after the last stage")
 
     monkeypatch.setattr(multi_mod, "as_event_stream", capture)
-    monkeypatch.setattr(MultiHistogramRefinement, "_build_result", fail)
+    monkeypatch.setattr(JointRefinement, "_build_result", fail)
     structure, instruments = perturbed_inputs()
-    ref = MultiHistogramRefinement(structure, instruments)
+    ref = JointRefinement(structure, instruments)
     with pytest.raises(RuntimeError, match="after the last stage"):
         ref.fit(two_patterns, plan=RefinementPlan(stages=[
             Stage("scale+bkg", ["phases.*.scale", "instrument.background.*"])]),
@@ -217,7 +217,7 @@ def test_a_cancelled_joint_stage_is_abandoned(two_patterns):
             token.cancel()
 
     structure, instruments = perturbed_inputs()
-    ref = MultiHistogramRefinement(structure, instruments)
+    ref = JointRefinement(structure, instruments)
     with pytest.raises(RefinementCancelled) as info:
         ref.fit(two_patterns, plan=plan, events=hook, cancel=token)
     exc = info.value
@@ -230,7 +230,7 @@ def test_a_cancelled_joint_stage_is_abandoned(two_patterns):
 
     # the same two stages run to completion land exactly where the cancel left
     structure, instruments = perturbed_inputs()
-    done = MultiHistogramRefinement(structure, instruments)
+    done = JointRefinement(structure, instruments)
     # the declared stages' working state; the closing stage is tests/test_closing_stage.py's
     done.fit(two_patterns, plan=RefinementPlan(stages=plan.stages[:2],
                                                intermediate_ftol=None,
@@ -247,7 +247,7 @@ def test_a_recorded_joint_fit_is_one_run(two_patterns, tmp_path):
     was = runs.set_enabled(True)
     try:
         structure, instruments = perturbed_inputs()
-        ref = MultiHistogramRefinement(structure, instruments)
+        ref = JointRefinement(structure, instruments)
         result = ref.fit(two_patterns, plan="mccusker_default",
                          telemetry=tmp_path, label="joint LaB6")
     finally:
@@ -264,9 +264,9 @@ def test_a_recorded_joint_fit_is_one_run(two_patterns, tmp_path):
 
 # ---------------------------------------------------------------- the report --
 def test_each_histogram_gets_its_own_report(two_patterns):
-    """Layers 0-2 per histogram, off that histogram's model and curves."""
+    """Layers 0-2 per pattern, off that pattern's model and curves."""
     structure, instruments = perturbed_inputs()
-    ref = MultiHistogramRefinement(structure, instruments)
+    ref = JointRefinement(structure, instruments)
     with pytest.raises(RuntimeError, match="fit"):
         ref.report(0)
     result = ref.fit(two_patterns, plan="mccusker_default")
@@ -277,14 +277,14 @@ def test_each_histogram_gets_its_own_report(two_patterns):
         report = ref.report(h, plan="mccusker_default")
         assert report.layer1_available
         assert report.unmatched == []       # one phase, every peak ticked
-        assert report.rwp == result.histograms[h].statistics.rwp
-        # the background section reads this histogram's own screen, which
-        # the joint result carries ``hist.<h>.``-scoped
+        assert report.rwp == result.patterns[h].statistics.rwp
+        # the background section reads this pattern's own screen, which
+        # the joint result carries ``pattern.<h>.``-scoped
         mine = {k.split(".", 2)[2]: v for k, v in
                 result.identifiability.background_absorption.items()
-                if k.startswith(f"hist.{h}.")}
+                if k.startswith(f"pattern.{h}.")}
         assert mine
-        assert (result.for_histogram(h).identifiability.background_absorption
+        assert (result.for_pattern(h).identifiability.background_absorption
                 == mine)
         assert report.background.worst_absorption == max(mine.values())
 
@@ -297,7 +297,7 @@ def test_a_cancelled_second_fit_leaves_the_first_report_alone(two_patterns):
     second fit's values with the first fit's models.
     """
     structure, instruments = perturbed_inputs()
-    ref = MultiHistogramRefinement(structure, instruments)
+    ref = JointRefinement(structure, instruments)
     ref.fit(two_patterns, plan="mccusker_default")
     before = ref.report(0).model_dump()
 
@@ -315,15 +315,15 @@ def test_a_cancelled_second_fit_leaves_the_first_report_alone(two_patterns):
 
 
 def test_a_view_spells_its_own_rows_as_a_single_fit_does(two_patterns):
-    """A per-histogram structural row reaches the report under its bare name.
+    """A per-pattern structural row reaches the report under its bare name.
 
     ``build_report`` looks parameters up by bare path (the moment arm's esds,
-    Layer 2's freed-parameter rows), so a view carrying ``hist.1.…`` missed
-    them, and carried histogram 0's rows beside its own.
+    Layer 2's freed-parameter rows), so a view carrying ``pattern.1.…`` missed
+    them, and carried pattern 0's rows beside its own.
     """
     biso = "phases.0.atoms.0.biso"
     structure, instruments = perturbed_inputs()
-    ref = MultiHistogramRefinement(
+    ref = JointRefinement(
         structure, instruments,
         sharing=SharingMap(per_histogram=["phases.*.atoms.*.biso"]))
     result = ref.fit(two_patterns, plan=RefinementPlan(stages=[
@@ -333,21 +333,21 @@ def test_a_view_spells_its_own_rows_as_a_single_fit_does(two_patterns):
         Stage("width", ["instrument.profile.w"]),
         Stage("b", [biso])]))
     assert result.status == "converged"
-    assert all(hr.statistics.rwp < 0.12 for hr in result.histograms)
+    assert all(hr.statistics.rwp < 0.12 for hr in result.patterns)
     _plot(result, "joint_report_view_rows")
     rows = {p.path: p for p in result.parameters}
-    assert {f"hist.0.{biso}", f"hist.1.{biso}"} <= set(rows)
+    assert {f"pattern.0.{biso}", f"pattern.1.{biso}"} <= set(rows)
     for h in (0, 1):
-        view = {p.path: p for p in result.for_histogram(h).parameters}
-        assert view[biso] == rows[f"hist.{h}.{biso}"].model_copy(
+        view = {p.path: p for p in result.for_pattern(h).parameters}
+        assert view[biso] == rows[f"pattern.{h}.{biso}"].model_copy(
             update={"path": biso})
-        assert not [p for p in view if p.startswith("hist.")]
+        assert not [p for p in view if p.startswith("pattern.")]
         assert "phases.0.cell.b" in view          # a shared (tied) row stays bare
     # a negative index counts from the end, and past either end is refused
-    assert result.for_histogram(-1).parameters == result.for_histogram(1).parameters
+    assert result.for_pattern(-1).parameters == result.for_pattern(1).parameters
     for bad in (2, -3):
         with pytest.raises(IndexError):
-            result.for_histogram(bad)
+            result.for_pattern(bad)
 
 
 @pytest.fixture(scope="module")
@@ -363,16 +363,16 @@ def _size(block) -> float:
 
 
 def test_the_specimen_size_is_reported_once(size_patterns):
-    """One specimen, one size: the same block in every histogram's report.
+    """One specimen, one size: the same block in every pattern's report.
 
     Measured 2026-10-12: the joint fit reads 408.82(4.86) Å; the two solo
     arms read 408.71(8.05) and 409.20(6.43) Å.  The joint block is read off
-    the shared column at histogram 0's λ, so both reports quote its
-    coefficient, never histogram 1's λ-scaled copy.
+    the shared column at pattern 0's λ, so both reports quote its
+    coefficient, never pattern 1's λ-scaled copy.
     """
     structure, _ = _width_start(LAMS[0])
     instruments = [_width_start(lam)[1] for lam in LAMS]
-    ref = MultiHistogramRefinement(structure, instruments)
+    ref = JointRefinement(structure, instruments)
     result = ref.fit(size_patterns, plan=_width_plan("lor_size"))
     _plot(result, "joint_report_size")
     joint = result.microstructure[0]
@@ -399,7 +399,7 @@ def _codes(result, code):
 
 def _one_stage(patterns, turn_on, *, sharing=None):
     structure, instruments = perturbed_inputs()
-    ref = MultiHistogramRefinement(structure, instruments, sharing=sharing)
+    ref = JointRefinement(structure, instruments, sharing=sharing)
     return ref.fit(patterns, plan=RefinementPlan(stages=[
         Stage("only", ["phases.*.scale", *turn_on], max_iter=5)]))
 
@@ -412,18 +412,18 @@ def _one_stage(patterns, turn_on, *, sharing=None):
     ("phases.0.cell.b", "follows phases.0.cell.a"),
 ])
 def test_a_joint_plan_naming_a_fixed_literal_says_so(two_patterns, path, says):
-    """Issue #803: one finding per path, naming its stage and its histograms.
+    """Issue #803: one finding per path, naming its stage and its patterns.
 
     The rows are shared, so both tables hold them fixed and the finding is
     one.  ``STAGE_FREED_NOTHING`` stays silent: the literal matched a row in
-    both histograms, which is that check's "reached".
+    both patterns, which is that check's "reached".
     """
     result = _one_stage(two_patterns, [path])
     assert path not in result.stages[0].freed
     (found,) = _codes(result, "STAGE_PATH_NOT_FREE")
     assert found.level == "warning" and found.where == [path]
     assert found.message == (f"Stage 'only' asked for {path}, which {says}, so "
-                             "nothing was freed for it in every histogram.")
+                             "nothing was freed for it in every pattern.")
     if path == "phases.0.cell.b":
         assert found.suggestion.startswith("Free phases.0.cell.a instead")
     assert not _codes(result, "STAGE_PATH_UNKNOWN")
@@ -444,27 +444,27 @@ def test_a_joint_plan_that_frees_what_it_names_stays_silent(two_patterns, turn_o
 
 
 def test_a_per_histogram_row_is_reported_on_its_own_histogram(two_patterns):
-    """A cell made per-histogram is one row per table.  A scoped literal
+    """A cell made per-pattern is one row per table.  A scoped literal
     addresses one of them, and a bare one both, as ``set_vary`` reads them."""
     sharing = SharingMap(per_histogram=["phases.0.cell.*"])
-    scoped = _one_stage(two_patterns, ["hist.1.phases.0.cell.b"], sharing=sharing)
+    scoped = _one_stage(two_patterns, ["pattern.1.phases.0.cell.b"], sharing=sharing)
     (found,) = _codes(scoped, "STAGE_PATH_NOT_FREE")
-    assert found.where == ["hist.1.phases.0.cell.b"]
-    assert found.message.endswith("in histogram 1.")
-    assert found.suggestion.startswith("Free hist.1.phases.0.cell.a instead")
+    assert found.where == ["pattern.1.phases.0.cell.b"]
+    assert found.message.endswith("in pattern 1.")
+    assert found.suggestion.startswith("Free pattern.1.phases.0.cell.a instead")
 
     bare = _one_stage(two_patterns, ["phases.0.cell.b"], sharing=sharing)
     assert sorted(d.where[0] for d in _codes(bare, "STAGE_PATH_NOT_FREE")) == [
-        "hist.0.phases.0.cell.b", "hist.1.phases.0.cell.b"]
+        "pattern.0.phases.0.cell.b", "pattern.1.phases.0.cell.b"]
 
 
 # ------------------------------------------------------------ WP-2028 -----
-# A joint fit's guards and findings read every histogram.  Each test below
+# A joint fit's guards and findings read every pattern.  Each test below
 # was run on main 12f459e5 first and failed there; the controls pass on both.
 
 def _biso_fit(patterns, b0, b1, *, per_histogram=True):
-    """A one-stage joint fit with La's B set to ``b0`` in histogram 0's start
-    and ``b1`` in histogram 1's, per histogram unless ``per_histogram`` is
+    """A one-stage joint fit with La's B set to ``b0`` in pattern 0's start
+    and ``b1`` in pattern 1's, per pattern unless ``per_histogram`` is
     off (then both must agree).  B is never freed, so the value the guard
     reads is the one set here."""
     structure, instruments = perturbed_inputs()
@@ -473,7 +473,7 @@ def _biso_fit(patterns, b0, b1, *, per_histogram=True):
     other.phases[0].atoms[0].biso.value = b1
     sharing = (SharingMap(per_histogram=["phases.0.atoms.*.biso"])
                if per_histogram else None)
-    ref = MultiHistogramRefinement([structure, other], instruments,
+    ref = JointRefinement([structure, other], instruments,
                                    sharing=sharing)
     return ref.fit(patterns, plan=RefinementPlan(stages=[
         Stage("only", ["phases.*.scale", "instrument.background.*"],
@@ -481,14 +481,14 @@ def _biso_fit(patterns, b0, b1, *, per_histogram=True):
 
 
 @pytest.mark.parametrize("b0, b1, code, where", [
-    # the WP's test: the bad value in histogram 1 alone
-    (0.5, -0.5, "BISO_NEGATIVE", ["hist.1.phases.0.atoms.0.biso"]),
-    (0.5, 60.0, "BISO_UNUSUALLY_LARGE", ["hist.1.phases.0.atoms.0.biso"]),
-    # the positive arm: histogram 0 alone, which main already read
-    (-0.5, 0.5, "BISO_NEGATIVE", ["hist.0.phases.0.atoms.0.biso"]),
+    # the WP's test: the bad value in pattern 1 alone
+    (0.5, -0.5, "BISO_NEGATIVE", ["pattern.1.phases.0.atoms.0.biso"]),
+    (0.5, 60.0, "BISO_UNUSUALLY_LARGE", ["pattern.1.phases.0.atoms.0.biso"]),
+    # the positive arm: pattern 0 alone, which main already read
+    (-0.5, 0.5, "BISO_NEGATIVE", ["pattern.0.phases.0.atoms.0.biso"]),
     # both: one finding per path, so two here
-    (-0.5, -0.4, "BISO_NEGATIVE", ["hist.0.phases.0.atoms.0.biso",
-                                   "hist.1.phases.0.atoms.0.biso"]),
+    (-0.5, -0.4, "BISO_NEGATIVE", ["pattern.0.phases.0.atoms.0.biso",
+                                   "pattern.1.phases.0.atoms.0.biso"]),
 ], ids=["negative-in-1", "large-in-1", "negative-in-0", "negative-in-both"])
 def test_a_specimen_guard_fires_on_the_histogram_that_holds_the_value(
         two_patterns, b0, b1, code, where):
@@ -508,8 +508,8 @@ def test_a_shared_biso_is_named_once_and_a_clean_pair_names_nothing(two_patterns
 
 
 def _shared_biso_two_cells(patterns, biso, cell1_scale):
-    """A joint fit whose B is shared and whose cell is per histogram:
-    histogram 1's cell is ``cell1_scale`` times histogram 0's along a, so its
+    """A joint fit whose B is shared and whose cell is per pattern:
+    pattern 1's cell is ``cell1_scale`` times pattern 0's along a, so its
     volume per atom, and with it the Lindemann bound, is larger."""
     structure, instruments = perturbed_inputs()
     other = structure.model_copy(deep=True)
@@ -517,7 +517,7 @@ def _shared_biso_two_cells(patterns, biso, cell1_scale):
     other.phases[0].atoms[0].biso.value = biso
     other.phases[0].cell.a.value *= cell1_scale
     other.phases[0].cell.b.value = other.phases[0].cell.c.value = other.phases[0].cell.a.value  # the cell's ties follow a
-    ref = MultiHistogramRefinement(
+    ref = JointRefinement(
         [structure, other], instruments,
         sharing=SharingMap(per_histogram=["phases.0.cell.*"]))
     return ref.fit(patterns, plan=RefinementPlan(stages=[
@@ -527,11 +527,11 @@ def _shared_biso_two_cells(patterns, biso, cell1_scale):
 
 def test_a_shared_biso_is_tested_against_the_loosest_cell(two_patterns):
     """#1205 ruling: a B read against several cells fires only past the
-    loosest bound, naming that histogram.  Histogram 0's cell alone would
-    flag B = 20 here; histogram 1's larger cell admits it."""
+    loosest bound, naming that pattern.  Pattern 0's cell alone would
+    flag B = 20 here; pattern 1's larger cell admits it."""
     admitted = _shared_biso_two_cells(two_patterns, 20.0, 3.0)
     far = _shared_biso_two_cells(two_patterns, 20.0, 1.0)
-    # the control: equal cells, histogram 0's bound is the bound, B is flagged
+    # the control: equal cells, pattern 0's bound is the bound, B is flagged
     assert _codes(far, "BISO_UNUSUALLY_LARGE")
     # a cell large enough that its bound admits the B: nothing fires
     assert not _codes(admitted, "BISO_UNUSUALLY_LARGE")
@@ -539,7 +539,7 @@ def test_a_shared_biso_is_tested_against_the_loosest_cell(two_patterns):
     (found,) = _codes(past, "BISO_UNUSUALLY_LARGE")
     assert found.where == ["phases.0.atoms.0.biso"]
     assert "loosest of 2" in found.message
-    assert "histogram 1" in found.message
+    assert "pattern 1" in found.message
 
 
 def test_a_joint_cell_driven_out_of_its_window_names_its_coefficient(
@@ -553,10 +553,10 @@ def test_a_joint_cell_driven_out_of_its_window_names_its_coefficient(
 
     import numpy as np
 
-    from rietx import multi
+    from rietx import joint
     from rietx.schemas.parametric import CoordinateTable, ParametricEquation
 
-    real = multi.run_multi_least_squares
+    real = joint.run_multi_least_squares
     calls = []
 
     def walked(models, mtable, **kw):
@@ -568,9 +568,9 @@ def test_a_joint_cell_driven_out_of_its_window_names_its_coefficient(
         theta[mtable.free_paths.index("vars.a_0")] *= 1.3
         return dataclasses.replace(out, theta=theta)
 
-    monkeypatch.setattr(multi, "run_multi_least_squares", walked)
+    monkeypatch.setattr(joint, "run_multi_least_squares", walked)
     structure, instruments = perturbed_inputs()
-    ref = MultiHistogramRefinement(
+    ref = JointRefinement(
         structure, instruments,
         coordinates=CoordinateTable(columns={"T": [300.0, 500.0]},
                                     units={"T": "K"}),
@@ -580,7 +580,7 @@ def test_a_joint_cell_driven_out_of_its_window_names_its_coefficient(
         Stage("only", ["phases.*.scale", "vars.*"], max_iter=3)]))
     (found,) = _codes(result, "CELL_RUNAWAY")
     assert "vars.a_0" in found.where
-    assert {"hist.0.phases.0.cell.a", "hist.1.phases.0.cell.a"} <= set(found.where)
+    assert {"pattern.0.phases.0.cell.a", "pattern.1.phases.0.cell.a"} <= set(found.where)
     assert "vars.a_0 drives" in found.message
     assert "not put back" in found.message
 
@@ -590,7 +590,7 @@ def test_a_joint_cell_inside_its_window_names_nothing(two_patterns):
     from rietx.schemas.parametric import CoordinateTable, ParametricEquation
 
     structure, instruments = perturbed_inputs()
-    ref = MultiHistogramRefinement(
+    ref = JointRefinement(
         structure, instruments,
         coordinates=CoordinateTable(columns={"T": [300.0, 500.0]},
                                     units={"T": "K"}),
@@ -603,7 +603,7 @@ def test_a_joint_cell_inside_its_window_names_nothing(two_patterns):
 
 def _vanished_phase_fit():
     """test_held_phase's series shape: pattern 0 lacks the second phase,
-    pattern 1 has it, every phase path per histogram."""
+    pattern 1 has it, every phase path per pattern."""
     import rietx as rx
     from tests.test_held_phase import _absent_phase_inputs, _pattern_with_both_phases
     from tests.test_held_phase import synthesize as one_phase
@@ -611,7 +611,7 @@ def _vanished_phase_fit():
     blind, ins = _absent_phase_inputs()
     seen = blind.model_copy(deep=True)
     seen.phases[1].scale.value = blind.phases[0].scale.value
-    ref = rx.MultiHistogramRefinement(
+    ref = rx.JointRefinement(
         [blind, seen], [ins, ins.model_copy(deep=True)],
         sharing=SharingMap(per_histogram=["phases.*"]))
     result = ref.fit([one_phase(), _pattern_with_both_phases()],
@@ -629,12 +629,12 @@ def vanished_phase_fit():
 
 def test_a_hold_made_in_some_patterns_is_named_with_its_count(vanished_phase_fit):
     _, result = vanished_phase_fit
-    assert result.stages[-1].held == ["hist.0.phases.1.cell.a"]
+    assert result.stages[-1].held == ["pattern.0.phases.1.cell.a"]
     (found,) = _codes(result, "PHASE_HELD_IN_PATTERNS")
     assert found.level == "info"
-    assert found.where == ["hist.0.phases.1.cell.a"]
+    assert found.where == ["pattern.0.phases.1.cell.a"]
     assert found.value == 1.0
-    assert "held in 1 of 2 patterns (histogram 0)" in found.message
+    assert "held in 1 of 2 patterns (pattern 0)" in found.message
     # the phase is seen by the joint fit, so the joint code stays silent
     assert not _codes(result, "PHASE_UNCONSTRAINED")
 
@@ -646,43 +646,43 @@ def test_a_fit_that_held_nothing_per_pattern_names_nothing(two_patterns):
 
 
 def test_a_histogram_view_keeps_its_reflections_and_structure_r(two_patterns):
-    """WP-1986's gap: ``for_histogram`` copied ``ticks`` alone."""
+    """WP-1986's gap: ``for_pattern`` copied ``ticks`` alone."""
     result = _one_stage(two_patterns, [])
-    for h, hr in enumerate(result.histograms):
-        view = result.for_histogram(h)
+    for h, hr in enumerate(result.patterns):
+        view = result.for_pattern(h)
         assert hr.tick_hkl and view.tick_hkl == hr.tick_hkl
         assert hr.phase_agreement
         assert view.phase_agreement == hr.phase_agreement
-    # the top level mirrors histogram 0, its ticks and their labels together
-    assert result.ticks == result.histograms[0].ticks
-    assert result.tick_hkl == result.histograms[0].tick_hkl
+    # the top level mirrors pattern 0, its ticks and their labels together
+    assert result.ticks == result.patterns[0].ticks
+    assert result.tick_hkl == result.patterns[0].tick_hkl
 
 
 def test_a_histogram_view_carries_the_fit_findings_that_name_it(vanished_phase_fit):
-    """A finding scoped to histogram h sits beside h's own; histogram 1's
-    view does not carry histogram 0's hold."""
+    """A finding scoped to pattern h sits beside h's own; pattern 1's
+    view does not carry pattern 0's hold."""
     _, result = vanished_phase_fit
-    zero = [d.code for d in result.for_histogram(0).diagnostics]
-    one = [d.code for d in result.for_histogram(1).diagnostics]
+    zero = [d.code for d in result.for_pattern(0).diagnostics]
+    one = [d.code for d in result.for_pattern(1).diagnostics]
     assert zero.count("PHASE_HELD_IN_PATTERNS") == 1
     assert "PHASE_HELD_IN_PATTERNS" not in one
 
 
 def test_a_stage_that_freed_nothing_in_a_histogram_reaches_its_view(two_patterns):
-    """``STAGE_FREED_NOTHING``'s ``value`` is the histogram's index."""
+    """``STAGE_FREED_NOTHING``'s ``value`` is the pattern's index."""
     from rietx.schemas.instrument import BackgroundChebyshev
 
     structure, instruments = perturbed_inputs()
-    # a fourth term on histogram 0 alone, so the literal reaches only it
+    # a fourth term on pattern 0 alone, so the literal reaches only it
     instruments[0].background = BackgroundChebyshev.with_terms(4)
-    ref = MultiHistogramRefinement(structure, instruments)
+    ref = JointRefinement(structure, instruments)
     result = ref.fit(two_patterns, plan=RefinementPlan(stages=[
         Stage("only", ["instrument.background.c3"], max_iter=3)]))
     (top,) = _codes(result, "STAGE_FREED_NOTHING")
     assert top.value == 1.0
-    assert not [d for d in result.for_histogram(0).diagnostics
+    assert not [d for d in result.for_pattern(0).diagnostics
                 if d.code == "STAGE_FREED_NOTHING"]
-    assert [d for d in result.for_histogram(1).diagnostics
+    assert [d for d in result.for_pattern(1).diagnostics
             if d.code == "STAGE_FREED_NOTHING"] == [top]
 
 
@@ -691,13 +691,13 @@ def test_a_stage_that_freed_nothing_lists_the_histogram_through_parameters(two_p
 
     It names ``ref.parameters()``, not the internal ``ref.mtable``, and the
     expression it prints runs as written on the fit it came from, listing the
-    passed-over histogram's own rows under the names a stage accepts.
+    passed-over pattern's own rows under the names a stage accepts.
     """
     from rietx.schemas.instrument import BackgroundChebyshev
 
     structure, instruments = perturbed_inputs()
     instruments[0].background = BackgroundChebyshev.with_terms(4)
-    ref = MultiHistogramRefinement(structure, instruments)
+    ref = JointRefinement(structure, instruments)
     result = ref.fit(two_patterns, plan=RefinementPlan(stages=[
         Stage("only", ["instrument.background.c3"], max_iter=3)]))
     (top,) = _codes(result, "STAGE_FREED_NOTHING")
@@ -705,20 +705,20 @@ def test_a_stage_that_freed_nothing_lists_the_histogram_through_parameters(two_p
     expression = top.suggestion.split(" with ", 1)[1].split(" and add", 1)[0]
     assert expression.startswith("[r.path for r in ref.parameters()")
     listed = eval(expression, {"ref": ref})  # noqa: S307 — the package's own text
-    assert listed and all(p.startswith("hist.1.") for p in listed)
-    assert "hist.1.instrument.background.c0" in listed
-    assert "hist.1.instrument.background.c3" not in listed
+    assert listed and all(p.startswith("pattern.1.") for p in listed)
+    assert "pattern.1.instrument.background.c0" in listed
+    assert "pattern.1.instrument.background.c3" not in listed
 
 
 def test_a_fit_level_finding_appears_once_in_every_view(two_patterns):
     """The FIT findings a reader of one pattern must see
     (``SCALE_B_INSEPARABLE``, ``PARAMETRIC_OUT_OF_RANGE``,
     ``PARAMETRIC_FORM_REJECTED``, ``STAGE_PATH_UNKNOWN``) are copied once
-    into each view, never once per histogram."""
+    into each view, never once per pattern."""
     result = _one_stage(two_patterns, ["phases.0.no_such_path"])
     (top,) = _codes(result, "STAGE_PATH_UNKNOWN")
     for h in range(2):
-        mine = [d for d in result.for_histogram(h).diagnostics
+        mine = [d for d in result.for_pattern(h).diagnostics
                 if d.code == "STAGE_PATH_UNKNOWN"]
         assert mine == [top]
 
@@ -726,7 +726,7 @@ def test_a_fit_level_finding_appears_once_in_every_view(two_patterns):
 # ------------------------------------------- WP-2028, review round 1 -----
 
 def test_a_phase_held_in_every_pattern_is_unconstrained_not_held_in_patterns():
-    """Two patterns, neither showing phase 1, its structure per histogram:
+    """Two patterns, neither showing phase 1, its structure per pattern:
     ``PHASE_UNCONSTRAINED`` says it, and ``PHASE_HELD_IN_PATTERNS`` (a hold
     in *some* patterns) does not repeat it (review of #1128, item 1)."""
     import rietx as rx
@@ -734,7 +734,7 @@ def test_a_phase_held_in_every_pattern_is_unconstrained_not_held_in_patterns():
     from tests.test_held_phase import synthesize as one_phase
 
     blind, ins = _absent_phase_inputs()
-    ref = rx.MultiHistogramRefinement(
+    ref = rx.JointRefinement(
         [blind, blind.model_copy(deep=True)], [ins, ins.model_copy(deep=True)],
         sharing=SharingMap(per_histogram=["phases.*"]))
     result = ref.fit([one_phase(), one_phase()], plan=rx.RefinementPlan(stages=[
@@ -744,15 +744,15 @@ def test_a_phase_held_in_every_pattern_is_unconstrained_not_held_in_patterns():
     assert _codes(result, "PHASE_UNCONSTRAINED")
     assert not _codes(result, "PHASE_HELD_IN_PATTERNS")
     for h in range(2):
-        assert not [d for d in result.for_histogram(h).diagnostics
+        assert not [d for d in result.for_pattern(h).diagnostics
                     if d.code == "PHASE_HELD_IN_PATTERNS"]
 
 
 def _hold_stub(held, ridge, n):
     from types import SimpleNamespace as NS
     last = NS(held=held, scale_b_held=ridge, name="cell")
-    table = NS(parametric=[], n_histograms=n,
-               _owner=lambda p: int(p.split(".")[1]) if p.startswith("hist.")
+    table = NS(parametric=[], n_patterns=n,
+               _owner=lambda p: int(p.split(".")[1]) if p.startswith("pattern.")
                else None)
     structure = NS(phases=[NS(name="A"), NS(name="B")])
     return [last], table, structure
@@ -767,9 +767,9 @@ def _hold_stub(held, ridge, n):
 ])
 def test_the_ridge_exclusion_reads_the_displacement_columns_refine_does(
         leaf, ridge_phases, fires):
-    from rietx.multi import _per_pattern_hold_diagnostics
+    from rietx.joint import _per_pattern_hold_diagnostics
 
-    held = [f"hist.0.phases.0.atoms.0.{leaf}"]
+    held = [f"pattern.0.phases.0.atoms.0.{leaf}"]
     stages, table, structure = _hold_stub(held, ridge_phases, 3)
     assert bool(_per_pattern_hold_diagnostics(stages, table, structure)) is fires
 
@@ -779,10 +779,10 @@ def test_an_adp_site_is_scoped_by_the_columns_that_move_it():
     of #1128, item 3)."""
     from types import SimpleNamespace as NS
 
-    from rietx.multi import _row_shared, _specimen_path
+    from rietx.joint import _row_shared, _specimen_path
 
     per_adp = NS(sharing=SharingMap(per_histogram=["phases.*.atoms.*.adp.*"]))
-    assert _specimen_path(per_adp, 1, "phases.0.atoms.0") == "hist.1.phases.0.atoms.0"
+    assert _specimen_path(per_adp, 1, "phases.0.atoms.0") == "pattern.1.phases.0.atoms.0"
     plain = NS(sharing=SharingMap())
     assert _specimen_path(plain, 1, "phases.0.atoms.0") == "phases.0.atoms.0"
     # a follower row is its source's, not its own name's
@@ -794,14 +794,14 @@ def test_an_adp_site_is_scoped_by_the_columns_that_move_it():
 
 
 def test_an_occupancy_above_one_in_one_histograms_copy_is_named(two_patterns):
-    """Review of #1128, item 4: ``OCCUPANCY_ABOVE_ONE`` read histogram 0."""
+    """Review of #1128, item 4: ``OCCUPANCY_ABOVE_ONE`` read pattern 0."""
     structure, instruments = perturbed_inputs()
     other = structure.model_copy(deep=True)
     structure.phases[0].atoms[0].occ.value = 0.5
     other.phases[0].atoms[0].occ.value = 1.4
 
     def fit(sharing):
-        ref = MultiHistogramRefinement(
+        ref = JointRefinement(
             [structure.model_copy(deep=True), other.model_copy(deep=True)],
             instruments, sharing=sharing)
         return ref.fit(two_patterns, plan=RefinementPlan(stages=[
@@ -810,8 +810,8 @@ def test_an_occupancy_above_one_in_one_histograms_copy_is_named(two_patterns):
 
     own = fit(SharingMap(per_histogram=["phases.0.atoms.*.occ"]))
     (found,) = _codes(own, "OCCUPANCY_ABOVE_ONE")
-    assert found.where == ["hist.1.phases.0.atoms.0.occ"]
-    assert "histogram 1" in found.message
+    assert found.where == ["pattern.1.phases.0.atoms.0.occ"]
+    assert "pattern 1" in found.message
 
 
 # --------------------------------------- WP-2028, review round 2 (item 7) --
@@ -830,7 +830,7 @@ def _blind_pattern_fit(*, free_cell: bool):
     blind, ins = _absent_phase_inputs()
     seen = blind.model_copy(deep=True)
     seen.phases[1].scale.value = blind.phases[0].scale.value
-    ref = rx.MultiHistogramRefinement(
+    ref = rx.JointRefinement(
         [blind, seen], [ins, ins.model_copy(deep=True)],
         sharing=SharingMap(per_histogram=["phases.*"]))
     stages = [rx.Stage("scale_bkg", ["phases.*.scale",
@@ -853,56 +853,56 @@ def test_a_scale_held_in_one_pattern_is_named_once_with_its_pattern(
     silent while another pattern sees the phase, and this record dropped
     ``.scale`` rows, so nothing said pattern 0 held only a scale."""
     result = scale_only_hold
-    assert result.stages[-1].held == ["hist.0.phases.0.scale",
-                                      "hist.0.phases.1.scale"]
+    assert result.stages[-1].held == ["pattern.0.phases.0.scale",
+                                      "pattern.0.phases.1.scale"]
     assert not _codes(result, "PHASE_UNCONSTRAINED")
     found = _codes(result, "PHASE_HELD_IN_PATTERNS")
-    assert [d.where for d in found] == [["hist.0.phases.0.scale"],
-                                        ["hist.0.phases.1.scale"]]
+    assert [d.where for d in found] == [["pattern.0.phases.0.scale"],
+                                        ["pattern.0.phases.1.scale"]]
     for d in found:
         assert d.value == 1.0
-        assert "held in 1 of 2 patterns (histogram 0)" in d.message
+        assert "held in 1 of 2 patterns (pattern 0)" in d.message
         assert "own scale keeps the value handed in" in d.message
         assert "structure" not in d.message
     # the pattern that holds it is the one whose fraction is absent
     assert all(x.weight_fraction is None
-               for x in result.for_histogram(0).qpa.phases)
+               for x in result.for_pattern(0).qpa.phases)
     assert all(x.weight_fraction is not None
-               for x in result.for_histogram(1).qpa.phases)
+               for x in result.for_pattern(1).qpa.phases)
 
 
 def test_a_scale_and_its_structure_held_together_are_one_finding_per_phase():
     result = _blind_pattern_fit(free_cell=True)
     found = _codes(result, "PHASE_HELD_IN_PATTERNS")
     assert [d.where for d in found] == [
-        ["hist.0.phases.0.cell.a", "hist.0.phases.0.scale"],
-        ["hist.0.phases.1.cell.a", "hist.0.phases.1.scale"]]
+        ["pattern.0.phases.0.cell.a", "pattern.0.phases.0.scale"],
+        ["pattern.0.phases.1.cell.a", "pattern.0.phases.1.scale"]]
     for d in found:
         assert "structure (1 row)" in d.message
         assert "own scale keeps the value handed in" in d.message
 
 
 @pytest.mark.parametrize("held, n, fires", [
-    (["hist.0.phases.0.scale"], 2, True),
-    (["hist.0.phases.0.scale", "hist.1.phases.0.scale"], 2, False),  # every pattern
+    (["pattern.0.phases.0.scale"], 2, True),
+    (["pattern.0.phases.0.scale", "pattern.1.phases.0.scale"], 2, False),  # every pattern
     (["phases.0.scale"], 2, False),                  # shared: PHASE_UNCONSTRAINED's
-    (["hist.0.phases.0.scale", "hist.1.phases.0.cell.a"], 3, True),  # union of patterns
+    (["pattern.0.phases.0.scale", "pattern.1.phases.0.cell.a"], 3, True),  # union of patterns
 ])
 def test_the_scale_rows_count_toward_the_patterns_a_phase_was_held_in(
         held, n, fires):
-    from rietx.multi import _per_pattern_hold_diagnostics
+    from rietx.joint import _per_pattern_hold_diagnostics
 
     stages, table, structure = _hold_stub(held, set(), n)
     found = _per_pattern_hold_diagnostics(stages, table, structure)
     assert bool(found) is fires
-    if fires and held[-1].startswith("hist.1"):
+    if fires and held[-1].startswith("pattern.1"):
         assert found[0].value == 2.0 and len(found) == 1
 
 
 # ----------------------------- WP-2028, a joint parameters() (#1205, 3) -----
 # The maintainer's ruling: read-only, the single fit's ``ParameterRow``, paths
-# as the joint table spells them.  The per-histogram cell ``a`` makes ``b``
-# and ``c`` tied rows whose source is per histogram, the one case where the
+# as the joint table spells them.  The per-pattern cell ``a`` makes ``b``
+# and ``c`` tied rows whose source is per pattern, the one case where the
 # result's spelling (``row_path``) and ``_canonical`` part.
 
 PER_A = SharingMap(per_histogram=["phases.0.cell.a"])
@@ -910,7 +910,7 @@ PER_A = SharingMap(per_histogram=["phases.0.cell.a"])
 
 def _joint(sharing=None):
     structure, instruments = perturbed_inputs()
-    return MultiHistogramRefinement(structure, instruments, sharing=sharing)
+    return JointRefinement(structure, instruments, sharing=sharing)
 
 
 @pytest.mark.parametrize("sharing", [None, PER_A], ids=["default", "per-a"])
@@ -931,24 +931,24 @@ def test_every_joint_parameter_row_round_trips_through_the_joint_names(sharing):
             for h, t in enumerate(mt.tables):
                 (e,) = [e for e in t.entries if e.path == r.path]
                 assert mt.row_path(h, e) == r.path
-        else:               # one histogram's: its own table, and no other
+        else:               # one pattern's: its own table, and no other
             bare = mt._unscope(owner, r.path)
             (e,) = [e for e in mt.tables[owner].entries if e.path == bare]
             assert mt.row_path(owner, e) == r.path
             assert all(mt._unscope(h, r.path) is None
-                       for h in range(mt.n_histograms) if h != owner)
+                       for h in range(mt.n_patterns) if h != owner)
         if r.tie is not None:
             assert set(r.tie.sources) <= set(paths), r.path
         assert r.esd is None            # no fit yet
-    # shared once, per-histogram once per histogram
+    # shared once, per-pattern once per pattern
     assert paths.count("phases.0.atoms.0.biso") == 1
     assert "instrument.zero_shift" not in paths
-    assert {"hist.0.instrument.zero_shift", "hist.1.instrument.zero_shift"} <= set(paths)
+    assert {"pattern.0.instrument.zero_shift", "pattern.1.instrument.zero_shift"} <= set(paths)
     if sharing is PER_A:
         assert "phases.0.cell.b" not in paths
-        (b1,) = [r for r in rows if r.path == "hist.1.phases.0.cell.b"]
-        assert b1.tie.sources == ["hist.1.phases.0.cell.a"]
-        assert b1.held_because == "tied: = 1·hist.1.phases.0.cell.a"
+        (b1,) = [r for r in rows if r.path == "pattern.1.phases.0.cell.b"]
+        assert b1.tie.sources == ["pattern.1.phases.0.cell.a"]
+        assert b1.held_because == "tied: = 1·pattern.1.phases.0.cell.a"
     else:
         assert paths.count("phases.0.cell.b") == 1
 
@@ -965,22 +965,22 @@ def test_joint_parameters_carry_the_fits_values_and_esds(two_patterns, sharing):
         assert rows[p.path].esd == p.stderr, p.path
     measured = {p.path for p in result.parameters if p.stderr is not None}
     assert measured and {p for p, r in rows.items() if r.esd is not None} == measured
-    # the per-histogram rows hold each histogram's own value
+    # the per-pattern rows hold each pattern's own value
     if sharing is PER_A:
-        a = [rows[f"hist.{h}.phases.0.cell.{x}"].value
+        a = [rows[f"pattern.{h}.phases.0.cell.{x}"].value
              for h in (0, 1) for x in "ab"]
         assert a[0] == a[1] and a[2] == a[3]
 
 
 def test_a_shared_row_reports_the_window_the_solver_enforces():
-    """Two histograms that disagree about a shared bound: the row is the tighter.
+    """Two patterns that disagree about a shared bound: the row is the tighter.
 
     Per-pattern starts may declare different windows for one shared path, and
     the solver holds their intersection (``params/multi.py``'s column build),
-    so reading histogram 0's ``lo``/``hi`` would show a window the fit never
+    so reading pattern 0's ``lo``/``hi`` would show a window the fit never
     allows (Yue's review of #1270, item 1).  The wavelengths differ too, so
     the case also runs through ``size_value_scales``, which scales a stored cap
-    with its histogram's value: the row must be in the shared column's units.
+    with its pattern's value: the row must be in the shared column's units.
     Pinned against the solver's own column: free the size, and the row equals
     ``mtable.bounds()`` at it.
     """
@@ -989,11 +989,11 @@ def test_a_shared_row_reports_the_window_the_solver_enforces():
     structures[0].phases[0].lor_size.max = 10.0
     structures[1].phases[0].lor_size.max = 7.0
     instruments = [_width_start(lam)[1] for lam in LAMS]
-    ref = MultiHistogramRefinement(structures, instruments)
+    ref = JointRefinement(structures, instruments)
     mt = ref.mtable
     assert mt.value_scales[1][path] != 1.0       # two wavelengths, as in WP-1131
     (row,) = [r for r in ref.parameters() if r.path == path]
-    assert row.hi == pytest.approx(7.0)          # histogram 0's 10.0 is not the answer
+    assert row.hi == pytest.approx(7.0)          # pattern 0's 10.0 is not the answer
     mt.set_vary([path], True)
     lo, hi = mt.bounds()
     k = mt.free_paths.index(path)
@@ -1009,7 +1009,7 @@ def test_both_parameters_listings_build_a_row_in_one_place(monkeypatch):
     built there cannot miss one; this pins that no listing builds a row beside it.
     """
     import sys
-    multi_mod = sys.modules["rietx.multi"]
+    multi_mod = sys.modules["rietx.joint"]
     refine_mod = sys.modules["rietx.refine"]   # ``rietx.refine`` the name is the function
     built: list[str] = []
     real = refine_mod._parameter_row
@@ -1036,16 +1036,16 @@ def test_stage_path_unknown_names_the_joint_parameters(two_patterns):
 
 
 def test_a_tied_row_copied_from_the_listing_is_answered(two_patterns):
-    """``hist.1.phases.0.cell.b`` is a row ``parameters()`` prints.  Named in
+    """``pattern.1.phases.0.cell.b`` is a row ``parameters()`` prints.  Named in
     a stage it is a tied row, so ``STAGE_PATH_NOT_FREE`` answers it with its
-    histogram's source.  On main it was ``STAGE_PATH_UNKNOWN``, a typo report
+    pattern's source.  On main it was ``STAGE_PATH_UNKNOWN``, a typo report
     for a path the result itself spells."""
-    result = _one_stage(two_patterns, ["hist.1.phases.0.cell.b"], sharing=PER_A)
+    result = _one_stage(two_patterns, ["pattern.1.phases.0.cell.b"], sharing=PER_A)
     assert not _codes(result, "STAGE_PATH_UNKNOWN")
     (found,) = _codes(result, "STAGE_PATH_NOT_FREE")
-    assert found.where == ["hist.1.phases.0.cell.b"]
-    assert found.message.endswith("in histogram 1.")
-    assert found.suggestion.startswith("Free hist.1.phases.0.cell.a instead")
+    assert found.where == ["pattern.1.phases.0.cell.b"]
+    assert found.message.endswith("in pattern 1.")
+    assert found.suggestion.startswith("Free pattern.1.phases.0.cell.a instead")
 
 
 def test_a_locked_joint_literal_points_at_held_because(two_patterns):

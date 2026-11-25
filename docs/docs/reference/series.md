@@ -11,7 +11,7 @@ A joint fit is one refinement whose residual stacks several patterns, and the pa
 | What crosses a pattern | the starting values | the shared parameters themselves |
 | Answer | a trajectory, such as a(T) or w(t) | one set of numbers, informed by every pattern |
 | Used for | an in-situ ramp, a parametric sweep, a tray of specimens | one specimen measured twice, at two wavelengths or on two instruments |
-| Entry point | `SequentialRefinement`, `refine_sequential` | `MultiHistogramRefinement`, `refine_multi` |
+| Entry point | `SequentialRefinement`, `refine_sequential` | `JointRefinement`, `refine_joint` |
 | Modes | any | Rietveld or Pawley |
 
 The question that separates them is whether the specimen changed.

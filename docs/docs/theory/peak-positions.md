@@ -280,7 +280,7 @@ every computed position unchanged:
 
 {source}`rietx.params.vector.check_wavelength_freedom`
 
-For one histogram that one-parameter family is an exactly flat direction of the
+For one pattern that one-parameter family is an exactly flat direction of the
 residual, whatever the data quality, so $\lambda$ and the cell cannot both be
 free. Differentiating {eq}`pos-bragg` in $\lambda$ gives
 
@@ -294,7 +294,7 @@ free. Differentiating {eq}`pos-bragg` in $\lambda$ gives
 {source}`rietx.model.forward`
 
 the same $\tan\theta$ signature as {eq}`pos-doublet`, and the signature a
-uniform cell scaling has. Across $N$ histograms of one specimen the cell is one
+uniform cell scaling has. Across $N$ patterns of one specimen the cell is one
 object and the $\lambda_i$ are $N$ separate ones, so the family
 {eq}`pos-lambda-cell` collapses to a single scalar $s$. Fixing one $\lambda_i$
 fixes $s$, and the other $N-1$ become measurable against the shared lattice. One

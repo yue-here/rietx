@@ -540,7 +540,7 @@ def test_a_joint_fit_merges_its_structure_and_reports_it(pbso4):
     structure = Structure(phases=[pbso4.model_copy(deep=True)])
     (s2,) = [a for a in structure.phases[0].atoms if a.label == "S2"]
     s2.y.value = 0.25 + 1e-4
-    joint = rx.MultiHistogramRefinement(structure, [INSTRUMENT, INSTRUMENT])
+    joint = rx.JointRefinement(structure, [INSTRUMENT, INSTRUMENT])
     assert all(_y(s) == 0.25 for s in joint.fitted_structures)
     assert [d.code for d in joint._twin_findings] == ["SITE_TWINS_MERGED"]
 

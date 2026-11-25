@@ -82,7 +82,7 @@ from .derived import DerivedBlock
 #: Dot-path suffix of a source line's wavelength row.  One authority for the
 #: spelling, since three places test for it: the collector, the freedom check
 #: below and the ``WAVELENGTH_CALIBRATION`` diagnostic in ``refine.py`` (shared
-#: with the joint path in ``multi.py``).
+#: with the joint path in ``joint.py``).
 WAVELENGTH_SUFFIX = ".wavelength"
 
 #: The largest esd whose square is still a double (≈ 1.3e+154).  Past it a
@@ -144,14 +144,14 @@ def _is_wavelength(path: str) -> bool:
 
 
 def check_wavelength_freedom(free_wavelengths: list[str], n_wavelengths: int,
-                             n_histograms: int, *,
+                             n_patterns: int, *,
                              cell_shared: bool = True) -> None:
     """Refuse a wavelength freedom the data cannot support.  Three cases.
 
     A powder pattern measures d = λ/(2 sin θ), which fixes only the *product*
-    λ·(1/d) — so for **one** histogram a free λ beside a free cell is a flat
+    λ·(1/d) — so for **one** pattern a free λ beside a free cell is a flat
     direction, exactly, and no amount of data removes it.  Across **N**
-    histograms of one specimen sharing one cell the degeneracy breaks: holding
+    patterns of one specimen sharing one cell the degeneracy breaks: holding
     one λ pins the cell's scale, and the remaining N − 1 are then
     over-determined by that shared cell and genuinely measurable.  Holding
     *all* of them instead forces every monochromator's calibration error into
@@ -159,20 +159,20 @@ def check_wavelength_freedom(free_wavelengths: list[str], n_wavelengths: int,
 
     **The shared cell is the whole mechanism, so it is part of the rule**:
 
-        a free wavelength requires its histogram's cell to be *shared* with at
-        least one histogram whose wavelength is held.
+        a free wavelength requires its pattern's cell to be *shared* with at
+        least one pattern whose wavelength is held.
 
     "Exactly one held, at most N − 1 free" is that statement's special case
-    when every histogram shares one cell, which is the default
+    when every pattern shares one cell, which is the default
     (:class:`~rietx.params.multi.SharingMap` shares everything that is not
     ``instrument.*`` or ``*.scale``).  Un-share the cell — a legitimate thing to
-    want, when two histograms are two preparations — and the degeneracy of a
-    single-histogram fit is back inside the joint one, per histogram, which is
+    want, when two patterns are two preparations — and the degeneracy of a
+    single-pattern fit is back inside the joint one, per pattern, which is
     why ``cell_shared=False`` refuses every free λ rather than letting the fit
     wander.
 
     **Which one to hold is not arbitrary**: hold the wavelength of the
-    histogram that determines the cell.  On a synchrotron-plus-neutron pair
+    pattern that determines the cell.  On a synchrotron-plus-neutron pair
     that is the synchrotron — its wavelength calibration is the better known
     *and* its angular resolution makes its cell the better determined — and the
     neutron wavelengths then refine against a cell the X-ray data has pinned,
@@ -192,7 +192,7 @@ def check_wavelength_freedom(free_wavelengths: list[str], n_wavelengths: int,
 
     ``free_wavelengths`` are the free wavelength paths, spelled as the caller's
     own surface spells them; ``n_wavelengths`` is how many wavelength rows the
-    whole problem has and ``n_histograms`` how many patterns it stacks.
+    whole problem has and ``n_patterns`` how many patterns it stacks.
 
     **Scope: constant-wavelength only.**  The same fence generalises verbatim to
     a time-of-flight multi-bank fit, where each bank carries its own DIFC
@@ -204,30 +204,30 @@ def check_wavelength_freedom(free_wavelengths: list[str], n_wavelengths: int,
     if not cell_shared:
         raise ValueError(
             f"{free_wavelengths[0]} cannot vary while the cell is "
-            "per-histogram: λ is measurable only against a cell some *other* "
-            "histogram's held wavelength has pinned, so a histogram with its "
-            "own cell is back in the single-histogram degeneracy — inside a "
+            "per-pattern: λ is measurable only against a cell some *other* "
+            "pattern's held wavelength has pinned, so a pattern with its "
+            "own cell is back in the single-pattern degeneracy — inside a "
             "joint fit, where it looks solved.  Share the cell "
             "(SharingMap's default does) or hold every wavelength")
-    if n_histograms < 2:
+    if n_patterns < 2:
         raise ValueError(
-            f"{free_wavelengths[0]} cannot vary in a single-histogram fit: "
+            f"{free_wavelengths[0]} cannot vary in a single-pattern fit: "
             "d = λ/(2 sin θ) fixes only the product, so a free wavelength "
             "beside a free cell is an exactly flat direction — the same "
             "degeneracy that makes a certified standard's cell the thing you "
             "hold in order to calibrate λ.  It becomes measurable only in a "
-            "joint fit of several histograms of one specimen sharing one cell "
-            "(rietx.refine_multi), where one wavelength is held and the rest "
+            "joint fit of several patterns of one specimen sharing one cell "
+            "(rietx.refine_joint), where one wavelength is held and the rest "
             "are free")
     if len(free_wavelengths) >= n_wavelengths:
         raise ValueError(
             f"{len(free_wavelengths)} of {n_wavelengths} wavelengths are "
-            f"free; hold one.  Across {n_histograms} histograms of one "
+            f"free; hold one.  Across {n_patterns} patterns of one "
             "specimen the shared cell makes N − 1 wavelengths measurable, but "
             "only because the held one pins the cell's scale — free them all "
-            "and the flat direction of a single-histogram fit is back.  Hold "
+            "and the flat direction of a single-pattern fit is back.  Hold "
             f"{sorted(free_wavelengths)[0]} (the convention is to hold the "
-            "best-calibrated histogram's) and leave the others free")
+            "best-calibrated pattern's) and leave the others free")
 
 
 def background_parameters(bkg) -> list[tuple[str, Parameter]]:
@@ -304,7 +304,7 @@ def incident_spectrum_parameters(spectrum) -> list[tuple[str, Parameter]]:
 #: ``instrument.source.difc``/``difa`` for the two 2θ position aberrations.
 #: Registering the constant-wavelength rows force-fixed would make a glob like
 #: ``instrument.profile.*`` *match* on a bank and free nothing — silent under
-#: ``MultiParameterTable.unreached_histograms``' "matched, not freed" rule, which
+#: ``MultiParameterTable.unreached_patterns``' "matched, not freed" rule, which
 #: is right for a row with nothing to refine (a capillary's
 #: ``sample_displacement``) and wrong for one whose role the bank fills under
 #: another name.  Absent, the glob matches nothing on the bank and the
@@ -1125,7 +1125,7 @@ def tie_window(lo: float, hi: float, coeff: float,
 
 
 def _magnetic_component_drawn(phase, instrument) -> bool:
-    """Whether a histogram on ``instrument`` draws ``phase``'s magnetic term.
+    """Whether a pattern on ``instrument`` draws ``phase``'s magnetic term.
 
     :func:`rietx.model.forward.magnetic_wanted` is the one authority on that
     dispatch and this only asks it.  A source it refuses by name is refused
@@ -1268,11 +1268,11 @@ class ParameterTable:
 
     def __init__(self, structure: Structure, instrument: Instrument, *,
                  joint: bool = False):
-        #: ``True`` when this table is one histogram of a joint fit, so the
+        #: ``True`` when this table is one pattern of a joint fit, so the
         #: wavelength count is somebody else's to make —
         #: :class:`~rietx.params.multi.MultiParameterTable`, the only object
         #: that can see the whole set (:func:`check_wavelength_freedom`).
-        #: ``False`` (the default) is a single-histogram fit, where a free
+        #: ``False`` (the default) is a single-pattern fit, where a free
         #: wavelength is refused here, in ``__init__``, like every other
         #: symmetry-of-the-problem refusal.
         self._joint = joint
@@ -1309,7 +1309,7 @@ class ParameterTable:
         self._reanchored: set[str] = set()
         #: path → a fixed positive factor between this table's *physical* value
         #: and the number the free column carries — see :meth:`apply_value_scale`.
-        #: Empty for every single-histogram table, which is why an unscaled
+        #: Empty for every single-pattern table, which is why an unscaled
         #: table's arithmetic is untouched: the rebuild writes the literal 1.0
         #: it always wrote, and ``x0``/``bounds`` skip the lookup's branch.
         self._value_scale: dict[str, float] = {}
@@ -1468,14 +1468,14 @@ class ParameterTable:
             # schema refuses a non-zero *value* there for the same reason,
             # which is the half a table cannot state.
             if phase.magnetic_symmetry is not None:
-                # **Force-fixed where this histogram carries no magnetic
+                # **Force-fixed where this pattern carries no magnetic
                 # component**, the WP-1073 rule: on an X-ray source (or a
                 # phase declaring no moment) the forward model never draws
                 # the second family, so a free width would be a dead column —
                 # and ``run_least_squares`` refuses one by name, which a plan
                 # freeing ``phases.*.magnetic_lor_*`` would hit with advice
                 # it cannot take.  Not in a joint table: there a neutron
-                # histogram shares the entry and does see it.
+                # pattern shares the entry and does see it.
                 off = (not self._joint
                        and not _magnetic_component_drawn(phase, instrument))
                 self._add(f"{base}.magnetic_lor_size", phase.magnetic_lor_size,
@@ -2715,7 +2715,7 @@ class ParameterTable:
                     if not tof else
                     f"instrument.geometry.{name} cannot vary on a neutron_tof "
                     f"bank: eq (4) is Δ2θ = (−a·sin2θ + b·cos2θ)/R, a shift in "
-                    f"degrees 2θ, and this histogram's abscissa is a flight "
+                    f"degrees 2θ, and this pattern's abscissa is a flight "
                     f"time in microseconds. A bank's position calibration is "
                     f"instrument.source.difc/difa/tzero/difb")
             # force-fixed rather than merely unfree when R is missing, because
@@ -2781,7 +2781,7 @@ class ParameterTable:
         # The wavelength, and the mirror image of the weight rule above it.  A
         # line weight's scale lives inside this source, so **line 0** is the one
         # that must be held; a wavelength's scale lives in the *cell*, which may
-        # be shared across histograms this table cannot see, so line 0 is the
+        # be shared across patterns this table cannot see, so line 0 is the
         # one that may be *free* — and only when somebody else is counting.
         #
         # Two locks and one refusal, in the shape ``CAPILLARY_OFFSETS`` uses
@@ -2791,20 +2791,20 @@ class ParameterTable:
         # this reason, ~20 ppm), so a free secondary line is a second flat
         # direction beside the first — the WP-1073 rule that a parameter which
         # cannot legitimately move is force-fixed rather than merely unfree.  In
-        # a single-histogram table *every* line is force-fixed, because there λ
+        # a single-pattern table *every* line is force-fixed, because there λ
         # is exactly degenerate with the cell whatever the data; that is what
         # lets ``ParameterRow.held_because`` tell the truth about it without a
         # fourth held-reason, and what stops a glob freeing it by accident.  And
         # a *declared* ``vary=True`` there is refused by name rather than
         # quietly swallowed, because it is a claim the caller made.
         wl_params = list(source.wavelength_parameters)
-        # No single-histogram check here: ``_rebuild`` runs at the end of
+        # No single-pattern check here: ``_rebuild`` runs at the end of
         # ``__init__`` and at every stage boundary, and it is the only place
         # that sees both free sets at once.  Checking here as well would be a
         # second authority for one fact, and the weaker of the two — it cannot
         # see a cell freed by a later stage.
         for il, wl in enumerate(wl_params):
-            # Line 0 is NOT force-fixed even in a single-histogram table.  A
+            # Line 0 is NOT force-fixed even in a single-pattern table.  A
             # free λ there is admissible whenever the *cell* is held — which is
             # what a certified standard is for — so "can never legitimately
             # move", which is what force_fixed asserts, would be false.  The
@@ -3143,7 +3143,7 @@ class ParameterTable:
         an answer would otherwise be produced from a flat direction, which is
         the solve.
 
-        Single-histogram only.  The joint case is ``MultiParameterTable``'s,
+        Single-pattern only.  The joint case is ``MultiParameterTable``'s,
         where the rule is "exactly one held, at most N − 1 free" and the shared
         cell is the mechanism; that check runs there and this one must not
         second-guess it.
@@ -3166,9 +3166,9 @@ class ParameterTable:
                 "unchanged — an exactly flat direction no amount of data "
                 "removes.  Hold the cell (what a certified standard is for, "
                 "and how a wavelength is calibrated) or hold λ.  Across "
-                "several histograms of one specimen sharing a cell the "
+                "several patterns of one specimen sharing a cell the "
                 "degeneracy breaks and N − 1 wavelengths are measurable: "
-                "rietx.refine_multi")
+                "rietx.refine_joint")
 
     def constraint_block(self) -> tuple[sparse.csr_matrix, np.ndarray]:
         """The current (C, d) with rows in entry order, columns in θ order."""
@@ -4191,10 +4191,10 @@ class ParameterTable:
 
         **The seed is in column units, not this table's** (WP-1131): a scaled
         entry (:meth:`apply_value_scale`) is seeded to ``value`` times its
-        scale, so the shared column lands on ``value`` in every histogram.
-        Seeding the physical value instead would give the histograms
+        scale, so the shared column lands on ``value`` in every pattern.
+        Seeding the physical value instead would give the patterns
         different internal coordinates for one shared column, and the joint
-        table's *identical values from each histogram* would quietly stop
+        table's *identical values from each pattern* would quietly stop
         being true -- nothing raises, the last write simply wins.
         """
         seeded = []
@@ -4234,9 +4234,9 @@ class ParameterTable:
         actually seeded.
 
         ``ray_from`` reads the ray off another table's cell, for a joint fit
-        sharing one block across histograms whose cells differ
+        sharing one block across patterns whose cells differ
         (:meth:`MultiParameterTable.seed_stephens`).  Any point of one cell's
-        ray is inside every histogram's cone, since σ²(M) is the literal
+        ray is inside every pattern's cone, since σ²(M) is the literal
         monomial sum and the ray makes it (hᵀG*h)², positive for any metric.
         """
         if microstrain <= 0.0:
@@ -4442,14 +4442,14 @@ class ParameterTable:
         column does, and the two cannot disagree about it.
 
         **What it is for** (WP-1131).  A joint fit shares a column between
-        histograms by giving them the same internal coordinate, which is right
-        only for a quantity that is the same number in every histogram.  A
+        patterns by giving them the same internal coordinate, which is right
+        only for a quantity that is the same number in every pattern.  A
         crystallite-size coefficient is not: it is (180/π)·K·λ/L, so one
         specimen needs coefficients in the ratio of the wavelengths
         (:func:`~rietx.model.profiles.caglioti.apparent_size_from_size_coefficient`).
         :class:`~rietx.params.multi.MultiParameterTable` therefore hands each
-        histogram the factor λ_h/λ_ref, and the shared column becomes the
-        coefficient at λ_ref — one specimen, one number, with each histogram's
+        pattern the factor λ_h/λ_ref, and the shared column becomes the
+        coefficient at λ_ref — one specimen, one number, with each pattern's
         structure copy still carrying the coefficient *it* needs.
 
         Three rules, enforced rather than commented:
@@ -4463,7 +4463,7 @@ class ParameterTable:
         * an **unknown** path is a caller's typo, not a silent no-op.
 
         ``{}`` (or a map of exact ``1.0``\\ s) restores the unscaled table bit
-        for bit, and no single-histogram fit ever sets one.
+        for bit, and no single-pattern fit ever sets one.
         """
         cleaned: dict[str, float] = {}
         for path, factor in scale.items():
@@ -4658,7 +4658,7 @@ class ParameterTable:
         """Put the table back as :meth:`_commit_state` found it.
 
         Undoes a commit this table refused (#801), or one it made inside a
-        joint commit that another histogram's table refused
+        joint commit that another pattern's table refused
         (:meth:`MultiParameterTable.commit`).
         """
         old_values, anchors, precommit, phi0s, precommit_torsions = state
@@ -4819,7 +4819,7 @@ class ParameterTable:
         (the maintainer's answer (c) on #801).  A linear body has two
         directions, and one of them free is a turn about a fixed axis.
 
-        ``joint`` words the remedies for ``MultiHistogramRefinement``, which
+        ``joint`` words the remedies for ``JointRefinement``, which
         has no hold or tie verb, so the stage's globs are the only lever.
         """
         turns = self.free_turn_directions()

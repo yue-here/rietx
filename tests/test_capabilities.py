@@ -608,7 +608,7 @@ def test_the_documented_feature_keys_are_present(caps):
         "magnetic_interchange", "surface_roughness",
         "capillary_absorption", "flat_plate_absorption", "anomalous_dispersion",
         "anomalous_dispersion_default_on", "extra_components",
-        "multi_histogram",
+        "joint_refinement",
         "sequential_series", "project_container", "background_estimation",
         "pattern_diagnostics", "peak_picking", "peak_fitting", "indexing",
         "cancellation", "report_trajectory", "powderline_recipe",

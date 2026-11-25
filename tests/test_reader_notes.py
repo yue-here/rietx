@@ -148,9 +148,9 @@ def test_a_joint_fit_carries_each_patterns_own_notes(truth, tmp_path):
     flat = rx.read_pattern(_constant(truth, tmp_path))
     structure, instrument = _models()
     _, other = _models()
-    result = rx.refine_multi([flat, truth], structure, [instrument, other],
+    result = rx.refine_joint([flat, truth], structure, [instrument, other],
                              plan=PLAN)
-    first, second = result.histograms
+    first, second = result.patterns
     assert _codes(first.diagnostics).count("PATTERN_SIGMA_CONSTANT") == 1
     assert "PATTERN_SIGMA_CONSTANT" not in _codes(second.diagnostics)
 

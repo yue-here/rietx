@@ -20,7 +20,7 @@ import gemmi
 import pytest
 
 from rietx import (
-    MultiHistogramRefinement,
+    JointRefinement,
     Refinement,
     RefinementPlan,
     Stage,
@@ -227,10 +227,10 @@ def test_a_tied_row_inherits_a_withheld_esd(default_fit):
 # the joint fit builds its own rows
 # ----------------------------------------------------------------------
 def test_the_joint_fit_reports_the_same_membership():
-    """``multi.py`` keeps a second row builder, so it carries the rule too.
+    """``joint.py`` keeps a second row builder, so it carries the rule too.
 
     A plan that never frees the cell leaves every cell row, shared or per
-    histogram, out of the answer; before WP-1999 ``b`` and ``c`` stayed.
+    pattern, out of the answer; before WP-1999 ``b`` and ``c`` stayed.
     """
     patterns = [
         synth_hist(0.41390, 3.0, 24.0, scale=5e-4, zero=0.006,
@@ -243,9 +243,9 @@ def test_the_joint_fit_reports_the_same_membership():
         Stage("scale_bkg", ["phases.*.scale", "instrument.background.*",
                             "instrument.zero_shift"]),
     ])
-    result = MultiHistogramRefinement(structure, instruments).fit(patterns, plan=plan)
+    result = JointRefinement(structure, instruments).fit(patterns, plan=plan)
     OUT.mkdir(exist_ok=True)
     for h in range(len(patterns)):
-        result.for_histogram(h).plot(OUT / f"reported_rows_joint_h{h}.png")
+        result.for_pattern(h).plot(OUT / f"reported_rows_joint_h{h}.png")
     assert not [p for p in _paths(result) if ".cell." in p]
     assert [p for p in result.parameters if p.vary]

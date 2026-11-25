@@ -90,7 +90,7 @@ def test_one_specimen_needs_two_size_coefficients_and_one_strain_coefficient(siz
 
     A specimen of one crystallite size measured at two wavelengths needs size
     coefficients in the ratio λ₂/λ₁ — so a joint fit that serves one coefficient
-    to both histograms is wrong by that ratio, 1.717× on this fixture's pair.
+    to both patterns is wrong by that ratio, 1.717× on this fixture's pair.
     The Scherrer constant cancels out of it, which is why the defect does not
     wait on the convention question.
     """
@@ -320,21 +320,21 @@ def test_a_coefficient_on_its_floor_reads_at_zero_whatever_it_stores():
 
 
 def test_a_joint_fit_hands_histogram_0_its_own_floor_spelling():
-    """Shared rows are bare and per-histogram rows ``hist.h.…`` (WP-1914)."""
-    from rietx.multi import _hist_floors
+    """Shared rows are bare and per-pattern rows ``pattern.h.…`` (WP-1914)."""
+    from rietx.joint import _hist_floors
     from rietx.strategy.staged import GuardFinding
 
     found = [
         GuardFinding.at_bound("phases.0.gauss_size", limit=("lower", 0.0)),
-        GuardFinding.at_bound("hist.0.phases.0.gauss_strain",
+        GuardFinding.at_bound("pattern.0.phases.0.gauss_strain",
                               limit=("lower", 0.0)),
-        GuardFinding.at_bound("hist.1.phases.0.lor_size",
+        GuardFinding.at_bound("pattern.1.phases.0.lor_size",
                               limit=("lower", 0.0)),
         GuardFinding.at_bound("phases.0.lor_strain", limit=("upper", 0.5)),
     ]
     assert _hist_floors(found, 0) == {"phases.0.gauss_size",
                                       "phases.0.gauss_strain"}
-    # any histogram reads its own spelling the same way (WP-2141)
+    # any pattern reads its own spelling the same way (WP-2141)
     assert _hist_floors(found, 1) == {"phases.0.gauss_size",
                                       "phases.0.lor_size"}
 
@@ -591,7 +591,7 @@ def test_a_declared_size_window_travels_with_the_value_across_wavelengths():
     at `MultiParameterTable` construction — on a caller who did nothing but
     declare a maximum crystallite width, with a message that says nothing about
     wavelengths. It is also wrong in itself: the caller states the window once,
-    on the specimen quantity, and unscaled bounds leave the histograms
+    on the specimen quantity, and unscaled bounds leave the patterns
     disagreeing about it, which the bound intersection then resolves silently
     by taking the tightest.
     """
@@ -607,10 +607,10 @@ def test_a_declared_size_window_travels_with_the_value_across_wavelengths():
     assert windows[0] == (0.0, 0.03)
     assert windows[1][1] == pytest.approx(0.03 * (LAM_LONG / LAM_SHORT), rel=1e-12)
 
-    # the two histograms therefore agree about the shared column's window, so
+    # the two patterns therefore agree about the shared column's window, so
     # the intersection is the identity rather than a silent tightening: the
     # bound the solver sees is the declared 0.03 deg in the *reference*
-    # histogram's units, which is where the shared column lives; the column
+    # pattern's units, which is where the shared column lives; the column
     # is the coefficient itself since WP-1938, so the box is [0, 0.03]
     mt.set_vary(["phases.*.lor_size"], True)
     col = mt.free_paths.index("phases.0.lor_size")

@@ -482,9 +482,9 @@ measurement: far from 1 means the two describe different specimens and neither
 is quotable alone.
 
 **In a joint fit, read the size and never the degrees.** The Lorentzian size coefficient is
-proportional to λ and the Gaussian one to λ² (`SIZE_LAMBDA_POWER`), so `MultiHistogramRefinement` normalises the shared column
-and reports it at histogram 0's wavelength, saying so through
-`SIZE_NORMALISED_ACROSS_WAVELENGTHS`. Each histogram's own structure copy
+proportional to λ and the Gaussian one to λ² (`SIZE_LAMBDA_POWER`), so `JointRefinement` normalises the shared column
+and reports it at pattern 0's wavelength, saying so through
+`SIZE_NORMALISED_ACROSS_WAVELENGTHS`. Each pattern's own structure copy
 carries the coefficient it needs; the crystallite behind them is one number.
 
 **`SIZE_UNUSUALLY_SMALL` and `STRAIN_UNUSUALLY_LARGE` flag a coefficient

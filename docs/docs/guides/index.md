@@ -60,7 +60,7 @@ Each guide's fits are a script in `examples/guides/`, run by the test suite, and
 
 ## Several radiations
 
-- [How to fit an X-ray and a neutron pattern together](joint.md) refines one structure against both with `MultiHistogramRefinement`, and refines the neutron wavelength.
+- [How to fit an X-ray and a neutron pattern together](joint.md) refines one structure against both with `JointRefinement`, and refines the neutron wavelength.
 
 ```{toctree}
 :hidden:

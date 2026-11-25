@@ -967,7 +967,7 @@ def _joint_patterns() -> tuple[PatternData, ...]:
 
 
 def _joint_held(stages, sharing=None):
-    from rietx.multi import MultiHistogramRefinement
+    from rietx.joint import JointRefinement
 
     phase = _child((0.5, 0.5, 0), "S1", "(rank 2)#3").phase
     seeded = rx.Refinement(Structure(phases=[phase.model_copy(deep=True)]),
@@ -975,7 +975,7 @@ def _joint_held(stages, sharing=None):
     seeded.set_values({STRAIN_0: SEED})
     instruments = [Instrument(source=Source(lines=[EmissionLine(wavelength=w)]))
                    for w, _, _ in JOINT_WAVELENGTHS]
-    joint = MultiHistogramRefinement(seeded.structure, instruments, sharing=sharing)
+    joint = JointRefinement(seeded.structure, instruments, sharing=sharing)
     plan = rx.RefinementPlan(stages=[rx.Stage(name=n, turn_on=g, max_iter=5)
                                      for n, g in stages])
     result = joint.fit(list(_joint_patterns()), plan=plan, telemetry=False)
@@ -986,9 +986,9 @@ def test_a_joint_fit_says_the_strain_was_held_too():
     """``PARENT_STRAIN_HELD`` on a joint fit, both of its readings (#1108 round 7).
 
     Shared edges arrive bare, and the first arm fails without the call in
-    ``multi.py``.  Edges made per histogram arrive as
-    ``hist.h.phases.0.parent_cell.cell.a``, and the second arm fails without
-    the ``hist.h.`` stripping.  It is stripped twice, by ``multi.py``'s
+    ``joint.py``.  Edges made per pattern arrive as
+    ``pattern.h.phases.0.parent_cell.cell.a``, and the second arm fails without
+    the ``pattern.h.`` stripping.  It is stripped twice, by ``joint.py``'s
     ``_unscoped`` and by the helper itself, so either alone keeps it green
     (measured: removing the call, or both strippings, turns this red).
     Freeing the strain silences it.

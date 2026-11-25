@@ -25,7 +25,7 @@ reasons make a row un-refinable and they are distinguishable on purpose:
   (WP-1435), or through ``Phase.floating_origin``, which holds one
   coordinate per floating-origin direction (WP-1912; ``origin_axis`` says
   which).  The only one a caller both created and can lift;
-* ``needs_held_cell`` — a wavelength this histogram's free cell makes
+* ``needs_held_cell`` — a wavelength this pattern's free cell makes
   degenerate.  The only *dynamic* one: another parameter's state decides it.
 
 :attr:`ParameterRow.refinable` is the single predicate over the five, so a
@@ -176,7 +176,7 @@ class ParameterRow(Base):
     held: bool = False
     esd: float | None = None
     mode_fixed: bool = False
-    #: A wavelength that cannot be freed **right now** because this histogram's
+    #: A wavelength that cannot be freed **right now** because this pattern's
     #: cell is free, making the two an exactly flat direction.  The fourth
     #: held-reason, and the only *dynamic* one: unlike ``locked`` it is not a
     #: fact about the parameter, and unlike ``mode_fixed`` it is undone by
@@ -255,6 +255,6 @@ class ParameterRow(Base):
             return ("held by this refinement: declared with hold(), so no "
                     "stage's turn_on frees it until unhold()")
         if self.needs_held_cell:
-            return ("a free wavelength needs this histogram's cell held: "
+            return ("a free wavelength needs this pattern's cell held: "
                     "d = lambda/(2 sin theta) fixes only the product")
         return ""

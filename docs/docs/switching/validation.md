@@ -152,7 +152,7 @@ The silicon displacement parameters are 0.90 combined esd apart, and both codes 
 
 The specimen is Nd<sub>2</sub>Ru<sub>2</sub>O<sub>7</sub>, measured with synchrotron X-rays and with neutrons from a Cu(311) monochromator.
 The reference is the published combined refinement (Gaultois *et al.*, *Journal of Physics: Condensed Matter* 25, 186004 (2013)), which held the X-ray wavelength and refined the neutron one.
-rietx runs the same protocol as a joint fit of the two histograms.
+rietx runs the same protocol as a joint fit of the two patterns.
 
 | Quantity | rietx | Published |
 | --- | --- | --- |
@@ -162,7 +162,7 @@ rietx runs the same protocol as a joint fit of the two histograms.
 
 The cell is 57 ppm above the published value, and the oxygen coordinate is inside its own esd.
 The published refinement also carries 0.5(1) % by mole of RuO<sub>2</sub> and a λ/2 contribution, which rietx does not model.
-The neutron wavelength moves 257.9 ppm from its nominal value, which is the same cell disagreement the two histograms show when each is fitted on its own.
+The neutron wavelength moves 257.9 ppm from its nominal value, which is the same cell disagreement the two patterns show when each is fitted on its own.
 
 ## Spherical-harmonic texture against GSAS-II
 

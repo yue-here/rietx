@@ -1,12 +1,12 @@
 """The wavelength–cell degeneracy fence, and the parameter path behind it.
 
-Fast tests over synthetic two-histogram fixtures.  The real-data acceptance —
+Fast tests over synthetic two-pattern fixtures.  The real-data acceptance —
 the published joint refinement this feature exists for — is
 ``tests/test_acceptance_wavelength.py``.
 
-Two halves.  The first is the **refusal**: for one histogram λ and the cell are
+Two halves.  The first is the **refusal**: for one pattern λ and the cell are
 exactly degenerate (Bragg's law fixes only λ/2d), so a free λ is refused; for N
-histograms of one specimen the shared cell breaks the degeneracy, so exactly one
+patterns of one specimen the shared cell breaks the degeneracy, so exactly one
 held and at most N − 1 free is admitted and everything else is refused, each
 case naming its own cause.  The second is the **wiring**: a parameter registered
 in ``_collect_instrument`` and forgotten in ``apply_to_models`` loses its
@@ -19,7 +19,7 @@ builds a fresh ``EmissionLine`` per access.
 import numpy as np
 import pytest
 
-from rietx import Instrument, MultiHistogramRefinement, PatternData, Refinement
+from rietx import Instrument, JointRefinement, PatternData, Refinement
 from rietx.model.forward import compile_model
 from rietx.params.multi import MultiParameterTable, SharingMap
 from rietx.params.vector import (
@@ -120,7 +120,7 @@ def test_a_held_cell_makes_the_wavelength_measurable():
     """The case the old fence refused, and the reason the feature exists.
 
     Holding a certified cell pins the scale exactly as sharing it across
-    histograms does, so one histogram is enough.  This is how a beamline's
+    patterns does, so one pattern is enough.  This is how a beamline's
     wavelength is calibrated in the first place, and the mirror image of
     ``test_acceptance_srm660c``, which holds a certified cell so the
     *instrument* terms decorrelate.
@@ -201,9 +201,9 @@ def test_two_histograms_admit_one_free_wavelength_and_refuse_two():
     ins = [Instrument.debye_scherrer(wavelength=0.41390),
            Instrument.debye_scherrer(wavelength=0.71070)]
     mt = MultiParameterTable(make_lab6(), list(ins))
-    assert mt.set_vary([f"hist.1.{WL}"], True) == [f"hist.1.{WL}"]
+    assert mt.set_vary([f"pattern.1.{WL}"], True) == [f"pattern.1.{WL}"]
     with pytest.raises(ValueError, match="2 of 2 wavelengths are free"):
-        mt.set_vary([f"hist.0.{WL}"], True)
+        mt.set_vary([f"pattern.0.{WL}"], True)
     # the bare (unscoped) glob frees both copies at once, hence the same refusal
     fresh = MultiParameterTable(make_lab6(), list(ins))
     with pytest.raises(ValueError, match="2 of 2 wavelengths are free"):
@@ -215,53 +215,53 @@ def test_three_histograms_admit_two_free_wavelengths():
     ins = [Instrument.debye_scherrer(wavelength=lam)
            for lam in (0.41390, 0.71070, 1.54060)]
     mt = MultiParameterTable(make_lab6(), ins)
-    mt.set_vary([f"hist.1.{WL}", f"hist.2.{WL}"], True)
+    mt.set_vary([f"pattern.1.{WL}", f"pattern.2.{WL}"], True)
     assert sum(1 for p in mt.free_paths if p.endswith(".wavelength")) == 2
     with pytest.raises(ValueError, match="3 of 3 wavelengths are free"):
-        mt.set_vary([f"hist.0.{WL}"], True)
+        mt.set_vary([f"pattern.0.{WL}"], True)
 
 
 def test_a_one_histogram_joint_fit_is_still_a_single_histogram_fit():
     """``MultiParameterTable`` accepts N = 1, and the physics does not change."""
     ins = Instrument.debye_scherrer(wavelength=0.41390)
     mt = MultiParameterTable(make_lab6(), [ins])
-    with pytest.raises(ValueError, match="single-histogram"):
-        mt.set_vary([f"hist.0.{WL}"], True)
+    with pytest.raises(ValueError, match="single-pattern"):
+        mt.set_vary([f"pattern.0.{WL}"], True)
 
 
 def test_an_unshared_cell_refuses_every_free_wavelength():
     """The general rule, of which "one held, N − 1 free" is the special case.
 
-    λ is measurable only against a cell some *other* histogram's held λ has
-    pinned.  Give each histogram its own cell — a legitimate thing to want when
-    two histograms are two preparations — and the single-histogram degeneracy
-    is back per histogram, inside a joint fit where it would look solved.
+    λ is measurable only against a cell some *other* pattern's held λ has
+    pinned.  Give each pattern its own cell — a legitimate thing to want when
+    two patterns are two preparations — and the single-pattern degeneracy
+    is back per pattern, inside a joint fit where it would look solved.
     """
     ins = [Instrument.debye_scherrer(wavelength=0.41390),
            Instrument.debye_scherrer(wavelength=0.71070)]
     mt = MultiParameterTable(make_lab6(), ins,
                              sharing=SharingMap(per_histogram=["phases.*.cell.*"]))
-    with pytest.raises(ValueError, match="per-histogram"):
-        mt.set_vary([f"hist.1.{WL}"], True)
+    with pytest.raises(ValueError, match="per-pattern"):
+        mt.set_vary([f"pattern.1.{WL}"], True)
 
 
 def test_the_check_is_one_function_with_three_cases():
     """Called by both tables; the messages are its contract."""
     check_wavelength_freedom([], 2, 2)                  # nothing free: silent
-    check_wavelength_freedom([f"hist.1.{WL}"], 2, 2)    # one of two: fine
-    with pytest.raises(ValueError, match="single-histogram"):
+    check_wavelength_freedom([f"pattern.1.{WL}"], 2, 2)    # one of two: fine
+    with pytest.raises(ValueError, match="single-pattern"):
         check_wavelength_freedom([WL], 1, 1)
     with pytest.raises(ValueError, match="hold one"):
-        check_wavelength_freedom([f"hist.0.{WL}", f"hist.1.{WL}"], 2, 2)
-    with pytest.raises(ValueError, match="per-histogram"):
-        check_wavelength_freedom([f"hist.1.{WL}"], 2, 2, cell_shared=False)
+        check_wavelength_freedom([f"pattern.0.{WL}", f"pattern.1.{WL}"], 2, 2)
+    with pytest.raises(ValueError, match="per-pattern"):
+        check_wavelength_freedom([f"pattern.1.{WL}"], 2, 2, cell_shared=False)
 
 
 def test_suggest_never_proposes_a_wavelength():
     """A suggestion is "free this next", and a locked row is not freeable.
 
     No special case in ``suggest`` for this: the row is force-fixed in a
-    single-histogram table, so ``ParameterRow.refinable`` is already ``False``
+    single-pattern table, so ``ParameterRow.refinable`` is already ``False``
     and the enumeration drops it — which is also what makes
     ``held_because`` tell the truth about it.
     """
@@ -286,9 +286,9 @@ def test_the_wavelength_is_a_table_row_and_survives_write_back():
     structure = make_lab6()
     ins = Instrument.constant_wavelength_neutron(2.078, fwhm_deg=0.3)
     mt = MultiParameterTable(structure, [ins, ins.model_copy(deep=True)])
-    mt.set_vary([f"hist.1.{WL}"], True)
+    mt.set_vary([f"pattern.1.{WL}"], True)
     theta = mt.x0()
-    col = mt.free_paths.index(f"hist.1.{WL}")
+    col = mt.free_paths.index(f"pattern.1.{WL}")
     theta[col] = 2.0800
     mt.commit(theta)
     mt.apply_to_models()
@@ -357,7 +357,7 @@ def test_the_analytic_column_matches_finite_differences():
     ``scalar_chain_supported`` claims that everything λ touches is one of the
     four per-peak scalars.  Here that claim meets a whole-model finite
     difference — the column that decodes through C exactly as the residual
-    does — on a two-histogram state where λ is genuinely free.
+    does — on a two-pattern state where λ is genuinely free.
     """
     from rietx.optimize.least_squares import _make_jacobian, _make_residual
 
@@ -385,7 +385,7 @@ def test_a_joint_fit_reports_the_calibration_move_in_ppm():
 
     Two patterns of one crystal, the second's λ declared 500 ppm below the
     value it was generated at.  The diagnostic must report roughly +500 ppm,
-    carry it as ``Diagnostic.value``, and fire only on the histogram whose λ
+    carry it as ``Diagnostic.value``, and fire only on the pattern whose λ
     was freed.
     """
     from rietx.strategy.staged import RefinementPlan, Stage
@@ -401,30 +401,30 @@ def test_a_joint_fit_reports_the_calibration_move_in_ppm():
     p = RefinementPlan(stages=[
         Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
         Stage("cell", ["phases.*.cell.*"]),
-        Stage("wavelength", [f"hist.1.{WL}", "phases.*.cell.*"]),
+        Stage("wavelength", [f"pattern.1.{WL}", "phases.*.cell.*"]),
     ])
-    joint = MultiHistogramRefinement(make_lab6(), [ins0, ins1])
+    joint = JointRefinement(make_lab6(), [ins0, ins1])
     result = joint.fit([d0, d1], plan=p)
-    diags = [d for h in result.histograms for d in h.diagnostics
+    diags = [d for h in result.patterns for d in h.diagnostics
              if d.code == "WAVELENGTH_CALIBRATION"]
     assert len(diags) == 1
-    assert diags[0].where == [f"hist.1.{WL}"]
+    assert diags[0].where == [f"pattern.1.{WL}"]
     assert diags[0].value == pytest.approx(500.0, rel=0.25)
     assert "ppm" in diags[0].message
-    # the joint framing names the histogram whose λ is held, not the cell
-    assert "the histogram whose wavelength is held" in diags[0].message
+    # the joint framing names the pattern whose λ is held, not the cell
+    assert "the pattern whose wavelength is held" in diags[0].message
 
 
 def test_a_single_histogram_held_cell_fit_reports_the_calibration_move():
     """``WAVELENGTH_CALIBRATION`` on the case the fence fix exists for.
 
-    A held certified cell pins the scale for one histogram, so a free λ is
+    A held certified cell pins the scale for one pattern, so a free λ is
     admissible and its move *is* the calibration measurement — the SRM 640c
     shape.  One pattern generated at the true λ, its instrument declared 400 ppm
     below it: the diagnostic must fire exactly once, report roughly +400 ppm,
     carry it as ``Diagnostic.value``, resolve the move against its own esd, and
     address the plain (un-prefixed) path.  Its clause is the held **cell**, not
-    a held histogram — the joint framing is false here.  A fit that frees no λ
+    a held pattern — the joint framing is false here.  A fit that frees no λ
     emits none.
     """
     from rietx.strategy.staged import RefinementPlan, Stage
@@ -445,7 +445,7 @@ def test_a_single_histogram_held_cell_fit_reports_the_calibration_move():
     diags = [d for d in result.diagnostics
              if d.code == "WAVELENGTH_CALIBRATION"]
     assert len(diags) == 1
-    assert diags[0].where == [WL]                       # no hist. prefix
+    assert diags[0].where == [WL]                       # no pattern. prefix
     assert diags[0].value == pytest.approx(400.0, rel=0.25)
     assert "ppm" in diags[0].message
     assert "its own esd" in diags[0].message            # the move is resolved
@@ -469,8 +469,8 @@ def test_declared_is_the_constructed_lambda_so_run_stage_reports_cumulatively():
     this ``Refinement`` was *built* with, so a second λ-freeing ``run_stage``
     reports the **cumulative** move from that declared value — not a delta from
     the value the first stage happened to leave behind, which is a number nobody
-    declared.  This is what makes the single-histogram path agree with the joint
-    one (``multi.py`` snapshots at construction).
+    declared.  This is what makes the single-pattern path agree with the joint
+    one (``joint.py`` snapshots at construction).
 
     His measured shape, per-verb snapshotting (the bug): stage 1 ``+417 ppm from
     declared 1.539984``, stage 2 ``−18 ppm from declared 1.540626`` — 1.540626

@@ -161,7 +161,7 @@ p_k \;=\; f(v, z_k),
 
 where $v$ are the variables and $z_k$ the pattern's coordinates. A variable is
 one refined column, shared by every formula that names it, so $f$ may be
-nonlinear in it. A variable the sharing map makes per-histogram is one column
+nonlinear in it. A variable the sharing map makes per-pattern is one column
 per pattern instead, Stinton and Evans's temperature offset {cite}`stinton2007`.
 In each pattern the target is a derived row, written from the variables at
 each evaluation, and $\partial f/\partial v_i$ is exact: the grammar has one

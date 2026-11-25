@@ -56,7 +56,7 @@ from .io.projects import (
 )
 from .io.readers import read_pattern, read_pdcif
 from .io.recipe import Recipe, RecipeError, read_recipe, write_recipe_tables
-from .multi import MultiHistogramRefinement, refine_multi
+from .joint import JointRefinement, refine_joint
 from .optimize.cancel import CancelToken, RefinementCancelled
 from .params.multi import SharingMap
 from .project import Project
@@ -158,7 +158,7 @@ __all__ = [
     "ExtinctionPrior",
     "ExtinctionScreen",
     "IndexingResult",
-    "MultiHistogramRefinement",
+    "JointRefinement",
     "NoPhasesError",
     "NodeAction",
     "PLAN_INFO",
@@ -242,7 +242,7 @@ __all__ = [
     "reflection_table",
     "refine",
     "refine_sequential",
-    "refine_multi",
+    "refine_joint",
     "replay",
     "save_instrument_profile",
     "solve_magnetic",
@@ -305,6 +305,11 @@ _TOP_LEVEL_HINTS: dict[str, str] = {
     "agent": ("removed in v1.3 — call rietx.refine() or Refinement.fit() and "
               "dump the answer with result.model_dump(mode='json'); the "
               "envelope's ok:false is now a raised ValueError/RuntimeError"),
+    # the joint call's names before v1.13 (WP-2305); the old module is
+    # src/rietx/multi.py, which raises on import with the same pointer
+    "refine_multi": "renamed in v1.13: call rietx.refine_joint",
+    "MultiHistogramRefinement": "renamed in v1.13: use rietx.JointRefinement",
+    "multi": "renamed in v1.13: the module is rietx.joint",
 }
 
 

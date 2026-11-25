@@ -169,13 +169,13 @@ def _seq():
 
 def _joint(c, **kw):
     structure, instrument = perturbed_models()
-    return rx.refine_multi([c.data, c.data], structure,
+    return rx.refine_joint([c.data, c.data], structure,
                            [instrument, instrument.model_copy(deep=True)], **kw)
 
 
 def _joint_ref(c, **kw):
     structure, instrument = perturbed_models()
-    return rx.MultiHistogramRefinement(
+    return rx.JointRefinement(
         structure, [instrument, instrument.model_copy(deep=True)], **kw)
 
 
@@ -235,17 +235,17 @@ CASES: dict[tuple[str, str], tuple] = {
         ("r_bragg", "r_f")),
     ("SeriesResult.summary", "deliverable"): (
         lambda c, v: rx.SeriesResult.model_construct().summary(deliverable=v), None),
-    ("refine_multi", "mode"): (lambda c, v: _joint(c, mode=v), None),
-    ("refine_multi", "plan"): (lambda c, v: _joint(c, plan=v), None),
-    ("refine_multi", "backend"): (lambda c, v: _joint(c, backend=v), BACKEND_NAMES),
-    ("refine_multi", "solver"): (lambda c, v: _joint(c, solver=v), SOLVERS),
-    ("MultiHistogramRefinement.fit", "mode"): (
+    ("refine_joint", "mode"): (lambda c, v: _joint(c, mode=v), None),
+    ("refine_joint", "plan"): (lambda c, v: _joint(c, plan=v), None),
+    ("refine_joint", "backend"): (lambda c, v: _joint(c, backend=v), BACKEND_NAMES),
+    ("refine_joint", "solver"): (lambda c, v: _joint(c, solver=v), SOLVERS),
+    ("JointRefinement.fit", "mode"): (
         lambda c, v: _joint_ref(c).fit([c.data, c.data], mode=v), None),
-    ("MultiHistogramRefinement.fit", "plan"): (
+    ("JointRefinement.fit", "plan"): (
         lambda c, v: _joint_ref(c).fit([c.data, c.data], plan=v), None),
-    ("MultiHistogramRefinement.parameters", "mode"): (
+    ("JointRefinement.parameters", "mode"): (
         lambda c, v: _joint_ref(c).parameters(mode=v), MODES),
-    ("MultiHistogramRefinement.report", "plan"): (
+    ("JointRefinement.report", "plan"): (
         lambda c, v: c.joint.report(0, plan=v), None),
     ("Project.create", "mode"): (
         lambda c, v: rx.Project.create(c.root / f"m{v}.rex", pattern=c.xy,

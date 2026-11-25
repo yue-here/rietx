@@ -32,7 +32,7 @@ import pytest
 from pydantic import ValidationError
 
 import rietx as rx
-from rietx.multi import MultiHistogramRefinement, _joint_fixed_literals, refine_multi
+from rietx.joint import JointRefinement, _joint_fixed_literals, refine_joint
 from rietx.params.multi import MultiParameterTable, SharingMap
 from rietx.schemas.parametric import CoordinateTable, ParametricEquation
 from rietx.strategy.staged import Stage
@@ -75,7 +75,7 @@ def _table(n: int = 3, *, parametric=None, variables=None, coordinates=None,
 def _plot(result: rx.RefinementResult, name: str, histograms: tuple[int, ...]) -> None:
     OUT.mkdir(exist_ok=True)
     for h in histograms:
-        plot_result(result.for_histogram(h), path=str(OUT / f"{name}_h{h}_fit.png"))
+        plot_result(result.for_pattern(h), path=str(OUT / f"{name}_h{h}_fit.png"))
 
 
 # -- the declaration as data -------------------------------------------------
@@ -131,7 +131,7 @@ def test_a_malformed_expression_equation_is_refused_at_construction(kw, fragment
     (lambda: _table(parametric=[_expression(target="phases.0.cell.b")]),
      r"is tied: = 1·phases.0.cell.a"),
     (lambda: _table(parametric=[_expression(target="phases.0.cell.q")]),
-     r"is not a parameter of histogram 0's model\. To list them.*\.parameters\(\)"),
+     r"is not a parameter of pattern 0's model\. To list them.*\.parameters\(\)"),
     (lambda: _table(parametric=[_expression(target="phases.0.atoms.0.x")]), "locked"),
     (lambda: _table(parametric=[_expression(patterns=[0, 5])]), "out of range"),
     (lambda: _table(coordinates=_coords(2)), "2 rows for 3 patterns"),
@@ -191,8 +191,8 @@ def test_a_glob_on_the_target_frees_the_variables_bar_a_fixed_one():
     assert mt.set_vary(["phases.*.cell.*"], True) == ["vars.zero_a", "vars.grad"]
     assert mt.free_paths == ["vars.zero_a", "vars.grad"]
     mt.set_vary(["*"], False)
-    # scoped to one histogram, the glob still reaches the equation
-    assert mt.set_vary(["hist.1.phases.0.cell.a"], True) == ["vars.zero_a", "vars.grad"]
+    # scoped to one pattern, the glob still reaches the equation
+    assert mt.set_vary(["pattern.1.phases.0.cell.a"], True) == ["vars.zero_a", "vars.grad"]
     # a glob naming the fixed variable itself frees it
     assert mt.set_vary(["vars.theta"], True) == ["vars.theta"]
     # a plan's literal on the target is not "a row the stage cannot free"
@@ -203,7 +203,7 @@ def test_the_refinement_lists_an_expression_equation_in_the_order_declared():
     s, _ = perturbed_inputs()
     line = ParametricEquation(name="w", target="instrument.profile.w", basis="polynomial",
                               terms=[[], ["T"]])
-    ref = MultiHistogramRefinement(s, _lab6_instruments(3), coordinates=_coords(3),
+    ref = JointRefinement(s, _lab6_instruments(3), coordinates=_coords(3),
                                    parametric=[_expression(), line], variables=_variables())
     a, w = ref.parametric
     assert a == _expression()
@@ -232,7 +232,7 @@ def test_an_einstein_cell_with_theta_held_recovers_its_two_variables():
     variables = {"zero_a": rx.Parameter(value=A0 * 1.001, vary=True),
                  "grad": rx.Parameter(value=0.01, vary=True),
                  "theta": rx.Parameter(value=theta, vary=False, min=20.0, max=1000.0)}
-    ref = MultiHistogramRefinement(
+    ref = JointRefinement(
         structure, [ins] * len(temps),
         sharing=SharingMap(shared=["instrument.zero_shift", "instrument.profile.*"]),
         coordinates=CoordinateTable(columns={"T": temps}, units={"T": "K"}),
@@ -253,17 +253,17 @@ def test_an_einstein_cell_with_theta_held_recovers_its_two_variables():
     assert cell.freed == ["vars.zero_a", "vars.grad"]
     # each pattern's cell edge is the equation at its own temperature
     for h, temp in enumerate(temps):
-        a = rows[f"hist.{h}.phases.0.cell.a"].value
+        a = rows[f"pattern.{h}.phases.0.cell.a"].value
         assert a == pytest.approx(rows["vars.zero_a"].value
                                   + rows["vars.grad"].value / np.expm1(theta / temp),
                                   rel=1e-13)
     # the rows the equation sets name it: its variables, and each pattern's
     # target with the b and c that follow it (§ Inherited, the third reader)
     for path in ("vars.zero_a", "vars.grad",
-                 *(f"hist.{h}.phases.0.cell.{k}" for h in range(len(temps)) for k in "abc")):
+                 *(f"pattern.{h}.phases.0.cell.{k}" for h in range(len(temps)) for k in "abc")):
         if path in rows:
             assert rows[path].equations == ["a"], path
-    assert rows["hist.0.phases.0.cell.a"].equations == ["a"]
+    assert rows["pattern.0.phases.0.cell.a"].equations == ["a"]
     # the variables are the equation's rows in result.parametric, θ held
     by_term = {c.term: c for c in result.parametric}
     assert list(by_term) == ["zero_a", "grad", "theta"]
@@ -279,7 +279,7 @@ def test_an_einstein_cell_with_theta_held_recovers_its_two_variables():
     (eq,) = result.parametric_equations
     for h, temp in enumerate(temps):
         v = eq.evaluate(result.parametric, coordinates={"T": temp})
-        row = rows[f"hist.{h}.phases.0.cell.a"]
+        row = rows[f"pattern.{h}.phases.0.cell.a"]
         assert v.value == pytest.approx(row.value, rel=1e-13)
         assert v.esd == pytest.approx(row.stderr, rel=1e-6), h
         assert v.outside == [] and v.unit == "Å"
@@ -315,7 +315,7 @@ def test_a_polynomial_and_the_same_form_as_an_expression_agree_to_a_hundredth_es
     sharing = SharingMap(shared=["instrument.zero_shift", "instrument.profile.*"])
 
     structure, ins = _start_models()
-    poly = MultiHistogramRefinement(
+    poly = JointRefinement(
         structure, [ins] * len(temps), sharing=sharing, coordinates=coords,
         parametric=[ParametricEquation(name="a", target="phases.0.cell.a",
                                        basis="polynomial", terms=[[], ["T"]])])
@@ -326,8 +326,8 @@ def test_a_polynomial_and_the_same_form_as_an_expression_agree_to_a_hundredth_es
 
     structure, ins = _start_models()
     start = structure.phases[0].cell.a.value
-    # the § Goal spelling: refine_multi takes variables= beside coordinates=
-    by_expr = refine_multi(
+    # the § Goal spelling: refine_joint takes variables= beside coordinates=
+    by_expr = refine_joint(
         patterns, structure, [ins] * len(temps), plan="mccusker_default",
         sharing=SharingMap(shared=list(sharing.shared)), coordinates=coords,
         variables={"c0": rx.Parameter(value=start, vary=True),
@@ -345,7 +345,7 @@ def test_a_polynomial_and_the_same_form_as_an_expression_agree_to_a_hundredth_es
         assert abs(e[mine].value - p[theirs].value) < 0.01 * esd, (mine, e[mine], p[theirs])
         assert e[mine].stderr == pytest.approx(esd, rel=0.01)
     for h in range(len(temps)):
-        path = f"hist.{h}.phases.0.cell.a"
+        path = f"pattern.{h}.phases.0.cell.a"
         assert abs(e[path].value - p[path].value) < 0.01 * p[path].stderr, path
     # one model, one form test: the gradient reading of the expression and the
     # Φ reading of the polynomial agree.  Measured (macOS arm64): 6.8e-11
@@ -367,7 +367,7 @@ def test_a_line_written_over_an_einstein_cell_is_rejected_by_the_form_test():
     temps = [300.0, 525.0, 750.0, 975.0, 1200.0]
     patterns = _ramp([A0 + 0.02 / np.expm1(400.0 / t) for t in temps], seed=20)
     structure, ins = _start_models()
-    result = refine_multi(
+    result = refine_joint(
         patterns, structure, [ins] * len(temps), plan="mccusker_default",
         sharing=SharingMap(shared=["instrument.zero_shift", "instrument.profile.*"]),
         coordinates=CoordinateTable(columns={"T": temps}, units={"T": "K"}),
@@ -407,7 +407,7 @@ def test_a_held_slope_is_named_and_the_rejection_names_it_first():
     patterns, structure, instruments, coords = _line_ramp()
     fits = {}
     for vary in (True, False):
-        fits[vary] = refine_multi(
+        fits[vary] = refine_joint(
             patterns, structure, instruments, plan="mccusker_default",
             sharing=SharingMap(shared=["instrument.zero_shift", "instrument.profile.*"]),
             coordinates=coords,
@@ -434,7 +434,7 @@ def test_a_held_slope_is_named_and_the_rejection_names_it_first():
         "No stage freed vars.a1, so it kept its starting value. Free it and refit "
         "before changing the equation. Revise the expression")
     # a fit-wide statement: every pattern's view carries it
-    assert "VARIABLE_NOT_FREED" in {d.code for d in held.for_histogram(2).diagnostics}
+    assert "VARIABLE_NOT_FREED" in {d.code for d in held.for_pattern(2).diagnostics}
 
 
 @pytest.mark.xdist_group("parametric-expression")
@@ -447,7 +447,7 @@ def test_an_equation_on_a_target_no_stage_reaches_is_named():
                               terms=[[], ["T"]])
     biso = ParametricEquation(name="b", target="phases.0.atoms.0.biso",
                               basis="polynomial", terms=[[], ["T"]])
-    result = refine_multi(
+    result = refine_joint(
         patterns, structure, instruments, plan="mccusker_default",
         sharing=SharingMap(shared=["instrument.zero_shift", "instrument.profile.*"]),
         coordinates=coords, parametric=[cell, biso])
@@ -562,7 +562,7 @@ def test_an_order_parameter_through_its_transition_recovers_tc_and_beta():
 
     patterns = [_simulate(cell(t), seed=k) for k, t in enumerate(temps)]
     structure, ins = _exact_start()
-    result = refine_multi(
+    result = refine_joint(
         patterns, structure, [ins] * len(temps), plan="mccusker_default",
         sharing=SharingMap(shared=["instrument.zero_shift", "instrument.profile.*"]),
         coordinates=CoordinateTable(columns={"T": temps}, units={"T": "K"}),
@@ -594,7 +594,7 @@ def test_an_avrami_fraction_recovers_its_rate_and_exponent():
     structure, ins = _exact_start()
     for name in "abc":
         getattr(structure.phases[0].cell, name).value = A0
-    result = refine_multi(
+    result = refine_joint(
         patterns, structure, [ins] * len(times), plan="mccusker_default",
         sharing=SharingMap(shared=["instrument.zero_shift", "instrument.profile.*"]),
         coordinates=CoordinateTable(columns={"t": times}, units={"t": "s"}),
@@ -767,7 +767,7 @@ def test_one_intermediate_feeds_two_equations():
 
 def test_the_refinement_lists_an_intermediate_in_its_place():
     s, _ = perturbed_inputs()
-    ref = MultiHistogramRefinement(s, _lab6_instruments(3), coordinates=_coords(3),
+    ref = JointRefinement(s, _lab6_instruments(3), coordinates=_coords(3),
                                    parametric=[_calibration(), _fed()],
                                    variables=_fed_variables())
     assert ref.parametric == [_calibration(), _fed()]
@@ -797,7 +797,7 @@ def test_a_temperature_calibration_feeding_the_cell_recovers_its_coefficients():
                  "k": rx.Parameter(value=k, vary=False),
                  "c0": rx.Parameter(value=0.0, vary=True),
                  "c1": rx.Parameter(value=0.0, vary=True)}
-    ref = MultiHistogramRefinement(
+    ref = JointRefinement(
         structure, [ins] * len(temps),
         sharing=SharingMap(shared=["instrument.zero_shift", "instrument.profile.*"]),
         coordinates=CoordinateTable(columns={"T": temps}, units={"T": "K"}),
@@ -815,7 +815,7 @@ def test_a_temperature_calibration_feeding_the_cell_recovers_its_coefficients():
     assert sorted(cell.freed) == ["vars.c0", "vars.c1"]
     got0, got1 = rows["vars.c0"].value, rows["vars.c1"].value
     for h, temp in enumerate(temps):
-        a = rows[f"hist.{h}.phases.0.cell.a"].value
+        a = rows[f"pattern.{h}.phases.0.cell.a"].value
         assert a == pytest.approx(a0 + k * (temp + got0 + got1 * temp), rel=1e-13)
     # evaluated from the result alone, the intermediate passed as a definition
     # (task 10); its own entry reads over its two variables
@@ -825,7 +825,7 @@ def test_a_temperature_calibration_feeding_the_cell_recovers_its_coefficients():
     for h, temp in enumerate(temps):
         v = by_name["a"].evaluate(mine, coordinates={"T": temp},
                                   definitions=[by_name["T_true"]])
-        row = rows[f"hist.{h}.phases.0.cell.a"]
+        row = rows[f"pattern.{h}.phases.0.cell.a"]
         assert v.value == pytest.approx(row.value, rel=1e-13)
         assert v.esd == pytest.approx(row.stderr, rel=1e-6), h
     with pytest.raises(ValueError, match="T_true"):
@@ -879,19 +879,19 @@ def test_a_per_histogram_glob_makes_a_variable_a_column_per_pattern():
     mt = _table(sharing=SharingMap(per_histogram=["vars.zero_a"]))
     mt.set_vary(["*"], False)
     freed = mt.set_vary(["phases.*.cell.*"], True)
-    assert sorted(freed) == ["hist.0.vars.zero_a", "hist.1.vars.zero_a",
-                             "hist.2.vars.zero_a", "vars.grad"]
+    assert sorted(freed) == ["pattern.0.vars.zero_a", "pattern.1.vars.zero_a",
+                             "pattern.2.vars.zero_a", "vars.grad"]
     assert mt.shared_paths == ["vars.grad"]
     mt.set_vary(["*"], False)
     # scoped to one pattern, the glob frees that pattern's column and the shared one
-    assert sorted(mt.set_vary(["hist.1.phases.0.cell.a"], True)) == [
-        "hist.1.vars.zero_a", "vars.grad"]
+    assert sorted(mt.set_vary(["pattern.1.phases.0.cell.a"], True)) == [
+        "pattern.1.vars.zero_a", "vars.grad"]
     # a subset: only the patterns whose equation reads the variable carry it
     sub = _table(parametric=[_expression(patterns=[1, 2])],
                  sharing=SharingMap(per_histogram=["vars.*"]))
     assert ["vars.zero_a" in t._paths for t in sub.tables] == [False, True, True]
     (r,) = sub.expressions
-    assert sub.variable_rows(r) == [f"hist.{h}.vars.{v}" for v in ("zero_a", "grad", "theta")
+    assert sub.variable_rows(r) == [f"pattern.{h}.vars.{v}" for v in ("zero_a", "grad", "theta")
                                     for h in (1, 2)]
 
 
@@ -965,7 +965,7 @@ def _stinton_evans(seed: int):
                            expression="as0 + gs*(T + dT - 300)"),
         ParametricEquation(name="smp", target="phases.1.cell.a", basis="expression",
                            expression="b0 + gb*(T + dT - 300)")]
-    ref = MultiHistogramRefinement(
+    ref = JointRefinement(
         structure, [ins] * len(TEMPS_SE),
         sharing=SharingMap(shared=["instrument.zero_shift", "instrument.profile.*"],
                            per_histogram=["vars.dT"]),
@@ -983,7 +983,7 @@ def _stinton_evans(seed: int):
 
 def _z_scores(result: rx.RefinementResult) -> dict[str, float]:
     rows = {p.path: p for p in result.parameters}
-    truth = {**{f"hist.{k}.vars.dT": d for k, d in enumerate(DT_SE)},
+    truth = {**{f"pattern.{k}.vars.dT": d for k, d in enumerate(DT_SE)},
              "vars.b0": B0_SMP, "vars.gb": GB_SMP}
     return {path: (rows[path].value - t) / rows[path].stderr for path, t in truth.items()}
 
@@ -1001,22 +1001,22 @@ def test_a_temperature_offset_per_pattern_feeds_two_cell_equations():
     rows = {p.path: p for p in result.parameters}
     cell = next(st for st in result.stages if st.name == "cell")
     assert cell.freed == ["vars.b0", "vars.gb",
-                          *(f"hist.{k}.vars.dT" for k in range(len(TEMPS_SE)))]
+                          *(f"pattern.{k}.vars.dT" for k in range(len(TEMPS_SE)))]
     # each pattern's cells are the two equations at its own T + ΔT
     for k, temp in enumerate(TEMPS_SE):
-        dt = rows[f"hist.{k}.vars.dT"].value
-        assert rows[f"hist.{k}.phases.1.cell.a"].value == pytest.approx(
+        dt = rows[f"pattern.{k}.vars.dT"].value
+        assert rows[f"pattern.{k}.phases.1.cell.a"].value == pytest.approx(
             rows["vars.b0"].value + rows["vars.gb"].value * (temp + dt - 300.0), rel=1e-13)
-        assert rows[f"hist.{k}.vars.dT"].equations == ["std", "smp"]
+        assert rows[f"pattern.{k}.vars.dT"].equations == ["std", "smp"]
     # result.parametric: a per-pattern variable is a row per pattern of its equation
     smp = [c for c in result.parametric if c.equation == "smp"]
     assert [c.path for c in smp] == ["vars.b0", "vars.gb", *(
-        f"hist.{k}.vars.dT" for k in range(len(TEMPS_SE)))]
+        f"pattern.{k}.vars.dT" for k in range(len(TEMPS_SE)))]
     assert all(c.term == "dT" and c.esd == rows[c.path].stderr for c in smp[2:])
     # no value between patterns, so evaluate says where each pattern's is
     eq = next(e for e in result.parametric_equations if e.equation.name == "smp")
     assert eq.covariance is None
-    with pytest.raises(ValueError, match="hist.h.phases.1.cell.a"):
+    with pytest.raises(ValueError, match="pattern.h.phases.1.cell.a"):
         eq.evaluate(smp, coordinates={"T": 450.0})
     # with ΔT free in every pattern, neither equation alone has a direction to
     # test once the other's targets are freed; the joint reading tests the pair

@@ -251,7 +251,7 @@ Divide it by $f$ for the uncorrected number. The exact $f$ is `stderr` over
 measures $f$ again at the values the result reports, while the esds carry the
 $f$ of the solve's last residual. The two agreed to 0.75 % or better on the
 single-pattern fits measured, and differed by 4 % on a joint fit with
-histogram weights 1:4. Values are quoted with two-significant-figure su's per
+pattern weights 1:4. Values are quoted with two-significant-figure su's per
 the IUCr convention {cite}`schwarzenbach1989`.
 
 ### What other programs report
@@ -576,8 +576,8 @@ scale's column and its projection onto the span, both at unit length, form the
 block $[[1, c], [c, 1]]$ with $c = \cos\varphi$. Its small eigenvalue,
 $1 - |c| \approx r^2/2$, is discarded against $\lambda_{\max} \approx 2$
 exactly when $r < 2\sqrt{\mathrm{rcond}}$. A joint fit has one scale per
-histogram and shares $B$, so it reads the smallest angle between the span of
-the scales and the span of the $b_j$, stacked over histograms.
+pattern and shares $B$, so it reads the smallest angle between the span of
+the scales and the span of the $b_j$, stacked over patterns.
 
 With $B$ held, the phase's weight fraction is conditional on it. At fixed
 intensity, an error $\delta B$ moves the fraction by the factor
@@ -776,11 +776,11 @@ reports how far it was still moving in esd units, and the same stage starved to
 one iteration measures $\approx 14$. The value is withheld wherever it cannot
 be measured: with no accepted step, no esds, or an evaluate-only replay.
 
-A joint multi-histogram fit has the same quantity over its joint $\theta$. Each
+A joint fit has the same quantity over its joint $\theta$. Each
 column has one shift, the joint solve's last accepted step. It has one esd,
-from the covariance of the weighted stacked residual. The histogram weights
+from the covariance of the weighted stacked residual. The pattern weights
 enter both, so they change the number and leave the criterion as it is. A
-shared column appears in every histogram's table with the same ratio, because
+shared column appears in every pattern's table with the same ratio, because
 each table decodes it affinely.
 
 ## The fp64 floor

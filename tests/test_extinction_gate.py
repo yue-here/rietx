@@ -290,7 +290,7 @@ def _pbso4_arrays():
 
 
 def _pbso4_inputs(factor: float = 1.0):
-    """The issue's reproducer: the X-ray histogram on the preset instrument at
+    """The issue's reproducer: the X-ray pattern on the preset instrument at
     the cell ``index_pattern`` returned for its neutron twin (0.1-0.2 % long),
     scaled by ``factor``."""
     from rietx.schemas.instrument import EmissionLine, Source

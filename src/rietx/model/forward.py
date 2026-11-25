@@ -350,7 +350,7 @@ def apertures_to_lift(freed: list[str]) -> list[str]:
     """The paths in ``freed`` that are an FCJ axial ratio, the rows a stage
     may lift when they sit on zero (WP-1955), S/L's before H/L's.
 
-    A path may carry a multi-histogram scope (``hist.{h}.``).  The runner's
+    A path may carry a joint scope (``pattern.{h}.``).  The runner's
     ``seed_floored`` then writes only a row on its floor: a row whose value
     equals its lower bound is moved (a typed 0 and a value = min = 0.005 alike),
     and one above its bound is not.
@@ -374,13 +374,13 @@ def apertures_to_lift(freed: list[str]) -> list[str]:
     walk back to zero: CPD 1b does, ending on its floor.
     """
     return sorted((p for p in freed
-                   if (p.split(".", 2)[2] if p.startswith("hist.") else p)
+                   if (p.split(".", 2)[2] if p.startswith("pattern.") else p)
                    in AXIAL_PATHS),
                   key=lambda p: p.endswith("axial_hl"))
 
 
 def axial_partner(path: str) -> str:
-    """The other FCJ axial ratio of ``path``'s own instrument or histogram."""
+    """The other FCJ axial ratio of ``path``'s own instrument or pattern."""
     scope, name = path.rsplit(".", 1)
     sl_name, hl_name = (p.rsplit(".", 1)[1] for p in AXIAL_PATHS)
     return f"{scope}.{hl_name if name == sl_name else sl_name}"
@@ -400,7 +400,7 @@ def axial_lift_start(path: str, partner_value: float) -> float:
     value, so a partner that was lifted counts at its start and one that
     could not be (a start the caller chose, above its floor) at its own.  Both
     lifted: S/L 0.02, H/L 0.01.  By the symmetry of the pair either order is a
-    valid answer, so two histograms of one instrument may land on opposite
+    valid answer, so two patterns of one instrument may land on opposite
     orders in a joint fit.
     """
     own, other = ((AXIAL_SL_START, AXIAL_HL_START) if path.endswith("axial_sl")
@@ -1071,7 +1071,7 @@ class CompiledModel:
     # special case), so it exists only for the post-fit HARMONIC_FRACTION
     # diagnostic, which has to name the order it is reporting.
     harmonic_orders: dict[int, int]
-    #: ``Source.kind`` of the histogram this model was compiled for.  Nothing
+    #: ``Source.kind`` of the pattern this model was compiled for.  Nothing
     #: in the forward model reads it (the radiation's own arithmetic — form
     #: factors or scattering lengths, polarisation — is compiled into the
     #: phases); it is frozen here for the post-fit readers that must ask
@@ -1272,10 +1272,10 @@ class CompiledModel:
 
         The tick half of the member contract's clause 2, written once because
         **two** result builders owe it: ``refine._build_result`` and
-        ``multi.MultiHistogramRefinement._build_result``, through their one
+        ``joint.JointRefinement._build_result``, through their one
         tick builder ``refine._tick_rows`` (WP-2028).  A copy in each is how a
         joint fit ends up reporting a declared peak as an unindexed impurity
-        while a single-histogram fit does not — the ``ticks`` failure this
+        while a single-pattern fit does not — the ``ticks`` failure this
         exists to prevent, one surface over.
 
         **No zero shift**, unlike a phase's ticks: the centre is the *apparent*
@@ -1482,7 +1482,7 @@ class CompiledModel:
         and cap both arrays through one index, never one at a time.
 
         This is the one place that walks a phase's cell, lines and positions
-        for a tick.  ``refine._build_result``, ``multi.MultiHistogramRefinement
+        for a tick.  ``refine._build_result``, ``joint.JointRefinement
         ._build_result`` and ``viz.snapshot.stage_ticks`` each carried their
         own copy until WP-1908's review, and a copy is how a builder forgets
         the shift.  The first two now share ``refine._tick_rows`` (WP-2028).
@@ -1825,7 +1825,7 @@ class CompiledModel:
         every caller wants both: the line positions are ``two_theta_deg(d, λ)``
         and nothing else enters them.  ``d`` depends on the cell alone; the
         per-line angles are where λ enters the model at all, which is why a free
-        λ moves every peak of its histogram and nothing else does.
+        λ moves every peak of its pattern and nothing else does.
         """
         d = d_spacings(cp.reflections.index, *cell)
         return d, [two_theta_deg(d, lam) for lam in lams]
@@ -4431,13 +4431,13 @@ def _reraise_species_fault(phase, disp, lams, exc, *, neutron=False):
 
 # ----------------------------------------------------------------------
 def magnetic_wanted(phase, source) -> bool:
-    """Whether this phase's moment contributes to *this* histogram (WP-1327).
+    """Whether this phase's moment contributes to *this* pattern (WP-1327).
 
-    **The magnetic term enters a neutron histogram and nothing else.**  A
+    **The magnetic term enters a neutron pattern and nothing else.**  A
     neutron sees the
     magnetization density through its own moment; an X-ray of a laboratory or
     ordinary synchrotron experiment does not, to many orders of magnitude, so
-    on an X-ray histogram of a joint fit the term is identically zero — and it
+    on an X-ray pattern of a joint fit the term is identically zero — and it
     is not *computed* and then found to be zero, it is never built, so the
     phase's X-ray arithmetic is untouched.  A moment refined against X-ray data
     alone therefore has no gradient anywhere, which is exactly the state the
@@ -4463,7 +4463,7 @@ def magnetic_wanted(phase, source) -> bool:
         f"see it to many orders of magnitude. This package computes it for "
         f"neutron_cw, returns False for xray_cw, and refuses "
         f"any other source by name rather than guessing which of the two it "
-        f"resembles. Refine the moment against a neutron histogram, or drop "
+        f"resembles. Refine the moment against a neutron pattern, or drop "
         f"the moment to fit the nuclear structure against this source")
 
 

@@ -44,8 +44,8 @@ def test_the_last_glob_to_match_a_path_decides_it():
                         ["x.a", "x.b"]) == ["x.a"]
     # a joint table's row under two names: either name matches
     assert fixed_at_end([rx.Stage("e", ["*"], turn_off=["instrument.zero_shift"])],
-                        [("hist.1.instrument.zero_shift", "instrument.zero_shift")]
-                        ) == ["hist.1.instrument.zero_shift"]
+                        [("pattern.1.instrument.zero_shift", "instrument.zero_shift")]
+                        ) == ["pattern.1.instrument.zero_shift"]
 
 
 def test_a_plan_that_never_fixes_closes_as_it_did():
@@ -188,7 +188,7 @@ def test_a_series_refits_a_plan_that_fixes_stage_by_stage(pattern):
 
 # ------------------------------------------------------------- the joint fit
 def test_a_joint_fit_fixes_and_closes_on_the_fix():
-    from rietx.multi import MultiHistogramRefinement
+    from rietx.joint import JointRefinement
     from tests.test_multi_histogram import perturbed_inputs
     from tests.test_multi_histogram import synthesize as synthesize_joint
 
@@ -198,7 +198,7 @@ def test_a_joint_fit_fixes_and_closes_on_the_fix():
                                  bkg=[70.0, 5.0, -2.0], seed=2)]
     structure, instruments = perturbed_inputs()
     start = [ins.zero_shift.value for ins in instruments]
-    result = MultiHistogramRefinement(structure, instruments).fit(
+    result = JointRefinement(structure, instruments).fit(
         patterns, plan=rx.RefinementPlan(stages=[
             rx.Stage("all", ["phases.*.scale", "instrument.background.*",
                              "phases.*.cell.*", "instrument.zero_shift"],

@@ -150,7 +150,7 @@ WALKED: dict[str, int] = {
     "params": 2002,
     "schemas": 2002,
     "sequential.py": 2003,
-    "multi.py": 2003,
+    "joint.py": 2003,
     "report": 2004,
     "purposes.py": 2004,
     "io/readers.py": 2006,
@@ -185,6 +185,7 @@ NOT_WALKED: dict[str, str] = {
     "_audit.py": "this table",
     "_display.py": "the widths of printed displays, which read fields and compute nothing",
     "_nearmiss.py": "difflib's own 0.6 cutoff, ranking the names a 'did you mean' error offers",
+    "multi.py": "the joint call's old module, which raises on import naming rietx.joint",
     "backend": ("two bars the tests hold an fp32 Jacobian column to, and a chunk size that "
                 "moves memory use and no value"),
     "capabilities.py": "reads the registries and decides nothing",
@@ -495,7 +496,7 @@ OTHER_RECORD_FIELDS: frozenset[str] = frozenset({
     "rietx.schemas.results.RefinementResult.diagnostics",
     "rietx.schemas.results.RefinementResult.distortion_totals",
     "rietx.schemas.results.RefinementResult.geometry",
-    "rietx.schemas.results.RefinementResult.histograms",
+    "rietx.schemas.results.RefinementResult.patterns",
     "rietx.schemas.results.RefinementResult.identifiability",
     "rietx.schemas.results.RefinementResult.microstructure",
     "rietx.schemas.results.RefinementResult.mode",
@@ -533,7 +534,7 @@ OTHER_RECORD_FIELDS: frozenset[str] = frozenset({
     "rietx.schemas.results.StageResult.rwp",
     "rietx.schemas.results.StageResult.status",
     "rietx.schemas.results.StageResult.unknown_paths",
-    "rietx.schemas.results.StageResult.unreached_histograms",
+    "rietx.schemas.results.StageResult.unreached_patterns",
     "rietx.schemas.results.StageResult.window_loss",
     "rietx.schemas.results.Statistics.chi2",
     "rietx.schemas.results.Statistics.durbin_watson",
@@ -1782,11 +1783,11 @@ ROWS: tuple[Row, ...] = (
         responds=("quote no value of the dependent (a cell, a width, a scale) at the named "
                   "patterns, where the equation put it outside the target's own min/max; "
                   "narrow the subset or lower the order and refit"),
-        evidence=("opt-in twice: parametric=None by default, inside refine_multi / "
-                  "MultiHistogramRefinement, which no default path calls (searched 2026-10-24: "
-                  "no call in src/rietx outside multi.py, the GUI included); it reads the "
+        evidence=("opt-in twice: parametric=None by default, inside refine_joint / "
+                  "JointRefinement, which no default path calls (searched 2026-10-24: "
+                  "no call in src/rietx outside joint.py, the GUI included); it reads the "
                   "caller's own declaration against each target entry's min/max, the schema's "
-                  "default where the caller set none (multi.py:2316-2322), and applies no "
+                  "default where the caller set none (joint.py:2316-2322), and applies no "
                   "threshold of its own (WP-1325)")),
     Row("PARAMETRIC_TARGET_UNSEEN", "code"),
     Row("PARENT_STRAIN_HELD", "code", tier=3, ambiguity=1,
@@ -2033,7 +2034,7 @@ ROWS: tuple[Row, ...] = (
                   "SIZE_LAMBDA_POWER); the package cannot tell which term the user wrote, so "
                   "it warns rather than converts. Fires exactly where a degree-valued peak "
                   "equation's coefficient is one column across patterns declaring two or more "
-                  "wavelengths (multi._peak_equation_sharing_diagnostics; maintainer's ruling "
+                  "wavelengths (joint._peak_equation_sharing_diagnostics; maintainer's ruling "
                   "of 2026-11-20, option a, WP-2107), unless the expression reads "
                   "wavelength, which states the term's lambda dependence as a parametric "
                   "equation states a driven coefficient's (WP-2152, settled by Claude under "
@@ -2488,14 +2489,14 @@ ROWS: tuple[Row, ...] = (
                   "supports the row)")),
     Row("SIZE_NORMALISED_ACROSS_WAVELENGTHS", "code", tier=1, ambiguity=1,
         response="info",
-        responds=("nothing to correct: read the shared size column as histogram 0's "
-                  "coefficient and convert it at each histogram's own wavelength, as the "
+        responds=("nothing to correct: read the shared size column as pattern 0's "
+                  "coefficient and convert it at each pattern's own wavelength, as the "
                   "message states"),
         evidence=("physics: a size coefficient is (180/pi)K lambda/L and the Gaussian one its "
                   "square (Scherrer; params/multi.py SIZE_LAMBDA_POWER and its docstring), so "
                   "one specimen's size is one column scaled by (lambda_h/lambda_0)^p; states "
                   "that conversion and is silent while no scaled term is off zero "
-                  "(multi.py:2249-2300; WP-1131, WP-1343)")),
+                  "(joint.py:2249-2300; WP-1131, WP-1343)")),
     Row("SIZE_UNUSUALLY_SMALL", "code"),
     Row("SOLVE_B_TIED_PER_PARENT_SITE", "code", tier="caller", ambiguity=2,
         evidence="opt-in: solve_magnetic(tie_to_parent=True), default False"),
@@ -2503,13 +2504,13 @@ ROWS: tuple[Row, ...] = (
     Row("SPECIES_FALLBACK_NEUTRAL", "code"),
     Row("STAGE_FREED_NOTHING", "code", tier=1, ambiguity=3,
         response="info",
-        responds=("nothing, where the stage was meant for the other histograms; otherwise add "
-                  "a glob that reaches the named histogram and refit"),
-        evidence=("arithmetic: names the histograms a stage's globs matched no row of while "
-                  "matching another's, read off StageResult.unreached_histograms, which already "
+        responds=("nothing, where the stage was meant for the other patterns; otherwise add "
+                  "a glob that reaches the named pattern and refit"),
+        evidence=("arithmetic: names the patterns a stage's globs matched no row of while "
+                  "matching another's, read off StageResult.unreached_patterns, which already "
                   "drops a scoped glob, a declined row and a glob matching nowhere "
-                  "(multi.py:2539-2584); raised only in the joint fit; states and gates nothing, "
-                  "since one histogram can be the intent (issue #265, WP-1414)")),
+                  "(joint.py:2539-2584); raised only in the joint fit; states and gates nothing, "
+                  "since one pattern can be the intent (issue #265, WP-1414)")),
     Row("STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT", "code"),
     Row("STAGE_MAX_ITER", "code", tier=1, ambiguity=1,
         evidence=("arithmetic: fires exactly when a stage's solver stopped at its iteration "
@@ -2930,7 +2931,7 @@ ROWS: tuple[Row, ...] = (
         evidence=("WP-1301/1523: a held phase reading >= 3 sigma at the answer is released and the "
                   "stage re-solved once; one that fell under it is restored to its stage start and "
                   "held; the ramp's worst cell error fell from 11.96 A (start-only hold) to 0; the "
-                  "joint runner releases on the same statistic (multi._joint_answer_significance, "
+                  "joint runner releases on the same statistic (joint._joint_answer_significance, "
                   "WP-2003 C10)"),
         grounds=("A phase the data now see is one the plan asked to refine, and a cell chased "
                  "into noise is no measurement; kept with the hold (B1, ruled 2026-10-19). The "
@@ -2954,7 +2955,7 @@ ROWS: tuple[Row, ...] = (
                   "restore leaves it exactly at its stage-start value "
                   "(tests/test_held_phase.py collapsed_fit); until B14 the restore joined "
                   "StageResult.held unmarked; the joint runner restores on the same statistic "
-                  "(multi._joint_answer_significance, WP-2003 C10, ruled by the maintainer "
+                  "(joint._joint_answer_significance, WP-2003 C10, ruled by the maintainer "
                   "2026-11-03, 2003-batch/batch.md C10 q2 (a))"),
         grounds=("A cell chased into noise is no measurement, so a refiner puts it back where "
                  "the data last constrained it; kept with the hold and the release (B1, ruled "
@@ -3253,9 +3254,9 @@ ROWS: tuple[Row, ...] = (
                   "every fraction; the set is what the last stage held plus the answer's own "
                   "no-line count, so a line a zero shift moved into range cannot quote the "
                   "handed-in value (#1103 item 1), and in a joint fit a scale shared with a "
-                  "histogram that has lines counts as measured in every histogram (item 2), "
-                  "as does a per-histogram scale a free column ties to that phase's scale in "
-                  "such a histogram (a constant ParametricEquation's vars., #1103 follow-up; a "
+                  "pattern that has lines counts as measured in every pattern (item 2), "
+                  "as does a per-pattern scale a free column ties to that phase's scale in "
+                  "such a pattern (a constant ParametricEquation's vars., #1103 follow-up; a "
                   "polynomial link leaves it unmeasured, its narrow value being the start value)")),
     Row("rietx.schemas.indexing.PeakList.instrument_undeclared", "action", tier=1, ambiguity=1,
         evidence=("reads the declaration: the picker checks the instrument only where "
@@ -4229,7 +4230,7 @@ ROWS: tuple[Row, ...] = (
                   "in FWHM. 1.0 over 0.5 on the synthetic tetragonal set (0.5 refuted a true "
                   "0.9-FWHM split). Swept 0.5-1.0 on 15 real runs from 12 sources (the CPD "
                   "round robin's seven patterns, NIST SRM 660c, 11-BM NAC, the GSAS-II FAP, "
-                  "Hill's PbSO4 X-ray and neutron histograms, one with no truth to rank): the "
+                  "Hill's PbSO4 X-ray and neutron patterns, one with no truth to rank): the "
                   "one rank move is PbSO4 X-ray at 0.7, between that pattern's near-duplicate "
                   "cells. Rayleigh/Sparrow put one line or two at 0.58-0.85 FWHM and do not "
                   "cover the seen window or p0. Fails where a real split under 1 FWHM ties a "
@@ -7519,7 +7520,7 @@ ROWS: tuple[Row, ...] = (
     Row("PARAMETRIC_FORM_REJECTED.suggestion", "suggestion", value=2),
     Row("PARAMETRIC_OUT_OF_RANGE.suggestion", "suggestion", tier="caller", ambiguity=1, value=1,
         evidence=("opt-in, as its code: names three changes to the caller's own declaration "
-                  "(subset, order, basis) and picks none (multi.py:2334-2336)")),
+                  "(subset, order, basis) and picks none (joint.py:2334-2336)")),
     Row("PARAMETRIC_TARGET_UNSEEN.suggestion", "suggestion", value=1),
     Row("PARENT_STRAIN_HELD.suggestion", "suggestion", tier=3, ambiguity=1, value=1,
         evidence="names the two verbs that free a held strain: set_values to seed it, turn_on to free it",
@@ -7717,18 +7718,18 @@ ROWS: tuple[Row, ...] = (
                   "real displacement")),
     Row("SIZE_NORMALISED_ACROSS_WAVELENGTHS.suggestion", "suggestion", tier=1, ambiguity=1,
         value=1,
-        evidence=("arithmetic: names the conversion at a histogram's own wavelength "
+        evidence=("arithmetic: names the conversion at a pattern's own wavelength "
                   "(caglioti.apparent_size_from_size_coefficient) and the argument that "
-                  "declares a size per histogram instead (multi.py:2293-2298)")),
+                  "declares a size per pattern instead (joint.py:2293-2298)")),
     Row("SIZE_UNUSUALLY_SMALL.suggestion", "suggestion", value=1),
     Row("SPACE_GROUP_SETTING_ASSUMED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence=('arithmetic: names the setting taken and every alternative, as a symbol to '
                   'write into the file, and ranks none (symmetry.py:1436-1438)')),
     Row("SPECIES_FALLBACK_NEUTRAL.suggestion", "suggestion", value=1),
     Row("STAGE_FREED_NOTHING.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
-        evidence=("arithmetic: names how to list the histogram's rows and the two ways to "
+        evidence=("arithmetic: names how to list the pattern's rows and the two ways to "
                   "change the plan, a glob that reaches them or a stage scoped to one "
-                  "histogram, and picks neither (multi.py:2579-2582)")),
+                  "pattern, and picks neither (joint.py:2579-2582)")),
     Row("STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT.suggestion", "suggestion", value=1),
     Row("STAGE_MAX_ITER.suggestion", "suggestion", value=1),
     Row("STAGE_NOT_FINITE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,

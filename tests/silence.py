@@ -557,10 +557,10 @@ def _weight_unusable_silent() -> list:
 
 
 def _parametric_range(w_slope: float) -> list:
-    """``multi._parametric_range_diagnostics`` on a three-histogram table whose
+    """``joint._parametric_range_diagnostics`` on a three-pattern table whose
     equation sets Caglioti W = 1e-3 + ``w_slope``·u over the ramp, never fitted
     (``tests/test_parametric_series.py``'s fixture)."""
-    from rietx.multi import _parametric_range_diagnostics
+    from rietx.joint import _parametric_range_diagnostics
     from rietx.params.multi import MultiParameterTable
     from tests.test_parametric_series import (
         _coords,
@@ -597,7 +597,7 @@ def _not_freed(freed: list[str]) -> list:
     from types import SimpleNamespace
 
     import rietx as rx
-    from rietx.multi import _parametric_not_freed_diagnostics
+    from rietx.joint import _parametric_not_freed_diagnostics
     from rietx.refine import _variable_not_freed_diagnostics
     from rietx.schemas.parametric import ParametricCoefficient
     from rietx.schemas.results import StageResult

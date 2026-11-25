@@ -435,7 +435,7 @@ def compute_qpa(structure: Structure, values: dict[str, float],
 
     ``wavelength`` (Å, primary emission line) enables the Brindley
     microabsorption correction for phases carrying ``particle_radius_um``,
-    with µ from the table ``source_kind`` (the histogram's ``Source.kind``)
+    with µ from the table ``source_kind`` (the pattern's ``Source.kind``)
     names in :data:`LINEAR_ATTENUATION_BY_SOURCE`.
     The correction needs *every* phase's radius (τ compares each phase to the
     mixture average µ̄, which a phase of unknown size would corrupt); partial
@@ -688,7 +688,7 @@ def _apply_microabsorption(qpa: QuantitativePhaseAnalysis, structure: Structure,
     (no phase has a radius).  µ comes from the table ``source_kind`` names
     (:data:`LINEAR_ATTENUATION_BY_SOURCE`), and a kind with none skips with
     that reason.  Until #543 this path read the X-ray table on every source,
-    so on a neutron histogram a correction of well under 1 % rewrote the
+    so on a neutron pattern a correction of well under 1 % rewrote the
     fractions by the X-ray µ, two to four orders of magnitude too large.
     """
     radii = [phase.particle_radius_um for phase in structure.phases]

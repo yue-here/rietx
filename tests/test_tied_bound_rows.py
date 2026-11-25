@@ -31,8 +31,8 @@ import numpy as np
 import pytest
 
 import rietx as rx
+from rietx.joint import refine_joint
 from rietx.model.forward import compile_model
-from rietx.multi import refine_multi
 from rietx.optimize.least_squares import tied_bound_inequalities
 from rietx.params.multi import SharingMap
 from rietx.params.vector import AffineTie, ParameterTable
@@ -228,7 +228,7 @@ def _biso_ramp(solver: str):
     structure, ins = _start_models()
     for atom in structure.phases[0].atoms:
         atom.biso.min = 0.0
-    return patterns, refine_multi(
+    return patterns, refine_joint(
         patterns, structure, [ins] * len(_TEMPS), plan="mccusker_structural",
         solver=solver,
         sharing=SharingMap(shared=["instrument.zero_shift", "instrument.profile.*"]),
@@ -242,10 +242,10 @@ def test_lm_holds_a_parametric_target_inside_its_bounds_in_every_pattern():
     _, result = _biso_ramp("lm")
     OUT.mkdir(exist_ok=True)
     for h in (0, len(_TEMPS) - 1):
-        result.for_histogram(h).plot(OUT / f"tied_bound_rows_joint_h{h}.png")
+        result.for_pattern(h).plot(OUT / f"tied_bound_rows_joint_h{h}.png")
     values = []
     for h in range(len(_TEMPS)):
-        rows = {p.path: p.value for p in result.for_histogram(h).parameters}
+        rows = {p.path: p.value for p in result.for_pattern(h).parameters}
         values.append(rows["phases.0.atoms.0.biso"])
     assert min(values) >= 0.0 and values[0] < 1e-8, values   # held on the floor at 300 K
     assert all(b > a for a, b in zip(values, values[1:])), values
@@ -254,14 +254,14 @@ def test_lm_holds_a_parametric_target_inside_its_bounds_in_every_pattern():
     (d,) = [d for d in result.diagnostics if d.code == "CONSTRAINT_ACTIVE"]
     # one block for the equation across its five patterns, never one per pattern
     assert "parametric equation 'b' (phases.0.atoms.0.biso bounds)" in d.message
-    assert "hist." not in d.message
+    assert "pattern." not in d.message
     # the pattern held on the floor, by path, as a free column there would be
     floors = [d for d in result.diagnostics if d.code == "FLOOR_HIT"
               and any("atoms.0.biso" in w for w in d.where)]
-    assert [d.where for d in floors] == [["hist.0.phases.0.atoms.0.biso"]], floors
+    assert [d.where for d in floors] == [["pattern.0.phases.0.atoms.0.biso"]], floors
     assert floors[0].level == "warning"
     rows = {p.path: p for p in result.parameters}
-    assert rows["hist.0.phases.0.atoms.0.biso"].at_bound is True
+    assert rows["pattern.0.phases.0.atoms.0.biso"].at_bound is True
 
 
 @pytest.mark.xdist_group("tied-bound-rows")
@@ -271,12 +271,12 @@ def test_trf_takes_no_rows_and_finishes_with_the_range_warning():
     cone's precedent: a constraint LM cannot hold becomes a warning)."""
     _, result = _biso_ramp("trf")
     OUT.mkdir(exist_ok=True)
-    result.for_histogram(0).plot(OUT / "tied_bound_rows_joint_trf_h0.png")
-    rows = {p.path: p.value for p in result.for_histogram(0).parameters}
+    result.for_pattern(0).plot(OUT / "tied_bound_rows_joint_trf_h0.png")
+    rows = {p.path: p.value for p in result.for_pattern(0).parameters}
     assert rows["phases.0.atoms.0.biso"] < 0.0        # the equation's value, kept
     (d,) = [d for d in result.diagnostics if d.code == "PARAMETRIC_OUT_OF_RANGE"]
-    assert d.level == "warning" and d.where == ["hist.0.phases.0.atoms.0.biso"]
-    assert d.value == 1.0 and "histogram 0" in d.message
+    assert d.level == "warning" and d.where == ["pattern.0.phases.0.atoms.0.biso"]
+    assert d.value == 1.0 and "pattern 0" in d.message
     assert "FLOOR_HIT" not in {d.code for d in result.diagnostics
                                if "atoms.0.biso" in " ".join(d.where)}
 
@@ -291,7 +291,7 @@ class _Outcome:
 
 def test_the_gaussian_floor_sentence_reads_past_a_histogram_prefix_and_no_further():
     gaussian = "Gaussian width (the Γ_G² floor"
-    (d,) = _constraint_diagnostics("s", _Outcome({"hist.1 instrument.profile (phases.0)": 2}))
+    (d,) = _constraint_diagnostics("s", _Outcome({"pattern.1 instrument.profile (phases.0)": 2}))
     assert gaussian in d.suggestion
     # the Lorentzian floor's rows are not the Gaussian floor's
     (d,) = _constraint_diagnostics(

@@ -175,7 +175,7 @@ _INTENSITY_ONLY = (
     # a line weight and the polarization ratio scale the intensity of a peak
     # that is already placed.  The line's ``wavelength`` beside it is a table
     # entry since WP-1134 and is deliberately **absent** from this list: λ moves
-    # every peak of its histogram (2θ = 2·asin(λ/2d)), so it needs the position,
+    # every peak of its pattern (2θ = 2·asin(λ/2d)), so it needs the position,
     # width and mixing partials.  Spelled ``\.weight$`` rather than as a
     # ``lines\.\d+\.`` prefix precisely so the wavelength cannot be swept in.
     re.compile(r"^instrument\.source\.lines\.\d+\.weight$"),
@@ -266,7 +266,7 @@ class LSQOutcome:
     #: pairs, stacked (:func:`run_multi_least_squares`).
     #: ``LSQOutcome`` itself
     #: is an internal dataclass, never serialised; ``refine.py`` and
-    #: ``multi.py`` copy this onto the (pydantic)
+    #: ``joint.py`` copy this onto the (pydantic)
     #: ``StageResult.n_degenerate_cell_probes``, carried by
     #: ``SCHEMA_VERSION`` 0.19 → 0.20 (see ``schemas/common.py``).
     n_degenerate_cell_probes: int = 0
@@ -342,10 +342,10 @@ class LSQOutcome:
     moment_angle_tests: list[MomentAngleTest] | None = None
     #: how the joint solve held its Jacobian (WP-1325): ``"dense"``, the
     #: stacked matrix every joint fit had before, or ``"blocked"``, one
-    #: :class:`~.blocked.BlockJacobian` block per histogram, with its
+    #: :class:`~.blocked.BlockJacobian` block per pattern, with its
     #: covariance by Schur complement.  :func:`run_multi_least_squares` writes
     #: it on every return, from :func:`.blocked.choose_layout`'s answer.
-    #: ``None`` on the single-histogram path, which has one layout and no
+    #: ``None`` on the single-pattern path, which has one layout and no
     #: choice to report.
     jacobian_layout: str | None = None
     #: why the solve stopped on a non-finite model, or ``None`` when it did
@@ -788,7 +788,7 @@ def _column_entries(tables: list[ParameterTable], col_maps: list[np.ndarray],
     """Per column of θ, every entry it moves: ``{(table, path): coefficient}``.
 
     :meth:`~rietx.params.vector.ParameterTable.column_reach` composed over a
-    joint fit's tables, keyed by table because two histograms' copies of one
+    joint fit's tables, keyed by table because two patterns' copies of one
     path are two entries.  ``col_maps[h]`` sends table ``h``'s free columns
     to θ's, as ``MultiParameterTable.col_map`` does; a single fit passes its
     one table and ``arange``.  The pattern is ``column_reach``'s and the
@@ -1420,7 +1420,7 @@ def _row_typical(table: ParameterTable, row: str) -> float | None:
 
 #: Width rows in deg that may go negative, so :func:`_fd_typicals` cannot read
 #: them off their lower bound.  Matched on the end of the path, which a joint
-#: fit's histogram prefix leaves in place.
+#: fit's pattern prefix leaves in place.
 _SIGNED_WIDTHS = ("instrument.profile.y",)
 
 
@@ -2816,7 +2816,7 @@ def gaussian_width_inequalities(model: CompiledModel, table: ParameterTable,
     A phase whose width rows are derived (``ParameterTable.derived_paths``) is
     skipped, since a derived row is written after C and is not affine in θ.
 
-    A joint fit asks it of each histogram (:func:`_joint_width_inequalities`).
+    A joint fit asks it of each pattern (:func:`_joint_width_inequalities`).
     TRF never sees these rows, and
     ``RESOLUTION_NOT_POSITIVE`` stays its guard
     (:func:`~rietx.strategy.staged.check_resolution_positive`).
@@ -2924,7 +2924,7 @@ def lorentzian_width_inequalities(model: CompiledModel, table: ParameterTable,
     frozen Bragg angles for the starting cell and λ; affine in θ through C and
     d; exact duplicates and rows no free column reaches dropped; a row the
     start violates dropped; a phase with a derived width row skipped.  The
-    joint runner asks it of each histogram (:func:`_joint_width_inequalities`).
+    joint runner asks it of each pattern (:func:`_joint_width_inequalities`).
     ``RESOLUTION_NOT_POSITIVE`` is TRF's guard.
     """
     from . import lm as lm_mod
@@ -3002,13 +3002,13 @@ def lorentzian_width_inequalities(model: CompiledModel, table: ParameterTable,
 
 def _joint_width_inequalities(models: list[CompiledModel], mtable, x0: np.ndarray
                               ) -> list["lm_mod.LinearInequality"]:
-    """The single fit's Γ_G² and Γ_L rows, asked of each histogram and laid on
+    """The single fit's Γ_G² and Γ_L rows, asked of each pattern and laid on
     the joint columns (``mtable.col_map``).
 
     Without them a joint fit kept a width non-negative only through the
     per-coefficient floors, and WP-2002 removed the U, V and Y floors: a free
     Y could step to a negative Γ_L and every residual to NaN.  Each builder
-    reads its own histogram's table, whose C already carries the λ factor a
+    reads its own pattern's table, whose C already carries the λ factor a
     shared size column takes (WP-1131), so a row needs only its columns moved.
     """
     return _on_joint_columns((gaussian_width_inequalities,
@@ -3018,12 +3018,12 @@ def _joint_width_inequalities(models: list[CompiledModel], mtable, x0: np.ndarra
 def _joint_positivity_inequalities(models: list[CompiledModel], mtable,
                                    x0: np.ndarray) -> list["lm_mod.LinearInequality"]:
     """The single fit's Stephens strain cone and texture P ≥ 0 rows, asked of
-    each histogram and laid on the joint columns (WP-2239).
+    each pattern and laid on the joint columns (WP-2239).
 
-    A shared Stephens block gets a cone per histogram, since each histogram's
+    A shared Stephens block gets a cone per pattern, since each pattern's
     reflections are its own monomials; a point inside all of them is a block
-    no histogram's width reads as negative.  Each builder's skip rules hold
-    per histogram: nothing free in the direction, or a start already outside.
+    no pattern's width reads as negative.  Each builder's skip rules hold
+    per pattern: nothing free in the direction, or a start already outside.
     """
     return _on_joint_columns((strain_cone_inequalities,
                               texture_positivity_inequalities), models, mtable, x0)
@@ -3031,9 +3031,9 @@ def _joint_positivity_inequalities(models: list[CompiledModel], mtable,
 
 def _on_joint_columns(builders, models: list[CompiledModel], mtable, x0: np.ndarray
                       ) -> list["lm_mod.LinearInequality"]:
-    """Each single-fit builder asked of each histogram's own model and table,
+    """Each single-fit builder asked of each pattern's own model and table,
     its rows moved onto the joint columns (``mtable.col_map``) and labelled
-    ``"hist.<h> <label>"``."""
+    ``"pattern.<h> <label>"``."""
     from . import lm as lm_mod
 
     out: list[lm_mod.LinearInequality] = []
@@ -3046,7 +3046,7 @@ def _on_joint_columns(builders, models: list[CompiledModel], mtable, x0: np.ndar
                 T = np.zeros((block.T.shape[0], n), dtype=np.float64)
                 T[:, cols] = block.T
                 out.append(lm_mod.LinearInequality(T=T, c=block.c,
-                                                   label=f"hist.{h} {block.label}"))
+                                                   label=f"pattern.{h} {block.label}"))
     return out
 
 
@@ -3146,16 +3146,16 @@ def tied_bound_inequalities(table: ParameterTable, x0: np.ndarray,
 
 def _joint_tied_bound_inequalities(mtable, x0: np.ndarray, lo: np.ndarray,
                                    hi: np.ndarray) -> list["lm_mod.LinearInequality"]:
-    """:func:`tied_bound_inequalities` asked of each histogram, laid on the
+    """:func:`tied_bound_inequalities` asked of each pattern, laid on the
     joint columns (``mtable.col_map``), as :func:`_joint_width_inequalities`
     lays the width rows.
 
     A linear parametric equation's target rows, one per subset pattern, are
     gathered into one block per equation, labelled by the equation, so a
     library of hundreds of patterns names one constraint rather than hundreds.
-    Any other tied entry keeps its own block, prefixed ``hist.{h}``, once: a
-    shared tied entry gives every histogram the same rows on the same joint
-    columns, and only the first histogram's block is kept.
+    Any other tied entry keeps its own block, prefixed ``pattern.{h}``, once: a
+    shared tied entry gives every pattern the same rows on the same joint
+    columns, and only the first pattern's block is kept.
     """
     from . import lm as lm_mod
 
@@ -3178,7 +3178,7 @@ def _joint_tied_bound_inequalities(mtable, x0: np.ndarray, lo: np.ndarray,
                     continue
                 seen.add(key)
                 out.append(lm_mod.LinearInequality(
-                    T=T, c=block.c, label=f"hist.{h} {block.label}"))
+                    T=T, c=block.c, label=f"pattern.{h} {block.label}"))
             else:
                 by_equation.setdefault(f"parametric equation {name!r} ({path} bounds)",
                                        []).append(lm_mod.LinearInequality(T=T, c=block.c))
@@ -3212,7 +3212,7 @@ def _free_values(table, theta: np.ndarray) -> list[float]:
     The table answers, because it knows its own layout:
     :meth:`ParameterTable.free_values` drops an appended Pawley tail, and a
     joint fit's :meth:`~rietx.params.multi.MultiParameterTable.free_values`
-    reads each combined path from the histogram that owns it (WP-1341).
+    reads each combined path from the pattern that owns it (WP-1341).
     """
     return table.free_values(theta)
 
@@ -3395,14 +3395,14 @@ def _final_shift_over_esd_multi(mtable: "MultiParameterTable",
     The definition carries over unchanged.  Every free column of the joint θ
     has one shift, the joint solve's final accepted step, and one esd, read
     off the covariance of the weighted stacked residual.  That esd is the one
-    the joint result reports, because each histogram's slice is decoded here
-    exactly as ``MultiHistogramRefinement._build_result`` decodes it.  The
-    histogram weights enter both the step and the covariance, so they change
+    the joint result reports, because each pattern's slice is decoded here
+    exactly as ``JointRefinement._build_result`` decodes it.  The
+    pattern weights enter both the step and the covariance, so they change
     the number and leave its meaning alone.
 
-    A shared column sits in every histogram's table.  Its ratio is the same in
+    A shared column sits in every pattern's table.  Its ratio is the same in
     each, because each table decodes it affinely, and the WP-1131 λ factor
-    scales the shift and the esd alike.  So the maximum over histograms is
+    scales the shift and the esd alike.  So the maximum over patterns is
     the maximum over columns.
     """
     if step is None or stderr is None:
@@ -3472,10 +3472,10 @@ def _freeze_strain_cap_multi(models: list[CompiledModel],
     """The freeze above for a joint refinement, where a phase is *shared*.
 
     ``lor_strain`` is a phase parameter, so in a joint fit its column is
-    written once per histogram and the last write wins — harmless only while
-    the histograms agree (``MultiParameterTable.refresh_bounds``).  Here they
+    written once per pattern and the last write wins — harmless only while
+    the patterns agree (``MultiParameterTable.refresh_bounds``).  Here they
     disagree by construction, each having its own 2θ extent, so the **widest**
-    cap governs: a line only has to be a line in *some* histogram, and a joint
+    cap governs: a line only has to be a line in *some* pattern, and a joint
     fit is entitled to whichever one can express it.  Taking the narrowest
     would let a short scan bound a width the long scan measures perfectly well.
     """
@@ -3526,14 +3526,14 @@ def _freeze_size_cap_multi(models: list[CompiledModel],
 
     ``lor_size`` is a phase parameter, so the **widest** cap is the one declared
     to every table, for the strain reason one function up: a line only has to
-    fit inside *some* histogram's range, and a joint fit is entitled to
+    fit inside *some* pattern's range, and a joint fit is entitled to
     whichever pattern can express it.
 
     Since WP-1131 the caps do not merely overwrite one another.
-    ``MultiParameterTable`` **intersects** each histogram's bounds onto the
+    ``MultiParameterTable`` **intersects** each pattern's bounds onto the
     shared column, and each table divides its physical cap by its own value
     scale, so the binding bound is the widest cap expressed in the reference
-    histogram's units.  Only a histogram whose copy has reached its cap arms
+    pattern's units.  Only a pattern whose copy has reached its cap arms
     it, and the arming asymmetry decides where the intersection lands.
     """
     caps = [size_cap(m.tt_min, m.tt_max) for m in models]
@@ -3547,11 +3547,11 @@ def _freeze_cell_windows_multi(models: list[CompiledModel],
                                sigma: float | None = PHASE_SUPPORT_SIGMA) -> None:
     """The freeze above for a joint refinement, where a cell can be *shared*.
 
-    A phase invisible in one histogram may be plain in another, and if its cell
+    A phase invisible in one pattern may be plain in another, and if its cell
     is shared then the data — jointly, which is what a joint refinement fits —
     can see it. So a phase is windowed only when it is below support in **every**
-    histogram, and the same set is frozen on every sub-table: the combined bound
-    vectors write shared columns once per histogram and keep the last, which is
+    pattern, and the same set is frozen on every sub-table: the combined bound
+    vectors write shared columns once per pattern and keep the last, which is
     only harmless while they agree.  ``sigma`` is :func:`_freeze_cell_windows`'
     own, and ``None`` windows nothing.
     """
@@ -3816,41 +3816,41 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
 
 def _stacked_rows(models: list[CompiledModel]) -> tuple[int, int]:
     """``(n_data_total, n_rows)`` of the stacked joint residual: every
-    histogram's data rows, then every histogram's rows below its data."""
+    pattern's data rows, then every pattern's rows below its data."""
     n_data = sum(len(m.tt) for m in models)
     return n_data, n_data + sum(_rows_below_data(m) for m in models)
 
 
 def _rows_below_data(model: CompiledModel) -> int:
-    """One histogram's rows after its data: the background penalty, then a
+    """One pattern's rows after its data: the background penalty, then a
     Pawley model's restraint rows (``model/rows.py``'s order).  A joint fit
     refuses soft restraints and a floating origin, so nothing else sits there."""
     return row_layout.n_rows(model) - len(model.tt)
 
 
 def _joint_aux_counts(models: list[CompiledModel]) -> list[int]:
-    """Each histogram's Pawley intensity count, 0 outside Pawley (WP-2104).
+    """Each pattern's Pawley intensity count, 0 outside Pawley (WP-2104).
 
-    A joint Pawley fit keeps one off-table intensity block per histogram,
+    A joint Pawley fit keeps one off-table intensity block per pattern,
     never shared across them.  The joint vector is ``[the table's columns |
-    histogram 0's block | histogram 1's …]``, so each block is one
-    histogram's own columns, the arrow's diagonal in ``optimize/blocked.py``.
+    pattern 0's block | pattern 1's …]``, so each block is one
+    pattern's own columns, the arrow's diagonal in ``optimize/blocked.py``.
     """
     return [0 if m.pawley is None else int(m.pawley.n) for m in models]
 
 
 def _joint_aux_slices(models: list[CompiledModel], n_table: int) -> list[slice]:
-    """Where each histogram's intensity block sits in the joint vector."""
+    """Where each pattern's intensity block sits in the joint vector."""
     off = n_table + np.concatenate([[0], np.cumsum(_joint_aux_counts(models))])
     return [slice(int(a), int(b)) for a, b in zip(off[:-1], off[1:], strict=True)]
 
 
 def _joint_aux_paths(models: list[CompiledModel]) -> list[str]:
-    """A name per joint intensity column, ``hist.<h>.pawley.<k>``, in vector
+    """A name per joint intensity column, ``pattern.<h>.pawley.<k>``, in vector
     order.  Not table paths: a reader that counts free columns (the form
     test's χ²_red) or aligns a matrix with names reads these after
     ``free_paths``."""
-    return [f"hist.{h}.pawley.{k}" for h, n in enumerate(_joint_aux_counts(models))
+    return [f"pattern.{h}.pawley.{k}" for h, n in enumerate(_joint_aux_counts(models))
             for k in range(n)]
 
 
@@ -3869,19 +3869,19 @@ def _table_part(jac, n_table: int, n_maps: list[int]):
 def _multi_closures(models: list[CompiledModel], mtable: "MultiParameterTable",
                     *, weights: list[float] | None = None,
                     backend: str = "numpy", layout: str = "dense"):
-    """(residual, jacobian, n_data_total) for the stacked multi-histogram solve.
+    """(residual, jacobian, n_data_total) for the stacked joint solve.
 
     Split out of :func:`run_multi_least_squares` so the stacked layout is
     reachable without running a solve — WP-0404's cross-backend matrix compares
     this Jacobian across backends exactly as the solver would build it.
 
     ``layout="blocked"`` returns the same Jacobian as a
-    :class:`~.blocked.BlockJacobian`, each histogram's weighted rows against
+    :class:`~.blocked.BlockJacobian`, each pattern's weighted rows against
     its own columns, whose :meth:`~.blocked.BlockJacobian.toarray` is the
     dense matrix entry for entry (WP-1325).
 
-    In Pawley mode θ is ``[mtable.free_paths | each histogram's intensity
-    block]`` (:func:`_joint_aux_slices`, WP-2104), and each histogram's rows
+    In Pawley mode θ is ``[mtable.free_paths | each pattern's intensity
+    block]`` (:func:`_joint_aux_slices`, WP-2104), and each pattern's rows
     below its data carry its Pawley restraint rows after its background
     penalty.  Outside Pawley θ is the table's alone.
     """
@@ -3892,13 +3892,13 @@ def _multi_closures(models: list[CompiledModel], mtable: "MultiParameterTable",
     if any(m.restraints is not None for m in models):
         # The stacked layout sizes the below-data slot from the background
         # penalty rows only, and a shared structure's restraints would land
-        # once per histogram.  Deferred since WP-0406; owned by WP-1995.
+        # once per pattern.  Deferred since WP-0406; owned by WP-1995.
         raise NotImplementedError(
-            "soft restraints are not yet supported in a multi-histogram joint "
-            "refinement; run each restrained phase in a single-histogram fit")
+            "soft restraints are not yet supported in a joint "
+            "refinement; run each restrained phase in a single-pattern fit")
     weights = [1.0] * n_hist if weights is None else list(weights)
     if len(weights) != n_hist:
-        raise ValueError("weights must have one entry per histogram")
+        raise ValueError("weights must have one entry per pattern")
     sqrt_w = [float(np.sqrt(w)) for w in weights]
 
     residuals = [_make_residual(m, t) for m, t in zip(models, mtable.tables, strict=True)]
@@ -3910,8 +3910,8 @@ def _multi_closures(models: list[CompiledModel], mtable: "MultiParameterTable",
     n_data_total = int(data_off[-1])
     pen_off = n_data_total + np.concatenate([[0], np.cumsum(n_pen)])
     n_rows = int(pen_off[-1])
-    # a Pawley histogram's intensity block rides after the table's columns,
-    # one block per histogram (WP-2104); outside Pawley every slice is empty
+    # a Pawley pattern's intensity block rides after the table's columns,
+    # one block per pattern (WP-2104); outside Pawley every slice is empty
     n_table = len(mtable.free_paths)
     aux = _joint_aux_slices(models, n_table)
     n_cols = aux[-1].stop if aux else n_table
@@ -3950,7 +3950,7 @@ def _multi_closures(models: list[CompiledModel], mtable: "MultiParameterTable",
         return J
 
     def block_jacobian(theta: np.ndarray) -> BlockJacobian:
-        # the dense closure's entries, never scattered: each histogram's rows
+        # the dense closure's entries, never scattered: each pattern's rows
         # stay against its own columns (WP-1325)
         thetas = split(theta)
         return BlockJacobian(
@@ -3972,37 +3972,37 @@ def run_multi_least_squares(models: list[CompiledModel],
                             cancel=None,
                             phase_support_sigma: float | None = PHASE_SUPPORT_SIGMA
                             ) -> LSQOutcome:
-    """Joint solve of several histograms stacked into one residual (WP-0308).
+    """Joint solve of several patterns stacked into one residual (WP-0308).
 
-    Each histogram keeps its own compiled model (⇒ its own frozen hkl list,
+    Each pattern keeps its own compiled model (⇒ its own frozen hkl list,
     windows, FCJ node counts) and its own :class:`ParameterTable`; the combined
     free vector θ threads through them via ``mtable``'s column map, so a *shared*
     structural column (cell, coordinates, ADPs …) receives Jacobian
-    contributions from *every* histogram — that is what refines the shared
+    contributions from *every* pattern — that is what refines the shared
     quantity better than any single pattern could.
 
-    Row layout is [all histograms' data rows] then [all histograms' background-
+    Row layout is [all patterns' data rows] then [all patterns' background-
     penalty rows], so :func:`covariance_estimates` (which treats the first
     ``n_data`` rows as data for χ² and the Bérar-Lelann factor) is reused
     verbatim.  The BL run-of-signs statistic is therefore evaluated on the
     *concatenated* data residual: WP-0407 examined this and kept it as-is —
-    each histogram join contaminates the statistic with at most one artificial
+    each pattern join contaminates the statistic with at most one artificial
     run boundary (a point where consecutive residuals are not 2θ-neighbours),
     i.e. ≤ ``n_hist − 1`` boundaries out of ``n_data_total``, negligible for the
-    handful of patterns co-refined here.  A per-histogram decomposition was not
+    handful of patterns co-refined here.  A per-pattern decomposition was not
     adopted because BL applies as a single scalar to the whole covariance
-    diagonal and a *shared* parameter draws from every histogram, so there is
-    no clean single per-parameter factor to combine.  A per-histogram scalar
+    diagonal and a *shared* parameter draws from every pattern, so there is
+    no clean single per-parameter factor to combine.  A per-pattern scalar
     weight ``w_h`` scales both that
-    histogram's data and its penalty rows by ``√w_h`` — keeping the smoothness
+    pattern's data and its penalty rows by ``√w_h`` — keeping the smoothness
     prior's strength relative to the data fixed; default unit weights leave the
     residual identical to N independent solves sharing the structure.
 
     ``solver`` selects the driver exactly as in :func:`run_least_squares` —
     this is the *second* entry point WP-0308 warned about, and a solver swap
-    that reached only the single-histogram one would leave joint refinements
+    that reached only the single-pattern one would leave joint refinements
     silently on scipy.  Under it the single fit's rows are built per
-    histogram on the joint columns: the Stephens cone and texture positivity
+    pattern on the joint columns: the Stephens cone and texture positivity
     (:func:`_joint_positivity_inequalities`, WP-2239), the width rows
     (:func:`_joint_width_inequalities`) and each tied entry's own bounds, a
     parametric target's in every subset pattern among them
@@ -4073,7 +4073,7 @@ def run_multi_least_squares(models: list[CompiledModel],
     lo, hi = mtable.bounds()
     pawley = [m for m in models if m.pawley is not None]
     if pawley:
-        # each histogram's intensity block, bounded ≥ 0, in histogram order
+        # each pattern's intensity block, bounded ≥ 0, in pattern order
         # (``_joint_aux_slices``), as :func:`run_least_squares` appends one
         bounds = [m.pawley_bounds() for m in pawley]
         x0 = np.concatenate([x0, *[m.pawley_x0() for m in pawley]])
@@ -4091,7 +4091,7 @@ def run_multi_least_squares(models: list[CompiledModel],
                           jacobian_layout=layout)
 
     def set_intensities(x: np.ndarray, stderr_full: np.ndarray | None = None) -> None:
-        # each histogram's block into its model's per-phase buffers, as the
+        # each pattern's block into its model's per-phase buffers, as the
         # single fit pins its own
         for m, a in zip(models, aux, strict=True):
             if m.pawley is not None:
@@ -4107,7 +4107,7 @@ def run_multi_least_squares(models: list[CompiledModel],
                                    jacobian_layout=layout)
 
     if not np.all(np.isfinite(r0)):
-        # the single-histogram rule (WP-2048), on the stacked residual
+        # the single-pattern rule (WP-2048), on the stacked residual
         return stopped("residual")
 
     max_nfev = max_iter * NFEV_PER_ITERATION
@@ -4138,8 +4138,8 @@ def run_multi_least_squares(models: list[CompiledModel],
     stderr = corr = covariance_error = moment_angle_tests = esd_inflation = None
     stderr_full = discards = subspace = None
     if compute_uncertainties and res.jac is not None and len(res.fun) > len(res.x):
-        # the single-histogram rule (WP-1929) on the stacked residual: a
-        # moment angle's column is every histogram's rows of it, and a shared
+        # the single-pattern rule (WP-1929) on the stacked residual: a
+        # moment angle's column is every pattern's rows of it, and a shared
         # angle is stationary only where the joint χ² says so
         moment_angle_tests, stationary = stationary_angle_test(
             probe, res.x, res.jac, n_data_total, mtable.free_paths,

@@ -615,7 +615,7 @@ def test_one_selector_answers_which_line_for_the_size_flag():
 
 
 # ======================================================================
-# tier 2 in a JOINT (multi-histogram) refinement
+# tier 2 in a JOINT (joint) refinement
 # ======================================================================
 def _broad_structure(strain: float, size_coeff: float) -> rx.Structure:
     """One phase whose sample widths sit past both tier-2 flags, held there.
@@ -665,20 +665,20 @@ def test_both_tier_2_flags_fire_per_histogram_in_a_joint_fit():
     ``_freeze_size_cap_multi`` are called from ``run_multi_least_squares``) and
     **neither** tier-2 flag — the interpretive half the two-tier argument rests
     on, silently absent on exactly the multi-pattern work that most needs it.
-    Measured on this fixture before the fix: both histograms came back with an
+    Measured on this fixture before the fix: both patterns came back with an
     empty ``diagnostics`` list while the identical numbers through
     ``Refinement.fit`` reported ``STRAIN_UNUSUALLY_LARGE`` and
     ``SIZE_UNUSUALLY_SMALL``.
 
-    **Per histogram, and the size flag is why that is not a formality.**  The
+    **Per pattern, and the size flag is why that is not a formality.**  The
     default :class:`~rietx.params.multi.SharingMap` puts size/strain on the
     *structure*, so there is one shared column — but a coefficient is only a
-    crystallite once a λ is chosen, and λ is per histogram.  One reading would
-    therefore quote one histogram's wavelength about all of them.
+    crystallite once a λ is chosen, and λ is per pattern.  One reading would
+    therefore quote one pattern's wavelength about all of them.
 
     Since WP-1131 the two readings **agree**, and that agreement is the
-    assertion: the shared column is normalised by λ, so each histogram's copy
-    is the coefficient that histogram needs and the crystallite behind them is
+    assertion: the shared column is normalised by λ, so each pattern's copy
+    is the coefficient that pattern needs and the crystallite behind them is
     one number.  Before it, the same fixture reported 3.0 nm and 1.384 nm — one
     specimen wearing the wavelength ratio as a size spread.
     """
@@ -696,34 +696,34 @@ def test_both_tier_2_flags_fire_per_histogram_in_a_joint_fit():
 
     plan = rx.RefinementPlan(stages=[
         rx.Stage(name="scale", turn_on=["phases.*.scale"], max_iter=3)])
-    ref = rx.MultiHistogramRefinement(
+    ref = rx.JointRefinement(
         _broad_structure(_JOINT_STRAIN, _JOINT_SIZE_COEFF), instruments)
     result = ref.fit(patterns, plan=plan)
 
-    assert len(result.histograms) == 2
-    for h, hist in enumerate(result.histograms):
+    assert len(result.patterns) == 2
+    for h, hist in enumerate(result.patterns):
         codes = {d.code for d in hist.diagnostics}
         assert "STRAIN_UNUSUALLY_LARGE" in codes, f"hist {h}: {sorted(codes)}"
         assert "SIZE_UNUSUALLY_SMALL" in codes, f"hist {h}: {sorted(codes)}"
 
     def one(h, code):
-        found = [d for d in result.histograms[h].diagnostics if d.code == code]
+        found = [d for d in result.patterns[h].diagnostics if d.code == code]
         assert len(found) == 1, found          # one term each, not both spellings
         return found[0]
 
-    # strain is λ-free, so the two histograms report the one shared number
+    # strain is λ-free, so the two patterns report the one shared number
     assert [one(h, "STRAIN_UNUSUALLY_LARGE").value for h in (0, 1)] == \
         [_JOINT_STRAIN, _JOINT_STRAIN]
 
     # size is not λ-free, and since WP-1131 that is why the two rows agree
-    # rather than why they differ: the shared column carries histogram 0's
+    # rather than why they differ: the shared column carries pattern 0's
     # wavelength and each copy is scaled to its own, so the crystallite behind
     # them is one number.  A disagreement here would mean the normalisation had
     # come undone — before it, these read 3.0 nm and 1.384 nm.
     sizes = [one(h, "SIZE_UNUSUALLY_SMALL").value for h in (0, 1)]
     assert sizes[0] == pytest.approx(3.0, rel=1e-3)
     assert sizes[1] == pytest.approx(sizes[0], rel=1e-9)
-    # each histogram's own copy is the coefficient *it* needs, in the ratio of
+    # each pattern's own copy is the coefficient *it* needs, in the ratio of
     # the wavelengths — the thing that used to be true of the reported size
     coeffs = [ref.fitted_structures[h].phases[0].lor_size.value for h in (0, 1)]
     assert coeffs[1] / coeffs[0] == pytest.approx(lams[1] / lams[0], rel=1e-12)
@@ -733,11 +733,11 @@ def test_both_tier_2_flags_fire_per_histogram_in_a_joint_fit():
     assert ref.mtable.sharing.is_shared("phases.0.lor_size")
     assert ref.mtable.sharing.is_shared("phases.0.lor_strain")
     # …which is why the flag's ``where`` is the joint table's own bare spelling,
-    # with no ``hist.N.`` scope (unlike a wavelength row, which is per histogram)
+    # with no ``pattern.N.`` scope (unlike a wavelength row, which is per pattern)
     assert one(0, "SIZE_UNUSUALLY_SMALL").where == ["phases.0.lor_size"]
     assert one(0, "STRAIN_UNUSUALLY_LARGE").where == ["phases.0.lor_strain"]
 
-    # a per-histogram statement stays per histogram: not duplicated to the top,
+    # a per-pattern statement stays per pattern: not duplicated to the top,
     # exactly like the QPA and specimen-absorption rows beside it
     top = {d.code for d in result.diagnostics}
     assert "STRAIN_UNUSUALLY_LARGE" not in top

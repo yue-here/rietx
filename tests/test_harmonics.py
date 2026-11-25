@@ -6,7 +6,7 @@ that its wavelength is derived rather than stored, that the reflection list has
 to be generated for it and not for the fundamental, that one |F|² still serves
 both lines, and that declaring none leaves the model bit-identical.
 
-The real-data case is the **published** histogram: the λ/2 second-order
+The real-data case is the **published** pattern: the λ/2 second-order
 contribution on the NIST BT-1 Cu(311) monochromator is stated in the paper's
 own experimental section — "a Cu(311) monochromator was used, with a constant
 wavelength of λ = 1.5402(2) Å and a second-order contribution at λ/2"
@@ -16,7 +16,7 @@ the fit that models it.  Its evidence is **GoF**, never Rwp: the λ/2 peaks are
 extra intensity where the model puts none, which GoF sees against σ and Rwp
 (dominated by the strong peaks) does not.
 
-The negative control is **synthetic** on purpose.  A second real histogram from
+The negative control is **synthetic** on purpose.  A second real pattern from
 a harmonic-free monochromator would still rest on believing that it is
 harmonic-free; a simulated single-wavelength pattern is one where the absence is
 a fact of construction.  So the control declares a λ/2 line on a pattern that
@@ -55,7 +55,7 @@ from rietx.schemas.pattern import PatternData
 
 DATA = Path(__file__).parent / "data"
 
-#: The published BT-1 Cu(311) histogram, with the wavelength its instrument file
+#: The published BT-1 Cu(311) pattern, with the wavelength its instrument file
 #: declares.  The paper quotes λ = 1.5402(2) Å as the nominal; 1.54040 is what
 #: the ``.inst`` states, and that is what a refinement of this file must use.
 #: Committed by the ``refinable-wavelength`` branch, which owns the data row.
@@ -398,7 +398,7 @@ def test_a_monochromators_own_extinction_decides_whether_a_harmonic_exists():
         return 0.0 if len({h % 2, k % 2, l % 2}) != 1 else 4.0
 
     # the monochromator this correction is validated against passes its own
-    # second order, which is why the histogram is contaminated
+    # second order, which is why the pattern is contaminated
     assert fcc(3, 1, 1) > 0.0                       # Cu(311) reflects
     assert fcc(6, 2, 2) > 0.0                       # so does (622) = 2x(311)
     # an all-odd diamond cut does not, for any all-odd cut
@@ -412,7 +412,7 @@ def test_a_monochromators_own_extinction_decides_whether_a_harmonic_exists():
 @pytest.mark.slow
 @pytest.mark.xdist_group("harmonics-cu311")
 class TestPublishedCu311Histogram:
-    """The published BT-1 Cu(311) histogram, fitted with and without λ/2.
+    """The published BT-1 Cu(311) pattern, fitted with and without λ/2.
 
     The evidence is **GoF**, not Rwp — and here that is not merely a house rule
     but the only reading that works: the λ/2 peaks are intensity in places the

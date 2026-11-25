@@ -483,7 +483,7 @@ class SatelliteEvidence(Base):
       What the count does settle is that these peaks need no k, so they are
       not scored.  Measured on the Cr₂WO₆ 4 K pattern, whose two strongest
       residual peaks are the absent (0 0 1) and (1 0 2).
-    * ``radiation`` — on an X-ray histogram a satellite is a **superstructure**
+    * ``radiation`` — on an X-ray pattern a satellite is a **superstructure**
       reflection, not magnetism.  The positions are the same and the inference
       is not.
 
@@ -1562,7 +1562,7 @@ class FitReport(Base):
     #: the fit measured, the dipole approximation in force, the direction the
     #: powder average could not determine, and whether the modulus is above
     #: its floor at all.  Empty when no compiled model was supplied, when no
-    #: phase declares a moment, or on an X-ray histogram — absence for cause
+    #: phase declares a moment, or on an X-ray pattern — absence for cause
     #: in all three, never "no moment was found".
     magnetic: list[MomentEvidence] = Field(default_factory=list)
     #: structural-vs-profile triage (Layer-0 in trustworthiness, though it

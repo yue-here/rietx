@@ -2,7 +2,7 @@
 
 ``solver="lm"`` must reach the same physical answer as the scipy TRF reference
 through the *same* residual/Jacobian closures, on both entry points — the
-single-histogram one and the joint multi-histogram one, which WP-0308 warned
+single-pattern one and the joint one, which WP-0308 warned
 is a second driver rather than a wrapper.
 """
 
@@ -11,7 +11,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from rietx import Instrument, MultiHistogramRefinement, Refinement, refine
+from rietx import Instrument, JointRefinement, Refinement, refine
 from rietx.optimize.least_squares import SOLVERS
 from rietx.schemas.plan import CLOSING_WINDOW_TOL
 from tests.test_refine_synthetic import (
@@ -90,7 +90,7 @@ def test_multi_histogram_entry_point_takes_the_solver(pattern):
     second.profile.w.value = ins.profile.w.value
     second.background = ins.background.model_copy(deep=True)
 
-    multi = MultiHistogramRefinement(structure, [ins, second], solver="lm")
+    multi = JointRefinement(structure, [ins, second], solver="lm")
     result = multi.fit([pattern, pattern])
     assert result.status in ("converged", "max_iter")
     assert result.statistics.rwp < 0.15
@@ -98,7 +98,7 @@ def test_multi_histogram_entry_point_takes_the_solver(pattern):
     assert all(s.n_constraint_truncations == 0 for s in result.stages)
 
     with pytest.raises(ValueError, match="unknown solver"):
-        MultiHistogramRefinement(structure, [ins], solver="nope")
+        JointRefinement(structure, [ins], solver="nope")
 
 
 def test_sequential_takes_the_solver(pattern):

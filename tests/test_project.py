@@ -727,7 +727,7 @@ def test_a_pattern_only_project_is_created_saved_and_reopened(tmp_path, pattern_
 
 
 def test_multi_pattern_projects_are_refused_not_truncated(tmp_path, pattern_file):
-    """The ``patterns`` list is the multi-histogram seam, not a feature yet."""
+    """The ``patterns`` list is the joint seam, not a feature yet."""
     project = _create(tmp_path / "s.rex", pattern_file)
     doc_path = project.path / PROJECT_JSON
     raw = json.loads(doc_path.read_text(encoding="utf-8"))

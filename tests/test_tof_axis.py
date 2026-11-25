@@ -1179,14 +1179,14 @@ def test_fit_refuses_a_tof_pattern_against_a_cw_instrument(tof_pattern,
 
 def test_the_multi_histogram_entry_names_which_histogram(tof_pattern, cw_models):
     """A joint fit is where a TOF bank most plausibly arrives beside CW ones,
-    so the refusal names which histogram of how many."""
+    so the refusal names which pattern of how many."""
     structure, instrument = cw_models
     cw = PatternData(two_theta=[10.0 + 0.02 * i for i in range(200)],
                      intensity=[10.0] * 200)
     with pytest.raises(ValueError) as exc:
-        rx.MultiHistogramRefinement(structure, [instrument, instrument]).fit(
+        rx.JointRefinement(structure, [instrument, instrument]).fit(
             [cw, tof_pattern])
-    _assert_authored(exc, "MultiHistogramRefinement.fit(), histogram 1 of 2")
+    _assert_authored(exc, "JointRefinement.fit(), pattern 1 of 2")
 
 
 def test_the_sequential_entry_names_which_pattern(tof_pattern, cw_models):
@@ -1383,8 +1383,8 @@ def test_a_tof_instrument_is_refused_at_construction(cw_models):
     bank = rx.Instrument.tof_neutron_bank(difc=5123.45, two_theta_bank_deg=61.2)
     for call, where in (
             (lambda: rx.Refinement(structure, bank), "Refinement()"),
-            (lambda: rx.MultiHistogramRefinement(structure, [instrument, bank]),
-             "MultiHistogramRefinement(), instrument 1 of 2"),
+            (lambda: rx.JointRefinement(structure, [instrument, bank]),
+             "JointRefinement(), instrument 1 of 2"),
             (lambda: rx.Refinement(structure, instrument, history=False).edit(
                 instrument=bank), "Refinement.edit()")):
         with pytest.raises(ValueError) as exc:

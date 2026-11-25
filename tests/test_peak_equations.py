@@ -260,7 +260,7 @@ def _mo(ins: rx.Instrument) -> rx.Instrument:
 
 
 def _shared_across_wavelengths(equations, instruments, **kw) -> list:
-    from rietx.multi import _peak_equation_sharing_diagnostics
+    from rietx.joint import _peak_equation_sharing_diagnostics
     from rietx.params.multi import MultiParameterTable
 
     mt = MultiParameterTable(Structure(phases=[brucite(peak_equations=equations)]),
@@ -476,7 +476,7 @@ def test_a_coefficient_follows_a_coordinate_in_a_joint_fit():
     a ParametricEquation whose target is the coefficient's path (the
     2026-11-19 ruling, consent item 5).  Measured ([dev], macOS arm64): w0
     -0.63 esd and w1 +0.94 esd from the truth."""
-    from rietx.multi import MultiHistogramRefinement
+    from rietx.joint import JointRefinement
     from rietx.params.multi import SharingMap
     from rietx.schemas.parametric import CoordinateTable, ParametricEquation
 
@@ -493,7 +493,7 @@ def test_a_coefficient_follows_a_coordinate_in_a_joint_fit():
 
     patterns = [_simulate(*models(w0 + w1 * t), 40 + k) for k, t in enumerate(temps)]
     structure, ins = models(0.08)
-    ref = MultiHistogramRefinement(
+    ref = JointRefinement(
         structure, [ins] * len(temps),
         sharing=SharingMap(shared=["instrument.profile.*"]),
         coordinates=CoordinateTable(columns={"T": temps}, units={"T": "K"}),
@@ -510,7 +510,7 @@ def test_a_coefficient_follows_a_coordinate_in_a_joint_fit():
         row = rows[path]
         assert abs(row.value - truth) < 2 * row.stderr, (path, row.value, row.stderr)
     for h, t in enumerate(temps):
-        w = rows[f"hist.{h}.phases.0.peak_equations.0.w"].value
+        w = rows[f"pattern.{h}.phases.0.peak_equations.0.w"].value
         assert w == pytest.approx(rows["vars.w0"].value + rows["vars.w1"].value * t,
                                   rel=1e-12)
 
@@ -580,7 +580,7 @@ def test_a_calibration_curve_and_per_phase_tchz_are_recovered_jointly():
     the fit closes there too: at the declared stages' windows the cut
     Lorentzian tails took a sample x 1.2 esd low on average.
     """
-    from rietx.multi import MultiHistogramRefinement
+    from rietx.joint import JointRefinement
     from rietx.params.multi import SharingMap
     from rietx.schemas.plan import CLOSING_WINDOW_TOL
 
@@ -593,7 +593,7 @@ def test_a_calibration_curve_and_per_phase_tchz_are_recovered_jointly():
         patterns.append(rx.PatternData(two_theta=RAMP_TT, intensity=counts,
                                        sigma=np.sqrt(y)))
     start = [{"u": 5.0, "v": 0.0, "w": 5.0, "x": 10.0, "y": 10.0}] * 2
-    ref = MultiHistogramRefinement(
+    ref = JointRefinement(
         _ramp_structure(start, *_ramp_cell(300.0)),
         [_ramp_instrument({"sq": 0.0, "ln": 0.0}) for _ in RAMP_TEMPS],
         sharing=SharingMap(shared=["instrument.peak_equations.*"],
@@ -609,7 +609,7 @@ def test_a_calibration_curve_and_per_phase_tchz_are_recovered_jointly():
     OUT.mkdir(exist_ok=True)
     from rietx.viz.plots import plot_result
     for h in (0, len(RAMP_TEMPS) - 1):
-        plot_result(result.for_histogram(h), path=OUT / f"peak_equations_ramp_h{h}.png")
+        plot_result(result.for_pattern(h), path=OUT / f"peak_equations_ramp_h{h}.png")
     rows = {p.path: p for p in result.parameters}
     truths = {f"instrument.peak_equations.0.{k}": v for k, v in TRUE_CURVE.items()}
     for ip, values in enumerate(TRUE_TCHZ):

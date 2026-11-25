@@ -1648,7 +1648,7 @@ Measured on rietx at `f9adf0e57` with the NAC example (11-BM, `cod_1000236.cif`)
 - A mode spelled wrong is refused by every fitting call, but late. `refine(mode="rietvled")` ran
   2.8 s of a 4.1 s fit and then raised a pydantic error about `RefinementResult.mode`.
   `Refinement.fit` and `run_stage` raise at once with an error about `RefinementState`. Only
-  `refine_multi` names the argument and its choices. `Refinement.parameters(mode="lebial")`
+  `refine_joint` names the argument and its choices. `Refinement.parameters(mode="lebial")`
   returns a list with no warning.
 - `set_vary("instrument.zero_shift", False)` and then `fit()`: the default plan frees zero shift
   again, with no warning and no diagnostic. `hold` is the verb that holds.

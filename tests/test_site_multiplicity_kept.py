@@ -129,10 +129,10 @@ def test_stage_boundaries_keep_the_split_too(truth):
 
 
 def test_a_joint_fit_keeps_the_split_too(truth):
-    """The joint runner decides the split once per histogram, as ``fit`` does."""
-    from rietx import MultiHistogramRefinement
+    """The joint runner decides the split once per pattern, as ``fit`` does."""
+    from rietx import JointRefinement
 
-    multi = MultiHistogramRefinement(
+    multi = JointRefinement(
         rx.Structure(phases=[_toy(0.27, occ=0.5, free=True)]),
         [_instrument(), _instrument()])
     # declared, not inherited: off by default since WP-2222

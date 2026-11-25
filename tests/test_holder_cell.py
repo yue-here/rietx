@@ -231,7 +231,7 @@ def _joint():
             basis="expression",
             expression=f"2 * {theta} * 180 / pi + zero"
                        f" - 2 * (height + offset) / {radius} * cos({theta}) * 180 / pi"))
-    return rx.MultiHistogramRefinement(
+    return rx.JointRefinement(
         FLUORAPATITE.model_copy(deep=True), instruments,
         sharing=rx.SharingMap(shared=["instrument.profile.*"], per_histogram=["vars.height"]),
         variables=variables, parametric=equations)
@@ -248,14 +248,14 @@ def series():
                               telemetry=False)
         row = _scores(result, "vars.a_holder", "vars.offset")
         for k, h in enumerate(HEIGHTS):
-            row[f"height_{k}"] = _z(result, f"hist.{k}.vars.height", h)
+            row[f"height_{k}"] = _z(result, f"pattern.{k}.vars.height", h)
         out.append(row)
         if seed == SEEDS[0]:
             OUTPUT.mkdir(exist_ok=True)
             for h in (0, len(HEIGHTS) - 1):
-                plot_result(result.for_histogram(h),
+                plot_result(result.for_pattern(h),
                             path=str(OUTPUT / f"holder_series_h{h}_fit.png"))
-                plot_result(result.for_histogram(h),
+                plot_result(result.for_pattern(h),
                             path=str(OUTPUT / f"holder_series_h{h}_zoom.png"),
                             two_theta_limits=(37.5, 46.0))
     return out

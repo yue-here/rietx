@@ -420,15 +420,15 @@ def test_edit_does_not_rejudge_a_refined_supercell_with_one_value_changed():
 
 def test_a_multi_histogram_refinement_judges_the_statement():
     import rietx as rx
-    from rietx.multi import MultiHistogramRefinement
+    from rietx.joint import JointRefinement
     from rietx.schemas.structure import Structure
 
     instrument = rx.Instrument.constant_wavelength_neutron(2.4)
     bad = _Phase(name="c", space_group="P 4/m m m", atoms=[_mn()], **C8)
     with pytest.raises(ValueError, match=REFUSED):
-        MultiHistogramRefinement(Structure(phases=[bad]), [instrument])
+        JointRefinement(Structure(phases=[bad]), [instrument])
     _, _, fresh, _ = _refined_ref()
-    MultiHistogramRefinement(fresh, [instrument])       # positive arm
+    JointRefinement(fresh, [instrument])       # positive arm
 
 
 def test_a_series_judges_the_statement_once_and_not_each_patterns_carried_state():

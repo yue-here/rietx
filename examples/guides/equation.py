@@ -23,7 +23,7 @@ coordinates = rx.CoordinateTable(columns={"T": [float(t) for t in TEMPERATURES]}
 line = rx.ParametricEquation(name="a", target="phases.0.cell.a",
                              basis="polynomial", terms=[[], ["T"]])
 
-result = rx.refine_multi(patterns, structure, instruments, plan="mccusker_default",
+result = rx.refine_joint(patterns, structure, instruments, plan="mccusker_default",
                          coordinates=coordinates, parametric=[line])
 for c in result.parametric:
     print(f"[{c.term}] {c.value:.10f} +/- {c.esd:.1e} {c.unit}")
@@ -38,7 +38,7 @@ print(result.parametric_value("a", {"T": 293.0}))
 # guide: bowed start
 bowed_a = [a - 9.4e-5 * (1 - ((t - 600) / 300) ** 2) for a, t in zip(TRUE_A, TEMPERATURES)]
 bowed = [simulate(a, seed=11 + k) for k, a in enumerate(bowed_a)]
-bent = rx.refine_multi(bowed, starting_model()[0], [starting_model()[1] for _ in bowed],
+bent = rx.refine_joint(bowed, starting_model()[0], [starting_model()[1] for _ in bowed],
                        plan="mccusker_default", coordinates=coordinates, parametric=[line])
 form = bent.parametric_form[0]
 print(f"form rejected: {form.rejected} (statistic {form.tied.statistic:.1f}, cut {form.tied.cut:.1f})")
@@ -51,7 +51,7 @@ variables = {"a0": rx.Parameter(value=4.16, vary=True),
              "a1": rx.Parameter(value=0.0)}  # vary=False, the default
 formula = rx.ParametricEquation(name="a", target="phases.0.cell.a", basis="expression",
                                 expression="a0 + a1*(T - 600)")
-held = rx.refine_multi(patterns, starting_model()[0], [starting_model()[1] for _ in patterns],
+held = rx.refine_joint(patterns, starting_model()[0], [starting_model()[1] for _ in patterns],
                        plan="mccusker_default", coordinates=coordinates,
                        variables=variables, parametric=[formula])
 print(f"Rwp {held.statistics.rwp:.3f} against {result.statistics.rwp:.3f} with the slope free")
@@ -62,7 +62,7 @@ print([d.code for d in held.diagnostics if d.code in WATCHED])
 # guide: reach start
 b_line = rx.ParametricEquation(name="b", target="phases.0.atoms.0.biso",
                                basis="polynomial", terms=[[], ["T"]])
-unreached = rx.refine_multi(patterns, starting_model()[0],
+unreached = rx.refine_joint(patterns, starting_model()[0],
                             [starting_model()[1] for _ in patterns], plan="mccusker_default",
                             coordinates=coordinates, parametric=[line, b_line])
 for c in unreached.parametric:

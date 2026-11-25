@@ -472,7 +472,7 @@ def test_refinement_summary_series_deliverable_points_one_rank_up():
 # ------------------------------------------- parametric coefficients (WP-1325)
 def _coefficients() -> list:
     """Two terms of one declaration, in user units at T = 750 K: the shape
-    ``MultiHistogramRefinement._build_result`` writes, built by hand because
+    ``JointRefinement._build_result`` writes, built by hand because
     these rows are a projection of the field."""
     from rietx import ParametricCoefficient
 

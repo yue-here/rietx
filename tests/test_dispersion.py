@@ -671,7 +671,7 @@ def test_the_doublet_assumption_has_real_exceptions_off_cu():
     doublets span 105 and 173 eV, and one of them is a specimen someone will
     actually mount: **Ru at Ag Kα** (K edge 22.14 keV, between the lines).
     The refusal is the correct answer, not a limitation to route around — the
-    fix is separate histograms or a measured override.
+    fix is separate patterns or a measured override.
     """
     import gemmi
 

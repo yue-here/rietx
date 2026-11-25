@@ -815,3 +815,18 @@ rule above the constant).  ``capabilities().expression_grammar_version`` does
 not move either.  The grammar parses any name, and the names a peak equation
 binds belong to the schema (``schemas.peak_equation.REFLECTION_NAMES``).
 WP-2107 moved the grammar for its two functions and the schema for its names.
+
+Also in 0.62 (WP-2305): the joint fit says pattern where it said histogram.
+``RefinementResult.histograms`` is ``RefinementResult.patterns``, its type
+``HistogramResult`` is ``PatternResult``, ``RefinementResult.for_histogram`` is
+``for_pattern``, and ``StageResult.unreached_histograms`` is
+``unreached_patterns``.  A joint fit's per-pattern dot-path scope ``hist.N.`` is
+``pattern.N.`` in every row, ``where`` and glob, and a caller's path or glob
+that still starts with ``hist.`` raises naming its ``pattern.`` spelling.  A
+result JSON written before reads the two old field names into the new ones
+(``results._fold_renamed``), and its ``hist.N.`` paths as ``pattern.N.``
+(``results._rescope_legacy_paths``); an older build refuses a result carrying
+the new names.  ``capabilities().features["multi_histogram"]`` is
+``features["joint_refinement"]``.  The joint fit's ``fit_start`` and
+``stage_start`` events carry ``patterns`` and ``pattern_index`` in their open
+``data`` dict, so ``EVENT_SCHEMA_VERSION`` does not move.

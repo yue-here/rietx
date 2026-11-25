@@ -790,7 +790,7 @@ def test_multi_histogram_restraints_raise():
     s = _rutile_with_bond(RUTILE_OX, target=1.95, sigma=0.01)
     model = compile_model(s, LAB, _blank(20.0, 80.0, 0.1), mode="rietveld")
     mtable = MultiParameterTable(s, [LAB])
-    with pytest.raises(NotImplementedError, match="multi-histogram"):
+    with pytest.raises(NotImplementedError, match="joint"):
         run_multi_least_squares([model], mtable)
 
 

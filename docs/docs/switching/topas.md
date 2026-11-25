@@ -110,12 +110,12 @@ Each line of a TOPAS parametric input has its rietx spelling:
 | `be = b0*(1 + b1*1e-6*te + b2*1e-9*te^2);` on a monoclinic cell | a formula on `phases.0.cell.beta`, in degrees |
 | `a0 (1 + ax1 (T - 273))`, a product written with a space | `a0*(1 + ax1*(T - 273))`: a name before a parenthesis reads as a function call, and the formula is refused as an unknown function |
 | `range 3` of a multi-range RAW file | `rx.read_pattern(path, scan=2)`, since `scan` counts from 0 |
-| `Get(r_wp)`, `Out(Get(a), ...)` and `MVW(...)` | `result.histograms[h].statistics`, the rows of `result.parameters` (a per-pattern row is `hist.<h>.<path>`), and `result.histograms[h].qpa` |
+| `Get(r_wp)`, `Out(Get(a), ...)` and `MVW(...)` | `result.patterns[h].statistics`, the rows of `result.parameters` (a per-pattern row is `pattern.<h>.<path>`), and `result.patterns[h].qpa` |
 | `val_on_continue = Val*Rand(0.99, 1.01);` | no equivalent: rietx refines once from its starting values, so a python loop over starting values repeats the fit |
 | `load_save_locals` or `use_stored_values`, which start each value from the last run's | no equivalent: a joint fit starts from the values its models carry |
 
 A formula is evaluated in radians, and `pi` is the constant.
-`MultiHistogramRefinement.preview_equations` evaluates every formula at its starting values before any fit.
+`JointRefinement.preview_equations` evaluates every formula at its starting values before any fit.
 Comparing that with the cells a TOPAS input stores checks a port line by line.
 
 TOPAS's `scale_pks` factor exp(−2b/(2d)²) is the Debye-Waller factor on the intensity, exp(−2bs²) with s = 1/(2d).
@@ -144,7 +144,7 @@ overall_b = [
     rx.ParametricEquation(name="b_b", target="phases.0.atoms.1.biso", basis="expression",
                           expression="0.40 + b"),
 ]
-joint = rx.MultiHistogramRefinement(
+joint = rx.JointRefinement(
     lab6, instruments, coordinates=rx.CoordinateTable(columns={"T": temperatures}),
     variables={"b": rx.Parameter(value=0.0, vary=True, min=-1.0, max=10.0)},
     parametric=overall_b, sharing=rx.SharingMap(per_histogram=["vars.b"]))
@@ -158,7 +158,7 @@ print([row.path for row in joint.parameters() if row.path.endswith("vars.b")])
 ```
 
 ```text
-['hist.0.vars.b', 'hist.1.vars.b', 'hist.2.vars.b', 'hist.3.vars.b', 'hist.4.vars.b']
+['pattern.0.vars.b', 'pattern.1.vars.b', 'pattern.2.vars.b', 'pattern.3.vars.b', 'pattern.4.vars.b']
 ```
 
 `joint.fit(patterns, plan=plan)` then refines one `b` per pattern and keeps the boron coordinate where it started.
@@ -330,7 +330,7 @@ These steps port such an input:
    `for xdds { ... }` is its body once per `xdd`.
 3. Translate each line with the table in [A parametric equation is a formula](#a-parametric-equation-is-a-formula) and with [Names in other programs](../reference/foreign-names.md).
    A construct in the list under that table has no rietx spelling yet.
-4. Call `MultiHistogramRefinement.preview_equations` before fitting.
+4. Call `JointRefinement.preview_equations` before fitting.
    It evaluates every formula at its starting values, so compare its cells with the ones the input states.
 5. Fit, and compare a refined value the input states, such as a lattice parameter, with rietx's in ppm, with both esds beside it.
    Two programs can differ by more than either esd.

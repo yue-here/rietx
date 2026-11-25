@@ -787,32 +787,32 @@ def test_neglecting_capillary_absorption_biases_biso_low_by_the_predicted_amount
 
 
 def test_multi_histogram_resolves_mu_r_per_instrument():
-    """Each histogram gets its own µR, and none is silently dropped.
+    """Each pattern gets its own µR, and none is silently dropped.
 
-    The failure this guards against is quiet: `multi.py` compiles models
+    The failure this guards against is quiet: `joint.py` compiles models
     directly rather than through `Refinement`, so a `capillary_radius_mm` set
     here would have produced no correction *and* no diagnostic. µR is
-    per-instrument because histograms may sit at different wavelengths — the
+    per-instrument because patterns may sit at different wavelengths — the
     same specimen absorbs very differently at Cu Kα and at 0.414 Å.
     """
-    from rietx import MultiHistogramRefinement
+    from rietx import JointRefinement
     from tests.test_schemas import make_lab6
 
     structure = make_lab6()
     cu = Instrument.debye_scherrer(wavelength=1.5406, capillary_radius_mm=0.02)
     synch = Instrument.debye_scherrer(wavelength=0.4139090, capillary_radius_mm=0.02)
-    multi = MultiHistogramRefinement(structure, [cu, synch])
+    joint = JointRefinement(structure, [cu, synch])
 
-    mu_cu, mu_synch = (ins.geometry.mu_r for ins in multi.fitted_instruments)
+    mu_cu, mu_synch = (ins.geometry.mu_r for ins in joint.fitted_instruments)
     assert mu_cu is not None and mu_synch is not None
     assert mu_cu > 20 * mu_synch, "µ falls steeply with wavelength"
-    assert multi._mu_r_skipped == [None, None]
+    assert joint._mu_r_skipped == [None, None]
 
 
 def test_multi_histogram_leaves_absorption_off_without_a_radius():
-    from rietx import MultiHistogramRefinement
+    from rietx import JointRefinement
     from tests.test_schemas import make_lab6
 
     ins = [Instrument.debye_scherrer(wavelength=1.5406) for _ in range(2)]
-    multi = MultiHistogramRefinement(make_lab6(), ins)
-    assert all(i.geometry.mu_r is None for i in multi.fitted_instruments)
+    joint = JointRefinement(make_lab6(), ins)
+    assert all(i.geometry.mu_r is None for i in joint.fitted_instruments)

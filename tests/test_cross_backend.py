@@ -30,10 +30,10 @@ WP-0401 golden states — ``toy_lebail`` (Le Bail snapshot + P-spline penalty
 rows), ``toy_pawley`` (aux intensity block + overlap-restraint rows),
 ``toy_rich`` (aniso ADPs + March-Dollase + *nonzero* extinction + displacement/
 transparency), and the real-data ``srm660c`` / ``nac`` (marked ``slow``).
-Multi-histogram (stacked ``run_multi_least_squares`` layout) and the
+Joint (stacked ``run_multi_least_squares`` layout) and the
 stage-boundary recompiles get their own tests below, the stacked layout in
-Rietveld and in Pawley mode (WP-2104: each histogram's intensity block rides
-after the table's columns).  Le Bail is single-histogram only.
+Rietveld and in Pawley mode (WP-2104: each pattern's intensity block rides
+after the table's columns).  Le Bail is single-pattern only.
 
 **Every compile declares its windows** (WP-2002), as ``test_backend_shim``'s
 do.  ``compile_model``'s default is the closing stage's ``CLOSING_WINDOW_TOL``,
@@ -130,8 +130,8 @@ KINK_PATHS = frozenset({"instrument.geometry.axial_sl",
 #: scale, within 2.4e-7.
 DEAD_COL_FRAC = 1e-6
 
-#: the multi-histogram reference's FD step, the v0.2 harness's rule (applied
-#: ±h, centrally); the single-histogram reference takes the package's own
+#: the joint reference's FD step, the v0.2 harness's rule (applied
+#: ±h, centrally); the single-pattern reference takes the package's own
 #: ``fd_step`` (WP-1936)
 FD_STEP = 1e-6
 
@@ -2010,33 +2010,33 @@ def test_axial_columns_are_not_silently_fd_routed(config):
 
 
 # ----------------------------------------------------------------------
-# multi-histogram: the stacked layout
+# joint: the stacked layout
 # ----------------------------------------------------------------------
 #: the free set for the joint state — one shared structural column (the cubic
-#: cell) plus per-histogram scale, background, zero, width and **wavelength**.
+#: cell) plus per-pattern scale, background, zero, width and **wavelength**.
 #:
-#: The wavelength can only live here.  A single-histogram table refuses a free λ
+#: The wavelength can only live here.  A single-pattern table refuses a free λ
 #: by construction (exactly degenerate with the cell —
 #: ``params.vector.check_wavelength_freedom``), so the joint state is the only
 #: config in this file able to free one, and it has to: λ is a derivative path
 #: like any other and this file's rule is that its configs grow whenever one
-#: does.  Scoped to histogram 1, because freeing both copies is the degeneracy
+#: does.  Scoped to pattern 1, because freeing both copies is the degeneracy
 #: back again.
 MULTI_GLOBS = ["phases.*.scale", "instrument.background.*", "phases.*.cell.*",
                "instrument.zero_shift", "instrument.profile.w",
-               "hist.1.instrument.source.lines.0.wavelength"]
+               "pattern.1.instrument.source.lines.0.wavelength"]
 
 _MULTI_CACHE: dict[str, tuple] = {}
 
 #: the joint modes, each its own state: Pawley's free set is the Rietveld one
-#: less the scales it force-fixes, and its θ carries each histogram's
+#: less the scales it force-fixes, and its θ carries each pattern's
 #: intensity block after the table's columns (WP-2104)
 MULTI_MODES = ("rietveld", "pawley")
 
 
 def _multi_state(mode: str = "rietveld"):
     """Two LaB6 patterns of one crystal at two wavelengths (the WP-0308 state),
-    compiled per histogram and wired through a ``MultiParameterTable``:
+    compiled per pattern and wired through a ``MultiParameterTable``:
     ``(models, mtable, theta, labels)``."""
     key = f"state:{mode}"
     if key not in _MULTI_CACHE:
@@ -2062,7 +2062,7 @@ def _multi_state(mode: str = "rietveld"):
                                           data, mtable.tables, strict=True)]
         theta = mtable.x0()
         if mode == "pawley":
-            # the joint runner's seed (``multi._seed_joint_pawley``)
+            # the joint runner's seed (``joint._seed_joint_pawley``)
             for m, t in zip(models, mtable.tables, strict=True):
                 m.lebail_update(t.decode(t.x0()),
                                 n_cycles=_pawley_seed_cycles(Stage("seed", [])))
@@ -2087,7 +2087,7 @@ def test_multi_histogram_stacked_jacobian_matches_analytic(method, mode):
     """The same matrix over the stacked ``run_multi_least_squares`` layout.
 
     Rietveld and Pawley (WP-2104).  Le Bail is not a joint mode:
-    ``multi.py`` refuses it, its partition having no seam in the joint solve.
+    ``joint.py`` refuses it, its partition having no seam in the joint solve.
     """
     models, mtable, theta, labels = _multi_state(mode)
     J_ref = _multi_jacobian("numpy", mode)(theta)
@@ -2121,7 +2121,7 @@ def test_multi_histogram_stacked_jacobian_matches_analytic(method, mode):
 
 def test_multi_histogram_stacked_layout():
     """The layout the agreement above is measured on: one shared column fed by
-    *every* histogram's rows, per-histogram columns confined to their own."""
+    *every* pattern's rows, per-pattern columns confined to their own."""
     models, mtable, _theta, _labels = _multi_state()
     J = _multi_jacobian("numpy")(mtable.x0())
     n_data = [len(m.tt) for m in models]
@@ -2131,9 +2131,9 @@ def test_multi_histogram_stacked_layout():
     shared = paths.index("phases.0.cell.a")
     assert all(np.linalg.norm(J[b, shared]) > 0 for b in blocks), (
         "the shared cell column must receive contributions from every "
-        "histogram — that is what refines it better than one pattern can")
+        "pattern — that is what refines it better than one pattern can")
 
-    own = paths.index("hist.1.phases.0.scale")
+    own = paths.index("pattern.1.phases.0.scale")
     assert np.linalg.norm(J[blocks[0], own]) == 0.0
     assert np.linalg.norm(J[blocks[1], own]) > 0.0
 

@@ -1,14 +1,15 @@
 (guide-joint)=
 # How to fit an X-ray and a neutron pattern together
 
-Give each pattern its own `Instrument`, fit one `Structure` to both with `rietx.MultiHistogramRefinement`, and free the wavelength of the less well calibrated pattern in a stage of its own.
+Give each pattern its own `Instrument`, fit one `Structure` to both with `rietx.JointRefinement`, and free the wavelength of the less well calibrated pattern in a stage of its own.
 
 X-rays scatter from electrons, so heavy atoms dominate an X-ray pattern.
 Neutrons scatter from nuclei, and the scattering length b follows no such order, so a neutron pattern weights the same atoms differently.
 Corundum ranks its two sites oppositely: f(0) is 13 electrons for Al and 8 for O, while b is 3.449 fm for Al and 5.803 fm for O.
 A joint fit refines one structure against both patterns at once, in one residual {cite}`vondreele1997`.
 GSAS-II calls this a combined refinement over several histograms, histogram being its word for one pattern in a fit.
-rietx keeps the word where it needs a name for one of several patterns, as in `MultiHistogramRefinement` and `SharingMap.per_histogram`.
+rietx says pattern, so a per-pattern row of a joint fit is `pattern.0.instrument.zero_shift`.
+A path that still starts with the old `hist.` scope raises and names the new one.
 
 ## Compare the patterns' cells first
 
@@ -47,15 +48,15 @@ The shared cell then carries the X-ray scale, and the neutron wavelength refines
 
 <!-- output of examples/guides/joint.py -->
 ```text
-info[WAVELENGTH_CALIBRATION]: Histogram 1 line 0: wavelength refined from the declared 2.078000 A to 2.078618 A, +297.3 ppm, 58.8× its own esd (1.05e-05 A). The shift is taken against the cell pinned by the histogram whose wavelength is held.
-  at: hist.1.instrument.source.lines.0.wavelength
+info[WAVELENGTH_CALIBRATION]: Pattern 1 line 0: wavelength refined from the declared 2.078000 A to 2.078618 A, +297.3 ppm, 58.8× its own esd (1.05e-05 A). The shift is taken against the cell pinned by the pattern whose wavelength is held.
+  at: pattern.1.instrument.source.lines.0.wavelength
   help: Compare it with the instrument's own calibration history before you quote the cell.
 ```
 
 The refined wavelength lies within its esd, 5.1 ppm, of the one the pattern was made with, and the shared cell 1.4 esd from the true one.
 
-`MultiHistogramRefinement` takes the instruments in the order `fit` takes the patterns.
-A parameter that belongs to one pattern is named with a `hist.{h}.` scope, so `hist.1.instrument.source.lines.0.wavelength` is the neutron pattern's wavelength.
+`JointRefinement` takes the instruments in the order `fit` takes the patterns.
+A parameter that belongs to one pattern is named with a `pattern.{h}.` scope, so `pattern.1.instrument.source.lines.0.wavelength` is the neutron pattern's wavelength.
 A glob without the scope frees the parameter on every pattern.
 Freeing both wavelengths is refused, because the cell would then have no fixed length scale:
 
@@ -64,7 +65,7 @@ Freeing both wavelengths is refused, because the cell would then have no fixed l
 ```
 
 [`WAVELENGTH_CALIBRATION`](../reference/diagnostics-refinement.md#wavelength_calibration) reports the shift in ppm and against its own esd.
-It sits in `result.histograms[1].diagnostics`, with the other findings that belong to one pattern.
+It sits in `result.patterns[1].diagnostics`, with the other findings that belong to one pattern.
 A shift inside its esd means the wavelength was already right.
 
 Held at its declared value instead, the 300 ppm error goes into the shared model.
@@ -106,7 +107,7 @@ assert not per_mount.is_shared("phases.0.preferred_orientation.r")
 assert per_mount.is_shared("phases.0.cell.a")
 ```
 
-Pass it as `MultiHistogramRefinement(structure, instruments, sharing=per_mount)`.
+Pass it as `JointRefinement(structure, instruments, sharing=per_mount)`.
 Give each pattern its own preferred orientation when the two specimens were mounted differently.
 Keep the cell shared whenever a wavelength is free, because a cell of one pattern alone and a free wavelength cannot be told apart.
 
@@ -116,5 +117,5 @@ The full script is `examples/guides/joint.py`.
 
 ## See also
 
-- [How to refine a cell edge as a function of temperature](equation.md) fits one equation across many patterns with `refine_multi`.
+- [How to refine a cell edge as a function of temperature](equation.md) fits one equation across many patterns with `refine_joint`.
 - [How to fit a temperature series](series.md) fits each pattern on its own, starting from the last.

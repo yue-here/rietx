@@ -61,7 +61,7 @@ def analyse_moments(model, values, structure=None, *,
 
     Empty is the honest state on three counts and none of them is "no moment
     was found": no compiled model was supplied, no phase declares one, or the
-    histogram carries no magnetic term at all — an X-ray one, where it is
+    pattern carries no magnetic term at all — an X-ray one, where it is
     identically zero and the moment was never observed.  The test is
     ``cp.magnetic``, the frozen block the compile attaches exactly when
     ``forward.magnetic_wanted`` says so, so this function needs no opinion

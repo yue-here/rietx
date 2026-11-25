@@ -1,28 +1,28 @@
-"""Multi-histogram parameter bookkeeping (WP-0308).
+"""Joint parameter bookkeeping (WP-0308).
 
 A joint refinement fits one **shared** :class:`~rietx.schemas.structure.Structure`
 against several patterns, each measured on its **own**
 :class:`~rietx.schemas.instrument.Instrument` (different wavelength, geometry,
 resolution, background).  Physically the split is instrument-vs-sample: the
 crystal (cell, coordinates, occupancies, ADPs, size/strain, extinction, texture)
-is one object seen by every histogram, while the instrument and the per-pattern
+is one object seen by every pattern, while the instrument and the per-pattern
 scale (incident flux × illuminated volume) differ.
 
 :class:`MultiParameterTable` owns one ordinary :class:`ParameterTable` per
-histogram — so each keeps its crystal-system cell ties, Wyckoff DOFs and
+pattern — so each keeps its crystal-system cell ties, Wyckoff DOFs and
 bounds unchanged — and threads a single combined free vector θ through them
 with a column map that folds *shared* columns onto one shared combined column
-(fed to every histogram's model) while giving *per-histogram* columns their own.
+(fed to every pattern's model) while giving *per-pattern* columns their own.
 The stacked residual/Jacobian in
 :func:`~rietx.optimize.least_squares.run_multi_least_squares` scatters each
-histogram's block through this map.
+pattern's block through this map.
 
-Per-histogram parameters are named with a ``hist.{h}.`` scope
-(``hist.0.instrument.zero_shift``, ``hist.1.phases.0.scale``); shared parameters
+Per-pattern parameters are named with a ``pattern.{h}.`` scope
+(``pattern.0.instrument.zero_shift``, ``pattern.1.phases.0.scale``); shared parameters
 keep their bare path (``phases.0.cell.a``).  A turn-on glob frees a parameter
-when it matches either form, so every existing single-histogram plan
-(``phases.*.scale``, ``instrument.background.*``) frees *all* histograms' copies
-unchanged, while a scoped glob (``hist.1.*``) targets one.
+when it matches either form, so every existing single-pattern plan
+(``phases.*.scale``, ``instrument.background.*``) frees *all* patterns' copies
+unchanged, while a scoped glob (``pattern.1.*``) targets one.
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from pydantic import BaseModel
 
-from ..schemas.common import Parameter
+from ..schemas.common import Parameter, refuse_retired_scope
 from ..schemas.instrument import Instrument
 from ..schemas.parametric import CoordinateTable, ParametricEquation
 from ..schemas.structure import Phase, Structure
@@ -51,12 +51,12 @@ from .vector import (
 
 
 def _unscoped(path: str) -> str:
-    """A combined path with any ``hist.{h}.`` scope removed.
+    """A combined path with any ``pattern.{h}.`` scope removed.
 
     Shared paths arrive bare and come back unchanged, so this is the inverse of
     :meth:`MultiParameterTable._canonical` for exactly the cases that have one.
     """
-    if path.startswith("hist."):
+    if path.startswith("pattern."):
         return path.split(".", 2)[2]
     return path
 
@@ -73,7 +73,7 @@ def _unscoped(path: str) -> str:
 #: exactly the reason ``lor_size`` does: it is the same Scherrer coefficient
 #: (180/π)·K·λ/L with the *magnetic coherence length* in place of the
 #: crystallite size, so one magnetic domain needs coefficients in the ratio
-#: λ₂/λ₁ across two histograms.  Its strain partner is λ-free and is absent
+#: λ₂/λ₁ across two patterns.  Its strain partner is λ-free and is absent
 #: here, as both nuclear strain terms are.
 SIZE_LAMBDA_POWER = {"lor_size": 1.0, "gauss_size": 2.0,
                      "magnetic_lor_size": 1.0}
@@ -113,24 +113,24 @@ def _longest_wavelength(instrument: Instrument) -> float | None:
 
 def size_value_scales(structure: Structure, instruments: list[Instrument],
                       sharing: "SharingMap") -> list[dict[str, float]]:
-    """Per-histogram factors that turn a shared size column into one specimen.
+    """Per-pattern factors that turn a shared size column into one specimen.
 
-    One entry per histogram, each mapping a size path to the factor between
-    **that histogram's** coefficient and the shared column's, which is carried
-    in histogram 0's wavelength (so histogram 0's map is empty and its numbers
+    One entry per pattern, each mapping a size path to the factor between
+    **that pattern's** coefficient and the shared column's, which is carried
+    in pattern 0's wavelength (so pattern 0's map is empty and its numbers
     are unchanged, and a reader of ``phases.0.lor_size`` is reading the
     coefficient at λ₀).
 
     **The physics, and why the Scherrer constant is not in it** (WP-1131).  A
     size coefficient is (180/π)·K·λ/L, so for one crystallite size L two
-    histograms need coefficients in the ratio λ₂/λ₁ — K and the degree
+    patterns need coefficients in the ratio λ₂/λ₁ — K and the degree
     conversion cancel, which is why sharing a size across wavelengths is
     provably wrong whatever convention K follows, and why the fix needs no
     convention at all.  Microstrain is 2·(Δd/d)·tanθ with no λ in it, so it
     stays one number and is not listed here.
 
     Empty maps (⇒ the pre-WP-1131 behaviour, bit for bit) in three cases, and
-    each is the honest answer rather than a fallback: **one** histogram, where
+    each is the honest answer rather than a fallback: **one** pattern, where
     there is nothing to normalise; a source with **no declared line**, where
     there is no λ to normalise by; and equal wavelengths, where every factor is
     exactly 1.0 — which is every joint fit that existed before this change.
@@ -157,14 +157,14 @@ def size_value_scales(structure: Structure, instruments: list[Instrument],
 
 @dataclass
 class SharingMap:
-    """Which parameter paths are shared across histograms vs. per-histogram.
+    """Which parameter paths are shared across patterns vs. per-pattern.
 
-    Default rule: a path is **per-histogram** iff it starts with ``instrument.``
+    Default rule: a path is **per-pattern** iff it starts with ``instrument.``
     or ends with ``.scale``; everything else (cell, coordinates, occupancies,
     ADPs, size/strain, extinction, preferred orientation) is **shared** — one
     specimen, one crystal.  ``per_histogram`` / ``shared`` are override glob
     lists (fnmatch on the bare unscoped path, no brackets), checked in that
-    order before the default, so a caller can e.g. give each histogram its own
+    order before the default, so a caller can e.g. give each pattern its own
     preferred-orientation axis (``per_histogram=["phases.*.preferred_orientation.*"]``)
     or tie a sample-displacement across mounts.
     """
@@ -184,15 +184,15 @@ class SharingMap:
 
 def row_shared(sharing: SharingMap, entry) -> bool:
     """Whether a table entry is one column of the joint fit, or a row per
-    histogram.
+    pattern.
 
     An entry is shared when its own path is, and a **tied** one also needs
     every source of its tie shared: ``u11`` of an anisotropic site is a
     follower of the site's ``adp.k`` columns, so under
-    ``per_histogram=["phases.*.atoms.*.adp.*"]`` it is each histogram's own
+    ``per_histogram=["phases.*.atoms.*.adp.*"]`` it is each pattern's own
     although no glob names it (WP-2028).  The one rule behind
     :meth:`MultiParameterTable.row_path`, which the joint result's rows,
-    ``MultiHistogramRefinement.parameters()`` and :meth:`~MultiParameterTable.known_paths`
+    ``JointRefinement.parameters()`` and :meth:`~MultiParameterTable.known_paths`
     all spell with.
     """
     if not sharing.is_shared(entry.path):
@@ -321,7 +321,7 @@ def _target_refusal(table: ParameterTable, e) -> str | None:
     while its record moves (WP-1805), and a moment DOF, read in a frame rebuilt
     from the cell at every stage start (#598).  The intensity modes'
     force-fix is refused at fit, where the mode is known
-    (``multi._refuse_joint_mode``, WP-2104).
+    (``joint._refuse_joint_mode``, WP-2104).
     """
     if e.locked:
         return ("is structurally fixed by symmetry or by the model (locked), so "
@@ -357,7 +357,7 @@ def _model_differences(a, b, path: str = ""):
 
     A :class:`~rietx.schemas.common.Parameter` is skipped whole: its value is
     what a per-pattern start may change, and its bounds and vary flag are
-    either per-histogram or intersected and replaced by a plan.  So are
+    either per-pattern or intersected and replaced by a plan.  So are
     :data:`_PHASE_FIELDS_FREE_PER_PATTERN`.  Everything else is compared
     exactly, recursing through models, lists and dicts.  A list of another
     length is one difference at the list.  A dict is compared by key, never by
@@ -414,7 +414,7 @@ def _short(value: object, limit: int = 60) -> str:
 
 def _starting_structures(structure: Structure | list[Structure],
                          n: int) -> list[Structure]:
-    """One starting structure per histogram: the one given, or each its own.
+    """One starting structure per pattern: the one given, or each its own.
 
     A list is the per-pattern form (WP-1325): a library's specimens start from
     their own cells, occupancies and widths.  It must describe **one model**,
@@ -430,7 +430,7 @@ def _starting_structures(structure: Structure | list[Structure],
     if len(starts) != n:
         raise ValueError(
             f"{len(starts)} starting structures for {n} instruments: pass one "
-            "Structure for every histogram, or one per histogram")
+            "Structure for every pattern, or one per pattern")
     ref = starts[0]
     for h, s in enumerate(starts[1:], start=1):
         if len(s.phases) != len(ref.phases):
@@ -456,18 +456,18 @@ def _starting_structures(structure: Structure | list[Structure],
 
 
 class MultiParameterTable:
-    """One :class:`ParameterTable` per histogram + a shared/per-histogram θ map.
+    """One :class:`ParameterTable` per pattern + a shared/per-pattern θ map.
 
-    ``structure`` is one :class:`Structure` deep-copied into every histogram,
-    or a list of one per histogram (WP-1325): the same model with each
+    ``structure`` is one :class:`Structure` deep-copied into every pattern,
+    or a list of one per pattern (WP-1325): the same model with each
     pattern's own starting values.  A list must agree on every **shared**
     path's value (a shared column has one starting value) and may differ
-    anywhere a path is per-histogram — instrument, scales, a
+    anywhere a path is per-pattern — instrument, scales, a
     ``SharingMap.per_histogram`` override, a parametric target.
 
     ``parametric`` declares targets as functions of ``coordinates``
     (:class:`~rietx.schemas.parametric.ParametricEquation`): each target becomes
-    per-histogram, its coefficients ``vars.{name}_{j}`` are added to every
+    per-pattern, its coefficients ``vars.{name}_{j}`` are added to every
     table and fold onto one shared column each, and the target in each
     pattern of the subset is tied onto Σ_j Φ_kj·``vars.{name}_{j}``.  Every
     refusal is made here, before any solve.  :attr:`parametric` holds the
@@ -500,7 +500,7 @@ class MultiParameterTable:
         if declared:
             _refuse_clashing_declarations(declared, len(instruments))
             # a private copy: the targets (and, below, what follows them)
-            # become per-histogram, which is the caller's map plus this fit's
+            # become per-pattern, which is the caller's map plus this fit's
             # declarations and never an edit of the caller's object
             self.sharing = SharingMap(
                 per_histogram=[*self.sharing.per_histogram,
@@ -525,21 +525,21 @@ class MultiParameterTable:
         #: ``vars.{name}`` of each variable declared ``vary=False``, which a
         #: glob reaching an equation's target does not free
         self._fixed_variables: set[str] = set()
-        # a private structure copy per histogram: shared parameters are written
-        # identically into every copy at each commit; only the per-histogram
-        # scale (and any per-histogram override) diverges.
+        # a private structure copy per pattern: shared parameters are written
+        # identically into every copy at each commit; only the per-pattern
+        # scale (and any per-pattern override) diverges.
         self.structures: list[Structure] = [s.model_copy(deep=True)
                                              for s in starts]
         self.instruments: list[Instrument] = [ins.model_copy(deep=True)
                                               for ins in instruments]
         # ``joint=True``: a sub-table sees one instrument, so it would always
-        # read the single-histogram case and refuse a wavelength this fit is
+        # read the single-pattern case and refuse a wavelength this fit is
         # entitled to free.  The count is made once, over all of them, in
         # :meth:`_rebuild_columns`.
         # WP-1131: a *size* coefficient is not one number across wavelengths,
         # so before any table is built each copy is put into its own
-        # histogram's units and the table is told the factor.  Empty maps
-        # everywhere (one histogram, equal wavelengths, or a source with no
+        # pattern's units and the table is told the factor.  Empty maps
+        # everywhere (one pattern, equal wavelengths, or a source with no
         # declared line) leave every table exactly as it was.
         self.value_scales = size_value_scales(starts[0], self.instruments,
                                               self.sharing)
@@ -548,11 +548,11 @@ class MultiParameterTable:
                 _, ip, term = path.split(".")
                 param = getattr(struct.phases[int(ip)], term)
                 # the declared window travels with the value: it is a limit on
-                # the *specimen* quantity, so in this histogram's units it is
+                # the *specimen* quantity, so in this pattern's units it is
                 # the same factor away.  Scaling the value alone would trip
                 # ``Parameter``'s own min<=value<=max validator on any size
                 # term carrying a finite bound, with a message that says
-                # nothing about wavelengths -- and would leave the histograms
+                # nothing about wavelengths -- and would leave the patterns
                 # disagreeing about a window the caller stated once.
                 lo, hi = param.min * factor, param.max * factor
                 param.min, param.max = -math.inf, math.inf
@@ -585,13 +585,13 @@ class MultiParameterTable:
         one shared ``r`` are two models under one column, refused naming the
         field.  Under ``SharingMap(per_histogram=["phases.*.preferred_orientation.*"])``
         each pattern has its own ``r`` and the axes may differ, as GSAS-II
-        keeps texture per histogram (``docs/practice.md``).
+        keeps texture per pattern (``docs/practice.md``).
 
         A shared path is one column, so it has one starting value: the column
-        map writes each histogram's into it and keeps the last, which would
-        hand every other histogram a value it never declared.  Compared on the
+        map writes each pattern's into it and keeps the last, which would
+        hand every other pattern a value it never declared.  Compared on the
         tables, the authority on which paths a model has, except where WP-1131
-        rescaled a shared size term into a histogram's own units, which is
+        rescaled a shared size term into a pattern's own units, which is
         compared as the caller wrote it.
         """
         for h, start in enumerate(starts[1:], start=1):
@@ -605,7 +605,7 @@ class MultiParameterTable:
                         f"parameter and shapes the shared {sorted(shaped)[0]}: "
                         "per-pattern starting structures are one model with "
                         "different values. Give every structure the same "
-                        f"{where}, or make what it shapes per-histogram")
+                        f"{where}, or make what it shapes per-pattern")
         scaled = set().union(*(set(s) for s in self.value_scales))
         shared0 = {e.path: e.value for e in self.tables[0].entries
                    if self.sharing.is_shared(e.path)}
@@ -634,10 +634,10 @@ class MultiParameterTable:
                     f"{'' if len(disagree) == 2 else 's'})" if len(disagree) > 1 else "")
             raise ValueError(
                 f"the starting structures disagree on {path}, which is shared: "
-                f"histogram{'' if len(hs) == 1 else 's'} {', '.join(map(str, hs))} "
-                f"differ from histogram 0{more}. A shared parameter is one column "
+                f"pattern{'' if len(hs) == 1 else 's'} {', '.join(map(str, hs))} "
+                f"differ from pattern 0{more}. A shared parameter is one column "
                 f"with one starting value; start every structure at one value, "
-                f"make it per-histogram (SharingMap(per_histogram=['{path}'])), "
+                f"make it per-pattern (SharingMap(per_histogram=['{path}'])), "
                 f"or declare it a ParametricEquation target")
 
     def _install_parametric(self, declared: list[ParametricEquation],
@@ -692,7 +692,7 @@ class MultiParameterTable:
         it.  The intermediates go to :attr:`intermediates`; the equations with
         a target are returned.
         """
-        n = self.n_histograms
+        n = self.n_patterns
         linear_names = list(linear_names or [])
         if coordinates is not None and coordinates.n_patterns != n:
             raise ValueError(
@@ -831,13 +831,13 @@ class MultiParameterTable:
                 if i is None:
                     raise ValueError(
                         f"parametric equation {name!r}: target {r.target!r} is not a "
-                        f"parameter of histogram {h}'s model. To list them, build the "
+                        f"parameter of pattern {h}'s model. To list them, build the "
                         "refinement without parametric= and read the paths from its "
-                        ".parameters(), dropping any 'hist.<h>.' prefix")
+                        ".parameters(), dropping any 'pattern.<h>.' prefix")
                 why = _target_refusal(table, table.entries[i])
                 if why:
                     raise ValueError(f"parametric equation {name!r}: {r.target} in "
-                                     f"histogram {h} {why}")
+                                     f"pattern {h} {why}")
             self._refuse_unanchorable(r)
             self._refuse_size_across_wavelengths(r)
             used.update(names_v)
@@ -865,13 +865,13 @@ class MultiParameterTable:
         until a stage frees it, so it folds onto one shared column
         (``_rebuild_columns`` asserts the shared free sets agree), with its
         value, bounds and unit from the ``Parameter``.  A variable the sharing
-        map makes per-histogram (``SharingMap.per_histogram`` naming
+        map makes per-pattern (``SharingMap.per_histogram`` naming
         ``vars.{name}``, an ordinary glob) is a column per pattern, Stinton &
         Evans's (2007) ΔT, and is added only to the tables of the patterns
         whose expressions read it: anywhere else it would be a column no
         residual moves.  Each starts at the ``Parameter``'s value.  What follows each
-        target becomes per-histogram with it, as on the linear path, and the
-        target in each subset histogram becomes the expression's derived row
+        target becomes per-pattern with it, as on the linear path, and the
+        target in each subset pattern becomes the expression's derived row
         at that pattern's coordinates (``ParameterTable.add_expression``).
         """
         readers: dict[str, set[int]] = {}
@@ -880,7 +880,7 @@ class MultiParameterTable:
                 readers.setdefault(path, set()).update(r.patterns)
         for name, param in variables.items():
             path = f"vars.{name}"
-            where = (range(self.n_histograms) if self.sharing.is_shared(path)
+            where = (range(self.n_patterns) if self.sharing.is_shared(path)
                      else sorted(readers.get(path, ())))
             for h in where:
                 table = self.tables[h]
@@ -915,22 +915,22 @@ class MultiParameterTable:
 
         Refusals first, all of them, so a declaration that cannot be built
         leaves no half-wired table behind: the target must exist in every
-        subset histogram's model and be a parameter a parametric equation may drive — not
+        subset pattern's model and be a parameter a parametric equation may drive — not
         locked, not already tied (its sources named), not held, not a rigid
         body's increment or a moment DOF, not a coordinate DOF whose
         anchor the subset's starting structures store differently, and not a
         size coefficient over patterns at different wavelengths.  A
         coefficient's path must be new and shared under the caller's map.
 
-        Then, per declaration: what follows the target becomes per-histogram
-        with it (a cubic ``b`` and ``c`` follow ``a`` in every histogram, so a
-        bare row would report histogram 0's value as everyone's); the
+        Then, per declaration: what follows the target becomes per-pattern
+        with it (a cubic ``b`` and ``c`` follow ``a`` in every pattern, so a
+        bare row would report pattern 0's value as everyone's); the
         coefficients are added to **every** table, so they fold onto one
         shared column each (``_rebuild_columns`` asserts the shared free sets
         agree), at the least-squares start (:func:`least_squares_start`); and
-        the target in each subset histogram is tied onto Σ_j Φ_kj·c_j.
+        the target in each subset pattern is tied onto Σ_j Φ_kj·c_j.
         """
-        n = self.n_histograms
+        n = self.n_patterns
         resolved: list[ResolvedParametric] = []
         for equation in declared:
             resolved.append(resolve_parametric(equation, coordinates, n,
@@ -942,20 +942,20 @@ class MultiParameterTable:
                 if i is None:
                     raise ValueError(
                         f"parametric equation {r.name!r}: target {r.target!r} is not a "
-                        f"parameter of histogram {h}'s model. To list them, build the "
+                        f"parameter of pattern {h}'s model. To list them, build the "
                         "refinement without parametric= and read the paths from its "
-                        ".parameters(), dropping any 'hist.<h>.' prefix")
+                        ".parameters(), dropping any 'pattern.<h>.' prefix")
                 why = _target_refusal(table, table.entries[i])
                 if why:
                     raise ValueError(f"parametric equation {r.name!r}: {r.target} in "
-                                     f"histogram {h} {why}")
+                                     f"pattern {h} {why}")
             self._refuse_unanchorable(r)
             self._refuse_size_across_wavelengths(r)
             for path in r.paths:
                 if not self.sharing.is_shared(path):
                     raise ValueError(
                         f"parametric equation {r.name!r}: the sharing map makes {path} "
-                        "per-histogram (a per_histogram glob matches it), but a "
+                        "per-pattern (a per_histogram glob matches it), but a "
                         "coefficient is one number across the subset; narrow the "
                         "glob so vars.* stays shared")
                 if any(path in t._paths for t in self.tables):
@@ -1042,8 +1042,8 @@ class MultiParameterTable:
         """A size coefficient is not one number across wavelengths (WP-1131).
 
         It is (180/π)·K·λ/L, so a shared size column carries the factor
-        λ_h/λ_0 into each histogram (:func:`size_value_scales`).  A parametric
-        target is per-histogram, so no factor reaches it, and Σ_j Φ_kj·c_j
+        λ_h/λ_0 into each pattern (:func:`size_value_scales`).  A parametric
+        target is per-pattern, so no factor reaches it, and Σ_j Φ_kj·c_j
         would state one number of *degrees* in every pattern: a different
         specimen size at each wavelength.  Refused where the subset's
         wavelengths differ; where a source declares no line there is no λ to
@@ -1063,10 +1063,10 @@ class MultiParameterTable:
             "coordinates would state one number of degrees at every λ — a "
             "different size in each pattern (WP-1131). Give the declaration a "
             "subset at one wavelength (patterns=…), or leave the size shared, "
-            "which converts it per histogram")
+            "which converts it per pattern")
 
     def parametric_targets(self, h: int) -> set[str]:
-        """The bare paths histogram ``h``'s parametric equations drive (WP-1325),
+        """The bare paths pattern ``h``'s parametric equations drive (WP-1325),
         both kinds."""
         return {r.target for r in (*self.parametric, *self.expressions)
                 if h in r.patterns}
@@ -1111,7 +1111,7 @@ class MultiParameterTable:
         """The coefficient and variable paths of every declaration a glob reaches.
 
         A glob reaches a declaration when it matches the target in a subset
-        histogram, bare or scoped (``hist.{h}.<target>``), under
+        pattern, bare or scoped (``pattern.{h}.<target>``), under
         :meth:`set_vary`'s matching rule.  The target is a tied or derived row,
         so the glob alone would free nothing; its coefficients, or the
         variables its expression names, are what carry it.  A variable
@@ -1124,7 +1124,7 @@ class MultiParameterTable:
         for r in (*self.parametric, *self.expressions):
             hit = [h for h in r.patterns
                    if any(fnmatch.fnmatchcase(name, g)
-                          for name in (r.target, f"hist.{h}.{r.target}")
+                          for name in (r.target, f"pattern.{h}.{r.target}")
                           for g in path_globs)]
             out.update(self._canonical(h, p) for h in hit for p in r.paths
                        if p not in self._fixed_variables)
@@ -1134,7 +1134,7 @@ class MultiParameterTable:
         """The joint rows of a declaration's coefficients or variables, in order.
 
         A shared one is its bare ``vars.`` path, once.  A per-pattern
-        variable (WP-1964) is ``hist.{h}.vars.{name}`` for each pattern of
+        variable (WP-1964) is ``pattern.{h}.vars.{name}`` for each pattern of
         the subset, in pattern order, so the list is what the joint result
         prints and ``free_paths`` spells.
         """
@@ -1143,19 +1143,19 @@ class MultiParameterTable:
             if self.sharing.is_shared(p):
                 out[p] = None
             else:
-                out.update((f"hist.{h}.{p}", None) for h in r.patterns)
+                out.update((f"pattern.{h}.{p}", None) for h in r.patterns)
         return list(out)
 
     def _check_moment_frames_shared(self) -> None:
-        """Refuse a shared moment DOF over a per-histogram cell or position.
+        """Refuse a shared moment DOF over a per-pattern cell or position.
 
         A moment's DOFs are read in a frame built from the cell angles and the
         atom's position (#598).  One shared column then states one moment only
-        if every histogram builds the same frame; with a per-histogram cell
+        if every pattern builds the same frame; with a per-pattern cell
         each table would re-seed it from its own, the column would keep one
-        histogram's value, and every other histogram would read a different
-        moment at each stage start, silently (review of #615).  Per-histogram
-        DOFs over a per-histogram cell are fine: each table re-seeds its own.
+        pattern's value, and every other pattern would read a different
+        moment at each stage start, silently (review of #615).  Per-pattern
+        DOFs over a per-pattern cell are fine: each table re-seeds its own.
         """
         for base in self.tables[0].moment_frames():
             _, ip, _, j = base.split(".")
@@ -1167,22 +1167,22 @@ class MultiParameterTable:
             if (any(self.sharing.is_shared(d) for d in dofs)
                     and not all(self.sharing.is_shared(f) for f in frame_paths)):
                 raise ValueError(
-                    f"the moment of {base} is shared across histograms but its "
-                    f"cell or position is per-histogram "
+                    f"the moment of {base} is shared across patterns but its "
+                    f"cell or position is per-pattern "
                     f"(SharingMap.per_histogram): a moment's DOFs are read in a "
                     f"frame built from the cell, so one shared DOF would mean a "
-                    f"different moment in each histogram. Make the moment "
-                    f"per-histogram too (per_histogram=['{base}.moment.*']) or "
+                    f"different moment in each pattern. Make the moment "
+                    f"per-pattern too (per_histogram=['{base}.moment.*']) or "
                     f"share the cell.")
 
     @property
-    def n_histograms(self) -> int:
+    def n_patterns(self) -> int:
         return len(self.tables)
 
     # -- vary control --------------------------------------------------
     def _canonical(self, h: int, path: str) -> str:
-        """The scoped name of ``path`` in histogram ``h`` (bare if shared)."""
-        return path if self.sharing.is_shared(path) else f"hist.{h}.{path}"
+        """The scoped name of ``path`` in pattern ``h`` (bare if shared)."""
+        return path if self.sharing.is_shared(path) else f"pattern.{h}.{path}"
 
     def row_names(self) -> list[tuple[str, str]]:
         """Every row as ``(scoped, bare)``, the two names :meth:`set_vary` matches.
@@ -1198,19 +1198,19 @@ class MultiParameterTable:
         return list(out.items())
 
     def set_vary(self, path_globs: list[str], vary: bool) -> list[str]:
-        """Free/fix by glob across every histogram; returns scoped hits.
+        """Free/fix by glob across every pattern; returns scoped hits.
 
         A glob matches an entry when it matches either the scoped canonical name
-        or the bare path, so single-histogram plans keep working verbatim.
+        or the bare path, so single-pattern plans keep working verbatim.
 
-        A **shared** path is one column however many histograms carry it, so
-        it is returned once, at its first histogram's place (WP-1312): every
-        histogram's table holds its own copy of the entry and sets it, but the
+        A **shared** path is one column however many patterns carry it, so
+        it is returned once, at its first pattern's place (WP-1312): every
+        pattern's table holds its own copy of the entry and sets it, but the
         record is of what the joint fit freed, and one shared cell listed once
-        per histogram claimed twice the parameters a two-histogram fit had.
+        per pattern claimed twice the parameters a two-pattern fit had.
 
         A glob reaching a **parametric target** (WP-1325) reaches its
-        coefficients too, in every histogram, since they are shared columns
+        coefficients too, in every pattern, since they are shared columns
         every table carries: the target is a tied row a glob alone would skip,
         so a plan's ``phases.*.cell.*`` frees a parametric cell as it frees a
         plain one, and the returned list names the coefficients.  A glob
@@ -1218,6 +1218,7 @@ class MultiParameterTable:
         declared ``vary=False`` (WP-1964); a glob naming ``vars.{name}`` frees
         that variable as it would any shared entry.
         """
+        refuse_retired_scope(path_globs, "set_vary")
         freed: list[str] = []
         seen: set[str] = set()
         coupled = (self._parametric_reached(path_globs)
@@ -1262,20 +1263,20 @@ class MultiParameterTable:
         return sorted(blocked)
 
     def row_path(self, h: int, entry) -> str:
-        """The name histogram ``h``'s ``entry`` goes by in the joint result.
+        """The name pattern ``h``'s ``entry`` goes by in the joint result.
 
-        Bare when the entry is one column of the joint fit, ``hist.h.``-scoped
-        when it is a row per histogram (:func:`row_shared`).  It differs from
+        Bare when the entry is one column of the joint fit, ``pattern.h.``-scoped
+        when it is a row per pattern (:func:`row_shared`).  It differs from
         :meth:`_canonical` only for a tied row whose sources are per
-        histogram, which ``_canonical`` names bare by its own path.
+        pattern, which ``_canonical`` names bare by its own path.
         """
-        return entry.path if row_shared(self.sharing, entry) else f"hist.{h}.{entry.path}"
+        return entry.path if row_shared(self.sharing, entry) else f"pattern.{h}.{entry.path}"
 
     def _names(self, h: int) -> set[str]:
-        """Every name a glob can match in histogram ``h``: bare and scoped.
+        """Every name a glob can match in pattern ``h``: bare and scoped.
 
         The scoped names include :meth:`row_path`'s, so every path the joint
-        result and ``MultiHistogramRefinement.parameters()`` print is a known
+        result and ``JointRefinement.parameters()`` print is a known
         one, and a literal copied from either is never ``STAGE_PATH_UNKNOWN``.
         """
         names: set[str] = set()
@@ -1286,57 +1287,57 @@ class MultiParameterTable:
         return names
 
     def known_paths(self) -> set[str]:
-        """Every name a glob can match in any histogram: bare and scoped."""
+        """Every name a glob can match in any pattern: bare and scoped."""
         known: set[str] = set()
-        for h in range(self.n_histograms):
+        for h in range(self.n_patterns):
             known |= self._names(h)
         return known
 
     def unknown_paths(self, path_globs: list[str]) -> list[str]:
-        """The paths naming no entry in any histogram (WP-1414).
+        """The paths naming no entry in any pattern (WP-1414).
 
         :meth:`ParameterTable.unknown_paths` across the stack, under this
         table's matching rule: a literal is known when it is a bare path of
-        some histogram or a scoped one (``hist.1.instrument.zero_shift``), so
-        ``hist.7.…`` on a three-histogram fit is unknown however real its tail.
+        some pattern or a scoped one (``pattern.1.instrument.zero_shift``), so
+        ``pattern.7.…`` on a three-pattern fit is unknown however real its tail.
         """
         return unknown_paths_among(path_globs, self.known_paths())
 
-    def unreached_histograms(self, path_globs: list[str]) -> dict[int, list[str]]:
-        """Histograms a stage's globs reached elsewhere and not here (WP-1414).
+    def unreached_patterns(self, path_globs: list[str]) -> dict[int, list[str]]:
+        """Patterns a stage's globs reached elsewhere and not here (WP-1414).
 
-        Maps each such histogram to the globs that did reach another one, in
-        plan order.  Histogram ``h`` is unreached when no glob *addressing* it
+        Maps each such pattern to the globs that did reach another one, in
+        plan order.  Pattern ``h`` is unreached when no glob *addressing* it
         matched any of its rows, while one of those same globs matched a row
-        of another histogram.  Issue #265's joint fit is the case:
+        of another pattern.  Issue #265's joint fit is the case:
         ``instrument.profile.*`` freed four rows on the one
-        constant-wavelength histogram and none on any bank, and the result
+        constant-wavelength pattern and none on any bank, and the result
         said ``converged``.
 
         Three things keep this silent where silence is right. **Matched, not
         freed**: a row that exists and is locked, tied or held was reached,
         and the reason it stayed is ``ParameterRow.held_because``'s to give —
         a capillary's force-fixed ``sample_displacement`` is not a miss. A
-        glob **scoped** to another histogram does not address this one, so a
-        plan that targets one histogram on purpose says nothing about the
-        rest. And a glob that matched **nowhere** is the single-histogram
+        glob **scoped** to another pattern does not address this one, so a
+        plan that targets one pattern on purpose says nothing about the
+        rest. And a glob that matched **nowhere** is the single-pattern
         case, silent for the reason :func:`~rietx.params.vector.is_literal_path`
         gives.
 
-        Scoped means one of two spellings.  A ``hist.<seg>.`` prefix addresses
-        the histograms ``<seg>`` admits, so ``hist.*.…`` still means every
-        one.  Any other glob addresses every histogram if it matched a **bare**
-        path anywhere, which is how a plan written for one histogram is
-        spelled, and otherwise only the histograms whose scoped names it
-        matched: ``*.1.instrument.zero_shift`` reaches histogram 1 by its
-        scope and is aimed there, never a miss on histogram 0.
+        Scoped means one of two spellings.  A ``pattern.<seg>.`` prefix addresses
+        the patterns ``<seg>`` admits, so ``pattern.*.…`` still means every
+        one.  Any other glob addresses every pattern if it matched a **bare**
+        path anywhere, which is how a plan written for one pattern is
+        spelled, and otherwise only the patterns whose scoped names it
+        matched: ``*.1.instrument.zero_shift`` reaches pattern 1 by its
+        scope and is aimed there, never a miss on pattern 0.
 
-        What it cannot tell apart, and so reports: a component one histogram
+        What it cannot tell apart, and so reports: a component one pattern
         declares and another does not (a hump, a surface roughness) is
         reached on one side only by construction. That is a true statement
         about the stage, at ``info``.
         """
-        n = self.n_histograms
+        n = self.n_patterns
         names = [self._names(h) for h in range(n)]
         bare = [{e.path for e in table.entries} for table in self.tables]
         globs = list(dict.fromkeys(path_globs))
@@ -1348,7 +1349,7 @@ class MultiParameterTable:
                         for g in globs}
 
         def addresses(g: str, h: int) -> bool:
-            if g.startswith("hist."):
+            if g.startswith("pattern."):
                 return fnmatch.fnmatchcase(str(h), g.split(".", 2)[1])
             return written_bare[g] or hit[g][h]
 
@@ -1364,13 +1365,13 @@ class MultiParameterTable:
         return out
 
     def seed_floored(self, scoped_paths: list[str], value: float) -> list[str]:
-        """Lift free rows bounded below at 0 up to ``value`` (per histogram);
-        see the single-histogram :meth:`ParameterTable.seed_floored`.
+        """Lift free rows bounded below at 0 up to ``value`` (per pattern);
+        see the single-pattern :meth:`ParameterTable.seed_floored`.
 
-        A shared column is seeded in every histogram or in none.  Each
-        histogram's box is its own (WP-1131), so a seed can fit under one
-        histogram's upper bound and not another's; written in some, the
-        histograms would disagree about one column and the last write would
+        A shared column is seeded in every pattern or in none.  Each
+        pattern's box is its own (WP-1131), so a seed can fit under one
+        pattern's upper bound and not another's; written in some, the
+        patterns would disagree about one column and the last write would
         win ``x0``.
         """
         wants = []
@@ -1395,21 +1396,21 @@ class MultiParameterTable:
     def seed_stephens(self, scoped_paths: list[str],
                       microstrain: float) -> list[str]:
         """Put each freed, all-zero Stephens block on the isotropic ray (per
-        histogram); see the single-histogram :meth:`ParameterTable.seed_stephens`.
+        pattern); see the single-pattern :meth:`ParameterTable.seed_stephens`.
 
         S_HKL are λ-free, so the default sharing gives one block to every
-        histogram, and :meth:`seed_floored`'s rule holds: a shared block is
-        seeded in every histogram or in none.  It is declined when any
-        histogram's copy is not all zero.  The ray reads the cell, so under a
-        per-histogram cell (``SharingMap(per_histogram=["phases.*.cell.*"])``)
-        each histogram would compute its own; a shared block takes
-        **histogram 0's ray** in all of them.  That start is inside every
-        histogram's cone, which is all a seed needs, while seeding each
-        histogram from its own cell would give one column several values and
+        pattern, and :meth:`seed_floored`'s rule holds: a shared block is
+        seeded in every pattern or in none.  It is declined when any
+        pattern's copy is not all zero.  The ray reads the cell, so under a
+        per-pattern cell (``SharingMap(per_histogram=["phases.*.cell.*"])``)
+        each pattern would compute its own; a shared block takes
+        **pattern 0's ray** in all of them.  That start is inside every
+        pattern's cone, which is all a seed needs, while seeding each
+        pattern from its own cell would give one column several values and
         the last write would win ``x0``.  A block the sharing gives each
-        histogram whole (every DOF of it per-histogram) is seeded from that
-        histogram's own cell, as a single fit would seed it.  A block with
-        any DOF shared, freed or not, takes histogram 0's ray, since its
+        pattern whole (every DOF of it per-pattern) is seeded from that
+        pattern's own cell, as a single fit would seed it.  A block with
+        any DOF shared, freed or not, takes pattern 0's ray, since its
         shared column can hold only one value.
         """
         if microstrain <= 0.0:
@@ -1425,7 +1426,7 @@ class MultiParameterTable:
             return p.rpartition(".microstrain.dof.")[0]
 
         def per_histogram(b: str) -> bool:
-            # every DOF of the block, freed or not, is each histogram's own
+            # every DOF of the block, freed or not, is each pattern's own
             n = max(len(t._strain_unit.get(b, ())) for t in self.tables)
             return n > 0 and not any(
                 self.sharing.is_shared(f"{b}.microstrain.dof.{k}") for k in range(n))
@@ -1451,12 +1452,12 @@ class MultiParameterTable:
 
     # -- combined column layout ----------------------------------------
     def _rebuild_columns(self) -> None:
-        """Recompute the shared/per-histogram combined column layout.
+        """Recompute the shared/per-pattern combined column layout.
 
-        Shared free columns come first (in histogram 0's order, and asserted
-        identical across histograms — same structure copy, same globs), then
-        each histogram's per-histogram free columns in turn.  ``_col_map[h][c]``
-        is the combined index of histogram ``h``'s c-th free column.
+        Shared free columns come first (in pattern 0's order, and asserted
+        identical across patterns — same structure copy, same globs), then
+        each pattern's per-pattern free columns in turn.  ``_col_map[h][c]``
+        is the combined index of pattern ``h``'s c-th free column.
         """
         shared_order: list[str] = []
         shared_seen: set[str] = set()
@@ -1478,16 +1479,16 @@ class MultiParameterTable:
                 missing = sorted(shared_seen - sset)
                 extra = sorted(sset - shared_seen)
                 raise ValueError(
-                    f"histogram {h} disagrees on the shared free set "
+                    f"pattern {h} disagrees on the shared free set "
                     f"(missing {missing[:3]}, extra {extra[:3]}); shared "
-                    "parameters must be freed identically in every histogram")
+                    "parameters must be freed identically in every pattern")
         if self._column_anchor:
             # a parametric coefficient takes the column its target would have
             # had (WP-1325): the order is then the one a plain shared target
             # gives, which is what makes a ``constant`` declaration the same
-            # solve as ``refine_multi`` bit for bit (a permuted normal matrix
+            # solve as ``refine_joint`` bit for bit (a permuted normal matrix
             # is factorised in another order).  Every other column keeps
-            # histogram 0's entry order, which is the order above.
+            # pattern 0's entry order, which is the order above.
             pos = {e.path: i for i, e in enumerate(self.tables[0].entries)}
             shared_order.sort(key=lambda p: (pos[self._column_anchor.get(p, (p, 0))[0]],
                                              self._column_anchor.get(p, (p, 0))[1]))
@@ -1498,7 +1499,7 @@ class MultiParameterTable:
         for h in range(len(self.tables)):
             for p in per_hist_paths[h]:
                 per_hist_index[h][p] = len(combined_paths)
-                combined_paths.append(f"hist.{h}.{p}")
+                combined_paths.append(f"pattern.{h}.{p}")
 
         n = len(combined_paths)
         col_map: list[np.ndarray] = []
@@ -1513,14 +1514,14 @@ class MultiParameterTable:
             col_map.append(idx)
             xh = table.x0()
             loh, hih = table.bounds()
-            # shared columns get identical values from each histogram (harmless
-            # overwrite); per-histogram columns are written once.
+            # shared columns get identical values from each pattern (harmless
+            # overwrite); per-pattern columns are written once.
             x0[idx] = xh
             # bounds are **intersected**, not overwritten.  A shared column has
-            # to satisfy every histogram's bound, and since WP-1131 the
-            # histograms can genuinely disagree about one: a size cap is a
-            # physical limit on each histogram's own coefficient, which the
-            # value scale divides by a different factor per histogram.  Identity
+            # to satisfy every pattern's bound, and since WP-1131 the
+            # patterns can genuinely disagree about one: a size cap is a
+            # physical limit on each pattern's own coefficient, which the
+            # value scale divides by a different factor per pattern.  Identity
             # wherever they agree — which is every bound the three per-stage
             # freezes set, since each is made to agree deliberately — so this is
             # bit-identical on every joint fit that predates the scaling.
@@ -1528,18 +1529,18 @@ class MultiParameterTable:
             hi[idx] = np.minimum(hi[idx], hih)
 
         # The wavelength count, made where the whole set is visible.  A
-        # wavelength is per-histogram under the default sharing rule (it starts
-        # with ``instrument.``), so the scoped ``hist.h.…`` name is what a user
+        # wavelength is per-pattern under the default sharing rule (it starts
+        # with ``instrument.``), so the scoped ``pattern.h.…`` name is what a user
         # reads and what the refusal must name — the check tests the *unscoped*
         # tail and reports the scoped path.  Asked after every column rebuild
         # rather than only at construction, because a staged plan frees its
         # globs one stage at a time and every :meth:`set_vary` ends here.
         n_wavelengths = sum(1 for t in self.tables for e in t.entries
                             if _is_wavelength(e.path))
-        # ``SharingMap`` decides sharing per *path*, not per (path, histogram),
-        # so "the cell is shared with a held-λ histogram" collapses to "the cell
+        # ``SharingMap`` decides sharing per *path*, not per (path, pattern),
+        # so "the cell is shared with a held-λ pattern" collapses to "the cell
         # is shared at all" — which is the strongest form this map can express,
-        # and it is the right one: with a per-histogram cell *every* histogram
+        # and it is the right one: with a per-pattern cell *every* pattern
         # has its own, so no free λ has anything to be measured against.
         cell_shared = all(
             self.sharing.is_shared(e.path) for t in self.tables
@@ -1561,7 +1562,7 @@ class MultiParameterTable:
         """Re-read the sub-tables' bounds after a per-stage freeze changed them.
 
         The constructor's "harmless overwrite" of a shared column holds only
-        while every histogram reports the same bound for it, so a caller that
+        while every pattern reports the same bound for it, so a caller that
         freezes cell windows must freeze the **same** set on every sub-table —
         see ``optimize.least_squares._freeze_cell_windows_multi``, which decides
         a phase is invisible only when it is invisible in all of them.
@@ -1589,7 +1590,7 @@ class MultiParameterTable:
         return self._col_map[h]
 
     def split(self, theta: np.ndarray) -> list[np.ndarray]:
-        """Gather the per-histogram internal free vectors from combined θ."""
+        """Gather the per-pattern internal free vectors from combined θ."""
         return [theta[self._col_map[h]] for h in range(len(self.tables))]
 
     def decode(self, theta: np.ndarray) -> list[dict[str, float]]:
@@ -1600,8 +1601,8 @@ class MultiParameterTable:
         """Physical values of :attr:`free_paths` at ``theta``, in that order.
 
         :meth:`ParameterTable.free_values` across the stack (WP-1341).  Each
-        combined path is read from the histogram that owns it, and a shared
-        one from histogram 0, whose value scale is 1 (WP-1131), which is
+        combined path is read from the pattern that owns it, and a shared
+        one from pattern 0, whose value scale is 1 (WP-1131), which is
         where the joint result reads a shared row's value too.
         """
         decoded = self.decode(np.asarray(theta, dtype=np.float64))
@@ -1612,7 +1613,7 @@ class MultiParameterTable:
         return out
 
     def commit(self, theta: np.ndarray) -> np.ndarray | None:
-        """Each histogram's table commits its slice; the re-charting
+        """Each pattern's table commits its slice; the re-charting
         (``ParameterTable.commit``: moment signs, #604, or a body's composed
         rotation, WP-1805) comes back on the combined columns.  A shared
         column is committed from one value by every table that holds it, and
@@ -1620,9 +1621,9 @@ class MultiParameterTable:
         combined form is the widest any table returned: a vector of signs, or
         the square matrix once one table's is.
 
-        One commit, not one per histogram: a table that refuses (a rigid body
+        One commit, not one per pattern: a table that refuses (a rigid body
         failing the commit-time guard, #801) puts back every table, so the
-        histograms never disagree on a shared column, and the error goes on."""
+        patterns never disagree on a shared column, and the error goes on."""
         thetas = self.split(theta)
         before = [table._commit_state() for table in self.tables]
         try:
@@ -1647,7 +1648,7 @@ class MultiParameterTable:
         return combined
 
     def apply_to_models(self) -> None:
-        """Each histogram's table into its own model copies.
+        """Each pattern's table into its own model copies.
 
         A parametric or expression target the coefficients put past its own
         bounds is written at the bound it crossed (``clamp``): the fit
@@ -1661,7 +1662,7 @@ class MultiParameterTable:
                                   clamp=targets)
 
     def reframe_moments(self) -> list[str]:
-        """:meth:`ParameterTable.reframe_moments` per histogram, at a stage start.
+        """:meth:`ParameterTable.reframe_moments` per pattern, at a stage start.
 
         Each table against its own structure copy, which holds the cell the
         last :meth:`apply_to_models` wrote; a shared cell is one value in every
@@ -1669,7 +1670,7 @@ class MultiParameterTable:
         and the column map stays a map of equal entries (#598).  Returns the
         scoped atom paths reframed.
         """
-        moved = [f"hist.{h}.{base}"
+        moved = [f"pattern.{h}.{base}"
                  for h, (table, structure) in enumerate(
                      zip(self.tables, self.structures, strict=True))
                  for base in table.reframe_moments(structure)]
@@ -1678,20 +1679,20 @@ class MultiParameterTable:
         return moved
 
     def push_moment_frames(self, models) -> None:
-        """:meth:`ParameterTable.push_moment_frames`, histogram by histogram."""
+        """:meth:`ParameterTable.push_moment_frames`, pattern by pattern."""
         for table, model in zip(self.tables, models, strict=True):
             table.push_moment_frames(model)
 
     # -- helpers used by esd assembly ----------------------------------
     def _owner(self, scoped: str) -> int | None:
-        """Histogram index of a scoped per-histogram path, or None if shared."""
-        if scoped.startswith("hist."):
+        """Pattern index of a scoped per-pattern path, or None if shared."""
+        if scoped.startswith("pattern."):
             return int(scoped.split(".", 2)[1])
         return None
 
     def _unscope(self, h: int, scoped: str) -> str | None:
-        """Bare path of ``scoped`` as seen by histogram ``h`` (None if it
-        belongs to another histogram)."""
+        """Bare path of ``scoped`` as seen by pattern ``h`` (None if it
+        belongs to another pattern)."""
         owner = self._owner(scoped)
         if owner is None:
             return scoped

@@ -1068,7 +1068,7 @@ def test_a_forbidden_lattice_peak_on_neutrons_names_all_four_causes():
 
 
 def test_a_forbidden_lattice_peak_on_x_rays_has_no_magnetic_reading():
-    """The same peak on an X-ray histogram: three causes, none magnetic."""
+    """The same peak on an X-ray pattern: three causes, none magnetic."""
     # λ as the neutron case, so (0 0 1) lands inside the same grid
     arm = _absent_001_arm(rx.Instrument.debye_scherrer(LAMBDA))
     assert arm.radiation == "xray"

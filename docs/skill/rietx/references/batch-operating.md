@@ -25,7 +25,7 @@ A batch is N separate `rx.Refinement` runs, or N branches of one history tree
 ([`references/history.md`](history.md)), each a whole §1-§10 job with its own
 deliverable, stop rule and report. It is not `rx.refine_sequential` (§9b: each
 fit is warm-started from its neighbour, so the set has an order and its
-trajectory a path) and not `rx.refine_multi` (one joint residual over patterns
+trajectory a path) and not `rx.refine_joint` (one joint residual over patterns
 that share structural parameters). What the body settles for one fit is
 settled here too and is not restated: the deliverable and its deciding rows
 (§4b), the three stop conditions (§10), abstention (§6). This file holds only

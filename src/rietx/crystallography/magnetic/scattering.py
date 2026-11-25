@@ -75,7 +75,7 @@ from .moments import moment_frame, moment_from_dofs
 #: is the one this package computes in.
 P_MAGNETIC_FM = 2.695
 
-#: The source kinds whose histograms carry the magnetic term, and the ones that
+#: The source kinds whose patterns carry the magnetic term, and the ones that
 #: do not.  One table, two readers: ``model.forward.magnetic_wanted`` dispatches
 #: on it (and refuses a kind in neither set by name), and
 #: ``capabilities.RadiationCapability.magnetic_scattering`` is derived from it,

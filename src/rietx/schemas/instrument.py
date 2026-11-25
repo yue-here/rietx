@@ -61,10 +61,10 @@ class EmissionLine(_InheritsDeclaredDefaults):
     """One wavelength component of the incident spectrum.
 
     ``wavelength`` is in Å and **defaults to fixed**, because for a *single*
-    histogram it is exactly degenerate with the cell: d = λ/(2 sin θ) fixes
+    pattern it is exactly degenerate with the cell: d = λ/(2 sin θ) fixes
     only the product, so a free λ beside a free cell is a flat direction and
     the parameter table refuses it (:func:`rietx.params.multi.check_wavelength_freedom`).
-    Across several histograms of **one specimen sharing one cell** the
+    Across several patterns of **one specimen sharing one cell** the
     degeneracy breaks — holding one λ pins the cell's scale and the remaining
     N − 1 are over-determined by that shared cell — so a joint fit may free all
     but one of them.  A bare number is still accepted and becomes a fixed
@@ -148,7 +148,7 @@ class Harmonic(_InheritsDeclaredDefaults):
     to (14,6,6) with h+k+l = 26 ≡ 2, so **Ge(733) passes no λ/2 at all**.  Cu
     is face-centred cubic with one atom per lattice point and no such
     cancellation: Cu(311) doubles to (622), all even, fully allowed — so
-    **Cu(311) does pass λ/2**.  Two histograms of one specimen taken on those
+    **Cu(311) does pass λ/2**.  Two patterns of one specimen taken on those
     two monochromators are therefore a controlled pair by construction, which
     is what this correction is validated against (``tests/test_harmonics.py``).
 
@@ -163,7 +163,7 @@ class Harmonic(_InheritsDeclaredDefaults):
     the **same** *hkl* list with the **same** |F|², which gets positions and
     intensities right together, and costs one refinable number instead of a
     whole phase.  This is also what the published Nd₂Ru₂O₇ pyrochlore
-    refinement did: two wavelengths, λ and exactly λ/2, on one histogram, each
+    refinement did: two wavelengths, λ and exactly λ/2, on one pattern, each
     with its own scale.
 
     ``weight`` follows the package's existing convention — relative to line 0
@@ -292,11 +292,11 @@ class NeutronSource(Base):
     """
 
     kind: Literal["neutron_cw"] = "neutron_cw"
-    #: Å.  **Fixed by default** — for one histogram a powder pattern cannot
+    #: Å.  **Fixed by default** — for one pattern a powder pattern cannot
     #: separate λ from the cell (they enter d = λ/(2 sin θ) as a product),
     #: which is why a certified standard is refined with its cell held to
     #: calibrate λ rather than the other way round.  In a *joint* fit of
-    #: several histograms of one specimen the product splits: see
+    #: several patterns of one specimen the product splits: see
     #: :class:`EmissionLine` and
     #: :func:`rietx.params.multi.check_wavelength_freedom`.  A bare number is
     #: accepted and becomes a fixed parameter.
@@ -553,7 +553,7 @@ class IncidentSpectrum(_InheritsDeclaredDefaults):
     """The moderator spectrum a time-of-flight bank still carries, or none.
 
     A white beam delivers a different number of neutrons at every flight time,
-    so a histogram that has **not** been divided by a vanadium measurement
+    so a pattern that has **not** been divided by a vanadium measurement
     carries the source's own output as a smooth envelope over its Bragg peaks.
     GSAS measures that envelope, fits it with one of five functions and writes
     the choice into an instrument-parameter file's ``ITYP`` record with the
@@ -663,7 +663,7 @@ class TOFSource(_InheritsDeclaredDefaults):
       :class:`Parameter`: it is the detector's placement, it is already folded
       into the refined DIFC, and freeing both would be a flat direction.
     * **The Lorentz factor is d⁴·sin θ**, not 1/(sin²θ·cos θ) (manual p. 140),
-      and the absorption varies *within* one histogram because λ does.
+      and the absorption varies *within* one pattern because λ does.
 
     **This build reads such a bank and refines none.**  The readers
     (:mod:`rietx.io.instrument_tof`, :mod:`rietx.io.legacy`) return one
@@ -2545,9 +2545,9 @@ class Instrument(_InheritsDeclaredDefaults):
         **A multi-bank experiment is several instruments, not one.**  DIFC,
         DIFA, TZERO and the whole profile differ per bank — that is what a bank
         *is* — so each bank gets its own ``Instrument`` and they meet in a
-        multi-histogram fit once a time-of-flight forward model exists, the
+        joint fit once a time-of-flight forward model exists, the
         way several wavelengths meet today
-        (:class:`rietx.multi.MultiHistogramRefinement`).
+        (:class:`rietx.joint.JointRefinement`).
 
         This build builds and reads such a bank and refines none; see
         :class:`TOFSource`.

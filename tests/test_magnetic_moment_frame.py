@@ -248,11 +248,11 @@ def test_the_joint_path_writes_back_the_moment_it_fitted():
     sims = [_simulate(ins, seed) for ins, seed in zip(instruments, (7, 11), strict=True)]
     data = [d for d, _ in sims]
     structure = rx.Structure(phases=[_phase(103.0, scale=sims[0][1])])
-    ref = rx.MultiHistogramRefinement(structure, instruments)
+    ref = rx.JointRefinement(structure, instruments)
     result = ref.fit(data, plan=PLAN_3)
     dofs = [_dof_value(result, k) for k in range(3)]
     for h in range(len(data)):
-        # the joint path has no result-time compile (#272 is single-histogram),
+        # the joint path has no result-time compile (#272 is single-pattern),
         # so ``y_calc`` is the last stage's frozen model and differs from a fresh
         # compile by its windows alone; the moment is compared directly instead:
         # the one the stage's model read the refined DOFs as, against the one
@@ -411,7 +411,7 @@ def test_a_shared_moment_over_a_per_histogram_cell_is_refused():
     with pytest.raises(ValueError, match="moment of phases.0.atoms.0 is shared"):
         MultiParameterTable(structure, instruments,
                             sharing=SharingMap(per_histogram=["phases.*.cell.*"]))
-    # positive arms: the moment per-histogram as well, or the default sharing
+    # positive arms: the moment per-pattern as well, or the default sharing
     MultiParameterTable(structure, instruments, sharing=SharingMap(
         per_histogram=["phases.*.cell.*", "phases.*.atoms.*.moment.*"]))
     MultiParameterTable(structure, instruments)

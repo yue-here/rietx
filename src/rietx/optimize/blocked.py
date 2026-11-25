@@ -1,10 +1,10 @@
 """The joint Jacobian kept in blocks, never assembled dense (WP-1325).
 
-A joint fit stacks N histograms' residuals over one free vector θ whose
+A joint fit stacks N patterns' residuals over one free vector θ whose
 columns are of two kinds (``MultiParameterTable._rebuild_columns``): the
-**shared** ones every histogram's rows reach, and each histogram's **own**,
-which no other histogram's rows reach.  So the stacked Jacobian is zero
-wherever one histogram's rows meet another histogram's own columns, and its
+**shared** ones every pattern's rows reach, and each pattern's **own**,
+which no other pattern's rows reach.  So the stacked Jacobian is zero
+wherever one pattern's rows meet another pattern's own columns, and its
 normal matrix is block-diagonal with a border: the "arrow" of bundle
 adjustment (Triggs, B., McLauchlan, P. F., Hartley, R. I. & Fitzgibbon, A. W.
 (2000). Bundle adjustment — a modern synthesis. *Vision Algorithms: Theory and
@@ -12,22 +12,22 @@ Practice*, LNCS **1883**, 298-372, §6.1).  Assembled dense, the Jacobian of a
 3 000-point library with 20 shared and ten own columns a pattern is 1.2 GB at
 70 patterns and 22 GB at 300, where its blocks are 50 MB and 216 MB.
 
-:class:`BlockJacobian` holds each histogram's weighted rows against its own
+:class:`BlockJacobian` holds each pattern's weighted rows against its own
 free columns only.  Its consumers read it three ways:
 
 * **the step** (:mod:`.lm`): A = JᵀJ and b = −Jᵀr scattered block by block
   into a dense n × n A, after which the driver is unchanged — BVLS up to
   :data:`.lm.BVLS_MAX_COLUMNS`, projected CG above, which holds the box.  That
   is the WP's route (i).  Its step solve was 4 % of a 300-pattern fit's wall
-  clock (1.7-1.9 s of 48 s), so route (ii), eliminating each histogram's own
+  clock (1.7-1.9 s of 48 s), so route (ii), eliminating each pattern's own
   block from the step, would buy nothing measurable;
 * **the covariance** (:func:`normal_factors`): the Schur complement of the
   equilibrated arrow, never a pseudo-inverse of the whole n × n matrix.  It
   comes back n × n all the same, since every reader of a joint covariance
-  indexes it by θ's columns, and the blocks between two histograms' own
+  indexes it by θ's columns, and the blocks between two patterns' own
   columns cost one product of rank n_border;
 * **everything else that read the final Jacobian** — the residual cosine,
-  the column norms, the per-histogram slices a joint result reads, the
+  the column norms, the per-pattern slices a joint result reads, the
   discarded-direction guard and the moment-angle test's refit — per block.
 
 So what the blocked path keeps dense is n × n, never rows × n: A, and the
@@ -42,11 +42,11 @@ path keeps its bits, and blocked above it; :func:`set_layout` forces either,
 the seam tests and benchmarks run each side through.
 
 **Where the blocked numbers differ from the dense ones.**  Every sum over rows
-is taken per histogram and then across histograms, where the dense product
+is taken per pattern and then across patterns, where the dense product
 sums all rows in BLAS's order, so A, b, the column norms and the residual
 cosine agree with the dense path to rounding, not to the bit.  The covariance
 is exact algebra too (the inverse of a nonsingular arrow *is* its Schur form),
-but its pseudo-inverse cut is applied per block — to each histogram's own
+but its pseudo-inverse cut is applied per block — to each pattern's own
 equilibrated block and to the Schur complement, at :data:`.statistics.PINV_RCOND`
 of the whole matrix's largest eigenvalue — rather than to the eigenvalues of
 the whole matrix, which the arrow never forms.  The two agree wherever no
@@ -135,13 +135,13 @@ def choose_layout(n_rows: int, n_cols: int, solver: str) -> str:
 
 
 class BlockJacobian:
-    """The stacked joint Jacobian as one block per histogram.
+    """The stacked joint Jacobian as one block per pattern.
 
-    ``blocks[h]`` is histogram ``h``'s weighted rows — its data rows, then its
+    ``blocks[h]`` is pattern ``h``'s weighted rows — its data rows, then its
     background-penalty rows — against its own free columns, in its table's
     free order; ``col_maps[h]`` sends those columns to θ's
     (``MultiParameterTable.col_map``).  The row space is the dense stacked
-    layout's: every histogram's data rows first, then every histogram's
+    layout's: every pattern's data rows first, then every pattern's
     penalty rows, so :meth:`toarray` is ``_multi_closures``' dense matrix
     entry for entry and a residual vector indexes both alike.
     """
@@ -185,7 +185,7 @@ class BlockJacobian:
         return out
 
     def residual_part(self, r: np.ndarray, h: int) -> np.ndarray:
-        """``r``'s rows for histogram ``h``, aligned with ``blocks[h]``."""
+        """``r``'s rows for pattern ``h``, aligned with ``blocks[h]``."""
         do, nd = int(self._data_off[h]), self.n_data[h]
         if not self.n_pen[h]:
             return r[do:do + nd]
@@ -193,7 +193,7 @@ class BlockJacobian:
         return np.concatenate([r[do:do + nd], r[po:po + self.n_pen[h]]])
 
     def block(self, h: int, *, data_only: bool = True) -> np.ndarray:
-        """Histogram ``h``'s rows against its own columns (``col_maps[h]``
+        """Pattern ``h``'s rows against its own columns (``col_maps[h]``
         order): the dense ``J[rows_h][:, col_map(h)]``, bit for bit."""
         b = self.blocks[h]
         return b[:self.n_data[h]] if data_only else b
@@ -261,9 +261,9 @@ class BlockJacobian:
         return BlockJacobian(blocks, self.col_maps, self.n_data, self.n_pen, self.n_cols)
 
     def matmul_chart(self, t: np.ndarray) -> "BlockJacobian":
-        """``J @ T`` for a square chart matrix that keeps each histogram's
+        """``J @ T`` for a square chart matrix that keeps each pattern's
         columns among themselves (a rigid body's rotation composed into its
-        anchor, ``rechart_outcome``).  A ``T`` mixing one histogram's columns
+        anchor, ``rechart_outcome``).  A ``T`` mixing one pattern's columns
         into another's has no block form, and is refused rather than cut."""
         t = np.asarray(t, dtype=np.float64)
         blocks = []
@@ -271,7 +271,7 @@ class BlockJacobian:
             outside = np.ones(self.n_cols, dtype=bool)
             outside[cm] = False
             if np.any(t[np.ix_(cm, outside)]):
-                raise ValueError("a chart matrix moving one histogram's columns into "
+                raise ValueError("a chart matrix moving one pattern's columns into "
                                  "another's has no block form")
             blocks.append(b @ t[np.ix_(cm, cm)])
         return BlockJacobian(blocks, self.col_maps, self.n_data, self.n_pen, self.n_cols)
@@ -290,7 +290,7 @@ class BlockJacobian:
 def column_rescale(bj: BlockJacobian) -> np.ndarray | None:
     """:func:`.statistics.column_rescale` on blocks: the same factors from
     the same per-column largest |entry|, which the zero rows of other
-    histograms cannot change."""
+    patterns cannot change."""
     if bj.shape[0] == 0:
         return None
     m = bj.column_max_abs()
