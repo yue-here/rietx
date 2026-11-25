@@ -1,6 +1,6 @@
 # WP-2246 — the register guard reads the rebuilt page: `lib/style.test.ts` scans `gui/src/next/`
 
-Milestone: gui-overhaul · Status: ⬜
+Milestone: gui-overhaul · Status: 🔄 2026-11-25 — claimed by ghostshift runner (MacBook-Air-9db21f)
 Depends on: —
 Priority: P3 2026-11-24 — a workaround covers it: acceptance row 3's other measure, a look at each piece's screenshots, still runs; the guard gates the milestone's completion, not any fit
 
