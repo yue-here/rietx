@@ -824,8 +824,9 @@ Also in 0.62 (WP-2305): the joint fit says pattern where it said histogram.
 ``pattern.N.`` in every row, ``where`` and glob, and a caller's path or glob
 that still starts with ``hist.`` raises naming its ``pattern.`` spelling.  A
 result JSON written before reads the two old field names into the new ones
-(``results._fold_renamed``); an older build refuses a result carrying the new
-names.  ``capabilities().features["multi_histogram"]`` is
+(``results._fold_renamed``), and its ``hist.N.`` paths as ``pattern.N.``
+(``results._rescope_legacy_paths``); an older build refuses a result carrying
+the new names.  ``capabilities().features["multi_histogram"]`` is
 ``features["joint_refinement"]``.  The joint fit's ``fit_start`` and
 ``stage_start`` events carry ``patterns`` and ``pattern_index`` in their open
 ``data`` dict, so ``EVENT_SCHEMA_VERSION`` does not move.

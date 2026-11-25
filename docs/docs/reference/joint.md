@@ -97,7 +97,9 @@ assert per_mount.is_shared("phases.0.cell.a")
 A per-pattern parameter is named with a `pattern.{h}.` scope (`pattern.0.instrument.zero_shift`, `pattern.1.phases.0.scale`), and a shared one keeps its bare path.
 A stage glob matches either form, so an existing single-pattern plan frees every pattern's copy unchanged, and a scoped glob frees one pattern's.
 Before 1.13 the scope was `hist.{h}.`.
-A path or glob that still starts with `hist.` raises `ValueError` naming its `pattern.` spelling, because such a glob would otherwise match nothing and free nothing.
+A path or glob that still starts with `hist.` raises naming its `pattern.` spelling, because such a glob would otherwise match nothing and free nothing.
+A plan stage and `set_vary` raise `ValueError`, and `RefinementResult.parameter` raises `KeyError`.
+A result saved before 1.13 opens with its paths in the `pattern.` spelling.
 The joint call was `refine_multi` and `MultiHistogramRefinement`, and each old name raises naming its replacement, as an import of the old module does.
 `JointRefinement.parameters()` lists every parameter under these names, before or after a fit, as `Refinement.parameters()` does for one pattern ([The parameter table](parameter-table.md)).
 A shared parameter is one row and a per-pattern one is a row per pattern.

@@ -1419,13 +1419,17 @@ def test_a_result_lookup_in_the_old_scope_names_the_new_one():
 
 def test_a_result_written_before_the_rename_still_opens(plan_and_spec_fits):
     """A result JSON carrying ``histograms`` and ``unreached_histograms`` reads
-    under the new names (WP-2305), as every renamed field's document does."""
+    under the new names (WP-2305), as every renamed field's document does, and
+    its ``hist.<h>.`` paths read as ``pattern.<h>.``."""
     import json
+    import re
 
     from rietx.schemas.results import RefinementResult
 
     result = plan_and_spec_fits[2]["plan"][1]
-    doc = json.loads(result.model_dump_json())
+    text = result.model_dump_json()
+    assert '"pattern.1.' in text      # a scoped row the repair must reach
+    doc = json.loads(re.sub(r"\bpattern\.(?=\d+[. ])", "hist.", text))
     doc["histograms"] = doc.pop("patterns")
     for stage in doc["stages"]:
         stage["unreached_histograms"] = stage.pop("unreached_patterns")

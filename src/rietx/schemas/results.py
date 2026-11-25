@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import functools
+import json
+import re
 from dataclasses import dataclass
 from typing import Any, ClassVar, Literal
 
@@ -1133,6 +1135,31 @@ def _fold_renamed(value: Any, old: str, new: str) -> Any:
         legacy = value.pop(old)
         value.setdefault(new, legacy)
     return value
+
+
+#: A joint path's ``hist.<h>.`` scope, or a constraint label's ``hist.<h> ``,
+#: as a result written before WP-2305 spells it.
+_LEGACY_SCOPE = re.compile(r"\bhist\.(?=\d+[. ])")
+
+
+def _rescope_legacy_paths(value: dict) -> dict:
+    """A stored joint result's ``hist.<h>.`` paths in the ``pattern.<h>.`` spelling.
+
+    The fields fold by name (:func:`_fold_renamed`), but a joint result also
+    carries the old scope in its *values*: every per-pattern row of
+    ``parameters``, each finding's ``where``, the background screen's keys.
+    Left alone, :meth:`RefinementResult.for_pattern` keeps every pattern's
+    rows in each view and routes no scoped finding to it.  The repair is on
+    the document's text, as :mod:`rietx.schemas.migrate` repairs a renamed
+    dot-path, since a path is not confined to one field.  Only a document that
+    still carries ``histograms`` is touched, so a current result never is; a
+    document holding live models rather than JSON values is left as it is.
+    """
+    try:
+        text = json.dumps(value)
+    except (TypeError, ValueError):
+        return value
+    return json.loads(_LEGACY_SCOPE.sub("pattern.", text))
 
 
 class StageResult(Base):
@@ -2414,6 +2441,8 @@ class RefinementResult(Base):
                 and value.get("n_background_components") is None):
             value = dict(value)
             value["n_background_components"] = value["n_extra_components"]
+        if isinstance(value, dict) and "histograms" in value:
+            value = _rescope_legacy_paths(value)
         return _fold_renamed(value, "histograms", "patterns")
 
     # Per-pattern slices of a joint refinement (WP-0308);

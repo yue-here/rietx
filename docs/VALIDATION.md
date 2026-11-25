@@ -94,7 +94,7 @@ either fine or broken depending on which seed the suite happened to pin.
 | `hl2` | `tests/data/hl2_peaks.txt` | characterisation | 74 peaks from a genuinely UNIDENTIFIED laboratory pattern -- our own derived product from datalab-org/guillemot's MIT examples, carried with attribution; the compound is unknown and stays unknown |
 | `qarr` | `tests/data/qarr` | **absolute anchor** | IUCr CPD QPA round-robin patterns (samples 1a-1h, 2, 4 and six pure phases), Cu Ka doublet, graphite diffracted-beam monochromator |
 | `srm660a_capillary` | `tests/data/11BM_LaB6_660a.fxye` | consistency only — *never* an anchor | APS 11-BM SRM 660a LaB6 in the beamline's documented 0.81 mm Kapton bore; lambda was calibrated against this very standard |
-| `ndruo_joint` | `tests/data/mg090.fxye` | cross-code | Nd2Ru2O7 pyrochlore, one specimen, two histograms: APS 11-BM synchrotron X-ray (lambda 0.4132950 A, 49 493 points) and NCNR BT-1 neutron through a Cu(311) monochromator (lambda 1.54040 A, 3 296 points).  The two histograms of the combined refinement in Gaultois et al., J. Phys.: Condens. Matter 25 (2013) 186004 (doi:10.1088/0953-8984/25/18/186004), whose stated method is to hold the X-ray wavelength and refine the neutron one -- the only one-specimen two-wavelength pair in the suite, hence the only dataset that can exercise a refinable wavelength at all |
+| `ndruo_joint` | `tests/data/mg090.fxye` | cross-code | Nd2Ru2O7 pyrochlore, one specimen, two patterns: APS 11-BM synchrotron X-ray (lambda 0.4132950 A, 49 493 points) and NCNR BT-1 neutron through a Cu(311) monochromator (lambda 1.54040 A, 3 296 points).  The two patterns of the combined refinement in Gaultois et al., J. Phys.: Condens. Matter 25 (2013) 186004 (doi:10.1088/0953-8984/25/18/186004), whose stated method is to hold the X-ray wavelength and refine the neutron one -- the only one-specimen two-wavelength pair in the suite, hence the only dataset that can exercise a refinable wavelength at all |
 | `bethanechol` | `tests/data/bethanechol_indexing.json` | cross-code | Bergmann et al. (2004) Tables 5 and 6: ten sets of twenty 2theta positions for bethanechol chloride, the known P21/n cell, and every program's published score -- the only externally graded benchmark any feature in this package has |
 | `cr2wo6_hb2a` | `tests/data/gsas2_hb2a_cr2wo6_4K.dat` | characterisation | HFIR HB-2A constant-wavelength neutron (lambda 2.4067 A) Cr2WO6 at 4 K, below its ordering temperature, and its 150 K partner gsas2_hb2a_cr2wo6_150K.dat, above it -- the GSAS-II Magnetic-II tutorial pair, vendored verbatim.  No certified moment exists, so every row referenced to it is characterisation: a moment the report supports below T_N and refuses above it |
 | `lamno3_bt1` | `tests/data/gsas2_bt1_lamno3_50K.gsas` | characterisation | NIST BT-1 constant-wavelength neutron (lambda 1.5403 A, Cu(311)) LaMnO3 at 50 K, below its ordering temperature, with the tutorial's own structure file -- the GSAS-II Magnetic-I tutorial, vendored verbatim.  k = 0, and two magnetic groups index every line.  The tutorial quotes no moment, so every row referenced to it is characterisation: which group the data prefers, and the shape of the moment it carries |
@@ -581,7 +581,7 @@ Sequential (chained) series.
 
 ### `joint_refinement`
 
-Joint multi-histogram refinement (refine_multi).
+Joint refinement (refine_joint).
 
 **Verified by:** `test_the_refined_wavelength_is_the_solo_cell_disagreement`, `test_the_diagnostic_reports_the_ppm_and_nothing_claims_rwp`, `test_the_cell_belongs_to_the_synchrotron`, `test_swapping_which_wavelength_is_held_measures_the_same_ratio`, `test_the_neutron_widths_leave_one_esd_at_every_start`
 
@@ -677,7 +677,7 @@ WP-1103's design case on real data: the SRM 660c protocol, contaminated by injec
 
 ### `tests/test_acceptance_lab6_cbn.py`
 
-Two-phase QPA on an APS 11-BM histogram of NIST SRM 660b LaB6 mixed with cubic BN, with the standard's certified cell held so the second phase's is measurable against it.  There is no weighed composition, so every row here is cross-code against TOPAS, bounded by the 0.043 wt % spread between TOPAS's own two models of this pattern.  The suite's real subject is identifiability: Lorentzian FWHMs add, so freeing the instrument's X,Y alongside each phase's lor_size/lor_strain is one quantity split three ways, and the degenerate fit reaches a LOWER Rwp while its phase fractions move several sigma away from the reference.  An Rwp comparison would have chosen the wrong model.
+Two-phase QPA on an APS 11-BM pattern of NIST SRM 660b LaB6 mixed with cubic BN, with the standard's certified cell held so the second phase's is measurable against it.  There is no weighed composition, so every row here is cross-code against TOPAS, bounded by the 0.043 wt % spread between TOPAS's own two models of this pattern.  The suite's real subject is identifiability: Lorentzian FWHMs add, so freeing the instrument's X,Y alongside each phase's lor_size/lor_strain is one quantity split three ways, and the degenerate fit reaches a LOWER Rwp while its phase fractions move several sigma away from the reference.  An Rwp comparison would have chosen the wrong model.
 
 #### `test_the_protocol_matches_before_any_number_is_compared`
 
@@ -733,9 +733,9 @@ Two-phase QPA on an APS 11-BM histogram of NIST SRM 660b LaB6 mixed with cubic B
 
 `cross_code` `ceiling` · dataset `lab6_cbn`
 
-**Claims:** two-phase QPA on a synchrotron histogram with the standard's cell held, referenced to TOPAS's own two-model interval
+**Claims:** two-phase QPA on a synchrotron pattern with the standard's cell held, referenced to TOPAS's own two-model interval
 
-**Referenced to:** TOPAS's two shipped models of this histogram give LaB6 17.907 and 17.950 wt %, so the reference is an interval 0.043 wt % wide, not a number; no weighed composition exists and none is claimed
+**Referenced to:** TOPAS's two shipped models of this pattern give LaB6 17.907 and 17.950 wt %, so the reference is an interval 0.043 wt % wide, not a number; no weighed composition exists and none is claimed
 
 **Measured:** LaB6 17.787 +- 0.319 wt %, 0.120 outside the interval, i.e. 0.38 of its own esd; 1.9.0 read 17.791, 0.116 and 0.36
 
@@ -1007,7 +1007,7 @@ The one cross-code comparison. GSAS-II's converged fluorapatite tutorial, with i
 
 **Claims:** the free set this plan refines against the free set GSAS's own file states, with the difference named rather than implied
 
-**Referenced to:** FAP.EXP's own refine flags, read by rx.read_gsas_exp and converted to rietx dot-paths through to_structure.  The file states 28 variables in its REFN GDNFT record, and the flags reconstruct that exactly: 2 cell + 12 coordinate DOFs + 7 Biso structural, plus 1 histogram scale, 3 background terms and 3 profile terms.  This is an identity check against a number the file states somewhere else, not a tolerance
+**Referenced to:** FAP.EXP's own refine flags, read by rx.read_gsas_exp and converted to rietx dot-paths through to_structure.  The file states 28 variables in its REFN GDNFT record, and the flags reconstruct that exactly: 2 cell + 12 coordinate DOFs + 7 Biso structural, plus 1 pattern scale, 3 background terms and 3 profile terms.  This is an identity check against a number the file states somewhere else, not a tolerance
 
 **Measured:** this plan frees 20 parameters and GSAS freed 28.  It leaves out the 12 coordinate DOFs, which no stage here turns on, and frees four more: axial_sl, which GSAS held, and a six-term Chebyshev where GSAS refined three terms of its function 5.  Every other structural parameter the file frees, this plan frees too.  Freeing the DOFs measured 2026-10-08: Rwp 0.092498 -> 0.092314, cell +82.5/+82.3 -> +82.3/+81.9 ppm, no wall-clock change, still converged — so closing the gap is nearly free and is a deliberate change with its own numbers rather than a silent one
 
@@ -1793,15 +1793,15 @@ The only externally *graded* feature in the package. Bergmann et al. (2004) publ
 
 ### `tests/test_acceptance_wavelength.py`
 
-A parameter that is exactly degenerate in one histogram and measurable in several, on the two histograms of a published combined refinement whose stated method is precisely that. The bar worth reading is the third row: the refined wavelength reproduces, to 2 %, the cell disagreement the two histograms already showed when refined separately — a prediction made without freeing anything. The fourth adds the check that keeps it honest, which is that holding the other end measures the same ratio with the opposite sign.
+A parameter that is exactly degenerate in one pattern and measurable in several, on the two patterns of a published combined refinement whose stated method is precisely that. The bar worth reading is the third row: the refined wavelength reproduces, to 2 %, the cell disagreement the two patterns already showed when refined separately — a prediction made without freeing anything. The fourth adds the check that keeps it honest, which is that holding the other end measures the same ratio with the opposite sign.
 
 #### `test_holding_both_wavelengths_costs_the_neutron_histogram`
 
 `characterisation` · dataset `ndruo_joint`
 
-**Claims:** the problem statement, asserted: one cell for two uncalibrated wavelengths lands the whole calibration mismatch on the histogram with less leverage on the cell
+**Claims:** the problem statement, asserted: one cell for two uncalibrated wavelengths lands the whole calibration mismatch on the pattern with less leverage on the cell
 
-**Referenced to:** each histogram against **its own solo fit** on the same protocol -- our own results either side of one change, so the bar is the 10 % degradation being an order larger on one histogram than the other, not any external value
+**Referenced to:** each pattern against **its own solo fit** on the same protocol -- our own results either side of one change, so the bar is the 10 % degradation being an order larger on one pattern than the other, not any external value
 
 **Measured:** neutron Rwp 0.05234 alone -> 0.06216 jointly (+19 %); X-ray 0.09176 -> 0.09186 (+0.1 %), a ratio of ~170; 1.9.0 read 0.05259 -> 0.06226 (+18 %), 0.09365 -> 0.09373 and ~200
 
@@ -1809,7 +1809,7 @@ A parameter that is exactly degenerate in one histogram and measurable in severa
 
 `characterisation` · dataset `ndruo_joint`
 
-**Claims:** the degradation above goes away when the neutron wavelength is freed, and the X-ray histogram does not pay for it -- the SYMPTOM, recorded because a correction does not ship on an Rwp comparison
+**Claims:** the degradation above goes away when the neutron wavelength is freed, and the X-ray pattern does not pay for it -- the SYMPTOM, recorded because a correction does not ship on an Rwp comparison
 
 **Referenced to:** the same three fits as the row above.  Deliberately a loose band: two independently converged fits differ by more than their own ftol, so the bars are 'more than half the way back' and 'not past the solo floor', never a figure
 
@@ -1819,9 +1819,9 @@ A parameter that is exactly degenerate in one histogram and measurable in severa
 
 `prediction` · dataset `ndruo_joint`
 
-**Claims:** the headline: the refined wavelength reproduces the cell disagreement the two histograms already showed when refined separately -- one number arrived at two independent ways
+**Claims:** the headline: the refined wavelength reproduces the cell disagreement the two patterns already showed when refined separately -- one number arrived at two independent ways
 
-**Referenced to:** the ratio of the two SOLO cells, computed without freeing anything, is a prediction for how far the neutron lambda must move.  The 20 % band is the scatter two separately converged single-histogram fits carry, not a tolerance
+**Referenced to:** the ratio of the two SOLO cells, computed without freeing anything, is a prediction for how far the neutron lambda must move.  The 20 % band is the scatter two separately converged single-pattern fits carry, not a tolerance
 
 **Measured:** solo cells 10.342905 vs 10.340285 A = +253 ppm; refined lambda 1.540400 -> 1.5407972(795) A = +257.9 ppm, agreeing to 2 %; the move is 5.0x its own esd; 1.9.0 read 1.5407968(843), +257.6 ppm and 4.7x
 
@@ -1829,11 +1829,11 @@ A parameter that is exactly degenerate in one histogram and measurable in severa
 
 `identity` · dataset `ndruo_joint`
 
-**Claims:** the record field this correction ships with: WAVELENGTH_CALIBRATION fires exactly where a wavelength was refined, carries the ppm as Diagnostic.value, and is silent on the held histogram and on a fit that held both
+**Claims:** the record field this correction ships with: WAVELENGTH_CALIBRATION fires exactly where a wavelength was refined, carries the ppm as Diagnostic.value, and is silent on the held pattern and on a fit that held both
 
 **Referenced to:** floating point (rel=1e-9) between the diagnostic's value and the ppm recomputed from the row -- one measurement, two surfaces, pinned rather than re-derived
 
-**Measured:** one diagnostic, level info, value +257.9 ppm (+257.6 on 1.9.0), where hist.1.instrument.source.lines.0.wavelength; zero on histogram 0 and zero on the both-held fit
+**Measured:** one diagnostic, level info, value +257.9 ppm (+257.6 on 1.9.0), where pattern.1.instrument.source.lines.0.wavelength; zero on pattern 0 and zero on the both-held fit
 
 **Diagnostics:** `WAVELENGTH_CALIBRATION`
 
@@ -1841,7 +1841,7 @@ A parameter that is exactly degenerate in one histogram and measurable in severa
 
 `cross_code` `characterisation` · dataset `ndruo_joint`
 
-**Claims:** holding the X-ray wavelength hands the cell to the X-ray histogram -- the accuracy hierarchy in action -- and the result agrees with the published combined refinement
+**Claims:** holding the X-ray wavelength hands the cell to the X-ray pattern -- the accuracy hierarchy in action -- and the result agrees with the published combined refinement
 
 **Referenced to:** the X-ray SOLO cell to 5e-6 relative (our own result, the claim being that the joint cell lands ON it rather than between the two), and the published a = 10.342312(8) A under a 2e-4 relative band.  The published band is NOT claimed: this is a single-phase fit against a refinement carrying 0.5(1) mol % RuO2 and a modelled lambda/2 second-order contribution, neither of which rietx does
 
@@ -1853,9 +1853,9 @@ A parameter that is exactly degenerate in one histogram and measurable in severa
 
 **Claims:** the sharpest statement of the physics: a joint fit determines the RATIO of the two wavelengths, so which one is called 'the calibration error' is a choice of what to hold and not a result
 
-**Referenced to:** eq. pos-lambda-cell, which says the two runs are one fit in two parameterisations.  Bars: the two ppm figures agree to 2 % of the effect, every per-histogram Rwp to 2e-3 relative and the shared x(O) to 1e-5 absolute
+**Referenced to:** eq. pos-lambda-cell, which says the two runs are one fit in two parameterisations.  Bars: the two ppm figures agree to 2 % of the effect, every per-pattern Rwp to 2e-3 relative and the shared x(O) to 1e-5 absolute
 
-**Measured:** +257.9 ppm holding the X-ray against -256.9 ppm holding the neutron -- 0.9 ppm apart on an effect of 258 (0.35 %); both histograms' Rwp agree to 6e-5 relative, x(O) to 1.5e-6.  1.9.0 read +257.6 and -256.7 ppm (0.34 %), Rwp identical to 5 decimals and x(O) to 1.2e-6
+**Measured:** +257.9 ppm holding the X-ray against -256.9 ppm holding the neutron -- 0.9 ppm apart on an effect of 258 (0.35 %); both patterns' Rwp agree to 6e-5 relative, x(O) to 1.5e-6.  1.9.0 read +257.6 and -256.7 ppm (0.34 %), Rwp identical to 5 decimals and x(O) to 1.2e-6
 
 #### `test_the_neutron_widths_leave_one_esd_at_every_start`
 
@@ -1881,7 +1881,7 @@ A parameter that is exactly degenerate in one histogram and measurable in severa
 
 `ceiling` · dataset `ndruo_joint`
 
-**Claims:** the per-histogram obs/calc/diff renderings exist, so the fit can be looked at rather than only summarised
+**Claims:** the per-pattern obs/calc/diff renderings exist, so the fit can be looked at rather than only summarised
 
 **Referenced to:** existence, not a number -- a ceiling row
 
@@ -1889,7 +1889,7 @@ A parameter that is exactly degenerate in one histogram and measurable in severa
 
 ### `tests/test_acceptance_si640c.py`
 
-The single-histogram refinable wavelength, on NIST SRM 640c silicon at APS 11-BM, against an independent XND 1.42 refinement of the same scan.  Holding the certified cell is what makes a free lambda a measurement of the monochromator's calibration error, and the fit finds it +30 to +41 ppm off the beamline's stated value at many sigma.  The row worth reading is the pair: on XND's own 2-50 deg range the codes agree to 11 ppm, and that gap is entirely the asymmetry convention (rietx's FCJ axial divergence against XND's A_T2) -- restrict to the symmetric peaks where neither applies one and the agreement collapses to 0.4 ppm.  The sub-ppm number lives where the two codes model the same physics, and the residual is named rather than tuned away.
+The single-pattern refinable wavelength, on NIST SRM 640c silicon at APS 11-BM, against an independent XND 1.42 refinement of the same scan.  Holding the certified cell is what makes a free lambda a measurement of the monochromator's calibration error, and the fit finds it +30 to +41 ppm off the beamline's stated value at many sigma.  The row worth reading is the pair: on XND's own 2-50 deg range the codes agree to 11 ppm, and that gap is entirely the asymmetry convention (rietx's FCJ axial divergence against XND's A_T2) -- restrict to the symmetric peaks where neither applies one and the agreement collapses to 0.4 ppm.  The sub-ppm number lives where the two codes model the same physics, and the residual is named rather than tuned away.
 
 #### `test_the_protocol_is_sane_and_states_what_differs_from_xnd`
 
