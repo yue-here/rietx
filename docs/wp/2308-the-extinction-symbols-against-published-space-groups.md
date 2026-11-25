@@ -70,7 +70,7 @@ certificate.
 
 ## Handover log
 
-- **2026-11-25** — filed by WP-2010's closing handover, as the third of its "references for
+- **2026-11-25** — filed by WP-2010's closing handover (PR #1839), as the third of its "references for
   data already in the tree". No open WP owns it. WP-2076 owns the screen's real-data rows, but
   its PR #1738 closes it on merge, so a fold there would be lost. WP-1910 owns the screen at a
   small cell error, not the validation record. Checked against the tree at `0e79e455f`. Next:

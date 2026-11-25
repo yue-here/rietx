@@ -211,7 +211,7 @@ confirm the new test goes red naming it.
 
 ## Handover log
 
-- **2026-11-25** — closed by a ghostshift close-only batch (PR #PRNUM), no code. Every feature
+- **2026-11-25** — closed by a ghostshift close-only batch (PR #1839), no code. Every feature
   now names what verifies it, and the follow-ups that would validate the unvalidated ones each
   have an owner. A successor looking for the next validation row reads WP-2072 (the SRM 660c
   cell), WP-2306 (the ceria size), WP-2308 (the extinction symbols) or WP-1327's
