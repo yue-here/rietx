@@ -4789,9 +4789,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "and the message quotes the range of µR across the fitted window. µ follows "
             "the wavelength on a neutron bank, so one number cannot describe it. It was "
             "computed from the refined composition and the declared capillary radius, "
-            "and it is never refined, because it is indistinguishable from thermal "
-            "motion. Without a capillary radius no correction runs, and this line does "
-            "not appear."
+            "and it is not a refinable parameter in this build. Without a capillary "
+            "radius no correction runs, and this line does not appear."
         ),
     ),
     "STAGE_FREED_NOTHING": HelpEntry(

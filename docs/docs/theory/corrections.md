@@ -298,20 +298,24 @@ $1/v$ law while scattering does not {cite}`sears1992`:
 so $\mu$ is exactly affine in $\lambda$, and on a fixed-angle bank
 $\lambda = 2d\sin\theta_{\text{bank}}$, one wavelength per reflection. The
 cylinder transmission factor {eq}`corr-rouse` is then evaluated per reflection at
-its own $\mu R$, which is where GSAS evaluates it too: the manual's absorption
-parameter for a flight-time histogram is written $A_B = \mu R/\lambda$
-precisely because it is $\mu R$ *per ångström* that is constant across a bank
-{cite}`larson2004`.
+its own $\mu R$, which is where GSAS evaluates it too. The manual writes the
+absorption parameter for a flight-time histogram as $A_B = \mu R/\lambda$
+{cite}`larson2004`, which is constant across a bank only when every
+component's absorption follows $1/v$; rietx's $\mu$ above is affine, with a
+$\lambda$-free scattering part, so it carries the two constants rather than
+one.
 
 Three consequences worth stating, because none of them has a
 constant-wavelength counterpart:
 
-* It is computed, never refined. The manual's own warning (that the
-  correction is indistinguishable from thermal motion and should not be
-  refined) applies with more force here, not less. A scalar
-  `Geometry.mu_r` is refused on a bank for the same reason: it is a claim at
-  one wavelength. Declare `capillary_radius_mm` and let the composition
-  supply $\mu$.
+* It is computed from the composition and the declared radius, and is not a
+  refinable parameter in this build. The manual's warning that the correction
+  should not be refined is its constant-wavelength sentence; for a flight-time
+  histogram it expects the absorption factor to be refined, because that is
+  what compensates an incident spectrum measured on vanadium without an
+  absorption correction {cite}`larson2004`. A scalar `Geometry.mu_r` is
+  refused on a bank because it is a claim at one wavelength. Declare
+  `capillary_radius_mm` and let the composition supply $\mu$.
 * The correction does not disappear into the scale. On a
   constant-wavelength capillary {eq}`corr-rouse` factors exactly into a constant
   times $\exp(c\sin^2\theta)$, so omitting it moves $B_{\text{iso}}$ and

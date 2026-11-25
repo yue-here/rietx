@@ -128,9 +128,7 @@ def _tof_absorption_diagnostics(model) -> list[Diagnostic]:
                  f"window, computed from the refined composition and the "
                  f"declared capillary radius (mu = sum n_i [sigma_abs_i "
                  f"lambda/1.798 + sigma_coh_i + sigma_inc_i]/V, Sears 1992). "
-                 f"It is not a refinable parameter here and must not become "
-                 f"one — GSAS's own warning is that the correction is "
-                 f"indistinguishable from thermal motion"),
+                 f"It is not a refinable parameter in this build"),
         suggestion=("nothing to do; quote a displacement parameter from this "
                     "fit knowing the correction was in the model, and check "
                     "geometry.capillary_radius_mm and packing_fraction against "

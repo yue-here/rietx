@@ -66,15 +66,20 @@ along the bank here, because λ is a property of the channel:
 * **specimen absorption**, whose µ follows the 1/v law, so µR runs linearly
   with λ across the bank.  Applied **per reflection** at λ_hkl, which is where
   GSAS applies it (manual PAGE 134);
-* **secondary extinction**, whose Sabine variable carries λ² and so runs as
+* **extinction** (Sabine's, which in a powder is primary extinction within a
+  grain; Sabine, Von Dreele & Jørgensen 1988), whose variable carries λ² and so runs as
   λ⁴-ish across the bank.  Also per reflection, through exactly the
   constant-wavelength :func:`~rietx.model.extinction.sabine_extinction` with an
   array of wavelengths where a scalar used to go.
 
-Absorption is **computed, never refined**: the manual's own warning (PAGE 134,
-verbatim) is that *"the correction is indistinguishable from thermal motion
-effects and should not be refined"*, and a scalar ``Geometry.mu_r`` is refused
-on this arm because it is a claim at one wavelength.  Preferred orientation,
+Absorption is **computed from the composition and the declared radius, and is
+not a refinable parameter in this build**.  That is rietx's choice, not the
+manual's rule: the manual's "should not be refined" (PAGE 134) is its
+constant-wavelength sentence, and for a flight-time histogram it expects the
+sample absorption factor to be refined, since that is what compensates an
+incident spectrum measured on vanadium without an absorption correction
+(LAUR 86-748, the incident-intensity section).  A scalar ``Geometry.mu_r`` is
+refused on this arm because it is a claim at one wavelength.  Preferred orientation,
 Stephens strain and soft restraints stay refused, each naming its rung.
 
 Units, once
@@ -871,7 +876,7 @@ class CompiledTOFModel:
             if absorption is not None:
                 intensity = intensity * absorption
             if not cp.skip_extinction:
-                # Sabine's secondary extinction, per reflection at **its own**
+                # Sabine's (primary, within a grain) extinction, per reflection at **its own**
                 # wavelength — the constant-wavelength function unchanged, with
                 # an array of λ where a scalar per emission line used to go.
                 # The λ dependence is real and steep: x carries (λ/V)², and the
@@ -1181,9 +1186,8 @@ def compile_tof_model(structure: Structure, instrument: Instrument,
              f"declared would be right at exactly one channel. This arm "
              f"computes µ(λ) from the composition instead — declare "
              f"geometry.capillary_radius_mm (and packing_fraction) and clear "
-             f"mu_r. GSAS's own warning applies either way (LAUR 86-748, "
-             f"Technical Manual p. 134): the correction is indistinguishable "
-             f"from thermal motion and should not be refined.")
+             f"mu_r. The correction is computed from those and is not a "
+             f"refinable parameter in this build.")
     _require(geom.mu_t is None,
              f"compile_tof_model(): geometry.mu_t = {geom.mu_t!r} is a "
              f"flat-specimen absorption and this arm's specimen model is the "

@@ -702,7 +702,7 @@ the rise on the **short**-TOF side and β the decay on the **long**-TOF side,
 so the usual β < α puts the tail at long flight time — where a moderator puts
 it. The GSAS manual's prose reads the other way round ("the difference in TOF
 between the reflection position and the profile point") while its own
-formulae, and GSAS-II's call site, use channel minus peak.
+formulae use channel minus peak.
 ```
 
 Because $u - y^2 = v - z^2 = -\Delta T^2/2\sigma^2$ identically, the enormous
@@ -734,14 +734,14 @@ q &= \beta(-\Delta T + i\Gamma/2).
 
 ```{warning}
 The GSAS manual {cite}`larson2004` defines $p$ for this function by reference
-to its Ikeda-Carpenter function, giving $p = -\alpha\Delta T + i\alpha\Gamma/2$,
-and the GSAS Fortran implements that. Both exponentials of the
+to its Ikeda-Carpenter function, giving $p = -\alpha\Delta T + i\alpha\Gamma/2$.
+Both exponentials of the
 Ikeda-Carpenter pulse decay *forward* in time and take that sign; the
 back-to-back rise wing runs backwards and does not. As published the term is
 invariant under exchanging α and β, which the convolution of an asymmetric
 pulse cannot be, and it departs from the integral it is the closed form of by
 0.81 % of the peak at a mixed shape. rietx uses the sign the convolution
-requires, so a γ coefficient refined by GSAS against this function is not
+requires, so a γ coefficient refined against the function as printed is not
 directly transferable.
 ```
 

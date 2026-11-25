@@ -2534,7 +2534,11 @@ ROWS: tuple[Row, ...] = (
                   "of the fitted window; the correction is Rouse et al. (1970)'s cylinder "
                   "at each reflection's own wavelength with mu on Sears (1992)'s 1/v law, "
                   "physics with no threshold of its own; it gates nothing, the past-domain "
-                  "warning being ABSORPTION_MU_R_OUT_OF_RANGE's"),
+                  "warning being ABSORPTION_MU_R_OUT_OF_RANGE's.  Computed, not refined, in "
+                  "this build: the GSAS manual instead refines a flight-time histogram's "
+                  "absorption factor, which compensates a vanadium incident spectrum taken "
+                  "without an absorption correction (Larson & Von Dreele 2004, incident "
+                  "intensity)"),
         response="info",
         responds=("note that absorption was in the model at the quoted muR range before "
                   "reading a displacement parameter, and check the capillary radius and "
