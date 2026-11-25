@@ -5126,7 +5126,7 @@ ROWS: tuple[Row, ...] = (
                   "'no Gaussian broadening') and the back-to-back Gaussian kernel divides by "
                   "sigma^2, so at sigma = 0 every channel was NaN (#1548 review, item 14); at "
                   "sigma = 1e-4 us the kernel is its sigma -> 0 limit, the pure exponential "
-                  "pair, to 5e-9 of the peak more than 1e-3 us from the cusp and 2e-5 at it "
+                  "pair, to 5e-9 of the peak from 1e-3 us off the cusp and 8e-5 at it "
                   "(tests/test_profile_tof.py::test_a_zero_gaussian_width_is_the_pure_exponential_pair); "
                   "real banks' sigma sit at microseconds, four decades above, and pass "
                   "through unchanged; the flight-time twin of caglioti._MIN_GAMMA_G2")),

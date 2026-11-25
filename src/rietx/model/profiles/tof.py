@@ -110,10 +110,12 @@ _LENTZ_TINY = 1e-300
 #: there), and the kernel divides by σ² — at σ = 0 every channel is NaN.  At
 #: this floor the kernel is the pure back-to-back exponential pair (the σ → 0
 #: limit) to within 1e-8 of the peak for α, β ≤ 1 µs⁻¹ wherever a channel is
-#: more than ten floors (1e-3 µs) from the pulse's cusp (measured 5e-9;
-#: ``tests/test_profile_tof.py::test_a_zero_gaussian_width_is_the_pure_exponential_pair``),
-#: and 2e-5 of the peak at the cusp itself; σ at or above it passes through
-#: ``maximum`` unchanged.
+#: ten floors (1e-3 µs) or more from the pulse's cusp (measured 5.0e-9 at
+#: 1e-3 µs), and to within 1e-4 of the peak at the cusp itself (measured
+#: 8.0e-5, the largest over α, β ∈ {0.05, 0.3, 1} µs⁻¹ and {0.02, 0.2, 1}
+#: µs⁻¹; both asserted by
+#: ``tests/test_profile_tof.py::test_a_zero_gaussian_width_is_the_pure_exponential_pair``);
+#: σ at or above it passes through ``maximum`` unchanged.
 _MIN_SIGMA_US = 1e-4
 
 

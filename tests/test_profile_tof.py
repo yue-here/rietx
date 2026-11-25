@@ -590,10 +590,16 @@ def test_a_zero_gaussian_width_is_the_pure_exponential_pair():
     each floored at 0), and the kernel divides by σ² — without the floor
     every channel is NaN (#1548 review, item 14).  At ``_MIN_SIGMA_US`` the
     kernel is the σ → 0 limit, :func:`back_to_back_exponential`, to 1e-8 of
-    the peak once a channel is ten floors from the cusp, and both branches
-    stay finite."""
-    dt = np.linspace(-200.0, 200.0, 4001)
-    off_cusp = np.abs(dt) >= 10.0 * tof._MIN_SIGMA_US
+    the peak once a channel is ten floors from the cusp, and to 1e-4 at the
+    cusp itself, and both branches stay finite.  The grid carries the cusp
+    and the ten-floor edge (±1e-3 µs) on purpose: the comment's two figures
+    are measured there (#1548 round-2, follow-up 2)."""
+    edge = 10.0 * tof._MIN_SIGMA_US
+    dt = np.union1d(np.linspace(-200.0, 200.0, 4001),
+                    [-2.0 * edge, -edge, -0.5 * edge, 0.5 * edge, edge,
+                     2.0 * edge])
+    off_cusp = np.abs(dt) >= edge
+    assert np.count_nonzero(np.isclose(np.abs(dt), edge, rtol=0, atol=0)) == 2
     for a in (0.05, 0.3, 1.0):
         for b in (0.02, 0.2, 1.0):
             h = back_to_back_gaussian(dt, a, b, 0.0)
@@ -601,5 +607,6 @@ def test_a_zero_gaussian_width_is_the_pure_exponential_pair():
             pure = back_to_back_exponential(dt, a, b)
             peak = float(np.max(pure))
             assert float(np.max(np.abs(h - pure)[off_cusp])) <= 1e-8 * peak
+            assert float(np.max(np.abs(h - pure))) <= 1e-4 * peak
             pv = back_to_back_pseudovoigt(dt, a, b, 0.0, np.zeros_like(dt))
             assert np.all(np.isfinite(pv))
