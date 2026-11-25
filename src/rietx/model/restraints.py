@@ -1373,8 +1373,11 @@ def elemental_ratio_restraint(structure, numerator, denominator, ratio: float,
 
     ``numerator`` and ``denominator`` are element symbols (a string or an
     iterable of them); ``phases`` the phase indices the row spans, every
-    phase by default.  A phase holding none of the elements has a zero
-    coefficient and leaves the row; an element no spanned phase holds is
+    phase by default.  Each index is a distinct integer from 0 to
+    ``len(structure.phases) - 1``; any other is refused before anything is
+    read, since a negative one would name a path no table holds.  A phase
+    holding none of the elements has a zero coefficient and leaves the row;
+    an element no spanned phase holds is
     refused by name, since a misspelt symbol would otherwise build a row that
     drives the other side's scales to zero.  The cell volumes and the
     occupancies are read now and frozen.  The row records each occupancy it
@@ -1403,7 +1406,8 @@ def elemental_ratio_restraint(structure, numerator, denominator, ratio: float,
         raise ValueError(f"{sorted(num & den)} is on both sides of the ratio")
     if not (math.isfinite(ratio) and ratio >= 0.0):
         raise ValueError(f"ratio must be finite and non-negative, got {ratio}")
-    span = range(len(structure.phases)) if phases is None else list(phases)
+    n_phases = len(structure.phases)
+    span = range(n_phases) if phases is None else _phase_span(phases, n_phases)
     terms: list = []
     occ: dict = {}
     held: set = set()
@@ -1442,3 +1446,30 @@ def elemental_ratio_restraint(structure, numerator, denominator, ratio: float,
         terms=terms, target=0.0, sigma=sigma, weight=weight,
         label=label or f"{'+'.join(sorted(num))}/({'+'.join(sorted(den))}) = {ratio:g}",
         occupancies=occ)
+
+
+def _phase_span(phases, n_phases: int) -> list[int]:
+    """``elemental_ratio_restraint``'s ``phases``, checked before any work.
+
+    Each member is a distinct non-negative integer below ``n_phases``.  A
+    negative index is refused rather than read from the end: it would build
+    ``phases.-1.scale``, a path no table holds.
+    """
+    fix = (f"name each phase once by its index, 0 to {n_phases - 1}, or leave "
+           f"phases=None for every phase")
+    try:
+        span = list(phases)
+    except TypeError:
+        raise TypeError(f"phases must be a list of phase indices, got {phases!r}; "
+                        f"{fix}") from None
+    seen: set[int] = set()
+    for k, i in enumerate(span):
+        if isinstance(i, bool) or not isinstance(i, (int, np.integer)):
+            raise TypeError(f"phases[{k}] is {i!r}, not an integer; {fix}")
+        if not 0 <= i < n_phases:
+            raise ValueError(f"phases[{k}] is {int(i)}, but the structure has "
+                             f"{n_phases} phase(s); {fix}")
+        if int(i) in seen:
+            raise ValueError(f"phases names phase {int(i)} twice; {fix}")
+        seen.add(int(i))
+    return [int(i) for i in span]

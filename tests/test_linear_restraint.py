@@ -244,6 +244,28 @@ def test_the_ratio_row_refuses_what_it_cannot_build():
     assert elemental_ratio_restraint(s, "Cu2+", "Ni", 1.5, 0.1).terms
 
 
+@pytest.mark.parametrize("phases, error, match", [
+    ([0, 2], ValueError, r"phases\[1\] is 2, but the structure has 2 phase\(s\)"),
+    ([0, -1], ValueError, r"phases\[1\] is -1, but the structure has 2 phase\(s\)"),
+    ([0, 0, 1], ValueError, r"phases names phase 0 twice"),
+    ([0, 1.0], TypeError, r"phases\[1\] is 1\.0, not an integer"),
+    ([0, True], TypeError, r"phases\[1\] is True, not an integer"),
+    (1, TypeError, r"phases must be a list of phase indices, got 1"),
+])
+def test_the_ratio_row_refuses_a_phase_index_it_cannot_honour(phases, error, match):
+    """Each index is a distinct non-negative integer below the phase count,
+    checked before any volume or count is read (Design Rule 4): past the end
+    raised a bare IndexError, a negative one built ``phases.-1.scale``, which
+    no table holds, and a repeat was caught only after the work."""
+    s = _pair(SEPARATE)
+    with pytest.raises(error, match=match) as info:
+        elemental_ratio_restraint(s, "Cu", "Ni", 1.5, 0.1, phases=phases)
+    assert "by its index, 0 to 1, or leave phases=None" in str(info.value)
+    # numpy integers are indices too
+    assert elemental_ratio_restraint(s, "Cu", "Ni", 1.5, 0.1,
+                                     phases=np.arange(2)).terms
+
+
 # ----------------------------------------------------------------------
 # the acceptance: a flat partition decided by the ratio; a wrong ratio reported
 # ----------------------------------------------------------------------
