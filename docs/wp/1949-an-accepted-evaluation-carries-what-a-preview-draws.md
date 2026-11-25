@@ -1,6 +1,6 @@
 # WP-1949 — an accepted evaluation carries what a preview draws
 
-Milestone: unscheduled · Status: 🔄 2026-11-16 — built in #1623; the spelling waits on Yue's ruling
+Milestone: unscheduled · Status: 🔄 2026-11-25 — built in #1623; the spelling was accepted as built (2026-11-17); the WP closes with the maintainer's handover after the merge
 Track: Render what the fit already knows
 Depends on: —
 Priority: P3 2026-10-11 — a live preview keeps a shadow refinement and re-predicts every frame (about 0.7 s a frame on a large framework); the workaround works and costs a throttle
@@ -142,7 +142,8 @@ threshold, no automatic action). No number is added.
       HKUST-1. A residual evaluation of the MOF is cheap: what costs the
       reporter 0.5-0.7 s a frame is the compile `predict` does, which the
       preview removes.
-- [ ] Decide the spelling and record it as `Decided YYYY-MM-DD:`. The
+- [x] Decided 2026-11-17: accepted as built (maintainer, PR #1623 review).
+      Decide the spelling and record it as `Decided YYYY-MM-DD:`. The
       options are a `fit(..., eval_payload=...)` flag, or a property of the
       callback the caller passes. Decide too whether `y_calc` reaches only
       an in-process callback (ndarray, never the file sink) or also the file
@@ -269,10 +270,8 @@ today's.
   (`using/refining.md`) and "event table in the API index" are stale. The
   manual section is now `docs/docs/guides/watch.md`, and the index has no
   event table.
-  *Next:* Yue rules on the spelling (PR body § Decision). If he keeps it,
-  tick Task 2 as `Decided` and close the WP at merge. If he moves the key,
-  the change is local to `events._with_preview`/`_without_preview` and the
-  two emit sites in `optimize/least_squares.py`. Issue #1626 holds the
+  *Next:* the spelling is decided (2026-11-17, accepted as built); the WP
+  closes in the maintainer's handover after the merge. Issue #1626 holds the
   joint-fit and magnetic-moment follow-ups.
 - **2026-10-11** — created, from the 2026-10-11 issue triage (issue #892).
   Checked against the tree at `d80ca5f4`: an `eval` event carries only the
