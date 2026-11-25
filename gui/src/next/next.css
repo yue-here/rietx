@@ -336,7 +336,8 @@ button.ghost:not(.pick, .tab, .link, .ib, .mbtn, .step) {
 /* Variants of a register that one piece draws at its own geometry. They are
    declared here rather than in the piece, because `lib/style.test.ts` fails a
    piece that sets a register's size, padding or radius (WP-2246). Each was
-   moved from its piece unchanged. */
+   moved from its piece unchanged, and now holds for the whole page, so its
+   class names (`words`, `op`, `jump`) mean this variant wherever they appear. */
 
 /* an icon button that carries a word instead of an icon: the Plan's
    "+ Stage" and each stage's add */

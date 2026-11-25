@@ -1,6 +1,6 @@
 # WP-2246 — the register guard reads the rebuilt page: `lib/style.test.ts` scans `gui/src/next/`
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-25 — claimed by ghostshift runner (MacBook-Air-9db21f)
+Milestone: gui-overhaul · Status: 🔄 2026-11-25 — the guard reads next/ (PR #1840); waits on the maintainer's three style-guide questions, then one short session closes it
 Depends on: —
 Priority: P3 2026-11-24 — a workaround covers it: acceptance row 3's other measure, a look at each piece's screenshots, still runs; the guard gates the milestone's completion, not any fit
 
@@ -130,6 +130,64 @@ acceptance row 3 names this WP.
 - `gui/STYLE.md` § Components; WP-1201 (the guard's origin).
 
 ## Handover log
+
+- **2026-11-25** — The house-style guard now reads the rebuilt page, so the milestone's
+  acceptance row 3 is measured on `/next` as the record requires. A piece that gives a
+  button, a chip or an icon button its own size, padding or radius now fails the test, and
+  so does a type size off the scale or a new filled button. Nothing on screen moved: three
+  overrides changed files, and a browser read the same computed styles before and after.
+  Three style-guide calls are left for the maintainer (§ Questions), and two type sizes wait
+  on an explicit list in the test until then. PR #1840.
+
+  *Done.* `styledFiles()` reads `next/*.svelte` (26 files), and the parse check floors each
+  directory. `.ib` joins `REGISTERS`; `.mbtn` stays out pending question 1. `.ib.words`,
+  `button.op` (with its disabled and hover rules) and `.jump .link` moved unchanged from
+  `next/Plan.svelte` and `next/Params.svelte` into a commented block at the end of
+  `next/next.css`. The test's header names `next.css` beside `app.css` as exempt until the
+  swap, which is question 2's provisional answer, not a ruling. The two off-scale sizes
+  are `OFF_SCALE`, an exact list that fails both ways. The filled-primary check now reads a
+  class as unfilled where its own rule (in the file, or in `next.css` for a `next/` file)
+  sets a non-accent background or `all: unset`, through `groundedClasses()`, which has its
+  own fixture test. The shorthand `class:on` now counts as a segmented option, like
+  `class:on=…`. `ALLOWED` gains 16 buttons in 10 `next/` files; the six `panels/` rows are
+  unchanged. Milestone row 3 names this WP.
+
+  *Measured.* Browser pass (chromium 1255, example `fap`, 1600 × 1000): § Measured above.
+  Computed padding, radius, font size and weight, height, width, colour, background, border,
+  underline, opacity and line height of every `.jump .link`, `.ib.words` and `button.op`
+  (59 rows, with hover and disabled states) were identical before and after the move. A
+  planted `.chip.zz { padding; font-size: 11px }` and `.ib.zz { border-radius }` inside
+  `@media` in `next/Plan.svelte` turned the geometry and size checks red (3 + 1 findings),
+  then were removed. Gates, node v24.22.1 on macOS arm64: vitest 72 files, 1076 tests
+  passed; svelte-check 510 files, 0 errors, 0 warnings. No python changed, so the python
+  suite did not run beyond `tests/test_gui_dist.py`, `tests/test_gui_style_guide.py` and
+  `tests/test_docs_consistency.py`.
+
+  *Review.* `/code-review high --fix` made one fix: the class match in the filled check is
+  `(?<![\w-])class="`, so `data-class="…"` no longer reads as a class. It also led to one
+  comment in `next.css` saying the moved rules now hold page-wide. Declined, each a
+  deliberate limit: the moved overrides are moved rather than resolved (that is question 2);
+  `groundedClasses()` grounds a class through a descendant selector anywhere on the page
+  (tightening it would count `.steps .step`, `.chips .term` and `.pt .x` as filled, which
+  the browser showed they are not); `class:on` outside a `.segmented` track would be
+  skipped though filled (none exists); the guard checks no `height`/`width` (WP-1201's
+  choice for every register); a quoted string inside `class="{…}"` is misread (none exists).
+
+  *Not generalised.* The geometry check sees only a selector that names a register. A
+  button drawn through its own class is invisible to it, and `/next` has eight such
+  classes that set their own radius: `.pname` 6 px and `.num` 4 px (Interactive), `.axis`
+  and `.gut` 4 px (Pattern, SeriesTrends), `.pt .x` 10 px (Plan), `.chips .term` 5 px
+  (Background), `.entry` 3 px (Structure). Each is a deliberate look in a piece, so
+  closing that class would be eight visual questions; it is left for the maintainer's
+  screen review (row 10).
+
+  *Generality.* Not dispatched: the branch touches no `_audit.py` row and adds no package
+  heuristic; the guard is a test over GUI source.
+
+  Next: the maintainer answers § Questions 1-3. Then one short session applies them: add
+  `.mbtn` to `REGISTERS` (and STYLE.md's table) if it is a register; rewrite STYLE.md's
+  "drawings live in `app.css`" sentence or move the `next.css` drawings, per question 2;
+  replace the two `OFF_SCALE` sizes, rebuild the dist and empty the list. That closes the WP.
 
 - **2026-11-24** — created, from the 2026-11-24 issue triage (issue #1656 item 2; PR #1827). Checked
   against the tree at `ce9f2de00`: `styledFiles()` still lists `App.svelte` and

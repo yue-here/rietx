@@ -320,7 +320,7 @@ describe("one filled primary per view", () => {
       for (const tag of buttonTags(source)) {
         tags.push(tag);
         if (OTHER.test(tag) || /\bclass:(ghost|on)\b/.test(tag)) continue;
-        const classes = (tag.match(/\bclass="([^"]*)"/)?.[1] ?? "")
+        const classes = (tag.match(/(?<![\w-])class="([^"]*)"/)?.[1] ?? "")
           .replace(/\{[^{}]*\}/g, " ").split(/\s+/).filter(Boolean);
         if (classes.some((c) => grounded.has(c))) continue;
         filled[rel] = (filled[rel] ?? 0) + 1;
