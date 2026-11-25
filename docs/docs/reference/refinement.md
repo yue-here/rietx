@@ -154,7 +154,7 @@ A `RefinementPlan` holds its stages and five settings.
 | `RefinementPlan.intermediate_ftol` | 1e-6 | the tolerance every declared stage but the last stops at ([Stage tolerances](#stage-tolerances)) |
 | `RefinementPlan.lebail_passes` | 1 | the cap on Le Bail passes ([Le Bail passes](#le-bail-passes)) |
 | `RefinementPlan.phase_support_sigma` | 3 | the number of esds a phase's scale must sit from zero for the stage to treat the phase as seen; `None` skips the test ([Held parameters](#held-parameters)) |
-| `RefinementPlan.closing_window_tol` | `None` | `None` runs no closing stage; a fraction asks for one whose windows drop that much of each peak's area, 1e-3 for an answer to publish ([The closing stage](#the-closing-stage)) |
+| `RefinementPlan.closing_window_tol` | `None`, or 1e-3 when a stage frees a magnetic width | `None` runs no closing stage; a fraction asks for one whose windows drop that much of each peak's area, 1e-3 for an answer to publish ([The closing stage](#the-closing-stage)) |
 
 ```python
 import rietx as rx
@@ -281,6 +281,9 @@ The closing stage compiles the model again at the answer, with peak windows that
 It is off by default since 1.13: `closing_window_tol` is `None`, and a plan runs its declared stages alone.
 `lab_calibrate` keeps it, since every later fit inherits a calibration's error.
 So does a Pawley series carrying intensities, since each pattern would start from the last one's error; `carry_hkl_intensities=False` turns both off.
+So does a plan whose stages free a magnetic width, `magnetic_lor_size` or `magnetic_lor_strain`, the `magnetic_width` preset among them.
+Such a width is freed from zero on windows sized for a narrower peak, and without a recompile at the width reached the moment depends on how the plan was staged: 0.12 plain esd from the closing-stage answer under the preset and 0.25 under one stage freeing the same parameters, on a simulated MnF₂ pattern.
+The default is read off the stages whenever the plan is asked, so a stage appended to a preset counts; an explicit `closing_window_tol=None` still turns the closing stage off.
 Ask for it with `CLOSING_WINDOW_TOL`, 1e-3, for an answer you will publish:
 
 ```python
@@ -290,6 +293,7 @@ from rietx.schemas.plan import CLOSING_WINDOW_TOL
 plan = rx.RefinementPlan.lab_bragg_brentano()
 assert plan.closing_window_tol is None
 assert plan.run_stages() == plan.stages
+assert rx.RefinementPlan.magnetic_width().closing_window_tol == CLOSING_WINDOW_TOL
 
 plan.closing_window_tol = CLOSING_WINDOW_TOL
 stages = plan.run_stages()

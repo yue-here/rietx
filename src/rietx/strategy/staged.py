@@ -12,6 +12,7 @@ invariant — they stay frozen *within* a stage).
 from __future__ import annotations
 
 import dataclasses
+import enum
 import fnmatch
 import functools
 import re
@@ -27,12 +28,15 @@ from ..schemas.common import Mode
 # need them at class-definition time and this module is the *upper* layer;
 # they are re-exported here, where plan policy is read.
 from ..schemas.plan import (
-    CLOSING_WINDOW_TOL,  # noqa: F401  re-exported: the opt-in value, no longer a default here
+    CLOSING_WINDOW_TOL,  # noqa: F401  re-exported: the opt-in value, the default only where a magnetic width is freed
     CORRELATION_GUARD,
     INTERMEDIATE_FTOL,
+    MAGNETIC_WIDTH_NAMES,  # noqa: F401  re-exported beside the predicate
     PHASE_SUPPORT_SIGMA,
     PlanSpec,
     check_closing_window_tol,
+    default_closing_window_tol,
+    frees_magnetic_width,  # noqa: F401  re-exported: the plan's own test
 )
 
 #: The name of the stage :meth:`RefinementPlan.closing_stage` appends.
@@ -385,6 +389,45 @@ def fixed_at_end(stages: Iterable[Stage],
     return out
 
 
+class _Unset(enum.Enum):
+    """The one value meaning "the caller set no ``closing_window_tol``" (PEP 661's sentinel shape)."""
+
+    CLOSING_WINDOW_TOL = "closing_window_tol: not set"
+
+    def __repr__(self) -> str:          # what a signature shows
+        return "<unset: 0.001 where a stage frees a magnetic width, else None>"
+
+
+class _ClosingWindowTol:
+    """:attr:`RefinementPlan.closing_window_tol`, its default read off the stages when asked (#1850).
+
+    A dataclass descriptor field: the generated ``__init__`` stores what the
+    caller passed, or :class:`_Unset` when nothing was passed, and every read
+    of an unset field answers :func:`~rietx.schemas.plan.default_closing_window_tol`
+    over the stages the plan holds *then*.  So a stage appended in place after
+    the plan was built (``plan.stages.append``, the way ``examples/nac_11bm.py``
+    extends a preset) is counted, and an explicit ``None`` is a value that
+    declines the closing stage.  Every reader (``closing_stage``,
+    :class:`~rietx.schemas.plan.PlanSpec`, ``dataclasses.replace``, ``==``) reads the
+    resolved number, so the record says what ran.
+    """
+
+    def __set_name__(self, owner, name: str) -> None:
+        self._slot = f"_{name}"
+
+    def __get__(self, plan, owner=None):
+        if plan is None:                # the dataclass machinery asking the default
+            return _Unset.CLOSING_WINDOW_TOL
+        value = plan.__dict__.get(self._slot, _Unset.CLOSING_WINDOW_TOL)
+        if value is _Unset.CLOSING_WINDOW_TOL:
+            return default_closing_window_tol(
+                g for stage in plan.stages for g in stage.turn_on)
+        return value
+
+    def __set__(self, plan, value) -> None:
+        plan.__dict__[self._slot] = value
+
+
 @dataclass
 class RefinementPlan:
     stages: list[Stage]
@@ -425,11 +468,15 @@ class RefinementPlan:
     #: the sixth round's Q1 and Q2).  After the declared stages, one more
     #: recompiles at the answer with these windows and solves with every glob
     #: the plan freed (:meth:`closing_stage`); :data:`CLOSING_WINDOW_TOL` says
-    #: what it fixes, what it costs and what other programs do.  ``None``, the
-    #: default since WP-2222, runs the declared stages alone, which reproduces
-    #: every fit before the field, bit for bit; :data:`CLOSING_WINDOW_TOL` is
-    #: the opt-in for an answer to publish.
-    closing_window_tol: float | None = None
+    #: what it fixes, what it costs and what other programs do.  ``None`` runs
+    #: the declared stages alone, which reproduces every fit before the field,
+    #: bit for bit; :data:`CLOSING_WINDOW_TOL` is the opt-in for an answer to
+    #: publish.  **Not set, it follows the stages**
+    #: (:func:`~rietx.schemas.plan.default_closing_window_tol`):
+    #: :data:`CLOSING_WINDOW_TOL` when a stage frees a magnetic width (#1708's
+    #: ruling, 2026-11-19; #1850), ``None`` otherwise (WP-2222).  An explicit
+    #: ``None`` declines it either way.
+    closing_window_tol: float | None = _ClosingWindowTol()  # type: ignore[assignment]
 
     def closing_stage(self, paths: Iterable[str | tuple[str, ...]] | None = None) -> Stage | None:
         """The stage a fit runs after the declared ones, or ``None``.
@@ -787,6 +834,16 @@ class RefinementPlan:
         Steps 2 and 3 free **both** width terms — see
         ``MAGNETIC_WIDTH_STAGE_PATHS`` for why and for what freeing both
         costs.
+
+        **It ends with the closing stage** (:data:`CLOSING_WINDOW_TOL`), as
+        every plan freeing a magnetic width does unless its caller sets
+        ``closing_window_tol=None`` (#1708's ruling, 2026-11-19; #1850).  Step
+        2 frees the widths from zero, so their windows are sized at
+        ``MAGNETIC_SIZING_FLOOR``, and only a recompile at the width reached
+        takes the clipping back out: on #1850's MnF₂ repro the moment lands
+        0.12 plain esd from the closing-stage answer without it, and a
+        one-stage plan freeing the same globs 0.25; with it the two agree to
+        0.000 (``tests/test_magnetic_width_closing.py``).
         """
         names = ("moment", "magnetic_width", "moment_and_width")
         # no step seeds: step 2 frees the widths from their zero floor, where
@@ -1069,7 +1126,10 @@ PLAN_INFO: dict[str, PlanInfo] = {
             "runs to the final tolerance. The plan frees nothing else. The "
             "moment and the width confound each other, since both lower the "
             "calculated magnetic peak's height. This order brings the moment "
-            "into the width stage already converged."),
+            "into the width stage already converged. It ends with the closing "
+            "stage, because a width freed from zero is drawn on windows sized "
+            "for a narrower peak. Any plan that frees a magnetic width does, "
+            "unless it sets `closing_window_tol=None`."),
         modes=("rietveld",),
         when_to_use=(
             "After a magnetic structure has converged and "

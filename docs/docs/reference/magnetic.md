@@ -274,6 +274,7 @@ The moment and the width both lower the calculated magnetic peak's height, so fr
 The `magnetic_width` preset, `RefinementPlan.magnetic_width`, frees them in order: the moment with the widths at zero, then the widths beside the converged moment, then both together as the last stage.
 Staging is cumulative, so the moment keeps refining in the middle stage, and enters it at its own converged value.
 The preset continues from a converged nuclear fit and frees no cell, coordinate or instrument width.
+It ends with the closing stage, as every plan that frees a magnetic width does unless it sets `closing_window_tol=None` ([The closing stage](refinement.md#the-closing-stage)), because the middle stage frees the widths from zero on windows sized for a narrower peak.
 
 <!-- api-doc: no-exec — it needs a converged magnetic structure -->
 ```python

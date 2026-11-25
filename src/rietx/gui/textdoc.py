@@ -1018,6 +1018,11 @@ def _plan_changes(parsed: ParsedDocument, doc: ProjectDoc, delta: Delta,
 
     spec: PlanSpec | None = None
     if parsed.stages:
+        # an absent ``closing`` line is the plan's default, which follows the
+        # stages (a magnetic width keeps the closing stage, #1850), so it is
+        # left out rather than read off an empty PlanSpec
+        closing = ({"closing_window_tol": parsed.closing} if parsed.closing_set
+                   else {})
         spec = PlanSpec(stages=parsed.stages,
                         correlation_guard=(parsed.guard if parsed.guard is not None
                                            else PlanSpec().correlation_guard),
@@ -1027,8 +1032,7 @@ def _plan_changes(parsed: ParsedDocument, doc: ProjectDoc, delta: Delta,
                                        else PlanSpec().lebail_passes),
                         phase_support_sigma=(parsed.support if parsed.support_set
                                              else PlanSpec().phase_support_sigma),
-                        closing_window_tol=(parsed.closing if parsed.closing_set
-                                            else PlanSpec().closing_window_tol))
+                        **closing)
     stages_changed = spec is not None and spec != current
 
     if name_changed and stages_changed:

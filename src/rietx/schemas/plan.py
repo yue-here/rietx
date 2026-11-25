@@ -24,8 +24,11 @@ silently fail to serialize.
 
 from __future__ import annotations
 
+import fnmatch
 import math
 import numbers
+import re
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from pydantic import Field, field_validator, model_validator
@@ -173,6 +176,77 @@ def check_phase_support_sigma(value: Any) -> float | None:
 #: moves U at any window (WP-1955).
 CLOSING_WINDOW_TOL = 1e-3
 
+#: The two magnetic broadening widths (WP-1343).  A plan that frees either
+#: keeps the closing stage by default (#1708's ruling, 2026-11-19; #1850):
+#: :func:`default_closing_window_tol`.
+MAGNETIC_WIDTH_NAMES: tuple[str, ...] = ("magnetic_lor_size", "magnetic_lor_strain")
+
+#: The magnetic width paths as a table spells them, bare and joint-scoped
+#: (``params.multi``'s ``hist.<h>.``), at index 0; a glob's literal indices are
+#: read as 0 before it is matched against them (:func:`frees_magnetic_width`).
+_MAGNETIC_WIDTH_PROBES = tuple(f"{scope}phases.0.{name}"
+                               for scope in ("", "hist.0.")
+                               for name in MAGNETIC_WIDTH_NAMES)
+_LITERAL_INDEX = re.compile(r"(?<=phases\.)\d+|(?<=hist\.)\d+")
+
+
+def frees_magnetic_width(globs: Iterable[str]) -> bool:
+    """Whether any of ``globs`` reaches a magnetic width path.
+
+    Read from the globs alone, as ``fnmatch`` reads them against the path
+    shapes ``phases.<i>.magnetic_lor_size`` and ``…_strain``, bare or
+    ``hist.<h>.``-scoped, so a plan answers it before any table exists.  A
+    catch-all such as ``phases.*`` counts, whether or not a phase carries the
+    widths: the closing stage it then keeps costs time and moves no answer
+    the wrong way.
+    """
+    for glob in globs:
+        probe = _LITERAL_INDEX.sub("0", glob)
+        if any(fnmatch.fnmatchcase(p, probe) for p in _MAGNETIC_WIDTH_PROBES):
+            return True
+    return False
+
+
+def default_closing_window_tol(globs: Iterable[str]) -> float | None:
+    """A plan's ``closing_window_tol`` when its caller sets none, from what its stages free.
+
+    :data:`CLOSING_WINDOW_TOL` when ``globs`` (every stage's ``turn_on``)
+    reach a magnetic width, else ``None``, WP-2222's default.  Ruled on #1708
+    (2026-11-19, before WP-2222 merged) and built for #1850: a magnetic width
+    freed from zero is drawn on windows sized at ``MAGNETIC_SIZING_FLOOR``,
+    whose ground is "behind the closing stage only".  Without it the moment
+    lands 0.07-0.57 esd from the closing-stage answer (WP-2002, the seventh
+    round's Q2), and on #1850's MnF₂ repro 0.12 plain esd under the
+    ``magnetic_width`` preset and 0.25 under one stage freeing the same globs,
+    so the answer depends on how the plan was staged.  With it both land on
+    one answer (``tests/test_magnetic_width_closing.py``).  The cost falls on
+    those fits alone; an explicit ``None`` still declines it, and
+    ``strategy.magnetic._close`` keeps its own 1e-3 as before.
+    """
+    return CLOSING_WINDOW_TOL if frees_magnetic_width(globs) else None
+
+
+def _turn_on_globs(stages: Any) -> list[str]:
+    """Every ``turn_on`` glob of a :class:`PlanSpec`'s raw ``stages``, before validation.
+
+    Each entry is read by its type, never its shape: a ``StageSpec``, a
+    ``strategy.staged.Stage`` or a mapping (a JSON document).  Anything else
+    contributes nothing here and is refused by the field's own validation.
+    """
+    from ..strategy.staged import Stage
+
+    globs: list[str] = []
+    for stage in stages if isinstance(stages, (list, tuple)) else ():
+        if isinstance(stage, (StageSpec, Stage)):
+            turn_on = stage.turn_on
+        elif isinstance(stage, Mapping):
+            turn_on = stage.get("turn_on", ())
+        else:
+            continue
+        if isinstance(turn_on, (list, tuple)):
+            globs.extend(g for g in turn_on if isinstance(g, str))
+    return globs
+
 
 def check_closing_window_tol(value: Any) -> float | None:
     """``value`` as a closing stage's window area fraction, or ``None`` for no closing stage.
@@ -311,7 +385,7 @@ class PlanSpec(Base):
 
     closing_window_tol: float | None = Field(
         None, description=(
-            "null (the default) = no closing stage.  A number asks for one: "
+            "null = no closing stage.  A number asks for one: "
             "after the last declared stage, one more stage recompiles at the "
             "answer with peak windows dropping this fraction of each peak's "
             "area and solves with every glob the plan freed.  Declared stages "
@@ -319,7 +393,10 @@ class PlanSpec(Base):
             "esd; 1e-3 meets 0.1 esd on three of four families at 1.2-2.3x "
             "the fit time, the opt-in for an answer to publish.  Any value "
             "under 2 % keeps the closing stage's finer axial-divergence "
-            "sampling (WP-2002, off by default since WP-2222)"))
+            "sampling (WP-2002, off by default since WP-2222).  Omitted, it "
+            "is 0.001 when a stage frees a magnetic width "
+            "(magnetic_lor_size, magnetic_lor_strain) and null otherwise "
+            "(#1708's ruling, #1850); an explicit null still declines it"))
 
     @field_validator("phase_support_sigma")
     @classmethod
@@ -359,7 +436,14 @@ class PlanSpec(Base):
         """
         from ..strategy.staged import RefinementPlan
 
-        return cls.from_plan(value).model_dump() if isinstance(value, RefinementPlan) else value
+        if isinstance(value, RefinementPlan):
+            return cls.from_plan(value).model_dump()
+        if isinstance(value, Mapping) and "closing_window_tol" not in value:
+            # an omitted value is the plan's default, read off the stages the
+            # way RefinementPlan reads it (#1850); an explicit null is a value
+            value = {**value, "closing_window_tol":
+                     default_closing_window_tol(_turn_on_globs(value.get("stages")))}
+        return value
 
     @classmethod
     def from_plan(cls, plan: Any) -> "PlanSpec":
