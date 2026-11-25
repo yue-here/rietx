@@ -159,7 +159,7 @@ acceptance row 3 names this WP.
   planted `.chip.zz { padding; font-size: 11px }` and `.ib.zz { border-radius }` inside
   `@media` in `next/Plan.svelte` turned the geometry and size checks red (3 + 1 findings),
   then were removed. Gates, node v24.22.1 on macOS arm64: vitest 72 files, 1076 tests
-  passed; svelte-check 510 files, 0 errors, 0 warnings. No python changed, so the python
+  passed (one new); svelte-check 510 files, 0 errors, 0 warnings. No python changed, so the python
   suite did not run beyond `tests/test_gui_dist.py`, `tests/test_gui_style_guide.py` and
   `tests/test_docs_consistency.py`.
 
@@ -174,11 +174,11 @@ acceptance row 3 names this WP.
   choice for every register); a quoted string inside `class="{…}"` is misread (none exists).
 
   *Not generalised.* The geometry check sees only a selector that names a register. A
-  button drawn through its own class is invisible to it, and `/next` has eight such
-  classes that set their own radius: `.pname` 6 px and `.num` 4 px (Interactive), `.axis`
+  button drawn through its own class is invisible to it, and `/next` has seven such
+  classes that set their own radius, in eight rules: `.pname` 6 px and `.num` 4 px (Interactive), `.axis`
   and `.gut` 4 px (Pattern, SeriesTrends), `.pt .x` 10 px (Plan), `.chips .term` 5 px
   (Background), `.entry` 3 px (Structure). Each is a deliberate look in a piece, so
-  closing that class would be eight visual questions; it is left for the maintainer's
+  closing that class would be seven visual questions; it is left for the maintainer's
   screen review (row 10).
 
   *Generality.* Not dispatched: the branch touches no `_audit.py` row and adds no package
