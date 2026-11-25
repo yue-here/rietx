@@ -120,6 +120,12 @@ hold); WP-1441 (`constrain`).
 
 ### Inherited
 
+- **2026-11-25, from WP-2305's close: the joint call's names have landed** (PR #1838).
+  Write the declaration against `rietx.refine_joint`, `rietx.JointRefinement` (module
+  `rietx.joint`), `RefinementResult.patterns`, `for_pattern` and the `pattern.N.` scope.
+  `SharingMap` and its `per_histogram` field were left for this WP to replace. A caller path
+  starting with `hist.` is refused by `schemas.common.refuse_retired_scope`; a new entry
+  point taking a path or glob calls it.
 - **2026-11-23, from WP-2081's close: a fixed value's own error reaches every pattern, and
   the series has no row for it (issue #1556 § 5).** The reporter ran a synthetic LaB₆ ramp,
   7 patterns × 150 noise replicates, holding zero and profile from pattern 1 on at pattern
