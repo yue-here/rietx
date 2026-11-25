@@ -139,6 +139,7 @@ from .refine import (
     _phase_support_diagnostics,
     _quantify_phases,
     _radiation,
+    _reader_diagnostics,
     _refuse_without_phases,
     _reported_support_sigma,
     _resolve_specimen_absorption,
@@ -294,6 +295,8 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
                       "histogram the model does not describe"),
     "_low_angle_diagnostics": (
         (HISTOGRAM,), "the region below one pattern's first reflection"),
+    "_reader_diagnostics": (
+        (HISTOGRAM,), "what one file's reader repaired or noticed (WP-2304)"),
     "_air_scatter_undeclared_diagnostics": (
         (HISTOGRAM,), "one histogram's residual against its own background"),
     "_qpa_esd_unavailable_diagnostics": (
@@ -2717,6 +2720,7 @@ class MultiHistogramRefinement:
                                                 ticks, tick_support))
             diags.extend(_air_scatter_undeclared_diagnostics(model, values,
                                                              y_calc, stats))
+            diags.extend(_reader_diagnostics(model, diags))
 
             histograms.append(HistogramResult(
                 label=model.meta.get("label", "") or f"hist{h}",

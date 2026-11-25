@@ -75,7 +75,7 @@ Every refinable quantity is a `rx.Parameter` (`value`, `vary`, bounds), addresse
 - `rx.Dispersion` — Anomalous scattering corrections f′, f″ at the source wavelengths.
   Fields: `table: Literal['cromer_liberman'] = 'cromer_liberman'`, `overrides: dict[str, tuple[float, float]] = {}`
 - `rx.PatternData` — A powder pattern.
-  Fields: `two_theta: list[float] | None = None`, `tof: list[float] | None = None`, `intensity: list[float]`, `sigma: list[float] | None = None`, `nonpositive_sigma: Literal['exclude', 'poisson'] = 'exclude'`, `excluded_regions: list[tuple[float, float]] = []`, `metadata: dict[str, str] = {}`
+  Fields: `two_theta: list[float] | None = None`, `tof: list[float] | None = None`, `intensity: list[float]`, `sigma: list[float] | None = None`, `nonpositive_sigma: Literal['exclude', 'poisson'] = 'exclude'`, `excluded_regions: list[tuple[float, float]] = []`, `metadata: dict[str, str] = {}`, `diagnostics: list[Diagnostic] = []`
 
 ## Refinement
 

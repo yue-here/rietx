@@ -17,7 +17,7 @@ from typing import Literal
 import numpy as np
 from pydantic import Field, model_validator
 
-from .common import Base
+from .common import Base, Diagnostic
 
 #: The two abscissae a pattern may carry, spelled as the field that holds each.
 AxisKind = Literal["two_theta", "tof"]
@@ -117,6 +117,13 @@ class PatternData(Base):
     nonpositive_sigma: NonPositiveSigma = "exclude"
     excluded_regions: list[tuple[float, float]] = Field(default_factory=list)
     metadata: dict[str, str] = Field(default_factory=dict)
+    #: What :func:`~rietx.io.readers.read_pattern` repaired or noticed in the
+    #: file, filled on every read (WP-2304).  A fit on this pattern copies
+    #: them into ``RefinementResult.diagnostics``, so a caller who passed no
+    #: ``diagnostics=`` list still meets them.  Empty on a pattern built by
+    #: hand.  Not part of ``TreeHeader.data_fingerprint``, which hashes the
+    #: arrays alone.
+    diagnostics: list[Diagnostic] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _validate(self) -> "PatternData":
@@ -328,6 +335,7 @@ class PatternData(Base):
             nonpositive_sigma=self.nonpositive_sigma,
             excluded_regions=self.excluded_regions,
             metadata=self.metadata,
+            diagnostics=self.diagnostics,
         )
 
 

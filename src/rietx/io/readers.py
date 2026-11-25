@@ -65,13 +65,15 @@ def read_pattern(path: str | Path, *, diagnostics: list[Diagnostic] | None = Non
     an option *no* format takes is a typo and raises.  See
     :func:`~rietx.io.formats.base.reader_options_for` for that distinction.
 
-    ``diagnostics``, when a list is passed, collects what the reader **repaired
-    or assumed** — a scan stored high→low and reversed, a duplicated point
-    dropped, an option that did not apply.  It is the same channel
+    What the reader **repaired or assumed** (a scan stored high→low and
+    reversed, a duplicated point dropped, an option that did not apply) is
+    kept on the pattern's own ``diagnostics`` on every call, and appended to
+    ``diagnostics`` when a list is passed.  It is the same channel
     :func:`~rietx.crystallography.cif.structure_from_cif` takes and exists
     for the same reason: a reader is the one layer that may silently correct a
     stranger's file, and it may only do so where it can say that it did.
-    Returning a bare :class:`PatternData` was an accident, not a design.
+    A fit on the pattern hands the notes on in ``RefinementResult.diagnostics``
+    (WP-2304), so a caller who passed no list still meets them.
 
     ``PATTERN_DEAD_CHANNELS`` is the one entry on that channel that is neither
     a repair nor an assumption, and it is here rather than only at compile
@@ -79,8 +81,8 @@ def read_pattern(path: str | Path, *, diagnostics: list[Diagnostic] | None = Non
     fourteen parameters at their bounds several minutes later, and none of the
     fourteen is the problem (issue #274).  It is format-agnostic — a dead cell
     is a property of the measurement and not of the file — so it is raised
-    once here rather than in each reader, and only when a caller passed the
-    list, which keeps it off the path of everyone who did not ask.
+    once here rather than in each reader.  A fit does not hand this one on: it
+    asks the question again on the channels it fits.
 
     **The axis every reader hands back is checked here**, whatever the format,
     because a wrong one parses perfectly: a GSAS file whose ``BANK`` record is
@@ -96,8 +98,7 @@ def read_pattern(path: str | Path, *, diagnostics: list[Diagnostic] | None = Non
       sides, but no Bragg reflection lies there, and a header row read as data
       lands there too (issue #266's lands at exactly 0).
 
-    The refusal runs on every call; the report, like the two below, only when
-    a caller passed the list.
+    The refusal and the report both run on every call, as do the two below.
 
     ``PATTERN_SIGMA_CONSTANT`` is here for the dead-channel reason: a σ
     identical on every point makes the fit unweighted whichever reader
@@ -121,20 +122,27 @@ def read_pattern(path: str | Path, *, diagnostics: list[Diagnostic] | None = Non
     """
     p = Path(path)
     fmt = identify_format(p)
-    kwargs = reader_options_for(fmt, options, diagnostics=diagnostics)
-    # ruled here rather than in each reader: every format's σ meets it
-    rule = kwargs.pop("nonpositive_sigma", "exclude")
-    if rule not in NONPOSITIVE_SIGMA_RULES:
-        raise ValueError(f"reader option nonpositive_sigma= takes one of "
-                         f"{list(NONPOSITIVE_SIGMA_RULES)}, got {rule!r}")
-    data = fmt.read(p, diagnostics=diagnostics, **kwargs)
-    sigma_notes = _apply_nonpositive_sigma(data, rule, p.name)
-    axis = _axis_diagnostics(data, fmt, p.name)
-    if diagnostics is not None:
-        diagnostics.extend(sigma_notes)
-        diagnostics.extend(axis)
-        diagnostics.extend(_constant_sigma_diagnostics(data, fmt, p.name))
-        diagnostics.extend(_dead_channel_diagnostics(data, p.name))
+    # Collected on every call and kept on the pattern (WP-2304), so a fit
+    # meets them whether or not the caller passed a list.  The caller's list
+    # is extended in ``finally``: a refusal's notes reach it, as they did when
+    # the readers wrote into it directly.
+    notes: list[Diagnostic] = []
+    try:
+        kwargs = reader_options_for(fmt, options, diagnostics=notes)
+        # ruled here rather than in each reader: every format's σ meets it
+        rule = kwargs.pop("nonpositive_sigma", "exclude")
+        if rule not in NONPOSITIVE_SIGMA_RULES:
+            raise ValueError(f"reader option nonpositive_sigma= takes one of "
+                             f"{list(NONPOSITIVE_SIGMA_RULES)}, got {rule!r}")
+        data = fmt.read(p, diagnostics=notes, **kwargs)
+        notes.extend(_apply_nonpositive_sigma(data, rule, p.name))
+        notes.extend(_axis_diagnostics(data, fmt, p.name))
+        notes.extend(_constant_sigma_diagnostics(data, fmt, p.name))
+        notes.extend(_dead_channel_diagnostics(data, p.name))
+    finally:
+        if diagnostics is not None:
+            diagnostics.extend(notes)
+    data.diagnostics = list(notes)
     return data
 
 
