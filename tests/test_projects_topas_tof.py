@@ -356,6 +356,27 @@ def test_the_writer_names_the_extra_range_rietx_keeps(tmp_path):
     assert left > -math.log(1e-4) / beta
 
 
+def test_the_extra_range_follows_the_windows_tolerance():
+    """#1548 round-2 item 4: the writer's tail is the window's own, derived
+    from the imported ``forward_tof.TOF_WINDOW_AREA_TOL`` rather than
+    respelled, so one retune moves both.  The equality alone would pass a
+    respelled ``-log(1e-4)`` too, so the assignment is read as well."""
+    import ast
+    import inspect
+
+    from rietx.model import forward_tof
+
+    assert TT.TOF_WINDOW_AREA_TOL is forward_tof.TOF_WINDOW_AREA_TOL
+    assert TT._TAIL_EFOLDS == forward_tof.TAIL_EFOLDS
+    (node,) = [n for n in ast.parse(inspect.getsource(TT)).body
+               if isinstance(n, ast.Assign)
+               and any(getattr(t, "id", None) == "_TAIL_EFOLDS" for t in n.targets)]
+    names = {n.id for n in ast.walk(node.value) if isinstance(n, ast.Name)}
+    numbers = [n.value for n in ast.walk(node.value)
+               if isinstance(n, ast.Constant) and isinstance(n.value, float)]
+    assert "TOF_WINDOW_AREA_TOL" in names and not numbers
+
+
 @pytest.mark.parametrize("update, needle", [
     (lambda st, ins: (st, ins.model_copy(update={"source": ins.source.model_copy(
         update={"incident_spectrum": IncidentSpectrum(itype=1, coefficients=[Parameter(value=1.0)] * 11)})})),

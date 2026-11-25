@@ -83,6 +83,7 @@ import numpy as np
 # The TCH coefficients rietx's pseudo-Voigt uses (Thompson, Cox & Hastings,
 # 1987, J. Appl. Cryst. 20, 79, eqs. 4-5), imported rather than restated so a
 # `.inp` carries exactly the Γ and η the model computes.
+from ...model.forward_tof import TOF_WINDOW_AREA_TOL
 from ...model.profiles.pseudovoigt import _TCH_ETA, _TCH_GAMMA
 from ...schemas.common import Parameter
 from . import topas as _topas
@@ -93,9 +94,18 @@ LN1000 = math.log(1000.0)
 #: b² in barn per b² in fm² — the unit factor between the two codes' |F|².
 BARN_PER_FM2 = 0.01
 #: Where a law is sampled to decide whether rietx's reproduces it: the d range
-#: of every bank in the archive and beyond, so a term that matters anywhere a
-#: reflection could be is seen.
-_D_SAMPLES = np.geomspace(0.25, 8.0, 17)
+#: (Å) of every bank in the archive and beyond, so a term that matters anywhere
+#: a reflection could be is seen.  It matters only for a law that is not a sum
+#: of powers of d (an ``Exp`` or ``Ln`` of D_spacing): for one that is, any
+#: :data:`_D_SAMPLE_COUNT` distinct positive d decide it.
+_D_SAMPLE_RANGE = (0.25, 8.0)
+#: How many d the law is sampled at.  A sum of n distinct real powers of d that
+#: vanishes at n distinct positive d vanishes everywhere (Descartes' rule of
+#: signs for generalised polynomials: it has at most n − 1 positive roots), so
+#: agreement at 17 points is identity for any pair of power-law laws with 17
+#: distinct powers between them, and the bases here have at most four.
+_D_SAMPLE_COUNT = 17
+_D_SAMPLES = np.geomspace(*_D_SAMPLE_RANGE, _D_SAMPLE_COUNT)
 #: How closely rietx's law must reproduce the file's, relative. Evaluation is
 #: double precision end to end, so this is rounding, not tolerance.
 _EXACT = 1e-9
@@ -1039,9 +1049,10 @@ def from_tof(structure, instrument, *, data_file: str, x_range: tuple | None = N
     return "\n".join(lines) + "\n"
 
 
-#: e-folds of an exponential tail rietx's frozen window keeps: −ln(1e-4), its
-#: per-wing area tolerance (``model.forward_tof``'s TOF_WINDOW_AREA_TOL).
-_TAIL_EFOLDS = -math.log(1e-4)
+#: e-folds of an exponential tail rietx's frozen window keeps: −ln of its
+#: per-wing area tolerance, imported so one retune of
+#: ``model.forward_tof.TOF_WINDOW_AREA_TOL`` moves the written ``extra_X`` too.
+_TAIL_EFOLDS = -math.log(TOF_WINDOW_AREA_TOL)
 
 
 def _extra_x(src, x_range) -> tuple[float, float]:

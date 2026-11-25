@@ -168,6 +168,7 @@ WALKED: dict[str, int] = {
     "io/projects/fullprof.py": 2006,
     "io/projects/registry.py": 2006,
     "io/projects/topas_input.py": 2006,
+    "io/projects/topas_tof.py": 2006,
     "gui/imports.py": 2006,
     "gui/symmetry.py": 2006,
 }
@@ -4510,6 +4511,61 @@ ROWS: tuple[Row, ...] = (
         evidence=('Thompson, Cox & Hastings (1987), J. Appl. Cryst. 20, 79, the gamma polynomial '
                   '(2.69269, 2.42843, 4.47163, 0.07842); equal to '
                   'model.profiles.pseudovoigt._TCH_GAMMA (checked 2026-11-17)')),
+    Row("rietx.io.projects.topas_tof.BARN_PER_FM2", "constant", tier=1, value=0.01,
+        evidence=("arithmetic: 1 fm^2 = 0.01 barn, the unit factor between rietx's |F|^2 (b in "
+                  "fm) and TOPAS's (b in barn); measured with TOPAS v6 as a black box, TOPAS = "
+                  "rietx x 0.01/sin(theta_bank) per d-group to |ln dev| <= 1.3e-7 (Si and NiO, "
+                  "tests/data/README.md, TOPAS time of flight; "
+                  "tests/test_projects_topas_tof.py::test_the_scale_is_converted_by_the_measured_factor)")),
+    Row("rietx.io.projects.topas_tof.LN1000", "constant", tier=1, value=6.907755278982137,
+        evidence=("arithmetic on the foreign format's definition: TOPAS states a time-of-flight "
+                  "exponential by where it falls to 1e-3, so its rate is ln(1000) times the "
+                  "stated coefficient (TOF_Exponential) or ln(1000)/c (exp_conv_const); measured "
+                  "with TOPAS v6 as a black box, exp_conv_const = -Ln(0.001)/0.05 gives 0.0500000 "
+                  "per us at every d (tests/data/README.md, TOPAS time of flight; "
+                  "tests/test_projects_topas_tof.py::test_exp_conv_const_is_a_rate_by_its_sign)")),
+    Row("rietx.io.projects.topas_tof._D_SAMPLE_COUNT", "constant", tier=1, value=17,
+        evidence=("arithmetic: a sum of n distinct real powers of d has at most n - 1 positive "
+                  "roots (Descartes' rule of signs for generalised polynomials), so a file's "
+                  "power-law law and rietx's agree at 17 distinct positive d only if they are "
+                  "one law, for any pair with 17 distinct powers between them; the bases fitted "
+                  "have at most four terms (topas_tof._exact_fit's callers: calibration 1, d, "
+                  "d^2, 1/d; widths 1, d^2, d^4 and 1, d, d^2; rates 1 and 1/d or 1/d^4)")),
+    Row("rietx.io.projects.topas_tof._D_SAMPLE_RANGE", "constant", tier=3, value=(0.25, 8.0),
+        evidence=("the d range (A) over which a file's law is judged against rietx's, read or "
+                  "refused; it decides only for a law that is not a sum of powers of d (an Exp "
+                  "or Ln of D_spacing), which agreement at _D_SAMPLE_COUNT points settles "
+                  "anywhere; chosen to cover every bank in the archive the reader was built "
+                  "on, whose reflections lie inside it; measured on that archive only, "
+                  "untested beyond it"),
+        grounds=("A domain bound of rietx's choosing: no physics fixes where a time-of-flight "
+                 "reflection may fall, and a law that differs from rietx's only below 0.25 A "
+                 "or above 8 A would be read as rietx's there.  The alternative, judging over "
+                 "the bank's own d range from start_X/finish_X and its calibration, is a "
+                 "design for its own change.  Unanimity: not an action; nobody named against "
+                 "judging a law over the range its reflections occupy.")),
+    Row("rietx.io.projects.topas_tof._EXACT", "constant", tier=1, value=1e-09,
+        evidence=("numerical floor: the relative residual under which a file's law counts as "
+                  "rietx's (topas_tof._exact_fit) and a declared value as the evaluated one "
+                  "(math.isclose); both sides are double precision end to end, so this is "
+                  "rounding.  Measured 2026-11-25 over every law the TOPAS time-of-flight tests "
+                  "read (tests/test_projects_topas_tof.py, tests/test_tof_topas_synthetic.py): "
+                  "139 basis fits, largest accepted residual 9.7e-15, smallest refused 3.4e-4 "
+                  "(test_a_calibration_that_is_not_the_four_term_relation_is_refused); 43 "
+                  "declared-value checks, largest accepted 8.3e-12, smallest refused 0.31 "
+                  "(test_phases_of_one_bank_stating_different_shapes_are_refused)")),
+    Row("rietx.io.projects.topas_tof._TAIL_EFOLDS", "constant", tier=3, value=9.210340371976182,
+        evidence=("derived: -ln(model.forward_tof.TOF_WINDOW_AREA_TOL), imported, with no free "
+                  "factor, the twin of forward_tof.TAIL_EFOLDS; sizes the written extra_X so "
+                  "TOPAS generates every reflection whose tail rietx's frozen window keeps "
+                  "inside the range (a peak 20 us below start_X: 6e-3 of the maximum missing on "
+                  "the TOPAS side until extra_X was set, tests/data/README.md; "
+                  "tests/test_projects_topas_tof.py::test_the_writer_names_the_extra_range_rietx_keeps)"),
+        grounds=("Derived from forward_tof.TOF_WINDOW_AREA_TOL with no free factor, so it "
+                 "inherits that row's tier and grounds (approved 2026-11-17), as "
+                 "forward_tof.TAIL_EFOLDS does; imported rather than respelled so one retune "
+                 "moves the window and the written extra range together (#1548 round-2 "
+                 "item 4).")),
     Row("rietx.io.readers.TWO_THETA_MAX_DEG", "constant", tier=1, value=180.0,
         evidence=('180.0 degrees: no scattering angle exceeds it, since 2theta is the angle '
                   'between the incident and scattered beams, so an axis running past it is not '
