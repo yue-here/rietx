@@ -138,6 +138,18 @@ Cell and Bragg's law.
 - *Domain:* one phase (corundum), one laboratory instrument (Cu Ka), c/a and both axes; the absolute axes are not at certificate grade
 - *Mismatch:* c/a +29 ppm; absolute axes -314 / -284 ppm with |da - dc| within 2.9e-5; Rwp 14.4 %, GoF 1.60 against a GoF floor of 1.5-1.9 for analytical-PSF lab fits (Cline 2015); 1.9.0 read +30, -312 / -282 ppm, Rwp 14.6 % and GoF 1.63
 
+**Validated by:** `test_every_table7_value_lies_inside_the_participants_envelope`, dataset `pbso4_rr` (development data).
+
+- *Reference value:* Hill (1992) Table 7 p. 601: the range and the weighted mean of 16 X-ray and 17 neutron refinements; a spread is sigma_ext*sqrt(n) (Table 8), the participants' own standard deviation, so 3 spreads passes a participant-like fit on all 19 values with probability ~95 %
+- *Domain:* cell edges, coordinates and B of PbSO4 only: one ILL D1A neutron pattern (lambda 1.909 A as given to the participants) and one Cu Ka Bragg-Brentano pattern of one specimen, judged against 1992 participants' answers to the same data (Hill's 23 participants, 11 programs), so no independent measurement; development data
+- *Mismatch:* neutron 19/19 inside, worst 1.52 spreads (O3 x); X-ray 19/19 inside, worst 1.26 spreads (B O1); bar 3 spreads
+
+**Validated by:** `test_an_axial_model_raises_the_neutron_cell_towards_the_xray_cell`, dataset `pbso4_rr` (development data).
+
+- *Reference value:* Hill (1992) p. 605: the participants who modelled the detector-height asymmetry physically reported larger neutron cells, nearer the X-ray ones; the X-ray mean cell of Table 7 is the ceiling
+- *Domain:* the neutron cell edges under a freed FCJ axial model, PbSO4 only: one ILL D1A neutron pattern (lambda 1.909 A as given to the participants) and one Cu Ka Bragg-Brentano pattern of one specimen, judged against 1992 participants' answers to the same data (Hill's 23 participants, 11 programs), so no independent measurement; development data
+- *Mismatch:* each edge +0.08 %; b and c then 5.5 spreads above the neutron mean, still inside its range
+
 **State:** validated on development data.
 
 ### `wavelength`
@@ -151,6 +163,12 @@ Emission lines, wavelength scales, harmonics, wavelength-cell degeneracy.
 - *Reference value:* NIST's cell recomputed for this dataset's 20.85 C block, 4.156780 A, under an explicitly interim +-2e-4 A band; the certificate's own +-8e-5 A (k = 2, 19 ppm) at 22.5 C is NOT claimed and the residual is a characterised cotTheta/sin2Theta aberration (divergence, tube tails, monochromator passband) fenced to the v2 FPA work
 - *Domain:* one phase (LaB6), one laboratory instrument (Cu Ka doublet, graphite analyser), the cell at the certification measurement's 20.85 C; not the certificate's own 22.5 C band
 - *Mismatch:* a = 4.156882(21) A, +24 ppm; Rwp 8.74 %, GoF 1.89; zero_shift held at exactly 0.0; displacement -0.0790 mm vs the CIF's -0.07877. The Gaussian width is real at all 60 reflections. 1.9.0 read +25 ppm (24.6 against 24.5), Rwp 8.75 % and -0.0791 mm, before WP-2002's closing stage (#1085). Before WP-1938 the width sat on its clamp at 12 reflections, and the fit read 4.156895 A, +28 ppm, Rwp 8.67 %
+
+**Validated by:** `test_the_joint_fit_finds_the_wavelength_hill_back_calculated`, dataset `pbso4_rr` (development data).
+
+- *Reference value:* Hill (1992) p. 605 ('closer to 1.912 A'); the band is 1.909 * (X-ray mean edge) / (neutron edge) over every neutron edge in Table 7's range, 1.91083-1.91290 A
+- *Domain:* the free neutron wavelength of a joint fit, PbSO4 only: one ILL D1A neutron pattern (lambda 1.909 A as given to the participants) and one Cu Ka Bragg-Brentano pattern of one specimen, judged against 1992 participants' answers to the same data (Hill's 23 participants, 11 programs), so no independent measurement; development data
+- *Mismatch:* lambda_N 1.91252(5) A
 
 **State:** validated on development data.
 
@@ -206,7 +224,13 @@ Finger-Cox-Jephcoat axial divergence.
 
 **Verified by:** `test_the_refined_wavelength_recovers_xnds_calibration_error`, `test_the_symmetric_window_recovers_xnd_to_sub_ppm`
 
-**State:** not yet validated.
+**Validated by:** `test_an_axial_model_raises_the_neutron_cell_towards_the_xray_cell`, dataset `pbso4_rr` (development data).
+
+- *Reference value:* Hill (1992) p. 605: the participants who modelled the detector-height asymmetry physically reported larger neutron cells, nearer the X-ray ones; the X-ray mean cell of Table 7 is the ceiling
+- *Domain:* the neutron cell edges under a freed FCJ axial model, PbSO4 only: one ILL D1A neutron pattern (lambda 1.909 A as given to the participants) and one Cu Ka Bragg-Brentano pattern of one specimen, judged against 1992 participants' answers to the same data (Hill's 23 participants, 11 programs), so no independent measurement; development data
+- *Mismatch:* each edge +0.08 %; b and c then 5.5 spreads above the neutron mean, still inside its range
+
+**State:** validated on development data.
 
 ### `bragg_intensities`
 
@@ -244,7 +268,13 @@ Isotropic and anisotropic displacement parameters.
 
 **Verified by:** `test_tying_the_similar_atoms_bisos_buys_precision`, `test_biso_is_positive_and_agrees_with_xnd`
 
-**State:** not yet validated.
+**Validated by:** `test_every_table7_value_lies_inside_the_participants_envelope`, dataset `pbso4_rr` (development data).
+
+- *Reference value:* Hill (1992) Table 7 p. 601: the range and the weighted mean of 16 X-ray and 17 neutron refinements; a spread is sigma_ext*sqrt(n) (Table 8), the participants' own standard deviation, so 3 spreads passes a participant-like fit on all 19 values with probability ~95 %
+- *Domain:* cell edges, coordinates and B of PbSO4 only: one ILL D1A neutron pattern (lambda 1.909 A as given to the participants) and one Cu Ka Bragg-Brentano pattern of one specimen, judged against 1992 participants' answers to the same data (Hill's 23 participants, 11 programs), so no independent measurement; development data
+- *Mismatch:* neutron 19/19 inside, worst 1.52 spreads (O3 x); X-ray 19/19 inside, worst 1.26 spreads (B O1); bar 3 spreads
+
+**State:** validated on development data.
 
 ### `atomic_coordinates`
 
@@ -252,7 +282,13 @@ Fractional coordinates and site-symmetry DOFs.
 
 **Verified by:** `test_the_one_free_coordinate_agrees`, `test_fap_lab_rietveld_matches_gsas`
 
-**State:** not yet validated.
+**Validated by:** `test_every_table7_value_lies_inside_the_participants_envelope`, dataset `pbso4_rr` (development data).
+
+- *Reference value:* Hill (1992) Table 7 p. 601: the range and the weighted mean of 16 X-ray and 17 neutron refinements; a spread is sigma_ext*sqrt(n) (Table 8), the participants' own standard deviation, so 3 spreads passes a participant-like fit on all 19 values with probability ~95 %
+- *Domain:* cell edges, coordinates and B of PbSO4 only: one ILL D1A neutron pattern (lambda 1.909 A as given to the participants) and one Cu Ka Bragg-Brentano pattern of one specimen, judged against 1992 participants' answers to the same data (Hill's 23 participants, 11 programs), so no independent measurement; development data
+- *Mismatch:* neutron 19/19 inside, worst 1.52 spreads (O3 x); X-ray 19/19 inside, worst 1.26 spreads (B O1); bar 3 spreads
+
+**State:** validated on development data.
 
 ### `rigid_bodies`
 
@@ -586,7 +622,13 @@ Joint multi-histogram refinement (refine_multi).
 
 **Verified by:** `test_the_refined_wavelength_is_the_solo_cell_disagreement`, `test_the_diagnostic_reports_the_ppm_and_nothing_claims_rwp`, `test_the_cell_belongs_to_the_synchrotron`, `test_swapping_which_wavelength_is_held_measures_the_same_ratio`, `test_the_neutron_widths_leave_one_esd_at_every_start`
 
-**State:** not yet validated.
+**Validated by:** `test_the_joint_fit_finds_the_wavelength_hill_back_calculated`, dataset `pbso4_rr` (development data).
+
+- *Reference value:* Hill (1992) p. 605 ('closer to 1.912 A'); the band is 1.909 * (X-ray mean edge) / (neutron edge) over every neutron edge in Table 7's range, 1.91083-1.91290 A
+- *Domain:* the free neutron wavelength of a joint fit, PbSO4 only: one ILL D1A neutron pattern (lambda 1.909 A as given to the participants) and one Cu Ka Bragg-Brentano pattern of one specimen, judged against 1992 participants' answers to the same data (Hill's 23 participants, 11 programs), so no independent measurement; development data
+- *Mismatch:* lambda_N 1.91252(5) A
+
+**State:** validated on development data.
 
 ### `parametric_refinement`
 

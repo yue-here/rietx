@@ -3253,6 +3253,8 @@ CLAIMS: tuple[Claim, ...] = (
                   "19 values with probability ~95 %",
         measured="neutron 19/19 inside, worst 1.52 spreads (O3 x); X-ray 19/19 "
                  "inside, worst 1.26 spreads (B O1); bar 3 spreads",
+        features=("lattice_metric", "atomic_coordinates", "displacement_parameters"),
+        domain="cell edges, coordinates and B of PbSO4 only: one ILL D1A neutron pattern (lambda 1.909 A as given to the participants) and one Cu Ka Bragg-Brentano pattern of one specimen, judged against 1992 participants' answers to the same data (Hill's 23 participants, 11 programs), so no independent measurement; development data",
     ),
     Claim(
         "test_acceptance_pbso4_round_robin",
@@ -3276,6 +3278,8 @@ CLAIMS: tuple[Claim, ...] = (
                   "of Table 7 is the ceiling",
         measured="each edge +0.08 %; b and c then 5.5 spreads above the "
                  "neutron mean, still inside its range",
+        features=("axial_divergence", "lattice_metric"),
+        domain="the neutron cell edges under a freed FCJ axial model, PbSO4 only: one ILL D1A neutron pattern (lambda 1.909 A as given to the participants) and one Cu Ka Bragg-Brentano pattern of one specimen, judged against 1992 participants' answers to the same data (Hill's 23 participants, 11 programs), so no independent measurement; development data",
     ),
     Claim(
         "test_acceptance_pbso4_round_robin",
@@ -3288,6 +3292,8 @@ CLAIMS: tuple[Claim, ...] = (
                   "1.909 * (X-ray mean edge) / (neutron edge) over every "
                   "neutron edge in Table 7's range, 1.91083-1.91290 A",
         measured="lambda_N 1.91252(5) A",
+        features=("wavelength", "joint_refinement"),
+        domain="the free neutron wavelength of a joint fit, PbSO4 only: one ILL D1A neutron pattern (lambda 1.909 A as given to the participants) and one Cu Ka Bragg-Brentano pattern of one specimen, judged against 1992 participants' answers to the same data (Hill's 23 participants, 11 programs), so no independent measurement; development data",
     ),
 )
 
