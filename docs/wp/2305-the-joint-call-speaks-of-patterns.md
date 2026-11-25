@@ -1,6 +1,6 @@
 # WP-2305 — The joint call speaks of patterns and is named a joint refinement
 
-Milestone: series · Status: ⬜
+Milestone: series · Status: 🔄 2026-11-25 — claimed by @yue-here (ghostshift runner)
 Depends on: —
 Priority: P2 2026-11-23 — WP-2300's declaration says `per_pattern` to both calls, and the joint call it reaches still says histogram in its paths, its names and its prose
 

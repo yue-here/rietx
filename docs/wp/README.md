@@ -66,6 +66,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2238](2238-the-decision-machinery.md) | The decision machinery: fewer calls reach the maintainer, and each ruling is reused | 2026-11-22 | P2 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2243](2243-the-series-workflow.md) | The series workflow at `/next`: patterns, first fit, run, results, with Trends and Map | 2026-11-24 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2245](2245-the-pattern-graph-s-axis-and-gutter.md) | The Pattern graph's empty difference axis and its blank right margin | 2026-11-24 | P3 | [gui-overhaul](#gui-overhaul) |
+| [2305](2305-the-joint-call-speaks-of-patterns.md) | The joint call speaks of patterns and is named a joint refinement | 2026-11-25 | P2 | [series](#series) |
 
 ## Next, by priority
 
@@ -90,7 +91,6 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2302](2302-a-wrong-choice-is-refused-at-the-call.md) | A wrong choice is refused at the call, and a requested window has one name | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2303](2303-a-glob-that-matches-nothing-says-so.md) | A glob a caller passes that matches nothing says so | P2 | — ([2300](2300-a-series-declares-each-parameter.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2304](2304-a-readers-repairs-reach-the-fits-diagnostics.md) | A reader's repairs reach the fit's diagnostics | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [2305](2305-the-joint-call-speaks-of-patterns.md) | The joint call speaks of patterns and is named a joint refinement | P2 | — | [series](#series) |
 
 ## <a id="v0-3"></a>v0.3 — multi-phase workflows
 
@@ -556,7 +556,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2081](2081-how-a-series-holds-what-the-setup-fixes.md) | How a series holds what the setup fixes (a design discussion) | ✅ 2026-11-23 | — | — ([2003](2003-the-chain-actions.md) soft) |
 | [2300](2300-a-series-declares-each-parameter.md) | A series declares each parameter, and refuses what it cannot honour | ⬜ | P2 | [2305](2305-the-joint-call-speaks-of-patterns.md) |
 | [2301](2301-the-typical-temperature-series.md) | The typical temperature series: one route, a preset, and a Switching page | ⬜ | P3 | [2300](2300-a-series-declares-each-parameter.md) |
-| [2305](2305-the-joint-call-speaks-of-patterns.md) | The joint call speaks of patterns and is named a joint refinement | ⬜ | P2 | — |
+| [2305](2305-the-joint-call-speaks-of-patterns.md) | The joint call speaks of patterns and is named a joint refinement | 🔄 2026-11-25 | P2 | — |
 
 ## <a id="unscheduled"></a>Unscheduled
 
