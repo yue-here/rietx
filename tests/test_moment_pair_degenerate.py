@@ -16,7 +16,10 @@ Since issue #1692 two atoms on one position are a *co-sited* group, read by
 the moment per position |Σ occ·m| and never quadrature-paired: the fit test
 below now reads that number, which for these orthogonal moments at full
 occupancy is the same √(m1² + m2²).  The quadrature fold itself, for distinct
-sites, is held by the arithmetic tests after it.
+sites, is held by the arithmetic tests after it.  The orthogonal moments make
+the degenerate valley a circle, on which the quadrature fold is right from any
+start, so that test cannot fail on the fold; the collinear pair, whose valley is
+a straight line, is the negative arm.
 """
 
 from __future__ import annotations
@@ -176,6 +179,62 @@ def test_two_starting_splits_report_the_same_moment_per_position(degenerate_patt
                                                  abs=2 * alone.stderr)
     for row in (row_a, row_b):
         assert row.cosited_magnitude_esd == pytest.approx(2 * alone.stderr, rel=0.1)
+
+
+def collinear_pair_phase(m1: float, m2: float) -> Phase:
+    """The pair above with both moments along x: a straight valley, not a circle."""
+    phase = degenerate_pair_phase(m1, 0.0)
+    phase.atoms[1].moment = Moment.from_values((m2, 0.0, 0.0), "Mn3+")
+    return phase
+
+
+COLLINEAR_M1, COLLINEAR_M2 = 2.5, 1.0
+
+
+@pytest.fixture(scope="module")
+def collinear_pattern():
+    return simulate(collinear_pair_phase(COLLINEAR_M1, COLLINEAR_M2), neutron(), seed=1)
+
+
+def test_a_collinear_cosited_pair_from_equal_starts_is_never_quadrature_paired(
+        collinear_pattern):
+    """The negative arm the orthogonal test above cannot give (found in the
+    review of WP-2230, #1736).  With both moments along x the powder
+    determines m1 + m2, so the degenerate valley is the straight line
+    m1 + m2 = const.  Started at equal moduli (``solve_magnetic``'s seed,
+    ``SOLVE_SEED_MU_B``) the fit stops at m1 = m2, the one point where
+    √(m1² + m2²) has the gradient (1, 1)/√2 the data determine, so the pair
+    fold's first-order estimable test passes and, without the per-position
+    reading (#1692), the pair was reported as a "quadrature sum" of
+    (m1 + m2)/√2: 2.479 ± 0.006 here, while the same data started at 2.6/1.0
+    formed no pair.  Read per position, both starts give |Σ occ·m| with its
+    esd, and the truth, 3.5, lies inside it (3.505 ± 0.009 from both starts,
+    macOS arm64)."""
+    from rietx.strategy.magnetic import SOLVE_SEED_MU_B
+
+    found = []
+    for start in ((SOLVE_SEED_MU_B, SOLVE_SEED_MU_B), (2.6, 1.0)):
+        structure = rx.Structure(phases=[collinear_pair_phase(*start)])
+        ref = rx.Refinement(structure, neutron())
+        ref.fit(collinear_pattern, plan=PLAN)
+        assert ref.result_.status == "converged", (start, ref.result_.status)
+        rows = ref.report().magnetic
+        paired = [(r.atom, r.paired_magnitude, r.paired_magnitude_esd)
+                  for r in rows if r.paired_with]
+        assert not paired, (start, paired)
+        grouped = [r for r in rows if r.cosited_with]
+        assert len(grouped) == 2, (start, rows)
+        row = grouped[0]
+        assert row.cosited_magnitude is not None and row.cosited_magnitude_esd
+        assert abs(row.cosited_magnitude - (COLLINEAR_M1 + COLLINEAR_M2)) <= (
+            row.cosited_magnitude_esd), (start, row.cosited_magnitude,
+                                         row.cosited_magnitude_esd)
+        found.append(row)
+
+    equal, lopsided = found
+    combined_sigma = math.hypot(equal.cosited_magnitude_esd,
+                                lopsided.cosited_magnitude_esd)
+    assert abs(equal.cosited_magnitude - lopsided.cosited_magnitude) <= combined_sigma
 
 
 def test_pair_degenerate_moments_quadrature_and_esd_are_correct():

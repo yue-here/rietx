@@ -1062,6 +1062,18 @@ mixed site whose species' coordinates are refined apart. Neither a symmetry-equi
 representative nor a position that is also pair-correlated is combined.
 `MOMENT_ANGLE_STATIONARY` still reads per site.
 
+### 2026-11-25 — #1725's collinear negative arm (PR #1725)
+
+The co-sited fit test in `test_moment_pair_degenerate.py` has orthogonal moments, so its valley is
+a circle and the quadrature fold is right from any start: it could not fail on the fold. New
+`test_a_collinear_cosited_pair_from_equal_starts_is_never_quadrature_paired` puts both Mn³⁺
+moments along x (truth 2.5 and 1.0 μ_B) and fits from `SOLVE_SEED_MU_B` on both and from 2.6/1.0.
+On main `68dae52c2` the equal start pairs the two at 2.479 ± 0.006, which is (m₁ + m₂)/√2, and the
+test fails there. Here both starts give |Σ occ·m| = 3.505 ± 0.009 and no pair. Fast, 0.3 s a fit.
+`_estimable_pair_esd` and `statistics.estimable` now say the estimable test is first-order at the
+answer (Prince 2004, p. 120). After this PR no fit test reaches `_estimable_pair_esd`, since its
+one fit test is co-sited: a follow-up for WP-2230 (#1736).
+
 ### 2026-11-24 — K1a's budget now stops a search inside a stratum (PR #1732)
 
 A time budget on the k-grid search now holds to within one block of work. Before, the search read its budget only between strata, so a stratum that had started ran to its end. The general stratum of the 1/64 `P n m a` grid holds 29 791 k. On a 245-peak list the 100-shuffle null then ran past nine minutes under a 120 s budget. Now the search stops at the first expired read, and the result names the stratum it cut and how many of its points were scored. Nothing reads a cut search yet. Whether anything may be read off one is K1b's question.

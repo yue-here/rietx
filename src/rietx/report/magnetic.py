@@ -342,6 +342,17 @@ def _estimable_pair_esd(covariance, path_a: str, path_b: str,
     pseudo-inverse is the esd a fit on the sum alone would give (Searle
     1971, p. 169).  ``None`` when the tuple carries no discarded subspace or
     no correlation, or when the sum is not estimable.
+
+    The test is first-order: it asks whether g, taken *at the answer*, is
+    orthogonal to the discarded direction, so it is exact only for a linear
+    function and for a function of the determined combinations (Prince,
+    E., 2004, *Mathematical Techniques in Crystallography and Materials
+    Science*, 3rd ed., Springer, p. 120).  √(d_a² + d_b²) is neither on a
+    straight valley: two collinear moduli started equal stop at d_a = d_b,
+    where g = (1, 1)/√2 is the determined direction, so the test passes and
+    the number returned is (d_a + d_b)/√2, at a point the data do not single
+    out.  Atoms sharing a position never reach this function
+    (:func:`cosited_moments`).
     """
     _result, table, theta, stderr_internal, correlation, discarded = covariance
     if stderr_internal is None or correlation is None or discarded is None:

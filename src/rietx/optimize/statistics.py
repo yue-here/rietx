@@ -358,6 +358,13 @@ def estimable(grad: np.ndarray, cov: np.ndarray, lost: np.ndarray) -> np.ndarray
     (Rietveld and Pawley, three starting splits, macOS arm64).  A row whose
     gradient is zero has nothing to compare and is not estimable here; its
     caller decides on reach.
+
+    For a nonlinear function the caller passes its gradient at the answer,
+    and the test is then first-order (Prince, E., 2004, *Mathematical
+    Techniques in Crystallography and Materials Science*, 3rd ed., Springer,
+    p. 120): exact only for a linear function and for a function of the
+    determined combinations.  Elsewhere it can pass at an isolated point the
+    data do not determine, where the gradient happens to lie in J's row space.
     """
     g = np.atleast_2d(np.asarray(grad, dtype=np.float64))
     lost_var = ((g @ lost) ** 2).sum(axis=1)
