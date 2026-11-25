@@ -11326,21 +11326,48 @@ def _extra_peak_diagnostics(model: CompiledModel, values: dict,
 #: excluded must not come back with the advice to exclude it.
 _FIT_OWNED_READER_CODES = frozenset({"PATTERN_DEAD_CHANNELS"})
 
+#: Reader codes for a lossless repair, kept on ``PatternData.diagnostics`` and
+#: never handed on: a scan stored backwards and a repeated point of equal y
+#: are the same measurement once repaired, so the fit's answer is the same
+#: either way and the note gives a reader of the fit nothing to act on.
+_LOSSLESS_READER_CODES = frozenset({"PATTERN_SCAN_REVERSED",
+                                    "PATTERN_DUPLICATE_POINTS"})
+
+#: Reader codes saying σ was withheld and the Poisson fallback used, which a
+#: σ the caller assigned before fitting settles.
+_WITHHELD_SIGMA_CODES = frozenset({"PATTERN_SIGMA_NONPOSITIVE",
+                                   "PATTERN_WEIGHT_UNUSABLE",
+                                   "PATTERN_INTENSITY_SCALED"})
+
 
 def _reader_note_settled(note: Diagnostic, model: CompiledModel) -> bool:
     """Whether the caller has already done what ``note`` asks, on this fit.
 
     The notes describe the file as read, and a caller may act on one before
-    fitting: exclude the interval at or below 0° that
-    ``PATTERN_X_AXIS_IMPLAUSIBLE`` names (or crop it away), or set
-    ``pattern.sigma = None`` as ``PATTERN_SIGMA_CONSTANT`` suggests.  Handing
-    such a note on would repeat advice already taken, for the reason
+    fitting.  Each test below is exact on the compiled model:
+
+    - ``PATTERN_X_AXIS_IMPLAUSIBLE``: no fitted channel sits at or below 0°.
+    - ``PATTERN_SIGMA_CONSTANT``: σ was set to ``None``, or the caller's σ
+      varies over the fitted channels.
+    - ``PATTERN_SIGMA_NONPOSITIVE`` naming 2θ intervals: no fitted channel was
+      left out for its σ, after ``nonpositive_sigma="poisson"``, an excluded
+      region or a crop.
+    - a withheld σ (any other note in :data:`_WITHHELD_SIGMA_CODES`): the
+      caller assigned a σ.  One whose ``where`` names ``intensity`` also
+      doubts the intensity scale, which no σ settles, so it stays.
+
+    Handing such a note on would repeat advice already taken, for the reason
     :data:`_FIT_OWNED_READER_CODES` gives about dead channels.
     """
     if note.code == "PATTERN_X_AXIS_IMPLAUSIBLE":
         return model.tt.size == 0 or float(model.tt.min()) > 0.0
     if note.code == "PATTERN_SIGMA_CONSTANT":
-        return not model.sigma_measured
+        return not model.sigma_measured or model.sigma_uniform is False
+    if note.code == "PATTERN_SIGMA_NONPOSITIVE" and note.where != ["sigma"]:
+        return (model.sigma_rule is not None
+                and model.sigma_rule.n_nonpositive_excluded == 0)
+    if note.code in _WITHHELD_SIGMA_CODES and "intensity" not in note.where:
+        return bool(model.sigma_measured)
     return False
 
 
@@ -11352,11 +11379,12 @@ def _reader_diagnostics(model: CompiledModel,
     not a caller passed a list, and ``compile_model`` carries them here, so a
     rescaled intensity or a withheld σ reaches every fit on the file.  A note
     whose code the fit has already raised, or asks for itself
-    (:data:`_FIT_OWNED_READER_CODES`), is left out; an exact repeat is too, and
-    so is one whose advice the caller has already taken
-    (:func:`_reader_note_settled`).
+    (:data:`_FIT_OWNED_READER_CODES`), is left out, as is a lossless repair
+    (:data:`_LOSSLESS_READER_CODES`); an exact repeat is too, and so is one
+    whose advice the caller has already taken (:func:`_reader_note_settled`).
     """
-    have = {d.code for d in raised} | _FIT_OWNED_READER_CODES
+    have = ({d.code for d in raised} | _FIT_OWNED_READER_CODES
+            | _LOSSLESS_READER_CODES)
     out: list[Diagnostic] = []
     for note in model.reader_notes:
         if (note.code in have or note in out

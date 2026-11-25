@@ -170,3 +170,80 @@ def test_advice_already_taken_is_not_handed_on(truth, tmp_path):
     codes = _codes(result.diagnostics)
     assert "PATTERN_SIGMA_CONSTANT" not in codes
     assert "PATTERN_X_AXIS_IMPLAUSIBLE" not in codes
+
+
+def test_a_lossless_repair_stays_with_the_file(truth, tmp_path):
+    """A scan stored backwards, with one point written twice, is the same
+    measurement once repaired: the notes stay on the pattern and the fit
+    repeats neither."""
+    tt, y = truth.tt(), truth.y()
+    sig = np.sqrt(np.maximum(y, 1.0))
+    order = np.sort(np.r_[np.arange(tt.size), 300])[::-1]  # point 300 twice
+    data = rx.read_pattern(_xye(tmp_path / "backwards.xye", tt[order],
+                                y[order], sig[order]))
+    assert {"PATTERN_SCAN_REVERSED", "PATTERN_DUPLICATE_POINTS"} <= set(
+        _codes(data.diagnostics))
+
+    structure, instrument = _models()
+    result = Refinement(structure, instrument, history=False).fit(data, plan=PLAN)
+    codes = _codes(result.diagnostics)
+    assert "PATTERN_SCAN_REVERSED" not in codes
+    assert "PATTERN_DUPLICATE_POINTS" not in codes
+
+
+@pytest.mark.parametrize("how", ["poisson", "excluded"])
+def test_a_point_back_in_the_fit_settles_the_nonpositive_note(how, truth,
+                                                              tmp_path):
+    """The note says its points are left out of the fit; once the caller
+    weights them at the Poisson σ, or excludes them, none is."""
+    data = rx.read_pattern(_nonpositive(truth, tmp_path))
+    assert "PATTERN_SIGMA_NONPOSITIVE" in _codes(data.diagnostics)
+    if how == "poisson":
+        data.nonpositive_sigma = "poisson"
+    else:
+        at = float(truth.tt()[700])
+        data.excluded_regions = [(at - 0.001, at + 0.001)]
+
+    structure, instrument = _models()
+    result = Refinement(structure, instrument, history=False).fit(data, plan=PLAN)
+    assert "PATTERN_SIGMA_NONPOSITIVE" not in _codes(result.diagnostics)
+
+
+def test_an_assigned_sigma_settles_a_withheld_sigma_note(truth, tmp_path):
+    """Three notes say σ was withheld and the Poisson σ used; a σ the caller
+    assigns settles each.  The GSAS counter note also doubts the intensity
+    scale, which no σ settles, so it stays."""
+    data = rx.read_pattern(_scaled(truth, tmp_path))
+    rate = next(n for n in data.diagnostics
+                if n.code == "PATTERN_INTENSITY_SCALED")
+    zeros = np.zeros(truth.y().size)
+    none = rx.read_pattern(_xye(tmp_path / "nosig.xye", truth.tt(), truth.y(),
+                                zeros)).diagnostics
+    assert _codes(none) == ["PATTERN_SIGMA_NONPOSITIVE"]
+    weight = Diagnostic(level="info", code="PATTERN_WEIGHT_UNUSABLE",
+                        message="_pd_proc_ls_weight holds 3 negative weight(s).",
+                        where=["_pd_proc_ls_weight"])
+    counters = Diagnostic(level="warning", code="PATTERN_INTENSITY_SCALED",
+                          message="the STD bank's counter numbers run 1 to 20.",
+                          where=["intensity", "sigma"])
+    data = data.model_copy(update={
+        "diagnostics": [*data.diagnostics, *none, weight, counters]})
+    data.sigma = list(np.sqrt(np.maximum(data.y(), 1.0)) / 7.3)
+
+    structure, instrument = _models()
+    result = Refinement(structure, instrument, history=False).fit(data, plan=PLAN)
+    kept = list(result.diagnostics)
+    assert counters in kept
+    assert rate not in kept
+    assert "PATTERN_SIGMA_NONPOSITIVE" not in _codes(kept)
+    assert "PATTERN_WEIGHT_UNUSABLE" not in _codes(kept)
+
+
+def test_a_varying_sigma_settles_the_constant_sigma_note(truth, tmp_path):
+    flat = rx.read_pattern(_constant(truth, tmp_path))
+    assert "PATTERN_SIGMA_CONSTANT" in _codes(flat.diagnostics)
+    flat.sigma = list(np.sqrt(np.maximum(flat.y(), 1.0)))
+
+    structure, instrument = _models()
+    result = Refinement(structure, instrument, history=False).fit(flat, plan=PLAN)
+    assert "PATTERN_SIGMA_CONSTANT" not in _codes(result.diagnostics)

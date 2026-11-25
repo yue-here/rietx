@@ -1218,6 +1218,11 @@ class CompiledModel:
     # WP-2304), carried so the result builder can hand it on: by then the
     # pattern itself is out of reach.  Empty on a pattern built by hand.
     reader_notes: tuple = ()
+    # Whether the fitted channels' σ are one value, read before a measured
+    # background widens them: what settles ``PATTERN_SIGMA_CONSTANT`` once a
+    # caller's own σ varies (WP-2304).  ``None`` only on a model built without
+    # ``compile_model``.
+    sigma_uniform: bool | None = None
     meta: dict = field(default_factory=dict)
 
     # ------------------------------------------------------------------
@@ -4733,6 +4738,7 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         mask &= window
     tt, y_obs, sigma = tt_all[mask], y_all[mask], s_all[mask]
     sigma_rule = pattern.sigma_rule(window)
+    sigma_uniform = bool(sigma.size) and bool(np.all(sigma == sigma[0]))
     if len(tt) < 10:
         why = ""
         if sigma_rule.n_nonpositive_excluded:
@@ -5258,6 +5264,7 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         sigma_measured=pattern.sigma is not None,
         sigma_rule=sigma_rule,
         reader_notes=tuple(pattern.diagnostics),
+        sigma_uniform=sigma_uniform,
         wavelength=instrument.source.primary_wavelength,
         line_wavelengths=lams,
         harmonic_orders=harmonic_orders,

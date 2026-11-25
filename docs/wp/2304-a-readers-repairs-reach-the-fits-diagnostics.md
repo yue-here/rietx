@@ -91,6 +91,41 @@ carries that code in `result.diagnostics` exactly once.
 
 ## Handover log
 
+- **2026-11-25** — blind check of the reader-facing change, and its fixes. A fresh reviewer
+  judged what a fit now prints and found two kinds of junk. Both held against the code.
+
+  *Lossless repairs no longer reach the fit.* `PATTERN_SCAN_REVERSED` and
+  `PATTERN_DUPLICATE_POINTS` describe a repair after which the measurement is the same. The fit's
+  answer is the same either way, and the note gives no action. They stay on
+  `PatternData.diagnostics` and are never handed on (`refine._LOSSLESS_READER_CODES`).
+
+  *More notes settle once the caller has acted.* `refine._reader_note_settled` now also drops:
+  `PATTERN_SIGMA_NONPOSITIVE`'s partial form once no fitted channel is left out for its σ
+  (`sigma_rule.n_nonpositive_excluded == 0`, after `nonpositive_sigma="poisson"`, an excluded
+  region or a crop); a withheld-σ note (`PATTERN_SIGMA_NONPOSITIVE` for a whole column,
+  `PATTERN_WEIGHT_UNUSABLE`, `PATTERN_INTENSITY_SCALED`) once the caller assigns a σ
+  (`sigma_measured`); and `PATTERN_SIGMA_CONSTANT` once the caller's σ varies over the fitted
+  channels. That last test reads the new `CompiledModel.sigma_uniform`, taken before a measured
+  background widens σ, since the widening alone would make a placeholder column look varied. The
+  GSAS counter note (`PATTERN_INTENSITY_SCALED` from an STD bank with NCTR above 1) doubts the
+  intensity scale as well as σ, so a σ does not settle it. Its `where` now names `intensity`
+  beside `sigma`, which is the structural mark the settle test reads. The earlier review's
+  "no reliable test" for these two codes is answered by that mark and by `where == ["sigma"]`,
+  which separates the whole-column σ ≤ 0 note from the partial one.
+
+  *Left, with no exact test.* `crop` keeps notes about points it removed. `RAS_ATTENUATOR_PRESENT`
+  stays after a caller applies the factor themselves, since nothing on the pattern records that.
+
+  *Siblings checked and kept.* The other info-level pattern-reader codes each change what is
+  fitted or name a choice: `XRDML_ATTENUATOR_APPLIED`, `BRML_ABSORBER_ENGAGED` and
+  `XYDATA_INTER_APPLIED` change y or σ; `PATTERN_ZERO_WEIGHT_EXCLUDED`, `PATTERN_INTENSITY_NET`,
+  `READER_OPTION_IGNORED` and `GSAS_BANK_COMMENTED` say what was or was not read.
+
+  *Measured* ([dev], darwin/arm64). `tests/test_reader_notes.py`: 13 passed, five added. Each
+  added test fails with its fix undone, one fix at a time (a scratch plugin patching
+  `refine`). `tests.reader_output`: exit 0, unchanged. Fast suite and lint: see the PR.
+
+  Next: none. PR #1842.
 - **2026-11-25** — closed. What a pattern reader repaired or noticed in a file now reaches
   every fit on that file, whether or not the caller passed a `diagnostics=` list. Before, a
   file whose intensities were rescaled, or whose σ was withheld, constant or partly zero, was
