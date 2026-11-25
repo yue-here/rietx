@@ -41,7 +41,7 @@ from ..backend.api import TORCH_DEVICES
 from ..backend.linalg64 import get_precision_policy, require_fp64, to_host_fp64
 from ..background.models import hump_partials
 from ..crystallography.adp import U_NAMES
-from ..crystallography.lattice import DegenerateCellError
+from ..crystallography.lattice import DegenerateCellError, d_spacings
 from ..crystallography.magnetic.moments import (
     MOMENT_DIRECTION_SUPPORT,
     MOMENT_DOF_PATH,
@@ -2717,6 +2717,82 @@ def texture_positivity_inequalities(model: CompiledModel, table: ParameterTable,
     return out
 
 
+#: The three Lorentzian FWHM coefficients of a bank's ``ProfileTOF``, in the
+#: order :func:`tof_gamma_inequalities` lays its basis ``(1, d, d²)``.
+TOF_GAMMA_PATHS = tuple(f"instrument.source.profile_tof.gam{k}" for k in range(3))
+
+
+def tof_gamma_inequalities(model, table: ParameterTable,
+                           x0: np.ndarray) -> list["lm_mod.LinearInequality"]:
+    """γ(d) = gam0 + gam1·d + gam2·d² ≥ 0 on a time-of-flight bank, held inside
+    the step (#1548 review, the bank's twin of
+    :func:`lorentzian_width_inequalities`).
+
+    ``compile_tof_model`` refuses a negative γ(d) at any reflection of the
+    fitted range, and nothing stopped a stage from stepping there: a real bank
+    converged at gam1 = −5.749.  A fit that did then raised from the closing
+    compile, with no result, after every stage's work (Rule 1: protect work
+    already done).  γ(d) couples three coefficients, so it is a cone, not a box
+    (root ``CLAUDE.md``: a bound on a combination is an LM row).
+
+    One row per distinct d: every reflection of the frozen list, at the
+    starting cell (a stage that frees the cell beside the widths holds the rows
+    to first order only, :func:`texture_positivity_inequalities`' rule), and
+    the frozen fitted range's two ends (``CompiledTOFModel.d_range``), so the
+    next stage's reflection list, drawn from a calibration that may have
+    moved, starts inside too.  The sample's own Lorentzian terms
+    (``tof_sample_gamma``) have floors of 0 and are left out, so the row is
+    the instrument's γ alone, which is what the compile refuses.
+
+    Skipped as the other builders skip: not a bank; no γ coefficient a free
+    column reaches; a derived γ.  A row the start violates is dropped.  The
+    TRF driver has no rows, and the compile's refusal stays its guard.
+    """
+    from . import lm as lm_mod
+
+    if not is_tof_model(model) or not table.free_paths:
+        return []
+    if any(q in table.derived_paths() for q in TOF_GAMMA_PATHS):
+        return []
+    try:
+        rows = [table._paths[q] for q in TOF_GAMMA_PATHS]
+    except KeyError:
+        return []
+    C, d0 = table.constraint_block()
+    C = C.toarray()[rows, :]
+    if not np.any(C):
+        return []
+    values = table.decode(x0)
+    ds: list[np.ndarray] = []
+    if model.d_range is not None:
+        ds.append(np.asarray(model.d_range, dtype=np.float64))
+    for ip, cp in enumerate(model.phases):
+        if len(cp.reflections.hkl) == 0:
+            continue
+        cell = tuple(values[f"phases.{ip}.cell.{k}"]
+                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+        ds.append(np.asarray(d_spacings(cp.reflections.hkl, *cell), dtype=np.float64))
+    if not ds:
+        return []
+    d = np.unique(np.concatenate(ds))
+    basis = np.stack([np.ones_like(d), d, d * d], axis=1)
+    T = basis @ C
+    c = basis @ d0[rows]
+    label = "instrument.source.profile_tof γ(d)"
+    keep = ~lm_mod.LinearInequality(T=T, c=c).violated(x0)
+    if not keep.any():
+        return []
+    T, c = np.ascontiguousarray(T[keep]), c[keep].copy()
+    # each face a margin inside γ = 0, :func:`tied_bound_inequalities`' rule
+    # and for its reason: the polished step holds a row only to its rounding,
+    # and the closing compile reads γ(d) itself.  A start inside the margin
+    # keeps its face on zero, where the compile's on-face reading covers it.
+    slack = T @ x0 + c
+    margin = TIED_BOUND_MARGIN * (np.abs(T) @ np.abs(x0) + np.abs(c))
+    c = np.where(slack >= margin, c - margin, c)
+    return [lm_mod.LinearInequality(T=T, c=c, label=label)]
+
+
 def _equation_width_rows(model: CompiledModel, table: ParameterTable, C: np.ndarray,
                          derived, values: dict, x0: np.ndarray, ip: int, target: str,
                          d_refl, tt_lines, masks, *, squared: bool = False):
@@ -3719,6 +3795,7 @@ def _drive_single(model: CompiledModel, table: ParameterTable, residual, jacobia
             + texture_positivity_inequalities(model, table, x0[:n_table])
             + gaussian_width_inequalities(model, table, x0[:n_table])
             + lorentzian_width_inequalities(model, table, x0[:n_table])
+            + tof_gamma_inequalities(model, table, x0[:n_table])
             + tied_bound_inequalities(table, x0[:n_table], lo[:n_table],
                                       hi[:n_table]), n_aux)
         from . import lm as lm_mod

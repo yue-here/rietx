@@ -1035,6 +1035,66 @@ def test_sig2_freed_from_zero_moves_and_never_refuses_mid_plan():
     assert sig2.stderr is not None and sig2.stderr > 0.0
 
 
+def _gamma_pulled_negative():
+    """A bank whose data pull γ(d) below zero: generated with σ² = 300·d² and
+    no Lorentzian, refined with σ² held at twice that, so the only way to
+    narrow the model's peaks is a negative Lorentzian FWHM."""
+    data = _synthetic_pattern()
+    structure = silicon()
+    structure.phases[0].scale.value = 12.0
+    instrument = bank(sig1=600.0, gam0=2.0)
+    instrument.background.coefficients[0].value = 40.0
+    instrument.background.coefficients[1].value = -8.0
+    plan = rx.RefinementPlan(stages=[
+        rx.Stage("scale_bkg", ["phases.*.scale", "instrument.background.c*"]),
+        rx.Stage("lorentzian", ["phases.*.scale",
+                                "instrument.source.profile_tof.gam0",
+                                "instrument.source.profile_tof.gam1"]),
+    ])
+    return structure, instrument, data, plan
+
+
+def test_a_stage_cannot_step_gamma_below_zero_and_lose_the_fit():
+    """γ(d) ≥ 0 is held inside the step (``tof_gamma_inequalities``), so a
+    fit whose data pull the Lorentzian width negative ends on γ = 0 and
+    returns, where it used to step there and raise from the closing compile
+    with no result after every stage's work (#1548, the hostile review's
+    must-fix 4)."""
+    structure, instrument, data, plan = _gamma_pulled_negative()
+    ref = rx.Refinement(structure, instrument, history=False)
+    result = ref.fit(data, plan=plan)
+    prof = ref.instrument.source.profile_tof
+    g0, g1, g2 = prof.gam0.value, prof.gam1.value, prof.gam2.value
+    d = np.linspace(TOF_LO / DIFC_GEN, TOF_HI / DIFC_GEN, 400)
+    gamma = g0 + g1 * d + g2 * d * d
+    assert result.stages[-1].status is not None
+    assert gamma.min() >= 0.0
+    # the data did push: from 2 µs everywhere the width came down to its face
+    assert gamma.min() < 1e-3
+
+
+def test_the_gamma_rows_exist_only_on_a_bank_with_a_free_gamma():
+    """The builder's skip rules: no rows without a free γ coefficient, and no
+    rows on a constant-wavelength model; with γ free, one row per distinct d,
+    each satisfied at the start."""
+    from rietx.model.forward_tof import compile_tof_model
+    from rietx.optimize.least_squares import tof_gamma_inequalities
+
+    structure, instrument = silicon(), bank(gam0=2.0)
+    table = ParameterTable(structure, instrument)
+    model = compile_tof_model(structure, instrument, _blank_bank())
+    assert tof_gamma_inequalities(model, table, table.x0()) == []
+    table.set_vary(["instrument.source.profile_tof.gam*"], True)
+    model = compile_tof_model(structure, instrument, _blank_bank(),
+                              moving_paths=set(table.moving_paths))
+    (block,) = tof_gamma_inequalities(model, table, table.x0())
+    n_refl = len(model.phases[0].reflections.hkl)
+    assert 2 < block.T.shape[0] <= n_refl + 2
+    assert not block.violated(table.x0()).any()
+    # a model that is not a bank gets none, whatever the table frees
+    assert tof_gamma_inequalities(object(), table, table.x0()) == []
+
+
 def test_what_the_floor_actually_buys_is_the_sign_and_not_a_live_gradient():
     """The discriminating control: what the floor buys is the sign, not a
     revived gradient.

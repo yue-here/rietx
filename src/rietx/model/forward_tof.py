@@ -1407,7 +1407,15 @@ def compile_tof_model(structure: Structure, instrument: Instrument,
         # then broadens again).  So the coefficients keep their signs and the
         # *polynomial* is what has to be non-negative — exactly the
         # STEPHENS_STRAIN_NOT_POSITIVE cone/box distinction one arm over.
-        _require(n == 0 or np.all(gam >= 0.0),
+        # "Non-negative" read as the solver's own guards read a row's face
+        # (``optimize.lm._ON_FACE``: 1e-9 of the largest |γ| or of 1 µs), since
+        # a stage that the γ(d) ≥ 0 rows held on γ = 0
+        # (``optimize.least_squares.tof_gamma_inequalities``) hands back a
+        # rounding either side of it, and a strict test would refuse the
+        # closing compile of a fit that did what it was told.
+        from ..optimize.lm import _ON_FACE
+        gam_floor = -_ON_FACE * max(1.0, float(np.max(np.abs(gam))) if n else 0.0)
+        _require(n == 0 or np.all(gam >= gam_floor),
                  f"compile_tof_model(): γ(d) = gam0 + gam1·d + gam2·d² is "
                  f"negative somewhere in {d_lo:.4g}-{d_hi:.4g} Å "
                  f"(gam0={prof.gam0.value:g}, gam1={prof.gam1.value:g}, "
