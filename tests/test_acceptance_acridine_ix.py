@@ -433,7 +433,7 @@ def _draw_zoom(result, stem: str) -> None:
     from rietx.viz.plots import plot_result
 
     OUT.mkdir(exist_ok=True)
-    plot_result(result, path=str(OUT / f"{stem}_zoom.png"), two_theta_range=(6.5, 12.5))
+    plot_result(result, path=str(OUT / f"{stem}_zoom.png"), two_theta_limits=(6.5, 12.5))
 
 
 def _simulate(ref, result, pattern: rx.PatternData) -> tuple[rx.PatternData, Phase]:

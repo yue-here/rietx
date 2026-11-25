@@ -11,6 +11,7 @@ assuming — see :func:`require_two_theta`, which is how a 2θ-only path says no
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Literal
 
 import numpy as np
@@ -307,8 +308,9 @@ class PatternData(Base):
         return tree(self, order=("intensity", "sigma", "excluded_regions", "metadata"),
                     show_empty=True, head=head)
 
-    def plot(self, path: str | None = None, **kw):
-        """Draw the pattern: :func:`rietx.viz.plots.plot_pattern`, the peer of
+    def plot(self, path: str | Path | None = None, **kw):
+        """Draw the pattern, writing it to the file ``path`` when given:
+        :func:`rietx.viz.plots.plot_pattern`, the peer of
         :meth:`RefinementResult.plot`, forwarding ``**kw``; ``model=ref`` adds a
         :class:`~rietx.Refinement`'s reflection ticks and starting background
         before any fit, and names its radiation on the 2θ label."""

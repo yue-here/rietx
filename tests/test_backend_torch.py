@@ -324,7 +324,7 @@ def test_unknown_backend_still_rejected():
     from tests.test_backend_shim import _toy_base
 
     structure, ins, _ = _toy_base()
-    with pytest.raises(NotImplementedError, match="unknown backend"):
+    with pytest.raises(ValueError, match="unknown backend"):
         rx.Refinement(structure, ins, backend="cupy", history=False)
 
 
@@ -428,4 +428,4 @@ def test_mps_refine_matches_numpy_cell():
     OUT.mkdir(exist_ok=True)
     plot_result(res_mps, path=str(OUT / "srm676a_torch_mps_fit.png"))
     plot_result(res_mps, path=str(OUT / "srm676a_torch_mps_fit_lowangle.png"),
-                two_theta_range=(24.0, 30.0))
+                two_theta_limits=(24.0, 30.0))

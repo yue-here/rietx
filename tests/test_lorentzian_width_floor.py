@@ -93,7 +93,7 @@ def _draw(result, stem: str) -> None:
 
     OUT.mkdir(exist_ok=True)
     plot_result(result, path=str(OUT / f"{stem}.png"))
-    plot_result(result, path=str(OUT / f"{stem}_zoom.png"), two_theta_range=(21.0, 24.0))
+    plot_result(result, path=str(OUT / f"{stem}_zoom.png"), two_theta_limits=(21.0, 24.0))
 
 
 def test_y_has_no_floor_of_its_own():
