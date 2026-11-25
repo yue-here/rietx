@@ -83,7 +83,7 @@ An esd measures how well this model fixes the scales against this pattern, and i
 
 ## Mole fractions
 
-A mole fraction comes from the same scales as the weight fraction.
+A mole fraction comes from the same scales as the weight fraction, as in {eq}`corr-qpa-mole`.
 W<sub>p</sub> ∝ S<sub>p</sub>·(Z·M)<sub>p</sub>·V<sub>p</sub>, so dividing by the cell mass leaves S<sub>p</sub>·V<sub>p</sub>, the number of unit cells, with no mass in it.
 `PhaseQuantity.mole_fraction` is that number renormalised, counted in unit cells, and it is reported wherever the weight fraction is.
 `PhaseQuantity.mole_fraction_formula_unit` multiplies by Z and counts formula units, which is what reaction stoichiometry and phase diagrams use.
