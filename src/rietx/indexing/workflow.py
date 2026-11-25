@@ -823,6 +823,7 @@ def index_pattern(peaks: PeakList | None = None, *,
     cannot read raises before peaks are picked.  The result records the formula
     and temperature read (:attr:`~rietx.schemas.indexing.IndexingResult.formula`).
     """
+    from .._nearmiss import check_choice
     from ..history.events import as_event_stream
     from ..optimize.cancel import RefinementCancelled
     from ..refine import _VERSION, _utcnow
@@ -853,6 +854,11 @@ def index_pattern(peaks: PeakList | None = None, *,
     from .pick import pick_peaks
     from .quality import assess_peak_list
 
+    # the choices first, before a peak is picked (WP-2302)
+    if preset is not None:
+        check_choice("preset", preset, SEARCH_PRESETS)
+    for name in engines or ():
+        check_choice("engines", name, engine_names())
     if formula is not None:
         from ..crystallography.atomic_volume import formula_unit_volume
 
@@ -873,9 +879,6 @@ def index_pattern(peaks: PeakList | None = None, *,
         peaks = pick_peaks(data, instrument)
     spec = spec or SearchSpec()
     preset_name = DEFAULT_SEARCH_PRESET if preset is None else preset
-    if preset_name not in SEARCH_PRESETS:
-        raise ValueError(f"unknown search preset {preset_name!r}; "
-                         f"available: {', '.join(SEARCH_PRESETS)}")
     ran_preset = preset_name
     if spec.total_budget_seconds is None:
         ceiling = SEARCH_PRESETS[preset_name]

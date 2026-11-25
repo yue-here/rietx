@@ -123,18 +123,18 @@ heuristic, so `_audit` gains no row.
 
 ## Tasks
 
-- [ ] `mode` checked on entry in every public call that takes it, through one helper with
+- [x] `mode` checked on entry in every public call that takes it, through one helper with
   `refine_multi`'s message form; `Refinement.parameters(mode=)` refuses too.
-- [ ] Survey the other choice arguments: list which refuse at the call today, and check the
+- [x] Survey the other choice arguments: list which refuse at the call today, and check the
   rest against their registry on entry.
-- [ ] M1: `tests/test_api_choices.py`, registry-driven, `compile_model` patched; the CLAUDE.md
+- [x] M1: `tests/test_api_choices.py`, registry-driven, `compile_model` patched; the CLAUDE.md
   Invariants entry.
 - [ ] `two_theta_range` → `two_theta_limits` on the four calls that request a window; the
   docstrings state the describe/request split; the two schema fields measured against it.
   Manual, skill, examples and GUI callers follow.
 - [ ] Each `path` argument says which it is, in its type and its docstring's first mention.
 - [ ] Measure the "how many" family and rename only where two names count the same thing.
-- [ ] Tests for each refusal (the message names the argument; no compile reached).
+- [x] Tests for each refusal (the message names the argument; no compile reached).
 - [ ] Skill: none expected. The refusals name their own fix, and the renamed arguments reach
   the generated `api.md`. Re-check at handover.
 

@@ -142,7 +142,7 @@ def test_unknown_backend_rejected():
     with pytest.raises(ValueError, match="unknown backend"):
         resolve_backend("cupy")
     structure, ins, _ = _lab_state()
-    with pytest.raises(NotImplementedError, match="unknown backend"):
+    with pytest.raises(ValueError, match="unknown backend"):
         rx.Refinement(structure, ins, backend="cupy", history=False)
 
 

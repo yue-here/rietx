@@ -2959,9 +2959,9 @@ def test_argument_validation(thermal_patterns):
     seq = SequentialRefinement(structure, ins)
     with pytest.raises(ValueError, match="at least one pattern"):
         seq.fit([])
-    with pytest.raises(ValueError, match="refit must be"):
+    with pytest.raises(ValueError, match="unknown refit .nope.; refit takes"):
         seq.fit(thermal_patterns[:1], refit="nope")
-    with pytest.raises(ValueError, match="direction must be"):
+    with pytest.raises(ValueError, match="unknown direction .sideways.; direction takes"):
         seq.fit(thermal_patterns[:1], direction="sideways")
     with pytest.raises(ValueError, match="x has 2 entries"):
         seq.fit(thermal_patterns[:1], x=[1.0, 2.0])

@@ -46,7 +46,7 @@ from .io.formats.gsas import _first_bank_number
 from .io.readers import identify_format, read_pattern, reader_options_for
 from .optimize.least_squares import DEFAULT_SOLVER
 from .refine import _VERSION, Refinement
-from .schemas.common import Diagnostic, Mode
+from .schemas.common import Diagnostic, Mode, check_mode
 from .schemas.history import NodeAction
 from .schemas.instrument import Instrument
 from .schemas.migrate import migrate_document_text
@@ -154,6 +154,7 @@ class Project:
         depending on which scan was chosen, and neither the bytes nor the
         fingerprint can say which that was.
         """
+        check_mode(mode)
         root = Path(path)
         src = Path(pattern)
         if (root / PROJECT_JSON).exists():

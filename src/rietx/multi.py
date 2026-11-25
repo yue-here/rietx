@@ -30,6 +30,7 @@ from contextlib import contextmanager
 import numpy as np
 
 from . import runs
+from ._nearmiss import check_choice
 from .backend.api import backend_dtype_note
 from .crystallography.structure_factor import phase_orbit_split
 from .crystallography.twins import merge_site_twins
@@ -168,7 +169,7 @@ from .refine import (
 )
 from .report.magnetic import moment_angle_stationary_diagnostics
 from .report.schemas import THRESHOLDS_VERSION
-from .schemas.common import Diagnostic, Parameter, Provenance
+from .schemas.common import Diagnostic, Parameter, Provenance, check_mode
 from .schemas.instrument import Instrument
 from .schemas.parametric import (
     CoordinateTable,
@@ -1514,16 +1515,10 @@ class MultiHistogramRefinement:
                  parametric: list[ParametricEquation] | None = None,
                  variables: dict[str, Parameter] | None = None,
                  backend: str = "numpy", solver: str = DEFAULT_SOLVER):
-        if backend != "numpy":
-            from .backend import resolve_backend
+        from .backend.api import check_backend
 
-            try:
-                resolve_backend(backend)  # fail fast with the install hint
-            except ValueError as exc:
-                raise NotImplementedError(str(exc)) from exc
-        if solver not in SOLVERS:
-            raise ValueError(f"unknown solver {solver!r}; "
-                             f"available: {', '.join(SOLVERS)}")
+        check_backend(backend)
+        check_choice("solver", solver, SOLVERS)
         self._backend = backend
         self._solver = solver
         instruments = list(instruments)
@@ -1655,6 +1650,8 @@ class MultiHistogramRefinement:
         ``set_values`` on the joint fit are not built (#1205's ruling), and the
         plan's globs are how a joint fit frees a row.
         """
+        if mode is not None:
+            check_mode(mode)
         if mode is None:
             mode = self.result_.mode if self.result_ is not None else "rietveld"
         mt = self.mtable

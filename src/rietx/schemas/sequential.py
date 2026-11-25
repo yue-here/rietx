@@ -25,6 +25,7 @@ from typing import ClassVar, Literal
 
 from pydantic import Field, model_validator
 
+from .._nearmiss import check_choice
 from ..report.schemas import MomentEvidence
 from .common import Base, Diagnostic, Mode, Provenance
 from .results import (
@@ -1157,9 +1158,7 @@ class SeriesResult(Base):
         empty rather than zero.  Patterns missing the phase are skipped, not
         filled, for :meth:`trajectory`'s reason.
         """
-        if metric not in ("r_bragg", "r_f"):
-            raise ValueError(
-                f"metric must be 'r_bragg' or 'r_f', got {metric!r}")
+        check_choice("metric", metric, ("r_bragg", "r_f"))
         traj = Trajectory(path=f"{metric}.{phase}", x_label=self.x_label,
                           phase=phase)
         for i, (e, xv) in enumerate(zip(self.entries, self.x, strict=True)):

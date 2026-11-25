@@ -324,7 +324,7 @@ def test_unknown_backend_still_rejected():
     from tests.test_backend_shim import _toy_base
 
     structure, ins, _ = _toy_base()
-    with pytest.raises(NotImplementedError, match="unknown backend"):
+    with pytest.raises(ValueError, match="unknown backend"):
         rx.Refinement(structure, ins, backend="cupy", history=False)
 
 
