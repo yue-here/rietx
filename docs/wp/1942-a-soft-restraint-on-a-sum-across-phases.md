@@ -1,6 +1,6 @@
 # WP-1942 — a soft restraint on a sum of parameters across phases
 
-Milestone: unscheduled · Status: 🔄 2026-11-17 — all tasks built; PR #1642 awaits its fast suite
+Milestone: unscheduled · Status: 🔄 2026-11-17 — all tasks built; PR #1642 in review
 Track: Coming from another code
 Depends on: —
 Priority: P3 2026-10-11 — a named user has waited since 2026-09-01; a variable, a tie and a value restraint cover it today, clumsily
@@ -108,6 +108,20 @@ result, which records measurements only. The same rule binds the ratio
 helper here: the declared ratio is an input, and no result field stores it
 as if measured.
 
+**The reporter's answers to task 1's two questions** (from the 2026-10-13
+triage, #212; posted 2026-10-12). (1) The row lives on
+`Structure.restraints`: a row over several phases has no single owner, and
+in one phase's list it dangles when phases are removed or reordered or the
+phase is copied into a structure where its paths do not resolve; the
+per-phase union stays for rows inside one phase. (2) It is an item inside
+the `soft_restraint` block, not a new `BLOCK_ORDER` entry:
+r = (Σ aᵢ·pᵢ − t)/σ is `ValueRestraint`'s form generalised to (path,
+coefficient) pairs, with the same χ² term and `RESTRAINT_TENSION`
+reporting. Checked against the tree at c3d0367: `_Value`
+(`model/restraints.py:100`) holds one `path` and the block makes one row
+per item (`CompiledRestraints.n_rows`), so the item shape fits without a
+new block. Task 1 records the maintainer's decision.
+
 **What WP-1912 left to reuse** (from the 2026-10-13 triage, #727). The
 floating-origin centroid landed without this item, as a row block of its own
 (`origin_restraint`, `model/origin.py`), because its restraint has no σ and
@@ -156,12 +170,13 @@ carries no closing keyword by design, so #212 is closed by hand once
       *Decided 2026-10-13 (the maintainer, through the issue triage; #212):*
       the row lives on `Structure.restraints`, and it is an item kind inside
       the `soft_restraint` block, not a new `BLOCK_ORDER` entry: the
-      reporter's answers in § Inherited, taken as written.
+      reporter's answers in § Context, taken as written.
 - [x] The schema type, (path, coefficient) pairs plus target, σ and weight,
       with its JSON round-trip and the `SCHEMA_VERSION` or project-format
       bump it needs. *Done 2026-11-17:* `LinearRestraint` (`terms` as
       `TieSpec.terms` stores them) on `Structure.restraints`, additive under
-      the open 0.61 (no bump; its note in `schemas/common.py`); carried and
+      the open 0.62 (no bump; its note is `docs/contracts/schema.md`'s
+      "Also in 0.62 (WP-1942)"); carried and
       renumbered through `carry_restraints` like a phase's own list.
 - [x] Compile, residual and analytic partials; the geometry-esd path
       handles or excludes it; `summarise_restraints` and
@@ -171,7 +186,7 @@ carries no closing keyword by design, so #212 is closed by hand once
 - [x] The elemental-ratio helper: coefficients from `element_counts` and
       cell volumes, σ stated on the ratio, and a report when a stage frees
       an occupancy of a phase in the row.
-- [x] The three #349 exports from § Inherited (now in Context). *Done
+- [x] The three #349 exports from § Context. *Done
       2026-11-17 (a lane):* `PhaseQuantity.element_counts`,
       `QuantitativePhaseAnalysis.weight_fraction_covariance` (phase order,
       `None` where an esd is, rows summing to zero) and
@@ -186,8 +201,9 @@ carries no closing keyword by design, so #212 is closed by hand once
       worked ratio); Part 2 the row's equation with its *Source* line.
       *Done 2026-11-17:* the manual has moved, so Part 1 is
       `guides/restrain.md` § Restrain a sum across phases and Part 2
-      `theory/parameterisation.md`'s `par-linear-restraint` and
-      `par-ratio-restraint`.
+      `theory/restraints.md`'s `par-linear-restraint` and
+      `par-ratio-restraint` (their own page since ffdb353e9, when
+      `theory/parameterisation.md` crossed its size cap on the merged tree).
 - [x] Skill: a reference row for the new restraint kind and the ratio
       helper, keyed by their names. *Done 2026-11-17:* one
       `references/diagnostics.md` row, keyed by `LINEAR_RESTRAINT_STALE`,
@@ -270,16 +286,18 @@ the declared ratio is wrong by 5σ.
   where the data measure the partition (Cu, Ni on their own cells). The three
   #349 exports landed too.
   - *Done:* `LinearRestraint` on `Structure.restraints` (open schema 0.61, no
-    bump); `_Linear` in the soft-restraint block keyed `restraints.<k>`, with
-    the cross-backend row `toy_linear` (numpy and jax agree); carried through
-    edits by the phase list's place rule; `elemental_ratio_restraint`
+    bump; *0.62 once main's WP-2107 bump merged in, its note in
+    `docs/contracts/schema.md`*); `_Linear` in the soft-restraint block
+    keyed `restraints.<k>`, with the cross-backend row `toy_linear` (numpy
+    and jax agree); carried through edits by the phase list's place rule; `elemental_ratio_restraint`
     (`model/restraints.py`) and `LINEAR_RESTRAINT_STALE` (read off the values
     against the row's declared `occupancies`, so an earlier stage or a series
     carry is seen); `PhaseQuantity.element_counts`,
     `QuantitativePhaseAnalysis.weight_fraction_covariance`,
     `FitReport.unidentified_phase` (a lane); manual `guides/restrain.md` and
     `theory/parameterisation.md` (`par-linear-restraint`,
-    `par-ratio-restraint`); skill row in `references/diagnostics.md`.
+    `par-ratio-restraint`; *moved to `theory/restraints.md` in ffdb353e9*);
+    skill row in `references/diagnostics.md`.
   - *Review:* a read-only reviewer found four bugs (a row deleted in an edit
     that renumbers phases was silently re-read; a trailing phase removed
     refused the edit; the stale check saw only the last stage; a misspelt
