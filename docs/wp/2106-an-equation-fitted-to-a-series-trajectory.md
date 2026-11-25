@@ -1,7 +1,8 @@
 # WP-2106 — an equation fitted to a series trajectory
 
-Milestone: parametric · Status: ✅ 2026-11-09 — rx.fit_trajectory and the .gpx's stored equations; follow-ups on #1489
+Milestone: parametric · Status: 🔄 2026-11-25 — every task landed on #1491 (rx.fit_trajectory, the .gpx's stored equations, the manual, the API index); in review, follow-ups on #1489
 Depends on: 1964 (the grammar and its derivative rules)
+Priority: P2 2026-11-04 — a feature the open milestone was opened for: this is how a GSAS-II user works, and nothing else in the milestone serves them
 
 ## Goal
 
@@ -78,12 +79,12 @@ its code. Any reader takes the stored format from a file's contents.
   GSAS-II tutorials' `steel.gpx`.)
 - [x] Manual: `guides/equation.md` beside the joint route, and `switching/gsas2.md`.
   (`guides/equation.md` § Fit the equation to the series trajectory, run by
-  `examples/guides/equation.py`; the reference halves are `reference/parametric.md` § An
-  equation fitted to a trajectory and `reference/foreign-models.md` § Equations stored
+  `examples/guides/equation.py`; the reference halves are `reference/trajectory.md`, An
+  equation fitted to a trajectory, and `reference/foreign-models.md` § Equations stored
   with a sequential fit.)
-- [x] Skill: the series reference's row. (The joint-fit row of `references/series.md`
-  names `rx.fit_trajectory` as the line through a chain, inside the file's budget;
-  `fit_trajectory` joins the API index's series section.)
+- [x] Skill: the series reference's row. (`references/series.md` is unchanged, being at
+  its budget; `references/api.md`'s series section names `fit_trajectory` instead, in its
+  lead sentence and as a row of the API index.)
 
 ## Acceptance
 
@@ -98,6 +99,18 @@ its code. Any reader takes the stored format from a file's contents.
 - WP-1964 (the grammar), WP-1325 (the joint fit), WP-1051 (quarantine).
 
 ## Handover log
+
+- **2026-11-25 (the maintainer's review of #1491, items 1-7)** — The WP is open again: closing
+  it is the maintainer's, after the merge. `TrajectoryVariable.at_bound` is `None` on every
+  variable, since scipy's active set reads proximity and the package's test asks whether the
+  limit carried load; the load test is #1489, item 5. `TrajectoryFit` and `TrajectorySkip`
+  join `_audit.RECORD_SCHEMAS`, with `skipped` and `TrajectorySkip.reason` at tier 1 as the
+  review proposed. A stored coefficient that is not finite refuses its own equation by name.
+  `pi()`, as GSAS-II writes it, lowers to `pi`, and a bare `pi` is refused. Stored equations
+  that name one variable, which GSAS-II fits as one, are read one by one and
+  `Gsas2SequentialEquation.shared` names the labels, with a `GSAS2_GPX_ITEM_NOT_READ` warning
+  naming the variable and the equations. The pointers above now name `reference/trajectory.md`
+  and `references/api.md`, and the note this branch had put into closed WP-2101 is dropped.
 
 - **2026-11-09 (a ghostshift runner, closing)** — The checklist is done and the WP closes.
   After a series, a user can now fit an equation to one parameter's trajectory, weighted by
@@ -131,9 +144,9 @@ its code. Any reader takes the stored format from a file's contents.
     evaluating the same text. GSAS-II's `sin`/`cos`/`tan` are taken as degree functions on
     `docs/practice.md`'s record; no GSAS-II source was opened. Manual:
     `guides/equation.md` § Fit the equation to the series trajectory,
-    `reference/parametric.md` § An equation fitted to a trajectory, `reference/foreign-models.md`
-    § Equations stored with a sequential fit, `switching/gsas2.md`. Skill: the joint-fit row
-    of `references/series.md` and the API index's series section.
+    `reference/trajectory.md` (An equation fitted to a trajectory), `reference/foreign-models.md`
+    § Equations stored with a sequential fit, `switching/gsas2.md`. Skill: the series section
+    of `references/api.md`, its lead sentence and the API index row.
   - *Measured* (`[dev]`, darwin/arm64). `2106-measure/trajectory_vs_joint.py` and its
     results file: twenty seeds of the guides' seven-pattern LaB₆ ramp, each run as a chain
     both ways and as one joint fit of the same expression. Largest gap between the
@@ -148,7 +161,8 @@ its code. Any reader takes the stored format from a file's contents.
     review fixes, 14386 passed, 415 skipped, 32 xfailed and 2 failed in 15:35. Both
     failures were `reference/series.md` over the manual's 50 000-character page cap,
     after this branch's section on it; the section moved to `reference/parametric.md` in
-    the next commit, and the page is now byte-identical to main. On the final tree the
+    the next commit and then to its own page, `reference/trajectory.md`, since
+    `parametric.md` would pass the cap too; `reference/series.md` is byte-identical to main. On the final tree the
     touched files re-ran green: `test_trajectory_fit.py`, `test_projects_gsas2.py`,
     `test_manual_api.py`, `test_audit_table.py` and `test_skill.py` (378 passed),
     `test_manual.py` and `test_reference_pages.py` (112 with `test_manual_api.py`),
@@ -236,9 +250,9 @@ its code. Any reader takes the stored format from a file's contents.
     milestone's `.gpx` row (no GSAS-II install was at hand, so the refusals are tested on
     pickles of the same layout), evaluating a `TrajectoryFit` at a coordinate, a
     pseudo-variable dependent, and GSAS-II's own table as a trajectory.
-  - *Overlap.* WP-2101 owns `switching/gsas2.md`'s GSAS-II sequential section and the skill's
-    series rows too; its `### Inherited` names what this branch wrote there. No 2101 or 2103
-    branch was on origin at the start.
+  - *Overlap.* WP-2101 owned `switching/gsas2.md`'s GSAS-II sequential section and the skill's
+    series rows too, and closed on 2026-11-19 with every task done, so no note goes into it.
+    No 2101 or 2103 branch was on origin at the start.
   - PR #1491. Next: the maintainer's ruling on the four names; then issue #1489's first
     item closes the milestone's `.gpx` row.
 

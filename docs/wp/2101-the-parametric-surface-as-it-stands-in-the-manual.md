@@ -46,15 +46,6 @@ Measured on 2026-11-03, on a seven-pattern synthetic LaB₆ ramp and by reading 
   `mtable.tables[h].entries`, where `.parameters()` is the public answer.
   *Superseded 2026-11-19:* it names `.parameters()`.
 
-- **From WP-2106 (2026-11-09): GSAS-II's fit afterwards has a call now, and a section
-  says so.** `switching/gsas2.md` § A parametric equation is fitted with the patterns
-  names `rx.fit_trajectory` as GSAS-II's fit to the sequential table, and
-  `Gsas2Model.sequential_equations` as where a `.gpx`'s stored equations arrive, with a
-  worked call. This WP's task on `switching/gsas2.md` and GSAS-II's "parametric fit
-  afterwards" builds on that section rather than writing a second. The skill's series
-  reference names `fit_trajectory` in its joint-fit row, and that file sat 1 B under its
-  budget after it.
-
 ## Non-goals
 
 - Anything WP-1964 adds. Its Manual task extends these pages with the grammar and a
