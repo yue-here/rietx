@@ -1,6 +1,6 @@
 # WP-2228 — A reflection centred past the range end keeps its tail
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-25 — claimed by @yue-here (ghostshift runner)
 Track: What fires, and what stays silent
 Depends on: 2222 (the closing stage off by default); 2075 soft (the report half: a reflection straddling a range end)
 Priority: P2 2026-11-19 — a silent wrong answer on a path few fits take: a default Le Bail cell 7-15 esd off, reported `converged`, where a strong reflection sits just past the data's end
