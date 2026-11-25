@@ -60,9 +60,9 @@ result = ref.fit(data, plan=plan, two_theta_limits=(15, 130))
 
 ```text
 >>> result.status, round(result.statistics.rwp, 4)
-('converged', 0.0898)
+('converged', 0.0893)
 >>> [(s.name, len(s.freed)) for s in result.stages]
-[('background', 7), ('cell', 3), ('profile', 5), ('atoms', 19), ('closing', 34)]
+[('background', 7), ('cell', 3), ('profile', 5), ('atoms', 19)]
 ```
 
 The two axial-divergence terms are set by hand, where an `.instprm` would supply `SH/L`.
@@ -71,8 +71,30 @@ This plan frees U, V and W, which the [validation protocol](validation.md#fluora
 A name in `turn_on` is a parameter path, and `*` stands for any text at that place.
 `phases.*.cell.*` is every lattice parameter of every phase.
 Staging is cumulative, so the cell stays free in the profile and atom stages.
-The fit ends with a closing stage, which frees all 34 parameters again with wider peak windows ([The closing stage](../reference/refinement.md#the-closing-stage)).
+The fit ends with the last stage, `atoms`.
+A plan can add a closing stage that frees all 34 parameters again on tighter peak windows, and this one does not ([The closing stage](../reference/refinement.md#the-closing-stage)).
 [About a fit](../concepts/fit.md#the-plan) describes the stages, and the [plan presets](../reference/plans.md) draw the ones rietx ships.
+
+### A sequential refinement is a chain
+
+GSAS-II refines the histograms a sequential refinement selects one after another, with one set of refinement flags for all of them.
+rietx does the same with `rx.refine_sequential` ([Sequential refinement](../reference/series.md)).
+Each GSAS-II control has a rietx argument:
+
+| GSAS-II | rietx |
+| --- | --- |
+| the histograms selected for the sequential refinement, in order | `rx.refine_sequential(patterns, structure, instrument, x=temperatures, x_label="T (K)")`, in the order of `patterns` |
+| the refinement flags, the same for every histogram | `plan=`, run whole on the first pattern |
+| Copy results to next histogram? | the default, `carry=["*"]`: each pattern starts from the one before |
+| the same box cleared, each histogram from the project's values | `carry=[]` with `refit="stages"`: each pattern starts from the starting models and walks the whole plan. GSAS-II starts a histogram's phase parameters from its own earlier sequential result when one is stored, and rietx keeps none between runs |
+| Reverse order? | `direction="backward"`. `direction="both"` runs both orders and lists each parameter's gap between them in `SeriesResult.direction_gaps` |
+| the sequential results table | `series.to_table(paths=[...])` and `series.write_csv(path)`; `series.trajectory("phases.0.cell.a")` for one column |
+| a pseudo-variable over the table's columns | a derived path such as `qpa.<phase>` in `to_table`; other expressions have no rietx counterpart with an esd |
+
+After the first pattern, rietx collapses the plan into one stage by default (`refit="single"`), since a converged neighbour is a good start.
+GSAS-II refines every histogram with its whole set of flags at once.
+`refit="stages"` walks the whole plan on every pattern.
+On three patterns of a synthetic LaB₆ ramp, `carry=[]` with `refit="stages"` took 107 iterations against 68 for the default, and both gave the same lattice parameters to 10⁻⁶ Å.
 
 ### A parametric equation is fitted with the patterns
 
@@ -127,17 +149,17 @@ rx.write_gsas2_instprm(ref.fitted_instrument, "refined.instprm")
 Type:PXC
 Lam1:1.54059
 Lam2:1.54443
-Zero:-0.0365586
+Zero:-0.0365483
 I(L2)/I(L1):0.5
 Polariz.:0.5
-U:-1.57826
-V:2.76475
-W:2.37759
-X:2.68762
-Y:4.11637
+U:-1.57858
+V:2.93235
+W:2.29048
+X:2.74538
+Y:3.9936
 ```
 
-The `.instprm` states U = −1.57826 centidegrees², and rietx's own value is −0.000875173 degrees².
+The `.instprm` states U = −1.57858 centidegrees², and rietx's own value is −0.000875351 degrees².
 `rx.read_gsas2_instprm` reads the file back and converts.
 
 GSAS-II states one axial divergence, `SH/L`, as the sum of the specimen and detector terms.

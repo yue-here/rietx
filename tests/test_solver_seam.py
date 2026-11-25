@@ -13,6 +13,7 @@ import pytest
 
 from rietx import Instrument, MultiHistogramRefinement, Refinement, refine
 from rietx.optimize.least_squares import SOLVERS
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
 from tests.test_refine_synthetic import (
     TRUE_A,
     TRUE_ZERO,
@@ -379,6 +380,8 @@ def test_stage_ftol_reaches_the_solver_and_only_its_own_stage(pattern, monkeypat
     structure, instrument = perturbed_models()
     plan = rx.RefinementPlan.mccusker_default()
     plan.stages[1].ftol = 1e-4
+    # declared, not inherited: off by default since WP-2222
+    plan.closing_window_tol = CLOSING_WINDOW_TOL
     refine(pattern, structure, instrument, plan=plan, solver=solver)
 
     assert {c["driver"] for c in calls} == {solver}

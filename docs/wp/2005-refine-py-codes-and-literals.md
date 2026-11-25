@@ -1,6 +1,6 @@
 # WP-2005 — `refine.py`'s codes and its inline literals
 
-Milestone: generality · Status: 🔄 2026-11-09 — part 1 (the inventory, no tiers) in PR #1486; part 2 waits on the maintainer's answer on the gate after 2004
+Milestone: generality · Status: 🔄 2026-11-21 — 44 of 75 codes tiered; the other 31 answered in `2005-batch/rulings.md` (9 settled by Claude, 19 consent lines and 1 brief for the maintainer, 2 for Mike), nothing approved yet
 Track: The audits
 Depends on: 2002
 Priority: P3 2026-10-23 — 2002 closed, its last item touching no code here; codes, not actions; a verdict here is a flag the caller reads, and the workaround is to read past it
@@ -126,8 +126,13 @@ its tier.
       reasons in `2005-batch/judgements.json`; the 4 thresholds in `refine.py` wait for
       their tiers, since a new constant enters the table tiered. The fifth threshold
       refuses a Chebyshev scan in `background/select.py` and gates no code, so it stays.
-- [ ] Tier each code per part, with evidence and families.
-- [ ] The batch to the maintainer; rulings dated into the table.
+      *2026-11-17:* 32 tier-1 literals now (three new counts in `_owner_words`). Each of
+      the 4 thresholds waits on its code's ruling in `2005-batch/batch.md`, since a code
+      that goes takes its literal with it.
+- [ ] Tier each code per part, with evidence and families. *2026-11-17:* 44 of 75 tiered
+      (33 this session); the other 31 need a ruling (`2005-batch/batch.md`).
+- [ ] The batch to the maintainer; rulings dated into the table. *2026-11-17:* written,
+      `2005-batch/batch.md`; no ruling yet.
 - [ ] Approved demotions: `level` to `info`, or, where the threshold was the trigger, the
       code replaced by an `info` record with no threshold that states the number (the
       record § Demotion); the explanation's observation sentence updated where the verdict
@@ -152,6 +157,93 @@ its tier.
 - `docs/milestones/generality.md`; WP-1985; WP-1076 (a declared name is a claim).
 
 ## Handover log
+
+- **2026-11-21** — the batch's 31 codes answered, docs only (ghostshift runner, unattended, a
+  rulings job). The maintainer asked for the clear calls to be ruled and only the hard ones
+  brought to him. `2005-batch/rulings.md` holds the answers. Nine are settled by Claude, most
+  of them by sending a tier-3 threshold back for its three-family measurement before
+  approval. Nineteen wait on him as one-line consent lines, because each changes what a
+  reader receives or needs a tier-3 approval. `HIGH_CORRELATION` has a full brief, because
+  the agent skill's body rule 7 tells an agent to act at 0.98 and the record's judgement
+  ground says a warning needs every refiner to act. The two magnetic codes are Mike's, with a
+  question drafted for #1075. Nothing is approved, and no `src/`, `tests/` or `_audit.py` line
+  changed.
+  *Settled for the next session*: Questions E and F (`rulings.md`). Two premises in
+  `batch.md` were wrong. McCusker et al. (1999) is in the maintainer's Zotero library, and §§
+  2 and 9 confirm 5 steps per FWHM and 3 and 5 observations per parameter. Under
+  `ROUGHNESS_OUTSIDE_REGIME`, half of sin θ_min is the turnover of Pitschke's u(1 − u), so it
+  is not rietx's own number.
+  *Measured*: a correct model of flat Poisson data reads Rwp above `MODEL_FAR_FROM_DATA_RWP`
+  (0.8) below about 0.65 counts per step under √max(y,1) weights (numpy simulation, 2-4 × 10⁵
+  draws per point).
+  Next: the maintainer answers the 19 consent lines and the `HIGH_CORRELATION` brief, and
+  approves posting the question to Mike. Then the next session lands what he approves, runs
+  the measurements the settled rows ask for, and tiers the rows they free.
+
+- **2026-11-17** — part 2, the tiers, in PR #1638 (ghostshift runner, unattended).
+  Ruled by Yue, 2026-11-16 (decision walk): run 2005-2007 now under the gate as written.
+  44 of this WP's 75 codes now carry a tier in the audit table, 33 of them from this session.
+  Each of the 33 reports an act or a fact: a declared correction that could not run, a
+  negative variance, a zero column, a sum of scales at zero, a value on a limit. The other 31
+  need the maintainer, and `2005-batch/batch.md` sorts them by the gate's two questions. Asked
+  first whether the package should make the call at all, 12 of the 75 fail (16 %): a named,
+  competent refiner would quote the number anyway, so the warning should go and the number
+  stay. Nothing a reader receives has changed yet, and no code was demoted, lifted or split.
+  *Done*: 30 code rows at tier 1, 2 at tier 2 (`ABSORPTION_MU_R_OUT_OF_RANGE`,
+  `BRINDLEY_OUTSIDE_REGIME`), 1 caller (`HOLD_BLOCKED_PLAN`, matching its action row); 23
+  suggestion rows; responses for eight `info` codes. `batch.md` holds classes A (12 fail Q1),
+  B (9 pass Q1, threshold to approve or measure), C (4 with a threshold between two levels),
+  D (2 magnetic, for Mike) and E (4 whose tier waits on a convention or another row), plus
+  questions A-F. The inventory is re-collated (75 codes; the new `PARENT_STRAIN_HELD` and
+  three `_owner_words` counts added to `judgements.json`). WP-2004's `### Inherited` names
+  the two of its rows that hold a code of this WP.
+  *Settled by Claude, 2026-11-17*, most important first:
+  1. A code stating a tiered threshold's outcome takes tier 1 for its own part, the threshold
+     keeping its row (`BOUND_HIT`, `FLOOR_HIT`, `BACKGROUND_ORDER_AT_CAP`). Grounds: the
+     `STAGE_SLOW_DESCENT` row, and the thresholds' approved rows say they report through these
+     codes. Alternative: inherit the threshold's tier 3. The general rule is Question E.
+  2. Warning responses withdrawn. Grounds: `tests/test_silence.py` needs a silence pair for
+     each, and the reader-output ruling may reach them (Question F). Alternative: build 23
+     pairs here.
+  3. `RESOLUTION_NOT_POSITIVE` keeps no response. Grounds: the reader-output rule; it would
+     change the standard fit's line from "warning under every purpose" to "microstructure,
+     calibration".
+  4. `ABSORPTION_ESTIMATE_UNAVAILABLE` and `MICROABSORPTION_SKIPPED` at tier 1, not caller.
+     Grounds: the record's caller test (the package decides to skip), and the caller tier is
+     no catchall (ruled 2026-10-21). Alternative: caller, since both inputs are opt-in.
+  5. `HOLD_BLOCKED_PLAN` at caller. Grounds: `StageResult.blocked_by_hold`'s caller row; the
+     package's one `hold()` call sits under an opt-in flag (`strategy/magnetic.py:1369`).
+  *Measured* (darwin arm64, `.venv` `[dev]`, Python 3.12): fast selection (`-m "not slow"`, `-n auto` through the Mac suite lock): 14 681 passed, 433 skipped, 32 xfailed, 4 errors in 642 s. The 4 errors are `tests/test_gui_dist.py`'s wheel build failing a DNS lookup of pypi.org for hatchling, a network fault; the same four passed on this session's first run (14 684 passed, 1 failed: the silence-pair test, since fixed). The branch adds no test, and 14 685 tests ran both times.
+  `tests.reader_output`: unchanged (exit 0). `tests.audit_delta`: exit 0. CI's lint steps as
+  CI runs them: ruff clean, `ruff format --check examples/tutorials` clean, Vale 0 errors.
+  *Review*: `/code-review` was not run. The diff's only code is table data, and a ghostshift
+  runner cannot point the command at its worktree. The generality judge read every row
+  instead. Its findings were all taken, in commit `984c6c56b`: six rows went back to the
+  batch (class E, and `DATA_SUPPORT_LOW` and `LEBAIL_ALTERNATION_STOPPED` to class C),
+  `WAVELENGTH_CALIBRATION`'s sentence stopped asking for an act, `PAWLEY_OFF_DATA_RIDGED` lost
+  its response, `STAGE_MAX_ITER.suggestion` went back to unaudited, and `HOLD_BLOCKED_PLAN`
+  names the magnetic call. Its report also found the silence-pair gap, which the first fast
+  run confirmed (1 failed, `test_every_code_declared_a_warning_has_a_silence_pair`).
+  *Generality* (the judge's verdicts in short; the report is in the session):
+  `BOUND_HIT`, `FLOOR_HIT`, `BACKGROUND_ORDER_AT_CAP` hold; `MODEL_FAR_FROM_DATA` and
+  `PHASE_UNCONSTRAINED` fail as tier 1 (the `CELL_RUNAWAY` shape applies; author: agreed,
+  reverted to the batch); `PAWLEY_OFF_DATA_RIDGED`, `LEBAIL_ALTERNATION_STOPPED`,
+  `SPECIES_FALLBACK_NEUTRAL`, `WAVELENGTH_CALIBRATION`, `PATTERN_UNDERSAMPLED` and
+  `STAGE_MAX_ITER.suggestion` weak (each fixed or reverted as above); the two tier-2 citations
+  and `DATA_SUPPORT_LOW` hold, the last conditionally; the other tier-1 rows and suggestions
+  hold. The silence-pair finding "fails on the test, by reading" (author: the responses were
+  withdrawn).
+  *Not done, on purpose*: `### Inherited` is not pruned, since PR #1480 (WP-2075) still adds
+  an entry there. No demotion, split or lift: each changes what a reader receives or waits on
+  its code's ruling. `generality.md` is untouched (another branch records the ruling).
+  *Gotchas*: a warning or error response needs a silence pair in `tests/silence.py`. A
+  response also moves `summary()` for every fit that raises the code, which one probe fit
+  cannot show. `rows.py` and `rows2.py` in the runner's scratch dir generated the rows; they
+  are not in the tree.
+  Next: the maintainer answers questions A-F in `2005-batch/batch.md`, and Mike class D. Then,
+  in order: land the approved demotions with their help sentences and release notes; split
+  the class-C codes; lift any surviving inline literal with a bit-identity check; give the 23
+  warnings their responses with a silence pair each, if Question F allows.
 
 - **2026-11-09** — part 1, the inventory, in PR #1486 (ghostshift runner, unattended).
   WP-2005 now has a measured inventory of what it audits, built from the tree by a script

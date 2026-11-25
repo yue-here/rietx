@@ -216,6 +216,41 @@ def test_carry_fits_the_next_pattern_warm(eight_patterns, fail_on_pattern):
 
 
 # ----------------------------------------------------------------------
+# steps: a run of failed patterns is a gap, never one step (WP-1524)
+# ----------------------------------------------------------------------
+FAIL_RUN = (3, 4, 5)
+
+
+@pytest.mark.parametrize("policy", ["skip", "carry"])
+def test_a_run_of_failed_patterns_is_never_bridged_by_a_step(
+        eight_patterns, monkeypatch, policy):
+    """Three consecutive patterns on which every rung raised are
+    ``SeriesFailure``s with no ``SeriesEntry``, so ``entries`` holds 2 and 6
+    side by side.  Bridged, ``steps`` would carry a 2 → 6 row spanning four of
+    the ramp's steps (WP-1524 shape 1); by series index, only the pairs either
+    side of the gap remain.  The fix landed with WP-2003 (c9c59b3fc) and this
+    is its test."""
+    import rietx.refine  # noqa: F401  (registers rietx.refine in sys.modules)
+
+    refine_mod = sys.modules["rietx.refine"]
+    orig_fit = refine_mod.Refinement.fit
+    targets = [eight_patterns[k] for k in FAIL_RUN]
+
+    def patched_fit(self, data, *args, **kwargs):
+        if any(data is t for t in targets):
+            raise np.linalg.LinAlgError("SVD did not converge for slice = 0")
+        return orig_fit(self, data, *args, **kwargs)
+
+    monkeypatch.setattr(refine_mod.Refinement, "fit", patched_fit)
+    result = _series().fit(eight_patterns, on_error=policy)
+
+    assert [f.index for f in result.failures] == list(FAIL_RUN)
+    assert [e.index for e in result.entries] == [0, 1, 2, 6, 7]
+    assert result.steps, "the ramp's cell must step somewhere"
+    assert {s.indices for s in result.steps} == {(0, 1), (1, 2), (6, 7)}
+
+
+# ----------------------------------------------------------------------
 # bit-identity: a chain that never fails is untouched by any of this
 # ----------------------------------------------------------------------
 def test_a_chain_with_no_failures_is_unaffected_by_the_new_parameter(

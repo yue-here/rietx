@@ -22,7 +22,7 @@ The matching reads `[0]` as a set of characters, so `phases[0].cell.a` matches n
 
 Some names exist only when the model declares the block they belong to.
 `phases.0.microstrain.dof.*` appears once the phase carries a `StephensStrain`, `phases.0.atoms.2.adp.*` once that atom carries an `AnisoU`, and `instrument.geometry.capillary_offset_along_beam` only on a capillary geometry.
-A wildcard over an absent block matches nothing, so the shipped plans' broad names are safe on any model.
+A wildcard over an absent block matches nothing, so the built-in plans' broad names are safe on any model.
 
 ## Rows
 
@@ -367,7 +367,7 @@ A pattern that matches nothing returns `[]` in silence, since plans reach compon
 
 `set_vary` warns with a `UserWarning` when it frees nothing for a row that exists.
 It also warns when a pattern under a spelling a release retired matches nothing, and names the current spelling.
-When freeing, a phase path or a pattern naming one atom site gets the reason a stage gives under `STAGE_PATH_NOT_FREE`.
+When freeing, a phase path, or a pattern naming one atom site or one phase's cell, gets the reason a stage gives under `STAGE_PATH_NOT_FREE`.
 On LaB6, `set_vary("phases.0.atoms.0.dof.*")` returns `[]` and warns that every coordinate of La on 1a is fixed by its site symmetry.
 A wildcard pattern such as `phases.*.atoms.*.x` declines rows without a warning, since a sweep declining rows is how plans work.
 

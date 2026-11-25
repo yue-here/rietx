@@ -101,8 +101,8 @@ def test_a_hold_survives_reopening_the_project(tmp_path, pattern_file):
     # and it is still enforced, not merely remembered
     result = reopened.fit(plan=SHORT)
     blocked = {s.name: s.blocked_by_hold for s in result.stages if s.blocked_by_hold}
-    # the closing stage frees every glob the plan freed, the cell's too
-    assert blocked == {"cell": ["phases.0.cell.a"], "closing": ["phases.0.cell.a"]}
+    # no closing stage by default since WP-2222, so the cell stage alone
+    assert blocked == {"cell": ["phases.0.cell.a"]}
     assert reopened.refinement.structure.phases[0].cell.a.value == \
         project.refinement.structure.phases[0].cell.a.value
 
@@ -774,7 +774,7 @@ def test_settings_drive_the_convenience_verbs(tmp_path, pattern_file):
                       two_theta_limits=(4.0, 20.0))
     result = project.fit()
 
-    assert [s.name for s in result.stages] == ["scale_bkg", "closing"]
+    assert [s.name for s in result.stages] == ["scale_bkg"]   # no closing stage (WP-2222)
     assert project.refinement._two_theta_limits == (4.0, 20.0)
 
 
