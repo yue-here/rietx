@@ -217,6 +217,14 @@ flipping).
 - [ ] Fixtures: Jana-distributed examples licence-checked per file, else
       synthetic; perturbation fuzz in `test_readers_robust.py`'s arm;
       cross-check against at least one published Jana refinement's numbers.
+- [ ] Verify the three conventions read from the manuals' prose against
+      Jana's own output (root `CLAUDE.md` § Conventions; PR #1627 review,
+      2026-11-23): the `ai` convention, U → Biso through 8π², and the `.m41`
+      cell units. One real refinement with an atom on a special position,
+      read locally and compared field by field with the CIF Jana exported
+      from it; nothing needs vendoring. Until this is done the reader's
+      docstring states them as unverified assumptions and the reader stays
+      out of `PROJECT_FORMATS` (the next task waits on this one).
 - [ ] `capabilities()` model-format arm entry, skill routing-row widening
       (SKILL.md byte budget — see 1118's Inherited), manual section,
       provenance rows.

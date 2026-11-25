@@ -239,6 +239,33 @@ def _jana_constraints_silent() -> list:
     return _jana_read(refine="autkeys 0")
 
 
+def _jana_build(**m40_kw) -> list:
+    """Build phase Alpha of one synthetic Jana set (tests/test_reader_mfile.py)."""
+    from rietx.io.projects import jana
+    from tests.test_reader_mfile import m40, m41, m50
+
+    found: list = []
+    with tempfile.TemporaryDirectory() as tmp:
+        root = pathlib.Path(tmp)
+        for suffix, text in ((".m50", m50()), (".m40", m40(**m40_kw)), (".m41", m41())):
+            (root / f"set{suffix}").write_text(text, encoding="utf-8")
+        jana.to_structure(jana.read_jana(root / "set.m50"), phase="Alpha",
+                          diagnostics=found)
+    return found
+
+
+def _jana_merge_fires() -> list:
+    """O2 on the general position keyed on x and y only: z is freed with them."""
+    from tests.test_reader_mfile import _keyed
+
+    return _jana_build(o2_adp=_keyed([0.02, 0, 0, 0, 0, 0], "0110100000"))
+
+
+def _jana_merge_silent() -> list:
+    """Ti1 (4g) and O1 (4h) keyed on x and y, the only directions they allow."""
+    return _jana_build()
+
+
 # --------------------------------------------------- the instrument-file readers
 
 
@@ -1327,6 +1354,8 @@ SILENCE: dict[str, Pair] = {
         _jana_constraints_fires, _jana_constraints_silent, "tests/test_reader_mfile.py"),
     "JANA_KEYS_MAY_BE_IGNORED": Pair(
         _jana_autkeys_fires, _jana_autkeys_silent, "tests/test_reader_mfile.py"),
+    "JANA_REFINE_KEY_MERGED": Pair(
+        _jana_merge_fires, _jana_merge_silent, "tests/test_reader_mfile.py"),
     "LEBAIL_CYCLES_AT_CAP": Pair(
         functools.partial(_lebail_cap, False), _lebail_settled_or_unasked,
         "tests/test_lebail_cycles.py"),

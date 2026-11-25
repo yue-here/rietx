@@ -82,7 +82,8 @@ def m50(*, extra_global: str = "", extra_phase: str = "", refine: str = "autkeys
 
 
 def m40(*, two_phase: bool = True, header_a: str = "    4    0    0    0",
-        ba_line: str | None = None, ti_adp: str | None = None) -> str:
+        ba_line: str | None = None, ti_adp: str | None = None,
+        o2_adp: str | None = None) -> str:
     lines = [header_a]
     if two_phase:
         lines.append("    2    0    0    0")
@@ -105,7 +106,7 @@ def m40(*, two_phase: bool = True, header_a: str = "    4    0    0    0",
     # O on 8i, the general position: ai = 1
     lines.append("O2        3  1     " + "".join(
         _num(v) for v in (1.0, 0.11, 0.27, 0.23)))
-    lines.append(_keyed([0.02, 0, 0, 0, 0, 0], "0111100000"))
+    lines.append(o2_adp or _keyed([0.02, 0, 0, 0, 0, 0], "0111100000"))
     if two_phase:
         lines += ["Na1       1  1     " + "".join(_num(v) for v in (1 / 48, 0, 0, 0)),
                   _keyed([0.015, 0, 0, 0, 0, 0], "0000100000"),
@@ -211,12 +212,10 @@ def test_the_structure_carries_occupancy_symmetry_and_flags(tmp_path):
     assert [getattr(cell, n).value for n in ("a", "b", "c", "alpha", "beta", "gamma")] \
         == [8.11, 9.21, 4.31, 90.0, 90.0, 90.0]
     assert (cell.a.vary, cell.c.vary, cell.alpha.vary) == (True, True, False)
-    (info,) = [d for d in diags if d.code == "JANA_NOT_CARRIED"]
-    assert "Ba1" in info.message and "Gaussian parameters" in info.message
-    assert "phase volume fractions" in info.message
-    assert "f'" in info.message and 'f"' in info.message
-    assert "the .m50 cell [8.1" in info.message
-    assert "phases.0.atoms.0.x" in info.where
+    (fixed,) = [d for d in diags if d.code == "JANA_COORDINATES_SYMMETRY_FIXED"]
+    assert "Ba1" in fixed.message and fixed.where == ["phases.0.atoms.0.x"]
+    (scale,) = [d for d in diags if d.code == "JANA_SCALE_NOT_COMPARABLE"]
+    assert scale.where == ["phases.0.scale"] and scale.suggestion
 
 
 def test_the_cubic_phase_reads_its_setting_from_the_operators(tmp_path):
@@ -363,8 +362,10 @@ def test_a_non_finite_value_is_refused_naming_the_file(tmp_path):
 
 
 def test_a_form_factor_table_is_read_past_across_lines(tmp_path):
-    text = m50().replace("atom O\n", "atom O\nformtab -4\n 8.0 7.5\n 7.0 6.5 atweight 15.999\n")
-    assert len(jana.read_jana(write_set(tmp_path, m50=text)).phases[0].atom_types) == 3
+    text = m50().replace("atom O\natweight 15.999\n",
+                         "atom O\nformtab -4\n 8.0 7.5\n 7.0 6.5 atweight 15.999\n")
+    types = jana.read_jana(write_set(tmp_path, m50=text)).phases[0].atom_types
+    assert len(types) == 3 and types[2].values["atweight"] == 15.999
 
 
 def test_an_operator_listed_and_generated_is_one_operation(tmp_path):
@@ -379,7 +380,7 @@ def test_rows_after_the_declared_atoms_are_counted_and_named(tmp_path):
     assert model.m40_trailing == 1
     diags: list[Diagnostic] = []
     jana.to_structure(model, phase=0, diagnostics=diags)
-    assert "after the declared atoms" in diags[-1].message
+    assert "after the declared atoms" in _info(diags).message
 
 
 @pytest.mark.parametrize("which", [".m50", ".m41"])
@@ -489,8 +490,8 @@ def test_a_tied_tensor_rounded_in_its_last_digit_is_read_on_the_site(tmp_path):
     assert abs(aniso.u12.value - 0.006174) <= 5e-7 + 1e-12
     assert abs(aniso.u11.value - 0.012347) <= 5e-7 + 1e-12
     assert aniso.u13.value == 0.0 and aniso.u33.value == 0.015
-    (info,) = [d for d in diags if d.code == "JANA_NOT_CARRIED"]
-    assert "Uij of Mg1" in info.message
+    (info,) = [d for d in diags if d.code == "JANA_PRINTED_DIGIT_REPAIRED"]
+    assert "U^ij of Mg1" in info.message
     assert any(w.startswith("phases.0.atoms.0.aniso.") for w in info.where)
     # the snapped ai (1/12 printed 0.083333) points at the occupancy
     assert "phases.0.atoms.0.occ" in info.where
@@ -533,9 +534,13 @@ def test_commands_on_the_refine_line_are_read(tmp_path):
 
 # --------------------------------------------------------------- third review (PR #1627)
 
-def _info(diags):
-    (info,) = [d for d in diags if d.code == "JANA_NOT_CARRIED"]
+def _info(diags, code="JANA_NOT_CARRIED"):
+    (info,) = [d for d in diags if d.code == code]
     return info
+
+
+def _codes(diags):
+    return [d.code for d in diags]
 
 
 def test_a_uij_key_on_some_components_is_reported_as_merged(tmp_path):
@@ -545,9 +550,10 @@ def test_a_uij_key_on_some_components_is_reported_as_merged(tmp_path):
     diags: list[Diagnostic] = []
     jana.to_structure(jana.read_jana(write_set(tmp_path, m40=m40(ti_adp=ti))),
                       phase="Alpha", diagnostics=diags)
-    info = _info(diags)
-    assert "per-component Uij keys of Ti1" in info.message
-    assert "phases.0.atoms.1.aniso.u11" in info.where
+    info = _info(diags, "JANA_REFINE_KEY_MERGED")
+    assert info.level == "warning"
+    assert "Ti1 U^ij (U22, U33, U12)" in info.message
+    assert info.where == ["phases.0.atoms.1.aniso.u11"]
 
 
 def test_a_uij_key_on_every_allowed_component_reports_no_merge(tmp_path):
@@ -557,7 +563,7 @@ def test_a_uij_key_on_every_allowed_component_reports_no_merge(tmp_path):
     diags: list[Diagnostic] = []
     jana.to_structure(jana.read_jana(write_set(tmp_path, m40=m40(ti_adp=ti))),
                       phase="Alpha", diagnostics=diags)
-    assert "Uij keys" not in _info(diags).message
+    assert "JANA_REFINE_KEY_MERGED" not in _codes(diags)
 
 
 def test_a_nonzero_origin_shift_is_refused_and_a_zero_one_read(tmp_path):
@@ -582,7 +588,7 @@ def test_a_stated_form_factor_table_is_reported_not_carried(tmp_path):
     diags = []
     jana.to_structure(jana.read_jana(write_set(tmp_path, stem="b")),
                       phase="Alpha", diagnostics=diags)
-    assert "formtab" not in _info(diags).message
+    assert "JANA_NOT_CARRIED" not in _codes(diags)
 
 
 def test_ai_is_read_to_its_own_last_printed_digit(tmp_path):
@@ -594,7 +600,7 @@ def test_ai_is_read_to_its_own_last_printed_digit(tmp_path):
         tmp_path, (0.012347, 0.012347, 0.015, 0.006174, 0, 0), ai_text="0.083")),
         diagnostics=diags)
     assert s.phases[0].atoms[0].occ.value == 1.0
-    assert "phases.0.atoms.0.occ" in _info(diags).where
+    assert "phases.0.atoms.0.occ" in _info(diags, "JANA_PRINTED_DIGIT_REPAIRED").where
 
 
 def test_a_uij_is_moved_within_its_own_last_printed_digit(tmp_path):
@@ -608,3 +614,137 @@ def test_a_uij_is_moved_within_its_own_last_printed_digit(tmp_path):
     aniso = s.phases[0].atoms[0].aniso
     assert aniso.u12.value == pytest.approx(aniso.u11.value / 2, abs=1e-12)
     assert abs(aniso.u12.value - 0.0062) <= 5e-5 + 1e-12
+
+
+# --------------------------------------------------------------- fourth review (PR #1627)
+
+@pytest.mark.parametrize("old, new, match", [
+    ("lambda 1.5406", "lambda 1.5406\nlambda 0.7093", "'lambda' is stated twice for the set"),
+    ("radtype 1", "radtype 1 radtype 2", "'radtype' is stated twice"),
+    ("cell 8.1 9.2 4.3 90 90 90", "cell 8.1 9.2 4.3 90 90 90\ncell 8.2 9.2 4.3 90 90 90",
+     "'cell' is stated twice for phase 1"),
+    ("spgroup Pbam 55 3", "spgroup Pbam 55 3\nspgroup Pbnm 62 3", "'spgroup' is stated twice"),
+    ("lattice P", "lattice P\nlattice C", "'lattice' is stated twice"),
+    ("atweight 47.867", "atweight 47.867 atweight 47.9",
+     "'atweight' is stated twice for atom type 2 of phase 1"),
+])
+def test_a_single_valued_keyword_stated_twice_is_refused(tmp_path, old, new, match):
+    """io/CLAUDE.md: a row the format states two ways is refused, not picked."""
+    with pytest.raises(jana.JanaError, match=match) as info:
+        jana.read_jana(write_set(tmp_path, m50=m50().replace(old, new, 1)))
+    assert "syn.m50 line" in str(info.value)
+
+
+def test_the_same_keyword_in_two_phases_or_two_atom_types_is_not_a_repeat(tmp_path):
+    """Each phase states its own cell and each atom type its own weight."""
+    model = jana.read_jana(write_set(tmp_path))
+    assert [p.cell[0] for p in model.phases] == [8.1, 5.64]
+    assert [t.values["atweight"] for t in model.phases[0].atom_types] \
+        == [137.33, 47.867, 15.999]
+
+
+def test_autkeys_stated_twice_is_refused(tmp_path):
+    with pytest.raises(jana.JanaError, match="autkeys is stated twice"):
+        jana.read_jana(write_set(tmp_path, m50=m50(refine="autkeys 0\nautkeys 1")))
+
+
+def test_a_second_refine_section_is_refused(tmp_path):
+    text = m50() + "refine\nautkeys 1\nend\n"
+    with pytest.raises(jana.JanaError, match=r"syn\.m50 line \d+: a second REFINE"):
+        jana.read_jana(write_set(tmp_path, m50=text))
+    # a repeated section of a program the reader reads nothing from still reads
+    other = m50() + "fourier\nend\nfourier\nend\n"
+    assert jana.read_jana(write_set(tmp_path, stem="b", m50=other)).autkeys == 0
+
+
+def test_keys_on_every_direction_a_partly_special_site_allows_are_no_merge(tmp_path):
+    """Ti1 (4g) and O1 (4h) of Pbam have z fixed by symmetry and keys on x and
+    y: every allowed direction is keyed, so nothing is merged or reported."""
+    diags: list[Diagnostic] = []
+    s = jana.to_structure(jana.read_jana(write_set(tmp_path)), phase="Alpha",
+                          diagnostics=diags)
+    assert "JANA_REFINE_KEY_MERGED" not in _codes(diags)
+    # the first slice said "the per-axis coordinate keys of Ti1, O1" here
+    assert not any("Ti1" in d.message or "O1" in d.message for d in diags)
+    atoms = {a.label: a for a in s.phases[0].atoms}
+    assert atoms["Ti1"].x.vary and atoms["O1"].y.vary
+
+
+def test_a_coordinate_key_on_some_allowed_axes_is_a_merge_warning(tmp_path):
+    """O2 on 8i (general) keyed on x and y only: z, which the Jana run held,
+    is freed with them, and the warning names it."""
+    o2 = _keyed([0.02, 0, 0, 0, 0, 0], "0110100000")
+    diags: list[Diagnostic] = []
+    s = jana.to_structure(jana.read_jana(write_set(tmp_path, m40=m40(o2_adp=o2))),
+                          phase="Alpha", diagnostics=diags)
+    (warn,) = [d for d in diags if d.code == "JANA_REFINE_KEY_MERGED"]
+    assert warn.level == "warning"
+    assert "O2 coordinates (z)" in warn.message
+    assert "Ti1" not in warn.message and "O1" not in warn.message
+    assert "floating_origin" in warn.message
+    assert warn.where == ["phases.0.atoms.3.x"]
+    assert s.phases[0].atoms[3].z.vary
+
+
+def test_held_directions_counts_a_tied_direction_keyed_through_any_member():
+    """x, x, z: a key on x alone keys the tied x/y direction; on x and nothing
+    else of x, y, z, the held direction is z."""
+    basis = [[1, 1, 0], [0, 0, 1]]
+    assert jana.held_directions(basis, (True, False, True), ("x", "y", "z")) == []
+    assert jana.held_directions(basis, (True, False, False), ("x", "y", "z")) == ["z"]
+    assert jana.held_directions(basis, (False, False, False), ("x", "y", "z")) == []
+    assert jana.held_directions([], (True, True, True), ("x", "y", "z")) == []
+
+
+def test_a_tied_tensor_keyed_on_one_member_of_each_tie_is_no_merge(tmp_path):
+    """Mg1 on 2c of P6_3/mmc: U22 and U12 follow U11. Keys on U11 and U33 key
+    both allowed directions, so the earlier per-component test's merge report
+    (U22 and U12 unkeyed) was false."""
+    path = _p63mmc_set(tmp_path, (0.012347, 0.012347, 0.015, 0.0061735, 0, 0))
+    text = path.with_suffix(".m40").read_text(encoding="utf-8")
+    path.with_suffix(".m40").write_text(text.replace("0000111100", "0000101000"),
+                                        encoding="utf-8")
+    diags: list[Diagnostic] = []
+    jana.to_structure(jana.read_jana(path), diagnostics=diags)
+    assert "JANA_REFINE_KEY_MERGED" not in _codes(diags)
+    # the first slice said "the per-component Uij keys of Mg1" here
+    assert not any("keys of Mg1" in d.message for d in diags)
+
+
+def test_a_zero_cell_length_is_refused_naming_the_file(tmp_path):
+    """U_eq's Cholesky factor of the metric raised LinAlgError outside the guard."""
+    text = m41(two_phase=False).replace(
+        _keyed([8.11, 9.21, 4.31, 90, 90, 90], "111000"),
+        _keyed([8.11, 0.0, 4.31, 90, 90, 90], "111000"))
+    model = jana.read_jana(write_set(tmp_path, m41=text, two_phase=False))
+    with pytest.raises(jana.JanaError, match=r"syn\.m50"):
+        jana.to_structure(model)
+
+
+def test_a_build_says_each_kind_under_its_own_code(tmp_path):
+    """The action is a warning; fixed keys, repairs and the seeded scale are
+    infos of their own; JANA_NOT_CARRIED holds only what is left."""
+    diags: list[Diagnostic] = []
+    jana.to_structure(jana.read_jana(write_set(tmp_path)), phase=1, diagnostics=diags)
+    assert _codes(diags) == ["JANA_PRINTED_DIGIT_REPAIRED", "JANA_SCALE_NOT_COMPARABLE"]
+    repaired = _info(diags, "JANA_PRINTED_DIGIT_REPAIRED")
+    assert "ai of Na1, Cl1 read as fully occupied" in repaired.message
+    assert repaired.where == ["phases.0.atoms.0.occ", "phases.0.atoms.1.occ"]
+
+
+def test_clauses_that_read_the_same_on_every_file_are_cut(tmp_path):
+    """The .m50 cell against the .m41's, stated f' and f'', the volume
+    fractions and the .m41 sections on the model fire on every such file."""
+    diags: list[Diagnostic] = []
+    jana.to_structure(jana.read_jana(write_set(tmp_path)), phase="Alpha",
+                      diagnostics=diags)
+    text = " ".join(d.message for d in diags)
+    for clause in (".m50 cell", "f'", "volume fractions", "Gaussian parameters",
+                   "stay on the model"):
+        assert clause not in text
+    assert "JANA_NOT_CARRIED" not in _codes(diags)
+    with_neutron = m50(extra_phase="fneutron 5.8")
+    diags = []
+    jana.to_structure(jana.read_jana(write_set(tmp_path, stem="n", m50=with_neutron)),
+                      phase="Alpha", diagnostics=diags)
+    assert "fneutron" in _info(diags).message and "f'" not in _info(diags).message

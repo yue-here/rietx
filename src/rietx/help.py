@@ -3425,6 +3425,14 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "Jana protocol."
         ),
     ),
+    "JANA_COORDINATES_SYMMETRY_FIXED": HelpEntry(
+        title="Jana coordinate keys on a fully fixed site",
+        description=(
+            "A site carries a coordinate key but sits on a fully fixed special position, "
+            "where symmetry leaves no direction to move, so its coordinates are held. "
+            "Nothing to do."
+        ),
+    ),
     "JANA_KEYS_MAY_BE_IGNORED": HelpEntry(
         title="Jana's refinement keys may not be the refined set",
         description=(
@@ -3439,15 +3447,40 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         title="Parts of a Jana set were not carried",
         description=(
             "The message lists what the Jana files state that the structure does not "
-            "hold: the scale, seeded at a small value because Jana's is not a rietx "
-            "scale; .m41 sections other than the cell; the phase volume fractions of a "
-            "set with several phases; stated f', f'', neutron scattering length and "
-            "tabulated form factors, which rietx replaces with its own; and coordinate "
-            "keys symmetry does not allow. It also names three changes that move values: "
-            "an occupancy within the last printed digit of full, read as full; a `U^ij` "
-            "moved within its last printed digit onto the form the site allows; and a "
-            "key on some axes or some `U^ij` components, which frees every direction the "
-            "site allows. The model returned by the reader still has every number."
+            "hold: the .m50 cell, taken and held, where the .m41 states none for the "
+            "phase; a stated neutron scattering length or tabulated form factor, which "
+            "rietx replaces with its own; and .m40 lines after the declared atoms. "
+            "The model returned by the reader still has every number."
+        ),
+    ),
+    "JANA_PRINTED_DIGIT_REPAIRED": HelpEntry(
+        title="A Jana value was read within its last printed digit",
+        description=(
+            "Each number in a Jana file stands for any value within half a unit of its "
+            "own last printed digit. An occupancy that lies that close to a full site is "
+            "read as full, and a `U^ij` that lies that close to the form its site's "
+            "symmetry allows is moved onto it, as the CIF reader does. A value further "
+            "off is refused, naming the site. Nothing to do; the message names the sites."
+        ),
+    ),
+    "JANA_REFINE_KEY_MERGED": HelpEntry(
+        title="Jana keys on some of a site's directions free all of them",
+        description=(
+            "A structure carries one refine flag for an atom's coordinates and one for "
+            "its `U^ij`, each freeing every direction the site's symmetry allows. Jana "
+            "keys each value, so a key on some allowed directions frees the rest, which "
+            "the Jana run held. The message names each atom and the held directions. A "
+            "held coordinate can be what fixed a polar group's origin. Hold them again "
+            "with `Refinement.hold`, or set `Phase.floating_origin`, before you compare "
+            "the fit with the Jana run."
+        ),
+    ),
+    "JANA_SCALE_NOT_COMPARABLE": HelpEntry(
+        title="The Jana scale was not carried",
+        description=(
+            "Jana's scale is not a rietx scale, so the phase scale is seeded at a small "
+            "value and the message quotes the .m40's scale line. Refine the scale before "
+            "you trust anything derived from it."
         ),
     ),
     "K_SEARCH_PARTNER": HelpEntry(

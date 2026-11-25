@@ -1666,6 +1666,15 @@ ROWS: tuple[Row, ...] = (
         responds=("tie or hold the coordinates, occupancies or ADPs the listed "
                   "commands name before comparing them with the Jana run's"),
         scope=("all",)),
+    Row("JANA_COORDINATES_SYMMETRY_FIXED", "code", tier=1, ambiguity=1,
+        evidence=("info; fires when sites carry coordinate keys but sit on fully fixed "
+                  "special positions (the coordinate_basis is empty), where the "
+                  "coordinates are held; the same reading as "
+                  "GSAS_EXP_COORDINATES_SYMMETRY_FIXED "
+                  "(test_the_structure_carries_occupancy_symmetry_and_flags, Pbam 2a)"),
+        grounds='Site symmetry fixes it.',
+        response='info',
+        responds='nothing, the key cannot refine anything on a fixed position'),
     Row("JANA_KEYS_MAY_BE_IGNORED", "code", tier=1, ambiguity=1,
         evidence=("warning; a reading rule from the format's documentation: the "
                   "Jana98 manual states that REFINE in automatic mode ignores the .m40 "
@@ -1679,27 +1688,65 @@ ROWS: tuple[Row, ...] = (
                   "refined before its vary flags are taken as the plan"),
         scope=("all",)),
     Row("JANA_NOT_CARRIED", "code", tier=1, ambiguity=1,
-        evidence=("info; a record of what a build did not carry or changed: the scale "
-                  "(seeded at 1e-3, as the .EXP and .gpx conversions seed theirs), .m41 "
-                  "sections other than the cell, a multiphase set's volume fractions, "
-                  "stated f'/f''/fneutron and formtab, and keys on fully fixed sites; "
-                  "and three repairs it reports, each within the file's own last "
-                  "printed digit or its flag model: ai read as full where a full "
-                  "site's occupancy lies within half a unit of the token's last digit "
-                  "(read off the token, as cif._printed_half does, no print width "
-                  "assumed), Uij moved onto the site's allowed form within the same "
-                  "box (cif._project_printed_adps' rule), and a per-axis xyz key or a "
-                  "partial Uij key freeing every allowed direction (ParameterTable has "
-                  "one flag per atom); tests: "
-                  "test_ai_is_read_to_its_own_last_printed_digit, "
+        evidence=("info; a record of what a build did not carry and that differs "
+                  "from file to file: a phase the .m41 gives no cell (the .m50 cell "
+                  "taken and held), a stated fneutron or formtab (rietx computes its "
+                  "own scattering factors), and .m40 lines after the declared atoms; "
+                  "fires only when one of them is present and diagnostics= is passed "
+                  "(test_clauses_that_read_the_same_on_every_file_are_cut, "
+                  "test_a_stated_form_factor_table_is_reported_not_carried); acts on "
+                  "nothing"),
+        grounds=("A capability limit of the reader, named item by item; the clauses "
+                 "that read the same on every file were cut (PR #1627 review)."),
+        response="info",
+        responds="note which parts of the Jana set the structure does not hold",
+        scope=("all",)),
+    Row("JANA_PRINTED_DIGIT_REPAIRED", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic on the file's own digits, read off each token as "
+                  "cif._printed_half does (no print width assumed): an ai whose "
+                  "occupancy (ai x the site's symmetry order) lies within half a unit "
+                  "of its last digit times that order of a full site is read as full, "
+                  "and a U^ij within the same box of its site's allowed form is moved "
+                  "onto it (cif._project_printed_adps' rule, CIF_ADP_SYMMETRY_PROJECTED); "
+                  "past the box ai is refused and the tensor refused by the table; "
+                  "tests: test_ai_is_read_to_its_own_last_printed_digit, "
                   "test_a_uij_is_moved_within_its_own_last_printed_digit, "
                   "test_a_tied_tensor_rounded_in_its_last_digit_is_read_on_the_site, "
-                  "test_a_uij_key_on_some_components_is_reported_as_merged, "
-                  "test_the_cubic_phase_reads_its_setting_from_the_operators; "
-                  "fires on every build with diagnostics="),
+                  "test_a_build_says_each_kind_under_its_own_code (Fm-3m 4a, ai "
+                  "0.020833 x 48 = 0.999984)"),
+        grounds=("Arithmetic: the move is no larger than the file's own rounding, so the "
+                 "value stored is one the file printed; past it the reader or the table "
+                 "refuses, naming the site."),
         response="info",
-        responds="refine the scale before reading any scale-derived number",
+        responds=("note which sites' ai or U^ij were read within their last printed digit; "
+                  "nothing to do")),
+    Row("JANA_REFINE_KEY_MERGED", "code", tier=1, ambiguity=1,
+        evidence=("warning; a record of an action the structure's flag model forces: "
+                  "ParameterTable frees an atom's allowed coordinates on one flag and its "
+                  "allowed U^ij on another, so a key set covering some but not all of a "
+                  "site's allowed directions (rows of wyckoff.coordinate_basis or "
+                  "adp_basis; a tied direction keyed through any member) frees the rest; "
+                  "fires exactly then (jana.held_directions), and not for a component the "
+                  "site's symmetry fixes (Pbam 4g/4h keyed on x, y: no warning); tests: "
+                  "test_a_coordinate_key_on_some_allowed_axes_is_a_merge_warning, "
+                  "test_keys_on_every_direction_a_partly_special_site_allows_are_no_merge, "
+                  "test_a_tied_tensor_keyed_on_one_member_of_each_tie_is_no_merge, "
+                  "test_a_uij_key_on_some_components_is_reported_as_merged"),
+        grounds=("Arithmetic: whether keys cover a site's allowed directions is a "
+                 "nullspace of its stabiliser; the merge is a capability limit, said "
+                 "where it moves what the Jana run held."),
+        response="warning",
+        responds=("hold the named atoms' coordinates or U^ij (or the polar origin) "
+                  "before comparing the fit with the Jana run"),
         scope=("all",)),
+    Row("JANA_SCALE_NOT_COMPARABLE", "code", tier=1, ambiguity=1,
+        evidence=("info; the phase scale is seeded at 1e-3, as the .EXP and .gpx "
+                  "conversions seed theirs (GSAS_EXP_SCALE_NOT_COMPARABLE), since Jana's "
+                  "scale is not a rietx scale; fires on every build with diagnostics= "
+                  "and names the .m40's scale line"),
+        grounds="Arithmetic: two programs' scales differ by their normalisations.",
+        response="info",
+        responds="refine the scale before reading any scale-derived number"),
     Row("K_SEARCH_PARTNER", "code", tier=1, ambiguity=2,
         evidence=("a geometric fact of the cell: fires once per image of k under a near-symmetry "
                   "of the metric (indexing.ambiguity.lattice_point_group at the caller's tol) "
@@ -7515,7 +7562,11 @@ ROWS: tuple[Row, ...] = (
                   "ranking them, and names the argument that forbids the retry")),
     Row("JANA_KEYS_MAY_BE_IGNORED.suggestion", "suggestion", tier=1, ambiguity=1,
         value=1, evidence="arithmetic: names the record the reader cannot see"),
-    Row("JANA_NOT_CARRIED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+    Row("JANA_REFINE_KEY_MERGED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: names the verbs that hold again what the merge freed "
+                  "(Refinement.hold, Phase.floating_origin); ranks neither holding nor "
+                  "freeing")),
+    Row("JANA_SCALE_NOT_COMPARABLE.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence="arithmetic: names the parameter the reader seeded"),
     Row("K_SEARCH_PARTNER.suggestion", "suggestion", tier=1, ambiguity=2, value=1,
         evidence=("arithmetic: the metric is unchanged within tol by the map between the two "

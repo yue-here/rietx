@@ -54,6 +54,24 @@ Jana2020 magnetic or other newer construct lands, since no document describes
 those keywords. A commensurate magnetic phase therefore refuses here, unlike
 the TOPAS and ``.pcr`` readers (WP-1328): the reader cannot recognise one
 without a description of how Jana writes it.
+
+**Unverified assumptions.** Three conventions come from the manuals' prose
+alone and have not been measured against Jana's own output, which root
+``CLAUDE.md`` § Conventions requires of a foreign format's unit: ``ai`` as the
+occupancy over the site's symmetry order (M98 p. 116, whose "multiplicity"
+reads either as that order or as the Wyckoff multiplicity, a factor of two
+apart on 2a of Pbam), the ``.m40`` displacement parameters as U in Å² with
+Biso = 8π²·U (M98 E14, p. 120), and the ``.m41`` cell in Å and degrees (M2000
+pp. 50-54). The reference output that settles all three is the CIF Jana
+exports of a refinement with an atom on a special position, read here and
+compared field by field; no such pair is in reach (WP-1314's task to verify
+them). Until that task is done the reader stays out of ``PROJECT_FORMATS``,
+so nothing dispatches to it and every caller names it.
+
+**A statement made twice is refused, not picked** (``io/CLAUDE.md``): a
+single-valued ``.m50`` keyword repeated in its scope (the file, a phase, an
+atom type), a repeated ``autkeys``, and a second REFINE section, since no page
+of either manual says which of two such statements Jana uses.
 """
 
 from __future__ import annotations
@@ -72,6 +90,10 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 EIGHT_PI_SQUARED = 8.0 * math.pi ** 2
 
 SUFFIXES = (".m50", ".m40", ".m41")
+
+#: The ``.m40`` displacement line's six tensor keys, in its order (M98 p. 118),
+#: which is ``adp_basis``'s Voigt order.
+U_LABELS = ("U11", "U22", "U33", "U12", "U13", "U23")
 
 #: A Jana number: always written with a decimal point, optionally signed, with
 #: an optional exponent (``E`` or Fortran's ``D``).  Requiring the point is what
@@ -172,6 +194,20 @@ M50_STANCES: dict[str, Stance] = {
 #: (M98 p. 224).  Their grammar is not described closely enough to apply, so a
 #: set using one is read and the commands are reported as not carried.
 CONSTRAINT_COMMANDS = ("equation", "restric", "fixed", "keep")
+
+#: The single-valued ``.m50`` keywords, by the scope a statement of one holds
+#: for: the whole set (M2000 p. 53 puts the experiment keywords before the
+#: first ``phase``), one phase, or one ``atom`` block.  A second statement in
+#: the same scope is refused rather than letting the later one win in silence
+#: (``io/CLAUDE.md``: "A row the format states two ways is refused, not
+#: picked").  The repeatable keywords (``symmetry``, ``lattvec``, ``atom``,
+#: ``phase``) and the ignored ones are in none of the three.
+ONCE_PER_SET = frozenset({"title", "lambda", "radtype", "lpfactor", "monangle",
+                          "datcolltemp"})
+ONCE_PER_PHASE = frozenset({"cell", "esdcell", "spgroup", "lattice", "centro",
+                            "sgshift", "ndim", "ncomp", "unitsnumb", "chemform"})
+ONCE_PER_ATOM_TYPE = frozenset({"atweight", "atradius", "formula", "f'", 'f"',
+                                "fneutron", "formtab"})
 
 
 # ------------------------------------------------------------- the model
@@ -407,6 +443,8 @@ def _read_m50(lines: list[str], model: JanaModel, where: str) -> None:
     phases: list[JanaPhase] = []
     explicit = False
     in_table = False  # inside a formtab's numbers, which may wrap lines
+    stated: dict[tuple, int] = {}  # a single-valued keyword's scope -> its line
+    n_phase = n_atom = 0
     for n, raw in enumerate(lines[:end], start=1):
         here = f"{where} line {n}"
         text = raw.split("!")[0]
@@ -444,6 +482,21 @@ def _read_m50(lines: list[str], model: JanaModel, where: str) -> None:
                 # a negative count means is not documented, so the numbers are
                 # taken up to the next keyword rather than counted
                 in_table = True
+            if key == "phase":
+                n_phase, n_atom = n_phase + 1, 0
+            elif key == "atom":
+                n_atom += 1
+            scope = (("the set", key) if key in ONCE_PER_SET
+                     else (f"phase {n_phase}", key) if key in ONCE_PER_PHASE
+                     else (f"atom type {n_atom} of phase {n_phase}", key)
+                     if key in ONCE_PER_ATOM_TYPE else None)
+            if scope is not None:
+                if scope in stated:
+                    raise JanaError(
+                        f"{here}: {key!r} is stated twice for {scope[0]} (first "
+                        f"at line {stated[scope]}); no page of the Jana manuals "
+                        f"says which statement Jana uses, so neither is picked")
+                stated[scope] = n
             try:
                 phase, explicit = _apply(key, arg, phase, phases, explicit, model)
             except JanaError as exc:
@@ -453,7 +506,7 @@ def _read_m50(lines: list[str], model: JanaModel, where: str) -> None:
                                 f"{arg!r}") from exc
     phases.append(phase)
     model.phases = phases
-    _read_control_sections(lines[end + 1:], model, where)
+    _read_control_sections(lines[end + 1:], model, where, first_line=end + 2)
 
 
 def _apply(key: str, arg: str, phase: JanaPhase, phases: list[JanaPhase],
@@ -516,14 +569,18 @@ def _apply(key: str, arg: str, phase: JanaPhase, phases: list[JanaPhase],
     return phase, explicit
 
 
-def _read_control_sections(lines: list[str], model: JanaModel, where: str) -> None:
+def _read_control_sections(lines: list[str], model: JanaModel, where: str, *,
+                           first_line: int = 1) -> None:
     """Part II: one section per program, each closed by ``end`` (M98 p. 79).
 
-    Only REFINE's ``autkeys`` and its constraint commands are read; a second
-    section for the same program is ignored, as Jana ignores it.
+    Only REFINE's ``autkeys`` and its constraint commands are read.  A second
+    REFINE section, and a second ``autkeys``, are refused: neither manual says
+    which of the two Jana uses.  A repeated section of another program is
+    skipped, as every other program's section is, so nothing read changes.
     """
     current: str | None = None
-    for raw in lines:
+    autkeys_line: int | None = None
+    for n, raw in enumerate(lines, start=first_line):
         text = raw.split("!")[0].strip()
         if not text or text.startswith("*"):
             continue
@@ -531,6 +588,12 @@ def _read_control_sections(lines: list[str], model: JanaModel, where: str) -> No
         head = tokens[0].lower()
         if current is None:
             current = head
+            if _names(head, "refine") and any(_names(s, "refine")
+                                              for s in model.sections):
+                raise JanaError(
+                    f"{where} line {n}: a second REFINE section; "
+                    f"no page of the Jana manuals says which of the two Jana "
+                    f"reads, so neither is picked")
             if head in model.sections:
                 current = "<repeat>"
             else:
@@ -548,6 +611,13 @@ def _read_control_sections(lines: list[str], model: JanaModel, where: str) -> No
             continue
         for j, token in enumerate(tokens):
             if _names(token.lower(), "autkeys") and j + 1 < len(tokens):
+                if autkeys_line is not None:
+                    raise JanaError(
+                        f"{where} line {n}: autkeys is stated twice in the "
+                        f"REFINE section (first at line {autkeys_line}); "
+                        f"no page of the Jana manuals says which one Jana uses, "
+                        f"so neither is picked")
+                autkeys_line = n
                 try:
                     model.autkeys = int(tokens[j + 1])
                 except ValueError as exc:
@@ -863,22 +933,28 @@ def _tensor_within_print(sg, xyz, u: tuple[float, ...], halves: tuple[float, ...
     return tuple(float(t) for t in target), names
 
 
-def _uij_key_narrower(sg, xyz, keys: tuple[bool, ...]) -> bool:
-    """Whether the keys leave a Uij component the site allows unkeyed.
+def held_directions(basis, keys: tuple[bool, ...],
+                    names: tuple[str, ...]) -> list[str]:
+    """The site's allowed directions its keys hold, where they free others.
 
-    ``ParameterTable`` frees an atom's whole symmetry-allowed tensor on one
-    flag, so keys that name only some of the components the site's symmetry
-    lets move are merged to all of them.  A component the symmetry fixes
-    (U13 on the 4g site of Pbam) is rightly unkeyed and does not count.
+    ``ParameterTable`` frees an atom's symmetry-allowed coordinates on one
+    flag, and its allowed Uij on another, so keys that name only some of the
+    directions the site's symmetry lets move are merged to all of them.  A
+    direction (a row of ``basis``, the site's ``coordinate_basis`` or
+    ``adp_basis``) counts as keyed when any component it moves carries a key,
+    since Jana may key one member of a symmetry-tied set (x of an x, x, z
+    site) or all of them.  A component the symmetry fixes (z on 4g of Pbam,
+    U13 there) is rightly unkeyed and is in no direction.  Returns each held
+    direction as the components it moves (``"z"``, ``"U11/U22/U12"``); an
+    empty list when no key is set, when every direction is keyed, or when the
+    site allows none.
     """
-    from ...crystallography.wyckoff import adp_basis, stabilizer_rotations
-
-    try:
-        basis = adp_basis(stabilizer_rotations(sg, xyz))
-    except ValueError:
-        return False
-    allowed = [any(abs(row[i]) > 1e-12 for row in basis) for i in range(6)]
-    return any(a and not k for a, k in zip(allowed, keys, strict=True))
+    rows = [[abs(float(c)) > 1e-12 for c in row] for row in basis]
+    keyed = [any(m and k for m, k in zip(row, keys, strict=True)) for row in rows]
+    if not any(keyed) or all(keyed):
+        return []
+    return ["/".join(n for n, m in zip(names, row, strict=True) if m)
+            for row, k in zip(rows, keyed, strict=True) if not k]
 
 
 def to_structure(model: JanaModel, *, phase: int | str | None = None,
@@ -897,10 +973,16 @@ def to_structure(model: JanaModel, *, phase: int | str | None = None,
     value of its multiplicity", which only reads so if "multiplicity" means
     that order and not the Wyckoff multiplicity (that would give 1/2).  U values become ``Biso`` through 8π²;
     an anisotropic site keeps its U-form Uij (M98 E14, the CIF convention).
-    The keys map onto ``vary``: ai to ``occ``, x/y/z each to its coordinate,
-    the fifth to ``biso`` and any of the fifth to tenth to the anisotropic
-    block.  The cell's keys come from the ``.m41`` phase block, whose cell is
-    the refined one; without a ``.m41`` the ``.m50`` cell is taken and held.
+    **These readings, and the ``.m41`` cell's units, are unverified
+    assumptions**: taken from the manuals' prose, not yet measured against a
+    CIF Jana exported from the same refinement (the module docstring; a
+    WP-1314 task).
+    The keys map onto ``vary``: ai to ``occ``, any of x/y/z to the site's
+    coordinates, the fifth to ``biso`` and any of the fifth to tenth to the
+    anisotropic block; a key set narrower than the directions the site allows
+    is merged to all of them and said (``JANA_REFINE_KEY_MERGED``).  The
+    cell's keys come from the ``.m41`` phase block, whose cell is the refined
+    one; without a ``.m41`` the ``.m50`` cell is taken and held.
     """
     import gemmi
     import numpy as np
@@ -910,7 +992,11 @@ def to_structure(model: JanaModel, *, phase: int | str | None = None,
     from ...crystallography.adp import u_equivalent
     from ...crystallography.symmetry import site_orbit
     from ...crystallography.twins import merge_site_twins
-    from ...crystallography.wyckoff import coordinate_basis
+    from ...crystallography.wyckoff import (
+        adp_basis,
+        coordinate_basis,
+        stabilizer_rotations,
+    )
     from ...params.vector import ParameterTable
     from ...schemas.instrument import Instrument
 
@@ -970,10 +1056,6 @@ def to_structure(model: JanaModel, *, phase: int | str | None = None,
                             f"section holds {len(cell_section.values)} values, "
                             f"not six")
         cell, cell_vary = cell_section.values, cell_section.keys
-        if chosen.cell is not None and any(
-                abs(x - y) > 1e-9 for x, y in zip(chosen.cell, cell)):
-            not_carried.append(f"the .m50 cell {list(chosen.cell)}, the .m41's "
-                               f"refined {list(cell)} being taken")
     elif chosen.cell is not None and len(chosen.cell) == 6:
         cell, cell_vary = list(chosen.cell), [False] * 6
         not_carried.append("the .m41 states no cell for this phase, so the "
@@ -982,7 +1064,8 @@ def to_structure(model: JanaModel, *, phase: int | str | None = None,
         raise JanaError(f"{named}: phase {label!r} states no cell")
 
     general = len(list(sg.operations()))
-    sites, frozen, merged, merged_adp, snapped, moved = [], [], [], [], [], []
+    sites, frozen, snapped, moved = [], [], [], []
+    merged: list[tuple[str, str, list[str]]] = []  # (label, "xyz"/"uij", held)
     for atom in model.atoms[index]:
         xyz = np.array(atom.xyz, dtype=float)
         orbit = site_orbit(sg, xyz)
@@ -1004,28 +1087,33 @@ def to_structure(model: JanaModel, *, phase: int | str | None = None,
             snapped.append(atom.label)
             occupancy = 1.0
         # one flag for the three coordinates, freeing what symmetry permits,
-        # as GSAS's X flag does: ParameterTable frees a site's DOFs together
+        # as GSAS's X flag does: ParameterTable frees a site's DOFs together,
+        # so a key set narrower than the site's allowed directions is merged
         keys_xyz = atom.keys[1:4]
         vary_xyz = any(keys_xyz)
-        if vary_xyz and not all(keys_xyz):
-            merged.append(atom.label)
-        if vary_xyz and len(coordinate_basis(list(orbit.stabilizer))) == 0:
+        directions = coordinate_basis(list(orbit.stabilizer))
+        if vary_xyz and len(directions) == 0:
             frozen.append(atom.label)
             vary_xyz = False
-        if atom.adp_type == 2 and any(atom.keys[4:10]) and _uij_key_narrower(
-                sg, xyz, atom.keys[4:10]):
-            merged_adp.append(atom.label)
+        held = held_directions(directions, keys_xyz, ("x", "y", "z"))
+        if held:
+            merged.append((atom.label, "xyz", held))
+        if atom.adp_type == 2:
+            try:
+                tensor = adp_basis(stabilizer_rotations(sg, xyz))
+            except ValueError:
+                tensor = []
+            held = held_directions(tensor, atom.keys[4:10], U_LABELS)
+            if held:
+                merged.append((atom.label, "uij", held))
         u = atom.adp
         if atom.adp_type == 2:
-            u, names = _tensor_within_print(sg, xyz, u, atom.adp_half)
-            if names:
-                moved.append((atom.label, names))
+            u, components = _tensor_within_print(sg, xyz, u, atom.adp_half)
+            if components:
+                moved.append((atom.label, components))
         sites.append(dict(
             atom=atom, species=chosen.atom_types[atom.type_index - 1].symbol,
-            occupancy=occupancy, vary_xyz=vary_xyz,
-            # an anisotropic site's biso is an inert record (Atom's docstring)
-            biso=(u[0] if atom.adp_type == 1 else u_equivalent(u, cell))
-            * EIGHT_PI_SQUARED,
+            occupancy=occupancy, vary_xyz=vary_xyz, u=u,
             aniso=u if atom.adp_type == 2 else None,
             vary_aniso=any(atom.keys[4:10])))
 
@@ -1033,7 +1121,13 @@ def to_structure(model: JanaModel, *, phase: int | str | None = None,
     # ParameterTable, whose symmetry refusals (a cell angle against its
     # setting, a tensor outside its site's subspace) would otherwise reach
     # the caller at fit time naming a parameter path rather than the file.
+    # So is U_eq, whose Cholesky factor of the cell's metric raises on a cell
+    # with a zero length or angle (numpy's LinAlgError is a ValueError).
     try:
+        for s in sites:
+            # an anisotropic site's biso is an inert record (Atom's docstring)
+            s["biso"] = (s["u"][0] if s["aniso"] is None
+                         else u_equivalent(s["u"], cell)) * EIGHT_PI_SQUARED
         structure = rx.Structure(phases=[rx.Phase(
             name=label,
             space_group=sg.xhm(),
@@ -1062,64 +1156,92 @@ def to_structure(model: JanaModel, *, phase: int | str | None = None,
 
     structure = merge_site_twins(structure, diagnostics=diagnostics, source=named)
     if diagnostics is not None:
-        where = ["phases.0.scale"]
-        labels = [s["atom"].label for s in sites]
-        if frozen:
-            not_carried.append(f"coordinate keys on fully fixed special positions "
-                               f"({', '.join(frozen)}), which are held")
-        if merged:
-            not_carried.append(
-                f"the per-axis coordinate keys of {', '.join(merged)}: a key on "
-                f"any axis frees every direction the site allows, so an axis "
-                f"the Jana run held (a polar group's origin, say) moves unless "
-                f"held again, e.g. by Phase.floating_origin")
-        if merged_adp:
-            not_carried.append(
-                f"the per-component Uij keys of {', '.join(merged_adp)}: a key "
-                f"on any of U11..U23 frees every tensor direction the site "
-                f"allows, so a component the Jana run held moves unless held "
-                f"again")
+        _report_build(model, chosen, label, sites, diagnostics, not_carried=not_carried,
+                      frozen=frozen, merged=merged, snapped=snapped, moved=moved)
+    return structure
+
+
+def _report_build(model: JanaModel, chosen: JanaPhase, label: str, sites: list[dict],
+                  diagnostics: list[Diagnostic], *, not_carried: list[str],
+                  frozen: list[str], merged: list[tuple[str, str, list[str]]],
+                  snapped: list[str], moved: list[tuple[str, list[str]]]) -> None:
+    """What a build did, one code per kind (as the ``.EXP`` and ``.gpx`` readers split it).
+
+    An action that moves what the Jana run held is a warning of its own
+    (``JANA_REFINE_KEY_MERGED``); keys on fully fixed sites, the seeded scale
+    and the two print-box repairs are infos of their own; ``JANA_NOT_CARRIED``
+    is left with the omissions that differ from file to file, and is emitted
+    only when one is left.
+    """
+    named = model.path
+    labels = [s["atom"].label for s in sites]
+
+    def at(atom: str, field: str) -> str:
+        return f"phases.0.atoms.{labels.index(atom)}.{field}"
+
+    if merged:
+        parts = [f"{atom} {'coordinates' if kind == 'xyz' else 'U^ij'} "
+                 f"({', '.join(held)})" for atom, kind, held in merged]
+        polar = any(kind == "xyz" for _, kind, _ in merged)
+        diagnostics.append(Diagnostic(
+            level="warning", code="JANA_REFINE_KEY_MERGED",
+            message=(
+                f"{named}: phase {label!r}: a key on some of a site's allowed "
+                f"directions frees all of them, since a structure carries one "
+                f"flag for an atom's coordinates and one for its U^ij. These "
+                f"directions the Jana run held will refine: {'; '.join(parts)}."
+                + (" A held coordinate can be what fixed a polar group's "
+                   "origin, and Phase.floating_origin is off by default."
+                   if polar else "")),
+            suggestion=("Hold those atoms' coordinates or U^ij with "
+                        "Refinement.hold, or set Phase.floating_origin, before "
+                        "comparing the fit with the Jana run."),
+            where=[at(atom, "x" if kind == "xyz" else "aniso.u11")
+                   for atom, kind, _ in merged]))
+    if frozen:
+        diagnostics.append(Diagnostic(
+            level="info", code="JANA_COORDINATES_SYMMETRY_FIXED",
+            message=(f"{named}: phase {label!r}: {len(frozen)} site(s) carry "
+                     f"coordinate keys but sit on fully fixed special positions "
+                     f"({', '.join(frozen)}), so their coordinates are held."),
+            where=[at(atom, "x") for atom in frozen]))
+    if snapped or moved:
+        repairs = []
         if snapped:
-            not_carried.append(f"the last printed digit of ai for "
-                               f"{', '.join(snapped)}, read as fully occupied")
+            repairs.append(f"ai of {', '.join(snapped)} read as fully occupied")
         if moved:
-            not_carried.append(
-                "the last printed digit of the Uij of "
-                + ", ".join(f"{n} ({', '.join(c.upper() for c in cs)})"
-                            for n, cs in moved)
-                + ", moved within it onto the form the site's symmetry allows")
-        where += [f"phases.0.atoms.{labels.index(n)}.x"
-                  for n in dict.fromkeys(frozen + merged)]
-        where += [f"phases.0.atoms.{labels.index(n)}.aniso.u11"
-                  for n in merged_adp]
-        where += [f"phases.0.atoms.{labels.index(n)}.occ" for n in snapped]
-        where += [f"phases.0.atoms.{labels.index(n)}.aniso.{c}"
-                  for n, cs in moved for c in cs]
-        stated = sorted({k for t in chosen.atom_types for k in t.values
-                         if k in ("f'", 'f"', "fneutron", "formtab")})
-        if stated:
-            not_carried.append(f"the .m50's stated {', '.join(stated)}"
-                               + (" (a tabulated form factor)"
-                                  if "formtab" in stated else "")
-                               + ", rietx computing its own scattering factors")
-        if len(model.phases) > 1:
-            not_carried.append("the .m40 scale line's phase volume fractions, "
-                               "whose positions no published document states")
-        if model.m40_trailing:
-            not_carried.append(f"{model.m40_trailing} .m40 line(s) after the "
-                               f"declared atoms, taken as the s.u. block")
-        others = sorted({_title_key(t) for t in model.m41_common}
-                        | {_title_key(t) for p in model.m41_phases
-                           for t in p.sections} - set(M41_READ))
-        if others:
-            not_carried.append(f"the .m41 section(s) {others}, which stay on "
-                               f"the model")
-        not_carried.append(f"the scale, seeded at 1e-3 (the .m40 states "
-                           f"{model.scale.values if model.scale else None})")
+            repairs.append(
+                "U^ij of " + ", ".join(f"{n} ({', '.join(c.upper() for c in cs)})"
+                                       for n, cs in moved)
+                + " moved onto the form the site's symmetry allows")
+        diagnostics.append(Diagnostic(
+            level="info", code="JANA_PRINTED_DIGIT_REPAIRED",
+            message=(f"{named}: phase {label!r}: within half a unit of each "
+                     f"value's own last printed digit, " + "; ".join(repairs)
+                     + "."),
+            where=([at(n, "occ") for n in snapped]
+                   + [at(n, f"aniso.{c}") for n, cs in moved for c in cs])))
+    # f' and f'' are written for nearly every atom type and change nothing
+    # rietx computes, so only the two that replace a scattering factor are said
+    stated = sorted({k for t in chosen.atom_types for k in t.values
+                     if k in ("fneutron", "formtab")})
+    if stated:
+        not_carried.append(f"the .m50's stated {', '.join(stated)}"
+                           + (" (a tabulated form factor)"
+                              if "formtab" in stated else "")
+                           + ", rietx computing its own scattering factors")
+    if model.m40_trailing:
+        not_carried.append(f"{model.m40_trailing} .m40 line(s) after the "
+                           f"declared atoms, taken as the s.u. block")
+    if not_carried:
         diagnostics.append(Diagnostic(
             level="info", code="JANA_NOT_CARRIED",
             message=(f"{named}: phase {label!r} was built without: "
-                     + "; ".join(not_carried) + "."),
-            suggestion="Refine the scale before you trust it.",
-            where=where))
-    return structure
+                     + "; ".join(not_carried) + ".")))
+    diagnostics.append(Diagnostic(
+        level="info", code="JANA_SCALE_NOT_COMPARABLE",
+        message=(f"{named}: phase {label!r} was built without: the scale, "
+                 f"seeded at 1e-3 (the .m40 states "
+                 f"{model.scale.values if model.scale else None})."),
+        suggestion="Refine the scale before you trust it.",
+        where=["phases.0.scale"]))
