@@ -123,7 +123,9 @@ carries that code in `result.diagnostics` exactly once.
 
   *Measured* ([dev], darwin/arm64). `tests/test_reader_notes.py`: 13 passed, five added. Each
   added test fails with its fix undone, one fix at a time (a scratch plugin patching
-  `refine`). `tests.reader_output`: exit 0, unchanged. Fast suite and lint: see the PR.
+  `refine`). `tests.reader_output`: exit 0, unchanged. Fast suite on the final tree: 15751 passed, 452
+  skipped, 30 xfailed; passed+skipped moved by 5, the added tests. CI's lint steps, Vale
+  included: 0 errors.
 
   Next: none. PR #1842.
 - **2026-11-25** — closed. What a pattern reader repaired or noticed in a file now reaches
