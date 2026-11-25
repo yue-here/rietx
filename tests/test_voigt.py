@@ -25,6 +25,7 @@ from rietx.model.profiles.voigt import (
     fwhm_to_voigt_params,
     voigt,
     voigt_derivs,
+    voigt_fwhm,
 )
 from rietx.optimize.least_squares import _make_jacobian, _make_residual
 from rietx.params.vector import ParameterTable
@@ -342,6 +343,9 @@ def test_basis_is_not_the_plain_profile_and_that_is_the_point():
 MANUAL_FWHM_ERROR_PCT = 0.43
 MANUAL_SHAPE_ERROR_PCT = 1.3
 MANUAL_CENTRE_ERROR_PCT = 0.25
+#: The bound `docs/docs/theory/profiles.md` quotes for Olivero & Longbothum's
+#: width, the reported FWHM under `"voigt"` (WP-1926).
+MANUAL_OLIVERO_FWHM_ERROR_PCT = 0.024
 
 
 def _voigt_fwhm(gamma_g: float, gamma_l: float) -> float:
@@ -382,6 +386,67 @@ def test_tch_reproduces_the_voigt_fwhm_to_the_bound_the_manual_quotes():
     # ...and the bound is not slack by an order of magnitude, or the manual is
     # telling the reader something looser than the truth.
     assert worst * 100.0 > MANUAL_FWHM_ERROR_PCT / 2.0
+
+
+def test_olivero_reproduces_the_voigt_fwhm_to_the_bound_the_manual_quotes():
+    """Olivero & Longbothum's width against the bisected Faddeeva FWHM (WP-1926).
+
+    A denser sweep than the TCH test's, because the bound is eighteen times
+    tighter and the worst case (Γ_L ≈ 0.28 Γ_G) sits between that test's
+    points. Both pure limits are checked by value: the Gaussian is exact by
+    construction, the Lorentzian 0.5346 + √0.2166 above one by 3.1e-6.
+    """
+    worst, worst_at = 0.0, 0.0
+    for ratio in np.concatenate([[1e-12], np.geomspace(1e-3, 1e3, 121)]):
+        true = _voigt_fwhm(1.0, ratio)
+        got = float(voigt_fwhm(1.0, ratio))
+        if abs(got - true) / true > worst:
+            worst, worst_at = abs(got - true) / true, float(ratio)
+    assert worst * 100.0 <= MANUAL_OLIVERO_FWHM_ERROR_PCT, (
+        f"Olivero-Longbothum FWHM error {worst:.4%} at Γ_L/Γ_G = {worst_at:.3g} "
+        f"exceeds the {MANUAL_OLIVERO_FWHM_ERROR_PCT} % docs/docs/theory/profiles.md quotes")
+    assert worst * 100.0 > MANUAL_OLIVERO_FWHM_ERROR_PCT / 2.0
+    assert 0.2 < worst_at < 0.4
+    assert float(voigt_fwhm(1.0, 0.0)) == 1.0
+    assert float(voigt_fwhm(0.0, 1.0)) == pytest.approx(1.0, abs=4e-6)
+
+
+def test_peak_fwhm_under_voigt_is_olivero_and_window_sizing_keeps_the_quintic():
+    """The reported width is the evaluated shape's; the frozen sizing is not moved.
+
+    Under ``"voigt"`` :meth:`CompiledModel.peak_fwhm` matches the bisected
+    Faddeeva FWHM of each reflection's own (σ, γ) to the Olivero bound, while
+    :meth:`peak_gamma_eta` — what ``rewindow`` and the FCJ node counts read —
+    still returns the TCH quintic bit for bit. Under the default shape the two
+    readers agree exactly, so nothing moves for a TCHZ fit.
+    """
+    from rietx.model.profiles.pseudovoigt import tch_gamma_eta
+    from tests.test_lab_instrument import _lab6_phase, _lab_instrument
+
+    structure = rx.Structure(phases=[_lab6_phase()])
+    tt = np.arange(18.0, 130.0, 0.05)
+    pattern = rx.PatternData(two_theta=tt.tolist(), intensity=[50.0] * len(tt))
+    ins = _lab_instrument()
+    table = ParameterTable(structure, ins)
+    values = table.decode(table.x0())
+
+    tch_model = compile_model(structure, ins, pattern)
+    _, w1, w2, _ = tch_model.phase_peaks(0, values)[0]
+    assert np.array_equal(tch_model.peak_fwhm(w1, w2), tch_model.peak_gamma_eta(w1, w2)[0])
+
+    ins.profile.shape = "voigt"
+    model = compile_model(structure, ins, pattern)
+    _, sigma, gamma, _ = model.phase_peaks(0, values)[0]
+    sigma, gamma = np.asarray(sigma, dtype=np.float64), np.asarray(gamma, dtype=np.float64)
+    gam_g, gam_l = sigma * GAUSS_FWHM_TO_SIGMA, 2.0 * gamma
+    assert len(sigma) > 5 and np.all(gam_l > 0.0) and np.all(gam_g > 0.0)
+
+    reported = np.asarray(model.peak_fwhm(sigma, gamma), dtype=np.float64)
+    true = np.array([_voigt_fwhm(float(g), float(lo)) for g, lo in zip(gam_g, gam_l, strict=True)])
+    assert np.max(np.abs(reported - true) / true) * 100.0 <= MANUAL_OLIVERO_FWHM_ERROR_PCT
+
+    sizing = np.asarray(model.peak_gamma_eta(sigma, gamma)[0], dtype=np.float64)
+    assert np.array_equal(sizing, np.asarray(tch_gamma_eta(gam_g, gam_l)[0], dtype=np.float64))
 
 
 def test_pseudo_voigt_shape_error_is_on_the_flanks_at_the_quoted_size():

@@ -2834,6 +2834,85 @@ def test_a_real_run_streams_its_events_to_disk_and_to_followers(fitted):
     assert [e["seq"] for e in later] == [s for s in seqs if s > half]
 
 
+def test_a_cursor_held_across_an_open_reads_the_new_projects_events(
+        blank, tmp_path, pattern_file):
+    """WP-2237: a page follows once, at mount, and keeps its cursor across an open.
+
+    Opening another project used to reset ``seq`` to 0, so the new project's
+    events up to the old count fell below the page's cursor: the poll returned
+    nothing for them and the SSE loop, which holds its own ``since``, did not
+    wake. ``oldest`` sat below the cursor, so no gap was counted either.
+    """
+    session, client = blank
+    stage = {"kind": "stage", "stage": {"name": "s", "turn_on": ["phases.*.scale"]}}
+    _open(session, tmp_path / "a.rex", pattern_file)
+    assert client.post("/api/run", stage)[0] == 200
+    _wait_idle(client)
+    cursor = client.get("/api/events?poll=1&since=0")[1]["next"]
+    assert cursor > 0
+
+    _open(session, tmp_path / "b.rex", pattern_file)
+    empty = client.get(f"/api/events?poll=1&since={cursor}")[1]
+    # the old project's events are gone, and nothing reads as a gap
+    assert empty["events"] == [] and empty["next"] == cursor
+    assert empty["oldest"] == cursor + 1
+
+    assert client.post("/api/run", stage)[0] == 200
+    _wait_idle(client)
+    batch = client.get(f"/api/events?poll=1&since={cursor}")[1]
+    seqs = [e["seq"] for e in batch["events"]]
+    kinds = [e["kind"] for e in batch["events"]]
+    assert seqs and seqs[0] == cursor + 1 and seqs == sorted(seqs)
+    assert batch["oldest"] == cursor + 1, "a fresh project's run is no gap"
+    assert kinds[0] == "stage_start" and kinds[-1] == "stage_end"
+    # the SSE route's loop reads the same cursor through ``follow``
+    events, nxt, _, _ = session.follow(cursor, "", timeout=0)
+    assert [e["seq"] for e in events] == seqs and nxt == seqs[-1]
+
+
+def _first_sse_event(port: int, path: str, headers: dict) -> dict:
+    conn = HTTPConnection("127.0.0.1", port, timeout=10)
+    conn.request("GET", path, headers={"Host": f"127.0.0.1:{port}", **headers})
+    response = conn.getresponse()
+    name = ""
+    try:
+        assert response.status == 200, response.read()[:300]
+        while True:
+            line = response.fp.readline().decode()
+            if not line:
+                raise AssertionError("the stream closed before an event frame")
+            if line.startswith("event: "):
+                name = line[7:].strip()
+            elif line.startswith("data: ") and name == "event":
+                return json.loads(line[6:])
+    finally:
+        conn.close()
+
+
+def test_a_reconnecting_stream_resumes_at_its_last_event_id(blank, tmp_path,
+                                                           pattern_file):
+    """WP-2237: EventSource re-opens its first URL and names the last id it read.
+
+    The URL's ``since`` is the cursor the page held when the stream opened, so
+    a server reading the URL alone replayed the whole ring after a dropped
+    connection, and the Console listed the run twice.
+    """
+    session, client = blank
+    _open(session, tmp_path / "a.rex", pattern_file)
+    assert client.post("/api/run", {"kind": "stage", "stage": {
+        "name": "s", "turn_on": ["phases.*.scale"]}})[0] == 200
+    _wait_idle(client)
+    n = client.get("/api/events?poll=1&since=0")[1]["next"]
+    assert n >= 2
+    port = client.port
+    got = _first_sse_event(port, "/api/events?since=0", {"Last-Event-ID": str(n - 1)})
+    assert got["seq"] == n
+    # an id this process never numbered is another server's, so the URL stands
+    got = _first_sse_event(port, "/api/events?since=0", {"Last-Event-ID": str(n + 50)})
+    assert got["seq"] == 1
+    assert _first_sse_event(port, "/api/events?since=0", {})["seq"] == 1
+
+
 def test_the_watcher_finds_a_gui_project_run_and_tails_it(fitted):
     """WP-1401's reader, now reading WP-1403's writer.
 
@@ -3091,6 +3170,86 @@ def test_a_series_member_has_curves_of_its_own(series):
     assert status == 404 and payload["error"]["where"] == ["index"]
 
 
+def test_the_map_puts_every_member_on_one_grid(series, monkeypatch):
+    """WP-2243 task 7: the Map's route serves each staged member's counts as a
+    row, and each fitted member's Δ/σ beside them, read off the same
+    ``curve_arrays`` the per-pattern plot uses. The ramp's members share their
+    channels, so the grid is theirs and each cell holds one channel: the rows
+    are the files' own numbers, bit for bit."""
+    session, client, _ = series
+    entry = session._series_run
+    got = _packed(client, "/api/series/map")
+    head, arrays = got.header, got.arrays
+    n, m = head["n_rows"], head["n_cols"]
+    data = entry["data"]
+    assert (n, m) == (3, len(data[0].tt()))
+    assert head["labels"] == ["T300", "T400", "T500"] and head["x"] == [300.0, 400.0, 500.0]
+    assert head["axis"] == "T" and head["fitted"] == [True] * 3 and head["running"] is False
+    np.testing.assert_array_equal(arrays["two_theta"], data[0].tt())
+    obs, diff = arrays["obs"].reshape(n, m), arrays["diff"].reshape(n, m)
+    for k, row in enumerate(entry["result"].entries):
+        res = entry["runner"].results_[k]
+        np.testing.assert_array_equal(obs[row.index], data[row.index].y())
+        at = np.searchsorted(data[row.index].tt(), res.two_theta)
+        np.testing.assert_array_equal(diff[row.index][at], _residuals(res)["delta"])
+        # a channel the fit did not keep has no difference, never a zero
+        assert np.isnan(np.delete(diff[row.index], at)).all()
+        assert head["rwp"][row.index] == row.statistics.rwp
+
+    # before a run the counts alone: the series' pre-visualisation
+    monkeypatch.setattr(session, "_series_run", None)
+    before = _packed(client, "/api/series/map")
+    assert before.header["fitted"] == [False] * 3 and "diff" not in before.arrays
+    np.testing.assert_array_equal(before.arrays["obs"], arrays["obs"])
+    monkeypatch.setattr(session, "_series_run", entry)
+
+    # an edit after the run (here the order) drops every row's difference, so
+    # one pattern's misfit is never drawn over another's counts
+    from rietx.gui.series import SeriesSetup
+
+    setup = session._series
+    monkeypatch.setattr(session, "_series", SeriesSetup(
+        members=setup.members[::-1], carry=setup.carry, refit=setup.refit,
+        direction=setup.direction, x_label=setup.x_label))
+    edited = _packed(client, "/api/series/map")
+    assert edited.header["fitted"] == [False] * 3
+    assert edited.header["labels"] == ["T500", "T400", "T300"]
+
+
+def test_the_map_grid_merges_members_that_disagree():
+    """Two steps and two ranges go onto one uniform grid over both, at the finer
+    step; a cell holds the mean of the channels in it; past the cell budget,
+    neighbouring columns merge and the means still add up."""
+    from rietx.gui.series import binned, map_grid
+
+    fine, coarse = np.arange(10.0, 20.0001, 0.01), np.arange(15.0, 30.0001, 0.02)
+    grid, edges = map_grid([fine, coarse], 2)
+    assert grid[0] == 10.0 and abs(grid[-1] - 30.0) < 1e-9
+    np.testing.assert_allclose(np.diff(grid), 0.01, atol=1e-9)
+    assert len(edges) == len(grid) + 1
+    y = np.arange(len(coarse), dtype=float)
+    cells = binned(coarse, y, edges)
+    # every channel lands in exactly one cell, and no cell outside its span has one
+    assert np.nansum(cells) == y.sum() and np.isnan(cells[grid < 14.99]).all()
+
+    same, same_edges = map_grid([fine, fine.copy()], 2)
+    np.testing.assert_array_equal(same, fine)
+    np.testing.assert_array_equal(binned(fine, fine, same_edges), fine)
+
+    merged, merged_edges = map_grid([fine, fine], 2, cells=500)
+    assert 2 * len(merged) <= 500 + 2
+    ones = binned(fine, np.ones_like(fine), merged_edges)
+    np.testing.assert_array_equal(ones, 1.0)
+    assert merged_edges[0] == same_edges[0] and merged_edges[-1] == same_edges[-1]
+
+
+def test_the_map_needs_a_staged_series(blank, tmp_path, pattern_file):
+    session, client = blank
+    _open(session, tmp_path / "lone.rex", pattern_file)
+    status, payload = client.get("/api/series/map")
+    assert status == 409 and payload["error"]["code"] == "NO_SERIES"
+
+
 def test_a_failed_pattern_does_not_shift_the_members_after_it(series, monkeypatch):
     """``results_``/``trees_`` skip a failed pattern and the staged members do
     not, so the routes find a member through its entry's ``SeriesEntry.index``
@@ -3115,6 +3274,49 @@ def test_a_failed_pattern_does_not_shift_the_members_after_it(series, monkeypatc
     np.testing.assert_array_equal(got.arrays["two_theta"], entry["data"][2].tt())
     status, tree = client.get("/api/series/history?index=1")
     assert status == 200 and (tree["index"], tree["label"]) == (2, member["label"])
+
+    # ``pattern`` addresses the place in the series, never the entry, so the
+    # failed member is drawn alone and the one after it keeps its fit
+    alone = _packed(client, "/api/series/curves?pattern=1")
+    assert alone.header["fitted"] is False and alone.header["label"] == entry["members"][1]["label"]
+    assert "y_calc" not in alone.arrays
+    after = _packed(client, "/api/series/curves?pattern=2")
+    assert after.header["fitted"] is True
+    np.testing.assert_array_equal(after.arrays["two_theta"][after.arrays["fitted"]],
+                                  runner.results_[2].two_theta)
+
+
+def test_a_series_member_is_drawn_by_its_place_before_during_and_after_a_run(series):
+    """WP-2243: ``?pattern=`` serves any member of a list by its place. The
+    staged list draws from the file with no fit; the run's list draws each
+    reported-chain fit from the moment ``on_result`` hands it over, which a
+    live entry stands in for here."""
+    session, client, _ = series
+    entry = session._series_run
+    staged = _packed(client, "/api/series/curves?pattern=1&of=staged")
+    assert staged.header["fitted"] is False and staged.header["label"] == "T400"
+    np.testing.assert_array_equal(staged.arrays["two_theta"], entry["data"][1].tt())
+    assert "y_calc" not in staged.arrays
+    done = _packed(client, "/api/series/curves?pattern=1")
+    assert done.header["fitted"] is True
+    np.testing.assert_array_equal(done.arrays["y_calc"],
+                                  _packed(client, "/api/series/curves?index=1").arrays["y_calc"])
+
+    # mid-run: only the fits that have landed carry a curve, and the live run
+    # outranks the last record
+    session._series_live = {**{k: entry[k] for k in ("members", "data", "limits")},
+                            "results": {0: entry["runner"].results_[0]}}
+    try:
+        assert _packed(client, "/api/series/curves?pattern=0").header["fitted"] is True
+        assert _packed(client, "/api/series/curves?pattern=1").header["fitted"] is False
+    finally:
+        session._series_live = None
+
+    status, payload = client.get("/api/series/curves?pattern=9")
+    assert status == 404 and payload["error"]["where"] == ["pattern"]
+    status, payload = client.get("/api/series/curves?pattern=9&of=staged")
+    assert status == 404 and payload["error"]["where"] == ["pattern"]
+    assert client.get("/api/series/curves?pattern=0&of=both")[0] == 400
 
 
 def test_the_series_answer_carries_the_trace_it_is_scrubbed_along(series):

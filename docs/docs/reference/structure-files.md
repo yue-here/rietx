@@ -243,8 +243,10 @@ Applying it would move the group away from the atoms beside it.
 Where no tabulated magnetic group matches, it is `None`, with [`CIF_MAGNETIC_UNIDENTIFIED`](diagnostics-structures.md#cif_magnetic_unidentified).
 A stated `number_BNS` or `number_OG` is checked against the same identification.
 A number labels the group's type in every setting, so one the operators are not is a contradiction.
-The operators are what is refined, so their numbers are stored, the stated `name_BNS` is dropped, and [`CIF_MAGNETIC_NUMBER_MISMATCH`](diagnostics-structures.md#cif_magnetic_number_mismatch) names both.
-The reader cannot tell which side is wrong: a forgotten anti-centring makes the operators a smaller group while the number stays right.
+The reader cannot tell which side is wrong: a typing error in the number leaves the operators right, and a forgotten anti-centring makes the operators a smaller group while the number stays right.
+So the file is refused with a `MagCifError`, [`CIF_MAGNETIC_NUMBER_MISMATCH`](diagnostics-structures.md#cif_magnetic_number_mismatch), naming the file, each stated number with its tag, the group the loops generate, and each side's operation count per cell.
+Correcting the one line that disagrees with the file's source makes it readable.
+A file in a non-standard setting of its stated group is not a mismatch, and a group spglib cannot identify is not checked.
 
 A file's `_atom_site_moment.symmform`, the constraint its producer applied to each moment, is kept for reference and compared with the allowed directions the operators give, [`CIF_MAGNETIC_SYMMFORM`](diagnostics-structures.md#cif_magnetic_symmform).
 Four tags are read and deliberately not used: `_space_group_magn.name_OG`, `_parent_space_group.IT_number`, `_parent_space_group.transform_Pp_abc` and `_atom_site_moment.refinement_flags_magnetic`.
