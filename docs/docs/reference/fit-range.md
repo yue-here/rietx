@@ -22,8 +22,8 @@ Each fact restates the limits and exclusions the fit was handed, and nothing in 
 | `FitRange.outside` | one `OutsideSpan` per stretch of channels the limits and excluded regions cut | empty when nothing was cut; a channel left out only for a σ of zero or below is in no span, and `RefinementResult.sigma_rule.n_nonpositive_excluded` counts it |
 | `FitRange.cut_window_deg`, `FitRange.straddle_fwhm` | the two reporting widths the spans' facts were read with | `None` when nothing was cut |
 
-`FitRange.line()` is the line `summary()` prints beside `excluded:`.
-An uncut fit prints a fitted range equal to the file's range and nothing else.
+`FitRange.line()` is the line `summary()` prints beside `excluded:` when the limits or an excluded region cut channels.
+An uncut fit prints no such line, and neither does a fit whose only unfitted channels have a σ of zero or below.
 
 An `OutsideSpan` is one stretch the caller's limits or excluded regions cut.
 `OutsideSpan.kind` is `"below"` from the file's start, `"above"` to its end, or `"excluded"` with fitted channels on both sides.
@@ -39,7 +39,7 @@ Each ratio below divides by the median observed intensity over the fitted channe
 | `OutsideSpan.slope_at_cut` | the slope over that window as a fraction of its mean per degree, positive when rising away from the fitted range |
 | `OutsideSpan.background_slope_at_cut` | the fitted background's slope over the same width inside the fitted range, in the same units |
 | `OutsideSpan.peak_two_theta`, `OutsideSpan.peak_sigma` | where the span's largest excess over the background envelope lies, and its size in σ |
-| `OutsideSpan.reflections` | the reflections the model put in the span or within `FitRange.straddle_fwhm` FWHM of its edge |
+| `OutsideSpan.reflections` | the reflections the model put in the span or within `FitRange.straddle_fwhm` FWHM of its edge, or `None` for a fit with no compiled model |
 | `OutsideSpan.reflections_searched` | the part of the span the model's reflection list covers |
 
 The excess is a location, not a detection.

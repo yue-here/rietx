@@ -7604,9 +7604,13 @@ class Refinement:
             ranges = ", ".join(f"{lo:.2f}-{hi:.2f}°" for lo, hi in self._excluded_regions)
             lines.append(f"    excluded: {ranges}")
         # WP-2075: beside ``excluded:``, never in place of it, until the
-        # maintainer rules which (#1219's question 2)
-        if self.result_.fit_range is not None:
-            lines.append(f"    {self.result_.fit_range.line()}")
+        # maintainer rules which (#1219's question 2); only where the limits
+        # or an excluded region cut channels, since an uncut fit's line would
+        # restate the file's range on every fit (and a channel dropped for
+        # σ <= 0 alone is no cut of the caller's)
+        fit_range = self.result_.fit_range
+        if fit_range is not None and fit_range.outside:
+            lines.append(f"    {fit_range.line()}")
         support = self.result_.data_support
         stats = self.result_.statistics
         if support is not None:

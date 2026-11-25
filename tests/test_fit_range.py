@@ -88,7 +88,7 @@ def test_channels_the_sigma_rule_drops_are_no_cut_of_the_callers():
     zeros = [0, 500, 501, 900]
     sig[zeros] = 0.0
     data = data.model_copy(update={"sigma": sig.tolist()})
-    _ref, result = _fit(data)
+    ref, result = _fit(data)
     fr = result.fit_range
     assert fr.limits_requested is None
     assert fr.excluded_declared == fr.excluded_applied == []
@@ -96,6 +96,8 @@ def test_channels_the_sigma_rule_drops_are_no_cut_of_the_callers():
     assert fr.n_fitted == len(result.two_theta) == fr.n_file - len(zeros)
     assert result.sigma_rule.n_nonpositive_excluded == len(zeros)
     assert "outside" not in fr.line()
+    # nothing the caller cut, so the summary prints no fit-range line
+    assert not any(s.startswith("    fit range:") for s in ref.summary().splitlines())
     # with limits, the spans are the limits' alone, and the three counts
     # still add up to the file's
     rec = fit_range_record(data, LIMITS)
@@ -143,15 +145,65 @@ def test_the_record_round_trips_through_json(cut):
 
 
 def test_the_summary_prints_the_range_beside_the_excluded_line(uncut, cut):
-    ref, result = uncut
-    line = f"    {result.fit_range.line()}"
-    assert line in ref.summary().splitlines()
-    assert "% of the file's counts outside" not in line
+    """Only on a fit the limits or an excluded region cut: an uncut fit's
+    line would restate the file's range, the same on every uncut fit."""
+    ref, _result = uncut
+    assert not any(s.startswith("    fit range:") for s in ref.summary().splitlines())
     _data, ref, result = cut
     lines = ref.summary().splitlines()
     excluded = next(i for i, s in enumerate(lines) if s.startswith("    excluded: "))
     assert lines[excluded + 1] == f"    {result.fit_range.line()}"
     assert "outside, in 3 spans" in lines[excluded + 1]
+
+
+
+def test_a_span_with_no_reflection_list_says_none_not_empty(cut):
+    """``OutsideSpan.reflections`` is ``None`` where no reflection list was
+    read (no compiled model, or chunk 1 alone), and a list, empty or not,
+    where one was: an empty list would say the model put nothing there."""
+    data, _ref, result = cut
+    assert all(isinstance(s.reflections, list) for s in result.fit_range.outside)
+    bare = fit_range_record(data, LIMITS)
+    assert bare.outside and all(s.reflections is None for s in bare.outside)
+    record = describe_outside(bare, data, LIMITS, [], None, None)
+    assert all(s.reflections is None for s in record.outside)
+    assert record.straddle_fwhm is None
+
+
+@pytest.mark.parametrize("limits", [LIMITS, None])
+def test_the_spans_the_fitted_channels_and_the_sigma_rule_partition_the_file(limits):
+    """Every channel of the file is in exactly one of: an ``OutsideSpan``
+    (the caller's cut, built from the excluded regions and the limits), the
+    fitted channels (:func:`rietx.project.fitted_mask`, the residual's
+    authority), or the σ <= 0 channels the rule dropped from what the caller
+    kept, counted by ``sigma_rule``.  The spans and the fitted mask are built
+    by two routes, so this holds them together.  σ = 0 is planted at the
+    file's first channel, below the lower limit, inside the band, inside the
+    fitted range and beside the band's edge."""
+    from rietx.project import fitted_mask
+
+    data = synthesize()
+    tt = data.tt()
+    sig = np.sqrt(np.maximum(np.asarray(data.intensity), 1.0))
+    planted = [0, 150, int(np.searchsorted(tt, 10.5)), 1000,
+               int(np.searchsorted(tt, BAND[1])) + 1, tt.size - 1]
+    sig[planted] = 0.0
+    data = data.model_copy(update={"sigma": sig.tolist(),
+                                   "excluded_regions": [BAND, (30.0, 31.0)]})
+    rec = fit_range_record(data, limits)
+    in_span = np.zeros(tt.size, dtype=int)
+    for span in rec.outside:
+        in_span += (tt >= span.lo) & (tt <= span.hi)
+    fitted = fitted_mask(data, limits)
+    dropped = (sig <= 0.0) & (in_span == 0)
+    assert np.all(in_span + fitted + dropped == 1)
+    assert rec.n_fitted == int(fitted.sum())
+    assert sum(s.n_points for s in rec.outside) == int(in_span.sum())
+    kept = data._region_mask()
+    if limits is not None:
+        kept &= (tt >= limits[0]) & (tt <= limits[1])
+    assert int(dropped.sum()) == data.sigma_rule(kept).n_nonpositive_excluded
+    assert rec.n_fitted + int(in_span.sum()) + int(dropped.sum()) == rec.n_file
 
 
 # -- issue #1219's family A: C7 and C8 ---------------------------------------

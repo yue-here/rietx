@@ -268,4 +268,4 @@ def test_the_result_records_the_range_cut_below_20_degrees(textured):
     assert below.count_share > 0.0
     assert below.level_ratio_at_cut is not None and below.level_ratio_at_cut > 1.0
     # corundum's first reflection is above 25°: nothing predicted below the cut
-    assert all(r.fraction_outside < 0.5 for r in below.reflections)
+    assert below.reflections == []

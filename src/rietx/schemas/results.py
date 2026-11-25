@@ -2193,7 +2193,9 @@ class OutsideSpan(Base):
       reflections further out.
 
     A fact the span cannot give is ``None``: a window holding fewer than two
-    channels, or a fit with no compiled model behind it.
+    channels, or a fit with no compiled model behind it (``reflections`` and
+    ``reflections_searched``).  An empty ``reflections`` is a list that was
+    read and holds no reflection.
     """
 
     kind: Literal["below", "above", "excluded"]
@@ -2208,7 +2210,7 @@ class OutsideSpan(Base):
     background_slope_at_cut: float | None = None
     peak_two_theta: float | None = None
     peak_sigma: float | None = None
-    reflections: list[ReflectionOutside] = Field(default_factory=list)
+    reflections: list[ReflectionOutside] | None = None
     reflections_searched: tuple[float, float] | None = None
 
 
@@ -2267,7 +2269,8 @@ class FitRange(Base):
         return float(sum(s.count_share for s in self.outside))
 
     def line(self) -> str:
-        """The one protocol line ``Refinement.summary()`` prints."""
+        """The one protocol line ``Refinement.summary()`` prints, where the
+        limits or an excluded region cut channels (``outside`` non-empty)."""
         lo, hi = self.fitted_range
         flo, fhi = self.file_range
         text = (f"fit range: {lo:.2f}-{hi:.2f}° of the file's {flo:.2f}-{fhi:.2f}° "

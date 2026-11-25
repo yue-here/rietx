@@ -6025,7 +6025,8 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "counts it), with its share of the file's "
             "counts, its level and slope at the cut against the fitted median, "
             "its largest excess over the background envelope, and the "
-            "reflections the model put in it or across its edge. Facts, with no "
+            "reflections the model put in it or within 3 of their own FWHM of its "
+            "edge (`straddle_fwhm`). Facts, with no "
             "threshold: nothing reads them to decide anything. `None` when the "
             "result did not come from `fit` or `run_stage`."
         ),
