@@ -774,6 +774,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1407](1407-the-format-a-benchtop-still-writes.md) | The format a benchtop still writes: PANalytical `.udf`/`.rd`, and three named refusals | ✅ 2026-09-13 | — | — |
 | [1416](1416-read-xy-reads-the-files-shape.md) | `read_xy` reads the file's shape | 🛑 2026-09-24 | — | — |
 | [2059](2059-a-bruker-raw-v2-file-reads.md) | A Bruker RAW v2 file reads, checked against two descriptions and one real file | ✅ 2026-11-02 | — | — |
+| [2309](2309-the-fullprof-free-format-pattern-reads.md) | FullProf's free-format pattern reads, and a misread names its cause | ⬜ | P3 | — ([2304](2304-a-readers-repairs-reach-the-fits-diagnostics.md) soft) |
 
 ### <a id="unscheduled-render-what-the-fit-already-knows"></a>Render what the fit already knows
 
