@@ -2568,10 +2568,18 @@ class MultiHistogramRefinement:
             # the single fit's builder, blind-scale rule and finding included
             # (WP-1463); rows are addressed as this surface spells them.
             # Rietveld only, as there (``refine._build_result``): a Pawley
-            # fit force-fixes every scale, so a fraction would be the start's
-            # what each fraction rests on in this histogram (WP-2073): the
-            # support the hold was decided on, read as the single fit does, and
-            # the answer stage's holds and the bound test's paths, scoped to h
+            # fit force-fixes every scale, so a fraction would be the start's.
+            # What each fraction rests on in this histogram (WP-2073): the
+            # support of the phase's scale **in histogram h**, the reading a
+            # per-pattern hold of h's copy is decided on (``_unseen``), and
+            # the answer stage's holds and the bound test's paths, scoped to h.
+            # It is not the number PHASE_UNCONSTRAINED's joint statement
+            # decides on, which is the largest reading over the histograms
+            # (``per_support.max(axis=0)`` below): a row quotes the scale its
+            # own fraction is formed from, so a phase plain in one pattern and
+            # absent from another reads high in one row and low in the other
+            # while no finding fires.  The finding's number is the largest of
+            # the rows' (pinned by test_qpa's joint test).
             h_support = (significance[h] if significance is not None
                          else model.phase_support(values))
             qpa, qpa_diags = (_quantify_phases(

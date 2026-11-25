@@ -412,12 +412,19 @@ class QPATrajectory(Trajectory):
     #: verdict: no threshold is applied and no point is dropped for it.
     support_sigma: list[float | None] = Field(default_factory=list)
     #: per point, the phase's paths that pattern's fraction was conditional on
-    #: (``PhaseQuantity.conditional_on``); empty where nothing was held.
-    conditional_on: list[list[str]] = Field(default_factory=list)
+    #: (``PhaseQuantity.conditional_on``), as the row carries it: ``[]`` where
+    #: nothing was held or on a bound, ``None`` where the row made no such
+    #: measurement (a result stored before WP-2073, or a replay with neither a
+    #: guard nor a stage record).
+    conditional_on: list[list[str] | None] = Field(default_factory=list)
     #: per point, whether the pattern carried ``PHASE_UNCONSTRAINED`` on this
     #: phase.  Such a point is **kept**: its scale was still measured and only
     #: its structure was held (WP-2073, ruled 2026-11-17), so its fraction is
     #: a measurement conditional on the held values, which the flag says.
+    #: The finding is this phase's when a path it names is the phase's own
+    #: (``phases.<i>.``, scoped or not) or is on the row's ``conditional_on``,
+    #: which places a held ``vars.X`` on the phase whose cell it drives
+    #: (``StageResult.held_reach``), where the finding names ``vars.X`` alone.
     unconstrained: list[bool] = Field(default_factory=list)
 
     @property
@@ -438,9 +445,11 @@ class QPATrajectory(Trajectory):
         for k, flagged in enumerate(self.unconstrained):
             if flagged:
                 label = self.labels[k] if k < len(self.labels) else ""
+                paths = (self.conditional_on[k] if k < len(self.conditional_on)
+                         else None)
                 notes.append(f"  {label or f'point {k}'}: PHASE_UNCONSTRAINED on "
                              f"this phase; the fraction is conditional on "
-                             f"{', '.join(self.conditional_on[k]) or 'held values'}")
+                             f"{', '.join(paths or ()) or 'held values'}")
         return "\n".join([text, *notes])
 
 
@@ -1155,11 +1164,14 @@ class SeriesResult(Base):
             traj.positions.append(i)
             traj.unmeasured.append(list(e.qpa.unmeasured_phases))
             traj.support_sigma.append(row.support_sigma)
-            traj.conditional_on.append(list(row.conditional_on or ()))
+            # as the row carries it: ``None`` (no measurement) is not ``[]``
+            traj.conditional_on.append(None if row.conditional_on is None
+                                       else list(row.conditional_on))
             ip = next(k for k, r in enumerate(e.qpa.phases) if r.name == phase)
+            own = set(row.conditional_on or ())
             traj.unconstrained.append(any(
                 d.code == "PHASE_UNCONSTRAINED"
-                and any(f"phases.{ip}." in w for w in d.where)
+                and any(f"phases.{ip}." in w or w in own for w in d.where)
                 for d in e.diagnostics))
         return traj
 

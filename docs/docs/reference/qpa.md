@@ -43,6 +43,8 @@ for row in result.qpa.phases:
 | `PhaseQuantity.zmv` | their product, the quantity the fractions are proportional to |
 | `PhaseQuantity.z` | formula units per cell |
 | `PhaseQuantity.molar_mass` | one formula unit's mass, in g/mol |
+| `PhaseQuantity.support_sigma` | how many esds from zero the phase's scale is, the number `PHASE_UNCONSTRAINED` decides on (on a joint fit, in this row's histogram, and the finding reads the largest) |
+| `PhaseQuantity.conditional_on` | the phase's paths the answer held at a handed-in value or left on a bound |
 | `PhaseQuantity.particle_radius_um` | the particle radius you supplied, in µm, when the correction ran |
 | `PhaseQuantity.mu_cm` | the phase's linear attenuation coefficient µ, in cm⁻¹ |
 | `PhaseQuantity.mu_r` | its µ·R, with R the particle radius |
@@ -50,11 +52,11 @@ for row in result.qpa.phases:
 | `PhaseQuantity.weight_fraction_corrected` | the fraction after that correction |
 
 The last five fields are `None` unless the microabsorption correction ran.
-| `PhaseQuantity.support_sigma` | how many esds from zero the phase's scale is, the number `PHASE_UNCONSTRAINED` decides on |
-| `PhaseQuantity.conditional_on` | the phase's paths the answer held at a handed-in value or left on a bound |
 
 `PhaseQuantity.support_sigma` and `PhaseQuantity.conditional_on` say what the fraction rests on, so a reader of `result.qpa` alone sees them (WP-2073).
 `PhaseQuantity.support_sigma` is written for every phase of a Rietveld fit, whether or not [`PHASE_UNCONSTRAINED`](diagnostics-refinement.md#phase_unconstrained) fired, and is that finding's own number rather than a second test.
+On a joint fit each `HistogramResult.qpa` row carries the reading in its own histogram, the scale that row's fraction is formed from.
+The joint `PHASE_UNCONSTRAINED` decides on the largest of those readings over the histograms, so a phase plain in one pattern and absent from another has a low `support_sigma` in one row while no finding fires.
 `PhaseQuantity.conditional_on` lists the phase's paths that the answer stage held (`StageResult.held`) and the phase's paths at a [`BOUND_HIT`](diagnostics-refinement.md#bound_hit).
 A width on its zero floor ([`FLOOR_HIT`](diagnostics-refinement.md#floor_hit)) is not listed, because zero width is the correction off.
 An empty list means that nothing was held and nothing sat on a bound.
@@ -225,6 +227,10 @@ A block from a solve that held them drops the scales' correlations with them, an
 
 `PhaseQuantity.support_sigma` and `PhaseQuantity.conditional_on` stay `None` on these rows: they are measurements of a fit's answer stage.
 
+`Refinement.qpa` raises `ValueError` where there is no fraction to form, and the message says which case holds.
+The cases are a model with no phase, a `data` range that holds no reflection of any phase, and scales whose Σ S·ZMV is not positive, with the scales at or below zero named.
+A fit reports the same cases inside its result instead (`QPA_UNAVAILABLE`, `QuantitativePhaseAnalysis.unmeasured_phases`), because there QPA is one field of an answer.
+
 A plan of one empty stage gives the same fractions inside a full `RefinementResult`, with statistics and diagnostics, when you want those.
 `Refinement.fit` with `rx.RefinementPlan(stages=[rx.Stage("evaluate", [])])` evaluates the model where it stands, with 0 free parameters, and its esds are `None` for the same reason.
 `Refinement.run_stage` with an empty stage does not do this on a refinement that has already fitted: it continues the previous fit's free set, so the values you set are refitted away.
@@ -315,4 +321,4 @@ A corrected fraction still 11 wt % from the weighed value is evidence that this 
 `Refinement.write_qpa_table` writes the table to a CSV file, or a tab-separated one for a `.tsv` or `.tab` suffix ([Exports and derived tables](exports.md)).
 The file opens with `#` comment lines stating the crystalline-only scope and, where it applies, the microabsorption correction or why it was skipped.
 A joint fit reports a `QuantitativePhaseAnalysis` per pattern on `HistogramResult.qpa`, and a series reports one per pattern on `SeriesEntry.qpa`.
-`SeriesResult.qpa_trajectory` turns one phase's fraction into a trajectory across the series ([Sequential refinement](series.md)). `QPATrajectory.support_sigma`, `QPATrajectory.conditional_on` and `QPATrajectory.unconstrained` give, per point, the phase's `PhaseQuantity.support_sigma`, its `PhaseQuantity.conditional_on` and whether the pattern carried `PHASE_UNCONSTRAINED` on it. A point whose pattern held the phase's structure is kept and marked, not dropped: its scale was still measured, and only its structure was held. No threshold decides the mark.
+`SeriesResult.qpa_trajectory` turns one phase's fraction into a trajectory across the series ([Sequential refinement](series.md)). `QPATrajectory.support_sigma`, `QPATrajectory.conditional_on` and `QPATrajectory.unconstrained` give, per point, the phase's `PhaseQuantity.support_sigma`, its `PhaseQuantity.conditional_on` as the row carries it (`None` stays `None`, distinct from an empty list) and whether the pattern carried `PHASE_UNCONSTRAINED` on it. A point whose pattern held the phase's structure is kept and marked, not dropped: its scale was still measured, and only its structure was held. No threshold decides the mark. A finding marks the point when a path it names is the phase's own or is on the row's `PhaseQuantity.conditional_on`, so a held variable driving the phase's cell, which the finding names alone, marks it too.

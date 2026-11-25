@@ -1158,14 +1158,99 @@ def test_refinement_qpa_forms_fractions_at_the_held_values_with_no_fit():
         ref.qpa(data, scale_cov=np.eye(3))
 
 
-@pytest.mark.xdist_group("qpa-issue-1213")
-def test_refinement_qpa_reproduces_the_fits_fraction_bit_for_bit():
-    """The acceptance: QPA at the fit's own values is the fit's W, and the
-    covariance block the fit used gives the fit's esd."""
-    data, ref, fitted = _i1213_fit("real weak")
-    q = ref.qpa(data)
+@pytest.mark.parametrize("kernels", [False, True], ids=["numpy", "compiled"])
+def test_refinement_qpa_reproduces_the_fits_fraction_bit_for_bit(kernels):
+    """The acceptance: QPA at the fit's own values is the fit's W, bit for
+    bit.  A bit-identity assertion declares its path (tests/CLAUDE.md), so the
+    fit and the call run under each tier in turn, never the inherited one."""
+    from rietx.model import compiled
+
+    was = compiled.set_enabled(kernels)
+    try:
+        data, s, ins = _i1213_case("real weak")
+        ref = Refinement(s, ins)
+        fitted = ref.fit(data, plan=_i1213_plan(), telemetry=False)
+        q = ref.qpa(data)
+    finally:
+        compiled.set_enabled(was)
     assert q.phases[1].weight_fraction == fitted.qpa.phases[1].weight_fraction
     assert q.phases[0].weight_fraction == fitted.qpa.phases[0].weight_fraction
+
+
+def test_refinement_qpa_raises_naming_the_case_when_there_is_no_fraction():
+    """Design Rule 4: a verb raises on failure, and the message names which
+    case holds, where the fit path reports the same cases as fields."""
+    data, ref = _two_phase_qpa_case()
+    below = PatternData(two_theta=np.arange(5.0, 6.0, 0.02).tolist(),
+                        intensity=[10.0] * 50)
+    with pytest.raises(ValueError, match=r"no reflection of phase 0 \(LaB6\), "
+                                         r"phase 1 \(CaF2\) lies in the data's range"):
+        ref.qpa(below)
+    ref.set_values({"phases.0.scale": 0.0, "phases.1.scale": 0.0})
+    with pytest.raises(ValueError, match=r"non-positive Σ S·ZMV \(phases\.0\.scale, "
+                                         r"phases\.1\.scale at or below zero\)"):
+        ref.qpa(data)
+    # the positive arm: one scale back above zero forms fractions again
+    ref.set_values({"phases.0.scale": 1e-3})
+    assert ref.qpa(data).phases[0].weight_fraction == 1.0
+
+
+def test_a_joint_rows_support_is_its_histograms_and_the_finding_reads_the_largest(
+        monkeypatch):
+    """On a joint fit each histogram's QPA row carries the phase's reading in
+    that histogram (the scale its fraction is formed from), and the number
+    ``PHASE_UNCONSTRAINED``'s joint statement decides on is the largest of
+    them: CaF2 plain in the real-weak pattern, absent from the unseen one."""
+    from rietx import MultiHistogramRefinement, multi
+
+    handed: list[np.ndarray] = []
+    inner = multi._phase_support_diagnostics
+
+    def spy(support, *args, **kw):
+        handed.append(np.array(support, dtype=float))
+        return inner(support, *args, **kw)
+
+    monkeypatch.setattr(multi, "_phase_support_diagnostics", spy)
+    d0, s, i0 = _i1213_case("real weak")
+    d1, _, i1 = _i1213_case("unseen")
+    result = MultiHistogramRefinement(s, [i0, i1]).fit([d0, d1], plan=_i1213_plan())
+    rows = np.array([[q.support_sigma for q in result.for_histogram(h).qpa.phases]
+                     for h in range(2)])
+    (decided,) = handed
+    assert np.array_equal(decided, rows.max(axis=0))       # pinned, bit for bit
+    assert rows[0, 1] > 3 > rows[1, 1]                     # the rows differ
+    assert not [d for d in result.diagnostics if d.code == "PHASE_UNCONSTRAINED"]
+
+
+def test_a_qpa_trajectory_keeps_a_rows_none_and_marks_a_held_variable():
+    """``conditional_on`` is appended as the row carries it (``None`` is no
+    measurement, ``[]`` one), and a finding naming only a held ``vars.X`` marks
+    the phase whose row lists it (``held_reach`` put it there)."""
+    from rietx.schemas.common import Diagnostic
+    from rietx.schemas.results import QuantitativePhaseAnalysis
+    from rietx.schemas.sequential import SeriesEntry, SeriesResult
+
+    def entry(i, conditional_on, where):
+        rows = [PhaseQuantity(name=n, weight_fraction=w, scale=1.0, z=1,
+                              molar_mass=1.0, cell_mass=1.0, cell_volume=1.0,
+                              zmv=1.0, support_sigma=sg,
+                              conditional_on=c)
+                for n, w, sg, c in (("LaB6", 0.9, 50.0, []),
+                                    ("CaF2", 0.1, 1.2, conditional_on))]
+        diags = ([] if where is None else
+                 [Diagnostic(level="warning", code="PHASE_UNCONSTRAINED",
+                             message="m", where=where, value=1.2)])
+        return SeriesEntry(index=i, x=float(i),
+                           qpa=QuantitativePhaseAnalysis(phases=rows),
+                           diagnostics=diags)
+
+    series = SeriesResult(entries=[entry(0, None, None), entry(1, [], None),
+                                   entry(2, ["vars.A"], ["vars.A"])])
+    caf2 = series.qpa_trajectory("CaF2")
+    assert caf2.conditional_on == [None, [], ["vars.A"]]
+    assert caf2.unconstrained == [False, False, True]
+    assert "conditional on vars.A" in str(caf2)
+    assert series.qpa_trajectory("LaB6").unconstrained == [False, False, False]
 
 
 @pytest.mark.slow

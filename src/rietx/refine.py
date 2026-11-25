@@ -7208,7 +7208,7 @@ class Refinement:
             _carry_lebail(self._model, model)
         return model.evaluate(table.decode(table.x0()))
 
-    def qpa(self, data: PatternData, *, scale_cov=None) -> QuantitativePhaseAnalysis | None:
+    def qpa(self, data: PatternData, *, scale_cov=None) -> QuantitativePhaseAnalysis:
         """Weight fractions at the parameter values this object holds, with no fit.
 
         The route for "QPA at my values" (WP-2073, named by the maintainer
@@ -7233,20 +7233,35 @@ class Refinement:
 
         ``support_sigma`` and ``conditional_on`` stay ``None`` on every row:
         they are measurements of a fit's answer stage and nothing here made one.
-        Returns ``None`` where the scales cannot form fractions, as
-        :func:`~rietx.optimize.qpa.compute_qpa` does.
+
+        Raises ``ValueError`` where there is no fraction to form, naming which
+        case holds (Design Rule 4: a verb raises on failure, where a fit's
+        ``result.qpa`` reports the same cases as ``QPA_UNAVAILABLE`` or
+        ``unmeasured_phases``, being one field of a result): the model has no
+        phase, no phase has a reflection in ``data``'s range, or the scales give
+        a non-positive Σ S·ZMV (the scales named that sit at or below zero).
         """
         require_two_theta(data, "Refinement.qpa()", instrument=self.instrument)
         if self._mode != "rietveld":
             raise RuntimeError(
                 f"qpa() forms weight fractions from Rietveld scales, and this "
                 f"object's mode is {self._mode!r}.")
+        if not self.structure.phases:
+            raise ValueError("qpa() has no fraction to form: the model has no phase.")
         table = ParameterTable(self.structure, self.instrument)
         model = compile_model(self.structure, self.instrument, data,
                               mode="rietveld", moving_paths=set(table.moving_paths))
         values = table.decode(table.x0())
         unmeasured = sorted(_lineless_phases(model))
         n_measured = len(self.structure.phases) - len(unmeasured)
+        if n_measured == 0:
+            raise ValueError(
+                "qpa() has no fraction to form: no reflection of "
+                + ", ".join(f"phase {ip} ({self.structure.phases[ip].name})"
+                            for ip in unmeasured)
+                + f" lies in the data's range {model.tt_min:.4g}-"
+                f"{model.tt_max:.4g}°. Pass data whose range covers a "
+                f"reflection of at least one phase.")
         cov = None
         if scale_cov is not None:
             cov = np.asarray(scale_cov, dtype=np.float64)
@@ -7261,7 +7276,18 @@ class Refinement:
         qpa = compute_qpa(self.structure, values, cov, multiplicities,
                           wavelength=wavelength, source_kind=model.source_kind,
                           unmeasured=unmeasured)
-        if qpa is not None and cov is not None:
+        if qpa is None:
+            # compute_qpa's one remaining None here: more than one phase in
+            # range and Σ S·ZMV ≤ 0, the fit path's QPA_UNAVAILABLE
+            dead = [f"phases.{ip}.scale" for ip in range(len(self.structure.phases))
+                    if ip not in unmeasured
+                    and values.get(f"phases.{ip}.scale", 0.0) <= 0.0]
+            raise ValueError(
+                "qpa() cannot form weight fractions: the phase scales give a "
+                "non-positive Σ S·ZMV"
+                + (f" ({', '.join(dead)} at or below zero)" if dead else "")
+                + ". Set a positive scale on a phase in range with set_values.")
+        if cov is not None:
             qpa.esd_basis = (
                 "propagated through the scale covariance the caller supplied. A "
                 "block taken with the background and every other parameter held "

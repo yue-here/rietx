@@ -484,7 +484,11 @@ class PhaseQuantity(Base):
     #: Rietveld fit, whether or not the finding fired, so a reader of
     #: ``result.qpa`` alone sees it.  A projection of that test, never a second
     #: one, pinned equal to it as ``RefinedParameter.at_bound`` is pinned to
-    #: ``bound_findings``.  ``None`` where no fit measured it (``Refinement.qpa``).
+    #: ``bound_findings``.  On a joint fit a ``HistogramResult.qpa`` row carries
+    #: its own histogram's reading, the scale that row's fraction is formed
+    #: from; the joint ``PHASE_UNCONSTRAINED`` decides on the largest of them
+    #: over the histograms, so one row may read low while no finding fires.
+    #: ``None`` where no fit measured it (``Refinement.qpa``).
     support_sigma: float | None = None
     #: The phase's paths its fraction is conditional on at the answer: held at a
     #: handed-in value by the answer stage (``StageResult.held``, including the
