@@ -122,6 +122,7 @@ fit = rx.fit_trajectory(series, "phases.0.cell.a", eq.expression, eq.variables,
 ```
 
 An equation the grammar cannot carry, such as one calling `np.exp` or one of GSAS-II's external functions, stays on the model with `refused` naming why.
+GSAS-II fits all of a project's stored equations at once, so two that name one variable share it there; here each is read on its own, `shared` names that label, and the read says so.
 The formula's text follows [Expressions](../reference/expressions.md), which is close to GSAS-II's python syntax:
 
 | GSAS-II | rietx |
@@ -131,6 +132,7 @@ The formula's text follows [Expressions](../reference/expressions.md), which is 
 | `a0 + k*T` as the equation for a cell edge | `rx.ParametricEquation(name="a", target="phases.0.cell.a", basis="expression", expression="a0 + k*T")` |
 | one label in two equations | one variable named in both formulas |
 | `exp`, `log`, `sqrt` | `exp`, `log`, `sqrt` |
+| `pi()` | `pi` |
 | `sind`, `cosd`, `tand` in degrees | `sin(pi*x/180)`: rietx's trigonometry is in radians |
 | `sin`, `cos`, `tan`, which GSAS-II's expressions also read in degrees | `sin(pi*x/180)` as well: copied unchanged, the formula gives a different value with no error |
 

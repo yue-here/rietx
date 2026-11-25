@@ -326,6 +326,8 @@ The per-histogram results table itself is not carried, and the read says so.
 | `Gsas2SequentialEquation.text` | the equation as GSAS-II stored it |
 | `Gsas2SequentialEquation.expression` | the same equation in rietx's [expression grammar](expressions.md), or `None` when it is refused |
 | `Gsas2SequentialEquation.variables` | each label the equation fits, as an `rx.Parameter` with the stored value and refine flag |
+| `Gsas2SequentialEquation.names` | the name GSAS-II keys each of those variables by, label to name |
+| `Gsas2SequentialEquation.shared` | the labels whose name another equation of the same item also fits |
 | `Gsas2SequentialEquation.bindings` | each other label, and the table column it reads, by GSAS-II's name for that column |
 | `Gsas2SequentialEquation.dependent` | the column the equation is fitted to, by GSAS-II's name |
 | `Gsas2SequentialEquation.dependent_text`, `Gsas2SequentialEquation.dependent_expression`, `Gsas2SequentialEquation.dependent_bindings` | where that column is a GSAS-II pseudo-variable: its own equation as stored, in the grammar, and the columns it reads |
@@ -334,6 +336,8 @@ The per-histogram results table itself is not carried, and the read says so.
 
 The expression and the variables go to `fit_trajectory` as they stand.
 Give the trajectory's coordinates under the labels the equation uses, which `Gsas2SequentialEquation.bindings` maps to GSAS-II's columns, and pick the rietx path that the dependent column names.
+GSAS-II fits all the equations of one item in one least squares, keyed by each variable's name, so two equations naming one variable, such as a Debye temperature in a(T) and c(T), share it there.
+The reader reads each on its own, since `fit_trajectory` fits one equation, so a fit of each returns its own value of that variable; `Gsas2SequentialEquation.shared` names it, and `GSAS2_GPX_ITEM_NOT_READ` names it and the equations that share it.
 Where the dependent is a pseudo-variable, such as a strain `(x-x0)/x0` of a peak position, rietx fits a parameter's own trajectory, so write the equation for that parameter instead.
 
 The equation is python syntax, read with python's own parser, which runs nothing.
@@ -347,7 +351,7 @@ A label that is a reserved word of the grammar, such as `exp` or `min`, is refus
 | `sind(u)`, `cosd(u)`, `tand(u)` | `sin(pi*u/180)`, `cos(pi*u/180)`, `tan(pi*u/180)` | the functions of an angle in degrees |
 | `sin(u)`, `cos(u)`, `tan(u)` | `sin(pi*u/180)`, `cos(pi*u/180)`, `tan(pi*u/180)` | GSAS-II's expressions read these in degrees too |
 | `exp(u)`, `log(u)`, `sqrt(u)` | unchanged | the same functions; `log` is the natural logarithm in both |
-| `pi` | unchanged | |
+| `pi()` | `pi` | GSAS-II's `pi` is a function, so its equations call it; a bare `pi` is refused, being no name there |
 
 ### The pickle allow-list
 

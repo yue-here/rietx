@@ -1338,7 +1338,7 @@ def test_the_read_equation_fits_a_trajectory(tmp_path, monkeypatch):
 @pytest.mark.parametrize("text", [
     "-x**2", "a*x**2**y", "2**-x", "-(a+b)**2*x", "a/b/x - b - x",
     "sind(2*x) + cosd(a)*tand(b) - sin(y) + cos(x)*tan(a)",
-    "exp(-b/x)*sqrt(a) + log(y)", "+a - -b", "pi*x/2"])
+    "exp(-b/x)*sqrt(a) + log(y)", "+a - -b", "pi()*x/2", "sind(180*x/pi())"])
 def test_a_lowered_equation_has_the_value_python_gives_it(text):
     """Each rewrite in the table, checked against python reading the same text,
     with GSAS-II's degree functions (``docs/practice.md``) as python lambdas."""
@@ -1348,7 +1348,9 @@ def test_a_lowered_equation_has_the_value_python_gives_it(text):
     degrees = {name: (lambda f: lambda u: f(math.radians(u)))(getattr(math, base))
                for name, base in (("sind", "sin"), ("cosd", "cos"), ("tand", "tan"),
                                   ("sin", "sin"), ("cos", "cos"), ("tan", "tan"))}
-    env = {**degrees, "exp": math.exp, "log": math.log, "sqrt": math.sqrt, "pi": math.pi}
+    # GSAS-II's pi is a function, so its equations write pi() (per the WP-2106 review)
+    env = {**degrees, "exp": math.exp, "log": math.log, "sqrt": math.sqrt,
+           "pi": lambda: math.pi}
     lowered, _ = lower_gsas2_expression(text, {"a", "b", "x", "y"})
     rng = np.random.default_rng(7)
     for _ in range(5):
@@ -1366,6 +1368,8 @@ def test_a_lowered_equation_has_the_value_python_gives_it(text):
     ("x*(", {"x"}, "not python syntax"),
     ("exp*x", {"exp", "x"}, "label 'exp' is a reserved word"),
     ("1e999*x", {"x"}, "the number inf, which is not finite"),
+    ("pi*x", {"x"}, "names 'pi' bare, where GSAS-II's pi is a function its equations call, pi()"),
+    ("pi(x)*x", {"x"}, "calls pi() with an argument"),
 ])
 def test_a_spelling_the_table_does_not_carry_is_refused_by_name(text, names, fragment):
     from rietx.io.projects.gsas2 import lower_gsas2_expression
@@ -1389,6 +1393,63 @@ def test_a_refused_equation_is_kept_with_its_reason_and_reported(tmp_path, monke
     refused = [d for d in notes if d.code == "GSAS2_GPX_ITEM_NOT_READ"
                and "is not read into rietx's grammar" in d.message]
     assert len(refused) == 2
+
+
+def test_pi_called_as_gsas2_writes_it_lowers_to_the_constant():
+    from rietx.io.projects.gsas2 import lower_gsas2_expression
+
+    lowered, rewrites = lower_gsas2_expression("2*pi()*x", {"x"})
+    assert lowered == "2 * pi * x" and rewrites == ("pi() → pi",)
+
+
+def test_a_variable_stored_as_nan_refuses_its_equation_and_no_other(tmp_path, monkeypatch):
+    """A stored coefficient of NaN would reach ``Parameter``'s bounds check as a
+    pydantic error naming no file; the equation is refused by name instead, and
+    the read goes on."""
+    bad = _expression_obj(monkeypatch, expression="m*y+b", depVar="pos0",
+                          freeVars={"b": ["b", float("nan"), True], "m": ["m", 1.0, True]},
+                          assgnVars={"y": "load"})
+    worse = _expression_obj(monkeypatch, expression="k*y", depVar="pos1",
+                            freeVars={"k": ["k", float("inf"), True]}, assgnVars={"y": "load"})
+    good = _expression_obj(monkeypatch, expression="c*y", depVar="pos2",
+                           freeVars={"c": ["c", 2.0, True]}, assgnVars={"y": "load"})
+    notes: list = []
+    model = read_gsas2_gpx(_write_gpx(tmp_path / "nan.gpx",
+                                      _sequential_project(monkeypatch, bad, worse, good)),
+                           diagnostics=notes)
+    first, second, third = model.sequential_equations
+    assert first.expression is None and "'b' has the stored value nan" in first.refused
+    assert second.expression is None and "'k' has the stored value inf" in second.refused
+    assert third.refused is None and third.variables["c"].value == 2.0
+    assert sum("is not finite" in d.message for d in notes) == 2
+
+
+def test_equations_sharing_a_variable_name_it_and_the_read_says_so(tmp_path, monkeypatch):
+    """GSAS-II fits one item's equations in one least squares, keyed by each
+    variable's name, so a(T) and c(T) naming one Debye temperature share it
+    (per the WP-2106 review).  Each is read on its own, the shared label is on
+    each, and the read warns naming the variable and both equations."""
+    a = _expression_obj(monkeypatch, expression="a0 + g/(exp(th/T) - 1)", depVar="a",
+                        freeVars={"a0": ["a0", 4.0, True], "g": ["g", 1e-3, True],
+                                  "th": ["Theta", 300.0, True]}, assgnVars={"T": "Temp"})
+    c = _expression_obj(monkeypatch, expression="c0 + h/(exp(t/T) - 1)", depVar="c",
+                        freeVars={"c0": ["c0", 9.0, True], "h": ["h", 1e-3, True],
+                                  "t": ["Theta", 300.0, True]}, assgnVars={"T": "Temp"})
+    alone = _expression_obj(monkeypatch, expression="b0 + k*T", depVar="b",
+                            freeVars={"b0": ["b0", 5.0, True], "k": ["k", 0.0, True]},
+                            assgnVars={"T": "Temp"})
+    notes: list = []
+    model = read_gsas2_gpx(_write_gpx(tmp_path / "shared.gpx",
+                                      _sequential_project(monkeypatch, a, c, alone)),
+                           diagnostics=notes)
+    first, second, third = model.sequential_equations
+    assert (first.shared, second.shared, third.shared) == (("th",), ("t",), ())
+    assert first.names["th"] == second.names["t"] == "Theta"
+    assert first.refused is None and second.refused is None
+    (note,) = [d for d in notes if "share the variable" in d.message]
+    assert note.level == "warning" and note.code == "GSAS2_GPX_ITEM_NOT_READ"
+    assert "'Theta'" in note.message and first.text in note.message and second.text in note.message
+    assert third.text not in note.message
 
 
 def test_a_project_with_no_stored_equation_reads_none(tmp_path, monkeypatch):

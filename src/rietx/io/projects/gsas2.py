@@ -708,6 +708,12 @@ class Gsas2SequentialEquation:
     the table column each other label reads.  Every rewrite between the two
     spellings is in :attr:`rewrites` (:data:`GSAS2_EXPRESSION_REWRITES`).
 
+    GSAS-II fits every equation of one item's list in one least squares, keyed
+    by each variable's name (:attr:`names`), so a name two equations fit is one
+    variable there.  Each equation is read on its own all the same, since
+    :func:`rietx.fit_trajectory` fits one; :attr:`shared` names the labels where
+    that changes the answer, and the read reports it.
+
     An equation the grammar cannot carry has :attr:`expression` ``None`` and
     :attr:`refused` naming why, and the read reports it.  :attr:`dependent` is
     the column fitted, as GSAS-II names it.  Where that column is one of
@@ -722,6 +728,11 @@ class Gsas2SequentialEquation:
     text: str
     expression: str | None
     variables: dict[str, Parameter] = field(default_factory=dict)
+    #: the name GSAS-II keys each of :attr:`variables` by, label to name
+    names: dict[str, str] = field(default_factory=dict)
+    #: the labels of :attr:`variables` whose name another equation stored in
+    #: the same item also fits, which GSAS-II fits as one variable
+    shared: tuple[str, ...] = ()
     bindings: dict[str, str] = field(default_factory=dict)
     dependent: str | None = None
     dependent_text: str | None = None
@@ -1258,7 +1269,8 @@ GSAS2_EXPRESSION_REWRITES: dict[str, tuple[str, str]] = {
     "exp(u)": ("exp(u)", "unchanged"),
     "log(u)": ("log(u)", "unchanged: the natural logarithm in both"),
     "sqrt(u)": ("sqrt(u)", "unchanged"),
-    "pi": ("pi", "unchanged"),
+    "pi()": ("pi", "GSAS-II's pi is a function, so a working equation calls it; "
+                   "a bare pi is no name there"),
 }
 
 #: python's arithmetic operators, each the grammar's own; ``**`` is the one
@@ -1332,8 +1344,9 @@ def lower_gsas2_expression(text: str, names: set[str]) -> tuple[str, tuple[str, 
         if isinstance(node, ast.Name):
             if node.id in names:
                 return Name(node.id)
-            if node.id in GSAS2_EXPRESSION_REWRITES:
-                return Name(node.id)
+            if f"{node.id}()" in GSAS2_EXPRESSION_REWRITES:
+                raise _Unlowerable(f"it names {node.id!r} bare, where GSAS-II's {node.id} "
+                                   f"is a function its equations call, {node.id}()")
             raise _Unlowerable(f"it names {node.id!r}, which it neither fits nor "
                                "reads from the table")
         if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.USub, ast.UAdd)):
@@ -1346,8 +1359,16 @@ def lower_gsas2_expression(text: str, names: set[str]) -> tuple[str, tuple[str, 
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
             raise _Unlowerable(f"it uses {_python_construct(node.func)}")
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) \
+                and not node.keywords and not node.args \
+                and f"{node.func.id}()" in GSAS2_EXPRESSION_REWRITES:
+            written = GSAS2_EXPRESSION_REWRITES[f"{node.func.id}()"][0]
+            rewrites.append(f"{node.func.id}() → {written}")
+            return Name(written)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) \
                 and not node.keywords and len(node.args) == 1:
             func = node.func.id
+            if f"{func}()" in GSAS2_EXPRESSION_REWRITES:
+                raise _Unlowerable(f"it calls {func}() with an argument, which it takes none of")
             if func not in functions:
                 raise _Unlowerable(f"it calls {func}(), which the rewrite table does not carry")
             target, degrees = functions[func]
@@ -1385,15 +1406,20 @@ def _sequential_equation(source: str, stored: Any, pseudo: dict) -> Gsas2Sequent
     if not isinstance(free, dict) or not isinstance(bound, dict):
         return _refused(blank, "its variables are not stored as this reader knows them")
     variables: dict[str, Parameter] = {}
+    names: dict[str, str] = {}
     for label, row in free.items():
         if not (isinstance(row, (list, tuple)) and len(row) == 3
                 and _float(row[1]) is not None):
             return _refused(blank, f"its variable {label!r} is not stored as "
                                    "[name, value, refine flag]")
+        if not math.isfinite(_float(row[1])):
+            return _refused(blank, f"its variable {label!r} has the stored value "
+                                   f"{_float(row[1])!r}, which is not finite")
         variables[str(label)] = Parameter(value=_float(row[1]), vary=bool(row[2]))
+        names[str(label)] = str(row[0])
     bindings = {str(k): str(v) for k, v in bound.items()}
     dependent = getattr(stored, "depVar", None)
-    found = {"variables": variables, "bindings": bindings,
+    found = {"variables": variables, "names": names, "bindings": bindings,
              "dependent": dependent if isinstance(dependent, str) else None}
     try:
         expression, rewrites = lower_gsas2_expression(text, set(variables) | set(bindings))
@@ -1440,8 +1466,27 @@ def _sequential_equations(source: str, payload: Any) -> list[Gsas2SequentialEqua
     pseudo = payload.get("SeqPseudoVars") or {}
     if not isinstance(stored, (list, tuple)):
         return []
-    return [_sequential_equation(source, eq, pseudo if isinstance(pseudo, dict) else {})
-            for eq in stored]
+    equations = [_sequential_equation(source, eq, pseudo if isinstance(pseudo, dict) else {})
+                 for eq in stored]
+    shared = _shared_names(equations)
+    from dataclasses import replace
+
+    return [replace(eq, shared=tuple(label for label, name in eq.names.items()
+                                     if name in shared))
+            if any(name in shared for name in eq.names.values()) else eq
+            for eq in equations]
+
+
+def _shared_names(equations: list[Gsas2SequentialEquation]) -> dict[str, list[str]]:
+    """Each variable name more than one of ``equations`` fits, with the text of
+    each that does.  GSAS-II fits every equation of one item's list in one least
+    squares, keyed by the variable's name, so such a name is one variable there
+    (WP-2106 review); :func:`rietx.fit_trajectory` fits one equation."""
+    texts: dict[str, list[str]] = {}
+    for eq in equations:
+        for name in dict.fromkeys(eq.names.values()):
+            texts.setdefault(name, []).append(eq.text)
+    return {name: t for name, t in texts.items() if len(t) > 1}
 
 
 def read_gsas2_gpx(path: str | Path, *,
@@ -1516,12 +1561,19 @@ def read_gsas2_gpx(path: str | Path, *,
                 f"{label!r} holds the per-histogram results of a sequential fit, which "
                 f"this reader does not carry. The equations stored with them are on "
                 f"model.sequential_equations.")
-            for equation in _sequential_equations(label, payload):
+            read = _sequential_equations(label, payload)
+            for equation in read:
                 equations.append(equation)
                 if equation.refused:
                     reported.append(
                         f"the equation {equation.text!r} stored in {label!r} is not "
                         f"read into rietx's grammar: {equation.refused}.")
+            for name, texts in _shared_names(read).items():
+                reported.append(
+                    f"the equations {', '.join(map(repr, texts))} stored in {label!r} "
+                    f"share the variable {name!r}, which GSAS-II fits as one across "
+                    f"them. They are read one by one (Gsas2SequentialEquation.shared), "
+                    f"and a fit of each returns its own {name!r}.")
         elif stance is Stance.REPORTED:
             reported.append(f"{label!r} is {what}. This reader does not carry it.")
         elif stance is None:
