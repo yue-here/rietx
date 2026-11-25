@@ -646,7 +646,7 @@ A five-stage fluorapatite fit emitted 1 `fit_start`, 5 `stage_start`, 102 `eval`
 | `fit_end` | `status`, `rwp`, `gof`, `node_id` |
 
 Read `data` with `.get`: a version may add keys.
-A cancelled run's `fit_end` has `status` `"cancelled"`, the abandoned `stage`, the `completed` stage names and `node_id`, and no `rwp` or `gof`, because there is no fitted result.
+A cancelled run's `fit_end` has `status` `"cancelled"`, the abandoned `stage`, the `completed` stage names and `node_id`, and no `rwp` or `gof`.
 Under `RefinementPlan.lebail_passes`, each pass's `fit_start` and `fit_end` also carry `lebail_pass` and `lebail_of`.
 A run's state is not an event: it is in the run's `status.json`, because a fit killed outright emits no `fit_end`.
 
