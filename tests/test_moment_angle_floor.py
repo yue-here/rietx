@@ -98,6 +98,8 @@ def _fit(seed: int, *, exact: bool, tilt2: float | None, truth1=(3.5, 0.0, 0.0),
                                if t.zeroed for q in t.paths),
            "interval": interval,
            "floor": (sum(floor), len(floor)),
+           "angles": {p.split(".", 2)[2]: rows[p].value for p in rows
+                      if p.endswith((".moment.dof1", ".moment.dof2"))},
            "stages": [f"{s.name} {s.status}/{s.termination} nfev {s.n_iterations}"
                       for s in result.stages]}
     if tilt2 is not None:
@@ -210,7 +212,10 @@ def test_on_axis_fits_stop_no_further_above_the_forward_difference_than_the_cut(
 
 def _deep_plan() -> rx.RefinementPlan:
     """The solve's plan through its first two stages (the moduli, then the
-    moment stage with scale and background), closing stage kept."""
+    moment stage with scale and background), closing stage kept.  The moment
+    stage is now the last declared one, so it runs at the solver default
+    tolerance, not the intermediate 1e-6 it runs at inside the full plan
+    (``RefinementPlan.stage_ftols``)."""
     full = S._plan()
     return rx.RefinementPlan(stages=full.stages[:2],
                              closing_window_tol=full.closing_window_tol)
@@ -234,7 +239,8 @@ def _deep_line(name: str, fit: dict) -> str:
     hits, checks = fit["floor"]
     columns = (f"{hits} of {checks} angle-column builds by forward difference"
                if checks else "every moment column by forward difference")
-    return (f"{name}: χ²_red {fit['chi2r']:.12f}; {columns}; "
+    angles = ", ".join(f"{k} {v:.10g}" for k, v in sorted(fit["angles"].items()))
+    return (f"{name}: χ²_red {fit['chi2r']:.12f}; {columns}; angles {angles}; "
             f"stages {fit['stages']}; zeroed {sorted(fit['zeroed'])}")
 
 
@@ -247,9 +253,11 @@ def test_a_deep_start_reaches_the_forward_difference_s_chi2(kind, angle):
     forward-difference fit's χ² to 1e-6 relative.
 
     The deep starts stop before the plan's last stage, which frees the cell,
-    zero, Biso and profile: there the reference arm's stop moved on one CI
-    job (py3.14, 2026-11-20) and not on a run of the same tree on
-    2026-11-24, and this row tests the angle rule, not that stage.
+    zero, Biso and profile.  On one CI job (py3.14, 2026-11-20) the reference
+    arm's full-plan stop moved, and on a run of the same tree on 2026-11-24 it
+    did not; that job printed only the final χ², so the stage it moved in is
+    not recorded.  The angles leave the symmetric start in the moment stage,
+    which this row keeps.
 
     Measured 2026-11-24 (darwin/arm64): the six agree to 8.1e-11 relative,
     the azimuth starts taking 3-12 of 30-46 angle-column builds by forward
@@ -257,7 +265,10 @@ def test_a_deep_start_reaches_the_forward_difference_s_chi2(kind, angle):
     tilt stops at χ²_red 1.0302671 against 1.0302484 (1.8e-5 relative, 18
     times the bar), so the bar separates the rule from the exact columns
     alone.  On the full plan (2026-11-20) the six agreed to 2e-10 and that
-    tilt missed by 2.5e-4.
+    tilt missed by 2.5e-4.  Two-stage χ²_red, forward-difference arm
+    (2026-11-24, darwin/arm64): tilt 0.05, 0.2, 0.8: 1.0303014985,
+    1.0302483725, 1.0305123421; azimuth 0.05, 0.2, 0.8: 1.0316700102,
+    1.0316429014, 1.0318350780.
     """
     truth = (3.5, angle) if kind == "tilt" else (3.5, 0.0, angle)
     exact = _fit(2, exact=True, tilt2=None, truth1=truth, plan=_deep_plan())

@@ -275,9 +275,11 @@ def test_a_minimum_on_the_symmetric_direction_is_not_pushed_off(cw_seed11, beta0
     platforms (4.4e-9 relative in χ² on CI py3.11, 1.4e-4 esd in |m| on CI
     py3.14; tests/CLAUDE.md § Budgets), one-sided in χ² because a push off a
     minimum can only raise it.  With the azimuth held at 1.1e-2 rad (0.2σ_φ)
-    in the rule arm from 103.0°, the row fails both: χ² 3.9e-7 above, |m|
-    4.9e-3 esd off (2026-11-24, darwin/arm64, read on χ² since the held
-    angle leaves one parameter fewer).  Neither arm lands on φ = 0 to round-off, and neither
+    in the rule arm from 103.0°, both bars fail: χ² 3.9e-7 above, |m| 4.9e-3
+    esd off (2026-11-24, darwin/arm64).  The χ² bar is on χ², not χ²_red, so
+    an arm with one parameter fewer is compared on the same footing; a held
+    angle is not zeroed, so that plant fails first at the zeroed assert, with
+    the full message.  Neither arm lands on φ = 0 to round-off, and neither
     did before.  A zeroed angle has no esd, so the residual is read against
     its profile interval, ±0.108 rad at 95 % (σ_φ ≈ 0.055 rad), and printed
     as that fraction, not asserted: from 103.0° it is 3.0e-4 rad (0.005σ_φ)
@@ -296,7 +298,8 @@ def test_a_minimum_on_the_symmetric_direction_is_not_pushed_off(cw_seed11, beta0
             CompiledModel.moment_grad_supported = real
         m_back, cell = _written_back(ref)
         row = ref.report().magnetic[0]
-        azimuth = next(p for p in result.parameters
+        # every entry, so the row still reports an azimuth no stage freed
+        azimuth = next(p for p in ref.parameters()
                        if p.path == "phases.0.atoms.0.moment.dof2")
         zeroed = {q for st in result.stages
                   for t in (st.moment_angle_tests or []) if t.zeroed
@@ -305,19 +308,27 @@ def test_a_minimum_on_the_symmetric_direction_is_not_pushed_off(cw_seed11, beta0
                 azimuth, zeroed)
 
     a, b = arm(True), arm(False)
+
+    def total(result):
+        st = result.statistics
+        return st.chi2 * (st.n_points - st.n_free_parameters)
+
     lines = [f"β₀ {beta0}"]
     for name, (result, m, esd, azimuth, zeroed) in (("rule", a), ("forward difference", b)):
-        assert result.status == "converged"
-        assert "phases.0.atoms.0.moment.dof2" in zeroed, zeroed
-        lines.append(f"{name}: χ²_red {result.statistics.chi2:.12f}, |m| {m:.7f} "
-                     f"(esd {esd:.2e}), azimuth {azimuth.value:+.3e} rad = "
+        esd_s = f"{esd:.2e}" if esd is not None else "None"
+        lines.append(f"{name}: {result.status}, zeroed {sorted(zeroed)}, "
+                     f"χ²_red {result.statistics.chi2:.12f}, |m| {m:.7f} (esd {esd_s}), "
+                     f"azimuth {azimuth.value:+.3e} rad = "
                      f"{azimuth.value / AZIMUTH_SIGMA:+.4f} σ_φ")
-    rel = (a[0].statistics.chi2 - b[0].statistics.chi2) / b[0].statistics.chi2
-    dm = abs(a[1] - b[1]) / b[2]
+    rel = (total(a[0]) - total(b[0])) / total(b[0])
+    dm = abs(a[1] - b[1]) / b[2] if b[2] else float("nan")
     lines.append(f"χ² rule above forward difference {rel:+.2e} relative (bar 5e-8), "
                  f"|Δm| {dm:.2e} esd (bar 1.5e-3)")
     message = "\n".join(lines)
     print(message)
+    for result, _m, _esd, _azimuth, zeroed in (a, b):
+        assert result.status == "converged", message
+        assert "phases.0.atoms.0.moment.dof2" in zeroed, message
     assert rel < 5e-8, message
     assert dm < 1.5e-3, message
 
