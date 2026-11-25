@@ -65,10 +65,10 @@ Tier: none. The notes are the reader's existing codes, already in `_audit`.
   histogram in a joint fit). A series fits each pattern through `refine`, so it inherits the
   seam. The joint fit calls the helper in its per-histogram loop, with a `DIAGNOSTIC_SCOPES`
   row.
-- [ ] `src/rietx/io/CLAUDE.md` § the repairs: the notes reach the fit.
+- [x] `src/rietx/io/CLAUDE.md` § the repairs: the notes reach the fit.
 - [x] Tests: one fixture per repair code, read without a list, asserting the code in
   `result.diagnostics`. `tests/test_reader_notes.py`, seven cases.
-- [ ] Skill: none. The codes already have rows; they now arrive where the skill already sends
+- [x] Skill: none. The codes already have rows; they now arrive where the skill already sends
   the agent.
 
 ## Acceptance
