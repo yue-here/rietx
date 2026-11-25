@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 
 from rietx import Refinement
-from rietx.multi import MultiHistogramRefinement
+from rietx.joint import JointRefinement
 from rietx.optimize.statistics import discarded_directions
 from rietx.refine import _REVISABLE_CODES, _guard_diagnostics
 from rietx.strategy.staged import (
@@ -290,14 +290,14 @@ def test_a_joint_fit_gives_an_exact_pair_no_esd():
     twin.name = "LaB6 twin"
     structure.phases.append(twin)
     data = synthesize()
-    mr = MultiHistogramRefinement(structure, [ins, ins.model_copy(deep=True)])
+    mr = JointRefinement(structure, [ins, ins.model_copy(deep=True)])
     result = mr.fit([data, data], plan=RefinementPlan(stages=[
         Stage(name="scale+bkg", turn_on=["phases.*.scale", "instrument.background.*"])]))
     rows = {p.path: p for p in result.parameters}
     for h in (0, 1):
         for ip in (0, 1):
-            assert rows[f"hist.{h}.phases.{ip}.scale"].stderr is None
-        assert rows[f"hist.{h}.instrument.background.c0"].stderr > 0.0
+            assert rows[f"pattern.{h}.phases.{ip}.scale"].stderr is None
+        assert rows[f"pattern.{h}.instrument.background.c0"].stderr > 0.0
 
 
 def test_an_overlap_split_with_no_esd_says_so_rather_than_inf_percent():
@@ -370,14 +370,14 @@ def test_the_lab6_width_triple_has_no_short_esd_in_a_joint_fit():
 
     structure, ins = perturbed_models()
     data = [synthesize(noise_seed=s) for s in (7, 8, 9)]
-    mr = MultiHistogramRefinement(
+    mr = JointRefinement(
         structure, [ins.model_copy(deep=True) for _ in data],
         sharing=SharingMap(shared=["instrument.profile.w"],
                            per_histogram=["phases.*.gauss_*"]))
     result = mr.fit(data, plan=_triple_plan())
     rows = {p.path: p for p in result.parameters}
     paths = ["instrument.profile.w",
-             *(f"hist.{h}.phases.0.gauss_{t}" for h in range(3) for t in ("size", "strain"))]
+             *(f"pattern.{h}.phases.0.gauss_{t}" for h in range(3) for t in ("size", "strain"))]
     for path in paths:
         row = rows[path]
         assert row.stderr is None or row.stderr > _SHORT * abs(row.value), (path, row)

@@ -265,7 +265,7 @@ class Project:
         if len(doc.patterns) != 1:
             raise ValueError(
                 f"{doc_path}: this version opens single-pattern projects only, "
-                f"found {len(doc.patterns)}; joint multi-histogram projects are "
+                f"found {len(doc.patterns)}; joint projects are "
                 "a later milestone (the list is the seam, not a feature yet)")
 
         ref_doc = doc.patterns[0]

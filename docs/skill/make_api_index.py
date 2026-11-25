@@ -164,12 +164,12 @@ SECTIONS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     (
         "Series, history, projects",
         "`refine_sequential` chains N patterns by warm start (§9b); "
-        "`refine_multi` stacks them into one joint residual. The history verbs "
+        "`refine_joint` stacks them into one joint residual. The history verbs "
         "work the DAG every fit commits to "
         "(§9); a `Project` owns a `.rex` directory; a `CancelToken` cancels "
         "cooperatively, between residual evaluations.",
-        ("rx.refine_sequential", "rx.SequentialRefinement", "rx.refine_multi",
-         "rx.MultiHistogramRefinement", "rx.MultiHistogramRefinement.report",
+        ("rx.refine_sequential", "rx.SequentialRefinement", "rx.refine_joint",
+         "rx.JointRefinement", "rx.JointRefinement.report",
          "rx.Refinement.checkout",
          "rx.Refinement.branch", "rx.Refinement.merge",
          "rx.Refinement.cherry_pick", "rx.replay", "rx.Project",
@@ -480,7 +480,7 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
                 "amplitudes always fit better. Classes inside the tie width "
                 "abstain together rather than name a winner, listed fewest "
                 "moment parameters first, and a class with no "
-                "supported moment cannot win. A non-neutron histogram is refused "
+                "supported moment cannot win. A non-neutron pattern is refused "
                 "by name; everything else, \"nothing to solve\" included, is "
                 "reported. Read `MagneticSolution.verdict` before `.best`, and "
                 "`references/magnetic.md` for what each reading must not be "

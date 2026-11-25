@@ -1,8 +1,8 @@
 """Schemas for a sequential (in-situ / parametric) refinement series.
 
 A series is N separate refinements, ordered, each warm-started from its
-predecessor — not one joint residual (that is the multi-histogram path,
-``rietx.multi``).  What the user wants back is therefore not N unrelated
+predecessor — not one joint residual (that is the joint path,
+``rietx.joint``).  What the user wants back is therefore not N unrelated
 results but a **trajectory**: a(T), Biso(t), the weight fractions against the
 series coordinate, with esds, and with the per-pattern status of the fit that
 produced each point.
@@ -153,7 +153,7 @@ class SeriesEntry(Base):
     #:
     #: Empty for the three reasons ``FitReport.magnetic`` is empty — no phase
     #: declares a moment, no compiled model reached the writer, or the
-    #: histogram carries no magnetic term at all — and never "no moment was
+    #: pattern carries no magnetic term at all — and never "no moment was
     #: found".
     magnetic: list[MomentEvidence] = Field(default_factory=list)
     diagnostics: list[Diagnostic] = Field(default_factory=list)
@@ -1518,7 +1518,7 @@ class SeriesResult(Base):
         deliverable, or without one when none is given (WP-2037).
 
         ``parametric`` is a joint fit of the same patterns with parametric
-        declarations (``refine_multi(..., coordinates=, parametric=)``,
+        declarations (``refine_joint(..., coordinates=, parametric=)``,
         WP-1325): its coefficients print after the trajectory, beside the
         curve they describe, and the deliverable's functional-form row reads
         them.  A chain has no coefficients of its own, so without one that
@@ -1585,7 +1585,7 @@ class SeriesResult(Base):
             if parametric.parametric is None:
                 raise ValueError(
                     "parametric= takes a joint fit with parametric declarations "
-                    "(refine_multi(..., coordinates=, parametric=[...])); this "
+                    "(refine_joint(..., coordinates=, parametric=[...])); this "
                     "result declared none, so it has no coefficients to print")
             lines += _parametric_lines(parametric.parametric, parametric.parametric_form,
                                        parametric.parametric_form_joint)
@@ -1694,7 +1694,7 @@ class SeriesResult(Base):
             lines.append(line)
         else:
             lines.append("    functional form: NOT measured — a chain measures "
-                         "points; refine_multi(..., coordinates=, parametric=) "
+                         "points; refine_joint(..., coordinates=, parametric=) "
                          "refines the coefficients with a joint esd, and "
                          "summary(parametric=that result) prints them here")
 

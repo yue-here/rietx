@@ -148,13 +148,13 @@ def run_request(request: dict) -> dict:
 
 def trim_response(response: dict) -> dict:
     """Elide bulk curve arrays from a response (in the ``result`` arm and any
-    per-histogram slices); every parameter, statistic, diagnostic and the
+    per-pattern slices); every parameter, statistic, diagnostic and the
     report survive intact."""
     trimmed = json.loads(json.dumps(response))  # deep copy, JSON types only
     result = trimmed.get("result")
     blocks = [result] if isinstance(result, dict) else []
     if isinstance(result, dict):
-        blocks.extend(h for h in result.get("histograms", ())
+        blocks.extend(h for h in result.get("patterns", ())
                       if isinstance(h, dict))
     for block in blocks:
         for key in _BULK_KEYS:

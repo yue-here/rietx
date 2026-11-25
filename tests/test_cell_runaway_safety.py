@@ -1188,13 +1188,13 @@ def test_two_solves_driven_escapes_merge_by_driver_once():
     import sys
 
     refine = sys.modules["rietx.refine"]
-    multi = sys.modules["rietx.multi"]
-    assert multi._merge_unresolved is refine._merge_unresolved
+    joint = sys.modules["rietx.joint"]
+    assert joint._merge_unresolved is refine._merge_unresolved
     first = [("vars.a_0", ["phases.0.cell.a"]), ("vars.c_1", ["phases.0.cell.c"])]
-    second = [("vars.a_0", ["hist.1.phases.0.cell.a"]),
+    second = [("vars.a_0", ["pattern.1.phases.0.cell.a"]),
               ("vars.b_0", ["phases.0.cell.b"])]
     assert refine._merge_unresolved(first, second) == [
-        ("vars.a_0", ["hist.1.phases.0.cell.a", "phases.0.cell.a"]),
+        ("vars.a_0", ["pattern.1.phases.0.cell.a", "phases.0.cell.a"]),
         ("vars.c_1", ["phases.0.cell.c"]),
         ("vars.b_0", ["phases.0.cell.b"])]
     assert refine._merge_unresolved(first, []) == first

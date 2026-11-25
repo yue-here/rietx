@@ -40,7 +40,7 @@ The 2θ axis label names the radiation the fit used, which `RefinementResult.rad
 `Radiation.wavelengths` holds each emission line's λ in Å at the answer, primary first, so a refined wavelength is recorded as refined.
 The label reads `2θ (degrees), Cu Kα, λ = 1.54059 Å`, by the rule `PatternData.plot` uses ([Plotting a pattern](data.md#plotting-a-pattern)).
 A refined wavelength, a synchrotron or a neutron source shows λ alone.
-A joint fit records each histogram's own in `HistogramResult.radiation`, so `result.for_histogram(h).plot()` names histogram `h`'s.
+A joint fit records each pattern's own in `PatternResult.radiation`, so `result.for_pattern(h).plot()` names pattern `h`'s.
 A result saved by a version without the record has `radiation=None` and shows `2θ (degrees)`.
 `wavelength=` replaces the recorded λ.
 `x_axis="q"` and `x_axis="d"` raise without it, because the label converts nothing.

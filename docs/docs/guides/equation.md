@@ -1,7 +1,7 @@
 (guide-equation)=
 # How to refine a cell edge as a function of temperature
 
-Declare the equation with `rietx.ParametricEquation`, give each pattern's temperature in a `rietx.CoordinateTable`, and pass both to `rietx.refine_multi`, which refines the equation's coefficients against every pattern at once.
+Declare the equation with `rietx.ParametricEquation`, give each pattern's temperature in a `rietx.CoordinateTable`, and pass both to `rietx.refine_joint`, which refines the equation's coefficients against every pattern at once.
 
 This is parametric refinement {cite}`stinton2007`.
 All the patterns share one residual, as in a joint fit, and the refined parameters are the coefficients of the equation.
@@ -30,9 +30,9 @@ The true slope is 2.0783 × 10⁻⁵ Å/K, 0.1 esd from the fitted one.
 
 Read the coefficients from `result.parametric`.
 The coefficient rows in `result.parameters` are per unit of the centred and scaled temperature, so their numbers differ.
-Each pattern's own value of the cell edge is in `result.parameters` as `hist.<k>.phases.0.cell.a`, with an esd propagated from the coefficients.
+Each pattern's own value of the cell edge is in `result.parameters` as `pattern.<k>.phases.0.cell.a`, with an esd propagated from the coefficients.
 
-`refine_multi` takes one instrument per pattern.
+`refine_joint` takes one instrument per pattern.
 By default each pattern keeps its own zero shift, peak widths, background and scale.
 If nothing about the mount changed between patterns, share those parameters by passing `sharing=rx.SharingMap(shared=[...])`.
 On a ten-pattern synthetic ramp, sharing the zero shift and the profile reduced the slope's esd 2.6 times.

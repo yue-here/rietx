@@ -80,7 +80,7 @@ equations = [
     rx.ParametricEquation(name="c", target="phases.0.cell.c", basis="expression",
                           expression="c0 + gc/(exp(theta/T) - 1)"),
 ]
-joint = rx.MultiHistogramRefinement(
+joint = rx.JointRefinement(
     structure, instruments, coordinates=coordinates, variables=variables,
     parametric=equations,
     sharing=rx.SharingMap(shared=["instrument.zero_shift", "instrument.profile.*"]))

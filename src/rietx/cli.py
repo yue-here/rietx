@@ -127,7 +127,7 @@ def _events(argv: list[str]) -> int:
         prog="rietx events",
         description="Summarise an events.jsonl run by run: fits and stages "
                     "counted, wall clock per stage, the termination "
-                    "histogram, the most-held paths, first and last Rwp.")
+                    "pattern, the most-held paths, first and last Rwp.")
     p.add_argument("log", help="an events.jsonl, or a run directory holding one")
     p.add_argument("--json", action="store_true",
                    help="print the summary as JSON instead of text")

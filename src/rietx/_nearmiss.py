@@ -44,13 +44,19 @@ CUTOFF = 0.6
 #: where both spellings are real field names somewhere in the schemas
 SYNONYMS: dict[str, str] = {"esd": "stderr", "stderr": "esd"}
 
+#: one word the package renamed, mapped old to new only: a name spelled with
+#: the old word is answered with the one that replaced it (WP-2305 renamed the
+#: joint fit's "histogram" to "pattern", so ``result.histograms`` names
+#: ``patterns`` and ``for_histogram`` names ``for_pattern``)
+RENAMED_WORDS: dict[str, str] = {"histogram": "pattern", "histograms": "patterns"}
+
 
 def _respelled(name: str) -> list[str]:
-    """``name`` with each :data:`SYNONYMS` word swapped, one word at a time."""
+    """``name`` with each :data:`SYNONYMS` or :data:`RENAMED_WORDS` word swapped, one at a time."""
     parts = re.split(r"([._])", name)
     forms = []
     for i, part in enumerate(parts):
-        other = SYNONYMS.get(part.casefold())
+        other = SYNONYMS.get(part.casefold()) or RENAMED_WORDS.get(part.casefold())
         if other is not None:
             forms.append("".join(parts[:i] + [other] + parts[i + 1:]))
     return forms

@@ -142,7 +142,7 @@ Above µR = {{ BRINDLEY_MU_R_FENCE }} the correction is outside the regime Brind
 ## Write the table
 
 `Refinement.write_qpa_table` writes the fractions to a CSV with the crystalline-only caveat in it.
-A joint fit reports the fractions for each of its patterns on `HistogramResult.qpa`, and a series per pattern on `SeriesEntry.qpa`.
+A joint fit reports the fractions for each of its patterns on `PatternResult.qpa`, and a series per pattern on `SeriesEntry.qpa`.
 
 ## See also
 

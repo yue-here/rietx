@@ -318,7 +318,7 @@ class DiscardedSubspace:
     ``stderr`` is the pseudo-inverse's own esd of every column, before
     WP-2219 marked the touched ones ``inf``: a dead column alone is ``inf``
     here.  Both are indexed by the solve's columns, and :meth:`take` selects
-    the rows a narrower consumer (a table's columns, one histogram's) reads.
+    the rows a narrower consumer (a table's columns, one pattern's) reads.
     """
 
     lost: np.ndarray     # (n_cols, n_gone)

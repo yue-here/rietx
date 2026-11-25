@@ -50,7 +50,7 @@ unexplained and then "indexed" by a candidate whose satellite sits 0.14° away.
    Tasci, E. S., de la Flor, G., Perez-Mato, J. M. & Aroyo, M. I. (2012).
    *J. Appl. Cryst.* **45**, 1236, § 4.1.1 on Pn′ma′ and § 4.3.2 on
    P4₂/mnm).  The note names all four and reads none of them as the answer;
-   on an X-ray histogram it names the first three only, since X-rays see no
+   on an X-ray pattern it names the first three only, since X-rays see no
    magnetic order.  What it does settle is that these peaks need no k, so
    they are not handed to the ranking.  It is what the Cr₂WO₆ 4 K pattern
    shows (:func:`~rietx.crystallography.satellites.lattice_two_theta`).
@@ -71,7 +71,7 @@ on the forbidden (1 0 0), and the note said nothing about it.
 
 And one sentence about the radiation, which is read off the compiled phase's
 own amplitude — a bound coherent scattering length means neutrons — rather than
-assumed: **on an X-ray histogram** the positions of a superstructure reflection
+assumed: **on an X-ray pattern** the positions of a superstructure reflection
 and of a magnetic satellite are the same and the inference is not.
 
 References
@@ -317,7 +317,7 @@ def _note(evidence: SatelliteEvidence,
         "is outside it by construction, so a good pattern can score nothing")
     if evidence.radiation != "neutron":
         parts.append(
-            "this is an X-ray histogram — intensity at G ± k is a "
+            "this is an X-ray pattern — intensity at G ± k is a "
             "superstructure reflection, not magnetism; the positions are the "
             "same and the inference is not")
     return "; ".join(parts)

@@ -727,16 +727,16 @@ def test_a_release_is_not_a_collapse(released_fit):
 
 
 def test_the_joint_path_records_a_collapse_too():
-    """The joint runner's restore writes the same field (``multi.py``).
+    """The joint runner's restore writes the same field (``joint.py``).
 
     Two copies of the sub-onset pattern, CaF₂ seeded at 1e-4 in both: no
-    histogram sees it at the answer, so its shared cell is put back and held.
+    pattern sees it at the answer, so its shared cell is put back and held.
     """
     import rietx as rx
 
     data = _ramp_patterns([300.0])[0]
     ins = _ramp_instrument()
-    ref = rx.MultiHistogramRefinement(_ramp_start(scale=1.0e-4, bounds=None),
+    ref = rx.JointRefinement(_ramp_start(scale=1.0e-4, bounds=None),
                                       [ins, ins.model_copy(deep=True)])
     result = ref.fit([data, data.model_copy(deep=True)], plan=_collapsed_plan())
     stage = result.stages[0]
@@ -935,7 +935,7 @@ def test_an_extracted_phase_is_not_unsupported_and_is_not_held(mode):
 
 
 def test_the_joint_path_holds_a_phase_no_histogram_can_see():
-    """A joint fit's authority is every histogram, not any one of them.
+    """A joint fit's authority is every pattern, not any one of them.
 
     ``_freeze_cell_windows_multi``'s rule, one tier up: a phase invisible in one
     pattern may be plain in another, and a shared cell is then measured by the
@@ -946,7 +946,7 @@ def test_the_joint_path_holds_a_phase_no_histogram_can_see():
     import rietx as rx
 
     structure, ins = _absent_phase_inputs()
-    ref = rx.MultiHistogramRefinement(structure, [ins, ins.model_copy(deep=True)])
+    ref = rx.JointRefinement(structure, [ins, ins.model_copy(deep=True)])
     result = ref.fit([synthesize(), synthesize()], plan=rx.RefinementPlan(stages=[
         rx.Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
         rx.Stage("cell", ["phases.*.cell.*"]),
@@ -960,10 +960,10 @@ def test_the_joint_path_holds_a_phase_no_histogram_can_see():
 
 
 def _held_columns(sharing=None) -> tuple[list[str], list[str]]:
-    """The cell columns held with the absent phase unseen in both histograms,
-    then with its scale raised in the second histogram only."""
+    """The cell columns held with the absent phase unseen in both patterns,
+    then with its scale raised in the second pattern only."""
+    from rietx.joint import _joint_unsupported_phases, _unsupported_paths_multi
     from rietx.model.forward import compile_model as _compile
-    from rietx.multi import _joint_unsupported_phases, _unsupported_paths_multi
     from rietx.params.multi import MultiParameterTable
 
     structure, ins = _absent_phase_inputs()
@@ -976,7 +976,7 @@ def _held_columns(sharing=None) -> tuple[list[str], list[str]]:
     assert blind == [{1}, {1}]
     both = _unsupported_paths_multi(mtable, blind)
 
-    # the scale is a per-histogram column, so the second pattern alone shows it
+    # the scale is a per-pattern column, so the second pattern alone shows it
     entry = next(e for e in mtable.tables[1].entries
                  if e.path == "phases.1.scale")
     entry.value = structure.phases[0].scale.value
@@ -988,10 +988,10 @@ def _held_columns(sharing=None) -> tuple[list[str], list[str]]:
 
 
 def test_the_joint_hold_needs_every_histogram_to_be_blind():
-    """One histogram that can see the phase is enough to refine a shared cell.
+    """One pattern that can see the phase is enough to refine a shared cell.
 
     Asserted on the predicate rather than on a fit, because the state it turns
-    on — one histogram's scale up, the other's at its floor — is one a joint
+    on — one pattern's scale up, the other's at its floor — is one a joint
     fit reaches only through a specimen that differs between patterns, and the
     rule has to hold before any of that is arranged.
     """
@@ -1001,7 +1001,7 @@ def test_the_joint_hold_needs_every_histogram_to_be_blind():
 
 
 def test_a_per_pattern_cell_is_held_where_its_own_pattern_is_blind():
-    """WP-1325: a cell made per-histogram lives in one pattern.
+    """WP-1325: a cell made per-pattern lives in one pattern.
 
     Under ``SharingMap(per_histogram=["phases.*"])``, the series and library
     shape, each pattern's cell is its own column, so the pattern that cannot
@@ -1011,8 +1011,8 @@ def test_a_per_pattern_cell_is_held_where_its_own_pattern_is_blind():
     from rietx.params.multi import SharingMap
 
     both, one = _held_columns(SharingMap(per_histogram=["phases.*"]))
-    assert both == ["hist.0.phases.1.cell.a", "hist.1.phases.1.cell.a"]
-    assert one == ["hist.0.phases.1.cell.a"]
+    assert both == ["pattern.0.phases.1.cell.a", "pattern.1.phases.1.cell.a"]
+    assert one == ["pattern.0.phases.1.cell.a"]
 
 
 def _pattern_with_both_phases():
@@ -1038,17 +1038,17 @@ def test_a_joint_series_fit_holds_a_vanished_phase_in_its_own_pattern():
     blind, ins = _absent_phase_inputs()
     seen = blind.model_copy(deep=True)
     seen.phases[1].scale.value = blind.phases[0].scale.value
-    ref = rx.MultiHistogramRefinement(
+    ref = rx.JointRefinement(
         [blind, seen], [ins, ins.model_copy(deep=True)],
         sharing=SharingMap(per_histogram=["phases.*"]))
     result = ref.fit([synthesize(), _pattern_with_both_phases()], plan=rx.RefinementPlan(
         stages=[rx.Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
                 rx.Stage("cell", ["phases.*.cell.*"])]))
 
-    assert result.stages[-1].held == ["hist.0.phases.1.cell.a"]
+    assert result.stages[-1].held == ["pattern.0.phases.1.cell.a"]
     rows = {p.path: p for p in result.parameters}
-    assert "hist.0.phases.1.cell.a" not in rows
-    refined = rows["hist.1.phases.1.cell.a"]
+    assert "pattern.0.phases.1.cell.a" not in rows
+    refined = rows["pattern.1.phases.1.cell.a"]
     assert refined.stderr is not None
     assert refined.value == pytest.approx(5.2, abs=0.01)
 
@@ -1561,13 +1561,13 @@ def test_the_cell_window_follows_the_plans_threshold():
 
 
 def test_the_joint_path_takes_the_plans_threshold():
-    """``MultiHistogramRefinement.fit`` reads the same field: with the hold
-    off, a phase no histogram can see is held in no stage, and the joint
+    """``JointRefinement.fit`` reads the same field: with the hold
+    off, a phase no pattern can see is held in no stage, and the joint
     report still names it."""
     import rietx as rx
 
     structure, ins = _absent_phase_inputs()
-    ref = rx.MultiHistogramRefinement(structure, [ins, ins.model_copy(deep=True)])
+    ref = rx.JointRefinement(structure, [ins, ins.model_copy(deep=True)])
     plan = rx.RefinementPlan(stages=[
         rx.Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
         rx.Stage("cell", ["phases.*.cell.*"]),
@@ -1794,9 +1794,9 @@ def test_a_series_carries_the_last_measured_zero_shift_across_a_blank_frame(
 
 
 def test_a_joint_fit_holds_the_blank_patterns_own_zero_shift(blank_frames):
-    """The joint twin.  Each histogram's zero shift is its own, so the blank
+    """The joint twin.  Each pattern's zero shift is its own, so the blank
     frame's is held while the frame that sees the phase refines its own.  The
-    shared cell refines, because one histogram sees the phase."""
+    shared cell refines, because one pattern sees the phase."""
     import rietx as rx
 
     ps, series = blank_frames
@@ -1804,7 +1804,7 @@ def test_a_joint_fit_holds_the_blank_patterns_own_zero_shift(blank_frames):
     @ps.numpy_path
     def fit():
         structure, ins = ps.cubic_model(series.temperature[86])
-        ref = rx.MultiHistogramRefinement(
+        ref = rx.JointRefinement(
             [structure, structure.model_copy(deep=True)],
             [ins, ins.model_copy(deep=True)])
         return ref.fit([series.patterns[86], series.patterns[87]],
@@ -1816,8 +1816,8 @@ def test_a_joint_fit_holds_the_blank_patterns_own_zero_shift(blank_frames):
 
     result = fit()
     held = set(result.stages[-1].held)
-    assert "hist.1.instrument.zero_shift" in held
-    assert "hist.0.instrument.zero_shift" not in held
+    assert "pattern.1.instrument.zero_shift" in held
+    assert "pattern.0.instrument.zero_shift" not in held
     rows = {p.path: p for p in result.parameters}
-    assert rows["hist.0.instrument.zero_shift"].stderr is not None
+    assert rows["pattern.0.instrument.zero_shift"].stderr is not None
     assert rows["phases.0.cell.a"].stderr is not None

@@ -69,7 +69,7 @@ In the GUI it is the third answer to the wizard's structure step.
 
 It cannot be refined.
 A phase reaches the pattern only through `scale × |F|² × profile`, so with no phase only the background is left to fit, and a plan run over it would converge on the background and report success.
-`Refinement.fit`, `Refinement.run_stage`, `refine_multi` and `refine_sequential` therefore raise `NoPhasesError` before they start.
+`Refinement.fit`, `Refinement.run_stage`, `refine_joint` and `refine_sequential` therefore raise `NoPhasesError` before they start.
 `NoPhasesError.code` is the string `NO_PHASES`, which the GUI also gives as its reason for a disabled Run button:
 
 ```python

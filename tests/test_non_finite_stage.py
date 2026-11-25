@@ -18,7 +18,7 @@ import pytest
 
 import rietx.optimize.least_squares as lsq
 from rietx import Refinement
-from rietx.multi import MultiHistogramRefinement
+from rietx.joint import JointRefinement
 from rietx.optimize.least_squares import run_least_squares, run_multi_least_squares
 from rietx.schemas.instrument import BackgroundChebyshev, Instrument
 from rietx.schemas.pattern import PatternData
@@ -233,7 +233,7 @@ def test_a_second_solve_starting_non_finite_puts_the_whole_stage_back():
 
 
 def test_a_joint_stage_whose_jacobian_is_not_finite_ends_at_its_start(monkeypatch):
-    """``multi.py``'s twin, through ``MultiHistogramRefinement.fit``."""
+    """``joint.py``'s twin, through ``JointRefinement.fit``."""
     structure = _rhombohedral_boundary_cell()
     structure.phases[0].cell.alpha.value = 119.0
     structure.phases[0].scale.value = 1e-3
@@ -260,7 +260,7 @@ def test_a_joint_stage_whose_jacobian_is_not_finite_ends_at_its_start(monkeypatc
     plan = RefinementPlan(stages=[
         Stage(name="cell", turn_on=["phases.0.cell.alpha"], max_iter=3)],
         closing_window_tol=None)
-    result = MultiHistogramRefinement(structure, instruments).fit(patterns, plan=plan)
+    result = JointRefinement(structure, instruments).fit(patterns, plan=plan)
     assert result.stages[0].status == "diverged"
     stop = next(d for d in result.diagnostics if d.code == "STAGE_NOT_FINITE")
     assert "'cell'" in stop.message

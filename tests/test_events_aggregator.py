@@ -141,7 +141,7 @@ def test_the_aggregate_reconciles_with_the_emitting_runs_own_records(
     """Counts, terminations, held paths, Rwp and stage clocks, each exact.
 
     The absent-phase fixture makes the cell stage hold the invisible phase's
-    structural paths (WP-1301), so the held-path histogram has something real
+    structural paths (WP-1301), so the held-path pattern has something real
     to count.  Every expectation is computed from the events the callback
     received — the same dicts the file holds — never from the aggregator's own
     code path.

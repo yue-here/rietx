@@ -180,7 +180,7 @@ class RadiationCapability(Base):
     #: own refusal reads — so this cannot claim a support the validator denies.
     #: False for X-rays, where one shared f′/f″ cannot serve λ and λ/n.
     harmonic_contamination: bool
-    #: ``True`` where a histogram of this radiation carries the magnetic
+    #: ``True`` where a pattern of this radiation carries the magnetic
     #: structure factor of a phase that declares a moment (WP-1327).  Read off
     #: ``crystallography.magnetic.scattering.MAGNETIC_SOURCE_KINDS``, the table
     #: ``model.forward.magnetic_wanted`` dispatches on, so it cannot claim a
@@ -526,7 +526,7 @@ def _anode(name: str) -> AnodeCapability:
 #: test asserting the same ``hasattr``, which is how ``indexing`` stayed
 #: ``False`` from the day the feature shipped (see the module docstring).
 _SURFACE_FLAGS: dict[str, str] = {
-    "multi_histogram": "refine_multi",
+    "joint_refinement": "refine_joint",
     "sequential_series": "refine_sequential",
     "project_container": "Project",
     "background_estimation": "auto_background",
@@ -590,7 +590,7 @@ def _features() -> dict[str, bool]:
         # exactly as the rest of this arm does.
         "satellites": "propagation_vector" in Phase.model_fields,
         # a magnetic moment on a site under a magnetic space group, refined
-        # against a neutron histogram (WP-1327).  Derived from the fields, like
+        # against a neutron pattern (WP-1327).  Derived from the fields, like
         # every flag here: the two together are what makes a moment model
         # expressible at all, and either alone is not.  Which *radiations* carry
         # the term is reported per source kind, as

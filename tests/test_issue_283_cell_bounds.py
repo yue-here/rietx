@@ -18,7 +18,7 @@ import pytest
 
 from rietx import (
     Instrument,
-    MultiHistogramRefinement,
+    JointRefinement,
     PatternData,
     Refinement,
 )
@@ -370,7 +370,7 @@ def test_run_least_squares_completes_from_a_jacobian_boundary_adjacent_start():
 #
 # ``run_multi_least_squares`` is the second solver entry point (its own
 # docstring says so, quoting WP-0308), and it stacks the very
-# ``_make_residual``/``_jacobian_for`` pairs the single-histogram one wraps.
+# ``_make_residual``/``_jacobian_for`` pairs the single-pattern one wraps.
 # Left unguarded it turned this issue's survivable ``RuntimeWarning`` into a
 # ``DegenerateCellError`` that killed the stage, on the one path none of the
 # tests above enters.
@@ -378,7 +378,7 @@ def test_run_least_squares_completes_from_a_jacobian_boundary_adjacent_start():
 
 def _joint_alpha_only(structure):
     """:func:`_compile_alpha_only`, stacked: the same one free column
-    (``phases.0.cell.alpha``, shared across histograms because a structural
+    (``phases.0.cell.alpha``, shared across patterns because a structural
     parameter is) in the two-wavelength joint setup
     ``run_multi_least_squares`` consumes."""
     structure.phases[0].scale.value = 1e-3
@@ -402,7 +402,7 @@ def _joint_alpha_only(structure):
 
 def test_the_joint_closures_reach_a_degenerate_cell_the_same_way():
     """The gap's existence proof: ``_multi_closures``' stacked residual and
-    Jacobian reach ``d_spacings`` exactly as the single-histogram pair does,
+    Jacobian reach ``d_spacings`` exactly as the single-pattern pair does,
     and a shared cell is unbounded here too (``_freeze_cell_windows_multi``
     windows only phases below support), so nothing keeps a joint search out
     of the degenerate region."""
@@ -418,7 +418,7 @@ def test_the_joint_closures_reach_a_degenerate_cell_the_same_way():
 
     assert np.isfinite(residual(theta)).all()  # the cell itself is admissible
     with pytest.raises(DegenerateCellError):
-        jacobian(theta)  # the FD step crosses, as it does on one histogram
+        jacobian(theta)  # the FD step crosses, as it does on one pattern
     with pytest.raises(DegenerateCellError):
         residual(np.array([180.0]))  # and a degenerate trial, directly
 
@@ -486,7 +486,7 @@ def test_a_joint_fit_reaches_the_boundary_survives_it_and_says_so():
     :class:`DegenerateCellError` out of ``fit()`` (measured on this fixture,
     11 reaches in the one stage), because a joint refinement decodes through
     the same ``C`` and calls the same ``d_spacings``.  It also pins
-    ``multi.py``'s two writers: the count onto its ``StageResult``, and the
+    ``joint.py``'s two writers: the count onto its ``StageResult``, and the
     sum across stages into ``CELL_DEGENERATE_PROBE``.  The count itself is
     asserted as "at least one", since how many trials a trust region spends
     near a boundary is not a number this test controls."""
@@ -506,7 +506,7 @@ def test_a_joint_fit_reaches_the_boundary_survives_it_and_says_so():
     plan = RefinementPlan(stages=[
         Stage(name="cell", turn_on=["phases.0.cell.alpha"], max_iter=3)],
         closing_window_tol=None)
-    result = MultiHistogramRefinement(structure, instruments).fit(
+    result = JointRefinement(structure, instruments).fit(
         patterns, plan=plan)
 
     counts = [s.n_degenerate_cell_probes for s in result.stages]

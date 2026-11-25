@@ -579,32 +579,32 @@ def test_a_magnetic_window_in_range_counts_as_a_line(four_phase_narrow_pattern):
 @pytest.mark.parametrize("solver", ["lm", "trf"])
 def test_a_joint_fit_holds_each_histograms_unseen_scale(
         four_phase_narrow_pattern, solver):
-    """The joint runner's half: each histogram's own Fe scale is held where
-    that histogram has no line of it.  Measured before the hold, TRF walked
+    """The joint runner's half: each pattern's own Fe scale is held where
+    that pattern has no line of it.  Measured before the hold, TRF walked
     the two to 214.1 and 2.3 on two copies of the 25–33° scan."""
-    from rietx.multi import MultiHistogramRefinement
+    from rietx.joint import JointRefinement
 
     structure, instrument = _models(START_SCALES)
-    multi = MultiHistogramRefinement(
+    multi = JointRefinement(
         structure, [instrument.model_copy(deep=True) for _ in range(2)],
         solver=solver)
     res = multi.fit([four_phase_narrow_pattern] * 2,
                     plan=RefinementPlan(stages=SCALES_ONLY))
-    held = {f"hist.{h}.{FE_SCALE}" for h in range(2)}
+    held = {f"pattern.{h}.{FE_SCALE}" for h in range(2)}
     assert all(held <= set(sr.held) for sr in res.stages)
     assert [s.phases[FE].scale.value for s in multi.fitted_structures] == [
         START_SCALES[FE]] * 2
 
 
 # ----------------------------------------------------------------------
-# a joint fit: scales per histogram, displacement parameters shared
+# a joint fit: scales per pattern, displacement parameters shared
 # ----------------------------------------------------------------------
 def _joint_fit(patterns, stages):
-    from rietx.multi import MultiHistogramRefinement
+    from rietx.joint import JointRefinement
 
     structure, instrument = _models(START_SCALES)
     ins = [instrument.model_copy(deep=True) for _ in patterns]
-    multi = MultiHistogramRefinement(structure, ins)
+    multi = JointRefinement(structure, ins)
     return multi, multi.fit(patterns, plan=RefinementPlan(stages=stages))
 
 
@@ -645,11 +645,11 @@ def test_a_second_histogram_reaching_more_reflections_separates_fe(pattern):
 
 def test_a_scale_shared_across_histograms_is_one_column(pattern):
     """Fe's (110) on one scan and (200) on another each sit at one d-spacing,
-    so per-histogram scales and the shared B are one ridge.  Sharing the scale
+    so per-pattern scales and the shared B are one ridge.  Sharing the scale
     leaves one scale column for two s², which the shared B can no longer
-    imitate, so nothing is held.  Counted once per histogram, the shared scale
+    imitate, so nothing is held.  Counted once per pattern, the shared scale
     read as two columns and held B anyway."""
-    from rietx.multi import MultiHistogramRefinement
+    from rietx.joint import JointRefinement
     from rietx.params.multi import SharingMap
 
     other = _wide_pattern(np.arange(55.0, 75.0, 0.02))
@@ -657,7 +657,7 @@ def test_a_scale_shared_across_histograms_is_one_column(pattern):
     _, own = _joint_fit([pattern, other], stages)
     assert list(own.stages[-1].scale_b_held) == [FE]
     structure, instrument = _models(START_SCALES)
-    multi = MultiHistogramRefinement(
+    multi = JointRefinement(
         structure, [instrument.model_copy(deep=True) for _ in range(2)],
         sharing=SharingMap(shared=[f"phases.{FE}.scale"]))
     shared = multi.fit([pattern, other], plan=RefinementPlan(stages=stages))
@@ -747,31 +747,31 @@ def test_the_unmeasured_set_is_what_the_last_stage_held(pattern):
 
 
 def test_a_shared_scale_another_histogram_measures_is_quoted_everywhere():
-    """A scale shared by a histogram without a line of iron and one with
+    """A scale shared by a pattern without a line of iron and one with
     several: its value is the wide scan's measurement, so the narrow
-    histogram's QPA counts iron too (it left iron out before)."""
-    from rietx.multi import MultiHistogramRefinement
+    pattern's QPA counts iron too (it left iron out before)."""
+    from rietx.joint import JointRefinement
     from rietx.params.multi import SharingMap
 
     structure, instrument = _models(START_SCALES)
     narrow = _wide_pattern(np.arange(25.0, 33.0, 0.01))
     wide = _wide_pattern(np.arange(25.0, 90.0, 0.02))
     plan = RefinementPlan(stages=SCALES_ONLY)
-    multi = MultiHistogramRefinement(
+    multi = JointRefinement(
         structure, [instrument.model_copy(deep=True) for _ in range(2)],
         sharing=SharingMap(shared=["phases.*.scale"]))
     res = multi.fit([narrow, wide], plan=plan)
     assert all(FE_SCALE not in sr.held for sr in res.stages)
-    for hist in res.histograms:
+    for hist in res.patterns:
         assert hist.qpa.unmeasured_phases == []
         (iron,) = [q for q in hist.qpa.phases if q.name == "iron"]
         assert iron.weight_fraction is not None
-    # per-histogram scales stay as before: the narrow scan has no iron fraction
-    own = MultiHistogramRefinement(
+    # per-pattern scales stay as before: the narrow scan has no iron fraction
+    own = JointRefinement(
         structure, [instrument.model_copy(deep=True) for _ in range(2)]
     ).fit([narrow, wide], plan=plan)
-    assert own.histograms[0].qpa.unmeasured_phases == ["iron"]
-    assert own.histograms[1].qpa.unmeasured_phases == []
+    assert own.patterns[0].qpa.unmeasured_phases == ["iron"]
+    assert own.patterns[1].qpa.unmeasured_phases == []
 
 
 def test_the_message_says_where_the_closing_stage_refined_the_scale():
@@ -920,17 +920,17 @@ def test_a_restraint_freed_scale_is_not_called_a_measurement():
 
 
 def test_a_joint_message_names_the_histograms_that_held_the_scale():
-    """Item 4: only histogram 0's iron scale was held."""
+    """Item 4: only pattern 0's iron scale was held."""
     from rietx.refine import _phase_support_diagnostics
 
     structure, _ = _models(START_SCALES)
     held = StageResult(name="s", status="converged", n_iterations=1,
                        cost_initial=1.0, cost_final=1.0,
-                       held=[f"hist.0.{FE_SCALE}"])
+                       held=[f"pattern.0.{FE_SCALE}"])
     (finding,) = _phase_support_diagnostics(
         np.full(4, 0.5), np.array([5, 5, 5, 0]), (25.0, 44.0), [FE_SCALE],
         structure, [held, held])
-    assert "in histogram 0" in finding.message
+    assert "in pattern 0" in finding.message
 
 
 # ----------------------------------------------------------------------
@@ -1000,22 +1000,22 @@ def test_a_held_variable_driving_a_cell_is_still_structural():
 def test_per_histogram_scales_tied_to_one_variable_are_quoted_everywhere():
     """A constant ``ParametricEquation`` on iron's scale ties each pattern's
     own scale to ``vars.S_fe_0``, which the wide scan measures, so the narrow
-    histogram's scale is the wide scan's measurement as a shared one is.  It
+    pattern's scale is the wide scan's measurement as a shared one is.  It
     left iron out under the tie and quoted it under ``SharingMap.shared``."""
-    from rietx.multi import MultiHistogramRefinement
+    from rietx.joint import JointRefinement
     from rietx.schemas.parametric import ParametricEquation
 
     structure, instrument = _models(START_SCALES)
     narrow = _wide_pattern(TT_NARROW)
     wide = _wide_pattern(np.arange(25.0, 90.0, 0.02))
     stages = [Stage(s.name, [*s.turn_on, "vars.*"]) for s in SCALES_ONLY]
-    multi = MultiHistogramRefinement(
+    multi = JointRefinement(
         structure, [instrument.model_copy(deep=True) for _ in range(2)],
         parametric=[ParametricEquation(name="S_fe", target=FE_SCALE,
                                        basis="constant")])
     res = multi.fit([narrow, wide], plan=RefinementPlan(stages=stages))
     assert all("vars.S_fe_0" in sr.freed and sr.held == [] for sr in res.stages)
-    for hist in res.histograms:
+    for hist in res.patterns:
         assert hist.qpa.unmeasured_phases == []
         (iron,) = [q for q in hist.qpa.phases if q.name == "iron"]
         assert iron.weight_fraction is not None
@@ -1023,21 +1023,21 @@ def test_per_histogram_scales_tied_to_one_variable_are_quoted_everywhere():
 
 def test_a_variable_no_histogram_with_a_line_reaches_measures_nothing():
     """The negative arm: the same tie over two narrow scans, neither with a
-    line of iron.  The stages hold the variable, and neither histogram
+    line of iron.  The stages hold the variable, and neither pattern
     quotes iron."""
-    from rietx.multi import MultiHistogramRefinement
+    from rietx.joint import JointRefinement
     from rietx.schemas.parametric import ParametricEquation
 
     structure, instrument = _models(START_SCALES)
     narrow = _wide_pattern(TT_NARROW)
     stages = [Stage(s.name, [*s.turn_on, "vars.*"]) for s in SCALES_ONLY]
-    multi = MultiHistogramRefinement(
+    multi = JointRefinement(
         structure, [instrument.model_copy(deep=True) for _ in range(2)],
         parametric=[ParametricEquation(name="S_fe", target=FE_SCALE,
                                        basis="constant")])
     res = multi.fit([narrow, narrow], plan=RefinementPlan(stages=stages))
     assert all("vars.S_fe_0" in sr.held for sr in res.stages)
-    assert [h.qpa.unmeasured_phases for h in res.histograms] == [["iron"]] * 2
+    assert [h.qpa.unmeasured_phases for h in res.patterns] == [["iron"]] * 2
 
 
 def test_a_polynomial_link_on_a_scale_leaves_the_narrow_scan_unmeasured():
@@ -1046,20 +1046,20 @@ def test_a_polynomial_link_on_a_scale_leaves_the_narrow_scan_unmeasured():
     linked by a + b·T.  Two columns face one measured scale, so one direction
     of the pair is flat and the narrow scan's fraction would be the start
     value wearing an esd.  Only a constant link counts as measured, so the
-    narrow histogram quotes no iron and the wide one does."""
-    from rietx.multi import MultiHistogramRefinement
+    narrow pattern quotes no iron and the wide one does."""
+    from rietx.joint import JointRefinement
     from rietx.schemas.parametric import CoordinateTable, ParametricEquation
 
     structure, instrument = _models(START_SCALES)
     narrow = _wide_pattern(TT_NARROW)
     wide = _wide_pattern(np.arange(25.0, 90.0, 0.02))
     stages = [Stage(s.name, [*s.turn_on, "vars.*"]) for s in SCALES_ONLY]
-    multi = MultiHistogramRefinement(
+    multi = JointRefinement(
         structure, [instrument.model_copy(deep=True) for _ in range(2)],
         coordinates=CoordinateTable(columns={"T": [300.0, 500.0]}, units={"T": "K"}),
         parametric=[ParametricEquation(name="S_fe", target=FE_SCALE,
                                        basis="polynomial", terms=[[], ["T"]])])
     res = multi.fit([narrow, wide], plan=RefinementPlan(stages=stages))
-    narrow_res, wide_res = res.histograms
+    narrow_res, wide_res = res.patterns
     assert narrow_res.qpa.unmeasured_phases == ["iron"]
     assert wide_res.qpa.unmeasured_phases == []

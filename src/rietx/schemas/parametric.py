@@ -1,6 +1,6 @@
 """A parameter as a declared function of each pattern's coordinates (WP-1325).
 
-A joint fit over many patterns (:func:`rietx.refine_multi`) can refine a
+A joint fit over many patterns (:func:`rietx.refine_joint`) can refine a
 parameter as a function of where each pattern sits: a temperature down a ramp,
 an (x, y) composition across a combinatorial library.  Pattern k's value of the
 target is p_k = Σ_j Φ_kj · c_j, and the coefficients c_j are the refined
@@ -19,7 +19,7 @@ round-trip, so a self-driving lab can write one and a result can carry it:
   coordinate.  A form with a coefficient inside a power or an exponential is
   not linear in it, and is written as an ``expression`` (WP-1964): text in
   the grammar of :mod:`rietx.params.expression` over named variables, which
-  ``refine_multi(variables=…)`` declares, and the coordinate columns.
+  ``refine_joint(variables=…)`` declares, and the coordinate columns.
 * :class:`ParametricCoefficient` — one refined coefficient on
   :attr:`RefinementResult.parametric <rietx.schemas.results.RefinementResult.parametric>`,
   in the caller's units at the reference.
@@ -126,7 +126,7 @@ class ParametricEquation(Base):
     For ``basis="expression"`` the target in each pattern of the subset is the
     ``expression`` evaluated at that pattern's coordinates.  Its free names are
     variables, ``vars.{name}`` for each name the caller declares with
-    ``refine_multi(variables=…)`` (one shared column, however many equations
+    ``refine_joint(variables=…)`` (one shared column, however many equations
     name it), or coordinate columns.  It has no coefficients of its own, and a
     stage's glob reaching the target frees the variables it names.
 
@@ -138,7 +138,7 @@ class ParametricEquation(Base):
     a later equation names it, so it takes no ``patterns``.
 
     * ``target`` — one model parameter's bare dot-path, no glob and no
-      ``hist.`` scope (the subset says which patterns): ``phases.0.cell.a``,
+      ``pattern.`` scope (the subset says which patterns): ``phases.0.cell.a``,
       ``instrument.background.c2``.  ``None`` only on an expression equation,
       which is then an intermediate.
     * ``basis`` — ``constant``; ``polynomial``, with ``terms``: each a list of
@@ -193,7 +193,7 @@ class ParametricEquation(Base):
             raise ValueError(
                 f"target {t!r} must be a model parameter, a dot-path under "
                 "'phases.' or 'instrument.'; name the patterns it applies to "
-                "with patterns=, never with a 'hist.' scope")
+                "with patterns=, never with a 'pattern.' scope")
         if self.patterns is not None:
             if not self.patterns:
                 raise ValueError("patterns=[] selects nothing; pass None for every pattern")
@@ -336,7 +336,7 @@ class ParametricCoefficient(Base):
     variable's ``unit``, and ``reference`` is ``None``.  A variable two
     formulas read is listed under each, once per equation.  A per-pattern
     variable (one ``SharingMap.per_histogram`` names) has a row per pattern
-    of the subset, ``path`` its ``hist.<h>.vars.<name>`` row.  So this table
+    of the subset, ``path`` its ``pattern.<h>.vars.<name>`` row.  So this table
     does not count free parameters; ``RefinementResult.parameters`` does.
 
     ``equation`` was ``tie`` in 1.9.0 (schema 0.55), whose results still open:
@@ -622,13 +622,13 @@ class RefinedParametricEquation(Base):
         if wrong:
             raise ValueError(f"equation {equation.name!r} takes its own variables' rows; "
                              f"{wrong} belong to another equation")
-        local = [c.path for c in coefficients if c.path.startswith("hist.")]
+        local = [c.path for c in coefficients if c.path.startswith("pattern.")]
         if local:
             raise ValueError(
                 f"equation {equation.name!r} reads a per-pattern variable ({local[0]}), "
                 "which has a value at each pattern and none between them, so the "
                 f"equation is not evaluated anywhere else; its value at pattern h is "
-                f"the result row hist.h.{equation.target}, with its esd")
+                f"the result row pattern.h.{equation.target}, with its esd")
         if self.covariance is not None and len(self.covariance) != len(coefficients):
             raise ValueError(f"equation {equation.name!r} takes {len(self.covariance)} "
                              f"variables' rows, in result.parametric's order; got "

@@ -411,7 +411,7 @@ class RefinementPlan:
     #: where the stage found it and held, with one more solve.  The default cell
     #: window (``params.vector.cell_window``) is applied to the same phases.
     #: Read by ``Refinement._run_stage`` through ``fit``,
-    #: ``MultiHistogramRefinement.fit`` and a series, each through
+    #: ``JointRefinement.fit`` and a series, each through
     #: :func:`~rietx.schemas.plan.check_phase_support_sigma`.  ``None`` switches
     #: all of that off: no stage holds, releases or restores a phase for
     #: support, and no cell is windowed.  ``PHASE_UNCONSTRAINED`` still reports
@@ -492,7 +492,7 @@ class RefinementPlan:
         """The tolerance each stage runs at, in order — the one authority.
 
         Both runners ask this rather than reading ``stage.ftol``
-        (``Refinement._run_stage`` through ``fit``, ``MultiHistogramRefinement.fit``),
+        (``Refinement._run_stage`` through ``fit``, ``JointRefinement.fit``),
         because the answer needs a fact no stage has: **whether it is the
         last**.  A plan is the only object that knows, so the rule lives here
         and is applied once per fit instead of restated per call site.
@@ -1534,7 +1534,7 @@ def check_hump_width(table, model) -> list[GuardFinding]:
     skipped rather than passed.  The instrument model being unphysical at that
     angle is a separate, more fundamental defect and not this guard's to name.
 
-    Under the LM driver a single-histogram fit holds Γ_G² ≥ ``_MIN_GAMMA_G2``
+    Under the LM driver a single-pattern fit holds Γ_G² ≥ ``_MIN_GAMMA_G2``
     at every reflection, so Γ_G ≥ 1e-4° there (WP-1938 D7,
     ``optimize.least_squares.gaussian_width_inequalities``).  This guard's
     floor of 10·√ε, 1e-3°, sits a decade above that, and the inequality also
@@ -1620,7 +1620,7 @@ def check_stephens_positive(table, model) -> list[GuardFinding]:
     driver carries it as a linear inequality (``optimize/lm.py``), and then
     this guard falls silent because there is nothing left to report.  It is
     the only check under ``solver="trf"``.  A joint fit's LM step holds one
-    cone per histogram (``_joint_positivity_inequalities``, WP-2239).
+    cone per pattern (``_joint_positivity_inequalities``, WP-2239).
 
     Zero is *inside* the physical set, and the test is one-sided for that
     reason: an all-zero block is the exact no-broadening identity, and a
@@ -2113,8 +2113,8 @@ def check_resolution_positive(table, model) -> list[GuardFinding]:
     over zero does not make U, V, W quotable.  Read a firing as "this
     resolution function is not quotable", never as a verdict on the sample.
 
-    This is TRF's guard.  The LM driver, on a single histogram and on each
-    histogram of a joint fit, also holds the **total** Γ_G², each phase's
+    This is TRF's guard.  The LM driver, on a single pattern and on each
+    pattern of a joint fit, also holds the **total** Γ_G², each phase's
     Gaussian size and strain included, and a width peak equation's term where
     that term is exact (WP-2153), at or above ``caglioti._MIN_GAMMA_G2`` at every
     reflection, as a linear inequality (WP-1938 D7,
@@ -2244,7 +2244,7 @@ def bound_findings(bounds, free: list[str], theta, *,
     and ``FLOOR_HIT`` diagnostics built from these findings, and
     :attr:`~rietx.schemas.results.RefinedParameter.at_bound`, which is the same
     list projected onto the result rows (WP-1076).  Before that WP the loop was
-    written out twice — here and in ``multi.py`` — which is a duplicate a joint
+    written out twice — here and in ``joint.py`` — which is a duplicate a joint
     refinement would have had to keep in step by hand.
 
     Only *free* paths are testable.  A tied path is not in ``theta`` and is
@@ -2380,7 +2380,7 @@ def bound_findings(bounds, free: list[str], theta, *,
 def pressed_tied_paths(truncated_by) -> set[str]:
     """The tied entries whose bound rows shaped a step, read off the labels
     :func:`~rietx.optimize.least_squares.tied_bound_inequalities` writes
-    (``"<path> bounds"``, a joint fit's ``"hist.<h> <path> bounds"`` and
+    (``"<path> bounds"``, a joint fit's ``"pattern.<h> <path> bounds"`` and
     ``"parametric equation '<name>' (<target> bounds)"``).  A label of any
     other block (the Stephens cone, the width floors) names no tied entry."""
     out: set[str] = set()
@@ -2388,7 +2388,7 @@ def pressed_tied_paths(truncated_by) -> set[str]:
         if not n:
             continue
         m = (re.search(r"\((\S+) bounds\)$", label)
-             or re.fullmatch(r"(?:hist\.\d+ )?(\S+) bounds", label))
+             or re.fullmatch(r"(?:pattern\.\d+ )?(\S+) bounds", label))
         if m:
             out.add(m.group(1))
     return out
@@ -2420,7 +2420,7 @@ def tied_bound_findings(table, pressed: set[str], esd: dict[str, float], *,
 
     ``esd`` is :meth:`~rietx.params.vector.ParameterTable.stderr_physical`'s
     map for this table.  ``scope`` prefixes each finding's path, as a joint
-    fit spells a per-histogram row (``"hist.1."``); a joint caller passes
+    fit spells a per-pattern row (``"pattern.1."``); a joint caller passes
     ``""`` for a shared entry.
     """
     import math
@@ -2639,7 +2639,7 @@ def check_guards(table, outcome, threshold: float,
         report.at_bounds += tied_bound_findings(
             table, pressed,
             # the result's own esds, a tie the data determine included
-            # (WP-2230), as the joint fit's per-histogram build reads them
+            # (WP-2230), as the joint fit's per-pattern build reads them
             table.stderr_physical(
                 outcome.theta, sd_internal, outcome.correlation,
                 discarded=getattr(outcome, "discarded_subspace", None)))

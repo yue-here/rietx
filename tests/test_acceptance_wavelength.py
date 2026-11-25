@@ -3,7 +3,7 @@
 The feature exists so that rietx can do what one sentence of a published paper
 describes.  Gaultois *et al.*, *J. Phys.: Condens. Matter* (2013), ms.
 CM/461205, refined one Nd₂Ru₂O₇ specimen jointly against an APS 11-BM
-synchrotron histogram and an NCNR BT-1 constant-wavelength neutron histogram,
+synchrotron pattern and an NCNR BT-1 constant-wavelength neutron pattern,
 and says of its own protocol:
 
     "the synchrotron X-ray wavelength was fixed while the neutron wavelength
@@ -12,7 +12,7 @@ and says of its own protocol:
 
 That is the whole of this WP in the authors' words, and until now rietx refused
 it — ``EmissionLine.wavelength`` was a plain float.  The datasets are the two
-histograms of that refinement (``tests/data/README.md`` has the provenance and
+patterns of that refinement (``tests/data/README.md`` has the provenance and
 the published reference values).
 
 **Why the X-ray wavelength is the one to hold**, rather than either being an
@@ -21,12 +21,12 @@ arbitrary choice: 49 493 points at λ = 0.4132950 Å against 3 296 points at
 *and* its angular resolution makes its cell the better determined, so the cell
 belongs to the X-ray data; the neutron data's unique contribution is the
 structural content that its scattering-length contrast buys.  Holding the
-wavelength of the histogram that owns the cell is what makes the other
-histogram's monochromator calibration measurable at all.
+wavelength of the pattern that owns the cell is what makes the other
+pattern's monochromator calibration measurable at all.
 
 Measured here, 2026-08-24, single-phase Fd-3m:2, ``mccusker_structural`` plus a
 final stage freeing {λ, cell, coordinates}, 8-term Chebyshev backgrounds, X-ray
-2-46° and neutron 5-155°, unit histogram weights (each point's esd governs):
+2-46° and neutron 5-155°, unit pattern weights (each point's esd governs):
 
 ===========================  =========  =========  ==============  ==========
 protocol                     Rwp X-ray  Rwp n      a (Å)           λ moved
@@ -41,10 +41,10 @@ joint, n held, X-ray free    0.09371    0.05502    10.340249(661)  −256.7 ppm
 Three things in that table are the acceptance, and each is a separate test
 below.
 
-1. **Forcing one cell with both λ held costs the neutron histogram**, 0.05259
-   alone to 0.06226 jointly, while the X-ray histogram barely notices
+1. **Forcing one cell with both λ held costs the neutron pattern**, 0.05259
+   alone to 0.06226 jointly, while the X-ray pattern barely notices
    (0.09364 → 0.09373).  The joint fit dumps the calibration mismatch onto the
-   histogram with less leverage on the cell.  Freeing the neutron λ recovers it
+   pattern with less leverage on the cell.  Freeing the neutron λ recovers it
    to 0.05502.
 2. **The refined λ measures the mismatch the two solo cells already showed.**
    The solo cells differ by +253 ppm (10.342905 against 10.340285) and the
@@ -167,8 +167,8 @@ def _neutron_instrument() -> rx.Instrument:
 def _plan(free_histogram: int | None) -> rx.RefinementPlan:
     """``mccusker_structural`` plus a final stage that frees one λ.
 
-    The glob is **scoped** (``hist.N.…``), which is what makes "all but one"
-    expressible: the bare path would free every histogram's copy and be
+    The glob is **scoped** (``pattern.N.…``), which is what makes "all but one"
+    expressible: the bare path would free every pattern's copy and be
     refused.  The cell and the coordinates ride along in the same stage because
     λ trades against both, and the staged runner is cumulative — everything
     freed earlier is still free here.
@@ -177,7 +177,7 @@ def _plan(free_histogram: int | None) -> rx.RefinementPlan:
     if free_histogram is not None:
         plan.stages.append(Stage(
             "wavelength",
-            [f"hist.{free_histogram}.instrument.source.lines.0.wavelength",
+            [f"pattern.{free_histogram}.instrument.source.lines.0.wavelength",
              "phases.*.cell.*", "phases.*.atoms.*.dof.*"]))
     # WP-1123's shipped schedule, named rather than inherited: every stage but
     # the last stops at 1e-6 and the last at the solver's 1e-9, which is what a
@@ -198,7 +198,7 @@ def _patterns():
 
 def _joint(free_histogram: int | None):
     data = _patterns()
-    return rx.refine_multi(
+    return rx.refine_joint(
         list(data), _structure(),
         [_xray_instrument(), _neutron_instrument()],
         plan=_plan(free_histogram),
@@ -207,7 +207,7 @@ def _joint(free_histogram: int | None):
 
 def _solo_refinement(which: int, nudge: int = 0, *,
                      y_floor: bool = False) -> rx.Refinement:
-    """One histogram alone, fitted; the result is its ``result_``.  ``nudge``
+    """One pattern alone, fitted; the result is its ``result_``.  ``nudge``
     multiplies every refinable nonzero start value by (1 + nudge·1e-14), the
     size of the difference two platforms' arithmetic makes (WP-1929).
     ``y_floor`` declares Y ≥ 0, the floor WP-2002 removed from the default."""
@@ -277,15 +277,15 @@ def _cell(result) -> float:
 
 
 def _refined_wavelength(result, h: int):
-    path = f"hist.{h}.instrument.source.lines.0.wavelength"
+    path = f"pattern.{h}.instrument.source.lines.0.wavelength"
     row = next(p for p in result.parameters if p.path == path)
     return row.value, row.stderr
 
 
 def _ppm_diagnostic(result, h: int):
-    diags = [d for d in result.histograms[h].diagnostics
+    diags = [d for d in result.patterns[h].diagnostics
              if d.code == "WAVELENGTH_CALIBRATION"]
-    assert len(diags) == 1, [d.code for d in result.histograms[h].diagnostics]
+    assert len(diags) == 1, [d.code for d in result.patterns[h].diagnostics]
     return diags[0]
 
 
@@ -294,20 +294,20 @@ def _ppm_diagnostic(result, h: int):
 
 def test_holding_both_wavelengths_costs_the_neutron_histogram(
         solo_neutron, solo_xray, joint_held):
-    """One cell for two uncalibrated wavelengths lands on one histogram.
+    """One cell for two uncalibrated wavelengths lands on one pattern.
 
     This is the *problem statement*, asserted rather than asserted-about: the
-    neutron histogram fits worse inside the joint fit than it does alone, by
-    much more than the X-ray histogram does, because the shared cell is pinned
-    by the histogram with 13× the points and 3.7× the angular leverage.  Read a
+    neutron pattern fits worse inside the joint fit than it does alone, by
+    much more than the X-ray pattern does, because the shared cell is pinned
+    by the pattern with 13× the points and 3.7× the angular leverage.  Read a
     firing of this as "the joint fit has nowhere to put the calibration
     mismatch", never as a data problem.
     """
     solo_n = solo_neutron.statistics.rwp
     solo_x = solo_xray.statistics.rwp
-    joint_n = joint_held.histograms[1].statistics.rwp
-    joint_x = joint_held.histograms[0].statistics.rwp
-    # the neutron histogram degrades, and by an order more than the X-ray one
+    joint_n = joint_held.patterns[1].statistics.rwp
+    joint_x = joint_held.patterns[0].statistics.rwp
+    # the neutron pattern degrades, and by an order more than the X-ray one
     assert joint_n > solo_n * 1.10
     assert joint_x == pytest.approx(solo_x, rel=0.01)
     assert (joint_n - solo_n) > 10.0 * abs(joint_x - solo_x)
@@ -325,16 +325,16 @@ def test_freeing_the_neutron_wavelength_recovers_its_fit(
     their own ftol (tests/CLAUDE.md).
     """
     solo = solo_neutron.statistics.rwp
-    held = joint_held.histograms[1].statistics.rwp
-    freed = joint_neutron_free.histograms[1].statistics.rwp
+    held = joint_held.patterns[1].statistics.rwp
+    freed = joint_neutron_free.patterns[1].statistics.rwp
     assert freed < held
     # most of the way back to the solo fit, and never past it: the solo fit has
     # its own cell, so it is the floor this protocol can approach
     assert (held - freed) > 0.5 * (held - solo)
     assert freed > solo * 0.95
-    # the X-ray histogram is not paying for it
-    assert (joint_neutron_free.histograms[0].statistics.rwp
-            == pytest.approx(joint_held.histograms[0].statistics.rwp, rel=0.01))
+    # the X-ray pattern is not paying for it
+    assert (joint_neutron_free.patterns[0].statistics.rwp
+            == pytest.approx(joint_held.patterns[0].statistics.rwp, rel=0.01))
 
 
 # --- 2. the refined wavelength is the measured cell mismatch ------------
@@ -344,12 +344,12 @@ def test_the_refined_wavelength_is_the_solo_cell_disagreement(
         solo_xray, solo_neutron, joint_neutron_free):
     """+258 ppm from the fit against +253 ppm from two independent fits.
 
-    The two histograms refined separately give two cells, and the ratio of
+    The two patterns refined separately give two cells, and the ratio of
     those cells is a *prediction* for how far the neutron λ must move to fit
     the X-ray's cell — arrived at without freeing anything.  Agreement between
     the two is the feature working, and it is the assertion this suite exists
     for.  The bar is 20 % of the effect, which is the scatter two separately
-    converged single-histogram fits carry, not the solver's tolerance.
+    converged single-pattern fits carry, not the solver's tolerance.
     """
     cell_ppm = 1e6 * (_cell(solo_xray) - _cell(solo_neutron)) / _cell(solo_xray)
     lam, esd = _refined_wavelength(joint_neutron_free, 1)
@@ -373,17 +373,17 @@ def test_the_diagnostic_reports_the_ppm_and_nothing_claims_rwp(
     assert diag.level == "info"
     assert diag.value == pytest.approx(
         1e6 * (lam - LAM_NEUTRON) / LAM_NEUTRON, rel=1e-9)
-    assert diag.where == ["hist.1.instrument.source.lines.0.wavelength"]
-    # the histogram whose λ was held says nothing, and neither does the fit
+    assert diag.where == ["pattern.1.instrument.source.lines.0.wavelength"]
+    # the pattern whose λ was held says nothing, and neither does the fit
     # that held both — silence is the absence of a refinement, not a clean bill
-    assert not [d for d in joint_neutron_free.histograms[0].diagnostics
+    assert not [d for d in joint_neutron_free.patterns[0].diagnostics
                 if d.code == "WAVELENGTH_CALIBRATION"]
-    assert not [d for h in joint_held.histograms for d in h.diagnostics
+    assert not [d for h in joint_held.patterns for d in h.diagnostics
                 if d.code == "WAVELENGTH_CALIBRATION"]
 
 
 def test_the_cell_belongs_to_the_synchrotron(solo_xray, joint_neutron_free):
-    """Holding the X-ray λ hands the cell to the X-ray histogram, as intended.
+    """Holding the X-ray λ hands the cell to the X-ray pattern, as intended.
 
     The joint cell lands on the X-ray solo cell rather than between the two,
     which is the accuracy hierarchy in action: 49 493 points at 0.413 Å own the
@@ -410,7 +410,7 @@ def test_swapping_which_wavelength_is_held_measures_the_same_ratio(
     eq. pos-lambda-cell — so calling one of them "the calibration error" is a
     choice of what to hold, not a result.  Holding the other end must therefore
     give the same mismatch with the opposite sign.  It does, to under 1 ppm on
-    an effect of 257, and every histogram's Rwp and the shared x(O) are
+    an effect of 257, and every pattern's Rwp and the shared x(O) are
     unchanged: the two runs are the same fit in two parameterisations.
     """
     lam_n, _ = _refined_wavelength(joint_neutron_free, 1)
@@ -423,9 +423,9 @@ def test_swapping_which_wavelength_is_held_measures_the_same_ratio(
     # shared cells
     assert abs(ppm_n + ppm_x) < 0.02 * abs(ppm_n)
     for h in (0, 1):
-        assert (joint_xray_free.histograms[h].statistics.rwp
+        assert (joint_xray_free.patterns[h].statistics.rwp
                 == pytest.approx(
-                    joint_neutron_free.histograms[h].statistics.rwp, rel=2e-3))
+                    joint_neutron_free.patterns[h].statistics.rwp, rel=2e-3))
     x_free_n = next(p.value for p in joint_neutron_free.parameters
                     if p.path.endswith("atoms.2.x"))
     x_free_x = next(p.value for p in joint_xray_free.parameters
@@ -499,9 +499,9 @@ def test_a_width_on_its_floor_has_a_one_sided_profile_interval(
 
 
 def test_the_fits_render(joint_neutron_free):
-    """obs/calc/diff per histogram, as the other real-data suites write them."""
+    """obs/calc/diff per pattern, as the other real-data suites write them."""
     OUT.mkdir(exist_ok=True)
     for h in range(2):
         path = OUT / f"mg090_joint_hist{h}.png"
-        joint_neutron_free.for_histogram(h).plot(path=str(path))
+        joint_neutron_free.for_pattern(h).plot(path=str(path))
         assert path.exists()

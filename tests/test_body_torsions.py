@@ -383,10 +383,10 @@ def test_a_refused_commit_puts_the_torsion_anchor_back(monkeypatch):
 
 def test_a_joint_commit_one_histogram_refuses_puts_every_torsion_anchor_back(
         monkeypatch):
-    """#825's joint rollback covers the torsion: when the second histogram's
+    """#825's joint rollback covers the torsion: when the second pattern's
     table refuses, the first table, which composed its twist (φ₀ 16 → 21)
     before the refusal, gets φ₀ and the anchors a later
-    ``restore_body_anchors`` reads back, so the histograms never disagree on
+    ``restore_body_anchors`` reads back, so the patterns never disagree on
     the torsion."""
     from rietx.params.multi import MultiParameterTable
 

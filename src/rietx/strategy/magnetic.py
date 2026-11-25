@@ -74,10 +74,10 @@ modulus alone rides a flat direction and fails the ratio however large it is,
 so the gate reads the quadrature sum the powder does measure
 (:attr:`MomentRow.pair_supported`).
 
-**What it refuses.**  An X-ray histogram, by name: the *position* of a magnetic
+**What it refuses.**  An X-ray pattern, by name: the *position* of a magnetic
 satellite and of a superstructure reflection are the same and the inference is
 not, and a moment refined against X-rays has no gradient anywhere
-(:func:`rietx.model.forward.magnetic_wanted`).  A histogram whose report shows
+(:func:`rietx.model.forward.magnetic_wanted`).  A pattern whose report shows
 no unexplained intensity is not refused — it is answered, with the reason.
 
 **Provisional.**  The chain is stable; the ranking criterion is not.  M-10
@@ -209,7 +209,7 @@ SOLVE_SEED_MU_B = 2.0
 #: see that constant's docstring for the mechanism and :func:`_seed`.
 SOLVE_SEED_TILT = _moments.SEED_TILT
 
-#: The stage list a trial refines under on a **constant-wavelength** histogram,
+#: The stage list a trial refines under on a **constant-wavelength** pattern,
 #: unless a caller supplies a plan, named by :data:`SOLVE_STAGE_NAMES`.  Moment
 #: + scale + background first — the block that has to climb out of the noise
 #: before anything else is allowed to move — then the fuller stage.
@@ -843,8 +843,8 @@ def _refuse_non_neutron(instrument, phase_name: str) -> None:
     if kind == "neutron_cw":
         return
     raise ValueError(
-        f"solve_magnetic(): the histogram's source is {kind!r} and a moment "
-        f"reaches a neutron histogram and nothing else "
+        f"solve_magnetic(): the pattern's source is {kind!r} and a moment "
+        f"reaches a neutron pattern and nothing else "
         f"(model.forward.magnetic_wanted). On an X-ray pattern of "
         f"{phase_name!r} the position of a magnetic satellite and of a "
         f"superstructure reflection are the same and the inference is not: "
@@ -1587,7 +1587,7 @@ def _dead_globs(plan, result) -> tuple[str, ...]:
     """Stage free-list globs that freed nothing — reported, never silent.
 
     A ``Stage`` entry matching no parameter is accepted without a word, and the
-    two ways that happens are a typo and a term this histogram's forward model
+    two ways that happens are a typo and a term this pattern's forward model
     does not read, which changes Rwp in no digit.  In a
     ranking that is not a wasted line: it makes the models that were compared
     differ from the ones the caller believes were compared, so it goes in the
@@ -2157,7 +2157,7 @@ def solve_magnetic(refinement, data, *, phase: int = 0,
     — see :data:`SOLVE_K_TIE_DELTA_BIC`.  Every k actually tried is reported
     in :attr:`MagneticSolution.k_trials`, whether it won or not.
 
-    Refuses by name on a non-neutron histogram.  Everything else — no
+    Refuses by name on a non-neutron pattern.  Everything else — no
     unexplained intensity, no candidate k, a tie at the top — is *reported*,
     which is the 1043/1301 rule this workflow inherits: a determination stage
     returns a ranked list with a stated criterion and an abstention reason,

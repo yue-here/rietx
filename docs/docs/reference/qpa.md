@@ -251,5 +251,5 @@ A corrected fraction still 11 wt % from the weighed value is evidence that this 
 
 `Refinement.write_qpa_table` writes the table to a CSV file, or a tab-separated one for a `.tsv` or `.tab` suffix ([Exports and derived tables](exports.md)).
 The file opens with `#` comment lines stating the crystalline-only scope and, where it applies, the microabsorption correction or why it was skipped.
-A joint fit reports a `QuantitativePhaseAnalysis` per pattern on `HistogramResult.qpa`, and a series reports one per pattern on `SeriesEntry.qpa`.
+A joint fit reports a `QuantitativePhaseAnalysis` per pattern on `PatternResult.qpa`, and a series reports one per pattern on `SeriesEntry.qpa`.
 `SeriesResult.qpa_trajectory` turns one phase's fraction into a trajectory across the series ([Sequential refinement](series.md)).

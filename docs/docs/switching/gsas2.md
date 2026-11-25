@@ -128,7 +128,7 @@ The log is appended to and never rewritten, so a crash leaves the history up to 
 
 GSAS-II keeps phases, histograms and the pairing of each phase with each histogram in one tree.
 rietx's `Refinement` holds the phases and one instrument, and fits one pattern at a time.
-Several patterns of one specimen go in `MultiHistogramRefinement`, with the structure shared and each pattern keeping its own instrument, wavelength and background.
+Several patterns of one specimen go in `JointRefinement`, with the structure shared and each pattern keeping its own instrument, wavelength and background.
 A joint fit shares the crystallite size and scales each pattern's width in degrees by its wavelength.
 The [joint fit](validation.md#one-specimen-two-radiations) of a synchrotron and a neutron pattern agrees with the published refinement of the same data.
 

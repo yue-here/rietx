@@ -8,7 +8,7 @@ in ``tests/test_cross_backend.py``, whose ``"torch"`` and ``"torch+fp32"`` rows
 this WP activates across all six configs at once (the 18 analytic families, Le
 Bail with P-spline penalty rows, Pawley with its aux block and restraint rows,
 the aniso/PO/extinction state, real srm660c/nac data, and the stacked
-multi-histogram layout).  What is here is what that matrix cannot express: the
+joint layout).  What is here is what that matrix cannot express: the
 op-level contract, process isolation, and the two device-specific claims (fp32
 columns crossing the fp64 host boundary, and an end-to-end MPS refine).
 """
@@ -303,9 +303,9 @@ def test_backend_kwarg_refines_and_is_recorded(backend):
 
 
 def test_multi_histogram_backend_kwarg():
-    """The same kwarg on the multi-histogram entry point (the stacked Jacobian's
+    """The same kwarg on the joint entry point (the stacked Jacobian's
     column agreement is WP-0404's matrix; this is the plumbing)."""
-    from rietx.multi import MultiHistogramRefinement
+    from rietx.joint import JointRefinement
     from tests.test_multi_histogram import perturbed_inputs, synthesize
 
     data = [synthesize(0.41390, 3.0, 24.0, scale=5e-4, zero=0.006,
@@ -313,11 +313,11 @@ def test_multi_histogram_backend_kwarg():
             synthesize(0.71070, 6.0, 46.0, scale=9e-4, zero=-0.010,
                        bkg=[70.0, 5.0, -2.0], seed=2)]
     structure, instruments = perturbed_inputs()
-    ref = MultiHistogramRefinement(structure, instruments, backend="torch")
+    ref = JointRefinement(structure, instruments, backend="torch")
     res = ref.fit(data, plan="mccusker_default")
     assert res.status == "converged"
     assert res.provenance.backend == "torch"
-    assert len(res.histograms) == 2
+    assert len(res.patterns) == 2
 
 
 def test_unknown_backend_still_rejected():

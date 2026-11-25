@@ -259,10 +259,10 @@ DATASETS: dict[str, Dataset] = {
         state="development"),
     "ndruo_joint": Dataset(
         "mg090.fxye",
-        "Nd2Ru2O7 pyrochlore, one specimen, two histograms: APS 11-BM "
+        "Nd2Ru2O7 pyrochlore, one specimen, two patterns: APS 11-BM "
         "synchrotron X-ray (lambda 0.4132950 A, 49 493 points) and NCNR BT-1 "
         "neutron through a Cu(311) monochromator (lambda 1.54040 A, 3 296 "
-        "points).  The two histograms of the combined refinement in Gaultois "
+        "points).  The two patterns of the combined refinement in Gaultois "
         "et al., J. Phys.: Condens. Matter 25 (2013) 186004 "
         "(doi:10.1088/0953-8984/25/18/186004), whose stated method is to hold "
         "the X-ray wavelength and refine the neutron one -- the only "
@@ -512,9 +512,9 @@ CLAIMS: tuple[Claim, ...] = (
     Claim(
         "test_acceptance_lab6_cbn", "test_the_qpa_agrees_with_topas_within_its_own_esd",
         "lab6_cbn", ("cross_code", "ceiling"),
-        "two-phase QPA on a synchrotron histogram with the standard's cell "
+        "two-phase QPA on a synchrotron pattern with the standard's cell "
         "held, referenced to TOPAS's own two-model interval",
-        reference="TOPAS's two shipped models of this histogram give LaB6 "
+        reference="TOPAS's two shipped models of this pattern give LaB6 "
                   "17.907 and 17.950 wt %, so the reference is an interval "
                   "0.043 wt % wide, not a number; no weighed composition "
                   "exists and none is claimed",
@@ -969,7 +969,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "converted to rietx dot-paths through to_structure.  The "
                   "file states 28 variables in its REFN GDNFT record, and the "
                   "flags reconstruct that exactly: 2 cell + 12 coordinate DOFs "
-                  "+ 7 Biso structural, plus 1 histogram scale, 3 background "
+                  "+ 7 Biso structural, plus 1 pattern scale, 3 background "
                   "terms and 3 profile terms.  This is an identity check "
                   "against a number the file states somewhere else, not a "
                   "tolerance",
@@ -2431,12 +2431,12 @@ CLAIMS: tuple[Claim, ...] = (
         "test_holding_both_wavelengths_costs_the_neutron_histogram",
         "ndruo_joint", ("characterisation",),
         "the problem statement, asserted: one cell for two uncalibrated "
-        "wavelengths lands the whole calibration mismatch on the histogram "
+        "wavelengths lands the whole calibration mismatch on the pattern "
         "with less leverage on the cell",
-        reference="each histogram against **its own solo fit** on the same "
+        reference="each pattern against **its own solo fit** on the same "
                   "protocol -- our own results either side of one change, so "
                   "the bar is the 10 % degradation being an order larger on "
-                  "one histogram than the other, not any external value",
+                  "one pattern than the other, not any external value",
         measured="neutron Rwp 0.05234 alone -> 0.06216 jointly (+19 %); X-ray "
                  "0.09176 -> 0.09186 (+0.1 %), a ratio of ~170; 1.9.0 read "
                  "0.05259 -> 0.06226 (+18 %), 0.09365 -> 0.09373 and ~200",
@@ -2447,7 +2447,7 @@ CLAIMS: tuple[Claim, ...] = (
         "test_freeing_the_neutron_wavelength_recovers_its_fit",
         "ndruo_joint", ("characterisation",),
         "the degradation above goes away when the neutron wavelength is "
-        "freed, and the X-ray histogram does not pay for it -- the SYMPTOM, "
+        "freed, and the X-ray pattern does not pay for it -- the SYMPTOM, "
         "recorded because a correction does not ship on an Rwp comparison",
         reference="the same three fits as the row above.  Deliberately a loose "
                   "band: two independently converged fits differ by more than "
@@ -2463,12 +2463,12 @@ CLAIMS: tuple[Claim, ...] = (
         "test_the_refined_wavelength_is_the_solo_cell_disagreement",
         "ndruo_joint", ("prediction",),
         "the headline: the refined wavelength reproduces the cell "
-        "disagreement the two histograms already showed when refined "
+        "disagreement the two patterns already showed when refined "
         "separately -- one number arrived at two independent ways",
         reference="the ratio of the two SOLO cells, computed without freeing "
                   "anything, is a prediction for how far the neutron lambda "
                   "must move.  The 20 % band is the scatter two separately "
-                  "converged single-histogram fits carry, not a tolerance",
+                  "converged single-pattern fits carry, not a tolerance",
         measured="solo cells 10.342905 vs 10.340285 A = +253 ppm; refined "
                  "lambda 1.540400 -> 1.5407972(795) A = +257.9 ppm, agreeing "
                  "to 2 %; the move is 5.0x its own esd; 1.9.0 read "
@@ -2482,22 +2482,22 @@ CLAIMS: tuple[Claim, ...] = (
         "ndruo_joint", ("identity",),
         "the record field this correction ships with: WAVELENGTH_CALIBRATION "
         "fires exactly where a wavelength was refined, carries the ppm as "
-        "Diagnostic.value, and is silent on the held histogram and on a fit "
+        "Diagnostic.value, and is silent on the held pattern and on a fit "
         "that held both",
         reference="floating point (rel=1e-9) between the diagnostic's value "
                   "and the ppm recomputed from the row -- one measurement, two "
                   "surfaces, pinned rather than re-derived",
         measured="one diagnostic, level info, value +257.9 ppm (+257.6 on "
                  "1.9.0), where "
-                 "hist.1.instrument.source.lines.0.wavelength; zero on "
-                 "histogram 0 and zero on the both-held fit",
+                 "pattern.1.instrument.source.lines.0.wavelength; zero on "
+                 "pattern 0 and zero on the both-held fit",
         diagnostics=("WAVELENGTH_CALIBRATION",),
         features=("wavelength", "joint_refinement"),
     ),
     Claim(
         "test_acceptance_wavelength", "test_the_cell_belongs_to_the_synchrotron",
         "ndruo_joint", ("cross_code", "characterisation"),
-        "holding the X-ray wavelength hands the cell to the X-ray histogram "
+        "holding the X-ray wavelength hands the cell to the X-ray pattern "
         "-- the accuracy hierarchy in action -- and the result agrees with the "
         "published combined refinement",
         reference="the X-ray SOLO cell to 5e-6 relative (our own result, the "
@@ -2522,11 +2522,11 @@ CLAIMS: tuple[Claim, ...] = (
         "calibration error' is a choice of what to hold and not a result",
         reference="eq. pos-lambda-cell, which says the two runs are one fit in "
                   "two parameterisations.  Bars: the two ppm figures agree to "
-                  "2 % of the effect, every per-histogram Rwp to 2e-3 relative "
+                  "2 % of the effect, every per-pattern Rwp to 2e-3 relative "
                   "and the shared x(O) to 1e-5 absolute",
         measured="+257.9 ppm holding the X-ray against -256.9 ppm holding the "
                  "neutron -- 0.9 ppm apart on an effect of 258 (0.35 %); both "
-                 "histograms' Rwp agree to 6e-5 relative, x(O) to 1.5e-6.  "
+                 "patterns' Rwp agree to 6e-5 relative, x(O) to 1.5e-6.  "
                  "1.9.0 read +257.6 and -256.7 ppm (0.34 %), Rwp identical to "
                  "5 decimals and x(O) to 1.2e-6",
         features=("wavelength", "joint_refinement"),
@@ -2586,13 +2586,13 @@ CLAIMS: tuple[Claim, ...] = (
     Claim(
         "test_acceptance_wavelength", "test_the_fits_render",
         "ndruo_joint", ("ceiling",),
-        "the per-histogram obs/calc/diff renderings exist, so the fit can be "
+        "the per-pattern obs/calc/diff renderings exist, so the fit can be "
         "looked at rather than only summarised",
         reference="existence, not a number -- a ceiling row",
         measured="two PNGs written to tests/output/, mg090_joint_hist0.png and "
                  "mg090_joint_hist1.png",
     ),
-    # ---- Si SRM 640c: the single-histogram refinable wavelength ----------
+    # ---- Si SRM 640c: the single-pattern refinable wavelength ----------
     Claim(
         "test_acceptance_si640c",
         "test_the_protocol_is_sane_and_states_what_differs_from_xnd",
@@ -3558,7 +3558,7 @@ SUITE_INTROS: dict[str, str] = {
         "reflections is where that changes, and LaB6 is not one."
     ),
     "test_acceptance_lab6_cbn": (
-        "Two-phase QPA on an APS 11-BM histogram of NIST SRM 660b LaB6 mixed "
+        "Two-phase QPA on an APS 11-BM pattern of NIST SRM 660b LaB6 mixed "
         "with cubic BN, with the standard's certified cell held so the second "
         "phase's is measurable against it.  There is no weighed composition, "
         "so every row here is cross-code against TOPAS, bounded by the "
@@ -3629,7 +3629,7 @@ SUITE_INTROS: dict[str, str] = {
         "result — an improvement both statistical tests bless and the "
         "physics rejects.",
     "test_acceptance_si640c":
-        "The single-histogram refinable wavelength, on NIST SRM 640c silicon "
+        "The single-pattern refinable wavelength, on NIST SRM 640c silicon "
         "at APS 11-BM, against an independent XND 1.42 refinement of the same "
         "scan.  Holding the certified cell is what makes a free lambda a "
         "measurement of the monochromator's calibration error, and the fit "
@@ -3642,11 +3642,11 @@ SUITE_INTROS: dict[str, str] = {
         "where the two codes model the same physics, and the residual is "
         "named rather than tuned away.",
     "test_acceptance_wavelength":
-        "A parameter that is exactly degenerate in one histogram and "
-        "measurable in several, on the two histograms of a published combined "
+        "A parameter that is exactly degenerate in one pattern and "
+        "measurable in several, on the two patterns of a published combined "
         "refinement whose stated method is precisely that. The bar worth "
         "reading is the third row: the refined wavelength reproduces, to 2 %, "
-        "the cell disagreement the two histograms already showed when refined "
+        "the cell disagreement the two patterns already showed when refined "
         "separately — a prediction made without freeing anything. The fourth "
         "adds the check that keeps it honest, which is that holding the other "
         "end measures the same ratio with the opposite sign.",

@@ -400,7 +400,7 @@ def _parameter_row(e, *, tie: "TieSpec | None", esd: float | None, mode: Mode,
                    lo: float | None = None, hi: float | None = None) -> ParameterRow:
     """The one place an ``Entry`` becomes a :class:`ParameterRow` (WP-2028).
 
-    ``Refinement.parameters`` and ``MultiHistogramRefinement.parameters`` both
+    ``Refinement.parameters`` and ``JointRefinement.parameters`` both
     call it, so the two listings cannot drift.  Every ``Entry`` field not named
     in the keywords is copied by name from ``dataclasses.fields(Entry)``: a
     field added to ``Entry`` and ``ParameterRow`` reaches both surfaces, and one
@@ -752,13 +752,13 @@ def _restrained_scale_phases(model: CompiledModel,
 def _held_scale_phases(sr: StageResult, hist: int | None = None) -> set[int]:
     """The phases whose own ``scale`` the stage held, off its record: a held
     column named it, or moved it (``held_reach``, a ``vars.X`` driving it).  A
-    joint record's scoped path ``hist.h.…`` counts for histogram ``hist`` only,
-    a bare (shared) one for every histogram."""
+    joint record's scoped path ``pattern.h.…`` counts for pattern ``hist`` only,
+    a bare (shared) one for every pattern."""
     out: set[int] = set()
     for path in sr.held:
         for name in (path, *sr.held_reach.get(path, ())):
-            if name.startswith("hist."):
-                h, _, name = name[len("hist."):].partition(".")
+            if name.startswith("pattern."):
+                h, _, name = name[len("pattern."):].partition(".")
                 if hist is None or not h.isdigit() or int(h) != hist:
                     continue
             if (m := _SCALE_PATH.match(name)):
@@ -784,9 +784,9 @@ def _unmeasured_phases(model: CompiledModel,
     restraint's, not the data's): a phase with no line at the answer has no
     data at the values quoted.  A line entering at a closing recompile makes
     that stage free the scale, so neither reading fires and the scale is
-    measured.  ``hist`` scopes a joint record to one histogram; ``lineless``
+    measured.  ``hist`` scopes a joint record to one pattern; ``lineless``
     replaces the recount where the caller owns a better one (a joint fit's
-    shared scale, :func:`rietx.multi._joint_unmeasured_phases`).  ``held``
+    shared scale, :func:`rietx.joint._joint_unmeasured_phases`).  ``held``
     replaces the stage record where there is none: ``replay`` reads it off the
     node (``NodeMetrics.held_scale_phases``).
     """
@@ -940,7 +940,7 @@ def _column_separation(scales: list[np.ndarray], columns: list[np.ndarray]
     (:func:`_scale_b_separation`), or ``None`` where either set is all zero.
 
     ``scales`` are one phase's scale columns: one in a single fit, one per
-    histogram in a joint fit, where each lives on its own histogram's rows and
+    pattern in a joint fit, where each lives on its own pattern's rows and
     so they are orthonormal once unit.  Each is projected off the span of
     ``columns`` by least squares at numpy's default cut, and the answer is the
     smallest singular value of what is left.  For one scale column that is
@@ -1766,7 +1766,7 @@ def _escaped_cell_paths(table: ParameterTable, start_values: dict[str, float]
     """The free cell parameters outside ``CELL_SAFETY_FRACTION`` /
     ``CELL_SAFETY_ANGLE_DEG`` of ``start_values``, the stage's own, in entry
     order.  :func:`reset_cell_runaway`'s test, kept apart so the joint runner
-    can ask it of every histogram before it restores any of them."""
+    can ask it of every pattern before it restores any of them."""
     escaped: list[str] = []
     free = set(table.free_paths)
     for e in table.entries:
@@ -1967,7 +1967,7 @@ def _merge_unresolved(first: list[tuple[str, list[str]]],
     driver still escaping after both is named once, not twice.
 
     One rule for both runners, :meth:`Refinement._run_stage` and the joint
-    stage loop in ``multi.py`` (WP-2028 task 7).
+    stage loop in ``joint.py`` (WP-2028 task 7).
     """
     merged = dict(first)
     for driver, escaped in second:
@@ -2015,7 +2015,7 @@ def _cell_runaway_withheld(table: ParameterTable,
 #: one and printed for the other names the wrong unit and the wrong window.
 _ANGLE_CELL_NAMES = ("alpha", "beta", "gamma")
 
-#: a cell path's phase index, bare or scoped ``hist.h.`` by a joint fit
+#: a cell path's phase index, bare or scoped ``pattern.h.`` by a joint fit
 _CELL_PHASE = re.compile(r"phases\.(\d+)\.(?:parent_cell\.)?cell\.")
 
 
@@ -2665,7 +2665,7 @@ class Refinement:
         #: ``WAVELENGTH_CALIBRATION`` measures a refined λ against this, so
         #: every verb (``fit``/``run_stage``) reports the move *cumulatively*
         #: from the truly-declared value rather than from the previous call's
-        #: answer, matching the joint path (``multi.py`` snapshots at
+        #: answer, matching the joint path (``joint.py`` snapshots at
         #: construction for the same reason).  A deliberate model ``edit`` that
         #: replaces the instrument redefines it; a ``checkout`` to an earlier
         #: node does **not**, and a ``branch`` inherits the root's reference
@@ -2928,7 +2928,7 @@ class Refinement:
         state and the result is not: a later fit that is cancelled keeps the
         stages it completed and the previous result, and a view that read the
         live models then would pair those values with this result's model
-        (WP-1421; the joint fit's ``MultiHistogramRefinement._freeze_answer``).
+        (WP-1421; the joint fit's ``JointRefinement._freeze_answer``).
         """
         table = ParameterTable(self.structure, self.instrument)
         # the model's moment frames are the last stage's, not this table's (#598)
@@ -4409,7 +4409,7 @@ class Refinement:
         leaves that atom where it is and the other atoms' coordinates are
         quoted relative to it.  The same as setting the field yourself: since
         WP-1912 the table does the holding, so a series pattern, a joint
-        histogram and a history replay hold the same atom.
+        pattern and a history replay hold the same atom.
 
         Opt-in: nothing is held unless this is called or the field is set.
         :meth:`unhold` on a held DOF takes it back, with the rest of that
@@ -5747,7 +5747,7 @@ class Refinement:
                 n_iterations=outcome.n_iterations + second.n_iterations,
                 n_constraint_truncations=(outcome.n_constraint_truncations
                                           + second.n_constraint_truncations),
-                # counts of the whole search, as multi.py's merge sums them
+                # counts of the whole search, as joint.py's merge sums them
                 n_degenerate_cell_probes=(outcome.n_degenerate_cell_probes
                                           + second.n_degenerate_cell_probes),
                 n_lapack_fallbacks=outcome.n_lapack_fallbacks + second.n_lapack_fallbacks,
@@ -6694,8 +6694,8 @@ class Refinement:
                 termination=outcome.termination or None,
                 seeded=hold.seeded,
                 cell_reset=hold.cell_reset, collapsed=hold.collapsed,
-                # checked, trivially: one histogram has no elsewhere
-                unreached_histograms={},
+                # checked, trivially: one pattern has no elsewhere
+                unreached_patterns={},
                 moment_angle_tests=outcome.moment_angle_tests,
             ))
             if stage_reports:
@@ -7022,7 +7022,7 @@ class Refinement:
                 moment_flat_axes=hold.moment_flat_axes,
                 moment_turned=hold.moment_turned,
                 blocked_by_hold=hold.blocked_by_hold,
-                unknown_paths=hold.unknown_paths, fixed=hold.fixed, unreached_histograms={},
+                unknown_paths=hold.unknown_paths, fixed=hold.fixed, unreached_patterns={},
                 window_loss=hold.window_loss, rwp=hold.rwp,
                 lebail_cycles_run=hold.lebail_run,
                 lebail_settled=hold.lebail_settled,
@@ -8456,11 +8456,11 @@ def _constraint_diagnostics(stage_name: str, outcome) -> list[Diagnostic]:
     # which block bound each step, by its label (WP-1938 D7): the Stephens
     # cone's end in ``.microstrain``, the Γ_G² floor's start with
     # ``instrument.profile (`` (the Γ_L floor's with ``instrument.profile
-    # Lorentzian``).  A joint fit prefixes a histogram's block with
-    # ``hist.{h} `` (WP-1325), read past here.
+    # Lorentzian``).  A joint fit prefixes a pattern's block with
+    # ``pattern.{h} `` (WP-1325), read past here.
     by = getattr(outcome, "truncated_by", None) or {}
     which = "; ".join(f"{label}: {k}" for label, k in sorted(by.items()))
-    bare = [re.sub(r"^hist\.\d+ ", "", label) for label in by]
+    bare = [re.sub(r"^pattern\.\d+ ", "", label) for label in by]
     suggestion = ("Vary the starting seed and quote the values only if they "
                   "survive.")
     if any(label.endswith(".microstrain") for label in bare):
@@ -8575,7 +8575,7 @@ def _origin_diagnostics(table: ParameterTable,
     (:meth:`Refinement.hold_floating_origin`) every declaring phase that holds
     or cannot hold is reported, that being the question the verb asks.
 
-    ``canonical`` is a joint fit's (``multi._joint_origin_findings``): the
+    ``canonical`` is a joint fit's (``joint._joint_origin_findings``): the
     name a held row carries in the joint fit, for ``where`` and the message.
 
     ``origins`` is ``(stage name, model.origin)`` per stage, the restraint a
@@ -8751,8 +8751,8 @@ def _hold_diagnostics(stage_results: list[StageResult],
     )]
 
 
-#: a joint fit's histogram scope, stripped to compare a path with the model's
-_HIST_SCOPE = re.compile(r"^hist\.\d+\.")
+#: a joint fit's pattern scope, stripped to compare a path with the model's
+_HIST_SCOPE = re.compile(r"^pattern\.\d+\.")
 
 
 def _parent_strain_held_diagnostics(stage_results: list[StageResult],
@@ -8775,7 +8775,7 @@ def _parent_strain_held_diagnostics(stage_results: list[StageResult],
 
     ``free`` is the answer's free paths and the stages' ``freed`` lists add
     what an earlier stage freed, so an edge freed and later held is still
-    counted; a joint fit's ``hist.h.`` scope is stripped.
+    counted; a joint fit's ``pattern.h.`` scope is stripped.
     """
     def bare(path: str) -> str:
         return _HIST_SCOPE.sub("", path)
@@ -8919,7 +8919,7 @@ def _variable_not_freed_diagnostics(stage_results: list[StageResult],
     tie onto a variable, linear or a formula (WP-2118), under a preset plan
     ends the fit with the variable at its start and everything following it
     set from that start, and nothing said so.  The joint fit's equation-level
-    reading of the same fact is ``multi._parametric_not_freed_diagnostics``.
+    reading of the same fact is ``joint._parametric_not_freed_diagnostics``.
 
     One warning per fit naming every such variable, with its start and what
     follows it (``ParameterTable.entry_reach``, through chains and formula
@@ -9012,12 +9012,12 @@ def _path_hint(path: str, known, instrument=None) -> str:
 def _owner_words(owner: str) -> str:
     """``phases.0`` as "phase 0", ``phases.0.atoms.3`` as "atom 3 of phase 0".
 
-    A joint fit's ``hist.1.`` scope reads as "of histogram 1" after it.
+    A joint fit's ``pattern.1.`` scope reads as "of pattern 1" after it.
     """
     parts = owner.split(".")
     tail = ""
-    if parts[0] == "hist" and len(parts) > 2:
-        tail, parts = f" of histogram {parts[1]}", parts[2:]
+    if parts[0] == "pattern" and len(parts) > 2:
+        tail, parts = f" of pattern {parts[1]}", parts[2:]
     if parts[0] == "phases" and len(parts) == 2:
         return f"phase {parts[1]}{tail}"
     if parts[0] == "phases" and len(parts) == 4 and parts[2] == "atoms":
@@ -9074,7 +9074,7 @@ def _fixed_literal_diagnostics(stages, table: ParameterTable, user_ties, *,
 
     ``canonical`` is a joint fit's (#803, WP-1341): the second name a row
     answers to in a :class:`~rietx.params.multi.MultiParameterTable`, bare
-    when shared and ``hist.<h>.``-scoped when not.  A literal then matches a
+    when shared and ``pattern.<h>.``-scoped when not.  A literal then matches a
     row exactly when ``MultiParameterTable.set_vary`` would match it, and
     ``where`` and the suggestion name rows as the joint result spells them.
     A single fit's row has one name and passes nothing.
@@ -9472,7 +9472,7 @@ def _apply_esds(table: ParameterTable, result: RefinementResult,
 #: correction with nothing said, the outcome the docstring below calls the
 #: worst of the three.  This fence is what made WP-1132 visible and it stays
 #: for every kind still without a table: a time-of-flight bank spans a range
-#: of λ, so one µ per histogram is not even well defined there.  An explicit
+#: of λ, so one µ per pattern is not even well defined there.  An explicit
 #: ``mu_r``/``mu_t`` is always honoured, whatever the source.
 _NO_ATTENUATION_TABLE_ESTIMATE = (
     "there is no attenuation table for this source kind, so the composition "
@@ -9765,7 +9765,7 @@ def _radiation(model: CompiledModel, values: dict[str, float]) -> Radiation:
     """The source a result's curves were fitted with (WP-2042): the compiled
     kind and each line's λ at ``values``, so a refined wavelength is recorded
     as refined.  One builder for both result writers, the single fit's and
-    the joint fit's per histogram."""
+    the joint fit's per pattern."""
     return Radiation(kind=model.source_kind,
                      wavelengths=[float(lam) for lam in model.line_lambdas(values)])
 
@@ -9824,11 +9824,11 @@ def _tick_rows(model: CompiledModel, structure: Structure,
                values: dict[str, float], *, support: bool = True
                ) -> tuple[dict[str, list[float]], dict[str, list[list[int]]],
                           dict[str, list[float]]]:
-    """Every tick row of one histogram: positions, Miller indices and
+    """Every tick row of one pattern: positions, Miller indices and
     support, keyed alike.
 
     One builder for both paths, this module's :func:`_build_result` and each
-    histogram of ``multi.MultiHistogramRefinement._build_result`` (WP-2028
+    pattern of ``joint.JointRefinement._build_result`` (WP-2028
     task 7), so a joint fit draws the rows a single fit draws: a magnetic
     phase's own ``"<phase> (magnetic)"`` row (issue #278) and the declared
     peaks' ``EXTRA_TICK_KEY`` row as well as one row per phase.
@@ -9921,7 +9921,7 @@ def _tick_rows(model: CompiledModel, structure: Structure,
     # position by declaration and carries its own aberrations (see
     # `PeakComponent`).  That, and where each emission line's image falls, is
     # `CompiledModel.extra_peak_tick_positions` — one authority, because a
-    # joint fit's histograms owe the same list, and a second copy is how a
+    # joint fit's patterns owe the same list, and a second copy is how a
     # joint fit ends up disagreeing with a single one.
     #
     # Accepted wrinkle, recorded rather than special-cased: Layer 0's
@@ -10041,7 +10041,7 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
             ))
 
     # every row, and its labels and support, from the one builder the joint
-    # fit's histograms call too (`_tick_rows`)
+    # fit's patterns call too (`_tick_rows`)
     ticks, tick_hkl, tick_support = _tick_rows(model, structure, values)
 
     # Quantitative phase analysis from the refined scales.  Le Bail scales are
@@ -10157,7 +10157,7 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
         model, values, set(table.free_paths), stderr_phys)
 
     # A refined wavelength, reported in ppm against its declared value — the
-    # single-histogram twin of the joint diagnostic in ``multi.py`` (WP-1134),
+    # single-pattern twin of the joint diagnostic in ``joint.py`` (WP-1134),
     # for the case the held-cell fence exists to admit.  Empty unless a
     # wavelength was actually freed, and only when the caller passed the
     # pre-fit declared values: a wavelength refines against the *held cell*
@@ -10482,21 +10482,21 @@ FROZEN_COMPILE_CHI2_REL = 1e-2
 
 
 def _frozen_compile_diagnostics(chi2_frozen: float, chi2_fresh: float, *,
-                                histogram: int | None = None) -> list[Diagnostic]:
+                                pattern: int | None = None) -> list[Diagnostic]:
     """``FROZEN_COMPILE_STALE`` when the two χ² differ past :data:`FROZEN_COMPILE_CHI2_REL`.
 
     One comparison for both runners: the single fit's
     :meth:`Refinement._final_compile` and the joint fit's
-    ``MultiHistogramRefinement._final_compiles``, which passes its worst
-    histogram's pair and index (``histogram``) and keeps no history node to
+    ``JointRefinement._final_compiles``, which passes its worst
+    pattern's pair and index (``pattern``) and keeps no history node to
     hold the frozen figure.
     """
     rel = (abs(chi2_fresh - chi2_frozen) / chi2_frozen
            if chi2_frozen > 0 else 0.0)
     if not rel > FROZEN_COMPILE_CHI2_REL:
         return []
-    joint = histogram is not None
-    whose = f" for histogram {histogram}" if joint else ""
+    joint = pattern is not None
+    whose = f" for pattern {pattern}" if joint else ""
     kept = ("the last stage's record keeps the frozen one" if joint
             else "the history node keeps the frozen one")
     return [Diagnostic(
@@ -10988,7 +10988,7 @@ def _harmonic_diagnostics(model: CompiledModel, values: dict[str, float],
                         if implausible else
                         "Quote this as a property of this beam on this "
                         "monochromator, and do not transfer it to another "
-                        "histogram.")))
+                        "pattern.")))
     return out
 
 
@@ -11015,13 +11015,13 @@ def _wavelength_calibration_diagnostics(
     back inside its own esd measured nothing, which is a different (and
     commoner) outcome from one that measured a calibration error.
 
-    Two callers, one function.  ``h`` selects the histogram framing —
-    ``None`` for a single-histogram fit (``refine.py``), an index for a joint
-    one (``multi.py``), which is the whole difference in the message's *head*
+    Two callers, one function.  ``h`` selects the pattern framing —
+    ``None`` for a single-pattern fit (``refine.py``), an index for a joint
+    one (``joint.py``), which is the whole difference in the message's *head*
     and its ``where`` addressing.  The message's *last clause* is passed in as
-    ``pinned_by`` because the two are false of each other: a single histogram
+    ``pinned_by`` because the two are false of each other: a single pattern
     measures λ against the **held cell**, a joint fit against the cell pinned by
-    the histogram whose λ is held.  ``declared`` is λ per line as taken off the
+    the pattern whose λ is held.  ``declared`` is λ per line as taken off the
     instrument the ``Refinement`` was **constructed** with (or last edited to) —
     the refined values have been written back by the time a result is built, so
     there is nothing left to compare to otherwise — and is indexed by line,
@@ -11049,8 +11049,8 @@ def _wavelength_calibration_diagnostics(
         resolved = ("" if sigma in (None, 0.0)
                     else f", {abs(lam - lam0) / sigma:.1f}× its own esd "
                          f"({sigma:.2e} A)")
-        head = f"line {il}" if h is None else f"histogram {h} line {il}"
-        where = [e.path] if h is None else [f"hist.{h}.{e.path}"]
+        head = f"line {il}" if h is None else f"pattern {h} line {il}"
+        where = [e.path] if h is None else [f"pattern.{h}.{e.path}"]
         out.append(Diagnostic(
             level="info", code="WAVELENGTH_CALIBRATION",
             message=(f"{head[:1].upper()}{head[1:]}: wavelength refined from "
@@ -11063,12 +11063,12 @@ def _wavelength_calibration_diagnostics(
 
 
 #: the ``WAVELENGTH_CALIBRATION`` clause naming what pins the scale the refined
-#: λ is measured against — the held cell for a single histogram, the cell a
+#: λ is measured against — the held cell for a single pattern, the cell a
 #: held wavelength pins for a joint fit (the two are false of each other, so
 #: each caller states its own; see :func:`_wavelength_calibration_diagnostics`).
 _WAVELENGTH_PINNED_BY_HELD_CELL = "taken against the held cell"
-_WAVELENGTH_PINNED_BY_HELD_HISTOGRAM = (
-    "taken against the cell pinned by the histogram whose wavelength is held")
+_WAVELENGTH_PINNED_BY_HELD_PATTERN = (
+    "taken against the cell pinned by the pattern whose wavelength is held")
 
 
 def _declared_wavelengths(instrument: Instrument) -> list[float]:
@@ -11083,7 +11083,7 @@ def _declared_wavelengths(instrument: Instrument) -> list[float]:
     answer rather than against the declared value.  A :meth:`~Refinement.branch`
     inherits the reference rather than re-snapshotting it, because it is built
     from an instrument already carrying a refined λ.  The joint path
-    (``multi.py``) snapshots the same list at construction for the same reason.
+    (``joint.py``) snapshots the same list at construction for the same reason.
     """
     return [p.value for p in instrument.source.wavelength_parameters]
 
@@ -11694,10 +11694,10 @@ def _quantify_phases(table: ParameterTable, theta: np.ndarray,
                      ) -> tuple[QuantitativePhaseAnalysis | None, list[Diagnostic]]:
     """Weight fractions from the refined scales, and the findings they carry.
 
-    One builder for the single fit and for each histogram of a joint one
-    (:mod:`rietx.multi`), which had its own until WP-1463 and skipped the
+    One builder for the single fit and for each pattern of a joint one
+    (:mod:`rietx.joint`), which had its own until WP-1463 and skipped the
     blind-scale rule below.  ``where_of`` maps a table path to the row path a
-    client holds (``hist.h.…`` for a per-histogram row); identity by default.
+    client holds (``pattern.h.…`` for a per-pattern row); identity by default.
 
     **A scale the data carries no gradient in makes every fraction's esd
     unquotable, not only its own** (WP-1110 item 14).  W_i normalises by
@@ -11748,7 +11748,7 @@ def _quantify_phases(table: ParameterTable, theta: np.ndarray,
     # position and collapsed an orbit).  The primary emission line feeds
     # the Brindley microabsorption attenuation (µ ∝ λ³ makes the Kα₂
     # offset sub-percent in µ, far smaller in τ), from the table of the
-    # histogram's own radiation (#543): the neutron µ, not the X-ray one.
+    # pattern's own radiation (#543): the neutron µ, not the X-ray one.
     multiplicities = [[len(op[0]) for op in cp.sites.ops] for cp in model.phases]
     wavelength = model.line_wavelengths[0] if model.line_wavelengths else None
     qpa = compute_qpa(structure, values, scale_cov, multiplicities,
@@ -11984,7 +11984,7 @@ def _slow_descent_diagnostics(stage_results: list[StageResult]) -> list[Diagnost
 def _moves_scale(path: str, held_reach: dict[str, set[str]], scale: str) -> bool:
     """Whether held column ``path`` is phase ``scale``'s, by its name or by
     what it moved (``StageResult.held_reach``), either spelled bare or
-    ``hist.h.``-scoped."""
+    ``pattern.h.``-scoped."""
     return any(_unscoped(n) == scale for n in (path, *held_reach.get(path, ())))
 
 
@@ -11999,8 +11999,8 @@ def _held_by_phase(stage_results: list[StageResult], n_phases: int
 
     The index is read off the ``phases`` segment rather than off position one,
     because the joint runner's records carry *scoped* paths whenever the
-    sharing map makes a structural family per-histogram
-    (``hist.0.phases.1.cell.a``), and position one is then the histogram.
+    sharing map makes a structural family per-pattern
+    (``pattern.0.phases.1.cell.a``), and position one is then the pattern.
 
     Since WP-1342 a held path need not name a phase at all: the freeze holds
     *columns*, and a caller's ``vars.X`` driving a cell is one.  So the phase is
@@ -12114,7 +12114,7 @@ def _phase_support_diagnostics(support_by_phase: np.ndarray,
     so.  A ratio is unmoved by the scale's degeneracy with |F|², the widths
     and the line weights, since rescaling one rescales the scale and its esd
     alike.  ``basis`` names how the σ was taken, for the message: a joint fit
-    reads the screen in the histogram that shows the phase best.
+    reads the screen in the pattern that shows the phase best.
     ``decided`` says whether a held phase's reading is the one the last
     stage's answer kept its hold on (a single Rietveld fit's stage vector,
     measured with the held columns freed) or one the result took at the
@@ -12209,7 +12209,7 @@ def _phase_support_diagnostics(support_by_phase: np.ndarray,
         clauses = []
         # a phase with no line in range has its scale held too (WP-1958), and
         # the scale is not a structural parameter, so it is named on its own
-        # (a joint fit's per-histogram scale is scoped ``hist.h.``).  A held
+        # (a joint fit's per-pattern scale is scoped ``pattern.h.``).  A held
         # column is the scale's by what it moves, not by its name: a held
         # ``vars.S`` driving the scale is the scale held (#1103, round 2)
         structural = [p for p in held
@@ -12234,13 +12234,13 @@ def _phase_support_diagnostics(support_by_phase: np.ndarray,
                             if _unscoped(n) != f"{prefix}scale":
                                 continue
                             hit = True
-                            if n.startswith("hist."):
-                                h = n[len("hist."):].partition(".")[0]
+                            if n.startswith("pattern."):
+                                h = n[len("pattern."):].partition(".")[0]
                                 if h.isdigit():
                                     scale_hists.add(int(h))
                     if hit:
                         scale_stages.append(sr.name)
-                where = (f" in histogram{'' if len(scale_hists) == 1 else 's'} "
+                where = (f" in pattern{'' if len(scale_hists) == 1 else 's'} "
                          f"{', '.join(map(str, sorted(scale_hists)))}"
                          if scale_hists else "")
                 last = stage_results[-1] if stage_results else None
@@ -12319,7 +12319,7 @@ def _scale_b_columns(sr: StageResult) -> dict[int, list[str]]:
     for ip in sorted(sr.scale_b_held or {}):
         for col in sr.held:
             for name in (col, *sr.held_reach.get(col, ())):
-                # a joint fit's per-histogram override is scoped ``hist.h.``
+                # a joint fit's per-pattern override is scoped ``pattern.h.``
                 m = _DISPLACEMENT_PATH.match(_unscoped(name))
                 if m is not None and int(m.group(1)) == ip:
                     out.setdefault(ip, []).append(col)
@@ -12330,12 +12330,12 @@ def _scale_b_columns(sr: StageResult) -> dict[int, list[str]]:
 def _intensity_weighted_s2(models: list[CompiledModel], ip: int,
                            per_values: list[dict[str, float]]) -> float | None:
     """Phase ``ip``'s mean s² = 1/(4d²) over its reflections in the fitted range
-    of every histogram (one in a single fit).
+    of every pattern (one in a single fit).
 
     Weighted by each (emission line, reflection)'s integrated intensity, since
     the fraction's sensitivity to B is the intensity's, and a weak reflection
     at high s moves it less than a strong one at low s.  s is λ-free, so a
-    joint fit's histograms pool.  "In range" is a nonempty frozen window
+    joint fit's patterns pool.  "In range" is a nonempty frozen window
     (:meth:`CompiledModel.phase_line_counts`' reading), and the plain mean
     stands in where every intensity is zero.  ``None`` when no reflection of
     the phase lies in range.
@@ -12384,13 +12384,13 @@ def _scale_b_ridge_diagnostics(models: list[CompiledModel],
     ridge and returned 0.000 ± 0.000 wt% (WP-1534 task 1).
 
     ``warning``: the reported fraction is a conditional statement, and nothing
-    else in the result says on what.  A joint fit passes every histogram's
+    else in the result says on what.  A joint fit passes every pattern's
     model and values; the range quoted spans them.
     """
     def value_of(path: str) -> float | None:
-        # a joint fit's held name is bare where shared, ``hist.h.``-scoped
-        # where a histogram owns it
-        h = int(path.split(".")[1]) if path.startswith("hist.") else 0
+        # a joint fit's held name is bare where shared, ``pattern.h.``-scoped
+        # where a pattern owns it
+        h = int(path.split(".")[1]) if path.startswith("pattern.") else 0
         return per_values[h].get(_unscoped(path))
 
     tt_min = min(m.tt_min for m in models)

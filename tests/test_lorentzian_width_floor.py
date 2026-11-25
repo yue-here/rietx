@@ -160,12 +160,12 @@ def test_trf_reports_the_negative_width_it_cannot_hold(too_broad):
 
 
 def _joint_gamma_l(pattern, start: dict) -> list[np.ndarray]:
-    """Each histogram's instrument Γ_L over the measured range, after a joint
-    fit of ``pattern`` twice that frees each histogram's X and Y."""
-    from rietx.multi import MultiHistogramRefinement
+    """Each pattern's instrument Γ_L over the measured range, after a joint
+    fit of ``pattern`` twice that frees each pattern's X and Y."""
+    from rietx.joint import JointRefinement
 
     structure, ins = _models(start, true=False)
-    ref = MultiHistogramRefinement(structure, [ins, ins.model_copy(deep=True)])
+    ref = JointRefinement(structure, [ins, ins.model_copy(deep=True)])
     ref.fit([pattern, pattern], plan=rx.RefinementPlan(stages=[
         rx.Stage(name="scale", turn_on=_B),
         rx.Stage(name="profile", turn_on=_B + ["instrument.profile.x",
@@ -178,7 +178,7 @@ def _joint_gamma_l(pattern, start: dict) -> list[np.ndarray]:
 def test_the_joint_runner_holds_the_lorentzian_width_too(too_broad, monkeypatch):
     """The joint LM runner built no width rows, and the per-coefficient floor
     was what kept Γ_L ≥ 0 there (code review of WP-2002's 9th session).
-    Without the rows the joint fit takes each histogram's Γ_L negative at the
+    Without the rows the joint fit takes each pattern's Γ_L negative at the
     top of the range; with them neither goes below zero."""
     pattern, start = too_broad
     with monkeypatch.context() as m:

@@ -169,16 +169,16 @@ that is never asked runs all 150. A 4-pattern series stopped at 0 completed
 entries with `SEQUENTIAL_CANCELLED`, against 4 of 4 unasked. `[dev]` venv,
 macOS arm64.)*
 
-**9d.10 A joint fit is one run, with no picture and a row per histogram.**
-`MultiHistogramRefinement.fit` and `refine_multi` take `events=`, `cancel=`,
+**9d.10 A joint fit is one run, with no picture and a row per pattern.**
+`JointRefinement.fit` and `refine_joint` take `events=`, `cancel=`,
 `telemetry=`, `label=` and `progress=` as `fit` does, and record one directory
 for the whole job. `rietx watch` lists it and follows its status, but draws no
-curves, because the live view draws one pattern. Read a histogram off the
-events instead: `stage_end` carries a `histograms` list, one row per
-histogram with its `histogram_index` and its Rwp. A cancel raises as in 9d.9,
+curves, because the live view draws one pattern. Read a pattern off the
+events instead: `stage_end` carries a `patterns` list, one row per
+pattern with its `pattern_index` and its Rwp. A cancel raises as in 9d.9,
 with `node_id` `None`, since a joint fit keeps no history.
 
 *(Measured: WP-1341, `[dev]` venv, macOS arm64. The two-wavelength LaB6 pair
 logged one `fit_start`, five `stage_start` and `stage_end`, 38 `eval` and one
-`fit_end`, and the last `stage_end` rows equal each histogram's Rwp in the
+`fit_end`, and the last `stage_end` rows equal each pattern's Rwp in the
 result, 0.0411 and 0.0613.)*

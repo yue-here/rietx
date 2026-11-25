@@ -69,12 +69,12 @@ so they are reader output and checked blind in the PR.
 
 ## Tasks
 
-- [ ] `refine_joint`, `JointRefinement` and the module `rietx.joint`; the old names raise
+- [x] `refine_joint`, `JointRefinement` and the module `rietx.joint`; the old names raise
       `AttributeError` naming the new ones (a module `__getattr__`), with a test.
-- [ ] `hist.N.` → `pattern.N.` wherever a path is built, parsed or documented; a path or glob
+- [x] `hist.N.` → `pattern.N.` wherever a path is built, parsed or documented; a path or glob
       starting with `hist.` raises naming `pattern.`, with a test through a plan glob,
       `set_vary`, and a result lookup.
-- [ ] "histogram" → "pattern" in public docstrings, `help.py`, diagnostic messages, the manual,
+- [x] "histogram" → "pattern" in public docstrings, `help.py`, diagnostic messages, the manual,
       examples and the skill. `docs/contracts/schema.md` records the path change.
 - [ ] Goldens and the cross-backend matrix unchanged in value; the joint acceptance tests pass.
 

@@ -111,7 +111,7 @@ def test_run_stage_records_its_seed_too(pattern):
 
 
 def test_a_joint_fit_seeds_each_histograms_row():
-    """The third call site: one row per histogram, each at the seed."""
+    """The third call site: one row per pattern, each at the seed."""
     patterns = [
         tm.synthesize(0.41390, 3.0, 24.0, scale=5e-4, zero=0.006,
                       bkg=[40.0, -6.0, 1.5], seed=1),
@@ -124,7 +124,7 @@ def test_a_joint_fit_seeds_each_histograms_row():
         PROFILE.stages[0],
         rx.Stage("profile", ["instrument.profile.x", "instrument.profile.y"],
                  max_iter=10, seed=1e-4)])
-    result = rx.refine_multi(patterns, structure, instruments, plan=plan)
+    result = rx.refine_joint(patterns, structure, instruments, plan=plan)
     seeded = result.stages[1].seeded
     assert len(seeded) == 2, seeded
     assert all(p.endswith("instrument.profile.y") for p in seeded)

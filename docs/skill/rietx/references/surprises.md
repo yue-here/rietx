@@ -119,7 +119,7 @@ Three things then follow from *which* anode, all measured:
   source assumption gets weaker. A census over Z = 3–98 × six anodes refuses 7
   of 576 combinations, and one is a real specimen: **Ru at Ag Kα**, K edge
   22.14 keV, between the lines. The refusal is correct — split the lines into
-  separate histograms or supply a measured override.
+  separate patterns or supply a measured override.
 * What `DISPERSION_NEGLECTED` is warning about is anode-dependent: hematite is
   a `warning` at Co Kα (180 eV under the Fe K edge, f′ = −3.3 e) and an `info`
   at Mo Ka (f′ = +0.3 e). Same specimen, same code, different severity.
@@ -485,8 +485,8 @@ or one cell is a claim: `phases.0.atoms.0.dof.*` on rutile's fixed Ti fires §7
 `STAGE_PATH_NOT_FREE` (WP-1951). **A typo inside a glob (`phases.*.cel.*`)
 still cannot be told from a healthy miss, so read `StageResult.freed` for each
 stage you wrote.** On a joint fit the
-same miss can hit one histogram only: `instrument.profile.*` freed the
-constant-wavelength histogram and nothing on the fork's time-of-flight banks,
+same miss can hit one pattern only: `instrument.profile.*` freed the
+constant-wavelength pattern and nothing on the fork's time-of-flight banks,
 and the fit converged at Rwp 0.115 against 0.066 with the right globs. That is
 §7 `STAGE_FREED_NOTHING`.
 (Measured: WP-1414, issue #265.)
@@ -504,15 +504,15 @@ for phase 0 goes here as c*·D, with
 `tie("instrument.background.scale", "phases.0.scale")` (Measured: WP-1512).
 
 **8.30 A joint X-ray + neutron fit keys every correction, and each pattern's
-findings, to its own histogram.** f₀ with f′/f″ on the X-ray one; b, a locked
+findings, to its own pattern.** f₀ with f′/f″ on the X-ray one; b, a locked
 polarisation and the magnetic term on the neutron one. Read every
-`result.histograms[h].diagnostics`: `DISPERSION_NEGLECTED` and
+`result.patterns[h].diagnostics`: `DISPERSION_NEGLECTED` and
 `SPECIES_FALLBACK_NEUTRAL` are X-ray findings, `NEUTRON_RESONANT_ABSORBER` a
 neutron one. `result.diagnostics` holds the shared structure, solve and plan,
-plus each histogram's `BACKGROUND_ABSORPTION`, on both lists: count it once.
-`DATA_SUPPORT_LOW` never fires on a joint fit. Histogram h's radiation is
-`MultiHistogramRefinement.fitted_instruments[h].source.kind`.
-`ref.report(h)` is histogram h's report, `for_histogram(h).diagnostics` its
+plus each pattern's `BACKGROUND_ABSORPTION`, on both lists: count it once.
+`DATA_SUPPORT_LOW` never fires on a joint fit. Pattern h's radiation is
+`JointRefinement.fitted_instruments[h].source.kind`.
+`ref.report(h)` is pattern h's report, `for_pattern(h).diagnostics` its
 findings. If the last stage broadened peaks, its
 curves cut their tails and Layer 0 lists the cuts as unmatched.
 (Measured: WP-1312, WP-1344, WP-1341.)

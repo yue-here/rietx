@@ -302,7 +302,7 @@ def test_the_peaks_still_read_as_structure_past_an_excluded_region(lab6, monkeyp
 
 
 def test_a_joint_fit_with_one_misplaced_and_one_blank_histogram(lab6, no_check):
-    """The case nobody had measured.  Each histogram answers for itself: the
+    """The case nobody had measured.  Each pattern answers for itself: the
     blank one's zero shift and widths are held, the misplaced one's stay free
     and reach the peaks, and the shared cell comes home.  Without the check
     both are held, the cell stops 7800 ppm short and Rwp is 0.92."""
@@ -310,23 +310,23 @@ def test_a_joint_fit_with_one_misplaced_and_one_blank_histogram(lab6, no_check):
 
     def run():
         start = [_with_cell(lab6, A_TRUE / 1.02) for _ in data]
-        ref = rx.MultiHistogramRefinement(start, [_start_instrument() for _ in data])
+        ref = rx.JointRefinement(start, [_start_instrument() for _ in data])
         return ref.fit(data, plan="mccusker_default")
 
     result = run()
-    _draw(result.for_histogram(0), "hold_noise_joint_misplaced")
-    _draw(result.for_histogram(1), "hold_noise_joint_blank")
+    _draw(result.for_pattern(0), "hold_noise_joint_misplaced")
+    _draw(result.for_pattern(1), "hold_noise_joint_blank")
     rows = {p.path: p for p in result.parameters}
     assert rows["phases.0.cell.a"].value == pytest.approx(A_TRUE, rel=2e-5)
-    assert result.histograms[0].statistics.rwp == pytest.approx(0.0405, abs=5e-4)
+    assert result.patterns[0].statistics.rwp == pytest.approx(0.0405, abs=5e-4)
     held = set(result.stages[-1].held)
-    assert {f"hist.1.{p}" for p in PEAK_ONLY} <= held
-    assert not {f"hist.0.{p}" for p in PEAK_ONLY} & held
-    assert rows["hist.0.instrument.zero_shift"].value == pytest.approx(0.008, abs=1e-4)
+    assert {f"pattern.1.{p}" for p in PEAK_ONLY} <= held
+    assert not {f"pattern.0.{p}" for p in PEAK_ONLY} & held
+    assert rows["pattern.0.instrument.zero_shift"].value == pytest.approx(0.008, abs=1e-4)
 
     no_check()
     without = run()
-    assert without.histograms[0].statistics.rwp > 0.9
+    assert without.patterns[0].statistics.rwp > 0.9
     rows = {p.path: p for p in without.parameters}
     assert abs(rows["phases.0.cell.a"].value / A_TRUE - 1.0) > 0.005
 

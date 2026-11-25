@@ -232,8 +232,8 @@ The two are read separately and compared through `PhaseMicrostructure.size_agree
 ### Size in a joint fit
 
 A joint fit shares the crystallite size and not the degrees it is read in.
-In a multi-histogram fit `MultiHistogramRefinement` normalises the size coefficients by wavelength.
+In a joint fit `JointRefinement` normalises the size coefficients by wavelength.
 A Lorentzian size coefficient goes as λ and a Gaussian one as λ², while a strain coefficient does not depend on λ.
-The shared column is the coefficient at the first histogram's wavelength, and each histogram's own structure copy carries the value it needs.
+The shared column is the coefficient at the first pattern's wavelength, and each pattern's own structure copy carries the value it needs.
 So the crystallite behind them is a single number, and the [`SIZE_NORMALISED_ACROSS_WAVELENGTHS`](diagnostics-series.md#size_normalised_across_wavelengths) diagnostic says so.
-Read a shared `phases.*.lor_size` as histogram 0's coefficient, never as the number your second pattern shows.
+Read a shared `phases.*.lor_size` as pattern 0's coefficient, never as the number your second pattern shows.

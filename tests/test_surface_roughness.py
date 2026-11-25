@@ -333,7 +333,7 @@ def test_roughness_rides_the_analytic_peak_chain_not_whole_model_fd():
 
 
 def test_roughness_is_per_histogram_by_default():
-    """Each histogram is a separate mount, so packing is not a shared property."""
+    """Each pattern is a separate mount, so packing is not a shared property."""
     from rietx.params.multi import SharingMap
     sharing = SharingMap()
     for name in ("a", "b", "c", "tau"):

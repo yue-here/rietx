@@ -1793,8 +1793,8 @@ def test_a_joint_fit_writes_the_same_reserved_key_as_a_single_one():
     destination.
 
     A declared peak missing from a joint fit's ticks is reported as an
-    unindexed impurity by every histogram's Layer 0 — the identical failure
-    the test above pins for a single histogram.  `multi.MultiHistogramRefinement`
+    unindexed impurity by every pattern's Layer 0 — the identical failure
+    the test above pins for a single pattern.  `joint.JointRefinement`
     had its own tick builder until WP-2028 task 7; both paths now call
     `refine._tick_rows`, which reads `CompiledModel.extra_peak_tick_positions`,
     so they cannot disagree about where the images fall.
@@ -2306,14 +2306,14 @@ def test_either_driver_reports_a_declared_peak_on_its_floor(solver):
 
 @pytest.mark.parametrize("solver", ["lm", "trf"])
 def test_a_joint_fit_judges_a_declared_peak_after_the_bound_test(solver):
-    """WP-2141: the joint fit runs its bound test before the per-histogram
-    diagnostics, so each histogram's declared peak reads that histogram's
-    ``FLOOR_HIT`` (``multi._hist_floors``).
+    """WP-2141: the joint fit runs its bound test before the per-pattern
+    diagnostics, so each pattern's declared peak reads that pattern's
+    ``FLOOR_HIT`` (``joint._hist_floors``).
 
     The peak sits on a LaB6 line the phase already fits.  On seed 1 the phase
     takes every count there, so the area goes to its floor.  Seed 2's noise
     leaves a small excess, which the area fits at a free optimum (0.84
-    counts·deg against an esd near 0.8 on macOS arm64).  So one histogram
+    counts·deg against an esd near 0.8 on macOS arm64).  So one pattern
     fires and the other does not, and each answers for itself.
     ``_floor_plan`` says why its stage stops early.
     """
@@ -2321,20 +2321,20 @@ def test_a_joint_fit_judges_a_declared_peak_after_the_bound_test(solver):
     _s, _i, data_b, _ = _clean_lab6(seed=2)
     ins_fit = ins.model_copy(deep=True)
     ins_fit.extra_components = [make_peak(center=43.5, span=0.5, area=50.0)]
-    joint = rx.refine_multi(
+    joint = rx.refine_joint(
         [data_a, data_b], structure.model_copy(deep=True),
         [ins_fit, ins_fit.model_copy(deep=True)], solver=solver,
         plan=_floor_plan())
     OUT.mkdir(exist_ok=True)
-    for h in range(len(joint.histograms)):
-        joint.for_histogram(h).plot(
+    for h in range(len(joint.patterns)):
+        joint.for_pattern(h).plot(
             OUT / f"wp2141_peak_floor_{solver}_joint_h{h}.png")
 
     floors = {p for d in joint.diagnostics if d.code == "FLOOR_HIT"
               for p in d.where}
     fired = []
-    for h, hist in enumerate(joint.histograms):
-        scoped = f"hist.{h}.instrument.extra_components.0.area"
+    for h, hist in enumerate(joint.patterns):
+        scoped = f"pattern.{h}.instrument.extra_components.0.area"
         area = next(p.value for p in joint.parameters if p.path == scoped)
         fired.append(any(d.code == "EXTRA_PEAK_NO_INTENSITY"
                          for d in hist.diagnostics))

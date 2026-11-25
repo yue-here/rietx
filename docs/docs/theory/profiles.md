@@ -77,7 +77,7 @@ takes no bounds, so no step lands on a floor there. The floor holds $W$ and
 not the sum. A negative $U$ or $V$ can still take $\Gamma_G^2$ under the
 clamp.
 
-So the driver also holds the sum on a single-histogram fit. Each reflection on
+So the driver also holds the sum on a single-pattern fit. Each reflection on
 the data adds one row to its linear inequalities ({ref}`ch-estimation`,
 § Solvers):
 
@@ -95,7 +95,7 @@ angles are those of the cell at the start of the stage. It includes a peak
 equation's Gaussian term wherever that term is exact at those angles: an
 equation whose coefficients are held, or one affine in its free coefficients.
 Any other equation term is left out of the row. A joint fit builds
-each histogram's rows. TRF builds no rows, and neither does a reflection that
+each pattern's rows. TRF builds no rows, and neither does a reflection that
 starts under the clamp. The guard above stays the check for those.
 
 ```{math}
@@ -111,7 +111,7 @@ $\Gamma_L$ is a width, so it must not go below zero. $X$ has a floor of 0,
 because as $\theta \to 0$ the $\tan\theta$ term vanishes and the
 instrument's $\Gamma_L$ is $X$ itself. $Y$ has no floor of its own. A
 negative $Y$ is legitimate wherever $X$ carries the width. The default driver
-holds the sum on a single-histogram fit, one more row per reflection on the
+holds the sum on a single-pattern fit, one more row per reflection on the
 data:
 
 ```{math}

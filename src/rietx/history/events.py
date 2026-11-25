@@ -76,14 +76,14 @@ Event kinds (closed set, versioned with the schema):
   unit whose ``stage_end`` carries the graded shortlist in the WP-1043
   evidence shape — added fields and added *units*, no new kind;
 
-**A joint fit** (``multi.MultiHistogramRefinement``, WP-1341) is one solve
-over several histograms, so it emits each kind once per fit, stage or
-evaluation, never once per histogram.  A series stamps its index on every
+**A joint fit** (``joint.JointRefinement``, WP-1341) is one solve
+over several patterns, so it emits each kind once per fit, stage or
+evaluation, never once per pattern.  A series stamps its index on every
 event because each event there is about one pattern; here none is.  What is
-about one histogram rides in a ``histograms`` list on ``fit_start``,
+about one pattern rides in a ``patterns`` list on ``fit_start``,
 ``stage_start``, ``stage_end`` and ``fit_end``, one row each stamped with its
-``histogram_index``, beside ``n_histograms``.  An ``eval``'s ``values`` align
-with combined free paths, ``hist.<h>.``-scoped where a row is one histogram's.
+``pattern_index``, beside ``n_patterns``.  An ``eval``'s ``values`` align
+with combined free paths, ``pattern.<h>.``-scoped where a row is one pattern's.
 Added keys on existing kinds, so the version does not move.
 
 Every line carries ``t`` (Unix seconds) so a tail of the file doubles as a

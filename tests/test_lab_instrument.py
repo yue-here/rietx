@@ -569,8 +569,8 @@ def test_an_aperture_the_caller_freed_by_hand_is_lifted_too():
 
 def test_the_lift_starts_off_the_partners_value_in_a_joint_fit():
     """WP-1955, the review of #1372: the joint runner writes the same lift,
-    one row per histogram, and records all four.  By the symmetry of the pair
-    the two histograms of one instrument may end on opposite orders of the
+    one row per pattern, and records all four.  By the symmetry of the pair
+    the two patterns of one instrument may end on opposite orders of the
     pair, where main had them the same.
     """
     from tests import test_multi_histogram as tm
@@ -582,9 +582,9 @@ def test_the_lift_starts_off_the_partners_value_in_a_joint_fit():
     structure, instruments = tm.perturbed_inputs()
     plan = rx.RefinementPlan(stages=[
         rx.Stage("axial", list(_AXIAL), max_iter=3)])
-    res = rx.refine_multi(patterns, structure, instruments, plan=plan)
+    res = rx.refine_joint(patterns, structure, instruments, plan=plan)
     assert res.stages[0].seeded == {
-        f"hist.{h}.{p}": v for p, v in ((_SL, 0.02), (_HL, 0.01))
+        f"pattern.{h}.{p}": v for p, v in ((_SL, 0.02), (_HL, 0.01))
         for h in (0, 1)}
 
 

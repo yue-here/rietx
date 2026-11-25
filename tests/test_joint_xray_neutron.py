@@ -1,6 +1,6 @@
-"""A mixed X-ray + neutron joint fit: does each histogram get its own physics?
+"""A mixed X-ray + neutron joint fit: does each pattern get its own physics?
 
-Issue #194 / WP-1312 task 3.  `multi.py` stacks histograms into one residual
+Issue #194 / WP-1312 task 3.  `joint.py` stacks patterns into one residual
 per Von Dreele (1997), *J. Appl. Cryst.* **30**, 517 — the combined
 X-ray/neutron paper itself — and nothing in `params/multi.py` restricts the
 radiation kind, so a mixed fit has been *admissible* since CW neutron landed
@@ -8,44 +8,44 @@ in WP-1134.  Admissible is not exercised.
 
 **One thing this file does not need to add.**  A genuine mixed joint fit on
 real published data already runs, in
-`test_acceptance_wavelength.py::_joint` — `rx.refine_multi` over
+`test_acceptance_wavelength.py::_joint` — `rx.refine_joint` over
 `mg090.fxye` (11-BM synchrotron) and `mg090.Cu311.gsas` (BT-1 neutron) against
 one shared `Structure`, with seven tests around it.  It landed with WP-1134
 for a different reason (which wavelength is free), *after* #194 was filed, so
 the issue's "I could find no test or example exercising a mixed X-ray+neutron
 joint fit" is out of date.  That discharges #194's task 1.
 
-What no test covered is #194's tasks 2 and 3: whether the per-histogram
-physics keys on **the histogram's own radiation** once the two kinds are in
-one residual.  Every correction below is one that must apply to one histogram
-and no-op on the other, and the failure mode is silent — a neutron histogram
+What no test covered is #194's tasks 2 and 3: whether the per-pattern
+physics keys on **the pattern's own radiation** once the two kinds are in
+one residual.  Every correction below is one that must apply to one pattern
+and no-op on the other, and the failure mode is silent — a neutron pattern
 scattering off electron counts still converges, and still reports a good Rwp.
 
 Synthetic throughout, so the assertions are about the machinery rather than
 about a specimen: corundum ranks its two sites in *opposite* order under the
 two radiations (f_Al(0) = 13 > f_O(0) = 8 electrons, while b_Al = 3.449 fm <
 b_O = 5.803 fm, Sears 1992 as gemmi's ``neutron92`` gives them), which makes
-"did this histogram use the right amplitude?" a question about which peak is
+"did this pattern use the right amplitude?" a question about which peak is
 tallest rather than about a tolerance.
 
 **The audit is a table, keyed on the source kind** (:data:`RADIATION_KEYED`):
-one row per correction that must key on a histogram's own radiation, a probe
-reading the *joint fit's own* compiled state for that histogram, and the
+one row per correction that must key on a pattern's own radiation, a probe
+reading the *joint fit's own* compiled state for that pattern, and the
 answer each kind must give.  A new radiation-keyed term joins with one row
 (WP-1327's magnetic term is the row that proved the shape), and a new source
 kind fails :func:`test_every_row_answers_for_every_source_kind` until every row
 says what it does there.  Three things the table is not: the radiation-keyed
-*diagnostics*, which WP-1344 placed on the histogram that owns each (pinned
-below at their exact count, ``multi.DIAGNOSTIC_SCOPES`` the rule); the
+*diagnostics*, which WP-1344 placed on the pattern that owns each (pinned
+below at their exact count, ``joint.DIAGNOSTIC_SCOPES`` the rule); the
 λ-keyed size normalisation, which is WP-1131's and tested in
 ``test_multi_histogram.py``; and anything a single
-histogram already tests, since the question here is only whether the stack
-keeps each histogram's answer its own.
+pattern already tests, since the question here is only whether the stack
+keeps each pattern's answer its own.
 
-#194's third ask, whether the shared-vs-per-histogram split holds when the two
-histograms weight the structure factor differently, is measured last: one
+#194's third ask, whether the shared-vs-per-pattern split holds when the two
+patterns weight the structure factor differently, is measured last: one
 corundum truth recovered through both weightings, and the esds showing which
-histogram bought which site.
+pattern bought which site.
 """
 from __future__ import annotations
 
@@ -138,7 +138,7 @@ def _flat(lo: float, hi: float, step: float = 0.05) -> rx.PatternData:
 
 
 def _short_plan():
-    """One three-iteration stage: enough to compile every histogram."""
+    """One three-iteration stage: enough to compile every pattern."""
     from rietx.strategy.staged import RefinementPlan, Stage
 
     return RefinementPlan(stages=[Stage("scale", ["phases.*.scale"],
@@ -161,7 +161,7 @@ def _synthetic(structure, instrument, lo: float, hi: float, step: float,
     """Poisson counts from ``structure`` on ``instrument``, and the true scale.
 
     The phase scale is set so the strongest channel holds ``peak`` counts
-    over a flat 50, and returned, so a fit's per-histogram scale has a truth
+    over a flat 50, and returned, so a fit's per-pattern scale has a truth
     to be compared with.  ``structure`` is not modified.
     """
     grid = _flat(lo, hi, step)
@@ -180,17 +180,17 @@ def _synthetic(structure, instrument, lo: float, hi: float, step: float,
 def test_a_mixed_joint_fit_runs_at_all():
     """The structural claim, asserted rather than inferred from a grep.
 
-    Two histograms, two radiation kinds, one shared structure, one residual.
+    Two patterns, two radiation kinds, one shared structure, one residual.
     """
     xd, nd = _flat(20.0, 80.0), _flat(20.0, 80.0)
-    ref = rx.MultiHistogramRefinement(rx.Structure(phases=[corundum()]),
+    ref = rx.JointRefinement(rx.Structure(phases=[corundum()]),
                                       [_xray(), _neutron()])
     result = ref.fit([xd, nd], plan="profile_only")
     assert result.status in {"converged", "max_iter"}
-    assert len(result.histograms) == 2
+    assert len(result.patterns) == 2
     kinds = [i.source.kind for i in ref.fitted_instruments]
     assert kinds == ["xray_cw", "neutron_cw"], (
-        f"the two histograms did not keep their own radiation: {kinds}")
+        f"the two patterns did not keep their own radiation: {kinds}")
     # No background value is pinned.  The data are flat at 1, and the
     # profile_w stage broadens the peaks until the phase stands in for the
     # background, so its scale reads as measured and the closing stage frees
@@ -198,7 +198,7 @@ def test_a_mixed_joint_fit_runs_at_all():
     # then where the solver stops: 1.0 on macOS arm64, 2931 on Linux x86-64
     # (WP-2003 sixth session; the defect is the WP's to fix).
 
-    # `HistogramResult` carries no instrument, so the radiation each histogram
+    # `PatternResult` carries no instrument, so the radiation each pattern
     # was fitted under is not readable from the result at all -- only from the
     # refinement object. Noted here as a comment rather than an assertion:
     # this is the audit's one structural gap and it is issue #252's subject,
@@ -208,7 +208,7 @@ def test_a_mixed_joint_fit_runs_at_all():
 
 def test_a_deuterated_structure_goes_on_both_histograms():
     """Issue #552: one ``Structure`` carrying ``D`` compiles on an X-ray
-    histogram, which sees hydrogen, and on a neutron one, which sees ²H.
+    pattern, which sees hydrogen, and on a neutron one, which sees ²H.
 
     Before #552 the X-ray compile refused it ("no Waasmaier-Kirfel
     coefficients for species 'D'"), so a deuterated sample could not be
@@ -238,17 +238,17 @@ def test_a_deuterated_structure_goes_on_both_histograms():
     assert np.array_equal(neutron["D"], neutron["2H"])
     assert np.max(np.abs(neutron["D"] - neutron["H"])) > 0.1 * np.max(neutron["H"])
 
-    ref = rx.MultiHistogramRefinement(nickel_hydride("D"), [_xray(), _neutron()])
+    ref = rx.JointRefinement(nickel_hydride("D"), [_xray(), _neutron()])
     result = ref.fit([_flat(20.0, 120.0), _flat(20.0, 120.0)], plan=_short_plan())
     assert result.status in {"converged", "max_iter"}
-    assert len(result.histograms) == 2
+    assert len(result.patterns) == 2
 
 
 def test_each_histogram_scatters_off_its_own_amplitude():
-    """#194 task 3: f(Q) on the X-ray histogram, b on the neutron one.
+    """#194 task 3: f(Q) on the X-ray pattern, b on the neutron one.
 
     Corundum ranks Al and O oppositely under the two radiations, so if both
-    histograms shared one amplitude the two patterns would peak on the *same*
+    patterns shared one amplitude the two patterns would peak on the *same*
     reflection. They must not.
 
     This is checked on the compiled model rather than on a converged fit,
@@ -297,16 +297,16 @@ INSTRUMENT_FOR_KIND: dict[str, Callable[[], rx.Instrument]] = {
 
 @dataclass(frozen=True)
 class Keyed:
-    """One correction that must key on the histogram's own radiation.
+    """One correction that must key on the pattern's own radiation.
 
-    ``probe(joint, h)`` reads what the joint fit actually built for histogram
+    ``probe(joint, h)`` reads what the joint fit actually built for pattern
     ``h`` (its compiled model, its table, its instrument) and returns whether
     the correction is in force there; ``expect`` is the answer each source
     kind must give.
     """
 
     name: str
-    probe: Callable[[rx.MultiHistogramRefinement, int], bool]
+    probe: Callable[[rx.JointRefinement, int], bool]
     expect: dict[str, bool]
 
 
@@ -342,7 +342,7 @@ RADIATION_KEYED = [
     Keyed("capillary muR read off the Sears (neutron) table",
           lambda j, h: _mu_r_is_from_table(j, h, "neutron_cw"),
           {"xray_cw": False, "neutron_cw": True}),
-    # #543: Brindley's µ read the X-ray table on every histogram, so on the
+    # #543: Brindley's µ read the X-ray table on every pattern, so on the
     # neutron one a sub-percent correction moved the fractions by the X-ray µ
     Keyed("Brindley mu read off the McMaster (X-ray) table",
           lambda j, h: _brindley_mu_is_from_table(j, h, "xray_cw"),
@@ -352,14 +352,14 @@ RADIATION_KEYED = [
           {"xray_cw": False, "neutron_cw": True}),
 ]
 
-#: Every phase of the joint fixture carries a radius, so each histogram's QPA
+#: Every phase of the joint fixture carries a radius, so each pattern's QPA
 #: runs Brindley's correction (it needs all of them) and the rows above can ask
 #: which table it read.
 BRINDLEY_RADIUS_UM = 2.0
 
 
 def _mu_r_is_from_table(joint, h: int, table_kind: str) -> bool:
-    """Whether histogram ``h``'s compiled µR is the one ``table_kind`` gives.
+    """Whether pattern ``h``'s compiled µR is the one ``table_kind`` gives.
 
     Recomputed on a fresh copy of the fixture's specimen at its starting
     values, which is what the joint fit estimates from at construction.
@@ -380,7 +380,7 @@ def _mu_r_is_from_table(joint, h: int, table_kind: str) -> bool:
 
 
 def _brindley_mu_is_from_table(joint, h: int, table_kind: str) -> bool:
-    """Whether histogram ``h``'s Brindley µ per phase is ``table_kind``'s.
+    """Whether pattern ``h``'s Brindley µ per phase is ``table_kind``'s.
 
     The want side calls the two tables' own functions by name, not
     ``LINEAR_ATTENUATION_BY_SOURCE``, so an entry filed under the wrong kind
@@ -392,7 +392,7 @@ def _brindley_mu_is_from_table(joint, h: int, table_kind: str) -> bool:
     from rietx.crystallography.symmetry import resolve_group
     from rietx.optimize.qpa import phase_zmv
 
-    qpa = joint.result_.histograms[h].qpa
+    qpa = joint.result_.patterns[h].qpa
     if qpa is None or qpa.microabsorption is None:
         return False
     lam = joint.mtable.instruments[h].source.primary_wavelength
@@ -414,10 +414,10 @@ def _brindley_mu_is_from_table(joint, h: int, table_kind: str) -> bool:
 
 @pytest.fixture(scope="module")
 def every_kind_jointly():
-    """One joint fit, one histogram per source kind, both phases shared.
+    """One joint fit, one pattern per source kind, both phases shared.
 
     Flat data and one short stage: the probes read what was *compiled* for
-    each histogram, which the fit builds whatever the data say, so solving
+    each pattern, which the fit builds whatever the data say, so solving
     for longer would buy nothing (``profile_only`` spends 400 iterations
     here fitting a constant).
     """
@@ -425,7 +425,7 @@ def every_kind_jointly():
     phases = [corundum(), mnf2()]
     for phase in phases:
         phase.particle_radius_um = BRINDLEY_RADIUS_UM
-    joint = rx.MultiHistogramRefinement(
+    joint = rx.JointRefinement(
         rx.Structure(phases=phases),
         [INSTRUMENT_FOR_KIND[k]() for k in kinds])
     joint.fit([_flat(20.0, 80.0) for _ in kinds], plan=_short_plan())
@@ -450,7 +450,7 @@ def test_a_kind_left_out_of_the_table_is_one_no_fit_takes():
     fit refuses a bank by name, so the table has nothing to ask it yet."""
     assert NOT_REFINED_KINDS == {"neutron_tof"}
     with pytest.raises(ValueError, match="time-of-flight"):
-        rx.MultiHistogramRefinement(
+        rx.JointRefinement(
             rx.Structure(phases=[corundum()]),
             [INSTRUMENT_FOR_KIND["xray_cw"](),
              rx.Instrument.tof_neutron_bank(5000.0, two_theta_bank_deg=90.0)])
@@ -470,7 +470,7 @@ def test_each_histogram_of_a_joint_fit_keys_on_its_own_radiation(
 
     Read off the joint fit's own compiled models and tables — never off an
     instrument built beside it — because the failure this audits is the
-    stack handing one histogram another's physics.
+    stack handing one pattern another's physics.
     """
     joint, kinds = every_kind_jointly
     got = {kind: row.probe(joint, h) for h, kind in enumerate(kinds)}
@@ -480,7 +480,7 @@ def test_each_histogram_of_a_joint_fit_keys_on_its_own_radiation(
 def test_the_shared_moment_is_measured_by_the_neutron_histogram_alone():
     """The magnetic row, end to end: a joint fit refines a moment.
 
-    The moment is shared (it is the specimen's), so the X-ray histogram
+    The moment is shared (it is the specimen's), so the X-ray pattern
     carries the column too — and contributes no gradient to it, because its
     model never builds the term.  Freed from 3.5 μ_B against synthetic
     X-ray and neutron patterns of the 4.6 μ_B truth, it comes back at the
@@ -497,7 +497,7 @@ def test_the_shared_moment_is_measured_by_the_neutron_histogram_alone():
         (0.0, 0.0, 3.5), "Mn2+", vary=True)
     plan = PLAN_PRESETS["mccusker_structural"]()
     plan.stages.append(Stage("moment", ["phases.*.atoms.*.moment.*"]))
-    joint = rx.MultiHistogramRefinement(start, [
+    joint = rx.JointRefinement(start, [
         _xray(), rx.Instrument.constant_wavelength_neutron(2.4, fwhm_deg=0.3)])
     result = joint.fit([xd, nd], plan=plan)
 
@@ -505,52 +505,52 @@ def test_the_shared_moment_is_measured_by_the_neutron_histogram_alone():
     assert [m.phases[0].magnetic is not None for m in joint._models] == [
         False, True]
     row = next(p for p in result.parameters if ".moment." in p.path)
-    assert not row.path.startswith("hist."), "the moment is the specimen's"
+    assert not row.path.startswith("pattern."), "the moment is the specimen's"
     assert row.stderr is not None and row.stderr > 0
     assert abs(row.value - 4.6) < 4 * row.stderr, (row.value, row.stderr)
 
 
 def test_the_dispersion_diagnostic_fires_on_the_xray_histogram_alone():
-    """`DISPERSION_NEGLECTED` fires once, on the X-ray histogram only.
+    """`DISPERSION_NEGLECTED` fires once, on the X-ray pattern only.
 
     The exact count, as the review on #281 asked, since `<= 1` cannot tell
     "fired once, correctly" from "never fired at all" — which is what this
-    test used to pin: `multi.py` never called `_dispersion_diagnostics`, so a
-    joint fit raised it at no count while a single-histogram `Refinement` on
+    test used to pin: `joint.py` never called `_dispersion_diagnostics`, so a
+    joint fit raised it at no count while a single-pattern `Refinement` on
     the same structure and instrument raised it once (corundum's Al at this
     wavelength carries ~3.3 % of its scattering power in f′, past
     `DISPERSION_NEGLECT_FRAC`).  WP-1344 placed it: the code asks one
-    histogram's source, so it is that histogram's (`multi.DIAGNOSTIC_SCOPES`),
-    the neutron histogram abstains, and the top-level list stays clear of it.
+    pattern's source, so it is that pattern's (`joint.DIAGNOSTIC_SCOPES`),
+    the neutron pattern abstains, and the top-level list stays clear of it.
     `tests/test_multi_diagnostics.py` carries the siblings and the meta-test.
     """
     xray = _xray()
     xray = xray.model_copy(update={
         "source": xray.source.model_copy(update={"dispersion": None})})
     xd, nd = _flat(20.0, 80.0), _flat(20.0, 80.0)
-    result = rx.refine_multi([xd, nd], rx.Structure(phases=[corundum()]),
+    result = rx.refine_joint([xd, nd], rx.Structure(phases=[corundum()]),
                              [xray, _neutron()], plan="profile_only")
     assert [d.code for d in result.diagnostics].count("DISPERSION_NEGLECTED") == 0
     assert [[d.code for d in h.diagnostics].count("DISPERSION_NEGLECTED")
-            for h in result.histograms] == [1, 0]
+            for h in result.patterns] == [1, 0]
 
 
 def test_the_structure_is_shared_and_the_instruments_are_not():
     """#194 task 3's other half: one crystal, two instruments.
 
     The point of a joint fit is that the *structure* is one object and the
-    per-histogram machinery is not, so this asserts both directions — a shared
+    per-pattern machinery is not, so this asserts both directions — a shared
     cell that moved together, and profile terms that did not.
     """
     xd, nd = _flat(20.0, 80.0), _flat(20.0, 80.0)
-    ref = rx.MultiHistogramRefinement(rx.Structure(phases=[corundum()]),
+    ref = rx.JointRefinement(rx.Structure(phases=[corundum()]),
                                       [_xray(), _neutron()])
     result = ref.fit([xd, nd], plan="profile_only")
-    assert ref.n_histograms == 2
+    assert ref.n_patterns == 2
 
     cells = [s.phases[0].cell.a.value for s in ref.fitted_structures]
     assert cells[0] == pytest.approx(cells[1]), (
-        "the shared cell differs between histograms — the structure is not "
+        "the shared cell differs between patterns — the structure is not "
         "shared")
 
     # On flat data every width ends on its floor (WP-1938), so the two values
@@ -558,9 +558,9 @@ def test_the_structure_is_shared_and_the_instruments_are_not():
     # data shows no phase, so each width is held at the answer (WP-2049) and
     # its column is named in the hold's record rather than among the results.
     paths = {p.path for p in result.parameters} | set(result.stages[-1].held)
-    assert {f"hist.{h}.instrument.profile.w" for h in (0, 1)} <= paths, (
-        "the profile width is not a column per histogram; the instruments are "
-        "supposed to be per-histogram")
+    assert {f"pattern.{h}.instrument.profile.w" for h in (0, 1)} <= paths, (
+        "the profile width is not a column per pattern; the instruments are "
+        "supposed to be per-pattern")
     assert "instrument.profile.w" not in paths
 
 
@@ -592,25 +592,25 @@ def two_weightings():
                                              b_al=0.6, b_o=0.7)])
 
     plan = "mccusker_structural"
-    joint = rx.refine_multi([xd, nd], start(), [_xray(), _neutron()], plan=plan)
+    joint = rx.refine_joint([xd, nd], start(), [_xray(), _neutron()], plan=plan)
     alone = [rx.Refinement(start(), ins, history=False).fit(d, plan=plan)
              for ins, d in ((_xray(), xd), (_neutron(), nd))]
-    return joint, alone, {"hist.0.phases.0.scale": s_x,
-                          "hist.1.phases.0.scale": s_n,
-                          "hist.0.instrument.zero_shift": 0.01,
-                          "hist.1.instrument.zero_shift": -0.03}
+    return joint, alone, {"pattern.0.phases.0.scale": s_x,
+                          "pattern.1.phases.0.scale": s_n,
+                          "pattern.0.instrument.zero_shift": 0.01,
+                          "pattern.1.instrument.zero_shift": -0.03}
 
 
 @pytest.mark.xdist_group("joint-two-weightings")
 def test_one_structure_answers_to_both_weightings(two_weightings):
-    """#194 task 3: the shared-vs-per-histogram split, where it can fail.
+    """#194 task 3: the shared-vs-per-pattern split, where it can fail.
 
-    The two histograms weight the structure factor oppositely (corundum's
+    The two patterns weight the structure factor oppositely (corundum's
     Al outscatters its O for X-rays and the reverse for neutrons), so a
     shared coordinate is pulled by two different sensitivities.  Every
-    shared parameter must land on the one truth, and every per-histogram
-    one on its own histogram's truth — two scales 3.5× apart and two zero
-    shifts of opposite sign, none of them leaking into the other histogram.
+    shared parameter must land on the one truth, and every per-pattern
+    one on its own pattern's truth — two scales 3.5× apart and two zero
+    shifts of opposite sign, none of them leaking into the other pattern.
     Measured over seeds 1-3 on macOS arm64: the largest |Δ|/esd was 1.21;
     on Linux x86_64 (seed 1) it was 0.91.
     """
@@ -636,7 +636,7 @@ def test_the_neutron_histogram_buys_the_oxygen_and_not_the_aluminium(
     ~0.07 across builds, so the claim is pinned as the *asymmetry*
     joint_al / joint_o, which held at 1.38-1.45 on every one of them; the
     absolute floor under joint_al only rules out the aluminium gaining as
-    much as the oxygen does.  A stack that handed both histograms one
+    much as the oxygen does.  A stack that handed both patterns one
     amplitude could not produce this asymmetry: the two sensitivities
     would be one, and the ratio would sit near 1.
     """
@@ -654,7 +654,7 @@ def test_the_neutron_histogram_buys_the_oxygen_and_not_the_aluminium(
     assert joint_al / joint_o > 1.25, ratios
 
 
-# -------------------- the radiation-keyed diagnostics, on their own histogram ---
+# -------------------- the radiation-keyed diagnostics, on their own pattern ---
 def _yb_oxide() -> rx.Phase:
     """A rock-salt 'YbO' — a vehicle for one Yb site, not a real phase."""
     P = rx.Parameter
@@ -686,13 +686,13 @@ def test_the_other_radiation_keyed_diagnostics_fire_on_their_own_histogram(
         code, phase, owner):
     """The two siblings of ``DISPERSION_NEGLECTED`` above, placed by WP-1344.
 
-    Each is raised by a single-histogram ``Refinement`` on the histogram
+    Each is raised by a single-pattern ``Refinement`` on the pattern
     whose radiation it belongs to — measured here as the control.  This test
     used to pin a joint fit over the same structure and both instruments at
-    no count, because ``multi.py`` called none of the three radiation-keyed
-    helpers.  WP-1344 placed them (``multi.DIAGNOSTIC_SCOPES``): each asks
-    one histogram's source, so a joint fit raises it once, on the ``owner``
-    histogram only, and never at the top level.
+    no count, because ``joint.py`` called none of the three radiation-keyed
+    helpers.  WP-1344 placed them (``joint.DIAGNOSTIC_SCOPES``): each asks
+    one pattern's source, so a joint fit raises it once, on the ``owner``
+    pattern only, and never at the top level.
     """
     structure = rx.Structure(phases=[phase()])
     by_kind = {"xray_cw": _xray, "neutron_cw": _neutron}
@@ -702,9 +702,9 @@ def test_the_other_radiation_keyed_diagnostics_fire_on_their_own_histogram(
     assert [d.code for d in alone.diagnostics].count(code) == 1
 
     instruments = [_xray(), _neutron()]
-    joint = rx.refine_multi([_flat(20.0, 80.0), _flat(20.0, 80.0)],
+    joint = rx.refine_joint([_flat(20.0, 80.0), _flat(20.0, 80.0)],
                             structure, instruments, plan=_short_plan())
     assert [d.code for d in joint.diagnostics].count(code) == 0
     assert [[d.code for d in h.diagnostics].count(code)
-            for h in joint.histograms] == [
+            for h in joint.patterns] == [
         int(inst.source.kind == owner) for inst in instruments]

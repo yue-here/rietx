@@ -24,9 +24,9 @@ measure:
   (``AFIX 43``), while X₂N–H does not restrict the nitrogen's hybridisation.
   It is a fair pair for a riding default, not a like-for-like row.
 * **A joint X-ray + neutron fit takes the neutron lengths**: the hydrogen's
-  scattering signal is in the neutron histogram (a design choice of this
+  scattering signal is in the neutron pattern (a design choice of this
   package), and the X-ray pattern barely constrains it.  So
-  :func:`riding_radiation` answers ``"neutron"`` whenever any histogram is
+  :func:`riding_radiation` answers ``"neutron"`` whenever any pattern is
   neutron.
 """
 
@@ -51,7 +51,7 @@ RIDING_MIN_SEPARATION = 1e-6
 
 
 def riding_radiation(instruments) -> str:
-    """``"neutron"`` if any histogram is a neutron one, else ``"xray"``.
+    """``"neutron"`` if any pattern is a neutron one, else ``"xray"``.
 
     One instrument or several (a joint fit).  A joint X-ray + neutron fit
     takes the neutron lengths, where the hydrogen signal is.

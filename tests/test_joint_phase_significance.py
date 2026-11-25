@@ -8,9 +8,9 @@ Until C10 the joint fit read the screen alone, at the stage start and at the
 answer, so under the same 3σ it held and restored less.
 
 The fixture is that file's blank frame (#481's seed 107) twice, once per
-histogram: background and Poisson noise, no LaB₆.  Measured 2026-11-03
+pattern: background and Poisson noise, no LaB₆.  Measured 2026-11-03
 (macOS arm64, ``[dev]``), each stage answer's ``(screen, significance)`` in
-both histograms under ``mccusker_default``:
+both patterns under ``mccusker_default``:
 
 * screen alone: (2.24, 2.24), (2.50, 2.50), (2.50, 2.50), (3.25, 2.61),
   (3.73, 1.60), (3.73, 1.60).  The ``profile_w`` answer released the shared
@@ -35,7 +35,7 @@ import numpy as np
 import pytest
 
 import rietx as rx
-from rietx import multi
+from rietx import joint
 from rietx.model.forward import PHASE_SUPPORT_SIGMA
 from rietx.params.multi import SharingMap
 from tests.test_phase_significance import A0, _assert_prior_holds, _draw, _lab6, _unfitted
@@ -48,20 +48,20 @@ OUT = Path(__file__).parent / "output"
 def _joint_fit(pattern, monkeypatch, *, sharing=None, plan="mccusker_default",
                events=None, start=_unfitted):
     """Two copies of ``pattern``, recording ``(screen, significance)`` per
-    histogram at every stage answer, and the obs/calc/diff plot per pattern."""
+    pattern at every stage answer, and the obs/calc/diff plot per pattern."""
     record: list[list[tuple[float, float]]] = []
-    inner = multi._joint_answer_significance
+    inner = joint._joint_answer_significance
 
     def spy(models, mtable, outcome, held, reach, backend, **kw):
         out = inner(models, mtable, outcome, held, reach, backend, **kw)
-        screen = multi._joint_screen(models, mtable)
+        screen = joint._joint_screen(models, mtable)
         record.append([(float(s[0]), float(z[0])) for s, z in zip(screen, out,
                                                                    strict=True)])
         return out
 
-    monkeypatch.setattr(multi, "_joint_answer_significance", spy)
+    monkeypatch.setattr(joint, "_joint_answer_significance", spy)
     structure, ins = start()
-    ref = rx.MultiHistogramRefinement(structure, [ins, ins.model_copy(deep=True)],
+    ref = rx.JointRefinement(structure, [ins, ins.model_copy(deep=True)],
                                       sharing=sharing)
     result = ref.fit([pattern, pattern.model_copy(deep=True)], plan=plan,
                      events=None if events is None else events.append)
@@ -69,7 +69,7 @@ def _joint_fit(pattern, monkeypatch, *, sharing=None, plan="mccusker_default",
     name = (os.environ["PYTEST_CURRENT_TEST"].split("::")[-1]
             .split(" ")[0].split("@")[0].replace("[", "_").replace("]", ""))
     for h in range(2):
-        result.for_histogram(h).plot(OUT / f"joint_significance_{name}_h{h}.png")
+        result.for_pattern(h).plot(OUT / f"joint_significance_{name}_h{h}.png")
     return ref, result, record
 
 
@@ -85,7 +85,7 @@ def test_a_blank_pair_past_the_screen_is_judged_by_its_marginal_z(
     """The screen passes at an answer the marginal does not, and the cell stays held.
 
     Shared, the cell is one column of the joint fit, held because neither
-    pattern sees the phase.  Per histogram, each pattern holds its own copy.
+    pattern sees the phase.  Per pattern, each pattern holds its own copy.
     """
     events: list[dict] = []
     _, result, record = _joint_fit(blank, monkeypatch, sharing=sharing,
@@ -93,7 +93,7 @@ def test_a_blank_pair_past_the_screen_is_judged_by_its_marginal_z(
     assert any(s >= PHASE_SUPPORT_SIGMA > z for row in record for s, z in row), record
     assert all(z < PHASE_SUPPORT_SIGMA for row in record for _, z in row), record
     cells = ({"phases.0.cell.a"} if sharing is None
-             else {"hist.0.phases.0.cell.a", "hist.1.phases.0.cell.a"})
+             else {"pattern.0.phases.0.cell.a", "pattern.1.phases.0.cell.a"})
     assert cells <= set(result.stages[-1].held)
     assert not any(cells & set(st.released) for st in result.stages)
     assert not cells & {p.path for p in result.parameters}
@@ -130,9 +130,9 @@ def test_the_blocked_matrix_reads_the_dense_one(monkeypatch):
     pattern = _draw(_lab6(A0, 2.5e-7), np.random.default_rng(200))
     ref, _, _ = _joint_fit(pattern, monkeypatch)
     models, mtable = ref._models, ref.mtable
-    dense, cut = (multi._joint_answer_significance(
+    dense, cut = (joint._joint_answer_significance(
         models, mtable, SimpleNamespace(moment_angle_tests=None, jacobian_layout=lay),
         [], {}, "numpy") for lay in ("dense", "blocked"))
-    screen = multi._joint_screen(models, mtable)
+    screen = joint._joint_screen(models, mtable)
     assert all(z[0] < s[0] for z, s in zip(dense, screen, strict=True))
     np.testing.assert_allclose(np.concatenate(cut), np.concatenate(dense), rtol=1e-9)

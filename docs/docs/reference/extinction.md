@@ -109,7 +109,7 @@ Above it the screen still ranks the classes, sets `ExtinctionScreen.status` to `
 A cell outside the basin a Le Bail can refine it from (0.4 % off held, or 1 % off with the cell-free fit, on a synthetic Si pattern at synchrotron resolution) lands there rather than on a confident wrong class.
 So does a real one: SRM 676a corundum at 1.02 times its certified cell reads 1.00 where the certified cell reads 0.19, and the GSAS-II fluorapatite at 0.99 times its cell reads 1.00 where its own reads 0.12; in both the cell-free fit leaves the cell more than 0.5 % off.
 The gate does not catch every such cell.
-The PbSO₄ X-ray histogram at 0.99 times its index cell reads 0.45: the cell-free fit stops about 0.3 % short, and the screen returns `P c - -` where the specimen is `P c - n`.
+The PbSO₄ X-ray pattern at 0.99 times its index cell reads 0.45: the cell-free fit stops about 0.3 % short, and the screen returns `P c - -` where the specimen is `P c - n`.
 
 `ExtinctionScreen.perfect_fit_rwp_net` is what `reference_rwp_net` would read for a fit that left only the counting noise: √(N/(N+S)), with N the fitted channels and S the weighted net Bragg power, since a background channel's net is that noise.
 It is past the bound exactly when S < N.

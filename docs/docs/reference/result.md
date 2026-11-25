@@ -39,7 +39,7 @@ The band on `Statistics.max_shift_over_esd` is quoted from the guidelines and ga
 A converged stage meets it, so the number says most on a stage that stopped on its iteration budget: how far the solve was still moving, in esds.
 It is `None` when it cannot be measured: no accepted step, no esds, or a replay.
 A joint fit measures it over the joint parameter vector.
-A `HistogramResult`'s own statistics leave it `None`, and `RefinementResult.for_histogram` carries the joint figure onto one histogram's view.
+A `PatternResult`'s own statistics leave it `None`, and `RefinementResult.for_pattern` carries the joint figure onto one pattern's view.
 
 `build_report` writes `Statistics.identifiability_clause`, and a fit alone leaves it `None`.
 It is also `None` when nothing crossed a comment threshold.
@@ -73,7 +73,7 @@ Every statistic above weights a point by 1/σ², and a fit does not show where e
 `SigmaRule.n_file_sigma` points were weighted by the file's own esd, and `SigmaRule.n_poisson_sigma` by the Poisson σ = √max(y, 1).
 The two add up to `Statistics.n_points`.
 `SigmaRule.n_nonpositive_excluded` counts the points inside the fitted range that left the fit because the file gave them an esd of zero or below ([Intensities and esds](pattern-files.md#intensities-and-esds)).
-A joint fit records one per histogram, on `HistogramResult.sigma_rule`, and leaves the top-level field `None`.
+A joint fit records one per pattern, on `PatternResult.sigma_rule`, and leaves the top-level field `None`.
 
 ### Limits of the agreement statistics
 
@@ -99,7 +99,7 @@ They are on `RefinementResult.phase_agreement`, one `PhaseAgreement` row per pha
 | `PhaseAgreement.n_reflections` | how many reflections were summed | smaller than the phase's reflection list whenever one falls off the Ewald sphere |
 
 `PhaseAgreement.r_bragg` and `PhaseAgreement.r_f` are `None` for a phase with no scattering power to partition at all.
-A joint multi-histogram fit reports the indices per histogram, on `HistogramResult.phase_agreement`.
+A joint fit reports the indices per pattern, on `PatternResult.phase_agreement`.
 The partition is of one pattern's counts, so there is no pooled value.
 
 A phase carrying a spherical-harmonics texture gets one more row, on `RefinementResult.texture`, one `PhaseTexture` per textured phase in a Rietveld fit.
@@ -112,7 +112,7 @@ These rows are the correction's evidence, because Rwp is not.
 | `PhaseTexture.min_p_reflections` | the lowest multiplier P over the phase's fitted reflections | the default driver holds it at 0 or above |
 | `PhaseTexture.min_p_sphere` | the lowest P over directions sampled on the whole sphere, the reflections included | below zero, [`TEXTURE_NOT_POSITIVE`](diagnostics-corrections.md#texture_not_positive) fires and the coefficients are not a pole density |
 
-A joint fit leaves `RefinementResult.texture` empty, because its shared coefficients meet each histogram at its own sample angle.
+A joint fit leaves `RefinementResult.texture` empty, because its shared coefficients meet each pattern at its own sample angle.
 
 Both structure indices are biased towards the model you are testing.
 A powder pattern does not measure individual reflection intensities, because overlapped peaks share their counts.
@@ -152,7 +152,7 @@ So the algorithm will refine far more parameters than the data support without c
 The same fit refined them against the same pattern, but the peak positions and shapes determine them.
 
 `RefinementResult.data_support` is present for anything with a compiled model behind it, a replay included.
-It is `None` for a joint multi-histogram fit, which would need one count per histogram, and for a result recorded before v1.0.
+It is `None` for a joint fit, which would need one count per pattern, and for a result recorded before v1.0.
 
 `DataSupport.n_unique_reflections` over-counts on purpose.
 Two reflections at the same 2θ are one observation, and both are counted here.
@@ -227,8 +227,8 @@ The fields are empty when nothing was measurable: fewer than two free parameters
 `RefinementResult.identifiability` is `None` when nothing measured it, as on a replay of a history node, which solves nothing.
 Read `None` as "not measured here", never as "no degeneracy".
 
-A joint multi-histogram fit screens each histogram's own rows.
-Its `Identifiability.background_absorption` keys carry a `hist.<h>.` prefix, shared paths included, and `RefinementResult.for_histogram` hands one histogram's view its own rows without the prefix.
+A joint fit screens each pattern's own rows.
+Its `Identifiability.background_absorption` keys carry a `pattern.<h>.` prefix, shared paths included, and `RefinementResult.for_pattern` hands one pattern's view its own rows without the prefix.
 A joint fit runs neither the declared-peak screen nor the parameter-space screens, so the other four fields stay empty there.
 
 ### Background component counts
@@ -248,7 +248,7 @@ Declare no peaks and the two numbers are equal, which is every pattern written b
 Both counts sit on the result, because they are declared values and `Identifiability` holds measurements.
 They are counted from what the compiled instrument carried, so they are there on a replayed node too, where `RefinementResult.identifiability` is `None`.
 `0` means none was declared.
-`None` means nothing was counted: a joint multi-histogram fit, which has one count per histogram, or a result recorded before the field existed.
+`None` means nothing was counted: a joint fit, which has one count per pattern, or a result recorded before the field existed.
 
 ## Restraint report
 
@@ -279,7 +279,7 @@ The deviations are always reported unscaled.
 A row past three σ raises [`RESTRAINT_TENSION`](diagnostics-refinement.md#restraint_tension).
 A plane raises one between its rows, naming the atoms past three σ, worst first.
 The restraint and the data are then pulling against each other, and one of them is wrong.
-A joint fit reports the same object per histogram, on `HistogramResult.restraints`.
+A joint fit reports the same object per pattern, on `PatternResult.restraints`.
 
 ## Absorption correction
 
@@ -574,7 +574,7 @@ A file written with `path=` or `fig.savefig()` keeps the figure's own dpi and fu
 ## Progress lines
 
 `progress=` writes one line per stage boundary to a text stream or a path.
-`Refinement.fit`, `MultiHistogramRefinement.fit`, `refine_multi`, `SequentialRefinement.fit` and `refine_sequential` take it.
+`Refinement.fit`, `JointRefinement.fit`, `refine_joint`, `SequentialRefinement.fit` and `refine_sequential` take it.
 Under a series each line is stamped with the pattern's place in it.
 A path is opened for appending.
 

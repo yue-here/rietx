@@ -142,7 +142,7 @@ def test_a_trf_stage_records_its_fallbacks(monkeypatch):
 #: left out: their decompositions act on small symmetry matrices or are caught
 #: by their own handlers, and none has been met failing.
 FIT_PATH = ("optimize", "model", "params", "report", "background", "solve",
-            "refine.py", "multi.py", "sequential.py")
+            "refine.py", "joint.py", "sequential.py")
 
 
 def test_the_fit_path_decomposes_only_through_the_fallbacks():

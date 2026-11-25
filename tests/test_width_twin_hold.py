@@ -16,7 +16,7 @@ import numpy as np
 import pytest
 
 from rietx import Instrument, Refinement
-from rietx.multi import _hold_width_twins_multi
+from rietx.joint import _hold_width_twins_multi
 from rietx.params.multi import MultiParameterTable
 from rietx.params.vector import AffineTie, ParameterTable
 from rietx.refine import _hold_width_twins
@@ -151,13 +151,13 @@ def test_a_joint_size_is_flat_with_every_histograms_x_despite_the_lambda_factor(
     size are three columns behind two sums: still one flat direction."""
     mt = _joint(["instrument.profile.x", "phases.*.lor_size"])
     held, twins = _hold_width_twins_multi(mt, [set(), set()])
-    assert sorted(held) == ["hist.0.instrument.profile.x",
-                            "hist.1.instrument.profile.x"]
+    assert sorted(held) == ["pattern.0.instrument.profile.x",
+                            "pattern.1.instrument.profile.x"]
     assert all(t == ["phases.0.lor_size"] for t in twins.values())
 
 
 def test_one_histograms_held_x_pins_the_other():
-    mt = _joint(["hist.0.instrument.profile.x", "phases.*.lor_size"])
+    mt = _joint(["pattern.0.instrument.profile.x", "phases.*.lor_size"])
     assert _hold_width_twins_multi(mt, [set(), set()]) == ([], {})
 
 

@@ -174,21 +174,21 @@ def test_a_non_magnetic_phase_gains_no_table_row_at_all():
 def test_the_size_term_carries_one_power_of_lambda():
     """WP-1131's invariant: a size coefficient is (180/π)·K·λ/L, so one
     magnetic domain needs coefficients in the ratio λ₂/λ₁ across two
-    histograms.  Its strain partner is λ-free and must **not** be listed."""
+    patterns.  Its strain partner is λ-free and must **not** be listed."""
     assert SIZE_LAMBDA_POWER["magnetic_lor_size"] == 1.0
     assert "magnetic_lor_strain" not in SIZE_LAMBDA_POWER
 
 
 def test_a_joint_fit_converts_the_shared_magnetic_size_between_wavelengths():
-    """The two-histogram test WP-1343's multi-histogram task asks for: a
-    shared magnetic size column lands on each histogram's own coefficient."""
+    """The two-pattern test WP-1343's joint task asks for: a
+    shared magnetic size column lands on each pattern's own coefficient."""
     from rietx.params.multi import SharingMap, size_value_scales
 
     st = rx.Structure(phases=[_mnf2(size=0.2)])
     a = rx.Instrument.constant_wavelength_neutron(2.4)
     b = rx.Instrument.constant_wavelength_neutron(1.2)
     scales = size_value_scales(st, [a, b], SharingMap())
-    assert scales[0] == {}                       # histogram 0 carries the column
+    assert scales[0] == {}                       # pattern 0 carries the column
     assert scales[1]["phases.0.magnetic_lor_size"] == pytest.approx(1.2 / 2.4)
     assert scales[1]["phases.0.lor_size"] == pytest.approx(1.2 / 2.4)
     # and a phase with no moment contributes no such path, because no table

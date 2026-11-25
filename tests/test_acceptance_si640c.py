@@ -1,6 +1,6 @@
 """Acceptance: a refined wavelength on 11-BM Si SRM 640c, against XND.
 
-The flagship validation of the single-histogram refinable wavelength (WP-1128
+The flagship validation of the single-pattern refinable wavelength (WP-1128
 made it admissible when the cell is held, WP-1134 gave it the
 ``WAVELENGTH_CALIBRATION`` record).  The specimen is **NIST SRM 640c silicon**,
 whose certified lattice parameter is the internal standard that licenses freeing
@@ -234,7 +234,7 @@ def _fit_with_model(*, limits, asymmetric, free_wavelength=True):
     ref = rx.Refinement(_structure(), _instrument(limits), history=False)
     if asymmetric:
         # S/L and H/L enter the FCJ aberration nearly symmetrically and are
-        # exactly degenerate on one histogram (ρ → −1); tie them equal, which is
+        # exactly degenerate on one pattern (ρ → −1); tie them equal, which is
         # standard practice and what keeps this fit identifiable.
         ref.tie_equal(["instrument.geometry.axial_sl",
                        "instrument.geometry.axial_hl"])

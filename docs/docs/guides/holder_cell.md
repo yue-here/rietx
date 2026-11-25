@@ -94,7 +94,7 @@ The script makes five patterns of the same fluorapatite over the same aluminium 
 The holder sits 0.120 mm below the specimen in each.
 
 A joint fit has no `tie`, so each formula becomes a `ParametricEquation` with `basis="expression"`.
-The four variables are passed to `MultiHistogramRefinement` as `variables`:
+The four variables are passed to `JointRefinement` as `variables`:
 
 ```{literalinclude} ../../../examples/guides/holder_cell.py
 :language: python
@@ -107,15 +107,15 @@ The four variables are passed to `MultiHistogramRefinement` as `variables`:
 vars.a_holder        4.049470(77) made with 4.0495
 vars.offset          -0.11943(96) made with -0.12
 vars.zero            0.0120(54)   made with 0.012
-hist.0.vars.height   0.0401(97)   made with 0.04
-hist.1.vars.height   -0.0299(97)  made with -0.03
-hist.2.vars.height   0.0900(97)   made with 0.09
-hist.3.vars.height   0.0100(97)   made with 0.01
-hist.4.vars.height   -0.0600(97)  made with -0.06
+pattern.0.vars.height   0.0401(97)   made with 0.04
+pattern.1.vars.height   -0.0299(97)  made with -0.03
+pattern.2.vars.height   0.0900(97)   made with 0.09
+pattern.3.vars.height   0.0100(97)   made with 0.01
+pattern.4.vars.height   -0.0600(97)  made with -0.06
 ```
 
 Each variable is one number across the five patterns, unless `SharingMap.per_histogram` names it.
-Here only `height` is named, so it comes back as one row per pattern, `hist.<k>.vars.height`.
+Here only `height` is named, so it comes back as one row per pattern, `pattern.<k>.vars.height`.
 The zero shift is one number too, because the five patterns come from one instrument.
 Every parameter under `instrument.` is otherwise one per pattern, so each pattern refines its own area and width for each line.
 `shared=["instrument.profile.*"]` gives the five patterns one instrument profile.

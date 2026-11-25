@@ -116,7 +116,7 @@ path is entitled to make.
   core-level effect. There the element is the identity; here the isotope is.
   The X-ray lookups read an isotope label as its element (`2H` and `D` as H,
   `7Li1+` as Li⁺), since the electrons do not see the nucleus's mass, so one
-  deuterated structure goes on both histograms of a joint fit.
+  deuterated structure goes on both patterns of a joint fit.
 - The table is thermal. For the resonant absorbers (Cd, Sm, Eu, Gd, and notably
   $^{113}$Cd and $^{157}$Gd) $b$ is complex and varies with wavelength near a
   resonance, the neutron analogue of an X-ray edge. At one constant wavelength a

@@ -168,7 +168,7 @@ def xray_scatterer(species: str) -> str:
     read as ``H``, while a charge is kept, since it is the charge that changes
     f₀. It is the mirror of ``neutron.normalize_species``, which keeps the mass
     number and drops the charge (issue #552: without it a deuterated structure
-    could not go on an X-ray histogram, nor into a joint X-ray + neutron fit).
+    could not go on an X-ray pattern, nor into a joint X-ray + neutron fit).
     A mass number is dropped only where it names a nuclide the neutron table
     carries, so the two radiations accept the same isotope labels and a
     malformed ``"1Cu"`` still fails as it always did. Anything that is not an

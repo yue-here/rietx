@@ -308,14 +308,14 @@ def test_a_result_without_esds_has_no_uncorrected_esd(lebail):
 
 
 def test_a_joint_fit_divides_by_the_factor_of_its_weighted_residual(monkeypatch):
-    """The joint writer (``MultiHistogramRefinement._parameters``), shared
-    and per-histogram rows alike.
+    """The joint writer (``JointRefinement._parameters``), shared
+    and per-pattern rows alike.
 
     Weighted 1:4, the joint solve's factor reads the weighted residual and
     ``Statistics.esd_inflation`` the unweighted one: 1.173 against 1.129
     (measured 2026-10-20), so this fixture separates the two divisors.
     """
-    from rietx import MultiHistogramRefinement
+    from rietx import JointRefinement
     from tests.test_multi_histogram import perturbed_inputs, synthesize
 
     patterns = [
@@ -327,12 +327,12 @@ def test_a_joint_fit_divides_by_the_factor_of_its_weighted_residual(monkeypatch)
 
     def joint():
         structure, instruments = perturbed_inputs()
-        return MultiHistogramRefinement(structure, instruments).fit(
+        return JointRefinement(structure, instruments).fit(
             patterns, plan="mccusker_default", weights=[1.0, 4.0])
 
     result = joint()
     assert result.status == "converged"
-    assert any(p.path.startswith("hist.") and p.stderr is not None
+    assert any(p.path.startswith("pattern.") and p.stderr is not None
                for p in result.parameters)
     _without_the_factor(monkeypatch)
     _assert_uncorrected_is_the_plain_esd(result, joint())

@@ -1483,7 +1483,7 @@ class Phase(_InheritsDeclaredDefaults):
     # every coordinate along it has a flat direction.  ``"hold"`` makes the
     # parameter table hold, per such direction, the first atom DOF a shift
     # along it moves (``ParameterTable`` does it, so
-    # every fit, series pattern and joint histogram builds the same hold), and
+    # every fit, series pattern and joint pattern builds the same hold), and
     # skips a direction the caller's own ties or holds already fix.
     # ``Refinement.unhold`` on that DOF sets this back to ``None``.
     # ``"centroid"`` holds nothing: each stage whose free set can slide the

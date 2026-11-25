@@ -84,7 +84,7 @@ def test_a_where_that_names_no_parameter_is_read_as_no_path():
 
 
 def test_a_joint_fits_histogram_scope_is_read_through():
-    scoped = _d("RESOLUTION_UNCONSTRAINED", ["hist.1.instrument.profile.u"])
+    scoped = _d("RESOLUTION_UNCONSTRAINED", ["pattern.1.instrument.profile.u"])
     assert level_under(scoped, "microstructure") == "warning"
     assert level_under(scoped, "qpa") == "info"
 

@@ -60,7 +60,7 @@ _TARGETS = (
     "capabilities", "read_pattern", "crystallography.cif.structure_from_cif",
     "read_recipe", "write_recipe_tables",
     # fitting
-    "refine", "refine_sequential", "refine_multi", "replay",
+    "refine", "refine_sequential", "refine_joint", "replay",
     "Refinement.fit", "Refinement.run_stage", "Refinement.predict",
     "SequentialRefinement.fit",
     # judging

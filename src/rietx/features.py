@@ -503,8 +503,8 @@ FEATURES: dict[str, Feature] = {
         ),
     ),
     "joint_refinement": Feature(
-        "Joint multi-histogram refinement (refine_multi)",
-        no_theory="one objective summed over histograms, each term estimation § Objective and weights; the sharing of a size across wavelengths is the invariant in CLAUDE.md, not a new equation",
+        "Joint refinement (refine_joint)",
+        no_theory="one objective summed over patterns, each term estimation § Objective and weights; the sharing of a size across wavelengths is the invariant in CLAUDE.md, not a new equation",
     ),
     "parametric_refinement": Feature(
         "A parameter as a function of each pattern's coordinates",

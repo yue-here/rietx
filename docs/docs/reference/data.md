@@ -190,7 +190,7 @@ fig = data.plot(model=ref, two_theta_range=(25, 40))
 A time-of-flight pattern comes from a spallation neutron source such as ISIS, SNS or LANSCE.
 The whole moderator spectrum reaches the specimen, and the reflections arrive in order of d-spacing.
 This version reads such a pattern and refines none, because no flight-time forward model exists yet.
-`Refinement`, `refine`, `MultiHistogramRefinement`, `refine_sequential`, `index_pattern`, `pick_peaks`, `diagnose`, `auto_background`, `PatternData.plot` and every other entry point that computes from a pattern raise on a flight-time axis or a `neutron_tof` instrument.
+`Refinement`, `refine`, `JointRefinement`, `refine_sequential`, `index_pattern`, `pick_peaks`, `diagnose`, `auto_background`, `PatternData.plot` and every other entry point that computes from a pattern raise on a flight-time axis or a `neutron_tof` instrument.
 The message names the axis, its unit and the entry point.
 With the bank's calibration ([Time-of-flight bank](instrument.md#time-of-flight-bank)), the flight times convert to d-spacings.
 

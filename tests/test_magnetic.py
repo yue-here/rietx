@@ -23,7 +23,7 @@ so each block below turns on something specific:
 * the powder average is over the **Laue orbit**, not one representative times
   a multiplicity — which is what makes a cubic collinear structure's intensity
   direction-independent and its direction DOFs unmeasured;
-* a moment reaches ``neutron_cw`` histograms and **nothing else**.
+* a moment reaches ``neutron_cw`` patterns and **nothing else**.
 """
 
 from __future__ import annotations
@@ -1484,7 +1484,7 @@ def test_qpa_is_bit_identical_with_and_without_a_moment_block():
 def test_the_term_reaches_a_neutron_histogram_and_nothing_else():
     """Radiation dispatch: ``neutron_cw`` only, X-ray identically zero.
 
-    On an X-ray histogram the magnetic block is not built at all — not built
+    On an X-ray pattern the magnetic block is not built at all — not built
     and evaluated to zero — so the phase's X-ray arithmetic is untouched and
     the moment has no gradient anywhere, which is the state the hold rule
     reports as never observed.

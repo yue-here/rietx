@@ -1054,7 +1054,7 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "the width then comes back with an esd larger than its value. "
             "`MAGNETIC_WIDTH_UNMEASURED` names that case. The parameter exists only on "
             "a phase that declares `magnetic_symmetry`. It is held fixed wherever no "
-            "magnetic component is drawn, which means an X-ray histogram and Le Bail or "
+            "magnetic component is drawn, which means an X-ray pattern and Le Bail or "
             "Pawley."
         ),
         unit="deg 2θ", default="0.0",
@@ -1073,7 +1073,7 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "real k ≠ 0 dataset this term can carry the effect in place of the size "
             "term. The `magnetic_width` plan therefore frees both and lets the report "
             "say which was measured. The parameter exists only on a phase that declares "
-            "`magnetic_symmetry`. It is held fixed on an X-ray histogram and under Le "
+            "`magnetic_symmetry`. It is held fixed on an X-ray pattern and under Le "
             "Bail or Pawley."
         ),
         unit="deg 2θ", default="0.0",
@@ -1444,13 +1444,13 @@ def undeclared_opt_in(path: str, known, instrument=None) -> tuple[OptIn, str] | 
     does, and so does an owner the model lacks (``phases.7`` on one phase).
     A row the schema accepts on one geometry or source only answers when
     ``instrument`` is given and is of that kind, since a path cannot say
-    which geometry it is on.  A joint fit's ``hist.N.`` prefix is carried
+    which geometry it is on.  A joint fit's ``pattern.N.`` prefix is carried
     onto the owner, and a shared row is read bare.
     """
     parts = path.split(".")
     scope = ""
-    if len(parts) > 2 and parts[0] == "hist" and parts[1].isdigit():
-        scope, parts = f"hist.{parts[1]}.", parts[2:]
+    if len(parts) > 2 and parts[0] == "pattern" and parts[1].isdigit():
+        scope, parts = f"pattern.{parts[1]}.", parts[2:]
     bare = ".".join(parts)
     known = {k[len(scope):] if scope and k.startswith(scope) else k for k in known}
     for row in OPT_IN:
@@ -2444,7 +2444,7 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "parameter being right. Where the data do not move their difference at "
             "all, neither has an esd. Fix one at an independently known value and refine "
             "the other, or free them in separate stages. A wider range or a second "
-            "histogram can separate them."
+            "pattern can separate them."
         ),
     ),
     "FLAT_DIRECTION_OMITTED": HelpEntry(
@@ -3024,7 +3024,7 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "A declared wavelength harmonic refined to a measurable fraction of the "
             "fundamental. The value describes this beam on this monochromator in this "
-            "measurement. Do not carry it to another histogram or instrument. A large "
+            "measurement. Do not carry it to another pattern or instrument. A large "
             "fraction means the harmonic is absorbing intensity the model puts "
             "elsewhere, such as an unindexed impurity or a stiff background. Check the "
             "tick marks against the unfitted peaks."
@@ -4703,8 +4703,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "A size-broadening coefficient scales with wavelength. A joint fit over "
             "several wavelengths therefore shares the crystallite size and gives each "
-            "histogram its own coefficient. The shared value is the coefficient at the "
-            "first histogram's wavelength. Nothing is wrong. Read the crystallite size, "
+            "pattern its own coefficient. The shared value is the coefficient at the "
+            "first pattern's wavelength. Nothing is wrong. Read the crystallite size, "
             "which is one number for the specimen, instead of the raw coefficient."
         ),
     ),
@@ -4754,13 +4754,13 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         ),
     ),
     "STAGE_FREED_NOTHING": HelpEntry(
-        title="A stage freed nothing in one histogram",
+        title="A stage freed nothing in one pattern",
         description=(
-            "A refinement stage freed parameters in other histograms of a joint fit and "
-            "none in this one. The stage's parameter patterns matched only the other "
-            "histograms, so this histogram kept its starting values for that stage. "
+            "A refinement stage freed parameters in other patterns of a joint fit and "
+            "none in this one. The stage's parameter globs matched only the other "
+            "patterns, so this pattern kept its starting values for that stage. "
             "Nothing is wrong if it has no such component. Otherwise its parameters go "
-            "by other names, so widen the patterns or scope the stage to one histogram."
+            "by other names, so widen the globs or scope the stage to one pattern."
         ),
     ),
     "STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT": HelpEntry(
@@ -6133,15 +6133,15 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "many points inside the fitted range left the fit because their esd was "
             "zero or negative (`n_nonpositive_excluded`). The first two add up to the "
             "fit's point count. `None` means nothing counted: a joint fit, which "
-            "counts per histogram, or a result recorded before the field existed."
+            "counts per pattern, or a result recorded before the field existed."
         ),
     ),
-    "RefinementResult.histograms": HelpEntry(
-        title="Per-histogram results",
+    "RefinementResult.patterns": HelpEntry(
+        title="Per-pattern results",
         description=(
-            "One slice per pattern of a multi-histogram joint fit, each with its own "
+            "One slice per pattern of a joint fit, each with its own "
             "curves, statistics and diagnostics, while `statistics` is then the pooled "
-            "figure. Empty for an ordinary fit. `RefinementResult.for_histogram` gives "
+            "figure. Empty for an ordinary fit. `RefinementResult.for_pattern` gives "
             "one slice in a single fit's shape."
         ),
     ),
@@ -6242,7 +6242,7 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "stage; an earlier stage records it without a warning, since the stages "
             "after it refit its answer. Magnetic windows and extra peaks are not "
             "measured. `None` means nobody looked. A joint fit records its worst "
-            "histogram."
+            "pattern."
         ),
     ),
     "StageResult.rwp": HelpEntry(
@@ -6250,7 +6250,7 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
         description=(
             "The stage's Rwp at the values it ended on, measured on the stage's own "
             "frozen windows. It is the number the `stage_end` event carries. A joint "
-            "fit pools it over its histograms. The last stage's differs from "
+            "fit pools it over its patterns. The last stage's differs from "
             "`statistics.rwp`, which is measured on a compile at the answer. Stages "
             "that fit different ranges or modes cannot be compared by it. `None` "
             "means a result stored before the field."
@@ -6390,12 +6390,12 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "checked; `None` means nobody looked. It feeds `STAGE_PATH_UNKNOWN`."
         ),
     ),
-    "StageResult.unreached_histograms": HelpEntry(
-        title="Histograms a stage missed",
+    "StageResult.unreached_patterns": HelpEntry(
+        title="Patterns a stage missed",
         description=(
-            "Joint fits only: for each histogram, by index, the patterns of this stage "
-            "that matched rows on another histogram and none on this one. A "
-            "single-histogram fit writes an empty mapping; `None` means nobody looked. "
+            "Joint fits only: for each pattern, by index, the globs of this stage "
+            "that matched rows on another pattern and none on this one. A "
+            "single-pattern fit writes an empty mapping; `None` means nobody looked. "
             "It feeds `STAGE_FREED_NOTHING`."
         ),
     ),

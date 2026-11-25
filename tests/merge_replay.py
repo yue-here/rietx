@@ -33,7 +33,7 @@ INDEX = "docs/wp/README.md"
 WATCHED = ("docs/ROADMAP.md", "tests/test_docs_consistency.py")
 #: A driver that is git's own text merge, standing in for "no driver" where
 #: the repository's config names one.  It runs myers where git's merge runs
-#: histogram, because ``merge-file --diff-algorithm`` is missing from git 2.39
+#: pattern, because ``merge-file --diff-algorithm`` is missing from git 2.39
 #: and 2.43, and a driver git cannot start reports every merge it reaches as a
 #: conflict.  The /pr-review bench sets the same line.
 TEXT_MERGE = "git merge-file %A %O %B"

@@ -108,7 +108,7 @@ class ProjectDoc(Base):
     created_utc: str = ""
     updated_utc: str = ""
 
-    #: length 1 in v1.0.  The list is the multi-histogram seam (``multi.py``
+    #: length 1 in v1.0.  The list is the joint seam (``joint.py``
     #: stacks N patterns into one joint residual); a project holding more than
     #: one pattern is a later milestone's work, and ``Project.open`` refuses it
     #: rather than opening the first and looking like it worked.

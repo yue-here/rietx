@@ -227,7 +227,7 @@ class RefinementTree:
             refuse_existing_log(path)
         created = _utcnow()
         # The pattern's abscissa **as measured** — ``x()`` rather than
-        # ``two_theta``, which is ``None`` on a time-of-flight histogram.  The
+        # ``two_theta``, which is ``None`` on a time-of-flight pattern.  The
         # fingerprint is a hash of the bytes and the count is a channel count,
         # so neither is a statement about the quantity: what a tree pins is
         # *this data*, and it pins it the same way on either axis.

@@ -11,7 +11,7 @@ from pydantic import Field, model_validator
 
 from .._about import DIST_NAME
 from ..purposes import PURPOSES
-from .common import Base, Diagnostic, Mode, Provenance
+from .common import Base, Diagnostic, Mode, Provenance, refuse_retired_scope
 from .interval import ParameterInterval
 from .parametric import (
     ParametricCoefficient,
@@ -80,7 +80,7 @@ class RefinedParameter(Base):
     (``PARAMETRIC_TARGET_UNSEEN``).  On a coefficient row they are in the
     table's units, per unit of the *scaled* coordinate, and
     :attr:`RefinementResult.parametric` holds the same coefficient in the
-    caller's units.  Two writers: ``MultiHistogramRefinement._parameters``,
+    caller's units.  Two writers: ``JointRefinement._parameters``,
     and ``refine._build_result``, which writes it empty because a single fit
     declares no equation (a chain's rows are its fits').  ``None`` says nobody
     recorded it: a hand-built row, or a result written before schema 0.57,
@@ -116,7 +116,7 @@ class RefinedParameter(Base):
     0.07 % (Rietveld) and 0.75 % (Le Bail), and by 4 % on a joint fit
     weighted 1:4.  So ``stderr / Statistics.esd_inflation`` is close to this
     and not equal to it.  Two writers, each beside ``stderr``:
-    ``refine._build_result`` and ``MultiHistogramRefinement._parameters``; a
+    ``refine._build_result`` and ``JointRefinement._parameters``; a
     series copies its fits' rows.  ``None`` wherever ``stderr`` is, and on a
     result stored before the field.
     """
@@ -174,12 +174,12 @@ class Statistics(Base):
     ``run_least_squares`` computes it, ``refine`` copies it, nothing else
     derives it (WP-1076).  ``None`` wherever it cannot be measured: no
     accepted step, no esds, or an evaluate-only ``replay``.  A joint
-    multi-histogram fit has it too (WP-1341): one shift per column of the
+    joint fit has it too (WP-1341): one shift per column of the
     joint θ against the esd the joint covariance gives that column, so the
-    histogram weights change the number and leave its meaning alone
+    pattern weights change the number and leave its meaning alone
     (``run_multi_least_squares`` computes it).  It is whole-fit, so a
-    :class:`HistogramResult`'s own statistics leave it ``None`` and
-    :meth:`RefinementResult.for_histogram` carries the joint figure onto
+    :class:`PatternResult`'s own statistics leave it ``None`` and
+    :meth:`RefinementResult.for_pattern` carries the joint figure onto
     its view, beside the joint stages it prints.
 
     ``identifiability_clause`` is the report's identifiability sentence,
@@ -192,7 +192,7 @@ class Statistics(Base):
     (``report_thresholds_version``), so no fit-time code writes it and a fit
     alone leaves it ``None``.  ``None`` covers both "no report was built"
     and "nothing crossed a comment threshold" — the honest empty state,
-    never a verdict — and per-histogram statistics have no writer (the
+    never a verdict — and per-pattern statistics have no writer (the
     clause is whole-fit).  It is delivered here, beside the numbers, because
     measured agent consumers pipe the JSON response to a file and grep the
     statistics block back, and the summary string is what those greps drop
@@ -402,10 +402,10 @@ class Identifiability(Base):
     history node (evaluate-only, no solve).  Read ``None`` as "not measured
     here", never as "no degeneracy".
 
-    A joint multi-histogram fit (WP-1341) screens each histogram's own rows,
-    so its ``background_absorption`` keys are ``hist.<h>.``-scoped, shared
-    paths included, and :meth:`RefinementResult.for_histogram` hands one
-    histogram's view its own rows, unscoped.  The joint path runs neither
+    A joint fit (WP-1341) screens each pattern's own rows,
+    so its ``background_absorption`` keys are ``pattern.<h>.``-scoped, shared
+    paths included, and :meth:`RefinementResult.for_pattern` hands one
+    pattern's view its own rows, unscoped.  The joint path runs neither
     the declared-peak screen nor the parameter-space screens, so
     ``extra_peak_absorption`` and the three tables below it stay empty there,
     a declared and freed peak included: not measured, the same reading as
@@ -644,7 +644,7 @@ class PhaseTexture(Base):
 
     Written by ``refine._phase_texture``, one row per phase that carries a
     texture block in Rietveld mode.  Empty otherwise, and empty for a joint
-    fit, whose shared coefficients meet each histogram at its own ψ.
+    fit, whose shared coefficients meet each pattern at its own ψ.
     """
 
     name: str                         # matches Phase.name
@@ -1118,6 +1118,23 @@ class MomentAngleTest(Base):
     half_widths: dict[str, float] = Field(default_factory=dict)
 
 
+def _fold_renamed(value: Any, old: str, new: str) -> Any:
+    """A stored result's field read under the name WP-2305 gave it.
+
+    WP-2305 renamed the joint fit's "histogram" fields to "pattern"
+    (``RefinementResult.histograms``, ``StageResult.unreached_histograms``).
+    A result JSON written before then still opens, as every renamed field's
+    does (``_migrate_v1_2_n_background_peaks``); an explicit new-name value
+    wins.  A caller's keyword is folded too, since a validator cannot tell the
+    two apart, and the attribute read names the new field (``_nearmiss``).
+    """
+    if isinstance(value, dict) and old in value:
+        value = dict(value)
+        legacy = value.pop(old)
+        value.setdefault(new, legacy)
+    return value
+
+
 class StageResult(Base):
     """One stage's outcome.
 
@@ -1191,8 +1208,8 @@ class StageResult(Base):
     #: the stage's Rwp at the values it ended on, measured on its own frozen
     #: compile: the number the ``stage_end`` event carries, so a caller keeping
     #: the best stage reads it here rather than from the event log (WP-1334).
-    #: A joint fit's is pooled over its histograms; the event carries each
-    #: histogram's beside it.  The result's own ``statistics.rwp`` is measured
+    #: A joint fit's is pooled over its patterns; the event carries each
+    #: pattern's beside it.  The result's own ``statistics.rwp`` is measured
     #: on a compile at the answer, so the last stage's differs from it by the
     #: frozen windows alone.  Not comparable across stages that fit different
     #: ranges or modes.
@@ -1303,7 +1320,7 @@ class StageResult(Base):
     #:
     #: **``None`` means nobody looked**: a result stored before this field, and
     #: every stage of a joint fit, whose runner does not ask the question.
-    #: Both single-histogram runners write a mapping on every stage, so an
+    #: Both single-pattern runners write a mapping on every stage, so an
     #: empty one is a stage that looked and held nothing on this test.
     scale_b_held: dict[int, float] | None = None
     #: per instrument width column this stage **held** because free specimen
@@ -1392,8 +1409,8 @@ class StageResult(Base):
     #: (``instrument.background_peaks.*``, WP-1102), which can only be a
     #: rename the plan missed; nor is a row that exists and was declined (locked, tied or
     #: held), which :attr:`freed` omits and ``ParameterRow.held_because``
-    #: explains.  On a joint fit, known means a bare path of some histogram or
-    #: a scoped ``hist.h.…`` one.  It feeds ``STAGE_PATH_UNKNOWN``.
+    #: explains.  On a joint fit, known means a bare path of some pattern or
+    #: a scoped ``pattern.h.…`` one.  It feeds ``STAGE_PATH_UNKNOWN``.
     #:
     #: **``None`` means nobody looked**, and every runner writes a list, so an
     #: empty one is a stage that was checked and named nothing missing.  The
@@ -1402,19 +1419,19 @@ class StageResult(Base):
     #: that never ran (WP-1076's rule; ``RefinedParameter.at_bound`` is the
     #: precedent).  Writers: the three runners that build a ``StageResult``.
     unknown_paths: list[str] | None = None
-    #: joint fits only: per histogram this stage's globs **reached elsewhere
+    #: joint fits only: per pattern this stage's globs **reached elsewhere
     #: and not there**, the globs that did (WP-1414, issue #265's comment).
-    #: Keyed by histogram index.  Histogram ``h`` is here when no glob
+    #: Keyed by pattern index.  Pattern ``h`` is here when no glob
     #: addressing it matched any of its rows while one of those globs matched
-    #: another histogram's — ``instrument.profile.*`` freeing the
-    #: constant-wavelength histogram and nothing on a bank.  A glob scoped to
-    #: another histogram (``hist.0.…``) does not address ``h``, and a row that
+    #: another pattern's — ``instrument.profile.*`` freeing the
+    #: constant-wavelength pattern and nothing on a bank.  A glob scoped to
+    #: another pattern (``pattern.0.…``) does not address ``h``, and a row that
     #: exists but is locked, tied or held counts as reached, so a deliberate
-    #: plan stays out of it.  Written ``{}`` by a single-histogram fit, where
+    #: plan stays out of it.  Written ``{}`` by a single-pattern fit, where
     #: there is no elsewhere to have reached, and ``None`` — nobody looked —
     #: only on a result stored before the field, for :attr:`unknown_paths`'
     #: reason.  It feeds ``STAGE_FREED_NOTHING``.
-    unreached_histograms: dict[int, list[str]] | None = None
+    unreached_patterns: dict[int, list[str]] | None = None
     #: each row this stage lifted before solving, and the value it started at
     #: in column units (WP-1930).  Three writers put a row here.  The runner
     #: itself starts an FCJ axial ratio the stage newly frees on zero at
@@ -1434,7 +1451,7 @@ class StageResult(Base):
     #: since a Stephens DOF is unbounded below.  The joint fit's runner writes
     #: both seeds through :class:`~rietx.params.multi.MultiParameterTable`'s
     #: twins, keyed by the joint column (WP-2239): a shared block's DOFs under
-    #: their bare paths, a per-histogram one's under ``hist.N.``.
+    #: their bare paths, a per-pattern one's under ``pattern.N.``.
     #: WP-1930's floor seed sized by unit went with WP-1938: it existed because
     #: a softplus column at its floor was twelve orders below its neighbours,
     #: and a row refined in its own units has its physical column there.
@@ -1465,7 +1482,7 @@ class StageResult(Base):
     #: Disjoint from :attr:`freed` and from :attr:`held`: a path the collapse
     #: also holds is in ``held``.  Writers: the three runners that build a
     #: ``StageResult``, ``Refinement.fit`` and ``Refinement.run_stage`` from
-    #: ``Refinement._run_stage``'s record, and ``MultiHistogramRefinement.fit``
+    #: ``Refinement._run_stage``'s record, and ``JointRefinement.fit``
     #: from its own stage loop.  ``None`` means a result stored before the
     #: field; every runner writes a list, and an empty one is a stage that put
     #: nothing back, which is every stage of an ordinary fit.
@@ -1486,7 +1503,7 @@ class StageResult(Base):
     #: :attr:`cell_reset`: a cell the runaway reset and the collapse both reach
     #: is here.  Writers: the three runners that build a ``StageResult``,
     #: ``Refinement.fit`` and ``Refinement.run_stage`` from
-    #: ``Refinement._run_stage``'s record, and ``MultiHistogramRefinement.fit``
+    #: ``Refinement._run_stage``'s record, and ``JointRefinement.fit``
     #: from its own stage loop.  ``None`` means a result stored before the
     #: field; every runner writes a list, and an empty one is a stage whose
     #: answer restored nothing, which is every stage of an ordinary fit.
@@ -1506,7 +1523,7 @@ class StageResult(Base):
         if isinstance(value, dict) and "floor_unseeded" in value:
             value = dict(value)
             value.pop("floor_unseeded")
-        return value
+        return _fold_renamed(value, "unreached_histograms", "unreached_patterns")
 
 
 class Radiation(Base):
@@ -1524,25 +1541,25 @@ class Radiation(Base):
     table entry to the last digit do.
     """
 
-    #: ``Source.kind`` of the histogram: ``"xray_cw"`` or ``"neutron_cw"``.
+    #: ``Source.kind`` of the pattern: ``"xray_cw"`` or ``"neutron_cw"``.
     kind: str
     #: Each emission line's wavelength in Å, in line order, primary first.
     wavelengths: list[float]
 
 
-class HistogramResult(Base):
-    """One pattern's slice of a multi-histogram joint refinement.
+class PatternResult(Base):
+    """One pattern's slice of a joint refinement.
 
     A joint fit stacks several patterns into one residual (Von Dreele, 1997,
     J. Appl. Cryst. 30, 517), so a *single* pooled Rwp would hide a
-    badly-fitting histogram — the failure mode this package's reporting exists
-    to prevent.  Each histogram therefore reports its **own** agreement indices
+    badly-fitting pattern — the failure mode this package's reporting exists
+    to prevent.  Each pattern therefore reports its **own** agreement indices
     and curves here; ``RefinementResult.statistics`` stays the pooled number,
-    never quoted alone.  Empty ``RefinementResult.histograms`` ⇒ an ordinary
-    single-histogram fit (backward compatible).
+    never quoted alone.  Empty ``RefinementResult.patterns`` ⇒ an ordinary
+    single-pattern fit (backward compatible).
 
-    ``weight`` is the inter-histogram relative weight applied to this
-    histogram's residual block (1.0 = unit weight, each point's own esd
+    ``weight`` is the inter-pattern relative weight applied to this
+    pattern's residual block (1.0 = unit weight, each point's own esd
     governs); it is also recorded in ``Provenance.notes`` so a non-unit
     weighting is never silent.
     """
@@ -1574,16 +1591,16 @@ class HistogramResult(Base):
     #: A satellite (WP-1326) is ``[h, k, l, m]`` — its parent H and its order —
     #: because H alone does not identify it; a nuclear row keeps three.
     tick_hkl: dict[str, list[list[int]]] = Field(default_factory=dict)
-    #: This histogram's own radiation, which a joint fit's other histograms
-    #: need not share (WP-2042); :meth:`RefinementResult.for_histogram` swaps
+    #: This pattern's own radiation, which a joint fit's other patterns
+    #: need not share (WP-2042); :meth:`RefinementResult.for_pattern` swaps
     #: it in.  ``None`` on a result written before schema 0.60.
     radiation: Radiation | None = None
     qpa: "QuantitativePhaseAnalysis | None" = None
     restraints: "RestraintReport | None" = None
-    #: this histogram's own R_Bragg/R_F — the partition is of *these* counts
+    #: this pattern's own R_Bragg/R_F — the partition is of *these* counts
     phase_agreement: list[PhaseAgreement] = Field(default_factory=list)
-    #: which σ rule weighted this histogram's channels, counted (WP-1952);
-    #: :meth:`RefinementResult.for_histogram` swaps it in.  ``None`` on a
+    #: which σ rule weighted this pattern's channels, counted (WP-1952);
+    #: :meth:`RefinementResult.for_pattern` swaps it in.  ``None`` on a
     #: result written before the field existed.
     sigma_rule: SigmaRule | None = None
     diagnostics: list[Diagnostic] = Field(default_factory=list)
@@ -1691,11 +1708,11 @@ def _cap_high_correlation(diagnostics: list[Diagnostic]) -> list[Diagnostic]:
 #: neither owns.
 DELIVERABLES = tuple(PURPOSES)
 
-#: The first segment of a parameter dot-path, a joint fit's ``hist.{h}.``
+#: The first segment of a parameter dot-path, a joint fit's ``pattern.{h}.``
 #: scope included.  A ``where`` entry starting with none of them names
 #: something other than a parameter, and :func:`level_under` reads it as no
 #: path at all.
-_PATH_ROOTS = ("phases.", "instrument.", "vars.", "hist.")
+_PATH_ROOTS = ("phases.", "instrument.", "vars.", "pattern.")
 
 
 def _bears_on(path: str, globs: tuple[str, ...]) -> bool:
@@ -1706,7 +1723,7 @@ def _bears_on(path: str, globs: tuple[str, ...]) -> bool:
     a fact of the table, not of the record (WP-1342's blind spot)."""
     from fnmatch import fnmatchcase
 
-    if path.startswith("hist."):
+    if path.startswith("pattern."):
         path = path.split(".", 2)[2] if path.count(".") >= 2 else path
     if path.startswith("vars."):
         return True
@@ -2122,22 +2139,22 @@ def _agreement_line(stats: Statistics) -> str:
 _LEGACY_COUNT_FIELD = "n_background_peaks"
 
 
-#: The joint result's top-level codes every histogram view carries
+#: The joint result's top-level codes every pattern view carries
 #: (WP-2028): fit-wide statements about the shared model or the plan that a
-#: reader of any one pattern must see.  ``for_histogram`` copies each once.
+#: reader of any one pattern must see.  ``for_pattern`` copies each once.
 FINDINGS_IN_EVERY_VIEW = frozenset({
     "SCALE_B_INSEPARABLE", "PARAMETRIC_OUT_OF_RANGE",
     "PARAMETRIC_FORM_REJECTED", "STAGE_PATH_UNKNOWN", "VARIABLE_NOT_FREED"})
 
 
-def _names_histogram(d: Diagnostic, h: int) -> bool:
-    """Whether a joint result's top-level finding belongs in histogram
-    ``h``'s view (:meth:`RefinementResult.for_histogram`, WP-2028)."""
+def _names_pattern(d: Diagnostic, h: int) -> bool:
+    """Whether a joint result's top-level finding belongs in pattern
+    ``h``'s view (:meth:`RefinementResult.for_pattern`, WP-2028)."""
     if d.code == "STAGE_FREED_NOTHING":
         return d.value is not None and int(d.value) == h
     if d.code in FINDINGS_IN_EVERY_VIEW:
         return True
-    prefix = f"hist.{h}."
+    prefix = f"pattern.{h}."
     return any(p.startswith(prefix) for p in d.where)
 
 
@@ -2216,7 +2233,7 @@ class RefinementResult(Base):
     #: The source the curves above were fitted with (WP-2042), which
     #: :meth:`plot` names on its 2θ axis.  Two writers: ``refine``'s result
     #: builder, from the compiled model, for every single fit and ``replay``;
-    #: and the joint fit's, which mirrors histogram 0 as the curves do.
+    #: and the joint fit's, which mirrors pattern 0 as the curves do.
     #: ``None`` means not recorded, a result written before schema 0.60, and
     #: never "no radiation".
     radiation: Radiation | None = None
@@ -2236,8 +2253,8 @@ class RefinementResult(Base):
 
     # Observation/parameter evidence (WP-1071) — see :class:`DataSupport`.
     # Present for anything with a compiled model behind it, ``replay``
-    # included.  None for a joint multi-histogram fit, which would need one
-    # count per histogram, and for a result recorded before v1.0 — the
+    # included.  None for a joint fit, which would need one
+    # count per pattern, and for a result recorded before v1.0 — the
     # ``identifiability`` convention: read None as "not measured here".
     data_support: DataSupport | None = None
 
@@ -2288,14 +2305,14 @@ class RefinementResult(Base):
     #: joint covariance or ``None`` where that gives it none.  ``None`` means
     #: no parametric equation was declared — never "declared, and nothing to say",
     #: which a declaration cannot be.  One writer:
-    #: ``MultiHistogramRefinement._build_result``.
+    #: ``JointRefinement._build_result``.
     parametric: list[ParametricCoefficient] | None = None
 
     #: Whether each parametric declaration's form survives the data, one
     #: :class:`~rietx.schemas.parametric.ParametricFormTest` per declaration,
     #: in declaration order (WP-1325).  ``None`` exactly when
     #: :attr:`parametric` is.  One writer:
-    #: ``MultiHistogramRefinement._build_result``.
+    #: ``JointRefinement._build_result``.
     parametric_form: list[ParametricFormTest] | None = None
 
     #: The form test of every tested parametric declaration at once
@@ -2305,7 +2322,7 @@ class RefinementResult(Base):
     #: whose targets move the pattern alike can each pass with the other freed
     #: while both are wrong; this reading sees that, and names no equation.
     #: ``None`` unless two or more declarations were tested.  One writer:
-    #: ``MultiHistogramRefinement._build_result``.
+    #: ``JointRefinement._build_result``.
     parametric_form_joint: ParametricFormReading | None = None
 
     #: Each parametric declaration as the fit resolved it, with its
@@ -2314,7 +2331,7 @@ class RefinementResult(Base):
     #: declaration order (WP-1325).  :meth:`parametric_value` evaluates one at
     #: any coordinate.  ``None`` exactly when :attr:`parametric` is, and on a
     #: result written before schema 0.57.  One writer:
-    #: ``MultiHistogramRefinement._build_result``.
+    #: ``JointRefinement._build_result``.
     parametric_equations: list[RefinedParametricEquation] | None = None
 
     # How many explicit :class:`~rietx.schemas.instrument.HumpComponent` terms
@@ -2337,8 +2354,8 @@ class RefinementResult(Base):
     #
     # ``0`` therefore means none was declared, exactly off; ``None`` means
     # nothing here counted — the ``data_support`` convention, and for the same
-    # reason, a joint multi-histogram fit (one count per histogram, reported
-    # through each histogram) or a result recorded before the feature existed.
+    # reason, a joint fit (one count per pattern, reported
+    # through each pattern) or a result recorded before the feature existed.
     n_extra_components: int | None = None
     #: How many of those are **background-landing** — humps, in v1.4's
     #: vocabulary (WP-1103).  Equal to :attr:`n_extra_components` until the seam
@@ -2359,7 +2376,7 @@ class RefinementResult(Base):
     #: inside the range whose σ ≤ 0 left the fit.  Written from
     #: ``CompiledModel.sigma_rule``, which :meth:`PatternData.sigma_rule` built
     #: at compile with the fit's own window, so a ``replay`` carries it too.
-    #: ``None`` means nothing here counted: a joint fit (each histogram has its
+    #: ``None`` means nothing here counted: a joint fit (each pattern has its
     #: own), or a result recorded before the field existed.
     sigma_rule: SigmaRule | None = None
 
@@ -2397,12 +2414,12 @@ class RefinementResult(Base):
                 and value.get("n_background_components") is None):
             value = dict(value)
             value["n_background_components"] = value["n_extra_components"]
-        return value
+        return _fold_renamed(value, "histograms", "patterns")
 
-    # Per-histogram slices of a multi-histogram joint refinement (WP-0308);
-    # empty for an ordinary single-histogram fit.  ``statistics`` above is then
-    # the pooled combined number and ``two_theta``/``y_*`` mirror histogram 0.
-    histograms: list[HistogramResult] = Field(default_factory=list)
+    # Per-pattern slices of a joint refinement (WP-0308);
+    # empty for an ordinary single-pattern fit.  ``statistics`` above is then
+    # the pooled combined number and ``two_theta``/``y_*`` mirror pattern 0.
+    patterns: list[PatternResult] = Field(default_factory=list)
 
     @property
     def usable(self) -> bool:
@@ -2478,45 +2495,45 @@ class RefinementResult(Base):
                 np.asarray(self.sigma, dtype=np.float64), y)
         return np.sqrt(np.maximum(y, POISSON_FLOOR_COUNTS))
 
-    def for_histogram(self, h: int) -> "RefinementResult":
-        """A single-histogram-shaped view of histogram ``h`` for reporting/plots.
+    def for_pattern(self, h: int) -> "RefinementResult":
+        """A single-pattern-shaped view of pattern ``h`` for reporting/plots.
 
-        Swaps the top-level curves and statistics for histogram ``h``'s own and
-        clears ``histograms``, so ``build_report(result.for_histogram(h))`` and
-        ``result.for_histogram(h).plot()`` operate per pattern (reports are
-        per-histogram — see :class:`HistogramResult`).
+        Swaps the top-level curves and statistics for pattern ``h``'s own and
+        clears ``patterns``, so ``build_report(result.for_pattern(h))`` and
+        ``result.for_pattern(h).plot()`` operate per pattern (reports are
+        per-pattern — see :class:`PatternResult`).
 
         Paths are spelled as a single fit spells them (WP-1341).  The joint
-        result scopes a per-histogram row ``hist.<h>.``; the view keeps
-        histogram ``h``'s rows, unscoped, and drops every other histogram's,
+        result scopes a per-pattern row ``pattern.<h>.``; the view keeps
+        pattern ``h``'s rows, unscoped, and drops every other pattern's,
         in ``parameters`` and in the background screen alike.  A shared row
         keeps the joint result's value, which for a WP-1131 size term is the
-        coefficient at histogram 0's wavelength.  A negative ``h`` counts from
+        coefficient at pattern 0's wavelength.  A negative ``h`` counts from
         the end, as list indexing does.
 
-        The view's ``diagnostics`` are histogram ``h``'s own, then the
+        The view's ``diagnostics`` are pattern ``h``'s own, then the
         joint result's top-level findings that a reader of this pattern must
         see, each once (WP-2028): a finding whose ``where`` names a
-        ``hist.<h>.`` row, ``STAGE_FREED_NOTHING`` whose ``value`` is ``h``,
+        ``pattern.<h>.`` row, ``STAGE_FREED_NOTHING`` whose ``value`` is ``h``,
         and the fit-wide :data:`FINDINGS_IN_EVERY_VIEW`.  Their ``where``
         keeps the joint spelling.  The rest stay on the joint result.
         """
-        if not self.histograms:
+        if not self.patterns:
             if h == 0:
                 return self
-            raise IndexError("this result has no per-histogram slices")
-        n = len(self.histograms)
+            raise IndexError("this result has no per-pattern slices")
+        n = len(self.patterns)
         if not -n <= h < n:
-            raise IndexError(f"histogram {h} of a {n}-histogram result")
+            raise IndexError(f"pattern {h} of a {n}-pattern result")
         h %= n
-        hr = self.histograms[h]
-        prefix = f"hist.{h}."
+        hr = self.patterns[h]
+        prefix = f"pattern.{h}."
         view = self.model_copy(deep=True)
         view.parameters = [
             p.model_copy(update={"path": p.path[len(prefix):]})
             if p.path.startswith(prefix) else p
             for p in view.parameters
-            if p.path.startswith(prefix) or not p.path.startswith("hist.")]
+            if p.path.startswith(prefix) or not p.path.startswith("pattern.")]
         view.statistics = hr.statistics.model_copy(deep=True)
         # the joint solve's convergence figure belongs to the stages the view
         # keeps, so it travels with them (WP-1341)
@@ -2544,17 +2561,17 @@ class RefinementResult(Base):
         # every pattern shares, each once
         view.diagnostics = list(hr.diagnostics)
         for d in self.diagnostics:
-            if _names_histogram(d, h) and d not in view.diagnostics:
+            if _names_pattern(d, h) and d not in view.diagnostics:
                 view.diagnostics.append(d.model_copy(deep=True))
         if view.identifiability is not None:
-            # this histogram's background screen, as a single fit spells it
-            # (WP-1341): the joint result scopes every row ``hist.<h>.``
+            # this pattern's background screen, as a single fit spells it
+            # (WP-1341): the joint result scopes every row ``pattern.<h>.``
             mine = {k[len(prefix):]: v for k, v in
                     view.identifiability.background_absorption.items()
                     if k.startswith(prefix)}
             view.identifiability = view.identifiability.model_copy(
                 update={"background_absorption": mine})
-        view.histograms = []
+        view.patterns = []
         return view
 
     def plot(self, path: str | None = None, **kw):
@@ -2566,6 +2583,7 @@ class RefinementResult(Base):
         for p in self.parameters:
             if p.path == path:
                 return p
+        refuse_retired_scope([path], "RefinementResult.parameter()", KeyError)
         raise KeyError(path)
 
     def parametric_value(self, equation: str, coordinates: dict[str, float] | None = None,
@@ -2579,7 +2597,7 @@ class RefinementResult(Base):
         (:attr:`parametric_equations`), and the form test (:attr:`parametric_form`
         and :attr:`parametric_form_joint`), whose verdicts ride beside the value
         because the esd assumes the form.  At a pattern's own coordinates this is that pattern's
-        ``hist.<h>.`` target row, value and esd.
+        ``pattern.<h>.`` target row, value and esd.
         """
         if self.parametric_equations is None:
             raise ValueError(

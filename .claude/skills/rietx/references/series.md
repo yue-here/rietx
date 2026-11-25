@@ -7,7 +7,7 @@ Load it for an in-situ ramp, a parametric sweep or a tray of related specimens.
 An in-situ ramp, a parametric sweep or a tray of related specimens is
 `rx.SequentialRefinement` / `rx.refine_sequential`: N separate refinements,
 each warm-started from its predecessor.  (One *joint* residual is
-`rx.refine_multi`, below.)
+`rx.refine_joint`, below.)
 What comes back is a `SeriesResult` — per-pattern summaries plus
 `trajectory(path)`, `qpa_trajectory(phase)`, `to_table()`, `write_csv()`.
 
@@ -59,7 +59,7 @@ What an operator must know, all measured:
   established or refuted transition by transition.
 - **An equation across the patterns is a joint fit, not a line through a
   chain**:
-  `rx.refine_multi(..., coordinates=, variables=, parametric=[...])`,
+  `rx.refine_joint(..., coordinates=, variables=, parametric=[...])`,
   read on `result.parametric`, never the scaled `vars.` rows.  No structure:
   `mode="pawley"`.  It pays only where a pattern cannot see the parameter
   alone (slope esd 0.72-0.76× the line's, minor phase); elsewhere it equals

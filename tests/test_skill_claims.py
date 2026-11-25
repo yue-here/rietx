@@ -116,7 +116,7 @@ def _background_zero():
 
 def _correlation_guard():
     """Defaults only: the comparison is strict (``abs(ρ) > guard`` in
-    `strategy/staged.py` and `multi.py`), which is why the body says
+    `strategy/staged.py` and `joint.py`), which is why the body says
     "above"; a stub of the guard's inputs would test the stub."""
     from rietx.schemas.plan import PlanSpec
 

@@ -169,14 +169,14 @@ for j, (hkl, n) in enumerate(reflections.items()):
         expression=f"2 * {theta} * 180 / pi + zero"
                    f" - 2 * (height + offset) / {radius} * cos({theta}) * 180 / pi"))
 
-joint = rx.MultiHistogramRefinement(
+joint = rx.JointRefinement(
     FLUORAPATITE.model_copy(deep=True), instruments,
     sharing=rx.SharingMap(shared=["instrument.profile.*"], per_histogram=["vars.height"]),
     variables=variables, parametric=equations)
 joint_result = joint.fit(series, plan=plan, two_theta_limits=(15, 90))
 rows = {p.path: p for p in joint_result.parameters}
 for path, true in (("vars.a_holder", A_HOLDER), ("vars.offset", OFFSET), ("vars.zero", ZERO),
-                   *((f"hist.{k}.vars.height", h) for k, h in enumerate(heights))):
+                   *((f"pattern.{k}.vars.height", h) for k, h in enumerate(heights))):
     print(f"{path:<20} {rx.format_su(rows[path].value, rows[path].stderr):<12} made with {true}")
 # guide: series end
 
@@ -208,7 +208,7 @@ assert round(result.statistics.gof, 2) == 1.02 and round(phase_result.statistics
 
 # 2026-11-22, darwin/arm64: the series.
 truths = {"vars.a_holder": A_HOLDER, "vars.offset": OFFSET, "vars.zero": ZERO,
-          **{f"hist.{k}.vars.height": h for k, h in enumerate(heights)}}
+          **{f"pattern.{k}.vars.height": h for k, h in enumerate(heights)}}
 assert [quoted(joint_result, path) for path in truths] == [
     "4.049470(77)", "-0.11943(96)", "0.0120(54)",
     "0.0401(97)", "-0.0299(97)", "0.0900(97)", "0.0100(97)", "-0.0600(97)"]
@@ -219,9 +219,9 @@ for path, true in truths.items():
 assert 0.4 < rows["vars.offset"].stderr / result.parameter("vars.offset").stderr < 0.5
 # The page: the zero shift trades against every pattern's height, and the fit says so.
 for k in range(len(heights)):
-    assert any(d.code == "FLAT_DIRECTION" and set(d.where) == {"vars.zero", f"hist.{k}.vars.height"}
+    assert any(d.code == "FLAT_DIRECTION" and set(d.where) == {"vars.zero", f"pattern.{k}.vars.height"}
                for d in joint_result.diagnostics)
 # The page: the heights miss their values by amounts that agree to under a tenth of an esd.
-misses = [rows[f"hist.{k}.vars.height"].value - h for k, h in enumerate(heights)]
-assert max(misses) - min(misses) < 0.1 * rows["hist.0.vars.height"].stderr
+misses = [rows[f"pattern.{k}.vars.height"].value - h for k, h in enumerate(heights)]
+assert max(misses) - min(misses) < 0.1 * rows["pattern.0.vars.height"].stderr
 assert round(joint_result.statistics.gof, 2) == 1.0

@@ -466,7 +466,7 @@ that depends on what the data measure: the SHELXL riding defaults for X-ray
 data (C–H 0.93–0.98 Å, O–H 0.82 Å, the electron-density centroid) and the
 neutron means of the *International Tables* Vol. C § 9.5 for neutron data
 (C–H 1.06–1.10 Å, N–H 1.009 Å, O–H 0.967 Å). A joint X-ray and neutron fit takes the
-neutron lengths, because the hydrogen signal is in the neutron histogram.
+neutron lengths, because the hydrogen signal is in the neutron pattern.
 
 ### Placing the origin
 
