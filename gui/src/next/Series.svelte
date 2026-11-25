@@ -18,6 +18,21 @@
    * Run. The run's table fills as fits land, folded from the events the page
    * already follows (`seriesrun.ts`), and the record replaces the fold once
    * the run ends. Stop keeps what finished (call 10).
+   *
+   * Results. The record read whole (`seriesresults.ts`): three label-value
+   * rows with no verdict (call 11), the last two with Plot, one row per
+   * pattern, every value at the selected pattern with a tick that plots it
+   * on Trends (call 20), that pattern's warnings, and the series' warnings and
+   * largest steps under disclosures. A summary row's Plot, and a row of the
+   * largest steps, plots its value, selects the pattern it names and shows
+   * Trends (`ongraph`); what Trends plots is this panel's (`ontrends`).
+   *
+   * One selected pattern links the tables and the Pattern graph (round 12,
+   * calls 2 and 9; `seriespattern.ts`). A row click, ‹ › in the graph's title
+   * and ↑ ↓ move it; during a run it follows the pattern being fitted until a
+   * row click, and "Follow the run" resumes. The panel hands the frame what
+   * the graph draws (`onview`), mid-run too, and the Map the row it marks
+   * (`onmark`); a Map click comes back through `select`.
    */
   import { onMount, untrack } from "svelte";
 
@@ -28,9 +43,19 @@
   import type { Step } from "../lib/workflows";
   import type { Say } from "./console";
   import {
-    ORDER, axisWord, emptyProgress, fitsDone, fold, inOrder, merged, rwpText, secondWalkDone,
-    spanOf, startedFrom, walksOf, type RunProgress,
+    answerOf, countText, largestGap, pathName, seriesWarnings, sizedSteps, valueGroups,
+    warningsOf, type SeriesAnswer,
+  } from "./seriesresults";
+  import { esdText } from "../lib/series";
+  import {
+    ORDER, axisWord, emptyProgress, fitsDone, fittingText, fold, inOrder, merged, rwpText,
+    secondWalkDone, spanOf, startedFrom, walksOf, type RunProgress,
   } from "./seriesrun";
+  import {
+    drawnPlace, loadMember, markedIn, sameMembers, stepped, subText,
+    type ListName, type Selection, type SeriesView,
+  } from "./seriespattern";
+  import { defaultPlotted, type TrendsView } from "./seriestrends";
 
   let {
     step = 0,
@@ -41,6 +66,11 @@
     onstep = () => {},
     onrun = async () => {},
     onstop = () => {},
+    onview = () => {},
+    ontrends = () => {},
+    ongraph = () => {},
+    onstaged = () => {},
+    onmark = () => {},
   }: {
     step?: number;
     steps: readonly Step[];
@@ -53,6 +83,17 @@
     /** start a run behind its call (the shell's, so the Console holds it) */
     onrun?: (body: Record<string, unknown>, text: string) => Promise<void>;
     onstop?: () => void;
+    /** what the Pattern graph draws for the series, or null with no pattern */
+    onview?: (view: SeriesView | null) => void;
+    /** what the Trends graph draws, or null with no record (task 6) */
+    ontrends?: (view: TrendsView | null) => void;
+    /** show a graph tab: a summary row's Plot shows Trends */
+    ongraph?: (tab: "trends") => void;
+    /** the server took a new list or walk, so the Map asks again */
+    onstaged?: () => void;
+    /** the row the Map marks: the drawn pattern's place in the staged list,
+     *  or null while the drawn one is the run's on a list since edited */
+    onmark?: (staged: number | null) => void;
   } = $props();
 
   let setup = $state.raw<SeriesSetup | null>(null);
@@ -63,6 +104,8 @@
   let moreOpen = $state(false);
   /** the record of the last series run in this session */
   let entries = $state.raw<SeriesEntry[] | null>(null);
+  /** the record's answer whole, which the Results step reads */
+  let answer = $state.raw<SeriesAnswer | null>(null);
   let cancelled = $state(false);
   /** the patterns the second walk fitted, from the record (`secondWalkDone`) */
   let backDone = $state.raw<Set<number>>(new Set());
@@ -71,7 +114,12 @@
   let ran = $state(false);
   /** the list or the walk changed after the last run (call 13) */
   let changed = $state(false);
-  let selected = $state<number | null>(null);
+  /** the pattern chosen, on the list it was chosen on; null draws the first */
+  let sel = $state.raw<Selection | null>(null);
+  /** the selection moves with the pattern being fitted (call 9) */
+  let follow = $state(false);
+  /** a run has ended and its record is being read: the run's list still holds */
+  let awaiting = $state(false);
   let fileInput: HTMLInputElement | undefined = $state();
   /** the list and the walk the last run ran over, taken when its record is
    *  read: the Run step's rows are keyed by series index, so an edit after the
@@ -80,6 +128,10 @@
   let ranOver = $state.raw<{ patterns: SeriesPattern[]; direction: string } | null>(null);
   /** this panel started the run now rising, so its progress is already reset */
   let startedHere = false;
+  /** the values Trends plots, in the order they were ticked; Rwp and the
+   *  first phase's cell until a tick changes them (call 12) */
+  let plotted = $state.raw<string[]>([]);
+  let plotTouched = false;
 
   const settings = $derived(setup?.settings ?? null);
   const axis = $derived(settings?.x_label ?? "index");
@@ -91,6 +143,7 @@
   const rows = $derived(ranOver?.patterns ?? patterns);
   const runDirection = $derived(ranOver?.direction ?? settings?.direction ?? "forward");
   const runWalks = $derived(walksOf(runDirection));
+  const firstFitBuilt = $derived(!!steps[1]?.built);
   /** a series needs two patterns to run */
   const few = $derived(patterns.length < 2);
   const heading = $derived(patterns.length
@@ -115,6 +168,7 @@
     ranOver = null;
     progress = emptyProgress();
     entries = null;
+    answer = null;
     cancelled = false;
     backDone = new Set();
   }
@@ -128,9 +182,17 @@
       // a run another page started folds onto an empty table, never onto the
       // last run's fits and rungs
       if (now && !wasRunning && !startedHere) clearRun();
+      if (now && !wasRunning) follow = true;
       if (now) startedHere = false;
       // a run that failed left the server's record at the run before it
-      if (wasRunning && !now) void load(run?.run?.status !== "failed");
+      if (wasRunning && !now) {
+        // only a run whose record will be read keeps its list meanwhile: a
+        // failed one left the server at the run before it, which is not the
+        // list this panel shows
+        const read = run?.run?.status !== "failed";
+        awaiting = read;
+        void load(read).finally(() => (awaiting = false));
+      }
       wasRunning = now;
     });
   });
@@ -161,22 +223,46 @@
 
   async function loadAnswer() {
     try {
-      const answer = await api.seriesResult();
-      entries = answer.result.entries as SeriesEntry[];
-      cancelled = (answer.result.diagnostics ?? [])
+      const payload = await api.seriesResult();
+      answer = answerOf(payload);
+      entries = answer.entries;
+      // a run keeps what was ticked, less the values its record lacks
+      const has = new Set(["rwp", "gof", ...answer.trajectories.map((t) => t.path)]);
+      plotted = plotTouched ? plotted.filter((p) => has.has(p)) : defaultPlotted(answer);
+      cancelled = (payload.result.diagnostics ?? [])
         .some((d: { code: string }) => d.code === "SEQUENTIAL_CANCELLED");
       // the list as the run left it (no edit lands while one is in flight),
       // and the walk the record says ran
       const direction = settings?.direction ?? "forward";
-      ranOver ??= { patterns, direction: answer.has_backward ? "both"
+      ranOver ??= { patterns: runList(payload), direction: payload.has_backward ? "both"
         : direction === "both" ? "forward" : direction };
       progress = merged(progress, entries, ranOver.direction);
-      backDone = answer.has_backward
-        ? secondWalkDone(entries, answer.trajectories?.[0]) : new Set();
+      backDone = payload.has_backward
+        ? secondWalkDone(entries, payload.trajectories?.[0]) : new Set();
       ran = true;
     } catch {
       // nothing has run in this session: the Run step's empty state
     }
+  }
+
+  /** The list the record's run fitted, for a page that did not follow it:
+   *  the staged list while the record's labels agree with it place by place,
+   *  else the record's own labels and coordinates. After an edit and a
+   *  reload the staged list is not the run's, and the graph's run-list fetch
+   *  must not draw one file under another's name. */
+  function runList(payload: any): SeriesPattern[] {
+    const named = new Map<number, { label: string; x: number | null }>();
+    for (const e of [...(payload.result.entries ?? []), ...(payload.result.failures ?? [])]) {
+      named.set(e.index, { label: e.label, x: e.x ?? null });
+    }
+    const agree = [...named].every(([k, m]) => patterns[k]?.label === m.label);
+    if (agree) return patterns;
+    const n = Math.max(...named.keys()) + 1;
+    return Array.from({ length: n }, (_, k) => ({
+      upload: `run:${k}`, filename: named.get(k)?.label ?? `#${k + 1}`,
+      label: named.get(k)?.label ?? `#${k + 1}`, x: named.get(k)?.x ?? null,
+      reader: "", reader_options: {}, n_points: 0, two_theta_range: [0, 0], has_sigma: false,
+    }));
   }
 
   /** The server's list becomes this panel's, never merged (WP-1016). */
@@ -186,15 +272,36 @@
     carryText = next.settings.carry.join(" ");
   }
 
-  /** Send the list and the settings as one PUT: the order is the series. */
+  /** the PUTs this panel has sent, and the one now on the wire */
+  let sent = 0;
+  let wire: Promise<unknown> = Promise.resolve();
+
+  /** Send the list and the settings as one PUT: the order is the series.
+   *  The body is the list as it stands now. The PUTs go one after another,
+   *  and only the last one's answer becomes the panel's list: an earlier
+   *  answer lacks an edit typed while it was on the wire, and absorbing it
+   *  would drop that edit from every later PUT (gui/CLAUDE.md § Svelte and
+   *  browser traps, a stale response is dropped). */
   async function put(extra: Record<string, unknown> = {}): Promise<boolean> {
     failure = "";
+    const mine = ++sent;
+    const body = { patterns: asRequest(patterns), ...extra };
+    const answer = wire.then(() => api.putSeries(body));
+    wire = answer.catch(() => {});
     try {
-      absorb(await api.putSeries({ patterns: asRequest(patterns), ...extra }) as SeriesSetup);
+      const next = await answer as SeriesSetup;
+      // an earlier answer is still what the server holds until the next one
+      // lands, so a later PUT that fails reverts to it, never to the list
+      // before it
+      if (mine === sent) absorb(next);
+      else setup = next;
+      onstaged();
       if (ran) changed = true;
       return true;
     } catch (error) {
       failure = (error as Error).message;
+      // a later PUT carries this one's list, so only the last reverts it
+      if (mine !== sent) return false;
       // the list the server holds is still the series
       if (setup) patterns = [...setup.patterns];
       return false;
@@ -235,8 +342,9 @@
 
   function remove(index: number) {
     patterns = patterns.filter((_, i) => i !== index);
-    if (selected === index) selected = null;
-    else if (selected !== null && selected > index) selected -= 1;
+    // a place on the run's list stays: that list did not change
+    if (sel?.of === "staged" && sel.index === index) sel = null;
+    else if (sel?.of === "staged" && sel.index > index) sel = { of: "staged", index: sel.index - 1 };
     void put();
   }
 
@@ -255,7 +363,7 @@
 
   function sort() {
     patterns = sortByX(patterns);
-    selected = null;
+    if (sel?.of === "staged") sel = null;
     void put();
   }
 
@@ -289,7 +397,7 @@
 
   async function start() {
     failure = "";
-    const was = { progress, entries, cancelled, backDone, ranOver };
+    const was = { progress, entries, answer, cancelled, backDone, ranOver };
     clearRun();
     changed = false;
     startedHere = true;
@@ -298,7 +406,7 @@
       await onrun({ kind: "series" }, callText());
       ran = true;
     } catch (error) {
-      ({ progress, entries, cancelled, backDone, ranOver } = was);
+      ({ progress, entries, answer, cancelled, backDone, ranOver } = was);
       startedHere = false;
       failure = (error as Error).message;
     }
@@ -313,17 +421,130 @@
   const secondPass = $derived(runWalks > 1 ? (firstPass === "forward" ? "backward" : "forward") : null);
   const nConverged = $derived(entries ? entries.filter((e) => e.status === "converged").length : 0);
   const status = $derived.by(() => {
-    if (running) {
-      const c = progress.current;
-      if (!c) return `Fitting · ${nDone} of ${nFits}`;
-      const x = rows[c.index]?.x;
-      const walk = runWalks > 1 ? ` · ${c.pass === firstPass ? "first walk" : "second walk"}` : "";
-      return `Fitting ${c.label}${x == null ? "" : ` · ${x}`}${walk} · ${Math.min(nDone + 1, nFits)} of ${nFits}`;
-    }
+    if (running) return fittingText(progress, runWalks, firstPass, (i) => rows[i]?.x);
     if (cancelled) return `Stopped · ${nDone} of ${nFits} fits`;
     if (entries) return `Finished · ${nConverged} of ${rows.length} converged`;
     return "";
   });
+  // -- the selected pattern (seriespattern.ts) ---------------------------
+
+  /** the run's list is the one in flight, or the last run's */
+  const hasRun = $derived(running || awaiting || ranOver !== null);
+  /** the staged list holds the files the run fitted, in its places */
+  const same = $derived(!ranOver || sameMembers(ranOver.patterns, patterns));
+  const drawn = $derived(drawnPlace(sel, hasRun, same, rows.length, patterns.length));
+  const markStaged = $derived(markedIn(drawn, "staged", same));
+  const markRun = $derived(markedIn(drawn, "run", same));
+
+  function choose(of: ListName, index: number) {
+    sel = { of, index };
+    follow = false;
+  }
+
+  /** ‹ › and ↑ ↓: the next pattern or the one before, in the list drawn. */
+  export function move(delta: number) {
+    if (!drawn) return;
+    const n = drawn.of === "run" ? rows.length : patterns.length;
+    choose(drawn.of, stepped(drawn.index, delta, n));
+  }
+
+  // during a run the selection is the pattern being fitted (call 9)
+  $effect(() => {
+    const c = progress.current ?? progress.last;
+    if (!running || !follow || !c) return;
+    untrack(() => {
+      if (sel?.of !== "run" || sel.index !== c.index) sel = { of: "run", index: c.index };
+    });
+  });
+
+  /** the pattern the Results step reads, the first until a row is clicked */
+  const at = $derived(drawn?.of === "run" ? drawn.index : entries?.[0]?.index ?? null);
+  const atEntry = $derived(entries?.find((e) => e.index === at) ?? null);
+  const gap = $derived(answer ? largestGap(answer.gaps) : null);
+  const bigSteps = $derived(answer ? sizedSteps(answer.steps) : []);
+  /** a pattern's coordinate: the record's, else the list's as it ran */
+  const xOf = (index: number) => entries?.find((e) => e.index === index)?.x ?? rows[index]?.x ?? null;
+  /** a coordinate where a line needs one, the pattern's number without */
+  const xAt = (index: number) => xOf(index) ?? `#${index + 1}`;
+  const atX = $derived(at === null ? null : xOf(at));
+  const atName = $derived(atEntry ? `${atEntry.label}${atX == null ? "" : `, ${atX}`}` : "");
+  const view = $derived.by((): SeriesView | null => {
+    if (!drawn) return null;
+    const { of, index } = drawn;
+    const list = of === "run" ? rows : patterns;
+    const p = list[index];
+    if (!p) return null;
+    const fit = of === "run" ? progress.fits[firstPass]?.[index] ?? null : null;
+    const fitting = of === "run" && running && progress.current?.index === index;
+    return {
+      // the key moves when the fit lands or the record replaces it, so the
+      // graph asks again then and never on a redraw
+      source: { key: `${of}:${index}:${p.upload}:${fit ? `${fit.rwp}:${fit.rung}` : "-"}`,
+                load: () => loadMember(() => api.seriesPattern(index, of), !!fit) },
+      name: p.label,
+      sub: subText(of === "run" ? xOf(index) : p.x, index, list.length, fit?.rwp, fitting),
+      canPrev: index > 0,
+      canNext: index < list.length - 1,
+    };
+  });
+  $effect(() => {
+    const v = view;
+    untrack(() => onview(v));
+  });
+  $effect(() => () => onview(null));
+  $effect(() => {
+    const m = markStaged;
+    untrack(() => onmark(m));
+  });
+
+  // -- Trends (task 6): the plotted values and the selection it marks -------
+
+  /** Plot the paths on Trends, or take them off. */
+  export function plot(paths: string[], on: boolean) {
+    plotTouched = true;
+    plotted = on ? [...plotted, ...paths.filter((p) => !plotted.includes(p))]
+      : plotted.filter((p) => !paths.includes(p));
+  }
+
+  /** Select a pattern: a point click on Trends picks from the run's list,
+   *  a row click on the Map from the staged one. */
+  export function select(index: number, of: ListName = "run") {
+    choose(of, index);
+  }
+
+  /** A summary row's Plot: the value on Trends, the pattern it names
+   *  selected, and the graph switched to Trends (the prototype's). */
+  function show(path: string, index: number) {
+    plot([path], true);
+    choose("run", index);
+    ongraph("trends");
+  }
+
+  /** A tick in the Plot list plots on Trends and shows it (the prototype's). */
+  function tick(path: string, on: boolean) {
+    plot([path], on);
+    ongraph("trends");
+  }
+
+  const trends = $derived.by((): TrendsView | null => {
+    if (!answer) return null;
+    const selected = drawn?.of === "run" ? drawn.index : null;
+    const e = answer.entries.find((x) => x.index === selected);
+    return {
+      answer, plotted, selected,
+      name: selected === null ? "" : e?.label ?? rows[selected]?.label ?? "",
+      x: selected === null ? null : xOf(selected),
+      canPrev: selected !== null && selected > 0,
+      canNext: selected !== null && selected < rows.length - 1,
+      axis,
+    };
+  });
+  $effect(() => {
+    const t = trends;
+    untrack(() => ontrends(t));
+  });
+  $effect(() => () => ontrends(null));
+
   /** a finished run is whole, even read by a page that did not follow it */
   const fraction = $derived(!running && entries && !cancelled ? 1
     : nFits ? Math.min(1, nDone / nFits) : 0);
@@ -352,8 +573,8 @@
           </thead>
           <tbody>
             {#each patterns as p, i (p.upload + ":" + i)}
-              <tr class:sel={selected === i} onclick={(ev) => {
-                if (!(ev.target as HTMLElement).closest("input, button")) selected = i; }}>
+              <tr class:sel={markStaged === i} onclick={(ev) => {
+                if (!(ev.target as HTMLElement).closest("input, button")) choose("staged", i); }}>
                 <td class="r num muted">{i + 1}</td>
                 <td class="fname" title={p.filename}>{p.filename}</td>
                 <td class="r"><input class="num coord" inputmode="decimal" value={xText(p.x)}
@@ -402,8 +623,10 @@
       {#if failure}<p class="bad">{failure}</p>{/if}
     </div>
     <div class="foot">
-      <button disabled={few} onclick={() => onstep(1)}>First fit</button>
-      <button class="ghost" disabled={!editable || few} onclick={start}
+      <!-- First fit is the view's one primary once its step is built; until
+           then Run series is, as in the Run step's foot -->
+      <button class:ghost={!firstFitBuilt} disabled={few} onclick={() => onstep(1)}>First fit</button>
+      <button class:ghost={firstFitBuilt} disabled={!editable || few} onclick={start}
         title="Run without a first fit: the first pattern starts from the model">Run series</button>
       <span class="muted">{#if reading}Reading {reading}…{:else if few}Needs two patterns{:else if changed}Changed since the last run{:else}{patterns.length} patterns · {walks === 2 ? "two walks" : "one walk"}{/if}</span>
     </div>
@@ -416,7 +639,9 @@
       </div>
     {:else}
       <div class="body">
-        <p class="status">{status}</p>
+        <p class="status">{status}{#if running && !follow}{" · "}<button class="link"
+            title="Move the selection with the pattern being fitted"
+            onclick={() => (follow = true)}>Follow the run</button>{/if}</p>
         <div class="gauge" role="progressbar" aria-label="Series progress" aria-valuemin="0"
           aria-valuemax="100" aria-valuenow={Math.round(fraction * 100)}>
           <i style:width="{(fraction * 100).toFixed(1)}%"></i></div>
@@ -424,20 +649,24 @@
           <thead>
             <tr><th class="r">#</th><th>Pattern</th><th class="r">{axis}</th>
               <th class="r">Rwp (%)</th><th>Started from</th>
-              {#if secondPass}<th class="r">Second walk</th>{/if}</tr>
+              {#if secondPass}<th class="r">Second walk Rwp (%)</th>{/if}</tr>
           </thead>
           <tbody>
             {#each rows as p, i (p.upload + ":" + i)}
               {@const fit = progress.fits[firstPass]?.[i]}
               {@const cur = running && progress.current?.index === i ? progress.current.pass : null}
-              <tr class:sel={selected === i} onclick={() => (selected = i)}>
+              <tr class:sel={markRun === i} onclick={() => choose("run", i)}>
                 <td class="r num muted">{i + 1}</td>
                 <td class="fname">{p.label}</td>
                 <td class="r num">{xText(p.x)}</td>
                 <td class="r num">{fit ? rwpText(fit.rwp) : cur === firstPass ? "…" : ""}</td>
                 <td>{fit ? startedFrom(fit.rung) : ""}</td>
                 {#if secondPass}
-                  <td class="r">{progress.fits[secondPass]?.[i] || backDone.has(i) ? "✓"
+                  {@const back = progress.fits[secondPass]?.[i]}
+                  <!-- the second walk's Rwp as its fit lands; a page that did
+                       not follow the run reads only that the walk fitted it,
+                       since the record keeps no second-walk fits -->
+                  <td class="r num">{back ? rwpText(back.rwp) || "✓" : backDone.has(i) ? "✓"
                     : cur === secondPass ? "…" : ""}</td>
                 {/if}
               </tr>
@@ -455,6 +684,108 @@
           <button class="ghost" disabled={!editable || few} onclick={start}
             title="Replaces these results">Run again</button>
         {/if}
+      </div>
+    {/if}
+  {:else if step === 3}
+    {#if !answer}
+      <div class="body"><p class="muted empty">{running ? "Running. The results appear when the run ends." : "Not run yet."}</p>
+        {#if failure}<p class="bad">{failure}</p>{/if}</div>
+      <div class="foot">
+        <button disabled={!editable || few} onclick={start}>Run series</button>
+      </div>
+    {:else}
+      {@const a = answer}
+      <div class="body">
+        <dl class="kv summary">
+          <dt>Converged</dt>
+          <dd><span class="num">{nConverged}</span> of <span class="num">{a.entries.length}</span>{#if a.entries.length < rows.length}{" "}fitted{/if}</dd>
+          {#if gap}
+            <dt>Largest walk gap</dt>
+            <dd>{pathName(gap.path, a)} · {xAt(gap.index)} · <span class="num">{esdText(gap.gap_esd!)}</span> esd
+              <button class="link" title="Plot this value on Trends"
+                onclick={() => show(gap.path, gap.index)}>Plot</button></dd>
+          {/if}
+          {#if bigSteps[0]}
+            {@const s = bigSteps[0]}
+            <dt>Largest step</dt>
+            <dd>{pathName(s.path, a)} · {xAt(s.indices[0])} → {xAt(s.indices[1])} · <span class="num">{esdText(s.size_esd!)}</span> esd
+              <button class="link" title="Plot this value on Trends"
+                onclick={() => show(s.path, s.indices[1])}>Plot</button></dd>
+          {/if}
+        </dl>
+        {#if changed}<p class="warn">Changed since this run</p>{/if}
+        <h3>Patterns</h3>
+        <table class="rows">
+          <thead>
+            <tr><th class="r">#</th><th class="r">{axis}</th><th class="r">Rwp (%)</th>
+              <th class="r">GoF</th><th>Started from</th><th class="r">Warnings</th></tr>
+          </thead>
+          <tbody>
+            {#each rows as p, i (p.upload + ":" + i)}
+              {@const e = a.entries.find((x) => x.index === i)}
+              {@const nw = warningsOf(e).length}
+              <tr class:sel={at === i} onclick={() => choose("run", i)}>
+                <td class="r num muted">{i + 1}</td>
+                <td class="r num">{xText(e?.x ?? p.x)}</td>
+                <td class="r num">{e?.statistics ? rwpText(e.statistics.rwp) : "—"}</td>
+                <td class="r num">{e?.statistics ? e.statistics.gof.toFixed(2) : ""}</td>
+                <td>{e ? startedFrom(e.rung) : "not fitted"}</td>
+                <td class="r num">{nw || ""}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+        <h3>Plot{#if atName}<span class="nt">values at {atName}</span>{/if}</h3>
+        <table class="rows values">
+          <tbody>
+            {#each valueGroups(a, at) as g (g.key)}
+              <tr class="gh"><td colspan="3">{g.title}</td></tr>
+              {#each g.rows as v (v.path)}
+                {@const on = plotted.includes(v.path)}
+                <!-- a tick plots the value on Trends; the row is the target too -->
+                <tr onclick={(ev) => { if (!(ev.target as HTMLElement).closest("input")) tick(v.path, !on); }}>
+                  <td class="ck"><input type="checkbox" checked={on} aria-label="Plot {g.key === '#fit' ? v.name : pathName(v.path, a)}"
+                    onchange={(ev) => tick(v.path, ev.currentTarget.checked)} /></td>
+                  <td>{v.name}{#if v.count < v.n}<span class="nt num">{v.count}/{v.n}</span>{/if}</td>
+                  <td class="r num">{v.value}</td>
+                </tr>
+              {/each}
+            {/each}
+          </tbody>
+        </table>
+        {#if atEntry}
+          <h3>{atEntry.label}{#if atX != null}<span class="nt">{atX}</span>{/if}</h3>
+          {#each warningsOf(atEntry) as d, k (k)}
+            <p class="dg"><b>{d.code}</b> {d.message}</p>
+          {:else}
+            <p class="muted">No warnings.</p>
+          {/each}
+        {/if}
+        {#if seriesWarnings(a.codes).length}
+          <details class="notes">
+            <summary>Warnings across the series</summary>
+            {#each seriesWarnings(a.codes).slice(0, 8) as c, k (k)}
+              <p class="dg"><b>{c.code}</b>{#if c.path}{" "}<span class="muted">{c.path}</span>{/if}: {countText(c)}</p>
+            {/each}
+          </details>
+        {/if}
+        {#if bigSteps.length}
+          <details class="notes">
+            <summary>Largest steps between neighbours</summary>
+            <table class="rows">
+              <tbody>
+                {#each bigSteps.slice(0, 10) as s, k (k)}
+                  <tr onclick={() => show(s.path, s.indices[1])}>
+                    <td>{pathName(s.path, a)}</td>
+                    <td class="muted">{xAt(s.indices[0])} → {xAt(s.indices[1])}</td>
+                    <td class="r num">{esdText(s.size_esd!)} esd</td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </details>
+        {/if}
+        {#if failure}<p class="bad">{failure}</p>{/if}
       </div>
     {/if}
   {/if}
@@ -517,8 +848,9 @@
     color: var(--muted);
   }
 
+  /* as wide as the carried-over globs' box, so "Temperature (K)" shows whole */
   input.axis {
-    width: 12ch;
+    width: 20ch;
   }
 
   input.carry {
@@ -617,6 +949,59 @@
 
   .status {
     margin: 10px 0 6px;
+  }
+
+  /* the label-value rows, as the Candidates step's checks draw them */
+  .kv {
+    display: grid;
+    grid-template-columns: max-content auto;
+    gap: 4px 16px;
+    margin: 10px 0 0;
+  }
+
+  .kv dt {
+    color: var(--muted);
+  }
+
+  .kv dd {
+    margin: 0;
+  }
+
+  .rows tr.gh td {
+    padding-top: 10px;
+    font-weight: 500;
+    color: var(--muted);
+  }
+
+  .rows .ck {
+    width: 26px;
+    padding: 0 0 0 2px;
+  }
+  .rows .ck input {
+    margin: 0;
+    vertical-align: middle;
+  }
+  .kv dd .link {
+    margin-left: 8px;
+  }
+
+  .rows .nt {
+    margin-left: 8px;
+    color: var(--muted);
+  }
+
+  .dg {
+    margin: 6px 0 0;
+  }
+
+  details.notes {
+    margin: 12px 0;
+    color: var(--muted);
+  }
+
+  details.notes summary {
+    cursor: pointer;
+    color: var(--fg);
   }
 
   /* the run's progress: a hairline track, filled in the accent */

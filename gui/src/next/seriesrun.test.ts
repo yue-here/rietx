@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import type { SeriesEntry, SeriesPattern } from "../lib/series";
 import type { EngineEvent } from "../lib/stream";
 import {
-  axisWord, emptyProgress, fitsDone, fold, inOrder, merged, rwpText, secondWalkDone, spanOf,
+  axisWord, emptyProgress, fitsDone, fittingText, fold, inOrder, merged, rwpText, secondWalkDone, spanOf,
   startedFrom,
 } from "./seriesrun";
 
@@ -49,6 +49,8 @@ describe("the Run step's fold", () => {
     p = fold(p, ev("eval", stamp(0)));
     p = fold(p, ev("fit_end", stamp(0, "forward", { rwp: 0.2241, gof: 1.9, status: "converged" })));
     expect(p.current).toBeNull();
+    expect(p.last).toEqual({ index: 0, label: "T0", pass: "forward" });
+    expect(fittingText(p, 1, "forward", (i) => 300 + 100 * i)).toBe("Fitting T0 · 300 · 1 of 3");
     expect(p.fits.forward[0]).toEqual({ rwp: 0.2241, gof: 1.9, status: "converged", rung: "cold" });
     p = fold(p, ev("fit_start", stamp(1)));
     p = fold(p, ev("fit_end", stamp(1, "forward", { rwp: 0.22, gof: 1.8, status: "converged" })));
@@ -62,6 +64,8 @@ describe("the Run step's fold", () => {
     p = fold(p, ev("fit_start", stamp(2, "backward")));
     expect(p.passes).toEqual(["forward", "backward"]);
     expect(p.rungs.backward[2]).toBe("cold");
+    // the second walk counts its own place in the series, as the Console does
+    expect(fittingText(p, 2, "forward", () => null)).toBe("Fitting T2 · second walk · 3 of 3");
     expect(fitsDone(p)).toBe(3);
   });
 

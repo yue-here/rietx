@@ -28,7 +28,7 @@ from rietx.gui import structure3d as s3
 from rietx.model import compiled
 from rietx.schemas.structure import AnisoU, Atom, Cell, Phase, Structure
 from rietx.viz import component, keep, recolour, render_structure, select
-from rietx.viz.figure3d import cut, glyphs, raster, render, views
+from rietx.viz.figure3d import cut, glyphs, raster, render, vector, views
 from rietx.viz.figure3d import report as rp
 from rietx.viz.figure3d import scene as sc
 from rietx.viz.figure3d.render import _png
@@ -499,7 +499,8 @@ def test_the_png_carries_its_chunks_and_the_array(tmp_path, nac):
 
 
 def test_a_jpeg_is_refused(tmp_path, nac):
-    with pytest.raises(ValueError, match="not JPEG"):
+    # the refusal names every suffix it takes (WP-1536 D1, WP-1537)
+    with pytest.raises(ValueError, match=r"writes \.png, \.svg, \.pov, \.glb.*not JPEG"):
         render_structure(nac, path=tmp_path / "nac.jpg")
 
 
@@ -1827,3 +1828,373 @@ def test_the_ringed_sphere_lays_its_triangles_on_the_rings_edges():
 def test_a_png_only_switch_is_refused_with_a_scene(nac, tmp_path, suffix, kw):
     with pytest.raises(ValueError, match="PNG renderer's own"):
         render_structure(nac, path=tmp_path / f"nac{suffix}", **kw)
+
+
+# ----------------------------------------------------------------------
+# WP-1536: the same picture as an SVG
+# ----------------------------------------------------------------------
+
+SVG = "{http://www.w3.org/2000/svg}"
+
+
+def _svg_tree(path: Path):
+    import xml.etree.ElementTree as ET
+    return ET.parse(path).getroot()
+
+
+def test_the_svg_ellipse_lies_on_the_rasters_silhouette():
+    """Points on the projected ellipse are within half a pixel of the raster's
+    own hit test: half a pixel in hits, half a pixel out misses (D2)."""
+    geo = _general_ellipsoid()
+    scene = sc.build_scene(geo, "ellipsoid")
+    R = views.resolve(geo, "opening", None, None)
+    frame = raster.Frame(width=400, height=400, x0=-6.0, y0=6.0, ppa=400 / 12.0,
+                         px_scale=1.0)
+    checked = 0
+    for a in scene["atoms"]:
+        sv = R @ np.asarray(a["shape"]).reshape(3, 3)
+        rx, ry, angle = vector.projected_ellipse(sv, frame.ppa)
+        minv = np.asarray(a["inverse"]).reshape(3, 3) @ R.T
+        e = minv[:, 2]
+        t = np.radians(angle)
+        u, v = np.array([np.cos(t), np.sin(t)]), np.array([-np.sin(t), np.cos(t)])
+        for phi in np.linspace(0.0, 2 * np.pi, 24, endpoint=False):
+            edge = rx * np.cos(phi) * u + ry * np.sin(phi) * v       # image px
+            out = edge / np.hypot(*edge)
+            for step, inside in ((-0.5, True), (0.5, False)):
+                dx, dy = (edge + step * out) / frame.ppa
+                q = minv[:, :2] @ np.array([dx, -dy])                # view, y up
+                disc = (q @ e) ** 2 - (e @ e) * (q @ q - 1.0)
+                assert (disc >= 0.0) == inside, (a["index"], phi, step)
+            checked += 1
+        assert rx > ry or rx == pytest.approx(ry)
+    assert checked >= 24
+
+
+def test_a_trimmed_stick_starts_where_its_rim_leaves_its_atom():
+    """A stick is cut where the first point of its rim leaves the ellipsoid,
+    so no wedge of background opens between stick and ball (D2): exactly
+    √(R² − r²) on a sphere, and on an ellipsoid one rim point on the surface
+    with the rest inside."""
+    sphere = sc.invert3([0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5])
+    w = np.array([0.6, 0.0, 0.8])
+    assert vector.trim_length(sphere, w, 0.08) == pytest.approx(np.sqrt(0.25 - 0.0064), abs=1e-3)
+    assert vector.trim_length(sphere, w) == pytest.approx(0.5, abs=1e-12)
+    assert vector.trim_length(sphere, w, 0.6) == 0.0          # wider than the ball
+    geo = s3.build(_rutile())                # an anisotropic Ti, and bonds
+    scene = sc.build_scene(geo, "ellipsoid")
+    # a half starts at its atom's centre, or at an image of it drawn there
+    atoms = {tuple(np.round(a["pos"], 8)): a for a in scene["atoms"]}
+    checked = 0
+    for h in scene["halves"]:
+        own = atoms.get(tuple(np.round(h["from"], 8)))
+        if own is None:
+            continue
+        A, B = np.asarray(h["from"]), np.asarray(h["to"])
+        w = (B - A) / np.linalg.norm(B - A)
+        r = h["radius"]
+        t = vector.trim_length(own["inverse"], w, r)
+        assert 0.0 < t < vector.trim_length(own["inverse"], w)
+        minv = np.asarray(own["inverse"]).reshape(3, 3)
+        e1 = np.cross(w, [1.0, 0.0, 0.0] if abs(w[0]) < 0.9 else [0.0, 1.0, 0.0])
+        e1 /= np.linalg.norm(e1)
+        e2 = np.cross(w, e1)
+        rim = [np.linalg.norm(minv @ (w * t + r * (np.cos(f) * e1 + np.sin(f) * e2)))
+               for f in np.linspace(0.0, 2 * np.pi, vector.RIM_SAMPLES, endpoint=False)]
+        assert max(rim) == pytest.approx(1.0, abs=1e-9)
+        checked += 1
+    assert checked
+    # and the display list's first piece starts at that point's projection
+    frame = raster.Frame(width=400, height=400, x0=-6.0, y0=6.0, ppa=400 / 12.0, px_scale=1.0)
+    items = vector.display_list(scene, geo, np.eye(3), frame)
+    h = scene["halves"][0]
+    own = atoms[tuple(np.round(h["from"], 8))]
+    A, B = np.asarray(h["from"]), np.asarray(h["to"])
+    w = (B - A) / np.linalg.norm(B - A)
+    p = A + w * vector.trim_length(own["inverse"], w, h["radius"])
+    want = ((p[0] - frame.x0) * frame.ppa, (frame.y0 - p[1]) * frame.ppa)
+    starts = [it["a"] for it in items if it["kind"] == "stick"]
+    assert min(np.hypot(s[0] - want[0], s[1] - want[1]) for s in starts) < 1e-6
+
+
+def test_a_line_ending_at_an_atom_is_trimmed_at_its_surface():
+    """A polyhedron edge or cell edge from an atom's centre starts where its
+    width leaves the atom's surface, as a stick does, so no piece of it sorts
+    in front of the ball it is inside; an end at no atom is left alone."""
+    r = 0.5
+    m = [r, 0.0, 0.0, 0.0, r, 0.0, 0.0, 0.0, r]
+    geo = {"sites": [{"label": "A1"}], "atoms": [{"site": 0}], "bonds": [], "polyhedra": []}
+    scene = {"atoms": [{"index": 0, "pos": [0.0, 0.0, 0.0], "shape": m,
+                        "inverse": sc.invert3(m), "color": [0.5, 0.5, 0.5], "rings": False}],
+             "halves": [], "faces": [], "labels": [],
+             "lines": [{"a": [0.0, 0.0, 0.0], "b": [2.0, 0.0, 1.0], "color": [0, 0, 0],
+                        "width": sc.EDGE_WIDTH_PX}]}
+    frame = raster.Frame(width=300, height=300, x0=-3.0, y0=3.0, ppa=50.0, px_scale=1.0)
+    items = vector.display_list(scene, geo, np.eye(3), frame)
+    pieces = [it for it in items if it["kind"] == "line"]
+    w = np.array([2.0, 0.0, 1.0]) / np.sqrt(5.0)
+    half = 0.5 * sc.EDGE_WIDTH_PX / frame.ppa
+    t = vector.trim_length(scene["atoms"][0]["inverse"], w, half)
+    assert t == pytest.approx(np.sqrt(r * r - half * half), abs=1e-3)
+    first = min(pieces, key=lambda it: it["a"][0])
+    assert first["a"] == pytest.approx((150.0 + w[0] * t * frame.ppa, 150.0), abs=1e-9)
+    last = max(pieces, key=lambda it: it["b"][0])
+    assert last["b"] == pytest.approx((250.0, 150.0), abs=1e-9)
+    ball = next(k for k, it in enumerate(items) if it["kind"] == "atom")
+    assert all(items.index(it) > ball for it in pieces)    # all of it in front
+
+
+def _crossing(sign: float) -> tuple[dict, dict]:
+    """1470's crossing fault in its smallest form: a bond seen down z, tilted
+    so the half on the right has its mean depth in front of a third ball at
+    the origin while its middle passes behind it; ``sign=-1`` turns it round,
+    its mean depth behind the ball and its middle in front."""
+    def ball(pos, r):
+        m = [r, 0.0, 0.0, 0.0, r, 0.0, 0.0, 0.0, r]
+        return {"pos": list(pos), "shape": m, "inverse": sc.invert3(m),
+                "color": [0.5, 0.5, 0.5], "rings": False}
+    mid = (0.0, 0.0, -0.8 if sign > 0 else 1.5)
+    ends = [(-2.0, 0.0, mid[2]), (2.0, 0.0, 3.0 * sign)]
+    geo = {"sites": [{"label": "A1"}, {"label": "B1"}],
+           "atoms": [{"site": 0}, {"site": 0}, {"site": 1}],
+           "bonds": [{"i": 0, "j": 1, "a": list(ends[0]), "b": list(ends[1])}],
+           "polyhedra": []}
+    scene = {"atoms": [{"index": 0, **ball(ends[0], 0.3)}, {"index": 1, **ball(ends[1], 0.3)},
+                       {"index": 2, **ball((0.0, 0.0, 0.0), 0.6)}],
+             "halves": [{"bond": 0, "from": list(ends[0]), "to": list(mid),
+                         "radius": 0.1, "color": [0.9, 0.1, 0.1]},
+                        {"bond": 0, "from": list(ends[1]), "to": list(mid),
+                         "radius": 0.1, "color": [0.9, 0.1, 0.1]}],
+             "lines": [], "faces": [], "labels": []}
+    return scene, geo
+
+
+@pytest.mark.parametrize("sign", [1.0, -1.0], ids=["rising", "falling"])
+def test_a_bond_passing_a_third_ball_sorts_piece_by_piece(sign):
+    """The crossing fault (WP-1470's ``mpl_baseline.py``) repaired.  The half
+    on the right averages in front of the ball while its middle passes behind
+    it, so drawn whole it would sort wrong one way or the other; cut, every
+    piece over the ball's disc lying wholly behind the ball's centre is drawn
+    before it, and every piece wholly in front of its surface after it."""
+    scene, geo = _crossing(sign)
+    frame = raster.Frame(width=300, height=300, x0=-3.0, y0=3.0, ppa=50.0, px_scale=1.0)
+    items = vector.display_list(scene, geo, np.eye(3), frame)
+    ball = next(k for k, it in enumerate(items) if it["cls"] == "atom B1")
+    right = scene["halves"][1]
+    A, B = np.asarray(right["from"]), np.asarray(right["to"])
+
+    def z_at(px_x):                          # the bond's depth at an image x
+        x = px_x / frame.ppa + frame.x0
+        return A[2] + (B[2] - A[2]) * (x - A[0]) / (B[0] - A[0])
+
+    behind = in_front = 0
+    for k, it in enumerate(items):
+        if it["kind"] != "stick" or min(it["a"][0], it["b"][0]) < 150.0:
+            continue
+        xs = [(x - 150.0) / frame.ppa for x in (it["a"][0], it["b"][0])]
+        if max(abs(x) for x in xs) >= 0.6:
+            continue                         # not wholly over the disc
+        zs = [z_at(it["a"][0]), z_at(it["b"][0])]
+        surface = [np.sqrt(0.36 - x * x) for x in xs]
+        if max(zs) < 0.0:
+            assert k < ball
+            behind += 1
+        elif all(z > s for z, s in zip(zs, surface)):
+            assert k > ball
+            in_front += 1
+    # rising, the middle runs behind the ball; falling, in front of it
+    assert (behind if sign > 0 else in_front) >= 2
+    # drawn whole, the half's one depth would put all of it on one side
+    assert (np.mean([A[2], B[2]]) > 0) == (sign > 0)
+
+
+def test_the_svg_is_the_pngs_picture_in_shapes(tmp_path, nac):
+    """D1, D4, D5: the suffix picks the format, the array is the PNG's, every
+    drawn atom is one ellipse classed by its site, and the letters are text."""
+    png = render_structure(nac, size=400, path=tmp_path / "nac.png", dpi=300)
+    fig = render_structure(nac, size=400, path=tmp_path / "nac.svg", dpi=300)
+    assert np.array_equal(fig.image, png.image)
+    assert fig.path == str(tmp_path / "nac.svg")
+    root = _svg_tree(tmp_path / "nac.svg")
+    h, w = fig.image.shape[:2]
+    assert root.get("viewBox") == f"0 0 {w} {h}"
+    assert root.get("width") == f"{w / 300:.4f}in"
+    ellipses = root.findall(f"{SVG}ellipse")
+    assert len(ellipses) == len(fig.atoms)
+    labels = {a["label"] for a in fig.atoms}
+    assert {e.get("class").split()[1] for e in ellipses} == labels
+    assert all(e.get("class").split()[0] == "atom" for e in ellipses)
+    texts = root.findall(f"{SVG}text")
+    assert sorted(t.text for t in texts) == sorted(L["text"] for L in fig.letters)
+    for t in texts:
+        at = next(L for L in fig.letters if L["text"] == t.text)
+        assert float(t.get("x")) == pytest.approx(at["x"], abs=0.01)
+        assert float(t.get("y")) == pytest.approx(at["y"], abs=0.01)
+    assert root.find(f"{SVG}rect").get("class") == "background"
+    # every fill url names a gradient the document defines
+    ids = {g.get("id") for g in root.iter() if g.tag.endswith("Gradient")}
+    used = {re.match(r"url\(#(\w+)\)", e.get("fill")).group(1)
+            for e in root.iter() if (e.get("fill") or "").startswith("url(")}
+    assert used and used <= ids
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+    (OUTPUT / "nac_svg.svg").write_bytes((tmp_path / "nac.svg").read_bytes())
+    _save(png, "nac_svg")
+
+
+@pytest.mark.parametrize("kw", [
+    {"mode": "ellipsoid", "background": None, "outline": True},
+    {"mode": "ball", "polyhedra": True, "atom_labels": True, "depth_cue": True},
+], ids=["ellipsoid", "polyhedra"])
+def test_the_svg_carries_every_switch(tmp_path, kw):
+    fig = render_structure(_rutile(), size=300, path=tmp_path / "r.svg", **kw)
+    root = _svg_tree(tmp_path / "r.svg")
+    classes = [e.get("class") or "" for e in root.iter()]
+    assert ("background" in classes) == (kw.get("background", "white") is not None)
+    if kw["mode"] == "ellipsoid":
+        assert any(c.startswith("ring ") for c in classes)
+        assert any(c.endswith(" outline") for c in classes)
+        assert any(c.startswith("stick ") for c in classes)
+    else:
+        assert any(c.startswith("face TiO") for c in classes)
+        texts = root.findall(f"{SVG}text")
+        assert len(texts) == 3 + sum(not a["boundary"] for a in fig.atoms)
+        # a site label carries its site's class, as every element of the site does
+        sites = {a["label"] for a in fig.atoms}
+        named = [t.get("class").split() for t in texts if t.get("class") != "label axis"]
+        assert named and all(c[0] == "label" and c[1] in sites for c in named)
+        # depth cueing fades the rearmost atom's gradient toward the ground,
+        # and the uncued drawing of the same view leaves it alone
+        plain = dict(kw, depth_cue=False)
+        render_structure(_rutile(), size=300, path=tmp_path / "plain.svg", **plain)
+        ground = _hex_rgb(root.find(f"{SVG}rect").get("fill"))
+        cued, bare = (_rear_stops(_svg_tree(tmp_path / name)) for name in ("r.svg", "plain.svg"))
+        assert np.abs(cued - ground).mean() < np.abs(bare - ground).mean() - 0.05
+    _save(fig, f"rutile_svg_{kw['mode']}")
+    (OUTPUT / f"rutile_svg_{kw['mode']}.svg").write_bytes((tmp_path / "r.svg").read_bytes())
+
+
+def _hex_rgb(text: str) -> np.ndarray:
+    return np.array([int(text[k:k + 2], 16) / 255 for k in (1, 3, 5)])
+
+
+def _rear_stops(root) -> np.ndarray:
+    """The stop colours of the rearmost atom's gradient: the first ellipse
+    drawn, the document being far to near."""
+    gid = re.match(r"url\(#(\w+)\)", root.find(f"{SVG}ellipse").get("fill")).group(1)
+    grad = next(g for g in root.iter() if g.get("id") == gid)
+    return np.array([_hex_rgb(st.get("stop-color")) for st in grad.findall(f"{SVG}stop")])
+
+
+def _classes(path: Path) -> list[list[str]]:
+    return [(e.get("class") or "").split() for e in _svg_tree(path).iter()]
+
+
+def test_the_svg_draws_each_planar_ring_as_one_polygon(tmp_path, paracetamol_block):
+    """``planar_rings=`` reaches the SVG, and a ring is one polygon however
+    far its fan's triangles tilt from one another, so it sorts as one shape
+    rather than as four pieces each in front of or behind a neighbour."""
+    from rietx.viz.figure3d import rings
+
+    render_structure(paracetamol_block, size=240, path=tmp_path / "plain.svg")
+    render_structure(paracetamol_block, size=240, path=tmp_path / "rings.svg",
+                     planar_rings=True)
+    assert not [c for c in _classes(tmp_path / "plain.svg") if c[:2] == ["fill", "ring"]]
+    filled = [e for e in _svg_tree(tmp_path / "rings.svg").iter(f"{SVG}polygon")
+              if (e.get("class") or "").split()[:2] == ["fill", "ring"]]
+    found = rings.planar_rings(paracetamol_block)
+    assert len(filled) == len(found) > 0
+    # a six-ring's outline has its six corners, a five-ring's five
+    assert {len(e.get("points").split()) for e in filled} <= {len(r) for r in found}
+
+
+def test_the_svg_draws_named_faces_and_leaves_hidden_atoms_out(tmp_path, nac):
+    """``faces=`` and ``hidden=`` reach the SVG as they reach the PNG: a named
+    face is filled polygons classed ``fill face``, and a hidden element's
+    sites have no element at all."""
+    geometry = s3.build(nac)
+    fluorine = {s["label"] for s in geometry["sites"] if s["species"].rstrip("1-") == "F"}
+    render_structure(geometry, size=240, path=tmp_path / "plain.svg", polyhedra=False)
+    render_structure(geometry, size=240, path=tmp_path / "faced.svg", polyhedra=False,
+                     faces=[cut.plane(geometry, (0, 0, 1), 0.0)])
+    render_structure(geometry, size=240, path=tmp_path / "hidden.svg", hidden=["F"])
+    plain = _classes(tmp_path / "plain.svg")
+    assert not [c for c in plain if c[:2] == ["fill", "face"]]
+    assert [c for c in _classes(tmp_path / "faced.svg") if c[:2] == ["fill", "face"]]
+    assert fluorine and any(fluorine & set(c) for c in plain)
+    assert not any(fluorine & set(c) for c in _classes(tmp_path / "hidden.svg"))
+
+
+def _mixed(order: str) -> Structure:
+    """Pm-3m with Ca1 and Sr1 sharing ½,½,½ at half occupancy each, Sr1's
+    tensor three times Ca1's, listed in ``order``, and O1 at ½,½,0."""
+    cell = Cell(a=_p(4.0), b=_p(4.0), c=_p(4.0),
+                alpha=_p(90.0), beta=_p(90.0), gamma=_p(90.0))
+    site = {"Ca1": ("Ca", 0.01), "Sr1": ("Sr", 0.03)}
+    atoms = [Atom(label=label, species=site[label][0], x=_p(0.5), y=_p(0.5), z=_p(0.5),
+                  occ=_p(0.5), aniso=AnisoU.from_values([site[label][1]] * 3 + [0.0] * 3))
+             for label in (order[:3], order[3:])]
+    atoms.append(Atom(label="O1", species="O", x=_p(0.5), y=_p(0.5), z=_p(0.0)))
+    return Structure(phases=[Phase(name="mixed", space_group="P m -3 m", cell=cell,
+                                   atoms=atoms)])
+
+
+@pytest.mark.parametrize("order", ["Ca1Sr1", "Sr1Ca1"])
+def test_a_mixed_sites_atoms_sort_with_their_rings_and_trim_at_the_largest(order):
+    """Two sites sharing a position: each atom's rings come straight after its
+    own ellipse, so the larger atom, drawn last, covers the smaller's; and a
+    stick from there starts where it leaves the larger atom, whichever site
+    the scene lists last, so no stub of it is drawn over the larger ball."""
+    geo = s3.build(_mixed(order))
+    centre = np.array([2.0, 2.0, 2.0])
+    frame = raster.Frame(width=400, height=400, x0=-2.0, y0=6.0, ppa=50.0, px_scale=1.0)
+    cpx = ((centre[0] - frame.x0) * frame.ppa, (frame.y0 - centre[1]) * frame.ppa)
+    scene = sc.build_scene(geo, "ellipsoid")
+    items = vector.display_list(scene, geo, np.eye(3), frame)
+    here = []                                # what is drawn at the shared centre
+    for it in items:
+        if it["kind"] not in ("atom", "ring") or it["depth"] != pytest.approx(centre[2]):
+            continue
+        xy = [(it["cx"], it["cy"])] if it["kind"] == "atom" else it["points"]
+        if max(np.hypot(x - cpx[0], y - cpx[1]) for x, y in xy) < frame.ppa:
+            here.append(it["cls"].split())
+    assert here[0] == ["atom", "Ca1"] and ["atom", "Sr1"] in here
+    big = here.index(["atom", "Sr1"])
+    assert all(c[1] == "Ca1" for c in here[:big]) and all(c[1] == "Sr1" for c in here[big:])
+    assert ["ring", "Ca1"] in here[:big] and ["ring", "Sr1"] in here[big:]
+
+    # a tilted view of the balls, so no stick is seen end on
+    tx, ty = np.radians(30.0), np.radians(20.0)
+    R = (np.array([[1, 0, 0], [0, np.cos(tx), -np.sin(tx)], [0, np.sin(tx), np.cos(tx)]])
+         @ np.array([[np.cos(ty), 0, np.sin(ty)], [0, 1, 0], [-np.sin(ty), 0, np.cos(ty)]]))
+    scene = sc.build_scene(geo, "ball")
+    items = vector.display_list(scene, geo, R, frame)
+    shared = [a for a in scene["atoms"] if np.allclose(a["pos"], centre)]
+    assert len(shared) == 2
+
+    def px(p):
+        c = R @ p
+        return np.array([(c[0] - frame.x0) * frame.ppa, (frame.y0 - c[1]) * frame.ppa])
+
+    checked = 0
+    for h in scene["halves"]:
+        if not np.allclose(h["from"], centre):
+            continue
+        w = np.asarray(h["to"]) - centre
+        w /= np.linalg.norm(w)
+        trims = [vector.trim_length(a["inverse"], w, h["radius"]) for a in shared]
+        d = px(centre + w) - px(centre)
+        first = min((it for it in items if it.get("half") == id(h)),
+                    key=lambda it: np.hypot(*(np.asarray(it["a"]) - px(centre))))
+        s = float((np.asarray(first["a"]) - px(centre)) @ d / (d @ d))
+        assert s == pytest.approx(max(trims), abs=1e-6)
+        assert max(trims) > min(trims) + 0.05
+        checked += 1
+    assert checked >= 2
+
+
+def test_a_quote_in_a_site_label_keeps_the_svg_well_formed(tmp_path):
+    geo = s3.build(_rutile())
+    geo = {**geo, "sites": [dict(s, label=s["label"] + '"x') for s in geo["sites"]]}
+    render_structure(geo, size=200, path=tmp_path / "q.svg")
+    root = _svg_tree(tmp_path / "q.svg")
+    assert any((e.get("class") or "").endswith('"x') for e in root.iter())

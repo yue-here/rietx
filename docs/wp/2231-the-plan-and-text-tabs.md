@@ -135,6 +135,8 @@ drawing them today (`Frame.svelte`'s `carried`); R4 makes both arms this page's 
   `styledFiles()` to `next/*.svelte`, add `.ib` (and `.mbtn` once STYLE.md gains its row) to
   `REGISTERS`, name `next.css` as the rebuild's home for a register's geometry, and move the
   six overrides there as named variants. Moving them changes no pixel.
+  2026-11-24, issue triage: moved to WP-2246, since this WP's handover left it listed and its
+  next step closes the WP. This entry is consumed; prune it on arrival.
 
 ## Tasks
 
