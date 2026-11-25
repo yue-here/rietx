@@ -38,8 +38,9 @@ Bérar and Lelann's factor, which each pattern's own esds carry for its correlat
 `TrajectoryVariable.esd_unscaled` is √((JᵀWJ)⁻¹), the reading of someone who trusts each pattern's esd as it stands.
 They differ by √(χ²/ν), and neither is chosen for you.
 Both are `None` on a held variable, and on one the trajectory does not move, alone or only together with another, as `a` and `b` in `a + b + k*T`.
-`TrajectoryVariable.at_bound` says the solver ended with the value on the variable's own `min` or `max`; its esds are then marginal, as a refined parameter's are.
-It is `None` on a held variable.
+`TrajectoryVariable.at_bound` is `None` on every variable for now.
+The package's bound test asks whether a limit carried load, not whether a value sits near one, and this fit does not make that test yet.
+A variable that ends on its own `min` or `max` keeps marginal esds, as a refined parameter does.
 
 The result is a fit to the trajectory, not to the patterns.
 Each point's esd is conditional on the rest of its own pattern's fit, and a chain's values depend on the direction it walked, which is why the result names the chain.

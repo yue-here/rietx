@@ -70,7 +70,7 @@ def test_a_line_is_the_closed_form_weighted_least_squares():
     for var, i in ((a0, 0), (k, 1)):
         assert var.esd_unscaled == pytest.approx(math.sqrt(cov[i, i]), rel=1e-8)
         assert var.esd == pytest.approx(math.sqrt(cov[i, i] * chi2 / 5), rel=1e-8)
-        assert var.vary and not var.at_bound
+        assert var.vary and var.at_bound is None
     assert np.allclose(fit.covariance, cov * chi2 / 5, rtol=1e-8, atol=0.0)
     assert fit.positions == list(range(7)) and fit.n_points == 7
     assert fit.fitted == pytest.approx([coef[0] + coef[1] * (t - 600) for t in TEMPS])
@@ -112,12 +112,17 @@ def test_a_coordinate_table_binds_by_name_in_series_order():
     assert [v.value for v in fit.variables] == pytest.approx(list(coef), rel=1e-8)
 
 
-def test_a_variable_on_its_bound_is_named_and_keeps_a_marginal_esd():
+def test_a_variable_on_its_bound_keeps_a_marginal_esd_and_claims_no_bound_test():
+    """The slope's own optimum, 2.08e-5, is past its max, so the fit ends on
+    the limit and the esds are the marginal ones.  ``at_bound`` stays ``None``:
+    the solver's active set reads proximity, and the package's bound test asks
+    whether the limit carried load (WP-1434), which this fit does not ask yet."""
     fit = rx.fit_trajectory(_series(), PATH, "a0 + k*(x - 600)",
                             {"a0": _free(4.16), "k": _free(1e-5, max=1e-5)})
-    k = fit.variables[1]
-    assert k.at_bound and k.value == pytest.approx(1e-5)
-    assert k.esd_unscaled is not None and not fit.variables[0].at_bound
+    a0, k = fit.variables
+    assert k.value == pytest.approx(1e-5) and k.esd_unscaled is not None
+    assert k.at_bound is None and a0.at_bound is None
+    assert "at its bound" not in str(fit)
 
 
 def test_no_degree_of_freedom_leaves_the_unscaled_esd_alone():

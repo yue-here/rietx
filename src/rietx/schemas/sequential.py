@@ -1765,11 +1765,13 @@ class TrajectoryVariable(Base):
     vary: bool
     esd: float | None = None
     esd_unscaled: float | None = None
-    #: whether the solver ended with the variable in its active set, on its
-    #: own ``min`` or ``max`` (scipy's ``active_mask``, a proximity test, not
-    #: a test that the bound carried load); its esds are then marginal, as a
-    #: refined row's are (WP-1929).  ``None`` on a held variable.
-    at_bound: bool | None
+    #: whether the variable's own ``min`` or ``max`` carried load at the
+    #: answer.  ``None`` on every variable for now: no test of that is made
+    #: for this fit (issue #1489, item 5), and the solver's active set, which
+    #: says only that a value is near a limit, is not one (WP-1434).  A
+    #: variable on its bound keeps marginal esds, as a refined row does
+    #: (WP-1929).
+    at_bound: bool | None = None
 
 
 class TrajectorySkip(Base):

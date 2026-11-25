@@ -248,6 +248,8 @@ RECORD_SCHEMAS: tuple[str, ...] = (
     "rietx.report.schemas.DistortionBlockTests",
     "rietx.schemas.indexing.IndexingResult",
     "rietx.schemas.indexing.PeakList",
+    "rietx.schemas.sequential.TrajectoryFit",
+    "rietx.schemas.sequential.TrajectorySkip",
 )
 
 
@@ -573,6 +575,21 @@ OTHER_RECORD_FIELDS: frozenset[str] = frozenset({
     "rietx.schemas.sequential.SeriesResult.provenance",
     "rietx.schemas.sequential.SeriesResult.relative_paths",
     "rietx.schemas.sequential.SeriesResult.x_label",
+    "rietx.schemas.sequential.TrajectoryFit.chain",
+    "rietx.schemas.sequential.TrajectoryFit.chi2",
+    "rietx.schemas.sequential.TrajectoryFit.converged",
+    "rietx.schemas.sequential.TrajectoryFit.covariance",
+    "rietx.schemas.sequential.TrajectoryFit.dof",
+    "rietx.schemas.sequential.TrajectoryFit.expression",
+    "rietx.schemas.sequential.TrajectoryFit.fitted",
+    "rietx.schemas.sequential.TrajectoryFit.message",
+    "rietx.schemas.sequential.TrajectoryFit.path",
+    "rietx.schemas.sequential.TrajectoryFit.positions",
+    "rietx.schemas.sequential.TrajectoryFit.reduced_chi2",
+    "rietx.schemas.sequential.TrajectoryFit.series_direction",
+    "rietx.schemas.sequential.TrajectoryFit.variables",
+    "rietx.schemas.sequential.TrajectorySkip.label",
+    "rietx.schemas.sequential.TrajectorySkip.position",
 })
 
 ROWS: tuple[Row, ...] = (
@@ -2135,6 +2152,26 @@ ROWS: tuple[Row, ...] = (
                   "5x-median-and-3-sigma threshold. The summary prints one line naming the "
                   "largest and the field (2003-batch/batch.md, C4, settled by Claude "
                   "2026-10-26; its row written with C6's, ruled by the maintainer 2026-11-03)")),
+    Row("rietx.schemas.sequential.TrajectoryFit.skipped", "action", tier=1, ambiguity=1,
+        evidence=("records each point of a trajectory fit_trajectory left out, with its reason "
+                  "(trajectory_fit.py; TrajectorySkip.reason names the test). A point with "
+                  "no positive, finite esd has no weight in weighted least squares, the "
+                  "package's sigma <= 0 rule (WP-1952), and a non-finite value is no point; "
+                  "a quarantined pattern is one schemas/sequential.py _rejected rejects "
+                  "(diverged, or an error-level code), which generality.md § The rule reads "
+                  "as 'do not read the values, for any purpose'. The skip adds no number of "
+                  "its own: _rejected keeps its tier-3 row under SEQUENTIAL_UNRECOVERED, "
+                  "approved 2026-11-03. Dissenter: none named; the WP-2106 judge's open case "
+                  "is an error-level code about one phase that leaves another phase's point "
+                  "sound. Tiers proposed by the maintainer's review of #1491, 2026-11-24")),
+    Row("rietx.schemas.sequential.TrajectorySkip.reason", "action", tier=1, ambiguity=1,
+        evidence=("arithmetic and the package's own read-nothing rule: 'no_esd' where the "
+                  "esd is None, not finite or <= 0 (no weight, WP-1952), 'no_value' where "
+                  "the value is not finite, 'quarantined' where _rejected holds (a diverged "
+                  "fit or an error-level code, generality.md § The rule: do not read the "
+                  "values, for any purpose); no threshold of its own "
+                  "(trajectory_fit.py fit_trajectory; maintainer's review of #1491, "
+                  "2026-11-24)")),
     Row("rietx.schemas.sequential.SeriesEntry.held_values", "action", tier=3, ambiguity=1,
         evidence=("records the value each caller-held path had on the kept fit "
                   "(sequential.py _held_values); the action is that a cold rung and a "

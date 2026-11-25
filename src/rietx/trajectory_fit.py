@@ -208,13 +208,15 @@ def fit_trajectory(series: SeriesResult, path: str, expression: str,
     covariance = (None if reduced is None or n_gone else
                   (covariance_from_factors(k, inv_d) * reduced).tolist())
 
-    at_bound = np.asarray(solution.active_mask) != 0
+    # no bound test is made: scipy's active set is a proximity reading, and the
+    # package's test asks whether the limit carried load (WP-1434), so the
+    # honest empty state is None until one is built for this fit (#1489, 5)
     fitted: dict[str, TrajectoryVariable] = {}
     for i, name in enumerate(varied):
         fitted[name] = TrajectoryVariable(
             name=name, value=float(theta[i]), vary=True,
             esd=None if raw[i] is None or factor is None else raw[i] * factor,
-            esd_unscaled=raw[i], at_bound=bool(at_bound[i]))
+            esd_unscaled=raw[i], at_bound=None)
     out = [fitted.get(name) or TrajectoryVariable(
         name=name, value=float(p.value), vary=False, at_bound=None)
         for name, p in variables.items()]
