@@ -155,7 +155,7 @@ def _plot_with_zoom(result, stem: str, zoom: tuple[float, float]) -> None:
 
     OUT.mkdir(exist_ok=True)
     result.plot(path=str(OUT / f"{stem}.png"))
-    result.plot(path=str(OUT / f"{stem}_zoom.png"), two_theta_range=zoom)
+    result.plot(path=str(OUT / f"{stem}_zoom.png"), two_theta_limits=zoom)
     plt.close("all")
 
 

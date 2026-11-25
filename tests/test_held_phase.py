@@ -1074,7 +1074,7 @@ def test_the_blind_range_and_the_collapse_are_drawn_for_inspection(
     _, collapsed = collapsed_fit
     plot_result(collapsed, path=str(OUT / "held_phase_collapsed.png"))
     plot_result(collapsed, path=str(OUT / "held_phase_collapsed_zoom.png"),
-                two_theta_range=(26.0, 40.0))
+                two_theta_limits=(26.0, 40.0))
     plt.close("all")
     for name in ("held_phase_blind_range", "held_phase_collapsed",
                  "held_phase_collapsed_zoom"):

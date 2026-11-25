@@ -63,6 +63,7 @@ It is `None` on a parameter that was never free, and on a free one whose esd cou
 | `PatternData.sigma` | `list[float]` or `None` | `None` | per-point esd from the file; `None` selects the Poisson fallback |
 | `PatternData.excluded_regions` | `list[tuple[float, float]]` | `[]` | intervals left out of the fit, on whichever axis is set |
 | `PatternData.metadata` | `dict[str, str]` | `{}` | what the reader found in the file header |
+| `PatternData.diagnostics` | `list[Diagnostic]` | `[]` | what the reader repaired or noticed in the file; every fit on the pattern repeats those that still bear on it in its own `diagnostics` |
 
 Exactly one of `two_theta` and `tof` is set, and a pattern that sets both or neither is refused.
 A pattern needs at least two points, and `sigma` needs one value per point.
@@ -129,7 +130,7 @@ Hold the curve with `BackgroundFixedPlusChebyshev`, or refine it under the smoot
 
 `PatternData.plot` draws the pattern as read, before any model exists.
 It forwards to `rietx.viz.plots.plot_pattern`, the data panel of `RefinementResult.plot` with nothing modelled in it.
-It takes the same `two_theta_range=`, `x_axis=`, `wavelength=`, `y_scale=`, `style=`, `figsize=`, `font_size=`, `dpi=` and `title=` keywords, so a peak reaches the same height in both figures.
+It takes the same `two_theta_limits=`, `x_axis=`, `wavelength=`, `y_scale=`, `style=`, `figsize=`, `font_size=`, `dpi=` and `title=` keywords, so a peak reaches the same height in both figures.
 `path=` writes the figure to a file.
 An excluded region is shaded over channels that are still drawn.
 σ is not drawn, even when the file carried it.
@@ -182,7 +183,7 @@ folder = examples_dir()
 data = rx.read_pattern(folder / "FAP.XRA")
 ref = rx.Refinement(rx.Structure.from_cif(folder / "fluorapatite.cif"),
                     rx.Instrument.bragg_brentano(radiation="CuKa"))
-fig = data.plot(model=ref, two_theta_range=(25, 40))
+fig = data.plot(model=ref, two_theta_limits=(25, 40))
 ```
 
 ### Time-of-flight patterns

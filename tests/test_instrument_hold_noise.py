@@ -138,9 +138,9 @@ def _spy(monkeypatch):
     return read
 
 
-def _draw(result, name: str, two_theta_range=None) -> None:
+def _draw(result, name: str, two_theta_limits=None) -> None:
     OUT.mkdir(exist_ok=True)
-    plot_result(result, path=OUT / f"{name}.png", two_theta_range=two_theta_range)
+    plot_result(result, path=OUT / f"{name}.png", two_theta_limits=two_theta_limits)
 
 
 # ---- the arithmetic ---------------------------------------------------------

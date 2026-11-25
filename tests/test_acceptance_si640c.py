@@ -510,7 +510,7 @@ def test_the_fit_renders(full, symmetric, held):
     # the whole y-scale and no shape is readable — the first attempt at this
     # zoom showed one reflection and was useless for the purpose.
     zoom = OUT / "si640c_symmetric_lowangle.png"
-    plot_result(symmetric, path=str(zoom), two_theta_range=(11.5, 20.0))
+    plot_result(symmetric, path=str(zoom), two_theta_limits=(11.5, 20.0))
     written.append(zoom)
 
     assert all(p.exists() for p in written), (
@@ -1065,7 +1065,7 @@ def test_the_blank_arms_render(blank_held, blank_free):
         full_page = OUT / f"{name}.png"
         fit.result.plot(path=str(full_page))
         zoom = OUT / f"{name}_halo.png"
-        plot_result(fit.result, path=str(zoom), two_theta_range=(2.0, 7.0))
+        plot_result(fit.result, path=str(zoom), two_theta_limits=(2.0, 7.0))
         written += [full_page, zoom]
 
     assert all(p.exists() for p in written), (

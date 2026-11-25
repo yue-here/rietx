@@ -177,7 +177,7 @@ def runs():
             for name, r in (("declared", result), ("as_phase", phase_result)):
                 plot_result(r, path=str(OUTPUT / f"holder_cell_{name}_fit.png"))
                 plot_result(r, path=str(OUTPUT / f"holder_cell_{name}_zoom.png"),
-                            two_theta_range=(37.5, 46.0))
+                            two_theta_limits=(37.5, 46.0))
     return declared, as_phase
 
 
@@ -257,7 +257,7 @@ def series():
                             path=str(OUTPUT / f"holder_series_h{h}_fit.png"))
                 plot_result(result.for_pattern(h),
                             path=str(OUTPUT / f"holder_series_h{h}_zoom.png"),
-                            two_theta_range=(37.5, 46.0))
+                            two_theta_limits=(37.5, 46.0))
     return out
 
 

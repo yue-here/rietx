@@ -75,6 +75,31 @@ def _op_key(op) -> tuple[tuple[int, ...], tuple[int, ...]]:
             tuple(int(v) % op.DEN for v in op.tran))
 
 
+def _setting_matching(space_group: str, listed: set) -> str | None:
+    """The tabulated setting of ``space_group``'s type whose operations are
+    ``listed``, or ``None`` (issue #1835).
+
+    A list printed under a bare two-origin symbol (``F d -3 m``) is often the
+    other origin's: the same group, refused as a different one, with the
+    doubled-cell remedy that does not apply.  Every setting gemmi tabulates
+    for the type's number is compared, so a monoclinic list under the wrong
+    unique axis is named the same way.
+    """
+    import gemmi
+
+    from ..crystallography.symmetry import get_spacegroup
+
+    try:
+        number = get_spacegroup(space_group).number
+    except ValueError:
+        return None
+    for entry in gemmi.spacegroup_table():
+        if entry.number == number and {
+                _op_key(op) for op in entry.operations()} == listed:
+            return entry.xhm()
+    return None
+
+
 @functools.lru_cache(maxsize=64)
 def _operation_list_refusal(xyz: tuple[str, ...],
                             space_group: str | None) -> str | None:
@@ -120,6 +145,12 @@ def _operation_list_refusal(xyz: tuple[str, ...],
                 f"symbol the list agrees with, or the closest type in "
                 f"brackets")
     if symbol_ops != listed:
+        other = _setting_matching(space_group, listed)
+        if other is not None:
+            return (f" declares {len(listed)} symmetry_operations and the space "
+                    f"group {space_group!r}, and the list is that type's other "
+                    f"setting: it equals the operations of {other!r} "
+                    f"operation for operation. Label the phase {other!r}")
         missing = len(symbol_ops - listed)
         extra = len(listed - symbol_ops)
         return (f" declares {len(listed)} symmetry_operations and the space "

@@ -782,7 +782,7 @@ def test_neglecting_capillary_absorption_biases_biso_low_by_the_predicted_amount
     out.mkdir(exist_ok=True)
     plot_result(with_it, path=str(out / "absorb_capillary_fit.png"))
     plot_result(with_it, path=str(out / "absorb_capillary_lowangle.png"),
-                two_theta_range=(15.0, 45.0))
+                two_theta_limits=(15.0, 45.0))
     plot_result(without, path=str(out / "absorb_capillary_uncorrected.png"))
 
 

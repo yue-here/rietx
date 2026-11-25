@@ -50,7 +50,7 @@ ref = rx.Refinement(structure, instrument, backend="numpy", solver="trf")
 `"numpy"` and `"lm"`, a bounded Levenberg-Marquardt, are the defaults.
 `solver="trf"` selects scipy's Trust Region Reflective, the default before 1.8, which reproduces a number measured before then.
 From a poor start it can stop in a basin the default driver leaves ([Solvers](../theory/estimation.md#solvers)).
-An unknown solver raises `ValueError` and an unknown backend `NotImplementedError`.
+An unknown solver or backend raises `ValueError` that names the valid choices.
 A backend whose optional dependency is missing raises `ImportError` with the install command.
 `Capabilities.backends` and `Capabilities.solvers` report what this installation has ([Backends](programs.md#backends)).
 

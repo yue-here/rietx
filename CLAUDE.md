@@ -469,6 +469,8 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   to the table enters at `unaudited` (CI's `tests/audit_delta.py`, against the base), and the
   shrink-only `UNAUDITED_BASELINE` holds rows awaiting audit. `/wp-handover` step 7 and `/pr-review`
   send a table change, or one adding what the table cannot see, to the `generality-review` agent.
+- **A choice argument is refused at the call, before any work** (WP-2302): `_nearmiss.check_choice`, a
+  live registry; `tests/test_api_choices.py` finds the choices.
 - **Licensing**: port code only from permissive sources, with ATTRIBUTION.md updates.
   BGMN/Profex/xrayutilities are GPL — concepts only, never code. TOPAS/FullProf are closed —
   papers only. ChimeraX's source is never opened, only its user docs (WP-1537, 1538). **Data
@@ -879,9 +881,8 @@ whole triage record: the command's table reads it, and so does `wp_claim.py` abo
 Every shipped release has one record in `docs/milestones/`; ROADMAP's table carries the
 acceptance one-liners, restated in neither place. Since WP-1117 the compatibility promise
 (`docs/docs/reference/compatibility.md`) is a **preview**: anything may change in any release,
-versions bumping per observable change. **1.0.2 was written and never published**, folded into v1.1
-(2026-08-23), so `docs/releases/1.0.2.md` describes a
-release that never existed. **A milestone is named, a release is numbered at its cut** (WP-1540,
+versions bumping per observable change. **1.0.2 was never published** (folded into v1.1), so
+`docs/releases/1.0.2.md` describes no release. **A milestone is named, a release is numbered at its cut** (WP-1540,
 ROADMAP rule 6), so `pyproject.version` is the next release's `.dev0` except on the tree a tag is
 cut from. Every `RefinementResult.provenance` and history node stamps it; it moves after each cut.
 

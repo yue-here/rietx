@@ -14,7 +14,7 @@ It forwards to `rietx.viz.plots.plot_result`.
 | Keyword | Default | Effect |
 |---|---|---|
 | `path` | `None` | writes the figure to that file as well |
-| `two_theta_range` | the whole pattern | a window in degrees 2θ, whatever the x axis |
+| `two_theta_limits` | the whole pattern | a window in degrees 2θ, whatever the x axis |
 | `show_background` | `True` | draws the background curve |
 | `weighted` | `False` | draws Δ/σ in a panel of its own, with a ±3σ band |
 | `x_axis` | `"two_theta"` | `"q"` or `"d"` redraws against Q or d-spacing |
@@ -26,8 +26,9 @@ It forwards to `rietx.viz.plots.plot_result`.
 | `dpi` | 300 | the raster resolution of a PNG |
 | `title` | `None` | words drawn above the data panel ([Printing a result](result.md#printing-a-result)) |
 
-`two_theta_range` selects channels rather than cropping a whole-range figure.
+`two_theta_limits` selects channels rather than cropping a whole-range figure.
 The intensity scale, the difference offset and the tick rows are built from what the window contains, so a zoom into a weak region is a figure of its own data.
+An argument that requests a window is named `two_theta_limits`, and a field that describes the span something covers is named `two_theta_range`, as `DataRef.two_theta_range` is.
 A window holding no points raises `ValueError`.
 
 `weighted=True` puts the residual on an absolute statistical scale.
