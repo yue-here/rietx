@@ -98,7 +98,7 @@ Pawley fit, a neighbour's free intensity can absorb an unmodelled tail and drag 
 
 | Program | Its in-range tail | Le Bail or Pawley handling | Warning or guidance |
 |---|---|---|---|
-| rietx | the reflection's own window, which can hold no channel (WP-2228) | Pawley ridges an off-data intensity toward zero (`PAWLEY_OFF_DATA_RIDGED`, WP-1459); Le Bail nothing | none |
+| rietx | since WP-2228, a window that drops at most 1e-3 of the peak's area (`forward.OFF_DATA_WINDOW_TOL`, the closing stage's fraction) whatever the stage's; until then the stage's 2 % window, which could hold no channel | Pawley ridges an off-data intensity toward zero (`PAWLEY_OFF_DATA_RIDGED`, WP-1459); Le Bail nothing | none |
 | GSAS-II 5.8.4 | not modelled: the reflection is not generated (`GSASIIstrIO.py:3177`) | the Pawley upper limit is clipped to the Pawley dmin (`GSASIIstrIO.py:3019-3025`) | the Pawley help page advises against reflections beyond the limits (checked (source), checked (manual)) |
 | TOPAS (TR v5) | an ordinary peak, generated within `extra_X_right` | a free intensity like any other (inferred, not run); p.111 warns that low-d-edge Pawley intensities can be badly wrong | none found (checked (manual)) |
 | FullProf | an ordinary peak, generated within 3 × `Wdt` × FWHM | none in the fit; `Dum = 3` leaves reflections near a limit out of R_Bragg and the hkl files | the manual warns a small `Wdt` leaves "discontinuities in the edges" (checked (manual)) |
@@ -111,6 +111,8 @@ is left out and its tail is unmodelled (GSAS-II, RIETAN-FP). FullProf and RIETAN
 reflections in their output. The literature read (McCusker et al. 1999 §5 and §12.4; Hill
 1992; Le Bail 2005; Toby 2006) treats each peak's own cut-off and says nothing about a peak
 centred outside the data. Pawley (1981) was not read.
+
+rietx's rule is its own (tier 3): it keeps generating the reflection, as TOPAS and FullProf do, and models its tail in the data to the closing stage's fraction. No program was found to do this.
 
 ## Staging and what a stage holds
 

@@ -232,6 +232,16 @@ WINDOW_AREA_TOL = 2e-2
 #: the cell move it during the stage — this is movement headroom, not tail
 #: coverage (a cold fit's zero error is instrument-scale, ~0.1°).
 WINDOW_MIN_DEG = 0.3
+#: The most a window may drop of a peak centred off the data, outside the
+#: fitted channels' first and last 2θ, at any stage fraction (WP-2228).  Such
+#: a peak meets the data only through its tail, so a window cut at the stage's
+#: 2 % can hold no channel at all, and then a neighbour's intensity absorbs the
+#: tail.  On issue #440's fluorapatite ramp (6 0 2), 0.45° past the data, did
+#: exactly that, and a default Le Bail cell landed 6.9 esd off, ``converged``;
+#: at this fraction 0.11 esd.  The closing stage's fraction, so the tail is
+#: modelled as far as a closing stage would model it, and a closing compile is
+#: unchanged.  :func:`_half_widths` applies it.
+OFF_DATA_WINDOW_TOL = CLOSING_WINDOW_TOL
 
 def recorded_window_tol(tol: float | None) -> float:
     """A stage's window fraction as a record or a plan states it, for a compile.
@@ -691,6 +701,28 @@ def _window_bounds(tt: np.ndarray, pos: np.ndarray, half: np.ndarray,
     i0[~valid] = 0
     i1[~valid] = 0
     return i0, i1
+
+
+def _half_widths(k_of, pos: np.ndarray, gamma: np.ndarray, eta: np.ndarray,
+                 tol: float, slack: float, tt_min: float, tt_max: float
+                 ) -> np.ndarray:
+    """Each peak's window half-width, k(η)·Γ + ``slack``, before any FCJ extent.
+
+    The rule ``compile_model`` and :func:`window_sizing` share, each with its
+    own ``k_of`` (the bisection or its table).  A peak centred off the data,
+    outside ``[tt_min, tt_max]``, drops no more than
+    :data:`OFF_DATA_WINDOW_TOL` of its area whatever the stage's ``tol``
+    (WP-2228).  ``on_data`` in ``compile_model`` is the same test, which
+    Pawley's ridge reads (``CompiledPhase.off_data``).  A peak on the data
+    keeps ``k_of(eta, tol)·gamma + slack`` exactly, so a pattern with no peak
+    off the data compiles bit for bit as before.
+    """
+    half = k_of(eta, tol) * gamma + slack
+    edge_tol = min(tol, OFF_DATA_WINDOW_TOL)
+    off = ~((pos >= tt_min) & (pos <= tt_max))
+    if edge_tol < tol and off.any():
+        half = np.where(off, k_of(eta, edge_tol) * gamma + slack, half)
+    return half
 
 
 def _batch_layout(win: np.ndarray, fcj_n: np.ndarray, tt: np.ndarray
@@ -5028,7 +5060,8 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                     on_data[:] |= (pos >= tt_min) & (pos <= tt_max)
                 slack = (WINDOW_MIN_DEG if window_slack_deg is None
                          else window_slack_deg)
-                half = window_fwhm_mult(eta_est, window_area_tol) * gamma_est + slack
+                half = _half_widths(window_fwhm_mult, pos, gamma_est, eta_est,
+                                    window_area_tol, slack, tt_min, tt_max)
                 if fcj_on:
                     half = half + fcj_extent_deg(pos, sl_eff, hl_eff)
                 valid = np.isfinite(pos)
@@ -5349,7 +5382,8 @@ def window_sizing(model: CompiledModel, values: dict[str, float],
                 model.phase_peaks(ip, values, component=component)):
             pos = np.asarray(pos, dtype=np.float64)
             gamma, eta = model.peak_gamma_eta(w1, w2)
-            half = window_fwhm_mult_interp(eta, tol) * gamma + model.window_slack_deg
+            half = _half_widths(window_fwhm_mult_interp, pos, gamma, eta, tol,
+                                model.window_slack_deg, model.tt_min, model.tt_max)
             if fcj_on:
                 half = half + fcj_extent_deg(pos, sl, hl)
             valid = np.isfinite(pos) & np.isfinite(half)

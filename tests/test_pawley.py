@@ -437,6 +437,78 @@ def test_pawley_intensity_centred_off_the_data_stays_bounded():
     assert f"{name} (6, 0, 2)" in ridged[0].where
 
 
+def test_a_reflection_past_the_range_end_has_a_window_reaching_the_data():
+    """WP-2228: a line centred off the data is seen only through its tail, so
+    its window drops at most ``CLOSING_WINDOW_TOL`` of its area whatever the
+    stage's fraction.  At the declared 2 % (6 0 2), 0.45° past the last
+    channel, reached no channel and its tail went unmodelled.  A line on the
+    data keeps the stage's window, and ``rewindow`` sizes by the same rule."""
+    from rietx import Structure
+    from rietx.model.forward import (
+        WINDOW_AREA_TOL,
+        _half_widths,
+        rewindow,
+        window_fwhm_mult,
+    )
+
+    s, ins = Structure.from_cif(str(FAP_CIF)), _fap_instrument(False)
+    model = compile_model(s, ins, fap_series(1)[0], mode="pawley",
+                          window_area_tol=WINDOW_AREA_TOL)
+    cp = model.phases[0]
+    hkl = [tuple(h) for h in cp.reflections.hkl.tolist()]
+    k = hkl.index((6, 0, 2))
+    assert cp.tt_primary[k] > model.tt_max + 0.4
+    width = cp.win[:, :, 1] - cp.win[:, :, 0]
+    assert (width[:, k] > 0).all()  # both lines reach the data
+    # the rule, at both tolerances, on a line past each end and one on the data
+    pos = np.array([model.tt_min - 0.2, 0.5 * (model.tt_min + model.tt_max),
+                    model.tt_max + 0.2])
+    gamma, eta = np.full(3, 0.064), np.full(3, 0.027)
+    half = _half_widths(window_fwhm_mult, pos, gamma, eta, WINDOW_AREA_TOL, 0.3,
+                        model.tt_min, model.tt_max)
+    stage = window_fwhm_mult(eta, WINDOW_AREA_TOL) * gamma + 0.3
+    edge = window_fwhm_mult(eta, 1e-3) * gamma + 0.3
+    np.testing.assert_array_equal(half, [edge[0], stage[1], edge[2]])
+    # a closing compile is unchanged: its own fraction is already the edge's
+    np.testing.assert_array_equal(
+        _half_widths(window_fwhm_mult, pos, gamma, eta, 1e-3, 0.3,
+                     model.tt_min, model.tt_max), edge)
+    # rewindow at the compile's values keeps (6 0 2) on the data too
+    table = ParameterTable(s, ins)
+    again = rewindow(model, table.decode(table.x0())).phases[0]
+    assert ((again.win[:, k, 1] - again.win[:, k, 0]) > 0).all()
+
+
+def test_lebail_cell_is_right_with_a_reflection_past_the_range_end():
+    """WP-2228 (issue #440's ramp): the default Le Bail fit of pattern 2 from
+    the CIF cell, which starts 0.067 % off.  Before the edge rule (6 0 2)'s
+    unmodelled tail went into (5 -2 4), whose intensity rose 30×, and the cell
+    followed it: 6.9 esd from the truth at Rwp 0.083, ``converged``.  Measured
+    after it: 0.11 and 0.00 esd at Rwp 0.054."""
+    import importlib.util
+
+    from rietx import Structure
+
+    s0 = Structure.from_cif(str(FAP_CIF))
+    truth = {"a": s0.phases[0].cell.a.value * (1 + 3e-3 * 2 / 9),
+             "c": s0.phases[0].cell.c.value * (1 + 3e-3 * 2 / 9)}
+    ref = Refinement(Structure.from_cif(str(FAP_CIF)), _fap_instrument(False),
+                     history=False)
+    result = ref.fit(fap_series(3)[2], mode="lebail")
+    assert result.status == "converged"
+    rows = {p.path: p for p in result.parameters}
+    for axis, true in truth.items():
+        row = rows[f"phases.0.cell.{axis}"]
+        assert abs(row.value - true) < row.stderr, (axis, row.value, true, row.stderr)
+    if importlib.util.find_spec("matplotlib") is not None:
+        from rietx.viz.plots import plot_result
+
+        OUT.mkdir(exist_ok=True)
+        plot_result(result, path=str(OUT / "fap_range_end_lebail_fit.png"))
+        plot_result(result, path=str(OUT / "fap_range_end_lebail_zoom.png"),
+                    two_theta_range=(72.5, 75.0))
+
+
 def test_pawley_off_data_code_is_silent_when_every_reflection_is_on_the_data():
     """The same pattern cut at 73.5°, where no reflection falls in the list's
     margin past the last channel (the next line is at 74.19°): nothing is
