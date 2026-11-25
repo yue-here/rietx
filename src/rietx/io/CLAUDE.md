@@ -57,9 +57,10 @@ order in `base.ascending()`, the one place it lives:
 
 **Every report reaches the fit** (WP-2304). `read_pattern` keeps its notes on
 `PatternData.diagnostics` whether or not a list was passed, and each fit copies
-them into `result.diagnostics` (`refine._reader_diagnostics`). The one
-exception is a code the fit asks again on its fitted channels
-(`refine._FIT_OWNED_READER_CODES`, today `PATTERN_DEAD_CHANNELS`). So a reader
+them into `result.diagnostics` (`refine._reader_diagnostics`). Two
+exceptions: a code the fit asks again on its fitted channels
+(`refine._FIT_OWNED_READER_CODES`, today `PATTERN_DEAD_CHANNELS`), and a note
+whose advice the caller took before fitting (`refine._reader_note_settled`). So a reader
 emits into the list it is handed and needs no other wiring.
 
 The finite-row drop (`base.finite_rows`, WP-2079): **a reader's decisions before

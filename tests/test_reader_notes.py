@@ -31,6 +31,9 @@ from tests.test_schemas import make_lab6
 
 OUT = Path(__file__).parent / "output"
 
+#: the module fixture ``truth`` is shared, so the module keeps to one worker
+pytestmark = pytest.mark.xdist_group("reader-notes")
+
 #: scale and background alone: the notes are what is under test, not the fit
 PLAN = RefinementPlan(stages=[Stage(
     name="scale", turn_on=["phases.*.scale", "instrument.background.*"])])
@@ -150,3 +153,20 @@ def test_a_joint_fit_carries_each_patterns_own_notes(truth, tmp_path):
     first, second = result.histograms
     assert _codes(first.diagnostics).count("PATTERN_SIGMA_CONSTANT") == 1
     assert "PATTERN_SIGMA_CONSTANT" not in _codes(second.diagnostics)
+
+
+def test_advice_already_taken_is_not_handed_on(truth, tmp_path):
+    """A note whose advice the caller followed before fitting stays with the
+    file: σ set to ``None`` after ``PATTERN_SIGMA_CONSTANT``, and an axis
+    note whose interval at or below 0° holds no fitted channel."""
+    flat = rx.read_pattern(_constant(truth, tmp_path))
+    assert "PATTERN_SIGMA_CONSTANT" in _codes(flat.diagnostics)
+    flat.sigma = None
+    axis = Diagnostic(level="warning", code="PATTERN_X_AXIS_IMPLAUSIBLE",
+                      message="the x axis starts at 0°.", where=["-0.001-0.001"])
+    data = flat.model_copy(update={"diagnostics": [*flat.diagnostics, axis]})
+    structure, instrument = _models()
+    result = Refinement(structure, instrument, history=False).fit(data, plan=PLAN)
+    codes = _codes(result.diagnostics)
+    assert "PATTERN_SIGMA_CONSTANT" not in codes
+    assert "PATTERN_X_AXIS_IMPLAUSIBLE" not in codes

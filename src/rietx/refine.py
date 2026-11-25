@@ -11327,6 +11327,23 @@ def _extra_peak_diagnostics(model: CompiledModel, values: dict,
 _FIT_OWNED_READER_CODES = frozenset({"PATTERN_DEAD_CHANNELS"})
 
 
+def _reader_note_settled(note: Diagnostic, model: CompiledModel) -> bool:
+    """Whether the caller has already done what ``note`` asks, on this fit.
+
+    The notes describe the file as read, and a caller may act on one before
+    fitting: exclude the interval at or below 0° that
+    ``PATTERN_X_AXIS_IMPLAUSIBLE`` names (or crop it away), or set
+    ``pattern.sigma = None`` as ``PATTERN_SIGMA_CONSTANT`` suggests.  Handing
+    such a note on would repeat advice already taken, for the reason
+    :data:`_FIT_OWNED_READER_CODES` gives about dead channels.
+    """
+    if note.code == "PATTERN_X_AXIS_IMPLAUSIBLE":
+        return model.tt.size == 0 or float(model.tt.min()) > 0.0
+    if note.code == "PATTERN_SIGMA_CONSTANT":
+        return not model.sigma_measured
+    return False
+
+
 def _reader_diagnostics(model: CompiledModel,
                         raised: list[Diagnostic]) -> list[Diagnostic]:
     """What the reader repaired or noticed in this pattern (WP-2304).
@@ -11335,12 +11352,15 @@ def _reader_diagnostics(model: CompiledModel,
     not a caller passed a list, and ``compile_model`` carries them here, so a
     rescaled intensity or a withheld σ reaches every fit on the file.  A note
     whose code the fit has already raised, or asks for itself
-    (:data:`_FIT_OWNED_READER_CODES`), is left out; an exact repeat is too.
+    (:data:`_FIT_OWNED_READER_CODES`), is left out; an exact repeat is too, and
+    so is one whose advice the caller has already taken
+    (:func:`_reader_note_settled`).
     """
     have = {d.code for d in raised} | _FIT_OWNED_READER_CODES
     out: list[Diagnostic] = []
     for note in model.reader_notes:
-        if note.code in have or note in out:
+        if (note.code in have or note in out
+                or _reader_note_settled(note, model)):
             continue
         out.append(note)
     return out

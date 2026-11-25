@@ -185,6 +185,9 @@ class Project:
         notes: list[Diagnostic] = []
         options = reader_options_for(fmt, reader_options or {}, diagnostics=notes)
         data = read_pattern(copied, diagnostics=notes, **options)
+        # the options pre-filter above reports an ignored option into
+        # ``notes`` only, so the pattern carries the whole list (WP-2304)
+        data.diagnostics = list(notes)
         # A project is a refinement's durable form, so a pattern it cannot
         # refine has nothing to be one of — and DataRef records a
         # ``two_theta_range``, which is a 2θ by its name.
