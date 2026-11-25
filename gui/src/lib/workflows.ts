@@ -9,8 +9,7 @@
  * (R6, WP-2240, and R7, WP-2243, build theirs a step at a time, and a step
  * not built yet shows its sentence). Structure solution and rigid bodies are
  * not built yet and say so, so a workflow that is not built never reads as
- * one that is. Series shows the Pattern graph alone until R7 adds Trends and
- * Map. The mark is "not
+ * one that is. Series shows the Pattern, Trends and Map graphs. The mark is "not
  * built yet", never "placeholder" (the maintainer's ruling, 2026-11-10).
  * The steps and their words are the design round's (round 4, 2026-11-07),
  * restated in WP-2204.
@@ -38,7 +37,7 @@ export interface Workflow {
   loop?: string;
   /** the graph tabs the workflow shows, when not all of them (the
    *  prototype's: peaks and indexing draws the pattern and the peak fits) */
-  graphs?: readonly ("pattern" | "peaks" | "background" | "structure")[];
+  graphs?: readonly ("pattern" | "peaks" | "background" | "structure" | "trends" | "map")[];
   /** the model panel's opening width in px, where a step's widest table
    *  needs more than the frame's default; measured, never chosen */
   panel?: number;
@@ -70,7 +69,7 @@ export const WORKFLOWS: readonly Workflow[] = [
     id: "series",
     name: "Series",
     built: true,
-    graphs: ["pattern"],
+    graphs: ["pattern", "trends", "map"],
     steps: [
       { name: "Patterns", body: "The files in series order, and what each pattern after the first refines.", built: true },
       { name: "First fit", body: "Refine the walk's first pattern alone; the series starts from that result." },

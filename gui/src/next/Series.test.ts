@@ -42,11 +42,30 @@ vi.mock("../api", () => ({
     series: () => series(),
     putSeries: (b: unknown) => putSeries(b),
     seriesResult: () => seriesResult(),
+    seriesPattern: (i: number, of: string) => seriesPattern(i, of),
     uploadFile: vi.fn(),
   },
 }));
 
+/** A curves payload whose header says whether it carries a fit. */
+const packed = (fitted: boolean) => {
+  const head = new TextEncoder().encode(JSON.stringify({ fitted, arrays: [] }));
+  const buffer = new ArrayBuffer(4 + head.length);
+  new DataView(buffer).setUint32(0, head.length, true);
+  new Uint8Array(buffer, 4).set(head);
+  return buffer;
+};
+const seriesPattern = vi.fn(async (_i: number, _of: string) => packed(false));
+
 import Series from "./Series.svelte";
+import type { SeriesView } from "./seriespattern";
+import type { TrendsView } from "./seriestrends";
+
+const views: (SeriesView | null)[] = [];
+const view = () => views[views.length - 1];
+const trendViews: (TrendsView | null)[] = [];
+const trendsView = () => trendViews[trendViews.length - 1];
+const graphs: string[] = [];
 
 let app: any = null;
 const steps: number[] = [];
@@ -68,6 +87,9 @@ async function boot(step = 0, run: RunState | null = null) {
     step, steps: workflow("series").steps!, busy: run?.state === "running", run,
     onstep: (i: number) => steps.push(i),
     onrun: async (body: Record<string, unknown>, t: string) => { runs.push([body, t]); },
+    onview: (v: SeriesView | null) => views.push(v),
+    ontrends: (v: TrendsView | null) => trendViews.push(v),
+    ongraph: (g: string) => graphs.push(g),
   } });
   await settle();
 }
@@ -78,6 +100,7 @@ afterEach(() => {
   document.body.innerHTML = "";
   steps.length = 0;
   runs.length = 0;
+  views.length = 0;
   vi.clearAllMocks();
 });
 
@@ -286,11 +309,11 @@ describe("the Results step", () => {
     await boot(3);
     expect([...document.querySelectorAll(".summary dt")].map(text)).toEqual(["Converged", "Largest step"]);
     expect([...document.querySelectorAll(".summary dd")].map(text))
-      .toEqual(["2 of 2", "LaB6 cell.a · 10 → 20 · 4.3 esd"]);
+      .toEqual(["2 of 2", "LaB6 cell.a · 10 → 20 · 4.3 esd Plot"]);
     expect(cells(0)).toEqual(["1", "10", "4.19", "1.90", "model", ""]);
     expect(cells(1)).toEqual(["2", "20", "4.34", "1.90", "previous", "1"]);
     const values = () => [...document.querySelectorAll(".values tbody tr")]
-      .map((r) => [...r.querySelectorAll("td")].map(text).join(" "));
+      .map((r) => [...r.querySelectorAll("td")].map(text).filter(Boolean).join(" "));
     expect(values()).toEqual(["Fit", "Rwp (%) 4.19", "GoF 1.90", "LaB6", "cell.a 4.15692"]);
     expect(text(document.querySelector(".body p.muted:not(.empty)"))).toBe("No warnings.");
     // a row click selects its pattern: its values and its warnings follow
@@ -299,5 +322,139 @@ describe("the Results step", () => {
     expect(values()).toContain("cell.a 4.15901");
     expect(text(document.querySelector(".body .dg"))).toBe("BOUND_HIT a hit its bound");
     expect(text(document.querySelector("details.notes summary"))).toBe("Warnings across the series");
+  });
+
+  it("plots on Trends: a tick per value under Plot, and each summary row's Plot (task 6)", async () => {
+    stored = { ...setupOf([pattern("T0", 10), pattern("T1", 20)]), has_result: true };
+    seriesResult.mockImplementationOnce(async () => ({
+      result: {
+        entries: [entry(0, 0.0419), entry(1, 0.0434)],
+        diagnostics: [],
+        steps: [{ path: "phases.0.scale", labels: ["T0", "T1"], indices: [0, 1], step: 0.1,
+                  size_esd: 6.1, cold_ratio: null }],
+        direction_gaps: [{ path: "phases.0.cell.a", label: "T1", index: 1, forward: 4.159,
+                           backward: 4.158, gap: 0.001, gap_esd: 2.5, forward_rung: "warm",
+                           backward_rung: "warm" }],
+        code_counts: [], phase_names: ["LaB6"], atom_labels: [[]],
+      },
+      trajectories: [
+        { path: "phases.0.cell.a", x: [10, 20], x_label: "T (K)", value: [4.15692, 4.15901],
+          stderr: [0.00002, 0.00003], labels: ["T0", "T1"], backward: [4.15690, 4.158],
+          n_sigma: 2.5, gap_at: null },
+        { path: "phases.0.scale", x: [10, 20], x_label: "T (K)", value: [1.2, 1.3],
+          stderr: [0.01, 0.01], labels: ["T0", "T1"], backward: null, n_sigma: null, gap_at: null },
+      ],
+      has_backward: true,
+    }) as any);
+    trendViews.length = 0;
+    graphs.length = 0;
+    await boot(3);
+    // the list is headed Plot, and names the pattern its values are at
+    const heads = () => [...document.querySelectorAll(".body h3")].map((h) => [h.firstChild?.textContent, text(h.querySelector(".nt"))].join(" ").trim());
+    expect(heads()).toContain("Plot values at T0, 10");
+    const box = (name: string) => document.querySelector<HTMLInputElement>(`input[aria-label="Plot ${name}"]`)!;
+    // Rwp and the first phase's cell are plotted by default (call 12)
+    expect([box("Rwp (%)").checked, box("GoF").checked, box("LaB6 cell.a").checked, box("LaB6 scale").checked])
+      .toEqual([true, false, true, false]);
+    expect(trendsView()).toMatchObject({ plotted: ["rwp", "phases.0.cell.a"], selected: 0, name: "T0", x: 10 });
+    // a tick plots on Trends and shows it
+    box("LaB6 scale").click();
+    flushSync();
+    expect(trendsView()!.plotted).toEqual(["rwp", "phases.0.cell.a", "phases.0.scale"]);
+    expect(graphs).toEqual(["trends"]);
+    box("Rwp (%)").click();
+    flushSync();
+    expect(trendsView()!.plotted).toEqual(["phases.0.cell.a", "phases.0.scale"]);
+    expect(box("Rwp (%)").checked).toBe(false);
+    // a summary row's Plot: the value plotted, its pattern selected, Trends shown
+    const plots = [...document.querySelectorAll<HTMLButtonElement>(".summary button")];
+    expect(plots.map(text)).toEqual(["Plot", "Plot"]);
+    app.plot(["phases.0.cell.a"], false);
+    flushSync();
+    plots[0].click();
+    flushSync();
+    expect(trendsView()).toMatchObject({ plotted: ["phases.0.scale", "phases.0.cell.a"], selected: 1, name: "T1" });
+    expect(graphs).toEqual(["trends", "trends", "trends"]);
+    expect(document.querySelectorAll("table.rows tbody tr")[1].classList.contains("sel")).toBe(true);
+    expect(heads()).toContain("Plot values at T1, 20");
+    // a point click on Trends selects its pattern through `select`
+    app.select(0);
+    flushSync();
+    expect(trendsView()!.selected).toBe(0);
+  });
+});
+
+describe("the selected pattern", () => {
+  const ev = (seq: number, kind: string, index: number, data: Record<string, unknown> = {}): EngineEvent =>
+    ({ seq, kind, t: seq, data: { series_index: index, series_label: `T${index}`, series_n: 3,
+                                   series_pass: "forward", ...data } });
+
+  it("draws the first staged pattern, and a row click and the steps move it", async () => {
+    stored = setupOf([pattern("T0", 10), pattern("T1", 20), pattern("T2", 30)]);
+    await boot();
+    expect(view()).toMatchObject({ name: "T0", sub: "10 · 1 of 3 · not fitted",
+                                   canPrev: false, canNext: true });
+    await view()!.source.load();
+    expect(seriesPattern).toHaveBeenLastCalledWith(0, "staged");
+    (document.querySelectorAll("table.rows tbody tr")[2] as HTMLElement).click();
+    flushSync();
+    expect(view()).toMatchObject({ name: "T2", canNext: false });
+    expect(document.querySelectorAll("table.rows tbody tr")[2].classList.contains("sel")).toBe(true);
+    // ‹ and ↑ step back, held at the ends
+    app.move(-1);
+    flushSync();
+    expect(view()!.name).toBe("T1");
+    app.move(-5);
+    flushSync();
+    expect(view()!.name).toBe("T0");
+  });
+
+  it("follows the pattern being fitted until a row click, and Follow the run resumes", async () => {
+    stored = setupOf([pattern("T0", 10), pattern("T1", 20), pattern("T2", 30)]);
+    await boot(2, { state: "running", run: { kind: "series" } } as RunState);
+    app.event(ev(1, "fit_start", 0));
+    flushSync();
+    expect(view()).toMatchObject({ name: "T0", sub: "10 · 1 of 3 · fitting…" });
+    app.event(ev(2, "fit_end", 0, { rwp: 0.2241, gof: 1.9, status: "converged" }));
+    flushSync();
+    // the fit has landed: the key moves, so the graph asks again, expecting it
+    expect(view()!.sub).toBe("10 · 1 of 3 · Rwp 22.41 %");
+    seriesPattern.mockImplementationOnce(async () => packed(true));
+    await view()!.source.load();
+    expect(seriesPattern).toHaveBeenLastCalledWith(0, "run");
+    app.event(ev(3, "fit_start", 1));
+    flushSync();
+    expect(view()!.name).toBe("T1");
+    expect(button("Follow the run")).toBeUndefined();
+    // a row click stops following
+    (document.querySelectorAll("table.rows tbody tr")[0] as HTMLElement).click();
+    flushSync();
+    app.event(ev(4, "fit_end", 1, { rwp: 0.23, gof: 2, status: "converged" }));
+    app.event(ev(5, "fit_start", 2));
+    flushSync();
+    expect(view()!.name).toBe("T0");
+    button("Follow the run").click();
+    flushSync();
+    expect(view()).toMatchObject({ name: "T2", sub: "30 · 3 of 3 · fitting…" });
+  });
+
+  it("reads the run's list off the record when the staged list was edited after it", async () => {
+    // the run fitted T0, T1 and T2; T0 was removed, and the page reloaded
+    stored = { ...setupOf([pattern("T1", 20), pattern("T2", 30)]), has_result: true };
+    const fitted = (index: number) => ({ index, label: `T${index}`, x: 10 * (index + 1),
+      status: "converged", statistics: { rwp: 0.04, gof: 1.9 }, rung: index ? "warm" : "cold",
+      rungs_tried: [], diagnostics: [] });
+    seriesResult.mockImplementationOnce(async () => ({
+      result: { entries: [0, 1, 2].map(fitted), diagnostics: [], steps: [], direction_gaps: null,
+                code_counts: [], phase_names: [], atom_labels: [] },
+      trajectories: [], has_backward: false,
+    }) as any);
+    await boot(2);
+    expect([...document.querySelectorAll("table.rows tbody tr")].map((r) => cells(
+      [...document.querySelectorAll("table.rows tbody tr")].indexOf(r))[1])).toEqual(["T0", "T1", "T2"]);
+    // the graph draws the run's first member, under its own name
+    expect(view()).toMatchObject({ name: "T0" });
+    await view()!.source.load();
+    expect(seriesPattern).toHaveBeenLastCalledWith(0, "run");
   });
 });

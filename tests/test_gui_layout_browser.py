@@ -1184,6 +1184,50 @@ def test_no_pattern_control_moves_the_refinement_window(browser, gui):
     assert not failures, "\n".join(failures)
 
 
+#: The ink a canvas region holds: how many of its pixels anything painted.
+_INK = """([i, x0, x1, y0, y1]) => {
+    const u = document.querySelectorAll('.host .uplot')[i], c = u.querySelector('canvas');
+    const r = c.getBoundingClientRect(), s = c.width / r.width;
+    const img = c.getContext('2d').getImageData(Math.round((x0 - r.left) * s), Math.round((y0 - r.top) * s),
+        Math.round((x1 - x0) * s), Math.round((y1 - y0) * s)).data;
+    let n = 0;
+    for (let k = 3; k < img.length; k += 4) if (img[k] > 0) n++;
+    return n;
+}"""
+
+
+def test_the_rebuilt_plot_reaches_its_gutter_and_labels_only_what_it_draws(browser, tmp_path_factory):
+    """WP-2245, on a project that has never been fitted. The plot area ends where
+    the legend gutter starts, as the prototype's does: uPlot padded it 25 px
+    short, a fifth of the pane blank with the gutter. The difference pane draws
+    nothing before a fit, so its axis prints nothing: it read 100 and 0, the
+    range uPlot gives a pane with no data, under the intensity's labels."""
+    from tests.test_project import _write_xye
+    from tests.test_refine_synthetic import synthesize
+
+    data = _write_xye(tmp_path_factory.mktemp("prefit-data") / "synth.xye", synthesize())
+    project = _project(tmp_path_factory.mktemp("prefit") / "sample.rex", data)
+    httpd = _start(GuiSession(project, state_dir=tmp_path_factory.mktemp("prefit-state")))
+    try:
+        page = _open_window(browser, f"http://127.0.0.1:{httpd.server_address[1]}/")
+        boxes = page.evaluate("""() => {
+            const r = (e) => { const b = e.getBoundingClientRect(); return [b.left, b.top, b.right, b.bottom]; };
+            return { over: [...document.querySelectorAll('.host .u-over')].map(r),
+                     uplot: [...document.querySelectorAll('.host .uplot')].map(r),
+                     gutter: r(document.querySelector('.gutter')) }; }""")
+        for over in boxes["over"]:
+            assert abs(over[2] - boxes["gutter"][0]) <= 1, (over, boxes["gutter"])
+        # the tick-label column left of each plot area: the intensity's holds
+        # its labels, the empty difference pane's holds no ink at all
+        main, resid = boxes["over"][0], boxes["over"][1]
+        assert page.evaluate(_INK, [0, boxes["uplot"][0][0], main[0] - 1, main[1], main[3]]) > 0
+        assert page.evaluate(_INK, [1, boxes["uplot"][1][0], resid[0] - 1, boxes["uplot"][1][1], resid[3]]) == 0
+        assert not page.errors, page.errors
+        page.close()
+    finally:
+        httpd.shutdown()
+
+
 def test_a_region_is_drawn_selected_and_deleted_in_place(browser, gui):
     """An excluded region is an object on the plot (WP-2216): armed from the
     context menu, dragged, selected with a click, deleted with a key. The

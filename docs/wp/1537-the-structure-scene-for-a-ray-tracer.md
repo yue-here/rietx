@@ -139,6 +139,15 @@ change.
 - `src/rietx/gui/server.py` and `gui/src/panels/Structure3D.svelte` for the
   menu, then a rebuilt dist.
 
+### Inherited
+
+- **2026-11-16, from [1536](1536-the-structure-figure-as-an-svg.md) (open, PR #1606): the
+  suffix dispatch exists.** `render.WRITERS` is the tuple `render_structure`'s refusal quotes,
+  `(".png", ".svg")`, and the write branch in `render_structure` picks the writer by suffix after
+  the raster has run; `.pov` and `.glb` join that tuple and that branch. `vector.py`'s
+  `display_list` is a flat, depth-keyed list in image pixels, so it is not the scene a ray tracer
+  wants: read `scene.build_scene`'s Å geometry as this WP's Context already says.
+
 ## Non-goals
 
 - STL, OBJ, X3D and VRML. STL has no colour and OBJ no vertex colour.
