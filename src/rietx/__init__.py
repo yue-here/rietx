@@ -308,6 +308,25 @@ _TOP_LEVEL_HINTS: dict[str, str] = {
 }
 
 
+def _defined_below(name: str) -> str:
+    """Where a public name the package defines one level down lives, or ``""``.
+
+    A name that exists in an imported submodule but is not exported was
+    answered with the closest *spelling* on the top-level surface:
+    ``rietx.structure_from_cif`` suggested ``MicrostructureTerm`` (issue
+    #1837).  The exact name in the module that defines it is the better
+    answer.  Only modules already imported are read, so this imports nothing.
+    """
+    import sys
+
+    homes = sorted(
+        module.__name__ for module in list(sys.modules.values())
+        if getattr(module, "__name__", "").startswith(__name__ + ".")
+        and getattr(vars(module).get(name), "__module__", None)
+        == module.__name__)
+    return f"it is not exported at top level; import it from {homes[0]}" if homes else ""
+
+
 def __getattr__(name: str) -> object:
     """PEP 562: a missing top-level name answered with where it actually is.
 
@@ -349,7 +368,7 @@ def __getattr__(name: str) -> object:
     plain = f"module {__name__!r} has no attribute {name!r}"
     if name.startswith("_"):
         raise AttributeError(plain)
-    extra = _TOP_LEVEL_HINTS.get(name)
+    extra = _TOP_LEVEL_HINTS.get(name) or _defined_below(name)
     if extra:
         raise AttributeError(f"{plain}; {extra}")
     hint = _did_you_mean(name, __all__)
