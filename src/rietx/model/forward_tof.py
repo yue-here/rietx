@@ -1220,6 +1220,19 @@ def compile_tof_model(structure: Structure, instrument: Instrument,
         # a phase with a moment asks the one dispatch authority, which refuses
         # a source it does not name rather than drawing the nuclear part alone
         magnetic_wanted(phase, src)
+        # A propagation vector with no moment adds satellites the bank never
+        # builds: Le Bail and Pawley are refused here, and a Rietveld stage puts
+        # exactly zero on a satellite, so nothing would read k and its ticks
+        # would be missing without a word (Rule 4: a literal the call cannot
+        # honour raises before any work).
+        _require(phase.propagation_vector is None,
+                 f"compile_tof_model(): phases.{ip} declares propagation_vector "
+                 f"= {phase.propagation_vector!r} and this arm builds no "
+                 f"satellite reflections: the time-of-flight model generates "
+                 f"the nuclear list only, so k would be read by nothing. Set "
+                 f"phases[{ip}].propagation_vector = None; magnetic scattering "
+                 f"on a bank is a later rung of the time-of-flight track "
+                 f"(yue-here/rietx issue #193).")
         _require(phase.microstrain is None,
                  f"compile_tof_model(): phases.{ip} declares a Stephens "
                  f"anisotropic-strain block and this arm cannot apply it: "

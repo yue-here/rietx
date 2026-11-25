@@ -197,7 +197,7 @@ The result carries `RefinementResult.tof` in place of `RefinementResult.two_thet
 The rest of the package is still angle-shaped, and says so.
 `MultiHistogramRefinement`, `refine_sequential`, `index_pattern`, `pick_peaks`, `determine_extinction_symbol`, `auto_background`, `diagnose`, `PatternData.plot` and the project container raise on a flight-time axis or a `neutron_tof` instrument.
 The message names the axis, its unit and the entry point.
-Le Bail and Pawley extraction, soft restraints and a magnetic moment are refused on a bank by name.
+Le Bail and Pawley extraction, soft restraints, a magnetic moment and a propagation vector are refused on a bank by name.
 So are March-Dollase preferred orientation and Stephens anisotropic strain, rather than dropped: both are written in degrees 2θ, and on a bank every reflection shares one angle, so each has a different form there and not a different value.
 A spherical-harmonics texture is refused because only the constant-wavelength model computes it.
 Specimen absorption and Sabine extinction are not refused.

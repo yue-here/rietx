@@ -1244,6 +1244,22 @@ def test_a_declared_peak_equation_or_sharp_extra_peak_is_refused_on_a_bank():
     compile_tof_model(silicon(), ins, _blank_bank())
 
 
+def test_a_propagation_vector_is_refused_on_a_bank():
+    """The bank builds no satellite list, so a k with no moment would be read
+    by nothing and its ticks would be missing without a word; it is refused by
+    name before any work (Rule 4), and the same phase without k compiles."""
+    from rietx.model.forward_tof import compile_tof_model
+
+    structure = silicon()
+    structure.phases[0].propagation_vector = ("0", "0", "1/2")
+    with pytest.raises(ValueError, match=r"phases\.0 declares propagation_vector"):
+        compile_tof_model(structure, bank(), _blank_bank())
+    with pytest.raises(ValueError, match=r"propagation_vector = None"):
+        rx.Refinement(structure, bank(), history=False).fit(_synthetic_pattern())
+    structure.phases[0].propagation_vector = None
+    compile_tof_model(structure, bank(), _blank_bank())
+
+
 def test_a_gaussian_branch_bank_with_no_gaussian_width_is_finite():
     """Item 14.  sig0 = sig1 = sig2 = 0 is legal ("no Gaussian
     broadening"); on the Gaussian branch (γ = 0) the kernel divided by
