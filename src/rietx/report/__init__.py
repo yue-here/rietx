@@ -366,8 +366,8 @@ def build_report(result: RefinementResult, *, model=None, values=None,
         The refinement result.  With nothing else the report is Layer 0.
     model
         The :class:`~rietx.model.forward.CompiledModel` the fit ran on.  With
-        ``values`` it enables Layers 1-2; without it ``layer1_available``
-        stays False.  ``Refinement.report()`` fills it in for you.
+        ``values`` it enables Layers 1-2 (with ``structure`` and ``instrument``,
+        unless the model is Pawley); without it ``layer1_available`` stays False.  ``Refinement.report()`` fills it in for you.
     values
         The parameter value dict to read ``model`` at, needed with ``model``.
         ``Refinement.report()`` fills it in for you.

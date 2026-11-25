@@ -517,7 +517,7 @@ def _stray_entries(calls: dict) -> list[str]:
 def _baseline_problems(calls: dict, baseline: frozenset[str], cap: int) -> list[str]:
     """Both ways, the shape of `test_help.py`, plus the size: an argument with
     no entry and no baseline line, a baseline line whose argument is now
-    documented or gone, and a baseline larger than its cap."""
+    documented or gone, and a baseline whose size is not its cap."""
     missing = {f"{name}({arg})" for name, obj in calls.items()
                for arg in reference_pages.call_arguments(obj)
                if arg not in {a for a, _ in reference_pages.parameter_entries(obj)}}
@@ -530,10 +530,11 @@ def _baseline_problems(calls: dict, baseline: frozenset[str], cap: int) -> list[
         problems.append(
             "documented or gone, so delete their lines from docs/undocumented_parameters.py:\n"
             + "\n".join(sorted(baseline - missing)))
-    if len(baseline) > cap:
+    if len(baseline) != cap:
         problems.append(
             f"docs/undocumented_parameters.py holds {len(baseline)} lines against its cap "
-            f"of {cap}: the baseline only shrinks, so a new argument gets an entry")
+            f"of {cap}: the baseline only shrinks, so a new argument gets an entry, and "
+            f"a deleted line lowers UNDOCUMENTED_CAP in the same commit")
     return problems
 
 
@@ -588,13 +589,15 @@ def test_the_gate_refuses_an_entry_that_says_nothing():
     (frozenset({"f(a)", "f(b)"}), 2, "delete their lines"),
     # growth: a new undocumented argument, its line added beside it, past the cap
     (frozenset({"f(b)"}), 0, "against its cap of 0"),
+    # room left behind: a line deleted without lowering the cap
+    (frozenset({"f(b)"}), 2, "against its cap of 2"),
 ])
 def test_the_baseline_gate_refuses(baseline, cap, fragment):
     problems = _baseline_problems({"f": _undocumented_b}, baseline, cap)
     assert len(problems) == 1 and fragment in problems[0], problems
 
 
-def test_the_baseline_gate_passes_a_baseline_at_or_under_its_cap():
+def test_the_baseline_gate_passes_a_baseline_at_its_cap():
     assert _baseline_problems({"f": _undocumented_b}, frozenset({"f(b)"}), 1) == []
 
 

@@ -106,7 +106,7 @@ rest of the docstring stays where `help()` and an IDE show it.
   an entry or a line in the shrink-only baseline `UNDOCUMENTED_PARAMETERS`
   (`docs/undocumented_parameters.py`). Write the entry, delete the line and
   lower `UNDOCUMENTED_CAP` in the same commit; a baseline line whose argument
-  is documented or gone fails, and so does a baseline larger than its cap.
+  is documented or gone fails, and so does a baseline whose size is not its cap.
 
 One worked entry, from `Refinement.fit`:
 

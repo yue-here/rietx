@@ -6058,19 +6058,18 @@ class Refinement:
             ``(low, high)`` in degrees 2θ: only the channels between them are fitted.
             ``None`` fits the whole pattern.
         events
-            Per-iteration events for the caller: a path they are appended to as JSON
-            lines, a callable given each event as a dict, or an ``EventStream``.
+            Per-iteration events: a path (appended as JSON lines), a callable given
+            each event as a dict, or an ``EventStream``.
             ``None`` sends none; the run still records itself (``telemetry``).
         cancel
             A ``CancelToken`` another thread can set. The stage in flight is abandoned,
             the models go back to their values before it, and ``RefinementCancelled`` is
-            raised carrying the stages that completed. ``None`` passes no token; a
-            recorded run can still be stopped from ``rietx watch``.
+            raised carrying the stages that completed. ``None``: no token
+            (``rietx watch`` can still stop a recorded run).
         telemetry
-            The directory the run's own directory is created in, which ``rietx watch``
-            reads. ``False`` records nothing; ``None`` uses the project's ``live/``
-            directory when this refinement came from a project, else ``.rietx/runs``
-            under the working directory.
+            Where the run's directory is created, for ``rietx watch``. ``False``
+            records nothing; ``None`` is the project's ``live/``, else ``.rietx/runs``
+            in the working directory.
         label
             What the run is called in ``rietx watch``: the phase, the sample or the
             candidate it fits. ``None`` names it after its directory or its project. It
@@ -6085,7 +6084,8 @@ class Refinement:
         refit
             What a re-fit of a pattern this model already converged on runs:
             ``"single"`` collapses the plan into one stage, ``"stages"`` runs the plan
-            as a first fit does. A first fit always runs the plan.
+            as a first fit does. A plan that turns parameters off, or frees one the
+            last fit held, runs staged either way. A first fit always runs the plan.
 
         Notes
         -----
@@ -7122,21 +7122,20 @@ class Refinement:
             stage to refine the phase's structure. ``None`` holds no phase for that.
         window_area_tol
             The fraction of each peak's area the stage's windows may leave out. ``None``
-            is ``CLOSING_WINDOW_TOL``, the fraction a fit's answer is measured at.
+            takes the working default ([stage settings](settings.md#stage-settings)).
         events
-            Per-iteration events for the caller: a path they are appended to as JSON
-            lines, a callable given each event as a dict, or an ``EventStream``.
+            Per-iteration events: a path (appended as JSON lines), a callable given
+            each event as a dict, or an ``EventStream``.
             ``None`` sends none; the run still records itself (``telemetry``).
         cancel
             A ``CancelToken`` another thread can set. The stage in flight is abandoned,
             the models go back to their values before it, and ``RefinementCancelled`` is
-            raised carrying the stages that completed. ``None`` passes no token; a
-            recorded run can still be stopped from ``rietx watch``.
+            raised carrying the stages that completed. ``None``: no token
+            (``rietx watch`` can still stop a recorded run).
         telemetry
-            The directory the run's own directory is created in, which ``rietx watch``
-            reads. ``False`` records nothing; ``None`` uses the project's ``live/``
-            directory when this refinement came from a project, else ``.rietx/runs``
-            under the working directory.
+            Where the run's directory is created, for ``rietx watch``. ``False``
+            records nothing; ``None`` is the project's ``live/``, else ``.rietx/runs``
+            in the working directory.
         label
             What the run is called in ``rietx watch``: the phase, the sample or the
             candidate it fits. ``None`` names it after its directory or its project. It

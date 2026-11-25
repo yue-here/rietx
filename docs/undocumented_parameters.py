@@ -2,7 +2,7 @@
 
 Shrink-only (WP-2024): `tests/test_reference_pages.py` fails on an argument
 missing from both its call's Parameters section and this set, on a line here
-whose argument is documented or gone, and on a set larger than
+whose argument is documented or gone, and on a set whose size is not
 `UNDOCUMENTED_CAP`.  Write the entry, delete the line and lower the cap in
 the same commit, so the room is not spent on a new argument
 (`CONTRIBUTING.md` § A Parameters section under each call).  WP-2025 empties
