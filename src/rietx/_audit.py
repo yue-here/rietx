@@ -4530,7 +4530,9 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic: a sum of n distinct real powers of d has at most n - 1 positive "
                   "roots (Descartes' rule of signs for generalised polynomials), so a file's "
                   "power-law law and rietx's agree at 17 distinct positive d only if they are "
-                  "one law, for any pair with 17 distinct powers between them; the bases fitted "
+                  "one law, for any pair with 17 distinct powers between them (the theorem counts "
+                  "exact zeros; the check itself runs at _EXACT, a rounding floor); the bases "
+                  "fitted "
                   "have at most four terms (topas_tof._exact_fit's callers: calibration 1, d, "
                   "d^2, 1/d; widths 1, d^2, d^4 and 1, d, d^2; rates 1 and 1/d or 1/d^4)")),
     Row("rietx.io.projects.topas_tof._D_SAMPLE_RANGE", "constant", tier=3, value=(0.25, 8.0),
@@ -4542,10 +4544,16 @@ ROWS: tuple[Row, ...] = (
                   "untested beyond it"),
         grounds=("A domain bound of rietx's choosing: no physics fixes where a time-of-flight "
                  "reflection may fall, and a law that differs from rietx's only below 0.25 A "
-                 "or above 8 A would be read as rietx's there.  The alternative, judging over "
-                 "the bank's own d range from start_X/finish_X and its calibration, is a "
-                 "design for its own change.  Unanimity: not an action; nobody named against "
-                 "judging a law over the range its reflections occupy.")),
+                 "or above 8 A would be read as rietx's there.  Read-or-refuse on a law is an "
+                 "action, and a refiner is named against the fixed range: one who judges over "
+                 "the bank's own d range, from start_X/finish_X and the calibration.  That "
+                 "refiner differs from rietx in two ways: a law that departs from rietx's only "
+                 "outside 0.25 to 8 A is read here in silence and judged there, and a law "
+                 "exact on the bank's range but not on 0.25 to 8 A is refused here and read "
+                 "there.  Both need a term that is not a power of d, below 1e-9 relative on "
+                 "one interval and above it on the other; no test law has one.  Judging over "
+                 "the bank's own range is a design for its own change."),
+        approved="2026-11-25", approved_by="checked"),
     Row("rietx.io.projects.topas_tof._EXACT", "constant", tier=1, value=1e-09,
         evidence=("numerical floor: the relative residual under which a file's law counts as "
                   "rietx's (topas_tof._exact_fit) and a declared value as the evaluated one "
@@ -4558,7 +4566,8 @@ ROWS: tuple[Row, ...] = (
                   "(test_phases_of_one_bank_stating_different_shapes_are_refused)")),
     Row("rietx.io.projects.topas_tof._TAIL_EFOLDS", "constant", tier=3, value=9.210340371976182,
         evidence=("derived: -ln(model.forward_tof.TOF_WINDOW_AREA_TOL), imported, with no free "
-                  "factor, the twin of forward_tof.TAIL_EFOLDS; sizes the written extra_X so "
+                  "factor, the twin of forward_tof.TAIL_EFOLDS; sizes the tail term of the "
+                  "written extra_X (topas_tof._extra_x adds 6 sigma and 10 gamma beside it), so "
                   "TOPAS generates every reflection whose tail rietx's frozen window keeps "
                   "inside the range (a peak 20 us below start_X: 6e-3 of the maximum missing on "
                   "the TOPAS side until extra_X was set, tests/data/README.md; "
@@ -4567,7 +4576,8 @@ ROWS: tuple[Row, ...] = (
                  "inherits that row's tier and grounds (approved 2026-11-17), as "
                  "forward_tof.TAIL_EFOLDS does; imported rather than respelled so one retune "
                  "moves the window and the written extra range together (#1548 round-2 "
-                 "item 4).")),
+                 "item 4)."),
+        approved="2026-11-25", approved_by="checked"),
     Row("rietx.io.readers.TWO_THETA_MAX_DEG", "constant", tier=1, value=180.0,
         evidence=('180.0 degrees: no scattering angle exceeds it, since 2theta is the angle '
                   'between the incident and scattered beams, so an axis running past it is not '
