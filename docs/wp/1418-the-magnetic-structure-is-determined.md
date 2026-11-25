@@ -1071,7 +1071,8 @@ moments along x (truth 2.5 and 1.0 μ_B) and fits from `SOLVE_SEED_MU_B` on both
 On main `68dae52c2` the equal start pairs the two at 2.479 ± 0.006, which is (m₁ + m₂)/√2, and the
 test fails there. Here both starts give |Σ occ·m| = 3.505 ± 0.009 and no pair. Fast, 0.3 s a fit.
 `_estimable_pair_esd` and `statistics.estimable` now say the estimable test is first-order at the
-answer (Prince 2004, p. 120). After this PR no fit test reaches `_estimable_pair_esd`, since its
+answer, a linearisation (Prince 2004, p. 120); that it is also exact for a function of the determined
+combinations is our own extension. After this PR no fit test reaches `_estimable_pair_esd`, since its
 one fit test is co-sited: a follow-up for WP-2230 (#1736).
 
 ### 2026-11-24 — K1a's budget now stops a search inside a stratum (PR #1732)
