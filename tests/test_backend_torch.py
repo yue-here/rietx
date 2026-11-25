@@ -428,4 +428,4 @@ def test_mps_refine_matches_numpy_cell():
     OUT.mkdir(exist_ok=True)
     plot_result(res_mps, path=str(OUT / "srm676a_torch_mps_fit.png"))
     plot_result(res_mps, path=str(OUT / "srm676a_torch_mps_fit_lowangle.png"),
-                two_theta_range=(24.0, 30.0))
+                two_theta_limits=(24.0, 30.0))

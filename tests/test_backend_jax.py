@@ -325,9 +325,9 @@ def test_srm660c_end_to_end_jax_matches_numpy(srm660c_baseline):
     OUT.mkdir(exist_ok=True)
     plot_result(results["jax"][1], path=str(OUT / "srm660c_jax_fit.png"))
     plot_result(results["jax"][1], path=str(OUT / "srm660c_jax_fit_lowangle.png"),
-                two_theta_range=(20.6, 22.2))
+                two_theta_limits=(20.6, 22.2))
     plot_result(results["jax"][1], path=str(OUT / "srm660c_jax_fit_highangle.png"),
-                two_theta_range=(147.5, 150.9))
+                two_theta_limits=(147.5, 150.9))
 
 
 def test_y3plus_hands_over_to_neutral_y_under_jax_as_under_numpy():

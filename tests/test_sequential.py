@@ -520,7 +520,7 @@ def test_a_tie_declared_in_constrain_holds_on_every_pattern(thermal_patterns):
     for k, result in enumerate(runner.results_):
         plot_result(result, path=str(out / f"sequential_tied_biso_p{k}.png"))
         plot_result(result, path=str(out / f"sequential_tied_biso_p{k}_zoom.png"),
-                    two_theta_range=(3.0, 10.0))
+                    two_theta_limits=(3.0, 10.0))
 
 
 def test_a_hold_declared_in_constrain_reaches_every_pattern(thermal_patterns):
@@ -561,7 +561,7 @@ def test_a_hold_declared_in_constrain_reaches_every_pattern(thermal_patterns):
     for k, result in enumerate(runner.results_):
         plot_result(result, path=str(out / f"sequential_held_cell_p{k}.png"))
         plot_result(result, path=str(out / f"sequential_held_cell_p{k}_zoom.png"),
-                    two_theta_range=(3.0, 10.0))
+                    two_theta_limits=(3.0, 10.0))
 
 
 class _ColdOnFrame(SequentialRefinement):
@@ -623,7 +623,7 @@ def test_a_hold_keeps_its_value_across_the_cold_rung(thermal_patterns):
     out.mkdir(exist_ok=True)
     plot_result(runner.results_[2], path=str(out / "sequential_cold_hold_p2.png"))
     plot_result(runner.results_[2], path=str(out / "sequential_cold_hold_p2_zoom.png"),
-                two_theta_range=(3.0, 10.0))
+                two_theta_limits=(3.0, 10.0))
 
 
 class _FailOnFrame(_ColdOnFrame):

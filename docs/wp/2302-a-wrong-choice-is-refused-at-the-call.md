@@ -129,7 +129,7 @@ heuristic, so `_audit` gains no row.
   rest against their registry on entry.
 - [x] M1: `tests/test_api_choices.py`, registry-driven, `compile_model` patched; the CLAUDE.md
   Invariants entry.
-- [ ] `two_theta_range` → `two_theta_limits` on the four calls that request a window; the
+- [x] `two_theta_range` → `two_theta_limits` on the four calls that request a window; the
   docstrings state the describe/request split; the two schema fields measured against it.
   Manual, skill, examples and GUI callers follow.
 - [ ] Each `path` argument says which it is, in its type and its docstring's first mention.

@@ -126,7 +126,7 @@ def test_a_synchrotron_twin_is_indexed_in_its_own_window(tmp_path,
     data = rx.PatternData(two_theta=list(tt), intensity=list(obs.astype(float)),
                           sigma=list(np.sqrt(np.maximum(obs, 1.0))))
     limits = (12.1, 60.0)
-    peaks = rx.pick_peaks(data, ins, two_theta_range=limits)
+    peaks = rx.pick_peaks(data, ins, two_theta_limits=limits)
 
     allowance, assumed = effective_shift_allowance(SearchSpec(), None, peaks)
     assert assumed and 0.015 < allowance < 0.03, allowance

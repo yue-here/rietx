@@ -461,7 +461,7 @@ def test_a_zoom_is_a_figure_of_its_own_data(synthetic_pattern):
 
     OUT.mkdir(exist_ok=True)
     zoom = result.plot(path=str(OUT / "viz_zoom_window.png"),
-                       two_theta_range=(float(lo), float(hi)))
+                       two_theta_limits=(float(lo), float(hi)))
     assert zoom.get_axes()[0].get_ylim()[1] < float(y.max())
     # the spine spans the window's own data, so no peak escapes the axis and
     # none of the axis is empty above it

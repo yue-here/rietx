@@ -38,4 +38,4 @@ A site is left out, or a slab or a motif kept, by a mask over the dict's `atoms`
 
 `data.plot()` on a `PatternData` just read draws it in the result panel's style, keywords shared with `result.plot()`. It shows the file, not a fit: judge a fit from the result's figure and its numbers. `title=` names either figure; the default draws none.
 
-- `rx.viz.plot_pattern(data, *, path: str | None = None, two_theta_range: tuple[float, float] | None = None, x_axis: str = 'two_theta', wavelength: float | None = None, y_scale: str = 'linear', style: str = 'light', figsize: tuple[float, float] | None = None, font_size: float = 11.0, dpi: int = 300, title: str | None = None, model=None)` — A measured pattern on its own, before any model exists.
+- `rx.viz.plot_pattern(data, *, path: str | None = None, two_theta_limits: tuple[float, float] | None = None, x_axis: str = 'two_theta', wavelength: float | None = None, y_scale: str = 'linear', style: str = 'light', figsize: tuple[float, float] | None = None, font_size: float = 11.0, dpi: int = 300, title: str | None = None, model=None)` — A measured pattern on its own, before any model exists.
