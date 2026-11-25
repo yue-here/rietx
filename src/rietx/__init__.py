@@ -316,12 +316,14 @@ def _defined_below(name: str) -> str:
     the CIF reader asked for at top level suggested ``MicrostructureTerm`` (issue
     #1837).  The exact name in the module that defines it is the better
     answer.  Only modules already imported are read, so this imports nothing.
+    A private module (any ``_`` segment) is never offered as an address.
     """
     import sys
 
     homes = sorted(
         module.__name__ for module in list(sys.modules.values())
         if getattr(module, "__name__", "").startswith(__name__ + ".")
+        and not any(part.startswith("_") for part in module.__name__.split("."))
         and getattr(vars(module).get(name), "__module__", None)
         == module.__name__)
     return f"it is not exported at top level; import it from {homes[0]}" if homes else ""

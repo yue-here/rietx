@@ -1740,6 +1740,7 @@ class MultiHistogramRefinement:
         joint fit is its event log, and :meth:`report` builds the answer's
         report per histogram.
         """
+        check_mode(mode)
         _refuse_without_phases(self.mtable.structures[0], "refine_multi")
         data = list(data)
         n = self.n_histograms
@@ -4099,6 +4100,7 @@ def refine_multi(data: list[PatternData], structure: Structure | list[Structure]
     ``basis="expression"`` equation refines (WP-1964), and ``mode``,
     ``events``, ``cancel``, ``telemetry``, ``label`` and ``progress`` its
     ``fit``'s."""
+    check_mode(mode)
     ref = MultiHistogramRefinement(structure, instruments, sharing=sharing,
                                    coordinates=coordinates, parametric=parametric,
                                    variables=variables,

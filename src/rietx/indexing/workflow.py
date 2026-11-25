@@ -857,6 +857,10 @@ def index_pattern(peaks: PeakList | None = None, *,
     # the choices first, before a peak is picked (WP-2302)
     if preset is not None:
         check_choice("preset", preset, SEARCH_PRESETS)
+    if isinstance(engines, str):
+        # a bare name would be read letter by letter
+        raise ValueError(f"engines takes a list of names, as in "
+                         f"engines=[{engines!r}]; got the string {engines!r}")
     for name in engines or ():
         check_choice("engines", name, engine_names())
     if formula is not None:
