@@ -310,7 +310,12 @@ def test_a_ratio_the_data_cannot_see_is_never_in_tension(flat_pattern):
 def test_a_ratio_wrong_by_five_sigma_is_reported_under_one_key(separate_pattern):
     """Where the data measure the partition (W_Cu ± 0.002 unrestrained), a
     ratio declared 5σ off fires ``RESTRAINT_TENSION`` (−3.6σ measured), once,
-    keyed on the row and not its paths; the true ratio does not."""
+    keyed on the row and not its paths; the true ratio does not.
+
+    The margin over the 3σ threshold (0.62σ) is the fixed noise draw's
+    (seed 3), not the solver's: refitting from a start scale moved by
+    (1 + k·1e-14), k = ±1, ±3, ±7, 20, moved −3.616085σ by under 1e-12σ
+    (darwin arm64, 2026-11-25)."""
     _, ratio = _truth(SEPARATE)
     good = _fit(SEPARATE, separate_pattern, [_ratio_row(SEPARATE, ratio, 0.02)])
     assert not [d for d in good.diagnostics if d.code == "RESTRAINT_TENSION"]
@@ -368,7 +373,11 @@ def test_a_series_where_the_ratio_decides_each_partition():
         _instrument(), plan=plan)
     rows = [c for c in series.code_counts or [] if c.code == "RESTRAINT_TENSION"]
     # one row of the series, never one per path the row reads; the noise puts
-    # a 5σ error at about 4σ, so it fires on most patterns (2 of 3 measured)
+    # a 5σ error at about 4σ, so it fires on most patterns: 2 of 3 measured
+    # (seeds 21 and 23 at -3.4σ and -4.1σ, seed 22 under 3σ; darwin arm64,
+    # 2026-11-25), so ``>= 2`` holds while the draws do; the nearest firing
+    # sits 0.4σ over the threshold, against under 1e-12σ that a perturbed
+    # start moved the single fit's deviation (the test above)
     assert [(c.path, c.n_patterns) for c in rows] == [("restraints.0", 3)]
     assert rows[0].count >= 2
 
