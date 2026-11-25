@@ -242,6 +242,19 @@ so they are reader output and checked blind in the PR.
   `STAGE_FREED_NOTHING`'s help, the `unreached_patterns` help and the
   reference page now say "globs" where they meant globs.
 
+  *Merge of main (`68dae52c2`), 2026-11-25, by a ghostshift runner.* Two
+  conflicts. `docs/milestones/v1.13.md` keeps both entries. `src/rietx/multi.py`
+  stays the stub, and main's edits to it land in `joint.py`: WP-2304's
+  `_reader_diagnostics` scope row and per-pattern call, and WP-2302's
+  `check_backend`, `check_choice` and `check_mode` refusals.
+  `tests/test_api_choices.py` and `tests/test_reader_notes.py` came in from
+  main naming `refine_multi`, `MultiHistogramRefinement` and `.histograms`,
+  and now use the new names. Gates on the merged tree (`[dev]`,
+  darwin/arm64): CI's lint steps against `origin/main` all exit 0, Vale 0
+  errors, `tests.reader_output` unchanged. Fast selection 15816 passed,
+  452 skipped, 30 xfailed, 0 failed. The slow rows calling the joint fit
+  (wavelength, holder cell, parametric expression and series) 16 passed.
+
   *Next:* WP-2300's declaration, written in these names (noted in its
   `### Inherited`), and WP-2103's path-taking verbs call
   `refuse_retired_scope` (noted in its `### Inherited`).
