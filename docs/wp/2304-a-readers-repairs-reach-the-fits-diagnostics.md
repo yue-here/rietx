@@ -55,13 +55,19 @@ Tier: none. The notes are the reader's existing codes, already in `_audit`.
 - [x] `PatternData` carries the reader's notes; `read_pattern` fills it whether or not a list
   was passed, and still extends the list when one was. The caller's list is extended in a
   `finally`, so a refusal's notes still reach it. `crop` carries the notes.
-- [ ] Each fit entry point copies the notes into `result.diagnostics`, one per code;
-  `PATTERN_DEAD_CHANNELS` appears once.
-- [ ] A series and a joint fit carry each pattern's notes (per pattern in a series, per
-  histogram in a joint fit).
+- [x] Each fit entry point copies the notes into `result.diagnostics`, one per code;
+  `PATTERN_DEAD_CHANNELS` appears once. One seam: `compile_model` copies them onto
+  `CompiledModel.reader_notes`, and `refine._build_result` (every single-pattern entry point:
+  `fit`, `run_stage`, `cherry_pick`, `replay`) appends them last. A note whose code the fit
+  already raised is left out. The fit owns `PATTERN_DEAD_CHANNELS`: it asks again on the fitted
+  channels, so the reader's copy is never handed on.
+- [x] A series and a joint fit carry each pattern's notes (per pattern in a series, per
+  histogram in a joint fit). A series fits each pattern through `refine`, so it inherits the
+  seam. The joint fit calls the helper in its per-histogram loop, with a `DIAGNOSTIC_SCOPES`
+  row.
 - [ ] `src/rietx/io/CLAUDE.md` § the repairs: the notes reach the fit.
-- [ ] Tests: one fixture per repair code, read without a list, asserting the code in
-  `result.diagnostics`.
+- [x] Tests: one fixture per repair code, read without a list, asserting the code in
+  `result.diagnostics`. `tests/test_reader_notes.py`, seven cases.
 - [ ] Skill: none. The codes already have rows; they now arrive where the skill already sends
   the agent.
 

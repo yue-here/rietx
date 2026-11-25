@@ -10259,6 +10259,10 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     diagnostics = diagnostics + _extra_peak_diagnostics(
         model, values, ticks, table, floors=floors)
 
+    # What the reader repaired or noticed in the file, last so that a code the
+    # fit raised itself keeps the fit's reading (WP-2304).
+    diagnostics = diagnostics + _reader_diagnostics(model, diagnostics)
+
     # Degeneracy evidence off the answer-producing stage's Jacobian, which is
     # not serialized and so cannot be recovered later (WP-1055/-1056).  The
     # same numbers the guards screened, carried whole rather than as the
@@ -11313,6 +11317,32 @@ def _extra_peak_diagnostics(model: CompiledModel, values: dict,
                         "If the component stands in for a misfitting "
                         "reflection, fix the phase's scale, profile and "
                         "preferred orientation instead.")))
+    return out
+
+
+#: Reader codes the fit asks again for itself, so the reader's copy is never
+#: handed on: ``PATTERN_DEAD_CHANNELS`` is judged on the fitted channels by
+#: :func:`_data_support_diagnostics`, and a dead cell the caller has since
+#: excluded must not come back with the advice to exclude it.
+_FIT_OWNED_READER_CODES = frozenset({"PATTERN_DEAD_CHANNELS"})
+
+
+def _reader_diagnostics(model: CompiledModel,
+                        raised: list[Diagnostic]) -> list[Diagnostic]:
+    """What the reader repaired or noticed in this pattern (WP-2304).
+
+    ``read_pattern`` keeps its notes on ``PatternData.diagnostics`` whether or
+    not a caller passed a list, and ``compile_model`` carries them here, so a
+    rescaled intensity or a withheld σ reaches every fit on the file.  A note
+    whose code the fit has already raised, or asks for itself
+    (:data:`_FIT_OWNED_READER_CODES`), is left out; an exact repeat is too.
+    """
+    have = {d.code for d in raised} | _FIT_OWNED_READER_CODES
+    out: list[Diagnostic] = []
+    for note in model.reader_notes:
+        if note.code in have or note in out:
+            continue
+        out.append(note)
     return out
 
 

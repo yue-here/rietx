@@ -1214,6 +1214,10 @@ class CompiledModel:
     # ``RefinementResult.sigma_rule`` carries.  ``None`` only on a model built
     # without ``compile_model``.
     sigma_rule: SigmaRule | None = None
+    # What the reader repaired or noticed in the file (``PatternData.diagnostics``,
+    # WP-2304), carried so the result builder can hand it on: by then the
+    # pattern itself is out of reach.  Empty on a pattern built by hand.
+    reader_notes: tuple = ()
     meta: dict = field(default_factory=dict)
 
     # ------------------------------------------------------------------
@@ -5253,6 +5257,7 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         tt=tt, y_obs=y_obs, sigma=sigma, tt_min=tt_min, tt_max=tt_max,
         sigma_measured=pattern.sigma is not None,
         sigma_rule=sigma_rule,
+        reader_notes=tuple(pattern.diagnostics),
         wavelength=instrument.source.primary_wavelength,
         line_wavelengths=lams,
         harmonic_orders=harmonic_orders,
