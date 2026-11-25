@@ -39,6 +39,8 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 from ..schemas.pattern import PatternData
 from ..schemas.sequential import SeriesResult, _rejected
 from ..sequential import (
@@ -46,6 +48,7 @@ from ..sequential import (
     REFIT_MODES,
     unique_labels,
 )
+from ..viz.packed import Packed, curve_arrays
 from .imports import UploadStore, preview_pattern
 
 #: What the carry-glob editor says about itself.  A control for parameters that
@@ -307,6 +310,133 @@ def setup_payload(setup: SeriesSetup, *, running: bool, has_result: bool,
 
 
 # ----------------------------------------------------------------------
+# the trace's vocabulary (WP-1317)
+# ----------------------------------------------------------------------
+#: Every mark the series trace draws, and what it reads, written **once**.
+#:
+#: The rule this table keeps is issue #141's: the flag list and the event
+#: markers are one vocabulary, read from the :class:`SeriesResult`, never a
+#: second set invented view-side.  So each row names the field it is read from,
+#: and :func:`trace` is the only code that reads it; the route serves the table
+#: beside the trace, the panel draws what it is told, and the GUI guide's table
+#: is held to these rows both ways by ``tests/test_gui_series_trace.py``.
+#:
+#: Three sources, in order of how much the library has already judged:
+#:
+#: - a **series verdict on a pattern**: a ``SeriesResult.diagnostics`` row whose
+#:   ``where`` names one pattern, as the per-pattern fences all do
+#:   (``where=[entry.label or str(entry.index)]``).  The codes are an open
+#:   vocabulary (root ``CLAUDE.md``, Guards), so a code this table has no row for
+#:   is still drawn, with :data:`OTHER_MARK` and its own name.  A series-level
+#:   row with no pattern in ``where`` (``SEQUENTIAL_PERSISTENT_FINDING``,
+#:   ``…_CANCELLED``) stays the panel's banner and
+#:   Fences strip: it says something about the chain, not about a point of it.
+#: - the **pattern's own findings**: each ``SeriesEntry.diagnostics`` code,
+#:   counted per pattern.  A count and not a glyph per code, because a fit's own
+#:   codes include the ones that fire on every pattern, and those raise every
+#:   bar alike while a cluster still stands out above them.
+#: - the **largest step** of the parameter on show: its first row in
+#:   ``SeriesResult.steps``, which is sorted largest first.  A rank, not a
+#:   threshold — the field calls no step a jump (WP-2003), so neither does the
+#:   trace; it says where that parameter moved most.
+TRACE_VOCABULARY: tuple[dict[str, str], ...] = (
+    {"key": "SERIES_PATTERN_FAILED", "mark": "bar", "label": "failed",
+     "source": "SeriesResult.diagnostics",
+     "means": "every rung of the ladder raised, so this pattern has no fit and "
+              "no point on any trajectory"},
+    {"key": "SEQUENTIAL_UNRECOVERED", "mark": "cross", "label": "unrecovered",
+     "source": "SeriesResult.diagnostics",
+     "means": "the fit diverged on every rung: its values are not a "
+              "measurement, and it seeded no successor"},
+    {"key": "SEQUENTIAL_RESEED", "mark": "ring", "label": "reseeded",
+     "source": "SeriesResult.diagnostics",
+     "means": "a good fit reached from the initial model, not from its "
+              "neighbour, so it is no evidence the trajectory is continuous here"},
+    {"key": "findings", "mark": "count", "label": "findings",
+     "source": "SeriesEntry.diagnostics",
+     "means": "how many codes this pattern's own fit raised; a cluster of tall "
+              "bars is where the fits changed character"},
+    {"key": "largest_step", "mark": "band", "label": "largest step",
+     "source": "SeriesResult.steps",
+     "means": "the pair of patterns between which the parameter on show moved "
+              "most, in its esds; a rank, never a verdict"},
+)
+
+#: The mark a series verdict gets when :data:`TRACE_VOCABULARY` has no row for
+#: its code: drawn and named by its code rather than dropped.
+OTHER_MARK = "tick"
+
+
+def trace(series: SeriesResult,
+          coordinates: list[float | None] | None = None) -> dict:
+    """The series on its own axis: one point per pattern, with its marks.
+
+    Every pattern the chain was given is a point, a failed one included, in
+    index order — the order the chain is numbered in, which is the scrubber's
+    axis.  ``x`` is the pattern's series coordinate, the entry's own
+    (``SeriesEntry.x``), and for a failed pattern, which has no entry, the
+    one ``coordinates`` (the staged members' ``x``) gives at its index, or
+    ``None``.  ``marks`` are the codes of the series verdicts naming the
+    pattern, and ``findings`` its own fit's codes with their worst level,
+    both as :data:`TRACE_VOCABULARY` says.
+
+    The largest steps are served per path, so the panel marks the parameter
+    on show without a round trip when the reader picks another.  A path with
+    no esd on any step has none, as ``steps`` ranks only measured ones first.
+    """
+    points: dict[int, dict] = {}
+    names: dict[str, int] = {}
+    for entry in series.entries:
+        stats = entry.statistics
+        levels: dict[str, str] = {}
+        for d in entry.diagnostics:
+            if _LEVEL_RANK[d.level] > _LEVEL_RANK.get(levels.get(d.code, ""), -1):
+                levels[d.code] = d.level
+        points[entry.index] = {
+            "index": entry.index, "label": entry.label, "x": entry.x,
+            "status": entry.status,
+            "rwp": stats.rwp if stats is not None else None,
+            "marks": [],
+            "findings": [{"code": c, "level": v} for c, v in sorted(levels.items())]}
+        names[entry.label or str(entry.index)] = entry.index
+    for failure in series.failures:
+        at = (coordinates[failure.index]
+              if coordinates is not None and failure.index < len(coordinates)
+              else None)
+        points.setdefault(failure.index, {
+            "index": failure.index, "label": failure.label, "x": at,
+            "status": "failed", "rwp": None, "marks": [], "findings": []})
+        names.setdefault(failure.label or str(failure.index), failure.index)
+    for d in series.diagnostics:
+        if d.where and d.where[0] in names:
+            point = points[names[d.where[0]]]
+            # ``direction="both"`` adds the backward chain's failures here too,
+            # naming a pattern whose reported (forward) fit stands: that one
+            # has a point on every trajectory, so "failed" would be false of it
+            if d.code == "SERIES_PATTERN_FAILED" and point["status"] != "failed":
+                continue
+            if d.code not in point["marks"]:
+                point["marks"].append(d.code)
+    largest: dict[str, dict] = {}
+    for s in series.steps or []:
+        if s.size_esd is not None and s.path not in largest:
+            largest[s.path] = {"indices": list(s.indices),
+                               "size_esd": s.size_esd,
+                               "cold_ratio": s.cold_ratio}
+    return {
+        "x_label": series.x_label,
+        "points": [points[i] for i in sorted(points)],
+        "largest_steps": largest,
+        "vocabulary": [dict(row) for row in TRACE_VOCABULARY],
+        "other_mark": OTHER_MARK,
+    }
+
+
+#: a diagnostic level's rank, for keeping a code's worst level per pattern
+_LEVEL_RANK = {"info": 0, "warning": 1, "error": 2}
+
+
+# ----------------------------------------------------------------------
 # the answer
 # ----------------------------------------------------------------------
 def trajectories(series: SeriesResult,
@@ -381,8 +511,10 @@ def trajectories(series: SeriesResult,
 def result_payload(series: SeriesResult, backward: SeriesResult | None, *,
                    running: bool, curves: list[bool],
                    relative: frozenset[str] = frozenset(),
-                   angles: frozenset[str] = frozenset()) -> dict:
-    """The series answer as a client needs it: entries, trajectories, fences.
+                   angles: frozenset[str] = frozenset(),
+                   coordinates: list[float | None] | None = None) -> dict:
+    """The series answer as a client needs it: entries, trajectories, fences,
+    and the trace the panel scrubs along (:func:`trace`).
 
     ``curves`` says per entry whether this session still holds that pattern's
     full :class:`~rietx.schemas.results.RefinementResult` — a
@@ -403,14 +535,119 @@ def result_payload(series: SeriesResult, backward: SeriesResult | None, *,
 
     ``relative`` is the runner's ``sequential._relative_paths``, and
     ``angles`` its ``sequential._angle_paths``, both passed on to
-    :func:`trajectories`.
+    :func:`trajectories`.  ``coordinates`` are the staged members' ``x``, which
+    place a failed pattern on the trace (:func:`trace`).
     """
     return {
         "result": series.model_dump(mode="json"),
         "trajectories": trajectories(series, backward, relative, angles),
+        "trace": trace(series, coordinates),
         "has_backward": backward is not None,
         "n_iterations": series.n_iterations,
         "curves": list(curves),
         "rejected": [_rejected(entry) for entry in series.entries],
         "running": running,
     }
+
+
+# ----------------------------------------------------------------------
+# the map: every member on one grid (WP-2243)
+# ----------------------------------------------------------------------
+#: About the most cells (rows times columns) the map route sends in one
+#: answer, each a float64 in up to two arrays. At 34 patterns that is 44 000
+#: columns, every channel of a lab or synchrotron scan at its own step; at 68
+#: patterns, 22 000. Past it, neighbouring columns merge into one cell.
+#: *(Chosen: WP-2243, 2026-11-24 — ten curves payloads' worth,
+#: ``viz.packed.CURVES_CEILING``, so the largest answer is 24 MB over loopback
+#: and the browser's binning per row stays a loop over 1.5 M floats.)*
+MAP_CELLS = 1_500_000
+
+
+def map_grid(grids: list[np.ndarray], n_rows: int,
+             cells: int = MAP_CELLS) -> tuple[np.ndarray, np.ndarray]:
+    """The 2θ of each map column, and the edges of the cells around them.
+
+    Members that share their channels keep them: the grid is the first
+    member's own, and each cell holds one channel of each member. Members that
+    do not (two ranges, two steps) go onto a uniform grid over the span they
+    cover together, at the finest member's median step. A grid that fine
+    invents nothing, and a coarser one would merge channels a member resolves.
+    Past ``cells`` (rows times columns) the grid merges ``k`` neighbouring
+    columns into one cell.
+
+    The edges are the midpoints between neighbouring columns, so a channel
+    falls in the cell of the column nearest it.
+    """
+    first = np.asarray(grids[0], dtype=float)
+    if all(len(g) == len(first) and np.array_equal(g, first) for g in grids[1:]):
+        grid = first
+    else:
+        step = min(float(np.median(np.diff(g))) for g in grids if len(g) > 1)
+        lo, hi = min(float(g[0]) for g in grids), max(float(g[-1]) for g in grids)
+        grid = np.linspace(lo, hi, int(round((hi - lo) / step)) + 1)
+    if len(grid) == 1:
+        return grid, np.array([grid[0] - 0.5, grid[0] + 0.5])
+    mid = (grid[:-1] + grid[1:]) / 2
+    edges = np.concatenate([[2 * grid[0] - mid[0]], mid, [2 * grid[-1] - mid[-1]]])
+    k = -(-n_rows * len(grid) // cells)
+    if k > 1:
+        n = len(grid)
+        edges = edges[::k] if n % k == 0 else np.append(edges[::k], edges[-1])
+        grid = (edges[:-1] + edges[1:]) / 2
+    return grid, edges
+
+
+def binned(tt: np.ndarray, values: np.ndarray, edges: np.ndarray) -> np.ndarray:
+    """The mean of ``values`` in each cell between ``edges``, NaN where none falls."""
+    n = len(edges) - 1
+    at = np.searchsorted(edges, tt, side="right") - 1
+    ok = (at >= 0) & (at < n)
+    count = np.bincount(at[ok], minlength=n)
+    total = np.bincount(at[ok], weights=np.asarray(values, dtype=float)[ok],
+                        minlength=n)
+    out = np.full(n, np.nan)
+    np.divide(total, count, out=out, where=count > 0)
+    return out
+
+
+def map_payload(setup: SeriesSetup, data: list[PatternData],
+                fits: dict[int, Any], *, running: bool,
+                rwp: dict[int, float | None]) -> Packed:
+    """Every staged member's counts, and each fitted one's difference, on one grid.
+
+    The Map graph draws each pattern as a row (WP-2243 task 7), and before a
+    run it draws the counts alone, which is the series' pre-visualisation. A
+    row is a staged member, in series order. ``obs`` is the mean count of the
+    member's channels in each cell (:func:`map_grid`), over every channel the
+    file holds, since a map of the data is not a picture of a fit's protocol.
+    ``diff`` is the mean of (obs − calc)/σ over the channels the member's fit
+    kept, built by :func:`~rietx.viz.packed.curve_arrays`, so its σ is the one
+    every residual in the package divides by (``RefinementResult.sig()``). A
+    cell with no such channel is NaN, and so is every cell of a member without
+    a fit. ``fitted`` says which rows have one, and ``diff`` is absent when
+    none does.
+
+    ``fits`` maps a member's position to its result. ``rwp`` maps it to the
+    Rwp its entry records, for the hover readout.
+    """
+    tts = [d.tt() for d in data]
+    grid, edges = map_grid(tts, len(data))
+    obs = np.stack([binned(tt, d.y(), edges) for tt, d in zip(tts, data)])
+    arrays: dict[str, np.ndarray] = {"two_theta": grid, "obs": obs.ravel()}
+    if fits:
+        diff = np.full_like(obs, np.nan)
+        for at, res in fits.items():
+            tt = tts[at]
+            c = curve_arrays(tt, data[at].y(), np.ones(len(tt), bool), res,
+                             weighted=None, ceiling=len(tt))
+            diff[at] = binned(tt[c.arrays["fitted"]], c.arrays["delta"], edges)
+        arrays["diff"] = diff.ravel()
+    return Packed({
+        "n_rows": len(data), "n_cols": len(grid),
+        "labels": setup.labels, "x": [m.x for m in setup.members],
+        "axis": setup.axis_label,
+        "fitted": [i in fits for i in range(len(data))],
+        "rwp": [rwp.get(i) for i in range(len(data))],
+        "channels": [len(tt) for tt in tts],
+        "running": running,
+    }, arrays)

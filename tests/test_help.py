@@ -36,6 +36,7 @@ import rietx as rx
 from rietx import _about
 from rietx.gui.imports import INSTRUMENT_PRESETS
 from rietx.help import (
+    CELL_RELATION_HELP,
     DIAGNOSTIC_HELP,
     INSTRUMENT_FIELD_HELP,
     OPT_IN,
@@ -59,7 +60,7 @@ from rietx.io.formats.base import READER_OPTIONS
 from rietx.params.vector import ParameterTable
 from rietx.refine import SIZE_FLAG_SIZE_A, STRAIN_FLAG_WIDTH
 from rietx.schemas.common import Parameter
-from rietx.schemas.indexing import IndexingControls, ObservedPeak, PeakFlag
+from rietx.schemas.indexing import IndexingControls, ObservedPeak, PeakFlag, SupercellCheck
 from rietx.schemas.instrument import (
     BackgroundFixedPlusChebyshev,
     BackgroundPSpline,
@@ -380,6 +381,7 @@ def _arms() -> dict[str, dict[str, HelpEntry]]:
         "peak_flags": PEAK_FLAG_HELP,
         "diagnostics": DIAGNOSTIC_HELP,
         "peak_origins": PEAK_ORIGIN_HELP,
+        "cell_relations": CELL_RELATION_HELP,
         "stage_fields": STAGE_FIELD_HELP,
         "reader_options": READER_OPTION_HELP,
         "instrument_fields": INSTRUMENT_FIELD_HELP,
@@ -587,6 +589,16 @@ def test_every_peak_origin_has_an_entry():
     assert set(PEAK_ORIGIN_HELP) == origins, (
         f"missing: {sorted(origins - set(PEAK_ORIGIN_HELP))}; "
         f"describing nothing: {sorted(set(PEAK_ORIGIN_HELP) - origins)}")
+
+
+def test_every_cell_relation_has_an_entry():
+    """The candidate table's relations: the GUI's ``same_cell`` and each value
+    of ``SupercellCheck.relation`` (WP-2240)."""
+    relations = set(get_args(SupercellCheck.model_fields["relation"].annotation))
+    assert relations == {"sublattice", "containment"}, "SupercellCheck.relation moved?"
+    assert set(CELL_RELATION_HELP) == {"same_cell"} | relations, (
+        f"missing: {sorted(({'same_cell'} | relations) - set(CELL_RELATION_HELP))}; "
+        f"describing nothing: {sorted(set(CELL_RELATION_HELP) - relations - {'same_cell'})}")
 
 
 #: The arms whose members are drawn as chips (WP-1209): every entry carries a
@@ -991,7 +1003,8 @@ def test_every_row_of_a_real_model_carries_its_family_key():
 def test_the_registry_is_json_and_carries_every_arm():
     registry = help_registry()
     assert set(registry) == {"parameters", "peak_flags", "diagnostics",
-                             "peak_origins", "stage_fields", "reader_options",
+                             "peak_origins", "cell_relations", "stage_fields",
+                             "reader_options",
                              "instrument_fields", "search_fields", "plans",
                              "result_fields"}
     payload = json.dumps(registry)  # raises on anything unserialisable

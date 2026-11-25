@@ -122,6 +122,16 @@ choice.
 
 ### Inherited
 
+- **From WP-2152 (2026-11-22): the strain report's θ may lag a refined λ.**
+  `report/strain.py::_components` takes each line's Bragg angle off
+  `model.line_wavelengths`, which is frozen at compile, through a clipped arcsin. A phase
+  peak equation reading `wavelength` binds 2·d·sinθ off that θ, so the report evaluates
+  it at the compile-time λ too. On a fit with λ refined, the report's widths would then
+  differ from the forward model's. Not measured: whether the model the report is built
+  from is compiled at the answer, which would make the gap zero, is the first check. It
+  lives in the function this WP's `_strain_errors` work already opens, so it is filed
+  here rather than as a WP of its own.
+
 - **2026-10-11, from the issue triage (#245): the reporter's three paired
   timings of 2026-09-04 are not carried here.** Neutron CW, neither a
   March-Dollase nor a Stephens block, 3 292 points: 2.81 s against about
@@ -154,6 +164,10 @@ choice.
 - The solver's own cost, and the exhausted-budget stop rule — 1334.
 - A joint fit's `stage_reports=` (Inherited, from 1341): offered on top of
   this WP once the per-report cost is cut far enough.
+  *2026-11-23, raised in the review of PR #1364:* not built, and nothing filed.
+  This Non-goal keeps the reopen condition. Settled by Claude under DESIGN.md
+  Rule 5 Direction ("nothing is built before a case needs it"), 2026-11-23;
+  checked blind.
 - Removing the per-stage report. WP-1058's rule stands: **the report at every
   stage boundary, because a run's last state is routinely its least
   informative.** This WP makes it cheap and countable, not optional-by-stealth.

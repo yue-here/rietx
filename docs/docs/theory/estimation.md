@@ -618,10 +618,9 @@ back between 1e-16 and 4e-15 of the largest. Before the change Linux raised no
 `HIGH_CORRELATION` there. On macOS a 1e-14 change to one start value left six
 widths at ± 0.
 
-A touched parameter has no esd, nor has a tie or derived quantity built on
-it. A parameter that is not
-estimable has no standard error, and a generalised inverse's variance for it
-depends on the inverse taken {cite}`searle1971`. Two starts of one synthetic
+A touched parameter has no esd: a generalised inverse's variance for it
+depends on the inverse taken {cite}`searle1971`. A tie or derived quantity
+on one keeps its esd where the test, asked of its gradient, does not fire. Two starts of one synthetic
 LaB₆ fit with W, `gauss_size` and `gauss_strain` free landed 140 esd apart in
 W. `COVARIANCE_DIRECTION_DISCARDED` names the touched parameters, unless
 `FLAT_DIRECTION` already reported them as a pair. The test runs on the matrix
