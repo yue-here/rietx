@@ -275,6 +275,8 @@ The `magnetic_width` preset, `RefinementPlan.magnetic_width`, frees them in orde
 Staging is cumulative, so the moment keeps refining in the middle stage, and enters it at its own converged value.
 The preset continues from a converged nuclear fit and frees no cell, coordinate or instrument width.
 It ends with the closing stage, as every plan that frees a magnetic width does unless it sets `closing_window_tol=None` ([The closing stage](refinement.md#the-closing-stage)), because the middle stage frees the widths from zero on windows sized for a narrower peak.
+Without a recompile at the width reached, the moment depends on how the plan was staged: on a simulated MnF<sub>2</sub> pattern it landed 0.12 plain esd from the closing-stage answer under the preset and 0.25 under one stage freeing the same parameters, and with it both land on one answer.
+The default is read off the stages whenever the plan is asked, so a stage appended to a preset counts.
 
 <!-- api-doc: no-exec — it needs a converged magnetic structure -->
 ```python
