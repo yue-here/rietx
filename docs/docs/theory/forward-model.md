@@ -149,6 +149,44 @@ warm refits early (WP-1459). The result names the ridged reflections, one
 `PAWLEY_OFF_DATA_RIDGED` diagnostic per phase, because their intensities are
 the ridge's and not the data's.
 
+## Peak equations
+
+A peak equation adds a term written by the user to reflection $k$ of phase $p$
+at emission line $l$, evaluated at that reflection's indices, multiplicity,
+d-spacing and Bragg angle {cite}`stinton2007`, and at the line's wavelength
+$\lambda_l = 2d\sin\theta$. A size term written as $y\lambda_l/\cos\theta$ is
+then Scherrer's {eq}`ms-scherrer` at every line and every wavelength with one
+$y$. With $g$, $q$, $\ell$, $s$ and
+$f$ the values of the `gauss_fwhm`, `gauss_fwhm_squared`, `lor_fwhm`, `shift`
+and `intensity_factor` equations, each zero (or one, for $f$) where it is not
+declared, the reflection's widths, position and intensity become
+
+```{math}
+:label: fm-peak-equation
+
+\Gamma_{G,pkl}^2 = \Gamma_{G,\mathrm{built\text{-}in}}^2 + g^2 + q,\quad
+\Gamma_{L,pkl} = \Gamma_{L,\mathrm{built\text{-}in}} + \ell,\quad
+2\theta_{pkl} = 2\theta_{\mathrm{drawn}} + s,\quad
+I_{pk} \to f \cdot I_{pk}.
+```
+
+{source}`rietx.model.forward.CompiledModel.phase_term`
+
+Gaussian terms add in variance and Lorentzian ones in FWHM, the composition the
+built-in terms already follow, and $f$ multiplies the intensity of
+{eq}`fm-rietveld`. The
+Gaussian sum is floored as the built-in one is, so a negative $q$ is legal while
+the total stays above zero. An instrument-level `shift` reads the angle alone and
+is added to every phase's position before the phase's own `shift`, whose
+`two_theta` is that drawn position. Each coefficient $c$ of an equation is a
+parameter, and its Jacobian column is exact: the chain rule through the
+equation's own derivative $\partial v/\partial c$ and the peak function's
+partials in position, Γ and η, with the TCH partials
+$\partial(\Gamma, \eta)/\partial(\Gamma_G, \Gamma_L)$ differentiated from
+{cite}`thompson1987`. A reflection is one representative of its Laue orbit, so
+an equation must give every image of the orbit one value; the compile refuses
+one that does not.
+
 ## The residual row layout
 
 The residual carries four blocks of rows, and the data is the first. The

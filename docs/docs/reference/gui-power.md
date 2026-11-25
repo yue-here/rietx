@@ -235,7 +235,7 @@ indices int32, so a browser reads each array without copying it.
 | `POST /api/recent/remove` | take one path off that list; a path that is not on it is no error |
 | `POST /api/recent/clear` | empty that list |
 | `GET /api/fs` | the filesystem browser's listing, confined to the home directory and the working directory |
-| `GET /api/examples` | the example projects shipped in the wheel |
+| `GET /api/examples` | the example projects included in the wheel |
 | `POST /api/examples/open` · `POST /api/examples/reset` | build one into the state directory and open it; throw a copy away and rebuild it |
 
 ### The project
@@ -269,7 +269,7 @@ indices int32, so a browser reads each array without copying it.
 | `POST /api/run` · `POST /api/cancel` · `GET /api/run/state` | start the plan; ask it to stop between iterations; where it is |
 | `GET /api/result` | the fit's numbers, without the curves |
 | `GET /api/result/curves` | every channel of the pattern and, after a fit, its curves on the channels it kept |
-| `POST /api/preview` | the calculated curve, the background, each phase, the three residuals and the ticks at values sent in the body and never applied; writes nothing, and says whether it evaluated the last compile, resized its windows or compiled afresh |
+| `POST /api/preview` | the calculated curve, the background, each phase, the three residuals and the ticks at values sent in the body and never applied; writes nothing, and says whether it evaluated the last compile, resized its windows or compiled afresh. Every compile cuts the peak tails where the last fit did, so at the head's values the curve and Rwp are the fit's |
 | `GET /api/background` | the background curve at the working state's values, the observed pattern, and the curve's esd at each fitted channel through the whole covariance of the free parameters; `?hold=` names paths held for that answer alone, so the band shows what a pending hold would give; writes nothing |
 | `GET /api/report` · `POST /api/report/apply` | the `FitReport`; run the stage one of its suggestions names |
 
@@ -280,6 +280,7 @@ indices int32, so a browser reads each array without copying it.
 | `GET /api/peaks` · `POST /api/peaks` | the picked list; pick it, with `pick_peaks`'s `shoulders`, `two_theta_range` and `flag_contamination` |
 | `POST /api/peaks/add` · `POST /api/peaks/remove` · `POST /api/peaks/move` | one line, added, removed, moved |
 | `POST /api/peaks/flag` · `POST /api/peaks/refit` | mark a line; refit its group |
+| `POST /api/peaks/undo` · `POST /api/peaks/redo` | put the list back as it was before the last edit; make that edit again |
 | `POST /api/index` · `GET /api/index/result` | search for a cell; the ranked candidates |
 | `GET /api/index/ticks` | one candidate's predicted lines, for the overlay |
 | `POST /api/index/adopt` | adopt any candidate as a Le Bail scaffold |
@@ -291,9 +292,11 @@ indices int32, so a browser reads each array without copying it.
 |---|---|
 | `GET /api/series` · `PUT /api/series` | the staged pattern list; replace it whole |
 | `POST /api/series/run` · `GET /api/series/result` | run the chain; its per-pattern answers and trajectories |
-| `GET /api/series/curves` · `GET /api/series/history` | one member's channels and curves, as float64 arrays; one member's tree |
+| `GET /api/series/curves` · `GET /api/series/history` | one member's channels and curves, as float64 arrays, by its entry (`index`) or by its place in the run's or the staged list (`pattern`, `of`), mid-run too; one member's tree |
+| `GET /api/series/map` | every staged pattern's counts on one 2θ grid, and each fitted one's difference in esd, as float64 arrays |
 | `GET /api/history` | the node graph |
 | `GET /api/history/diff` · `GET /api/history/compare` | one node against its parent; two nodes against each other |
+| `GET /api/history/curves` | one node's calculated curve, recomputed at its own values, for Compare |
 | `POST /api/history/checkout` · `POST /api/history/branch` | restore a state; fork from one |
 | `POST /api/history/tag` · `POST /api/history/annotate` | name a node; attach a note |
 
@@ -304,6 +307,7 @@ indices int32, so a browser reads each array without copying it.
 | `POST /api/export/cif` · `POST /api/export/html` · `POST /api/export/qpa` | the refined structure; the page `rietx html` writes; the phase fractions |
 | `POST /api/export/reflections` · `POST /api/export/result_json` | the reflection list; the whole result |
 | `POST /api/export/instrument_profile` | the instrument, answered from the project because it needs no result |
+| `POST /api/export/script` | the console as a Python script; the page holds the session's calls, so the body carries the text as `script` and the route only writes it |
 | `POST /api/upload/pattern` · `POST /api/upload/cif` · `POST /api/upload/instrument` | the three routes whose body is raw bytes rather than JSON: a file goes up as itself, with its name and reader options in the query string |
 | `GET /api/upload/pattern/scans` | what each scan in a multi-scan file is, fetched when the picker is opened |
 

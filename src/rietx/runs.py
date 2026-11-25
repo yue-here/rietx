@@ -1233,7 +1233,7 @@ class _WatchedToken:
     Duck-typed at the three verbs every consumer in the package uses —
     ``is_set()`` for the solver, ``bool()`` for ``sequential``, ``cancel()``
     and ``reset()`` for a caller — which is the same contract
-    ``indexing.Deadline`` satisfies without inheriting anything either.
+    ``indexing.engines.Deadline`` satisfies without inheriting anything either.
 
     **Where the probe hangs, and why it is not the event stream.** The recorder
     only gets control when something calls it, so a probe "once per cadence"
@@ -1249,7 +1249,7 @@ class _WatchedToken:
     One authority per run for "stop" means the object the caller holds is the
     one that ends up set, so a GUI session whose own button and whose watcher
     both stop the same fit agree afterwards. But a token is only duck-typed
-    here: ``indexing.Deadline`` answers ``is_set()`` and has no ``cancel()`` at
+    here: ``indexing.engines.Deadline`` answers ``is_set()`` and has no ``cancel()`` at
     all, and calling one that is not there would latch the recorder instead of
     stopping the fit. Hence the fallback event, which is never the *only*
     mechanism where a real token was passed.

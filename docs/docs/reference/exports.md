@@ -93,11 +93,18 @@ Two cases need a fit first.
 `predict()` with no argument has no grid until a fit has run.
 In Le Bail and Pawley mode the per-reflection intensities are extracted by a fit, so a new grid carries them over from the fitted model and there is nothing to carry before one has run.
 
-The two forms are not bit-identical on the same grid.
-`predict()` reuses the model compiled for the last stage, whose per-reflection evaluation windows were sized at the values that stage started from.
-A grid argument sizes them at the values the stage ended on.
-On a synthetic five-stage fit that changes 36 of 4200 channels, by at most 8×10⁻⁶ of the peak height, all of them in peak tails at a window edge.
-`RefinementResult.y_calc` is the first of the two: the curve the fit minimised.
+After a fit, both forms draw the fit's own curve.
+`predict()` evaluates the model the result was measured on, so it returns `RefinementResult.y_calc`.
+A grid compiles at the peak cut of the fit's last stage, whose windows leave out 2 % of each peak's area after a default fit.
+An edit such as `Refinement.set_values` keeps that cut, and so does a project reopened from its history.
+So `predict(result.two_theta)` returns `y_calc` bit for bit too.
+The exception is a site the fit left on a special position, reported as `SITE_MULTIPLICITY_KEPT`.
+There `y_calc` keeps the orbit count the fit solved at, and a grid counts the orbit afresh.
+
+A `Refinement` that has not been fitted compiles windows that leave out 0.1 % of each peak's area (`CLOSING_WINDOW_TOL`), so a synthetic pattern carries near-complete tails.
+A twin carrying the fitted values but no fit therefore draws a slightly different curve.
+On the fluorapatite tutorial under `mccusker_default` the twin's curve differs from `y_calc` on all 5751 channels, by at most 1.4×10⁻³ of the strongest peak and by 9×10⁻⁵ at the median.
+To rebuild a fit's curve from its record alone, pass `window_area_tol=recorded_window_tol(result.stages[-1].window_area_tol)` to `compile_model`.
 
 ## The reflection list
 
