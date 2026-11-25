@@ -1,6 +1,6 @@
 # WP-1950 — rietx inside an application
 
-Milestone: unscheduled · Status: ✅ 2026-11-17 — a process-wide run root, a shipped PyInstaller hook and the embedding guide landed (PR #1644); a CI freeze on Linux and Windows is issue #1651
+Milestone: unscheduled · Status: 🔄 2026-11-25 — a process-wide run root, a shipped PyInstaller hook and the embedding guide landed (PR #1644); the WP closes with the maintainer's handover after the merge; a CI freeze on Linux and Windows is issue #1651
 Track: Candidates — named on a use case, not yet on a measurement
 Depends on: —
 
