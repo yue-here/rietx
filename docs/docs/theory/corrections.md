@@ -143,7 +143,7 @@ own flight times over the whole histogram, before the fit window is cut, and
 never taken from the instrument: a `TIME_MAP` bank tabulates its widths in the
 data file. It is applied only where `PatternData.intensity_basis` is
 `"counts"`; a `"density"` bank, one already divided by its widths, takes no
-factor, and an undeclared one is fitted as a density and says so
+factor, and an undeclared one is refused before the fit starts
 ([](../reference/pattern-files.md#what-a-channel-holds)). The factor carries a
 microsecond and is not normalised, so no hidden reference flight time enters
 the phase scale.

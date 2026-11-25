@@ -1178,25 +1178,6 @@ def _basis_unknown_silent() -> list:
             + _gsas_bank(time_map=True))
 
 
-class _BasisModel:
-    """The two members ``report.tof._tof_intensity_basis_diagnostics`` reads
-    off a compiled flight-time model."""
-
-    def __init__(self, basis):
-        self.intensity_basis = basis
-
-    def channel_width_factor(self):
-        import numpy as np
-
-        return np.array([1.0, 2.5])
-
-
-def _basis_assumed(basis) -> list:
-    from rietx.report.tof import _tof_intensity_basis_diagnostics
-
-    return _tof_intensity_basis_diagnostics(_BasisModel(basis))
-
-
 # ------------------------------------------------------- the TOPAS bank build
 
 
@@ -1450,10 +1431,6 @@ SILENCE: dict[str, Pair] = {
     "STAGE_WINDOWS_STALE": Pair(
         functools.partial(_windows_stale, 0.3), functools.partial(_windows_stale, None),
         "tests/test_window_loss.py"),
-    "TOF_INTENSITY_BASIS_ASSUMED": Pair(
-        functools.partial(_basis_assumed, None),
-        lambda: _basis_assumed("counts") + _basis_assumed("density"),
-        "tests/test_tof_intensity_basis.py (a stub model: the fits there are 10 s)"),
     "TOPAS_TOF_FLAG_HELD": Pair(
         functools.partial(_topas_tof_flags, "@"),
         functools.partial(_topas_tof_flags, "!"),

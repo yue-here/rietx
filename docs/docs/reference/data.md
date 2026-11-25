@@ -60,7 +60,7 @@ It is `None` on a parameter that was never free, and on a free one whose esd cou
 | `PatternData.two_theta` | `list[float]` or `None` | `None` | 2θ in degrees, strictly increasing |
 | `PatternData.tof` | `list[float]` or `None` | `None` | neutron flight time in µs, strictly increasing |
 | `PatternData.intensity` | `list[float]` | required | measured intensity, one value per point |
-| `PatternData.intensity_basis` | `"counts"`, `"density"` or `None` | `None` | whether a channel holds counts or counts per µs; `None` means the file did not say. Read on a flight-time axis only |
+| `PatternData.intensity_basis` | `"counts"`, `"density"` or `None` | `None` | whether a channel holds counts or counts per µs; `None` means the file did not say, and a fit of a bank refuses it. Read on a flight-time axis only |
 | `PatternData.sigma` | `list[float]` or `None` | `None` | per-point esd from the file; `None` selects the Poisson fallback |
 | `PatternData.excluded_regions` | `list[tuple[float, float]]` | `[]` | intervals left out of the fit, on whichever axis is set |
 | `PatternData.metadata` | `dict[str, str]` | `{}` | what the reader found in the file header |
@@ -207,7 +207,7 @@ What one channel holds is a declaration too.
 `PatternData.intensity_basis` says whether the stored intensity is the number of neutrons the channel counted, or that number already divided by the channel's own width in µs.
 On a bank the width rises with the flight time, so the two answers differ by a slope that a displacement parameter pays for, not the phase scale.
 The readers set the field where the file says so and leave it `None` where nothing does ([What a channel holds](pattern-files.md#what-a-channel-holds)).
-`None` is refined as a density, with a warning that names the two values in question.
+A bank at `None` is not refined: the fit raises a `ValueError` that names the field, its two values and what tells them apart, because a wrong guess returns a plausible but biased Biso.
 The constant-wavelength arm ignores the field: a 2θ step is constant, or nearly so, and folds into the scale.
 
 ### The Lorentzian window on a bank

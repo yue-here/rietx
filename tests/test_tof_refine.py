@@ -417,7 +417,7 @@ def _synthetic_pattern(seed: int = 20260906) -> PatternData:
     from rietx.model.forward_tof import compile_tof_model
 
     grid = np.arange(TOF_LO, TOF_HI + 0.5 * TOF_STEP, TOF_STEP)
-    blank = PatternData(tof=grid.tolist(), intensity=[1.0] * len(grid))
+    blank = PatternData(intensity_basis="density", tof=grid.tolist(), intensity=[1.0] * len(grid))
     ins = bank()
     ins.background.coefficients[0].value = 40.0
     ins.background.coefficients[1].value = -8.0
@@ -428,7 +428,7 @@ def _synthetic_pattern(seed: int = 20260906) -> PatternData:
     y = np.asarray(model.evaluate(table.decode(table.x0())), dtype=np.float64)
     rng = np.random.default_rng(seed)
     noisy = rng.poisson(np.maximum(y, 0.0)).astype(np.float64)
-    return PatternData(tof=grid.tolist(), intensity=noisy.tolist())
+    return PatternData(intensity_basis="density", tof=grid.tolist(), intensity=noisy.tolist())
 
 
 # ----------------------------------------------------------------------
@@ -1093,7 +1093,7 @@ def test_what_the_floor_actually_buys_is_the_sign_and_not_a_live_gradient():
     long_bank.source.profile_tof.sig2 = rx.Parameter(value=unfloored,
                                                      min=-math.inf)
     long_grid = np.arange(3500.0, 22000.0, 20.0)
-    long_pattern = PatternData(tof=long_grid.tolist(),
+    long_pattern = PatternData(intensity_basis="density", tof=long_grid.tolist(),
                                intensity=[1.0] * len(long_grid))
     with pytest.raises(ValueError, match="is negative somewhere in"):
         compile_tof_model(silicon(a=12.0), long_bank, long_pattern)
@@ -1123,7 +1123,7 @@ def test_a_stored_negative_variance_coefficient_is_now_refused_at_the_schema():
 # ----------------------------------------------------------------------
 def _blank_bank() -> PatternData:
     grid = np.arange(TOF_LO, TOF_HI + 0.5 * TOF_STEP, TOF_STEP)
-    return PatternData(tof=grid.tolist(), intensity=[1.0] * len(grid))
+    return PatternData(intensity_basis="density", tof=grid.tolist(), intensity=[1.0] * len(grid))
 
 
 def test_no_claim_about_what_moves_freezes_nothing():
@@ -1190,7 +1190,9 @@ def test_a_gaussian_branch_bank_with_no_gaussian_width_is_finite():
     σ² = 0 and ``predict`` returned NaN on every channel inside a window.
     The pseudo-Voigt branch at the same σ is the control that was always
     finite."""
-    grid = np.arange(TOF_LO, TOF_HI + 0.5 * TOF_STEP, TOF_STEP)
+    x = np.arange(TOF_LO, TOF_HI + 0.5 * TOF_STEP, TOF_STEP)
+    grid = PatternData(tof=x.tolist(), intensity=[0.0] * len(x),
+                       intensity_basis="density")
     gaussian = rx.Refinement(silicon(), bank(sig1=0.0), history=False)
     y = np.asarray(gaussian.predict(grid))
     assert np.all(np.isfinite(y)) and float(np.max(y)) > 0.0

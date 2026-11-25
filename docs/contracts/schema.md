@@ -821,7 +821,8 @@ is stated to be on the result's own abscissa (µs on a bank).
 defaulting to ``None`` ("the file did not say"): on a bank a ``"counts"``
 pattern has its calculated Bragg sum multiplied by the channel width it
 measures from its own abscissa, a ``"density"`` one by nothing, and ``None``
-proceeds as a density while saying so (``PATTERN_INTENSITY_BASIS_UNKNOWN``).
+is refused by name before any work (``schemas.pattern.require_intensity_basis``;
+the reader's ``PATTERN_INTENSITY_BASIS_UNKNOWN`` says so at read).
 The readers set it only where the file declares it.
 (c) what varies with λ inside one bank is evaluated: the declared incident
 spectrum per channel, and specimen absorption and Sabine extinction per

@@ -10,9 +10,10 @@ refinement page.  Two kinds:
 * **What the flight-time model applied.**  Specimen absorption evaluated per
   reflection along the bank (``SPECIMEN_ABSORPTION_TOF``, with the
   ``ABSORPTION_MU_R_OUT_OF_RANGE`` warning past the Rouse domain), and GSAS's
-  channel width W(T) — applied (``TOF_CHANNEL_WIDTH_APPLIED``) or, where
-  nothing declared the intensity basis, assumed away
-  (``TOF_INTENSITY_BASIS_ASSUMED``).
+  channel width W(T), applied on a bank declared ``"counts"``
+  (``TOF_CHANNEL_WIDTH_APPLIED``); an undeclared basis never reaches here,
+  being refused at the fit's door
+  (:func:`~rietx.schemas.pattern.require_intensity_basis`).
 * **"Did not run here" lines.**  :func:`_tof_skip` builds the info-level
   statement that a constant-wavelength check abstained on a bank, so an unrun
   check never reads as a clean one; ``BACKGROUND_PEAK_WIDTH_UNAVAILABLE`` is
@@ -150,8 +151,7 @@ def _tof_absorption_diagnostics(model) -> list[Diagnostic]:
 def _tof_intensity_basis_diagnostics(model) -> list[Diagnostic]:
     """What the flight-time model did about GSAS's channel width W.
 
-    Three states and three different things to say, which is why this is a
-    function and not a boolean:
+    Two declared states, and only one of them is news:
 
     * ``"counts"`` — the calculated Bragg sum was multiplied by W, measured
       from the pattern's own abscissa.  An **info** line, and it always fires,
@@ -161,47 +161,29 @@ def _tof_intensity_basis_diagnostics(model) -> list[Diagnostic]:
     * ``"density"`` — the caller declared the histogram already divided, so
       nothing was applied.  Silent: a declared state that produced the
       declared behaviour is not news.
-    * ``None`` — nothing established it, and the model **proceeded as a
-      density**.  A warning, and it names the field and both values, because
-      the only thing wrong with this state is that nobody has said which of
-      two answers is right.
+
+    ``None`` does not reach here: a bank with no declared basis is refused
+    before any work (:func:`~rietx.schemas.pattern.require_intensity_basis`,
+    ruled on #1548, 2026-11-24).
     """
-    basis = getattr(model, "intensity_basis", "density")
-    if basis == "density":
+    if getattr(model, "intensity_basis", None) != "counts":
         return []
     where = ["intensity_basis"]
-    if basis == "counts":
-        w = model.channel_width_factor()
-        lo, hi = (float(w[0]), float(w[-1])) if w is not None else (0.0, 0.0)
-        return [Diagnostic(
-            level="info", code="TOF_CHANNEL_WIDTH_APPLIED", where=where,
-            message=(f"this histogram declares intensity_basis='counts', so "
-                     f"the calculated Bragg sum was multiplied by the channel "
-                     f"width W(T) — GSAS's I_o = I'_o/(W·I_i) (LAUR 86-748, "
-                     f"Technical Manual p. 127). W was measured from the "
-                     f"pattern's own abscissa and runs {lo:.3f} to {hi:.3f} µs "
-                     f"across the fitted window, a factor of "
-                     f"{(hi / lo if lo > 0 else float('nan')):.2f}. It is a "
-                     f"slope in flight time and not a scale, so leaving it out "
-                     f"would have been paid for by the displacement "
-                     f"parameters rather than by the phase scale"),
-            suggestion=("nothing to do; if this bank's export already divided "
-                        "by the bin width, say so with "
-                        "intensity_basis='density' — applying W twice biases "
-                        "Biso the other way by the same amount"))]
+    w = model.channel_width_factor()
+    lo, hi = (float(w[0]), float(w[-1])) if w is not None else (0.0, 0.0)
     return [Diagnostic(
-        level="warning", code="TOF_INTENSITY_BASIS_ASSUMED", where=where,
-        message=("nothing established whether one channel of this histogram "
-                 "holds the counts it recorded or those counts already divided "
-                 "by the channel width, so pattern.intensity_basis is None and "
-                 "this fit proceeded as 'density' — no channel-width factor, "
-                 "which is what every flight-time fit before this option did. "
-                 "If the histogram is in counts (Mantid's SaveGSS multiplies Y "
-                 "by the bin widths by default), the missing factor of W(T) is "
-                 "a smooth rise across the bank and a refined Biso is what "
-                 "absorbs it, with a worse Rwp beside it"),
-        suggestion=("set pattern.intensity_basis to 'counts' or 'density' from "
-                    "how the bank was reduced. The readers set it themselves "
-                    "where the file declares it — a GSAS STD/ESD layout or "
-                    "TIME_MAP bintype, a SaveGSS header stating the bin-width "
-                    "multiplication, or a stated .xye Y-axis unit"))]
+        level="info", code="TOF_CHANNEL_WIDTH_APPLIED", where=where,
+        message=(f"this histogram declares intensity_basis='counts', so "
+                 f"the calculated Bragg sum was multiplied by the channel "
+                 f"width W(T) — GSAS's I_o = I'_o/(W·I_i) (LAUR 86-748, "
+                 f"Technical Manual p. 127). W was measured from the "
+                 f"pattern's own abscissa and runs {lo:.3f} to {hi:.3f} µs "
+                 f"across the fitted window, a factor of "
+                 f"{(hi / lo if lo > 0 else float('nan')):.2f}. It is a "
+                 f"slope in flight time and not a scale, so leaving it out "
+                 f"would have been paid for by the displacement "
+                 f"parameters rather than by the phase scale"),
+        suggestion=("nothing to do; if this bank's export already divided "
+                    "by the bin width, say so with "
+                    "intensity_basis='density' — applying W twice biases "
+                    "Biso the other way by the same amount"))]

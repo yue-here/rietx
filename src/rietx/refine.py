@@ -176,6 +176,7 @@ from .schemas.params import ParameterRow, TieSpec
 from .schemas.pattern import (
     PatternData,
     is_tof_model,
+    require_intensity_basis,
     require_matched_axis,
     require_two_theta,
 )
@@ -4857,6 +4858,7 @@ class Refinement:
         """
         require_matched_axis(data, "Refinement.suggest()",
                              instrument=self.instrument)
+        require_intensity_basis(data, "Refinement.suggest()")
         from .strategy.suggest import (
             SUGGEST_SEED_ROUGHNESS,
             SUGGEST_SEED_STEPHENS,
@@ -5164,6 +5166,7 @@ class Refinement:
         """
         require_matched_axis(data, "Refinement.cherry_pick()",
                              instrument=self.instrument)
+        require_intensity_basis(data, "Refinement.cherry_pick()")
         tree = self._require_history()
         node = tree[node_id]
         if node.action.kind != "stage":
@@ -6400,6 +6403,7 @@ class Refinement:
         # event go out before the run says no.
         require_matched_axis(data, "Refinement.fit()",
                              instrument=self.instrument)
+        require_intensity_basis(data, "Refinement.fit()")
         self._mode = mode
         self._two_theta_limits = two_theta_limits
         self._free_paths = []
@@ -7074,6 +7078,7 @@ class Refinement:
             window_area_tol = WINDOW_AREA_TOL
         require_matched_axis(data, "Refinement.run_stage()",
                              instrument=self.instrument)
+        require_intensity_basis(data, "Refinement.run_stage()")
         mode = mode or self._mode
         ttl = two_theta_limits if two_theta_limits is not None else self._two_theta_limits
         self._mode = mode
@@ -7314,7 +7319,9 @@ class Refinement:
         axis, and a pair whose two halves disagree is refused by name.  On a
         bank it carries its ``intensity_basis`` too, which decides whether the
         channel width W(T) multiplies the curve; a bare array takes the basis
-        of the pattern the last fit ran on, and none before a fit.
+        of the pattern the last fit ran on, and before a fit is refused by
+        name (:func:`~rietx.schemas.pattern.require_intensity_basis`): pass a
+        :class:`~rietx.PatternData` that declares one.
 
         **It does not require a fit** (WP-1110 item 6).  Until then it did, and
         the refusal was ``RuntimeError: call fit() first`` on both forms, which
@@ -7390,6 +7397,7 @@ class Refinement:
         if isinstance(two_theta, PatternData):
             require_matched_axis(two_theta, "Refinement.predict()",
                                  instrument=self.instrument)
+            require_intensity_basis(two_theta, "Refinement.predict()")
             basis = two_theta.intensity_basis
             two_theta = two_theta.x()
         tt = np.asarray(two_theta, dtype=np.float64)
@@ -7402,6 +7410,11 @@ class Refinement:
             tof=tt.tolist() if tof_grid else None,
             intensity=[0.0] * len(tt),
             intensity_basis=basis if tof_grid else None)
+        # a bare flight-time array before any fit has no basis to take: refused
+        # here, naming this door, rather than at the compiler's
+        require_intensity_basis(
+            grid, "Refinement.predict() on a bare flight-time array with no "
+                  "fitted pattern to take a basis from")
         mode = self._mode
         if mode in ("lebail", "pawley") and self._model is None:
             raise RuntimeError(
@@ -13447,6 +13460,7 @@ def replay(tree: RefinementTree, node_id: str, data: PatternData) -> RefinementR
     # the recorded instrument against this pattern, before anything is
     # compiled: a bank's history replays a flight time, a scan's an angle
     require_matched_axis(data, "replay()", instrument=instrument)
+    require_intensity_basis(data, "replay()")
     table = ParameterTable(structure, instrument)
     for name, prm in state.variables.items():
         # ``Refinement._declare_variables`` one rank down, and for its reason:

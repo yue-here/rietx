@@ -59,8 +59,8 @@ along the bank here, because λ is a property of the channel:
   observed in a channel of width W"*).  A calculated Bragg sum is a density,
   so a histogram holding *counts* owes it a factor of W and one already
   divided by W does not — which is a fact about the file, declared on the
-  pattern (:attr:`~rietx.schemas.pattern.PatternData.intensity_basis`) and
-  never inferred.  W is measured from the pattern's **own abscissa**, because
+  pattern (:attr:`~rietx.schemas.pattern.PatternData.intensity_basis`),
+  never inferred, and refused when undeclared.  W is measured from the pattern's **own abscissa**, because
   a ``TIME_MAP`` bank's widths are tabulated in the data and are in no
   instrument file: :meth:`CompiledTOFModel.channel_width_factor`;
 * **specimen absorption**, whose µ follows the 1/v law, so µR runs linearly
@@ -113,7 +113,12 @@ from ..crystallography.structure_factor import (
 )
 from ..crystallography.symmetry import generate_reflections
 from ..schemas.instrument import HUMP_FIELDS, Instrument
-from ..schemas.pattern import IntensityBasis, PatternData, SigmaRule
+from ..schemas.pattern import (
+    IntensityBasis,
+    PatternData,
+    SigmaRule,
+    require_intensity_basis,
+)
 from ..schemas.structure import Structure
 from .absorption import cylinder_absorption
 from .extinction import sabine_extinction
@@ -357,13 +362,14 @@ class CompiledTOFModel:
 
     #: What one channel of ``y_obs`` **holds** — the pattern's own declaration,
     #: carried onto the compiled model so a consumer reading the model alone
-    #: can say what was applied.  ``None`` is "the file did not say", and it is
-    #: the state every fit before this field ran in.
+    #: can say what was applied.  Never ``None`` on a compiled bank:
+    #: ``compile_tof_model`` refuses an undeclared one
+    #: (:func:`~rietx.schemas.pattern.require_intensity_basis`).
     intensity_basis: IntensityBasis | None = None
 
     #: W(T) on this model's grid in µs, or ``None`` when the calculated Bragg
-    #: sum is **not** multiplied by it (a declared ``"density"``, an
-    #: undeclared basis, and the whole constant-wavelength arm).  ``None``
+    #: sum is **not** multiplied by it (a declared ``"density"``, and the
+    #: whole constant-wavelength arm).  ``None``
     #: rather than an array of ones for :meth:`incident_spectrum`'s reason: a
     #: bank that owes no width factor multiplies by nothing at all, which is
     #: bit-identical to the build before this field rather than merely equal.
@@ -819,8 +825,7 @@ class CompiledTOFModel:
         which is what this is.
 
         Returns ``None`` where no factor is owed, so a declared ``"density"``
-        bank and an unstated one both take the same code path they always
-        took.  The factor carries a **microsecond**, and it is deliberately
+        bank takes the code path every bank took before the field.  The factor carries a **microsecond**, and it is deliberately
         not normalised out: the manual's relation is written in the file's own
         units, and dividing by W at some chosen channel would put a hidden
         reference flight time into the phase scale.
@@ -1129,6 +1134,11 @@ def compile_tof_model(structure: Structure, instrument: Instrument,
     reinterpreted.  A model that silently ignored a declared correction would
     report a fit the caller did not ask for.
 
+    A bank whose ``pattern.intensity_basis`` is ``None`` is refused too
+    (:func:`~rietx.schemas.pattern.require_intensity_basis`): whether a
+    channel holds counts or counts per µs decides whether W(T) multiplies the
+    Bragg sum, and only the reduction knows it (ruled on #1548, 2026-11-24).
+
     """
     _require(pattern.axis == "tof",
              "compile_tof_model(): this pattern's abscissa is 2θ in degrees, "
@@ -1141,6 +1151,7 @@ def compile_tof_model(structure: Structure, instrument: Instrument,
              f"pattern is a time of flight in microseconds. The flight time of "
              f"a reflection comes from the bank's DIFC/DIFA/TZERO/DIFB, which "
              f"only a neutron_tof source carries.")
+    require_intensity_basis(pattern, "compile_tof_model()")
     _require(restraint_weight_scale >= 0.0,
              f"restraint_weight_scale must be >= 0 "
              f"(got {restraint_weight_scale})")
@@ -1282,7 +1293,7 @@ def compile_tof_model(structure: Structure, instrument: Instrument,
     # are a property of the histogram's channel layout, and taking the
     # difference across an excluded region or a fit-window edge would report
     # the gap as a channel width.  ``None`` where no factor is owed, so a
-    # density and an unstated basis both take the pre-T-3b code path exactly
+    # declared density takes the pre-T-3b code path exactly
     # (see ``CompiledTOFModel.channel_width_factor`` for the edge convention
     # and for why it is not normalised).
     channel_width = (np.gradient(x_all)[mask]

@@ -3751,8 +3751,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "the channel width. The two differ by the width W(T), which grows with the "
             "flight time on most banks. That is a slope across the bank, not a scale, "
             "and a displacement parameter pays for it if it is wrong. Set "
-            "`pattern.intensity_basis` by hand from how the bank was reduced. Left "
-            "unset, the fit runs as a density and says so again."
+            "`pattern.intensity_basis` by hand from how the bank was reduced: "
+            "'counts' if the export multiplied by the bin width, 'density' if a "
+            "channel holds counts per µs. Until you do, a fit of the bank is "
+            "refused with a `ValueError` that names the argument."
         ),
     ),
     "PATTERN_INTENSITY_NET": HelpEntry(
@@ -4933,18 +4935,6 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "the window. If the export had already divided by the bin width, declare "
             "`'density'` instead, because applying the width twice biases the "
             "displacement parameters the other way."
-        ),
-    ),
-    "TOF_INTENSITY_BASIS_ASSUMED": HelpEntry(
-        title="The fit assumed what a channel holds",
-        description=(
-            "Nothing said whether a channel of this bank holds counts or counts per "
-            "channel width, so the fit ran as a density, with no width factor. If the "
-            "data are counts, the missing factor is a smooth rise across the bank, and "
-            "a refined Biso absorbs it beside a worse Rwp. Mantid's `SaveGSS` "
-            "multiplies by the bin widths by default. Declare "
-            "`pattern.intensity_basis` and refit before you quote a displacement "
-            "parameter."
         ),
     ),
     "TOPAS_BLOCK_SKIPPED": HelpEntry(

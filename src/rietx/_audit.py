@@ -1832,14 +1832,16 @@ ROWS: tuple[Row, ...] = (
                   "an STD or ESD raw-histogram layout, a TIME_MAP bintype; "
                   "io/formats/gsas.py _intensity_basis) and leaves intensity_basis None; "
                   "it tests no value, a count per channel and a count per us being both "
-                  "plausible positive reals, and changes nothing: which one the bank holds "
-                  "is how it was reduced, a fact outside the file (DESIGN.md Rules, 1, "
-                  "third kind)"),
+                  "plausible positive reals, and changes nothing in the read: which one the "
+                  "bank holds is how it was reduced, a fact outside the file (DESIGN.md "
+                  "Rules, 1, third kind), so a fit of the bank is refused until it is "
+                  "declared (schemas.pattern.require_intensity_basis, ruled 2026-11-24 on "
+                  "#1548)"),
         response="warning",
-        responds=("set pattern.intensity_basis from how the bank was reduced before quoting "
-                  "a biso, an adp or a scale from a fit of it: the two readings differ by "
-                  "the channel width W(T), a slope across the bank that a displacement "
-                  "parameter absorbs")),
+        responds=("set pattern.intensity_basis from how the bank was reduced before fitting "
+                  "it: until then Refinement.fit, run_stage, predict and suggest refuse the "
+                  "bank by name, because the two readings differ by the channel width W(T), "
+                  "a slope across the bank that a displacement parameter absorbs")),
     Row("PATTERN_INTENSITY_NET", "code", tier=1, ambiguity=1,
         evidence=("a record of which column was read: the file states only "
                   "_pd_proc_intensity_net, and the code names it with the IUCr "
@@ -2643,18 +2645,6 @@ ROWS: tuple[Row, ...] = (
         response="info",
         responds=("nothing, where the bank's channels hold counts; if the export had already "
                   "divided by the bin width, declare intensity_basis='density' and refit")),
-    Row("TOF_INTENSITY_BASIS_ASSUMED", "code", tier=1, ambiguity=3,
-        evidence=("arithmetic: fires exactly when a bank's intensity_basis is None at "
-                  "compile (report/tof.py _tof_intensity_basis_diagnostics) and says the "
-                  "fit proceeded as 'density', what every flight-time fit before the option "
-                  "did; which basis the bank holds is how it was reduced, a fact outside "
-                  "the pattern, so it reports and ranks neither (DESIGN.md Rules, 1, third "
-                  "kind).  The fallback itself is the PatternData:intensity_basis default "
-                  "row"),
-        response="warning",
-        responds=("quote no biso or adp from this bank until pattern.intensity_basis is "
-                  "declared and the bank refit: a missing W(T) is a smooth rise across the "
-                  "bank that a displacement parameter absorbs")),
     Row("TOPAS_BLOCK_SKIPPED", "code", tier=1, ambiguity=1,
         evidence=('read the site at topas.py:3814 and :3262: a str block that states no '
                   'phase_name or no space_group is skipped as a phase, recorded on '
@@ -7897,10 +7887,10 @@ ROWS: tuple[Row, ...] = (
     Row("PATTERN_DEAD_CHANNELS.suggestion", "suggestion", value=2),
     Row("PATTERN_INTENSITY_BASIS_UNKNOWN.suggestion", "suggestion", tier=1, ambiguity=3,
         value=1,
-        evidence=("arithmetic: names the field that overrides the default and both of its "
-                  "values, with what tells them apart (whether the export multiplied by the "
-                  "bin width); ranks neither, the answer being how the bank was reduced, "
-                  "and moves nothing")),
+        evidence=("arithmetic: names the field a fit of the bank refuses to run without "
+                  "and both of its values, with what tells them apart (whether the export "
+                  "multiplied by the bin width); ranks neither, the answer being how the "
+                  "bank was reduced, and moves nothing")),
     Row("PATTERN_INTENSITY_SCALED.suggestion", "suggestion", tier=1, ambiguity=1, value=6,
         evidence=('six sites, all the same advice: export the scan in counts, or supply the esds '
                   '(base.py:753, brml.py:332, gsas.py:1040, uxd.py:219, xrdml.py:311, 324). Each '
@@ -8145,10 +8135,6 @@ ROWS: tuple[Row, ...] = (
                   "(intensity_basis='density') and what a doubled one does (W applied twice "
                   "is a slope a displacement parameter absorbs the other way); moves "
                   "nothing")),
-    Row("TOF_INTENSITY_BASIS_ASSUMED.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
-        evidence=("arithmetic: names the field and both of its values, and the file "
-                  "declarations the readers already honour; ranks neither, the answer being "
-                  "how the bank was reduced, and moves nothing")),
     Row("TOPAS_BLOCK_SKIPPED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence=('read topas.py:3814: names the missing keywords to add to the block '
                   '(_skipped_wants)')),

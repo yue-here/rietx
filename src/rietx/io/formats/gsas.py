@@ -689,12 +689,15 @@ def _no_basis_diagnostic(p: Path, bintype: str, type_flag: str,
                  f"raw-histogram layout either. The two differ by W(T), which "
                  f"on a logarithmic bank grows in proportion to T, so it is "
                  f"not a scale a refinement absorbs — it is a slope in flight "
-                 f"time, and a displacement parameter is what pays for it"),
+                 f"time, and a displacement parameter is what pays for it. "
+                 f"The pattern is read with intensity_basis None, and a fit "
+                 f"of it is refused until one is declared"),
         suggestion=("set pattern.intensity_basis to 'counts' or to 'density' "
                     "from how the bank was reduced — 'counts' if the export "
-                    "multiplied by the bin width, 'density' if it did not; "
-                    "left unset, the flight-time model proceeds as 'density', "
-                    "which is what every fit before this option did")))
+                    "multiplied by the bin width, 'density' if it holds "
+                    "counts per µs; until then Refinement.fit, run_stage, "
+                    "predict and suggest raise a ValueError naming the "
+                    "argument rather than guess")))
 
 
 def _synth_axis(axis: AxisKind, bintype: str, lines: list[str], bank_line: str,

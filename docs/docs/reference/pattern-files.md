@@ -235,7 +235,7 @@ The difference is a slope in flight time, not a scale, and a fit that gets it wr
 A Mantid header is not by itself evidence of a density.
 A POWGEN `.xye` states `Counts per microAmp.hour`: a count normalised by an integrated proton charge, which is a scalar and exactly degenerate with the phase scale.
 Only a per-µs unit is a division by the channel's own width.
-A reader leaves `None` as `None`, and the fit then proceeds as a density and says so with `TOF_INTENSITY_BASIS_ASSUMED`.
+A reader leaves `None` as `None`, and a fit of a flight-time pattern at `None` is refused with a `ValueError` naming `intensity_basis` and its two values, before any work. Set it by hand from how the bank was reduced.
 
 ## Metadata
 

@@ -71,7 +71,7 @@ def _rietx(generator, structure, instrument) -> np.ndarray:
 
     x = generator.grid()
     model = compile_tof_model(structure, instrument,
-                              PatternData(tof=x.tolist(), intensity=[1.0] * len(x)))
+                              PatternData(intensity_basis="density", tof=x.tolist(), intensity=[1.0] * len(x)))
     table = ParameterTable(structure, instrument)
     return np.asarray(model.evaluate(table.decode(table.x0())), dtype=np.float64)
 

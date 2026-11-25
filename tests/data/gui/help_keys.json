@@ -297,7 +297,6 @@
   "diagnostics:STRAIN_UNUSUALLY_LARGE",
   "diagnostics:TEXTURE_NOT_POSITIVE",
   "diagnostics:TOF_CHANNEL_WIDTH_APPLIED",
-  "diagnostics:TOF_INTENSITY_BASIS_ASSUMED",
   "diagnostics:TOPAS_BLOCK_SKIPPED",
   "diagnostics:TOPAS_CELL_COUPLING_DROPPED",
   "diagnostics:TOPAS_FEATURES_NOT_IMPORTED",

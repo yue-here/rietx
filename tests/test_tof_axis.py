@@ -2040,7 +2040,8 @@ def test_no_flight_time_surface_still_says_the_arm_is_unwritten():
 
     # (1) the enabling facts, in the order the surfaces claim them
     grid = [8000.0 + 20.0 * i for i in range(400)]
-    pattern = PatternData(tof=grid, intensity=[10.0] * len(grid))
+    pattern = PatternData(tof=grid, intensity=[10.0] * len(grid),
+                          intensity_basis="density")
     instrument = rx.Instrument.tof_neutron_bank(
         difc=12000.0, tzero=-5.0, two_theta_bank_deg=90.0,
         profile=ProfileTOF(alpha1=0.45, beta0=0.055, beta1=0.003, sig1=300.0))

@@ -491,3 +491,49 @@ def require_matched_axis(pattern: PatternData, where: str, *,
         f"{where}: {what}. The two are related by the bank's "
         f"DIFC/DIFA/TZERO/DIFB, so running one against the other would put "
         f"every reflection somewhere it was not measured. {fix}.")
+
+
+def require_intensity_basis(pattern: PatternData, where: str) -> None:
+    """Refuse a time-of-flight bank whose :attr:`PatternData.intensity_basis`
+    nobody declared, before any work.
+
+    Which basis a bank holds is how it was reduced, a fact outside the pattern
+    (DESIGN-RULES Rule 1, third kind), and the two readings are not two valid
+    models of one histogram: they differ by the channel width W(T), a slope in
+    flight time that a refined displacement parameter absorbs, so a wrong one
+    returns a plausible Biso.  That makes an undeclared basis the multi-scan
+    case of WP-2006 § Rulings 23 (refuse), not the origin-setting one (warn);
+    ruled by the maintainer on #1548, 2026-11-24.  The message takes the shape
+    of the GSAS reader's refusal of a several-bank file read with no ``bank=``
+    (``io.formats.gsas._select_bank``): what is missing, why it is a choice,
+    what a guess would cost, and the argument that makes it.
+
+    A constant-wavelength pattern passes whatever the field says: that arm
+    does not read it.  Called at every ``Refinement`` door that routes a bank
+    (beside :func:`require_matched_axis`) and at
+    :func:`rietx.model.forward_tof.compile_tof_model`, which every path to the
+    flight-time forward model passes.
+    """
+    if pattern.axis != "tof" or pattern.intensity_basis is not None:
+        return
+    raise ValueError(
+        f"{where}: this time-of-flight bank's intensity_basis is None, so "
+        f"nothing says what one channel holds: the neutrons it counted "
+        f"('counts') or those counts already divided by the channel's width "
+        f"in µs ('density'). What tells them apart is whether the export "
+        f"multiplied by the bin width (Mantid's SaveGSS does by default), "
+        f"which is how the bank was reduced and is not in the pattern, so "
+        f"which one applies is a choice, and fitting either without being "
+        f"told would make it silently. A wrong choice is paid for by the "
+        f"displacement parameters rather than the scale: the two readings "
+        f"differ by the channel width W(T), a slope across the bank, and a "
+        f"counts bank fitted as a density put Biso more than 0.1 Å² off a "
+        f"true 0.5 (2.8 Å² on a synthetic silicon bank whose W(T) rises 5.6× "
+        f"across it). The bias scales with how much W(T) varies across the "
+        f"bank. Set intensity_basis='counts' if a channel holds what it "
+        f"counted (an export that multiplied by the bin width does), or "
+        f"'density' if it holds counts per µs, e.g. "
+        f"pattern.model_copy(update={{'intensity_basis': 'counts'}}); the "
+        f"readers set it themselves where the file declares it (a GSAS "
+        f"STD/ESD layout or TIME_MAP bintype, a SaveGSS header stating the "
+        f"multiplication, a stated .xye Y-axis unit).")

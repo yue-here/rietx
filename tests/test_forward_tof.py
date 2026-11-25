@@ -94,7 +94,7 @@ def grid(n: int = 3701) -> np.ndarray:
 
 def blank_pattern(x: np.ndarray | None = None) -> PatternData:
     x = grid() if x is None else x
-    return PatternData(tof=x.tolist(), intensity=[1.0] * len(x))
+    return PatternData(intensity_basis="density", tof=x.tolist(), intensity=[1.0] * len(x))
 
 
 def values_of(structure: Structure, instrument: Instrument) -> dict:
@@ -208,7 +208,7 @@ def synthetic_pattern(seed: int = 20260906, *, structure=None, instrument=None):
         np.asarray(model.evaluate(values_of(structure, instrument))), 0.0)
     rng = np.random.default_rng(seed)
     y = rng.poisson(y_true).astype(float)
-    return PatternData(tof=x.tolist(), intensity=y.tolist(),
+    return PatternData(intensity_basis="density", tof=x.tolist(), intensity=y.tolist(),
                        sigma=np.sqrt(np.maximum(y, 1.0)).tolist()), y_true
 
 
@@ -797,7 +797,7 @@ def test_the_compiled_bank_counts_its_sigma_rule_over_its_own_window():
     sigma = np.ones_like(x)
     sigma[5] = 0.0          # inside the window below
     sigma[-5] = 0.0         # outside it
-    pat = PatternData(tof=x.tolist(), intensity=np.ones_like(x).tolist(),
+    pat = PatternData(intensity_basis="density", tof=x.tolist(), intensity=np.ones_like(x).tolist(),
                       sigma=sigma.tolist())
     whole = compile_tof_model(silicon(), bank(), pat)
     assert whole.sigma_rule.n_nonpositive_excluded == 2

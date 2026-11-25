@@ -70,7 +70,7 @@ def grid() -> np.ndarray:
 
 def blank() -> PatternData:
     g = grid()
-    return PatternData(tof=g.tolist(), intensity=[1.0] * len(g))
+    return PatternData(intensity_basis="density", tof=g.tolist(), intensity=[1.0] * len(g))
 
 
 def values_of(structure, instrument) -> dict[str, float]:
@@ -231,7 +231,7 @@ def observed(seed: int = 20260906) -> PatternData:
     m = compile_tof_model(st, ins, blank(), window_slack_us=500.0)
     y = np.asarray(m.evaluate(values_of(st, ins)), dtype=np.float64)
     rng = np.random.default_rng(seed)
-    return PatternData(tof=grid().tolist(),
+    return PatternData(intensity_basis="density", tof=grid().tolist(),
                        intensity=rng.poisson(np.maximum(y, 0.0)
                                              ).astype(np.float64).tolist())
 

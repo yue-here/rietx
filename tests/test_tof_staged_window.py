@@ -50,7 +50,7 @@ GAM1 = 5.0
 
 
 def _blank() -> PatternData:
-    return PatternData(tof=GRID.tolist(), intensity=[1.0] * len(GRID))
+    return PatternData(intensity_basis="density", tof=GRID.tolist(), intensity=[1.0] * len(GRID))
 
 
 def _curve(structure, instrument, **kw) -> tuple[np.ndarray, object]:
@@ -206,7 +206,7 @@ def _data(seed: int = 20260929) -> PatternData:
     s.phases[0].scale.value = 12.0
     y, _ = _curve(s, ins, lorentz_window_tol=1e-9)
     noisy = np.random.default_rng(seed).poisson(np.maximum(y, 0.0)).astype(float)
-    return PatternData(tof=GRID.tolist(), intensity=noisy.tolist())
+    return PatternData(intensity_basis="density", tof=GRID.tolist(), intensity=noisy.tolist())
 
 
 def _fit(intermediate, *, history: bool = False):

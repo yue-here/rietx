@@ -255,10 +255,9 @@ def test_no_width_factor_is_built_where_none_is_owed():
     """``None`` and not an array of ones — the same choice
     ``incident_spectrum`` makes, and for the same reason: a bank owing no
     factor multiplies by *nothing*, which is bit-identical rather than equal."""
-    for basis in (None, "density"):
-        m = compile_tof_model(silicon(), bank(), blank(basis))
-        assert m.channel_width_factor() is None
-        assert m.intensity_basis == basis
+    m = compile_tof_model(silicon(), bank(), blank("density"))
+    assert m.channel_width_factor() is None
+    assert m.intensity_basis == "density"
     assert compile_tof_model(silicon(), bank(),
                              blank("counts")).intensity_basis == "counts"
 
@@ -312,14 +311,60 @@ def test_the_width_multiplies_the_bragg_sum_exactly_once_and_not_the_background(
     assert np.array_equal(np.asarray(on.evaluate(v)), bragg_off * w + bkg)
 
 
-def test_an_unstated_basis_is_bit_identical_to_a_declared_density():
-    """The compatibility claim, asserted rather than argued: ``None`` is the
-    behaviour every flight-time fit had before this field existed."""
-    st, ins = silicon(), bank()
-    v = values_of(st, ins)
-    a = np.asarray(compile_tof_model(st, ins, blank(None)).evaluate(v))
-    b = np.asarray(compile_tof_model(st, ins, blank("density")).evaluate(v))
-    assert np.array_equal(a, b)
+def _refused(call, where: str) -> str:
+    """``call()`` raises the undeclared-basis refusal, naming ``where``; the
+    message, for the caller to check its wording."""
+    with pytest.raises(ValueError, match="intensity_basis is None") as err:
+        call()
+    msg = str(err.value)
+    assert msg.startswith(f"{where}: ")
+    return msg
+
+
+def test_an_undeclared_bank_is_refused_before_any_work(tmp_path):
+    """Ruled by the maintainer on #1548 (2026-11-24): which basis a bank holds
+    is how it was reduced, a fact outside the pattern, and a wrong guess
+    returns a plausible Biso, so an undeclared one is refused by name rather
+    than fitted as either reading (DESIGN-RULES Rule 1, the multi-scan form).
+
+    The likeliest misuse (Rule 4, *A new API*) is the one made here first: a
+    GSAS bank whose file declares nothing, read and fitted as it comes.  The
+    message names the argument, both values, what tells them apart and what a
+    wrong one costs; nothing is compiled, no node is committed and no event
+    goes out before the refusal.  The declared banks beside it fit (every
+    refit below and in ``test_tof_refine.py``)."""
+    p = _gsas(tmp_path, "bare.gss",
+              "BANK 1 60 60 RALF    35328      141    35328 0.00400 FXYE")
+    read = rx.read_pattern(str(p))
+    assert read.intensity_basis is None
+    events: list = []
+    ref = rx.Refinement(silicon(), bank())
+    msg = _refused(lambda: ref.fit(read, events=events.append),
+                   "Refinement.fit()")
+    assert ref.history is None and events == []   # no tree opened, no event
+    for needle in ("'counts'", "'density'", "bin width", "0.1 Å²", "true 0.5",
+                   "W(T) varies across the bank", "intensity_basis='counts'"):
+        assert needle in msg, needle
+    assert "Rwp" not in msg          # an Rwp comparison is never the evidence
+
+    data = blank(None)
+    _refused(lambda: ref.run_stage(data, rx.Stage("s", ["phases.*.scale"])),
+             "Refinement.run_stage()")
+    _refused(lambda: ref.predict(data), "Refinement.predict()")
+    _refused(lambda: ref.predict(np.asarray(data.tof)),
+             "Refinement.predict() on a bare flight-time array with no "
+             "fitted pattern to take a basis from")
+    _refused(lambda: ref.suggest(data), "Refinement.suggest()")
+    _refused(lambda: compile_tof_model(silicon(), bank(), data),
+             "compile_tof_model()")
+
+    # the positive arm: the same bank, declared, compiles; and a 2θ pattern is
+    # not asked, since the constant-wavelength arm does not read the field
+    for basis in ("counts", "density"):
+        compile_tof_model(silicon(), bank(), blank(basis))
+    tt = np.arange(20.0, 90.0, 0.05)
+    compile_model(silicon(), rx.Instrument.bragg_brentano(radiation="CuKa1"),
+                  PatternData(two_theta=tt.tolist(), intensity=[1.0] * len(tt)))
 
 
 def test_the_constant_wavelength_arm_does_not_read_the_field():
@@ -415,29 +460,20 @@ def test_declaring_counts_on_a_density_pattern_is_the_same_error_reversed():
 
 
 # ------------------------------------------------------------- what it reports
-def test_the_three_states_report_three_different_things():
-    """A factor applied and not reported is the worst of the states, and an
-    *unestablished* one that a user cannot see is the second worst."""
+def test_the_two_declared_states_report_two_different_things():
+    """A factor applied and not reported is the worst of the states; the
+    third, an undeclared basis, is refused before the fit (above)."""
     data = _generated(silicon(0.5), bank(), "counts", seed=20260906)
 
     on = _refit(silicon(0.5), bank(), data)
     said = next(d for d in on.diagnostics if d.code == "TOF_CHANNEL_WIDTH_APPLIED")
     assert said.level == "info" and "counts" in said.message
     assert "µs" in said.message          # W at both ends of the window
-    assert "TOF_INTENSITY_BASIS_ASSUMED" not in [d.code for d in on.diagnostics]
 
     declared = _refit(silicon(0.5), bank(),
                       data.model_copy(update={"intensity_basis": "density"}))
     codes = [d.code for d in declared.diagnostics]
     assert "TOF_CHANNEL_WIDTH_APPLIED" not in codes
-    assert "TOF_INTENSITY_BASIS_ASSUMED" not in codes
-
-    unstated = _refit(silicon(0.5), bank(),
-                      data.model_copy(update={"intensity_basis": None}))
-    warned = next(d for d in unstated.diagnostics
-                  if d.code == "TOF_INTENSITY_BASIS_ASSUMED")
-    assert warned.level == "warning" and warned.where == ["intensity_basis"]
-    assert "'density'" in warned.message and "intensity_basis" in warned.suggestion
 
 
 def test_the_constant_wavelength_arm_reports_nothing_about_it():
@@ -454,7 +490,6 @@ def test_the_constant_wavelength_arm_reports_nothing_about_it():
     res = _refit(silicon(1.0), rx.Instrument.bragg_brentano(radiation="CuKa1"), data)
     codes = [d.code for d in res.diagnostics]
     assert "TOF_CHANNEL_WIDTH_APPLIED" not in codes
-    assert "TOF_INTENSITY_BASIS_ASSUMED" not in codes
 
 
 # ------------------------------------------- what a rebuilt grid carries

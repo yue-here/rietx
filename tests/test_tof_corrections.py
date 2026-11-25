@@ -82,7 +82,7 @@ def blank_pattern(n: int | None = None) -> PatternData:
     grid = np.arange(TOF_LO, TOF_HI + 0.5 * TOF_STEP, TOF_STEP)
     if n is not None:
         grid = grid[:n]
-    return PatternData(tof=grid.tolist(), intensity=[1.0] * len(grid))
+    return PatternData(intensity_basis="density", tof=grid.tolist(), intensity=[1.0] * len(grid))
 
 
 def values_of(structure, instrument) -> dict[str, float]:
@@ -550,14 +550,14 @@ def _generated(structure, instrument, seed: int) -> PatternData:
     swallow it.
     """
     grid = np.arange(TOF_LO, TOF_HI + 0.5 * TOF_STEP, TOF_STEP)
-    blank = PatternData(tof=grid.tolist(), intensity=[1.0] * len(grid))
+    blank = PatternData(intensity_basis="density", tof=grid.tolist(), intensity=[1.0] * len(grid))
     structure.phases[0].scale.value = 2.0e4
     instrument.background.coefficients[0].value = 200.0
     model = compile_tof_model(structure, instrument, blank)
     table = ParameterTable(structure, instrument)
     y = np.asarray(model.evaluate(table.decode(table.x0())), dtype=np.float64)
     rng = np.random.default_rng(seed)
-    return PatternData(tof=grid.tolist(),
+    return PatternData(intensity_basis="density", tof=grid.tolist(),
                        intensity=rng.poisson(np.maximum(y, 0.0)).astype(
                            np.float64).tolist())
 
