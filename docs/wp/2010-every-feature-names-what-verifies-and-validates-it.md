@@ -1,9 +1,8 @@
 # WP-2010 — Every feature names what verifies it and what validates it
 
-Milestone: generality · Status: 🔄 2026-11-24 — the build merged (#1266); open: references for data already in the tree
+Milestone: generality · Status: ✅ 2026-11-25 — the build merged (#1266); every follow-up filed (2072, 2306, 2308, 1327's Inherited)
 Track: The audits
 Depends on: —
-Priority: P3 2026-10-18 — outside the gate after 2004, so it waits on nothing
 
 ## Goal
 
@@ -107,13 +106,6 @@ microstructure) are keyed on their Theory heading, Rule 4 already sending a new 
 equation there. Four features have no Theory section (TOF shape, peak picking, extinction
 symbols, joint fits) and get one or a declared exception.
 
-### Inherited
-
-- 2026-10-26 issue triage: #1051 is the outside contributor's (mustachefeeling) claim on
-  this WP. Their 2026-10-19 comment proposes the seat and the key, with a 43-feature
-  first-pass table, and asks five questions. Answers drafted 2026-10-27, posted on the
-  maintainer's approval (the handover log).
-
 ## Non-goals
 
 - New validation data. Finding an independent measurement for an unvalidated feature is a follow-up per
@@ -184,13 +176,14 @@ symbols, joint fits) and get one or a declared exception.
       rulebook budget). The partition test names an unclaimed family or heading
       instead, where a contributor meets the rule.
 - [x] 1327's `### Inherited` note updated: the moment's state now lives only in `docs/VALIDATION.md`.
-- [ ] Follow-ups filed: the ceria round robin as a microstructure measurement; references
+- [x] Follow-ups filed: the ceria round robin as a microstructure measurement; references
       for data already in the tree (a Le Bail cell against the SRM 660c and 676a
       certificates, published space groups for the extinction symbols, LaMnO₃'s Pn′ma′).
-      *2026-11-24:* the ceria half is filed as WP-2306 (from #1724). The references
-      half is still open.
+      *2026-11-24:* the ceria half is filed as WP-2306 (from #1724). *2026-11-25:* the
+      660c cell is WP-2072 (#1259; 676a ruled out there), LaMnO₃ is in WP-1327's
+      `### Inherited` (#1260), and the extinction symbols are WP-2308.
 - [x] Tests; the fast count moved by exactly the tests added.
-- [ ] Skill: none.
+- [x] Skill: none. The record is for the developers (ruled 2026-10-27), and no skill file names it.
 
 ## Acceptance
 
@@ -217,6 +210,27 @@ confirm the new test goes red naming it.
   patterns are served from the first author's University of Denver page.
 
 ## Handover log
+
+- **2026-11-25** — closed by a ghostshift close-only batch (PR #PRNUM), no code. Every feature
+  now names what verifies it, and the follow-ups that would validate the unvalidated ones each
+  have an owner. A successor looking for the next validation row reads WP-2072 (the SRM 660c
+  cell), WP-2306 (the ceria size), WP-2308 (the extinction symbols) or WP-1327's
+  `### Inherited` (LaMnO₃), never this file.
+
+  - *Done.* The follow-ups task's references half, placed fold-first. The SRM 660c cell was
+    already WP-2072 (issue #1259), which also rules 676a out: NIST publishes no raw 676a
+    pattern. LaMnO₃'s Pn′ma′ and moment were already in WP-1327's `### Inherited` (issue
+    #1260). The extinction symbols had no owner. WP-2076 owns the screen's real-data rows,
+    but its PR #1738 closes it on merge, so a fold there would be lost. Filed as WP-2308. The
+    Skill task ticked as none: `docs/skill/` names neither the registry nor the matrix. The
+    consumed `### Inherited` (#1051's answers, posted 2026-10-31) and the Priority line
+    deleted. The narrative moved to the v1.13 record.
+  - *Re-rated.* WP-2072's Priority line: its hard blocker was this WP's registry.
+  - *Review.* A prose-only branch, so `/code-review` did not run (skill step 6).
+  - *Gotcha for WP-2308.* `test_corundum_returns_the_class_its_certificate_names` calls its
+    reference SRM 676a's certificate, while WP-2072 found the corundum file is not 676a.
+
+  Next: none here. The four owners above carry the work.
 
 - **2026-11-24** — maintainer's post-merge entry, PR #1818, recording rounds 2 to 5
   of #1266. Mike's PR #1266 merged on 2026-11-24 as `5cf100fd1`. The feature
