@@ -102,7 +102,7 @@ ref
 # Expect the dashed starting background to run along the lowest counts between the peaks.
 
 # %%
-data.plot(model=ref, two_theta_range=(100, 130))
+data.plot(model=ref, two_theta_limits=(100, 130))
 
 # %% [markdown]
 # The dashed line is the starting background, flat at the 5th percentile of the counts.
@@ -115,7 +115,7 @@ data.plot(model=ref, two_theta_range=(100, 130))
 # Expect a tick under every peak.
 
 # %%
-data.plot(model=ref, two_theta_range=(25, 35))
+data.plot(model=ref, two_theta_limits=(25, 35))
 
 # %% [markdown]
 # The ticks include the Kα2 line of each reflection, so most peaks have a pair.

@@ -134,7 +134,7 @@ def _draw(res, stem):
     plot_result(res, path=str(out / f"crsbr_k00half_{stem}.png"))
     for tag, rng in (("mag001", (5.0, 14.0)), ("magmid", (38.0, 55.0))):
         plot_result(res, path=str(out / f"crsbr_k00half_{stem}_{tag}.png"),
-                    two_theta_range=rng)
+                    two_theta_limits=rng)
 
 
 @pytest.fixture(scope="module")

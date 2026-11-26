@@ -203,7 +203,7 @@ def test_quick_is_the_default_and_never_overrides_a_declared_ceiling(
     assert res.preset == "full"
     assert "total_budget_seconds" not in res.provenance.notes
 
-    with pytest.raises(ValueError, match="unknown search preset"):
+    with pytest.raises(ValueError, match="unknown preset .fastest.; preset takes"):
         index_pattern(peaks, preset="fastest")
 
 

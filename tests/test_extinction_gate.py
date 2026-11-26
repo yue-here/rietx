@@ -77,7 +77,7 @@ def si():
     obs = np.random.default_rng(1).poisson(y / y.max() * 1.3e6 + 7700.0).astype(float)
     data = rx.PatternData(two_theta=tt.tolist(), intensity=obs.tolist(),
                           sigma=np.sqrt(np.maximum(obs, 1.0)).tolist())
-    return data, instrument, rx.pick_peaks(data, instrument, two_theta_range=LIMITS)
+    return data, instrument, rx.pick_peaks(data, instrument, two_theta_limits=LIMITS)
 
 
 def _cubic_f(a: float) -> CellCandidate:
@@ -305,7 +305,7 @@ def _pbso4_inputs(factor: float = 1.0):
                             weight=rx.Parameter(value=0.5, min=0.0, max=1.0))],
         polarization=rx.Parameter(value=0.5, min=0.0, max=1.0), dispersion=None)
     limits = (15.0, float(x.max()))
-    peaks = rx.pick_peaks(data, instrument, two_theta_range=limits)
+    peaks = rx.pick_peaks(data, instrument, two_theta_limits=limits)
     cell = tuple(v * factor for v in (6.9644, 5.4038, 8.4956)) + (90.0, 90.0, 90.0)
     candidate = CellCandidate(cell=cell, cell_esd=(0.0,) * 6, system="orthorhombic",
                               centring="P", volume=float(np.prod(cell[:3])))
