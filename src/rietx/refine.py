@@ -11641,6 +11641,11 @@ def _reader_note_settled(note: Diagnostic, model: AnyCompiledModel) -> bool:
     - a withheld σ (any other note in :data:`_WITHHELD_SIGMA_CODES`): the
       caller assigned a σ.  One whose ``where`` names ``intensity`` also
       doubts the intensity scale, which no σ settles, so it stays.
+    - ``PATTERN_INTENSITY_BASIS_UNKNOWN``: the bank's model carries a declared
+      ``intensity_basis``.  The refusal's remedy, ``model_copy``, keeps the
+      reader's note on the pattern, and every bank that compiles has passed
+      :func:`~rietx.schemas.pattern.require_intensity_basis`, so a fit that
+      ran would otherwise report itself refused.
 
     Handing such a note on would repeat advice already taken, for the reason
     :data:`_FIT_OWNED_READER_CODES` gives about dead channels.
@@ -11655,6 +11660,8 @@ def _reader_note_settled(note: Diagnostic, model: AnyCompiledModel) -> bool:
                 and model.sigma_rule.n_nonpositive_excluded == 0)
     if note.code in _WITHHELD_SIGMA_CODES and "intensity" not in note.where:
         return bool(model.sigma_measured)
+    if note.code == "PATTERN_INTENSITY_BASIS_UNKNOWN":
+        return getattr(model, "intensity_basis", None) is not None
     return False
 
 

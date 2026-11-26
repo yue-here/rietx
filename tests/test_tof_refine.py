@@ -673,8 +673,11 @@ def test_a_banks_reader_notes_reach_its_fit():
     ``AttributeError`` building its result.
 
     Positive arm: an intensity-scale note, which no σ settles, comes through
-    once.  Negative arm: a constant-σ note on a pattern fitted with no σ of
-    its own is settled, so it stays with the file.
+    once.  Negative arms: a constant-σ note on a pattern fitted with no σ of
+    its own is settled, so it stays with the file; so is the reader's
+    undeclared-basis note on a bank whose basis was declared afterwards (the
+    refusal's own remedy, ``model_copy``, keeps the note), since a fit that
+    ran was not refused.
     """
     from rietx.schemas.common import Diagnostic
 
@@ -684,9 +687,14 @@ def test_a_banks_reader_notes_reach_its_fit():
     constant = Diagnostic(level="warning", code="PATTERN_SIGMA_CONSTANT",
                           message="every sigma is one value (test note)",
                           where=["sigma"])
+    basis = Diagnostic(level="warning", code="PATTERN_INTENSITY_BASIS_UNKNOWN",
+                       message="a fit of it is refused until one is declared "
+                               "(test note)",
+                       where=["intensity_basis"])
     data = _synthetic_pattern().model_copy(
-        update={"diagnostics": [scaled, constant]})
+        update={"diagnostics": [scaled, constant, basis]})
     assert data.sigma is None
+    assert data.intensity_basis == "density"
     structure = silicon()
     structure.phases[0].scale.value = 12.0
     instrument = bank()
@@ -699,6 +707,7 @@ def test_a_banks_reader_notes_reach_its_fit():
     codes = [d.code for d in result.diagnostics]
     assert codes.count("PATTERN_INTENSITY_SCALED") == 1
     assert "PATTERN_SIGMA_CONSTANT" not in codes
+    assert "PATTERN_INTENSITY_BASIS_UNKNOWN" not in codes
 
 
 def test_the_engine_recovers_the_generating_bank(tof_fit):
