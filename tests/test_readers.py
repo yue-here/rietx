@@ -1075,7 +1075,7 @@ def test_an_std_bank_that_writes_its_counter_numbers_reads_the_counts(tmp_path):
     assert len(scaled) == 1
     assert "counters.gda" in scaled[0].message
     assert "run 1 to 20" in scaled[0].message
-    assert scaled[0].where == ["sigma"]
+    assert scaled[0].where == ["intensity", "sigma"]
 
 
 @pytest.mark.parametrize("counter", [None, 0, 1])

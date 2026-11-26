@@ -847,7 +847,7 @@ def test_injected_roughness_is_recovered_and_is_resolved_not_merely_fitted():
     OUT.mkdir(exist_ok=True)
     plot_result(result, path=str(OUT / "roughness_recovery.png"))
     plot_result(result, path=str(OUT / "roughness_recovery_lowangle.png"),
-                two_theta_range=(7.0, 40.0))  # where the depression lives
+                two_theta_limits=(7.0, 40.0))  # where the depression lives
     import matplotlib.pyplot as plt
     plt.close("all")
 
@@ -982,7 +982,7 @@ def test_qarr_pure_phases_cannot_constrain_roughness(phase_name):
     OUT.mkdir(exist_ok=True)
     on.plot(path=str(OUT / f"roughness_qarr_{phase_name}.png"))
     on.plot(path=str(OUT / f"roughness_qarr_{phase_name}_lowangle.png"),
-            two_theta_range=(15.0, 60.0))
+            two_theta_limits=(15.0, 60.0))
     import matplotlib.pyplot as plt
     plt.close("all")
 

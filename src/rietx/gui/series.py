@@ -39,6 +39,8 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 from ..schemas.pattern import PatternData
 from ..schemas.sequential import SeriesResult, _rejected
 from ..sequential import (
@@ -46,6 +48,7 @@ from ..sequential import (
     REFIT_MODES,
     unique_labels,
 )
+from ..viz.packed import Packed, curve_arrays
 from .imports import UploadStore, preview_pattern
 
 #: What the carry-glob editor says about itself.  A control for parameters that
@@ -545,3 +548,106 @@ def result_payload(series: SeriesResult, backward: SeriesResult | None, *,
         "rejected": [_rejected(entry) for entry in series.entries],
         "running": running,
     }
+
+
+# ----------------------------------------------------------------------
+# the map: every member on one grid (WP-2243)
+# ----------------------------------------------------------------------
+#: About the most cells (rows times columns) the map route sends in one
+#: answer, each a float64 in up to two arrays. At 34 patterns that is 44 000
+#: columns, every channel of a lab or synchrotron scan at its own step; at 68
+#: patterns, 22 000. Past it, neighbouring columns merge into one cell.
+#: *(Chosen: WP-2243, 2026-11-24 — ten curves payloads' worth,
+#: ``viz.packed.CURVES_CEILING``, so the largest answer is 24 MB over loopback
+#: and the browser's binning per row stays a loop over 1.5 M floats.)*
+MAP_CELLS = 1_500_000
+
+
+def map_grid(grids: list[np.ndarray], n_rows: int,
+             cells: int = MAP_CELLS) -> tuple[np.ndarray, np.ndarray]:
+    """The 2θ of each map column, and the edges of the cells around them.
+
+    Members that share their channels keep them: the grid is the first
+    member's own, and each cell holds one channel of each member. Members that
+    do not (two ranges, two steps) go onto a uniform grid over the span they
+    cover together, at the finest member's median step. A grid that fine
+    invents nothing, and a coarser one would merge channels a member resolves.
+    Past ``cells`` (rows times columns) the grid merges ``k`` neighbouring
+    columns into one cell.
+
+    The edges are the midpoints between neighbouring columns, so a channel
+    falls in the cell of the column nearest it.
+    """
+    first = np.asarray(grids[0], dtype=float)
+    if all(len(g) == len(first) and np.array_equal(g, first) for g in grids[1:]):
+        grid = first
+    else:
+        step = min(float(np.median(np.diff(g))) for g in grids if len(g) > 1)
+        lo, hi = min(float(g[0]) for g in grids), max(float(g[-1]) for g in grids)
+        grid = np.linspace(lo, hi, int(round((hi - lo) / step)) + 1)
+    if len(grid) == 1:
+        return grid, np.array([grid[0] - 0.5, grid[0] + 0.5])
+    mid = (grid[:-1] + grid[1:]) / 2
+    edges = np.concatenate([[2 * grid[0] - mid[0]], mid, [2 * grid[-1] - mid[-1]]])
+    k = -(-n_rows * len(grid) // cells)
+    if k > 1:
+        n = len(grid)
+        edges = edges[::k] if n % k == 0 else np.append(edges[::k], edges[-1])
+        grid = (edges[:-1] + edges[1:]) / 2
+    return grid, edges
+
+
+def binned(tt: np.ndarray, values: np.ndarray, edges: np.ndarray) -> np.ndarray:
+    """The mean of ``values`` in each cell between ``edges``, NaN where none falls."""
+    n = len(edges) - 1
+    at = np.searchsorted(edges, tt, side="right") - 1
+    ok = (at >= 0) & (at < n)
+    count = np.bincount(at[ok], minlength=n)
+    total = np.bincount(at[ok], weights=np.asarray(values, dtype=float)[ok],
+                        minlength=n)
+    out = np.full(n, np.nan)
+    np.divide(total, count, out=out, where=count > 0)
+    return out
+
+
+def map_payload(setup: SeriesSetup, data: list[PatternData],
+                fits: dict[int, Any], *, running: bool,
+                rwp: dict[int, float | None]) -> Packed:
+    """Every staged member's counts, and each fitted one's difference, on one grid.
+
+    The Map graph draws each pattern as a row (WP-2243 task 7), and before a
+    run it draws the counts alone, which is the series' pre-visualisation. A
+    row is a staged member, in series order. ``obs`` is the mean count of the
+    member's channels in each cell (:func:`map_grid`), over every channel the
+    file holds, since a map of the data is not a picture of a fit's protocol.
+    ``diff`` is the mean of (obs − calc)/σ over the channels the member's fit
+    kept, built by :func:`~rietx.viz.packed.curve_arrays`, so its σ is the one
+    every residual in the package divides by (``RefinementResult.sig()``). A
+    cell with no such channel is NaN, and so is every cell of a member without
+    a fit. ``fitted`` says which rows have one, and ``diff`` is absent when
+    none does.
+
+    ``fits`` maps a member's position to its result. ``rwp`` maps it to the
+    Rwp its entry records, for the hover readout.
+    """
+    tts = [d.tt() for d in data]
+    grid, edges = map_grid(tts, len(data))
+    obs = np.stack([binned(tt, d.y(), edges) for tt, d in zip(tts, data)])
+    arrays: dict[str, np.ndarray] = {"two_theta": grid, "obs": obs.ravel()}
+    if fits:
+        diff = np.full_like(obs, np.nan)
+        for at, res in fits.items():
+            tt = tts[at]
+            c = curve_arrays(tt, data[at].y(), np.ones(len(tt), bool), res,
+                             weighted=None, ceiling=len(tt))
+            diff[at] = binned(tt[c.arrays["fitted"]], c.arrays["delta"], edges)
+        arrays["diff"] = diff.ravel()
+    return Packed({
+        "n_rows": len(data), "n_cols": len(grid),
+        "labels": setup.labels, "x": [m.x for m in setup.members],
+        "axis": setup.axis_label,
+        "fitted": [i in fits for i in range(len(data))],
+        "rwp": [rwp.get(i) for i in range(len(data))],
+        "channels": [len(tt) for tt in tts],
+        "running": running,
+    }, arrays)

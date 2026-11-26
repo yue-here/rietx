@@ -1033,7 +1033,8 @@ def _std_counter_diagnostic(p: Path, counters: list[int],
                  "over the counters or a per-counter mean, so the scale of "
                  "the intensities is not established. The values are read as "
                  "written and no σ was supplied."),
-        where=["sigma"],
+        # the scale is in doubt, not only σ: a fit's σ does not settle it
+        where=["intensity", "sigma"],
         suggestion="Export the scan in counts, or supply the esds."))
 
 
