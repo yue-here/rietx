@@ -58,7 +58,7 @@ def flat_si(tmp_path_factory):
     instrument the issue used, and ``pick_peaks_with_state``'s answer."""
     data = _silicon(tmp_path_factory.mktemp("si"), steep=False, hi=62.0)
     ins = rx.Instrument.debye_scherrer(wavelength=LAM)
-    pl, det, fits = pick_peaks_with_state(data, ins, two_theta_range=RANGE)
+    pl, det, fits = pick_peaks_with_state(data, ins, two_theta_limits=RANGE)
     draw_pick("bounds_flat_silicon", data, ins, pl, det, fits, truth=_si_lines(),
               title="#916's flat reproducer on the default instrument: the bounds each fit ended on")
     return data, ins, pl, det
@@ -120,18 +120,18 @@ def test_a_named_position_off_a_line_is_a_bound_hit_and_on_it_is_not(tmp_path):
     data = _silicon(tmp_path, steep=False, hi=62.0)
     ins = rx.Instrument.debye_scherrer(wavelength=LAM)
     ins.profile.w.value, ins.profile.u.value, ins.profile.x.value = 3e-4, 5e-4, 5e-3
-    pl, det, _ = pick_peaks_with_state(data, ins, two_theta_range=RANGE)
+    pl, det, _ = pick_peaks_with_state(data, ins, two_theta_limits=RANGE)
     line = max((p for p in pl.usable() if p.two_theta > 45.0),
                key=lambda p: p.intensity)
     r = PEAK_POSITION_BOUND_FWHM * det.groups[line.group].seed_fwhm
     assert abs(r - PEAK_POSITION_BOUND_FWHM * det.groups[0].seed_fwhm) > 5e-4
 
-    on = rx.fit_peaks(data, ins, [line.two_theta], two_theta_range=RANGE)
+    on = rx.fit_peaks(data, ins, [line.two_theta], two_theta_limits=RANGE)
     assert "position_at_bound" not in on.peaks[0].flags
     assert not [d for d in on.diagnostics if d.code == "PEAK_POSITION_AT_BOUND"]
 
     off = rx.fit_peaks(data, ins, [line.two_theta + line.fwhm],
-                       two_theta_range=RANGE)
+                       two_theta_limits=RANGE)
     (p,) = off.peaks
     assert "position_at_bound" in p.flags and p.usable
     assert p.two_theta == pytest.approx(line.two_theta + line.fwhm - r, abs=2e-3)
@@ -154,7 +154,7 @@ def test_no_intensity_says_whether_the_bound_or_the_floor_put_it_there(
     # that stays above it with an esd thousands of times its value.  The
     # closing stage's wider windows (#1085) moved the pair: 21.37 used to go
     # to zero and now keeps 0.33, while 22.5 now takes the zero bound.
-    named = rx.fit_peaks(data, ins, [20.0, 22.5], two_theta_range=RANGE)
+    named = rx.fit_peaks(data, ins, [20.0, 22.5], two_theta_limits=RANGE)
     d = _one(named, "PEAK_NO_INTENSITY")
     low, zero = named.peaks
     assert zero.intensity < 1e-10 < low.intensity
