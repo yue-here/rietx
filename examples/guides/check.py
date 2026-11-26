@@ -20,7 +20,7 @@ print(d)
 # guide: ticks start
 structure = rx.Structure.from_cif(examples_dir() / "fluorapatite.cif")
 ref = rx.Refinement(structure, rx.Instrument.bragg_brentano(radiation="CuKa"))
-fig = data.plot(model=ref, two_theta_range=(25, 40))  # path="ticks.png" writes it
+fig = data.plot(model=ref, two_theta_limits=(25, 40))  # path="ticks.png" writes it
 # guide: ticks end
 
 # guide: background start
