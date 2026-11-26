@@ -260,7 +260,7 @@ and 11 now review whole screens at a piece's end.
 |---|---|---|---|
 | 1 | No click moves the layout unless it asks to. Expanding, collapsing, switching a tab and jumping ask; editing a value, ticking a box and choosing a mode do not | R1, then every piece | the layout-shift browser test clicks every control on a fresh page in each starting state and compares element boxes before and after |
 | 2 | Every panel and route of the GUI before the milestone stays reachable | the swap | `tests/test_gui_manual.py`'s partitions, plus a browser pass that opens every tab |
-| 3 | A choice never looks like an action: every segmented choice is a sunken track with one raised option, and actions are outlined or filled buttons | R1, then every piece | `lib/style.test.ts` and a look at the screenshots |
+| 3 | A choice never looks like an action: every segmented choice is a sunken track with one raised option, and actions are outlined or filled buttons | R1, then every piece | `lib/style.test.ts`, which reads the new page since WP-2246, and a look at the screenshots |
 | 4 | Colour values live in `src/rietx/viz/theme.py`, and `gui/src/tokens.css` is generated from it | R1, then every piece | `tests/test_gui_palette.py` |
 | 5 | Below a measured width the window is one column, graphs above the model, with no sideways scroll of the page | R1 | the browser test at 420 px and at the threshold |
 | 6 | The graphs say what they show, so a preview never reads as a changed fit | R2, R3 | the title line's text in each state, asserted in vitest |
