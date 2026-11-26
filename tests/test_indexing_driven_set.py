@@ -156,7 +156,7 @@ def test_916s_flat_silicon_is_driven_by_its_own_lines(tmp_path):
     # A measured pattern at this draw's counting level would decide it.
     peaks = rx.pick_peaks(_silicon(tmp_path, steep=False, hi=62.0,
                                    window_area_tol=WINDOW_AREA_TOL), ins,
-                          two_theta_range=RANGE)
+                          two_theta_limits=RANGE)
     spec = SearchSpec(systems=("cubic",), n_unindexed=2)
 
     def truth_rank(res):

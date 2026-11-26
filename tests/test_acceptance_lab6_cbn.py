@@ -538,5 +538,5 @@ def test_the_fits_render(shared, degenerate):
     for name, result in (("shared", shared), ("degenerate", degenerate)):
         result.plot(path=str(out / f"lab6_cbn_{name}.png"))
         result.plot(path=str(out / f"lab6_cbn_{name}_zoom.png"),
-                    two_theta_range=(5.1, 12.0))
+                    two_theta_limits=(5.1, 12.0))
     plt.close("all")
