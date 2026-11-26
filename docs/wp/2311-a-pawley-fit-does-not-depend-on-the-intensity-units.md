@@ -133,6 +133,10 @@ from the worktree root.
    intensity, and with s floored at ρ times it for every ρ from 1 down to 1e-8.
    At ρ = 1e-9 the lock returns (Rwp 0.1713 at ×10, 0.2634 at ×100). No variant
    moves the true start's fit.
+   Suspects not reached: the off-data floor binds nowhere here (this fit has no
+   off-data reflection, as on 2026-10-28). The LM damping and tolerances, column
+   scaling paths and background seeding are behind the restraint, not beside it:
+   fixing the restraint alone restores the answer.
 3. **On the nine real true cells** (`probe5_real_truths.py`, the shipped validation,
    peak-list path, the f = 1 peak list handed to every variant). Columns:
    Rwp with the old floor and with the fix, on counts (`base`), and with
@@ -180,10 +184,17 @@ from the worktree root.
    The constant is tier 3 at 1.0 by WP-2011 ruling 3 (2026-10-28), and it also
    guards a phase whose every on-data intensity sits on the floor, where no
    intensity offers a relative anchor. Handed to Yue at handover.
-   Suspects not reached in Finding 2: the off-data floor binds nowhere there (this fit has no
-   off-data reflection, as on 2026-10-28). The LM damping and tolerances, column
-   scaling paths and background seeding are behind the restraint, not beside it:
-   fixing the restraint alone restores the answer.
+5. **A phase the seed emptied entirely** (`probe7_one_stage.py`; the handover's
+   review found it). When every on-data intensity of a phase sits on the floor,
+   the relative floor has nothing to stand on, so the group rows still weighed
+   5e9 in the first stage. The staged plans above recover because the second
+   stage rebuilds the rows, but a one-stage plan has no rebuild. On the
+   overlapped Cu-LaB6 fixture, background ×100, one stage freeing background,
+   cell, w and the shift: Rwp 0.2365 with two reflections at zero after 52
+   iterations, against 0.1620 from the true start. Fixed by building no group
+   rows for such a phase in that stage, so its splits are flat directions for
+   the stage. The same plan then reads 0.162014 from either start, in 66
+   iterations from the high one.
 
 ## Tasks
 

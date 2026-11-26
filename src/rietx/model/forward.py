@@ -718,9 +718,11 @@ def _batch_layout(win: np.ndarray, fcj_n: np.ndarray, tt: np.ndarray
 PAWLEY_OVERLAP_FWHM_FRAC = 0.5
 #: soft equal-split restraint weight for overlapped Pawley groups.  With the
 #: per-group intensity scaling in ``build_pawley_restraint`` this makes the
-#: split-direction esd ≈ (group intensity)/√λ, i.e. an unresolved split is
-#: reported with an esd of order its own value (≈100 % at λ=1) rather than the
-#: spuriously tight one a bare pseudo-inverse of a singular JᵀJ would give.
+#: split-direction esd ≈ s/√λ, s the group intensity (or, for a group under
+#: ``PAWLEY_GROUP_SCALE_FLOOR_REL`` of its phase, that floor), i.e. an
+#: unresolved split is reported with an esd of order its own value (≈100 % at
+#: λ=1) or larger, rather than the spuriously tight one a bare pseudo-inverse
+#: of a singular JᵀJ would give.
 PAWLEY_OVERLAP_LAMBDA = 1.0
 #: floor on the scale of the off-data ridge in ``build_pawley_restraint``, in
 #: the Pawley block's intensity units: the ridge is as wide as the phase's
@@ -729,8 +731,8 @@ PAWLEY_OVERLAP_LAMBDA = 1.0
 PAWLEY_OFF_DATA_SCALE_FLOOR = 1.0
 #: floor on an overlap group's restraint scale, as a fraction of its phase's
 #: largest on-data intensity, so the scale is never read off a seed the
-#: partition emptied (WP-2311).  A group on ``LEBAIL_INTENSITY_FLOOR`` had
-#: rows weighing √λ/1e-10 = 5e9, which equilibration turned into a group sum
+#: partition emptied (WP-2311).  A pair on ``LEBAIL_INTENSITY_FLOOR`` had
+#: rows weighing (1 − 1/2)·√λ/1e-10 = 5e9, which equilibration turned into a group sum
 #: the trust region could not move, rebuilt from the stuck value every stage.
 #: Synthetic LaB6 under a declared background 10x and 100x the data: any value
 #: from 1 down to 1e-8 recovers the true start's fit exactly, 1e-9 locks again.
@@ -4087,7 +4089,8 @@ class CompiledModel:
         """Build the equal-split restraint rows for the current intensities.
 
         One row per member of every overlapped group: √λ/s·(δ_kj − 1/n) over the
-        group, where s is the group's current mean intensity.  The rows sum to
+        group, where s is the group's current mean intensity, floored as the
+        last paragraph says.  The rows sum to
         zero, so they penalise deviations of the *split* from an equal partition
         while leaving the group *sum* (the data-determined quantity) free.  Run
         after the intensities are seeded/carried so s reflects a realistic
@@ -4120,8 +4123,18 @@ class CompiledModel:
         ``LEBAIL_INTENSITY_FLOOR``; an absolute floor of 1e-10 then weighed
         their rows at 5e9, the equilibrated step could not move the group's
         sum (free in exact arithmetic, the rows summing to zero), and every
-        later stage rebuilt s from the stuck value.  ``LEBAIL_INTENSITY_FLOOR``
-        stays only as the guard for a phase nothing has measured yet.
+        later stage rebuilt s from the stuck value.
+
+        **A phase nothing has measured gets no group rows for the stage.**
+        Where every on-data intensity of a phase sits on
+        ``LEBAIL_INTENSITY_FLOOR`` (the seed partitioned nothing under it),
+        there is no intensity to floor against, and any scale written here
+        would be a number of counts.  Its splits are then flat directions for
+        the stage, which the damped step leaves alone and the covariance
+        reports as unmeasured rather than tight; the next stage builds the
+        rows from what this one measured.  Measured on the overlapped Cu-LaB6
+        fixture under a one-stage plan and a background 100× the data: Rwp
+        0.2365 with the rows at 5e9, against 0.1620 from the true start.
         """
         pb = self.pawley
         if pb is None or not (pb.groups or pb.off_data):
@@ -4137,9 +4150,10 @@ class CompiledModel:
             top[a:b] = float(on.max()) if len(on) else 0.0
         rows: list[np.ndarray] = []
         for g in pb.groups:
+            if top[g[0]] <= LEBAIL_INTENSITY_FLOOR:
+                continue                 # a phase nothing has measured yet
             s = max(float(np.mean(intens[g])),
-                    PAWLEY_GROUP_SCALE_FLOOR_REL * float(top[g[0]]),
-                    LEBAIL_INTENSITY_FLOOR)
+                    PAWLEY_GROUP_SCALE_FLOOR_REL * float(top[g[0]]))
             n = len(g)
             for k in g:
                 row = np.zeros(pb.n, dtype=np.float64)

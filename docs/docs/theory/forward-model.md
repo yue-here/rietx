@@ -136,7 +136,7 @@ where $\bar I_g$ is the group's mean intensity when the stage starts, $s_p$ the
 phase's largest on-data intensity of equation {eq}`fm-pawley-ridge`, and
 $\rho$ = {{ PAWLEY_GROUP_SCALE_FLOOR_REL }}. The rows sum to zero, so they
 leave the group's sum to the data and weigh only its split, whose esd is then of
-order the group intensity itself. An unresolved split is reported at ≈100 %
+order $s_g$: the group intensity itself, or more for a group under the floor. An unresolved split is reported at ≈100 %
 uncertainty, where a bare pseudo-inverse of a singular $J^\top J$ would report a
 spuriously tight one. Such groups come back flagged `PAWLEY_OVERLAP_UNRESOLVED`.
 The floor $\rho\, s_p$ is relative to the phase, never a number of counts. The
@@ -144,7 +144,11 @@ seed partitions $\max(y_\text{obs} - y_\text{bkg}, 0)$, so a declared
 background above the data empties whole groups. With an absolute floor of
 $10^{-10}$ their rows weighed $5\times10^{9}$. Column equilibration then put the
 group's sum out of the trust region's reach, so the fit kept the seed's empty
-groups (WP-2311).
+groups (WP-2311). Where the seed empties a phase entirely, so that its every
+on-data intensity sits on the partition's floor, no intensity is left to
+scale against. That phase gets no group rows for the stage: its splits are flat
+directions the damped step leaves alone, and the next stage builds the rows
+from what this one measured.
 
 The reflection list runs 0.5° past each end of the fitted window, so that a
 reflection a stage moves onto the data is modelled. A reflection with no

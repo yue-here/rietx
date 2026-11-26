@@ -144,7 +144,7 @@ def test_pawley_recovers_overlapped_sum_and_flags_split():
 
 # ------------------------------------------------------- units and start state
 def _unit_fit(pattern: PatternData, *, intensity_factor: float = 1.0,
-              background_factor: float = 1.0):
+              background_factor: float = 1.0, plan=None):
     """The overlapped Cu-LaB6 Pawley fit, from the perturbed start, with the
     intensity, σ and the declared background multiplied as asked."""
     s, ins = _overlapped_lab6(a=4.160, w=1e-2)
@@ -156,7 +156,7 @@ def _unit_fit(pattern: PatternData, *, intensity_factor: float = 1.0,
             "intensity": (np.asarray(pattern.intensity) * intensity_factor).tolist(),
             "sigma": (np.asarray(pattern.sig()) * intensity_factor).tolist()})
     ref = Refinement(s, ins, history=False)
-    result = ref.fit(pattern, mode="pawley")
+    result = ref.fit(pattern, mode="pawley", **({} if plan is None else {"plan": plan}))
     return result, ref._model
 
 
@@ -168,12 +168,16 @@ def test_a_pawley_fit_depends_neither_on_the_units_nor_on_a_high_background_star
     its seed partition empties whole overlap groups, and the equal-split
     restraint, once floored at an absolute 1e-10, weighed their rows at 5e9 and
     left the group sums where the seed put them (Rwp 0.214 against 0.162 here).
-    The tolerances are 1e-3 esd and 1e-6 in Rwp; the measured agreement is
-    under 1e-6 esd and 1e-14, and the lock moved the widths by 0.3-0.6 esd."""
+    The tolerances are 1e-3 esd and 1e-6 in Rwp; the measured agreement, on
+    Linux x86-64, is under 1e-6 esd and 1e-14, and the lock moved the widths
+    by 0.3-0.6 esd.  The fixture has no reflection off the data, so the
+    off-data ridge, whose floor is still in counts (WP-2311 Finding 4), is not
+    what this pins."""
     pattern, _, _ = _synth_overlapped()
     base, model = _unit_fit(pattern)
     assert base.status == "converged"
     assert model.pawley.groups, "the fixture must carry an overlap group"
+    assert not model.pawley.off_data, "the ridge's floor is outside this test"
     i_base = model.pawley_x0()
     f = 1e-3
     scaled, m_scaled = _unit_fit(pattern, intensity_factor=f, background_factor=f)
@@ -184,8 +188,10 @@ def test_a_pawley_fit_depends_neither_on_the_units_nor_on_a_high_background_star
                                          ("start", high, m_high.pawley_x0(), 1.0)):
         assert other.status == "converged", label
         assert other.statistics.rwp == pytest.approx(base.statistics.rwp, rel=1e-6), label
+        assert {p.path for p in other.parameters} == set(rows), label
         for p in other.parameters:
             ref_row = rows[p.path]
+            assert ref_row.stderr is not None, (label, p.path)
             if p.path.startswith("instrument.background."):
                 # declared in the pattern's units, so it scales with them
                 assert p.value == pytest.approx(ref_row.value * factor,
@@ -196,6 +202,29 @@ def test_a_pawley_fit_depends_neither_on_the_units_nor_on_a_high_background_star
         np.testing.assert_allclose(intens / factor, i_base, rtol=1e-5,
                                    atol=1e-6 * float(i_base.max()), err_msg=label)
 
+
+def test_a_one_stage_pawley_fit_from_a_seed_that_partitioned_nothing_is_not_locked():
+    """WP-2311.  A background 100× above the data leaves the seed nothing to
+    partition, so every on-data intensity of the phase sits on the
+    partition's floor and no intensity can scale the equal-split rows.  With
+    rows at 5e9 a one-stage plan, which has no later stage to rebuild them,
+    ended at Rwp 0.2365 with two reflections at zero, against 0.1620 from the
+    true start.  An unmeasured phase gets no group rows for the stage, so
+    both starts reach one answer."""
+    from rietx.strategy.staged import RefinementPlan, Stage
+
+    plan = RefinementPlan(stages=[Stage("all", [
+        "instrument.background.*", "phases.*.cell.*", "instrument.profile.w",
+        "instrument.geometry.zero_shift"])], closing_window_tol=None)
+    pattern, _, _ = _synth_overlapped()
+    base, _ = _unit_fit(pattern, plan=plan)
+    high, model = _unit_fit(pattern, background_factor=100.0, plan=plan)
+    assert base.status == high.status == "converged"
+    assert high.statistics.rwp == pytest.approx(base.statistics.rwp, rel=1e-6)
+    a_base = next(p for p in base.parameters if p.path.endswith("cell.a"))
+    a_high = next(p for p in high.parameters if p.path.endswith("cell.a"))
+    assert abs(a_high.value - a_base.value) <= 1e-3 * a_base.stderr
+    assert int((model.pawley_x0() < 1e-6).sum()) == 0
 
 
 # --------------------------------------------------------------- history
