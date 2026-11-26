@@ -60,6 +60,11 @@ declare module "rxplot" {
     titled?: () => boolean;
     layers?: Record<string, { under?: Layer[]; over?: Layer[] }>;
     rawResidual?: () => ArrayLike<number | null> | null;
+    /** a pane's own y range in place of the chart module's, as the watcher's */
+    ranges?: { main?: (u: any, min: number, max: number) => [number, number];
+               resid?: (u: any, min: number, max: number) => [number, number] };
+    /** the plot's right padding on screen in CSS px, for a page with a right margin of its own (`/next`'s copy) */
+    padRight?: number;
   }
 
   export interface Pattern extends Group {

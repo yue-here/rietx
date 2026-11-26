@@ -584,6 +584,47 @@ def test_diff_hides_the_fits_residual_and_never_the_pages(page):
     assert page.evaluate("G.panes.resid.series[1].show") is True
 
 
+def _quiet(page, key: str) -> bool:
+    """Whether pane ``key``'s y axis prints no label and draws no tick mark or gridline."""
+    return page.evaluate("""k => { const u = G.panes[k], a = u.axes[1], s = a._splits;
+        return a._values.every((v) => v === '') && s.length > 0
+            && a.ticks.filter(u, s).every((v) => v == null) && a.grid.filter(u, s).every((v) => v == null); }""",
+                         key)
+
+
+def test_a_pane_that_draws_nothing_in_view_labels_no_range(page):
+    """WP-2245: uPlot ranges a pane with no value in view over 0 to 100, and the
+    difference pane before a fit printed 100 and 0 under the intensity's labels.
+    Such a pane prints nothing on its axis. A fit landing labels it, and a zoom
+    onto channels the fit skipped, where the residual is null, quiets it again."""
+    page.evaluate("""(() => { const a = curves().arrays;
+        return mountPattern({}, { header: { fit: false, weighted: true },
+            arrays: { two_theta: a.two_theta, y_obs: a.y_obs, kept: a.kept } }); })()""")
+    _frames(page)
+    assert _quiet(page, "resid")
+    assert any(_labels(page, "main"))
+    page.evaluate("G.setCurves(curves(), true)")
+    _frames(page)
+    assert not _quiet(page, "resid") and any(_labels(page, "resid"))
+    page.evaluate("G.setX(45, 55)")
+    _frames(page)
+    assert _quiet(page, "resid") and any(_labels(page, "main"))
+    page.evaluate("G.setX(20, 30)")
+    _frames(page)
+    assert any(_labels(page, "resid"))
+
+
+def test_a_trajectory_drawn_by_its_backward_chain_alone_keeps_its_labels(page):
+    """WP-2245's quiet axis asks the pane's series, and the trajectory's hook
+    draws a backward chain beside the forward one. Where only the backward pass
+    has values, the axis still labels the range they set."""
+    page.evaluate("""mountTrajectory({ rings: [], crosses: [] },
+        { x: [300, 350, 400], value: [null, null, null], stderr: [null, null, null],
+          backward: [1.0, 1.1, 1.2] })""")
+    _frames(page)
+    assert any(_labels(page, "traj"))
+
+
 # ---------------------------------------------------------------- the trajectory
 TONE, WARN = [0, 0, 255], [255, 128, 0]
 

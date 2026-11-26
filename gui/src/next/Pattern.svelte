@@ -37,6 +37,17 @@
    * picked lines' lenses and their fitted curve, the line chosen in the Pick
    * step's table, and a frame request that zooms to a line. The three-effect split
    * (fetch, knob, mode) is `panels/Plot.svelte`'s, for the same reasons.
+   *
+   * While the workflow has lines, the plot is their editing surface under
+   * interaction rules 1 to 12: a click on empty space adds a line (after
+   * 300 ms, so a double-click can still show everything, round 11c call 27),
+   * a hover shows where it would land, a click on a lens selects it and opens
+   * its bar, a drag moves it with the mark under the pointer, Option-click
+   * removes it, right-click opens its menu, Esc puts a drag back or takes a
+   * just-finished move back, and the main pane keeps 96 px clear above the
+   * data for the lenses and the bar (call 28). The hover mark, the dragged
+   * mark and the danger mark are DOM marks, so pointing repaints no pane
+   * (gui/CLAUDE.md § Plot). The verbs are the workflow panel's (`onpeakedit`).
    */
   import { untrack } from "svelte";
 
@@ -44,12 +55,15 @@
   import { exportFigure, type ExportKind } from "../lib/exports";
   import { isShortcutTarget } from "../lib/palette";
   import {
-    curveColors, curveToggles, dataOnlyHidden, isDataOnly, mergeRegions, normalizeRegion,
+    curveColors, curveToggles, dataOnlyHidden, isDataOnly, LENS_HEIGHT, LENS_WIDTH, mergeRegions,
+    normalizeRegion,
     residual, shows, toggleCurve,
-    type Protocol, type ResidualKind, type Scale, type Window,
+    type CandidateOverlay, type Protocol, type ResidualKind, type Scale, type Window,
   } from "../lib/plot";
   import type { PreviewAnswer } from "../lib/interactive";
-  import type { GroupCurve, PeakRow } from "../lib/peaks";
+  import {
+    formatPosition, UNUSED_REACH_DEG, type GroupCurve, type PeakEdit, type PeakRow,
+  } from "../lib/peaks";
   import type { Curves, Overlay, PatternChart } from "./pattern";
   import type { Theme } from "../lib/theme";
   import Menu, { type MenuAt, type MenuEntry } from "./Menu.svelte";
@@ -78,8 +92,13 @@
     peaks = null,
     groups = null,
     peaksActive = false,
-    selectedPeak = null,
+    candidate = null,
+    selectedPeak = $bindable(null),
     frameAt = null,
+    onpeakedit = async () => false,
+    onpeakundo = async () => false,
+    source = null,
+    nav = null,
   }: {
     result: any;
     /** bumped when the curves moved: a run landed or the history moved */
@@ -121,11 +140,24 @@
     groups?: readonly GroupCurve[] | null;
     /** the peaks-and-indexing workflow is up: the peak layer is drawn */
     peaksActive?: boolean;
-    /** the row chosen in the Pick step's table */
+    /** the candidate cell chosen in the Index step: its lines (round 11, call 9) */
+    candidate?: CandidateOverlay | null;
+    /** the line chosen, in the Pick step's table or by a click on its lens */
     selectedPeak?: number | null;
+    /** one edit to the peak list, through the workflow panel's verbs */
+    onpeakedit?: (edit: PeakEdit) => Promise<boolean>;
+    /** take the last peak edit back (Esc right after a drag, rule 2) */
+    onpeakundo?: () => Promise<boolean>;
     /** a request to frame a line: 2θ, with a count so the same line asked
      *  twice frames twice */
     frameAt?: { two_theta: number; seq: number } | null;
+    /** where the curves come from instead of the project's: a series member
+     *  (WP-2243). The graph fetches again when its `key` moves. */
+    source?: { key: string; load: () => Promise<ArrayBuffer> } | null;
+    /** the title line for a member of a series: its name, the rest of the
+     *  line, and ‹ › stepping the selection (round 12, call 2) */
+    nav?: { name: string; sub: string; canPrev: boolean; canNext: boolean;
+            onstep: (delta: number) => void } | null;
   } = $props();
 
   /** The difference axis's choices: the three today's page draws
@@ -142,6 +174,11 @@
   const UI_SCALE = "intensity_scale";
   const UI_DIFFERENCE = "difference";
   const GUTTER = 112;
+  /** How far the chart's canvas reaches into the gutter, as the plot's right
+   *  padding: the plot area ends at the gutter, and a 2θ label centred on that
+   *  edge is drawn whole, as the prototype's canvas spans its gutter (WP-2245).
+   *  Left to uPlot, the same 25 px sat outside the gutter, blank. */
+  const OVERHANG = 25;
   const LEGEND_ROW = 20;
 
   let host: HTMLDivElement | undefined = $state();
@@ -191,7 +228,7 @@
   let colors = $state.raw<ReturnType<typeof curveColors> | null>(null);
   let viewAt = $state<MenuAt | null>(null);
   let viewButton: HTMLButtonElement | undefined = $state();
-  let ctx = $state<{ at: MenuAt; region: Selection | null } | null>(null);
+  let ctx = $state<{ at: MenuAt; region: Selection | null; peak?: number | null } | null>(null);
   /** The plot object selected: the fitted range, or one excluded region. */
   type Selection = { kind: "range" } | { kind: "region"; index: number };
   let selection = $state<Selection | null>(null);
@@ -240,7 +277,8 @@
   const pct = (x: number | null | undefined) => (x == null ? "" : `${(x * 100).toFixed(2)} %`);
   /** The whole title line as its tooltip, since the title is what gives way
    *  (B1); a refused preview's reason is said there, in the route's words. */
-  const titleTip = $derived(previewing ? "Preview, not refined"
+  const titleTip = $derived(nav ? `${nav.name} · ${nav.sub}`
+    : previewing ? "Preview, not refined"
     : previewError ? `${title}. Preview refused: ${previewError}`
     : (held as Window | null)?.stale ? `${title}, fitted over other channels`
     : fitShown && howText ? `${title}. ${howText}` : title);
@@ -249,13 +287,18 @@
 
   function overlayNow(): Overlay {
     return { protocol, extent, peaks, groups, peaksActive, selected: selectedPeak,
-             candidate: null, hidden: drawn, held: untrack(() => held) };
+             dragging: drag?.moved ? drag.index : landing?.index ?? null,
+             candidate, hidden: drawn, held: untrack(() => held) };
   }
 
   // the peak layer is a repaint, never a refetch (gui/CLAUDE.md § Plot)
   $effect(() => {
-    void peaks; void groups; void peaksActive; void selectedPeak;
-    untrack(() => chart?.update(overlayNow()));
+    void peaks; void groups; void peaksActive; void selectedPeak; void candidate;
+    void drag?.moved; void landing;
+    untrack(() => {
+      chart?.update(overlayNow());
+      relayout();
+    });
   });
 
   /** A row click frames its line at 2° of 2θ, or keeps a narrower zoom
@@ -272,6 +315,9 @@
     });
   });
 
+  /** Bumped after each draw, so the DOM marks re-read where the lenses went. */
+  let painted = $state(0);
+
   let fetchSeq = 0;
   let applied: { kind: ResidualKind; scale: Scale; theme: Theme } | null = null;
 
@@ -282,7 +328,8 @@
     let c: Curves;
     try {
       mod = chartModule ??= await import("./pattern");
-      c = await mod.fetchCurves();
+      const from = untrack(() => source);
+      c = from ? mod.unpackCurves(await from.load()) : await mod.fetchCurves();
     } catch (exc) {
       if (seq !== fetchSeq) return;
       dropChart();
@@ -308,6 +355,7 @@
         // no titles on screen (2026-11-11): each axis carries a hint instead,
         // and the y axes keep no strip for one (the look of 2026-11-21, item 1)
         titled: () => exporting,
+        padRight: OVERHANG,
         labels: {
           y: () => (!exporting ? "" : scale === "linear" ? "intensity"
             : `intensity (${scale === "sqrt" ? "√" : "log"})`),
@@ -391,6 +439,7 @@
   function relayout() {
     requestAnimationFrame(() => {
       if (!chart) return;
+      painted++;
       const dpr = devicePixelRatio, out: any = {};
       for (const key of ["main", "ticks", "resid"] as const) {
         const u = chart.fig.panes[key];
@@ -426,11 +475,15 @@
   const protocolKey = $derived(JSON.stringify([protocol.limits, protocol.regions]));
   const extentKey = $derived(JSON.stringify(extent));
 
-  // fetch on what moves the curves: a run, a move in the history, the mask
+  const sourceKey = $derived(source?.key ?? null);
+
+  // fetch on what moves the curves: a run, a move in the history, the mask,
+  // another series member or its fit landing
   $effect(() => {
     void plotKey;
     void protocolKey;
     void result;
+    void sourceKey;
     untrack(() => drawChart());
   });
 
@@ -653,6 +706,11 @@
       selection = null;
     } else if (id === "delete" && ctx?.region) {
       remove(ctx.region);
+    } else if (id === "peak:delete" && ctx?.peak != null) {
+      removePeak(ctx.peak);
+    } else if (id === "peak:use" && ctx?.peak != null) {
+      const row = peakRow(ctx.peak);
+      if (row) void peakEdit({ kind: "use", index: row.index, on: !row.usable });
     } else if (id.startsWith("export:")) {
       void exportAs(id.slice(7) as ExportKind);
     }
@@ -704,12 +762,124 @@
 
   let downAt: { x: number; y: number } | null = null;
 
+  // -- the peak lines as objects (WP-2240) ---------------------------------
+
+  /** A press must travel this far, in CSS px, to be a drag, as for a region. */
+  const DRAG_PX = 3;
+  /** A click on empty space adds its line this long after, so a second
+   *  click can make it a double-click, which shows everything (call 27). */
+  const ADD_DELAY_MS = 300;
+  const DOUBLE_MS = 350;
+
+  /** Whether the plot edits peak lines: the workflow is up with a list, its
+   *  layer is shown (a hidden layer would take lines nobody can see), and no
+   *  range gesture is armed. */
+  const peakMode = $derived(peaksActive && !!peaks?.length && !arm && !drawn.includes("peaks"));
+  /** A lens being dragged: its line, where it started and where it is. */
+  let drag = $state<{ index: number; from: number; at: number; x0: number; y0: number;
+                      moved: boolean; pointer: number } | null>(null);
+  /** A dropped lens waiting for the move's answer, drawn where it landed. */
+  let landing = $state<{ index: number; at: number } | null>(null);
+  /** The move a drag just made, while its line stays chosen: Esc takes it
+   *  back (rule 2, call 35), and any other press ends that chance. */
+  let moved: { after: number; before: number } | null = null;
+  /** A click on empty space, waiting its 300 ms to add a line. */
+  let pending = $state<{ at: number; x: number; y: number; t: number;
+                         timer: ReturnType<typeof setTimeout> } | null>(null);
+  /** The lens under the pointer, and whether Option is held over it. */
+  let overMark = $state<number | null>(null);
+  let altHeld = $state(false);
+
+  const peakRow = (i: number | null | undefined) =>
+    i == null ? null : peaks?.find((p) => p.index === i) ?? null;
+
+  /** The unused line within reach of 2θ `x`, which a click there chooses
+   *  rather than adding its twin (call 33). */
+  function unusedNear(x: number): PeakRow | null {
+    let best: PeakRow | null = null;
+    for (const p of peaks ?? []) {
+      if (p.usable || Math.abs(p.two_theta - x) > UNUSED_REACH_DEG) continue;
+      if (!best || Math.abs(p.two_theta - x) < Math.abs(best.two_theta - x)) best = p;
+    }
+    return best;
+  }
+
+  /** Any edit ends Esc's chance to take a drag's move back, since Esc
+   *  undoes the stack's last step, which is then this edit's. */
+  async function peakEdit(e: PeakEdit): Promise<boolean> {
+    moved = null;
+    return onpeakedit(e);
+  }
+
+  function removePeak(index: number) {
+    if (selectedPeak === index) selectedPeak = null;
+    void peakEdit({ kind: "remove", index });
+  }
+
   function down(ev: PointerEvent) {
     downAt = ev.button === 0 ? { x: ev.clientX, y: ev.clientY } : null;
+    moved = null;
+    if (!peakMode || !chart || ev.button !== 0 || busy) return;
+    const m = chart.markAt(ev.clientX, ev.clientY);
+    const row = peakRow(m);
+    if (m == null || !row) return;
+    // the press is the lens's: no box zoom starts under it (preventing the
+    // pointerdown withholds the mouse events the chart listens to)
+    ev.preventDefault();
+    ev.stopPropagation();
+    host?.setPointerCapture?.(ev.pointerId);
+    drag = { index: m, from: row.two_theta, at: row.two_theta, x0: ev.clientX, y0: ev.clientY,
+             moved: false, pointer: ev.pointerId };
+  }
+
+  function move(ev: PointerEvent) {
+    altHeld = ev.altKey;
+    if (drag && chart) {
+      if (!drag.moved && Math.hypot(ev.clientX - drag.x0, ev.clientY - drag.y0) > DRAG_PX) {
+        drag.moved = true;
+      }
+      if (drag.moved) drag.at = chart.thetaOf(ev.clientX) ?? drag.at;
+      return;
+    }
+    overMark = peakMode && chart && !busy ? chart.markAt(ev.clientX, ev.clientY) : null;
+  }
+
+  function leave() {
+    hoverAt = null;
+    if (!drag) overMark = null;
+  }
+
+  /** End a drag: a press that did not travel is a click on the lens. */
+  async function dropLens(ev: PointerEvent) {
+    const d = drag!;
+    drag = null;
+    host?.releasePointerCapture?.(d.pointer);
+    if (!d.moved) {
+      if (ev.altKey) removePeak(d.index);
+      else {
+        selection = null;
+        selectedPeak = d.index;
+      }
+      return;
+    }
+    if (Math.abs(d.at - d.from) < 1e-9) return;
+    landing = { index: d.index, at: d.at };
+    try {
+      if (await peakEdit({ kind: "move", index: d.index, two_theta: d.at }) && selectedPeak != null) {
+        moved = { after: selectedPeak, before: d.index };
+      }
+    } finally {
+      landing = null;
+    }
   }
 
   /** A click, not a drag: select the object under it, or clear the selection. */
   function up(ev: PointerEvent) {
+    if (drag) {
+      downAt = null;
+      void dropLens(ev);
+      return;
+    }
     const d = downAt;
     downAt = null;
     if (arm || !d || !chart || Math.hypot(ev.clientX - d.x, ev.clientY - d.y) > 3) return;
@@ -719,19 +889,111 @@
       remove(hit);
       return;
     }
-    selection = hit;
+    if (!peakMode || hit || x === null) {
+      selection = hit;
+      // the chosen line is the workflow's: outside it a click leaves it be
+      if (peaksActive) selectedPeak = null;
+      return;
+    }
+    // a click elsewhere closes a region's bar and does nothing more (rule 3)
+    if (selection) {
+      selection = null;
+      return;
+    }
+    // a second click on the spot is a double-click: no line, and the chart
+    // shows everything
+    if (pending && ev.timeStamp - pending.t < DOUBLE_MS
+        && Math.hypot(ev.clientX - pending.x, ev.clientY - pending.y) < 6) {
+      clearTimeout(pending.timer);
+      pending = null;
+      return;
+    }
+    // with a line chosen, a click on empty space only lets it go (round 11b)
+    if (selectedPeak != null) {
+      selectedPeak = null;
+      return;
+    }
+    const near = unusedNear(x);
+    if (near) {
+      selectedPeak = near.index;
+      return;
+    }
+    if (busy) return;
+    if (pending) clearTimeout(pending.timer);
+    const at = x;
+    pending = { at, x: ev.clientX, y: ev.clientY, t: ev.timeStamp, timer: setTimeout(async () => {
+      try {
+        await peakEdit({ kind: "add", two_theta: at });
+      } finally {
+        if (pending?.at === at) pending = null;
+      }
+    }, ADD_DELAY_MS) };
   }
 
   function context(ev: MouseEvent) {
     if (!chart || arm) return;
     ev.preventDefault();
+    const m = peakMode ? chart.markAt(ev.clientX, ev.clientY) : null;
+    if (m != null) {
+      selection = null;
+      selectedPeak = m;
+      ctx = { at: { x: ev.clientX, y: ev.clientY }, region: null, peak: m };
+      return;
+    }
     const x = chart.thetaOf(ev.clientX);
     const hit = x === null ? null : objectAt(x);
     if (hit) selection = hit;
-    ctx = { at: { x: ev.clientX, y: ev.clientY }, region: hit };
+    ctx = { at: { x: ev.clientX, y: ev.clientY }, region: hit, peak: null };
   }
 
+  /** The chosen line's row, its lens, and where its bar sits over the plot. */
+  const chosenPeak = $derived(peakMode ? peakRow(selectedPeak) : null);
+  const peakSpot = $derived.by(() => {
+    void painted;
+    if (!chosenPeak || !chart || !geom || !plotX) return null;
+    const mark = chart.markOf(chosenPeak.index);
+    const x = mark?.x ?? chart.xOf(chosenPeak.two_theta);
+    if (x == null) return null;
+    // above its lens, or at the plot's top for a line with no lens
+    const top = mark ? Math.max(2, mark.y - mark.h / 2 - 6) : 2;
+    return { left: plotX.left + x, bottom: geom.main.top + top };
+  });
+  let barWidth = $state(0);
+  let hostWidth = $state(0);
+  /** The host's width short of the gutter, which its canvas reaches into by `OVERHANG`. */
+  const columnWidth = $derived(hostWidth - OVERHANG);
+  let peakBarWidth = $state(0);
+  const peakBarLeft = $derived(peakSpot
+    ? Math.max(peakBarWidth / 2, Math.min(columnWidth - peakBarWidth / 2, peakSpot.left)) : 0);
+
+  /** The DOM marks: a dashed lens where a click would add a line (rule 9),
+   *  the dragged or pending lens, and the danger lens under Option. */
+  const lensOf = (tt: number) => {
+    void painted;
+    const at = chart?.lensAt(tt);
+    return at && plotX && geom ? { left: plotX.left + at.x, top: geom.main.top + at.y } : null;
+  };
+  const hoverLens = $derived.by(() => {
+    if (!peakMode || busy || drag || landing || pending || overMark != null || hoverAt == null
+        || selectedPeak != null || objectAt(hoverAt) || unusedNear(hoverAt)) return null;
+    return lensOf(hoverAt);
+  });
+  const movingLens = $derived.by(() => {
+    const at = drag?.moved ? drag.at : landing?.at ?? pending?.at ?? null;
+    return at == null ? null : lensOf(at);
+  });
+  const dangerLens = $derived.by(() => {
+    void painted;
+    if (!altHeld || overMark == null || drag || !chart || !plotX || !geom) return null;
+    const m = chart.markOf(overMark);
+    return m ? { left: plotX.left + m.x, top: geom.main.top + m.y, h: m.h } : null;
+  });
+
   const ctxItems = $derived<MenuEntry[]>([
+    ...(ctx?.peak != null && peakRow(ctx.peak)
+      ? [{ id: "peak:use", label: peakRow(ctx.peak)!.usable ? "Leave out of the search" : "Use in the search" },
+         { id: "peak:delete", label: "Delete the line" }, "-" as const]
+      : []),
     ...(ctx?.region
       ? [{ id: "delete", label: ctx.region.kind === "region" ? "Delete the region" : "Fit the whole pattern" }, "-" as const]
       : []),
@@ -744,15 +1006,32 @@
   ]);
 
   function keydown(ev: KeyboardEvent) {
+    if (ev.key === "Alt") altHeld = true;
     if (!isShortcutTarget(ev)) return;
-    if (ev.key === "Escape" && arm) {
+    if (ev.key === "Escape" && drag) {
+      // a drag backs out: the lens goes back where it started (rule 2)
+      host?.releasePointerCapture?.(drag.pointer);
+      drag = null;
+      ev.preventDefault();
+    } else if (ev.key === "Escape" && moved && selectedPeak === moved.after) {
+      // right after a drag, the first Esc takes the move back (call 35)
+      const m = moved;
+      moved = null;
+      ev.preventDefault();
+      void onpeakundo().then((ok) => { if (ok) selectedPeak = m.before; });
+    } else if (ev.key === "Escape" && arm) {
       arm = null;
       ev.preventDefault();
     } else if (ev.key === "Escape" && selection) {
       selection = null;
+    } else if (ev.key === "Escape" && peakMode && selectedPeak != null) {
+      selectedPeak = null;
     } else if ((ev.key === "Delete" || ev.key === "Backspace") && selection && !busy) {
       ev.preventDefault();
       remove(selection);
+    } else if ((ev.key === "Delete" || ev.key === "Backspace") && chosenPeak && !busy) {
+      ev.preventDefault();
+      removePeak(chosenPeak.index);
     }
   }
 
@@ -832,8 +1111,6 @@
 
   /** Where a selected object's bar sits: over the object's middle, at the top
    *  of the plot area, kept inside the plot. */
-  let barWidth = $state(0);
-  let hostWidth = $state(0);
   const span = $derived.by(() => {
     if (!chosen || !chart || !geom) return null;
     void zoomed;
@@ -853,7 +1130,7 @@
   const barLeft = $derived.by(() => {
     if (!span) return 0;
     const mid = span.left + span.width / 2;
-    return Math.max(barWidth / 2, Math.min(hostWidth - barWidth / 2, mid));
+    return Math.max(barWidth / 2, Math.min(columnWidth - barWidth / 2, mid));
   });
 
   // -- the legend ------------------------------------------------------------
@@ -914,7 +1191,16 @@
   }
 </script>
 
-<svelte:window onkeydown={keydown} />
+<svelte:window onkeydown={keydown} onkeyup={(e) => { if (e.key === "Alt") altHeld = false; }}
+  onblur={() => (altHeld = false)} />
+
+<!-- a lens as a DOM mark, the canvas's `lens` (`lib/plot.ts`) at 18 by 4.5 px -->
+{#snippet lensMark(cls: string, left: number, top: number, scale: number)}
+  <svg class="lensmark {cls}" style:left="{left}px" style:top="{top}px"
+    width={2 * LENS_WIDTH * scale + 4} height={LENS_HEIGHT * scale + 4} aria-hidden="true">
+    <path d="M {LENS_WIDTH * scale + 2} 2 Q {2 * LENS_WIDTH * scale + 2} {LENS_HEIGHT * scale / 2 + 2} {LENS_WIDTH * scale + 2} {LENS_HEIGHT * scale + 2} Q 2 {LENS_HEIGHT * scale / 2 + 2} {LENS_WIDTH * scale + 2} 2 Z" />
+  </svg>
+{/snippet}
 
 <div class="pattern">
   <div class="ghead">
@@ -926,6 +1212,16 @@
         <b class="pv">Preview, not refined</b>
         <span class="stat">Rwp <span class="num">{pct(preview?.curves?.header?.rwp)}</span>{#if stats?.rwp != null},
           last fit <span class="num">{pct(stats.rwp)}</span>{/if}</span>
+      {:else if nav}
+        <!-- a series member: ‹ › step the one selection every view shares,
+             then its name and the prototype's line (round 12, call 2) -->
+        <span class="sstep">
+          <button class="ib" aria-label="Previous pattern" title="Previous pattern (↑)"
+            disabled={!nav.canPrev} onclick={() => nav.onstep(-1)}>‹</button>
+          <button class="ib" aria-label="Next pattern" title="Next pattern (↓)"
+            disabled={!nav.canNext} onclick={() => nav.onstep(1)}>›</button>
+        </span>
+        <b>{nav.name}</b><span class="stat">{nav.sub}</span>
       {:else}
       {#if title}<b>{title}</b>{/if}
       {#if previewError}<span class="bad">Preview refused</span>{/if}
@@ -955,12 +1251,16 @@
     {:else if loadError}
       <p class="empty bad">{loadError}</p>
     {/if}
-    <div class="plot" class:armed={!!arm} style:--gutter="{GUTTER}px"
+    <div class="plot" class:armed={!!arm} style:--gutter="{GUTTER}px" style:--overhang="{OVERHANG}px"
       style:--inset="{LABEL_INSET}px" style:--mark-line="{MARK_LINE}px">
       <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <div class="host" bind:this={host} bind:clientWidth={hostWidth} onpointerdowncapture={down}
-        onpointerupcapture={up} oncontextmenu={context}
-        onpointerleave={() => (hoverAt = null)}></div>
+      <div class="host" class:onmark={overMark != null && !altHeld} class:dragging={!!drag?.moved}
+        bind:this={host} bind:clientWidth={hostWidth} onpointerdowncapture={down}
+        onpointerupcapture={up} onpointermove={move} oncontextmenu={context}
+        onpointerleave={leave}></div>
+      {#if hoverLens}{@render lensMark("ghost", hoverLens.left, hoverLens.top, 1)}{/if}
+      {#if movingLens}{@render lensMark("moving", movingLens.left, movingLens.top, drag || landing ? 1.4 : 1)}{/if}
+      {#if dangerLens}{@render lensMark("danger", dangerLens.left, dangerLens.top, dangerLens.h / LENS_HEIGHT)}{/if}
       {#if geom && plotX && held}
         <!-- each axis is its own control: its tick labels and its hint open its
              choices, the hint's explanation shows on hover and on focus -->
@@ -1067,6 +1367,25 @@
           </button>
         </div>
       {/if}
+      {#if chosenPeak && peakSpot}
+        <div class="selbar peakbar" style:left="{peakBarLeft}px" style:top="{peakSpot.bottom}px"
+          bind:clientWidth={peakBarWidth} role="toolbar" aria-label="Peak line">
+          <span class="num">{formatPosition(chosenPeak.two_theta, null).value}</span><span class="unit">° 2θ</span>
+          <span class="segmented" role="group" aria-label="In the search">
+            <button class:on={chosenPeak.usable} aria-pressed={chosenPeak.usable} disabled={busy}
+              onclick={() => !chosenPeak!.usable && peakEdit({ kind: "use", index: chosenPeak!.index, on: true })}>Used</button>
+            <button class:on={!chosenPeak.usable} aria-pressed={!chosenPeak.usable} disabled={busy}
+              onclick={() => chosenPeak!.usable && peakEdit({ kind: "use", index: chosenPeak!.index, on: false })}>Not used</button>
+          </span>
+          <button class="ib" aria-label="Delete the line" title="Delete the line" disabled={busy}
+            onclick={() => removePeak(chosenPeak!.index)}>
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.7 8.5h5.6l.7-8.5" /></svg>
+          </button>
+          <button class="ib" aria-label="Close" title="Close" onclick={() => (selectedPeak = null)}>
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" /></svg>
+          </button>
+        </div>
+      {/if}
       {#if note || protocolError}
         <div class="toast" role="status" class:bad={!note && !!protocolError}>{note || protocolError}</div>
       {/if}
@@ -1090,6 +1409,15 @@
 {/if}
 
 <style>
+  /* ‹ › before a series member's name, the prototype's place for them */
+  .gtitle > .sstep {
+    display: inline-flex;
+    gap: 2px;
+    margin: 0 8px 0 0;
+    color: var(--fg);
+    vertical-align: middle;
+  }
+
   .pattern {
     flex: 1 1 auto;
     min-height: 0;
@@ -1125,7 +1453,7 @@
 
   .host {
     position: absolute;
-    inset: 0 var(--gutter) 0 0;
+    inset: 0 calc(var(--gutter) - var(--overhang)) 0 0;
   }
 
   .plot.armed .host :global(.u-over) {
@@ -1328,6 +1656,44 @@
   .selbar {
     top: 4px;
     transform: translateX(-50%);
+  }
+
+  /* a line's bar stands on its lens: `top` is the bar's foot */
+  .selbar.peakbar {
+    transform: translate(-50%, -100%);
+  }
+
+  .lensmark {
+    position: absolute;
+    z-index: 2;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    overflow: visible;
+  }
+
+  .lensmark path {
+    fill: var(--plot-peak);
+  }
+
+  /* where a click would add a line (rule 9) */
+  .lensmark.ghost path {
+    fill: none;
+    stroke: var(--plot-peak);
+    stroke-width: 1.2;
+    stroke-dasharray: 2 2;
+  }
+
+  /* the lens Option-click would remove (rule 9) */
+  .lensmark.danger path {
+    fill: var(--bad);
+  }
+
+  .host.onmark :global(.u-over) {
+    cursor: grab;
+  }
+
+  .host.dragging :global(.u-over) {
+    cursor: grabbing;
   }
 
   .chosen {

@@ -180,7 +180,8 @@ Two were open, and both were the maintainer's. Answered 2026-11-22 under the mai
 | [1317](../wp/1317-series-scrubber.md) | the GUI's view of a finished series | not moved: [gui-overhaul](gui-overhaul.md) § R7 carries it (maintainer, 2026-11-21) |
 | [2103](../wp/2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) | hold, tie and restart on a joint fit | stays in parametric; rule 2's start from a series result depends on it |
 | [2003](../wp/2003-the-chain-actions.md) | the tiers of the series' automatic actions | stays in generality |
-| [2300](../wp/2300-a-series-declares-each-parameter.md) | rule 1's declaration on the series call, and rule 2's refusal | filed 2026-11-22; its vocabulary is the maintainer's |
+| [2300](../wp/2300-a-series-declares-each-parameter.md) | rule 1's declaration on the series call, and rule 2's refusal | filed 2026-11-22; its shape ruled 2026-11-23 (one object for both calls) and its names settled the same day |
+| [2305](../wp/2305-the-joint-call-speaks-of-patterns.md) | the joint call says pattern and is named `refine_joint`; old names and the `hist.` prefix refused | filed 2026-11-23; the `hist.` rename ruled by the maintainer, the rest settled by Claude at his instruction |
 | [2301](../wp/2301-the-typical-temperature-series.md) | the typical temperature series: one documented route, its preset and a Switching page | filed 2026-11-22; the preset's name is the maintainer's |
 
 The two proposed rows keep `Milestone: unscheduled` in their files until their next edit

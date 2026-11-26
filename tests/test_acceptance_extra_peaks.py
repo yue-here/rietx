@@ -317,6 +317,6 @@ def test_the_arms_are_plotted_for_inspection(arms):
         for i, c in enumerate(arms["centres"]):
             zoom = OUT / f"extra_peaks_{name}_zoom{i}.png"
             plot_result(arms[name], path=str(zoom),
-                        two_theta_range=(c - 1.5, c + 1.5))
+                        two_theta_limits=(c - 1.5, c + 1.5))
             written.append(zoom)
     assert all(q.exists() and q.stat().st_size > 0 for q in written)
