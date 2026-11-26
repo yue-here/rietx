@@ -458,8 +458,9 @@ dipole amplitude is $[\langle j_0\rangle\,(L + 2S) + \langle j_2\rangle\,L] /
 $g = 2$, so a spin-only test cannot tell them apart. The output names which
 form was used per species, because a fit that does not say cannot be checked.
 
-Brown fitted {eq}`int-ff-dipole` over a stated range, $s \le 1.5$ Å$^{-1}$
-for his 3d, 4d and actinide rows and $s \le 1.2$ Å$^{-1}$ for the rare earths
+Brown fitted {eq}`int-ff-dipole` over a stated range, $s \le$ {{ S_MAX_BROWN_3D_4D }} Å$^{-1}$
+for his 3d and 4d rows, {{ S_MAX_BROWN_ACTINIDE }} Å$^{-1}$ for the actinides and
+{{ S_MAX_BROWN_RARE_EARTH }} Å$^{-1}$ for the rare earths
 {cite}`brown2004`, and past it the fitted form is not a form factor: the
 $\langle j_2\rangle$ rows grow as $D s^2$, and Mn$^{2+}$ $\langle j_0\rangle$,
 whose third exponent is negative, reaches 1.01 at $s = 3$ Å$^{-1}$. So each of
@@ -474,12 +475,13 @@ and 4d rows, Dirac-Fock for the rare earths and actinides
 f(s) = (1 - w)\,f_\text{Brown}(s) + w\,f_\text{computed}(s),
 \qquad
 w = 10t^3 - 15t^4 + 6t^5,\quad
-t = \min\!\left(1, \max\!\left(0, \frac{s - s_\text{end}}{0.2\ \text{Å}^{-1}}\right)\right).
+t = \min\!\left(1, \max\!\left(0, \frac{s - s_\text{end}}{\Delta s}\right)\right).
 ```
 
 {source}`rietx.crystallography.magnetic.form_factor.TAIL_BLEND_WIDTH`
 
-The weight $w$ has zero first and second derivatives at both ends, so the
+The blend is $\Delta s$ = {{ TAIL_BLEND_WIDTH }} Å$^{-1}$ wide. The weight $w$
+has zero first and second derivatives at both ends, so the
 curve stays smooth as a refined cell moves a reflection across the join. Some
 ions are served from a computed curve over the whole range instead: the
 high-charge 4d ions Ru$^{3+}$-Ru$^{6+}$, Rh$^{4+}$, Tc$^{4+}$,
@@ -492,11 +494,11 @@ and
 Pr$^{3+}$ and Pu$^{3+}$ (Dirac-Fock, GRASP2018 {cite}`froesefischer2019`).
 Brown carries no Pr row, and the older Pr$^{3+}$ fit {cite}`lisher1971` is on a
 non-relativistic footing; his printed Pu$^{3+}$ rows are fits to the Pu$^{5+}$
-curve. Every computed curve is tabulated on $0 \le s \le 6$ Å$^{-1}$ at
-0.01 Å$^{-1}$ and read with a cubic spline, which errs by at most
+curve. Every computed curve is tabulated on $0 \le s \le$ {{ TABLE_S_MAX }} Å$^{-1}$ at
+{{ TABLE_STEP }} Å$^{-1}$ and read with a cubic spline, which errs by at most
 $1.5\times10^{-6}$ between the points. They are computed for rietx and not
 peer-reviewed, and `approximation_name` says so wherever one is in force.
-Past $s = 6$ Å$^{-1}$ every row is refused.
+Past $s =$ {{ TABLE_S_MAX }} Å$^{-1}$ every row is refused.
 
 A free-ion curve is not a crystal's form factor at high $s$. Beyond about
 $s = 1.2$ Å$^{-1}$ the two part company, for every row, published or computed:
@@ -512,7 +514,7 @@ $s = 1.2$ Å$^{-1}$ the two part company, for every row, published or computed:
 - no published measurement of a magnetic form factor found for this manual reaches past
   $s = 1.157$ Å$^{-1}$ (iron metal {cite}`shull1962`).
 
-So the curves are numerically right to $s = 6$, though out there they are a
+So the curves are numerically right to $s =$ {{ TABLE_S_MAX }} Å$^{-1}$, though out there they are a
 free-ion model. Little rests on it: past Brown's ranges $f^2$ is
 $6 \times 10^{-5}$ (Mn$^{2+}$) to $7 \times 10^{-3}$ (Nd$^{3+}$) of its
 low-angle value. A fit whose reflections pass a Brown row's range records it

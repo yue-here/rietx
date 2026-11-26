@@ -31,6 +31,14 @@ from rietx import __version__
 from rietx._about import REPO_URL
 from rietx.crystallography.atomic_volume import VOLUME_RATIO_BOUNDS, VOLUME_SCATTER
 from rietx.crystallography.dispersion import NEAR_EDGE_EV
+from rietx.crystallography.magnetic.form_factor import (
+    S_MAX_BROWN_3D_4D,
+    S_MAX_BROWN_ACTINIDE,
+    S_MAX_BROWN_RARE_EARTH,
+    TABLE_S_MAX,
+    TABLE_STEP,
+    TAIL_BLEND_WIDTH,
+)
 from rietx.crystallography.magnetic.moments import MOMENT_DIRECTION_SUPPORT
 from rietx.crystallography.representation.distortion import DISTORTION_SEED
 from rietx.crystallography.scattering import _itc_handover
@@ -227,6 +235,15 @@ MYST_SUBSTITUTIONS = {
     "MOMENT_DIRECTION_SUPPORT": f"{MOMENT_DIRECTION_SUPPORT:.0e}",
     "DISTORTION_SEED": f"{DISTORTION_SEED:g}",
     "STATIONARY_ANGLE_LEVEL": STATIONARY_ANGLE_LEVEL,
+    # the magnetic form factor's ranges (#1806 review, item 5): where Brown's
+    # fitted ranges end, the blend onto the computed tail, and the computed
+    # tables' end and step, all in s = sinθ/λ, Å⁻¹
+    "S_MAX_BROWN_3D_4D": f"{S_MAX_BROWN_3D_4D:g}",
+    "S_MAX_BROWN_RARE_EARTH": f"{S_MAX_BROWN_RARE_EARTH:g}",
+    "S_MAX_BROWN_ACTINIDE": f"{S_MAX_BROWN_ACTINIDE:g}",
+    "TAIL_BLEND_WIDTH": f"{TAIL_BLEND_WIDTH:g}",
+    "TABLE_S_MAX": f"{TABLE_S_MAX:g}",
+    "TABLE_STEP": f"{TABLE_STEP:g}",
     # the parametric form test's level (WP-1325)
     "PARAMETRIC_FORM_LEVEL": FORM_TEST_LEVEL,
     "SCALE_B_SEPARATION_FLOOR": f"{SCALE_B_SEPARATION_FLOOR:.1e}",

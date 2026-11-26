@@ -154,7 +154,7 @@ The neutron scattering length is keyed by nuclide and the form factor by oxidati
 An ion the table does not carry is refused by name rather than mapped to a neighbour.
 State the charge: a site that is an ion is written as one, `"Fe3+"`, and the neutral atom with a 0, in the configuration `approximation_name` names (`"Ru0"` is neutral Ru 4d<sup>7</sup>5s, not Ru<sup>+</sup>; `"Pd0"` is neutral Pd 4d<sup>9</sup>5s <sup>3</sup>D).
 A bare symbol (`"Fe"`) is read as its element's most common oxidation state in one ICSD census {cite}`ding2020`, in a magCIF, a `solve_magnetic` site and `Moment.ion` alike, and reported as the warning [`MAGNETIC_ION_ASSUMED`](diagnostics-structures.md#magnetic_ion_assumed) naming the alternatives; where that ion carries no moment (Ti⁴⁺, Nb⁵⁺, Eu³⁺, U⁶⁺) a bare symbol on a moment is refused.
-The table serves every row on s = sinθ/λ ≤ 6 Å<sup>−1</sup> and refuses a reflection past it at the stage compile (the rows, their footing and the free-ion caveat are in {eq}`int-ff-tail`'s section of the theory page).
+The table serves every row on s = sinθ/λ ≤ {{ TABLE_S_MAX }} Å<sup>−1</sup> and refuses a reflection past it at the stage compile (the rows, their footing and the free-ion caveat are in {eq}`int-ff-tail`'s section of the theory page).
 Leave `Moment.g` as `None` for a 3d or 4d ion, where the spin-only g = 2 makes the ⟨j<sub>2</sub>⟩ term of the dipole approximation vanish.
 Set it for a 4f or 5f ion, where that term does not vanish: an absent g there is refused, because a default would drop a term worth tens of per cent at high angle.
 
