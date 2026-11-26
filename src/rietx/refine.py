@@ -10681,7 +10681,8 @@ def _form_factor_range_diagnostics(model: CompiledModel) -> list[Diagnostic]:
     """``MAGNETIC_FORM_FACTOR_COMPUTED_TAIL``: the Brown form-factor rows this
     model's reflection list evaluates past the range he fitted them over,
     where the value is the blend onto (then) the row's computed free-ion tail,
-    once per result, as ``info``: it records that the computed tail was used
+    once per result (in a joint fit, once per histogram that reaches it), as
+    ``info``: it records that the computed tail was used
     (the #1806 ruling: past Brown's range f² is 6 × 10⁻⁵ (Mn²⁺) to 7 × 10⁻³ (Nd³⁺)
     of its low-angle value, so nothing is owed), which
     :func:`~.crystallography.magnetic.form_factor.approximation_name` also

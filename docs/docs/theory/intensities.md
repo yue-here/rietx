@@ -518,5 +518,5 @@ So the curves are numerically right to $s =$ {{ TABLE_S_MAX }} Å$^{-1}$, though
 free-ion model. Little rests on it: past Brown's ranges $f^2$ is
 $6 \times 10^{-5}$ (Mn$^{2+}$) to $7 \times 10^{-3}$ (Nd$^{3+}$) of its
 low-angle value. A fit whose reflections pass a Brown row's range records it
-once, as the `info` row
+once per pattern, as the `info` row
 [`MAGNETIC_FORM_FACTOR_COMPUTED_TAIL`](../reference/diagnostics-refinement.md#magnetic_form_factor_computed_tail).

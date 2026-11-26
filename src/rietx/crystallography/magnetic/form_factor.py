@@ -167,8 +167,9 @@ p. 461).  So a Brown row is his analytic form exactly up to that end
 (:func:`fitted_range`), then blended onto its computed tail over
 :data:`TAIL_BLEND_WIDTH` = 0.2 Å⁻¹ by the C² quintic 10t³ − 15t⁴ + 6t⁵, and
 the tail beyond.  A fit whose reflections pass a Brown row's range carries
-``MAGNETIC_FORM_FACTOR_COMPUTED_TAIL`` once (:func:`past_fitted_range` is
-the one comparison).  Past s = 6 Å⁻¹ every row is refused, before any work,
+``MAGNETIC_FORM_FACTOR_COMPUTED_TAIL`` once per pattern (in a joint fit, on
+each histogram that reaches it; :func:`past_fitted_range` is the one
+comparison).  Past s = 6 Å⁻¹ every row is refused, before any work,
 by :func:`j0`, :func:`j2`, :func:`magnetic_form_factor` and the forward
 model's stage compile alike (:func:`past_table_end`).
 
