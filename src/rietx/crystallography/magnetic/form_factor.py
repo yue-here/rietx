@@ -228,6 +228,7 @@ from typing import Literal
 import numpy as np
 from scipy.interpolate import CubicSpline
 
+from ..._about import DATA_PACKAGE
 from ...backend import get_backend
 
 #: (A, a, B, b, C, c, D) of one Brown-shaped ⟨jₙ⟩ fit.
@@ -930,7 +931,7 @@ def computed_curves() -> dict[str, ComputedCurve]:
     Each block's grid is checked to be s = s_first, s_first + 0.01, ..., 6, so
     a malformed file fails here and never as a wrong value.
     """
-    text = (files("rietx.data") / COMPUTED_FILE).read_text(encoding="utf-8")
+    text = (files(DATA_PACKAGE) / COMPUTED_FILE).read_text(encoding="utf-8")
     out: dict[str, ComputedCurve] = {}
     for chunk in text.split("\n@ ")[1:]:
         head, *body = chunk.split("\n")
