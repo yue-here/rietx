@@ -4580,6 +4580,16 @@ ROWS: tuple[Row, ...] = (
                  "first recorded invariant, a class with no conditional form (the generality "
                  "judge, 2026-10-22)."),
         approved="2026-10-21"),
+    Row("rietx.model.forward.PAWLEY_GROUP_SCALE_FLOOR_REL", "constant", tier=1, value=1e-4,
+        evidence=("numerical floor (WP-2311): an overlap group's restraint scale is never "
+                  "under this fraction of its phase's largest on-data intensity, so it is "
+                  "relative to the phase and never read off a seed the partition emptied; "
+                  "it replaced an absolute 1e-10 that weighed an emptied group's rows at 5e9 "
+                  "and left its sum where the seed put it.  Synthetic LaB6, declared background "
+                  "1x, 10x and 100x the data: every value from 1 to 1e-8 gives the true start's "
+                  "fit (cost 3415.253, the same widths), 1e-9 locks again; the scale test in "
+                  "tests/test_pawley.py pins the answer under a background start 100x high and "
+                  "under intensity and sigma rescaled by 1e-3")),
     Row("rietx.model.forward.PAWLEY_OFF_DATA_SCALE_FLOOR", "constant", tier=3, value=1.0,
         evidence=("WP-1459 (outside PR #453): the off-data ridge is as wide as the phase's "
                   "largest on-data intensity; the floor of 1 has no stated source and binds "
