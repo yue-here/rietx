@@ -4580,6 +4580,25 @@ ROWS: tuple[Row, ...] = (
                  "first recorded invariant, a class with no conditional form (the generality "
                  "judge, 2026-10-22)."),
         approved="2026-10-21"),
+    Row("rietx.model.forward.OFF_DATA_WINDOW_TOL", "constant", tier=3, value=0.001,
+        evidence=("window fraction for a peak centred off the data (outside the fitted "
+                  "channels' first and last 2theta), at any stage fraction; the closing "
+                  "stage's, schemas.plan.CLOSING_WINDOW_TOL, by alias.  On issue #440's "
+                  "fluorapatite ramp (tests/test_pawley.py, "
+                  "test_lebail_cell_is_right_with_a_reflection_past_the_range_end) (6 0 2), "
+                  "0.45 deg past the data, held no channel at the stage's 2 % and a default "
+                  "Le Bail cell landed 6.9 esd off (Rwp 0.083, converged); with this rule 0.11 "
+                  "esd (Rwp 0.054), and 0.09 esd from a start 0.133 % off where it was 15 esd.  "
+                  "Pawley and Rietveld single fits move 0.00-0.18 esd.  No program has a "
+                  "mechanism for this edge (docs/practice.md, A reflection centred past the "
+                  "range end); not tested on other families"),
+        grounds=("A new default with no program to follow: tier 3.  The mechanism is the "
+                 "maintainer's direction of 2026-11-19 (WP-2228, fix the edge itself, option "
+                 "C); the fraction is the closing stage's, the windows a converged rietx "
+                 "answer is measured on, so the tail is modelled as a closing stage would "
+                 "model it and a closing compile is unchanged.  Settled by Claude on those "
+                 "grounds (WP-2228)."),
+        approved="2026-11-25", approved_by="checked"),
     Row("rietx.model.forward.PAWLEY_OFF_DATA_SCALE_FLOOR", "constant", tier=3, value=1.0,
         evidence=("WP-1459 (outside PR #453): the off-data ridge is as wide as the phase's "
                   "largest on-data intensity; the floor of 1 has no stated source and binds "

@@ -1,6 +1,6 @@
 # WP-2228 — A reflection centred past the range end keeps its tail
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-25 — claimed by @yue-here (ghostshift runner)
 Track: What fires, and what stays silent
 Depends on: 2222 (the closing stage off by default); 2075 soft (the report half: a reflection straddling a range end)
 Priority: P2 2026-11-19 — a silent wrong answer on a path few fits take: a default Le Bail cell 7-15 esd off, reported `converged`, where a strong reflection sits just past the data's end
@@ -54,6 +54,9 @@ window holds 80.
   0.15 esd with the window fraction. Rietveld's intensities come from the
   structure, so no neighbour can absorb a tail. On real 11-BM NAC, which has
   no such reflection, the Le Bail cell moves 0.01-0.02 esd.
+  *Superseded in part, 2026-11-25:* NAC does have such reflections. Under
+  the acceptance limits (2-24°) 8 of 129 are centred off the data, and at
+  the 2 % fraction 6 of their line windows hold no channel.
 
 The probe scripts were not kept. The first task rebuilds the decisive one,
 the Le Bail single fit at pattern 2, as a test.
@@ -110,7 +113,7 @@ approval. Candidates, from what rietx already has:
 
 ## Tasks
 
-- [ ] Reproduce the four measurements of § Context as a test on `fap_series` (Le Bail single fit at pattern 2 from the CIF cell, cell within 1 esd of the truth at the default plan)
+- [x] Reproduce the four measurements of § Context as a test on `fap_series` (Le Bail single fit at pattern 2 from the CIF cell, cell within 1 esd of the truth at the default plan)
 - [ ] Choose the mechanism from § Practice, measure it on the ramp and on NAC, and bring the choice to the maintainer if practice does not settle it
 - [ ] Implement it in `compile_model`'s window sizing; `_audit.py` row for the new default
 - [ ] Remove the carried-Pawley closing-stage rule (`SequentialRefinement.fit`) and `tests/test_sequential.py::test_a_carried_pawley_chain_runs_the_closing_stage`; the Pawley series lands within 0.1 esd of the closing answer without it
@@ -124,6 +127,65 @@ green, with the default Le Bail fit of pattern 2 within 1 esd of the truth
 and the carried Pawley chain within 0.1 esd of its closing-stage answer.
 
 ## Handover log
+
+- **2026-11-25** (ghostshift runner, draft PR #1843) — **paused on a
+  question for the maintainer**; nothing merged. PR #1480 (WP-2075) was
+  checked first: it edits `refine.py` and `report/fit_range.py`, not window
+  sizing, so no collision.
+
+  *Built* (commit f1e098ccf): `forward._half_widths`, shared by
+  `compile_model` and `window_sizing`, sizes the window of any line centred
+  outside `[tt_min, tt_max]` at `OFF_DATA_WINDOW_TOL` (= the closing stage's
+  1e-3) whatever the stage's fraction. A line on the data is untouched, bit
+  for bit. Two tests in `tests/test_pawley.py` (both fail with the rule
+  removed), an `_audit.py` row (tier 3, `approved_by="checked"` pending the
+  generality judge), a `docs/practice.md` row.
+
+  *Measured on the ramp* (macOS arm64, `[dev]`, compiled tier on; probes in
+  the runner's scratch, `~/.cache/ghostshift/rietx/wp-2228/probe/`):
+  - Le Bail single fit, pattern 2 from the CIF cell: 6.85 → 0.11 esd (a),
+    −9.24 → 0.00 (c), Rwp 0.083 → 0.054. Pattern 4: 15 → 0.09 esd.
+  - Pawley single fit, pattern 2: −0.44/−0.58 → −0.57/−0.76 esd. Rietveld:
+    −0.03/+0.08, unchanged.
+  - Carried Pawley chain without the closing stage: worst Rwp 0.0368
+    (pattern 3) against 0.0341 with it; cell up to 0.43 esd from the
+    closing answer (pattern 4). Main's figure was 0.0407 and 0.77 esd. So
+    the fix halves the drift but misses task 4's 0.1 esd bar, and the
+    carried-Pawley rule stays. At edge windows of 1e-4 the Rwp drift goes
+    but the cell scatters ±1.5 esd. Cause of the remainder not isolated.
+  - Le Bail chain, no closing stage: main worst 39 esd (Rwp 0.26), fix
+    worst 11.9 esd (Rwp 0.058). With the data cut at 72° or 74°, where the
+    edge reflections' windows already reach the data, main and fix both
+    drift 12-33 esd. Cut at 73.5°, with no reflection in the margin, both
+    sit at 3.4 esd (Rwp 0.040 against 0.036 with the closing stage). So
+    most of the Le Bail chain drift is not the window: it is a tail-only
+    reflection's Le Bail intensity in a warm chain, plus a 3-esd lag of
+    the warm one-stage fit itself. A closing stage at 2e-2 removes all of
+    it (≤ 2 esd).
+
+  *Measured on 11-BM NAC* (acceptance protocol, 2-24°): Rietveld with its
+  closing stage is unchanged to 7 digits. **The default Le Bail fit is
+  worse**: two tail-only reflections, (6 6 6) and (10 2 2) just past 24°,
+  run away to an extracted intensity of 9.37e4, against a phase median of
+  60 and a strongest real reflection of 1477. Rwp 0.143 → 0.172; the cell
+  moves +1.8e-5 Å (0.25 esd) away from the Rietveld value. Main never
+  showed this: its edge windows held no channel, and its closing stage (at
+  1e-3 for every reflection) runs too few cycles for the runaway (max 1504).
+  The partition is unstable for an intensity that only a tail determines.
+  Pawley already has the cure for its own case (WP-1459's ridge); Le Bail
+  has none.
+
+  **Question for the maintainer.** The window that reaches the data fixes
+  the ramp, but on real synchrotron data it lets Le Bail's partition send
+  a tail-only intensity to 1500× the median. Choose one:
+  (A) ship the window rule as built and accept the NAC Le Bail regression;
+  (B) ship it with a Le Bail twin of the Pawley ridge, holding or bounding
+  the intensity of a reflection centred off the data (a new tier-3
+  heuristic, no program does it; to be designed and measured);
+  (C) drop the window rule, keep the carried-Pawley rule, and file the
+  ramp's Le Bail failure as known. The runner leans to B, as a close
+  call: A ships junk intensities to every Le Bail user whose range ends
+  inside a strong tail, and C leaves the headline 6.9-esd failure.
 
 - **2026-11-19** — created from WP-2222's follow-ups. No open WP owns the
   window at a range end: WP-2075 reports a straddling reflection and changes
