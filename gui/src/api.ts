@@ -410,6 +410,9 @@ export const api = {
    *  its fit wherever one has landed, mid-run too (WP-2243). */
   seriesPattern: (pattern: number, of: "run" | "staged") =>
     arrays(`/api/series/curves?pattern=${pattern}&of=${of}`),
+  /** Every staged pattern's counts on one 2θ grid, and each fitted one's
+   *  difference in esd, packed as the curves are (WP-2243). Before a run too. */
+  seriesMap: () => arrays("/api/series/map"),
   /** That pattern's own history tree — **read-only**: a tree is pinned to its
    *  data fingerprint, so its nodes cannot be checked out into this project. */
   seriesHistory: (index: number) =>

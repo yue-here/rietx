@@ -257,6 +257,11 @@ class GuiSession:
         #: reported-chain fit as it lands (``on_result``), so a member's fit is
         #: served before the run ends. ``None`` between runs (WP-2243).
         self._series_live: dict | None = None
+        #: each staged member's pattern as the Map last read it, keyed by its
+        #: upload and reader options: a staged file never changes, and reading
+        #: one costs ~27 ms (an .xye of 4200 points), so a coordinate edit on a
+        #: 34-pattern list would otherwise cost the Map a second (WP-2243)
+        self._series_reads: dict[tuple, Any] = {}
         if project is not None:
             self._remember(project)
 
@@ -740,6 +745,7 @@ class GuiSession:
             self._series = series_mod.SeriesSetup()
             self._series_run = None
             self._series_live = None
+            self._series_reads = {}
             self._cond.notify_all()
         self._write_recent([
             {**_recent_entry(e), "closed": True} if str(e.get("path", "")) == path
@@ -3331,6 +3337,47 @@ class GuiSession:
             header={"index": pattern, "label": member["label"],
                     "x": member["x"], "fitted": res is not None})
 
+    def series_map(self) -> Packed:
+        """Every staged member's counts and difference on one grid, for the Map graph.
+
+        Answers before any run, from the staged files alone: that is the
+        series' pre-visualisation (WP-2243 task 7). The rows are the staged
+        list in series order, each file read as the chain would read it, once
+        while it stays staged under the same reader options.
+        A row carries its fit's difference only while the last run's list is
+        the staged one, member for member and reader option for option, so an
+        edit after a run never draws one pattern's misfit over another's
+        counts. While a series run is in flight no row has one: the record is
+        still the run before it (:meth:`series_result`), and the Map asks
+        again when the run ends.
+        """
+        self._need_project()
+        setup = self._series
+        if not setup.members:
+            raise GuiError("no series is staged; add patterns with PUT /api/series",
+                           code="NO_SERIES", status=409, where=["patterns"])
+        with self._cond:
+            entry = self._series_run
+            running = self._state != "idle" and self._run.get("kind") == "series"
+        keys = [(m.token, tuple(sorted(m.options.items()))) for m in setup.members]
+        reads = {k: self._series_reads.get(k) or read_pattern(m.path, **m.options)
+                 for k, m in zip(keys, setup.members)}
+        self._series_reads = reads
+        data = [reads[k] for k in keys]
+        fits, rwp = {}, {}
+        staged = [(m.token, dict(m.options)) for m in setup.members]
+        if (entry is not None and not running
+                and [(m["upload"], m["reader_options"]) for m in entry["members"]]
+                == staged):
+            runner, result = entry["runner"], entry["result"]
+            for k, row in enumerate(result.entries):
+                res = runner.results_[k] if k < len(runner.results_) else None
+                if res is not None and res.two_theta:
+                    fits[row.index] = res
+                    rwp[row.index] = (row.statistics.rwp
+                                      if row.statistics is not None else None)
+        return series_mod.map_payload(setup, data, fits, running=running, rwp=rwp)
+
     def series_history(self, index: int) -> dict:
         """One series member's own history tree — read-only, and that is the point.
 
@@ -3809,6 +3856,7 @@ class GuiSession:
             self._series = series_mod.SeriesSetup()
             self._series_run = None
             self._series_live = None
+            self._series_reads = {}
             self._cond.notify_all()
         self._remember(project)
 

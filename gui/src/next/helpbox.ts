@@ -109,6 +109,18 @@ export const GRAPH_HELP: Record<GraphTab, HelpBoxEntry> = {
     ],
     anchor: "series",
   },
+  map: {
+    title: "Map",
+    lead: "Each row is one pattern of the series, the first at the top.",
+    items: [
+      "Map colours each row by its counts on a log scale; Waterfall draws each as a line on its row.",
+      "Difference colours each fitted pattern by (observed − calculated) / esd: red where the model is too low, blue where it is too high.",
+      "Drag across to zoom in 2θ, or down to show a window of rows. Double-click, or press Show all, to show everything.",
+      "With Cuts on, click to set a cut and select that pattern. Under the map is the selected pattern; shift-click another row to average the rows between. Beside it is each pattern at the cut.",
+      "Set the cut's width on the profile under the map: drag across it, drag the bar's edges, or drag the bar to move it. You can also type the width, or shift-drag an area of the map.",
+    ],
+    anchor: "series",
+  },
 };
 
 /** The bottom panel's History tab (WP-2211), in the design's words, with the

@@ -353,6 +353,8 @@ ROUTES: dict[tuple[str, str], Any] = {
     ("POST", "/api/series/run"): lambda s, q, b: s.run({**b, "kind": "series"}),
     ("GET", "/api/series/result"): lambda s, q, b: s.series_result(),
     ("GET", "/api/series/curves"): _series_curves,
+    # every member on one grid, for the Map graph, before a run too (WP-2243)
+    ("GET", "/api/series/map"): lambda s, q, b: s.series_map(),
     ("GET", "/api/series/history"): _series_history,
 
     ("GET", "/api/history"): lambda s, q, b: s.history(),

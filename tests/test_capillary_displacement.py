@@ -320,7 +320,7 @@ def test_an_injected_displacement_is_recovered_on_both_axes():
     from rietx.viz.plots import plot_result
     plot_result(result, path=str(OUT / "capillary_displacement_corrected.png"))
     plot_result(result, path=str(OUT / "capillary_displacement_corrected_zoom.png"),
-                two_theta_range=(8.0, 40.0))
+                two_theta_limits=(8.0, 40.0))
 
 
 def test_neglecting_it_bends_the_cell_and_only_a_rung_names_the_cause():
@@ -383,7 +383,7 @@ def test_neglecting_it_bends_the_cell_and_only_a_rung_names_the_cause():
     from rietx.viz.plots import plot_result
     plot_result(result, path=str(OUT / "capillary_displacement_neglected.png"))
     plot_result(result, path=str(OUT / "capillary_displacement_neglected_zoom.png"),
-                two_theta_range=(8.0, 40.0))
+                two_theta_limits=(8.0, 40.0))
 
 
 # ----------------------------------------------------------------------
