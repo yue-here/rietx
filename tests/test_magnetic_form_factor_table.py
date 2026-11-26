@@ -204,7 +204,9 @@ _TABLE_SHA256 = "bc35092c77fb1fa6233112525bed1ed5270ff3dba42d3ad871f0dd7ec879e98
 #: SHA-256 of ``rietx/data/mff_computed.dat``, the computed curves (rietx #1691): written by
 #: ``tools/magnetic_form_factors/write_data_file.py`` from the curves its README lists, and checked against them
 #: (every value within the file's 5e-8 rounding) when it was written. Any change to the file fails here.
-_DATA_SHA256 = "108807083129b3c80b50076deb252bb922c8b29234c297a37f79d094db33edc0"
+#: Re-derived for #1806 (round 1, point 11) on a header line alone: the file rebuilt from all 106 regenerated
+#: curves is this file byte for byte.
+_DATA_SHA256 = "b500a4784c6f7610b965a1a9bdcf0a3d594d21f997715af9196930b8daf917ab"
 
 
 def _canonical_table() -> bytes:

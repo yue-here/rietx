@@ -15,6 +15,8 @@
 #         doi:10.1525/9780520906150). C. Froese Fischer, G. Gaigalas,
 #         P. Jonsson & J. Bieron, GRASP2018, Comput. Phys. Commun. 237,
 #         184-187 (2019), doi:10.1016/j.cpc.2018.10.032.
+# TERMS:  the codes' distribution terms (RCN: free of charge, not to be sold;
+#         GRASP2018: MIT) are stated in rietx's ATTRIBUTION.md.
 #
 # CHECKS (the numbers are in tools/magnetic_form_factors/README.md):
 #   - the 3d/4d curves reproduce Brown's ITC Vol. C sec. 4.4.5 rows to his

@@ -63,7 +63,7 @@ needed any more:
 
 **Proof:** the unmodified source, built as above, run from the decks in `curves.csv` through `regenerate.py`, gives
 back all 106 curves, and `write_data_file.py` turns them into a file **byte-identical** to the shipped
-`mff_computed.dat` (SHA-256 `108807083129b3c80b50076deb252bb922c8b29234c297a37f79d094db33edc0`). The per-order
+`mff_computed.dat` (SHA-256 `b500a4784c6f7610b965a1a9bdcf0a3d594d21f997715af9196930b8daf917ab`). The per-order
 match against the shipped values is in "Checks" below. (The neutral Pd table joined on 2026-11-23; its deck is
 byte-identical to the data job's, and its curve matches the data job's to 5 × 10⁻⁹, the `%.8f` print.)
 
