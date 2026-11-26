@@ -271,7 +271,7 @@ def test_fap_lab_rietveld_matches_gsas(fap_inputs, fap_fit):
     out.mkdir(exist_ok=True)
     plot_result(result, path=str(out / "fap_fit.png"))
     plot_result(result, path=str(out / "fap_fit_lowangle.png"),
-                two_theta_range=(15.0, 35.0))
+                two_theta_limits=(15.0, 35.0))
     plot_for_vlm(result, report, path=str(out / "fap_vlm.png"))
 
 
@@ -367,7 +367,7 @@ def test_tying_the_similar_atoms_bisos_buys_precision(fap_inputs, fap_fit):
     out.mkdir(exist_ok=True)
     plot_result(tied, path=str(out / "fap_tied_bisos.png"))
     plot_result(tied, path=str(out / "fap_tied_bisos_lowangle.png"),
-                two_theta_range=(15.0, 35.0))
+                two_theta_limits=(15.0, 35.0))
 
 
 def _fit_on_gsas_own_model(gaussian_variance_read_as_fwhm_squared: bool):

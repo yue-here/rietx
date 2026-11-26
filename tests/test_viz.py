@@ -101,7 +101,7 @@ def test_a_pattern_and_its_fit_share_one_intensity_axis(fitted):
     lam = 0.45
     for kw in ({}, {"y_scale": "sqrt"}, {"y_scale": "log"}, {"y_scale": "asinh"},
                {"x_axis": "d", "wavelength": lam}, {"x_axis": "q", "wavelength": lam},
-               {"two_theta_range": (8.0, 16.0)}):
+               {"two_theta_limits": (8.0, 16.0)}):
         stem = "_".join(["viz_pattern", *(f"{k}-{v}" for k, v in kw.items())])
         mine = plot_pattern(bare, path=str(OUT / f"{stem}.png"), **kw).get_axes()
         panels = plot_result(result, **kw).get_axes()
@@ -169,7 +169,7 @@ def test_an_excluded_region_is_shaded_over_channels_the_fit_left_out(fitted):
     expect = sorted(lam / (2 * np.sin(np.radians(t) / 2)) for t in EXCLUDED)
     assert _span(d_ax.patches[0]) == pytest.approx(expect)
     # a window that misses the region draws no band at all
-    assert not plot_pattern(pattern, two_theta_range=(10.0, 14.0)).get_axes()[0].patches
+    assert not plot_pattern(pattern, two_theta_limits=(10.0, 14.0)).get_axes()[0].patches
 
 
 def test_a_region_from_two_theta_zero_is_clipped_before_it_becomes_d_or_q(fitted):
@@ -209,7 +209,7 @@ def test_pattern_data_plot_forwards_and_refuses_what_the_result_refuses(fitted):
     with pytest.raises(ValueError, match="y_scale must be one of"):
         pattern.plot(y_scale="logit")
     with pytest.raises(ValueError, match="contains no points"):
-        pattern.plot(two_theta_range=(90.0, 91.0))
+        pattern.plot(two_theta_limits=(90.0, 91.0))
 
 
 # ----------------------------------------------------------------------
@@ -260,7 +260,7 @@ def test_a_model_draws_its_starting_background_under_the_data(fitted):
 
     # a window draws the window's part of the same curve
     windowed = plot_pattern(pattern, model=_starting(),
-                            two_theta_range=(8.0, 16.0)).get_axes()[0]
+                            two_theta_limits=(8.0, 16.0)).get_axes()[0]
     tt_w = np.asarray(_dashed(windowed)[0].get_xdata())
     assert tt_w.min() >= 8.0 and tt_w.max() <= 16.0
 

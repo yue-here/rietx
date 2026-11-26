@@ -277,7 +277,7 @@ indices int32, so a browser reads each array without copying it.
 
 | Route | Is |
 |---|---|
-| `GET /api/peaks` · `POST /api/peaks` | the picked list; pick it, with `pick_peaks`'s `shoulders`, `two_theta_range` and `flag_contamination` |
+| `GET /api/peaks` · `POST /api/peaks` | the picked list; pick it, with `shoulders`, `two_theta_range` and `flag_contamination`; the range is `pick_peaks`'s `two_theta_limits` |
 | `POST /api/peaks/add` · `POST /api/peaks/remove` · `POST /api/peaks/move` | one line, added, removed, moved |
 | `POST /api/peaks/flag` · `POST /api/peaks/refit` | mark a line; refit its group |
 | `POST /api/peaks/undo` · `POST /api/peaks/redo` | put the list back as it was before the last edit; make that edit again |
@@ -293,6 +293,7 @@ indices int32, so a browser reads each array without copying it.
 | `GET /api/series` · `PUT /api/series` | the staged pattern list; replace it whole |
 | `POST /api/series/run` · `GET /api/series/result` | run the chain; its per-pattern answers and trajectories |
 | `GET /api/series/curves` · `GET /api/series/history` | one member's channels and curves, as float64 arrays, by its entry (`index`) or by its place in the run's or the staged list (`pattern`, `of`), mid-run too; one member's tree |
+| `GET /api/series/map` | every staged pattern's counts on one 2θ grid, and each fitted one's difference in esd, as float64 arrays |
 | `GET /api/history` | the node graph |
 | `GET /api/history/diff` · `GET /api/history/compare` | one node against its parent; two nodes against each other |
 | `GET /api/history/curves` | one node's calculated curve, recomputed at its own values, for Compare |

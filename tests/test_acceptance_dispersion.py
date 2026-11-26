@@ -86,7 +86,7 @@ def _fit_anomalous(sample: str, phases: list[rx.Phase], *,
     OUT.mkdir(exist_ok=True)
     result.plot(path=str(OUT / f"disp_{tag}.png"))
     result.plot(path=str(OUT / f"disp_{tag}_lowangle.png"),
-                two_theta_range=(15.0, 60.0))
+                two_theta_limits=(15.0, 60.0))
     import matplotlib.pyplot as plt
     plt.close("all")
     return ref, result

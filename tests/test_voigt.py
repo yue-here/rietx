@@ -283,9 +283,9 @@ def test_voigt_end_to_end_refines_and_plots():
     OUT.mkdir(exist_ok=True)
     plot_result(result, path=str(OUT / "voigt_lab6_fit.png"))
     plot_result(result, path=str(OUT / "voigt_lab6_fit_lowangle.png"),
-                two_theta_range=(20.6, 22.2))
+                two_theta_limits=(20.6, 22.2))
     plot_result(result, path=str(OUT / "voigt_lab6_fit_highangle.png"),
-                two_theta_range=(115.0, 125.0))
+                two_theta_limits=(115.0, 125.0))
 
 
 # -- the basis-only twins (WP-1109) ---------------------------------------
