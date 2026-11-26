@@ -50,7 +50,7 @@ from .peaks import Detection, FdrScreen, PeakGroup, detect_peaks, fdr_screen, gr
 
 
 def pick_peaks(data: PatternData, instrument: Instrument, *,
-               two_theta_range: tuple[float, float] | None = None,
+               two_theta_limits: tuple[float, float] | None = None,
                shoulders: bool = True,
                flag_contamination: bool = True,
                ) -> PeakList:
@@ -62,18 +62,21 @@ def pick_peaks(data: PatternData, instrument: Instrument, *,
     seeds), ``profile.shape`` (so the peak list and the refinement that follows
     share one peak shape), and the axial apertures (FCJ, applied and held).
 
+    ``two_theta_limits`` requests the (low, high) window in degrees 2θ to pick
+    in, on top of ``data.excluded_regions``.
+
     Returns a :class:`PeakList`; abstention is a *result*, so an unindexably
     short list comes back as a list carrying ``PEAK_LIST_TOO_SHORT`` rather than
     as an exception.
     """
     return pick_peaks_with_state(data, instrument,
-                                 two_theta_range=two_theta_range,
+                                 two_theta_limits=two_theta_limits,
                                  shoulders=shoulders,
                                  flag_contamination=flag_contamination)[0]
 
 
 def pick_peaks_with_state(data: PatternData, instrument: Instrument, *,
-                          two_theta_range: tuple[float, float] | None = None,
+                          two_theta_limits: tuple[float, float] | None = None,
                           shoulders: bool = True,
                           flag_contamination: bool = True,
                           ) -> tuple[PeakList, Detection, list[GroupFit]]:
@@ -86,7 +89,7 @@ def pick_peaks_with_state(data: PatternData, instrument: Instrument, *,
     windows and the fitted width pairs rather than the flattened list.
     """
     require_two_theta(data, "pick_peaks()", instrument=instrument)
-    det = detect_peaks(data, instrument, two_theta_range=two_theta_range,
+    det = detect_peaks(data, instrument, two_theta_limits=two_theta_limits,
                        shoulders=shoulders)
     lam0 = instrument.source.lines[0].wavelength.value
 
@@ -111,7 +114,7 @@ def pick_peaks_with_state(data: PatternData, instrument: Instrument, *,
 
 def fit_peaks(data: PatternData, instrument: Instrument,
               positions: np.ndarray | list[float], *,
-              two_theta_range: tuple[float, float] | None = None,
+              two_theta_limits: tuple[float, float] | None = None,
               ) -> PeakList:
     """Profile-fit the peaks at ``positions`` and nothing else, with no structure,
     space group or refinement.
@@ -174,7 +177,7 @@ def fit_peaks(data: PatternData, instrument: Instrument,
             raise ValueError(
                 f"2θ = {same[0]:.4f}° is named more than once; two components "
                 "at one position cannot be told apart, so name it once")
-    det = detect_peaks(data, instrument, two_theta_range=two_theta_range)
+    det = detect_peaks(data, instrument, two_theta_limits=two_theta_limits)
     lam0 = instrument.source.lines[0].wavelength.value
 
     groups = _windows_for(det, pos, instrument)
