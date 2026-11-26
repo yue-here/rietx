@@ -195,7 +195,7 @@ def test_every_row_is_well_behaved_inside_browns_fit_range():
 #: Tables 4.4.5.1-4.4.5.8, pp. 454-457 (page image) and against P. J. Brown's data file (2013-09-19), row by row as
 #: curves on Brown's fit ranges (issue #593). Re-derived for issue #626 (keys moved, no digit of Brown's) and for
 #: #1691/#1804, which removed six rows and changed no digit of the rest: Pu³⁺ (a fit to the Pu⁵⁺ curve) and the
-#: bare Mo, Tc, Ru, Rh, Pd rows (M⁺ curves), all six now served from computed tables (ruling D63 item 3); Lisher &
+#: bare Mo, Tc, Ru, Rh, Pd rows (M⁺ curves), all six now served from computed tables (https://github.com/yue-here/rietx/issues/1691#issuecomment-7098289449; for Pd, https://github.com/yue-here/rietx/pull/1806#issuecomment-7115570833); Lisher &
 #: Forsyth's Pr³⁺ store retired for a computed table. ``test_browns_rows_are_unchanged_by_the_rekeying`` puts all of
 #: them back and recovers the #593 fingerprint. Any edit to any digit fails here. Re-derive it only together with a
 #: stated verification of the edited rows, and say which in the commit.

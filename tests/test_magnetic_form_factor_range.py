@@ -2,8 +2,10 @@
 
 Every Brown ⟨jₙ⟩ row is a least-squares fit over a stated range of s = sinθ/λ (Brown, ITC Vol. C § 4.4.5 (2004),
 p. 461), and past it the fitted form is not a form factor: Mn²⁺ ⟨j₀⟩ carries e^(+0.609·s²) and returned 1.0105 at
-s = 3 Å⁻¹ and 1.43 × 10⁷ at s = 6 (rietx #1796).  Since rietx #1691 (rulings D46, D56) each Brown row is his
-analytic form inside his range, blended over 0.2 Å⁻¹ onto a computed free-ion tail, and the tail to s = 6;
+s = 3 Å⁻¹ and 1.43 × 10⁷ at s = 6 (rietx #1796).  Since the rulings on #1691 of 2026-11-23
+(https://github.com/yue-here/rietx/issues/1691#issuecomment-7095775367 and
+https://github.com/yue-here/rietx/issues/1691#issuecomment-7098289449), each Brown row is his analytic form
+inside his range, blended over 0.2 Å⁻¹ onto a computed free-ion tail, and the tail to s = 6;
 seventeen ions are served from computed tables over the whole range, neutral ``Pd0`` among them (rulings on #1806 of 2026-11-23 and 2026-11-24);
 and past s = 6 every row is refused.  These tests pin
 
@@ -430,8 +432,8 @@ def test_a_magnetic_fit_inside_range_is_browns_alone_bit_for_bit(monkeypatch):
 # ============================================================= approximation_name
 
 def test_approximation_name_names_every_rows_footing():
-    """Yue, #1691 (2026-11-21): every result that uses a computed row names its footing; D56 call 3: a bare row
-    that is not the neutral ground state says what it is, and Cr/Ni say their footing is not identified."""
+    """Yue, #1691 (2026-11-21): every result that uses a computed row names its footing; https://github.com/yue-here/rietx/issues/1691#issuecomment-7098289449, call 3: a
+    bare row that is not the neutral ground state says what it is, and Cr/Ni say their footing is not identified."""
     name = ff.approximation_name
     assert name("Mn2+", None).startswith(ff.J0_ONLY + "; Brown ITC Vol. C § 4.4.5 to s = 1.5 Å⁻¹, computed tail")
     assert "Hartree-Fock" in name("Mn2+", None) and ff.COMPUTED_LABEL in name("Mn2+", None)

@@ -34,7 +34,7 @@ import math
 from collections import defaultdict
 from pathlib import Path
 
-#: The s grid every curve is on (rietx issue #1691, ruling D46 (c)).
+#: The s grid every curve is on (ruled on 2026-11-23, https://github.com/yue-here/rietx/issues/1691#issuecomment-7095775367).
 STEP = 0.01
 S_LAST = 6.0
 N_FULL = 601
@@ -42,7 +42,7 @@ N_FULL = 601
 #: Where Brown's fitted range ends, per family (ITC Vol. C § 4.4.5, p. 461).
 S_END = {"3d": 1.5, "4d": 1.5, "4f": 1.2, "5f": 1.5}
 
-#: The ten high-charge 4d ions of rietx issue #1691 (ruling D32).
+#: The ten high-charge 4d ions proposed in https://github.com/yue-here/rietx/issues/1691 (2026-11-18).
 D32_IONS = ("Ru3+", "Ru4+", "Ru5+", "Ru6+", "Rh4+", "Tc4+", "Mo3+", "Mo4+",
             "Mo5+", "Nb4+")
 D32_CONFIG = {"Ru3+": "4d5", "Ru4+": "4d4", "Ru5+": "4d3", "Ru6+": "4d2",
@@ -56,7 +56,8 @@ NEUTRAL = {"Mo0": "Mo", "Tc0": "Tc", "Ru0": "Ru", "Rh0": "Rh", "Pd0": "Pd"}
 #: line says instead of "neutral ground configuration".  Pd's ground 4d10 1S
 #: has no open shell to carry a moment; the row is the lowest magnetic
 #: configuration, as Brown's bare Nb and Sc rows are excited configurations
-#: (rulings D56, D63 item 3).
+#: (https://github.com/yue-here/rietx/issues/1691#issuecomment-7098289449;
+#: https://github.com/yue-here/rietx/pull/1806#issuecomment-7115570833).
 NEUTRAL_EXCITED = {"Pd0": "neutral, excited configuration; ground 4d10 1S"}
 
 #: Rows served from a whole computed table instead of a Brown row

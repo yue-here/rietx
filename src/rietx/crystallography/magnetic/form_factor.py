@@ -779,13 +779,14 @@ _TABLE_KEY: dict[str, str] = {
 #: curves"): computed for rietx, not peer-reviewed, and says so in its header.
 COMPUTED_FILE = "mff_computed.dat"
 
-#: Every computed curve, table or tail, ends here: s = sinθ/λ in Å⁻¹ (rietx
-#: #1691, ruling D46 (c)).  Past it every row is refused.
+#: Every computed curve, table or tail, ends here: s = sinθ/λ in Å⁻¹ (ruled
+#: on 2026-11-23, https://github.com/yue-here/rietx/issues/1691#issuecomment-7095775367).
+#: Past it every row is refused.
 TABLE_S_MAX = 6.0
-#: The s step of every computed curve, Å⁻¹ (D46 (c)).
+#: The s step of every computed curve, Å⁻¹ (the same ruling).
 TABLE_STEP = 0.01
 #: Width in s, Å⁻¹, of the blend from a Brown row onto its computed tail,
-#: starting at the end of his fitted range (D46 (d1)).
+#: starting at the end of his fitted range (the same ruling).
 TAIL_BLEND_WIDTH = 0.2
 
 #: Upper end, s = sinθ/λ in Å⁻¹, of the range Brown fitted his rows over, and

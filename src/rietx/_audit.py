@@ -3582,7 +3582,7 @@ ROWS: tuple[Row, ...] = (
                   "over 0-0.5 and 0.5-1.2")),
     Row("rietx.crystallography.magnetic.form_factor.TABLE_S_MAX", "constant", tier=3,
         value=6.0,
-        evidence=("ours, ruled by the magnetic-path owner (rietx #1691, D46 (c), 2026-11-23): "
+        evidence=("ours, ruled by the magnetic-path owner on 2026-11-23 (https://github.com/yue-here/rietx/issues/1691#issuecomment-7095775367, (c)): "
                   "the end of every computed curve. Beyond it a free-ion curve is not a "
                   "crystal's form factor anyway (covalency moves the tail past s = 1.5 by "
                   "8-93 %; no measured form factor past s = 1.157), and CW neutrons reach s = 6 "
@@ -3604,7 +3604,7 @@ ROWS: tuple[Row, ...] = (
                   "tests/test_magnetic_form_factor_range.py checks every table's midpoints")),
     Row("rietx.crystallography.magnetic.form_factor.TAIL_BLEND_WIDTH", "constant", tier=3,
         value=0.2,
-        evidence=("ours, ruled by the magnetic-path owner (rietx #1691, D46 (d1), 2026-11-23): "
+        evidence=("ours, ruled by the magnetic-path owner on 2026-11-23 (https://github.com/yue-here/rietx/issues/1691#issuecomment-7095775367, (d1)): "
                   "the width over which a Brown row is blended onto its computed tail; the "
                   "largest fit-to-tail gap at s_end on the rows kept is 8.7e-3 (bare Nb <j0> "
                   "at s = 1.5); the blend's value lies between the two, so the width moves a "

@@ -221,7 +221,8 @@ def test_five_rows_match_both_renderings_of_browns_table(ion, j0_published, j2_p
 
 
 def test_pr3_is_a_computed_dirac_fock_table():
-    """Pr³⁺ is served from the computed Dirac-Fock table (rietx #1691, D56),
+    """Pr³⁺ is served from the computed Dirac-Fock table (ruled on 2026-11-23,
+    https://github.com/yue-here/rietx/issues/1691#issuecomment-7098289449),
     the footing of the other rare-earth rows; Lisher & Forsyth's
     non-relativistic 5-parameter row, held here from #626 until then, retired.
 
