@@ -120,9 +120,9 @@ def test_srm676a_corundum_cell_anchor():
     out.mkdir(exist_ok=True)
     plot_result(result, path=str(out / "srm676a_fit.png"))
     plot_result(result, path=str(out / "srm676a_fit_lowangle.png"),
-                two_theta_range=(24.0, 60.0))
+                two_theta_limits=(24.0, 60.0))
     plot_result(result, path=str(out / "srm676a_fit_highangle.png"),
-                two_theta_range=(120.0, 150.0))
+                two_theta_limits=(120.0, 150.0))
     report = ref.report(plan=qpa_plan())
     plot_for_vlm(result, report, path=str(out / "srm676a_vlm.png"))
     import matplotlib.pyplot as plt
@@ -317,7 +317,7 @@ def test_the_two_descriptions_of_the_r_lattice_refine_to_the_same_cell():
     out.mkdir(exist_ok=True)
     plot_result(res_r, path=str(out / "srm676a_rhombohedral_fit.png"))
     plot_result(res_r, path=str(out / "srm676a_rhombohedral_lowangle.png"),
-                two_theta_range=(24.0, 60.0))
+                two_theta_limits=(24.0, 60.0))
     plot_result(res_h, path=str(out / "srm676a_hexagonal_lebail_fit.png"))
     import matplotlib.pyplot as plt
     plt.close("all")

@@ -103,7 +103,7 @@ TET_CELLS = {
 def si():
     data = _synth(_SI, 1.3e6, 7700.0, 1)
     ins = _instrument()
-    peaks = pick_peaks(data, ins, two_theta_range=LIM)
+    peaks = pick_peaks(data, ins, two_theta_limits=LIM)
     return data, ins, peaks
 
 
@@ -114,7 +114,7 @@ def tet():
     # 'refuted' (seeds 1, 3, 7, 8 of 1-8 do; 2, 4, 5, 6 read 0 seen).
     data = _synth(_TET, 1.0e6, 5000.0, 2)
     ins = _instrument()
-    peaks = pick_peaks(data, ins, two_theta_range=LIM)
+    peaks = pick_peaks(data, ins, two_theta_limits=LIM)
     return data, ins, peaks
 
 
@@ -248,7 +248,7 @@ def test_a_split_reads_the_same_on_every_poisson_draw(seed):
 
     data = _synth(_TET, 1.0e6, 5000.0, seed)
     ins = _instrument()
-    peaks = pick_peaks(data, ins, two_theta_range=LIM)
+    peaks = pick_peaks(data, ins, two_theta_limits=LIM)
     pattern, s = _screens(data, ins, peaks, TET_CELLS)
     truth = s["truth tP"]
     assert truth.seen_fraction == pytest.approx(1.0)
@@ -489,7 +489,7 @@ def dense_ap():
         compiled.set_enabled(was)
     obs = np.random.default_rng(35).poisson(y / y.max() * 2e4 + 100.0).astype(float)
     data = rx.PatternData(two_theta=tt, intensity=obs, sigma=np.sqrt(np.maximum(obs, 1.0)))
-    peaks = pick_peaks(data, ins, two_theta_range=(5.0, 90.0))
+    peaks = pick_peaks(data, ins, two_theta_limits=(5.0, 90.0))
     # the run's own screen: the assumed shift bound floors p0 (#951)
     pattern = PatternScreen.from_peaks(peaks, q_match=absence_window(peaks), data=data,
                                        instrument=ins,

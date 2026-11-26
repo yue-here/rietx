@@ -73,11 +73,44 @@ def near_misses(name: str, candidates: Iterable[str], *, n: int = 3) -> list[str
     return list(dict.fromkeys(exact + respelled + ranked))[:n]
 
 
+def quoted(names: Iterable[str], *, conjunction: str = "or") -> str:
+    """``'a', 'b' or 'c'``: each name quoted on its own, the last two joined.
+
+    Each name is quoted by itself so a caller can copy any one of them.
+    Quoting the joined string made three names read as one that does not exist
+    (``'read_pattern, index_pattern, read_topas_inp'``, issue #1837).
+    """
+    parts = [repr(name) for name in names]
+    if len(parts) <= 1:
+        return "".join(parts)
+    return f"{', '.join(parts[:-1])} {conjunction} {parts[-1]}"
+
+
 def did_you_mean(name: str, candidates: Iterable[str], *, n: int = 3) -> str:
     """``"did you mean 'x'?"`` for the closest candidates, or ``""`` for none.
 
-    The phrase is the one the three ``__getattr__`` hooks printed before they
-    shared it, byte for byte: the matches joined and quoted as one string.
+    Several matches read ``did you mean 'x', 'y' or 'z'?`` (:func:`quoted`).
     """
     close = near_misses(name, candidates, n=n)
-    return f"did you mean {', '.join(close)!r}?" if close else ""
+    return f"did you mean {quoted(close)}?" if close else ""
+
+
+def check_choice(argument: str, value: object, choices: Iterable[str]) -> None:
+    """Refuse ``value`` for ``argument`` unless it is one of ``choices``.
+
+    The one form every public call uses to refuse a choice it cannot honour,
+    before any work (DESIGN § Rules, 4; WP-2302).  The message names the
+    argument, every valid choice and the closest one::
+
+        unknown mode 'lebial'; mode takes 'rietveld', 'lebail' or 'pawley';
+        did you mean 'lebail'?
+
+    ``choices`` is the live registry (``get_args(Mode)``, ``SOLVERS``,
+    ``BACKEND_NAMES``), never a copy of it.
+    """
+    pool = list(choices)
+    if value in pool:
+        return
+    message = f"unknown {argument} {value!r}; {argument} takes {quoted(pool)}"
+    hint = did_you_mean(value, pool, n=1) if isinstance(value, str) else ""
+    raise ValueError(f"{message}; {hint}" if hint else message)

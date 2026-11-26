@@ -40,13 +40,15 @@ from typing import Any
 import numpy as np
 
 from . import _about
+from ._nearmiss import check_choice
+from .backend.api import check_backend
 from .history.store import fingerprint, holds_a_log
 from .history.tree import RefinementTree
 from .io.formats.gsas import _first_bank_number
 from .io.readers import identify_format, read_pattern, reader_options_for
-from .optimize.least_squares import DEFAULT_SOLVER
+from .optimize.least_squares import DEFAULT_SOLVER, SOLVERS
 from .refine import _VERSION, Refinement
-from .schemas.common import Diagnostic, Mode
+from .schemas.common import Diagnostic, Mode, check_mode
 from .schemas.history import NodeAction
 from .schemas.instrument import Instrument
 from .schemas.migrate import migrate_document_text
@@ -154,6 +156,11 @@ class Project:
         depending on which scan was chosen, and neither the bytes nor the
         fingerprint can say which that was.
         """
+        # every choice before the directory exists: a refusal after the
+        # history log is written strands a create that cannot be retried
+        check_mode(mode)
+        check_backend(backend)
+        check_choice("solver", solver, SOLVERS)
         root = Path(path)
         src = Path(pattern)
         if (root / PROJECT_JSON).exists():
@@ -185,6 +192,9 @@ class Project:
         notes: list[Diagnostic] = []
         options = reader_options_for(fmt, reader_options or {}, diagnostics=notes)
         data = read_pattern(copied, diagnostics=notes, **options)
+        # the options pre-filter above reports an ignored option into
+        # ``notes`` only, so the pattern carries the whole list (WP-2304)
+        data.diagnostics = list(notes)
         # A project is a refinement's durable form, so a pattern it cannot
         # refine has nothing to be one of — and DataRef records a
         # ``two_theta_range``, which is a 2θ by its name.
@@ -243,6 +253,8 @@ class Project:
         one; a container that silently rebound a tree to different data would be
         the confident-wrong-singleton failure one level up.
         """
+        check_backend(backend)
+        check_choice("solver", solver, SOLVERS)
         root = Path(path)
         if root.is_file() and root.name == PROJECT_JSON:
             root = root.parent
