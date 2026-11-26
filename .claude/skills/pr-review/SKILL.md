@@ -68,10 +68,17 @@ nothing. They have not been re-checked under this line.
 One network call, no checkout, no diff:
 
 ```sh
-gh pr list --state open --limit 30 \
+gh pr list --state open --limit 200 \
   --json number,title,author,files,changedFiles,mergeStateStatus,latestReviews,headRefOid,updatedAt,statusCheckRollup,commits
 ```
 
+- **Rank the whole backlog or none of it.** gh stops at `--limit` and says
+  nothing, and a rank over part of the list is wrong, not short: collision
+  degree counts files shared with PRs the call never returned, and which
+  PRs are left out is gh's list order, not the rank's. So a call that returns exactly `--limit` rows is
+  a stop: raise the limit and call again. Neither a larger call's cost nor
+  whether GitHub answers one is measured yet (WP-2312; 84 open on
+  2026-11-26, against the 30 this call used to ask for).
 - **Reviewable size is a jq filter over `files[]`**, excluding
   `^tests/data/|^src/rietx/data/` — never a diff (#125: 48,791 lines, 708
   reviewable).
