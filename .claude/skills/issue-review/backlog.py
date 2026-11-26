@@ -301,10 +301,14 @@ def gh_json(root: Path, *args: str, timeout: int) -> tuple:
     return None, why + " (twice)"
 
 
+# gh stops at ``--limit`` without saying so; ``main`` notes a list that reached it.
+ISSUE_LIMIT = 500
+
+
 def fetch_issues(root: Path) -> tuple:
-    """``(issues, None)`` or ``(None, reason)``."""
+    """``(issues, None)`` or ``(None, reason)``; at most ``ISSUE_LIMIT`` issues."""
     raw, why = gh_json(
-        root, "issue", "list", "--state", "open", "--limit", "500", "--json",
+        root, "issue", "list", "--state", "open", "--limit", str(ISSUE_LIMIT), "--json",
         "number,title,body,author,createdAt,updatedAt,labels,comments,url",
         timeout=180,
     )
@@ -422,6 +426,8 @@ def main(argv: list) -> int:
     if issues is None:
         print(f"could not list the issues ({why}): is `gh` installed, logged in and online?")
         return 1
+    # Read before ``only`` narrows the list: the limit is on what gh returned.
+    issues_cut = wp_claim.listing_cut(issues, ISSUE_LIMIT)
     if only:
         missing = sorted(only - {i.number for i in issues})
         if missing:
@@ -433,7 +439,13 @@ def main(argv: list) -> int:
 
     references: list = []
     notes = []
+    if issues_cut:
+        notes.append(f"gh returned its limit of {ISSUE_LIMIT} open issues: the backlog may be "
+                     "larger than this table, so raise ISSUE_LIMIT before auditing against it")
     prs = wp_claim.open_prs(root)
+    if wp_claim.listing_cut(prs):
+        notes.append(f"gh returned its limit of {wp_claim.OPEN_PR_LIMIT} open PRs: the open PR "
+                     "column may miss a PR past it, so raise OPEN_PR_LIMIT in wp_claim.py")
     for name, (got, why) in (
         ("open PRs", open_pr_references(prs)),
         ("merged PRs", merged_pr_references(root)),

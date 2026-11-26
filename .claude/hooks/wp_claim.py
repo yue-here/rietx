@@ -452,16 +452,31 @@ def _gh(root: Path, *args: str, timeout: int = 20, partial: bool = False) -> Opt
     return proc.stdout if proc.returncode == 0 or (partial and proc.stdout) else None
 
 
+# ``gh pr list`` returns at most ``--limit`` rows and says nothing when it
+# stops there, so a listing of exactly this many is read as possibly cut off
+# (``listing_cut``), never as the whole backlog (WP-2312: 84 open on 2026-11-26).
+OPEN_PR_LIMIT = 100
+
+
+def listing_cut(rows: Optional[list], limit: int = OPEN_PR_LIMIT) -> bool:
+    """True when *rows* reached *limit*, so gh may have stopped before the end.
+
+    A listing of exactly *limit* rows may also be the whole backlog; gh gives
+    no way to tell the two apart, so the caller says "may be cut off".
+    """
+    return rows is not None and len(rows) >= limit
+
+
 def open_prs(root: Path) -> Optional[list[PullRequest]]:
-    """Every open pull request, forks included.  ``None`` when gh cannot answer.
+    """Open pull requests, forks included, up to ``OPEN_PR_LIMIT``.  ``None`` when gh cannot answer.
 
     ``None`` rather than ``[]``, because "no PRs" and "could not look" are
     different answers and only the second should stop a session trusting the
     table.  Not installed, not logged in, offline and rate-limited all land
-    here.
+    here.  A list of ``OPEN_PR_LIMIT`` rows may be cut off: ``listing_cut``.
     """
     proc = _gh(
-        root, "pr", "list", "--state", "open", "--limit", "100", "--json",
+        root, "pr", "list", "--state", "open", "--limit", str(OPEN_PR_LIMIT), "--json",
         "number,title,body,author,headRefName,updatedAt,isDraft,files,"
         "closingIssuesReferences,isCrossRepository,url",
     )
@@ -874,6 +889,9 @@ def _status(root: Path, here: Path, wp: Optional[str] = None) -> int:
         print("  gh could not answer (offline, not installed, or not logged in)")
         print("  — the table above is this machine only, so ask before starting")
         return 0
+    if listing_cut(prs):
+        print(f"  ⚠ gh returned its limit of {OPEN_PR_LIMIT} open PRs, so the list may be cut off:")
+        print("    a PR past it is not checked below")
     found = overlaps(prs, wp_issue_citations(root), branch)
     if wp is not None:
         found = [o for o in found if o.wp == wp]
