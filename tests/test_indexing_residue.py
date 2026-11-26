@@ -201,7 +201,7 @@ def test_a_cell_that_does_not_fit_the_pattern_leaves_no_residue():
 def _structure_and_peaks():
     ins, data = _pattern(None)
     from rietx.indexing.pick import pick_peaks
-    return ins, data, pick_peaks(data, ins, two_theta_range=LIMITS)
+    return ins, data, pick_peaks(data, ins, two_theta_limits=LIMITS)
 
 
 def test_a_setup_error_raises_where_a_fit_error_is_a_refuted_candidate(monkeypatch):

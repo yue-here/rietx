@@ -1382,7 +1382,7 @@ def index_residue(first, data: PatternData, instrument: Instrument, *,
                              "candidate=")
         candidate = first.candidates[0]
     if peaks is None:
-        peaks = pick_peaks(data, instrument, two_theta_range=two_theta_limits)
+        peaks = pick_peaks(data, instrument, two_theta_limits=two_theta_limits)
     # a list handed in as positions carries an assumed width on every line:
     # neither seed the fit from it nor refuse a cell against it
     measured = peaks.source == "fitted"
@@ -1423,7 +1423,7 @@ def index_residue(first, data: PatternData, instrument: Instrument, *,
         two_theta=list(tt),
         intensity=list(np.asarray(fit.y_obs, dtype=np.float64) - phase),
         sigma=list(np.asarray(fit.sigma, dtype=np.float64)))
-    picked = pick_peaks(residue, width_law, two_theta_range=two_theta_limits)
+    picked = pick_peaks(residue, width_law, two_theta_limits=two_theta_limits)
     above = (np.asarray(residue.intensity, dtype=np.float64)
              - np.asarray(fit.y_background, dtype=np.float64))
     flagged, lines = [], []
