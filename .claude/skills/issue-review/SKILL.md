@@ -196,14 +196,6 @@ pass, `gh issue comment N --body-file`, `gh issue close N --comment`,
 `gh issue edit N --add-label`, record each decision in its WP file, and
 commit.
 
-**An act the batch leaves unanswered is written down before the PR**, since
-its drafted text dies with the scratchpad at `/clear`. Where a WP owns the
-issue, a dated line in its `### Inherited`:
-`Held YYYY-MM-DD, not posted: <the act> for #N — waiting on <the question>`.
-The act and the question, never the drafted text: the next round rewrites it
-against the tree it finds. With no owning WP, the PR body's held list names
-it the same way. Either way the report says `held, waiting on you`.
-
 **The audit, then the PR.** Re-run the table. The untriaged list must be
 empty, or each remaining number is named in the report with its reason. The
 counts in the commit and the PR come from the summary line and never from

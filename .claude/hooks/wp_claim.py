@@ -454,8 +454,10 @@ def _gh(root: Path, *args: str, timeout: int = 20, partial: bool = False) -> Opt
 
 # ``gh pr list`` returns at most ``--limit`` rows and says nothing when it
 # stops there, so a listing of exactly this many is read as possibly cut off
-# (``listing_cut``), never as the whole backlog (WP-2312: 84 open on 2026-11-26).
-OPEN_PR_LIMIT = 100
+# (``listing_cut``), never as the whole backlog (WP-2312).  This listing's
+# fields stay far under GitHub's 500 000-node query limit at gh's page of
+# 100; ``commits`` is the field that would not (``/pr-review`` triage).
+OPEN_PR_LIMIT = 200
 
 
 def listing_cut(rows: Optional[list], limit: int = OPEN_PR_LIMIT) -> bool:
@@ -465,6 +467,19 @@ def listing_cut(rows: Optional[list], limit: int = OPEN_PR_LIMIT) -> bool:
     no way to tell the two apart, so the caller says "may be cut off".
     """
     return rows is not None and len(rows) >= limit
+
+
+def pr_open_in(prs: Optional[list]):
+    """A *pr_open* for ``ghost_live``: True, False, or None where the list cannot tell.
+
+    A number missing from a cut list may be open past the cut, so it is
+    unknown rather than closed; read as closed, it dropped a live claim.
+    """
+    if prs is None:
+        return lambda n: None
+    numbers = {p.number for p in prs}
+    cut = listing_cut(prs)
+    return lambda n: True if n in numbers else (None if cut else False)
 
 
 def open_prs(root: Path) -> Optional[list[PullRequest]]:
@@ -828,13 +843,13 @@ def _status(root: Path, here: Path, wp: Optional[str] = None) -> int:
         fetch = pool.submit(fetch_ghost_claims, root)
         prs = open_prs(root)
         fetched = fetch.result()
-    open_numbers = None if prs is None else {p.number for p in prs}
+    pr_open = pr_open_in(prs)
     now = time.time()
     ghosts = []
     for c in read_ghost_claims(root):
         if c.wp is None:
             continue
-        live = ghost_live(c, lambda n: None if open_numbers is None else n in open_numbers, now)
+        live = ghost_live(c, pr_open, now)
         if live is not False:
             ghosts.append((c, live))
     # Every claim marks the table, which ``status NNNN`` still prints whole;
@@ -891,7 +906,7 @@ def _status(root: Path, here: Path, wp: Optional[str] = None) -> int:
         return 0
     if listing_cut(prs):
         print(f"  ⚠ gh returned its limit of {OPEN_PR_LIMIT} open PRs, so the list may be cut off:")
-        print("    a PR past it is not checked below")
+        print("    a PR past it is not checked below, and a claim naming one reads as state unknown")
     found = overlaps(prs, wp_issue_citations(root), branch)
     if wp is not None:
         found = [o for o in found if o.wp == wp]

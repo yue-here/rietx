@@ -1244,6 +1244,18 @@ def test_a_listing_at_gh_s_limit_reads_as_possibly_cut_off(
     assert not claim.listing_cut(None)  # "could not look" is its own answer
 
 
+def test_a_pr_missing_from_a_cut_list_is_unknown_not_closed() -> None:
+    """A ghostshift claim naming a PR past the cut read as closed and was
+    dropped from ``status`` (WP-2312); only an uncut list can say closed."""
+    from types import SimpleNamespace
+
+    cut = [SimpleNamespace(number=n) for n in range(1, claim.OPEN_PR_LIMIT + 1)]
+    assert claim.pr_open_in(cut)(1) is True
+    assert claim.pr_open_in(cut)(99_999) is None
+    assert claim.pr_open_in(cut[:-1])(99_999) is False
+    assert claim.pr_open_in(None)(1) is None
+
+
 def test_one_broad_issue_does_not_fill_the_table_with_one_pr(
     repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1637,6 +1649,23 @@ def test_the_table_notes_a_listing_that_reached_gh_s_limit(
     monkeypatch.setattr(backlog.wp_claim, "open_prs", lambda root: prs[:-1])
     assert backlog.main(["backlog.py", str(repo / "out")]) == 0
     assert "limit of" not in capsys.readouterr().out
+
+
+def test_the_landed_column_says_how_far_back_it_can_see() -> None:
+    """A merged PR's body reaches the table only through the merged listing,
+    since the commit parser skips merges; a full listing that stops after the
+    oldest open issue, or a shallow clone, is said (WP-2312)."""
+    def merged(n: int, day: str):
+        return [backlog.Reference("merged PR", f"PR #{i}", frozenset(), False, day) for i in range(n)]
+
+    full = merged(backlog.MERGED_LIMIT, "2026-11-01")
+    (note,) = backlog.reach_notes(full, "2026-09-01", shallow=False)
+    assert "goes back only to 2026-11-01" in note
+    assert backlog.reach_notes(full, "2026-11-02", shallow=False) == []  # reaches past it
+    assert backlog.reach_notes(full[:-1], "2026-09-01", shallow=False) == []  # the whole list
+    assert backlog.reach_notes(None, "2026-09-01", shallow=False) == []  # gh declined: main says so
+    (note,) = backlog.reach_notes([], "2026-09-01", shallow=True)
+    assert "shallow" in note
 
 
 # --------------------------------------------------------------------------- #

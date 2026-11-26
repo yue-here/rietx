@@ -110,6 +110,7 @@ class Reference(NamedTuple):
     label: str  # "#385 (mustachefeeling)", "PR #292 (2026-09-10)", "5c9a72e2 2026-09-18 WP-1434: …"
     cited: frozenset  # the issue numbers its text names
     placement: bool = False  # touched nothing outside PLACEMENT
+    day: str = ""  # YYYY-MM-DD it merged or was committed; "" where unknown
 
 
 class Row(NamedTuple):
@@ -340,6 +341,12 @@ def fetch_issues(root: Path) -> tuple:
     return issues, None
 
 
+# The merged listing is the only source of a PR's *body* and closing
+# references: ``parse_commit_log`` skips merge commits, which is where a merged
+# PR's body would be.  So its reach is checked, not assumed (``reach_notes``).
+MERGED_LIMIT = 200
+
+
 def merged_pr_references(root: Path) -> tuple:
     """The newest merged PRs as references; a linked closing issue counts as cited.
 
@@ -348,7 +355,7 @@ def merged_pr_references(root: Path) -> tuple:
     tells a placement from a landing, so it stays.
     """
     raw, why = gh_json(
-        root, "pr", "list", "--state", "merged", "--limit", "200", "--json",
+        root, "pr", "list", "--state", "merged", "--limit", str(MERGED_LIMIT), "--json",
         "number,title,body,mergedAt,closingIssuesReferences,files", timeout=240,
     )
     if raw is None:
@@ -364,6 +371,7 @@ def merged_pr_references(root: Path) -> tuple:
                 f"PR #{item['number']} ({(item.get('mergedAt') or '')[:10]})",
                 frozenset(cited),
                 is_placement(paths),
+                (item.get("mergedAt") or "")[:10],
             )
         )
     return refs, None
@@ -377,6 +385,38 @@ def open_pr_references(prs: Optional[list]) -> tuple:
         Reference("open PR", f"#{pr.number} ({pr.author})", frozenset(pr.issues))
         for pr in prs
     ], None
+
+
+def reach_notes(merged: Optional[list], oldest_issue: str, shallow: bool) -> list:
+    """What the landed column cannot see, in words; empty when it sees back far enough.
+
+    *merged* is ``merged_pr_references``' list (``None`` when gh declined,
+    which ``main`` reports on its own).  A listing that reached
+    ``MERGED_LIMIT`` stops at its oldest merge, and a shallow clone's
+    ``git log`` stops at its boundary, both without a word.
+    """
+    notes = []
+    days = [r.day for r in merged or () if r.day]
+    if merged is not None and len(merged) >= MERGED_LIMIT and days and min(days) > oldest_issue:
+        notes.append(
+            f"the merged-PR listing reached its limit of {MERGED_LIMIT} and goes back only to "
+            f"{min(days)}, after the oldest open issue ({oldest_issue}): a PR merged before then "
+            "reaches the landed column only through a commit message, never its body"
+        )
+    if shallow:
+        notes.append(
+            "this clone is shallow, so commits before its boundary are not read: "
+            "run `git fetch --unshallow origin` for a landed column back to the oldest issue"
+        )
+    return notes
+
+
+def is_shallow(root: Path) -> bool:
+    proc = subprocess.run(
+        ["git", "rev-parse", "--is-shallow-repository"], cwd=root,
+        capture_output=True, encoding="utf-8", errors="replace",
+    )
+    return proc.stdout.strip() == "true"
 
 
 def commit_references(root: Path, since: str) -> list:
@@ -405,7 +445,7 @@ def parse_commit_log(text: str) -> list:
         if cited:
             paths = [p for p in files.splitlines() if p]
             refs.append(
-                Reference("commit", f"{sha} {day} {subject[:60]}", cited, is_placement(paths))
+                Reference("commit", f"{sha} {day} {subject[:60]}", cited, is_placement(paths), day)
             )
     return refs
 
@@ -431,7 +471,8 @@ def main(argv: list) -> int:
     if only:
         missing = sorted(only - {i.number for i in issues})
         if missing:
-            print("not open: " + " ".join(f"#{n}" for n in missing))
+            what = "not in the listing, which may be cut off" if issues_cut else "not open"
+            print(f"{what}: " + " ".join(f"#{n}" for n in missing))
         issues = [i for i in issues if i.number in only]
     if not issues:
         print("no open issues")
@@ -446,9 +487,10 @@ def main(argv: list) -> int:
     if wp_claim.listing_cut(prs):
         notes.append(f"gh returned its limit of {wp_claim.OPEN_PR_LIMIT} open PRs: the open PR "
                      "column may miss a PR past it, so raise OPEN_PR_LIMIT in wp_claim.py")
+    merged, merged_why = merged_pr_references(root)
     for name, (got, why) in (
         ("open PRs", open_pr_references(prs)),
-        ("merged PRs", merged_pr_references(root)),
+        ("merged PRs", (merged, merged_why)),
     ):
         if got is None:
             notes.append(f"could not list the {name} ({why}); that column is blank, not empty")
@@ -456,6 +498,7 @@ def main(argv: list) -> int:
             references += got
     oldest = min(i.created for i in issues)
     references += commit_references(root, oldest)
+    notes += reach_notes(merged, oldest, is_shallow(root))
 
     roadmap = root / "docs" / "ROADMAP.md"
     roadmap_cited = cited_numbers(
