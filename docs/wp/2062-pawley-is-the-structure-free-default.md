@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: ⬜
 Track: What fires, and what stays silent
 Depends on: 2011 (the indexer's validation, built provisionally as Pawley); 2311 (the unit dependence, its first bug task); 1910 soft (the extinction screen's fits)
-Priority: P2 2026-11-01 — decided: Pawley at every site, its known bugs fixed first; A1 already sends every `index_pattern` user through Pawley, unit dependence included
+Priority: P2 2026-11-26 — WP-2311 fixed the unit dependence and left decision 0 standing, so its remaining bug tasks come next; A1 already sends every `index_pattern` user through Pawley
 
 ## Goal
 
@@ -158,6 +158,26 @@ above, which come from lab and synchrotron single-phase patterns
 (LaB6, NAC, FAP, the IUCr round-robin pure phases, aragonite).
 
 ### Inherited
+
+- **2026-11-26, from WP-2311 (closed): the unit dependence is fixed, decision 0
+  stands, and this WP is unblocked.** The 2026-10-28 reading was a start
+  dependence. The probe rescaled the data but left the declared background in
+  counts, and the equal-split restraint's absolute 1e-10 floor then locked the
+  overlap groups the seed had emptied. On real data, groups that collapsed in
+  the first stage locked the same way (NAC −1.8e-4 Rwp, magnetite −6.3e-4,
+  counts and scaled units now agree). Fixed by
+  `PAWLEY_GROUP_SCALE_FLOOR_REL`; a phase with nothing measured gets no group
+  rows for the stage. Two absolute floors remain in the Pawley path, both for
+  this WP's bug list:
+  - **For Yue:** `PAWLEY_OFF_DATA_SCALE_FLOOR` = 1.0 is in counts and binds on
+    a pattern scaled to a maximum of 1. That is a 5.7e-6 Rwp gap on zircon's
+    true cell and 7e-7 on corundum's, and none at 1e-10 (WP-2311 Finding 4).
+    It is tier 3 at 1.0 by WP-2011 ruling 3. A relative form needs an anchor
+    for a phase with no measured on-data intensity, and the ruling is yours.
+  - `_pawley_unresolved_diagnostics` (`model/forward.py`) divides each esd by
+    max(|I|, 1e-10). In small enough units that floor decides
+    `PAWLEY_OVERLAP_UNRESOLVED`. Unmeasured: nothing in WP-2311's probes
+    reached it.
 
 - **2026-11-26, from WP-2311: the unit dependence is its own WP.** At Yue's request, this
   WP's first bug task (synthetic LaB6's true cell at Rwp 0.164 on counts and 0.262 rescaled)

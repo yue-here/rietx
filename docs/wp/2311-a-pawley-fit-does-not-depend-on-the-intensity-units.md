@@ -1,9 +1,8 @@
 # WP-2311 — A Pawley fit does not depend on the intensity units
 
-Milestone: unscheduled · Status: 🔄 2026-11-26 — claimed by @yue-here (cloud session)
+Milestone: unscheduled · Status: ✅ 2026-11-26 — a start dependence, not one on units; the overlap restraint's scale is floored relative to its phase (PR #1857), and the off-data ridge's floor goes to Yue through WP-2062
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P2 2026-11-26 — the first of WP-2062's bug tasks, and the only one whose answer can reopen that WP's decision 0; every other site move there waits on it
 
 ## Goal
 
