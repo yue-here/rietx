@@ -11625,13 +11625,14 @@ _WITHHELD_SIGMA_CODES = frozenset({"PATTERN_SIGMA_NONPOSITIVE",
                                    "PATTERN_INTENSITY_SCALED"})
 
 
-def _reader_note_settled(note: Diagnostic, model: CompiledModel) -> bool:
+def _reader_note_settled(note: Diagnostic, model: AnyCompiledModel) -> bool:
     """Whether the caller has already done what ``note`` asks, on this fit.
 
     The notes describe the file as read, and a caller may act on one before
     fitting.  Each test below is exact on the compiled model:
 
-    - ``PATTERN_X_AXIS_IMPLAUSIBLE``: no fitted channel sits at or below 0°.
+    - ``PATTERN_X_AXIS_IMPLAUSIBLE``: no fitted channel sits at or below zero
+      on the fit axis (0°, or 0 µs on a bank).
     - ``PATTERN_SIGMA_CONSTANT``: σ was set to ``None``, or the caller's σ
       varies over the fitted channels.
     - ``PATTERN_SIGMA_NONPOSITIVE`` naming 2θ intervals: no fitted channel was
@@ -11645,7 +11646,8 @@ def _reader_note_settled(note: Diagnostic, model: CompiledModel) -> bool:
     :data:`_FIT_OWNED_READER_CODES` gives about dead channels.
     """
     if note.code == "PATTERN_X_AXIS_IMPLAUSIBLE":
-        return model.tt.size == 0 or float(model.tt.min()) > 0.0
+        # ``grid``, not ``tt``: a bank's model raises on an angle
+        return model.n_points == 0 or float(model.grid.min()) > 0.0
     if note.code == "PATTERN_SIGMA_CONSTANT":
         return not model.sigma_measured or model.sigma_uniform is False
     if note.code == "PATTERN_SIGMA_NONPOSITIVE" and note.where != ["sigma"]:
@@ -11656,12 +11658,13 @@ def _reader_note_settled(note: Diagnostic, model: CompiledModel) -> bool:
     return False
 
 
-def _reader_diagnostics(model: CompiledModel,
+def _reader_diagnostics(model: AnyCompiledModel,
                         raised: list[Diagnostic]) -> list[Diagnostic]:
     """What the reader repaired or noticed in this pattern (WP-2304).
 
     ``read_pattern`` keeps its notes on ``PatternData.diagnostics`` whether or
-    not a caller passed a list, and ``compile_model`` carries them here, so a
+    not a caller passed a list, and ``compile_model`` (``compile_tof_model``
+    on a bank) carries them here, so a
     rescaled intensity or a withheld σ reaches every fit on the file.  A note
     whose code the fit has already raised, or asks for itself
     (:data:`_FIT_OWNED_READER_CODES`), is left out, as is a lossless repair

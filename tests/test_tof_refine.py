@@ -666,6 +666,41 @@ def tof_fit():
     return ref, result
 
 
+def test_a_banks_reader_notes_reach_its_fit():
+    """WP-2304 on a bank: what the reader noticed in the file reaches
+    ``result.diagnostics``, and a note whose advice the pattern already took
+    does not.  Before the bank model carried the notes, every bank fit raised
+    ``AttributeError`` building its result.
+
+    Positive arm: an intensity-scale note, which no σ settles, comes through
+    once.  Negative arm: a constant-σ note on a pattern fitted with no σ of
+    its own is settled, so it stays with the file.
+    """
+    from rietx.schemas.common import Diagnostic
+
+    scaled = Diagnostic(level="warning", code="PATTERN_INTENSITY_SCALED",
+                        message="intensities read as a rate (test note)",
+                        where=["intensity"])
+    constant = Diagnostic(level="warning", code="PATTERN_SIGMA_CONSTANT",
+                          message="every sigma is one value (test note)",
+                          where=["sigma"])
+    data = _synthetic_pattern().model_copy(
+        update={"diagnostics": [scaled, constant]})
+    assert data.sigma is None
+    structure = silicon()
+    structure.phases[0].scale.value = 12.0
+    instrument = bank()
+    instrument.background.coefficients[0].value = 40.0
+    instrument.background.coefficients[1].value = -8.0
+    plan = rx.RefinementPlan(stages=[
+        rx.Stage("scale_bkg", ["phases.*.scale", "instrument.background.c*"])])
+    result = rx.Refinement(structure, instrument, history=False).fit(
+        data, plan=plan)
+    codes = [d.code for d in result.diagnostics]
+    assert codes.count("PATTERN_INTENSITY_SCALED") == 1
+    assert "PATTERN_SIGMA_CONSTANT" not in codes
+
+
 def test_the_engine_recovers_the_generating_bank(tof_fit):
     """Positive arm.  The cell is tied by the table, so a cubic phase stays
     cubic; the calibration and the profile come back where they were put."""

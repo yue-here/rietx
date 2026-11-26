@@ -419,6 +419,16 @@ class CompiledTOFModel:
     #: only on a model built without ``compile_tof_model``.
     sigma_rule: SigmaRule | None = None
 
+    #: What the reader repaired or noticed in the file (``PatternData.diagnostics``,
+    #: WP-2304), and the two σ facts that say whether a note's advice was
+    #: already taken, as on ``CompiledModel``: the result builder hands the
+    #: notes on (``refine._reader_diagnostics``), and by then the pattern is out
+    #: of reach.  Empty and ``None`` on a model built without
+    #: ``compile_tof_model``.
+    reader_notes: tuple = ()
+    sigma_measured: bool | None = None
+    sigma_uniform: bool | None = None
+
     #: ``"gaussian"`` (GSAS TOF profile type 1) or ``"pseudovoigt"`` (type 3).
     #: Compile-time structural, like ``CompiledModel.shape``: taken from
     #: whether any γ coefficient is non-zero or can move this stage, so the
@@ -1297,6 +1307,7 @@ def compile_tof_model(structure: Structure, instrument: Instrument,
     tof, y_obs, sigma = x_all[mask], y_all[mask], s_all[mask]
     # the same count, over the same window, ``compile_model`` takes (WP-1952)
     sigma_rule = pattern.sigma_rule(window)
+    sigma_uniform = bool(sigma.size) and bool(np.all(sigma == sigma[0]))
     why = ""
     if sigma_rule.n_nonpositive_excluded:
         why = (f"; {sigma_rule.n_nonpositive_excluded} of them were left out "
@@ -1576,6 +1587,9 @@ def compile_tof_model(structure: Structure, instrument: Instrument,
         spectrum_itype=spectrum_itype, spectrum_paths=spectrum_paths,
         absorption_terms=absorption_terms, mu_r_range=mu_r_range,
         sigma_rule=sigma_rule,
+        reader_notes=tuple(pattern.diagnostics),
+        sigma_measured=pattern.sigma is not None,
+        sigma_uniform=sigma_uniform,
         d_range=(d_lo, d_hi), difc_stage=float(src.difc.value),
         restraint_weight_scale=float(restraint_weight_scale),
         lorentz_window_tol=(None if profile_kind == "gaussian"
