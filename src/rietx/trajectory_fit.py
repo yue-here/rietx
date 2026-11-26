@@ -38,7 +38,7 @@ from typing import Literal
 
 import numpy as np
 
-from ._nearmiss import did_you_mean
+from ._nearmiss import check_choice, did_you_mean
 from .params.expression import RESERVED, Expression
 from .schemas.common import Parameter
 from .schemas.parametric import CoordinateTable
@@ -52,6 +52,10 @@ from .schemas.sequential import (
 
 #: the name the series axis takes in an equation when no coordinate table is passed
 SERIES_AXIS_NAME = "x"
+
+
+#: The two chains of a ``direction="both"`` series, the values ``chain=`` takes.
+CHAINS: tuple[str, ...] = ("forward", "backward")
 
 
 def fit_trajectory(series: SeriesResult, path: str, expression: str,
@@ -74,7 +78,7 @@ def fit_trajectory(series: SeriesResult, path: str, expression: str,
     required there: the two chains' gap is path dependence the package
     reports and never resolves (:attr:`SeriesResult.direction_gaps`), so
     which one to read is the caller's.  A one-way series has the one chain it
-    ran, and asking for the other raises.  ``path`` is any name
+    ran, and asking for the other raises.  ``path`` is any dot-path
     :meth:`SeriesResult.resolve_trajectory` takes, ``qpa.<phase>`` included,
     bar a step path (:attr:`SeriesResult.relative_paths`), whose values are
     displacements from where each fit began, and an angle path
@@ -231,6 +235,8 @@ def fit_trajectory(series: SeriesResult, path: str, expression: str,
 
 def _chain(series: SeriesResult, chain: str | None) -> tuple[SeriesResult, str]:
     """The chain to read and its name, refusing one the series did not run."""
+    if chain is not None:
+        check_choice("chain", chain, CHAINS)
     direction = series.direction
     if chain is None:
         if direction == "both":
@@ -238,8 +244,6 @@ def _chain(series: SeriesResult, chain: str | None) -> tuple[SeriesResult, str]:
                 "this series ran both ways: pass chain='forward' or chain='backward' "
                 "(series.direction_gaps says how far apart the two are), or fit each")
         return series, direction
-    if chain not in ("forward", "backward"):
-        raise ValueError(f"chain must be 'forward' or 'backward', got {chain!r}")
     if direction == "both":
         if chain == "forward":
             return series, "forward"

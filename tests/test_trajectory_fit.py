@@ -158,7 +158,7 @@ def test_the_fit_round_trips_through_json_and_prints_its_chain():
      {"coordinates": rx.CoordinateTable(columns={"T": [*TEMPS[:6], None]})},
      "pattern 6 ('p6') has no value for coordinate 'T'"),
     ("a0 + k*x", {"a0": _free(4.0), "k": _free(0.0)}, {"chain": "sideways"},
-     "chain must be 'forward' or 'backward'"),
+     "chain takes 'forward' or 'backward'"),
 ])
 def test_each_refusal_names_its_cause(expression, variables, kw, fragment):
     with pytest.raises(ValueError, match=fragment.replace("(", r"\(").replace(")", r"\)")):
