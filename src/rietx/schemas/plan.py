@@ -30,7 +30,7 @@ from typing import Any
 
 from pydantic import Field, field_validator, model_validator
 
-from .common import Base
+from .common import Base, check_mode
 
 #: What :attr:`PlanSpec.intermediate_ftol` and
 #: ``strategy.staged.RefinementPlan.intermediate_ftol`` both default to.
@@ -397,6 +397,8 @@ class PlanSpec(Base):
         """
         from ..strategy.staged import PLAN_PRESETS, resolve_plan
 
+        if mode is not None:
+            check_mode(mode)
         for name, build in PLAN_PRESETS.items():
             if PlanSpec.from_plan(build()) == self:
                 return name
