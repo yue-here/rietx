@@ -4029,6 +4029,20 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.crystallography.superspace.operators._ZERO3", "constant", tier=1, value=(0.0, 0.0, 0.0),
         evidence=('arithmetic: the exact zero translation (Fraction(0),) x 3 of a superspace '
                   'operator (superspace/operators.py:95)')),
+    Row("rietx.crystallography.symmetry.D_RANGE_SLACK", "constant", tier=3, value=0.001,
+        evidence=("the relative slack on the enumerated d range: generate_reflections and the two "
+                  "satellite enumerations keep d >= d_min*(1 - slack) and d <= d_max*(1 + slack), and "
+                  "model.forward._form_factor_range_fix quotes its 2theta from the same number "
+                  "(#1806 review, item 1; tests/test_magnetic_form_factor_range.py::"
+                  "test_the_refusals_quoted_2theta_compiles). Named in #1806 from the 0.999 / 1.001 "
+                  "the four enumerations typed, bit for bit (1 - 1e-3 == 0.999 in binary64), so no "
+                  "list and no number moves. Its job, keeping a reflection on the window's edge from "
+                  "being lost to round-off, needs only a slack above ~1e-15; 1e-3 widens the list "
+                  "past the window by 1e-3*tan(theta) rad in theta, beyond REFLECTION_MARGIN_DEG, whose "
+                  "measurements (tests/test_window_domain.py) were taken with this slack in place"),
+        grounds=("A pre-existing edge slack, named at the maintainer's request (#1806 round 1, item 1) "
+                 "and not retuned. Its size is ours, not the arithmetic's, so it waits for the "
+                 "maintainer's dated approval.")),
     Row("rietx.crystallography.symmetry.MAX_HKL_GRID_POINTS", "constant", value=30000000),
     Row("rietx.crystallography.symmetry.SITE_TOL", "constant", value=0.0001,
         evidence=("unaudited, for the maintainer's tier. Besides site_orbit's snap it has two "

@@ -335,6 +335,35 @@ def test_a_fit_reaching_past_s_6_is_refused_at_compile():
         assert part in text, (part, text)
 
 
+
+def test_the_refusals_quoted_2theta_compiles():
+    """#1806 review, item 1: the fix the refusal quotes is itself accepted.  FeF₂ Fe²⁺ at λ = 0.15 Å over
+    10-140° is refused; compiled again with the fitted data ended at the quoted 2θ, it compiles, and its list's top
+    s is at most 6 Å⁻¹.  The control is the quote before the fix, the table's end less the 0.5° margin
+    (127.82°): it left out the generator's d slack, and the same compile is refused at s ≈ 6.01 Å⁻¹."""
+    import re
+
+    import rietx as rx
+    from rietx.crystallography.lattice import d_spacings
+    from rietx.model.forward import compile_model
+
+    structure = rx.Structure(phases=[_rutile("Fe", "Fe2+", FEF2_CELL)])
+    instrument = rx.Instrument.constant_wavelength_neutron(0.15)
+    tt = np.arange(10.0, 140.0, 0.01)
+    blank = rx.PatternData(two_theta=tt.tolist(), intensity=np.ones_like(tt).tolist())
+    with pytest.raises(ValueError, match="past s = 6") as err:
+        compile_model(structure, instrument, blank, mode="rietveld")
+    (quoted,) = re.findall(r"End the fitted data at 2θ ≤ ([0-9.]+)°", str(err.value))
+    end = float(quoted)
+    model = compile_model(structure, instrument, blank, mode="rietveld", two_theta_limits=(10.0, end))
+    cell = structure.phases[0].cell.lengths_angles()
+    top_s = 0.5 / float(np.min(d_spacings(model.phases[0].reflections.index, *cell)))
+    assert 5.99 < top_s <= 6.0, top_s
+
+    with pytest.raises(ValueError, match="past s = 6"):
+        compile_model(structure, instrument, blank, mode="rietveld", two_theta_limits=(10.0, 127.82))
+    assert end < 127.82
+
 # ============================================================= the diagnostic
 
 def test_a_fit_past_browns_range_carries_one_diagnostic():

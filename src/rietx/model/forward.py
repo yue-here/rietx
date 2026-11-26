@@ -101,6 +101,7 @@ from ..crystallography.structure_factor import (
     structure_factors_squared,
 )
 from ..crystallography.symmetry import (
+    D_RANGE_SLACK,
     ReflectionSet,
     generate_reflections,
     reflection_orbits,
@@ -4628,15 +4629,25 @@ def _form_factor_range_fix(s_max: float, *, lam: float, tt_max: float,
                            hi_eff: float) -> str:
     """The data-side remedy for a magnetic form factor refused past the end
     of its table (``form_factor.past_table_end``): the 2θ at which this
-    stage's reflection list would stay inside ``s_max``, at the shortest λ."""
+    stage's reflection list would stay inside ``s_max``, at the shortest λ.
+
+    The list runs past the data end by ``hi_eff - tt_max`` (the margin
+    :func:`generation_window` adds), and :func:`generate_reflections` keeps d
+    down to (1 − :data:`D_RANGE_SLACK`)·d_min, so its top s is
+    sin(θ_edge)/((1 − slack)·λ).  The quoted end is that arithmetic solved
+    for s = ``s_max`` less the margin, rounded down, so following it compiles
+    (#1806 review, item 1)."""
     margin = hi_eff - tt_max
     tt_lim = 2.0 * math.degrees(math.asin(min(lam * s_max, 1.0)))
+    edge = 2.0 * math.degrees(math.asin(
+        min((1.0 - D_RANGE_SLACK) * lam * s_max, 1.0)))
+    end = math.floor((edge - margin) * 100.0) / 100.0
     return (f"At λ = {lam:g} Å the table ends at 2θ = {tt_lim:.2f}°, and this "
             f"stage's reflection list runs to 2θ = {hi_eff:.2f}°: the data end "
             f"at {tt_max:.2f}° and reflections are kept {margin:.2f}° beyond "
-            f"so their tails are modelled. End the fitted data at "
-            f"2θ ≤ {tt_lim - margin:.2f}° (fit(two_theta_limits=...) or an "
-            f"excluded region).")
+            f"so their tails are modelled, and {D_RANGE_SLACK:.1%} further in "
+            f"d. End the fitted data at 2θ ≤ {end:.2f}° "
+            f"(fit(two_theta_limits=...) or an excluded region).")
 
 
 def compile_model(structure: Structure, instrument: Instrument, pattern: PatternData,

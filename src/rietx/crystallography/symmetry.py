@@ -37,6 +37,17 @@ from .lattice import d_spacings, two_theta_deg
 #: below the PiB-scale grids a collapsed cell implies
 MAX_HKL_GRID_POINTS = 30_000_000
 
+#: relative slack on the enumerated d range: :func:`generate_reflections`
+#: keeps d ≥ d_min·(1 − D_RANGE_SLACK) and, with a low cutoff,
+#: d ≤ d_max·(1 + D_RANGE_SLACK), so a reflection on the window's edge is
+#: never lost to round-off.  The satellite enumerations
+#: (``crystallography.satellites``, ``report.satellites``) take the same
+#: slack, and ``model.forward._form_factor_range_fix`` builds the 2θ it
+#: quotes from it, so the list it predicts is the list the generator keeps.
+#: ``1 ∓ 1e-3`` is the 0.999 / 1.001 the four enumerations typed before,
+#: bit for bit.
+D_RANGE_SLACK = 1e-3
+
 #: transient element budget for the orbit-image stack in
 #: ``generate_reflections`` — the hkl loop it replaced was O(1) in memory, so
 #: the vectorised form chunks to stay bounded.  ~24M int64 ≈ 200 MB, which every
@@ -1854,10 +1865,10 @@ def generate_reflections(sg_symbol: str,
     hkl = hkl[~np.all(hkl == 0, axis=1)]
 
     d = d_spacings(hkl, *cell)
-    keep = d >= d_min * 0.999
+    keep = d >= d_min * (1.0 - D_RANGE_SLACK)
     if two_theta_min > 0.0:
         d_max = wavelength / (2.0 * np.sin(np.radians(max(two_theta_min, 1e-3) / 2.0)))
-        keep &= d <= d_max * 1.001
+        keep &= d <= d_max * (1.0 + D_RANGE_SLACK)
     hkl, d = hkl[keep], d[keep]
 
     # systematic absences via gemmi GroupOps (vectorised where available)
