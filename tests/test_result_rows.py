@@ -125,7 +125,7 @@ def test_at_bound_names_exactly_the_paths_bound_hit_names():
     out.mkdir(exist_ok=True)
     plot_result(result, path=str(out / "row_at_bound_capped_cell.png"))
     plot_result(result, path=str(out / "row_at_bound_capped_cell_lowangle.png"),
-                two_theta_range=(2.0, 8.0))
+                two_theta_limits=(2.0, 8.0))
 
 
 def test_a_result_built_without_a_guard_reports_none(lebail):

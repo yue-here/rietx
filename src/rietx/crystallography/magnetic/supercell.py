@@ -96,6 +96,7 @@ from fractions import Fraction
 
 import numpy as np
 
+from ..._nearmiss import check_choice
 from ...schemas.common import Diagnostic, Parameter
 from ...schemas.structure import (
     Atom,
@@ -1136,6 +1137,12 @@ def _refuse_a_contradicting_bns_number(group: MagneticGroup,
 # ---------------------------------------------------------------------------
 # the statement
 # ---------------------------------------------------------------------------
+#: what ``nuclear_group`` may name in :func:`magnetic_supercell` and
+#: ``solve_magnetic``: the parent's space group, or the magnetic group's own
+#: nuclear part
+SUPERCELL_NUCLEAR_GROUPS = ("parent", "magnetic")
+
+
 def magnetic_supercell(parent: Phase, candidate=None, *, group=None,
                        transform: str | None = None, k=None,
                        bns_number: str | None = None,
@@ -1253,10 +1260,7 @@ def magnetic_supercell(parent: Phase, candidate=None, *, group=None,
             "2k in the reciprocal lattice (candidates' scope); the explicit route "
             "takes the cell from the transform and has no such fence, because "
             "a child lattice exists for every commensurate k.")
-    if nuclear_group not in ("parent", "magnetic"):
-        raise ValueError(
-            f"magnetic_supercell(): nuclear_group={nuclear_group!r} is not one "
-            f"of 'parent' or 'magnetic'.")
+    check_choice("nuclear_group", nuclear_group, SUPERCELL_NUCLEAR_GROUPS)
     if group is not None and transform is None:
         raise ValueError(
             "magnetic_supercell(): an explicit group needs its transform. The "

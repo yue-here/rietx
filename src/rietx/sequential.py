@@ -174,6 +174,7 @@ from typing import Any, Literal
 import numpy as np
 
 from . import runs
+from ._nearmiss import check_choice
 from .backend.api import backend_dtype_note
 from .crystallography.twins import (
     CoordinateSnapshot,
@@ -201,7 +202,7 @@ from .refine import (
     _utcnow,
 )
 from .report.schemas import THRESHOLDS_VERSION, MomentEvidence
-from .schemas.common import Diagnostic, Mode, Provenance
+from .schemas.common import Diagnostic, Mode, Provenance, check_mode
 from .schemas.history import ReflectionState
 from .schemas.instrument import Instrument
 from .schemas.pattern import PatternData, require_two_theta
@@ -1166,16 +1167,10 @@ class SequentialRefinement:
                  carry: Sequence[str] = ("*",),
                  carry_hkl_intensities: bool = True,
                  history: bool | str | Path = False):
-        if backend != "numpy":
-            from .backend import resolve_backend
+        from .backend.api import check_backend
 
-            try:
-                resolve_backend(backend)  # fail fast with the install hint
-            except ValueError as exc:
-                raise NotImplementedError(str(exc)) from exc
-        if solver not in SOLVERS:
-            raise ValueError(f"unknown solver {solver!r}; "
-                             f"available: {', '.join(SOLVERS)}")
+        check_backend(backend)
+        check_choice("solver", solver, SOLVERS)
         self._backend = backend
         self._solver = solver
         # the caller's statement is judged once, here; each pattern's
@@ -1462,12 +1457,10 @@ class SequentialRefinement:
         for i, pat in enumerate(patterns):
             require_two_theta(pat, f"refine_sequential(), pattern {i} of "
                                    f"{len(patterns)}", instrument=self.instrument)
-        if refit not in REFIT_MODES:
-            raise ValueError(f"refit must be one of {REFIT_MODES}")
-        if direction not in DIRECTIONS:
-            raise ValueError(f"direction must be one of {DIRECTIONS}")
-        if on_error not in ON_ERROR_POLICIES:
-            raise ValueError(f"on_error must be one of {ON_ERROR_POLICIES}")
+        check_mode(mode)
+        check_choice("refit", refit, REFIT_MODES)
+        check_choice("direction", direction, DIRECTIONS)
+        check_choice("on_error", on_error, ON_ERROR_POLICIES)
         _check_verify_steps(verify_steps)
         _check_factor("reseed_factor", reseed_factor,
                       "the caller's Rwp fence, a multiple of the accepted median",

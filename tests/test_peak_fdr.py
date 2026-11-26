@@ -159,7 +159,7 @@ def test_a_line_free_pattern_keeps_no_line_and_says_so(slope):
                           sigma=list(np.sqrt(np.maximum(obs, 1))))
     ins = rx.Instrument.debye_scherrer(wavelength=LAM)
     ins.profile.w.value, ins.profile.u.value, ins.profile.x.value = 3e-4, 5e-4, 5e-3
-    pl = rx.pick_peaks(data, ins, two_theta_range=RANGE)
+    pl = rx.pick_peaks(data, ins, two_theta_limits=RANGE)
     d = _diag(pl)
     assert pl.peaks == [] and d.value == 0.0
     # nothing kept, so the bar is the Bonferroni one a first line would need
@@ -179,7 +179,7 @@ def test_steep_background_junk_fails_the_patterns_bar_and_no_true_line_does(tmp_
     truth = _si_lines()
     data = _silicon(tmp_path, steep=True, hi=102.1161)
     ins = rx.Instrument.debye_scherrer(wavelength=LAM)
-    pl, det, fits = pick_peaks_with_state(data, ins, two_theta_range=RANGE)
+    pl, det, fits = pick_peaks_with_state(data, ins, two_theta_limits=RANGE)
     draw_pick("fdr_steep_silicon", data, ins, pl, det, fits, truth=truth,
               title="#728 arm c2: silicon on a background falling 3x over 12-23 deg")
     per, off = _count(pl, truth)
@@ -203,7 +203,7 @@ def test_tail_maxima_on_a_clean_pattern_fail_the_bar(tmp_path):
     data = _silicon(tmp_path, steep=False, hi=62.0)
     ins = rx.Instrument.debye_scherrer(wavelength=LAM)
     ins.profile.w.value, ins.profile.u.value, ins.profile.x.value = 3e-4, 5e-4, 5e-3
-    pl, det, fits = pick_peaks_with_state(data, ins, two_theta_range=RANGE)
+    pl, det, fits = pick_peaks_with_state(data, ins, two_theta_limits=RANGE)
     draw_pick("fdr_flat_silicon", data, ins, pl, det, fits, truth=truth,
               title="#916's flat silicon: tail maxima under the false-discovery bar")
     per, off = _count(pl, truth)
