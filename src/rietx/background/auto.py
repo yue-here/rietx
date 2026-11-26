@@ -12,8 +12,9 @@ choice was made on (WP-2002, B12).
 from __future__ import annotations
 
 import warnings
-from typing import Literal
+from typing import Literal, get_args
 
+from .._nearmiss import check_choice
 from ..schemas.common import Base, Parameter
 from ..schemas.instrument import (
     PSPLINE_LAMBDA_SMOOTH,
@@ -135,6 +136,7 @@ def auto_background(data: PatternData, *, kind: str = "pspline",
     ``BACKGROUND_ORDER_AT_CAP`` when the order is the scan's cap of 16 rather
     than a choice (issue #833).
     """
+    check_choice("kind", kind, get_args(BackgroundChoice.model_fields["kind"].annotation))
     require_two_theta(data, "auto_background()")
     if two_theta_limits is not None:
         lo, hi = (float(v) for v in two_theta_limits)
@@ -163,8 +165,6 @@ def auto_background(data: PatternData, *, kind: str = "pspline",
             cheb.coefficients[0].value = level
         return BackgroundChoice(background=cheb, kind="chebyshev",
                                 selection=sel, seed_level=level)
-    if kind != "pspline":
-        raise ValueError(f"unknown background kind {kind!r}")
 
     step = (_KNOT_STEP_HUMPY_DEG if diag.amorphous_hump_score > HUMP_TRIGGER
             else _KNOT_STEP_SMOOTH_DEG)

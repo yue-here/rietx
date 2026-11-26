@@ -297,5 +297,5 @@ def test_srm660c_fp32_columns_refine_to_the_same_answer():
     OUT.mkdir(exist_ok=True)
     plot_result(result32, path=str(OUT / "mixed_precision_srm660c_fp32.png"))
     plot_result(result32, path=str(OUT / "mixed_precision_srm660c_fp32_lowangle.png"),
-                two_theta_range=(20.6, 22.2))
+                two_theta_limits=(20.6, 22.2))
     plot_result(result64, path=str(OUT / "mixed_precision_srm660c_fp64.png"))
