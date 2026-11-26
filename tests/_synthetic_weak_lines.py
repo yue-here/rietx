@@ -132,7 +132,7 @@ def _grid(lo: float, hi: float) -> np.ndarray:
 
 
 def _pick(name, data, ins, rng_tt, cell, centring, weak) -> WeakLineFixture:
-    peaks = rx.pick_peaks(data, ins, two_theta_range=rng_tt)
+    peaks = rx.pick_peaks(data, ins, two_theta_limits=rng_tt)
     return WeakLineFixture(name=name, data=data, instrument=ins, peaks=peaks,
                            cell=tuple(float(v) for v in cell),
                            centring=centring, two_theta_range=rng_tt,
