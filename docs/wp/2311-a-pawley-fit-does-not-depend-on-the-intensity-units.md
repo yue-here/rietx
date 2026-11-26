@@ -209,12 +209,20 @@ from the worktree root.
       ×100 high. Agreement is under 1e-6 esd and 1e-14 in Rwp, against
       tolerances of 1e-3 esd and 1e-6. With the floor set to 0 it fails on the
       start case, Rwp 0.214 against 0.162.)*
-- [ ] Re-measure the nine real true cells and the indexing acceptance suite, and
-      say which pinned numbers moved.
+- [x] Re-measure the nine real true cells and the indexing acceptance suite, and
+      say which pinned numbers moved. *(Findings 3: the validation's Rwp
+      moves on NAC (−1.8e-4), magnetite (−6.3e-4), FAP (−2e-6) and zircon
+      (−1e-6); no unmatched count and no status moves. No pinned number
+      failed: the fast suite reads 15795 passed, 465 skipped, 30 xfailed
+      (2026-11-26, Linux x86-64, `[dev]`, alone), and
+      `tests/test_acceptance_indexing.py` 45 passed, 0 skipped,
+      2026-11-26, Linux x86-64, `[dev]`, alone, so no ranking or class
+      decision was lost.)*
 - [x] Tick WP-2062's unit-dependence task with a pointer here.
-- [ ] Skill: none expected. A fix removes a trap and adds no rule an agent
+- [x] Skill: none expected. A fix removes a trap and adds no rule an agent
       needs. If the result is "belongs to the method", the trap ("Pawley in
-      rietx depends on intensity units") gets a row.
+      rietx depends on intensity units") gets a row. *(None: the result is a
+      fix.)*
 
 ## Acceptance
 
