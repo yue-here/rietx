@@ -333,7 +333,7 @@ def _build_fap(data_dir: Path) -> StandardInputs:
     data = PatternData(two_theta=raw.two_theta, intensity=raw.intensity,
                        sigma=raw.sigma,
                        excluded_regions=list(hist.excluded_regions),
-                       metadata=raw.metadata)
+                       metadata=raw.metadata, diagnostics=raw.diagnostics)
     structure = to_structure(exp)
     phase = structure.phases[0]
     phase.name = "fluorapatite"

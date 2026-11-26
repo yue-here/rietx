@@ -56,6 +56,7 @@ second one.
 from __future__ import annotations
 
 from functools import partial
+from pathlib import Path
 
 import numpy as np
 
@@ -277,7 +278,7 @@ def _x_values(two_theta, x_axis: str, wavelength: float | None,
     sin_theta = np.sin(np.radians(tt) / 2.0)
     if tt.size and np.min(sin_theta) <= 0.0:
         raise ValueError(f"x_axis={x_axis!r} is undefined at 2θ ≤ 0; window the "
-                         "pattern with two_theta_range=")
+                         "pattern with two_theta_limits=")
     if x_axis == "q":
         return 4.0 * np.pi * sin_theta / wavelength, r"$Q$ (Å$^{-1}$)"
     return wavelength / (2.0 * sin_theta), r"$d$ (Å)"
@@ -787,8 +788,8 @@ def _intensity_axis(ax, y_scale: str, forward, inverse, base: float, top: float,
     return u_bottom
 
 
-def plot_result(result: RefinementResult, *, path: str | None = None,
-                two_theta_range: tuple[float, float] | None = None,
+def plot_result(result: RefinementResult, *, path: str | Path | None = None,
+                two_theta_limits: tuple[float, float] | None = None,
                 show_background: bool = True, weighted: bool = False,
                 style: str = "light", wavelength: float | None = None,
                 x_axis: str = "two_theta", y_scale: str = "linear",
@@ -829,11 +830,13 @@ def plot_result(result: RefinementResult, *, path: str | None = None,
     ``"curve"`` puts each name level with where its curve ends, which reads
     better when the curves stay apart.
 
-    ``two_theta_range`` is a window on the pattern, not a crop of a whole-range
+    ``two_theta_limits`` is a window on the pattern, not a crop of a whole-range
     figure: the intensity scale, the residual offset and the tick rows are all
     built from what the window contains, so a zoom is a figure of its own data.
     It is in 2θ whatever ``x_axis`` is, because it selects channels rather than
-    describing the drawing.
+    describing the drawing.  The name says *limits* because it requests a window;
+    a field named ``two_theta_range`` describes the span something covers
+    (``DataRef.two_theta_range``).
 
     The 2θ axis names the radiation the fit used, which
     :attr:`RefinementResult.radiation` records (WP-2042):
@@ -892,10 +895,10 @@ def plot_result(result: RefinementResult, *, path: str | None = None,
     y_calc = np.asarray(result.y_calc, dtype=float)
     y_bkg = np.asarray(result.y_background, dtype=float)
     sigma = result.sig()
-    if two_theta_range is not None:
-        keep = (tt >= two_theta_range[0]) & (tt <= two_theta_range[1])
+    if two_theta_limits is not None:
+        keep = (tt >= two_theta_limits[0]) & (tt <= two_theta_limits[1])
         if not keep.any():
-            raise ValueError(f"two_theta_range {two_theta_range} contains no points")
+            raise ValueError(f"two_theta_limits {two_theta_limits} contains no points")
         tt, y_obs, y_calc = tt[keep], y_obs[keep], y_calc[keep]
         sigma = sigma[keep]
         y_bkg = y_bkg[keep] if y_bkg.size == keep.size else y_bkg[:0]
@@ -1201,8 +1204,8 @@ def _stated_radiation(model, data, recorded=None) -> tuple[float | None, str | N
             name)
 
 
-def plot_pattern(data, *, path: str | None = None,
-                 two_theta_range: tuple[float, float] | None = None,
+def plot_pattern(data, *, path: str | Path | None = None,
+                 two_theta_limits: tuple[float, float] | None = None,
                  x_axis: str = "two_theta", wavelength: float | None = None,
                  y_scale: str = "linear", style: str = "light",
                  figsize: tuple[float, float] | None = None,
@@ -1225,7 +1228,7 @@ def plot_pattern(data, *, path: str | None = None,
     but here they are a measurement the next fit will not use, and hiding them
     would say they were never collected.
 
-    ``two_theta_range``, ``x_axis``/``wavelength``, ``y_scale``, ``style``,
+    ``two_theta_limits``, ``x_axis``/``wavelength``, ``y_scale``, ``style``,
     ``figsize``/``font_size``/``dpi`` and ``title`` mean exactly what they
     mean on :func:`plot_result`; the default size is the result panel's own,
     so a before-and-after pair lines up.
@@ -1271,10 +1274,10 @@ def plot_pattern(data, *, path: str | None = None,
 
     tt = np.asarray(data.two_theta, dtype=float)
     y_obs = np.asarray(data.intensity, dtype=float)
-    if two_theta_range is not None:
-        keep = (tt >= two_theta_range[0]) & (tt <= two_theta_range[1])
+    if two_theta_limits is not None:
+        keep = (tt >= two_theta_limits[0]) & (tt <= two_theta_limits[1])
         if not keep.any():
-            raise ValueError(f"two_theta_range {two_theta_range} contains no points")
+            raise ValueError(f"two_theta_limits {two_theta_limits} contains no points")
         tt, y_obs = tt[keep], y_obs[keep]
     hue = PALETTES[style]
 
@@ -1507,7 +1510,7 @@ def plot_for_vlm(result: RefinementResult, report=None, *,
     return _handed_back(fig)
 
 
-def plot_trajectory(series, paths, *, path: str | None = None,
+def plot_trajectory(series, paths, *, path: str | Path | None = None,
                     dpi: int = 150, mark_diagnostics: bool = True,
                     title: str | None = None, style: str = "light"):
     """Parameter trajectories across a sequential series (WP-0505).

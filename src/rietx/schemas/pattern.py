@@ -11,12 +11,13 @@ assuming — see :func:`require_two_theta`, which is how a 2θ-only path says no
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Literal
 
 import numpy as np
 from pydantic import Field, model_validator
 
-from .common import Base
+from .common import Base, Diagnostic
 
 #: The two abscissae a pattern may carry, spelled as the field that holds each.
 AxisKind = Literal["two_theta", "tof"]
@@ -177,6 +178,13 @@ class PatternData(Base):
     nonpositive_sigma: NonPositiveSigma = "exclude"
     excluded_regions: list[tuple[float, float]] = Field(default_factory=list)
     metadata: dict[str, str] = Field(default_factory=dict)
+    #: What :func:`~rietx.io.readers.read_pattern` repaired or noticed in the
+    #: file, filled on every read (WP-2304).  A fit on this pattern copies
+    #: them into ``RefinementResult.diagnostics``, so a caller who passed no
+    #: ``diagnostics=`` list still meets them.  Empty on a pattern built by
+    #: hand.  Not part of ``TreeHeader.data_fingerprint``, which hashes the
+    #: arrays alone.
+    diagnostics: list[Diagnostic] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _validate(self) -> "PatternData":
@@ -361,8 +369,9 @@ class PatternData(Base):
         return tree(self, order=("intensity", "sigma", "excluded_regions", "metadata"),
                     show_empty=True, head=head)
 
-    def plot(self, path: str | None = None, **kw):
-        """Draw the pattern: :func:`rietx.viz.plots.plot_pattern`, the peer of
+    def plot(self, path: str | Path | None = None, **kw):
+        """Draw the pattern, writing it to the file ``path`` when given:
+        :func:`rietx.viz.plots.plot_pattern`, the peer of
         :meth:`RefinementResult.plot`, forwarding ``**kw``; ``model=ref`` adds a
         :class:`~rietx.Refinement`'s reflection ticks and starting background
         before any fit, and names its radiation on the 2θ label."""
@@ -390,6 +399,7 @@ class PatternData(Base):
             nonpositive_sigma=self.nonpositive_sigma,
             excluded_regions=self.excluded_regions,
             metadata=self.metadata,
+            diagnostics=self.diagnostics,
         )
 
 
