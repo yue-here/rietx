@@ -119,11 +119,32 @@ The per-$hkl$ intensities sit inside the least-squares problem
 Equation {eq}`fm-lebail` is then used for at most three cycles, to seed the block
 before the first solve. Reflections whose primary-line centres sit within
 {{ PAWLEY_OVERLAP_FWHM_FRAC }} × their mean FWHM form an overlapped group and
-receive a soft equal-split restraint, scaled so that the split-direction esd is
-of order the group intensity itself. An unresolved split is then reported at
-≈100 % uncertainty, where a bare pseudo-inverse of a singular $J^\top J$ would
-report a spuriously tight one. Such groups come back flagged
-`PAWLEY_OVERLAP_UNRESOLVED`.
+receive a soft equal-split restraint, one row per member $k$ of a group $g$ of
+$n$ reflections,
+
+```{math}
+:label: fm-pawley-split
+
+r_{gk} \;=\; \frac{\sqrt{\lambda}}{s_g}
+  \Big(I_k - \tfrac{1}{n}\textstyle\sum_{j\in g} I_j\Big),
+\qquad s_g = \max\!\big(\bar I_g,\; \rho\, s_p\big),
+```
+
+{source}`rietx.model.forward.CompiledModel.build_pawley_restraint`
+
+where $\bar I_g$ is the group's mean intensity when the stage starts, $s_p$ the
+phase's largest on-data intensity of equation {eq}`fm-pawley-ridge`, and
+$\rho$ = {{ PAWLEY_GROUP_SCALE_FLOOR_REL }}. The rows sum to zero, so they
+leave the group's sum to the data and weigh only its split, whose esd is then of
+order the group intensity itself. An unresolved split is reported at ≈100 %
+uncertainty, where a bare pseudo-inverse of a singular $J^\top J$ would report a
+spuriously tight one. Such groups come back flagged `PAWLEY_OVERLAP_UNRESOLVED`.
+The floor $\rho\, s_p$ is relative to the phase, never a number of counts. The
+seed partitions $\max(y_\text{obs} - y_\text{bkg}, 0)$, so a declared
+background above the data empties whole groups. With an absolute floor of
+$10^{-10}$ their rows weighed $5\times10^{9}$. Column equilibration then put the
+group's sum out of the trust region's reach, so the fit kept the seed's empty
+groups (WP-2311).
 
 The reflection list runs 0.5° past each end of the fitted window, so that a
 reflection a stage moves onto the data is modelled. A reflection with no

@@ -419,11 +419,17 @@ ruling.
 - [x] The maintainer's five decisions (0-4), each recorded as `Decided YYYY-MM-DD:`.
       Recorded 2026-11-01 above: 0 and 1 decided by the maintainer, 1's D and
       2-4 settled by Claude.
-- [ ] The unit dependence, **moved to WP-2311 on 2026-11-26**: synthetic
+- [x] The unit dependence, **moved to WP-2311 on 2026-11-26**: synthetic
       LaB6's true cell validates at Rwp 0.164 on raw counts and 0.262 with
       pattern and σ divided by the maximum count, where Le Bail reads 0.2339
       and 0.2338. Tick this when WP-2311 closes. If it shows the dependence
-      belongs to the method, decision 0 comes back to Yue.
+      belongs to the method, decision 0 comes back to Yue. *(2026-11-26,
+      WP-2311: not a unit dependence, and not the method's. The probe rescaled
+      the data but left the declared background in counts, so the fit started
+      from a background up to 100× above the data. The seed then emptied whole
+      overlap groups, and the equal-split restraint's absolute 1e-10 floor
+      locked them. Fixed by `PAWLEY_GROUP_SCALE_FLOOR_REL`; decision 0 stands.
+      WP-2311 § Findings.)*
 - [ ] The extinction screen's Hamilton test adds `n_lines + n_free_parameters`
       (`indexing/extinction.py:1137-1141`), and Pawley's `n_free_parameters`
       already counts the intensities. Count them once, before A2 moves.

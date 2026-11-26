@@ -727,6 +727,16 @@ PAWLEY_OVERLAP_LAMBDA = 1.0
 #: largest on-data intensity, and never narrower than this, which a phase
 #: with no on-data reflection falls back to (WP-1459, outside PR #453)
 PAWLEY_OFF_DATA_SCALE_FLOOR = 1.0
+#: floor on an overlap group's restraint scale, as a fraction of its phase's
+#: largest on-data intensity, so the scale is never read off a seed the
+#: partition emptied (WP-2311).  A group on ``LEBAIL_INTENSITY_FLOOR`` had
+#: rows weighing √λ/1e-10 = 5e9, which equilibration turned into a group sum
+#: the trust region could not move, rebuilt from the stuck value every stage.
+#: Synthetic LaB6 under a declared background 10x and 100x the data: any value
+#: from 1 down to 1e-8 recovers the true start's fit exactly, 1e-9 locks again.
+#: *(Chosen: WP-2311, 2026-11-26 — four decades inside that window either
+#: side; below it a group is weaker than any line a pattern resolves.)*
+PAWLEY_GROUP_SCALE_FLOOR_REL = 1e-4
 
 
 
@@ -4102,25 +4112,42 @@ class CompiledModel:
         overlap rows' large-but-honest answer — while a reflection the data
         do reach has a column far more precise than a prior as wide as the
         strongest reflection.
+
+        **A group's scale is floored relative to its phase, never in intensity
+        units** (WP-2311): s ≥ ``PAWLEY_GROUP_SCALE_FLOOR_REL`` × the phase's
+        largest on-data intensity.  The seed partitions max(y_obs − bkg, 0), so
+        a declared background above the data leaves whole groups on
+        ``LEBAIL_INTENSITY_FLOOR``; an absolute floor of 1e-10 then weighed
+        their rows at 5e9, the equilibrated step could not move the group's
+        sum (free in exact arithmetic, the rows summing to zero), and every
+        later stage rebuilt s from the stuck value.  ``LEBAIL_INTENSITY_FLOOR``
+        stays only as the guard for a phase nothing has measured yet.
         """
         pb = self.pawley
         if pb is None or not (pb.groups or pb.off_data):
             return
         intens = self.pawley_x0()
+        off = np.zeros(pb.n, dtype=bool)
+        off[pb.off_data] = True
+        # each phase's largest on-data intensity: the ridge's width below, and
+        # the group scale's floor relative to it
+        top = np.zeros(pb.n, dtype=np.float64)
+        for a, b in pb.phase_slices:
+            on = intens[a:b][~off[a:b]]
+            top[a:b] = float(on.max()) if len(on) else 0.0
         rows: list[np.ndarray] = []
         for g in pb.groups:
-            s = max(float(np.mean(intens[g])), 1e-10)
+            s = max(float(np.mean(intens[g])),
+                    PAWLEY_GROUP_SCALE_FLOOR_REL * float(top[g[0]]),
+                    LEBAIL_INTENSITY_FLOOR)
             n = len(g)
             for k in g:
                 row = np.zeros(pb.n, dtype=np.float64)
                 for j in g:
                     row[j] = (np.sqrt(lam) / s) * ((1.0 if j == k else 0.0) - 1.0 / n)
                 rows.append(row)
-        off = np.zeros(pb.n, dtype=bool)
-        off[pb.off_data] = True
         for a, b in pb.phase_slices:
-            on = intens[a:b][~off[a:b]]
-            s = max(float(on.max()) if len(on) else 0.0, PAWLEY_OFF_DATA_SCALE_FLOOR)
+            s = max(float(top[a]) if b > a else 0.0, PAWLEY_OFF_DATA_SCALE_FLOOR)
             for k in np.flatnonzero(off[a:b]):
                 row = np.zeros(pb.n, dtype=np.float64)
                 row[a + k] = np.sqrt(lam) / s

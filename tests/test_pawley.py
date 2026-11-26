@@ -16,7 +16,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from rietx import Instrument, PatternData, Refinement
+from rietx import Dispersion, Instrument, PatternData, Refinement
 from rietx.model.forward import compile_model
 from rietx.optimize.least_squares import _make_jacobian, _make_residual
 from rietx.params.vector import ParameterTable
@@ -140,6 +140,62 @@ def test_pawley_recovers_overlapped_sum_and_flags_split():
     assert "(2, 2, 1)" in named and "(3, 0, 0)" in named
 
     _save(result, "pawley_lab6_overlapped.png")
+
+
+# ------------------------------------------------------- units and start state
+def _unit_fit(pattern: PatternData, *, intensity_factor: float = 1.0,
+              background_factor: float = 1.0):
+    """The overlapped Cu-LaB6 Pawley fit, from the perturbed start, with the
+    intensity, σ and the declared background multiplied as asked."""
+    s, ins = _overlapped_lab6(a=4.160, w=1e-2)
+    ins.source.dispersion = Dispersion()        # declared: the default, on
+    for c in ins.background.coefficients:
+        c.value *= background_factor
+    if intensity_factor != 1.0:
+        pattern = pattern.model_copy(update={
+            "intensity": (np.asarray(pattern.intensity) * intensity_factor).tolist(),
+            "sigma": (np.asarray(pattern.sig()) * intensity_factor).tolist()})
+    ref = Refinement(s, ins, history=False)
+    result = ref.fit(pattern, mode="pawley")
+    return result, ref._model
+
+
+def test_a_pawley_fit_depends_neither_on_the_units_nor_on_a_high_background_start():
+    """WP-2311.  χ² is one function of every parameter but the intensities
+    whether the counts are counts or counts × 1e-3, so the cell, the widths,
+    the shift and Rwp come back unchanged and the intensities in ratio 1e-3.
+    And a declared background 100× above the data must reach the same answer:
+    its seed partition empties whole overlap groups, and the equal-split
+    restraint, once floored at an absolute 1e-10, weighed their rows at 5e9 and
+    left the group sums where the seed put them (Rwp 0.214 against 0.162 here).
+    The tolerances are 1e-3 esd and 1e-6 in Rwp; the measured agreement is
+    under 1e-6 esd and 1e-14, and the lock moved the widths by 0.3-0.6 esd."""
+    pattern, _, _ = _synth_overlapped()
+    base, model = _unit_fit(pattern)
+    assert base.status == "converged"
+    assert model.pawley.groups, "the fixture must carry an overlap group"
+    i_base = model.pawley_x0()
+    f = 1e-3
+    scaled, m_scaled = _unit_fit(pattern, intensity_factor=f, background_factor=f)
+    high, m_high = _unit_fit(pattern, background_factor=100.0)
+
+    rows = {p.path: p for p in base.parameters}
+    for label, other, intens, factor in (("units", scaled, m_scaled.pawley_x0(), f),
+                                         ("start", high, m_high.pawley_x0(), 1.0)):
+        assert other.status == "converged", label
+        assert other.statistics.rwp == pytest.approx(base.statistics.rwp, rel=1e-6), label
+        for p in other.parameters:
+            ref_row = rows[p.path]
+            if p.path.startswith("instrument.background."):
+                # declared in the pattern's units, so it scales with them
+                assert p.value == pytest.approx(ref_row.value * factor,
+                                                abs=1e-3 * ref_row.stderr * factor), (label, p.path)
+                continue
+            assert abs(p.value - ref_row.value) <= 1e-3 * ref_row.stderr, (
+                label, p.path, p.value, ref_row.value, ref_row.stderr)
+        np.testing.assert_allclose(intens / factor, i_base, rtol=1e-5,
+                                   atol=1e-6 * float(i_base.max()), err_msg=label)
+
 
 
 # --------------------------------------------------------------- history

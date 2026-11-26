@@ -147,14 +147,24 @@ from the worktree root.
 - [x] Find the cause: the first stage and quantity where the two fits part,
       with the suspects above checked one at a time and each result recorded.
       *(Findings 2: the group scale's 1e-10 floor.)*
-- [ ] Fix it, or show it belongs to the method, and if so hand decision 0 back
-      to Yue through WP-2062 (an `### Inherited` entry there).
-- [ ] Test: a Pawley fit of one pattern at *f* = 1 and *f* = 1e-3 (intensity and
+- [x] Fix it, or show it belongs to the method, and if so hand decision 0 back
+      to Yue through WP-2062 (an `### Inherited` entry there). *(Fixed:
+      `PAWLEY_GROUP_SCALE_FLOOR_REL` = 1e-4 floors a group's scale at that
+      fraction of its phase's largest on-data intensity; the absolute 1e-10
+      survives only as the guard for a phase nothing has measured. Audit row
+      tier 1, numerical floor, for the judge at handover. The equation is the
+      Theory tab's `fm-pawley-split`. Decision 0 is not handed back: Findings 1.)*
+- [x] Test: a Pawley fit of one pattern at *f* = 1 and *f* = 1e-3 (intensity and
       σ both scaled) gives the same cell, widths and Rwp, and intensities in
       ratio *f*. Fast, synthetic, with `dispersion` declared explicitly.
+      *(`test_pawley.py::test_a_pawley_fit_depends_neither_on_the_units_nor_on_a_high_background_start`,
+      ~3 s: units ×1e-3 with the declared background scaled too, and a start
+      ×100 high. Agreement is under 1e-6 esd and 1e-14 in Rwp, against
+      tolerances of 1e-3 esd and 1e-6. With the floor set to 0 it fails on the
+      start case, Rwp 0.214 against 0.162.)*
 - [ ] Re-measure the nine real true cells and the indexing acceptance suite, and
       say which pinned numbers moved.
-- [ ] Tick WP-2062's unit-dependence task with a pointer here.
+- [x] Tick WP-2062's unit-dependence task with a pointer here.
 - [ ] Skill: none expected. A fix removes a trap and adds no rule an agent
       needs. If the result is "belongs to the method", the trap ("Pawley in
       rietx depends on intensity units") gets a row.
