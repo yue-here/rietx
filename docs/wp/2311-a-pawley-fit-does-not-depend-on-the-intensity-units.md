@@ -1,6 +1,6 @@
 # WP-2311 — A Pawley fit does not depend on the intensity units
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-26 — claimed by @yue-here (cloud session)
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P2 2026-11-26 — the first of WP-2062's bug tasks, and the only one whose answer can reopen that WP's decision 0; every other site move there waits on it
