@@ -23,6 +23,9 @@ Every listing these commands read asks `gh` for at most `--limit` rows, and
 - **`/pr-review` triage**: `gh pr list --limit 30` with `commits` among its
   fields. It ranked 30 of 84 PRs. The rank was wrong even for those 30, since
   collision degree counted only files shared with PRs the call returned.
+  gh orders every PR listing `orderBy: {field: CREATED_AT, direction: DESC}`
+  (in its binary), so the 30 were the newest-opened, and the oldest
+  unreviewed PRs never reached the rank.
   - **Raising the limit is not the fix.** gh 2.89's query nests
     `authors(first:100)` inside `commits(first:100)`; the strings are in its
     binary. GitHub sizes a query from its `first:` arguments, not from the
@@ -65,8 +68,12 @@ Every listing these commands read asks `gh` for at most `--limit` rows, and
   `--merge`. So a PR's body and its closing references reach the landed
   column only through this listing. `git log --since` also stops at a
   shallow clone's boundary, and cloud sessions clone shallow. `reach_notes`
-  says when the listing ends after the oldest open issue, and when the clone
-  is shallow.
+  says when the oldest PR the listing holds was *opened* after the oldest
+  open issue, and when the clone is shallow. It reads `createdAt`, not
+  `mergedAt`, because of gh's order: a cut list misses a PR opened before its
+  oldest row however recently that PR merged. The shallow note fires for
+  every shallow clone, even one whose boundary predates the oldest issue. It
+  over-warns but hides nothing; reading git's shallow file would fix it.
 
 Considered and dropped:
 
@@ -130,4 +137,15 @@ Its first line names no `ranked N of M`.
 
 - **2026-11-26** — created, from a review of how the two review commands behave on a backlog no single session can clear. With 84 open PRs, `/pr-review` triage ranked 30 as if they were all of them, and three other listings could stop at their limit in silence. Each listing now says so when it may be cut off. `/pr-review` still ranks only 30, because the call that ranks every PR is designed but not run. Checked against the tree at dd94fd32. No open WP owns it: of the open WPs in "The repo's own process", 1988 watches a PR after it is opened, 2238 cuts the calls that reach the maintainer, and 1941 moves release notes to fragments. None touches what a listing returns.
     - *Review*: an independent subagent read the first draft. It found the `--limit 200` call over GitHub's node limit, a ghostshift claim dropped on a cut list, the merged-listing gap, and a held-act record with no reader. Each was checked against the code or gh's binary. All are fixed or withdrawn above.
-    - *Next*: the open task, on a machine where `gh pr list` runs.
+    - *Code review* (`/code-review high --fix`): six findings, four fixed:
+      - the merged listing's reach now reads `createdAt` (above), checked against gh's binary;
+      - all given issue numbers missing reads "none of those is in the listing", not "no open issues";
+      - `status` prints `200+ open` on a cut list;
+      - the count call's 1000 is marked a floor.
+      Two declined: the shallow note's over-warning (above), and `pr_open_in`
+      reading a PR newer than every listed one as unknown, not closed. It errs
+      toward keeping a claim, and with creation order a cleverer reading is
+      possible but not needed.
+    - *Measured*: see the fast-suite line below.
+    - *Next*: the open task, on a machine where `gh pr list` runs. Build the
+      paginated call, measure it, then change the skill.
