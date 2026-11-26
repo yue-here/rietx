@@ -90,7 +90,6 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2300](2300-a-series-declares-each-parameter.md) | A series declares each parameter, and refuses what it cannot honour | P2 | [2305](2305-the-joint-call-speaks-of-patterns.md) | [series](#series) |
 | [2303](2303-a-glob-that-matches-nothing-says-so.md) | A glob a caller passes that matches nothing says so | P2 | — ([2300](2300-a-series-declares-each-parameter.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2305](2305-the-joint-call-speaks-of-patterns.md) | The joint call speaks of patterns and is named a joint refinement | P2 | — | [series](#series) |
-| [2311](2311-a-pawley-fit-does-not-depend-on-the-intensity-units.md) | A Pawley fit does not depend on the intensity units | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 
 ## <a id="v0-3"></a>v0.3 — multi-phase workflows
 
@@ -731,7 +730,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2302](2302-a-wrong-choice-is-refused-at-the-call.md) | A wrong choice is refused at the call, and a requested window has one name | ✅ 2026-11-25 | — | — |
 | [2303](2303-a-glob-that-matches-nothing-says-so.md) | A glob a caller passes that matches nothing says so | ⬜ | P2 | — ([2300](2300-a-series-declares-each-parameter.md) soft) |
 | [2304](2304-a-readers-repairs-reach-the-fits-diagnostics.md) | A reader's repairs reach the fit's diagnostics | ✅ 2026-11-25 | — | — |
-| [2311](2311-a-pawley-fit-does-not-depend-on-the-intensity-units.md) | A Pawley fit does not depend on the intensity units | ⬜ | P2 | — |
+| [2311](2311-a-pawley-fit-does-not-depend-on-the-intensity-units.md) | A Pawley fit does not depend on the intensity units | ✅ 2026-11-26 | — | — |
 
 ### <a id="unscheduled-a-long-run-is-not-one-fit"></a>A long run is not one fit
 
