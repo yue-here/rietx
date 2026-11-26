@@ -444,7 +444,7 @@ def test_unresolved_kalpha2_shoulder_is_not_a_line():
 
     for seed in range(1000, 1006):
         data = _noisy(y_true, grid, seed)
-        peaks = pick_peaks(data, instrument, two_theta_range=(29.0, 32.0))
+        peaks = pick_peaks(data, instrument, two_theta_limits=(29.0, 32.0))
         usable = peaks.usable()
         assert len(usable) == 1, (
             f"seed {seed}: {[round(p.two_theta, 3) for p in usable]} — the Kα2 "
@@ -453,7 +453,7 @@ def test_unresolved_kalpha2_shoulder_is_not_a_line():
 
     # with shoulders switched off entirely the answer must be the same line
     off = pick_peaks(_noisy(y_true, grid, 1000), instrument, shoulders=False,
-                     two_theta_range=(29.0, 32.0))
+                     two_theta_limits=(29.0, 32.0))
     assert len(off.usable()) == 1
 
 
@@ -751,13 +751,13 @@ def test_excluded_regions_and_range_crop_compose():
     noisy = _noisy(y_true, grid, 5)
     data = PatternData(two_theta=noisy.two_theta, intensity=noisy.intensity,
                        excluded_regions=[(40.0, 50.0)])
-    peaks = pick_peaks(data, instrument, two_theta_range=(25.0, 70.0))
+    peaks = pick_peaks(data, instrument, two_theta_limits=(25.0, 70.0))
     tt = peaks.two_theta()
     assert tt.min() > 25.0 and tt.max() < 70.0
     assert not np.any((tt > 40.0) & (tt < 50.0))
 
     with pytest.raises(ValueError, match="needs a pattern, not a window"):
-        pick_peaks(data, instrument, two_theta_range=(60.0, 60.1))
+        pick_peaks(data, instrument, two_theta_limits=(60.0, 60.1))
 
 
 # ----------------------------------------------------------------------
@@ -1213,7 +1213,7 @@ def test_a_short_named_list_is_not_told_it_is_too_short_to_index():
     peaks = fit_peaks(_noisy(y, grid, seed=7), ins, truth[:3])
     assert "PEAK_LIST_TOO_SHORT" not in [d.code for d in peaks.diagnostics]
     # but pick_peaks on a three-line range still says it
-    short = pick_peaks(_noisy(y, grid, seed=7), ins, two_theta_range=(20.0, 45.0))
+    short = pick_peaks(_noisy(y, grid, seed=7), ins, two_theta_limits=(20.0, 45.0))
     assert "PEAK_LIST_TOO_SHORT" in [d.code for d in short.diagnostics]
 
 
