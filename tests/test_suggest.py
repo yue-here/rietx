@@ -953,5 +953,5 @@ def test_injected_states_render_for_inspection(truth):
         result, _, _ = _result_for(structure, instrument, data)
         plot_result(result, path=str(out / f"{name}.png"))
         plot_result(result, path=str(out / f"{name}_zoom.png"),
-                    two_theta_range=(18.0, 45.0))
+                    two_theta_limits=(18.0, 45.0))
         assert (out / f"{name}.png").exists()

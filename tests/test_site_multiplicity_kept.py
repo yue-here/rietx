@@ -101,7 +101,7 @@ def test_a_split_pair_that_lands_on_its_mirror_keeps_its_atoms(truth):
     out.mkdir(exist_ok=True)
     plot_result(res, path=str(out / "site_multiplicity_kept_fit.png"))
     plot_result(res, path=str(out / "site_multiplicity_kept_low.png"),
-                two_theta_range=(10.0, 40.0))
+                two_theta_limits=(10.0, 40.0))
 
 
 def test_stage_boundaries_keep_the_split_too(truth):
