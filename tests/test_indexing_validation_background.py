@@ -65,7 +65,7 @@ def candidate():
 
 
 def _validate(candidate, data, **kw):
-    peaks = rx.pick_peaks(data, INSTRUMENT, two_theta_range=LIMITS)
+    peaks = rx.pick_peaks(data, INSTRUMENT, two_theta_limits=LIMITS)
     return validate_by_lebail(candidate, data, INSTRUMENT, peaks=peaks,
                               two_theta_limits=LIMITS, with_result=True, **kw)
 
