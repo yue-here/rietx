@@ -1,6 +1,6 @@
 # WP-2243 — the series workflow at `/next`: patterns, first fit, run, results, with Trends and Map
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-24 — Patterns, Run and Results built (PRs #1794, #1820); the selected pattern next
+Milestone: gui-overhaul · Status: 🔄 2026-11-24 — Patterns, Run, Results, the selected pattern, Trends and Map built (PRs #1794, #1820, #1825, #1823); Q1-Q3 and the scrubber placement wait on the maintainer
 Depends on: 2240 soft (the workflow frame R6 builds on); 2300 soft (what each pattern refines)
 Priority: P2 2026-11-23 — a feature the open milestone was opened for: R7, the rebuild's last piece before the swap
 
@@ -152,6 +152,15 @@ disagree on wavelength, range or step; a blank pattern) names its tier here befo
   column, "Walk gap (esd)", after the second walk's Rwp; (b) both numbers in one cell,
   "4.31 · 0.8 esd"; (c) no gap in Run, only in Results and Trends. Built so far: the Rwp
   alone, which is (c).
+- **Q2 (2026-11-24, task 6). Which inks tell apart two to four values sharing a Trends
+  panel?** The prototype uses four Okabe-Ito hues. The page has no free plot hue
+  (gui/CLAUDE.md § House style), so it reuses `--plot-obs`, `--plot-peak`, `--phase-0`
+  and `--phase-1`, skipping `--plot-calc` because it is the accent. Options: (a) keep
+  these; (b) add a small series palette to `viz/theme.py`, held apart by
+  `test_gui_palette.py`; (c) one ink and a different mark shape per value.
+- **Q3 (2026-11-24, task 6). Where do the summary rows' Plot buttons sit?** The prototype
+  puts them in a third, right-hand column of the summary. Built: a `.link` "Plot" at the
+  end of each row's value, as the page's other inline actions sit.
 
 ## Non-goals
 
@@ -197,14 +206,24 @@ disagree on wavelength, range or step; a blank pattern) names its tier here befo
   `seriesresults.ts` reads the record. The list is headed "Values at <pattern>" and has
   no ticks yet: a tick plots on Trends, so the ticks, the heading "Plot", and the summary
   rows' Plot buttons land with task 6.
-- [ ] 5. The selected pattern: Pattern draws its fit while Series is up, ‹ › in the title,
-  ↑ ↓, and the graphs following the run until a row click.
-- [ ] 6. The Trends graph tab: small panels, the Plot menu, Against, the second walk's rings,
-  the bars' span, a point click selecting its pattern.
-- [ ] 7. The Map graph tab, with a route serving every member's observed counts and
+- [x] 5. The selected pattern: Pattern draws its fit while Series is up, ‹ › in the title,
+  ↑ ↓, and the graphs following the run until a row click. `seriespattern.ts` holds the
+  rules. A selection names the list it was made on, the staged one or the run's, so a
+  removal after a run moves neither table's mark onto another file. `GET
+  /api/series/curves?pattern=&of=` serves a member by its place, before a run from its
+  file and mid-run from each fit `on_result` hands over. Series stays mounted under
+  another workflow once chosen.
+- [x] 6. The Trends graph tab: small panels, the Plot menu, Against, the second walk's rings,
+  the bars' span, a point click selecting its pattern. `seriestrends.ts` holds the rules,
+  `SeriesTrends.svelte` draws them. Results gains the ticks under the heading "Plot" and a
+  Plot link on its two summary rows. Trends draws the record only, so during a run it
+  waits for the run to end.
+- [x] 7. The Map graph tab, with a route serving every member's observed counts and
   difference on one grid: Map and Waterfall, Observed and Difference, cuts and the two
   profiles, the averaging bar, the row window, area averaging, Flip and the colour key; drawn
   from the observed counts before a run too (pre-visualisation).
+- [ ] 7a. Map and Pattern sharing one 2θ zoom (§ The design, Map). Task 7 left it to
+  task 5 because it moves Pattern, and task 5 merged first without it.
 - [ ] 8. The scrubber's nine features (S1 to S9) placed in the new design: drawn on real
   pages and brought to the maintainer, since round 12 predates them and neither the workshop
   nor `gui/STYLE.md` places them; then built as ruled.
@@ -214,12 +233,15 @@ disagree on wavelength, range or step; a blank pattern) names its tier here befo
 - [ ] 11. Loading and cleaning: a check before the run that the members agree on wavelength,
   range and step; a pattern with no signal found before it is fitted; excluded regions and a
   2θ range for the whole series; the coordinate from file headers where the reader has it.
+  The step check also decides the Map on mixed steps: a coarser member fills every k-th
+  cell of the finest grid, and a map zoomed past its step draws the cells between as gaps.
 - [ ] 12. Output: Save table… (`SeriesResult.to_table`), an interactive page for a series,
   and saving the series with the project (a stored-format change, to the maintainer first).
 - [ ] 13. Browser passes over the four steps and both graphs by real clicks; screenshots at
   1440 × 900, light and dark, under `docs/wp/2243-screenshots/`, beside the prototype's in the
   runner's scratch, with an inventory of where each of today's Series features lives. The
   last PR waits on the maintainer's look.
+  Measure the Map's hover on a large series: each pointer move redraws the whole raster.
 - [ ] Skill: none. The skill drives the Python API, and this piece changes only the GUI.
 
 ## Acceptance
@@ -235,6 +257,130 @@ The piece closes when every task is ticked and the maintainer has looked at its 
 the prototype's (WP-2214 § How the maintainer reviews).
 
 ## Handover log
+
+- **2026-11-24** — ghostshift runner wp-2243-c, task 7 alone; PR #1823, built beside #1820
+  (task 4) and merged over it. The Series workflow at `/next` now has its Map graph. Every
+  staged pattern is a row of colour on one 2θ axis, drawn from the observed counts as soon as
+  the files are staged, before any fit. After a run the Difference view shows where each
+  pattern's model misses, in esd. A click sets a cut and selects the pattern. The profile
+  under the map and the profile beside it read the selected pattern and every pattern at the
+  cut. The task can merge on green; the maintainer's look waits for task 13.
+
+  *Done.* Task 7. `GET /api/series/map` (`GuiSession.series_map`, with the grid in
+  `gui/series.py` `map_grid`, `binned`, `map_payload`) sends every staged member as packed
+  float64. Members that share their channels keep them. Others go onto one uniform grid at the
+  finest member's step, each cell the mean of the channels in it. Past `MAP_CELLS` (1.5 M) the
+  columns merge. `diff` rides only when the staged list is the one that ran and no run is in
+  flight. Each staged file is read once while it stays staged (`_series_reads`), dropped on a
+  project close or open. The manual's route table (`reference/gui-power.md`) has the row.
+  The client is `gui/src/next/SeriesMap.svelte` with its arithmetic in `seriesmap.ts`. Every
+  control in § The design, Map is built, at the prototype's frame constants. It sits as the
+  Map tab in `next/tabs.ts`, `workflowOnly`, listed by the series in `lib/workflows.ts`, with
+  a help entry. **Of the other runner's files**, `Frame.svelte` gained the import, two state
+  lines (`seriesSelected`, `seriesStamp`), the `graphTabs` filter that hides a `workflowOnly`
+  tab from a workflow without a `graphs` list, the reset in `chooseWorkflow` reading that
+  filter, the Map branch, and `onstaged` on `<Series>`. `Series.svelte` gained the `onstaged`
+  prop, called after a PUT lands (kept through #1820's rewrite of that function in the
+  merge). `/code-review high --fix` found seven issues; five fixes
+  landed as their own commits (the workflow-switch tab reset, the empty state before any
+  pattern, the nearest cell in three helpers, the cache reset). Two went forward: task 11
+  (mixed steps) and task 13 (hover cost). Map and Pattern sharing one 2θ zoom went to task 5,
+  since it moves Pattern.
+
+  *Measured* (arm64 macOS, worktree venv `[dev]` plus playwright, node 24.22.1; the WP's
+  node 22 floor is met, and no 22 is installed here). Route, 34 patterns of 4 200 channels:
+  reading every file took 930 ms before the cache; the grid 17 ms; the payload 1.2 MB.
+  Before the merge of #1820: the fast suite (`serial.py`, playwright in the venv) 15911 passed,
+  440 skipped, 30 xfailed, 1 failed; the four added tests cost 11.5 s, 11.3 of it the browser
+  case. The failure was task 2's `test_a_series_is_loaded_sorted_walked_and_run`, under
+  `-n auto` only: Sort by index stayed disabled because the server never held the typed
+  coordinates. That is the race under Gotchas, which #1820 fixed. After the merge, with the
+  dist rebuilt from the merged source: vitest 1048 passed in 69 files, two of them new here
+  (`seriesmap.test.ts`, `MapGraph.svelte.test.ts`); svelte-check 0 errors over 504 files;
+  the Acceptance GUI python files with `test_docs_consistency.py` 332 passed; the seven
+  `tests/test_gui_*_browser.py` files, serially, 71 passed (after #1822 too). Server tests: three new in `tests/test_gui_server.py`. Lint as CI runs it: ruff, ruff
+  format on the tutorials, Vale (0 errors), skill caps, skill surface, audit delta, code
+  references, rulebook limits, all clean. Reader output unchanged. Screenshots of the Map,
+  Observed, Difference and Waterfall, light and dark, looked at in the runner's scratch.
+
+  *Gotchas.* macOS folds case, so `SeriesMap.test.ts` overwrites `seriesmap.test.ts`; the
+  mount test is `MapGraph.svelte.test.ts`. A test using `$state` must be named
+  `*.svelte.test.ts`. Before #1820, typing twelve coordinates fast in the Patterns table kept
+  four on the server: concurrent PUTs, and a stale response absorbed over a newer edit. #1820
+  fixed it in `Series.svelte`; the screenshot probe still waits for each value on the server.
+
+  *For the maintainer.* One visual choice the design does not make: in Difference, a row with
+  no fit (every row before a run, or a pattern the run quarantined) is drawn in the `--hover`
+  token. Zero difference is the plot's ground, so an unfitted row must differ from it, and
+  `--hover` is the nearest token the pages already lay over an area. Built that way; it
+  comes to the maintainer at task 13's look.
+
+  Next: task 5, which also takes the Map and Pattern shared zoom; then task 6.
+
+  *Main merged* (steward, after #1825). Both sides' tabs, routes, help entries and
+  session fields are kept: the series lists Pattern, Trends and Map, and
+  `GET /api/series/map` sits beside `GET /api/series/curves?pattern=&of=`. The Map's own
+  `seriesSelected` is gone. The Map marks the row `Series.svelte` hands it (`onmark`, the
+  drawn pattern's place in the staged list) and a click calls `Series.select(row,
+  "staged")`, so a Map click, a table row, ‹ › and ↑ ↓ move one selection. The series
+  browser test now clicks a Map row, sees the Patterns table and the Pattern graph follow,
+  clicks a table row and sees the Map follow. The dist was rebuilt from source. Still open:
+  Map and Pattern sharing one 2θ zoom, which task 5 merged without (task 7a).
+
+- **2026-11-24** — ghostshift runner wp-2243-d, third session; PR #1825. One selected
+  pattern now links the Series steps and the graphs. The Pattern graph draws the selected
+  member's fit, before a run from its file alone and during a run as each fit lands, and
+  follows the pattern being fitted until a person clicks a row. A new Trends tab plots any
+  refined value against the series coordinate, and Results ticks choose what it plots.
+  Trends draws only the record, so it stays empty until a run ends.
+
+  *Done.* Task 5 (`seriespattern.ts`, the selection in `Series.svelte`, `source` and `nav`
+  on `Pattern.svelte`, ↑ ↓ and the Series mount in `Frame.svelte`; `GuiSession`'s
+  `series_pattern_curves` and the `pattern`/`of` arm of `GET /api/series/curves`). The two
+  findings #1820 declined are fixed: a selection names the list it was made on, so a
+  removal after a run moves no mark onto another file; Series stays mounted under another
+  workflow once chosen. Task 6 (`seriestrends.ts`, `SeriesTrends.svelte`, submenus in
+  `Menu.svelte`, the Plot ticks and summary Plot links in Results), built by a lane and
+  read here before its commit. Trends joins the tab strip the way #1823 adds Map
+  (`workflowOnly` in `tabs.ts`, the same `graphTabs` filter), so their merge is a
+  two-line union.
+
+  *Gotchas.* A pattern's `fit_end` event can reach the page before the chain hands the
+  result over (`on_result` runs after the ladder picks a rung), so the page asks up to
+  four times, 250 ms apart, while it expects a fit (`seriespattern.ts:loadMember`). The
+  second walk of "Both" keeps no fits, so a member's drawn fit is always the reported
+  walk's. #1823's Map keeps its own `seriesSelected` in the frame; whichever PR merges
+  second points the Map at `Series.select`/`move` so all three views share one selection.
+
+  *Review.* `/code-review high --fix` found five issues, all fixed in their own commit:
+  the live run is published in the block that publishes the running state, so a member
+  asked for the moment a run is seen is never the last record's; ↑ ↓ leave an open menu
+  alone; `awaiting` is set only when the record will be read; the series browser module
+  keeps one worker (`xdist_group`). A sixth, older than this branch, is fixed too: a
+  reload after the staged list was re-ordered drew the record against the wrong files,
+  so Results now builds its run list from the record when the labels disagree
+  (`Series.svelte:runList`). None declined.
+
+  *Measured* (arm64 macOS, worktree venv `[dev]` plus playwright, node 24.22.1, on
+  298f63c3e). vitest 1057 passed in 70 files (1030 at #1820). svelte-check 0 errors in
+  506 files. Dist rebuilt from source; `test_gui_dist.py` passes. The seven
+  `test_gui_*_browser.py` files: 71 passed (68 + 1 failed at #1820; this branch adds two
+  series tests). Fast suite (`-m "not slow"`, through `serial.py`): 15911 passed, 440
+  skipped, 30 xfailed. `test_docs_consistency.py` 57 passed. ruff clean, Vale 0 errors.
+  `python -m tests.reader_output` exit 0, reader output unchanged. Not measured: the
+  lane's token use, since `session_usage.py lanes` keys on the parent session and found
+  none.
+
+  *Open questions for the maintainer*: Q2 and Q3 above, two visual choices built on the
+  nearest existing pattern. Next: Q1 to Q3 wait on the maintainer. Task 8 waits on the
+  scrubber placement. Then task 9 (First fit), which makes First fit the filled button
+  again.
+
+  *Main merged* (steward, 37d551db0). #1822's `padRight`/`OVERHANG` and this branch's
+  `source`/`nav` props merged clean in `Pattern.svelte`. Only the dist conflicted, and it
+  was rebuilt from source. vitest 1057 passed, svelte-check 0 errors, the seven browser
+  files 72 passed, `test_gui_dist.py` 16 passed, CI's lint steps clean (arm64 macOS,
+  worktree venv `[dev]` plus playwright, node 24.22.1).
 
 - **2026-11-24** — ghostshift runner wp-2243-a, second session; PR #1820. The Series
   workflow at `/next` now has a Results step. After a run, a person reads how many

@@ -52,6 +52,10 @@
   import HelpBox from "./HelpBox.svelte";
   import Indexing from "./Indexing.svelte";
   import Series from "./Series.svelte";
+  import SeriesMap from "./SeriesMap.svelte";
+  import SeriesTrends from "./SeriesTrends.svelte";
+  import type { Against, TrendsView } from "./seriestrends";
+  import { arrowStep, type SeriesView } from "./seriespattern";
   import History from "./History.svelte";
   import { howComment, howWords } from "./howran";
   import { GRAPH_HELP, HISTORY_HELP, MODEL_HELP, WORKFLOW_HELP } from "./helpbox";
@@ -199,6 +203,24 @@
   let indexingPanel: ReturnType<typeof Indexing> | undefined = $state();
   /** the series workflow's panel, which folds the run's events (WP-2243) */
   let seriesPanel: ReturnType<typeof Series> | undefined = $state();
+  /** what the Pattern graph draws while Series is up: the selected member
+   *  (WP-2243 task 5), handed up by the panel */
+  let seriesView = $state.raw<SeriesView | null>(null);
+  /** Series has been chosen once: from then on it stays mounted, hidden under
+   *  another workflow, so its list, its run's table and the selection keep,
+   *  and a run it started still folds into it */
+  let seriesMounted = $state(false);
+  const seriesShown = $derived(wf === "series" ? seriesView : null);
+  /** what the Trends graph draws (WP-2243 task 6), and its view choices,
+   *  kept here so a tab switch keeps them */
+  let seriesTrends = $state.raw<TrendsView | null>(null);
+  let trendsAgainst = $state<Against>("x");
+  let trendsHidden = $state<string[]>([]);
+  /** the row the Map marks, handed up by the Series panel, which holds the
+   *  one selection; a count the staged list moves, so the Map asks again
+   *  (WP-2243 task 7) */
+  let seriesMark = $state<number | null>(null);
+  let seriesStamp = $state(0);
   let frameAt = $state.raw<{ two_theta: number; seq: number } | null>(null);
 
   /** The model panel's width and the bottom panel's height, session-local
@@ -233,8 +255,8 @@
   const wfSteps = $derived(workflow(wf).steps ?? null);
   /** The graph tabs the workflow shows (the prototype's: peaks and indexing
    *  draws the pattern and the peak fits). */
-  const graphTabs = $derived(GRAPH_TABS.filter((t) => !workflow(wf).graphs
-    || workflow(wf).graphs!.includes(t.id)));
+  const graphTabs = $derived(GRAPH_TABS.filter((t) => workflow(wf).graphs
+    ? workflow(wf).graphs!.includes(t.id) : !("workflowOnly" in t)));
   const head = $derived(run?.head ?? project?.head ?? null);
   const noPhases = $derived(project ? (project.n_phases ?? 1) === 0 : false);
   const blocked = $derived(noPhases ? "Add a phase before refining" : null);
@@ -824,10 +846,13 @@
 
   function chooseWorkflow(id: string) {
     wf = id as WorkflowId;
+    if (wf === "series") seriesMounted = true;
     if (!sized) modelWidth = opening(wf);
     chooseStep(0);
-    const shown = workflow(wf).graphs;
-    if (shown && !shown.includes(graphTab)) graphTab = shown[0];
+    // the tabs `graphTabs` shows for this workflow, so a tab only another
+    // workflow lists (the series' Trends and Map) never stays chosen behind the strip
+    const shown = graphTabs.map((t) => t.id);
+    if (!shown.includes(graphTab)) graphTab = shown[0];
   }
 
   /** A step opens on its graph: the peak fits for Fit peaks, the pattern for
@@ -903,6 +928,16 @@
       if (layered) return;
       event.preventDefault();
       keysOpen = true;
+      return;
+    }
+    // ↑ ↓ move the series' selected pattern on every view (round 12, call 2)
+    // never from inside an open menu (the Trends graph's Plot), whose rows
+    // the arrows belong to
+    const delta = wf === "series" && !layered && isShortcutTarget(event)
+      && !(event.target as Element | null)?.closest?.(".rx-menu") ? arrowStep(event) : 0;
+    if (delta) {
+      event.preventDefault();
+      seriesPanel?.move(delta);
       return;
     }
     // `.` runs the Plan tab's selected stage (WP-2214 row 232)
@@ -1066,11 +1101,17 @@
         <div class="pane">
           {#key opens}
           {#if graphTab === "pattern"}
-            <Pattern {result} {plotKey} {theme} {protocol} {extent} {wavelengths} {busy}
+            <!-- while Series is up the graph draws its selected member, not
+                 the project's fit (WP-2243 task 5): no preview, no compared
+                 node, and the sliders keep the project's curves -->
+            <Pattern result={seriesShown ? null : result} {plotKey} {theme} {protocol} {extent} {wavelengths} {busy}
               {protocolError} onprotocol={setProtocol} onreadout={(r) => (reading = r)}
               projectPath={project?.path ?? null} ui={project?.doc?.ui ?? null} onui={saveUi}
-              preview={previewAnswer} {previewError} oncurves={(c) => (baseCurves = c)}
-              {compared} howText={howWords(result?.how, corpus)}
+              preview={seriesShown ? null : previewAnswer} previewError={seriesShown ? "" : previewError}
+              oncurves={(c) => { if (!seriesShown) baseCurves = c; }}
+              source={seriesShown?.source ?? null}
+              nav={seriesShown ? { ...seriesShown, onstep: (d: number) => seriesPanel?.move(d) } : null}
+              compared={seriesShown ? null : compared} howText={howWords(result?.how, corpus)}
               peaksActive={wf === "index"} peaks={wf === "index" ? peaksPayload?.peaks ?? null : null}
               groups={wf === "index" ? peaksPayload?.groups ?? null : null}
               candidate={wf === "index" ? candidateLines : null}
@@ -1094,6 +1135,16 @@
           {:else if graphTab === "structure"}
             <Structure {head} {busy} {theme} {say} values={sliderValues}
               projectPath={project?.path ?? null} onreadout={(r) => (reading = r)} />
+          {:else if graphTab === "trends" && wf === "series"}
+            <SeriesTrends trends={seriesTrends} running={busy && run?.run?.kind === "series"}
+              {corpus} {theme} bind:against={trendsAgainst} bind:hidden={trendsHidden}
+              onplot={(paths, on) => seriesPanel?.plot(paths, on)}
+              onselect={(i) => seriesPanel?.select(i)} onstep={(d) => seriesPanel?.move(d)}
+              onreadout={(r) => (reading = r)} />
+          {:else if graphTab === "map" && wf === "series"}
+            <SeriesMap {theme} {busy} stamp={seriesStamp} selected={seriesMark}
+              onselect={(i) => seriesPanel?.select(i, "staged")}
+              onreadout={(r) => (reading = r)} />
           {:else}
             <p class="unbuilt">Not built yet.</p>
           {/if}
@@ -1168,11 +1219,15 @@
               onadopted={() => { chooseWorkflow("refine"); void structureMoved(); }} />
           </div>
         {/if}
-        {#if wf === "series"}
+        {#if seriesMounted}
           {#key project.path}
-            <div class="pane wfsteps">
-              <Series bind:this={seriesPanel} {step} steps={wfSteps ?? []} {busy} {run} {say}
-                onstep={chooseStep} onrun={startRun} onstop={stop} />
+            <div class="pane wfsteps" class:gone={wf !== "series"}>
+              <Series bind:this={seriesPanel} step={wf === "series" ? step : 0}
+                steps={workflow("series").steps ?? []} {busy} {run} {say}
+                onstep={chooseStep} onrun={startRun} onstop={stop}
+                onview={(v) => (seriesView = v)} ontrends={(t) => (seriesTrends = t)}
+                ongraph={(g) => { if (graphTabs.some((t) => t.id === g)) graphTab = g; }}
+                onstaged={() => (seriesStamp += 1)} onmark={(m) => (seriesMark = m)} />
             </div>
           {/key}
         {/if}
