@@ -106,6 +106,22 @@ its tier.
   `help.py` ~3037 carries the "Raise the lower limit" sentence. The 12/12 and
   3/3 counts are the issue's, not re-run here. The retext is a `suggestion=`
   site, so it goes in this WP's batch to the maintainer.
+- **2026-11-25, from the issue triage (issue #1830): the Le Bail stop record should state the
+  rise it rejected.** On a real neutron pattern Mike's second Le Bail pass raised Rwp from
+  28.6 % to 45.2 %. Pass 1 was kept and `usable` stayed True, under the same
+  `LEBAIL_ALTERNATION_STOPPED` warning a 0.004-point rise gets. He offers three options: an
+  error past a ratio, the rise as a number a caller can threshold, or no change. Checked
+  against the tree at `21c574dc6`: `refine._lebail_stop_diagnostic` makes a non-monotone stop
+  a `warning` with `value` = the kept pass's Rwp, and the per-pass Rwp only in the message.
+  `2005-batch/rulings.md` already settles this code as one `info` record naming why the passes
+  stopped (2026-11-22, checked blind). **Decided 2026-11-25** (settled by Claude under the
+  maintainer's rulings of 2026-11-03 and 2026-11-16, "a field, and the caller decides", and
+  WP-2003 C1's sibling, where a series Rwp fence acts by no default and its ratio rides on
+  `SeriesEntry.rwp_over_median`): the error threshold is declined, because its evidence is an
+  Rwp comparison. When this WP writes the `info` record, the record carries the rejected
+  pass's Rwp beside the kept one's as numbers, so a caller who wants Mike's gate writes it.
+  The kept pass is still the best one the alternation visited. If issue #1828 retires Le Bail
+  as a user mode (WP-2062), this applies wherever the alternation stays.
 
 ## Non-goals
 

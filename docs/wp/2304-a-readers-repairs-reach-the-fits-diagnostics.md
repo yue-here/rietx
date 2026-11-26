@@ -1,9 +1,8 @@
 # WP-2304 — A reader's repairs reach the fit's diagnostics
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: ✅ 2026-11-25 — every fit repeats what the reader repaired or noticed, whether or not a list was passed; PR #1842
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P2 2026-11-23 — a reader that rescales intensities and withholds σ says so only into a list the caller passed; a fit on it changes weights with no word in `result.diagnostics`
 
 ## Goal
 
@@ -47,19 +46,32 @@ Tier: none. The notes are the reader's existing codes, already in `_audit`.
 
 ## Tasks
 
-- [ ] List every place a `PatternData` is serialised or compared, and confirm a new field
-  breaks none of them.
-- [ ] `PatternData` carries the reader's notes; `read_pattern` fills it whether or not a list
-  was passed, and still extends the list when one was.
-- [ ] Each fit entry point copies the notes into `result.diagnostics`, one per code;
-  `PATTERN_DEAD_CHANNELS` appears once.
-- [ ] A series and a joint fit carry each pattern's notes (per pattern in a series, per
-  histogram in a joint fit).
-- [ ] `src/rietx/io/CLAUDE.md` § the repairs: the notes reach the fit.
-- [ ] Tests: one fixture per repair code, read without a list, asserting the code in
-  `result.diagnostics`.
-- [ ] Skill: none. The codes already have rows; they now arrive where the skill already sends
-  the agent.
+- [x] List every place a `PatternData` is serialised or compared, and confirm a new field
+  breaks none of them. No schema field holds a `PatternData`. Every fingerprint hashes the
+  arrays alone: `TreeHeader.data_fingerprint`, `DataRef.fingerprint` and `refine._refit_key`.
+  A `model_dump`/`model_validate` round trip (`test_tof_axis.py`, the report-eval fixtures)
+  loads an old dump with the default empty list.
+- [x] `PatternData` carries the reader's notes; `read_pattern` fills it whether or not a list
+  was passed, and still extends the list when one was. The caller's list is extended in a
+  `finally`, so a refusal's notes still reach it. `crop` carries the notes.
+- [x] Each fit entry point copies the notes into `result.diagnostics`, one per code;
+  `PATTERN_DEAD_CHANNELS` appears once. One seam: `compile_model` copies them onto
+  `CompiledModel.reader_notes`, and `refine._build_result` (every single-pattern entry point:
+  `fit`, `run_stage`, `cherry_pick`, `replay`) appends them last. A note whose code the fit
+  already raised is left out. The fit owns `PATTERN_DEAD_CHANNELS`: it asks again on the fitted
+  channels, so the reader's copy is never handed on.
+- [x] A series and a joint fit carry each pattern's notes (per pattern in a series, per
+  histogram in a joint fit). A series fits each pattern through `refine`, so it inherits the
+  seam. The joint fit calls the helper in its per-histogram loop, with a `DIAGNOSTIC_SCOPES`
+  row.
+- [x] Rulebook: none. The rule lives in `read_pattern`'s and `refine._reader_diagnostics`'
+  docstrings. A paragraph in `src/rietx/io/CLAUDE.md` overran its byte budget by 514 B
+  (`tests.rulebook_limits`), and a reader needs no wiring beyond the list it is handed.
+- [x] Tests: one fixture per repair code, read without a list, asserting the code in
+  `result.diagnostics`. `tests/test_reader_notes.py`, seven cases.
+- [x] Skill: none. The codes already have rows; they now arrive where the skill already sends
+  the agent. One row named only the reader's list as its channel (`PATTERN_SCAN_REVERSED`)
+  and now names both; the manual's pattern-files page says the same in one sentence.
 
 ## Acceptance
 
@@ -67,7 +79,7 @@ A file that triggers `PATTERN_INTENSITY_SCALED`, read with no `diagnostics=` lis
 carries that code in `result.diagnostics` exactly once.
 
 ```sh
-.venv/bin/python -m pytest tests/test_readers_robust.py -q
+.venv/bin/python -m pytest tests/test_readers_robust.py tests/test_reader_notes.py -q
 .venv/bin/python -m pytest -n auto --dist loadgroup -m "not slow"
 .venv/bin/python -m ruff check src tests examples
 ```
@@ -79,6 +91,98 @@ carries that code in `result.diagnostics` exactly once.
 
 ## Handover log
 
+- **2026-11-25** — blind check of the reader-facing change, and its fixes. A fresh reviewer
+  judged what a fit now prints and found two kinds of junk. Both held against the code.
+
+  *Lossless repairs no longer reach the fit.* `PATTERN_SCAN_REVERSED` and
+  `PATTERN_DUPLICATE_POINTS` describe a repair after which the measurement is the same. The fit's
+  answer is the same either way, and the note gives no action. They stay on
+  `PatternData.diagnostics` and are never handed on (`refine._LOSSLESS_READER_CODES`).
+
+  *More notes settle once the caller has acted.* `refine._reader_note_settled` now also drops:
+  `PATTERN_SIGMA_NONPOSITIVE`'s partial form once no fitted channel is left out for its σ
+  (`sigma_rule.n_nonpositive_excluded == 0`, after `nonpositive_sigma="poisson"`, an excluded
+  region or a crop); a withheld-σ note (`PATTERN_SIGMA_NONPOSITIVE` for a whole column,
+  `PATTERN_WEIGHT_UNUSABLE`, `PATTERN_INTENSITY_SCALED`) once the caller assigns a σ
+  (`sigma_measured`); and `PATTERN_SIGMA_CONSTANT` once the caller's σ varies over the fitted
+  channels. That last test reads the new `CompiledModel.sigma_uniform`, taken before a measured
+  background widens σ, since the widening alone would make a placeholder column look varied. The
+  GSAS counter note (`PATTERN_INTENSITY_SCALED` from an STD bank with NCTR above 1) doubts the
+  intensity scale as well as σ, so a σ does not settle it. Its `where` now names `intensity`
+  beside `sigma`, which is the structural mark the settle test reads. The earlier review's
+  "no reliable test" for these two codes is answered by that mark and by `where == ["sigma"]`,
+  which separates the whole-column σ ≤ 0 note from the partial one.
+
+  *Left, with no exact test.* `crop` keeps notes about points it removed. `RAS_ATTENUATOR_PRESENT`
+  stays after a caller applies the factor themselves, since nothing on the pattern records that.
+
+  *Siblings checked and kept.* The other info-level pattern-reader codes each change what is
+  fitted or name a choice: `XRDML_ATTENUATOR_APPLIED`, `BRML_ABSORBER_ENGAGED` and
+  `XYDATA_INTER_APPLIED` change y or σ; `PATTERN_ZERO_WEIGHT_EXCLUDED`, `PATTERN_INTENSITY_NET`,
+  `READER_OPTION_IGNORED` and `GSAS_BANK_COMMENTED` say what was or was not read.
+
+  *Measured* ([dev], darwin/arm64). `tests/test_reader_notes.py`: 13 passed, five added. Each
+  added test fails with its fix undone, one fix at a time (a scratch plugin patching
+  `refine`). `tests.reader_output`: exit 0, unchanged. Fast suite on the final tree: 15751 passed, 452
+  skipped, 30 xfailed; passed+skipped moved by 5, the added tests. CI's lint steps, Vale
+  included: 0 errors.
+
+  Next: none. PR #1842.
+- **2026-11-25** — closed. What a pattern reader repaired or noticed in a file now reaches
+  every fit on that file, whether or not the caller passed a `diagnostics=` list. Before, a
+  file whose intensities were rescaled, or whose σ was withheld, constant or partly zero, was
+  fitted with no word in `result.diagnostics` unless the caller had asked the reader. Now the
+  notes ride on the pattern, and every single fit, series member and joint-fit pattern repeats
+  them once. Two kinds stay behind: the dead-channel check, which the fit asks again on the
+  channels it fits, and a note whose advice the caller took before fitting.
+
+  *Done.* `PatternData.diagnostics` (default empty, carried by `crop`). `read_pattern` fills it
+  on every call and extends a passed list in a `finally`, so a refusal's notes still reach the
+  caller. `compile_model` copies the notes onto `CompiledModel.reader_notes`.
+  `refine._reader_diagnostics` appends them last in `refine._build_result` (so `fit`,
+  `run_stage`, `cherry_pick`, `replay` and each series member) and in the joint fit's
+  per-pattern loop (a `DIAGNOSTIC_SCOPES` row, HISTOGRAM). A note is left out where the fit
+  already raised its code; where the code is in `refine._FIT_OWNED_READER_CODES`
+  (`PATTERN_DEAD_CHANNELS`); or where `refine._reader_note_settled` finds its advice taken
+  (`PATTERN_X_AXIS_IMPLAUSIBLE` with no fitted channel at or below 0°, `PATTERN_SIGMA_CONSTANT`
+  once the fit has no measured σ). An exact repeat is dropped; two reader notes sharing a code
+  with different messages both pass. `Project.create` puts its option pre-filter's
+  `READER_OPTION_IGNORED` on the pattern too, and `rietx compare`'s FAP standard keeps the notes
+  when it rebuilds its pattern. `read_pattern`'s docstring, the manual
+  (`reference/data.md` field row, one sentence in `reference/pattern-files.md`), the
+  `PATTERN_SCAN_REVERSED` skill row and the generated skill API index name the new channel; the
+  skill copies are re-synced.
+
+  *Serialisation survey (task 1).* No schema field holds a `PatternData`. Every fingerprint
+  hashes arrays alone: `TreeHeader.data_fingerprint`, `DataRef.fingerprint`,
+  `refine._refit_key`. A project stores the file's bytes. JSON round trips (`test_tof_axis.py`,
+  the `tests/eval_report_agent` fixtures) load an old dump with the empty default.
+
+  *Measured* ([dev], darwin/arm64, this worktree's venv). `tests/test_reader_notes.py`: 8
+  passed; with the hand-on in `_build_result` disabled, the four that fit a read file through it fail. Fast suite on the final tree: 15746 passed, 452 skipped, 30 xfailed, 18-19 min wall beside WP-2305's suite on the same machine. A run during the review had three failures: the skill API index was stale (regenerated), and two whole-tree checks read files the review was editing mid-run and pass on rerun. Passed+skipped moved by one between the two runs, the test the review added. The eight added tests cost 4.40 s in that run (`tests.added_test_times`), none near the slow tail.
+  `tests.reader_output`: exit 0, unchanged against the merge-base. CI's lint steps, Vale
+  included: 0 errors. Full suite not run: no measured number moves, and a grep of the slow
+  tests found none asserting a whole diagnostics list on a fit of a read file.
+
+  *Review.* `/code-review high --fix` found five; all landed in one commit. Two were stale
+  advice (the axis and constant-σ notes above). Three were missed sites or hygiene
+  (`Project.create`, the compare FAP standard, the test module's xdist group). Not fixed, by
+  the review's own account: `PATTERN_SIGMA_NONPOSITIVE` and `PATTERN_INTENSITY_SCALED` can go
+  stale the same way when a caller edits σ before fitting, and no reliable test separates
+  that, the second code being raised for reasons other than σ too; and `crop` keeps notes about
+  points it removed, the axis note excepted.
+
+  *Gotchas.* WP-2305 renames the joint call and "histogram" in a parallel branch. This branch
+  adds one `DIAGNOSTIC_SCOPES` row and one call in `multi.py`'s per-pattern loop, so whichever
+  merges second resolves two lines. Info-level reader notes (`PATTERN_SCAN_REVERSED`,
+  `PATTERN_DUPLICATE_POINTS`, `READER_OPTION_IGNORED`, …) now print as one line each in
+  `str(result)` for a file that triggers them; the standard fit's file triggers none.
+
+  *Generality.* No judge dispatched: no `_audit.py` change and no new code. The rules added
+  choose which of two copies of one report is shown, and when a report no longer describes the
+  fit; neither sets a number or an action. The WP's own tier line says none.
+
+  Next: none. PR #1842.
 - **2026-11-23** — created from the API review (2302-batch/plans.md). No open WP owns
   where a reader's notes land: WP-1952 is the xy reader's own skips, and WP-2146 the ISIS iparm
   repairs. Next: the serialisation survey.
