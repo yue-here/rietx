@@ -134,7 +134,7 @@ def draw(result, stem: str, low_angle: tuple[float, float]) -> None:
     out = Path(__file__).parent / "output"
     out.mkdir(exist_ok=True)
     plot_result(result, path=str(out / f"{stem}.png"))
-    plot_result(result, path=str(out / f"{stem}_low.png"), two_theta_range=low_angle)
+    plot_result(result, path=str(out / f"{stem}_low.png"), two_theta_limits=low_angle)
 
 
 @pytest.fixture(scope="module")

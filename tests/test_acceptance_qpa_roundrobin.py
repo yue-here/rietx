@@ -269,7 +269,7 @@ def _fit(sample: str, phases: list[rx.Phase], *, plan: rx.RefinementPlan,
     name = label or sample
     result.plot(path=str(OUT / f"qarr_{name}.png"))
     result.plot(path=str(OUT / f"qarr_{name}_lowangle.png"),
-                two_theta_range=(15.0, 60.0))
+                two_theta_limits=(15.0, 60.0))
     import matplotlib.pyplot as plt
     plt.close("all")   # plot() hands back live figures; 24 of them add up
     return ref, result

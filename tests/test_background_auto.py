@@ -1357,7 +1357,7 @@ def _plot(result, stem):
     _OUT.mkdir(exist_ok=True)
     plot_result(result, path=str(_OUT / f"{stem}.png"))
     plot_result(result, path=str(_OUT / f"{stem}_zoom.png"),
-                two_theta_range=(15.0, 40.0))
+                two_theta_limits=(15.0, 40.0))
 
 
 def _biso_rms_error(result, truth=0.5):
