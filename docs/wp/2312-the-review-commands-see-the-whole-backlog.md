@@ -146,6 +146,6 @@ Its first line names no `ranked N of M`.
       reading a PR newer than every listed one as unknown, not closed. It errs
       toward keeping a claim, and with creation order a cleverer reading is
       possible but not needed.
-    - *Measured*: see the fast-suite line below.
+    - *Measured*: fast suite (`-m "not slow"`, `[dev]` venv in this worktree, Linux x86-64, 4 cores, nothing else running), run on the branch tree (main had not moved since its base, dd94fd32). 15 798 passed, 465 skipped, 30 xfailed in 44 min, a wall clock far above the usual 3-5 min on this container. Four tests added, all in `tests/test_workflow_hooks.py`: 0.06 s together on this run. The base's own count was not re-measured, per `tests/CLAUDE.md` § Running. No full suite: hooks, skills and their tests move no measured number.
     - *Next*: the open task, on a machine where `gh pr list` runs. Build the
       paginated call, measure it, then change the skill.
