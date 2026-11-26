@@ -194,6 +194,18 @@ from the worktree root.
    rows for such a phase in that stage, so its splits are flat directions for
    the stage. The same plan then reads 0.162014 from either start, in 66
    iterations from the high one.
+6. **A start the restraint does not explain** (`probe7_one_stage.py`,
+   `probe8_one_stage_70.py`, after the generality review asked for factors
+   between ×10 and ×100). The same one-stage plan reads 0.162014 at ×1, ×12,
+   ×15, ×20, ×30 and ×50, and 0.449137 at ×70. The restraint is not the cause
+   there. With the group rows dropped, ×70 reads 0.449137 too, and the
+   largest row weight is 505, not 5e9: the seed left 19 of 20 reflections on
+   the floor, and the relative floor held. So the one-stage solve itself lands
+   in another basin when the background starts 70× high and almost every
+   intensity starts at zero. Every staged plan measured here refines the
+   background first and recovers. Not fixed here, since it is the seed and
+   solve, not this WP's restraint. Forwarded to WP-2062, whose bug list owns
+   the Pawley seed.
 
 ## Tasks
 

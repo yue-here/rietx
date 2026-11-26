@@ -7,12 +7,16 @@ s is 1e-10 and the rows weigh 5e9, in every stage, since each rebuild reads
 the group's stuck value.  Each variant replaces the group scale and nothing
 else (the off-data ridge is untouched):
 
-- ``shipped``: the code as it is.
+- ``shipped``: the tree's own ``build_pawley_restraint`` (the absolute floor
+  when this ran on 2026-11-26 before the fix; the relative one after it).
 - ``no_groups``: the overlap rows dropped (λ_group = 0); the ridge stays.
 - ``phase_max``: s = max(mean, phase's largest on-data intensity).
 - ``rel=r``: s = max(mean, r × phase's largest on-data intensity).
 
-f = 1 data throughout; ``g`` multiplies the declared background.
+Every variant but ``shipped`` builds its own group rows and takes only the
+ridge from the tree's builder, so its reading does not depend on which floor
+the tree ships.  f = 1 data throughout; ``g`` multiplies the declared
+background.  ``rel=1e-9`` is the window's lower edge (the lock returns).
 
 Run from the worktree root:
     .venv/bin/python docs/wp/2311-probe/probe4_restraint_scale.py
@@ -50,7 +54,11 @@ def make_build(rel):
             finally:
                 pb.groups = groups
             return
-        _BUILD(self, lam)
+        pb.groups = []
+        try:
+            _BUILD(self, lam)            # the ridge alone
+        finally:
+            pb.groups = groups
         if not groups:
             return
         intens = self.pawley_x0()
@@ -71,14 +79,14 @@ def make_build(rel):
                 for j in g:
                     row[j] = (np.sqrt(lam) / s) * ((1.0 if j == k else 0.0) - 1.0 / n)
                 rows.append(row)
-        n_group_rows = sum(len(g) for g in groups)
-        rest = pb.restraint[n_group_rows:] if pb.restraint is not None else np.zeros((0, pb.n))
+        rest = pb.restraint if pb.restraint is not None else np.zeros((0, pb.n))
         pb.restraint = np.vstack([np.array(rows), rest])
     return build
 
 
 VARIANTS = [("shipped", "shipped"), ("no_groups", None), ("phase_max", 1.0),
-            ("rel=1e-2", 1e-2), ("rel=1e-4", 1e-4)]
+            ("rel=1e-2", 1e-2), ("rel=1e-4", 1e-4), ("rel=1e-6", 1e-6),
+            ("rel=1e-8", 1e-8), ("rel=1e-9", 1e-9)]
 
 
 def main():

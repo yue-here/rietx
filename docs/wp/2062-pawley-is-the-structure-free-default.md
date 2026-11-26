@@ -179,6 +179,17 @@ above, which come from lab and synchrotron single-phase patterns
     `PAWLEY_OVERLAP_UNRESOLVED`. Unmeasured: nothing in WP-2311's probes
     reached it.
 
+  And one start dependence that is not the restraint's (WP-2311 Finding 6).
+  A one-stage Pawley plan (background, cell, w and the shift freed together)
+  from a declared background 70× above the data reads Rwp 0.449 against
+  0.162, with or without the group rows. The seed leaves 19 of 20 reflections
+  on the partition floor, and the joint solve lands in another basin. Staged
+  plans that refine the background first recover. The seed is one Le Bail
+  partition against the declared background. Whether it should partition
+  against a fitted background, or the plan should always lead with the
+  background, is this WP's to decide before Pawley reaches a site where a
+  caller's own one-stage plan meets a bad background.
+
 - **2026-11-26, from WP-2311: the unit dependence is its own WP.** At Yue's request, this
   WP's first bug task (synthetic LaB6's true cell at Rwp 0.164 on counts and 0.262 rescaled)
   moved to WP-2311, and this WP now depends on it. That task has its own goal, its own suspects

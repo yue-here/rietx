@@ -29,7 +29,7 @@ PLAN = RefinementPlan(stages=[Stage("all", [
 
 def main():
     pattern, _, _ = _synth_overlapped()
-    for g in (1.0, 100.0):
+    for g in tuple(float(x) for x in sys.argv[1:]) or (1.0, 100.0):
         s, ins = _overlapped_lab6(a=4.160, w=1e-2)
         ins.source.dispersion = Dispersion()
         for c in ins.background.coefficients:
