@@ -3593,10 +3593,15 @@ ROWS: tuple[Row, ...] = (
         approved="2026-11-23", approved_by="checked"),
     Row("rietx.crystallography.magnetic.form_factor.TABLE_STEP", "constant", tier=1,
         value=0.01,
-        evidence=("measured: a cubic spline on this grid errs by <= 1.5e-6 on s = 0-1.5 and "
-                  "<= 7.8e-11 beyond against the same curves at 0.005 (rietx #1691, D46 (c)); "
-                  "decides only interpolation error, two orders under the curves' own accuracy "
-                  "(HFR vs Dirac-Fock 1.5e-4)")),
+        evidence=("measured on all 17 tables against the same curves at 0.005 (the ten high-charge 4d "
+                  "tables as computed, rietx #1691; the other seven regenerated at 0.005 from the same "
+                  "inputs for #1806 round 2, item 6, matching the shipped points to 5.5e-8): a cubic "
+                  "spline on this grid errs by <= 3.9e-6 on s = 0-1.5, largest at the first midpoint "
+                  "(Mo0 <j0> at s = 0.005, where the not-a-knot end meets a curve even in s; <= 1.6e-6 "
+                  "from s = 0.015), and by <= 8.1e-8 beyond, the file's %.7f rounding (also on the "
+                  "Mn2+, Gd3+ and U4+ tails); decides only interpolation error, 38 times under the "
+                  "curves' own accuracy (HFR vs Dirac-Fock 1.5e-4); "
+                  "tests/test_magnetic_form_factor_range.py checks every table's midpoints")),
     Row("rietx.crystallography.magnetic.form_factor.TAIL_BLEND_WIDTH", "constant", tier=3,
         value=0.2,
         evidence=("ours, ruled by the magnetic-path owner (rietx #1691, D46 (d1), 2026-11-23): "

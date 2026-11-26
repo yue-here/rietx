@@ -967,9 +967,11 @@ def tabulated_spline(stol, values) -> CubicSpline:
 
     ``stol`` is the grid, s = sinθ/λ in Å⁻¹, strictly increasing, and
     ``values`` the ⟨jₙ⟩ on it.  On the shipped 0.01 Å⁻¹ grid the spline errs
-    by at most 1.5 × 10⁻⁶ between the points on s = 0-1.5 and 8 × 10⁻¹¹
-    beyond (measured against the same curves computed at 0.005 Å⁻¹, rietx
-    #1691); a linear interpolant on a 0.05 grid errs by up to 0.011 in ⟨j₀⟩.
+    by at most 3.9 × 10⁻⁶ between the points on s = 0-1.5, at the first
+    midpoint of a neutral 4d table (1.6 × 10⁻⁶ from s = 0.015), and by the
+    file's rounding beyond, 8 × 10⁻⁸ (every table measured against its curve
+    computed at 0.005 Å⁻¹, rietx #1691 and #1806); a linear interpolant on a
+    0.05 grid errs by up to 0.011 in ⟨j₀⟩.
     The spline is C², so a refined cell moving s moves the value smoothly.
     The caller keeps s inside the grid: this evaluates nothing outside it.
     """

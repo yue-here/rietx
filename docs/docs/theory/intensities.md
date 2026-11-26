@@ -496,7 +496,7 @@ Brown carries no Pr row, and the older Pr$^{3+}$ fit {cite}`lisher1971` is on a
 non-relativistic footing; his printed Pu$^{3+}$ rows are fits to the Pu$^{5+}$
 curve. Every computed curve is tabulated on $0 \le s \le$ {{ TABLE_S_MAX }} Å$^{-1}$ at
 {{ TABLE_STEP }} Å$^{-1}$ and read with a cubic spline, which errs by at most
-$1.5\times10^{-6}$ between the points. They are computed for rietx and not
+$4\times10^{-6}$ between the points. They are computed for rietx and not
 peer-reviewed, and `approximation_name` says so wherever one is in force.
 Past $s =$ {{ TABLE_S_MAX }} Å$^{-1}$ every row is refused.
 

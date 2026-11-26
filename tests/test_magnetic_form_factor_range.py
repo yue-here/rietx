@@ -195,8 +195,9 @@ def test_the_blend_reproduces_the_curve_builders_blend_and_a_wrong_one_does_not(
 
 def test_each_table_reproduces_its_source_and_interpolates_within_the_spline_bound():
     """At the grid points the spline returns the source value to the file's rounding (5e-8); between them, against
-    the D32 ions' own 0.005 Å⁻¹ curves, it stays inside the measured cubic-spline bound, 1.5e-6 on 0-1.5 Å⁻¹, plus
-    that rounding."""
+    every table's own curve at 0.005 Å⁻¹ on s < 1.5, it stays inside the measured cubic-spline bound, 3.9e-6, plus
+    that rounding.  The bound is set by the neutral 4d tables at the first midpoint (Mo0 ⟨j0⟩ 3.84e-6 at
+    s = 0.005; from s = 0.015 every table is under 1.6e-6), and all seventeen are compared (#1806 round 2, item 6)."""
     seen = set()
     for (ion, order), (s, v) in REF["grid"].items():
         public = ff._public({v: k for k, v in ff._TABLE_KEY.items()}[ion])
@@ -205,10 +206,11 @@ def test_each_table_reproduces_its_source_and_interpolates_within_the_spline_bou
         assert np.max(np.abs(got - v)) <= 5.1e-8, (ion, order)
         seen.add(ion)
     assert seen == set(ff._TABLE_KEY.values())
+    assert {ion for ion, _ in REF["mid"]} == set(ff._TABLE_KEY.values())
     for (ion, order), (s, v) in REF["mid"].items():
         assert s.min() > 0.0 and s.max() < 1.5
         err = np.max(np.abs(np.asarray(ff._value(ff._public(ion), int(order[1]), s)) - v))
-        assert err <= 1.5e-6 + 1e-7, (ion, order, err)
+        assert err <= 3.9e-6 + 1e-7, (ion, order, err)
 
 
 # ============================================================= the numbers a user sees
