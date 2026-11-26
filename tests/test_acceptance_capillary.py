@@ -205,9 +205,9 @@ def test_capillary_absorption_is_an_exact_reparameterisation(plain, corrected):
     out.mkdir(exist_ok=True)
     plot_result(res_b, path=str(out / "capillary_lab6_660a_fit.png"))
     plot_result(res_b, path=str(out / "capillary_lab6_660a_lowangle.png"),
-                two_theta_range=(5.0, 12.0))
+                two_theta_limits=(5.0, 12.0))
     plot_result(res_b, path=str(out / "capillary_lab6_660a_highangle.png"),
-                two_theta_range=(52.0, 60.0))
+                two_theta_limits=(52.0, 60.0))
 
 
 def test_fit_quality_and_the_circular_cell(corrected):

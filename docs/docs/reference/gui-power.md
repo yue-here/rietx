@@ -277,7 +277,7 @@ indices int32, so a browser reads each array without copying it.
 
 | Route | Is |
 |---|---|
-| `GET /api/peaks` · `POST /api/peaks` | the picked list; pick it, with `pick_peaks`'s `shoulders`, `two_theta_range` and `flag_contamination` |
+| `GET /api/peaks` · `POST /api/peaks` | the picked list; pick it, with `shoulders`, `two_theta_range` and `flag_contamination`; the range is `pick_peaks`'s `two_theta_limits` |
 | `POST /api/peaks/add` · `POST /api/peaks/remove` · `POST /api/peaks/move` | one line, added, removed, moved |
 | `POST /api/peaks/flag` · `POST /api/peaks/refit` | mark a line; refit its group |
 | `POST /api/peaks/undo` · `POST /api/peaks/redo` | put the list back as it was before the last edit; make that edit again |
