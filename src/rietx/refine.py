@@ -7181,6 +7181,8 @@ class Refinement:
         a run directory for each call would only feed retention in a loop
         that evaluates many times.
         """
+        if mode is not None:
+            check_mode(mode)
         require_two_theta(data, "Refinement.evaluate()", instrument=self.instrument)
         _refuse_without_phases(self.structure, "evaluate")
         return self._evaluated(data, mode, two_theta_limits).result_
@@ -7807,6 +7809,8 @@ class Refinement:
         """
         from .io.exporters import reflection_table
 
+        if mode is not None:
+            check_mode(mode)
         if data is not None:
             require_two_theta(data, "Refinement.reflection_table()",
                               instrument=self.instrument)

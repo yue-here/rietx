@@ -198,6 +198,9 @@ CASES: dict[tuple[str, str], tuple] = {
     ("Refinement.run_stage", "mode"): (
         lambda c, v: _fresh().run_stage(c.data, rx.Stage("s", turn_on=["phases.*.scale"]),
                                         mode=v), MODES),
+    ("Refinement.evaluate", "mode"): (lambda c, v: _fresh().evaluate(c.data, mode=v), MODES),
+    ("Refinement.reflection_table", "mode"): (
+        lambda c, v: _fresh().reflection_table(c.data, mode=v), MODES),
     ("Refinement.parameters", "mode"): (lambda c, v: _fresh().parameters(mode=v), MODES),
     ("Refinement.suggest", "mode"): (lambda c, v: c.fitted.suggest(c.data, mode=v), MODES),
     ("Refinement.report", "plan"): (lambda c, v: c.fitted.report(plan=v), None),
