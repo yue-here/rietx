@@ -19,7 +19,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Literal
 
-from .._nearmiss import did_you_mean
+from .._nearmiss import check_choice, did_you_mean
 from ..schemas.common import Mode
 
 # INTERMEDIATE_FTOL, CORRELATION_GUARD, PHASE_SUPPORT_SIGMA and
@@ -1344,6 +1344,7 @@ class GuardFinding:
                                ) -> "GuardFinding":
         """``width="lorentzian"`` is Γ_L's finding: one code for both widths,
         since the action is the same for either (WP-2002)."""
+        check_choice("width", width, ("gaussian", "lorentzian"))
         if width == "lorentzian":
             return cls("RESOLUTION_NOT_POSITIVE",
                        ("instrument.profile.x", "instrument.profile.y"),

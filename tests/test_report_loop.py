@@ -296,7 +296,7 @@ def _plot(episode: EpisodeResult, stem: str) -> None:
     result = episode.ref.result_
     plot_result(result, path=str(_OUT / f"{stem}.png"))
     plot_result(result, path=str(_OUT / f"{stem}_zoom.png"),
-                two_theta_range=(18.0, 45.0))
+                two_theta_limits=(18.0, 45.0))
 
 
 def _actions_in_order(report: FitReport) -> list[str]:

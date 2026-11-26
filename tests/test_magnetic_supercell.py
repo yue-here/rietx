@@ -883,7 +883,7 @@ def test_the_two_routes_are_exclusive_and_say_so():
     with pytest.raises(ValueError, match="needs its transform"):
         magnetic_supercell(parent, group=cand.group, magnetic_species="Mn",
                            ion="Mn2+")
-    with pytest.raises(ValueError, match="nuclear_group="):
+    with pytest.raises(ValueError, match="unknown nuclear_group .parental.; nuclear_group takes"):
         magnetic_supercell(parent, cand, nuclear_group="parental",
                            magnetic_species="Mn", ion="Mn2+")
 
