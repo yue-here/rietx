@@ -2,7 +2,7 @@
 
 Milestone: unscheduled · Status: ⬜
 Track: What fires, and what stays silent
-Depends on: 2011 (the indexer's validation, built provisionally as Pawley); 1910 soft (the extinction screen's fits)
+Depends on: 2011 (the indexer's validation, built provisionally as Pawley); 2311 (the unit dependence, its first bug task); 1910 soft (the extinction screen's fits)
 Priority: P2 2026-11-01 — decided: Pawley at every site, its known bugs fixed first; A1 already sends every `index_pattern` user through Pawley, unit dependence included
 
 ## Goal
@@ -158,6 +158,13 @@ above, which come from lab and synchrotron single-phase patterns
 (LaB6, NAC, FAP, the IUCr round-robin pure phases, aragonite).
 
 ### Inherited
+
+- **2026-11-26, from WP-2311: the unit dependence is its own WP.** At Yue's request, this
+  WP's first bug task (synthetic LaB6's true cell at Rwp 0.164 on counts and 0.262 rescaled)
+  moved to WP-2311, and this WP now depends on it. That task has its own goal, its own suspects
+  and a scale-invariance test to land. The bugs-first order is unchanged: no site here moves
+  before WP-2311 closes, and if WP-2311 finds the dependence belongs to the method, decision 0
+  goes back to Yue.
 
 - **2026-11-19, from WP-2219: a Pawley fit's discarded direction is never named.**
   `staged.py`'s guard skips every solve with `outcome.n_aux`, because the intensity block
@@ -407,10 +414,11 @@ ruling.
 - [x] The maintainer's five decisions (0-4), each recorded as `Decided YYYY-MM-DD:`.
       Recorded 2026-11-01 above: 0 and 1 decided by the maintainer, 1's D and
       2-4 settled by Claude.
-- [ ] Find the unit dependence: synthetic LaB6's true cell validates at Rwp
-      0.164 on raw counts and 0.262 with pattern and σ divided by the maximum
-      count, where Le Bail reads 0.2339 and 0.2338. Fix it, or show it belongs
-      to the method and bring decision 0 back.
+- [ ] The unit dependence, **moved to WP-2311 on 2026-11-26**: synthetic
+      LaB6's true cell validates at Rwp 0.164 on raw counts and 0.262 with
+      pattern and σ divided by the maximum count, where Le Bail reads 0.2339
+      and 0.2338. Tick this when WP-2311 closes. If it shows the dependence
+      belongs to the method, decision 0 comes back to Yue.
 - [ ] The extinction screen's Hamilton test adds `n_lines + n_free_parameters`
       (`indexing/extinction.py:1137-1141`), and Pawley's `n_free_parameters`
       already counts the intensities. Count them once, before A2 moves.
