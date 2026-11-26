@@ -165,6 +165,11 @@ above, which come from lab and synchrotron single-phase patterns
   and a scale-invariance test to land. The bugs-first order is unchanged: no site here moves
   before WP-2311 closes, and if WP-2311 finds the dependence belongs to the method, decision 0
   goes back to Yue.
+  Read on `main` at `68dae52c` while filing it, not ticked here: WP-2076's PR #1460 (merged)
+  looks like it has delivered two of this WP's open tasks. `indexing/extinction.py` sets
+  `SCREEN_MODE = "pawley"` for the shared, reference and class fits, and `hamilton_justified`
+  is passed `n_free_parameters` alone (`:1527`). Only the cell-free prefit is still Le Bail
+  (`:1083`). The next session on this WP checks both against its task lines and ticks them.
 
 - **2026-11-19, from WP-2219: a Pawley fit's discarded direction is never named.**
   `staged.py`'s guard skips every solve with `outcome.n_aux`, because the intensity block
