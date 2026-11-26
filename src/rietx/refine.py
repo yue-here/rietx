@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 
 from . import runs
 from ._about import DIST_NAME
-from ._nearmiss import did_you_mean
+from ._nearmiss import check_choice, did_you_mean
 from .backend.api import backend_dtype_note
 from .background.diagnostics import (
     STEPS_PER_FWHM_MIN,
@@ -160,7 +160,7 @@ from .report.schemas import (
     FitReport,
     StageReport,
 )
-from .schemas.common import Diagnostic, Parameter, Provenance
+from .schemas.common import Diagnostic, Parameter, Provenance, check_mode
 from .schemas.history import NodeAction, NodeMetrics, RefinementState, ReflectionState
 from .schemas.instrument import CAPILLARY_OFFSETS, Instrument
 from .schemas.interval import PARAMETER_INTERVAL_LEVEL, PARAMETER_INTERVAL_MAX_REFITS
@@ -2621,18 +2621,10 @@ class Refinement:
     def __init__(self, structure: Structure, instrument: Instrument, *,
                  backend: str = "numpy", solver: str = DEFAULT_SOLVER,
                  history: bool | str | Path | RefinementTree = True):
-        if backend != "numpy":
-            # fail fast (with the install hint) instead of at the first stage;
-            # resolve_backend caches the instance, so this costs one import
-            from .backend import resolve_backend
+        from .backend.api import check_backend
 
-            try:
-                resolve_backend(backend)
-            except ValueError as exc:
-                raise NotImplementedError(str(exc)) from exc
-        if solver not in SOLVERS:
-            raise ValueError(f"unknown solver {solver!r}; "
-                             f"available: {', '.join(SOLVERS)}")
+        check_backend(backend)
+        check_choice("solver", solver, SOLVERS)
         # Before the copies below, because what this constructor goes on to
         # read (the declared wavelengths, the specimen absorption) is a
         # wavelength a TOF bank does not carry — so without this the refusal
@@ -3450,6 +3442,8 @@ class Refinement:
         say so, or a Le Bail project's atom rows come back looking editable,
         which is the one thing ``mode_fixed`` exists to prevent.
         """
+        if mode is not None:
+            check_mode(mode)
         esd = ({p.path: p.stderr for p in self.result_.parameters}
                if self.result_ is not None else {})
         mode = mode or self._mode
@@ -4090,7 +4084,7 @@ class Refinement:
             source: "str | dict[str, float] | Sequence[tuple[str, float]] | None" = None,
             *, scale: float = 1.0, offset: float = 0.0,
             expression: str | None = None) -> str:
-        """Constrain ``path`` to ``scale·source + offset``, or to ``expression=``: a formula over ``add_variable`` names, trig in radians.
+        """Constrain the parameter dot-path ``path`` to ``scale·source + offset``, or to ``expression=``: a formula over ``add_variable`` names, trig in radians.
 
         The general affine form, of which :meth:`tie_equal` is the ``scale=1,
         offset=0`` case.  Complementary occupancies on a shared site are the
@@ -4746,6 +4740,8 @@ class Refinement:
         ``action_kind`` (an instrument width, an atom DOF) is an expected
         disagreement, not an inconsistency.
         """
+        if mode is not None:
+            check_mode(mode)
         require_two_theta(data, "Refinement.suggest()",
                           instrument=self.instrument)
         from .strategy.suggest import (
@@ -4926,6 +4922,8 @@ class Refinement:
                          ) -> "ParameterInterval":
         """The profile-likelihood interval for one parameter of the last fit.
 
+        ``path`` is that parameter's dot-path.
+
         An esd read as an interval is symmetric, and on a bound it is not an
         interval at all: an estimate there has no symmetric sampling
         distribution (Self & Liang, 1987).  A row the fit left on its bound
@@ -4999,6 +4997,7 @@ class Refinement:
         merging a phase-added branch into a phase-removed one path-by-path is
         not meaningful.  Returns the merge node's id.
         """
+        check_choice("prefer", prefer, ("ours", "theirs"))
         tree = self._require_history()
         ours_id = self._head_id
         if ours_id is None:
@@ -5007,8 +5006,6 @@ class Refinement:
         base = tree.common_ancestor(ours_id, theirs_id)
         if base is None:
             raise ValueError(f"{ours_id} and {theirs_id} share no ancestor")
-        if prefer not in ("ours", "theirs"):
-            raise ValueError("prefer must be 'ours' or 'theirs'")
 
         values_base = tree._values(tree[base])
         values_ours = tree._values(tree[ours_id])
@@ -5928,9 +5925,9 @@ class Refinement:
         McCusker turn-on order *is* the bootstrap ladder — so prepending one
         reproduced stage 1's report to three decimals.)
         """
+        check_mode(mode)
         plan = resolve_plan(plan, mode)
-        if refit not in REFIT_MODES:
-            raise ValueError(f"refit must be one of {REFIT_MODES}, not {refit!r}")
+        check_choice("refit", refit, REFIT_MODES)
         # read before anything moves, then dropped: a fit that raises part way
         # has moved the values, and one that returns writes its own below
         converged_here = (refit == "single" and self._refit_key is not None
@@ -6913,6 +6910,8 @@ class Refinement:
         recorded node's.  The stage's ``window_area_tol`` records the fraction
         it ran at.
         """
+        if mode is not None:
+            check_mode(mode)
         _refuse_without_phases(self.structure, "run_stage")
         phase_support_sigma = check_phase_support_sigma(phase_support_sigma)
         if window_area_tol is not None:
@@ -7695,14 +7694,15 @@ class Refinement:
         answer = self._answer
         return reflection_table(self._model, answer["values"], answer["structure"])
 
-    def write_reflection_table(self, path, **kw) -> None:
-        """Write the reflection table to CSV/TSV (delimiter from the suffix)."""
+    def write_reflection_table(self, path: str | Path, **kw) -> None:
+        """Write the reflection table to the file ``path``, CSV or TSV by its
+        suffix."""
         from .io.exporters import write_reflection_table
 
         write_reflection_table(self.reflection_table(), path, **kw)
 
-    def write_cif(self, path) -> None:
-        """Write a refinement CIF: structure with esds, R-factors, wavelength,
+    def write_cif(self, path: str | Path) -> None:
+        """Write a refinement CIF to the file ``path``: structure with esds, R-factors, wavelength,
         profile/background description, and the observed/calculated pattern.
 
         The pattern loop carries every point of the pattern the last fit was
@@ -7722,8 +7722,9 @@ class Refinement:
                                           instrument, pattern=self._fit_pattern,
                                           reflections=self.reflection_table()), path)
 
-    def write_qpa_table(self, path, **kw) -> None:
-        """Write the QPA weight-fraction table (crystalline-only caveat included)."""
+    def write_qpa_table(self, path: str | Path, **kw) -> None:
+        """Write the QPA weight-fraction table to the file ``path``
+        (crystalline-only caveat included)."""
         from .io.exporters import write_qpa_table
 
         if self.result_ is None or self.result_.qpa is None:
@@ -10261,6 +10262,10 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     diagnostics = diagnostics + _extra_peak_diagnostics(
         model, values, ticks, table, floors=floors)
 
+    # What the reader repaired or noticed in the file, last so that a code the
+    # fit raised itself keeps the fit's reading (WP-2304).
+    diagnostics = diagnostics + _reader_diagnostics(model, diagnostics)
+
     # Degeneracy evidence off the answer-producing stage's Jacobian, which is
     # not serialized and so cannot be recovered later (WP-1055/-1056).  The
     # same numbers the guards screened, carried whole rather than as the
@@ -11315,6 +11320,80 @@ def _extra_peak_diagnostics(model: CompiledModel, values: dict,
                         "If the component stands in for a misfitting "
                         "reflection, fix the phase's scale, profile and "
                         "preferred orientation instead.")))
+    return out
+
+
+#: Reader codes the fit asks again for itself, so the reader's copy is never
+#: handed on: ``PATTERN_DEAD_CHANNELS`` is judged on the fitted channels by
+#: :func:`_data_support_diagnostics`, and a dead cell the caller has since
+#: excluded must not come back with the advice to exclude it.
+_FIT_OWNED_READER_CODES = frozenset({"PATTERN_DEAD_CHANNELS"})
+
+#: Reader codes for a lossless repair, kept on ``PatternData.diagnostics`` and
+#: never handed on: a scan stored backwards and a repeated point of equal y
+#: are the same measurement once repaired, so the fit's answer is the same
+#: either way and the note gives a reader of the fit nothing to act on.
+_LOSSLESS_READER_CODES = frozenset({"PATTERN_SCAN_REVERSED",
+                                    "PATTERN_DUPLICATE_POINTS"})
+
+#: Reader codes saying σ was withheld and the Poisson fallback used, which a
+#: σ the caller assigned before fitting settles.
+_WITHHELD_SIGMA_CODES = frozenset({"PATTERN_SIGMA_NONPOSITIVE",
+                                   "PATTERN_WEIGHT_UNUSABLE",
+                                   "PATTERN_INTENSITY_SCALED"})
+
+
+def _reader_note_settled(note: Diagnostic, model: CompiledModel) -> bool:
+    """Whether the caller has already done what ``note`` asks, on this fit.
+
+    The notes describe the file as read, and a caller may act on one before
+    fitting.  Each test below is exact on the compiled model:
+
+    - ``PATTERN_X_AXIS_IMPLAUSIBLE``: no fitted channel sits at or below 0°.
+    - ``PATTERN_SIGMA_CONSTANT``: σ was set to ``None``, or the caller's σ
+      varies over the fitted channels.
+    - ``PATTERN_SIGMA_NONPOSITIVE`` naming 2θ intervals: no fitted channel was
+      left out for its σ, after ``nonpositive_sigma="poisson"``, an excluded
+      region or a crop.
+    - a withheld σ (any other note in :data:`_WITHHELD_SIGMA_CODES`): the
+      caller assigned a σ.  One whose ``where`` names ``intensity`` also
+      doubts the intensity scale, which no σ settles, so it stays.
+
+    Handing such a note on would repeat advice already taken, for the reason
+    :data:`_FIT_OWNED_READER_CODES` gives about dead channels.
+    """
+    if note.code == "PATTERN_X_AXIS_IMPLAUSIBLE":
+        return model.tt.size == 0 or float(model.tt.min()) > 0.0
+    if note.code == "PATTERN_SIGMA_CONSTANT":
+        return not model.sigma_measured or model.sigma_uniform is False
+    if note.code == "PATTERN_SIGMA_NONPOSITIVE" and note.where != ["sigma"]:
+        return (model.sigma_rule is not None
+                and model.sigma_rule.n_nonpositive_excluded == 0)
+    if note.code in _WITHHELD_SIGMA_CODES and "intensity" not in note.where:
+        return bool(model.sigma_measured)
+    return False
+
+
+def _reader_diagnostics(model: CompiledModel,
+                        raised: list[Diagnostic]) -> list[Diagnostic]:
+    """What the reader repaired or noticed in this pattern (WP-2304).
+
+    ``read_pattern`` keeps its notes on ``PatternData.diagnostics`` whether or
+    not a caller passed a list, and ``compile_model`` carries them here, so a
+    rescaled intensity or a withheld σ reaches every fit on the file.  A note
+    whose code the fit has already raised, or asks for itself
+    (:data:`_FIT_OWNED_READER_CODES`), is left out, as is a lossless repair
+    (:data:`_LOSSLESS_READER_CODES`); an exact repeat is too, and so is one
+    whose advice the caller has already taken (:func:`_reader_note_settled`).
+    """
+    have = ({d.code for d in raised} | _FIT_OWNED_READER_CODES
+            | _LOSSLESS_READER_CODES)
+    out: list[Diagnostic] = []
+    for note in model.reader_notes:
+        if (note.code in have or note in out
+                or _reader_note_settled(note, model)):
+            continue
+        out.append(note)
     return out
 
 
@@ -13293,6 +13372,7 @@ def refine(data: PatternData, structure: Structure, instrument: Instrument,
     derive a project from, so the run lands under the working directory unless
     ``telemetry=`` names somewhere else.
     """
+    check_mode(mode)
     ref = Refinement(structure, instrument, backend=backend, solver=solver,
                      history=history)
     return ref.fit(data, mode=mode, plan=plan, two_theta_limits=two_theta_limits,
