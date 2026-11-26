@@ -94,13 +94,59 @@ or changes a threshold names its tier under
   on an empty peak list (WP-2011 § Found on the way). That is WP-1956's screen.
 - Le Bail's zero clip on net counts (#1552), which WP-2062 inherits.
 
+## Findings (2026-11-26, Linux x86-64, `[dev]`, tree `dd94fd32`)
+
+Probes in `docs/wp/2311-probe/`. Each one is `.venv/bin/python docs/wp/2311-probe/<file>`
+from the worktree root.
+
+1. **The reading reproduces, but it is not a dependence on units**
+   (`probe1_rerun.py`, `probe2_start_vs_units.py`). With intensity and σ scaled
+   by *f* and the instrument left as declared, the true cell reads Rwp 0.1639,
+   0.1713, 0.2660 and 0.2660 at *f* = 1, 0.1, 0.01 and 1e-3. At 1e-4 it reads
+   0.1639, where on 2026-10-28 it ended at `max_iter`. Re-picking the peaks from
+   the scaled pattern changes nothing. But `_true_models()` declares the f = 1
+   background in counts, Chebyshev (30, −4, 1), so that fit *starts* with a
+   background 1/f too high: the first stage's starting cost goes as 1/f² (5.3e3,
+   8.0e6, 9.6e8, 9.8e10). With the declared background scaled as well, every *f*
+   from 1 to 1e-4 reproduces the f = 1 fit, with the same cost at the start and
+   end of every stage and the same widths to six figures. With f = 1 data and the
+   declared background ×10 and ×100, probe 1's 0.1713 and 0.2660 come back
+   exactly. **The Pawley fit is invariant under a change of units. It depends on
+   where the background starts**, and the 2026-10-28 probe varied both at once.
+   So the finding does not bear on WP-2062's decision 0 as filed.
+2. **The cause is the equal-split restraint's floor** (`probe3_seed_state.py`,
+   `probe4_restraint_scale.py`). The Pawley seed is one Le Bail partition of
+   max(y_obs − bkg, 0). A background above the data partitions nothing, so the
+   seed leaves reflections on `LEBAIL_INTENSITY_FLOOR` (1e-10): 6 of 28 at ×10,
+   all 28 at ×100. `build_pawley_restraint` weights each overlap group's rows by
+   √λ/s, with s = max(mean(I_group), 1e-10). That 1e-10 is an absolute intensity,
+   unaudited and inline. An emptied group therefore gets weight 5e9, against 0.04
+   to 0.06 on the true start. Every later stage rebuilds s from the group's
+   stuck value, so the weight stays 5e9 to the last stage, and 2 (×10) or 10
+   (×100) reflections end there. The rows sum to zero, so the group's sum is in
+   their null space and is free in exact arithmetic. But column equilibration
+   divides each member's column by a norm of ~5e9, so moving the sum takes a
+   scaled step of order 1e10, and the trust region never gets there. Changing
+   the group's scale alone, with the off-data ridge untouched, recovers the true
+   start's answer exactly (cost 3415.253, same u, w, y) at ×10 and ×100: with
+   the group rows dropped, with s floored at the phase's largest on-data
+   intensity, and with s floored at ρ times it for every ρ from 1 down to 1e-8.
+   At ρ = 1e-9 the lock returns (Rwp 0.1713 at ×10, 0.2634 at ×100). No variant
+   moves the true start's fit.
+   Suspects not reached: the off-data floor binds nowhere here (this fit has no
+   off-data reflection, as on 2026-10-28). The LM damping and tolerances, column
+   scaling paths and background seeding are behind the restraint, not beside it:
+   fixing the restraint alone restores the answer.
+
 ## Tasks
 
-- [ ] Rerun the measurement on the current tree: synthetic LaB6's true cell,
+- [x] Rerun the measurement on the current tree: synthetic LaB6's true cell,
       validation plan, *f* ∈ {1, 0.1, 0.01, 1e-4}. If the dependence is gone,
-      bisect to the commit that removed it, record it, and close.
-- [ ] Find the cause: the first stage and quantity where the two fits part,
+      bisect to the commit that removed it, record it, and close. *(2026-11-26:
+      reproduces, but as a start dependence, Findings 1.)*
+- [x] Find the cause: the first stage and quantity where the two fits part,
       with the suspects above checked one at a time and each result recorded.
+      *(Findings 2: the group scale's 1e-10 floor.)*
 - [ ] Fix it, or show it belongs to the method, and if so hand decision 0 back
       to Yue through WP-2062 (an `### Inherited` entry there).
 - [ ] Test: a Pawley fit of one pattern at *f* = 1 and *f* = 1e-3 (intensity and
