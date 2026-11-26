@@ -1653,14 +1653,15 @@ def test_the_table_notes_a_listing_that_reached_gh_s_limit(
 
 def test_the_landed_column_says_how_far_back_it_can_see() -> None:
     """A merged PR's body reaches the table only through the merged listing,
-    since the commit parser skips merges; a full listing that stops after the
-    oldest open issue, or a shallow clone, is said (WP-2312)."""
+    since the commit parser skips merges; a full listing whose oldest-opened PR
+    is newer than the oldest open issue (gh lists by creation, not merge), or a
+    shallow clone, is said (WP-2312)."""
     def merged(n: int, day: str):
         return [backlog.Reference("merged PR", f"PR #{i}", frozenset(), False, day) for i in range(n)]
 
     full = merged(backlog.MERGED_LIMIT, "2026-11-01")
     (note,) = backlog.reach_notes(full, "2026-09-01", shallow=False)
-    assert "goes back only to 2026-11-01" in note
+    assert "opened since 2026-11-01" in note
     assert backlog.reach_notes(full, "2026-11-02", shallow=False) == []  # reaches past it
     assert backlog.reach_notes(full[:-1], "2026-09-01", shallow=False) == []  # the whole list
     assert backlog.reach_notes(None, "2026-09-01", shallow=False) == []  # gh declined: main says so

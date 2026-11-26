@@ -110,7 +110,7 @@ class Reference(NamedTuple):
     label: str  # "#385 (mustachefeeling)", "PR #292 (2026-09-10)", "5c9a72e2 2026-09-18 WP-1434: …"
     cited: frozenset  # the issue numbers its text names
     placement: bool = False  # touched nothing outside PLACEMENT
-    day: str = ""  # YYYY-MM-DD it merged or was committed; "" where unknown
+    day: str = ""  # YYYY-MM-DD a merged PR was opened (gh lists by creation) or a commit made; "" where unknown
 
 
 class Row(NamedTuple):
@@ -348,7 +348,11 @@ MERGED_LIMIT = 200
 
 
 def merged_pr_references(root: Path) -> tuple:
-    """The newest merged PRs as references; a linked closing issue counts as cited.
+    """The newest-opened merged PRs as references; a linked closing issue counts as cited.
+
+    gh orders the listing by creation, not by merge, so a cut list holds every
+    PR opened since its oldest row's ``createdAt`` and none before it, however
+    recently that one merged: ``reach_notes`` reads the cut off ``day``.
 
     200 rows reach back to 2026-08-22 on 2026-09-21, past the oldest open
     issue; ``files`` doubles the call (27 s to 52-58 s, measured) and is what
@@ -356,7 +360,7 @@ def merged_pr_references(root: Path) -> tuple:
     """
     raw, why = gh_json(
         root, "pr", "list", "--state", "merged", "--limit", str(MERGED_LIMIT), "--json",
-        "number,title,body,mergedAt,closingIssuesReferences,files", timeout=240,
+        "number,title,body,createdAt,mergedAt,closingIssuesReferences,files", timeout=240,
     )
     if raw is None:
         return None, why
@@ -371,7 +375,7 @@ def merged_pr_references(root: Path) -> tuple:
                 f"PR #{item['number']} ({(item.get('mergedAt') or '')[:10]})",
                 frozenset(cited),
                 is_placement(paths),
-                (item.get("mergedAt") or "")[:10],
+                (item.get("createdAt") or "")[:10],
             )
         )
     return refs, None
@@ -392,16 +396,19 @@ def reach_notes(merged: Optional[list], oldest_issue: str, shallow: bool) -> lis
 
     *merged* is ``merged_pr_references``' list (``None`` when gh declined,
     which ``main`` reports on its own).  A listing that reached
-    ``MERGED_LIMIT`` stops at its oldest merge, and a shallow clone's
-    ``git log`` stops at its boundary, both without a word.
+    ``MERGED_LIMIT`` stops at the oldest PR it was *opened* on (gh lists by
+    creation), so a PR opened before then is missing however recently it
+    merged; a shallow clone's ``git log`` stops at its boundary. Both stop
+    without a word.
     """
     notes = []
     days = [r.day for r in merged or () if r.day]
     if merged is not None and len(merged) >= MERGED_LIMIT and days and min(days) > oldest_issue:
         notes.append(
-            f"the merged-PR listing reached its limit of {MERGED_LIMIT} and goes back only to "
-            f"{min(days)}, after the oldest open issue ({oldest_issue}): a PR merged before then "
-            "reaches the landed column only through a commit message, never its body"
+            f"the merged-PR listing reached its limit of {MERGED_LIMIT} and holds only PRs opened "
+            f"since {min(days)}, after the oldest open issue ({oldest_issue}): a PR opened before "
+            "then, however recently it merged, reaches the landed column only through a commit "
+            "message, never its body"
         )
     if shallow:
         notes.append(
@@ -475,7 +482,7 @@ def main(argv: list) -> int:
             print(f"{what}: " + " ".join(f"#{n}" for n in missing))
         issues = [i for i in issues if i.number in only]
     if not issues:
-        print("no open issues")
+        print("none of those is in the listing" if only else "no open issues")
         return 0
 
     references: list = []

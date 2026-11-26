@@ -70,7 +70,7 @@ Two network calls, no checkout, no diff:
 ```sh
 gh pr list --state open --limit 30 \
   --json number,title,author,files,changedFiles,mergeStateStatus,latestReviews,headRefOid,updatedAt,statusCheckRollup,commits
-gh pr list --state open --limit 1000 --json number --jq length    # how many are open
+gh pr list --state open --limit 1000 --json number --jq length    # how many are open; 1000 is a floor
 ```
 
 - **Say when the rank is partial.** The first call stops at `--limit` without

@@ -912,7 +912,8 @@ def _status(root: Path, here: Path, wp: Optional[str] = None) -> int:
         found = [o for o in found if o.wp == wp]
     scope = f" touching WP-{wp}" if wp else " touching a WP"
     if not found:
-        print(f"  {len(prs)} open, none{scope} other than this session's")
+        count = f"{len(prs)}+" if listing_cut(prs) else str(len(prs))
+        print(f"  {count} open, none{scope} other than this session's")
         return 0
     for pr, touched in by_pull_request(found):
         print(f"⚠ {describe_pull_request(pr, touched)}")
