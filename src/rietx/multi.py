@@ -1754,7 +1754,7 @@ class MultiHistogramRefinement:
             source: "str | dict[str, float] | Sequence[tuple[str, float]] | None" = None,
             *, scale: float = 1.0, offset: float = 0.0,
             expression: str | None = None) -> str:
-        """Constrain ``path`` to ``scale·source + offset``, or to ``expression=``.
+        """Constrain the dot-path ``path`` to ``scale·source + offset``, or to ``expression=``.
 
         :meth:`Refinement.tie <rietx.refine.Refinement.tie>` on the joint
         table, the same keywords and refusals.  Which patterns it reaches is
