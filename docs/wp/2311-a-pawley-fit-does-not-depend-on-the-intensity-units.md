@@ -133,7 +133,54 @@ from the worktree root.
    intensity, and with s floored at ρ times it for every ρ from 1 down to 1e-8.
    At ρ = 1e-9 the lock returns (Rwp 0.1713 at ×10, 0.2634 at ×100). No variant
    moves the true start's fit.
-   Suspects not reached: the off-data floor binds nowhere here (this fit has no
+3. **On the nine real true cells** (`probe5_real_truths.py`, the shipped validation,
+   peak-list path, the f = 1 peak list handed to every variant). Columns:
+   Rwp with the old floor and with the fix, on counts (`base`), and with
+   intensity, σ and the declared background divided by the maximum count
+   (`units`); `bound` is the number of groups the new floor raised, per stage.
+
+   | true cell | base, old | base, fix | units, old | units, fix | bound |
+   |---|---|---|---|---|---|
+   | SRM 660c | 0.092695 | 0.092695 | 0.092695 | 0.092695 | 0 |
+   | 11-BM NAC | 0.126143 | 0.125965 | 0.125965 | 0.125965 | 13 to 14 from stage 2 |
+   | GSAS-II FAP | 0.078541 | 0.078539 | 0.078541 | 0.078539 | 1 |
+   | corundum | 0.139386 | 0.139386 | 0.139386 | 0.139386 | 1 to 2 |
+   | brucite | 0.166897 | 0.166897 | 0.166897 | 0.166897 | 1 |
+   | zincite | 0.104809 | 0.104809 | 0.104809 | 0.104809 | no group |
+   | zircon | 0.147447 | 0.147446 | 0.147441 | 0.147441 | 1 |
+   | fluorite | 0.178806 | 0.178806 | 0.178806 | 0.178806 | 0 |
+   | magnetite | 0.180152 | 0.17952 | 0.180051 | 0.17952 | 6 from stage 2 |
+
+   No unmatched count moved and no status moved; every fit converged. So
+   **the lock reached real data too, by a second route**. No real seed emptied
+   a group (the first stage's `bound` is 0 everywhere). On NAC, FAP, corundum,
+   brucite, zircon and magnetite, though, a group ended the first stage under
+   1e-4 of its phase's strongest reflection. From the second stage on, the old
+   floor weighed it by the reciprocal of its own near-zero mean, or by 1e10
+   where the mean sat under 1e-10 counts: a weight that depends on the
+   units. Where that moved the answer
+   (NAC, FAP, magnetite, zircon), it is the unit dependence WP-2011 measured
+   on real data: at most 2e-4 then, and here NAC 1.8e-4 and magnetite 1.0e-4
+   with the old floor, counts against units. With the fix, NAC, FAP and
+   magnetite read the same in both units. That invariance is the evidence;
+   that the fixed Rwp is also the lower is a fact, and it is not the evidence.
+   Zircon alone keeps a 5e-6 gap, Finding 4.
+   The `absent` count does move between variants (NAC 17 against 3, zircon 19
+   against 0). That is the probe's artefact: the line screen adds the peak
+   list's areas to the data's envelope (`indexing/screen.py`,
+   `PatternScreen._add_pattern`), and the probe handed scaled data a peak list
+   in counts. Zircon re-picked in the scaled units reads 19 in both (78 peaks
+   picked against 79, the picker's own concern, WP-1956).
+4. **What remains: the off-data ridge's floor** (`probe6_ridge_floor.py`).
+   `PAWLEY_OFF_DATA_SCALE_FLOOR` = 1.0 is in counts. Scaled to a maximum of 1,
+   the phase's largest on-data intensity falls to 0.09 to 0.18 on zircon and
+   corundum, so the floor binds. With it at 1e-10, both read the same on counts
+   and in the scaled units to seven figures (zircon 0.1474465, corundum
+   0.1393856). With it at 1.0, the gap is 5.7e-6 and 7e-7. Not changed here.
+   The constant is tier 3 at 1.0 by WP-2011 ruling 3 (2026-10-28), and it also
+   guards a phase whose every on-data intensity sits on the floor, where no
+   intensity offers a relative anchor. Handed to Yue at handover.
+   Suspects not reached in Finding 2: the off-data floor binds nowhere there (this fit has no
    off-data reflection, as on 2026-10-28). The LM damping and tolerances, column
    scaling paths and background seeding are behind the restraint, not beside it:
    fixing the restraint alone restores the answer.
