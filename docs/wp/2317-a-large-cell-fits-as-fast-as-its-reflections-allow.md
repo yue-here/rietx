@@ -1,6 +1,6 @@
 # WP-2317 — a large cell fits as fast as its reflections allow: the case, the bar, and the rulings in the way
 
-Milestone: unscheduled · Status: 🔄 2026-11-27 — claimed by ghostshift (runner, MacBook-Air-c4aacd): task 2 bench cases and the GSAS-II timing; task 4 answered, tasks 1, 3, 5, 7 and 8 open
+Milestone: unscheduled · Status: 🔄 2026-11-27 — tasks 2, 4 and 6 done (PR #1864); task 1 and task 3's R0-R7 wait on the maintainer, 5, 7 and 8 open
 Track: A large cell
 Depends on: —
 Priority: P2 2026-11-27 — the scoping WP of a track the maintainer opened for a user at the wall (slowdowns on a 12 × 36 × 4 Å cell); 2314, 2315 and 2316 read its case, its bar and its rulings
@@ -442,6 +442,74 @@ what it costs here.
 - `docs/practice.md` § Structure-free fitting, § When a fit stops, § Peak-width limits.
 
 ## Handover log
+
+### 2026-11-27 (3rd session) — four large-cell bench cases, and GSAS-II timed on the same pattern
+
+The bench now carries the large cell this track is about, so 2314-2316 each
+have a case to measure their own before and after on. GSAS-II was run on the
+same pattern under the same free sets. On its default settings it takes
+1.6-3.0× rietx's wall clock in structural and Pawley fits. The
+Le Bail fits ran from probe 1's unseeded background: GSAS-II took 0.9-1.5× rietx's wall,
+and it landed nearer the right answer. PR #1864.
+
+**Done.**
+- `examples/bench_refinement.py`: `bigcell-structural`, `bigcell-pawley`,
+  `bigcell-pawley-120` and `bigcell-lebail`, built from probe 1's generator and
+  reproducing its pattern bit for bit. `bigcell-lebail` seeds its background with
+  `auto_background(kind="chebyshev", seed=True)`, as WP-2316's Inherited entry
+  asked. `tests/test_bench_refinement.py` pins the cell's shape (one test).
+- `docs/wp/2317-probe/gsas2_bigcell.py` (the GSAS-II 5.8.4 driver) and
+  `export_bigcell.py` (its xye and start-model writer). Their docstrings give the
+  protocol and how to run them.
+- Inherited entries pushed into 2314, 2315 and 2316 with each one's case and the
+  GSAS-II numbers.
+
+**Measured.** Both tables are in Context: the bench ranges, and § Cross-code
+timing beside GSAS-II. Fast suite on this tree: 15 820 passed, 452 skipped,
+30 xfailed (`[dev]`, darwin/arm64). The one added test takes 0.09 s.
+`tests.reader_output` exits 0, unchanged against the merge-base.
+
+**Gotchas.**
+- The harness's nfev and njev columns print 0 under the default LM driver, since
+  `_counting` wraps only scipy's `least_squares`. Read per-stage counts off
+  `StageResult`. Not fixed here: the column's meaning is the docstring's rule 6.
+- Machine load moved wall clock by up to 1.5× between blocks, so every range in
+  the cross-code table spans all blocks.
+- GSAS-II draws no peak below its lower 2θ limit. The tail of (0 2 0) at 4.9°
+  stays unfitted and its intensity is dropped as singular, which puts 41-43 % of
+  its Pawley χ² below 6°. Its default Pawley tie also merges reflections whose d
+  agree within 1e-4, giving 352 intensities at 90° (540 at 120°) where rietx
+  carries 913 (1 606), because b = 3a exactly.
+- `bigcell-lebail`'s seed carries 16 Chebyshev terms, the order scan's cap, where
+  the other cases carry 6. Its seeded and unseeded rows differ in both.
+- GSAS-II was not run from the seeded background. Its `chebyschev-1` is rietx's
+  shifted Chebyshev, so the exported seed carries over term for term.
+
+**Settled by Claude.**
+1. The Le Bail seed is `kind="chebyshev"`, not the P-spline default. Settled by
+   Claude under convention (the other three cases' family) and WP-2316's
+   measurement of it at Rwp 0.047. The alternative was the default P-spline.
+2. The seed keeps the 16 terms `auto_background` returns. Settled by Claude
+   under WP-2316's Inherited entry, which names `auto_background(seed=True)` as
+   the seed. The alternative was holding 6 terms and seeding c0 alone.
+3. The 120° Pawley fit is a separate key, `bigcell-pawley-120`. Settled by Claude
+   under the Acceptance command, which names `bigcell-pawley` alone. The
+   alternative was one key fitting both ranges.
+4. The bench runs every case by default, the large cells adding 7-9 minutes.
+   Settled by Claude under the file's existing convention of documenting runtime
+   instead of gating cases. The alternative was an opt-in flag.
+5. GSAS-II ran on its own defaults: Pawley dmax, the stopping rule (min dM/M
+   0.001, 100 cycles), single process, the GUI's Le Bail reset path; its scale
+   was seeded outside the timed region. Settled by Claude under CLAUDE.md
+   § Conventions ("adopting its protocol"). The alternative was tightening
+   GSAS-II to rietx's tolerances.
+6. The Pawley and Le Bail cases use 10 atoms, as probe 1's readings did. Settled
+   by Claude under probe 1. The intensities are free in both modes, so the atom
+   count sets only the start pattern.
+
+**Next.** Task 1 (the user's case) and task 3 (R0-R7 as one batch) wait on the
+maintainer. Task 7 (jax) is open. A seeded GSAS-II Le Bail row needs one more
+run of the driver (its unseeded run took 79-87 s).
 
 ### 2026-11-27 (2nd session) — renumbered from 2313 to 2317
 
