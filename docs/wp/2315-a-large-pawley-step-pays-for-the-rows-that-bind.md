@@ -1,9 +1,9 @@
 # WP-2315 — a large Pawley step pays for the rows that bind, not for every intensity
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-27 — task 1 and the measurement done; Angle 0 ships only the cached |T|, its blockwise G·E⁻¹ moves bits on x86_64 OpenBLAS and joins Angles 1-2 behind WP-2317's R0, R4, R5 and its task 1
 Track: A large cell
 Depends on: 2317 soft (its `bigcell-pawley` case and rulings R0, R4, R5)
-Priority: P2 2026-11-27 — provisional: the track the maintainer opened for a user at the wall, on the path the structure-free default is moving to (WP-2062) and every `index_pattern` validation already runs; re-rate when WP-2317 task 1 names the user's path and task 1 here counts crossings on real data
+Priority: P2 2026-11-27 — provisional: the track the maintainer opened for a user at the wall; task 1 found real patterns on the tree reach the step once in 32 runs, so P3 if the user's pattern (WP-2317 task 1) does not cross either
 
 ## Goal
 
@@ -92,6 +92,42 @@ grows, and keeping the factor across λ retries (λ shifts only the diagonal).
   `index_pattern` validation of a large candidate; the validation fit has been
   Pawley since WP-2011) before calling the path routine.
 
+**Task 1's count (2026-11-27, macOS arm64, `[dev]`, compiled tier on).** No real
+large-cell pattern is on the tree, so the stand-ins are the real patterns whose
+Pawley block passes `BVLS_MAX_COLUMNS` (FAP.XRA, 11-BM NAC), the real
+`index_pattern` path (FAP.XRA's candidate validations) and two lab Cu patterns
+that run to high angle (QPA round robin cpd-1a and cpd-1h). They carry real
+instrument profiles, which is the probe's open question. The probe is
+[`2315-probe/count_crossings.py`](2315-probe/count_crossings.py).
+
+| case | least-squares runs | columns | crossings | constrained step | fit wall (one run) |
+|---|---|---|---|---|---|
+| FAP.XRA, default plan | 5 | 335-343 | 0 | 0 | 1.2 s |
+| NAC, whole file | 5 | 1 492-1 499 | 0 | 0 | 11.3 s |
+| FAP.XRA `index_pattern` | 12 | ≤ 375 | 1 (Γ_G² floor) | 0.05 s | 18.3 s |
+| cpd-1a, cpd-1h | 5 each | 117-128 | 0 | 0 | 0.8-1.4 s |
+| probe 1, 2θ ≤ 90° | 5 | ≤ 1 619 | 22 (Γ_L) | 8.6 s | 13.6 s |
+| probe 1, 2θ ≤ 120° | 5 | ≤ 1 621 | 31 (Γ_L) | 36.2 s | 54.7 s |
+| probe 1 + true `lor_strain` 0.03, 90° | 5 | ≤ 1 619 | 0 | 0 | 6.4 s |
+| probe 1 + true `lor_strain` 0.03, 120° | 5 | ≤ 1 621 | 53 (Γ_L) | 80.2 s | 102.4 s |
+
+- **Real data reached the step once in 32 least-squares runs**, for 0.05 s.
+  Every probe crossing is in the last (`profile`) stage and on the
+  **Lorentzian** rows (Γ_L ≥ 0), never the Γ_G² floor the Context above
+  suspected.
+- A strain term in the probe's truth does not remove the crossings at 120°.
+  So the probe's zero tanθ Lorentzian is not the whole cause. Why its
+  profile stage presses on Γ_L is not measured (a hypothesis: X and
+  `lor_size` are both 1/cosθ terms, so their difference is a flat direction
+  the LM step can overshoot along).
+- `solver="trf"` is no way round (one run each): it took 159.5 s at 90° (LM 13.6 s), stopped
+  its `profile` stage at the 400-evaluation cap, and ended at Rwp 0.0511
+  against LM's 0.0447. At 120° it was stopped after 9 min (LM 54.7 s), and on
+  NAC after 19.5 min (LM 11.3 s).
+- What this re-rates: the step is as costly as filed when a fit reaches it,
+  and no real pattern on the tree reaches it. Whether the user's pattern
+  does is WP-2317 task 1's question.
+
 **The ruling this touches (WP-2317's R4).** Practice (`docs/practice.md`
 § Peak-width limits) floors by value: GSAS-II per reflection, FullProf at
 Γ_G = 1e-10, while RIETAN-FP rejects a step to a negative width. rietx holds the
@@ -112,6 +148,10 @@ free swap under LM.
    multiply an identity block; keep T on the table columns only and widen lazily,
    or let `crossed` read the table block. This is plausibly much of the profiled
    step's unattributed time (a hypothesis; the profile split says).
+   *Measured 2026-11-27 (3rd session):* only the cached |T| is bit-identical
+   on every BLAS. Any blockwise G·E⁻¹ changes bits under x86_64 OpenBLAS,
+   so it is a rounding move under R0 like Angles 1-2. The handover log has
+   the numbers.
 1. **Row and box-row pruning** (exact; no ruling). Pass the LDP only the rows the
    box step crossed, plus those within a slack of the current point, re-adding any
    the solved step violates. Pass likewise only the box rows of variables on or
@@ -147,15 +187,24 @@ free swap under LM.
 
 ## Tasks
 
-- [ ] Count crossings per stage (`truncated_by`) on a real large-cell Pawley fit,
+- [x] Count crossings per stage (`truncated_by`) on a real large-cell Pawley fit,
       an `index_pattern` candidate validation, and on `bigcell-pawley`, plus
       `solver="trf"`'s wall on both. If real data never cross, re-rate this WP and
-      say so.
+      say so. *Done 2026-11-27: one crossing in 32 real-data runs; the table is
+      Context § Task 1's count.*
 - [ ] Measure main against the branch on `bigcell-pawley`, interleaved, one
       machine, min-max over at least three runs, plus one profiled run for the
-      split.
-- [ ] Angle 0. Steps byte-equal before and after.
-- [ ] Angles 1-2. The pruned/Cholesky step equal to the full step within the
+      split. *Measured 2026-11-27 on probe 1 at 2θ ≤ 120° for a form of
+      Angle 0 since withdrawn (the `bigcell-pawley` bench case is not on the
+      tree yet): main 55.0-55.4 s, that branch 52.6-52.9 s, three runs each.
+      The split is in the handover log. The cached |T| alone was not timed.*
+- [x] Angle 0, its bit-identical part. *Done 2026-11-27:
+      `LinearInequality.crossed` keeps |T|, bit-identical by construction.
+      The blockwise G·E⁻¹ (`lm._rows_in_z`) was byte-equal on macOS
+      Accelerate and arm64 OpenBLAS and not on x86_64 OpenBLAS (Linux CI,
+      and Rosetta here), so it was withdrawn to the next item.*
+- [ ] Angles 0 (blockwise G·E⁻¹), 1 and 2. The blockwise, pruned and Cholesky
+      steps equal to the full step within the
       polish tolerance (`_POLISH_FEASIBLE`) on the existing constrained-step cases
       and the bench case. The audit row for the slack.
 - [ ] Angle 4, measured.
@@ -189,6 +238,144 @@ free swap under LM.
   (variable projection, angle 7).
 
 ## Handover log
+
+### 2026-11-27 (3rd session) — Angle 0's blockwise product withdrawn (ghostshift runner; PR #1861)
+
+Linux CI failed `test_the_rows_in_z_are_the_dense_product_byte_for_byte` on
+all four seeds, on py3.11 and py3.14. Linux's BLAS sums the blockwise
+product in a different order from the dense one. So on Linux the change
+moved numbers at rounding level, which puts it under WP-2317's R0 with
+Angles 1-2. This session removed `lm._rows_in_z` and its two tests. The
+cached |T| in `LinearInequality.crossed` stays: `abs` is exact and T is
+frozen for the run, so it reuses the same bytes. The PR now ships task 1's
+probe and counts, the cached |T|, and the WP-2317 entry. It claims no
+speed-up, since the 1.04-1.05× was measured with the blockwise product in.
+
+*Measured* (`docs/wp/2315-probe/blockwise_bytes.py`, run with each BLAS's
+interpreter: eight random shapes, n = 300-591, 500 width rows, 7 columns of T
+nonzero, signed zeros in E⁻¹). Two blockwise forms against the dense
+`G @ E_inv`: (a) the PR's, T read on its nonzero columns; (b) the box rows
+sliced and T's rows multiplied whole.
+- macOS Accelerate and OpenBLAS 0.3.34 arm64 (`neoversen1`): both forms
+  byte-equal on all eight shapes.
+- OpenBLAS 0.3.34 x86_64 (`Sandybridge` kernels, an x86_64 numpy 2.5.5
+  under Rosetta): both forms differ on every shape, (a) in 727-96 905
+  elements, (b) in 115-5 099. The box rows matched in every case; only T's
+  rows moved. The largest difference was 2.3 ε of |T|·|E⁻¹| for (a) and
+  2.0 ε for (b), so it is rounding.
+- So no blockwise form is byte-equal on every BLAS. Form (b) shows that
+  splitting the GEMM by rows already moves T's bits. A BLAS promises no
+  reduction order, so a byte-equality test on one BLAS certifies only that
+  BLAS. An x86_64 venv under Rosetta reproduces the Linux split on this Mac.
+- Tests (macOS arm64, `[dev]`): `test_lm_solver.py`, `test_bccg.py`,
+  `test_pawley.py` and `test_gaussian_width_floor.py` together, 115 passed,
+  1 xfailed (the 2nd session's 122 less the 7 removed cases). Fast selection
+  (`-m "not slow"`, this branch over main e94925ae9): 15 819 passed,
+  452 skipped, 30 xfailed.
+
+*Next.* As the 2nd session's, with the blockwise G·E⁻¹ added to Angles 1-2
+behind R0.
+
+### 2026-11-27 (2nd session) — task 1, the measurement, Angle 0 (ghostshift runner; PR #1861)
+
+No real pattern on the tree reaches the expensive step: one crossing in 32
+least-squares runs over FAP.XRA, 11-BM NAC, FAP.XRA's `index_pattern`
+validations and two lab Cu round-robin patterns. WP-2317's synthetic probe
+reaches it in its last stage on the Lorentzian width rows, and there the
+step is 63-78 % of the fit. So the WP's cost is real but, on the evidence
+here, specific to the probe until the user's own pattern says otherwise.
+Angle 0 ran the same steps byte for byte on this Mac, for about 5 % less
+wall on the probe. *Corrected by the 3rd session:* Linux CI's BLAS gave
+different bits, so only the cached |T| ships and the 5 % does not. The rest
+of the step is the nnls solve and the eigendecomposition, which only Angles
+1-2 can shrink, and those move numbers at rounding level.
+
+*Scope.* The shift held this session to task 1, the measurement and Angle 0,
+until the maintainer answers WP-2317's R0-R8. Angles 1-2 and later were not
+started.
+
+*Done.*
+- Task 1: `docs/wp/2315-probe/count_crossings.py` wraps `lm.minimize` and
+  the constrained step and prints crossings per run and per stage. The table
+  is Context § Task 1's count.
+- Angle 0: `lm._rows_in_z` builds G·E⁻¹ by blocks (row slices of E⁻¹ for the
+  box rows, T on the columns it reads). `LinearInequality.crossed` keeps |T|
+  in a cached property. (The 3rd session removed `_rows_in_z` and both
+  tests; the cached |T| stays.) Two tests, seven cases, in `tests/test_lm_solver.py`: the helper
+  against the dense product on four seeds, with signed zeros and padded
+  columns, and a Pawley-shaped constrained step (262 columns, a sparse A,
+  the least-distance path reached) against the dense product on three seeds.
+
+*Measured* (macOS arm64, `[dev]` venv, compiled tier on, Accelerate BLAS;
+every timing under the shift's suite lock, `serial.py`).
+- Byte equality: the first 8 of probe 1's 31 constrained steps at 120°
+  (captured from main's run) come back byte-equal from both main and the
+  branch. The whole 120° fit is byte-equal too: y_calc, the 15 values and
+  esds, Rwp, every stage's iteration count. The helper's equality also held on
+  40 random shapes under OpenBLAS 0.3.34 (arm64) and Accelerate. Without the
+  `+ 0.0` all 40 differed in the sign of a zero. Linux CI (x86_64 OpenBLAS)
+  failed the helper's test on all four seeds, on py3.11 and py3.14.
+- Wall, probe 1, Pawley, 2θ ≤ 120°, unprofiled, interleaved: main 55.0-55.4 s,
+  branch 52.6-52.9 s (three each), 1.04-1.05×. This machine runs the probe at
+  about 0.44× the Linux wall the Context quotes (125.4 s there).
+- Per constrained step, the 8 captured calls, best of 3: main 1.19-1.20 s,
+  branch 1.09-1.12 s. `crossed` 5.3-5.6 ms → 3.5-3.6 ms a call for both blocks.
+- Profiled split, branch (main in brackets): constrained step 34.2 s
+  (36.9 s) over 31 calls, of it own time 1.3 s (4.1 s); `nnls` 23.2 s
+  (23.3 s); `eigh` 7.3 s; `_equality_step` 2.3 s. `projected_cg` 11.4 s, of it
+  `spilu` 8.9 s over 1 058 builds. On one captured step `nnls` is 68 % and
+  `eigh` 16 %.
+- `solver="trf"`, one run each: probe at 90° 159.5 s against LM's 13.6 s, its `profile`
+  stage at the 400-evaluation cap, Rwp 0.0511 against 0.0447. Stopped after
+  9 min at 120° and after 19.5 min on NAC.
+- Tests: `test_lm_solver.py`, `test_bccg.py`, `test_pawley.py` and
+  `test_gaussian_width_floor.py` together, 122 passed, 1 xfailed.
+- Fast selection (`-m "not slow"`, on main 94804b716 plus this branch):
+  15 821 passed, 452 skipped, 30 xfailed. The 7 added cases are passes, no
+  new skip. They cost 0.50 s in one local run (`tests.added_test_times`).
+  The full suite did not run. Its premise, that the change was
+  byte-identical, held on this Mac only.
+
+*Settled by Claude.*
+- The stand-ins for "a real large-cell pattern", under the shift's brief (say
+  which, and why) and the Context's own question, which is the instrument
+  profile and not the cell. Alternative: Durham's ZrP₂O₇ (Pa-3, a ≈ 24.7 Å)
+  in the local data root, dropped because its file is a multi-range VT
+  series with two internal standards and the Durham input models it as a
+  subcell.
+- Priority stays P2 provisional, settled by Claude under the line's own
+  trigger, which needed both WP-2317 task 1 and this task 1, and only this
+  one is in. Alternative: P3 now, on the rubric's "a cost-only item with no
+  user at the wall".
+- `crossed` and `slack` still multiply the padded T. Dropping its zero
+  columns there goes through a matrix-vector product, whose BLAS kernels sum
+  in SIMD lanes, so the order and the last bit can change. That is a
+  rounding move for Angle 1, settled by Claude under Angle 0's byte-equal
+  bar. Alternative: take it as R0 (a)'s working reading allows.
+
+*Gotchas.*
+- Probe 1 takes `PROFILE=0` for a wall. A main snapshot runs from a
+  `git archive` of `origin/main`'s `src/` with `PYTHONPATH`, never `-I`.
+- One captured call is 82 MB pickled (two 41 MB T blocks).
+- The cached |T| is a second dense copy of each block, 41 MB a block at
+  1 601 reflections, for 1.8 ms a `crossed` call. Narrowing it to the
+  columns T reads is Angle 1's, with `slack`.
+
+*Review* (`/code-review high --fix`): no correctness finding. It widened
+`test_the_rows_in_z_…` so odd seeds spread T's columns over the whole
+problem (taken; the spread form also measured byte-equal on 40 shapes under
+OpenBLAS and Accelerate). It asked for ranges on the single-run walls
+(answered by labelling them one run) and flagged the |T| copy (kept, above).
+
+*Next.*
+1. The maintainer's answers to WP-2317's R0, R4 and R5, and WP-2317 task 1's
+   pattern. A pattern that does not cross makes this WP P3.
+2. If it crosses: Angle 1, the pruned box rows and width rows. It targets the
+   nnls solve, 68 % of the step, whose problem has 1 619 box rows and 6 424
+   width rows where a handful bind. Then Angle 2 for `eigh`.
+3. Why probe 1's `profile` stage presses on Γ_L at 120° even with a strain
+   term in its truth is unmeasured. It decides whether the probe is a fair
+   stand-in for a user's lab pattern.
 
 - **2026-11-27** — Filed from WP-2317's probe. A fresh subagent reviewed the plan
   the same day, and its findings are folded in:
