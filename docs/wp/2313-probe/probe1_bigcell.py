@@ -21,9 +21,11 @@ identity check only.
                               the profiler's per-call charge; quote the
                               unprofiled wall as the timing)
 
-First run 2026-11-26/27 (linux x86_64, 4 cores, Python 3.12.3, numpy 2.5.5,
-``[dev]`` venv, compiled tier on, rietx 1.13.0.dev0 at 4e099d68), one run per
-case under cProfile — readings in the WP-2313 file, Context.
+Run 2026-11-26/27 (linux x86_64, 4 cores, Python 3.12.3, numpy 2.5.5,
+``[dev]`` venv, compiled tier on, rietx 1.13.0.dev0 at 4e099d68) — readings in
+the WP-2313 file, Context.  The start carries the truth's atoms (the same
+``POSITIONS``); only the cell, the widths and the background start off.
+``MIN_SEP`` (Å, default 1.5) sets the closest approach of any two images.
 """
 import os
 import sys
@@ -48,16 +50,53 @@ def p(v, **kw):
     return rx.Parameter(value=v, **kw)
 
 
-rng = np.random.default_rng(0)
 species = ["Mo", "O", "O", "O", "C", "N"]
+MIN_SEP = float(os.environ.get("MIN_SEP", "1.5"))     # Å, between any two images
+
+
+def _positions(seed: int = 0) -> list[tuple[float, float, float]]:
+    """Asymmetric-unit sites drawn over the whole cell, every symmetry image of
+    every site at least ``MIN_SEP`` from every other (rejection sampling).
+
+    The first version drew inside (0.05, 0.45)³, a 1/15.6 sub-box: at 40 atoms
+    65 % of nearest neighbours sat under 1 Å, a non-physical model (WP-2313
+    review, S3).
+    """
+    import gemmi
+    ops = list(gemmi.SpaceGroup(sg).operations())
+    G = np.diag(np.array(cell[:3]) ** 2)              # orthogonal cells only
+    r = np.random.default_rng(seed)
+    images: list[np.ndarray] = []
+    out: list[tuple[float, float, float]] = []
+    tries = 0
+    while len(out) < natoms:
+        tries += 1
+        if tries > 200_000:
+            raise RuntimeError(f"cannot place {natoms} atoms {MIN_SEP} Å apart")
+        x = r.uniform(0.0, 1.0, 3)
+        imgs = np.array([np.mod(op.apply_to_xyz(list(x)), 1.0) for op in ops])
+        cand = np.vstack(images + [imgs]) if images else imgs
+        # every pair among the new images and against the placed ones, minimum image
+        d = imgs[:, None, :] - cand[None, :, :]
+        d -= np.round(d)
+        dist = np.sqrt(np.einsum("ijk,kl,ijl->ij", d, G, d))
+        n_new = len(imgs)
+        dist[np.arange(n_new), len(cand) - n_new + np.arange(n_new)] = np.inf
+        if np.all(dist >= MIN_SEP):
+            images.append(imgs)
+            out.append(tuple(float(v) for v in x))
+    return out
+
+
+POSITIONS = _positions()
 
 
 def phase(drift):
     f = 1 + drift
     atoms = [rx.Atom(label=f"A{i}", species=species[i % len(species)],
-                     x=p(float(rng.uniform(.05, .45))), y=p(float(rng.uniform(.05, .45))),
-                     z=p(float(rng.uniform(.05, .45))), biso=p(1.0, min=0.0, max=25.0))
-             for i in range(natoms)]
+                     x=p(xyz[0]), y=p(xyz[1]), z=p(xyz[2]),
+                     biso=p(1.0, min=0.0, max=25.0))
+             for i, xyz in enumerate(POSITIONS)]
     return rx.Phase(name="big", space_group=sg,
                     cell=rx.Cell(a=p(12.0 * f, min=1.0), b=p(36.0 * f, min=1.0),
                                  c=p(4.0 * f, min=1.0), alpha=p(90.0), beta=p(90.0),
@@ -85,7 +124,6 @@ rs = generate_reflections(sg, cell, 1.5406, ttmax)
 print(f"SG {sg}  2theta<= {ttmax}  points {len(TT)}  unique reflections "
       f"{len(rs.hkl)}  atoms {natoms}  plan {PLAN}")
 
-state = rng.bit_generator.state
 truth = rx.Structure(phases=[phase(0.0)])
 blank = rx.PatternData(two_theta=TT.tolist(), intensity=np.ones_like(TT).tolist())
 m = compile_model(truth, instrument(True), blank)
@@ -99,7 +137,6 @@ print(f"one forward evaluation (warm): {(time.perf_counter() - t0) / 5 * 1e3:.0f
 counts = np.random.default_rng(1).poisson(np.clip(y, 1.0, None)).astype(float)
 data = rx.PatternData(two_theta=TT.tolist(), intensity=counts.tolist())
 
-rng.bit_generator.state = state     # the start carries the truth's atoms
 start = rx.Structure(phases=[phase(5e-4)])
 ref = rx.Refinement(start, instrument(False))
 pr = cProfile.Profile() if PROFILE else None

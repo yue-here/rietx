@@ -559,8 +559,8 @@ A user reported slowdowns on a 12 × 36 × 4 Å cell (2026-11-26). A synthetic
 stand-in (WP-2313's probe 1) found three paths whose cost grows faster than the
 reflections and atoms a large cell brings. Coordinate and ADP columns rebuild the
 whole structure factor once per column (2314). A Pawley step that crosses a width
-row solves densely over every intensity (2315). A Le Bail partition runs ~8 000
-Python cycles per update (2316). The maintainer's bar for the track (2026-11-27)
+row solves densely over every intensity (2315). A Le Bail partition runs
+thousands of cycles per update (2316). The maintainer's bar for the track (2026-11-27)
 is accuracy on par with the other codes, with speed bought by any means. 2313
 holds that bar, the bench cases, and the earlier rulings put back to the
 maintainer under it.
