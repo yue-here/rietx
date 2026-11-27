@@ -76,8 +76,10 @@ kernel is 6.8 s of 53.5 s (26 s of 207 s on the first probe):
 Every intensity-only column is Ω·(∂I/∂θ_c): the same Ω planes, a different
 per-peak coefficient. So the columns can be one dense (peaks × columns) block of
 ∂I, chained once through `_f2_derivative_chain` with a column axis, and laid onto
-the pattern by one sparse-dense product against the compiled Ω. This is what
-makes the ≥ 10× target reachable, since the hoist alone leaves this 26 s.
+the pattern by one sparse-dense product against the compiled Ω. On the physical model
+the hoist alone leaves about 26 s of the 72.4 s Jacobian: this 6.8 s, the 16.2 s
+of `_peak_chain_column` (angle 3) and ~3 s else. So the ≥ 10× target needs
+angles 2 and 3 together, and angle 3 is the larger share.
 
 **Biso and occupancy go by finite difference of `phase_peaks`**
 (`_peak_chain_column`), and that is also quadratic: one perturbed Biso recomputes

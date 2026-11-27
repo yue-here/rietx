@@ -204,9 +204,10 @@ first.
 - **2026-11-27, from WP-2314 (filed under WP-2313): the structural columns'
   structure factor has an owner now.**
   - On a 40-atom phase, `_structural_column` rebuilds A once per coordinate
-    column, n_asym `_orbit_terms` per column. The Biso/occupancy columns this
-    WP's FD chain builds pay a whole-phase |F|² each (WP-2313 probe 1: 16.2 s
-    of a 72 s Jacobian total, against 53.5 s for the coordinate columns).
+    column, n_asym `_orbit_terms` per column. Each Biso/occupancy column this
+    WP's FD chain builds pays a whole-phase |F|². WP-2313 probe 1 puts every
+    `_peak_chain_column` (Biso, occupancy, cell and the rest alike) at 16.2 s of
+    a 72 s Jacobian, against 53.5 s for the coordinate columns.
   - WP-2314 owns the per-evaluation structure-factor cache, an analytic or
     incremental Biso/occupancy branch, and everything that reassociates. This
     WP's task "|F|² orbit sums shared across a batch's cell columns, and Biso

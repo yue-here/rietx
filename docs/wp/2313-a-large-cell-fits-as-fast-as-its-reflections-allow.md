@@ -85,8 +85,8 @@ range. Task 2's bench cases replace them with min-max ranges.
 | Rietveld, `mccusker_structural`, **40 atoms**, 899 refl | **75.0 s** | 0.0867 | the Jacobian is 99 % of the solve, and the coordinate columns rebuilding A are 53.5 of its 72.4 s (**WP-2314**) |
 | Pawley, 899 intensity columns | 23.7 s | 0.0447 | the constrained step (**WP-2315**) |
 | Pawley, 1 601 columns | **125.4 s** | 0.0420 | `lm._solve_constrained_step` 72.8 s (31 calls), plus 23.9 s in 1 056 `spilu` builds; the Jacobian is 7.5 s (**WP-2315**) |
-| Le Bail, 899 refl | **154.9 s** | **0.1512** | 96 % in `_settled_partition` (**WP-2316**) |
-| Le Bail, 1 601 refl | **351.8 s** | **0.1449** | 97 % in `_settled_partition` (**WP-2316**) |
+| Le Bail, 899 refl | **154.9 s** | **0.1512** | 95 % in `_settled_partition`, first probe's profile (**WP-2316**) |
+| Le Bail, 1 601 refl | **351.8 s** | **0.1449** | 97 % in `_settled_partition`, first probe's profile (**WP-2316**) |
 | `report()` after the 40-atom fit | 5.6 s | | not a cost here (WP-1335 owns the report path) |
 
 Three readings shape the track.
@@ -111,8 +111,9 @@ where the choice was made, the reasoning given for it, what practice does, and
 what it costs here.
 
 - **R1 — bit-identity as a speed WP's own bar.** This is *not* a ruling. It is a
-  convention some speed WPs set themselves, most explicitly WP-1945 ("the bar this
-  WP set"; "kept only if bit-identical"). Others moved numbers when they had cause:
+  convention some speed WPs set themselves, most explicitly WP-1109 ("the bar this
+  WP set") and WP-1945 ("Bit-identity per family is the bar"; "kept only if
+  bit-identical"). Others moved numbers when they had cause:
   - WP-1123 moved the tolerance;
   - WP-1953 moved FAP's Pawley Rwp, 0.0803 → 0.0782;
   - WP-2011 moved NAC's Pawley Rwp, 0.12591 → 0.12592;
@@ -133,8 +134,9 @@ what it costs here.
     TOPAS and RIETAN-FP extract **once per least-squares cycle** and let the
     intensities converge across the refinement, and GSAS-II's refinement stops at
     a 1e-3 relative change.
-  - *Cost:* 96-97 % of a Le Bail fit here. WP-1542 named LaMnO₃'s 12 293 cycles
-    (from a flat start; 8 495 in-fit) at 150× the wall clock.
+  - *Cost:* 95-97 % of a Le Bail fit here (the first probe's profiled runs).
+    WP-1542 named LaMnO₃'s 12 293 cycles (from a flat start; 8 495 in-fit) at
+    150× the wall clock.
   - *Owners:* WP-2316 owns the cost. **WP-2017's group Q owns the number**
     (`StageSpec:lebail_tol`, on LaB₆ + cBN, `fap`, `cpd1a`).
 - **R3 — DESIGN-RULES Rule 5, *Structure-free fitting* (ruled 2026-11-05, #1434),
@@ -143,7 +145,7 @@ what it costs here.
   asked of it, in its smallest correct form. A change to Le Bail that moves every
   fit's numbers waits for WP-2062."
   - Read whole, the clause argues for routing a large cell to Pawley (on this case
-    already 3-7× faster than Le Bail), not for a Le Bail speed project. The second
+    already 3-7× faster than Le Bail), not for a Le Bail speed project. The third
     sentence also fences even a bit-identical Le Bail kernel that no ruling asked
     for.
   - *Question:* does a user at the wall on Le Bail count as the ruling that asks?
@@ -204,8 +206,9 @@ what it costs here.
 - **`backend="jax"`: expect little.** Its own docstring says the cost is "one
   tangent per column ≈ one forward evaluation each, the same order as plain FD",
   and the traced residual unrolls `_phase_component_scalar`'s per-reflection loop
-  into the jit graph (~1 800 windows at 899 reflections, ~13 000 at 6 477). So
-  compile time likely dominates. Run it once under a runaway guard, for the
+  into the jit graph (~1 800 windows at 899 reflections under the Cu Kα
+  doublet, ~6 500 at 6 477 on one 0.459 Å line). So compile time likely
+  dominates. Run it once under a runaway guard, for the
   record. It gates nothing.
 - **Iterations, not only cost per iteration:** R6, and task 5.
 
@@ -326,6 +329,24 @@ the code. Nothing in `src/` changed.
   - the measurement protocol (interleaved, same session, min-max).
 
   None was declined.
+- *Code review* (`/code-review high --fix`, handover step 6): 10 findings, 9
+  fixed. Among the fixes:
+  - the probe's docstring still described the sub-box draw;
+  - 2314's remainder after the hoist was quoted from the first probe;
+  - R3 named the wrong sentence of Rule 5;
+  - R1's quote is WP-1109's;
+  - jax's window count on one 0.459 Å line;
+  - 2315's ILU counts are now the physical model's;
+  - the Le Bail share is now 95-97 %, from the first probe's profile.
+
+  Declined: re-quoting the single-run walls as ranges, which is task 2's job,
+  since it needs repeated interleaved runs. The probe's import order was fixed
+  by ruff (the lint scope does not cover `docs/`).
+- *Not run:*
+  - the fast and full suites, since the branch adds no test and changes no code
+    in `src/`, `tests/` or `examples/`;
+  - the generality judge: no `_audit.py` change, and no heuristic in code;
+  - the `tests.reader_output` check, which runs at step 11.
 - *Gotchas:*
   - Probe walls are single runs on one machine, so no figure here is a "before"
     for another WP (task 2).

@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: ⬜
 Track: A large cell
 Depends on: 2313 soft (its `bigcell-lebail` case and rulings R0, R2, R3); 2017 soft (group Q owns `lebail_tol`'s number); 2062 soft (Rule 5's Le Bail fence)
-Priority: P2 2026-11-27 — provisional: the track the maintainer opened for a user at the wall, on the slowest mode measured (96-97 % of a large-cell Le Bail fit in the partition, which also lands at three times Pawley's Rwp); what may start without a ruling is narrow (R3), so re-rate when WP-2313 task 3 answers R2-R3
+Priority: P2 2026-11-27 — provisional: the track the maintainer opened for a user at the wall, on the slowest mode measured (95-97 % of a large-cell Le Bail fit in the partition, which also lands at three times Pawley's Rwp); what may start without a ruling is narrow (R3), so re-rate when WP-2313 task 3 answers R2-R3
 
 ## Goal
 
@@ -28,7 +28,7 @@ the structure-free method rietx leads with. WP-2062 carries the move to it as th
 default. Le Bail gets only what a ruling already asked of it, in its smallest
 correct form. A change to Le Bail that moves every fit's numbers waits for
 WP-2062."
-- The second sentence fences even a bit-identical Le Bail kernel unless a ruling
+- The third sentence fences even a bit-identical Le Bail kernel unless a ruling
   asks for it, and the first argues for angle 9 (route to Pawley) over a Le Bail
   speed project.
 - So **no angle here starts before WP-2313 task 3 has put R3 to the maintainer.**

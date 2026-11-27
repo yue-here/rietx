@@ -169,7 +169,7 @@ above, which come from lab and synchrotron single-phase patterns
     on Le Bail. That would close WP-2316 on its angle 9.
   - WP-2316 task 1 asks why Le Bail lands so much worse here. Its answer may
     bear on this WP's site-by-site choice.
-  - WP-2315 is making the large Pawley step faster.
+  - WP-2315 (filed, not started) plans to make the large Pawley step faster.
 - **2026-11-26, from WP-2311 (closed): the unit dependence is fixed, decision 0
   stands, and this WP is unblocked.** The 2026-10-28 reading was a start
   dependence. The probe rescaled the data but left the declared background in

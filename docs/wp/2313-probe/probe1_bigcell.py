@@ -2,8 +2,9 @@
 
 A measurement scaffold, not package code.  The cell, the space group and the
 atoms are **invented** for a performance question: the atoms are drawn at a
-fixed seed inside (0.05, 0.45) on general positions, the pattern is the truth
-model Poisson-sampled, and the fit starts 500 ppm high on the cell with
+fixed seed over the whole cell on general positions, every symmetry image at
+least ``MIN_SEP`` from every other, the pattern is the truth model
+Poisson-sampled, and the fit starts 500 ppm high on the cell with
 generic widths.  Nothing it prints is a structural claim, and Rwp is an
 identity check only.
 
@@ -27,17 +28,18 @@ the WP-2313 file, Context.  The start carries the truth's atoms (the same
 ``POSITIONS``); only the cell, the widths and the background start off.
 ``MIN_SEP`` (Å, default 1.5) sets the closest approach of any two images.
 """
+import cProfile
 import os
+import pstats
 import sys
 import time
-import cProfile
-import pstats
 
 import numpy as np
+
 import rietx as rx
+from rietx.crystallography.symmetry import generate_reflections
 from rietx.model.forward import compile_model
 from rietx.params.vector import ParameterTable
-from rietx.crystallography.symmetry import generate_reflections
 
 mode, sg, ttmax, natoms = sys.argv[1], sys.argv[2], float(sys.argv[3]), int(sys.argv[4])
 PLAN = os.environ.get("PLAN", "mccusker_default")

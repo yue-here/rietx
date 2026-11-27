@@ -76,8 +76,8 @@ This happens "whatever `BVLS_MAX_COLUMNS` says" (WP-1938).
   microbenchmark, 2026-11-27).
 
 **The preconditioner.** `bccg.projected_cg` already reuses its ILU while the free
-set is unchanged (`bccg.py:414-415`). The 1 099 builds in 67 solves are about 16
-free-set changes per solve, plus a fresh factor for every call, and so for every
+set is unchanged (`bccg.py:414-415`). The 1 056 builds in 73 solves are about 14 a
+solve: free-set changes, plus a fresh factor for every call, and so for every
 λ retry. The open angle is reusing a stale *superset* factor as the fixed set
 grows, and keeping the factor across λ retries (λ shifts only the diagonal).
 
