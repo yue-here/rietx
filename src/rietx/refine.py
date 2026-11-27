@@ -536,6 +536,10 @@ class _StageHold:
     #: ``StageResult.window_loss`` (WP-2047): measured on the stage's own
     #: frozen model at its answer, which only ``_run_stage`` still holds
     window_loss: float | None = None
+    #: ``StageResult.window_refit_loss`` (WP-2317 R7): the loss the stage's
+    #: first solve ended on, where it passed the window tolerance and the stage
+    #: was solved again on fresh windows
+    window_refit_loss: float | None = None
     #: ``StageResult.rwp`` (WP-1334), the same frozen model at the same answer
     rwp: float | None = None
 
@@ -5180,7 +5184,102 @@ class Refinement:
                    phase_support_sigma: float | None = PHASE_SUPPORT_SIGMA,
                    window_area_tol: float | None = None,
                    refined_before: frozenset[str] = frozenset()):
-        """One stage: free params, recompile, solve, commit, guard.
+        """One stage (:meth:`_solve_stage`), solved once more on fresh
+        windows when its frozen ones dropped more than its window tolerance
+        at its answer (WP-2317 R7).
+
+        A stage sizes its windows' movement slack from the position
+        parameters it can move (``forward.WINDOW_MOVE_FWHM``), and nothing
+        bounds how far a solve moves them, so this refit is the bound: the
+        stage is compiled again at its answer and solved from there, once,
+        never a third time.  The stage whose answer is the result (the last
+        of ``n_stages``, and a stage run on its own) keeps the uniform
+        ``forward.WINDOW_MIN_DEG``: its windows' tail room is in the esds and
+        statistics the result reports, which on a plan with no closing stage
+        doubled a series' cell esds at 3 FWHM (WP-2317, the series guide).  ``StageResult.window_refit_loss`` records the
+        loss that triggered it, and the record is one stage: the second
+        solve's answer, the first one's starting cost, and both solves'
+        iterations.  A stage declaring its own ``window_slack_deg`` keeps the
+        caller's windows and is not refitted, and neither is a stage stopped
+        on a non-finite model, which ended where it started.
+        """
+        kw = dict(correlation_guard=correlation_guard, events=events,
+                  cancel=cancel, stage_index=stage_index, n_stages=n_stages,
+                  ftol=ftol, phase_support_sigma=phase_support_sigma,
+                  window_area_tol=window_area_tol,
+                  movement_slack=stage_index < n_stages)
+        model, outcome, guard, freed, hold = self._solve_stage(
+            stage, data, mode, table, model, two_theta_limits,
+            prior_significance=prior_significance,
+            refined_before=refined_before, **kw)
+        first_loss = hold.window_loss
+        if (stage.window_slack_deg is None and outcome.non_finite is None
+                and first_loss is not None
+                and first_loss > recorded_window_tol(window_area_tol)):
+            first, first_hold = outcome, hold
+            # the stage again, from its answer: no seed (a row the solve put
+            # back on its floor is where the data put it, WP-1938) and no
+            # aperture lift (every path it left free is refined, WP-1955)
+            again = dataclasses.replace(stage, seed=None, strain_seed=None)
+            model, outcome, guard, freed, hold = self._solve_stage(
+                again, data, mode, table, model, two_theta_limits,
+                prior_significance=first_hold.significance,
+                refined_before=frozenset(refined_before | set(table.free_paths)),
+                **kw)
+
+            def joined(a, b):
+                return list(a) + [x for x in b if x not in a]
+
+            outcome = dataclasses.replace(
+                outcome, cost_initial=first.cost_initial,
+                n_iterations=first.n_iterations + outcome.n_iterations,
+                n_constraint_truncations=(first.n_constraint_truncations
+                                          + outcome.n_constraint_truncations),
+                n_degenerate_cell_probes=(first.n_degenerate_cell_probes
+                                          + outcome.n_degenerate_cell_probes),
+                n_lapack_fallbacks=first.n_lapack_fallbacks + outcome.n_lapack_fallbacks,
+                truncated_by={k: (first.truncated_by.get(k, 0)
+                                  + outcome.truncated_by.get(k, 0))
+                              for k in {**first.truncated_by, **outcome.truncated_by}})
+            settled = [x for x in (first_hold.lebail_settled, hold.lebail_settled)
+                       if x is not None]
+            hold = dataclasses.replace(
+                hold, window_refit_loss=first_loss,
+                # what the stage did before the refit stays on its record:
+                # its seeds, what it put back, the Le Bail cycles it ran
+                seeded=first_hold.seeded,
+                cell_runaway=joined(first_hold.cell_runaway, hold.cell_runaway),
+                cell_reset=joined(first_hold.cell_reset, hold.cell_reset),
+                collapsed=joined(first_hold.collapsed, hold.collapsed),
+                cell_runaway_unresolved=_merge_unresolved(
+                    first_hold.cell_runaway_unresolved,
+                    hold.cell_runaway_unresolved),
+                lebail_run=first_hold.lebail_run + hold.lebail_run,
+                lebail_settled=all(settled) if settled else None)
+        if events is not None:
+            # additive on the existing kind (history/events.py's rule)
+            events.emit("stage_end", stage=stage.name, status=outcome.status,
+                        n_iterations=outcome.n_iterations,
+                        termination=outcome.termination,
+                        cost_initial=outcome.cost_initial,
+                        cost_final=outcome.cost_final, rwp=hold.rwp,
+                        held=list(hold.held), released=list(hold.released),
+                        window_loss=hold.window_loss,
+                        window_refit_loss=hold.window_refit_loss)
+        return model, outcome, guard, freed, hold
+
+    def _solve_stage(self, stage: Stage, data: PatternData, mode: Mode,
+                     table: ParameterTable, model: CompiledModel | None,
+                     two_theta_limits: tuple[float, float] | None,
+                     correlation_guard: float, events=None, cancel=None,
+                     stage_index: int = 1, n_stages: int = 1,
+                     ftol: float | None = None,
+                     prior_significance: np.ndarray | None = None,
+                     phase_support_sigma: float | None = PHASE_SUPPORT_SIGMA,
+                     window_area_tol: float | None = None,
+                     refined_before: frozenset[str] = frozenset(),
+                     movement_slack: bool = False):
+        """One solve of a stage: free params, recompile, solve, commit, guard.
 
         The recompile is what keeps the residual smooth *within* the stage —
         the hkl list, symmetry-op subsets, FCJ node counts and windows are
@@ -5341,7 +5440,10 @@ class Refinement:
             window_area_tol=recorded_window_tol(window_area_tol),
             # the split this call decided at its start, so a stage that drove
             # a half-occupied atom onto a mirror keeps its multiplicity
-            orbit_split=self._orbit_split)
+            orbit_split=self._orbit_split,
+            # the movement slack sized from what this stage frees (WP-2317 R7),
+            # on a stage whose answer a later one refits (_run_stage)
+            movement_slack=movement_slack)
         table.push_moment_frames(new_model)
         carried = False
         if model is not None and mode in ("lebail", "pawley") and model.mode == mode:
@@ -5800,15 +5902,6 @@ class Refinement:
             model.y_obs, y_stage, model.sigma,
             n_free=len(table.free_paths) + _pawley_n(model),
             y_background=y_bkg).rwp
-        if events is not None:
-            # additive on the existing kind (history/events.py's rule)
-            events.emit("stage_end", stage=stage.name, status=outcome.status,
-                        n_iterations=outcome.n_iterations,
-                        termination=outcome.termination,
-                        cost_initial=outcome.cost_initial,
-                        cost_final=outcome.cost_final, rwp=stage_rwp,
-                        held=list(held), released=list(released),
-                        window_loss=loss)
         final_held = set(held)
         kept_axes = {b: a for b, a in flat_axes.items()
                      if f"{b}.moment.dof2" in final_held}
@@ -6685,7 +6778,8 @@ class Refinement:
                 moment_turned=hold.moment_turned,
                 blocked_by_hold=hold.blocked_by_hold,
                 unknown_paths=hold.unknown_paths, fixed=hold.fixed,
-                window_loss=hold.window_loss, rwp=hold.rwp,
+                window_loss=hold.window_loss,
+                window_refit_loss=hold.window_refit_loss, rwp=hold.rwp,
                 lebail_cycles_run=hold.lebail_run,
                 lebail_settled=hold.lebail_settled,
                 termination=outcome.termination or None,
@@ -7022,7 +7116,8 @@ class Refinement:
                 moment_turned=hold.moment_turned,
                 blocked_by_hold=hold.blocked_by_hold,
                 unknown_paths=hold.unknown_paths, fixed=hold.fixed, unreached_histograms={},
-                window_loss=hold.window_loss, rwp=hold.rwp,
+                window_loss=hold.window_loss,
+                window_refit_loss=hold.window_refit_loss, rwp=hold.rwp,
                 lebail_cycles_run=hold.lebail_run,
                 lebail_settled=hold.lebail_settled,
                 termination=outcome.termination or None,
@@ -9313,6 +9408,13 @@ def _window_loss_diagnostics(stage_results: list[StageResult]) -> list[Diagnosti
     its own windows.  ``FROZEN_COMPILE_STALE`` is the last stage's χ² read at
     the result, and misses half of the runaway, where frozen and fresh fit
     equally badly.
+
+    Since WP-2317 (R7) a stage of ``Refinement``'s runners that ends past its
+    fraction solves once more on windows sized at its answer, so this reads
+    the second solve's loss and fires only where that one is stale too.  The
+    runaway above now refits, stays at its ``axial_sl``, and ends on windows
+    that hold its peaks: its record is ``StageResult.window_refit_loss``
+    (73 %), and this stays silent.  A joint fit never refits.
     """
     # the closing stage is the one a plan appended: its name, and a recorded
     # fraction, which no declared stage of a plan carries (``None``); the name

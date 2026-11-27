@@ -5,8 +5,10 @@ error over the domain it claims.  This file holds the window constants of
 ``rietx.model.forward`` that only a fit can exercise:
 
 * ``WINDOW_AREA_TOL`` (2e-2), the area a window may drop from each peak.
-* ``WINDOW_MIN_DEG`` (0.3°), the slack added to every half-width as movement
-  headroom, and ``StageSpec.window_slack_deg``, whose default ``None`` is it.
+* The movement slack added to every half-width: ``WINDOW_MOVE_FWHM`` (3 FWHM
+  per position family a stage frees, WP-2317 R7) under the ceiling
+  ``WINDOW_MIN_DEG`` (0.3°), and ``StageSpec.window_slack_deg``, whose default
+  ``None`` is that rule.
 * ``REFLECTION_MARGIN_DEG`` (0.5°), how far past the fitted range a
   reflection is still generated.
 
@@ -62,15 +64,28 @@ read under 0.009 σ and 0.012 esd.  The whole protocol fit takes 1.3×, 3.5×,
 does not always fit better: from the shipped answer its χ² is 110 higher than
 the truncated one's on FAP and 37-1730 lower on the other three.
 
-``WINDOW_MIN_DEG`` claims movement headroom only.  At the converged tolerance
-the slack moves nothing: slack 0 and slack 1° give the slack-0.3° answer to
-within 0.001 σ and 0.001 esd on all four families.  What it must cover is how
-far a peak moves inside one stage.  The largest movement in any stage was
-0.21° (cpd-1a, ``profile_w``, from the fixture's start and from a cold start
-with the zero 0.1° off, the comment's "instrument-scale" error).  So the
-slack holds with 1.4× to spare.  NAC is not started cold: 0.1° is about ten
-of its FWHM, not an instrument-scale error at 11-BM, and its Le Bail pass
-then diverges.
+The movement slack claims headroom only.  At the converged tolerance the
+slack moves nothing: slack 0 and slack 1° give the slack-0.3° answer to within
+0.001 σ and 0.001 esd on all four families.  What it must cover is how far a
+peak moves inside one stage.  Under the uniform 0.3° the largest movement in
+any stage was 0.21° (cpd-1a, ``profile_w``, from the fixture's start and from
+a cold start with the zero 0.1° off, the comment's "instrument-scale" error).
+NAC is not started cold: 0.1° is about ten of its FWHM, not an
+instrument-scale error at 11-BM, and its Le Bail pass then diverges.
+
+Since WP-2317 (R7) a stage that a later stage refits sizes the slack from the
+position parameters it frees, and the bound is a re-solve: a stage ending past
+its window fraction solves once more on fresh windows.  The stage whose answer
+is the result keeps 0.3°, since its tail room is in the reported esds.  Measured on 2026-11-27, the largest
+movement in a stage is 1.17 FWHM from the fixtures' starts and 2.43 FWHM from
+the zero 0.1° off, inside every reflection's slack, so neither start refits.
+From every cell length 0.3 % long the first stages move peaks 0.68° (FAP),
+0.87° (cpd-1a) and 1.15° (LaB6), past the old 0.3° too.  Every stage still
+ends under its window fraction, LaB6 by one refit.  A stage freeing no
+position parameter gets half a point step.  At zero slack the windows of
+FAP's and NAC's ``scale_bkg`` stages dropped 2.01 % and 2.02 % of a peak,
+since a window takes the points within ±half and its cells can stop half a
+step short.
 
 The frozen windows do not cover a peak that **widens** during a stage, and no
 constant claims to.  In the ``profile`` stage of LaB6 (widths ×1.5) and
@@ -96,7 +111,9 @@ and the test selected by node id.  ``WINDOW_AREA_TOL`` at 1e-3 turned
 ``test_window_area_tol_meets_the_bar`` XPASS(strict) on all four families.
 ``REFLECTION_MARGIN_DEG`` at 5.0 did the same to the margin test on FAP and
 cpd-1a.  ``WINDOW_MIN_DEG`` at 0.1 failed the movement test on cpd-1a and on
-the cold FAP and cpd-1a starts, a peak moving 0.147° in a stage.
+the cold FAP and cpd-1a starts, a peak moving 0.147° in a stage.  On
+2026-11-27 ``WINDOW_MOVE_FWHM`` at 1.5 refit LaB6 from its own start and from
+the cold one, and the half step's absence failed the area test on FAP and NAC.
 """
 
 from __future__ import annotations
@@ -195,15 +212,17 @@ def _kept(c, gam, eta, a, b):
 
 
 def _stage_summary(model, v0, v1):
-    """For one solve: the largest peak movement, and the largest area an
+    """For one solve: the largest peak movement, the largest area an
     end-state peak inside the fitted range loses to the window frozen at the
-    stage start (FCJ smear at 512 nodes where the aberration acts)."""
+    stage start (FCJ smear at 512 nodes where the aberration acts), and the
+    largest movement of a reflection in range as a fraction of the slack its
+    window was given (WP-2317 R7)."""
     tt = np.asarray(model.tt)
     step = np.diff(tt)
     sl = v1.get("instrument.geometry.axial_sl", 0.0)
     hl = v1.get("instrument.geometry.axial_hl", 0.0)
     live = fcj_live(sl, hl)
-    move, worst = 0.0, (0.0, None)
+    move, worst, used = 0.0, (0.0, None), 0.0
     for ip, cp in enumerate(model.phases):
         for comp, win in ((0, cp.win), (1, cp.win_mag)):
             if win is None:
@@ -216,6 +235,16 @@ def _stage_summary(model, v0, v1):
                 ok = np.isfinite(pos0) & np.isfinite(pos1)
                 if ok.any():
                     move = max(move, float(np.abs(pos1[ok] - pos0[ok]).max()))
+                if comp == 0:
+                    gam0, _ = model.peak_gamma_eta(p0[il][1], p0[il][2])
+                    slack = (np.full(pos0.shape, model.window_slack_deg)
+                             if cp.window_slack_shape is None
+                             else fwd.movement_slack_deg(cp.window_slack_shape[il], gam0,
+                                                         fwd.grid_half_step(tt, pos0)))
+                    seen = ok & (pos0 >= tt[0]) & (pos0 <= tt[-1])
+                    d = np.abs(pos1 - pos0)[seen]
+                    if d.size:
+                        used = max(used, float(np.max(d / np.maximum(slack[seen], 1e-12))))
                 for k in np.flatnonzero(ok & (pos1 >= tt[0]) & (pos1 <= tt[-1])):
                     lo, hi = int(win[il, k, 0]), int(win[il, k, 1])
                     if hi <= lo:
@@ -234,18 +263,28 @@ def _stage_summary(model, v0, v1):
                         lost = 1.0 - kept
                     if lost > worst[0]:
                         worst = (lost, f"phase {ip} reflection {k} at {pos1[k]:.2f} deg")
-    return move, worst
+    return move, worst, used
+
+
+#: the starts the movement test fits from: the fixture's, the zero 0.1° off
+#: (an instrument-scale error on a lab instrument), every cell length 0.3 % long
+STARTS = ("warm", "zero", "cell")
 
 
 @lru_cache(maxsize=None)
-def _family(family, cold=False):
-    """The protocol fit, every solve summarised as it ran, and the answer."""
+def _family(family, start):
+    """The protocol fit from ``start`` (one of :data:`STARTS`), every solve
+    summarised as it ran, and the answer."""
     was = compiled.set_enabled(True)
     try:
         data, st, ins, plan, kw = _build(family)
         assert ins.source.dispersion is None, "every fixture here declines dispersion"
-        if cold:
+        if start == "zero":
             ins.zero_shift.value += 0.1
+        elif start == "cell":
+            for ph in st.phases:
+                for n in ("a", "b", "c"):
+                    getattr(ph.cell, n).value *= 1.003
         stages = []
         orig = refine_mod.run_least_squares
 
@@ -260,11 +299,14 @@ def _family(family, cold=False):
             ref = rx.Refinement(st, ins, history=False)
             res = ref.fit(data, plan=plan, **kw)
         OUT.mkdir(exist_ok=True)
-        res.plot(path=str(OUT / f"window_domain_{family}{'_cold' if cold else ''}.png"))
+        tag = "" if start == "warm" else f"_{start}"
+        res.plot(path=str(OUT / f"window_domain_{family}{tag}.png"))
         import matplotlib.pyplot as plt
         plt.close("all")
         return {"data": data, "plan": plan, "kw": kw, "stages": stages,
                 "window_loss": [(s.window_loss, s.window_area_tol) for s in res.stages],
+                "refits": [(s.name, s.window_refit_loss) for s in res.stages
+                           if s.window_refit_loss is not None],
                 "codes": {d.code for d in res.diagnostics},
                 "structure": ref.fitted_structure.model_copy(deep=True),
                 "instrument": ref.fitted_instrument.model_copy(deep=True)}
@@ -431,21 +473,30 @@ def test_the_converged_window_reference_is_converged(family):
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("family, cold", [
-    *((f, False) for f in FAMILIES),
+@pytest.mark.parametrize("family, start", [
+    *((f, "warm") for f in FAMILIES),
     # NAC is not started cold: 0.1 deg is ten of its FWHM (module docstring)
-    *((f, True) for f in ("lab6", "fap", "cpd1a"))])
-def test_window_min_deg_covers_every_stages_movement(family, cold):
-    """Movement headroom: no peak moves further within one stage than the
-    slack every window carries, nor than the reflection margin.  Measured at
-    most 0.21 deg (cpd-1a ``profile_w``, warm and cold)."""
-    stages = _family(family, cold)["stages"]
-    stage, move, _ = max(stages, key=lambda s: s[1])
+    *((f, "zero") for f in ("lab6", "fap", "cpd1a")),
+    *((f, "cell") for f in FAMILIES)])
+def test_each_stage_moves_its_peaks_inside_its_slack_or_refits(family, start):
+    """Movement headroom (WP-2317 R7).  From the fixture's start and from the
+    zero 0.1° off, no reflection in range moves further within a stage than
+    the slack its window was given, so no stage refits.  From a cell 0.3 %
+    long the first stages move peaks past it (1.15° on LaB6), and every stage
+    still ends with its windows dropping less than its tolerance, by a refit
+    where the slack did not hold.  From the two small starts no peak moves
+    past the reflection margin."""
+    f = _family(family, start)
+    stage, _, _, used = max(f["stages"], key=lambda s: s[3])
     assert StageSpec(name="x", turn_on=[]).window_slack_deg is None
-    assert move <= fwd.WINDOW_MIN_DEG, (
-        f"{family}{' cold' if cold else ''}: a peak moved {move:.3f} deg in {stage!r}, past "
-        f"the {fwd.WINDOW_MIN_DEG} deg slack")
-    assert move <= fwd.REFLECTION_MARGIN_DEG
+    for loss, tol in f["window_loss"]:
+        assert loss is not None and loss < fwd.recorded_window_tol(tol), f["window_loss"]
+    assert "STAGE_WINDOWS_STALE" not in f["codes"]
+    if start == "cell":
+        return
+    assert used <= 1.0, f"{family} {start}: a peak moved {used:.2f} of its slack in {stage!r}"
+    assert not f["refits"], f["refits"]
+    assert max(s[1] for s in f["stages"]) <= fwd.REFLECTION_MARGIN_DEG
 
 
 _GROWTH_FAILS = {
@@ -461,7 +512,7 @@ def test_no_protocol_stage_ends_on_stale_windows(family):
     dropping less than its own tolerance at its answer (1.61 % at most, LaB6's
     ``profile`` stage, against 2 %), so ``STAGE_WINDOWS_STALE`` stays silent
     on every fit the acceptance suites run."""
-    f = _family(family)
+    f = _family(family, "warm")
     for loss, tol in f["window_loss"]:
         assert loss is not None and loss < fwd.recorded_window_tol(tol), f["window_loss"]
     assert "STAGE_WINDOWS_STALE" not in f["codes"]
@@ -474,10 +525,8 @@ def test_frozen_windows_hold_the_area_bound_through_each_stage(family):
     ``WINDOW_AREA_TOL`` of its area within the window frozen at its stage's
     start.  Fails where a stage widens the peaks, which no constant claims
     to cover; every final stage holds it (at most 1.96 %)."""
-    # cold passed positionally, as the movement test does: lru_cache keys
-    # _family(f) and _family(f, False) apart, which would refit the protocol
-    stages = _family(family, False)["stages"]
-    stage, _, (lost, where) = max(stages, key=lambda s: s[2][0])
+    stages = _family(family, "warm")["stages"]
+    stage, _, (lost, where), _ = max(stages, key=lambda s: s[2][0])
     assert lost <= fwd.WINDOW_AREA_TOL, (
         f"{family}: {lost:.4f} of the area of {where} lost in {stage!r}")
     assert stages[-1][2][0] <= fwd.WINDOW_AREA_TOL
