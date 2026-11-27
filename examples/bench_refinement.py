@@ -95,23 +95,24 @@ structural claim.
              the saving one of them is quoted for was never measured at this
              width.
 
-The last four are WP-2317's large cell, also **simulated** (the block comment
-above ``_BIGCELL_SG``): one 12 × 36 × 4 Å P2₁2₁2₁ phase, Cu Kα doublet + FCJ,
-started at the truth's atoms with the cell 500 ppm high.
+The last four are WP-2317's large cell: a **real** structure with a
+**simulated** pattern (the block comment above ``_BIGCELL_SCALE``).
+Nb₁₈W₁₆O₉₃ from COD 2107344, 12.2 × 36.7 × 3.95 Å Pbam, 43 sites, Cu Kα
+doublet + FCJ, started at the truth's atoms with the cell 500 ppm high.
 
-``bigcell-structural``  40 atoms, ``mccusker_structural``, 2θ ≤ 90°: 120
-             coordinate and 40 Biso columns over 899 reflections (WP-2314).
+``bigcell-structural``  ``mccusker_structural``, 2θ ≤ 90°, the eight
+             co-sited Nb/W pairs tied: 66 coordinate and 35 Biso columns
+             over 886 reflections (WP-2314).
 ``bigcell-pawley`` and ``bigcell-pawley-120``
-             10 atoms' pattern, Pawley, ``mccusker_default``, 2θ ≤ 90° and
-             ≤ 120°: 913 and 1 606 intensity columns, tails from
-             outside the range included (WP-2315).
+             Pawley, ``mccusker_default``, 2θ ≤ 90° and ≤ 120°: 886 and
+             1 569 intensity columns, tails from outside the range included
+             (WP-2315).
 ``bigcell-lebail``  the same pattern at 2θ ≤ 90°, Le Bail from an
              ``auto_background`` seed, as the skill says (WP-2316).
 
 Runtime: the whole harness at the default three repeats is ~35 minutes before
 the large-cell cases, nearly all of it the three ``trigger`` cases; the four
-large-cell cases add 7-9 minutes (2026-11-27, darwin/arm64), most of it
-``bigcell-lebail`` and ``bigcell-pawley-120``.  ``--cases``
+large-cell cases add 2-3 minutes (2026-11-27, darwin/arm64).  ``--cases``
 selects; ``--list`` shows the keys.
 
 Configurations
@@ -489,6 +490,10 @@ class Setup:
     #: WP-2003 C3, the package default; the default here is WP-1127's 3.0,
     #: the bound this harness's rows were measured with.
     first_rung_factor: float | None = FIRST_RUNG_FACTOR
+    #: single-fit cases only — called on each repeat's fresh ``Refinement``
+    #: before its untimed ``fit``, for what a model cannot carry (a user tie).
+    #: None for every case but ``bigcell-structural``.
+    prepare: Callable[[rx.Refinement], object] | None = None
 
 
 @dataclass
@@ -866,78 +871,38 @@ def _trigger_series_unbounded() -> Setup:
     return setup
 
 
-# -- the large-cell cases, simulated (WP-2317) -----------------------------
+# -- the large-cell cases, a real structure (WP-2317) ----------------------
 #
 # A user reported slowdowns on a 12 × 36 × 4 Å cell (V ≈ 1 730 Å³), and no case
 # above carries more than ~1 200 (line, reflection) pairs or ~15 atoms in a
-# phase (WP-2317's R8).  These four are WP-2317 probe 1
-# (``docs/wp/2317-probe/probe1_bigcell.py``) as cases, and reproduce its
-# pattern bit for bit.
+# phase (WP-2317's R8).  These four put a published large cell through the
+# three modes.
 #
-# WHAT IS REAL AND WHAT IS NOT.  Nothing is.  The cell, the space group
-# (P2₁2₁2₁) and every atom are **invented** for a performance question: the
-# sites are drawn at a fixed seed over the whole cell on general positions,
-# rejection-sampled so every symmetry image of every site sits at least
-# ``_BIGCELL_MIN_SEP`` from every other.  The truth model is Poisson-sampled on
-# a Cu Kα doublet with FCJ live, and the start carries the truth's atoms, off
-# only in the cell (500 ppm high), the widths and the background.  The
-# structure-free cases use the first ten sites, the structural one forty; the
-# sampler is sequential, so the ten are the forty's first ten.  Dispersion is
-# declined, as for ``trigger``.  Rwp is an identity check only.
+# WHAT IS REAL AND WHAT IS NOT.  The structure is real: Nb₁₈W₁₆O₉₃ from COD
+# 2107344 (Stephenson 1968, ``tests/data/cod_2107344.cif``), P b a m,
+# 12.195 × 36.740 × 3.951 Å, 43 sites, eight of them Nb/W pairs at one
+# position.  It replaced WP-2317 probe 1's invented P2₁2₁2₁ cell (2026-11-27;
+# the maintainer: "Don't use your randomly generated ones").  The rest is
+# declared here: Biso (the file carries Uiso = 0; ``BISO_METAL``/``BISO_O``
+# in ``test_large_cell_refinement``), the scale, the instrument, and the
+# pattern, which is the model Poisson-sampled on a Cu Kα doublet with FCJ
+# live.  Dispersion is declined, as for ``trigger``.  The start protocol is
+# probe 1's, unchanged: the start carries the truth's atoms, Biso and scale,
+# and is off in the cell (500 ppm high), the widths (W, X), the axial ratios
+# (0.02 against the truth's 0.03, held by both plans, so a low-angle misfit is
+# expected) and the background (all zero against the truth's c0 = 900).  The
+# structural case ties each co-sited Nb/W pair, as a refiner would.  Nothing
+# here validates the compound, and Rwp is an identity check only.
 
-_BIGCELL_SG = "P 21 21 21"
-_BIGCELL_CELL = (12.0, 36.0, 4.0, 90.0, 90.0, 90.0)
-_BIGCELL_SPECIES = ("Mo", "O", "O", "O", "C", "N")
-_BIGCELL_MIN_SEP = 1.5      # Å, the closest approach of any two images
-
-
-def _bigcell_positions(natoms: int, seed: int = 0) -> list[tuple[float, float, float]]:
-    """Asymmetric-unit sites over the whole cell, every image ``_BIGCELL_MIN_SEP``
-    from every other (rejection sampling, orthogonal cell only).
-
-    Probe 1's first draw sat inside a 1/15.6 sub-box, 65 % of nearest
-    neighbours under 1 Å, and measured a degenerate model (WP-2317, S3).
-    """
-    import gemmi
-
-    ops = list(gemmi.SpaceGroup(_BIGCELL_SG).operations())
-    metric = np.diag(np.array(_BIGCELL_CELL[:3]) ** 2)
-    rng = np.random.default_rng(seed)
-    images: list[np.ndarray] = []
-    out: list[tuple[float, float, float]] = []
-    tries = 0
-    while len(out) < natoms:
-        tries += 1
-        if tries > 200_000:
-            raise RuntimeError(f"cannot place {natoms} atoms "
-                               f"{_BIGCELL_MIN_SEP} Å apart")
-        x = rng.uniform(0.0, 1.0, 3)
-        imgs = np.array([np.mod(op.apply_to_xyz(list(x)), 1.0) for op in ops])
-        cand = np.vstack(images + [imgs]) if images else imgs
-        d = imgs[:, None, :] - cand[None, :, :]
-        d -= np.round(d)                                    # minimum image
-        dist = np.sqrt(np.einsum("ijk,kl,ijl->ij", d, metric, d))
-        n_new = len(imgs)
-        dist[np.arange(n_new), len(cand) - n_new + np.arange(n_new)] = np.inf
-        if np.all(dist >= _BIGCELL_MIN_SEP):
-            images.append(imgs)
-            out.append(tuple(float(v) for v in x))
-    return out
+#: the phase scale: the strongest peak ~4 × 10⁴ counts over a 900-count
+#: background, the 40-atom probe's order (WP-2317)
+_BIGCELL_SCALE = 3e-5
 
 
-def _bigcell_phase(positions, drift: float) -> rx.Phase:
-    f = 1.0 + drift
-    a, b, c = _BIGCELL_CELL[:3]
-    atoms = [rx.Atom(label=f"A{i}", species=_BIGCELL_SPECIES[i % len(_BIGCELL_SPECIES)],
-                     x=_p(xyz[0]), y=_p(xyz[1]), z=_p(xyz[2]),
-                     biso=_p(1.0, min=0.0, max=25.0))
-             for i, xyz in enumerate(positions)]
-    return rx.Phase(name="sim-bigcell", space_group=_BIGCELL_SG,
-                    cell=rx.Cell(a=_p(a * f, min=1.0), b=_p(b * f, min=1.0),
-                                 c=_p(c * f, min=1.0), alpha=_p(90.0),
-                                 beta=_p(90.0), gamma=_p(90.0)),
-                    atoms=atoms, scale=_p(1e-4, min=0.0),
-                    lor_size=_p(0.03, min=0.0), lor_strain=_p(0.0, min=0.0))
+def _bigcell_phase(drift: float) -> rx.Phase:
+    from test_large_cell_refinement import NB18W16O93, large_cell_phase
+
+    return large_cell_phase(NB18W16O93, scale=_BIGCELL_SCALE, drift=drift)
 
 
 def _bigcell_instrument(*, truth: bool) -> rx.Instrument:
@@ -957,13 +922,13 @@ def _bigcell_instrument(*, truth: bool) -> rx.Instrument:
     return ins
 
 
-def _bigcell_pattern(two_theta_max: float, natoms: int) -> rx.PatternData:
+def _bigcell_pattern(two_theta_max: float) -> rx.PatternData:
     """The truth model on 5° to ``two_theta_max`` at 0.02°, Poisson-sampled at
     probe 1's seed."""
     from rietx.params.vector import ParameterTable
 
     tt = np.arange(5.0, two_theta_max, 0.02)
-    structure = rx.Structure(phases=[_bigcell_phase(_bigcell_positions(natoms), 0.0)])
+    structure = rx.Structure(phases=[_bigcell_phase(0.0)])
     instrument = _bigcell_instrument(truth=True)
     blank = rx.PatternData(two_theta=tt.tolist(),
                            intensity=np.ones_like(tt).tolist())
@@ -975,47 +940,50 @@ def _bigcell_pattern(two_theta_max: float, natoms: int) -> rx.PatternData:
                           intensity=counts.astype(float).tolist())
 
 
-def _bigcell(mode: str, two_theta_max: float, natoms: int,
-             plan: rx.RefinementPlan, plan_name: str) -> Setup:
-    data = _bigcell_pattern(two_theta_max, natoms)
-    structure = rx.Structure(
-        phases=[_bigcell_phase(_bigcell_positions(natoms), 5e-4)])
+def _bigcell(mode: str, two_theta_max: float, plan: rx.RefinementPlan,
+             plan_name: str) -> Setup:
+    data = _bigcell_pattern(two_theta_max)
+    structure = rx.Structure(phases=[_bigcell_phase(5e-4)])
     return Setup(
-        f"large cell (simulated): 12 × 36 × 4 Å P2₁2₁2₁, {natoms} atoms, "
-        f"2θ ≤ {two_theta_max:g}°, {mode}, {plan_name}",
+        f"large cell: Nb₁₈W₁₆O₉₃ (COD 2107344), 12.2 × 36.7 × 3.95 Å Pbam, "
+        f"43 sites, simulated pattern, 2θ ≤ {two_theta_max:g}°, {mode}, {plan_name}",
         data, structure, _bigcell_instrument(truth=False), plan, mode=mode,
-        notes="simulated — see the block comment above _BIGCELL_SG; WP-2317 "
-              "probe 1's pattern")
+        notes="real structure, simulated pattern — see the block comment "
+              "above _BIGCELL_SCALE; WP-2317")
 
 
 def _bigcell_structural() -> Setup:
-    return _bigcell("rietveld", 90.0, 40, rx.RefinementPlan.mccusker_structural(),
-                    "mccusker_structural")
+    from test_large_cell_refinement import tie_co_sited
+
+    setup = _bigcell("rietveld", 90.0, rx.RefinementPlan.mccusker_structural(),
+                     "mccusker_structural")
+    setup.prepare = tie_co_sited
+    setup.title += ", co-sited Nb/W tied"
+    return setup
 
 
 def _bigcell_pawley() -> Setup:
-    return _bigcell("pawley", 90.0, 10, rx.RefinementPlan.mccusker_default(),
+    return _bigcell("pawley", 90.0, rx.RefinementPlan.mccusker_default(),
                     "mccusker_default")
 
 
 def _bigcell_pawley_120() -> Setup:
-    return _bigcell("pawley", 120.0, 10, rx.RefinementPlan.mccusker_default(),
+    return _bigcell("pawley", 120.0, rx.RefinementPlan.mccusker_default(),
                     "mccusker_default")
 
 
 def _bigcell_lebail() -> Setup:
     """Le Bail from a **seeded** background, as the skill's Le Bail rule says.
 
-    From probe 1's all-zero Chebyshev the first partition hands the 900-count
-    pedestal to the reflections, and the fit ends in a background valley at
-    Rwp 0.151 (WP-2316 task 1).  Seeded, it lands at 0.047 against Pawley's
-    0.045, so this case times the right answer.  ``kind="chebyshev"`` keeps
-    the background family of the other three cases, but not their order: the
-    scan returns its cap of 16 terms (``BACKGROUND_ORDER_AT_CAP``) where the
-    other three carry 6, so this case and probe 1's unseeded start differ in
-    the seed and in ten background columns.
+    From an all-zero Chebyshev the first partition hands the 900-count
+    pedestal to the reflections, and probe 1's fit ended in a background
+    valley at Rwp 0.151 (WP-2316 task 1).  ``kind="chebyshev"`` keeps the
+    background family of the other three cases, but not their order: the
+    scan may return more terms than their 6 (it returned its cap of 16 on
+    probe 1's pattern), so this case and an unseeded start differ in the seed
+    and in the background's column count.
     """
-    setup = _bigcell("lebail", 90.0, 10, rx.RefinementPlan.mccusker_default(),
+    setup = _bigcell("lebail", 90.0, rx.RefinementPlan.mccusker_default(),
                      "mccusker_default")
     setup.instrument.background = rx.auto_background(
         setup.data, kind="chebyshev", seed=True).background
@@ -1043,13 +1011,16 @@ CASES: tuple[Case, ...] = (
     Case("trigger-series-unbounded", _trigger_series_unbounded,
          "trigger-series without WP-1127's bound — the pre-1127 'before'"),
     Case("bigcell-structural", _bigcell_structural,
-         "4 250 pts, 899 refl, 40 atoms, mccusker_structural — WP-2314's case"),
+         "Nb18W16O93 (COD), 4 250 pts, 886 refl, 43 sites, mccusker_structural"
+         " — WP-2314's case"),
     Case("bigcell-pawley", _bigcell_pawley,
-         "4 250 pts, 913 Pawley intensities, 2θ ≤ 90° — WP-2315's case"),
+         "Nb18W16O93 (COD), 4 250 pts, 886 Pawley intensities, 2θ ≤ 90°"
+         " — WP-2315's case"),
     Case("bigcell-pawley-120", _bigcell_pawley_120,
-         "5 750 pts, 1 606 Pawley intensities, 2θ ≤ 120°"),
+         "Nb18W16O93 (COD), 5 750 pts, 1 569 Pawley intensities, 2θ ≤ 120°"),
     Case("bigcell-lebail", _bigcell_lebail,
-         "4 250 pts, 899 refl, Le Bail, seeded background — WP-2316's case"),
+         "Nb18W16O93 (COD), 4 250 pts, 886 refl, Le Bail, seeded background"
+         " — WP-2316's case"),
 )
 
 
@@ -1122,6 +1093,8 @@ def _run_once(setup: Setup, config: Config = CONFIGS[0]) -> Run:
     ref = rx.Refinement(setup.structure.model_copy(deep=True),
                         setup.instrument.model_copy(deep=True),
                         history=False)
+    if setup.prepare is not None:
+        setup.prepare(ref)
     with _configured(config, account) as kwargs, _counting(counts):
         t0 = time.perf_counter()
         result = ref.fit(setup.data, plan=setup.plan, mode=setup.mode,
