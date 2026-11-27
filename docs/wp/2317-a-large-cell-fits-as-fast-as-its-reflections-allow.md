@@ -305,6 +305,12 @@ what it costs here.
     is under `Eps` × its esd (0.2 "or lower").
   - *The question:* is 1e-9 on the last stage more than "on par" buys? It is a
     kind (b) move under R0.
+  - **Ruled 2026-11-27 (R6): "Start with your recommendation. Consider best
+    practice."** The recommendation: the last stage stops on a FullProf-style
+    test, every free parameter's last shift under a fraction of its esd, with the
+    fraction measured against FullProf's 0.2 and GSAS-II's answer on the bench
+    cases. The three compounding places keep 1e-9 through a plan field. The change
+    is measured before the default moves.
 - **R7 — `WINDOW_MIN_DEG` = 0.3° of movement slack per window side**
   (`src/rietx/model/forward.py:234`).
   - About 30 of the probe's ~122 points a window (~25 %) are slack at a 0.02°
