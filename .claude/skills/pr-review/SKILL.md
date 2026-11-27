@@ -65,13 +65,23 @@ nothing. They have not been re-checked under this line.
 
 ## Triage — the no-argument mode
 
-One network call, no checkout, no diff:
+Two network calls, no checkout, no diff:
 
 ```sh
 gh pr list --state open --limit 30 \
   --json number,title,author,files,changedFiles,mergeStateStatus,latestReviews,headRefOid,updatedAt,statusCheckRollup,commits
+gh pr list --state open --limit 1000 --json number --jq length    # how many are open; 1000 is a floor
 ```
 
+- **Say when the rank is partial.** The first call stops at `--limit` without
+  a word, and its `commits` field keeps it small: GitHub sizes a query from
+  its `first:` arguments and refuses one past its node limit, and gh nests
+  `authors(first:100)` inside `commits(first:100)` (WP-2312 has the
+  arithmetic). When the count is above the rows returned, the triage's first
+  line says `ranked N of M open`, collision degree is marked as counting
+  those N alone, and the `all` mode's report says the rest were not seen. A
+  refused call is a stop, never a smaller call with a field dropped, since
+  every field here feeds a rank.
 - **Reviewable size is a jq filter over `files[]`**, excluding
   `^tests/data/|^src/rietx/data/` — never a diff (#125: 48,791 lines, 708
   reviewable).

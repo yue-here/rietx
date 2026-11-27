@@ -192,6 +192,7 @@ NOT_WALKED: dict[str, str] = {
     "compare_app": "the comparison page's port",
     "data": "bundled tables, read by modules the walk covers",
     "examples.py": "the shipped example projects",
+    "features.py": "the feature registry: names, help keys and Theory headings",
     "gui": ("beyond its import pre-fill and its symmetry edit gates: the server and 3D "
             "viewer's ports, payload caps and drawing tolerances"),
     "help.py": "the explanation text, and OPT_IN's declarations, which embed "
@@ -3015,7 +3016,10 @@ ROWS: tuple[Row, ...] = (
         evidence=("opt-in: Refinement.hold(), nothing held by default; the caller's hold outranks a"
                   " plan glob (WP-1435)")),
     Row("rietx.schemas.results.StageResult.seeded", "action", tier=3, ambiguity=1,
-        evidence=("the one shipped seed is _ROUGHNESS_STAGE's 0.3, recorded per model. Suortti's "
+        evidence=("the one shipped seed of a stage's own is _ROUGHNESS_STAGE's 0.3, recorded per "
+                  "model; the runner also writes a row here itself, an FCJ axial ratio a stage "
+                  "newly frees on zero, started at AXIAL_SL_START / AXIAL_HL_START (WP-1955, "
+                  "whose rows carry that evidence). Suortti's "
                   "b: start-invariant from 0.3 and 0 on five lab patterns from three families "
                   "(NIST LaB6, GSAS-II FAP, CPD corundum, fluorite, zincite), every Biso, scale "
                   "and b within 2.7e-3 of the smaller esd (tests/test_seed_invariance.py). "
@@ -3024,7 +3028,9 @@ ROWS: tuple[Row, ...] = (
                   "esd; no program supplies a Pitschke start (FullProf's examples start at "
                   "1.2-1.5; docs/practice.md). Since B14 the field also records "
                   "Stage.strain_seed's Stephens rows, whose start is STRAIN_SEED_PPM's row"),
-        grounds=("The seeding action is the stage's, recorded in the field; Suortti's start is "
+        grounds=("The seeding action is the stage's, recorded in the field, except the axial "
+                 "lift, which is the runner's own and fires on every stage that newly frees a "
+                 "ratio on zero (WP-1955, amended for the review of #1372); Suortti's start is "
                  "answer-invariant and Pitschke's is kept at 0.3 because from 0.3 the fit reaches "
                  "the switched-off branch inside the model's valid range, while from 0 the lower "
                  "chi2 is one the model flags as invalid (the sixth round's Q3, ruled (c) "
@@ -4540,6 +4546,48 @@ ROWS: tuple[Row, ...] = (
                  "2026-10-22) keeps it at tier 3 for WP-2017's second pass over a refine-from-zero "
                  "floor of its own."),
         approved="2026-10-22"),
+    Row("rietx.model.forward.AXIAL_SL_START", "constant", tier=3, value=0.02,
+        evidence=("where a stage starts S/L when it frees one sitting on zero (WP-1955); no code "
+                  "needs it to equal AXIAL_SIZING_FLOOR, which compile_model reads as "
+                  "max(value, floor): moving the start alone over 0.05, 0.02, 0.01, 0.005, 0.002 "
+                  "and 0.001 returned S/L 0.0453117 +- 0.00018 and Rwp 0.06304 every time (one "
+                  "pattern, #1075 repro 1 under lab_bragg_brentano, the review of #1372); fails "
+                  "where the pair starts equal: synthetic rutile at lab counts (strongest line "
+                  "about 68 000), a stage freeing only the two ratios from 0/0, ended on the "
+                  "S/L = H/L line in 4 of 8 fits when both started at 0.02 (truths 0.05/0.01 and "
+                  "0.035/0.025, four seeds each) and in 0 of 8 from 0.02/0.01 "
+                  "(tests/test_lab_instrument.py::test_two_lifted_apertures_do_not_stop_on_the_"
+                  "equal_line); real data: no number moved by more than 0.02 esd (LaB6, FAP, "
+                  "cpd-1a, the review's table)"),
+        grounds=("A starting value for a degenerate-at-zero column, tier 3: invariance of the "
+                 "answer to the start is measured on one pattern and the equal-line failure on "
+                 "synthetic rutile only, so no real family and no synchrotron one behind it "
+                 "(WP-1955 task 6 owes both).  A literal of its own, not AXIAL_SIZING_FLOOR's "
+                 "row, following the 2026-11-03 ruling on NOMINAL_AXIAL_APERTURE: a retune of "
+                 "the floor by WP-2017 cannot move a start."),
+        approved="2026-11-17"),
+    Row("rietx.model.forward.AXIAL_HL_START", "constant", tier=3, value=0.01,
+        evidence=("where a stage starts H/L when it frees one sitting on zero (WP-1955), half "
+                  "of S/L's so that a pair lifted together does not sit on the S/L = H/L line, "
+                  "where the pattern's symmetry makes the two columns identical and a step keeps "
+                  "them equal; from 0.02/0.01 the true pair was reached in 8 of 8 fits on "
+                  "synthetic rutile at lab counts, against 4 of 8 from 0.02/0.02 (the review of "
+                  "#1372; tests/test_lab_instrument.py); a start that would equal the partner's "
+                  "value takes the other ratio's number (forward.axial_lift_start)"),
+        grounds=("A starting value, tier 3 on the same grounds as AXIAL_SL_START: synthetic "
+                 "evidence only, task 6 owes a real family and a synchrotron one."),
+        approved="2026-11-17"),
+    Row("rietx.model.forward.AXIAL_NODE_STEP", "constant", tier=3, value=3e-06,
+        evidence=("the step of the second-order forward difference giving a node's derivative "
+                  "with respect to an aperture, from a scan against jax's exact column (WP-1955): "
+                  "below it rounding grows as 1/h, above it the h^2 term; at one zero aperture "
+                  "1e-7 sat 8.9e-3 rel-L2 off and 3e-6 sits 5.3e-4, and at interior apertures "
+                  "every step from 3e-7 to 1e-5 is under 2e-7; it moves fits (the goldens "
+                  "re-captured)"),
+        grounds=("A numerical setting scanned on the apertures the suite carries; tier 3 until "
+                 "task 6 has tested apertures 0.001 to 0.005 and the xi cap, as the review of "
+                 "#1372 asks (the same stance as FD_STEP's row)."),
+        approved="2026-11-17"),
     Row("rietx.model.forward.LEBAIL_INTENSITY_FLOOR", "constant", tier=1, value=1e-10,
         evidence=("numerical floor: keeps a partitioned intensity positive so the next cycle's "
                   "share of the point is defined; ten orders under one count, and the partition's "
@@ -4563,6 +4611,16 @@ ROWS: tuple[Row, ...] = (
                  "first recorded invariant, a class with no conditional form (the generality "
                  "judge, 2026-10-22)."),
         approved="2026-10-21"),
+    Row("rietx.model.forward.PAWLEY_GROUP_SCALE_FLOOR_REL", "constant", tier=1, value=1e-4,
+        evidence=("numerical floor (WP-2311): an overlap group's restraint scale is never "
+                  "under this fraction of its phase's largest on-data intensity, so it is "
+                  "relative to the phase and never read off a seed the partition emptied; "
+                  "it replaced an absolute 1e-10 that weighed an emptied group's rows at 5e9 "
+                  "and left its sum where the seed put it.  Synthetic LaB6, declared background "
+                  "1x, 10x and 100x the data: every value from 1 to 1e-8 gives the true start's "
+                  "fit (cost 3415.253, the same widths), 1e-9 locks again; the scale test in "
+                  "tests/test_pawley.py pins the answer under a background start 100x high and "
+                  "under intensity and sigma rescaled by 1e-3")),
     Row("rietx.model.forward.PAWLEY_OFF_DATA_SCALE_FLOOR", "constant", tier=3, value=1.0,
         evidence=("WP-1459 (outside PR #453): the off-data ridge is as wide as the phase's "
                   "largest on-data intensity; the floor of 1 has no stated source and binds "
@@ -5148,7 +5206,15 @@ ROWS: tuple[Row, ...] = (
                   "lm.minimize and run_least_squares, the last declared and closing stages "
                   "(run_multi_least_squares not exercised): worst 0.0011 plain esd, cpd-1a phases.0.scale at "
                   "1e-8, 0.957-1.043x evaluations, no reference moved past 3.2e-4 esd; at 1e-10 FAP and SRM "
-                  "660c stop on exhausted fp64 with identical answers; shipped starts only"),
+                  "660c stop on exhausted fp64 with identical answers; shipped starts only; "
+                  "WP-2017 group A's hard starts, 2026-11-09 (docs/wp/2017-batch/group_a_hard_20261109_summary.md; Linux x86_64 at fabfe9b3f; every phase's cell lengths +1 % and +3 % on the four families, and cpd-1a with zircon declared): no arm changed which of the nine starts reach the "
+                  "shipped start's answer (FAP +1 % and +3 %, NAC +1 %, cpd-1a +1 % and with zircon do); there 1e-8 "
+                  "acts on FAP, NAC and cpd-1a and 1e-10 on NAC and cpd-1a, FAP's 1e-10 arm closing on exhausted "
+                  "fp64 with the shipped answer as SRM 660c's does from its shipped start, so no third family reads "
+                  "the tighter side; worst 0.0012 plain esd (cpd-1a +1 % at 1e-8), no reference moved "
+                  "past 3.6e-4 esd; failing case, the starts that miss: on SRM 660c +3 % 1e-8 moves 0.118 esd against "
+                  "a noise arm of 0.053 at 0.69x evaluations, and polished, shipped and 1e-8 sit in different wrong "
+                  "minima (Rwp 0.823 and 0.861; the answer reads 0.087); start domain, per family: FAP cells within 3 %, NAC and cpd-1a within 1 %, SRM 660c its shipped start (+1 % already misses)"),
         grounds=("The last tolerance of the schedule rietx chose (WP-1123): B7's class went to "
                  "tier 3 once its invariance test failed on cpd-1a (ruled 2026-10-19), and the "
                  "schedule was kept on four families with that failure stated (the sixth "
@@ -5156,8 +5222,12 @@ ROWS: tuple[Row, ...] = (
                  "fixed, so the maintainer delegated this value's tier to the lead on "
                  "2026-10-23: tier 3, with WP-2017 refitting the four start-test families at "
                  "1e-8 and 1e-10."
-                 "  WP-2017 group A: one answer from the shipped starts on the families its evidence names; no"
-                 " failing case sought, so its hard starts are owed before that condition is met."),
+                 "  WP-2017 group A, hard starts (2026-11-09): one answer at the answer from every start that"
+                 " reaches it, on three families at 1e-8 and two at 1e-10, where fp64 stops the rest first; the"
+                 " failing case and start domain stated in the evidence. The approval condition is not met on"
+                 " the tighter side: the maintainer ruled on 2026-11-17 that approved stays 2026-10-23 until"
+                 " a synthetic case reaches 1e-10, since an arm that changes nothing measures nothing (the"
+                 " ruling of 2026-11-05); that case is owed."),
         approved="2026-10-23"),
     Row("rietx.optimize.lm._CONVERGED_RUNS", "constant", tier=3, value=3,
         evidence=("Coelho (2018) J. Appl. Cryst. 51, 428 stops its NIST, Rosenbrock and AntiBump runs at an "
@@ -5167,14 +5237,21 @@ ROWS: tuple[Row, ...] = (
                   "WP-2017 group A, 2026-11-05 (docs/wp/2017-batch/; development data; cpd-1a and SRM 660c "
                   "validate, FAP and NAC verify): 2 and 5 on FAP, NAC, cpd-1a and SRM 660c, both arms acting on"
                   " all four: worst 0.0024 plain esd, cpd-1a profile.v, 0.891-1.132x evaluations; no reference "
-                  "moved past 1.8e-4 esd; shipped starts only"),
+                  "moved past 1.8e-4 esd; shipped starts only; "
+                  "WP-2017 group A's hard starts, 2026-11-09 (docs/wp/2017-batch/group_a_hard_20261109_summary.md; Linux x86_64 at fabfe9b3f; every phase's cell lengths +1 % and +3 % on the four families, and cpd-1a with zircon declared): no arm changed which of the nine starts reach the "
+                  "shipped start's answer; there both arms act on FAP, NAC and cpd-1a, worst 0.0245 plain esd "
+                  "(cpd-1a with zircon at 5, at its noise arm's 0.0245) and otherwise 0.0011 (cpd-1a +1 % at 2), no "
+                  "reference moved past 4.4e-4 esd; failing case, the starts that miss: on NAC +3 % both arms lose "
+                  "NAC, Rwp 0.139 to 0.80, a second minimum (polished S 33x shipped's); on cpd-1a +3 % polished S "
+                  "0.65x (2) and 1.40x (5) shipped's; on SRM 660c +3 % 2 moves 51.4 esd against a noise arm of 0.053; "
+                  "start domain, per family: FAP cells within 3 %, NAC and cpd-1a within 1 %, SRM 660c its shipped start (+1 % already misses)"),
         grounds=("A constant that decides where a solve stops, taken from the paper that "
                  "defines the algorithm; the paper did not validate it on rietx's problems, so "
                  "tier 3 until refits of three families on either side give one answer, as "
                  "B10's solver-path switches (ruled 2026-10-20)."
-                 "  WP-2017 group A: one answer from the shipped starts on the families its evidence names; no"
-                 " failing case sought, so its hard starts are owed before that condition is met."),
-        approved="2026-10-20"),
+                 "  WP-2017 group A, hard starts (2026-11-09): one answer at the answer on three families"
+                 " from every start that reaches it, the failing case and start domain stated in the evidence."),
+        approved="2026-11-17"),
     Row("rietx.optimize.lm.SLOW_DESCENT_ESD", "constant", tier=3, value=1.0,
         evidence=("WP-1334 (issue #222): a stage stops once the rest of its budget, at the "
                   "rate the last 100 evaluations lowered the cost, would lower chi2 over the next 300 by less than "
@@ -5323,14 +5400,22 @@ ROWS: tuple[Row, ...] = (
                   "WP-2017 group A, 2026-11-05 (docs/wp/2017-batch/; development data; cpd-1a and SRM 660c "
                   "validate, FAP and NAC verify): 0.8 on FAP, cpd-1a and SRM 660c, 0.2 on cpd-1a and SRM 660c "
                   "(FAP's smallest r_u 0.585; NAC never read it): worst 8.2e-6 plain esd, cpd-1a axial_sl, "
-                  "noise floor 2.4e-6; no reference moved past 2.1e-6 esd; shipped starts only"),
+                  "noise floor 2.4e-6; no reference moved past 2.1e-6 esd; shipped starts only; "
+                  "WP-2017 group A's hard starts, 2026-11-09 (docs/wp/2017-batch/group_a_hard_20261109_summary.md; Linux x86_64 at fabfe9b3f; every phase's cell lengths +1 % and +3 % on the four families, and cpd-1a with zircon declared): no arm changed which of the nine starts reach the "
+                  "shipped start's answer; there 0.8 acts on FAP, NAC and cpd-1a and 0.2 on FAP +3 % and cpd-1a, so 0.2 "
+                  "now reaches three families with SRM 660c's shipped start; worst 0.0247 plain esd (cpd-1a with "
+                  "zircon at 0.8, at its noise arm's 0.0245) and otherwise 1.7e-4, no reference moved past 2.2e-4 "
+                  "esd; failing case, the starts that miss: on NAC +3 % 0.8 loses NAC, Rwp 0.139 to 0.79 polished, "
+                  "while 0.2 sits within that start's noise; on cpd-1a +3 % 0.8 reads Rwp 2.18x shipped's; on SRM "
+                  "660c +3 % 0.8 and 0.2 move 0.317 and 0.111 esd against a noise arm of 0.053; start domain, per family: FAP cells within 3 %, NAC and cpd-1a within 1 %, SRM 660c its shipped start (+1 % already misses)"),
         grounds=("A constant that decides where a solve stops, taken from the paper that "
                  "defines the algorithm; the paper did not validate it on rietx's problems, so "
                  "tier 3 until refits of three families on either side give one answer, as "
                  "B10's solver-path switches (ruled 2026-10-20)."
-                 "  WP-2017 group A: one answer from the shipped starts on the families its evidence names; no"
-                 " failing case sought, so its hard starts are owed before that condition is met."),
-        approved="2026-10-20"),
+                 "  WP-2017 group A, hard starts (2026-11-09): one answer at the answer on three families"
+                 " either side from every start that reaches it, the failing case and start domain stated in"
+                 " the evidence."),
+        approved="2026-11-17"),
     Row("rietx.optimize.lm._NULL_CURVATURE", "constant", tier=1, value=1.4901161193847656e-08,
         evidence=("numerical floor: sqrt(eps); at the cut itself three of 1000 random problems "
                   "stayed rank-deficient, sqrt(eps) left none (docstring)")),
@@ -5533,7 +5618,16 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.params.vector.CELL_WINDOW_ANGLE_DEG", "constant", tier=3, value=2.0,
         evidence=("TOPAS Tech Ref Version 9 § 2.17 Table 2-1 (checked 2026-10-19): angles Val +- "
                   "0.2 deg per iteration, here ten iterations' worth per stage (the ten is "
-                  "rietx's, and no angle was surveyed)"),
+                  "rietx's, and no angle was surveyed); "
+                  "WP-2017 group H, 2026-11-09 (docs/wp/2017-batch/group_h_summary.md; Linux x86_64 at fabfe9b3f): "
+                  "on 298 fits of group A, the four protocol families from the shipped starts and the nine hard "
+                  "starts at every arm, a phase took the window in 339 of 2432 solves and a free cell column was "
+                  "bounded in none, so it bound nowhere, and switched off all 13 starts are bit-identical: the "
+                  "absent-phase hold (WP-1301) holds every free column moving only those phases, on the same screen "
+                  "at the same values, before the solve freezes the window; positive arm, that hold off at each "
+                  "stage's start: LaB6 +1 % windows a free cell in 6 of 14 solves, mid-window, so no fit shows it "
+                  "binding; single fits only, the joint path's window not counted; one timed-out fit uncounted; "
+                  "group G's fits not yet counted"),
         grounds=("A guard on a barely-seen phase's cell.  Tier 3, re-tiered from 2 on "
                  "2026-10-20: TOPAS bounds every phase's cell at each iteration, while this "
                  "bounds a barely-seen phase's once per stage, ten iterations' worth, and the "
@@ -5544,7 +5638,16 @@ ROWS: tuple[Row, ...] = (
         evidence=("TOPAS Tech Ref Version 9 § 2.17 Table 2-1 (checked 2026-10-19): a, b, c within "
                   "0.995 Val - 0.05 .. 1.005 Val + 0.05, Val re-read each iteration; a stage takes "
                   "one bound pair, so 0.5 % compounds to 5.1 % over ten iterations (the ten is "
-                  "rietx's)"),
+                  "rietx's); "
+                  "WP-2017 group H, 2026-11-09 (docs/wp/2017-batch/group_h_summary.md; Linux x86_64 at fabfe9b3f): "
+                  "on 298 fits of group A, the four protocol families from the shipped starts and the nine hard "
+                  "starts at every arm, a phase took the window in 339 of 2432 solves and a free cell column was "
+                  "bounded in none, so it bound nowhere, and switched off all 13 starts are bit-identical: the "
+                  "absent-phase hold (WP-1301) holds every free column moving only those phases, on the same screen "
+                  "at the same values, before the solve freezes the window; positive arm, that hold off at each "
+                  "stage's start: LaB6 +1 % windows a free cell in 6 of 14 solves, mid-window, so no fit shows it "
+                  "binding; single fits only, the joint path's window not counted; one timed-out fit uncounted; "
+                  "group G's fits not yet counted"),
         grounds=("A guard on a barely-seen phase's cell.  Tier 3, re-tiered from 2 on "
                  "2026-10-20: TOPAS bounds every phase's cell at each iteration, while this "
                  "bounds a barely-seen phase's once per stage, ten iterations' worth, and the "
@@ -5553,7 +5656,16 @@ ROWS: tuple[Row, ...] = (
         approved="2026-10-20"),
     Row("rietx.params.vector.CELL_WINDOW_PAD_A", "constant", tier=3, value=0.05,
         evidence=("TOPAS Tech Ref Version 9 § 2.17 Table 2-1 (checked 2026-10-19): the 0.05 A pad "
-                  "on a, b, c"),
+                  "on a, b, c; "
+                  "WP-2017 group H, 2026-11-09 (docs/wp/2017-batch/group_h_summary.md; Linux x86_64 at fabfe9b3f): "
+                  "on 298 fits of group A, the four protocol families from the shipped starts and the nine hard "
+                  "starts at every arm, a phase took the window in 339 of 2432 solves and a free cell column was "
+                  "bounded in none, so it bound nowhere, and switched off all 13 starts are bit-identical: the "
+                  "absent-phase hold (WP-1301) holds every free column moving only those phases, on the same screen "
+                  "at the same values, before the solve freezes the window; positive arm, that hold off at each "
+                  "stage's start: LaB6 +1 % windows a free cell in 6 of 14 solves, mid-window, so no fit shows it "
+                  "binding; single fits only, the joint path's window not counted; one timed-out fit uncounted; "
+                  "group G's fits not yet counted"),
         grounds=("A guard on a barely-seen phase's cell.  Tier 3, re-tiered from 2 on "
                  "2026-10-20: TOPAS bounds every phase's cell at each iteration, while this "
                  "bounds a barely-seen phase's once per stage, ten iterations' worth, and the "
@@ -7108,7 +7220,8 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.indexing.kvector.kgrid_null:budget", "default", tier="caller", ambiguity=1,
         value=None,
         evidence=("opt-in: budget=None sets no cap; a Budget or Deadline is passed by name, and "
-                  "a cut stops every shuffle at one stratum boundary and names strata_left")),
+                  "it is read before every block of _CHUNK k, so a cut stops every shuffle at "
+                  "the same k, inside a stratum if need be, and names strata_cut and strata_left")),
     Row("rietx.indexing.kvector.kgrid_null:harmonics", "default", tier=1, ambiguity=1,
         value=(1,),
         evidence=("definition: (1,) is the first-order hypothesis H ± k; another order is "
@@ -7116,7 +7229,8 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.indexing.kvector.score_kgrid:budget", "default", tier="caller", ambiguity=1,
         value=None,
         evidence=("opt-in: budget=None sets no cap; a Budget or Deadline is passed by name, and "
-                  "a cut is reported as strata_left, never as a smaller search called complete")),
+                  "it is read before every block of _CHUNK k, and a cut is reported as "
+                  "strata_cut and strata_left, never as a smaller search called complete")),
     Row("rietx.indexing.kvector.score_kgrid:harmonics", "default", tier=1, ambiguity=1,
         value=(1,),
         evidence=("definition: (1,) is the first-order hypothesis H ± k; another order is "

@@ -57,7 +57,7 @@ curve that depends on its free set, by 4.8e-5 of the strongest peak on 2026-10-2
 
 | Program | At zero | Does a refine flag reach the profile? |
 |---|---|---|
-| rietx | FCJ off when both are 0; sized at 0.02 when free (`forward.AXIAL_SIZING_FLOOR`) | yes, at exactly zero only |
+| rietx | FCJ off when both are 0; sized at 0.02 when free (`forward.AXIAL_SIZING_FLOOR`); a stage that frees one on zero starts S/L at 0.02 and H/L at 0.01 (`forward.AXIAL_SL_START`, `AXIAL_HL_START`; WP-1955), never both at one value, since the pattern is symmetric in the pair | yes, at exactly zero only |
 | GSAS-II | never computed: one parameter SH/L = (S+H)/L, floored at 0.002 by value for the profile and its window at every evaluation, refined or not; the Fortran's zero branch gives a stand-in derivative of 0.002·sign(Δ2θ) (checked (source)) | no; windows come from values each evaluation |
 | RIETAN-FP | not described; Gauss-Legendre N between 10 and 100 "depending on τmin", which follows rs and rd (§3.10.3, checked (manual)) | no flag named; the count follows the values |
 | FullProf | not described; S_L and D_L act only below `AsymLim`, an angle (LINE 30 notes, checked (manual)) | no flag named |

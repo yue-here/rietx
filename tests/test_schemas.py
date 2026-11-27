@@ -961,6 +961,14 @@ def test_package_getattr_names_where_a_miss_actually_lives():
         rx.identify_format
     with pytest.raises(AttributeError, match=r"no attribute 'not_a_real_export'"):
         rx.not_a_real_export
+    # issue #1837: each suggestion quoted alone, so any one can be copied
+    with pytest.raises(AttributeError, match=r"did you mean 'read_pattern', "
+                                             r"'index_pattern' or 'read_topas_inp'\?"):
+        rx.read_patern
+    # a name defined one module down is answered with that module, not a spelling
+    with pytest.raises(AttributeError,
+                       match=r"import it from rietx\.crystallography\.cif$"):
+        rx.structure_from_cif
 
 
 def test_package_getattr_reports_a_broken_submodule_as_attributeerror():

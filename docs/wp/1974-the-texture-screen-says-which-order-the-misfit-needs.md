@@ -1,6 +1,6 @@
 # WP-1974 — the texture screen says which order the misfit needs
 
-Milestone: unscheduled · Status: 🔄 2026-11-16 — tasks 1-2 measured (PR #1604); task 3 waits on the maintainer's thresholds
+Milestone: unscheduled · Status: 🔄 2026-11-24 — tasks 1-2 merged (#1604); task 3 waits on the maintainer's thresholds
 Track: Candidates — named on a use case, not yet on a measurement
 Depends on: 1960 (the basis)
 Priority: P3 2026-10-15 — a workaround covers it: declare orders 4, 6 and 8 by hand and compare the fits
@@ -105,6 +105,51 @@ and CPD-2 brucite's suggestion is reported beside its weighed-fraction errors.
 - WP-1960, the basis and the CPD-2 numbers.
 
 ## Handover log
+
+- **2026-11-24** — maintainer's post-merge entry, PR #1818. Mike's PR #1604
+  merged on 2026-11-24 as `76f96e2f8`, after a second review round found
+  nothing that held it. The order screen is now on main. Nothing calls it yet,
+  so no report and no fitted number moves. Task 2 stays half done, because the
+  record field is still only proposed. Task 3 still waits on the maintainer's
+  answers to questions 1-3 below.
+
+  - **Round 2 of review** (head `7ad6d4f0e`). Round 1 (2026-11-21, at
+    `51514560f`) asked for three things, and `51a11568d` and `7ad6d4f0e` did
+    all three:
+    - `_order_screen`'s docstring cites Von Dreele (1997) for the symmetrised
+      spherical-harmonics basis and Schwarz (1978) for the BIC. It writes
+      ΔBIC as the code computes it.
+    - `_ORDER_RANK_TOL`'s window. A short-range P −1 case joined the gap
+      test. Its kept singular values are 5.9e-3 at order 6 and 2.1e-4 at
+      order 8. The row, the constant's comment and the test now all state a
+      window of 1e-12 to 1e-4 for the cut at 1e-8. The lower edge was 1e-14
+      until the py3.14 Linux leg put a roundoff singular value above it.
+      The generality judge reread the row and found tier 1 holds, as a
+      numerical floor of the `rcond` kind.
+    - The test's axis R² bar is 0.999.
+  - **What ran before the merge.** The review stacked #1604, #1605, #1494 and
+    #1266 onto main `00f9c6bc3` in merge order. The full suite on that stack
+    (macOS arm64, Python 3.12, `[dev,jax]`, nothing else running) gave
+    16 867 passed, 272 skipped, 52 xfailed and 0 failed. On main `c368ca3ba`
+    the same stack merged clean, and the targeted suites gave 1440 passed.
+  - **Fix-ups this file did not record.** The PR's review fix-ups
+    (`51514560f`) changed one number in the 2026-11-16 table. The axis is now
+    scored at a polished r (`_OrderScreen.axis_r`), a bounded solve between
+    the r grid's neighbours. The MD r 0.8 row's ΔBIC −2.9 at order 4 came
+    from the grid's step. With r polished, noise-free, that arm reads +92.5
+    against the axis at order 4. On 5 noisy seeds it reads +9 to +22. So
+    question 4's premise is stale, and the PR body says the same.
+  - **Owed before task 3**, from the PR body's "For Yue" list. None of them
+    is decided here:
+    - a degrees-of-freedom floor. Only n < 2 is guarded today, and the
+      reviewer measured ΔBIC(6|4) −15.6 at one degree of freedom on a random
+      P −1 powder;
+    - polishing the runner-up axis too;
+    - one helper for the extraction loop that `_partitioned` and
+      `_extracted_corrections` both run.
+
+  Next: the maintainer's answers to questions 1-3 and the floor. Then task 3,
+  which wires the screen into the report and sets its `_audit` rows.
 
 - **2026-11-16** — tasks 1 and 2 measured; PR #1604. The order screen works
   where it can see the reflections. Fitted bare, built order-4 and order-6
