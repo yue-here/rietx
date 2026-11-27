@@ -1717,8 +1717,19 @@ def test_the_triage_rows_carry_what_the_rank_reads(tmp_path: Path) -> None:
     assert first["wpCommits"] == ["WP-1234"] and second["wpCommits"] == []
     assert first["latestReviews"][0]["commit"] == "f" * 40
     assert (first["ci"], second["ci"]) == ("SUCCESS", None)
+    # GitHub's `files` and `latestReviews` are nullable: one null PR must not sink the triage
+    bare = {**_triage_node(3, [], [], []), "files": None, "latestReviews": None, "changedFiles": 5}
+    raw.write_text(json.dumps([{"data": {"repository": {"pullRequests": {
+        "totalCount": 1, "pageInfo": {"hasNextPage": False, "endCursor": None},
+        "nodes": [bare]}}}}]), encoding="utf-8")
+    row = json.loads(subprocess.run(["jq", "-c", "-f", str(_TRIAGE / "triage.jq"), str(raw)],
+                                    capture_output=True, encoding="utf-8",
+                                    check=True).stdout)["rows"][0]
+    assert (row["filesListed"], row["changedFiles"], row["latestReviews"]) == (0, 5, [])
     query = (_TRIAGE / "triage.graphql").read_text(encoding="utf-8")
-    for name in {k for node in (one, two) for k in node} | {"totalCount", "messageHeadline", "oid"}:
+    nested = {"totalCount", "nodes", "path", "additions", "deletions", "login", "authorAssociation",
+              "state", "submittedAt", "commit", "oid", "messageHeadline"}
+    for name in {k for node in (one, two) for k in node} | nested:
         assert re.search(rf"\b{name}\b", query), name
 
 

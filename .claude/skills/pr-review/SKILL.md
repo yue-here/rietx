@@ -74,9 +74,10 @@ gh api graphql --paginate --slurp -F owner='{owner}' -F name='{repo}' \
 jq -c -f .claude/skills/pr-review/triage.jq <scratchpad>/triage.json
 ```
 
-- **The rows are every open PR.** `open` is GitHub's own count, so `rows`
-  shorter than `open` means a page was lost. The triage's first line then
-  says `ranked N of M open`, collision degree is marked as counting those N
+- **The rows are every open PR.** `open` is GitHub's own count, taken on the
+  first page, so `rows` shorter than `open` means a page was lost or a PR
+  closed while the call paged. Rerun once to tell which. The triage's first
+  line then says `ranked N of M open`, collision degree is marked as counting those N
   alone, and the `all` mode's report says the rest were not seen. Measured on
   2026-11-27 (WP-2312): 84 of 84 PRs in 6 pages and 17 s, 296 kB raw and 42 kB
   of rows. `gh pr list` cannot do this. Its page of 100 timed out without
