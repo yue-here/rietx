@@ -209,6 +209,14 @@ free swap under LM.
   at 120°, where rietx carries 913 and 1 606 columns**. rietx holds an exact
   overlap by an equal-split restraint row; GSAS-II removes it from the
   dimension.
+- **From WP-2317, 2026-11-27 (4th session): the cases are now a real
+  structure.** `bigcell-pawley` and `bigcell-pawley-120` carry Nb₁₈W₁₆O₉₃
+  (COD 2107344, Pbam, 12.195 × 36.740 × 3.951 Å): 886 and 1 569 intensity
+  columns where probe 1 had 913 and 1 606. Its b is not 3a, so the exact
+  overlaps behind the 352-against-913 count above are gone, and that count
+  describes probe 1 only. The figures above are probe 1's; this WP's "before"
+  and its 3× target are re-read on the new cases. WP-2317's Context has the
+  new ranges.
 
 ## Non-goals
 

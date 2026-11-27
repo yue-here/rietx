@@ -113,40 +113,38 @@ def test_the_trigger_pattern_is_deterministic(bench):
 
 
 def test_the_bigcell_cases_carry_the_large_cell_shape(bench):
-    """WP-2317's cases exist for their shape: a 12 × 36 × 4 Å cell, 40 atoms
-    at least 1.5 Å apart, and more (line, reflection) pairs than ``trigger``.
+    """WP-2317's cases exist for their shape: a real 12.2 × 36.7 × 3.95 Å
+    cell (Nb₁₈W₁₆O₉₃, COD 2107344) with its 43 published sites, and more
+    (line, reflection) pairs than ``trigger``.
 
-    The separation is pinned because probe 1's first draw packed its atoms
-    into a sub-box, 65 % of nearest neighbours under 1 Å, and measured a
-    degenerate model (WP-2317, S3).  The prefix is pinned because the
-    structure-free cases take the first ten of the forty, and a sampler that
-    stopped being sequential would make them a different structure.  Compiled
-    on a blank pattern, so nothing here evaluates the model.
+    The structure is pinned to the vendored file because the maintainer
+    asked for a real one in place of probe 1's invented atoms (2026-11-27).
+    The structural case's preparation must tie the eight co-sited Nb/W
+    pairs: one tie for the fixed pair's Biso, three for each of the seven
+    others (two site-symmetry steps and the Biso).  Compiled on a blank
+    pattern, so nothing here evaluates the model.
     """
-    import gemmi
+    from test_large_cell_refinement import tie_co_sited
 
-    forty = bench._bigcell_positions(40)
-    assert bench._bigcell_positions(10) == forty[:10]
-    ops = list(gemmi.SpaceGroup(bench._BIGCELL_SG).operations())
-    images = np.array([np.mod(op.apply_to_xyz(list(x)), 1.0)
-                       for x in forty for op in ops])
-    d = images[:, None, :] - images[None, :, :]
-    d -= np.round(d)
-    dist = np.sqrt((d ** 2 * np.array(bench._BIGCELL_CELL[:3]) ** 2).sum(-1))
-    np.fill_diagonal(dist, np.inf)
-    assert dist.min() >= bench._BIGCELL_MIN_SEP
-
-    structure = rx.Structure(phases=[bench._bigcell_phase(forty, 0.0)])
+    phase = bench._bigcell_phase(0.0)
+    assert phase.space_group.replace(" ", "") == "Pbam"
+    assert (phase.cell.a.value, phase.cell.b.value, phase.cell.c.value) == \
+        pytest.approx((12.195, 36.73999, 3.951))
+    assert len(phase.atoms) == 43
+    structure = rx.Structure(phases=[phase])
     tt = np.arange(5.0, 90.0, 0.02)
     blank = rx.PatternData(two_theta=tt.tolist(),
                            intensity=np.ones_like(tt).tolist())
     model = compile_model(structure, bench._bigcell_instrument(truth=True), blank)
     pairs = sum(int(ph.win.shape[0] * ph.win.shape[1]) for ph in model.phases)
     assert pairs > 1500, f"the 90° large cell carries only {pairs} pairs"
-    assert len(structure.phases[0].atoms) == 40
-    keys = {c.key for c in bench.CASES}
+
+    ref = rx.Refinement(rx.Structure(phases=[bench._bigcell_phase(5e-4)]),
+                        bench._bigcell_instrument(truth=False), history=False)
+    assert tie_co_sited(ref) == 22
+    keys = {c.key: c for c in bench.CASES}
     assert {"bigcell-structural", "bigcell-pawley", "bigcell-pawley-120",
-            "bigcell-lebail"} <= keys
+            "bigcell-lebail"} <= set(keys)
 
 
 def test_a_baseline_case_builds_a_compiled_model(bench):
