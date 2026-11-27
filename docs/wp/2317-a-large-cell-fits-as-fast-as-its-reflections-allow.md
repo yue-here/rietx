@@ -340,9 +340,10 @@ what it costs here.
       1 089 at 1e-8, 695 at 1e-6). At 1e-6 the 1 wt% CuO cell sits 0.68 esd off.
       At 1e-8 every quantity is under 0.072 esd (cpd-1 profile), a margin of 1.4×
       on development data.
-    - The floor is not zero. On the large cell 2 of 5 reruns from starts nudged by
-      1e-12 land in a second minimum (O23, O27 move 3.3-4.3 esd). On cpd-1 one
-      nudge moved `axial_sl` 0.5 esd.
+    - The floor is zero on single fits (≤ 4.5e-6 esd) and not on a series: on
+      cpd-1 one start in ten moves `axial_sl` 0.5 esd. The large cell's apparent
+      second minimum was a fixture defect (`co_sited()` rounds to 1e-4, so the
+      nudge decided two ties), found by `2317-probe/errmeasure/`.
     - χ²-based decisions keep ≥ 100× margin over a single fit's stop, except
       profile-interval refits, whose settle tolerance a GSAS-like stop exceeds.
     - **Settled:** the shipped schedule stays (1e-6 intermediate, 1e-9 last). The

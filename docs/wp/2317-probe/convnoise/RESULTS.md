@@ -113,6 +113,11 @@ Read off these tables (measured):
   4e-4). So on the large cell the 1e-9 answer is one of at least two nearby
   minima, and which one a fit reaches depends on the 13th digit of the start.
   That path dependence is 250× larger than anything any stop added there.
+  **Corrected 2026-11-27 (`../errmeasure/RESULTS.md`):** this is not a second
+  minimum. The fixture's `co_sited()` rounds coordinates to 1e-4, and atoms 23
+  and 27 (W8 and Nb8) sit at x = 0.42515, on a rounding boundary, so the nudge
+  decides whether they are tied: 120 free parameters instead of 117. With the
+  ties decided on the unnudged start the floor is ≤ 4.5e-6 esd.
 
 ### Per-fixture tables (reported esd; ΔS on the reported χ²)
 
