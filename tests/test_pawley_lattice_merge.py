@@ -198,6 +198,26 @@ def test_a_cubic_pawley_block_merges_its_lattice_forced_pairs():
     assert not any(col in g for g in pb.groups)
 
 
+@pytest.mark.parametrize("term", ["strain_monomials", "peq", "nuclear_mask", "magnetic"])
+def test_each_hkl_reading_term_declines_the_merge(term):
+    """Each term that can tell a group's members apart keeps them apart.
+
+    The Stephens case is also run end to end below; this pins the guard for
+    all four, since an unexercised branch could merge where it must not.
+    """
+    import copy
+
+    from rietx.model.forward import _lattice_merge_groups
+
+    model = _lab6_pawley(stephens=False)
+    cp = model.phases[0]
+    group = as_group("P m -3 m")  # LaB6
+    assert _lattice_merge_groups(group, cp)
+    marked = copy.copy(cp)
+    setattr(marked, term, object())
+    assert _lattice_merge_groups(group, marked) == []
+
+
 def test_a_stephens_block_keeps_the_members_apart_under_an_equal_f2_restraint():
     """Λ(hkl) differs between (2 2 1) and (3 0 0) (Σh⁴ = 33 against 81), so a
     Stephens block can in principle tell the pair apart: they stay two

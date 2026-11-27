@@ -4622,7 +4622,8 @@ ROWS: tuple[Row, ...] = (
         grounds=("On three default paths: the peak picker's duplicate and unresolved flags, "
                  "the line screen's testable mask, and "
                  "since WP-2011 every index_pattern validation, where an overlapped group gets "
-                 "an equal-split restraint and is flagged PAWLEY_OVERLAP_UNRESOLVED rather than "
+                 "an equal-F² restraint (an equal split before WP-2315; the sweeps here predate it) "
+                 "and is flagged PAWLEY_OVERLAP_UNRESOLVED rather than "
                  "split confidently.  The validation reads the group's sum, which the restraint "
                  "leaves free, and its readings did not move over 0.25-1.0; kept at 0.5 "
                  "(WP-2011 ruling 3, 2026-10-28)."),
