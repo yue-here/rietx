@@ -766,53 +766,49 @@ LEBAIL_INTENSITY_FLOOR = 1e-10
 SQUAREM_STEP_GROWTH = 4.0
 
 
-def _settled_partition(cycle: Callable[[np.ndarray], tuple[np.ndarray, float, float]],
-                       x: np.ndarray, cap: int, tol: float,
-                       area: np.ndarray) -> tuple[np.ndarray, int, bool]:
-    """Repeat a Le Bail ``cycle`` until one moves a share ``tol``, at most ``cap``.
+def _accelerated_partition(cycle: Callable[[np.ndarray], tuple[np.ndarray, float]],
+                           x: np.ndarray, n: int, area: np.ndarray) -> np.ndarray:
+    """Run ``n`` Le Bail cycles, accelerated, and return the intensities.
 
     The partition is the Richardson-Lucy step (Richardson 1972, *J. Opt. Soc.
     Am.* 62, 55; Lucy 1974, *Astron. J.* 79, 745), an expectation-maximisation
     step on a Poisson likelihood (Shepp & Vardi 1982, *IEEE Trans. Med. Imaging*
     1, 113).  Such a step slows to a linear rate near 1 where reflections
-    overlap, so plain repetition needs thousands of cycles on a dense pattern.
+    overlap, so plain repetition moves an overlapped group a little a cycle.
     This is SQUAREM, scheme S3 (Varadhan & Roland 2008, *Scand. J. Stat.* 35,
     335): two cycles give the steplength, an extrapolation lands near the fixed
     point, and a third cycle from there keeps the iterate on the step's map.  A
     landing below the likelihood at the start of the round is dropped for the
-    plain second cycle, which is what makes it globally convergent.  The steplength
-    starts bounded at a plain step: the bound grows by
-    :data:`SQUAREM_STEP_GROWTH` when it binds on a landing that holds and shrinks
-    by that factor on one that does not.  Unbounded, one FAP partition dropped
-    every landing for hundreds of rounds, at 1.5 plain steps' cost a step.
+    plain second cycle, which is what makes it globally convergent.  The
+    steplength starts bounded at a plain step: the bound grows by
+    :data:`SQUAREM_STEP_GROWTH` when it binds on a landing that holds and
+    shrinks by that factor on one that does not.  Unbounded, one FAP partition
+    dropped every landing for hundreds of rounds, at 1.5 plain steps' cost a
+    step.
 
     It changes the path and never the fixed point, and an exact overlap keeps
-    its ratio, because each extrapolation is a sum of terms in that ratio.  The
-    test always reads a plain cycle.  Returns the intensities, the cycles run and
-    whether a cycle met ``tol``, which a cycle at the cap may do.
+    its ratio, because each extrapolation is a sum of terms in that ratio.
+    ``cycle(x)`` returns the next intensities and the Poisson likelihood of
+    ``x``.  Rounds of three run while three cycles remain, then plain cycles.
     """
     run, limit = 0, 1.0
-    while run < cap:
-        if cap - run < 3:           # no room left for a round
-            x, share, _ = cycle(x)
+    while run < n:
+        if n - run < 3:             # no room left for a round
+            x, _ = cycle(x)
             run += 1
-            if share <= tol:
-                return x, run, True
             continue
-        once, _, start = cycle(x)
-        twice, share, _ = cycle(once)
+        once, start = cycle(x)
+        twice, _ = cycle(once)
         run += 2
         step, bend = once - x, twice - 2.0 * once + x
         norm = math.sqrt(float((area * bend * bend).sum()))
-        if share <= tol:
-            return twice, run, True
         if norm == 0.0:             # a steady drift gives no steplength
             x = twice
             continue
         reach = math.sqrt(float((area * step * step).sum())) / norm
         alpha = -max(1.0, min(reach, limit))
-        landed, _, reached = cycle(np.maximum(x - 2.0 * alpha * step + alpha * alpha * bend,
-                                              LEBAIL_INTENSITY_FLOOR))
+        landed, reached = cycle(np.maximum(x - 2.0 * alpha * step + alpha * alpha * bend,
+                                           LEBAIL_INTENSITY_FLOOR))
         run += 1
         if reached >= start:
             x = landed
@@ -821,7 +817,7 @@ def _settled_partition(cycle: Callable[[np.ndarray], tuple[np.ndarray, float, fl
         else:
             x = twice
             limit = max(1.0, limit / SQUAREM_STEP_GROWTH)
-    return x, run, False
+    return x
 
 
 @dataclass(frozen=True)
@@ -3727,9 +3723,8 @@ class CompiledModel:
 
     # ------------------------------------------------------------------
     def lebail_update(self, values: dict[str, float], n_cycles: int = 1,
-                      *, tol: float = 0.0,
-                      check: Callable[[], None] | None = None
-                      ) -> tuple[int, bool | None]:
+                      *, accelerate: bool = False,
+                      check: Callable[[], None] | None = None) -> int:
         """Refresh per-hkl intensities by observed-intensity partitioning.
 
         Per-hkl intensities are shared across emission lines: reflection k
@@ -3757,37 +3752,40 @@ class CompiledModel:
         overcount compounding through the profile stages that follow, not the
         partition running away by itself.
 
-        **Stopping** (WP-1542, B11).  ``tol=0`` runs exactly ``n_cycles``.
-        Above it, ``n_cycles`` is a cap and :func:`_settled_partition` repeats
-        the step until one moves a share of the Bragg counts no larger than
-        ``tol``: Σ_k A_k·|ΔI_k| / Σ_k A_k·I_k, with A_k = Σ_l w_l·Σ_i Ω_lk,i the
-        counts a unit intensity lays on the pattern.  Weighted by A_k because a
-        reflection falling to the floor shrinks by a constant fraction of
-        itself per cycle for as long as it lives, so an unweighted largest
-        relative change never ends.
+        **When it runs** (WP-2316).  A ``lebail`` stage extracts at its
+        start and then inside the solve after every accepted iteration
+        (``least_squares._LeBailRefresh``), ``Stage.lebail_cycles`` cycles
+        each time.  That is where GSAS-II, FullProf, TOPAS and RIETAN-FP
+        extract, once per least-squares cycle, the intensities converging
+        across the refinement rather than at a frozen model
+        (``docs/practice.md`` § Structure-free fitting); GSAS-II's own
+        extraction runs ten cycles (``DoLeBail(cycles=10)``), MAUD's up to
+        five.  The solve's stop reads the change in χ² each extraction makes,
+        so nothing here stops on the intensities.
+
+        ``accelerate`` runs the cycles through :func:`_accelerated_partition`,
+        which is what a Le Bail stage asks for: a group of overlapped
+        reflections moves a little a plain cycle, and the extrapolation
+        carries it across many.  Off, the count is plain cycles whose adds
+        keep the order the per-reflection loop had, so it is bit-identical to
+        it: ``np.add.at`` on one buffer, and each window's own ``sum``, which
+        ``reduceat`` is not bit for bit.  The Pawley seed takes that path.
 
         Only the intensities move between cycles, so the background and the
-        profiles are built once.  The adds keep the order the per-reflection
-        loop had, so a fixed count is bit-identical to it: ``np.add.at`` on one
-        buffer, and each window's own ``sum``, which ``reduceat`` is not bit
-        for bit.  A partition with a stop has no such loop to match, so it
-        takes ``reduceat``.
+        profiles are built once per call.  ``check`` runs before every cycle,
+        so a cancel reaches a long seed; what it raises leaves the at-rest
+        buffers as they were.  It threads the intensity vectors functionally
+        through its own cycles and writes each phase's buffer exactly once at
+        the end.  A solve that calls it between iterations reads the new
+        buffers through its own list, never the buffers themselves
+        (``_lebail_snapshot``).
 
-        ``check`` runs before every cycle, because a partition can outlast a
-        whole solve and a cancel must not wait for it.  What it raises leaves
-        the at-rest buffers as they were.
-
-        Runs *between* least-squares solves, so it may commit to the at-rest
-        buffers — but it threads the intensity vectors functionally through its
-        own cycles and writes each phase's buffer exactly once at the end.
-
-        Returns the cycles it ran, and whether a cycle met ``tol``: ``None`` at
-        ``tol=0``, or where nothing ran, since nothing was asked.
+        Returns the cycles it ran.
         """
         if self.mode not in ("lebail", "pawley"):
             raise RuntimeError("lebail_update on a Rietveld-mode model")
         if n_cycles < 1:
-            return 0, None
+            return 0
         xp = get_backend()
         # clause 3, and the one thing a peak-landing member costs that a
         # background-landing one does not: a hump is inside ``background``
@@ -3798,16 +3796,11 @@ class CompiledModel:
             self.y_obs - self.background(values) - self.extra_peak_curve(values), 0.0))
         terms = self._partition_terms(values)
         intens = [np.asarray(cp.hkl_intensity, dtype=np.float64) for cp in self.phases]
-        area = np.concatenate([
-            sum((np.bincount(line.first, weights=line.w_line * line.mass,
-                             minlength=vec.size) for line in lines),
-                np.zeros_like(vec))
-            for vec, lines in zip(intens, terms, strict=True)])
         ends = np.cumsum([vec.size for vec in intens])[:-1]
 
-        def cycle(x: np.ndarray) -> tuple[np.ndarray, float, float]:
-            """One partition: the new intensities, the share of the Bragg counts
-            that moved, and the Poisson likelihood of ``x`` the step climbs."""
+        def cycle(x: np.ndarray) -> tuple[np.ndarray, float]:
+            """One partition: the new intensities, and under ``accelerate``
+            the Poisson likelihood of ``x`` the step climbs."""
             if check is not None:
                 check()
             vectors = np.split(x, ends)
@@ -3830,7 +3823,7 @@ class CompiledModel:
                     taken = np.divide(curve, denom, out=np.zeros_like(curve),
                                       where=good) * net[line.channel]
                     num[line.first] += (
-                        np.add.reduceat(taken, line.start) if tol > 0.0
+                        np.add.reduceat(taken, line.start) if accelerate
                         else [taken[i0:i1].sum() for i0, i1 in line.spans])
                     den[line.first] += np.where(
                         np.logical_or.reduceat(good, line.start),
@@ -3839,21 +3832,25 @@ class CompiledModel:
                     np.divide(num, den, out=vec.copy(), where=den > 0.0),
                     LEBAIL_INTENSITY_FLOOR))
             new = np.concatenate(new_vectors)
-            held = float((area * new).sum())
-            share = float((area * np.abs(new - x)).sum()) / held if held > 0.0 else 0.0
+            if not accelerate:
+                return new, 0.0
             live = y_bragg > 1e-12
-            return new, share, float((net[live] * np.log(y_bragg[live])).sum() - y_bragg.sum())
+            return new, float((net[live] * np.log(y_bragg[live])).sum() - y_bragg.sum())
 
         x = np.concatenate(intens)
-        if tol > 0.0:
-            x, run, settled = _settled_partition(cycle, x, n_cycles, tol, area)
+        if accelerate:
+            area = np.concatenate([
+                sum((np.bincount(line.first, weights=line.w_line * line.mass,
+                                 minlength=vec.size) for line in lines),
+                    np.zeros_like(vec))
+                for vec, lines in zip(intens, terms, strict=True)])
+            x = _accelerated_partition(cycle, x, n_cycles, area)
         else:
-            run, settled = n_cycles, None
             for _ in range(n_cycles):
-                x, _, _ = cycle(x)
+                x, _ = cycle(x)
         for cp, vec in zip(self.phases, np.split(x, ends), strict=True):
             cp.hkl_intensity = vec
-        return run, settled
+        return n_cycles
 
     def _partition_terms(self, values: dict[str, float]) -> list[list[_PartitionLine]]:
         """Per phase, per emission line, what a Le Bail cycle does not change."""

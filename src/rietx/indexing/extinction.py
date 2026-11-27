@@ -1075,11 +1075,9 @@ def _prefit(data: PatternData, candidate: CellCandidate, instrument: Instrument,
     # the prefit's answer is the cell and widths every class is then compared
     # at, so it pays for no closing stage either (WP-2002, the sixth round's
     # Q1 and Q2; the screen's own fits and the validation's run without one).
-    # Its partition settles like every other Le Bail fit's (WP-2076, 2026-11-07).
-    # Three fixed cycles were measured against it on eleven screens: two prefit
-    # cells better each way, and one answer changed, inside the margin's known
-    # failure near the right cell.  A partition stopped on its cap is reported
-    # on the screen, since the caller has no stage to raise it on
+    # Its intensities are extracted like every other Le Bail fit's, once per
+    # iteration (WP-2316).  A stage stopped on its budget is reported on the
+    # screen, since the caller has no stage to raise it on
     plan = replace(resolve_plan("profile_only", "lebail"), closing_window_tol=None)
     result = ref.fit(data, mode="lebail", plan=plan,
                      two_theta_limits=two_theta_limits, telemetry=False,
@@ -1090,7 +1088,7 @@ def _prefit(data: PatternData, candidate: CellCandidate, instrument: Instrument,
         "message": "The extinction screen's cell-free prefit: " + d.message,
         "suggestion": ("Refine the cell with a Le Bail fit of your own and pass it "
                        "with refine_cell=False.")})
-        for d in result.diagnostics if d.code == "LEBAIL_CYCLES_AT_CAP"]
+        for d in result.diagnostics if d.code == "STAGE_MAX_ITER"]
     return (ref.fitted_instrument, candidate.model_copy(update={"cell": cell}),
             float(result.statistics.rwp), capped)
 

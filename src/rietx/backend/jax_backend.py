@@ -56,7 +56,7 @@ def make_traced_decode(table):
     return _make_traced_decode(table, resolve_backend("jax"))
 
 
-def make_traced_residual(model, table):
+def make_traced_residual(model, table, *, intens=None):
     """jax's traced residual — :func:`backend.traced.make_traced_residual`
     bound to this backend.
 
@@ -64,10 +64,10 @@ def make_traced_residual(model, table):
     each other, and the row layout lives in ``model/rows.py`` so neither can
     drift from the numpy reference.
     """
-    return _make_traced_residual(model, table, resolve_backend("jax"))
+    return _make_traced_residual(model, table, resolve_backend("jax"), intens=intens)
 
 
-def make_jax_jacobian(model, table, *, chunk_size: int = DEFAULT_CHUNK):
+def make_jax_jacobian(model, table, *, chunk_size: int = DEFAULT_CHUNK, intens=None):
     """A drop-in replacement for ``_make_jacobian``'s callable, via jacfwd.
 
     Chunks over the *parameter* axis: ``vmap`` over blocks of ``chunk_size``
@@ -75,16 +75,21 @@ def make_jax_jacobian(model, table, *, chunk_size: int = DEFAULT_CHUNK):
     executable for every block (the trailing block is zero-padded to shape).
     The active backend is flipped to jax only inside the call (and restored),
     so residual evaluations before/after stay on the numpy path.
+
+    ``intens`` is a Le Bail solve's shared list (WP-2316).  It enters the
+    jit as an argument, so each call differentiates at the intensities the
+    last extraction left, with one executable for all of them.
     """
     import jax
     import jax.numpy as jnp
 
     xp_jax = resolve_backend("jax")
-    residual = make_traced_residual(model, table)
+    residual = make_traced_residual(model, table, intens=intens)
 
     @jax.jit
-    def jvp_block(theta, seeds):
-        return jax.vmap(lambda s: jax.jvp(residual, (theta,), (s,))[1])(seeds)
+    def jvp_block(theta, seeds, held):
+        return jax.vmap(lambda s: jax.jvp(lambda t: residual(t, held),
+                                          (theta,), (s,))[1])(seeds)
 
     def jacobian(theta: np.ndarray) -> np.ndarray:
         theta = np.asarray(theta, dtype=np.float64)
@@ -94,6 +99,8 @@ def make_jax_jacobian(model, table, *, chunk_size: int = DEFAULT_CHUNK):
         try:
             with _enable_x64():
                 t = jnp.asarray(theta)
+                held = (None if intens is None
+                        else tuple(jnp.asarray(v) for v in intens))
                 eye = np.eye(n, dtype=np.float64)
                 blocks = []
                 for a in range(0, n, chunk_size):
@@ -101,7 +108,7 @@ def make_jax_jacobian(model, table, *, chunk_size: int = DEFAULT_CHUNK):
                     if seeds.shape[0] < chunk_size:
                         seeds = np.concatenate(
                             [seeds, np.zeros((chunk_size - seeds.shape[0], n))])
-                    blocks.append(np.asarray(jvp_block(t, jnp.asarray(seeds)),
+                    blocks.append(np.asarray(jvp_block(t, jnp.asarray(seeds), held),
                                              dtype=np.float64))
             J = np.concatenate(blocks, axis=0)[:n]
         finally:

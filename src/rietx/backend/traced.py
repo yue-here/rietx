@@ -104,7 +104,7 @@ def make_traced_decode(table, xp):
     return decode
 
 
-def make_traced_residual(model, table, xp):
+def make_traced_residual(model, table, xp, *, intens=None):
     """The weighted residual as a pure traceable function of the combined θ.
 
     Mirrors ``optimize.least_squares._make_residual`` by *construction*, not by
@@ -117,6 +117,13 @@ def make_traced_residual(model, table, xp):
     The soft-restraint rows (bond/angle/value) are one differentiable function
     of the decoded coordinates and cell, so a forward-mode transform
     differentiates them with no extra wiring.
+
+    ``intens`` is a Le Bail solve's shared list
+    (``least_squares._lebail_snapshot``), whose entries the solve replaces
+    between accepted iterations (WP-2316).  The residual reads the list at
+    each call, and also takes ``intens_override``, the same arrays as
+    arguments, which is how a jit-compiled caller traces them as inputs
+    rather than baking one extraction into its executable.
     """
     # WP-1327: the magnetic structure factor is host numpy.  Two of its steps —
     # the Cholesky factorisation behind the Cartesian frame and the
@@ -138,13 +145,14 @@ def make_traced_residual(model, table, xp):
     n_table = len(table.free_paths)
     sqrt_w_host = np.asarray(1.0 / model.sigma, dtype=np.float64)
     y_obs_host = np.asarray(model.y_obs, dtype=np.float64)
-    # Le Bail extraction runs *between* solves; the snapshot is a constant of
-    # the trace exactly as it is a constant of the numpy closure
-    fixed_host = ([np.asarray(cp.hkl_intensity, dtype=np.float64)
-                   for cp in model.phases] if model.mode == "lebail" else None)
+    # the Le Bail intensities: the solve's list, read per call, so an
+    # extraction between iterations reaches the next evaluation
+    fixed_host = intens if intens is not None else (
+        [np.asarray(cp.hkl_intensity, dtype=np.float64) for cp in model.phases]
+        if model.mode == "lebail" else None)
     empty_host = np.zeros(0, dtype=np.float64)
 
-    def residual(theta):
+    def residual(theta, intens_override=None):
         # constants are lifted *here*, not above: fp64 is scoped on jax, and
         # the scope is only open inside ``active`` (module docstring)
         with active(xp):
@@ -158,8 +166,11 @@ def make_traced_residual(model, table, xp):
                 values = decode(theta[:n_table])
             else:
                 aux = xp.asarray(empty_host)
-                intens = (None if fixed_host is None
-                          else [xp.asarray(v) for v in fixed_host])
+                if intens_override is not None:
+                    intens = [xp.asarray(v) for v in intens_override]
+                else:
+                    intens = (None if fixed_host is None
+                              else [xp.asarray(v) for v in fixed_host])
                 values = decode(theta)
             return rows.assemble(model, rows.ResidualInputs(
                 values=values, intens=intens, theta_aux=aux,

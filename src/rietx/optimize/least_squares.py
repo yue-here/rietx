@@ -358,6 +358,10 @@ class LSQOutcome:
     #: ``status="diverged"``, no Jacobian and no esds; ``refine`` and
     #: ``multi`` end the stage there and say so in ``STAGE_NOT_FINITE``.
     non_finite: NonFiniteStop | None = None
+    #: the Le Bail partition cycles this solve ran inside itself, an
+    #: extraction before every outer iteration but the first (WP-2316,
+    #: :func:`.lm.minimize`'s ``refresh``).  0 outside ``lebail`` mode.
+    n_lebail_cycles: int = 0
     #: the covariance solve's discarded directions (WP-2219):
     #: :func:`.statistics.discarded_directions` on the matrix the covariance
     #: cut, the Pawley intensity block included, as ``(n, touched)`` with
@@ -1175,11 +1179,14 @@ def _active_bounds(res, n: int) -> np.ndarray:
 
 
 def _lebail_snapshot(model: CompiledModel) -> list[np.ndarray] | None:
-    """Le Bail intensities frozen for one solve (taken at closure build).
+    """The Le Bail intensities a solve's closures read, one array per phase.
 
-    They are constant during a least-squares run — ``lebail_update`` only runs
-    between solves — so snapshotting here is what lets the residual never read
-    the mutable per-phase buffers (the purity contract).
+    The residual and the Jacobian never read the mutable per-phase buffers
+    (the purity contract); they read this list.  A solve that extracts inside
+    itself (WP-2316) builds one list, hands it to both closures, and replaces
+    its entries between accepted iterations (:class:`_LeBailRefresh`), so the
+    two closures always agree on the objective.  A closure built alone takes
+    its own list, constant for its life.
     """
     if model.mode != "lebail":
         return None
@@ -1286,7 +1293,50 @@ class _DegenerateCellJacobianGuard:
         return j
 
 
-def _make_residual(model: CompiledModel, table: ParameterTable):
+class _LeBailRefresh:
+    """The Le Bail extraction a solve runs between its accepted iterations.
+
+    A call runs ``n_cycles`` accelerated partition cycles
+    (:meth:`CompiledModel.lebail_update`) at the incumbent, written to the
+    model's buffers and to the solve's shared list ``intens``, so the next
+    residual and Jacobian read the new intensities.  An extraction once per
+    least-squares cycle is the established programs' practice (GSAS-II at the
+    end of each derivative pass, FullProf, TOPAS and RIETAN-FP every cycle,
+    MAUD up to five inner iterations; ``docs/practice.md`` § Structure-free
+    fitting).  Only the intensities move.  They are not columns of θ, and the
+    hkl list, windows and FCJ node counts the stage froze are untouched, so
+    frozen-per-stage discreteness holds.
+
+    :meth:`keep` saves the intensities of the state the driver means to
+    return, and :meth:`restore` puts them back, in the list and the buffers
+    (:func:`.lm.minimize`'s best state).  ``cycles`` counts what ran.
+    """
+
+    def __init__(self, model: CompiledModel, table: ParameterTable,
+                 intens: list[np.ndarray], *, n_cycles: int, check=None):
+        self.model, self.table, self.intens = model, table, intens
+        self.n_cycles, self.check = n_cycles, check
+        self.cycles = 0
+        self._kept = list(intens)
+
+    def __call__(self, theta: np.ndarray) -> None:
+        self.cycles += self.model.lebail_update(
+            self.table.decode(theta[:len(self.table.free_paths)]),
+            n_cycles=self.n_cycles, accelerate=True, check=self.check)
+        self.intens[:] = [np.asarray(cp.hkl_intensity, dtype=np.float64)
+                          for cp in self.model.phases]
+
+    def keep(self) -> None:
+        self._kept = list(self.intens)
+
+    def restore(self) -> None:
+        self.intens[:] = self._kept
+        for cp, vec in zip(self.model.phases, self._kept, strict=True):
+            cp.hkl_intensity = vec
+
+
+def _make_residual(model: CompiledModel, table: ParameterTable, *,
+                   intens: list[np.ndarray] | None = None):
     """Weighted residual, optionally augmented with a Pawley intensity block.
 
     In Pawley mode θ = [table θ | per-hkl intensities]; the intensity tail is
@@ -1297,11 +1347,12 @@ def _make_residual(model: CompiledModel, table: ParameterTable):
     The row *layout* is not written here: ``model.rows`` owns it, and the
     traced residuals every autodiff backend uses call the same assembler, so
     the numpy reference and the traced twins cannot disagree about block order.
+    ``intens`` is a solve's shared Le Bail list (:func:`_lebail_snapshot`).
     """
     sqrt_w = 1.0 / model.sigma
     n_table = len(table.free_paths)
     xp = get_backend()
-    fixed_intens = _lebail_snapshot(model)
+    fixed_intens = _lebail_snapshot(model) if intens is None else intens
     empty_aux = np.zeros(0, dtype=np.float64)
 
     def residual(theta: np.ndarray) -> np.ndarray:
@@ -2272,7 +2323,8 @@ def _component_columns(model: CompiledModel, table: ParameterTable,
 
 
 def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
-                   moment_angles: bool = False):
+                   moment_angles: bool = False,
+                   intens: list[np.ndarray] | None = None):
     """Mixed analytic/FD Jacobian of the residual w.r.t. the internal vector.
 
     In Pawley mode the vector is [table θ | intensities]; the table columns are
@@ -2286,6 +2338,7 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
     the symmetry fixes, and a fit started on a maximum there then cannot
     leave it (the decline's docstring has the measurement).  On, the angle
     column is exact; nothing above this function asks for it yet.
+    ``intens`` is :func:`_make_residual`'s.
     """
     sqrt_w = 1.0 / model.sigma
     free = table.free_paths
@@ -2342,7 +2395,7 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
     typicals = _fd_typicals(table, identities)
     hump_reach, peak_cols = _component_columns(model, table, identities)
 
-    fixed_intens = _lebail_snapshot(model)
+    fixed_intens = _lebail_snapshot(model) if intens is None else intens
     # the origin rows are linear in the coordinates, so their physical
     # partials are a constant of the solve: scattered once, never per call
     o_phys = (None if model.origin is None or not n_table
@@ -2593,7 +2646,8 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
     return jacobian
 
 
-def _jacobian_for(model, table, backend: str, *, moment_angles: bool = False):
+def _jacobian_for(model, table, backend: str, *, moment_angles: bool = False,
+                  intens: list[np.ndarray] | None = None):
     """The Jacobian callable for ``backend`` (lazy import keeps numpy pure).
 
     Every autodiff callable produces the same fp64 host array in the same
@@ -2611,18 +2665,21 @@ def _jacobian_for(model, table, backend: str, *, moment_angles: bool = False):
 
     ``moment_angles`` is :func:`_make_jacobian`'s, passed to the numpy
     assembly; a traced backend declines every magnetic model by name, so it
-    has no moment angle to claim.
+    has no moment angle to claim.  ``intens`` is :func:`_make_residual`'s,
+    and every backend reads it per call.
     """
     if backend == "jax":
         from ..backend.jax_backend import make_jax_jacobian
 
-        inner = make_jax_jacobian(model, table)
+        inner = make_jax_jacobian(model, table, intens=intens)
     elif backend in TORCH_DEVICES:
         from ..backend.torch_backend import make_torch_jacobian
 
-        inner = make_torch_jacobian(model, table, device=TORCH_DEVICES[backend])
+        inner = make_torch_jacobian(model, table, device=TORCH_DEVICES[backend],
+                                    intens=intens)
     elif backend == "numpy":
-        inner = _make_jacobian(model, table, moment_angles=moment_angles)
+        inner = _make_jacobian(model, table, moment_angles=moment_angles,
+                               intens=intens)
     else:
         raise ValueError(f"unknown backend {backend!r}; "
                          f"available: numpy, jax, {', '.join(TORCH_DEVICES)}")
@@ -3309,7 +3366,7 @@ def _tracked(residual, tracker: _StepTracker, events, stage: str, table):
 
 def _lm_outcome(residual, jacobian, x0, lo, hi, *, max_nfev, ftol,
                 inequalities, events, stage: str, track=None, table=None,
-                normal_equations=None, cancel=None):
+                normal_equations=None, cancel=None, refresh=None):
     """Run the bounded-LM driver, adapted to the scipy result shape.
 
     The two drivers are kept interchangeable at exactly this point: everything
@@ -3353,7 +3410,8 @@ def _lm_outcome(residual, jacobian, x0, lo, hi, *, max_nfev, ftol,
                            on_trial=trial_cb if events is not None else None,
                            normal_equations=normal_equations,
                            check=(None if cancel is None
-                                  else _cancel_check(cancel, stage)))
+                                  else _cancel_check(cancel, stage)),
+                           refresh=refresh)
 
 
 class _StepTracker:
@@ -3640,10 +3698,18 @@ def _check_magnetic_width_compiled(model: CompiledModel,
 def _drive_single(model: CompiledModel, table: ParameterTable, residual, jacobian,
                   x0: np.ndarray, lo: np.ndarray, hi: np.ndarray, *, n_table: int,
                   n_aux: int, max_nfev: int, ftol: float, events, stage: str,
-                  tracker, backend: str, solver: str, cancel=None):
+                  tracker, backend: str, solver: str, cancel=None, refresh=None):
     """One driver run of :func:`run_least_squares`, either driver's result
     shape; a function of its own so that one ``try`` covers both drivers
-    (WP-2048)."""
+    (WP-2048).
+
+    ``refresh`` is a Le Bail solve's extraction (:class:`_LeBailRefresh`).
+    The LM driver runs it between iterations.  scipy's TRF exposes no hook
+    between iterations, so under TRF each extraction follows a whole TRF
+    solve, and the solves repeat until an extraction moves S by less than
+    ``ftol``, a round ends above the best S held, or the budget is spent:
+    FullProf's cycle, with a TRF solve as its least-squares step.  The
+    lowest-S round is returned, the LM driver's rule."""
     if solver == "lm":
         # the strain cone, the Γ_G² and Γ_L floors (WP-1938 D7, WP-2002) and
         # each tied entry's own bounds (WP-1325) are built against the
@@ -3669,11 +3735,40 @@ def _drive_single(model: CompiledModel, table: ParameterTable, residual, jacobia
         res = _lm_outcome(residual, jacobian, x0, lo, hi, max_nfev=max_nfev,
                           ftol=ftol, inequalities=ineqs, events=events, stage=stage,
                           track=tracker, table=table,
-                          normal_equations=normal_equations, cancel=cancel)
-    else:
+                          normal_equations=normal_equations, cancel=cancel,
+                          refresh=refresh)
+    elif refresh is None:
         with lapack.scipy_trf():
             res = least_squares(residual, x0, jac=jacobian, bounds=(lo, hi), method="trf",
                                 ftol=ftol, xtol=XTOL, gtol=GTOL, max_nfev=max_nfev)
+    else:
+        spent, x, best = 0, x0, None
+        while True:
+            with lapack.scipy_trf():
+                res = least_squares(residual, x, jac=jacobian, bounds=(lo, hi),
+                                    method="trf", ftol=ftol, xtol=XTOL, gtol=GTOL,
+                                    max_nfev=max_nfev - spent)
+            spent += int(res.nfev)
+            if best is not None and res.cost >= best.cost:
+                break
+            best = res
+            refresh.keep()
+            if spent >= max_nfev:
+                break
+            s_old = 2.0 * float(res.cost)
+            refresh(res.x)
+            fun = residual(res.x)
+            spent += 1
+            if abs(float(fun @ fun) - s_old) < ftol * max(abs(s_old), 1e-300):
+                break
+            x = res.x
+        if res is not best:
+            refresh.restore()
+        res = best
+        res.fun = residual(res.x)
+        res.cost = 0.5 * float(res.fun @ res.fun)
+        res.jac = jacobian(res.x)
+        res.nfev = spent
     return res
 
 
@@ -3684,14 +3779,17 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
                       backend: str = "numpy",
                       solver: str = DEFAULT_SOLVER,
                       cancel=None,
-                      phase_support_sigma: float | None = PHASE_SUPPORT_SIGMA
+                      phase_support_sigma: float | None = PHASE_SUPPORT_SIGMA,
+                      lebail_cycles: int = 10
                       ) -> LSQOutcome:
     """Solve one stage.  ``cancel`` — a :class:`~.cancel.CancelToken`, read
     between residual evaluations; a set token raises
     :class:`~.cancel.RefinementCancelled` out of this call, leaving the model
     and table exactly as the last accepted evaluation found them.
     ``phase_support_sigma`` is the plan's, which decides the default cell
-    window (:func:`_freeze_cell_windows`); ``None`` windows no cell."""
+    window (:func:`_freeze_cell_windows`); ``None`` windows no cell.
+    ``lebail_cycles`` is the stage's (``Stage.lebail_cycles``): the cycles
+    each extraction between iterations runs in ``lebail`` mode (WP-2316)."""
     if solver not in SOLVERS:
         raise ValueError(f"unknown solver {solver!r}; available: {', '.join(SOLVERS)}")
     lapack_start = lapack.retries()
@@ -3704,10 +3802,14 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
     _freeze_cell_windows(model, table, phase_support_sigma)
     _freeze_strain_cap(model, table)
     _freeze_size_cap(model, table)
-    residual = _make_residual(model, table)
+    # a Le Bail solve extracts inside itself (WP-2316): one list both
+    # closures read, and the start kept for a stop
+    intens = _lebail_snapshot(model)
+    lebail_start = None if intens is None else list(intens)
+    residual = _make_residual(model, table, intens=intens)
     cell_guard = _DegenerateCellGuard(residual)
     residual = cell_guard
-    jacobian = _jacobian_for(model, table, backend)
+    jacobian = _jacobian_for(model, table, backend, intens=intens)
     jacobian = _DegenerateCellJacobianGuard(jacobian, cell_guard)
     jacobian = _FiniteJacobianGuard(jacobian)
 
@@ -3766,6 +3868,11 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
             # the residual evaluations wrote their trial intensities into
             # the per-phase buffers; the outcome is the start, so are they
             model.set_pawley_intensities(x0[n_table:])
+        if lebail_start is not None:
+            # and a Le Bail solve's extractions wrote theirs (WP-2048's rule:
+            # a stopped stage changed nothing, its intensities included)
+            for cp, vec in zip(model.phases, lebail_start, strict=True):
+                cp.hkl_intensity = vec
         return _non_finite_outcome(kind, columns, table.free_paths, x0, n_table,
                                    cost0, solver, cell_guard, lapack_start)
 
@@ -3776,12 +3883,15 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
     n_truncated, truncated_by = 0, {}
     # one budget, in residual evaluations, for both drivers (WP-1937)
     max_nfev = max_iter * NFEV_PER_ITERATION
+    refresh = (None if intens is None else _LeBailRefresh(
+        model, table, intens, n_cycles=lebail_cycles,
+        check=None if cancel is None else _cancel_check(cancel, stage)))
     try:
         res = _drive_single(model, table, residual, jacobian, x0, lo, hi,
                             n_table=n_table, n_aux=n_aux, max_nfev=max_nfev,
                             ftol=ftol, events=events, stage=stage,
                             tracker=tracker, backend=backend, solver=solver,
-                            cancel=cancel)
+                            cancel=cancel, refresh=refresh)
     except _NonFiniteJacobian as stop:
         return stopped("jacobian", stop.columns)
     if solver == "lm":
@@ -3838,7 +3948,8 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
                       discarded=discards,
                       discarded_subspace=subspace,
                       esd_inflation=esd_inflation,
-                      moment_angle_tests=moment_angle_tests)
+                      moment_angle_tests=moment_angle_tests,
+                      n_lebail_cycles=0 if refresh is None else refresh.cycles)
 
 
 def _stacked_rows(models: list[CompiledModel]) -> tuple[int, int]:

@@ -217,12 +217,10 @@ class StageSpec(Base):
         "(intermediate_ftol for every declared stage but the last, the "
         "solver's 1e-9 for the last declared stage and for the closing stage "
         "when the plan has one)"))
-    lebail_cycles: int = Field(25000, description=(
-        "the most intensity-partitioning cycles run before and after the "
-        "solve in lebail mode, and for the seed in pawley mode"))
-    lebail_tol: float = Field(1e-7, ge=0.0, description=(
-        "the share of the Bragg counts a cycle may still move and end the "
-        "partition; 0 runs exactly lebail_cycles"))
+    lebail_cycles: int = Field(10, description=(
+        "the intensity-partitioning cycles of the initial extraction at the "
+        "stage's start in lebail mode, before the solve extracts once per "
+        "iteration; in pawley mode, at most this many seed the intensities"))
     seed: float = Field(0.0, description=(
         "start at this value every parameter this stage frees that sits "
         "exactly on a lower bound of 0 or above (e.g. surface roughness, "
@@ -243,17 +241,29 @@ class StageSpec(Base):
     @model_validator(mode="before")
     @classmethod
     def _accept_the_dataclass(cls, value: Any) -> Any:
-        """A ``Stage`` read as a ``StageSpec`` — see :meth:`PlanSpec._accept_the_dataclass`."""
+        """A ``Stage`` read as a ``StageSpec`` — see :meth:`PlanSpec._accept_the_dataclass`.
+
+        A stored stage from before WP-2316 carries ``lebail_tol``, the stop of
+        a partition settled at a frozen model.  No stage runs one now: the
+        intensities are extracted once per iteration and the solve's own stop
+        reads their χ² change.  The value is dropped rather than refused
+        under ``extra="forbid"``, so old documents open.
+        """
         from ..strategy.staged import Stage
 
-        return cls.from_stage(value).model_dump() if isinstance(value, Stage) else value
+        if isinstance(value, Stage):
+            return cls.from_stage(value).model_dump()
+        if isinstance(value, dict) and "lebail_tol" in value:
+            value = dict(value)
+            value.pop("lebail_tol")
+        return value
 
     @classmethod
     def from_stage(cls, stage: Any) -> "StageSpec":
         return cls(name=stage.name, turn_on=list(stage.turn_on),
                    turn_off=list(stage.turn_off),
                    max_iter=stage.max_iter, ftol=stage.ftol,
-                   lebail_cycles=stage.lebail_cycles, lebail_tol=stage.lebail_tol,
+                   lebail_cycles=stage.lebail_cycles,
                    seed=stage.seed, strain_seed=stage.strain_seed,
                    restraint_weight_scale=stage.restraint_weight_scale,
                    window_slack_deg=stage.window_slack_deg)
@@ -264,7 +274,7 @@ class StageSpec(Base):
         return Stage(name=self.name, turn_on=list(self.turn_on),
                      turn_off=list(self.turn_off),
                      max_iter=self.max_iter, ftol=self.ftol,
-                     lebail_cycles=self.lebail_cycles, lebail_tol=self.lebail_tol,
+                     lebail_cycles=self.lebail_cycles,
                      seed=self.seed, strain_seed=self.strain_seed,
                      restraint_weight_scale=self.restraint_weight_scale,
                      window_slack_deg=self.window_slack_deg)

@@ -442,25 +442,25 @@ def test_a_class_fit_that_raises_leaves_the_class_unscored(which, monkeypatch):
         assert "Run the screen again" in ambiguous[0].suggestion
 
 
-def test_a_prefit_partition_stopped_on_its_cap_is_reported_on_the_screen(monkeypatch):
-    """The prefit settles its Le Bail partition like every fit (WP-2076), so its
-    cap can bind; the caller has no stage to raise it on, so the screen says so."""
+def test_a_prefit_stopped_on_its_budget_is_reported_on_the_screen(monkeypatch):
+    """The prefit's stages can spend their budgets like every fit's; the caller
+    has no stage to raise one on, so the screen says so (WP-2316)."""
     from dataclasses import replace
 
     from rietx.strategy import staged
 
     real = staged.resolve_plan
 
-    def one_cycle(*args, **kw):
+    def two_iterations(*args, **kw):
         plan = real(*args, **kw)
-        return replace(plan, stages=[replace(s, lebail_cycles=1) for s in plan.stages])
+        return replace(plan, stages=[replace(s, max_iter=2) for s in plan.stages])
 
-    monkeypatch.setattr(staged, "resolve_plan", one_cycle)
+    monkeypatch.setattr(staged, "resolve_plan", two_iterations)
     structure, instrument = _mono_models()
     screen = determine_extinction_symbol(
         _pattern(structure, instrument), _candidate(MONO_CELL, "monoclinic"),
         instrument, two_theta_limits=MONO_RANGE)
-    capped = [d for d in screen.diagnostics if d.code == "LEBAIL_CYCLES_AT_CAP"]
+    capped = [d for d in screen.diagnostics if d.code == "STAGE_MAX_ITER"]
     assert len(capped) == 1, [str(d) for d in screen.diagnostics]
     assert capped[0].message.startswith("The extinction screen's cell-free prefit")
     assert "refine_cell=False" in capped[0].suggestion
@@ -818,6 +818,10 @@ def test_a_neighbours_tail_is_not_absence_evidence(corundum_screen,
     **no reflection of any kind** is predicted, the same 3σ test fires on a large
     fraction of probes — and only below the line, never above it.  A test that
     fires on nothing cannot be evidence about something.
+
+    Since WP-2316 a Le Bail fit extracts once per iteration, and the class's fit
+    leaves less there: (2,0,5)'s excess fell from over 3σ to 1.4σ.  The
+    neighbour's tail still fills both windows, which is the half pinned here.
     """
     from rietx.indexing.extinction import _fit_class
     from rietx.indexing.peaks import predicted_fwhm
@@ -848,9 +852,8 @@ def test_a_neighbours_tail_is_not_absence_evidence(corundum_screen,
     # every surviving line for ``testable_mask`` to have called them separable
     for position in CORUNDUM_FLAGGED:
         width = float(predicted_fwhm(np.array([position]), frozen)[0])
-        excess, tail = window(position, width)
-        assert excess > 3.0, (position, excess)     # the old refutation
-        assert tail > 10.0, (position, tail)        # and what was in the window
+        _, tail = window(position, width)
+        assert tail > 10.0, (position, tail)        # what was in the window
     assert corundum_screen.best_or_none().n_present == 0, (
         "the tail is what the gate removes, so neither position may refute")
 

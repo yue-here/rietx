@@ -466,11 +466,10 @@ class _StageHold:
     #: asked of the table afterwards, for this carrier's own reason.
     reach: dict[str, list[str]] = dataclasses.field(default_factory=dict)
     blocked_by_hold: list[str] = dataclasses.field(default_factory=list)
-    #: ``StageResult.lebail_cycles_run`` (WP-1542): the cycles each partition
-    #: of this stage ran, which only the two ``lebail_update`` calls know
+    #: ``StageResult.lebail_cycles_run`` (WP-1542, WP-2316): the cycles the
+    #: stage's initial extraction ran, then those inside its solve, which only
+    #: the stage start and the solve's outcome know
     lebail_run: list[int] = dataclasses.field(default_factory=list)
-    #: ``StageResult.lebail_settled``, for the same reason
-    lebail_settled: bool | None = None
     #: the ``turn_on`` paths naming no entry (WP-1414), riding here
     #: for ``blocked_by_hold``'s reason: decided before the solve, unchanged
     #: by it, and delivered to the two ``StageResult`` call sites this way
@@ -4815,7 +4814,7 @@ class Refinement:
             probe = Stage("suggest", [])
             if mode == "lebail":
                 model.lebail_update(table.decode(table.x0()),
-                                    n_cycles=probe.lebail_cycles, tol=probe.lebail_tol)
+                                    n_cycles=probe.lebail_cycles, accelerate=True)
             elif mode == "pawley":
                 if not carried:
                     model.lebail_update(table.decode(table.x0()),
@@ -5057,13 +5056,18 @@ class Refinement:
                 f"{node.id} records a {node.action.kind!r} action; only stage "
                 "nodes can be cherry-picked")
         # the node's own numbers, an explicit 0 included: ``NodeAction``
-        # carries the frozen 100 and 3 for a node written before the fields
+        # carries the frozen 100 and 3 for a node written before the fields.
+        # A node that extracted between solves (WP-2316) counted its cycles
+        # as a cap on a partition at a frozen model, which no stage runs
+        # any more, so its count is not an initial extraction's and the
+        # stage takes the default one
+        between = node.action.lebail_extraction == "between_solves"
         stage = Stage(node.action.name or "cherry-pick",
                       list(node.action.turn_on),
                       turn_off=list(node.action.turn_off),
                       max_iter=node.action.max_iter,
-                      lebail_cycles=node.action.lebail_cycles,
-                      lebail_tol=node.action.lebail_tol,
+                      lebail_cycles=(Stage.lebail_cycles if between
+                                     else node.action.lebail_cycles),
                       seed=node.action.seed, strain_seed=node.action.strain_seed,
                       restraint_weight_scale=node.action.restraint_weight_scale,
                       ftol=node.action.ftol,
@@ -5355,19 +5359,19 @@ class Refinement:
         model = new_model
 
         lebail_run: list[int] = []
-        lebail_settled: bool | None = None
         check = None if cancel is None else _cancel_check(cancel, stage.name)
         if mode == "lebail":
-            values = table.decode(table.x0())
-            run, lebail_settled = model.lebail_update(
-                values, n_cycles=stage.lebail_cycles, tol=stage.lebail_tol, check=check)
-            lebail_run.append(run)
+            # the initial extraction (WP-2316): the stage's cycles at its start,
+            # before the solve extracts as many again after every iteration
+            lebail_run.append(model.lebail_update(
+                table.decode(table.x0()), n_cycles=stage.lebail_cycles,
+                accelerate=True, check=check))
         elif mode == "pawley":
             if not carried:
                 # seed the intensity block from one Le Bail partition — a good
                 # warm start for the joint solve; refined values carry onward
                 lebail_run.append(model.lebail_update(
-                    table.decode(table.x0()), n_cycles=_pawley_seed_cycles(stage))[0])
+                    table.decode(table.x0()), n_cycles=_pawley_seed_cycles(stage)))
             # equal-split restraint on overlapped groups, scaled to the current
             # intensities (constant within the coming least-squares run)
             model.build_pawley_restraint()
@@ -5454,6 +5458,7 @@ class Refinement:
                                     backend=self._backend, solver=self._solver,
                                     cancel=cancel,
                                     phase_support_sigma=phase_support_sigma,
+                                    lebail_cycles=stage.lebail_cycles,
                                     **stage_ftol)
         # the table commits a moment in its principal chart (#604), and the
         # outcome is restated in that chart so every later reader of its
@@ -5689,7 +5694,8 @@ class Refinement:
                 model, table, max_iter=stage.max_iter, events=events,
                 stage=stage.name, backend=self._backend,
                 solver=self._solver, cancel=cancel,
-                phase_support_sigma=phase_support_sigma, **stage_ftol)
+                phase_support_sigma=phase_support_sigma,
+                lebail_cycles=stage.lebail_cycles, **stage_ftol)
             if second.non_finite is not None:
                 # The second solve starts from the first one's answer with
                 # what the reset and the collapse put back, and it is that
@@ -5742,6 +5748,7 @@ class Refinement:
             outcome = dataclasses.replace(
                 second, cost_initial=outcome.cost_initial,
                 n_iterations=outcome.n_iterations + second.n_iterations,
+                n_lebail_cycles=outcome.n_lebail_cycles + second.n_lebail_cycles,
                 n_constraint_truncations=(outcome.n_constraint_truncations
                                           + second.n_constraint_truncations),
                 # counts of the whole search, as multi.py's merge sums them
@@ -5769,15 +5776,10 @@ class Refinement:
             for ip in _phases_reached(support_held, held_reach):
                 support[ip] = decided[ip]
 
-        if mode == "lebail" and outcome.non_finite is None:
-            # a stopped stage changed nothing, its intensities included (WP-2048)
-            # the solve fitted against the first partition, so a settled second
-            # one does not undo a cut in it
-            run, settled = model.lebail_update(
-                table.decode(outcome.theta), n_cycles=stage.lebail_cycles,
-                tol=stage.lebail_tol, check=check)
-            lebail_run.append(run)
-            lebail_settled = settled if lebail_settled is None else lebail_settled and settled
+        if mode == "lebail":
+            # the extractions the solve ran between its iterations; a stopped
+            # solve put its intensities back and reports none (WP-2048)
+            lebail_run.append(outcome.n_lebail_cycles)
 
         guard = check_guards(table, outcome, correlation_guard, model=model,
                              scan_exchangeability=stage_index == n_stages)
@@ -5828,8 +5830,7 @@ class Refinement:
             # Le Bail and Pawley read the screen alone, which the result
             # measures on its own compile as it always has
             significance=support if mode == "rietveld" else None,
-            window_loss=loss, rwp=stage_rwp, lebail_run=lebail_run,
-            lebail_settled=lebail_settled)
+            window_loss=loss, rwp=stage_rwp, lebail_run=lebail_run)
 
     def fit(self, data: PatternData, *, mode: Mode = "rietveld",
             plan: RefinementPlan | PlanSpec | str = "mccusker_default",
@@ -6687,7 +6688,6 @@ class Refinement:
                 unknown_paths=hold.unknown_paths, fixed=hold.fixed,
                 window_loss=hold.window_loss, rwp=hold.rwp,
                 lebail_cycles_run=hold.lebail_run,
-                lebail_settled=hold.lebail_settled,
                 termination=outcome.termination or None,
                 seeded=hold.seeded,
                 cell_reset=hold.cell_reset, collapsed=hold.collapsed,
@@ -6711,7 +6711,7 @@ class Refinement:
                     kind="stage", name=stage.name, turn_on=list(stage.turn_on),
                     turn_off=list(stage.turn_off),
                     max_iter=stage.max_iter, lebail_cycles=stage.lebail_cycles,
-                    lebail_tol=stage.lebail_tol,
+                    lebail_extraction="per_iteration",
                     seed=stage.seed, strain_seed=stage.strain_seed,
                     restraint_weight_scale=stage.restraint_weight_scale,
                     # the tolerance this stage *ran* at, not the one it declared
@@ -7024,7 +7024,6 @@ class Refinement:
                 unknown_paths=hold.unknown_paths, fixed=hold.fixed, unreached_histograms={},
                 window_loss=hold.window_loss, rwp=hold.rwp,
                 lebail_cycles_run=hold.lebail_run,
-                lebail_settled=hold.lebail_settled,
                 termination=outcome.termination or None,
                 seeded=hold.seeded, cell_reset=hold.cell_reset,
                 collapsed=hold.collapsed,
@@ -7059,7 +7058,7 @@ class Refinement:
                     kind="stage", name=stage.name, turn_on=list(stage.turn_on),
                     turn_off=list(stage.turn_off),
                     max_iter=stage.max_iter, lebail_cycles=stage.lebail_cycles,
-                    lebail_tol=stage.lebail_tol,
+                    lebail_extraction="per_iteration",
                     seed=stage.seed, strain_seed=stage.strain_seed,
                     restraint_weight_scale=stage.restraint_weight_scale,
                     ftol=stage.ftol, window_slack_deg=stage.window_slack_deg,
@@ -10229,7 +10228,6 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     diagnostics = (diagnostics
                    + _far_from_data_diagnostics(model, y_calc, y_bkg, stats)
                    + _max_iter_diagnostics(stage_results)
-                   + _lebail_cap_diagnostics(stage_results)
                    + _slow_descent_diagnostics(stage_results))
 
     # Does the data support it (WP-1071): the observation/parameter ratio and
@@ -11997,26 +11995,6 @@ def _max_iter_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
         where=[],
         suggestion="Free fewer parameters at once, or check the diagnostics "
                    "for a correlation or bound hit in the same stage.",
-    )]
-
-
-def _lebail_cap_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
-    """``LEBAIL_CYCLES_AT_CAP``: the answer's partition stopped on its cap (WP-1542).
-
-    Only the last stage's partitions are the answer's: the solve fitted against
-    the first and the result carries the second.  An earlier stage's run from
-    intensities the next solve moves, so a cap there costs nothing the next
-    partition keeps.
-    """
-    last = stage_results[-1] if stage_results else None
-    if last is None or last.lebail_settled is not False:
-        return []
-    return [Diagnostic(
-        level="warning", code="LEBAIL_CYCLES_AT_CAP",
-        message=(f"A Le Bail partition of stage {last.name!r} stopped at its cap of "
-                 f"{max(last.lebail_cycles_run)} cycles, before the intensities settled."),
-        where=[],
-        suggestion="Raise lebail_cycles on the stage.",
     )]
 
 

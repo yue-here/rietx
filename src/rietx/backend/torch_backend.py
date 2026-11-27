@@ -57,7 +57,7 @@ make_traced_residual = _make_traced_residual
 
 
 def make_torch_jacobian(model, table, *, chunk_size: int = DEFAULT_CHUNK,
-                        device: str = "cpu"):
+                        device: str = "cpu", intens=None):
     """A drop-in replacement for ``_make_jacobian``'s callable, via ``jvp``.
 
     Chunks over the *parameter* axis: ``torch.func.vmap`` over blocks of
@@ -78,7 +78,8 @@ def make_torch_jacobian(model, table, *, chunk_size: int = DEFAULT_CHUNK,
     """
     xp = resolve_backend("torch" if device == "cpu" else f"torch-{device}")
     torch = xp._torch
-    residual = make_traced_residual(model, table, xp)
+    # ``intens``: a Le Bail solve's shared list, read per call (WP-2316)
+    residual = make_traced_residual(model, table, xp, intens=intens)
 
     def jvp_block(theta, seeds):
         return torch.func.vmap(

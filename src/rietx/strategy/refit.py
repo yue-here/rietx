@@ -69,9 +69,6 @@ def _collapse(plan: RefinementPlan) -> RefinementPlan:
         for glob in stage.turn_on:
             if glob not in turn_on:
                 turn_on.append(glob)
-    # the cap below is the plan's largest, which a fixed count would run in full,
-    # so one stage's stop keeps the collapsed stage stopping
-    stops = [s.lebail_tol for s in plan.stages if s.lebail_tol > 0.0]
     # the objective and windows the plan's answer converged under are its last
     # stage's, which the closing stage copies for the same reason
     # (``RefinementPlan.closing_stage``): a restraint weight, an ftol or a
@@ -83,10 +80,9 @@ def _collapse(plan: RefinementPlan) -> RefinementPlan:
                       ftol=last.ftol,
                       restraint_weight_scale=last.restraint_weight_scale,
                       window_slack_deg=last.window_slack_deg,
+                      # the most cycles an extraction of any stage ran
                       lebail_cycles=max((s.lebail_cycles for s in plan.stages),
                                         default=Stage.lebail_cycles),
-                      lebail_tol=min(stops, default=0.0 if plan.stages
-                                     else Stage.lebail_tol),
                       seed=0.0,
                       strain_seed=max((s.strain_seed for s in plan.stages),
                                       default=0.0))],

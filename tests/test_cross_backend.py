@@ -2254,21 +2254,21 @@ def _stage_boundaries(data, structure, instrument, stages, *, mode="rietveld",
         model = fresh
         if mode == "lebail":
             model.lebail_update(table.decode(table.x0()),
-                                n_cycles=stage.lebail_cycles, tol=stage.lebail_tol)
+                                n_cycles=stage.lebail_cycles, accelerate=True)
         elif mode == "pawley" and not carried:
             model.lebail_update(table.decode(table.x0()),
                                 n_cycles=_pawley_seed_cycles(stage))
             model.build_pawley_restraint()
 
         before = _frozen_signature(model)
-        outcome = run_least_squares(model, table, max_iter=stage.max_iter)
+        # a Le Bail solve extracts between its iterations (WP-2316), so the
+        # check below covers those extractions too
+        outcome = run_least_squares(model, table, max_iter=stage.max_iter,
+                                    lebail_cycles=stage.lebail_cycles)
         assert _same_signature(before, _frozen_signature(model)), (
             f"{stage.name}: the frozen state moved *during* the least-squares "
             "run — the differentiability invariant is broken")
         table.commit(outcome.theta)
-        if mode == "lebail":
-            model.lebail_update(table.decode(outcome.theta),
-                                n_cycles=stage.lebail_cycles, tol=stage.lebail_tol)
         prev_free = list(table.free_paths)
         table.apply_to_models(structure, instrument)
 

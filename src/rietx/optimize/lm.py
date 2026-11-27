@@ -398,7 +398,9 @@ class LMOutcome:
     #: inner loop found nothing downhill even at large λ), ``slow_descent``
     #: (the rest of the budget would buy less than :data:`SLOW_DESCENT_ESD`
     #: esd of travel, WP-1334), ``max_nfev`` (the evaluation budget, TRF's
-    #: token for the same stop).
+    #: token for the same stop), ``objective_rising`` (a moving objective whose
+    #: refresh and step together raised S on :data:`_CONVERGED_RUNS`
+    #: iterations running, WP-2316).
     termination: str = "max_nfev"
     #: the bounds that hold the returned point, scipy's ``active_mask``
     #: convention (−1 lower, +1 upper, 0 neither) and exact: the variable sits
@@ -448,6 +450,7 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
              normal_equations: Callable[[np.ndarray, np.ndarray],
                                         tuple] | None = None,
              check: Callable[[], None] | None = None,
+             refresh=None,
              ) -> LMOutcome:
     """Minimise ``S(θ) = r(θ)ᵀr(θ)`` subject to ``lo ≤ θ ≤ hi`` (and ``T·θ+c ≥ 0``).
 
@@ -531,6 +534,36 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
     which is how a cancel reaches a step that outlasts a deadline (one Pawley
     step refactorised 1099 times in 27 s, WP-2063).  A BVLS step at or below
     the cut, and a constrained step's one eigendecomposition, run unread.
+
+    **``refresh`` moves the objective between iterations** (WP-2316).  A
+    Le Bail stage passes one that re-extracts the per-hkl intensities at the
+    incumbent, which is where every surveyed program extracts: once per
+    least-squares cycle (``docs/practice.md`` § Structure-free fitting).  It
+    runs before each outer iteration but the first, so after every accepted
+    step, and the driver then measures S again at the same θ before it builds
+    J.  So every trial is judged against the incumbent's S under the
+    objective that trial is evaluated on, and the gain ratio never mixes two
+    objectives.  The measurement counts against ``max_nfev``.  An iteration
+    counts towards ``ftol`` only when the refresh's own change in S is under
+    ``ftol`` too, because a stage whose steps have stopped while its
+    intensities still move has not converged.  For the same reason an
+    iteration that finds no downhill step refreshes and tries again unless
+    the refresh before it moved S by less than ``ftol``.  The slow-descent
+    rule reads the travel of S, the steps' decreases plus the refreshes'
+    changes taken absolutely, since a refresh may raise S.
+
+    A moving objective is no descent method: a refresh may raise S by more
+    than the next step lowers it, and on a pattern whose background and
+    intensities trade against each other the pair walks, S rising for
+    hundreds of iterations.  So the driver keeps the state of lowest S it has
+    held, θ with ``refresh.keep()``'s intensities, and returns it whatever
+    ends the stage.  When the refresh and the step together raise S on
+    :data:`_CONVERGED_RUNS` iterations running, the stage stops there with
+    termination ``objective_rising``, a convergence.  Rietveld's rule of
+    keeping the best attempt is the same one.  ``refresh`` is called as
+    ``refresh(x)``, and ``refresh.keep()`` and ``refresh.restore()`` save and
+    put back the intensities of the best state.  ``None`` is the fixed
+    objective, bit for bit.
     """
     if max_nfev < 1:
         # scipy's TRF refuses the same budget in the same words.  Run on, it
@@ -570,9 +603,32 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
     # which coordinates have been measured (each at most once)
     curvature = np.zeros(len(x))
     measured = np.zeros(len(x), dtype=bool)
+    # a moving objective (``refresh``): the S change its last refresh made,
+    # relative, infinite before the first, and the travel of S the
+    # slow-descent rule reads in place of S itself
+    shift = np.inf
+    travel = 0.0
+    rising = 0
+    if refresh is not None:
+        accepted_s = [0.0]
+        best = (x, r, s)
+        accepted_step_s = s
+        refresh.keep()
 
     while n_fev < max_nfev:
         n_outer += 1
+        if refresh is not None and n_outer > 1:
+            refresh(x)
+            r = residual(x)
+            n_fev += 1
+            s_new = float(r @ r)
+            shift = abs(s_new - s) / max(abs(s), 1e-300)
+            travel += abs(s_new - s)
+            s = s_new
+            accepted_at.append(n_fev)
+            accepted_s.append(-travel)
+            if n_fev >= max_nfev:
+                break
         J = jacobian(x)
         n_jev += 1
         A, b = build(J, r)
@@ -660,10 +716,20 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
                 q = min(max(sum(signs[-_Q_WINDOW:]), 0), 10)
                 lam = _next_lambda(lam, r_u, q)
                 rel = -ds / max(abs(s), 1e-300)
+                if refresh is not None:
+                    rel = max(rel, shift)
+                    travel -= ds
+                    # the iteration's net change, refresh and step together,
+                    # against the state the last accepted step left
+                    rising = rising + 1 if s_try > accepted_step_s else 0
+                    accepted_step_s = s_try
+                    if s_try < best[2]:
+                        best = (x_try, r_try, s_try)
+                        refresh.keep()
                 x, r, s = x_try, r_try, s_try
                 accepted = True
                 accepted_at.append(n_fev)
-                accepted_s.append(s)
+                accepted_s.append(s if refresh is None else -travel)
                 if callback is not None:
                     callback(x, 0.5 * s)
                 small_runs = small_runs + 1 if rel < ftol else 0
@@ -699,6 +765,14 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
                 small_runs = 0
                 lam = min(lam, lam_start)
                 continue
+        if refresh is not None and rising >= _CONVERGED_RUNS:
+            status = 1
+            termination = "objective_rising"
+            break
+        if not accepted and refresh is not None and not shift < ftol:
+            # nothing downhill under these intensities, but the last refresh
+            # still moved S: refresh at the same θ and look again
+            continue
         if not accepted:
             # No downhill step exists that the cost can resolve.  That is
             # convergence, on the first outer iteration as on any later one,
@@ -719,11 +793,16 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
             termination = "ftol_runs"
             break
         if _descent_too_slow(accepted_at, accepted_s, n_fev, max_nfev,
-                    n_dof=len(r) - len(x)):
+                             n_dof=len(r) - len(x),
+                             s_now=None if refresh is None else s):
             status = 1
             termination = "slow_descent"
             break
 
+    if refresh is not None and best[2] < s:
+        # the lowest S the stage held, with the intensities it was measured on
+        x, r, s = best
+        refresh.restore()
     # J must be the Jacobian *at the returned point* — covariance_estimates
     # reads it together with ``fun``, and a stale one silently mis-scales
     # every esd.  Re-evaluating at an already-visited θ is nearly free: the
@@ -746,7 +825,8 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
 
 
 def _descent_too_slow(accepted_at: list[int], accepted_s: list[float],
-                      n_fev: int, max_nfev: int, *, n_dof: int) -> bool:
+                      n_fev: int, max_nfev: int, *, n_dof: int,
+                      s_now: float | None = None) -> bool:
     """Whether the slow-descent rule stops the stage here.
 
     The rule is :data:`SLOW_DESCENT_ESD`'s.
@@ -755,6 +835,8 @@ def _descent_too_slow(accepted_at: list[int], accepted_s: list[float],
     accepted step, the start first, so the incumbent ``window`` evaluations
     ago is the last entry at or before ``n_fev − window``.  Every count is in
     residual evaluations, the unit the budget is in (WP-1937), never steps.
+    Under a moving objective ``accepted_s`` is minus the travel of S and
+    ``s_now`` the incumbent's S, which the bound scales by.
     """
     if SLOW_DESCENT_ESD is None or n_dof <= 0:
         return False
@@ -762,8 +844,9 @@ def _descent_too_slow(accepted_at: list[int], accepted_s: list[float],
     if n_fev - window < 1 or n_fev >= max_nfev:
         return False
     i = bisect.bisect_right(accepted_at, n_fev - window) - 1
-    s_now = accepted_s[-1]
-    projected = (accepted_s[i] - s_now) * _SLOW_DESCENT_HORIZON / window
+    projected = (accepted_s[i] - accepted_s[-1]) * _SLOW_DESCENT_HORIZON / window
+    if s_now is None:
+        s_now = accepted_s[-1]
     return projected < SLOW_DESCENT_ESD ** 2 * s_now / n_dof
 
 

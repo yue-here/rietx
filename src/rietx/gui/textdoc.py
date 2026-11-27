@@ -131,6 +131,13 @@ STAGE_KEYS = tuple(k for k in StageSpec.model_fields
 STAGE_FIX_WORD = "fix"
 #: The subset that must come back as ``int``.
 STAGE_INT_KEYS = ("max_iter", "lebail_cycles")
+#: Stage keys a release removed, read and dropped so a stored document still
+#: opens: ``StageSpec``'s own ``mode="before"`` rule for a vanished field,
+#: applied one step earlier because the line parser refuses a key it does not
+#: know.  ``lebail_tol`` stopped a Le Bail partition settled at a frozen model,
+#: which no stage runs since the intensities are extracted once per iteration
+#: (WP-2316).
+STAGE_VANISHED_KEYS = ("lebail_tol",)
 
 #: Blocks whose *name* is reserved so a later WP can fill them in without a
 #: format bump.  Recognised by the parser and refused with the owner, which is
@@ -880,7 +887,7 @@ def _parse_stage(n: int, rest: list[str], raw: str, fail) -> StageSpec | None:
         return None
     rest = rest[1:]
     keys = STAGE_KEYS
-    stops = (*keys, STAGE_FIX_WORD)
+    stops = (*keys, *STAGE_VANISHED_KEYS, STAGE_FIX_WORD)
     cut = next((i for i, token in enumerate(rest) if token in stops), len(rest))
     globs = [g for g in " ".join(rest[:cut]).replace(",", " ").split() if g]
     tail = rest[cut:]
@@ -891,12 +898,16 @@ def _parse_stage(n: int, rest: list[str], raw: str, fail) -> StageSpec | None:
         if key == STAGE_FIX_WORD and not fixes:
             # ``fix <globs>``: the stage's turn_off, after its frees (WP-2208),
             # read up to the next key wherever the clause sits on the line
-            cut = next((i for i, token in enumerate(tail) if token in keys), len(tail))
+            cut = next((i for i, token in enumerate(tail)
+                        if token in keys or token in STAGE_VANISHED_KEYS), len(tail))
             fixes = [g for g in " ".join(tail[:cut]).replace(",", " ").split() if g]
             tail = tail[cut:]
             if not fixes:
                 fail(n, f"stage {name!r}: 'fix' takes '<glob>[, <glob>…]'", raw, name)
                 return None
+            continue
+        if key in STAGE_VANISHED_KEYS and tail and _number(tail[0]) is not None:
+            tail.pop(0)
             continue
         if key not in keys or not tail or _number(tail[0]) is None:
             fail(n, f"stage {name!r}: expected '<{'|'.join(keys)}> <number>' "

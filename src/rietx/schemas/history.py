@@ -106,7 +106,14 @@ class NodeAction(Base):
     ``lebail_cycles`` and ``lebail_tol`` keep the defaults of the stage a node
     without them ran (WP-1542): three cycles, no test.  The stage's own defaults
     moved, and these must not follow them, or an old node replays what it never
-    ran.  Every stage now writes both.
+    ran.  ``lebail_extraction`` (WP-2316) says where the node's stage extracted
+    its Le Bail intensities, and its default is what every node written before
+    the field ran: ``"between_solves"``, a partition at a frozen model before
+    and after the solve, ``lebail_cycles`` its cap and ``lebail_tol`` its stop.
+    A stage now writes ``"per_iteration"``: ``lebail_cycles`` initial cycles,
+    then one inside the solve after every accepted iteration, and no
+    ``lebail_tol``, whose 0.0 then means nothing.  ``cherry_pick`` reads the
+    count under the node's own word.
     """
 
     kind: NodeKind
@@ -117,6 +124,7 @@ class NodeAction(Base):
     max_iter: int = 100
     lebail_cycles: int = 3
     lebail_tol: float = 0.0
+    lebail_extraction: Literal["between_solves", "per_iteration"] = "between_solves"
     seed: float = 0.0
     strain_seed: float = 0.0
     restraint_weight_scale: float = 1.0

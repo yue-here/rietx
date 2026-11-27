@@ -1181,14 +1181,13 @@ class StageResult(Base):
     #: stage with no Bragg intensity to compare.  Writers: the three runners
     #: that build a ``StageResult``.
     window_loss: float | None = None
-    #: the Le Bail cycles this stage's partitions ran, in order: before the
-    #: solve, then after it (a Pawley seed is the one entry).  A stage the
-    #: solve stopped has only the partition before it.  Empty where none ran:
-    #: a Rietveld stage, or a Pawley stage that carried its intensities in.
+    #: the Le Bail partition cycles this stage ran, in order: its initial
+    #: extraction at the stage's start, then those inside the solve, one after
+    #: every accepted iteration (WP-2316).  A Pawley seed is the one entry.  A
+    #: solve stopped on a non-finite model put its intensities back and counts
+    #: 0.  Empty where none ran: a Rietveld stage, or a Pawley stage that
+    #: carried its intensities in.
     lebail_cycles_run: list[int] = Field(default_factory=list)
-    #: did every partition of this Le Bail stage meet ``lebail_tol`` under its
-    #: cap?  ``None`` where nothing was asked: another mode, or a fixed count.
-    lebail_settled: bool | None = None
     #: the stage's Rwp at the values it ended on, measured on its own frozen
     #: compile: the number the ``stage_end`` event carries, so a caller keeping
     #: the best stage reads it here rather than from the event log (WP-1334).
@@ -1507,6 +1506,24 @@ class StageResult(Base):
         if isinstance(value, dict) and "floor_unseeded" in value:
             value = dict(value)
             value.pop("floor_unseeded")
+        return value
+
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_lebail_settled(cls, value: Any) -> Any:
+        """Open a result stored while a Le Bail partition settled at a frozen
+        model (WP-1542 to WP-2316).
+
+        ``lebail_settled`` said whether every partition met ``lebail_tol``
+        under its cap, and fed ``LEBAIL_CYCLES_AT_CAP``.  Both went with the
+        settled partition: the intensities are extracted once per iteration and
+        the solve's own stop reads them, so a stage whose intensities still
+        moved is a stage on its budget (``STAGE_MAX_ITER``).  A stored value is
+        dropped rather than refused, because old documents open.
+        """
+        if isinstance(value, dict) and "lebail_settled" in value:
+            value = dict(value)
+            value.pop("lebail_settled")
         return value
 
 

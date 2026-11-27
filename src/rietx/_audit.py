@@ -1687,14 +1687,6 @@ ROWS: tuple[Row, ...] = (
                   "fires exactly when used")),
     Row("LAUE_CLASS_NOT_SEPARABLE", "code"),
     Row("LEBAIL_ALTERNATION_STOPPED", "code"),
-    Row("LEBAIL_CYCLES_AT_CAP", "code", tier=1, ambiguity=1,
-        evidence=("arithmetic: fires exactly when StageResult.lebail_settled is False on the "
-                  "last stage, a partition there having reached Stage.lebail_cycles; "
-                  "gates nothing"),
-        response="warning",
-        responds=("raise lebail_cycles on the stage until StageResult.lebail_settled reads True, "
-                  "and read the intensities and widths as unsettled until then"),
-        scope=("all",)),
     Row("LOW_ANGLE_UNMODELLED", "code"),
     Row("MAGNETIC_ION_ASSUMED", "code", tier=1, ambiguity=3,
         evidence=("arithmetic: fires exactly when the substitution was made (info); the "
@@ -2922,10 +2914,8 @@ ROWS: tuple[Row, ...] = (
                  "the pair."),
         approved="2026-10-23"),
     Row("rietx.schemas.results.StageResult.lebail_cycles_run", "action", tier=1, ambiguity=1,
-        evidence="arithmetic: the count each partition returned, recorded and acting on nothing"),
-    Row("rietx.schemas.results.StageResult.lebail_settled", "action", tier=1, ambiguity=1,
-        evidence=("arithmetic: every partition of the stage ended under its cap with a tolerance above 0; "
-                  "None where no tolerance was asked, so it cannot read as an answer")),
+        evidence=("arithmetic: the cycles of the stage's initial extraction and the sum of its "
+                  "in-solve extractions, recorded and acting on nothing (WP-2316)")),
     Row("rietx.schemas.results.StageResult.released", "action", tier=3, ambiguity=1,
         evidence=("WP-1301/1523: a held phase reading >= 3 sigma at the answer is released and the "
                   "stage re-solved once; one that fell under it is restored to its stage start and "
@@ -4664,8 +4654,10 @@ ROWS: tuple[Row, ...] = (
                   "FAP partition dropped every landing for hundreds of rounds; of 2, 4 and 8 on six "
                   "patterns only 4 stays within 1.25x of the best total cycles on all of them (2 "
                   "loses 1.9x on FAP, 8 loses 2.4x on #740); the factor picks the path, so at 2 and "
-                  "8 #740's 2 % scale lands 1.25 esd away (Rwp 4.697 against 4.680 %), the "
-                  "failing case of StageSpec:lebail_tol (WP-1542, 2026-11-05)")),
+                  "8 #740's 2 % scale lands 1.25 esd away (Rwp 4.697 against 4.680 %) "
+                  "(WP-1542, 2026-11-05), measured on a partition settled at a frozen model; "
+                  "since WP-2316 it accelerates each extraction a Le Bail stage runs between "
+                  "its iterations")),
     Row("rietx.model.forward.WINDOW_AREA_TOL", "constant", tier=3, value=0.02,
         evidence=("window area tolerance; measured 2026-10-21 on SRM 660c, FAP, cpd-1a and 11-BM NAC against 5e-5 (converged): fails on all four, "
                   "max |dy|/sigma 0.71-2.15 at fixed parameters against a bar of 0.1, a converged "
@@ -6678,48 +6670,17 @@ ROWS: tuple[Row, ...] = (
                  "S/L and H/L mirror (WP-2012), "
                  "not an accuracy loss from the tolerance."),
         approved="2026-11-01"),
-    Row("rietx.schemas.plan.StageSpec:lebail_cycles", "default", tier="invariant", ambiguity=1,
-        value=25000,
-        evidence=("answer-invariant: a cap the stop reaches first; the dearest partition of a "
-                  "profile_only fit at lebail_tol 1e-7 ran 8495 cycles on BT-1 LaMnO3, 1088 on "
-                  "#740's pattern and 161 on FAP, and one from a flat start 12 293 (2.0x, measured "
-                  "once); tests/test_lebail_cycles.py::test_the_tolerance_meets_its_bar asserts 2x "
-                  "on the fit's partitions on six patterns from four kinds of instrument, the "
-                  "largest 329 reflections; past that domain a cut says so "
-                  "(LEBAIL_CYCLES_AT_CAP); "
-                  "GSAS-II's DoLeBail runs a fixed 10 (GSASIIstrMain.py:761, checked)"),
-        grounds=("B11 (ruled 2026-10-19): repeat until the intensities stop changing, with a cap, "
-                 "and a budget is treated as not affecting the answer once a test confirms its "
-                 "margin."),
-        approved="2026-10-19"),
-    Row("rietx.schemas.plan.StageSpec:lebail_tol", "default", tier=3, ambiguity=1, value=1e-7,
-        evidence=("a numerical setting whose bar fails on one family; a cycle's share of the Bragg "
-                  "counts (the partition is one iterative solve, so this says how far it is taken); "
-                  "max|dy|/sigma against a 1e-10 reference at fixed parameters is, from a flat start, "
-                  "0.027 on #740's pattern, 0.005 at its 2 % scale, 0.015 on BT-1 LaMnO3, 0.011 on "
-                  "FAP and under 0.001 on corundum, 11-BM NAC and LaB6+cBN, where 1e-6 fails at "
-                  "0.237, 0.147 and 0.101; from the fit's own intensities 0.029, 0.001, 0.000 on "
-                  "#740, its 2 % scale, corundum and NAC; fails on FAP, 1.23: a pair 1e-4 A apart "
-                  "(506 and 10 -5 0) that 3000 more cycles swap, Rwp 10.108 to 10.103 %, with "
-                  "the answer 0.001 plain esd off; on #740 at 2 % scale settled intensities from "
-                  "two starts differ by 1.38, so no tolerance closes such a pair, and neither bar "
-                  "reads the split of such a pair, which can move while the curve holds; bar 2, "
-                  "0.1 plain esd, holds on four families of five patterns, #740 and its 2 % "
-                  "scale being one (0.023 on #740's pattern against 1e-9); #740, the "
-                  "ruling's yardstick, ends at Rwp 1.07 % against 1.09 % for its true structure and "
-                  "1.61 % at 3 cycles, a cell 4.6 ppm off truth against 34.9; a stop on estimated "
-                  "distance (s2^2/(s1-s2), Aitken) left FAP at 1.23 too; a Le Bail plan costs "
-                  "1.0-2.1x on six patterns and 150x on LaMnO3 (0.45 s to about a minute); "
-                  "tests/test_lebail_cycles.py, WP-1542, 2026-11-05, macOS arm64"),
-        grounds=("B11 (ruled 2026-10-19): repeat until the intensities stop changing, with a cap, "
-                 "judged against the true structure.  The number, FAP as its failing case and "
-                 "LaMnO3's 150x cost were settled by Claude under the maintainer's delegation "
-                 "of 2026-11-05, and the date is that settlement's, which he counted as his "
-                 "approval on 2026-11-22 (WP-2238).  No "
-                 "surveyed program stops on the intensities at a fixed model, because each "
-                 "extracts inside the solve (docs/practice.md); 1e-8 leaves FAP at 0.55 and "
-                 "more than doubles LaMnO3's cycles."),
-        approved="2026-11-05"),
+    Row("rietx.schemas.plan.StageSpec:lebail_cycles", "default", tier=2, ambiguity=1,
+        value=10,
+        evidence=("source: the cycles of each Le Bail extraction, run at a stage's start and "
+                  "after every accepted iteration (WP-2316); GSAS-II's DoLeBail runs a fixed "
+                  "cycles=10 (GSASIIstrMain.py:761, checked 2026-11-05), FullProf's manual "
+                  "advises a few cycles (say 10) of extraction before refining, MAUD runs up to "
+                  "5; the joint fixed point does not read the count, only the path to it and the "
+                  "solve's ftol stop; on #740's pattern 10 accelerated cycles end at the true "
+                  "cell within 6.3 ppm and Rwp 0.978 of the true structure's, where one plain "
+                  "cycle per iteration ran every stage to its budget (WP-2316, 2026-11-27, macOS "
+                  "arm64)")),
     Row("rietx.schemas.plan.StageSpec:seed", "default", tier="caller", ambiguity=1, value=0.0,
         evidence=("opt-in: Stage.seed > 0, default 0; the one shipped seed is "
                   "strategy.staged.ROUGHNESS_SEED's 0.3")),
@@ -7488,8 +7449,6 @@ ROWS: tuple[Row, ...] = (
         evidence="arithmetic: names the argument that overrides the default"),
     Row("LAUE_CLASS_NOT_SEPARABLE.suggestion", "suggestion", value=1),
     Row("LEBAIL_ALTERNATION_STOPPED.suggestion", "suggestion", value=1),
-    Row("LEBAIL_CYCLES_AT_CAP.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
-        evidence="arithmetic: names the stage setting that lifts the cap"),
     Row("LOW_ANGLE_UNMODELLED.suggestion", "suggestion", value=1),
     Row("MAGNETIC_ION_ASSUMED.suggestion", "suggestion", tier=1, ambiguity=3, value=2,
         evidence="arithmetic: names the argument that overrides the default"),
