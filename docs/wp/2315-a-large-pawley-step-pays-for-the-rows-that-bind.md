@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: 🔄 2026-11-27 — claimed by @claude (ghostshift runner)
 Track: A large cell
 Depends on: 2317 soft (its `bigcell-pawley` case and rulings R0, R4, R5)
-Priority: P2 2026-11-27 — provisional: the track the maintainer opened for a user at the wall, on the path the structure-free default is moving to (WP-2062) and every `index_pattern` validation already runs; re-rate when WP-2317 task 1 names the user's path and task 1 here counts crossings on real data
+Priority: P2 2026-11-27 — provisional: the track the maintainer opened for a user at the wall; task 1 found real patterns on the tree reach the step once in 32 runs, so P3 if the user's pattern (WP-2317 task 1) does not cross either
 
 ## Goal
 
@@ -92,6 +92,42 @@ grows, and keeping the factor across λ retries (λ shifts only the diagonal).
   `index_pattern` validation of a large candidate; the validation fit has been
   Pawley since WP-2011) before calling the path routine.
 
+**Task 1's count (2026-11-27, macOS arm64, `[dev]`, compiled tier on).** No real
+large-cell pattern is on the tree, so the stand-ins are the real patterns whose
+Pawley block passes `BVLS_MAX_COLUMNS` (FAP.XRA, 11-BM NAC), the real
+`index_pattern` path (FAP.XRA's candidate validations) and two lab Cu patterns
+that run to high angle (QPA round robin cpd-1a and cpd-1h). They carry real
+instrument profiles, which is the probe's open question. The probe is
+[`2315-probe/count_crossings.py`](2315-probe/count_crossings.py).
+
+| case | least-squares runs | columns | crossings | constrained step | fit wall |
+|---|---|---|---|---|---|
+| FAP.XRA, default plan | 5 | 335-343 | 0 | 0 | 1.2 s |
+| NAC, whole file | 5 | 1 492-1 499 | 0 | 0 | 11.3 s |
+| FAP.XRA `index_pattern` | 12 | ≤ 375 | 1 (Γ_G² floor) | 0.05 s | 18.3 s |
+| cpd-1a, cpd-1h | 5 each | 117-128 | 0 | 0 | 0.8-1.4 s |
+| probe 1, 2θ ≤ 90° | 5 | ≤ 1 619 | 22 (Γ_L) | 8.6 s | 13.6 s |
+| probe 1, 2θ ≤ 120° | 5 | ≤ 1 621 | 31 (Γ_L) | 36.2 s | 54.7 s |
+| probe 1 + true `lor_strain` 0.03, 90° | 5 | ≤ 1 619 | 0 | 0 | 6.4 s |
+| probe 1 + true `lor_strain` 0.03, 120° | 5 | ≤ 1 621 | 53 (Γ_L) | 80.2 s | 102.4 s |
+
+- **Real data reached the step once in 32 least-squares runs**, for 0.05 s.
+  Every probe crossing is in the last (`profile`) stage and on the
+  **Lorentzian** rows (Γ_L ≥ 0), never the Γ_G² floor the Context above
+  suspected.
+- A strain term in the probe's truth does not remove the crossings at 120°.
+  So the probe's zero tanθ Lorentzian is not the whole cause. Why its
+  profile stage presses on Γ_L is not measured (a hypothesis: X and
+  `lor_size` are both 1/cosθ terms, so their difference is a flat direction
+  the LM step can overshoot along).
+- `solver="trf"` is no way round: it took 159.5 s at 90° (LM 13.6 s), stopped
+  its `profile` stage at the 400-evaluation cap, and ended at Rwp 0.0511
+  against LM's 0.0447. At 120° it was stopped after 9 min (LM 54.7 s), and on
+  NAC after 19.5 min (LM 11.3 s).
+- What this re-rates: the step is as costly as filed when a fit reaches it,
+  and no real pattern on the tree reaches it. Whether the user's pattern
+  does is WP-2317 task 1's question.
+
 **The ruling this touches (WP-2317's R4).** Practice (`docs/practice.md`
 § Peak-width limits) floors by value: GSAS-II per reflection, FullProf at
 Γ_G = 1e-10, while RIETAN-FP rejects a step to a negative width. rietx holds the
@@ -147,10 +183,11 @@ free swap under LM.
 
 ## Tasks
 
-- [ ] Count crossings per stage (`truncated_by`) on a real large-cell Pawley fit,
+- [x] Count crossings per stage (`truncated_by`) on a real large-cell Pawley fit,
       an `index_pattern` candidate validation, and on `bigcell-pawley`, plus
       `solver="trf"`'s wall on both. If real data never cross, re-rate this WP and
-      say so.
+      say so. *Done 2026-11-27: one crossing in 32 real-data runs; the table is
+      Context § Task 1's count.*
 - [ ] Measure main against the branch on `bigcell-pawley`, interleaved, one
       machine, min-max over at least three runs, plus one profiled run for the
       split.
