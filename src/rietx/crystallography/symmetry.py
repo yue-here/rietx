@@ -1795,6 +1795,51 @@ def reflection_orbits(sg_symbol: str, hkl_reps: np.ndarray) -> list[np.ndarray]:
     return orbits
 
 
+def lattice_coincidences(sg_symbol, hkl_reps: np.ndarray) -> list[list[int]]:
+    """Groups of reflections whose d agree in **every** cell the group allows.
+
+    Returns lists of row indices into ``hkl_reps``, each of size ≥ 2, in
+    ascending order of their first member.  Two reflections in one list have
+    equal d for every metric of the space group's setting, so no powder pattern
+    of that phase can separate their intensities: cubic 333 and 511, or hkl
+    and khl under 4/m, -3 or 6/m.  Symmetry equivalents are already one row of
+    :func:`generate_reflections`, so they never appear here.  An accidental or
+    pseudo-metric coincidence (b ≈ 3a) is not returned either, since a cell the
+    group allows separates it.
+
+    **The test is exact, in integers.**  d*² = hᵀG*h, and the metrics the
+    setting allows are the G* with G* = R·G*·Rᵀ for every rotation R (the
+    untransposed action on a tensor that contracts with h twice; root
+    ``CLAUDE.md``).  For such a G*, tr(hhᵀ·G*) equals the trace of the group
+    average of (Rᵀh)(Rᵀh)ᵀ against G*, and that pairing is non-degenerate on
+    the invariant subspaces.  So two reflections coincide for every allowed
+    metric exactly when Σ_R (Rᵀh)(Rᵀh)ᵀ agrees, an integer matrix.  The
+    rotations are the setting's own, so a rhombohedral-axes or a c-unique
+    setting is served by the same arithmetic.  The derivation is the Reynolds
+    projection of invariant theory; ``tests/test_pawley_lattice_merge.py``
+    checks the answer against GSAS-II's per-Laue-class integer identities
+    (``GSASIIstrIO.GetPawleyConstr``, 5.8.4) and against d at random cells
+    drawn from :func:`cell_constraints`.
+    """
+    hkl = np.asarray(hkl_reps, dtype=np.int64).reshape(-1, 3)
+    if len(hkl) < 2:
+        return []
+    rots = rotation_matrices(as_group(sg_symbol))
+    rot_t = np.rint(np.transpose(rots, (0, 2, 1))).astype(np.int64)
+    rot_t = np.unique(rot_t.reshape(len(rot_t), 9), axis=0).reshape(-1, 3, 3)
+    images = np.einsum("mij,nj->nmi", rot_t, hkl)
+    moment = np.einsum("nmi,nmj->nij", images, images)
+    key = moment[:, [0, 1, 2, 1, 0, 0], [0, 1, 2, 2, 2, 1]]
+    _, inverse, counts = np.unique(key, axis=0, return_inverse=True,
+                                   return_counts=True)
+    inverse = np.asarray(inverse).reshape(-1)
+    shared = np.flatnonzero(counts >= 2)
+    if not len(shared):
+        return []
+    groups = [np.flatnonzero(inverse == u).tolist() for u in shared]
+    return sorted(groups, key=lambda g: g[0])
+
+
 def generate_reflections(sg_symbol: str,
                          cell: tuple[float, float, float, float, float, float],
                          wavelength: float,
