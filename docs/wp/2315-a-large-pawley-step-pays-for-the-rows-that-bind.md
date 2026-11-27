@@ -178,6 +178,18 @@ free swap under LM.
    intensities by NNLS per evaluation.
 8. **Measure `solver="trf"` first.** TRF never sees the rows, so it is angle 6's
    cost model without the ruling.
+9. **Merge lattice-forced coincidences** (WP-2317's R5, ruled 2026-11-27,
+   "go (b)"; a change of method under Rule 5, so judged against independent
+   references). Reflections whose d agree in every cell of the setting
+   (cubic 333/511, hkl/khl under 4/m, -3, 6/m) become one intensity column
+   carrying their sum; each member is drawn at its multiplicity's share (equal
+   F²) and reports no esd. Accidental coincidences (probe 1's b = 3a) keep the
+   restraint, whose target moves from equal peak intensity to equal F². A
+   phase whose model reads hkl (a Stephens block, a peak equation, satellites,
+   a magnetic component) keeps one column per member. *Done 2026-11-27 (4th
+   session); the handover log has the numbers.* It shrinks the block on
+   cubic, tetragonal, trigonal and hexagonal phases. It cannot shrink probe 1,
+   whose P2₁2₁2₁ metric forces no coincidence.
 
 ### Inherited
 
@@ -228,7 +240,12 @@ free swap under LM.
       measured remainder and each one's Rule 1 kind.
 - [ ] Tests: the FAP.XRA and NAC Pawley protocols within their recorded envelope;
       the bench case within R0 (a)'s bound.
-- [ ] Skill: none (no API change).
+- [x] Angle 9 (R5 (b)): the merge, its detection tested on every Laue class
+      against GSAS-II's identities, the exception for hkl-dependent models, the
+      equal-F² restraint target, and the cascade (statistics, diagnostics,
+      exporter, help, manual, skill row). *Done 2026-11-27 (4th session).*
+- [ ] Skill: none (no API change). *Angle 9 added one row to
+      `references/diagnostics.md` for `ReflectionRow.merged_group`.*
 
 ## Acceptance
 

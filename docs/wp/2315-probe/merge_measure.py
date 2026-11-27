@@ -50,7 +50,11 @@ def _run(name, data, structure, instrument, **kw):
 def main(arm: str) -> None:
     from tests.test_acceptance_fap import EXP, build_fap_inputs
     from tests.test_acceptance_qpa_roundrobin import (
-        DATA, corundum_phase, qarr_instrument, seed_scales)
+        DATA,
+        corundum_phase,
+        qarr_instrument,
+        seed_scales,
+    )
     from tests.test_acceptance_srm660c import build_srm_inputs
 
     rows = []
