@@ -636,7 +636,7 @@ calls its Pawley-type mode "LeBail". TOPAS was read at Technical Reference v5 (�
 
 | Program | Offers | Default or first steer | Le Bail re-extraction | Pawley overlap handling |
 |---|---|---|---|---|
-| rietx | both | no default argument picks either (`mode` defaults to `rietveld`); the indexer's validation fit is Pawley since WP-2011 | a partition before and after each least-squares *run*, none inside it, repeated until a cycle moves 1e-7 of the Bragg counts under a cap of 25000 cycles (WP-1542; 3 fixed cycles before it) | seeded from one Le Bail partition; overlapped groups held by an equal-split restraint and flagged |
+| rietx | both | no default argument picks either (`mode` defaults to `rietveld`); the indexer's validation fit is Pawley since WP-2011 | at a stage's start and after every accepted iteration, 10 accelerated cycles each (WP-2316; WP-1542's partition settled to 1e-7 at a frozen model before it) | seeded from one Le Bail partition; overlapped groups held by an equal-split restraint and flagged |
 | GSAS-II 5.8.4 | both | neither is on by default (`doPawley` and the histogram's `LeBail` both False); a "Start Le Bail extraction?" button on each histogram, Pawley a Phase › General checkbox | once per least-squares iteration under the default analytic Hessian (checked (source)) | reflections exactly overlapped by symmetry tied equal; a negative-intensity penalty, weight 0 by default |
 | FullProf 8.20 | Le Bail only (`Jbt` = 2, profile matching) | the manual advises profile matching before Rietveld when the model is crude | every least-squares cycle (ran); stops when χ² changes by < 1e-3 | not offered |
 | TOPAS (TR v5) | both | Pawley: "The default is Pawley refinement, the keyword lebail triggers a Le Bail refinement" (§8, p.84) | every iteration, a "two-step cyclic process"; "convergence is usually slow" | each intensity a parameter from 1; no rule stated |
@@ -646,8 +646,8 @@ calls its Pawley-type mode "LeBail". TOPAS was read at Technical Reference v5 (�
 | EasyDiffraction 0.21.1 | neither | n/a | n/a | n/a |
 
 What the table settles. **Every program that has Le Bail re-extracts the intensities inside the
-refinement, once per least-squares cycle or iteration.** rietx re-extracts only between whole
-solves, so one rietx Le Bail pass is one cycle of everyone else's. Of the two programs that
+refinement, once per least-squares cycle or iteration.** rietx has done the same since
+WP-2316; before it rietx re-extracted only between whole solves. Of the two programs that
 offer both, TOPAS defaults to Pawley and GSAS-II defaults to neither. MAUD steers Le Bail
 first and then Pawley. No program makes a structure-free fit the default mode.
 
@@ -660,10 +660,12 @@ default). FullProf extracts once per cycle and stops when χ² changes by under 
 extracts every iteration and RIETAN-FP every cycle. MAUD runs up to 5 inner iterations. Le Bail
 (2005) gives no rule for the count, and says only that one pass is not enough to reach the
 minimum Rwp. In those programs the model moves between extractions, so many cycles accumulate
-over a refinement. rietx holds the model frozen through a solve (the frozen-per-stage rule),
-so one partition has to carry what those cycles carry. That is why rietx alone has a stop on
-the intensities, and why it accelerates the step: plain repetition needed 17 512 cycles on
-one partition of a real neutron pattern at ten times this tolerance.
+over a refinement. From WP-1542 to WP-2316 rietx held the model frozen through a solve and
+settled one partition to 1e-7 of the Bragg counts, which cost 95-97 % of a large-cell fit.
+Since WP-2316 it extracts once per accepted iteration like the others, 10 cycles a time,
+GSAS-II's count; the hkl list and windows still freeze per stage, since the intensities are
+not columns of θ. It accelerates each extraction (SQUAREM), because one plain cycle an
+iteration ran every stage of #740's pattern to its budget.
 
 **GSAS-II** (checked (source)). `GetFobsSq`, the Le Bail update, runs at the end of every
 derivative pass (`GSASIIstrMath.py:4808`, `:4929`) and overwrites the calculated F² with the

@@ -205,6 +205,12 @@ and have no free factor to measure, so this file's old list named them without c
     families, not past them.
   - If group Q's pass changes the number or the tier, say so in WP-2316's
     `### Inherited`.
+  - *Settled 2026-11-27 (WP-2316, the maintainer's R2-R3 ruling "full fix of
+    lebail"):* `lebail_tol` is gone. A Le Bail stage extracts once per accepted
+    iteration, `lebail_cycles` (default 10, GSAS-II's `DoLeBail` count, tier 2)
+    accelerated cycles each time, and the solve's ftol stop reads the change each
+    extraction makes. Group Q no longer owns a Le Bail tolerance; `lebail_cycles`
+    is the setting, and its audit row is tier 2 with a source.
 - **From WP-2020 (2026-11-15).** WP-2020's design brief, which waits on the maintainer, leans
   towards extending the instrument profile file and the plan presets, because no setting in
   the tree needs a new carrier. A demotion here of a limit, a starting value or a plan setting

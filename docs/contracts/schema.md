@@ -815,3 +815,17 @@ rule above the constant).  ``capabilities().expression_grammar_version`` does
 not move either.  The grammar parses any name, and the names a peak equation
 binds belong to the schema (``schemas.peak_equation.REFLECTION_NAMES``).
 WP-2107 moved the grammar for its two functions and the schema for its names.
+
+Also in 0.62 (WP-2316): a Le Bail stage extracts its intensities once per
+least-squares iteration, as the established programs do, so the partition
+settled to a tolerance at a frozen model is gone with its fields.
+``StageSpec.lebail_tol`` and ``StageResult.lebail_settled`` are removed; a
+stored stage or result carrying either key loads, the key dropped by a
+``mode="before"`` validator, and a ``.rxt`` stage line naming ``lebail_tol``
+loads the same way.  ``StageSpec.lebail_cycles`` now counts the cycles of each
+extraction, default 10 (was a 25 000 cap).  ``NodeAction.lebail_extraction``
+(``"between_solves"`` or ``"per_iteration"``) is new and defaulted to
+``"between_solves"``, what every stored node ran, so a stored node keeps its
+meaning; ``NodeAction.lebail_tol`` stays for those nodes.  An older build
+refuses a node carrying ``lebail_extraction``.
+No new number: 0.62 is unreleased.

@@ -75,42 +75,50 @@ shares sum to 1 at each point. The update is a fixed point when $y_{\mathrm{obs}
 extracted intensities live outside the parameter vector and are path-dependent,
 so a history node serialises them beside the parameters it stores.
 
-Equation {eq}`fm-lebail` repeats until one cycle moves a small share of the Bragg
-counts:
+Equation {eq}`fm-lebail` runs inside the least-squares solve, as in GSAS-II,
+FullProf, TOPAS and RIETAN-FP, which extract once per least-squares cycle. A stage
+extracts at its start, then again after every accepted iteration $u$, at the
+parameters $\theta_u$ that iteration reached. Each extraction runs
+`Stage.lebail_cycles` cycles of {eq}`fm-lebail`. The solver then measures the
+weighted sum of squares $S$ again before it takes the next step, so every trial
+step is judged against the objective it is evaluated on. Iteration $u$ counts
+towards convergence when both the extraction and the step change $S$ by less than
+the stage's $f_\mathrm{tol}$:
 
 ```{math}
 :label: fm-lebail-stop
 
-\frac{\sum_k A_k\,\lvert\Delta I_k\rvert}{\sum_k A_k\, I_k} \le \mathrm{tol},
-\qquad A_k = \sum_l w_l \sum_i \Omega_{lk,i}.
+\frac{\max\bigl(\lvert S(\theta_u, I_u) - S(\theta_u, I_{u-1})\rvert,\;
+                 S(\theta_u, I_u) - S(\theta_{u+1}, I_u)\bigr)}
+     {S(\theta_u, I_{u-1})} < f_\mathrm{tol}.
 ```
 
-{source}`rietx.model.forward._settled_partition`
+{source}`rietx.optimize.lm.minimize`
 
-Here $A_k$ is the counts a unit intensity lays on the pattern, and $\mathrm{tol}$ is
-`Stage.lebail_tol`. The weight matters because a reflection falling to its floor
-shrinks by a constant fraction of itself per cycle for as long as it lives. An
-unweighted largest relative change would therefore never end.
+Three such iterations in a row end the stage, the rule a Rietveld stage follows.
+The intensities are not parameters, so the hkl list, the windows and the FCJ node
+counts stay frozen for the stage. Only the objective moves.
+
+Alternating an extraction with a least-squares step does not descend on one
+objective. An extraction can raise $S$ by more than the next step lowers it. Where
+the background and the intensities can trade against each other, the pair can then
+walk, with $S$ rising for hundreds of iterations. So the solver keeps the state of
+lowest $S$ it has held, the parameters with the intensities they were measured
+on, and returns it however the stage ends. Three iterations in a row that raise
+$S$ end the stage with termination `objective_rising`.
 
 Equation {eq}`fm-lebail` is a Richardson-Lucy step
 {cite}`richardson1972,lucy1974`, which is an expectation-maximisation step on a
 Poisson likelihood {cite}`shepp1982`. Such a step slows to a linear rate near 1
-where reflections overlap, so plain repetition needs thousands of cycles on a
-dense pattern. rietx accelerates it with SQUAREM, scheme S3 {cite}`varadhan2008`.
-Two cycles set a step length, an extrapolation lands near the fixed point, and a
-third cycle starts from the landing. A landing below the starting likelihood is
-dropped for the plain second cycle. The step length is bounded, starting at 1. The
-bound grows fourfold after a kept landing that met it and shrinks fourfold after
-a dropped one, which is the rule of the SQUAREM package. The acceleration changes
-the path and leaves the fixed point where it was, and an exact overlap keeps the
-ratio it started with. At $\mathrm{tol} = 0$ the cycles are plain and their number
-is fixed.
-
-The stop reads how fast the intensities move. It does not read how far they still
-have to go. Two reflections the data barely separate can stand still at $\mathrm{tol}$ and
-exchange intensity over thousands of further cycles. On fluorapatite one such pair
-lies $10^{-4}$ Å apart, and the exchange moves the curve by 1.2 σ at that peak and
-the refined parameters by 0.001 esd.
+where reflections overlap, so a plain cycle moves an overlapped group only a
+little. rietx accelerates each extraction with SQUAREM, scheme S3
+{cite}`varadhan2008`. Two cycles set a step length, an extrapolation lands near
+the fixed point, and a third cycle starts from the landing. A landing below the
+starting likelihood is dropped for the plain second cycle. The step length is
+bounded, starting at 1. The bound grows fourfold after a kept landing that met it
+and shrinks fourfold after a dropped one, which is the rule of the SQUAREM package.
+The acceleration changes the path and leaves the fixed point where it was, and an
+exact overlap keeps the ratio it started with.
 
 ### Pawley mode
 

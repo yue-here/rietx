@@ -352,8 +352,7 @@ import rietx as rx
 stage = rx.Stage("widths", ["instrument.profile.*"], max_iter=200)
 assert stage.max_iter == 200
 assert stage.seed == 0.0 and stage.strain_seed == 0.0
-assert stage.lebail_cycles == 25000
-assert stage.lebail_tol == 1e-7
+assert stage.lebail_cycles == 10
 ```
 
 `Stage.max_iter` bounds the solver's work.
@@ -367,9 +366,9 @@ A stage that reaches it ends with status `max_iter` and reports [`STAGE_MAX_ITER
 - `Stage.seed` lifts each parameter the stage frees that sits exactly on a lower bound of 0 or above to the given value. A value already above its bound starts where it is, and a parameter that can go negative, such as Caglioti `U` and `V` or the zero shift, is never seeded. The surface-roughness stage seeds at 0.3, because Suortti roughness has no effect at b = 0 and the data see it best near b = 0.2 to 0.5. It is the only built-in stage that seeds. Extinction and the two magnetic widths are freed from 0 with no seed, since each one's column at 0 is its physical one. `StageResult.seeded` lists every row a stage lifted.
 - `Stage.strain_seed` puts a freed, all-zero Stephens block on a small isotropic microstrain, in ppm of ΔM/M. Those coefficients can go negative, so `Stage.seed` does not reach them, and at zero the square root in their width law has unbounded slope.
 
-`Stage.lebail_cycles` caps the Le Bail cycles run before and after each solve, and `Stage.lebail_tol` ends them early ([the stop](../theory/forward-model.md#le-bail-mode)).
-At `0.0` exactly `lebail_cycles` plain cycles run.
-`StageResult.lebail_cycles_run` and `StageResult.lebail_settled` record what ran. A cut in the last stage warns `LEBAIL_CYCLES_AT_CAP`.
+`Stage.lebail_cycles` is the number of Le Bail cycles each extraction runs: once at the stage's start, then inside the solve after every accepted iteration ([the stop](../theory/forward-model.md#le-bail-mode)).
+The solve stops when neither the extraction nor the step moves the cost by more than the stage's `ftol`, and it returns the lowest-cost state it held.
+`StageResult.lebail_cycles_run` records the start's cycles, then the solve's.
 `Stage.restraint_weight_scale` weights the restraints against the data for the stage ([How to restrain a bond length or an angle](../guides/restrain.md)).
 `Stage.window_slack_deg` replaces the default capture margin in °2θ around each reflection's evaluation window.
 The indexing Le Bail validation sets it, because it holds a candidate cell fixed and a wrong candidate displaces peaks by whole degrees.
@@ -394,7 +393,7 @@ assert spec.correlation_guard == plan.correlation_guard
 
 `PlanSpec.from_plan` and `PlanSpec.to_plan` convert a plan, and `StageSpec.from_stage` and `StageSpec.to_stage` a stage.
 `PlanSpec.stages` is a list of `StageSpec`.
-A `StageSpec` carries every `Stage` field under the same name: `StageSpec.name`, `StageSpec.turn_on`, `StageSpec.turn_off`, `StageSpec.lebail_tol`, `StageSpec.max_iter`, `StageSpec.ftol`, `StageSpec.lebail_cycles`, `StageSpec.seed`, `StageSpec.strain_seed`, `StageSpec.restraint_weight_scale` and `StageSpec.window_slack_deg`.
+A `StageSpec` carries every `Stage` field under the same name: `StageSpec.name`, `StageSpec.turn_on`, `StageSpec.turn_off`, `StageSpec.max_iter`, `StageSpec.ftol`, `StageSpec.lebail_cycles`, `StageSpec.seed`, `StageSpec.strain_seed`, `StageSpec.restraint_weight_scale` and `StageSpec.window_slack_deg`.
 `PlanSpec.correlation_guard`, `PlanSpec.intermediate_ftol`, `PlanSpec.lebail_passes` and `PlanSpec.phase_support_sigma` carry the plan's four settings.
 
 Anything that takes one of the pair takes the other.

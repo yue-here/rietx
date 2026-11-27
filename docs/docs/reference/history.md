@@ -111,8 +111,9 @@ These are the fields of `Stage`, and [stage settings](settings.md#stage-settings
 | Field | Default | Holds |
 |---|---|---|
 | `NodeAction.max_iter` | `100` | the iteration budget |
-| `NodeAction.lebail_cycles` | `3` | the most intensity-partitioning cycles before and after each solve in `lebail` mode |
-| `NodeAction.lebail_tol` | `0.0` | the share of the Bragg counts that ends the partition; `0.0` runs exactly `lebail_cycles` |
+| `NodeAction.lebail_cycles` | `3` | the cycles of each Le Bail extraction under `"per_iteration"`; under `"between_solves"`, the most cycles of the partition before and after each solve |
+| `NodeAction.lebail_tol` | `0.0` | under `"between_solves"`, the share of the Bragg counts that ended the partition, `0.0` running exactly `lebail_cycles`; a `"per_iteration"` node has none |
+| `NodeAction.lebail_extraction` | `"between_solves"` | where the stage extracted its Le Bail intensities: `"per_iteration"` inside the solve after every accepted iteration, or `"between_solves"`, a partition at a frozen model, as every node written before the field ran |
 | `NodeAction.seed` | `0.0` | the starting value for a freed parameter sitting on a lower bound of 0 |
 | `NodeAction.strain_seed` | `0.0` | the microstrain in ppm that starts an all-zero Stephens block |
 | `NodeAction.restraint_weight_scale` | `1.0` | the weight on the geometric restraints |

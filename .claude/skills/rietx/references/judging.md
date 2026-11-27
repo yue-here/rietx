@@ -72,7 +72,7 @@ it writes beside them.
 
 **Seed the background first.** `auto_background` starts every coefficient at **0.0**, and the first `lebail_update` runs before the background is fitted, so the reflections get the whole pedestal: **571×** their true intensity under a background 5× the strongest peak. `seed=True` starts at a low count percentile.
 
-**Under a broad hump, co-refine the background too**, seeded as above: a Chebyshev or `auto_background`'s P-spline. Each stage partitions against its starting background, so it stops short under the hump and the reflections keep the rest (Measured: WP-1542, background/truth 0.83 there). A held `rx.background.snip` curve rides up into every line's tails, and the absorption screen cannot see it. (Measured: #1569, synthetic LaB₆, SNIP held at 3 FWHMs: La Biso 0.475(14) against a true 0.355, 8.8 esd high; co-refined, 0.379. Same sign on repeats, corundum and FAP.)
+**Under a broad hump, co-refine the background too**, seeded as above: a Chebyshev or `auto_background`'s P-spline. Each extraction partitions against its iteration's background, so what the background has not yet taken under the hump goes to the reflections (Measured, under the per-stage partition before WP-2316: WP-1542, background/truth 0.83 there). A held `rx.background.snip` curve rides up into every line's tails, and the absorption screen cannot see it. (Measured: #1569, synthetic LaB₆, SNIP held at 3 FWHMs: La Biso 0.475(14) against a true 0.355, 8.8 esd high; co-refined, 0.379. Same sign on repeats, corundum and FAP.)
 
 **The cell is the weaker half.** Peterson (2005, *Powder Diffr.* **20**, 14)
 fitted triclinic tricalcium silicate at NSLS X7A. Le Bail won on χ² (16.46 against 22.81) and R_p (2.34 against
