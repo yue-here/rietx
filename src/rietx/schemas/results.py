@@ -1207,7 +1207,10 @@ class StageResult(Base):
     #: ``no_descent`` or ``exhausted_fp64`` (nothing downhill the cost can
     #: resolve), ``slow_descent`` (``optimize.lm.SLOW_DESCENT_ESD``: at its
     #: last rate another 300 evaluations would have lowered χ² by less than
-    #: one esd's worth) and ``max_nfev`` (the budget ran out).  ``solver="trf"``
+    #: one esd's worth), ``objective_rising`` (a Le Bail solve whose
+    #: extraction and step together raised χ² on three iterations running; the
+    #: lowest-χ² state it held is returned, WP-2316) and ``max_nfev`` (the
+    #: budget ran out).  ``solver="trf"``
     #: writes scipy's ``ftol``, ``xtol``, ``gtol``, ``ftol+xtol`` and
     #: ``max_nfev``.  A model that stopped being finite writes
     #: ``non_finite_residual`` or ``non_finite_jacobian`` (WP-2048).  The

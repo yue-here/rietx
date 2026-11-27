@@ -6680,11 +6680,15 @@ ROWS: tuple[Row, ...] = (
                   "after every accepted iteration (WP-2316); GSAS-II's DoLeBail runs a fixed "
                   "cycles=10 (GSASIIstrMain.py:761, checked 2026-11-05), FullProf's manual "
                   "advises a few cycles (say 10) of extraction before refining, MAUD runs up to "
-                  "5; the joint fixed point does not read the count, only the path to it and the "
-                  "solve's ftol stop; on #740's pattern 10 accelerated cycles end at the true "
-                  "cell within 6.3 ppm and Rwp 0.978 of the true structure's, where one plain "
-                  "cycle per iteration ran every stage to its budget (WP-2316, 2026-11-27, macOS "
-                  "arm64)")),
+                  "5; GSAS-II's 10 is its extraction at a fixed model, the analogue of the "
+                  "stage-start one, and inside a refinement the programs run 1-5 plain cycles an "
+                  "iteration; rietx runs 10 accelerated ones there too, because one plain cycle an "
+                  "iteration ran every stage of #740's pattern to its budget (one synthetic "
+                  "family); the stop reads the count: on #740 the cell lands within 5.9 ppm of "
+                  "truth at 3, 10, 30 and 100 cycles, 10 against 100 is 0.35 esd apart and 30 "
+                  "against 100 0.11; on bigcell-lebail the cell (-220/-291/-296 ppm, esd ~25 ppm "
+                  "on a) agrees with rietx's Rietveld and Pawley fits of the same pattern, whose "
+                  "shared offset the profile model sets, not the extraction (WP-2316, 2026-11-27, macOS arm64)")),
     Row("rietx.schemas.plan.StageSpec:seed", "default", tier="caller", ambiguity=1, value=0.0,
         evidence=("opt-in: Stage.seed > 0, default 0; the one shipped seed is "
                   "strategy.staged.ROUGHNESS_SEED's 0.3")),
