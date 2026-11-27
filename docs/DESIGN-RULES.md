@@ -1,7 +1,7 @@
 # rietx design rules
 
 Why the package exists and the five rules every change answers to. The rest of the
-design record, and the history of these rules, is [DESIGN.md](DESIGN.md).
+design record is [DESIGN.md](DESIGN.md).
 
 ## Why this package exists
 
@@ -171,15 +171,16 @@ number. A sentence that nobody would use to make a choice does not belong here.
    nothing is built before a case needs it. A milestone's direction is in its record.
    The project's are two, each ruled by the maintainer.
    - *Arithmetic accuracy.* A speed setting (a convergence tolerance, a peak window, a
-     quadrature order) holds its error on each quantity a user reads to about a tenth
-     of that quantity's esd. McCusker et al. (1999, §7) set the same tenth for the
-     final cycle's shift/esd. rietx spends no wait past this bar. The established
-     programs are a cross-check and a floor. Where an error compounds (WP-2222: a
-     Pawley series carrying intensities, `lab_calibrate`, published guides), the setting follows what the compounding needs. A speed
-     change leaves the model as it was. It answers to an independent measurement
-     where one exists, and to this bar otherwise. One that only regroups arithmetic
-     is verified at fixed parameters, and its goldens re-pin in the same change
-     (ruled 2026-11-19 to 11-27; WP-2307, WP-2317 R0).
+     quadrature order) holds each quantity a user reads as accurately as that user
+     needs. rietx spends no wait past that. The established programs show what
+     suffices, since their users found it enough. Their thresholds do not carry
+     over. Unattended in rietx, GSAS-II's and FullProf's stops ended a series fit
+     18 esd off. An error is read in the quantity's esd, and *Intent* sets how small
+     it must be. Where an error compounds (three cases, WP-2222), the setting
+     follows what the compounding needs. A speed change leaves the model as it was.
+     One that only regroups arithmetic is verified at fixed parameters. Its goldens
+     re-pin in the same change. Rule 2's pinned-number test does not apply to a
+     speed change (ruled 2026-11-19 to 11-27; WP-2307, WP-2317 R0).
    - *Structure-free fitting.* Pawley is the structure-free method rietx leads with.
      WP-2062 carries the move to it as the default. Le Bail follows the established
      programs' practice (ruled 2026-11-27, WP-2317; lifts #1434's fence).

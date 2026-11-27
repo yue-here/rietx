@@ -65,6 +65,21 @@ different measurements. For common applications. This should be a general rule
 for the repo." It is now DESIGN-RULES Rule 5 *Arithmetic accuracy*, so a speed
 change answers to that bar and Rule 2's pinned-number test governs model changes.
 
+**Ruled 2026-11-27, later (R0 clarified), "in spirit".** A Claude draft had set the
+level at a tenth of each quantity's esd, borrowed from McCusker et al. (1999, §7).
+The maintainer never ruled that number, and it would have reversed the 2026-11-19
+window ruling. His words: "all my comments arise from the same intent: rietx should
+strive for a level of accuracy sufficient for users rather than wasting compute.
+evidence for this comes from other codes, which clearly have been sufficient for
+existing users." Then: "Whether or not 1e-9 should be the bar is not important to
+me: as long as you understand the intent and are able to make appropriate judgement
+on this tradeoff based on that knowledge going forward, I'd like to leave the
+details of judgement and implementation to you." So the level is what the
+established programs deliver to their users, and the esd is the unit an error is
+read in. Claude settles each speed-accuracy trade under that intent and lists it
+under *Settled for you*. Rule 5 *Arithmetic accuracy* carries the level. The window
+ruling of 2026-11-19 stands: 2 % windows, closing stage off.
+
 **Probe 1, the synthetic stand-in** ([`2317-probe/probe1_bigcell.py`](2317-probe/probe1_bigcell.py)):
 - 12 × 36 × 4 Å, P2₁2₁2₁;
 - invented atoms on general positions, placed over the whole cell with every
@@ -346,9 +361,21 @@ what it costs here.
       nudge decided two ties), found by `2317-probe/errmeasure/`.
     - χ²-based decisions keep ≥ 100× margin over a single fit's stop, except
       profile-interval refits, whose settle tolerance a GSAS-like stop exceeds.
-    - **Settled:** the shipped schedule stays (1e-6 intermediate, 1e-9 last). The
+    - ~~**Settled:** the shipped schedule stays (1e-6 intermediate, 1e-9 last). The
       runner-up, 1e-8 on the last stage, saves 7-16 % of a series and 0-4 % of a
-      single fit, at a 1.4× margin measured only on development data.
+      single fit, at a 1.4× margin measured only on development data.~~ That
+      margin was against the tenth-of-an-esd draft level, which R0 clarified
+      withdrew.
+    - **Re-settled 2026-11-27 by Claude under R0 clarified: the last stage moves to
+      1e-8.** Everything 1e-9 buys over 1e-8 is under 0.072 esd on every measured
+      quantity, and nobody reads a shift that small. 1e-8 saves 7-16 % of a series,
+      where the stop is most of the bill. The three compounding places (WP-2222)
+      keep 1e-9 through a plan field. 1e-6 on the last stage loses: on the CuCr₂O₄
+      ramp it leaves the 1 wt% CuO cell 0.68 esd off, a step a user reading a
+      trajectory can see, and WP-2045 recorded cpd-1b stalling there. A stop looser
+      than 1e-8 needs a test that the fit has stopped moving, since FullProf's and
+      GSAS-II's thresholds alone ended cpd-1f mid-crawl. The implementing change
+      re-pins goldens (R0) and checks that profile-interval refits still settle.
     - Unexplained, recorded for a later WP: the reported χ² differs from the χ²
       the solver minimised by 0.2-2.1 χ²_red at the answer, and that gap moves
       0.1 χ²_red between nearby answers.
@@ -519,6 +546,9 @@ what it costs here.
       practice does. Record each answer here as a dated ruling, and push each into
       the `### Inherited` of the WP it unblocks: 2314-2316, and WP-2017 for R2's
       number.
+- [ ] R6 as re-settled: the last declared stage stops at 1e-8, and a plan field
+      keeps 1e-9 in WP-2222's three compounding places. Re-pin the goldens in the
+      same change (R0), and check that profile-interval refits still settle.
 - [x] Why the 40-atom `coordinates` stage took 119 LM iterations from the true
       coordinates. *Answered 2026-11-27 by the review: the first probe drew its
       atoms inside a 1/15.6 sub-box, 65 % of nearest neighbours under 1 Å. On
