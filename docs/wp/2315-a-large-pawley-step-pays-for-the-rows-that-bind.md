@@ -282,6 +282,11 @@ every timing under the shift's suite lock, `serial.py`).
   9 min at 120° and after 19.5 min on NAC.
 - Tests: `test_lm_solver.py`, `test_bccg.py`, `test_pawley.py` and
   `test_gaussian_width_floor.py` together, 122 passed, 1 xfailed.
+- Fast selection (`-m "not slow"`, on main 94804b716 plus this branch):
+  15 821 passed, 452 skipped, 30 xfailed. The 7 added cases are passes, no
+  new skip. They cost 0.50 s in one local run (`tests.added_test_times`).
+  The full suite did not run: the change is byte-identical by test and by the
+  measurements above, so no measured number can move.
 
 *Settled by Claude.*
 - The stand-ins for "a real large-cell pattern", under the shift's brief (say
