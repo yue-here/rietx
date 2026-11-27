@@ -212,6 +212,21 @@ what it costs here.
   record. It gates nothing.
 - **Iterations, not only cost per iteration:** R6, and task 5.
 
+### Inherited
+
+- **From WP-2315, 2026-11-27 (task 1).** R4's "may come from its instrument"
+  is half answered. Real patterns on the tree reached the constrained step
+  once in 32 least-squares runs (FAP.XRA, 11-BM NAC whose Pawley block has
+  1 499 columns, FAP.XRA's `index_pattern` validations, QPA round robin
+  cpd-1a and cpd-1h). Probe 1 crosses 22 times at 90° and 31 at 120°, every
+  time on the **Lorentzian** rows (Γ_L ≥ 0), not the Γ_G² floor. A true
+  `lor_strain` of 0.03 in its truth removes the crossings at 90° and raises
+  them to 53 at 120°. So the probe's zero strain is not the whole cause.
+  `solver="trf"` ran 159.5 s at 90° against LM's 13.6 s and stopped its
+  `profile` stage at the cap (Rwp 0.0511 against 0.0447), so R4's cost model
+  has no TRF shortcut. Task 1 here (the user's pattern) decides whether
+  WP-2315 stays P2. WP-2315's Context § Task 1's count has the table.
+
 ## Non-goals
 
 - The fixes themselves: WP-2314 (structural columns), WP-2315 (Pawley step),

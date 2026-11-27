@@ -1,6 +1,6 @@
 # WP-2315 — a large Pawley step pays for the rows that bind, not for every intensity
 
-Milestone: unscheduled · Status: 🔄 2026-11-27 — claimed by @claude (ghostshift runner)
+Milestone: unscheduled · Status: 🔄 2026-11-27 — task 1, the measurement and Angle 0 done; Angles 1-2 wait on WP-2317's R0, R4, R5 and its task 1
 Track: A large cell
 Depends on: 2317 soft (its `bigcell-pawley` case and rulings R0, R4, R5)
 Priority: P2 2026-11-27 — provisional: the track the maintainer opened for a user at the wall; task 1 found real patterns on the tree reach the step once in 32 runs, so P3 if the user's pattern (WP-2317 task 1) does not cross either
@@ -190,7 +190,9 @@ free swap under LM.
       Context § Task 1's count.*
 - [ ] Measure main against the branch on `bigcell-pawley`, interleaved, one
       machine, min-max over at least three runs, plus one profiled run for the
-      split.
+      split. *Done 2026-11-27 for Angle 0, on probe 1 at 2θ ≤ 120° (the
+      `bigcell-pawley` bench case is not on the tree yet): main 55.0-55.4 s,
+      branch 52.6-52.9 s, three runs each. The split is in the handover log.*
 - [x] Angle 0. Steps byte-equal before and after. *Done 2026-11-27:
       `lm._rows_in_z` builds G·E⁻¹ by blocks and `LinearInequality.crossed`
       keeps |T|. Eight captured probe steps and the whole 120° fit
@@ -229,6 +231,89 @@ free swap under LM.
   (variable projection, angle 7).
 
 ## Handover log
+
+### 2026-11-27 (2nd session) — task 1, the measurement, Angle 0 (ghostshift runner; PR #1861)
+
+No real pattern on the tree reaches the expensive step: one crossing in 32
+least-squares runs over FAP.XRA, 11-BM NAC, FAP.XRA's `index_pattern`
+validations and two lab Cu round-robin patterns. WP-2317's synthetic probe
+reaches it in its last stage on the Lorentzian width rows, and there the
+step is 63-78 % of the fit. So the WP's cost is real but, on the evidence
+here, specific to the probe until the user's own pattern says otherwise.
+Angle 0 landed: the same steps, byte for byte, for about 5 % less wall on
+the probe. The rest of the step is the nnls solve and the eigendecomposition,
+which only Angles 1-2 can shrink, and those move numbers at rounding level.
+
+*Scope.* The shift held this session to task 1, the measurement and Angle 0,
+until the maintainer answers WP-2317's R0-R8. Angles 1-2 and later were not
+started.
+
+*Done.*
+- Task 1: `docs/wp/2315-probe/count_crossings.py` wraps `lm.minimize` and
+  the constrained step and prints crossings per run and per stage. The table
+  is Context § Task 1's count.
+- Angle 0: `lm._rows_in_z` builds G·E⁻¹ by blocks (row slices of E⁻¹ for the
+  box rows, T on the columns it reads). `LinearInequality.crossed` keeps |T|
+  in a cached property. Two tests, seven cases, in `tests/test_lm_solver.py`: the helper
+  against the dense product on four seeds, with signed zeros and padded
+  columns, and a Pawley-shaped constrained step (262 columns, a sparse A,
+  the least-distance path reached) against the dense product on three seeds.
+
+*Measured* (macOS arm64, `[dev]` venv, compiled tier on, Accelerate BLAS;
+every timing under the shift's suite lock, `serial.py`).
+- Byte equality: the first 8 of probe 1's 31 constrained steps at 120°
+  (captured from main's run) come back byte-equal from both main and the
+  branch. The whole 120° fit is byte-equal too: y_calc, the 15 values and
+  esds, Rwp, every stage's iteration count. The helper's equality also held on
+  40 random shapes under OpenBLAS 0.3.34 (arm64) and Accelerate. Without the
+  `+ 0.0` all 40 differed in the sign of a zero.
+- Wall, probe 1, Pawley, 2θ ≤ 120°, unprofiled, interleaved: main 55.0-55.4 s,
+  branch 52.6-52.9 s (three each), 1.04-1.05×. This machine runs the probe at
+  about 0.44× the Linux wall the Context quotes (125.4 s there).
+- Per constrained step, the 8 captured calls, best of 3: main 1.19-1.20 s,
+  branch 1.09-1.12 s. `crossed` 5.3-5.6 ms → 3.5-3.6 ms a call for both blocks.
+- Profiled split, branch (main in brackets): constrained step 34.2 s
+  (36.9 s) over 31 calls, of it own time 1.3 s (4.1 s); `nnls` 23.2 s
+  (23.3 s); `eigh` 7.3 s; `_equality_step` 2.3 s. `projected_cg` 11.4 s, of it
+  `spilu` 8.9 s over 1 058 builds. On one captured step `nnls` is 68 % and
+  `eigh` 16 %.
+- `solver="trf"`: probe at 90° 159.5 s against LM's 13.6 s, its `profile`
+  stage at the 400-evaluation cap, Rwp 0.0511 against 0.0447. Stopped after
+  9 min at 120° and after 19.5 min on NAC.
+- Tests: `test_lm_solver.py`, `test_bccg.py`, `test_pawley.py` and
+  `test_gaussian_width_floor.py` together, 122 passed, 1 xfailed.
+
+*Settled by Claude.*
+- The stand-ins for "a real large-cell pattern", under the shift's brief (say
+  which, and why) and the Context's own question, which is the instrument
+  profile and not the cell. Alternative: Durham's ZrP₂O₇ (Pa-3, a ≈ 24.7 Å)
+  in the local data root, dropped because its file is a multi-range VT
+  series with two internal standards and the Durham input models it as a
+  subcell.
+- Priority stays P2 provisional, settled by Claude under the line's own
+  trigger, which needed both WP-2317 task 1 and this task 1, and only this
+  one is in. Alternative: P3 now, on the rubric's "a cost-only item with no
+  user at the wall".
+- `crossed` and `slack` still multiply the padded T. Dropping its zero
+  columns there goes through a matrix-vector product, whose BLAS kernels sum
+  in SIMD lanes, so the order and the last bit can change. That is a
+  rounding move for Angle 1, settled by Claude under Angle 0's byte-equal
+  bar. Alternative: take it as R0 (a)'s working reading allows.
+
+*Gotchas.*
+- Probe 1 takes `PROFILE=0` for a wall. A main snapshot runs from a
+  `git archive` of `origin/main`'s `src/` with `PYTHONPATH`, never `-I`.
+- One captured call is 82 MB pickled (two 41 MB T blocks).
+
+*Next.*
+1. The maintainer's answers to WP-2317's R0, R4 and R5, and WP-2317 task 1's
+   pattern. A pattern that does not cross makes this WP P3.
+2. If it crosses: Angle 1, the pruned box rows and width rows. It targets the
+   nnls solve, 68 % of the step, whose problem has 1 619 box rows and 6 424
+   width rows where a handful bind. Then Angle 2 for `eigh`.
+3. Why probe 1's `profile` stage presses on Γ_L at 120° even with a strain
+   term in its truth is unmeasured. It decides whether the probe is a fair
+   stand-in for a user's lab pattern.
 
 - **2026-11-27** — Filed from WP-2317's probe. A fresh subagent reviewed the plan
   the same day, and its findings are folded in:
