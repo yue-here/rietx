@@ -56,7 +56,7 @@ def main(arm: str) -> None:
     rows = []
     data, s, ins = build_fap_inputs()
     ref, result, row = _run("FAP.XRA", data, s, ins)
-    row["reference"] = {"a": EXP.phases[0].cell.a.value, "c": EXP.phases[0].cell.c.value}
+    row["reference"] = {"a": EXP.phases[0].cell.a, "c": EXP.phases[0].cell.c}
     rows.append((ref, result, row))
 
     data, s, ins = build_srm_inputs()
