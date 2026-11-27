@@ -1,6 +1,6 @@
 # WP-2314 — a structural Jacobian costs one structure factor, not one per column
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-27 — claimed by @yue-here (ghostshift runner)
 Track: A large cell
 Depends on: 2317 soft (its `bigcell-structural` case and ruling R0); 1945 soft (its open task on batched Biso columns, see Context)
 Priority: P2 2026-11-27 — provisional: the track the maintainer opened for a user at the wall; a 40-atom structural fit spends most of its time rebuilding one structure factor per column; re-rate when WP-2317 task 1 names the user's path
