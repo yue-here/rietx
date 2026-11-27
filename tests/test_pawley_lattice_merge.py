@@ -241,3 +241,42 @@ def test_a_stephens_block_keeps_the_members_apart_under_an_equal_f2_restraint():
         np.testing.assert_allclose(-row[np.arange(len(group)) != kk] / c, frac[kk],
                                    rtol=1e-12)
     assert not np.allclose(frac, 1.0 / len(group))   # 24 against 6
+
+
+def test_equal_d_keeps_input_order_whichever_way_the_last_ulp_falls():
+    """WP-2315: lattice-equal d may differ by an ulp either way."""
+    from rietx.crystallography.symmetry import _order_by_d
+
+    for d in ([2.0, 1.0, 1.0 + 2e-16, 0.5], [2.0, 1.0 + 2e-16, 1.0, 0.5],
+              [2.0, 1.0, 1.0, 0.5]):
+        assert list(_order_by_d(np.array(d))) == [0, 1, 2, 3]
+    assert list(_order_by_d(np.array([0.5, 1.0, 2.0]))) == [2, 1, 0]
+
+
+@pytest.mark.parametrize("a", [4.150, 4.1569, 4.160, 4.1571234])
+def test_a_merged_group_gives_each_member_its_own_share_at_any_start(a):
+    """(2 2 1) (m 24) and (3 0 0) (m 6) are one column: whatever cell the
+    compile starts from, the members sit in one order and each draws its own
+    multiplicity's share, 0.8 and 0.2.  Linux once swapped the pair between
+    two starts, so an index-keyed comparison read one member's share as the
+    other's."""
+    from rietx import PatternData
+    from rietx.model.forward import compile_model
+    from tests.test_pawley import _overlapped_lab6
+
+    s, ins = _overlapped_lab6(a=a)
+    tt = np.arange(15.0, 110.0, 0.03)
+    blank = PatternData(two_theta=tt.tolist(), intensity=np.ones_like(tt).tolist())
+    model = compile_model(s, ins, blank, mode="pawley")
+    k = _pair(model, [(2, 2, 1), (3, 0, 0)])
+    assert k[1] < k[0], "(3 0 0) first, the orbit met first, at every start"
+    pb = model.pawley
+    assert pb.refl_col[k[0]] == pb.refl_col[k[1]]
+    np.testing.assert_array_equal(model.phases[0].reflections.multiplicity[k], [24, 6])
+    np.testing.assert_allclose(pb.share[k], [0.8, 0.2], rtol=1e-15)
+    x0 = model.pawley_x0()
+    model.set_pawley_intensities(x0)
+    member = model.phases[0].hkl_intensity[k]
+    np.testing.assert_allclose(member, x0[pb.refl_col[k[0]]] * np.array([0.8, 0.2]),
+                               rtol=1e-14)
+
