@@ -89,6 +89,25 @@ range. Task 2's bench cases replace them with min-max ranges.
 | Le Bail, 1 601 refl | **351.8 s** | **0.1449** | 97 % in `_settled_partition`, first probe's profile (**WP-2316**) |
 | `report()` after the 40-atom fit | 5.6 s | | not a cost here (WP-1335 owns the report path) |
 
+**The bench cases (task 2), 2026-11-27.** `examples/bench_refinement.py`, three
+repeats, `--configs off`, darwin/arm64 (Apple M-series, 10 cores), Python
+3.12.10, numpy 2.5.5, `[dev]` venv, compiled tier on, rietx 1.13.0.dev0 at
+`af159cf7` (after WP-2314's hoist and WP-2315's first step). Other runners
+shared the machine; the run held the suite lock. These are the "before" for
+2314-2316, and a speed WP re-measures them beside its own arm.
+
+| case | wall (min-max of 3) | Rwp | per-stage nfev |
+|---|---|---|---|
+| `bigcell-structural` (40 atoms) | 11.24-11.30 s | 0.08675 | coordinates 10, biso 16; 100 over 11 stages |
+| `bigcell-pawley` (2θ ≤ 90°) | 12.10-12.69 s | 0.04466 | 68 over 5 stages; profile 29 |
+| `bigcell-pawley-120` (2θ ≤ 120°) | 63.13-64.88 s | 0.04199 | 77 over 5 stages; profile 37 |
+| `bigcell-lebail` (2θ ≤ 90°) | 80.38-83.92 s | 0.15121 | 96 over 5 stages; cell 41 |
+
+The Linux single runs above and these Mac ranges are on two machines, so their
+ratios are not speed-ups. The harness's own `nfev` and `njev` columns print 0
+and `-` here: `_counting` wraps scipy's `least_squares`, and the default LM
+driver does not call it. The per-stage counts come from `StageResult`.
+
 Three readings shape the track.
 
 - **Le Bail is 3-7× slower than Pawley here (6.5× at 899 reflections, 2.8× at 1 601)**, against the practice survey's
@@ -258,12 +277,14 @@ what it costs here.
       asymmetric unit, space group, radiation and range, point count, and the wall
       clock they see. Record it, or the stand-in the user accepts, as this track's
       acceptance case. Re-rate 2314-2316 on it.
-- [ ] Add bench cases built from probe 1's generator (atoms ≥ 1.5 Å apart, the
+- [x] Add bench cases built from probe 1's generator (atoms ≥ 1.5 Å apart, the
       start carrying the truth's atoms, dispersion declared): `bigcell-structural`
       (40 atoms, `mccusker_structural`), `bigcell-pawley` (2θ ≤ 90° and ≤ 120°)
       and `bigcell-lebail`. Each WP measures its own before and after on them,
       **interleaved, on one machine, in one session, quoted as a min-max range**
       (the harness's rules 1-3). A figure in another WP's file is never a "before".
+      *Done 2026-11-27: four cases (`bigcell-pawley-120` is the 120° one), each
+      reproducing probe 1's pattern bit for bit; the ranges are in Context.*
 - [ ] Put R0-R7 to the maintainer as one batch, each with the cost above and what
       practice does. Record each answer here as a dated ruling, and push each into
       the `### Inherited` of the WP it unblocks: 2314-2316, and WP-2017 for R2's

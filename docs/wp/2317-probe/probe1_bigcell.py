@@ -27,6 +27,11 @@ Run 2026-11-26/27 (linux x86_64, 4 cores, Python 3.12.3, numpy 2.5.5,
 the WP-2317 file, Context.  The start carries the truth's atoms (the same
 ``POSITIONS``); only the cell, the widths and the background start off.
 ``MIN_SEP`` (Å, default 1.5) sets the closest approach of any two images.
+
+Since WP-2317 task 2 the bench carries this model as the ``bigcell-*`` cases
+of ``examples/bench_refinement.py``, which reproduce this script's pattern bit
+for bit at the default ``MIN_SEP``; a speed WP's before and after come from
+there.
 """
 import cProfile
 import os
