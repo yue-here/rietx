@@ -23,7 +23,27 @@ means". Under ruling R0's working reading, a step that solves the **same** probl
 (pruned rows, the same LSI) is exact. A different step (a clamp, a fallback, a
 profiled block) is a kind (b) move awaiting its ruling.
 
-READINGS-2315
+**The measurement** (WP-2313 probe 1, atoms ≥ 1.5 Å apart; Linux x86_64, 4
+cores, `[dev]`, compiled tier on, one run each; 12 × 36 × 4 Å, P2₁2₁2₁, Cu Kα
+doublet + FCJ, `mccusker_default`, `mode="pawley"`):
+- 899 columns (2θ ≤ 90°): 23.7 s unprofiled, Rwp 0.0447.
+- 1 601 columns (2θ ≤ 120°): **125.4 s** unprofiled, Rwp 0.0420. A profiled run
+  (127.6 s) splits as below.
+
+| call | calls | cumulative |
+|---|---|---|
+| `lm.minimize` (all stages) | 5 | 119.1 s |
+| `lm._solve_constrained_step` | 31 | **72.8 s** (12.9 s own) |
+| → `_least_distance` → `nnls` | 31 / 62 | 37.6 s / 34.6 s |
+| → `numpy.linalg.eigh` | 46 | 13.2 s |
+| `bccg.projected_cg` (the box-only step past 128) | 73 | 30.9 s |
+| → `spilu` | 1 056 | 23.9 s |
+| Jacobian | 78 | 7.5 s |
+
+The first probe (atoms in a sub-box, profiled) read 24 crossings and 53.5 s at
+1 601 columns and 18 crossings and 10.3 s at 899. Per call that is 0.57 s →
+2.23 s for 1.78× the columns, an exponent of about 2.4, from one run each. At
+6 477 reflections (0.459 Å to 50°) this step would dominate any fit.
 
 **The seam.** `lm.minimize` (`src/rietx/optimize/lm.py`, the inner loop near
 `:590`) takes the box-only step from `_solve_step`. Past 128 columns that step is

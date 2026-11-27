@@ -76,7 +76,34 @@ the compiled model carries a few more past the range end, e.g. 913 against 899):
 The v1.1 "trigger" case, the largest the bench carries, had 1 188
 (line, reflection) pairs over four phases.
 
-READINGS-TABLE
+Readings, 2026-11-27: one run each, unprofiled wall, so a figure rather than a
+range. Task 2's bench cases replace them with min-max ranges.
+
+| case | wall | Rwp | the leading cost (from a profiled run) |
+|---|---|---|---|
+| Rietveld, `mccusker_default`, 10 atoms, 899 refl | 2.8 s | 0.0517 | spread evenly; nothing to fix |
+| Rietveld, `mccusker_structural`, **40 atoms**, 899 refl | **75.0 s** | 0.0867 | the Jacobian is 99 % of the solve, and the coordinate columns rebuilding A are 53.5 of its 72.4 s (**WP-2314**) |
+| Pawley, 899 intensity columns | 23.7 s | 0.0447 | the constrained step (**WP-2315**) |
+| Pawley, 1 601 columns | **125.4 s** | 0.0420 | `lm._solve_constrained_step` 72.8 s (31 calls), plus 23.9 s in 1 056 `spilu` builds; the Jacobian is 7.5 s (**WP-2315**) |
+| Le Bail, 899 refl | **154.9 s** | **0.1512** | 96 % in `_settled_partition` (**WP-2316**) |
+| Le Bail, 1 601 refl | **351.8 s** | **0.1449** | 97 % in `_settled_partition` (**WP-2316**) |
+| `report()` after the 40-atom fit | 5.6 s | | not a cost here (WP-1335 owns the report path) |
+
+Three readings shape the track.
+
+- **Le Bail is 3-7× slower than Pawley here (6.5× at 899 reflections, 2.8× at 1 601)**, against the practice survey's
+  expectation (RIETAN-FP: Le Bail "needs no large normal matrix"). This is
+  consistent with R2 below.
+- **Le Bail also lands at three times Pawley's Rwp on the same pattern** (0.151
+  against 0.045). That is a correctness question before it is a speed one: a
+  wrong valley, the background protocol (WP-1542's subject), or the partition.
+  WP-2316 task 1 answers it before any speed work.
+- **The first probe drew its atoms inside a 1/15.6 sub-box**, 65 % of nearest
+  neighbours under 1 Å (the review's S3). It read 251 s for the 40-atom case, with
+  119 `coordinates` iterations, measuring the degenerate model. The readings
+  above use atoms ≥ 1.5 Å apart. The Pawley and Le Bail cases barely moved
+  between the two models (20.7 → 23.7 s, 82.7 → 125.4 s, 144.6 → 154.9 s,
+  351.3 → 351.8 s): the Pawley 1 601 case crossed rows 31 times rather than 24.
 
 **The earlier rulings that cost speed on a large cell, as the instruction asked.**
 None is changed by this file; task 3 puts each to the maintainer. Each entry gives
@@ -116,7 +143,7 @@ what it costs here.
   asked of it, in its smallest correct form. A change to Le Bail that moves every
   fit's numbers waits for WP-2062."
   - Read whole, the clause argues for routing a large cell to Pawley (on this case
-    already 4-6× faster than Le Bail), not for a Le Bail speed project. The second
+    already 3-7× faster than Le Bail), not for a Le Bail speed project. The second
     sentence also fences even a bit-identical Le Bail kernel that no ruling asked
     for.
   - *Question:* does a user at the wall on Le Bail count as the ruling that asks?

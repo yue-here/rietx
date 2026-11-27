@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: ⬜
 Track: A large cell
 Depends on: 2313 soft (its `bigcell-lebail` case and rulings R0, R2, R3); 2017 soft (group Q owns `lebail_tol`'s number); 2062 soft (Rule 5's Le Bail fence)
-Priority: P2 2026-11-27 — provisional: the track the maintainer opened for a user at the wall, on the slowest mode measured (96-97 % of a large-cell Le Bail fit in the partition); what may start without a ruling is narrow (R3), so re-rate when WP-2313 task 3 answers R2-R3
+Priority: P2 2026-11-27 — provisional: the track the maintainer opened for a user at the wall, on the slowest mode measured (96-97 % of a large-cell Le Bail fit in the partition, which also lands at three times Pawley's Rwp); what may start without a ruling is narrow (R3), so re-rate when WP-2313 task 3 answers R2-R3
 
 ## Goal
 
@@ -34,7 +34,34 @@ WP-2062."
 - So **no angle here starts before WP-2313 task 3 has put R3 to the maintainer.**
   The question is whether a user at the wall on Le Bail is the ruling that asks.
 
-READINGS-2316
+**The measurement** (WP-2313 probe 1; Linux x86_64, 4 cores, `[dev]`, compiled
+tier on; 12 × 36 × 4 Å, P2₁2₁2₁, Cu Kα doublet + FCJ, `mccusker_default`,
+`mode="lebail"`). Unprofiled walls, one run each, atoms ≥ 1.5 Å apart:
+
+| | wall | Rwp | Pawley on the same data |
+|---|---|---|---|
+| 899 reflections | 154.9 s | **0.1512** | 23.7 s, 0.0447 |
+| 1 601 reflections | 351.8 s | **0.1449** | 125.4 s, 0.0420 |
+
+**Le Bail lands at three times Pawley's Rwp.** Before any speed work, task 1 asks
+whether this is a wrong valley, the background protocol (WP-1542's subject), or
+the partition. A fit made faster at the wrong answer gains nothing.
+
+The split comes from the first probe (atoms in a sub-box, profiled; 150.0 s and
+364.2 s):
+
+| | 899 reflections | 1 601 reflections |
+|---|---|---|
+| `lebail_update` (10 calls: two per stage) | 146.3 s | 357.9 s |
+| → `_settled_partition` → `cycle` | 79 320 cycles, 143.1 s | 90 689 cycles, 352.5 s |
+| per cycle | 1.80 ms | 3.89 ms |
+| → `np.add.at` | 25.4 s | 59.4 s |
+| → `np.add.reduceat` / `logical_or.reduceat` | 8.5 s | 19.9 s |
+| → `np.zeros_like` | 7.0 s | 16.6 s |
+| → `cycle` own time (array arithmetic) | 99.3 s | 252.5 s |
+| the least-squares solves | 2.4 s | 4.4 s |
+
+That is about 8 000-9 000 cycles per update, even with SQUAREM acceleration.
 
 **The code.** `CompiledModel.lebail_update` (`src/rietx/model/forward.py:3702`)
 builds per-(phase, line) terms once (`_partition_terms`), then each `cycle`
@@ -116,7 +143,7 @@ numpy 2.5.5):
    the solver between iterations, and LM's acceptance test must allow for it. It
    is the largest change and the one practice supports.
 9. **Route a large cell to Pawley** (R3, WP-2062): on this case Pawley is already
-   4-6× faster, and WP-2315 makes it faster still.
+   3-7× faster, and WP-2315 makes it faster still.
 
 *Considered and dropped:* settling per overlap cluster. At the declared-stage
 windows (`WINDOW_AREA_TOL` 2e-2, 2θ ≤ 90°) the bench case's 913 reflections form
@@ -138,6 +165,11 @@ partition's cost. `test_lebail_alternation.py` is a natural second timing case.
 
 ## Tasks
 
+- [ ] Why Le Bail lands at Rwp 0.15 where Pawley lands at 0.045 on the same
+      pattern: compare the two answers' cells, profiles, background and per-hkl
+      intensities, and rerun Le Bail from Pawley's answer. Record whether the gap
+      is a valley, the background or the partition, and file it where it belongs
+      if it is a defect.
 - [ ] Wait for WP-2313 task 3's answer on R2-R3. If it is "route to Pawley", close
       this WP on angle 9 and say so.
 - [ ] Measure main against the branch on `bigcell-lebail`, interleaved, one
