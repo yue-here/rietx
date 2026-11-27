@@ -185,11 +185,15 @@ is held, and rebuilt per evaluation where the cell is free.
 
 ## Tasks
 
-- [ ] Measure main against the branch on `bigcell-structural`, interleaved, one
+- [x] Measure main against the branch on `bigcell-structural`, interleaved, one
       machine, min-max over at least three runs, plus one profiled run for the
       split. Record `_orbit_terms` calls per Jacobian, before and after.
-- [ ] Angle 1, the hoist: assert every column byte-equal to the pre-change
+      *(2026-11-27, angle 1 against main: the handover log's first entry.
+      Re-run it for each later angle, angle 1 as the "before".)*
+- [x] Angle 1, the hoist: assert every column byte-equal to the pre-change
       column on the bench case and the structural goldens.
+      *(2026-11-27: all 83 Jacobians of the bench fit hash equal;
+      `test_backend_shim.py`'s 19 goldens pass.)*
 - [ ] Angle 2, the Ω·∂I block. Columns within R0 (a)'s bound of angle 1's.
 - [ ] Angle 3, Biso/occupancy, with the exact oracles above, the reach declared,
       and a `test_cross_backend.py` config.
@@ -199,6 +203,9 @@ is held, and rebuilt per evaluation where the cell is free.
 - [ ] Angle 7, decided on the remaining structure-factor share.
 - [ ] Tests: the byte-equality test for angle 1; oracle tests; a timing guard on
       the bench case as a **runaway guard**, never a timer.
+      *(Angle 1's landed: `tests/test_structural_hoist.py`. The timing guard
+      waits for WP-2317's `bigcell-structural` bench case, which does not
+      exist yet; the probe stood in for it.)*
 - [ ] Skill: none (no API change).
 
 ## Acceptance
