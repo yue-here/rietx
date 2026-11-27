@@ -4,7 +4,7 @@ A standing reference: what established programs do by default, by topic, each cl
 marked. "Checked (source)" means read in the program's source code. "Checked (manual)" means
 read in its manual, official docs, help pages, technical reference or tutorials, or in a paper
 or forum post. "Checked (source and manual)" means both. The other marks are "ran" (measured)
-and "inferred". Read it before designing a default, a limit or an automatic action, since
+and "inferred". "Recall" means written from memory and not read, and "not found" means searched for and not located. Read it before designing a default, a limit or an automatic action, since
 tier 2 of the audit rule rests on it (`docs/milestones/generality.md` § The rule). Add a section after every survey, rather
 than leaving one in a conversation or a WP's batch directory.
 
@@ -27,13 +27,64 @@ The Lorentzian column is the area a pure Lorentzian loses to the default cut.
 | Program | Default cut | Lorentzian area lost | When the window is set |
 |---|---|---|---|
 | rietx | `WINDOW_AREA_TOL`, 2 % of each peak's own area | 2 % | once per stage, at the stage's start (checked (source)) |
-| TOPAS | `ymin_on_ymax` 0.001 of each peak's own height (a property of the emission profile, TR v5 §5.3.2 p.48; corrected 2026-11-19 from "the strongest line's") | 2.0 % | peak buffer rebuilt when a width moves past `aberration_range_change_allowed`, and per derivative for width parameters (§7.4, §7.7, checked (manual)) |
+| TOPAS | `ymin_on_ymax` 0.001. Each emission line is computed out to where it falls to 0.001 of the peak of `EMREF`, "the emission profile with the largest la value", so a weak line such as Kα2 is cut sooner than its own height would cut it (TR v5 §6.1, p.25; keyword `lam`, p.102; checked (manual)) | 2.0 % | peak buffer: a new shape only when the x-extent of a convolution moves past `aberration_range_change_allowed` (Table 6-4: `Peak_Calculation_Step` for `lor_fwhm`, `gauss_fwhm`, `h1`, `h2`, `axial_conv`; 0.05 for `m1`, `m2`; 0.01 for `pv_lor`); buffer spacing `peak_buffer_step` = 500 × `Peak_Calculation_Step` (TR v5 §6.4, pp.29-30, checked (manual)) |
 | MAUD | ±30 HWHM (±15 FWHM) | 2.1 % | every evaluation, finite-difference columns included (checked (source)) |
-| RIETAN-FP | `PC` 0.002 of each peak's own height, in three of four shipped examples; no default | 2.8 % | every evaluation (ran) |
-| FullProf | `Wdt` × FWHM each side; no default, floored at 3; examples 3-15, PbSO₄ 6 | 5.3 % at 6 (10.5 % at 3, 2.1 % at 15) | once per run, at the starting widths (`Ias = 0`, ran); `Ias = 1` lags one cycle |
-| GSAS-II | 50 FWHM below, 75 above | 0.53 % | every evaluation (checked (source)) |
+| RIETAN-FP | `PC`, read two ways: below 1 it is a fraction of each peak's own height, above 1 a half-width of ±PC × FWHM (the comments of a shipped `.ins` template, checked (manual)). No default; 0.002 in three of four shipped examples | 2.8 % at 0.002 | every evaluation (ran); `CHGPC` × `PC` sets the first cut in the hybrid step |
+| FullProf | `Wdt` × FWHM each side. The manual gives no default and says "typically 4 for Gaussian and 20-30 for Lorentzian", advising 20-30 or more for Lorentzian peaks (manual PDF pp.15, 75, checked (manual)); a run floors it at 3 (ran, earlier survey); examples 3-15, PbSO₄ 6 | 5.3 % at 6 (10.5 % at 3, 2.1 % at 15, 0.9 % at 30) | once per run, at the starting widths (`Ias = 0`, "reordering ... only at the first cycle", manual PDF p.68; ran); `Ias = 1` reorders every cycle |
+| GSAS-II | 50 FWHM below the peak, plus the axial term `shl`·\|cos 2θ\|, and 75 FWHM above; the two swap above 90° (`GSASIIpwd.getWidthsCW`, `GSASIIpwd.py:811-831`). There is no cut by peak height in the Rietveld path: GSAS-II's "Peak cutoff %" is a Fourier-map control (`GSASIIphsGUI.py:2462`) | 0.53 % | every evaluation, inside `getPowderProfile` (`GSASIIstrMath.py:4068-4078`, checked (source)) |
 | BGMN | no cut seen out to 22° from a peak | ~0 | not documented |
 | EasyDiffraction | none (cryspy sums every reflection over every point); the crysfml calculator uses 30 FWHM | 0 (1.1 %) | every evaluation (checked (source)) |
+| Jana2020 | "Cutoff" in multiples of the FWHM, a Profile-page setting; the Cookbook sets 12 × FWHM for PbSO₄ (Jana2006 Cookbook 2015, p.18, checked (manual)). The default is not found | 2.7 % if ±12, 5.3 % if ±6 | not found |
+| GSAS-I (EXPGUI) | "Peak cutoff", a fraction of the peak maximum, "set to match experimental signal-to-noise" (Toby's GSAS course slides, slide 36, checked (manual)); default 0.01 (recall) | 6.4 % at 0.01 | every cycle (recall) |
+
+Surveyed 2026-11-27 for WP-2317 (R4), which replaced the TOPAS, RIETAN-FP, FullProf and GSAS-II rows and added the last two. The Lorentzian column uses 1 − (2/π)·arctan(2N) for a cut at ±N FWHM, and 1 − (2/π)·arctan(√(1/r − 1)) for a cut at a fraction r of the height. The TOPAS row replaces the 2026-11-19 reading, which took the cut from each line's own height. The "fraction of the peak maximum" cut belongs to GSAS-I and not to GSAS-II, whose Rietveld path computes 50 and 75 FWHM at every evaluation.
+
+McCusker et al. (1999) §4, p.42, give a rule of thumb. A peak is at background once it falls below 0.1-1.0 % of its maximum, typically 10-20 FWHM depending on the Lorentzian character, and at least 40 FWHM initially for crystal-analyser synchrotron data (checked (manual)). The powder CIF records the cut as a fraction of the peak maximum (`_pd_proc_ls.peak_cutoff`: "for a value of 0.005, the tails ... are neglected after the intensity has dropped below 0.5%", checked (manual)).
+
+### Room for a peak to move inside its window
+
+| Program | Slack for movement | Why |
+|---|---|---|
+| rietx | 0.3° absolute added to each half-width (`model/forward.py`, `WINDOW_MIN_DEG`) | windows frozen per stage while zero, displacement and the cell move the peak (checked (source)) |
+| GSAS-II, MAUD, RIETAN-FP, EasyDiffraction | none | the window is rebuilt every evaluation (checked (source) for GSAS-II and MAUD; RIETAN-FP ran) |
+| TOPAS | none stated | the peak buffer tracks positions through `Xo`; only shape changes trigger a rebuild (TR v5 §6.4, checked (manual)) |
+| FullProf | none stated | windows frozen for a run at `Wdt` × FWHM; no slack term is named in the manual (checked (manual)) |
+| Jana2020, BGMN | not found | |
+
+**rietx's own record, kept for a later reassessment of windowing** (WP-2317 R7,
+2026-11-27).
+- *Origin.* `WINDOW_MIN_DEG` = 0.3° first appears in the v0.1 slice (`f51e8e67b`,
+  2026-07-22) as an additive minimum on a ±30 FWHM window, with no stated reason.
+  WP-1112 split the window into tail coverage, k(η)·Γ, and capture slack. It gave the
+  slack its present job: room for zero, displacement and cell to move a peak inside
+  one frozen stage, against a cold zero error of about 0.1°. It also added
+  `Stage.window_slack_deg` and a validation slack of 2·tanθ_max·1 %, clipped to
+  [0.3, 6]°. A fixed 4° slack had flipped 1 of 837 lines of the correct NAC cell to
+  absent.
+- *Measured* (WP-2002 B10, `tests/test_window_domain.py`). Over SRM 660c, FAP, cpd-1a
+  and NAC, warm and cold (zero 0.1° off), the largest move within a stage was 0.21°.
+  That leaves a 1.4× margin. At 0.1° of slack the test fails, with a peak moving
+  0.147°. At converged windows, slack 0 and slack 1° changed the answer by under
+  0.001 esd.
+- *Not measured.* A start with the cell far from its answer was never run. By
+  arithmetic, 0.3 % moves a 120° peak about 0.6°.
+- *What guards it now.* WP-2047 records `StageResult.window_loss` per stage, and
+  `STAGE_WINDOWS_STALE` warns on the last stages.
+- *Cost.* About 30 of a window's ~122 points are slack at a 0.02° step, roughly
+  25 %. The share grows as 1/step on synchrotron data.
+- *Alternatives on record.*
+  - Per-evaluation windows (WP-2047, WP-2051). Filed 2026-10-25: they gained no
+    accuracy on the four protocols and would rewrite the frozen-per-stage
+    invariant. Four of five surveyed programs resize every evaluation.
+  - A TOPAS-style rebuild once positions move past an allowance. It would need a
+    recompile inside a stage.
+  - Slack sized from the stage's free position parameters (zero, displacement or
+    transparency, cell, λ). Their allowed movement is mapped to 2θ per reflection:
+    Δzero directly, 2·tanθ·Δd/d for the cell. A stage freeing none needs almost no
+    slack. Chosen 2026-11-27 as R7's working answer, paired with a refit on fresh
+    windows when `window_loss` passes its tolerance.
+- *Practice for the window itself.* McCusker et al. (1999) §4 cut at 0.1-1 % of peak
+  height, typically 10-20 FWHM, and at least 40 FWHM for crystal-analyser data.
 
 ## Axial divergence quadrature
 
@@ -136,9 +187,28 @@ is free from the current values, so a re-fit in one stage is what their users do
 | Program | Stopping rule | Default |
 |---|---|---|
 | rietx | the solver's `ftol` on the relative change in cost; intermediate stages at 1e-6 (`intermediate_ftol`), the last stage at the solver's 1e-9 | checked (source) |
-| GSAS-II 5.8.4 | `min dM/M` 0.001 on the relative change in the minimised function, and `max cyc` 3 cycles a `Refine` call (`GSASIIobj.py:20`; `GSASIImath.HessianLSQ`, `GSASIImath.py:164-432`) | checked (source) |
-| FullProf | every shift under `Eps` times its esd, from `NCY, Eps` on line 9 of the control file; the manual calls `Eps = 0.2` "or lower" reasonable | checked (manual) |
-| TOPAS | the change in χ² under `chi2_convergence_criteria` for three consecutive cycles (Technical Reference v9 § 20.12) | checked (manual); the default value is not stated in the text |
+| GSAS-II 5.8.4 | the relative change in χ², (χ²₀ − χ²₁)/χ²₀ < `min dM/M` = 0.001, tested every cycle, with `max cyc` = 3 cycles per `Refine` call (`GSASIIobj.py:20`; `GSASIImath.py:362, 374`; `GSASIImath.HessianLSQ`, `GSASIImath.py:164-432`) | checked (source) |
+| FullProf | every shift under `Eps` × its esd ("Forced termination when shifts < Eps × e.s.d. A reasonable value is Eps=0.2 or lower", manual PDF p.77, line 9); `NCY` cycles cap it; `Dum = 1` drops the test for profile-matching phases; `Dum = 2` stops at the first cycle where χ² rises | checked (manual) |
+| TOPAS | the change in χ² under `chi2_convergence_criteria` for three consecutive cycles, plus every `stop_when` attribute true (TR v5 p.96; v9 § 20.12); default 0.001, "sufficient for routine refinements", with 0.01-0.1 typical for structure determination (Durham wiki copy of the Technical Reference). Whether the change is relative is not stated | checked (manual) |
+| RIETAN-FP 3.12 | `CONV`, "small positive number used for convergence judgement", applied over `NCONV` cycles, with `NCYCL` the cap. The shipped templates and examples set `CONV` = 1e-4, `NCONV` = 6, `NCYCL` = 50-100. What quantity `CONV` bounds is not stated in the text read. A stall ends as "Too large Marquardt parameter", then a one-pass Powell "fail-safe check of convergence" (manual §17.8.2; `New_features.pdf`) | checked (manual) for values; the quantity not found |
+| MAUD | every parameter's step under `leastSquares.precision` = 1e-8 of its normalised value, or λ past 1e5 × λ_min; `iterations` default 3, the GUI tooltip saying "best values: 3-7" (`LeastSquareFit.java:121-124, 703-711, 1541`) | checked (source) |
+| BGMN | "The program terminates the calculation if a refinement step is sufficiently small" (manual §5.1, p.24); `ITMAX` defaults to ten times the parameter count (variables page) | checked (manual); the threshold not found |
+| Jana2020 | "Check for convergence: stop if" max change/s.u. falls below a set value for a set number of consecutive cycles; a PETS tutorial sets 0.4 in 1 cycle; the cookbooks set 10-100 cycles and damping 0.1-0.5 | checked (manual) for the test; the default not found |
+| GSAS-I (EXPGUI, GENLES) | Σ(shift/esd)² over all parameters under the "Convergence Criterion", "Increase with large numbers of parameters" (Toby's GSAS slides, slide 25, checked (manual)); default 0.01 (a 2000 CCP14 reply by a GSAS developer, read only through a search excerpt) | checked (manual); the default recall |
+
+Surveyed 2026-11-27 for WP-2317 (R5(c)), which replaced the GSAS-II, FullProf and TOPAS rows and added the last five.
+
+### What a reported refinement is expected to show
+
+A test the field applies to the final cycle, separate from what stops a program.
+
+| Source | Threshold | Status |
+|---|---|---|
+| McCusker et al. (1999) §7, p.46 | "the maximum shift/e.s.d. in the final cycle of refinement should be no more than 0.10" | checked (manual) |
+| IUCr checkCIF, test SHFSU01 | `_refine_ls_shift/su_max` above 0.05 raises alert C, above 0.10 alert B, above 0.20 alert A; a missing value raises a test-not-performed alert | search excerpt of `journals.iucr.org/services/cif/checking/SHFSU_01.html` only; the page itself 403s |
+| RIETAN-FP manual §17.8.3, citing Pecharsky & Zavalij | the IUCr asks \|Δx\|/σ ≤ 0.05 for single-crystal refinements; < 0.1 is satisfactory for powder data | checked (manual) |
+| CIF core dictionary | `_refine_ls.shift_over_su_max`: "the largest ratio of the final least-squares parameter shift to the final standard uncertainty"; `_max_lt` for a ratio too small to measure | checked (manual) |
+| rietx | reports `Statistics.max_shift_over_esd`, writes `_refine_ls_shift/su_max`, and words one report sentence against `MAX_SHIFT_CONVERGED` = 0.1; it stops on `ftol`, not on shift/esd | checked (source) |
 
 ### How far one iteration may move a parameter
 
@@ -175,13 +245,15 @@ Surveyed 2026-10-26 for WP-2052 (issue #1088); the GSAS-II lines re-read 2026-11
 | Program | U, V, W, X, Y limits | Negative width | Sample-broadening limits |
 |---|---|---|---|
 | rietx | floors only since 2026-10-21 | Γ_G² clamped at 1e-8 deg² | `lor_size` etc. by their own schema |
-| GSAS-II | none | Gaussian variance and Lorentzian width floored per reflection | none |
+| GSAS-II 5.8.4 | none | per reflection, σ² = U tan²θ + V tanθ + W + sample term is clamped by value to ≥ 0.001 centideg², and γ to ≥ 0.001 centideg (`GSASIIstrMath.py:3900-3903`, checked (source)) | none |
 | FullProf | none | Γ_G set to 1e-10 with a message; peaks vanish (ran) | none |
 | RIETAN-FP | none | refused at the start; a step to one is rejected | none |
-| TOPAS | no u-y rows in Table 2-1; opt-in `force_positive_fwhm` | undocumented | `CS_L` 0.3 nm to min(2·Val + 0.3, 10 000) |
-| MAUD | ±0.5, ±0.3, ±0.1 on U, V, W, not enforced by its least squares | floored at 1e-7° | size 50-5000 Å, strain ≤ 0.005, not enforced |
+| TOPAS | no u-y rows in Table 2-1. None for TCHZ in Table 3-1; the PV and SPV widths `pv_fwhm`, `h1`, `h2`, `spv_h1`, `spv_h2` have a default min of 1e-6 (TR v5 §3.8 Table 3-1, p.7) | TCHZ's G is a square root (§6.2, p.27), and "Sqrt(x) for x < 0" throws a floating-point exception that "min/max equations, or Min/Max functions or If statements can be used to avoid" (§4.2, p.13, checked (manual)). V6 adds `force_positive_fwhm`, which a forum reply says "modifies the meaning of your equations" (forum thread 705, read through a search excerpt only). Whether the `TCHZ_Peak_Type` macro guards the root is in `Topas.inc`, not read | `CS_L` 0.3 nm to min(2·Val + 0.3, 10 000) |
+| MAUD | the GUI's ±0.5, ±0.3, ±0.1 on U, V, W are not enforced: `FilePar.checkBound` has its test commented out "for the moment" (`FilePar.java:3295-3301`, checked (source)) | HWHM = √(Σ cᵢ tanⁱθ)/2. A negative sum gives NaN, and NaN or anything under `minimumHWHMvalue` = 1e-7 is reset to 1e-7 (`InstrumentBroadeningPVCaglioti.java:578-580, 645-646`, a preference `instrBroadening.minimumHWHMvalue`, checked (source)). The Gaussian fraction η is clipped to [0, 1] | size 50-5000 Å, strain ≤ 0.005, not enforced |
 | EasyDiffraction | none | H_G² floored at machine ε; a negative H_L passes | none |
-| BGMN | no Caglioti widths | fatal error | Profex writes B1 ≤ 0.01 and k2 ≤ 1e-4 into the files it creates |
+| BGMN | no Caglioti widths; the instrument function is ray-traced | fatal error (ran, earlier survey). The sample widths are bounded by declaration: `PARAM=B1=0_0` gives B1 a lower bound of 0, and `B2` is parametrised as a square ("Using the square of the broadening solves a convergence problem", variables page; manual §4, p.12, checked (manual)) | the bounds a structure file declares; Profex writes B1 ≤ 0.01 and k2 ≤ 1e-4 into the files it creates |
+| Jana2020 | not found | not found | not found |
+| GSAS-I (EXPGUI) | not found | not found | not found |
 
 ### A width an equation sets
 
@@ -195,6 +267,23 @@ negative at every reflection, so that input relies on whatever TOPAS does there.
 rietx's LM driver holds the total width, an equation's term included, inside the step
 wherever the term is exact at the stage's frozen angles (WP-2153). TRF and an inexact
 term are reported after the fit by `PEAK_WIDTH_NOT_POSITIVE`.
+
+### The derivative at a width floor
+
+Surveyed 2026-11-27 for WP-2317 (R4). What a program does when the computed width reaches its floor, and what the Jacobian then says. That decides whether the fit is pulled back off the floor, stays there, or stalls.
+
+| Program | How a width is kept positive | Derivative at the floor | Status |
+|---|---|---|---|
+| rietx | Γ_G² ≥ 1e-8 deg² (`caglioti._MIN_GAMMA_G2`) and Γ_L ≥ 0, held as linear inequalities inside the LM step at every reflection (WP-1938, WP-2153; `least_squares.gaussian_width_inequalities`). The by-value clamp stays as a backstop, and TRF reports `PEAK_WIDTH_NOT_POSITIVE` after the fit | the step cannot cross the floor, so the Jacobian stays that of the model actually computed | checked (source) |
+| GSAS-II | clamp by value, per reflection | ignores the clamp: dσ²/dU = tan²θ etc. are taken unconditionally (`GSASIIstrMath.py:4493`), so a clamped reflection still reports a gradient for a width it does not have, and keeps pulling U, V, W | checked (source) |
+| MAUD | reset by value to 1e-7 | numerical derivatives (`leastSquares.derivativeStep` 5e-4) see a flat model while a step stays under the floor, so the column of a floored reflection is zero there (inferred from the source) | checked (source), derivative inferred |
+| FullProf | Γ_G set to 1e-10 with a message; the peaks vanish | not documented | ran (earlier survey); not re-confirmed on 2026-11-27 |
+| RIETAN-FP | refused at the start; a step to one is rejected | not documented | earlier survey; the manual text was not found on 2026-11-27 |
+| TOPAS | the user's min/max or `Min`/`Max`/`If` in the width equation (§4.2); the v6 `force_positive_fwhm` | an `If`/`Max` floor gives a zero derivative on the clamped side; a min/max limit is a bound held by the bounded conjugate-gradient solve (§5.4, p.18) | checked (manual) for the mechanisms; the default behaviour on a negative TCHZ sum not found |
+| BGMN | bounds on parameters, held inside its constrained step ("parameter ≥ lower boundary and/or parameter ≤ upper boundary", manual §5.1, pp.23-24) | the constrained step lands on the bound; the model is defined there | checked (manual) |
+| Jana2020, GSAS-I | not found | not found | not found |
+
+Two of the seven clamp the width by value (GSAS-II, MAUD), and FullProf substitutes a tiny width. BGMN holds bounds inside the step, but on parameters and not on the width. TOPAS leaves it to the input file. No program documents a constraint on the total width inside the step, which is what rietx does.
 
 ## Limits a control file declares
 
@@ -705,6 +794,55 @@ The paper gives no timings.
 
 Not determined: TOPAS v9 and its Pawley overlap rule, FullProf's current manual, the Profex
 5.7.2 manual. MAUD, BGMN and RIETAN-FP were not run.
+
+### Accidental overlaps during extraction
+
+Surveyed 2026-11-27 for WP-2317 (R6). Reflections that coincide in d without being symmetry equivalents or forced to by the lattice. Examples are b = 3a exactly, and near-equal d. Every program merges symmetry equivalents into one reflection first, so they are not in this table. Pawley (1981), David (1987), Sivia & David (1994), Jansen et al. (1992) and Estermann & Gramlich (1993) are not held on this machine, so what they say is taken from Le Bail (2005) and McCusker et al. (1999) and marked so.
+
+| Program | Lattice-forced coincidence | Accidental or near coincidence | Where it acts | Status |
+|---|---|---|---|---|
+| rietx | grouped by position | reflections within 0.5 FWHM (`forward.PAWLEY_OVERLAP_FWHM_FRAC`) are grouped and held toward equal peak intensity by a restraint row, and flagged `PAWLEY_OVERLAP_UNRESOLVED` | Pawley | checked (source) |
+| GSAS-II 5.8.4 | in 4/m, 4/mmm, 3, 3m1, 31m, 6/m, 6/mmm, 3R, 3mR, m3, m3m: Pawley intensities with equal index sums (h²+k², \|l\| equal etc.) tied equal | only in -1, 2/m and mmm (the `elif` branch): pairs with \|Δd\|/d < 1e-4 tied equal, so a near overlap in a higher class stays free (`GSASIIstrIO.GetPawleyConstr`) | Pawley; a negative-intensity penalty, `Pawley neg wt` 0 by default | checked (source) |
+| TOPAS | none automatic | none automatic; each `I` is a parameter with a default min of 1e-11 (Table 3-1). For structure solution the Pawley A matrix is carried into charge flipping (`out_A_matrix`, `cf_in_A_matrix`, TR v5 §11.1.3, pp.141-142), so the correlations go downstream instead of being split | Pawley | checked (manual) |
+| FullProf | none in extraction: the Le Bail partition gives exactly overlapping reflections the ratio they start with | the `.int` output clusters reflections i, i+1 when T(i+1) − T(i) < ½(Hᵢ + Hᵢ₊₁) × `Rmub`, or within that width and weak (G < `Rmuc` × the cluster sum); defaults `Rmub` 1.0 and `Rmuc` 0.2, "used to control whether two consecutive reflections belongs to a same cluster" (manual PDF p.93) | output for integrated-intensity refinement only (`Jvi` = 11) | checked (manual) |
+| RIETAN-FP | as FullProf in Le Bail | Le Bail: overlapped \|F\|² "tend to converge near their initial values", so the start (Wilson statistics) decides them (§10.4, PDF p.89). Hybrid step: \|F\|²s with Δ2θ < `RWID` × FWHM "are set equal" ("equipartition"), groups of at most `MREG`; the template shows `RWID` 0.35 and `MREG` 10, a worked example 0.05 and 6; negatives suppressed by a penalty of weight `WNEG` (ch. 11, PDF pp.96-97) | the hybrid step only | checked (manual) |
+| MAUD | none | none; intensities bounded 0 to 1e9 | Pawley | checked (source), earlier survey |
+| BGMN | none found | none found | | not found |
+| GSAS-I (EXPGUI) | Le Bail from F(calc) or "Equal Weighted", Fcalc = 1 | none found | Le Bail | checked (manual) for the start options |
+| Jana2020 | not found | not found | | not found |
+
+### What the literature does with overlapped intensities
+
+| Source | Treatment | Status |
+|---|---|---|
+| Pawley (1981) | the normal matrix is ill-conditioned for overlapped peaks; "slack constraints" (soft restraints toward equal intensity) remove it; when they work they give equipartitioned intensities, and when they fail they give negative intensities beside positive ones that sum correctly | not held; Le Bail (2005) p.317 |
+| PROFIT (Scott 1987), PROFIN (Will 1988) | "no slack constraints, but equal division of the intensity between expected peaks when the overlap is too close" | not held; Le Bail (2005) p.317 |
+| Le Bail's method (ARITB, 1988) | all-equal starting intensities, so exact overlaps end equipartitioned; any other start keeps its own ratio | checked (manual), Le Bail (2005) p.318 |
+| David (1987) | probabilistic determination of completely overlapping intensities | not held; Le Bail (2005) p.317 |
+| Jansen, Peschar & Schenk (1992), DOREES | relations between structure-factor amplitudes from direct methods and the Patterson function improve the split of overlapping intensities from the Pawley program LSQPROF | not held; Le Bail (2005) p.317 |
+| Estermann & Gramlich (1993), FIPS | Patterson positivity used inside the decomposition for severely or exactly overlapping reflections (with Estermann et al. 1992, Estermann & David 2002) | not held; Le Bail (2005) p.318 |
+| Sivia & David (1994) | Pawley least squares with a Bayesian positivity prior: correct esds and the covariances between overlapping reflections | not held; McCusker et al. (1999) §5, p.42 |
+| David et al. (1998), DASH | carries the Pawley correlated intensities into the structure-solution χ² | not held; Le Bail (2005) p.321 |
+| David (2004), *J. Res. NIST* 109, 107-123 | treats a "clump" of completely overlapped reflections as one observation J_h = ΣI_h, with the Pawley Hessian as its weight matrix, and builds the integrated-intensity R and χ² on clumps (eqs 5-6, p.109) | checked (manual) |
+| Le Bail (2005) | the question "cannot have a definite simple answer but continues to be discussed a lot" (p.317); for direct methods up to half the reflections, those nearer than about 0.5 FWHM, can be discarded (p.321) | checked (manual) |
+| Altomare et al. (EXPO) | Patterson positivity, pseudotranslation priors, a located fragment, and many Le Bail fits with random partitions instead of equipartition | not held; Le Bail (2005) p.318 |
+| IUCr powder CIF | a peak may hold several reflections: `_pd_refln.peak_id` links each reflection to a `_pd_peak.id`, and "where two peaks are severely overlapped, it may be desirable to list them as a single peak"; `_refln.F_squared_meas` is defined as the Rietveld partition of the net observed intensity in proportion to the calculated contributions | checked (manual) |
+
+**What practice adds up to.** The literature agrees that an overlapped intensity is not
+measured separately, and is settled on that.
+- For extraction, equipartition is the field's default for exact overlaps, since Le Bail
+  starts all intensities equal and Pawley restrains them to equal.
+- For structure solution, the better practice is to keep the joint information instead of
+  splitting it. DASH carries the Pawley correlations, TOPAS carries its A matrix, and
+  David (2004) works on clumps. EXPO uses priors to split.
+- For reporting, the powder CIF lets a peak carry several reflections, and defines an
+  "observed" F² as the model's own partition.
+
+No program surveyed acts on a near overlap by default, except two:
+- GSAS-II, in its three lowest Laue classes at 1e-4 in d.
+- RIETAN-FP, in its hybrid step at `RWID` × FWHM.
+
+FullProf's one-FWHM cluster rule acts on output alone.
 
 ## Ranking extinction symbols: which fit, and how a weak line is judged
 
