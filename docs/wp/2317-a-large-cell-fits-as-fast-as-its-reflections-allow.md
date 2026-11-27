@@ -296,6 +296,11 @@ what it costs here.
   invariant says profiling a linear block out "cannot buy an evaluation", but that
   Pawley *dimension* is "a per-step cost", and that a bounded block leaves the
   identity once a bound is active. On a large cell the dimension is the cost.
+  - **Ruled 2026-11-27 (R5): "go (b)".** Reflections whose d coincide for every
+    metric of their Laue class (cubic 333/511, hkl/khl under 4/m) merge into one
+    intensity column, the sum measured and each member's share unmeasured.
+    Accidental coincidences (b ≈ 3a) keep the restraint while their practice is
+    surveyed. Built under WP-2315.
 - **R6 — the stopping rule.**
   - *rietx:* intermediate stages at 1e-6 (`intermediate_ftol`, WP-1123), the last
     declared stage at the solver's 1e-9. The closing stage is **off by default
