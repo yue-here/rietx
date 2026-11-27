@@ -1,6 +1,6 @@
 # WP-2317 — a large cell fits as fast as its reflections allow: the case, the bar, and the rulings in the way
 
-Milestone: unscheduled · Status: 🔄 2026-11-27 — filed with its three plans (2314-2316), reviewed; task 4 answered, tasks 1-3 and 5-8 open
+Milestone: unscheduled · Status: 🔄 2026-11-27 — claimed by ghostshift (runner, MacBook-Air-c4aacd): task 2 bench cases and the GSAS-II timing; task 4 answered, tasks 1, 3, 5-8 open
 Track: A large cell
 Depends on: —
 Priority: P2 2026-11-27 — the scoping WP of a track the maintainer opened for a user at the wall (slowdowns on a 12 × 36 × 4 Å cell); 2314, 2315 and 2316 read its case, its bar and its rulings
