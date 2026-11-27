@@ -175,6 +175,16 @@ is held, and rebuilt per evaluation where the cell is free.
    new kernel under `compiled.py`'s four rules. Decide on the measurement after
    1-6.
 
+### Inherited
+
+- **From WP-2317, 2026-11-27 (task 2 and the cross-code timing).** The bench
+  case is `bigcell-structural` in `examples/bench_refinement.py`: 10.90-11.30 s
+  over two blocks on one Mac, Rwp 0.08675, coordinates 10 and biso 16
+  evaluations. GSAS-II 5.8.4 on the same pattern and free set took
+  18.13-20.41 s in 20 cycles at Rwp 0.08753, so after the hoist rietx is
+  already 1.6-1.9× faster than GSAS-II here. WP-2317's Context has the
+  protocol; the runaway guard this WP waits for can use the case.
+
 ## Non-goals
 
 - The peak-chain (position, width) columns, and the bit-identical batched Biso

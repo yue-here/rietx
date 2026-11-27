@@ -112,6 +112,43 @@ def test_the_trigger_pattern_is_deterministic(bench):
     assert not np.array_equal(np.asarray(a.intensity), np.asarray(c.intensity))
 
 
+def test_the_bigcell_cases_carry_the_large_cell_shape(bench):
+    """WP-2317's cases exist for their shape: a 12 × 36 × 4 Å cell, 40 atoms
+    at least 1.5 Å apart, and more (line, reflection) pairs than ``trigger``.
+
+    The separation is pinned because probe 1's first draw packed its atoms
+    into a sub-box, 65 % of nearest neighbours under 1 Å, and measured a
+    degenerate model (WP-2317, S3).  The prefix is pinned because the
+    structure-free cases take the first ten of the forty, and a sampler that
+    stopped being sequential would make them a different structure.  Compiled
+    on a blank pattern, so nothing here evaluates the model.
+    """
+    import gemmi
+
+    forty = bench._bigcell_positions(40)
+    assert bench._bigcell_positions(10) == forty[:10]
+    ops = list(gemmi.SpaceGroup(bench._BIGCELL_SG).operations())
+    images = np.array([np.mod(op.apply_to_xyz(list(x)), 1.0)
+                       for x in forty for op in ops])
+    d = images[:, None, :] - images[None, :, :]
+    d -= np.round(d)
+    dist = np.sqrt((d ** 2 * np.array(bench._BIGCELL_CELL[:3]) ** 2).sum(-1))
+    np.fill_diagonal(dist, np.inf)
+    assert dist.min() >= bench._BIGCELL_MIN_SEP
+
+    structure = rx.Structure(phases=[bench._bigcell_phase(forty, 0.0)])
+    tt = np.arange(5.0, 90.0, 0.02)
+    blank = rx.PatternData(two_theta=tt.tolist(),
+                           intensity=np.ones_like(tt).tolist())
+    model = compile_model(structure, bench._bigcell_instrument(truth=True), blank)
+    pairs = sum(int(ph.win.shape[0] * ph.win.shape[1]) for ph in model.phases)
+    assert pairs > 1500, f"the 90° large cell carries only {pairs} pairs"
+    assert len(structure.phases[0].atoms) == 40
+    keys = {c.key for c in bench.CASES}
+    assert {"bigcell-structural", "bigcell-pawley", "bigcell-pawley-120",
+            "bigcell-lebail"} <= keys
+
+
 def test_a_baseline_case_builds_a_compiled_model(bench):
     """`cpd-1a` is the cheapest real-data case to build: a read plus the scale
     seeding.  Compiling its setup is what every timed repeat starts from."""

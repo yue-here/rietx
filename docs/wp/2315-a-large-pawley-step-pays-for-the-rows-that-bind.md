@@ -179,6 +179,21 @@ free swap under LM.
 8. **Measure `solver="trf"` first.** TRF never sees the rows, so it is angle 6's
    cost model without the ruling.
 
+### Inherited
+
+- **From WP-2317, 2026-11-27 (task 2 and the cross-code timing).** The bench
+  cases are `bigcell-pawley` (2θ ≤ 90°) and `bigcell-pawley-120` in
+  `examples/bench_refinement.py`; their ranges are in WP-2317's Context. GSAS-II
+  5.8.4 on the same patterns and free set took about 2.5-3× rietx's wall and
+  landed at Rwp 0.0702 and 0.0610 against rietx's 0.0447 and 0.0420. 41-43 % of
+  GSAS-II's χ² sits below 6°, the tail of (0 2 0) at 4.9°, which GSAS-II does
+  not draw. The measurement that bears on angle 7 and R5: GSAS-II ties
+  reflections whose d agree to 1e-4 (`GetPawleyConstr`), and this cell has
+  b = 3a exactly, so it refines **352 independent intensities at 90° and 540
+  at 120°, where rietx carries 913 and 1 606 columns**. rietx holds an exact
+  overlap by an equal-split restraint row; GSAS-II removes it from the
+  dimension.
+
 ## Non-goals
 
 - Which structure-free method is the default: WP-2062.
