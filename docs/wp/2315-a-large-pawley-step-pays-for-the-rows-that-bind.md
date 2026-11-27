@@ -267,6 +267,11 @@ sliced and T's rows multiplied whole.
   splitting the GEMM by rows already moves T's bits. A BLAS promises no
   reduction order, so a byte-equality test on one BLAS certifies only that
   BLAS. An x86_64 venv under Rosetta reproduces the Linux split on this Mac.
+- Tests (macOS arm64, `[dev]`): `test_lm_solver.py`, `test_bccg.py`,
+  `test_pawley.py` and `test_gaussian_width_floor.py` together, 115 passed,
+  1 xfailed (the 2nd session's 122 less the 7 removed cases). Fast selection
+  (`-m "not slow"`, this branch over main e94925ae9): 15 819 passed,
+  452 skipped, 30 xfailed.
 
 *Next.* As the 2nd session's, with the blockwise G·E⁻¹ added to Angles 1-2
 behind R0.
