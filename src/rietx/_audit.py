@@ -7577,7 +7577,7 @@ ROWS: tuple[Row, ...] = (
                   '(readers.py:268-273)')),
     Row("PAWLEY_OFF_DATA_RIDGED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence="arithmetic: the one input that measures them, a wider fitted range"),
-    Row("PAWLEY_OVERLAP_UNRESOLVED.suggestion", "suggestion", value=1),
+    Row("PAWLEY_OVERLAP_UNRESOLVED.suggestion", "suggestion", value=2),
     Row("PEAK_ASYMMETRY_UNMODELLED.suggestion", "suggestion", value=1),
     Row("PEAK_AXIAL_TAIL.suggestion", "suggestion", value=1),
     Row("PEAK_CONTAMINATION_LINE.suggestion", "suggestion", value=1),

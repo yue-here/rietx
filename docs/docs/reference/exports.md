@@ -127,12 +127,17 @@ It takes the compiled model, the decoded parameter values and the structure, for
 | `ReflectionRow.satellite_order` | the m of Q = H + m·k, with k the propagation vector; 0 on every nuclear reflection |
 | `ReflectionRow.component` | `"total"`, or `"nuclear"` and `"magnetic"` where a magnetic peak width is active |
 | `ReflectionRow.phase_index` | the phase's index in the structure, which holds where two phases share a name |
+| `ReflectionRow.merged_group` | after a Pawley fit, the group number of a reflection whose d-spacing equals others' in every cell of its space group, or `None` |
 
 `ReflectionRow.two_theta` is the Bragg angle plus the zero shift plus the geometry's own position correction, so it matches `RefinementResult.ticks` rather than the ideal Bragg angle.
 A reflection whose 2θ is non-physical at one line's wavelength (sin θ > 1) is dropped for that line only, so a row missing from one line may be present in another.
 
 `ReflectionRow.intensity` is the whole modelled contribution under the tick.
 In Rietveld mode it is scale × multiplicity × \|F\|² × preferred orientation × line weight × Lp × extinction × absorption × roughness.
+
+After a Pawley fit, rows sharing a `ReflectionRow.merged_group` were refined as one intensity, because their d-spacings agree in every cell of the space group: cubic (3 3 3) and (5 1 1), or (h k l) and (k h l) under 4/m.
+Their summed `ReflectionRow.intensity` is measured.
+Each row's own value is its share of the sum by multiplicity and is not a measurement.
 
 `ReflectionRow.satellite_order` is 0 on every row of a phase that declares no `Phase.propagation_vector`.
 On a satellite row `ReflectionRow.h`, `ReflectionRow.k` and `ReflectionRow.l` stay the parent vector H, and the row reads as H and m together, the (3+1)-index spelling.

@@ -117,16 +117,45 @@ the refined parameters by 0.001 esd.
 The per-$hkl$ intensities sit inside the least-squares problem
 {cite}`pawley1981`, as an off-table parameter block appended to $\theta$.
 Equation {eq}`fm-lebail` is then used for at most three cycles, to seed the block
-before the first solve. Reflections whose primary-line centres sit within
+before the first solve.
+
+Some reflections share a d-spacing in every cell their space group allows:
+cubic (3 3 3) and (5 1 1), or $(h\,k\,l)$ and $(k\,h\,l)$ under $4/m$, $\bar 3$ or
+$6/m$. No powder pattern of the phase can separate their intensities, so they
+are one column of the block, carrying the group's sum $I_G$. The test is exact.
+The cells a setting allows are the reciprocal metrics $G^*$ with
+$G^* = R\,G^*R^\top$ for each rotation $R$ of the group, and two reflections
+$\mathbf h_1$, $\mathbf h_2$ have equal $d$ in all of them exactly when
+
+```{math}
+:label: fm-pawley-lattice
+
+\sum_{R} \big(R^\top\mathbf h_1\big)\big(R^\top\mathbf h_1\big)^{\!\top}
+ \;=\; \sum_{R} \big(R^\top\mathbf h_2\big)\big(R^\top\mathbf h_2\big)^{\!\top},
+\qquad I_k = \frac{m_k}{\sum_{j\in G} m_j}\, I_G ,
+```
+
+{source}`rietx.crystallography.symmetry.lattice_coincidences`
+
+an identity between integer matrices. It reproduces GSAS-II's per-Laue-class
+rules in every class {cite}`toby2013`. Each member $k$ is drawn at its share by
+multiplicity $m_k$, which is equal $F^2$, since a Pawley intensity is the whole
+peak. The share is drawn, never measured: a member's esd is infinite, and
+`PAWLEY_OVERLAP_UNRESOLVED` lists the groups once per phase. A phase whose model
+reads $hkl$ rather than $d$ keeps one column per member, since its members'
+peaks differ: a Stephens strain block, a peak equation, satellites or a magnetic
+component.
+
+Columns whose primary-line centres sit within
 {{ PAWLEY_OVERLAP_FWHM_FRAC }} × their mean FWHM form an overlapped group and
-receive a soft equal-split restraint, one row per member $k$ of a group $g$ of
-$n$ reflections,
+receive a soft restraint towards equal $F^2$, one row per member $k$ of a group
+$g$,
 
 ```{math}
 :label: fm-pawley-split
 
 r_{gk} \;=\; \frac{\sqrt{\lambda}}{s_g}
-  \Big(I_k - \tfrac{1}{n}\textstyle\sum_{j\in g} I_j\Big),
+  \Big(I_k - \frac{m_k}{\sum_{j\in g} m_j}\textstyle\sum_{j\in g} I_j\Big),
 \qquad s_g = \max\!\big(\bar I_g,\; \rho\, s_p\big),
 ```
 

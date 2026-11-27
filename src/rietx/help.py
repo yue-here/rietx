@@ -3921,10 +3921,16 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         title="Overlapping Pawley reflections cannot be split",
         description=(
             "Several reflections overlap so strongly that the data fix their summed "
-            "intensity but not how it divides among them. At least one individual "
-            "intensity has a large relative esd. The split shown comes from the "
-            "equal-split restraint. Use the summed intensity of the group as the datum. "
-            "Individual values from the group are not measurements."
+            "intensity but not how it divides among them. It fires in two cases. "
+            "Reflections whose d-spacings agree in every cell of the space group, such "
+            "as cubic (3 3 3) and (5 1 1) or (h k l) and (k h l) under 4/m, are refined "
+            "as one intensity, one diagnostic per phase listing the groups. Each "
+            "member's value is its share of the sum by multiplicity (equal F²), and its "
+            "esd is infinite. Reflections that overlap by accident keep one intensity "
+            "each, held by a restraint towards equal F², and are reported when an "
+            "individual relative esd is large. In both cases use the summed intensity "
+            "of the group as the datum. Individual values from the group are not "
+            "measurements."
         ),
     ),
     "PEAK_POSITION_AT_BOUND": HelpEntry(
