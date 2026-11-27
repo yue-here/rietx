@@ -371,22 +371,9 @@ A stage that reaches it ends with status `max_iter` and reports [`STAGE_MAX_ITER
 At `0.0` exactly `lebail_cycles` plain cycles run.
 `StageResult.lebail_cycles_run` and `StageResult.lebail_settled` record what ran. A cut in the last stage warns `LEBAIL_CYCLES_AT_CAP`.
 `Stage.restraint_weight_scale` weights the restraints against the data for the stage ([How to restrain a bond length or an angle](../guides/restrain.md)).
-Each stage computes a peak only over a window of points, sized where the stage starts and fixed while it solves.
-Each window carries a margin in °2θ for the peak to move.
-The stage whose answer is the result, and a stage run on its own, give every window 0.3°.
-On a stage that a later stage of the plan refits, the margin follows what the stage frees.
-It is three of the peak's FWHM for each kind of shift the stage can move: the zero, a specimen offset, and the cell or a wavelength.
-Each kind's share follows its angle dependence, such as tan θ for the cell.
-Half a point step is added, and the margin is at most 0.3°.
-A stage that frees none of these gets half a point step.
-When a stage ends with its windows dropping more than its window fraction of the Bragg intensity, it solves once more from that answer on windows sized there.
-`StageResult.window_refit_loss` records the loss that set off the second solve, and `StageResult.window_loss` the second solve's.
-A start with every cell length 0.3 % long sets it off on SRM 660c, and starts near the answer did not on the four acceptance standards.
-
-`Stage.window_slack_deg` replaces that margin with one value for every reflection, and a stage that declares it is never solved twice.
+`Stage.window_slack_deg` replaces each window's default margin. `StageResult.window_refit_loss` marks a re-solve.
 The indexing Le Bail validation sets it, because it holds a candidate cell fixed and a wrong candidate displaces peaks by whole degrees.
 Leave it unset in ordinary plans.
-A joint fit over several patterns still gives every window 0.3° and never solves a stage twice.
 
 ## Stored plans
 
