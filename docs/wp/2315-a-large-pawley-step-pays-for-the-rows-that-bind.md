@@ -403,6 +403,17 @@ member reflections, not columns; a real-fit test of an unmerged overlap
 `lattice_coincidences` cites Toby & Von Dreele (2013); this entry's cascade
 bullet. Its sixth point is the stored-format flag above.
 
+*CI fix (Linux py3.11).* `test_a_pawley_fit_depends_neither_on_the_units_nor_on_a_high_background_start`
+read LaB6's (2 2 1) and (3 0 0) swapped between two fits. Each member's share was
+right for its hkl; the reflection list's order was not. numpy's argsort is unstable
+and lattice-equal d may differ by an ulp, so the pair's order depended on the
+platform and the start. `generate_reflections`, the satellite lists and both list
+merges now keep d within 1e-12 relative in first-met orbit order
+(`symmetry._order_by_d`, audit row tier 1). `srm660c` and `nac` goldens re-pinned:
+only tied reflections' summation order moved, at most 1.6e-16 relative. Two tests
+pin it, one with the pair's shares at four starts. Fast selection after it (macOS
+arm64, `[dev,jax]`): 16 075 passed, 268 skipped, 30 xfailed; +5, the tests added.
+
 *Left undone.*
 - `solve/cost.py`'s nuisance columns are not merged.
 - torch is not installed here, so the `pawley_merged` torch rows did not run.
