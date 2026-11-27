@@ -1,6 +1,6 @@
 # WP-2317 — a large cell fits as fast as its reflections allow: the case, the bar, and the rulings in the way
 
-Milestone: unscheduled · Status: 🔄 2026-11-27 — claimed by ghostshift (runner, MacBook-Air-c4aacd): task 2 bench cases and the GSAS-II timing; task 4 answered, tasks 1, 3, 5-8 open
+Milestone: unscheduled · Status: 🔄 2026-11-27 — claimed by ghostshift (runner, MacBook-Air-c4aacd): task 2 bench cases and the GSAS-II timing; task 4 answered, tasks 1, 3, 5, 7 and 8 open
 Track: A large cell
 Depends on: —
 Priority: P2 2026-11-27 — the scoping WP of a track the maintainer opened for a user at the wall (slowdowns on a 12 × 36 × 4 Å cell); 2314, 2315 and 2316 read its case, its bar and its rulings
@@ -110,7 +110,9 @@ speed WP re-measures them beside its own arm.
 kind="chebyshev", seed=True)`, as WP-2316's inherited entry below asks; the
 unseeded start lands in the background valley that entry describes. Seeded, it
 spends 34 evaluations and still about 62 s, so the partition is the cost
-(WP-2316).
+(WP-2316). The seeded case also carries 16 Chebyshev terms, the order scan's
+cap, against the unseeded start's 6, so the two rows differ in the seed and
+in ten background columns.
 
 The Linux single runs above and these Mac ranges are on two machines, so their
 ratios are not speed-ups. The harness's own `nfev` and `njev` columns print 0
@@ -193,8 +195,9 @@ mechanism was not measured:
   Le Bail reaches a better curve than rietx's. WP-2316 found the cause on
   rietx's side (the inherited entry below). From the seeded background the
   bench case now uses, rietx lands at 0.0469 in 61.7 s. GSAS-II was not run
-  from that seed: its Chebyshev basis is not rietx's, and the conversion was
-  left for the session that needs it.
+  from that seed. Its `chebyschev-1` is rietx's basis, T_n over 2θ mapped
+  onto [-1, 1] (`GSASIIpwd.getBackground`), so the exporter's coefficients
+  carry over term for term and the driver can run it as committed.
 
 Three readings shape the track.
 

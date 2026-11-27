@@ -128,7 +128,9 @@ def rwp_of():
 cycles_done = [0]
 
 
-def on_cycle(histograms, icycle):
+def on_cycle(histograms, icycle=None):
+    # HessianLSQ/HessianSVD pass the cycle; RefineCore's leastsq paths
+    # (deriv type 'Jacobian' and numeric) call with Histograms alone
     cycles_done[0] += 1
 
 

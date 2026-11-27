@@ -5,6 +5,10 @@
 A measurement scaffold for ``gsas2_bigcell.py`` (WP-2317, cross-code timing).
 xye: 2θ, counts, σ = √max(y, 1) (rietx's Poisson fallback, the weight its fit uses).
 json: the start model in rietx units.
+
+``bigcell-lebail`` exports its seeded 16-term background since 1d6677887.
+The WP's GSAS-II Le Bail row ran from probe 1's unseeded six zeros, which
+this script wrote at 896991fde.
 """
 import importlib.util
 import json

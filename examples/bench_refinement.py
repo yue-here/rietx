@@ -103,7 +103,8 @@ started at the truth's atoms with the cell 500 ppm high.
              coordinate and 40 Biso columns over 899 reflections (WP-2314).
 ``bigcell-pawley`` and ``bigcell-pawley-120``
              10 atoms' pattern, Pawley, ``mccusker_default``, 2θ ≤ 90° and
-             ≤ 120°: 899 and 1 601 intensity columns (WP-2315).
+             ≤ 120°: 913 and 1 606 intensity columns, tails from
+             outside the range included (WP-2315).
 ``bigcell-lebail``  the same pattern at 2θ ≤ 90°, Le Bail from an
              ``auto_background`` seed, as the skill says (WP-2316).
 
@@ -1009,7 +1010,10 @@ def _bigcell_lebail() -> Setup:
     pedestal to the reflections, and the fit ends in a background valley at
     Rwp 0.151 (WP-2316 task 1).  Seeded, it lands at 0.047 against Pawley's
     0.045, so this case times the right answer.  ``kind="chebyshev"`` keeps
-    the background family of the other three cases.
+    the background family of the other three cases, but not their order: the
+    scan returns its cap of 16 terms (``BACKGROUND_ORDER_AT_CAP``) where the
+    other three carry 6, so this case and probe 1's unseeded start differ in
+    the seed and in ten background columns.
     """
     setup = _bigcell("lebail", 90.0, 10, rx.RefinementPlan.mccusker_default(),
                      "mccusker_default")
@@ -1041,9 +1045,9 @@ CASES: tuple[Case, ...] = (
     Case("bigcell-structural", _bigcell_structural,
          "4 250 pts, 899 refl, 40 atoms, mccusker_structural — WP-2314's case"),
     Case("bigcell-pawley", _bigcell_pawley,
-         "4 250 pts, 899 Pawley intensities, 2θ ≤ 90° — WP-2315's case"),
+         "4 250 pts, 913 Pawley intensities, 2θ ≤ 90° — WP-2315's case"),
     Case("bigcell-pawley-120", _bigcell_pawley_120,
-         "5 750 pts, 1 601 Pawley intensities, 2θ ≤ 120°"),
+         "5 750 pts, 1 606 Pawley intensities, 2θ ≤ 120°"),
     Case("bigcell-lebail", _bigcell_lebail,
          "4 250 pts, 899 refl, Le Bail, seeded background — WP-2316's case"),
 )
