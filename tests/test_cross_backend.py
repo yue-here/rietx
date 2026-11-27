@@ -1487,7 +1487,34 @@ def _state_peak_equations_wavelength():
     return model, table, {}
 
 
+def _state_pawley_merged():
+    """WP-2315: a Pawley block with lattice-merged columns, whose traced
+    residual spreads a column over its members through a frozen dense map,
+    where numpy gathers.  Cubic LaB6 to 110° (Cu): (2 2 1)/(3 0 0) and two
+    more pairs are one column each."""
+    from tests.test_pawley import _overlapped_lab6
+
+    structure, instrument = _overlapped_lab6()
+    instrument.source.dispersion = None
+    grid = np.arange(15.0, 110.0, 0.03)
+    pattern = PatternData(two_theta=grid.tolist(),
+                          intensity=(50.0 + 0.0 * grid).tolist())
+    table = ParameterTable(structure, instrument)
+    table.set_vary(["*"], False)
+    for path in ("phases.0.cell.a", "instrument.profile.w",
+                 "instrument.background.c0"):
+        table.set_vary([path], True)
+    model = compile_model(structure, instrument, pattern, mode="pawley",
+                          moving_paths=set(table.moving_paths),
+                          window_area_tol=WINDOW_AREA_TOL)
+    assert model.pawley.merged, "the state must carry a merged column"
+    model.lebail_update(table.decode(table.x0()), n_cycles=3)
+    model.build_pawley_restraint()
+    return model, table, {}
+
+
 CONFIGS = {"families": _state_families,
+           "pawley_merged": _state_pawley_merged,
            "peak_equations": _state_peak_equations,
            "peak_equations_wavelength": _state_peak_equations_wavelength,
            "distortion_modes": _state_distortion_modes,
@@ -1573,6 +1600,7 @@ CONFIG_PARAMS = [
     _config("bodies_site_fixed"),
     _config("toy_lebail"),
     _config("toy_pawley"),
+    _config("pawley_merged"),
     _config("toy_rich"),
     _config("toy_restraints"),
     _config("toy_capillary"),

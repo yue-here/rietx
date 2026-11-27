@@ -1892,9 +1892,17 @@ def _pawley_intensity_columns(model: CompiledModel, bases: DerivativeBases,
     """
     n_lines = len(model.line_wavelengths)
     w_lines = [values[f"instrument.source.lines.{il}.weight"] for il in range(n_lines)]
-    for ip, (a, _b) in enumerate(model.pawley.phase_slices):
+    pb = model.pawley
+    for ip, (a, b) in enumerate(pb.phase_slices):
+        r0, r1 = pb.refl_slices[ip]
+        if r1 - r0 == b - a:
+            for (il, k, i0, i1, omega, *_rest) in bases.entries[ip]:
+                J[i0:i1, n_table + a + k] += -sqrt_w[i0:i1] * (w_lines[il] * omega)
+            continue
+        # a merged column (WP-2315) is its members' columns weighted by share
+        col, share = pb.refl_col[r0:r1], pb.share[r0:r1]
         for (il, k, i0, i1, omega, *_rest) in bases.entries[ip]:
-            J[i0:i1, n_table + a + k] += -sqrt_w[i0:i1] * (w_lines[il] * omega)
+            J[i0:i1, n_table + col[k]] += -sqrt_w[i0:i1] * (w_lines[il] * share[k] * omega)
     if model.pawley.restraint is not None:
         # bound the write to exactly the Pawley-restraint stripe: soft-restraint
         # rows (WP-0406) may sit below it, though Pawley + geometry restraints
@@ -1938,15 +1946,18 @@ def _pawley_tail_pattern(model: CompiledModel) -> tuple[np.ndarray, np.ndarray]:
     """
     _data, _pen, pawley_blk, _restr, _origin = row_layout.layout(model)
     rows, cols = [], []
-    for cp, (a, _b) in zip(model.phases, model.pawley.phase_slices, strict=True):
+    pb = model.pawley
+    for ip, cp in enumerate(model.phases):
         lay = cp.batch
         if lay is None or not len(lay.i0):
             continue
+        r0, _r1 = pb.refl_slices[ip]
         width = lay.width.astype(np.intp)
         first = np.repeat(np.cumsum(width) - width, width)
         rows.append(np.repeat(lay.i0.astype(np.intp), width)
                     + np.arange(int(width.sum()), dtype=np.intp) - first)
-        cols.append(np.repeat(a + lay.k.astype(np.intp), width))
+        # a reflection's column: its own, or its merged group's (WP-2315)
+        cols.append(np.repeat(pb.refl_col[r0 + lay.k.astype(np.intp)], width))
     if model.pawley.restraint is not None:
         r_rows, r_cols = np.nonzero(model.pawley.restraint)
         rows.append(pawley_blk.start + r_rows.astype(np.intp))
