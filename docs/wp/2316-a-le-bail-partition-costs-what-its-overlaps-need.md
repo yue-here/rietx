@@ -170,15 +170,16 @@ partition's cost. `test_lebail_alternation.py` is a natural second timing case.
 ### Inherited
 
 - **From WP-2317, 2026-11-27 (task 2 and the cross-code timing).** The bench
-  case is `bigcell-lebail` in `examples/bench_refinement.py`: 58.39-83.92 s
-  over two blocks on one Mac (the load fell between them), Rwp 0.15121. GSAS-II
-  5.8.4 on the same pattern and free set, through its GUI's Le Bail reset path,
-  took 79.05-87.19 s and landed at Rwp 0.0831-0.0835. Task 1 now has a second
-  code's answer beside it. rietx's curve draws peaks where the data have none
-  (near 7.5° and 20°) and its background sits under the data; b came out
-  2 400 ppm low with a zero of −0.075°. GSAS-II follows the data except the
-  first degree, but its a came out 1 700 ppm low. The protocol and the table
-  are in WP-2317's Context; the driver is `2317-probe/gsas2_bigcell.py`.
+  case is `bigcell-lebail` in `examples/bench_refinement.py`, its background
+  seeded by `rx.auto_background(data, kind="chebyshev", seed=True)` as this
+  WP's 2nd session asked: 61.69-61.75 s on one Mac, Rwp 0.04685, 34
+  evaluations over five stages, so the time is the partition's. From probe 1's
+  unseeded start (58.39-83.92 s, Rwp 0.15121), GSAS-II 5.8.4 on the same
+  pattern and free set, through its GUI's Le Bail reset path, took
+  79.05-87.19 s and landed at Rwp 0.0831-0.0835, its curve following the data
+  except the first degree, its a 1 700 ppm low. GSAS-II was not run from the
+  seed. The protocol and the table are in WP-2317's Context; the driver is
+  `2317-probe/gsas2_bigcell.py`.
 
 ## Non-goals
 

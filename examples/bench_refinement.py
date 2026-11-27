@@ -104,11 +104,12 @@ started at the truth's atoms with the cell 500 ppm high.
 ``bigcell-pawley`` and ``bigcell-pawley-120``
              10 atoms' pattern, Pawley, ``mccusker_default``, 2θ ≤ 90° and
              ≤ 120°: 899 and 1 601 intensity columns (WP-2315).
-``bigcell-lebail``  the same pattern at 2θ ≤ 90°, Le Bail (WP-2316).
+``bigcell-lebail``  the same pattern at 2θ ≤ 90°, Le Bail from an
+             ``auto_background`` seed, as the skill says (WP-2316).
 
 Runtime: the whole harness at the default three repeats is ~35 minutes before
 the large-cell cases, nearly all of it the three ``trigger`` cases; the four
-large-cell cases add ~9 minutes (2026-11-27, darwin/arm64), most of it
+large-cell cases add 7-9 minutes (2026-11-27, darwin/arm64), most of it
 ``bigcell-lebail`` and ``bigcell-pawley-120``.  ``--cases``
 selects; ``--list`` shows the keys.
 
@@ -1002,8 +1003,20 @@ def _bigcell_pawley_120() -> Setup:
 
 
 def _bigcell_lebail() -> Setup:
-    return _bigcell("lebail", 90.0, 10, rx.RefinementPlan.mccusker_default(),
-                    "mccusker_default")
+    """Le Bail from a **seeded** background, as the skill's Le Bail rule says.
+
+    From probe 1's all-zero Chebyshev the first partition hands the 900-count
+    pedestal to the reflections, and the fit ends in a background valley at
+    Rwp 0.151 (WP-2316 task 1).  Seeded, it lands at 0.047 against Pawley's
+    0.045, so this case times the right answer.  ``kind="chebyshev"`` keeps
+    the background family of the other three cases.
+    """
+    setup = _bigcell("lebail", 90.0, 10, rx.RefinementPlan.mccusker_default(),
+                     "mccusker_default")
+    setup.instrument.background = rx.auto_background(
+        setup.data, kind="chebyshev", seed=True).background
+    setup.title += ", background seeded (auto_background)"
+    return setup
 
 
 CASES: tuple[Case, ...] = (
@@ -1032,7 +1045,7 @@ CASES: tuple[Case, ...] = (
     Case("bigcell-pawley-120", _bigcell_pawley_120,
          "5 750 pts, 1 601 Pawley intensities, 2θ ≤ 120°"),
     Case("bigcell-lebail", _bigcell_lebail,
-         "4 250 pts, 899 refl, Le Bail, 2θ ≤ 90° — WP-2316's case"),
+         "4 250 pts, 899 refl, Le Bail, seeded background — WP-2316's case"),
 )
 
 
