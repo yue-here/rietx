@@ -1,6 +1,6 @@
 # WP-2314 — a structural Jacobian costs one structure factor, not one per column
 
-Milestone: unscheduled · Status: 🔄 2026-11-27 — claimed by @yue-here (ghostshift runner)
+Milestone: unscheduled · Status: 🔄 2026-11-27 — angle 1 (the hoist) landed byte-equal; angles 2-7 wait for WP-2317's R0
 Track: A large cell
 Depends on: 2317 soft (its `bigcell-structural` case and ruling R0); 1945 soft (its open task on batched Biso columns, see Context)
 Priority: P2 2026-11-27 — provisional: the track the maintainer opened for a user at the wall; a 40-atom structural fit spends most of its time rebuilding one structure factor per column; re-rate when WP-2317 task 1 names the user's path
@@ -230,6 +230,77 @@ is held, and rebuilt per evaluation where the cell is free.
 
 ## Handover log
 
+- **2026-11-27** — Angle 1, the hoist, landed byte-equal (PR #1862, a
+  ghostshift runner). A coordinate or ADP column no longer rebuilds the
+  structure factor. One pass over the sites per phase per Jacobian
+  evaluation now serves every such column. On the bench fit every Jacobian
+  and every refined value is bit for bit what main computes. The fit runs
+  2.6-2.7× faster and each Jacobian about 3.3× faster. The 10× target
+  needs angle 3: Biso and occupancy finite differences are now three
+  quarters of the Jacobian. Angles 2-7 move numbers, so they wait for
+  WP-2317's ruling R0.
+  - *Done:* `structure_factor.d_f2_d_sites` builds A, B and the brackets of
+    every requested atom in one pass, in the single-atom kernels' own
+    arithmetic. `d_f2_d_xyz` and `d_f2_d_uaniso` are now that function
+    asked for one atom. `CompiledModel.structural_f2_grads` wraps it. The
+    Jacobian closure caches it per phase per evaluation, as it does
+    `moment_f2_grads`. The atoms to build are read once from the column
+    identities with the dispatch's own match, so the cache can hold an extra
+    atom but never miss one. `tests/test_structural_hoist.py` keeps the two
+    kernels as they stood at 94804b716 verbatim as the oracle. It asserts
+    every gradient array and every Jacobian column byte-equal, with
+    dispersion on and off. It also asserts that `_orbit_terms` calls per
+    evaluation do not grow with the number of structural columns.
+  - *Measured* (this Mac, arm64, Python 3.12, `[dev]` venv, compiled tier on,
+    rietx 1.13.0.dev0; main at 94804b716 from a `git archive` snapshot on
+    `PYTHONPATH`; interleaved under the suite lock; driver
+    `2314-probe/drive_bigcell.py` over WP-2317's probe 1: 40 atoms,
+    P2₁2₁2₁, 2θ ≤ 90°, `mccusker_structural`):
+
+    | | main | branch |
+    |---|---|---|
+    | fit wall, unprofiled, 3 runs | 29.7-29.9 s | 11.2-11.3 s |
+    | Jacobian, profiled, 83 evaluations | 28.9 s (0.348 s each) | 8.8 s (0.106 s each) |
+    | `_orbit_terms` calls per Jacobian, median (max) | 4 920 (6 520) | 160 (1 760) |
+    | `_orbit_terms` calls in the Jacobians, whole fit | 274 480 | 65 040 |
+    | sha256 over all 83 Jacobians, in order | `65098e4fd0421a7b` | `65098e4fd0421a7b` |
+    | digest of the 296 values and esds | `97d0a88be70d00c4` | `97d0a88be70d00c4` |
+
+    Rwp is 0.08674923965532694 on both arms. The stage iteration counts are
+    identical. WP-2317's 75.0 s for this fit was on Linux x86_64. That
+    number is another machine's and is no "before" here. On the branch,
+    `_peak_chain_column` (the Biso, occupancy and cell columns by finite
+    difference of `phase_peaks`) takes 6.6 s of the 8.8 s. `_structural_column`
+    no longer appears in the profile's top 28 rows.
+  - *Gates:* `test_backend_shim.py`'s bit-identity goldens 19 passed.
+    The WP's acceptance files plus the dispersion, ADP, coordinate and
+    preferred-orientation files: 368 passed, 205 skipped, 2 xfailed. The
+    skips are the jax and torch rows, absent in `[dev]`. Fast suite on this tree (main had not moved): 15 819 passed, 452 skipped, 30 xfailed. The five added tests cost 0.11 s locally. Main's count was not measured this session, so the +5 is by construction, not by comparison.
+    The full suite did not run. Its rule is a change that could move a
+    measured number, and every column is byte-equal by measurement.
+  - *Review:* `/code-review high --fix` found no correctness bug. It made two
+    changes. The hoist tests now declare the numpy path. A docstring was
+    reflowed. It noted a third point and left it: an atom index outside the
+    phase now raises `IndexError`, where the old kernels returned an
+    all-zero gradient.
+  - *Settled by Claude:*
+    1. The single-atom kernels became wrappers of the batched function, and
+       the pre-change kernels are frozen in the test file as the oracle.
+       Keeping them in `src` beside the batched one was the alternative, on
+       the `_phase_component_scalar` precedent. Settled by Claude under root
+       CLAUDE.md § Conventions ("two things are written once"): that
+       precedent stays because the traced backends run it, and these
+       kernels are host-side Jacobian support only.
+    2. An out-of-range atom index raises rather than returning zeros.
+       Settled by Claude under Rule 4 (*A new API*: a call the code cannot
+       honour raises before any work). No caller passes one.
+  - *Generality:* no heuristic, threshold or default added, so no judge.
+  - *Next:*
+    1. WP-2317's R0 gates everything left. Angle 3 is the largest share
+       (6.6 s of the fit's 8.8 s of Jacobians), then angle 2.
+    2. Re-run the driver with angle 1 as the "before" for each angle. Once
+       WP-2317 adds the `bigcell-structural` bench case, move to it and add
+       the runaway guard the Tests item names.
 - **2026-11-27** — Filed from WP-2317's probe. A fresh subagent reviewed the plan
   the same day, and its findings are folded in: the 120× call arithmetic, the
   Ω·∂I block, cross-atom reach, the exact oracles.
