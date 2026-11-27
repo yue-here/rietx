@@ -114,6 +114,7 @@ from __future__ import annotations
 
 import bisect
 from dataclasses import dataclass, field
+from functools import cached_property
 from typing import Callable
 
 import numpy as np
@@ -327,8 +328,15 @@ class LinearInequality:
         by more than the rounding of its evaluation (:data:`_ROW_ROUNDING`)."""
         end = theta + step
         floor = np.minimum(self.slack(theta), 0.0)
-        scale = np.abs(self.T) @ np.abs(end) + np.abs(self.c)
+        scale = self._abs_T @ np.abs(end) + np.abs(self.c)
         return bool(np.any(self.slack(end) < floor - _ROW_ROUNDING * scale))
+
+    @cached_property
+    def _abs_T(self) -> np.ndarray:
+        """|T|, built once: :meth:`crossed` runs at every inner step, and a
+        Pawley block's T is thousands of rows across every intensity column
+        (41 MB a block at 1 601 reflections, WP-2315)."""
+        return np.abs(self.T)
 
     def max_feasible_fraction(self, theta: np.ndarray, step: np.ndarray) -> float:
         """Largest τ ∈ [0, 1] with ``T·(θ + τ·step) + c ≥ min(slack, 0)``.
@@ -1028,7 +1036,7 @@ def _solve_constrained_step(A: np.ndarray, b: np.ndarray, lam: float, x: np.ndar
     sign = np.concatenate([np.full(int(has_lo.sum()), -1), np.full(int(has_hi.sum()), 1),
                            np.zeros(len(T), dtype=int)])
 
-    G_z = G @ E_inv
+    G_z = _rows_in_z(E_inv, has_lo, has_hi, T)
     h_z = h - G @ s0
     norm = np.linalg.norm(G_z, axis=1)
     live = norm > 0.0
@@ -1054,6 +1062,32 @@ def _solve_constrained_step(A: np.ndarray, b: np.ndarray, lam: float, x: np.ndar
     on_box = active & (var >= 0)
     side[var[on_box]] = sign[on_box]
     return s * inv_d, side
+
+
+def _rows_in_z(E_inv: np.ndarray, has_lo: np.ndarray, has_hi: np.ndarray,
+               T: np.ndarray) -> np.ndarray:
+    """``G·E⁻¹`` for :func:`_solve_constrained_step`'s
+    ``G = [I[has_lo]; −I[has_hi]; T]``, built by blocks (WP-2315).
+
+    A box row is a row of the identity, so its product is a row of E⁻¹.  A
+    column of T that is zero in every row adds nothing, and a Pawley block
+    makes most of them: no width row reads an intensity, so
+    ``least_squares._pad_inequalities`` widens each T by zero columns.  The
+    dense product cost (n_box + n_rows)·n² multiply-adds, 2.1e10 at 1 621
+    columns, 1 619 box rows and 6 424 width rows; this costs n_rows·k·n, k
+    the columns T reads, 5.2e7 there (k = 5).
+
+    The result is the dense product's bytes.  A GEMM accumulates each entry
+    over the shared index in order, so the skipped terms were exact zeros
+    added to a partial sum.  The one difference is the sign of an exact zero:
+    the product's sum starts from +0, so a −0 in E⁻¹ comes back +0, and
+    ``+ 0.0`` does the same here.  ``tests/test_lm_solver.py`` holds the two
+    equal byte for byte on whichever BLAS the suite runs on (Accelerate and
+    OpenBLAS measured).
+    """
+    cols = np.flatnonzero(np.any(T != 0.0, axis=0))
+    return np.vstack([E_inv[has_lo] + 0.0, -E_inv[has_hi] + 0.0,
+                      T[:, cols] @ E_inv[cols]])
 
 
 def _least_distance(G: np.ndarray, h: np.ndarray) -> tuple[np.ndarray, np.ndarray]:

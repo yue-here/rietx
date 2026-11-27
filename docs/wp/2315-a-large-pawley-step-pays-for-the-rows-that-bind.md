@@ -191,7 +191,10 @@ free swap under LM.
 - [ ] Measure main against the branch on `bigcell-pawley`, interleaved, one
       machine, min-max over at least three runs, plus one profiled run for the
       split.
-- [ ] Angle 0. Steps byte-equal before and after.
+- [x] Angle 0. Steps byte-equal before and after. *Done 2026-11-27:
+      `lm._rows_in_z` builds G·E⁻¹ by blocks and `LinearInequality.crossed`
+      keeps |T|. Eight captured probe steps and the whole 120° fit
+      (y_calc, values, esds, Rwp, iterations) are byte-equal to main.*
 - [ ] Angles 1-2. The pruned/Cholesky step equal to the full step within the
       polish tolerance (`_POLISH_FEASIBLE`) on the existing constrained-step cases
       and the bench case. The audit row for the slack.
