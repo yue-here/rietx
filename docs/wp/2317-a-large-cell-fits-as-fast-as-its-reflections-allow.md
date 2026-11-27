@@ -52,6 +52,19 @@ holds (b) for a ruling. The compiled tier already has a bar of kind (a):
 `compiled.py` rule 3 holds `solve_orbit_sums` to 1e-13 relative. R0 asks whether
 that bar extends to a converged fit.
 
+**Ruled 2026-11-27 (R0): allow both kinds of move.** The 1e-3 esd and 1e-7 Rwp
+figures in (a) were Claude's proposal and were never ruled. A second independent
+review withdrew them the same day: a 1-ulp change in `exp` already moves a
+converged fit 0.2-0.5 esd (WP-1940), so no regrouping could meet them. A
+regrouping is verified at fixed parameters (`compiled.py` rule 3) and guarded on
+the whole fit by the measured spread (`test_compiled_kernels.FIT_THETA_ESD`), with
+old and new goldens recorded in the WP. The maintainer generalised it (dictated, one word corrected): "our accuracy threshold should just
+be comparable with other Rietveld refinement codes. We don't need to be much more
+accurate than them. Consider the user and the amount of accuracy they need on
+different measurements. For common applications. This should be a general rule
+for the repo." It is now DESIGN-RULES Rule 5 *Arithmetic accuracy*, so a speed
+change answers to that bar and Rule 2's pinned-number test governs model changes.
+
 **Probe 1, the synthetic stand-in** ([`2317-probe/probe1_bigcell.py`](2317-probe/probe1_bigcell.py)):
 - 12 × 36 × 4 Å, P2₁2₁2₁;
 - invented atoms on general positions, placed over the whole cell with every
@@ -284,6 +297,7 @@ what it costs here.
   `compiled.py` rule 3 already admits a stated bound for a transcendental. The
   convention forbids every reassociation (`np.bincount` for `np.add.at`, a
   vectorised atom loop, a fused kernel), and R0 (a) is the proposed replacement.
+  *Closed 2026-11-27 by R0.*
 - **R2 — a Le Bail partition settles to 1e-7 of the Bragg counts with the model
   frozen.**
   - *Where:* WP-1542, under WP-2002's ruling B11; `lebail_tol` = 1e-7 settled by
@@ -311,6 +325,12 @@ what it costs here.
     sentence also fences even a bit-identical Le Bail kernel that no ruling asked
     for.
   - *Question:* does a user at the wall on Le Bail count as the ruling that asks?
+  - **Ruled 2026-11-27 (R2, R3): follow best practice and lift the fence.** The
+    maintainer also ruled that the Le Bail and Pawley speed work goes ahead
+    whatever the user's case shows, since cells this size are met in the wild.
+    He asked why rietx diverged from practice here, and that every cascading
+    change is found and made with it. Rule 5 *Structure-free fitting* now says
+    Le Bail follows the established programs' practice.
 - **R4 — the width floor is held inside the step in every mode** (WP-1938 D8,
   WP-2153).
   - *Reasoning* (the `gaussian_width_inequalities` docstring): without the row,
@@ -332,6 +352,11 @@ what it costs here.
   invariant says profiling a linear block out "cannot buy an evaluation", but that
   Pawley *dimension* is "a per-step cost", and that a bounded block leaves the
   identity once a bound is active. On a large cell the dimension is the cost.
+  - **Ruled 2026-11-27 (R5): "go (b)".** Reflections whose d coincide for every
+    metric of their Laue class (cubic 333/511, hkl/khl under 4/m) merge into one
+    intensity column, the sum measured and each member's share unmeasured.
+    Accidental coincidences (b ≈ 3a) keep the restraint while their practice is
+    surveyed. Built under WP-2315.
 - **R6 — the stopping rule.**
   - *rietx:* intermediate stages at 1e-6 (`intermediate_ftol`, WP-1123), the last
     declared stage at the solver's 1e-9. The closing stage is **off by default
@@ -341,6 +366,12 @@ what it costs here.
     is under `Eps` × its esd (0.2 "or lower").
   - *The question:* is 1e-9 on the last stage more than "on par" buys? It is a
     kind (b) move under R0.
+  - **Ruled 2026-11-27 (R6): "Start with your recommendation. Consider best
+    practice."** The recommendation: the last stage stops on a FullProf-style
+    test, every free parameter's last shift under a fraction of its esd, with the
+    fraction measured against FullProf's 0.2 and GSAS-II's answer on the bench
+    cases. The three compounding places keep 1e-9 through a plan field. The change
+    is measured before the default moves.
 - **R7 — `WINDOW_MIN_DEG` = 0.3° of movement slack per window side**
   (`src/rietx/model/forward.py:234`).
   - About 30 of the probe's ~122 points a window (~25 %) are slack at a 0.02°
@@ -353,6 +384,7 @@ what it costs here.
   ~15 atoms in a phase. So v1.1's ranking under-weights every term that grows with
   the atom count or the reflection count, which WP-1111 said of its own
   baselines.
+  *Closed 2026-11-27: task 2's four bench cases (PR #1864).*
 
 **Angles beyond the three WPs** (kept open, not yet measured):
 
@@ -375,6 +407,55 @@ what it costs here.
 - **Iterations, not only cost per iteration:** R6, and task 5.
 
 ### Inherited
+
+- **2026-11-27, research for the rulings (three read-only agents; file:line in
+  their reports, summarised here).**
+  - *Why Le Bail diverged (R2).* The extraction has sat between solves since v0.1
+    (`f51e8e67b`), under the frozen-per-stage rule written the same day. WP-2062
+    states the reason: the trust region judges each step against one fixed
+    objective. Ruling B11 (2026-10-19) asked to "repeat until the intensities stop
+    changing" on the premise that every refiner does so; none surveyed does
+    (`docs/practice.md` § Structure-free fitting). WP-1542 built the settled
+    partition to it, on issue #740 (Rwp 4.56 % at 3 cycles against 1.09 % for the
+    true structure) and on `test_window_domain.py` bar 1, a bar written for peak
+    windows. The fence came from a delegated settlement in WP-1542, not a ruling of
+    the maintainer's.
+  - *Cascade of a per-cycle extraction.* LM needs a between-iteration hook and a
+    gain-ratio rule for a moving objective. The intensity snapshots
+    (`least_squares._lebail_snapshot`, `traced.py`) freeze per solve.
+    `lebail_passes`, `LEBAIL_CONVERGED_REL`, `LEBAIL_CYCLES_AT_CAP`,
+    `StageResult.lebail_cycles_run`/`.lebail_settled` and `StageSpec.lebail_tol`/
+    `lebail_cycles` change meaning. A new `NodeAction` field is a stored-format
+    change and goes to the maintainer. The extinction screen's prefit, the GUI
+    (wizard default, Adopt, `.rxt` words, dist), `help.py`, `_audit.py` rows, the
+    manual's `fm-lebail-stop` equation, the skill's two rows and WP-2017 group Q
+    follow. Tests: `test_lebail_cycles.py`, `test_lebail_alternation.py`, NAC,
+    SRM 676a and indexing acceptance, validation-matrix rows. Unchanged: the
+    Pawley seed, the report's `lebail_gap`, the `toy_lebail` goldens. Risk:
+    #740's 3-cycle plateau returns unless the stop reads the χ² change per
+    extraction and an initial extraction runs first (FullProf: "say 10").
+  - *R0's cascade into the root CLAUDE.md.* The compiled tier's rule 3
+    ("associations as written") and the `_orbit_terms` association clause predate
+    R0. The off-state clause stays bit-identical (Rule 4). Rule 3 is revisited
+    when a kernel first regroups.
+  - *R5.* GSAS-II's merged Pawley intensities are not symmetry equivalents, which
+    both codes already merge into one reflection. GSAS-II ties (b) lattice-forced
+    coincidences by integer identity in the higher Laue classes, and (c) any pair
+    within 1e-4 in d in -1, 2/m and mmm. The b = 3a case is (c). rietx groups
+    within 0.5 FWHM and restrains toward equal peak intensity, where the
+    equipartition convention is equal F². TOPAS ties nothing automatically.
+  - *R4.* GSAS-II clamps by value and its derivative ignores the clamp, so a
+    clamped reflection keeps pulling U, V, W back. FullProf's peaks vanish at
+    1e-10. RIETAN-FP refuses a step to a negative width. Every probe crossing was
+    on the Lorentzian rows.
+  - *R6.* `ftol` is the relative decrease in S over three consecutive accepted
+    iterations. GSAS-II stops at 1e-3 relative χ² (about 2 esd of joint movement
+    at N = 5 000, inferred), FullProf at shifts under 0.2 esd, TOPAS on
+    `chi2_convergence_criteria` for three cycles. Nothing looser than 1e-8 was
+    ever run on the last stage. WP-2045 kept 1e-9 after cpd-1b stalled at 1e-6.
+  - *R7.* 0.3° dates from v0.1 and became capture slack in WP-1112. WP-2002 B10
+    measured a largest move of 0.21° over four families. Sizing it per stage from
+    the free position parameters needs a bound on each one's movement.
 
 - **From WP-2316, 2026-11-27 (task 1): probe 1's Le Bail fit sat in a wrong
   valley, and the cause is its background seed.** Probe 1 starts every

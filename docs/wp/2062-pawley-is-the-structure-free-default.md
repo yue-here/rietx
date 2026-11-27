@@ -166,7 +166,9 @@ above, which come from lab and synchrotron single-phase patterns
     reflections; Pawley 125.4 s, 0.042 against Le Bail 351.8 s, 0.145 at 1 601.
   - WP-2317 puts Rule 5's Le Bail fence (R3) to the maintainer, including
     whether "route a large cell to Pawley" is the answer for a user at the wall
-    on Le Bail. That would close WP-2316 on its angle 9.
+    on Le Bail. That would close WP-2316 on its angle 9. *Ruled 2026-11-27: the
+    fence is lifted and Le Bail follows practice, so WP-2316 proceeds. This WP's
+    route (a), Pawley as the default where rietx picks, is unchanged.*
   - WP-2316 task 1 asks why Le Bail lands so much worse here. Its answer may
     bear on this WP's site-by-site choice. *Answered 2026-11-27 by WP-2316:
     the threefold Rwp came from the probe's unseeded background, so the

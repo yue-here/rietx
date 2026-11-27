@@ -72,8 +72,9 @@ number. A sentence that nobody would use to make a choice does not belong here.
    package's gate: a feature ships verified or does not ship. Its forms: an exact
    identity (a reparameterisation that provably cannot move the fit, a sum that must
    close); an analytic Jacobian against finite differences; a refactor that reproduces
-   every number; two backends agreeing on one residual; and, weakest, two codes
-   agreeing on the same data under the same protocol, or a published refinement of the
+   every number, or its residual and Jacobian to a rounding bound where it only
+   regroups arithmetic; two backends agreeing on one residual; and, weakest, two
+   codes agreeing on the same data under the same protocol, or a published refinement of the
    same pattern reproduced under its protocol. The last is weakest because its
    reference value is a model's answer and can share the model's error. Under a
    different protocol it verifies nothing and measures only drift. In
@@ -101,9 +102,7 @@ number. A sentence that nobody would use to make a choice does not belong here.
    the feature should not move that choice. So the record is kept in the matrix and its
    generated page alone. No surface an agent reads while choosing carries a validation
    verdict: `capabilities()`, the help entries, the agent skill, the GUI's help (ruled
-   2026-10-27) and the fit report (ruled 2026-11-01). The report is on that list
-   because an agent reads it between stages, while it still chooses what to free, and a
-   sentence there would read the same for every fit with the same free parameters.
+   2026-10-27) and the fit report (ruled 2026-11-01).
 
    *A dataset is unused, sealed or development data.* Data that nobody who changes the
    package has run is unused. A family is sealed when its first run is on the tree as it
@@ -174,18 +173,19 @@ number. A sentence that nobody would use to make a choice does not belong here.
    project. Cases test it as acceptance rows. A design is not fitted to one case, and
    nothing is built before a case needs it. A milestone's direction is in its record.
    The project's are two, each ruled by the maintainer.
-   - *Arithmetic accuracy.* A setting that trades arithmetic accuracy for speed, such
-     as a convergence tolerance, a peak window or a quadrature order, matches the
-     accuracy the established programs deliver (`docs/practice.md`). rietx buys no
-     accuracy past theirs at a cost a user waits for. Where an error compounds, the
-     setting follows what the compounding needs. WP-2222 names three such places: a
-     Pawley series that carries intensities, `lab_calibrate`, and the guides that
-     publish numbers (ruled 2026-11-19; generalised from TOPAS to the established
-     programs 2026-11-23, WP-2307).
+   - *Arithmetic accuracy.* The bar is the accuracy the established programs deliver
+     on each quantity common applications read: a cell, a phase fraction, a
+     coordinate. A speed setting (a convergence tolerance, a peak window, a
+     quadrature order) sits at that bar. rietx spends no wait on accuracy past it.
+     Where an error compounds (WP-2222: a Pawley series carrying intensities,
+     `lab_calibrate`, published guides), the setting follows what the compounding
+     needs. A speed change leaves the model as it was. It answers to an independent
+     measurement where one exists, and to this bar otherwise. One that only
+     regroups arithmetic is verified at fixed parameters, and its goldens re-pin in
+     the same change (ruled 2026-11-19 to 11-27; WP-2307, WP-2317 R0).
    - *Structure-free fitting.* Pawley is the structure-free method rietx leads with.
-     WP-2062 carries the move to it as the default. Le Bail gets only what a ruling
-     already asked of it, in its smallest correct form. A change to Le Bail that moves
-     every fit's numbers waits for WP-2062 (ruled 2026-11-05, #1434).
+     WP-2062 carries the move to it as the default. Le Bail follows the established
+     programs' practice (ruled 2026-11-27, WP-2317; lifts #1434's fence).
 
    *Practice.* Where a good answer exists, in diffraction or in another field, rietx
    adopts it and spends its effort on the questions practice leaves open. A practice

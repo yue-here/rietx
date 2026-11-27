@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: 🔄 2026-11-27 — task 1 answered: the Rwp gap is a valley entered through an unseeded background, not the partition; the rest waits on WP-2317's R2-R3
 Track: A large cell
 Depends on: 2317 soft (its `bigcell-lebail` case and rulings R0, R2, R3); 2017 soft (group Q owns `lebail_tol`'s number); 2062 soft (Rule 5's Le Bail fence)
-Priority: P2 2026-11-27 — provisional: the track the maintainer opened for a user at the wall, on the slowest mode measured (95-97 % of a large-cell Le Bail fit in the partition, measured at the unseeded probe's wrong answer; seeded runs still end every last partition at the cycle cap, task 1); what may start without a ruling is narrow (R3), so re-rate when WP-2317 task 3 answers R2-R3
+Priority: P2 2026-11-27 — the maintainer's large-cell track, ruled to proceed whatever the user's case shows (cells this size are met in the wild); 95-97 % of a large-cell Le Bail fit is in the partition, and R2-R3 are ruled: follow practice, fence lifted
 
 ## Goal
 
@@ -18,10 +18,14 @@ WP-2062), this WP closes on that.
 
 **The bar** (WP-2317, restated because it is load-bearing): the maintainer asked on
 2026-11-27 for "accuracy on par with other codes … speed as fast as possible by any
-means". Under ruling R0's working reading:
-- a rounding-only change may move converged numbers within |Δ| ≤ 1e-3 esd and
-  Rwp 1e-7 relative, re-pinned in the same change;
-- a change of tolerance, stopping rule or method waits for its ruling.
+means". R0 was ruled that day (WP-2317, DESIGN-RULES Rule 5 *Arithmetic accuracy*):
+- a change that only regroups arithmetic is verified at fixed parameters
+  (`compiled.py` rule 3), guarded on the whole fit by the measured spread
+  (`test_compiled_kernels.FIT_THETA_ESD`), and re-pins its goldens in the same
+  change;
+- a change of tolerance, stopping rule or method answers to an independent
+  measurement where one exists, and otherwise to the established programs' answer
+  on the same pattern.
 
 **Rule 5's fence, in full** (DESIGN-RULES, ruled 2026-11-05, #1434): "Pawley is
 the structure-free method rietx leads with. WP-2062 carries the move to it as the
@@ -33,6 +37,10 @@ WP-2062."
   speed project.
 - So **no angle here starts before WP-2317 task 3 has put R3 to the maintainer.**
   The question is whether a user at the wall on Le Bail is the ruling that asks.
+- **Ruled 2026-11-27 (WP-2317 R2-R3): follow practice, fence lifted.** Rule 5 now
+  says Le Bail follows the established programs' practice, so every angle here may
+  start. A number-moving one answers to R0 (b). WP-2317 § Inherited lists the
+  cascade a per-cycle extraction reaches.
 
 **The measurement** (WP-2317 probe 1; Linux x86_64, 4 cores, `[dev]`, compiled
 tier on; 12 × 36 × 4 Å, P2₁2₁2₁, Cu Kα doublet + FCJ, `mccusker_default`,

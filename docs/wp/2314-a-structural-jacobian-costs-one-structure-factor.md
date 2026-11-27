@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: 🔄 2026-11-27 — angle 1 (the hoist) landed byte-equal, its runaway guard settled as a count; angles 2-7 wait for WP-2317's R0
 Track: A large cell
 Depends on: 2317 soft (its `bigcell-structural` case and ruling R0); 1945 soft (its open task on batched Biso columns, see Context)
-Priority: P2 2026-11-27 — provisional: the track the maintainer opened for a user at the wall; a 40-atom structural fit spends most of its time rebuilding one structure factor per column; re-rate when WP-2317 task 1 names the user's path
+Priority: P2 2026-11-27 — the maintainer's large-cell track, ruled to proceed whatever the user's case shows (cells this size are met in the wild); a 40-atom structural fit spends most of its time rebuilding one structure factor per column, and the user's Rietveld stages take ~25 min each
 
 ## Goal
 
@@ -19,11 +19,14 @@ in atoms. On `bigcell-structural` one Jacobian evaluation is at least 10× cheap
 
 **The bar** (WP-2317, restated because it is load-bearing): the maintainer asked on
 2026-11-27 for "accuracy on par with other codes … speed as fast as possible by any
-means". Under ruling R0's working reading:
-- a rounding-only change (reassociation, vectorisation, a kernel computing the
-  same expression) may move converged numbers within |Δ| ≤ 1e-3 esd and Rwp
-  1e-7 relative, re-pinned in the same change;
-- a change of method or stopping rule waits for R0 (b)'s ruling.
+means". R0 was ruled that day (WP-2317, DESIGN-RULES Rule 5 *Arithmetic accuracy*):
+- a change that only regroups arithmetic is verified at fixed parameters
+  (`compiled.py` rule 3), guarded on the whole fit by the measured spread
+  (`test_compiled_kernels.FIT_THETA_ESD`), and re-pins its goldens in the same
+  change;
+- a change of tolerance, stopping rule or method answers to an independent
+  measurement where one exists, and otherwise to the established programs' answer
+  on the same pattern.
 
 **The measurement** (WP-2317 probe 1, the physical model: atoms ≥ 1.5 Å apart;
 Linux x86_64, 4 cores, `[dev]`, compiled tier on, one run each; 12 × 36 × 4 Å,

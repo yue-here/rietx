@@ -147,10 +147,10 @@ def test_write_reflection_table_csv_round_trips(tmp_path):
     text = out.read_text(encoding="utf-8").splitlines()
     header = text[0].split(",")
     assert header[:6] == ["phase", "line", "wavelength", "h", "k", "l"]
-    assert header[-1] == "component"
+    assert header[-2:] == ["component", "merged_group"]
     assert len(text) - 1 == len(rows)                # one data row per reflection row
     for line in text[1:]:
-        assert line.split(",")[-1] == "total"        # no magnetic width here
+        assert line.split(",")[-2:] == ["total", ""]  # no magnetic width, no Pawley group
 
     # a .tsv suffix switches the delimiter
     out_tsv = tmp_path / "refl.tsv"
