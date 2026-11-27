@@ -1,6 +1,6 @@
 # WP-2315 — a large Pawley step pays for the rows that bind, not for every intensity
 
-Milestone: unscheduled · Status: 🔄 2026-11-27 — task 1, the measurement and Angle 0 done; Angles 1-2 wait on WP-2317's R0, R4, R5 and its task 1
+Milestone: unscheduled · Status: 🔄 2026-11-27 — task 1 and the measurement done; Angle 0 ships only the cached |T|, its blockwise G·E⁻¹ moves bits on x86_64 OpenBLAS and joins Angles 1-2 behind WP-2317's R0, R4, R5 and its task 1
 Track: A large cell
 Depends on: 2317 soft (its `bigcell-pawley` case and rulings R0, R4, R5)
 Priority: P2 2026-11-27 — provisional: the track the maintainer opened for a user at the wall; task 1 found real patterns on the tree reach the step once in 32 runs, so P3 if the user's pattern (WP-2317 task 1) does not cross either
@@ -148,6 +148,10 @@ free swap under LM.
    multiply an identity block; keep T on the table columns only and widen lazily,
    or let `crossed` read the table block. This is plausibly much of the profiled
    step's unattributed time (a hypothesis; the profile split says).
+   *Measured 2026-11-27 (3rd session):* only the cached |T| is bit-identical
+   on every BLAS. Any blockwise G·E⁻¹ changes bits under x86_64 OpenBLAS,
+   so it is a rounding move under R0 like Angles 1-2. The handover log has
+   the numbers.
 1. **Row and box-row pruning** (exact; no ruling). Pass the LDP only the rows the
    box step crossed, plus those within a slack of the current point, re-adding any
    the solved step violates. Pass likewise only the box rows of variables on or
@@ -190,14 +194,17 @@ free swap under LM.
       Context § Task 1's count.*
 - [ ] Measure main against the branch on `bigcell-pawley`, interleaved, one
       machine, min-max over at least three runs, plus one profiled run for the
-      split. *Done 2026-11-27 for Angle 0, on probe 1 at 2θ ≤ 120° (the
-      `bigcell-pawley` bench case is not on the tree yet): main 55.0-55.4 s,
-      branch 52.6-52.9 s, three runs each. The split is in the handover log.*
-- [x] Angle 0. Steps byte-equal before and after. *Done 2026-11-27:
-      `lm._rows_in_z` builds G·E⁻¹ by blocks and `LinearInequality.crossed`
-      keeps |T|. Eight captured probe steps and the whole 120° fit
-      (y_calc, values, esds, Rwp, iterations) are byte-equal to main.*
-- [ ] Angles 1-2. The pruned/Cholesky step equal to the full step within the
+      split. *Measured 2026-11-27 on probe 1 at 2θ ≤ 120° for a form of
+      Angle 0 since withdrawn (the `bigcell-pawley` bench case is not on the
+      tree yet): main 55.0-55.4 s, that branch 52.6-52.9 s, three runs each.
+      The split is in the handover log. The cached |T| alone was not timed.*
+- [x] Angle 0, its bit-identical part. *Done 2026-11-27:
+      `LinearInequality.crossed` keeps |T|, bit-identical by construction.
+      The blockwise G·E⁻¹ (`lm._rows_in_z`) was byte-equal on macOS
+      Accelerate and arm64 OpenBLAS and not on x86_64 OpenBLAS (Linux CI,
+      and Rosetta here), so it was withdrawn to the next item.*
+- [ ] Angles 0 (blockwise G·E⁻¹), 1 and 2. The blockwise, pruned and Cholesky
+      steps equal to the full step within the
       polish tolerance (`_POLISH_FEASIBLE`) on the existing constrained-step cases
       and the bench case. The audit row for the slack.
 - [ ] Angle 4, measured.
@@ -232,6 +239,38 @@ free swap under LM.
 
 ## Handover log
 
+### 2026-11-27 (3rd session) — Angle 0's blockwise product withdrawn (ghostshift runner; PR #1861)
+
+Linux CI failed `test_the_rows_in_z_are_the_dense_product_byte_for_byte` on
+all four seeds, on py3.11 and py3.14. Linux's BLAS sums the blockwise
+product in a different order from the dense one. So on Linux the change
+moved numbers at rounding level, which puts it under WP-2317's R0 with
+Angles 1-2. This session removed `lm._rows_in_z` and its two tests. The
+cached |T| in `LinearInequality.crossed` stays: `abs` is exact and T is
+frozen for the run, so it reuses the same bytes. The PR now ships task 1's
+probe and counts, the cached |T|, and the WP-2317 entry. It claims no
+speed-up, since the 1.04-1.05× was measured with the blockwise product in.
+
+*Measured* (`docs/wp/2315-probe/blockwise_bytes.py`, run with each BLAS's
+interpreter: eight random shapes, n = 300-591, 500 width rows, 7 columns of T
+nonzero, signed zeros in E⁻¹). Two blockwise forms against the dense
+`G @ E_inv`: (a) the PR's, T read on its nonzero columns; (b) the box rows
+sliced and T's rows multiplied whole.
+- macOS Accelerate and OpenBLAS 0.3.34 arm64 (`neoversen1`): both forms
+  byte-equal on all eight shapes.
+- OpenBLAS 0.3.34 x86_64 (`Sandybridge` kernels, an x86_64 numpy 2.5.5
+  under Rosetta): both forms differ on every shape, (a) in 727-96 905
+  elements, (b) in 115-5 099. The box rows matched in every case; only T's
+  rows moved. The largest difference was 2.3 ε of |T|·|E⁻¹| for (a) and
+  2.0 ε for (b), so it is rounding.
+- So no blockwise form is byte-equal on every BLAS. Form (b) shows that
+  splitting the GEMM by rows already moves T's bits. A BLAS promises no
+  reduction order, so a byte-equality test on one BLAS certifies only that
+  BLAS. An x86_64 venv under Rosetta reproduces the Linux split on this Mac.
+
+*Next.* As the 2nd session's, with the blockwise G·E⁻¹ added to Angles 1-2
+behind R0.
+
 ### 2026-11-27 (2nd session) — task 1, the measurement, Angle 0 (ghostshift runner; PR #1861)
 
 No real pattern on the tree reaches the expensive step: one crossing in 32
@@ -240,9 +279,11 @@ validations and two lab Cu round-robin patterns. WP-2317's synthetic probe
 reaches it in its last stage on the Lorentzian width rows, and there the
 step is 63-78 % of the fit. So the WP's cost is real but, on the evidence
 here, specific to the probe until the user's own pattern says otherwise.
-Angle 0 landed: the same steps, byte for byte, for about 5 % less wall on
-the probe. The rest of the step is the nnls solve and the eigendecomposition,
-which only Angles 1-2 can shrink, and those move numbers at rounding level.
+Angle 0 ran the same steps byte for byte on this Mac, for about 5 % less
+wall on the probe. *Corrected by the 3rd session:* Linux CI's BLAS gave
+different bits, so only the cached |T| ships and the 5 % does not. The rest
+of the step is the nnls solve and the eigendecomposition, which only Angles
+1-2 can shrink, and those move numbers at rounding level.
 
 *Scope.* The shift held this session to task 1, the measurement and Angle 0,
 until the maintainer answers WP-2317's R0-R8. Angles 1-2 and later were not
@@ -254,7 +295,8 @@ started.
   is Context § Task 1's count.
 - Angle 0: `lm._rows_in_z` builds G·E⁻¹ by blocks (row slices of E⁻¹ for the
   box rows, T on the columns it reads). `LinearInequality.crossed` keeps |T|
-  in a cached property. Two tests, seven cases, in `tests/test_lm_solver.py`: the helper
+  in a cached property. (The 3rd session removed `_rows_in_z` and both
+  tests; the cached |T| stays.) Two tests, seven cases, in `tests/test_lm_solver.py`: the helper
   against the dense product on four seeds, with signed zeros and padded
   columns, and a Pawley-shaped constrained step (262 columns, a sparse A,
   the least-distance path reached) against the dense product on three seeds.
@@ -266,7 +308,8 @@ every timing under the shift's suite lock, `serial.py`).
   branch. The whole 120° fit is byte-equal too: y_calc, the 15 values and
   esds, Rwp, every stage's iteration count. The helper's equality also held on
   40 random shapes under OpenBLAS 0.3.34 (arm64) and Accelerate. Without the
-  `+ 0.0` all 40 differed in the sign of a zero.
+  `+ 0.0` all 40 differed in the sign of a zero. Linux CI (x86_64 OpenBLAS)
+  failed the helper's test on all four seeds, on py3.11 and py3.14.
 - Wall, probe 1, Pawley, 2θ ≤ 120°, unprofiled, interleaved: main 55.0-55.4 s,
   branch 52.6-52.9 s (three each), 1.04-1.05×. This machine runs the probe at
   about 0.44× the Linux wall the Context quotes (125.4 s there).
@@ -285,8 +328,8 @@ every timing under the shift's suite lock, `serial.py`).
 - Fast selection (`-m "not slow"`, on main 94804b716 plus this branch):
   15 821 passed, 452 skipped, 30 xfailed. The 7 added cases are passes, no
   new skip. They cost 0.50 s in one local run (`tests.added_test_times`).
-  The full suite did not run: the change is byte-identical by test and by the
-  measurements above, so no measured number can move.
+  The full suite did not run. Its premise, that the change was
+  byte-identical, held on this Mac only.
 
 *Settled by Claude.*
 - The stand-ins for "a real large-cell pattern", under the shift's brief (say

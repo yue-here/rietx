@@ -226,6 +226,10 @@ what it costs here.
   `profile` stage at the cap (Rwp 0.0511 against 0.0447), so R4's cost model
   has no TRF shortcut. Task 1 here (the user's pattern) decides whether
   WP-2315 stays P2. WP-2315's Context § Task 1's count has the table.
+  For R0: WP-2315's blockwise G·E⁻¹ (its Angle 0) is byte-equal under
+  macOS Accelerate but not under x86_64 OpenBLAS. A BLAS fixes no reduction
+  order, so even a cost-only rewrite of a matrix product is a rounding move
+  under R0 (WP-2315's 3rd-session handover).
 
 - **From WP-2314 (2026-11-27, PR #1862):** angle 1, the structure-factor
   hoist, landed byte-equal, so probe 1's `bigcell-structural` numbers are
