@@ -866,4 +866,4 @@ mistake is not made twice; the narrative stays in the WP file or milestone recor
   re-extracted to 1e-7 with the model frozen, where every surveyed program
   re-extracts once per least-squares cycle. Lifted 2026-11-27 (WP-2317 R2-R3): Le
   Bail follows practice. The same day R0 replaced bit-identity as a speed change's
-  bar with Rule 5's regrouping bound.
+  bar with verification at fixed parameters.

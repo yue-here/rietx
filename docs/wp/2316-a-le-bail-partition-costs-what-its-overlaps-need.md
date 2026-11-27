@@ -18,10 +18,14 @@ WP-2062), this WP closes on that.
 
 **The bar** (WP-2317, restated because it is load-bearing): the maintainer asked on
 2026-11-27 for "accuracy on par with other codes … speed as fast as possible by any
-means". Under ruling R0's working reading:
-- a rounding-only change may move converged numbers within |Δ| ≤ 1e-3 esd and
-  Rwp 1e-7 relative, re-pinned in the same change;
-- a change of tolerance, stopping rule or method waits for its ruling.
+means". R0 was ruled that day (WP-2317, DESIGN-RULES Rule 5 *Arithmetic accuracy*):
+- a change that only regroups arithmetic is verified at fixed parameters
+  (`compiled.py` rule 3), guarded on the whole fit by the measured spread
+  (`test_compiled_kernels.FIT_THETA_ESD`), and re-pins its goldens in the same
+  change;
+- a change of tolerance, stopping rule or method answers to an independent
+  measurement where one exists, and otherwise to the established programs' answer
+  on the same pattern.
 
 **Rule 5's fence, in full** (DESIGN-RULES, ruled 2026-11-05, #1434): "Pawley is
 the structure-free method rietx leads with. WP-2062 carries the move to it as the

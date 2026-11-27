@@ -52,8 +52,13 @@ holds (b) for a ruling. The compiled tier already has a bar of kind (a):
 `compiled.py` rule 3 holds `solve_orbit_sums` to 1e-13 relative. R0 asks whether
 that bar extends to a converged fit.
 
-**Ruled 2026-11-27 (R0): allow both kinds of move.** Kind (a) carries the bound
-above. The maintainer generalised it (dictated, one word corrected): "our accuracy threshold should just
+**Ruled 2026-11-27 (R0): allow both kinds of move.** The 1e-3 esd and 1e-7 Rwp
+figures in (a) were Claude's proposal and were never ruled. A second independent
+review withdrew them the same day: a 1-ulp change in `exp` already moves a
+converged fit 0.2-0.5 esd (WP-1940), so no regrouping could meet them. A
+regrouping is verified at fixed parameters (`compiled.py` rule 3) and guarded on
+the whole fit by the measured spread (`test_compiled_kernels.FIT_THETA_ESD`), with
+old and new goldens recorded in the WP. The maintainer generalised it (dictated, one word corrected): "our accuracy threshold should just
 be comparable with other Rietveld refinement codes. We don't need to be much more
 accurate than them. Consider the user and the amount of accuracy they need on
 different measurements. For common applications. This should be a general rule

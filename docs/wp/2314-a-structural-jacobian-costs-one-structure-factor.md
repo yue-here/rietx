@@ -19,11 +19,14 @@ in atoms. On `bigcell-structural` one Jacobian evaluation is at least 10× cheap
 
 **The bar** (WP-2317, restated because it is load-bearing): the maintainer asked on
 2026-11-27 for "accuracy on par with other codes … speed as fast as possible by any
-means". Under ruling R0's working reading:
-- a rounding-only change (reassociation, vectorisation, a kernel computing the
-  same expression) may move converged numbers within |Δ| ≤ 1e-3 esd and Rwp
-  1e-7 relative, re-pinned in the same change;
-- a change of method or stopping rule waits for R0 (b)'s ruling.
+means". R0 was ruled that day (WP-2317, DESIGN-RULES Rule 5 *Arithmetic accuracy*):
+- a change that only regroups arithmetic is verified at fixed parameters
+  (`compiled.py` rule 3), guarded on the whole fit by the measured spread
+  (`test_compiled_kernels.FIT_THETA_ESD`), and re-pins its goldens in the same
+  change;
+- a change of tolerance, stopping rule or method answers to an independent
+  measurement where one exists, and otherwise to the established programs' answer
+  on the same pattern.
 
 **The measurement** (WP-2317 probe 1, the physical model: atoms ≥ 1.5 Å apart;
 Linux x86_64, 4 cores, `[dev]`, compiled tier on, one run each; 12 × 36 × 4 Å,
