@@ -168,7 +168,14 @@ above, which come from lab and synchrotron single-phase patterns
     whether "route a large cell to Pawley" is the answer for a user at the wall
     on Le Bail. That would close WP-2316 on its angle 9.
   - WP-2316 task 1 asks why Le Bail lands so much worse here. Its answer may
-    bear on this WP's site-by-site choice.
+    bear on this WP's site-by-site choice. *Answered 2026-11-27 by WP-2316:
+    the threefold Rwp came from the probe's unseeded background, so the
+    "third of its Rwp" above does not hold for a fit seeded as the skill
+    says (Le Bail 0.047, Pawley 0.044). What does bear on this WP: a Pawley
+    fit started from Le Bail's wrong answer climbs back to 0.0445, while a
+    Le Bail partition at that answer settles at 0.1395 whatever intensities
+    it starts from. Pawley's joint solve leaves the valley the unseeded start
+    leads into, and Le Bail's alternation of partition and solve does not.*
   - WP-2315 (filed, not started) plans to make the large Pawley step faster.
 - **2026-11-26, from WP-2311 (closed): the unit dependence is fixed, decision 0
   stands, and this WP is unblocked.** The 2026-10-28 reading was a start

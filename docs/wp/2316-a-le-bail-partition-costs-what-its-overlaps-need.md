@@ -1,9 +1,9 @@
 # WP-2316 — a Le Bail partition costs what its overlaps need, not thousands of cycles
 
-Milestone: unscheduled · Status: 🔄 2026-11-27 — claimed by ghostshift MacBook-Air-c4aacd (task 1, the Le Bail/Pawley Rwp gap)
+Milestone: unscheduled · Status: 🔄 2026-11-27 — task 1 answered: the Rwp gap is a valley entered through an unseeded background, not the partition; the rest waits on WP-2317's R2-R3
 Track: A large cell
 Depends on: 2317 soft (its `bigcell-lebail` case and rulings R0, R2, R3); 2017 soft (group Q owns `lebail_tol`'s number); 2062 soft (Rule 5's Le Bail fence)
-Priority: P2 2026-11-27 — provisional: the track the maintainer opened for a user at the wall, on the slowest mode measured (95-97 % of a large-cell Le Bail fit in the partition, which also lands at three times Pawley's Rwp); what may start without a ruling is narrow (R3), so re-rate when WP-2317 task 3 answers R2-R3
+Priority: P2 2026-11-27 — provisional: the track the maintainer opened for a user at the wall, on the slowest mode measured (95-97 % of a large-cell Le Bail fit in the partition; the threefold Rwp was the probe's unseeded background, task 1); what may start without a ruling is narrow (R3), so re-rate when WP-2317 task 3 answers R2-R3
 
 ## Goal
 
@@ -46,6 +46,17 @@ tier on; 12 × 36 × 4 Å, P2₁2₁2₁, Cu Kα doublet + FCJ, `mccusker_defaul
 **Le Bail lands at three times Pawley's Rwp.** Before any speed work, task 1 asks
 whether this is a wrong valley, the background protocol (WP-1542's subject), or
 the partition. A fit made faster at the wrong answer gains nothing.
+
+*Superseded in part, 2026-11-27 (task 1).* The gap is a wrong valley, and the
+probe's background protocol put the fit there. Probe 1 starts every Chebyshev
+coefficient at 0, the case SKILL.md §2 rule 5 warns about. The first partition
+hands the 900-count pedestal to the reflections, and the stages that follow
+widen the profile to carry it. With the background seeded as the skill says,
+Le Bail lands at Rwp 0.047 against Pawley's 0.044. The partition is not the
+cause: settled at Pawley's parameters it gives 0.0455. So the table's walls
+are of a fit at the wrong answer. The handover entry of 2026-11-27 (task 1)
+has every number. **Every Le Bail run here, seeded or not, ends its last
+partition at the 25 000-cycle cap**, so the speed question stands.
 
 The split comes from the first probe (atoms in a sub-box, profiled; 150.0 s and
 364.2 s):
@@ -165,11 +176,13 @@ partition's cost. `test_lebail_alternation.py` is a natural second timing case.
 
 ## Tasks
 
-- [ ] Why Le Bail lands at Rwp 0.15 where Pawley lands at 0.045 on the same
+- [x] Why Le Bail lands at Rwp 0.15 where Pawley lands at 0.045 on the same
       pattern: compare the two answers' cells, profiles, background and per-hkl
       intensities, and rerun Le Bail from Pawley's answer. Record whether the gap
       is a valley, the background or the partition, and file it where it belongs
-      if it is a defect.
+      if it is a defect. *Answered 2026-11-27: a valley, entered through the
+      probe's unseeded background. No package defect; nothing filed
+      ([`2316-probe/diag_gap.py`](2316-probe/diag_gap.py)).*
 - [ ] Wait for WP-2317 task 3's answer on R2-R3. If it is "route to Pawley", close
       this WP on angle 9 and say so.
 - [ ] Measure main against the branch on `bigcell-lebail`, interleaved, one
@@ -212,6 +225,93 @@ partition's cost. `test_lebail_alternation.py` is a natural second timing case.
   (Anderson acceleration, angle 7).
 
 ## Handover log
+
+### 2026-11-27 (2nd session) — task 1: the Rwp gap is a valley, entered through an unseeded background
+
+Le Bail's threefold Rwp on the large-cell probe is not the partition's fault.
+The probe started the background at zero, so the first partition gave the
+900-count pedestal to the reflections. Every later stage then widened the
+peaks to carry it, and the fit settled in a self-consistent wrong answer.
+Seeded the way the agent skill already says, Le Bail lands beside Pawley. No
+package code changed and nothing was filed. Two things move for the later
+tasks. Probe 1's Le Bail walls timed a fit at the wrong answer. And every Le
+Bail run here still ends its last partition at the 25 000-cycle cap, so the
+speed question stands on a correctly seeded fit.
+
+*Measured* (macOS arm64, `[dev]` venv, compiled tier on, `af159cf7d`; probe 1's
+pattern rebuilt at `NATOMS=10`, 2θ ≤ 90°, 899 reflections;
+[`2316-probe/diag_gap.py`](2316-probe/diag_gap.py), one run per row; walls are
+one-run figures on a shared machine, not timings):
+
+- **Reproduced.** Pawley Rwp 0.0447, Le Bail 0.1512, the Linux numbers to four
+  digits. The generating model itself gives 0.0283, the noise floor. Le Bail's
+  diagnostics: `FLOOR_HIT` (W) and `LEBAIL_CYCLES_AT_CAP`; none names the
+  background.
+- **The two answers.** Background c0 is 911 for Pawley and 261 for Le Bail
+  (truth 900). Le Bail's background lies 677 counts under the truth on average
+  (186-908). Le Bail's per-hkl intensities sum to 2.94× Pawley's, and 527 of
+  910 sit at the floor. Its profile is broad: W on its floor, V 0.122 against
+  0.0028, X 0.123 against 0.075. Its cell is off too: b 35.914 against
+  35.991, zero shift −0.075° against −0.020°. Le Bail's banded Rwp is worst at
+  low angle (0.22 at 5-20°, 0.046 at 80-90°), where the pedestal is largest
+  beside the peaks. The zoom at 40-46° shows a calculated curve dipping to
+  ~400 counts between peaks over an observed floor of ~950.
+- **The first stage decides it.** After the `bkg` stage Le Bail stands at
+  0.478 and Pawley at 0.060. The rest of Le Bail's plan only works down from
+  there.
+- **Rerun from the other's answer.** Le Bail started from Pawley's answer stays
+  at 0.0457. Pawley started from Le Bail's answer climbs out to 0.0445. So the
+  joint least-squares solve can leave the valley and Le Bail's alternation of
+  partition and solve cannot.
+- **The partition at fixed parameters** (25 000-cycle cap, tol 1e-7):
+  | parameters | seed | Rwp after |
+  |---|---|---|
+  | Pawley's | Pawley's intensities | 0.0455 |
+  | Pawley's | flat | 0.0455 |
+  | Le Bail's | Le Bail's intensities | 0.1395 |
+  | Le Bail's | Pawley's intensities | 0.1395 |
+  | Pawley's + Le Bail's background | Pawley's | 0.2542 |
+  | Le Bail's + Pawley's background | Le Bail's | 0.1155 |
+
+  The answer follows the parameters, never the intensity seed, and the
+  background alone breaks Pawley's set.
+- **Seeded as SKILL.md §2 rule 5 says** (`rx.auto_background(data,
+  seed=True)`): Le Bail 0.0469 (Chebyshev, 16 terms), 0.0484 (P-spline);
+  Pawley on the same seeded Chebyshev 0.0441.
+- **Cycles.** Le Bail unseeded: 76 965 in all, its last stage at the cap twice.
+  Seeded Chebyshev: 84 086, all three last updates at the cap. From Pawley's
+  answer: all ten partitions at the cap (250 000). The partition at the true
+  parameters settles from flat in 98 cycles with 8 reflections at the floor.
+  Moving b by 2e-4 there sends it to the cap with 284 at the floor.
+- **The invented cell is metrically degenerate.** b = 3a exactly, so 546 of
+  the 899 reflections share their d-spacing with a neighbour. Pawley's answer
+  has b/a − 3 = 1.5e-4. Restoring b = 3a at Pawley's parameters still runs to
+  the cap (300 at the floor), so the degeneracy is not the whole cause. What
+  the slow cycles are is not measured here. The floor counts point at angle 6.
+
+*Settled by Claude* (no maintainer trigger; R0-R8 untouched):
+- The classification: a valley entered through the background seed, under the
+  measurement above. The alternative, the partition, fails on the first row of
+  the table.
+- No defect filed, under SKILL.md §2 rule 5 ("Unseeded, every coefficient is
+  0.0 and the pedestal goes to the reflections") and WP-1542's two rulings of
+  2026-11-03: Q1, no finding for a background left at its seed, and Q2,
+  `auto_background`'s `seed` stays `False`. The alternative is a WP for a Le
+  Bail finding on this case. It would amend Q1, so it is the maintainer's.
+  Q1 reopens on a statistic that separates the cases on real patterns, and
+  one synthetic run is not one.
+- Forward references: WP-2317's `### Inherited` (seed the `bigcell-lebail`
+  case's background, and its cell's degeneracy), and a correction under
+  WP-2062's entry of the same day, which said Pawley "lands at a third of" Le
+  Bail's Rwp.
+
+*Gotchas.* A probe that writes to a file buffers its stdout, so run it with
+`-u` to read rows as they land. The cross step took 22 min on this
+machine, mostly partitions at the cap.
+
+*Next:* WP-2317 task 3's answer on R2-R3, as before. Then task 3 here on a
+`bigcell-lebail` case whose background is seeded, recording angle 6's floor
+count at each update, since the floor count tracks the slow partitions above.
 
 - **2026-11-27** — Filed from WP-2317's probe. A fresh subagent reviewed the plan
   the same day, and its findings are folded in:
