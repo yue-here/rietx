@@ -245,7 +245,7 @@ is held, and rebuilt per evaluation where the cell is free.
 ## Handover log
 
 - **2026-11-27** (second session) — The runaway guard the Tests item owed is
-  a count of structure-factor expansions, not a timer (PR #PRNUM, a
+  a count of structure-factor expansions, not a timer (PR #1865, a
   ghostshift runner). The count landed with angle 1. This session showed
   that it trips when the hoist is undone. A timer could not do that job
   honestly. A budget that trips at the hoist's 2.6× gain is not several times
