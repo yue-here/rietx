@@ -106,7 +106,7 @@ opened 2026-09-18 as v1.6; [generality](#generality--every-decision-rietx-makes-
 opened 2026-10-18; [parametric](#parametric--a-parametric-refinement-written-by-hand-ports-to-rietx)
 opened 2026-11-04; [gui-overhaul](#gui-overhaul--the-gui-redesigned-around-the-pattern-and-the-model) opened 2026-11-08; rietview, rigid-bodies and structure-solution were queued as v1.7, v1.8 and v1.9. Threads #286, #426, #561 and #562 quote those
 numbers, so each row in § Milestones says which it was. **Neutron TOF stays at
-[§ v2+](#v2--fenced)** behind issue #193, but for its T-1 cut ([1927](wp/1927-tof-t1-the-axis-and-its-readers.md), 2026-10-08).
+[§ v2+](#v2--fenced)** behind issue #193, but for the cuts named there.
 
 **Ten silent-answer fixes have landed since 1.5.0** (1434, 1435, 1432,
 1342, 1415, 1442, 1414, 1454, 1456, 1465), staged in the notes and narrated
@@ -579,7 +579,7 @@ scope creep. Each item names what fenced it.
   closes**, then cut T-1, T-2/T-3, T-5; **amended 2026-10-08: T-1 (axis, readers) cut as
   [1927](wp/1927-tof-t1-the-axis-and-its-readers.md)**; **amended 2026-11-11: T-2/T-3 opened
   (PR #1548), then T-5, then T-6 (magnetic), each after the previous merge** (#1868, 2026-11-27, is
-  T-6's moment term; #1867, a refinable bank absorption factor, has no ruling yet). Also #442 (a bank's CW
+  T-6's moment term; #1867's absorption factor left this fence that day as [2318](wp/2318-a-tof-bank-refines-its-absorption.md)). Also #442 (a bank's CW
   width rows, decided inside T-1), #618 (Mantid's instrument values: with provenance,
   never the files), #1067 (TOF pulse shapes as a registry, after T-2/T-3) and #362 (an
   accessor seam for the constant-wavelength reads, waiting for the second compiled-model
