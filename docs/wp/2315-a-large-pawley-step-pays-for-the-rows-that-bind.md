@@ -100,7 +100,7 @@ that run to high angle (QPA round robin cpd-1a and cpd-1h). They carry real
 instrument profiles, which is the probe's open question. The probe is
 [`2315-probe/count_crossings.py`](2315-probe/count_crossings.py).
 
-| case | least-squares runs | columns | crossings | constrained step | fit wall |
+| case | least-squares runs | columns | crossings | constrained step | fit wall (one run) |
 |---|---|---|---|---|---|
 | FAP.XRA, default plan | 5 | 335-343 | 0 | 0 | 1.2 s |
 | NAC, whole file | 5 | 1 492-1 499 | 0 | 0 | 11.3 s |
@@ -120,7 +120,7 @@ instrument profiles, which is the probe's open question. The probe is
   profile stage presses on Γ_L is not measured (a hypothesis: X and
   `lor_size` are both 1/cosθ terms, so their difference is a flat direction
   the LM step can overshoot along).
-- `solver="trf"` is no way round: it took 159.5 s at 90° (LM 13.6 s), stopped
+- `solver="trf"` is no way round (one run each): it took 159.5 s at 90° (LM 13.6 s), stopped
   its `profile` stage at the 400-evaluation cap, and ended at Rwp 0.0511
   against LM's 0.0447. At 120° it was stopped after 9 min (LM 54.7 s), and on
   NAC after 19.5 min (LM 11.3 s).
@@ -277,7 +277,7 @@ every timing under the shift's suite lock, `serial.py`).
   (23.3 s); `eigh` 7.3 s; `_equality_step` 2.3 s. `projected_cg` 11.4 s, of it
   `spilu` 8.9 s over 1 058 builds. On one captured step `nnls` is 68 % and
   `eigh` 16 %.
-- `solver="trf"`: probe at 90° 159.5 s against LM's 13.6 s, its `profile`
+- `solver="trf"`, one run each: probe at 90° 159.5 s against LM's 13.6 s, its `profile`
   stage at the 400-evaluation cap, Rwp 0.0511 against 0.0447. Stopped after
   9 min at 120° and after 19.5 min on NAC.
 - Tests: `test_lm_solver.py`, `test_bccg.py`, `test_pawley.py` and
@@ -304,6 +304,15 @@ every timing under the shift's suite lock, `serial.py`).
 - Probe 1 takes `PROFILE=0` for a wall. A main snapshot runs from a
   `git archive` of `origin/main`'s `src/` with `PYTHONPATH`, never `-I`.
 - One captured call is 82 MB pickled (two 41 MB T blocks).
+- The cached |T| is a second dense copy of each block, 41 MB a block at
+  1 601 reflections, for 1.8 ms a `crossed` call. Narrowing it to the
+  columns T reads is Angle 1's, with `slack`.
+
+*Review* (`/code-review high --fix`): no correctness finding. It widened
+`test_the_rows_in_z_…` so odd seeds spread T's columns over the whole
+problem (taken; the spread form also measured byte-equal on 40 shapes under
+OpenBLAS and Accelerate). It asked for ranges on the single-run walls
+(answered by labelling them one run) and flagged the |T| copy (kept, above).
 
 *Next.*
 1. The maintainer's answers to WP-2317's R0, R4 and R5, and WP-2317 task 1's

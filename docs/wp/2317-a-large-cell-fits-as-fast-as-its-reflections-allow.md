@@ -222,7 +222,7 @@ what it costs here.
   time on the **Lorentzian** rows (Γ_L ≥ 0), not the Γ_G² floor. A true
   `lor_strain` of 0.03 in its truth removes the crossings at 90° and raises
   them to 53 at 120°. So the probe's zero strain is not the whole cause.
-  `solver="trf"` ran 159.5 s at 90° against LM's 13.6 s and stopped its
+  `solver="trf"` ran 159.5 s at 90° against LM's 13.6 s (one run each) and stopped its
   `profile` stage at the cap (Rwp 0.0511 against 0.0447), so R4's cost model
   has no TRF shortcut. Task 1 here (the user's pattern) decides whether
   WP-2315 stays P2. WP-2315's Context § Task 1's count has the table.

@@ -512,7 +512,10 @@ def test_the_rows_in_z_are_the_dense_product_byte_for_byte(seed):
     """WP-2315 Angle 0: the box rows sliced from E⁻¹ and T read only on the
     columns it touches give the dense product's bytes, signed zeros in E⁻¹
     and zero columns between and after T's included.  Sized past what a
-    small GEMM special-cases, since the claim rests on the BLAS's order."""
+    small GEMM special-cases, since the claim rests on the BLAS's order.
+    Even seeds put T's columns in the leading 20, as a Pawley tail does;
+    odd seeds spread them over every column, as a large table can, so the
+    columns T reads fall in different blocks of the GEMM's shared index."""
     rng = np.random.default_rng(seed)
     n, m = 300 + 97 * seed, 500
     E_inv = rng.standard_normal((n, n)) * 10.0 ** rng.uniform(-3, 3, n)
@@ -520,7 +523,7 @@ def test_the_rows_in_z_are_the_dense_product_byte_for_byte(seed):
     E_inv[rng.random((n, n)) < 0.02] = -0.0
     has_lo, has_hi = rng.random(n) < 0.8, rng.random(n) < 0.2
     T = np.zeros((m, n))
-    cols = np.sort(rng.choice(20, 7, replace=False))
+    cols = np.sort(rng.choice(20 if seed % 2 == 0 else n, 7, replace=False))
     T[:, cols] = rng.standard_normal((m, 7)) * 10.0 ** rng.uniform(-6, 6, 7)
     got = lm._rows_in_z(E_inv, has_lo, has_hi, T)
     assert got.tobytes() == _dense_rows_in_z(E_inv, has_lo, has_hi, T).tobytes()
