@@ -5712,7 +5712,11 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.refine.LEBAIL_CONVERGED_REL", "constant", tier=3, value=0.0001,
         evidence=("WP-1323: one family, 11-BM LaB6+cBN (cell exact 16.908 to 16.908; +0.3 % 16.969 "
                   "to 16.967); stops the opt-in multi-pass alternation (lebail_passes > 1) and "
-                  "labels a non-lowering pass converged; second pass owed"),
+                  "labels a non-lowering pass converged; second pass owed; since WP-2316 "
+                  "extracts between iterations, pass 1 ends at 13.928 % from all three of "
+                  "WP-1323's starts and pass 2 at 13.931 %, 2.2e-4 over it, so a restarted "
+                  "converged fit now reads non_monotone at this value (macOS arm64, "
+                  "2026-11-27)"),
         grounds=("Stops an opt-in alternation once a pass no longer lowers Rwp; kept at the "
                  "measured value, one family (B11, ruled 2026-10-19)."),
         approved="2026-10-19"),

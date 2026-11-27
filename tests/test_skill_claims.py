@@ -188,8 +188,6 @@ NOT_CLAIMS: dict[str, str] = {
     "The starting cell is within ~1 %": "a rule of thumb for the fixed peak windows; no package constant",
     "The starting width is within ×2": "a tolerance the agent applies; no package constant",
     "McCusker et al. 1999, *J. Appl. Cryst.* **32**, 36": "a citation",
-    "`lebail_passes` (say 8)": "a suggested value, not a default (the default is 1)",
-    "plan.lebail_passes = 8": "the same suggested value, in code",
     "no occupancy above 1": "physics, not a package setting",
 }
 

@@ -304,7 +304,9 @@ class PlanSpec(Base):
             "the cap on Le Bail passes: under mode='lebail' the plan is run "
             "again from where it ended, up to this many times, stopping at the "
             "first pass that does not lower Rwp and keeping the best.  1 is a "
-            "single run; the field does nothing in any other mode (WP-1323)"))
+            "single run; the field does nothing in any other mode (WP-1323).  "
+            "Since WP-2316 a run extracts between its iterations and one pass "
+            "ends at the joint fixed point, so a second restarts a converged fit"))
     phase_support_sigma: float | None = Field(
         PHASE_SUPPORT_SIGMA, description=(
             "the absent-phase hold's threshold, in esds: at each stage start a "

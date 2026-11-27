@@ -66,7 +66,7 @@ it writes beside them.
 
 ## §2 rules 4-5 — the two Le Bail measurements
 
-**Alternate under a cap, and keep the best pass.** On PbSO4 pass 1 ends at Rwp 20.756 % with an unphysical Caglioti **V = +0.0615**; passes 2-4 reach 10.247 % with the curve sane. On Tb2BaCoO5 a later pass rose, 17.3 % → 18.7 %. `plan.lebail_passes` stops at the first pass that does not lower Rwp and keeps the best. `LEBAIL_ALTERNATION_STOPPED` names the stop; `non_monotone` or a cap hit is no fixed point.
+**One pass is the fixed point.** Each solve extracts once per iteration, as GSAS-II, FullProf and TOPAS do. (Measured, WP-2316, LaB6 + cBN, three starts: pass 1 13.928 % each, pass 2 13.931 %.) Above 1, `plan.lebail_passes` keeps the best pass; `LEBAIL_ALTERNATION_STOPPED` names the stop. PbSO4's 20.756 → 10.247 % over passes predates WP-2316.
 
 **A known structure is no Le Bail job.** One staged Rietveld calibration took 43.8 s against ~40 min of Le Bail (#210).
 

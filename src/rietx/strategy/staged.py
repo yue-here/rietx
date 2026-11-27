@@ -395,13 +395,15 @@ class RefinementPlan:
     #: it still does, bit for bit.  See :meth:`stage_ftols` for the rule and
     #: :data:`INTERMEDIATE_FTOL` for what the number is and costs.
     intermediate_ftol: float | None = INTERMEDIATE_FTOL
-    #: the cap on Le Bail passes (WP-1323).  A pass is one whole run of the plan;
-    #: extracted intensities are frozen inside a run, so intensities and profile
-    #: converge only by alternating.  ``1`` is the single run every fit made
-    #: before this field, bit for bit.  Above 1 under ``mode="lebail"``,
+    #: the cap on Le Bail passes (WP-1323).  A pass is one whole run of the plan,
+    #: restarted from where the last one ended.  Above 1 under ``mode="lebail"``,
     #: ``Refinement.fit`` repeats the plan, keeps the best pass and records why
-    #: it stopped (``LEBAIL_ALTERNATION_STOPPED``).  Ignored in every
-    #: other mode, where there is nothing to alternate.
+    #: it stopped (``LEBAIL_ALTERNATION_STOPPED``).  Ignored in every other mode.
+    #: It was written for a solve that froze the intensities, where intensities
+    #: and profile converged only by alternating.  Since WP-2316 every solve
+    #: extracts between its iterations, so one pass ends at the joint fixed
+    #: point: WP-1323's three starts on the LaB6 + cBN pattern each end pass 1 at
+    #: 13.928 % and pass 2 at 13.931 %.  A second pass restarts a converged fit.
     lebail_passes: int = 1
     #: the absent-phase hold's threshold, in esds of the phase's scale against
     #: the counting noise (WP-1301, WP-1523; a caller's option since WP-2002

@@ -76,10 +76,10 @@ The preset name `"mccusker_default"` runs as `profile_only` in Le Bail mode and 
 
 ### Le Bail passes
 
-Le Bail mode extracts the intensities before and after each stage's solve and holds them fixed during it.
-One run of the plan therefore alternates between the intensities and the profile a fixed number of times, and running the plan again continues the alternation.
-The alternation does not descend one objective.
-From a good start Rwp falls to a fixed point, and from a poor one it can rise for as many passes as you allow.
+Le Bail mode extracts the intensities at each stage's start and after every accepted iteration of its solve.
+A pass is one run of the plan, and running the plan again restarts it from where it ended.
+The passes were written for a solve that held the intensities fixed, which reached the joint fixed point only by alternating (WP-1323).
+Since WP-2316 one pass ends there: on the LaB6 + cBN pattern WP-1323 measured, the exact cells, cells 0.15 % low and cells 0.36 % high each end pass 1 at Rwp 13.928 % and pass 2 at 13.931 %.
 
 `RefinementPlan.lebail_passes`, mirrored by `PlanSpec.lebail_passes`, caps the passes.
 At 1, the default, `fit` runs the plan once.

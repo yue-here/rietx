@@ -4,7 +4,10 @@ The pattern is 11-BM LaB6 + cBN, Le Bail scaffolds, ``profile_only``.  It is the
 in-tree stand-in for issue #210's multi-phase lab pattern.  It shows three
 shapes depending on where the cells start.  At +0.48 % pass 2 comes back
 *worse* than pass 1 (``WORSE_START``).  At -0.15 % the passes converge.  At +2 %
-they never settle.
+they never settle.  Those were the shapes before WP-2316.  Since a solve
+extracts between its iterations, the exact, -0.15 % and ``WORSE_START`` cells
+each end pass 1 at 13.928 % and pass 2 at 13.931 %, and the loop keeps pass 1.
+The tests of the loop's machinery keep their fixtures.
 
 The fast tests fit 5.1-25° (``LIMITS``), under half the range the hand loop
 used, and a fit costs a quarter to a fifth of one at 5.1-50° (WP-1547).  The
@@ -198,39 +201,34 @@ def test_a_pass_that_comes_back_worse_stops_the_loop_and_pass_one_is_kept(worse)
 
 
 @pytest.mark.xdist_group("lebail-converging")
-def test_a_converging_run_is_not_cut_short_and_ends_at_a_fixed_point(converging):
-    """-0.15 % cells: each pass lower than the last until two are level.
-
-    The shape is the claim, and the pass it stops on is not.  The path splits by
-    platform from pass 3: macOS read 18.810, 14.150, 13.949, 13.933, 13.932,
-    and Linux 18.810, 14.150, 13.927, 13.908, 13.905, 13.905 (PR #857's CI).
-    PR #855's pin at 5.1-50° split the same way, pass 6 against pass 5.
-    """
-    from rietx.refine import LEBAIL_CONVERGED_REL
+def test_one_pass_from_a_converging_start_lands_where_the_exact_cells_do(converging, exact):
+    """Since WP-2316 a solve extracts between its iterations, so pass 1 is the
+    joint fixed point the passes used to walk to.  Before it the -0.15 % start
+    read 18.810, 14.150, 13.949, 13.933, 13.932 on macOS and ended on pass 5 or
+    6; now pass 1 reads 13.928 %, and so do the exact cells and ``WORSE_START``.
+    Pass 2 restarts a converged fit and cannot lower it."""
     result, _, _ = converging
     stop = _stop(result)
-    assert stop.level == "info"
-    assert "fixed point" in stop.message
     table = [float(v) for v in re.search(
         r"Rwp % per pass: ([\d., ]+)\)", stop.message).group(1).split(",")]
-    assert len(table) >= 4                       # not cut short
-    assert all(b < a for a, b in zip(table[:-2], table[1:-1]))
-    assert table[-1] <= table[-2] * (1 + LEBAIL_CONVERGED_REL) + 1e-3  # level, in %
-    kept = int(re.search(r"Pass (\d+) of", stop.message).group(1))
-    assert kept in (len(table) - 1, len(table))
-    # 0.139321 on macOS and 0.139050 on Linux: a spread of 2.7e-4, so the bar
-    # is 1e-3, wider than RWP_PLATFORM_SPREAD, which a single pass carries
-    assert result.statistics.rwp == pytest.approx(0.1392, abs=1e-3)
+    assert len(table) == 2
+    assert "Pass 1 of 2 was kept" in stop.message
+    assert table[1] == pytest.approx(table[0], rel=1e-3)
+    assert result.statistics.rwp == pytest.approx(exact[1].statistics.rwp,
+                                                  abs=RWP_PLATFORM_SPREAD)
     _plot(result, "lebail_alternation_converged.png")
 
 
-def test_the_cap_is_a_cap_and_says_it_truncated(pattern):
-    """Two passes of a run that was still falling: truncated, not finished."""
-    result = _fit(_refinement(0.9985), pattern, 2)
-    stop = _stop(result)
+def test_the_cap_is_a_cap_and_says_it_truncated():
+    """Every pass lower than the last up to the cap: truncated, not finished.
+    No start on this pattern still falls after pass 1 since WP-2316, so the
+    verdict is read off the message it builds."""
+    from rietx.refine import _lebail_stop_diagnostic
+    stop = _lebail_stop_diagnostic("cap", 2, [0.15, 0.14], 2)
     assert stop.level == "warning"
     assert "cap of 2 passes" in stop.message
     assert "Pass 2 of 2 was kept" in stop.message
+    assert "lebail_passes" in stop.suggestion
 
 
 @pytest.mark.slow       # the +2 % start wanders; with the closing stage declared, pass 2 comes back worse and stops it
