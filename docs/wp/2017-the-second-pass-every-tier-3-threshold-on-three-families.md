@@ -193,6 +193,18 @@ and have no free factor to measure, so this file's old list named them without c
 
 ### Inherited
 
+- **From WP-2313 / WP-2316 (2026-11-27): group Q's `lebail_tol` has a cost
+  measured on a large cell.**
+  - On a synthetic 12 × 36 × 4 Å cell (899 / 1 601 reflections, Cu Kα), a Le
+    Bail fit spends 96-97 % of 155-352 s in the partition, at ~8 000-9 000
+    cycles per update.
+  - WP-2313 puts R2 to the maintainer: whether a partition must settle to 1e-7
+    inside a frozen solve, when practice extracts once per least-squares cycle.
+  - WP-2316 angle 4 proposes a **schedule**: loose in intermediate stages, 1e-7
+    in the last, the `intermediate_ftol` convention. It is measured on group Q's
+    families, not past them.
+  - If group Q's pass changes the number or the tier, say so in WP-2316's
+    `### Inherited`.
 - **From WP-2020 (2026-11-15).** WP-2020's design brief, which waits on the maintainer, leans
   towards extending the instrument profile file and the plan presets, because no setting in
   the tree needs a new carrier. A demotion here of a limit, a starting value or a plan setting

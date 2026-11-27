@@ -1,6 +1,6 @@
 # WP-2313 — a large cell fits as fast as its reflections allow: the case, the bar, and the rulings in the way
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-27 — filed with its three plans (2314-2316), reviewed; task 4 answered, tasks 1-3 and 5-8 open
 Track: A large cell
 Depends on: —
 Priority: P2 2026-11-27 — the scoping WP of a track the maintainer opened for a user at the wall (slowdowns on a 12 × 36 × 4 Å cell); 2314, 2315 and 2316 read its case, its bar and its rulings
@@ -275,4 +275,68 @@ what it costs here.
 
 ## Handover log
 
-- **2026-11-27** — created.
+### 2026-11-27 — filed the track: three slow paths measured, the rulings in their way listed, the plans reviewed
+
+A large cell is slow in rietx for three separate reasons, and none of them is the
+forward model. On a synthetic 12 × 36 × 4 Å stand-in a profile-only Rietveld fit
+takes 2.8 s. A 40-atom structural fit takes 75 s, because every coordinate column
+rebuilds the whole structure factor. A Pawley fit at 1 601 reflections takes
+125 s, most of it in a dense constrained step over every intensity. A Le Bail fit
+takes 155-352 s in its partition loop, and lands at three times Pawley's Rwp on
+the same pattern. The track now has a written bar, the maintainer's "on par with
+other codes, speed by any means". It has the earlier choices that cost speed on a
+large cell (R0-R8), each with its original reasoning and what the other programs
+do. And it has three fix plans whose premises a fresh reviewer checked against
+the code. Nothing in `src/` changed.
+
+- *Fold-first:* no open WP owns any of the three costs. WP-1945 owns the
+  peak-chain columns and one bit-identical Biso task (split recorded in 2314).
+  WP-2062 owns which structure-free method is the default, not either method's
+  speed. WP-2017 group Q owns `lebail_tol`'s number, not the partition's cost.
+  WP-1335 owns the report, which costs 5.6 s here. WP-2051 is filed, and
+  WP-1323 is closed.
+- *Done:*
+  - this WP (scoping) and WP-2314/2315/2316 (plans), and the ROADMAP track
+    "A large cell";
+  - probe 1 (`2313-probe/probe1_bigcell.py`);
+  - task 4 answered.
+- *Measured:* Linux x86_64, 4 cores, Python 3.12.3, numpy 2.5.5, `[dev]` venv,
+  compiled tier on, rietx 1.13.0.dev0 at `4e099d68`, one run per case. The
+  table is in Context.
+  - The first probe drew atoms in a sub-box. Unprofiled walls for 10 atoms were
+    Rietveld 2.6 / 3.7 s, Pawley 20.7 / 82.7 s and Le Bail 144.6 / 351.3 s
+    (899 / 1 601 reflections); the 40-atom structural fit was 251.1 s.
+  - The physical model's readings are the Context table.
+  - Profiled splits come from one profiled run per case.
+- *Review* (a fresh general-purpose subagent, read-only, 2026-11-27): 2 blockers
+  and 18 should-fix findings, all taken. Among them:
+  - `reduceat` is pairwise, not sequential, so WP-2316's "bit-identical kernel"
+    was false;
+  - the bar paragraph contradicted Rule 2, which became R0;
+  - R1 and R6 were mis-stated (no bit-identity ruling exists; the closing stage
+    has been off since WP-2222);
+  - the probe's atoms overlapped (fixed, all cases re-measured);
+  - the call arithmetic in 2314 was off (120×, not 60×);
+  - the Ω·∂I block and cross-atom reach were missing from 2314;
+  - ILU reuse already exists (2315);
+  - the bench case is one overlap component (2316 angle dropped);
+  - jax is oversold;
+  - WP-2017 and WP-1945 overlaps;
+  - priorities were provisional;
+  - the measurement protocol (interleaved, same session, min-max).
+
+  None was declined.
+- *Gotchas:*
+  - Probe walls are single runs on one machine, so no figure here is a "before"
+    for another WP (task 2).
+  - The probe's crossing of Pawley width rows may come from its U = V = Y = 0
+    truth; WP-2315 task 1 checks real data.
+- *Next:*
+  1. Ask the user for their case (task 1). It decides which of 2314-2316 is the
+     user's path and re-rates all three.
+  2. Put R0-R7 to the maintainer as one batch (task 3). R0 and R3 gate the most:
+     R0 decides whether rounding-only moves may re-pin goldens; R3 decides
+     whether WP-2316 starts at all or the answer is "route to Pawley".
+  3. Add the bench cases (task 2).
+  4. In parallel with 2-3: WP-2314's hoist and WP-2315's angle 0-1 need no ruling
+     and can start now.

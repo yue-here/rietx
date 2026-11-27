@@ -213,4 +213,18 @@ partition's cost. `test_lebail_alternation.py` is a natural second timing case.
 
 ## Handover log
 
-- **2026-11-27** — created.
+- **2026-11-27** — Filed from WP-2313's probe. A fresh subagent reviewed the plan
+  the same day, and its findings are folded in:
+  - `reduceat` is pairwise, so no kernel is bit-identical for free;
+  - Rule 5 is quoted whole;
+  - per-cluster settling is dropped, since the bench case is one component;
+  - the tolerance schedule and the direct Newton solve are added.
+
+  *Fold-first:* no open WP owns the partition's cost.
+  - WP-2017 group Q owns `lebail_tol`'s number. Angle 4 is measured with it,
+    and a note is in its `### Inherited`.
+  - WP-2062 owns the method choice; a note is in its `### Inherited`.
+  - WP-1323 and WP-1542 are closed.
+
+  *Next:* task 1, why Le Bail lands at three times Pawley's Rwp here. Then wait
+  on WP-2313 task 3's answer to R2-R3.

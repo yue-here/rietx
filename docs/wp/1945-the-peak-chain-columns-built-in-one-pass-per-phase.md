@@ -199,6 +199,21 @@ over twelve acceptance fits), so the shares above are re-measured after it
 merges and before task 4. Task 1 touches neither file's hot path and can go
 first.
 
+### Inherited
+
+- **2026-11-27, from WP-2314 (filed under WP-2313): the structural columns'
+  structure factor has an owner now.**
+  - On a 40-atom phase, `_structural_column` rebuilds A once per coordinate
+    column, n_asym `_orbit_terms` per column. The Biso/occupancy columns this
+    WP's FD chain builds pay a whole-phase |F|² each (WP-2313 probe 1: 16.2 s
+    of a 72 s Jacobian total, against 53.5 s for the coordinate columns).
+  - WP-2314 owns the per-evaluation structure-factor cache, an analytic or
+    incremental Biso/occupancy branch, and everything that reassociates. This
+    WP's task "|F|² orbit sums shared across a batch's cell columns, and Biso
+    columns batched" keeps the bit-identical batch inside the one-pass design.
+  - Read WP-2314's Tasks before starting that task: if its cache lands first,
+    the batch may read the cache instead of building its own.
+
 ## Non-goals
 
 - A compiled per-reflection chain. 1121 § Findings 6 declined it: it would

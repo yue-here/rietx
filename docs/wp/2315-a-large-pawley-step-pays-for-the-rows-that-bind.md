@@ -190,4 +190,18 @@ free swap under LM.
 
 ## Handover log
 
-- **2026-11-27** — created.
+- **2026-11-27** — Filed from WP-2313's probe. A fresh subagent reviewed the plan
+  the same day, and its findings are folded in:
+  - n box rows, not 2n;
+  - ILU reuse already exists;
+  - the exponent is ~2.4;
+  - the identity-block and dense-T costs;
+  - Cholesky in place of `eigh`;
+  - the LM stalls behind R4.
+
+  *Fold-first:* no open WP owns the constrained step past `BVLS_MAX_COLUMNS`.
+  WP-1953 and WP-1938 are closed, and named it out of scope on a premise this
+  probe breaks. WP-2062 owns the method choice, not the step.
+
+  *Next:* task 1, count crossings on a real large-cell Pawley fit, since the
+  probe's U = V = Y = 0 truth may be what puts it on the floor.

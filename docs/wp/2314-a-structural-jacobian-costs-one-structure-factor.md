@@ -221,4 +221,12 @@ is held, and rebuilt per evaluation where the cell is free.
 
 ## Handover log
 
-- **2026-11-27** — created.
+- **2026-11-27** — Filed from WP-2313's probe. A fresh subagent reviewed the plan
+  the same day, and its findings are folded in: the 120× call arithmetic, the
+  Ω·∂I block, cross-atom reach, the exact oracles.
+  - *Fold-first:* no open WP owns the coordinate/ADP columns' structure-factor
+    cost. WP-1945 (🔄) owns the peak-chain columns and one bit-identical
+    batched-Biso task. The split is recorded in Context and in WP-1945's
+    `### Inherited`.
+  - *Next:* angle 1, the hoist, needs no ruling and can start. Measure main
+    against the branch, interleaved, first.
