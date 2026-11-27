@@ -112,7 +112,7 @@ doublet + FCJ, started at the truth's atoms with the cell 500 ppm high.
 
 Runtime: the whole harness at the default three repeats is ~35 minutes before
 the large-cell cases, nearly all of it the three ``trigger`` cases; the four
-large-cell cases add 2-3 minutes (2026-11-27, darwin/arm64).  ``--cases``
+large-cell cases add about 3 minutes (2026-11-27, darwin/arm64).  ``--cases``
 selects; ``--list`` shows the keys.
 
 Configurations

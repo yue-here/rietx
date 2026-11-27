@@ -267,7 +267,7 @@ def test_a_large_cell_rietveld_fit_recovers_its_coordinates(cif, scale, two_thet
 
     Measured 2026-11-27 (darwin/arm64, ``[dev]``), the start's RMS error
     against the fit's: Nb₁₈W₁₆O₉₃ 0.149 → 0.035 Å, largest |Δ|/esd 4.3, GoF
-    1.04, 3.6 s; H-Nb₂O₅ 0.119 → 0.037 Å, 4.0, 1.03, 5.7 s. From the truth
+    1.04, 3.6-4.3 s; H-Nb₂O₅ 0.119 → 0.037 Å, 4.0, 1.03, 5.7-6.0 s. From the truth
     itself each fit lands at the same answer, so the residual error is the
     noise's, not a local minimum's. H-Nb₂O₅ is ``slow`` for its wall.
     """
