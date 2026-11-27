@@ -453,9 +453,7 @@ Opened 2026-11-16 by the maintainer ([record](milestones/series.md)), beside par
 
 Opened by evidence — an issue, an agent round, a measurement — and owned by no
 milestone yet. Grouped by what the evidence says; each WP file carries it in
-full, with the issues it closes. Most of the 13xx rows come from the
-2026-09-01 issue triage (PRs #205, #213) and the day after; 1119, 1130 and
-1133 are older; 1414–1420 are the 2026-09-15 triage's.
+full, with the issues it closes.
 
 #### Coming from another code
 
@@ -552,6 +550,11 @@ Opened 2026-09-28 by the review of `solution case 1`. 1514-1516 each scope a
 milestone for what left § v2+ that day; 1517 counts the eight steers.
 
 The WPs are in [the index](wp/README.md#unscheduled-data-and-metadata-in-a-structure-out).
+
+#### A large cell
+
+Three slow paths on a 12 × 36 × 4 Å cell; 2317 holds the bar and the rulings.
+The WPs are in [the index](wp/README.md#unscheduled-a-large-cell).
 
 #### The repo's own process
 

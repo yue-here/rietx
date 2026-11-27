@@ -69,7 +69,7 @@ def _plot(result, tag: str) -> None:
     OUT.mkdir(exist_ok=True)
     result.plot(path=str(OUT / f"tie_expression_{tag}.png"))
     result.plot(path=str(OUT / f"tie_expression_{tag}_highangle.png"),
-                two_theta_range=(14.0, 24.0))
+                two_theta_limits=(14.0, 24.0))
 
 
 def synthesize_at(temperature: float, seed: int) -> PatternData:

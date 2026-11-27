@@ -272,7 +272,7 @@ def test_a_reopened_tree_at_a_converged_answer_is_a_refit(tmp_path):
 
 @_ZINCITE
 def test_refit_rejects_an_unknown_mode(zincite):
-    with pytest.raises(ValueError, match="refit must be one of"):
+    with pytest.raises(ValueError, match="unknown refit .once.; refit takes"):
         zincite.fit(refit="once")
 
 

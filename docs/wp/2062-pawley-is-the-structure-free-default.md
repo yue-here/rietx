@@ -2,8 +2,8 @@
 
 Milestone: unscheduled · Status: ⬜
 Track: What fires, and what stays silent
-Depends on: 2011 (the indexer's validation, built provisionally as Pawley); 1910 soft (the extinction screen's fits)
-Priority: P2 2026-11-01 — decided: Pawley at every site, its known bugs fixed first; A1 already sends every `index_pattern` user through Pawley, unit dependence included
+Depends on: 2011 (the indexer's validation, built provisionally as Pawley); 2311 (the unit dependence, its first bug task); 1910 soft (the extinction screen's fits)
+Priority: P2 2026-11-26 — WP-2311 fixed the unit dependence and left decision 0 standing, so its remaining bug tasks come next; A1 already sends every `index_pattern` user through Pawley
 
 ## Goal
 
@@ -166,6 +166,67 @@ above, which come from lab and synchrotron single-phase patterns
   across modes) and filed the gap and the Rwp here, under the 2026-11-05 ruling that Pawley is
   the direction (#1577, comment 6963408737). Owed here: whether the gap is Le Bail's partition
   (Pawley agrees with Rietveld), read when the default changes.
+
+- **2026-11-27, from WP-2317: on a large cell Pawley is 3-7× faster than Le Bail
+  and lands at a third of its Rwp.**
+  - Measured on a synthetic 12 × 36 × 4 Å cell (one run each, Linux, `[dev]`):
+    Pawley 23.7 s, Rwp 0.045 against Le Bail 154.9 s, Rwp 0.151 at 899
+    reflections; Pawley 125.4 s, 0.042 against Le Bail 351.8 s, 0.145 at 1 601.
+  - WP-2317 puts Rule 5's Le Bail fence (R3) to the maintainer, including
+    whether "route a large cell to Pawley" is the answer for a user at the wall
+    on Le Bail. That would close WP-2316 on its angle 9.
+  - WP-2316 task 1 asks why Le Bail lands so much worse here. Its answer may
+    bear on this WP's site-by-site choice. *Answered 2026-11-27 by WP-2316:
+    the threefold Rwp came from the probe's unseeded background, so the
+    "third of its Rwp" above does not hold for a fit seeded as the skill
+    says (seeded Chebyshev: Le Bail 0.047, Pawley 0.044). What does bear
+    on this WP: a Pawley fit started from Le Bail's wrong answer climbs
+    back to 0.0445, while a Le Bail partition at that answer settles at
+    0.1395 whatever intensities it starts from. Pawley's joint solve leaves the valley the unseeded start
+    leads into, and Le Bail's alternation of partition and solve does not.*
+  - WP-2315 (filed, not started) plans to make the large Pawley step faster.
+- **2026-11-26, from WP-2311 (closed): the unit dependence is fixed, decision 0
+  stands, and this WP is unblocked.** The 2026-10-28 reading was a start
+  dependence. The probe rescaled the data but left the declared background in
+  counts, and the equal-split restraint's absolute 1e-10 floor then locked the
+  overlap groups the seed had emptied. On real data, groups that collapsed in
+  the first stage locked the same way (NAC −1.8e-4 Rwp, magnetite −6.3e-4,
+  counts and scaled units now agree). Fixed by
+  `PAWLEY_GROUP_SCALE_FLOOR_REL`; a phase with nothing measured gets no group
+  rows for the stage. Two absolute floors remain in the Pawley path, both for
+  this WP's bug list:
+  - **For Yue:** `PAWLEY_OFF_DATA_SCALE_FLOOR` = 1.0 is in counts and binds on
+    a pattern scaled to a maximum of 1. That is a 5.7e-6 Rwp gap on zircon's
+    true cell and 7e-7 on corundum's, and none at 1e-10 (WP-2311 Finding 4).
+    It is tier 3 at 1.0 by WP-2011 ruling 3. A relative form needs an anchor
+    for a phase with no measured on-data intensity, and the ruling is yours.
+  - `_pawley_unresolved_diagnostics` (`model/forward.py`) divides each esd by
+    max(|I|, 1e-10). In small enough units that floor decides
+    `PAWLEY_OVERLAP_UNRESOLVED`. Unmeasured: nothing in WP-2311's probes
+    reached it.
+
+  And one start dependence that is not the restraint's (WP-2311 Finding 6).
+  A one-stage Pawley plan (background, cell, w and the shift freed together)
+  from a declared background 70× above the data reads Rwp 0.449 against
+  0.162, with or without the group rows. The seed leaves 19 of 20 reflections
+  on the partition floor, and the joint solve lands in another basin. Staged
+  plans that refine the background first recover. The seed is one Le Bail
+  partition against the declared background. Whether it should partition
+  against a fitted background, or the plan should always lead with the
+  background, is this WP's to decide before Pawley reaches a site where a
+  caller's own one-stage plan meets a bad background.
+
+- **2026-11-26, from WP-2311: the unit dependence is its own WP.** At Yue's request, this
+  WP's first bug task (synthetic LaB6's true cell at Rwp 0.164 on counts and 0.262 rescaled)
+  moved to WP-2311, and this WP now depends on it. That task has its own goal, its own suspects
+  and a scale-invariance test to land. The bugs-first order is unchanged: no site here moves
+  before WP-2311 closes, and if WP-2311 finds the dependence belongs to the method, decision 0
+  goes back to Yue.
+  Read on `main` at `68dae52c` while filing it, not ticked here: WP-2076's PR #1460 (merged)
+  looks like it has delivered two of this WP's open tasks. `indexing/extinction.py` sets
+  `SCREEN_MODE = "pawley"` for the shared, reference and class fits, and `hamilton_justified`
+  is passed `n_free_parameters` alone (`:1527`). Only the cell-free prefit is still Le Bail
+  (`:1083`). The next session on this WP checks both against its task lines and ticks them.
 
 - **2026-11-19, from WP-2219: a Pawley fit's discarded direction is never named.**
   `staged.py`'s guard skips every solve with `outcome.n_aux`, because the intensity block
@@ -415,10 +476,17 @@ ruling.
 - [x] The maintainer's five decisions (0-4), each recorded as `Decided YYYY-MM-DD:`.
       Recorded 2026-11-01 above: 0 and 1 decided by the maintainer, 1's D and
       2-4 settled by Claude.
-- [ ] Find the unit dependence: synthetic LaB6's true cell validates at Rwp
-      0.164 on raw counts and 0.262 with pattern and σ divided by the maximum
-      count, where Le Bail reads 0.2339 and 0.2338. Fix it, or show it belongs
-      to the method and bring decision 0 back.
+- [x] The unit dependence, **moved to WP-2311 on 2026-11-26**: synthetic
+      LaB6's true cell validates at Rwp 0.164 on raw counts and 0.262 with
+      pattern and σ divided by the maximum count, where Le Bail reads 0.2339
+      and 0.2338. Tick this when WP-2311 closes. If it shows the dependence
+      belongs to the method, decision 0 comes back to Yue. *(2026-11-26,
+      WP-2311: not a unit dependence, and not the method's. The probe rescaled
+      the data but left the declared background in counts, so the fit started
+      from a background up to 100× above the data. The seed then emptied whole
+      overlap groups, and the equal-split restraint's absolute 1e-10 floor
+      locked them. Fixed by `PAWLEY_GROUP_SCALE_FLOOR_REL`; decision 0 stands.
+      WP-2311 § Findings.)*
 - [ ] The extinction screen's Hamilton test adds `n_lines + n_free_parameters`
       (`indexing/extinction.py:1137-1141`), and Pawley's `n_free_parameters`
       already counts the intensities. Count them once, before A2 moves.

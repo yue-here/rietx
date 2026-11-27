@@ -95,9 +95,25 @@ structural claim.
              the saving one of them is quoted for was never measured at this
              width.
 
-Runtime: the whole harness at the default three repeats is ~35 minutes, nearly
-all of it the last three cases.  ``--cases`` selects; ``--list`` shows the
-keys.
+The last four are WP-2317's large cell: a **real** structure with a
+**simulated** pattern (the block comment above ``_BIGCELL_SCALE``).
+Nb₁₈W₁₆O₉₃ from COD 2107344, 12.2 × 36.7 × 3.95 Å Pbam, 43 sites, Cu Kα
+doublet + FCJ, started at the truth's atoms with the cell 500 ppm high.
+
+``bigcell-structural``  ``mccusker_structural``, 2θ ≤ 90°, the eight
+             co-sited Nb/W pairs tied: 66 coordinate and 35 Biso columns
+             over 886 reflections (WP-2314).
+``bigcell-pawley`` and ``bigcell-pawley-120``
+             Pawley, ``mccusker_default``, 2θ ≤ 90° and ≤ 120°: 886 and
+             1 569 intensity columns, tails from outside the range included
+             (WP-2315).
+``bigcell-lebail``  the same pattern at 2θ ≤ 90°, Le Bail from an
+             ``auto_background`` seed, as the skill says (WP-2316).
+
+Runtime: the whole harness at the default three repeats is ~35 minutes before
+the large-cell cases, nearly all of it the three ``trigger`` cases; the four
+large-cell cases add about 3 minutes (2026-11-27, darwin/arm64).  ``--cases``
+selects; ``--list`` shows the keys.
 
 Configurations
 --------------
@@ -474,6 +490,10 @@ class Setup:
     #: WP-2003 C3, the package default; the default here is WP-1127's 3.0,
     #: the bound this harness's rows were measured with.
     first_rung_factor: float | None = FIRST_RUNG_FACTOR
+    #: single-fit cases only — called on each repeat's fresh ``Refinement``
+    #: before its untimed ``fit``, for what a model cannot carry (a user tie).
+    #: None for every case but ``bigcell-structural``.
+    prepare: Callable[[rx.Refinement], object] | None = None
 
 
 @dataclass
@@ -851,6 +871,126 @@ def _trigger_series_unbounded() -> Setup:
     return setup
 
 
+# -- the large-cell cases, a real structure (WP-2317) ----------------------
+#
+# A user reported slowdowns on a 12 × 36 × 4 Å cell (V ≈ 1 730 Å³), and no case
+# above carries more than ~1 200 (line, reflection) pairs or ~15 atoms in a
+# phase (WP-2317's R8).  These four put a published large cell through the
+# three modes.
+#
+# WHAT IS REAL AND WHAT IS NOT.  The structure is real: Nb₁₈W₁₆O₉₃ from COD
+# 2107344 (Stephenson 1968, ``tests/data/cod_2107344.cif``), P b a m,
+# 12.195 × 36.740 × 3.951 Å, 43 sites, eight of them Nb/W pairs at one
+# position.  It replaced WP-2317 probe 1's invented P2₁2₁2₁ cell (2026-11-27;
+# the maintainer: "Don't use your randomly generated ones").  The rest is
+# declared here: Biso (the file carries Uiso = 0; ``BISO_METAL``/``BISO_O``
+# in ``test_large_cell_refinement``), the scale, the instrument, and the
+# pattern, which is the model Poisson-sampled on a Cu Kα doublet with FCJ
+# live.  Dispersion is declined, as for ``trigger``.  The start protocol is
+# probe 1's, unchanged: the start carries the truth's atoms, Biso and scale,
+# and is off in the cell (500 ppm high), the widths (W, X), the axial ratios
+# (0.02 against the truth's 0.03, held by both plans, so a low-angle misfit is
+# expected) and the background (all zero against the truth's c0 = 900).  The
+# structural case ties each co-sited Nb/W pair, as a refiner would.  Nothing
+# here validates the compound, and Rwp is an identity check only.
+
+#: the phase scale: the strongest peak ~4 × 10⁴ counts over a 900-count
+#: background, the 40-atom probe's order (WP-2317)
+_BIGCELL_SCALE = 3e-5
+
+
+def _bigcell_phase(drift: float) -> rx.Phase:
+    from test_large_cell_refinement import NB18W16O93, large_cell_phase
+
+    return large_cell_phase(NB18W16O93, scale=_BIGCELL_SCALE, drift=drift)
+
+
+def _bigcell_instrument(*, truth: bool) -> rx.Instrument:
+    from rietx.schemas.instrument import BackgroundChebyshev
+
+    ins = rx.Instrument.bragg_brentano(radiation="CuKa",
+                                       goniometer_radius_mm=250.0,
+                                       monochromator_two_theta=26.6)
+    ins.background = BackgroundChebyshev.with_terms(6)
+    ins.source.dispersion = None
+    ins.geometry.axial_sl.value = 0.03 if truth else 0.02
+    ins.geometry.axial_hl.value = 0.03 if truth else 0.02
+    ins.profile.w.value = 0.006 if truth else 0.010
+    ins.profile.x.value = 0.02 if truth else 0.01
+    if truth:
+        ins.background.coefficients[0].value = 900.0
+    return ins
+
+
+def _bigcell_pattern(two_theta_max: float) -> rx.PatternData:
+    """The truth model on 5° to ``two_theta_max`` at 0.02°, Poisson-sampled at
+    probe 1's seed."""
+    from rietx.params.vector import ParameterTable
+
+    tt = np.arange(5.0, two_theta_max, 0.02)
+    structure = rx.Structure(phases=[_bigcell_phase(0.0)])
+    instrument = _bigcell_instrument(truth=True)
+    blank = rx.PatternData(two_theta=tt.tolist(),
+                           intensity=np.ones_like(tt).tolist())
+    model = compile_model(structure, instrument, blank)
+    table = ParameterTable(structure, instrument)
+    y = np.asarray(model.evaluate(table.decode(table.x0())))
+    counts = np.random.default_rng(1).poisson(np.clip(y, 1.0, None))
+    return rx.PatternData(two_theta=tt.tolist(),
+                          intensity=counts.astype(float).tolist())
+
+
+def _bigcell(mode: str, two_theta_max: float, plan: rx.RefinementPlan,
+             plan_name: str) -> Setup:
+    data = _bigcell_pattern(two_theta_max)
+    structure = rx.Structure(phases=[_bigcell_phase(5e-4)])
+    return Setup(
+        f"large cell: Nb₁₈W₁₆O₉₃ (COD 2107344), 12.2 × 36.7 × 3.95 Å Pbam, "
+        f"43 sites, simulated pattern, 2θ ≤ {two_theta_max:g}°, {mode}, {plan_name}",
+        data, structure, _bigcell_instrument(truth=False), plan, mode=mode,
+        notes="real structure, simulated pattern — see the block comment "
+              "above _BIGCELL_SCALE; WP-2317")
+
+
+def _bigcell_structural() -> Setup:
+    from test_large_cell_refinement import tie_co_sited
+
+    setup = _bigcell("rietveld", 90.0, rx.RefinementPlan.mccusker_structural(),
+                     "mccusker_structural")
+    setup.prepare = tie_co_sited
+    setup.title += ", co-sited Nb/W tied"
+    return setup
+
+
+def _bigcell_pawley() -> Setup:
+    return _bigcell("pawley", 90.0, rx.RefinementPlan.mccusker_default(),
+                    "mccusker_default")
+
+
+def _bigcell_pawley_120() -> Setup:
+    return _bigcell("pawley", 120.0, rx.RefinementPlan.mccusker_default(),
+                    "mccusker_default")
+
+
+def _bigcell_lebail() -> Setup:
+    """Le Bail from a **seeded** background, as the skill's Le Bail rule says.
+
+    From an all-zero Chebyshev the first partition hands the 900-count
+    pedestal to the reflections, and probe 1's fit ended in a background
+    valley at Rwp 0.151 (WP-2316 task 1).  ``kind="chebyshev"`` keeps the
+    background family of the other three cases, but not their order: the
+    scan may return more terms than their 6 (it returned its cap of 16 on
+    probe 1's pattern), so this case and an unseeded start differ in the seed
+    and in the background's column count.
+    """
+    setup = _bigcell("lebail", 90.0, rx.RefinementPlan.mccusker_default(),
+                     "mccusker_default")
+    setup.instrument.background = rx.auto_background(
+        setup.data, kind="chebyshev", seed=True).background
+    setup.title += ", background seeded (auto_background)"
+    return setup
+
+
 CASES: tuple[Case, ...] = (
     Case("nac-lebail", _nac_lebail, "22 003 pts, 1 phase — the Le Bail seed leg"),
     Case("nac", _nac, "22 003 pts, no FCJ — the dispatch-light case"),
@@ -870,6 +1010,17 @@ CASES: tuple[Case, ...] = (
          "the same series, refit='stages' — the width-vs-stage-count trade"),
     Case("trigger-series-unbounded", _trigger_series_unbounded,
          "trigger-series without WP-1127's bound — the pre-1127 'before'"),
+    Case("bigcell-structural", _bigcell_structural,
+         "Nb18W16O93 (COD), 4 250 pts, 886 refl, 43 sites, mccusker_structural"
+         " — WP-2314's case"),
+    Case("bigcell-pawley", _bigcell_pawley,
+         "Nb18W16O93 (COD), 4 250 pts, 886 Pawley intensities, 2θ ≤ 90°"
+         " — WP-2315's case"),
+    Case("bigcell-pawley-120", _bigcell_pawley_120,
+         "Nb18W16O93 (COD), 5 750 pts, 1 569 Pawley intensities, 2θ ≤ 120°"),
+    Case("bigcell-lebail", _bigcell_lebail,
+         "Nb18W16O93 (COD), 4 250 pts, 886 refl, Le Bail, seeded background"
+         " — WP-2316's case"),
 )
 
 
@@ -942,6 +1093,8 @@ def _run_once(setup: Setup, config: Config = CONFIGS[0]) -> Run:
     ref = rx.Refinement(setup.structure.model_copy(deep=True),
                         setup.instrument.model_copy(deep=True),
                         history=False)
+    if setup.prepare is not None:
+        setup.prepare(ref)
     with _configured(config, account) as kwargs, _counting(counts):
         t0 = time.perf_counter()
         result = ref.fit(setup.data, plan=setup.plan, mode=setup.mode,
