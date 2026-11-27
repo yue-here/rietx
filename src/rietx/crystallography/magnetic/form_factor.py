@@ -1163,11 +1163,19 @@ def _short_footing(footing: str) -> str:
     return re.sub(r" \([^)]*\)", "", footing)
 
 
-def footing_name(ion: str) -> str:
+def footing_name(ion: str, *, stol_max: float | None = None) -> str:
     """What the row ``ion`` is, as :func:`approximation_name` names it: a
     computed table's code and footing, or Brown's row with its computed tail's
     footing, plus, for a bare (neutral-labelled) row, which configuration it
-    is.  Reads the data file's own provenance lines."""
+    is.  Reads the data file's own provenance lines.
+
+    ``stol_max`` (s = sinθ/λ, Å⁻¹) is the largest s an evaluation reaches.
+    Given, a Brown row names its computed tail only when ``stol_max`` passes
+    the end of his fitted range (:func:`past_fitted_range`, the one
+    comparison), since inside it his numbers are all that is used (rietx
+    #1806, round 1 point 14).  ``None`` names the row over its whole range,
+    tail included: what it serves before anything says how far a fit reaches.
+    """
     _require_row(ion)
     ion = _key(ion)
     key = _TABLE_KEY.get(ion)
@@ -1176,13 +1184,15 @@ def footing_name(ion: str) -> str:
         return (f"computed table ({_short_footing(c.footing)}, "
                 f"{c.configuration}; {COMPUTED_LABEL})")
     c = computed_curves()[ion]
-    out = (f"Brown ITC Vol. C § 4.4.5 to s = {_FITTED_RANGE[ion]:g} Å⁻¹, "
-           f"computed tail beyond ({_short_footing(c.footing)}; "
-           f"{COMPUTED_LABEL})")
+    out = f"Brown ITC Vol. C § 4.4.5 to s = {_FITTED_RANGE[ion]:g} Å⁻¹"
+    if stol_max is None or past_fitted_range(ion, stol_max, orders=(0,)):
+        out += (f", computed tail beyond ({_short_footing(c.footing)}; "
+                f"{COMPUTED_LABEL})")
     return out + (f"; row: {c.row}" if c.row else "")
 
 
-def approximation_name(ion: str, g: float | None) -> str:
+def approximation_name(ion: str, g: float | None, *,
+                       stol_max: float | None = None) -> str:
     """The name of the approximation :func:`magnetic_form_factor` will use,
     and the footing of the row it uses (:func:`footing_name`).
 
@@ -1190,11 +1200,14 @@ def approximation_name(ion: str, g: float | None) -> str:
     runs and a caller can compare two species' treatment.  Every result that
     uses a row carries this name, so a computed row, a bare row that is not
     the neutral ground state, and a row whose footing is not identified are
-    each said where the moment is reported (rietx #1691).
+    each said where the moment is reported (rietx #1691).  A stage compile
+    passes its reflection list's largest s as ``stol_max``, so a fit that
+    stays inside Brown's fitted range is not told it used a computed tail
+    (:func:`footing_name`).
     """
     gg = resolve_g(ion, g)
     name = J0_ONLY if gg == 2.0 else f"{J0_J2}, g = {gg:g}"
-    out = f"{name}; {footing_name(ion)}"
+    out = f"{name}; {footing_name(ion, stol_max=stol_max)}"
     if is_bare(ion):
         out += f"; bare {ion!r} read as {read_bare_label(ion).text()}"
     return out

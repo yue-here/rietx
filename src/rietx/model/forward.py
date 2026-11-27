@@ -5110,11 +5110,12 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
             cp.nuclear_mask = magnetic_mask
             cp.magnetic = compile_magnetic_sites(phase, sites.ops)
             if cp.magnetic is not None and len(refl.index):
+                stol_hi = 0.5 / float(np.min(d_spacings(refl.index, *cell)))
                 cp.magnetic.past_range = check_form_factor_range(
-                    cp.magnetic, phase,
-                    0.5 / float(np.min(d_spacings(refl.index, *cell))),
+                    cp.magnetic, phase, stol_hi,
                     functools.partial(_form_factor_range_fix, lam=lam_gen,
                                       tt_max=tt_max, hi_eff=hi_eff))
+                cp.magnetic.name_at_reach(stol_hi)
             # the Laue orbit of every reflection, frozen here: |F_⊥|² varies
             # over it, so the magnetic intensity is the orbit *average*.  The
             # same layout the March-Dollase correction uses, built from the

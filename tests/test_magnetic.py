@@ -2090,7 +2090,9 @@ def test_the_report_names_the_approximation_per_ion():
 
     rows = analyse_moments(model, values, structure)
     assert [r.ion for r in rows] == ["Mn2+", "Ho3+"]
-    assert rows[0].approximation == approximation_name("Mn2+", None)
+    # λ = 2.4 Å to 2θ = 140° reaches s ≈ 0.39 Å⁻¹, inside Brown's range, so no computed tail is named (#1806)
+    assert rows[0].approximation == approximation_name("Mn2+", None, stol_max=0.39)
+    assert "computed tail" not in rows[0].approximation
     assert rows[0].approximation.startswith(J0_ONLY + "; ")
     assert rows[1].approximation.startswith("dipole, <j0> + (2/g - 1)<j2>, g = 1.25; ")
     assert model.phases[0].magnetic.named_approximations() == {

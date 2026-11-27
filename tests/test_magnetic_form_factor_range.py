@@ -455,3 +455,28 @@ def test_approximation_name_names_every_rows_footing():
         assert "configuration average" in name(ion, None).split("row: ")[1]
     for ion in ff.magnetic_ions():
         assert ff.COMPUTED_LABEL in name(ion, 1.0)
+
+
+@pytest.mark.parametrize(("lam", "reaches"), [(2.4, False), (0.55, True)])
+def test_the_tail_clause_is_named_only_on_a_fit_that_reaches_the_tail(lam, reaches):
+    """Yue, #1806 round 1 point 14 (ruled by Mike for this PR, 2026-11-27): the approximation names the footing a result
+    *uses*.  One ion, Fe²⁺ in FeF₂, at two wavelengths: at λ = 2.4 Å every reflection is inside Brown's fitted range
+    (s ≤ 1.5 Å⁻¹) and the moment row names his row alone; at λ = 0.55 Å the list reaches s ≈ 1.7 and the row names the
+    computed tail too.  The label and ``past_range`` agree atom for atom, since both ask ``past_fitted_range``; with no
+    reach given, ``approximation_name`` still names the whole row."""
+    phase = _rutile("Fe", "Fe2+", FEF2_CELL)
+    ref, result = _fit(phase, lam, _pattern(phase, lam))
+    (row,) = ref.report().magnetic
+    brown = "Brown ITC Vol. C § 4.4.5 to s = 1.5 Å⁻¹"
+    assert brown in row.approximation
+    assert ("computed tail beyond (" in row.approximation) is reaches
+    assert (ff.COMPUTED_LABEL in row.approximation) is reaches
+    assert row.approximation == (ff.approximation_name("Fe2+", None) if reaches
+                                 else f"{ff.J0_ONLY}; {brown}")
+    msites = ref._model.phases[0].magnetic
+    tail_atoms = {j for j, name in enumerate(msites.approximations) if name and "computed tail" in name}
+    assert tail_atoms == {j for j, _rec in msites.past_range}
+    assert any(d.code == "MAGNETIC_FORM_FACTOR_COMPUTED_TAIL" for d in result.diagnostics) is reaches
+    assert "computed tail beyond" in ff.approximation_name("Fe2+", None)
+    assert "computed tail beyond" not in ff.approximation_name("Fe2+", None, stol_max=1.5)
+    assert "computed tail beyond" in ff.approximation_name("Fe2+", None, stol_max=1.5001)

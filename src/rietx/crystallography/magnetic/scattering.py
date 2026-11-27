@@ -141,6 +141,19 @@ class MagneticSites:
         frame = self.frames[j]
         return 0 if frame is None else len(frame)
 
+    def name_at_reach(self, stol_max: float) -> None:
+        """Rename every atom's approximation for a reflection list reaching
+        s = ``stol_max`` (Å⁻¹), so a Brown row names its computed tail only
+        on a stage that evaluates it there.  The stage compile calls this
+        with the s it hands :func:`check_form_factor_range`, and both ask
+        :func:`~.form_factor.past_fitted_range`, so the label and
+        :attr:`past_range` agree atom for atom (rietx #1806)."""
+        self.approximations = [
+            None if ion is None or name is None
+            else approximation_name(ion, g, stol_max=stol_max)
+            for ion, g, name in zip(self.ions, self.g_factors,
+                                    self.approximations, strict=True)]
+
     def named_approximations(self) -> dict[str, str]:
         """``{ion: approximation}`` for every magnetic species of the phase."""
         return {ion: name for ion, name in zip(self.ions, self.approximations,
