@@ -51,6 +51,41 @@ McCusker et al. (1999) §4, p.42, give a rule of thumb. A peak is at background 
 | FullProf | none stated | windows frozen for a run at `Wdt` × FWHM; no slack term is named in the manual (checked (manual)) |
 | Jana2020, BGMN | not found | |
 
+**rietx's own record, kept for a later reassessment of windowing** (WP-2317 R7,
+2026-11-27).
+- *Origin.* `WINDOW_MIN_DEG` = 0.3° first appears in the v0.1 slice (`f51e8e67b`,
+  2026-07-22) as an additive minimum on a ±30 FWHM window, with no stated reason.
+  WP-1112 split the window into tail coverage, k(η)·Γ, and capture slack. It gave the
+  slack its present job: room for zero, displacement and cell to move a peak inside
+  one frozen stage, against a cold zero error of about 0.1°. It also added
+  `Stage.window_slack_deg` and a validation slack of 2·tanθ_max·1 %, clipped to
+  [0.3, 6]°. A fixed 4° slack had flipped 1 of 837 lines of the correct NAC cell to
+  absent.
+- *Measured* (WP-2002 B10, `tests/test_window_domain.py`). Over SRM 660c, FAP, cpd-1a
+  and NAC, warm and cold (zero 0.1° off), the largest move within a stage was 0.21°.
+  That leaves a 1.4× margin. At 0.1° of slack the test fails, with a peak moving
+  0.147°. At converged windows, slack 0 and slack 1° changed the answer by under
+  0.001 esd.
+- *Not measured.* A start with the cell far from its answer was never run. By
+  arithmetic, 0.3 % moves a 120° peak about 0.6°.
+- *What guards it now.* WP-2047 records `StageResult.window_loss` per stage, and
+  `STAGE_WINDOWS_STALE` warns on the last stages.
+- *Cost.* About 30 of a window's ~122 points are slack at a 0.02° step, roughly
+  25 %. The share grows as 1/step on synchrotron data.
+- *Alternatives on record.*
+  - Per-evaluation windows (WP-2047, WP-2051). Filed 2026-10-25: they gained no
+    accuracy on the four protocols and would rewrite the frozen-per-stage
+    invariant. Four of five surveyed programs resize every evaluation.
+  - A TOPAS-style rebuild once positions move past an allowance. It would need a
+    recompile inside a stage.
+  - Slack sized from the stage's free position parameters (zero, displacement or
+    transparency, cell, λ). Their allowed movement is mapped to 2θ per reflection:
+    Δzero directly, 2·tanθ·Δd/d for the cell. A stage freeing none needs almost no
+    slack. Chosen 2026-11-27 as R7's working answer, paired with a refit on fresh
+    windows when `window_loss` passes its tolerance.
+- *Practice for the window itself.* McCusker et al. (1999) §4 cut at 0.1-1 % of peak
+  height, typically 10-20 FWHM, and at least 40 FWHM for crystal-analyser data.
+
 ## Axial divergence quadrature
 
 | Program | Method |
