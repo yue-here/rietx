@@ -378,8 +378,10 @@ the record moves no fitted number (the coordinator's rule for this item).
   coordinator under Rule 4 (a new output; kind 1 records that it fired) and
   the generality review's finding. **It is a stored-format addition**: schema
   0.62, additive, `None` by default, refused by an older build. The
-  maintainer's CLAUDE.md sends stored-format changes to him, so it waits for
-  his word before merge.
+  maintainer's CLAUDE.md sends stored-format changes to him. **Ruled
+  2026-11-27: "a, go ahead"**, option (a) of three: keep the stored field as
+  is, over (b) a diagnostic only, which loses the sum on reload and in the CIF
+  export, and (c) leaving R5 (b) unimplemented.
 - The two WP-2311 restraint tests keep LaB6's 221/300 pair apart by
   monkeypatching `_lattice_merge_groups`, since that pair is now merged.
 - For generality review: the merge is an automatic action the audit table
@@ -426,8 +428,8 @@ arm64, `[dev,jax]`): 16 075 passed, 268 skipped, 30 xfailed; +5, the tests added
 - `solve/cost.py`'s nuisance columns are not merged.
 - torch is not installed here, so the `pawley_merged` torch rows did not run.
 
-*Next.* (1) The maintainer's word on the stored-format addition, then merge
-PR 1869 after the `wp2317-rulings` PR. (2) Angles 1-2 and 4 on the bench case,
+*Next.* (1) Done 2026-11-27: the stored-format addition was ruled (a) and
+PR 1869 merged. (2) Angles 1-2 and 4 on the bench case,
 which the merge does not reach. A large cubic or hexagonal cell is where the
 merge's column saving would show in the wall; no bench case has one yet.
 
