@@ -317,6 +317,13 @@ the reflections missing from a cross row's intensities at the median rather
 than the floor. No row lacks any: Le Bail's 910 reflections all appear in
 Pawley's 913, and every other row seeds from its own answer's list.
 
+*Gates* (PR #1863; macOS arm64, `[dev]` venv, current main merged in, which
+was already up to date at `af159cf7d`). Fast selection: 15 819 passed, 452
+skipped, 30 xfailed. No test was added, and the full selection did not run,
+since no package code path changed. CI's lint steps were clean: ruff,
+`tests.rulebook_limits`, and vale with 0 errors. `tests.reader_output` exited
+0. No generality review: the branch adds no heuristic to the package.
+
 *Gotchas.* A probe that writes to a file buffers its stdout, so run it with
 `-u` to read rows as they land. The cross step took 22 min on this
 machine, mostly partitions at the cap.
