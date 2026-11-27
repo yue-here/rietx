@@ -398,9 +398,8 @@ class LMOutcome:
     #: inner loop found nothing downhill even at large λ), ``slow_descent``
     #: (the rest of the budget would buy less than :data:`SLOW_DESCENT_ESD`
     #: esd of travel, WP-1334), ``max_nfev`` (the evaluation budget, TRF's
-    #: token for the same stop), ``objective_rising`` (a moving objective whose
-    #: refresh and step together raised S on :data:`_CONVERGED_RUNS`
-    #: iterations running, WP-2316).
+    #: token for the same stop), ``non_finite_residual`` (a moving objective's
+    #: refresh left the residual not finite, WP-2316).
     termination: str = "max_nfev"
     #: the bounds that hold the returned point, scipy's ``active_mask``
     #: convention (−1 lower, +1 upper, 0 neither) and exact: the variable sits
@@ -552,15 +551,20 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
     rule reads the travel of S, the steps' decreases plus the refreshes'
     changes taken absolutely, since a refresh may raise S.
 
-    A moving objective is no descent method: a refresh may raise S by more
-    than the next step lowers it, and on a pattern whose background and
-    intensities trade against each other the pair walks, S rising for
-    hundreds of iterations.  So the driver keeps the state of lowest S it has
-    held, θ with ``refresh.keep()``'s intensities, and returns it whatever
-    ends the stage.  When the refresh and the step together raise S on
-    :data:`_CONVERGED_RUNS` iterations running, the stage stops there with
-    termination ``objective_rising``, a convergence.  Rietveld's rule of
-    keeping the best attempt is the same one.  ``refresh`` is called as
+    A moving objective is no descent method.  The extraction maximises a
+    Poisson likelihood, not S, so near the joint fixed point each refresh
+    raises S a little more than the next step lowers it, and S approaches its
+    limit from below.  A converged stage returns that fixed point, where
+    every surveyed program's cycles converge, and never the lowest S it held:
+    stopping there left 11-BM LaB6 + cBN 2.3 esd short of the fixed point
+    (WP-2316).  Where the pair does not settle (a pattern whose background
+    and intensities trade against each other walks, S rising for the whole
+    budget), the stage ends on its budget, not converged, and returns the
+    lowest-S state it held: a stage that did not converge keeps its best
+    attempt (DESIGN-RULES Rule 1).  So does a refresh that leaves the
+    residual, or the normal equations built from it, not finite, which ends
+    the stage at once with status −1 and termination
+    ``non_finite_residual``.  ``refresh`` is called as
     ``refresh(x)``, and ``refresh.keep()`` and ``refresh.restore()`` save and
     put back the intensities of the best state.  ``None`` is the fixed
     objective, bit for bit.
@@ -608,11 +612,9 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
     # slow-descent rule reads in place of S itself
     shift = np.inf
     travel = 0.0
-    rising = 0
     if refresh is not None:
         accepted_s = [0.0]
         best = (x, r, s)
-        accepted_step_s = s
         refresh.keep()
 
     while n_fev < max_nfev:
@@ -622,6 +624,11 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
             r = residual(x)
             n_fev += 1
             s_new = float(r @ r)
+            if not np.isfinite(s_new):
+                s = s_new
+                status = -1
+                termination = "non_finite_residual"
+                break
             shift = abs(s_new - s) / max(abs(s), 1e-300)
             travel += abs(s_new - s)
             s = s_new
@@ -632,6 +639,13 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
         J = jacobian(x)
         n_jev += 1
         A, b = build(J, r)
+        if refresh is not None and not (np.all(np.isfinite(A)) and np.all(np.isfinite(b))):
+            # a walking extraction can grow the residual until JᵀJ overflows
+            # (LaB6 + cBN from cells +2 %): the same stop as a non-finite S
+            s = np.nan
+            status = -1
+            termination = "non_finite_residual"
+            break
         # each column keeps the largest norm it has had this stage (Moré
         # 1978, MINPACK's ``mode=1``): a column that shrinks towards a
         # stationary point keeps the damping its scale earned, rather than
@@ -719,10 +733,6 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
                 if refresh is not None:
                     rel = max(rel, shift)
                     travel -= ds
-                    # the iteration's net change, refresh and step together,
-                    # against the state the last accepted step left
-                    rising = rising + 1 if s_try > accepted_step_s else 0
-                    accepted_step_s = s_try
                     if s_try < best[2]:
                         best = (x_try, r_try, s_try)
                         refresh.keep()
@@ -765,10 +775,6 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
                 small_runs = 0
                 lam = min(lam, lam_start)
                 continue
-        if refresh is not None and rising >= _CONVERGED_RUNS:
-            status = 1
-            termination = "objective_rising"
-            break
         if not accepted and refresh is not None and not shift < ftol:
             # nothing downhill under these intensities, but the last refresh
             # still moved S: refresh at the same θ and look again
@@ -799,8 +805,9 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
             termination = "slow_descent"
             break
 
-    if refresh is not None and best[2] < s:
-        # the lowest S the stage held, with the intensities it was measured on
+    if refresh is not None and status <= 0 and not best[2] >= s:
+        # unconverged: the lowest S the stage held, with the intensities it
+        # was measured on (``not >=`` so that a non-finite S is replaced)
         x, r, s = best
         refresh.restore()
     # J must be the Jacobian *at the returned point* — covariance_estimates

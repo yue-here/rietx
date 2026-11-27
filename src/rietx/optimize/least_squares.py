@@ -204,8 +204,10 @@ def _intensity_only(path: str, bkg_cols: dict[str, int]) -> bool:
 
 #: scipy ``least_squares`` termination codes as tokens (its docs, `status`):
 #: which tolerance fired, for :attr:`LSQOutcome.termination`.
-_TRF_TERMINATION = {-1: "invalid_input", 0: "max_nfev", 1: "gtol", 2: "ftol",
-                    3: "xtol", 4: "ftol+xtol"}
+#: ``-2`` is rietx's, never scipy's: a Le Bail extraction between TRF solves
+#: left the residual not finite (:func:`_drive_single`)
+_TRF_TERMINATION = {-2: "non_finite_residual", -1: "invalid_input", 0: "max_nfev",
+                    1: "gtol", 2: "ftol", 3: "xtol", 4: "ftol+xtol"}
 
 
 @dataclass
@@ -387,8 +389,11 @@ class NonFiniteStop:
     """Where a solve met a model that is not finite (WP-2048).
 
     ``kind`` is ``"residual"`` when the residual at the solve's start holds a
-    NaN or an infinity, and ``"jacobian"`` when the Jacobian does at a point
-    the driver had accepted, whose residual was finite.  ``columns`` names
+    NaN or an infinity, ``"jacobian"`` when the Jacobian does at a point
+    the driver had accepted, whose residual was finite, and ``"extraction"``
+    when a Le Bail extraction between iterations left the residual not
+    finite (WP-2316).  The first two hand back the solve's start; an
+    extraction stop hands back the lowest-S state the solve held.  ``columns`` names
     the Jacobian's non-finite columns, and is empty for a residual stop.
     ``free`` is every free path of the solve, in column order.
 
@@ -3707,9 +3712,12 @@ def _drive_single(model: CompiledModel, table: ParameterTable, residual, jacobia
     The LM driver runs it between iterations.  scipy's TRF exposes no hook
     between iterations, so under TRF each extraction follows a whole TRF
     solve, and the solves repeat until an extraction moves S by less than
-    ``ftol``, a round ends above the best S held, or the budget is spent:
-    FullProf's cycle, with a TRF solve as its least-squares step.  The
-    lowest-S round is returned, the LM driver's rule."""
+    ``ftol`` or the budget is spent: FullProf's cycle, with a TRF solve as
+    its least-squares step.  The LM driver's rule decides what is returned:
+    the last round when an extraction settled, since the answer is the fixed
+    point, and otherwise the lowest-S round, reported unconverged (scipy's
+    status 0, or ``-2``, ``non_finite_residual``, when an extraction left the
+    residual not finite)."""
     if solver == "lm":
         # the strain cone, the Γ_G² and Γ_L floors (WP-1938 D7, WP-2002) and
         # each tied entry's own bounds (WP-1325) are built against the
@@ -3742,29 +3750,35 @@ def _drive_single(model: CompiledModel, table: ParameterTable, residual, jacobia
             res = least_squares(residual, x0, jac=jacobian, bounds=(lo, hi), method="trf",
                                 ftol=ftol, xtol=XTOL, gtol=GTOL, max_nfev=max_nfev)
     else:
-        spent, x, best = 0, x0, None
+        spent, x, best, stop = 0, x0, None, 0
         while True:
             with lapack.scipy_trf():
                 res = least_squares(residual, x, jac=jacobian, bounds=(lo, hi),
                                     method="trf", ftol=ftol, xtol=XTOL, gtol=GTOL,
                                     max_nfev=max_nfev - spent)
             spent += int(res.nfev)
-            if best is not None and res.cost >= best.cost:
-                break
-            best = res
-            refresh.keep()
+            if best is None or res.cost < best.cost:
+                best = res
+                refresh.keep()
             if spent >= max_nfev:
                 break
             s_old = 2.0 * float(res.cost)
             refresh(res.x)
             fun = residual(res.x)
             spent += 1
-            if abs(float(fun @ fun) - s_old) < ftol * max(abs(s_old), 1e-300):
+            s_new = float(fun @ fun)
+            if not np.isfinite(s_new):
+                stop = -2
+                break
+            if abs(s_new - s_old) < ftol * max(abs(s_old), 1e-300):
+                stop = None
                 break
             x = res.x
-        if res is not best:
+        if stop is not None:
+            # unconverged: the best attempt, with the intensities it held
             refresh.restore()
-        res = best
+            res = best
+            res.status = stop
         res.fun = residual(res.x)
         res.cost = 0.5 * float(res.fun @ res.fun)
         res.jac = jacobian(res.x)
@@ -3949,7 +3963,10 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
                       discarded_subspace=subspace,
                       esd_inflation=esd_inflation,
                       moment_angle_tests=moment_angle_tests,
-                      n_lebail_cycles=0 if refresh is None else refresh.cycles)
+                      n_lebail_cycles=0 if refresh is None else refresh.cycles,
+                      non_finite=(NonFiniteStop("extraction", (),
+                                                tuple(table.free_paths))
+                                  if termination == "non_finite_residual" else None))
 
 
 def _stacked_rows(models: list[CompiledModel]) -> tuple[int, int]:

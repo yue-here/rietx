@@ -100,12 +100,13 @@ The intensities are not parameters, so the hkl list, the windows and the FCJ nod
 counts stay frozen for the stage. Only the objective moves.
 
 Alternating an extraction with a least-squares step does not descend on one
-objective. An extraction can raise $S$ by more than the next step lowers it. Where
-the background and the intensities can trade against each other, the pair can then
-walk, with $S$ rising for hundreds of iterations. So the solver keeps the state of
-lowest $S$ it has held, the parameters with the intensities they were measured
-on, and returns it however the stage ends. Three iterations in a row that raise
-$S$ end the stage with termination `objective_rising`.
+objective. The extraction raises a Poisson likelihood, not $S$, so near the joint
+fixed point each extraction raises $S$ a little more than the next step lowers it.
+$S$ then approaches its limit from below. A converged stage returns that fixed
+point, where every surveyed program's cycles converge. Where the background and
+the intensities trade against each other, the pair can walk, with $S$ rising for
+the whole budget. That stage ends on its budget, not converged, and returns the
+lowest $S$ it held, the parameters with the intensities they were measured on.
 
 Equation {eq}`fm-lebail` is a Richardson-Lucy step
 {cite}`richardson1972,lucy1974`, which is an expectation-maximisation step on a

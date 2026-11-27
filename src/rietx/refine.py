@@ -2123,19 +2123,27 @@ def _non_finite_diagnostic(stage_name: str, outcome) -> Diagnostic | None:
     stop = getattr(outcome, "non_finite", None)
     if stop is None:
         return None
-    if stop.kind == "jacobian":
-        cols = ", ".join(stop.columns)
-        what = (f"its Jacobian column{'s' if len(stop.columns) > 1 else ''} "
-                f"{cols}, at a point the solver had reached")
+    if stop.kind == "extraction":
+        message = (f"Stage {stage_name!r} stopped when a Le Bail extraction "
+                   "left its model holding a NaN or an infinity. The stage had "
+                   f"{len(stop.free)} parameters free. Every value, the "
+                   "intensities included, is at the lowest-cost state the "
+                   "stage held, and the stage did not converge.")
     else:
-        what = "its residual, where a solve began"
+        if stop.kind == "jacobian":
+            cols = ", ".join(stop.columns)
+            what = (f"its Jacobian column{'s' if len(stop.columns) > 1 else ''} "
+                    f"{cols}, at a point the solver had reached")
+        else:
+            what = "its residual, where a solve began"
+        message = (f"Stage {stage_name!r} stopped where it started. Its model "
+                   f"held a NaN or an infinity in {what}. The stage had "
+                   f"{len(stop.free)} parameters free. Every value is back at "
+                   "the stage's start, so the stage changed nothing.")
     return Diagnostic(
         level="warning", code="STAGE_NOT_FINITE", where=list(stop.free),
         value=float(len(stop.free)),
-        message=(f"Stage {stage_name!r} stopped where it started. Its model "
-                 f"held a NaN or an infinity in {what}. The stage had "
-                 f"{len(stop.free)} parameters free. Every value is back at "
-                 "the stage's start, so the stage changed nothing."),
+        message=message,
         suggestion=(
             "Hold some of the parameters this stage frees, or start it nearer "
             "its answer."

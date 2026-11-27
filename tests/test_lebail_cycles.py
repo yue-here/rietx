@@ -319,19 +319,60 @@ class _Rising:
         self.restored = True
 
 
-def test_a_refresh_that_raises_s_stops_the_solve_at_its_lowest_state():
-    """Under a moving objective the driver returns the lowest S it held, and
-    three rising iterations end the solve (``objective_rising``)."""
-    refresh = _Rising()
-
+def _solve(refresh, max_nfev=200):
     def residual(x):
         return np.array([x[0] - refresh.target, refresh.drift])
 
-    out = lm.minimize(residual, lambda x: np.array([[1.0], [0.0]]), np.array([5.0]),
-                      lo=np.array([-np.inf]), hi=np.array([np.inf]), refresh=refresh)
-    assert out.termination == "objective_rising"
-    assert refresh.calls == lm._CONVERGED_RUNS
+    return lm.minimize(residual, lambda x: np.array([[1.0], [0.0]]), np.array([5.0]),
+                       lo=np.array([-np.inf]), hi=np.array([np.inf]), refresh=refresh,
+                       max_nfev=max_nfev)
+
+
+class _Settling(_Rising):
+    """A refresh that raises S on every call while it settles: the target and
+    the unreachable row halve their distance to 1 a call, so S climbs to its
+    limit from below."""
+
+    def __call__(self, x):
+        self.calls += 1
+        self.target = 0.5 * (self.target + 1.0)
+        self.drift = 0.5 * (self.drift + 1.0)
+
+
+def test_a_refresh_that_raises_s_converges_at_the_fixed_point():
+    """A converged stage returns the fixed point, never the lowest S it held:
+    the extraction raises a likelihood, not S (WP-2316)."""
+    refresh = _Settling()
+    out = _solve(refresh)
+    assert out.status == 1 and refresh.calls > lm._CONVERGED_RUNS
+    assert not refresh.restored
+    assert out.x[0] == pytest.approx(1.0, abs=1e-4)
+
+
+def test_a_refresh_that_never_settles_returns_the_lowest_state_unconverged():
+    """A walk ends on the budget, status 0, at the lowest S the solve held."""
+    refresh = _Rising()
+    out = _solve(refresh, max_nfev=40)
+    assert out.status == 0 and out.termination == "max_nfev"
     assert refresh.restored and (refresh.target, refresh.drift) == (0.0, 1.0)
+    assert out.x[0] == pytest.approx(0.0) and out.cost == pytest.approx(0.5)
+
+
+class _Exploding(_Rising):
+    """A refresh whose third call leaves the residual not finite."""
+
+    def __call__(self, x):
+        super().__call__(x)
+        if self.calls == 3:
+            self.drift = np.nan
+
+
+def test_a_refresh_that_leaves_the_residual_not_finite_stops_the_solve():
+    """No LinAlgError: the solve stops, status −1, at its lowest state."""
+    refresh = _Exploding()
+    out = _solve(refresh)
+    assert out.status == -1 and out.termination == "non_finite_residual"
+    assert refresh.restored and np.isfinite(out.cost)
     assert out.x[0] == pytest.approx(0.0) and out.cost == pytest.approx(0.5)
 
 
