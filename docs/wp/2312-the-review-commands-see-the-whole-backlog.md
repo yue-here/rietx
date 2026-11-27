@@ -1,9 +1,8 @@
 # WP-2312 — the review commands see the whole backlog
 
-Milestone: unscheduled · Status: 🔄 2026-11-27 — claimed by @yue-here (ghostshift runner): /pr-review triage ranks every open PR
+Milestone: unscheduled · Status: ✅ 2026-11-27 — every listing says when it may be cut off (PR #1858), and /pr-review triage ranks every open PR through one paginated GraphQL query (PR #1859)
 Track: The repo's own process
 Depends on: —
-Priority: P4 2026-11-26 — process: no number moves, but a triage that ranks part of the backlog read as ranking all of it
 
 ## Goal
 
@@ -177,6 +176,15 @@ Its first line names no `ranked N of M`.
   above, read from the binary's strings.
 
 ## Handover log
+
+- **2026-11-27** — closed, PR #1859. `/pr-review` triage now ranks every open PR, not the newest 30. The plan's two calls were each run once against the live backlog of 84 PRs. The commit-headline query worked, but the `gh pr list` listing without `commits` timed out. GitHub stops a request at about 10 s, and `mergeStateStatus` costs it about 0.15 s a PR. So the skill now runs one GraphQL query of its own in pages of 15, and a jq filter turns the 296 kB of pages into 42 kB of rows. The same query returns each review's sha, which gh's own listing never asks for, so the `all` mode's skip check now reads a real field. A ghostshift runner did this session, from a draft opened at the start.
+    - *Done*: `.claude/skills/pr-review/triage.graphql` and `triage.jq`; the triage section of the skill rewritten around their row fields (`reviewable`, `degree`, `governance`, `execution`, `wpCommits`, `commitsTotal`, `filesListed`, `latestReviews[].commit`, `ci`); `test_the_triage_rows_carry_what_the_rank_reads` pins the filter on a fixture and checks every field it reads is one the query asks for. The count call is gone, since the connection's `totalCount` rides on the first page.
+    - *Measured*: the table in Context, every call run once on 2026-11-27 with gh 2.103.3 on this Mac. The acceptance's whole-backlog triage: 84 rows of 84 open, so its first line names no `ranked N of M`. gh moved from 2.89 to 2.103 since the first entry; its `latestReviews` fragment still omits `commit`.
+    - *Settled by Claude* (each under measurement, between options the WP named or engineering practice): one query instead of the planned two, since the second call timed out and the joined query costs 3 330 nodes a page, under 1 % of the limit; a page of 15, half the 10 s timeout at the worst per-PR rate seen (0.31 s); rerun a 502 or 504 once, then stop.
+    - *Code review* (`/code-review high --fix`): five findings, four fixed in `2124305c1`. A PR whose `files` or `latestReviews` came back null crashed the whole filter; the short-count wording now names a PR closed mid-call as the other cause; the test checks nested field names too; a size comment said 30 kB. One pre-existing finding declined here and filed as WP-2313: step 4's execution list misses what the GUI build runs (`gui/package.json` scripts, the Vite config, `gui/scripts/`).
+    - *Fast suite*: FAST_COUNTS_HERE
+    - *Rulebooks*: none edited. *Generality*: no judge, since the branch touches no `_audit.py` and adds no package heuristic. *Lanes*: none.
+    - *Next*: WP-2313, if the maintainer wants the bench to read the GUI build's files first. Nothing else is open here.
 
 - **2026-11-26** — created, from a review of how the two review commands behave on a backlog no single session can clear. With 84 open PRs, `/pr-review` triage ranked 30 as if they were all of them, and three other listings could stop at their limit in silence. Each listing now says so when it may be cut off. `/pr-review` still ranks only 30, because the call that ranks every PR is designed but not run. Checked against the tree at dd94fd32. No open WP owns it: of the open WPs in "The repo's own process", 1988 watches a PR after it is opened, 2238 cuts the calls that reach the maintainer, and 1941 moves release notes to fragments. None touches what a listing returns.
     - *Review*: an independent subagent read the first draft. It found the `--limit 200` call over GitHub's node limit, a ghostshift claim dropped on a cut list, the merged-listing gap, and a held-act record with no reader. Each was checked against the code or gh's binary. All are fixed or withdrawn above.
