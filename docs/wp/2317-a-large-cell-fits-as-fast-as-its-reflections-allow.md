@@ -445,6 +445,27 @@ what it costs here.
       short damped steps, so the implementing change tests the shift of the
       undamped Gauss-Newton step, which a crawl cannot shrink. It re-pins goldens
       (R0) and checks that profile-interval refits still settle.
+    - **The two programs' stops in their own programs** (Measured 2026-11-27,
+      `2317-probe/foreign_stops/RESULTS.md`). Each program was compared with
+      itself, default stop against tight, from its own warm start on cpd-1f.
+      - GSAS-II's 1e-3 test leaves the answer short at home too, and says
+        converged: on cpd-1f 13 cycles, χ² 0.38 % high, zincite c* 16 esd off,
+        Zero 14, Shift 12. One default `Refine` (3 cycles) is 34 esd off and says
+        not converged. Its own floor between two tight starts is 1.5 esd. On the
+        CuCr₂O₄ ramp in sequential mode, 1e-3 alone has all 17 patterns say
+        converged with the CuO Dij 10.5 esd and U 52 esd off.
+      - FullProf's Eps 0.2 does not: 12 cycles and 0.08 esd from its tight run,
+        with `S_L` held. Its steps are undamped Gauss-Newton, so a crawl does not
+        shrink them. That is why the implementation tests the undamped step.
+      - For GSAS-II, the in-solver failure (18 esd) carries over to its own
+        program. For FullProf, it came from rietx's damped steps. Either way the
+        rule's sentence ("their thresholds do not carry over") stands.
+      - Program defects seen (recorded, not acted on): GSAS-II accepted
+        χ²-raising steps and still said converged; it lets W go negative; it
+        refuses cell refinement in sequential mode. FullProf printed
+        "Convergence reached" after diverging to NaN from rietx's `seed_scales`
+        start, froze U, V, W once the Gaussian FWHM² went negative, and quotes an
+        `S_L` esd about 23× GSAS-II's (inference: too small).
     - Unexplained, recorded for a later WP: the reported χ² differs from the χ²
       the solver minimised by 0.2-2.1 χ²_red at the answer, and that gap moves
       0.1 χ²_red between nearby answers.
@@ -707,9 +728,9 @@ separately (PR #1870).
   and probe scripts only).
 
 **In flight.**
-- A background measurement of GSAS-II's and FullProf's default stops in their own
-  programs (cpd-1f, and the CuCr₂O₄ ramp in GSAS-II's sequential mode). It lands
-  as a follow-up commit on this branch.
+- Landed the same session: GSAS-II's and FullProf's default stops measured in
+  their own programs (`2317-probe/foreign_stops/`, R6's entry). GSAS-II's 1e-3
+  stops short at home too (14-16 esd on cpd-1f); FullProf's 0.2 does not (0.08).
 - Stopped runners, not restarted: WP-2316's Le Bail fix on `wp2316-lebail-practice`
   (4 pushed commits, untracked probes and a design patch in its worktree), and
   R7's window slack on `wp2317-window-slack` (state not checked).
@@ -723,8 +744,8 @@ separately (PR #1870).
   on the damped LM step, which a crawl keeps short; the implementation tests the
   undamped Gauss-Newton step.
 
-**Next.** (1) Record the GSAS-II/FullProf result in R6 and adjust the rule's
-sentence on it if the programs behave differently at home. (2) Get R4 ruled by the
+**Next.** (1) Done the same session: the GSAS-II/FullProf result is in R6, and the
+rule's sentence stands. (2) Get R4 ruled by the
 maintainer. (3) Implement R6 (its task), re-pinning goldens. (4) Task 1, the
 user's case, still decides the re-rating of 2314-2316.
 
