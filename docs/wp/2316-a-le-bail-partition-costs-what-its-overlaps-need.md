@@ -189,6 +189,13 @@ partition's cost. `test_lebail_alternation.py` is a natural second timing case.
   except the first degree, its a 1 700 ppm low. GSAS-II was not run from the
   seed. The protocol and the table are in WP-2317's Context; the driver is
   `2317-probe/gsas2_bigcell.py`.
+- **From WP-2317, 2026-11-27 (4th session): the case is now a real
+  structure.** `bigcell-lebail` carries Nb₁₈W₁₆O₉₃ (COD 2107344, Pbam,
+  886 reflections at 2θ ≤ 90°), seeded as before. Its b is not 3a, so the
+  exact d-spacing pairs this WP's 2nd session found behind the 25 000-cycle
+  partitions are absent. The figures above are probe 1's; this WP's "before"
+  and its 10× target are re-read on the new case. WP-2317's Context has the
+  new range.
 
 ## Non-goals
 
