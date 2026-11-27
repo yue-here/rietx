@@ -467,3 +467,17 @@ FullProf 0.2).
   recall. Journal volume and page numbers for Madsen 2001 (34, 409) and
   Scarlett 2002 (35, 383) are recall too; table and PDF page numbers were
   read from the papers via `paper-reader`.
+
+### Addendum 2026-11-27: ftol 1e-7 on the two series
+
+Run by `series.run` at 1e-9, 1e-8, 1e-7 and 1e-6 from the unnudged start, same
+machine. The 1e-9, 1e-8 and 1e-6 counts and departures reproduce the tables above
+exactly.
+
+| series | stop | evals total | max single-pattern dep (esd): cell zero/disp profile Biso/coords scale background | max jitter in Δ cell (esd(Δ)) |
+|---|---|---|---|---|
+| cucr2o4 | ftol1e-7 | 917 | 0.022 0.00065 0.01 0 0.00047 0.00044 | 0.021 |
+| cpd1 | ftol1e-7 | 442 | 0.03 0.026 0.22 0.049 0.063 0.024 | 0.028 |
+
+Walls on a shared machine, CuCr₂O₄: 28 s at 1e-9, 24 s at 1e-8, 21 s at 1e-7,
+16 s at 1e-6.

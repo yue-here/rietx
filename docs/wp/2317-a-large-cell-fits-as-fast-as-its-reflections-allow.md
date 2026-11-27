@@ -366,16 +366,34 @@ what it costs here.
       single fit, at a 1.4× margin measured only on development data.~~ That
       margin was against the tenth-of-an-esd draft level, which R0 clarified
       withdrew.
-    - **Re-settled 2026-11-27 by Claude under R0 clarified: the last stage moves to
-      1e-8.** Everything 1e-9 buys over 1e-8 is under 0.072 esd on every measured
-      quantity, and nobody reads a shift that small. 1e-8 saves 7-16 % of a series,
-      where the stop is most of the bill. The three compounding places (WP-2222)
-      keep 1e-9 through a plan field. 1e-6 on the last stage loses: on the CuCr₂O₄
-      ramp it leaves the 1 wt% CuO cell 0.68 esd off, a step a user reading a
-      trajectory can see, and WP-2045 recorded cpd-1b stalling there. A stop looser
-      than 1e-8 needs a test that the fit has stopped moving, since FullProf's and
-      GSAS-II's thresholds alone ended cpd-1f mid-crawl. The implementing change
-      re-pins goldens (R0) and checks that profile-interval refits still settle.
+    - **Re-settled 2026-11-27 by Claude under R0 clarified: the last stage stops
+      when every free parameter's shift is under 0.1 of its esd.** That is the
+      field's test of a published refinement (McCusker et al. 1999 §7; checkCIF
+      alert B above 0.10), so it is parity with what other programs' users
+      publish. Their default stops are not parity: GSAS-II's 1e-3 and FullProf's
+      0.2 ended cpd-1f 18 esd off and reported convergence. Measured against the
+      1e-9 answer (`2317-probe/convnoise/RESULTS.md`, addendum for 1e-7):
+
+      | stop | CuCr₂O₄ ramp evals | worst (esd) | cpd-1 evals | worst (esd) |
+      |---|---|---|---|---|
+      | 1e-9 (shipped) | 1 293 | 0 | 517 | 0 |
+      | 1e-8 | 1 089 | 0.006 | 479 | 0.072 |
+      | 1e-7 | 917 | 0.022 | 442 | 0.22 |
+      | shift/esd < 0.1 | 363 | 1.2 | 322 | 0.071 |
+      | FullProf 0.2 | 300 | 1.7 | 312 | 18 |
+      | GSAS-II 1e-3 | 183 | 1.8 | 269 | 18 |
+
+      The worst entry on the ramp is the cell of CuO at about 1 wt%, on a flat
+      valley; the main phase stays under 0.053 esd. A departure of one esd is
+      inside the error bar the user is shown, and it is what a FullProf user
+      reporting shift/esd 0.1 gets. Single fits stay under 0.06 esd at every
+      stop. Runner-up 1e-7 holds every quantity to 0.22 esd at 2.5× the
+      evaluations on the ramp; it loses on the intent (accuracy no user reads,
+      paid in compute). The three compounding places (WP-2222) keep 1e-9 through a
+      plan field. The measured test used the damped LM step, and a crawl takes
+      short damped steps, so the implementing change tests the shift of the
+      undamped Gauss-Newton step, which a crawl cannot shrink. It re-pins goldens
+      (R0) and checks that profile-interval refits still settle.
     - Unexplained, recorded for a later WP: the reported χ² differs from the χ²
       the solver minimised by 0.2-2.1 χ²_red at the answer, and that gap moves
       0.1 χ²_red between nearby answers.
@@ -546,8 +564,9 @@ what it costs here.
       practice does. Record each answer here as a dated ruling, and push each into
       the `### Inherited` of the WP it unblocks: 2314-2316, and WP-2017 for R2's
       number.
-- [ ] R6 as re-settled: the last declared stage stops at 1e-8, and a plan field
-      keeps 1e-9 in WP-2222's three compounding places. Re-pin the goldens in the
+- [ ] R6 as re-settled: the last declared stage stops when every free shift of
+      the undamped Gauss-Newton step is under 0.1 esd, and a plan field keeps 1e-9
+      in WP-2222's three compounding places. Re-pin the goldens in the
       same change (R0), and check that profile-interval refits still settle.
 - [x] Why the 40-atom `coordinates` stage took 119 LM iterations from the true
       coordinates. *Answered 2026-11-27 by the review: the first probe drew its
