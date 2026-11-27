@@ -1223,6 +1223,39 @@ def test_gh_declining_is_not_an_empty_table(
     assert claim.open_prs(repo) == []
 
 
+def test_a_listing_at_gh_s_limit_reads_as_possibly_cut_off(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """gh stops at ``--limit`` and says nothing, so a list that reached it may
+    be the first part of a longer backlog (WP-2312).  The limit asked for is
+    the constant the guard compares against, so the two cannot drift."""
+    asked = []
+
+    def fake(root, *a, **k):
+        asked.append(a)
+        return json.dumps([_pr(n, f"pr {n}") for n in range(1, claim.OPEN_PR_LIMIT + 1)])
+
+    monkeypatch.setattr(claim, "_gh", fake)
+    prs = claim.open_prs(repo)
+    listing = asked[0]
+    assert listing[listing.index("--limit") + 1] == str(claim.OPEN_PR_LIMIT)
+    assert claim.listing_cut(prs)
+    assert not claim.listing_cut(prs[:-1])
+    assert not claim.listing_cut(None)  # "could not look" is its own answer
+
+
+def test_a_pr_missing_from_a_cut_list_is_unknown_not_closed() -> None:
+    """A ghostshift claim naming a PR past the cut read as closed and was
+    dropped from ``status`` (WP-2312); only an uncut list can say closed."""
+    from types import SimpleNamespace
+
+    cut = [SimpleNamespace(number=n) for n in range(1, claim.OPEN_PR_LIMIT + 1)]
+    assert claim.pr_open_in(cut)(1) is True
+    assert claim.pr_open_in(cut)(99_999) is None
+    assert claim.pr_open_in(cut[:-1])(99_999) is False
+    assert claim.pr_open_in(None)(1) is None
+
+
 def test_one_broad_issue_does_not_fill_the_table_with_one_pr(
     repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1589,6 +1622,51 @@ def test_the_issue_file_carries_body_comments_and_both_reference_kinds() -> None
     for needle in ("# #390 — issue 390", "body of 390", "### them · 2026-09-18T20:31:01Z", "a reply",
                    "cited by: WP-1418 ⬜", "PR #391 (2026-09-18)", "PR #326 (2026-09-15)"):
         assert needle in text
+
+
+def test_the_table_notes_a_listing_that_reached_gh_s_limit(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    """Both listings are read against their limit before ``only`` narrows the
+    issues, since the limit is on what gh returned (WP-2312)."""
+    from types import SimpleNamespace
+
+    issues = [_issue(n) for n in range(1, backlog.ISSUE_LIMIT + 1)]
+    prs = [SimpleNamespace(number=10_000 + n, author="someone", issues=())
+           for n in range(backlog.wp_claim.OPEN_PR_LIMIT)]
+    monkeypatch.setattr(backlog, "fetch_issues", lambda root: (issues, None))
+    monkeypatch.setattr(backlog.wp_claim, "open_prs", lambda root: prs)
+    monkeypatch.setattr(backlog, "merged_pr_references", lambda root: ([], None))
+    monkeypatch.setattr(backlog, "commit_references", lambda root, since: [])
+    monkeypatch.chdir(repo)
+
+    assert backlog.main(["backlog.py", str(repo / "out"), "7"]) == 0
+    out = capsys.readouterr().out
+    assert f"limit of {backlog.ISSUE_LIMIT} open issues" in out
+    assert f"limit of {backlog.wp_claim.OPEN_PR_LIMIT} open PRs" in out
+
+    monkeypatch.setattr(backlog, "fetch_issues", lambda root: (issues[:-1], None))
+    monkeypatch.setattr(backlog.wp_claim, "open_prs", lambda root: prs[:-1])
+    assert backlog.main(["backlog.py", str(repo / "out")]) == 0
+    assert "limit of" not in capsys.readouterr().out
+
+
+def test_the_landed_column_says_how_far_back_it_can_see() -> None:
+    """A merged PR's body reaches the table only through the merged listing,
+    since the commit parser skips merges; a full listing whose oldest-opened PR
+    is newer than the oldest open issue (gh lists by creation, not merge), or a
+    shallow clone, is said (WP-2312)."""
+    def merged(n: int, day: str):
+        return [backlog.Reference("merged PR", f"PR #{i}", frozenset(), False, day) for i in range(n)]
+
+    full = merged(backlog.MERGED_LIMIT, "2026-11-01")
+    (note,) = backlog.reach_notes(full, "2026-09-01", shallow=False)
+    assert "opened since 2026-11-01" in note
+    assert backlog.reach_notes(full, "2026-11-02", shallow=False) == []  # reaches past it
+    assert backlog.reach_notes(full[:-1], "2026-09-01", shallow=False) == []  # the whole list
+    assert backlog.reach_notes(None, "2026-09-01", shallow=False) == []  # gh declined: main says so
+    (note,) = backlog.reach_notes([], "2026-09-01", shallow=True)
+    assert "shallow" in note
 
 
 # --------------------------------------------------------------------------- #
