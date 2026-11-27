@@ -815,3 +815,11 @@ rule above the constant).  ``capabilities().expression_grammar_version`` does
 not move either.  The grammar parses any name, and the names a peak equation
 binds belong to the schema (``schemas.peak_equation.REFLECTION_NAMES``).
 WP-2107 moved the grammar for its two functions and the schema for its names.
+
+Also in 0.62 (WP-2317, ruling R7): ``StageResult.window_refit_loss`` added.
+A stage that a later stage refits now sizes its windows' movement slack from
+the position parameters it can move (``forward.WINDOW_MOVE_FWHM``, at most the
+old 0.3°), and every stage of ``Refinement``'s runners re-solves once on fresh windows when its frozen ones dropped
+more than its window fraction at its answer.  The field is the loss that
+triggered that refit, and ``None`` where none ran.  The ``stage_end`` event
+carries it too, an additive field on an existing kind.

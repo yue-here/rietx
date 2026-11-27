@@ -2575,7 +2575,11 @@ ROWS: tuple[Row, ...] = (
                   "one family); reported only for the last stage and the one before a "
                   "closing stage, since the calibrate guide's sample_profile stage ends "
                   "at 12 % and the stages after it repair it (one synthetic fit; this "
-                  "stage selection is the session's judgement, not yet ruled)"),
+                  "stage selection is the session's judgement, not yet ruled); since "
+                  "WP-2317 R7 a stage past its fraction re-solves once on fresh windows, "
+                  "so this reads the second solve: the runaway re-solves at axial_sl 558 "
+                  "to a loss under 2 % and is silent here, recorded as "
+                  "StageResult.window_refit_loss 73 %"),
         grounds=("No surveyed program reports this: GSAS-II, MAUD, RIETAN-FP and "
                  "EasyDiffraction resize every evaluation, TOPAS rebuilds its buffer past "
                  "a width tolerance, FullProf never does, BGMN documents no rule. The "
@@ -3063,6 +3067,28 @@ ROWS: tuple[Row, ...] = (
                  "converges when a closing stage follows it (WP-2045 option 5, ruled "
                  "2026-10-24)."),
         approved="2026-11-01"),
+    Row("rietx.schemas.results.StageResult.window_refit_loss", "action", tier=3, ambiguity=1,
+        evidence=("the share of Bragg intensity the stage's first windows dropped at its first "
+                  "answer (fresh windows against frozen, window_loss's measure) when it passed "
+                  "the stage's window fraction, so the stage solved once more on windows sized "
+                  "there; written by both of Refinement's stage runners, None on a stage that "
+                  "did not re-solve, a stage with a declared window_slack_deg, a non-finite stop "
+                  "and every joint-fit stage. Measured 2026-11-27 (development data): from a "
+                  "cell 0.3 % long it fired once in 4 families (SRM 660c, 291 -> 278 residual "
+                  "evaluations in the whole fit), from the protocols' starts and a zero 0.1 deg "
+                  "off never; on the cpd-1b runaway of "
+                  "tests/test_acceptance_sequential.py it reads 73 % and the second solve stays "
+                  "at axial_sl 558; on the guides' profile stages that widen their peaks it "
+                  "reads 2.2-4.4 %, and the re-solve lands where a hand-run stage freeing "
+                  "nothing new did (Rwp 0.1022 -> 0.0940, examples/guides/stage.py)"),
+        grounds=("Ruled 2026-11-27 (WP-2317 R7): windows stay frozen within a solve, and a "
+                 "stage that ends past its own fraction re-solves once on fresh windows.  Kind 1: "
+                 "an answer computed on windows that miss its peaks is an arithmetic error.  "
+                 "GSAS-II, MAUD, RIETAN-FP and EasyDiffraction rebuild their windows every "
+                 "evaluation and TOPAS's peak buffer tracks positions; FullProf freezes them "
+                 "for a run, and its user's next run is this re-solve (docs/practice.md § Room "
+                 "for a peak to move inside its window)."),
+        approved="2026-11-27"),
     Row("rietx.schemas.results.StageResult.window_area_tol", "action", tier=2, ambiguity=1,
         evidence=("the record of the closing stage PlanSpec:closing_window_tol runs (that "
                   "row's evidence: BGMN's closing run by default), written by both stage "
@@ -4690,14 +4716,51 @@ ROWS: tuple[Row, ...] = (
                  "ruled 2026-10-22)."),
         approved="2026-10-22"),
     Row("rietx.model.forward.WINDOW_MIN_DEG", "constant", tier=3, value=0.3,
-        evidence=("minimum window half-width, the room a peak has to move within one stage; "
-                  "measured 2026-10-21 on SRM 660c, FAP, cpd-1a and 11-BM NAC from starts near "
-                  "each answer and a zero 0.1 deg off: largest move 0.21 deg (1.4x margin, "
-                  "tests/test_window_domain.py); untested from a cell off its answer, where 0.3 % "
-                  "moves a 120 deg peak about 0.6 deg, and a peak leaving its window is silent"),
+        evidence=("uniform movement slack of every compile but the staged runner's stage "
+                  "compiles for a stage a later one refits: the stage whose answer is the "
+                  "result, a stage run on its own, a fresh compile at an answer, a joint fit, "
+                  "a declared shift equation, and the ceiling of the slack sized from what a "
+                  "stage frees (WINDOW_MOVE_FWHM, WP-2317 R7); measured 2026-10-21 on SRM 660c, "
+                  "FAP, cpd-1a and 11-BM NAC from starts near each answer and a zero 0.1 deg "
+                  "off: largest move 0.21 deg; from every cell length 0.3 % long, 0.68 deg "
+                  "(FAP), 0.87 (cpd-1a) and 1.15 (SRM 660c) in one stage, past it, with the "
+                  "protocol's answer unchanged since later stages recompile (2026-11-27, "
+                  "tests/test_window_domain.py, all four development data). Its tail room is "
+                  "load-bearing beyond movement: sized by WINDOW_MOVE_FWHM on a plan's last stage, the "
+                  "series guide's cell esds doubled and Rwp rose 4.1 -> 4.8 %, so the answer stage "
+                  "keeps it"),
         grounds=("A numerical setting whose domain test covers less than the domain it claims; "
-                 "tier 3 under B10 option 2 (ruled 2026-10-19) until that is measured."),
+                 "tier 3 under B10 option 2 (ruled 2026-10-19).  The cell start is measured "
+                 "since WP-2317; Refinement's runners re-solve a stage once when its window "
+                 "loss passes the stage's fraction, which covers a peak that moved or widened "
+                 "past it.  A joint fit has no re-solve, and the shift-equation stage was not "
+                 "measured from the cell start."),
         approved="2026-10-19"),
+    Row("rietx.model.forward.WINDOW_MOVE_FWHM", "constant", tier=3, value=3.0,
+        evidence=("movement allowance per position family a stage frees, in the peak's own FWHM, "
+                  "shaped by each family's 2theta dependence, plus half a point step, capped at "
+                  "WINDOW_MIN_DEG (WP-2317 R7); applied only to a stage that a later stage of "
+                  "its plan refits; measured 2026-11-27 on SRM 660c, FAP, cpd-1a and 11-BM NAC "
+                  "(all development data) and four Nb18W16O93 bench cases: largest stage "
+                  "movement 1.17 FWHM from the protocols' starts, 2.43 FWHM from a zero 0.1 deg "
+                  "off (cpd-1a zero_disp), every reflection inside its own slack; at 3 no stage "
+                  "re-solves from either start, at 1.5 SRM 660c re-solves from both (76 -> 86 "
+                  "and 98 -> 109 residual evaluations in the whole fit); from a cell 0.3 % long "
+                  "one stage of 4 families re-solves (SRM 660c); against the uniform 0.3 deg on "
+                  "the same starts, declared-stage points per evaluation 0.20-0.22x on NAC, "
+                  "0.76-0.85x on SRM 660c, 0.98-0.99x on FAP, cpd-1a and the bench cases, and "
+                  "every answer within 0.06 esd, background coefficients 0.08 "
+                  "(tests/test_window_domain.py, tests/test_window_slack.py)"),
+        grounds=("Ours, a speed setting (Rule 5, Arithmetic accuracy).  A stage re-solves once "
+                 "on fresh windows when its window loss passes its fraction (R7, ruled "
+                 "2026-11-27, WP-2317), never a third time; a second solve still past it is "
+                 "warned only on the last stages (STAGE_WINDOWS_STALE).  So the allowance sets "
+                 "how often the re-solve is paid, and the measured answers moved under a tenth "
+                 "of an esd against the uniform slack's.  Widening peaks and a growing axial "
+                 "extent lose the 0.3 deg headroom they had and are covered by the re-solve "
+                 "alone.  3 is the smallest whole multiple covering every measured warm and "
+                 "cold-zero movement."),
+        approved="2026-11-27", approved_by="checked"),
     Row("rietx.model.forward._BASES_CHUNK_ROWS", "constant", tier="invariant", value=128,
         evidence=("chunking of the derivative bases; bit-identical at 1, 7, 128 and 4096 rows on a "
                   "298-row node bucket, every derivative plane and the forward pattern, tchz_pv and "
@@ -6730,10 +6793,14 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic: c_w = 1 is the identity, every restraint at the σ its caller "
                   "declared (bit-identical to pre-WP-1074)")),
     Row("rietx.schemas.plan.StageSpec:window_slack_deg", "default", tier=3, ambiguity=1, value=None,
-        evidence=("None resolves to WINDOW_MIN_DEG and compiles bit-identical windows and pattern "
-                  "(tests/test_window_domain.py), so it inherits that row's tier"),
+        evidence=("None is the slack a stage sizes from the position parameters it frees "
+                  "(WINDOW_MOVE_FWHM, WP-2317 R7) where a later stage of its plan refits it, "
+                  "and WINDOW_MIN_DEG on the answer stage, a stage run on its own, a joint fit "
+                  "and a shift equation (tests/test_window_slack.py); a declared value is never "
+                  "re-solved"),
         grounds=("A numerical setting whose domain test covers less than the domain it claims; "
-                 "tier 3 under B10 option 2 (ruled 2026-10-19) until that is measured."),
+                 "tier 3 under B10 option 2 (ruled 2026-10-19), sized per stage since R7 "
+                 "(ruled 2026-11-27)."),
         approved="2026-10-19"),
     Row("rietx.schemas.instrument.Source:kind", "default", tier=1, ambiguity=1, value="xray_cw",
         evidence="arithmetic: a union tag, no value judgement"),
