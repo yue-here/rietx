@@ -1,6 +1,6 @@
 # WP-2315 — a large Pawley step pays for the rows that bind, not for every intensity
 
-Milestone: unscheduled · Status: 🔄 2026-11-27 — task 1 and the measurement done; Angle 0 ships only the cached |T|, its blockwise G·E⁻¹ moves bits on x86_64 OpenBLAS and joins Angles 1-2 behind WP-2317's R0, R4, R5 and its task 1
+Milestone: unscheduled · Status: 🔄 2026-11-27 — task 1, the cached |T| (Angle 0) and Angle 9's lattice merge (R5 (b)) done; Angles 0 (blockwise G·E⁻¹), 1-2 and 4 open
 Track: A large cell
 Depends on: 2317 soft (its `bigcell-pawley` case and rulings R0, R4, R5)
 Priority: P2 2026-11-27 — the maintainer's large-cell track, ruled to proceed whatever the user's case shows (cells this size are met in the wild); real patterns on the tree reach the slow step once in 32 runs, but a large Pawley cell reaches it
@@ -274,6 +274,112 @@ free swap under LM.
   (variable projection, angle 7).
 
 ## Handover log
+
+### 2026-11-27 (4th session) — Angle 9, the lattice merge (ghostshift runner; PR #PRNUM)
+
+Built WP-2317's R5 (b), "go (b)". Branch `wp2315-pawley-lattice-merge`,
+stacked on the `wp2317-rulings` commits (through aa612fe02).
+
+*What changed.*
+- `symmetry.lattice_coincidences` finds reflections whose d agree for every
+  metric the setting allows. Two orbits coincide for every allowed metric
+  exactly when their orbit second moments Σ_R (Rᵀh)(Rᵀh)ᵀ agree. That sum is
+  the Reynolds projection of hhᵀ onto the invariant metrics, and it is an
+  integer matrix, so the test is exact.
+- `forward._lattice_merge_groups` declines the merge for a phase whose model
+  reads hkl: a Stephens block, a peak equation (any `peq`, since one may read
+  h, k, l), satellites or a magnetic component. Texture and extinction never
+  enter a Pawley fit.
+- `PawleyBlock` now holds columns. A merged group is one column carrying the
+  sum. Each member is drawn at m_k/Σm of it (equal F², since a Pawley
+  intensity is the whole peak) and reports an infinite esd. `expand` is a
+  gather on numpy and a frozen dense matmul on the traced backends. The groups
+  are frozen at compile and do not depend on the cell.
+- The overlap restraint's target is equal F² (m_k/Σm). Groups with equal
+  multiplicities give the old rows bit for bit.
+- Cascade: `n_free_parameters` counts columns; `PAWLEY_OVERLAP_UNRESOLVED`
+  (info) names each phase's merged groups as `(h,k,l)+(h,k,l)` labels;
+  `ReflectionRow.merged_group` in the exporter; the series carry goes through
+  `set_pawley_intensities`, which expands per phase; help, `_audit`
+  (suggestion count 2), the manual's `fm-pawley-lattice` equation and the
+  `fm-pawley-split` share, `reference/exports.md`, `guides/export.md`,
+  practice.md's rietx and GSAS-II rows, the skill row (copies re-synced), a
+  `pawley_merged` cross-backend config, and `multi.DIAGNOSTIC_SCOPES`.
+- `toy_pawley`'s golden is re-pinned: only its restraint rows moved
+  (`tests/data/README.md` § backend_goldens).
+
+*Verified.* `tests/test_pawley_lattice_merge.py`: on 18 space groups covering
+every Laue class and setting, the groups equal GSAS-II's per-class identities
+(GSASIIstrIO.py:955-998) to 2θ 110°; random cells drawn from
+`cell_constraints` agree with the d-classes; the textbook pairs (cubic
+333/511 and 410/322, tetragonal 210/120 under 4/m and not under mmm); a merged LaB6 block; the Stephens
+exception with its equal-F² rows; and each of the four hkl-reading declines. `tests/test_pawley.py`'s overlapped LaB6 fit
+reports the 221+300 sum within 6 % of the truth and the members as unmeasured.
+
+*Measured* (`docs/wp/2315-probe/merge_measure.py`; macOS arm64, `[dev,jax]`,
+compiled tier on; main = aa612fe02's `src`; three runs each, interleaved, on a quiet machine). References are
+independent where one exists, else GSAS's answer on the same pattern.
+
+| fit | columns main → branch | merged groups | n_free | wall main / branch (min-max of 3) | moved values |
+|---|---|---|---|---|---|
+| FAP.XRA (P 6₃/m) | 329 → 206 | 115 | 343 → 220 | 0.76-0.88 / 0.69-0.73 s | a 9.3716750 → 9.3716754 Å (+0.007 esd; GSAS's EXP 9.371724, gap 4.9e-5 on both); c 6.8858654 → 6.8858663 Å (+0.016 esd; EXP 6.885867, gap 1.6e-6 → 0.7e-6); esd(a) 5.90e-5 → 5.84e-5 |
+| SRM 660c LaB6 (P m-3m) | 30 → 24 | 6 | 43 → 37 | 0.25-0.29 / 0.26-0.28 s | a 4.157066932 Å, unchanged to 3e-13 (CIF 4.156780; the gap is the protocol's, the same on both); esd 1.6462e-5 → 1.6452e-5 |
+| corundum, SRM 676a (R-3c) | 64 → 60 | 4 | 78 → 74 | 0.38-0.42 / 0.41 s | cell unchanged to 1e-12, c/a 2.7298426 on both (certificate 2.7298468) |
+
+Rwp moved only on FAP (0.07824420 → 0.07824007) and is not the evidence.
+The wall moves are within run-to-run spread except FAP's, about 10 %
+faster. These fits are too small for the column count to dominate. A large
+cubic, tetragonal, trigonal or hexagonal cell is where the merge pays;
+probe 1 (P2₁2₁2₁) has no coincidence to merge. The plots
+`tests/output/wp2315_<case>_pawley.png` and the LaB6 overlapped fit were
+looked at. Each matches main's; corundum's peak-shape residual at low angle
+belongs to the protocol and is the same on main.
+
+*Tests* (macOS arm64, `[dev,jax]`): fast selection (`-m "not slow"`) 16 066 passed, 268 skipped, 30 xfailed, 16.5 min. full suite (`-n auto --dist loadgroup`) 17 031 passed, 275 skipped, 49 xfailed, 1 xpassed, 1 failed, 53 min. The failure was `test_audit_delta.py::test_the_reader_agrees_with_the_import`, caused by an `_audit.py` prose edit landing mid-run (the reader read the new text, the import was older); alone on the final tree it passes, 16 of 16.
+`tests.reader_output` exit READER.
+
+*Settled by Claude* (for blind review):
+- Detection by the orbit's second moment in `symmetry.py`, not by calling
+  `cell_constraints`. The root CLAUDE.md makes `ParameterTable` its only
+  caller. The test crosses the two. Alternative: route detection through
+  `ParameterTable`.
+- Any peak equation declines the merge, even one that reads no hkl.
+  Alternative: parse the expression for h, k, l. The conservative form costs
+  columns, never accuracy.
+- A merged member reports an infinite esd, the existing "unmeasured" spelling
+  (`LSQOutcome.discarded`), with the group in the diagnostic and in
+  `merged_group`. A `ReflectionState` field would be a stored-format change,
+  which goes to the maintainer. Alternative: that field.
+- The two WP-2311 restraint tests keep LaB6's 221/300 pair apart by
+  monkeypatching `_lattice_merge_groups`, since that pair is now merged.
+- For generality review: the merge is an automatic action the audit table
+  cannot see. Its tier is the physics (a metric identity) plus GSAS-II's
+  practice; it has no threshold.
+
+*Rule 1 kind.* The merge is kind 1. The split inside a group cannot be
+measured at any cell the setting allows. The dissenters checked: TOPAS, BGMN
+and MAUD leave both intensities free with no stated rule (practice.md), which
+is no different physical answer; GSAS-II ties them as this does. A history
+node's `inf` esd round-trips as `"Infinity"` (`ser_json_inf_nan`).
+
+*Generality review* (the `generality-review` agent, Sonnet, 2026-11-27).
+Held: the merge (tier 1 detection, tier 2 share convention), the suggestion
+count, the restraint target. Acted on: a test now pins each of the four
+hkl-reading declines (`test_each_hkl_reading_term_declines_the_merge`), and
+`PAWLEY_OVERLAP_FWHM_FRAC`'s grounds name the equal-F² target and say its
+sweeps predate it. Open, for the coordinator: the review rates the merged-group
+report as weak. It fires at `info` on every cubic, tetragonal, trigonal and
+hexagonal Pawley fit (3 of 3 here), and one code now carries two cases with
+different `where`/`value` shapes. Its proposal is a separate code (say
+`PAWLEY_LATTICE_MERGED`) with its own audit row, or a record field plus a help
+entry in place of a diagnostic. The brief named `PAWLEY_OVERLAP_UNRESOLVED`,
+so this branch keeps it.
+
+*Left undone.*
+- The merged sum's esd is not in the stored record (only the diagnostic and
+  the exporter name the group).
+- `solve/cost.py`'s nuisance columns are not merged.
+- torch is not installed here, so the `pawley_merged` torch rows did not run.
 
 ### 2026-11-27 (3rd session) — Angle 0's blockwise product withdrawn (ghostshift runner; PR #1861)
 
