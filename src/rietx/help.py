@@ -673,10 +673,15 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         title="TOF Gaussian variance σ₂²",
         description=(
             "The d⁴ term of the Gaussian variance, σ²(d) = σ₀² + σ₁²·d² + σ₂²·d⁴. It is "
-            "the instrument's share of a variance that grows as d⁴."
+            "the instrument's share of a variance that grows as d⁴. A calibration may "
+            "write it negative, which is legal only while σ²(d) stays positive over the "
+            "bank's d range. The `.iparm` reader checks it over the file's `I ITYP` "
+            "flight-time window, the range the spectrum was fitted over, and reads such "
+            "a value without the floor at zero. Check that your data stay inside that "
+            "range."
         ),
         unit="µs²/Å⁴", default="0.0",
-        typical="0-50 µs²/Å⁴",
+        typical="0-50 µs²/Å⁴; a facility file may write a small negative value",
         anchor="reference/instrument.html#time-of-flight-peak-shape",
     ),
     "instrument.source.profile_tof.gam0": HelpEntry(
@@ -2949,6 +2954,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "A time-of-flight bank can hold several peak-shape sets. Only the default "
             "set is read, so any other set is skipped. A bank with no set at all comes "
             "back with every profile coefficient at zero, and a fit refuses it by name. "
+            "So does a bank whose one set is a peak shape this package does not "
+            "compute. "
             "Enter the profile yourself, or read it from another file for the same bank."
         ),
     ),
@@ -2959,6 +2966,26 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "names the coefficients but never says that the record holds them in that "
             "order, so the order is an assumption. One cutoff value is read and not "
             "used. Check the values against a known profile before you refine from them."
+        ),
+    ),
+    "GSAS_IPARM_SET_NUMBER_ASSUMED": HelpEntry(
+        title="A peak-shape set without its number was read as set 1",
+        description=(
+            "The file wrote a bank's peak-shape set without the set number that the "
+            "GSAS manual puts in column 11. Instrument files written at ISIS do this. "
+            "The bank holds no other set, so the set can only be set 1, the default, "
+            "and it was read as set 1. Nothing to do. Where a bank also holds a "
+            "numbered set, the unnumbered one is skipped instead."
+        ),
+    ),
+    "GSAS_IPARM_TRAILING_ZEROS_READ": HelpEntry(
+        title="A number ran past its columns into trailing zeros",
+        description=(
+            "The reader takes each value from the columns the GSAS manual gives it. "
+            "Here the last value on a record ran past its columns, into columns that "
+            "belong to no field, and the extra characters are zeros. The number in "
+            "the value's own columns and the whole number are the same, so the value "
+            "was read. Nothing to do. Any other overrun is still refused."
         ),
     ),
     "GSAS_PRM_FIELD_DROPPED": HelpEntry(

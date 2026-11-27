@@ -53,8 +53,25 @@ bank number ``bb`` in columns 5-6.
 * ``INS bbPRCFn `` (2I5,F10.5; PTYP, NCOF, CTOF) and ``INS bbPRCFnc``
   (4E15.6) — the NTYP profile sets; **set n = 1 is the default** whatever its
   PTYP (p. 223) and is the only set read.  A set written without its number
-  (``INS bbPRCF  ``, an older writer's form) is declined, not read as set 1:
-  the bank keeps its calibration, as a bank with no set does.
+  (``INS bbPRCF  ``, the form ISIS files write) has one reading where it is
+  the bank's only set: set 1, read as such and recorded
+  (``GSAS_IPARM_SET_NUMBER_ASSUMED``).  Beside a numbered set, or beside a
+  second unnumbered one, it has two, and it is declined: the bank keeps its
+  calibration, as a bank with no set does.  A lone unnumbered set of a
+  function this package does not evaluate is declined the same way, where a
+  numbered set 1 of one is refused (WP-2146's open question).  So is a lone
+  unnumbered 8-coefficient type-1 block: the legacy reader restates that
+  block only under a numbered key, so the legacy pointer would lead nowhere.
+
+**The variance, not its coefficients.**  sig-0 and sig-1 are refused when
+negative.  sig-2 is tested on what it is for: σ²(d) = sig-0 + sig-1·d² +
+sig-2·d⁴ must be positive where the bank has data, and need not be outside
+it.  The bank's d range is its ``I ITYP`` window, TMIN-TMAX, mapped through
+ICONS' DIFC, DIFA and ZERO.  A negative sig-2 makes σ² concave in d², so
+its two ends decide.  POLARIS bank 5 (σ² = 29.2187 d² − 1.81041 d⁴, range
+0.108-2.762 Å, zero at 4.017 Å) passes, and the read's report says where σ²
+turns negative.  **A bank with no window keeps the sign test**, because no
+range the file does not state is invented for it.
 
 **Named assumption — PRCF coefficient order.**  The manual lists each
 function's coefficients "respectively" against their GSAS names (function 1,
@@ -64,7 +81,11 @@ sig-2 gam-0 gam-1 gam-2 g1ec g2ec gsf rstr rsta rsca L11 L22 L33 L12 L13 L23``)
 but never says that is the order in the record.  It is the only ordering the
 documentation offers and it is adopted as such.  A block whose NCOF is not the
 documented 12 / 15 / 21 for PTYP 1 / 2 / 3 is refused, never padded or
-truncated.  Profile functions 2 (Ikeda-Carpenter), 4 and 5 are documented but
+truncated.  The manual says nothing of a shorter block for these three.  Its
+record reads ``COF(I), I=1,NCOF`` (p. 223), and only functions 4 and 5 state
+a count that follows the Laue symmetry (14-27 and 14-21, p. 152), so a
+14-coefficient function-3 block has no documented reading (checked against
+the 2004 edition, WP-2146).  Profile functions 2 (Ikeda-Carpenter), 4 and 5 are documented but
 not evaluated by this package: a default set of one of them is refused by
 name; a non-default one is reported and skipped.  The anisotropic and
 peak-shift coefficients of functions 1 and 3 belong with the microstructure
@@ -86,6 +107,15 @@ the right span means a token began on the left and stopped inside the right
 span, which no right-aligned field produces, and the record is refused
 naming its key, both fields' columns and the raw text.  Blank fields keep
 their FORTRAN reading of zero.
+
+**One overrun has one reading and is read** (WP-2146): the last field's
+number running into the columns after it, which no field claims, where
+every character past the field is a zero and the column read and the token
+read give one number.  The HRPD file writes CTOF ``0.001000`` in columns
+26-33; by column it is ``0.00100``, the same number.  It is read and
+recorded once per record (``GSAS_IPARM_TRAILING_ZEROS_READ``).  A zero
+spilling into the next field's columns is that field's digit too, so it has
+two readings and stays refused, as does any other spill.
 
 What this cannot see, stated rather than hidden:
 
@@ -148,6 +178,7 @@ Every refusal names the file.
 
 from __future__ import annotations
 
+import math
 import re
 from pathlib import Path
 
@@ -170,6 +201,9 @@ PRCF_COEFFICIENT_NAMES: dict[int, tuple[str, ...]] = {
         "L11", "L22", "L33", "L12", "L13", "L23"),
 }
 
+#: The page listing each function's coefficients, which a refusal cites.
+_PRCF_NAMES_PAGE: dict[int, int] = {1: 144, 2: 147, 3: 148}
+
 #: Which documented names land on which :class:`ProfileTOF` field.
 _PRCF_TO_PROFILE: dict[int, dict[str, str]] = {
     1: {"alp-0": "alpha0", "alp-1": "alpha1", "bet-0": "beta0", "bet-1": "beta1",
@@ -179,12 +213,17 @@ _PRCF_TO_PROFILE: dict[int, dict[str, str]] = {
         "gam-2": "gam2"},
 }
 
-#: Documented profile functions this package does not evaluate, and why.
+#: Documented profile functions this package does not evaluate.
 _PRCF_NOT_EVALUATED: dict[int, str] = {
-    2: "the Ikeda-Carpenter function (manual p. 145-147), a causal shape with a "
-       "different peak origin from the back-to-back pair",
+    2: "the Ikeda-Carpenter function (manual p. 145-147)",
     4: "profile function 4 (manual p. 149)",
     5: "profile function 5 (manual p. 155)",
+}
+
+#: Why a refusal does not map a default set onto the back-to-back pair; said
+#: only where that mapping is refused, since a decline maps nothing.
+_PRCF_WHY_NOT_MAPPED: dict[int, str] = {
+    2: ", a causal shape with a different peak origin from the back-to-back pair",
 }
 
 #: Each parsed record's FORTRAN layout as contiguous ``(first, last, name)``
@@ -231,10 +270,12 @@ class _Record:
     are not records), which is the number an error message quotes.
     """
 
-    def __init__(self, path: Path, number: int, text: str):
+    def __init__(self, path: Path, number: int, text: str, diagnostics=None):
         self.path = path
         self.number_in_file = number
         self.text = text.rstrip("\r\n").ljust(80)
+        self.diagnostics = diagnostics
+        self._repaired = False
 
     def cols(self, a: int, b: int) -> str:
         return self.text[a - 1:b]
@@ -282,9 +323,10 @@ class _Record:
         produces.
         """
         spans = list(fields)
-        if spans[-1][1] < 80:
+        tail = spans[-1][1] < 80
+        if tail:
             spans.append((spans[-1][1] + 1, 80, "the columns after the last field"))
-        for (a1, b1, n1), (a2, b2, n2) in zip(spans, spans[1:]):
+        for k, ((a1, b1, n1), (a2, b2, n2)) in enumerate(zip(spans, spans[1:])):
             left, right = self.cols(a1, b1), self.cols(a2, b2)
             if left[-1] == " " or right[0] == " " or " " not in right:
                 continue
@@ -292,6 +334,9 @@ class _Record:
             while start > a1 and self.text[start - 2] != " ":
                 start -= 1
             end = a2 + right.index(" ") - 1
+            if (tail and k == len(spans) - 2
+                    and self._trailing_zeros(start, a1, b1, end, n1)):
+                continue
             raise self.fail(
                 f"the text {self.text[start - 1:end]!r} in columns {start}-{end} "
                 f"runs across the boundary between {n1} (columns {a1}-{b1}) and "
@@ -299,6 +344,42 @@ class _Record:
                 f"{left.strip()!r} and {n2} would begin {right.strip()!r} — a "
                 f"misaligned field, refused rather than read as a truncated "
                 f"number; right-align each value inside its columns")
+
+    def _trailing_zeros(self, start: int, first: int, last: int, end: int,
+                        name: str) -> bool:
+        """Whether the last field's overrun into the columns no field claims
+        is trailing zeros that leave its number unchanged (module docstring,
+        § Column overrun), recorded once per record when it is.
+
+        Those columns belong to no field, so the characters there have one
+        reading: the end of the last field's number.  Only zeros whose
+        column read and token read give one number are read.
+        """
+        field = self.text[start - 1:last]
+        token = self.text[start - 1:end]
+        spill = self.text[last:end]
+        if spill.strip("0"):
+            return False
+        try:
+            # the exponent letters number() accepts, D and d included
+            value = float(field.replace("D", "E").replace("d", "e"))
+            same = value == float(token.replace("D", "E").replace("d", "e"))
+        except ValueError:
+            return False
+        if not same:
+            return False
+        if not self._repaired:
+            self._repaired = True
+            _note(self.diagnostics, "info", "GSAS_IPARM_TRAILING_ZEROS_READ",
+                  f"{self.path.name}: record {self.number_in_file} "
+                  f"({self.text[:12].rstrip()!r}) writes {token!r} in columns "
+                  f"{start}-{end}, running past {name}'s columns "
+                  f"{first}-{last}. The "
+                  f"columns past {name} hold only zeros, so {name} was read "
+                  f"as {value!r}, the number in its "
+                  f"own columns.",
+                  where=[self.text[:12].rstrip()])
+        return True
 
 
 def _read_records(path: Path) -> list[tuple[str, str]]:
@@ -492,20 +573,61 @@ def _spectrum(path: Path, bank: int, ityp_rec: _Record | None,
 
 def _profile(path: Path, bank: int, headers: dict[int, _Record],
              conts: dict[int, dict[int, _Record]], diagnostics,
-             unnumbered: _Record | None = None) -> ProfileTOF:
-    if unnumbered is not None:
-        _note(diagnostics, "warning" if not headers else "info",
-              "GSAS_IPARM_PROFILE_DECLINED",
-              f"Bank {bank}: a PRCF set was not read, because the PRCF set "
-              f"number in column 11 is ' '; the manual numbers the sets "
-              f"n = 1 … NTYP (GSAS Technical Manual p. 223), so which set it "
-              f"is the file does not say.",
-              where=[f"bank {bank}", "PRCF"])
+             lone: list[_Record] | tuple[_Record, ...] = (),
+             lone_c: dict[int, _Record] | None = None,
+             d_range: tuple[float, float] | None = None
+             ) -> ProfileTOF:
+    lone_c = lone_c or {}
+    if lone or lone_c:
+        if headers or conts or len(lone) > 1:
+            # beside a numbered set, or as one of several, an unnumbered set
+            # has more than one reading: declined, the bank keeping the rest
+            _note(diagnostics, "warning" if not headers else "info",
+                  "GSAS_IPARM_PROFILE_DECLINED",
+                  f"Bank {bank}: a PRCF set was not read, because the PRCF set "
+                  f"number in column 11 is blank and the bank holds another set; "
+                  f"the manual numbers the sets n = 1 … NTYP (GSAS Technical "
+                  f"Manual p. 223), so the file does not say which set it is.",
+                  where=[f"bank {bank}", "PRCF"])
+        elif not lone:
+            raise ValueError(f"{path}: bank {bank} has PRCF coefficient records "
+                             f"and no PRCF header")
+        else:
+            rec = lone[0]
+            rec.check_columns(_PRCF_FIELDS)
+            ptyp = rec.integer(13, 17, "PTYP")
+            if ptyp in _PRCF_NOT_EVALUATED:
+                _note(diagnostics, "warning", "GSAS_IPARM_PROFILE_DECLINED",
+                      f"Bank {bank}: its one PRCF set, written without a set "
+                      f"number, declares profile function {ptyp}, "
+                      f"{_PRCF_NOT_EVALUATED[ptyp]}, which this package does not "
+                      f"evaluate; the profile coefficients are left at zero.",
+                      where=[f"bank {bank}", "PRCF"])
+                return ProfileTOF()
+            if (ptyp, rec.integer(18, 22, "NCOF")) == (1, 8):
+                # the legacy LANSCE block, which read_lansce_iparm restates
+                # only under a numbered PRCF1 key: refusing it here with the
+                # legacy pointer would send the caller to a reader that
+                # refuses the same file, so it is declined as before
+                _note(diagnostics, "warning", "GSAS_IPARM_PROFILE_DECLINED",
+                      f"Bank {bank}: its one PRCF set, written without a set "
+                      f"number, is an 8-coefficient type-1 block, the legacy "
+                      f"LANSCE layout, which rietx.io.legacy.read_lansce_iparm "
+                      f"reads once the set is numbered 1 ('PRCF1'); the profile "
+                      f"coefficients are left at zero.",
+                      where=[f"bank {bank}", "PRCF"])
+                return ProfileTOF()
+            _note(diagnostics, "info", "GSAS_IPARM_SET_NUMBER_ASSUMED",
+                  f"Bank {bank}: the PRCF set number in column 11 is blank. The "
+                  f"bank holds one set, so it was read as set 1, the default "
+                  f"(GSAS Technical Manual p. 223).",
+                  where=[f"bank {bank}", "PRCF"])
+            headers, conts = {1: rec}, ({1: lone_c} if lone_c else {})
     if not headers:
         if conts:
             raise ValueError(f"{path}: bank {bank} has PRCF coefficient records "
                              f"and no PRCF header")
-        if unnumbered is None:
+        if not (lone or lone_c):
             _note(diagnostics, "warning", "GSAS_IPARM_PROFILE_DECLINED",
                   f"Bank {bank} has no PRCF profile set, so the profile "
                   f"coefficients are left at zero.",
@@ -537,10 +659,16 @@ def _profile(path: Path, bank: int, headers: dict[int, _Record],
                 raise rec.fail(
                     f"PRCF set {n} declares profile function {ptyp} with {ncof} "
                     f"coefficients; the manual documents {want} for function "
-                    f"{ptyp}, and a block of another length is refused — never "
-                    f"zero-padded or truncated — because the order of its "
-                    f"slots would be a guess"
-                    + (_LEGACY_POINTER if (ptyp, ncof) == (1, 8) else ""))
+                    f"{ptyp} (p. {_PRCF_NAMES_PAGE[ptyp]}), and a block of "
+                    f"another length is refused — "
+                    f"never zero-padded or truncated — because the order of "
+                    f"its slots would be a guess"
+                    + (_LEGACY_POINTER if (ptyp, ncof) == (1, 8) else
+                       f". To read it, find which {ncof} terms the file's "
+                       f"writer wrote, then write all {want} in the manual's "
+                       f"order with zero for each one left out"
+                       if ncof < want and ptyp not in _PRCF_NOT_EVALUATED
+                       else ""))
         if n != 1:
             _note(diagnostics, "info", "GSAS_IPARM_PROFILE_DECLINED",
                   f"Bank {bank}: PRCF set {n} (profile function {ptyp}) was "
@@ -551,7 +679,8 @@ def _profile(path: Path, bank: int, headers: dict[int, _Record],
         if ptyp in _PRCF_NOT_EVALUATED:
             raise rec.fail(
                 f"the default PRCF set declares PTYP = {ptyp}, "
-                f"{_PRCF_NOT_EVALUATED[ptyp]}, which this package does not "
+                f"{_PRCF_NOT_EVALUATED[ptyp]}"
+                f"{_PRCF_WHY_NOT_MAPPED.get(ptyp, '')}, which this package does not "
                 f"evaluate; refused rather than mapped onto the back-to-back "
                 f"coefficients")
         fields = _sequence(path, bank, f"PRCF{n}", conts.get(n, {}),
@@ -574,10 +703,13 @@ def _profile(path: Path, bank: int, headers: dict[int, _Record],
                     f"coefficient (GSAS Technical Manual p. 144, 148) that "
                     f"belongs with the microstructure machinery and has no slot "
                     f"on ProfileTOF; refused rather than dropped")
-        for field in ("sig0", "sig1", "sig2"):
+        for field in ("sig0", "sig1"):
             if kwargs.get(field, 0.0) < 0.0:
                 raise rec.fail(f"PRCF set {n}: {field} = {kwargs[field]!r} is a "
                                f"variance coefficient and is negative")
+        sig2_note = ""
+        if kwargs.get("sig2", 0.0) < 0.0:
+            sig2_note = _negative_sig2(rec, n, kwargs, d_range)
         try:
             chosen = ProfileTOF(**kwargs)
         except ValidationError as exc:
@@ -586,10 +718,74 @@ def _profile(path: Path, bank: int, headers: dict[int, _Record],
               f"Bank {bank}: PRCF set 1, profile function {ptyp} with {ncof} "
               f"coefficients, was read in the order the GSAS Technical Manual "
               f"lists them ({', '.join(names)}). That order is an assumption. "
-              f"CTOF = {ctof!r} was read and not used.",
+              f"CTOF = {ctof!r} was read and not used.{sig2_note}",
               where=[f"bank {bank}", "PRCF1"])
     assert chosen is not None
     return chosen
+
+
+def _d_range(difc: float, difa: float, zero: float, lo_us: float | None,
+             hi_us: float | None) -> tuple[float, float] | None:
+    """The bank's d range in Å, from its ``I ITYP`` flight-time window and its
+    calibration TOF = DIFC·d + DIFA·d² + ZERO (GSAS Technical Manual p. 222),
+    or ``None`` where the file does not give one.
+
+    The root taken is the one that tends to (t − ZERO)/DIFC as DIFA → 0,
+    written as 2(t − Z)/(C + √(C² + 4A(t − Z))) so that a small DIFA loses
+    no digits.  ``None`` where the window is absent, an end maps to no real
+    or no positive d, or the ends do not order.
+    """
+    if lo_us is None or hi_us is None or not difc > 0.0:
+        return None
+    ends = []
+    for t in (lo_us, hi_us):
+        rest = t - zero
+        disc = difc * difc + 4.0 * difa * rest
+        if not rest > 0.0 or disc < 0.0:
+            return None
+        ends.append(2.0 * rest / (difc + disc ** 0.5))
+    return (ends[0], ends[1]) if ends[0] < ends[1] else None
+
+
+def _negative_sig2(rec: _Record, n: int, kwargs: dict, d_range) -> str:
+    """Pass a negative sig-2 where σ²(d) > 0 over the bank's d range, refuse it
+    otherwise (module docstring, PRCF), and return the sentence the read's
+    report adds.
+
+    σ²(d) = sig-0 + sig-1·d² + sig-2·d⁴ is the variance (GSAS Technical Manual
+    p. 144, 148).  With sig-2 < 0 it is concave in d², so its least value on
+    an interval is at an end, and two evaluations decide.  The coefficient is
+    handed over as a :class:`Parameter` without the schema's floor at zero,
+    which describes each coefficient alone; the read value stays fixed.
+    """
+    s0, s1, s2 = (kwargs.get(f, 0.0) for f in ("sig0", "sig1", "sig2"))
+    if d_range is None:
+        raise rec.fail(
+            f"PRCF set {n}: sig2 = {s2!r} is negative, and the bank states no "
+            f"flight-time range that maps to a d range (an I ITYP record whose "
+            f"TMIN and TMAX lie above ZERO and give increasing d through DIFC "
+            f"and DIFA) over which the variance sig0 + sig1·d² + sig2·d⁴ could "
+            f"be checked, so the coefficient is refused")
+
+    def var(d):
+        return s0 + s1 * d * d + s2 * d ** 4
+
+    lo, hi = d_range
+    for d in (lo, hi):
+        if not var(d) > 0.0:
+            raise rec.fail(
+                f"PRCF set {n}: sig2 = {s2!r} makes the variance sig0 + sig1·d² "
+                f"+ sig2·d⁴ = {var(d):.6g} µs² at d = {d:.4g} Å, inside the "
+                f"bank's own range {lo:.4g}-{hi:.4g} Å (its I ITYP flight-time "
+                f"window); a variance must be positive where the bank has data")
+    disc = s1 * s1 - 4.0 * s2 * s0
+    edge = ((-s1 - disc ** 0.5) / (2.0 * s2)) ** 0.5
+    default = ProfileTOF.model_fields["sig2"].get_default(call_default_factory=True)
+    kwargs["sig2"] = Parameter(value=s2, vary=False, unit=default.unit,
+                               min=-math.inf)
+    return (f" sig2 = {s2!r} is negative. The variance stays positive over the "
+            f"bank's range {lo:.4g}-{hi:.4g} Å and turns negative past d = "
+            f"{edge:.4g} Å.")
 
 
 def read_gsas_tof_iparm(path: str | Path, *,
@@ -632,7 +828,7 @@ def _banks_from_records(path: Path, records: list[tuple[str, str]],
         line = key + payload
         if not line.startswith("INS "):
             continue
-        rec = _Record(path, number, line)
+        rec = _Record(path, number, line, diagnostics)
         bb = rec.cols(5, 6)
         name = rec.cols(7, 12)
         if not bb.strip():
@@ -654,7 +850,8 @@ def _banks_from_records(path: Path, records: list[tuple[str, str]],
             raise rec.fail(f"columns 5-6 hold {bb!r}, not a bank number")
         bank = banks.setdefault(int(bb), {
             "icons": None, "bnkpar": None, "ityp": None, "icoff": {},
-            "iecof": {}, "prcf": {}, "prcf_c": {}, "dropped": [], "bad_key": None})
+            "iecof": {}, "prcf": {}, "prcf_c": {}, "lone": [], "lone_c": {},
+            "dropped": [], "bad_key": None})
         if name == " ICONS":
             bank["icons"] = rec
         elif name == "BNKPAR":
@@ -666,10 +863,17 @@ def _banks_from_records(path: Path, records: list[tuple[str, str]],
         elif name.startswith("PRCF"):
             n, c = name[4], name[5]
             if n == " ":
-                # an older writer's form (an ISIS GEM calibration file): no set
-                # number.  Which set it is, the file does not say, so the set
-                # is declined, not read as set 1; the bank keeps the rest
-                bank["prcf_unnumbered"] = bank.get("prcf_unnumbered") or rec
+                # a facility writer's form (ISIS GEM, HRPD and POLARIS files):
+                # no set number.  Sorted here and judged in _profile, which
+                # knows whether the bank has any other set
+                if c == " ":
+                    bank["lone"].append(rec)
+                elif c.isdigit():
+                    bank["lone_c"][int(c)] = rec
+                else:
+                    bank["bad_key"] = bank["bad_key"] or rec.fail(
+                        f"column 12 of a PRCF key is {c!r}; it is blank on a "
+                        f"header and a digit on a coefficient record")
             elif not n.isdigit() or n == "0":
                 # refused when this bank is processed, so the file-level
                 # refusals (HTYPE, NBANK) and earlier banks speak first
@@ -732,7 +936,9 @@ def _banks_from_records(path: Path, records: list[tuple[str, str]],
         if bank["bad_key"] is not None:
             raise bank["bad_key"]
         profile = _profile(path, b, bank["prcf"], bank["prcf_c"], diagnostics,
-                           bank.get("prcf_unnumbered"))
+                           bank["lone"], bank["lone_c"],
+                           _d_range(difc, difa, zero, spectrum.tof_min_us,
+                                    spectrum.tof_max_us))
         try:
             source = TOFSource(difc=difc, difa=difa, tzero=zero,
                                two_theta_bank_deg=ttheta, l1_m=l1_m,

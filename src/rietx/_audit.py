@@ -1447,11 +1447,11 @@ ROWS: tuple[Row, ...] = (
         grounds="The format's overflow convention leaves no number to read."),
     Row("GSAS_IPARM_FIELD_DROPPED", "code", tier=1, ambiguity=1,
         evidence=('info; fires when a GSAS-I TOF .iparm holds a record or field the schema has '
-                  'no slot for, listing them (instrument_tof.py:747-751). The fields it names '
-                  'are CHKSUM (instrument_tof.py:441-443; the checksum algorithm is unpublished, '
+                  'no slot for, listing them (instrument_tof.py:946-950). The fields it names '
+                  'are CHKSUM (instrument_tof.py:516-518; the checksum algorithm is unpublished, '
                   'so it is read and never checked) and IECOR (no slot). A field the schema '
                   "could hold, or a non-zero slot beyond a function's coefficients, is refused "
-                  'rather than dropped (instrument_tof.py:451-470, 556-570). Fires exactly when '
+                  'rather than dropped (instrument_tof.py:527-546, 682-698). Fires exactly when '
                   'such a field is present'),
         grounds=('Arithmetic: a checksum or a correction record with no model meaning is read, '
                  'named and not carried; a number the model needs is never in this list.'),
@@ -1480,20 +1480,24 @@ ROWS: tuple[Row, ...] = (
                   'way GSAS-II reads them; nothing to do'),
         scope=('calibration',)),
     Row("GSAS_IPARM_PROFILE_DECLINED", "code", tier=1, ambiguity=1,
-        evidence=('info at two sites and warning at one (instrument_tof.py:495-515 and 543-550), '
-                  'so levels is two literals and no response is proposed. (a) A PRCF set whose '
-                  'number column is blank is declined, not read as set 1 (warning when the bank '
-                  'has no other set, info otherwise): the manual numbers sets 1..NTYP (Technical '
-                  'Manual p. 223), so which set it is the file does not say. (b) A bank with no '
-                  'PRCF set leaves the profile coefficients at zero (warning). (c) Sets other '
-                  'than 1 are not read, because set 1 is the default whatever its function (p. '
-                  '223) (info). Each is fixed by what the file states: nothing is invented'),
+        evidence=('five sites, one of them either level (instrument_tof.py:576-628 and 666-671), '
+                  'so levels is two literals and no response is proposed. (a) An unnumbered PRCF '
+                  'set beside a numbered set, or one of several unnumbered sets, is declined '
+                  '(warning when the bank has no numbered set, info otherwise): the manual numbers '
+                  'sets 1..NTYP (Technical Manual p. 223), so which set it is the file does not '
+                  'say. A lone unnumbered set is read as set 1 (GSAS_IPARM_SET_NUMBER_ASSUMED) '
+                  'unless it declares function 2, 4 or 5, which the package does not evaluate, or '
+                  'is an 8-coefficient type-1 block, which only the legacy reader reads, as a '
+                  'numbered set 1; those two leave the coefficients at zero (warning). (b) A bank '
+                  'with no PRCF set leaves the profile coefficients at zero (warning). (c) Sets '
+                  'other than 1 are not read, because set 1 is the default whatever its function '
+                  '(p. 223) (info). Each is fixed by what the file states: nothing is invented'),
         grounds=('Format definition: the manual makes set 1 the default and numbers the sets; '
                  'where the file states no number or no set the package reads nothing and says '
                  'so.')),
     Row("GSAS_IPARM_PROFILE_READ", "code", tier=2, ambiguity=1,
         evidence=('info; fires once per bank when PRCF set 1 (function 1 or 3) is read '
-                  '(instrument_tof.py:582-590). The coefficients are read in the order the GSAS '
+                  '(instrument_tof.py:707-715). The coefficients are read in the order the GSAS '
                   'Technical Manual lists them (p. 144, 148), which the manual never says is the '
                   'record order, so the message calls it an assumption. Checked against GSAS-II: '
                   'v5.8.2 as a black box places slots 2,3,4,6,7 of function 1 as that order says '
@@ -1507,6 +1511,33 @@ ROWS: tuple[Row, ...] = (
         response='info',
         responds=('note which coefficient set was read and in what order; compare the profile '
                   'against a standard if the bank matters'),
+        scope=('calibration',)),
+    Row("GSAS_IPARM_SET_NUMBER_ASSUMED", "code", tier=2, ambiguity=1,
+        evidence=("a reading rule with one reading: the manual numbers a bank's PRCF sets "
+                  "n = 1 … NTYP and makes set 1 the default (GSAS Technical Manual p. 223), "
+                  "so a bank holding one set, written without its number in column 11, holds "
+                  "set 1; fires exactly when such a set is read, and never beside a numbered "
+                  "set or a second unnumbered one, which are declined. GSAS-II 5.8.4 reads "
+                  "the unnumbered key 'INS  1PRCF  ' as the bank's profile by default "
+                  "(GSASIIfiles.py:308-327, checked 2026-11-17). Real files: the ISIS HRPD "
+                  "and POLARIS instrument files of issue #1447"),
+        grounds=("Practice and logic agree: GSAS-II reads the set, and a bank with one "
+                 "set has no second reading for it."),
+        response="info",
+        responds="note that the bank's one profile set was read as set 1; nothing to do",
+        scope=('calibration',)),
+    Row("GSAS_IPARM_TRAILING_ZEROS_READ", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic on the record's own characters: a record's last field ran "
+                  "past its FORTRAN columns (GSAS Technical Manual p. 221-223) into the "
+                  "columns after it, which no field claims; fires exactly when every "
+                  "character past the field is a zero and the column read and the token "
+                  "read are one number (the HRPD file of issue #1447: CTOF 0.001000 in "
+                  "columns 26-33, read 0.00100 by column); a non-zero digit, zeros that "
+                  "change the number, or a spill into a field's columns stay refused"),
+        grounds=("Arithmetic: the characters past the field belong to no field and "
+                 "change no number, so the file states one value."),
+        response="info",
+        responds="note which record's last value ran past its columns; nothing to do",
         scope=('calibration',)),
     Row("GSAS_PRM_FIELD_DROPPED", "code", tier=1, ambiguity=1,
         evidence=('read the site at instrument_profile.py:683: fires per record or field the '

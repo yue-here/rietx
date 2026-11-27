@@ -240,6 +240,9 @@ A reader refuses to write any other key, because the GUI's import wizard and a p
 | `goniometer_radius_mm` | the goniometer radius the file records, in mm |
 | `beam_optics` | the optic elements the file lists in its beam paths, named only |
 | `diffracted_beam_optics` | the part of `beam_optics` after the sample, which sets `Source.kbeta` in the GUI's import wizard |
+| `total_flight_path_m` | a time-of-flight bank's total flight path in metres, from the comment line Mantid writes before the bank; recorded and never used |
+| `two_theta_bank_deg` | that bank's scattering angle in degrees, from the same line; recorded and never used |
+| `difc_geometric` | the DIFC that line states, computed from the flight path and angle; recorded and never used as the calibration, which an instrument file's `ICONS` DIFC is |
 
 ```python
 from rietx.io.formats.base import METADATA_KEYS
@@ -249,5 +252,6 @@ assert list(METADATA_KEYS) == [
     "scan_axis", "declared_axis", "scan", "scan_count", "anode", "wavelength",
     "wavelength_alpha2", "intensity_item", "intensity_unit", "count_time_s",
     "temperature_k", "goniometer_radius_mm", "beam_optics",
-    "diffracted_beam_optics"]
+    "diffracted_beam_optics", "total_flight_path_m", "two_theta_bank_deg",
+    "difc_geometric"]
 ```

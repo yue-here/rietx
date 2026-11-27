@@ -500,7 +500,10 @@ class ProfileTOF(_InheritsDeclaredDefaults):
     #: as a box since every parameter is refined in its own units (WP-1938), and
     #: a free row starting on it is what ``Stage(seed=…)`` lifts.  Zero stays
     #: the default: it is a physical statement (no Gaussian broadening), and a
-    #: negative value read from a file is refused by name at read.
+    #: negative sig0 or sig1 read from a file is refused by name at read.  A
+    #: negative sig2 is read only where σ²(d) stays positive over the bank's
+    #: own range, and then without this floor, which describes a coefficient
+    #: alone (:mod:`rietx.io.instrument_tof`, WP-2146).
     sig0: Parameter = Field(default_factory=lambda: Parameter(
         value=0.0, min=0.0, unit="us^2"))
     sig1: Parameter = Field(default_factory=lambda: Parameter(

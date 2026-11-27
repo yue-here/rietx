@@ -57,6 +57,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md) | The extinction screen names a wrong class at a correct cell | 2026-11-13 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-16 | P2 | [series](#series) |
 | [2140](2140-every-atom-is-named-by-its-unique-label.md) | Every atom is named by its unique label | 2026-11-16 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2146](2146-the-facility-iparm-files-read-with-their-repairs-recorded.md) | The ISIS iparm files read, with each repair recorded | 2026-11-24 | P3 | [Unscheduled](#unscheduled-the-specimen-is-not-an-angle-and-the-neutron-follow-through) |
 | [2211](2211-the-history-table.md) | The History table: Compare on the pattern, Restore as pending edits | 2026-11-23 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2221](2221-a-group-with-no-tabulated-type-reaches-the-report.md) | A phase whose group has no tabulated type still gets its report and its CIF | 2026-11-21 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2227](2227-the-gui-shows-how-a-refine-ran.md) | The GUI shows how a refine ran: in one stage or in stages | 2026-11-22 | P2 | [gui-overhaul](#gui-overhaul) |
@@ -606,7 +607,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2056](2056-a-low-angle-asymmetry-cw-neutron-cannot-calibrate.md) | A low-angle asymmetry the CW neutron lines cannot calibrate | ⬜ | P3 | — ([2054](2054-the-report-names-asymmetry-with-fcj-off.md) soft) |
 | [2061](2061-a-crystallite-has-a-shape.md) | A crystallite has a shape: hkl-dependent size broadening on the analytical profile | ⬜ | P3 | — ([1343](1343-the-moment-pays-for-the-width.md) soft) |
 | [2070](2070-a-second-cw-neutron-line-that-is-not-a-harmonic.md) | A second CW neutron line that is not a harmonic, with its own weight and offset | ⬜ | P3 | — |
-| [2146](2146-the-facility-iparm-files-read-with-their-repairs-recorded.md) | The ISIS iparm files read, with each repair recorded | ⬜ | P3 | — ([2032](2032-the-tof-readers-t1-follow-ups.md), [1927](1927-tof-t1-the-axis-and-its-readers.md) soft) |
+| [2146](2146-the-facility-iparm-files-read-with-their-repairs-recorded.md) | The ISIS iparm files read, with each repair recorded | 🔄 2026-11-24 | P3 | — ([2032](2032-the-tof-readers-t1-follow-ups.md), [1927](1927-tof-t1-the-axis-and-its-readers.md) soft) |
 
 ### <a id="unscheduled-what-fires-and-what-stays-silent"></a>What fires, and what stays silent
 

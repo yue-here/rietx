@@ -595,6 +595,20 @@ text line inside the data and a decimal comma?
 | GSAS-II 5.8.4 | `imports/G2pwd_xye.py:166` and `G2pwd_csv.py:28,73` replace `,` and `;` with spaces, so both importers read either separator. After the header, a line with fewer than two fields is printed to the console and skipped; a field that is not a number refuses the whole file, naming the line (`:187`). Columns past the third are ignored, so `10.0 100 # c` reads while `10.0 100 #c` refuses. A quoted field refuses. A decimal comma or a thousands separator splits the number in two, as rietx did before (checked (source) by reading, not run) |
 | FullProf, TOPAS, RIETAN-FP, BGMN, MAUD | Not checked |
 
+## A GSAS-I time-of-flight instrument file's profile set
+
+Surveyed 2026-11-17 for WP-2146 (issue #1447). The question: an ISIS file writes a bank's `PRCF`
+set without its set number (`INS  1PRCF  `), and declares fewer coefficients than the GSAS manual
+lists for the function (14 for function 3, where the manual lists 21). Which set is it, and is the
+short block read?
+
+| Program | What it does |
+|---|---|
+| rietx | A bank's one unnumbered set is read as set 1 and `GSAS_IPARM_SET_NUMBER_ASSUMED` says so; beside a numbered set it is declined. A declared NCOF other than 12 / 15 / 21 is refused by name (checked (source), `io/instrument_tof.py`) |
+| GSAS-II 5.8.4 | Reads the unnumbered key as the bank's profile when present and the numbered `PRCF1 ` key otherwise (`GSASIIfiles.py:308-342`). NCOF is never read: the first seven slots are split by whitespace and mapped by function type, so a short block reads like a full one (checked (source) by reading, not run) |
+| GSAS-I | The Technical Manual (LAUR 86-748, 2004 edition) reads `(COF(I),I=1,NCOF)`, and the first set is the default (p. 223). It describes no short block: function 3 "has 21 coefficients" (p. 148), and only functions 4 and 5 give a count that follows the Laue symmetry (14-27 and 14-21, p. 152). What GSAS-I does with a 14-coefficient function-3 block is not documented (checked (manual) 2026-11-24, WP-2146) |
+| FullProf, TOPAS, RIETAN-FP, BGMN, MAUD | Not checked |
+
 ## A magCIF in a non-standard orientation
 
 Surveyed 2026-11-01 for WP-1918's decision on the 91 untabulated orientations, by a research
