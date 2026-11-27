@@ -326,6 +326,31 @@ what it costs here.
     fraction measured against FullProf's 0.2 and GSAS-II's answer on the bench
     cases. The three compounding places keep 1e-9 through a plan field. The change
     is measured before the default moves.
+  - **Measured 2026-11-27 (`2317-probe/convnoise/RESULTS.md`), and the
+    recommendation withdrawn: settled by Claude under that measurement.** Five single
+    fits (SRM 660c, FAP, NAC, cpd-1a, the COD large cell) and two series (CuCr₂O₄,
+    17 patterns; cpd-1, 8 patterns) ran each stop as a real stop on the last stage.
+    - A FullProf 0.2 or GSAS-II-like stop **alone** is unsafe. On cpd-1f both
+      stopped mid-crawl with `axial_sl` 18 esd from the answer and χ²_red 9 % high,
+      and reported converged. The 1e-4 and FullProf 0.1 stops landed within 0.1 esd.
+    - Single fits: every stop holds every family under 0.06 reported esd; 1e-6
+      under 0.0075. The last stage is 9-29 of 40-165 evaluations, so 1e-6 saves
+      0-9 % of a fit.
+    - Series: the stop is most of the bill (CuCr₂O₄ 1 293 evaluations at 1e-9,
+      1 089 at 1e-8, 695 at 1e-6). At 1e-6 the 1 wt% CuO cell sits 0.68 esd off.
+      At 1e-8 every quantity is under 0.072 esd (cpd-1 profile), a margin of 1.4×
+      on development data.
+    - The floor is not zero. On the large cell 2 of 5 reruns from starts nudged by
+      1e-12 land in a second minimum (O23, O27 move 3.3-4.3 esd). On cpd-1 one
+      nudge moved `axial_sl` 0.5 esd.
+    - χ²-based decisions keep ≥ 100× margin over a single fit's stop, except
+      profile-interval refits, whose settle tolerance a GSAS-like stop exceeds.
+    - **Settled:** the shipped schedule stays (1e-6 intermediate, 1e-9 last). The
+      runner-up, 1e-8 on the last stage, saves 7-16 % of a series and 0-4 % of a
+      single fit, at a 1.4× margin measured only on development data.
+    - Unexplained, recorded for a later WP: the reported χ² differs from the χ²
+      the solver minimised by 0.2-2.1 χ²_red at the answer, and that gap moves
+      0.1 χ²_red between nearby answers.
 - **R7 — `WINDOW_MIN_DEG` = 0.3° of movement slack per window side**
   (`src/rietx/model/forward.py:234`).
   - About 30 of the probe's ~122 points a window (~25 %) are slack at a 0.02°
