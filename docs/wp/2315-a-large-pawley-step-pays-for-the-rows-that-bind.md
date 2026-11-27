@@ -13,15 +13,19 @@ box-only step costs, because two things change:
 - the work the dense route spends on the intensity block goes.
 
 On `bigcell-pawley` at 2θ ≤ 120° the fit runs at least 3× faster (target), with
-every moved number satisfying WP-2317's ruling R0.
+every moved number answering to WP-2317's ruling R0.
 
 ## Context
 
 **The bar** (WP-2317, restated because it is load-bearing): the maintainer asked on
 2026-11-27 for "accuracy on par with other codes … speed as fast as possible by any
-means". Under ruling R0's working reading, a step that solves the **same** problem
-(pruned rows, the same LSI) is exact. A different step (a clamp, a fallback, a
-profiled block) is a kind (b) move awaiting its ruling.
+means". R0 was ruled that day (WP-2317, DESIGN-RULES Rule 5 *Arithmetic accuracy*):
+- a step that solves the **same** problem (pruned rows, the same LSI) only
+  regroups arithmetic, so it is verified at fixed parameters and re-pins its
+  goldens in the same change;
+- a different step (a clamp, a fallback, a profiled block, Angle 9's merge) is a
+  change of method, and answers to an independent measurement where one exists,
+  otherwise to the established programs' answer on the same pattern.
 
 **The measurement** (WP-2317 probe 1, atoms ≥ 1.5 Å apart; Linux x86_64, 4
 cores, `[dev]`, compiled tier on, one run each; 12 × 36 × 4 Å, P2₁2₁2₁, Cu Kα
@@ -239,7 +243,7 @@ free swap under LM.
 - [ ] Put angles 5-7 to the maintainer only if 0-4 miss the target, with the
       measured remainder and each one's Rule 1 kind.
 - [ ] Tests: the FAP.XRA and NAC Pawley protocols within their recorded envelope;
-      the bench case within R0 (a)'s bound.
+      the bench case verified as R0 asks of the angle's kind.
 - [x] Angle 9 (R5 (b)): the merge, its detection tested on every Laue class
       against GSAS-II's identities, the exception for hkl-dependent models, the
       equal-F² restraint target, and the cascade (statistics, diagnostics,
