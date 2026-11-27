@@ -140,8 +140,8 @@ $\mathbf h_1$, $\mathbf h_2$ have equal $d$ in all of them exactly when
 an identity between integer matrices. It reproduces GSAS-II's per-Laue-class
 rules in every class {cite}`toby2013`. Each member $k$ is drawn at its share by
 multiplicity $m_k$, which is equal $F^2$, since a Pawley intensity is the whole
-peak. The share is drawn, never measured: a member's esd is infinite, and
-`PAWLEY_OVERLAP_UNRESOLVED` lists the groups once per phase. A phase whose model
+peak. The share is drawn, never measured: a member's esd is infinite, and the
+group's sum and its esd are recorded as a `MergedGroup`. A phase whose model
 reads $hkl$ rather than $d$ keeps one column per member, since its members'
 peaks differ: a Stephens strain block, a peak equation, satellites or a magnetic
 component.

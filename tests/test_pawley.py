@@ -141,18 +141,23 @@ def test_pawley_recovers_overlapped_sum_and_flags_split():
                                rtol=1e-12)
     state = ref.snapshot().reflections[0]
     assert all(np.isinf(state.stderr[k]) for k in idx)
+    # the record carries the measured sum and its esd, keyed by the members
+    group = [g for g in state.merged_groups
+             if sorted(map(tuple, g.hkl)) == [(2, 2, 1), (3, 0, 0)]]
+    assert len(group) == 1
+    assert group[0].intensity == pytest.approx(refined_sum, rel=1e-12)
+    assert group[0].stderr == pytest.approx(sd, rel=1e-12)
+    assert len(state.merged_groups) == len(pb.merged)
     # the exported table names the group, so a reader sums its rows
     rows = [r for r in ref.reflection_table() if r.line == 0
             and (r.h, r.k, r.l) in {(2, 2, 1), (3, 0, 0)}]
     assert len(rows) == 2 and rows[0].merged_group is not None
     assert rows[0].merged_group == rows[1].merged_group
 
-    # ...and it comes back flagged, naming the reflections as one group
-    flagged = [dg for dg in result.diagnostics
-               if dg.code == "PAWLEY_OVERLAP_UNRESOLVED"]
-    assert flagged, "merged group was not flagged"
-    named = " ".join(w for dg in flagged for w in dg.where)
-    assert "(2, 2, 1)+(3, 0, 0)" in named or "(3, 0, 0)+(2, 2, 1)" in named
+    # a merge is not an unresolved overlap: no diagnostic names the pair
+    named = " ".join(w for dg in result.diagnostics
+                     if dg.code == "PAWLEY_OVERLAP_UNRESOLVED" for w in dg.where)
+    assert "(2, 2, 1)" not in named and "(3, 0, 0)" not in named
 
     _save(result, "pawley_lab6_overlapped.png")
 

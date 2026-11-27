@@ -161,7 +161,13 @@ from .report.schemas import (
     StageReport,
 )
 from .schemas.common import Diagnostic, Parameter, Provenance, check_mode
-from .schemas.history import NodeAction, NodeMetrics, RefinementState, ReflectionState
+from .schemas.history import (
+    MergedGroup,
+    NodeAction,
+    NodeMetrics,
+    RefinementState,
+    ReflectionState,
+)
 from .schemas.instrument import CAPILLARY_OFFSETS, Instrument
 from .schemas.interval import PARAMETER_INTERVAL_LEVEL, PARAMETER_INTERVAL_MAX_REFITS
 from .schemas.params import ParameterRow, TieSpec
@@ -10389,7 +10395,33 @@ def _extract_reflections(model: CompiledModel | None) -> list[ReflectionState]:
             # a member of a lattice-merged group has no esd of its own: its
             # value is its share of the measured sum (WP-2315)
             state.stderr = [float(v) for v in model.pawley.member_stderr(ip)]
+        if is_pawley and model.pawley is not None:
+            state.merged_groups = _merged_group_states(model.pawley, ip, cp)
         out.append(state)
+    return out
+
+
+def _merged_group_states(pb, ip: int, cp) -> list[MergedGroup]:
+    """Phase ``ip``'s lattice-merged groups as the measured record (WP-2315).
+
+    Each group is one Pawley column (``PawleyBlock.merged``), so its summed
+    intensity is the column's value and its esd is the column's esd.  The
+    members' own intensities in ``ReflectionState.intensity`` are shares of
+    that sum and carry an infinite esd.
+    """
+    r0, r1 = pb.refl_slices[ip]
+    hkl = cp.reflections.hkl
+    out: list[MergedGroup] = []
+    for g in pb.merged:
+        if not r0 <= g[0] < r1:
+            continue
+        local = [int(r) - r0 for r in g]
+        col = int(pb.refl_col[g[0]])
+        sd = None if pb.stderr is None else float(pb.stderr[col])
+        out.append(MergedGroup(
+            hkl=[[int(v) for v in hkl[k]] for k in local],
+            intensity=float(cp.hkl_intensity[local].sum()),
+            stderr=sd))
     return out
 
 
@@ -10539,11 +10571,9 @@ def _pawley_unresolved_diagnostics(model: CompiledModel,
     group is well determined, so flagging the whole group is the safe report.
     """
     pb = model.pawley
-    if pb is None or pb.stderr is None:
+    if pb is None or pb.stderr is None or not pb.groups:
         return []
-    out = _pawley_merged_diagnostics(model, structure)
-    if not pb.groups:
-        return out
+    out: list[Diagnostic] = []
     intens = model.pawley_x0()
     for g in pb.groups:
         inten = intens[list(g)]
@@ -10565,38 +10595,6 @@ def _pawley_unresolved_diagnostics(model: CompiledModel,
             suggestion="Use the group's summed intensity as the datum.",
         ))
     return out
-
-
-def _pawley_merged_diagnostics(model: CompiledModel,
-                               structure: Structure) -> list[Diagnostic]:
-    """``PAWLEY_OVERLAP_UNRESOLVED`` per phase for its lattice-merged groups.
-
-    Reflections whose d agree in every cell of the phase's setting
-    (:attr:`~rietx.model.forward.PawleyBlock.merged`, WP-2315, ruling R5 (b))
-    are one Pawley column.  The data measure the group's sum and nothing
-    about its split, so the split is never reported as a measurement: a
-    member's value is its share of the sum by multiplicity (equal F²), and its
-    esd is ``inf`` in ``RefinementResult.reflections``.  One diagnostic per
-    phase, since a large cubic or 4/m cell carries hundreds of such groups.
-    """
-    pb = model.pawley
-    if pb is None or not pb.merged:
-        return []
-    by_phase: dict[int, list[str]] = {}
-    for g in pb.merged:
-        ip = next(i for i, (r0, r1) in enumerate(pb.refl_slices) if r0 <= g[0] < r1)
-        by_phase.setdefault(ip, []).append(
-            _pawley_label(pb, model, structure, int(pb.refl_col[g[0]])))
-    return [Diagnostic(
-        level="info", code="PAWLEY_OVERLAP_UNRESOLVED", where=labels,
-        message=(f"{len(labels)} group(s) of reflections of "
-                 f"{structure.phases[ip].name} have equal d in every cell of its "
-                 f"space group, so each group was refined as one intensity. "
-                 f"Its sum is measured. Each member's value is its share of the "
-                 f"sum by multiplicity and has no esd."),
-        suggestion="Use each group's summed intensity as the datum.",
-        value=float(len(labels)),
-    ) for ip, labels in by_phase.items()]
 
 
 def _pawley_off_data_diagnostics(model: CompiledModel,

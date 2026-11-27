@@ -138,6 +138,7 @@ In Rietveld mode it is scale × multiplicity × \|F\|² × preferred orientation
 After a Pawley fit, rows sharing a `ReflectionRow.merged_group` were refined as one intensity, because their d-spacings agree in every cell of the space group: cubic (3 3 3) and (5 1 1), or (h k l) and (k h l) under 4/m.
 Their summed `ReflectionRow.intensity` is measured.
 Each row's own value is its share of the sum by multiplicity and is not a measurement.
+The group's sum and its esd are `MergedGroup.intensity` and `MergedGroup.stderr`, in `ReflectionState.merged_groups`.
 
 `ReflectionRow.satellite_order` is 0 on every row of a phase that declares no `Phase.propagation_vector`.
 On a satellite row `ReflectionRow.h`, `ReflectionRow.k` and `ReflectionRow.l` stay the parent vector H, and the row reads as H and m together, the (3+1)-index spelling.

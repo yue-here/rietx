@@ -413,10 +413,6 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
     "_pawley_unresolved_diagnostics": (
         (HISTOGRAM,), "each histogram keeps its own Pawley intensity block "
                       "and overlap groups (WP-2104)"),
-    "_pawley_merged_diagnostics": (
-        (HISTOGRAM,), "each histogram's Pawley block merges its own lattice-forced "
-                      "groups, reached through _pawley_unresolved_diagnostics "
-                      "(WP-2315)"),
     "_pawley_off_data_diagnostics": (
         (HISTOGRAM,), "a reflection is off one histogram's fitted range, and "
                       "the ridge is that histogram's restraint (WP-2104)"),
