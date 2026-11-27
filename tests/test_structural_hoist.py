@@ -30,6 +30,7 @@ from rietx.crystallography.structure_factor import (
     d_f2_d_sites,
     transposed_rotation_indices,
 )
+from rietx.model import compiled
 from rietx.model.forward import CompiledModel, compile_model
 from rietx.optimize.least_squares import _make_jacobian
 from rietx.params.vector import ParameterTable
@@ -119,6 +120,18 @@ def _pre_d_f2_d_uaniso(
     if B is not None:
         out = out + 2.0 * xp.real(xp.conj(B)[:, None] * dB)
     return out
+
+
+@pytest.fixture(autouse=True)
+def _numpy_path():
+    """Every assertion here is bit-identity, so the path is declared, never
+    inherited (``tests/CLAUDE.md`` § Quoting numbers): the numpy path, which
+    is the one the structure-factor kernels run on either way."""
+    was = compiled.set_enabled(False)
+    try:
+        yield
+    finally:
+        compiled.set_enabled(was)
 
 
 # ----------------------------------------------------------------------

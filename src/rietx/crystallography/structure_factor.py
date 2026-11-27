@@ -447,9 +447,10 @@ def d_f2_d_sites(
 
     Returns ``({j: (N, 3)}, {j: (N, 6)})`` for the atoms in ``xyz_atoms`` and
     ``u_atoms`` (structure-factor derivatives per Rietveld, 1969, J. Appl.
-    Cryst. 2, 65; the equations are the two kernels').  Every bracket ∂A/∂p_j is built from the same per-atom
-    expansion as A itself (:func:`_orbit_terms`), so one pass over the sites
-    serves every atom, where one call per atom repeats the whole expansion
+    Cryst. 2, 65; the equations are the two kernels').  Every bracket
+    ∂A/∂p_j is built from the same per-atom expansion as A itself
+    (:func:`_orbit_terms`), so one pass over the sites serves every atom,
+    where one call per atom repeats the whole expansion
     (WP-2314).  The arithmetic is the single-atom kernels' as written: the
     same site order into A and B, the same association in each bracket, so
     each array is bit-identical to what the single-atom call returns.  The
