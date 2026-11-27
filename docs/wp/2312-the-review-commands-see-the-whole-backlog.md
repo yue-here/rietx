@@ -37,20 +37,59 @@ Every listing these commands read asks `gh` for at most `--limit` rows, and
     holds. This is derived from the query shape and was **not run**: `gh pr list`
     does not work in the session that wrote this. A first draft of this WP
     set `--limit 200`, and an independent review caught it.
-  - The skill now keeps the call that runs, counts the open PRs with a
-    `number`-only listing, and says `ranked N of M open` when they differ.
-- **The full fix is unbuilt** (task below): rank every PR without gh's
-  `commits` field.
-  - Rank 1 needs each PR's commit headlines, for a `WP-NNNN:` prefix.
-    `gh api graphql --paginate` over
-    `pullRequests(states: OPEN, first: 50)`, with
-    `commits(first: 100) { totalCount nodes { commit { messageHeadline } } }`,
-    costs about 5 050 nodes a page by the same arithmetic.
-  - `totalCount` also shows a PR with more than 100 commits, which
-    `commits(first:100)` hides today.
-  - Collision degree still needs every PR's `files`, at about 100 nodes a PR.
-  - The first draft dropped a split like this as "saves nothing". That was
-    wrong: it saves the node budget.
+  - The first fix kept the call that runs, counted the open PRs with a
+    `number`-only listing, and said `ranked N of M open` when they differ.
+- **The full fix: one GraphQL query of the skill's own** (built 2026-11-27).
+  `.claude/skills/pr-review/triage.graphql` asks for exactly the fields the
+  rank reads, in pages of 15, through `gh api graphql --paginate --slurp`.
+  `triage.jq` turns the pages into one compact row per PR. It computes
+  reviewable lines, collision degree and the governance, execution and
+  `WP-NNNN:` evidence, so no file list reaches the session.
+  - The plan was two calls: a paginated query for commit headlines, and
+    `gh pr list` without `commits` for the rest. Each was run once on
+    2026-11-27, with gh 2.103.3 and 84 open PRs (table below). The headline
+    query worked. The `gh pr list` call timed out, so the plan changed.
+  - **Time is the binding limit, not nodes.** GitHub answers HTTP 502 or 504
+    to a request that runs past about 10 s. `mergeStateStatus` alone took
+    7.7 s for 50 PRs, so GitHub computes it at about 0.15 s a PR. In the full
+    query a PR took 0.17-0.31 s. A page of 15 is at most about 4.7 s at the
+    worst rate seen, half the timeout. Settled by Claude under measurement.
+  - **One query, not two.** Without bodies and authors, the headlines cost
+    100 nodes a PR, and the whole row costs 222. That is 3 330 nodes a page of
+    15, under 1 % of the 500 000 limit. A second call would add a join and no
+    headroom. Settled by Claude under measurement.
+  - `totalCount` on the connection replaces the separate count call. The rows
+    fall short of it only if a page is lost.
+  - `latestReviews(...) { commit { oid } }` returns the sha when asked: all 15
+    reviews on the backlog carried one. gh's own `latestReviews` fragment does
+    not ask for `commit`, which is why `gh pr view --json latestReviews`
+    prints an empty sha (memory note of 2026-09-18). The skill's skip check
+    now reads a field that exists.
+  - `commits.totalCount` showed one PR past 100 commits (#1577, 107), and
+    `files.totalCount` two past 100 files (#1548, 155; #1838, 193). The rows
+    carry both counts so the skill can say what went unread.
+
+  | call (run once, 2026-11-27) | rows | pages | bytes | wall | nodes a page |
+  |---|---|---|---|---|---|
+  | old triage, `gh pr list --limit 30 … commits` | 30 | 1 | 402 777 | 8.7 s | not measured |
+  | `gh pr list --limit 1000`, skill fields without `commits` | 0 | — | — | 10.7 s, HTTP 502 | — |
+  | same, with `reviews` added | 0 | — | — | 10.9 s, HTTP 502 | — |
+  | headlines only, `first: 50` | 84 | 2 | 145 251 | 2.9 s | 5 050 |
+  | `mergeStateStatus` only, `first: 50` | 84 | 2 | 4 069 | 12.3 s (7.7 s a page) | 50 |
+  | `files` only, `first: 50` | 84 | 2 | 116 580 | 4.6 s | 5 050 |
+  | full query, `first: 100` | 0 | — | — | 10.8 s, HTTP 502 | — |
+  | full query, `first: 50` | 0 | — | — | 11.4 s, HTTP 504 | — |
+  | full query, `first: 25` | 84 | 4 | 296 304 | 18.5 s (6.5 s worst page) | 5 550 |
+  | full query, `first: 20` | 84 | 5 | 296 532 | 20.8 s (6.1 s worst page) | 4 440 |
+  | **the skill's call**, `first: 15`, `--paginate --slurp` | 84 | 6 | 296 425 | 16.8 s | 3 330 (arithmetic) |
+  | its rows through `triage.jq -c` | 84 | — | 42 201 | — | — |
+
+  Node counts are GitHub's `rateLimit.nodeCount`, except the last, which is
+  the arithmetic those counts confirmed. Wall times vary between runs by
+  about 2x, so each is one sample.
+- **Ghostshift's claim reader is untouched.** It reads `wp_claim.open_prs`,
+  a `gh pr list` without `mergeStateStatus` or `commits`, which answered
+  84 open PRs the same day.
 - **`wp_claim.open_prs`** (`/wp-start`'s overlap table, `backlog.py`'s open-PR
   column): `--limit 100`, now `OPEN_PR_LIMIT = 200`. Its fields have no
   `commits`, so they cost about 20 K nodes a page.
@@ -95,6 +134,10 @@ Caps left as they are, and named so they are not rediscovered:
   comment") can misread a thread longer than that.
 - `files[]` caps at 100 per PR. `/pr-review` already reads `changedFiles`
   beside it.
+- Commit headlines cap at 100 per PR, and `commitsTotal` shows a PR past it.
+  Raising the cap costs nodes on every PR for the one in 84 that needs it.
+- `latestReviews` caps at 20, one review per reviewer. The backlog's most
+  was 1.
 
 Tier ([generality § The rule](../milestones/generality.md#the-rule)): none.
 This is the repo's process machinery and makes no package decision.
@@ -111,8 +154,8 @@ This is the repo's process machinery and makes no package decision.
 - [x] `wp_claim`: `OPEN_PR_LIMIT` (200), `listing_cut`, `pr_open_in`; `status` says when the PR list may be cut off
 - [x] `backlog.py`: `ISSUE_LIMIT`, `MERGED_LIMIT`, `reach_notes`, and the cut-list wording for a missing given number
 - [x] `/pr-review` triage: the call that runs, a count beside it, `ranked N of M open` when they differ
-- [ ] `/pr-review` triage ranks every open PR: the paginated `gh api graphql` call for commit headlines (with `totalCount`) and a listing without `commits` for the rest. Run each once on a machine where gh lists PRs, record nodes, bytes and wall time here, then change the skill
-- [x] Tests (`tests/test_workflow_hooks.py`): `test_a_listing_at_gh_s_limit_reads_as_possibly_cut_off`, `test_a_pr_missing_from_a_cut_list_is_unknown_not_closed`, `test_the_table_notes_a_listing_that_reached_gh_s_limit`, `test_the_landed_column_says_how_far_back_it_can_see`
+- [x] `/pr-review` triage ranks every open PR. Both planned calls were run once and measured (Context's table); the listing without `commits` timed out, so the skill runs one paginated query of its own, `triage.graphql`, read through `triage.jq`
+- [x] Tests (`tests/test_workflow_hooks.py`): `test_a_listing_at_gh_s_limit_reads_as_possibly_cut_off`, `test_a_pr_missing_from_a_cut_list_is_unknown_not_closed`, `test_the_table_notes_a_listing_that_reached_gh_s_limit`, `test_the_landed_column_says_how_far_back_it_can_see`, `test_the_triage_rows_carry_what_the_rank_reads`
 - [x] Skill: none. These are the repo's own review commands, not the agent skill that drives rietx
 
 ## Acceptance

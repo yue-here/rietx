@@ -17,6 +17,7 @@ import importlib.util
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -1667,6 +1668,58 @@ def test_the_landed_column_says_how_far_back_it_can_see() -> None:
     assert backlog.reach_notes(None, "2026-09-01", shallow=False) == []  # gh declined: main says so
     (note,) = backlog.reach_notes([], "2026-09-01", shallow=True)
     assert "shallow" in note
+
+
+_TRIAGE = ROOT / ".claude" / "skills" / "pr-review"
+
+
+def _triage_node(number: int, files: list, headlines: list, rollup: list) -> dict:
+    return {
+        "number": number, "title": f"PR {number}", "author": {"login": "someone"},
+        "headRefOid": f"{number:040d}", "updatedAt": "2026-11-27T00:00:00Z",
+        "changedFiles": len(files), "mergeStateStatus": "CLEAN", "isDraft": False,
+        "files": {"totalCount": len(files),
+                  "nodes": [{"path": p, "additions": a, "deletions": d} for p, a, d in files]},
+        "latestReviews": {"nodes": [{"author": {"login": "yue-here"}, "authorAssociation": "OWNER",
+                                     "state": "COMMENTED", "submittedAt": "2026-11-26T00:00:00Z",
+                                     "commit": {"oid": "f" * 40}}]},
+        "statusCheckRollup": {"nodes": rollup},
+        "commits": {"totalCount": len(headlines),
+                    "nodes": [{"commit": {"messageHeadline": h}} for h in headlines]},
+    }
+
+
+@pytest.mark.skipif(shutil.which("jq") is None, reason="jq is not installed")
+def test_the_triage_rows_carry_what_the_rank_reads(tmp_path: Path) -> None:
+    """`/pr-review` triage pages through every open PR with its own GraphQL
+    query and reads only the rows `triage.jq` computes (WP-2312), so the rank's
+    inputs (reviewable lines, collision degree, the WP evidence) are pinned
+    here, and every field the fixture feeds the filter is one the query asks for."""
+    one = _triage_node(1, [("src/a.py", 10, 2), ("tests/data/big.xy", 900, 0),
+                           ("docs/wp/1234-x.md", 3, 1), ("tests/conftest.py", 1, 0)],
+                       ["WP-1234: the work", "a fix", "WP-1234: more"],
+                       [{"commit": {"statusCheckRollup": {"state": "SUCCESS"}}}])
+    two = _triage_node(2, [("src/a.py", 1, 1), ("docs/ROADMAP.md", 2, 0)], ["no prefix"], [])
+    pages = [{"data": {"repository": {"pullRequests": {
+        "totalCount": 3, "pageInfo": {"hasNextPage": h, "endCursor": "c"}, "nodes": [n]}}}}
+        for n, h in ((one, True), (two, False))]
+    raw = tmp_path / "triage.json"
+    raw.write_text(json.dumps(pages), encoding="utf-8")
+    out = subprocess.run(["jq", "-c", "-f", str(_TRIAGE / "triage.jq"), str(raw)],
+                         capture_output=True, encoding="utf-8", check=True).stdout
+    table = json.loads(out)
+    assert table["open"] == 3 and len(table["rows"]) == 2  # a lost page shows
+    first, second = table["rows"]
+    assert first["reviewable"] == 12 + 4 + 1  # tests/data/ is not reviewed
+    assert first["degree"] == second["degree"] == 1  # src/a.py is shared
+    assert first["governance"] == ["WP-1234"] and second["governance"] == ["ROADMAP.md"]
+    assert first["execution"] == ["tests/conftest.py"] and second["execution"] == []
+    assert first["wpCommits"] == ["WP-1234"] and second["wpCommits"] == []
+    assert first["latestReviews"][0]["commit"] == "f" * 40
+    assert (first["ci"], second["ci"]) == ("SUCCESS", None)
+    query = (_TRIAGE / "triage.graphql").read_text(encoding="utf-8")
+    for name in {k for node in (one, two) for k in node} | {"totalCount", "messageHeadline", "oid"}:
+        assert re.search(rf"\b{name}\b", query), name
 
 
 # --------------------------------------------------------------------------- #
