@@ -505,7 +505,7 @@ The maintainer asked for real large cells in the testing, not the invented
 one. Two published structures from the Crystallography Open Database are now
 vendored, and the four `bigcell-*` bench cases fit patterns simulated from
 Nb₁₈W₁₆O₉₃. A new test module puts both structures through Rietveld and
-Pawley fits. PR #PRNUM.
+Pawley fits. PR #1866.
 
 **Done.**
 - `tests/data/cod_2107344.cif` (Nb₁₈W₁₆O₉₃, Pbam, 1 770 Å³, 43 sites) and
