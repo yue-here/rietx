@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: 🔄 2026-11-27 — task 1 answered: the Rwp gap is a valley entered through an unseeded background, not the partition; the rest waits on WP-2317's R2-R3
 Track: A large cell
 Depends on: 2317 soft (its `bigcell-lebail` case and rulings R0, R2, R3); 2017 soft (group Q owns `lebail_tol`'s number); 2062 soft (Rule 5's Le Bail fence)
-Priority: P2 2026-11-27 — provisional: the track the maintainer opened for a user at the wall, on the slowest mode measured (95-97 % of a large-cell Le Bail fit in the partition; the threefold Rwp was the probe's unseeded background, task 1); what may start without a ruling is narrow (R3), so re-rate when WP-2317 task 3 answers R2-R3
+Priority: P2 2026-11-27 — provisional: the track the maintainer opened for a user at the wall, on the slowest mode measured (95-97 % of a large-cell Le Bail fit in the partition, measured at the unseeded probe's wrong answer; seeded runs still end every last partition at the cycle cap, task 1); what may start without a ruling is narrow (R3), so re-rate when WP-2317 task 3 answers R2-R3
 
 ## Goal
 
@@ -52,7 +52,8 @@ probe's background protocol put the fit there. Probe 1 starts every Chebyshev
 coefficient at 0, the case SKILL.md §2 rule 5 warns about. The first partition
 hands the 900-count pedestal to the reflections, and the stages that follow
 widen the profile to carry it. With the background seeded as the skill says,
-Le Bail lands at Rwp 0.047 against Pawley's 0.044. The partition is not the
+Le Bail lands at Rwp 0.047 against Pawley's 0.044 (a seeded Chebyshev;
+the default P-spline seed gives Le Bail 0.048). The partition is not the
 cause: settled at Pawley's parameters it gives 0.0455. So the table's walls
 are of a fit at the wrong answer. The handover entry of 2026-11-27 (task 1)
 has every number. **Every Le Bail run here, seeded or not, ends its last
@@ -283,8 +284,9 @@ one-run figures on a shared machine, not timings):
   answer: all ten partitions at the cap (250 000). The partition at the true
   parameters settles from flat in 98 cycles with 8 reflections at the floor.
   Moving b by 2e-4 there sends it to the cap with 284 at the floor.
-- **The invented cell is metrically degenerate.** b = 3a exactly, so 546 of
-  the 899 reflections share their d-spacing with a neighbour. Pawley's answer
+- **The invented cell is metrically degenerate.** b = 3a exactly, so 779 of
+  the 899 reflections share their d-spacing with a neighbour (546 coincident
+  adjacent pairs, some in clusters of three or more). Pawley's answer
   has b/a − 3 = 1.5e-4. Restoring b = 3a at Pawley's parameters still runs to
   the cap (300 at the floor), so the degeneracy is not the whole cause. What
   the slow cycles are is not measured here. The floor counts point at angle 6.
@@ -304,6 +306,16 @@ one-run figures on a shared machine, not timings):
   case's background, and its cell's degeneracy), and a correction under
   WP-2062's entry of the same day, which said Pawley "lands at a third of" Le
   Bail's Rwp.
+
+*Review* (`/code-review high --fix`, seven findings). Fixed: the
+coincidence count (779 reflections, not 546, which counts pairs); the seeded
+0.047 now names its Chebyshev kind beside the P-spline's 0.048 in all three
+WPs; the probe's docstring lists `degenerate`, and an unknown step exits with
+a message; WP-2317's Context bullet points to its answer; this WP's Priority
+line says its 95-97 % share was measured at the wrong answer. Declined: seed
+the reflections missing from a cross row's intensities at the median rather
+than the floor. No row lacks any: Le Bail's 910 reflections all appear in
+Pawley's 913, and every other row seeds from its own answer's list.
 
 *Gotchas.* A probe that writes to a file buffers its stdout, so run it with
 `-u` to read rows as they land. The cross step took 22 min on this

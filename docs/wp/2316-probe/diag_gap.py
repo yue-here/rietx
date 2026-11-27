@@ -17,6 +17,8 @@ widths.  Nothing it prints is a structural claim.
           seeded   Le Bail (and Pawley) with the background seeded first, the
                    skill's rule (SKILL.md §2 rule 5)
           truth    the generating model's Rwp, and the partition at its parameters
+          degenerate  the b = 3a coincidences, and the partition at truth and
+                   Pawley's answer with the cell split and restored
           plots    obs/calc/diff PNGs of every fit
     OUT   a directory for the saved answers, logs and PNGs
 
@@ -218,8 +220,12 @@ elif step == "degenerate":
     from rietx.crystallography.symmetry import generate_reflections
     rs = generate_reflections(SG, CELL, 1.5406, TTMAX)
     d = np.sort(np.asarray(rs.d))
+    tied = np.diff(d) < 1e-9
+    sharing = np.zeros(d.size, bool)
+    sharing[:-1] |= tied
+    sharing[1:] |= tied
     print(f"reflections {d.size}; sharing a d-spacing to 1e-9 Å with a neighbour: "
-          f"{int((np.diff(d) < 1e-9).sum())} pairs")
+          f"{int(sharing.sum())} ({int(tied.sum())} coincident adjacent pairs)")
 
     def with_cell(s, a=None, b=None):
         s = s.model_copy(deep=True)
@@ -278,3 +284,5 @@ elif step == "plots":
         plot_result(res, path=OUT / f"{tag}_fit.png")
         plot_result(res, path=OUT / f"{tag}_zoom.png", two_theta_limits=(40.0, 46.0))
         print(tag, "plotted")
+else:
+    sys.exit(f"unknown STEP {step!r}; see the module docstring")

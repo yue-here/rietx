@@ -97,7 +97,8 @@ Three readings shape the track.
 - **Le Bail also lands at three times Pawley's Rwp on the same pattern** (0.151
   against 0.045). That is a correctness question before it is a speed one: a
   wrong valley, the background protocol (WP-1542's subject), or the partition.
-  WP-2316 task 1 answers it before any speed work.
+  WP-2316 task 1 answers it before any speed work. *Answered 2026-11-27:
+  a wrong valley entered through the probe's unseeded background (§ Inherited).*
 - **The first probe drew its atoms inside a 1/15.6 sub-box**, 65 % of nearest
   neighbours under 1 Å (the review's S3). It read 251 s for the 40-atom case, with
   119 `coordinates` iterations, measuring the degenerate model. The readings
@@ -219,12 +220,13 @@ what it costs here.
   Chebyshev coefficient at 0. Le Bail's first partition hands the 900-count
   pedestal to the reflections, and the fit ends with the background at c0 261
   and Rwp 0.151. Seeded with `rx.auto_background(data, seed=True)`, as SKILL.md
-  §2 rule 5 says, it lands at 0.047 against Pawley's 0.044. So the Le Bail row
+  §2 rule 5 says, it lands at 0.047 against Pawley's 0.044 with
+  `kind="chebyshev"`, and at 0.048 with the default P-spline. So the Le Bail row
   of the readings table timed a fit at the wrong answer. Two points for task
   2's `bigcell-lebail` case:
   - seed its background as the skill does, or WP-2316 measures the speed of
     the wrong answer;
-  - the invented cell has b = 3a exactly, so 546 of its 899 reflections share
+  - the invented cell has b = 3a exactly, so 779 of its 899 reflections share
     a d-spacing with a neighbour. A refined cell splits each pair by about
     1e-4, and the partition then runs to its 25 000-cycle cap. Restoring
     b = 3a at Pawley's answer still runs to the cap, so the degeneracy is not
