@@ -248,8 +248,9 @@ free swap under LM.
       against GSAS-II's identities, the exception for hkl-dependent models, the
       equal-F² restraint target, and the cascade (statistics, diagnostics,
       exporter, help, manual, skill row). *Done 2026-11-27 (4th session).*
-- [ ] Skill: none (no API change). *Angle 9 added one row to
-      `references/diagnostics.md` for `ReflectionRow.merged_group`.*
+- [ ] Skill: none (no API change). *Angle 9 rewrote the
+      `PAWLEY_OVERLAP_UNRESOLVED` row in `references/diagnostics.md` to point
+      at `ReflectionState.merged_groups`.*
 
 ## Acceptance
 
@@ -275,7 +276,17 @@ free swap under LM.
 
 ## Handover log
 
-### 2026-11-27 (4th session) — Angle 9, the lattice merge (ghostshift runner; PR #PRNUM)
+### 2026-11-27 (4th session) — Angle 9, the lattice merge (ghostshift runner; PR #1869)
+
+A Pawley fit now refines reflections that share a d-spacing in every cell of
+their space group, such as cubic 333 and 511, as one intensity. That is the
+only quantity the pattern measures, and GSAS-II does the same. The fit
+reports the group's sum with its esd and marks each member's own value as
+unmeasured, so it no longer hands back an equal split that looks like a
+measurement. Accidental overlaps keep their restraint, now towards equal F².
+On the three real patterns measured, the merge removed 4 to 123 intensity
+columns and moved no cell by more than 0.02 esd. It cannot speed up the
+large-cell bench case, whose orthorhombic cell forces no coincidence.
 
 Built WP-2317's R5 (b), "go (b)". Branch `wp2315-pawley-lattice-merge`,
 stacked on the `wp2317-rulings` commits (through aa612fe02).
@@ -297,14 +308,17 @@ stacked on the `wp2317-rulings` commits (through aa612fe02).
   are frozen at compile and do not depend on the cell.
 - The overlap restraint's target is equal F² (m_k/Σm). Groups with equal
   multiplicities give the old rows bit for bit.
-- Cascade: `n_free_parameters` counts columns; `PAWLEY_OVERLAP_UNRESOLVED`
-  (info) names each phase's merged groups as `(h,k,l)+(h,k,l)` labels;
-  `ReflectionRow.merged_group` in the exporter; the series carry goes through
-  `set_pawley_intensities`, which expands per phase; help, `_audit`
-  (suggestion count 2), the manual's `fm-pawley-lattice` equation and the
-  `fm-pawley-split` share, `reference/exports.md`, `guides/export.md`,
+- Cascade: `n_free_parameters` counts columns; each merged group is a
+  `MergedGroup` (member hkls, the measured sum, its esd) in
+  `ReflectionState.merged_groups`, and `PAWLEY_OVERLAP_UNRESOLVED` stays for
+  accidental overlaps (5f9a7e80e replaced the first form, where that code
+  listed the merged groups); `ReflectionRow.merged_group` in the exporter;
+  the series carry goes through `set_pawley_intensities`, which expands per
+  phase; help, `_audit` (suggestion count 1), the manual's
+  `fm-pawley-lattice` equation and the `fm-pawley-split` share,
+  `reference/exports.md`, `reference/history.md`, `guides/export.md`,
   practice.md's rietx and GSAS-II rows, the skill row (copies re-synced), a
-  `pawley_merged` cross-backend config, and `multi.DIAGNOSTIC_SCOPES`.
+  `pawley_merged` cross-backend config, and the schema 0.62 note.
 - `toy_pawley`'s golden is re-pinned: only its restraint rows moved
   (`tests/data/README.md` § backend_goldens).
 
@@ -336,7 +350,9 @@ looked at. Each matches main's; corundum's peak-shape residual at low angle
 belongs to the protocol and is the same on main.
 
 *Tests* (macOS arm64, `[dev,jax]`): fast selection (`-m "not slow"`) 16 066 passed, 268 skipped, 30 xfailed, 16.5 min. full suite (`-n auto --dist loadgroup`) 17 031 passed, 275 skipped, 49 xfailed, 1 xpassed, 1 failed, 53 min. The failure was `test_audit_delta.py::test_the_reader_agrees_with_the_import`, caused by an `_audit.py` prose edit landing mid-run (the reader read the new text, the import was older); alone on the final tree it passes, 16 of 16.
-`tests.reader_output` exit READER.
+`tests.reader_output` exit 0 on the tree before the `MergedGroup` record.
+After it, on the final tree: fast selection 16 069 passed, 268 skipped, 30 xfailed, 18 min (one test edited after the run: `test_satellites`' key list gains `merged_groups`; that file passes alone), and `tests.reader_output` exit 0. The seven added tests cost 2.6 s locally, 2.25 s of it `test_pawley_lattice_merge.py`, none in the slow tail. Count check: passed + failed moved by 4 against the earlier fast run (16 066 → 16 070, the two now-fixed failures included), where 5 tests were added since. The one-test gap was not traced. The full suite was not rerun after the record:
+the record moves no fitted number (the coordinator's rule for this item).
 
 *Settled by Claude* (for blind review):
 - Detection by the orbit's second moment in `symmetry.py`, not by calling
@@ -347,9 +363,15 @@ belongs to the protocol and is the same on main.
   Alternative: parse the expression for h, k, l. The conservative form costs
   columns, never accuracy.
 - A merged member reports an infinite esd, the existing "unmeasured" spelling
-  (`LSQOutcome.discarded`), with the group in the diagnostic and in
-  `merged_group`. A `ReflectionState` field would be a stored-format change,
-  which goes to the maintainer. Alternative: that field.
+  (`LSQOutcome.discarded`), and keeps its share in `ReflectionState.intensity`,
+  since that list is what a checkout restores. Alternative: `None` there,
+  which would need a second restore path.
+- The record is `ReflectionState.merged_groups` (5f9a7e80e), settled by the
+  coordinator under Rule 4 (a new output; kind 1 records that it fired) and
+  the generality review's finding. **It is a stored-format addition**: schema
+  0.62, additive, `None` by default, refused by an older build. The
+  maintainer's CLAUDE.md sends stored-format changes to him, so it waits for
+  his word before merge.
 - The two WP-2311 restraint tests keep LaB6's 221/300 pair apart by
   monkeypatching `_lattice_merge_groups`, since that pair is now merged.
 - For generality review: the merge is an automatic action the audit table
@@ -367,19 +389,28 @@ Held: the merge (tier 1 detection, tier 2 share convention), the suggestion
 count, the restraint target. Acted on: a test now pins each of the four
 hkl-reading declines (`test_each_hkl_reading_term_declines_the_merge`), and
 `PAWLEY_OVERLAP_FWHM_FRAC`'s grounds name the equal-F² target and say its
-sweeps predate it. Open, for the coordinator: the review rates the merged-group
-report as weak. It fires at `info` on every cubic, tetragonal, trigonal and
-hexagonal Pawley fit (3 of 3 here), and one code now carries two cases with
-different `where`/`value` shapes. Its proposal is a separate code (say
-`PAWLEY_LATTICE_MERGED`) with its own audit row, or a record field plus a help
-entry in place of a diagnostic. The brief named `PAWLEY_OVERLAP_UNRESOLVED`,
-so this branch keeps it.
+sweeps predate it. It rated the first form of the report weak: an `info`
+`PAWLEY_OVERLAP_UNRESOLVED` firing on every cubic, tetragonal, trigonal and
+hexagonal Pawley fit (3 of 3 here). The coordinator settled the fix, and
+5f9a7e80e records the merge on `ReflectionState.merged_groups` instead; the
+code is back to accidental overlaps and its suggestion count to 1. The judge
+was not re-dispatched: the table's only remaining change is that row's prose.
+
+*Code review* (`/code-review high --fix`, 5d6c743b3): five nits, all taken.
+The help names the four terms that decline the merge; the diagnostics count
+member reflections, not columns; a real-fit test of an unmerged overlap
+(`test_an_unmerged_overlap_comes_back_flagged_with_its_split_unresolved`);
+`lattice_coincidences` cites Toby & Von Dreele (2013); this entry's cascade
+bullet. Its sixth point is the stored-format flag above.
 
 *Left undone.*
-- The merged sum's esd is not in the stored record (only the diagnostic and
-  the exporter name the group).
 - `solve/cost.py`'s nuisance columns are not merged.
 - torch is not installed here, so the `pawley_merged` torch rows did not run.
+
+*Next.* (1) The maintainer's word on the stored-format addition, then merge
+PR 1869 after the `wp2317-rulings` PR. (2) Angles 1-2 and 4 on the bench case,
+which the merge does not reach. A large cubic or hexagonal cell is where the
+merge's column saving would show in the wall; no bench case has one yet.
 
 ### 2026-11-27 (3rd session) — Angle 0's blockwise product withdrawn (ghostshift runner; PR #1861)
 
