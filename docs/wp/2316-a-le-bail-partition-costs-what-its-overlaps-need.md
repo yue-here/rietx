@@ -1,6 +1,6 @@
 # WP-2316 — a Le Bail partition costs what its overlaps need, not thousands of cycles
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-27 — claimed by ghostshift MacBook-Air-c4aacd (task 1, the Le Bail/Pawley Rwp gap)
 Track: A large cell
 Depends on: 2317 soft (its `bigcell-lebail` case and rulings R0, R2, R3); 2017 soft (group Q owns `lebail_tol`'s number); 2062 soft (Rule 5's Le Bail fence)
 Priority: P2 2026-11-27 — provisional: the track the maintainer opened for a user at the wall, on the slowest mode measured (95-97 % of a large-cell Le Bail fit in the partition, which also lands at three times Pawley's Rwp); what may start without a ruling is narrow (R3), so re-rate when WP-2317 task 3 answers R2-R3
