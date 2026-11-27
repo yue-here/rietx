@@ -2,8 +2,8 @@
 
 Milestone: unscheduled · Status: ⬜
 Track: A large cell
-Depends on: 2313 soft (its `bigcell-structural` case and ruling R0); 1945 soft (its open task on batched Biso columns, see Context)
-Priority: P2 2026-11-27 — provisional: the track the maintainer opened for a user at the wall; a 40-atom structural fit spends most of its time rebuilding one structure factor per column; re-rate when WP-2313 task 1 names the user's path
+Depends on: 2317 soft (its `bigcell-structural` case and ruling R0); 1945 soft (its open task on batched Biso columns, see Context)
+Priority: P2 2026-11-27 — provisional: the track the maintainer opened for a user at the wall; a 40-atom structural fit spends most of its time rebuilding one structure factor per column; re-rate when WP-2317 task 1 names the user's path
 
 ## Goal
 
@@ -13,11 +13,11 @@ reaches them through a tie, a rigid body or a distortion mode. The columns that
 move only the intensity are assembled as one block product. A structural
 Jacobian's cost then grows as atoms × operators × reflections, not as its square
 in atoms. On `bigcell-structural` one Jacobian evaluation is at least 10× cheaper
-(target, per evaluation, since the iteration count belongs to the model). Every moved number satisfies WP-2313's ruling R0.
+(target, per evaluation, since the iteration count belongs to the model). Every moved number satisfies WP-2317's ruling R0.
 
 ## Context
 
-**The bar** (WP-2313, restated because it is load-bearing): the maintainer asked on
+**The bar** (WP-2317, restated because it is load-bearing): the maintainer asked on
 2026-11-27 for "accuracy on par with other codes … speed as fast as possible by any
 means". Under ruling R0's working reading:
 - a rounding-only change (reassociation, vectorisation, a kernel computing the
@@ -25,7 +25,7 @@ means". Under ruling R0's working reading:
   1e-7 relative, re-pinned in the same change;
 - a change of method or stopping rule waits for R0 (b)'s ruling.
 
-**The measurement** (WP-2313 probe 1, the physical model: atoms ≥ 1.5 Å apart;
+**The measurement** (WP-2317 probe 1, the physical model: atoms ≥ 1.5 Å apart;
 Linux x86_64, 4 cores, `[dev]`, compiled tier on, one run each; 12 × 36 × 4 Å,
 P2₁2₁2₁, 40 general-position atoms, 899 reflections, `mccusker_structural`):
 - the fit took **75.0 s** unprofiled, against 2.8 s for the 10-atom profile-only
@@ -179,7 +179,7 @@ is held, and rebuilt per evaluation where the cell is free.
 
 - The peak-chain (position, width) columns, and the bit-identical batched Biso
   task: WP-1945.
-- Iteration counts: a property of the model and the stopping rule (WP-2313 task 5, R6).
+- Iteration counts: a property of the model and the stopping rule (WP-2317 task 5, R6).
 - New rigid-body or Z-matrix features (WP-1814); only their columns' cost is in
   scope (angle 4).
 
@@ -223,7 +223,7 @@ is held, and rebuilt per evaluation where the cell is free.
 
 ## Handover log
 
-- **2026-11-27** — Filed from WP-2313's probe. A fresh subagent reviewed the plan
+- **2026-11-27** — Filed from WP-2317's probe. A fresh subagent reviewed the plan
   the same day, and its findings are folded in: the 120× call arithmetic, the
   Ω·∂I block, cross-atom reach, the exact oracles.
   - *Fold-first:* no open WP owns the coordinate/ADP columns' structure-factor

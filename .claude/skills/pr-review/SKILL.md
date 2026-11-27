@@ -65,48 +65,51 @@ nothing. They have not been re-checked under this line.
 
 ## Triage — the no-argument mode
 
-Two network calls, no checkout, no diff:
+One paginated network call, no checkout, no diff. The raw pages go to a
+file, and only the jq rows are read:
 
 ```sh
-gh pr list --state open --limit 30 \
-  --json number,title,author,files,changedFiles,mergeStateStatus,latestReviews,headRefOid,updatedAt,statusCheckRollup,commits
-gh pr list --state open --limit 1000 --json number --jq length    # how many are open; 1000 is a floor
+gh api graphql --paginate --slurp -F owner='{owner}' -F name='{repo}' \
+  -F query=@.claude/skills/pr-review/triage.graphql > <scratchpad>/triage.json
+jq -c -f .claude/skills/pr-review/triage.jq <scratchpad>/triage.json
 ```
 
-- **Say when the rank is partial.** The first call stops at `--limit` without
-  a word, and its `commits` field keeps it small: GitHub sizes a query from
-  its `first:` arguments and refuses one past its node limit, and gh nests
-  `authors(first:100)` inside `commits(first:100)` (WP-2312 has the
-  arithmetic). When the count is above the rows returned, the triage's first
-  line says `ranked N of M open`, collision degree is marked as counting
-  those N alone, and the `all` mode's report says the rest were not seen. A
-  refused call is a stop, never a smaller call with a field dropped, since
-  every field here feeds a rank.
-- **Reviewable size is a jq filter over `files[]`**, excluding
-  `^tests/data/|^src/rietx/data/` — never a diff (#125: 48,791 lines, 708
-  reviewable).
+- **The rows are every open PR.** `open` is GitHub's own count, taken on the
+  first page, so `rows` shorter than `open` means a page was lost or a PR
+  closed while the call paged. Rerun once to tell which. The triage's first
+  line then says `ranked N of M open`, collision degree is marked as counting those N
+  alone, and the `all` mode's report says the rest were not seen. Measured on
+  2026-11-27 (WP-2312): 84 of 84 PRs in 6 pages and 17 s, 296 kB raw and 42 kB
+  of rows. `gh pr list` cannot do this. Its page of 100 timed out without
+  `commits`, and with `commits` gh's query would also pass GitHub's node limit.
+- **A page is sized by time.** A row costs GitHub 0.17-0.31 s, mostly for
+  `mergeStateStatus`, and a request past about 10 s comes back HTTP 502 or 504. Rerun a 502
+  or 504 once. A second one, or any other refusal, is a stop. Never drop a
+  field to make it pass, since every field here feeds a rank.
+- **`reviewable` sums `files[]` lines outside `^tests/data/|^src/rietx/data/`**.
+  Never read a diff for it (#125: 48,791 lines, 708 reviewable).
 - **`mergeStateStatus`, not `mergeable`**: `BLOCKED` PRs report `MERGEABLE`;
   `DIRTY` is the conflict, `CLEAN` the only state step 9 merges from.
-- **`changedFiles` beside `files[]`**: the array caps at 100 and under-reports
-  size and collision degree downward; when they differ, say so.
+- **`filesListed` below `changedFiles`** means the 100-file cap hid the rest.
+  `reviewable`, `degree`, `governance` and `execution` then under-count, so say so.
 - **`latestReviews[].commit`** is the sha a *review* (not a comment) was posted
-  at — what makes the `all` mode's skip check a field.
-- **`commits[].messageHeadline` is the only place a contributor's WP work is
-  visible**: a PR prefixing its commits `WP-NNNN:` edits no `docs/wp/` file, so
-  `files[]` cannot see it (#98: 45 `WP-1118:` commits, every one of them in
-  `src/` and `tests/`). The field carries each commit's *body* too: it took the
-  call from 27 kB to 60 kB on a three-PR backlog, so read it through jq, never
-  raw.
+  at. That makes the `all` mode's skip check a field. gh's own
+  `--json latestReviews` never asks GitHub for it and prints an empty sha.
+- **`wpCommits` is the only place a contributor's WP work is visible**: a PR
+  prefixing its commits `WP-NNNN:` edits no `docs/wp/` file, so `files[]`
+  cannot see it (#98: 45 `WP-1118:` commits, every one of them in `src/` and
+  `tests/`). It reads the first 100 commits. A `commitsTotal` above 100 says
+  the rest went unread.
 
 Print one row per PR — number, title, reviewable lines, merge state, CI,
 whether a maintainer has commented — **and the reason for its rank**:
 
 1. **Touches an in-flight WP** — `Status:` 🔄 in a `docs/wp/[0-9]*.md` the PR
-   edits, **or** a `WP-NNNN:` commit prefix naming one. Either way a live
-   session owns that WP's file.
-2. **Outside PR edits `docs/ROADMAP.md` or `docs/wp/**`** — a governance
-   question for the user (`CONTRIBUTING.md` § Maintainer-only machinery), cheap
-   and blocking nothing. Author-conditional: on the maintainer's own PR it is
+   edits (a `WP-NNNN` in `governance`), **or** a `WP-NNNN:` commit prefix
+   naming one (`wpCommits`). Either way a live session owns that WP's file.
+2. **Outside PR edits `docs/ROADMAP.md` or `docs/wp/**`** (`governance`) — a
+   governance question for the user (`CONTRIBUTING.md` § Maintainer-only
+   machinery), cheap and blocking nothing. Author-conditional: on the maintainer's own PR it is
    the work. **The edits CONTRIBUTING hands a contributor are not the
    question**: a claim (the WP's `Status:` line set to `🔄 <date> — claimed by
    @…`, with `docs/wp/README.md` regenerated), and, for the work the PR does,
@@ -124,9 +127,9 @@ whether a maintainer has commented — **and the reason for its rank**:
    is a conflict, and the lines after the tree name the conflicted paths. It
    runs in the bench because any other tree's row merge hides an index
    conflict (§ Where this command runs).
-4. **Collision degree** (files shared with other open PRs), ascending — every
-   merge stales the diffs sharing a file with it.
-5. **Reviewable lines**, ascending.
+4. **Collision degree** (`degree`: files shared with other open PRs),
+   ascending — every merge stales the diffs sharing a file with it.
+5. **Reviewable lines** (`reviewable`), ascending.
 
 **Name every PR by another author first, above the ranked rows.** That means
 an author outside `KNOWN_AUTHORS` in `.claude/skills/issue-review/backlog.py`,
@@ -163,7 +166,7 @@ bookkeeping syncs, and nothing beyond them.
 - Outside edit to `docs/ROADMAP.md` / `docs/wp/**` beyond the edits rank 2
   lists → question to the batch; the PR **stays** (its code
   half is reviewable).
-- Touches an execution-shaped path (step 4's list) → batch.
+- Touches an execution-shaped path (step 4's list, `execution`) → batch.
 - Already reviewed and nothing since → skip, naming the sha. Test:
   `latestReviews[].commit == headRefOid` **and** `updatedAt` no later than that
   review's `submittedAt` (keyed on the sha alone it skips forever a contributor
@@ -244,7 +247,7 @@ line if the checkpoint ended it. Close with
 
 1. **Read the thread once** — `gh pr view N --comments`; it is the record.
    Earlier rounds → review only `<last-reviewed-sha>..<head>`
-   (`latestReviews[].commit`) and say which round. Once the branch has taken
+   (the triage row's `latestReviews[].commit`) and say which round. Once the branch has taken
    main in, by a rebase or a step-4 sync, that range carries main's changes
    too. Diff the two merged trees instead: `git diff A B`, where A and B are
    the trees `git merge-tree --write-tree origin/main` prints for the

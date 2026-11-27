@@ -1,4 +1,4 @@
-# WP-2313 — a large cell fits as fast as its reflections allow: the case, the bar, and the rulings in the way
+# WP-2317 — a large cell fits as fast as its reflections allow: the case, the bar, and the rulings in the way
 
 Milestone: unscheduled · Status: 🔄 2026-11-27 — filed with its three plans (2314-2316), reviewed; task 4 answered, tasks 1-3 and 5-8 open
 Track: A large cell
@@ -52,7 +52,7 @@ holds (b) for a ruling. The compiled tier already has a bar of kind (a):
 `compiled.py` rule 3 holds `solve_orbit_sums` to 1e-13 relative. R0 asks whether
 that bar extends to a converged fit.
 
-**Probe 1, the synthetic stand-in** ([`2313-probe/probe1_bigcell.py`](2313-probe/probe1_bigcell.py)):
+**Probe 1, the synthetic stand-in** ([`2317-probe/probe1_bigcell.py`](2317-probe/probe1_bigcell.py)):
 - 12 × 36 × 4 Å, P2₁2₁2₁;
 - invented atoms on general positions, placed over the whole cell with every
   symmetry image ≥ 1.5 Å from every other;
@@ -278,6 +278,17 @@ what it costs here.
 
 ## Handover log
 
+### 2026-11-27 (2nd session) — renumbered from 2313 to 2317
+
+This WP was filed as WP-2313. While its PR (#1860) was open, main took WP-2313
+for another WP ("the bench reads what the GUI build runs"). A number is never
+recycled, so this one became WP-2317, the next free number, when main was merged
+in. The commits before that merge carry the `WP-2313:` prefix; they are this
+WP's. Every cross-reference was rewritten: 2314-2316, the ROADMAP track, and the
+`### Inherited` notes in WP-1945, WP-2017 and WP-2062. The probe directory is
+now `2317-probe/`. 2314-2316 were free on main and keep their numbers. Next:
+unchanged from the entry below.
+
 ### 2026-11-27 — filed the track: three slow paths measured, the rulings in their way listed, the plans reviewed
 
 A large cell is slow in rietx for three separate reasons, and none of them is the
@@ -301,7 +312,7 @@ the code. Nothing in `src/` changed.
 - *Done:*
   - this WP (scoping) and WP-2314/2315/2316 (plans), and the ROADMAP track
     "A large cell";
-  - probe 1 (`2313-probe/probe1_bigcell.py`);
+  - probe 1 (`2317-probe/probe1_bigcell.py`);
   - task 4 answered.
 - *Measured:* Linux x86_64, 4 cores, Python 3.12.3, numpy 2.5.5, `[dev]` venv,
   compiled tier on, rietx 1.13.0.dev0 at `4e099d68`, one run per case. The

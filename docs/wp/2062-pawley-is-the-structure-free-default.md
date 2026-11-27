@@ -159,12 +159,12 @@ above, which come from lab and synchrotron single-phase patterns
 
 ### Inherited
 
-- **2026-11-27, from WP-2313: on a large cell Pawley is 3-7× faster than Le Bail
+- **2026-11-27, from WP-2317: on a large cell Pawley is 3-7× faster than Le Bail
   and lands at a third of its Rwp.**
   - Measured on a synthetic 12 × 36 × 4 Å cell (one run each, Linux, `[dev]`):
     Pawley 23.7 s, Rwp 0.045 against Le Bail 154.9 s, Rwp 0.151 at 899
     reflections; Pawley 125.4 s, 0.042 against Le Bail 351.8 s, 0.145 at 1 601.
-  - WP-2313 puts Rule 5's Le Bail fence (R3) to the maintainer, including
+  - WP-2317 puts Rule 5's Le Bail fence (R3) to the maintainer, including
     whether "route a large cell to Pawley" is the answer for a user at the wall
     on Le Bail. That would close WP-2316 on its angle 9.
   - WP-2316 task 1 asks why Le Bail lands so much worse here. Its answer may

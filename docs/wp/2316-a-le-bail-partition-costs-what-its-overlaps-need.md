@@ -2,21 +2,21 @@
 
 Milestone: unscheduled · Status: ⬜
 Track: A large cell
-Depends on: 2313 soft (its `bigcell-lebail` case and rulings R0, R2, R3); 2017 soft (group Q owns `lebail_tol`'s number); 2062 soft (Rule 5's Le Bail fence)
-Priority: P2 2026-11-27 — provisional: the track the maintainer opened for a user at the wall, on the slowest mode measured (95-97 % of a large-cell Le Bail fit in the partition, which also lands at three times Pawley's Rwp); what may start without a ruling is narrow (R3), so re-rate when WP-2313 task 3 answers R2-R3
+Depends on: 2317 soft (its `bigcell-lebail` case and rulings R0, R2, R3); 2017 soft (group Q owns `lebail_tol`'s number); 2062 soft (Rule 5's Le Bail fence)
+Priority: P2 2026-11-27 — provisional: the track the maintainer opened for a user at the wall, on the slowest mode measured (95-97 % of a large-cell Le Bail fit in the partition, which also lands at three times Pawley's Rwp); what may start without a ruling is narrow (R3), so re-rate when WP-2317 task 3 answers R2-R3
 
 ## Goal
 
 A large-cell Le Bail fit costs no more than its overlaps need, through a cheaper
 partition cycle and fewer cycles. On `bigcell-lebail` at 2θ ≤ 120° the fit runs at
-least 10× faster (target). Every moved number satisfies WP-2313's ruling R0, and
+least 10× faster (target). Every moved number satisfies WP-2317's ruling R0, and
 the maintainer has ruled, under R2-R3, how far the partition's method and
 tolerance may move. If the answer is "route a large cell to Pawley" (R3,
 WP-2062), this WP closes on that.
 
 ## Context
 
-**The bar** (WP-2313, restated because it is load-bearing): the maintainer asked on
+**The bar** (WP-2317, restated because it is load-bearing): the maintainer asked on
 2026-11-27 for "accuracy on par with other codes … speed as fast as possible by any
 means". Under ruling R0's working reading:
 - a rounding-only change may move converged numbers within |Δ| ≤ 1e-3 esd and
@@ -31,10 +31,10 @@ WP-2062."
 - The third sentence fences even a bit-identical Le Bail kernel unless a ruling
   asks for it, and the first argues for angle 9 (route to Pawley) over a Le Bail
   speed project.
-- So **no angle here starts before WP-2313 task 3 has put R3 to the maintainer.**
+- So **no angle here starts before WP-2317 task 3 has put R3 to the maintainer.**
   The question is whether a user at the wall on Le Bail is the ruling that asks.
 
-**The measurement** (WP-2313 probe 1; Linux x86_64, 4 cores, `[dev]`, compiled
+**The measurement** (WP-2317 probe 1; Linux x86_64, 4 cores, `[dev]`, compiled
 tier on; 12 × 36 × 4 Å, P2₁2₁2₁, Cu Kα doublet + FCJ, `mccusker_default`,
 `mode="lebail"`). Unprofiled walls, one run each, atoms ≥ 1.5 Å apart:
 
@@ -80,7 +80,7 @@ with a bounded steplength and a likelihood landing test
 is Richardson-Lucy, an EM step on a Poisson likelihood, which slows to a linear
 rate where reflections overlap.
 
-**Arithmetic facts that bound the angles** (WP-2313 review, checked 2026-11-27,
+**Arithmetic facts that bound the angles** (WP-2317 review, checked 2026-11-27,
 numpy 2.5.5):
 - `np.add.at` accumulates sequentially in index order: a serial loop reproduces
   it bit for bit.
@@ -170,7 +170,7 @@ partition's cost. `test_lebail_alternation.py` is a natural second timing case.
       intensities, and rerun Le Bail from Pawley's answer. Record whether the gap
       is a valley, the background or the partition, and file it where it belongs
       if it is a defect.
-- [ ] Wait for WP-2313 task 3's answer on R2-R3. If it is "route to Pawley", close
+- [ ] Wait for WP-2317 task 3's answer on R2-R3. If it is "route to Pawley", close
       this WP on angle 9 and say so.
 - [ ] Measure main against the branch on `bigcell-lebail`, interleaved, one
       machine, min-max over at least three runs. Record cycles per update, first
@@ -213,7 +213,7 @@ partition's cost. `test_lebail_alternation.py` is a natural second timing case.
 
 ## Handover log
 
-- **2026-11-27** — Filed from WP-2313's probe. A fresh subagent reviewed the plan
+- **2026-11-27** — Filed from WP-2317's probe. A fresh subagent reviewed the plan
   the same day, and its findings are folded in:
   - `reduceat` is pairwise, so no kernel is bit-identical for free;
   - Rule 5 is quoted whole;
@@ -227,4 +227,4 @@ partition's cost. `test_lebail_alternation.py` is a natural second timing case.
   - WP-1323 and WP-1542 are closed.
 
   *Next:* task 1, why Le Bail lands at three times Pawley's Rwp here. Then wait
-  on WP-2313 task 3's answer to R2-R3.
+  on WP-2317 task 3's answer to R2-R3.

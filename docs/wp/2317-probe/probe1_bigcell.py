@@ -1,4 +1,4 @@
-"""WP-2313 probe 1: where a 12 x 36 x 4 Å cell spends its time.
+"""WP-2317 probe 1: where a 12 x 36 x 4 Å cell spends its time.
 
 A measurement scaffold, not package code.  The cell, the space group and the
 atoms are **invented** for a performance question: the atoms are drawn at a
@@ -8,7 +8,7 @@ Poisson-sampled, and the fit starts 500 ppm high on the cell with
 generic widths.  Nothing it prints is a structural claim, and Rwp is an
 identity check only.
 
-    RIETX_TELEMETRY=0 .venv/bin/python -I docs/wp/2313-probe/probe1_bigcell.py \
+    RIETX_TELEMETRY=0 .venv/bin/python -I docs/wp/2317-probe/probe1_bigcell.py \
         MODE SG TTMAX NATOMS
 
     MODE    rietveld | lebail | pawley
@@ -24,7 +24,7 @@ identity check only.
 
 Run 2026-11-26/27 (linux x86_64, 4 cores, Python 3.12.3, numpy 2.5.5,
 ``[dev]`` venv, compiled tier on, rietx 1.13.0.dev0 at 4e099d68) — readings in
-the WP-2313 file, Context.  The start carries the truth's atoms (the same
+the WP-2317 file, Context.  The start carries the truth's atoms (the same
 ``POSITIONS``); only the cell, the widths and the background start off.
 ``MIN_SEP`` (Å, default 1.5) sets the closest approach of any two images.
 """
@@ -61,7 +61,7 @@ def _positions(seed: int = 0) -> list[tuple[float, float, float]]:
     every site at least ``MIN_SEP`` from every other (rejection sampling).
 
     The first version drew inside (0.05, 0.45)³, a 1/15.6 sub-box: at 40 atoms
-    65 % of nearest neighbours sat under 1 Å, a non-physical model (WP-2313
+    65 % of nearest neighbours sat under 1 Å, a non-physical model (WP-2317
     review, S3).
     """
     import gemmi

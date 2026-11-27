@@ -2,8 +2,8 @@
 
 Milestone: unscheduled · Status: ⬜
 Track: A large cell
-Depends on: 2313 soft (its `bigcell-pawley` case and rulings R0, R4, R5)
-Priority: P2 2026-11-27 — provisional: the track the maintainer opened for a user at the wall, on the path the structure-free default is moving to (WP-2062) and every `index_pattern` validation already runs; re-rate when WP-2313 task 1 names the user's path and task 1 here counts crossings on real data
+Depends on: 2317 soft (its `bigcell-pawley` case and rulings R0, R4, R5)
+Priority: P2 2026-11-27 — provisional: the track the maintainer opened for a user at the wall, on the path the structure-free default is moving to (WP-2062) and every `index_pattern` validation already runs; re-rate when WP-2317 task 1 names the user's path and task 1 here counts crossings on real data
 
 ## Goal
 
@@ -13,17 +13,17 @@ box-only step costs, because two things change:
 - the work the dense route spends on the intensity block goes.
 
 On `bigcell-pawley` at 2θ ≤ 120° the fit runs at least 3× faster (target), with
-every moved number satisfying WP-2313's ruling R0.
+every moved number satisfying WP-2317's ruling R0.
 
 ## Context
 
-**The bar** (WP-2313, restated because it is load-bearing): the maintainer asked on
+**The bar** (WP-2317, restated because it is load-bearing): the maintainer asked on
 2026-11-27 for "accuracy on par with other codes … speed as fast as possible by any
 means". Under ruling R0's working reading, a step that solves the **same** problem
 (pruned rows, the same LSI) is exact. A different step (a clamp, a fallback, a
 profiled block) is a kind (b) move awaiting its ruling.
 
-**The measurement** (WP-2313 probe 1, atoms ≥ 1.5 Å apart; Linux x86_64, 4
+**The measurement** (WP-2317 probe 1, atoms ≥ 1.5 Å apart; Linux x86_64, 4
 cores, `[dev]`, compiled tier on, one run each; 12 × 36 × 4 Å, P2₁2₁2₁, Cu Kα
 doublet + FCJ, `mccusker_default`, `mode="pawley"`):
 - 899 columns (2θ ≤ 90°): 23.7 s unprofiled, Rwp 0.0447.
@@ -92,7 +92,7 @@ grows, and keeping the factor across λ retries (λ shifts only the diagonal).
   `index_pattern` validation of a large candidate; the validation fit has been
   Pawley since WP-2011) before calling the path routine.
 
-**The ruling this touches (WP-2313's R4).** Practice (`docs/practice.md`
+**The ruling this touches (WP-2317's R4).** Practice (`docs/practice.md`
 § Peak-width limits) floors by value: GSAS-II per reflection, FullProf at
 Γ_G = 1e-10, while RIETAN-FP rejects a step to a negative width. rietx holds the
 floor inside the step because LM stalled without it:
@@ -190,7 +190,7 @@ free swap under LM.
 
 ## Handover log
 
-- **2026-11-27** — Filed from WP-2313's probe. A fresh subagent reviewed the plan
+- **2026-11-27** — Filed from WP-2317's probe. A fresh subagent reviewed the plan
   the same day, and its findings are folded in:
   - n box rows, not 2n;
   - ILU reuse already exists;
