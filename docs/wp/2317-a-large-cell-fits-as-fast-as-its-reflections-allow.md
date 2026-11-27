@@ -306,6 +306,11 @@ what it costs here.
     intensity column, the sum measured and each member's share unmeasured.
     Accidental coincidences (b ≈ 3a) keep the restraint while their practice is
     surveyed. Built under WP-2315.
+  - **Ruled 2026-11-27 (R5 c): "follow your recommendations".** Accidental
+    coincidences keep the soft restraint, retargeted to equal F², and report the
+    group sum as the measurement. Practice mostly ties nothing (TOPAS), or ties
+    only in low symmetry (GSAS-II) or in a hybrid step (RIETAN-FP)
+    (`docs/practice.md` § Accidental overlaps during extraction).
 - **R6 — the stopping rule.**
   - *rietx:* intermediate stages at 1e-6 (`intermediate_ftol`, WP-1123), the last
     declared stage at the solver's 1e-9. The closing stage is **off by default
@@ -328,6 +333,11 @@ what it costs here.
   - The slack could be sized from the stage's own moving position parameters
     instead. This is a kind (b) move, and it is not WP-2051's per-evaluation
     windows.
+  - **Ruled 2026-11-27 (R7): "follow your recommendations".** The slack is sized
+    per stage from the stage's free position parameters, with a refit on fresh
+    windows when `window_loss` passes its tolerance. No surveyed program adds
+    movement slack, since they rebuild windows or freeze them with none
+    (`docs/practice.md` § Room for a peak to move inside its window).
 - **R8 — the bench measures the shapes it was built on.** No
   `bench_refinement.py` case has more than ~1 200 (line, reflection) pairs or
   ~15 atoms in a phase. So v1.1's ranking under-weights every term that grows with
