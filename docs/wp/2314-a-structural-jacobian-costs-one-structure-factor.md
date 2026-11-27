@@ -1,6 +1,6 @@
 # WP-2314 — a structural Jacobian costs one structure factor, not one per column
 
-Milestone: unscheduled · Status: 🔄 2026-11-27 — angle 1 (the hoist) landed byte-equal; angles 2-7 wait for WP-2317's R0
+Milestone: unscheduled · Status: 🔄 2026-11-27 — angle 1 (the hoist) landed byte-equal, its runaway guard settled as a count; angles 2-7 wait for WP-2317's R0
 Track: A large cell
 Depends on: 2317 soft (its `bigcell-structural` case and ruling R0); 1945 soft (its open task on batched Biso columns, see Context)
 Priority: P2 2026-11-27 — provisional: the track the maintainer opened for a user at the wall; a 40-atom structural fit spends most of its time rebuilding one structure factor per column; re-rate when WP-2317 task 1 names the user's path
@@ -183,7 +183,8 @@ is held, and rebuilt per evaluation where the cell is free.
   evaluations. GSAS-II 5.8.4 on the same pattern and free set took
   18.13-20.41 s in 20 cycles at Rwp 0.08753, so after the hoist rietx is
   already 1.6-1.9× faster than GSAS-II here. WP-2317's Context has the
-  protocol; the runaway guard this WP waits for can use the case.
+  protocol. (Its pointer to a runaway guard on the case is consumed: the
+  guard is a count, the 2026-11-27 second-session entry.)
 
 ## Non-goals
 
@@ -211,11 +212,14 @@ is held, and rebuilt per evaluation where the cell is free.
 - [ ] Angles 5-6. The full suite, since jax/torch goldens move. Every moved number
       checked against R0 (a).
 - [ ] Angle 7, decided on the remaining structure-factor share.
-- [ ] Tests: the byte-equality test for angle 1; oracle tests; a timing guard on
-      the bench case as a **runaway guard**, never a timer.
-      *(Angle 1's landed: `tests/test_structural_hoist.py`. The timing guard
-      waits for WP-2317's `bigcell-structural` bench case, which does not
-      exist yet; the probe stood in for it.)*
+- [x] Tests: the byte-equality test for angle 1, and a **runaway guard**
+      against the bench case's cost returning, never a timer.
+      *(Angle 1's landed: `tests/test_structural_hoist.py`. 2026-11-27: the
+      guard is that file's `_orbit_terms` count on its four-atom fixture, not
+      a wall-clock budget on `bigcell-structural`; the docstring of
+      `test_one_expansion_serves_every_structural_column` says why. A
+      negative control now shows the count trips on a per-atom expansion.)*
+- [ ] Tests: the oracle tests for angles 3 and 4, landing with each angle.
 - [ ] Skill: none (no API change).
 
 ## Acceptance
@@ -239,6 +243,58 @@ is held, and rebuilt per evaluation where the cell is free.
 - WP-1327's `moment_f2_grads`: the cached-per-evaluation shape this copies.
 
 ## Handover log
+
+- **2026-11-27** (second session) — The runaway guard the Tests item owed is
+  a count of structure-factor expansions, not a timer (PR #1865, a
+  ghostshift runner). The count landed with angle 1. This session showed
+  that it trips when the hoist is undone. A timer could not do that job
+  honestly. A budget that trips at the hoist's 2.6× gain is not several times
+  the fit's own time, so on a loaded machine it would fail for load alone.
+  The count gives the same answer on every machine.
+  - *Done:* `tests/test_structural_hoist.py` gains a negative control. With
+    the gradients built by the frozen pre-change kernels, one whole
+    expansion per atom, the count grows with the free columns: 24 calls
+    with 21 columns free, against 8 with one. The existing guard's
+    docstring now states the reason and its scope. The counter now also
+    replaces `_orbit_terms` in the test module, because the frozen kernels
+    call it from there. Before that fix, a probe of the pre-change kernels
+    counted none of their calls.
+  - *Measured* (this Mac, arm64, Python 3.12, `[dev]` venv, compiled tier
+    on; probe `~/.cache/ghostshift/rietx/wp-2314-guard/probe2.py`, outside
+    the tree): on `bigcell-structural`'s 40-atom phase, blank pattern, one
+    Jacobian over the 120 coordinate columns makes 40 `_orbit_terms` calls
+    hoisted and 1 600 with one expansion per atom. It takes 0.105-0.110 s
+    hoisted and 0.245-0.247 s per atom, three repeats each. With one
+    coordinate column free both make 40 calls in 0.02 s.
+  - *Gates:* fast suite on this tree (`[dev]`, darwin arm64, under the
+    suite lock, 7 min 9 s): 15 821 passed, 452 skipped, 30 xfailed. Main's
+    count was not measured, so the +1 is by construction. The added test
+    cost 0.03 s locally (`tests.added_test_times`). The hoist file: 6
+    passed. Ruff, `tests.rulebook_limits` and Vale (0 errors) clean;
+    `tests.reader_output` exit 0, unchanged against 1aed9c404. The full
+    suite did not run: the change is a test and prose, so no measured
+    number can move.
+  - *Review:* `/code-review high --fix` found no correctness bug. It fixed
+    three wording points: the ticked item now says the guard runs on the
+    four-atom fixture, it points at the test's docstring, and the docstring
+    names the paths the count sees. It left the first entry's stale *Next*
+    item 2 alone, since a log entry is history; this entry supersedes it.
+  - *Settled by Claude:*
+    1. The runaway guard is the `_orbit_terms` count per Jacobian on the
+       four-atom fixture, with no wall-clock budget on `bigcell-structural`.
+       The alternative was a timed bench fit in the slow tier. Settled by
+       Claude under `tests/CLAUDE.md` § Budgets in tests: a budget not
+       several times the serial time is a load sensor, and one that trips at
+       2.6× cannot be. A runaway in iteration count is bounded one rank
+       down, by the library's 400-evaluation stage budget
+       (`test_budget_and_tolerance_invariance.py`). The guard's shape is
+       copied from `test_one_expansion_serves_every_structural_column`.
+  - *Generality:* no heuristic, threshold or default added, so no judge.
+  - *Next:*
+    1. WP-2317's R0 still gates angles 2-7. Angle 3 is the largest share.
+    2. Angle 3 owes its own count guard on a fixture with Biso free. This
+       fixture frees no Biso, so a Biso column that went back to a
+       whole-phase finite difference would pass the guard above.
 
 - **2026-11-27** — Angle 1, the hoist, landed byte-equal (PR #1862, a
   ghostshift runner). A coordinate or ADP column no longer rebuilds the

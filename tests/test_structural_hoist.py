@@ -251,10 +251,13 @@ def test_the_jacobian_is_byte_equal_to_the_pre_change_columns(dispersion, monkey
     assert hoisted.tobytes() == before.tobytes()
 
 
-def test_one_expansion_serves_every_structural_column(monkeypatch):
-    """The cost shape the hoist buys.  ``_orbit_terms`` calls per evaluation
-    do not grow with the number of structural columns; before WP-2314 each
-    column added one call per atom."""
+def _expansions_per_jacobian(monkeypatch) -> dict[str, tuple[int, int]]:
+    """``_orbit_terms`` calls in one Jacobian evaluation, with one structural
+    column free and with all 21, as ``{name: (calls, columns)}``.
+
+    The counter replaces the name in this module too, because the frozen
+    oracle kernels above call it from here.
+    """
     calls = [0]
     real = SF._orbit_terms
 
@@ -263,6 +266,7 @@ def test_one_expansion_serves_every_structural_column(monkeypatch):
         return real(*a, **k)
 
     monkeypatch.setattr(SF, "_orbit_terms", counting)
+    monkeypatch.setitem(globals(), "_orbit_terms", counting)
     counts = {}
     for name, free in (("one", ("phases.0.atoms.1.dof.0",)),
                        ("all", ("phases.0.atoms.*.dof.*", "phases.0.atoms.*.adp.*"))):
@@ -273,4 +277,31 @@ def test_one_expansion_serves_every_structural_column(monkeypatch):
         jacobian(theta)
         counts[name] = (calls[0], len(theta))
     assert counts["one"][1] == 1 and counts["all"][1] == 21
+    return counts
+
+
+def test_one_expansion_serves_every_structural_column(monkeypatch):
+    """The cost shape the hoist buys.  ``_orbit_terms`` calls per evaluation
+    do not grow with the number of structural columns; before WP-2314 each
+    column added one call per atom.
+
+    This count is WP-2314's runaway guard, in place of a wall-clock budget on
+    ``bigcell-structural``.  On that case's fit one Jacobian made a median
+    4 920 calls before the hoist and 160 after, and the fit ran 2.6-2.7x
+    faster (the WP's handover log).  A budget that trips at 2.6x the serial
+    time is not several times it, so it would sense load (``tests/CLAUDE.md``
+    § Budgets in tests).  The count trips on a return to a per-atom or
+    per-column expansion on this fixture's path, on every machine.
+    """
+    counts = _expansions_per_jacobian(monkeypatch)
     assert counts["all"][0] == counts["one"][0], counts
+
+
+def test_the_count_guard_trips_on_an_expansion_per_atom(monkeypatch):
+    """The guard above is evidence only if its counter sees a return.  With
+    the gradients built by the frozen pre-change kernels, one whole expansion
+    per atom, the count grows with the free columns.  A return to one
+    expansion per *column* makes more calls still."""
+    monkeypatch.setattr(CompiledModel, "structural_f2_grads", _pre_change_grads)
+    counts = _expansions_per_jacobian(monkeypatch)
+    assert counts["all"][0] > 2 * counts["one"][0], counts
