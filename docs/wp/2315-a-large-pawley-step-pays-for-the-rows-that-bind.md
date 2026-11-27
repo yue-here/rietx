@@ -1,6 +1,6 @@
 # WP-2315 — a large Pawley step pays for the rows that bind, not for every intensity
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-27 — claimed by @claude (ghostshift runner)
 Track: A large cell
 Depends on: 2317 soft (its `bigcell-pawley` case and rulings R0, R4, R5)
 Priority: P2 2026-11-27 — provisional: the track the maintainer opened for a user at the wall, on the path the structure-free default is moving to (WP-2062) and every `index_pattern` validation already runs; re-rate when WP-2317 task 1 names the user's path and task 1 here counts crossings on real data
