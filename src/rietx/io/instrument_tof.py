@@ -213,12 +213,17 @@ _PRCF_TO_PROFILE: dict[int, dict[str, str]] = {
         "gam-2": "gam2"},
 }
 
-#: Documented profile functions this package does not evaluate, and why.
+#: Documented profile functions this package does not evaluate.
 _PRCF_NOT_EVALUATED: dict[int, str] = {
-    2: "the Ikeda-Carpenter function (manual p. 145-147), a causal shape with a "
-       "different peak origin from the back-to-back pair",
+    2: "the Ikeda-Carpenter function (manual p. 145-147)",
     4: "profile function 4 (manual p. 149)",
     5: "profile function 5 (manual p. 155)",
+}
+
+#: Why a refusal does not map a default set onto the back-to-back pair; said
+#: only where that mapping is refused, since a decline maps nothing.
+_PRCF_WHY_NOT_MAPPED: dict[int, str] = {
+    2: ", a causal shape with a different peak origin from the back-to-back pair",
 }
 
 #: Each parsed record's FORTRAN layout as contiguous ``(first, last, name)``
@@ -368,7 +373,8 @@ class _Record:
             _note(self.diagnostics, "info", "GSAS_IPARM_TRAILING_ZEROS_READ",
                   f"{self.path.name}: record {self.number_in_file} "
                   f"({self.text[:12].rstrip()!r}) writes {token!r} in columns "
-                  f"{start}-{end}, past {name} (columns {first}-{last}). The "
+                  f"{start}-{end}, running past {name}'s columns "
+                  f"{first}-{last}. The "
                   f"columns past {name} hold only zeros, so {name} was read "
                   f"as {value!r}, the number in its "
                   f"own columns.",
@@ -579,9 +585,9 @@ def _profile(path: Path, bank: int, headers: dict[int, _Record],
             _note(diagnostics, "warning" if not headers else "info",
                   "GSAS_IPARM_PROFILE_DECLINED",
                   f"Bank {bank}: a PRCF set was not read, because the PRCF set "
-                  f"number in column 11 is ' ' and the bank holds another set; "
+                  f"number in column 11 is blank and the bank holds another set; "
                   f"the manual numbers the sets n = 1 … NTYP (GSAS Technical "
-                  f"Manual p. 223), so which set it is the file does not say.",
+                  f"Manual p. 223), so the file does not say which set it is.",
                   where=[f"bank {bank}", "PRCF"])
         elif not lone:
             raise ValueError(f"{path}: bank {bank} has PRCF coefficient records "
@@ -606,8 +612,8 @@ def _profile(path: Path, bank: int, headers: dict[int, _Record],
                 _note(diagnostics, "warning", "GSAS_IPARM_PROFILE_DECLINED",
                       f"Bank {bank}: its one PRCF set, written without a set "
                       f"number, is an 8-coefficient type-1 block, the legacy "
-                      f"LANSCE layout, which is read only as a numbered set 1 "
-                      f"(rietx.io.legacy.read_lansce_iparm); the profile "
+                      f"LANSCE layout, which rietx.io.legacy.read_lansce_iparm "
+                      f"reads once the set is numbered 1 ('PRCF1'); the profile "
                       f"coefficients are left at zero.",
                       where=[f"bank {bank}", "PRCF"])
                 return ProfileTOF()
@@ -653,8 +659,8 @@ def _profile(path: Path, bank: int, headers: dict[int, _Record],
                 raise rec.fail(
                     f"PRCF set {n} declares profile function {ptyp} with {ncof} "
                     f"coefficients; the manual documents {want} for function "
-                    f"{ptyp} (p. {_PRCF_NAMES_PAGE[ptyp]}) and no other "
-                    f"length, and a block of another length is refused — "
+                    f"{ptyp} (p. {_PRCF_NAMES_PAGE[ptyp]}), and a block of "
+                    f"another length is refused — "
                     f"never zero-padded or truncated — because the order of "
                     f"its slots would be a guess"
                     + (_LEGACY_POINTER if (ptyp, ncof) == (1, 8) else
@@ -673,7 +679,8 @@ def _profile(path: Path, bank: int, headers: dict[int, _Record],
         if ptyp in _PRCF_NOT_EVALUATED:
             raise rec.fail(
                 f"the default PRCF set declares PTYP = {ptyp}, "
-                f"{_PRCF_NOT_EVALUATED[ptyp]}, which this package does not "
+                f"{_PRCF_NOT_EVALUATED[ptyp]}"
+                f"{_PRCF_WHY_NOT_MAPPED.get(ptyp, '')}, which this package does not "
                 f"evaluate; refused rather than mapped onto the back-to-back "
                 f"coefficients")
         fields = _sequence(path, bank, f"PRCF{n}", conts.get(n, {}),

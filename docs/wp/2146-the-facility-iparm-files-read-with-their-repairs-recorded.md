@@ -230,6 +230,95 @@ output, so its wording goes to the maintainer before merge.
 
 ## Handover log
 
+- **2026-11-27** — PR #1639, a ghostshift pass to take it to a merge-ready
+  verdict. Main merged cleanly. The reader-facing text went through the
+  blind check that the 2026-11-22 routing asks for, and five messages were
+  shortened or reworded. The open question was not settled: two of the
+  reader's own conventions point opposite ways, so it comes with a brief.
+  - *Done:* merged `origin/main` at `893ce88b6` (`4f6f05721`, no
+    conflicts). Wording, from the blind check: the trailing-zeros note says
+    the token runs past CTOF's columns; the beside-another-set decline says
+    "is blank" and "the file does not say which set it is"; the lone
+    function-2 decline drops the Ikeda-Carpenter shape clause, which the
+    numbered refusal keeps as its reason not to map the set (new
+    `_PRCF_WHY_NOT_MAPPED`, so that refusal reads as before); the lone
+    8-slot decline says `read_lansce_iparm` reads the block once the set is
+    numbered 1; the NCOF refusal drops "and no other length". One test
+    assertion follows the new wording.
+  - *Blind check* (fresh Opus, given only the added strings rendered with
+    fixture values and the junk test, not the author's view): keep on all
+    13 items. It asked for the two clause cuts above and three rewordings,
+    all applied. Not applied: cutting "never zero-padded or truncated" from
+    the NCOF refusal, which is older than this PR; and a next step for the
+    lone function-2 decline, since no TOF fit reads the profile yet and
+    there is no action to name. Nothing goes to the maintainer from it.
+    `tests.reader_output` exit 0.
+  - *Measured:* fast selection (`-m "not slow"`), `[dev]` venv, macOS arm64, on this branch merged with origin/main at `893ce88b6`, before the wording edits: 15827 passed, 452 skipped, 30 xfailed, 0 failed. After the edits, the reader's own tests (`test_instrument_tof`, `test_tof_axis`, `test_audit_table`, `test_readers`, `test_help`, `test_manual`, `test_manual_api`): 583 passed, 1 skipped. No test added. Lint as CI runs it: ruff, `ruff format --check examples/tutorials`, skill_caps, skill_surface exit 0; Vale 0 errors.
+  - *Question for the maintainer, brief.*
+    1. **The decision.** A bank's default profile set (set 1) uses a
+       profile function rietx cannot evaluate: function 2 (Ikeda-Carpenter),
+       4 or 5. Should the reader return the bank's calibration with an empty
+       profile and a warning (decline), or refuse the file? Today it
+       declines when the set is written without its number and refuses when
+       it is numbered 1. Trigger: two written conventions disagree, and
+       picking one reads a scope into the io rulebook's drop-against-refuse
+       rule that its text does not state. A 2026-11-21 reversal in this area
+       also warns against carrying one reader form onto a sibling case.
+    2. **Why it matters.** Each bank of a GSAS-I instrument file holds a
+       calibration (DIFC, DIFA, ZERO, which turn flight time into d) and a
+       profile set (peak-shape coefficients). rietx cannot fit TOF data yet
+       (ROADMAP § v2+), so the calibration is what a user gets out of the
+       file today: it puts a TOF pattern on a d axis. The profile is stored
+       and read by nothing. Task (a) made a lone unnumbered set read as set
+       1, so the two spellings now mean the same thing, and one file gets
+       two outcomes by column 11 alone. Who sees it: a reader of an older
+       ISIS GEM file (function 2, the PR #1503 fixture) or of any file whose
+       default set is 2, 4 or 5. Minor.
+    3. **Aim.** One input with one reading gets one outcome (Rule 5,
+       convention), and a reader returns what it can read correctly.
+    4. **Options.**
+       - *A, decline everywhere.* A numbered set 1 of function 2, 4 or 5
+         stops raising and returns the calibration, an empty profile and the
+         `PROFILE_DECLINED` warning. About ten lines and one test change;
+         reversible. It departs from two siblings in the same reader: an
+         incident-spectrum type the reader cannot use (`ITYP 10`, spectrum
+         in another file) is refused, and io/CLAUDE.md says a non-zero value
+         with no slot raises rather than being dropped. Rule 5 then asks the
+         same question of `ITYP 10` in the same change.
+       - *B, refuse everywhere.* The lone unnumbered case raises like the
+         numbered one, and the #1503 fixture stops reading. That partly
+         undoes #1503, a contributor's PR whose stated aim was to keep the
+         GEM calibration. #1503's own text says the real GEM file's
+         high-angle banks are refused anyway by the column rule (TTHETA
+         across the TILT boundary), with `read_lansce_iparm` reading it by
+         tokens. Not measured: the real file is not on this machine. About
+         ten lines; reversible.
+       - *C, do nothing.* The split stays, documented in the module
+         docstring as open.
+       - Dropped: mapping function 2 onto the back-to-back coefficients, as
+         GSAS-II does. GSAS-II's own warning says the result is not valid.
+    5. **Practice.** GSAS-II 5.8.4 (`GSASIIfiles.py:308-342`, read, not
+       run) treats numbered and unnumbered sets alike. For function 2 it
+       prints that it "does not give valid GSAS-II" coefficients and
+       loads the bank. It never refuses. GSAS-I evaluates function 2.
+       FullProf and TOPAS: not checked.
+    6. **Recommendation.** A, a lean. The crux is whether a block the
+       reader cannot use should cost the user the block it can. The
+       drop-against-refuse rule was written for a value inside a model rietx
+       evaluates, where dropping it leaves a model that looks whole and is
+       wrong. A declined function leaves the empty profile a bank with no
+       profile set already gets, at warning level, so nothing reads as a
+       complete answer. B loses there: it withholds a correct calibration
+       for a profile no fit reads, and GSAS-II keeps it too. What would flip
+       it: reading the rule as covering whole blocks, or a TOF fit landing
+       that could take an empty profile in silence.
+    The related split the 2026-11-24 entry names (an unnumbered set beside a
+    numbered one: GSAS-II reads the unnumbered, rietx the numbered) is
+    older than this WP and was not part of this pass.
+  - *Next:* (1) the maintainer rules on the question; (2) read both real
+    files on a local copy once the download is approved; (3) the #1446
+    follow-ups in `### Inherited`.
+
 - **2026-11-24** — PR #1639, brought up to date with main. The GSAS
   Technical Manual turned out to be held locally after all, outside the paper
   corpus, and it settles task (c): it describes no shorter block for profile

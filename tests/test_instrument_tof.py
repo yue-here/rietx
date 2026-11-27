@@ -548,7 +548,7 @@ def test_trailing_zeros_past_the_last_field_are_read_and_recorded(tmp_path):
     (read,) = [n for n in notes if n.code == "GSAS_IPARM_TRAILING_ZEROS_READ"]
     assert read.level == "info"
     assert read.where == ["INS  1PRCF1"]
-    assert "'0.001000' in columns 26-33, past CTOF (columns 23-32)" in read.message
+    assert "'0.001000' in columns 26-33, running past CTOF's columns 23-32" in read.message
     assert "read as 0.001" in read.message
 
 
