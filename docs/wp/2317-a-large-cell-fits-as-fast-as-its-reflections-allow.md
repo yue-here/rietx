@@ -52,6 +52,14 @@ holds (b) for a ruling. The compiled tier already has a bar of kind (a):
 `compiled.py` rule 3 holds `solve_orbit_sums` to 1e-13 relative. R0 asks whether
 that bar extends to a converged fit.
 
+**Ruled 2026-11-27 (R0): allow both kinds of move.** Kind (a) carries the bound
+above. The maintainer generalised it (dictated, one word corrected): "our accuracy threshold should just
+be comparable with other Rietveld refinement codes. We don't need to be much more
+accurate than them. Consider the user and the amount of accuracy they need on
+different measurements. For common applications. This should be a general rule
+for the repo." It is now DESIGN-RULES Rule 5 *Arithmetic accuracy*, so a speed
+change answers to that bar and Rule 2's pinned-number test governs model changes.
+
 **Probe 1, the synthetic stand-in** ([`2317-probe/probe1_bigcell.py`](2317-probe/probe1_bigcell.py)):
 - 12 × 36 × 4 Å, P2₁2₁2₁;
 - invented atoms on general positions, placed over the whole cell with every
@@ -233,6 +241,7 @@ what it costs here.
   `compiled.py` rule 3 already admits a stated bound for a transcendental. The
   convention forbids every reassociation (`np.bincount` for `np.add.at`, a
   vectorised atom loop, a fused kernel), and R0 (a) is the proposed replacement.
+  *Closed 2026-11-27 by R0.*
 - **R2 — a Le Bail partition settles to 1e-7 of the Bragg counts with the model
   frozen.**
   - *Where:* WP-1542, under WP-2002's ruling B11; `lebail_tol` = 1e-7 settled by
@@ -260,6 +269,12 @@ what it costs here.
     sentence also fences even a bit-identical Le Bail kernel that no ruling asked
     for.
   - *Question:* does a user at the wall on Le Bail count as the ruling that asks?
+  - **Ruled 2026-11-27 (R2, R3): follow best practice and lift the fence.** The
+    maintainer also ruled that the Le Bail and Pawley speed work goes ahead
+    whatever the user's case shows, since cells this size are met in the wild.
+    He asked why rietx diverged from practice here, and that every cascading
+    change is found and made with it. Rule 5 *Structure-free fitting* now says
+    Le Bail follows the established programs' practice.
 - **R4 — the width floor is held inside the step in every mode** (WP-1938 D8,
   WP-2153).
   - *Reasoning* (the `gaussian_width_inequalities` docstring): without the row,
@@ -302,6 +317,7 @@ what it costs here.
   ~15 atoms in a phase. So v1.1's ranking under-weights every term that grows with
   the atom count or the reflection count, which WP-1111 said of its own
   baselines.
+  *Closed 2026-11-27: task 2's four bench cases (PR #1864).*
 
 **Angles beyond the three WPs** (kept open, not yet measured):
 

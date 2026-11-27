@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: 🔄 2026-11-27 — task 1 answered: the Rwp gap is a valley entered through an unseeded background, not the partition; the rest waits on WP-2317's R2-R3
 Track: A large cell
 Depends on: 2317 soft (its `bigcell-lebail` case and rulings R0, R2, R3); 2017 soft (group Q owns `lebail_tol`'s number); 2062 soft (Rule 5's Le Bail fence)
-Priority: P2 2026-11-27 — provisional: the track the maintainer opened for a user at the wall, on the slowest mode measured (95-97 % of a large-cell Le Bail fit in the partition, measured at the unseeded probe's wrong answer; seeded runs still end every last partition at the cycle cap, task 1); what may start without a ruling is narrow (R3), so re-rate when WP-2317 task 3 answers R2-R3
+Priority: P2 2026-11-27 — the maintainer's large-cell track, ruled to proceed whatever the user's case shows (cells this size are met in the wild); 95-97 % of a large-cell Le Bail fit is in the partition, and R2-R3 are ruled: follow practice, fence lifted
 
 ## Goal
 

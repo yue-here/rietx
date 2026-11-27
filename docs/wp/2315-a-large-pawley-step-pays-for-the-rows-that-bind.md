@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: 🔄 2026-11-27 — task 1 and the measurement done; Angle 0 ships only the cached |T|, its blockwise G·E⁻¹ moves bits on x86_64 OpenBLAS and joins Angles 1-2 behind WP-2317's R0, R4, R5 and its task 1
 Track: A large cell
 Depends on: 2317 soft (its `bigcell-pawley` case and rulings R0, R4, R5)
-Priority: P2 2026-11-27 — provisional: the track the maintainer opened for a user at the wall; task 1 found real patterns on the tree reach the step once in 32 runs, so P3 if the user's pattern (WP-2317 task 1) does not cross either
+Priority: P2 2026-11-27 — the maintainer's large-cell track, ruled to proceed whatever the user's case shows (cells this size are met in the wild); real patterns on the tree reach the slow step once in 32 runs, but a large Pawley cell reaches it
 
 ## Goal
 

@@ -101,9 +101,7 @@ number. A sentence that nobody would use to make a choice does not belong here.
    the feature should not move that choice. So the record is kept in the matrix and its
    generated page alone. No surface an agent reads while choosing carries a validation
    verdict: `capabilities()`, the help entries, the agent skill, the GUI's help (ruled
-   2026-10-27) and the fit report (ruled 2026-11-01). The report is on that list
-   because an agent reads it between stages, while it still chooses what to free, and a
-   sentence there would read the same for every fit with the same free parameters.
+   2026-10-27) and the fit report (ruled 2026-11-01).
 
    *A dataset is unused, sealed or development data.* Data that nobody who changes the
    package has run is unused. A family is sealed when its first run is on the tree as it
@@ -174,18 +172,20 @@ number. A sentence that nobody would use to make a choice does not belong here.
    project. Cases test it as acceptance rows. A design is not fitted to one case, and
    nothing is built before a case needs it. A milestone's direction is in its record.
    The project's are two, each ruled by the maintainer.
-   - *Arithmetic accuracy.* A setting that trades arithmetic accuracy for speed, such
-     as a convergence tolerance, a peak window or a quadrature order, matches the
-     accuracy the established programs deliver (`docs/practice.md`). rietx buys no
-     accuracy past theirs at a cost a user waits for. Where an error compounds, the
-     setting follows what the compounding needs. WP-2222 names three such places: a
-     Pawley series that carries intensities, `lab_calibrate`, and the guides that
-     publish numbers (ruled 2026-11-19; generalised from TOPAS to the established
-     programs 2026-11-23, WP-2307).
+   - *Arithmetic accuracy.* rietx is as accurate as a user's measurement needs. The
+     bar is what the established programs deliver, read per quantity against its
+     common applications: a cell, a phase fraction, a coordinate, a size. A speed
+     setting (a convergence tolerance, a peak window, a quadrature order) sits at
+     that bar. Accuracy no user reads is not worth a wait. Where an error
+     compounds (WP-2222: a Pawley series carrying intensities, `lab_calibrate`, the
+     guides that publish numbers), the setting follows what the compounding needs.
+     A speed change answers to this bar, and Rule 2's pinned-number test governs
+     model changes. One that only regroups arithmetic may move a converged number by
+     1e-3 of its esd and Rwp by 1e-7 relative, re-pinning goldens with that bound
+     asserted (ruled 2026-11-19 and 2026-11-27; WP-2307, WP-2317 R0).
    - *Structure-free fitting.* Pawley is the structure-free method rietx leads with.
-     WP-2062 carries the move to it as the default. Le Bail gets only what a ruling
-     already asked of it, in its smallest correct form. A change to Le Bail that moves
-     every fit's numbers waits for WP-2062 (ruled 2026-11-05, #1434).
+     WP-2062 carries the move to it as the default. Le Bail follows the established
+     programs' practice (ruled 2026-11-05, #1434; fence lifted 2026-11-27, WP-2317).
 
    *Practice.* Where a good answer exists, in diffraction or in another field, rietx
    adopts it and spends its effort on the questions practice leaves open. A practice

@@ -539,6 +539,12 @@ before the exports joined the page. It is 1.36 MB with them. The `gui` extra
 is empty and the `viz` extra is matplotlib alone. The measurements and the
 decisions are in the two WP files.
 
+*Amendment (2026-11-01, validation verdicts).* The fit report joins the
+surfaces that carry no validation verdict (DESIGN-RULES Rule 2). An agent reads
+the report between stages, while it still chooses what to free, and a sentence
+there would read the same for every fit with the same free parameters. Moved
+here from the rule on 2026-11-27 to make room for the accuracy ruling.
+
 ## Absorption: a correction that cannot improve the fit
 
 Cylindrical (capillary) absorption, WP-0501, is worth recording as a design
