@@ -290,7 +290,8 @@ def test_one_expansion_serves_every_structural_column(monkeypatch):
     4 920 calls before the hoist and 160 after, and the fit ran 2.6-2.7x
     faster (the WP's handover log).  A budget that trips at 2.6x the serial
     time is not several times it, so it would sense load (``tests/CLAUDE.md``
-    § Budgets in tests).  The count trips on any return, on every machine.
+    § Budgets in tests).  The count trips on a return to a per-atom or
+    per-column expansion on this fixture's path, on every machine.
     """
     counts = _expansions_per_jacobian(monkeypatch)
     assert counts["all"][0] == counts["one"][0], counts

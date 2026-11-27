@@ -211,12 +211,13 @@ is held, and rebuilt per evaluation where the cell is free.
 - [ ] Angles 5-6. The full suite, since jax/torch goldens move. Every moved number
       checked against R0 (a).
 - [ ] Angle 7, decided on the remaining structure-factor share.
-- [x] Tests: the byte-equality test for angle 1, and a **runaway guard** for
-      the bench case, never a timer.
+- [x] Tests: the byte-equality test for angle 1, and a **runaway guard**
+      against the bench case's cost returning, never a timer.
       *(Angle 1's landed: `tests/test_structural_hoist.py`. 2026-11-27: the
-      guard is that file's `_orbit_terms` count, not a wall-clock budget;
-      the handover log's second entry says why. A negative control now shows
-      the count trips on a per-atom expansion.)*
+      guard is that file's `_orbit_terms` count on its four-atom fixture, not
+      a wall-clock budget on `bigcell-structural`; the docstring of
+      `test_one_expansion_serves_every_structural_column` says why. A
+      negative control now shows the count trips on a per-atom expansion.)*
 - [ ] Tests: the oracle tests for angles 3 and 4, landing with each angle.
 - [ ] Skill: none (no API change).
 
