@@ -304,9 +304,11 @@ class ReflectionState(Base):
     #: Pawley only: the phase's lattice-merged groups (WP-2315), written by
     #: ``refine._extract_reflections``.  A member's own ``intensity`` row is
     #: its share of the group's sum by multiplicity and its ``stderr`` row is
-    #: ``inf``; the measured value is here.  ``[]`` when the phase has none,
-    #: and ``None`` where no merge was examined: Le Bail, and a node written
-    #: before WP-2315.
+    #: ``inf``; the measured value is here.  ``[]`` when the phase merged
+    #: none, which includes a phase whose model reads hkl and so declines
+    #: the merge (``model.forward._lattice_merge_groups``), and ``None``
+    #: where no merge was examined: Le Bail, and a node written before
+    #: WP-2315.
     merged_groups: list[MergedGroup] | None = None
 
 

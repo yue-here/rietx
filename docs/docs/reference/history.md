@@ -222,6 +222,7 @@ The wavelengths that the `WAVELENGTH_CALIBRATION` check measures a refined λ ag
 Le Bail intensities start flat and are refined by a fixed-point loop, so they depend on the path the fit took.
 The structure, the instrument and the pattern cannot reproduce them, so a Le Bail checkpoint can be restored only because the node stores them.
 A Pawley fit refines reflections whose d-spacings agree in every cell of the space group as one intensity, such as cubic (3 3 3) and (5 1 1), or (h k l) and (k h l) under 4/m.
+A phase whose model reads the indices keeps one intensity per reflection, since its members' peaks differ: a Stephens strain block, a peak equation, satellites or a magnetic component.
 The pattern measures only their sum, which `MergedGroup.intensity` records with its esd.
 Each member's row in `ReflectionState.intensity` is its share of the sum by multiplicity, and its `ReflectionState.stderr` row is infinite, because no member's own intensity is measured.
 

@@ -176,6 +176,28 @@ def restrained_pairs(monkeypatch):
     monkeypatch.setattr(fwd, "_lattice_merge_groups", lambda group, cp: [])
 
 
+def test_an_unmerged_overlap_comes_back_flagged_with_its_split_unresolved(
+        restrained_pairs):
+    """An overlap held by the restraint rather than merged, as an accidental
+    one is: the split is not resolved and the result names the pair.  This
+    is the end-to-end check of ``PAWLEY_OVERLAP_UNRESOLVED`` the merged
+    test above no longer reaches."""
+    pattern, _, _ = _synth_overlapped()
+    s, ins = _overlapped_lab6(a=4.160, w=1e-2)
+    ref = Refinement(s, ins, history=False)
+    result = ref.fit(pattern, mode="pawley")
+    pb = ref._model.pawley
+    assert not pb.merged and pb.groups
+    d = ref._model.phases[0].reflections.d
+    idx = [k for k in range(len(d)) if abs(d[k] - 1.3855) < 1e-3]
+    rel = np.asarray(pb.stderr)[idx] / np.maximum(ref._model.pawley_x0()[idx], 1e-9)
+    assert float(rel.min()) > 0.3, f"split reported too confidently (rel esd {rel})"
+    flagged = [dg for dg in result.diagnostics
+               if dg.code == "PAWLEY_OVERLAP_UNRESOLVED"]
+    named = " ".join(w for dg in flagged for w in dg.where)
+    assert "(2, 2, 1)" in named and "(3, 0, 0)" in named
+
+
 def _unit_fit(pattern: PatternData, *, intensity_factor: float = 1.0,
               background_factor: float = 1.0, plan=None):
     """The overlapped Cu-LaB6 Pawley fit, from the perturbed start, with the

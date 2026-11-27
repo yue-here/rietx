@@ -3926,8 +3926,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "restraint towards equal F². Use the summed intensity of the group as the "
             "datum. Individual values from the group are not measurements. Reflections "
             "whose d-spacings agree in every cell of the space group are refined as one "
-            "intensity instead and never reach this code: their sums are in "
-            "ReflectionState.merged_groups."
+            "intensity instead, and their sums are in ReflectionState.merged_groups. A "
+            "phase with a Stephens strain block, a peak equation, satellites or a "
+            "magnetic component keeps them apart, so they can reach this code there."
         ),
     ),
     "PEAK_POSITION_AT_BOUND": HelpEntry(

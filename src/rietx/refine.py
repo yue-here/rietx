@@ -10582,6 +10582,8 @@ def _pawley_unresolved_diagnostics(model: CompiledModel,
         if float(np.max(rel)) < PAWLEY_UNRESOLVED_REL:
             continue  # every member is pinned by the data — the split is real
         labels = [_pawley_label(pb, model, structure, gi) for gi in g]
+        # a lattice-merged column is several reflections (WP-2315)
+        n_refl = sum(len(pb.column_members(gi)) for gi in g)
         total = float(np.sum(inten))
         # a split on a direction the covariance discards has no esd (WP-2219)
         worst = (f"the relative esd of an individual value reaches "
@@ -10589,7 +10591,7 @@ def _pawley_unresolved_diagnostics(model: CompiledModel,
                  else "an individual value has no esd.")
         out.append(Diagnostic(
             level="info", code="PAWLEY_OVERLAP_UNRESOLVED", where=labels,
-            message=(f"{len(g)} reflections overlap too strongly to split. "
+            message=(f"{n_refl} reflections overlap too strongly to split. "
                      f"Their summed intensity ({total:.4g}) is determined, and "
                      f"{worst}"),
             suggestion="Use the group's summed intensity as the datum.",
@@ -10612,12 +10614,16 @@ def _pawley_off_data_diagnostics(model: CompiledModel,
     if pb is None or not pb.off_data:
         return []
     by_phase: dict[int, list[str]] = {}
+    n_refl: dict[int, int] = {}
     for gi in pb.off_data:
-        ip = pb.column_members(gi)[0][0]
+        members = pb.column_members(gi)
+        ip = members[0][0]
         by_phase.setdefault(ip, []).append(_pawley_label(pb, model, structure, gi))
+        # a lattice-merged column is several reflections (WP-2315)
+        n_refl[ip] = n_refl.get(ip, 0) + len(members)
     return [Diagnostic(
         level="info", code="PAWLEY_OFF_DATA_RIDGED", where=labels,
-        message=(f"{len(labels)} reflection(s) of {structure.phases[ip].name} have "
+        message=(f"{n_refl[ip]} reflection(s) of {structure.phases[ip].name} have "
                  f"no emission line centred on the fitted data, so their "
                  f"intensities come from the restraint."),
         suggestion="Do not export or use these intensities. Widen the fitted "

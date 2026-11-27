@@ -1818,7 +1818,8 @@ def lattice_coincidences(sg_symbol, hkl_reps: np.ndarray) -> list[list[int]]:
     setting is served by the same arithmetic.  The derivation is the Reynolds
     projection of invariant theory; ``tests/test_pawley_lattice_merge.py``
     checks the answer against GSAS-II's per-Laue-class integer identities
-    (``GSASIIstrIO.GetPawleyConstr``, 5.8.4) and against d at random cells
+    (Toby & Von Dreele, 2013, J. Appl. Cryst. 46, 544;
+    ``GSASIIstrIO.GetPawleyConstr``, 5.8.4) and against d at random cells
     drawn from :func:`cell_constraints`.
     """
     hkl = np.asarray(hkl_reps, dtype=np.int64).reshape(-1, 3)
