@@ -530,7 +530,11 @@ Pawley fits. PR #PRNUM.
   probe 1's.
 
 **Measured.** The bench table is in Context, § The bench cases on a real
-structure. FASTSUITE
+structure. Fast suite on this tree: 15 828 passed, 452 skipped, 30
+xfailed (`[dev]`, darwin/arm64, 7 min 52 s). The branch adds five fast tests
+and one slow one. `tests.reader_output` exits 0, unchanged against the
+merge-base. Ruff is clean. Not run: the full suite (no number in `src/`
+moves), and the generality judge (no `_audit.py` change).
 
 **Gotchas.**
 - At ten times the counts (strongest peak ~10⁶), a structural fit started
