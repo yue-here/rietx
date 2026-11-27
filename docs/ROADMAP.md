@@ -453,9 +453,7 @@ Opened 2026-11-16 by the maintainer ([record](milestones/series.md)), beside par
 
 Opened by evidence — an issue, an agent round, a measurement — and owned by no
 milestone yet. Grouped by what the evidence says; each WP file carries it in
-full, with the issues it closes. Most of the 13xx rows come from the
-2026-09-01 issue triage (PRs #205, #213) and the day after; 1119, 1130 and
-1133 are older; 1414–1420 are the 2026-09-15 triage's.
+full, with the issues it closes.
 
 #### Coming from another code
 
@@ -555,16 +553,7 @@ The WPs are in [the index](wp/README.md#unscheduled-data-and-metadata-in-a-struc
 
 #### A large cell
 
-A user reported slowdowns on a 12 × 36 × 4 Å cell (2026-11-26). A synthetic
-stand-in (WP-2317's probe 1) found three paths whose cost grows faster than the
-reflections and atoms a large cell brings. Coordinate and ADP columns rebuild the
-whole structure factor once per column (2314). A Pawley step that crosses a width
-row solves densely over every intensity (2315). A Le Bail partition runs
-thousands of cycles per update (2316). The maintainer's bar for the track (2026-11-27)
-is accuracy on par with the other codes, with speed bought by any means. 2317
-holds that bar, the bench cases, and the earlier rulings put back to the
-maintainer under it.
-
+Three slow paths on a 12 × 36 × 4 Å cell; 2317 holds the bar and the rulings.
 The WPs are in [the index](wp/README.md#unscheduled-a-large-cell).
 
 #### The repo's own process

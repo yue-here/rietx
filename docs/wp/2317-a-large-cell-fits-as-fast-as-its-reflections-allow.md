@@ -286,8 +286,15 @@ recycled, so this one became WP-2317, the next free number, when main was merged
 in. The commits before that merge carry the `WP-2313:` prefix; they are this
 WP's. Every cross-reference was rewritten: 2314-2316, the ROADMAP track, and the
 `### Inherited` notes in WP-1945, WP-2017 and WP-2062. The probe directory is
-now `2317-probe/`. 2314-2316 were free on main and keep their numbers. Next:
-unchanged from the entry below.
+now `2317-probe/`. 2314-2316 were free on main and keep their numbers.
+
+CI's lint job then failed `tests.rulebook_limits`: ROADMAP is closed to growth,
+and the track paragraph added 743 B. The track is now one line, because its
+evidence already lives in this file. The Unscheduled intro's provenance sentence
+was cut to pay for the remaining bytes (which triage the 13xx, 1119/1130/1133
+and 1414-1420 rows came from). Each of those WP files carries its own issues.
+
+Next: unchanged from the entry below.
 
 ### 2026-11-27 — filed the track: three slow paths measured, the rulings in their way listed, the plans reviewed
 
