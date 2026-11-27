@@ -153,3 +153,71 @@ def test_the_textbook_cubic_and_tetragonal_pairs():
     assert _partition(lattice_coincidences("P 4/m", tetra)) == {frozenset({0, 1})}
     # under 4/mmm, 120 is 210's symmetry equivalent: no reflection list holds both
     assert lattice_coincidences("P m m m", tetra) == []
+
+
+# ---------------------------------------------------------------------------
+# the merge, and the exception where the model tells members apart
+# ---------------------------------------------------------------------------
+
+
+def _lab6_pawley(*, stephens: bool):
+    from rietx import PatternData
+    from rietx.model.forward import compile_model
+    from rietx.schemas.structure import StephensStrain
+    from tests.test_pawley import _overlapped_lab6
+
+    s, ins = _overlapped_lab6()
+    if stephens:
+        s.phases[0].microstrain = StephensStrain.from_values([0.0] * 15)
+    tt = np.arange(15.0, 110.0, 0.03)
+    blank = PatternData(two_theta=tt.tolist(), intensity=np.ones_like(tt).tolist())
+    return compile_model(s, ins, blank, mode="pawley")
+
+
+def _pair(model, hkls):
+    hkl = [tuple(int(v) for v in h) for h in model.phases[0].reflections.hkl]
+    return [hkl.index(h) for h in hkls]
+
+
+def test_a_cubic_pawley_block_merges_its_lattice_forced_pairs():
+    model = _lab6_pawley(stephens=False)
+    pb = model.pawley
+    k = _pair(model, [(2, 2, 1), (3, 0, 0)])
+    assert sorted(k) in [sorted(g) for g in pb.merged]
+    assert pb.refl_col[k[0]] == pb.refl_col[k[1]]
+    mult = model.phases[0].reflections.multiplicity
+    np.testing.assert_allclose(pb.share[k], mult[k] / mult[k].sum(), rtol=0)
+    # the column is the sum of its members, and spreading it back is exact
+    col = int(pb.refl_col[k[0]])
+    x0 = model.pawley_x0()
+    assert x0[col] == pytest.approx(float(model.phases[0].hkl_intensity[k].sum()))
+    model.set_pawley_intensities(x0)
+    np.testing.assert_allclose(model.pawley_x0(), x0, rtol=1e-15)
+    # no overlap-restraint group is left holding a lattice-forced pair
+    assert all(len({int(pb.refl_col[r]) for r in g}) == 1 for g in pb.merged)
+    assert not any(col in g for g in pb.groups)
+
+
+def test_a_stephens_block_keeps_the_members_apart_under_an_equal_f2_restraint():
+    """Λ(hkl) differs between (2 2 1) and (3 0 0) (Σh⁴ = 33 against 81), so a
+    Stephens block can in principle tell the pair apart: they stay two
+    columns, held by the overlap restraint, whose target is equal F²."""
+    model = _lab6_pawley(stephens=True)
+    pb = model.pawley
+    assert pb.merged == [] and pb.n == len(model.phases[0].reflections)
+    k = _pair(model, [(2, 2, 1), (3, 0, 0)])
+    group = next(g for g in pb.groups if k[0] in g)
+    assert k[1] in group
+    model.build_pawley_restraint()
+    mult = np.asarray(pb.col_mult)[group]
+    frac = mult / mult.sum()
+    rows = np.array([r[group] for r in pb.restraint if np.any(r[group])])
+    assert rows.shape == (len(group), len(group))
+    # row k is c·(δ_kj − m_k/Σm): together they sum to zero, leaving the
+    # group's sum free, and each one's target share is m_k/Σm
+    assert np.abs(rows.sum(axis=0)).max() < 1e-12 * np.abs(rows).max()
+    for kk, row in enumerate(rows):
+        c = row[kk] - row[(kk + 1) % len(group)]
+        np.testing.assert_allclose(-row[np.arange(len(group)) != kk] / c, frac[kk],
+                                   rtol=1e-12)
+    assert not np.allclose(frac, 1.0 / len(group))   # 24 against 6

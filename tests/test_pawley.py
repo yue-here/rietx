@@ -101,8 +101,10 @@ def _synth_overlapped(seed: int = 3):
 
 
 def test_pawley_recovers_overlapped_sum_and_flags_split():
+    """(2 2 1) and (3 0 0) share d in every cubic cell (h²+k²+l² = 9), so
+    since WP-2315 (ruling R5 (b)) they are one Pawley column: the sum is
+    refined and measured, and neither member's value is."""
     pattern, inten_true, d_true = _synth_overlapped()
-    # the (221)/(300) accidental degeneracy near 2θ = 67.5°
     d_pair = 1.3855
     true_pair = [k for k in range(len(d_true)) if abs(d_true[k] - d_pair) < 1e-3]
     true_sum = float(inten_true[true_pair].sum())
@@ -112,37 +114,63 @@ def test_pawley_recovers_overlapped_sum_and_flags_split():
     ref = Refinement(s, ins, history=False)
     result = ref.fit(pattern, mode="pawley")
     model = ref._model
+    pb = model.pawley
 
     assert result.status == "converged"
     assert result.statistics.gof < 1.3  # fitting to the noise floor
 
-    # the pair was detected as an overlapped group
-    assert model.pawley.groups, "no overlap groups detected"
-
-    # locate the same pair in the refined model and check the *sum* is right
+    # the pair is one column, merged rather than restrained
     d = model.phases[0].reflections.d
     idx = [k for k in range(len(d)) if abs(d[k] - d_pair) < 1e-3]
-    Ivec, stderr = model.pawley_x0(), np.asarray(model.pawley.stderr)
-    refined_sum = float(Ivec[idx].sum())
+    assert sorted(idx) in [sorted(g) for g in pb.merged]
+    col = int(pb.refl_col[idx[0]])
+    assert int(pb.refl_col[idx[1]]) == col
+    assert pb.n == len(d) - sum(len(g) - 1 for g in pb.merged)
+
+    # the column is the sum, and the data measure it
+    refined_sum = float(model.pawley_x0()[col])
     assert refined_sum == pytest.approx(true_sum, rel=0.06), (
         f"summed overlapped intensity off: {refined_sum:.2f} vs {true_sum:.2f}")
+    sd = float(pb.stderr[col])
+    assert np.isfinite(sd) and sd < 0.05 * refined_sum
 
-    # ...while the individual split is NOT resolved: each esd is a large
-    # fraction of its own value (the equal-split restraint kept it honest)
-    rel = stderr[idx] / np.maximum(Ivec[idx], 1e-9)
-    assert float(rel.min()) > 0.3, f"split reported too confidently (rel esd {rel})"
+    # each member carries its share by multiplicity (equal F²) and no esd
+    mult = model.phases[0].reflections.multiplicity
+    members = model.phases[0].hkl_intensity[idx]
+    np.testing.assert_allclose(members, refined_sum * mult[idx] / mult[idx].sum(),
+                               rtol=1e-12)
+    state = ref.snapshot().reflections[0]
+    assert all(np.isinf(state.stderr[k]) for k in idx)
+    # the exported table names the group, so a reader sums its rows
+    rows = [r for r in ref.reflection_table() if r.line == 0
+            and (r.h, r.k, r.l) in {(2, 2, 1), (3, 0, 0)}]
+    assert len(rows) == 2 and rows[0].merged_group is not None
+    assert rows[0].merged_group == rows[1].merged_group
 
-    # ...and it comes back flagged, naming the reflections
+    # ...and it comes back flagged, naming the reflections as one group
     flagged = [dg for dg in result.diagnostics
                if dg.code == "PAWLEY_OVERLAP_UNRESOLVED"]
-    assert flagged, "overlapped split was not flagged unresolved"
+    assert flagged, "merged group was not flagged"
     named = " ".join(w for dg in flagged for w in dg.where)
-    assert "(2, 2, 1)" in named and "(3, 0, 0)" in named
+    assert "(2, 2, 1)+(3, 0, 0)" in named or "(3, 0, 0)+(2, 2, 1)" in named
 
     _save(result, "pawley_lab6_overlapped.png")
 
 
 # ------------------------------------------------------- units and start state
+@pytest.fixture
+def restrained_pairs(monkeypatch):
+    """Hold the cubic fixture's lattice-forced pairs as separate columns.
+
+    Every overlap in this cubic fixture is lattice-forced and has merged since
+    WP-2315.  The two WP-2311 tests below pin the overlap restraint's scale,
+    which a real fit still reaches on an accidental overlap, so they keep the
+    pairs apart, as an accidental pair would be."""
+    import rietx.model.forward as fwd
+
+    monkeypatch.setattr(fwd, "_lattice_merge_groups", lambda group, cp: [])
+
+
 def _unit_fit(pattern: PatternData, *, intensity_factor: float = 1.0,
               background_factor: float = 1.0, plan=None):
     """The overlapped Cu-LaB6 Pawley fit, from the perturbed start, with the
@@ -160,7 +188,8 @@ def _unit_fit(pattern: PatternData, *, intensity_factor: float = 1.0,
     return result, ref._model
 
 
-def test_a_pawley_fit_depends_neither_on_the_units_nor_on_a_high_background_start():
+def test_a_pawley_fit_depends_neither_on_the_units_nor_on_a_high_background_start(
+        restrained_pairs):
     """WP-2311.  χ² is one function of every parameter but the intensities
     whether the counts are counts or counts × 1e-3, so the cell, the widths,
     the shift and Rwp come back unchanged and the intensities in ratio 1e-3.
@@ -203,7 +232,8 @@ def test_a_pawley_fit_depends_neither_on_the_units_nor_on_a_high_background_star
                                    atol=1e-6 * float(i_base.max()), err_msg=label)
 
 
-def test_a_one_stage_pawley_fit_from_a_seed_that_partitioned_nothing_is_not_locked():
+def test_a_one_stage_pawley_fit_from_a_seed_that_partitioned_nothing_is_not_locked(
+        restrained_pairs):
     """WP-2311.  A background 100× above the data leaves the seed nothing to
     partition, so every on-data intensity of the phase sits on the
     partition's floor and no intensity can scale the equal-split rows.  With
@@ -505,21 +535,26 @@ def test_pawley_intensity_centred_off_the_data_stays_bounded():
     assert off is not None and off[hkl.index((6, 0, 2))]
     # the flag is "no line centred on the data", read off the compile
     assert not off[(cp.tt_primary >= model.tt_min) & (cp.tt_primary <= model.tt_max)].any()
-    assert sorted(model.pawley.off_data) == list(np.flatnonzero(off))
+    pb = model.pawley
+    off_cols = sorted({int(pb.refl_col[k]) for k in np.flatnonzero(off)})
+    assert sorted(pb.off_data) == off_cols
     median = float(np.median(cp.hkl_intensity))
     assert cp.hkl_intensity[off].max() <= median
-    # one ridge row per off-data reflection, below the overlap rows
-    R = model.pawley.restraint
-    ridge = R[-int(off.sum()):]
+    # one ridge row per off-data column, below the overlap rows
+    R = pb.restraint
+    ridge = R[-len(off_cols):]
     assert (np.count_nonzero(ridge, axis=1) == 1).all()
-    assert sorted(np.flatnonzero(ridge.any(axis=0))) == list(np.flatnonzero(off))
+    assert sorted(np.flatnonzero(ridge.any(axis=0))) == off_cols
     # ...and the result names them, once for the phase (the review of #453):
     # a caller exporting intensities must see which ones are the ridge's
     ridged = [dg for dg in result.diagnostics if dg.code == "PAWLEY_OFF_DATA_RIDGED"]
     assert len(ridged) == 1 and ridged[0].level == "info"
     name = ref.structure.phases[0].name
-    assert ridged[0].where == [f"{name} {hkl[k]}" for k in np.flatnonzero(off)]
-    assert f"{name} (6, 0, 2)" in ridged[0].where
+    # a column per entry: a lattice-merged pair is one, its members joined
+    expected = [f"{name} " + "+".join(str(hkl[k]) for _ip, k in pb.column_members(c))
+                for c in off_cols]
+    assert ridged[0].where == expected
+    assert any("(6, 0, 2)" in w for w in ridged[0].where)
 
 
 def test_pawley_off_data_code_is_silent_when_every_reflection_is_on_the_data():
