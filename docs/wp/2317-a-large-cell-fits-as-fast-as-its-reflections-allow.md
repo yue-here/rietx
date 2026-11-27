@@ -734,8 +734,9 @@ separately (PR #1870).
 - Stopped runners, not restarted: WP-2316's Le Bail fix on `wp2316-lebail-practice`
   (4 pushed commits, untracked probes and a design patch in its worktree), and
   R7's window slack on `wp2317-window-slack` (state not checked).
-- PR #1869 (WP-2315's lattice merge) is green and open. Its new stored field
-  `ReflectionState.merged_groups` waits on the maintainer.
+- PR #1869 (WP-2315's lattice merge): its stored field
+  `ReflectionState.merged_groups` was ruled (a), kept as is, and the PR merged
+  the same day.
 
 **Gotchas.**
 - A ruling that picks a unit (the esd) sets no level. Read the maintainer's
