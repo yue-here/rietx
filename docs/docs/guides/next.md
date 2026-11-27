@@ -56,9 +56,9 @@ This frees the instrument widths and asks again:
 
 <!-- output of examples/guides/next.py -->
 ```text
-instrument.source.lines.1.weight    gain  478  dBIC +15.7
-phases.0.atoms.2.occ                gain  215  dBIC  +3.3
-phases.0.atoms.6.occ                gain  182  dBIC  +1.7
+instrument.source.lines.1.weight    gain  475  dBIC +31.5
+phases.0.atoms.2.occ                gain  214  dBIC +10.1
+phases.0.atoms.6.occ                gain  181  dBIC  +7.4
 ```
 
 The gain says how far a parameter can move χ², and nothing about whether it should move.
@@ -79,15 +79,14 @@ The structure declared extinction at the start, so it is among them: an undeclar
 
 <!-- output of examples/guides/next.py -->
 ```text
-free phases.0.extinction next: predicted Δχ² 105, ΔBIC -1.8; ΔBIC refuses it — the predicted gain does not pay for 1 parameter(s) at N_eff=915 (5751 rows over the squared esd inflation) (24 candidate(s) evaluated, 4 non-separable from the free set, 0 without leverage; noise floor 29.96)
+free phases.0.extinction next: predicted Δχ² 106, ΔBIC +1.4 (24 candidate(s) evaluated, 4 non-separable from the free set, 0 without leverage; noise floor 25.31)
 ```
 
-Extinction clears the noise floor, and ΔBIC refuses it.
-`best_or_none()` still returns it, because it checks the floor and the tie and does not check ΔBIC.
-Read `delta_bic` before you free what `best_or_none()` names.
+Extinction clears the noise floor, with a ΔBIC of +1.4.
+`best_or_none()` returns it, because it checks the floor and the tie and does not check ΔBIC.
+Read `delta_bic` before you free what `best_or_none()` names, since a negative one means the gain does not pay for the parameter.
 
 A positive `delta_bic` is not enough either.
-Asked again on the re-solved fit of the next section, the same query gives extinction a ΔBIC of +1.4.
 Extinction sits on its lower bound of 0, and the data push it below 0, so freeing it moves nothing.
 `suggest` predicts each gain as if the parameter could move both ways.
 Before you free a candidate, check that it is not on a bound, or measure it as the next section does.
@@ -107,12 +106,14 @@ First, the re-solve:
 
 <!-- output of examples/guides/next.py -->
 ```text
-Rwp before 0.1022, after re-solving 0.0940
+Rwp before 0.0940, after re-solving 0.0940
 ```
 
-A stage that frees nothing new still moves the fit here.
-Each stage fixes its peak windows at the values it starts from, and the `profile` stage started from much wider peaks than it ended with.
-Giving that stage wider windows (`Stage.window_slack_deg=1.0`) ends it at Rwp 0.0947 instead.
+The re-solve does not move the fit here.
+Each stage fixes its peak windows at the values it starts from, and the `profile` stage started from narrower peaks than it ended with.
+Its windows dropped 4.4 % of the intensity at its first answer, so the stage already solved once more on windows sized there.
+`StageResult.window_refit_loss` records that figure.
+A stage that declares its own margin (`Stage.window_slack_deg=1.0`) is never re-solved, and that one ends at Rwp 0.0947.
 
 Then free the Kα2 weight on a branch of the re-solved fit, and compare:
 
@@ -125,7 +126,7 @@ Then free the Kα2 weight on a branch of the re-solved fit, and compare:
 <!-- output of examples/guides/next.py -->
 ```text
 instrument.source.lines.1.weight: 0.5 -> 0.464(6), t = -6.0
-dBIC +31.0 at N_eff 1297 (raw N: +161)
+dBIC +30.9 at N_eff 1295 (raw N: +161)
 ```
 
 `t_ratio` is how far the parameter moved from where it was held, in its own esds.
@@ -138,8 +139,8 @@ A line weight can also absorb a peak asymmetry the model lacks, and the two axia
 
 ```{warning}
 Compare against the re-solved branch, never against the fit as the stage left it.
-Freed on a branch of the fit before the re-solve, extinction stayed on its floor at 0 and still scored ΔBIC +148, all of it the re-solve's gain.
-On a branch of the re-solved fit it scored −7.
+A fit that a re-solve would still move carries that gain into any candidate freed on it.
+Here the `profile` stage had already re-solved, so extinction scored ΔBIC −7 on either branch and stayed on its floor at 0.
 ```
 
 The full script is `examples/guides/next.py`.

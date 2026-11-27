@@ -69,7 +69,7 @@ The script fits the pattern three ways and compares each with the fit to the pat
 
 <!-- output of examples/guides/holder.py -->
 ```text
-ignored   largest move 1.91 esd, phases.0.atoms.6.x
+ignored   largest move 1.90 esd, phases.0.atoms.6.x
 excluded  largest move 0.25 esd, phases.0.atoms.6.x
 declared  largest move 0.22 esd, phases.0.atoms.6.x
 ```
