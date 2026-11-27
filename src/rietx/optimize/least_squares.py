@@ -26,6 +26,7 @@ full-model finite differences:
 
 from __future__ import annotations
 
+import functools
 import math
 import re
 from dataclasses import dataclass, field, replace
@@ -2383,6 +2384,17 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable):
     # partials are a constant of the solve: scattered once, never per call
     o_phys = (None if model.origin is None or not n_table
               else origin_partials(model.origin, table))
+    # WP-2314: the atoms whose coordinate or ADP columns the structural branch
+    # may build, per phase, so one expansion of each phase's structure factor
+    # per evaluation serves them all.  A superset is harmless (an atom asked
+    # for and never read costs one bracket); a column whose atom is missing
+    # would raise, never return short.
+    struct_atoms: dict[int, tuple[set[int], set[int]]] = {}
+    for path, extra, _own in identities:
+        if ((dof := _STRUCTURAL_PATH.match(path))
+                and _within_atom(extra, dof.group(1), dof.group(2))):
+            want = struct_atoms.setdefault(int(dof.group(1)), (set(), set()))
+            want[0 if dof.group(3) == "dof" else 1].add(int(dof.group(2)))
 
     def jacobian(theta: np.ndarray) -> np.ndarray:
         if model.pawley is not None:
@@ -2437,6 +2449,17 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable):
                 modulus_norms[ip, j] = float(np.linalg.norm(sqrt_w * col))
             return modulus_norms[ip, j]
 
+        # WP-2314: likewise ∂|F_N|² per coordinate and ADP atom, one
+        # structure-factor expansion per phase per evaluation
+        struct_grads: dict[int, tuple[dict, dict]] = {}
+
+        def get_struct_grads(ip: int) -> tuple[dict, dict]:
+            if ip not in struct_grads:
+                xyz_atoms, u_atoms = struct_atoms[ip]
+                struct_grads[ip] = model.structural_f2_grads(
+                    ip, values, sorted(xyz_atoms), sorted(u_atoms))
+            return struct_grads[ip]
+
         for c, (path, extra, own) in enumerate(identities):
             if bkg_mix[c] is not None:
                 # y is linear in the coefficient: ∂y/∂c_n = basis row; the
@@ -2459,8 +2482,12 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable):
             elif ((dof := _STRUCTURAL_PATH.match(path)) and model.mode == "rietveld"
                     and model.structural_grad_supported(int(dof.group(1)))
                     and _within_atom(extra, dof.group(1), dof.group(2))):
-                rows, grad = (("x", "y", "z"), model.coordinate_intensity_grad) \
-                    if dof.group(3) == "dof" else (U_NAMES, model.adp_intensity_grad)
+                g_xyz, g_u = get_struct_grads(int(dof.group(1)))
+                rows, grad = (
+                    (("x", "y", "z"),
+                     functools.partial(model.coordinate_intensity_grad, f2_grads=g_xyz))
+                    if dof.group(3) == "dof" else
+                    (U_NAMES, functools.partial(model.adp_intensity_grad, f2_grads=g_u)))
                 J[:n_data, c] = -sqrt_w * _structural_column(
                     model, table, get_bases(), values, c,
                     int(dof.group(1)), int(dof.group(2)), rows, grad)

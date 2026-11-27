@@ -95,8 +95,7 @@ from ..crystallography.stephens import S_NAMES, monomial_matrix, strain_width_de
 from ..crystallography.structure_factor import (
     PhaseSites,
     compile_phase_sites,
-    d_f2_d_uaniso,
-    d_f2_d_xyz,
+    d_f2_d_sites,
     structure_factors_squared,
 )
 from ..crystallography.symmetry import (
@@ -718,15 +717,27 @@ def _batch_layout(win: np.ndarray, fcj_n: np.ndarray, tt: np.ndarray
 PAWLEY_OVERLAP_FWHM_FRAC = 0.5
 #: soft equal-split restraint weight for overlapped Pawley groups.  With the
 #: per-group intensity scaling in ``build_pawley_restraint`` this makes the
-#: split-direction esd ≈ (group intensity)/√λ, i.e. an unresolved split is
-#: reported with an esd of order its own value (≈100 % at λ=1) rather than the
-#: spuriously tight one a bare pseudo-inverse of a singular JᵀJ would give.
+#: split-direction esd ≈ s/√λ, s the group intensity (or, for a group under
+#: ``PAWLEY_GROUP_SCALE_FLOOR_REL`` of its phase, that floor), i.e. an
+#: unresolved split is reported with an esd of order its own value (≈100 % at
+#: λ=1) or larger, rather than the spuriously tight one a bare pseudo-inverse
+#: of a singular JᵀJ would give.
 PAWLEY_OVERLAP_LAMBDA = 1.0
 #: floor on the scale of the off-data ridge in ``build_pawley_restraint``, in
 #: the Pawley block's intensity units: the ridge is as wide as the phase's
 #: largest on-data intensity, and never narrower than this, which a phase
 #: with no on-data reflection falls back to (WP-1459, outside PR #453)
 PAWLEY_OFF_DATA_SCALE_FLOOR = 1.0
+#: floor on an overlap group's restraint scale, as a fraction of its phase's
+#: largest on-data intensity, so the scale is never read off a seed the
+#: partition emptied (WP-2311).  A pair on ``LEBAIL_INTENSITY_FLOOR`` had
+#: rows weighing (1 − 1/2)·√λ/1e-10 = 5e9, which equilibration turned into a group sum
+#: the trust region could not move, rebuilt from the stuck value every stage.
+#: Synthetic LaB6 under a declared background 10x and 100x the data: any value
+#: from 1 down to 1e-8 recovers the true start's fit exactly, 1e-9 locks again.
+#: *(Chosen: WP-2311, 2026-11-26 — four decades inside that window either
+#: side; below it a group is weaker than any line a pattern resolves.)*
+PAWLEY_GROUP_SCALE_FLOOR_REL = 1e-4
 
 
 
@@ -1214,6 +1225,15 @@ class CompiledModel:
     # ``RefinementResult.sigma_rule`` carries.  ``None`` only on a model built
     # without ``compile_model``.
     sigma_rule: SigmaRule | None = None
+    # What the reader repaired or noticed in the file (``PatternData.diagnostics``,
+    # WP-2304), carried so the result builder can hand it on: by then the
+    # pattern itself is out of reach.  Empty on a pattern built by hand.
+    reader_notes: tuple = ()
+    # Whether the fitted channels' σ are one value, read before a measured
+    # background widens them: what settles ``PATTERN_SIGMA_CONSTANT`` once a
+    # caller's own σ varies (WP-2304).  ``None`` only on a model built without
+    # ``compile_model``.
+    sigma_uniform: bool | None = None
     meta: dict = field(default_factory=dict)
 
     # ------------------------------------------------------------------
@@ -3044,8 +3064,29 @@ class CompiledModel:
     # ------------------------------------------------------------------
     # analytic Jacobian support
     # ------------------------------------------------------------------
+    def structural_f2_grads(self, ip: int, values: dict[str, float],
+                            xyz_atoms=(), u_atoms=()
+                            ) -> tuple[dict[int, np.ndarray], dict[int, np.ndarray]]:
+        """``({j: (N, 3)}, {j: (N, 6)})``: ∂|F_N|²/∂xyz and ∂|F_N|²/∂U^ij of
+        phase ip's atoms (WP-2314).
+
+        Every atom asked for at once, from one expansion of the structure
+        factor (``structure_factor.d_f2_d_sites``), because A is the
+        expensive half and every atom's bracket comes from the same terms.
+        The caller caches it for one Jacobian evaluation, as it does
+        :meth:`moment_f2_grads`.  Each array is bit-identical to the
+        single-atom kernel's (``tests/test_structural_hoist.py``).
+        """
+        cp = self.phases[ip]
+        cell = tuple(values[f"phases.{ip}.cell.{k}"]
+                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+        d = d_spacings(cp.reflections.index, *cell)
+        xyz, occ, biso, uaniso, astar = self._site_values(ip, values, cell)
+        return d_f2_d_sites(cp.reflections.hkl, d, cp.sites, xyz, occ, biso,
+                            uaniso, astar, xyz_atoms=xyz_atoms, u_atoms=u_atoms)
+
     def coordinate_intensity_grad(self, ip: int, j: int, coeffs: np.ndarray,
-                                  values: dict[str, float]
+                                  values: dict[str, float], f2_grads=None
                                   ) -> list[np.ndarray] | None:
         """Per-line ∂intensity/∂u for a coordinate DOF u of atom j, phase ip.
 
@@ -3057,11 +3098,16 @@ class CompiledModel:
         positions and widths do not depend on coordinates, so the intensity
         scalar is the whole chain.  Le Bail intensities are extracted, not
         computed, so there is nothing to differentiate: returns ``None``.
+
+        ``f2_grads`` is the ``{j: (N, 3)}`` half of :meth:`structural_f2_grads`
+        at these ``values``, when the caller holds it; without it the
+        structure factor is expanded for this one atom.
         """
-        return self._structural_intensity_grad(ip, j, coeffs, values, d_f2_d_xyz)
+        return self._structural_intensity_grad(ip, j, coeffs, values, f2_grads, False)
 
     def adp_intensity_grad(self, ip: int, j: int, coeffs: np.ndarray,
-                           values: dict[str, float]) -> list[np.ndarray] | None:
+                           values: dict[str, float], f2_grads=None
+                           ) -> list[np.ndarray] | None:
         """Per-line ∂intensity/∂u for an anisotropic-ADP DOF of atom j.
 
         The exact analogue of :meth:`coordinate_intensity_grad` with
@@ -3069,8 +3115,9 @@ class CompiledModel:
         constraint block restricted to the atom's six U rows) — see
         ``structure_factor.d_f2_d_uaniso``.  ADPs, like coordinates, move only
         the intensity scalar, not the peak positions or widths.
+        ``f2_grads`` is the ``{j: (N, 6)}`` half of :meth:`structural_f2_grads`.
         """
-        return self._structural_intensity_grad(ip, j, coeffs, values, d_f2_d_uaniso)
+        return self._structural_intensity_grad(ip, j, coeffs, values, f2_grads, True)
 
     def structural_grad_supported(self, ip: int) -> bool:
         """Whether the analytic coordinate/ADP columns are exact for this phase.
@@ -3186,17 +3233,18 @@ class CompiledModel:
         return [[np.zeros_like(col) for col in moved], moved]
 
     def _structural_intensity_grad(self, ip: int, j: int, coeffs: np.ndarray,
-                                   values: dict[str, float], kernel
+                                   values: dict[str, float], f2_grads, adp: bool
                                    ) -> list[np.ndarray] | None:
         if self.mode != "rietveld" or not self.structural_grad_supported(ip):
             return None
+        if f2_grads is None:
+            f2_grads = self.structural_f2_grads(
+                ip, values, *(((), (j,)) if adp else ((j,), ())))[1 if adp else 0]
         cp = self.phases[ip]
         cell = tuple(values[f"phases.{ip}.cell.{k}"]
                      for k in ("a", "b", "c", "alpha", "beta", "gamma"))
         d = d_spacings(cp.reflections.index, *cell)
-        xyz, occ, biso, uaniso, astar = self._site_values(ip, values, cell)
-        df2 = kernel(cp.reflections.hkl, d, cp.sites, xyz, occ, biso, j, uaniso, astar
-                     ) @ np.asarray(coeffs, dtype=np.float64)
+        df2 = f2_grads[j] @ np.asarray(coeffs, dtype=np.float64)
         # a satellite or a parent-forbidden row has no nuclear structure
         # factor, so it has no derivative of one either — the same mask
         # ``_nuclear_f2`` applies to the forward model, applied here so the
@@ -4068,7 +4116,8 @@ class CompiledModel:
         """Build the equal-split restraint rows for the current intensities.
 
         One row per member of every overlapped group: √λ/s·(δ_kj − 1/n) over the
-        group, where s is the group's current mean intensity.  The rows sum to
+        group, where s is the group's current mean intensity, floored as the
+        last paragraph says.  The rows sum to
         zero, so they penalise deviations of the *split* from an equal partition
         while leaving the group *sum* (the data-determined quantity) free.  Run
         after the intensities are seeded/carried so s reflects a realistic
@@ -4093,25 +4142,53 @@ class CompiledModel:
         overlap rows' large-but-honest answer — while a reflection the data
         do reach has a column far more precise than a prior as wide as the
         strongest reflection.
+
+        **A group's scale is floored relative to its phase, never in intensity
+        units** (WP-2311): s ≥ ``PAWLEY_GROUP_SCALE_FLOOR_REL`` × the phase's
+        largest on-data intensity.  The seed partitions max(y_obs − bkg, 0), so
+        a declared background above the data leaves whole groups on
+        ``LEBAIL_INTENSITY_FLOOR``; an absolute floor of 1e-10 then weighed
+        their rows at 5e9, the equilibrated step could not move the group's
+        sum (free in exact arithmetic, the rows summing to zero), and every
+        later stage rebuilt s from the stuck value.
+
+        **A phase nothing has measured gets no group rows for the stage.**
+        Where every on-data intensity of a phase sits on
+        ``LEBAIL_INTENSITY_FLOOR`` (the seed partitioned nothing under it),
+        there is no intensity to floor against, and any scale written here
+        would be a number of counts.  Its splits are then flat directions for
+        the stage, which the damped step leaves alone and the covariance
+        reports as unmeasured rather than tight; the next stage builds the
+        rows from what this one measured.  Measured on the overlapped Cu-LaB6
+        fixture under a one-stage plan and a background 100× the data: Rwp
+        0.2365 with the rows at 5e9, against 0.1620 from the true start.
         """
         pb = self.pawley
         if pb is None or not (pb.groups or pb.off_data):
             return
         intens = self.pawley_x0()
+        off = np.zeros(pb.n, dtype=bool)
+        off[pb.off_data] = True
+        # each phase's largest on-data intensity: the ridge's width below, and
+        # the group scale's floor relative to it
+        top = np.zeros(pb.n, dtype=np.float64)
+        for a, b in pb.phase_slices:
+            on = intens[a:b][~off[a:b]]
+            top[a:b] = float(on.max()) if len(on) else 0.0
         rows: list[np.ndarray] = []
         for g in pb.groups:
-            s = max(float(np.mean(intens[g])), 1e-10)
+            if top[g[0]] <= LEBAIL_INTENSITY_FLOOR:
+                continue                 # a phase nothing has measured yet
+            s = max(float(np.mean(intens[g])),
+                    PAWLEY_GROUP_SCALE_FLOOR_REL * float(top[g[0]]))
             n = len(g)
             for k in g:
                 row = np.zeros(pb.n, dtype=np.float64)
                 for j in g:
                     row[j] = (np.sqrt(lam) / s) * ((1.0 if j == k else 0.0) - 1.0 / n)
                 rows.append(row)
-        off = np.zeros(pb.n, dtype=bool)
-        off[pb.off_data] = True
         for a, b in pb.phase_slices:
-            on = intens[a:b][~off[a:b]]
-            s = max(float(on.max()) if len(on) else 0.0, PAWLEY_OFF_DATA_SCALE_FLOOR)
+            s = max(float(top[a]) if b > a else 0.0, PAWLEY_OFF_DATA_SCALE_FLOOR)
             for k in np.flatnonzero(off[a:b]):
                 row = np.zeros(pb.n, dtype=np.float64)
                 row[a + k] = np.sqrt(lam) / s
@@ -4729,6 +4806,7 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         mask &= window
     tt, y_obs, sigma = tt_all[mask], y_all[mask], s_all[mask]
     sigma_rule = pattern.sigma_rule(window)
+    sigma_uniform = bool(sigma.size) and bool(np.all(sigma == sigma[0]))
     if len(tt) < 10:
         why = ""
         if sigma_rule.n_nonpositive_excluded:
@@ -5253,6 +5331,8 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         tt=tt, y_obs=y_obs, sigma=sigma, tt_min=tt_min, tt_max=tt_max,
         sigma_measured=pattern.sigma is not None,
         sigma_rule=sigma_rule,
+        reader_notes=tuple(pattern.diagnostics),
+        sigma_uniform=sigma_uniform,
         wavelength=instrument.source.primary_wavelength,
         line_wavelengths=lams,
         harmonic_orders=harmonic_orders,

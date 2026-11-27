@@ -139,7 +139,7 @@ def _screen(data, *, hump=None, free_hump=True):
             plan = copy.deepcopy(resolve_plan("profile_only", "lebail"))
             plan.stages.append(Stage("extra_components",
                                      ["instrument.extra_components.*"]))
-    peaks = pick_peaks(data, ins, two_theta_range=RANGE)
+    peaks = pick_peaks(data, ins, two_theta_limits=RANGE)
     ins, _seeded = seed_widths(ins, peaks)
     cand = _candidate()
     pre = Refinement(structure_from_candidate(cand), ins, history=False)
