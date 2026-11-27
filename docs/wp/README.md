@@ -66,6 +66,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2243](2243-the-series-workflow.md) | The series workflow at `/next`: patterns, first fit, run, results, with Trends and Map | 2026-11-24 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2245](2245-the-pattern-graph-s-axis-and-gutter.md) | The Pattern graph's empty difference axis and its blank right margin | 2026-11-24 | P3 | [gui-overhaul](#gui-overhaul) |
 | [2246](2246-the-register-guard-reads-the-rebuilt-page.md) | The register guard reads the rebuilt page: `lib/style.test.ts` scans `gui/src/next/` | 2026-11-25 | P3 | [gui-overhaul](#gui-overhaul) |
+| [2314](2314-a-structural-jacobian-costs-one-structure-factor.md) | A structural Jacobian costs one structure factor, not one per column | 2026-11-27 | P2 | [Unscheduled](#unscheduled-a-large-cell) |
 | [2315](2315-a-large-pawley-step-pays-for-the-rows-that-bind.md) | A large Pawley step pays for the rows that bind, not for every intensity | 2026-11-27 | P2 | [Unscheduled](#unscheduled-a-large-cell) |
 | [2317](2317-a-large-cell-fits-as-fast-as-its-reflections-allow.md) | A large cell fits as fast as its reflections allow: the case, the bar, and the rulings in the way | 2026-11-27 | P2 | [Unscheduled](#unscheduled-a-large-cell) |
 
@@ -91,7 +92,6 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2300](2300-a-series-declares-each-parameter.md) | A series declares each parameter, and refuses what it cannot honour | P2 | [2305](2305-the-joint-call-speaks-of-patterns.md) | [series](#series) |
 | [2303](2303-a-glob-that-matches-nothing-says-so.md) | A glob a caller passes that matches nothing says so | P2 | — ([2300](2300-a-series-declares-each-parameter.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2305](2305-the-joint-call-speaks-of-patterns.md) | The joint call speaks of patterns and is named a joint refinement | P2 | — | [series](#series) |
-| [2314](2314-a-structural-jacobian-costs-one-structure-factor.md) | A structural Jacobian costs one structure factor, not one per column | P2 | — ([2317](2317-a-large-cell-fits-as-fast-as-its-reflections-allow.md), [1945](1945-the-peak-chain-columns-built-in-one-pass-per-phase.md) soft) | [Unscheduled](#unscheduled-a-large-cell) |
 | [2316](2316-a-le-bail-partition-costs-what-its-overlaps-need.md) | A Le Bail partition costs what its overlaps need, not thousands of cycles | P2 | — ([2317](2317-a-large-cell-fits-as-fast-as-its-reflections-allow.md), [2017](2017-the-second-pass-every-tier-3-threshold-on-three-families.md), [2062](2062-pawley-is-the-structure-free-default.md) soft) | [Unscheduled](#unscheduled-a-large-cell) |
 
 ## <a id="v0-3"></a>v0.3 — multi-phase workflows
@@ -847,7 +847,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 
 | WP | Title | Status | Priority | Depends on |
 |---|---|---|---|---|
-| [2314](2314-a-structural-jacobian-costs-one-structure-factor.md) | A structural Jacobian costs one structure factor, not one per column | ⬜ | P2 | — ([2317](2317-a-large-cell-fits-as-fast-as-its-reflections-allow.md), [1945](1945-the-peak-chain-columns-built-in-one-pass-per-phase.md) soft) |
+| [2314](2314-a-structural-jacobian-costs-one-structure-factor.md) | A structural Jacobian costs one structure factor, not one per column | 🔄 2026-11-27 | P2 | — ([2317](2317-a-large-cell-fits-as-fast-as-its-reflections-allow.md), [1945](1945-the-peak-chain-columns-built-in-one-pass-per-phase.md) soft) |
 | [2315](2315-a-large-pawley-step-pays-for-the-rows-that-bind.md) | A large Pawley step pays for the rows that bind, not for every intensity | 🔄 2026-11-27 | P2 | — ([2317](2317-a-large-cell-fits-as-fast-as-its-reflections-allow.md) soft) |
 | [2316](2316-a-le-bail-partition-costs-what-its-overlaps-need.md) | A Le Bail partition costs what its overlaps need, not thousands of cycles | ⬜ | P2 | — ([2317](2317-a-large-cell-fits-as-fast-as-its-reflections-allow.md), [2017](2017-the-second-pass-every-tier-3-threshold-on-three-families.md), [2062](2062-pawley-is-the-structure-free-default.md) soft) |
 | [2317](2317-a-large-cell-fits-as-fast-as-its-reflections-allow.md) | A large cell fits as fast as its reflections allow: the case, the bar, and the rulings in the way | 🔄 2026-11-27 | P2 | — |

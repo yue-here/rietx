@@ -227,6 +227,16 @@ what it costs here.
   has no TRF shortcut. Task 1 here (the user's pattern) decides whether
   WP-2315 stays P2. WP-2315's Context § Task 1's count has the table.
 
+- **From WP-2314 (2026-11-27, PR #1862):** angle 1, the structure-factor
+  hoist, landed byte-equal, so probe 1's `bigcell-structural` numbers are
+  stale for the coordinate columns. On one Mac (arm64, `[dev]`), main against
+  the branch, interleaved: the fit took 29.7-29.9 s against 11.2-11.3 s, and
+  one Jacobian 0.348 s against 0.106 s (profiled). What remains of the
+  Jacobian is mostly the Biso, occupancy and cell columns by finite
+  difference: 6.6 s of 8.8 s. Those are WP-2314's angle 3, waiting on R0.
+  Task 1's re-rating of 2314-2316 starts from these numbers. The driver,
+  `2314-probe/drive_bigcell.py`, runs both arms and prints a bit-level digest.
+
 ## Non-goals
 
 - The fixes themselves: WP-2314 (structural columns), WP-2315 (Pawley step),

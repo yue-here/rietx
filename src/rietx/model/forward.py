@@ -95,8 +95,7 @@ from ..crystallography.stephens import S_NAMES, monomial_matrix, strain_width_de
 from ..crystallography.structure_factor import (
     PhaseSites,
     compile_phase_sites,
-    d_f2_d_uaniso,
-    d_f2_d_xyz,
+    d_f2_d_sites,
     structure_factors_squared,
 )
 from ..crystallography.symmetry import (
@@ -3065,8 +3064,29 @@ class CompiledModel:
     # ------------------------------------------------------------------
     # analytic Jacobian support
     # ------------------------------------------------------------------
+    def structural_f2_grads(self, ip: int, values: dict[str, float],
+                            xyz_atoms=(), u_atoms=()
+                            ) -> tuple[dict[int, np.ndarray], dict[int, np.ndarray]]:
+        """``({j: (N, 3)}, {j: (N, 6)})``: ∂|F_N|²/∂xyz and ∂|F_N|²/∂U^ij of
+        phase ip's atoms (WP-2314).
+
+        Every atom asked for at once, from one expansion of the structure
+        factor (``structure_factor.d_f2_d_sites``), because A is the
+        expensive half and every atom's bracket comes from the same terms.
+        The caller caches it for one Jacobian evaluation, as it does
+        :meth:`moment_f2_grads`.  Each array is bit-identical to the
+        single-atom kernel's (``tests/test_structural_hoist.py``).
+        """
+        cp = self.phases[ip]
+        cell = tuple(values[f"phases.{ip}.cell.{k}"]
+                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+        d = d_spacings(cp.reflections.index, *cell)
+        xyz, occ, biso, uaniso, astar = self._site_values(ip, values, cell)
+        return d_f2_d_sites(cp.reflections.hkl, d, cp.sites, xyz, occ, biso,
+                            uaniso, astar, xyz_atoms=xyz_atoms, u_atoms=u_atoms)
+
     def coordinate_intensity_grad(self, ip: int, j: int, coeffs: np.ndarray,
-                                  values: dict[str, float]
+                                  values: dict[str, float], f2_grads=None
                                   ) -> list[np.ndarray] | None:
         """Per-line ∂intensity/∂u for a coordinate DOF u of atom j, phase ip.
 
@@ -3078,11 +3098,16 @@ class CompiledModel:
         positions and widths do not depend on coordinates, so the intensity
         scalar is the whole chain.  Le Bail intensities are extracted, not
         computed, so there is nothing to differentiate: returns ``None``.
+
+        ``f2_grads`` is the ``{j: (N, 3)}`` half of :meth:`structural_f2_grads`
+        at these ``values``, when the caller holds it; without it the
+        structure factor is expanded for this one atom.
         """
-        return self._structural_intensity_grad(ip, j, coeffs, values, d_f2_d_xyz)
+        return self._structural_intensity_grad(ip, j, coeffs, values, f2_grads, False)
 
     def adp_intensity_grad(self, ip: int, j: int, coeffs: np.ndarray,
-                           values: dict[str, float]) -> list[np.ndarray] | None:
+                           values: dict[str, float], f2_grads=None
+                           ) -> list[np.ndarray] | None:
         """Per-line ∂intensity/∂u for an anisotropic-ADP DOF of atom j.
 
         The exact analogue of :meth:`coordinate_intensity_grad` with
@@ -3090,8 +3115,9 @@ class CompiledModel:
         constraint block restricted to the atom's six U rows) — see
         ``structure_factor.d_f2_d_uaniso``.  ADPs, like coordinates, move only
         the intensity scalar, not the peak positions or widths.
+        ``f2_grads`` is the ``{j: (N, 6)}`` half of :meth:`structural_f2_grads`.
         """
-        return self._structural_intensity_grad(ip, j, coeffs, values, d_f2_d_uaniso)
+        return self._structural_intensity_grad(ip, j, coeffs, values, f2_grads, True)
 
     def structural_grad_supported(self, ip: int) -> bool:
         """Whether the analytic coordinate/ADP columns are exact for this phase.
@@ -3207,17 +3233,18 @@ class CompiledModel:
         return [[np.zeros_like(col) for col in moved], moved]
 
     def _structural_intensity_grad(self, ip: int, j: int, coeffs: np.ndarray,
-                                   values: dict[str, float], kernel
+                                   values: dict[str, float], f2_grads, adp: bool
                                    ) -> list[np.ndarray] | None:
         if self.mode != "rietveld" or not self.structural_grad_supported(ip):
             return None
+        if f2_grads is None:
+            f2_grads = self.structural_f2_grads(
+                ip, values, *(((), (j,)) if adp else ((j,), ())))[1 if adp else 0]
         cp = self.phases[ip]
         cell = tuple(values[f"phases.{ip}.cell.{k}"]
                      for k in ("a", "b", "c", "alpha", "beta", "gamma"))
         d = d_spacings(cp.reflections.index, *cell)
-        xyz, occ, biso, uaniso, astar = self._site_values(ip, values, cell)
-        df2 = kernel(cp.reflections.hkl, d, cp.sites, xyz, occ, biso, j, uaniso, astar
-                     ) @ np.asarray(coeffs, dtype=np.float64)
+        df2 = f2_grads[j] @ np.asarray(coeffs, dtype=np.float64)
         # a satellite or a parent-forbidden row has no nuclear structure
         # factor, so it has no derivative of one either — the same mask
         # ``_nuclear_f2`` applies to the forward model, applied here so the
