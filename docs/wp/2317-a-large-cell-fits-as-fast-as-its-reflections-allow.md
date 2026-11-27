@@ -1,6 +1,6 @@
 # WP-2317 — a large cell fits as fast as its reflections allow: the case, the bar, and the rulings in the way
 
-Milestone: unscheduled · Status: 🔄 2026-11-27 — tasks 2, 4 and 6 done (PR #1864); task 1 and task 3's R0-R7 wait on the maintainer, 5, 7 and 8 open
+Milestone: unscheduled · Status: 🔄 2026-11-27 — R0, R2, R3 and R5-R7 ruled and recorded, R4 unruled; task 1 waits on the maintainer; R6's implementation, 5, 7 and 8 open
 Track: A large cell
 Depends on: —
 Priority: P2 2026-11-27 — the scoping WP of a track the maintainer opened for a user at the wall (slowdowns on a 12 × 36 × 4 Å cell); 2314, 2315 and 2316 read its case, its bar and its rulings
@@ -608,6 +608,69 @@ what it costs here.
 - `docs/practice.md` § Structure-free fitting, § When a fit stops, § Peak-width limits.
 
 ## Handover log
+
+### 2026-11-27 (4th session) — the rulings recorded, accuracy set by what users need, and the stopping rule re-settled
+
+The maintainer answered the rulings that held up the large-cell track, except R4.
+The one with the widest reach is the accuracy level. rietx aims for accuracy
+sufficient for users rather than spending compute past it, the established
+programs being the evidence of what suffices. Claude settles each speed-accuracy
+trade under that intent. A Claude draft of the rule had put the level at a tenth
+of an esd. That was never ruled, and it would have reversed the 2026-11-19 window
+ruling, so it is withdrawn. Measured: the last stage's 1e-9 stop costs little on
+one fit but most of a series. The field's published-fit test, every shift under
+0.1 esd, cuts a 17-pattern ramp from 1 293 evaluations to 363, and its worst
+quantity, a 1 wt% phase's cell, lands about one esd off. The programs' own default
+stops, run inside rietx, left a series pattern 18 esd off while reporting
+convergence. The large cell's apparent second minimum was a fixture defect, fixed
+separately (PR #1870).
+
+**Done.**
+- Rulings R0 (and R0 clarified), R2-R3, R5 (b) and (c), R6 and R7 recorded in
+  Context with the maintainer's words. Rule 5 *Arithmetic accuracy* rewritten to
+  the clarified R0, reviewed blind three times for the earlier drafts and once for
+  this one (wording adopted from the last review). Rule 5 also gained the *Intent*
+  test. The 2026-11-01 validation amendment moved to DESIGN.md for room.
+- `docs/practice.md`: the seven-program survey behind R4, R5 (c), R6 and R7.
+- R6 measured (`2317-probe/convnoise/`), then re-settled twice the same day: to
+  1e-8 on the clarified level, then to the 0.1-esd shift test on parity. The
+  table is in R6's entry. A new task carries the implementation.
+- `2317-probe/errmeasure/`: how a speed setting's error is measured (mean shift
+  over paired nudged starts), and the co-sited tie defect it found.
+- R0's note in 2314's and 2316's `### Inherited` updated to the clarified level.
+
+**Measured** (macOS arm64, rietx's `.venv` on this worktree, shared machine).
+- Single fits: every stop tried holds every family under 0.06 esd of the 1e-9
+  answer; the last stage is 9-29 of 40-165 evaluations.
+- Series, evaluations and worst departure from 1e-9 (esd): CuCr₂O₄ ramp 1e-8 1 089
+  / 0.006, 1e-7 917 / 0.022, shift/esd 0.1 363 / 1.2, FullProf 0.2 300 / 1.7,
+  GSAS-II 1e-3 183 / 1.8; cpd-1 chain 1e-7 442 / 0.22, shift/esd 0.1 322 / 0.071,
+  FullProf 0.2 and GSAS-II 18 (cpd-1f, `axial_sl`). The 1e-7 rerun reproduced the
+  earlier 1e-9, 1e-8 and 1e-6 counts exactly.
+- No test count moved: the branch adds no test. The fast suite was not run (prose
+  and probe scripts only).
+
+**In flight.**
+- A background measurement of GSAS-II's and FullProf's default stops in their own
+  programs (cpd-1f, and the CuCr₂O₄ ramp in GSAS-II's sequential mode). It lands
+  as a follow-up commit on this branch.
+- Stopped runners, not restarted: WP-2316's Le Bail fix on `wp2316-lebail-practice`
+  (4 pushed commits, untracked probes and a design patch in its worktree), and
+  R7's window slack on `wp2317-window-slack` (state not checked).
+- PR #1869 (WP-2315's lattice merge) is green and open. Its new stored field
+  `ReflectionState.merged_groups` waits on the maintainer.
+
+**Gotchas.**
+- A ruling that picks a unit (the esd) sets no level. Read the maintainer's
+  intent, and never invent a tighter bar.
+- A program's stop threshold is not its users' accuracy. The probe tested shifts
+  on the damped LM step, which a crawl keeps short; the implementation tests the
+  undamped Gauss-Newton step.
+
+**Next.** (1) Record the GSAS-II/FullProf result in R6 and adjust the rule's
+sentence on it if the programs behave differently at home. (2) Get R4 ruled by the
+maintainer. (3) Implement R6 (its task), re-pinning goldens. (4) Task 1, the
+user's case, still decides the re-rating of 2314-2316.
 
 ### 2026-11-27 (3rd session) — four large-cell bench cases, and GSAS-II timed on the same pattern
 

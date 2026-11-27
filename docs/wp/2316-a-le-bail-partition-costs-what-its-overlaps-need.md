@@ -23,9 +23,10 @@ means". R0 was ruled that day (WP-2317, DESIGN-RULES Rule 5 *Arithmetic accuracy
   (`compiled.py` rule 3), guarded on the whole fit by the measured spread
   (`test_compiled_kernels.FIT_THETA_ESD`), and re-pins its goldens in the same
   change;
-- a change of tolerance, stopping rule or method answers to an independent
-  measurement where one exists, and otherwise to the established programs' answer
-  on the same pattern.
+- a change of tolerance, stopping rule or method holds each quantity a user
+  reads as accurately as users need, the established programs being the evidence
+  of what suffices, with the error read in esd (R0 clarified the same day; Claude
+  settles each such trade and lists it).
 
 **Rule 5's fence, in full** (DESIGN-RULES, ruled 2026-11-05, #1434): "Pawley is
 the structure-free method rietx leads with. WP-2062 carries the move to it as the
