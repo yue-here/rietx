@@ -108,6 +108,70 @@ ratios are not speed-ups. The harness's own `nfev` and `njev` columns print 0
 and `-` here: `_counting` wraps scipy's `least_squares`, and the default LM
 driver does not call it. The per-stage counts come from `StageResult`.
 
+**Cross-code timing (task 6), 2026-11-27: GSAS-II 5.8.4 on the same four
+patterns.** Same Mac, same session. rietx ran as the bench (block 1), then
+GSAS-II three times per case interleaved by case, then the bench again
+(block 2). The machine's load fell between the blocks, so rietx's range below
+spans both blocks; GSAS-II's runs sat between them. GSAS-II ran single-process
+(its `Multiprocessing_cores` default, 0); rietx's compiled tier uses threads.
+
+| case | rietx wall | GSAS-II wall | GSAS-II ÷ rietx | rietx Rwp | GSAS-II Rwp | GSAS-II cycles, variables |
+|---|---|---|---|---|---|---|
+| `bigcell-structural` | 10.90-11.30 s | 18.13-20.41 s | 1.6-1.9× | 0.08675 | 0.08753 | 20, 176 |
+| `bigcell-pawley` | 11.84-12.69 s | PAWLEY90 | | 0.04466 | | |
+| `bigcell-pawley-120` | 54.89-64.88 s | PAWLEY120 | | 0.04199 | | |
+| `bigcell-lebail` | 58.39-83.92 s | 79.05-87.19 s | 0.9-1.5× | **0.15121** | 0.0831-0.0835 | 156-161, 15 |
+
+The protocol, matched to rietx's:
+- *Data and weights:* the bench's pattern written as 2θ, counts and
+  σ = √max(y, 1), rietx's Poisson fallback; 4 250 (5 750) points fitted by
+  both, checked on GSAS-II's own count.
+- *Free set:* rietx's plan, stage for stage and cumulative, through
+  `do_refinements`: background (+ scale in Rietveld), zero, cell, W, then U,
+  V, X, Y; then coordinates and Uiso for the structural case. Scale is held in
+  the structure-free modes, as rietx force-fixes it. Both hold the axial
+  terms, and both start them at 0.02 against the truth's 0.03, which is the
+  low-angle misfit both curves share.
+- *Model:* Cu Kα doublet at rietx's wavelengths, graphite monochromator at
+  26.6° (Polariz. 0.5557), Bragg-Brentano at 250 mm. rietx's Γ_G² (deg²) is
+  8 ln 2 times GSAS-II's σ² (centideg²); X (1/cosθ) and Y (tanθ) mean the
+  same in both, and rietx's held `lor_size` folds into GSAS-II's X. GSAS-II's
+  single FCJ term is SH/L = S/L + H/L. **Dispersion off on both sides**: the
+  driver patches GSAS-II's `GetFprime` to f′ = f″ = 0, since rietx declines
+  dispersion here and GSAS-II offers no switch.
+- *Start:* the same cell (500 ppm high), widths, background and atoms. The
+  Rietveld scale is seeded by one untimed zero-cycle calculation, as rietx's
+  start carries the true scale.
+- *Pawley:* GSAS-II's own "Pawley create" and "Pawley estimate" (re-done in
+  the driver, which has no GUI), every intensity flagged to refine, `Pawley
+  dmin` at 2θ_max and the default `dmax`. GSAS-II then ties reflections whose
+  d agree to 1e-4 (`GetPawleyConstr`). This cell has b = 3a exactly, so
+  (h k l) and (k/3 3h l) coincide in d, and **GSAS-II refines PAWLEYVARS
+  independent intensities where rietx carries one column per reflection**
+  (913 and 1 606 in the compiled model). That is R5's question, answered one
+  way by practice.
+- *Le Bail:* the GUI's "reset Le Bail structure factors? Yes" path: unity
+  start, one Le Bail-only pass (`DoLeBail`, 1 cycle), then least squares,
+  which re-extracts once per cycle.
+- *Stopping:* GSAS-II's default, a 0.1 % change in χ² per cycle (`min dM/M`),
+  with 100 cycles a step as rietx-bench caps it. rietx stops at 1e-6
+  (intermediate stages) and 1e-9 (the last). That is R6's question.
+- *Timed:* `do_refinements` alone, its `.gpx` writes included; rietx's
+  `fit()` alone.
+
+The driver and exporter are `2317-probe/gsas2_bigcell.py` and
+`2317-probe/export_bigcell.py`. Three readings, each a measurement whose
+mechanism was not measured:
+- **Structural:** rietx is 1.6-1.9× faster at the same Rwp to 1 %.
+- **Pawley:** PAWLEYREADING
+- **Le Bail:** the walls overlap, and **rietx lands at 1.8× GSAS-II's Rwp**.
+  The plot shows rietx drawing peaks where the data have none (near 7.5° and
+  20°) and its background pulled under the data; its b came out 2 400 ppm low
+  (35.914 Å) with a zero of −0.075°. GSAS-II's curve follows the data except
+  the first degree, but its a came out 1 700 ppm low (11.980 Å). Neither
+  Le Bail fit is right on this pattern; rietx's is visibly worse. This is
+  WP-2316 task 1's question, now with a second code's answer beside it.
+
 Three readings shape the track.
 
 - **Le Bail is 3-7× slower than Pawley here (6.5× at 899 reflections, 2.8× at 1 601)**, against the practice survey's
