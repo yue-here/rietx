@@ -1967,7 +1967,8 @@ class HumpComponent(_InheritsDeclaredDefaults):
 
     Fields, and the reason each bound is the bound it is:
 
-    * ``position`` — °2θ, **required**, and **unbounded by default**.  It is
+    * ``position`` — °2θ (µs on a time-of-flight bank, whose axis is a flight
+      time), **required**, and **unbounded by default**.  It is
       not a Bragg position, so nothing constrains it but the data; and the
       bound one would want — the fitted range — is not a fact this schema can
       see, since it depends on the pattern and on the excluded regions.  That
@@ -1987,7 +1988,11 @@ class HumpComponent(_InheritsDeclaredDefaults):
       ``PreferredOrientation.r``, whose identity is interior at r = 1 with
       the pole *at* zero).
     * ``fwhm`` — °2θ, floored at :data:`HUMP_FWHM_MIN` with a reachability
-      validator, because this one *does* divide.
+      validator, because this one *does* divide.  On a time-of-flight bank it
+      is in µs, and a bank's hump needs its width given: the 5.0 default is a
+      width in degrees, read there as 5 µs, about one channel (#1548 round 5,
+      item 4).  The stored unit stays ``"deg"``, as round 1's item 12 left the
+      size's.
     * shape — **Gaussian only, and the fence is deliberate.**  No mixing
       parameter: a broad feature is described by a few tens of channels of
       curvature sitting on a polynomial that can already absorb the difference
@@ -2003,7 +2008,8 @@ class HumpComponent(_InheritsDeclaredDefaults):
     bit-identical to no peak at all.
     """
 
-    #: apparent position of the hump in °2θ.  **Required**: a caller who omits
+    #: apparent position of the hump in °2θ, or in µs on a time-of-flight
+    #: bank.  **Required**: a caller who omits
     #: it is refused (:meth:`_position_is_required`).  The factory is not a
     #: default a caller can reach.  It declares the unit a caller's own
     #: ``Parameter`` inherits, and it is the 0.0 placeholder a stored document
@@ -2050,9 +2056,11 @@ class HumpComponent(_InheritsDeclaredDefaults):
                 and not reading_stored_document(info)):
             raise ValueError(
                 "HumpComponent.position is required: give the hump's apparent "
-                "2θ, e.g. position=Parameter(value=5.0, unit='deg'). It is "
-                "unbounded, so seed it where the feature is, from a blank scan "
-                "or from the pattern itself.")
+                "2θ, e.g. position=Parameter(value=5.0, unit='deg'), or its "
+                "flight time in µs on a time-of-flight bank, where its fwhm "
+                "is in µs too and needs giving. It is unbounded, so seed it "
+                "where the feature is, from a blank scan or from the pattern "
+                "itself.")
         return data
 
     @model_validator(mode="after")

@@ -476,6 +476,32 @@ def test_the_two_declared_states_report_two_different_things():
     assert "TOF_CHANNEL_WIDTH_APPLIED" not in codes
 
 
+def test_equal_channel_widths_are_reported_as_a_scale_not_a_slope():
+    """#1548 round 5, item 2: a counts bank whose channels are all 5 µs.
+
+    A constant W is a scale the phase scale absorbs, so the slope sentence and
+    the Biso sentence are false there; the log-binned bank above keeps both,
+    which is the positive arm."""
+    from rietx.report.tof import _tof_intensity_basis_diagnostics
+
+    x, _ = log_grid()
+    flat = np.arange(x[0], x[-1], 5.0)
+    data = PatternData(tof=flat.tolist(), intensity=[1.0] * len(flat),
+                       intensity_basis="counts")
+    [said] = _tof_intensity_basis_diagnostics(
+        compile_tof_model(silicon(), bank(), data))
+    assert said.code == "TOF_CHANNEL_WIDTH_APPLIED"
+    assert "5.000 µs in every channel" in said.message
+    assert "scale" in said.message and "slope" not in said.message
+    assert "Biso" not in said.suggestion
+    assert "phase scale" in said.suggestion
+
+    [varies] = _tof_intensity_basis_diagnostics(
+        compile_tof_model(silicon(), bank(), blank("counts")))
+    assert "slope in flight time" in varies.message
+    assert "Biso" in varies.suggestion
+
+
 def test_the_constant_wavelength_arm_reports_nothing_about_it():
     """The field is silent on the arm that ignores it, whatever it says."""
     st = silicon()

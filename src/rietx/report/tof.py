@@ -14,11 +14,12 @@ refinement page.  Two kinds:
   (``TOF_CHANNEL_WIDTH_APPLIED``); an undeclared basis never reaches here,
   being refused at the fit's door
   (:func:`~rietx.schemas.pattern.require_intensity_basis`).
-* **"Did not run here" lines.**  :func:`_tof_skip` builds the info-level
-  statement that a constant-wavelength check abstained on a bank, so an unrun
-  check never reads as a clean one; ``BACKGROUND_PEAK_WIDTH_UNAVAILABLE`` is
-  raised here, and ``refine._capillary_offset_diagnostics`` calls the same
-  builder for its own code.
+* **A "did not run here" line.**  ``BACKGROUND_PEAK_WIDTH_UNAVAILABLE`` says
+  at info level that the constant-wavelength hump-width guard abstained on a
+  bank that declares a hump, so an unrun check never reads as a clean one.
+  It is the only such line: a check whose subject a bank's model does not
+  have at all (the eq (4) capillary offsets) is silent there, as it is on a
+  flat plate (#1548 round 5, item 1).
 
 Called from ``refine._build_result``; ``refine._is_tof`` stays the one test of
 which arm a compiled model is, imported where it is used because ``refine``
@@ -32,38 +33,16 @@ from ..schemas.common import Diagnostic
 from ..schemas.pattern import TOF_NOT_EVALUATED
 
 
-def _tof_skip(code: str, what: str, why: str,
-              where: list[str] | None = None) -> Diagnostic:
-    """One "this did not run, and here is why" diagnostic, at info level.
-
-    Info rather than warning: nothing is wrong with the fit — a bank simply has
-    no 2θ aberration to attribute, no scalar wavelength to build a Scherrer
-    size from, and no per-reflection profile partition yet.  Saying so is the
-    point.  A silent ``return []`` here would be indistinguishable from the
-    check running and passing, which is the failure mode
-    ``CAPILLARY_OFFSET_UNAVAILABLE`` exists to prevent one arm over: a held
-    aberration reads as a measured zero, and an unrun check reads as a clean
-    one.
-    """
-    return Diagnostic(
-        level="info", code=code, where=list(where or []),
-        message=f"{what} is {TOF_NOT_EVALUATED}: {why}",
-        suggestion=("the flight-time arm's own diagnostics are the ones to "
-                    "read — Rwp, chi-squared, the per-stage records and the "
-                    "refined calibration; this line says the check did not run "
-                    "rather than that it ran and found nothing"))
-
-
 def _tof_background_peak_diagnostics(model) -> list[Diagnostic]:
     """The hump-width guard, and that it did not run on a bank.
 
     ``strategy.staged.check_hump_width`` compares a declared hump's FWHM
     against the *instrument* resolution at its position, and both halves are
     deg 2θ on this package's constant-wavelength arm.  A bank has no Caglioti
-    term to evaluate and its hump is in microseconds, so the guard abstains
-    there — and an abstention nobody reports is indistinguishable from a guard
-    that ran and found nothing, which is the whole reason :func:`_tof_skip`
-    exists.
+    term to evaluate, so the guard as built abstains there — and an
+    abstention nobody reports is indistinguishable from a guard that ran and
+    found nothing.  Info rather than warning: nothing is wrong with the fit,
+    and saying that the guard did not run is the point.
 
     Silent unless there is something to say: no declared hump, or a
     constant-wavelength histogram, where the guard did run.
@@ -73,21 +52,15 @@ def _tof_background_peak_diagnostics(model) -> list[Diagnostic]:
 
     if not _is_tof(model) or not getattr(model, "component_paths", ()):
         return []
-    # ``_tof_skip``'s wording, built here with the code and the level written
-    # out so the audit walk reads this raise site (#1548 review, item 4): a
-    # code reaching ``Diagnostic`` only as an argument is invisible to it.
-    skip = _tof_skip(
-        "BACKGROUND_PEAK_WIDTH_UNAVAILABLE",
-        "the hump-width guard",
-        "it asks whether a declared hump is narrower than a real reflection "
-        "can be at its position, and the resolution it compares against is the "
-        "Caglioti FWHM in deg 2θ; this bank's resolution is "
-        "instrument.source.profile_tof's sigma(d) and gamma(d) and its hump is "
-        "in microseconds, so the two have no common unit")
     return [Diagnostic(
         level="info", code="BACKGROUND_PEAK_WIDTH_UNAVAILABLE",
         where=[paths[2] for paths in model.component_paths],
-        message=skip.message,
+        message=(f"the hump-width guard is {TOF_NOT_EVALUATED}: it asks "
+                 f"whether a declared hump is narrower than a real reflection "
+                 f"can be at its position, and the resolution it compares "
+                 f"against is the Caglioti FWHM in deg 2θ; this bank's "
+                 f"resolution is instrument.source.profile_tof's sigma(d) and "
+                 f"gamma(d)"),
         suggestion=(f"judge the hump's width yourself against the narrowest "
                     f"reflection near it: the constant-wavelength guard calls "
                     f"a hump narrower than {HUMP_MIN_WIDTH_MULT:g} times the "
@@ -160,6 +133,8 @@ def _tof_intensity_basis_diagnostics(model) -> list[Diagnostic]:
       for :func:`_tof_absorption_diagnostics`'s reason: nothing else in the
       result would say that a factor with a shape in flight time was in the
       model, and the number it moves most is a displacement parameter.
+      Where W is the same in every channel (a constant-Δt bank), it is a
+      scale the phase scale absorbs, and the line says that instead.
     * ``"density"`` — the caller declared the histogram already divided, so
       nothing was applied.  Silent: a declared state that produced the
       declared behaviour is not news.
@@ -173,18 +148,31 @@ def _tof_intensity_basis_diagnostics(model) -> list[Diagnostic]:
     where = ["intensity_basis"]
     w = model.channel_width_factor()
     lo, hi = (float(w[0]), float(w[-1])) if w is not None else (0.0, 0.0)
+    head = ("this histogram declares intensity_basis='counts', so the "
+            "calculated Bragg sum was multiplied by the channel width W(T) — "
+            "GSAS's I_o = I'_o/(W·I_i) (LAUR 86-748, Technical Manual "
+            "p. 127). W was measured from the pattern's own abscissa")
+    # Equal as printed is equal (#1548 round 5, item 2): a W the message would
+    # quote as one number in every channel is a constant, which the phase scale
+    # absorbs, and the slope and Biso sentences are false of it.
+    if w is not None and f"{float(w.min()):.3f}" == f"{float(w.max()):.3f}":
+        return [Diagnostic(
+            level="info", code="TOF_CHANNEL_WIDTH_APPLIED", where=where,
+            message=(f"{head} and is {lo:.3f} µs in every channel of the "
+                     f"fitted window. A constant W is a scale, and the phase "
+                     f"scale absorbs it"),
+            suggestion=("nothing to do; if this bank's export already divided "
+                        "by the bin width, say so with "
+                        "intensity_basis='density' — with equal widths, "
+                        "applying W twice moves only the phase scale"))]
     return [Diagnostic(
         level="info", code="TOF_CHANNEL_WIDTH_APPLIED", where=where,
-        message=(f"this histogram declares intensity_basis='counts', so "
-                 f"the calculated Bragg sum was multiplied by the channel "
-                 f"width W(T) — GSAS's I_o = I'_o/(W·I_i) (LAUR 86-748, "
-                 f"Technical Manual p. 127). W was measured from the "
-                 f"pattern's own abscissa and runs {lo:.3f} to {hi:.3f} µs "
-                 f"across the fitted window, a factor of "
-                 f"{(hi / lo if lo > 0 else float('nan')):.2f}. It is a "
-                 f"slope in flight time and not a scale, so leaving it out "
-                 f"would have been paid for by the displacement "
-                 f"parameters rather than by the phase scale"),
+        message=(f"{head} and runs {lo:.3f} to {hi:.3f} µs across the fitted "
+                 f"window, a factor of "
+                 f"{(hi / lo if lo > 0 else float('nan')):.2f}. It is a slope "
+                 f"in flight time and not a scale, so leaving it out would "
+                 f"have been paid for by the displacement parameters rather "
+                 f"than by the phase scale"),
         suggestion=("nothing to do; if this bank's export already divided "
                     "by the bin width, say so with "
                     "intensity_basis='density' — applying W twice biases "

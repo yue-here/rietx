@@ -813,6 +813,7 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         description=(
             "The centre, in °2θ, of an explicit Gaussian background term, such as a "
             "diffuse or amorphous hump or a cryostat or sample-container contribution. "
+            "On a time-of-flight bank it is a flight time in µs. "
             "It has no default value and no default bounds. It is not a Bragg "
             "position, so only the data "
             "constrain it. Set min and max if you know the fitted range. A declared "
@@ -853,7 +854,8 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "Its floor exists only because the profile divides by Γ. Each kind has a "
             "small positive floor, 0.1 for a hump and 0.005 for a peak. The floors come "
             "from the coarsest and the finest scan step that anything can be refined "
-            "from."
+            "from. On a time-of-flight bank a hump's width is in µs, so give it: the "
+            "default of 5.0 is read there as 5 µs, about one channel."
         ),
         unit="deg 2θ", default="5.0 for a hump, 0.1 for a peak",
         typical="a hump: several times the instrumental FWHM at that angle, ~6 "
@@ -1869,9 +1871,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "A declared hump is checked against the narrowest real reflection at its "
             "position, using the Caglioti width in degrees 2θ. A time-of-flight bank "
-            "states its resolution as σ(d) and γ(d) in microseconds, and its hump is in "
-            "microseconds too, so the two widths have no common unit and the check did "
-            "not run. The constant-wavelength check calls a hump a peak, not a "
+            "states its resolution as σ(d) and γ(d), so the check did not run. The "
+            "constant-wavelength check calls a hump a peak, not a "
             "background, when it is narrower than several times the instrument's width "
             "at its position (`HUMP_MIN_WIDTH_MULT`, quoted in the suggestion). Compare "
             "its width with the reflections near it yourself."
@@ -4933,9 +4934,11 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "The pattern declares that its channels hold counts, so the calculated "
             "Bragg sum was multiplied by each channel's width, measured from the "
             "pattern's own flight times. The message quotes the width at both ends of "
-            "the window. If the export had already divided by the bin width, declare "
-            "`'density'` instead, because applying the width twice biases the "
-            "displacement parameters the other way."
+            "the window, or the one width when every channel has it. If the export had "
+            "already divided by the bin width, declare `'density'` instead. Where the "
+            "widths vary across the window, applying them twice biases the displacement "
+            "parameters the other way. Where every channel has the same width, it is a "
+            "scale, and applying it twice moves only the phase scale."
         ),
     ),
     "TOPAS_BLOCK_SKIPPED": HelpEntry(

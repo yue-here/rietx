@@ -513,7 +513,13 @@ def build_report(result: RefinementResult, *, model=None, values=None,
         # and equally 2θ-shaped, and ``compile_tof_model`` refuses a declared
         # texture or Stephens block outright, so there is nothing for them to
         # find either.
-        report.summary += "; Layer 1 and Layer 2 are " + TOF_NOT_EVALUATED
+        # A summary can already end in a full stop (a density bank with a
+        # correlated pair does), and "; " after one printed "independent.;
+        # Layer 1" (#1548 round 5, item 3): a sentence then gets a sentence.
+        clause = "Layer 1 and Layer 2 are " + TOF_NOT_EVALUATED
+        base = report.summary.rstrip()
+        report.summary = base + (" " + clause + "." if base.endswith(".")
+                                 else "; " + clause)
         return report
 
     misfit, shapes = _reading_models(model, structure, instrument)

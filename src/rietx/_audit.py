@@ -609,9 +609,9 @@ ROWS: tuple[Row, ...] = (
         responds=("nothing; the hump-width guard did not run on this bank, so read the bank's "
                   "own records"),
         evidence=("arithmetic: the guard compares a hump's FWHM with the Caglioti FWHM in deg "
-                  "2theta, and a bank's resolution is sigma(d), gamma(d) in us, so there is no "
-                  "common unit; fires exactly when a flight-time model declares a hump, so an "
-                  "unrun check never reads as a clean one, as CAPILLARY_OFFSET_UNAVAILABLE")),
+                  "2theta, and a bank's resolution is sigma(d), gamma(d), so the guard as built "
+                  "does not run there; fires exactly when a flight-time model declares a hump, "
+                  "so an unrun check never reads as a clean one")),
     Row("BACKGROUND_SMOOTHING_AT_FLEXIBLE_END", "code", tier=1, ambiguity=1,
         evidence=("a reading of the scan's own record: fires exactly when no candidate of "
                   "select_arpls_lambda's grid reached its Durbin-Watson floor, so the "
@@ -8152,11 +8152,12 @@ ROWS: tuple[Row, ...] = (
     Row("TEXTURE_NOT_POSITIVE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence=("arithmetic: names a lower order, held top terms, or the LM driver; picks "
                   "none")),
-    Row("TOF_CHANNEL_WIDTH_APPLIED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+    Row("TOF_CHANNEL_WIDTH_APPLIED.suggestion", "suggestion", tier=1, ambiguity=1, value=2,
         evidence=("arithmetic: names the declaration that removes the factor "
-                  "(intensity_basis='density') and what a doubled one does (W applied twice "
-                  "is a slope a displacement parameter absorbs the other way); moves "
-                  "nothing")),
+                  "(intensity_basis='density') and what a doubled one does (W varying across "
+                  "the window, applied twice, is a slope a displacement parameter absorbs the "
+                  "other way; W equal in every channel is a scale the phase scale absorbs); "
+                  "moves nothing")),
     Row("TOPAS_BLOCK_SKIPPED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence=('read topas.py:3814: names the missing keywords to add to the block '
                   '(_skipped_wants)')),
@@ -8219,11 +8220,6 @@ ROWS: tuple[Row, ...] = (
         evidence=('arithmetic: tells the reader to free in the target program the hexagonal '
                   'parameters they mean to refine, which the writer held (symmetry.py:205-206)')),
     Row("rietx.refine._dedup_high_correlations.suggestion", "suggestion", value=1),
-    Row("rietx.report.tof._tof_skip.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
-        evidence=("arithmetic: the one sentence of every check that abstains on a bank "
-                  "(CAPILLARY_OFFSET_UNAVAILABLE through the same builder): it points at the records that did run and says the "
-                  "check did not, so an unrun check never reads as a clean one; moves "
-                  "nothing")),
     Row("rietx.schemas.results._cap_one_code.suggestion", "suggestion", value=1),
 )
 

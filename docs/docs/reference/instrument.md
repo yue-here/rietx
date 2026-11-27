@@ -685,9 +685,9 @@ No expression member exists yet.
 
 | Field | Default | Bounds | Meaning |
 |---|---|---|---|
-| `HumpComponent.position` | required | none | the hump's apparent 2θ |
+| `HumpComponent.position` | required | none | the hump's apparent 2θ, or its flight time in µs on a bank |
 | `HumpComponent.height` | 0.0 counts | ≥ 0 | its peak value; 0 is off |
-| `HumpComponent.fwhm` | 5.0 deg | ≥ `HUMP_FWHM_MIN` (0.1°) | its width in 2θ |
+| `HumpComponent.fwhm` | 5.0 deg | ≥ `HUMP_FWHM_MIN` (0.1°) | its width in 2θ, or in µs on a bank, where it needs giving |
 | `HumpComponent.label` | `None` | | free text, never part of a parameter's name |
 | `PeakComponent.center` | 0.0 deg | finite `min` and `max` required | the line's apparent 2θ for the primary emission line |
 | `PeakComponent.area` | 0.0 counts·deg | ≥ 0 | the integrated intensity; 0 is off |

@@ -166,7 +166,6 @@ from .report.tof import (
     _tof_absorption_diagnostics,
     _tof_background_peak_diagnostics,
     _tof_intensity_basis_diagnostics,
-    _tof_skip,
 )
 from .schemas.common import Diagnostic, Parameter, Provenance, check_mode
 from .schemas.history import NodeAction, NodeMetrics, RefinementState, ReflectionState
@@ -9879,6 +9878,14 @@ def _capillary_offset_diagnostics(model: CompiledModel,
     capillary fit.  This one fact is about the model being unable to hold the
     aberration at all.
 
+    **Silent on a flight-time bank, as on a flat plate** (#1548 round 5,
+    item 1).  Eq (4) is a shift in deg 2θ, an aberration a bank's model does
+    not have: its position calibration is DIFC/DIFA/TZERO/DIFB, measured
+    against a standard.  A line here would read the same on every bank fit
+    and offer nothing to do, so the arm returns ``[]`` the way a
+    constant-wavelength flat plate does, where the aberration does not belong
+    to the model either.
+
     **The breadth is intended, including on a calibrated instrument.**  Every
     ``Instrument.debye_scherrer(wavelength=…)`` built with no radius trips it —
     the bundled 11-BM references (``examples/nac_11bm.py``, the NAC and SRM 660a
@@ -9893,15 +9900,7 @@ def _capillary_offset_diagnostics(model: CompiledModel,
     than the verdict for exactly that reason — the protocol row (§7) carries the
     clause on how to read it on a calibrated instrument.
     """
-    if _is_tof(model):
-        return [_tof_skip(
-            "CAPILLARY_OFFSET_UNAVAILABLE", "the eq (4) specimen-offset check",
-            "eq (4) is a shift in deg 2θ and this histogram's abscissa is a "
-            "flight time; a bank's position calibration is DIFC/DIFA/TZERO/"
-            "DIFB, and it is measured against a standard rather than flagged "
-            "here",
-            ["instrument.source.difc"])]
-    if model.geometry_kind != "debye_scherrer":
+    if _is_tof(model) or model.geometry_kind != "debye_scherrer":
         return []
     # Read the gate off the table rather than re-deriving it from the geometry.
     # ``ParameterTable`` force-fixes these two exactly when eq (4) has no R to

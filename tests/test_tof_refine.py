@@ -760,8 +760,10 @@ def test_no_microsecond_reaches_a_member_called_two_theta(tof_fit):
 
 
 def test_summary_renders_and_says_what_did_not_run(tof_fit):
-    """Survivability, and the shape of it: every 2θ-only check reports that it
-    did not run rather than returning an empty list that reads as a pass.
+    """Survivability, and the shape of it: a 2θ-only check whose subject a
+    bank has reports that it did not run rather than returning an empty list
+    that reads as a pass; one whose subject a bank's model lacks (the eq (4)
+    capillary offsets) is silent, as on a flat plate (#1548 round 5, item 1).
 
     The two sample-width flags left this list in T-3c: a bank carries a
     crystallite size and a microstrain, so both flags *run* there rather than
@@ -774,12 +776,32 @@ def test_summary_renders_and_says_what_did_not_run(tof_fit):
     assert "converged" in text
     assert TOF_NOT_EVALUATED in text
     codes = {d.code for d in result.diagnostics}
-    assert "CAPILLARY_OFFSET_UNAVAILABLE" in codes
+    # #1548 round 5, item 1: eq (4) is an aberration a bank's model does not
+    # have, so the bank is silent about it, as a flat plate is; a line that
+    # read the same on every bank fit would tell a reader nothing.
+    assert "CAPILLARY_OFFSET_UNAVAILABLE" not in codes
     assert not ({"STRAIN_UNUSUALLY_LARGE", "SIZE_UNUSUALLY_SMALL"} & codes)
-    for d in result.diagnostics:
-        if d.code == "CAPILLARY_OFFSET_UNAVAILABLE":
-            assert TOF_NOT_EVALUATED in d.message
-            assert d.level == "info"
+
+
+def test_the_layer_clause_joins_a_summary_that_ends_a_sentence(tof_fit,
+                                                              monkeypatch):
+    """#1548 round 5, item 3: a summary already ending in a full stop (a
+    density bank with a correlated pair, whose identifiability clause is a
+    sentence) printed "independent.; Layer 1".  It now gets a sentence."""
+    import rietx.report as report_module
+
+    ref, _ = tof_fit
+    # this fixture's fit carries a correlated pair, so its summary ends one
+    text = ref.report().summary
+    assert ".;" not in text
+    assert text.endswith("not independent. Layer 1 and Layer 2 are "
+                         + TOF_NOT_EVALUATED + ".")
+    # positive arm: with no identifiability sentence the clause still joins
+    # with "; ", so the test cannot pass by always opening a sentence
+    monkeypatch.setattr(report_module, "identifiability_clause",
+                        lambda _ident: None)
+    assert ref.report().summary.endswith(
+        "; Layer 1 and Layer 2 are " + TOF_NOT_EVALUATED)
 
 
 def test_the_report_abstains_rather_than_attributing_degrees(tof_fit):
@@ -1320,6 +1342,19 @@ def test_a_gaussian_branch_bank_with_no_gaussian_width_is_finite():
     assert np.all(np.isfinite(np.asarray(pv.predict(grid))))
 
 
+def test_a_humps_units_are_stated_for_a_bank():
+    """#1548 round 5, item 4: a hump on a bank is in µs, not °2θ, and the
+    5.0 default width is one channel there, so the text a reader gets says
+    both, at the help entries and at the missing-position refusal."""
+    from rietx.help import PARAMETER_HELP
+
+    assert "µs" in PARAMETER_HELP["instrument.extra_components.*.position"].description
+    width = PARAMETER_HELP["instrument.extra_components.*.fwhm"].description
+    assert "µs" in width and "give it" in width
+    with pytest.raises(ValueError, match="µs on a time-of-flight bank"):
+        HumpComponent()
+
+
 def test_a_hump_on_a_bank_says_the_width_guard_did_not_run():
     """Items 4 and 16.  The hump-width guard compares against a Caglioti
     width in deg 2θ, which a bank does not have, so it abstains there and
@@ -1334,7 +1369,10 @@ def test_a_hump_on_a_bank_says_the_width_guard_did_not_run():
     assert [(d.code, d.level) for d in got] == [
         ("BACKGROUND_PEAK_WIDTH_UNAVAILABLE", "info")]
     assert got[0].where == ["instrument.extra_components.0.fwhm"]
-    assert "not evaluated" in got[0].message or "no common unit" in got[0].message
+    assert TOF_NOT_EVALUATED in got[0].message
+    # #1548 round 5, item 5: the suggestion asks for the comparison in µs, so
+    # the message does not say the two widths cannot be compared
+    assert "common unit" not in got[0].message
     assert "narrowest" in got[0].suggestion
     # the constant-wavelength guard's own factor, quoted from the constant
     # (#1548 round-2 item 6), so the two cannot drift

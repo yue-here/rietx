@@ -32,8 +32,8 @@ IntensityBasis = Literal["counts", "density"]
 AXIS_UNITS: dict[str, str] = {"two_theta": "degrees", "tof": "microseconds (µs)"}
 
 #: One sentence, quoted by every check a time-of-flight histogram cannot
-#: answer — the diagnostics in ``refine.py`` and the Layer-0 abstention in
-#: ``report/layer0.py``.  **A shared string, because the alternative is
+#: answer — the hump-width line in ``report/tof.py``, the Layer-0 abstention
+#: in ``report/layer0.py`` and the Layer 1/2 clause of the summary.  **A shared string, because the alternative is
 #: silence**: a check that returns an empty list reads as "we looked and found
 #: nothing" about a question nobody asked, which is the same failure
 #: ``CAPILLARY_OFFSET_UNAVAILABLE`` names one rank over (a held aberration
