@@ -9,6 +9,10 @@ json: the start model in rietx units.
 ``bigcell-lebail`` exports its seeded 16-term background since 1d6677887.
 The WP's GSAS-II Le Bail row ran from probe 1's unseeded six zeros, which
 this script wrote at 896991fde.
+
+Since the bench's cases moved to Nb₁₈W₁₆O₉₃ (COD 2107344, P b a m, mixed
+sites), this script refuses them: the driver writes probe 1's space group
+at full occupancy. The GSAS-II readings in the WP are probe 1's.
 """
 import importlib.util
 import json
@@ -32,6 +36,11 @@ for key in ("bigcell-structural", "bigcell-pawley", "bigcell-pawley-120", "bigce
     assert np.allclose(sig, np.sqrt(np.maximum(y, 1.0)))
     np.savetxt(OUT / f"{key}.xye", np.column_stack([tt, y, sig]), fmt="%.6f %.1f %.6f")
     ph = setup.structure.phases[0]
+    if ph.space_group != "P 21 21 21" or any(a.occ.value != 1.0 for a in ph.atoms):
+        sys.exit(f"{key}: the bench's phase is {ph.space_group!r} with partial "
+                 "sites, and gsas2_bigcell.py writes probe 1's P 21 21 21 at full "
+                 "occupancy. Export from a checkout before the COD swap "
+                 "(8ac51004f), or teach the driver the space group and occupancy.")
     ins = setup.instrument
     start = {
         "mode": setup.mode,

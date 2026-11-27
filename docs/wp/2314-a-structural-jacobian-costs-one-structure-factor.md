@@ -188,6 +188,12 @@ is held, and rebuilt per evaluation where the cell is free.
   already 1.6-1.9× faster than GSAS-II here. WP-2317's Context has the
   protocol. (Its pointer to a runaway guard on the case is consumed: the
   guard is a count, the 2026-11-27 second-session entry.)
+- **From WP-2317, 2026-11-27 (4th session): the case is now a real
+  structure.** `bigcell-structural` carries Nb₁₈W₁₆O₉₃ (COD 2107344, Pbam,
+  43 sites, eight co-sited Nb/W pairs tied), freeing 66 coordinate and 35 Biso
+  columns over 886 reflections where probe 1 freed 120 and 40 over 913. The
+  figures in the entry above are probe 1's, so this WP's "before" is
+  re-measured on the new case. WP-2317's Context has the new range.
 
 ## Non-goals
 
