@@ -1,6 +1,6 @@
 # WP-2312 — the review commands see the whole backlog
 
-Milestone: unscheduled · Status: 🔄 2026-11-26 — every listing says when it may be cut off; /pr-review still ranks 30 PRs, and the call that would rank them all is unmeasured
+Milestone: unscheduled · Status: 🔄 2026-11-27 — claimed by @yue-here (ghostshift runner): /pr-review triage ranks every open PR
 Track: The repo's own process
 Depends on: —
 Priority: P4 2026-11-26 — process: no number moves, but a triage that ranks part of the backlog read as ranking all of it
