@@ -33,6 +33,10 @@ WP-2062."
   speed project.
 - So **no angle here starts before WP-2317 task 3 has put R3 to the maintainer.**
   The question is whether a user at the wall on Le Bail is the ruling that asks.
+- **Ruled 2026-11-27 (WP-2317 R2-R3): follow practice, fence lifted.** Rule 5 now
+  says Le Bail follows the established programs' practice, so every angle here may
+  start. A number-moving one answers to R0 (b). WP-2317 § Inherited lists the
+  cascade a per-cycle extraction reaches.
 
 **The measurement** (WP-2317 probe 1; Linux x86_64, 4 cores, `[dev]`, compiled
 tier on; 12 × 36 × 4 Å, P2₁2₁2₁, Cu Kα doublet + FCJ, `mccusker_default`,

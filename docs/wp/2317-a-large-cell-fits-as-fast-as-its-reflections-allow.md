@@ -341,6 +341,55 @@ what it costs here.
 
 ### Inherited
 
+- **2026-11-27, research for the rulings (three read-only agents; file:line in
+  their reports, summarised here).**
+  - *Why Le Bail diverged (R2).* The extraction has sat between solves since v0.1
+    (`f51e8e67b`), under the frozen-per-stage rule written the same day. WP-2062
+    states the reason: the trust region judges each step against one fixed
+    objective. Ruling B11 (2026-10-19) asked to "repeat until the intensities stop
+    changing" on the premise that every refiner does so; none surveyed does
+    (`docs/practice.md` § Structure-free fitting). WP-1542 built the settled
+    partition to it, on issue #740 (Rwp 4.56 % at 3 cycles against 1.09 % for the
+    true structure) and on `test_window_domain.py` bar 1, a bar written for peak
+    windows. The fence came from a delegated settlement in WP-1542, not a ruling of
+    the maintainer's.
+  - *Cascade of a per-cycle extraction.* LM needs a between-iteration hook and a
+    gain-ratio rule for a moving objective. The intensity snapshots
+    (`least_squares._lebail_snapshot`, `traced.py`) freeze per solve.
+    `lebail_passes`, `LEBAIL_CONVERGED_REL`, `LEBAIL_CYCLES_AT_CAP`,
+    `StageResult.lebail_cycles_run`/`.lebail_settled` and `StageSpec.lebail_tol`/
+    `lebail_cycles` change meaning. A new `NodeAction` field is a stored-format
+    change and goes to the maintainer. The extinction screen's prefit, the GUI
+    (wizard default, Adopt, `.rxt` words, dist), `help.py`, `_audit.py` rows, the
+    manual's `fm-lebail-stop` equation, the skill's two rows and WP-2017 group Q
+    follow. Tests: `test_lebail_cycles.py`, `test_lebail_alternation.py`, NAC,
+    SRM 676a and indexing acceptance, validation-matrix rows. Unchanged: the
+    Pawley seed, the report's `lebail_gap`, the `toy_lebail` goldens. Risk:
+    #740's 3-cycle plateau returns unless the stop reads the χ² change per
+    extraction and an initial extraction runs first (FullProf: "say 10").
+  - *R0's cascade into the root CLAUDE.md.* The compiled tier's rule 3
+    ("associations as written") and the `_orbit_terms` association clause predate
+    R0. The off-state clause stays bit-identical (Rule 4). Rule 3 is revisited
+    when a kernel first regroups.
+  - *R5.* GSAS-II's merged Pawley intensities are not symmetry equivalents, which
+    both codes already merge into one reflection. GSAS-II ties (b) lattice-forced
+    coincidences by integer identity in the higher Laue classes, and (c) any pair
+    within 1e-4 in d in -1, 2/m and mmm. The b = 3a case is (c). rietx groups
+    within 0.5 FWHM and restrains toward equal peak intensity, where the
+    equipartition convention is equal F². TOPAS ties nothing automatically.
+  - *R4.* GSAS-II clamps by value and its derivative ignores the clamp, so a
+    clamped reflection keeps pulling U, V, W back. FullProf's peaks vanish at
+    1e-10. RIETAN-FP refuses a step to a negative width. Every probe crossing was
+    on the Lorentzian rows.
+  - *R6.* `ftol` is the relative decrease in S over three consecutive accepted
+    iterations. GSAS-II stops at 1e-3 relative χ² (about 2 esd of joint movement
+    at N = 5 000, inferred), FullProf at shifts under 0.2 esd, TOPAS on
+    `chi2_convergence_criteria` for three cycles. Nothing looser than 1e-8 was
+    ever run on the last stage. WP-2045 kept 1e-9 after cpd-1b stalled at 1e-6.
+  - *R7.* 0.3° dates from v0.1 and became capture slack in WP-1112. WP-2002 B10
+    measured a largest move of 0.21° over four families. Sizing it per stage from
+    the free position parameters needs a bound on each one's movement.
+
 - **From WP-2316, 2026-11-27 (task 1): probe 1's Le Bail fit sat in a wrong
   valley, and the cause is its background seed.** Probe 1 starts every
   Chebyshev coefficient at 0. Le Bail's first partition hands the 900-count
