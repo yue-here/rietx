@@ -90,6 +90,10 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2300](2300-a-series-declares-each-parameter.md) | A series declares each parameter, and refuses what it cannot honour | P2 | [2305](2305-the-joint-call-speaks-of-patterns.md) | [series](#series) |
 | [2303](2303-a-glob-that-matches-nothing-says-so.md) | A glob a caller passes that matches nothing says so | P2 | — ([2300](2300-a-series-declares-each-parameter.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2305](2305-the-joint-call-speaks-of-patterns.md) | The joint call speaks of patterns and is named a joint refinement | P2 | — | [series](#series) |
+| [2313](2313-a-large-cell-fits-as-fast-as-its-reflections-allow.md) | A large cell fits as fast as its reflections allow: the case, the bar, and the rulings in the way | P2 | — | [Unscheduled](#unscheduled-a-large-cell) |
+| [2314](2314-a-structural-jacobian-costs-one-structure-factor.md) | A structural Jacobian costs one structure factor, not one per column | P2 | — ([2313](2313-a-large-cell-fits-as-fast-as-its-reflections-allow.md) soft) | [Unscheduled](#unscheduled-a-large-cell) |
+| [2315](2315-a-large-pawley-step-pays-for-the-rows-that-bind.md) | A large Pawley step pays for the rows that bind, not for every intensity | P2 | — ([2313](2313-a-large-cell-fits-as-fast-as-its-reflections-allow.md) soft) | [Unscheduled](#unscheduled-a-large-cell) |
+| [2316](2316-a-le-bail-partition-costs-what-its-overlaps-need.md) | A Le Bail partition costs what its overlaps need, not ten thousand Python cycles | P2 | — ([2313](2313-a-large-cell-fits-as-fast-as-its-reflections-allow.md) soft) | [Unscheduled](#unscheduled-a-large-cell) |
 
 ## <a id="v0-3"></a>v0.3 — multi-phase workflows
 
@@ -839,6 +843,15 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2033](2033-a-declared-z-filters-the-extinction-class.md) | A declared Z or density filters an extinction class's members | ✅ 2026-11-02 | — | — ([1967](1967-what-the-chemist-declares-reaches-the-extinction-screen.md), [2030](2030-a-formulas-volume-window-fits-inorganic-cells.md) soft) |
 | [2069](2069-every-displacive-child-of-a-parent-in-a-stated-cell.md) | Every displacive child of a parent in a stated cell, several irreps included | ⬜ | P3 | — ([1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md), [1919](1919-maximal-subgroups-generated-from-the-operators.md) soft) |
 | [2085](2085-a-phase-in-its-standardized-description.md) | A phase in its standardized description: the Parthé–Gelato Γ rule and the standardized CIF | ⬜ | P3 | #1332, [1452](1452-spglib-to-moyo.md) |
+
+### <a id="unscheduled-a-large-cell"></a>A large cell
+
+| WP | Title | Status | Priority | Depends on |
+|---|---|---|---|---|
+| [2313](2313-a-large-cell-fits-as-fast-as-its-reflections-allow.md) | A large cell fits as fast as its reflections allow: the case, the bar, and the rulings in the way | ⬜ | P2 | — |
+| [2314](2314-a-structural-jacobian-costs-one-structure-factor.md) | A structural Jacobian costs one structure factor, not one per column | ⬜ | P2 | — ([2313](2313-a-large-cell-fits-as-fast-as-its-reflections-allow.md) soft) |
+| [2315](2315-a-large-pawley-step-pays-for-the-rows-that-bind.md) | A large Pawley step pays for the rows that bind, not for every intensity | ⬜ | P2 | — ([2313](2313-a-large-cell-fits-as-fast-as-its-reflections-allow.md) soft) |
+| [2316](2316-a-le-bail-partition-costs-what-its-overlaps-need.md) | A Le Bail partition costs what its overlaps need, not ten thousand Python cycles | ⬜ | P2 | — ([2313](2313-a-large-cell-fits-as-fast-as-its-reflections-allow.md) soft) |
 
 ### <a id="unscheduled-the-repo-s-own-process"></a>The repo's own process
 
