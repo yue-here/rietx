@@ -1,6 +1,6 @@
 # WP-1993 — N-W3: satellites at a real q, to order m, with (h k l m) rows
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-27 — N-W3a (`satellite_positions`, positions at a real q) built as its own PR under A2, proposed and pending the maintainer's ruling; N-W3b (the (h k l m) rows) remains
 Track: Data and metadata in, a structure out
 Depends on: — (N-W1 landed as PR #682; 1992 soft, the same package)
 Priority: P3 2026-10-16 — library code with a contributor ready to build it; the k-search (#795, WP-1418) and both future forward models read it
@@ -40,6 +40,10 @@ The 2026-10-08 reply deferred all six amendments to the cut. A2 is the one
 that changes this WP's shape. The others belong to later chunks (see
 Non-goals).
 
+Proposed 2026-11-27: A2 (split N-W3); N-W3a lands first as its own PR,
+pending the maintainer's ruling (#678 issuecomment-7219873154). If A2 is
+declined, N-W3b joins this branch before it leaves draft.
+
 Checked at `138d55dc`: `crystallography/satellites.py` exists and serves the
 commensurate magnetic track (WP-1326); N-W1's operators are in
 `crystallography/superspace/`.
@@ -54,7 +58,7 @@ commensurate magnetic track (WP-1326); N-W1's operators are in
 ## Tasks
 
 - [ ] Decide A2 with the maintainer and record it here as `Decided YYYY-MM-DD`.
-- [ ] Satellite positions at a real q (N-W3a, or the whole chunk if A2 is declined).
+- [x] Satellite positions at a real q (N-W3a, or the whole chunk if A2 is declined).
 - [ ] The (h k l m) rows, dedup, absences and coincidence merge.
 - [ ] Tests: the 1326 fixtures bit-identical at m = ±1; the three de Wolff conditions; the negative control
 - [ ] Skill: none expected while the package stays unexported; say why at handover
@@ -73,6 +77,27 @@ commensurate magnetic track (WP-1326); N-W1's operators are in
 - Issues #678, #258, #795.
 
 ## Handover log
+
+- **2026-11-27** — N-W3a built: `satellites.satellite_positions(space_group,
+  cell, wavelength, two_theta_range, q, lambdas=None, harmonics=(1,))` gives
+  the positions Q = H + m·q of a phase at a modulation vector that may be
+  incommensurate, one d per Laue orbit, so the k-search's real-q form (K3)
+  and the forward models have one position call to read. *Done:* `q` is a
+  `ModulationVector` or its text, refused as a vector of numbers; `lambdas`
+  declared, never inferred; an all-`Fraction` q takes today's exact path,
+  so at `harmonics=(1,)` it returns `satellite_d_spacings` bit for bit;
+  a float λ takes the real path, an exact orbit merge on integer codes with
+  the free part read as generic; `harmonics` the declared |m|, both signs;
+  `_parent_grid` gained `margin` (default unchanged) for |m·q_i| ≥ 1;
+  `_ORDERS` unchanged. *Measured* (`tests/test_satellite_positions.py`, 28
+  tests): every WP-1326 k (133 cases over 17 group/cell/window fixtures)
+  bit-identical, and the real path's merge with no free part bit-identical
+  too; NbTe₄ P4/mcc(½,½,0.691), Cu Kα₁, 5-140°: 156 positions at m = ±1
+  and 356 to m = ±2, equal to a brute force with the 4/mmm orbit read off
+  by hand; with the c glides applied to the parents the brute force finds
+  fewer. *Gotchas:* a float λ at a commensurate value (0.5) keeps the
+  coinciding ±q positions apart (64 against 32 on P m m m), as the
+  docstring says. *Next:* the maintainer's ruling on A2 (#678); then N-W3b.
 
 - **2026-10-16** — created, from the 2026-10-16 issue triage (issue #678).
   The maintainer decided to cut N-W2's group half and N-W3 now that T-1 has
