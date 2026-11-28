@@ -71,10 +71,10 @@ def test_the_differences_name_the_code_and_the_standard_it_moved_on():
 
 
 def test_only_the_findings_rounding_decides_leave_the_table():
-    """WP-2036: fluorite's floor and discarded-direction findings on the flat
-    width triple, and zincite's floor finding there, depend on a 1e-14 nudge
-    to the start, so the pin leaves them out.  The same codes elsewhere, and
-    other codes on the triple, stay in."""
+    """WP-2036: the floor and discarded-direction findings on the flat width
+    triple depend on a 1e-14 nudge to the start, on fluorite and (since
+    WP-2314) on zincite, so the pin leaves them out.  The same codes
+    elsewhere, and other codes on the triple, stay in."""
     from types import SimpleNamespace
 
     from rietx.schemas.common import Diagnostic
@@ -85,14 +85,15 @@ def test_only_the_findings_rounding_decides_leave_the_table():
     size, strain, w = FLAT_TRIPLE
     fluorite = [diag("FLOOR_HIT", strain), diag("COVARIANCE_DIRECTION_DISCARDED", size, strain, w),
                 diag("FLOOR_HIT", "phases.0.atoms.0.biso"), diag("HIGH_CORRELATION", size, w)]
-    zincite = [diag("FLOOR_HIT", strain), diag("COVARIANCE_DIRECTION_DISCARDED", size, strain, w)]
+    zincite = [diag("FLOOR_HIT", strain), diag("COVARIANCE_DIRECTION_DISCARDED", size, strain, w),
+               diag("FLAT_DIRECTION", size, w)]
     corundum = [diag("FLOOR_HIT", strain)]
     table = suite_alarms.firing_table({key: SimpleNamespace(diagnostics=d) for key, d in
                                        (("fluorite", fluorite), ("zincite", zincite),
                                         ("corundum", corundum))})
     assert table["standards"] == {
         "fluorite": {"FLOOR_HIT": "warning", "HIGH_CORRELATION": "warning"},
-        "zincite": {"COVARIANCE_DIRECTION_DISCARDED": "warning"},
+        "zincite": {"FLAT_DIRECTION": "warning"},
         "corundum": {"FLOOR_HIT": "warning"},
     }
     assert table["n_results"]["FLOOR_HIT"] == 2

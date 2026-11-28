@@ -220,7 +220,8 @@ Rwp and the residual differ, because anyone can recompute them from the arrays a
 The matrix is the one `top_correlations` is cut from, so a pair quoted there has the same value here.
 It is carried on the result and never on a history node, because at 300 free parameters the triangle is 45 150 numbers.
 `Refinement.write_correlation_table` writes it to a file ([Exports and derived tables](exports.md)).
-A joint multi-histogram fit carries the joint solve's matrix, over the joint free parameters, with an undetermined pair `None` as in a single fit; its other parameter-space tables stay empty.
+A joint multi-histogram fit carries the joint solve's matrix, over the joint free parameters, with an undetermined pair `None` as in a single fit.
+Its `top_correlations` and `soft_modes` are measured on that same matrix (WP-2028), and `exchangeability` stays empty there.
 `RefinementResult.for_histogram` hands each histogram's view the block over its own rows and the shared ones, spelled as its `parameters` spell them.
 
 The two absorption tables partition the declared extra components by kind.
@@ -240,7 +241,8 @@ Read `None` as "not measured here", never as "no degeneracy".
 
 A joint multi-histogram fit screens each histogram's own rows.
 Its `Identifiability.background_absorption` keys carry a `hist.<h>.` prefix, shared paths included, and `RefinementResult.for_histogram` hands one histogram's view its own rows without the prefix.
-A joint fit runs neither the declared-peak screen nor the parameter-space screens, so the other four fields stay empty there.
+A joint fit also runs the declared-peak screen per histogram, keyed `hist.<h>.` like the background screen, and the correlation and soft-mode screens over the joint matrix, so `extra_peak_absorption`, `top_correlations` and `soft_modes` are filled there.
+Only `exchangeability` stays empty, because its held-parameter scan re-compiles one model and a joint fit has one per histogram.
 
 ### Background component counts
 

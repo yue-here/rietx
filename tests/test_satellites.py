@@ -603,6 +603,8 @@ def test_a_no_k_le_bail_node_gains_exactly_one_null():
     (state,) = _extract_reflections(model)
     dumped = json.loads(state.model_dump_json())
     assert dumped.pop("satellite_order") is None
+    # WP-2315's Pawley merge record: a Le Bail node examined none, so None
+    assert dumped.pop("merged_groups") is None
     assert list(dumped) == ["phase_index", "hkl", "intensity", "kind",
                             "stderr", "varied"]
 
