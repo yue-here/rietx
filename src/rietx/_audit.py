@@ -3941,7 +3941,7 @@ ROWS: tuple[Row, ...] = (
         evidence=('physics: a phase ordering with propagation vector k scatters at Q = H + m k '
                   'for the reciprocal-lattice H, and a single-k structure has its Fourier '
                   'components at +k and -k, so this rung enumerates m = +1 and -1 '
-                  '(satellites.py:1-12, 366-368; Rodriguez-Carvajal (1993) Physica B 192, 55, '
+                  '(satellites.py:1-12, 374-376; Rodriguez-Carvajal (1993) Physica B 192, 55, '
                   "and the FullProf manual's propagation-vector section, cited in the module "
                   'docstring)')),
     Row("rietx.crystallography.site_classes.GRID", "constant", tier=1,

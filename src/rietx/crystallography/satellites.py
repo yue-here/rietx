@@ -62,15 +62,19 @@ inventing a scheme that would look like CDML and disagree with it.
 :func:`cdml_label` is the hook, and it returns ``None`` until those tables
 land.
 
-Non-goals, refused by name rather than approximated: an incommensurate k (a
-superspace problem, ``as_propagation_vector``), a refinable k, more than one k
-on a phase, and k = 0 (:func:`check_propagation_vector` — the satellites then
-coincide with the nuclear lines, which is a degeneracy and not a model).
+Non-goals, refused by name rather than approximated: an incommensurate k as
+a phase's propagation vector (a superspace problem, ``as_propagation_vector``),
+a refinable k, more than one k on a phase, and k = 0
+(:func:`check_propagation_vector` — the satellites then coincide with the
+nuclear lines, which is a degeneracy and not a model).  The *positions* of a
+modulation vector q that may be incommensurate, declared on its line, are
+:func:`satellite_positions` (WP-1993, N-W3a); its (h k l m) rows are not yet.
 """
 
 from __future__ import annotations
 
 import math
+import numbers
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from fractions import Fraction
@@ -104,6 +108,7 @@ __all__ = [
     "reciprocal_lattice_mask",
     "satellite_reflections",
     "satellite_d_spacings",
+    "satellite_positions",
     "satellite_orbit",
     "merge_satellites",
     "zone_boundary_candidates",
@@ -325,7 +330,7 @@ def _d_min(wavelength: float, two_theta_max: float) -> float:
 
 
 def _parent_grid(sg, cell, wavelength: float, two_theta_max: float, *,
-                 apply_structure_absences: bool = False) -> np.ndarray:
+                 apply_structure_absences: bool = False, margin: int = 2) -> np.ndarray:
     """Every parent H a satellite in range can have, as an (n, 3) int array.
 
     **Independent of k**: |Q_i| <= |a_i| / d_min bounds the satellite index,
@@ -334,12 +339,15 @@ def _parent_grid(sg, cell, wavelength: float, two_theta_max: float, *,
     on Q).  So one grid serves every candidate k of a phase, which is what
     :func:`satellite_d_spacings` shares and why the report arm's cost does not
     grow with the number of candidates it scores (review item 4 on #468).
+    ``margin`` is how far past ⌊a_i / d_min⌋ each index range reaches: the
+    default 2 covers |m·k_i| < 1, and :func:`satellite_positions` passes more
+    for a higher harmonic or a q outside the first cell.
     """
     d_min = _d_min(wavelength, two_theta_max)
     a, b, c = cell[0], cell[1], cell[2]
-    hmax = int(np.floor(a / d_min)) + 2
-    kmax = int(np.floor(b / d_min)) + 2
-    lmax = int(np.floor(c / d_min)) + 2
+    hmax = int(np.floor(a / d_min)) + margin
+    kmax = int(np.floor(b / d_min)) + margin
+    lmax = int(np.floor(c / d_min)) + margin
     n_grid = (2 * hmax + 1) * (2 * kmax + 1) * (2 * lmax + 1)
     if n_grid > MAX_HKL_GRID_POINTS:
         raise ValueError(
@@ -538,6 +546,260 @@ def satellite_d_spacings(space_group,
         d_reps = orbits[2]
         out.append(d_reps[_order_by_d(d_reps)])
     return out
+
+
+# --------------------------------------------------------------------------
+# positions at a real modulation vector (WP-1993, N-W3a)
+# --------------------------------------------------------------------------
+
+def _declared_line(q):
+    """``q`` as a :class:`~rietx.crystallography.superspace.ModulationVector`.
+
+    Its text (``"(1/2,1/2,γ)"``) is read as
+    :func:`~rietx.crystallography.representation.irreps.little_group_on_line`
+    reads it; a bare vector of numbers is refused, because a float component
+    would have to be guessed into a rational part and a free direction.
+    """
+    from .superspace.operators import ModulationVector
+
+    if isinstance(q, ModulationVector):
+        return q
+    if isinstance(q, str):
+        try:
+            return ModulationVector.parse(q)
+        except ValueError as exc:
+            raise ValueError(
+                f"satellite_positions: q={q!r} is not a modulation vector with a "
+                f"free direction ({exc}). Spell the line with a parameter letter, "
+                "for example '(1/2,1/2,γ)', and pass its value in lambdas; a "
+                "commensurate k goes to satellite_reflections") from exc
+    raise TypeError(
+        f"satellite_positions: q must be a superspace ModulationVector (or its "
+        f"text, such as '(1/2,1/2,γ)'), not {type(q).__name__} {q!r}. A vector of "
+        "numbers does not say which components are exact and which are free: "
+        "declare the line with ModulationVector.parse('(1/2,1/2,γ)') and pass the "
+        "value of each free parameter in lambdas, a Fraction for a commensurate "
+        "value. A commensurate k on its own goes to satellite_reflections")
+
+
+def _declared_values(q, lambdas) -> tuple:
+    """One value per free direction: ``Fraction`` (or int) exact, float real."""
+    n = q.dimension
+    if lambdas is None:
+        raise ValueError(
+            f"satellite_positions: q={q.label()} has {n} free parameter(s) and "
+            "lambdas=None. The line is declared and its values are not inferred: "
+            f"pass lambdas with {n} value(s), a Fraction for a commensurate value "
+            "or a float for an incommensurate one")
+    vals = tuple(lambdas) if np.ndim(lambdas) else (lambdas,)
+    if len(vals) != n:
+        raise ValueError(
+            f"satellite_positions: q={q.label()} has {n} free parameter(s), and "
+            f"lambdas gives {len(vals)} value(s) {vals!r}; pass one per free "
+            "direction, in the order of q.free")
+    out = []
+    for v in vals:
+        if isinstance(v, bool) or not isinstance(v, numbers.Real):
+            raise TypeError(
+                f"satellite_positions: lambdas value {v!r} is not a real number; "
+                "pass a Fraction for a commensurate value or a float")
+        if isinstance(v, (Fraction, int, np.integer)):
+            out.append(Fraction(v) if isinstance(v, Fraction) else Fraction(int(v)))
+            continue
+        x = float(v)
+        if not math.isfinite(x):
+            raise ValueError(
+                f"satellite_positions: lambdas value {v!r} is not finite")
+        out.append(x)
+    return tuple(out)
+
+
+def _declared_orders(harmonics) -> tuple[int, ...]:
+    """The orders m = +h, −h for each declared |m| = h, ascending in h."""
+    hs = tuple(harmonics) if np.ndim(harmonics) else (harmonics,)
+    bad = [h for h in hs if isinstance(h, bool)
+           or not isinstance(h, (int, np.integer)) or int(h) < 1]
+    if not hs or bad:
+        raise ValueError(
+            f"satellite_positions: harmonics={harmonics!r} must be a non-empty "
+            "set of positive integers |m|, such as (1,) or (1, 2); both signs "
+            "of each are taken, so (1,) is the orders m = +1 and m = -1")
+    return tuple(o for h in sorted({int(h) for h in hs}) for o in (h, -h))
+
+
+def _two_theta_window(two_theta_range) -> tuple[float, float]:
+    try:
+        lo, hi = (float(x) for x in two_theta_range)
+    except (TypeError, ValueError):
+        raise ValueError(
+            f"satellite_positions: two_theta_range={two_theta_range!r} must be "
+            "two angles (min, max) in degrees") from None
+    if not (math.isfinite(lo) and math.isfinite(hi) and 0.0 <= lo < hi <= 180.0):
+        raise ValueError(
+            f"satellite_positions: two_theta_range={two_theta_range!r} must "
+            "satisfy 0 <= min < max <= 180 degrees")
+    return lo, hi
+
+
+def _position_orbits(sg, cell, parents: np.ndarray, rational, free, lambdas,
+                     orders: tuple[int, ...], wavelength: float,
+                     two_theta_max: float, two_theta_min: float) -> np.ndarray:
+    """One d per Laue orbit of the Q = H + m·q in range, descending.
+
+    q = q_r + Σ_j λ_j f_j with ``rational`` the exact q_r, ``free`` the
+    integer f_j and ``lambdas`` the float λ_j (both empty for an exact q).  A
+    row is carried exactly as den·(H + m·q_r), an integer vector, and m, its
+    coefficient on the free part; the λ_j are read as **generic**, rationally
+    independent of each other and of 1 (an incommensurate q), so two rows are
+    one Q exactly when both parts are equal.  The image of a row under the
+    Laue operation Rᵀ is (Rᵀ·den·(H + m·q_r), m·Rᵀf_j), so the orbit merge of
+    :func:`_satellite_orbits` carries over unchanged: integer codes, the
+    lexicographically largest image as the orbit's key, the largest
+    enumerated row as its representative.  With no free part and the orders
+    (1, −1) it **is** that merge, bit for bit (``tests/test_satellite_positions.py``).
+    d comes from the real indices H + m·q.
+    """
+    den = _common_denominator(tuple(rational))
+    r_int = np.array([int(c * den) for c in rational], dtype=np.int64)
+    fdir = np.asarray(free, dtype=np.int64).reshape(-1, 3)
+    shift = np.asarray(lambdas, dtype=np.float64) @ fdir.astype(np.float64)
+    n_par = len(parents)
+    rows = np.concatenate([den * parents + m * r_int for m in orders], axis=0)
+    m_of = np.repeat(np.asarray(orders, dtype=np.int64), n_par)
+    real = rows.astype(np.float64) / den + m_of[:, None].astype(np.float64) * shift
+    # Q = 0 is no position (a float λ that cancels q_r, or m·q in L* for an
+    # exact q, which puts the other satellites of that order on lattice points)
+    live = np.any(real != 0.0, axis=1)
+    rows, m_of, real = rows[live], m_of[live], real[live]
+    d_min = _d_min(wavelength, two_theta_max)
+    d = d_spacings(real, *cell)
+    in_range = d >= d_min * 0.999
+    if two_theta_min > 0.0:
+        d_max = wavelength / (2.0 * np.sin(np.radians(max(two_theta_min, 1e-3) / 2.0)))
+        in_range &= d <= d_max * 1.001
+    rows, m_of, d = rows[in_range], m_of[in_range], np.asarray(d)[in_range]
+    if len(rows) == 0:
+        return np.zeros(0, dtype=np.float64)
+
+    images_op = _laue_images(sg)
+    ops = np.unique(images_op.reshape(len(images_op), 9), axis=0).reshape(-1, 3, 3)
+    # the exact part, coded as in _satellite_orbits
+    base = int(np.abs(images_op).sum(axis=2).max()) * int(np.abs(rows).max()) + 1
+    radix = 2 * base + 1
+    w = np.array([radix * radix, radix, 1], dtype=np.int64)
+    offset = base * (radix * radix + radix + 1)
+    code = (np.transpose(ops, (0, 2, 1)) @ w) @ rows.T + offset
+    own_code = rows @ w + offset
+    # the free part: Rᵀ·f_j coded once per operation with balanced digits, so
+    # the image of a row is m times its operation's code (linear, exact)
+    free_code = np.zeros(len(ops), dtype=np.int64)
+    own_free = np.zeros(len(rows), dtype=np.int64)
+    if len(fdir):
+        imgs = np.einsum("oij,fj->ofi", ops, fdir).reshape(len(ops), -1)
+        top = int(np.abs(imgs).max()) * max(abs(o) for o in orders) + 1
+        radix_f = 2 * top + 1
+        if radix_f ** imgs.shape[1] >= 2 ** 62:  # pragma: no cover - |f| ~ 1
+            raise ValueError(
+                f"satellite_positions: the free directions {fdir.tolist()} are "
+                "too long to code exactly; give them as the shortest integer "
+                "vectors along each line")
+        place = np.array([radix_f ** i for i in range(imgs.shape[1])], dtype=np.int64)
+        free_code = imgs @ place
+        ident = int(np.flatnonzero(np.all(ops.reshape(len(ops), 9)
+                                          == np.eye(3, dtype=np.int64).ravel(),
+                                          axis=1))[0])
+        own_free = m_of * free_code[ident]
+    image_free = free_code[:, None] * m_of[None, :]
+    # the orbit's key: the lexicographically largest (exact, free) image
+    key_code = code.max(axis=0)
+    key_free = np.where(code == key_code, image_free,
+                        np.iinfo(np.int64).min).max(axis=0)
+    by_own = np.lexsort((-own_free, -own_code))
+    keys = np.stack([key_code, key_free], axis=1)[by_own]
+    first = np.sort(np.unique(keys, axis=0, return_index=True)[1])
+    d_reps = d[by_own[first]]
+    return d_reps[np.argsort(-d_reps)]
+
+
+def satellite_positions(space_group,
+                        cell: tuple[float, float, float, float, float, float],
+                        wavelength: float,
+                        two_theta_range: tuple[float, float],
+                        q, lambdas=None, harmonics=(1,)) -> np.ndarray:
+    """The distinct satellite positions Q = H + m·q in range, as d (Å), descending.
+
+    One d per Laue orbit of Q (Friedel mates merged, action Rᵀ), the
+    positions :func:`satellite_d_spacings` gives for a commensurate k, now at
+    a modulation vector that may be **incommensurate**.  A satellite of a
+    modulated or magnetically ordered phase sits at H + m·q for every vector
+    H of the average cell's reciprocal lattice and an integer harmonic m
+    (de Wolff, P. M., Janssen, T. & Janner, A. (1981). *Acta Cryst.* A**37**,
+    625, eqs (1.1)-(1.2)).
+
+    * ``q`` is a :class:`~rietx.crystallography.superspace.ModulationVector`
+      (or its text, ``"(1/2,1/2,γ)"``): the exact rational part q_r and the
+      free directions f_j of q = q_r + Σ λ_j f_j.  A vector of numbers is
+      refused, so a float never decides which part of q is exact.
+    * ``lambdas`` gives one value per free direction, declared, never
+      inferred (``None`` is refused).  **A rational q is a λ fixed at a
+      rational value on its line**: when every λ is a ``Fraction`` (or an
+      int), q is exact and the call takes the exact path, so at
+      ``harmonics=(1,)`` the result is :func:`satellite_d_spacings`'s for
+      that k, bit for bit.  A float λ takes the real path and is read as
+      generic: positions that coincide only at that value (at λ = 0.5, H + q
+      and H′ − q for q = (0, 0, λ)) are kept apart, so declare a commensurate
+      value as a ``Fraction``.
+    * ``harmonics`` is the declared set of |m| (magCIF ``q_coeff``), both
+      signs taken: ``(1,)`` is the orders m = ±1 that
+      :func:`satellite_reflections` enumerates; ``(1, 2)`` adds m = ±2.
+      Satellite intensity falls fast with |m|, so the set is declared rather
+      than open-ended, and with |m| bounded the positions in a 2θ range are
+      finite (Dušek, M., Petříček, V., Wunschel, M., Dinnebier, R. E. & van
+      Smaalen, S. (2001). *J. Appl. Cryst.* **34**, 398, p. 399).  An exact
+      q whose m·q is a reciprocal-lattice vector puts that order on the
+      lattice points, which are positions too (the m = 0 point itself is
+      not); q itself in L* is k = 0 and refused
+      (:func:`check_propagation_vector`).
+    * ``two_theta_range`` is (min, max) in degrees, at ``wavelength``; as in
+      :func:`satellite_reflections`, a position up to 0.1 % in d past either
+      end is kept.
+
+    H runs over the **reciprocal lattice** (:func:`reciprocal_lattice_mask`,
+    centring only): glide and screw absences are conditions on the nuclear
+    structure factor and are not applied, as in :func:`satellite_reflections`.
+    One parent grid serves the call (:func:`_parent_grid`), widened for the
+    largest |m·q_i|; d comes from the real indices H + m·q.  The main
+    reflections (m = 0) are not among the positions and are untouched.  The
+    (h k l m) rows, the dedup under the (3+1)D superspace point group with
+    multiplicities, the absences derived from the superspace operators and
+    the merge of coincident rows at a commensurate q are WP-1993's second
+    half (N-W3b), not this call.
+    """
+    sg = _resolve(space_group)
+    line = _declared_line(q)
+    values = _declared_values(line, lambdas)
+    orders = _declared_orders(harmonics)
+    two_theta_min, two_theta_max = _two_theta_window(two_theta_range)
+    if all(isinstance(v, Fraction) for v in values):
+        kk = check_propagation_vector(sg, line.value(*values))
+        if orders == _ORDERS:
+            # today's exact path, untouched: the positions the report arm
+            # and the k-grid already read
+            return satellite_d_spacings(sg, cell, wavelength, two_theta_max,
+                                        [kk], two_theta_min)[0]
+        rational, free, lams = kk, (), ()
+        reach = [abs(float(c)) for c in kk]
+    else:
+        rational, free, lams = line.rational, line.free, values
+        shift = np.asarray(lams, dtype=np.float64) @ np.asarray(free, dtype=np.float64)
+        reach = [abs(float(c) + s) for c, s in zip(line.rational, shift)]
+    # H = Q − m·q, so each index range reaches ⌈max|m·q_i|⌉ past the sphere,
+    # plus one for the d filter's slack (the default 2 is |k_i| < 1)
+    top = max(abs(o) for o in orders) * max(reach)
+    margin = 1 + max(1, math.ceil(top))
+    parents = _parent_grid(sg, cell, wavelength, two_theta_max, margin=margin)
+    return _position_orbits(sg, cell, parents, rational, free, lams, orders,
+                            wavelength, two_theta_max, two_theta_min)
 
 
 def merge_satellites(nuclear: ReflectionSet, sat: ReflectionSet) -> ReflectionSet:
