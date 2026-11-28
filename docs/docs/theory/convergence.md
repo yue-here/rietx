@@ -77,7 +77,7 @@ from the data $\chi^2_\nu$ measures the misfit, and every $\sigma_i$ is too
 wide by its square root. Tutorial 05's 2 % cell jump, refitted warm, reached
 $\chi^2_\nu = 632$ in one step. The next Gauss-Newton step read 0.076 of the
 scaled esd and 1.9 at $\chi^2_\nu = 1$. On the scaled esd the stage stopped
-there, at Rwp 0.966 with the cell 2 % short. With the cap it goes on to Rwp
+there, at $R_{wp}$ 0.966 with the cell 2 % short. With the cap it goes on to $R_{wp}$
 0.039. The value $\chi^2_\nu$ alone cannot tell that point from a converged fit
 with real model error, so no cap above 1 has a source. At 1, $\sigma_i$ is the
 esd of the counting statistics alone. A converged fit at $\chi^2_\nu > 1$ then

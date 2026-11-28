@@ -87,7 +87,7 @@ The refined position and width describe the background model, not the halo on it
 
 <!-- output of examples/guides/hump.py -->
 ```text
-3 terms: hump at 4.19 ± 0.11°, FWHM 5.56 ± 0.26°
+3 terms: hump at 4.19 ± 0.11°, FWHM 5.57 ± 0.26°
 6 terms: hump at 5.25 ± 0.05°, FWHM 1.97 ± 0.13°
 ```
 

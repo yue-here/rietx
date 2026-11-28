@@ -74,5 +74,5 @@ def rounded(p, digits):
 
 
 assert [rounded(b, 3) for b in bisos.values()] == [(0.418, 0.065), (0.425, 0.012), (0.425, 0.026)]
-assert [rounded(p, 2) for p in humps[3]] == [(4.19, 0.11), (5.56, 0.26)]  # FWHM 5.57 before WP-2317 R6 (2026-11-28)
+assert [rounded(p, 2) for p in humps[3]] == [(4.19, 0.11), (5.57, 0.26)]  # FWHM 5.56 before the chi2_red cap of WP-2317 R6 (2026-11-28)
 assert [rounded(p, 2) for p in humps[6]] == [(5.25, 0.05), (1.97, 0.13)]  # FWHM 1.96 before WP-2317 R6 (2026-11-28)

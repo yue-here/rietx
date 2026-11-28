@@ -19,11 +19,11 @@ This runs two stages by hand on the GSAS-II tutorial fluorapatite pattern that s
 <!-- output of examples/guides/next.py -->
 ```text
 noise floor 693 | best: None
-instrument.profile.x, phases.0.lor_size       gain   320546  dBIC   +783  resolved False
-instrument.profile.y, phases.0.lor_strain     gain   188336  dBIC   +330  resolved False
-instrument.profile.w                          gain   156103  dBIC   +262  resolved True
-phases.0.gauss_size, instrument.profile.v     gain   129904  dBIC   +202  resolved False
-instrument.profile.u, phases.0.gauss_strain   gain    39894  dBIC    +45  resolved False
+instrument.profile.x, phases.0.lor_size       gain   320367  dBIC   +783  resolved False
+instrument.profile.y, phases.0.lor_strain     gain   187880  dBIC   +329  resolved False
+instrument.profile.w                          gain   156361  dBIC   +263  resolved True
+phases.0.gauss_size, instrument.profile.v     gain   128989  dBIC   +200  resolved False
+instrument.profile.u, phases.0.gauss_strain   gain    39377  dBIC    +45  resolved False
 ```
 
 Each group's `gain` is the fall in χ² that freeing the group would give, predicted from the derivatives at the current values.
@@ -126,7 +126,7 @@ Then free the Kα2 weight on a branch of the re-solved fit, and compare:
 <!-- output of examples/guides/next.py -->
 ```text
 instrument.source.lines.1.weight: 0.5 -> 0.464(6), t = -6.0
-dBIC +31.0 at N_eff 1298 (raw N: +161)
+dBIC +30.9 at N_eff 1295 (raw N: +161)
 ```
 
 `t_ratio` is how far the parameter moved from where it was held, in its own esds.

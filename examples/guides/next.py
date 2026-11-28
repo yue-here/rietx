@@ -91,8 +91,8 @@ assert at_cell.best_or_none() is None
 assert [len(g.members) for g in at_cell.groups] == [2, 2, 1, 2, 2]
 assert [g.resolved for g in at_cell.groups] == [False, False, True, False, False]
 assert round(at_cell.noise_floor) == 693
-assert [round(g.gain) for g in at_cell.groups] == [320546, 188336, 156103, 129904, 39894]  # 320387, 187891, 156393, 129080, 39422 before WP-2317 R6 (2026-11-28)
-assert [round(g.delta_bic) for g in at_cell.groups] == [783, 330, 262, 202, 45]  # 784, 329, 263, 201, 45 before WP-2317 R6 (2026-11-28)
+assert [round(g.gain) for g in at_cell.groups] == [320367, 187880, 156361, 128989, 39377]  # 320546, 188336, 156103, 129904, 39894 before the chi2_red cap of WP-2317 R6 (2026-11-28)
+assert [round(g.delta_bic) for g in at_cell.groups] == [783, 329, 263, 200, 45]  # 783, 330, 262, 202, 45 before the chi2_red cap of WP-2317 R6 (2026-11-28)
 # After the widths: the Kα2 weight leads, then two occupancies.
 assert [g.members[0].path for g in at_profile.groups[:3]] == [
     "instrument.source.lines.1.weight", "phases.0.atoms.2.occ", "phases.0.atoms.6.occ"]
@@ -128,7 +128,7 @@ assert [p.path for p in c.freed] == ["instrument.source.lines.1.weight"]
 assert c.freed[0].held_at == 0.5
 assert f"{c.freed[0].value:.3f}" == "0.464" and round(c.freed[0].esd * 1000) == 6
 assert f"{c.freed[0].t_ratio:+.1f}" == "-6.0"
-assert f"{c.delta_bic:+.1f}" == "+31.0" and round(c.n_effective) == 1298  # +30.9 at 1295 before WP-2317 R6 (2026-11-28)
+assert f"{c.delta_bic:+.1f}" == "+30.9" and round(c.n_effective) == 1295  # +31.0 at 1298 before the chi2_red cap of WP-2317 R6 (2026-11-28)
 assert round(c.delta_bic_raw_n) == 161
 # The warning's numbers: extinction does not move, and with the `profile` stage
 # re-solved (WP-2317 R7) both branches score it alike (+148 unpaired before).
