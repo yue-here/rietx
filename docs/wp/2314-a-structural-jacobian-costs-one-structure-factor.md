@@ -262,7 +262,7 @@ is held, and rebuilt per evaluation where the cell is free.
 ## Handover log
 
 - **2026-11-28** — Angle 3 landed: Biso and occupancy columns from the
-  cache (PR #PRNUM, a ghostshift runner). A Biso or occupancy column no
+  cache (PR #1876, a ghostshift runner). A Biso or occupancy column no
   longer re-runs the whole phase's structure factor. It is now analytic,
   built from the one expansion per phase that the coordinate columns
   already share, and exact rather than a finite difference. On
