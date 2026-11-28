@@ -313,7 +313,9 @@ def test_lab6_hump_is_the_degenerate_direction_both_engines_found(
     statement in this package's vocabulary.  That is the closing stage since
     WP-2002.  Since WP-1334 it crawls until the slow-descent rule stops it
     (``termination`` ``slow_descent``, status ``converged`` by Yue's ruling of
-    2026-11-03), where before it spent its budget.
+    2026-11-03), where before it spent its budget.  Since WP-2317 (R6) the
+    shift test can end that crawl first (``shift_over_esd``): each step along
+    the degenerate direction is then under a tenth of its esd.
     """
     _, _, result = lab6
     pairs = {frozenset(d.where) for d in result.diagnostics
@@ -323,7 +325,8 @@ def test_lab6_hump_is_the_degenerate_direction_both_engines_found(
     assert hump_pairs
     last = next(s for s in reversed(result.stages)
                 if any("extra_components" in p for p in s.freed))
-    assert last.termination in ("slow_descent", "max_nfev"), (last.name, last.termination)
+    assert last.termination in ("slow_descent", "max_nfev", "shift_over_esd"), (
+        last.name, last.termination)
 
     gsas = {r["descriptive_name"]: (float(r["value"]), float(r["esd"]))
             for r in csv.DictReader(

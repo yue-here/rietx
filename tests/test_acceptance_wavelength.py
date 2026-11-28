@@ -223,6 +223,9 @@ def _solo_refinement(which: int, nudge: int = 0, *,
                         if row.refinable and row.value != 0.0})
     plan = PLAN_PRESETS["mccusker_structural"]()
     plan.closing_window_tol = 1e-3   # the pinned values were measured behind it
+    # and at the 1e-9 stop: these pins read y to 1e-4 of itself across starts,
+    # finer than the shift test's 0.1 esd moves it (WP-2317 R6: 0.013 esd)
+    plan.shift_over_esd_tol = None
     ref.fit(data, plan=plan, two_theta_limits=lim)
     return ref
 
