@@ -30,6 +30,7 @@ from __future__ import annotations
 import math
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass, field, replace
+from fractions import Fraction
 from typing import Literal
 
 import numpy as np
@@ -76,7 +77,7 @@ from ..schemas.instrument import (
     Instrument,
     ProfileTOF,
 )
-from ..schemas.structure import MOMENT_COMPONENTS, Structure
+from ..schemas.structure import MOMENT_COMPONENTS, Structure, _parent_records_disagree
 from .derived import DerivedBlock
 
 #: Dot-path suffix of a source line's wavelength row.  One authority for the
@@ -1390,11 +1391,13 @@ class ParameterTable:
         #: take-back leaves the row as the caller left it, never silently fixed.
         self._origin_wanted: dict[str, bool] = {}
         #: phase base path → (its amplitude paths, which of them are invariant
-        #: under the whole parent group), for every phase with
+        #: under the whole parent group, which sit at k = Γ, its
+        #: ``Phase.parent_cell`` strain paths), for every phase with
         #: ``Phase.distortion_modes`` (WP-1419).  Built by
         #: :meth:`_collect_distortion_modes`; read by
         #: :meth:`_refuse_unseeded_distortion`.  Empty for every other table.
-        self._distortion: dict[str, tuple[tuple[str, ...], tuple[bool, ...]]] = {}
+        self._distortion: dict[str, tuple[tuple[str, ...], tuple[bool, ...],
+                                          tuple[bool, ...], tuple[str, ...]]] = {}
         # every fixed site at once, before the walk, which would stop at the
         # first (WP-1913, #728 item 4)
         _refuse_fixed_but_free([base for base, _ in fixed_sites_asking_to_vary(structure)])
@@ -1430,6 +1433,11 @@ class ParameterTable:
         for ip, phase in enumerate(structure.phases):
             sg = resolve_group(phase.space_group, phase.symmetry_operations)
             base = f"phases.{ip}"
+            # the two records of one parent agree, or neither can be read
+            # (``model_copy`` skips the ``Phase`` validator that asks this too)
+            reason = _parent_records_disagree(phase.distortion_modes, phase.parent_cell)
+            if reason is not None:
+                raise ValueError(f"{base}: {reason}")
             if phase.parent_cell is not None:
                 self._collect_parent_cell(base, sg, phase)
             else:
@@ -1817,8 +1825,12 @@ class ParameterTable:
             path = f"{base}.distortion_modes.modes.{m}.amplitude"
             self._add(path, mode.amplitude)
             paths.append(path)
-        self._distortion[base] = (tuple(paths),
-                                  tuple(mode.parent_invariant for mode in modes.modes))
+        strains = () if phase.parent_cell is None else tuple(
+            f"{base}.parent_cell.strain.{j}" for j in range(len(phase.parent_cell.strain)))
+        self._distortion[base] = (
+            tuple(paths), tuple(mode.parent_invariant for mode in modes.modes),
+            tuple(all(Fraction(c).denominator == 1 for c in mode.k) for mode in modes.modes),
+            strains)
         return _mode_moved_atoms(phase)
 
     def _collect_mode_atom_coords(self, base: str, sg, phase, j: int) -> None:
@@ -1899,6 +1911,10 @@ class ParameterTable:
     def _refuse_unseeded_distortion(self) -> None:
         """Refuse a free distortion block sitting exactly at the parent (WP-1419).
 
+        The block is the amplitudes outside the identity irrep and, on a phase
+        whose cell is stated through its parent, the Γ strains
+        (``Phase.parent_cell``).
+
         χ²(D(g)·A) = χ²(A) for every lost parent operation g, D(g) its action on
         the amplitude vector (it maps the child to a domain-related structure
         with the same powder pattern), so at A = 0 the gradient lies in the fixed subspace of the
@@ -1912,24 +1928,68 @@ class ParameterTable:
         identity-irrep (``parent_invariant``) is accepted: its column at the
         parent is not forced to zero.  Asked of what moves (C's rows), so a
         variable driving an amplitude counts as freeing it.
+
+        **The strains share the rule** (WP-1419 C3b), and a held strain
+        narrows it.  With every non-identity amplitude at zero the atoms keep
+        every parent lattice translation, which acts on an amplitude at
+        k ≠ Γ by a phase ≠ 1 and on a metric not at all: such an amplitude's
+        column is exactly zero whatever the strains.  An amplitude at Γ and a
+        strain are exactly zero only when every strain is zero too: the
+        pattern is then invariant under every parent rotation's action
+        Δ ↦ Rᵀ·Δ·R on the metric, and a Γ strain lies in the kernel of the
+        parent's average (``crystallography.metric``).  So with the amplitudes
+        at zero a stage is refused when what it frees is all k ≠ Γ, or when
+        every strain is zero as well; a held non-zero strain can couple to a
+        Γ mode of its own irrep, so those are let through.  The pattern need
+        not be *even* in a strain (a tetragonal strain of a cubic parent is in
+        no parent operation's orbit of its negative, and y(+s) ≠ y(−s) at
+        third order); zero is still stationary.  An amplitude off zero lifts
+        the rule: the strain's column is then not forced to zero.  A k counted
+        as Γ here is any integer one, which errs toward letting a stage run.
+
+        **The refusal is a statement about the start, not about the
+        gradient** (#1533).  The arguments above act with a lost parent
+        operation on the block alone, so they hold only while everything
+        else in the pattern keeps that operation.  Moments, preferred
+        orientation, and unequal ADPs or occupancies on a split orbit break
+        it, and some of the block's columns then have a term at zero.  That
+        term has not been shown to choose the sign reliably: on LaMnO₃'s Pm
+        child at k = (½, ½, 0) with Mn moments on, the strain's odd term is
+        2e-5 of the top at s = 1e-3, and a fit freed from zero took the strain
+        to +0.00200 in 6 of 6 fits whatever the truth's sign; the strongest
+        live Mn mode, freed from zero with the truth at ±0.03 Å, took the
+        truth's sign in 5 of 6.  Neither is measured for preferred
+        orientation, ADP or occupancy breakers.  So the block at
+        the parent is not freed whatever else the phase carries, and the
+        caller states the sign by seeding (Theory: *Distortion-mode
+        amplitudes*, for the measured sizes).
         """
         reach = np.asarray(abs(self._reach).sum(axis=1)).ravel()
-        for base, (paths, invariant) in self._distortion.items():
-            broken = [p for p, inv in zip(paths, invariant, strict=True) if not inv]
-            if not broken:
+        for base, (paths, invariant, at_gamma, strains) in self._distortion.items():
+            broken = [i for i, inv in enumerate(invariant) if not inv]
+            block = [self._paths[paths[i]] for i in broken] + [self._paths[p] for p in strains]
+            freed = [i for i in block if reach[i] > 0.0]
+            if not freed or any(self.entries[self._paths[paths[i]]].value != 0.0
+                                for i in broken):
                 continue
-            idx = [self._paths[p] for p in broken]
-            if not any(reach[i] > 0.0 for i in idx):
+            strained = any(self.entries[self._paths[p]].value != 0.0 for p in strains)
+            couple = {self._paths[paths[i]] for i in broken if at_gamma[i]} | {
+                self._paths[p] for p in strains}
+            if strained and any(i in couple for i in freed):
                 continue
-            if all(self.entries[i].value == 0.0 for i in idx):
-                raise ValueError(
-                    f"{base}.distortion_modes: every amplitude outside the identity "
-                    "irrep is exactly zero, where the pattern is invariant under every "
-                    "lost parent operation's action on the block, so its gradient there "
-                    "is exactly zero and the stage "
-                    "cannot move off the parent.  State the child with "
-                    "displacive_statement, which seeds it, or set_values a small "
-                    "non-zero amplitude before freeing the block")
+            what = ("every amplitude outside the identity irrep" if not strains else
+                    "every amplitude outside the identity irrep and every strain"
+                    if not strained else
+                    "every amplitude outside the identity irrep (the freed ones at k ≠ Γ)")
+            raise ValueError(
+                f"{base}.distortion_modes: {what} is exactly zero: the block "
+                "starts at the parent, where it is not freed.  Its gradient there is "
+                "exactly zero, or set only by what else in the pattern breaks the "
+                "parent's symmetry (moments, preferred orientation, unequal ADPs or "
+                "occupancies on a split orbit), which has not been shown to choose the sign reliably, so "
+                "the sign is the caller's to state.  State the child with "
+                "displacive_statement, which seeds it, or set_values a small "
+                "non-zero amplitude (or strain) before freeing the block")
 
     def _declare_origin(self, ip: int, sg, phase) -> None:
         """Record where phase ``ip``'s origin floats and what could hold it (WP-1912).
@@ -2293,6 +2353,43 @@ class ParameterTable:
                     "atoms' coordinates: move the body (its origin and "
                     "orientation), or rewrite the atoms from it with "
                     "rietx.crystallography.bodies.place_body_atoms")
+
+    def parent_cell_rows(self) -> dict[str, tuple[str, ...]]:
+        """Every child cell row a ``Phase.parent_cell`` block derives → what carries it.
+
+        The carriers are the globs a stage frees it through, and a row lists
+        only those that move it at the table's values
+        (:meth:`~rietx.params.parent_cell.ParentCellBlock.carriers`):
+        ``phases.i.parent_cell.cell.*``, which ``phases.*.cell.*`` reaches,
+        and ``phases.i.parent_cell.strain.*`` where the child's group allows a
+        strain, freed only by naming it (WP-1419; Michael's ruling D59,
+        2026-11-24).  A row nothing moves, such as an angle the child's group
+        fixes at 90 deg, maps to ``()``: it is held by symmetry, and
+        ``ParameterRow.held_because`` says that.  Read off the blocks
+        :meth:`_collect_parent_cell` built.
+        """
+        from .parent_cell import ParentCellBlock
+        by_path = {e.path: e for e in self.entries}
+        out: dict[str, tuple[str, ...]] = {}
+        for block in self._cell_blocks:
+            if not isinstance(block, ParentCellBlock):
+                continue
+            edges = block.inputs[0].rsplit(".", 1)[0]
+            strains = f"{edges.rsplit('.', 1)[0]}.strain.*"
+            index = {path: i for i, path in enumerate(block.inputs[:6])}
+            ties = {index[path]: index[e.tie.terms[0][0]]
+                    for path in block.inputs[:6]
+                    if (e := by_path[path]).tie is not None}
+            held = [index[path] for path in block.inputs[:6]
+                    if by_path[path].locked and by_path[path].tie is None]
+            x = np.array([by_path[path].value for path in block.inputs], dtype=np.float64)
+            for i, src in ties.items():  # a tied entry holds its source's value after the rebuild
+                x[i] = x[src]
+            for i, row in enumerate(block.carriers(x, ties, held)):
+                found = tuple(g for g, moves in zip((f"{edges}.*", strains), row,
+                                                    strict=True) if moves)
+                out[block.outputs[i]] = found
+        return out
 
     def body_rows(self) -> dict[str, str]:
         """Every derived row a rigid body writes → that body's name (WP-1805)."""

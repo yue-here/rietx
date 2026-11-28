@@ -1398,7 +1398,10 @@ def _state_distortion_modes():
     amplitude column reaches O2's x and y through C, and numpy takes
     ``_site_column`` for it (WP-2314 angle 4; the peak chain before).  The
     traced backends differentiate the same affine rows.
-    The cell, scale and Biso free beside it.
+    The statement's cell is derived (C3b), so the parent's edge and the held
+    tetragonal strain free beside it through the ``ParentCellBlock``, with the
+    scale and Biso.  The glob names the parent's cell: ``phases.0.cell.*``
+    reaches only the child's six, which the block writes.
     """
     from rietx.crystallography.representation.distortion import displacive_statement
     from rietx.schemas.structure import Atom, Cell, Phase, Structure
@@ -1428,7 +1431,8 @@ def _state_distortion_modes():
                           intensity=(50.0 + 10.0 * rng.random(len(tt))).tolist())
     table = ParameterTable(structure, ins)
     table.set_vary(["*"], False)
-    for glob in ("phases.0.distortion_modes.modes.*.amplitude", "phases.0.cell.*",
+    for glob in ("phases.0.distortion_modes.modes.*.amplitude",
+                 "phases.0.parent_cell.cell.*", "phases.0.parent_cell.strain.*",
                  "phases.0.scale", "phases.0.atoms.*.biso"):
         assert table.set_vary([glob], True), glob
     amp = table.free_paths.index("phases.0.distortion_modes.modes.0.amplitude")

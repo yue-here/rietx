@@ -30,6 +30,9 @@ from ..crystallography.metric import cell_from_metric, child_metric
 from .derived import DerivedBlock
 
 _DEG = math.pi / 180.0
+#: a Jacobian entry below this moves nothing: the exact zeros of a child group's
+#: fixed angles come out at round-off (1e-14), a live angle at 1e-2 and above
+_MOVES_TOL = 1e-9
 _CELL = ("a", "b", "c", "alpha", "beta", "gamma")
 #: which G′ components each output reads: lengths their diagonal, an angle the
 #: two diagonals and the off-diagonal between them
@@ -105,6 +108,35 @@ class ParentCellBlock(DerivedBlock):
                                 + dg[:, j, j] / (2.0 * g[j, j])))
             out[o] = -dcos / (math.sqrt(1.0 - cosine * cosine) * _DEG)
         return out
+
+    def carriers(self, x: np.ndarray, ties: dict[int, int] | None = None,
+                 held: Sequence[int] = ()) -> np.ndarray:
+        """Which child entry each family of inputs moves at ``x``: (6, 2) bool.
+
+        Column 0 is the parent's edges and angles (``parent_cell.cell.*``),
+        column 1 the strains (``parent_cell.strain.*``), read where a stage
+        would free them: a parent entry tied to another (``ties``, input
+        index -> source index) moves the child only through its source, which
+        carries the tied entry's column with it, and an entry the parent's
+        group fixes (``held``) is not a carrier.  A nonzero of the exact
+        Jacobian at ``x`` (above ``_MOVES_TOL``) is what moving is, where
+        :meth:`reach_pattern` says only which entries the map could reach:
+        it marks the angles reached by every edge, which a child's group that
+        fixes them at 90 deg never moves (WP-1419 round 5).
+        """
+        jac = self.jacobian(np.asarray(x, dtype=np.float64))
+        ties = ties or {}
+        cols = {i: jac[:, i].copy() for i in range(6) if i not in ties and i not in held}
+        for i, src in ties.items():
+            if src in cols:
+                cols[src] += jac[:, i]
+        edge = np.zeros(6, dtype=bool)
+        for col in cols.values():
+            edge |= np.abs(col) > _MOVES_TOL
+        strain = np.zeros(6, dtype=bool)
+        for j in range(6, len(self.inputs)):
+            strain |= np.abs(jac[:, j]) > _MOVES_TOL
+        return np.stack([edge, strain], axis=1)
 
     def evaluate_traced(self, x: Sequence) -> list:
         from ..crystallography.lattice import direct_metric_tensor

@@ -1213,9 +1213,9 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "own. Unit: AMPLIMODES's, the mode normalised over a primitive cell of the "
             "child in the parent metric before any strain. The sign of the driving mode is a "
             "domain label; relative signs inside a basis are measured (Perez-Mato et al. "
-            "2010, § 7). At the parent every amplitude outside the "
-            "identity irrep has an exactly zero gradient, so a block freed there is "
-            "refused: start from the statement's seed."
+            "2010, § 7). A block of amplitudes outside the identity irrep is not freed "
+            "at the parent, since its gradient there is exactly zero or has not been shown to choose "
+            "the sign reliably: start from the statement's seed."
         ),
         unit="Å", default=None,
         typical="0 to about 1.5 Å for an octahedral tilt",
@@ -1974,6 +1974,22 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "a bracketed label that names the closest group type. The statement is "
             "complete. The leading symbol of the label generates a different group, so "
             "check the cell transform before you compare it with a published symbol."
+        ),
+    ),
+    "CHILD_VARY_RESET": HelpEntry(
+        title="A stated child's free rows come back held",
+        description=(
+            "`displacive_statement` derives some of the child's rows: the six cell "
+            "parameters when the cell is stated through the parent (`Phase.parent_cell`), "
+            "and the coordinates of every atom a distortion mode moves. A derived row is "
+            "not refined directly, so a `vary` flag the child carried on it (the GSAS and "
+            "GSAS-II importers set every refined cell parameter free) is reset. The "
+            "message names each reset row and what now refines it, only where something "
+            "does: `phases.*.cell.*` frees the parent's cell edges, a strain is freed only "
+            "by naming `phases.*.parent_cell.strain.*`, and the mode amplitudes move the "
+            "atoms. A row nothing carries, such as an angle or a coordinate the child's "
+            "group fixes, is named as fixed by the group. "
+            "`DisplaciveStatement.held` lists the same pairs."
         ),
     ),
     "CIF_ADP_SYMMETRY_PROJECTED": HelpEntry(

@@ -17,10 +17,14 @@ decomposes a given child into amplitudes A_τ per (k, irrep, direction).
                                                                       -> ModeDecomposition
     displacive_statement(parent, child, transform, *, seed=DISTORTION_SEED,
                          reference="average", tolerance=1.5)        -> DisplaciveStatement
+    displacive_statement(parent, candidate=DistortionCandidate, *, seed=DISTORTION_SEED)
+                                                                      -> DisplaciveStatement
     parent_site_ties(site_map, *, phase_index=0)                     -> tuple of Biso ties
 
 ``displacive_statement`` is WP-1419 chunk 3 (2026-10-21): the child as its
-parent plus absolute, refinable mode amplitudes (``Phase.distortion_modes``).
+parent plus absolute, refinable mode amplitudes (``Phase.distortion_modes``),
+its cell derived from the parent's (``Phase.parent_cell``), from a stated
+child or from a ``distortion_candidates`` entry.
 
 ``parent`` and ``child`` are :class:`~rietx.schemas.structure.Phase` objects.
 ``transform`` is (P, p) with r_parent = P·r_child + p: the columns of P are the
@@ -111,6 +115,7 @@ import itertools
 import math
 from dataclasses import dataclass
 from fractions import Fraction
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -119,6 +124,9 @@ from ..symmetry import _group_arrays, group_key, resolve_group, site_orbit
 from ..wyckoff import SPGLIB_REFUSALS
 from .irreps import canonical_kvector, equivalent_kvectors, small_irreps
 from .modes import basis_vectors, magnetic_representation
+
+if TYPE_CHECKING:
+    from ...schemas.common import Diagnostic
 
 #: Rank and residual tolerance on the projected subspaces.  Every matrix here
 #: is an average of permutation-times-rotation matrices in a well-conditioned
@@ -898,13 +906,36 @@ def _count(species) -> str:
 DISTORTION_SEED = 0.01
 
 
+@dataclass(frozen=True)
+class HeldVary:
+    """One stated ``vary=True`` the statement reset, and what carries it now (D59).
+
+    ``path`` is the child's row (``phases.0.cell.a``, ``phases.0.atoms.3.x``)
+    whose stored flag was ``True`` and is ``False`` on the returned phase,
+    because the row is derived: a cell row from ``Phase.parent_cell``, a
+    moved atom's coordinate from the mode amplitudes.  ``carried_by`` names
+    what refines that freedom instead, as paths a stage's ``turn_on`` takes:
+    ``phases.0.parent_cell.cell.*`` (which ``phases.*.cell.*`` reaches) and
+    ``phases.0.parent_cell.strain.*`` (freed only by naming it) for a cell
+    row, whichever of them moves that row at the statement's values, and the
+    amplitude paths whose vectors move the coordinate for an atom.  Empty
+    where nothing moves the row: an angle the child's group fixes at 90 deg,
+    a coordinate no mode moves.
+    """
+
+    path: str
+    carried_by: tuple[str, ...]
+
+
 @dataclass(frozen=True, eq=False)
 class DisplaciveStatement:
     """A child phase stated as its parent plus mode amplitudes (WP-1419).
 
     ``phase`` is the child with ``Phase.distortion_modes`` set and the
     coordinates of every moved atom written as ``base + Σ A·v``; it refines on
-    the amplitudes (``phases.*.distortion_modes.modes.*.amplitude``).
+    the amplitudes (``phases.*.distortion_modes.modes.*.amplitude``).  Its cell
+    is derived through ``Phase.parent_cell`` (the parent's cell plus held Γ
+    strains) unless the parent is stated by an operator list.
     ``basis`` is the :class:`ModeBasis` the modes come from and ``transform``
     the (P, p) it was built with.  ``site_map[j]`` is the index in
     ``parent.atoms`` of the parent atom child atom j is an image of, and
@@ -913,7 +944,11 @@ class DisplaciveStatement:
     constant)`` for ``Refinement.tie``.  ``seed`` maps each amplitude path to
     the value the statement seeded it with, and is empty when the child was
     already distorted (it starts at its own decomposition and is never
-    re-seeded).  Paths assume the phase is ``phases.0``.
+    re-seeded).  ``held`` lists every row the caller stated free that the
+    statement returns held, each with the paths that now carry it
+    (:class:`HeldVary`), and ``diagnostics`` holds one ``CHILD_VARY_RESET``
+    info row naming them when ``held`` is not empty (Michael's ruling D59,
+    2026-11-24).  Paths assume the phase is ``phases.0``.
     """
 
     phase: object
@@ -922,6 +957,8 @@ class DisplaciveStatement:
     site_map: tuple[int, ...]
     biso_ties: tuple[tuple[str, str, float, float], ...]
     seed: dict[str, float]
+    held: tuple[HeldVary, ...] = ()
+    diagnostics: tuple[Diagnostic, ...] = ()
 
 
 def parent_site_ties(site_map, *, phase_index: int = 0
@@ -1184,8 +1221,188 @@ def _generic_seed(n: int) -> list[np.ndarray]:
     return out
 
 
-def displacive_statement(parent, child, transform, *, seed: float = DISTORTION_SEED,
-                         reference: str = "average",
+def _tied_cell(phase, where: str):
+    """``phase``'s cell with its group's own ties and fixed angles imposed (WP-1419).
+
+    The cell is read the way the parameter table reads it, refusals
+    included, so the statement refuses what the phase's own table refuses
+    (Yue's review of #1533, round 2, item 1).  A fixed angle more than
+    ``SYMMETRY_ANGLE_TOL_DEG`` from its value is refused
+    (``check_cell_angles``, "refused, not normalised"), and so is a tied edge
+    more than ``SYMMETRY_LENGTH_RTOL`` (relative) from its source
+    (``check_cell_ties``, WP-2150); within those tolerances the group's value
+    is imposed, as the table builds a tied edge from its source and never
+    reads its stored value.  ``where`` (``"child.cell"``) names the cell in
+    the message.  A phase stated by an operator list has no symbol to take
+    the constraints from and keeps its cell as written.  Returns an object
+    whose ``a`` … ``gamma`` are floats.
+    """
+    from types import SimpleNamespace
+
+    from ..symmetry import cell_constraints, check_cell_angles, check_cell_ties
+
+    names = ("a", "b", "c", "alpha", "beta", "gamma")
+    values = {n: _value(getattr(phase.cell, n)) for n in names}
+    if phase.symmetry_operations is None:
+        check_cell_angles(_group(phase), values)
+        check_cell_ties(_group(phase), values, prefix=where)
+        cons = cell_constraints(_group(phase))
+        for name, src in cons.ties.items():
+            values[name] = values[src]
+        values.update({n: float(v) for n, v in cons.fixed_angles.items()})
+    return SimpleNamespace(**values)
+
+
+def _from_candidate(parent, candidate, reference: str):
+    """A ``DistortionCandidate``'s child, (P, p), basis and driving component, checked.
+
+    Read by duck type (``.child``, ``.transform``, ``.basis``, ``.driving``,
+    ``.refusal``, ``.candidate``), so this module imports nothing from
+    ``magnetic/`` (#418's layering).  A candidate the probe refused has no
+    child, and one whose isotropy group failed verification is not a child of
+    its direction; both are refused, naming why.  The basis is the
+    candidate's own, built in the ``"average"`` reference, and it must have
+    been built from this parent: the same atoms and the same cell (the
+    parent's metric carried through P is the candidate child's, to
+    ``_RANK_TOL``, relative), so a parent whose cell has moved since
+    ``distortion_candidates`` ran is refused rather than stated on the old one.
+    """
+    name = getattr(candidate, "label", repr(candidate))
+    refusal = getattr(candidate, "refusal", None)
+    if refusal is not None:
+        raise ValueError(f"candidate {name} has no child to state: {refusal.message}")
+    inner = getattr(candidate, "candidate", None)
+    if inner is not None and getattr(inner, "verified", None) is False:
+        raise ValueError(
+            f"candidate {name} failed verification ({inner.verification_reason}): its "
+            "isotropy group is not the stabiliser of its direction, so its child is not "
+            "this candidate's to state")
+    if reference != "average":
+        raise ValueError(
+            f"a candidate's basis is built in the 'average' reference, not {reference!r}; "
+            "pass its child and transform instead to state it in another")
+    big, small = _transform(candidate.transform)
+    ref = _reference(parent, big, small)
+    basis = candidate.basis
+    if (len(ref.site) != len(basis.parent_atoms)
+            or not np.array_equal(ref.site, basis.parent_atoms)
+            or tuple(ref.species) != tuple(basis.species)
+            or not np.array_equal(ref.child_frac, basis.positions)):
+        raise ValueError(
+            f"candidate {name}'s basis was not built from this parent ({parent.name!r}): "
+            "its atoms are not this parent's images in the child cell")
+    carried = big.T @ _cell_metric(_tied_cell(parent, "parent.cell")) @ big
+    stated = _cell_metric(candidate.child.cell)
+    drift = float(np.max(np.abs(carried - stated))) / float(np.max(np.abs(stated)))
+    if drift > _RANK_TOL:
+        raise ValueError(
+            f"candidate {name} was built on another parent cell than {parent.name!r}'s: "
+            f"the parent's metric carried through the candidate's transform differs from "
+            f"the candidate child's by {drift:.3g} (relative), so the child's cell is not "
+            "this parent's; rerun distortion_candidates on this parent")
+    driving = candidate.driving
+    index = next(i for i, c in enumerate(basis.components) if c is driving)
+    return candidate.child, (big, small), basis, ref, index
+
+
+def _parent_cell_of(parent, child, big, small):
+    """The child's cell as its parent's plus Γ strains: (``ParentCell``, child cell, carriers) (WP-1419).
+
+    The parent's cell is the parent-symmetric part of the child's metric
+    carried into the parent's basis (the Reynolds average ⟨Rᵀ·G·R⟩ over the
+    parent point group, ``reference="average"``'s metric), with the parent
+    group's ties and fixed angles imposed; the strains are what is left,
+    G′ = Pᵀ·(G_parent + 2·L·E·L)·P (``crystallography.metric``), read off in the
+    orthonormal strain basis and held.  A child stated at its parent's metric
+    (a candidate's child, a ``magnetic_supercell`` child) has every strain at
+    exactly zero; a strained child keeps its own cell, now as strains.  The
+    child cell returned is the derived one, which the parameter table then
+    reproduces to the bit.  The child's cell is read with its own group's ties
+    and fixed angles imposed, as the parameter table reads it: a tied edge
+    within ``SYMMETRY_LENGTH_RTOL`` of its source states as the exact tie
+    does, and one beyond it is refused, as the child's own table refuses it
+    (``_tied_cell``).  Campbell, Stokes, Tanner & Hatch
+    (2006), *J. Appl. Cryst.* 39, 607, for the Γ strain as the part of a
+    child's metric the parent's group does not fix.  ``None`` for a parent stated by an operator list,
+    which ``ParentCell`` cannot name: that child keeps its own cell.
+    ``carriers`` maps each of the child's six cell names to the globs that
+    move it (``ParentCellBlock.carriers``, the table's own reading): the
+    parent's cell, the strains, or neither, as an angle the child's group
+    fixes at 90 deg is moved by neither.
+    """
+    if parent.symmetry_operations is not None:
+        return None, None, {}
+    from types import SimpleNamespace
+
+    from ...schemas.common import Parameter
+    from ...schemas.structure import Cell, ParentCell
+    from .. import metric
+    from ..lattice import direct_metric_tensor
+    from ..symmetry import cell_constraints, get_spacegroup
+
+    names = ("a", "b", "c", "alpha", "beta", "gamma")
+    parent_sg = get_spacegroup(parent.space_group)
+    cons = cell_constraints(parent_sg)
+    # the child's cell as its table reads it: refused where its table refuses
+    # it, and its own group's ties and fixed angles imposed within tolerance
+    tied = _tied_cell(child, "child.cell")
+    values = dict(zip(names, metric.cell_from_metric(
+        _parent_metric(parent, SimpleNamespace(cell=tied), big, "average")), strict=True))
+    for name, src in cons.ties.items():
+        values[name] = values[src]
+    values.update({n: float(v) for n, v in cons.fixed_angles.items()})
+    exact = [[Fraction(float(v)).limit_denominator(96) for v in row] for row in big]
+    basis = metric.strain_basis(
+        metric.rotations_of(parent_sg),
+        metric.in_parent_basis(exact, metric.rotations_of(_group(child))),
+        cons.fixed_angles)
+    inv = np.linalg.inv(big)
+    g_parent = np.asarray(direct_metric_tensor(*(values[n] for n in names)), dtype=np.float64)
+    lengths = np.sqrt(np.diag(g_parent))
+    strain = (inv.T @ _cell_metric(tied) @ inv - g_parent) / (2.0 * np.outer(lengths, lengths))
+    frame = np.linalg.inv(metric._normalised_frame(cons.fixed_angles))
+    amps = np.array([metric._inner(frame, strain, e) for e in basis])
+    left = strain - (np.tensordot(amps, basis, axes=1) if len(basis) else 0.0)
+    if float(np.abs(left).max()) > _RANK_TOL:
+        raise ValueError(
+            f"the child's cell, carried into the parent's basis, is not the parent's "
+            f"metric plus a strain its group {child.space_group!r} allows (residual "
+            f"{float(np.abs(left).max()):.3g}): the cell does not have the symmetry its "
+            "group states")
+    amps[np.abs(amps) < _RANK_TOL] = 0.0
+    for n in names:
+        bound = getattr(parent.cell, n)
+        if not bound.min <= values[n] <= bound.max:
+            raise ValueError(
+                f"the child's cell gives the parent {n} = {values[n]!r}, outside the "
+                f"parent's bounds [{bound.min}, {bound.max}]: widen them or restate the child")
+    record = ParentCell(
+        space_group=str(parent.space_group), transform=_format_transform(big, small),
+        cell=Cell(**{n: Parameter(value=float(values[n]), min=getattr(parent.cell, n).min,
+                                  max=getattr(parent.cell, n).max) for n in names}),
+        strain=[Parameter(value=float(s)) for s in amps])
+    derived = metric.cell_from_metric(metric.child_metric(
+        [values[n] for n in names], big, amps, basis))
+    cell = child.cell.model_copy(update={
+        n: getattr(child.cell, n).model_copy(update={"value": float(v), "vary": False})
+        for n, v in zip(names, derived, strict=True)})
+    from ...params.parent_cell import ParentCellBlock
+
+    block = ParentCellBlock(
+        "phases.0.parent_cell.cell", "phases.0.cell",
+        [f"phases.0.parent_cell.strain.{j}" for j in range(len(basis))], big, basis)
+    moves = block.carriers(
+        np.array([values[n] for n in names] + [float(a) for a in amps], dtype=np.float64),
+        ties={names.index(n): names.index(src) for n, src in cons.ties.items()},
+        held=[names.index(n) for n in cons.fixed_angles])
+    globs = ("phases.0.parent_cell.cell.*", "phases.0.parent_cell.strain.*")
+    carriers = {n: tuple(g for g, m in zip(globs, row, strict=True) if m)
+                for n, row in zip(names, moves, strict=True)}
+    return record, cell, carriers
+
+
+def displacive_statement(parent, child=None, transform=None, *, candidate=None,
+                         seed: float = DISTORTION_SEED, reference: str = "average",
                          tolerance: float = 1.5) -> DisplaciveStatement:
     """State ``child`` as ``parent`` plus refinable mode amplitudes (WP-1419).
 
@@ -1226,22 +1443,72 @@ def displacive_statement(parent, child, transform, *, seed: float = DISTORTION_S
     re-seeded.  ``seed=0`` states the child at the parent unseeded, which a fit
     then refuses to free (``ParameterTable``).
 
+    **From a candidate** (``candidate=``, a
+    :func:`~rietx.crystallography.magnetic.isotropy.distortion_candidates`
+    entry, read by duck type in place of ``child, transform``): the
+    candidate's child, (P, p) and mode basis are used as they come, the
+    driving irrep's modes come first, and the seed lies in the driving irrep
+    alone, whose isotropy group is the child's by definition, so the
+    secondary modes start at zero and move once it has.  A candidate the probe
+    refused, or one whose isotropy group failed verification, is refused with
+    its reason.
+
+    **The cell is derived** (``Phase.parent_cell``, WP-1419 C2): the parent's
+    cell, refined under the parent's own constraints, plus the Γ strains the
+    child's group allows, held (the TOPAS/ISODISTORT convention #746 settled
+    on).  The parent's cell is the parent-symmetric part of the child's metric
+    and the strains the rest, so a child at its parent's metric (a candidate's)
+    holds every strain at exactly zero and a strained stated child keeps its
+    own cell, now as held strains; ``phases.*.cell.*`` frees the parent's
+    edges, and a strain is freed only by naming it
+    (``phases.*.parent_cell.strain.*``).  At a child sitting exactly at its
+    parent (every amplitude outside the identity irrep zero, every strain
+    zero) a strain has an exactly zero gradient too, since its subspace is the
+    kernel of the parent's average; the seeded amplitudes lift that, and the
+    parameter table refuses a stage that frees the block while all of it is
+    zero.  No strain is seeded here: a held strain moved off zero would bias
+    every fit that keeps it held.  A parent stated by an operator list has no
+    symbol for ``ParentCell``, so its child keeps its own cell under its own
+    group's constraints.  Drop the record (``phase.model_copy(update=
+    {"parent_cell": None})``) to refine the child's six cell parameters
+    instead.
+
+    **Stated free flags on derived rows** (Michael's ruling D59, 2026-11-24).
+    With ``parent_cell`` written the child's six cell rows come back held, and
+    a moved atom's x, y and z always do: those rows are derived, so the table
+    could never free them.  Every one the caller stated free is listed in
+    ``held`` with the paths that now carry it (``phases.*.cell.*`` frees the
+    parent's edges, a strain only by name, the amplitudes move the atoms),
+    and ``diagnostics`` says so once, as an ``info`` ``CHILD_VARY_RESET`` row.
+    Not a warning, since the GSAS and GSAS-II importers state every refined
+    child's cell free; not a refusal.  An operator-list parent's child keeps
+    its own cell flags.
+
     A mixed-occupancy parent site is refused (two parent atoms on one site,
     ``_reference``), as are atoms that do not pair one to one
-    (``CHILD_ATOMS_UNPAIRED``).  The cell is the child's own, under its own
-    group's constraints.
+    (``CHILD_ATOMS_UNPAIRED``).
     """
     from ...schemas.common import Parameter
     from ...schemas.structure import DistortionMode, DistortionModes
 
-    basis, ref = _distortion_basis(parent, child, transform, reference)
+    if candidate is not None:
+        if child is not None or transform is not None:
+            raise ValueError("displacive_statement(): pass child and transform, or "
+                             "candidate=, not both")
+        child, _, basis, ref, driving = _from_candidate(parent, candidate, reference)
+    elif child is None or transform is None:
+        raise ValueError("displacive_statement() needs child and transform, or candidate=")
+    else:
+        basis, ref = _distortion_basis(parent, child, transform, reference)
+        driving = None
     big, small = basis.transform
     labels = [a.label for a in parent.atoms]
     whiten = _whitener(basis)
 
-    # the modes, per parent orbit, primary irreps first
+    # the modes, per parent orbit: a candidate's driving irrep first, then the
+    # primary irreps
     order = sorted(range(len(basis.components)),
-                   key=lambda i: basis.components[i].primary is not True)
+                   key=lambda i: (i != driving, basis.components[i].primary is not True))
     actions = _parent_actions(parent, ref, big, small)
     modes: list[tuple[IrrepModes, int, str, bool, np.ndarray]] = []
     for i in order:
@@ -1286,22 +1553,26 @@ def displacive_statement(parent, child, transform, *, seed: float = DISTORTION_S
                         "an operation of the child's group; the phase's operator list and "
                         "the mode field's stabiliser differ, which is a bug")
 
-    # the seed
+    # the seed: every non-identity mode jointly, or a candidate's driving irrep
     broken = [i for i, (*_, inv_, _v) in enumerate(modes) if not inv_]
+    lead = broken if driving is None else [
+        i for i in broken if modes[i][0] is basis.components[driving]]
     seeded: dict[str, float] = {}
-    if seed > 0.0 and broken and not np.any(amps[broken]):
+    if seed > 0.0 and lead and not np.any(amps[broken]):
         n_h = len(rot_h)
-        for direction in _generic_seed(len(broken)):
+        for direction in _generic_seed(len(lead)):
             trial = amps.copy()
-            trial[broken] = seed * direction
+            trial[lead] = seed * direction
             if _stabiliser_order(np.tensordot(trial, fields, axes=1), actions) == n_h:
                 amps = trial
                 seeded = {f"phases.0.distortion_modes.modes.{i}.amplitude": float(amps[i])
-                          for i in broken}
+                          for i in lead}
                 break
         else:
+            where = "the child's modes" if driving is None else (
+                f"the driving irrep {basis.components[driving].irrep}'s modes")
             raise ValueError(
-                f"no seed direction in the child's modes has exactly the child's group "
+                f"no seed direction in {where} has exactly the child's group "
                 f"{child.space_group!r} as its stabiliser in the parent group: a generic "
                 "distortion of the parent in this cell has more symmetry than the stated "
                 "child, so the child is not an isotropy subgroup of its displacements; "
@@ -1309,6 +1580,8 @@ def displacive_statement(parent, child, transform, *, seed: float = DISTORTION_S
 
     # the record and the coordinates it derives
     placed = np.tensordot(amps, fields, axes=1) if len(modes) else np.zeros_like(disp)
+    amp_paths = [f"phases.0.distortion_modes.modes.{i}.amplitude" for i in range(len(modes))]
+    moved_held: list[HeldVary] = []
     atoms = []
     base_rows = []
     for j, atom in enumerate(child.atoms):
@@ -1323,10 +1596,17 @@ def displacive_statement(parent, child, transform, *, seed: float = DISTORTION_S
             atoms.append(atom)
             continue
         new = origin + placed[n]
+        # a moved atom's coordinates are derived from the amplitudes, so a
+        # stated free flag is reset and said (D59); a coordinate no mode moves
+        # is fixed by the child's group, the basis being complete
+        moved_held.extend(
+            HeldVary(f"phases.0.atoms.{j}.{c}",
+                     tuple(amp_paths[i] for i, (*_, v) in enumerate(modes) if v[n][k] != 0.0))
+            for k, c in enumerate("xyz") if getattr(atom, c).vary)
         atoms.append(atom.model_copy(update={
             c: getattr(atom, c).model_copy(update={"value": float(new[k]), "vary": False})
             for k, c in enumerate("xyz")}))
-    site_map = tuple(int(ref.site[partner[reps[j]]]) for j in range(len(child.atoms)))
+    site_map = tuple(int(basis.parent_atoms[partner[reps[j]]]) for j in range(len(child.atoms)))
     record = DistortionModes(
         parent_space_group=str(parent.space_group),
         transform=_format_transform(big, small),
@@ -1339,10 +1619,67 @@ def displacive_statement(parent, child, transform, *, seed: float = DISTORTION_S
                      for j in range(len(child.atoms))],
             amplitude=Parameter(value=float(a), unit="A"))
             for (comp, index, label, invariant, v), a in zip(modes, amps, strict=True)])
-    phase = child.model_copy(update={"atoms": atoms, "distortion_modes": record})
+    update = {"atoms": atoms, "distortion_modes": record}
+    parent_cell, cell, cell_carriers = _parent_cell_of(parent, child, big, small)
+    held: list[HeldVary] = []
+    if parent_cell is not None:
+        update.update(parent_cell=parent_cell, cell=cell)
+        held = [HeldVary(f"phases.0.cell.{n}", cell_carriers[n])
+                for n in ("a", "b", "c", "alpha", "beta", "gamma")
+                if getattr(child.cell, n).vary]
+    held.extend(moved_held)
+    phase = child.model_copy(update=update)
     return DisplaciveStatement(
         phase=phase, basis=basis, transform=(big, small), site_map=site_map,
-        biso_ties=parent_site_ties(site_map), seed=seeded)
+        biso_ties=parent_site_ties(site_map), seed=seeded, held=tuple(held),
+        diagnostics=_vary_reset_diagnostics(held))
+
+
+def _vary_reset_diagnostics(held) -> tuple:
+    """``CHILD_VARY_RESET``: the stated free rows the statement returned held (D59).
+
+    One ``info`` row naming every reset path, grouped by what now carries
+    it, or nothing when no stated flag was reset.  Info, never a warning:
+    the GSAS and GSAS-II importers state all six cell flags free on every
+    refined child, so a warning would fire on every import, and the reset
+    changes nothing a fit could refine, the rows being derived (the
+    parameter table holds a ``Phase.parent_cell`` child's cell and refuses a
+    free coordinate on a mode-moved atom).  Michael's ruling D59, 2026-11-24.
+    """
+    from ...schemas.common import Diagnostic
+
+    if not held:
+        return ()
+    groups: dict[tuple[str, ...], list[str]] = {}
+    for h in held:
+        groups.setdefault(h.carried_by, []).append(h.path)
+    # one reason per row: a row something carries is derived by the statement
+    # and named with its carriers; a row nothing carries is the child group's
+    parts = [f"{', '.join(paths)} (derived by the statement, carried by "
+             f"{', '.join(carriers)})" if carriers
+             else f"{', '.join(paths)} (fixed by the child's group: no mode moves it)"
+             for carriers, paths in groups.items()]
+    n = len(held)
+    # the suggestion names only what carries a row in this statement
+    carriers = {c for h in held for c in h.carried_by}
+    ways = []
+    if any(c.endswith(".parent_cell.cell.*") for c in carriers):
+        ways.append("phases.*.cell.* reaches the parent's cell edges")
+    if any(c.endswith(".parent_cell.strain.*") for c in carriers):
+        ways.append("a strain is freed only by naming phases.*.parent_cell.strain.*")
+    if any(".distortion_modes.modes." in c for c in carriers):
+        ways.append("phases.*.distortion_modes.modes.*.amplitude moves the atoms")
+    suggestion = (
+        "Free what carries each row instead (DisplaciveStatement.held pairs them): "
+        + "; ".join(ways) + "." if ways else
+        "Nothing carries these rows: the child's group fixes them, so there is nothing to free.")
+    return (Diagnostic(
+        level="info", code="CHILD_VARY_RESET",
+        where=[h.path for h in held], value=float(n),
+        message=(f"displacive_statement(): {n} row{'' if n == 1 else 's'} stated free "
+                 f"{'is' if n == 1 else 'are'} returned held: {'; '.join(parts)}."),
+        suggestion=suggestion,
+    ),)
 
 
 # --------------------------------------------------------------------------

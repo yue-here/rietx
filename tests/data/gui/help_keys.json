@@ -36,6 +36,7 @@
   "diagnostics:CELL_DEGENERATE_PROBE",
   "diagnostics:CELL_RUNAWAY",
   "diagnostics:CHILD_GROUP_UNNAMED",
+  "diagnostics:CHILD_VARY_RESET",
   "diagnostics:CIF_ADP_SYMMETRY_PROJECTED",
   "diagnostics:CIF_ANISO_COLLAPSED",
   "diagnostics:CIF_CELL_ANGLE_CORRECTED",

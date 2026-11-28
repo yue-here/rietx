@@ -47,11 +47,15 @@ SHORT = rx.RefinementPlan(stages=[
 #: ``locked`` in ``held_because`` because its remedy differs — and is
 #: outranked by ``mode_fixed``, which force-fixes that remedy too.
 #:
+#: ``carried_by`` (WP-1419, D59) names what refines a ``Phase.parent_cell``
+#: child's derived cell row, read off the table's blocks rather than the entry,
+#: and outranks ``locked`` in ``held_because`` for the same reason ``body`` does.
+#:
 #: ``help_key`` (WP-1202) is not a held-reason at all: it names the
 #: ``rietx.help`` family that describes the path, which is a fact about the
 #: path's *shape* and so belongs to no single entry.
 DELIBERATE_EXTRAS = {"esd", "mode_fixed", "needs_held_cell", "help_key", "body",
-                     "origin_axis"}
+                     "origin_axis", "carried_by"}
 
 
 @pytest.fixture(scope="module")

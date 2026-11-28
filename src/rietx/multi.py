@@ -1686,6 +1686,7 @@ class MultiHistogramRefinement:
             reach = table.entry_reach()
             owned = table.body_rows()
             origin = table.origin_holds
+            carried = table.parent_cell_rows()
             for e in table.entries:
                 path = mt.row_path(h, e)
                 if path in seen:
@@ -1699,7 +1700,7 @@ class MultiHistogramRefinement:
                 rows.append(_parameter_row(
                     e, tie=tie, esd=esd.get(path), mode=mode,
                     blocked=blocked, reach=reach, owned=owned, origin=origin,
-                    path=path, lo=lo, hi=hi))
+                    carried=carried, path=path, lo=lo, hi=hi))
         return rows
 
     # ------------------------------------------------------------------
