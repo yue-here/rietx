@@ -1,6 +1,6 @@
 # WP-2028 — a joint fit's guards see every histogram
 
-Milestone: unscheduled · Status: 🔄 2026-11-18 — the inherited W-esd finding fixed in the blocked covariance (PR #1668), its WP-1535 question with the maintainer; earlier: tasks 1-3, 5, 6 merged from outside as PR #1128 (`1ba6c216`), 7's census as PR #1205 (`d0d4831d`) and the joint `parameters()` as PR #1270 (`2d6e3e0b`); 4 measured, not wired; 8 measured on #1124, its two wording edits merged as PR #1277 (`e0cb41ea`); the joint identifiability screens are open as PR #1272
+Milestone: unscheduled · Status: 🔄 2026-11-28 — the joint identifiability screens merged from outside as PR #1272 (`e079df9a`); tasks 4 and 8 remain; the inherited W-esd finding fixed in the blocked covariance (PR #1668), its WP-1535 question with the maintainer; earlier: tasks 1-3, 5, 6 merged from outside as PR #1128 (`1ba6c216`), 7's census as PR #1205 (`d0d4831d`) and the joint `parameters()` as PR #1270 (`2d6e3e0b`); 4 measured, not wired; 8 measured on #1124, its two wording edits merged as PR #1277 (`e0cb41ea`)
 Track: What fires, and what stays silent
 Depends on: — (1341 closed: it built the joint report this WP completes; 1325
 soft: its parametric codes and per-pattern holds are what tasks 3 and 6
@@ -258,7 +258,7 @@ that caveat until 1421 lands.
       and fold it or record why it stays, as `DIAGNOSTIC_SCOPES` does. Say
       whether a joint `parameters()` is owed. Include the declared-peak and
       parameter-space screens the joint path skips (Context item 7).
-- [ ] Joint identifiability screens (census, ruled 2026-10-31 on #1205): the
+- [x] Joint identifiability screens (census, ruled 2026-10-31 on #1205): the
       tables `check_guards` builds after the loop (`measured_top_correlations`,
       `soft_modes`) run on the joint matrix, since that is what was solved; the
       declared-peak absorption screen runs per histogram, since a declared peak
@@ -304,6 +304,12 @@ shows the findings that name histogram h.
   WP-2001 and WP-2004 (the tier rule).
 
 ## Handover log
+
+- **2026-11-28** (`/pr-review`, post-merge bookkeeping; PR #1889) — the joint identifiability screens merged from outside as PR #1272 (`e079df9a4`) after four review rounds. A joint fit's result now carries the correlation pairs and soft modes measured on the joint matrix, and each histogram's declared-peak screen. A joint report can therefore print a soft-mode sentence that it never printed before. The contributor's 2026-10-31 entry and its tick of the identifiability-screens task stand as written, so this entry adds the merge record and the approval.
+  *Approved by Yue, 2026-11-05.* On the LaB6 pair of `tests/test_joint_report.py` (`mccusker_default`, unit weights), report 1 is byte-identical to `main`. Report 0 gains one sentence, about its own Caglioti terms: "The combination 0.80·instrument.profile.v −0.48·instrument.profile.u −0.37·instrument.profile.w is unconstrained at the 3.0e-03 level. These parameters trade freely, so their individual esds are not independent." Yue approved that sentence on 2026-11-05, in the shift bundle's "post all, clear calls" answer ("#1272 keeps the one soft-mode sentence"). Round 3 recorded the approval on the PR the same day. Round 2's item, a view quoting another pattern's mode, was fixed before that: `for_histogram(h)` keeps a pair or mode only when it touches pattern h's rows or a shared one.
+  *What ran* (review round 4, macOS arm64, Python 3.12, `[dev]` without jax). On the merged tree, the joint, multi-histogram, report, parametric-series and manual files gave 410 passed. Stacked with #1378 and #1285 on `main` `0f4894d58`: fast 15 975 passed, 467 skipped, 30 xfailed, 0 failed; `-m slow` 964 passed, 25 skipped, 20 xfailed, 1 xpassed, 0 failed. `ruff`, `tests.audit_delta` (no change) and `tests.reader_output` (exit 0; its standard fit is a single fit) were clean. The release note is `docs/releases/unreleased/1272.numbers-that-move.md`.
+  *Not built:* the exchangeability scan on a joint fit, which the 2026-10-31 ruling did not name. Round 1's take-or-leave note stands: the `Identifiability` carrier is built twice, in `multi._joint_identifiability` and in `refine.py`. A field added to the single-fit carrier later would not reach the joint one.
+  Next: the maintainer's WP-1535 question from the 2026-11-18 entry; then task 4 (WP-1523's test on the joint path) and task 8 (a joint observations-per-parameter for `DATA_SUPPORT_LOW`, or the written reason).
 
 - **2026-11-18** — the 1e-12 esd on W in WP-2081's joint ramp was a defect in the joint fit's covariance, and it is fixed. When a combination of parameters is exactly flat, the covariance drops it and reports each parameter's spread along the directions the data did measure. The joint fit's block inverse put that entire dropped direction onto the shared parameter, so W read as measured to twelve decimal places while two starts disagreed on it by 6.5e-6. Now the joint fit gives the same esds as one dense inverse of the whole matrix: on the ramp W reads ± 5.6e-6, the size of the disagreement between starts. A narrower question stays open and goes to the maintainer. WP-1535 chose to keep a short esd beside a warning for such a direction, and a single fit's W is still ± 6.3e-7 while two starts land 9e-5 apart.
 
@@ -355,6 +361,28 @@ shows the findings that name histogram h.
   `STAGE_PATH_NOT_FREE` suggestion points at `held_because` there, as a single
   fit's does. No other joint finding's text moves. `set_vary` and `set_values` on the
   joint are not built.
+
+- **2026-10-31** — the joint identifiability screens, from outside (#1205's
+  second ruling). `_joint_identifiability` fills the joint result's carrier:
+  `top_correlations` from the joint correlation matrix, the one
+  `HIGH_CORRELATION` thresholds, and `soft_modes` from the joint Jacobian,
+  both named by the joint paths, beside each histogram's background screen
+  and, new, its declared-peak screen (`extra_peak_absorption`, on that
+  histogram's rows, keys `hist.<h>.`). `for_histogram(h)` hands a view its
+  own screen rows unscoped and keeps the joint tables' entries that touch its
+  own rows or a shared one (round 2: not another pattern's alone), its own rows
+  unscoped and another histogram's still scoped, so `report(h)` quotes them.
+  `soft_modes` reads a WP-1325 `BlockJacobian` block by block (it raised
+  `TypeError` there before); on random blocks it matches the dense matrix to
+  1e-9. The exchangeability scan is not run: the ruling named the two tables.
+  No threshold, code or field is added: the report's existing
+  `SOFT_MODE_NOTABLE_EIGENVALUE` now sees a joint fit's modes. *Measured* on
+  `tests/test_joint_report.py`'s LaB6 pair (cell, scales, backgrounds, zeros
+  free, a peak declared at 30° in pattern 1): on `main` both reports' tables
+  are empty; here the worst pair is the shared `a` with pattern 1's zero
+  (ρ = 0.879), the softest mode (eigenvalue 0.087) joins `a` with both
+  patterns' zeros, and the peak is screened in pattern 1 alone. The four new
+  tests fail on `main` `e4ddbcda` and pass here.
 
 - **2026-10-31** — review round on #1205 (task 7's census closed). The
   maintainer ruled on the three open questions. (1) *Lindemann bound for a

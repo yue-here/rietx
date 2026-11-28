@@ -1,8 +1,8 @@
 # WP-2058 — the FullProf `.pcr` reader takes three control flags, `Jbt ±10` and `NPATT`
 
-Milestone: unscheduled · Status: 🔄 2026-11-01 — F1 and F2 merged from outside as PR #1199 (`8326bc3d`); F3 (`NPATT`) remains
+Milestone: unscheduled · Status: 🔄 2026-11-28 — F1 and F2 merged from outside as PR #1199 (`8326bc3d`), the `Nre` limits applied as bounds as PR #1285 (`7d923c05`); the three decisions recorded; F3 (`NPATT`) remains
 Track: Coming from another code
-Depends on: — (F3 waits on two maintainer decisions; #193 for TOF patterns, fenced)
+Depends on: — (#193 for TOF patterns, fenced)
 Priority: P3 2026-10-26 — a reader with a workaround (rebuild the model by hand); none of FullProf's 94 example `.pcr` files reads today, and a contributor's dataset needs F2 and F3
 
 ## Goal
@@ -90,6 +90,8 @@ per-histogram scale held at 0, or a phase absent from a histogram in
 through or rescaled so a uniform `W_PAT` is `weights=None`; check first what
 FullProf's normalised weight multiplies. (3) `Nre` limits as `min`/`max`
 bounds, or a report only.
+*Decided, 2026-11-28 entry:* (3) by Yue on 2026-11-05, bounds where FullProf's mapping holds
+(PR #1285); (1) and (2) settled by Claude on 2026-11-16.
 
 ### Inherited
 
@@ -104,7 +106,8 @@ bounds, or a report only.
 
 ## Tasks
 
-- [ ] Decisions (maintainer): `JCONTR = 0`, `W_PAT`, `Nre` (Context).
+- [x] Decisions (maintainer): `JCONTR = 0`, `W_PAT`, `Nre` (Context).
+  2026-11-28: `Nre` by Yue (2026-11-05), `JCONTR = 0` and `W_PAT` settled by Claude (2026-11-16); handover log.
 - [ ] F1: `Nor = 1` (G₂ = 0 → March-Dollase r = G₁; G₂ ≠ 0 refused), `Dum` read and recorded, `Nre` lines read; decide whether `Nba`'s polynomial forms join it.
 - [ ] F2: `Jbt = ±10` through `magnetic_reading`; k ≠ 0 refused naming WP-1918.
 - [ ] F3: `NPATT` CW layout, `JCONTR`, per-pattern profile blocks, `to_multi()`; per-pattern sample terms → `SharingMap.per_histogram` with an info diagnostic.
@@ -132,6 +135,13 @@ outside the new scope still refuses by name.
 - Issue #1066; companions #1063 (mCIF), #1068 (single crystal), #193 (TOF).
 
 ## Handover log
+
+- **2026-11-28** (`/pr-review`, post-merge bookkeeping; PR #1889) — PR #1285 merged from outside as `7d923c05e` after four review rounds. The `.pcr` reader now applies a file's `Nre` hard limits as `min` and `max` where FullProf's own mapping holds: a cell length or angle, `biso`, and March `r`, each only where the first value carrying the limit's number has multiplier +1. Every other limit is reported once with its reason. A limit the file's own value sits on or past is a warning, `FULLPROF_BINDING_LIMIT_NOT_APPLIED` (new, tier 1). The rest stay at info under `FULLPROF_LIMITS_NOT_APPLIED`, now one diagnostic per limit. So the same file now builds a `Structure` with bounds it did not have in 1.12.0, and a refit can land elsewhere; the release note says so.
+  *Ruled by Yue, 2026-11-05.* In the shift bundle's "post all, clear calls" answer, Yue accepted the recommendation that #1285 keeps `FULLPROF_BINDING_LIMIT_NOT_APPLIED` and the `.pcr` bounds. That decides the Context's decision (3): bounds where the mapping holds. It supersedes the 2026-11-01 entry's reading of #1199 as settling (3) as a report only.
+  *Settled by Claude, 2026-11-16* (decisions walk, posted on #1285 on 2026-11-17; Yue may reverse either). (1) `JCONTR = 0` reads as that pattern's scale for the phase, fixed at 0 in a form no plan glob can free, reported with an info code naming the pattern and the phase. Grounds: rietx convention (`params/multi.py` requires every pattern to carry the same phases) and the smallest-thing rule; the residual is identical. Alternative: per-pattern phase membership, as GSAS-II and TOPAS model it. F3 must check that `PHASE_UNCONSTRAINED` and `PHASE_HELD_IN_PATTERNS` report no noise on such a phase. (2) `W_PAT` is mapped by FullProf's own definition (manual pp. 65-67), read before any code; a uniform `W_PAT` normalises to `weights=None` if FullProf's weights are relative. Grounds: this WP's rule that every mapping is the format's own definition. With all three recorded, the decisions task is ticked.
+  *What ran* (review round 4, macOS arm64, Python 3.12, `[dev]` without jax). On the merged tree, the three `.pcr` test files with the silence, help, GUI-help, audit, docs, skill and cell-tie files gave 728 passed. Stacked with #1378 and #1272 on `main` `0f4894d58`: fast 15 975 passed, 467 skipped, 30 xfailed, 0 failed; `-m slow` 964 passed, 25 skipped, 20 xfailed, 1 xpassed, 0 failed. `ruff` and `tests.reader_output` (exit 0; its standard fit reads no `.pcr`) were clean. `tests.audit_delta`: 1 added, 1 changed, 0 at `unaudited`, the two tier-1 rows the generality judge passed in round 1.
+  *Follow-ups, not blocking* (Mike said he will brief each as its own PR): a `cell_limits=` keyword like the TOPAS reader's; the `write_fullprof_pcr` round trip, which drops the bounds the reader now sets; W's reason text.
+  Next: the F1 and F2 boxes still read unticked though #1199 merged both; the next session on this WP checks them against the tree and ticks them. Then F3 (`NPATT`) on decisions (1) and (2) above, and its tests.
 
 - **2026-11-01** (`/pr-review`) — F1 and F2 merged from outside as PR #1199 (`8326bc3d`). The `.pcr` reader now takes `Nor`, `Dum`, `Opt`, `Nre`, the analytic background types and `Jbt` ±10. With the analytic backgrounds in, the census's block on `Nba` that the Context describes no longer applies to F1. A new info code, `FULLPROF_LIMITS_NOT_APPLIED` (tier 1, with its `_audit` row, `help.py` entry and skill row), records that a file's `Nre` hard limits are not carried. A limit names a FullProf parameter number that can drive several values, so the caller sets bounds by hand. That settles the third open decision in the Context (`Nre` as a report only). The other two decisions and F3 are untouched. The PR ticked nothing. Its diff covers the F1 and F2 items, their tests and the audit and `help.py` entries, and the boxes stay for the maintainer. What ran: the PR was replayed in a stack of nine with the other round's merges onto `main` `276fe91d` and run at `635d25e3` (Mac arm64, Python 3.12, `[dev,jax]`). Full suite 14 161 passed, 235 skipped, 50 xfailed, 0 failed. The manual `-W` build was green.
 
