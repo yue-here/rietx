@@ -229,8 +229,9 @@ from .restraints import (
 WINDOW_AREA_TOL = 2e-2
 #: Absolute slack added to every half-width: windows are frozen per stage,
 #: so a peak must stay inside its window while zero-shift, displacement and
-#: the cell move it during the stage — this is movement headroom, not tail
-#: coverage (a cold fit's zero error is instrument-scale, ~0.1°).
+#: the cell move it during the stage.  It was chosen as movement headroom
+#: (a cold fit's zero error is instrument-scale, ~0.1°), and it is tail room
+#: as well, which the next paragraph's answer stage depends on.
 #:
 #: Since WP-2317 (R7) it is the slack of every compile but the stage compile
 #: of a stage that a later stage of its plan refits (``compile_model``'s

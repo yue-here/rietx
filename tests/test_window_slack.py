@@ -198,3 +198,29 @@ def test_only_a_stage_a_later_one_refits_sizes_its_slack(pattern, monkeypatch):
     stage_compiles = [x for x in asked if x is not None]
     assert stage_compiles[0] is True and stage_compiles[-1] is False
     assert stage_compiles.count(False) == 1
+
+
+def test_a_stage_a_later_turn_off_leaves_final_keeps_the_uniform_slack(pattern, monkeypatch):
+    """A later stage existing is not a later stage refitting: here the second
+    stage fixes the cell the first freed, so the first stage's cell is the
+    answer, and its windows keep the uniform slack's tail room."""
+    real = refine_mod.compile_model
+    asked = []
+
+    def recording(*a, **k):
+        asked.append(k.get("movement_slack"))
+        return real(*a, **k)
+
+    monkeypatch.setattr(refine_mod, "compile_model", recording)
+    structure, ins = perturbed_models()
+    ref = rx.Refinement(structure, ins, history=True)
+    res = ref.fit(pattern, plan=rx.RefinementPlan(stages=[
+        rx.Stage("cell", ["phases.*.scale", "phases.*.cell.*"], max_iter=40),
+        rx.Stage("scale", ["phases.*.scale"], turn_off=["phases.*.cell.*"],
+                 max_iter=20)]))
+    _plot(res, "window_slack_turned_off.png")
+    stage_compiles = [x for x in asked if x is not None]
+    assert stage_compiles and not any(stage_compiles)
+    # and the history says so, so a replay compiles the same windows
+    actions = [ref.history.nodes[i].action for i in ref.history.order]
+    assert [a.movement_slack for a in actions if a.kind == "stage"] == [False, False]

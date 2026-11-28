@@ -4852,8 +4852,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "its fraction first solves once more on windows sized at its answer, so "
             "this fires when the second solve's windows are stale too, or in a joint "
             "fit, which does not re-solve. Treat the result as "
-            "unconfirmed, and refit from starting values nearer the data. On the case "
-            "measured, a further stage from the stage's answer ran further away."
+            "unconfirmed, and refit from starting values nearer the data. A stage "
+            "whose first solve was stale and whose second was not records the first "
+            "loss as StageResult.window_refit_loss, and this does not fire."
         ),
     ),
     "STEPHENS_STRAIN_NOT_POSITIVE": HelpEntry(

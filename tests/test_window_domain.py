@@ -548,8 +548,10 @@ def test_reflection_margin_meets_the_bar(family):
 
 
 def test_a_stage_without_window_slack_compiles_the_window_min_deg_windows():
-    """``StageSpec.window_slack_deg = None`` is ``WINDOW_MIN_DEG``, to the
-    bit: the same frozen windows and the same pattern.  Made to fail once by
+    """On a bare compile, which claims no movement slack,
+    ``StageSpec.window_slack_deg = None`` is ``WINDOW_MIN_DEG``, to the bit:
+    the same frozen windows and the same pattern (a staged plan's earlier
+    stages size theirs, ``tests/test_window_slack.py``).  Made to fail once by
     passing ``WINDOW_MIN_DEG + 1e-3`` as the explicit slack."""
     from tests.test_schemas import make_lab6
     st = make_lab6()

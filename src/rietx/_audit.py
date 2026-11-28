@@ -3079,8 +3079,12 @@ ROWS: tuple[Row, ...] = (
                   "off never; on the cpd-1b runaway of "
                   "tests/test_acceptance_sequential.py it reads 73 % and the second solve stays "
                   "at axial_sl 558; on the guides' profile stages that widen their peaks it "
-                  "reads 2.2-4.4 %, and the re-solve lands where a hand-run stage freeing "
-                  "nothing new did (Rwp 0.1022 -> 0.0940, examples/guides/stage.py)"),
+                  "reads 2.2-4.4 %.  What the re-solve moves: a solo width stage reads a "
+                  "synthetic 400 A size as 400.35 and 401.91 A where the stale windows read "
+                  "about 409 (tests/test_joint_report.py); the paired and unpaired dBIC "
+                  "branches of examples/guides/next.py, 148 apart on the stale answer, agree; "
+                  "a hold of the zero and W the stale windows caused is released "
+                  "(tests/test_instrument_hold_noise.py)"),
         grounds=("Ruled 2026-11-27 (WP-2317 R7): windows stay frozen within a solve, and a "
                  "stage that ends past its own fraction re-solves once on fresh windows.  Kind 1: "
                  "an answer computed on windows that miss its peaks is an arithmetic error.  "
@@ -4746,8 +4750,8 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.model.forward.WINDOW_MOVE_FWHM", "constant", tier=3, value=3.0,
         evidence=("movement allowance per position family a stage frees, in the peak's own FWHM, "
                   "shaped by each family's 2theta dependence, plus half a point step, capped at "
-                  "WINDOW_MIN_DEG (WP-2317 R7); applied only to a stage that a later stage of "
-                  "its plan refits; measured 2026-11-27 on SRM 660c, FAP, cpd-1a and 11-BM NAC "
+                  "WINDOW_MIN_DEG (WP-2317 R7); applied only to a stage every path of which a "
+                  "later stage of its plan frees again (strategy.staged.refit_later); measured 2026-11-27 on SRM 660c, FAP, cpd-1a and 11-BM NAC "
                   "(all development data) and four Nb18W16O93 bench cases: largest stage "
                   "movement 1.17 FWHM from the protocols' starts, 2.43 FWHM from a zero 0.1 deg "
                   "off (cpd-1a zero_disp), every reflection inside its own slack; at 3 no stage "
@@ -4766,8 +4770,10 @@ ROWS: tuple[Row, ...] = (
                  "of an esd against the uniform slack's.  Widening peaks and a growing axial "
                  "extent lose the 0.3 deg headroom they had and are covered by the re-solve "
                  "alone.  3 is the smallest whole multiple covering every measured warm and "
-                 "cold-zero movement."),
-        approved="2026-11-27", approved_by="checked"),
+                 "cold-zero movement.  The value is Claude's under R7's ruling; the generality "
+                 "judge called it weak on 2026-11-28 (no series measured sized against "
+                 "uniform), so it waits on the maintainer in R7's pull request."),
+        approved="2026-11-27"),
     Row("rietx.model.forward._BASES_CHUNK_ROWS", "constant", tier="invariant", value=128,
         evidence=("chunking of the derivative bases; bit-identical at 1, 7, 128 and 4096 rows on a "
                   "298-row node bucket, every derivative plane and the forward pattern, tchz_pv and "
@@ -6801,14 +6807,15 @@ ROWS: tuple[Row, ...] = (
                   "declared (bit-identical to pre-WP-1074)")),
     Row("rietx.schemas.plan.StageSpec:window_slack_deg", "default", tier=3, ambiguity=1, value=None,
         evidence=("None is the slack a stage sizes from the position parameters it frees "
-                  "(WINDOW_MOVE_FWHM, WP-2317 R7) where a later stage of its plan refits it, "
-                  "and WINDOW_MIN_DEG on the answer stage, a stage run on its own, a joint fit "
-                  "and a shift equation (tests/test_window_slack.py); a declared value is never "
-                  "re-solved"),
+                  "(WINDOW_MOVE_FWHM, WP-2317 R7) where a later stage of its plan frees every "
+                  "path it frees again (strategy.staged.refit_later), and WINDOW_MIN_DEG on "
+                  "the answer stage, a stage a later turn_off leaves final, a stage run on "
+                  "its own, a joint fit and a shift equation (tests/test_window_slack.py); a "
+                  "declared value keeps the caller's windows and is never re-solved"),
         grounds=("A numerical setting whose domain test covers less than the domain it claims; "
                  "tier 3 under B10 option 2 (ruled 2026-10-19), sized per stage since R7 "
                  "(ruled 2026-11-27)."),
-        approved="2026-10-19"),
+        approved="2026-11-27"),
     Row("rietx.schemas.instrument.Source:kind", "default", tier=1, ambiguity=1, value="xray_cw",
         evidence="arithmetic: a union tag, no value judgement"),
     Row("rietx.schemas.instrument.Source:polarization", "default", tier=3, ambiguity=3, value={"value": 0.5, "vary": False, "min": 0.0, "max": 1.0, "unit": None, "stderr": None},

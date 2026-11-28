@@ -206,6 +206,7 @@ from .strategy.staged import (
     RefinementPlan,
     Stage,
     check_guards,
+    refit_later,
     resolve_plan,
 )
 
@@ -546,6 +547,11 @@ class _StageHold:
     #: first solve ended on, where it passed the window tolerance and the stage
     #: was solved again on fresh windows
     window_refit_loss: float | None = None
+    #: whether the stage compile sized its windows' movement slack from what
+    #: the stage frees (WP-2317 R7), decided after its ``set_vary`` and
+    #: carried out for ``NodeAction.movement_slack``, so replay compiles the
+    #: windows the stage solved
+    movement_slack: bool = False
     #: ``StageResult.rwp`` (WP-1334), the same frozen model at the same answer
     rwp: float | None = None
 
@@ -5189,7 +5195,8 @@ class Refinement:
                    prior_significance: np.ndarray | None = None,
                    phase_support_sigma: float | None = PHASE_SUPPORT_SIGMA,
                    window_area_tol: float | None = None,
-                   refined_before: frozenset[str] = frozenset()):
+                   refined_before: frozenset[str] = frozenset(),
+                   later_stages: tuple[Stage, ...] = ()):
         """One stage (:meth:`_solve_stage`), solved once more on fresh
         windows when its frozen ones dropped more than its window tolerance
         at its answer (WP-2317 R7).
@@ -5198,9 +5205,11 @@ class Refinement:
         parameters it can move (``forward.WINDOW_MOVE_FWHM``), and nothing
         bounds how far a solve moves them, so this refit is the bound: the
         stage is compiled again at its answer and solved from there, once,
-        never a third time.  The stage whose answer is the result (the last
-        of ``n_stages``, and a stage run on its own) keeps the uniform
-        ``forward.WINDOW_MIN_DEG``: its windows' tail room is in the esds and
+        never a third time.  A stage sizes its slack only where every path it
+        frees is free again in one of ``later_stages`` (``staged.refit_later``).
+        A stage with a final answer for any path keeps the uniform
+        ``forward.WINDOW_MIN_DEG``.  That covers the last of ``n_stages``, a
+        stage run on its own, and a stage a later ``turn_off`` leaves final: its windows' tail room is in the esds and
         statistics the result reports, which on a plan with no closing stage
         doubled a series' cell esds at 3 FWHM (WP-2317, the series guide).  ``StageResult.window_refit_loss`` records the
         loss that triggered it, and the record is one stage: the second
@@ -5213,7 +5222,7 @@ class Refinement:
                   cancel=cancel, stage_index=stage_index, n_stages=n_stages,
                   ftol=ftol, phase_support_sigma=phase_support_sigma,
                   window_area_tol=window_area_tol,
-                  movement_slack=stage_index < n_stages)
+                  later_stages=later_stages)
         model, outcome, guard, freed, hold = self._solve_stage(
             stage, data, mode, table, model, two_theta_limits,
             prior_significance=prior_significance,
@@ -5297,7 +5306,7 @@ class Refinement:
                      phase_support_sigma: float | None = PHASE_SUPPORT_SIGMA,
                      window_area_tol: float | None = None,
                      refined_before: frozenset[str] = frozenset(),
-                     movement_slack: bool = False):
+                     later_stages: tuple[Stage, ...] = ()):
         """One solve of a stage: free params, recompile, solve, commit, guard.
 
         The recompile is what keeps the residual smooth *within* the stage —
@@ -5393,6 +5402,11 @@ class Refinement:
         # caller's holds and ties and the mode's force-fix have all settled
         # the free set and before anything is written (WP-1805, answer (c))
         table.refuse_partial_turns()
+        # the free set is settled, so whether a later stage refits every path
+        # of it is too: only then may the windows' slack be sized from the
+        # stage's moves (WP-2317 R7)
+        movement_slack = bool(later_stages) and all(
+            refit_later(p, later_stages) for p in table.free_paths)
         # an FCJ aperture this stage frees on zero starts off it, since its
         # column there is nearly zero; before the plan's own seed, which then
         # finds it off its floor.  Not one an earlier stage of this fit
@@ -5942,7 +5956,7 @@ class Refinement:
             # measures on its own compile as it always has
             significance=support if mode == "rietveld" else None,
             window_loss=loss, rwp=stage_rwp, lebail_run=lebail_run,
-            lebail_settled=lebail_settled)
+            lebail_settled=lebail_settled, movement_slack=movement_slack)
 
     def fit(self, data: PatternData, *, mode: Mode = "rietveld",
             plan: RefinementPlan | PlanSpec | str = "mccusker_default",
@@ -6726,7 +6740,8 @@ class Refinement:
                     prior_significance=answer_significance,
                     phase_support_sigma=phase_support_sigma,
                     window_area_tol=window_tol,
-                    refined_before=frozenset(refined_before))
+                    refined_before=frozenset(refined_before),
+                    later_stages=tuple(stages[k:]))
             refined_before.update(table.free_paths)
             # WP-1343: the moment's rung at this boundary, and the shift the
             # moment took when the widths were released.  Gated on what the
@@ -6835,7 +6850,7 @@ class Refinement:
                     window_area_tol=window_tol,
                     # the windows _run_stage compiled (WP-2317 R7), so a
                     # replay draws the model the stage solved
-                    movement_slack=k < len(stages),
+                    movement_slack=hold.movement_slack,
                     # and the plan's two settings, for the same reason
                     # (WP-2002, B1)
                     phase_support_sigma=phase_support_sigma,
