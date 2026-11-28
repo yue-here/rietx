@@ -1772,7 +1772,11 @@ ROWS: tuple[Row, ...] = (
                   "nothing in result.diagnostics (WP-2060). Projects the FitReport's own "
                   "MomentEvidence.supported verdict through report.magnetic.moment_supported, "
                   "so its cut is MOMENT_SUPPORT_SIGMA's and MOMENT_FLOOR_MU_B's rows, not "
-                  "its own")),
+                  "its own. On a mixed-occupancy position the same cut reads the moment "
+                  "per position |sum occ*m| with its esd through the answer covariance, "
+                  "never each modulus (physics: only that linear sum scatters from one "
+                  "position, the module's F_m split by position; ruled by Mike on #1692, "
+                  "2026-11-18)")),
     Row("NEUTRON_RESONANT_ABSORBER", "code"),
     Row("OCCUPANCY_ABOVE_ONE", "code", tier=1, ambiguity=3,
         evidence=("physics: a full site is occupancy 1 by definition; reports the refined "

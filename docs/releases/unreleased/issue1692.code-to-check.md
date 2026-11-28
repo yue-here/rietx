@@ -1,0 +1,1 @@
+- Code that reads `MomentEvidence.supported` or `MomentRow.supported` on atoms sharing one position now gets the position's verdict, not the atom's own (#1692), and `paired_with` stays empty for them. Read `cosited_with` to tell such a row apart.

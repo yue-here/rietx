@@ -32,6 +32,7 @@ to nothing and every direction flat with it, and the honest report of that is
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -99,11 +100,14 @@ def analyse_moments(model, values, structure=None, *,
 
     ``covariance`` is the live covariance of the fit that produced the
     result, :attr:`~rietx.Refinement._answer_covariance`'s tuple, or
-    ``None``.  A pair whose moduli lie on a direction the solve discarded has
-    no esd on either (WP-2219), and only that covariance can say whether
-    their quadrature sum is determined (WP-2230,
-    :func:`_estimable_pair_esd`).  It is never serialized, so a result read
-    back without its fit folds such a pair into nothing, as before.
+    ``None``; it is never serialized, so a result read back without its fit
+    has none.  Two readings are made through it.  A pair whose moduli lie on
+    a direction the solve discarded has no esd on either (WP-2219), and only
+    that covariance can say whether their quadrature sum is determined
+    (WP-2230, :func:`_estimable_pair_esd`).  The esd of a co-sited group's
+    moment per position (:func:`cosited_moments`, issue #1692) is propagated
+    through it; without it the group is still named on every row and the
+    combination carries no esd, so nothing is tested on it.
     """
     if model is None:
         return []
@@ -123,11 +127,206 @@ def analyse_moments(model, values, structure=None, *,
             out.append(_row(model, values, ip, j, cp, msites, phase_name,
                             cell, held_set, structure, esd or {},
                             flat_axes or {}, set(turned or ())))
+    cosited = cosited_moments(model, values, esd or {}, covariance)
+    if cosited:
+        out = _fold_cosited(out, cosited)
     if correlations:
         out = _pair_degenerate_moments(
             out, correlations, {r.path: float(values[r.path]) for r in out},
-            covariance=covariance)
+            skip={p for c in cosited for p in c.paths}, covariance=covariance)
     return out
+
+
+@dataclass(frozen=True)
+class CositedMoment:
+    """One mixed-occupancy position's measured moment (issue #1692).
+
+    ``paths`` are the group's modulus DOFs (``…moment.dof0``) in atom order,
+    ``magnitude`` |Σ occ_j·m_j| in μ_B and ``esd`` its esd, ``None`` where it
+    could not be propagated (:func:`cosited_moments`).
+    """
+
+    paths: tuple[str, ...]
+    magnitude: float
+    esd: float | None
+
+    @property
+    def supported(self) -> bool | None:
+        """WP-1327 D4's null test on the moment per position:
+        :func:`moment_supported`, the same floor and the same
+        :data:`~rietx.report.schemas.MOMENT_SUPPORT_SIGMA` as a single
+        site's, ``None`` without an esd."""
+        return moment_supported(self.magnitude, self.esd)
+
+
+def cosited_moments(model, values, esd: dict[str, float],
+                    covariance=None) -> list[CositedMoment]:
+    """The moment per position of every mixed-occupancy magnetic site.
+
+    Ruled by Mike on issue #1692 (2026-11-18): where magnetic atoms share one
+    position, the support test reads the combination the powder measures
+    there.  At a position the magnetic structure factor's atom sum reads
+    Σ_j occ_j·f_j(s)·T_j·m_j through one set of axial matrices
+    (:func:`~rietx.crystallography.magnetic.scattering.cosited_groups`), so
+    each modulus alone rides a direction the pattern does not see and its esd
+    is the length of that valley, while the sum is measured.  Taken at
+    Q → 0 (f_j = 1, T_j = 1), the combination is the moment per position,
+    M = Σ occ_j·m_j.  Unequal form factors or Debye-Waller factors leave a
+    weak Q-dependence that could in principle split the group; it is not
+    tested here.  Not the quadrature sum √(Σ m_j²) a powder-degenerate pair
+    of *distinct* sites is read by (:func:`_pair_degenerate_moments`): only
+    the linear sum scatters from one position.
+
+    The group shares one orthonormal frame, so in its coefficients
+    c_j = μ_j·u_j(angles) the modulus is |M| = ‖Σ occ_j·c_j‖, and its esd is
+    the linearised gᵀ·Cov·g over every modulus, angle and occupancy of the
+    group, Cov read off the fit's own answer covariance, ``covariance``
+    (:attr:`~rietx.Refinement._answer_covariance`'s tuple; a held angle or
+    occupancy has a zero row there and adds nothing).  The esd is ``None``
+    without ``covariance``, and where a modulus of the group has no esd of its
+    own (stated and held, or left out of the covariance as unmeasured): a
+    combination over a modulus nothing measured is not tested, never
+    certified.  **One exception, WP-2230's:** a modulus with no esd only
+    because a discarded direction touched it (the exactly degenerate pair at
+    equal form factors puts both moduli there) keeps the position's esd where
+    the data determine the combination, read through the pseudo-inverse's
+    covariance (:func:`_cosited_sigma`).
+
+    Source: the atom sum of the magnetic structure factor, F_m(Q) = Σ_j occ_j·f_j(Q)·T_j·m_j
+    (Halpern & Johnson, 1939, *Phys. Rev.* **55**, 898, the same F_m
+    :mod:`~rietx.crystallography.magnetic.scattering` evaluates); the
+    linearised esd is the standard propagation gᵀ·Cov·g.
+    """
+    from ..crystallography.magnetic.moments import _coefficients
+
+    out: list[CositedMoment] = []
+    if model is None:
+        return out
+    for ip, cp in enumerate(model.phases):
+        msites = getattr(cp, "magnetic", None)
+        for group in getattr(msites, "cosited", ()) if msites is not None else ():
+            n = msites.n_dofs(group[0])
+            if n == 0:
+                continue
+            total = np.zeros(n)
+            parts = []
+            for j in group:
+                site = f"phases.{ip}.atoms.{j}"
+                d = np.array([float(values[f"{site}.moment.dof{k}"])
+                              for k in range(n)])
+                occ = float(values[f"{site}.occ"])
+                c = _coefficients(d)
+                total += occ * c
+                parts.append((site, d, occ, c))
+            magnitude = float(np.linalg.norm(total))
+            dof0 = [f"{site}.moment.dof0" for site, *_ in parts]
+            sigma = None
+            if covariance is not None and magnitude > 0.0:
+                unit = total / magnitude
+                paths: list[str] = []
+                grad: list[float] = []
+                for site, d, occ, c in parts:
+                    jac = _coefficient_jacobian(d)
+                    for k in range(n):
+                        paths.append(f"{site}.moment.dof{k}")
+                        grad.append(occ * float(unit @ jac[:, k]))
+                    paths.append(f"{site}.occ")
+                    grad.append(float(unit @ c))
+                sigma = _cosited_sigma(covariance, esd, dof0, paths,
+                                       np.asarray(grad))
+            out.append(CositedMoment(tuple(dof0), magnitude, sigma))
+    return out
+
+
+def _cosited_sigma(covariance, esd: dict[str, float], dof0: list[str],
+                   paths: list[str], g: np.ndarray) -> float | None:
+    """σ of one position's |Σ occ·m| (gradient ``g`` over ``paths``) through
+    the live covariance, or ``None`` where it is not measured.
+
+    Without a discarded direction this is gᵀ·Cov·g on the answer's own block.
+    A modulus with no esd that is *free* was left out by a discarded direction
+    (WP-2219): the combination is then read through the pseudo-inverse's
+    covariance only if ``unmeasured_functions`` says the data determine it
+    (WP-2230), and rows no discarded direction touched keep the covariance
+    they were always read through.  A modulus with no esd that is not free
+    (stated and held) is a combination over something nothing measured:
+    ``None``.
+    """
+    _result, table, theta, stderr_internal, correlation, *rest = covariance
+    discarded = rest[0] if rest else None
+    if stderr_internal is None or any(q not in table._paths for q in paths):
+        return None
+    free = set(getattr(table, "free_paths", ()) or ())
+    if any(p not in esd and not (discarded is not None and p in free)
+           for p in dof0):
+        return None
+    rows = [table._paths[q] for q in paths]
+    grad = g.reshape(1, -1)
+    extra = {}
+    if table.unmeasured_functions(theta, stderr_internal, rows, grad,
+                                  correlation=correlation)[0]:
+        if discarded is None or table.unmeasured_functions(
+                theta, stderr_internal, rows, grad, correlation=correlation,
+                discarded=discarded)[0]:
+            return None
+        extra = {"discarded": discarded}
+    cov = table.physical_covariance(theta, stderr_internal, correlation, paths,
+                                    **extra)
+    return math.sqrt(max(float(g @ np.asarray(cov) @ g), 0.0))
+
+
+def _coefficient_jacobian(d: np.ndarray) -> np.ndarray:
+    """∂c/∂d, ``(n, n)``, of the frame coefficients
+    (:func:`~rietx.crystallography.magnetic.moments.moment_from_dofs`'s
+    (μ, angles…) chart: c = μ for one DOF, μ(cos φ, sin φ) for two,
+    μ(sin θ cos φ, sin θ sin φ, cos θ) for three)."""
+    mu = float(d[0])
+    if len(d) == 1:
+        return np.array([[1.0]])
+    if len(d) == 2:
+        cp, sp = math.cos(d[1]), math.sin(d[1])
+        return np.array([[cp, -mu * sp], [sp, mu * cp]])
+    st, ct = math.sin(d[1]), math.cos(d[1])
+    cp, sp = math.cos(d[2]), math.sin(d[2])
+    return np.array([[st * cp, mu * ct * cp, -mu * st * sp],
+                     [st * sp, mu * ct * sp, mu * st * cp],
+                     [ct, -mu * st, 0.0]])
+
+
+def _fold_cosited(rows: list[MomentEvidence],
+                  cosited: list[CositedMoment]) -> list[MomentEvidence]:
+    """Mark each co-sited row with its group and the moment per position.
+
+    Each atom's own modulus stays on its row (still what a magCIF writes per
+    atom) and is named as not separately determined, never dropped (issue
+    #1692's ruling).  The note replaces the per-site reading, as a degenerate
+    pair's does, and ``supported`` becomes the position's verdict
+    (:attr:`CositedMoment.supported`, ``None`` where the combination has no
+    esd): the per-site ratio is a reading along a direction the pattern does
+    not see, and it can pass on a position with no moment at all (measured on
+    two co-sited Mn at m = 0: each modulus 4.6 of its own esd, the position's
+    moment 0.69), so no consumer of ``supported`` may read it here.
+    """
+    by_path = {r.path: i for i, r in enumerate(rows) if r.path}
+    updated = list(rows)
+    for c in cosited:
+        members = [p for p in c.paths if p in by_path]
+        names = {p: updated[by_path[p]].atom for p in members}
+        number = (f"{c.magnitude:.3f} +/- {c.esd:.3f}" if c.esd is not None
+                  else f"{c.magnitude:.3f} (no esd: not tested)")
+        for p in members:
+            others = [q for q in members if q != p]
+            note = (f"not separately determined: this atom shares its position "
+                    f"with {', '.join(f'{names[q]} ({q})' for q in others)}, and "
+                    f"the powder measures the moment per position, "
+                    f"|sum occ*m| = {number} μ_B (form factors at Q -> 0), "
+                    f"not each modulus on its own")
+            i = by_path[p]
+            updated[i] = updated[i].model_copy(update={
+                "cosited_with": others, "cosited_magnitude": c.magnitude,
+                "cosited_magnitude_esd": c.esd, "supported": c.supported,
+                "note": note})
+    return updated
 
 
 def _estimable_pair_esd(covariance, path_a: str, path_b: str,
@@ -143,6 +342,18 @@ def _estimable_pair_esd(covariance, path_a: str, path_b: str,
     pseudo-inverse is the esd a fit on the sum alone would give (Searle
     1971, p. 169).  ``None`` when the tuple carries no discarded subspace or
     no correlation, or when the sum is not estimable.
+
+    The test is first-order: it asks whether g, taken *at the answer*, is
+    orthogonal to the discarded direction.  Linearising a nonlinear function
+    is Prince's variance of a derived function (Prince, E., 2004,
+    *Mathematical Techniques in Crystallography and Materials Science*, 3rd
+    ed., Springer, p. 120), exact for a linear one.  We add, not Prince, that
+    it is also exact for a function of the determined combinations.  √(d_a² + d_b²) is neither on a
+    straight valley: two collinear moduli started equal stop at d_a = d_b,
+    where g = (1, 1)/√2 is the determined direction, so the test passes and
+    the number returned is (d_a + d_b)/√2, at a point the data do not single
+    out.  Atoms sharing a position never reach this function
+    (:func:`cosited_moments`).
     """
     _result, table, theta, stderr_internal, correlation, discarded = covariance
     if stderr_internal is None or correlation is None or discarded is None:
@@ -163,6 +374,7 @@ def _estimable_pair_esd(covariance, path_a: str, path_b: str,
 
 def _pair_degenerate_moments(rows: list[MomentEvidence], correlations: list,
                              signed: dict[str, float], *,
+                             skip: set[str] = frozenset(),
                              covariance: tuple | None = None
                              ) -> list[MomentEvidence]:
     """Q5: fold a powder-degenerate pair into one measured number.
@@ -194,11 +406,17 @@ def _pair_degenerate_moments(rows: list[MomentEvidence], correlations: list,
     well (review of #433, finding 4).  Required rather than defaulted, so no
     caller can reach the unsigned form by leaving it out.
 
+    ``skip`` is the co-sited rows (:func:`cosited_moments`): their moduli
+    correlate because they share a position, and the number measured there
+    is the linear sum, so a quadrature-sum pair is never formed with one of
+    them (issue #1692).
+
     A row with no esd (its modulus on a discarded direction, WP-2219) folds
     only through ``covariance`` (:func:`_estimable_pair_esd`), and only when
     the sum is estimable; the two rows keep their absent esds.
     """
-    by_path = {r.path: i for i, r in enumerate(rows) if r.path}
+    by_path = {r.path: i for i, r in enumerate(rows)
+               if r.path and r.path not in skip}
     claimed: set[str] = set()
     updated = list(rows)
     ranked = sorted(
@@ -523,7 +741,7 @@ def moment_supported(modulus: float, sigma: float | None) -> bool | None:
     return not (modulus <= MOMENT_FLOOR_MU_B or modulus <= MOMENT_SUPPORT_SIGMA * sigma)
 
 
-def moment_unsupported_diagnostics(parameters) -> list[Diagnostic]:
+def moment_unsupported_diagnostics(parameters, cosited=()) -> list[Diagnostic]:
     """``MOMENT_UNSUPPORTED`` (warning): the moduli the data do not support (WP-2060).
 
     The same verdict as the FitReport's moment rows (:func:`moment_supported`),
@@ -535,23 +753,44 @@ def moment_unsupported_diagnostics(parameters) -> list[Diagnostic]:
     1e4-1e6 μ_B on the fits that ended on m = 0.  ``where`` is the moduli,
     ``value`` the smallest |m|/esd among them.  Silent where every free
     modulus is supported, and where none has an esd.
+
+    ``cosited`` is :func:`cosited_moments`' list.  A modulus on a
+    mixed-occupancy position is judged by its position's combination, never
+    by itself (issue #1692): its own ratio is the length of a direction the
+    powder does not see.  A group whose combination passes is silent here; one
+    that fails is named as a group, with the combination's numbers.
     """
+    grouped = {p for c in cosited for p in c.paths}
     rows = [r for r in parameters
-            if r.path.endswith(".moment.dof0")
+            if r.path.endswith(".moment.dof0") and r.path not in grouped
             and moment_supported(abs(r.value), r.stderr) is False]
-    if not rows:
+    groups = [c for c in cosited if c.supported is False]
+    if not rows and not groups:
         return []
     parts = []
+    ratios = []
     for r in rows:
         modulus = abs(r.value)
         why = (f"at the floor of {MOMENT_FLOOR_MU_B:g} μ_B" if modulus <= MOMENT_FLOOR_MU_B
                else f"{modulus / r.stderr:.2g}× its esd")
         parts.append(f"{r.path} is {r.value:.3g} ± {r.stderr:.3g} μ_B, {why}")
+        if r.stderr > 0.0:
+            ratios.append(modulus / r.stderr)
+    for c in groups:
+        why = (f"at the floor of {MOMENT_FLOOR_MU_B:g} μ_B"
+               if c.magnitude <= MOMENT_FLOOR_MU_B
+               else f"{c.magnitude / c.esd:.2g}× its esd")
+        parts.append(f"{' and '.join(c.paths)} share one position, whose moment "
+                     f"|Σ occ·m| is {c.magnitude:.3g} ± {c.esd:.3g} μ_B, {why}")
+        if c.esd > 0.0:
+            ratios.append(c.magnitude / c.esd)
+    where = [r.path for r in rows] + [p for c in groups for p in c.paths]
+    one = len(rows) + len(groups) == 1
     return [Diagnostic(
-        level="warning", code="MOMENT_UNSUPPORTED", where=[r.path for r in rows],
-        value=min((abs(r.value) / r.stderr for r in rows if r.stderr > 0.0), default=None),
+        level="warning", code="MOMENT_UNSUPPORTED", where=where,
+        value=min(ratios, default=None),
         message=(f"{'; '.join(parts)}. The data do not support "
-                 f"{'this moment' if len(rows) == 1 else 'these moments'}: under "
+                 f"{'this moment' if one else 'these moments'}: under "
                  f"{MOMENT_SUPPORT_SIGMA:g} esd or at the floor. The magnetic "
                  f"intensity goes as m², so where the moment's sign changes no "
                  f"intensity its column vanishes at m = 0, and near it the esd "

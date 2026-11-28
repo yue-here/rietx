@@ -193,7 +193,9 @@ print(row.magnitude, row.magnitude_esd, row.supported, row.unmeasured_directions
 | `MomentEvidence.unmeasured_directions` | those the powder average did not determine | held, so they carry no esd |
 | `MomentEvidence.paired_with` | the paths of other sites this modulus is powder-degenerate with | empty for an ordinary site; [`MOMENT_PAIR_DEGENERATE`](diagnostics-structures.md#moment_pair_degenerate) names the pair |
 | `MomentEvidence.paired_magnitude`, `MomentEvidence.paired_magnitude_esd` | the quadrature sum √(Σm²) over the pair, with its esd from the fit's covariance | the number the powder measures for a degenerate pair; `None` otherwise |
-| `MomentEvidence.supported` | whether the modulus is above 0.001 μ<sub>B</sub> and above three of its own esds | false means the data do not support a moment here; `None` means the modulus has no esd, so nothing was tested |
+| `MomentEvidence.cosited_with` | the paths of the other atoms on this atom's position, a mixed-occupancy site | empty for an atom alone on its position; such a modulus is not separately determined, and the row is never also `paired_with` |
+| `MomentEvidence.cosited_magnitude`, `MomentEvidence.cosited_magnitude_esd` | the moment per position \|Σ occ·m\| over the group, μ<sub>B</sub>, with its esd from the fit's covariance of every modulus, angle and occupancy in it | form factors taken at Q → 0, so unequal ones leave a weak Q-dependence it does not carry; the esd is `None` without the answer's covariance (a reopened result) |
+| `MomentEvidence.supported` | whether the modulus is above 0.001 μ<sub>B</sub> and above three of its own esds; on a co-sited row, whether the position's moment is | false means the data do not support a moment here; `None` means the modulus (or, co-sited, the moment per position) has no esd, so nothing was tested |
 | `MomentEvidence.note` | a sentence for whichever case applies | empty when there is nothing to add |
 
 The support test is a ratio.
@@ -468,7 +470,7 @@ The nuclear model it starts from is the one in the refinement you hand it, fitte
 | `MagneticTrial.n_moment_parameters`, `MagneticTrial.n_free_parameters` | the moment parameters left free, and the whole free count | `None` on a refused trial |
 | `MagneticTrial.moments` | one `MomentRow` per site with a moment | |
 | `MagneticTrial.held` | the parameters the stage held | a direction here was not measured |
-| `MagneticTrial.supported` | whether any site's moment, or any degenerate pair's quadrature sum, passed the support test | false disqualifies the trial |
+| `MagneticTrial.supported` | whether any site's moment, any degenerate pair's quadrature sum, or any mixed-occupancy position's moment passed the support test | false disqualifies the trial |
 | `MagneticTrial.anti_translation_drift` | how far a supercell refinement left its own group, μ<sub>B</sub> | zero is the pass; `None` for k = 0 |
 | `MagneticTrial.n_starts` | the starts the moment stage ran from | one per magnetic site plus the equal-magnitude one; 1 for a single site |
 | `MagneticTrial.n_minima` | distinct minima those starts found | more than one means one start would have reported another answer |
@@ -477,7 +479,9 @@ The nuclear model it starts from is the one in the refinement you hand it, fitte
 | `MomentRow.magnitude`, `MomentRow.esd` | \|m\| in μ<sub>B</sub> and the modulus's esd | the components carry none |
 | `MomentRow.sigma` | \|m\| over its own esd | `None` without an esd |
 | `MomentRow.crystalaxis` | the three components | |
-| `MomentRow.supported` | the support test for this site | |
+| `MomentRow.supported` | the support test for this site | on a co-sited row, the test on the moment per position |
+| `MomentRow.cosited_with` | the other atoms on this atom's position | |
+| `MomentRow.cosited_magnitude`, `MomentRow.cosited_magnitude_esd` | the moment per position \|Σ occ·m\| and its esd | the number the powder measures there; `None` for an atom alone on its position |
 | `MomentRow.unmeasured_directions` | directions the powder average did not determine | a result about the measurement |
 | `MomentRow.paired_with` | the other site this modulus is powder-degenerate with | |
 | `MomentRow.paired_magnitude`, `MomentRow.paired_magnitude_esd` | the pair's quadrature sum and its esd | the number the powder measures for the pair; `None` without a pair |

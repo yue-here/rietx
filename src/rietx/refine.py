@@ -151,6 +151,7 @@ from .params.vector import (
 )
 from .report.distortion import distortion_totals as _distortion_totals
 from .report.magnetic import (
+    cosited_moments,
     magnetic_width_findings,
     moment_angle_stationary_diagnostics,
     moment_unsupported_diagnostics,
@@ -10342,8 +10343,14 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
         diagnostics = diagnostics + moment_angle_stationary_diagnostics(
             stage_results[-1], params)
     # WP-2060: a modulus the data do not support, the FitReport's verdict on
-    # the result, where its esd would otherwise read as an interval
-    diagnostics = diagnostics + moment_unsupported_diagnostics(params)
+    # the result, where its esd would otherwise read as an interval.  On a
+    # mixed-occupancy position the verdict is the position's moment, its esd
+    # through this answer's own covariance (issue #1692)
+    diagnostics = diagnostics + moment_unsupported_diagnostics(
+        params, cosited_moments(
+            model, values, stderr_phys,
+            None if stderr_internal is None else
+            (None, table, theta, stderr_internal, correlation, discarded)))
 
     # Specimen absorption: report what was applied and, crucially, the Biso
     # bias it removed — for a capillary Rwp is provably unchanged by it, so

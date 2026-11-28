@@ -394,7 +394,10 @@ def build_report(result: RefinementResult, *, model=None, values=None,
         ``Refinement.report()`` passes and nothing serializes.  With it, a
         powder-degenerate moment pair whose moduli lie on a discarded
         direction still folds into its quadrature sum when the data determine
-        that sum (WP-2230); without it such a pair is left unfolded.
+        that sum (WP-2230), and the moment arm propagates the esd of a
+        mixed-occupancy position's moment through it (issue #1692); without
+        it such a pair is left unfolded and the position is named on its rows
+        with no esd.
 
     ``model`` without ``structure`` and ``instrument`` is refused, except for a
     Pawley model, whose intensity block is the solve's and is read as it is.
@@ -490,6 +493,8 @@ def build_report(result: RefinementResult, *, model=None, values=None,
         flat_axes=(result.stages[-1].moment_flat_axes if result.stages
                    else None),
         turned=(result.stages[-1].moment_turned if result.stages else None),
+        # the pair fold (WP-2230) and a mixed-occupancy position's moment
+        # (#1692) both take their esd from the answer's own covariance
         covariance=covariance)
     misfit, shapes = _reading_models(model, structure, instrument)
     nominal_axial = _nominal_axial(shapes, structure, instrument, values)

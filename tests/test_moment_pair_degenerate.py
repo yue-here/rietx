@@ -11,6 +11,15 @@ orthogonal sum, Pythagorean) with no cross term -- the quadrature invariant
 Q5's formula assumes, engineered rather than found, because a real two-site
 isotropy candidate with this exact shape was not located in the time
 available (flagged in the report).
+
+Since issue #1692 two atoms on one position are a *co-sited* group, read by
+the moment per position |Σ occ·m| and never quadrature-paired: the fit test
+below now reads that number, which for these orthogonal moments at full
+occupancy is the same √(m1² + m2²).  The quadrature fold itself, for distinct
+sites, is held by the arithmetic tests after it.  The orthogonal moments make
+the degenerate valley a circle, on which the quadrature fold is right from any
+start, so that test cannot fail on the fold; the collinear pair, whose valley is
+a straight line, is the negative arm.
 """
 
 from __future__ import annotations
@@ -99,17 +108,18 @@ def single_moment_phase(m: float) -> Phase:
 
 
 @pytest.mark.slow
-def test_two_starting_splits_report_the_same_quadrature_number(degenerate_pattern):
+def test_two_starting_splits_report_the_same_moment_per_position(degenerate_pattern):
     """A 50/50-ish split and a lopsided split of the same total: both must
-    converge to (near enough) the true total modulus and, more to Q5's
-    point, both must report the *same* quadrature number within 1 sigma via
-    the pairing mechanism, even though m1 and m2 themselves may differ
-    between the two runs (the flat direction the pairing exists for).
+    converge to (near enough) the true total modulus and both must report
+    the *same* moment per position within 1 sigma, even though m1 and m2
+    themselves may differ between the two runs (the flat direction).  The
+    atoms share one position, so the number is the co-sited group's
+    |Σ occ·m| (issue #1692) and no quadrature pair is formed.
 
     Since WP-2219 neither modulus has an esd (they lie on a discarded
-    direction), and since WP-2230 the sum keeps one through the fit's live
-    covariance, within 10 % of the esd a fit of one site carrying the
-    quadrature modulus gives."""
+    direction), and since WP-2230 the position keeps one through the fit's
+    live covariance, within 10 % of the esd a fit of one site carrying the
+    sum gives."""
     ref_a, result_a = _fit_from(1.75, 1.75, degenerate_pattern)
     ref_b, result_b = _fit_from(2.4, 0.3, degenerate_pattern)
 
@@ -135,21 +145,22 @@ def test_two_starting_splits_report_the_same_quadrature_number(degenerate_patter
                 if p.stderr is not None},
             correlations=result.identifiability.top_correlations,
             covariance=ref._answer_covariance)
-        paired = [r for r in rows if r.paired_with]
-        assert len(paired) == 2, rows
-        return paired[0]
+        assert not any(r.paired_with for r in rows), rows
+        grouped = [r for r in rows if r.cosited_with]
+        assert len(grouped) == 2, rows
+        return grouped[0]
 
     row_a = quadrature_of(ref_a, result_a)
     row_b = quadrature_of(ref_b, result_b)
 
-    assert row_a.paired_magnitude is not None and row_a.paired_magnitude_esd
-    assert row_b.paired_magnitude is not None and row_b.paired_magnitude_esd
-    assert row_a.paired_magnitude == pytest.approx(TRUE_QUADRATURE, abs=0.3)
-    combined_sigma = math.sqrt(row_a.paired_magnitude_esd ** 2
-                               + row_b.paired_magnitude_esd ** 2)
-    assert abs(row_a.paired_magnitude - row_b.paired_magnitude) <= combined_sigma, (
-        row_a.paired_magnitude, row_a.paired_magnitude_esd,
-        row_b.paired_magnitude, row_b.paired_magnitude_esd)
+    assert row_a.cosited_magnitude is not None and row_a.cosited_magnitude_esd
+    assert row_b.cosited_magnitude is not None and row_b.cosited_magnitude_esd
+    assert row_a.cosited_magnitude == pytest.approx(TRUE_QUADRATURE, abs=0.3)
+    combined_sigma = math.sqrt(row_a.cosited_magnitude_esd ** 2
+                               + row_b.cosited_magnitude_esd ** 2)
+    assert abs(row_a.cosited_magnitude - row_b.cosited_magnitude) <= combined_sigma, (
+        row_a.cosited_magnitude, row_a.cosited_magnitude_esd,
+        row_b.cosited_magnitude, row_b.cosited_magnitude_esd)
 
     # each modulus on its own has none, as WP-2219 rules for a column
     for result in (result_a, result_b):
@@ -157,17 +168,73 @@ def test_two_starting_splits_report_the_same_quadrature_number(degenerate_patter
         for path in pair_key:
             assert rows[path].stderr is None, path
     # the report folds the pair through the same live covariance
-    paired = [r for r in ref_a.report().magnetic if r.paired_with]
-    assert len(paired) == 2
-    assert paired[0].paired_magnitude_esd == pytest.approx(row_a.paired_magnitude_esd)
+    grouped = [r for r in ref_a.report().magnetic if r.cosited_with]
+    assert len(grouped) == 2
+    assert grouped[0].cosited_magnitude_esd == pytest.approx(row_a.cosited_magnitude_esd)
 
     one = rx.Refinement(rx.Structure(phases=[single_moment_phase(2.0)]), neutron())
     one.fit(degenerate_pattern, plan=PLAN)
     alone = one.result_.parameter("phases.0.atoms.0.moment.dof0")
-    assert 2 * abs(alone.value) == pytest.approx(row_a.paired_magnitude,
+    assert 2 * abs(alone.value) == pytest.approx(row_a.cosited_magnitude,
                                                  abs=2 * alone.stderr)
     for row in (row_a, row_b):
-        assert row.paired_magnitude_esd == pytest.approx(2 * alone.stderr, rel=0.1)
+        assert row.cosited_magnitude_esd == pytest.approx(2 * alone.stderr, rel=0.1)
+
+
+def collinear_pair_phase(m1: float, m2: float) -> Phase:
+    """The pair above with both moments along x: a straight valley, not a circle."""
+    phase = degenerate_pair_phase(m1, 0.0)
+    phase.atoms[1].moment = Moment.from_values((m2, 0.0, 0.0), "Mn3+")
+    return phase
+
+
+COLLINEAR_M1, COLLINEAR_M2 = 2.5, 1.0
+
+
+@pytest.fixture(scope="module")
+def collinear_pattern():
+    return simulate(collinear_pair_phase(COLLINEAR_M1, COLLINEAR_M2), neutron(), seed=1)
+
+
+def test_a_collinear_cosited_pair_from_equal_starts_is_never_quadrature_paired(
+        collinear_pattern):
+    """The negative arm the orthogonal test above cannot give (found in the
+    review of WP-2230, #1736).  With both moments along x the powder
+    determines m1 + m2, so the degenerate valley is the straight line
+    m1 + m2 = const.  Started at equal moduli (``solve_magnetic``'s seed,
+    ``SOLVE_SEED_MU_B``) the fit stops at m1 = m2, the one point where
+    √(m1² + m2²) has the gradient (1, 1)/√2 the data determine, so the pair
+    fold's first-order estimable test passes and, without the per-position
+    reading (#1692), the pair was reported as a "quadrature sum" of
+    (m1 + m2)/√2: 2.479 ± 0.006 here, while the same data started at 2.6/1.0
+    formed no pair.  Read per position, both starts give |Σ occ·m| with its
+    esd, and the truth, 3.5, lies inside it (3.505 ± 0.009 from both starts,
+    macOS arm64)."""
+    from rietx.strategy.magnetic import SOLVE_SEED_MU_B
+
+    found = []
+    for start in ((SOLVE_SEED_MU_B, SOLVE_SEED_MU_B), (2.6, 1.0)):
+        structure = rx.Structure(phases=[collinear_pair_phase(*start)])
+        ref = rx.Refinement(structure, neutron())
+        ref.fit(collinear_pattern, plan=PLAN)
+        assert ref.result_.status == "converged", (start, ref.result_.status)
+        rows = ref.report().magnetic
+        paired = [(r.atom, r.paired_magnitude, r.paired_magnitude_esd)
+                  for r in rows if r.paired_with]
+        assert not paired, (start, paired)
+        grouped = [r for r in rows if r.cosited_with]
+        assert len(grouped) == 2, (start, rows)
+        row = grouped[0]
+        assert row.cosited_magnitude is not None and row.cosited_magnitude_esd
+        assert abs(row.cosited_magnitude - (COLLINEAR_M1 + COLLINEAR_M2)) <= (
+            row.cosited_magnitude_esd), (start, row.cosited_magnitude,
+                                         row.cosited_magnitude_esd)
+        found.append(row)
+
+    equal, lopsided = found
+    combined_sigma = math.hypot(equal.cosited_magnitude_esd,
+                                lopsided.cosited_magnitude_esd)
+    assert abs(equal.cosited_magnitude - lopsided.cosited_magnitude) <= combined_sigma
 
 
 def test_pair_degenerate_moments_quadrature_and_esd_are_correct():
