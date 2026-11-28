@@ -1,6 +1,6 @@
 # WP-1536 — the structure figure as an SVG
 
-Milestone: rietview · Status: 🔄 2026-11-16 — SVG writer in PR #1606; parity, PDF check and ASE read open (#1614)
+Milestone: rietview · Status: 🔄 2026-11-28 — SVG writer merged (#1606); parity, crossing pixels and PDF check open (#1614)
 Depends on: —
 Priority: P3 2026-10-02 — a workaround covers it: a 3000 px PNG, or a CIF exported to VESTA's own vector output
 
@@ -204,6 +204,30 @@ measurement set. Inkscape opens the file with one element per atom.
 - `docs/wp/1470-spike/mpl_baseline.py`, for the crossing fault.
 
 ## Handover log
+
+### 2026-11-28 — repair, close-only bookkeeping (ghostshift runner), PR #PRNUM
+
+PR #1606 merged on 2026-11-24, and two of its commits from 2026-11-17 had no entry, so the
+session-start scan flagged this WP. This repair adds the reconstructed 2026-11-17 entry below.
+It also corrects the Status line, which still called the PR open and the ASE reading open. The
+WP stays open. The crossing pixels, parity, the PDF check, the manual's PDF command, the
+rasterised figure pairs and the skill's measured tag are not done, and issue #1614 is open.
+
+- **Checked on `origin/main` at `300853e90`.** PR #1606 merged at 2026-11-24 13:17 UTC. PR
+  #1666 (WP-1537's writers) is still open, so the two inherited external checks still wait on
+  it.
+- **Next.** Unchanged from the 2026-11-16 entry, less task 1. First the parity row on a
+  machine with playwright's chromium, which also measures #1614's items 1 to 4. Then the
+  rasterised crossing test, then `rsvg-convert -f pdf` and Inkscape once.
+
+### 2026-11-17 — review round 1 answered (reconstructed post hoc)
+
+Two commits answered the first review of PR #1606, posted on 2026-11-17. Commit `e9a6a4b2e`
+ticks task 1, reading ASE's writer, as superseded. Its reason is that D2 is built and tested
+by its own crossing case, as settled in the decisions walk. Commit `b34ec862e` changed two
+files. `figure3d/vector.py` takes the SVG title's package name from `DIST_NAME`, and
+`reference/figures.md` no longer calls the figure PNG-only. The 2026-11-24 review of round 2
+records that Yue accepted the WP-file edits on 2026-11-17. The diffs do not say more.
 
 ### 2026-11-16 — first slice (ghostshift runner), PR #1606
 
