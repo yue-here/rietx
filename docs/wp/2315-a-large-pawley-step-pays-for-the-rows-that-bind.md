@@ -195,6 +195,10 @@ free swap under LM.
    chosen P. H_II is banded plus low rank (WP-1902).
 4. **Preconditioner:** a stale superset ILU and reuse across λ retries,
    measured in CG products against build cost.
+   *Done 2026-11-28 for the superset half: products 5 887 → 11 481, builds
+   1 290 → 67, the 120° fit 14.25-14.73 s → 7.87-8.28 s. Reuse across λ
+   retries was built, measured and dropped: 3 of 300 projected-CG solves on
+   five cases were retries. The handover log has the numbers.*
 5. **The fallback as the step** (kind (b)). Past 128 columns, shorten the box
    step to the first row it reaches (today's `_NoConstrainedStep` fallback).
    WP-1953's caveat applies: from a point on a face this gives τ = 0, so λ must
@@ -256,8 +260,12 @@ free swap under LM.
       and the bench case. The audit row for the slack. *Held 2026-11-28:
       neither bench case crosses a row, so nothing on the tree but probe 1
       exercises the step. Start this item on a case that crosses.*
-- [ ] Angle 4, measured. *The leading cost on `bigcell-pawley-120` since
-      2026-11-28: `spilu` is about half the fit.*
+- [x] Angle 4, measured. *The leading cost on `bigcell-pawley-120` since
+      2026-11-28: `spilu` is about half the fit.* *Done 2026-11-28:
+      `bccg.projected_cg` keeps a sparse free block's incomplete LU while
+      variables only leave the free set. The 120° fit went from
+      14.25-14.73 s to 7.87-8.28 s, 1.8×, and every parameter moved under
+      3e-7 esd.*
 - [ ] Angle 3 only if 0-2 and 4 leave the constrained step above ~10 % of the fit.
 - [ ] Put angles 5-7 to the maintainer only if 0-4 miss the target, with the
       measured remainder and each one's Rule 1 kind.
