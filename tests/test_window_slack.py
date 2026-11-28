@@ -17,6 +17,7 @@ import pytest
 import rietx as rx
 import rietx.model.forward as fwd
 from rietx.params.vector import ParameterTable
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
 from tests.test_refine_synthetic import perturbed_models, synthesize
 
 refine_mod = importlib.import_module("rietx.refine")
@@ -224,3 +225,30 @@ def test_a_stage_a_later_turn_off_leaves_final_keeps_the_uniform_slack(pattern, 
     # and the history says so, so a replay compiles the same windows
     actions = [ref.history.nodes[i].action for i in ref.history.order]
     assert [a.movement_slack for a in actions if a.kind == "stage"] == [False, False]
+
+
+@pytest.mark.parametrize("fix_cell, expected", [
+    (False, [True, True, False]),
+    # the closing stage fixes what a declared turn_off left fixed at the end,
+    # so the cell stage's answer for the cell is final there too
+    (True, [False, True, False]),
+])
+def test_the_closing_stage_refits_what_the_plan_leaves_free(pattern, monkeypatch,
+                                                          fix_cell, expected):
+    real = refine_mod.compile_model
+    asked = []
+
+    def recording(*a, **k):
+        asked.append(k.get("movement_slack"))
+        return real(*a, **k)
+
+    monkeypatch.setattr(refine_mod, "compile_model", recording)
+    structure, ins = perturbed_models()
+    ref = rx.Refinement(structure, ins, history=False)
+    res = ref.fit(pattern, plan=rx.RefinementPlan(stages=[
+        rx.Stage("cell", ["phases.*.scale", "phases.*.cell.*"], max_iter=40),
+        rx.Stage("scale", ["phases.*.scale"], max_iter=20,
+                 turn_off=["phases.*.cell.*"] if fix_cell else [])],
+        closing_window_tol=CLOSING_WINDOW_TOL))
+    assert len(res.stages) == 3
+    assert [x for x in asked if x is not None] == expected
