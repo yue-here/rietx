@@ -224,3 +224,11 @@ after the inlier retry searches again on the lines at or above
 search's ranking when it finds agreement (``INDEX_WEAK_LINE_RETRY``).  A run
 that found agreement, a declared ``n_unindexed`` and a position-only list
 rank exactly as before.
+
+1.12 → 1.13 (WP-1910, ruled on #1178, the first change to what this string
+stamps since 1.12.0): with ``refine_cell=True`` a screen that names a class
+is checked by a second screen at the prefit's cell, held, from the declared
+instrument (an all-zero background seeded first when the declared background is the preset's all-zero start, as the prefit seeds it), and
+``best_or_none()`` abstains when the two name different classes
+(``EXTINCTION_SCREENS_DISAGREE``).  No threshold moves: a screen's answer
+does, so the same stamp must not cover both.

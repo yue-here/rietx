@@ -816,6 +816,11 @@ not move either.  The grammar parses any name, and the names a peak equation
 binds belong to the schema (``schemas.peak_equation.REFLECTION_NAMES``).
 WP-2107 moved the grammar for its two functions and the schema for its names.
 
+Also in 0.62 (WP-1910, ruled on #1178): ``ExtinctionScreen.held_screen``, the
+second screen at the prefit's cell, held, itself an ``ExtinctionScreen``.
+Additive and defaulted to ``None``, the 0.25 → 0.26 rule; an older build
+refuses a screen carrying the key.  It moves no stored value.
+
 Also in 0.62 (WP-2315): ``ReflectionState.merged_groups``, a list of
 ``MergedGroup`` (``hkl``, ``intensity``, ``stderr``): the reflections a Pawley
 fit refined as one intensity because their d agree in every cell of the space
