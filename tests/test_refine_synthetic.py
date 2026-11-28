@@ -22,8 +22,9 @@ TRUE_SCALE = 5e-4
 TRUE_BKG = [40.0, -6.0, 1.5]
 
 
-def synthesize(noise_seed: int | None = 7, extra_phases=()) -> PatternData:
-    """The LaB₆ truth, plus ``extra_phases`` drawn at the values they carry."""
+def truth(extra_phases=()):
+    """The LaB₆ truth's structure and instrument, plus ``extra_phases`` at the
+    values they carry."""
     structure = make_lab6()
     structure.phases[0].cell.a.value = TRUE_A
     structure.phases[0].cell.b.value = TRUE_A
@@ -35,7 +36,12 @@ def synthesize(noise_seed: int | None = 7, extra_phases=()) -> PatternData:
     ins.profile.w.value = TRUE_W
     ins.background = BackgroundChebyshev(
         coefficients=[Parameter(value=v) for v in TRUE_BKG])
+    return structure, ins
 
+
+def synthesize(noise_seed: int | None = 7, extra_phases=()) -> PatternData:
+    """The LaB₆ truth, plus ``extra_phases`` drawn at the values they carry."""
+    structure, ins = truth(extra_phases)
     tt = np.arange(3.0, 24.0, 0.005)
     pattern = PatternData(two_theta=tt.tolist(), intensity=np.zeros_like(tt).tolist())
     model = compile_model(structure, ins, pattern, mode="rietveld")

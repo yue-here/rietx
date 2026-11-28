@@ -445,6 +445,29 @@ def test_the_pattern_loop_weights_the_unfitted_points_zero(fitted_lab6, tmp_path
     np.testing.assert_allclose(d, lam / (2 * np.sin(np.radians(tt) / 2)), rtol=1e-7)
 
 
+def test_without_the_pattern_the_range_comes_from_the_result(fitted_lab6):
+    """WP-2075: handed no pattern, the loop holds the fitted points alone, and
+    the measured range, its count and the unfitted stretch are the result's
+    own ``fit_range``, which a result written before it lacks."""
+    from rietx.io.cif.powder import pattern_items
+
+    _ref, result, data = fitted_lab6
+    lam = 0.4139
+    items, _tags, rows = pattern_items(result, lam)
+    pairs = dict(items)
+    n_out = len(data.two_theta) - len(result.two_theta)
+    assert len(rows) == len(result.two_theta)
+    assert pairs["_pd_meas_number_of_points"] == str(len(data.two_theta))
+    assert float(pairs["_pd_meas_2theta_range_min"]) == pytest.approx(data.two_theta[0])
+    assert float(pairs["_pd_meas_2theta_range_max"]) == pytest.approx(data.two_theta[-1])
+    assert "_pd_meas_2theta_range_inc" not in pairs
+    assert f"({n_out} points)" in " ".join(pairs["_pd_proc_info_excluded_regions"].split())
+
+    older = dict(pattern_items(result.model_copy(update={"fit_range": None}), lam)[0])
+    assert older["_pd_meas_number_of_points"] == str(len(result.two_theta))
+    assert "_pd_proc_info_excluded_regions" not in older
+
+
 def test_a_stated_sigma_rides_in_parentheses_and_reads_back(fitted_lab6, tmp_path):
     """A pattern whose file stated σ writes ``_pd_meas_intensity_total`` as
     ``value(su)``, and ``read_pdcif`` takes σ from there."""
