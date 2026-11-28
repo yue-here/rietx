@@ -52,6 +52,7 @@
   import HelpBox from "./HelpBox.svelte";
   import Indexing from "./Indexing.svelte";
   import Series from "./Series.svelte";
+  import SeriesMap from "./SeriesMap.svelte";
   import SeriesTrends from "./SeriesTrends.svelte";
   import type { Against, TrendsView } from "./seriestrends";
   import { arrowStep, type SeriesView } from "./seriespattern";
@@ -215,6 +216,11 @@
   let seriesTrends = $state.raw<TrendsView | null>(null);
   let trendsAgainst = $state<Against>("x");
   let trendsHidden = $state<string[]>([]);
+  /** the row the Map marks, handed up by the Series panel, which holds the
+   *  one selection; a count the staged list moves, so the Map asks again
+   *  (WP-2243 task 7) */
+  let seriesMark = $state<number | null>(null);
+  let seriesStamp = $state(0);
   let frameAt = $state.raw<{ two_theta: number; seq: number } | null>(null);
 
   /** The model panel's width and the bottom panel's height, session-local
@@ -249,7 +255,8 @@
   const wfSteps = $derived(workflow(wf).steps ?? null);
   /** The graph tabs the workflow shows (the prototype's: peaks and indexing
    *  draws the pattern and the peak fits). */
-  const graphTabs = $derived(GRAPH_TABS.filter((t) => workflow(wf).graphs ? workflow(wf).graphs!.includes(t.id) : !("workflowOnly" in t)));
+  const graphTabs = $derived(GRAPH_TABS.filter((t) => workflow(wf).graphs
+    ? workflow(wf).graphs!.includes(t.id) : !("workflowOnly" in t)));
   const head = $derived(run?.head ?? project?.head ?? null);
   const noPhases = $derived(project ? (project.n_phases ?? 1) === 0 : false);
   const blocked = $derived(noPhases ? "Add a phase before refining" : null);
@@ -843,8 +850,9 @@
     if (!sized) modelWidth = opening(wf);
     chooseStep(0);
     // the tabs `graphTabs` shows for this workflow, so a tab only another
-    // workflow lists never stays chosen behind the strip
-    const shown = graphTabs.map((t) => t.id); if (!shown.includes(graphTab)) graphTab = shown[0];
+    // workflow lists (the series' Trends and Map) never stays chosen behind the strip
+    const shown = graphTabs.map((t) => t.id);
+    if (!shown.includes(graphTab)) graphTab = shown[0];
   }
 
   /** A step opens on its graph: the peak fits for Fit peaks, the pattern for
@@ -1133,6 +1141,10 @@
               onplot={(paths, on) => seriesPanel?.plot(paths, on)}
               onselect={(i) => seriesPanel?.select(i)} onstep={(d) => seriesPanel?.move(d)}
               onreadout={(r) => (reading = r)} />
+          {:else if graphTab === "map" && wf === "series"}
+            <SeriesMap {theme} {busy} stamp={seriesStamp} selected={seriesMark}
+              onselect={(i) => seriesPanel?.select(i, "staged")}
+              onreadout={(r) => (reading = r)} />
           {:else}
             <p class="unbuilt">Not built yet.</p>
           {/if}
@@ -1214,7 +1226,8 @@
                 steps={workflow("series").steps ?? []} {busy} {run} {say}
                 onstep={chooseStep} onrun={startRun} onstop={stop}
                 onview={(v) => (seriesView = v)} ontrends={(t) => (seriesTrends = t)}
-                ongraph={(g) => { if (graphTabs.some((t) => t.id === g)) graphTab = g; }} />
+                ongraph={(g) => { if (graphTabs.some((t) => t.id === g)) graphTab = g; }}
+                onstaged={() => (seriesStamp += 1)} onmark={(m) => (seriesMark = m)} />
             </div>
           {/key}
         {/if}

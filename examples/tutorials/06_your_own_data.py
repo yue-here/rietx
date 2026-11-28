@@ -93,7 +93,7 @@ ref
 
 # %%
 # ✏️ any 10° with strong peaks
-data.plot(model=ref, two_theta_range=(25, 35))
+data.plot(model=ref, two_theta_limits=(25, 35))
 
 # %% [markdown]
 # Every observed peak in the window should have a tick under it.

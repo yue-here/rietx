@@ -31,7 +31,8 @@
    * calls 2 and 9; `seriespattern.ts`). A row click, ‹ › in the graph's title
    * and ↑ ↓ move it; during a run it follows the pattern being fitted until a
    * row click, and "Follow the run" resumes. The panel hands the frame what
-   * the graph draws (`onview`), mid-run too.
+   * the graph draws (`onview`), mid-run too, and the Map the row it marks
+   * (`onmark`); a Map click comes back through `select`.
    */
   import { onMount, untrack } from "svelte";
 
@@ -68,6 +69,8 @@
     onview = () => {},
     ontrends = () => {},
     ongraph = () => {},
+    onstaged = () => {},
+    onmark = () => {},
   }: {
     step?: number;
     steps: readonly Step[];
@@ -86,6 +89,11 @@
     ontrends?: (view: TrendsView | null) => void;
     /** show a graph tab: a summary row's Plot shows Trends */
     ongraph?: (tab: "trends") => void;
+    /** the server took a new list or walk, so the Map asks again */
+    onstaged?: () => void;
+    /** the row the Map marks: the drawn pattern's place in the staged list,
+     *  or null while the drawn one is the run's on a list since edited */
+    onmark?: (staged: number | null) => void;
   } = $props();
 
   let setup = $state.raw<SeriesSetup | null>(null);
@@ -287,6 +295,7 @@
       // before it
       if (mine === sent) absorb(next);
       else setup = next;
+      onstaged();
       if (ran) changed = true;
       return true;
     } catch (error) {
@@ -483,6 +492,10 @@
     untrack(() => onview(v));
   });
   $effect(() => () => onview(null));
+  $effect(() => {
+    const m = markStaged;
+    untrack(() => onmark(m));
+  });
 
   // -- Trends (task 6): the plotted values and the selection it marks -------
 
@@ -493,9 +506,10 @@
       : plotted.filter((p) => !paths.includes(p));
   }
 
-  /** Select a pattern of the run's list: a point click on Trends. */
-  export function select(index: number) {
-    choose("run", index);
+  /** Select a pattern: a point click on Trends picks from the run's list,
+   *  a row click on the Map from the staged one. */
+  export function select(index: number, of: ListName = "run") {
+    choose(of, index);
   }
 
   /** A summary row's Plot: the value on Trends, the pattern it names

@@ -1,6 +1,6 @@
 # WP-2140 — Every atom is named by its unique label
 
-Milestone: unscheduled · Status: 🔄 2026-11-16 — assessment landed (#1625); label paths or renumbering waits on Yue's ruling, uniqueness and restraints-on-labels can start
+Milestone: unscheduled · Status: 🔄 2026-11-28 — assessment landed (#1625); label paths or renumbering waits on Yue's ruling, uniqueness and restraints-on-labels can start
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P2 2026-11-09 — the remedy for a class of silent wrong answers (a reference that lands on another atom after a reorder), ruled by the maintainer; a stored-format change, so it starts with an assessment
@@ -274,6 +274,26 @@ npm --prefix gui test
 - `docs/DESIGN.md` § Rules, rules 1 and 4.
 
 ## Handover log
+
+- **2026-11-28** — **Repair, close-only bookkeeping** (ghostshift runner; PR #1886). PR #1625
+  merged on 2026-11-23, and a decision record landed on the same day. Neither had an entry, so
+  the session-start scan flagged this WP. This repair adds the reconstructed 2026-11-23 entry
+  below and moves the Status date. The WP stays open. Tasks 2 to 12 are unticked, and the
+  choice between label paths (A) and renumbering (B) is still Yue's.
+  *Checked on `origin/main` at `300853e90`:* no later ruling on (A) or (B) in the WP file. The
+  2026-11-23 ghostshift log keeps the question in the batch for Yue.
+  *Next:* unchanged from the 2026-11-16 entry. Yue's answer to the brief in § Findings decides
+  tasks 4 to 7. Tasks 2 and 3 and the seven restraint kinds on labels can start under either.
+
+- **2026-11-23** — (reconstructed post hoc) Two commits reached main without an entry.
+  PR #1625, task 1's assessment, merged at 19:54 UTC. Its two WP commits carry this date as
+  their commit date and are covered by the 2026-11-16 entry. Commit `993fa489f`, merged at
+  20:55 UTC by PR #1811, added a dated paragraph to the end of § Findings. It records one
+  sub-question of the brief as settled. If (A) is chosen, `events.jsonl` keeps the old
+  spelling, because `schemas/migrate.py` leaves its reader outside `READ_POINTS` on purpose.
+  The paragraph names its grounds as DESIGN.md Rule 5 and says it was checked blind. The
+  choice between (A) and (B), and the spelling of a result's JSON, stay with Yue. The commit
+  touched only this file. The diff does not say who ran the blind check.
 
 - **2026-11-16** — task 1, the assessment, by a ghostshift runner; PR #1625. No format or
   behaviour changed. The defect is real on today's main. An edit given the working structure

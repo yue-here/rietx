@@ -11,11 +11,11 @@ import math
 from collections.abc import Mapping
 from functools import lru_cache
 from types import MappingProxyType
-from typing import Annotated, ClassVar, Literal
+from typing import Annotated, ClassVar, Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, ValidationInfo, model_validator
 
-from .._nearmiss import did_you_mean
+from .._nearmiss import check_choice, did_you_mean
 
 #: Data-contract version of the pydantic schemas (``Capabilities.schema_version``).
 #: Any change a consumer could observe bumps the last component by one, and
@@ -36,6 +36,16 @@ SCHEMA_VERSION = "0.62"
 #: Defined here rather than in ``model.forward`` so the schemas can name it
 #: without importing the forward model (which imports the schemas).
 Mode = Literal["rietveld", "lebail", "pawley"]
+
+
+def check_mode(mode: object) -> None:
+    """Refuse a ``mode`` outside :data:`Mode`, before any work (WP-2302).
+
+    ``Mode`` is a ``Literal``, which nothing checks at a call: a misspelt mode
+    used to raise a pydantic error about an internal schema after most of a
+    fit.  Every public call taking ``mode`` calls this on entry.
+    """
+    check_choice("mode", mode, get_args(Mode))
 
 
 @lru_cache(maxsize=None)

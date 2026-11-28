@@ -1102,7 +1102,7 @@ def test_tied_angles_follow_a_restored_alpha():
 @pytest.mark.parametrize("nudge", [
     pytest.param(0, id="start"),
     # its own group, so the two rows run on two workers (WP-2048)
-    pytest.param(-1, id="nudged", marks=pytest.mark.xdist_group("cell-runaway-nudged")),
+    pytest.param(3, id="nudged", marks=pytest.mark.xdist_group("cell-runaway-nudged")),
 ])
 def test_a_wrong_triclinic_le_bail_fit_raises_no_degenerate_cell_error(tmp_path, nudge):
     """The public path: a P 1 Le Bail fit of a valid but wrong ~7 Å^3 cell on
@@ -1119,12 +1119,15 @@ def test_a_wrong_triclinic_le_bail_fit_raises_no_degenerate_cell_error(tmp_path,
     What this row alone shows is a fit walking into the guard unaided, and
     that is kept in the nightly's full suite.
 
-    ``nudged`` multiplies cell ``a`` by 1 - 1e-14 (WP-1930's nudge).  On
-    macOS arm64 that start's second plan met a Jacobian that was not finite
-    and raised ``ValueError`` out of ``fit``, as the Linux nightly did on the
-    unnudged start once (WP-2048).  It now ends the stage with
-    ``STAGE_NOT_FINITE``, asserted where the trajectory was measured, since
-    elsewhere rounding picks another one."""
+    ``nudged`` multiplies cell ``a`` by 1 + 3e-14 (WP-1930's nudge, three
+    steps).  On macOS arm64 a nudged start's second plan met a Jacobian that
+    was not finite and raised ``ValueError`` out of ``fit``, as the Linux
+    nightly did on the unnudged start once (WP-2048).  It now ends the stage
+    with ``STAGE_NOT_FINITE``, asserted where the trajectory was measured,
+    since elsewhere rounding picks another one.  The nudge was 1 - 1e-14 until
+    WP-2317 R7 sized the intermediate stages' windows, which moved the
+    trajectory: of the starts -4 to +3 (× 1e-14) only +3 and -4 still reach
+    the non-finite model there."""
     import rietx as rx
     from rietx.schemas.structure import lebail_scaffold
     from tests._synthetic_silicon import silicon_pattern
