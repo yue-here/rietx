@@ -305,10 +305,11 @@ def test_an_overlap_split_with_no_esd_says_so_rather_than_inf_percent():
     overlap report states it has no esd, never "reaches inf%"."""
     from types import SimpleNamespace
 
+    from rietx.model.forward import PawleyBlock
     from rietx.refine import _pawley_unresolved_diagnostics
 
-    pb = SimpleNamespace(stderr=np.array([1.0, np.inf, 2.0]), groups=[(0, 1)],
-                         phase_slices=[(0, 3)])
+    pb = PawleyBlock(n=3, phase_slices=[(0, 3)], groups=[[0, 1]],
+                     stderr=np.array([1.0, np.inf, 2.0]))
     hklm = np.array([[1, 0, 0, 0], [1, 1, 0, 0], [1, 1, 1, 0]])
     model = SimpleNamespace(
         pawley=pb, pawley_x0=lambda: np.array([10.0, 20.0, 30.0]),
@@ -381,3 +382,110 @@ def test_the_lab6_width_triple_has_no_short_esd_in_a_joint_fit():
     for path in paths:
         row = rows[path]
         assert row.stderr is None or row.stderr > _SHORT * abs(row.value), (path, row)
+
+
+# ----------------------------------------------------------------------
+# One eigensolve for the covariance and the discard test (WP-2315)
+# ----------------------------------------------------------------------
+# ``_guarded_covariance`` hands ``normal_factors`` and ``discarded_directions``
+# one ``equilibrated_eigen`` of their shared matrix, where each used to build
+# and eigensolve it.  The input to ``eigh`` is the same array either way, so
+# the bar is equality to the bit within one process, never a tolerance.
+# Across BLAS builds nothing here is claimed.
+
+
+def _guarded_both_ways(monkeypatch, jac, resid, n_data):
+    from rietx.optimize import least_squares
+
+    out = {}
+    for share in (True, False):
+        monkeypatch.setattr(least_squares, "_SHARE_EIGEN", share)
+        out[share] = least_squares._guarded_covariance(jac, resid, jac.shape[1],
+                                                       n_data)
+    return out[True], out[False]
+
+
+def _assert_same_answer(shared, separate):
+    stderr, corr, factor, error, discards, subspace = shared
+    assert error is None and separate[3] is None
+    assert np.array_equal(stderr, separate[0])
+    assert np.array_equal(corr, separate[1])
+    assert factor == separate[2]
+    assert discards[0] == separate[4][0]
+    assert np.array_equal(discards[1], separate[4][1])
+    if subspace is None:
+        assert separate[5] is None
+    else:
+        assert np.array_equal(subspace.lost, separate[5].lost)
+        assert np.array_equal(subspace.stderr, separate[5].stderr)
+
+
+@pytest.mark.parametrize("case", ["plain", "combination", "dead", "far"])
+def test_one_eigensolve_gives_both_readers_their_own_answer(monkeypatch, case):
+    """Every esd, correlation, discard count, touched set and basis is the
+    two-solve path's to the bit, on each branch the readers take: nothing
+    discarded, a three-column combination (touched, with a basis), a dead
+    column, and a column of 1e-170 that ``column_rescale`` lifts."""
+    j = _jac(n=400, seed=1)
+    j = np.hstack([j, _jac(n=400, seed=2)])
+    if case == "combination":
+        j[:, 4] = j[:, 0] + j[:, 1]
+    elif case == "dead":
+        j[:, 2] = 0.0
+        j[:, 4] = j[:, 0] + j[:, 1]
+    elif case == "far":
+        j[:, 7] *= 1e-170
+        j[:, 4] = j[:, 0] + j[:, 1]
+    resid = np.random.default_rng(4).standard_normal(400)
+    shared, separate = _guarded_both_ways(monkeypatch, j, resid, 400)
+    _assert_same_answer(shared, separate)
+    assert (shared[4][0] > 0) == (case != "plain")
+
+
+def test_a_pawley_fit_is_the_two_solve_fit_to_the_bit(monkeypatch):
+    """The whole fit, since a stage's esds reach the next stage (the bound
+    test, the support test): every table value and esd (an unmeasured row's
+    is ``None``), every Pawley intensity esd and every diagnostic agree
+    exactly.  The numpy path is declared, as every bit-identity row's is
+    (``tests/CLAUDE.md`` § Quoting numbers)."""
+    from rietx.model import compiled
+    from rietx.optimize import least_squares
+    from tests.test_pawley import _overlapped_lab6, _synth_overlapped
+
+    pattern, _, _ = _synth_overlapped()
+    runs = {}
+    was = compiled.set_enabled(False)
+    try:
+        for share in (True, False):
+            monkeypatch.setattr(least_squares, "_SHARE_EIGEN", share)
+            s, ins = _overlapped_lab6(a=4.160, w=1e-2)
+            ref = Refinement(s, ins, history=False)
+            result = ref.fit(pattern, mode="pawley")
+            runs[share] = (
+                [(p.path, p.value, p.stderr) for p in result.parameters],
+                np.array(ref._model.pawley.stderr, dtype=float),
+                [d.code for d in result.diagnostics],
+            )
+    finally:
+        compiled.set_enabled(was)
+    shared, separate = runs[True], runs[False]
+    assert shared[0] == separate[0]
+    assert np.array_equal(shared[1], separate[1], equal_nan=True)
+    assert shared[2] == separate[2]
+
+
+def test_an_eigendecomposition_refuses_a_jacobian_it_was_not_built_from():
+    """The likeliest misuse: the decomposition of the solve's Jacobian handed
+    a copy with a column zeroed (``least_squares._without_columns``), which
+    has the same shape and a different answer."""
+    from rietx.optimize.statistics import equilibrated_eigen, normal_factors
+
+    j = _jac(n=400, seed=1)
+    eigen = equilibrated_eigen(j)
+    zeroed = j.copy()
+    zeroed[:, 2] = 0.0
+    resid = np.random.default_rng(4).standard_normal(400)
+    with pytest.raises(ValueError, match="not built from"):
+        normal_factors(zeroed, resid, 5, eigen=eigen)
+    with pytest.raises(ValueError, match="not built from"):
+        discarded_directions(zeroed, eigen=eigen)

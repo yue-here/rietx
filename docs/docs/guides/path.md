@@ -56,10 +56,10 @@ This replaces the 700 K pattern with one whose cell is 1.5 % larger:
 
 <!-- output of examples/guides/path.py -->
 ```text
-phases.0.cell.a p003->p004  +0.06454  15,810 esd  cold pair 1.00x
-phases.0.cell.b p003->p004  +0.06454  15,810 esd  cold pair 1.00x
-phases.0.cell.c p003->p004  +0.06454  15,810 esd  cold pair 1.00x
-phases.0.cell.a p004->p005  -0.06040  -14,062 esd  not refitted
+phases.0.cell.a p003->p004  +0.06454  15,811 esd  cold pair 1.00x
+phases.0.cell.b p003->p004  +0.06454  15,811 esd  cold pair 1.00x
+phases.0.cell.c p003->p004  +0.06454  15,811 esd  cold pair 1.00x
+phases.0.cell.a p004->p005  -0.06040  -14,109 esd  not refitted
 p000  cold
 p001  warm
 p002  warm

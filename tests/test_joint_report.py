@@ -7,6 +7,7 @@ wavelengths, so no number here is a claim about a specimen.
 """
 from __future__ import annotations
 
+import dataclasses
 import io
 from pathlib import Path
 
@@ -14,6 +15,7 @@ import pytest
 
 from rietx import MultiHistogramRefinement, Refinement, Stage, runs
 from rietx.history.events import as_event_stream, read_events
+from rietx.model.forward import WINDOW_MIN_DEG
 from rietx.optimize.cancel import CancelToken, RefinementCancelled
 from rietx.optimize.statistics import MAX_SHIFT_CONVERGED
 from rietx.params.multi import SharingMap
@@ -369,6 +371,13 @@ def test_the_specimen_size_is_reported_once(size_patterns):
     arms read 408.71(8.05) and 409.20(6.43) Å.  The joint block is read off
     the shared column at histogram 0's λ, so both reports quote its
     coefficient, never histogram 1's λ-scaled copy.
+
+    The solo arms run the joint fit's window protocol: every stage declares
+    the uniform 0.3° slack, so none re-solves.  Since WP-2317 (R7) a solo
+    ``width`` stage re-solves on fresh windows (its first windows drop
+    3.8 % and 7.5 % of the widened peaks) and reads 400.35 and 401.91 Å
+    against the synthesis's 400, where the joint runner does not re-solve
+    yet (WP-2317 § Tasks).
     """
     structure, _ = _width_start(LAMS[0])
     instruments = [_width_start(lam)[1] for lam in LAMS]
@@ -385,8 +394,10 @@ def test_the_specimen_size_is_reported_once(size_patterns):
 
     for h, (pattern, lam) in enumerate(zip(size_patterns, LAMS, strict=True)):
         s, ins = _width_start(lam)
-        solo = Refinement(s, ins, history=False).fit(
-            pattern, plan=_width_plan("lor_size"))
+        plan = _width_plan("lor_size")
+        plan.stages = [dataclasses.replace(st, window_slack_deg=WINDOW_MIN_DEG)
+                       for st in plan.stages]
+        solo = Refinement(s, ins, history=False).fit(pattern, plan=plan)
         solo.plot(OUT / f"joint_report_size_solo_h{h}.png")
         assert _size(joint) == pytest.approx(_size(solo.microstructure[0]),
                                              rel=0.005)

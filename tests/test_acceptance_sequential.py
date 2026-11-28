@@ -226,10 +226,13 @@ def test_the_hostile_pairs_runaway_reports_its_stale_windows(monkeypatch):
     stage still runs to ``axial_sl`` 558, and its record says so.
 
     At that answer its frozen windows drop 73 % of the Bragg intensity that
-    windows sized there hold, against the 2 % each may drop.  The closing
-    compile at that answer would run for tens of minutes, so the test reads the
-    warm stage's ``stage_end`` event, which carries ``window_loss`` as the stage
-    ends, and stops the fit at the closing compile as the test above does.
+    windows sized there hold, against the 2 % each may drop.  Since WP-2317
+    (R7) the stage then solves once more on windows sized there, which stays
+    at the runaway: the record carries the 73 % as ``window_refit_loss``, and
+    the second solve's windows hold their peaks.  The closing compile at that
+    answer would run for tens of minutes, so the test reads the warm stage's
+    ``stage_end`` event, which carries both losses as the stage ends, and stops
+    the fit at the closing compile as the test above does.
     """
     _require_data()
     refine_mod = importlib.import_module("rietx.refine")
@@ -273,7 +276,8 @@ def test_the_hostile_pairs_runaway_reports_its_stale_windows(monkeypatch):
     cpd_1a = [e["window_loss"] for e in ends if e["series_index"] == 0]
     assert all(x < 0.02 for x in cpd_1a), cpd_1a
     warm = [e for e in ends if e["series_index"] == 1][-1]
-    assert warm["window_loss"] > 0.5, warm
+    assert warm["window_refit_loss"] > 0.5, warm
+    assert warm["window_loss"] < 0.02, warm
 
 
 # -- accuracy: a chained fit must be as good as an unchained one ----------

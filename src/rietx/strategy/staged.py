@@ -436,6 +436,27 @@ class _ClosingWindowTol:
         plan.__dict__[self._slot] = value
 
 
+def refit_later(path: str, later: Iterable[Stage]) -> bool:
+    """Whether a path free now is free again in one of the ``later`` stages.
+
+    Read as :func:`fixed_at_end` reads a plan: the flags carry, ``turn_on``
+    frees and then ``turn_off`` fixes, so a free path stays free into the next
+    stage unless that stage's ``turn_off`` matches it.  This is the test of
+    "a later stage refits this stage's answer" that sizes a stage's window
+    slack (WP-2317 R7): a stage whose free path no later stage refits has a
+    final answer for it, and keeps the uniform slack.
+    """
+    free = True
+    for stage in later:
+        if any(fnmatch.fnmatchcase(path, g) for g in stage.turn_on):
+            free = True
+        if any(fnmatch.fnmatchcase(path, g) for g in stage.turn_off):
+            free = False
+        if free:
+            return True
+    return False
+
+
 @dataclass
 class RefinementPlan:
     stages: list[Stage]

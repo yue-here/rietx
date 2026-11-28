@@ -90,6 +90,7 @@ from .symmetry import (
     MAX_HKL_GRID_POINTS,
     OperatorGroup,
     ReflectionSet,
+    _order_by_d,
     get_spacegroup,
     rotation_matrices,
 )
@@ -504,7 +505,7 @@ def satellite_reflections(sg_symbol,
             f"satellite representative {row.tolist()} (in {q}ths) is not "
             f"H ± k for the declared k {format_kvector(kk)}")
 
-    sort = np.argsort(-d_reps)
+    sort = _order_by_d(d_reps)
     return ReflectionSet(hkl=hkl[sort], multiplicity=mult[sort], d=d_reps[sort],
                          spacegroup=sg.xhm(), satellite_order=order[sort],
                          propagation_vector=tuple(float(x) for x in kk))
@@ -535,7 +536,7 @@ def satellite_d_spacings(space_group,
             out.append(np.zeros(0, dtype=np.float64))
             continue
         d_reps = orbits[2]
-        out.append(d_reps[np.argsort(-d_reps)])
+        out.append(d_reps[_order_by_d(d_reps)])
     return out
 
 
@@ -561,7 +562,7 @@ def merge_satellites(nuclear: ReflectionSet, sat: ReflectionSet) -> ReflectionSe
     d = np.concatenate([nuclear.d, sat.d])
     order = np.concatenate([np.zeros(len(nuclear), dtype=np.int64),
                             sat.satellite_order.astype(np.int64)])
-    sort = np.argsort(-d, kind="stable")
+    sort = _order_by_d(d)  # the nuclear list's tie rule, nuclear rows first
     return ReflectionSet(hkl=hkl[sort], multiplicity=mult[sort], d=d[sort],
                          spacegroup=nuclear.spacegroup,
                          extra=dict(nuclear.extra),

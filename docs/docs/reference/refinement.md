@@ -372,7 +372,7 @@ A stage that reaches it ends with status `max_iter` and reports [`STAGE_MAX_ITER
 At `0.0` exactly `lebail_cycles` plain cycles run.
 `StageResult.lebail_cycles_run` and `StageResult.lebail_settled` record what ran. A cut in the last stage warns `LEBAIL_CYCLES_AT_CAP`.
 `Stage.restraint_weight_scale` weights the restraints against the data for the stage ([How to restrain a bond length or an angle](../guides/restrain.md)).
-`Stage.window_slack_deg` replaces the default capture margin in °2θ around each reflection's evaluation window.
+`Stage.window_slack_deg` replaces each window's default margin. `StageResult.window_refit_loss` marks a re-solve.
 The indexing Le Bail validation sets it, because it holds a candidate cell fixed and a wrong candidate displaces peaks by whole degrees.
 Leave it unset in ordinary plans.
 
