@@ -607,6 +607,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2061](2061-a-crystallite-has-a-shape.md) | A crystallite has a shape: hkl-dependent size broadening on the analytical profile | ⬜ | P3 | — ([1343](1343-the-moment-pays-for-the-width.md) soft) |
 | [2070](2070-a-second-cw-neutron-line-that-is-not-a-harmonic.md) | A second CW neutron line that is not a harmonic, with its own weight and offset | ⬜ | P3 | — |
 | [2146](2146-the-facility-iparm-files-read-with-their-repairs-recorded.md) | The ISIS iparm files read, with each repair recorded | ⬜ | P3 | — ([2032](2032-the-tof-readers-t1-follow-ups.md), [1927](1927-tof-t1-the-axis-and-its-readers.md) soft) |
+| [2318](2318-a-tof-bank-refines-its-absorption.md) | A time-of-flight bank refines its absorption factor | ⬜ | P3 | #1548 |
 
 ### <a id="unscheduled-what-fires-and-what-stays-silent"></a>What fires, and what stays silent
 
