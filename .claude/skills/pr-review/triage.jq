@@ -4,7 +4,7 @@
 def data: test("^tests/data/|^src/rietx/data/");
 # What the bench runs as build or test machinery: step 4 reads these first and
 # the `all` mode batches them. The GUI and docs builds' rows are WP-2313's.
-def execution: test("(^|/)conftest\\.py$|^pyproject\\.toml$|^setup\\.py$|^\\.github/|^\\.claude/hooks/|^\\.claude/settings[^/]*\\.json$|^gui/(package(-lock)?\\.json|\\.npmrc|\\.postcssrc[^/]*|[^/]*\\.config\\.[^/]+)$|^gui/scripts/|^docs/docs/conf\\.py$");
+def execution: test("(^|/)conftest\\.py$|^pyproject\\.toml$|^setup\\.py$|^(hatch|uv)\\.toml$|^\\.?pytest\\.ini$|^\\.github/|^\\.claude/hooks/|^\\.claude/settings[^/]*\\.json$|^\\.mcp\\.json$|^gui/(package(-lock)?\\.json|\\.npmrc|\\.postcssrc[^/]*|[^/]*\\.config\\.[^/]+)$|^gui/scripts/|^docs/docs/conf\\.py$");
 [.[].data.repository.pullRequests.nodes[]] as $prs
 | ([$prs[] | [(.files.nodes // [])[].path] | unique[]] | group_by(.) | map({key: .[0], value: length}) | from_entries) as $owners
 | {

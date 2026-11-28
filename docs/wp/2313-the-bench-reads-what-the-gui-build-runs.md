@@ -49,10 +49,21 @@ these files, narrow on that count, as `156a274d4` did for `.claude/`.
 the code a PR is reviewed for:
 
 - **Every ladder**: the venv install runs `pyproject.toml`'s build backend
-  (hatchling, no custom hook, so a `hatch_build.py` acts only through a
-  `pyproject.toml` edit). pytest reads `pyproject.toml` and imports every
-  `conftest.py`. `ruff` reads its config and runs nothing. No `setup.py` exists,
-  and hatchling would not run one. The pattern keeps it at no cost.
+  (hatchling, no custom hook today). Hatchling also merges a `hatch.toml` beside
+  `pyproject.toml` (`hatchling/metadata/core.py`, `ProjectMetadata.hatch`), so a
+  `hatch_build.py` hook can be switched on from either file. uv reads a project
+  `uv.toml`, whose index settings decide where every package comes from, as
+  `gui/.npmrc` does for npm. pytest reads `pyproject.toml` and imports every
+  `conftest.py`. A `pytest.ini` or `.pytest.ini` takes precedence over
+  `pyproject.toml`, while a `tox.ini` or `setup.cfg` ranks below it and so
+  cannot displace the config there. `ruff` reads its config and runs nothing.
+  None of `setup.py`, `hatch.toml`, `uv.toml` or the two pytest files exists,
+  and hatchling would not run a `setup.py`. The pattern holds them all at no
+  cost.
+- **The bench session itself**: a Claude Code session started in the bench
+  reads `.claude/settings*.json` and a root `.mcp.json`, whose servers run
+  commands once approved. Neither file is a build file, but both are config
+  the bench obeys, so `.mcp.json` joins the settings files.
 - **`gui/`**: `npm ci` installs what `gui/package-lock.json` resolves under
   `gui/.npmrc` if one appears. One package carries an install script,
   `fsevents`. `npm run build` runs `gui/package.json`'s `build` script, which
@@ -80,8 +91,8 @@ This is the repo's process machinery and makes no package decision.
 
 - [x] List the files the step 5 ladders execute, `gui/` and docs builds included
 - [x] Widen step 4's list and `triage.jq`'s `execution` pattern together
-- [ ] Extend `test_the_triage_rows_carry_what_the_rank_reads` with a `gui/package.json` row
-- [ ] Skill: none. These are the repo's own review commands
+- [x] Extend `test_the_triage_rows_carry_what_the_rank_reads` with a `gui/package.json` row
+- [x] Skill: none. These are the repo's own review commands
 
 ## Acceptance
 

@@ -166,7 +166,7 @@ bookkeeping syncs, and nothing beyond them.
 - Outside edit to `docs/ROADMAP.md` / `docs/wp/**` beyond the edits rank 2
   lists → question to the batch; the PR **stays** (its code
   half is reviewable).
-- Touches an execution-shaped path (step 4's list, `execution`) → batch.
+- Touches an execution-shaped path (`execution`, read at step 4) → batch.
 - Already reviewed and nothing since → skip, naming the sha. Test:
   `latestReviews[].commit == headRefOid` **and** `updatedAt` no later than that
   review's `submittedAt` (keyed on the sha alone it skips forever a contributor
@@ -271,10 +271,11 @@ line if the checkpoint ended it. Close with
      `conftest.py`, `npm --prefix gui ci` installs what its lockfile resolves).
      First read every hunk to a path `triage.jq`'s `execution` matches: the
      Python build and test config, `.github/**`, `.claude/hooks/**`,
-     `.claude/settings*.json`, and the GUI and docs builds' config, scripts and
-     lockfile (WP-2313). Read a lockfile hunk by property: the packages it adds
-     or moves, a new `hasInstallScript`, a `resolved` host off the registry. A
-     workflow change is a question for the user, not a finding.
+     `.claude/settings*.json`, `.mcp.json`, and the GUI and docs builds'
+     config, scripts and lockfile (WP-2313). Read a lockfile hunk by property:
+     the packages it adds or moves, a new `hasInstallScript`, a `resolved` host
+     off the registry. A workflow change is a question for the user, not a
+     finding.
      **The rest of `.claude/` is text, not execution** — skills, commands and
      agent definitions are markdown the bench never runs, and treating the whole
      directory as execution-shaped batched three PRs that only sync markdown.
