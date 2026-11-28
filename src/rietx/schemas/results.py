@@ -166,7 +166,10 @@ class Statistics(Base):
 
     ``max_shift_over_esd`` is McCusker et al. (1999) §7's convergence
     quantity: the largest |Δθᵢ|/esd(θᵢ) over the final accepted step of the
-    answer-producing solve, both sides in external parameter units.
+    answer-producing solve, both sides in external parameter units.  Where
+    the shift test (``RefinementPlan.shift_over_esd_tol``) stopped that solve
+    before it accepted a step, it is the undamped step the test read there,
+    the next cycle the convergence rests on (WP-2317 R6).
     The paper's band — converged when ≤ 0.1
     (``optimize.statistics.MAX_SHIFT_CONVERGED``) — is quoted, never tuned,
     and gates nothing; a TRF solve at ftol 1e-9 satisfies it a fortiori, so

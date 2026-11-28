@@ -406,6 +406,11 @@ class LMOutcome:
     #: sparse), which is the returned point when the test ended the run.
     #: Written only under ``shift_tol``; ``None`` where the test was not run.
     gauss_newton_shift: float | None = None
+    #: the undamped step the test read at the returned point, landed on the
+    #: box, where the test ended the run; ``None`` otherwise.  It is the step
+    #: the convergence claim rests on, so a solve that stopped before
+    #: accepting any step still reports a final shift (WP-2317).
+    gauss_newton_step: np.ndarray | None = None
     #: the bounds that hold the returned point, scipy's ``active_mask``
     #: convention (−1 lower, +1 upper, 0 neither) and exact: the variable sits
     #: *on* the bound, the step having landed it there, and the gradient at
@@ -581,6 +586,7 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
     n_outer = 0
     termination = "max_nfev"
     gauss_newton_shift = None
+    gauss_newton_step = None
     scale = None
     # the largest norm each column of J has had this stage, apart from any
     # curvature held for it, so a dropped curvature leaves its scale too
@@ -616,9 +622,9 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
                 check()
             undamped = _trial_step(A, b, 0.0, x, lo, hi, ineqs, n_rows=len(r),
                                    scale=scale, check=check)
-            gauss_newton_shift = _max_shift_over_esd(
-                A, _landed(undamped[0], undamped[1], x, lo, hi) - x, s,
-                n_dof=len(r) - len(x))
+            tested = _landed(undamped[0], undamped[1], x, lo, hi) - x
+            gauss_newton_shift = _max_shift_over_esd(A, tested, s,
+                                                     n_dof=len(r) - len(x))
             if gauss_newton_shift < shift_tol:
                 # a would-be stop, so a held curvature is read again first,
                 # as at the other stops below
@@ -630,6 +636,7 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
                     continue
                 status = 1
                 termination = "shift_over_esd"
+                gauss_newton_step = tested
                 break
             if lam == 0.0:
                 # the first trial's own step: the same solve at the same λ
@@ -780,7 +787,8 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
                      n_bound_hits=n_bound_hits, n_truncated=n_truncated,
                      truncated_by=truncated_by,
                      n_stalled=n_stalled, termination=termination,
-                     active_mask=active, gauss_newton_shift=gauss_newton_shift)
+                     active_mask=active, gauss_newton_shift=gauss_newton_shift,
+                     gauss_newton_step=gauss_newton_step)
 
 
 def _trial_step(A, b: np.ndarray, lam: float, x: np.ndarray, lo: np.ndarray,

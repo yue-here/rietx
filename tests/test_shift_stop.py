@@ -159,3 +159,13 @@ def test_a_trf_fit_records_no_shift_test(pattern):
     assert "shift_over_esd" not in {s.termination for s in result.stages}
     out = ref.run_stage(pattern, rx.Stage("polish", ["phases.*.scale"]))
     assert ref.history[out.node_id].action.shift_over_esd_tol is None
+
+
+def test_a_stage_stopped_at_its_start_still_reports_its_final_shift(fitted, pattern):
+    # a stage started at its answer accepts no step, and the reported
+    # convergence quantity is then the step the test read, not None
+    ref, _ = fitted
+    out = ref.run_stage(pattern, rx.Stage("again", list(SHORT[-1].turn_on)))
+    assert out.stages[-1].termination == "shift_over_esd"
+    shift = out.statistics.max_shift_over_esd
+    assert shift is not None and shift < MAX_SHIFT_CONVERGED

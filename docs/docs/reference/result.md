@@ -29,7 +29,7 @@ The definitions follow Toby {cite}`toby2006`, and [Agreement statistics](../theo
 | `Statistics.durbin_watson` | the serial-correlation statistic | about 2 when neighbouring residuals are independent; far from 2, the misfit is structured whatever Rwp says |
 | `Statistics.esd_inflation` | the Bérar-Lelann factor | what the reported esds were multiplied by to account for that serial correlation; already applied |
 | `Statistics.n_points`, `Statistics.n_free_parameters` | N and P | the counts the rest is read against |
-| `Statistics.max_shift_over_esd` | the largest \|Δθ\|/esd over the last accepted step, both sides in the parameter's own units | the convergence quantity: converged when at most {{ MAX_SHIFT_CONVERGED }} {cite}`mccusker1999` |
+| `Statistics.max_shift_over_esd` | the largest \|Δθ\|/esd over the last accepted step, both sides in the parameter's own units; the step the shift test read where it stopped the solve before any step | the convergence quantity: converged when at most {{ MAX_SHIFT_CONVERGED }} {cite}`mccusker1999` |
 | `Statistics.identifiability_clause` | the report's identifiability sentence, verbatim | the sentence the report's summary carries, delivered beside the numbers |
 
 `Statistics.chi2` is the reduced χ² and not Σw δ².

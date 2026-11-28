@@ -3563,6 +3563,20 @@ class _StepTracker:
         return None if self.prev is None else (self.prev, self.best)
 
 
+def _final_step(tracker, res) -> tuple[np.ndarray, np.ndarray] | None:
+    """The step :func:`_final_shift_over_esd` reads: the solve's final accepted
+    one, or, where the shift test stopped the solve before it accepted any,
+    the undamped step the test read there (WP-2317 R6).  That is the next
+    cycle the convergence claim rests on, so the quantity stays measured
+    rather than ``None`` on a stage that starts at its answer."""
+    step = tracker.step()
+    tested = getattr(res, "gauss_newton_step", None)
+    if step is None and tested is not None:
+        x = np.asarray(res.x, dtype=np.float64)
+        return x, x + tested
+    return step
+
+
 def _final_shift_over_esd(table: ParameterTable,
                           step: tuple[np.ndarray, np.ndarray] | None,
                           stderr_full: np.ndarray | None,
@@ -4017,7 +4031,8 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
                       n_constraint_truncations=n_truncated,
                       truncated_by=truncated_by,
                       max_shift_over_esd=_final_shift_over_esd(
-                          table, tracker.step(), stderr_full, corr, n_table),
+                          table, _final_step(tracker, res), stderr_full, corr,
+                          n_table),
                       termination=termination,
                       n_degenerate_cell_probes=cell_guard.n_degenerate,
                       n_lapack_fallbacks=lapack.retries() - lapack_start,
@@ -4393,7 +4408,7 @@ def run_multi_least_squares(models: list[CompiledModel],
                       residual_cosine=cosine,
                       active_bounds=_active_bounds(res, n_table),
                       max_shift_over_esd=_final_shift_over_esd_multi(
-                          mtable, tracker.step(), stderr, corr),
+                          mtable, _final_step(tracker, res), stderr, corr),
                       termination=termination,
                       n_degenerate_cell_probes=cell_guard.n_degenerate,
                       n_lapack_fallbacks=lapack.retries() - lapack_start,
