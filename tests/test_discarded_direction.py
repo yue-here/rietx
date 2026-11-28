@@ -446,23 +446,46 @@ def test_a_pawley_fit_is_the_two_solve_fit_to_the_bit(monkeypatch):
     """The whole fit, since a stage's esds reach the next stage (the bound
     test, the support test): every table value and esd (an unmeasured row's
     is ``None``), every Pawley intensity esd and every diagnostic agree
-    exactly."""
+    exactly.  The numpy path is declared, as every bit-identity row's is
+    (``tests/CLAUDE.md`` § Quoting numbers)."""
+    from rietx.model import compiled
     from rietx.optimize import least_squares
     from tests.test_pawley import _overlapped_lab6, _synth_overlapped
 
     pattern, _, _ = _synth_overlapped()
     runs = {}
-    for share in (True, False):
-        monkeypatch.setattr(least_squares, "_SHARE_EIGEN", share)
-        s, ins = _overlapped_lab6(a=4.160, w=1e-2)
-        ref = Refinement(s, ins, history=False)
-        result = ref.fit(pattern, mode="pawley")
-        runs[share] = (
-            [(p.path, p.value, p.stderr) for p in result.parameters],
-            np.array(ref._model.pawley.stderr, dtype=float),
-            [d.code for d in result.diagnostics],
-        )
+    was = compiled.set_enabled(False)
+    try:
+        for share in (True, False):
+            monkeypatch.setattr(least_squares, "_SHARE_EIGEN", share)
+            s, ins = _overlapped_lab6(a=4.160, w=1e-2)
+            ref = Refinement(s, ins, history=False)
+            result = ref.fit(pattern, mode="pawley")
+            runs[share] = (
+                [(p.path, p.value, p.stderr) for p in result.parameters],
+                np.array(ref._model.pawley.stderr, dtype=float),
+                [d.code for d in result.diagnostics],
+            )
+    finally:
+        compiled.set_enabled(was)
     shared, separate = runs[True], runs[False]
     assert shared[0] == separate[0]
     assert np.array_equal(shared[1], separate[1], equal_nan=True)
     assert shared[2] == separate[2]
+
+
+def test_an_eigendecomposition_refuses_a_jacobian_it_was_not_built_from():
+    """The likeliest misuse: the decomposition of the solve's Jacobian handed
+    a copy with a column zeroed (``least_squares._without_columns``), which
+    has the same shape and a different answer."""
+    from rietx.optimize.statistics import equilibrated_eigen, normal_factors
+
+    j = _jac(n=400, seed=1)
+    eigen = equilibrated_eigen(j)
+    zeroed = j.copy()
+    zeroed[:, 2] = 0.0
+    resid = np.random.default_rng(4).standard_normal(400)
+    with pytest.raises(ValueError, match="not built from"):
+        normal_factors(zeroed, resid, 5, eigen=eigen)
+    with pytest.raises(ValueError, match="not built from"):
+        discarded_directions(zeroed, eigen=eigen)

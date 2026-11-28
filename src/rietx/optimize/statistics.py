@@ -170,7 +170,7 @@ def _equilibrated_normal(jac: np.ndarray
     return JTJ * np.outer(inv_d, inv_d), inv_d, s, live
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class EquilibratedEigen:
     """One eigendecomposition of :func:`_equilibrated_normal`'s ``E``, for the
     two readers of one covariance solve (WP-2315).
@@ -182,7 +182,10 @@ class EquilibratedEigen:
     Handed this, each reads the one decomposition.  Its input is the matrix
     each would have built, through the same call, so every esd, correlation
     and discard verdict is the one the two solves gave.  ``lam``/``vec`` are
-    ``eigh``'s own and are only read, never written.
+    ``eigh``'s own and are only read, never written.  ``source`` is the
+    Jacobian it was built from, and a reader handed another refuses it, since
+    a copy with a column zeroed (``least_squares._without_columns``) has the
+    same shape and a different answer.
     """
 
     lam: np.ndarray
@@ -191,6 +194,7 @@ class EquilibratedEigen:
     rescale: np.ndarray | None   # :func:`column_rescale`'s factor
     live: np.ndarray             # d > 0
     n_cols: int
+    source: object               # the ``jac`` handed to equilibrated_eigen
 
 
 def equilibrated_eigen(jac: np.ndarray) -> EquilibratedEigen | None:
@@ -207,14 +211,15 @@ def equilibrated_eigen(jac: np.ndarray) -> EquilibratedEigen | None:
         return None
     e, inv_d, s, live = _equilibrated_normal(jac)
     lam, vec = lapack.eigh(e)
-    return EquilibratedEigen(lam, vec, inv_d, s, live, e.shape[0])
+    return EquilibratedEigen(lam, vec, inv_d, s, live, e.shape[0], jac)
 
 
 def _check_eigen(eigen: EquilibratedEigen, jac) -> None:
-    if eigen.n_cols != np.shape(jac)[1]:
+    if eigen.source is not jac:
         raise ValueError(f"an eigendecomposition of {eigen.n_cols} columns was "
-                         f"handed a Jacobian of {np.shape(jac)[1]}; build it "
-                         f"with equilibrated_eigen(jac) on this Jacobian")
+                         f"handed a Jacobian of {np.shape(jac)[1]} it was not "
+                         f"built from; build it with equilibrated_eigen(jac) "
+                         f"on this Jacobian")
 
 
 def normal_factors(jac: np.ndarray, resid: np.ndarray, n_free: int, *,
@@ -331,8 +336,8 @@ def discarded_directions(jac: np.ndarray, *, basis: bool = False,
     subspace, never one eigenvector, because two discarded directions are
     defined only up to a rotation inside it and the projector is not.  Jacobi
     scaling is shared with :func:`normal_factors`, so a column's units do not
-    enter.  The matrix is rebuilt here, not returned by :func:`normal_factors`,
-    whose signature and bits stay as they were: one more ``eigh``.  A joint
+    enter.  The matrix is rebuilt here, or read off the ``eigen=`` a caller
+    shared with :func:`normal_factors` (below).  A joint
     fit's :class:`~.blocked.BlockJacobian` is read on its blocked covariance's
     own discards (:func:`.blocked.discarded_directions`, WP-1325).
 
