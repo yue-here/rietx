@@ -826,3 +826,11 @@ carries it too, an additive field on an existing kind.
 ``NodeAction.movement_slack`` records whether a stage ran on those sized
 windows, so ``replay`` recompiles the model the stage solved; ``False`` is
 the uniform slack every older node ran, so an old node replays as before.
+
+Also in 0.62 (WP-2315): ``ReflectionState.merged_groups``, a list of
+``MergedGroup`` (``hkl``, ``intensity``, ``stderr``): the reflections a Pawley
+fit refined as one intensity because their d agree in every cell of the space
+group, with the measured sum and its esd.  Additive and defaulted to ``None``,
+the 0.25 → 0.26 rule; an older build refuses a node carrying the key.  In the
+same change a member's ``ReflectionState.stderr`` row reads ``inf``, the
+unmeasured convention, where it read a finite esd.

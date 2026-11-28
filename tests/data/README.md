@@ -626,6 +626,26 @@ and by 6.7e-6 (S/L) and 3.0e-6 (H/L) in `toy_rich`. Every other key is
 bit-identical. The other eight states reproduced bit-for-bit and were not
 re-captured.
 
+**WP-2315 re-baseline (2026-11-27)**: `toy_pawley` only, on macOS 26.7.2 arm64
+(Python 3.12.10, numpy 2.5.5). The Pawley overlap restraint's target became
+equal F², a share of m_k/Σm per member, in place of an equal 1/n share of the
+group's intensity. Only the restraint rows moved: 12 of the 18 rows of
+`residual` (rows 3250 onward), and 24 entries of `jacobian` in those rows. These
+are the overlap groups whose members have unequal multiplicities. A group with
+equal multiplicities gives the old rows bit for bit. `pawley_x0`, `theta` and
+`y_calc` are bit-identical. The toy has no lattice-forced coincidence, so it
+merges no column. The other ten states reproduced bit-for-bit and were not
+re-captured.
+
+**WP-2315 re-baseline, second event (2026-11-27)**: `srm660c` and `nac`, on the
+same machine. `generate_reflections` now keeps reflections of equal d (within
+1e-12 relative) in the order their orbits are first met, where numpy's
+unstable argsort had left that order to the platform: Linux CI swapped LaB6's
+(2 2 1) and (3 0 0) between two fits that macOS kept in place. Only the order
+in which tied reflections are summed moved. `theta` is bit-identical, and the
+largest change in `y_calc`, `residual` and `jacobian` is 1.6e-16 of the key's
+largest value. The other nine states reproduced bit-for-bit.
+
 These are *environment-pinned* bit patterns, not physical reference values: a
 different BLAS/numpy build may legitimately differ in final bits.  **WP-1002
 measured which half of that sentence is true.**  The *numpy* half is not:

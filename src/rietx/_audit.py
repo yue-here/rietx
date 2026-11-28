@@ -4068,6 +4068,12 @@ ROWS: tuple[Row, ...] = (
                   'invariants (|G| = multiplicity x |stabiliser|) over all 564 settings with it, '
                   'and ::test_the_guard_message_names_the_invariant shows a loose value (0.4) '
                   'breaks them')),
+    Row("rietx.crystallography.symmetry._D_TIE_REL", "constant", tier=1, value=1e-12,
+        evidence=('numerical floor: reflections of equal d in every cell compute d a few ulps '
+                  'apart, so 1e-12 relative is float equality and orders nothing the data could '
+                  'separate; it only keeps such ties in orbit order (WP-2315, Linux swapped '
+                  "LaB6's 221/300 between two compiles); tests/test_pawley_lattice_merge.py "
+                  '::test_equal_d_keeps_input_order_whichever_way_the_last_ulp_falls')),
     Row("rietx.crystallography.symmetry._GAMMA_HEX", "constant", tier=1, value=120.0,
         evidence=('physics: a hexagonal or trigonal gamma on hexagonal axes is 120 deg by the '
                   "lattice's symmetry (symmetry.py:582-583)")),
@@ -4648,7 +4654,8 @@ ROWS: tuple[Row, ...] = (
         grounds=("On three default paths: the peak picker's duplicate and unresolved flags, "
                  "the line screen's testable mask, and "
                  "since WP-2011 every index_pattern validation, where an overlapped group gets "
-                 "an equal-split restraint and is flagged PAWLEY_OVERLAP_UNRESOLVED rather than "
+                 "an equal-F² restraint (an equal split before WP-2315; the sweeps here predate it) "
+                 "and is flagged PAWLEY_OVERLAP_UNRESOLVED rather than "
                  "split confidently.  The validation reads the group's sum, which the restraint "
                  "leaves free, and its readings did not move over 0.25-1.0; kept at 0.5 "
                  "(WP-2011 ruling 3, 2026-10-28)."),

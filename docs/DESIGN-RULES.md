@@ -1,8 +1,7 @@
 # rietx design rules
 
-Why the package exists and the five rules every change answers to. Every session and
-subagent loads this file through the root `CLAUDE.md`. The rest of the design record,
-and the history of these rules, is [DESIGN.md](DESIGN.md).
+Why the package exists and the five rules every change answers to. The rest of the
+design record is [DESIGN.md](DESIGN.md).
 
 ## Why this package exists
 
@@ -16,8 +15,7 @@ what was refined, how well, and what to look at next, so an expert can audit and
 non-expert can learn to steer. The API follows current Python practice, and the whole
 of powder diffraction is in scope.
 
-*Written 2026-10-18. The founding statement of 2026-07 and what superseded it are in
-[DESIGN.md](DESIGN.md) § History.*
+*Written 2026-10-18. Earlier statements are in [DESIGN.md](DESIGN.md) § History.*
 
 ## Rules
 
@@ -30,8 +28,8 @@ number. A sentence that nobody would use to make a choice does not belong here.
      same action: the physics, the arithmetic, established practice. The package acts
      and records that it did. The absent-phase hold is the example.
    - *The data can rank it.* The hypotheses are enumerable and the data score them,
-     though not always to one winner: indexing, extinction symbols, structure solution,
-     a choice of peak shape. The package enumerates, scores each with its evidence, and
+     though not always to one winner. Indexing, extinction symbols, structure solution
+     and a choice of peak shape are of this kind. The package enumerates, scores each with its evidence, and
      presents the ranking without picking. It picks in two cases only, and returns the
      whole ranking with the pick. In the first, the caller asked for a pick by calling a
      function made for it, such as `best_or_none`, and no default path calls one. In the
@@ -48,10 +46,10 @@ number. A sentence that nobody would use to make a choice does not belong here.
    withheld verdict leaves its statistic. Where a rerun is expensive (an hour-long
    search, a 200-pattern batch, a write into a project's history) the package protects
    work already done: it keeps the best attempt, seeds no successor from a diverged
-   fit, refuses to overwrite history, and records each. A default reaches a correct
-   answer in the fewest calls, since a fit costs seconds and an agent's reasoning costs
-   tokens. The provenance audit of every threshold (the physics', the literature's, or
-   ours) is [milestones/generality.md](milestones/generality.md) § The rule.
+   fit, refuses to overwrite history, and records each. The right default reaches a
+   correct answer in the fewest calls. A fit costs seconds, an agent's reasoning costs
+   tokens, and ten reruns cost more than one unanimous action. The provenance audit of
+   every threshold (whose number it is: the physics', the literature's, or ours) is [milestones/generality.md](milestones/generality.md) § The rule.
 
    An input that leaves a choice open is surfaced. It is never settled by which reading
    most files mean. A bare space-group symbol with two origin settings keeps origin 1
@@ -94,8 +92,8 @@ number. A sentence that nobody would use to make a choice does not belong here.
    its source and its code are stated plainly, and the topic is recorded *not yet
    validated* until one does. That state is separate from *provisional*, which rietx
    keeps for an API that may still change (PEP 411's sense). The validation record is
-   for the developers. A user chooses a feature by the sample and the data, so the
-   record lives in the matrix and its generated page alone. No surface an agent reads
+   for the developers. An agent or a user chooses a feature by the sample and the data
+   alone. So the record lives in the matrix and its generated page. No surface an agent reads
    while choosing carries a validation verdict: `capabilities()`, the help entries, the
    agent skill, the GUI's help (ruled 2026-10-27) and the fit report (ruled 2026-11-01).
 
@@ -173,15 +171,16 @@ number. A sentence that nobody would use to make a choice does not belong here.
    nothing is built before a case needs it. A milestone's direction is in its record.
    The project's are two, each ruled by the maintainer.
    - *Arithmetic accuracy.* A speed setting (a convergence tolerance, a peak window, a
-     quadrature order) keeps its error under about a tenth of each quantity's esd,
-     the final shift/esd McCusker et al. (1999) accept, and spends no wait past that.
-     The established programs are the cross-check, and rietx is never less accurate
-     than them. Where an error compounds (WP-2222: a Pawley series carrying
-     intensities, `lab_calibrate`, published guides), the setting follows what the
-     compounding needs. A speed change leaves the model as it was. It answers to an
-     independent measurement where one exists, and to this bar otherwise. One that
-     only regroups arithmetic is verified at fixed parameters, and its goldens re-pin
-     in the same change (ruled 2026-11-19 to 11-27; WP-2307, WP-2317 R0).
+     quadrature order) holds each quantity a user reads as accurately as that user
+     needs. rietx spends no wait past that. The established programs show what
+     suffices, since their users found it enough. Their thresholds do not carry
+     over. Unattended in rietx, GSAS-II's and FullProf's stops ended a series fit
+     18 esd off. An error is read in the quantity's esd, and *Intent* sets how small
+     it must be. Where an error compounds (three cases, WP-2222), the setting
+     follows what the compounding needs. A speed change leaves the model as it was.
+     One that only regroups arithmetic is verified at fixed parameters. Its goldens
+     re-pin in the same change. Rule 2's pinned-number test does not apply to a
+     speed change (ruled 2026-11-19 to 11-27; WP-2307, WP-2317 R0).
    - *Structure-free fitting.* Pawley is the structure-free method rietx leads with.
      WP-2062 carries the move to it as the default. Le Bail follows the established
      programs' practice (ruled 2026-11-27, WP-2317; lifts #1434's fence).
@@ -191,8 +190,7 @@ number. A sentence that nobody would use to make a choice does not belong here.
    yields to the model's accuracy and to the constraints a reused design must meet. The
    survey behind it is `docs/practice.md`.
 
-   *Conflicts.* Intent comes first. The shape of the API follows rietx convention. A name
-   or a meaning follows the term the literature and the IUCr dictionaries use. One
-   program's keyword is not that term, and rietx takes no alias for one. A number the
-   model computes follows accuracy. An arithmetic setting follows *Arithmetic accuracy*
-   above.
+   *Conflicts.* The shape of the API follows rietx convention. A name or a meaning
+   follows the term the literature and the IUCr dictionaries use. One program's keyword
+   is not that term, and rietx takes no alias for one. A number the model computes
+   follows accuracy. An arithmetic setting follows *Arithmetic accuracy* above.

@@ -161,7 +161,13 @@ from .report.schemas import (
     StageReport,
 )
 from .schemas.common import Diagnostic, Parameter, Provenance, check_mode
-from .schemas.history import NodeAction, NodeMetrics, RefinementState, ReflectionState
+from .schemas.history import (
+    MergedGroup,
+    NodeAction,
+    NodeMetrics,
+    RefinementState,
+    ReflectionState,
+)
 from .schemas.instrument import CAPILLARY_OFFSETS, Instrument
 from .schemas.interval import PARAMETER_INTERVAL_LEVEL, PARAMETER_INTERVAL_MAX_REFITS
 from .schemas.params import ParameterRow, TieSpec
@@ -10491,9 +10497,36 @@ def _extract_reflections(model: CompiledModel | None) -> list[ReflectionState]:
             varied=is_pawley,
         )
         if is_pawley and stderr_all is not None:
-            a, b = model.pawley.phase_slices[ip]
-            state.stderr = [float(v) for v in stderr_all[a:b]]
+            # a member of a lattice-merged group has no esd of its own: its
+            # value is its share of the measured sum (WP-2315)
+            state.stderr = [float(v) for v in model.pawley.member_stderr(ip)]
+        if is_pawley and model.pawley is not None:
+            state.merged_groups = _merged_group_states(model.pawley, ip, cp)
         out.append(state)
+    return out
+
+
+def _merged_group_states(pb, ip: int, cp) -> list[MergedGroup]:
+    """Phase ``ip``'s lattice-merged groups as the measured record (WP-2315).
+
+    Each group is one Pawley column (``PawleyBlock.merged``), so its summed
+    intensity is the column's value and its esd is the column's esd.  The
+    members' own intensities in ``ReflectionState.intensity`` are shares of
+    that sum and carry an infinite esd.
+    """
+    r0, r1 = pb.refl_slices[ip]
+    hkl = cp.reflections.hkl
+    out: list[MergedGroup] = []
+    for g in pb.merged:
+        if not r0 <= g[0] < r1:
+            continue
+        local = [int(r) - r0 for r in g]
+        col = int(pb.refl_col[g[0]])
+        sd = None if pb.stderr is None else float(pb.stderr[col])
+        out.append(MergedGroup(
+            hkl=[[int(v) for v in hkl[k]] for k in local],
+            intensity=float(cp.hkl_intensity[local].sum()),
+            stderr=sd))
     return out
 
 
@@ -10645,19 +10678,17 @@ def _pawley_unresolved_diagnostics(model: CompiledModel,
     pb = model.pawley
     if pb is None or pb.stderr is None or not pb.groups:
         return []
-    intens = model.pawley_x0()
     out: list[Diagnostic] = []
+    intens = model.pawley_x0()
     for g in pb.groups:
         inten = intens[list(g)]
         sd = np.asarray(pb.stderr)[list(g)]
         rel = sd / np.maximum(np.abs(inten), 1e-10)
         if float(np.max(rel)) < PAWLEY_UNRESOLVED_REL:
             continue  # every member is pinned by the data — the split is real
-        labels = []
-        for gi in g:
-            ip, k = _pawley_locate(pb, gi)
-            h = reflection_label(model.phases[ip].reflections.hklm[k])
-            labels.append(f"{structure.phases[ip].name} {h}")
+        labels = [_pawley_label(pb, model, structure, gi) for gi in g]
+        # a lattice-merged column is several reflections (WP-2315)
+        n_refl = sum(len(pb.column_members(gi)) for gi in g)
         total = float(np.sum(inten))
         # a split on a direction the covariance discards has no esd (WP-2219)
         worst = (f"the relative esd of an individual value reaches "
@@ -10665,7 +10696,7 @@ def _pawley_unresolved_diagnostics(model: CompiledModel,
                  else "an individual value has no esd.")
         out.append(Diagnostic(
             level="info", code="PAWLEY_OVERLAP_UNRESOLVED", where=labels,
-            message=(f"{len(g)} reflections overlap too strongly to split. "
+            message=(f"{n_refl} reflections overlap too strongly to split. "
                      f"Their summed intensity ({total:.4g}) is determined, and "
                      f"{worst}"),
             suggestion="Use the group's summed intensity as the datum.",
@@ -10688,13 +10719,16 @@ def _pawley_off_data_diagnostics(model: CompiledModel,
     if pb is None or not pb.off_data:
         return []
     by_phase: dict[int, list[str]] = {}
+    n_refl: dict[int, int] = {}
     for gi in pb.off_data:
-        ip, k = _pawley_locate(pb, gi)
-        h = reflection_label(model.phases[ip].reflections.hklm[k])
-        by_phase.setdefault(ip, []).append(f"{structure.phases[ip].name} {h}")
+        members = pb.column_members(gi)
+        ip = members[0][0]
+        by_phase.setdefault(ip, []).append(_pawley_label(pb, model, structure, gi))
+        # a lattice-merged column is several reflections (WP-2315)
+        n_refl[ip] = n_refl.get(ip, 0) + len(members)
     return [Diagnostic(
         level="info", code="PAWLEY_OFF_DATA_RIDGED", where=labels,
-        message=(f"{len(labels)} reflection(s) of {structure.phases[ip].name} have "
+        message=(f"{n_refl[ip]} reflection(s) of {structure.phases[ip].name} have "
                  f"no emission line centred on the fitted data, so their "
                  f"intensities come from the restraint."),
         suggestion="Do not export or use these intensities. Widen the fitted "
@@ -13266,12 +13300,14 @@ def _restraint_where(row, structure: Structure) -> list[str]:
     return [f"{phase.name} {phase.atoms[j].label}" for j in row.atoms]
 
 
-def _pawley_locate(pb, gi: int) -> tuple[int, int]:
-    """Map a flat intensity index to (phase index, in-phase reflection index)."""
-    for ip, (a, b) in enumerate(pb.phase_slices):
-        if a <= gi < b:
-            return ip, gi - a
-    raise IndexError(gi)
+def _pawley_label(pb, model: CompiledModel, structure: Structure, col: int) -> str:
+    """A Pawley column's label: ``phase (h k l)``, or its merged members
+    joined, ``phase (3 3 3)+(5 1 1)`` (WP-2315)."""
+    members = pb.column_members(col)
+    ip = members[0][0]
+    refl = model.phases[ip].reflections
+    hkl = "+".join(reflection_label(refl.hklm[k]) for _ip, k in members)
+    return f"{structure.phases[ip].name} {hkl}"
 
 
 def _tie_refusal_text(path: str, refused: tuple[str, str]) -> str:

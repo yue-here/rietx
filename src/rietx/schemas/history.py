@@ -257,6 +257,21 @@ class NodeAction(Base):
         return f"# model edited: {self.name or 'structure/instrument replaced'}"
 
 
+class MergedGroup(Base):
+    """Reflections refined as one Pawley intensity (WP-2315, ruling R5 (b)).
+
+    Their d-spacings agree in every cell the space group allows, such as cubic
+    (3 3 3) and (5 1 1), or (h k l) and (k h l) under 4/m, so the pattern
+    measures only their sum.  ``intensity`` is that sum and ``stderr`` its esd
+    from the fit, ``None`` before one has run.  No member has a measured
+    intensity of its own.
+    """
+
+    hkl: list[list[int]]  # the members, (M, 3)
+    intensity: float
+    stderr: float | None = None
+
+
 class ReflectionState(Base):
     """Per-hkl intensities, the state that is *not* in the parameter vector.
 
@@ -290,6 +305,15 @@ class ReflectionState(Base):
     kind: Literal["lebail_extracted", "pawley_refined"] = "lebail_extracted"
     stderr: list[float] | None = None  # Pawley has esds; Le Bail does not
     varied: bool = False  # were these free in θ?
+    #: Pawley only: the phase's lattice-merged groups (WP-2315), written by
+    #: ``refine._extract_reflections``.  A member's own ``intensity`` row is
+    #: its share of the group's sum by multiplicity and its ``stderr`` row is
+    #: ``inf``; the measured value is here.  ``[]`` when the phase merged
+    #: none, which includes a phase whose model reads hkl and so declines
+    #: the merge (``model.forward._lattice_merge_groups``), and ``None``
+    #: where no merge was examined: Le Bail, and a node written before
+    #: WP-2315.
+    merged_groups: list[MergedGroup] | None = None
 
 
 class RefinementState(Base):
