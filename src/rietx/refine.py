@@ -3569,10 +3569,13 @@ class Refinement:
         anything is applied, so a list with one typo leaves the model and the
         history as they were.  An agent reads an exception every time, where a
         warning can scroll past or show once per call site.  A pattern that
-        matches nothing stays silent (WP-1414), since that is how plans reach
-        a component a model may not declare.
+        matches no parameter **warns** (WP-2303), naming the pattern.  A
+        pattern whose matches were declined or already as asked stays silent.
+        A stage's ``turn_on`` does not come through this verb, so a plan's
+        glob reaching a component the model does not declare stays silent
+        (WP-1414).
 
-        A request that changes nothing it named **warns** (issue #896), with
+        A request that changes nothing it named also **warns** (issue #896), with
         the text a stage's ``STAGE_PATH_UNKNOWN`` and ``STAGE_PATH_NOT_FREE``
         give: a pattern under a retired spelling that matches nothing, with its
         current one, and, when freeing, a phase literal or a glob naming one
@@ -3666,11 +3669,13 @@ class Refinement:
         known = [e.path for e in table.entries]
         verb = "freed" if vary else "fixed"
         out = []
-        for path in table.unknown_paths(globs):
+        reported = table.unknown_paths(globs)
+        for path in reported:
             hint = _path_hint(path, known, self.instrument)
             out.append(f"set_vary {verb} nothing for {path!r}, which names no "
                        "parameter of this model."
                        + (f" {hint[:1].upper()}{hint[1:]}" if hint else ""))
+        answered = set(reported)
         if vary:
             request = [Stage("set_vary", globs)]
             subject = "a set_vary call"
@@ -3679,6 +3684,12 @@ class Refinement:
                       + _site_glob_diagnostics(request, table, self._ties,
                                                subject=subject)):
                 out.append(d.message + (f" {d.suggestion}" if d.suggestion else ""))
+                answered.update(d.where or ())
+        # every other pattern naming nothing (WP-2303); a retired one and a
+        # site glob were answered above in #896's words
+        out += _empty_match_findings(f"set_vary {verb}",
+                                     [g for g in globs if g not in answered],
+                                     known)
         return out
 
     def set_values(self, values: dict[str, float]) -> None:
@@ -4293,13 +4304,18 @@ class Refinement:
         sweeps in a locked row is a glob to narrow, and the message names it.
 
         Returns the paths actually tied, source excluded.
+
+        A literal path the model lacks raises with the nearest real path, as
+        :meth:`set_vary` does (WP-1951).  A pattern matching no parameter
+        warns when the others tie a group (WP-2303), and nothing matching at
+        all raises.
         """
         globs = [paths] if isinstance(paths, str) else list(paths)
         table = self._working_table()
-        import fnmatch
-
-        matched = [e.path for e in table.entries
-                   if any(fnmatch.fnmatchcase(e.path, g) for g in globs)]
+        self._refuse_unknown_literals(globs, table)
+        known = [e.path for e in table.entries]
+        matched = [p for p in known
+                   if any(fnmatch.fnmatchcase(p, g) for g in globs)]
         if not matched:
             raise ValueError(f"no parameter matches {globs}")
         src = source if source is not None else matched[0]
@@ -4308,7 +4324,9 @@ class Refinement:
             raise ValueError(
                 f"{globs} matches only {src!r}, so there is nothing to tie to "
                 "it; an equality group needs at least two parameters")
-        return self._declare_ties({p: ([(src, 1.0)], 0.0) for p in targets})
+        tied = self._declare_ties({p: ([(src, 1.0)], 0.0) for p in targets})
+        _warn_each(_empty_match_findings("tie_equal tied", globs, known))
+        return tied
 
     def untie(self, paths: list[str] | str) -> list[str]:
         """Release user ties, recording a ``set_tie`` node.
@@ -4317,7 +4335,9 @@ class Refinement:
         ``untie("phases.0.atoms.*.biso")`` releases what this refinement tied
         and leaves symmetry alone.  A literal path that is not a user tie is
         refused with the reason — that call meant one specific parameter, and a
-        silent no-op would read as success.
+        silent no-op would read as success.  A pattern matching no parameter
+        of the model warns (WP-2303); one matching parameters none of which
+        is a user tie stays silent, so a repeated sweep says nothing.
 
         An untied parameter comes back **held** at the value its tie last gave
         it, not free: releasing a constraint is not a decision to refine, and
@@ -4341,7 +4361,12 @@ class Refinement:
                     f"{glob!r} is tied by symmetry, not by this refinement, and "
                     "cannot be released")
             raise ValueError(f"{glob!r} is not tied")
+        # a pattern naming no parameter at all, against the table rather than
+        # the ties, so a repeated untie matches and stays silent (WP-2303)
+        empty = _empty_match_findings("untie released", globs,
+                                      [*known, *self._ties])
         if not hits:
+            _warn_each(empty)
             return []
         derived = table.derived_paths()
         for path in hits:
@@ -4355,6 +4380,7 @@ class Refinement:
                 # the register entry, holds it there (WP-2118)
                 table.set_tie(path, None)
         self._commit_tie_edit(table, ties={}, untied=hits)
+        _warn_each(empty)
         return hits
 
     # ------------------------------------------------------------------
@@ -4367,8 +4393,9 @@ class Refinement:
         a stage's ``turn_on`` (``"phases.*.cell.*"``).  Returns the paths this
         call **newly** held, sorted, and records a ``set_hold`` node carrying
         them.  A second call over the same glob returns ``[]`` and records
-        nothing, having changed nothing; an unknown literal path raises, while
-        a pattern matching none is an empty sweep rather than an error.
+        nothing, having changed nothing.  An unknown literal path raises, and
+        a pattern matching no parameter warns, naming it (WP-2303): a misspelt
+        glob would otherwise hold nothing while the parameter refines.
 
         **This is not ``set_vary(paths, False)``.**  A plan *replaces* the
         vary flags rather than continuing them (WP-1208), so a stage whose
@@ -4428,11 +4455,14 @@ class Refinement:
                 "origin, rotation and torsions instead "
                 f"({', '.join(_body_dof_globs(b) for b in owners)})")
         new = [p for p in hits if p not in self._user_holds]
+        empty = _empty_match_findings("hold held", globs, known)
         if not new:
+            _warn_each(empty)
             return []
         self._user_holds.update(new)
         table.set_held(new, True)
         self._commit_hold_edit(table, held=new, unheld=[])
+        _warn_each(empty)
         return new
 
     def hold_floating_origin(self) -> list[Diagnostic]:
@@ -4518,7 +4548,9 @@ class Refinement:
         cannot reach anything the space group fixed.  A literal path that is
         not held is refused with the reason, exactly as :meth:`untie` refuses
         one that is not tied: that call meant one parameter, and a silent
-        no-op would read as success.
+        no-op would read as success.  A pattern matching no parameter of the
+        model warns (WP-2303); one matching parameters none of which is held
+        stays silent, so a repeated sweep says nothing.
 
         A released parameter comes back **fixed** at its current value, never
         free.  Withdrawing a declaration that something must not move is not a
@@ -4557,7 +4589,13 @@ class Refinement:
             if glob not in known:
                 raise _unknown_path_error(glob, known, self.instrument)
             raise ValueError(f"{glob!r} is not held by this refinement")
+        # against the table rather than the holds, so a repeated unhold
+        # matches and stays silent (WP-2303)
+        empty = _empty_match_findings(
+            "unhold released", globs,
+            [*(e.path for e in table.entries), *self._user_holds])
         if not hits and not origin_hits:
+            _warn_each(empty)
             return []
         if hits:
             # the register first, then the same table: ``set_held`` re-runs the
@@ -4574,6 +4612,7 @@ class Refinement:
             for ip in released:
                 structure.phases[ip].floating_origin = None
             self.edit(structure=structure, label="unhold: floating origin")
+        _warn_each(empty)
         return sorted(set(hits) | set(origin_hits))
 
     def _commit_hold_edit(self, table: ParameterTable, *,
@@ -9203,7 +9242,7 @@ def _path_hint(path: str, known, instrument=None) -> str:
     """
     current = retired_spelling(path)
     if current is not None:
-        return f"it is a spelling retired after v1.2, now spelled {current!r}."
+        return _retired_words(current)
     if (hit := undeclared_opt_in(path, known, instrument)) is not None:
         row, owner = hit
         # "a parameter of", never "exists once declared": an indexed family
@@ -9211,6 +9250,53 @@ def _path_hint(path: str, known, instrument=None) -> str:
         return (f"it is a parameter of {row.name}, which {_owner_words(owner)} "
                 f"does not declare. Declare it with {row.declaration}.")
     return did_you_mean(path, known, n=1)
+
+
+def _retired_words(current: str) -> str:
+    """The clause naming a retired spelling's current one, for an unknown path."""
+    return f"it is a spelling retired after v1.2, now spelled {current!r}."
+
+
+def _empty_match_findings(verb: str, globs, known) -> list[str]:
+    """What a glob verb warns for each pattern matching no path in ``known``.
+
+    Rule 4's empty match (WP-2303): a pattern the caller passed that names no
+    parameter at all is most likely a typo, and the verb's ``[]`` cannot say
+    so, since ``[]`` is also the answer to a pattern whose rows were declined
+    or were already as asked.  Those stay silent: a repeated ``hold`` matched
+    and changed nothing.  Literals are left out, as every verb has raised on
+    an unknown one before this is asked.  A plan's ``turn_on`` never comes
+    here, because a plan's glob may reach a component the model does not
+    declare (WP-1414).  ``verb`` is the sentence's subject and past tense
+    (``"hold held"``).  Order kept, repeats dropped.
+
+    A retired spelling is named with its current one; any other pattern is
+    pointed at the full list, because the nearest *path* to a pattern is
+    rarely the pattern the caller meant.  A pattern with a ``[`` is told why
+    first, as the manual's parameter-table page warns: fnmatch reads
+    ``phases[0]`` as a set of characters, and no name has brackets.
+    """
+    out = []
+    for glob in dict.fromkeys(globs):
+        if is_literal_path(glob) or any(fnmatch.fnmatchcase(p, glob)
+                                        for p in known):
+            continue
+        current = retired_spelling(glob)
+        words = _retired_words(current) if current is not None else ""
+        tail = (f" {words[:1].upper()}{words[1:]}" if current is not None
+                else (" No parameter name contains square brackets, and the "
+                      "match reads [...] as a set of characters."
+                      if "[" in glob else "")
+                + " Refinement.parameters() lists every path.")
+        out.append(f"{verb} nothing for {glob!r}, which matches no parameter "
+                   "of this model." + tail)
+    return out
+
+
+def _warn_each(messages: list[str]) -> None:
+    """Warn each of ``messages`` at the caller of the public verb calling this."""
+    for message in messages:
+        warnings.warn(message, UserWarning, stacklevel=3)
 
 
 def _owner_words(owner: str) -> str:

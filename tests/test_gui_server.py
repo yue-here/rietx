@@ -2731,8 +2731,11 @@ def test_a_bulk_glob_is_one_round_trip_and_one_history_node(blank, tmp_path,
     assert status == 200 and payload["changed"]["vary"]["instrument.profile.*"] == freed
     assert len(project.history) == before + 3
 
-    # a glob nobody matches is not an error: it changed nothing, and says so
-    status, payload = client.patch("/api/params", {"vary": {"nothing.at.*": True}})
+    # a glob nobody matches is not an error: it changed nothing, and says so.
+    # The verb's warning (WP-2303) reaches only the server's stderr until the
+    # GUI's message channel carries it, that WP's open task
+    with pytest.warns(UserWarning, match=r"'nothing\.at\.\*'"):
+        status, payload = client.patch("/api/params", {"vary": {"nothing.at.*": True}})
     assert status == 200 and payload["changed"]["vary"]["nothing.at.*"] == []
     assert len(project.history) == before + 4   # …but it is still a recorded move
 

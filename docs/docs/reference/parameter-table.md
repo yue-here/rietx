@@ -18,7 +18,8 @@ A number in the middle is a list index, counted from 0 in the order the model st
 The same names, with `*` and `?` as wildcards, are what `Refinement.set_vary`, `Refinement.hold`, `Refinement.untie` and a stage's `turn_on` list take.
 
 A name never contains square brackets.
-The matching reads `[0]` as a set of characters, so `phases[0].cell.a` matches nothing and raises no error.
+The matching reads `[0]` as a set of characters, so `phases[0].cell.a` matches nothing.
+A stage raises no error for it, and `set_vary` only warns.
 
 Some names exist only when the model declares the block they belong to.
 `phases.0.microstrain.dof.*` appears once the phase carries a `StephensStrain`, `phases.0.atoms.2.adp.*` once that atom carries an `AnisoU`, and `instrument.geometry.capillary_offset_along_beam` only on a capillary geometry.
@@ -359,11 +360,16 @@ A held row is skipped by a wildcard name, as a locked one is.
 A literal path to a row you held raises `ValueError`, saying to `Refinement.unhold` it first.
 A row the current mode fixes is the exception to the matching rule: `set_vary` frees it, and the next stage drops it again and reports it as `mode_fixed`.
 
-A literal path the model lacks raises `ValueError` and names the nearest real path, as `Refinement.hold`, `Refinement.tie`, `Refinement.untie` and `Refinement.set_values` do.
+A literal path the model lacks raises `ValueError` and names the nearest real path, as `Refinement.hold`, `Refinement.tie`, `Refinement.tie_equal`, `Refinement.untie` and `Refinement.set_values` do.
 A path of an opt-in correction the model does not declare names the declaration instead.
 For extinction on a phase that declares none, it names `phase.extinction = 0.0`.
 `set_vary` checks every literal in the call before it changes anything, so a list with one wrong name leaves the model and the history as they were.
-A pattern that matches nothing returns `[]` in silence, since plans reach components that some models lack.
+A pattern that matches no parameter returns `[]` and warns with a `UserWarning` naming the pattern.
+`Refinement.hold`, `Refinement.unhold` and `Refinement.untie` warn the same way.
+`Refinement.tie_equal` warns for such a pattern when its other patterns tie a group, and raises when no pattern matches anything.
+A pattern that matched rows and changed none of them stays silent, so a repeated `hold` says nothing.
+The exceptions are `set_vary`'s, in the next paragraph.
+A stage's pattern that matches nothing also stays silent, since plans reach components that some models lack.
 
 `set_vary` warns with a `UserWarning` when it frees nothing for a row that exists.
 It also warns when a pattern under a spelling a release retired matches nothing, and names the current spelling.

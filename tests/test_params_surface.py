@@ -6,6 +6,7 @@ WP-1004.  Everything here is plain API — the GUI is a consumer, not a premise.
 from __future__ import annotations
 
 import dataclasses
+import fnmatch
 from pathlib import Path
 
 import pytest
@@ -1166,7 +1167,6 @@ def test_set_vary_warns_on_a_request_that_changes_nothing(args, says):
 @pytest.mark.parametrize("args", [
     ("phases.*.atoms.*.dof.*",), ("phases.*.cell.*",),
     (["phases.0.cell.a", "phases.0.cell.b"],), ("phases.0.atoms.0.x", False),
-    ("instrument.extra_components.*",),
 ])
 def test_set_vary_is_silent_on_a_sweep_or_a_request_it_honoured(args):
     import warnings
@@ -1195,7 +1195,7 @@ def test_set_vary_refuses_an_unknown_literal_before_changing_anything(
     """Settled under delegation (WP-1951, 2026-11-02): a literal path the model
     lacks raises, as the sibling verbs do, and every literal is checked before
     anything applies, so a list with one typo leaves model and history as
-    they were.  A pattern matching nothing stays silent (WP-1414)."""
+    they were.  A pattern matching nothing warns (WP-2303)."""
     ref.fit(pattern, plan=SHORT)
     before = [(r.path, r.vary) for r in ref.parameters()]
     n_nodes, head = len(ref.history), ref._head_id
@@ -1208,7 +1208,94 @@ def test_set_vary_refuses_an_unknown_literal_before_changing_anything(
         "'phases.0.cel.a', did you mean 'phases.0.cell.a'?"), "each typo once"
     assert [(r.path, r.vary) for r in ref.parameters()] == before
     assert (len(ref.history), ref._head_id) == (n_nodes, head)
-    assert ref.set_vary("phases.*.nothing.*", vary) == []
+    with pytest.warns(UserWarning, match=r"'phases\.\*\.nothing\.\*'"):
+        assert ref.set_vary("phases.*.nothing.*", vary) == []
+
+
+#: Each glob verb's call with one pattern that names no parameter (WP-2303),
+#: beside one that does where the verb needs a match to reach its warning.
+EMPTY_MATCH_CALLS = {
+    "set_vary-free": ("set_vary", ("phases.0.cel.*",), "set_vary freed"),
+    "set_vary-fix": ("set_vary", ("phases.0.cel.*", False), "set_vary fixed"),
+    "set_vary-absent-family": ("set_vary", ("instrument.extra_components.*",),
+                               "set_vary freed"),
+    "hold": ("hold", (["phases.0.cell.*", "phases.0.cel.*"],), "hold held"),
+    "unhold": ("unhold", ("phases.0.cel.*",), "unhold released"),
+    "untie": ("untie", ("phases.0.atom.*.biso",), "untie released"),
+    "tie_equal": ("tie_equal", (["phases.0.atoms.*.biso", "phases.0.cel.*"],),
+                  "tie_equal tied"),
+}
+
+
+@pytest.mark.parametrize("verb, args, says", EMPTY_MATCH_CALLS.values(),
+                         ids=EMPTY_MATCH_CALLS)
+def test_a_glob_verb_warns_on_a_pattern_matching_nothing(verb, args, says):
+    """Rule 4 (WP-2303): the caller's own pattern naming nothing warns, naming it.
+
+    Before, each returned ``[]`` in silence, so a misspelt ``hold`` held
+    nothing and the parameter refined.
+    """
+    ref = rx.Refinement(*perturbed_models(), history=False)
+    paths = [r.path for r in ref.parameters()]
+    globs = [args[0]] if isinstance(args[0], str) else args[0]
+    glob = next(g for g in globs
+                if not any(fnmatch.fnmatchcase(p, g) for p in paths))
+    with pytest.warns(UserWarning) as caught:
+        getattr(ref, verb)(*args)
+    messages = [str(w.message) for w in caught]
+    assert [m for m in messages if repr(glob) in m] == [
+        f"{says} nothing for {glob!r}, which matches no parameter of this "
+        "model. Refinement.parameters() lists every path."], messages
+
+
+def test_a_glob_verb_is_silent_when_it_matched_and_changed_nothing():
+    """Matched-and-unchanged is not the caller's mistake: a repeat says nothing."""
+    import warnings
+
+    ref = rx.Refinement(*perturbed_models(), history=False)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        assert ref.hold("phases.0.cell.*")
+        assert ref.hold("phases.0.cell.*") == []
+        assert ref.unhold("phases.0.cell.*")
+        assert ref.unhold("phases.0.cell.*") == []
+        assert ref.untie("phases.0.atoms.*.biso") == []    # nothing tied yet
+        assert ref.tie_equal("phases.0.atoms.*.biso")
+        assert ref.untie("phases.0.atoms.*.biso")
+        assert ref.untie("phases.0.atoms.*.biso") == []
+
+
+def test_a_glob_verb_commits_before_it_warns():
+    """A caller turning warnings into errors keeps what the call did."""
+    import warnings
+
+    ref = rx.Refinement(*perturbed_models(), history=False)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        with pytest.raises(UserWarning, match="phases.0.cel"):
+            ref.hold(["phases.0.cell.*", "phases.0.cel.*"])
+    assert "phases.0.cell.a" in ref._user_holds
+
+
+def test_tie_equal_refuses_an_unknown_literal_as_its_siblings_do():
+    """WP-2303's sibling: a literal the model lacks raised everywhere but here,
+    where it dropped out of the group in silence (WP-1951's rule)."""
+    ref = rx.Refinement(*perturbed_models(), history=False)
+    with pytest.raises(ValueError, match=r"unknown parameter path: "
+                       r"'phases\.0\.atoms\.9\.biso'"):
+        ref.tie_equal(["phases.0.atoms.0.biso", "phases.0.atoms.9.biso"])
+    assert ref._ties == {}
+
+
+def test_a_plan_glob_matching_nothing_stays_silent(pattern):
+    """WP-1414's silence is the plan's, and a stage never calls the verb."""
+    import warnings
+
+    ref = rx.Refinement(*perturbed_models(), history=False)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
+        ref.fit(pattern, plan=rx.RefinementPlan(stages=[rx.Stage(
+            "scale", ["phases.*.scale", "phases.*.nothing.*"], max_iter=3)]))
 
 
 @pytest.mark.parametrize("verb, arg", [
