@@ -1,0 +1,2023 @@
+{
+ "codes": {
+  "EXTINCTION_CONDITIONS_PARTIAL": {
+   "condition": "Fires on an extinction class whose printed reflection conditions do not name every absence the class implies (`not cand.conditions_complete`, indexing/diagnostics.py:1015).",
+   "kind": 1,
+   "statistic": 1,
+   "threshold": "n/a",
+   "action": 1,
+   "measured_on": "n/a",
+   "evidence": "Arithmetic on the class's own absence set against its readable summary; the screen used the full set, so no score, rank or pick moves. The info level says nothing is owed for any purpose, which matches what it reports."
+  },
+  "EXTINCTION_FORBIDDEN_INTENSITY": {
+   "condition": "Fires on a class refuted because at least one testable forbidden position carries net intensity of ABSENT_SIGMA (3) times its propagated sigma or more against the class's own Pawley y_calc (indexing/extinction.py:1524-1545; diagnostics.py:992).",
+   "kind": 2,
+   "statistic": 3,
+   "threshold": 3,
+   "action": 3,
+   "measured_on": "IUCr CPD QPA round-robin qarr lab Cu Ka patterns (one source; corundum SRM 676a, zincite, zircon, brucite, magnetite, fluorite, cpd-1a); WP-1077 sham probes; no second or third family named for the firing side.",
+   "evidence": "The testability rule (`_model_is_quiet`, WP-1077) and the absence test against the class's own fit are rietx's own; ABSENT_SIGMA's 3 is the 99.7 % window shared with MATCH_SIGMA, and one present position suffices to refute. **Demotes a candidate:** `refuted=True` sorts the class below every unrefuted one (extinction.py:1568) and `best_or_none` cannot return it. Unanimity: no; a careful refiner who reads the excess as an impurity line at a forbidden position keeps the class (the code's own suggestion says so), and the gallery's zincite row records its true 6_3 screw and c-glide still refuted (tests/indexing_gallery.py, zincite).",
+   "question": "A single 3-sigma position refutes and demotes a class, and the true zincite class is refuted on disk; should a refuted class keep its ranked place with its present-position count as the evidence (report), rather than be sorted below every unrefuted class (refuse)?"
+  },
+  "EXTINCTION_GROUPS_NOT_SEPARABLE": {
+   "condition": "Fires when the leading extinction class admits more than one space group (`len(top.space_groups) > 1`, indexing/diagnostics.py:1129).",
+   "kind": 3,
+   "statistic": 1,
+   "threshold": 1,
+   "action": 1,
+   "measured_on": "n/a",
+   "evidence": "Group theory: members of one extinction symbol differ only by elements that produce no systematic absence, so the statement is physics and fires whenever it is true. Info is the right level, since no data could act on it; the full list travels and no group is picked."
+  },
+  "EXTINCTION_PRIOR_APPLIED": {
+   "condition": "Fires when a declared ExtinctionPrior (Sohncke, centrosymmetric, polar, Z or density) removed space groups from some classes, at warning when it emptied the data's leading class or a declared density contradicts Z, at info otherwise (indexing/diagnostics.py:1272, `_prior_diagnostic`).",
+   "kind": 1,
+   "statistic": 1,
+   "threshold": 2,
+   "action": "caller",
+   "measured_on": "n/a",
+   "evidence": "The filter is opt-in (`determine_extinction_symbol(restrict=)`, off by default) and moves no Delta-BIC; membership is group theory and the density test uses DENSITY_Z_TOLERANCE (1.5 %, International Tables Vol. C ch. 3.2, tier 2 on its row, WP-2033). The level split (warning when the declaration and the data disagree) is the caller-visible half of best_or_none's abstention and reads two different consequences, so it is not a threshold between levels. The withdrawn INDEX_Z_NOT_INTEGER (schemas/indexing.py:218, WP-2030) is not this code: its volume-window rule is WP-2030's to own (WP-1510 entry).",
+   "question": "WP-2033's inherited entry: the `z_candidates` field comment on ExtinctionScreen (schemas/indexing.py ~2547) still says two whole Z fit from Z of about 50, where the 1.5 % tolerance gives two from Z of about 33 (extinction.py:184 already says 33); correct it when DENSITY_Z_TOLERANCE's row is written?"
+  },
+  "EXTINCTION_SCREEN_FAILED": {
+   "condition": "Fires at error when the prefit or reference fit raised, or when the lattice group predicts no reflection in the measured range (indexing/extinction.py:1302, :1347).",
+   "kind": 1,
+   "statistic": 1,
+   "threshold": "n/a",
+   "action": 1,
+   "measured_on": "n/a",
+   "evidence": "A raised fit or an empty reflection set is arithmetic, and no class is scored, so there is nothing to read; error is the rule's level for that. It removes no cell and picks nothing, and REFERENCE_NET_RWP_MAX is read first so a reference that models nothing reports as unreliable instead (extinction.py:1336-1340, WP-2076)."
+  },
+  "EXTINCTION_SCREEN_UNRELIABLE": {
+   "condition": "Fires when the absence-free reference fit's background-subtracted Rwp exceeds REFERENCE_NET_RWP_MAX (0.7071) or is unmeasured (indexing/diagnostics.py:1069; extinction.py:1336).",
+   "kind": 2,
+   "statistic": 2,
+   "threshold": 3,
+   "action": 3,
+   "measured_on": "Already tiered: silent side on four real families, firing side on synthetic Si, SRM 676a at x1.02 and GSAS-II LabData fluorapatite (lab) at x0.99 (_audit.py:678).",
+   "evidence": "Already tiered (tier 3, approved 2026-10-21, PR #939): the row's tier is copied into threshold and action. The statistic is Toby's (2006, Powder Diffr. 21, 67) background-subtracted Rwp, as REFERENCE_NET_RWP_MAX's comment cites. The action withholds the pick and keeps the ranking."
+  },
+  "EXTINCTION_SYMBOL_AMBIGUOUS": {
+   "condition": "Fires at warning when the runner-up class lies within DECISIVE_DELTA_BIC (10) of the leader, a declared prior is contradicted, the leader has no testable absence, classes were left unfitted or raised, every class was refuted, or the screen was cancelled or had no candidates; at info on a class with no testable absence (indexing/diagnostics.py:1003, :1093, :1101, :1179).",
+   "kind": 2,
+   "statistic": 2,
+   "threshold": 2,
+   "action": 3,
+   "measured_on": "IUCr CPD QPA round-robin qarr lab Cu Ka patterns (one source; corundum SRM 676a, zincite, zircon, brucite, magnetite, fluorite, cpd-1a) (SRM 676a corundum); GSAS-II LabData fluorapatite (lab); APS 11-BM NAC (synchrotron); GSAS-II PbSO4 X-ray (Hill 1992); synthetic P2_1/c (tests/test_extinction_gate.py, test_extinction_margin.py).",
+   "evidence": "The statistic is Schwarz's BIC difference with the penalty counted on testable lines only (WP-2076); the threshold is Kass & Raftery (1995, J. Am. Stat. Assoc. 90, 773) 'very strong', as extinction.py:149 cites. The action withholds `best_or_none` and keeps the full ranking, which is DESIGN.md Rule 1's second-kind posture; it removes no class. Unanimity: yes, none found, since a caller who would accept 'strong' evidence (6-10) still has every class's Delta-BIC in the ranking.",
+   "question": "The GUI route calls `screen.best_or_none()` (gui/session.py:2803), so the pick under this margin sits on a default path; is DECISIVE_DELTA_BIC therefore the unanimity margin the WP's best_or_none task tiers (tier 2 by Kass & Raftery)?"
+  },
+  "LAUE_CLASS_NOT_SEPARABLE": {
+   "condition": "Fires when the leading class's admitted groups fall in more than one Laue class (`len(top.laue_classes) > 1`, indexing/diagnostics.py:1115).",
+   "kind": 3,
+   "statistic": 1,
+   "threshold": 1,
+   "action": 1,
+   "measured_on": "n/a",
+   "evidence": "Group theory: Laue classes sharing every position and absence differ only in the intensity partition inside overlapped multiplets, which a powder does not expose. Info, and it moves nothing."
+  },
+  "INDEX_ABSTAINED": {
+   "condition": "Fires whenever `IndexingResult.best_or_none()` returns None: no candidate, or not exactly one candidate graded high without ambiguity partners; warning with candidates, error with none (indexing/diagnostics.py:893-912).",
+   "kind": 2,
+   "statistic": 1,
+   "threshold": 3,
+   "action": 3,
+   "measured_on": "NIST SRM 660c LaB6 (lab Cu Ka, analyzer); IUCr CPD QPA round-robin qarr lab Cu Ka patterns (one source; corundum SRM 676a, zincite, zircon, brucite, magnetite, fluorite, cpd-1a); APS 11-BM NAC (synchrotron); GSAS-II LabData fluorapatite (lab); hl2 bare position list (unknown phase)",
+   "evidence": "The statistic is arithmetic over the gate's grades (schemas/indexing.py:2245-2263). The threshold is the gate itself: high needs zero caveats and every engine behind the cell (consensus.py:765-769), with INDEX_REFUTING_CAVEATS's split rietx's own (WP-1024, WP-1042). The action withholds the pick and keeps the ranking with every caveat. Unanimity on withholding: yes, none found; on the level: on real data with no measured shift `high` is unreachable by design (shift_allowance_assumed, indexing/CLAUDE.md), so this warning fires on nearly every default run.",
+   "question": "Attention clause 1: a warning that fires on nearly every real-data run tells no fit from another; should the abstention be the record (best_or_none None plus the caveats) and the code fire only where it says something a run can differ on? And is error right for an empty search, which is an answer rather than unreadable values? Separately, best_or_none is reached on default paths: workflow._emit_end's `index_end` event carries its cell (workflow.py:1211), the CLI exit code (cli.py:374) and the GUI's picked row (gui/session.py:2593)."
+  },
+  "INDEX_MULTIPLE_SOLUTIONS": {
+   "condition": "Fires when more than one candidate is graded high (`len(high) > 1`, indexing/diagnostics.py:881).",
+   "kind": 2,
+   "statistic": 1,
+   "threshold": 1,
+   "action": 3,
+   "measured_on": "NIST SRM 660c LaB6 (lab Cu Ka, analyzer); IUCr CPD QPA round-robin qarr lab Cu Ka patterns (one source; corundum SRM 676a, zincite, zircon, brucite, magnetite, fluorite, cpd-1a); APS 11-BM NAC (synchrotron); GSAS-II LabData fluorapatite (lab); hl2 bare position list (unknown phase)",
+   "evidence": "Arithmetic count of high grades; `best_or_none` returns None and every candidate stays ranked. Unanimity: yes, none found; no refiner names one of two cells that each pass the whole gate. The action is withholding a pick, never removing a candidate."
+  },
+  "INDEX_NOT_VALIDATED": {
+   "condition": "Fires when no pattern was supplied, so no candidate had a whole-profile fit (`not result.validated`, indexing/diagnostics.py:914).",
+   "kind": 1,
+   "statistic": 1,
+   "threshold": "n/a",
+   "action": 3,
+   "measured_on": "hl2 bare position list (unknown phase); the bethanechol benchmark sets (positions only).",
+   "evidence": "The fact is arithmetic; the act is the capping caveat `not_validated` on every candidate (consensus.py:684), so high is out of reach and nothing is refuted. Capping is rietx's gate (WP-1024). Unanimity: a dissenter exists, since de Wolff (1968) reads M20 >= 10 as sufficient for a correct cell from positions alone, and the classical programs report peaks-only solutions; the cap only withholds high and leaves medium.",
+   "question": "Is capping a peaks-only answer at medium unanimous, given that de Wolff's M20 criterion is the field's own peaks-only acceptance (tier 2 practice)?"
+  },
+  "INDEX_SYSTEMS_NOT_COVERED": {
+   "condition": "Fires when some crystal system is missing from `systems_searched` (indexing/diagnostics.py:923).",
+   "kind": 1,
+   "statistic": 1,
+   "threshold": "n/a",
+   "action": 1,
+   "measured_on": "n/a",
+   "evidence": "Arithmetic on the systems searched against SYSTEM_ORDER; info, and it moves no grade or rank. It names a scope the caller declared or the ceiling left."
+  },
+  "INDEX_CELL_SYSTEMATIC_UNQUANTIFIED": {
+   "condition": "Fires on every run with candidates when no instrument was supplied or the geometry is Bragg-Brentano, stating BRAGG_BRENTANO_CELL_PPM (85 ppm) as the unquantified systematic (indexing/diagnostics.py:950, :963).",
+   "kind": 3,
+   "statistic": 3,
+   "threshold": "n/a",
+   "action": 1,
+   "measured_on": "One study (tag guillemot-study, audit_tools.py check A): one lab Bragg-Brentano family.",
+   "evidence": "The 85 ppm is rietx's own measurement (goniometer radius swept 180-320 mm moves Rwp 0.029 points while about 85 ppm lands on the cell); it is the meaning of the cell esd, not a verdict, and it moves nothing. Info is right for the level, but the code fires on every Bragg-Brentano run with candidates.",
+   "question": "Attention clause 1: a diagnostic firing on every Bragg-Brentano run tells no run from another; should it become a record field on the result (the cell's unquantified systematic, keyed in rietx.help) with one report line?"
+  },
+  "INDEX_DATA_INSUFFICIENT": {
+   "condition": "Fires at error, and no engine runs, when the list has fewer than two usable lines, fewer than MIN_LINES_PER_DOF (5) usable lines per metric degree of freedom in every system, or a median sigma(Q)/Q above MAX_RELATIVE_SIGMA_Q (1e-3) on a fitted list (indexing/quality.py:426-491; workflow.py:962-975; engines' own two-line guards at dichotomy.py:807, svd.py:668, trial_error.py:289).",
+   "kind": 2,
+   "statistic": 1,
+   "threshold": 3,
+   "action": 3,
+   "measured_on": "IUCr CPD QPA round-robin qarr lab Cu Ka patterns (one source; corundum SRM 676a, zincite, zircon, brucite, magnetite, fluorite, cpd-1a); NIST SRM 660c LaB6 (lab Cu Ka, analyzer); APS 11-BM NAC (synchrotron); GSAS-II LabData fluorapatite (lab); bethanechol positions (the sigma arm is skipped on positions).",
+   "evidence": "**A gate that still refuses:** `supports_indexing=False` returns an empty result before any engine runs (workflow.py:962). The two-line arm is arithmetic (kind 1). The other two thresholds are rietx's: MIN_LINES_PER_DOF 'is not a statistical threshold' (schemas/indexing.py:470) and MAX_RELATIVE_SIGMA_Q is a resolving-power scale argument after Mighell & Santoro (1975), not a tested value. Unanimity: no; WP-1043 already moved the 20-line bar from refusing to reporting after fluorite's 18 clean cubic lines were refused, and an engine run with a widened tolerance on imprecise lines is ordinary practice.",
+   "question": "Should the per-DOF and sigma(Q)/Q arms report (search anyway, grade every candidate with a refuting or capping caveat naming the number) rather than refuse, keeping refusal for the two-line arithmetic case only, per 'gates report evidence, never refuse'?"
+  },
+  "INDEX_PANEL_REDUCED": {
+   "condition": "Fires when the search is supported but the list has fewer than PEAK_MIN_USABLE_LINES (20) usable lines, so some classical figures of merit are undefined (indexing/diagnostics.py:622).",
+   "kind": 1,
+   "statistic": 1,
+   "threshold": 2,
+   "action": 3,
+   "measured_on": "IUCr CPD QPA round-robin qarr lab Cu Ka patterns (one source; corundum SRM 676a, zincite, zircon, brucite, magnetite, fluorite, cpd-1a) (fluorite, 18 lines).",
+   "evidence": "The threshold is de Wolff's (1968) M20, defined on the first twenty lines, and Smith's (1977) envelope at N = 20 (schemas/indexing.py PEAK_MIN_USABLE_LINES comment); Smith & Snyder recommend N = 30 for F_N, so scoring F_N at 20 is rietx's. The act is the capping caveat `fom_panel_reduced` (consensus.py:682), which keeps high out of reach and refutes nothing; the search still runs (WP-1043). Unanimity on capping high: yes, none found, since the panel that would score the cell is incomplete.",
+   "question": "PEAK_LIST_TOO_SHORT states the same fact one layer down at the same threshold; is one code enough (attention clause 1)?"
+  },
+  "PEAK_POSITION_PRECISION": {
+   "condition": "Fires on every list with a finite median sigma(Q)/Q, at warning above 0.3 x MAX_RELATIVE_SIGMA_Q and at info below (indexing/diagnostics.py:634-650).",
+   "kind": 1,
+   "statistic": 1,
+   "threshold": 3,
+   "action": 3,
+   "measured_on": "NIST SRM 660c LaB6 (lab Cu Ka, analyzer); IUCr CPD QPA round-robin qarr lab Cu Ka patterns (one source; corundum SRM 676a, zincite, zircon, brucite, magnetite, fluorite, cpd-1a); APS 11-BM NAC (synchrotron); GSAS-II LabData fluorapatite (lab); hl2 bare position list (unknown phase)",
+   "evidence": "The statistic is arithmetic on the fitted or assumed sigma. The level is split by an inline threshold whose free factor 0.3 has no comment or source, which the rule forbids ('never a threshold between levels'). It moves no search or grade.",
+   "question": "Should the level split at 0.3 x MAX_RELATIVE_SIGMA_Q go, leaving the numbers in DataQualityReport (relative_sigma_q_median, sigma_over_spacing) as record fields and no diagnostic that fires on every run?"
+  },
+  "PEAK_SIGMA_ASSUMED": {
+   "condition": "Fires at warning when the list's `source` is 'positions', so every sigma(2theta) is PEAK_ASSUMED_ESD_DEG (0.02 deg) rather than fitted (indexing/diagnostics.py:109).",
+   "kind": 1,
+   "statistic": 1,
+   "threshold": "n/a",
+   "action": 1,
+   "measured_on": "Bethanechol positions (acceptance test_a_bare_position_list_says_its_sigma_was_assumed); hl2 bare position list (unknown phase).",
+   "evidence": "Arithmetic on `PeakList.source`; the assumed value is PEAK_ASSUMED_ESD_DEG's own row. Warning matches the rule's definition, since the cell esd a positions-only run reports is computed from that assumed sigma. Only `peak_diagnostics` emits it, called by the GUI's peak editor and `pick_peaks` on lists that are not positions, so `index_pattern` on a `PeakList.from_positions` list never shows it (quality.py:415-418; WP-2013 entry).",
+   "question": "Should `index_pattern` (or `assess_peak_list`) emit PEAK_SIGMA_ASSUMED, naming the assumed sigma, for a positions list, since that is the only path a positions list actually takes?"
+  },
+  "INDEX_GEOMETRIC_AMBIGUITY": {
+   "condition": "Fires on a candidate with ambiguity partners: derivative lattices up to MAX_AMBIGUITY_INDEX (4) whose mean |dQ| is within AMBIGUITY_DISCREPANCY_SLACK (1.5) of the parent's and that the in-range absence test does not refute (indexing/diagnostics.py:730; ambiguity.py).",
+   "kind": 3,
+   "statistic": 2,
+   "threshold": 3,
+   "action": 3,
+   "measured_on": "NIST SRM 660c LaB6 (lab Cu Ka, analyzer) (half-volume rival); IUCr CPD QPA round-robin qarr lab Cu Ka patterns (one source; corundum SRM 676a, zincite, zircon, brucite, magnetite, fluorite, cpd-1a).",
+   "evidence": "The statistic is Mighell & Santoro's (1975) derivative-lattice ambiguity; the index fence and the 1.5 slack are rietx's (ambiguity.py:88, :99). **Demotes a candidate:** `geometric_ambiguity` is in INDEX_REFUTING_CAVEATS, so the candidate grades low and `best_or_none` refuses it. A candidate never reached by the sweep (outside CONSENSUS_CHECK_TOP's three and not found by every engine, or stopped by the ceiling) gets the same refuting caveat (consensus.py:671-674) and this code does not fire on it, since it keys on `cand.ambiguity`. Unanimity on refuting where partners exist: yes, none found.",
+   "question": "WP-1986 entry: the caveat for a candidate the ambiguity search never reached (consensus.py:671, the ~627 docstring) refutes, so under a binding ceiling every unreached candidate grades low, and so does every candidate ranked below three that two of three engines found; is that 'capping' (an unasked question) or 'refuting'? WP-2013 rewrote the comments to say refuting; if the ruling is capping, the code and those words change together, and an unreached candidate should say so in its own diagnostic."
+  },
+  "INDEX_BRAVAIS_AMBIGUOUS": {
+   "condition": "Fires when the lattice reads a higher symmetry only at a loose tolerance in the sweep (BRAVAIS_OBLIQUITIES 0.5-3 deg for gemmi, BRAVAIS_SYMPREC_SIGMAS 1, 3, 10 x the cell esd for spglib) or the two tools disagree at their tightest (indexing/diagnostics.py:751).",
+   "kind": 2,
+   "statistic": 2,
+   "threshold": 3,
+   "action": 3,
+   "measured_on": "NIST SRM 660c LaB6 (lab Cu Ka, analyzer); IUCr CPD QPA round-robin qarr lab Cu Ka patterns (one source; corundum SRM 676a, zincite, zircon, brucite, magnetite, fluorite, cpd-1a); APS 11-BM NAC (synchrotron); GSAS-II LabData fluorapatite (lab); hl2 bare position list (unknown phase)",
+   "evidence": "The statistic is Le Page's (1982) obliquity via gemmi plus spglib's symprec (reduce.py:5, :117-123); the sweep values are rietx's. The act is the capping caveat `bravais_ambiguous` (consensus.py:723) and the lower system reported; nothing is refuted or removed. Unanimity on reporting the lower symmetry and capping high: yes, none found. A candidate with `bravais is None` gets the caveat with no diagnostic."
+  },
+  "INDEX_PREDICTED_BUT_ABSENT": {
+   "condition": "Fires when the line screen counts predicted lines no extinction could remove with nothing above the picker's envelope: warning inside de Wolff's window (first twenty lines), info outside it (indexing/diagnostics.py:790).",
+   "kind": 2,
+   "statistic": 3,
+   "threshold": 3,
+   "action": 3,
+   "measured_on": "Already tiered: true magnetite and PbSO4 cells (count 2), NIST SRM 660c LaB6 (lab Cu Ka, analyzer) wrong a-sqrt2 I cell (_audit.py:812).",
+   "evidence": "Already tiered (tier 3, approved 2026-10-21, C3): the row's tier is copied into statistic, threshold and action. The window is de Wolff's; the > 0 trigger is rietx's own, and the act caps the grade (`predicted_but_absent`, capping since thresholds 1.12) and ranks nothing. The level split by in-window count is two consequences (caps or caps nothing), not a threshold between levels."
+  },
+  "INDEX_SUPERCELL_REFUTED": {
+   "condition": "Fires when a candidate's supercell check against a higher-ranked parent reads refuted: its uncancellable extra lines are seen no more often than chance at SUPERCELL_CHANCE_ALPHA (0.01) (indexing/diagnostics.py:814).",
+   "kind": 2,
+   "statistic": 3,
+   "threshold": 3,
+   "action": 3,
+   "measured_on": "Already tiered: acceptance corpus finished searches, brucite a x 2 supercell, APS 11-BM NAC (synchrotron) P description (_audit.py:832).",
+   "evidence": "Already tiered (tier 3, approved 2026-11-01, PR #1302): the row's tier is copied into every part. **Demotes a candidate:** it ranks directly below its parent and `supercell_refuted` is refuting, so it grades low; it stays in the list."
+  },
+  "INDEX_IMPURITY_LINES": {
+   "condition": "Fires on any validated candidate whose Pawley validation leaves at least one observed peak with no calculated reflection nearby (`lebail.unmatched_observed > 0`, indexing/diagnostics.py:833).",
+   "kind": 2,
+   "statistic": 3,
+   "threshold": 3,
+   "action": 3,
+   "measured_on": "WP-1041: 21 validated candidates on six known-cell datasets (NIST SRM 660c LaB6 (lab Cu Ka, analyzer); IUCr CPD QPA round-robin qarr lab Cu Ka patterns (one source; corundum SRM 676a, zincite, zircon, brucite, magnetite, fluorite, cpd-1a); APS 11-BM NAC (synchrotron); GSAS-II LabData fluorapatite (lab)).",
+   "evidence": "The count is deliberately not a caveat: WP-1041 measured it at 10-188 on correct cells, its level being the specimen's, and found it comparative only (consensus.py:652-663). The > 0 trigger is rietx's. The act is a per-candidate warning; it moves no grade or rank. Unanimity on the warning level: no, since on WP-1041's numbers it fires on the true cell of every validated dataset, including 11-BM NAC's truth with 188 unmatched against a CaF2 impurity.",
+   "question": "A warning that fires on correct cells by WP-1041's own measurement fails attention clause 1; should the count be a record field ranked across candidates (it is already `lebail.unmatched_observed`) with no per-candidate warning?"
+  },
+  "INDEX_VOLUME_UNPHYSICAL": {
+   "condition": "Fires on a candidate carrying `volume_unphysical`: volume below DEFAULT_MIN_VOLUME (15 A^3) or above VOLUME_ENVELOPE_SLACK (1.5) times Smith's (1977) envelope for its system (consensus.py:724-727; indexing/diagnostics.py:845).",
+   "kind": 2,
+   "statistic": 2,
+   "threshold": 3,
+   "action": 3,
+   "measured_on": "IUCr CPD QPA round-robin qarr lab Cu Ka patterns (one source; corundum SRM 676a, zincite, zircon, brucite, magnetite, fluorite, cpd-1a); GSAS-II LabData fluorapatite (lab) (WP-1045 slack).",
+   "evidence": "The envelope is Smith's (1977) mean-line volume estimate; 15 A^3 and the 1.5 slack are rietx's (WP-1045). **Demotes a candidate:** `volume_unphysical` is refuting, so the cell grades low. Unanimity: yes below 15 A^3 (no lattice); no above the envelope, since Smith's estimate excludes true cells below 0.71 line-completeness by its own calibration and a caller who widened max_volume for a large cell is a named dissenter.",
+   "question": "Should the upper arm (above 1.5 x Smith's envelope) cap rather than refute, keeping refutation for the sub-atomic lower arm?"
+  },
+  "INDEX_BUDGET_EXHAUSTED": {
+   "condition": "Fires when the whole-run ceiling's clock, not a user cancel, stopped the run, naming engines not run, systems truncated or not reached, and candidates not validated (indexing/engines.py:2314).",
+   "kind": 1,
+   "statistic": 1,
+   "threshold": 3,
+   "action": 3,
+   "measured_on": "IUCr CPD QPA round-robin qarr lab Cu Ka patterns (one source; corundum SRM 676a, zincite, zircon, brucite, magnetite, fluorite, cpd-1a) corundum (121.3 s) and GSAS-II LabData fluorapatite (lab) (130.7 s), WP-1986 entry; the quick preset's 120 s from WP-1042 on darwin arm64.",
+   "evidence": "The fact is arithmetic. The default threshold is the quick preset's QUICK_TOTAL_BUDGET_SECONDS (120 s, engines.py:2345), rietx's own and not answer-invariant (WP task 2); a declared total_budget_seconds is the caller's. The act truncates trailing systems: unvalidated candidates read `not_validated` (capping), unreached candidates read `geometric_ambiguity` (refuting) and grade low. Unanimity on a bounded first search: no, a caller after a low-symmetry cell the ceiling cuts is a dissenter (the WP's own case against).",
+   "question": "#1374's share rule: one (engine x system) unit can hold the whole declared ceiling, so a single slow unit can leave every later system unreached; should a unit's share be bounded? And the unreached-candidate refutation above is the same capping-vs-refuting question as INDEX_GEOMETRIC_AMBIGUITY's."
+  },
+  "INDEX_CANDIDATES_TRUNCATED": {
+   "condition": "Fires when consensus merged more distinct lattices than max_candidates (DEFAULT_MAX_CANDIDATES 12) or a unit returned a full engine pool (indexing/engines.py:2261).",
+   "kind": 1,
+   "statistic": 1,
+   "threshold": 3,
+   "action": 3,
+   "measured_on": "NIST SRM 660c LaB6 (lab Cu Ka, analyzer); IUCr CPD QPA round-robin qarr lab Cu Ka patterns (one source; corundum SRM 676a, zincite, zircon, brucite, magnetite, fluorite, cpd-1a); APS 11-BM NAC (synchrotron); GSAS-II LabData fluorapatite (lab); hl2 bare position list (unknown phase)",
+   "evidence": "The merge clause is an exact count of what lies outside the list; the pool clause is a flag that cannot count. Under the listing-cap rule (tier 1 once a test shows the report complete inside the cap and its notes count what lies outside) only the merge clause qualifies. The cut lattices are never validated or graded, so the cap also bounds what the answer can contain. Unanimity: yes, none found, while the count is stated.",
+   "question": "Is DEFAULT_MAX_CANDIDATES a listing cap (tier 1, given a completeness test) or a cap on the answer (tier 3), given that the pool clause names units without a count?"
+  },
+  "INDEX_SEARCH_INCOMPLETE": {
+   "condition": "Fires when an engine stopped before exhausting a system: its per-system budget (DEFAULT_BUDGET_SECONDS 30 s), a grid size cap, or the run's ceiling or a cancel (indexing/engines.py:2218).",
+   "kind": 1,
+   "statistic": 1,
+   "threshold": 3,
+   "action": 3,
+   "measured_on": "NIST SRM 660c LaB6 (lab Cu Ka, analyzer); IUCr CPD QPA round-robin qarr lab Cu Ka patterns (one source; corundum SRM 676a, zincite, zircon, brucite, magnetite, fluorite, cpd-1a); APS 11-BM NAC (synchrotron); GSAS-II LabData fluorapatite (lab); hl2 bare position list (unknown phase)",
+   "evidence": "The fact is arithmetic; the budgets and size caps are tiered on their own rows. The act is the capping caveat `search_incomplete` on every candidate of that system (consensus.py:718), so high is out of reach there. Unanimity: no, a refiner holding a cell every engine found and that validated would not discount it because the clock cut the rest of the system; the cap is defensible as 'a better cell may be missing' but is not unanimous.",
+   "question": "Should `search_incomplete` cap only a negative result (systems with no candidate), as its schema comment says ('a negative result elsewhere in the domain means nothing'), rather than every candidate found in that system?"
+  },
+  "INDEX_SINGLE_ENGINE": {
+   "condition": "Fires when only one engine ran (indexing/engines.py:2279).",
+   "kind": 1,
+   "statistic": 1,
+   "threshold": 3,
+   "action": 3,
+   "measured_on": "n/a",
+   "evidence": "Opt-in: only a caller passing one engine reaches it. The act is the grade floor (fewer than MIN_AGREEMENT 2 engines grades low, consensus.py:765), which demotes every candidate by construction, and this info code says the low means unconfirmed, not refuted. MIN_AGREEMENT is rietx's corroboration rule (WP-1042, WP-1046), tiered on its row."
+  },
+  "INDEX_INLIER_RETRY": {
+   "condition": "Fires when the first pass returned no lattice MIN_AGREEMENT (2) engines agree on and the run searched again under the inlier rule: at least INLIER_FRACTION (0.6) of the driven lines and the ANCHOR_LINES (5) strongest (indexing/engines.py:1329).",
+   "kind": 1,
+   "statistic": 1,
+   "threshold": 3,
+   "action": 3,
+   "measured_on": "Not measured in the code's comments by family; the constants' rows carry the evidence (indexing C4).",
+   "evidence": "The trigger is arithmetic on the corroboration count. The inlier acceptance is RANSAC's shape (Fischler & Bolles 1981, as INLIER_FRACTION cites) with rietx's numbers. The act is a second search on the same ceiling; it removes nothing and can add cells. Unanimity: no; DICVOL's absolute unindexed-line count is the dissenting default (DEFAULT_N_UNINDEXED's comment), and a looser acceptance can manufacture cells, which the code mitigates by reporting n_search_unindexed per candidate."
+  },
+  "INDEX_DOMINANT_ZONE": {
+   "condition": "Fires when the merged harvest was empty and the trial_error probe found a cell in a system with at most DOMINANT_ZONE_MAX_DOF (2) metric degrees of freedom only at a wider index table (DOMINANT_ZONE_PROBE_LADDER 3, 5, 9; DOMINANT_ZONE_PROBE_SECONDS 30 s per rung) (indexing/trial_error.py:567).",
+   "kind": 1,
+   "statistic": 1,
+   "threshold": 3,
+   "action": 3,
+   "measured_on": "One synthetic construction (tetragonal, c = 26 A); no real family.",
+   "evidence": "The statistic is measured, not inferred (a census statistic failed, WP-1019). BASE_INDEX_MAX 2 and the ladder are rietx's. The act is a warning only: the cells the probe found are not returned as candidates.",
+   "question": "The probe finds cells and discards them, reporting only that they exist; should the found cells be returned in the ranking with their wider-index provenance, per 'report evidence, never refuse'?"
+  },
+  "INDEX_SHIFT_ALLOWANCE": {
+   "condition": "Fires when no shift was measured or declared and the search added an assumed allowance in quadrature to every sigma: the picked list's lower-quartile FWHM where widths were measured, else DEFAULT_UNKNOWN_SHIFT_DEG (0.05 deg) (indexing/engines.py:1311, :1264-1267).",
+   "kind": 1,
+   "statistic": 3,
+   "threshold": 3,
+   "action": 3,
+   "measured_on": "IUCr CPD QPA round-robin qarr lab Cu Ka patterns (one source; corundum SRM 676a, zincite, zircon, brucite, magnetite, fluorite, cpd-1a) corundum (median 0.060 deg from the certified positions against 0.0056 deg fitted sigma).",
+   "evidence": "The allowance's existence is measured and its value is a policy (DEFAULT_UNKNOWN_SHIFT_DEG's comment). The act widens every matching window and adds the capping caveat `shift_allowance_assumed` (consensus.py:720), which makes high unreachable on real data with no measured shift (indexing/CLAUDE.md). Unanimity on widening: yes, none found, since every indexing program takes a matching tolerance; on capping: yes, a cell found inside an assumed window has absorbed the shift."
+  },
+  "INDEX_SHIFT_FROM_PAIRS": {
+   "condition": "Fires when the default pair screen (shift_from_pairs=True) measured a systematic shift from harmonic reflection pairs with no reference positions (indexing/workflow.py:610-617; engines.py:1362).",
+   "kind": 1,
+   "statistic": 3,
+   "threshold": 3,
+   "action": 3,
+   "measured_on": "NIST SRM 660c LaB6 (lab Cu Ka, analyzer) (0.037 deg allowance recovers the certificate); IUCr CPD QPA round-robin qarr lab Cu Ka patterns (one source; corundum SRM 676a, zincite, zircon, brucite, magnetite, fluorite, cpd-1a) corundum (WP-1038).",
+   "evidence": "The pair test (clustering against structureless replicates, WP-1038) is rietx's own. The act sets the window from the measured amplitude and lifts the `shift_allowance_assumed` cap (engines.py:1260-1263), which is what makes high reachable. Unanimity: no named dissenter for using a measured amplitude; the cause is left unnamed, as the code says."
+  },
+  "INDEX_SHIFT_DETECTED": {
+   "condition": "Fires when a shift was measured against caller-supplied reference positions and the best template leaves the runner-up SEPARABILITY_MIN_SS_RATIO (2.0) times more residual (indexing/diagnostics.py:655; quality.py:207-216).",
+   "kind": 2,
+   "statistic": 2,
+   "threshold": 3,
+   "action": 3,
+   "measured_on": "Not measured on a family in the code; reachable only with reference_two_theta.",
+   "evidence": "The templates (constant, cos theta, sin 2theta) are the textbook peak-position aberrations and the fit is weighted least squares; the 2.0 ratio is rietx's (report/schemas.py:369, unaudited on its own row). The act is a warning advising the template and the instrument correction; it does not change the search beyond the measured allowance. Unanimity on naming the cause at a 2x residual ratio: no, a careful refiner with a narrow range would not correct an instrument fault from it."
+  },
+  "INDEX_SHIFT_MODEL_AMBIGUOUS": {
+   "condition": "Fires when a shift was measured against references and the templates are not separable at SEPARABILITY_MIN_SS_RATIO (2.0) (indexing/diagnostics.py:668).",
+   "kind": 3,
+   "statistic": 2,
+   "threshold": 3,
+   "action": 3,
+   "measured_on": "Not measured on a family in the code; reachable only with reference_two_theta.",
+   "evidence": "The cause depends on the range, so the code reports the amplitude, the collinearity and the template spread and names no fault, which is DESIGN.md Rule 1's third-kind posture. The 2.0 ratio is rietx's. Warning: the spread is a systematic to carry onto every position before quoting a cell."
+  },
+  "INDEX_PRIOR_USED": {
+   "condition": "Fires when the caller declared a cell, system or space-group prior; at warning when a prior lies outside the axis box and was not checked (indexing/priors.py:379, :387).",
+   "kind": 1,
+   "statistic": 1,
+   "threshold": "n/a",
+   "action": "caller",
+   "measured_on": "n/a",
+   "evidence": "Opt-in: priors are off by default and the code reports the requested act and each prior's fate. The box refusal is WP-1045's ruling (a prior never widens the declared search), and the warning names the SearchSpec values to pass (WP-1510).",
+   "question": "Condition 2 of the caller class: a prior also reorders the systems (`jumped`) and seeds an engine, which moves what a bounded run reaches; is that a package choice to tier rather than the caller's?"
+  },
+  "INDEX_VALIDATION_FAILED": {
+   "condition": "Fires when a candidate's whole-pattern (Pawley) validation fit raised an exception (indexing/workflow.py:560).",
+   "kind": 1,
+   "statistic": 1,
+   "threshold": "n/a",
+   "action": 3,
+   "measured_on": "n/a",
+   "evidence": "The fact is arithmetic. **Demotes a candidate:** the status 'failed' (and 'diverged') writes `validation_failed`, which is in INDEX_REFUTING_CAVEATS (schemas/indexing.py:703; consensus.py:686), so the candidate grades low. The code's own explanation says the candidate is 'neither supported nor refuted' (help.py:3229), and the dossier's rule one module over is 'a raised fit is no evidence' (WP-2076). Unanimity on refuting: no; the explanation itself is the dissent.",
+   "question": "Should a raised validation fit cap (like `not_validated`) rather than refute, matching its own explanation and WP-2076's 'a raised fit is no evidence'; and should 'diverged', which is a measurement, stay refuting as a separate caveat?"
+  },
+  "PEAK_LIST_TOO_SHORT": {
+   "condition": "Fires at warning when the list has fewer than PEAK_MIN_USABLE_LINES (20) usable lines (indexing/diagnostics.py:97).",
+   "kind": 1,
+   "statistic": 1,
+   "threshold": 2,
+   "action": 3,
+   "measured_on": "IUCr CPD QPA round-robin qarr lab Cu Ka patterns (one source; corundum SRM 676a, zincite, zircon, brucite, magnetite, fluorite, cpd-1a) (fluorite, 18 lines).",
+   "evidence": "The threshold is de Wolff's (1968) M20 definition. The code takes no act of its own; the cap is INDEX_PANEL_REDUCED's. Its help title and description (help.py:3830) still say the list has 'fewer usable lines than an indexing search needs', which WP-1043 made untrue: the search runs and only the scoring needs twenty, as the message itself says.",
+   "question": "Fix the stale help text, and keep one of PEAK_LIST_TOO_SHORT and INDEX_PANEL_REDUCED (same fact, same threshold, two layers)?"
+  },
+  "PEAK_NO_INTENSITY": {
+   "condition": "Fires on components flagged `no_intensity`: on the fit's zero-intensity bound, under PEAK_NO_INTENSITY_SIGMA of their own esd, or marked by hand (indexing/diagnostics.py:350).",
+   "kind": 1,
+   "statistic": 1,
+   "threshold": "n/a",
+   "action": 1,
+   "measured_on": "IUCr CPD QPA round-robin qarr lab Cu Ka patterns (one source; corundum SRM 676a, zincite, zircon, brucite, magnetite, fluorite, cpd-1a) (6 of 798 lines, thresholds 1.7).",
+   "evidence": "Already tiered (tier 1, Yue, #993 round 2, 2026-10-21): a record of the flag; the threshold is PEAK_NO_INTENSITY_SIGMA's own row. The flag removes the line from usable() (PEAK_UNUSABLE_FLAGS); that removal is the flag's and its constant's act, not this code's."
+  },
+  "PEAK_POSITION_AT_BOUND": {
+   "condition": "Fires on components whose fitted 2theta ended on its box bound, PEAK_POSITION_BOUND_FWHM (0.5) of the window's seed FWHM from the seed (indexing/diagnostics.py:319).",
+   "kind": 1,
+   "statistic": 1,
+   "threshold": "n/a",
+   "action": 1,
+   "measured_on": "IUCr CPD QPA round-robin qarr lab Cu Ka patterns (one source; corundum SRM 676a, zincite, zircon, brucite, magnetite, fluorite, cpd-1a) (19 usable above-bar components freed on 16 Oct, 12 moved away and 7 towards the lattice line).",
+   "evidence": "Already tiered (tier 1, Yue, #993 round 2, 2026-10-21): a record of the flag; the bound is PEAK_POSITION_BOUND_FWHM's own row, and the line stays usable."
+  },
+  "PEAK_NOT_SEPARABLE": {
+   "condition": "Fires on components flagged `not_separable`: a re-seed component that is a satellite of a group-mate (within PEAK_SATELLITE_NEAR_FWHM 1.5, area ratio under PEAK_SATELLITE_MAX_RATIO 0.25) in a group whose fit is still refuted at PEAK_REFUTED_SIGMA (3) (indexing/diagnostics.py:131; pick.py:437-460).",
+   "kind": 2,
+   "statistic": 3,
+   "threshold": 3,
+   "action": 3,
+   "measured_on": "IUCr CPD QPA round-robin qarr lab Cu Ka patterns (one source; corundum SRM 676a, zincite, zircon, brucite, magnetite, fluorite, cpd-1a) (satellite ratios 0.08-0.14); NIST SRM 660c LaB6 (lab Cu Ka, analyzer).",
+   "evidence": "The three-condition test is rietx's own; the thresholds are its satellite constants. **Removes a line:** `not_separable` is in PEAK_UNUSABLE_FLAGS, so the component is withheld from every engine and screen while it stays in the model. Unanimity: no named dissenter for withholding a residual-seeded satellite of a refuted fit, though WP-1043's tail census found real lines this family of screens catches. Its help text says 'did not survive the nested comparison', where the code's load-bearing condition is that the group fit is still refuted."
+  },
+  "PEAK_UNRESOLVED_SHOULDER": {
+   "condition": "Fires on components kept in a group where they never separated from a neighbour by half a FWHM (indexing/diagnostics.py:120).",
+   "kind": 1,
+   "statistic": 1,
+   "threshold": 3,
+   "action": 1,
+   "measured_on": "IUCr CPD QPA round-robin qarr lab Cu Ka patterns (one source; corundum SRM 676a, zincite, zircon, brucite, magnetite, fluorite, cpd-1a).",
+   "evidence": "Reports a flag; the line stays usable and its sigma carries the penalty (PEAK_UNUSABLE_FLAGS deliberately omits it). The half-FWHM separation is rietx's. Info, and nothing moves."
+  },
+  "PEAK_UNRESOLVED_SPLIT": {
+   "condition": "Fires on comparable components (area ratio at least PEAK_SATELLITE_MAX_RATIO 0.25) closer than Sparrow's limit for the group's fitted shape; each pair is reported as one line with a widened sigma (indexing/diagnostics.py:144).",
+   "kind": 2,
+   "statistic": 2,
+   "threshold": 3,
+   "action": 3,
+   "measured_on": "IUCr CPD QPA round-robin qarr lab Cu Ka patterns (one source; corundum SRM 676a, zincite, zircon, brucite, magnetite, fluorite, cpd-1a) (789 to 782 usable over 16 patterns); synthetic flat-topped silicon (#728, 34 to 18).",
+   "evidence": "The statistic is Sparrow's resolution criterion for the fitted shape (peakfit.unresolved_mates). The 0.25 ratio is rietx's. **Removes a line:** the merged component is `unresolved_split`, in PEAK_UNUSABLE_FLAGS, and the stronger one's sigma is widened to reach it. Unanimity: yes, none found, for not offering two lines no shape can resolve."
+  },
+  "PEAK_WIDTH_CAPPED": {
+   "condition": "Fires on components whose fitted width ran into the upper bound, PEAK_WIDTH_BOUND_FACTORS[1] (5) times the group's seed width (indexing/diagnostics.py:158).",
+   "kind": 1,
+   "statistic": 1,
+   "threshold": 3,
+   "action": 3,
+   "measured_on": "IUCr CPD QPA round-robin qarr lab Cu Ka patterns (one source; corundum SRM 676a, zincite, zircon, brucite, magnetite, fluorite, cpd-1a) (6 components, all I/sigma <= 3.9); synthetic steep-background silicon (#728, 129).",
+   "evidence": "A bound hit is arithmetic; the factor 5 is rietx's. **Removes a line:** `width_capped` is in PEAK_UNUSABLE_FLAGS. Unanimity: no, a refiner indexing a broad second phase or a nanocrystalline line would keep a hump the law calls too wide, and the code's suggestion says to pick it separately."
+  },
+  "PEAK_AXIAL_TAIL": {
+   "condition": "Fires on weak components within PEAK_AXIAL_TAIL_MAX_FWHM (3.5) FWHM of a stronger group-mate on the side axial divergence points (indexing/diagnostics.py:177).",
+   "kind": 2,
+   "statistic": 3,
+   "threshold": 3,
+   "action": 1,
+   "measured_on": "NIST SRM 660c LaB6 (lab Cu Ka, analyzer) (farthest tail 2.99 FWHM; five components carry 125 ppm of cell bias); one family.",
+   "evidence": "The one-sided 90-degree flip is the aberration's physics; the weak-ratio reuse and the 3.5 reach are rietx's, measured on SRM 660c only. Reported, not removed (absent from PEAK_UNUSABLE_FLAGS): info and nothing moves."
+  },
+  "PEAK_KALPHA2_RESIDUAL": {
+   "condition": "Fires on components at a strong group-mate's predicted Kalpha2 maximum, within the mate's own FWHM, at a few per cent of its area (indexing/diagnostics.py:191; pick.py:611).",
+   "kind": 2,
+   "statistic": 1,
+   "threshold": 3,
+   "action": 1,
+   "measured_on": "NIST SRM 660c LaB6 (lab Cu Ka, analyzer) (3 % of area, WP-1028 census).",
+   "evidence": "The position is predicted from the declared doublet splitting, so the statistic is physics; the area bound is rietx's. Reported, not removed: info and nothing moves, although its suggestion says to exclude the component before indexing."
+  },
+  "PEAK_KALPHA2_ALIAS": {
+   "condition": "Fires when detection dropped candidates within PEAK_ALIAS_TOL_FWHM_FRAC (0.3) of a FWHM, plus one sampling step, of a stronger candidate's Bragg-predicted Kalpha2 position (indexing/diagnostics.py:402).",
+   "kind": 1,
+   "statistic": 1,
+   "threshold": 3,
+   "action": 3,
+   "measured_on": "Synthetic Cu Ka pattern; IUCr CPD QPA round-robin qarr lab Cu Ka patterns (one source; corundum SRM 676a, zincite, zircon, brucite, magnetite, fluorite, cpd-1a) (cpd-4, corundum, thresholds 1.9).",
+   "evidence": "The Kalpha2 position is physics (the declared wavelengths); the 0.3 tolerance is rietx's. **Removes a line:** the candidates are dropped before any fit and never enter the list. Unanimity: a dissenter exists, a refiner whose genuine weak line aliases onto a Kalpha2 position, which is why the positions are reported."
+  },
+  "PEAK_CONTAMINATION_LINE": {
+   "condition": "Fires on lines flagged `ghost_kbeta` or `ghost_tungsten` by the joint screen (several strong parents at one common ratio, GHOST_MIN_PARENTS 5, background/diagnostics.py:206) (indexing/diagnostics.py:204).",
+   "kind": 2,
+   "statistic": 3,
+   "threshold": 3,
+   "action": 3,
+   "measured_on": "17 bundled monochromated patterns (20 flags to none after the joint rule, WP-1442); IUCr CPD QPA round-robin qarr lab Cu Ka patterns (one source; corundum SRM 676a, zincite, zircon, brucite, magnetite, fluorite, cpd-1a).",
+   "evidence": "The Kbeta and W Lalpha positions are emission physics; the joint ratio rule and the GHOST_* numbers are rietx's (WP-2002 B13 proposes their tiers here). **Removes a line:** both flags are in PEAK_UNUSABLE_FLAGS, excluded and never subtracted. Unanimity: yes for a confirmed common-ratio leak, none found."
+  },
+  "PEAK_ASYMMETRY_UNMODELLED": {
+   "condition": "Fires on lines whose residual's odd-cubic projection exceeds PEAK_ASYMMETRY_MIN_SIGMA (4) in |t| (indexing/diagnostics.py:214).",
+   "kind": 2,
+   "statistic": 3,
+   "threshold": 3,
+   "action": 3,
+   "measured_on": "Not measured on a named family in the constant's comment.",
+   "evidence": "The odd-cubic projection is rietx's statistic and 4 sigma its threshold. Reported, not removed; warning because the position, and so the cell, is pulled towards the tail."
+  },
+  "PEAK_EXPECTED_FALSE_LINES": {
+   "condition": "Fires on every detected fitted list, stating the Benjamini-Hochberg bar at PEAK_FDR_Q (0.01) over the pattern's resolution elements and the expected number of noise lines kept (indexing/diagnostics.py:247).",
+   "kind": 1,
+   "statistic": 2,
+   "threshold": 3,
+   "action": 3,
+   "measured_on": "Synthetic steep-background silicon (#728: 24 of 26 off-lattice components marked, no silicon line); IUCr CPD QPA round-robin qarr lab Cu Ka patterns (one source; corundum SRM 676a, zincite, zircon, brucite, magnetite, fluorite, cpd-1a); GSAS-II LabData fluorapatite (lab).",
+   "evidence": "The statistic is Benjamini & Hochberg (1995, J. R. Stat. Soc. B 57, 289), as PEAK_FDR_Q cites; q = 0.01 is rietx's. The act: `weak_line` components stay usable but are excluded from the set that drives the search (PEAK_UNDRIVEN_FLAGS, schemas/indexing.py:872). Info, always emitted by design ('a peak list that never states its null is the defect').",
+   "question": "Attention clause 1: an info code emitted on every detected list; should the expected false-line count be a record field on the PeakList with its help entry, leaving the weak_line flags as the per-line statement?"
+  },
+  "PEAK_SHOULDER_SEEDED": {
+   "condition": "Fires when detection offered curvature seeds for components with no local maximum, which Delta-BIC then kept or dropped (indexing/diagnostics.py:412).",
+   "kind": 1,
+   "statistic": 1,
+   "threshold": "n/a",
+   "action": 3,
+   "measured_on": "IUCr CPD QPA round-robin qarr lab Cu Ka patterns (one source; corundum SRM 676a, zincite, zircon, brucite, magnetite, fluorite, cpd-1a).",
+   "evidence": "Reports an act on by default (`shoulders=True`): seeding adds candidate components the BIC comparison may keep as usable lines. The comparison's threshold is tiered on its own row. Info; the suggestion names the switch to see the list without them."
+  },
+  "PEAK_WIDTH_LAW_MISMATCH": {
+   "condition": "Fires when the median FWHM of the PEAK_WIDTH_CENSUS_N (12) most prominent lines differs from the instrument law's (indexing path) or the fitted model's (refinement path) by WIDTH_MISMATCH_RATIO (3) or more either way (indexing/diagnostics.py:389, :483).",
+   "kind": 3,
+   "statistic": 3,
+   "threshold": 3,
+   "action": 3,
+   "measured_on": "Third-party lab data (WP-1028 census); the ProfileTCHZ default on lab data (ratio near 13); #249's refinement.",
+   "evidence": "Rank-then-measure on twelve lines is rietx's (WP-1028); the factor 3 is chosen loose on purpose (diagnostics.py:62-67). Broadened specimen or wrong instrument depends on facts outside the pattern, so the code names both readings (third kind). Warning; on the indexing path detection rescales seeds and windows by `width_scale` whatever the ratio. Unanimity on the warning: no, a refiner of a nanocrystalline specimen broadened more than threefold reads it as the finding it is."
+  }
+ },
+ "constants": {
+  "rietx.indexing.consensus.CONSENSUS_CHECK_TOP": {
+   "role": "cap",
+   "decides": "Which candidates get the expensive checks (ambiguity enumeration and the whole-pattern validation fit): the top three plus every candidate an engine consensus could promote (consensus.py:94, checked_indices).",
+   "measured_on": "not measured (cost per fit ~0.6 s quoted in the comment)",
+   "proposed": 1,
+   "evidence": "A cap on which candidates are checked, built so it never removes a candidate the gate could call high: tests/test_indexing_consensus.py:518-529 (test_the_expensive_checks_cover_every_promotable_candidate) asserts the promotable set is always inside it. Unchecked candidates are floored by geometric_ambiguity and carry no validation record, which the result shows per candidate.",
+   "question": "Is this tier 1 as a cap whose report is complete inside it (every promotable candidate checked, tested), or tier 3 because under a binding ceiling more checked candidates compete for the validation reserve and the validation records a reader sees for ranks 1-3 depend on it (consensus.py:94)?"
+  },
+  "rietx.indexing.engines.MAX_PREDICTED_REFLECTIONS": {
+   "role": "cap",
+   "decides": "Refuses a trial cell whose predicted reflection count exceeds two million rather than enumerating it, before every generate_reflections a search reaches (engines.py:82, reflection_ceiling_ok).",
+   "measured_on": "not measured on a family; a runaway synthetic cell in tests/test_indexing_engines.py:374",
+   "proposed": 1,
+   "evidence": "A crash guard (the module docstring's 1.6 PiB case): two million triples is ~48 MB, and the comment says no legitimate cell in a bounded search reaches it. tests/test_indexing_engines.py:374 shows a runaway cell exceeds it; no test shows that every cell inside the default box (max_d_axis 25 Å) at the shortest bundled wavelength stays below it.",
+   "question": "Should a test pin that the largest default-box cell at 11-BM NAC's 0.414 Å and its 2θ range predicts fewer than MAX_PREDICTED_REFLECTIONS, so the guard is shown never to refuse a reachable cell (engines.py:82)?"
+  },
+  "rietx.indexing.engines.DEDUP_VOLUME_RTOL": {
+   "role": "tolerance",
+   "decides": "Skips the χ² lattice-equality test for two candidates whose reduced volumes differ by more than 1 % (engines.py:88, _dedup_admits).",
+   "measured_on": "bethanechol set F and qarr corundum harvests (WP-1509), synthetic twins",
+   "proposed": "invariant",
+   "evidence": "A gate on comparisons whose answer is already known, measured to change no group: tests/test_indexing_engines.py:1369 (test_the_fast_dedup_groups_exactly_as_the_plain_pass) builds cousins inside the gate and twins the χ² merges across 0.6 % of volume and asserts every group, its order and members equal the plain pass.",
+   "question": "The invariance rests on the χ² never merging two lattices more than 1 % apart in volume; is that bounded for a candidate with a very large cov_af, or should the test add one (engines.py:88)?"
+  },
+  "rietx.indexing.engines.DEDUP_STACK_FIRST": {
+   "role": "count",
+   "decides": "Size of the first stack of χ² tests in dedup, each later stack four times the last (engines.py:93).",
+   "measured_on": "synthetic band of 81 tetragonal lattices (WP-1519)",
+   "proposed": "invariant",
+   "evidence": "The comment says it moves the clock, never a verdict, and tests/test_indexing_engines.py:1505 (test_the_stacked_dedup_groups_exactly_as_one_pair_at_a_time, reading the constant at :1559) asserts the stacked pass builds the plain pass's groups with a match in the first stack, the second, none, and the cache."
+  },
+  "rietx.indexing.engines.DEFAULT_MIN_D_AXIS": {
+   "role": "threshold",
+   "decides": "The shortest principal d(100) a search considers, the lower edge of every engine's Q-space box (engines.py:99).",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "rietx's own bound with a stated geometric meaning (a bound on d(100) = a sin β, not on a) and no measurement or program default in the repo; docs/practice.md records DICVOL06's volume range from the user but no axis default.",
+   "question": "A hexagonal cell's d(100) is a·√3/2, so any hexagonal metric with a below about 2.31 Å is outside the default box; beryllium's a is about 2.29 Å by recall (not checked against a source in the repo). Is that case real, and should the floor sit lower (engines.py:99)?"
+  },
+  "rietx.indexing.engines.DEFAULT_MAX_D_AXIS": {
+   "role": "threshold",
+   "decides": "The longest principal d-spacing a search considers, the upper edge of the box every engine searches (engines.py:103).",
+   "measured_on": "bethanechol published peak sets (longest axis 15.9 Å)",
+   "proposed": 3,
+   "evidence": "rietx's own: the comment justifies 25 Å by small-molecule organics and the bethanechol benchmark's 15.9 Å axis, one family. A cell with a longer axis is never found and the result does not say the box excluded it beyond spec_notes.",
+   "question": "Is there an indexing program default for the longest axis in the repo's survey (docs/practice.md has none), and should a run whose envelope exceeds the box say so (engines.py:103)?"
+  },
+  "rietx.indexing.engines.DEFAULT_MIN_VOLUME": {
+   "role": "threshold",
+   "decides": "The smallest cell volume a search reports; engines drop a fitted cell below 15 Å³ (engines.py:107, trial_error.py:518, svd.py:969).",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "Stated as physics (smaller than one atom's exclusion volume) but the comparison is on the fitted cell in its searched system and centring, so a one-atom primitive metallic cell (about 11.8 Å³ for Cu or Fe, by recall) would be refused in a triclinic or rhombohedral-primitive search while its centred cubic description passes. No test or source in the repo bounds the value.",
+   "question": "Is the floor physics (tier 1) as the comment claims, given that primitive cells of common metals sit below it and are only found through a centred setting (engines.py:107)?"
+  },
+  "rietx.indexing.engines.DEFAULT_SEARCH_LINES": {
+   "role": "count",
+   "decides": "How many observed lines drive a search (the strongest N from a low-Q pool); scoring then uses every usable line (engines.py:140).",
+   "measured_on": "the known-cell corpus swept by WP-1039 (NIST SRM 660c, qarr, 11-BM NAC, GSAS-II FAP)",
+   "proposed": 2,
+   "evidence": "The indexing engines' published defaults sit at twenty: DICVOL06 card 2 N \"e.g. N = 20\" (dicvol06.inf:83-91), TREOR90 USE defaults to 19 with a maximum of 20, McMaille's automatic mode takes twenty, and Bergmann et al. (2004) gave every program the first 20 lines (docs/practice.md:681-713). Conograph's 48 is the named dissenter; WP-1039 measured that raising N bought nothing on the corpus, and which twenty (SEARCH_POOL_MULTIPLE) is rietx's own."
+  },
+  "rietx.indexing.engines.SEARCH_POOL_MULTIPLE": {
+   "role": "cap",
+   "decides": "The low-Q pool, as a multiple of n_search_lines, from which the strongest driven lines are drawn (engines.py:164).",
+   "measured_on": "WP-1039: 11-BM NAC, qarr corundum and zircon, NIST SRM 660c, the indexing acceptance file",
+   "proposed": 3,
+   "evidence": "Not answer-invariant: the comment measures NAC's driven truth lines 20 to 18, corundum 19 to 17, zircon 18 to 17 against the unbounded rule, every acceptance row passing either way, and the cost 72 s to 26 s on corundum's trigonal unit. Three unrelated families (NIST lab, qarr lab, 11-BM synchrotron); no program ranks the driven lines by intensity (docs/practice.md:725-733), so the rule sits outside existing practice and names its reason."
+  },
+  "rietx.indexing.engines.DEFAULT_N_UNINDEXED": {
+   "role": "threshold",
+   "decides": "How many driven lines a cell may leave unindexed and still be accepted on the default first pass, and on a list with no anchor (engines.py:173, SearchSpec.miss_budget).",
+   "measured_on": "not measured as a value; the inlier retry's measurements are on synthetic Si",
+   "proposed": 3,
+   "evidence": "The comment cites DICVOL06's reported gain from an impurity tolerance but names no DICVOL default count, and Bergmann et al. (2004) record manual runs tolerating 8-10 unindexed lines (docs/practice.md:717). The value 2 is rietx's own, with the failure case stated (more off-lattice lines than the cap complete as no cell, fixed by the inlier retry).",
+   "question": "Does DICVOL06's manual give a default count of impurity lines (dicvol06.inf), which would make the default tier 2 if 2 sits inside the programs' range (engines.py:173)?"
+  },
+  "rietx.indexing.engines.INLIER_FRACTION": {
+   "role": "threshold",
+   "decides": "Under the inlier rule, the fraction of driven lines a cell must index to be accepted, used on the retry after a first pass finds no agreement (engines.py:205).",
+   "measured_on": "one synthetic Si pattern with twelve planted lines; SRM 660c LaB6 for the retry-only ruling",
+   "proposed": 3,
+   "evidence": "rietx's own on one synthetic family: 0.6 is that measurement's 12 of 20, 0.7 and 0.75 lose the truth there. Le Bail (2004, Powder Diffr. 19, 249)'s under-35 %-impurity bound is the published range it sits inside, and the retry-after-silence shape has precedent (Bergmann et al. 2004, DICVOL91's advice, docs/practice.md:730-731)."
+  },
+  "rietx.indexing.engines.INLIER_DOF_MARGIN": {
+   "role": "threshold",
+   "decides": "Inliers beyond the metric's degrees of freedom the inlier rule requires; binds only on short lists (engines.py:211).",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "Fischler and Bolles (1981)'s RANSAC acceptance gives the shape (a minimal subset plus verification), not the number four; a paper that tests a formula does not test the numbers inside it (generality.md § The rule, 2026-11-05)."
+  },
+  "rietx.indexing.engines.ANCHOR_LINES": {
+   "role": "threshold",
+   "decides": "How many of the strongest driven lines every accepted cell must index, also a prune for the exhaustive engine (engines.py:222).",
+   "measured_on": "one synthetic Si pattern (8 anchors put a planted line among them)",
+   "proposed": 3,
+   "evidence": "rietx's own, one synthetic family; a position-only list has no anchor and keeps DEFAULT_N_UNINDEXED. A cell missing one of the five strongest lines is never returned, an action whose dissenter would be a refiner whose strongest line is an impurity's."
+  },
+  "rietx.indexing.engines.DRIVEN_MIN_LINES": {
+   "role": "arithmetic",
+   "decides": "The fewest driven lines before a line carrying an undriven flag is taken back into the driven set (engines.py:228).",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "Arithmetic, already in the table: the triclinic reciprocal metric has six components, so fewer than six driven lines cannot determine every lattice a search may be asked for (_audit.py:2422)."
+  },
+  "rietx.indexing.engines.DEFAULT_UNKNOWN_SHIFT_DEG": {
+   "role": "tolerance",
+   "decides": "The systematic 2θ allowance added in quadrature to every line's σ when no shift is measured, the cap on the width-derived allowance (engines.py:266).",
+   "measured_on": "qarr corundum (SRM 676a), NIST SRM 660c (where 0.060° manufactured a wrong high cell)",
+   "proposed": 2,
+   "evidence": "The indexing programs' default matching windows bracket it: DICVOL06 0.03° 2θ (dicvol06.inf:139-157), ITO15 TOLG 0.06° (ito15.inf:337-342), TOPAS index_max_th2_error 0.05° (inferred from a summarised manual fetch), docs/practice.md:279-286; a value between two programs' values is inside the range. Every result reports it as INDEX_SHIFT_ALLOWANCE, and shift_allowance_assumed keeps high unreachable on real data.",
+   "question": "The seven programs of generality.md's tier 2 are Rietveld programs; DICVOL06 and ITO15 are indexing programs, which the WP names as tier-2 sources for indexing, and TOPAS's 0.05 degrees is inferred, not read (docs/practice.md:280). Does an indexing program's default count here, or is this tier 3 on the corundum and SRM 660c measurements?"
+  },
+  "rietx.indexing.engines.WIDTH_ALLOWANCE_FWHM": {
+   "role": "tolerance",
+   "decides": "When the pair screen declines on a picked list, the allowance is this multiple of the usable lines' lower-quartile FWHM, capped at DEFAULT_UNKNOWN_SHIFT_DEG (engines.py:290, width_allowance).",
+   "measured_on": "one synthetic Si twin of F2's T5 arms (λ 0.8257 Å, FWHM 0.021°)",
+   "proposed": 3,
+   "evidence": "rietx's own on one synthetic family; no surveyed program scales its window with the peak width (docs/practice.md:292-293), so the choice sits outside practice and names its reason (the 0.05° window is two to six FWHM on high-resolution data). It needs the inlier rule, and the shift stays unmeasured and reported."
+  },
+  "rietx.indexing.engines.WIDTH_ALLOWANCE_QUANTILE": {
+   "role": "threshold",
+   "decides": "Which quantile of the usable lines' FWHM the width allowance multiplies (engines.py:293).",
+   "measured_on": "one synthetic Si twin (with WIDTH_ALLOWANCE_FWHM)",
+   "proposed": 3,
+   "evidence": "rietx's own, argued (the picker's junk components are the broad ones) and measured only jointly with WIDTH_ALLOWANCE_FWHM on one synthetic family."
+  },
+  "rietx.indexing.engines.DEFAULT_BUDGET_SECONDS": {
+   "role": "budget",
+   "decides": "Wall-clock seconds one (engine × system) unit may spend before it stops and reports search_complete false (engines.py:296).",
+   "measured_on": "WP-1042 corpus re-measure; bethanechol set F (WP-1046); #1374's synthetic monoclinic and orthorhombic lists",
+   "proposed": 3,
+   "evidence": "Not answer-invariant: a truncated unit can omit the truth or a finder, and WP-1046 measured a cap interacting with it (bethanechol set F's truth present at 5 s and 15 s, absent at 30 s and 60 s before the pool fix). No program default in the repo (DICVOL04 runs to 3770 s); under quick, #1374 measured the 30 s slice never worse than a ceiling-sized unit on 15 rows.",
+   "question": "Issue #1374 asks whether a declared ceiling should cap each unit at a share, min(budget_seconds, T_search / n_engines), since one unit can hold the whole ceiling when a caller raises budget_seconds to it; adopt it, and per engine or over the remaining units (engines.py:296)?"
+  },
+  "rietx.indexing.engines.DEFAULT_MAX_CANDIDATES": {
+   "role": "cap",
+   "decides": "How many candidates the reported list holds after consensus ranks the whole merge; it also bounds what estimate_ceiling prices and checked_indices may reach (engines.py:316).",
+   "measured_on": "bethanechol set F (WP-1046); a synthetic cubic list in tests/test_indexing_consensus.py:499-515; the synthetic cubic list of clash M1 at max_candidates 12 and 1 (PR #1591 review)",
+   "proposed": "unaudited",
+   "evidence": "No tier proposed: the tier-1 proposal (a listing cap) is withdrawn, because the cap is not answer-invariant. It is applied once, at the layer whose ordering is authoritative (WP-1046 moved it off the units), and INDEX_CANDIDATES_TRUNCATED states the truncation (tests/test_indexing_consensus.py:505-515). But it also sets the panel population: fom_panel_disagrees is computed over the truncated list (consensus.py:497-510, cut at engines.py:2095) and is refuting (schemas/indexing.py:703-706), so the cap decides whether every candidate grades low. Measured on M1's synthetic cubic list (preset full): at 12 the top candidate carries geometric_ambiguity, fom_panel_disagrees and not_validated; at 1 the refuting fom_panel_disagrees is gone. The pick did not change there, since geometric_ambiguity still refutes; where nothing else refutes (K9's LaB6 row), the cap decides best_or_none and the CLI exit code.",
+   "question": "Which tier, now that the cap sets the panel population (clash K9)? Tier 1 holds only if the panel is read over the whole merge or per candidate (K9's own question). Also: the test asserts the truncation note fires but not its count, and WP-2112 (#1375) reports an engine's own first cell dropped from the twelve because every corroborated cell sorts above it (engines.py:316)."
+  },
+  "rietx.indexing.engines.ENGINE_POOL_MULTIPLE": {
+   "role": "cap",
+   "decides": "How many candidates each (engine × system) unit hands to the merge, as a multiple of max_candidates (engines.py:331, SearchSpec.engine_pool).",
+   "measured_on": "bethanechol set F only (WP-1026's sweep)",
+   "proposed": 3,
+   "evidence": "rietx's own on one family: five makes the default pool the measured 60, at which set F's truth returns ranked 3rd; a pool of 200 cost 91.6 s against 90.7 s at 12. Smaller multiples were not measured, and a cut above the ranking layer is a ranking (WP-1046), so the pool decides what consensus can rank; INDEX_CANDIDATES_TRUNCATED flags it at the pool.",
+   "question": "Should a second and third family (a low-symmetry synthetic list, a qarr pattern) measure that the truth survives the unit pool before the multiple is kept (engines.py:331)?"
+  },
+  "rietx.indexing.engines.MIN_AGREEMENT": {
+   "role": "threshold",
+   "decides": "How many engines must find a lattice for it to count as corroborated: grade floors fewer at low before any caveat is read, rank_candidates sorts corroborated first, and _no_agreement triggers the inlier retry (engines.py:337).",
+   "measured_on": "FAP (GSAS-II tutorial; the cross-code cell leads since WP-1046), bethanechol (finder counts not comparable across systems)",
+   "proposed": 3,
+   "evidence": "rietx's own design (engines that fail differently must agree, indexing/CLAUDE.md § The governing rule); no established program requires two engines. As an ordering it is a second-kind ranking key; as the grade floor it is an action, and a refiner who indexes with one program (DICVOL or TOPAS alone) and accepts a single-program solution on M20 is a named dissenter to that floor.",
+   "question": "With a dissenter named, should the floor at low stay an action (the grade is rietx's own confidence vocabulary and the candidate stays listed) or be reported only as the agreement count beside the ranking (engines.py:337, consensus.grade)?"
+  },
+  "rietx.indexing.engines.PROVISIONAL_STREAM_TOP": {
+   "role": "cap",
+   "decides": "How many cells a just-finished (engine × system) unit streams as provisional events, with no confidence field (engines.py:820).",
+   "measured_on": "not measured",
+   "proposed": "invariant",
+   "evidence": "Presentation only by construction: its one reader is provisional_payload, the streamed events carry no grade, and the returned IndexingResult does not read them.",
+   "question": "No test asserts that the final result is the same at any value; is the construction enough, or should the invariance test be added (engines.py:820)?"
+  },
+  "rietx.indexing.engines._INDEX_MAX_CONDITION": {
+   "role": "numerical floor",
+   "decides": "The largest Σ|A..F|/λ_min(G*) at which TrialIndex bounds a cell's rows rather than scanning the whole set (engines.py:887).",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "A numerical floor with its rounding bound derived in the comment (6.7e-10 of Q against a 1e-6 margin). tests/test_indexing_engines.py:433 (test_the_trial_index_keeps_every_row_a_cell_can_put_in_range_in_order) asserts every needed row is kept, in order, over at least 300 restricted cases."
+  },
+  "rietx.indexing.engines._INDEX_MIN_DEFECT": {
+   "role": "numerical floor",
+   "decides": "The smallest orthogonality defect at which the closed-form inverse of G* is trusted for the row bound (engines.py:894).",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "A numerical floor whose rounding (≲ 1.3e-8 of the determinant above it) is derived in the comment; a metric below it takes the whole set. Covered by the same row-completeness test (tests/test_indexing_engines.py:433)."
+  },
+  "rietx.indexing.engines._INDEX_MARGIN": {
+   "role": "numerical floor",
+   "decides": "The relative slack on each per-axis index bound (engines.py:898).",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "A numerical margin fifty times the derived rounding; a looser bound costs rows, never correctness, and the row-completeness test (tests/test_indexing_engines.py:433) asserts no needed row is lost."
+  },
+  "rietx.indexing.engines._INDEX_MAX_SHARE": {
+   "role": "threshold",
+   "decides": "The fraction of a trial set above which a bounded row list is not built and the set is scanned whole (engines.py:901).",
+   "measured_on": "not measured",
+   "proposed": "invariant",
+   "evidence": "A cost switch between two paths that return the same rows in the same order: the restriction keeps a superset of the needed rows in the set's own order (tests/test_indexing_engines.py:433), and WP-1509 replays finished units to their digests (python -m tests.unit_replay)."
+  },
+  "rietx.indexing.engines._INDEX_MIN_ROWS": {
+   "role": "threshold",
+   "decides": "The trial-set size below which no row index is built (engines.py:908).",
+   "measured_on": "WP-1509 timing, one BLAS thread",
+   "proposed": "invariant",
+   "evidence": "A cost switch measured for speed (1188 to 138 µs at 150 381 rows); the indexed and scanned paths keep the same rows (tests/test_indexing_engines.py:433, :473 asserts a small set is scanned whole), and row_local_product checks the product's rounding once a process."
+  },
+  "rietx.indexing.engines.DEFAULT_VOLUME_CEILING": {
+   "role": "threshold",
+   "decides": "The search's volume ceiling when neither the caller nor the data-quality report supplies one for a system (engines.py:1273, search_volume_ceiling).",
+   "measured_on": "not measured; tests/test_indexing_quality.py:437-465 pins the fallback",
+   "proposed": 3,
+   "evidence": "rietx's own, chosen generous to exclude only the absurd; on index_pattern's default path assess_peak_list always runs, so it binds only where a system has no envelope. DICVOL06's default VOLMAX is 2500 Å³ (docs/practice.md:657), so 8000 sits outside the one program default surveyed and names its reason.",
+   "question": "Does any default path reach this fallback (a system without a volume_envelope entry), or is it reached only by callers passing quality=None to the engines directly (engines.py:1298)?"
+  },
+  "rietx.indexing.engines.IDENTITY_CHANGE": {
+   "role": "arithmetic",
+   "decides": "The change_of_basis recorded on a candidate whose setting was not changed (engines.py:1632).",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "The 3×3 identity matrix, arithmetic."
+  },
+  "rietx.indexing.engines.SAME_SOLUTION_RTOL": {
+   "role": "tolerance",
+   "decides": "The relative grid on which a solved metric is hashed before refinement, so repeated solutions are refined once (engines.py:1681, solution_key).",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "Not shown invariant: indexing/CLAUDE.md § More rules records that solution_key's quantised key, claimed before scoring, lost a cubic-I truth and fired INDEX_DOMINANT_ZONE for two years (WP-1041). No test names the value.",
+   "question": "Should an invariance or sweep test bound the 1e-3 grid against the corpus, since a dedup key claimed before scoring can fail with a wrong answer (engines.py:1681)?"
+  },
+  "rietx.indexing.engines.QUICK_TOTAL_BUDGET_SECONDS": {
+   "role": "budget",
+   "decides": "The whole-run ceiling the default quick preset fills into total_budget_seconds when the caller declares none, covering search, probe and validation (engines.py:2345, held in SEARCH_PRESETS[\"quick\"]).",
+   "measured_on": "WP-1042 task-0 re-measure: six corpus quick runs (NIST SRM 660c, qarr corundum, zincite, zircon, fluorite, 11-BM NAC, GSAS-II FAP), macOS arm64",
+   "proposed": 3,
+   "evidence": "Not answer-invariant: it decides which systems the shortlist can contain. Measured, the truth's own system completed inside it on every corpus run (115-126 s wall), four unrelated families, all high-symmetry; the stated failure is the trailing low-symmetry systems it cuts, reported by INDEX_BUDGET_EXHAUSTED. Rule 1's token clause is the case for it (a first answer in one call where the full run reaches 440 s); the case against is a low-symmetry cell the bound leaves off the list, as #1374's all-systems monoclinic rows return nothing at a 30-60 s ceiling (issue #1374).",
+   "question": "The corpus is high-symmetry; should the ceiling be re-measured on a low-symmetry family (bethanechol, #1374's synthetic monoclinic list) before it is kept, and is the SEARCH_PRESETS dict, which the audit walk cannot see, to be recorded on this row (engines.py:2345, :2391)?"
+  },
+  "rietx.indexing.engines.VALIDATION_RESERVE_FRACTION": {
+   "role": "budget",
+   "decides": "The share of a whole-run ceiling the search may not consume when whole-pattern validation will run, so the first answer arrives validated (engines.py:2385).",
+   "measured_on": "WP-2011 and WP-2063: 11-BM NAC, qarr zircon and corundum, GSAS-II FAP, NIST SRM 660c LaB6",
+   "proposed": 3,
+   "evidence": "Already tier 3, approved 2026-10-28 (_audit.py:2439): 0.15 is the smallest measured share at which NAC's true cell validated, four unrelated families, and WP-2063 found 0.08-0.15 changed no system, candidate or ranking on the six sets. WP-1986's default run on bundled FAP (2026-10-22, Linux [dev], 130.7 s) validated none of its 12 candidates at the old 0.08, Le Bail and rank-order slices, before WP-2011 moved to Pawley, cheapest first and 0.15; WP-2011 then had FAP validate every checked cell at all three values on macOS.",
+   "question": "The WP-1986 run counted all 12 reported candidates, but only CONSENSUS_CHECK_TOP plus the promotable are ever validated; should the default FAP run be repeated on this tree on Linux to confirm its checked cells validate, and should a result say how many checked candidates the reserve left unvalidated (engines.py:2385)?"
+  },
+  "rietx.indexing.engines.SEARCH_PRESET_INFO": {
+   "role": "label",
+   "decides": "The title, description, when-to-use text and measured typical seconds capabilities() quotes for each preset (engines.py:2419).",
+   "measured_on": "WP-1042 task-0 re-measure (typical_seconds)",
+   "proposed": "invariant",
+   "evidence": "Presentation: read only by capabilities.capabilities and the agent schema, held in bijection with SEARCH_PRESETS by a meta-test (tests/test_indexing_scheduler.py, tests/test_capabilities.py). Its numbers inform a chooser and move no search."
+  },
+  "rietx.indexing.engines.MEASURED_VALIDATION_SECONDS": {
+   "role": "label",
+   "decides": "The measured range of seconds per validation fit that estimate_ceiling reports beside its arithmetic (engines.py:2488).",
+   "measured_on": "the eight-dataset known-cell corpus (WP-1037), re-checked for Pawley on lab patterns and 11-BM NAC (WP-2011)",
+   "proposed": "invariant",
+   "evidence": "Read only by estimate_ceiling, a pre-run estimate; it moves no search, rank or grade."
+  },
+  "rietx.indexing.engines.MEASURED_TYPICAL_SECONDS": {
+   "role": "label",
+   "decides": "The measured wall-clock band of an unbounded run that estimate_ceiling quotes beside the worst case (engines.py:2499).",
+   "measured_on": "the acceptance-protocol corpus (WP-1042 task 0)",
+   "proposed": "invariant",
+   "evidence": "Read only by estimate_ceiling, a pre-run estimate; it moves no search, rank or grade."
+  },
+  "rietx.indexing.engines.CEILING_GRANULARITY_SECONDS": {
+   "role": "label",
+   "decides": "How far past a declared ceiling a run can land, quoted by estimate_ceiling and the preset text (engines.py:2510).",
+   "measured_on": "a 30-line synthetic (consensus ~3.6 s past a binding ceiling); the acceptance run's --total-budget 60",
+   "proposed": "invariant",
+   "evidence": "Read only by estimate_ceiling; it states the worst case and moves no search, rank or grade."
+  },
+  "rietx.indexing.fom.MATCH_SIGMA": {
+   "role": "threshold",
+   "decides": "How many σ_eff an observed and a predicted line may differ by and count as one line, shared by the whole FoM panel, assignment and the ambiguity checks, and SearchSpec.k_sigma's default (fom.py:45).",
+   "measured_on": "WP-1018's pull ensemble (a single line and a lab doublet)",
+   "proposed": 3,
+   "evidence": "rietx's own 3σ on a σ measured to be calibrated (pull mean +0.03, std 0.97; −0.08, 0.98 on a doublet), the same shape as the absent-phase hold's 3σ, which generality.md § The rule puts on trial under the mechanical ground. The families behind WP-1018's pulls are not named in the comment.",
+   "question": "Is a 3σ window on a calibrated σ tier 1 (Gaussian arithmetic, once the calibration is tested) or tier 3 (a chosen coverage), and which families did WP-1018's pull ensemble use (fom.py:45)?"
+  },
+  "rietx.indexing.fom.LINE_COINCIDENCE_RTOL": {
+   "role": "numerical floor",
+   "decides": "The relative separation below which two calculated reflections are merged into one line (fom.py:88).",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "A numerical floor nine orders below any measurement precision, merging exact coincidences only; tests/test_indexing_screen.py reads it."
+  },
+  "rietx.indexing.fom._BOUNDARY_RTOL": {
+   "role": "numerical floor",
+   "decides": "The tie tolerance on the up-to-the-N-th-observed-line boundary in every N_poss count (fom.py:291).",
+   "measured_on": "one lattice in two unimodular settings (N_poss 20 and 19, M20 76.43 and 80.45 before it)",
+   "proposed": 1,
+   "evidence": "A tie rule, not a fudge: the N-th observed line is itself a predicted line, so a strict comparison makes a setting-invariant count depend on rounding. No test names it yet.",
+   "question": "Should a test pin that M20 and N_poss are equal in two unimodular settings of one lattice (fom.py:291)?"
+  },
+  "rietx.indexing.fom.RESOLUTION_FWHM": {
+   "role": "threshold",
+   "decides": "The resolution multiple for every reversed question: merge distance, seen half-width and p0's scale, in FWHM (fom.py:521).",
+   "measured_on": "15 real runs from 12 sources (CPD round robin, NIST SRM 660c, 11-BM NAC, GSAS-II FAP, Hill's PbSO4 X-ray and neutron) and a synthetic tetragonal split",
+   "proposed": 3,
+   "evidence": "Already tier 3, kept 2026-10-21 (_audit.py:2498): 1.0 over 0.5 on the synthetic split, and the real-family sweep 0.5-1.0 moved one rank (PbSO4 X-ray at 0.7). Rayleigh (1879) and Sparrow (1916) bracket one-line-or-two at about a width but do not cover the seen window or p0."
+  },
+  "rietx.indexing.fom._AGGREGATE_FLOOR_RTOL": {
+   "role": "numerical floor",
+   "decides": "How far below the best candidate a member's value is floored before its log is taken in the log-sum aggregate (fom.py:907).",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "A relative numerical floor that keeps the aggregate unit-invariant. Its only reader, fom._log_sum_scores, is unwired: no module calls it (grep 2026-11-16; consensus.py:663 names it in a docstring) and indexing/CLAUDE.md § Engines and the FoM panel says it stays unwired, so today it moves nothing returned."
+  },
+  "rietx.indexing.priors.CLASSIFY_RTOL": {
+   "role": "tolerance",
+   "decides": "The relative axis-equality tolerance used to classify a prior cell's crystal system, which sets where the prior is checked and which system jumps the queue (priors.py:71).",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "rietx's own, inside an opt-in (SearchSpec.prior_cells defaults to empty) but used once the switch is on, so tiered on its own (generality.md § Caller, condition 2). A misclassified prior fails its own check; the engines still search every system."
+  },
+  "rietx.indexing.priors.CLASSIFY_ATOL_DEG": {
+   "role": "tolerance",
+   "decides": "The absolute angle-equality tolerance (deg) used to classify a prior cell's crystal system (priors.py:72).",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "rietx's own, inside the opt-in priors and used once a prior is supplied; no comment of its own beyond CLASSIFY_RTOL's."
+  },
+  "rietx.indexing.priors.MAX_PRIOR_PASSES": {
+   "role": "count",
+   "decides": "How many assign-refine passes a prior cell gets before its assignment is taken as settled (priors.py:76).",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "rietx's own, said to match the engines' own leaves; inside the opt-in priors."
+  },
+  "rietx.indexing.priors.MAX_PRIOR_INDEX": {
+   "role": "cap",
+   "decides": "Refuses, loudly, a prior whose longest axis needs more than 40 indices to reach the observed Q range (priors.py:82).",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "A guard after the MAX_TRIAL_HKL precedent, inside the opt-in priors; a refused prior is reported rather than capped, but no test or measurement in the repo bounds the value.",
+   "question": "Is this a tier-1 computational guard (refused and reported), or tier 3 as a number that decides which priors are checked (priors.py:82)?"
+  },
+  "rietx.indexing.priors.PRIOR_DRIFT_MAX": {
+   "role": "threshold",
+   "decides": "The largest relative volume drift a prior's check may take from the stated cell before it stops counting as a check of that cell (priors.py:93).",
+   "measured_on": "one synthetic pin case (a tetragonal prior on cubic 4.157 Å data)",
+   "proposed": 3,
+   "evidence": "rietx's own, one synthetic case: the assign-refine loop walked a wrong prior to the true lattice and called it confirmed. 10 % in volume is about 3 % per axis; the seeded svd start still finds the basin as an engine, so the guard keeps provenance honest and loses no candidate."
+  },
+  "rietx.indexing.quality._LAUE_ORBIT_FACTOR": {
+   "role": "physics",
+   "decides": "Reflections per Laue orbit relative to triclinic, scaling Smith's volume envelope per system (quality.py:114).",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "Physics: the Laue-class order over the triclinic order, checked against the package's own generate_reflections in tests/test_indexing_quality.py:501 rather than trusted as a table."
+  },
+  "rietx.indexing.quality._MAX_CENTRING": {
+   "role": "physics",
+   "decides": "The largest centring multiplicity each system admits, the worst case the volume envelope uses (quality.py:240).",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "Physics: lattice points per conventional cell of the most centred Bravais type of each system (F 4, R in the hexagonal setting 3, I/C 2), asserted in tests/test_indexing_quality.py:477."
+  },
+  "rietx.indexing.quality.VOLUME_ENVELOPE_SLACK": {
+   "role": "tolerance",
+   "decides": "The factor between Smith's mean-line volume estimate and the search ceiling, and the margin past which consensus reports volume_unphysical (quality.py:254).",
+   "measured_on": "Smith's own calibration set, as the comment reads it (raw line excludes the truth below p = 0.71)",
+   "proposed": 3,
+   "evidence": "Smith's envelope is the cited statistic; 1.5 is a free factor above Smith's worst case (1/0.71 ≈ 1.41), so it is tiered on its own (generality.md § The rule, a factor is a threshold of its own). tests/test_indexing_quality.py:455 pins the ceiling as slack × envelope.",
+   "question": "Should the slack be measured on the corpus (the fraction of truths whose volume sits above the raw envelope), or does Smith's published worst case make 1.5 tier 2 (quality.py:254)?"
+  },
+  "rietx.indexing.screen.SCREEN_WINDOW_LINES": {
+   "role": "count",
+   "decides": "The lines of de Wolff's window the capping count takes predicted positions up to (screen.py:96).",
+   "measured_on": "n/a",
+   "proposed": 2,
+   "evidence": "Already tier 2 (_audit.py:2540): de Wolff (1968, J. Appl. Cryst. 1, 108)'s twenty, the window M20 is defined on, held as its own literal so a retune of fom.FOM_N cannot move it."
+  },
+  "rietx.indexing.screen._LN2": {
+   "role": "arithmetic",
+   "decides": "ln 2 in the pseudo-Voigt profile (screen.py:97).",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "Arithmetic, already tier 1 (_audit.py:2546)."
+  },
+  "rietx.indexing.screen._LATTICE_POINTS": {
+   "role": "physics",
+   "decides": "Lattice points per conventional cell for each centring letter, dividing a cell's volume to its primitive volume (screen.py:512).",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "Physics: P 1, A/B/C/I 2, F 4, R 3 (hexagonal setting), the Bravais centring multiplicities."
+  },
+  "rietx.indexing.workflow.ABSENT_SIGMA": {
+   "role": "threshold",
+   "decides": "How many propagated σ a predicted reflection's net intensity must reach to count as present, feeding the absent count, the extinction screen and validation (workflow.py:106).",
+   "measured_on": "qarr corundum (R-3c), magnetite (Fd-3m), zincite; NIST SRM 660c (Pm-3m, no extinctions) as the control",
+   "proposed": 3,
+   "evidence": "rietx's own 3σ, matched to MATCH_SIGMA so one number means one thing; its failure mode on a correct cell is stated (a space-group extinction or an unreached high-angle line reads absent), and the 2θ of every flagged reflection travels with the count. Three qarr materials and the NIST control, two families by laboratory."
+  },
+  "rietx.indexing.workflow.VALIDATION_METRIC_REL": {
+   "role": "tolerance",
+   "decides": "The relative metric error whose displacement the validation fit's windows must capture, setting the capture slack from the pattern's top angle (workflow.py:115).",
+   "measured_on": "the separation table's canonical 1 % wrong metric (tests/test_indexing_consensus.py)",
+   "proposed": 3,
+   "evidence": "rietx's own assumed tolerance, stated as one: 1 % is the canonical wrong metric the separation table grades, so a wrong metric reads as displaced intensity rather than absent."
+  },
+  "rietx.indexing.workflow.VALIDATION_SLACK_BOUNDS_DEG": {
+   "role": "tolerance",
+   "decides": "The floor and cap (0.3°, 6.0°) on the validation fit's derived capture slack (workflow.py:123).",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "rietx's own, argued (the floor keeps a short-range synchrotron validation from tail-only windows, the cap keeps tan θ finite near 180°) and not measured."
+  },
+  "rietx.indexing.workflow.ABSENT_WINDOW_FWHM": {
+   "role": "tolerance",
+   "decides": "The half-width, in predicted FWHM, of the window integrated to decide whether a predicted reflection is present (workflow.py:149).",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "rietx's own, argued (a wider window on a dense supercell collects a neighbour's tail and reports a phantom as present) and not measured."
+  },
+  "rietx.indexing.ambiguity.MAX_AMBIGUITY_INDEX": {
+   "role": "cap",
+   "decides": "The highest derivative-lattice index the ambiguity search enumerates, so which supercell partners can be reported and can write the refuting geometric_ambiguity caveat.",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "A fence argued from the HNF count (7, 13, 35 at index 2, 3, 4) and Mighell & Santoro (1975) tabulating low-index cases only, which names the source but does not test the cut at 4 (ambiguity.py:88). tests/test_indexing_reduce.py:1277 pins the value and no test shows the report says that partners above index 4 were not looked for, so the tier-1 listing-cap ground is not met.",
+   "question": "Should the result state the fence (no partner above index 4 sought), which would make it a tier-1 cap on distance, or is index 4 a tier-3 choice to keep?"
+  },
+  "rietx.indexing.ambiguity.AMBIGUITY_DISCREPANCY_SLACK": {
+   "role": "threshold",
+   "decides": "How much worse a derivative partner's mean |ΔQ| may be than its parent's and still be reported as explaining the lines equally well, which writes geometric_ambiguity (a refuting caveat) on the parent.",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "Argued as a deliberately permissive screen, made safe by extras_absent_in_range doing the refutation (ambiguity.py:286-291); no citation and no measurement in the tree. Unanimity: reporting a partner that fits as well is a second-kind ranking, and no competent refiner would hide one, but the 1.5 factor itself decides which partners exist and so which parents grade low.",
+   "question": "Is 1.5 measured anywhere (WP-1446/1449), or only argued?"
+  },
+  "rietx.indexing.ambiguity.MAX_DISCRIMINATING": {
+   "role": "cap",
+   "decides": "How many discriminating reflections are listed per partner as advice on where to look; the partner, its verdict and the grade do not read the list.",
+   "measured_on": "n/a",
+   "proposed": "invariant",
+   "evidence": "The list fills AmbiguityPartner.discriminating_reflections only (ambiguity.py:293-299, 349), and the one other reader prints it as a suggestion (diagnostics.py:729-736), so no candidate, rank or grade moves with it. No test asserts that invariance yet.",
+   "question": "Accept invariant on the code reading, or require a test asserting rank and grade do not move?"
+  },
+  "rietx.indexing.ambiguity.AMBIGUITY_EXTEND_FACTOR": {
+   "role": "cap",
+   "decides": "How far past the measured 2θ range a partner's discriminating reflections are predicted, as a factor on two_theta_max.",
+   "measured_on": "n/a",
+   "proposed": "invariant",
+   "evidence": "It sets only tt_ext for the advice list (ambiguity.py:253, 293), so it changes which reflections are suggested and never whether a partner is reported; tests/test_indexing_reduce.py:847 checks the bound, not the invariance."
+  },
+  "rietx.indexing.ambiguity._DERIVATIVE_VOLUME_RTOL": {
+   "role": "tolerance",
+   "decides": "Which candidate pairs are tried as parent and derivative by volume ratio, a prefilter before _same_reduced_metric decides.",
+   "measured_on": "the IUCr round-robin brucite pattern (WP-1446), one family",
+   "proposed": 3,
+   "evidence": "Measured once: brucite's a×2 supercell sits 6 ppm from 4× the truth's volume, four orders inside 1 % (ambiguity.py:355-365). A prefilter that never drops a related pair would be answer-invariant, but no test shows the volume error of two independent fits stays under 1 % on a lower-quality cell.",
+   "question": "Would a test over the acceptance corpus's derivative pairs (largest volume-ratio error found) let this move to invariant?"
+  },
+  "rietx.indexing.ambiguity.SUPERCELL_CHANCE_ALPHA": {
+   "role": "threshold",
+   "decides": "The significance level below which a containment child's extra lines are seen more often than chance, which separates supercell_refuted (refuting, ranked below its parent) from supported or undecided.",
+   "measured_on": "the indexing acceptance corpus's finished searches: IUCr round robin, SRM 660c LaB6, GSAS tutorial FAP/NAC (WP-1449)",
+   "proposed": 3,
+   "evidence": "A convention placed between measured clusters, correct cells at p ≤ 0.0072 and wrong ones at p ≥ 0.27 (ambiguity.py:456-464); the truth side is close (pseudo-tetragonal LaB6 at 2 of 3 extras), now undecided since thresholds 1.7. Unanimity: none found who would keep a supercell whose extras are seen at chance rate, but the margin on the truth side is a factor 1.4."
+  },
+  "rietx.indexing.diagnostics.WIDTH_MISMATCH_RATIO": {
+   "role": "threshold",
+   "decides": "The measured-to-predicted FWHM ratio past which PEAK_WIDTH_LAW_MISMATCH warns and seed_widths re-seeds the instrument's Gaussian w before validation (workflow.py:375-395).",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "Argued between ordinary sample broadening of 2-3× and the ProfileTCHZ default left on lab data, which lands near 13 (diagnostics.py:62-68); no family measurement is cited. Unanimity for the re-seed: none found who would validate lab candidates against a synchrotron line width, and the threshold, not the action, is on trial."
+  },
+  "rietx.indexing.diagnostics.LAB_LINE_TOLERANCE_ANGSTROM": {
+   "role": "tolerance",
+   "decides": "How far a declared wavelength may sit from one anode's Kα1, Kα2 or weighted mean and still be read as that laboratory source.",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "Arithmetic: the six anodes' lines are at least 0.143 Å apart (Fe Kα1 to Co Kα2), so 5e-4 Å names one anode at most while admitting four-decimal typing (1.5405 is 9e-5 off) (diagnostics.py:493-499); tests/test_indexing_quality.py exercises it."
+  },
+  "rietx.indexing.diagnostics.BRAGG_BRENTANO_CELL_PPM": {
+   "role": "threshold",
+   "decides": "The cell systematic quoted in the info code INDEX_CELL_SYSTEMATIC_UNQUANTIFIED for a Bragg-Brentano cell; it gates nothing.",
+   "measured_on": "one lab pattern (tag guillemot-study, audit_tools.py check A)",
+   "proposed": 3,
+   "evidence": "Measured on one pattern by sweeping goniometer radius 180-320 mm: Rwp moves 0.029 points and about ±85 ppm lands on the lattice parameters (diagnostics.py:687-699). Under three families; the number reaches only an info message (diagnostics.py:951-965).",
+   "question": "Should the message name the one pattern it was measured on, as the rule asks for a single-family threshold?"
+  },
+  "rietx.indexing.extinction.DECISIVE_DELTA_BIC": {
+   "role": "threshold",
+   "decides": "The ΔBIC margin by which the top surviving extinction class must beat the next before ExtinctionScreen.best_or_none returns it (schemas/indexing.py:2653-2660).",
+   "measured_on": "n/a",
+   "proposed": 2,
+   "evidence": "Kass & Raftery (1995) call a difference above 10 very strong evidence, the band the rule itself names as tier 2 (extinction.py:149-153). Note for the best_or_none task: the GUI's extinction route calls screen.best_or_none() (gui/session.py:2803), so this pick margin reaches a default path. The sham probe in the module docstring (corundum SRM 676a, round robin: 40-50 % of sham positions 1-3 FWHM from an allowed line clear 3σ, up to 24.7σ, extinction.py:61-79) measures the absence test's ABSENT_SIGMA (workflow.py:106, outside this slice) on one family only, and the fix it motivated is _model_is_quiet, not a threshold.",
+   "question": "The GUI route reaches this pick margin: is the GUI's 'best' marker the pick verb the rule allows, or a default that must pass the unanimity gate?"
+  },
+  "rietx.indexing.extinction.REFERENCE_NET_RWP_MAX": {
+   "role": "threshold",
+   "decides": "The background-subtracted Rwp of the absence-free reference fit above which the screen is marked unreliable and best_or_none abstains, the classes still ranked (extinction.py:1376-1382).",
+   "measured_on": "one synthetic Si pattern at 11-BM-like resolution with the cell 0.4 % off; a real synchrotron pattern built as a mechanism in tests/test_extinction_gate.py",
+   "proposed": 3,
+   "evidence": "The statistic is Toby (2006)'s background-subtracted Rwp, tier 2; the bar 1/√2 (half the net weighted power unexplained) is rietx's, measured on one synthetic case (extinction.py:155-167). Arithmetic in extinction.py:1107-1111 shows a perfect fit reads √(N/(N+S)), so the bar also abstains on weak data (S < N) with no misfit at all, which the message separates (thresholds 1.12). Unanimity for abstaining: none found who would name an extinction symbol from a reference that leaves half the net signal unexplained.",
+   "question": "One synthetic family only: keep at tier 3 under the rare-feature wording, or ask for a second and third family before the abstention stands?"
+  },
+  "rietx.indexing.extinction.N_A_CM3_PER_A3": {
+   "role": "unit",
+   "decides": "The unit factor that turns density, cell volume and formula weight into formula units per cell.",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "N_A × 1e-24 cm³/Å³, N_A exact in the SI since 2019 (extinction.py:169-173); tests/test_extinction_prior.py uses it."
+  },
+  "rietx.indexing.extinction.DENSITY_Z_TOLERANCE": {
+   "role": "tolerance",
+   "decides": "How far a declared density may put Z from a whole number (fraction of Z) before it names that Z, filters the members by it, or contradicts a declared z and makes best_or_none abstain.",
+   "measured_on": "n/a",
+   "proposed": 2,
+   "evidence": "International Tables Vol. C (2006) §3.2.1 gives 1.5 % for measured against calculated density (extinction.py:175-186), ruled on PR #1140 (WP-2033). Arithmetic checked against density_zs (extinction.py:502-509): two whole Z first fit at z_rho = 33.49 ({33, 34}), about 35 % of z_rho in 40-50 and 65 % in 50-60 give two, every z_rho ≥ 66 gives at least two, and no whole Z fits up to z_rho = 32.5; so the z_candidates field comment's 'Z ≳ 50' (schemas/indexing.py:2590, not ~2547) should read 'Z ≳ 33', as extinction.py:184 and :531 already say. Z_INTEGER_TOLERANCE no longer exists in the tree: WP-2030 (closed 2026-11-07) deleted it with INDEX_Z_NOT_INTEGER (PR #1237; schemas/indexing.py:218), so it has no row here and WP-2030 owns that rule.",
+   "question": "Correct schemas/indexing.py:2590 to 'Z ≳ 33' in this WP's code change (not edited by this proposal)?"
+  },
+  "rietx.indexing.extinction._ZONES": {
+   "role": "enumeration",
+   "decides": "The vocabulary of the zones (planes through the origin) on which reflection conditions are stated when deriving an extinction class's conditions; each is kept only if it reproduces the absence set exactly.",
+   "measured_on": "every gemmi setting (550)",
+   "proposed": 1,
+   "evidence": "Crystallography: the derivation fits conditions to the computed absence set (extinction.py:615-648), and tests/test_extinction_symbol.py:196 measures it over the whole table: 1 of 550 settings (C 4 2 21, non-standard) is incomplete and reports conditions_complete = False rather than a partial list."
+  },
+  "rietx.indexing.extinction._AXES": {
+   "role": "enumeration",
+   "decides": "The vocabulary of the axes on which reflection conditions are stated when deriving an extinction class's conditions; each is kept only if it reproduces the absence set exactly.",
+   "measured_on": "every gemmi setting (550)",
+   "proposed": 1,
+   "evidence": "Crystallography: the derivation fits conditions to the computed absence set (extinction.py:615-648), and tests/test_extinction_symbol.py:196 measures it over the whole table: 1 of 550 settings (C 4 2 21, non-standard) is incomplete and reports conditions_complete = False rather than a partial list."
+  },
+  "rietx.indexing.extinction._FORMS2": {
+   "role": "enumeration",
+   "decides": "The vocabulary of the linear forms of two free indices tried as conditions when deriving an extinction class's conditions; each is kept only if it reproduces the absence set exactly.",
+   "measured_on": "every gemmi setting (550)",
+   "proposed": 1,
+   "evidence": "Crystallography: the derivation fits conditions to the computed absence set (extinction.py:615-648), and tests/test_extinction_symbol.py:196 measures it over the whole table: 1 of 550 settings (C 4 2 21, non-standard) is incomplete and reports conditions_complete = False rather than a partial list."
+  },
+  "rietx.indexing.extinction._FORMS1": {
+   "role": "enumeration",
+   "decides": "The vocabulary of the linear form of one free index tried as a condition when deriving an extinction class's conditions; each is kept only if it reproduces the absence set exactly.",
+   "measured_on": "every gemmi setting (550)",
+   "proposed": 1,
+   "evidence": "Crystallography: the derivation fits conditions to the computed absence set (extinction.py:615-648), and tests/test_extinction_symbol.py:196 measures it over the whole table: 1 of 550 settings (C 4 2 21, non-standard) is incomplete and reports conditions_complete = False rather than a partial list."
+  },
+  "rietx.indexing.extinction._MODULI": {
+   "role": "physics",
+   "decides": "The moduli (2, 3, 4, 6) against which each linear form is tried as a reflection condition.",
+   "measured_on": "every gemmi setting (550)",
+   "proposed": 1,
+   "evidence": "Physics: crystallographic translations (centring, glide and screw components) are 1/2, 1/3, 1/4 or 1/6 of a lattice vector, so these are the only moduli a condition can have (extinction.py:644-648); the whole-table test (tests/test_extinction_symbol.py:196) covers it."
+  },
+  "rietx.indexing.peakfit._H_WIDTH": {
+   "role": "numerical floor",
+   "decides": "The finite-difference step for the (Γ_G, Γ_L) → (w₁, w₂) width map in the group fitter's Jacobian.",
+   "measured_on": "synthetic groups in tests/test_peak_picking.py:289-311",
+   "proposed": 1,
+   "evidence": "A numerical setting whose error a test bounds: test_group_jacobian_matches_finite_differences (tests/test_peak_picking.py:299) holds the analytic Jacobian within 5e-5 of central differences on six shapes including true Voigt and asymmetric FCJ."
+  },
+  "rietx.indexing.peakfit._H_POS": {
+   "role": "numerical floor",
+   "decides": "The finite-difference step for the FCJ node vectors' motion with position in the group fitter's Jacobian.",
+   "measured_on": "synthetic groups in tests/test_peak_picking.py:289-311",
+   "proposed": 1,
+   "evidence": "Covered by the same test as _H_WIDTH (tests/test_peak_picking.py:299), whose docstring names the FCJ node-vector differences; worst column within 5e-5."
+  },
+  "rietx.indexing.peakfit._SEED_GAUSS_FRACTION": {
+   "role": "seed",
+   "decides": "The Gaussian share of the seed combined width at the start of every group fit.",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "Argued (both components must start non-zero; a Gaussian-dominant start avoids over-weighting tails, peakfit.py:100-106); a seed can move which minimum a non-linear fit reaches, and no test shows the converged components are independent of it.",
+   "question": "Is there a measurement that 0.8 against, say, 0.5 leaves the picked list unchanged, which would make it invariant?"
+  },
+  "rietx.indexing.peakfit._SPARROW_DIP_MIN": {
+   "role": "numerical floor",
+   "decides": "The relative dip depth below which two equal lines count as one maximum, so whether a pair is mergeable or an unresolved mate.",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "Sparrow's criterion is whether a dip exists; 1e-6 only keeps a rounding ripple on a flat top from counting as one (peakfit.py:530-534), a numerical floor. No test pins it."
+  },
+  "rietx.indexing.peaks._LN2_8": {
+   "role": "arithmetic",
+   "decides": "The factor 8 ln 2 converting a Gaussian variance to its squared FWHM in the shoulder seeds.",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "Arithmetic: FWHM² = 8 ln 2 σ² for a Gaussian (peaks.py:63)."
+  },
+  "rietx.indexing.peaks.MIN_GROUP_POINTS": {
+   "role": "threshold",
+   "decides": "The fewest channels a caller-requested window (group_at, the GUI peak editor) may hold before it is refused with a ValueError.",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "Argued as enough channels to fit two widths and one component (peaks.py:64-69, 217-222); detection never meets it. No measurement and no test.",
+   "question": "Is 8 channels arithmetic (twice the four free parameters) and so tier 1, or a choice?"
+  },
+  "rietx.indexing.peaks.TRIAL_GAP_STEPS": {
+   "role": "threshold",
+   "decides": "The channel step, as a multiple of the median step, read as an excluded gap when counting the resolution elements that set the false-discovery bar.",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "No measurement in the tree (peaks.py:496-500); it changes n_trials and so the Benjamini-Hochberg bar of PEAK_FDR_Q on any pattern with excluded regions."
+  },
+  "rietx.indexing.qspace._AF_INDEX": {
+   "role": "arithmetic",
+   "decides": "The fixed map giving which G* component each of A..F is, between the quadratic-form coefficients and the reciprocal metric tensor.",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "Arithmetic: (A..F) = (G*₁₁, G*₂₂, G*₃₃, 2G*₂₃, 2G*₁₃, 2G*₁₂) by definition of Q(hkl) (qspace.py:55-63); tests/test_indexing_core.py:167 checks the cell Jacobian built on it against finite differences."
+  },
+  "rietx.indexing.qspace._AF_FACTOR": {
+   "role": "arithmetic",
+   "decides": "The fixed map giving the factor of two on A..F's off-diagonal entries, between the quadratic-form coefficients and the reciprocal metric tensor.",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "Arithmetic: (A..F) = (G*₁₁, G*₂₂, G*₃₃, 2G*₂₃, 2G*₁₃, 2G*₁₂) by definition of Q(hkl) (qspace.py:55-63); tests/test_indexing_core.py:167 checks the cell Jacobian built on it against finite differences."
+  },
+  "rietx.indexing.qspace._VOIGT_OF_AF": {
+   "role": "arithmetic",
+   "decides": "The fixed map giving the Voigt slot of each A..F entry, between the quadratic-form coefficients and the reciprocal metric tensor.",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "Arithmetic: (A..F) = (G*₁₁, G*₂₂, G*₃₃, 2G*₂₃, 2G*₁₃, 2G*₁₂) by definition of Q(hkl) (qspace.py:55-63); tests/test_indexing_core.py:167 checks the cell Jacobian built on it against finite differences."
+  },
+  "rietx.schemas.indexing.PEAK_POSITION_ESD_MAX_DEG": {
+   "role": "threshold",
+   "decides": "The position esd past which a fitted line is flagged position_unmeasured and leaves PeakList.usable().",
+   "measured_on": "1 165 usable lines of 17 bundled lab patterns; FAP.XRA (GSAS tutorial)",
+   "proposed": 1,
+   "evidence": "The bar is the axis: 2θ spans at most 180°, so an esd of 180° admits every angle and the line locates nothing (schemas/indexing.py:237-264); measured, the next-worst esd is 0.868°, 207× inside, and the one line it drops moved FAP's cell 1 376 ppm (WP-1442). Unanimity: none found who would match on a line of unbounded position."
+  },
+  "rietx.schemas.indexing.PEAK_NO_INTENSITY_SIGMA": {
+   "role": "threshold",
+   "decides": "The I/σ_I under which a fitted component is flagged no_intensity and leaves PeakList.usable().",
+   "measured_on": "the 16 IUCr CPD round-robin lab patterns (one diffractometer, one family); FAP.XRA (GSAS tutorial); a forward-modelled silicon synthetic",
+   "proposed": 3,
+   "evidence": "Measured: 2σ dropped eight real fluorapatite lines (I/σ_I 1.2-1.9), 1σ drops 6 of 798 usable round-robin lines and cleared the synthetic silicon's flank junk (schemas/indexing.py:266-282). Two real families plus a synthetic, under three. Unanimity: none found who would drive a search with a line at I < 1σ; the crystallographer's 2σ(I) convention dissents only in the stricter direction."
+  },
+  "rietx.schemas.indexing.PEAK_FDR_Q": {
+   "role": "threshold",
+   "decides": "The false-discovery rate a picked list is held to; a component failing it is flagged weak_line, kept usable and out of the set the search is driven by.",
+   "measured_on": "the 16 IUCr CPD round-robin lab patterns (one diffractometer, one family); #728's steep-background synthetic silicon; F2's synthetic",
+   "proposed": 3,
+   "evidence": "The statistic and rule are Benjamini & Hochberg (1995) over Detection.n_trials, tier 2, with astronomy's source-detection use cited (Miller et al. 2001; Hopkins et al. 2002); the rate 0.01 is the one F2's design names (schemas/indexing.py:284-314). Over the round robin it flags 13 of 789 usable components; one real family plus synthetics.",
+   "question": "Do the cited astronomy papers fix q = 0.01 by default, which would lift the threshold to tier 2?"
+  },
+  "rietx.schemas.indexing.PEAK_MIN_HEIGHT_SIGMA": {
+   "role": "threshold",
+   "decides": "The net height in channel σ a detection candidate must reach to be offered to the group fit.",
+   "measured_on": "KD1-2_5_NaCoO2 (tag guillemot-study), one lab pattern, for the σ-normalised form",
+   "proposed": 3,
+   "evidence": "The σ-normalised form was measured against the prototype's relative prominence on one pattern; the value 5 is said to match the pattern-diagnostics census (schemas/indexing.py:316-326), which is rietx's own. No citation."
+  },
+  "rietx.schemas.indexing.PEAK_MIN_PROMINENCE_SIGMA": {
+   "role": "threshold",
+   "decides": "The topographic prominence in local σ a detection candidate must reach.",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "Argued lower than the height floor because a shoulder has small prominence by construction (schemas/indexing.py:328-331); no measurement or citation."
+  },
+  "rietx.schemas.indexing.PEAK_SHOULDER_MIN_SIGMA": {
+   "role": "threshold",
+   "decides": "The significance a curvature (shoulder) seed must reach in the second-derivative filter's propagated noise.",
+   "measured_on": "one three-peak synthetic",
+   "proposed": 3,
+   "evidence": "Multiple-comparison arithmetic over several hundred trials gives about one false shoulder per pattern at 3σ and about 1e-4 at 5σ (schemas/indexing.py:333-341); the target rate is rietx's, and the measurement is one synthetic."
+  },
+  "rietx.schemas.indexing.PEAK_DETECT_SEPARATION_FWHM_FRAC": {
+   "role": "threshold",
+   "decides": "The closest two detections may sit, as a fraction of the narrowest predicted FWHM.",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "Argued: smaller than the Pawley overlap fraction 0.5 so a 0.3-FWHM shoulder is offered and the ΔBIC test decides (schemas/indexing.py:343-348); no measurement."
+  },
+  "rietx.schemas.indexing.PEAK_ALIAS_TOL_FWHM_FRAC": {
+   "role": "tolerance",
+   "decides": "How close, in FWHM, a candidate must sit to a stronger line's Bragg-predicted Kα2 position to be dropped as its alias.",
+   "measured_on": "a synthetic Cu Kα pattern",
+   "proposed": 3,
+   "evidence": "Measured on one synthetic (one spurious line per resolved doublet without the filter); the 0.3 itself is not measured (schemas/indexing.py:350-361). The drop is reported as PEAK_KALPHA2_ALIAS."
+  },
+  "rietx.schemas.indexing.PEAK_ALIAS_RATIO_RANGE": {
+   "role": "tolerance",
+   "decides": "The observed height ratio, in multiples of the emission line's weight, inside which a Kα2-position candidate is accepted as an alias and dropped.",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "Argued wide because partial overlap inflates the apparent Kα2 height (schemas/indexing.py:363-369); a genuine line at that position is indistinguishable in one pattern, so the drop is reported (PEAK_KALPHA2_ALIAS). Unanimity: a refiner who knows a second phase is present would keep such a line, so the action is reported rather than silent, and the range is unmeasured."
+  },
+  "rietx.schemas.indexing.PEAK_WIDTH_CENSUS_N": {
+   "role": "count",
+   "decides": "How many of the most prominent detections the width census takes its median over, which sets the width scale for every seed and window.",
+   "measured_on": "one noisy 0.01°-step third-party lab pattern (WP-1028)",
+   "proposed": 3,
+   "evidence": "Measured on one pattern: the all-detections median read 0.071° against real 0.389° lines, the top-12 median recovers 0.389° (schemas/indexing.py:371-376). Under three families."
+  },
+  "rietx.schemas.indexing.PEAK_POSITION_BOUND_FWHM": {
+   "role": "threshold",
+   "decides": "The half-width, in seed FWHM, of each component's position bound; a component that ends on it is flagged position_at_bound.",
+   "measured_on": "the 16 IUCr CPD round-robin lab patterns (one diffractometer, one family) (WP-2055)",
+   "proposed": 3,
+   "evidence": "Argued as the analogue of VALIDITY_RADIUS_FWHM = 0.4; on the round robin 8 of 24 usable components on this bound were low-angle tail shoulders and freeing it moved seven further from any lattice line (schemas/indexing.py:378-390). The tree's docs/wp/2120 (WP-2120, open PR #1579) takes position_at_bound together with axial_tail as its subject, so its outcome may change what this bound's flag does."
+  },
+  "rietx.schemas.indexing.PEAK_WIDTH_BOUND_FACTORS": {
+   "role": "threshold",
+   "decides": "The bounds on each fitted Gaussian and Lorentzian width as multiples of the seed width; a fit on the upper bound is flagged width_capped and leaves PeakList.usable().",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "The lower 1e-4 is a positivity floor (tier 1 on its own, schemas/indexing.py:392-399); the upper 5 decides width_capped, an unusable flag (schemas/indexing.py:846-849, pick.py:384-385), and has no measurement or citation.",
+   "question": "Split the tuple's tiers (lower 1, upper 3) in the table?"
+  },
+  "rietx.schemas.indexing.PEAK_WINDOW_FWHM_MULT": {
+   "role": "threshold",
+   "decides": "The half-width of a group's fitting window, in seed FWHM beyond the outermost seed.",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "Argued: a wider window buys baseline error against a frozen background, a narrower one costs Lorentzian precision (schemas/indexing.py:401-409); no measurement."
+  },
+  "rietx.schemas.indexing.PEAK_WIDTH_SCALE_BOUNDS": {
+   "role": "cap",
+   "decides": "The clamp on the global broadening factor fitted from the width census, which sets every seed width and window.",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "Argued as a guard against a pathological census (schemas/indexing.py:411-416; peaks.py:452); no test shows an ordinary pattern stays inside it or names the case that reaches it."
+  },
+  "rietx.schemas.indexing.PEAK_MAX_RESEED_PASSES": {
+   "role": "budget",
+   "decides": "How many explicit re-seed passes may add a component to a group whose residual demands one.",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "The frozen-per-stage argument decides why passes are separate, not why two (schemas/indexing.py:418-422); a third pass could add a component, so the cap moves the list and is not answer-invariant."
+  },
+  "rietx.schemas.indexing.PEAK_KEEP_COMPONENT_MIN_DELTA_BIC": {
+   "role": "threshold",
+   "decides": "The ΔBIC an added component must clear to be kept in a group fit.",
+   "measured_on": "n/a",
+   "proposed": 2,
+   "evidence": "Kass & Raftery (1995): 6 is the edge of the strong band, cited in schemas/indexing.py:424-428; the statistic is report.layer2.delta_bic."
+  },
+  "rietx.schemas.indexing.PEAK_ASYMMETRY_MIN_SIGMA": {
+   "role": "threshold",
+   "decides": "The |t| of the residual's odd-cubic projection above which a peak is flagged asymmetric beyond the model; the flag does not leave usable().",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "The odd-cubic direction is argued from a free position absorbing the first odd moment (schemas/indexing.py:430-434); the value 4 is neither measured nor cited, and the flag only reports."
+  },
+  "rietx.schemas.indexing.PEAK_MIN_USABLE_LINES": {
+   "role": "threshold",
+   "decides": "The usable-line count below which the classical figures of merit are not computed and the fom_panel_reduced caveat caps confidence at medium; it never stops a search.",
+   "measured_on": "n/a",
+   "proposed": 2,
+   "evidence": "de Wolff (1968) defines M₂₀ on the first twenty lines and Smith (1977) quotes the envelope at N = 20 (schemas/indexing.py:436-455); the engines' defaults in docs/practice.md agree (DICVOL card 2 N = 20, TREOR USE ≤ 20). Smith & Snyder recommend N = 30 for F_N, and scoring F_N at 20 is rietx's choice, said in the comment."
+  },
+  "rietx.schemas.indexing.METRIC_DOF": {
+   "role": "count",
+   "decides": "The number of free metric coefficients per crystal system, the denominator of lines per degree of freedom.",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "Physics: the independent entries of A..F in Q(hkl) per system (schemas/indexing.py:457-466), used by tests/test_indexing_quality.py and three other test modules."
+  },
+  "rietx.schemas.indexing.MIN_LINES_PER_DOF": {
+   "role": "threshold",
+   "decides": "The usable lines per metric degree of freedom below which a crystal system is not searched, and below which in every system index_pattern abstains before any engine runs (workflow.py:962-976).",
+   "measured_on": "fluorite, IUCr round robin (18 lines, the case that motivated separating it from PEAK_MIN_USABLE_LINES)",
+   "proposed": 3,
+   "evidence": "Argued as the smallest ratio at which a wrong cell is unlikely to match every line by accident (schemas/indexing.py:468-476); no measurement of the ratio and no citation. This is a gate that refuses rather than reports, which the WP asks about.",
+   "question": "Shown 4 lines per DOF, would every competent refiner decline to search that system, or would a DICVOL user run it and read the figures of merit?"
+  },
+  "rietx.schemas.indexing.MAX_RELATIVE_SIGMA_Q": {
+   "role": "threshold",
+   "decides": "The median σ(Q)/Q above which index_pattern abstains on a fitted list before any engine runs; position-only lists are exempt (quality.py:486).",
+   "measured_on": "the ten published bethanechol peak sets (Bergmann et al. 2004), as the case the exemption was made for",
+   "proposed": 3,
+   "evidence": "The bar has no citation or measurement (schemas/indexing.py:478-481). The rule 'an assumed precision may never refuse to index' (indexing/CLAUDE.md:319) holds in the tree: the abstention reads only source == 'fitted' (quality.py:486), after all ten bethanechol sets failed at their assumed σ (4.4e-3 on the synchrotron set, quality.py:407-410). On measured σ it still refuses, and the engines' published practice dissents: DICVOL and ITO search with a fixed 0.03° or 0.06° window whatever the precision (docs/practice.md:283-285); and since Q ∝ 1/a², a 0.1 % lattice difference is a 0.2 % Q difference, twice this bar per line, so the comment's 'indistinguishable' overstates it.",
+   "question": "Demote the refusal on measured σ to the PEAK_POSITION_PRECISION report (diagnostics.py:634-640) and run the search, since a named dissenter (DICVOL/ITO practice) exists?"
+  },
+  "rietx.schemas.indexing.PAIR_MAX_M": {
+   "role": "threshold",
+   "decides": "The largest harmonic order a reflection pair may have in the shift screen.",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "m·sin θ ≤ 1 confines high-order pairs to low angle (arithmetic), but the cut at 8 is argued, not measured (schemas/indexing.py:497-505)."
+  },
+  "rietx.schemas.indexing.PAIR_WINDOW_DEG": {
+   "role": "tolerance",
+   "decides": "The implied shift beyond which a candidate triple is not admitted as a reflection pair.",
+   "measured_on": "n/a",
+   "proposed": 2,
+   "evidence": "Dong (1999) §3's own window, used there to find 11 pairs on a pattern carrying −0.182° (schemas/indexing.py:507-511)."
+  },
+  "rietx.schemas.indexing.PAIR_CLUSTER_HALF_WIDTH_DEG": {
+   "role": "tolerance",
+   "decides": "The half-width of the window the concentration statistic slides over the implied shifts.",
+   "measured_on": "the WP-1038 corpus of fitted lists: IUCr round robin, SRM 660c LaB6, GSAS tutorial FAP/NAC",
+   "proposed": 3,
+   "evidence": "Measured: real clusters have σ 0.0033-0.0071° across the corpus, so 0.010 holds one whole (schemas/indexing.py:513-516)."
+  },
+  "rietx.schemas.indexing.PAIR_NULL_REPLICATES": {
+   "role": "count",
+   "decides": "The number of structureless replicates the pair concentration is tested against, which sets the empirical p floor at 1/201.",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "1/201 is below the 0.01 bar (arithmetic, schemas/indexing.py:518-520), but PAIR_MAX_P's own comment records a verdict that changed with the rng sequence, so the replicate count is a numerical setting with no test bounding its effect on the verdict.",
+   "question": "Would a test that the verdicts on the corpus are stable across seeds at 200 replicates make this tier 1?"
+  },
+  "rietx.schemas.indexing.PAIR_MIN_Z": {
+   "role": "threshold",
+   "decides": "The concentration z below which the pair method declines to report a shift.",
+   "measured_on": "3 600 null replicates over 18 line lists; seven real fitted lists of the WP-1038 corpus (round robin, SRM 660c, GSAS tutorial)",
+   "proposed": 3,
+   "evidence": "Measured: z ≥ 3.0 fires on 0.83 % of nulls and z ≥ 3.5 on one replicate, while every real fitted list scores z ≥ 4.2 (schemas/indexing.py:522-527)."
+  },
+  "rietx.schemas.indexing.PAIR_MAX_P": {
+   "role": "threshold",
+   "decides": "The empirical p a concentration must also clear to report a shift, and the only bar used to refute a losing template.",
+   "measured_on": "SRM 660c and the WP-1038 corpus",
+   "proposed": 3,
+   "evidence": "A conventional 0.01 chosen for small-count robustness after sin_2theta escaped refutation on SRM 660c on one rng draw (schemas/indexing.py:529-537); no citation."
+  },
+  "rietx.schemas.indexing.PAIR_MIN_CLUSTERED": {
+   "role": "count",
+   "decides": "The number of pairs that must agree before a shift amplitude is quoted.",
+   "measured_on": "n/a",
+   "proposed": 2,
+   "evidence": "Dong (1999) §3 asks for at least three reflection pairs with close zero shifts (schemas/indexing.py:539-541)."
+  },
+  "rietx.schemas.indexing.PAIR_REFUTE_K_FRACTION": {
+   "role": "threshold",
+   "decides": "How far below the winner's concentration a template must fall, together with an insignificant z, to be reported refuted.",
+   "measured_on": "the WP-1038 corpus; zircon from the IUCr round robin",
+   "proposed": 3,
+   "evidence": "Measured: sin_2theta sits at 0.30-0.50 of the winner wherever a shift exists, and zircon's constant at 7 against cos_theta's 8 is the one-pair case it stops (schemas/indexing.py:543-551)."
+  },
+  "rietx.schemas.indexing.SHIFT_ALLOWANCE_K_ESD": {
+   "role": "threshold",
+   "decides": "The standard errors of the fitted shift amplitude added as headroom to the matching window.",
+   "measured_on": "corundum SRM 676a (IUCr round robin) and SRM 660c LaB6, two certified families (WP-1038)",
+   "proposed": 3,
+   "evidence": "Swept against certified answers: corundum keeps R to 0.070° and flips at 0.0767°, SRM 660c flips at 0.0532° and at 0.060° returns a cell 293 000 ppm off at high confidence; 3 standard errors put corundum at 0.0681° (schemas/indexing.py:553-577). Two families, under three, and validated against certificates."
+  },
+  "rietx.schemas.indexing.SMITH_VOLUME_C1": {
+   "role": "physics",
+   "decides": "The published constant 0.6 of Smith's (1977) volume envelope V ≈ 0.6·d_N³/(1/N − 0.0052), which sets the volume ceiling the data support.",
+   "measured_on": "n/a",
+   "proposed": 2,
+   "evidence": "Smith (1977), kept as the two published constants because the formula is used at other N (schemas/indexing.py:579-581). Under the 2026-11-05 ruling a printed value is the row's source and does not by itself test the number, so the citation is the evidence."
+  },
+  "rietx.schemas.indexing.SMITH_VOLUME_C2": {
+   "role": "physics",
+   "decides": "The published constant 0.0052 of Smith's (1977) volume envelope V ≈ 0.6·d_N³/(1/N − 0.0052), which sets the volume ceiling the data support.",
+   "measured_on": "n/a",
+   "proposed": 2,
+   "evidence": "Smith (1977), kept as the two published constants because the formula is used at other N (schemas/indexing.py:579-581). Under the 2026-11-05 ruling a printed value is the row's source and does not by itself test the number, so the citation is the evidence."
+  },
+  "rietx.schemas.indexing.INDEX_MIN_INDEXED_FRACTION": {
+   "role": "threshold",
+   "decides": "The share of the usable lines' intensity a candidate must index (else the refuting indexed_fraction_low) and of their count (else the capping indexed_lines_low) before it can grade high.",
+   "measured_on": "SRM 660c LaB6 with injected weak and strong impurity lines (WP-1969, issue #933)",
+   "proposed": 2,
+   "evidence": "McMaille's published scoring tolerates impurities holding under 10-15 % of the total intensity (Le Bail 2004, docs/practice.md § Which lines an indexing search is given), and 0.9 explained sits inside that range; measured, SRM 660c explains 0.93-1.00 with up to six weak impurity lines and 0.73-0.74 with six strong ones (schemas/indexing.py:583-625). The caveat vocabulary INDEX_REFUTING_CAVEATS (schemas/indexing.py:703-706, no row: a frozenset of strings the walk drops) refutes on geometric_ambiguity, fom_panel_disagrees, indexed_fraction_low, volume_unphysical, validation_failed and supercell_refuted, and caps on engines_disagree, fom_panel_reduced, not_validated, predicted_but_absent (capping since 1.12), indexed_lines_low, search_incomplete, shift_allowance_assumed and bravais_ambiguous.",
+   "question": "Is McMaille's impurity tolerance a published default this gate may rest on (tier 2), or a scoring weight unlike a grade gate (tier 3)? And in the caveat vocabulary, should geometric_ambiguity written for a candidate the ambiguity search never reached (consensus.py:627-632, WP-1986) and fom_panel_disagrees refute, or cap?"
+  },
+  "rietx.schemas.indexing.PEAK_ASSUMED_ESD_DEG": {
+   "role": "tolerance",
+   "decides": "The σ(2θ) PeakList.from_positions gives a bare position list by default, which sets every line's σ(Q) and so the ±kσ matching windows the engines and figures of merit read.",
+   "measured_on": "the ten published bethanechol peak sets (Bergmann et al. 2004); hl2's bare list",
+   "proposed": 3,
+   "evidence": "Called a typical well-aligned lab precision with no measurement (schemas/indexing.py:708-714); every such line carries sigma_assumed. At 3σ the window is 0.06° 2θ, between DICVOL's 0.03° default and ITO's TOLG 0.06° (docs/practice.md:283-285), which may make the value tier 2 on the engines' defaults. Per WP-2013's follow-up, index_pattern emits no PEAK_SIGMA_ASSUMED for such a list; only peak_diagnostics does.",
+   "question": "Tier 2 on the engines' windows (the 3σ window inside DICVOL-ITO's range), or tier 3? And should index_pattern emit PEAK_SIGMA_ASSUMED for a from_positions list?"
+  },
+  "rietx.schemas.indexing.PEAK_AXIAL_TAIL_MAX_FWHM": {
+   "role": "threshold",
+   "decides": "The distance in fitted FWHM within which a weak component on the aberration's side of a stronger group-mate is flagged axial_tail; the flag does not leave usable().",
+   "measured_on": "the SRM 660c LaB6 census (WP-1028, WP-1043); six real lab patterns for the unverified hits",
+   "proposed": 3,
+   "evidence": "3.5 spans the farthest measured SRM 660c tail at 2.99 FWHM, and the one-sided sign flip at 90° is a physics signature (schemas/indexing.py:815-829). The tree's docs/wp/2120 (WP-2120, open PR #1579) takes axial_tail together with position_at_bound as its subject."
+  },
+  "rietx.schemas.indexing.PEAK_REFUTED_SIGMA": {
+   "role": "threshold",
+   "decides": "The standard deviations above χ²_red = 1 at which a group fit is refuted, so a component added to it is flagged not_separable and leaves usable().",
+   "measured_on": "the bundled IUCr round-robin corundum pattern (Cu Kα, lab Bragg-Brentano)",
+   "proposed": 3,
+   "evidence": "The statistic is arithmetic (σ(χ²_red) = √(2/ν), tier 1); the 3σ is the package's convention, the same as fom.MATCH_SIGMA, with no citation in the tree (schemas/indexing.py:874-911). Measured on one family, where satellites at χ²_red 17.4 and 4.6 stopped both engines and removing them indexed the certified cell; the comment states the failure mode (a genuine weak neighbour of a badly fitted group is demoted)."
+  },
+  "rietx.schemas.indexing.PEAK_SATELLITE_NEAR_FWHM": {
+   "role": "threshold",
+   "decides": "The distance in fitted FWHM within which a re-seeded weak component counts as inside a neighbour's profile, one of the three conditions of not_separable.",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "No measurement for this distance (schemas/indexing.py:913-916); PEAK_AXIAL_TAIL_MAX_FWHM's comment records that widening it reached four of six tails, so the census bears on it only indirectly."
+  },
+  "rietx.schemas.indexing.PEAK_SATELLITE_MAX_RATIO": {
+   "role": "threshold",
+   "decides": "The area ratio below which a component is a satellite of a group-mate, read by not_separable, the merge test, the axial-tail screen and the Kα2-residual flag.",
+   "measured_on": "the qarr lab patterns (IUCr round robin), one family",
+   "proposed": 3,
+   "evidence": "Measured satellite ratios 0.08-0.14 on one family; 0.25 is set above them (schemas/indexing.py:918-920)."
+  },
+  "rietx.indexing.dichotomy.MAX_ANGLE_COSINE": {
+   "role": "physics",
+   "decides": "The obliquity bound of the dichotomy's search domain: reciprocal angles outside 30-150 degrees are pruned (dichotomy.py:107, read by _initial_box, _inside_domain and _stage_edges).",
+   "measured_on": "not measured",
+   "proposed": 1,
+   "evidence": "Geometry: every lattice's reciprocal lattice has a Buerger-reduced basis with |cos| of each angle at most 1/2, so a bound at cos 30 degrees leaves every lattice reachable in some setting. tests/test_indexing_kernels.py:187 and tests/test_indexing_engines.py:635-740 hold the cone the search enforces, but no test sweeps reduced cells against it.",
+   "question": "Is the reduced-reciprocal-basis argument the maintainer's reading of 'covers every reduced cell' (dichotomy.py:102), and should a test assert it, given the bound is not stated in any result field?"
+  },
+  "rietx.indexing.dichotomy.MAX_DEPTH": {
+   "role": "cap",
+   "decides": "How many bisections one box may undergo before it is sent to the assign-refine loop as it stands (dichotomy.py:112, used at :1286).",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "A termination guard: reaching it accepts the box as a leaf rather than dropping it, so the search stays exhaustive. In a 6-D triclinic box, 60 bisections are about 10 per dimension (1e-3 of each width), not 1e-18, and the comment at dichotomy.py:1107-1115 records the cap binding in monoclinic under a 3-sigma stopping rule; no test reaches it today.",
+   "question": "Is a cap that hands the box on rather than dropping it a tier-1 termination guarantee, and does the 'unreachable' wording (dichotomy.py:111) need the per-dimension figure?"
+  },
+  "rietx.indexing.dichotomy.MAX_ASSIGN_PASSES": {
+   "role": "cap",
+   "decides": "How many assign-refine passes a dichotomy leaf takes before its assignment is reported as it stands (dichotomy.py:117, _accept at :1469-1479).",
+   "measured_on": "GSAS-II fluorapatite list (WP-2066) and the #1258 381-line list",
+   "proposed": 3,
+   "evidence": "rietx's own: WP-2066 measured two closing passes stopping the true fluorapatite cell at 128 of 135 lines where a settled assignment reaches 131 (dichotomy.py:1475-1478). Fewer than three unrelated families, and no test pins the value."
+  },
+  "rietx.indexing.dichotomy.ANNEAL_FACTOR": {
+   "role": "threshold",
+   "decides": "How fast the dichotomy's match window tightens from a box's width to the per-line sigma, which decides whether a leaf polishes onto the true cell (dichotomy.py:122, :1469).",
+   "measured_on": "certified corundum (SRM 676a) per dichotomy.py:1440-1446; not otherwise recorded",
+   "proposed": 3,
+   "evidence": "rietx's own schedule; the comment says a gentler schedule bought no measured gain, without naming the datasets. No test pins it."
+  },
+  "rietx.indexing.dichotomy.ACCEPT_SPACING_FRAC": {
+   "role": "threshold",
+   "decides": "Below what fraction of the median observed-line gap a box stops being bisected and is refined (dichotomy.py:127, :1121).",
+   "measured_on": "monoclinic domain recorded at dichotomy.py:1107-1118 (bethanechol)",
+   "proposed": 3,
+   "evidence": "rietx's own stopping rule: exhaustiveness rests on the pruning, but whether a leaf's centre polishes onto the truth depends on it; the comment records the 3-sigma alternative never terminating. One family recorded and no test."
+  },
+  "rietx.indexing.dichotomy.AXIS_STEP": {
+   "role": "threshold",
+   "decides": "The top-level grid step, 0.4 Angstrom in a principal d-spacing, of the dichotomy's staged grid (dichotomy.py:129, _stage_edges at :595).",
+   "measured_on": "not measured",
+   "proposed": 2,
+   "evidence": "Altomare et al. (2019), International Tables Vol. H ch. 3.4 section 3.4.3.1.5, the DICVOL step the module cites (dichotomy.py:6, :128).",
+   "question": "Is the grid step answer-invariant (the pruning below it is exact), which would make it invariant rather than tier 2 once a test shows it?"
+  },
+  "rietx.indexing.dichotomy.ANGLE_STEP_DEG": {
+   "role": "threshold",
+   "decides": "The top-level grid step, 5 degrees of reciprocal angle, of the dichotomy's staged grid (dichotomy.py:131, :608).",
+   "measured_on": "not measured",
+   "proposed": 2,
+   "evidence": "Same source as AXIS_STEP: International Tables Vol. H ch. 3.4 section 3.4.3.1.5, the DICVOL step (dichotomy.py:130)."
+  },
+  "rietx.indexing.dichotomy.MAX_TRIAL_HKL": {
+   "role": "cap",
+   "decides": "How many trial hkl the dichotomy holds; the widest centrings are dropped past it and the system is reported incomplete (dichotomy.py:136, :1065-1080).",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "A memory cap of rietx's own, reported as search_complete = False; tests/test_indexing_engines.py:533-561 holds that the F set survives where P is dropped. Same shape as MAX_GRID_BYTES, approved tier 3 on 2026-10-31."
+  },
+  "rietx.indexing.dichotomy.MAX_GRID_CELLS": {
+   "role": "cap",
+   "decides": "How many grid cells the breadth-first pass may hold before the grid is reported incomplete (dichotomy.py:141, :983).",
+   "measured_on": "bethanechol triclinic grid (#780)",
+   "proposed": 3,
+   "evidence": "A memory cap of rietx's own; overflow returns search_complete = False and INDEX_SEARCH_INCOMPLETE rather than truncating. MAX_GRID_BYTES, its companion, was approved tier 3 on 2026-10-31.",
+   "question": "No test overflows the cell count itself (the bytes cap's test is tests/test_indexing_engines.py:932): should one be built before the row is recorded?"
+  },
+  "rietx.indexing.dichotomy.MAX_GRID_BYTES": {
+   "role": "cap",
+   "decides": "How many bytes of survivor lists the grid's next stage may hold before the grid is reported incomplete (dichotomy.py:148).",
+   "measured_on": "bethanechol (#780 monoclinic and triclinic grids)",
+   "proposed": 3,
+   "evidence": "Current tier 3, approved 2026-10-31 (_audit.py:2384): rietx's own memory bound, reported as INDEX_SEARCH_INCOMPLETE; tests/test_indexing_engines.py::test_the_grid_frontier_is_bounded_by_its_lists_bytes."
+  },
+  "rietx.indexing.dichotomy.DEDUP_EVERY": {
+   "role": "cap",
+   "decides": "How many raw leaves accumulate before an intermediate dedup pass runs between systems (dichotomy.py:152, :849).",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "rietx's own memory bound; the comment says it does not change the answer, but no test shows dedup of a partial list then the rest equals dedup of the whole, and a chi-squared equality is not transitive.",
+   "question": "Should an invariance test (with its margin) move this to invariant?"
+  },
+  "rietx.indexing.dichotomy.MAX_HARVEST": {
+   "role": "cap",
+   "decides": "How many accepted leaves one system unit may hold before it stops and is reported incomplete (dichotomy.py:159).",
+   "measured_on": "bethanechol (#780, a 7 000-leaf unit)",
+   "proposed": 3,
+   "evidence": "Current tier 3, approved 2026-10-31 (_audit.py:2396): rietx's own memory and dedup-time bound, reported as INDEX_SEARCH_INCOMPLETE, and held by tests/test_indexing_engines.py::test_a_dichotomy_unit_stops_at_its_harvest_cap (line 959)."
+  },
+  "rietx.indexing.dichotomy._FACE_LETTERS": {
+   "role": "enumeration",
+   "decides": "Which axis each face-centring letter's centred face is normal to (dichotomy.py:234).",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "Definition: A, B and C centrings are named for the face normal to a, b and c."
+  },
+  "rietx.indexing.dichotomy._OFFDIAG_PARTNERS": {
+   "role": "arithmetic",
+   "decides": "Which diagonal A..F components pair with each off-diagonal one in the Cauchy-Schwarz bound (dichotomy.py:569).",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "Arithmetic read off qspace._AF_INDEX: D = 2G*23 pairs (B, C), E pairs (A, C), F pairs (A, B)."
+  },
+  "rietx.indexing.dichotomy._SAME_BOX_RTOL": {
+   "role": "tolerance",
+   "decides": "On what relative grid a converged box's A..F is hashed, so that a second leaf in the same cell is skipped before refinement (dichotomy.py:1330, :1362).",
+   "measured_on": "certified corundum (SRM 676a), dichotomy.py:1347-1350",
+   "proposed": 3,
+   "evidence": "rietx's own pre-filter; tests/test_indexing_engines.py:813-840 holds that cells 20 tolerances apart hash apart and 0.1 apart hash together. A skipped leaf is skipped, not merged, so two cells within 0.1 % that a synchrotron chi-squared would separate are not both refined.",
+   "question": "Is 1e-3 safely coarser than nothing the dedup would keep apart, given CELL_EQUALITY_CHI2 can separate cells far closer than this on synchrotron data?"
+  },
+  "rietx.indexing.reduce.CELL_EQUALITY_CHI2": {
+   "role": "threshold",
+   "decides": "When two candidates' reduced A..F vectors are one lattice, which merges candidates in every dedup (reduce.py:95).",
+   "measured_on": "tests/indexing_gallery.py and tests/test_acceptance_indexing.py families: NIST SRM 660c LaB6, APS 11-BM NAC, IUCr CPD QPA round robin (corundum, zincite, zircon), GSAS-II fluorapatite tutorial list, bethanechol published sets",
+   "proposed": 3,
+   "evidence": "The statistic is a chi-squared on the joint covariance and 16.8119 is the chi-squared(6) 0.99 quantile (arithmetic); the 99 % level is rietx's choice, with no source cited in the repo. tests/test_indexing_reduce.py:347-363 holds that one pair is one lattice at lab precision and two at synchrotron precision.",
+   "question": "Is a 99 % level established practice for a lattice-equality test (tier 2 with a source), or rietx's own?"
+  },
+  "rietx.indexing.reduce.CELL_EQUALITY_RELATIVE": {
+   "role": "threshold",
+   "decides": "When two candidates without a covariance are one lattice, as a relative bound on A..F (reduce.py:99).",
+   "measured_on": "tests/indexing_gallery.py and tests/test_acceptance_indexing.py families: NIST SRM 660c LaB6, APS 11-BM NAC, IUCr CPD QPA round robin (corundum, zincite, zircon), GSAS-II fluorapatite tutorial list, bethanechol published sets",
+   "proposed": 3,
+   "evidence": "rietx's own: set an order looser than a synchrotron cell's precision so it never tightens what chi-squared would decide; tests/test_indexing_plots.py:335-348 holds the truth test tighter than it."
+  },
+  "rietx.indexing.reduce.NIGGLI_EPS_RELATIVE": {
+   "role": "tolerance",
+   "decides": "The floating-point tolerance of every comparison inside the Niggli reduction, eps = 1e-5 times V^(1/3) (reduce.py:116).",
+   "measured_on": "not measured (hypothesis-generated cells)",
+   "proposed": 1,
+   "evidence": "A numerical tolerance whose value is Grosse-Kunstleve, Sauter & Adams (2004), Acta Cryst. A60, 1-6, eq. (3), and their Test 3 passes at it; tests/test_indexing_reduce.py::test_niggli_reduction_is_unimodular_invariant reproduces that test here (and :442-449 reads the value).",
+   "question": "Should the row cite the paper as tier 2 instead, since the cell it treats as metrically special within eps decides a tie?"
+  },
+  "rietx.indexing.reduce.BRAVAIS_OBLIQUITIES": {
+   "role": "threshold",
+   "decides": "The Le Page obliquities (0.5-3 degrees) swept by bravais_screen, whose loosest value decides INDEX_BRAVAIS_AMBIGUOUS and whose tightest decides the reported system (reduce.py:118, :300).",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "rietx's own sweep over Le Page's (1982) method; tests/test_indexing_reduce.py:180-189 holds monotonicity across it but no source in the repo gives the values.",
+   "question": "Does an established program's Le Page default (PLATON, gemmi) sit inside 0.5-3 degrees, which would make it tier 2?"
+  },
+  "rietx.indexing.reduce.BRAVAIS_SYMPREC_SIGMAS": {
+   "role": "threshold",
+   "decides": "The multiples of the cell's own esd used as spglib symprec values in bravais_screen (reduce.py:123).",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "rietx's own; no test pins the multiples and no source is cited."
+  },
+  "rietx.indexing.reduce._SYSTEM_BY_NUMBER": {
+   "role": "enumeration",
+   "decides": "How a space-group number maps to its crystal system (reduce.py:127).",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "International Tables A's standard division of the 230 groups by number."
+  },
+  "rietx.indexing.reduce._SYSTEM_BY_SYM_OPS": {
+   "role": "physics",
+   "decides": "How a holohedral lattice group's rotation count maps to its crystal system (reduce.py:134).",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "Physics: the seven holohedries -1, 2/m, mmm, 4/mmm, -3m, 6/mmm and m-3m have the rotation counts listed, and a lattice group is always holohedral."
+  },
+  "rietx.indexing.reduce._SETTING_STEPS": {
+   "role": "cap",
+   "decides": "How many Gauss steps a monoclinic re-set may take before it is declared stuck (reduce.py:477).",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "A termination guard: each step at least halves |a.c| or shortens a vector, so 200 steps exceed double precision's range on any finite metric; tests/test_indexing_reduce.py::test_a_metric_that_is_no_lattice_has_no_setting covers the refusal path.",
+   "question": "No test reaches the cap itself: is the halving argument enough for tier 1?"
+  },
+  "rietx.indexing.reduce._SETTING_TIE": {
+   "role": "numerical floor",
+   "decides": "Below what relative size a.c or a^2 - c^2 is rounding rather than a choice in the monoclinic re-set (reduce.py:483).",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "A numerical floor four orders above double rounding; tests/test_indexing_reduce.py::test_rounding_is_not_a_setting_to_re_set holds that rounding-level ties are not re-set."
+  },
+  "rietx.indexing.reduce._FACE_AXES": {
+   "role": "enumeration",
+   "decides": "Which two axes each centred face spans, by letter (reduce.py:587).",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "Definition: the A face spans b and c, the B face a and c."
+  },
+  "rietx.indexing.reduce.CELL_PINV_RCOND": {
+   "role": "numerical floor",
+   "decides": "The relative cut equal_reduced hands the pseudo-inverse of the summed covariance (reduce.py:630).",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "numpy's own pinv default, a numerical floor; tests/test_indexing_reduce_boundaries.py:247-269 holds that the PSD pseudo-inverse is taken at it and a rounding eigenvalue cannot make chi-squared negative."
+  },
+  "rietx.indexing.reduce.SELLING_GATE_SIGMAS": {
+   "role": "threshold",
+   "decides": "How many Selling-scalar esds wide the gate is inside which the boundary-free test looks for b's other descriptions (reduce.py:747).",
+   "measured_on": "bethanechol (two dedup calls of 1 906 and 16 198 candidates)",
+   "proposed": 3,
+   "evidence": "The root inherits CELL_EQUALITY_CHI2's tier; the 1.25 factor is rietx's own, and the groups were the same at 1.1, 1.25 and 2 times on bethanechol only. A gate and selector: the chi-squared on the image decides.",
+   "question": "Cauchy-Schwarz gives sufficiency at 1.0 to first order (reduce.py:741-744): is the factor answer-invariant if a test shows it?"
+  },
+  "rietx.indexing.reduce.SELLING_GATE_RELATIVE": {
+   "role": "threshold",
+   "decides": "The same gate for a pair without covariances, as a fraction of the larger metric trace (reduce.py:752).",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "rietx's own: ten times CELL_EQUALITY_RELATIVE, a gate whose verdict the componentwise rule on the image decides; no test pins it."
+  },
+  "rietx.indexing.reduce._SELLING_DEPTH": {
+   "role": "cap",
+   "decides": "How many reduction boundaries the cross-boundary equality crosses on each side (reduce.py:757).",
+   "measured_on": "bethanechol (#834's 608 split comparisons, Ba/manual)",
+   "proposed": 3,
+   "evidence": "rietx's own: one step each side joined 604 of 608 split pairs and two steps on one side joined the other four; one family. A shallower depth splits one lattice into two candidates."
+  },
+  "rietx.indexing.reduce._SELLING_PAIRS": {
+   "role": "arithmetic",
+   "decides": "Which vector pairs give Selling's six scalars (reduce.py:761).",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "Definition: s1..s6 = b.c, a.c, a.b, a.d, b.d, c.d with d = -(a + b + c) (Andrews, Bernstein & Sauter 2019, A75, 115, section 2)."
+  },
+  "rietx.indexing.reduce._SELLING_START": {
+   "role": "arithmetic",
+   "decides": "The four starting vectors a, b, c and d = -(a + b + c) of a Selling reduction (reduce.py:764).",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "Definition of Selling's superbase (Andrews, Bernstein & Sauter 2019, section 2)."
+  },
+  "rietx.indexing.reduce._SELLING_STEPS": {
+   "role": "cap",
+   "decides": "How many Selling steps a reduction may take before the pair keeps the answer of the vectors as given (reduce.py:768).",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "A termination guard, by an arithmetic argument rather than a test: each Selling step strictly lowers the sum of the four vectors' squared lengths, so a finite lattice reduces in far fewer steps; no test reaches the limit, which tier 1 for a numerical setting asks for (generality.md:58-61).",
+   "question": "Should a synthetic case reach the cap before the row is recorded?"
+  },
+  "rietx.indexing.reduce._AF_ROW": {
+   "role": "arithmetic",
+   "decides": "Which G* row each A..F slot reads (reduce.py:897).",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "Arithmetic: A..F = G*11, G*22, G*33, 2G*23, 2G*13, 2G*12."
+  },
+  "rietx.indexing.reduce._AF_COL": {
+   "role": "arithmetic",
+   "decides": "Which G* column each A..F slot reads (reduce.py:898).",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "Arithmetic: the same definition of A..F as _AF_ROW."
+  },
+  "rietx.indexing.reduce._AF_TWO": {
+   "role": "arithmetic",
+   "decides": "The factor 2 on the off-diagonal A..F slots (reduce.py:899).",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "Arithmetic: D, E and F carry 2G*ij by definition."
+  },
+  "rietx.indexing.svd.MAX_ITERATIONS": {
+   "role": "cap",
+   "decides": "How many Table 1 step (iv) iterations an SVD call takes before giving up (svd.py:201).",
+   "measured_on": "WP-1040 corpus: NIST SRM 660c LaB6, APS 11-BM NAC, IUCr CPD QPA round robin (zincite, zircon, corundum), GSAS-II fluorapatite, bethanechol published sets (five unrelated families)",
+   "proposed": 2,
+   "evidence": "Coelho (2003), J. Appl. Cryst. 36, 86-95: N_T1 = 20, the engine's published default; the corpus converges in 3-9 (svd.py:197-200)."
+  },
+  "rietx.indexing.svd.NC_NO_LO": {
+   "role": "threshold",
+   "decides": "The lower N_c/N_o ratio, which rietx reads as the upper end of the volume window V up to N_o/(3 kappa) (svd.py:206, volume_window at :641).",
+   "measured_on": "WP-1040 corpus: NIST SRM 660c LaB6, APS 11-BM NAC, IUCr CPD QPA round robin (zincite, zircon, corundum), GSAS-II fluorapatite, bethanechol published sets (five unrelated families)",
+   "proposed": 2,
+   "evidence": "Coelho (2003) Table 1 step (ii), the published value; rietx uses it as a volume window rather than a per-trial abort (svd.py:58-69), and that window held the true volume on all nine corpus datasets.",
+   "question": "The action changed (a precomputed window, not Coelho's per-trial abort): does the row need a tier-3 action entry beside the tier-2 value?"
+  },
+  "rietx.indexing.svd.NC_NO_HI": {
+   "role": "threshold",
+   "decides": "The upper N_c/N_o ratio, which bounds the volume window at 4 N_o/kappa (svd.py:206).",
+   "measured_on": "WP-1040 corpus: NIST SRM 660c LaB6, APS 11-BM NAC, IUCr CPD QPA round robin (zincite, zircon, corundum), GSAS-II fluorapatite, bethanechol published sets (five unrelated families)",
+   "proposed": 2,
+   "evidence": "Coelho (2003) Table 1 step (ii); tests/test_indexing_engines.py:2326-2340 holds that N_c counts distinct lines, the reading under which the certified LaB6 cell passes."
+  },
+  "rietx.indexing.svd.VOLUME_LADDER_RATIO": {
+   "role": "threshold",
+   "decides": "The factor the SVD engine's volume ladder grows by per rung (svd.py:208, :866).",
+   "measured_on": "WP-1040 corpus: NIST SRM 660c LaB6, APS 11-BM NAC, IUCr CPD QPA round robin (zincite, zircon, corundum), GSAS-II fluorapatite, bethanechol published sets (five unrelated families)",
+   "proposed": 2,
+   "evidence": "Coelho (2003) eq. (3), nu_1 = 1.1, as the module cites it (svd.py:66, :207)."
+  },
+  "rietx.indexing.svd.CONTROL": {
+   "role": "budget",
+   "decides": "How many random starts (N1) and perturbation rounds (N2) the SVD engine spends per volume rung in each crystal system (svd.py:213).",
+   "measured_on": "WP-1040 corpus: NIST SRM 660c LaB6, APS 11-BM NAC, IUCr CPD QPA round robin (zincite, zircon, corundum), GSAS-II fluorapatite, bethanechol published sets (five unrelated families)",
+   "proposed": 2,
+   "evidence": "Coelho (2003) Table 3, the engine's published control values (svd.py:209-212); tests/test_indexing_priors.py reads it."
+  },
+  "rietx.indexing.svd.WEIGHT_EXPONENT": {
+   "role": "threshold",
+   "decides": "The exponent m of Coelho's weighting W = d_o^m |d2theta| I_o, which decides which assignment the SVD iteration converges to (svd.py:237).",
+   "measured_on": "LaB6 SRM 660c and 11-BM NAC (svd.py:233-236)",
+   "proposed": 3,
+   "evidence": "Coelho (2003) randomises m (over 0-4 in section 2.2, 0-6 in section 3.1); rietx fixes it at 4, measured to help NAC and hurt LaB6 at large perturbation. The value is inside the paper's range, the fixed choice is rietx's own.",
+   "question": "Is a fixed m = 4, inside a range Coelho randomises over, a tier-2 choice or rietx's own?"
+  },
+  "rietx.indexing.svd.TRIM_RETRY": {
+   "role": "count",
+   "decides": "How many lines at most are dropped when an SVD search that found nothing is retried (svd.py:242, :707).",
+   "measured_on": "WP-1040 corpus: NIST SRM 660c LaB6, APS 11-BM NAC, IUCr CPD QPA round robin (zincite, zircon, corundum), GSAS-II fluorapatite, bethanechol published sets (five unrelated families)",
+   "proposed": 3,
+   "evidence": "rietx's own: it rescues qarr corundum (0 to 3293 convergences in 4000 starts) and costs zircon, zincite and bethanechol F, so it runs only after silence (svd.py:86-97)."
+  },
+  "rietx.indexing.svd.MAX_BOX_INDEX": {
+   "role": "cap",
+   "decides": "Above which |h| the SVD engine abandons a trial metric rather than enumerate its box (svd.py:247, _predicted at :298).",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "A crash guard of rietx's own; hmax = floor(a sqrt(Q_max)) + 1, so a trial with a longest axis above about 40 d_min returns no lines and dies. No test reaches it, and nothing reports a cell lost to it.",
+   "question": "Can it drop a real long-axis cell (a above 40 d_min, a 40 Angstrom axis at d_min = 1 Angstrom), and should that be reported as a search bound?"
+  },
+  "rietx.indexing.svd.KAPPA_PROBES": {
+   "role": "count",
+   "decides": "How many random starts the kappa probe takes its median over, which places the SVD volume window (svd.py:251, :629).",
+   "measured_on": "WP-1040 corpus: NIST SRM 660c LaB6, APS 11-BM NAC, IUCr CPD QPA round robin (zincite, zircon, corundum), GSAS-II fluorapatite, bethanechol published sets (five unrelated families)",
+   "proposed": 3,
+   "evidence": "rietx's own: the comment says 24 moves the window's endpoints by under one per cent, without naming the data; the window held the truth on all nine corpus datasets."
+  },
+  "rietx.indexing.svd.KAPPA_VOLUME": {
+   "role": "unit",
+   "decides": "The reference volume the kappa probe scales its random cells to (svd.py:251, :631).",
+   "measured_on": "WP-1040 corpus: NIST SRM 660c LaB6, APS 11-BM NAC, IUCr CPD QPA round robin (zincite, zircon, corundum), GSAS-II fluorapatite, bethanechol published sets (five unrelated families)",
+   "proposed": 3,
+   "evidence": "rietx's own; kappa = N_c/V is volume-independent only to first order, and no test shows the window unmoved by the reference volume.",
+   "question": "Is it answer-invariant if a test shows the window does not move between reference volumes?"
+  },
+  "rietx.indexing.svd.ANGLE_LO": {
+   "role": "threshold",
+   "decides": "The lower end of the angle range random triclinic and monoclinic SVD starts are drawn from (svd.py:254, :578).",
+   "measured_on": "WP-1040 corpus: NIST SRM 660c LaB6, APS 11-BM NAC, IUCr CPD QPA round robin (zincite, zircon, corundum), GSAS-II fluorapatite, bethanechol published sets (five unrelated families)",
+   "proposed": 3,
+   "evidence": "Coelho (2003) section 3 used 90-130 degrees to generate test lattices, not starts, so the printed value is the source and the use is rietx's own (generality.md: a printed value does not move a row to tier 2)."
+  },
+  "rietx.indexing.svd.ANGLE_HI": {
+   "role": "threshold",
+   "decides": "The upper end of the angle range random triclinic and monoclinic SVD starts are drawn from (svd.py:254).",
+   "measured_on": "WP-1040 corpus: NIST SRM 660c LaB6, APS 11-BM NAC, IUCr CPD QPA round robin (zincite, zircon, corundum), GSAS-II fluorapatite, bethanechol published sets (five unrelated families)",
+   "proposed": 3,
+   "evidence": "Same as ANGLE_LO: Coelho (2003) section 3's test-lattice range used for starts."
+  },
+  "rietx.indexing.svd.IMPURITY_CUT_DEG": {
+   "role": "threshold",
+   "decides": "How far (degrees 2theta) an observed line may sit from its nearest calculated line in the last SVD pass before it is left unindexed (svd.py:260, :516).",
+   "measured_on": "WP-1040 corpus: NIST SRM 660c LaB6, APS 11-BM NAC, IUCr CPD QPA round robin (zincite, zircon, corundum), GSAS-II fluorapatite, bethanechol published sets (five unrelated families)",
+   "proposed": 3,
+   "evidence": "The last-pass rule is Coelho (2003) section 2.4 (svd.py:76-84, measured on zincite, zircon and fluorapatite); the comment does not say 0.05 degrees is his printed value.",
+   "question": "Is 0.05 degrees Coelho's own number (tier 2) or rietx's?"
+  },
+  "rietx.indexing.svd.ZERO_ERROR_LIMIT_DEG": {
+   "role": "threshold",
+   "decides": "How large a zero error (degrees 2theta) an SVD pass may carry forward; larger is clipped (svd.py:271, :501).",
+   "measured_on": "LaB6 SRM 660c, qarr corundum, bethanechol A sets (svd.py:266-270)",
+   "proposed": 3,
+   "evidence": "rietx's own: twice the 0.05 degrees Coelho (2003) says the strategy tolerates, and measured not to bind on SRM 660c (+0.033) or corundum (-0.067)."
+  },
+  "rietx.indexing.trial_error.BASE_INDEX_MAX": {
+   "role": "cap",
+   "decides": "The largest index a trial-and-error base line may be given, which decides which cells the engine can find (trial_error.py:82).",
+   "measured_on": "tests/indexing_gallery.py and tests/test_acceptance_indexing.py families: NIST SRM 660c LaB6, APS 11-BM NAC, IUCr CPD QPA round robin (corundum, zincite, zircon), GSAS-II fluorapatite tutorial list, bethanechol published sets",
+   "proposed": 3,
+   "evidence": "rietx's own: a cell needing a higher index on a low-angle line is reported by INDEX_DOMINANT_ZONE naming the bound (tests/test_indexing_engines.py:1781-1800). No TREOR or ITO default is cited in the repo.",
+   "question": "Does TREOR90's or N-TREOR09's published base-line index limit match 2, which would make it tier 2?"
+  },
+  "rietx.indexing.trial_error.DOMINANT_ZONE_PROBE_LADDER": {
+   "role": "threshold",
+   "decides": "Which index ceilings the dominant-zone probe tries after a silent search, which decides whether INDEX_DOMINANT_ZONE is emitted (trial_error.py:89).",
+   "measured_on": "a synthetic tetragonal cell with c = 26 Angstrom (trial_error.py:84-88)",
+   "proposed": 3,
+   "evidence": "rietx's own; the probe returns only a diagnostic, never a candidate. tests/test_indexing_engines.py:1781-1800 holds its first rung above BASE_INDEX_MAX."
+  },
+  "rietx.indexing.trial_error.DOMINANT_ZONE_PROBE_SECONDS": {
+   "role": "budget",
+   "decides": "How long one rung of the dominant-zone probe may run, which decides whether its diagnostic can appear (trial_error.py:104).",
+   "measured_on": "the synthetic construction of trial_error.py:84-88 (4.3 s serially)",
+   "proposed": 3,
+   "evidence": "rietx's own runaway guard on a diagnostic, raised from 10 s in WP-1026 after a race under -n auto; tests/test_indexing_engines.py:1783-1791 reads it."
+  },
+  "rietx.indexing.trial_error.DOMINANT_ZONE_MAX_DOF": {
+   "role": "threshold",
+   "decides": "Above how many metric degrees of freedom the dominant-zone probe is skipped (trial_error.py:110).",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "rietx's own cost bound; a dominant zone in an orthorhombic or lower cell goes undiagnosed, and no test covers that case."
+  },
+  "rietx.indexing.trial_error.BASE_POOL_MIN": {
+   "role": "count",
+   "decides": "How many low-angle lines the trial-and-error base combinations are drawn from, which decides whether cross terms can be determined (trial_error.py:125).",
+   "measured_on": "a monoclinic cell (8.875, 16.408, 7.137, beta 93.84) in tests/test_indexing_engines.py:1223-1250",
+   "proposed": 3,
+   "evidence": "rietx's own: a pool of six cannot determine E for that cell; the test asserts the pool is at least 8. One case, not three families."
+  },
+  "rietx.indexing.trial_error.MAX_ASSIGN_PER_BASE": {
+   "role": "cap",
+   "decides": "How many assignments are enumerated per base set before the index table is shrunk and the search reported incomplete (trial_error.py:130).",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "A cost cap of rietx's own, reported as search_complete = False; same shape as MAX_GRID_BYTES (approved tier 3, 2026-10-31). No test reaches it."
+  },
+  "rietx.indexing.trial_error.SOLVE_CHUNK": {
+   "role": "budget",
+   "decides": "How many rows one batched np.linalg.solve call takes (trial_error.py:133).",
+   "measured_on": "n/a",
+   "proposed": "invariant",
+   "evidence": "Memory only: each row's n-by-n solve is independent of the batch it rides in, so the chunk size changes peak memory and never a solution.",
+   "question": "The rule asks for an invariance test: should one be built?"
+  },
+  "rietx.solve.chemistry.OCCUPANCY_MAX_DENOMINATOR": {
+   "role": "threshold",
+   "decides": "The largest denominator a part occupancy is read as a fraction of in Composition.require (solve/chemistry.py:102).",
+   "measured_on": "not measured (three published part-occupied structures pending)",
+   "proposed": 3,
+   "evidence": "Current tier 3, approved 2026-10-24 on the judgement ground (_audit.py:4303); tests/test_solve_chemistry.py::test_the_inventory_tolerance_scales_with_the_part_occupied_multiplicity."
+  },
+  "rietx.solve.chemistry._CELLS27": {
+   "role": "enumeration",
+   "decides": "The 27 lattice translations around a minimum image for the clash term (solve/chemistry.py:364).",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "Arithmetic: the translations (-1, 0, 1) cubed, with (0, 0, 0) at index 13."
+  },
+  "rietx.solve.cluster._ISOMETRY_RTOL": {
+   "role": "tolerance",
+   "decides": "When an integer matrix is an isometry of the cell in equivalences() (solve/cluster.py:79).",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "Current tier 1 (_audit.py:4285): ten orders above rounding; test_the_normaliser_index_is_international_tables and test_a_metrically_special_cell_is_judged_at_the_isometry_tolerance (tests/test_solve_engine.py)."
+  },
+  "rietx.solve.cluster._CELLS27": {
+   "role": "enumeration",
+   "decides": "The 27 lattice translations around a minimum image in the cluster module (solve/cluster.py:80).",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "Arithmetic: itertools.product((-1, 0, 1), repeat=3)."
+  },
+  "rietx.solve.cost.NUISANCE_RCOND": {
+   "role": "numerical floor",
+   "decides": "Below what fraction of the largest eigenvalue of the equilibrated nuisance normal matrix a direction is dropped from the pseudo-inverse (solve/cost.py:136, :388).",
+   "measured_on": "APS 11-BM NAC and the two-phase fixture of tests/test_solve_cost.py",
+   "proposed": 1,
+   "evidence": "A numerical floor on a unit-diagonal matrix; tests/test_solve_cost.py::test_chi2_does_not_depend_on_the_impurity_s_stored_scale holds chi-squared unmoved over eight decades of a nuisance column's scale, and :205-231 holds the cost to 1e-13 against an independent pinv at the same cut."
+  },
+  "rietx.solve.cost.NAMED_REFLECTIONS": {
+   "role": "cap",
+   "decides": "How many reflections an ExtractionRefused message names before it counts the rest (solve/cost.py:142, _named at :208).",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "A cap on what a refusal lists: _named appends 'and N more', so the message counts what lies outside it and the refusal does not depend on the number.",
+   "question": "No test asserts the 'and N more' count: should one be added for the tier-1 cap clause?"
+  },
+  "rietx.solve.moves._TAU": {
+   "role": "arithmetic",
+   "decides": "The 2 pi in the structure-factor phase (solve/moves.py:103).",
+   "measured_on": "n/a",
+   "proposed": 1,
+   "evidence": "Current tier 1 (_audit.py:4324): arithmetic, the phase of exp(2 pi i h.x)."
+  },
+  "rietx.solve.tempering.REFRESH_EVERY": {
+   "role": "numerical floor",
+   "decides": "How many sweeps pass between full rebuilds of the running orbit sums in temper() (solve/tempering.py:73).",
+   "measured_on": "acridine-shaped synthetic case and APS 11-BM NAC",
+   "proposed": 1,
+   "evidence": "Current tier 1 (_audit.py:4326): a numerical setting; tests/test_solve_engine.py::test_running_sums_stay_on_a_rebuild holds the drift under 1e-10 J at the cadence."
+  },
+  "rietx.indexing.fom.FOM_N": {
+   "role": "count",
+   "decides": "The N of F_N the panel computes, an alias of PEAK_MIN_USABLE_LINES (fom.py:56), so the scoring precondition and the figure it guards cannot drift apart.",
+   "measured_on": "n/a",
+   "proposed": 2,
+   "evidence": "It takes PEAK_MIN_USABLE_LINES' ground: de Wolff (1968) defines M20 on the first twenty lines; fom.py:46-55 records that the 20 for F_N is the package's own choice, since Smith & Snyder (1979) fix no N (WP-1436).",
+   "question": "Should FOM_N carry its own row at tier 3, since fom.py:50-55 says twenty is this package's choice for F_N, or ride PEAK_MIN_USABLE_LINES' tier as an alias with no free factor?"
+  },
+  "rietx.indexing.ambiguity.UNCANCELLABLE_METRIC_RTOL": {
+   "role": "tolerance",
+   "decides": "The metric deviation up to which a lattice symmetry still counts when deciding which reflections an extinction could cancel, the sine of the Bravais screen's loosest obliquity (ambiguity.py:466-472).",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "Derived with no free factor from reduce.BRAVAIS_OBLIQUITIES' loosest entry, 3 degrees (reduce.py:118, Le Page obliquities), so it inherits that tuple's tier; the tuple itself is not walked as a row of its own here and its 3 degrees are rietx's sweep, loose on purpose per the comment.",
+   "question": "Is the 3 degree loosest obliquity of the Le Page sweep (reduce.py:118) a published default (Le Page 1982 uses a tolerance of the same order), which would make this tier 2 by derivation?"
+  }
+ },
+ "defaults": {
+  "rietx.indexing.workflow.index_pattern:peaks": {
+   "decides": "The peak list to index; with None the package picks one from data and instrument (pick_peaks) or raises (workflow.py:866-871).",
+   "proposed": "caller",
+   "evidence": "The caller's input: supplying a list or a pattern is the caller's act, and the picker's own numbers are tiered at their rows in indexing/pick.py and indexing/peaks.py."
+  },
+  "rietx.indexing.workflow.index_pattern:data": {
+   "decides": "The powder pattern; supplying it turns whole-pattern validation on, and without it every candidate caps at medium with INDEX_NOT_VALIDATED (workflow.py:734-760).",
+   "proposed": "caller",
+   "evidence": "The caller's input; the package chooses nothing at this seat, and what a missing pattern costs is reported (INDEX_NOT_VALIDATED)."
+  },
+  "rietx.indexing.workflow.index_pattern:instrument": {
+   "decides": "The instrument the picker and validation read; required with data when peaks is None (workflow.py:866-871).",
+   "proposed": "caller",
+   "evidence": "The caller's input; None with no peaks raises rather than assuming a wavelength."
+  },
+  "rietx.indexing.workflow.index_pattern:spec": {
+   "decides": "spec=None resolves to SearchSpec(), the search's whole control surface (workflow.py:870).",
+   "proposed": "n/a",
+   "evidence": "A delegation: every decision behind it is a SearchSpec field default, tiered at the seat rietx.indexing.engines.SearchSpec (17 rows here).",
+   "question": "Is n/a acceptable for a None that only delegates to another seat, or should the row carry the lowest tier among SearchSpec's fields (3) (workflow.py:870)?"
+  },
+  "rietx.indexing.workflow.index_pattern:preset": {
+   "decides": "preset=None resolves to the quick preset, a 120 s whole-run ceiling covering search, probe and validation (workflow.py:871-881).",
+   "proposed": 3,
+   "evidence": "preset=None resolves to DEFAULT_SEARCH_PRESET = \"quick\" (engines.py:2347, workflow.py:873), a string the walk drops, which fills QUICK_TOTAL_BUDGET_SECONDS (120 s) into total_budget_seconds unless the caller declared one. Under DESIGN.md § Rules, 1 the preset is not a verdict: it stops the search and reports what it cut (INDEX_BUDGET_EXHAUSTED names truncated and unreached systems), so its answer is a second-kind ranking over the systems reached, justified as a default by the token clause, and a refiner indexing a low-symmetry organic who would let the search run (DICVOL04 to 3770 s, indexing/CLAUDE.md) is the named dissenter to treating the cut as first kind. Its budgets are tier 3 on four high-symmetry families (WP-1042), not answer-invariant.",
+   "question": "Keep quick as the default on the token clause with its budgets at tier 3, and re-measure the ceiling on a low-symmetry family before approval (engines.py:2345)? Separately, #1374's share rule under a declared ceiling: cap each unit at min(budget_seconds, T_search / n_engines) so one unit cannot hold the whole ceiling, per engine or over the remaining units?"
+  },
+  "rietx.indexing.workflow.index_pattern:engines": {
+   "decides": "engines=None runs every registered engine (dichotomy, svd, trial_error); high means every engine that ran found the lattice (workflow.py:892).",
+   "proposed": 3,
+   "evidence": "rietx's own design: engines that fail differently must agree before a lattice is corroborated (indexing/CLAUDE.md § The governing rule), and restricting the list narrows what the answer can say. Running all is the no-narrowing default; no established program runs several indexing engines by default in the repo's survey.",
+   "question": "Is running every registered engine a first-kind default (nobody would narrow by default) and so tier 1, or rietx's own (3) because the set of engines decides the corroboration the gate reads (workflow.py:892)?"
+  },
+  "rietx.indexing.workflow.index_pattern:quality": {
+   "decides": "quality=None computes the data-quality report from the peaks (assess_peak_list), which sets the volume envelope, the measured shift and the supported systems (workflow.py:887-889).",
+   "proposed": "n/a",
+   "evidence": "A delegation: the report's own numbers (Smith's envelope, VOLUME_ENVELOPE_SLACK, the pair screen) are tiered at their rows; passing one in is the caller's act.",
+   "question": "Is n/a acceptable here, as for spec (workflow.py:887)?"
+  },
+  "rietx.indexing.workflow.index_pattern:shift_from_pairs": {
+   "decides": "Whether the harmonic-pair screen (Dong 1999) measures a shift magnitude from the peak list alone, which then sizes the search window (workflow.py:741, :888).",
+   "proposed": 3,
+   "evidence": "The statistic is Dong (1999)'s; adopting it as the window by default is rietx's own (WP-1038), measured on NIST SRM 660c (a certified shift recovered from the list), qarr corundum (one shift from a multi-phase pattern) and 11-BM NAC (the published false-pair rule admits it at chance; the seeded null rejects it), three families. It sizes windows only and never moves a cell; the allowance is reported as INDEX_SHIFT_ALLOWANCE."
+  },
+  "rietx.indexing.workflow.index_pattern:validate": {
+   "decides": "Whether checked candidates get a whole-pattern validation fit when a pattern is supplied; it is what lets a candidate leave medium (workflow.py:742).",
+   "proposed": 2,
+   "evidence": "The validation fit is Pawley since WP-2011 (workflow.VALIDATION_MODE = \"pawley\", workflow.py:119, a string the walk cannot see; LeBailValidation.mode records it per candidate), tier 2 on docs/practice.md's survey: TOPAS defaults to Pawley (Technical Reference v5 §8) and its indexing GUI refines each selected solution by Pawley or Le Bail (docs/practice.md:557-570, 603-604). Without validation every candidate caps at medium with INDEX_NOT_VALIDATED; PAWLEY_OVERLAP_FWHM_FRAC (tier 3, _audit.py:2741) is also read by the peak picker (indexing/peaks.py:42, :308), so its opt-in-Pawley ground no longer holds on index_pattern's path.",
+   "question": "Validation adds evidence and refuses nothing, but a batch screener who wants speed would turn it off; is that a dissent to the default or only to its cost, which the validation reserve bounds inside the ceiling (workflow.py:742)?"
+  },
+  "rietx.indexing.workflow.index_pattern:check_top": {
+   "decides": "check_top=None resolves to CONSENSUS_CHECK_TOP, three plus every promotable candidate (workflow.py:893).",
+   "proposed": 1,
+   "evidence": "Follows rietx.indexing.consensus.CONSENSUS_CHECK_TOP's proposed tier: a cap tested never to remove a promotable candidate (tests/test_indexing_consensus.py:518-529)."
+  },
+  "rietx.indexing.workflow.index_pattern:two_theta_limits": {
+   "decides": "two_theta_limits=None uses the pattern's whole range for picking and validation (workflow.py:744).",
+   "proposed": "caller",
+   "evidence": "Off by default: None narrows nothing, and a range is the caller's declared act; the package chooses nothing inside it."
+  },
+  "rietx.indexing.workflow.index_pattern:formula": {
+   "decides": "formula=None records no formula units on the candidates (workflow.py:745).",
+   "proposed": "caller",
+   "evidence": "Already caller (_audit.py:5140): opt-in, a formula only records formula_units and moves no search, rank or grade (WP-2030)."
+  },
+  "rietx.indexing.workflow.index_pattern:temperature": {
+   "decides": "The temperature at which Hofmann's (2002) volumes are read when a formula is supplied (workflow.py:745).",
+   "proposed": 2,
+   "evidence": "Used only once the formula switch is on, so tiered on its own: 298 K is the temperature Hofmann (2002) tabulates his volumes at (Table 2's caption and § 3, crystallography/atomic_volume.py:16-31, TABLE_TEMPERATURE). It moves the reported formula_units only."
+  },
+  "rietx.indexing.workflow.index_pattern:events": {
+   "decides": "events=None streams no progress events (workflow.py:746).",
+   "proposed": "caller",
+   "evidence": "Off by default; an event sink is the caller's, and the stream (provisional cells, per-system consensus) moves nothing in the returned result."
+  },
+  "rietx.indexing.workflow.index_pattern:cancel": {
+   "decides": "cancel=None runs without a cancel token beyond the preset's deadline (workflow.py:746).",
+   "proposed": "caller",
+   "evidence": "Off by default; a token is the caller's, and a cancelled run returns a complete result over what it reached."
+  },
+  "rietx.indexing.engines.SearchSpec:systems": {
+   "decides": "Searches all seven systems, in SYSTEM_ORDER (cubic, hexagonal, trigonal, tetragonal, orthorhombic, monoclinic, triclinic), the order a binding ceiling cuts from the end (engines.py:58, :360).",
+   "proposed": 3,
+   "evidence": "All seven is the no-narrowing choice; the order (cheapest metric first) is rietx's own (WP-1042) and decides, under quick, which systems are cut, reported by INDEX_BUDGET_EXHAUSTED. Measured on the high-symmetry corpus, where the truth's system finished first on every run.",
+   "question": "Is the cheapest-first order an answer-deciding choice that needs a low-symmetry family under quick, as #1374's all-systems monoclinic rows suggest (engines.py:58)?"
+  },
+  "rietx.indexing.engines.SearchSpec:centrings": {
+   "decides": "centrings=None searches every Bravais centring each system admits (CENTRINGS, engines.py:67).",
+   "proposed": 1,
+   "evidence": "Physics: CENTRINGS lists the fourteen Bravais lattices in conventional settings (cubic P I F, trigonal P R, tetragonal P I, orthorhombic P C I F, monoclinic P C, hexagonal and triclinic P); a centred filter prunes rather than adds work."
+  },
+  "rietx.indexing.engines.SearchSpec:min_d_axis": {
+   "decides": "The default 2.0 Å lower bound on d(100) (DEFAULT_MIN_D_AXIS).",
+   "proposed": 3,
+   "evidence": "Follows rietx.indexing.engines.DEFAULT_MIN_D_AXIS's proposed tier and question."
+  },
+  "rietx.indexing.engines.SearchSpec:max_d_axis": {
+   "decides": "The default 25 Å upper bound on a principal d-spacing (DEFAULT_MAX_D_AXIS).",
+   "proposed": 3,
+   "evidence": "Follows rietx.indexing.engines.DEFAULT_MAX_D_AXIS's proposed tier."
+  },
+  "rietx.indexing.engines.SearchSpec:min_volume": {
+   "decides": "The default 15 Å³ volume floor (DEFAULT_MIN_VOLUME).",
+   "proposed": 3,
+   "evidence": "Follows rietx.indexing.engines.DEFAULT_MIN_VOLUME's proposed tier and question."
+  },
+  "rietx.indexing.engines.SearchSpec:max_volume": {
+   "decides": "max_volume=None takes the per-system ceiling from the data-quality report, VOLUME_ENVELOPE_SLACK × Smith's envelope, else DEFAULT_VOLUME_CEILING (engines.py:1276, search_volume_ceiling).",
+   "proposed": 3,
+   "evidence": "Smith's envelope is the cited statistic; the slack and the fallback are rietx's own (VOLUME_ENVELOPE_SLACK, DEFAULT_VOLUME_CEILING). A declared ceiling is used verbatim and recorded in spec_notes."
+  },
+  "rietx.indexing.engines.SearchSpec:n_unindexed": {
+   "decides": "n_unindexed=None accepts with DEFAULT_N_UNINDEXED (2) on the first pass and retries under the inlier rule when no lattice has two engines' agreement (engines.py:366-370).",
+   "proposed": 3,
+   "evidence": "Follows DEFAULT_N_UNINDEXED and INLIER_FRACTION (tier 3); the retry after silence has precedent (Bergmann et al. 2004, DICVOL91's advice, docs/practice.md:730-731), and it is not the default for every run because it moves the pool Borda ranks (SRM 660c LaB6 rank 1 to 3)."
+  },
+  "rietx.indexing.engines.SearchSpec:n_search_lines": {
+   "decides": "The default twenty driven lines (DEFAULT_SEARCH_LINES).",
+   "proposed": 2,
+   "evidence": "Follows rietx.indexing.engines.DEFAULT_SEARCH_LINES: the indexing engines' published defaults sit at twenty (docs/practice.md:681-713)."
+  },
+  "rietx.indexing.engines.SearchSpec:k_sigma": {
+   "decides": "The default matching window of 3σ_eff (MATCH_SIGMA).",
+   "proposed": 3,
+   "evidence": "Follows rietx.indexing.fom.MATCH_SIGMA's proposed tier and question."
+  },
+  "rietx.indexing.engines.SearchSpec:shift_allowance_deg": {
+   "decides": "0.0 declares no window, so the package sizes it: the pair screen's measured allowance, else the width allowance capped at DEFAULT_UNKNOWN_SHIFT_DEG (effective_shift_allowance).",
+   "proposed": 3,
+   "evidence": "The value itself declares nothing; what decides is the fallback chain, whose cap is tier 2 (the programs' 0.03-0.06° windows) and whose width rule is tier 3 (WIDTH_ALLOWANCE_FWHM), so the lower tier is proposed.",
+   "question": "Should a delegating zero carry the lower tier of its fallback chain, or n/a with the tiers left on the constants (engines.py:382)?"
+  },
+  "rietx.indexing.engines.SearchSpec:shift_template": {
+   "decides": "shift_template=None moves no cell for a shift; a measured shift only sizes windows (engines.py:383).",
+   "proposed": "caller",
+   "evidence": "Off by default: declaring a template (constant, cos θ, sin 2θ) is the caller's act, since the magnitude is knowable from the list and the cause is not (indexing/CLAUDE.md § The search window and the shift). The cost of the off default, a cell biased by roughly the shift, is reported (INDEX_SHIFT_ALLOWANCE, shift_allowance_assumed keeps high unreachable)."
+  },
+  "rietx.indexing.engines.SearchSpec:budget_seconds": {
+   "decides": "The default 30 s per (engine × system) unit (DEFAULT_BUDGET_SECONDS).",
+   "proposed": 3,
+   "evidence": "Follows rietx.indexing.engines.DEFAULT_BUDGET_SECONDS's proposed tier and #1374's question."
+  },
+  "rietx.indexing.engines.SearchSpec:total_budget_seconds": {
+   "decides": "total_budget_seconds=None lets the preset decide; under the default quick preset it becomes 120 s, and a declared value records preset custom (engines.py:395).",
+   "proposed": 3,
+   "evidence": "Follows QUICK_TOTAL_BUDGET_SECONDS (tier 3, not answer-invariant) through the preset seat; see rietx.indexing.workflow.index_pattern:preset for the preset's kind under DESIGN.md § Rules, 1."
+  },
+  "rietx.indexing.engines.SearchSpec:max_candidates": {
+   "decides": "The default reported cap of twelve (DEFAULT_MAX_CANDIDATES); the unit pool is five times it.",
+   "proposed": 1,
+   "evidence": "Follows rietx.indexing.engines.DEFAULT_MAX_CANDIDATES's proposed tier and its question on WP-2112 (WP-1046 is where the cap moved to the reported layer)."
+  },
+  "rietx.indexing.engines.SearchSpec:seed": {
+   "decides": "The seed of the stochastic svd engine, part of its answer and recorded in every result (engines.py:399).",
+   "proposed": 3,
+   "evidence": "A fixed, recorded seed makes a run reproducible from its report; no test or measurement in the repo bounds how much the ranking depends on its value.",
+   "question": "Is a recorded fixed seed tier 1 as a reproducibility setting, or should a seed sweep on the corpus show the ranking is seed-insensitive first (engines.py:399)?"
+  },
+  "rietx.indexing.engines.SearchSpec:prior_cells": {
+   "decides": "No analogue prior cells by default (engines.py:408).",
+   "proposed": "caller",
+   "evidence": "Off by default: a prior is the caller's declared knowledge; it steers and never gates, and the numbers used once it is on (priors.py constants) are tiered at their rows."
+  },
+  "rietx.indexing.engines.SearchSpec:prior_spacegroups": {
+   "decides": "No analogue prior space groups by default (engines.py:409).",
+   "proposed": "caller",
+   "evidence": "Off by default, as prior_cells; INDEX_PRIOR_USED records what was supplied."
+  }
+ }
+}
