@@ -1,6 +1,6 @@
 # WP-2317 — a large cell fits as fast as its reflections allow: the case, the bar, and the rulings in the way
 
-Milestone: unscheduled · Status: 🔄 2026-11-27 — tasks 2, 4 and 6 done (PR #1864); task 1 and task 3's R0-R7 wait on the maintainer, 5, 7 and 8 open
+Milestone: unscheduled · Status: 🔄 2026-11-27 — R0, R2, R3 and R5-R7 ruled and recorded, R4 unruled; task 1 waits on the maintainer; R6's implementation, 5, 7 and 8 open
 Track: A large cell
 Depends on: —
 Priority: P2 2026-11-27 — the scoping WP of a track the maintainer opened for a user at the wall (slowdowns on a 12 × 36 × 4 Å cell); 2314, 2315 and 2316 read its case, its bar and its rulings
@@ -65,6 +65,21 @@ different measurements. For common applications. This should be a general rule
 for the repo." It is now DESIGN-RULES Rule 5 *Arithmetic accuracy*, so a speed
 change answers to that bar and Rule 2's pinned-number test governs model changes.
 
+**Ruled 2026-11-27, later (R0 clarified), "in spirit".** A Claude draft had set the
+level at a tenth of each quantity's esd, borrowed from McCusker et al. (1999, §7).
+The maintainer never ruled that number, and it would have reversed the 2026-11-19
+window ruling. His words: "all my comments arise from the same intent: rietx should
+strive for a level of accuracy sufficient for users rather than wasting compute.
+evidence for this comes from other codes, which clearly have been sufficient for
+existing users." Then: "Whether or not 1e-9 should be the bar is not important to
+me: as long as you understand the intent and are able to make appropriate judgement
+on this tradeoff based on that knowledge going forward, I'd like to leave the
+details of judgement and implementation to you." So the level is what the
+established programs deliver to their users, and the esd is the unit an error is
+read in. Claude settles each speed-accuracy trade under that intent and lists it
+under *Settled for you*. Rule 5 *Arithmetic accuracy* carries the level. The window
+ruling of 2026-11-19 stands: 2 % windows, closing stage off.
+
 **Probe 1, the synthetic stand-in** ([`2317-probe/probe1_bigcell.py`](2317-probe/probe1_bigcell.py)):
 - 12 × 36 × 4 Å, P2₁2₁2₁;
 - invented atoms on general positions, placed over the whole cell with every
@@ -108,8 +123,9 @@ repeats, `--configs off`, darwin/arm64 (Apple M-series, 10 cores), Python
 `af159cf7` (after WP-2314's hoist and WP-2315's first step). Other runners
 shared the machine; each run held the suite lock, and the load fell over the
 session, so each range spans the blocks that measured it (two for the first
-three, three for Pawley at 90°). These are the "before" for 2314-2316, and a
-speed WP re-measures them beside its own arm.
+three, three for Pawley at 90°). These are probe 1's invented structure. The
+cases now carry a real one (the next table), and a speed WP re-measures its
+"before" beside its own arm.
 
 | case | wall (min-max) | Rwp | per-stage nfev |
 |---|---|---|---|
@@ -131,6 +147,56 @@ The Linux single runs above and these Mac ranges are on two machines, so their
 ratios are not speed-ups. The harness's own `nfev` and `njev` columns print 0
 and `-` here: `_counting` wraps scipy's `least_squares`, and the default LM
 driver does not call it. The per-stage counts come from `StageResult`.
+
+**The bench cases on a real structure, 2026-11-27 (4th session).** The
+maintainer asked for real large cells in place of the invented one: "Don't
+use your randomly generated ones", then "the COD cells are fine … so long as
+it's not an extremely pathological case". The four `bigcell-*` keys now carry
+Nb₁₈W₁₆O₉₃ (COD 2107344, Stephenson 1968), a tetragonal-tungsten-bronze
+superstructure:
+- Pbam, 12.195 × 36.740 × 3.951 Å, V = 1 770 Å³, the real cell closest to
+  the user's 12 × 36 × 4 Å;
+- 43 sites, eight of them Nb 0.6 / W 0.4 pairs at one position, which
+  `bigcell-structural` ties (two site-symmetry steps and the Biso per pair);
+- Biso declared (0.5 Å² for metals, 1.0 Å² for O), since the file carries
+  Uiso = 0;
+- scale 3e-5, so the strongest peak is about 4 × 10⁴ counts over the
+  900-count background, the 40-atom probe's order.
+
+The instrument, the ranges, the Poisson seed and the start protocol are
+probe 1's unchanged: the start carries the truth's atoms, Biso and scale, and
+is off in the cell (500 ppm high), W and X, the held axial ratios (0.02
+against 0.03) and the background. So the pattern is still simulated, and
+every row verifies. The cell has no exact b = 3a overlap, unlike probe 1's.
+Compiled reflections: 886 at 2θ ≤ 90° and 1 569 at 2θ ≤ 120° (probe 1: 913
+and 1 606). The structural case frees 66 coordinate and 35 Biso columns
+(probe 1: 120 and 40).
+
+Three repeats, `--configs off`, darwin/arm64 (Apple M-series, 10 cores),
+Python 3.12.10, numpy 2.5.5, `[dev]` venv, compiled tier on, rietx
+1.13.0.dev0 at `52866c321`. No test suite ran during the block. Old is the
+table above (probe 1, another session), so the two columns compare two
+structures, not two codes.
+
+| case | wall, Nb₁₈W₁₆O₉₃ (min-max) | Rwp | per-stage nfev | wall, probe 1 |
+|---|---|---|---|---|
+| `bigcell-structural` | 17.33-17.90 s | 0.03518 | 118 over 11 stages; coordinates 19, biso 33 | 10.90-11.30 s |
+| `bigcell-pawley` (2θ ≤ 90°) | 5.24-5.34 s | 0.03086 | 46 over 5 stages; profile 17 | 11.82-12.69 s |
+| `bigcell-pawley-120` (2θ ≤ 120°) | 13.81-14.07 s | 0.02997 | 43 over 5 stages; profile 14 | 54.89-64.88 s |
+| `bigcell-lebail` (2θ ≤ 90°), background seeded | 14.90-15.71 s | 0.03714 | 26 over 5 stages; 24 free | 61.69-61.75 s |
+
+Read the last column as the old case's cost, not as a "before". The
+structural fit costs more on the real cell with fewer columns. It takes 118
+evaluations against 100, and Pbam has eight operators against
+P2₁2₁2₁'s four; which of the two sets the cost was not measured. The
+structure-free fits cost 2-4× less. The seeded Le Bail background has 15
+Chebyshev terms here (16 on probe 1's pattern).
+
+Two old readings do not carry over. WP-2316's 25 000-cycle partitions came
+partly from probe 1's b = 3a degeneracy, and WP-2315's GSAS-II tie count
+(352 intensities against 913) came wholly from it. The GSAS-II rows below are
+probe 1's; `2317-probe/export_bigcell.py` now refuses the new phase, since
+the driver writes P2₁2₁2₁ at full occupancy.
 
 **Cross-code timing (task 6), 2026-11-27: GSAS-II 5.8.4 on the same four
 patterns.** Same Mac, same session, run in blocks under the suite lock:
@@ -306,6 +372,11 @@ what it costs here.
     intensity column, the sum measured and each member's share unmeasured.
     Accidental coincidences (b ≈ 3a) keep the restraint while their practice is
     surveyed. Built under WP-2315.
+  - **Ruled 2026-11-27 (R5 c): "follow your recommendations".** Accidental
+    coincidences keep the soft restraint, retargeted to equal F², and report the
+    group sum as the measurement. Practice mostly ties nothing (TOPAS), or ties
+    only in low symmetry (GSAS-II) or in a hybrid step (RIETAN-FP)
+    (`docs/practice.md` § Accidental overlaps during extraction).
 - **R6 — the stopping rule.**
   - *rietx:* intermediate stages at 1e-6 (`intermediate_ftol`, WP-1123), the last
     declared stage at the solver's 1e-9. The closing stage is **off by default
@@ -321,6 +392,83 @@ what it costs here.
     fraction measured against FullProf's 0.2 and GSAS-II's answer on the bench
     cases. The three compounding places keep 1e-9 through a plan field. The change
     is measured before the default moves.
+  - **Measured 2026-11-27 (`2317-probe/convnoise/RESULTS.md`), and the
+    recommendation withdrawn: settled by Claude under that measurement.** Five single
+    fits (SRM 660c, FAP, NAC, cpd-1a, the COD large cell) and two series (CuCr₂O₄,
+    17 patterns; cpd-1, 8 patterns) ran each stop as a real stop on the last stage.
+    - A FullProf 0.2 or GSAS-II-like stop **alone** is unsafe. On cpd-1f both
+      stopped mid-crawl with `axial_sl` 18 esd from the answer and χ²_red 9 % high,
+      and reported converged. The 1e-4 and FullProf 0.1 stops landed within 0.1 esd.
+    - Single fits: every stop holds every family under 0.06 reported esd; 1e-6
+      under 0.0075. The last stage is 9-29 of 40-165 evaluations, so 1e-6 saves
+      0-9 % of a fit.
+    - Series: the stop is most of the bill (CuCr₂O₄ 1 293 evaluations at 1e-9,
+      1 089 at 1e-8, 695 at 1e-6). At 1e-6 the 1 wt% CuO cell sits 0.68 esd off.
+      At 1e-8 every quantity is under 0.072 esd (cpd-1 profile), a margin of 1.4×
+      on development data.
+    - The floor is zero on single fits (≤ 4.5e-6 esd) and not on a series: on
+      cpd-1 one start in ten moves `axial_sl` 0.5 esd. The large cell's apparent
+      second minimum was a fixture defect (`co_sited()` rounds to 1e-4, so the
+      nudge decided two ties), found by `2317-probe/errmeasure/`.
+    - χ²-based decisions keep ≥ 100× margin over a single fit's stop, except
+      profile-interval refits, whose settle tolerance a GSAS-like stop exceeds.
+    - ~~**Settled:** the shipped schedule stays (1e-6 intermediate, 1e-9 last). The
+      runner-up, 1e-8 on the last stage, saves 7-16 % of a series and 0-4 % of a
+      single fit, at a 1.4× margin measured only on development data.~~ That
+      margin was against the tenth-of-an-esd draft level, which R0 clarified
+      withdrew.
+    - **Re-settled 2026-11-27 by Claude under R0 clarified: the last stage stops
+      when every free parameter's shift is under 0.1 of its esd.** That is the
+      field's test of a published refinement (McCusker et al. 1999 §7; checkCIF
+      alert B above 0.10), so it is parity with what other programs' users
+      publish. Their default stops are not parity: GSAS-II's 1e-3 and FullProf's
+      0.2 ended cpd-1f 18 esd off and reported convergence. Measured against the
+      1e-9 answer (`2317-probe/convnoise/RESULTS.md`, addendum for 1e-7):
+
+      | stop | CuCr₂O₄ ramp evals | worst (esd) | cpd-1 evals | worst (esd) |
+      |---|---|---|---|---|
+      | 1e-9 (shipped) | 1 293 | 0 | 517 | 0 |
+      | 1e-8 | 1 089 | 0.006 | 479 | 0.072 |
+      | 1e-7 | 917 | 0.022 | 442 | 0.22 |
+      | shift/esd < 0.1 | 363 | 1.2 | 322 | 0.071 |
+      | FullProf 0.2 | 300 | 1.7 | 312 | 18 |
+      | GSAS-II 1e-3 | 183 | 1.8 | 269 | 18 |
+
+      The worst entry on the ramp is the cell of CuO at about 1 wt%, on a flat
+      valley; the main phase stays under 0.053 esd. A departure of one esd is
+      inside the error bar the user is shown, and it is what a FullProf user
+      reporting shift/esd 0.1 gets. Single fits stay under 0.06 esd at every
+      stop. Runner-up 1e-7 holds every quantity to 0.22 esd at 2.5× the
+      evaluations on the ramp; it loses on the intent (accuracy no user reads,
+      paid in compute). The three compounding places (WP-2222) keep 1e-9 through a
+      plan field. The measured test used the damped LM step, and a crawl takes
+      short damped steps, so the implementing change tests the shift of the
+      undamped Gauss-Newton step, which a crawl cannot shrink. It re-pins goldens
+      (R0) and checks that profile-interval refits still settle.
+    - **The two programs' stops in their own programs** (Measured 2026-11-27,
+      `2317-probe/foreign_stops/RESULTS.md`). Each program was compared with
+      itself, default stop against tight, from its own warm start on cpd-1f.
+      - GSAS-II's 1e-3 test leaves the answer short at home too, and says
+        converged: on cpd-1f 13 cycles, χ² 0.38 % high, zincite c* 16 esd off,
+        Zero 14, Shift 12. One default `Refine` (3 cycles) is 34 esd off and says
+        not converged. Its own floor between two tight starts is 1.5 esd. On the
+        CuCr₂O₄ ramp in sequential mode, 1e-3 alone has all 17 patterns say
+        converged with the CuO Dij 10.5 esd and U 52 esd off.
+      - FullProf's Eps 0.2 does not: 12 cycles and 0.08 esd from its tight run,
+        with `S_L` held. Its steps are undamped Gauss-Newton, so a crawl does not
+        shrink them. That is why the implementation tests the undamped step.
+      - For GSAS-II, the in-solver failure (18 esd) carries over to its own
+        program. For FullProf, it came from rietx's damped steps. Either way the
+        rule's sentence ("their thresholds do not carry over") stands.
+      - Program defects seen (recorded, not acted on): GSAS-II accepted
+        χ²-raising steps and still said converged; it lets W go negative; it
+        refuses cell refinement in sequential mode. FullProf printed
+        "Convergence reached" after diverging to NaN from rietx's `seed_scales`
+        start, froze U, V, W once the Gaussian FWHM² went negative, and quotes an
+        `S_L` esd about 23× GSAS-II's (inference: too small).
+    - Unexplained, recorded for a later WP: the reported χ² differs from the χ²
+      the solver minimised by 0.2-2.1 χ²_red at the answer, and that gap moves
+      0.1 χ²_red between nearby answers.
 - **R7 — `WINDOW_MIN_DEG` = 0.3° of movement slack per window side**
   (`src/rietx/model/forward.py:234`).
   - About 30 of the probe's ~122 points a window (~25 %) are slack at a 0.02°
@@ -328,6 +476,11 @@ what it costs here.
   - The slack could be sized from the stage's own moving position parameters
     instead. This is a kind (b) move, and it is not WP-2051's per-evaluation
     windows.
+  - **Ruled 2026-11-27 (R7): "follow your recommendations".** The slack is sized
+    per stage from the stage's free position parameters, with a refit on fresh
+    windows when `window_loss` passes its tolerance. No surveyed program adds
+    movement slack, since they rebuild windows or freeze them with none
+    (`docs/practice.md` § Room for a peak to move inside its window).
 - **R8 — the bench measures the shapes it was built on.** No
   `bench_refinement.py` case has more than ~1 200 (line, reflection) pairs or
   ~15 atoms in a phase. So v1.1's ranking under-weights every term that grows with
@@ -454,6 +607,15 @@ what it costs here.
   Task 1's re-rating of 2314-2316 starts from these numbers. The driver,
   `2314-probe/drive_bigcell.py`, runs both arms and prints a bit-level digest.
 
+- **From WP-2315, 2026-11-28:** for R4's cost, the real-structure bench cases
+  never reach the constrained step. `bigcell-pawley` and `bigcell-pawley-120`
+  carry 3 544 and 6 272 width rows in their last stage and cross none, so the
+  in-step floor costs them nothing. Probe 1 still crosses on the same tree,
+  with the same instrument and start, so its crossings came from its
+  invented structure, not the U = V = Y = 0 truth. On the 120° case about
+  half the 15 s fit is `spilu`'s factorisation (WP-2315 Angle 4). WP-2315's
+  Context § Re-read on the real structure has the table.
+
 ## Non-goals
 
 - The fixes themselves: WP-2314 (structural columns), WP-2315 (Pawley step),
@@ -479,10 +641,19 @@ what it costs here.
       (the harness's rules 1-3). A figure in another WP's file is never a "before".
       *Done 2026-11-27: four cases (`bigcell-pawley-120` is the 120° one), each
       reproducing probe 1's pattern bit for bit; the ranges are in Context.*
+      *Rebuilt 2026-11-27 (4th session) on a real structure, as the
+      maintainer asked ("Don't use your randomly generated ones"): the same
+      four keys, modes, ranges, instrument and start protocol, on Nb₁₈W₁₆O₉₃
+      (COD 2107344, Pbam, 12.195 × 36.740 × 3.951 Å, 43 sites). The new
+      ranges are in Context, § The bench cases on a real structure.*
 - [ ] Put R0-R7 to the maintainer as one batch, each with the cost above and what
       practice does. Record each answer here as a dated ruling, and push each into
       the `### Inherited` of the WP it unblocks: 2314-2316, and WP-2017 for R2's
       number.
+- [ ] R6 as re-settled: the last declared stage stops when every free shift of
+      the undamped Gauss-Newton step is under 0.1 esd, and a plan field keeps 1e-9
+      in WP-2222's three compounding places. Re-pin the goldens in the
+      same change (R0), and check that profile-interval refits still settle.
 - [x] Why the 40-atom `coordinates` stage took 119 LM iterations from the true
       coordinates. *Answered 2026-11-27 by the review: the first probe drew its
       atoms inside a 1/15.6 sub-box, 65 % of nearest neighbours under 1 Å. On
@@ -523,6 +694,138 @@ what it costs here.
 - `docs/practice.md` § Structure-free fitting, § When a fit stops, § Peak-width limits.
 
 ## Handover log
+
+### 2026-11-27 (5th session) — the rulings recorded, accuracy set by what users need, and the stopping rule re-settled
+
+The maintainer answered the rulings that held up the large-cell track, except R4.
+The one with the widest reach is the accuracy level. rietx aims for accuracy
+sufficient for users rather than spending compute past it, the established
+programs being the evidence of what suffices. Claude settles each speed-accuracy
+trade under that intent. A Claude draft of the rule had put the level at a tenth
+of an esd. That was never ruled, and it would have reversed the 2026-11-19 window
+ruling, so it is withdrawn. Measured: the last stage's 1e-9 stop costs little on
+one fit but most of a series. The field's published-fit test, every shift under
+0.1 esd, cuts a 17-pattern ramp from 1 293 evaluations to 363, and its worst
+quantity, a 1 wt% phase's cell, lands about one esd off. The programs' own default
+stops, run inside rietx, left a series pattern 18 esd off while reporting
+convergence. The large cell's apparent second minimum was a fixture defect, fixed
+separately (PR #1870).
+
+**Done.**
+- Rulings R0 (and R0 clarified), R2-R3, R5 (b) and (c), R6 and R7 recorded in
+  Context with the maintainer's words. Rule 5 *Arithmetic accuracy* rewritten to
+  the clarified R0, reviewed blind three times for the earlier drafts and once for
+  this one (wording adopted from the last review). Rule 5 also gained the *Intent*
+  test. The 2026-11-01 validation amendment moved to DESIGN.md for room.
+- `docs/practice.md`: the seven-program survey behind R4, R5 (c), R6 and R7.
+- R6 measured (`2317-probe/convnoise/`), then re-settled twice the same day: to
+  1e-8 on the clarified level, then to the 0.1-esd shift test on parity. The
+  table is in R6's entry. A new task carries the implementation.
+- `2317-probe/errmeasure/`: how a speed setting's error is measured (mean shift
+  over paired nudged starts), and the co-sited tie defect it found.
+- R0's note in 2314's and 2316's `### Inherited` updated to the clarified level.
+
+**Measured** (macOS arm64, rietx's `.venv` on this worktree, shared machine).
+- Single fits: every stop tried holds every family under 0.06 esd of the 1e-9
+  answer; the last stage is 9-29 of 40-165 evaluations.
+- Series, evaluations and worst departure from 1e-9 (esd): CuCr₂O₄ ramp 1e-8 1 089
+  / 0.006, 1e-7 917 / 0.022, shift/esd 0.1 363 / 1.2, FullProf 0.2 300 / 1.7,
+  GSAS-II 1e-3 183 / 1.8; cpd-1 chain 1e-7 442 / 0.22, shift/esd 0.1 322 / 0.071,
+  FullProf 0.2 and GSAS-II 18 (cpd-1f, `axial_sl`). The 1e-7 rerun reproduced the
+  earlier 1e-9, 1e-8 and 1e-6 counts exactly.
+- No test count moved: the branch adds no test. The fast suite was not run (prose
+  and probe scripts only).
+
+**In flight.**
+- Landed the same session: GSAS-II's and FullProf's default stops measured in
+  their own programs (`2317-probe/foreign_stops/`, R6's entry). GSAS-II's 1e-3
+  stops short at home too (14-16 esd on cpd-1f); FullProf's 0.2 does not (0.08).
+- Stopped runners, not restarted: WP-2316's Le Bail fix on `wp2316-lebail-practice`
+  (4 pushed commits, untracked probes and a design patch in its worktree), and
+  R7's window slack on `wp2317-window-slack` (state not checked).
+- PR #1869 (WP-2315's lattice merge): its stored field
+  `ReflectionState.merged_groups` was ruled (a), kept as is, and the PR merged
+  the same day.
+
+**Gotchas.**
+- A ruling that picks a unit (the esd) sets no level. Read the maintainer's
+  intent, and never invent a tighter bar.
+- A program's stop threshold is not its users' accuracy. The probe tested shifts
+  on the damped LM step, which a crawl keeps short; the implementation tests the
+  undamped Gauss-Newton step.
+
+**Next.** (1) Done the same session: the GSAS-II/FullProf result is in R6, and the
+rule's sentence stands. (2) Get R4 ruled by the
+maintainer. (3) Implement R6 (its task), re-pinning goldens. (4) Task 1, the
+user's case, still decides the re-rating of 2314-2316.
+
+### 2026-11-27 (4th session) — the bench and the suite carry real large cells
+
+The maintainer asked for real large cells in the testing, not the invented
+one. Two published structures from the Crystallography Open Database are now
+vendored, and the four `bigcell-*` bench cases fit patterns simulated from
+Nb₁₈W₁₆O₉₃. A new test module puts both structures through Rietveld and
+Pawley fits. PR #1866.
+
+**Done.**
+- `tests/data/cod_2107344.cif` (Nb₁₈W₁₆O₉₃, Pbam, 1 770 Å³, 43 sites) and
+  `tests/data/cod_2107337.cif` (H-Nb₂O₅, P2/m, 1 358 Å³, 51 sites), whole
+  as fetched, with a provenance row each in `tests/data/README.md`. Both were
+  checked on the vendored file before use: cell content against the formula,
+  each metal's nearest oxygens 1.64-2.48 Å, no two images under 1.6 Å apart
+  except a mixed site's two species.
+- `examples/bench_refinement.py`: the four `bigcell-*` cases keep their keys,
+  modes, ranges, instrument, seed and start protocol, on Nb₁₈W₁₆O₉₃. `Setup`
+  gained `prepare`, a hook called on each repeat's `Refinement` before the
+  timed fit. `bigcell-structural` uses it to tie the co-sited pairs.
+- `tests/test_large_cell_refinement.py` (six tests). It reads both files
+  whole, then runs a structural fit from displaced coordinates and a Pawley
+  fit from a cell 500 ppm high on each. The patterns are simulated, so these
+  verify. Measured walls (darwin/arm64, `[dev]`): 0.02-0.03 s for the reads,
+  1.6 s and 2.6 s for Pawley, 4.3 s for the Nb₁₈W₁₆O₉₃ structural fit, and
+  6.0 s for H-Nb₂O₅'s, which is marked `slow`.
+- `tests/test_bench_refinement.py`'s large-cell test now pins the COD
+  structure and the 22 ties.
+- Inherited entries in 2314, 2315 and 2316 say their quoted figures are
+  probe 1's.
+
+**Measured.** The bench table is in Context, § The bench cases on a real
+structure. Fast suite on this tree: 15 828 passed, 452 skipped, 30
+xfailed (`[dev]`, darwin/arm64, 7 min 52 s). The branch adds five fast tests
+and one slow one. `tests.reader_output` exits 0, unchanged against the
+merge-base. Ruff is clean. Not run: the full suite (no number in `src/`
+moves), and the generality judge (no `_audit.py` change).
+
+**Gotchas.**
+- At ten times the counts (strongest peak ~10⁶), a structural fit started
+  from the truth lands at GoF 1.30, not 1. The simulator's peak windows and
+  the fit's are cut at different places, and the cut tail is then above the
+  noise. The tests keep a lab pattern's counts.
+- H-Nb₂O₅'s oxygen positions are weakly determined below 2θ = 70°: at 50°
+  the fit's RMS position error (0.081 Å) exceeded the start's (0.071 Å).
+  The test runs to 70° at three times the counts.
+- `2317-probe/export_bigcell.py` refuses the new phase. The GSAS-II driver
+  writes P2₁2₁2₁ at full occupancy, so the cross-code rows stay probe 1's.
+
+**Settled by Claude.**
+1. All four bench cases moved to Nb₁₈W₁₆O₉₃, keeping their keys. Settled
+   under the brief's "keep the cases' names if the shape is unchanged": modes,
+   ranges and reflection counts are within 3 % of probe 1's. The alternative
+   was new keys beside the old cases.
+2. `bigcell-structural` ties each co-sited Nb/W pair (steps and Biso).
+   Settled under established practice (recall, not a survey): a refiner
+   constrains two species on one site to one position and one displacement,
+   since their columns differ only by the ratio of form factors. The alternative
+   was H-Nb₂O₅, which has no mixed sites, for the structural case.
+3. The second structure, H-Nb₂O₅, lives in the tests only. Settled under the
+   brief ("more than one crystal system if cheap"): a fifth bench case would
+   add minutes to every bench run. The alternative was a monoclinic bench case.
+4. Biso 0.5 Å² for metals and 1.0 Å² for oxygen. Settled as a declared
+   value, since the files carry Uiso = 0 and a pattern needs one. The
+   alternative was one value for every site.
+
+**Next.** Unchanged from the 3rd session's entry. A GSAS-II row on the new
+cases needs the driver to read the space group and occupancies.
 
 ### 2026-11-27 (3rd session) — four large-cell bench cases, and GSAS-II timed on the same pattern
 

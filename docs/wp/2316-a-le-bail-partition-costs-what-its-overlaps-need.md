@@ -23,9 +23,10 @@ means". R0 was ruled that day (WP-2317, DESIGN-RULES Rule 5 *Arithmetic accuracy
   (`compiled.py` rule 3), guarded on the whole fit by the measured spread
   (`test_compiled_kernels.FIT_THETA_ESD`), and re-pins its goldens in the same
   change;
-- a change of tolerance, stopping rule or method answers to an independent
-  measurement where one exists, and otherwise to the established programs' answer
-  on the same pattern.
+- a change of tolerance, stopping rule or method holds each quantity a user
+  reads as accurately as users need, the established programs being the evidence
+  of what suffices, with the error read in esd (R0 clarified the same day; Claude
+  settles each such trade and lists it).
 
 **Rule 5's fence, in full** (DESIGN-RULES, ruled 2026-11-05, #1434): "Pawley is
 the structure-free method rietx leads with. WP-2062 carries the move to it as the
@@ -188,6 +189,13 @@ partition's cost. `test_lebail_alternation.py` is a natural second timing case.
   except the first degree, its a 1 700 ppm low. GSAS-II was not run from the
   seed. The protocol and the table are in WP-2317's Context; the driver is
   `2317-probe/gsas2_bigcell.py`.
+- **From WP-2317, 2026-11-27 (4th session): the case is now a real
+  structure.** `bigcell-lebail` carries Nb₁₈W₁₆O₉₃ (COD 2107344, Pbam,
+  886 reflections at 2θ ≤ 90°), seeded as before. Its b is not 3a, so the
+  exact d-spacing pairs this WP's 2nd session found behind the 25 000-cycle
+  partitions are absent. The figures above are probe 1's; this WP's "before"
+  and its 10× target are re-read on the new case. WP-2317's Context has the
+  new range.
 
 ## Non-goals
 

@@ -816,6 +816,14 @@ not move either.  The grammar parses any name, and the names a peak equation
 binds belong to the schema (``schemas.peak_equation.REFLECTION_NAMES``).
 WP-2107 moved the grammar for its two functions and the schema for its names.
 
+Also in 0.62 (WP-2315): ``ReflectionState.merged_groups``, a list of
+``MergedGroup`` (``hkl``, ``intensity``, ``stderr``): the reflections a Pawley
+fit refined as one intensity because their d agree in every cell of the space
+group, with the measured sum and its esd.  Additive and defaulted to ``None``,
+the 0.25 → 0.26 rule; an older build refuses a node carrying the key.  In the
+same change a member's ``ReflectionState.stderr`` row reads ``inf``, the
+unmeasured convention, where it read a finite esd.
+
 Also in 0.62 (WP-2316): a Le Bail stage extracts its intensities once per
 least-squares iteration, as the established programs do, so the partition
 settled to a tolerance at a frozen model is gone with its fields.

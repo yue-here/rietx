@@ -212,9 +212,21 @@ The wavelengths that the `WAVELENGTH_CALIBRATION` check measures a refined λ ag
 | `ReflectionState.kind` | `lebail_extracted` or `pawley_refined` |
 | `ReflectionState.stderr` | the esd of each intensity, which Pawley has and Le Bail does not |
 | `ReflectionState.varied` | whether the intensities were free parameters |
+| `ReflectionState.merged_groups` | after a Pawley fit, the groups refined as one intensity, each a `MergedGroup`; `None` for Le Bail |
+
+| Field | Holds |
+|---|---|
+| `MergedGroup.hkl` | the member reflections, one triple each |
+| `MergedGroup.intensity` | the group's summed intensity, which the data measure |
+| `MergedGroup.stderr` | the esd of that sum, or `None` before a fit |
 
 Le Bail intensities start flat and are refined by a fixed-point loop, so they depend on the path the fit took.
 The structure, the instrument and the pattern cannot reproduce them, so a Le Bail checkpoint can be restored only because the node stores them.
+A Pawley fit refines reflections whose d-spacings agree in every cell of the space group as one intensity, such as cubic (3 3 3) and (5 1 1), or (h k l) and (k h l) under 4/m.
+A phase whose model reads the indices keeps one intensity per reflection, since its members' peaks differ: a Stephens strain block, a peak equation, satellites or a magnetic component.
+The pattern measures only their sum, which `MergedGroup.intensity` records with its esd.
+Each member's row in `ReflectionState.intensity` is its share of the sum by multiplicity, and its `ReflectionState.stderr` row is infinite, because no member's own intensity is measured.
+
 In the walkthrough of [A first fit in Python](../start/first-fit.md#worked-example-a-synchrotron-pattern-with-an-impurity), the Le Bail node carries 129 extracted intensities and the Rietveld nodes carry none.
 
 ## Cached metrics
