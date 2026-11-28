@@ -216,8 +216,12 @@ is held, and rebuilt per evaluation where the cell is free.
       *(2026-11-27: all 83 Jacobians of the bench fit hash equal;
       `test_backend_shim.py`'s 19 goldens pass.)*
 - [ ] Angle 2, the Ω·∂I block. Columns within R0 (a)'s bound of angle 1's.
-- [ ] Angle 3, Biso/occupancy, with the exact oracles above, the reach declared,
+- [x] Angle 3, Biso/occupancy, with the exact oracles above, the reach declared,
       and a `test_cross_backend.py` config.
+      *(2026-11-28: analytic, from the angle 1 cache. The reach is the Biso and
+      occupancy rows of one phase, summed through C, so the co-sited ties take
+      the branch. `test_cross_backend.py`'s `site_scalars` row; five backend
+      goldens re-pinned, `tests/data/README.md` § WP-2314 re-baseline.)*
 - [ ] Angle 4, cross-atom reach, the same three obligations.
 - [ ] Angles 5-6. The full suite, since jax/torch goldens move. Every moved number
       checked against R0 (a).
@@ -230,6 +234,9 @@ is held, and rebuilt per evaluation where the cell is free.
       `test_one_expansion_serves_every_structural_column` says why. A
       negative control now shows the count trips on a per-atom expansion.)*
 - [ ] Tests: the oracle tests for angles 3 and 4, landing with each angle.
+      *(Angle 3's landed, 2026-11-28: `tests/test_biso_occ_columns.py`, the
+      exact oracles plus the count guard with Biso free and its negative
+      control. Angle 4's are owed.)*
 - [ ] Skill: none (no API change).
 
 ## Acceptance

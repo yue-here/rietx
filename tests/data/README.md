@@ -646,6 +646,18 @@ in which tied reflections are summed moved. `theta` is bit-identical, and the
 largest change in `y_calc`, `residual` and `jacobian` is 1.6e-16 of the key's
 largest value. The other nine states reproduced bit-for-bit.
 
+**WP-2314 re-baseline (2026-11-28)**: `toy_roughness`, `toy_restraints`,
+`toy_anomalous`, `nac` and `srm660c`, the five states that free a Biso or an
+occupancy, on macOS 26.7.2 arm64 (Python 3.12.10, numpy 2.5.5). Those columns are
+now analytic, from the structure-factor expansion the coordinate columns share,
+where the peak chain finite-differenced them. Only the `jacobian` key moved,
+and inside it only those columns: one Biso or occupancy column per toy state,
+two Biso columns in `nac` and in `srm660c`. Each moved by 0.9e-7 to 4.0e-7 of
+its norm. Against a Richardson-extrapolated central difference of the residual
+the old columns were off by exactly that, and the new ones by 5e-13 to 8e-10,
+the oracle's own precision. The other five states reproduced bit-for-bit and
+were not re-captured.
+
 These are *environment-pinned* bit patterns, not physical reference values: a
 different BLAS/numpy build may legitimately differ in final bits.  **WP-1002
 measured which half of that sentence is true.**  The *numpy* half is not:
