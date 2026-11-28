@@ -699,6 +699,74 @@ what it costs here.
 
 ## Handover log
 
+### 2026-11-28 (3rd session) — the two Le Bail failures are R7's: one pin moved, one cap question filed (runner 4)
+
+Both full-suite failures are R7's. A snapshot of main (`9f3dd5542`) ran
+the two rows alone: 2 passed (80 s). The branch merged with main
+`cd4a461f1` failed both (553 s, beside another runner's suite).
+
+- **The nudged runaway pin moved with the trajectory.** The row asserts
+  that on macOS arm64 a start nudged by k × 1e-14 in cell a reaches a
+  non-finite model. R7's windows move the trajectory. Of k = −4 to +3,
+  only +3 (once) and −4 (twice) still reach `STAGE_NOT_FINITE`, and
+  `CELL_RUNAWAY` fires at every k. The row is re-pinned to k = +3, and its
+  docstring says why. It passed on the branch. The injected rows of
+  `test_non_finite_stage.py` cover the mechanism through `fit` on every
+  platform.
+- **LaMnO₃'s closing partition now costs more than half the cycle cap.**
+  `test_the_tolerance_meets_its_bar[lamno3]` asserts that the 25 000-cycle
+  default holds twice the dearest partition. The plan is `profile_only` in
+  Le Bail mode, with the opt-in closing stage declared. The closing
+  stage's cycles, at the pinned start and three starts 1e-4 apart in a
+  (about 0.1 esd):
+
+  | start (a ×) | main | R7 |
+  |---|---|---|
+  | 1 | 9 188 | 25 000 (cap) |
+  | 1.0001 | 10 094 | 25 000 (cap) |
+  | 0.9999 | 25 000 (cap) | 22 376 |
+  | 1.00001 | 7 742 | 22 682 |
+
+  At the pinned start, the cell and profile values agree within 0.2 esd.
+  R7's Rwp reads 16.95 % on every start, against 17.30 % on main. Bar 1
+  (the shipped curve against a partition carried to a tenth of the
+  tolerance) reads 0.048 σ, against 0.081 σ on main and a bar of 0.1 σ.
+  No stage re-solved (`window_refit_loss` is `None` on every stage), so the
+  cost comes from the sized slack of the intermediate stages. R7's fit now
+  carries `LEBAIL_CYCLES_AT_CAP`. The row is a non-strict xfail citing
+  WP-2017, and WP-2017's `### Inherited` carries the measurement under
+  group Q. A strict mark would rest on one platform's numbers.
+- Merged `origin/main` `cd4a461f1` (`9b67deee6`). The conflict was in
+  WP-2017's `### Inherited`, and both entries are kept.
+
+**For the maintainer**, a fourth item: the LaMnO₃ cost above. R7 makes this
+partition about 2.4 times dearer (median of four starts, 23 500 against
+9 600 cycles) and the fit lands lower in Rwp. Why the Rwp moves 0.35
+points while the values move under 0.2 esd is not measured. One possible
+cause is the unsettled partition itself. A branch run at the uniform 0.3°
+slack on the same starts would separate the sized slack from the rest of
+R7; it was not run.
+
+**Blind review** (a fresh subagent, given the evidence and not the picks).
+It agreed on LaMnO₃: a non-strict xfail, no change to the cap, and the
+question to the maintainer. On the nudged pin it would drop the macOS
+assertion rather than re-pin it, since the pin will move again with the
+next trajectory change. Settled by Claude as a re-pin: it keeps the one
+real fit that walks into the non-finite path, at the cost of a re-pin when
+the trajectory moves.
+
+**Measured** (macOS arm64, this worktree's `[dev]` venv, shared machine).
+- Fast suite on `9b67deee6`: 15 934 passed, 467 skipped, 30 xfailed, 0
+  failed (680 s). Passed plus skipped moved +40 against runner 3's run.
+  The tree has merged main twice since, and this session added no fast
+  test.
+- The two failed rows on the branch after the fixes: see the PR body's
+  suite paragraph. The R7 Le Bail rows runner 3 fixed (the alternation's
+  slow row, the hostile pair's runaway) were rerun on the merged tree.
+
+**Next.** (1) The maintainer's four items. (2) The joint runner's re-solve.
+(3) The series measurement for 3 FWHM, if the maintainer wants it.
+
 ### 2026-11-28 (2nd session) — R7's handover: the slack follows what a later stage refits, the Le Bail warning read, the PR opened (runner 3)
 
 R7 is in a pull request, #1881, which waits on the maintainer for a

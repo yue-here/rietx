@@ -205,6 +205,21 @@ and have no free factor to measure, so this file's old list named them without c
   - Group Q's question: whether a rise of 0.009 Rwp points should send a
     user to "check the cell and the background". It is the threshold's
     question, not R7's (macOS arm64, `[dev]`, development data).
+- **From WP-2317 R7 (2026-11-28): group Q's `lebail_cycles` cap of 25 000
+  is marginal on LaMnO₃.**
+  - `test_lebail_cycles.py`'s `test_the_tolerance_meets_its_bar[lamno3]`
+    asserts the cap holds twice the dearest partition. The row fits
+    `profile_only` in Le Bail mode with the closing stage declared.
+  - Its closing stage's partition took 9 188 cycles on main at the pinned
+    start. Three starts 1e-4 apart in a (about 0.1 esd) took 10 094,
+    25 000 and 7 742 on main. Under R7 the same four starts took 25 000,
+    25 000, 22 376 and 22 682. So R7's fit there now carries
+    `LEBAIL_CYCLES_AT_CAP`.
+  - The answers agree within 0.2 esd, and R7's Rwp reads 16.95 % against
+    17.30 %. Bar 1 reads 0.048 σ. The row is a non-strict xfail citing this
+    WP. Group Q's question: whether the cap, or the tolerance it serves,
+    suffices on a 296-reflection neutron pattern (macOS arm64, `[dev]`,
+    development data).
 
 - **2026-11-28, from WP-2314: corundum's roughness fence now passes on
   macOS arm64.** `test_surface_roughness.py`'s
