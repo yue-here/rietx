@@ -823,3 +823,6 @@ old 0.3°), and every stage of ``Refinement``'s runners re-solves once on fresh 
 more than its window fraction at its answer.  The field is the loss that
 triggered that refit, and ``None`` where none ran.  The ``stage_end`` event
 carries it too, an additive field on an existing kind.
+``NodeAction.movement_slack`` records whether a stage ran on those sized
+windows, so ``replay`` recompiles the model the stage solved; ``False`` is
+the uniform slack every older node ran, so an old node replays as before.

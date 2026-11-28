@@ -6813,6 +6813,9 @@ class Refinement:
                     # schedule), because a cherry-pick re-runs what happened
                     ftol=ftol, window_slack_deg=stage.window_slack_deg,
                     window_area_tol=window_tol,
+                    # the windows _run_stage compiled (WP-2317 R7), so a
+                    # replay draws the model the stage solved
+                    movement_slack=k < len(stages),
                     # and the plan's two settings, for the same reason
                     # (WP-2002, B1)
                     phase_support_sigma=phase_support_sigma,
@@ -13383,7 +13386,8 @@ def replay(tree: RefinementTree, node_id: str, data: PatternData) -> RefinementR
                           moving_paths=set(table.moving_paths),
                           restraint_weight_scale=action.restraint_weight_scale,
                           window_slack_deg=action.window_slack_deg,
-                          window_area_tol=recorded_window_tol(action.window_area_tol))
+                          window_area_tol=recorded_window_tol(action.window_area_tol),
+                          movement_slack=action.movement_slack)
     if state.mode in ("lebail", "pawley"):
         _restore_lebail(state.reflections, model)
 
