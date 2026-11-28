@@ -760,9 +760,10 @@ the trajectory moves.
   failed (680 s). Passed plus skipped moved +40 against runner 3's run.
   The tree has merged main twice since, and this session added no fast
   test.
-- The two failed rows on the branch after the fixes: see the PR body's
-  suite paragraph. The R7 Le Bail rows runner 3 fixed (the alternation's
-  slow row, the hostile pair's runaway) were rerun on the merged tree.
+- After the fixes, through `serial.py` on the merged tree: the two rows
+  gave 1 passed, 1 xfailed (175 s). The R7 Le Bail rows runner 3 fixed,
+  the alternation's slow row and the hostile pair's runaway, gave 2 passed
+  (637 s).
 
 **Next.** (1) The maintainer's four items. (2) The joint runner's re-solve.
 (3) The series measurement for 3 FWHM, if the maintainer wants it.
