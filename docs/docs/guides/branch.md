@@ -32,13 +32,13 @@ Each object keeps its own position, so `ref` stays at the end of strategy A whil
 
 <!-- output of examples/guides/branch.py -->
 ```text
-n0003  stage:profile  free 15  Rwp 0.0947
-n0005  stage:profile  free 15  Rwp 0.0947
-best: n0005
+n0003  stage:profile  free 15  Rwp 0.0945
+n0005  stage:profile  free 15  Rwp 0.0945
+best: n0003
 ```
 
-Both ends refine the same 15 parameters and reach Rwp 0.0947, so on this pattern the two orders find one fit.
-`best` returns `n0005`, lower by 0.00002.
+Both ends refine the same 15 parameters and reach Rwp 0.0945, so on this pattern the two orders find one fit.
+`best` returns `n0003`, lower by less than 0.00001.
 `best` takes the name of any other `Statistics` field, such as `"gof"` or `"chi2"`, and skips the nodes that ran no fit.
 
 `RefinementTree.diff` lists the parameters whose values differ between two nodes, as `(first, second)` pairs.
@@ -52,11 +52,11 @@ Here it is narrowed to the five width terms, in deg²:
 
 <!-- output of examples/guides/branch.py -->
 ```text
-instrument.profile.u   0.00187  0.00187
-instrument.profile.v   -0.00320  -0.00320
-instrument.profile.w   0.00324  0.00324
-instrument.profile.x   0.03102  0.03101
-instrument.profile.y   0.03371  0.03372
+instrument.profile.u   0.00191  0.00191
+instrument.profile.v   -0.00334  -0.00334
+instrument.profile.w   0.00334  0.00334
+instrument.profile.x   0.02999  0.02999
+instrument.profile.y   0.03501  0.03501
 ```
 
 The full list also holds the background, zero shift, lattice parameters and scale.
@@ -79,9 +79,9 @@ tcb8d2285  7 nodes  data=FAP.XRA
  n0000  root                   —
  n0001  stage:scale_bkg        Rwp 0.6050
  n0002  stage:cell             Rwp 0.4919  [cell]
-├─  n0003  stage:profile          Rwp 0.0947  [together]
+├─  n0003  stage:profile          Rwp 0.0945  [together]
 └─  n0004  stage:profile_w        Rwp 0.1930
-    n0005  stage:profile          Rwp 0.0947  [w_first]
+    n0005  stage:profile          Rwp 0.0945  [w_first]
    *n0006  stage:biso             Rwp 0.0943
 ```
 
@@ -105,14 +105,16 @@ A node records the Rwp the solver reached, on a model whose reflection list and 
 
 <!-- output of examples/guides/branch.py -->
 ```text
-together  recorded 0.0947  replayed 0.0970
-w_first   recorded 0.0947  replayed 0.0970
+together  recorded 0.0945  replayed 0.0945
+w_first   recorded 0.0945  replayed 0.0945
 ```
 
-The difference comes from rebuilding the reflection list and windows at the stage's final values.
-The `RefinementResult` a stage returns is computed as a replay is, so `together.statistics.rwp` is 0.0970.
+A replay rebuilds the reflection list and windows at the stage's final values, so it can differ from the record.
+The `RefinementResult` a stage returns is computed as a replay is, so `together.statistics.rwp` is 0.0945.
 A result carries `FROZEN_COMPILE_STALE` when its χ² and its node's differ by more than 1 %.
-Both results carry it here, at 5.0 %, and the two strategies stay within 0.0001 of each other on either measure.
+Neither does here.
+Each `profile` stage widened its peaks past the windows it started on, so it solved once more on windows sized at its answer.
+`StageResult.window_refit_loss` records the 2.2 to 2.3 % of the intensity the first windows dropped.
 
 `replay` refuses a pattern other than the one the history was recorded against, and names both.
 

@@ -20,7 +20,7 @@ This runs three stages by hand on the GSAS-II tutorial fluorapatite pattern that
 ```text
 scale_bkg  converged  Rwp 0.6050
 cell       converged  Rwp 0.4920
-profile    converged  Rwp 0.1022
+profile    converged  Rwp 0.0940
 ```
 
 Each call returns a full `RefinementResult` for the stage it ran, with the statistics, the parameters and their esds, and the diagnostics.
@@ -49,20 +49,22 @@ To see where the preset pulls ahead, ask it for a report at each stage:
 
 <!-- output of examples/guides/stage.py -->
 ```text
-scale_bkg  Rwp 0.6050
-zero       Rwp 0.4921
-cell       Rwp 0.4920
-profile_w  Rwp 0.1932
-profile    Rwp 0.0988
+scale_bkg  Rwp 0.6063
+zero       Rwp 0.4926
+cell       Rwp 0.4923
+profile_w  Rwp 0.1944
+profile    Rwp 0.0939
 ```
 
-The preset's `profile` stage reaches Rwp 0.0988, and the hand-run `profile` stage 0.1022.
+The preset's `profile` stage reaches Rwp 0.0939, and the hand-run `profile` stage 0.0940.
 The preset ends there, because a plan runs a closing stage only when it asks for one ([The closing stage](../reference/refinement.md#the-closing-stage)).
-The difference comes from where each stage fixed its peak windows.
-A stage fixes them at the values it starts from.
-The hand-run stage fixed them at the default widths, and its result carries `FROZEN_COMPILE_STALE`.
-The preset's `profile` stage fixed them at the widths its `profile_w` stage had fitted.
-One more hand-run stage that frees nothing new starts from the fitted widths too, and it ends at 0.0940.
+The preset's earlier stages read a little higher than the hand-run ones.
+A stage that a later stage refits computes each peak over a narrower window, and a stage's Rwp is measured on its own windows.
+A stage fixes its peak windows at the values it starts from.
+Both `profile` stages started from narrower peaks than they ended with, so the peaks outgrew their windows.
+The hand-run stage's windows dropped 4.4 % of the intensity at its first answer, and the preset's 3.4 %.
+Each stage then solved once more on windows sized at its answer, and `StageResult.window_refit_loss` records the first figure.
+One more hand-run stage that frees nothing new ends at 0.0940 too.
 The full script is `examples/guides/stage.py`.
 
 ## Read a report at every stage

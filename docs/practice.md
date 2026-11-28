@@ -45,7 +45,7 @@ McCusker et al. (1999) §4, p.42, give a rule of thumb. A peak is at background 
 
 | Program | Slack for movement | Why |
 |---|---|---|
-| rietx | 0.3° absolute added to each half-width (`model/forward.py`, `WINDOW_MIN_DEG`) | windows frozen per stage while zero, displacement and the cell move the peak (checked (source)) |
+| rietx | on a stage a later stage refits, 3 FWHM for each position family it frees, shaped by its angle dependence, plus half a point step, at most 0.3° (`model/forward.py`, `WINDOW_MOVE_FWHM`, since WP-2317 R7); 0.3° (`WINDOW_MIN_DEG`) on the answer stage, in a joint fit and where a compile claims nothing | windows frozen per stage while zero, displacement and the cell move the peak; a stage that ends past its window fraction solves once more on fresh windows (checked (source)) |
 | GSAS-II, MAUD, RIETAN-FP, EasyDiffraction | none | the window is rebuilt every evaluation (checked (source) for GSAS-II and MAUD; RIETAN-FP ran) |
 | TOPAS | none stated | the peak buffer tracks positions through `Xo`; only shape changes trigger a rebuild (TR v5 §6.4, checked (manual)) |
 | FullProf | none stated | windows frozen for a run at `Wdt` × FWHM; no slack term is named in the manual (checked (manual)) |
@@ -66,8 +66,9 @@ McCusker et al. (1999) §4, p.42, give a rule of thumb. A peak is at background 
   That leaves a 1.4× margin. At 0.1° of slack the test fails, with a peak moving
   0.147°. At converged windows, slack 0 and slack 1° changed the answer by under
   0.001 esd.
-- *Not measured.* A start with the cell far from its answer was never run. By
-  arithmetic, 0.3 % moves a 120° peak about 0.6°.
+- *Not measured* until WP-2317 R7. A start with every cell length 0.3 % long moves
+  peaks 0.68° (FAP), 0.87° (cpd-1a) and 1.15° (SRM 660c) within one stage, past the
+  0.3°. The protocols' answers were unchanged, since later stages recompile.
 - *What guards it now.* WP-2047 records `StageResult.window_loss` per stage, and
   `STAGE_WINDOWS_STALE` warns on the last stages.
 - *Cost.* About 30 of a window's ~122 points are slack at a 0.02° step, roughly
@@ -82,7 +83,9 @@ McCusker et al. (1999) §4, p.42, give a rule of thumb. A peak is at background 
     transparency, cell, λ). Their allowed movement is mapped to 2θ per reflection:
     Δzero directly, 2·tanθ·Δd/d for the cell. A stage freeing none needs almost no
     slack. Chosen 2026-11-27 as R7's working answer, paired with a refit on fresh
-    windows when `window_loss` passes its tolerance.
+    windows when `window_loss` passes its tolerance. Shipped in WP-2317 at 3 FWHM a
+    family: the largest measured movement was 2.43 FWHM, and at 1.5 FWHM SRM 660c
+    refit from its own start.
 - *Practice for the window itself.* McCusker et al. (1999) §4 cut at 0.1-1 % of peak
   height, typically 10-20 FWHM, and at least 40 FWHM for crystal-analyser data.
 
