@@ -126,7 +126,17 @@ elif case == "fap-index":
 elif case.startswith("bench:"):
     sys.path.insert(0, str(ROOT / "examples"))
     import bench_refinement as bench
-    setup = next(c for c in bench.CASES if c.key == case.split(":", 1)[1]).build()
+    key = case.split(":", 1)[1]
+    found = next((c for c in bench.CASES if c.key == key), None)
+    if found is None:
+        raise SystemExit(f"unknown bench case {key!r}; one of "
+                         f"{', '.join(c.key for c in bench.CASES)}")
+    setup = found.build()
+    if setup.patterns is not None:
+        raise SystemExit(f"bench case {key!r} is a series; bench:KEY runs "
+                         "single-fit cases only")
+    # a build may fit (nac's Le Bail seed); its runs are not the case's
+    runs.clear()
     ref = rx.Refinement(setup.structure.model_copy(deep=True),
                         setup.instrument.model_copy(deep=True), history=False)
     if setup.prepare is not None:
