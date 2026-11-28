@@ -891,6 +891,28 @@ def _max_shift_over_esd(A, step: np.ndarray, s: float, *, n_dof: int) -> float:
     A column with no gradient has no esd: a shift along it reads infinite, and
     none reads 0.
 
+    **The gate: χ²_red is read at no more than 1**, so σ_i is
+    √(min(χ²_red, 1) · (A⁺)_ii).  Scaling an esd by χ²_red assumes the
+    residual left is noise, which holds only near the minimum.  Far from the
+    data χ²_red is the misfit, and every σ is too wide by its square root.
+    Tutorial 05's 2 % cell jump, refitted warm, reached χ²_red 632 in one step
+    that lowered S 956-fold; the next undamped step read 0.076 esd at χ²_red
+    and 1.9 at 1, so the scaled test stopped the stage at Rwp 0.966 with the
+    cell 2 % short, where the 1e-9 stop goes on to Rwp 0.039.  χ²_red alone
+    cannot tell that point from a converged fit with real model error, so no
+    bound above 1 has a source; 1 is the value correct weights give χ²_red,
+    and σ at 1 is the esd of counting statistics alone.  Under it the test
+    can only stop later than either reading: a converged fit at χ²_red > 1
+    stops once every shift is under ``shift_tol``/√χ²_red of its reported
+    esd, and otherwise stops on ``ftol`` as before the test.  Two gates that
+    keep the scaled σ fail on the same case, since both re-read it.  Requiring
+    the step just accepted to pass the scaled test too stopped it at χ²_red
+    632 two steps later (that step read 0.019, the undamped one 0.066).  A
+    bound on the last relative fall in S derived from ``shift_tol``,
+    ``shift_tol``²/n_dof ≈ 2.4e-6, passes the 4.4e-7 fall there.  No step test sees a
+    column that is flat far from the data (an unseen phase at zero scale);
+    ``MODEL_FAR_FROM_DATA`` and ``PHASE_UNCONSTRAINED`` report that.
+
     **Where A is sparse** (a Pawley block past :data:`BVLS_MAX_COLUMNS`) the
     diagonal of A⁻¹ costs a dense eigensolve per iteration, so the bound is
     read instead: Δ_i² ≤ (A⁻¹)_ii · ΔᵀAΔ (Cauchy-Schwarz in A's inner
@@ -901,7 +923,9 @@ def _max_shift_over_esd(A, step: np.ndarray, s: float, *, n_dof: int) -> float:
     """
     if n_dof <= 0 or not s > 0.0:
         return float("inf") if np.any(step) else 0.0
-    chi2 = s / n_dof
+    # χ²_red widens σ only up to 1, the value correct weights give it (the
+    # docstring's gate): above 1 it may be misfit rather than noise
+    chi2 = min(s / n_dof, 1.0)
     if sparse.issparse(A):
         if A.shape[0] > BVLS_MAX_COLUMNS:
             q = float(step @ (A @ step))

@@ -1004,13 +1004,33 @@ def test_the_overshoot_branch_stalls_on_the_cusp(monkeypatch):
 
 # ----------------------------------------------------------------------
 # the shift test (WP-2317 R6)
-def _esds(J, r, n_par):
+def _esds(J, r, n_par, *, gated=False):
     """Each parameter's esd at a point, √(χ²_red · pinv(JᵀJ)_ii), Jacobi
-    equilibrated: the reading the shift test makes, written out here."""
+    equilibrated; ``gated`` reads χ²_red at no more than 1, the reading the
+    shift test makes, written out here."""
     A = J.T @ J
     d = np.sqrt(np.diag(A))
     C = np.linalg.pinv(A / np.outer(d, d), hermitian=True)
-    return np.sqrt(float(r @ r) / (len(r) - n_par) * np.diag(C)) / d
+    chi2 = float(r @ r) / (len(r) - n_par)
+    if gated:
+        chi2 = min(chi2, 1.0)
+    return np.sqrt(chi2 * np.diag(C)) / d
+
+
+def test_the_shift_reading_takes_chi2_red_at_no_more_than_one():
+    """The gate (WP-2317 R6): χ²_red widens σ up to 1 and no further, since
+    above 1 it may be misfit, and σ wider by its root lets a fit far from the
+    data stop.  At χ²_red = 400 the reading is the counting-statistics one,
+    20× the scaled one; under 1 it is the scaled one."""
+    _, jacobian, best = _linear_problem(n_data=60, n_par=5, seed=4)
+    J = jacobian(best)
+    A = J.T @ J
+    step = np.array([0.3, -0.2, 0.05, 0.4, -0.1])
+    n_dof = 55
+    unit = lm._max_shift_over_esd(A, step, float(n_dof), n_dof=n_dof)
+    assert lm._max_shift_over_esd(A, step, 400.0 * n_dof, n_dof=n_dof) == unit
+    assert lm._max_shift_over_esd(A, step, 0.25 * n_dof, n_dof=n_dof) == (
+        pytest.approx(2.0 * unit, rel=1e-12))
 
 
 def test_the_shift_reading_is_the_largest_shift_over_its_esd():
@@ -1025,8 +1045,8 @@ def test_the_shift_reading_is_the_largest_shift_over_its_esd():
     step = best - x
     s = float(r @ r)
     exact = lm._max_shift_over_esd(J.T @ J, step, s, n_dof=55)
-    assert exact == pytest.approx(float(np.max(np.abs(step) / _esds(J, r, 5))),
-                                  rel=1e-10)
+    assert exact == pytest.approx(
+        float(np.max(np.abs(step) / _esds(J, r, 5, gated=True))), rel=1e-10)
     # at or under the cut a sparse A is read exactly
     bound = lm._max_shift_over_esd(sparse.csr_matrix(J.T @ J), step, s, n_dof=55)
     assert bound == pytest.approx(exact, rel=1e-12)

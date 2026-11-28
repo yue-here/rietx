@@ -56,7 +56,7 @@ its esd:
 
 \max_i \; \frac{|\Delta^{\mathrm{GN}}_i|}{\sigma_i} \;<\; \epsilon_{\mathrm{stop}},
 \qquad
-\sigma_i^2 \;=\; \chi^2_\nu \,\bigl(A^{+}\bigr)_{ii},
+\sigma_i^2 \;=\; \min\bigl(\chi^2_\nu,\, 1\bigr) \,\bigl(A^{+}\bigr)_{ii},
 ```
 
 {source}`rietx.optimize.lm._max_shift_over_esd`
@@ -69,10 +69,25 @@ does, without the Bérar-Lelann factor. `StageResult.termination` then reads
 
 The damped step cannot stand in for the Gauss-Newton one. A large $\lambda$
 shrinks every shift, so a solve crawling towards its minimum would pass the
-test while far from it. On a Pawley block above 128 parameters the normal
+test while far from it.
+
+The esd scales with $\chi^2_\nu$ only up to 1. Scaling an esd by $\chi^2_\nu$
+assumes the residual left is noise, which holds only near the minimum. Far
+from the data $\chi^2_\nu$ measures the misfit, and every $\sigma_i$ is too
+wide by its square root. Tutorial 05's 2 % cell jump, refitted warm, reached
+$\chi^2_\nu = 632$ in one step. The next Gauss-Newton step read 0.076 of the
+scaled esd and 1.9 at $\chi^2_\nu = 1$. On the scaled esd the stage stopped
+there, at Rwp 0.966 with the cell 2 % short. With the cap it goes on to Rwp
+0.039. The value $\chi^2_\nu$ alone cannot tell that point from a converged fit
+with real model error, so no cap above 1 has a source. At 1, $\sigma_i$ is the
+esd of the counting statistics alone. A converged fit at $\chi^2_\nu > 1$ then
+stops when every shift is under $\epsilon_{\mathrm{stop}}/\sqrt{\chi^2_\nu}$ of
+its reported esd, and otherwise on the $10^{-9}$ test below.
+
+On a Pawley block above 128 parameters the normal
 matrix is sparse, and the driver bounds the ratio instead. By the
 Cauchy-Schwarz inequality,
-$|\Delta_i|/\sigma_i \le \sqrt{\Delta^\top A \Delta / \chi^2_\nu}$, so the bound
+$|\Delta_i|/\sigma_i \le \sqrt{\Delta^\top A \Delta / \min(\chi^2_\nu, 1)}$, so the bound
 can stop a stage later than the exact ratio would, never earlier. The
 $10^{-9}$ relative decrease in $\chi^2$ still ends a stage that never meets
 the band. Every intermediate stage, a stage declaring its own `ftol` and a plan

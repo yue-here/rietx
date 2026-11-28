@@ -72,6 +72,8 @@ assert shifts[-1] == 0.1 and set(shifts[:-1]) == {None}
 An intermediate stage, and a stage that declares its own `Stage.ftol`, run no shift test.
 A stage the test ended reads `shift_over_esd` in `StageResult.termination`, and `StageResult.shift_over_esd_tol` records the value it ran.
 The step is the undamped one because a damped step shrinks as the damping grows, so a slow solve would pass the test far from its minimum.
+The esd the test divides by scales with χ²_red only up to 1, since far from the data χ²_red is the misfit and would widen every esd.
+A fit at χ²_red above 1 therefore stops once every shift is under 0.1/√χ²_red of its reported esd, or on the 1e-9 stop.
 [Convergence](../theory/convergence.md) gives the equation.
 
 Measured against the same plans with `shift_over_esd_tol=None`, on macOS arm64 with the `[dev]` install, 2026-11-28:
