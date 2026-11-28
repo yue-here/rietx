@@ -114,6 +114,7 @@ from __future__ import annotations
 
 import bisect
 from dataclasses import dataclass, field
+from functools import cached_property
 from typing import Callable
 
 import numpy as np
@@ -327,8 +328,16 @@ class LinearInequality:
         by more than the rounding of its evaluation (:data:`_ROW_ROUNDING`)."""
         end = theta + step
         floor = np.minimum(self.slack(theta), 0.0)
-        scale = np.abs(self.T) @ np.abs(end) + np.abs(self.c)
+        scale = self._abs_T @ np.abs(end) + np.abs(self.c)
         return bool(np.any(self.slack(end) < floor - _ROW_ROUNDING * scale))
+
+    @cached_property
+    def _abs_T(self) -> np.ndarray:
+        """|T|, built once: :meth:`crossed` runs at every inner step, and a
+        Pawley block's T is thousands of rows across every intensity column
+        (41 MB a block at 1 601 reflections, WP-2315).  ``abs`` is exact and
+        T is frozen for the run, so the reuse moves no bit."""
+        return np.abs(self.T)
 
     def max_feasible_fraction(self, theta: np.ndarray, step: np.ndarray) -> float:
         """Largest τ ∈ [0, 1] with ``T·(θ + τ·step) + c ≥ min(slack, 0)``.

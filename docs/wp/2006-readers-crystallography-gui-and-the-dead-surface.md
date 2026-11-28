@@ -48,6 +48,32 @@ promise stages every break).
 
 Pruned 2026-11-17 (part 2's session; the handover entry says why each other entry went).
 
+- **2026-11-28, from the issue triage (#1836, a process question): Mike's reading of
+  WP-2037's level rule on the magnetic and distortion paths, sent for Yue's check.** It
+  adds no level and asks no change on `main`. Seven clauses: raise on a contradiction,
+  refuse an open choice unless a ruling names keep-and-warn, raise on a literal (Rule 4),
+  then `warning`, `info`, a field with no diagnostic, and one response per code. Checked
+  against `docs/milestones/generality.md` § The rule, *Attention is a cost*, at
+  `02341ffdb`. Clauses 4, 6 and 7 restate clauses 1 and 2 and § Demotion as written.
+  Clause 5 is narrower than the text: the text's `info` is "nothing to do for this
+  purpose", and a code's level under a purpose is computed from its one response, so
+  `info` is not only "an act taken by rule or a caller's stated choice". Clause 1 files
+  an input contradiction under Rule 1's third kind; Rule 1's third kind is a verdict that
+  needs facts outside the pattern, and an input contradiction is closer to Rule 1's input
+  paragraph and Rule 4's raise. The two level calls it changes
+  (`LOW_ANGLE_ASYMMETRY_UNCALIBRATED`, #1493, a `warning`; `MAGNETIC_FORM_FACTOR_COMPUTED_TAIL`,
+  #1806, `info`) are magnetic-path calls and Mike's under #1075. **Held for Yue:** the
+  offered test for Rule 1's "a new case asks which of the two forms fits it" (ruling 23
+  above): keep and warn only when the kept reading is a format's or the established
+  programs' default (tier 2) and the warning states what each alternative implies in terms
+  checkable without a rerun; otherwise refuse. The reporter says it reproduces both picks
+  of ruling 23. The scan refusal follows (no program's default to keep). The origin pick
+  follows only through the *format's* default: FullProf and GSAS-II both read a bare
+  two-origin symbol as origin 2 (`docs/practice.md`, `FULLPROF_ORIGIN_CHOICE`), and rietx
+  keeps origin 1, so the test holds there only if the symbol convention itself makes
+  origin 1 the default (not checked in this triage). It reads a criterion into a rule of Yue's that the text does not state, so it is Yue's to
+  accept or decline.
+
 - **From WP-2013 (2026-11-03, PR #1369): a reader default the hump ruling left standing.** `HumpComponent.position` is now required of a caller (maintainer, 2026-11-02), because the old 0.0 placed a hump below any measured range. `io/recipe.py`'s background-peak builder still writes `0.0 if pos is None`, silently, so a PowderLine recipe whose `single_peaks` entry has no position gets the placeholder the ruling removed, and a flagged position starts its refinement there. Refusing it or reporting it changes what `read_recipe` returns, so it goes to the maintainer before merge (memory rule on reader output). No recipe with a null position has been seen; whether PowderLine writes one is unchecked. Still open; on the maintainer's list of 2026-11-16.
 - **From WP-2001 (2026-10-19): numbers inside a dict, list or array.** The constant walk sees module-level numbers and tuples of numbers only, so a number held in a dict, list or array in `crystallography/` and the walked `io/` and `gui/` files is audited by hand. Nobody has looked yet; part 2 did not.
 - **From [2014](2014-a-heuristic-meets-the-judge-on-every-path.md)'s close, confirmed 2026-11-17: a silent repair in the FullProf reader.** `fullprof._OCCUPANCY_RTOL = 5e-3` lets per-site occupancy ratios spread 0.5 % and then builds 1.0 on every site with no diagnostic (`io/projects/fullprof.py` around lines 2364 and 3635). A probe that scaled one site's Occ by 0.996 built every site full with no record; 0.995 is refused. The constant's comment puts the file's rounding at 2e-5. The same constant gates the magnetic Scale × f² match (around line 2730). A fix adds a record or narrows the bound, and either changes what `read_project` returns, so it goes to the maintainer. The row is a tier-3 candidate in `2006-batch/tiers.md`.
