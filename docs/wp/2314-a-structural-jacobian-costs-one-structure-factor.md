@@ -336,7 +336,26 @@ is held, and rebuilt per evaluation where the cell is free.
     sat 0.9-4.0e-7 from it (`tests/data/README.md` § WP-2314 re-baseline).
     Every bar the new tests assert is a rounding bound, not a byte
     comparison, so Linux x86_64 OpenBLAS is held to it too.
-  - *Gates:* GATES
+  - *Gates* (this Mac, darwin arm64, Python 3.12.10, `[dev]` venv, under
+    the suite lock): fast suite 15 903 passed, 462 skipped, 30 xfailed
+    (8 min 25 s). Main's count was not measured, so the added cases are by
+    construction. The six added tests cost 0.24 s together
+    (`tests.added_test_times`, local seconds). Full suite once on this
+    tree: 16 863 passed, 473 skipped, 49 xfailed, 1 xpassed and 1 failed
+    (34 min). The failure was `test_suite_alarms`' pin: zincite gained
+    `COVARIANCE_DIRECTION_DISCARDED` on the Gaussian-size, Gaussian-strain
+    and W triple. A sweep of seven 1e-14 starts on W found it at k = 0
+    only on this branch and at none on main, so it is the rounding-decided
+    class WP-2036 already lists for fluorite, and zincite's `ROUNDING` set
+    now names it. `tests/test_suite_alarms.py` then passed, 10 tests; the
+    full suite was not rerun for that test-side change. `site_scalars` and
+    the `families_*` rows pass `fd`, `jax` and `jax+fp32` in a scratch
+    `[dev,jax]` venv (jax 0.12.1): 16 passed, 8 skipped (torch absent).
+    CI's lint job run locally: ruff, the tutorials' format, Vale (0
+    errors; no warning on a line this change wrote), `skill_caps`,
+    `skill_surface`, `audit_delta`, `code_references --delta`,
+    `rulebook_limits`, all clean. `tests.reader_output` exit 0, unchanged
+    against 5a06184af. `test_docs_consistency`: 57 passed.
   - *Review:* `/code-review high --fix` found no correctness bug. It added
     the scattering-factor citations to `_scattering_factor`, named Biso and
     occupancy in `sabine_extinction_and_dx`'s docstring, and made the
@@ -370,6 +389,11 @@ is held, and rebuilt per evaluation where the cell is free.
        rather than dividing the cached amplitude by the occupancy. The
        division was the alternative. Settled under Rule 4 (*A new API*): an
        occupancy at 0 is a legal start, and division there is undefined.
+    4. Zincite's discarded-direction finding on the width triple left the
+       alarm pin, as fluorite's did. Re-pinning `suite_alarms.json` with it
+       was the alternative. Settled under WP-2036's rule that the pin holds
+       what the platforms share: the finding fires at one of seven 1e-14
+       starts, so Linux could read either answer.
   - *Generality:* no heuristic, threshold or default added and `_audit.py`
     untouched, so no judge.
   - *Next:*
