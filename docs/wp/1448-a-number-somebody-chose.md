@@ -208,6 +208,31 @@ remembers, and the alternatives are the first thing lost.
 
 ## Handover log
 
+### 2026-11-28 — issue triage: #1629's four questions placed
+
+Checked against the tree at `300853e90`. The issue's mechanical item is done (PR #1807
+set this WP to ✅ and regenerated the index). Its four proposals, each checked blind by a
+fresh subagent given the evidence and not the pick:
+
+- **Decided 2026-11-28 (settled by Claude under task 2's rule):** the ~161 "ruled
+  YYYY-MM-DD" phrases stay as they are. Their record is `docs/milestones/generality.md`, and
+  task 2 says a ruling recorded in a milestone file stays there.
+- **Decided 2026-11-28 (settled by Claude under task 4's rule):** the five sites without a
+  record of their alternatives get a record and a tag when next chosen, never one written
+  after the fact. Each is now in the `### Inherited` of the open WP that will tier it:
+  WP-2017 (`PEAK_MASK_SIGMA`, `PARAMETER_INTERVAL_CHI2_TOL`), WP-2006
+  (`CIF_ANGLE_CORRECT_MAX_DEG`, `SYMMETRY_ANGLE_TOL_DEG`) and WP-2007 (the `indexing.fom`
+  ⟨ΔQ⟩ floor).
+- **Decided 2026-11-28 (settled by Claude under task 4's rule):** `GHOST_RATIO_TOL`'s sweep
+  goes into its audit row's `evidence` when WP-2007 tiers it. That entry is in WP-2007's
+  `### Inherited`.
+- **Held for the maintainer:** whether every tier-3 `_audit` row must name where its
+  alternatives are recorded (a WP, an issue or a `docs/` section), as a check in
+  `tests/test_audit_table.py` with a shrink-only baseline. It adds a requirement to what
+  `generality.md` § The rule says a tier-3 row carries, so it amends a ruling. Measured on
+  `300853e90`: 175 tier-3 rows; 51 name no WP; 34 name no WP, issue or `docs/` path, so the
+  baseline would hold 34. The 2026-11-28 triage batch carries the question.
+
 ### 2026-11-23 — closed: PR #1628 merged
 
 PR #1628 merged today (merge `f3cbcfd9b`), so a value somebody chose can say

@@ -1,9 +1,7 @@
 # rietx design rules
 
-Why the package exists and the five rules every change answers to. Every session and
-subagent working in this repository loads this file, through the `@` import in the root
-`CLAUDE.md`. The rest of the design record, and the history of these rules, is
-[DESIGN.md](DESIGN.md).
+Why the package exists and the five rules every change answers to. The rest of the
+design record is [DESIGN.md](DESIGN.md).
 
 ## Why this package exists
 
@@ -17,8 +15,7 @@ what was refined, how well, and what to look at next, so an expert can audit and
 non-expert can learn to steer. The API follows current Python practice, and the whole
 of powder diffraction is in scope.
 
-*Written 2026-10-18. The founding statement of 2026-07 and what superseded it are in
-[DESIGN.md](DESIGN.md) § History.*
+*Written 2026-10-18. Earlier statements are in [DESIGN.md](DESIGN.md) § History.*
 
 ## Rules
 
@@ -31,13 +28,13 @@ number. A sentence that nobody would use to make a choice does not belong here.
      same action: the physics, the arithmetic, established practice. The package acts
      and records that it did. The absent-phase hold is the example.
    - *The data can rank it.* The hypotheses are enumerable and the data score them,
-     though not always to one winner. The package enumerates, scores each with its
-     evidence, and presents the ranking without picking. Indexing, extinction symbols,
-     structure solution, a choice of peak shape. It picks in two cases only, and
-     returns the whole ranking with the pick. In the first, the caller asked for a pick
-     by calling a function made for it, such as `best_or_none`, and no default path
-     calls one. In the second, the top candidate leads by a margin every competent
-     refiner would accept, so taking it is an action of the first kind.
+     though not always to one winner. Indexing, extinction symbols, structure solution
+     and a choice of peak shape are of this kind. The package enumerates, scores each with its evidence, and
+     presents the ranking without picking. It picks in two cases only, and returns the
+     whole ranking with the pick. In the first, the caller asked for a pick by calling a
+     function made for it, such as `best_or_none`, and no default path calls one. In the
+     second, the top candidate leads by a margin every competent refiner would accept,
+     so taking it is an action of the first kind.
    - *The data cannot settle it.* The explanation depends on facts outside the pattern:
      sample history, a temperature ramp, a beam dump. The package reports the
      statistic with its meaning and stops, because only an agent told those facts can
@@ -49,12 +46,10 @@ number. A sentence that nobody would use to make a choice does not belong here.
    withheld verdict leaves its statistic. Where a rerun is expensive (an hour-long
    search, a 200-pattern batch, a write into a project's history) the package protects
    work already done: it keeps the best attempt, seeds no successor from a diverged
-   fit, refuses to overwrite history, and records each. A fit costs seconds and an
-   agent's reasoning costs tokens, so the right default reaches a correct answer in the
-   fewest calls; a default that forces ten reruns to learn what one unanimous action
-   would have shown costs more than the action. The provenance audit of every threshold
-   (whose number is it: the physics', the literature's, or ours) is
-   [milestones/generality.md](milestones/generality.md) § The rule.
+   fit, refuses to overwrite history, and records each. The right default reaches a
+   correct answer in the fewest calls. A fit costs seconds, an agent's reasoning costs
+   tokens, and ten reruns cost more than one unanimous action. The provenance audit of
+   every threshold (whose number it is: the physics', the literature's, or ours) is [milestones/generality.md](milestones/generality.md) § The rule.
 
    An input that leaves a choice open is surfaced. It is never settled by which reading
    most files mean. A bare space-group symbol with two origin settings keeps origin 1
@@ -72,7 +67,8 @@ number. A sentence that nobody would use to make a choice does not belong here.
    package's gate: a feature ships verified or does not ship. Its forms: an exact
    identity (a reparameterisation that provably cannot move the fit, a sum that must
    close); an analytic Jacobian against finite differences; a refactor that reproduces
-   every number; two backends agreeing on one residual; and, weakest, two codes
+   every number, or its residual and Jacobian to a rounding bound where it only
+   regroups arithmetic; two backends agreeing on one residual; and, weakest, two codes
    agreeing on the same data under the same protocol, or a published refinement of the
    same pattern reproduced under its protocol. The last is weakest because its
    reference value is a model's answer and can share the model's error. Under a
@@ -94,16 +90,12 @@ number. A sentence that nobody would use to make a choice does not belong here.
    it was measured on), never only a pass; and it says whether the data is development
    data. Where no claim compares a topic with an independent measurement, the equation,
    its source and its code are stated plainly, and the topic is recorded *not yet
-   validated* until one does. That state is
-   separate from *provisional*, which rietx keeps for an API that may still change (PEP
-   411's sense). The validation record is for the developers. An agent or a user
-   chooses a feature by the sample and the data, and whether the package has validated
-   the feature should not move that choice. So the record is kept in the matrix and its
-   generated page alone. No surface an agent reads while choosing carries a validation
-   verdict: `capabilities()`, the help entries, the agent skill, the GUI's help (ruled
-   2026-10-27) and the fit report (ruled 2026-11-01). The report is on that list
-   because an agent reads it between stages, while it still chooses what to free, and a
-   sentence there would read the same for every fit with the same free parameters.
+   validated* until one does. That state is separate from *provisional*, which rietx
+   keeps for an API that may still change (PEP 411's sense). The validation record is
+   for the developers. An agent or a user chooses a feature by the sample and the data
+   alone. So the record lives in the matrix and its generated page. No surface an agent reads
+   while choosing carries a validation verdict: `capabilities()`, the help entries, the
+   agent skill, the GUI's help (ruled 2026-10-27) and the fit report (ruled 2026-11-01).
 
    *A dataset is unused, sealed or development data.* Data that nobody who changes the
    package has run is unused. A family is sealed when its first run is on the tree as it
@@ -117,9 +109,9 @@ number. A sentence that nobody would use to make a choice does not belong here.
    back, and data whose results the developers have seen (Oberkampf & Roy pp. 31-32, 44
    and 401). An independent measurement it carries calibrates as much as it validates. A
    test on it still measures, but weakly, and the record says so. Nothing goes from
-   development data back to sealed. A pinned number that moves has moved for
-   the right reason only if the new value is no further from its reference value than
-   the old; that rule tunes the package toward the development data, and only the sealed
+   development data back to sealed. A pinned number that moves has moved for the right
+   reason only if the new value is no further from its reference value than the old;
+   that rule tunes the package toward the development data, and only the sealed
    families show whether the tuning generalises.
 
 3. **Feedback teaches.** The report, each diagnostic's explanation and the manual bring
@@ -161,7 +153,11 @@ number. A sentence that nobody would use to make a choice does not belong here.
    *A new skill row.* It names a field, a verb, a code, or a trap or practice with a
    source outside rietx's own runs. Anything else is cut.
 
-5. **Choosing a design.** Three tests, and an order for when they disagree.
+5. **Choosing a design.** Four tests, and an order for when they disagree.
+
+   *Intent.* A design starts from what its user does with the result: the quantity
+   read, the decision it feeds, and how finely that use resolves it. A number is
+   chosen from that use, with its source, and never from the mechanism alone.
 
    *Convention.* A change takes the shape rietx already uses for the same job. One shape
    sets fewer traps for a person or an agent learning the package. A departure names in
@@ -174,25 +170,27 @@ number. A sentence that nobody would use to make a choice does not belong here.
    project. Cases test it as acceptance rows. A design is not fitted to one case, and
    nothing is built before a case needs it. A milestone's direction is in its record.
    The project's are two, each ruled by the maintainer.
-   - *Arithmetic accuracy.* A setting that trades arithmetic accuracy for speed, such
-     as a convergence tolerance, a peak window or a quadrature order, matches the
-     accuracy the established programs deliver (`docs/practice.md`). rietx buys no
-     accuracy past theirs at a cost a user waits for. Where an error compounds, the
-     setting follows what the compounding needs. WP-2222 names three such places: a
-     Pawley series that carries intensities, `lab_calibrate`, and the guides that
-     publish numbers (ruled 2026-11-19; generalised from TOPAS to the established
-     programs 2026-11-23, WP-2307).
+   - *Arithmetic accuracy.* A speed setting (a convergence tolerance, a peak window, a
+     quadrature order) holds each quantity a user reads as accurately as that user
+     needs. rietx spends no wait past that. The established programs show what
+     suffices, since their users found it enough. Their thresholds do not carry
+     over. Unattended in rietx, GSAS-II's and FullProf's stops ended a series fit
+     18 esd off. An error is read in the quantity's esd, and *Intent* sets how small
+     it must be. Where an error compounds (three cases, WP-2222), the setting
+     follows what the compounding needs. A speed change leaves the model as it was.
+     One that only regroups arithmetic is verified at fixed parameters. Its goldens
+     re-pin in the same change. Rule 2's pinned-number test does not apply to a
+     speed change (ruled 2026-11-19 to 11-27; WP-2307, WP-2317 R0).
    - *Structure-free fitting.* Pawley is the structure-free method rietx leads with.
-     WP-2062 carries the move to it as the default. Le Bail gets only what a ruling
-     already asked of it, in its smallest correct form. A change to Le Bail that moves
-     every fit's numbers waits for WP-2062 (ruled 2026-11-05, #1434).
+     WP-2062 carries the move to it as the default. Le Bail follows the established
+     programs' practice (ruled 2026-11-27, WP-2317; lifts #1434's fence).
 
    *Practice.* Where a good answer exists, in diffraction or in another field, rietx
    adopts it and spends its effort on the questions practice leaves open. A practice
-   yields to the model's accuracy and to the constraints a reused design must meet. The survey behind
-   it is in `docs/practice.md`.
+   yields to the model's accuracy and to the constraints a reused design must meet. The
+   survey behind it is `docs/practice.md`.
 
-   *Conflicts.* The shape of the API follows rietx convention. A name or a meaning follows
-   the term the literature and the IUCr dictionaries use. One program's keyword is not
-   that term, and rietx takes no alias for one. A number the model computes follows
-   accuracy. An arithmetic setting follows *Arithmetic accuracy* above.
+   *Conflicts.* The shape of the API follows rietx convention. A name or a meaning
+   follows the term the literature and the IUCr dictionaries use. One program's keyword
+   is not that term, and rietx takes no alias for one. A number the model computes
+   follows accuracy. An arithmetic setting follows *Arithmetic accuracy* above.

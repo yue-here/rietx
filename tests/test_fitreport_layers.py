@@ -761,7 +761,7 @@ def _plot_state(structure, ins, data, stem):
     _OUT.mkdir(exist_ok=True)
     plot_result(result, path=str(_OUT / f"{stem}.png"))
     plot_result(result, path=str(_OUT / f"{stem}_zoom.png"),
-                two_theta_range=(18.0, 45.0))
+                two_theta_limits=(18.0, 45.0))
 
 
 def _broad_truth(lor_size, seed=17):
@@ -1225,7 +1225,7 @@ def _fit_and_report(structure, start_ins, data, stem, plan="mccusker_default",
     _OUT.mkdir(exist_ok=True)
     plot_result(result, path=str(_OUT / f"{stem}.png"))
     plot_result(result, path=str(_OUT / f"{stem}_zoom.png"),
-                two_theta_range=zoom)
+                two_theta_limits=zoom)
     return ref, result, report
 
 

@@ -43,7 +43,7 @@ assert [(r.kind, r.atoms, f"{r.computed:.3f}", f"{r.deviation_over_sigma:+.1f}")
     ("bond", [2, 4], "1.552", "+1.2"),
     ("bond", [2, 5], "1.573", "+3.3"),
     ("bond", [2, 6], "1.526", "-1.4"),
-    ("angle", [4, 2, 5], "110.833", "+1.4"),
+    ("angle", [4, 2, 5], "110.834", "+1.4"),
 ]
 assert result.restraints.weight_scale == 1.0
 tension = [d for d in result.diagnostics if d.code == "RESTRAINT_TENSION"]
