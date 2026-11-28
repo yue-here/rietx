@@ -402,8 +402,10 @@ class SearchSpec:
     #: ceiling in when this is ``None`` (``preset="full"`` declines one).
     #: ``budget_seconds`` is **per (engine × system)** — an unbounded run is
     #: 3 × 7 × 30 s of search before the probe and the validation fits, and
-    #: nothing used to state that.  This is the bound a caller actually means:
-    #: ``index_pattern`` wraps it in a :class:`Deadline` that every existing
+    #: nothing used to state that.  Under this ceiling a unit runs at most
+    #: :func:`unit_share_seconds`, the search's time over the engines (#1374).
+    #: This is the bound a caller actually means: ``index_pattern`` wraps it in
+    #: a :class:`Deadline` that every existing
     #: cooperative check reads, the run returns a complete
     #: :class:`~rietx.schemas.indexing.IndexingResult` over whatever was
     #: reached, and ``INDEX_BUDGET_EXHAUSTED`` names what was not.
@@ -2239,6 +2241,61 @@ def _panel_for(cand: EngineCandidate, peaks: PeakList, k_sigma: float,
         return []
 
 
+#: ``INDEX_SEARCH_INCOMPLETE``'s remedy for a unit its own ``budget_seconds``
+#: stopped; :func:`shared_unit_advice` replaces it where the unit ran on its
+#: share of a ceiling, which a larger ``budget_seconds`` does not raise.
+_PER_SYSTEM_ADVICE = ("Raise budget_seconds, or narrow the search with a "
+                      "smaller max_volume or a shorter d-axis range.")
+
+
+def unit_share_seconds(search_seconds: float | None,
+                       n_engines: int) -> float | None:
+    """The most one (engine × system) unit may spend under a ceiling (#1374).
+
+    ``search_seconds`` is the search's part of the declared
+    ``total_budget_seconds``: the whole ceiling, or the ceiling less
+    :data:`VALIDATION_RESERVE_FRACTION` when validation is going to run.  Each
+    unit runs for at most ``min(budget_seconds, search_seconds / n_engines)``,
+    so one unit that does not finish leaves the other engines their time on
+    the same system.  Before this, a caller who raised ``budget_seconds`` to
+    the ceiling let the first unfinished unit hold all of it: on #780's
+    monoclinic list dichotomy's unit held the ceiling and svd and trial_error
+    never started, and over all seven systems svd's orthorhombic unit held it
+    and the run returned no candidate.  On #1374's 15 synthetic rows (three
+    lists, one system or all seven, ceilings of 30, 60 and 120 s of CPU) the
+    share was never worse than a unit budget equal to the ceiling; it found the
+    cell in 3 of the 5 rows that returned nothing and added a finder in 9 of
+    the other 10.  Measured on synthetic lists only, untested beyond them.
+
+    ``None`` with no ceiling, where ``budget_seconds`` alone bounds a unit.
+    The default 30 s slice sits under the share of the ``quick`` ceiling
+    (120 s less the reserve, over three engines: 34 s), so a default run is
+    unchanged.  A caller who wants one engine's exhaustive answer inside one
+    ceiling names that engine, and its share is the whole search time.
+    Ruled by the maintainer on 2026-11-17 (#1373, #1374).
+    """
+    if search_seconds is None or n_engines < 1:
+        return None
+    return float(search_seconds) / n_engines
+
+
+def shared_unit_advice(diag: Diagnostic, share: float,
+                       n_engines: int) -> Diagnostic:
+    """``INDEX_SEARCH_INCOMPLETE`` for a unit that ran on its share of a
+    ceiling (:func:`unit_share_seconds`): the per-system remedy names the
+    ceiling and the engine count, since raising ``budget_seconds`` past the
+    share changes nothing.  Any other diagnostic comes back unchanged."""
+    if diag.code != "INDEX_SEARCH_INCOMPLETE" or not diag.suggestion \
+            or _PER_SYSTEM_ADVICE not in diag.suggestion:
+        return diag
+    advice = (f"Each unit's {share:.4g} s is the ceiling's search time shared "
+              f"over {n_engines} engines, so raise total_budget_seconds or name "
+              "fewer engines, or narrow the search with a smaller max_volume "
+              "or a shorter d-axis range.")
+    return diag.model_copy(update={
+        "suggestion": diag.suggestion.replace(_PER_SYSTEM_ADVICE, advice)})
+
+
 def incomplete_diagnostic(engine: str, systems: Sequence[str],
                           seconds: float,
                           capped: Sequence[str] = (),
@@ -2274,8 +2331,7 @@ def incomplete_diagnostic(engine: str, systems: Sequence[str],
     dof = ", ".join(f"{s} {METRIC_DOF[s]}" for s in everything if s in METRIC_DOF)
     advice = []
     if systems:
-        advice.append("Raise budget_seconds, or narrow the search with a "
-                      "smaller max_volume or a shorter d-axis range.")
+        advice.append(_PER_SYSTEM_ADVICE)
     if capped:
         advice.append(f"Narrow the search on {', '.join(capped)} with a smaller "
                       "max_volume, a shorter d-axis range or a peak list ending "
@@ -2357,7 +2413,9 @@ def budget_exhausted_diagnostic(total_seconds: float,
                                 engines_not_run: Sequence[str],
                                 systems_truncated: Sequence[str],
                                 systems_not_reached: Sequence[str],
-                                candidates_not_validated: int) -> Diagnostic:
+                                candidates_not_validated: int,
+                                unit_share: float | None = None,
+                                n_engines: int = 0) -> Diagnostic:
     """``INDEX_BUDGET_EXHAUSTED`` — the declared whole-run ceiling bound.
 
     Written only when the *clock* stopped the run
@@ -2370,6 +2428,11 @@ def budget_exhausted_diagnostic(total_seconds: float,
     validation fit could also run out of its equal slice with the run's clock
     unspent, and a second message said so; the fits now run on the run's
     clock, so a cancelled fit means the ceiling bound.
+
+    ``unit_share`` is the share each (engine × system) unit ran on
+    (:func:`unit_share_seconds`), passed only where it was below the caller's
+    ``budget_seconds``; the suggestion then says so in one sentence, because
+    there a longer ``budget_seconds`` buys nothing and fewer engines do.
     """
     where = []
     if engines_not_run:
@@ -2380,14 +2443,20 @@ def budget_exhausted_diagnostic(total_seconds: float,
         where.append("not reached: " + ", ".join(systems_not_reached))
     if candidates_not_validated:
         where.append(f"{candidates_not_validated} candidate(s) not validated")
+    suggestion = ("Read systems_searched and search_complete before you "
+                  "treat an absence as evidence. Raise total_budget_seconds, "
+                  "or narrow systems= to where the answer can live.")
+    if unit_share is not None:
+        suggestion += (f" Each engine's unit on one crystal system ran at most "
+                       f"{unit_share:.4g} s, the search's part of the ceiling "
+                       f"shared over {n_engines} engines, so naming fewer "
+                       "engines gives each one more.")
     return Diagnostic(
         level="warning", code="INDEX_BUDGET_EXHAUSTED",
         message=(f"The run hit its declared ceiling of {total_seconds:g} s, "
                  "so the answer covers what was reached."),
         where=where,
-        suggestion=("Read systems_searched and search_complete before you "
-                    "treat an absence as evidence. Raise total_budget_seconds, "
-                    "or narrow systems= to where the answer can live."))
+        suggestion=suggestion)
 
 
 # ----------------------------------------------------------------------

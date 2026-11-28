@@ -5600,9 +5600,11 @@ SEARCH_FIELD_HELP: dict[str, HelpEntry] = {
         title="Time per engine and system",
         description=(
             "Wall-clock time for one engine on one crystal system. It does not bound "
-            "the whole run. An engine that this limit stops reports that system as "
-            "incomplete. A negative result from an incomplete search is no evidence "
-            "against a cell."
+            "the whole run. Under a whole-run limit, no engine gets more than an "
+            "equal share of the search's time on one system, whatever this value. "
+            "An engine that this limit stops reports that system as incomplete. A "
+            "negative result from an incomplete search is no evidence against a "
+            "cell."
         ),
         unit="s",
         default="30.0",

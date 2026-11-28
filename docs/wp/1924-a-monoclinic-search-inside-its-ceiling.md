@@ -120,6 +120,12 @@ The reporter's figures, not re-run here: the 2026-10-30 pattern is private and g
 
 ## Handover log
 
+### 2026-11-21 — review round on #1700 (the per-unit share, #1374)
+
+Yue's review of 2026-11-21 accepted the share rule and the reworded `INDEX_SEARCH_INCOMPLETE` remedy for a shared unit. The accepted rule adds one sentence to `INDEX_BUDGET_EXHAUSTED`; the remedy rewrite is reader text beyond that sentence, so it went to Yue under the 2026-11-01 ruling, and **Yue accepted it on 2026-11-21**. The two `slow` rows' margins are now stated in their docstrings (macOS arm64, CPU seconds). Linux x86_64 was measured on 2026-11-23 on an i9-14900K under WSL2 (the numbers match the Mac's: the #780 row's limiting finder, dichotomy, needs 8 s of its share).
+
+Round 2 (Yue, 2026-11-23): the #780 row's dichotomy margin of 2.5 to 3.3 was under tests/CLAUDE.md § Budgets, and the nightly runner's core speed is unmeasured, so the row's ceiling went from 60 s to 120 s. The share is then 40 s and dichotomy's margin 5 (8 s of CPU against 40 s); the row's docstring says so. Both finders stay in the assertion. Revert check on 2026-11-24 (macOS arm64, CPU-clocked, one thread): at 120 s with the share the row passes and the cell has both finders; with the share disabled (`unit_share_seconds` returning `None`) the run finds the cell by dichotomy alone, so the second assertion fails. The CASES row is unchanged.
+
 ### 2026-10-31 — dichotomy's memory bounded when the unit limit is lifted, and a stop honoured inside the dedup and inside one trial_error base
 
 A caller who raises the per-system time limit can no longer drive dichotomy into an out-of-memory kill. The grid now stops at 1 GiB of stored survivor lists, and one crystal system stops after 20 000 accepted cells. Either limit returns what the search has, marked incomplete, where the reporter's runs reached 18.4 GB and 7 GB and returned nothing. A stop request no longer waits minutes on the final dedup, and the dedup stops only where the rest could not change the ranked list, so a run that hits the `quick` ceiling ranks exactly what it ranked before. trial_error now reads its time limit between the solutions of one base, so a 60 s unit stops at 60 s instead of minutes later. Every finished search returns the same candidates bit for bit. Nothing here was re-run on the reporter's private pattern.
