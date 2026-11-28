@@ -931,6 +931,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2307](2307-the-design-rules-load-into-every-session.md) | The design rules load into every session | ✅ 2026-11-23 | — | — |
 | [2312](2312-the-review-commands-see-the-whole-backlog.md) | The review commands see the whole backlog | ✅ 2026-11-27 | — | — |
 | [2313](2313-the-bench-reads-what-the-gui-build-runs.md) | The bench reads what the GUI build runs | ⬜ | P3 | — |
+| [2319](2319-a-jax-test-returns-its-memory.md) | A jax test returns its memory when it ends | ⬜ | P3 | — |
 
 ### <a id="unscheduled-candidates-named-on-a-use-case-not-yet-on-a-measurement"></a>Candidates — named on a use case, not yet on a measurement
 
