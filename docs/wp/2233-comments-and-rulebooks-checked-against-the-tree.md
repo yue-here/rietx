@@ -253,7 +253,7 @@ alongside any other edit fails, and a pull request with no base fails.
 
 ## Handover log
 
-- **2026-11-28** — repair, by a ghostshift close-only runner. The session-start
+- **2026-11-28** — repair, by a ghostshift close-only runner (PR #1879). The session-start
   scan flagged two `WP-2233:` commits made after this file was last touched. The entry below
   records them. They were CI fixes on the closing PR, #1757, and reopen no work. Nothing else
   changed, and the status stays ✅. Both entries correct this WP's own record and ask for no work.
