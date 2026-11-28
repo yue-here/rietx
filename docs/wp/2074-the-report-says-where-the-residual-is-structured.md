@@ -162,7 +162,7 @@ J. Appl. Cryst. 20, 356; Davies 1977, Biometrika 64, 247; Davies 1987, Biometrik
   2026-11-17 acceptance there. This entry marks the WP's open decision as decided. The report
   grows no always-printed residual-structure rows; the scan, the bulge and the replica table
   become functions a caller or agent runs. The tier-3 choices stay open.
-  *Done* (PR #PRNUM, docs only): the decision paragraph marked decided, with where the ruling
+  *Done* (PR #1888, docs only): the decision paragraph marked decided, with where the ruling
   is recorded; a dated note under the Goal; the first task split into its decided half (ticked)
   and the tier-3 half (open); the Priority line re-dated, tier unchanged. What decided it: the
   maintainer's note on #1585 of 2026-11-17, posted from Yue's account, files the WP-2074 item
