@@ -195,7 +195,7 @@ the rows.)* *(2026-11-16: was "the finding at the disagreeing pattern"; WP-2003 
 
 ## Handover log
 
-- **2026-11-28** — **Repair, close-only bookkeeping** (ghostshift runner; PR #PRNUM). PR #1594
+- **2026-11-28** — **Repair, close-only bookkeeping** (ghostshift runner; PR #1886). PR #1594
   merged on 2026-11-23 and left the session-start scan flagging this WP. The flag came from
   dates alone. The PR's last commit, `78f8f999b`, was committed on 2026-11-22 and wrote the
   2026-11-21 entry below, so that entry already records it. No work is missing from the log,
