@@ -19,11 +19,12 @@ minimised over the residual rows of {eq}`fm-rows` {cite}`rietveld1969`.
 Weights come from the data file's esd column when it has one;
 Poisson $\sigma = \sqrt{\max(y, 1)}$ is only the fallback for bare counts.
 
-The Jacobian is assembled column by column, exact wherever it can be: linear background columns, analytic peak-chain columns (per-peak
-position, width, mixing and intensity), analytic site columns for
-coordinates, anisotropic ADPs, Biso and occupancy over the frozen operator
-subsets, analytic columns for magnetic-moment moduli and the FCJ apertures, and forward
-differences otherwise.
+The Jacobian is assembled column by column, exact wherever it can be:
+linear for the background; analytic for per-peak position, width, mixing
+and intensity, for coordinates, anisotropic ADPs, Biso and occupancy over
+the frozen operator subsets (ties across atoms and distortion modes
+included), for magnetic-moment moduli and for the FCJ apertures; a forward
+difference otherwise.
 Under a differentiable backend the same residual is traced and columns
 come from forward-mode autodiff, whose cost scales with the parameter
 count {cite}`nocedal2006`; every backend is held to per-column agreement
