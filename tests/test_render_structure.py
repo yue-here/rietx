@@ -198,6 +198,10 @@ def _corpus(payloads: dict[str, dict] | None = None) -> dict:
         "shown": shown,
         "views": _views(payloads),
         "fog": _fog(scenes),
+        # ambient occlusion's light directions and their map bases (WP-1538)
+        "occlusion": {"directions": raster.occlusion_directions().tolist(),
+                      "bases": [raster._light_basis(d).reshape(-1).tolist()
+                                for d in raster.occlusion_directions()]},
     })
 
 
@@ -343,13 +347,16 @@ def _general_ellipsoid() -> dict:
     {"mode": "ellipsoid", "background": None, "outline": True},
     {"mode": "ball", "polyhedra": True, "atom_labels": True, "outline": True,
      "depth_cue": True},
-], ids=["ball", "ellipsoid", "cued"])
+    {"mode": "ball", "polyhedra": True, "ambient_occlusion": True},
+], ids=["ball", "ellipsoid", "cued", "occluded"])
 def test_the_two_paths_draw_the_same_bits_in_any_banding(nac, kw, monkeypatch):
     """The wheel's kernel and its numpy oracle call no library function, so
     the bar between them is the bit (D1).  A band boundary moves nothing on
     either path: the outline reads across one through its halo.  The numpy
     half runs without the wheel too.  A depth-cued picture is the wheel's
-    ``render_rows_cued`` on the compiled side (WP-1548)."""
+    ``render_rows_cued`` on the compiled side (WP-1548).  An occluded picture
+    is drawn by the numpy path on both sides, from maps each side's
+    ``id_plane`` built (WP-1538)."""
     images = {}
     was = compiled.set_enabled(False)
     try:
@@ -1267,7 +1274,7 @@ def test_auto_never_hides_more_than_the_opening_view(row):
     {"view": {"hkl": (1, 0, 0)}, "size": (300, 200), "background": (0.9, 0.9, 0.5)},
     {"mode": "ellipsoid", "hidden": "Na", "polyhedra": False, "supersample": 1},
     {"atom_labels": True, "outline": True, "background": None, "exaggeration": 1.5},
-    {"stick": 0.5, "outline": True}])
+    {"stick": 0.5, "outline": True}, {"ambient_occlusion": True, "size": 160}])
 def test_the_recipe_draws_the_same_picture_through_json(nac, kw):
     geometry = s3.build(nac)
     kw = dict(kw)
@@ -1554,6 +1561,120 @@ def test_carbon_is_lighter_on_a_dark_ground_only(monkeypatch):
     assert s3.dark_ground_colours(molecule["sites"]) == {}
     clash = render_structure(molecule, size=200, background="#151515")
     assert carbon(clash) == {s3._CPK["C"]}
+
+
+# ----------------------------------------------------------------------
+# ambient occlusion (WP-1538)
+# ----------------------------------------------------------------------
+
+def _ball(index: int, pos, r: float) -> dict:
+    return {"index": index, "pos": list(pos), "shape": [r, 0, 0, 0, r, 0, 0, 0, r],
+            "inverse": [1 / r, 0, 0, 0, 1 / r, 0, 0, 0, 1 / r], "color": [0.6, 0.6, 0.6],
+            "rings": False}
+
+
+def _balls(*balls) -> dict:
+    """A scene of spheres alone, centred on the origin, 4 Å its reach."""
+    return {"atoms": list(balls), "halves": [], "lines": [], "faces": [], "labels": [],
+            "center": [0.0, 0.0, 0.0], "radius": 4.0, "depth": 4.0}
+
+
+def _sphere_points(n: int = 4000) -> np.ndarray:
+    rng = np.random.default_rng(1538)
+    v = rng.normal(size=(n, 3))
+    return v / np.linalg.norm(v, axis=1)[:, None]
+
+
+def test_the_occlusion_directions_cover_the_sphere_evenly():
+    """D2's Fibonacci lattice: unit vectors, summing to nearly nothing, and
+    every point of the sphere within 20° of one of them."""
+    d = raster.occlusion_directions()
+    assert d.shape == (raster.OCCLUSION_DIRECTIONS, 3)
+    assert np.allclose(np.linalg.norm(d, axis=1), 1.0)
+    assert np.linalg.norm(d.sum(axis=0)) < 0.05 * len(d)
+    nearest = np.degrees(np.arccos(np.clip((_sphere_points() @ d.T).max(axis=1), -1, 1)))
+    assert nearest.max() < 20.0
+    for k in range(len(d)):
+        basis = raster._light_basis(d[k])
+        assert np.allclose(basis @ basis.T, np.eye(3)) and np.linalg.det(basis) > 0
+        assert np.array_equal(basis[2], d[k])
+
+
+def test_an_isolated_atom_is_unoccluded_everywhere():
+    """A convex surface shadows only points facing away from the light, which
+    weigh nothing, so the share is 1 up to the texel's grazing error."""
+    n = _sphere_points()
+    maps = raster.occlusion_maps(_balls(_ball(0, (0, 0, 0), 1.0)))
+    share = raster.occlusion(maps, n, n)
+    assert share.min() > 0.98 and share.mean() > 0.999
+
+
+def test_a_point_between_two_touching_atoms_is_darker_than_either_far_side():
+    n = _sphere_points()
+    maps = raster.occlusion_maps(_balls(_ball(0, (-1, 0, 0), 1.0), _ball(1, (1, 0, 0), 1.0)))
+    share = raster.occlusion(maps, n + [-1.0, 0.0, 0.0], n)
+    near, far = share[n[:, 0] > 0.9], share[n[:, 0] < -0.9]
+    assert near.mean() < 0.5 < 0.99 < far.mean()
+    # the darkening falls off from the contact: the side facing it is darker
+    # than the side across from it, and the ring round the axis in between
+    side = share[np.abs(n[:, 0]) < 0.1]
+    assert near.mean() < side.mean() < far.mean()
+
+
+def test_a_stick_casts_occlusion_on_an_atom_above_it():
+    """Bond halves go into the depth maps too (``_depths``' half branch): two
+    balls joined by a stick, and a third ball 0.2 Å above the stick, whose
+    underside the stick darkens and whose top it leaves alone."""
+    n = _sphere_points()
+    ends = [_ball(0, (-2, 0, 0), 0.5), _ball(1, (2, 0, 0), 0.5)]
+    top = _ball(2, (0, 0, 1.0), 0.5)
+    stick = [{"bond": 0, "from": [-2.0, 0.0, 0.0], "to": [0.0, 0.0, 0.0], "radius": 0.3,
+              "color": [0.6, 0.6, 0.6]},
+             {"bond": 0, "from": [2.0, 0.0, 0.0], "to": [0.0, 0.0, 0.0], "radius": 0.3,
+              "color": [0.6, 0.6, 0.6]}]
+    bare = _balls(*ends, top)
+    joined = dict(bare, halves=stick)
+    points = n * 0.5 + [0.0, 0.0, 1.0]
+    without = raster.occlusion(raster.occlusion_maps(bare), points, n)
+    with_stick = raster.occlusion(raster.occlusion_maps(joined), points, n)
+    under, over = n[:, 2] < -0.9, n[:, 2] > 0.9
+    assert without[under].mean() > 0.9
+    assert with_stick[under].mean() < 0.7 * without[under].mean()
+    assert np.allclose(with_stick[over], without[over], atol=0.01)
+
+
+def test_occlusion_scales_the_ambient_term_and_leaves_the_key_light():
+    """D3: ``base·(ambient·A + diffuse·d) + specular``; A = 1 is the plain
+    shade to the bit and A = 0 removes ambient light alone."""
+    look = raster._pack({"atoms": [], "halves": [], "lines": [], "faces": []},
+                        np.eye(3), raster.Frame(1, 1, 0.0, 0.0, 1.0, 1.0), 1)["look"]
+    n = _sphere_points(200)
+    base = np.array([0.3, 0.5, 0.7])
+    plain = raster._shade(base, n[:, 0], n[:, 1], n[:, 2], look)
+    one = raster._shade(base, n[:, 0], n[:, 1], n[:, 2], look, np.ones(len(n)))
+    zero = raster._shade(base, n[:, 0], n[:, 1], n[:, 2], look, np.zeros(len(n)))
+    assert np.array_equal(plain, one)
+    assert np.allclose(plain - zero, base * sc.LOOK["ambient"])
+
+
+def test_ambient_occlusion_darkens_both_modes_and_is_off_by_default(nac):
+    """Off by default, refused unless a bool, and on it only darkens, in both
+    modes: the sticks a small ellipsoid meets shade it too, so ellipsoid mode
+    loses about 0.6 of what ball mode does on its atoms, not the filing's
+    atoms-only 1-3 % (``docs/wp/1538-measure/results.txt``)."""
+    with pytest.raises(ValueError, match="ambient_occlusion"):
+        render_structure(nac, size=100, ambient_occlusion="yes")
+    darkening = {}
+    for mode in ("ball", "ellipsoid"):
+        plain = render_structure(nac, mode=mode, size=320)
+        lit = render_structure(nac, mode=mode, size=320, ambient_occlusion=True)
+        assert lit.recipe["ambient_occlusion"] and not plain.recipe["ambient_occlusion"]
+        _save(lit, f"ambient_occlusion_{mode}")
+        ink = plain.image[..., :3].astype(float).sum(axis=2) < 3 * 250
+        drop = (plain.image[..., :3].astype(float) - lit.image[..., :3])[ink]
+        assert (drop >= -1).all()                    # it only darkens
+        darkening[mode] = float(drop.mean())
+    assert darkening["ball"] > 3.0 and darkening["ellipsoid"] > 1.0, darkening
 
 
 # ----------------------------------------------------------------------

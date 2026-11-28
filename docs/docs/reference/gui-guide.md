@@ -688,7 +688,7 @@ Double-clicking empty space ends it. `chemistry` goes back to the rule, and so d
 caption says when the lists are your own.
 
 `PNG` renders the picture again, 3000 pixels on its long side, with the a, b, c
-letters drawn in. That is a 17 cm figure at 300 dpi with room to crop.
+letters drawn in. That is a 17 cm figure at 300 dpi.
 `transparent PNG`, under `drawing`, leaves the background out.
 
 `depth cue`, under `drawing`, fades each surface toward the background with
@@ -699,7 +699,9 @@ exported without the cue, and the line under the plot says so.
 0.1 Å of one plane as a translucent grey face. Flat is all the fill says:
 coordinates cannot tell an aromatic ring from any other flat one. The viewer
 draws one cell, so a ring that a cell edge cuts stays open; a block drawn by
-`render_structure` closes it. Both start off.
+`render_structure` closes it. `ambient occlusion` darkens crowded atoms and
+sticks; its first frame builds 64 depth maps. All three
+start off.
 
 Two things here will mislead you if nobody says them:
 
@@ -707,8 +709,7 @@ Two things here will mislead you if nobody says them:
   drawn at a fraction of the sum of covalent radii, and no single value is right
   for both an ionic solid and an organic. LaB₆ at the default draws every La–B
   contact and looks like a cage; one turn of the slider down and the B₆
-  octahedron appears. It sits behind the `drawing` disclosure, and a first-time
-  user needs it. No stick joins a metal to a cation at any threshold, so
+  octahedron appears. It sits behind the `drawing` disclosure. No stick joins a metal to a cation at any threshold, so
   forsterite's Mg is never joined to the Si of its SiO₄ neighbours.
 - The ellipsoids are a diagnostic. Their axes are refined quantities, so a
   background flexible enough to imitate the peaks arrives here as balloons,
@@ -719,11 +720,11 @@ Two things here will mislead you if nobody says them:
 The probability selector scales the ellipsoids. The `× size` factor beside it is
 a drawing multiplier and no ellipsoid stands above 100 %. A figure exported at a
 multiplier other than 1 is not an ORTEP-quotable surface, and the caption prints
-both numbers so it cannot be quoted as one by accident.
+both numbers.
 
 Element colours are chosen per phase rather than per element, so the same
 element can be drawn in two colours in two phases. The familiar assignments
-never move; the rest are separated against whatever else is in that phase.
+never move; the rest are separated against the rest of that phase.
 
 ## Text
 
