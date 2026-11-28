@@ -361,6 +361,7 @@ matplotlib
 numpy
 PANalytical
 pydantic
+PyInstaller
 pytest
 rietx
 Rigaku

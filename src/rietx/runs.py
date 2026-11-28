@@ -79,6 +79,7 @@ from pydantic import ConfigDict, Field
 from ._about import (
     LIVE_DIR_NAME,
     PROJECT_SUFFIX,
+    RUNS_DIR_ENV,
     RUNS_DIR_NAME,
     STATE_DIR_NAME,
     TELEMETRY_ENV,
@@ -1098,24 +1099,82 @@ def set_enabled(flag: bool | None) -> bool | None:
     return was
 
 
+#: The process-wide root :func:`set_root` named, or ``None`` to read
+#: :data:`~rietx._about.RUNS_DIR_ENV`. Never a cache of that read, for the
+#: reason :data:`_ENABLED` is not one.
+_ROOT: Path | None = None
+
+
+def set_root(path: str | Path | None) -> Path | None:
+    """Record every fit in this process under ``path``; ``None`` re-reads the
+    environment. Returns the previous setting, so a caller can restore it.
+
+    The process-wide twin of :data:`~rietx._about.RUNS_DIR_ENV`, and it
+    outranks the variable as :func:`set_enabled` outranks
+    :data:`~rietx._about.TELEMETRY_ENV`. ``path`` holds the run directories
+    themselves, exactly as a ``telemetry=<path>`` does, and is made absolute
+    here, so a later change of working directory cannot move it. It is still
+    a root rietx chose for the caller (WP-1950): :func:`run_root` creates it,
+    hides it from git if it was empty and prunes it, where a call's
+    ``telemetry=`` is left alone.
+
+    It moves the root and turns nothing on. ``RIETX_TELEMETRY=0`` still
+    records nothing, and a call's ``telemetry=`` and a project's ``live/``
+    still win over it (:func:`attach`).
+    """
+    global _ROOT
+    was = _ROOT
+    _ROOT = None if path is None else Path(os.path.abspath(Path(path).expanduser()))
+    return was
+
+
+def configured_root() -> Path | None:
+    """The root a process configured with :func:`set_root` or
+    :data:`~rietx._about.RUNS_DIR_ENV`, else ``None`` (the working directory).
+
+    Not created and not checked: :func:`run_root` does that, inside
+    :func:`attach`'s guard, so an unwritable one declines a run rather than
+    breaking a fit. An empty variable is unset, and a relative one is taken
+    against the working directory at each fit, since the variable is read at
+    each fit.
+    """
+    if _ROOT is not None:
+        return _ROOT
+    value = os.environ.get(RUNS_DIR_ENV, "").strip()
+    return Path(os.path.abspath(Path(value).expanduser())) if value else None
+
+
 def run_root(base: str | Path | None = None) -> Path:
-    """``<base or the working directory>/.rietx/runs``, created.
+    """The runs root rietx chose, created: ``<base>/.rietx/runs`` when ``base``
+    is given, else :func:`configured_root`, else
+    ``<working directory>/.rietx/runs``.
 
     Creates the root and drops a ``.gitignore`` of ``*`` into it, so a fit
     inside somebody's repository does not turn up in their ``git status``, and
-    prunes it once per process (:func:`prune`). All three only for the root *this
-    package chose*: a caller who passed ``telemetry=`` named their own
-    directory, and neither writing an ignore file into it nor deleting anything
-    out of it is a decision this package gets to make there.
+    prunes it once per process (:func:`prune`). All three only for a root *this
+    package chose*, which a configured root is (it replaces the working
+    directory's, and an application pointing every fit at a cache directory
+    wants that directory bounded): a caller who passed ``telemetry=`` named
+    their own directory, and neither writing an ignore file into it nor
+    deleting anything out of it is a decision this package gets to make there.
+
+    A configured root gets the ignore file only when it starts out empty or
+    absent. ``RIETX_RUNS_DIR=.`` names a directory that holds other things,
+    and a ``*`` there would hide all of them from git; ``.rietx/runs`` is
+    always this package's alone. Pruning needs no such care, its guards
+    deleting only what a recorder wrote.
     """
-    global _PRUNED
-    root = (Path.cwd() if base is None else Path(base)) / STATE_DIR_NAME / RUNS_DIR_NAME
+    configured = configured_root() if base is None else None
+    root = (configured if configured is not None
+            else (Path.cwd() if base is None else Path(base)) / STATE_DIR_NAME / RUNS_DIR_NAME)
+    ours = configured is None or not root.exists() or not any(root.iterdir())
     root.mkdir(parents=True, exist_ok=True)
     marker = root / GITIGNORE_FILE
-    if not marker.exists():
+    if ours and not marker.exists():
         marker.write_text("*\n", encoding="utf-8")
-    if not _PRUNED:
-        _PRUNED = True
+    key = os.path.abspath(root)
+    if key not in _PRUNED:
+        _PRUNED.add(key)
         try:
             prune(root)
         except Exception:      # retention is telemetry; it breaks no fit
@@ -1760,11 +1819,15 @@ def prune(root: str | Path, *, max_bytes: int = RETENTION_MAX_BYTES,
     :data:`RETENTION_MIN_AGE_SECONDS` for the batch this rule exists to
     survive.
 
-    The root's whole size decides *whether* to prune, including directories
-    that may not be deleted; only :func:`_is_prunable` decides *what*. So a root
+    The size of every run directory in the root (each direct child whose name
+    matches :data:`RUN_ID_RE`) decides *whether* to prune, including runs that
+    may not be deleted; only :func:`_is_prunable` decides *what*. So a root
     filled with runs too young to touch **warns and keeps**: using somebody's
     disk is better than deleting their evidence, and a silent cap on either
-    would be worse than both.
+    would be worse than both. Anything else in the root is not counted: a
+    configured root (``RIETX_RUNS_DIR``, :func:`set_root`) may be a directory
+    that also holds the user's own data, and that is not this package's to
+    weigh or to warn about.
 
     Every ``rmtree`` here is guarded three times over, because a recursive
     delete is the one thing in this track that can destroy data and the guards
@@ -1776,7 +1839,8 @@ def prune(root: str | Path, *, max_bytes: int = RETENTION_MAX_BYTES,
     now = time.time() if now is None else now
     try:
         entries = [Path(e.path) for e in os.scandir(root)
-                   if e.is_dir(follow_symlinks=False)]
+                   if e.is_dir(follow_symlinks=False)
+                   and RUN_ID_RE.match(e.name)]
     except OSError:
         return []
 
@@ -1839,12 +1903,14 @@ def _guarded_rmtree(child: Path, root: Path) -> bool:
     return True
 
 
-#: Has this process already pruned its derived root? Once, not once per fit: a
-#: batch of two hundred candidates in one process should pay the walk once.
+#: The roots this process has already pruned (absolute paths): each once, not
+#: once per fit, since a batch of two hundred candidates in one process should
+#: pay the walk once. A set rather than a flag since WP-1950, because a
+#: configured root can change mid-process and a new one is owed its walk.
 #: Measured on ``[dev]`` / macOS arm64 over six-file run directories: 0.2 ms at
 #: 10 runs, 2.2 ms at 100, 27.6 ms at 1000 (197 MB) — so the walk stays under a
 #: tenth of a second right up to the ceiling, and a fit pays it once.
-_PRUNED = False
+_PRUNED: set[str] = set()
 
 
 #: Marks a stream as already carrying a recorder. One job is one run directory,
@@ -1910,7 +1976,9 @@ def attach(stream, events, *, telemetry=None, project_hint=None,
     Where the directory comes from, first hit winning: an explicit
     ``telemetry=``; a ``project_hint`` (what ``Project.fit`` sets, and the
     derived fallback for a bare ``fit()`` on a project-built ``Refinement``);
-    else :func:`run_root` under the working directory. Each is a *root*, and
+    else :func:`run_root`, which is the process's configured root
+    (:func:`set_root`, :data:`~rietx._about.RUNS_DIR_ENV`) when there is one
+    and the working directory's ``.rietx/runs`` otherwise. Each is a *root*, and
     the run is a fresh ``<run id>`` directory inside it — which is what keeps an
     agent fitting a project and a human with the GUI open on it from
     interleaving one log.

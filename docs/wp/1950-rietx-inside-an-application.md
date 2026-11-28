@@ -1,9 +1,8 @@
 # WP-1950 — rietx inside an application
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-25 — a process-wide run root, a shipped PyInstaller hook and the embedding guide landed (PR #1644); the WP closes with the maintainer's handover after the merge; a CI freeze on Linux and Windows is issue #1651
 Track: Candidates — named on a use case, not yet on a measurement
 Depends on: —
-Priority: P3 2026-10-11 — an application that freezes rietx with PyInstaller and runs it from a user's working directory has a workaround for each step; nothing documents them
 
 ## Goal
 
@@ -83,58 +82,48 @@ hook is the `pyinstaller40` entry point: `hook-dirs =
 `hiddenimports` (pyinstaller.org, *Understanding PyInstaller Hooks*).
 `pyinstaller-hooks-contrib` is the other route and needs a PR elsewhere.
 
-### Inherited
-
-- **From WP-1966 (2026-10-14): a second host where run records are useless.**
-  The JupyterLite site's install cell sets `RIETX_TELEMETRY=0` before rietx
-  is imported, because no `rietx watch` can read a browser tab's runs
-  (`docs/lite/build.py`, `INSTALL`). A once-per-process switch from this WP
-  would replace that line, so name the browser as a second caller. The same
-  host also empties `fcntl`. WP-1966 made the three lock sites import `flock`
-  by name, so a record written there takes the Windows path.
-- **From WP-1464 (2026-11-18): what the manual section says about
-  `RIETX_COMPILED_THREADS`.** Measured on a 10-core arm64 Mac under load from
-  other work: a screen of 26 fits on 10 worker processes ran 1.9-2.8× slower
-  with `RIETX_COMPILED_THREADS=1` than with the default pool, and 104 fits
-  2.0× slower. So the package keeps its default in a pool and does not read
-  `OMP_NUM_THREADS` (`docs/practice.md` § Inner threads in a process pool).
-  The embedding section names the variable as the way to cap rietx beside an
-  application's own parallel work, and does not recommend 1 for speed.
-- **From WP-1464 (2026-11-19, on closing): the default ignores CPU
-  affinity.** `model.compiled.n_threads()` takes `min(8, os.cpu_count())`,
-  and `os.cpu_count()` counts the node's cores, not those a job is allowed
-  (affinity, cgroup limits; inferred, never measured). A job given four cores
-  on a large node then starts eight kernel threads per process.
-  `os.process_cpu_count()` (Python 3.13+) reads affinity. WP-1464 closed with
-  this open and no run limited that way measured; it is this WP's because an
-  application or a cluster job is where a core limit is set.
+**Left open by WP-1464 (2026-11-19): the default ignores CPU affinity.**
+`model.compiled.n_threads()` takes `min(8, os.cpu_count())`, and
+`os.cpu_count()` counts the node's cores, not those a job is allowed
+(affinity, cgroup limits; inferred, never measured). A job given four cores
+on a large node then starts eight kernel threads per process.
+`os.process_cpu_count()` (Python 3.13+) reads affinity. WP-1464 closed with
+this open and no run limited that way measured. The embedding guide names
+`RIETX_COMPILED_THREADS` as the way to cap rietx beside an application's own
+parallel work, and does not recommend 1 for speed (a pool of 26 fits ran
+1.9-2.8× slower at 1 than at the default, `docs/practice.md` § Inner threads
+in a process pool). This WP closed without taking the affinity question up.
 
 ## Non-goals
 
 - Changing the telemetry default (Decided 2026-10-11, above).
 - The kernel thread count in a process pool (WP-1464, issue #898 (b),
-  closed 2026-11-19). The affinity question it left open is in Inherited.
+  closed 2026-11-19). The affinity question it left open is in Context.
 - `platformdirs` as a dependency.
 
 ## Tasks
 
-- [ ] A process-wide run root: an environment variable or a
+- [x] A process-wide run root: an environment variable or a
       `runs.set_root(path)` beside `runs.set_enabled`, its name imported
       from `_about.py` (root CLAUDE.md § Conventions). It sits between
       `telemetry=` and the working directory in the precedence. Retention
       and its three guards keep working under it (WP-1403), and `rietx
       watch` is told where to look.
-- [ ] A PyInstaller hook shipped in the package through the `pyinstaller40`
+- [x] A PyInstaller hook shipped in the package through the `pyinstaller40`
       entry point: data files, the static page directories, the kernel
       wheel as a hidden import, and the dist-info metadata.
-- [ ] Verify it with a real freeze of a one-fit script in CI or a temporary
+- [x] Verify it with a real freeze of a one-fit script in CI or a temporary
       branch workflow (no docker here): the frozen fit loads the kernels,
       stamps the real version, and writes its run where the root says.
-- [ ] Manual: an "Embedding rietx" section in `using/` covering telemetry
-      off or redirected, the hook, and `RIETX_COMPILED_THREADS`.
-- [ ] Tests for the root's precedence (`tests/test_telemetry.py`).
-- [ ] Skill: none expected, since an agent driving rietx does not freeze it.
-      Say so at close.
+      Done as a local macOS freeze by hand, with a control arm (handover
+      log); the CI freeze, and Linux and Windows, are issue #1651.
+- [x] Manual: an "Embedding rietx" section in `using/` covering telemetry
+      off or redirected, the hook, and `RIETX_COMPILED_THREADS`. Landed as
+      the guide page `guides/embed.md`, the manual having no `using/` tree.
+- [x] Tests for the root's precedence (`tests/test_telemetry.py`).
+- [x] Skill: none expected, since an agent driving rietx does not freeze it.
+      Said at close (2026-11-17): no skill row; an agent that wants its runs
+      elsewhere already has `telemetry=`.
 
 ## Acceptance
 
@@ -154,6 +143,95 @@ root's precedence against `telemetry=` and the working directory.
   *Run-time Information*.
 
 ## Handover log
+
+- **2026-11-17** — closed (ghostshift runner, PR #1644). An application that
+  embeds rietx can now settle where runs go once per process, with
+  `RIETX_RUNS_DIR` or `rietx.runs.set_root`, instead of passing `telemetry=`
+  on every call, and the telemetry default is unchanged. A PyInstaller freeze
+  needs no flags for rietx any more: the package ships its own hook, and a real
+  freeze showed what the hook buys (data files and the version stamp) against
+  a control frozen from `main`. The manual has a guide page for all of it. A
+  freeze on Linux and Windows, and a CI job that keeps freezing, are left as
+  issue #1651.
+  - *Done.* `_about.RUNS_DIR_ENV`; `runs.set_root` / `runs.configured_root`;
+    `run_root` takes the configured root when no base is given. Precedence in
+    `attach`: `RIETX_TELEMETRY=0` / `set_enabled(False)` / `telemetry=False`,
+    then `telemetry=`, then a project's `live/`, then the configured root,
+    then `<cwd>/.rietx/runs`. The configured root is a root rietx chose: it is
+    created and pruned (WP-1403's retention and guards; `_PRUNED` is now a set
+    of roots, so a root changed mid-process gets its walk), and gets the
+    `.gitignore` only if it starts out empty (`RIETX_RUNS_DIR=.` must not hide
+    a repository). `set_root` makes a relative path absolute at the call; a
+    relative variable is resolved at each fit. `rietx watch` with no argument
+    keeps scanning the working directory and prints one line naming a
+    configured root it cannot be sure to list (anything but the directory or
+    its `.rietx/runs`), and nothing while recording is off. Hook:
+    `src/rietx/__pyinstaller/` + `[project.entry-points.pyinstaller40]`;
+    `collect_data_files`, `collect_submodules` (the hook package excepted),
+    `rietx_kernels` as a hidden import, `copy_metadata(DIST_NAME)`;
+    `_audit.NOT_WALKED["__pyinstaller"]`. Guide `docs/docs/guides/embed.md`;
+    `guides/watch.md`'s switch table and `reference/project.md`'s `.rietx`
+    paragraph name the new root. Tests: 12 in `tests/test_telemetry.py`
+    (precedence against `telemetry=`, a project and the working directory;
+    `set_root` over the variable; absolute paths; off writes nothing; an
+    unusable root declines and the fit returns; per-root pruning; the
+    `.gitignore` rule; the banner), 5 in `tests/test_pyinstaller_hook.py`.
+  - *Measured, the freeze* (macOS arm64, CPython 3.12, PyInstaller 6.22.3,
+    rietx built from this branch as a wheel into a clean venv, onedir). Script:
+    build the `fap` example's inputs from the package data, fit them with a
+    plain `Refinement`, report. Hook arm, run from an empty directory with
+    `RIETX_RUNS_DIR` set: frozen, compiled tier loaded
+    (`compiled.unavailable()` None), provenance `1.12.0.dev0` = the installed
+    metadata, `converged`, Rwp 0.09283, one run directory under the configured
+    root (status `done`, `.gitignore` written), nothing in the working
+    directory, no warning; 120 MB. Control arm, the same script frozen from
+    `origin/main` 6f704aaa5 (no hook): `ModuleNotFoundError: No module named
+    'rietx.data'` before the fit, and the version stamp fell back to
+    `0.0.0+dev` with its warning; 113 MB. The compiled tier loaded in the
+    control too, since PyInstaller follows the function-level `import
+    rietx_kernels`; the hidden import is kept as a guard. The two PyInstaller
+    warnings in both builds were outside rietx (a scipy hidden import, a
+    Windows-only ctypes library).
+  - *Measured, tests.* Mac `[dev]` venv, macOS arm64: `test_telemetry.py`,
+    `test_runs.py`, `test_pyinstaller_hook.py`, `test_watch_app.py` 205 passed,
+    1 skipped; `test_manual_api.py` + `test_docs_consistency.py` +
+    `test_pyinstaller_hook.py` 50 passed; manual `sphinx -W` clean; Vale 0
+    errors. The workstation (Linux x86_64, `rietx-py312`, tree on `PYTHONPATH`): canary
+    at 691ee826c 287 passed, 1 failed (the audit walk had no place for
+    `__pyinstaller`, fixed in 073495b20), then 288 passed, 4 skipped at
+    073495b20. Fast selection on the merged tree 9d69c40d5 (`origin/main` f1187a062 merged in): 14873
+    passed, 281 skipped, 32 xfailed, 2 failed in 612 s, 6.6 GB peak, 725 % on
+    8 cores. Both failures were this branch's: the metadata-reader pin in
+    `test_capabilities.py` matched the hook's `copy_metadata(DIST_NAME)`, and
+    Vale's accept list is generated from `docs/vale/terms.txt`, where
+    PyInstaller now sits. Fixed in 7b5cfba9e; both files then 64 passed on the Mac.
+    The suite added 17 tests (12 + 5); the one extra skip against other
+    branches' runs (281, not 280) is the hook's entry-point test, which skips
+    wherever the installed dist-info predates the branch (the workstation's shared
+    venv); CI installs fresh.
+  - *Review.* A read-only reviewer found the banner silent for a root under
+    a dot-directory of the working directory (fixed), pruning once per process
+    rather than per root (fixed), a relative variable left relative (fixed), a
+    `.gitignore` of `*` written into a shared directory (fixed), and an
+    unguarded `resolve()` in the banner (fixed). Declined: replacing
+    `DIST_NAME` in the hook with a literal to spare importing rietx in the
+    build process, because CLAUDE.md § Conventions wants the name imported.
+  - *Generality* (standing-in judge, Opus, read-only, unedited verdicts):
+    `NOT_WALKED["__pyinstaller"]` **holds** (no module-level number). The
+    `.gitignore`-only-when-empty rule **holds**; weak side: a new empty folder
+    inside a repository meant to be committed gets hidden. The precedence
+    chain **holds**; weak side: a project-built `Refinement` still records into
+    the project's `live/` with a root set (documented, not warned). The watch
+    banner **fails**: it claimed a fit records somewhere with recording off.
+    Author: gated on `runs.enabled()` in 4563b711d, with a test.
+  - *Pruned.* `### Inherited` from WP-1966 (the in-browser notebooks set
+    `RIETX_TELEMETRY=0`): still true and still the right switch there, since
+    a root does not help where nothing reads runs; the guide names that
+    caller. Nothing replaced its line.
+  - *Not done.* No CI freeze, and no Linux or Windows freeze (issue #1651).
+    The telemetry default is unchanged (Decided 2026-10-11). Issues #893 and
+    #898 (a) are answered by this PR and left for the maintainer to close.
+  - *Next:* none in this WP. Issue #1651 for the CI freeze.
 
 - **2026-10-11** — created, from the 2026-10-11 issue triage (issues #893,
   #898 (a)). Checked against the tree at `d80ca5f4`: the run root is the

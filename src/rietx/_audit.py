@@ -181,6 +181,7 @@ WALKED: dict[str, int] = {
 #: ``project.py`` and nine files under ``io`` and ``gui``).
 NOT_WALKED: dict[str, str] = {
     "__init__.py": "re-exports and the lazy-import table",
+    "__pyinstaller": "the PyInstaller hook, run only inside a freeze; it lists files and holds no number",
     "_about.py": "the distribution's names, format tokens and state directory",
     "_audit.py": "this table",
     "_display.py": "the widths of printed displays, which read fields and compute nothing",
