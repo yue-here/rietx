@@ -6353,6 +6353,9 @@ class Refinement:
                 + _resonant_absorber_diagnostics(self.structure,
                                                  self.instrument)
                 + _species_fallback_diagnostics(self.structure, self.instrument)
+                + _charge_not_stated_diagnostics(self.structure,
+                                                 self.instrument)
+                + _bare_magnetic_ion_diagnostics(self.structure)
                 # WP-1343: the one check in the package that reads a *plan*
                 # rather than a solved state, and it is here because that is
                 # the only place it can be true to its own claim — the
@@ -10140,6 +10143,9 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # WP-2060: a modulus the data do not support, the FitReport's verdict on
     # the result, where its esd would otherwise read as an interval
     diagnostics = diagnostics + moment_unsupported_diagnostics(params)
+    # a form-factor row evaluated past its fitted range, read off the
+    # model's own compile-time check, once per result
+    diagnostics = diagnostics + _form_factor_range_diagnostics(model)
 
     # Specimen absorption: report what was applied and, crucially, the Biso
     # bias it removed — for a capillary Rwp is provably unchanged by it, so
@@ -10708,6 +10714,129 @@ def _symmetry_silence_diagnostics(structure: Structure,
             sites=([(a.species, a.x.value, a.y.value, a.z.value, a.occ.value)
                     for a in phase.atoms] if structural else None)))
     return out
+
+
+def _form_factor_range_diagnostics(model: CompiledModel) -> list[Diagnostic]:
+    """``MAGNETIC_FORM_FACTOR_COMPUTED_TAIL``: the Brown form-factor rows this
+    model's reflection list evaluates past the range he fitted them over,
+    where the value is the blend onto (then) the row's computed free-ion tail,
+    once per result (in a joint fit, once per histogram that reaches it), as
+    ``info``: it records that the computed tail was used
+    (the #1806 ruling: past Brown's range f² is 6 × 10⁻⁵ (Mn²⁺) to 7 × 10⁻³ (Nd³⁺)
+    of its low-angle value, so nothing is owed), which
+    :func:`~.crystallography.magnetic.form_factor.approximation_name` also
+    names on every result.
+
+    Read off ``MagneticSites.past_range``, which the stage compile wrote from
+    the table's one range check (``form_factor.past_fitted_range``), so this is
+    a projection of that decision and never a second comparison.  An ion
+    served from a computed table never appears: it is computed on its whole
+    range.  ``where`` is the moment parameters of every atom carrying such a
+    row, ``value`` the largest s.
+    """
+    rows: dict[tuple[str, int], object] = {}
+    where: list[str] = []
+    for ip, cp in enumerate(model.phases):
+        msites = getattr(cp, "magnetic", None)
+        if msites is None or not msites.past_range:
+            continue
+        for j, rec in msites.past_range:
+            key = (rec.ion, rec.order)
+            if key not in rows or rec.stol > rows[key].stol:
+                rows[key] = rec
+            for k in range(msites.n_dofs(j)):
+                path = f"phases.{ip}.atoms.{j}.moment.dof{k}"
+                if path not in where:
+                    where.append(path)
+    if not rows:
+        return []
+    recs = sorted(rows.values(), key=lambda r: (r.ion, r.order))
+    named = "; ".join(
+        f"{r.ion} ⟨j{r.order}⟩ to s = {r.stol:.3g} Å⁻¹ (Brown's fit ends at "
+        f"{r.s_max:g})" for r in recs)
+    return [Diagnostic(
+        level="info", code="MAGNETIC_FORM_FACTOR_COMPUTED_TAIL",
+        where=where, value=max(r.stol for r in recs),
+        message=(f"past the range Brown fitted these magnetic form factors "
+                 f"over, their values at the highest angles come from "
+                 f"computed free-ion curves (computed for rietx, not "
+                 f"peer-reviewed): {named}. A crystal's form factor departs "
+                 f"from a free ion's out there (covalency, the aspherical "
+                 f"⟨j4⟩ term)."),
+        suggestion=("Nothing to do: past Brown's ranges a magnetic form "
+                    "factor is already below 1 % of its low-angle value in "
+                    "f², so these reflections carry little magnetic "
+                    "intensity."))]
+
+
+def _bare_magnetic_ion_diagnostics(structure: Structure) -> list[Diagnostic]:
+    """``MAGNETIC_ION_ASSUMED``: a moment whose ion is a bare element label
+    (``Moment(ion="Fe")``), which the form-factor table reads as the
+    element's most common ICSD oxidation state (the #1806 ruling,
+    :func:`~.crystallography.magnetic.form_factor.read_bare_label`).  A
+    warning, one row per site: the moment depends on the pick.  A label the
+    census cannot read was refused when the phase was built, so every bare
+    label here has a reading.  The CIF reader and ``solve_magnetic`` state the
+    ion they read on the site and report it themselves, so they never reach
+    this.
+    """
+    from .crystallography.magnetic.form_factor import is_bare, read_bare_label
+
+    out: list[Diagnostic] = []
+    for ip, phase in enumerate(structure.phases):
+        for j, atom in enumerate(phase.atoms):
+            if atom.moment is None or not is_bare(atom.moment.ion):
+                continue
+            reading = read_bare_label(atom.moment.ion)
+            out.append(Diagnostic(
+                level="warning", code="MAGNETIC_ION_ASSUMED",
+                where=[f"phases.{ip}.atoms.{j}.moment.ion"],
+                message=(f"site {atom.label!r} states its moment's ion as the "
+                         f"bare {atom.moment.ion!r}, so its form factor is "
+                         f"{reading.text()}. The moment depends on that "
+                         f"pick."),
+                suggestion=(f"State the ion before quoting the moment: "
+                            f"Atom.moment.ion = '{reading.ion}', another "
+                            f"charge, or '{atom.moment.ion}0' for the "
+                            f"neutral atom.")))
+    return out
+
+
+def _charge_not_stated_diagnostics(structure: Structure,
+                                   instrument: Instrument) -> list[Diagnostic]:
+    """``MAGNETIC_SITE_CHARGE_NOT_STATED``: on an X-ray histogram, a site that
+    carries a moment and whose species is a bare element.  Its X-ray
+    scattering factor is the neutral atom's, as every program and the
+    International Tables read a bare label, while its magnetic form factor
+    (on a neutron histogram) is read as the most common ICSD ion (the
+    #1806 ruling).  An ``info`` record: the X-ray reading is the standard one and
+    nothing is owed.  Read narrowly (moment sites only), since a row on every
+    bare species would fire on nearly every X-ray fit (WP-2037, "Attention
+    is a cost", clause 1).
+    """
+    from .crystallography.magnetic.form_factor import is_bare
+
+    if instrument.source.kind != "xray_cw":
+        return []
+    where: list[str] = []
+    named: list[str] = []
+    for ip, phase in enumerate(structure.phases):
+        for j, atom in enumerate(phase.atoms):
+            if atom.moment is None or not is_bare(atom.species):
+                continue
+            where.append(f"phases.{ip}.atoms.{j}.species")
+            named.append(f"{atom.label!r} ({atom.species})")
+    if not where:
+        return []
+    return [Diagnostic(
+        level="info", code="MAGNETIC_SITE_CHARGE_NOT_STATED", where=where,
+        message=(f"the moment-bearing site(s) {', '.join(named)} state no "
+                 f"charge in their species, so their X-ray scattering factor "
+                 f"is the neutral atom's; their magnetic form factor reads "
+                 f"the moment's ion."),
+        suggestion=("Nothing to do for the X-ray model; write the species "
+                    "with its charge (Atom.species = 'Fe3+') if the ion's "
+                    "scattering factor is wanted."))]
 
 
 def _dispersion_diagnostics(structure: Structure,

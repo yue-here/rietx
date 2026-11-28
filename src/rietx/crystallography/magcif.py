@@ -1960,20 +1960,14 @@ def magnetic_diagnostics(path: str, moments, magnetic, atoms_by_label,
 
     Each a fact a caller would otherwise have to reconstruct from the file:
 
-    * ``CIF_MAGNETIC_ION_UNCHARGED`` — the form-factor ion was taken from
-      ``_atom_site_type_symbol`` and that symbol states no oxidation state.
-      MAGNDATA writes a bare ``Mn`` for a site that is chemically Mn³⁺, and
-      ⟨j₀⟩ for the two differs, so the substitution is *reported* rather than
-      guessed at in silence — the same rule ``CIF_SPECIES_NORMALISED`` follows
-      one column over.
-    * ``MAGNETIC_ION_ASSUMED`` — the site's bare element has **no** neutral-atom
-      row at all (every lanthanide/actinide this table carries: only ionic
-      ⟨jₙ⟩ curves exist for them), so the fallback went one step further, to
-      the element's majority oxidation state that is *magnetic*
-      (:func:`~.magnetic.form_factor.resolve_assumed_ion`, WP-1327 D1). Fires
-      instead of ``CIF_MAGNETIC_ION_UNCHARGED`` for these labels, since this is
-      a stronger substitution than the neutral-atom one — ``label`` is in
-      ``assumed_ions`` exactly when :func:`.cif.structure_from_cif` used it.
+    * ``MAGNETIC_ION_ASSUMED`` (a warning) — the form-factor ion was taken
+      from ``_atom_site_type_symbol`` and that symbol states no oxidation
+      state (MAGNDATA writes a bare ``Mn`` for a site that is chemically
+      Mn³⁺), so it was read as the element's most common ICSD oxidation state
+      (:func:`~.magnetic.form_factor.read_bare_label`, the #1806 ruling). The
+      moment depends on the pick, and the message names the alternatives —
+      ``label`` is in ``assumed_ions`` exactly when
+      :func:`.cif.structure_from_cif` made it.
     * ``LANDE_G_ASSUMED`` — the site's ion was itself just assumed
       (``MAGNETIC_ION_ASSUMED`` fired on the same label) and that ion needs an
       explicit Landé g (:func:`~.magnetic.form_factor.needs_explicit_g`), which
@@ -2012,14 +2006,14 @@ def magnetic_diagnostics(path: str, moments, magnetic, atoms_by_label,
             assumed_ion, reason = assumed_ions[label]
             element = re.match(r"[A-Za-z]{1,2}", assumed_ion).group(0)
             out.append(Diagnostic(
-                level="info", code="MAGNETIC_ION_ASSUMED",
+                level="warning", code="MAGNETIC_ION_ASSUMED",
                 where=[f"phases.0.atoms.{index}.moment.ion"],
                 message=(f"{path} states no oxidation state for the magnetic "
-                         f"site {label!r}, and this table has no neutral-atom "
-                         f"⟨j0⟩ for {element!r}. Its form factor defaulted to "
-                         f"{assumed_ion!r} ({reason})."),
-                suggestion=(f"Pass moment_ions={{{label!r}: '<ion>'}} to "
-                            f"Structure.from_cif to state the ion.")))
+                         f"site {label!r} ({element!r}), so its form factor "
+                         f"is {reason}. The moment depends on that pick."),
+                suggestion=(f"State the ion before quoting the moment: pass "
+                            f"moment_ions={{{label!r}: '<ion>'}} to "
+                            f"Structure.from_cif.")))
             if label in assumed_g:
                 g_value = assumed_g[label]
                 out.append(Diagnostic(
@@ -2032,22 +2026,6 @@ def magnetic_diagnostics(path: str, moments, magnetic, atoms_by_label,
                              f"g_J = {g_value:g} was used."),
                     suggestion=(f"Pass moment_g={{{label!r}: {g_value:g}}} to "
                                 f"Structure.from_cif to state g.")))
-        elif re.fullmatch(r"[A-Za-z]{1,2}", moment.ion):
-            from .magnetic.form_factor import magnetic_ions
-
-            near = [i for i in magnetic_ions()
-                    if i.startswith(moment.ion) and i != moment.ion]
-            out.append(Diagnostic(
-                level="info", code="CIF_MAGNETIC_ION_UNCHARGED",
-                where=[f"phases.0.atoms.{index}.moment.ion"],
-                message=(f"{path} states no oxidation state for the magnetic "
-                         f"site {label!r}, so its form factor is the neutral "
-                         f"atom {moment.ion!r}."),
-                suggestion=(f"Pass moment_ions={{{label!r}: '<ion>'}} to "
-                            f"state the ion. This table carries "
-                            f"{', '.join(near)} for {moment.ion}."
-                            if near else
-                            "Pass moment_ions= to state the ion.")))
         if row.get("magnitude_su") is not None:
             out.append(Diagnostic(
                 level="info", code="CIF_MAGNETIC_MAGNITUDE_ESD_NOT_STORED",

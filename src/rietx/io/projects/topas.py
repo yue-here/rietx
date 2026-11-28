@@ -4076,11 +4076,11 @@ def _magnetic_build_diagnostics(model: TopasModel, phases_in, specs,
       reading is the TOPAS Technical Reference's own formula, and it is
       **measured** against TOPAS's own calculated intensities, so the
       diagnostic says both.
-    * ``TOPAS_MOMENT_ION_UNCHARGED`` — the magnetic form factor is keyed by
-      oxidation state and the site's own species is what supplies it. TOPAS
-      files usually write ``occ Cr+3``, which normalises to ``Cr3+`` and
-      resolves; a site written ``occ Cr`` gets the *neutral* atom's ⟨j₀⟩, which
-      is a different curve, so the substitution is reported.
+
+    A site written ``occ Cr`` (no charge) keeps that species as its moment's
+    ion; the form-factor table reads a bare label as the element's most common
+    ICSD oxidation state, and the fit reports that as ``MAGNETIC_ION_ASSUMED``
+    (the #1806 ruling), so the reader adds no code of its own.
     """
     out: list[Diagnostic] = []
     path = model.path or "<model>"
@@ -4139,18 +4139,6 @@ def _magnetic_build_diagnostics(model: TopasModel, phases_in, specs,
                          + ". It is read as held at that value."),
                 suggestion="Set Atom.moment.g on the built structure to try "
                            "another value."))
-        bare =[s for s in moment_sites if re.fullmatch(r"[A-Za-z]{1,2}",
-                                                        s.species)]
-        if bare:
-            out.append(Diagnostic(
-                level="info", code="TOPAS_MOMENT_ION_UNCHARGED",
-                where=[f"phases.{ip}.atoms.{j}.moment.ion"
-                       for j, s in enumerate(ph.sites) if s in bare],
-                message=(f"{path}: phase {ph.name!r}: "
-                         f"{', '.join(repr(s.label) for s in bare)} state a "
-                         f"moment and an uncharged species."),
-                suggestion="Write the site's occ with its charge (occ Cr+3) "
-                           "so the ion resolves."))
     return out
 
 

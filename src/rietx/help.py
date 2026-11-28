@@ -2050,16 +2050,6 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "symmetry. Add the centring loop if the group has one."
         ),
     ),
-    "CIF_MAGNETIC_ION_UNCHARGED": HelpEntry(
-        title="Magnetic ion has no charge stated",
-        description=(
-            "A magnetic CIF has no item for the magnetic ion, and the type symbol of "
-            "this site gives no oxidation state. The form factor therefore comes from "
-            "the neutral atom. Neutral and ionic form factors differ, so a moment "
-            "refined under the wrong one absorbs the difference into its size. State the "
-            "ion for the site to use the one your chemistry implies."
-        ),
-    ),
     "CIF_MAGNETIC_MAGNITUDE_ESD_NOT_STORED": HelpEntry(
         title="Moment uncertainty not carried",
         description=(
@@ -3490,14 +3480,46 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "not choose between them."
         ),
     ),
+    "MAGNETIC_FORM_FACTOR_COMPUTED_TAIL": HelpEntry(
+        title="Magnetic form factor on its computed tail",
+        description=(
+            "Each of Brown's magnetic form-factor rows is a fit over a stated "
+            "range of s = sinθ/λ: 0–1.5 Å⁻¹ for his 3d, 4d and actinide rows, "
+            "0–1.2 Å⁻¹ for his rare-earth rows. Past it a row is blended over "
+            "0.2 Å⁻¹ onto a free-ion curve computed for rietx on the row's own "
+            "footing (labelled computed, not peer-reviewed), which runs to "
+            "s = 6 Å⁻¹. The fit's reflection list reaches past the range for "
+            "the rows named. Out there a crystal's form factor departs from "
+            "any free ion's: covalency expands the density, and the aspherical "
+            "⟨j4⟩ term the dipole approximation drops can exceed ⟨j0⟩. "
+            "Little rests on it: past Brown's ranges f² is 6 × 10⁻⁵ (Mn²⁺) "
+            "to 7 × 10⁻³ (Nd³⁺) of its low-angle value, so this is a record "
+            "and nothing is owed."
+        ),
+    ),
     "MAGNETIC_ION_ASSUMED": HelpEntry(
         title="Magnetic ion chosen by the package",
         description=(
-            "The file states no ion for a site whose element has no neutral-atom "
-            "magnetic form factor in the tables. The package took the most common "
-            "magnetic oxidation state of that element. The form factor depends on the "
-            "ion, so a moment refined under the wrong one absorbs the difference into "
-            "its size. State the ion for the site to override the default."
+            "A moment's ion is a bare element label ('Fe'), which states no charge. "
+            "The package reads it as the element's most common oxidation state in one "
+            "census of the ICSD (Ding, Kumagai, Oba & Burton 2020, SI Table 1): Fe3+ "
+            "for Fe, Mn2+ for Mn, Dy3+ for Dy. The pick is often wrong, and the form "
+            "factor depends on the ion, so a moment refined under the wrong one absorbs "
+            "the difference into its size. The message names the pick, its share of the "
+            "element's ICSD reports and the alternatives. State the ion ('Fe2+'), or "
+            "'Fe0' for the neutral atom. Where the common ion carries no moment (Ti4+, "
+            "Nb5+, Eu3+, U6+) a bare label on a moment is refused instead."
+        ),
+    ),
+    "MAGNETIC_SITE_CHARGE_NOT_STATED": HelpEntry(
+        title="X-ray scattering factor of a moment site with no charge",
+        description=(
+            "A site that carries a moment has a bare element species ('Fe'). On an "
+            "X-ray pattern its scattering factor is the neutral atom's, the reading "
+            "of a bare symbol in the International Tables and every Rietveld program, "
+            "while its magnetic form factor reads the moment's ion. This is a record: "
+            "write the species with its charge ('Fe3+') if the ion's X-ray scattering "
+            "factor is wanted."
         ),
     ),
     "MAGNETIC_SUBGROUP_PREFERRED": HelpEntry(
@@ -4992,16 +5014,6 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "file's refinement. The factor sets the weight of the orbital part of the "
             "magnetic form factor. Set another value on the structure to test it, and "
             "remember that g did not move when you compare fits."
-        ),
-    ),
-    "TOPAS_MOMENT_ION_UNCHARGED": HelpEntry(
-        title="A magnetic site has no oxidation state",
-        description=(
-            "The magnetic form factor depends on the oxidation state of the ion. A site "
-            "with a moment and an uncharged species gets the form factor of the neutral "
-            "atom. That is a different curve. The magnetic intensities then differ from "
-            "those of the ion. Write the site with its charge in the TOPAS file so the "
-            "ion resolves."
         ),
     ),
     "TOPAS_ORIGIN_TRANSLATED": HelpEntry(

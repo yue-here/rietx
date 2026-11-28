@@ -2235,38 +2235,35 @@ def test_other_magnetic_spellings_beside_the_dictionary_items_still_read(
 # 5. what the reader says it did
 # ===========================================================================
 
-def test_an_uncharged_type_symbol_is_reported_not_guessed(tmp_path):
+def test_an_uncharged_type_symbol_is_read_as_the_census_ion_and_warned(tmp_path):
     """MAGNDATA writes a bare ``Mn`` for a site that is chemically Mn3+, and
-    <j0> for the two is a different curve. So the neutral atom is used, the
-    substitution is reported, and the diagnostic names the ions of that element
-    the table does carry."""
+    <j0> for the two is a different curve.  A bare label is read as the
+    element's most common ICSD oxidation state (the #1806 ruling), Mn2+ here, which
+    is wrong for LaMnO3: so the read warns, naming the pick, its share and the
+    alternatives, and stating the ion silences it."""
     diagnostics: list = []
-    structure_from_cif(str(_fixture(tmp_path, "LaMnO3")),
-                       diagnostics=diagnostics)
-    (hit,) = [d for d in diagnostics
-              if d.code == "CIF_MAGNETIC_ION_UNCHARGED"]
+    structure = structure_from_cif(str(_fixture(tmp_path, "LaMnO3")),
+                                   diagnostics=diagnostics)
+    assert structure.phases[0].atoms[1].moment.ion == "Mn2+"
+    (hit,) = [d for d in diagnostics if d.code == "MAGNETIC_ION_ASSUMED"]
+    assert hit.level == "warning"
     assert "Mn1" in hit.message and "'Mn'" in hit.message
-    assert "Mn3+" in hit.suggestion
+    assert "Mn2+, the most common Mn oxidation state in the ICSD" in hit.message
+    assert "Mn3+ 22%" in hit.message
+    assert "moment_ions" in hit.suggestion
     assert hit.where == ["phases.0.atoms.1.moment.ion"]
     # ...and stating it silences the diagnostic
     quiet: list = []
-    structure_from_cif(str(_fixture(tmp_path, "LaMnO3")),
-                       moment_ions={"Mn1": "Mn3+"}, diagnostics=quiet)
-    assert not [d for d in quiet if d.code == "CIF_MAGNETIC_ION_UNCHARGED"]
+    stated = structure_from_cif(str(_fixture(tmp_path, "LaMnO3")),
+                                moment_ions={"Mn1": "Mn3+"}, diagnostics=quiet)
+    assert stated.phases[0].atoms[1].moment.ion == "Mn3+"
+    assert not [d for d in quiet if d.code == "MAGNETIC_ION_ASSUMED"]
 
 
 def test_a_bare_lanthanide_with_no_neutral_row_defaults_to_its_majority_ion(
         tmp_path):
-    """WP-1327 D1 / issue-magnetic-form-factor option (b).
-
-    A bare ``Mn`` degrades to the *neutral atom's* form factor
-    (``CIF_MAGNETIC_ION_UNCHARGED``, tested above) because this table carries
-    a neutral ``Mn`` row. No lanthanide or actinide has one — Brown's table
-    (ITC Vol C) carries only ionic curves for them — so a bare ``Dy`` refused
-    outright before this fix. It now defaults one step further, to the
-    majority oxidation state that is magnetic, and reports
-    ``MAGNETIC_ION_ASSUMED`` rather than ``CIF_MAGNETIC_ION_UNCHARGED``, since
-    this is a stronger substitution than the neutral-atom one.
+    """WP-1327 D1; the #1806 ruling (2026-11-24).  A bare ``Dy`` is read as Dy3+, the census's
+    Dy ion, and reported as ``MAGNETIC_ION_ASSUMED``, as a bare ``Mn`` is.
 
     LaMnO3's own real, cited geometry and operator list are reused verbatim
     (only the magnetic site's type symbol and label are swapped to a bare
@@ -2292,11 +2289,9 @@ def test_a_bare_lanthanide_with_no_neutral_row_defaults_to_its_majority_ion(
     assert atom.moment.ion == "Dy3+"
     (hit,) = [d for d in diagnostics if d.code == "MAGNETIC_ION_ASSUMED"]
     assert "Dy1" in hit.message and "'Dy'" in hit.message and "Dy3+" in hit.message
-    assert hit.level == "info"
+    assert hit.level == "warning"
     assert hit.where == ["phases.0.atoms.1.moment.ion"]
     assert "Dy1" in hit.suggestion and "moment_ions" in hit.suggestion
-    # never both: the stronger diagnostic fires, not the neutral-atom one too
-    assert not [d for d in diagnostics if d.code == "CIF_MAGNETIC_ION_UNCHARGED"]
 
     # ...and stating the ion explicitly beats the default, exactly as it beats
     # the neutral-atom fallback above
@@ -2307,18 +2302,24 @@ def test_a_bare_lanthanide_with_no_neutral_row_defaults_to_its_majority_ion(
     assert not [d for d in quiet if d.code == "MAGNETIC_ION_ASSUMED"]
 
 
-def test_the_lanthanide_default_does_not_change_a_fixture_that_already_resolves(
-        tmp_path):
-    """Bit-identity: LaMnO3's own Mn site keeps resolving through the
-    neutral-atom fallback, unchanged, because this table already carries a
-    neutral ``Mn`` row — the new default only fires where today's code
-    refuses outright."""
-    diagnostics: list = []
-    structure = structure_from_cif(str(_fixture(tmp_path, "LaMnO3")),
-                                   diagnostics=diagnostics)
-    assert structure.phases[0].atoms[1].moment.ion == "Mn"
-    assert not [d for d in diagnostics if d.code == "MAGNETIC_ION_ASSUMED"]
-    assert [d for d in diagnostics if d.code == "CIF_MAGNETIC_ION_UNCHARGED"]
+def test_a_bare_d0_label_on_a_moment_is_refused_naming_the_ions(tmp_path):
+    """The #1806 ruling (2026-11-24): a bare ``Ti`` reads as Ti4+, the census's Ti ion,
+    which is 3d0 and carries no moment, so a moment on it is refused at read,
+    naming the ions to state and the neutral curve ``Ti0``."""
+    sites = ("La1 La 0.54900 0.25000 0.01000 1",
+             "Ti1 Ti 0.00000 0.00000 0.00000 1",
+             "O1 O 0.98600 0.25000 0.93000 1",
+             "O2 O 0.30900 0.03900 0.22400 1")
+    moment_loop = _moment_loop([("Ti1", "3.7(1)", "0.0(5)", "0.00000",
+                                 "mx,my,mz")])
+    path = _fixture(tmp_path, "LaMnO3", sites=sites, moment_loop=moment_loop)
+    with pytest.raises(magcif.MagCifError) as err:
+        structure_from_cif(str(path))
+    text = str(err.value)
+    for part in ("'Ti1'", "Ti4+", "3d0", "Ti3+", "'Ti0'", "moment_ions"):
+        assert part in text, (part, text)
+    stated = structure_from_cif(str(path), moment_ions={"Ti1": "Ti3+"})
+    assert stated.phases[0].atoms[1].moment.ion == "Ti3+"
 
 
 def test_an_element_with_no_declared_default_still_refuses_exactly_as_before(
@@ -2335,7 +2336,7 @@ def test_an_element_with_no_declared_default_still_refuses_exactly_as_before(
     moment_loop = _moment_loop([("Re1", "3.7(1)", "0.0(5)", "0.00000",
                                  "mx,my,mz")])
     path = _fixture(tmp_path, "LaMnO3", sites=sites, moment_loop=moment_loop)
-    with pytest.raises(ValidationError,
+    with pytest.raises(magcif.MagCifError,
                        match=r"no magnetic form factor for 'Re'"):
         structure_from_cif(str(path))
 
@@ -2459,7 +2460,7 @@ def test_the_lande_g_default_does_not_change_a_fixture_that_already_resolves(
         tmp_path):
     """Bit-identity: LaMnO3's own Mn3+ site needs no g at all (Mn is a 3d
     ion, spin-only g = 2, ``needs_explicit_g`` is False for it), so this
-    fix — which only ever fires for an ion :func:`resolve_assumed_ion`
+    fix — which only ever fires for an ion :func:`read_bare_label`
     itself produced — never touches it. Same fixture and assertion shape as
     ``test_the_lanthanide_default_does_not_change_a_fixture_that_already_resolves``
     one rank up, for the g field specifically."""
@@ -2653,7 +2654,6 @@ def test_a_topas_magnetic_phase_reads_with_the_moments_in_place(tmp_path):
     assert out.atoms[0].moment.vary is True
     codes = [d.code for d in built]
     assert "TOPAS_MOMENT_CONVENTION" in codes
-    assert "TOPAS_MOMENT_ION_UNCHARGED" not in codes    # the file wrote Cr+3
     assert "TOPAS_MOMENT_G_HELD" not in codes           # the file states no mg
 
 

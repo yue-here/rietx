@@ -87,6 +87,7 @@ from .representation.irreps import (
     star,
 )
 from .symmetry import (
+    D_RANGE_SLACK,
     MAX_HKL_GRID_POINTS,
     OperatorGroup,
     ReflectionSet,
@@ -307,11 +308,11 @@ def lattice_two_theta(space_group,
     hkl = hkl[~np.all(hkl == 0, axis=1)]
     hkl = hkl[reciprocal_lattice_mask(sg, hkl)]
     d = d_spacings(hkl, *cell)
-    keep = d >= d_min * 0.999
+    keep = d >= d_min * (1.0 - D_RANGE_SLACK)
     if two_theta_min > 0.0:
         d_max = wavelength / (2.0 * np.sin(
             np.radians(max(two_theta_min, 1e-3) / 2.0)))
-        keep &= d <= d_max * 1.001
+        keep &= d <= d_max * (1.0 + D_RANGE_SLACK)
     d = d[keep]
     if len(d) == 0:
         return np.zeros(0)
@@ -393,10 +394,10 @@ def _satellite_orbits(sg, cell, parents: np.ndarray, kk: KVector,
     # (check_propagation_vector) — so no row needs dropping the way the
     # nuclear enumeration drops the origin.
     d = d_spacings(q_rows.astype(np.float64) / q, *cell)
-    in_range = d >= d_min * 0.999
+    in_range = d >= d_min * (1.0 - D_RANGE_SLACK)
     if two_theta_min > 0.0:
         d_max = wavelength / (2.0 * np.sin(np.radians(max(two_theta_min, 1e-3) / 2.0)))
-        in_range &= d <= d_max * 1.001
+        in_range &= d <= d_max * (1.0 + D_RANGE_SLACK)
     q_rows, d = q_rows[in_range], d[in_range]
     if len(q_rows) == 0:
         return None

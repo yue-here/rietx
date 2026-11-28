@@ -97,7 +97,7 @@ from ..crystallography.satellites import (
     satellite_d_spacings,
     zone_boundary_candidates,
 )
-from ..crystallography.symmetry import resolve_group
+from ..crystallography.symmetry import D_RANGE_SLACK, resolve_group
 from .schemas import VALIDITY_RADIUS_FWHM, SatelliteCandidate, SatelliteEvidence
 
 #: Fallback peak FWHM in degrees 2θ when the phase put no modelled peak in
@@ -378,7 +378,7 @@ def _centring_forbidden_positions(model, values, ip: int, sg
     hkl = np.column_stack([g.ravel() for g in grids]).astype(np.int64)
     hkl = hkl[~reciprocal_lattice_mask(sg, hkl)]
     d = d_spacings(hkl, *cell)
-    keep = (d >= d_min * 0.999) & (d <= d_max * 1.001)
+    keep = (d >= d_min * (1.0 - D_RANGE_SLACK)) & (d <= d_max * (1.0 + D_RANGE_SLACK))
     hkl, d = hkl[keep], d[keep]
     tts: list[np.ndarray] = []
     rows: list[np.ndarray] = []

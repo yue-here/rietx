@@ -1061,6 +1061,55 @@ def _unsupported_silent() -> list:
                 path="phases.0.gauss_size", value=0.0, stderr=1.0, vary=True)]))
 
 
+def _form_factor_range(lam: float) -> list:
+    """``_form_factor_range_diagnostics`` of a FeF₂ (Fe²⁺) model compiled at λ
+    over 2θ 10-140°; the reflection list reaches s = sin 70°/λ."""
+    import numpy as np
+
+    import rietx as rx
+    from rietx.model.forward import compile_model
+    from rietx.refine import _form_factor_range_diagnostics
+    from tests.test_magnetic_form_factor_range import FEF2_CELL, _grid, _rutile
+
+    tt = _grid()
+    blank = rx.PatternData(two_theta=tt.tolist(), intensity=np.ones_like(tt).tolist())
+    model = compile_model(rx.Structure(phases=[_rutile("Fe", "Fe2+", FEF2_CELL)]),
+                          rx.Instrument.constant_wavelength_neutron(lam), blank,
+                          mode="rietveld")
+    return _form_factor_range_diagnostics(model)
+
+
+def _ff_range_fires() -> list:
+    """λ = 0.55 Å reaches s = 1.71 Å⁻¹, past Fe²⁺ ⟨j0⟩'s 1.5."""
+    return _form_factor_range(0.55)
+
+
+def _ff_range_silent() -> list:
+    """λ = 0.7 Å stops at s = 1.34 Å⁻¹, inside the range, and λ = 2.4 Å far
+    inside it."""
+    return _form_factor_range(0.7) + _form_factor_range(2.4)
+
+
+def _bare_ion(ion: str) -> list:
+    """``MAGNETIC_ION_ASSUMED`` from ``refine._bare_magnetic_ion_diagnostics``
+    on FeF₂ of ``tests/test_magnetic_bare_label.py``, its moment's ion ``ion``."""
+    import rietx as rx
+    from rietx.refine import _bare_magnetic_ion_diagnostics
+    from tests.test_magnetic_form_factor_range import FEF2_CELL, _rutile
+
+    return _bare_magnetic_ion_diagnostics(rx.Structure(phases=[_rutile("Fe", ion, FEF2_CELL)]))
+
+
+def _bare_ion_fires() -> list:
+    """A bare ``Fe``: read as the census's Fe³⁺, and warned."""
+    return _bare_ion("Fe")
+
+
+def _bare_ion_silent() -> list:
+    """The ion stated, and the neutral atom stated as ``Fe0``."""
+    return _bare_ion("Fe2+") + _bare_ion("Fe0")
+
+
 # ------------------------------------------------------------ the restraint compile
 
 
@@ -1289,6 +1338,10 @@ SILENCE: dict[str, Pair] = {
     "LEBAIL_CYCLES_AT_CAP": Pair(
         functools.partial(_lebail_cap, False), _lebail_settled_or_unasked,
         "tests/test_lebail_cycles.py"),
+    "MAGNETIC_FORM_FACTOR_COMPUTED_TAIL": Pair(
+        _ff_range_fires, _ff_range_silent, "tests/test_magnetic_form_factor_range.py"),
+    "MAGNETIC_ION_ASSUMED": Pair(
+        _bare_ion_fires, _bare_ion_silent, "tests/test_magnetic_bare_label.py"),
     "MOMENT_UNSUPPORTED": Pair(
         _unsupported_fires, _unsupported_silent, "tests/test_modulus_interval.py"),
     "PARAMETRIC_OUT_OF_RANGE": Pair(

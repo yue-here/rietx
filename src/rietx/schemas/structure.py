@@ -1834,10 +1834,11 @@ class Phase(_InheritsDeclaredDefaults):
                     f"the origin and the parameter cannot move — seed a "
                     f"physical estimate (1-5 μ_B for a 3d ion) instead")
             try:
-                # existence only; j0 searches both stored forms, coefficients
-                # only Brown's (Pr3+ is Lisher & Forsyth's)
+                # existence only; j0 searches both stored forms.  A bare
+                # label is read as its census ion here too, and one whose
+                # census ion has no moment or no row is refused (#1806 ruling)
                 j0(atom.moment.ion, 0.0)
-            except KeyError as exc:
+            except (KeyError, ValueError) as exc:
                 # pydantic wraps a ValueError into its own report and lets a
                 # KeyError through raw, which would reach a caller as an
                 # unhandled exception with no path in it

@@ -29,8 +29,8 @@ of its own, below. GSAS and GSAS-II have a file of their own, §7h,
 kinds between them and the writers that put three of them back, under the same
 criterion.
 
-The TOPAS `.inp` reader's magnetic rows (`TOPAS_MAGNETIC_GROUP_READ`, `TOPAS_MOMENT_CONVENTION`,
-`TOPAS_MOMENT_ION_UNCHARGED`) and the FullProf `.pcr` reader's
+The TOPAS `.inp` reader's magnetic rows (`TOPAS_MAGNETIC_GROUP_READ`,
+`TOPAS_MOMENT_CONVENTION`) and the FullProf `.pcr` reader's
 `FULLPROF_MAGNETIC_PHASE_OMITTED` are in §7j,
 [`references/magnetic.md`](magnetic.md), beside the rest of the magnetic
 family. They fire at import and never reach `result.diagnostics`.

@@ -35,19 +35,18 @@ from pydantic import ValidationError
 from rietx.crystallography.magnetic.form_factor import (
     J0_ONLY,
     approximation_name,
-    assumed_ion_for_element,
     assumed_lande_g,
+    carries_moment,
     coefficients,
     has_ion,
     has_j2,
     j0,
     j2,
     lande_g,
-    lisher_coefficients,
     magnetic_form_factor,
     magnetic_ions,
     needs_explicit_g,
-    resolve_assumed_ion,
+    read_bare_label,
     resolve_g,
 )
 from rietx.crystallography.magnetic.operators import (
@@ -115,11 +114,13 @@ def test_j0_is_one_at_the_origin_for_every_ion():
     normalised one, so the sum is 1 to about ±0.003 and not to roundoff — the
     tolerance below is the *fit's*, measured over all 96 rows (worst: Cr¹⁺ at
     0.0023).  It is still the check that catches a mistranscribed leading
-    digit, which is the failure mode a transcription actually has.
+    digit, which is the failure mode a transcription actually has.  Since
+    #1691 the table serves 89 Brown rows and 17 computed tables, whose
+    ⟨j₀⟩(0) is 1 to the data file's 5e-8 rounding.
     """
     worst = max((abs(float(j0(ion, 0.0)) - 1.0), ion) for ion in magnetic_ions())
     assert worst[0] < 3e-3, worst
-    assert len(magnetic_ions()) == 96
+    assert len(magnetic_ions()) == 106
 
 
 def test_j2_carries_its_s_squared_factor():
@@ -219,55 +220,35 @@ def test_five_rows_match_both_renderings_of_browns_table(ion, j0_published, j2_p
     assert got_j2 == pytest.approx(j2_published, abs=0.0, rel=0.0)
 
 
-def test_pr3_is_lisher_and_forsyth_in_both_orders():
-    """Pr³⁺, Lisher & Forsyth (1971) *Acta Cryst.* A27, Table 1 p. 545 (⟨j₀⟩)
-    and Table 2 p. 546 (⟨j₂⟩), A a B b C as printed (#626).
+def test_pr3_is_a_computed_dirac_fock_table():
+    """Pr³⁺ is served from the computed Dirac-Fock table (ruled on 2026-11-23,
+    https://github.com/yue-here/rietx/issues/1691#issuecomment-7098289449),
+    the footing of the other rare-earth rows; Lisher & Forsyth's
+    non-relativistic 5-parameter row, held here from #626 until then, retired.
 
-    ITC Vol. C carries no Pr row; the ⟨j₀⟩ held here until 2026-10-01 was the
-    Pr³⁺ row of Brown's data file, the same curve to 0.05 %. Lisher & Forsyth
-    supply the matching ⟨j₂⟩, so a Pr³⁺ moment with g ≠ 2 now refines, and
-    every ion the table carries has both orders. The report names the source,
-    because its non-relativistic footing differs from the other 4f rows.
-    """
-    assert lisher_coefficients("Pr3+") == (
-        (0.2277, 16.11, 0.7923, 5.277, -0.0204),
-        (1.8655, 8.1948, 1.0779, 2.6641, 0.01199))
+    ITC Vol. C carries no Pr row. The table has both orders, so a Pr³⁺ moment
+    with g ≠ 2 refines, and the report names the code and footing.  Its ⟨r²⟩,
+    read off the ⟨j₀⟩ slope, sits between Ce³⁺ and Nd³⁺ as the lanthanide
+    contraction puts it; Lisher's row put it below Nd³⁺ (1.065 a.u.)."""
+    import rietx.crystallography.magnetic.form_factor as ff
     assert all(has_j2(i) for i in magnetic_ions())
-    with pytest.raises(KeyError, match="Lisher & Forsyth"):
+    with pytest.raises(KeyError, match="computed table"):
         coefficients("Pr3+")
-    with pytest.raises(KeyError, match=r"'Fe3\+' is stored in Brown's .* 7-parameter form"):
-        lisher_coefficients("Fe3+")      # the mirror refusal: in the table, in the other form (#630 review)
-    # the 5-parameter form, evaluated as printed, s² factor on <j2>
-    s = 0.3
-    A, a, B, b, C = lisher_coefficients("Pr3+")[0]
-    assert float(j0("Pr3+", s)) == pytest.approx(
-        A * np.exp(-a * s * s) + B * np.exp(-b * s * s) + C, rel=1e-15)
-    A, a, B, b, C = lisher_coefficients("Pr3+")[1]
-    assert float(j2("Pr3+", s)) == pytest.approx(
-        s * s * (A * np.exp(-a * s * s) + B * np.exp(-b * s * s) + C), rel=1e-15)
-    assert abs(float(j0("Pr3+", 0.0)) - 1.0) < 1e-3
-    assert approximation_name("Pr3+", 0.8).endswith("(Lisher & Forsyth 1971)")
-    assert "Lisher" not in approximation_name("Nd3+", 8 / 11)
+    assert not hasattr(ff, "lisher_coefficients")
+    assert float(j0("Pr3+", 0.0)) == pytest.approx(1.0, abs=1e-7)
+    assert float(j2("Pr3+", 0.0)) == 0.0
+    assert "GRASP2018, Dirac-Fock" in approximation_name("Pr3+", 0.8)
+    assert "Lisher" not in approximation_name("Pr3+", 0.8)
     with pytest.raises(ValueError, match="4f/5f ion"):
         magnetic_form_factor("Pr3+", 0.3)
     assert float(magnetic_form_factor("Pr3+", 0.3, g=0.8)) == pytest.approx(
         float(j0("Pr3+", 0.3)) + (2 / 0.8 - 1) * float(j2("Pr3+", 0.3)), rel=1e-15)
-
-
-def test_pr3_sits_on_a_non_relativistic_footing_and_the_docstring_says_so():
-    """⟨r²⟩ from the ⟨j₀⟩ slope, 3(Aa + Bb)/8π² for the 5-parameter form: Pr³⁺
-    is 1.065 a.u., below Nd³⁺'s Dirac-Fock 1.114, where the lanthanide
-    contraction would put it above (≈ 1.2). That is the footing the module
-    docstring states, pinned here so the statement and the row cannot drift."""
-    import rietx.crystallography.magnetic.form_factor as ff
     bohr2 = 0.529177210903 ** 2
-    A, a, B, b, _ = lisher_coefficients("Pr3+")[0]
-    r2_pr = 3 * (A * a + B * b) / (8 * np.pi ** 2) / bohr2
-    A, a, B, b, C, c, _ = coefficients("Nd3+")[0]
-    r2_nd = 3 * (A * a + B * b + C * c) / (8 * np.pi ** 2) / bohr2
-    assert r2_pr == pytest.approx(1.065, abs=2e-3)
-    assert r2_pr < r2_nd
-    assert "non-relativistic" in ff.__doc__ and "10 %" in ff.__doc__
+    s = 0.01
+    r2 = {ion: 6 * (1 - float(j0(ion, s))) / (4 * np.pi * s) ** 2 / bohr2
+          for ion in ("Ce3+", "Pr3+", "Nd3+")}
+    assert r2["Ce3+"] > r2["Pr3+"] > r2["Nd3+"]
+    assert r2["Pr3+"] == pytest.approx(1.203, abs=0.01)
 
 
 def test_ce2_is_retired_with_a_reason_and_ce3_carries_browns_row():
@@ -292,7 +273,8 @@ def test_ce2_is_retired_with_a_reason_and_ce3_carries_browns_row():
 
 def test_the_forward_model_evaluates_the_table_through_j0_and_j2():
     """``scattering._form_factor`` goes through ``j0``/``j2``, the one evaluator,
-    so an ion in either stored form reaches |F_M|² with its own curve."""
+    so an ion from a computed table or a Brown row reaches |F_M|² with its own
+    curve."""
     from types import SimpleNamespace
 
     from rietx.crystallography.magnetic.scattering import _form_factor
@@ -332,7 +314,7 @@ def test_an_absent_ion_is_refused_by_name_never_mapped_to_a_neighbour():
     element the table does carry, which is the reply someone who typed
     ``Fe7+`` or ``Mn3`` needs.
     """
-    with pytest.raises(KeyError, match=r"Fe, Fe1\+, Fe2\+, Fe3\+, Fe4\+"):
+    with pytest.raises(KeyError, match=r"Fe0, Fe1\+, Fe2\+, Fe3\+, Fe4\+"):
         coefficients("Fe7+")
     with pytest.raises(KeyError, match="no Xx at all"):
         coefficients("Xx3+")
@@ -343,60 +325,78 @@ def test_an_absent_ion_is_refused_by_name_never_mapped_to_a_neighbour():
     assert abs(float(j0("Fe2+", 0.3)) - float(j0("Fe3+", 0.3))) > 0.02
 
 
-def test_a_bare_lanthanide_or_actinide_defaults_to_its_majority_magnetic_ion():
-    """WP-1327 D1 / issue-magnetic-form-factor option (b): a bare element
-    symbol this table cannot resolve *neutrally* (every lanthanide and
-    actinide it carries — only ionic ⟨jₙ⟩ curves exist for them) falls back
-    one step further, to the majority oxidation state that is *magnetic*.
+def test_a_bare_label_reads_as_its_most_common_icsd_ion():
+    """The #1806 ruling (2026-11-24): a bare element label states no charge, so it is
+    read as the element's most common oxidation state in one ICSD census (Ding,
+    Kumagai, Oba & Burton 2020, SI Table 1), never the neutral atom, which is
+    stated ``"Mn0"``.  The pick, its share and the moment-carrying alternatives
+    travel with it.
 
-    This is the table-level unit test; :mod:`tests.test_magcif`'s
-    ``test_a_bare_lanthanide_with_no_neutral_row_defaults_to_its_majority_ion``
-    is the same fallback exercised through a magCIF read and its diagnostic.
+    This is the table-level unit test; :mod:`tests.test_magcif` and
+    :mod:`tests.test_magnetic_bare_label` exercise it through a read and a fit.
     """
-    assert has_ion("Mn") and not has_ion("Dy") and has_ion("Ce3+")
+    assert has_ion("Mn0") and not has_ion("Mn") and not has_ion("Dy") and has_ion("Ce3+")
+    picks = {"Cr": "Cr3+", "Mn": "Mn2+", "Fe": "Fe3+", "Co": "Co2+", "Ni": "Ni2+",
+             "Cu": "Cu2+", "Ru": "Ru4+", "Ce": "Ce3+", "Pr": "Pr3+", "Nd": "Nd3+",
+             "Sm": "Sm3+", "Gd": "Gd3+", "Tb": "Tb3+", "Dy": "Dy3+", "Ho": "Ho3+",
+             "Er": "Er3+", "Tm": "Tm3+", "Yb": "Yb3+", "Np": "Np5+", "Pu": "Pu4+"}
+    for element, ion in picks.items():
+        reading = read_bare_label(element)
+        assert reading.ion == ion and has_ion(ion), element
+        assert ion not in dict(reading.alternatives)
+    fe = read_bare_label("Fe")
+    assert fe.share == pytest.approx(14439 / 25374)
+    assert fe.alternatives[0] == ("Fe2+", pytest.approx(10580 / 25374))
+    assert "ICSD census, Ding et al. 2020" in fe.text()
+    # the reading is the one every evaluator uses
+    assert float(j0("Fe", 0.3)) == float(j0("Fe3+", 0.3)) != float(j0("Fe0", 0.3))
 
-    # the plain Ln3+ rule
-    for element, ion in (("Ce", "Ce3+"), ("Pr", "Pr3+"), ("Nd", "Nd3+"), ("Sm", "Sm3+"),
-                         ("Gd", "Gd3+"), ("Tb", "Tb3+"), ("Dy", "Dy3+"),
-                         ("Ho", "Ho3+"), ("Er", "Er3+"), ("Tm", "Tm3+")):
-        got_ion, reason = resolve_assumed_ion(element)
-        assert got_ion == ion
-        assert has_ion(got_ion)
-
-    # the two elements whose *magnetic* majority ion is not the plain 3+ one
-    assert resolve_assumed_ion("Eu") == (
-        "Eu2+", "Eu3+ is 4f6 (J=0, non-magnetic); Eu2+ (4f7, S=7/2) is the "
-                "state reported for magnetically ordered Eu compounds "
-                "(EuO, EuS, EuTe and similar)")
-    assert resolve_assumed_ion("Yb")[0] == "Yb3+"
-
-    # the actinides this table's own <j0> rows carry a majority ion for
-    assert resolve_assumed_ion("U")[0] == "U4+"
-    assert resolve_assumed_ion("Np")[0] == "Np4+"
-    assert resolve_assumed_ion("Pu")[0] == "Pu3+"
-
-    # an element already resolving neutrally is untouched: no default is
-    # declared for the 3d/4d block this table carries a neutral row for
-    assert resolve_assumed_ion("Mn") is None
-    assert resolve_assumed_ion("Cr") is None
-
-    # an element with no table entry at all (neutral or ionic) has no
-    # sensible default either, and stays exactly as unresolved as before
-    assert resolve_assumed_ion("Re") is None
-    assert resolve_assumed_ion("Ga") is None
+    # an element the census or the table does not cover keeps its refusal
+    for element in ("Re", "Ga", "La"):
+        with pytest.raises(KeyError, match="no magnetic form factor"):
+            read_bare_label(element)
 
 
-def test_ce_declares_ce3_and_it_now_resolves():
-    """Ce is declared as Ce3+ (Ce4+ is 4f0, non-magnetic) for the same reason
-    every other lanthanide is. Until #626 the default did not resolve,
-    because Brown's Ce³⁺ row was keyed by its misprinted label "Ce2+"; it now
-    resolves, and never to Ce2+."""
-    declared_ion, reason = assumed_ion_for_element("Ce")
-    assert declared_ion == "Ce3+"
-    assert has_ion(declared_ion)
-    assert resolve_assumed_ion("Ce") == (declared_ion, reason)
+@pytest.mark.parametrize("element, ion, why", [
+    ("Sc", "Sc3+", "3d0"), ("Ti", "Ti4+", "3d0"), ("V", "V5+", "3d0"),
+    ("Y", "Y3+", "4d0"), ("Zr", "Zr4+", "4d0"), ("Nb", "Nb5+", "4d0"),
+    ("Mo", "Mo6+", "4d0"), ("Eu", "Eu3+", "4f6"), ("U", "U6+", "5f0"),
+    ("Am", "Am3+", "5f6"),
+    ("Tc", "Tc3+", "no magnetic form factor"), ("Rh", "Rh3+", "no magnetic form factor"),
+    ("Pd", "Pd2+", "no magnetic form factor"),
+])
+def test_a_bare_label_whose_common_ion_has_no_moment_or_row_is_refused(element, ion, why):
+    """The #1806 ruling (2026-11-24): where the census ion carries no moment (d0, f0, the J = 0 f6),
+    or the table has no row for it, a bare label on a moment is refused,
+    listing the moment-carrying ions to state and the neutral curve where the
+    table has one.  The computed neutral curves stay available stated."""
+    with pytest.raises(ValueError) as err:
+        read_bare_label(element)
+    text = str(err.value)
+    assert ion in text and why in text, text
+    assert "Ding, Kumagai, Oba & Burton (2020)" in text
+    if has_ion(f"{element}0"):
+        assert f"'{element}0'" in text
+        assert float(j0(f"{element}0", 0.0)) == pytest.approx(1.0, abs=2e-2)
+    with pytest.raises(ValueError, match=ion.replace("+", r"\+")):
+        j0(element, 0.1)
+
+
+def test_carries_moment_follows_the_open_shell():
+    for ion in ("Fe3+", "Cu2+", "Ni2+", "Dy3+", "Gd3+", "Eu2+", "U4+", "Np5+", "Pu4+"):
+        assert carries_moment(ion), ion
+    for ion in ("Sc3+", "Ti4+", "Nb5+", "Mo6+", "Cu1+", "Eu3+", "Sm2+", "Yb2+", "U6+", "Am3+"):
+        assert not carries_moment(ion), ion
+
+
+def test_ce_reads_as_ce3_and_never_ce2():
+    """Ce is read as Ce3+ (75 % of Ce reports; Ce4+ 23 % is 4f0).  Until #626
+    Brown's Ce³⁺ row was keyed by its misprinted label "Ce2+"; it now resolves,
+    and never to Ce2+."""
+    reading = read_bare_label("Ce")
+    assert reading.ion == "Ce3+" and has_ion("Ce3+")
+    assert "Ce2+" not in dict(reading.alternatives)
     assert assumed_lande_g("Ce3+") == pytest.approx(6 / 7)
-
 
 def test_assumed_lande_g_matches_the_free_ion_hunds_rule_value():
     """WP-1327 D-lande-g: derive each (S, L, J) independently here — never
@@ -432,6 +432,8 @@ def test_assumed_lande_g_matches_the_free_ion_hunds_rule_value():
         ("U4+", 1, 5, 4, Fr(4, 5)),                      # 5f2,  3H4
         ("Np4+", Fr(3, 2), 6, Fr(9, 2), Fr(8, 11)),      # 5f3,  4I9/2
         ("Pu3+", Fr(5, 2), 5, Fr(5, 2), Fr(2, 7)),       # 5f5,  6H5/2
+        ("Np5+", 1, 5, 4, Fr(4, 5)),                     # 5f2,  3H4
+        ("Pu4+", 2, 6, 4, Fr(3, 5)),                     # 5f4,  5I4
     ]
     for ion, S, L, J, g_fraction in cases:
         g_expected = float(g_fraction)
@@ -450,8 +452,8 @@ def test_assumed_lande_g_matches_the_free_ion_hunds_rule_value():
 def test_lande_g_raises_on_a_nonmagnetic_j_equals_zero_ground_state():
     """Sm2+ and Eu3+ (both 4f6) are J = 0 — no orbital-plus-spin moment, so
     g_J is undefined rather than some fallback number. This is also *why*
-    neither is ever the assumed ion for Sm/Eu (`_ASSUMED_ION` picks Sm3+ and
-    Eu2+, the states with an unpaired-electron ground term), so
+    a bare Sm label reads as Sm3+ and a bare Eu label (census Eu3+) is
+    refused (#1806 ruling), so
     :func:`assumed_lande_g` never needs to raise this in practice — it is
     checked directly here rather than through a caller."""
     with pytest.raises(ValueError, match="J = 0"):
@@ -460,23 +462,23 @@ def test_lande_g_raises_on_a_nonmagnetic_j_equals_zero_ground_state():
     assert assumed_lande_g("Eu3+") is None
 
 
-def test_assumed_lande_g_is_declared_only_for_ions_the_ion_default_can_produce():
-    """The g table's keys are exactly the ions :func:`resolve_assumed_ion`
-    can hand back — never wider, since a g declared for an ion nothing ever
-    assumes would be dead code no caller exercises. And every one of them
-    genuinely needs an explicit g, or this default would never fire at all."""
-    produced = {resolve_assumed_ion(e)[0] for e in
-               ("Ce", "Pr", "Nd", "Sm", "Gd", "Tb", "Dy", "Ho", "Er", "Tm",
-                "Eu", "Yb", "U", "Np", "Pu")}
+def test_assumed_lande_g_is_declared_for_every_f_ion_a_bare_label_can_read_as():
+    """Every 4f/5f ion :func:`read_bare_label` can hand back has its g
+    declared, and genuinely needs one, or the default would never fire."""
+    produced = set()
+    for e in ("Ce", "Pr", "Nd", "Sm", "Gd", "Tb", "Dy", "Ho", "Er", "Tm",
+              "Eu", "Yb", "U", "Np", "Pu", "Am"):
+        try:
+            produced.add(read_bare_label(e).ion)
+        except ValueError:
+            pass
     assert produced == {"Ce3+", "Pr3+", "Nd3+", "Sm3+", "Gd3+", "Tb3+", "Dy3+",
-                        "Ho3+", "Er3+", "Tm3+", "Eu2+", "Yb3+",
-                        "U4+", "Np4+", "Pu3+"}
+                        "Ho3+", "Er3+", "Tm3+", "Yb3+", "Np5+", "Pu4+"}
     for ion in produced:
         assert assumed_lande_g(ion) is not None
         assert needs_explicit_g(ion)
     assert assumed_lande_g("Mn3+") is None           # not a 4f/5f default at all
     assert assumed_lande_g("Sc2+") is None           # a 3d/4d ion never needs one
-
 
 def test_g_defaults_to_two_for_3d_and_is_refused_absent_for_4f():
     """Issue #257 A5: a silent g = 2 on a rare earth drops the ⟨j₂⟩ term.
@@ -488,7 +490,7 @@ def test_g_defaults_to_two_for_3d_and_is_refused_absent_for_4f():
     """
     assert resolve_g("Cr3+", None) == 2.0
     assert not needs_explicit_g("Cr3+")
-    assert approximation_name("Cr3+", None) == J0_ONLY
+    assert approximation_name("Cr3+", None).startswith(J0_ONLY + "; ")
 
     assert needs_explicit_g("Ho3+") and needs_explicit_g("U4+")
     with pytest.raises(ValueError, match="4f/5f ion"):
@@ -1715,7 +1717,7 @@ def test_a_flat_moment_direction_is_held_and_named():
     assert "does not determine" in row.note
     assert row.magnitude == pytest.approx(abs(modulus.value), rel=1e-12)
     assert row.magnitude_from_components == pytest.approx(row.magnitude, rel=1e-9)
-    assert row.approximation == J0_ONLY
+    assert row.approximation.startswith(J0_ONLY + "; ")
     # and it round-trips through JSON with the new section
     again = type(report).model_validate_json(report.model_dump_json())
     assert again.magnetic[0].unmeasured_directions == ["polar", "azimuth"]
@@ -2088,8 +2090,11 @@ def test_the_report_names_the_approximation_per_ion():
 
     rows = analyse_moments(model, values, structure)
     assert [r.ion for r in rows] == ["Mn2+", "Ho3+"]
-    assert rows[0].approximation == J0_ONLY
-    assert rows[1].approximation == "dipole, <j0> + (2/g - 1)<j2>, g = 1.25"
+    # λ = 2.4 Å to 2θ = 140° reaches s ≈ 0.39 Å⁻¹, inside Brown's range, so no computed tail is named (#1806)
+    assert rows[0].approximation == approximation_name("Mn2+", None, stol_max=0.39)
+    assert "computed tail" not in rows[0].approximation
+    assert rows[0].approximation.startswith(J0_ONLY + "; ")
+    assert rows[1].approximation.startswith("dipole, <j0> + (2/g - 1)<j2>, g = 1.25; ")
     assert model.phases[0].magnetic.named_approximations() == {
         "Mn2+": rows[0].approximation, "Ho3+": rows[1].approximation}
 

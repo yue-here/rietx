@@ -417,3 +417,13 @@ Dal
 Negro
 Ungaretti
 ZrBeSi
+# Magnetic form factors computed for rietx (#1691): the theory page cites them.
+actinide
+actinides
+aspherical
+covalency
+Kobayashi
+Nagao
+# The ICSD oxidation-state census a bare magnetic label is read through (#1806).
+Kumagai
+Oba

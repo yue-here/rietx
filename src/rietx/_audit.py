@@ -766,21 +766,6 @@ ROWS: tuple[Row, ...] = (
         response='info',
         responds=('note that the magnetic group was read with the trivial centring; add the loop '
                   'if the group has a centring or an anti-centring')),
-    Row("CIF_MAGNETIC_ION_UNCHARGED", "code", tier=1, ambiguity=3,
-        evidence=('read the raise site at magcif.py:1985-2000: fires exactly when a magnetic '
-                  "site's ion is the bare element symbol (no moment_ions= entry and no charge in "
-                  'the type symbol) and the form-factor table has a neutral-atom entry for it, '
-                  'so the site scatters with the symbol the file wrote; the message lists the '
-                  'ions the table carries for that element (tests/test_magcif.py). Practice: '
-                  'GSAS-II 5.8.4 looks the magnetic form factor up by the atom type as written, '
-                  "and its MagFF table has neutral entries such as 'Mn' (GSASIIElem.py:117-132, "
-                  'atmdata.py:1458).'),
-        grounds=("No substitution: the form factor is the one the file's own symbol names, which "
-                 'GSAS-II also uses; which ion the chemistry implies is outside the file, so the '
-                 'code reports and picks nothing, as MAGNETIC_ION_ASSUMED does.'),
-        response='info',
-        responds=("note that the site's form factor is the neutral atom the file names, and pass "
-                  'moment_ions= if the chemistry says an ion')),
     Row("CIF_MAGNETIC_MAGNITUDE_ESD_NOT_STORED", "code", tier=1, ambiguity=1,
         evidence=('a record of a field not carried: read the raise site at magcif.py:2000-2010; '
                   'fires exactly when a row states _atom_site_moment.magnitude_su, which '
@@ -1696,10 +1681,36 @@ ROWS: tuple[Row, ...] = (
                   "and read the intensities and widths as unsettled until then"),
         scope=("all",)),
     Row("LOW_ANGLE_UNMODELLED", "code"),
-    Row("MAGNETIC_ION_ASSUMED", "code", tier=1, ambiguity=3,
-        evidence=("arithmetic: fires exactly when the substitution was made (info); the "
-                  "substitution's own tier is crystallography.magnetic.form_factor._ASSUMED_ION, "
-                  "a hand row (a dict the walk cannot see; docs/wp/2002-batch/inventory.json)")),
+    Row("MAGNETIC_FORM_FACTOR_COMPUTED_TAIL", "code", tier=1, ambiguity=1, response="info",
+        responds=("note that the moments' highest-angle form-factor values are computed "
+                  "free-ion tails, which approximation_name also names; nothing is owed"),
+        evidence=("arithmetic: fires exactly when the stage's reflection list reaches an s past "
+                  "the end of a Brown row's fitted range, the source's own number (Brown ITC "
+                  "Vol. C p. 461), where the row's value is its computed tail (rietx #1691). "
+                  "Level by the #1806 ruling (2026-11-24, reversing the 2026-11-23 warning): past Brown's "
+                  "range f^2 is 6e-5 (Mn2+) to 7e-3 (Nd3+) of its low-angle value, so the "
+                  "record is info and the advice to cut the data is dropped")),
+    Row("MAGNETIC_ION_ASSUMED", "code", tier=1, ambiguity=3, response="warning",
+        responds=("state the site's ion before quoting its moment, since the moment depends "
+                  "on which oxidation state the form factor is"),
+        evidence=("arithmetic: fires exactly when a moment's ion is a bare element label, read "
+                  "as the element's most common oxidation state in one ICSD census (Ding, "
+                  "Kumagai, Oba & Burton 2020, J. Phys. Chem. Lett. 11, 8264, SI Table 1; "
+                  "form_factor._ICSD_REPORTS, a hand row: a dict the walk cannot see), at "
+                  "the CIF read (magcif.py), in solve_magnetic and at the fit "
+                  "(refine._bare_magnetic_ion_diagnostics); the message names the pick, its "
+                  "share and the alternatives. The #1806 ruling (2026-11-24): keep-and-warn, "
+                  "reversing the 2026-11-23 neutral-atom reading; a census ion with no moment is "
+                  "refused instead (tests/test_magnetic_bare_label.py)")),
+    Row("MAGNETIC_SITE_CHARGE_NOT_STATED", "code", tier=1, ambiguity=1, response="info",
+        responds=("note that the moment site's X-ray scattering factor is the neutral atom "
+                  "its bare species names; nothing is owed"),
+        evidence=("arithmetic: fires on an X-ray histogram exactly when a site carrying a "
+                  "moment has a bare element species, whose X-ray scattering factor is the "
+                  "neutral atom (International Tables Vol. C Table 6.1.1.4 and every "
+                  "Rietveld program read a bare symbol so) while its magnetic form factor "
+                  "reads an ion; the #1806 ruling (2026-11-24), read for moment sites "
+                  "only (tests/test_magnetic_bare_label.py)")),
     Row("MAGNETIC_SUBGROUP_PREFERRED", "code", tier=3, ambiguity=2,
         evidence=("warning; fires when a maximal subgroup refit from the winner beats it by "
                   "more than SOLVE_TIE_DELTA_BIC at the winner's own N/f² (WP-2002 B12); never "
@@ -2682,14 +2693,6 @@ ROWS: tuple[Row, ...] = (
                   "the model has one free parameter fewer than the file's refinement "
                   '(tests/test_magcif.py::test_a_refined_lande_g_is_reported_held)'),
         grounds='The model has no g parameter, so the hold is forced and named.'),
-    Row("TOPAS_MOMENT_ION_UNCHARGED", "code", tier=1, ambiguity=1,
-        evidence=('read the site at topas.py:4145: fires when a site with a moment has an '
-                  'uncharged species (a one- or two-letter element token), so the magnetic form '
-                  "factor comes from the neutral atom's <j0>, a different curve from the ion's; "
-                  'the species is what the file wrote, so the reader supplies no charge'),
-        grounds='The file states no charge, so none is invented.',
-        response='info',
-        responds="write the site's occ with its charge (occ Cr+3) if an ion was meant"),
     Row("TOPAS_ORIGIN_TRANSLATED", "code", tier=1, ambiguity=1,
         evidence=('read the site at topas.py:3772 and :3289: the space-group symbol read by '
                   "normalize_space_group differs from the raw one (TOPAS's trailing Z/S/R/H "
@@ -3564,6 +3567,52 @@ ROWS: tuple[Row, ...] = (
                  "(2026-11-23, 11:47Z: the merge 'stays') under #1075; his, not the judge's, "
                  "since it sets the threshold of the parent-group pick (WP-2238)."),
         approved="2026-11-23"),
+    Row("rietx.crystallography.magnetic.form_factor.S_MAX_BROWN_3D_4D", "constant", tier=1,
+        value=1.5,
+        evidence=("source: the upper end of the range Brown fitted the 3d and 4d rows over, "
+                  "ITC Vol. C sec. 4.4.5 (2004), p. 461, 'in the range (sin theta)/lambda = 0 to "
+                  "1.5'; decides only where a row's values stop being a fit")),
+    Row("rietx.crystallography.magnetic.form_factor.S_MAX_BROWN_ACTINIDE", "constant", tier=1,
+        value=1.5,
+        evidence=("source: Brown, ITC Vol. C sec. 4.4.5 (2004), p. 461, for the actinides 'the "
+                  "calculations extend to 1.5'")),
+    Row("rietx.crystallography.magnetic.form_factor.S_MAX_BROWN_RARE_EARTH", "constant", tier=1,
+        value=1.2,
+        evidence=("source: Brown, ITC Vol. C sec. 4.4.5 (2004), p. 461, rare-earth rows fitted "
+                  "over 0-0.5 and 0.5-1.2")),
+    Row("rietx.crystallography.magnetic.form_factor.TABLE_S_MAX", "constant", tier=3,
+        value=6.0,
+        evidence=("ours, ruled by the magnetic-path owner on 2026-11-23 (https://github.com/yue-here/rietx/issues/1691#issuecomment-7095775367, (c)): "
+                  "the end of every computed curve. Beyond it a free-ion curve is not a "
+                  "crystal's form factor anyway (covalency moves the tail past s = 1.5 by "
+                  "8-93 %; no measured form factor past s = 1.157), and CW neutrons reach s = 6 "
+                  "only at lambda < 0.167 A; past it every row is refused, never extrapolated"),
+        grounds=("chosen with margin past any constant-wavelength neutron pattern; a time-of-"
+                 "flight bank reaching d < 0.083 A would need it raised, a data change only; settled by Claude under the "
+                 "magnetic-path owner's ruling on #1691 (#1075)"),
+        approved="2026-11-23", approved_by="checked"),
+    Row("rietx.crystallography.magnetic.form_factor.TABLE_STEP", "constant", tier=1,
+        value=0.01,
+        evidence=("measured on all 17 tables against the same curves at 0.005 (the ten high-charge 4d "
+                  "tables as computed, rietx #1691; the other seven regenerated at 0.005 from the same "
+                  "inputs for #1806 round 2, item 6, matching the shipped points to 5.5e-8): a cubic "
+                  "spline on this grid errs by <= 3.9e-6 on s = 0-1.5, largest at the first midpoint "
+                  "(Mo0 <j0> at s = 0.005, where the not-a-knot end meets a curve even in s; <= 1.6e-6 "
+                  "from s = 0.015), and by <= 8.1e-8 beyond, the file's %.7f rounding (also on the "
+                  "Mn2+, Gd3+ and U4+ tails); decides only interpolation error, 38 times under the "
+                  "curves' own accuracy (HFR vs Dirac-Fock 1.5e-4); "
+                  "tests/test_magnetic_form_factor_range.py checks every table's midpoints")),
+    Row("rietx.crystallography.magnetic.form_factor.TAIL_BLEND_WIDTH", "constant", tier=3,
+        value=0.2,
+        evidence=("ours, ruled by the magnetic-path owner on 2026-11-23 (https://github.com/yue-here/rietx/issues/1691#issuecomment-7095775367, (d1)): "
+                  "the width over which a Brown row is blended onto its computed tail; the "
+                  "largest fit-to-tail gap at s_end on the rows kept is 8.7e-3 (bare Nb <j0> "
+                  "at s = 1.5); the blend's value lies between the two, so the width moves a "
+                  "value only by a fraction of the gap there"),
+        grounds=("a C2 quintic over 0.2 keeps the curve's slope change under the size of "
+                 "Brown's own end-of-range residual; no published blend exists to adopt; settled by Claude under the "
+                 "magnetic-path owner's ruling on #1691 (#1075)"),
+        approved="2026-11-23", approved_by="checked"),
     Row("rietx.crystallography.magnetic.isotropy.CROSS_IRREP_DRAWS", "constant", value=12,
         evidence=("back to Mike, unaudited: he ruled tier 3 on PR #1636 (2026-11-23), and "
                   "the judge (2026-11-24) called it weak and an action's threshold: "
@@ -3985,6 +4034,20 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.crystallography.superspace.operators._ZERO3", "constant", tier=1, value=(0.0, 0.0, 0.0),
         evidence=('arithmetic: the exact zero translation (Fraction(0),) x 3 of a superspace '
                   'operator (superspace/operators.py:95)')),
+    Row("rietx.crystallography.symmetry.D_RANGE_SLACK", "constant", tier=3, value=0.001,
+        evidence=("the relative slack on the enumerated d range: generate_reflections and the two "
+                  "satellite enumerations keep d >= d_min*(1 - slack) and d <= d_max*(1 + slack), and "
+                  "model.forward._form_factor_range_fix quotes its 2theta from the same number "
+                  "(#1806 review, item 1; tests/test_magnetic_form_factor_range.py::"
+                  "test_the_refusals_quoted_2theta_compiles). Named in #1806 from the 0.999 / 1.001 "
+                  "the four enumerations typed, bit for bit (1 - 1e-3 == 0.999 in binary64), so no "
+                  "list and no number moves. Its job, keeping a reflection on the window's edge from "
+                  "being lost to round-off, needs only a slack above ~1e-15; 1e-3 widens the list "
+                  "past the window by 1e-3*tan(theta) rad in theta, beyond REFLECTION_MARGIN_DEG, whose "
+                  "measurements (tests/test_window_domain.py) were taken with this slack in place"),
+        grounds=("A pre-existing edge slack, named at the maintainer's request (#1806 round 1, item 1) "
+                 "and not retuned. Its size is ours, not the arithmetic's, so it waits for the "
+                 "maintainer's dated approval.")),
     Row("rietx.crystallography.symmetry.MAX_HKL_GRID_POINTS", "constant", value=30000000),
     Row("rietx.crystallography.symmetry.SITE_TOL", "constant", value=0.0001,
         evidence=("unaudited, for the maintainer's tier. Besides site_orbit's snap it has two "
@@ -7318,9 +7381,6 @@ ROWS: tuple[Row, ...] = (
     Row("CIF_MAGNETIC_CENTERING_ASSUMED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence=('arithmetic: names the loop to add and an anti-centring as the example of what '
                   'it would change (magcif.py:651-653)')),
-    Row("CIF_MAGNETIC_ION_UNCHARGED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
-        evidence=('arithmetic: names the argument that states the ion and lists every ion the '
-                  'table carries for the element, ranking none (magcif.py:1994-1999)')),
     Row("CIF_MAGNETIC_MAGNITUDE_ESD_NOT_STORED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence=('arithmetic: names the field that carries the refined modulus esd '
                   '(FitReport.magnetic[i].magnitude_esd; magcif.py:2008-2009)')),
@@ -7498,8 +7558,16 @@ ROWS: tuple[Row, ...] = (
     Row("LEBAIL_CYCLES_AT_CAP.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence="arithmetic: names the stage setting that lifts the cap"),
     Row("LOW_ANGLE_UNMODELLED.suggestion", "suggestion", value=1),
-    Row("MAGNETIC_ION_ASSUMED.suggestion", "suggestion", tier=1, ambiguity=3, value=2,
-        evidence="arithmetic: names the argument that overrides the default"),
+    Row("MAGNETIC_FORM_FACTOR_COMPUTED_TAIL.suggestion", "suggestion", tier=1, ambiguity=1,
+        value=1,
+        evidence=("arithmetic: says nothing is owed, since past Brown's ranges f^2 is under "
+                  "1 % of its low-angle value (6e-5 Mn2+ to 7e-3 Nd3+; the #1806 ruling)")),
+    Row("MAGNETIC_ION_ASSUMED.suggestion", "suggestion", tier=1, ambiguity=3, value=3,
+        evidence=("arithmetic: names the argument or field that states the ion, at each of "
+                  "the three raise sites")),
+    Row("MAGNETIC_SITE_CHARGE_NOT_STATED.suggestion", "suggestion", tier=1, ambiguity=1,
+        value=1,
+        evidence="arithmetic: names the species spelling that states the charge"),
     Row("MAGNETIC_SUBGROUP_PREFERRED.suggestion", "suggestion", tier=1, ambiguity=2, value=1,
         evidence="arithmetic: defers the pick to the caller, as Rule 1's second kind asks"),
     Row("MAGNETIC_WIDTH_MOVED_MOMENT.suggestion", "suggestion", value=1),
@@ -7806,9 +7874,6 @@ ROWS: tuple[Row, ...] = (
     Row("TOPAS_MOMENT_G_HELD.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence=("read topas.py:4132: 'Set Atom.moment.g on the built structure to try another "
                   "value', the field that holds g")),
-    Row("TOPAS_MOMENT_ION_UNCHARGED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
-        evidence=("read topas.py:4145: 'Write the site's occ with its charge (occ Cr+3) so the "
-                  "ion resolves', the file spelling TOPAS reads as an ion")),
     Row("TOPAS_PHASE_TERM_READ.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence=("read topas.py:4621: 'If the name is the file's own and means something else, "
                   "set the phase term back on the built Structure'; names the escape from the "
@@ -8497,7 +8562,6 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "LAUE_CLASS_NOT_SEPARABLE",
     "LEBAIL_ALTERNATION_STOPPED",
     "LOW_ANGLE_UNMODELLED",
-    "MAGNETIC_ION_ASSUMED",
     "MAGNETIC_SUBGROUP_PREFERRED",
     "MAGNETIC_WIDTH_MOVED_MOMENT",
     "MAGNETIC_WIDTH_UNMEASURED",

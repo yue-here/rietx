@@ -1,0 +1,1 @@
+- **Any form factor past s = sinθ/λ = 6 Å⁻¹ is refused** (#1691). A fit whose reflections reach past s = 6 raises at its first stage compile, naming the 2θ to end the data at. `form_factor.lisher_coefficients` is gone with the Lisher & Forsyth Pr³⁺ row, `coefficients()` refuses an ion served from a computed table, and `fitted_range()` returns `None` for one.
