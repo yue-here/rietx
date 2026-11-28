@@ -95,13 +95,13 @@ from ..crystallography.stephens import S_NAMES, monomial_matrix, strain_width_de
 from ..crystallography.structure_factor import (
     PhaseSites,
     compile_phase_sites,
-    d_f2_d_uaniso,
-    d_f2_d_xyz,
+    d_f2_d_sites,
     structure_factors_squared,
 )
 from ..crystallography.symmetry import (
     ReflectionSet,
     generate_reflections,
+    lattice_coincidences,
     reflection_orbits,
     resolve_group,
 )
@@ -718,15 +718,27 @@ def _batch_layout(win: np.ndarray, fcj_n: np.ndarray, tt: np.ndarray
 PAWLEY_OVERLAP_FWHM_FRAC = 0.5
 #: soft equal-split restraint weight for overlapped Pawley groups.  With the
 #: per-group intensity scaling in ``build_pawley_restraint`` this makes the
-#: split-direction esd ≈ (group intensity)/√λ, i.e. an unresolved split is
-#: reported with an esd of order its own value (≈100 % at λ=1) rather than the
-#: spuriously tight one a bare pseudo-inverse of a singular JᵀJ would give.
+#: split-direction esd ≈ s/√λ, s the group intensity (or, for a group under
+#: ``PAWLEY_GROUP_SCALE_FLOOR_REL`` of its phase, that floor), i.e. an
+#: unresolved split is reported with an esd of order its own value (≈100 % at
+#: λ=1) or larger, rather than the spuriously tight one a bare pseudo-inverse
+#: of a singular JᵀJ would give.
 PAWLEY_OVERLAP_LAMBDA = 1.0
 #: floor on the scale of the off-data ridge in ``build_pawley_restraint``, in
 #: the Pawley block's intensity units: the ridge is as wide as the phase's
 #: largest on-data intensity, and never narrower than this, which a phase
 #: with no on-data reflection falls back to (WP-1459, outside PR #453)
 PAWLEY_OFF_DATA_SCALE_FLOOR = 1.0
+#: floor on an overlap group's restraint scale, as a fraction of its phase's
+#: largest on-data intensity, so the scale is never read off a seed the
+#: partition emptied (WP-2311).  A pair on ``LEBAIL_INTENSITY_FLOOR`` had
+#: rows weighing (1 − 1/2)·√λ/1e-10 = 5e9, which equilibration turned into a group sum
+#: the trust region could not move, rebuilt from the stuck value every stage.
+#: Synthetic LaB6 under a declared background 10x and 100x the data: any value
+#: from 1 down to 1e-8 recovers the true start's fit exactly, 1e-9 locks again.
+#: *(Chosen: WP-2311, 2026-11-26 — four decades inside that window either
+#: side; below it a group is weaker than any line a pattern resolves.)*
+PAWLEY_GROUP_SCALE_FLOOR_REL = 1e-4
 
 
 
@@ -908,6 +920,11 @@ class CompiledPhase:
     # True where no emission line's compile-time centre lies on the fitted
     # data (``PawleyBlock.off_data``; None outside pawley mode)
     off_data: np.ndarray | None = None  # (N,) bool
+    # Pawley mode: the reflections whose d agree in every cell of the setting
+    # (``symmetry.lattice_coincidences``), local indices, each list one Pawley
+    # column (WP-2315, ruling R5 (b)).  Empty outside pawley mode and on a
+    # phase whose model can tell the members apart (``_lattice_merge_groups``).
+    lattice_groups: list[list[int]] = field(default_factory=list)
     # March-Dollase preferred orientation: the frozen symmetry orbit of every
     # reflection (flattened; see preferred_orientation.orbit_layout) plus the
     # fixed integer axis.  None unless the phase carries a PO block in Rietveld
@@ -1214,6 +1231,15 @@ class CompiledModel:
     # ``RefinementResult.sigma_rule`` carries.  ``None`` only on a model built
     # without ``compile_model``.
     sigma_rule: SigmaRule | None = None
+    # What the reader repaired or noticed in the file (``PatternData.diagnostics``,
+    # WP-2304), carried so the result builder can hand it on: by then the
+    # pattern itself is out of reach.  Empty on a pattern built by hand.
+    reader_notes: tuple = ()
+    # Whether the fitted channels' σ are one value, read before a measured
+    # background widens them: what settles ``PATTERN_SIGMA_CONSTANT`` once a
+    # caller's own σ varies (WP-2304).  ``None`` only on a model built without
+    # ``compile_model``.
+    sigma_uniform: bool | None = None
     meta: dict = field(default_factory=dict)
 
     # ------------------------------------------------------------------
@@ -3044,8 +3070,34 @@ class CompiledModel:
     # ------------------------------------------------------------------
     # analytic Jacobian support
     # ------------------------------------------------------------------
+    def structural_f2_grads(self, ip: int, values: dict[str, float],
+                            xyz_atoms=(), u_atoms=(), biso_atoms=(), occ_atoms=()
+                            ) -> tuple[dict[int, np.ndarray], dict[int, np.ndarray],
+                                       dict[int, np.ndarray], dict[int, np.ndarray]]:
+        """``({j: (N, 3)}, {j: (N, 6)}, {j: (N,)}, {j: (N,)})``: ∂|F_N|² by
+        the coordinates, the U^ij, the Biso and the occupancy of phase ip's
+        atoms (WP-2314).
+
+        Every atom asked for at once, from one expansion of the structure
+        factor (``structure_factor.d_f2_d_sites``), because A is the
+        expensive half and every atom's bracket comes from the same terms.
+        The caller caches it for one Jacobian evaluation, as it does
+        :meth:`moment_f2_grads`.  The coordinate and U^ij arrays are
+        bit-identical to the single-atom kernels'
+        (``tests/test_structural_hoist.py``); the Biso and occupancy arrays
+        are held to their exact oracles (``tests/test_biso_occ_columns.py``).
+        """
+        cp = self.phases[ip]
+        cell = tuple(values[f"phases.{ip}.cell.{k}"]
+                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+        d = d_spacings(cp.reflections.index, *cell)
+        xyz, occ, biso, uaniso, astar = self._site_values(ip, values, cell)
+        return d_f2_d_sites(cp.reflections.hkl, d, cp.sites, xyz, occ, biso,
+                            uaniso, astar, xyz_atoms=xyz_atoms, u_atoms=u_atoms,
+                            biso_atoms=biso_atoms, occ_atoms=occ_atoms)
+
     def coordinate_intensity_grad(self, ip: int, j: int, coeffs: np.ndarray,
-                                  values: dict[str, float]
+                                  values: dict[str, float], f2_grads=None
                                   ) -> list[np.ndarray] | None:
         """Per-line ∂intensity/∂u for a coordinate DOF u of atom j, phase ip.
 
@@ -3057,11 +3109,16 @@ class CompiledModel:
         positions and widths do not depend on coordinates, so the intensity
         scalar is the whole chain.  Le Bail intensities are extracted, not
         computed, so there is nothing to differentiate: returns ``None``.
+
+        ``f2_grads`` is the ``{j: (N, 3)}`` half of :meth:`structural_f2_grads`
+        at these ``values``, when the caller holds it; without it the
+        structure factor is expanded for this one atom.
         """
-        return self._structural_intensity_grad(ip, j, coeffs, values, d_f2_d_xyz)
+        return self._structural_intensity_grad(ip, j, coeffs, values, f2_grads, False)
 
     def adp_intensity_grad(self, ip: int, j: int, coeffs: np.ndarray,
-                           values: dict[str, float]) -> list[np.ndarray] | None:
+                           values: dict[str, float], f2_grads=None
+                           ) -> list[np.ndarray] | None:
         """Per-line ∂intensity/∂u for an anisotropic-ADP DOF of atom j.
 
         The exact analogue of :meth:`coordinate_intensity_grad` with
@@ -3069,8 +3126,9 @@ class CompiledModel:
         constraint block restricted to the atom's six U rows) — see
         ``structure_factor.d_f2_d_uaniso``.  ADPs, like coordinates, move only
         the intensity scalar, not the peak positions or widths.
+        ``f2_grads`` is the ``{j: (N, 6)}`` half of :meth:`structural_f2_grads`.
         """
-        return self._structural_intensity_grad(ip, j, coeffs, values, d_f2_d_uaniso)
+        return self._structural_intensity_grad(ip, j, coeffs, values, f2_grads, True)
 
     def structural_grad_supported(self, ip: int) -> bool:
         """Whether the analytic coordinate/ADP columns are exact for this phase.
@@ -3185,18 +3243,44 @@ class CompiledModel:
             return [moved]
         return [[np.zeros_like(col) for col in moved], moved]
 
-    def _structural_intensity_grad(self, ip: int, j: int, coeffs: np.ndarray,
-                                   values: dict[str, float], kernel
-                                   ) -> list[np.ndarray] | None:
+    def site_intensity_grad(self, ip: int, df2: np.ndarray,
+                            values: dict[str, float]
+                            ) -> list[np.ndarray] | None:
+        """Per-line ∂intensity for a column moving site rows of phase ip only
+        (WP-2314): coordinates, U^ij, Biso and occupancy, of any atoms.
+
+        ``df2`` is the column's ∂|F_N|², already summed over the rows it
+        moves from :meth:`structural_f2_grads`.  Every site row enters the
+        intensity through |F_N|² alone, so the chain is the coordinate
+        columns' (:meth:`_f2_derivative_chain`), with the same nuclear mask.
+        ``None`` where :meth:`structural_grad_supported` says the nuclear
+        derivative is not the whole one (a moment reads both) or outside
+        Rietveld mode, where intensities are extracted.
+        """
         if self.mode != "rietveld" or not self.structural_grad_supported(ip):
             return None
         cp = self.phases[ip]
         cell = tuple(values[f"phases.{ip}.cell.{k}"]
                      for k in ("a", "b", "c", "alpha", "beta", "gamma"))
         d = d_spacings(cp.reflections.index, *cell)
-        xyz, occ, biso, uaniso, astar = self._site_values(ip, values, cell)
-        df2 = kernel(cp.reflections.hkl, d, cp.sites, xyz, occ, biso, j, uaniso, astar
-                     ) @ np.asarray(coeffs, dtype=np.float64)
+        nuc = self._nuclear_mask(ip)
+        if nuc is not None:
+            df2 = df2 * nuc
+        return self._f2_derivative_chain(ip, values, cell, d, df2)
+
+    def _structural_intensity_grad(self, ip: int, j: int, coeffs: np.ndarray,
+                                   values: dict[str, float], f2_grads, adp: bool
+                                   ) -> list[np.ndarray] | None:
+        if self.mode != "rietveld" or not self.structural_grad_supported(ip):
+            return None
+        if f2_grads is None:
+            f2_grads = self.structural_f2_grads(
+                ip, values, *(((), (j,)) if adp else ((j,), ())))[1 if adp else 0]
+        cp = self.phases[ip]
+        cell = tuple(values[f"phases.{ip}.cell.{k}"]
+                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+        d = d_spacings(cp.reflections.index, *cell)
+        df2 = f2_grads[j] @ np.asarray(coeffs, dtype=np.float64)
         # a satellite or a parent-forbidden row has no nuclear structure
         # factor, so it has no derivative of one either — the same mask
         # ``_nuclear_f2`` applies to the forward model, applied here so the
@@ -3216,9 +3300,10 @@ class CompiledModel:
         Everything :meth:`phase_peaks` applies after the structure factor, for
         a parameter that moves only |F|²: scale · multiplicity · P · w · Lp ·
         G · absorption · roughness, with G = E + x·dE/dx where extinction is
-        evaluated.  The coordinate and ADP columns reach it with ∂|F_N|², the
-        moment columns (WP-1327) with ∂(p²⟨|F_⊥|²⟩) — both are terms of the
-        one total |F|² that the non-split draw scales and attenuates.
+        evaluated.  The coordinate, ADP, Biso and occupancy columns reach it
+        with ∂|F_N|², the moment columns (WP-1327) with ∂(p²⟨|F_⊥|²⟩) — both
+        are terms of the one total |F|² that the non-split draw scales and
+        attenuates.
 
         ``f2_total`` is that total, when the caller already holds it; it is
         read only where extinction is evaluated, and built here only then —
@@ -3239,13 +3324,13 @@ class CompiledModel:
         if P is not None:
             d_base = d_base * P
         # extinction couples |F|² into the intensity twice (as the prefactor
-        # and through x ∝ |F|²), so a coordinate/ADP move chains through the
-        # factor G = E + x·dE/dx (see model/extinction.py) — at ext=0, x=0
-        # makes G exactly 1 (purity (b)), so the stage that cannot move ext off
-        # zero skips it exactly as ``phase_peaks`` does, and every other stage
-        # applies it unconditionally.  Only these pure-analytic columns need it
-        # explicitly; the scale/occ/biso/cell/extinction columns pick it up
-        # from the FD-of-phase_peaks chain.
+        # and through x ∝ |F|²), so a coordinate, ADP, Biso or occupancy move
+        # chains through the factor G = E + x·dE/dx (see model/extinction.py)
+        # — at ext=0, x=0 makes G exactly 1 (purity (b)), so the stage that
+        # cannot move ext off zero skips it exactly as ``phase_peaks`` does,
+        # and every other stage applies it unconditionally.  Only these
+        # pure-analytic columns need it explicitly; the scale/cell/extinction
+        # columns pick it up from the FD-of-phase_peaks chain.
         ext = values.get(f"phases.{ip}.extinction", 0.0)
         # the extinction variable x is built from the whole reflection, so the
         # magnetic term belongs in it exactly as it does in ``phase_peaks``
@@ -3989,7 +4074,14 @@ class CompiledModel:
     # Pawley intensity block (per-hkl intensities as free parameters)
     # ------------------------------------------------------------------
     def pawley_x0(self) -> np.ndarray:
-        """Current per-hkl intensities, flat in phase order — the block's θ₀."""
+        """Current Pawley columns, flat in phase order — the block's θ₀.
+
+        One per reflection, or a merged group's summed intensity
+        (:attr:`PawleyBlock.merged`, WP-2315).  Outside pawley mode, the
+        per-hkl buffers concatenated.
+        """
+        if self.pawley is not None and not self.pawley.is_identity:
+            return self.pawley.columns_from([cp.hkl_intensity for cp in self.phases])
         return np.concatenate([np.asarray(cp.hkl_intensity, dtype=np.float64)
                                for cp in self.phases]) if self.phases else np.zeros(0)
 
@@ -4010,17 +4102,26 @@ class CompiledModel:
         The hot-loop counterpart of the buffers: the residual/Jacobian
         closures split the θ tail with this and pass the slices through
         ``evaluate``/``derivative_bases``, never touching ``hkl_intensity``.
+        A merged column is spread over its members by equal F²
+        (:meth:`PawleyBlock.expand`, WP-2315).
         """
-        return [vec[a:b] for (a, b) in self.pawley.phase_slices]
+        pb = self.pawley
+        if pb.is_identity:
+            return [vec[a:b] for (a, b) in pb.phase_slices]
+        xp = get_backend()
+        return [pb.expand(vec, ip, xp) for ip in range(len(pb.phase_slices))]
 
     def set_pawley_intensities(self, vec: np.ndarray) -> None:
-        """Commit a flat intensity vector to the at-rest per-phase buffers.
+        """Commit a column vector to the at-rest per-phase buffers.
 
         Called once per solve, after TRF returns — never from inside the
-        residual (purity contract).
+        residual (purity contract).  A merged group's members take its sum
+        split by equal F², the split drawn and never measured (WP-2315).
         """
-        for cp, (a, b) in zip(self.phases, self.pawley.phase_slices, strict=True):
-            cp.hkl_intensity = np.array(vec[a:b], dtype=np.float64)
+        pb = self.pawley
+        for ip, cp in enumerate(self.phases):
+            cp.hkl_intensity = np.array(pb.expand(np.asarray(vec, dtype=np.float64), ip),
+                                        dtype=np.float64)
 
     def pawley_restraint_residual(self, vec: np.ndarray) -> np.ndarray | None:
         """√λ·R·I overlap-restraint rows appended to the residual (or None)."""
@@ -4067,10 +4168,18 @@ class CompiledModel:
     def build_pawley_restraint(self, lam: float = PAWLEY_OVERLAP_LAMBDA) -> None:
         """Build the equal-split restraint rows for the current intensities.
 
-        One row per member of every overlapped group: √λ/s·(δ_kj − 1/n) over the
-        group, where s is the group's current mean intensity.  The rows sum to
-        zero, so they penalise deviations of the *split* from an equal partition
-        while leaving the group *sum* (the data-determined quantity) free.  Run
+        One row per member (column) of every overlapped group:
+        √λ/s·(δ_kj − m_k/Σm) over the group, where s is the group's current
+        mean intensity, floored as the last paragraph says, and m a column's
+        multiplicity (:attr:`PawleyBlock.col_mult`).  The rows sum to zero, so
+        they penalise deviations of the *split* from an equal-F² partition
+        while leaving the group *sum* (the data-determined quantity) free.
+        Equal F² is the equipartition convention: a Pawley intensity is the
+        whole peak, multiplicity included, so equal F² puts each member's
+        share at its multiplicity's (WP-2315; until then the target was equal
+        peak intensity, 1/n, which it still is wherever the multiplicities
+        agree, bit for bit).  A lattice-forced coincidence never reaches these
+        rows, being one column already (:attr:`PawleyBlock.merged`).  Run
         after the intensities are seeded/carried so s reflects a realistic
         scale; constant during the least-squares run, like the background
         penalty.
@@ -4093,25 +4202,54 @@ class CompiledModel:
         overlap rows' large-but-honest answer — while a reflection the data
         do reach has a column far more precise than a prior as wide as the
         strongest reflection.
+
+        **A group's scale is floored relative to its phase, never in intensity
+        units** (WP-2311): s ≥ ``PAWLEY_GROUP_SCALE_FLOOR_REL`` × the phase's
+        largest on-data intensity.  The seed partitions max(y_obs − bkg, 0), so
+        a declared background above the data leaves whole groups on
+        ``LEBAIL_INTENSITY_FLOOR``; an absolute floor of 1e-10 then weighed
+        their rows at 5e9, the equilibrated step could not move the group's
+        sum (free in exact arithmetic, the rows summing to zero), and every
+        later stage rebuilt s from the stuck value.
+
+        **A phase nothing has measured gets no group rows for the stage.**
+        Where every on-data intensity of a phase sits on
+        ``LEBAIL_INTENSITY_FLOOR`` (the seed partitioned nothing under it),
+        there is no intensity to floor against, and any scale written here
+        would be a number of counts.  Its splits are then flat directions for
+        the stage, which the damped step leaves alone and the covariance
+        reports as unmeasured rather than tight; the next stage builds the
+        rows from what this one measured.  Measured on the overlapped Cu-LaB6
+        fixture under a one-stage plan and a background 100× the data: Rwp
+        0.2365 with the rows at 5e9, against 0.1620 from the true start.
         """
         pb = self.pawley
         if pb is None or not (pb.groups or pb.off_data):
             return
         intens = self.pawley_x0()
-        rows: list[np.ndarray] = []
-        for g in pb.groups:
-            s = max(float(np.mean(intens[g])), 1e-10)
-            n = len(g)
-            for k in g:
-                row = np.zeros(pb.n, dtype=np.float64)
-                for j in g:
-                    row[j] = (np.sqrt(lam) / s) * ((1.0 if j == k else 0.0) - 1.0 / n)
-                rows.append(row)
         off = np.zeros(pb.n, dtype=bool)
         off[pb.off_data] = True
+        # each phase's largest on-data intensity: the ridge's width below, and
+        # the group scale's floor relative to it
+        top = np.zeros(pb.n, dtype=np.float64)
         for a, b in pb.phase_slices:
             on = intens[a:b][~off[a:b]]
-            s = max(float(on.max()) if len(on) else 0.0, PAWLEY_OFF_DATA_SCALE_FLOOR)
+            top[a:b] = float(on.max()) if len(on) else 0.0
+        rows: list[np.ndarray] = []
+        for g in pb.groups:
+            if top[g[0]] <= LEBAIL_INTENSITY_FLOOR:
+                continue                 # a phase nothing has measured yet
+            s = max(float(np.mean(intens[g])),
+                    PAWLEY_GROUP_SCALE_FLOOR_REL * float(top[g[0]]))
+            m = np.asarray(pb.col_mult, dtype=np.float64)[g]
+            frac = m / float(np.sum(m))
+            for kk, k in enumerate(g):
+                row = np.zeros(pb.n, dtype=np.float64)
+                for j in g:
+                    row[j] = (np.sqrt(lam) / s) * ((1.0 if j == k else 0.0) - frac[kk])
+                rows.append(row)
+        for a, b in pb.phase_slices:
+            s = max(float(top[a]) if b > a else 0.0, PAWLEY_OFF_DATA_SCALE_FLOOR)
             for k in np.flatnonzero(off[a:b]):
                 row = np.zeros(pb.n, dtype=np.float64)
                 row[a + k] = np.sqrt(lam) / s
@@ -4140,12 +4278,106 @@ class PawleyBlock:
     members of each overlapped group so those splits can be flagged unresolved.
     """
 
-    n: int                                   # total intensities across phases
-    phase_slices: list[tuple[int, int]]      # (start, stop) into the flat vector
-    groups: list[list[int]]                  # overlapped groups (flat idx), size ≥ 2
-    off_data: list[int] = field(default_factory=list)  # centred off the data (flat idx)
+    n: int                                   # intensity columns across phases
+    phase_slices: list[tuple[int, int]]      # (start, stop) into the column vector
+    groups: list[list[int]]                  # overlapped groups (column idx), size ≥ 2
+    off_data: list[int] = field(default_factory=list)  # centred off the data (column idx)
     restraint: np.ndarray | None = None      # (n_rows, n) √λ-scaled restraint rows
-    stderr: np.ndarray | None = None         # per-intensity esd, filled post-solve
+    stderr: np.ndarray | None = None         # per-column esd, filled post-solve
+    #: WP-2315 (ruling R5 (b)).  A column is a reflection, or a group of
+    #: reflections whose d agree in every cell of the setting
+    #: (``CompiledPhase.lattice_groups``), which carries the group's **sum**.
+    #: ``refl_slices`` are each phase's rows of the flat reflection list (the
+    #: per-phase ``hkl_intensity`` buffers concatenated); ``refl_col`` maps a
+    #: flat reflection to its global column and ``share`` gives its fraction of
+    #: that column, mᵢ/Σm (equal F²), and 1 for a column of one reflection.
+    #: ``col_mult`` is each column's multiplicity, the members' summed, which the
+    #: overlap restraint's equal-F² target reads.  ``merged`` lists each merged
+    #: group's flat reflection indices.  Empty arrays only on a hand-built block,
+    #: which then reads as one column per reflection.
+    refl_slices: list[tuple[int, int]] = field(default_factory=list)
+    refl_col: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.intp))
+    share: np.ndarray = field(default_factory=lambda: np.zeros(0))
+    col_mult: np.ndarray = field(default_factory=lambda: np.zeros(0))
+    merged: list[list[int]] = field(default_factory=list)
+    _dense: dict = field(default_factory=dict, repr=False)
+
+    def __post_init__(self) -> None:
+        if not self.refl_slices:          # a hand-built block: one column a reflection
+            self.refl_slices = list(self.phase_slices)
+            self.refl_col = np.arange(self.n, dtype=np.intp)
+            self.share = np.ones(self.n)
+            if not len(self.col_mult):
+                self.col_mult = np.ones(self.n)
+
+    @property
+    def is_identity(self) -> bool:
+        """One column per reflection: the layout before WP-2315, bit for bit."""
+        return not self.merged
+
+    def column_members(self, col: int) -> list[tuple[int, int]]:
+        """(phase index, in-phase reflection index) of every reflection in a column."""
+        for ip, (a, b) in enumerate(self.phase_slices):
+            if a <= col < b:
+                r0, r1 = self.refl_slices[ip]
+                rows = np.flatnonzero(self.refl_col[r0:r1] == col)
+                return [(ip, int(k)) for k in rows]
+        raise IndexError(col)
+
+    def expand(self, vec, ip: int, xp=None):
+        """Phase ip's per-reflection intensities from the column vector ``vec``.
+
+        A phase with no merged group is the plain slice (a view), so a fit
+        that merges nothing runs the arithmetic it always did.  Otherwise
+        each reflection is its column's value times its ``share``: a numpy
+        gather, or on a traced backend a frozen dense map through
+        ``xp.matmul``, since a θ-derived tensor takes no numpy index array
+        on every backend (root ``CLAUDE.md``'s hot-path rule).
+        """
+        a, b = self.phase_slices[ip]
+        r0, r1 = self.refl_slices[ip]
+        local = vec[a:b]
+        if r1 - r0 == b - a:
+            return local
+        cols = self.refl_col[r0:r1] - a
+        share = self.share[r0:r1]
+        if xp is None or getattr(xp, "name", "numpy") == "numpy":
+            return np.asarray(local)[cols] * share
+        dense = self._dense.get(ip)
+        if dense is None:
+            dense = np.zeros((r1 - r0, b - a), dtype=np.float64)
+            dense[np.arange(r1 - r0), cols] = share
+            self._dense[ip] = dense
+        return xp.matmul(xp.asarray(dense, dtype=np.float64), local)
+
+    def columns_from(self, intensities: list[np.ndarray]) -> np.ndarray:
+        """The column vector a set of per-phase reflection buffers sums to."""
+        out = np.zeros(self.n, dtype=np.float64)
+        for ip, buf in enumerate(intensities):
+            a, b = self.phase_slices[ip]
+            r0, r1 = self.refl_slices[ip]
+            buf = np.asarray(buf, dtype=np.float64)
+            if r1 - r0 == b - a:
+                out[a:b] = buf
+            else:
+                out[a:b] = np.bincount(self.refl_col[r0:r1] - a, weights=buf,
+                                       minlength=b - a)
+        return out
+
+    def member_stderr(self, ip: int) -> np.ndarray | None:
+        """Phase ip's per-reflection esds: its column's for a reflection alone,
+        ``inf`` for a member of a merged group, whose own value the data never
+        measured (the absent esd's spelling, ``LSQOutcome.discarded``)."""
+        if self.stderr is None:
+            return None
+        a, b = self.phase_slices[ip]
+        r0, r1 = self.refl_slices[ip]
+        sd = np.asarray(self.stderr, dtype=np.float64)
+        if r1 - r0 == b - a:
+            return sd[a:b].copy()
+        out = sd[self.refl_col[r0:r1]].copy()
+        out[self.share[r0:r1] != 1.0] = np.inf
+        return out
 
 
 @dataclass
@@ -4729,6 +4961,7 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         mask &= window
     tt, y_obs, sigma = tt_all[mask], y_all[mask], s_all[mask]
     sigma_rule = pattern.sigma_rule(window)
+    sigma_uniform = bool(sigma.size) and bool(np.all(sigma == sigma[0]))
     if len(tt) < 10:
         why = ""
         if sigma_rule.n_nonpositive_excluded:
@@ -5111,6 +5344,7 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         if mode == "pawley":
             cp.tt_primary, cp.fwhm_primary = tt_primary, fwhm_primary
             cp.off_data = ~on_data
+            cp.lattice_groups = _lattice_merge_groups(group, cp)
         # March-Dollase preferred orientation acts on *calculated* structure-
         # factor intensities, so it is a Rietveld-mode correction only — Le Bail
         # and Pawley intensities are empirical and would absorb it.  Freeze the
@@ -5253,6 +5487,8 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         tt=tt, y_obs=y_obs, sigma=sigma, tt_min=tt_min, tt_max=tt_max,
         sigma_measured=pattern.sigma is not None,
         sigma_rule=sigma_rule,
+        reader_notes=tuple(pattern.diagnostics),
+        sigma_uniform=sigma_uniform,
         wavelength=instrument.source.primary_wavelength,
         line_wavelengths=lams,
         harmonic_orders=harmonic_orders,
@@ -5429,27 +5665,99 @@ def _overlap_groups(tt: np.ndarray, fwhm: np.ndarray) -> list[list[int]]:
     return groups
 
 
+def _lattice_merge_groups(group, cp: CompiledPhase) -> list[list[int]]:
+    """The phase's lattice-forced coincidences that become one Pawley column.
+
+    ``symmetry.lattice_coincidences`` finds the reflections whose d agree in
+    every cell the setting allows (WP-2315, ruling R5 (b)).  Their peaks are
+    then drawn at one position with one width, so the pattern sees only the
+    group's summed intensity, and the column carries that sum.
+
+    **A phase whose model can tell the members apart keeps one column per
+    member**, with the overlap restraint of :meth:`CompiledModel.
+    build_pawley_restraint` on them.  In Pawley mode an intensity is drawn as
+    ``hkl_intensity`` × the line weight (:meth:`CompiledModel.phase_peaks`):
+    no Lp, texture, extinction or absorption factor enters, so the members of
+    a group differ only where a term reads hkl rather than d or θ.  Three do,
+    and each declines the merge for the whole phase, present or free:
+
+    * a Stephens block (``strain_monomials``): Λ(hkl) differs between 333
+      and 511, or between hkl and khl under 4/m, so the widths differ;
+    * a peak equation (``peq``), which may read h, k, l or a direction
+      (``model.peak_equations.ReflectionFrame``);
+    * satellites or a magnetic component (``nuclear_mask``), whose rows are
+      not lattice points of the nuclear metric.
+
+    Every other width and position term is a function of θ or d.
+    """
+    if (cp.strain_monomials is not None or cp.peq is not None
+            or cp.nuclear_mask is not None or cp.magnetic is not None):
+        return []
+    return lattice_coincidences(group, cp.reflections.hkl)
+
+
 def _build_pawley_block(phases: list[CompiledPhase]) -> PawleyBlock:
     """Assemble the flat intensity layout and overlapped-group list.
+
+    One column per reflection, except that each of a phase's
+    ``lattice_groups`` is one column carrying the group's summed intensity
+    (WP-2315).  Columns follow the reflection order, a merged group at its
+    first member's place, so the block of each phase stays contiguous.  The
+    overlap groups (``_overlap_groups``) and the off-data list are mapped onto
+    those columns.
 
     The restraint rows themselves are built later (once the intensities are
     seeded to a realistic scale) by ``CompiledModel.build_pawley_restraint``.
     """
     phase_slices: list[tuple[int, int]] = []
+    refl_slices: list[tuple[int, int]] = []
     groups: list[list[int]] = []
     off_data: list[int] = []
+    merged: list[list[int]] = []
+    refl_col: list[np.ndarray] = []
+    shares: list[np.ndarray] = []
+    col_mult: list[np.ndarray] = []
     offset = 0
+    r_offset = 0
     for cp in phases:
         n = len(cp.reflections)
-        phase_slices.append((offset, offset + n))
+        mult = np.asarray(cp.reflections.multiplicity, dtype=np.float64)
+        # the column of each reflection: its own, or its group's first member's
+        lead = np.arange(n)
+        for g in cp.lattice_groups:
+            lead[g] = g[0]
+            merged.append([r_offset + k for k in g])
+        firsts = np.unique(lead)
+        local = np.searchsorted(firsts, lead)          # reflection → local column
+        n_col = len(firsts)
+        m_col = np.bincount(local, weights=mult, minlength=n_col)
+        # equal F² within a group: a Pawley intensity is the whole peak, so
+        # each member's share of the column is its multiplicity's
+        share = np.ones(n, dtype=np.float64)
+        for g in cp.lattice_groups:
+            share[g] = mult[g] / m_col[local[g[0]]]
+        phase_slices.append((offset, offset + n_col))
+        refl_slices.append((r_offset, r_offset + n))
+        refl_col.append(offset + local)
+        shares.append(share)
+        col_mult.append(m_col)
         if cp.tt_primary is not None and n:
             for g in _overlap_groups(cp.tt_primary, cp.fwhm_primary):
-                groups.append([offset + k for k in g])
+                cols = sorted({int(offset + local[k]) for k in g})
+                if len(cols) >= 2:
+                    groups.append(cols)
         if cp.off_data is not None:
-            off_data.extend(offset + int(k) for k in np.flatnonzero(cp.off_data))
-        offset += n
+            off_data.extend(sorted({int(offset + local[k])
+                                    for k in np.flatnonzero(cp.off_data)}))
+        offset += n_col
+        r_offset += n
+    def cat(parts, dt):
+        return np.concatenate(parts).astype(dt) if parts else np.zeros(0, dtype=dt)
+
     return PawleyBlock(n=offset, phase_slices=phase_slices, groups=groups,
-                       off_data=off_data)
+                       off_data=off_data, refl_slices=refl_slices,
+                       refl_col=cat(refl_col, np.intp), share=cat(shares, np.float64),
+                       col_mult=cat(col_mult, np.float64), merged=merged)
 
 
 def seed_phase_scales(structure: Structure, instrument: Instrument,

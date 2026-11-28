@@ -95,7 +95,7 @@ def _fit(data: rx.PatternData, background, name: str, hump: bool, zoom: bool = F
     plot_result(result, path=str(out / f"lebail_hump_{name}.png"))
     if zoom:
         plot_result(result, path=str(out / f"lebail_hump_{name}_zoom.png"),
-                    two_theta_range=(30.0, 70.0))
+                    two_theta_limits=(30.0, 70.0))
     widths = {p.path.rsplit(".", 1)[-1]: (p.value, p.stderr) for p in result.parameters
               if p.path.startswith("instrument.profile.")}
     ratio = (np.interp(HUMP_CENTRE, result.two_theta, result.y_background)

@@ -1521,13 +1521,6 @@
     font-size: var(--text-sm);
   }
 
-  .jump .link {
-    padding: 2px 0;
-    color: var(--accent-ink);
-    text-decoration: underline;
-    text-underline-offset: 2px;
-  }
-
   .scroller {
     flex: 1 1 auto;
     overflow: auto;
