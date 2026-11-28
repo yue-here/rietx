@@ -469,7 +469,7 @@ def test_zincite_fit_pictures(zincite_fits):
     for (solver, origin), (_, result) in zincite_fits.items():
         name = f"floating_origin_zincite_{solver}_{origin or 'free'}"
         _save_fit_png(result, name)
-        _save_fit_png(result, f"{name}_zoom", two_theta_range=(30.0, 40.0))
+        _save_fit_png(result, f"{name}_zoom", two_theta_limits=(30.0, 40.0))
     held = zincite_fits["lm", "hold"][1].statistics.rwp
     free = zincite_fits["lm", None][1].statistics.rwp
     assert held == pytest.approx(free, rel=1e-6)

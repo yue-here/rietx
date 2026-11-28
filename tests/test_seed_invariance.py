@@ -103,7 +103,7 @@ def _fit(stage: rx.Stage, tag: str):
     OUT.mkdir(exist_ok=True)
     result.plot(path=str(OUT / f"seed_invariance_fap_{tag}.png"))
     result.plot(path=str(OUT / f"seed_invariance_fap_{tag}_lowangle.png"),
-                two_theta_range=(15.0, 55.0))
+                two_theta_limits=(15.0, 55.0))
     import matplotlib.pyplot as plt
 
     plt.close("all")
@@ -179,7 +179,7 @@ def _lab6_fit(widths: dict[str, float], tag: str) -> rx.RefinementResult:
     OUT.mkdir(exist_ok=True)
     result.plot(path=str(OUT / f"seed_invariance_lab6_{tag}.png"))
     result.plot(path=str(OUT / f"seed_invariance_lab6_{tag}_lowangle.png"),
-                two_theta_range=(20.0, 50.0))
+                two_theta_limits=(20.0, 50.0))
     import matplotlib.pyplot as plt
 
     plt.close("all")

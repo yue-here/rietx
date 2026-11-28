@@ -1655,6 +1655,13 @@ class BackgroundFixedPlusChebyshev(_InheritsDeclaredDefaults):
     inside the model keeps the Poisson weights correct where subtracting it
     would not.
 
+    A measurement is what this model is for.  Holding an estimate is possible
+    but not recommended, whichever estimator made it.  SNIP is the measured
+    case: a held SNIP curve takes intensity from the tails of the reflections
+    and biases Biso high (:func:`rietx.background.snip`), and
+    the background-absorption screen cannot see a held curve.  Co-refine a
+    :class:`BackgroundChebyshev` or :class:`BackgroundPSpline` instead.
+
     ``scale`` is the multiplier the measured case needs, and it is TOPAS's
     ``bkg_file("f.xy", @, s)`` against its ``bkg_file("f.xy")`` (Coelho,
     *TOPAS-Academic Technical Reference*, v8).  The default is 1.0 held, which

@@ -194,11 +194,11 @@ def sabine_extinction_and_dx(f2: np.ndarray, wavelength: float, volume: float,
     ``dE/dx`` is the derivative w.r.t. the extinction variable x (not ext).
     Because x ∝ |F|², a structural parameter p that moves |F|² changes both
     the |F|² prefactor and x, and the exact chain factor for the analytic
-    coordinate/ADP columns is ``G = E + x·dE/dx`` (see
-    ``CompiledModel._structural_intensity_grad``).  The ``scale``/``occ``/
-    ``biso``/``cell``/``extinction`` columns need nothing from here — they go
-    through the finite-difference-of-``phase_peaks`` chain, which already sees
-    the folded-in E.
+    coordinate, ADP, Biso and occupancy columns is ``G = E + x·dE/dx`` (see
+    ``CompiledModel._f2_derivative_chain``).  The ``scale``/``cell``/
+    ``extinction`` columns need nothing from here — they go through the
+    finite-difference-of-``phase_peaks`` chain, which already sees the
+    folded-in E.
     """
     xp = get_backend()
     x, sth2, cth2 = _extinction_x(f2, wavelength, volume, two_theta_deg, ext)
