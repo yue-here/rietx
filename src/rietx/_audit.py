@@ -4767,7 +4767,15 @@ ROWS: tuple[Row, ...] = (
                   "the same starts, declared-stage points per evaluation 0.20-0.22x on NAC, "
                   "0.76-0.85x on SRM 660c, 0.98-0.99x on FAP, cpd-1a and the bench cases, and "
                   "every answer within 0.06 esd, background coefficients 0.08 "
-                  "(tests/test_window_domain.py, tests/test_window_slack.py)"),
+                  "(tests/test_window_domain.py, tests/test_window_slack.py); two series against "
+                  "the uniform 0.3 deg with the re-solve kept, shifts in esd over starts nudged "
+                  "1e-12 (2026-11-28, WP-2317, development data): the cpd-1 chain (8 lab patterns, "
+                  "qpa_plan with its closing stage, every warm stage sized; 11 starts, 360 "
+                  "quantities) moves no quantity's mean past 0.059 esd and no single pair past "
+                  "0.31, inside the 0.35 a rounding-level change gives on that chain; the CuCr2O4 "
+                  "ramp (17 11-BM patterns, mccusker_default with the closing stage declared, "
+                  "every warm stage sized; 5 starts, 425 quantities) moves none past 0.005 esd, "
+                  "and on its default route, where only the first pattern's stages size, 0.001"),
         grounds=("Ours, a speed setting (Rule 5, Arithmetic accuracy).  A stage re-solves once "
                  "on fresh windows when its window loss passes its fraction (R7, ruled "
                  "2026-11-27, WP-2317), never a third time; a second solve still past it is "
@@ -4777,9 +4785,12 @@ ROWS: tuple[Row, ...] = (
                  "extent lose the 0.3 deg headroom they had and are covered by the re-solve "
                  "alone.  3 is the smallest whole multiple covering every measured warm and "
                  "cold-zero movement.  The value is Claude's under R7's ruling; the generality "
-                 "judge called it weak on 2026-11-28 (no series measured sized against "
-                 "uniform), so it waits on the maintainer in R7's pull request."),
-        approved="2026-11-27"),
+                 "judge called it weak on 2026-11-28 for want of a series sized against "
+                 "uniform, and on the two series above judged it holds: no systematic "
+                 "departure, under the 0.071 esd the shipped stop and the 0.08 FullProf's "
+                 "leave on the cpd-1 chain.  Not measured: a series from a cold cell start or "
+                 "with a free wavelength."),
+        approved="2026-11-28", approved_by="checked"),
     Row("rietx.model.forward._BASES_CHUNK_ROWS", "constant", tier="invariant", value=128,
         evidence=("chunking of the derivative bases; bit-identical at 1, 7, 128 and 4096 rows on a "
                   "298-row node bucket, every derivative plane and the forward pattern, tchz_pv and "
