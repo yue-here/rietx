@@ -3267,6 +3267,11 @@ class CompiledModel:
         cell = tuple(values[f"phases.{ip}.cell.{k}"]
                      for k in ("a", "b", "c", "alpha", "beta", "gamma"))
         d = d_spacings(cp.reflections.index, *cell)
+        # a satellite or a parent-forbidden row has no nuclear structure
+        # factor, so it has no derivative of one either — the same mask
+        # ``_nuclear_f2`` applies to the forward model, applied here so the
+        # analytic column and the residual cannot disagree about a row the
+        # forward model puts at exactly zero
         nuc = self._nuclear_mask(ip)
         if nuc is not None:
             df2 = df2 * (nuc[:, None] if np.ndim(df2) == 2 else nuc)
@@ -3280,20 +3285,8 @@ class CompiledModel:
         if f2_grads is None:
             f2_grads = self.structural_f2_grads(
                 ip, values, *(((), (j,)) if adp else ((j,), ())))[1 if adp else 0]
-        cp = self.phases[ip]
-        cell = tuple(values[f"phases.{ip}.cell.{k}"]
-                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
-        d = d_spacings(cp.reflections.index, *cell)
-        df2 = f2_grads[j] @ np.asarray(coeffs, dtype=np.float64)
-        # a satellite or a parent-forbidden row has no nuclear structure
-        # factor, so it has no derivative of one either — the same mask
-        # ``_nuclear_f2`` applies to the forward model, applied here so the
-        # analytic column and the residual cannot disagree about a row the
-        # forward model puts at exactly zero
-        nuc = self._nuclear_mask(ip)
-        if nuc is not None:
-            df2 = df2 * nuc
-        return self._f2_derivative_chain(ip, values, cell, d, df2)
+        return self.site_intensity_grad(
+            ip, f2_grads[j] @ np.asarray(coeffs, dtype=np.float64), values)
 
     def _f2_derivative_chain(self, ip: int, values: dict[str, float],
                              cell: tuple, d: np.ndarray, df2: np.ndarray,

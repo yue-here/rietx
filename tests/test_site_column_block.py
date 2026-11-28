@@ -9,9 +9,13 @@ pattern.  Before angle 2 each column rebuilt those factors.  Now one
 (``least_squares._site_columns``).  It changes no arithmetic: each column
 meets the same multiplies in the same order, so the bar is the bytes.
 
-The oracle is the per-column builder as it stood at cd4a461f1, copied below
-with its docstring shortened, since the package's chain now serves both
-shapes and a test comparing it with itself would pass whatever it did.
+The oracle is the per-column loop as it stood at cd4a461f1, copied below
+with its docstring shortened: the gather and the accumulation once per
+column.  It still reaches the intensity chain through
+``CompiledModel.site_intensity_grad`` on one column, so it shares the
+chain's one-column path with the package.  That path's arithmetic is held by
+the goldens, and the block path's agreement with it by
+``test_a_block_through_the_chain_is_each_column_alone``.
 """
 from __future__ import annotations
 
@@ -51,9 +55,11 @@ FREE = ("phases.0.atoms.*.dof.*", "phases.0.atoms.*.adp.*",
 def _state(*, ties: bool, corrections: bool):
     """``(model, table)`` on ``test_biso_occ_columns``' P2₁/c phase.
 
-    ``corrections`` puts every factor of the intensity chain on: a Kα
+    ``corrections`` puts five factors of the intensity chain on: a Kα
     doublet, a finite-thickness flat plate, Suortti roughness, a
-    March-Dollase axis and extinction off zero.  ``ties`` makes N's
+    March-Dollase axis and extinction off zero.  A texture block and a peak
+    equation's intensity factor stay off; the chain broadcasts them the same
+    way.  ``ties`` makes N's
     coordinates follow C's and N's occupancy the remainder of C's, so the
     columns cross atoms and take the site branch rather than the
     one-atom one.
@@ -148,7 +154,7 @@ def test_the_jacobian_is_byte_equal_to_the_per_column_build(ties, corrections,
 
 def test_a_block_through_the_chain_is_each_column_alone():
     """``_f2_derivative_chain`` on (N, K) against K one-column calls, with
-    every factor on.  This is the arithmetic claim the Jacobian test rests
+    ``_state``'s five factors on.  This is the arithmetic claim the Jacobian test rests
     on, asserted where it is made."""
     model, table = _state(ties=False, corrections=True)
     values = table.decode(_theta(table))

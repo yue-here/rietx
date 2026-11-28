@@ -309,7 +309,7 @@ exact map in `decode`** converges in one solve of 6–8 TRF iterations to the sa
 (≤ 4e‑8 Å apart), commits a structure rigid to 1e‑15 Å, and needs **no new Jacobian
 branch**: a body column takes `_peak_chain_column`, which differences θ *through*
 `decode`, so the data‑row column is exact at every iteration (8e‑11 relative against the
-whole‑model FD; `_STRUCTURAL_PATH` never matches a body path, `_structural_column` is
+whole‑model FD; `_STRUCTURAL_PATH` never matches a body path, so the structural branch is
 never entered). The derived block is therefore the seam, and "constant during a run"
 narrows to the affine rows.
 
