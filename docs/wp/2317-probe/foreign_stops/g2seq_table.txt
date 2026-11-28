@@ -1,0 +1,22 @@
+tight: cycles [1, 9, 11, 9, 9, 20, 24, 8, 11, 17, 22, 14, 40, 10, 11, 16, 15] sum 247
+default: cycles total 48, converged 3/17, max dchi2 39908.5 (median 1083.9; tight chi2 median 33412, Nobs 12799)
+   CuCr2O4 cell(Dij)      4.89  0:14:D11 OH_45.fxye
+   CuO cell(Dij)          14.1  1:9:D22 OH_30.fxye
+   zero/disp              2.52  :15:Zero OH_49.fxye
+   profile                78.8  :15:U OH_49.fxye
+   scale                  6.78  :8:Scale OH_28.fxye
+   bkg                     3.8  :14:Back;0 OH_45.fxye
+default2: cycles total 35, converged 15/17, max dchi2 1454.6 (median 20.2; tight chi2 median 33412, Nobs 12799)
+   CuCr2O4 cell(Dij)     0.754  0:11:D33 OH_35.fxye
+   CuO cell(Dij)          14.1  1:9:D22 OH_30.fxye
+   zero/disp             0.771  :9:Zero OH_30.fxye
+   profile                55.4  :15:U OH_49.fxye
+   scale                  1.74  1:9:Scale OH_30.fxye
+   bkg                   0.396  :11:Back;7 OH_35.fxye
+dm: cycles total 89, converged 17/17, max dchi2 756.6 (median 100.7; tight chi2 median 33412, Nobs 12799)
+   CuCr2O4 cell(Dij)     0.502  0:9:D11 OH_30.fxye
+   CuO cell(Dij)          10.5  1:9:D22 OH_30.fxye
+   zero/disp             0.841  :9:Zero OH_30.fxye
+   profile                52.5  :15:U OH_49.fxye
+   scale                   1.3  1:16:Scale OH_53.fxye
+   bkg                   0.378  :9:Back;7 OH_30.fxye

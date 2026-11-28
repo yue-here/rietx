@@ -97,6 +97,8 @@
     frameAt = null,
     onpeakedit = async () => false,
     onpeakundo = async () => false,
+    source = null,
+    nav = null,
   }: {
     result: any;
     /** bumped when the curves moved: a run landed or the history moved */
@@ -149,6 +151,13 @@
     /** a request to frame a line: 2θ, with a count so the same line asked
      *  twice frames twice */
     frameAt?: { two_theta: number; seq: number } | null;
+    /** where the curves come from instead of the project's: a series member
+     *  (WP-2243). The graph fetches again when its `key` moves. */
+    source?: { key: string; load: () => Promise<ArrayBuffer> } | null;
+    /** the title line for a member of a series: its name, the rest of the
+     *  line, and ‹ › stepping the selection (round 12, call 2) */
+    nav?: { name: string; sub: string; canPrev: boolean; canNext: boolean;
+            onstep: (delta: number) => void } | null;
   } = $props();
 
   /** The difference axis's choices: the three today's page draws
@@ -165,6 +174,11 @@
   const UI_SCALE = "intensity_scale";
   const UI_DIFFERENCE = "difference";
   const GUTTER = 112;
+  /** How far the chart's canvas reaches into the gutter, as the plot's right
+   *  padding: the plot area ends at the gutter, and a 2θ label centred on that
+   *  edge is drawn whole, as the prototype's canvas spans its gutter (WP-2245).
+   *  Left to uPlot, the same 25 px sat outside the gutter, blank. */
+  const OVERHANG = 25;
   const LEGEND_ROW = 20;
 
   let host: HTMLDivElement | undefined = $state();
@@ -263,7 +277,8 @@
   const pct = (x: number | null | undefined) => (x == null ? "" : `${(x * 100).toFixed(2)} %`);
   /** The whole title line as its tooltip, since the title is what gives way
    *  (B1); a refused preview's reason is said there, in the route's words. */
-  const titleTip = $derived(previewing ? "Preview, not refined"
+  const titleTip = $derived(nav ? `${nav.name} · ${nav.sub}`
+    : previewing ? "Preview, not refined"
     : previewError ? `${title}. Preview refused: ${previewError}`
     : (held as Window | null)?.stale ? `${title}, fitted over other channels`
     : fitShown && howText ? `${title}. ${howText}` : title);
@@ -313,7 +328,8 @@
     let c: Curves;
     try {
       mod = chartModule ??= await import("./pattern");
-      c = await mod.fetchCurves();
+      const from = untrack(() => source);
+      c = from ? mod.unpackCurves(await from.load()) : await mod.fetchCurves();
     } catch (exc) {
       if (seq !== fetchSeq) return;
       dropChart();
@@ -339,6 +355,7 @@
         // no titles on screen (2026-11-11): each axis carries a hint instead,
         // and the y axes keep no strip for one (the look of 2026-11-21, item 1)
         titled: () => exporting,
+        padRight: OVERHANG,
         labels: {
           y: () => (!exporting ? "" : scale === "linear" ? "intensity"
             : `intensity (${scale === "sqrt" ? "√" : "log"})`),
@@ -458,11 +475,15 @@
   const protocolKey = $derived(JSON.stringify([protocol.limits, protocol.regions]));
   const extentKey = $derived(JSON.stringify(extent));
 
-  // fetch on what moves the curves: a run, a move in the history, the mask
+  const sourceKey = $derived(source?.key ?? null);
+
+  // fetch on what moves the curves: a run, a move in the history, the mask,
+  // another series member or its fit landing
   $effect(() => {
     void plotKey;
     void protocolKey;
     void result;
+    void sourceKey;
     untrack(() => drawChart());
   });
 
@@ -939,9 +960,11 @@
   });
   let barWidth = $state(0);
   let hostWidth = $state(0);
+  /** The host's width short of the gutter, which its canvas reaches into by `OVERHANG`. */
+  const columnWidth = $derived(hostWidth - OVERHANG);
   let peakBarWidth = $state(0);
   const peakBarLeft = $derived(peakSpot
-    ? Math.max(peakBarWidth / 2, Math.min(hostWidth - peakBarWidth / 2, peakSpot.left)) : 0);
+    ? Math.max(peakBarWidth / 2, Math.min(columnWidth - peakBarWidth / 2, peakSpot.left)) : 0);
 
   /** The DOM marks: a dashed lens where a click would add a line (rule 9),
    *  the dragged or pending lens, and the danger lens under Option. */
@@ -1107,7 +1130,7 @@
   const barLeft = $derived.by(() => {
     if (!span) return 0;
     const mid = span.left + span.width / 2;
-    return Math.max(barWidth / 2, Math.min(hostWidth - barWidth / 2, mid));
+    return Math.max(barWidth / 2, Math.min(columnWidth - barWidth / 2, mid));
   });
 
   // -- the legend ------------------------------------------------------------
@@ -1189,6 +1212,16 @@
         <b class="pv">Preview, not refined</b>
         <span class="stat">Rwp <span class="num">{pct(preview?.curves?.header?.rwp)}</span>{#if stats?.rwp != null},
           last fit <span class="num">{pct(stats.rwp)}</span>{/if}</span>
+      {:else if nav}
+        <!-- a series member: ‹ › step the one selection every view shares,
+             then its name and the prototype's line (round 12, call 2) -->
+        <span class="sstep">
+          <button class="ib" aria-label="Previous pattern" title="Previous pattern (↑)"
+            disabled={!nav.canPrev} onclick={() => nav.onstep(-1)}>‹</button>
+          <button class="ib" aria-label="Next pattern" title="Next pattern (↓)"
+            disabled={!nav.canNext} onclick={() => nav.onstep(1)}>›</button>
+        </span>
+        <b>{nav.name}</b><span class="stat">{nav.sub}</span>
       {:else}
       {#if title}<b>{title}</b>{/if}
       {#if previewError}<span class="bad">Preview refused</span>{/if}
@@ -1218,7 +1251,7 @@
     {:else if loadError}
       <p class="empty bad">{loadError}</p>
     {/if}
-    <div class="plot" class:armed={!!arm} style:--gutter="{GUTTER}px"
+    <div class="plot" class:armed={!!arm} style:--gutter="{GUTTER}px" style:--overhang="{OVERHANG}px"
       style:--inset="{LABEL_INSET}px" style:--mark-line="{MARK_LINE}px">
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div class="host" class:onmark={overMark != null && !altHeld} class:dragging={!!drag?.moved}
@@ -1376,6 +1409,15 @@
 {/if}
 
 <style>
+  /* ‹ › before a series member's name, the prototype's place for them */
+  .gtitle > .sstep {
+    display: inline-flex;
+    gap: 2px;
+    margin: 0 8px 0 0;
+    color: var(--fg);
+    vertical-align: middle;
+  }
+
   .pattern {
     flex: 1 1 auto;
     min-height: 0;
@@ -1411,7 +1453,7 @@
 
   .host {
     position: absolute;
-    inset: 0 var(--gutter) 0 0;
+    inset: 0 calc(var(--gutter) - var(--overhang)) 0 0;
   }
 
   .plot.armed .host :global(.u-over) {

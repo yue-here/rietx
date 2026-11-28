@@ -46,9 +46,9 @@ This fit refines the GSAS-II tutorial fluorapatite pattern twice under one plan,
   phases.0.atoms.5.biso  0.467 ± 0.157
   phases.0.atoms.6.biso  0.385 ± 0.109
 32 0.0894
-  phases.0.atoms.4.biso  0.377 ± 0.076
-  phases.0.atoms.5.biso  0.377 ± 0.076
-  phases.0.atoms.6.biso  0.377 ± 0.076
+  phases.0.atoms.4.biso  0.376 ± 0.076
+  phases.0.atoms.5.biso  0.376 ± 0.076
+  phases.0.atoms.6.biso  0.376 ± 0.076
 ```
 
 For each pair of free values, divide their difference by their combined esd, the square root of the sum of the two squared esds.

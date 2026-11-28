@@ -112,6 +112,41 @@ def test_the_trigger_pattern_is_deterministic(bench):
     assert not np.array_equal(np.asarray(a.intensity), np.asarray(c.intensity))
 
 
+def test_the_bigcell_cases_carry_the_large_cell_shape(bench):
+    """WP-2317's cases exist for their shape: a real 12.2 × 36.7 × 3.95 Å
+    cell (Nb₁₈W₁₆O₉₃, COD 2107344) with its 43 published sites, and more
+    (line, reflection) pairs than ``trigger``.
+
+    The structure is pinned to the vendored file because the maintainer
+    asked for a real one in place of probe 1's invented atoms (2026-11-27).
+    The structural case's preparation must tie the eight co-sited Nb/W
+    pairs: one tie for the fixed pair's Biso, three for each of the seven
+    others (two site-symmetry steps and the Biso).  Compiled on a blank
+    pattern, so nothing here evaluates the model.
+    """
+    from test_large_cell_refinement import tie_co_sited
+
+    phase = bench._bigcell_phase(0.0)
+    assert phase.space_group.replace(" ", "") == "Pbam"
+    assert (phase.cell.a.value, phase.cell.b.value, phase.cell.c.value) == \
+        pytest.approx((12.195, 36.73999, 3.951))
+    assert len(phase.atoms) == 43
+    structure = rx.Structure(phases=[phase])
+    tt = np.arange(5.0, 90.0, 0.02)
+    blank = rx.PatternData(two_theta=tt.tolist(),
+                           intensity=np.ones_like(tt).tolist())
+    model = compile_model(structure, bench._bigcell_instrument(truth=True), blank)
+    pairs = sum(int(ph.win.shape[0] * ph.win.shape[1]) for ph in model.phases)
+    assert pairs > 1500, f"the 90° large cell carries only {pairs} pairs"
+
+    ref = rx.Refinement(rx.Structure(phases=[bench._bigcell_phase(5e-4)]),
+                        bench._bigcell_instrument(truth=False), history=False)
+    assert tie_co_sited(ref) == 22
+    keys = {c.key: c for c in bench.CASES}
+    assert {"bigcell-structural", "bigcell-pawley", "bigcell-pawley-120",
+            "bigcell-lebail"} <= set(keys)
+
+
 def test_a_baseline_case_builds_a_compiled_model(bench):
     """`cpd-1a` is the cheapest real-data case to build: a read plus the scale
     seeding.  Compiling its setup is what every timed repeat starts from."""
