@@ -800,6 +800,11 @@ refines as before.  A bump rather than "also in 0.61" because 1.12.0 shipped
 0.61: a 1.12 build refuses a phase or instrument carrying the key, and the
 version now says why.
 
+Also in 0.62 (#562 S2b, WP-1997): ``Capabilities.solve_engines``, the
+structure-solution engines the build registers.  Additive and defaulted to
+an empty list, the same rule.  The solver stays unexported, so
+``SolutionResult``'s own schema move waits until it is exported.
+
 Also in 0.62 (WP-2081): ``SeriesEntry.held_values``, every path the
 caller held on a pattern with the value it was held at.  Additive and
 defaulted to ``None``, the 0.25 → 0.26 rule; an older build refuses an entry
