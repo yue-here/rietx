@@ -2,7 +2,7 @@
 
 Milestone: unscheduled · Status: 🔄 2026-11-28 — task 1, the cached |T| and Angle 9 done; Angles 0-2 held, since the real-structure bench crosses no width row; Angle 4, now the leading cost, open
 Track: A large cell
-Depends on: 2317 soft (its `bigcell-pawley` case and rulings R0, R4, R5)
+Depends on: 2317 soft (its `bigcell-pawley` case and rulings R0, R4 (settled 2026-11-28), R5)
 Priority: P2 2026-11-28 — the maintainer's large-cell track, ruled to proceed whatever the user's case shows; the real-structure bench crosses no width row, so what reaches it is Angle 4 (`spilu`, about half the 120° fit)
 
 ## Goal
@@ -201,6 +201,10 @@ free swap under LM.
    rise.
 6. **Clamp by value** (R4; kind (b)). It must answer the LM stalls above and
    state its Rule 1 kind. `PEAK_WIDTH_NOT_POSITIVE` reports the clamp.
+   *Dropped 2026-11-28: R4 settled by Claude under measurement, keeping the
+   width floor inside the LM step in every mode (LM stalls without the row:
+   NAC Rwp 0.180 against TRF's 0.134, Cr₂WO₆ 0.255 against 0.099; TRF took
+   159.5 s against LM's 13.6 s on probe 1 at 90°). A blind review agreed.*
 7. **Profile out the intensities** (R5; kind (b), and the WP-2062
    conversation): a bounded VarPro, LM over the profile columns with the
    intensities by NNLS per evaluation.
@@ -315,6 +319,10 @@ which is Angle 4.
   re-read on the new cases, which this entry does.
 - WP-2317's `### Inherited` has a bullet for R4: no step on the bench
   crosses a width row.
+- R4 settled by Claude under measurement (LM stalls without the row: NAC
+  0.180 against 0.134, Cr₂WO₆ 0.255 against 0.099; TRF 159.5 s against
+  13.6 s), 2026-11-28; a blind review agreed; Angle 6 dropped. Recorded at
+  the shift lead's word; the Angles list marks it.
 
 *Measured* (macOS arm64, `[dev]`, compiled tier on, Accelerate, rietx
 1.13.0.dev0 at 8e691ccb8; every run under the shift's suite lock).
@@ -361,7 +369,12 @@ still fits a 15 s fit with no crossing, which Next item 1 re-reads.
    or a bench case whose truth presses Γ_L. The design notes in the Angles
    list stand. Pruning keeps the polish's inputs, so a pruned step that finds
    the same active rows, in the same order, gives the same polished step.
-3. Why probe 1's structure presses on Γ_L is still unmeasured.
+3. Why probe 1's structure presses on Γ_L is still unmeasured. The review
+   of R4 left a lead: every probe 1 crossing is on the Γ_L ≥ 0 rows, and X
+   and `lor_size` both go as 1/cosθ, so their difference may be a flat
+   direction. If so, the crossings are a conditioning problem rather than a
+   step-cost one. Test it on probe 1 by the correlation of X and `lor_size`
+   in the `profile` stage, or by refitting with one of them held.
 
 ### 2026-11-27 (4th session) — Angle 9, the lattice merge (ghostshift runner; PR #1869)
 
