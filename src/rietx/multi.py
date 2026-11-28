@@ -30,6 +30,7 @@ from contextlib import contextmanager
 import numpy as np
 
 from . import runs
+from ._nearmiss import check_choice
 from .backend.api import backend_dtype_note
 from .crystallography.structure_factor import phase_orbit_split
 from .crystallography.twins import merge_site_twins
@@ -141,6 +142,7 @@ from .refine import (
     _phase_support_diagnostics,
     _quantify_phases,
     _radiation,
+    _reader_diagnostics,
     _refuse_without_phases,
     _reported_support_sigma,
     _resolve_specimen_absorption,
@@ -171,7 +173,7 @@ from .refine import (
 )
 from .report.magnetic import moment_angle_stationary_diagnostics
 from .report.schemas import THRESHOLDS_VERSION
-from .schemas.common import Diagnostic, Parameter, Provenance
+from .schemas.common import Diagnostic, Parameter, Provenance, check_mode
 from .schemas.instrument import Instrument
 from .schemas.parametric import (
     CoordinateTable,
@@ -302,6 +304,8 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
                       "histogram the model does not describe"),
     "_low_angle_diagnostics": (
         (HISTOGRAM,), "the region below one pattern's first reflection"),
+    "_reader_diagnostics": (
+        (HISTOGRAM,), "what one file's reader repaired or noticed (WP-2304)"),
     "_air_scatter_undeclared_diagnostics": (
         (HISTOGRAM,), "one histogram's residual against its own background"),
     "_qpa_esd_unavailable_diagnostics": (
@@ -1526,16 +1530,10 @@ class MultiHistogramRefinement:
                  parametric: list[ParametricEquation] | None = None,
                  variables: dict[str, Parameter] | None = None,
                  backend: str = "numpy", solver: str = DEFAULT_SOLVER):
-        if backend != "numpy":
-            from .backend import resolve_backend
+        from .backend.api import check_backend
 
-            try:
-                resolve_backend(backend)  # fail fast with the install hint
-            except ValueError as exc:
-                raise NotImplementedError(str(exc)) from exc
-        if solver not in SOLVERS:
-            raise ValueError(f"unknown solver {solver!r}; "
-                             f"available: {', '.join(SOLVERS)}")
+        check_backend(backend)
+        check_choice("solver", solver, SOLVERS)
         self._backend = backend
         self._solver = solver
         instruments = list(instruments)
@@ -1667,6 +1665,8 @@ class MultiHistogramRefinement:
         ``set_values`` on the joint fit are not built (#1205's ruling), and the
         plan's globs are how a joint fit frees a row.
         """
+        if mode is not None:
+            check_mode(mode)
         if mode is None:
             mode = self.result_.mode if self.result_ is not None else "rietveld"
         mt = self.mtable
@@ -1755,6 +1755,7 @@ class MultiHistogramRefinement:
         joint fit is its event log, and :meth:`report` builds the answer's
         report per histogram.
         """
+        check_mode(mode)
         _refuse_without_phases(self.mtable.structures[0], "refine_multi")
         data = list(data)
         n = self.n_histograms
@@ -2734,6 +2735,7 @@ class MultiHistogramRefinement:
                                                 ticks, tick_support))
             diags.extend(_air_scatter_undeclared_diagnostics(model, values,
                                                              y_calc, stats))
+            diags.extend(_reader_diagnostics(model, diags))
 
             histograms.append(HistogramResult(
                 label=model.meta.get("label", "") or f"hist{h}",
@@ -4117,6 +4119,7 @@ def refine_multi(data: list[PatternData], structure: Structure | list[Structure]
     ``basis="expression"`` equation refines (WP-1964), and ``mode``,
     ``events``, ``cancel``, ``telemetry``, ``label`` and ``progress`` its
     ``fit``'s."""
+    check_mode(mode)
     ref = MultiHistogramRefinement(structure, instruments, sharing=sharing,
                                    coordinates=coordinates, parametric=parametric,
                                    variables=variables,

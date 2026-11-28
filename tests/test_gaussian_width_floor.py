@@ -103,7 +103,7 @@ def _draw(result, stem: str) -> None:
 
     OUT.mkdir(exist_ok=True)
     plot_result(result, path=str(OUT / f"{stem}.png"))
-    plot_result(result, path=str(OUT / f"{stem}_zoom.png"), two_theta_range=(9.5, 12.5))
+    plot_result(result, path=str(OUT / f"{stem}_zoom.png"), two_theta_limits=(9.5, 12.5))
 
 
 @pytest.fixture(scope="module")

@@ -1806,6 +1806,88 @@ def reflection_orbits(sg_symbol: str, hkl_reps: np.ndarray) -> list[np.ndarray]:
     return orbits
 
 
+def lattice_coincidences(sg_symbol, hkl_reps: np.ndarray) -> list[list[int]]:
+    """Groups of reflections whose d agree in **every** cell the group allows.
+
+    Returns lists of row indices into ``hkl_reps``, each of size ≥ 2, in
+    ascending order of their first member.  Two reflections in one list have
+    equal d for every metric of the space group's setting, so no powder pattern
+    of that phase can separate their intensities: cubic 333 and 511, or hkl
+    and khl under 4/m, -3 or 6/m.  Symmetry equivalents are already one row of
+    :func:`generate_reflections`, so they never appear here.  An accidental or
+    pseudo-metric coincidence (b ≈ 3a) is not returned either, since a cell the
+    group allows separates it.
+
+    **The test is exact, in integers.**  d*² = hᵀG*h, and the metrics the
+    setting allows are the G* with G* = R·G*·Rᵀ for every rotation R (the
+    untransposed action on a tensor that contracts with h twice; root
+    ``CLAUDE.md``).  For such a G*, tr(hhᵀ·G*) equals the trace of the group
+    average of (Rᵀh)(Rᵀh)ᵀ against G*, and that pairing is non-degenerate on
+    the invariant subspaces.  So two reflections coincide for every allowed
+    metric exactly when Σ_R (Rᵀh)(Rᵀh)ᵀ agrees, an integer matrix.  The
+    rotations are the setting's own, so a rhombohedral-axes or a c-unique
+    setting is served by the same arithmetic.  The derivation is the Reynolds
+    projection of invariant theory; ``tests/test_pawley_lattice_merge.py``
+    checks the answer against GSAS-II's per-Laue-class integer identities
+    (Toby & Von Dreele, 2013, J. Appl. Cryst. 46, 544;
+    ``GSASIIstrIO.GetPawleyConstr``, 5.8.4) and against d at random cells
+    drawn from :func:`cell_constraints`.
+    """
+    hkl = np.asarray(hkl_reps, dtype=np.int64).reshape(-1, 3)
+    if len(hkl) < 2:
+        return []
+    rots = rotation_matrices(as_group(sg_symbol))
+    rot_t = np.rint(np.transpose(rots, (0, 2, 1))).astype(np.int64)
+    rot_t = np.unique(rot_t.reshape(len(rot_t), 9), axis=0).reshape(-1, 3, 3)
+    images = np.einsum("mij,nj->nmi", rot_t, hkl)
+    moment = np.einsum("nmi,nmj->nij", images, images)
+    key = moment[:, [0, 1, 2, 1, 0, 0], [0, 1, 2, 2, 2, 1]]
+    _, inverse, counts = np.unique(key, axis=0, return_inverse=True,
+                                   return_counts=True)
+    inverse = np.asarray(inverse).reshape(-1)
+    shared = np.flatnonzero(counts >= 2)
+    if not len(shared):
+        return []
+    groups = [np.flatnonzero(inverse == u).tolist() for u in shared]
+    return sorted(groups, key=lambda g: g[0])
+
+
+#: Relative d difference under which two reflections count as one d when
+#: ordering the list: a few ulps of a d near 1 Å, far below any separation the
+#: data could see.  *(Chosen: WP-2315, 2026-11-27 — numeric tie tolerance.)*
+_D_TIE_REL = 1e-12
+
+
+def _order_by_d(d: np.ndarray) -> np.ndarray:
+    """Indices ordering ``d`` descending, with equal d kept in input order.
+
+    Reflections whose d agree in every cell (cubic 221 and 300) compute equal
+    d, or d an ulp apart depending on the cell and the platform's arithmetic,
+    and numpy's default argsort does not keep ties in place.  So the members'
+    order, and with it every index-keyed comparison between two compiles, came
+    to depend on the run (WP-2315: Linux swapped a pair macOS kept).  A stable
+    sort, then each run of d within ``_D_TIE_REL`` put back in input order,
+    makes the order a function of the reflection list alone.
+    """
+    order = np.argsort(-d, kind="stable")
+    if len(order) < 2:
+        return order
+    ds = d[order]
+    tie = np.abs(np.diff(ds)) <= _D_TIE_REL * np.abs(ds[1:])
+    if not tie.any():
+        return order
+    out = order.copy()
+    i, n = 0, len(order)
+    while i < n:
+        j = i
+        while j + 1 < n and tie[j]:
+            j += 1
+        if j > i:
+            out[i:j + 1] = np.sort(order[i:j + 1])
+        i = j + 1
+    return out
+
+
 def generate_reflections(sg_symbol: str,
                          cell: tuple[float, float, float, float, float, float],
                          wavelength: float,
@@ -1938,7 +2020,7 @@ def generate_reflections(sg_symbol: str,
                      (sel % radix) - base], axis=1).astype(np.int64)
     mult = n_distinct[keep].astype(np.int64)
     d_reps = d_spacings(reps, *cell)
-    sort = np.argsort(-d_reps)  # ascending 2θ = descending d
+    sort = _order_by_d(d_reps)  # ascending 2θ = descending d
     return ReflectionSet(hkl=reps[sort], multiplicity=mult[sort], d=d_reps[sort],
                          spacegroup=sg.xhm(),
                          operations=(sg.xyz if isinstance(sg, OperatorGroup)
