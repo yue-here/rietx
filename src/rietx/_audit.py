@@ -6587,10 +6587,11 @@ ROWS: tuple[Row, ...] = (
                   "lower) on undamped cycles (docs/practice.md, When a fit stops); read on the "
                   "undamped Gauss-Newton step, since on the damped one 0.2 and GSAS-II's 1e-3 "
                   "ended cpd-1f 18 esd off (docs/wp/2317-probe/convnoise/RESULTS.md); against "
-                  "the 1e-9 stop on development data, macOS arm64: CuCr2O4 ramp 363 against 1 293 "
-                  "evaluations, worst 1.2 esd (1 wt% CuO cell), main phase under 0.053; cpd-1 "
-                  "chain 322 against 517, worst 0.071; single fits under 0.06 esd, 0-9 % "
-                  "saved (probe); as shipped, docs/wp/2317-probe/r6/RESULTS.md")),
+                  "the 1e-9 stop on development data as shipped, macOS arm64 "
+                  "(docs/wp/2317-probe/r6/RESULTS.md): CuCr2O4 ramp 748 against 1 293 "
+                  "evaluations, worst 0.72 esd (1 wt% CuO cell), main phase under 0.006; cpd-1 "
+                  "chain 411 against 516, worst 0.59 (profile v), weight fractions under 0.05; "
+                  "single fits under 0.06 esd, 6-16 % of evaluations saved")),
     Row("rietx.schemas.plan.PlanSpec:stages", "default", tier=1, ambiguity=1, value=(),
         evidence="arithmetic: the empty container; resolve_plan supplies every plan a fit runs"),
     Row("rietx.schemas.plan.PlanSpec:correlation_guard", "default", value=0.98),
@@ -6662,10 +6663,11 @@ ROWS: tuple[Row, ...] = (
                   "lower) on undamped cycles (docs/practice.md, When a fit stops); read on the "
                   "undamped Gauss-Newton step, since on the damped one 0.2 and GSAS-II's 1e-3 "
                   "ended cpd-1f 18 esd off (docs/wp/2317-probe/convnoise/RESULTS.md); against "
-                  "the 1e-9 stop on development data, macOS arm64: CuCr2O4 ramp 363 against 1 293 "
-                  "evaluations, worst 1.2 esd (1 wt% CuO cell), main phase under 0.053; cpd-1 "
-                  "chain 322 against 517, worst 0.071; single fits under 0.06 esd, 0-9 % "
-                  "saved (probe); as shipped, docs/wp/2317-probe/r6/RESULTS.md"),
+                  "the 1e-9 stop on development data as shipped, macOS arm64 "
+                  "(docs/wp/2317-probe/r6/RESULTS.md): CuCr2O4 ramp 748 against 1 293 "
+                  "evaluations, worst 0.72 esd (1 wt% CuO cell), main phase under 0.006; cpd-1 "
+                  "chain 411 against 516, worst 0.59 (profile v), weight fractions under 0.05; "
+                  "single fits under 0.06 esd, 6-16 % of evaluations saved"),
         grounds=("Rule 5 Arithmetic accuracy: the accuracy other programs' users publish, read in "
                  "each quantity's esd; R6 ruled 2026-11-27 ('Start with your recommendation. "
                  "Consider best practice.'), the level re-settled by Claude the same day under "

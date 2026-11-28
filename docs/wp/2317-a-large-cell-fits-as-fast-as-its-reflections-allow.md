@@ -1,6 +1,6 @@
 # WP-2317 — a large cell fits as fast as its reflections allow: the case, the bar, and the rulings in the way
 
-Milestone: unscheduled · Status: 🔄 2026-11-27 — R0, R2, R3 and R5-R7 ruled and recorded, R4 unruled; task 1 waits on the maintainer; R6's implementation, 5, 7 and 8 open
+Milestone: unscheduled · Status: 🔄 2026-11-28 — R0, R2, R3 and R5-R7 ruled and recorded, R4 unruled; task 1 waits on the maintainer; R6 built, its goldens wait on #1881; 5, 7 and 8 open
 Track: A large cell
 Depends on: —
 Priority: P2 2026-11-27 — the scoping WP of a track the maintainer opened for a user at the wall (slowdowns on a 12 × 36 × 4 Å cell); 2314, 2315 and 2316 read its case, its bar and its rulings
@@ -654,6 +654,8 @@ what it costs here.
       the undamped Gauss-Newton step is under 0.1 esd, and a plan field keeps 1e-9
       in WP-2222's three compounding places. Re-pin the goldens in the
       same change (R0), and check that profile-interval refits still settle.
+      *Built 2026-11-28 (6th session) on `wp2317-stopping-rule`; the goldens
+      re-pin after R7's #1881 merges.*
 - [x] Why the 40-atom `coordinates` stage took 119 LM iterations from the true
       coordinates. *Answered 2026-11-27 by the review: the first probe drew its
       atoms inside a 1/15.6 sub-box, 65 % of nearest neighbours under 1 Å. On
@@ -694,6 +696,71 @@ what it costs here.
 - `docs/practice.md` § Structure-free fitting, § When a fit stops, § Peak-width limits.
 
 ## Handover log
+
+### 2026-11-28 (6th session) — R6 built: the last stage stops on the undamped shift over its esd
+
+The plan's last stage now stops once the next undamped step would move no free
+parameter by a tenth of its esd, McCusker's test of a converged refinement. A
+series gets the saving: the 17-pattern CuCr₂O₄ ramp takes 748 evaluations
+against 1 293, and a single fit saves 6-16 %. The cost is a departure from the
+1e-9 answer of at most 0.06 esd on a single fit, and 0.72 esd on a series, on
+the cell of a 1 wt% phase. The goldens are not re-pinned yet, by plan: they
+wait on R7's #1881, so the two re-pins land once.
+
+**Done.**
+- `optimize.lm.minimize(shift_tol=)`: each iteration solves the step once more
+  at λ = 0 and stops (`termination="shift_over_esd"`) when the largest
+  |Δᵢ|/σᵢ is under the tolerance. σ is √(χ²_ν·(A⁺)ᵢᵢ) on the equilibrated A,
+  without the Bérar-Lelann factor. A sparse A past 128 columns (Pawley) uses the
+  Cauchy-Schwarz bound, which never stops earlier than the exact ratio.
+- `RefinementPlan.shift_over_esd_tol` / `PlanSpec.shift_over_esd_tol`, default
+  `SHIFT_OVER_ESD_TOL` = 0.1, equal to `statistics.MAX_SHIFT_CONVERGED` by test.
+  `stage_shift_tols()` is the schedule, parallel to `stage_ftols()`: the last
+  declared stage and the closing stage take it unless they declare an `ftol`.
+- 1e-9 kept, field `None`, in WP-2222's three places: `lab_calibrate`, a series
+  carrying Pawley intensities, and the guides that print numbers (path,
+  calibrate, branch, magnetic, moment). Profile-interval and fraction-profile
+  refits run `None`, since their settle test reads χ² finer than 0.1 esd.
+- Recorded and replayed: `StageResult`/`NodeAction.shift_over_esd_tol`,
+  `run_stage(shift_over_esd_tol=0.1)`, cherry-pick, `api_call`,
+  `_plan_settings`, the series collapse, the magnetic solve's plans, and the
+  `.rxt` `shift` line (rendered only away from 0.1; GUI dist rebuilt).
+- Manual: two pages split off at the 50 000-character cap,
+  `reference/stopping.md` (Stage tolerances, from `refinement.md`) and
+  `theory/convergence.md` (from `estimation.md`, with a `MOVED_ANCHORS` row and
+  the help anchors moved). Skill 8.20, audit rows, help entries.
+- `2317-probe/r6/`: `measure.py` and `RESULTS.md`.
+
+**Measured** (macOS arm64, this worktree's `.venv`, `[dev]`, shared machine;
+`2317-probe/r6/RESULTS.md`). Evaluations, 1e-9 → 0.1, and the worst departure:
+- Single fits: SRM 660c 69 → 65 (0.026 esd), FAP 40 → 34 (0.044), NAC 49 → 43
+  (0.010), cpd-1a 165 → 143 (0.052), `bigcell-structural` 116 → 104 (0.011),
+  `bigcell-lebail` 26 → 23 (0.015), `bigcell-pawley` 43 → 37 (0.036),
+  `bigcell-pawley-120` 43 → 36 (0.038). Rwp within 5e-6. The Pawley cases gain
+  no wall clock, the extra sparse solve costing what it saves.
+- Series: CuCr₂O₄ 1 293 → 748, 102.7 → 43.5 s, worst 0.72 esd (CuO cell; main
+  phase 0.006, weight fractions 0.071); cpd-1 516 → 411, worst 0.59 esd
+  (`instrument.profile.v`; weight fractions 0.050), the size of that chain's own
+  start-nudge floor.
+- Tests on this branch: `tests/test_shift_stop.py` 13, `test_lm_solver.py` +5,
+  `test_solver_seam.py` +1, `test_textdoc.py` +1. The fast and full suites were
+  not run: the goldens move, and re-pin in Phase 2.
+
+**In flight.** Phase 2, after #1881 merges: merge `origin/main`, re-measure if
+the merge moved a solve, re-pin the goldens, the full suite once, the PR.
+WP-2316's Le Bail branches do not land before v1.13.0 and are not merged here.
+
+**For the maintainer.** One stored-format question, not blocking: the change
+adds two optional keys, `shift_over_esd_tol` on a history node's action and on
+a project's plan. Old files read as "no shift test" (`None`), which is what they
+ran. The precedent is WP-1123's `ftol` and WP-2002's `window_area_tol`, both
+added the same way.
+
+**Gotchas.**
+- A page at the 50 000-character cap takes no new section. Split it, and give
+  the moved section a `MOVED_ANCHORS` row if a release linked it.
+- `PlanSpec`'s after-validators see a coerced value, so `True` passes as 1.0.
+  The shift field validates before coercion.
 
 ### 2026-11-27 (5th session) — the rulings recorded, accuracy set by what users need, and the stopping rule re-settled
 

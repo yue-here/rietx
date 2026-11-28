@@ -193,12 +193,13 @@ CLOSING_WINDOW_TOL = 1e-3
 #: convergence.  So the test reads the undamped step, as FullProf's own
 #: undamped cycles do.
 #:
-#: **What it buys, measured 2026-11-27** against the 1e-9 stop it replaces
-#: (``docs/wp/2317-probe/convnoise/RESULTS.md``; macOS arm64, development
-#: data): the 17-pattern CuCr₂O₄ ramp took 363 evaluations against 1 293,
-#: its worst quantity the cell of a 1 wt% CuO phase 1.2 esd off and the main
-#: phase within 0.053 esd; the 8-pattern cpd-1 chain took 322 against 517,
-#: worst 0.071 esd.  Single fits stay under 0.06 esd, saving 0-9 % of a fit.
+#: **What it buys, measured 2026-11-28** against the 1e-9 stop it replaces
+#: (``docs/wp/2317-probe/r6/RESULTS.md``; macOS arm64, development data): the
+#: 17-pattern CuCr₂O₄ ramp took 748 evaluations against 1 293, its worst
+#: quantity the cell of a 1 wt% CuO phase 0.72 esd off and the main phase
+#: within 0.006 esd; the 8-pattern cpd-1 chain took 411 against 516, worst
+#: 0.59 esd (a width), weight fractions within 0.05 esd.  Single fits stay
+#: under 0.06 esd, saving 6-16 % of a fit's evaluations.
 #: A departure of one esd sits inside the error bar the user is shown.
 #: ``None`` stops on the solver's 1e-9 alone, every fit before WP-2317 bit for
 #: bit, and is what the three places an error compounds declare: the
@@ -383,8 +384,8 @@ class PlanSpec(Base):
             "declares its own ftol.  0.1 is the field's test of a converged "
             "refinement (McCusker et al. 1999, section 7).  null = stop on "
             "the solver's 1e-9 change in chi2 alone, every fit before "
-            "WP-2317; on a 17-pattern series 0.1 took 363 evaluations "
-            "against 1 293, its worst quantity 1.2 esd off"))
+            "WP-2317; on a 17-pattern series 0.1 took 748 evaluations "
+            "against 1 293, its worst quantity 0.72 esd off"))
 
     @field_validator("phase_support_sigma")
     @classmethod
