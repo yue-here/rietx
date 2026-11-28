@@ -57,6 +57,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2072](2072-the-le-bail-and-pawley-cell-against-the-srm-660c-certificate.md) | The Le Bail and Pawley cell, validated against the SRM 660c certificate | 2026-11-16 | P3 | [Unscheduled](#unscheduled-the-fit-has-no-reference) |
 | [2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md) | The extinction screen names a wrong class at a correct cell | 2026-11-13 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-16 | P2 | [series](#series) |
+| [2132](2132-the-estimation-page-splits-before-it-grows.md) | The Estimation page splits before it grows | 2026-11-16 | P3 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2140](2140-every-atom-is-named-by-its-unique-label.md) | Every atom is named by its unique label | 2026-11-28 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2211](2211-the-history-table.md) | The History table: Compare on the pattern, Restore as pending edits | 2026-11-23 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2221](2221-a-group-with-no-tabulated-type-reaches-the-report.md) | A phase whose group has no tabulated type still gets its report and its CIF | 2026-11-21 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
@@ -920,7 +921,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2077](2077-the-workflow-sees-ghostshift-runners.md) | The WP workflow sees ghostshift's runners | ✅ 2026-11-02 | — | — |
 | [2119](2119-the-design-record-says-how-a-design-is-chosen.md) | The design record says how a design is chosen | ✅ 2026-11-07 | — | — |
 | [2122](2122-the-mark-redrawn.md) | The mark's bar redrawn, and the header lockup set on the type | ✅ 2026-11-08 | — | — |
-| [2132](2132-the-estimation-page-splits-before-it-grows.md) | The Estimation page splits before it grows | ⬜ | P3 | — |
+| [2132](2132-the-estimation-page-splits-before-it-grows.md) | The Estimation page splits before it grows | 🔄 2026-11-16 | P3 | — |
 | [2134](2134-the-gui-rulebook-condensed.md) | The GUI rulebook keeps rules, and its evidence moves out | ✅ 2026-11-10 | — | — |
 | [2143](2143-a-case-only-rename-works-on-windows.md) | A case-only rename works on Windows, and its recovery copy follows the folder | ✅ 2026-11-12 | — | — |
 | [2145](2145-the-gui-boot-test-waits-as-long-as-the-boot.md) | The `rietx watch` GUI boot test waits as long as the watcher does | ✅ 2026-11-13 | — | — |
