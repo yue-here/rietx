@@ -2355,8 +2355,63 @@ ROWS: tuple[Row, ...] = (
                   "person's stop, and no default path sets one (searched 2026-10-24). It "
                   "reports the requested act, n of N patterns, and moves no value "
                   "(sequential.py:2153-2167, WP-1016)")),
-    Row("SEQUENTIAL_MOMENT_HOLD", "code"),
-    Row("SEQUENTIAL_MOMENT_ONSET", "code"),
+    Row("SEQUENTIAL_MOMENT_HOLD", "code", tier=1, ambiguity=1,
+        response="warning",
+        responds=("quote the patterns the message counts as held, not as measured moments, "
+                  "and read each floored successor's modulus as reseeded, not warm-started"),
+        evidence=("arithmetic on the per-pattern MOMENT_UNSUPPORTED verdicts: fires exactly "
+                  "when one or more patterns of a site came back unsupported, and never on "
+                  "patterns that gave no verdict alone (sequential._moment_diagnostics). It "
+                  "names what SeriesEntry.floored records; the floor itself is that row's "
+                  "act, tier 3, approved 2026-11-03, so it is not audited twice here. The "
+                  "cut is MOMENT_SUPPORT_SIGMA's, and this tier reopens with WP-2004's "
+                  "ruling on it. Ruled by the magnetic-path owner under #1075 (#1411 item 1, "
+                  "2026-11-12; tests/test_magnetic_series.py)")),
+    Row("SEQUENTIAL_MOMENT_ONSET", "code", tier=1, ambiguity=3,
+        response="info",
+        responds=("read the bracket as where the per-pattern moment verdicts switch, its ± "
+                  "half the pattern spacing and no fitted esd; quote it as the onset only "
+                  "when no SEQUENTIAL_MOMENT_ONSET_UNRESOLVED row names the same site"),
+        evidence=("arithmetic on the per-pattern verdicts, never on the |m| column "
+                  "(schemas.sequential.locate_onset: the midpoint and half-gap of the two "
+                  "patterns where the verdict switches; sequential._moment_diagnostics). It "
+                  "reports a statistic and decides nothing, so it raises at info at its one "
+                  "site; the verdicts' own threshold is MOMENT_SUPPORT_SIGMA's row (WP-2004). "
+                  "Split from SEQUENTIAL_MOMENT_ONSET_UNRESOLVED (WP-2003 batch C8), since the "
+                  "one code used to raise at a level computed between the two "
+                  "(tests/test_magnetic_series.py, the ramp and the hand-built verdict "
+                  "columns)")),
+    Row("SEQUENTIAL_MOMENT_ONSET_UNRESOLVED", "code", tier=1, ambiguity=1,
+        response="warning",
+        responds=("quote no onset temperature and no ordered moment at the bracket for the "
+                  "site `where` names; the message says which of the three reasons holds"),
+        evidence=("arithmetic on the verdicts the bracket is read from, with no threshold of "
+                  "its own: (1) a supported side of the bracket whose fit did not converge "
+                  "(MagneticOnset.bracket_verdicts_final, a solver status), (2) verdicts that "
+                  "switch more than once, so there is no single bracket (the message gives "
+                  "the switches' envelope), and under direction='both' (3) two chains whose "
+                  "brackets do not overlap, order opposite sides or exist on one side only "
+                  "(sequential._moment_diagnostics, _with_onset_agreement, _fold_onset). "
+                  "Unanimity: no competent refiner quotes a transition two readings of the "
+                  "same data place differently, or one whose ordered side had not finished "
+                  "refining; none found. A chain that gave no verdict is "
+                  "SEQUENTIAL_MOMENT_ONSET_UNCHECKED's. Ruled tier 1 by the magnetic-path "
+                  "owner under #1075 (#1411 item 8, 2026-11-12); reason 2 exists only "
+                  "through MOMENT_SUPPORT_SIGMA's cut, so its level reopens with WP-2004's "
+                  "ruling on it (#1411 item 9; tests/test_magnetic_series.py)")),
+    Row("SEQUENTIAL_MOMENT_ONSET_UNCHECKED", "code", tier="caller", ambiguity=1,
+        response="info",
+        responds=("read the other chain's onset reading on the site `where` names as "
+                  "unchecked by the forward-backward comparison; its own rows stand"),
+        evidence=("opt-in: fires only under direction='both', off by default, which no "
+                  "default path sets (searched 2026-11-19: the GUI series panel "
+                  "defaults to 'forward', gui/series.py:71). It reports that one chain gave no verdict on any "
+                  "pattern, so the requested comparison of the onset could not run, and "
+                  "moves no value and no other row's level: the forward bracket keeps its "
+                  "own advice and gains a note (sequential._with_onset_agreement). The "
+                  "shape SEQUENTIAL_PATH_CHECK_INCOMPLETE was given (C5). Ruled by the "
+                  "magnetic-path owner under #1075 (#1411 item 8, 2026-11-12; "
+                  "tests/test_magnetic_series.py)")),
     Row("SEQUENTIAL_PATH_CHECK_INCOMPLETE", "code", tier="caller", ambiguity=1,
         response="info",
         responds=("treat the patterns or paths `where` names as unchecked by the "
@@ -7156,9 +7211,30 @@ ROWS: tuple[Row, ...] = (
                   "Gauss-Newton with relaxation factors")),
     Row("rietx.sequential.refine_sequential:history", "default", tier="invariant", ambiguity=1, value=False,
         evidence=("answer-invariant: one history tree per pattern; tests/test_answer_invariant_defaults.py asserts a three-pattern chain's every kept value, esd, rung and code equal with it on (WP-2003)")),
-    Row("rietx.sequential.SequentialRefinement.fit:x", "default", value=None),
-    Row("rietx.sequential.SequentialRefinement.fit:x_label", "default", value="index"),
-    Row("rietx.sequential.SequentialRefinement.fit:labels", "default", value=None),
+    Row("rietx.sequential.SequentialRefinement.fit:x", "default", tier="invariant", ambiguity=1,
+        value=None,
+        evidence=("answer-invariant: the series axis, the pattern index without one; "
+                  "tests/test_answer_invariant_defaults.py asserts a three-pattern chain's "
+                  "every kept value, esd, rung, code and step equal with an axis given, and "
+                  "that the axis reached the entries (WP-2003 C11). By design the magnetic "
+                  "onset is read along the axis (schemas.sequential.locate_onset sorts the "
+                  "verdicts by x), so where the given x is not monotone in the list order the "
+                  "bracket, and which onset code fires, follow the caller's axis; every "
+                  "fitted value stays invariant")),
+    Row("rietx.sequential.SequentialRefinement.fit:x_label", "default", tier="invariant",
+        ambiguity=1, value="index",
+        evidence=("answer-invariant: the axis's name; tests/test_answer_invariant_defaults.py "
+                  "asserts a three-pattern chain's every kept value, esd, rung, code and step "
+                  "equal with a name given, and that it reached the result (WP-2003 C11)")),
+    Row("rietx.sequential.SequentialRefinement.fit:labels", "default", tier="invariant",
+        ambiguity=1, value=None,
+        evidence=("answer-invariant: each pattern's name, its file's stem else p000.., which "
+                  "also names its history file and pairs the two chains; "
+                  "tests/test_answer_invariant_defaults.py asserts a three-pattern chain's "
+                  "every kept value, esd, rung, code and step equal with labels given, "
+                  "compared blind to the names, under direction='forward' and under 'both' "
+                  "(the latter also every direction gap, which pairs the chains by label), "
+                  "and that the names reached the record (WP-2003 C11)")),
     Row("rietx.sequential.SequentialRefinement.fit:mode", "default", tier=2, ambiguity=1,
         value="rietveld",
         evidence=("the single fit's default (rietx.refine.Refinement.fit:mode), handed to each "
@@ -7797,8 +7873,32 @@ ROWS: tuple[Row, ...] = (
     Row("SEQUENTIAL_CANCELLED.suggestion", "suggestion", tier="caller", ambiguity=1, value=1,
         evidence=("opt-in, as its code: says the one way to extend a trajectory the caller "
                   "stopped, re-running it (sequential.py:2166)")),
-    Row("SEQUENTIAL_MOMENT_HOLD.suggestion", "suggestion", value=1),
-    Row("SEQUENTIAL_MOMENT_ONSET.suggestion", "suggestion", value=6),
+    Row("SEQUENTIAL_MOMENT_HOLD.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: names the record to plot (series.magnetic_trajectory()) and "
+                  "says to quote the held points as held, which is what the code counts; "
+                  "picks no value (sequential._moment_diagnostics). The batch's proposal, "
+                  "beside the code's tier 1 (#1411 item 1)")),
+    Row("SEQUENTIAL_MOMENT_ONSET.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: names the check that compares the bracket with the reverse "
+                  "chain (direction='both'), or the unresolved row when the bracket's "
+                  "supported side stopped early; folded, it names the unresolved row or says "
+                  "to quote the bracket with its spacing, and against a chain that gave no "
+                  "verdict it names the unchecked row and says to quote the bracket as one "
+                  "pass's; the reverse chain's own bracket names the forward rows, so no "
+                  "advice asks for the run that just ran (sequential._moment_diagnostics, "
+                  "_with_onset_agreement, _as_reverse_chain; #1411 item 8, amended "
+                  "2026-11-18)")),
+    Row("SEQUENTIAL_MOMENT_ONSET_UNCHECKED.suggestion", "suggestion", tier="caller",
+        ambiguity=1, value=3,
+        evidence=("opt-in, as its code: read the status and magnetic row of the entries in "
+                  "the chain that gave no verdict (sequential._with_onset_agreement), which "
+                  "restates what the requested check left undone")),
+    Row("SEQUENTIAL_MOMENT_ONSET_UNRESOLVED.suggestion", "suggestion", tier=1, ambiguity=1,
+        value=5,
+        evidence=("arithmetic: each names the record to open for the reason given — the "
+                  "moment stage's max_iter, the patterns either side of each switch, or the "
+                  "two chains' magnetic rows — and picks no reading "
+                  "(sequential._moment_diagnostics, _with_onset_agreement)")),
     Row("SEQUENTIAL_PATH_CHECK_INCOMPLETE.suggestion", "suggestion", tier="caller", ambiguity=1,
         value=2,
         evidence=("opt-in, as its code: treat the named patterns as unchecked, or read both "
@@ -8123,10 +8223,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "ROUGHNESS_OUTSIDE_REGIME.suggestion",
     "ROUGHNESS_UNCONSTRAINED",
     "ROUGHNESS_UNCONSTRAINED.suggestion",
-    "SEQUENTIAL_MOMENT_HOLD",
-    "SEQUENTIAL_MOMENT_HOLD.suggestion",
-    "SEQUENTIAL_MOMENT_ONSET",
-    "SEQUENTIAL_MOMENT_ONSET.suggestion",
     "SIZE_UNUSUALLY_SMALL",
     "SIZE_UNUSUALLY_SMALL.suggestion",
     "SPACE_GROUP_SETTING_ASSUMED",
@@ -8494,10 +8590,7 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.schemas.suggest.SUGGEST_ABSORPTION_MAX",
     "rietx.schemas.suggest.SUGGEST_GROUP_R2",
     "rietx.schemas.suggest.SUGGEST_MIN_GAIN",
-    "rietx.sequential.SequentialRefinement.fit:labels",
     "rietx.sequential.SequentialRefinement.fit:refit",
-    "rietx.sequential.SequentialRefinement.fit:x",
-    "rietx.sequential.SequentialRefinement.fit:x_label",
     "rietx.solve.cost.NAMED_REFLECTIONS",
     "rietx.solve.cost.NUISANCE_RCOND",
     "rietx.strategy.magnetic.SOLVE_D_MIN",
@@ -8664,8 +8757,6 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "ROUGHNESS_OUTSIDE_REGIME",
     "ROUGHNESS_UNCONSTRAINED",
     "SCALE_B_INSEPARABLE",
-    "SEQUENTIAL_MOMENT_HOLD",
-    "SEQUENTIAL_MOMENT_ONSET",
     "SIZE_UNUSUALLY_SMALL",
     "SOLVE_B_TIED_PER_PARENT_SITE",
     "SPACE_GROUP_SETTING_ASSUMED",

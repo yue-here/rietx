@@ -757,6 +757,61 @@ def _unrecovered_silent() -> list:
             + _unrecovered("max_iter"))
 
 
+def _onset_fires() -> list:
+    """Verdicts that switch more than once: no single onset to quote."""
+    from rietx.sequential import _moment_diagnostics
+    from tests.test_magnetic_series import _INTERLEAVED, _verdicts
+
+    return _moment_diagnostics(_verdicts(_INTERLEAVED))
+
+
+def _onset_silent() -> list:
+    """One clean 60 → 75 bracket, a moment supported everywhere, and that
+    bracket beside a backward chain that gave no verdict: the bracket is
+    ``info``, never the warning, and a check that could not run is not a
+    reason to withhold it (#1411 item 8)."""
+    from rietx.sequential import _moment_diagnostics
+    from tests.test_magnetic_series import _BRACKETED, _EVERYWHERE, _fold_rows, _quiet, _verdicts
+
+    return (_moment_diagnostics(_verdicts(_BRACKETED))
+            + _moment_diagnostics(_verdicts(_EVERYWHERE))
+            + _fold_rows(_verdicts(_BRACKETED), _quiet(None)))
+
+
+def _unchecked_fires() -> list:
+    """A clean forward bracket and a backward chain whose every fit diverged."""
+    from tests.test_magnetic_series import _BRACKETED, _fold_rows, _quiet, _verdicts
+
+    return _fold_rows(_verdicts(_BRACKETED), _quiet(None))
+
+
+def _unchecked_silent() -> list:
+    """The same bracket against a backward chain that agrees, and against one
+    that disagrees: both chains judged, so the comparison ran."""
+    from tests.test_magnetic_series import _BRACKETED, _EVERYWHERE, _fold_rows, _verdicts
+
+    return (_fold_rows(_verdicts(_BRACKETED), _verdicts(_BRACKETED))
+            + _fold_rows(_verdicts(_BRACKETED), _verdicts(_EVERYWHERE)))
+
+
+def _hold_fires() -> list:
+    """Two of five patterns unsupported."""
+    from rietx.sequential import _moment_diagnostics
+    from tests.test_magnetic_series import _BRACKETED, _verdicts
+
+    return _moment_diagnostics(_verdicts(_BRACKETED))
+
+
+def _hold_silent() -> list:
+    """A moment supported everywhere, and a series whose every fit diverged:
+    a pattern that gives no verdict is no held moment (#1411 item 1)."""
+    from rietx.sequential import _moment_diagnostics
+    from tests.test_magnetic_series import _EVERYWHERE, _quiet, _verdicts
+
+    return (_moment_diagnostics(_verdicts(_EVERYWHERE))
+            + _moment_diagnostics(_quiet(None)))
+
+
 def _short_series(*, cancel_after_first: bool) -> list:
     """Two cheap patterns of ``tests/test_sequential.py``'s ramp, the chain
     cancelled once the first pattern's fit ends where ``cancel_after_first``,
@@ -1356,6 +1411,12 @@ SILENCE: dict[str, Pair] = {
         _dofs_renumbered_fires, _dofs_renumbered_silent, "tests/test_site_twins_merged.py"),
     "SEQUENTIAL_CANCELLED": Pair(
         _cancelled_fires, _cancelled_silent, "tests/test_sequential.py"),
+    "SEQUENTIAL_MOMENT_HOLD": Pair(
+        _hold_fires, _hold_silent, "tests/test_magnetic_series.py"),
+    "SEQUENTIAL_MOMENT_ONSET_UNCHECKED": Pair(
+        _unchecked_fires, _unchecked_silent, "tests/test_magnetic_series.py"),
+    "SEQUENTIAL_MOMENT_ONSET_UNRESOLVED": Pair(
+        _onset_fires, _onset_silent, "tests/test_magnetic_series.py"),
     "SEQUENTIAL_PATH_CHECK_NOT_RUN": Pair(
         _path_not_run_fires, _path_not_run_silent,
         "tests/test_sequential.py, tests/test_series_error_policy.py"),
