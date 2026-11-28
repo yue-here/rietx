@@ -891,14 +891,14 @@ def locate_onset(traj: MagneticTrajectory) -> MagneticOnset:
     return onset
 
 
-def _arc_spread(angles: list[float]) -> float:
-    """The shortest arc, in radians, covering every angle in ``angles``.
+def _arc_spread(angles: list[float], turn: float = 2.0 * math.pi) -> float:
+    """The shortest arc covering every angle in ``angles``, in radians (or
+    degrees with ``turn=360.0``, a Z-matrix dihedral's, WP-1814).
 
     A turn less the widest empty gap between neighbours on the circle — the
     spread :meth:`SeriesResult.moved_paths` takes of an angle path, for the
     reason ``sequential._angle_difference`` takes a step modulo a turn (#604).
     """
-    turn = 2.0 * math.pi
     points = sorted(a % turn for a in angles)
     gaps = [b - a for a, b in zip(points, points[1:])]
     gaps.append(points[0] + turn - points[-1])
@@ -978,6 +978,10 @@ class SeriesResult(Base):
     #: (``sequential._angle_paths``, #604).  Written and read as
     #: :attr:`relative_paths` is.
     angle_paths: list[str] | None = None
+    #: The Z-matrix dihedrals (degrees), whose differences are taken modulo
+    #: 360° (``sequential._dihedral_paths``, WP-1814): :attr:`angle_paths`'
+    #: sibling, written and read as it is.
+    dihedral_paths: list[str] | None = None
     #: every pattern on which every rung of the ladder raised, so the chain
     #: has no entry for it — see :class:`SeriesFailure`.  Populated under the
     #: default ``on_error="carry"`` and under ``"skip"``; under ``"raise"``
@@ -1363,6 +1367,7 @@ class SeriesResult(Base):
             raise ValueError(f"min_sigma must be ≥ 0, got {min_sigma}")
         relative = set(self.relative_paths or ())
         angles = set(self.angle_paths or ())
+        dihedrals = set(self.dihedral_paths or ())
         phases: list[str] = []
         for e in self.entries:
             for row in (e.qpa.phases if e.qpa is not None else []):
@@ -1388,6 +1393,7 @@ class SeriesResult(Base):
             curves.add(curve)
             values = [v for v, _ in points]
             spread = (_arc_spread(values) if path in angles
+                      else _arc_spread(values, 360.0) if path in dihedrals
                       else max(values) - min(values))
             esds = sorted(s for _, s in points)
             mid = len(esds) // 2

@@ -561,6 +561,7 @@ OTHER_RECORD_FIELDS: frozenset[str] = frozenset({
     "rietx.schemas.sequential.SeriesEntry.tree_id",
     "rietx.schemas.sequential.SeriesEntry.x",
     "rietx.schemas.sequential.SeriesResult.angle_paths",
+    "rietx.schemas.sequential.SeriesResult.dihedral_paths",
     "rietx.schemas.sequential.SeriesResult.atom_labels",
     "rietx.schemas.sequential.SeriesResult.backward",
     "rietx.schemas.sequential.SeriesResult.diagnostics",
@@ -2288,8 +2289,10 @@ ROWS: tuple[Row, ...] = (
                   "zero against each. Verified exactly, not sampled: over all 546 bonds, angles and "
                   "torsions of a generic seven-atom body with a chained torsion, the rule "
                   "reports the 45 that stay put when every torsion twists and the pose and "
-                  "cell move, and no other (tests/test_restraint_body_refusal.py). Read off the declaration, never "
-                  "vary, so a held torsion keeps its restraint. Only the two axis atoms count "
+                  "cell move, and no other (tests/test_restraint_body_warning.py). Read off the declaration, never "
+                  "vary, so a held torsion keeps its restraint. A body with a Z-matrix is not "
+                  "checked: its lines' lengths, angles and dihedrals are declared parameters "
+                  "that can change the quantity (design review M20). Only the two axis atoms count "
                   "as on the axis, so an error lands on accepting. Action: a warning "
                   "that keeps the row, because a competent refiner who would act otherwise "
                   "can be named (the WP-1814 design review, 2026-11-09): one keeping a "
@@ -3531,6 +3534,19 @@ ROWS: tuple[Row, ...] = (
                   'DOF (fragments.py:101-102, 190); '
                   'tests/test_fragments.py::test_the_rotation_dof_count_is_the_inertia_rank_with_a_near_linear_tolerance '
                   'holds a single atom and two coincident atoms at 0')),
+    Row("rietx.crystallography.fragments.ZMATRIX_ANGLE_EDGE", "constant", tier=1,
+        value=0.00011459155902616463,
+        evidence=("arithmetic: a Z-matrix line at 0 or 180 degrees leaves a later line's reference "
+                  "triple collinear (sine 0, refused by zmatrix_points below COLLINEAR_TOL); the "
+                  "angle whose sine is 2 x COLLINEAR_TOL keeps the sine above that test "
+                  "(test_zmatrix_body.py, edge and bounds tests); root inherits "
+                  "fragments.COLLINEAR_TOL (tier 1 on main); the factor 2 is a margin over that "
+                  "test and moves a bound by at most 1.15e-4 degrees, below any angle esd; "
+                  "WP-1814, review of #1665")),
+    Row("rietx.crystallography.fragments.ZMATRIX_R_FLOOR", "constant", tier=1, value=1e-06,
+        evidence=("arithmetic: zmatrix_points refuses r <= 0, so a refined length's box stops "
+                  "above 0, at MARCH_R_MIN's 1e-6 where every placement and tangent is finite "
+                  "(test_zmatrix_body.py, edge test); WP-1814, review of #1665")),
     Row("rietx.crystallography.magcif.MOMENT_FORM_AGREEMENT_MU_B", "constant", value=0.02,
         evidence=("unaudited by ruling: Mike retires the constant on PR #1636 (2026-11-23, "
                   "corrected 11:47Z). A number within half a unit of its last printed digit "

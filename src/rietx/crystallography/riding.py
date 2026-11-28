@@ -91,8 +91,13 @@ def riding_parents(body) -> dict[str, str]:
 
     The parent is the nearest template atom that is not itself riding, the
     rule :func:`set_riding_lengths` places the H by.  A body whose atoms all
-    ride has no parent for them and is refused.
+    ride has no parent for them and is refused.  On a Z-matrix body (WP-1814)
+    the parent is the H line's ``b``, the atom it is placed from, which the
+    schema requires to be a non-riding atom.
     """
+    if getattr(body, "zmatrix", None):
+        line = {z.atom: z for z in body.zmatrix if z.atom is not None}
+        return {h: body.zmatrix[line[h].b].atom for h in body.riding}
     labels = list(body.atoms)
     pts = np.asarray(body.template, dtype=np.float64)
     heavy = [i for i, lab in enumerate(labels) if lab not in body.riding]
@@ -116,8 +121,29 @@ def set_riding_lengths(body, classes: Mapping[str, str], radiation: str):
     name.  The H labels are recorded in ``RigidBody.riding``, which is what the
     CIF writer flags ``R``/``calc``; the copy is validated, as a constructed
     body is.
+
+    On a Z-matrix body (WP-1814) the parent is the H line's ``b`` and the
+    length is that line's ``r``, held: the line's angle and dihedral keep the
+    direction, and the template is rewritten from the Z-matrix.
     """
-    from ..schemas.structure import RigidBody
+    from ..schemas.structure import RigidBody, ZLine, zmatrix_template
+
+    if getattr(body, "zmatrix", None):
+        unknown = sorted(set(classes) - set(body.atoms))
+        if unknown:
+            raise ValueError(f"rigid body {body.name!r} has no atoms {unknown}")
+        doc = body.model_dump()
+        index = {z["atom"]: k for k, z in enumerate(doc["zmatrix"]) if z["atom"] is not None}
+        for h, cls in classes.items():
+            line = doc["zmatrix"][index[h]]
+            if line["b"] is None:
+                raise ValueError(f"rigid body {body.name!r}: {h!r} is the Z-matrix's "
+                                 "first atom and has no parent to ride on")
+            line["r"] = {**line["r"], "value": riding_length(cls, radiation), "vary": False}
+        lines = [ZLine.model_validate(z) for z in doc["zmatrix"]]
+        doc["template"] = zmatrix_template(lines, body.zmatrix_origin)
+        doc["riding"] = sorted(set(body.riding) | set(classes), key=list(body.atoms).index)
+        return RigidBody.model_validate(doc)
 
     labels = list(body.atoms)
     unknown = sorted(set(classes) - set(labels))

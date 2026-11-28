@@ -1092,6 +1092,68 @@ def _state_bodies():
     return model, table, {}
 
 
+def _state_bodies_zmatrix():
+    """A Z-matrix body (WP-1814): its internals are block inputs after the twists.
+
+    The new derivative path: each internal's column is the closed-form
+    Z-matrix tangent (``fragments.zmatrix_points``) carried through a torsion
+    and the pose, and the traced backends differentiate
+    ``ZMatrixMap.points_traced``.  #759's branched 8-atom fragment in WP-1803's
+    triclinic cell, every r, angle and dihedral free and moved off its anchor,
+    beside a torsion whose axis an internal moves, the rotation and the cell
+    free too.  A 180° dihedral sits on line 5 (its angle is open, so the
+    general formula holds there); no refusal is asked for here, only columns.
+    """
+    from rietx.crystallography.bodies import add_body
+    from rietx.schemas.common import Parameter
+    from rietx.schemas.pattern import PatternData
+    from rietx.schemas.structure import Atom, BodyTorsion, Cell, Phase, Structure
+    from tests.test_zmatrix_body import BRANCHED, zlines
+
+    P = Parameter
+    cell = Cell(a=P(value=7.21), b=P(value=8.13), c=P(value=9.47),
+                alpha=P(value=84.3), beta=P(value=97.6), gamma=P(value=104.2))
+    phase = Phase(name="zbody", space_group="P-1", cell=cell, atoms=[
+        Atom(label="Li", species="Li", x=P(value=0.71), y=P(value=0.12),
+             z=P(value=0.63))], scale=P(value=1e-2, min=0.0))
+    zm = zlines(BRANCHED, vary=True)
+    phase = add_body(phase, "zb", [z.atom for z in zm], [ln[0] for ln in BRANCHED],
+                     None, (0.31, 0.42, 0.27), orientation=(0.9, 0.1, 0.2, 0.3),
+                     biso=2.0, zmatrix=zm,
+                     torsions=[BodyTorsion(name="t0", axis=("C1", "C3"),
+                                           moves=["H6", "H7"], angle=12.0)])
+    structure = Structure(phases=[Phase.model_validate(phase.model_dump())])
+    _, ins, _ = _lab_state()
+    tt = np.arange(10.0, 30.0, 0.02)
+    rng = np.random.default_rng(5)
+    pattern = PatternData(two_theta=tt.tolist(),
+                          intensity=(50.0 + 10.0 * rng.random(len(tt))).tolist())
+    table = ParameterTable(structure, ins)
+    table.set_vary(["*"], False)
+    for glob in ("phases.0.rigid_bodies.0.origin.dof.*",
+                 "phases.0.rigid_bodies.0.rotation.*", "phases.0.cell.*",
+                 "phases.0.scale", "phases.0.rigid_bodies.0.torsions.*.twist",
+                 "phases.0.rigid_bodies.0.zmatrix.*"):
+        assert table.set_vary([glob], True), glob
+    theta = table.x0()
+    for k, v in enumerate((0.07, -0.04, 0.05)):
+        theta[table.free_paths.index(f"phases.0.rigid_bodies.0.rotation.{k}")] = v
+    theta[table.free_paths.index("phases.0.rigid_bodies.0.torsions.0.twist")] = 9.0
+    off = {"r": 0.03, "angle": 2.5, "dihedral": -4.0}
+    for path in table.free_paths:
+        if ".zmatrix." in path:
+            theta[table.free_paths.index(path)] += off[path.rsplit(".", 1)[1]]
+    table.commit(theta)
+    for k, v in enumerate((0.03, 0.02, -0.06)):
+        table.entries[table._paths[f"phases.0.rigid_bodies.0.rotation.{k}"]].value = v
+    table.entries[table._paths["phases.0.rigid_bodies.0.torsions.0.twist"]].value = 4.0
+    table.refresh_ties()
+    model = compile_model(structure, ins, pattern, mode="rietveld",
+                          moving_paths=set(table.moving_paths),
+                          window_area_tol=WINDOW_AREA_TOL)
+    return model, table, {}
+
+
 def _state_bodies_site():
     """A rigid body on a special position (WP-1807): k = 1 rotation DOF.
 
@@ -1550,6 +1612,7 @@ CONFIGS = {"families": _state_families,
            "texture": _state_texture,
            "bodies": _state_bodies,
            "bodies_site": _state_bodies_site,
+           "bodies_zmatrix": _state_bodies_zmatrix,
            "parent_cell": _state_parent_cell,
            "bodies_site_fixed": _state_bodies_site_fixed,
            "families_voigt": _state_families_voigt,
@@ -1623,6 +1686,7 @@ CONFIG_PARAMS = [
     _config("distortion_modes"),
     _config("site_scalars"),
     _config("bodies_site"),
+    _config("bodies_zmatrix"),
     # the state imports test_parent_cell's LaMnO₃ child, whose candidate search
     # is cached per process: sharing that module's group pays it once
     # (tests/CLAUDE.md § Shared fixtures)

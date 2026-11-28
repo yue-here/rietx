@@ -1066,11 +1066,11 @@ def _unsupported_silent() -> list:
 
 def _restraint_compile(*restraints) -> list:
     """``RESTRAINT_ON_FIXED_BODY_GEOMETRY`` from ``resolve_phase_restraints``
-    on the bodies of ``tests/test_restraint_body_refusal.py``, one restraint
+    on the bodies of ``tests/test_restraint_body_warning.py``, one restraint
     at a time: the warning arrives with the compiled restraints."""
     from rietx.crystallography.structure_factor import compile_phase_sites
     from rietx.model.restraints import resolve_phase_restraints
-    from tests.test_restraint_body_refusal import _phase
+    from tests.test_restraint_body_warning import _phase
 
     found: list = []
     for r in restraints:
@@ -1083,7 +1083,7 @@ def _restraint_compile(*restraints) -> list:
 def _fixed_body_fires() -> list:
     """A bond inside a body with no torsion, and one no declared torsion splits."""
     from rietx.schemas.structure import BondRestraint
-    from tests.test_restraint_body_refusal import _index
+    from tests.test_restraint_body_warning import _index
 
     return _restraint_compile(
         BondRestraint(atom_i=_index("T0"), atom_j=_index("T1"), target=1.2, sigma=0.01),
@@ -1094,7 +1094,7 @@ def _fixed_body_silent() -> list:
     """A bond a torsion splits, one to a free atom, one across two bodies and
     one between two copies of the body."""
     from rietx.schemas.structure import BondRestraint
-    from tests.test_restraint_body_refusal import _index
+    from tests.test_restraint_body_warning import _index
 
     return _restraint_compile(
         BondRestraint(atom_i=_index("K0"), atom_j=_index("K3"), target=3.0, sigma=0.01),
@@ -1321,7 +1321,7 @@ SILENCE: dict[str, Pair] = {
     "QPA_INTENSITY_FACTOR": Pair(
         _qpa_factor_fires, _qpa_factor_silent, "tests/test_peak_equations.py"),
     "RESTRAINT_ON_FIXED_BODY_GEOMETRY": Pair(
-        _fixed_body_fires, _fixed_body_silent, "tests/test_restraint_body_refusal.py"),
+        _fixed_body_fires, _fixed_body_silent, "tests/test_restraint_body_warning.py"),
     "RESOLUTION_UNCONSTRAINED": Pair(
         _resolution_fires, _resolution_silent,
         "strategy.staged.check_resolution_supported (no test pinned it before)"),

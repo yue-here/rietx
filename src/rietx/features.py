@@ -232,6 +232,9 @@ FEATURES: dict[str, Feature] = {
             "phases.*.rigid_bodies.*.origin.dof.*",
             "phases.*.rigid_bodies.*.rotation.*",
             "phases.*.rigid_bodies.*.torsions.*.twist",
+            "phases.*.rigid_bodies.*.zmatrix.*.r",
+            "phases.*.rigid_bodies.*.zmatrix.*.angle",
+            "phases.*.rigid_bodies.*.zmatrix.*.dihedral",
         ),
         theory=(
             "parameterisation § Rigid bodies",

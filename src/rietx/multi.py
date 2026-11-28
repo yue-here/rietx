@@ -2078,6 +2078,7 @@ class MultiHistogramRefinement:
                 # turn free in two directions of three, in any histogram's table
                 for tab in self.mtable.tables:
                     tab.refuse_partial_turns(joint=True)
+                    tab.refuse_free_internals(joint=True)
                 seeded: dict[str, float] = {}
                 # the single-histogram runner's lift (``_run_stage``,
                 # WP-1955): an FCJ aperture this stage frees on zero starts

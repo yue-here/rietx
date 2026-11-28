@@ -800,6 +800,19 @@ refines as before.  A bump rather than "also in 0.61" because 1.12.0 shipped
 0.61: a 1.12 build refuses a phase or instrument carrying the key, and the
 version now says why.
 
+Also in 0.62 (WP-1814): ``RigidBody.zmatrix``, a list of ``ZLine`` (an atom
+label or ``None`` for a dummy, its reference lines and its ``r``, ``angle``
+and ``dihedral`` as refinable ``Parameter``s), and ``RigidBody.zmatrix_origin``
+(c₀, the Z-frame point the template is measured from).  Additive and
+defaulted to an empty list and the Z-frame origin, the 0.25 → 0.26 rule, so
+every stored body loads as the constant template it was; an older build
+refuses a body carrying either key.  And ``SeriesResult.dihedral_paths``, the
+paths a run's models make dihedrals, which ``moved_paths`` wraps beside
+``.angle_paths``.  Additive and defaulted to ``None``, "not recorded", the
+0.25 → 0.26 rule;
+``SequentialRefinement.fit`` writes it on every result (``[]`` with no Z
+body), so an older build refuses every series result this one writes.
+
 Also in 0.62 (WP-2081): ``SeriesEntry.held_values``, every path the
 caller held on a pattern with the value it was held at.  Additive and
 defaulted to ``None``, the 0.25 → 0.26 rule; an older build refuses an entry
