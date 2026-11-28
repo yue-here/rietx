@@ -1,9 +1,9 @@
 # WP-1460 — one degeneracy, one finding
 
-Milestone: unscheduled · Status: 🔄 2026-11-16 — task 1 (reader audit) done; task 2 waits on Yue's
-replace-or-beside question (§ The reader audit)
+Milestone: unscheduled · Status: 🔄 2026-11-28 — task 1 done; Yue ruled 2026-11-17 that groups replace the pair
+rows, built per stage (handover log); the grouping waits on PR #1475
 Track: What fires, and what stays silent
-Depends on: — (1454 soft: it removed the commonest source; 1302 soft: the render cap)
+Depends on: 1990 (PR #1475; Yue 2026-11-17: the grouping lands after it); 1454 soft (it removed the commonest source); 1302 soft (the render cap)
 Priority: P3 2026-09-24 — a correct report said once per pair, up to hundreds of times, burying the rows beside it; `summary()` already caps the view and dropping the rows is the workaround
 
 ## Goal
@@ -170,7 +170,8 @@ the compare UI: both print every row, so the flood reaches those surfaces
 today. **What it does not settle** is the question below, which is the
 maintainer's because it changes what `RefinementResult.diagnostics` stores.
 
-**Question for Yue (before task 2).** Does a group finding **replace** the pair
+**Question for Yue (before task 2).** *Answered 2026-11-17: replace, built per stage
+after PR #1475 (handover log, 2026-11-28).* Does a group finding **replace** the pair
 rows in `RefinementResult.diagnostics`, or **ride beside** them?
 - *Replace*: one row per group, `where` = the union, the pairs reachable
   through `Identifiability.correlation` (PR #1475), and through the stage
@@ -278,6 +279,34 @@ reachable.
   render cap), WP-1311 (`FLAT_DIRECTION`), WP-1103 (the reader audit).
 
 ## Handover log
+
+- **2026-11-28** — post-merge bookkeeping for PR #1597 (maintainer side, ghostshift runner; PR
+  #PRNUM). PR #1597 merged today as `0f4894d58`. Yue answered the question task 2 was waiting on, on
+  2026-11-17, posted on #1597. A group finding replaces the pair rows in
+  `RefinementResult.diagnostics`. It is built in `check_guards` at every stage where pairs are built
+  today, and it lands after PR #1475 (WP-1990). The goal is one finding per degeneracy, since a pair
+  row beside its group repeats it. `Identifiability.correlation` keeps every pair reachable. Mike
+  acknowledged the ruling on #1597 on 2026-11-18.
+
+  *What the ruling settles.* Replace, not beside. The sub-question too: groups are built per stage
+  (`check_guards` runs at each stage, `staged.py`, called from `refine.py`), not from the answer
+  stage only. *What it leaves to task 2:* the grouping itself (components, eigen-directions, or
+  components with their eigen-count), and how groups from different stages are deduplicated,
+  since today's dedup keeps each pair's worst \|ρ\| from any stage.
+
+  *Checked against `origin/main` at `0f4894d58`:* PR #1475 is open, not merged, so task 2 cannot
+  land yet. `check_guards` and `_correlation_findings` are in `strategy/staged.py`. The Depends-on
+  line now names WP-1990 as hard, by the ruling's order. No checklist item landed with #1597
+  beyond task 1, already ticked.
+
+  *Gotcha for task 3.* Its text says the pair rows stay reachable "since a caller already keys on
+  `where`". Under the ruling they stay reachable through `Identifiability.correlation` instead.
+  The audit above records that this field is `None` on a joint fit. So what a joint fit's caller
+  can reach under the ruling is open. Task 3 should say what that caller gets.
+
+  Next: wait for PR #1475 to merge. Then task 2: re-measure the fixture table on current main (its
+  counts are from 2026-09-24), choose the grouping and the cross-stage dedup, and write both here.
+  Task 3 lands it. Mike's claim holds the WP.
 
 - **2026-11-16** — The reader audit is done, and it narrows what the grouping
   has to protect. Nothing in `src/` outside the stage loop and the guard code
