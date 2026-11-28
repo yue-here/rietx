@@ -730,11 +730,22 @@ def test_each_mirror_declares_its_dataclass_defaults():
     import dataclasses
 
     from rietx.schemas.plan import PlanSpec, StageSpec
-    from rietx.strategy.staged import RefinementPlan
+    from rietx.strategy.staged import RefinementPlan, _Unset
 
     checked = 0
     for spec, cls in ((StageSpec, rx.Stage), (PlanSpec, RefinementPlan)):
         for field in dataclasses.fields(cls):
+            if isinstance(field.default, _Unset):
+                # closing_window_tol's default follows the stages (#1850), so
+                # an omitted value is compared on a plan of each kind
+                for stages in ([rx.Stage("s", ["phases.*.scale"])],
+                               [rx.Stage("w", ["phases.*.magnetic_lor_size"])]):
+                    mirrored = getattr(spec(stages=[StageSpec.from_stage(s)
+                                                    for s in stages]), field.name)
+                    default = getattr(cls(stages=stages), field.name)
+                    assert mirrored == default, (spec.__name__, field.name, mirrored, default)
+                checked += 1
+                continue
             if field.default is not dataclasses.MISSING:
                 default = field.default
             elif field.default_factory is not dataclasses.MISSING:

@@ -4612,8 +4612,9 @@ ROWS: tuple[Row, ...] = (
                   "closing stage), on the synthetic MnF2 round trip, one family "
                   "(tests/test_magnetic_width.py); the magnetic default solve's ranked trials (its "
                   "winner runs one on a solved verdict since 2026-10-22; the default solve frees "
-                  "no magnetic width), a plan with closing_window_tol=None and a "
-                  "stage run by hand have none, and a plan "
+                  "no magnetic width), a plan with an explicit closing_window_tol=None and a "
+                  "stage run by hand have none (a plan freeing a magnetic width runs one "
+                  "by default since #1850), and a plan "
                   "ending on the stage that frees the width keeps the clipping: 0.07, 0.17 and "
                   "0.57 esd on the moment (WP-2002, the seventh round's Q2, 2026-10-21)"),
         grounds=("A numerical setting whose domain test passes behind the closing stage and "
@@ -6711,12 +6712,25 @@ ROWS: tuple[Row, ...] = (
                   "without it (2026-10-22); since WP-2208 it is free but for the paths the "
                   "declared stages leave fixed (a turn_off whose glob matched last, "
                   "staged.fixed_at_end), which it keeps fixed and records in its "
-                  "StageResult.fixed"),
+                  "StageResult.fixed. The exception, schemas.plan.default_closing_window_tol: "
+                  "omitted on a plan whose stages free magnetic_lor_size or "
+                  "magnetic_lor_strain, it is CLOSING_WINDOW_TOL, read off the stages "
+                  "whenever the plan is asked (#1850); MAGNETIC_SIZING_FLOOR's row grounds "
+                  "that floor behind the closing stage only, and on #1850's MnF2 repro "
+                  "(tests/test_magnetic_width_closing.py, 2026-11-25, macOS arm64, [dev]) the "
+                  "moment landed 0.12 plain esd (the magnetic_width preset) and 0.25 (one "
+                  "stage freeing the same globs) from the closing-stage answer without it, "
+                  "0.000 with it; an explicit None still declines it"),
         grounds=("The maintainer's ruling of 2026-11-19 (WP-2222), after users complained of "
                  "fit time: codes such as TOPAS are fast, with accuracy their users consider "
                  "very sufficient; turn the closing stage off by default. It reverses the "
                  "sixth round's Q2 default (option 3, 2026-10-21), which stays the opt-in "
-                 "at CLOSING_WINDOW_TOL for an answer to publish."),
+                 "at CLOSING_WINDOW_TOL for an answer to publish. The magnetic-width "
+                 "exception is the magnetic-path owner's ruling on #1708 of the same day, "
+                 "before WP-2222 merged: a plan whose stages free a magnetic width keeps "
+                 "the closing stage at 1e-3 by default, as strategy.magnetic._close does; "
+                 "the cost falls on those fits alone, and no value is new (CLOSING_WINDOW_TOL "
+                 "has its own row)."),
         approved="2026-11-19"),
     Row("rietx.schemas.plan.PlanSpec:lebail_passes", "default", tier="caller", ambiguity=1, value=1,
         evidence="opt-in: lebail_passes > 1, default 1 (one run, bit-identical to pre-WP-1323)"),

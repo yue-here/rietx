@@ -77,7 +77,7 @@ A child stated on mode amplitudes (`Phase.distortion_modes`) reports per irrep b
 
 ## Magnetic-width codes
 
-On `result.diagnostics`, from a fit (WP-1343). The terms are `Phase.magnetic_lor_size`/`_strain`, the magnetic component's own Lorentzian width; the turn-on order is `plan="magnetic_width"` (moment with widths at zero → widths beside the converged moment, which keeps refining → both).
+On `result.diagnostics`, from a fit (WP-1343). The terms are `Phase.magnetic_lor_size`/`_strain`, the magnetic component's own Lorentzian width; the turn-on order is `plan="magnetic_width"` (moment with widths at zero → widths beside the converged moment, which keeps refining → both). Any plan freeing a width ends with the closing stage; `closing_window_tol=None` drops it and the floor-sized windows clip the moment.
 
 | code | what you must not assume, and what to do |
 |---|---|

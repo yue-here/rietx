@@ -154,7 +154,7 @@ A `RefinementPlan` holds its stages and five settings.
 | `RefinementPlan.intermediate_ftol` | 1e-6 | the tolerance every declared stage but the last stops at ([Stage tolerances](#stage-tolerances)) |
 | `RefinementPlan.lebail_passes` | 1 | the cap on Le Bail passes ([Le Bail passes](#le-bail-passes)) |
 | `RefinementPlan.phase_support_sigma` | 3 | the number of esds a phase's scale must sit from zero for the stage to treat the phase as seen; `None` skips the test ([Held parameters](#held-parameters)) |
-| `RefinementPlan.closing_window_tol` | `None` | `None` runs no closing stage; a fraction asks for one whose windows drop that much of each peak's area, 1e-3 for an answer to publish ([The closing stage](#the-closing-stage)) |
+| `RefinementPlan.closing_window_tol` | `None`; 1e-3 with a magnetic width | `None` runs none; a fraction asks for one whose windows drop that share of each peak ([The closing stage](#the-closing-stage)) |
 
 ```python
 import rietx as rx
@@ -278,9 +278,10 @@ Use it for a number going into a paper, for a number reproduced from an earlier 
 
 A plan can end with one more stage than it declares.
 The closing stage compiles the model again at the answer, with peak windows that drop `RefinementPlan.closing_window_tol` of each peak's area, and solves once more with every pattern any declared stage freed.
-It is off by default since 1.13: `closing_window_tol` is `None`, and a plan runs its declared stages alone.
+It is off by default since 1.13 (`closing_window_tol=None`).
 `lab_calibrate` keeps it, since every later fit inherits a calibration's error.
-So does a Pawley series carrying intensities, since each pattern would start from the last one's error; `carry_hkl_intensities=False` turns both off.
+So does a Pawley series carrying intensities, as each pattern starts from the last one's error; `carry_hkl_intensities=False` turns both off.
+So does a plan freeing a [magnetic width](magnetic.md#magnetic-peak-width).
 Ask for it with `CLOSING_WINDOW_TOL`, 1e-3, for an answer you will publish:
 
 ```python
