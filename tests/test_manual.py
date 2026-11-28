@@ -1605,7 +1605,9 @@ def test_every_page_links_its_markdown_twin(built_docs_tree):
 
 #: What MyST leaves in a page that no markdown reader renders: a role, a
 #: colon fence, a directive fence and an unexpanded substitution.
-_MYST_RESIDUE = re.compile(r"\{[a-z][\w:-]*\}`|^ *:{3,}|^ *`{3,}\{|\{\{", re.M)
+#: `:param x:` is a doc field the Markdown parser left as text (WP-2024), which
+#: the Python domain would have drawn as the call's Parameters list.
+_MYST_RESIDUE = re.compile(r"\{[a-z][\w:-]*\}`|^ *:{3,}|^ *`{3,}\{|\{\{|^ *:param ", re.M)
 #: A fenced block whose info string is a language, which may hold anything.
 _CODE_FENCE = re.compile(r"^( *`{3,})(?!\{)[^\n]*\n.*?^\1 *$", re.M | re.S)
 
@@ -1654,6 +1656,8 @@ def test_every_page_has_a_twin_that_keeps_the_contract(built_docs_tree):
     ("# T\n\nAn answer.\n\n:::{note}\nx\n:::\n", [":::", ":::"]),
     ("# T\n\nAn answer.\n\n```{math}\nx\n```\n", ["```{"]),
     ("# T\n\nIt is {{ VALUE }} wide.\n", ["{{"]),
+    ("# T\n\nRun it.\n:param data: The pattern.\n", [":param "]),
+    ("# T\n\n* **Parameters:**\n  * **data** – The pattern.\n", []),
 ])
 def test_the_residue_check_fails_what_it_should(twin, expected):
     assert _myst_residue(twin) == expected

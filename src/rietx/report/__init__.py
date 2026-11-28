@@ -362,39 +362,49 @@ def build_report(result: RefinementResult, *, model=None, values=None,
 
     Parameters
     ----------
-    result:
-        The refinement result (Layer 0 needs nothing else).
-    model, values:
-        A :class:`~rietx.model.forward.CompiledModel` and its parameter
-        value dict.  Supplying both enables Layers 1-2; without them the
-        report is Layer 0 and ``layer1_available`` stays False.
-        ``Refinement.report()`` fills these in for you.
-    plan, free_paths:
-        Used by the Layer-2 strategy veto: actions the plan already performs,
-        or parameters already free, are marked inactive.  ``plan`` is a plan,
-        its ``PlanSpec`` or a preset name, read for ``result.mode`` as the fit
-        read it (``strategy.staged.resolve_plan``, WP-2102).
-    structure:
+    result
+        The refinement result.  With nothing else the report is Layer 0.
+    model
+        The :class:`~rietx.model.forward.CompiledModel` the fit ran on.  With
+        ``values`` it enables Layers 1-2 (with ``structure`` and ``instrument``,
+        unless the model is Pawley); without it ``layer1_available`` stays False.  ``Refinement.report()`` fills it in for you.
+    values
+        The parameter value dict to read ``model`` at, needed with ``model``.
+        ``Refinement.report()`` fills it in for you.
+    plan
+        The plan the fit ran: a plan, its ``PlanSpec`` or a preset name, read
+        for ``result.mode`` as the fit read it.  A suggested action that the
+        plan already refines is marked inactive.  ``None`` checks no plan.
+    free_paths
+        The parameter paths already free in this fit.  A suggested action on
+        one of them is marked inactive.  ``None`` checks no paths.
+    structure
         The :class:`~rietx.schemas.structure.Structure` the model was compiled
-        from.  Optional, and it buys two things the compiled model does not
-        carry: the moment arm (WP-1327) labels each row with the atom's own
-        label rather than its index, and the satellite arm (WP-1326) reports
-        which propagation vector each phase already *declares*.
-    instrument:
+        from.  With it, ``FitReport.magnetic`` labels each row with the atom's
+        own label rather than its index, and ``FitReport.satellites`` reports
+        which propagation vector each phase already declares.
+    instrument
         The :class:`~rietx.schemas.instrument.Instrument` the model was
-        compiled from.  With ``structure`` it lets Layer 1 and the texture
-        screen read the misfit at the closing stage's precision and fit it
-        with shapes at the declared stages' (:func:`_reading_models`).
-    held:
-        The last stage's hold list (``StageResult.held``), so the moment arm's
-        "unmeasured" directions are the refinement's answer rather than a
-        second opinion about it.
-    covariance:
+        compiled from.  With ``structure``, Layer 1 and the texture screen
+        read the misfit at the closing stage's precision and fit it with the
+        peak shapes of the declared stages.
+    held
+        The last stage's hold list (``StageResult.held``), so the directions
+        ``FitReport.magnetic`` calls unmeasured are the refinement's answer
+        rather than a second opinion about it.
+    covariance
         The live covariance of the fit that produced ``result``, which
         ``Refinement.report()`` passes and nothing serializes.  With it, a
         powder-degenerate moment pair whose moduli lie on a discarded
         direction still folds into its quadrature sum when the data determine
         that sum (WP-2230); without it such a pair is left unfolded.
+
+    Notes
+    -----
+    A preset name in ``plan`` is resolved by ``strategy.staged.resolve_plan``
+    (WP-2102).  ``structure`` serves the moment arm (WP-1327) and the
+    satellite arm (WP-1326); ``structure`` with ``instrument`` serves
+    :func:`_reading_models`.
 
     ``model`` without ``structure`` and ``instrument`` is refused, except for a
     Pawley model, whose intensity block is the solve's and is read as it is.

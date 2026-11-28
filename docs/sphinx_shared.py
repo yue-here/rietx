@@ -116,7 +116,10 @@ REPO_ROOT = _Path(__file__).resolve().parents[1]
 #: The bibliography the manual cites from.
 BIBFILE = REPO_ROOT / "docs" / "docs" / "references.bib"
 
-MYST_EXTENSIONS = ["dollarmath", "amsmath", "substitution", "colon_fence", "deflist"]
+# `fieldlist` is what lets an API entry carry `:param name:` doc fields, which
+# the Python domain draws as a Parameters list (WP-2024).
+MYST_EXTENSIONS = ["dollarmath", "amsmath", "substitution", "colon_fence", "deflist",
+                   "fieldlist"]
 
 # Diagrams render in the browser (`raw` output needs no mermaid-cli at build
 # time).  The extension detects the active theme itself and re-renders on a
