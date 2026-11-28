@@ -2579,7 +2579,10 @@ ROWS: tuple[Row, ...] = (
                   "WP-2317 R7 a stage past its fraction re-solves once on fresh windows, "
                   "so this reads the second solve: the runaway re-solves at axial_sl 558 "
                   "to a loss under 2 % and is silent here, recorded as "
-                  "StageResult.window_refit_loss 73 %"),
+                  "StageResult.window_refit_loss 73 %; a fit still fires it where the "
+                  "re-solve is declined (a declared window_slack_deg 0 on a synthetic "
+                  "stage moving cell, zero and width: 45 %, "
+                  "test_window_loss.test_a_fit_whose_last_stage_outgrew_its_windows_reports_them)"),
         grounds=("No surveyed program reports this: GSAS-II, MAUD, RIETAN-FP and "
                  "EasyDiffraction resize every evaluation, TOPAS rebuilds its buffer past "
                  "a width tolerance, FullProf never does, BGMN documents no rule. The "
