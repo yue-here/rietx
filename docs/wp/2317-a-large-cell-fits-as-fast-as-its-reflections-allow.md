@@ -1,6 +1,6 @@
 # WP-2317 — a large cell fits as fast as its reflections allow: the case, the bar, and the rulings in the way
 
-Milestone: unscheduled · Status: 🔄 2026-11-28 — R0, R2, R3 and R5-R7 ruled and recorded, R4 unruled; R7 landed in PR #1881; task 1 waits on the maintainer; R6 built and re-measured, one defect before its PR (handover, 7th session); 5, 7 and 8 open
+Milestone: unscheduled · Status: 🔄 2026-11-28 — R0, R2, R3 and R5-R7 ruled and recorded, R4 unruled; R7 landed in PR #1881; R6 built, its false stop far from the data fixed, PR open (handover, 8th session); task 1 waits on the maintainer; 5, 7, 8 and R6's record field open
 Track: A large cell
 Depends on: —
 Priority: P2 2026-11-27 — the scoping WP of a track the maintainer opened for a user at the wall (slowdowns on a 12 × 36 × 4 Å cell); 2314, 2315 and 2316 read its case, its bar and its rulings
@@ -650,12 +650,18 @@ what it costs here.
       practice does. Record each answer here as a dated ruling, and push each into
       the `### Inherited` of the WP it unblocks: 2314-2316, and WP-2017 for R2's
       number.
-- [ ] R6 as re-settled: the last declared stage stops when every free shift of
+- [x] R6 as re-settled: the last declared stage stops when every free shift of
       the undamped Gauss-Newton step is under 0.1 esd, and a plan field keeps 1e-9
       in WP-2222's three compounding places. Re-pin the goldens in the
       same change (R0), and check that profile-interval refits still settle.
       *Built 2026-11-28 (6th session) on `wp2317-stopping-rule`; the goldens
       re-pin after R7's #1881 merges.*
+      *Done 2026-11-28 (8th session): re-pinned on R7, the esd capped at
+      χ²_red = 1 so a fit far from the data cannot stop; PR PRNUM.*
+- [ ] R6's record: carry the shift test's own reading
+      (`LMOutcome.gauss_newton_shift`) onto `StageResult`, since under the cap
+      the reported `max_shift_over_esd` reads smaller than the value the stop
+      compared with 0.1 (generality review, 8th session).
 - [x] Why the 40-atom `coordinates` stage took 119 LM iterations from the true
       coordinates. *Answered 2026-11-27 by the review: the first probe drew its
       atoms inside a 1/15.6 sub-box, 65 % of nearest neighbours under 1 Å. On
@@ -701,6 +707,108 @@ what it costs here.
 - `docs/practice.md` § Structure-free fitting, § When a fit stops, § Peak-width limits.
 
 ## Handover log
+
+### 2026-11-28 (8th session) — the shift test cannot stop a fit far from the data; R6's PR opened (runner 3)
+
+The shift test now reads each esd with χ²_red taken at no more than 1. Scaled
+by a χ²_red of 632, every esd had been 25 times too wide, and tutorial 05's
+warm refit stopped at Rwp 0.966 with its cell 2 % short. Capped, the same
+refit reaches Rwp 0.0395. The cap costs one or two evaluations a single fit
+against the uncapped test, and no departure grew: every single fit stays
+within 0.035 esd of the 1e-9 answer. The series keep part of their saving,
+36 % of the evaluations on the CuCr₂O₄ ramp (42 % uncapped) and 10 % on the
+cpd-1 chain (20 %).
+A first gate, which asked the step just taken to pass the scaled test too, was
+built, measured and dropped: it stopped the same refit at χ²_red 632 two
+steps later.
+
+**Settled for the maintainer** (each settled by Claude under the grounds
+named). Items 1 and 2 of the 7th entry stand, re-measured below. Item 3 moved:
+under the cap the reported final shift is SRM 660c 0.003, FAP 0.011, NAC
+0.002, cpd-1a 0.014, `bigcell-structural` 0.003, `bigcell-pawley` 0.030, so no
+measured fit now reaches checkCIF's 0.05 alert-C line (FAP read 0.071 before).
+
+4. *The shift test reads σ at min(χ²_red, 1).* Settled by Claude under Rule 1's
+   first kind (no refiner calls a fit at Rwp 0.97 converged) and the
+   statistics' own meaning: scaling an esd by χ²_red assumes the residual
+   left is noise, and χ²_red = 1 is the value correct weights give it, so the
+   cap is no tuned number. χ²_red alone cannot tell a fit far from the data
+   from a converged fit with real model error, so no bound above 1 has a
+   source. The test can only stop later than both the scaled and the unscaled
+   reading; McCusker et al. (1999) §7 and checkCIF read the scaled esd of a
+   final cycle already judged converged, and the cap is stricter than that.
+   Alternatives measured or reasoned: a consecutive-cycles gate on the scaled
+   esd (Jana2020's, TOPAS's form) was built and failed on tutorial 05 (the
+   accepted step read 0.019 esd and the undamped one 0.066, at χ²_red 632); a
+   bound on the last fall in S derived from the tolerance, 0.1²/n_dof ≈ 2.4e-6,
+   passes that point's 4.4e-7 fall; a fall-in-S bound at 1e-9 is the old stop
+   run once; an Rwp bound (`MODEL_FAR_FROM_DATA`'s 0.8) is not visible to the
+   driver and leaves 0.3-0.8 open. A fresh Opus reviewer, given the probe
+   numbers, the practice table and the four options without the pick, chose
+   the cap (lean). Its flip conditions were the cap losing most of R6's saving
+   on real data (measured below: it loses one evaluation a fit) or the
+   consecutive gate passing tutorial 05 on its own merits (it did not).
+   Not covered: a column that is flat far from the data (a phase at zero
+   scale), which no step test sees; `MODEL_FAR_FROM_DATA` and
+   `PHASE_UNCONSTRAINED` report it.
+
+**Done this session.**
+- `optimize.lm._max_shift_over_esd`: χ²_red capped at `_SHIFT_CHI2_CAP` = 1,
+  in the dense reading and the sparse bound; the docstring carries the case
+  and the rejected gates. The constant has a tier-1 audit row, as the
+  generality review asked.
+- `test_lm_solver.py`: one test pins the cap (the reading at χ²_red 400
+  equals the one at 1; at 0.25 it doubles); the reading test's oracle reads
+  the capped esd. `test_the_tutorials_step_is_reached_warm` is green: the
+  warm rung, Rwp 0.0395.
+- Manual: `theory/convergence.md` equation `est-shift-stop` and its paragraph;
+  `reference/stopping.md` the table and two sentences. `SHIFT_OVER_ESD_TOL`'s
+  comment, `PlanSpec`'s field description and both audit rows re-quoted.
+- `2317-probe/r6/RESULTS.md` re-measured under the cap, with a table of the
+  three gates on tutorial 05.
+- Seven guide pages re-pinned (Sonnet subagent, then checked): export,
+  holder, cell, interval, qpa, hump, next. Last-digit moves; the largest is the
+  qpa extinction fit's esd, 3.63 → 3.74 wt % (main has 3.71), on a direction
+  at ρ = +0.998. Several return to the values main pins.
+
+**Measured** (macOS arm64, this worktree's `.venv`, `[dev]`; machine load
+average up to 127 from other sessions, so wall clocks rank nothing).
+Evaluations 1e-9 → 0.1 and the worst departure, with the uncapped figure in
+brackets: SRM 660c 71 → 67 (0.003 esd; 66, 0.016), FAP 40 → 35 (0.016; 34,
+0.046), NAC 49 → 44 (0.004; 43, 0.010), cpd-1a 165 → 145 (0.030; 143, 0.052),
+`bigcell-structural` 116 → 104 (0.011; 104, 0.011), `bigcell-lebail` 26 → 23
+(0.015; same), `bigcell-pawley` 43 → 37 (0.035; same), `bigcell-pawley-120`
+43 → 37 (0.009; 36, 0.038). CuCr₂O₄ ramp 1 326 → 848 (0.68 esd, the CuO cell on pattern 16;
+765, 0.72), main-phase cell 0.006, weight fractions 0.071; cpd-1 chain 504 →
+453 (0.13, `axial_sl` on pattern 2; 403, 0.45), cells 0.030, weight fractions
+0.027. Neither chain's per-pattern departure grows. `python -m
+tests.reader_output`: exit 0, unchanged against the merge-base: the cap moved
+its fixture back onto the 1e-9 stop's numbers. The fast suite
+(`-m "not slow"`, run while the audit table was being edited) gave 9 failed,
+15 948 passed, 467 skipped, 30 xfailed, 7 errors: the 7 errors and one failure
+were the mid-run edit (green on re-run), seven were the guides above, one the
+theory page's plain-text Rwp. FULLSUITE.
+
+**Code review.** Not re-run: this session's code change is one capped
+expression and its constant; the 7th session's `/code-review high --fix` read
+the branch's R6 code. The two Opus reviews below read the rule.
+
+**Generality** (generality-review agent, on the four R6 rows and the cap).
+The four rows hold, the earlier weak `StageResult.shift_over_esd_tol` now
+holds; their evidence needed `RESULTS.md` rewritten, since done. The cap was
+weak: no row of its own, so it is now `lm._SHIFT_CHI2_CAP` with a tier-1 row
+(arithmetic). Its dissent: GSAS-II 5.8.4 computes shift/esd on the GOF-scaled
+esd (`GSASIIstrMain.py:397-402`) and does not stop on it; FullProf's esd
+scaling was not checked. Its remaining gap, not done: the test's own reading
+(`LMOutcome.gauss_newton_shift`) reaches no record field, so at χ²_red > 1
+the reported `max_shift_over_esd` reads smaller than the value the stop
+compared with 0.1. Added as a task.
+
+**Next.**
+1. CI on the PR (PRNUM). The maintainer merges.
+2. Then the new task: carry the shift test's own reading onto `StageResult`.
+3. The joint runner's re-solve and `backend="jax"` on the bench stay open, as
+   does the user's case (task 1).
 
 ### 2026-11-28 (7th session) — R6 merged with R7 and re-measured; a series keeps the shift test; one defect blocks the PR (runner 2, handed off)
 
