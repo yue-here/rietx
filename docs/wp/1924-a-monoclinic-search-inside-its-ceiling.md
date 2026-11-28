@@ -81,6 +81,13 @@ The reporter's figures, not re-run here: the 2026-10-30 pattern is private and g
   `MAX_GRID_BYTES` and `MAX_HARVEST` are on main (PR #1244), so the memory
   half no longer rests on these counts. The figures were not re-run (private
   pattern).
+- 2026-11-16, from WP-2110 (PR #1586), for the time share. On bethanechol set
+  F in manual mode, a trial_error unit on a 600 s CPU budget read 617 s. Its
+  in-loop dedup (`len(found) > 2000`, once per base) ran on every base, on up
+  to 17 000 raw candidates, and kept 4 980 distinct ones. That step reads no
+  budget, so one base's dedup is a stretch the per-`_score` read cannot cut.
+  Measured on a Linux x86-64 workstation, with `--cpu-clock`. WP-2110's
+  `MAX_SEEN` does not bound `found`.
 
 ## Non-goals
 
