@@ -22,7 +22,7 @@ Poisson $\sigma = \sqrt{\max(y, 1)}$ is only the fallback for bare counts.
 The Jacobian is assembled column by column, exact wherever it can be: linear background columns, analytic peak-chain columns (per-peak
 position, width, mixing and intensity), analytic site columns for
 coordinates, anisotropic ADPs, Biso and occupancy over the frozen operator
-subsets, analytic columns for magnetic-moment moduli and the FCJ apertures, and forward
+subsets (ties across atoms and distortion modes included), analytic columns for magnetic-moment moduli and the FCJ apertures, and forward
 differences otherwise.
 Under a differentiable backend the same residual is traced and columns
 come from forward-mode autodiff, whose cost scales with the parameter
