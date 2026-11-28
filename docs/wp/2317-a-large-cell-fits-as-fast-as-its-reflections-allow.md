@@ -1,6 +1,6 @@
 # WP-2317 — a large cell fits as fast as its reflections allow: the case, the bar, and the rulings in the way
 
-Milestone: unscheduled · Status: 🔄 2026-11-27 — R0, R2, R3 and R5-R7 ruled and recorded, R4 unruled; task 1 waits on the maintainer; R6's implementation, 5, 7 and 8 open
+Milestone: unscheduled · Status: 🔄 2026-11-28 — R0, R2, R3 and R5-R7 ruled, R4 unruled; R7 built on wp2317-window-slack, its suites and PR open; task 1 waits on the maintainer; R6, 5, 7 and 8 open
 Track: A large cell
 Depends on: —
 Priority: P2 2026-11-27 — the scoping WP of a track the maintainer opened for a user at the wall (slowdowns on a 12 × 36 × 4 Å cell); 2314, 2315 and 2316 read its case, its bar and its rulings
@@ -658,6 +658,10 @@ what it costs here.
       "on par" comparison, and it is the reference for "as fast as possible".
       *Done 2026-11-27 for all three modes (Context, Cross-code timing). Not
       done: GSAS-II from the seeded Le Bail background.*
+- [ ] R7 as ruled: window slack sized per stage from its free position
+      parameters, one re-solve on fresh windows past the window fraction.
+      *Built 2026-11-27/28 on `wp2317-window-slack`; suites and PR open.*
+- [ ] The joint runner's re-solve (`multi.py`), which R7 left out.
 - [ ] `backend="jax"` on the three bench cases once, under a runaway guard: wall,
       compile time, Rwp.
 - [ ] Skill: none until a fix lands. The interim advice (Pawley over Le Bail on a
@@ -685,6 +689,112 @@ what it costs here.
 - `docs/practice.md` § Structure-free fitting, § When a fit stops, § Peak-width limits.
 
 ## Handover log
+
+### 2026-11-28 — R7 implemented on `wp2317-window-slack`; suite fixes, handed off mid-handover (runner 2)
+
+R7 is built and most of the fast suite's fallout is fixed. A stage that a
+later stage refits now sizes each window's room for peak movement from the
+position parameters it frees, and any stage of the single-pattern runners
+solves once more on fresh windows when its frozen windows dropped more than
+its tolerance at its answer. The re-solve also makes some fits more accurate.
+A solo width stage that widens its peaks now reads the synthetic specimen's
+400 Å as 400.35 and 401.91 Å, where it read about 409. The joint runner does
+not re-solve yet and still reads 409.8. Not done: the second fast run, the
+full suite, `tests.reader_output`, the generality judge and the PR. Two
+stored-format and reader-output questions wait on the maintainer (below).
+
+**Done (runner 1, commits `c1b8f48d1`..`50d0f0dd7`).** `forward.WINDOW_MOVE_FWHM`
+= 3 FWHM per position family a stage frees (zero, displacement, transparency,
+capillary offsets, cell or λ), shaped by each family's 2θ dependence, plus
+half a point step, capped at the old 0.3°. The answer stage, a stage run on
+its own, a joint fit, a shift equation and a declared `window_slack_deg` keep
+0.3°. `StageResult.window_refit_loss` records the first solve's loss. Audit
+rows, help, manual, practice.md, skill row, the guides re-pinned. Runner 1's
+evidence: every refined value moved under 0.06 esd against the uniform slack,
+background coefficients under 0.08 esd, Rwp to 1e-5 (macOS arm64, `[dev]`,
+four acceptance families, all development data, and four Nb₁₈W₁₆O₉₃ bench
+cases). Points per evaluation in declared stages: 0.20-0.22× on 11-BM NAC,
+0.76-0.85× on SRM 660c, 0.98-0.996× elsewhere.
+
+**Done (runner 2).**
+- `NodeAction.movement_slack` (stored, default `False`) so `replay` compiles
+  the windows the stage solved (`4b570f857`, recovered from runner 1's
+  uncommitted tree). Documented in `reference/history.md`.
+- Merged `origin/main` (WP-2315's merged groups); export guide re-pinned.
+- Tests that pinned a pre-R7 path: the joint-size test's solo arms, the
+  width-floor trap, the sulfate body's and the split pair's stage boundaries
+  declare the uniform slack (claims about joint sharing, the clamp and site
+  multiplicity, not windows). The tutorial-step test runs the tutorial's own
+  plan. The extinction gate's out-of-basin cell starts 2 % off (R7 brings a
+  1 % cell back). The Le Bail converging and cap tests start at −1 %.
+- `/code-review high --fix`: a re-solved stage keeps its `fixed` paths, and
+  the first solve's resets and collapses stay only for paths the answer cannot
+  move (`7f1dc2c90`). Declined: the non-finite message after a non-finite
+  re-solve (says nothing moved, while the first solve's values stand; a safe
+  fix restores the free set and holds, not a local patch), and replay sizing
+  families from the end-of-stage free set (exact only where the free set did
+  not change at the answer).
+
+**Measured** (macOS arm64, this worktree's `[dev]` venv, shared machine).
+- Fast suite on the merged tree before the fixes: 12 failed, 15 888 passed,
+  457 skipped, 30 xfailed. Each failure is listed above as fixed, except the
+  Le Bail file, which was running when the session stopped.
+- Replay with the stored flag: a `scale_bkg` node replays bit-exact
+  (synthetic, FAP). Without it, replay's Rwp moves −2.0e-4 and −2.1e-3
+  relative, and `test_history`'s exact-replay pin fails.
+- Tutorial 05's 2 % jump: under the tutorial's plan (no closing stage) R7
+  reaches it warm (Rwp 0.0395) where the uniform slack took `warm_staged`. With
+  the closing stage declared, R7 takes `warm_staged` (0.0389) where the uniform
+  slack stayed warm (0.0390).
+- Le Bail, 5.1-25°: from −0.15 % to +0.6 % pass 1 now lands at Rwp 13.918 %
+  and pass 2 at 13.927 %.
+
+**In flight.**
+- **A hang.** `pytest tests/test_lebail_alternation.py -n 4` ran 67 minutes
+  with one worker at 100 % CPU, killed by the shift lead. That command omitted
+  `-m "not slow"`, and the file's one slow row says its partitions took 1 604 s
+  alone on an arm64 Mac, so the slow row is the likely cause. A serial capped
+  rerun of the fast rows was running when the session stopped; check
+  `tests/test_lebail_alternation.py -m "not slow"` passes before anything else.
+  The Le Bail edits are uncommitted in the worktree if that run did not finish.
+- Not run: fast suite 2 with junit, full suite (`serial.py`), reader_output,
+  generality judge (runner 1's verdict on the audit rows is not on disk), CI
+  lint steps after the latest commits (ruff and Vale were clean at the merge).
+
+**For the maintainer** (to go at the top of the PR body).
+1. *Stored-format change.* `NodeAction.movement_slack: bool = False` is
+   written to `history.jsonl` on every stage node. A new build reads an old
+   node as `False`, which is what it ran. An older build refuses a new node
+   (`extra="forbid"`), the shape WP-2315's `ReflectionState.merged_groups` had
+   when it was ruled (a) on 2026-11-27. Options: (a) keep the field, so replay
+   reproduces the stage exactly; (b) drop it, so replay compiles the uniform
+   slack and differs by up to 2e-3 in Rwp, a staleness the history docs
+   already allow, with the exact-replay test relaxed; (c) derive it, which the
+   node cannot, since it does not know whether a later stage followed.
+   Recommendation: (a), a clear call on the sibling ruling.
+2. *Reader output, two cases.* (i) The cpd-1b hostile runaway (reached only
+   under the pre-WP-2045 tolerance schedule) now re-solves, and
+   `STAGE_WINDOWS_STALE` reads the second solve, so the warning no longer
+   fires; the 73 % stays on `StageResult.window_refit_loss`. (ii) A fit with
+   `lebail_passes` > 1 from a near start now ends with the
+   `LEBAIL_ALTERNATION_STOPPED` *warning* ("stopped at the first pass that did
+   not lower Rwp … Check the cell and the background") though pass 1 is the
+   best pass, because pass 2 rises 6.5e-4 relative, past `LEBAIL_CONVERGED_REL`
+   (1e-4). Before R7 the same start converged over five passes and said
+   "fixed point" at info level.
+
+**Gotchas.** The worktree harness refuses `git -C` into another tree: take
+over a dormant tree by copying its files, restoring it with `git show`, and
+`git worktree remove`. `rietx.refine` the attribute is a function, so a probe
+imports the module with `importlib.import_module`.
+
+**Next.** (1) Confirm the Le Bail file's fast rows pass, serially and capped;
+commit its edits. (2) Fast suite with junit, then the full suite through
+`serial.py`. (3) `tests.reader_output`; dispatch the generality judge on the
+audit rows. (4) Open the PR as a draft with the two maintainer items at the
+top, name it here, push, mark it ready. (5) Follow-up, unowned: the joint
+runner's re-solve (`multi.py`'s stage loop is inline, so it needs the stage
+body factored first).
 
 ### 2026-11-27 (5th session) — the rulings recorded, accuracy set by what users need, and the stopping rule re-settled
 
