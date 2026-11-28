@@ -41,6 +41,7 @@ import numpy as np
 
 from ..model.forward import CompiledModel, DerivativeBases
 from ..optimize import lapack
+from ..schemas.pattern import is_tof_model
 from .schemas import (
     CONTENTS_MAX_TEMPLATE_R2,
     CONTENTS_MIN_INTENSITY_SHARE,
@@ -280,7 +281,18 @@ def attribute_regions(model: CompiledModel, values: dict[str, float],
     (``report._reading_models``).  ``axial_bases`` is the bases of a twin at the
     nominal aperture, which the report hands in when the model's apertures are
     both zero (:func:`nominal_axial_columns`).
+
+    **Empty on a model whose grid is not an angle**, checked here at the entry
+    point rather than deeper in: every template below is a function of
+    θ = radians(2θ/2), and ``np.radians`` of a flight time in the tens of
+    thousands does not fail — it returns a plausible angle and attributes the
+    misfit against shapes that describe nothing.  ``build_report`` already
+    returns before reaching this on such a result and says so in the summary;
+    this is the module's own boundary, so calling it directly cannot produce
+    the silent nonsense either.
     """
+    if is_tof_model(model):
+        return []
     y_calc = model.evaluate(values)
     delta = model.y_obs - y_calc
     sqrt_w = 1.0 / model.sigma

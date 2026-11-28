@@ -339,8 +339,10 @@ def _amplitudes(phase) -> np.ndarray:
 def _a_det(restricted, phase: int, modes: list[int], target: float,
            probe_amplitude: float) -> float | None:
     """A_det of ``modes`` at the restricted optimum: one predict per mode at the probe."""
+    from ..schemas.results import require_two_theta_grid
+
     result = restricted.result_
-    tt = np.asarray(result.two_theta)
+    tt = require_two_theta_grid(result, "distortion_block_tests()")
     sigma = np.asarray(result.sigma)
     even = _dist.amplitude_action(restricted.structure.phases[phase]).even(
         _amplitudes(restricted.structure.phases[phase]))

@@ -88,12 +88,14 @@ from .model.forward import (
     recorded_window_tol,
     window_loss,
 )
+from .model.forward_tof import CompiledTOFModel, compile_tof_model
 from .model.geometry import cell_volumes, geometry_table
 from .model.microstructure import floored_paths, microstructure_table
 from .model.origin import CompiledOrigin, OriginPhaseRows, compile_origin
 from .model.peak_equations import WIDTH_TARGETS
 from .model.profiles.caglioti import (
     SCHERRER_K,
+    apparent_size_from_d_size_coefficient,
     apparent_size_from_size_coefficient,
     gaussian_fwhm,
     lorentzian_fwhm,
@@ -160,6 +162,11 @@ from .report.schemas import (
     FitReport,
     StageReport,
 )
+from .report.tof import (
+    _tof_absorption_diagnostics,
+    _tof_background_peak_diagnostics,
+    _tof_intensity_basis_diagnostics,
+)
 from .schemas.common import Diagnostic, Parameter, Provenance, check_mode
 from .schemas.history import (
     MergedGroup,
@@ -171,7 +178,13 @@ from .schemas.history import (
 from .schemas.instrument import CAPILLARY_OFFSETS, Instrument
 from .schemas.interval import PARAMETER_INTERVAL_LEVEL, PARAMETER_INTERVAL_MAX_REFITS
 from .schemas.params import ParameterRow, TieSpec
-from .schemas.pattern import PatternData, require_two_theta
+from .schemas.pattern import (
+    PatternData,
+    is_tof_model,
+    require_intensity_basis,
+    require_matched_axis,
+    require_two_theta,
+)
 from .schemas.plan import (
     PlanSpec,
     check_closing_window_tol,
@@ -603,7 +616,91 @@ def _tie_terms(source: "str | dict[str, float] | Sequence[tuple[str, float]]",
     return [(path, scale * coeff) for path, coeff in seen.items()]
 
 
-def _unsupported_phase_paths(model: CompiledModel, table: ParameterTable,
+#: A compiled model of either arm.  Used in annotations wherever a function
+#: does not care which — which, after this rung, is nearly all of ``refine.py``:
+#: the diagnostics that *do* care say so by branching on ``model.axis`` and
+#: returning a diagnostic that names what did not run.
+AnyCompiledModel = CompiledModel | CompiledTOFModel
+
+
+def _is_tof(model) -> bool:
+    """Whether a compiled model's grid is a flight time.
+
+    Asked of the *model*, never of the instrument or the pattern: by the time a
+    diagnostic runs, the compiled model is the authority on which forward
+    branch produced the numbers it is about.  ``getattr`` with the
+    constant-wavelength default so a stand-in in a test needs no field.
+    """
+    return is_tof_model(model)
+
+
+def _recorded_stage_window_tol(model, tol: float | None) -> float | None:
+    """What a stage's ``window_area_tol`` record says it ran at.
+
+    A time-of-flight bank's compiler never reads the constant-wavelength
+    window fraction (its windows are sized per side by
+    ``forward_tof.TOF_WINDOW_AREA_TOL``), so ``None``, the "no fraction"
+    state of the model's own ``window_area_tol``: the closing stage's 0.1 %
+    would be a number nothing ran at.  A 2θ stage records what it ran at.
+    """
+    return None if _is_tof(model) else tol
+
+
+def _compile_for(structure: Structure, instrument: Instrument,
+                 data: PatternData, *, mode: Mode = "rietveld",
+                 limits: tuple[float, float] | None = None,
+                 moving_paths: set[str] | None = None,
+                 restraint_weight_scale: float = 1.0,
+                 window_slack: float | None = None,
+                 window_area_tol: float | None = None,
+                 orbit_split: list | None = None,
+                 lorentz_window_tol: float | None = None) -> AnyCompiledModel:
+    """Compile against whichever forward model this **pair** names.
+
+    The one routing point, so the four call sites in this module read alike and
+    a fifth cannot pick differently.  The rule is the pair, not either half: a
+    time-of-flight pattern *or* a ``neutron_tof`` source goes to
+    :func:`~rietx.model.forward_tof.compile_tof_model`, which refuses both
+    mismatched pairs by name at its own door; everything else goes to
+    :func:`~rietx.model.forward.compile_model`, whose ``require_two_theta``
+    call refuses a flight time there.  So each compiler states its own refusal
+    and this function states none — the alternative, a third message here,
+    would be a second authority on the same fact.
+
+    ``limits`` and ``window_slack`` are **on the pattern's own axis**: degrees
+    on a constant-wavelength scan, microseconds on a bank.  They are spelled
+    without a unit here for that reason; the public keyword a caller writes is
+    still ``two_theta_limits`` (see :meth:`Refinement.fit`), which is a name
+    this rung deliberately does not rename.
+
+    ``orbit_split`` reaches both compilers: a site's multiplicity is decided
+    once, at the fit's start, on either axis (WP-2052).  ``window_area_tol``
+    reaches the constant-wavelength one only.  It sizes a pseudo-Voigt window
+    in FWHM multiples, and a bank's windows are sized per side by
+    ``forward_tof.TOF_WINDOW_AREA_TOL`` in every stage, a closing one
+    included, so there is nothing on a bank for it to set.
+    ``lorentz_window_tol`` is the converse: it reaches the flight-time
+    compiler only, where it loosens a bank's Lorentzian component alone (issue
+    #193).  The constant-wavelength windows have their own rule and no such
+    schedule, so a plan's schedule is dropped here for a 2θ pattern rather
+    than at each caller.
+    """
+    if data.axis == "tof" or instrument.source.kind == "neutron_tof":
+        return compile_tof_model(
+            structure, instrument, data, mode=mode, tof_limits=limits,
+            moving_paths=moving_paths,
+            restraint_weight_scale=restraint_weight_scale,
+            window_slack_us=window_slack, orbit_split=orbit_split,
+            lorentz_window_tol=lorentz_window_tol)
+    return compile_model(
+        structure, instrument, data, mode=mode, two_theta_limits=limits,
+        moving_paths=moving_paths,
+        restraint_weight_scale=restraint_weight_scale,
+        window_slack_deg=window_slack, window_area_tol=window_area_tol,
+        orbit_split=orbit_split)
+
+
+def _unsupported_phase_paths(model: AnyCompiledModel, table: ParameterTable,
                              support: np.ndarray | None = None, *,
                              sigma: float | None = PHASE_SUPPORT_SIGMA,
                              at_answer: bool = False,
@@ -2476,7 +2573,12 @@ def _snapshot_sinks(*candidates) -> list:
 
 def _compile_cut(model: CompiledModel) -> dict[str, float]:
     """``model``'s peak cut as ``compile_model`` keywords: the area fraction
-    its windows drop and their slack, as the compile resolved them."""
+    its windows drop and their slack, as the compile resolved them.  A
+    time-of-flight bank has no such cut (its windows are sized per side by the
+    compiler, in every stage), so it records none and a grid compiles at the
+    bank's own defaults."""
+    if _is_tof(model):
+        return {}
     return {"window_area_tol": model.window_area_tol,
             "window_slack_deg": model.window_slack_deg}
 
@@ -2630,12 +2732,14 @@ class Refinement:
 
         check_backend(backend)
         check_choice("solver", solver, SOLVERS)
-        # Before the copies below, because what this constructor goes on to
-        # read (the declared wavelengths, the specimen absorption) is a
-        # wavelength a TOF bank does not carry — so without this the refusal
-        # is an AttributeError about a missing attribute rather than a
-        # statement about the radiation.
-        require_two_theta(None, "Refinement()", instrument=instrument)
+        # No axis fence here.  It used to be one — the parameter table this
+        # constructor builds reached for a wavelength a bank does not carry, so
+        # a ``neutron_tof`` instrument had to be refused where it stood or the
+        # failure was an AttributeError about a missing attribute.  The table
+        # now registers the bank's calibration instead (``params.vector``), so
+        # a Refinement over a bank is a legitimate object; what the *pattern*
+        # is is not known until ``fit``, and that is where the matched-pair
+        # check belongs (:func:`~rietx.schemas.pattern.require_matched_axis`).
         self._backend = backend
         self._solver = solver
         self.structure = structure.model_copy(deep=True)
@@ -2750,6 +2854,18 @@ class Refinement:
 
         # carried across calls so a checkout can be continued
         self._mode: Mode = "rietveld"
+        #: The fit window, **on the pattern's own abscissa** — degrees on a
+        #: constant-wavelength scan, *microseconds* on a time-of-flight bank.
+        #: The name says 2θ and, since T-1c, that is true of one of the two
+        #: arms rather than of both.
+        #:
+        #: It is kept anyway, deliberately: ``two_theta_limits`` is a public
+        #: keyword on :meth:`fit`, :meth:`run_stage` and :meth:`suggest`, is
+        #: persisted as a ``RefinementState`` field, and reaches ``project.py``,
+        #: ``sequential.py``, ``multi.py`` and ``gui/session.py``.  Renaming it
+        #: is a public-API deprecation with a state migration, and mixing one
+        #: into the change that routes a forward model would make two things
+        #: reviewable as one.  It is written down here instead.
         self._two_theta_limits: tuple[float, float] | None = None
         self._free_paths: list[str] = []
         #: whether ``_free_paths`` is a declaration.  Until something declares a
@@ -3281,11 +3397,6 @@ class Refinement:
         distortion-mode record that names an atom the new structure lacks
         refuses the edit, since a list changed in place re-ran no check.
         """
-        # Refused before anything is touched: a bank's table builds without
-        # error, so nothing later stops the edit, and by then the structure,
-        # the ties and the holds have moved (WP-1035's half-applied edit).
-        if instrument is not None:
-            require_two_theta(None, "Refinement.edit()", instrument=instrument)
         candidate = self.structure if structure is None else structure
         # a proposed structure meets the twin merge before its table is built,
         # since moving a site changes the symmetry its table is checked against
@@ -4746,8 +4857,9 @@ class Refinement:
         """
         if mode is not None:
             check_mode(mode)
-        require_two_theta(data, "Refinement.suggest()",
-                          instrument=self.instrument)
+        require_matched_axis(data, "Refinement.suggest()",
+                             instrument=self.instrument)
+        require_intensity_basis(data, "Refinement.suggest()")
         from .strategy.suggest import (
             SUGGEST_SEED_ROUGHNESS,
             SUGGEST_SEED_STEPHENS,
@@ -4800,11 +4912,11 @@ class Refinement:
             # at the windows the last answer was measured on: a closing
             # stage's (WP-2002), or the 2 % truncation reads as a gain on
             # every width and background candidate at a converged fit
-            model = compile_model(structure, instrument, data, mode=mode,
-                                  two_theta_limits=limits,
-                                  moving_paths=set(table.moving_paths),
-                                  window_area_tol=recorded_window_tol(
-                                      self._plan_settings["window_area_tol"]))
+            model = _compile_for(structure, instrument, data, mode=mode,
+                                 limits=limits,
+                                 moving_paths=set(table.moving_paths),
+                                 window_area_tol=recorded_window_tol(
+                                     self._plan_settings["window_area_tol"]))
             # a "centroid" phase's origin rows, or the probe's covariance
             # reads the floating origin as a flat direction (WP-1912)
             model.origin = compile_origin(model, table)
@@ -4830,7 +4942,7 @@ class Refinement:
             x0 = table.x0()
             if model.pawley is not None:
                 x0 = np.concatenate([x0, model.pawley_x0()])
-            n_data[0] = len(model.tt)
+            n_data[0] = model.n_points
             blocks[0] = row_layout(model)
             return (_jacobian_for(model, table, self._backend)(x0),
                     _make_residual(model, table)(x0))
@@ -5054,8 +5166,9 @@ class Refinement:
         branch (and, in v0.5, on a different sample via
         ``SequentialRefinement``).
         """
-        require_two_theta(data, "Refinement.cherry_pick()",
-                          instrument=self.instrument)
+        require_matched_axis(data, "Refinement.cherry_pick()",
+                             instrument=self.instrument)
+        require_intensity_basis(data, "Refinement.cherry_pick()")
         tree = self._require_history()
         node = tree[node_id]
         if node.action.kind != "stage":
@@ -5073,7 +5186,10 @@ class Refinement:
                       seed=node.action.seed, strain_seed=node.action.strain_seed,
                       restraint_weight_scale=node.action.restraint_weight_scale,
                       ftol=node.action.ftol,
-                      window_slack_deg=node.action.window_slack_deg)
+                      window_slack_deg=node.action.window_slack_deg,
+                      # the Lorentzian window tolerance the stage was handed,
+                      # a Stage field, so a coarse stage compiles its windows
+                      lorentz_window_tol=node.action.lorentz_window_tol)
         # and the plan settings the stage ran under, which are run_stage's
         # keywords rather than the Stage's (WP-2002, B1): the 3σ and 0.98 for
         # a node written before the fields
@@ -5185,6 +5301,7 @@ class Refinement:
                    prior_significance: np.ndarray | None = None,
                    phase_support_sigma: float | None = PHASE_SUPPORT_SIGMA,
                    window_area_tol: float | None = None,
+                   lorentz_window_tol: float | None = None,
                    refined_before: frozenset[str] = frozenset()):
         """One stage: free params, recompile, solve, commit, guard.
 
@@ -5329,9 +5446,9 @@ class Refinement:
         # rebuilds its frames from the written-back cell, re-seeds the DOFs to
         # the same components, and hands the compile those frames.
         table.reframe_moments(self.structure)
-        new_model = compile_model(
+        new_model = _compile_for(
             self.structure, self.instrument, data, mode=mode,
-            two_theta_limits=two_theta_limits,
+            limits=two_theta_limits,
             moving_paths=set(table.moving_paths),
             # eq (7)'s c_w for this stage: frozen onto the model here, with the
             # hkl list and the windows, because a schedule reweights the
@@ -5340,14 +5457,19 @@ class Refinement:
             # the stage's declared window capture slack (WP-1112): the same
             # frozen-at-compile shape as c_w, and None for every plan that
             # does not state one
-            window_slack_deg=stage.window_slack_deg,
+            window_slack=stage.window_slack_deg,
             # and the area its windows may drop: the closing stage's own, None
             # for every declared stage (WP-2002, the sixth round's Q1 and Q2),
             # which compiles at the declared 2 % by name
             window_area_tol=recorded_window_tol(window_area_tol),
             # the split this call decided at its start, so a stage that drove
             # a half-occupied atom onto a mirror keeps its multiplicity
-            orbit_split=self._orbit_split)
+            orbit_split=self._orbit_split,
+            # the Lorentzian window tolerance the *plan* scheduled for this
+            # stage (RefinementPlan.stage_lorentz_window_tols), passed in like
+            # ftol because only the plan knows which stage is last; a bank's
+            # alone, _compile_for dropping it on a 2θ pattern (issue #193)
+            lorentz_window_tol=lorentz_window_tol)
         table.push_moment_frames(new_model)
         carried = False
         if model is not None and mode in ("lebail", "pawley") and model.mode == mode:
@@ -5438,7 +5560,7 @@ class Refinement:
                         # at stage start, where a watcher can see the typo
                         # before the stage it emptied has spent its budget
                         unknown_paths=list(unknown_paths),
-                        n_points=len(model.tt),
+                        n_points=model.n_points,
                         index=stage_index, n_stages=n_stages)
         # ftol is passed only when there is one to pass, so a stage with no
         # schedule keeps the solver default from one authority (the runner's
@@ -5683,7 +5805,7 @@ class Refinement:
                             # the reader aligns on this, the most recent one,
                             # so it repeats what the first stage_start said
                             unknown_paths=list(unknown_paths),
-                            n_points=len(model.tt),
+                            n_points=model.n_points,
                             index=stage_index, n_stages=n_stages)
             # the origin restraint follows the free set, which the release or
             # the collapse has just changed: asked again, at the values this
@@ -6276,7 +6398,14 @@ class Refinement:
                 f"({', '.join(sorted(PLAN_PRESETS))}) or list at least one "
                 "stage.")
 
-        require_two_theta(data, "Refinement.fit()", instrument=self.instrument)
+        # The pair, not the pattern: this verb serves both arms and refuses the
+        # two crossed ones.  Checked here rather than left to the compiler
+        # below — which refuses them too — so that a caller who mixed up two
+        # instruments does not watch a history tree open and a ``fit_start``
+        # event go out before the run says no.
+        require_matched_axis(data, "Refinement.fit()",
+                             instrument=self.instrument)
+        require_intensity_basis(data, "Refinement.fit()")
         self._mode = mode
         self._two_theta_limits = two_theta_limits
         self._free_paths = []
@@ -6581,6 +6710,9 @@ class Refinement:
         stages = plan.run_stages(paths=[e.path for e in table.entries])
         ftols = plan.stage_ftols()
         window_tols = plan.stage_window_tols()
+        # and a bank's Lorentzian window tolerance, coarse in every declared
+        # stage but the last (issue #193); _compile_for drops it on a 2θ scan
+        lorentz_tols = plan.stage_lorentz_window_tols()
         # a dataclass validates nothing, so the plan's threshold is checked
         # where it is read, in the words its mirror uses (WP-2002, B1)
         phase_support_sigma = check_phase_support_sigma(plan.phase_support_sigma)
@@ -6607,8 +6739,9 @@ class Refinement:
         #: what an earlier stage of this fit left free (the aperture lift's
         #: gate, WP-1955)
         refined_before: set[str] = set()
-        for k, (stage, ftol, window_tol) in enumerate(
-                zip(stages, ftols, window_tols, strict=True), start=1):
+        for k, (stage, ftol, window_tol, lorentz_tol) in enumerate(
+                zip(stages, ftols, window_tols, lorentz_tols, strict=True),
+                start=1):
             with self._abandon_on_cancel(cancel, stage.name, stage_results, stream):
                 model, outcome, guard, freed, hold = self._run_stage(
                     stage, data, mode, table, model, two_theta_limits,
@@ -6619,6 +6752,7 @@ class Refinement:
                     prior_significance=answer_significance,
                     phase_support_sigma=phase_support_sigma,
                     window_area_tol=window_tol,
+                    lorentz_window_tol=lorentz_tol,
                     refined_before=frozenset(refined_before))
             refined_before.update(table.free_paths)
             # WP-1343: the moment's rung at this boundary, and the shift the
@@ -6682,7 +6816,8 @@ class Refinement:
                 n_constraint_truncations=outcome.n_constraint_truncations,
                 n_degenerate_cell_probes=outcome.n_degenerate_cell_probes,
                 n_lapack_fallbacks=outcome.n_lapack_fallbacks,
-                ftol=ftol, window_area_tol=window_tol,
+                ftol=ftol,
+                window_area_tol=_recorded_stage_window_tol(model, window_tol),
                 held=hold.held, released=hold.released,
                 held_reach=hold.reach,
                 scale_b_held=hold.scale_b_held,
@@ -6700,6 +6835,8 @@ class Refinement:
                 # checked, trivially: one histogram has no elsewhere
                 unreached_histograms={},
                 moment_angle_tests=outcome.moment_angle_tests,
+                # read off the model the stage ran on, never off the schedule
+                lorentz_window_tol=getattr(model, "lorentz_window_tol", None),
             ))
             if stage_reports:
                 t_report = time.perf_counter()
@@ -6724,11 +6861,16 @@ class Refinement:
                     # (Stage.ftol is None for every stage taking the plan's
                     # schedule), because a cherry-pick re-runs what happened
                     ftol=ftol, window_slack_deg=stage.window_slack_deg,
-                    window_area_tol=window_tol,
+                    window_area_tol=_recorded_stage_window_tol(model, window_tol),
                     # and the plan's two settings, for the same reason
                     # (WP-2002, B1)
                     phase_support_sigma=phase_support_sigma,
                     correlation_guard=plan.correlation_guard,
+                    # the Lorentzian window tolerance the schedule handed the
+                    # stage, so a cherry-pick compiles the same windows; None
+                    # off a bank, where no schedule applies and a
+                    # constant-wavelength node's api_call keeps its text
+                    lorentz_window_tol=lorentz_tol if _is_tof(model) else None,
                 ), model, table, outcome, stage_diagnostics,
                     held_scales=_held_scale_phases(stage_results[-1]),
                     window_loss=stage_results[-1].window_loss)
@@ -6790,17 +6932,21 @@ class Refinement:
         """
         if mode == "pawley":
             return model, []
-        fresh = compile_model(
+        fresh = _compile_for(
             self.structure, self.instrument, data, mode=mode,
-            two_theta_limits=two_theta_limits,
+            limits=two_theta_limits,
             moving_paths=set(table.moving_paths),
             restraint_weight_scale=stage.restraint_weight_scale,
-            window_slack_deg=stage.window_slack_deg,
+            window_slack=stage.window_slack_deg,
             window_area_tol=recorded_window_tol(window_area_tol),
             # and the solve's orbit split: the fit's own compiles all used it,
             # and a fresh one would halve a site the last stage left on a
             # mirror (WP-2052).  Its fresh reading is reported, never used.
-            orbit_split=orbit_split_of(model))
+            orbit_split=orbit_split_of(model),
+            # a bank's Lorentzian windows at the answer tolerance whatever the
+            # stage ran at: a result is never measured on coarse windows
+            # (issue #193, the diagnostic-tense condition)
+            lorentz_window_tol=None)
         # and the solve's moment frames, never the fresh compile's: this one is
         # built at the fitted cell, so a last stage that moved an angle would
         # otherwise read the refined moment DOFs in a frame they were never
@@ -6913,6 +7059,12 @@ class Refinement:
         tails, at about 1.5-2× the stage's time.  :meth:`cherry_pick` passes a
         recorded node's.  The stage's ``window_area_tol`` records the fraction
         it ran at.
+
+        On a time-of-flight bank the stage's own ``Stage.lorentz_window_tol``
+        sizes the Lorentzian component of its windows; ``None`` is the answer
+        tolerance, ``forward_tof.TOF_WINDOW_AREA_TOL``, for the same reason
+        (issue #193).  ``StageResult.lorentz_window_tol`` records what it ran
+        at.
         """
         if mode is not None:
             check_mode(mode)
@@ -6928,8 +7080,9 @@ class Refinement:
                     f"or None for the default; got {window_area_tol!r}") from None
         else:
             window_area_tol = WINDOW_AREA_TOL
-        require_two_theta(data, "Refinement.run_stage()",
-                          instrument=self.instrument)
+        require_matched_axis(data, "Refinement.run_stage()",
+                             instrument=self.instrument)
+        require_intensity_basis(data, "Refinement.run_stage()")
         mode = mode or self._mode
         ttl = two_theta_limits if two_theta_limits is not None else self._two_theta_limits
         self._mode = mode
@@ -6976,7 +7129,10 @@ class Refinement:
                         # for, and it takes its own ftol or the solver default
                         ftol=stage.ftol,
                         phase_support_sigma=phase_support_sigma,
-                        window_area_tol=window_area_tol)
+                        window_area_tol=window_area_tol,
+                        # — and a bank's own Lorentzian window tolerance, or
+                        # the answer tolerance (issue #193)
+                        lorentz_window_tol=stage.lorentz_window_tol)
             finally:
                 if (stream is not None and stream is not events
                         and stream is not recorder):
@@ -7019,7 +7175,8 @@ class Refinement:
                 n_constraint_truncations=outcome.n_constraint_truncations,
                 n_degenerate_cell_probes=outcome.n_degenerate_cell_probes,
                 n_lapack_fallbacks=outcome.n_lapack_fallbacks,
-                ftol=stage.ftol, window_area_tol=window_area_tol,
+                ftol=stage.ftol,
+                window_area_tol=_recorded_stage_window_tol(model, window_area_tol),
                 held=hold.held, released=hold.released,
                 held_reach=hold.reach,
                 scale_b_held=hold.scale_b_held,
@@ -7034,7 +7191,9 @@ class Refinement:
                 termination=outcome.termination or None,
                 seeded=hold.seeded, cell_reset=hold.cell_reset,
                 collapsed=hold.collapsed,
-                moment_angle_tests=outcome.moment_angle_tests)
+                moment_angle_tests=outcome.moment_angle_tests,
+                # read off the model the stage ran on, never off the stage
+                lorentz_window_tol=getattr(model, "lorentz_window_tol", None))
             # after the StageResult rather than beside the other two extends
             # above, because this one reads the record it has just built; and
             # before the node, so the node carries what the result carries
@@ -7069,9 +7228,12 @@ class Refinement:
                     seed=stage.seed, strain_seed=stage.strain_seed,
                     restraint_weight_scale=stage.restraint_weight_scale,
                     ftol=stage.ftol, window_slack_deg=stage.window_slack_deg,
-                    window_area_tol=window_area_tol,
+                    window_area_tol=_recorded_stage_window_tol(
+                        model, window_area_tol),
                     phase_support_sigma=phase_support_sigma,
                     correlation_guard=correlation_guard,
+                    lorentz_window_tol=(stage.lorentz_window_tol
+                                        if _is_tof(model) else None),
                 ), model, table, outcome, diagnostics,
                     held_scales=_held_scale_phases(stage_result),
                     window_loss=stage_result.window_loss)
@@ -7153,6 +7315,18 @@ class Refinement:
         last result's answer on that result's model, so a later fit that is
         cancelled, keeping its completed stages, does not move it (WP-1421).
 
+        **The bare array is read on the instrument's own axis.**  The parameter
+        keeps its 2θ name, and against a ``neutron_tof`` instrument the numbers
+        in it are flight times in microseconds — the axis is a property of the
+        instrument here, because a bare array declares nothing.  Passing a
+        :class:`~rietx.PatternData` is the unambiguous form: it carries its own
+        axis, and a pair whose two halves disagree is refused by name.  On a
+        bank it carries its ``intensity_basis`` too, which decides whether the
+        channel width W(T) multiplies the curve; a bare array takes the basis
+        of the pattern the last fit ran on, and before a fit is refused by
+        name (:func:`~rietx.schemas.pattern.require_intensity_basis`): pass a
+        :class:`~rietx.PatternData` that declares one.
+
         **It does not require a fit** (WP-1110 item 6).  Until then it did, and
         the refusal was ``RuntimeError: call fit() first`` on both forms, which
         is why an agent wanting y_calc at known parameters to redraw a figure
@@ -7218,12 +7392,33 @@ class Refinement:
             # the fitted model reads the moment DOFs in the last stage's frames
             table.pull_moment_frames(self._model)
             return self._model.evaluate(table.decode(table.x0()))
+        # What a bank's channels hold travels with the grid: a counts bank's
+        # Bragg sum carries W(T), a slope in flight time, so a grid rebuilt
+        # without it would not reproduce ``y_calc`` (#1548 review, item 11).
+        # From the pattern passed when there is one; for a bare array, from
+        # the model the last fit compiled, the pattern it ran on.
+        basis = getattr(self._model, "intensity_basis", None)
         if isinstance(two_theta, PatternData):
-            require_two_theta(two_theta, "Refinement.predict()",
-                              instrument=self.instrument)
-            two_theta = two_theta.two_theta
+            require_matched_axis(two_theta, "Refinement.predict()",
+                                 instrument=self.instrument)
+            require_intensity_basis(two_theta, "Refinement.predict()")
+            basis = two_theta.intensity_basis
+            two_theta = two_theta.x()
         tt = np.asarray(two_theta, dtype=np.float64)
-        grid = PatternData(two_theta=tt.tolist(), intensity=[0.0] * len(tt))
+        # A bare array carries no axis, so the instrument decides which field
+        # it lands in — the dummy grid must be a *time-of-flight* pattern for a
+        # bank, or the compile refuses its own instrument.
+        tof_grid = self.instrument.source.kind == "neutron_tof"
+        grid = PatternData(
+            two_theta=None if tof_grid else tt.tolist(),
+            tof=tt.tolist() if tof_grid else None,
+            intensity=[0.0] * len(tt),
+            intensity_basis=basis if tof_grid else None)
+        # a bare flight-time array before any fit has no basis to take: refused
+        # here, naming this door, rather than at the compiler's
+        require_intensity_basis(
+            grid, "Refinement.predict() on a bare flight-time array with no "
+                  "fitted pattern to take a basis from")
         mode = self._mode
         if mode in ("lebail", "pawley") and self._model is None:
             raise RuntimeError(
@@ -7232,9 +7427,14 @@ class Refinement:
                 "run. Fit first, or predict in rietveld mode.")
         # the fit's own peak cut, so a grid draws the fit's curve (WP-2235,
         # ruling A); before any fit, compile_model's default
-        model = compile_model(self.structure, self.instrument, grid,
-                              mode=mode, moving_paths=set(table.moving_paths),
-                              **self._peak_cut())
+        # (_compile_for spells the slack axis-neutrally: degrees on a 2θ scan,
+        # microseconds on a bank, as a stage's own compile passes it)
+        cut = self._peak_cut()
+        if "window_slack_deg" in cut:
+            cut["window_slack"] = cut.pop("window_slack_deg")
+        model = _compile_for(self.structure, self.instrument, grid,
+                             mode=mode, moving_paths=set(table.moving_paths),
+                             **cut)
         if mode in ("lebail", "pawley"):
             _carry_lebail(self._model, model)
         return model.evaluate(table.decode(table.x0()))
@@ -7425,9 +7625,17 @@ class Refinement:
         to still be holding.  One Jacobian build, no solve.
         """
         model = self._model
-        data = PatternData(two_theta=model.tt.tolist(),
-                           intensity=model.y_obs.tolist(),
-                           sigma=model.sigma.tolist())
+        # rebuilt on the model's own axis — ``grid`` is ``tt`` on the
+        # constant-wavelength arm and the flight times on a bank
+        # and with the bank's basis, or a counts bank would be probed without
+        # its W(T) and rank the next parameter against another model (#1548
+        # review, item 11)
+        data = PatternData(
+            two_theta=None if _is_tof(model) else model.grid.tolist(),
+            tof=model.grid.tolist() if _is_tof(model) else None,
+            intensity=model.y_obs.tolist(), sigma=model.sigma.tolist(),
+            intensity_basis=(model.intensity_basis if _is_tof(model)
+                             else None))
         s = self.suggest(data)
         if not s.groups:
             return (f"  next: nothing to free — no held parameter clears the "
@@ -9507,6 +9715,14 @@ def _resolve_specimen_absorption(structure: Structure,
     outcomes.
     """
     geom = instrument.geometry
+    if instrument.source.kind == "neutron_tof":
+        # Nothing to fill in: this arm has no scalar µR to write, and it does
+        # not need one — ``compile_tof_model`` computes µ(λ) from the same
+        # composition and the same ``capillary_radius_mm``/``packing_fraction``
+        # this function would have used, and applies it per reflection.
+        # Returning the estimator's "skipped" reason here would report a
+        # correction as unavailable while it was running.
+        return "given", None
     if geom.kind == "debye_scherrer":
         if geom.capillary_radius_mm is None or geom.mu_r is not None:
             return "given", None
@@ -9555,8 +9771,19 @@ FLAT_PLATE_BIAS_MIN = 0.05
 
 def _absorption_record(model: CompiledModel, source: str, skipped: str | None,
                        values: dict[str, float] | None = None):
-    """The :class:`AbsorptionCorrection` record, or None when nothing applies."""
-    if model.mode != "rietveld":
+    """The :class:`AbsorptionCorrection` record, or None when nothing applies.
+
+    ``None`` on a time-of-flight bank **even when the correction ran**, and the
+    reason is this container rather than the physics: it carries one ``mu_r``
+    at one ``wavelength``, and a bank has neither — µ follows the 1/v law, so
+    µR is a function of λ and λ is a property of the channel.  Since T-3 the
+    Rouse cylinder factor *is* applied there, per reflection, and what says so
+    is :func:`_tof_absorption_diagnostics`, which reports µR at both ends of
+    the fitted window.  Filling this record with a µR at some chosen reference
+    wavelength would be the defaulted-answer shape: a number that reads as a
+    measurement of the histogram and is true of one channel of it.
+    """
+    if model.mode != "rietveld" or _is_tof(model):
         return None
     lam = model.line_wavelengths[0] if model.line_wavelengths else model.wavelength
     if values is not None and model.line_wavelengths:
@@ -9657,6 +9884,14 @@ def _capillary_offset_diagnostics(model: CompiledModel,
     capillary fit.  This one fact is about the model being unable to hold the
     aberration at all.
 
+    **Silent on a flight-time bank, as on a flat plate** (#1548 round 5,
+    item 1).  Eq (4) is a shift in deg 2θ, an aberration a bank's model does
+    not have: its position calibration is DIFC/DIFA/TZERO/DIFB, measured
+    against a standard.  A line here would read the same on every bank fit
+    and offer nothing to do, so the arm returns ``[]`` the way a
+    constant-wavelength flat plate does, where the aberration does not belong
+    to the model either.
+
     **The breadth is intended, including on a calibrated instrument.**  Every
     ``Instrument.debye_scherrer(wavelength=…)`` built with no radius trips it —
     the bundled 11-BM references (``examples/nac_11bm.py``, the NAC and SRM 660a
@@ -9671,7 +9906,7 @@ def _capillary_offset_diagnostics(model: CompiledModel,
     than the verdict for exactly that reason — the protocol row (§7) carries the
     clause on how to read it on a calibrated instrument.
     """
-    if model.geometry_kind != "debye_scherrer":
+    if _is_tof(model) or model.geometry_kind != "debye_scherrer":
         return []
     # Read the gate off the table rather than re-deriving it from the geometry.
     # ``ParameterTable`` force-fixes these two exactly when eq (4) has no R to
@@ -9756,7 +9991,7 @@ def _phase_agreement(model: CompiledModel, values: dict[str, float],
     :meth:`~rietx.model.forward.CompiledModel.structure_intensity_partition`
     refuses rather than returning a circular number.
     """
-    if model.mode != "rietveld" or not model.phases:
+    if model.mode != "rietveld" or not model.phases or _is_tof(model):
         return []
     rows = []
     for ip, (i_obs, i_calc) in enumerate(
@@ -9863,6 +10098,14 @@ def _tick_rows(model: CompiledModel, structure: Structure,
     # emission-line image of that hkl, so a Kα2 or λ/2 image is judged with the
     # reflection it is an image of, as its index already says.  It is not a
     # result field; `_low_angle_diagnostics` is its one reader.
+    #
+    # A bank has one "line" and it is not an emission line: every reflection
+    # arrives at the same angle and is separated by flight time, so the
+    # positions come from the four-term calibration and there is no zero shift
+    # to add (that field is a 2θ offset in degrees, and a bank has no such row).
+    # The ticks land on the result's own abscissa either way, which is what
+    # ``RefinementResult.ticks`` now states.
+    tof = _is_tof(model)
     ticks = {}
     tick_hkl = {}
     tick_support = {}
@@ -9877,9 +10120,15 @@ def _tick_rows(model: CompiledModel, structure: Structure,
         # tiled once per emission line, so a Kα2 image says it is the same hkl
         # (H, m), not H: a satellite is labelled by its order (WP-1326)
         pos, hkl = model.reflection_positions(ip, values)
-        n_lines = len(model.line_wavelengths)
-        sup = (_reflection_tick_support(model, ip, values, n_lines) if support
-               else np.full(len(pos), np.nan))
+        if tof:
+            # one row, and no support: `_low_angle_diagnostics`, the one
+            # reader of the support, does not run on a bank
+            n_lines = 1
+            sup = np.full(len(pos), np.nan)
+        else:
+            n_lines = len(model.line_wavelengths)
+            sup = (_reflection_tick_support(model, ip, values, n_lines)
+                   if support else np.full(len(pos), np.nan))
         keep = np.isfinite(pos)
         if cp.magnetic is not None:
             # issue #278: a magnetic phase's reflections are drawn as their
@@ -9957,7 +10206,8 @@ def _uncorrected(stderr: float | None, esd_inflation: float | None) -> float | N
     return stderr / esd_inflation
 
 
-def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray, *,
+def _build_result(model: AnyCompiledModel, table: ParameterTable,
+                  theta: np.ndarray, *,
                   mode: Mode, status: str, stage_results: list[StageResult],
                   diagnostics: list[Diagnostic], structure: Structure,
                   stderr_internal=None, correlation=None,
@@ -10111,9 +10361,12 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # is the FLOOR_HIT half of the bound findings ``at_bound`` projects
     # above, so a width solve="trf" stopped a hair above zero reads absent
     # exactly where LM's lands on it (WP-1914).
+    # ``tof=``: on a bank the size pair is stored in the d-space units a white
+    # beam can express a specimen size in (T-3c), so the block reads L with no
+    # wavelength rather than abstaining on a coefficient it could not invert.
     microstructure = microstructure_table(
         structure, values, wavelength=_longest_line_wavelength(model),
-        esds=stderr_phys, floors=floors)
+        esds=stderr_phys, floors=floors, tof=_is_tof(model))
 
     # WP-1343: whether the magnetic peaks are broader than the profile drew
     # them, read off the converged residual's *shape* rather than from any
@@ -10147,11 +10400,19 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     absorption = _absorption_record(model, mu_r_source, mu_r_skipped, values)
     if absorption is not None:
         diagnostics = diagnostics + _absorption_diagnostics(absorption)
+    diagnostics = diagnostics + _tof_absorption_diagnostics(model)
+
+    # The other half of GSAS's I_o = I'_o/(W·I_i): whether the channel width
+    # was applied, and — the case that matters — whether nobody said.
+    diagnostics = diagnostics + _tof_intensity_basis_diagnostics(model)
 
     # The position aberration this geometry has and could not express, for the
     # same reason as above: nothing else in the result says it was unavailable
     # rather than measured at zero.
     diagnostics = diagnostics + _capillary_offset_diagnostics(model, table)
+
+    # The background-peak width guard, and — on a bank — that it abstained.
+    diagnostics = diagnostics + _tof_background_peak_diagnostics(model)
 
     # Surface-roughness regime fences (WP-0502): whether the fitted range can
     # see the correction at all, and whether it left its derivation's domain.
@@ -10191,7 +10452,7 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     support_sigma = _reported_support_sigma(phase_support_sigma)
     diagnostics = diagnostics + _phase_support_diagnostics(
         significance, model.phase_line_counts(),
-        (model.tt_min, model.tt_max), list(table.free_paths), structure,
+        _range_text(model), list(table.free_paths), structure,
         stage_results, decided=decided, sigma=support_sigma,
         quantified=model.mode == "rietveld", unmeasured=unmeasured_now)
 
@@ -10247,9 +10508,14 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # The region below the first reflection (Q3): read off the fit's own
     # residual, never the background-envelope proxy above — same ``ticks``
     # this function already built, so the two cannot disagree about where
-    # the first reflection sits.
-    diagnostics = diagnostics + _low_angle_diagnostics(
-        model, values, y_calc, stats, ticks, tick_support)
+    # the first reflection sits.  Constant wavelength only: it reads the
+    # Caglioti U/V/W + Lorentzian X/Y instrument profile, which a TOF bank does
+    # not carry in this form (``instrument.source.profile_tof`` is a different
+    # law entirely) — so it abstains there rather than raise, the same
+    # convention every other axis-aware diagnostic here follows.
+    if not _is_tof(model):
+        diagnostics = diagnostics + _low_angle_diagnostics(
+            model, values, y_calc, stats, ticks, tick_support)
 
     # The whole residual's half of the same question, for a P-spline whose
     # air term was declined: the region above reads only below the first
@@ -10296,7 +10562,15 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
                               backend=backend, dtype=backend_dtype_note(backend),
                               solver=solver,
                               report_thresholds_version=THRESHOLDS_VERSION),
-        two_theta=model.tt.tolist(), y_obs=model.y_obs.tolist(),
+        # **The fit's own abscissa, and only ever the one it ran on.**  A
+        # microsecond must never reach a member called ``two_theta``: that is
+        # the whole content of the T-1 fence one rank down, and this is the one
+        # place in the package that could break it, being the only writer of
+        # the field on a single-histogram fit.  Written as a matched pair —
+        # one of the two is the grid and the other is ``None``.
+        two_theta=None if _is_tof(model) else model.grid.tolist(),
+        tof=model.grid.tolist() if _is_tof(model) else None,
+        y_obs=model.y_obs.tolist(),
         y_calc=y_calc.tolist(), y_background=y_bkg.tolist(),
         sigma=model.sigma.tolist(),
         ticks=ticks, tick_hkl=tick_hkl, radiation=_radiation(model, values),
@@ -10886,7 +11160,7 @@ def _species_fallback_diagnostics(structure: Structure,
     """
     from .crystallography.scattering import detect_fallback
 
-    if instrument.source.kind == "neutron_cw":
+    if instrument.source.kind in ("neutron_cw", "neutron_tof"):
         return []
     # {raw species label -> (SpeciesFallback, [atom paths])}; grouped by the
     # label as written so two different ions of the same element (Fe2+ *and*
@@ -11123,8 +11397,17 @@ def _declared_wavelengths(instrument: Instrument) -> list[float]:
     inherits the reference rather than re-snapshotting it, because it is built
     from an instrument already carrying a refined λ.  The joint path
     (``multi.py``) snapshots the same list at construction for the same reason.
+
+    **Empty on a white beam**, which is the true answer rather than a skipped
+    one: a ``neutron_tof`` bank declares no wavelength at all — λ is a property
+    of the channel there — so there is no declared value for a refined one to
+    be measured against, and ``WAVELENGTH_CALIBRATION`` has nothing to say.
+    The flight-time quantity that plays λ's part is the bank calibration, and
+    what it is measured against is a certified cell, which is the standard
+    refinement rather than a diagnostic.
     """
-    return [p.value for p in instrument.source.wavelength_parameters]
+    return [p.value
+            for p in getattr(instrument.source, "wavelength_parameters", ())]
 
 
 #: a soft restraint is flagged in tension when its computed value sits more
@@ -11375,13 +11658,14 @@ _WITHHELD_SIGMA_CODES = frozenset({"PATTERN_SIGMA_NONPOSITIVE",
                                    "PATTERN_INTENSITY_SCALED"})
 
 
-def _reader_note_settled(note: Diagnostic, model: CompiledModel) -> bool:
+def _reader_note_settled(note: Diagnostic, model: AnyCompiledModel) -> bool:
     """Whether the caller has already done what ``note`` asks, on this fit.
 
     The notes describe the file as read, and a caller may act on one before
     fitting.  Each test below is exact on the compiled model:
 
-    - ``PATTERN_X_AXIS_IMPLAUSIBLE``: no fitted channel sits at or below 0°.
+    - ``PATTERN_X_AXIS_IMPLAUSIBLE``: no fitted channel sits at or below zero
+      on the fit axis (0°, or 0 µs on a bank).
     - ``PATTERN_SIGMA_CONSTANT``: σ was set to ``None``, or the caller's σ
       varies over the fitted channels.
     - ``PATTERN_SIGMA_NONPOSITIVE`` naming 2θ intervals: no fitted channel was
@@ -11390,12 +11674,18 @@ def _reader_note_settled(note: Diagnostic, model: CompiledModel) -> bool:
     - a withheld σ (any other note in :data:`_WITHHELD_SIGMA_CODES`): the
       caller assigned a σ.  One whose ``where`` names ``intensity`` also
       doubts the intensity scale, which no σ settles, so it stays.
+    - ``PATTERN_INTENSITY_BASIS_UNKNOWN``: the bank's model carries a declared
+      ``intensity_basis``.  The refusal's remedy, ``model_copy``, keeps the
+      reader's note on the pattern, and every bank that compiles has passed
+      :func:`~rietx.schemas.pattern.require_intensity_basis`, so a fit that
+      ran would otherwise report itself refused.
 
     Handing such a note on would repeat advice already taken, for the reason
     :data:`_FIT_OWNED_READER_CODES` gives about dead channels.
     """
     if note.code == "PATTERN_X_AXIS_IMPLAUSIBLE":
-        return model.tt.size == 0 or float(model.tt.min()) > 0.0
+        # ``grid``, not ``tt``: a bank's model raises on an angle
+        return model.n_points == 0 or float(model.grid.min()) > 0.0
     if note.code == "PATTERN_SIGMA_CONSTANT":
         return not model.sigma_measured or model.sigma_uniform is False
     if note.code == "PATTERN_SIGMA_NONPOSITIVE" and note.where != ["sigma"]:
@@ -11403,15 +11693,18 @@ def _reader_note_settled(note: Diagnostic, model: CompiledModel) -> bool:
                 and model.sigma_rule.n_nonpositive_excluded == 0)
     if note.code in _WITHHELD_SIGMA_CODES and "intensity" not in note.where:
         return bool(model.sigma_measured)
+    if note.code == "PATTERN_INTENSITY_BASIS_UNKNOWN":
+        return getattr(model, "intensity_basis", None) is not None
     return False
 
 
-def _reader_diagnostics(model: CompiledModel,
+def _reader_diagnostics(model: AnyCompiledModel,
                         raised: list[Diagnostic]) -> list[Diagnostic]:
     """What the reader repaired or noticed in this pattern (WP-2304).
 
     ``read_pattern`` keeps its notes on ``PatternData.diagnostics`` whether or
-    not a caller passed a list, and ``compile_model`` carries them here, so a
+    not a caller passed a list, and ``compile_model`` (``compile_tof_model``
+    on a bank) carries them here, so a
     rescaled intensity or a withheld σ reaches every fit on the file.  A note
     whose code the fit has already raised, or asks for itself
     (:data:`_FIT_OWNED_READER_CODES`), is left out, as is a lossless repair
@@ -11468,7 +11761,7 @@ def _data_support_diagnostics(support, model: CompiledModel) -> list[Diagnostic]
         ))
 
     steps, n_measured = sampling_steps_per_fwhm(
-        model.tt, model.y_obs, model.sigma)
+        model.grid, model.y_obs, model.sigma)
     if steps is not None and steps < STEPS_PER_FWHM_MIN:
         out.append(Diagnostic(
             level="warning", code="PATTERN_UNDERSAMPLED",
@@ -11485,8 +11778,10 @@ def _data_support_diagnostics(support, model: CompiledModel) -> list[Diagnostic]
     # pattern.  Gated on ``sigma_measured`` rather than on ``model.sigma``,
     # which is already the Poisson fallback by the time it is an array
     # (WP-1029) — and under that fallback the test cannot separate a dead cell
-    # from a channel that honestly counted zero.
-    if model.sigma_measured:
+    # from a channel that honestly counted zero.  CW-only: the run and window
+    # lengths are degrees of 2θ, which a TOF bank's µs grid is not — abstain
+    # there rather than raise, the convention of ``_low_angle_diagnostics``.
+    if not _is_tof(model) and model.sigma_measured:
         for run in dead_channels(model.tt, model.y_obs, model.sigma):
             lo, hi = _dead_interval(run)
             out.append(Diagnostic(
@@ -11756,7 +12051,9 @@ def _air_scatter_undeclared_diagnostics(model: CompiledModel,
     carries the term, and a λ = 0 spline has no rows to tell it from a
     Chebyshev by.
     """
-    if model.bkg_penalty is None or any(
+    # a bank has no 1/(2θ) column to test: its P-spline air row is refused
+    # at compile (``compile_tof_model``), being a statement about an angle
+    if _is_tof(model) or model.bkg_penalty is None or any(
             p.endswith("background.air") for p in model.bkg_paths):
         return []
     w = 1.0 / model.sigma
@@ -12196,9 +12493,26 @@ def _instrument_held(stage_results: list[StageResult]
     return paths, stages
 
 
+def _range_text(*models) -> str:
+    """The fitted range of one or more compiled models, **in their own unit**.
+
+    Its one consumer is :func:`_phase_support_diagnostics`, whose ``no_lines``
+    message quotes it.  A formatted string rather than a pair of floats,
+    because the unit is a property of the model.  Several models report the
+    span that covers them all: the joint path's histograms, which share an
+    axis because ``MultiHistogramRefinement`` refuses a bank by name.  The
+    constant-wavelength spelling is byte-identical to the one this replaced.
+    """
+    lo = min(m.x_min for m in models)
+    hi = max(m.x_max for m in models)
+    if not any(is_tof_model(m) for m in models):
+        return f"{lo:.4g}-{hi:.4g}°"
+    return f"{lo:.4g}-{hi:.4g} µs"
+
+
 def _phase_support_diagnostics(support_by_phase: np.ndarray,
                                line_counts: np.ndarray,
-                               tt_range: tuple[float, float],
+                               range_text: str,
                                free_paths: list[str],
                                structure: Structure,
                                stage_results: list[StageResult] | None = None,
@@ -12301,7 +12615,7 @@ def _phase_support_diagnostics(support_by_phase: np.ndarray,
         name = structure.phases[ip].name
         if no_lines:
             cause = (f"No reflection of phase {ip} ({name}) lies in the fitted "
-                     f"range {tt_range[0]:.4g}-{tt_range[1]:.4g}°.")
+                     f"range {range_text}.")
         elif scale_only:
             cause = (f"Phase {ip} ({name})'s scale was held at the value handed "
                      "in, so it is not a measurement, though a reflection of "
@@ -12506,8 +12820,7 @@ def _scale_b_ridge_diagnostics(models: list[CompiledModel],
         h = int(path.split(".")[1]) if path.startswith("hist.") else 0
         return per_values[h].get(_unscoped(path))
 
-    tt_min = min(m.tt_min for m in models)
-    tt_max = max(m.tt_max for m in models)
+    range_text = _range_text(*models)
     paths: dict[int, dict[str, None]] = {}
     stages: dict[int, dict[str, None]] = {}
     least: dict[int, float] = {}
@@ -12527,7 +12840,7 @@ def _scale_b_ridge_diagnostics(models: list[CompiledModel],
         at = ", ".join(f"{p} = {v:.4g}" for p in held[:3]
                        if (v := value_of(p)) is not None)
         message = (
-            f"The fitted range {tt_min:.4g}-{tt_max:.4g}° cannot "
+            f"The fitted range {range_text} cannot "
             f"separate phase {ip} ({name})'s scale from its displacement "
             f"parameters: their columns are {least[ip]:.1e} apart, under the "
             f"{SCALE_B_SEPARATION_FLOOR:.1e} the covariance can resolve. "
@@ -12619,6 +12932,14 @@ def _strain_flag_diagnostics(model: CompiledModel, values: dict[str, float],
     width and is not tested; the block's own Λ(hkl) is not an entry with a
     width.
     """
+    # **Runs on both arms**, and the threshold is one number for
+    # both because the quantity is: ``lor_strain`` is a tanθ coefficient in
+    # deg 2θ on a scan and the *same* coefficient on a bank, which reads it as
+    # Δd/d = radians(c)/2 (``model.forward_tof.sample_broadening_terms``) — the
+    # λ-free half of WP-1131's asymmetry.  The corpus behind the threshold is
+    # constant-wavelength TOPAS, but what it measures is a fractional spread in
+    # d, so it transfers; the size twin below is the one that had to change its
+    # arithmetic.
     out: list[Diagnostic] = []
     for ip in range(len(model.phases)):
         name = structure.phases[ip].name
@@ -12710,7 +13031,9 @@ def _width_census_diagnostics(model: CompiledModel, values: dict[str, float],
     from .indexing.diagnostics import refinement_width_diagnostics
     from .indexing.peaks import width_census
 
-    if not model.phases or any(
+    # constant wavelength only: the census reads the Caglioti instrument
+    # width in deg 2θ, which a bank's profile_tof is not
+    if not model.phases or _is_tof(model) or any(
             ph.microstrain is not None
             or any(eq.target in WIDTH_TARGETS for eq in ph.peak_equations)
             for ph in structure.phases):
@@ -12840,8 +13163,14 @@ def _size_flag_diagnostics(model: CompiledModel, values: dict[str, float],
     this tier's empty state differs from the bound's; that function's docstring
     is where the difference is argued.
     """
-    lam = _longest_line_wavelength(model)
-    if lam is None:
+    # **Runs on both arms** since T-3c.  On a bank the stored coefficient is
+    # already the d-space one, K/L in Å⁻¹, so the size reads with no λ at all
+    # and the flag's threshold — a length in Å — is the same number; the
+    # abstention this replaced said a Scherrer size needs a λ, which is true of
+    # the *angular* coefficient and not of the specimen.
+    tof = _is_tof(model)
+    lam = None if tof else _longest_line_wavelength(model)
+    if lam is None and not tof:
         return []
     out: list[Diagnostic] = []
     floor_nm = SIZE_FLAG_SIZE_A / 10.0
@@ -12852,17 +13181,21 @@ def _size_flag_diagnostics(model: CompiledModel, values: dict[str, float],
                 ("gauss_size", _sqrt_or_none(values.get(f"phases.{ip}.gauss_size")))):
             if coeff is None or not coeff > 0.0:
                 continue
-            size_a = apparent_size_from_size_coefficient(coeff, lam, SCHERRER_K)
+            size_a = (apparent_size_from_d_size_coefficient(coeff, SCHERRER_K)
+                      if tof
+                      else apparent_size_from_size_coefficient(coeff, lam,
+                                                               SCHERRER_K))
             if not size_a < SIZE_FLAG_SIZE_A:
                 continue
             size_nm = size_a / 10.0
+            read_at = "d-space coefficient" if tof else f"λ={lam:.4g} Å"
             path = f"phases.{ip}.{term}"
             out.append(Diagnostic(
                 level="warning", code="SIZE_UNUSUALLY_SMALL",
                 where=[path], value=float(size_nm),
                 message=(f"Phase {ip} ({name}) refined {term} to an apparent "
                          f"crystallite size of {size_nm:.3g} nm "
-                         f"(Scherrer K={SCHERRER_K}, λ={lam:.4g} Å), below the "
+                         f"(Scherrer K={SCHERRER_K}, {read_at}), below the "
                          f"flag threshold of {floor_nm:.0f} nm. Below about "
                          f"2 nm a crystallite is a few unit cells, and "
                          f"broadened Bragg peaks may not describe its pattern "
@@ -12959,7 +13292,7 @@ def _roughness_regime_diagnostics(model: CompiledModel,
     intensity.  Reported rather than clamped, because clamping would put a kink
     in the residual (the frozen-per-stage smoothness invariant).
     """
-    if model.roughness is None or not len(model.tt):
+    if model.roughness is None or not model.n_points:
         return []
     import numpy as np
 
@@ -13230,7 +13563,6 @@ def replay(tree: RefinementTree, node_id: str, data: PatternData) -> RefinementR
     the extracted intensities in place — inspecting a checkpoint must not
     change it.
     """
-    require_two_theta(data, "replay()")
     node = tree[node_id]
     expected = tree.header.data_fingerprint
     if expected:
@@ -13249,6 +13581,10 @@ def replay(tree: RefinementTree, node_id: str, data: PatternData) -> RefinementR
         state = state.model_copy(deep=True)
         carry_state_constraints(state, moves, twins)
     instrument = state.instrument.model_copy(deep=True)
+    # the recorded instrument against this pattern, before anything is
+    # compiled: a bank's history replays a flight time, a scan's an angle
+    require_matched_axis(data, "replay()", instrument=instrument)
+    require_intensity_basis(data, "replay()")
     table = ParameterTable(structure, instrument)
     for name, prm in state.variables.items():
         # ``Refinement._declare_variables`` one rank down, and for its reason:
@@ -13312,12 +13648,15 @@ def replay(tree: RefinementTree, node_id: str, data: PatternData) -> RefinementR
     # curve would be a different model from the one the stage solved.  Every
     # other kind of node carries the defaults.
     action = node.action
-    model = compile_model(structure, instrument, data, mode=state.mode,
-                          two_theta_limits=state.two_theta_limits,
-                          moving_paths=set(table.moving_paths),
-                          restraint_weight_scale=action.restraint_weight_scale,
-                          window_slack_deg=action.window_slack_deg,
-                          window_area_tol=recorded_window_tol(action.window_area_tol))
+    model = _compile_for(structure, instrument, data, mode=state.mode,
+                         limits=state.two_theta_limits,
+                         moving_paths=set(table.moving_paths),
+                         restraint_weight_scale=action.restraint_weight_scale,
+                         window_slack=action.window_slack_deg,
+                         window_area_tol=recorded_window_tol(action.window_area_tol),
+                         # a coarse stage's node is re-measured on the windows
+                         # it ran on, not on the answer tolerance's (issue #193)
+                         lorentz_window_tol=action.lorentz_window_tol)
     if state.mode in ("lebail", "pawley"):
         _restore_lebail(state.reflections, model)
 

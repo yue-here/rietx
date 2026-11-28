@@ -189,7 +189,9 @@ def profile_fraction(refinement, data, phase: int | str, *,
             raise ValueError(f"{axis!r} is {why}, so it cannot be pinned on a "
                              "grid; profile a width term the phase owns")
 
-    tt = np.asarray(result.two_theta, dtype=np.float64)
+    from ..schemas.results import require_two_theta_grid
+
+    tt = require_two_theta_grid(result, "profile_fraction()")
     if not tt.size:
         raise ValueError("the last result carries no fitted 2θ grid, so there is "
                          "no range to place a width grid on")

@@ -86,6 +86,7 @@ from ..schemas.common import Diagnostic
 from ..schemas.indexing import CellCandidate, LeBailValidation, PeakList
 from ..schemas.instrument import Instrument
 from ..schemas.pattern import PatternData, require_two_theta
+from ..schemas.results import require_two_theta_grid
 from ..schemas.structure import DUMMY_SPECIES, Structure, lebail_scaffold
 from .fom import lattice_group
 
@@ -584,7 +585,8 @@ def validate_by_lebail(candidate: CellCandidate, data: PatternData,
     else:
         positions = np.array([r.two_theta for r in rows], dtype=np.float64)
         absent_tt, _ratio = absent_reflections(
-            np.asarray(result.two_theta), np.asarray(result.y_obs),
+            require_two_theta_grid(result, "validate_by_lebail()"),
+            np.asarray(result.y_obs),
             np.asarray(result.y_background), np.asarray(result.sigma),
             positions, predicted_fwhm(positions, ref.fitted_instrument),
             k_sigma=k_sigma) if len(positions) else ([], [])

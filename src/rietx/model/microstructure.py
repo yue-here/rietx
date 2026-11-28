@@ -42,6 +42,7 @@ from ..schemas.results import MicrostructureTerm, PhaseMicrostructure
 from ..schemas.structure import Structure
 from .profiles.caglioti import (
     SCHERRER_K,
+    apparent_size_from_d_size_coefficient,
     apparent_size_from_size_coefficient,
     microstrain_from_strain_coefficient,
 )
@@ -59,7 +60,7 @@ _TERMS = {
 
 def _reading(kind: str, coefficient: float, variance: bool,
              sigma: float | None, wavelength: float | None,
-             k: float, *, on_floor: bool = False
+             k: float, tof: bool = False, *, on_floor: bool = False
              ) -> tuple[float | None, float | None, str | None]:
     """(value, esd, unavailable) for one coefficient.
 
@@ -80,15 +81,24 @@ def _reading(kind: str, coefficient: float, variance: bool,
     Both readings are inversely proportional (size) or proportional (strain) to
     that FWHM, so the *relative* esd is the same either way and the sign never
     matters — an esd is a magnitude.
+
+    ``tof`` says the stored size pair is in the **d-space** units a bank holds
+    them in (K/L in Å⁻¹, and its square), where the size reads with no
+    wavelength at all — the relative esd, and therefore this function's whole
+    second half, is unchanged, because L = K/c is inversely proportional to c
+    exactly as L = (180/π)·K·λ/c is.
     """
     if on_floor or not coefficient > 0.0:
         return None, None, "at_zero"
     if kind == "size":
-        if wavelength is None or not wavelength > 0.0:
-            return None, None, "no_wavelength"
         fwhm_coefficient = math.sqrt(coefficient) if variance else coefficient
-        value = apparent_size_from_size_coefficient(fwhm_coefficient,
-                                                    wavelength, k)
+        if tof:
+            value = apparent_size_from_d_size_coefficient(fwhm_coefficient, k)
+        elif wavelength is None or not wavelength > 0.0:
+            return None, None, "no_wavelength"
+        else:
+            value = apparent_size_from_size_coefficient(fwhm_coefficient,
+                                                        wavelength, k)
     else:
         fwhm_coefficient = math.sqrt(coefficient) if variance else coefficient
         value = microstrain_from_strain_coefficient(fwhm_coefficient)
@@ -127,7 +137,8 @@ def microstructure_table(structure: Structure, values: dict[str, float], *,
                          wavelength: float | None,
                          esds: dict[str, float] | None = None,
                          floors: Collection[str] = (),
-                         k: float = SCHERRER_K) -> list[PhaseMicrostructure]:
+                         k: float = SCHERRER_K,
+                         tof: bool = False) -> list[PhaseMicrostructure]:
     """One :class:`PhaseMicrostructure` per phase, in phase order.
 
     ``values`` is a decoded parameter dict (the forward model's own), ``esds``
@@ -152,6 +163,16 @@ def microstructure_table(structure: Structure, values: dict[str, float], *,
     broadening too.  Empty is "no test was recorded", and a coefficient then
     reads at zero only where it is stored as zero.
 
+    ``tof`` says the values came off a **time-of-flight bank**, where the size
+    pair is stored as K/L in Å⁻¹ rather than as a width in deg 2θ
+    (:func:`~rietx.model.forward_tof.sample_broadening_terms`).  It changes
+    only which inverse is taken: the block's ``wavelength`` is then ``None``
+    and stays ``None`` — a bank has no primary wavelength and this module must
+    not report one — while all four rows read, because L in Å and Δd/d are
+    axis-free.  Until T-3c a bank abstained on both size rows with
+    ``no_wavelength``, which was true of the *coefficient* it was handed and is
+    not true of the specimen.
+
     Never raises on a phase whose coefficients are all at zero — the common
     case, since none of them is freed by default — it returns four terms each
     saying ``at_zero``, which is the honest empty state and is not the same
@@ -174,7 +195,7 @@ def microstructure_table(structure: Structure, values: dict[str, float], *,
             if coefficient is None:
                 continue
             value, esd, why = _reading(kind, float(coefficient), variance,
-                                       esds.get(path), wavelength, k,
+                                       esds.get(path), wavelength, k, tof,
                                        on_floor=path in floors)
             terms.append(MicrostructureTerm(
                 path=path, kind=kind, coefficient=float(coefficient),

@@ -1777,9 +1777,12 @@ def _write_fit_profile(refinement, result, out: Path) -> Path:
     ``result.two_theta`` holds and the one every other number in the file
     belongs to.
     """
+    from ..schemas.results import require_two_theta_grid
+
+    # before the wavelength, which a bank's source does not have
+    tth = require_two_theta_grid(result, "write_recipe_tables()")
     path = out / "fit_profile.txt"
     lam = refinement.fitted_instrument.source.lines[0].wavelength.value
-    tth = np.asarray(result.two_theta, dtype=float)
     obs = np.asarray(result.y_obs, dtype=float)
     calc = np.asarray(result.y_calc, dtype=float)
     bkg = np.asarray(result.y_background, dtype=float)

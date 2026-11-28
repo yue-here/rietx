@@ -166,6 +166,12 @@ def written(fitted_lab6, tmp_path_factory) -> dict[str, set[str]]:  # noqa: F811
     # a Cu doublet, an applied absorption and a refined extinction: the
     # wavelength loop and the items 11-BM LaB6 never needs
     out["refinement"] |= _tags(refinement_cif_doc(*_lab_variant(result, ref)))
+    # a time-of-flight bank: its calibration in words, in place of a
+    # wavelength, on a result carrying no angular curve
+    bank = rx.Instrument.tof_neutron_bank(difc=5123.45, two_theta_bank_deg=90.0)
+    out["refinement"] |= _tags(refinement_cif_doc(
+        no_geometry.model_copy(update={"two_theta": None}), ref.fitted_structure,
+        bank))
     # every value refined and none with an su (WP-2219): each su item ``?``
     for structure in plain:
         out["refinement"] |= _tags(refinement_cif_doc(

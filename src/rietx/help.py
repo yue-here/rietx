@@ -602,8 +602,7 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "α₁/d. It describes the rise of the back-to-back pair, which is the "
             "short-flight-time side of the peak. A larger α gives a sharper leading "
             "edge. The shape has amplitude αβ/(α+β), and its width becomes infinite as "
-            "either rate goes to zero. An all-zero block is therefore a profile that "
-            "nobody calibrated."
+            "either rate goes to zero. A fit therefore refuses an all-zero block."
         ),
         unit="µs⁻¹", default="0.0",
         typical="0-1 µs⁻¹; often left at 0 with all of α in α₁",
@@ -814,6 +813,7 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         description=(
             "The centre, in °2θ, of an explicit Gaussian background term, such as a "
             "diffuse or amorphous hump or a cryostat or sample-container contribution. "
+            "On a time-of-flight bank it is a flight time in µs. "
             "It has no default value and no default bounds. It is not a Bragg "
             "position, so only the data "
             "constrain it. Set min and max if you know the fitted range. A declared "
@@ -854,7 +854,8 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "Its floor exists only because the profile divides by Γ. Each kind has a "
             "small positive floor, 0.1 for a hump and 0.005 for a peak. The floors come "
             "from the coarsest and the finest scan step that anything can be refined "
-            "from."
+            "from. On a time-of-flight bank a hump's width is in µs, so give it: the "
+            "default of 5.0 is read there as 5 µs, about one channel."
         ),
         unit="deg 2θ", default="5.0 for a hump, 0.1 for a peak",
         typical="a hump: several times the instrumental FWHM at that angle, ~6 "
@@ -979,7 +980,9 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "`BOUND_HIT` reports the range bound if reached. Setting max to any finite "
             "value is your own claim and switches that default off. A refined size "
             "below 5 nm raises `SIZE_UNUSUALLY_SMALL`. That flag marks the value and "
-            "does not bound it."
+            "does not bound it. On a time-of-flight bank the same parameter holds K/L "
+            "in Å⁻¹, because a white beam has no single wavelength to turn a size into "
+            "an angle, and the bank's parameter table records that unit."
         ),
         unit="deg 2θ", default="0.0",
         typical="0-0.3 deg; 0.1 deg is roughly a 100 nm domain at Cu Kα",
@@ -1012,7 +1015,8 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "Free this parameter when the peak shape is measurably more Gaussian than "
             "the standard's. It has the same default range bound as `lor_size`, "
             "squared. This parameter is a variance, so the limit on the width it "
-            "contributes applies to its square root."
+            "contributes applies to its square root. On a time-of-flight bank it holds "
+            "(K/L)² in Å⁻², the square of `lor_size`'s unit there."
         ),
         unit="deg² 2θ", default="0.0",
         typical="0-0.05 deg²",
@@ -1860,6 +1864,18 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "peak-shape misfit leaks into those channels at every order. Check whether "
             "the background absorbs peak intensity, or switch to the penalised spline "
             "background."
+        ),
+    ),
+    "BACKGROUND_PEAK_WIDTH_UNAVAILABLE": HelpEntry(
+        title="The hump-width check did not run on this bank",
+        description=(
+            "A declared hump is checked against the narrowest real reflection at its "
+            "position, using the Caglioti width in degrees 2θ. A time-of-flight bank "
+            "states its resolution as σ(d) and γ(d), so the check did not run. The "
+            "constant-wavelength check calls a hump a peak, not a "
+            "background, when it is narrower than several times the instrument's width "
+            "at its position (`HUMP_MIN_WIDTH_MULT`, quoted in the suggestion). Compare "
+            "its width with the reflections near it yourself."
         ),
     ),
     "BACKGROUND_SMOOTHING_AT_FLEXIBLE_END": HelpEntry(
@@ -3730,6 +3746,20 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "file. A repeat with a different intensity stops the read instead."
         ),
     ),
+    "PATTERN_INTENSITY_BASIS_UNKNOWN": HelpEntry(
+        title="A flight-time file did not say what a channel holds",
+        description=(
+            "This is a time-of-flight bank, and nothing in the file says whether a "
+            "channel holds the counts it recorded or those counts already divided by "
+            "the channel width. The two differ by the width W(T), which grows with the "
+            "flight time on most banks. That is a slope across the bank, not a scale, "
+            "and a displacement parameter pays for it if it is wrong. Set "
+            "`pattern.intensity_basis` by hand from how the bank was reduced: "
+            "'counts' if the export multiplied by the bin width, 'density' if a "
+            "channel holds counts per µs. Until you do, a fit of the bank is "
+            "refused with a `ValueError` that names the argument."
+        ),
+    ),
     "PATTERN_INTENSITY_NET": HelpEntry(
         title="The intensities are the file's net column",
         description=(
@@ -4757,6 +4787,17 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "tabulated ion of the same element with a nearby charge."
         ),
     ),
+    "SPECIMEN_ABSORPTION_TOF": HelpEntry(
+        title="Absorption was applied along the bank",
+        description=(
+            "Specimen absorption was applied to each reflection at its own wavelength, "
+            "and the message quotes the range of µR across the fitted window. µ follows "
+            "the wavelength on a neutron bank, so one number cannot describe it. It was "
+            "computed from the refined composition and the declared capillary radius, "
+            "and it is not a refinable parameter in this build. Without a capillary "
+            "radius no correction runs, and this line does not appear."
+        ),
+    ),
     "STAGE_FREED_NOTHING": HelpEntry(
         title="A stage freed nothing in one histogram",
         description=(
@@ -4889,6 +4930,19 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "evidence that the specimen is textured. Lower the order, or hold the "
             "highest terms. The default solver keeps the density positive at the "
             "reflections."
+        ),
+    ),
+    "TOF_CHANNEL_WIDTH_APPLIED": HelpEntry(
+        title="The channel width was in the model",
+        description=(
+            "The pattern declares that its channels hold counts, so the calculated "
+            "Bragg sum was multiplied by each channel's width, measured from the "
+            "pattern's own flight times. The message quotes the width at both ends of "
+            "the window, or the one width when every channel has it. If the export had "
+            "already divided by the bin width, declare `'density'` instead. Where the "
+            "widths vary across the window, applying them twice biases the displacement "
+            "parameters the other way. Where every channel has the same width, it is a "
+            "scale, and applying it twice moves only the phase scale."
         ),
     ),
     "TOPAS_BLOCK_SKIPPED": HelpEntry(
@@ -5050,6 +5104,19 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "neutral atom for it. The TOPAS file therefore names the neutral element and "
             "the ion's charge is lost. A site that carries a moment keeps its ion. "
             "Respell the site in TOPAS if you want to refine the ion."
+        ),
+    ),
+    "TOPAS_TOF_FLAG_HELD": HelpEntry(
+        title="A refined coefficient of the TOPAS bank arrives held",
+        description=(
+            "The file refines a time-of-flight width or calibration term through a "
+            "macro's arguments or an expression, such as the width in `TOF_PV`. The "
+            "bank's coefficient is derived from those arguments, so no one declaration "
+            "carries its refine flag, and it is built held at the file's value. The "
+            "built model then has one free parameter fewer per name the file refines. "
+            "Freeing the named coefficients is not the file's refinement either: where "
+            "one name feeds several coefficients, it frees a larger space than the "
+            "file's. Compare a fit with the file's with that in mind."
         ),
     ),
     "VARIABLE_NOT_FREED": HelpEntry(
@@ -5292,6 +5359,21 @@ STAGE_FIELD_HELP: dict[str, HelpEntry] = {
         ),
         unit="deg 2θ", default="null",
         typical="leave empty outside indexing validation",
+    ),
+    "lorentz_window_tol": HelpEntry(
+        title="Lorentzian window tolerance",
+        description=(
+            "Time-of-flight only. The fraction of each peak's Lorentzian "
+            "component, per side, this stage's frozen windows may leave "
+            "outside, overriding the plan's schedule. Empty takes it from the "
+            "plan, which runs every declared stage but the last at "
+            "`intermediate_lorentz_window_tol`, and the last and the closing "
+            "stage at 1e-4. The exponential wings and the Gaussian part are "
+            "never loosened, and a Gaussian-branch bank or a 2θ pattern "
+            "ignores it."
+        ),
+        default="null",
+        typical="leave empty; 1e-4 to force a stage to the answer tolerance",
     ),
 }
 
@@ -5893,14 +5975,25 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
         description=(
             "The 2θ of every channel the fit used, in order. A channel outside the fit "
             "range or inside an excluded region is absent, so this can be shorter than "
-            "the pattern file."
+            "the pattern file. `None` on a time-of-flight fit, whose channels are in "
+            "`tof`."
         ),
         unit="deg 2θ",
+    ),
+    "RefinementResult.tof": HelpEntry(
+        title="Fitted channels, in flight time",
+        description=(
+            "The flight time of every channel a time-of-flight fit used, in order. It "
+            "takes the place of `two_theta`, which is `None` on such a fit, and "
+            "`axis` says which of the two is set. A channel outside the fit range or "
+            "inside an excluded region is absent."
+        ),
+        unit="µs",
     ),
     "RefinementResult.y_obs": HelpEntry(
         title="Observed intensity",
         description=(
-            "The observed intensity at each channel of `two_theta`, in the pattern's "
+            "The observed intensity at each fitted channel, in the pattern's "
             "own intensity units. It is what the residual was computed against."
         ),
     ),
@@ -6232,7 +6325,20 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "`None` means `model.forward.WINDOW_AREA_TOL`, which every declared stage "
             "takes, and the closing stage runs at the plan's `closing_window_tol`. "
             "`model.forward.recorded_window_tol` turns this into what `compile_model` "
-            "needs to reproduce the result's curves."
+            "needs to reproduce the result's curves. A time-of-flight bank's stages "
+            "all record `None`: its windows are sized by `lorentz_window_tol`."
+        ),
+    ),
+    "StageResult.lorentz_window_tol": HelpEntry(
+        title="Lorentzian window tolerance",
+        description=(
+            "Time-of-flight only. The fraction of each peak's Lorentzian component, "
+            "per side, this stage's windows were sized to leave outside, read off "
+            "the model it ran on: the stage's own `lorentz_window_tol` where it "
+            "declares one, otherwise the plan's `intermediate_lorentz_window_tol` on "
+            "an intermediate stage and 1e-4 on the last declared stage and the "
+            "closing stage. `None` where no Lorentzian window was sized, on a 2θ pattern or "
+            "a Gaussian-branch bank."
         ),
     ),
     "StageResult.window_loss": HelpEntry(

@@ -39,6 +39,7 @@ from ..crystallography.symmetry import reflection_orbits, resolve_group
 from ..model.forward import CompiledModel
 from ..model.preferred_orientation import cos2_alpha, march_term, orbit_layout
 from ..optimize import lapack
+from ..schemas.pattern import is_tof_model
 from .schemas import (
     TEXTURE_MIN_R2,
     TEXTURE_MIN_REFLECTIONS,
@@ -198,7 +199,13 @@ def analyse_texture(model: CompiledModel, values: dict[str, float], *,
     Rietveld mode only (Le Bail / Pawley intensities are empirical, so there is
     no calculated pattern to compare against): returns ``[]`` otherwise.
     """
-    if model.mode != "rietveld":
+    # Empty on a model whose grid is not an angle, the boundary check
+    # ``report.strain`` carries for the same reason: March-Dollase averages
+    # over a reflection's symmetry orbit at the *measured* angle, and on a
+    # time-of-flight bank every reflection shares one — the correction has a
+    # different form there, not a different value, and ``compile_tof_model``
+    # refuses a declared block outright.
+    if model.mode != "rietveld" or is_tof_model(model):
         return []
     corrections = _extracted_corrections(model, values)
     axes = _candidate_axes(max_index)

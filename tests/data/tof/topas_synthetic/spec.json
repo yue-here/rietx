@@ -1,0 +1,18 @@
+{
+  "grid_us": [8000.0, 12000.0, 1.0],
+  "phases": [
+    {"name": "NiO", "space_group": "Fm-3m", "a": 4.177, "scale": 2.5,
+     "atoms": [["Ni1", "Ni", 0.0, 0.0, 0.0, 1.0, 0.5], ["O1", "O", 0.5, 0.5, 0.5, 1.0, 0.7]]},
+    {"name": "Si", "space_group": "Fd-3m:2", "a": 5.431, "scale": 1.2,
+     "atoms": [["Si1", "Si", 0.125, 0.125, 0.125, 1.0, 0.4]]}
+  ],
+  "bank": {"difc": 10000.0, "difa": -3.25, "tzero": 7.5, "difb": 0.0,
+           "two_theta_bank_deg": 90.0, "background": [10.0, -2.0, 0.5]},
+  "cases": {
+    "type1": {"alpha0": 0.1, "alpha1": 0.45, "beta0": 0.03, "beta1": 0.004,
+              "sig0": 2.0, "sig1": 40.0, "sig2": 1.5},
+    "type3": {"alpha0": 0.1, "alpha1": 0.45, "beta0": 0.03, "beta1": 0.004,
+              "sig0": 2.0, "sig1": 40.0, "sig2": 1.5,
+              "gam0": 0.5, "gam1": 1.2, "gam2": 0.3}
+  }
+}

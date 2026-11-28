@@ -214,29 +214,34 @@ is a detector, not a range of one experiment.
 
 **A format stating no axis at all is a fourth case and emits nothing** (WP-1407,
 `.udf`, following `.xy`): the policy is for formats that *have* a field to
-classify, and a warning firing on every file of a format trains people to
-ignore it. The assumption goes in `sniff`, where a UI shows it, and rests on
-evidence (the real `.udf` files are all powder scans, `tests/data/README.md`).
+classify, and a warning on every file of a format trains people to ignore it.
+The assumption goes in `sniff`, where a UI shows it (`.udf` files are all
+powder scans, `tests/data/README.md`).
 
 The policy is `base.check_axis()` and the **classifying is not part of it**: the
-authority differs per format and is always the field that *means* the axis —
-`.chi`'s line-2 label, `.ras`'s `*MEAS_SCAN_AXIS_X`, `.uxd`'s `_DRIVE`,
-`.xrdml`'s `scan/@scanAxis`, `.raw`'s flagged drive record — and those are
-inputs of five different shapes. So each format classifies for itself and passes
-the verdict in; a sixth adds a vocabulary, never a row to a shared table. And
+authority differs per format and is always the field that *means* the axis
+(`.chi`'s line-2 label, `.ras`'s `*MEAS_SCAN_AXIS_X`, `.uxd`'s `_DRIVE`,
+`.xrdml`'s `scan/@scanAxis`, `.raw`'s flagged drive record). So each format
+classifies for itself and passes the verdict in; a sixth adds a vocabulary,
+never a row to a shared table. And
 where a format states the axis **twice**, both statements are asked and have to
 agree: `.raw`'s scanned drive is the record that is flagged *and* parked at the
 range's start angle, neither being trusted alone. One code for every format,
-because the operator's answer is identical in every case (WP-1047).
+because the operator's answer is the same in every case (WP-1047).
 
 **The range is checked once, for every format, on `read_pattern`'s
 post-dispatch hook** (WP-1332). Past 180° raises; at or below 0° reads and
 reports `PATTERN_X_AXIS_IMPLAUSIBLE`. The split is § What a reader may
 repair's: a contradiction raises, a report says so. It exists because the
 classifying above cannot see a *unit* (a centidegree axis that fell to `xy`).
-A new format inherits it and adds no range check of its own. It abstains on a
-flight-time axis, which violates the bound by construction and was declared
-rather than assumed.
+A new format inherits it. It abstains on a flight-time axis, which violates
+the bound by construction.
+
+## The intensity basis is never inferred
+
+`PatternData.intensity_basis` is set **only from a declaration** (bin-width
+header, raw-histogram form, y-axis unit), never from the values
+(`formats/gsas.py`).
 
 ## Metadata
 
@@ -248,8 +253,7 @@ preview never parses a file twice; `list_scans` is for the CLI and the scan
 picker, not the preview path.
 
 A file's own wavelength is **recorded, never used**: the anode presets are the
-authority on wavelengths, and the files' own values differ from them by a few
-ppm, far inside what acceptance allows (WP-1047).
+authority, and the files' values differ from them by a few ppm (WP-1047).
 
 The **series coordinate is metadata too, and it is a reader's to surface**
 (WP-1110 item 17): on an in-situ run it is the point of the experiment, so a
@@ -299,26 +303,23 @@ it. Chapter: `docs/docs/reference/recipe.md`; measured convention table:
 - **A row the format states two ways is refused, not picked** — `Zero` is
   centidegrees in one upstream module and degrees in another, 100× apart. §
   What a reader may repair, one rank up: a contradiction is the caller's.
-- **Magnitude decides drop against refuse, and the refine flag does not.** A
-  value at the model's identity is dropped with a diagnostic even when flagged;
-  a non-zero one raises.
-- **Never adopt the other engine's project defaults, and never carry a quantity
-  normalised in its units** — the Chebyshev coefficients and the phase scale
-  are re-seeded, each saying so.
-- **A flag the model cannot honour as written is dropped at `warning`, naming
-  what it costs**: a half `LG_eta` puts at its off state stays fixed, so the
-  recipe's η stands and the fit is one parameter short (`RECIPE_FLAG_DROPPED`).
+- **Magnitude decides drop against refuse, not the refine flag.** A value at the
+  model's identity is dropped with a diagnostic even when flagged; non-zero raises.
+- **Never adopt the other engine's project defaults or a quantity normalised in
+  its units**: Chebyshev coefficients and phase scale are re-seeded, saying so.
+- **A flag the model cannot honour is dropped at `warning`, naming what it
+  costs**: a half `LG_eta` puts at its off state stays fixed, so the fit is one
+  parameter short (`RECIPE_FLAG_DROPPED`).
 
 ## Adding a format
 
 1. **Check the fixture licence per *file*, before writing the reader.** A repo
-LICENSE covers the repo's own work, not user-contributed instrument output, and
-a repo may have none at all. If a file cannot be vendored, that format's whole
+LICENSE covers the repo's own work, not user-contributed instrument output. If a file cannot be vendored, that format's whole
 test strategy changes — and what the real file established goes in
 `tests/data/README.md` regardless, since that is then the only place the design
 is checkable. 2. **Byte offsets, magic strings, tag names and element
-paths are specification facts** — merger, not expression — so they may be
-written down from any source, including one whose licence would bar a port.
+paths are specification facts** (merger, not expression): write them down from
+any source, even one whose licence would bar a port.
 Extract them into a table first, then write the parser **with the source file
 closed**. `ATTRIBUTION.md` § Format specifications records which source each
 came from. 3. One module, exporting a `PatternFormat`; add it to
@@ -417,6 +418,8 @@ same reason. Rules the pattern readers do not need:
   whose body lives in a library, and a file whose phases belong to different
   patterns — a *selection*, following `read_pattern`'s `scan=`:
   `to_structure(model, dataset=N)`, never concatenated; a TOF one refuses, #193.
+- **A TOPAS TOF bank is read by evaluating its laws, never its spelling**
+  (`projects/topas_tof.py`); a law rietx's lacks is refused.
 - **Where a file states its symmetry twice, the operators outrank the symbol —
   and where it states it once, the reader says so** (WP-1118, issue #101). A
   Hermann-Mauguin symbol is ambiguous for some of gemmi's settings, the `:1`/`:2`

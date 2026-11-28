@@ -78,7 +78,7 @@ def block_sizes(model) -> dict[str, int]:
     so callers can index by name without knowing which features are active.
     """
     return {
-        "data": len(model.tt),
+        "data": model.n_points,
         "background_penalty": (0 if model.bkg_penalty is None
                                else model.bkg_penalty.shape[0]),
         "pawley_restraint": (0 if model.pawley is None

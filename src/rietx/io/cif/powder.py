@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from ...schemas.results import require_two_theta_grid
 from .numbers import number, text
 
 
@@ -58,7 +59,7 @@ def _fitted(result, pattern) -> np.ndarray:
     value, and a pattern that is not the one fitted is refused.
     """
     tt = np.asarray(pattern.two_theta, dtype=np.float64)
-    fit = np.asarray(result.two_theta, dtype=np.float64)
+    fit = require_two_theta_grid(result, "the CIF pattern loop")
     at = np.searchsorted(tt, fit)
     if (fit.size > tt.size or np.any(at >= tt.size)
             or not np.array_equal(tt[np.minimum(at, tt.size - 1)], fit)):
@@ -113,7 +114,7 @@ def pattern_items(result, wavelength: float, pattern=None
     value is formatted before the caller sets one, so a refusal leaves the block
     unwritten.  The module docstring says what each item states.
     """
-    fit_tt = np.asarray(result.two_theta, dtype=np.float64)
+    fit_tt = require_two_theta_grid(result, "the CIF pattern loop")
     n_fit = fit_tt.size
     if pattern is None:
         tt, y = fit_tt, np.asarray(result.y_obs, dtype=np.float64)
@@ -192,8 +193,19 @@ def pattern_items(result, wavelength: float, pattern=None
 
 
 def write_pattern_block(block, result, wavelength: float, pattern=None) -> None:
-    """Set :func:`pattern_items`' pairs and loop on ``block``."""
-    if not result.two_theta:
+    """Set :func:`pattern_items`' pairs and loop on ``block``.
+
+    **Omitted on a time-of-flight fit**, whose ``two_theta`` is ``None``: every
+    tag written here is an angular one (``_pd_meas_2theta_scan``), and
+    pdCIF's flight-time column is a different tag
+    (``_pd_meas_time_of_flight``) with its own calibration items beside it.
+    Writing microseconds under the angular tag would produce a file that reads
+    back as a scan nobody measured, so the loop is left out and the rest of the
+    document — cell, coordinates, agreement indices, geometry — is written as
+    usual.  A flight-time pattern loop is a later rung of the time-of-flight
+    track (yue-here/rietx issue #193).
+    """
+    if result.axis != "two_theta":
         return
     pairs, tags, rows = pattern_items(result, wavelength, pattern)
     for tag, value in pairs:

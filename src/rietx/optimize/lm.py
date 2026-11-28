@@ -275,9 +275,10 @@ class LinearInequality:
     measured (Pawley, Rwp 3.901 in 16 iterations against 4.351 in 84), and
     WP-1938 D8 closed it for the rows a box cannot express.
 
-    Five builders make them, all in :mod:`.least_squares`:
+    Six builders make them, all in :mod:`.least_squares`:
     ``strain_cone_inequalities``, ``texture_positivity_inequalities``,
-    ``gaussian_width_inequalities``, ``lorentzian_width_inequalities`` and
+    ``gaussian_width_inequalities``, ``lorentzian_width_inequalities``,
+    ``tof_gamma_inequalities`` (a bank's γ(d), #1548) and
     ``tied_bound_inequalities`` (WP-1325).  A
     row the starting point violates is left out by each, since the step keeps
     feasibility and cannot restore it: at an iterate a row's slack is never

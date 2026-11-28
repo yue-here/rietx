@@ -74,6 +74,7 @@ from ..refine import (
 from ..report.apply import api_call, describe_action, refusal, stage_for
 from ..schemas.instrument import Instrument
 from ..schemas.plan import PlanSpec, StageSpec
+from ..schemas.results import require_two_theta_grid
 from ..schemas.structure import Structure
 from ..strategy.refit import REFIT_MODES, WARM_REFIT_STAGE, _collapse
 from ..strategy.staged import CLOSING_STAGE_NAME, PLAN_PRESETS, resolve_plan
@@ -3217,7 +3218,7 @@ class GuiSession:
         runner = entry["runner"]
         return series_mod.result_payload(
             entry["result"], entry["backward"], running=busy,
-            curves=[bool(r.two_theta) for r in runner.results_],
+            curves=[bool(r.x().size) for r in runner.results_],
             relative=entry["relative"], angles=entry["angles"],
             coordinates=[m["x"] for m in entry["members"]])
 
@@ -3231,7 +3232,7 @@ class GuiSession:
                 f"{len(runner.results_)}", code="NOT_FOUND", status=404,
                 where=["index"])
         res = runner.results_[index]
-        if not res.two_theta:
+        if not res.x().size:
             raise GuiError("this series pattern carries no curves",
                            code="NO_RESULT", status=409)
         return entry, res
@@ -3460,10 +3461,14 @@ class GuiSession:
         # stage run or a checkout since has replaced it
         how = self._how
         payload["how"] = how[1] if how is not None and how[0] is res else None
+        # read through x(): a result with no curve, or a bank's, holds None
+        # here, and len(None) raised (#1548 review, item 13); the range is a
+        # 2θ range, so a bank's flight times are never quoted under it
+        x = res.x()
         payload["curves"] = {
-            "n_points": len(res.two_theta),
-            "two_theta_range": ([res.two_theta[0], res.two_theta[-1]]
-                                if res.two_theta else None)}
+            "n_points": int(x.size),
+            "two_theta_range": ([float(x[0]), float(x[-1])]
+                                if x.size and res.axis == "two_theta" else None)}
         rwp = float(res.statistics.rwp)
         payload["maturity"] = {
             "immature": rwp > MATURITY_MAX_RWP,
@@ -3683,7 +3688,10 @@ class GuiSession:
             res = replay(p.history, node, p.data)
         except ValueError as exc:
             raise GuiError(str(exc), code="MODEL_REFUSED") from None
-        tt = np.asarray(res.two_theta, dtype=np.float64)
+        try:
+            tt = require_two_theta_grid(res, "the history curves route")
+        except ValueError as exc:
+            raise GuiError(str(exc), code="MODEL_REFUSED") from None
         y = np.asarray(res.y_calc, dtype=np.float64)
         # past the curves route's ceiling, thinned as that route thins (WP-1461)
         if len(tt) > _packed.CURVES_CEILING:

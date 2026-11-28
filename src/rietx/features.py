@@ -134,7 +134,11 @@ FEATURES: dict[str, Feature] = {
             "instrument.source.profile_tof.gam2",
             "instrument.source.incident_spectrum.p*",
         ),
-        no_theory="read from a GSAS or GSAS-II file and carried, never evaluated: no flight-time forward model ships, and fit refuses a TOF pattern, so there is no equation of rietx's to state",
+        theory=(
+            "profiles § Time-of-flight: the back-to-back exponentials",
+            "corrections § The incident spectrum of a time-of-flight bank",
+            "corrections § The channel width",
+        ),
     ),
     "instrument_profile": Feature(
         "Caglioti/TCH pseudo-Voigt and true Voigt",
@@ -176,6 +180,7 @@ FEATURES: dict[str, Feature] = {
         ),
         theory=(
             "corrections § Lorentz-polarisation",
+            "corrections § The time-of-flight Lorentz factor",
             "intensities § The species scattering factor",
             "intensities § The structure factor",
             "forward-model § Three intensity models",
@@ -252,6 +257,7 @@ FEATURES: dict[str, Feature] = {
         ),
         theory=(
             "corrections § Primary extinction",
+            "corrections § Extinction across a time-of-flight bank",
         ),
     ),
     "march_dollase": Feature(
@@ -298,6 +304,7 @@ FEATURES: dict[str, Feature] = {
         ),
         theory=(
             "corrections § Capillary (cylindrical) absorption",
+            "corrections § Absorption across a time-of-flight bank",
             "method § Rouse b₂: validate against the integral",
         ),
     ),
@@ -334,8 +341,11 @@ FEATURES: dict[str, Feature] = {
         ),
         theory=(
             "microstructure § Isotropic size and strain",
+            "microstructure § The same two quantities on a time-of-flight bank",
             "profiles § The strain width bound",
+            "profiles § The same rule on a flight-time bank",
             "profiles § The size coefficient bound",
+            "profiles § The same bound on a flight-time bank",
         ),
     ),
     "microstructure_readings": Feature(

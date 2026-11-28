@@ -742,3 +742,16 @@ def test_both_tier_2_flags_fire_per_histogram_in_a_joint_fit():
     top = {d.code for d in result.diagnostics}
     assert "STRAIN_UNUSUALLY_LARGE" not in top
     assert "SIZE_UNUSUALLY_SMALL" not in top
+
+
+def test_the_bank_cap_s_strain_factor_is_the_microstrain_width_s():
+    """``params.vector._STRAIN_COEFFICIENT_TO_DD`` is a second spelling of
+    :func:`rietx.model.profiles.caglioti.microstrain_width`'s π/360, kept so
+    ``params`` imports nothing from ``model``; this pin is what holds the two
+    equal, as the constant's comment says."""
+    from rietx.model.profiles.caglioti import microstrain_width
+    from rietx.params.vector import _STRAIN_COEFFICIENT_TO_DD
+
+    for c in (1e-3, 0.37, 2.0):
+        assert float(microstrain_width(c)) == pytest.approx(
+            c * _STRAIN_COEFFICIENT_TO_DD, rel=1e-15)

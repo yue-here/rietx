@@ -211,6 +211,61 @@ def size_coefficient_for_size(size_a: float, wavelength_a: float,
     return math.degrees(k * wavelength_a / size_a)
 
 
+def apparent_size_from_d_size_coefficient(coefficient_per_a: float,
+                                          k: float = SCHERRER_K) -> float:
+    """Scherrer size, Å, from a **d-space** size coefficient — no λ, no angle.
+
+    The flight-time twin of :func:`apparent_size_from_size_coefficient`, and
+    the reason there has to be one (T-3c).  A time-of-flight bank sorts a white
+    beam by arrival time, so a *degree* is not a unit it can express a specimen
+    width in: the same crystallite shows a λ-proportional number of degrees and
+    a bank has no λ to attribute one to (``CompiledTOFModel.wavelength``
+    refuses by name).  What it does have is d, and Scherrer written in d is
+
+        Δd/d = (K/L)·d                                                      (7)
+
+    — the same ΔQ = 2πK/L as the module docstring's (3), divided by
+    Q = 2π/d — so the specimen's whole size contribution on a bank is one
+    number in **Å⁻¹**, ``coefficient_per_a`` = K/L, and
+
+        L = K / ``coefficient_per_a``                                       (8)
+
+    inverts it with no reference angle and no wavelength, exactly as (4) does
+    on the angular arm.  The two arms therefore quote the *same* L from the
+    same specimen, which is what makes a size shareable across a joint
+    constant-wavelength + time-of-flight fit; the conversion between the two
+    coefficients is one wavelength, and it lives in
+    :func:`~rietx.params.multi.size_value_scales` where the joint fit knows
+    which λ that is.
+
+    Refuses a non-positive coefficient or K by name, for
+    :func:`apparent_size_from_size_coefficient`'s reason: a zero coefficient is
+    an infinite crystallite, which is true and is not a length.
+    """
+    if not coefficient_per_a > 0.0:
+        raise ValueError(
+            f"coefficient_per_a must be positive, got {coefficient_per_a!r}")
+    if not k > 0.0:
+        raise ValueError(f"k must be positive, got {k!r}")
+    return k / coefficient_per_a
+
+
+def d_size_coefficient_for_size(size_a: float,
+                                k: float = SCHERRER_K) -> float:
+    """Inverse of :func:`apparent_size_from_d_size_coefficient`: Å⁻¹ per Å.
+
+    ``K/L``.  What seeds a bank's width from a specimen one already knows —
+    the flight-time peer of :func:`size_coefficient_for_size`, and the function
+    an acceptance run calls to state "this crystallite is 1 µm" without
+    naming a wavelength.
+    """
+    if not size_a > 0.0:
+        raise ValueError(f"size_a must be positive, got {size_a!r}")
+    if not k > 0.0:
+        raise ValueError(f"k must be positive, got {k!r}")
+    return k / size_a
+
+
 def microstrain_from_strain_coefficient(coefficient_deg: float) -> float:
     """Δd/d (dimensionless) from a **tanθ strain coefficient** — no λ, no angle.
 
@@ -248,11 +303,29 @@ def microstrain_from_strain_coefficient(coefficient_deg: float) -> float:
 
     Refuses a non-positive coefficient by name, for
     :func:`apparent_size_from_size_coefficient`'s reason: zero strain is a
-    perfect lattice, which is true and is not a measurement.
+    perfect lattice, which is true and is not a measurement.  The arithmetic
+    itself is :func:`microstrain_width`, which does not refuse — a forward
+    model evaluates the same relation at a coefficient of exactly zero on
+    every peak of every phase that declares no strain, and that is not an
+    error.  One relation, two entry points, and the guard is the only
+    difference between them.
     """
     if not coefficient_deg > 0.0:
         raise ValueError(f"coefficient_deg must be positive, got {coefficient_deg!r}")
-    return math.radians(coefficient_deg) / 2.0
+    return float(microstrain_width(coefficient_deg))
+
+
+def microstrain_width(coefficient_deg):
+    """(5) without the guard, and through the backend: arrays and zero welcome.
+
+    The hot-path spelling of :func:`microstrain_from_strain_coefficient`, for
+    the forward models, which evaluate it at the zero default that function
+    refuses and on traced backends where a python ``float()`` is not available.
+    Zero in gives an exact zero out, which is what makes a phase declaring no
+    microstrain bit-identical to one that could not carry the term at all.
+    """
+    xp = get_backend()
+    return xp.radians(coefficient_deg) / 2.0
 
 
 def strain_coefficient_for_microstrain(microstrain: float) -> float:

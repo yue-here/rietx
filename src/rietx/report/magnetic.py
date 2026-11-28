@@ -36,6 +36,7 @@ import math
 import numpy as np
 
 from ..schemas.common import Diagnostic
+from ..schemas.pattern import is_tof_model
 from ..schemas.structure import MOMENT_FLOOR_MU_B
 from .schemas import (
     MAGNETIC_WIDTH_MIN_REFLECTIONS,
@@ -948,6 +949,10 @@ def magnetic_width_findings(model, values, *, esds=None, free=(),
     one's height is by taking the moment down.
     """
     out: list[Diagnostic] = []
+    # a bank draws no magnetic component (``forward.magnetic_wanted`` refuses
+    # a moment there), and its ``tt`` raises rather than answering None
+    if is_tof_model(model):
+        return out
     if getattr(model, "phases", None) is None or getattr(model, "tt", None) is None:
         return out
     # every result build calls this, so a fit with no magnetic component must

@@ -67,6 +67,7 @@ from ..schemas.instrument import (
     RoughnessSuortti,
     Source,
 )
+from ..schemas.results import require_two_theta_grid
 from ..schemas.structure import (
     Parameter,
     Phase,
@@ -1068,7 +1069,7 @@ def run(standard_key: str, variant_key: str, *,
                                 error=f"{type(exc).__name__}: {exc}",
                                 seconds=time.perf_counter() - started)
 
-    tt = np.asarray(result.two_theta, dtype=float)
+    tt = require_two_theta_grid(result, "the comparison page")
     y_obs = np.asarray(result.y_obs, dtype=float)
     y_calc = np.asarray(result.y_calc, dtype=float)
     y_bkg = np.asarray(result.y_background, dtype=float)
