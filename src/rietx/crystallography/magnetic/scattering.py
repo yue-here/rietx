@@ -65,7 +65,13 @@ import gemmi
 import numpy as np
 
 from ..adp import cartesian_basis
-from ..symmetry import SITE_TOL, ReflectionSet, as_group, generate_reflections
+from ..symmetry import (
+    SITE_TOL,
+    ReflectionSet,
+    _order_by_d,
+    as_group,
+    generate_reflections,
+)
 from .form_factor import approximation_name, j0, j2, resolve_g
 from .moments import moment_frame, moment_from_dofs
 
@@ -595,7 +601,7 @@ def merge_magnetic(nuclear: ReflectionSet, extra: ReflectionSet
     mult = np.concatenate([nuclear.multiplicity, extra.multiplicity])
     d = np.concatenate([nuclear.d, extra.d])
     nuc = np.concatenate([np.ones(len(nuclear)), np.zeros(len(extra))])
-    sort = np.argsort(-d, kind="stable")
+    sort = _order_by_d(d)  # the nuclear list's tie rule, nuclear rows first
     merged = ReflectionSet(hkl=hkl[sort], multiplicity=mult[sort], d=d[sort],
                            spacegroup=nuclear.spacegroup,
                            operations=nuclear.operations,

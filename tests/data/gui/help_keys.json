@@ -563,6 +563,7 @@
   "result_fields:StageResult.width_twins_held",
   "result_fields:StageResult.window_area_tol",
   "result_fields:StageResult.window_loss",
+  "result_fields:StageResult.window_refit_loss",
   "result_fields:UnmatchedPeak.flank",
   "result_fields:UnmatchedPeak.height_over_sigma",
   "result_fields:UnmatchedPeak.kind",

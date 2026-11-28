@@ -16,7 +16,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from rietx import Instrument, PatternData, Refinement
+from rietx import Dispersion, Instrument, PatternData, Refinement
 from rietx.model.forward import compile_model
 from rietx.optimize.least_squares import _make_jacobian, _make_residual
 from rietx.params.vector import ParameterTable
@@ -101,8 +101,10 @@ def _synth_overlapped(seed: int = 3):
 
 
 def test_pawley_recovers_overlapped_sum_and_flags_split():
+    """(2 2 1) and (3 0 0) share d in every cubic cell (h²+k²+l² = 9), so
+    since WP-2315 (ruling R5 (b)) they are one Pawley column: the sum is
+    refined and measured, and neither member's value is."""
     pattern, inten_true, d_true = _synth_overlapped()
-    # the (221)/(300) accidental degeneracy near 2θ = 67.5°
     d_pair = 1.3855
     true_pair = [k for k in range(len(d_true)) if abs(d_true[k] - d_pair) < 1e-3]
     true_sum = float(inten_true[true_pair].sum())
@@ -112,34 +114,174 @@ def test_pawley_recovers_overlapped_sum_and_flags_split():
     ref = Refinement(s, ins, history=False)
     result = ref.fit(pattern, mode="pawley")
     model = ref._model
+    pb = model.pawley
 
     assert result.status == "converged"
     assert result.statistics.gof < 1.3  # fitting to the noise floor
 
-    # the pair was detected as an overlapped group
-    assert model.pawley.groups, "no overlap groups detected"
-
-    # locate the same pair in the refined model and check the *sum* is right
+    # the pair is one column, merged rather than restrained
     d = model.phases[0].reflections.d
     idx = [k for k in range(len(d)) if abs(d[k] - d_pair) < 1e-3]
-    Ivec, stderr = model.pawley_x0(), np.asarray(model.pawley.stderr)
-    refined_sum = float(Ivec[idx].sum())
+    assert sorted(idx) in [sorted(g) for g in pb.merged]
+    col = int(pb.refl_col[idx[0]])
+    assert int(pb.refl_col[idx[1]]) == col
+    assert pb.n == len(d) - sum(len(g) - 1 for g in pb.merged)
+
+    # the column is the sum, and the data measure it
+    refined_sum = float(model.pawley_x0()[col])
     assert refined_sum == pytest.approx(true_sum, rel=0.06), (
         f"summed overlapped intensity off: {refined_sum:.2f} vs {true_sum:.2f}")
+    sd = float(pb.stderr[col])
+    assert np.isfinite(sd) and sd < 0.05 * refined_sum
 
-    # ...while the individual split is NOT resolved: each esd is a large
-    # fraction of its own value (the equal-split restraint kept it honest)
-    rel = stderr[idx] / np.maximum(Ivec[idx], 1e-9)
+    # each member carries its share by multiplicity (equal F²) and no esd
+    mult = model.phases[0].reflections.multiplicity
+    members = model.phases[0].hkl_intensity[idx]
+    np.testing.assert_allclose(members, refined_sum * mult[idx] / mult[idx].sum(),
+                               rtol=1e-12)
+    state = ref.snapshot().reflections[0]
+    assert all(np.isinf(state.stderr[k]) for k in idx)
+    # the record carries the measured sum and its esd, keyed by the members
+    group = [g for g in state.merged_groups
+             if sorted(map(tuple, g.hkl)) == [(2, 2, 1), (3, 0, 0)]]
+    assert len(group) == 1
+    assert group[0].intensity == pytest.approx(refined_sum, rel=1e-12)
+    assert group[0].stderr == pytest.approx(sd, rel=1e-12)
+    assert len(state.merged_groups) == len(pb.merged)
+    # the exported table names the group, so a reader sums its rows
+    rows = [r for r in ref.reflection_table() if r.line == 0
+            and (r.h, r.k, r.l) in {(2, 2, 1), (3, 0, 0)}]
+    assert len(rows) == 2 and rows[0].merged_group is not None
+    assert rows[0].merged_group == rows[1].merged_group
+
+    # a merge is not an unresolved overlap: no diagnostic names the pair
+    named = " ".join(w for dg in result.diagnostics
+                     if dg.code == "PAWLEY_OVERLAP_UNRESOLVED" for w in dg.where)
+    assert "(2, 2, 1)" not in named and "(3, 0, 0)" not in named
+
+    _save(result, "pawley_lab6_overlapped.png")
+
+
+# ------------------------------------------------------- units and start state
+@pytest.fixture
+def restrained_pairs(monkeypatch):
+    """Hold the cubic fixture's lattice-forced pairs as separate columns.
+
+    Every overlap in this cubic fixture is lattice-forced and has merged since
+    WP-2315.  The two WP-2311 tests below pin the overlap restraint's scale,
+    which a real fit still reaches on an accidental overlap, so they keep the
+    pairs apart, as an accidental pair would be."""
+    import rietx.model.forward as fwd
+
+    monkeypatch.setattr(fwd, "_lattice_merge_groups", lambda group, cp: [])
+
+
+def test_an_unmerged_overlap_comes_back_flagged_with_its_split_unresolved(
+        restrained_pairs):
+    """An overlap held by the restraint rather than merged, as an accidental
+    one is: the split is not resolved and the result names the pair.  This
+    is the end-to-end check of ``PAWLEY_OVERLAP_UNRESOLVED`` the merged
+    test above no longer reaches."""
+    pattern, _, _ = _synth_overlapped()
+    s, ins = _overlapped_lab6(a=4.160, w=1e-2)
+    ref = Refinement(s, ins, history=False)
+    result = ref.fit(pattern, mode="pawley")
+    pb = ref._model.pawley
+    assert not pb.merged and pb.groups
+    d = ref._model.phases[0].reflections.d
+    idx = [k for k in range(len(d)) if abs(d[k] - 1.3855) < 1e-3]
+    rel = np.asarray(pb.stderr)[idx] / np.maximum(ref._model.pawley_x0()[idx], 1e-9)
     assert float(rel.min()) > 0.3, f"split reported too confidently (rel esd {rel})"
-
-    # ...and it comes back flagged, naming the reflections
     flagged = [dg for dg in result.diagnostics
                if dg.code == "PAWLEY_OVERLAP_UNRESOLVED"]
-    assert flagged, "overlapped split was not flagged unresolved"
     named = " ".join(w for dg in flagged for w in dg.where)
     assert "(2, 2, 1)" in named and "(3, 0, 0)" in named
 
-    _save(result, "pawley_lab6_overlapped.png")
+
+def _unit_fit(pattern: PatternData, *, intensity_factor: float = 1.0,
+              background_factor: float = 1.0, plan=None):
+    """The overlapped Cu-LaB6 Pawley fit, from the perturbed start, with the
+    intensity, σ and the declared background multiplied as asked."""
+    s, ins = _overlapped_lab6(a=4.160, w=1e-2)
+    ins.source.dispersion = Dispersion()        # declared: the default, on
+    for c in ins.background.coefficients:
+        c.value *= background_factor
+    if intensity_factor != 1.0:
+        pattern = pattern.model_copy(update={
+            "intensity": (np.asarray(pattern.intensity) * intensity_factor).tolist(),
+            "sigma": (np.asarray(pattern.sig()) * intensity_factor).tolist()})
+    ref = Refinement(s, ins, history=False)
+    result = ref.fit(pattern, mode="pawley", **({} if plan is None else {"plan": plan}))
+    return result, ref._model
+
+
+def test_a_pawley_fit_depends_neither_on_the_units_nor_on_a_high_background_start(
+        restrained_pairs):
+    """WP-2311.  χ² is one function of every parameter but the intensities
+    whether the counts are counts or counts × 1e-3, so the cell, the widths,
+    the shift and Rwp come back unchanged and the intensities in ratio 1e-3.
+    And a declared background 100× above the data must reach the same answer:
+    its seed partition empties whole overlap groups, and the equal-split
+    restraint, once floored at an absolute 1e-10, weighed their rows at 5e9 and
+    left the group sums where the seed put them (Rwp 0.214 against 0.162 here).
+    The tolerances are 1e-3 esd and 1e-6 in Rwp; the measured agreement, on
+    Linux x86-64, is under 1e-6 esd and 1e-14, and the lock moved the widths
+    by 0.3-0.6 esd.  The fixture has no reflection off the data, so the
+    off-data ridge, whose floor is still in counts (WP-2311 Finding 4), is not
+    what this pins."""
+    pattern, _, _ = _synth_overlapped()
+    base, model = _unit_fit(pattern)
+    assert base.status == "converged"
+    assert model.pawley.groups, "the fixture must carry an overlap group"
+    assert not model.pawley.off_data, "the ridge's floor is outside this test"
+    i_base = model.pawley_x0()
+    f = 1e-3
+    scaled, m_scaled = _unit_fit(pattern, intensity_factor=f, background_factor=f)
+    high, m_high = _unit_fit(pattern, background_factor=100.0)
+
+    rows = {p.path: p for p in base.parameters}
+    for label, other, intens, factor in (("units", scaled, m_scaled.pawley_x0(), f),
+                                         ("start", high, m_high.pawley_x0(), 1.0)):
+        assert other.status == "converged", label
+        assert other.statistics.rwp == pytest.approx(base.statistics.rwp, rel=1e-6), label
+        assert {p.path for p in other.parameters} == set(rows), label
+        for p in other.parameters:
+            ref_row = rows[p.path]
+            assert ref_row.stderr is not None, (label, p.path)
+            if p.path.startswith("instrument.background."):
+                # declared in the pattern's units, so it scales with them
+                assert p.value == pytest.approx(ref_row.value * factor,
+                                                abs=1e-3 * ref_row.stderr * factor), (label, p.path)
+                continue
+            assert abs(p.value - ref_row.value) <= 1e-3 * ref_row.stderr, (
+                label, p.path, p.value, ref_row.value, ref_row.stderr)
+        np.testing.assert_allclose(intens / factor, i_base, rtol=1e-5,
+                                   atol=1e-6 * float(i_base.max()), err_msg=label)
+
+
+def test_a_one_stage_pawley_fit_from_a_seed_that_partitioned_nothing_is_not_locked(
+        restrained_pairs):
+    """WP-2311.  A background 100× above the data leaves the seed nothing to
+    partition, so every on-data intensity of the phase sits on the
+    partition's floor and no intensity can scale the equal-split rows.  With
+    rows at 5e9 a one-stage plan, which has no later stage to rebuild them,
+    ended at Rwp 0.2365 with two reflections at zero, against 0.1620 from the
+    true start.  An unmeasured phase gets no group rows for the stage, so
+    both starts reach one answer."""
+    from rietx.strategy.staged import RefinementPlan, Stage
+
+    plan = RefinementPlan(stages=[Stage("all", [
+        "instrument.background.*", "phases.*.cell.*", "instrument.profile.w",
+        "instrument.geometry.zero_shift"])], closing_window_tol=None)
+    pattern, _, _ = _synth_overlapped()
+    base, _ = _unit_fit(pattern, plan=plan)
+    high, model = _unit_fit(pattern, background_factor=100.0, plan=plan)
+    assert base.status == high.status == "converged"
+    assert high.statistics.rwp == pytest.approx(base.statistics.rwp, rel=1e-6)
+    a_base = next(p for p in base.parameters if p.path.endswith("cell.a"))
+    a_high = next(p for p in high.parameters if p.path.endswith("cell.a"))
+    assert abs(a_high.value - a_base.value) <= 1e-3 * a_base.stderr
+    assert int((model.pawley_x0() < 1e-6).sum()) == 0
 
 
 # --------------------------------------------------------------- history
@@ -420,21 +562,26 @@ def test_pawley_intensity_centred_off_the_data_stays_bounded():
     assert off is not None and off[hkl.index((6, 0, 2))]
     # the flag is "no line centred on the data", read off the compile
     assert not off[(cp.tt_primary >= model.tt_min) & (cp.tt_primary <= model.tt_max)].any()
-    assert sorted(model.pawley.off_data) == list(np.flatnonzero(off))
+    pb = model.pawley
+    off_cols = sorted({int(pb.refl_col[k]) for k in np.flatnonzero(off)})
+    assert sorted(pb.off_data) == off_cols
     median = float(np.median(cp.hkl_intensity))
     assert cp.hkl_intensity[off].max() <= median
-    # one ridge row per off-data reflection, below the overlap rows
-    R = model.pawley.restraint
-    ridge = R[-int(off.sum()):]
+    # one ridge row per off-data column, below the overlap rows
+    R = pb.restraint
+    ridge = R[-len(off_cols):]
     assert (np.count_nonzero(ridge, axis=1) == 1).all()
-    assert sorted(np.flatnonzero(ridge.any(axis=0))) == list(np.flatnonzero(off))
+    assert sorted(np.flatnonzero(ridge.any(axis=0))) == off_cols
     # ...and the result names them, once for the phase (the review of #453):
     # a caller exporting intensities must see which ones are the ridge's
     ridged = [dg for dg in result.diagnostics if dg.code == "PAWLEY_OFF_DATA_RIDGED"]
     assert len(ridged) == 1 and ridged[0].level == "info"
     name = ref.structure.phases[0].name
-    assert ridged[0].where == [f"{name} {hkl[k]}" for k in np.flatnonzero(off)]
-    assert f"{name} (6, 0, 2)" in ridged[0].where
+    # a column per entry: a lattice-merged pair is one, its members joined
+    expected = [f"{name} " + "+".join(str(hkl[k]) for _ip, k in pb.column_members(c))
+                for c in off_cols]
+    assert ridged[0].where == expected
+    assert any("(6, 0, 2)" in w for w in ridged[0].where)
 
 
 def test_pawley_off_data_code_is_silent_when_every_reflection_is_on_the_data():

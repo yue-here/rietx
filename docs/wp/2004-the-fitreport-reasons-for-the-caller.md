@@ -66,6 +66,27 @@ open under the same track; neither tiers a gate.
 
 ### Inherited
 
+- **2026-11-28, from the issue triage (#1849, a docs proposal): two report texts
+  name no class of lines drawn narrower than it is.** Text only; no code path
+  changes. Checked at `02341ffdb`. (1) `help.py` § `UnmatchedPeak.flank` (`:6839`)
+  says "Four causes leave such a shoulder", and so do `docs/docs/concepts/report.md:32`
+  and the `flank.on_flank` row of `docs/skill/rietx/references/abstention.md`. The
+  reporter proposes a fifth: one class of lines broader than the profile draws it
+  (magnetic satellites from a short correlation length, Rodríguez-Carvajal 1993,
+  *Physica B* 192, 55-69, pp. 59-60; one hkl class under anisotropic size). Its
+  signature is a lobe on both sides of each line of that class and on no other
+  line, which tells it from a foreign line. The issue carries a proposed sentence.
+  "Four" becomes "Five" in all three places in one change (Rule 5). The skill row's
+  new clause is tagged `(Hypothesis: …)` with the paper as its source, since no rietx
+  run has measured it. (2) `layer2.py:855-857`'s `increase_background_flexibility`
+  rationale names an amorphous hump and an un-modelled broad phase as what a bent
+  background hides. Line tails broader than the drawn profile do the same between
+  peak clusters. The same two-item list is in the comment above
+  `BACKGROUND_INCREASE_CAP` (`layer2.py:771`) and in
+  `docs/skill/rietx/references/diagnostics.md:142`. Settled by Claude under Rule 3
+  (feedback teaches, source outside rietx's runs): take both, in the report-text pass
+  of this WP's tasks. The reporter's per-row "lobe on the opposite side" flag and a
+  satellite width outside Rietveld are not part of it (#1065, #1089 hold those).
 - **2026-11-17, from WP-2005 (part 2, PR #1638): two of this WP's rows hold a `refine.py`
   code's tier.** `DATA_SUPPORT_LOW` fires on `optimize.statistics.OBS_PER_PARAMETER_MIN` and
   `_PREFERRED`, which quote McCusker et al. (1999) § 9 verbatim and are unaudited here. WP-2005

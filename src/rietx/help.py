@@ -3942,9 +3942,13 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "Several reflections overlap so strongly that the data fix their summed "
             "intensity but not how it divides among them. At least one individual "
-            "intensity has a large relative esd. The split shown comes from the "
-            "equal-split restraint. Use the summed intensity of the group as the datum. "
-            "Individual values from the group are not measurements."
+            "intensity has a large relative esd. The split shown comes from a "
+            "restraint towards equal F². Use the summed intensity of the group as the "
+            "datum. Individual values from the group are not measurements. Reflections "
+            "whose d-spacings agree in every cell of the space group are refined as one "
+            "intensity instead, and their sums are in ReflectionState.merged_groups. A "
+            "phase with a Stephens strain block, a peak equation, satellites or a "
+            "magnetic component keeps them apart, so they can reach this code there."
         ),
     ),
     "PEAK_POSITION_AT_BOUND": HelpEntry(
@@ -4864,9 +4868,17 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "stage's answer, than each window is allowed to drop. It reports only the "
             "stages whose answer reaches the result: the last one, and the one before "
             "a plan's closing stage. An earlier stage records its loss too, and every "
-            "stage after it refits its answer on fresh windows. Treat the result as "
-            "unconfirmed, and refit from starting values nearer the data. On the case "
-            "measured, a further stage from the stage's answer ran further away."
+            "stage after it refits its answer on fresh windows. A stage that ends past "
+            "its fraction first solves once more on windows sized at its answer, "
+            "where that answer fits the data better than the stage's start. So this "
+            "fires when the second solve's windows are stale too, when the answer was "
+            "no better than the start, on a stage that declares its own "
+            "`window_slack_deg`, which keeps its windows, or in a joint fit, which "
+            "does not re-solve. "
+            "Treat the result as "
+            "unconfirmed, and refit from starting values nearer the data. A stage "
+            "whose first solve was stale and whose second was not records the first "
+            "loss as StageResult.window_refit_loss, and this does not fire."
         ),
     ),
     "STEPHENS_STRAIN_NOT_POSITIVE": HelpEntry(
@@ -5301,10 +5313,17 @@ STAGE_FIELD_HELP: dict[str, HelpEntry] = {
     "window_slack_deg": HelpEntry(
         title="Peak window margin",
         description=(
-            "Extra 2θ on each side of a reflection's integration window, replacing the "
-            "default (`WINDOW_MIN_DEG`). A fit whose starting model may sit far from "
-            "the data declares it, such as the whole-pattern validation that an indexing "
-            "candidate goes through. Empty takes the default."
+            "Extra 2θ on each side of a reflection's integration window. A declared "
+            "value is the same for every reflection. Empty gives 0.3° on the stage whose "
+            "answer is the result. On a stage that a later stage refits, empty sizes it "
+            "per reflection from the position parameters the stage frees: three of the "
+            "peak's FWHM for each "
+            "kind of shift it can move (the zero, a specimen offset, the cell or a "
+            "wavelength) and half a point step, at most 0.3° in all. A stage whose peaks "
+            "then move past those windows solves once more on fresh ones, and a declared "
+            "value never does. A fit whose starting model may sit far from the data "
+            "declares it, such as the whole-pattern validation that an indexing "
+            "candidate goes through."
         ),
         unit="deg 2θ", default="null",
         typical="leave empty outside indexing validation",
@@ -6260,9 +6279,23 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "Negative where the peaks narrowed. Above the stage's window fraction it "
             "feeds `STAGE_WINDOWS_STALE` on the last stage and the one before a closing "
             "stage; an earlier stage records it without a warning, since the stages "
-            "after it refit its answer. Magnetic windows and extra peaks are not "
-            "measured. `None` means nobody looked. A joint fit records its worst "
-            "histogram."
+            "after it refit its answer. Where a stage's first solve passed its window "
+            "fraction, the stage solved once more on fresh windows, and this is the "
+            "second solve's (`window_refit_loss` holds the first). Magnetic windows and "
+            "extra peaks are not measured. `None` means nobody looked. A joint fit "
+            "records its worst histogram."
+        ),
+    ),
+    "StageResult.window_refit_loss": HelpEntry(
+        title="Stale windows before a re-solve",
+        description=(
+            "The share of the Bragg intensity this stage's first windows dropped at its "
+            "first answer, where that passed the stage's window fraction. The stage then "
+            "solved once more from that answer on windows sized there, and "
+            "`window_loss` is the second solve's. A start with the cell 0.3 % off can "
+            "move peaks past their windows this way. `None` means the stage solved once, "
+            "and a stage with a declared `window_slack_deg` or a joint-fit stage always "
+            "does."
         ),
     ),
     "StageResult.rwp": HelpEntry(
