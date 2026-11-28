@@ -1,6 +1,6 @@
 # WP-2313 — the bench reads what the GUI build runs
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-28 — claimed by @yue-here (ghostshift runner)
 Track: The repo's own process
 Depends on: —
 Priority: P3 2026-11-27 — process: an outside PR's npm scripts can run in the `/pr-review` bench unread; rare, since few PRs edit `gui/package.json`
