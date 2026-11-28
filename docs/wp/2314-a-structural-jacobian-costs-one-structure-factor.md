@@ -320,7 +320,11 @@ is held, and rebuilt per evaluation where the cell is free.
     merged into the branch, once: 16 880 passed, 478 skipped, 49 xfailed,
     1 xpassed. The xpass is `test_surface_roughness`'s corundum case, a
     non-strict xfail. It xpasses on main's snapshot too (02341ffdb, same
-    venv), so it is not this branch's; WP-2017's `### Inherited` has it. The added tests cost 1.08 s in
+    venv), so it is not this branch's; WP-2017's `### Inherited` has it. Main then moved to
+    20a0fcd1a, merged here after the full selection. Its one code change
+    is `optimize/bccg.py` (WP-2315), which shares no file with this branch,
+    so the full selection was not rerun; CI's fast matrix runs the merged
+    tree. The added tests cost 1.08 s in
     the fast run (junit, local), 1.07 s of it in
     `test_cross_atom_columns.py`, whose slowest test is the rigid-body
     decline at 0.52 s over three cases.
