@@ -35,6 +35,30 @@ from .faddeeva import _INV_SQRT_PI, faddeeva_w
 GAUSS_FWHM_TO_SIGMA = 2.0 * np.sqrt(2.0 * np.log(2.0))
 _SQRT2 = np.sqrt(2.0)
 _SQRT2PI = np.sqrt(2.0 * np.pi)
+#: Olivero & Longbothum (1977)'s two coefficients (a, b) in
+#: Γ_V ≈ a·Γ_L + √(b·Γ_L² + Γ_G²) — the combined width :func:`voigt_fwhm` reports
+_OLIVERO_FWHM = (0.5346, 0.2166)
+
+
+def voigt_fwhm(gamma_g: np.ndarray, gamma_l: np.ndarray) -> np.ndarray:
+    """FWHM of the exact Voigt from its component FWHMs Γ_G, Γ_L.
+
+    Γ_V ≈ 0.5346·Γ_L + √(0.2166·Γ_L² + Γ_G²), Olivero & Longbothum (1977),
+    J. Quant. Spectrosc. Radiat. Transfer 17, 233.  Measured against a
+    bisected Faddeeva FWHM across the mixing range it is within 0.024 % worst,
+    near Γ_L ≈ 0.28·Γ_G (``tests/test_voigt.py``); exact in the Gaussian limit
+    and 3.1e-6 above exact in the Lorentzian one (0.5346 + √0.2166).
+
+    The *reported* width of the opt-in ``shape="voigt"``
+    (:meth:`~rietx.model.forward.CompiledModel.peak_fwhm`).  It is not the TCH
+    quintic (``pseudovoigt.tch_gamma_eta``, 0.43 % worst), which stays what
+    window sizing and FCJ node counts read under either shape: those are
+    frozen per stage and approximate by design, and a reported width is not.
+    """
+    a, b = _OLIVERO_FWHM
+    gl = np.asarray(gamma_l, dtype=np.float64)
+    gg = np.asarray(gamma_g, dtype=np.float64)
+    return a * gl + np.sqrt(b * gl * gl + gg * gg)
 
 
 def fwhm_to_voigt_params(gamma_g: np.ndarray, gamma_l: np.ndarray

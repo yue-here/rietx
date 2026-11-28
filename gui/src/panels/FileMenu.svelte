@@ -30,6 +30,7 @@
     onopen = async (_path: string) => "",
     onproject = (_doc: any) => {},
     onclosed = () => {},
+    script = null,
   }: {
     /** `GET /api/project`, or null on the start screen */
     project?: any;
@@ -41,6 +42,8 @@
     /** a rename or a move answered with the project document */
     onproject?: (doc: any) => void;
     onclosed?: () => void;
+    /** the session as a script, where the page keeps its calls (WP-2212) */
+    script?: (() => string) | null;
   } = $props();
 
   const mac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform ?? "");
@@ -66,7 +69,7 @@
   const name = $derived(path ? projectStem(path) : "");
   const items = $derived(fileMenu({
     hasProject: !!project, busy, hasResult, nPhases: project?.n_phases ?? 0,
-    mode: project?.doc?.mode ?? "", recent, current: path, mac,
+    mode: project?.doc?.mode ?? "", recent, current: path, mac, scriptable: !!script,
   }));
   const subItems = $derived<Entry[]>(
     sub ? ((items.find((e) => e !== "-" && e.id === sub!.id) as MenuItem)?.sub ?? []) : []);
@@ -141,11 +144,18 @@
                replace: false, working: false };
   }
 
+  /** A menu label inside a sentence: only its first letter drops, so a
+   *  proper name in it (Python) keeps its capital. */
+  function lowerFirst(label: string): string {
+    return label.charAt(0).toLowerCase() + label.slice(1);
+  }
+
   function startExport(kind: string) {
     const k = EXPORT_KINDS.find((e) => e.kind === kind);
     if (!k || !path) return;
-    dialog = { kind: k, name: k.file, where: folderOf(path), error: "", replace: false,
-               working: false };
+    // the script is named after the project, as the prototype names it
+    dialog = { kind: k, name: k.kind === "script" ? `${name}.py` : k.file, where: folderOf(path),
+               error: "", replace: false, working: false };
   }
 
   async function submit() {
@@ -160,8 +170,9 @@
         dialog = null;
         flash(`Saved a copy as ${out.name}`);
       } else {
-        const out = await api.export(d.kind.kind, { directory: d.where, filename: d.name,
-                                                    overwrite: d.replace });
+        const out = await api.export(d.kind.kind, {
+          directory: d.where, filename: d.name, overwrite: d.replace,
+          ...(d.kind.kind === "script" && script ? { script: script() } : {}) });
         say(exportEcho(d.kind.kind, out.path));
         dialog = null;
         flash(`Exported ${out.name}`);
@@ -185,6 +196,7 @@
       html: `rx.viz.html.write_html(ref.result_, "${to}")`,
       result_json: `open("${to}", "w").write(ref.result_.model_dump_json(indent=2))`,
       instrument_profile: `rx.save_instrument_profile(ref.instrument, "${to}")`,
+      script: `# the console written to "${to}" as a script`,
     };
     return calls[kind] ?? `# export ${kind} to ${to}`;
   }
@@ -333,7 +345,7 @@
     <div class="fm-dialog" role="dialog" aria-modal="true" aria-labelledby="fm-title">
     <form onsubmit={(e) => { e.preventDefault(); submit(); }}>
       <h2 id="fm-title">{dialog.kind === "copy" ? "Save a copy"
-        : `Export ${dialog.kind.label.replace(/ \(.*\)$/, "").toLowerCase()}`}</h2>
+        : `Export ${lowerFirst(dialog.kind.label.replace(/ \(.*\)$/, ""))}`}</h2>
       <label class="fld">
         <span class="muted">Name</span>
         <span class="pjn">

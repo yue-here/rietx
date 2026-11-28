@@ -11,6 +11,9 @@ The milestone's bar (`docs/milestones/parametric.md`, 2108): over 12 pinned
 seeds the first phase's structure, both cells and the offset have a mean
 z-score under 0.5 in size, and the holder fitted as a structure misses the
 truth. The walkthrough is `examples/guides/holder_cell.py`.
+
+The series (WP-2154) holds the same bar on a joint fit of five patterns that
+share the holder's cell and offset, each pattern with its own specimen height.
 """
 
 import tempfile
@@ -63,16 +66,16 @@ def _instrument(height=0.0, background=(0.0,) * 4, *, true=False):
     return instrument
 
 
-def _simulate(seed):
+def _simulate(seed, height=HEIGHT):
     sample = FLUORAPATITE.model_copy(deep=True)
     sample.phases[0].scale.value = 5e-4
     holder = ALUMINIUM.model_copy(deep=True)
     holder.phases[0].scale.value = 1e-3
     holder.phases[0].preferred_orientation = rx.PreferredOrientation(
         axis=(1, 1, 1), r=rx.Parameter(value=0.55))
-    y = (rx.Refinement(sample, _instrument(HEIGHT, (300.0, -60.0, 20.0, -5.0), true=True),
+    y = (rx.Refinement(sample, _instrument(height, (300.0, -60.0, 20.0, -5.0), true=True),
                        history=False).predict(GRID)
-         + rx.Refinement(holder, _instrument(HEIGHT + OFFSET, true=True),
+         + rx.Refinement(holder, _instrument(height + OFFSET, true=True),
                          history=False).predict(GRID))
     counts = np.random.default_rng(seed).poisson(y).astype(float)
     return rx.PatternData(two_theta=GRID, intensity=counts)
@@ -92,10 +95,11 @@ def _plan(*, variables):
     return plan
 
 
-def _declared():
+def _with_lines():
+    """An instrument carrying one declared line per holder reflection, each
+    started at a 4.05 Å cell."""
     instrument = _instrument()
     wavelength = instrument.source.lines[0].wavelength.value
-    radius = instrument.geometry.goniometer_radius_mm
     for hkl, n in REFLECTIONS.items():
         start = 2 * np.degrees(np.arcsin(wavelength * np.sqrt(n) / (2 * 4.05)))
         instrument.extra_components.append(rx.PeakComponent(
@@ -103,6 +107,13 @@ def _declared():
             center=rx.Parameter(value=start, min=start - 0.4, max=start + 0.4, unit="deg"),
             area=rx.Parameter(value=10.0, min=0.0, unit="counts*deg"),
             fwhm=rx.Parameter(value=0.1, min=0.02, max=0.4, unit="deg")))
+    return instrument
+
+
+def _declared():
+    instrument = _with_lines()
+    wavelength = instrument.source.lines[0].wavelength.value
+    radius = instrument.geometry.goniometer_radius_mm
     ref = rx.Refinement(FLUORAPATITE.model_copy(deep=True), instrument, history=False)
     ref.add_variable("a_holder", 4.05, vary=True, min=4.0, max=4.1, unit="Å")
     ref.add_variable("offset", 0.0, vary=True, min=-0.5, max=0.5, unit="mm")
@@ -166,7 +177,7 @@ def runs():
             for name, r in (("declared", result), ("as_phase", phase_result)):
                 plot_result(r, path=str(OUTPUT / f"holder_cell_{name}_fit.png"))
                 plot_result(r, path=str(OUTPUT / f"holder_cell_{name}_zoom.png"),
-                            two_theta_range=(37.5, 46.0))
+                            two_theta_limits=(37.5, 46.0))
     return declared, as_phase
 
 
@@ -184,3 +195,82 @@ def test_the_holder_fitted_as_a_structure_misses_its_cell(runs):
     """A phase shares the specimen's height, so its cell absorbs the 0.120 mm offset."""
     _, as_phase = runs
     assert all(row["a_holder"] < -10.0 for row in as_phase), [r["a_holder"] for r in as_phase]
+
+
+# -- the series (WP-2154) -----------------------------------------------------
+
+HEIGHTS = [0.040, -0.030, 0.090, 0.010, -0.060]  # mm, one specimen height per pattern
+
+
+def _joint():
+    """The holder over five patterns as one joint fit.
+
+    A joint fit has no ``tie``, so each centre is an expression equation
+    (WP-2101's shape): ``a_holder``, ``offset`` and ``zero`` are one column
+    each, and ``SharingMap.per_histogram`` gives every pattern its own
+    ``height``.  Line areas and widths sit under ``instrument.`` and so are
+    per pattern by default; the profile is one instrument's, shared."""
+    instruments = [_with_lines() for _ in HEIGHTS]
+    wavelength = instruments[0].source.lines[0].wavelength.value
+    radius = instruments[0].geometry.goniometer_radius_mm
+    variables = {
+        "a_holder": rx.Parameter(value=4.05, vary=False, min=4.0, max=4.1, unit="Å"),
+        "offset": rx.Parameter(value=0.0, vary=False, min=-0.5, max=0.5, unit="mm"),
+        "zero": rx.Parameter(value=0.0, vary=False, min=-0.2, max=0.2, unit="deg"),
+        "height": rx.Parameter(value=0.0, vary=False, min=-0.5, max=0.5, unit="mm")}
+    equations = [
+        rx.ParametricEquation(name="zero_shift", target="instrument.zero_shift",
+                              basis="expression", expression="zero"),
+        rx.ParametricEquation(name="displacement",
+                              target="instrument.geometry.sample_displacement",
+                              basis="expression", expression="height")]
+    for j, (hkl, n) in enumerate(REFLECTIONS.items()):
+        theta = f"asin({wavelength} * sqrt({n}) / (2 * a_holder))"
+        equations.append(rx.ParametricEquation(
+            name=f"aluminium_{hkl}", target=f"instrument.extra_components.{j}.center",
+            basis="expression",
+            expression=f"2 * {theta} * 180 / pi + zero"
+                       f" - 2 * (height + offset) / {radius} * cos({theta}) * 180 / pi"))
+    return rx.MultiHistogramRefinement(
+        FLUORAPATITE.model_copy(deep=True), instruments,
+        sharing=rx.SharingMap(shared=["instrument.profile.*"], per_histogram=["vars.height"]),
+        variables=variables, parametric=equations)
+
+
+@pytest.fixture(scope="module")
+def series():
+    from rietx.viz.plots import plot_result
+
+    out = []
+    for seed in SEEDS:
+        data = [_simulate(seed * 10 + k, h) for k, h in enumerate(HEIGHTS)]
+        result = _joint().fit(data, plan=_plan(variables=True), two_theta_limits=LIMITS,
+                              telemetry=False)
+        row = _scores(result, "vars.a_holder", "vars.offset")
+        for k, h in enumerate(HEIGHTS):
+            row[f"height_{k}"] = _z(result, f"hist.{k}.vars.height", h)
+        out.append(row)
+        if seed == SEEDS[0]:
+            OUTPUT.mkdir(exist_ok=True)
+            for h in (0, len(HEIGHTS) - 1):
+                plot_result(result.for_histogram(h),
+                            path=str(OUTPUT / f"holder_series_h{h}_fit.png"))
+                plot_result(result.for_histogram(h),
+                            path=str(OUTPUT / f"holder_series_h{h}_zoom.png"),
+                            two_theta_limits=(37.5, 46.0))
+    return out
+
+
+@pytest.mark.xdist_group("holder-series")
+def test_a_joint_fit_shares_the_holder_cell_and_offset_across_heights(series):
+    """Five patterns, one holder cell and one offset, a specimen height each:
+    the milestone's bar (mean z under 0.5 in size) for both cells, the
+    structure and the offset, and for each pattern's height too.
+
+    Measured 2026-11-22 (macOS arm64, ``[dev]``): every mean z between −0.32
+    and +0.26, coordinate RMS 0.85 on average and 1.06 at most.  The offset's
+    esd is 0.42-0.49 of one pattern's fitted alone, about 1/√5."""
+    means = {key: float(np.mean([row[key] for row in series]))
+             for key in series[0] if key != "coordinates_rms"}
+    assert all(abs(m) < 0.5 for m in means.values()), means
+    assert max(row["coordinates_rms"] for row in series) < 1.6

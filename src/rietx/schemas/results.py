@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import functools
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, ClassVar, Literal
 
 import numpy as np
@@ -364,9 +365,9 @@ class Identifiability(Base):
     a new field on an existing shape not being a new shape.  **That is no
     longer the rule.**  Since WP-1117 the only question is whether a consumer
     could *notice*, and a new field on a result is noticeable, so an addition
-    of this shape now bumps the version like any other: the comment beside
-    :data:`~rietx.schemas.common.SCHEMA_VERSION` is the changelog, and three of
-    its entries are additive defaulted fields.  Corrected here rather than
+    of this shape now bumps the version like any other: the notes for
+    :data:`~rietx.schemas.common.SCHEMA_VERSION` in ``docs/contracts/schema.md``
+    are the changelog, and three of them are additive defaulted fields.  Corrected here rather than
     deleted because this is the sentence that talked a later reader out of a
     bump it owed.
 
@@ -403,13 +404,16 @@ class Identifiability(Base):
     here", never as "no degeneracy".
 
     A joint multi-histogram fit (WP-1341) screens each histogram's own rows,
-    so its ``background_absorption`` keys are ``hist.<h>.``-scoped, shared
-    paths included, and :meth:`RefinementResult.for_histogram` hands one
-    histogram's view its own rows, unscoped.  The joint path runs neither
-    the declared-peak screen nor the parameter-space screens, so
-    ``extra_peak_absorption`` and the three tables below it stay empty there,
-    a declared and freed peak included: not measured, the same reading as
-    ``None``.
+    so its ``background_absorption`` and ``extra_peak_absorption`` keys are
+    ``hist.<h>.``-scoped, shared paths included, and
+    :meth:`RefinementResult.for_histogram` hands one histogram's view its own
+    rows, unscoped: a declared peak is one instrument's (WP-2028).
+    ``top_correlations`` and ``soft_modes`` are measured on the joint matrix,
+    the one that was solved, and named by the joint paths (shared bare, a
+    histogram's own ``hist.<h>.``); a view keeps each entry that touches its
+    own rows or a shared one, whole, its own rows unscoped, and drops one made
+    only of other histograms' own rows.  ``exchangeability`` stays empty on a joint fit: not measured,
+    the same reading as ``None``.
     """
 
     background_absorption: dict[str, float] = Field(default_factory=dict)
@@ -732,7 +736,10 @@ class GeometryDistance(Base):
     information, not σ = 0.  The two causes deliberately share one ``None``
     (WP-1003): a consumer never needs σ's *reason* to use the number, and if
     one ever does, a per-row cause field is the additive fix — never a
-    reinterpreted zero.
+    reinterpreted zero.  ``stderr_diagonal`` alone is ``None`` when the row
+    draws on a parameter a discarded direction touched while the data still
+    determine the row (WP-2230): that parameter's own variance is not
+    measured, so a diagonal sum would quote it.
     """
 
     phase_index: int
@@ -1177,6 +1184,19 @@ class StageResult(Base):
     #: stage with no Bragg intensity to compare.  Writers: the three runners
     #: that build a ``StageResult``.
     window_loss: float | None = None
+    #: the ``window_loss`` this stage's first solve ended on, where it passed
+    #: ``recorded_window_tol(window_area_tol)`` and the stage was compiled
+    #: again at that answer and solved once more from it (WP-2317 R7).  The
+    #: stage sizes its windows' movement slack from the position parameters it
+    #: can move, and this refit is what bounds a movement past them; the
+    #: record's ``window_loss``, cost and iterations are then the second
+    #: solve's answer, the first solve's starting cost and both solves'
+    #: iterations.  ``None`` where no refit ran: the first loss was within the
+    #: tolerance (``window_loss`` says by how much), the stage declared its own
+    #: ``window_slack_deg``, it stopped on a non-finite model, or it ran in a
+    #: joint fit, whose runner does not refit.  Writers: ``Refinement``'s two
+    #: stage runners.
+    window_refit_loss: float | None = None
     #: the Le Bail cycles this stage's partitions ran, in order: before the
     #: solve, then after it (a Pawley seed is the one entry).  A stage the
     #: solve stopped has only the partition before it.  Empty where none ran:
@@ -1238,7 +1258,7 @@ class StageResult(Base):
     #: and 0 only means this particular stage never reached one.
     #: Additive field, defaulted to 0 (the honest "never happened" state);
     #: bumped with this change, ``SCHEMA_VERSION`` 0.19 → 0.20 (see the
-    #: changelog entry in ``schemas/common.py``).
+    #: note in ``docs/contracts/schema.md``).
     n_degenerate_cell_probes: int = 0
     #: decompositions this stage's solve and esds repeated with LAPACK's
     #: QR-iteration driver because the divide-and-conquer driver stopped
@@ -1413,7 +1433,13 @@ class StageResult(Base):
     #: reason.  It feeds ``STAGE_FREED_NOTHING``.
     unreached_histograms: dict[int, list[str]] | None = None
     #: each row this stage lifted before solving, and the value it started at
-    #: in column units (WP-1930).  Two writers put a row here.  The stage's own
+    #: in column units (WP-1930).  Three writers put a row here.  The runner
+    #: itself starts an FCJ axial ratio the stage newly frees on zero at
+    #: :data:`~rietx.model.forward.AXIAL_SL_START` (S/L) or
+    #: :data:`~rietx.model.forward.AXIAL_HL_START` (H/L), never at its
+    #: partner's value
+    #: (:func:`~rietx.model.forward.apertures_to_lift`, WP-1955), on every
+    #: stage and in both runners.  The stage's own
     #: :attr:`~rietx.strategy.staged.Stage.seed`, through
     #: :meth:`~rietx.params.vector.ParameterTable.seed_floored`, starts a
     #: freed row sitting exactly on a floor of 0 or above at the seed.  Its
@@ -1422,8 +1448,10 @@ class StageResult(Base):
     #: all-zero Stephens block on the isotropic ray, and every DOF of that block
     #: is here at the value the seed wrote, a zero coefficient of the ray
     #: included (WP-2002, B14).  Those rows sit at zero rather than on a floor,
-    #: since a Stephens DOF is unbounded below.  The joint fit's runner seeds
-    #: no Stephens block, so its stages carry the first writer's rows alone.
+    #: since a Stephens DOF is unbounded below.  The joint fit's runner writes
+    #: both seeds through :class:`~rietx.params.multi.MultiParameterTable`'s
+    #: twins, keyed by the joint column (WP-2239): a shared block's DOFs under
+    #: their bare paths, a per-histogram one's under ``hist.N.``.
     #: WP-1930's floor seed sized by unit went with WP-1938: it existed because
     #: a softplus column at its floor was twelve orders below its neighbours,
     #: and a row refined in its own units has its physical column there.
@@ -1548,8 +1576,8 @@ class HistogramResult(Base):
     #: Which reflection each of those ticks is, index for index, as the orbit
     #: representative ``h k l`` (WP-1438).  A **companion**, not a change of
     #: shape: :attr:`ticks` has four readers that want a list of positions and
-    #: none of them wants this, so the pairing is by index and
-    #: ``tests/test_ticks.py`` pins the two lengths equal per phase.
+    #: none of them wants this, so the pairing is by index, one entry per
+    #: position for each phase.
     #:
     #: Absent for a phase's key rather than empty when there is nothing to
     #: say, which is the case the reserved declared-peaks key is in: a peak
@@ -2186,8 +2214,8 @@ class RefinementResult(Base):
     #: Which reflection each of those ticks is, index for index, as the orbit
     #: representative ``h k l`` (WP-1438).  A **companion**, not a change of
     #: shape: :attr:`ticks` has four readers that want a list of positions and
-    #: none of them wants this, so the pairing is by index and
-    #: ``tests/test_ticks.py`` pins the two lengths equal per phase.
+    #: none of them wants this, so the pairing is by index, one entry per
+    #: position for each phase.
     #:
     #: Absent for a phase's key rather than empty when there is nothing to
     #: say, which is the case the reserved declared-peaks key is in: a peak
@@ -2536,22 +2564,57 @@ class RefinementResult(Base):
             if _names_histogram(d, h) and d not in view.diagnostics:
                 view.diagnostics.append(d.model_copy(deep=True))
         if view.identifiability is not None:
-            # this histogram's background screen, as a single fit spells it
-            # (WP-1341): the joint result scopes every row ``hist.<h>.``
-            mine = {k[len(prefix):]: v for k, v in
-                    view.identifiability.background_absorption.items()
-                    if k.startswith(prefix)}
-            view.identifiability = view.identifiability.model_copy(
-                update={"background_absorption": mine})
+            ident = view.identifiability
+
+            def mine(screen: dict[str, float]) -> dict[str, float]:
+                return {k[len(prefix):]: v for k, v in screen.items()
+                        if k.startswith(prefix)}
+
+            def spelt(path: str) -> str:
+                return path[len(prefix):] if path.startswith(prefix) else path
+
+            def seen(paths) -> bool:
+                # a row of the parameter-space tables belongs to this view
+                # unless it is another histogram's own: a mode or pair that
+                # touches this pattern's rows or a shared one is its to quote,
+                # one whose every loading is another pattern's own row is not
+                return any(path.startswith(prefix) or not path.startswith("hist.")
+                           for path in paths)
+
+            # this histogram's background and declared-peak screens, as a
+            # single fit spells them (WP-1341, WP-2028): the joint result
+            # scopes every row hist.<h>..  The joint matrix's tables are
+            # the fit's, one measurement of what was solved, so a view keeps
+            # each entry that touches its own rows or a shared one, whole, its
+            # own rows losing their scope as in parameters and another
+            # histogram's keeping theirs.  An entry made only of other
+            # histograms' own rows is theirs and is dropped (a Caglioti trade-
+            # off in pattern 0's instrument is no part of pattern 1's report).
+            view.identifiability = ident.model_copy(update={
+                "background_absorption": mine(ident.background_absorption),
+                "extra_peak_absorption": mine(ident.extra_peak_absorption),
+                "top_correlations": [
+                    c.model_copy(update={"path_a": spelt(c.path_a),
+                                         "path_b": spelt(c.path_b)})
+                    for c in ident.top_correlations
+                    if seen((c.path_a, c.path_b))],
+                "soft_modes": [
+                    m.model_copy(update={"loadings": {
+                        spelt(k): v for k, v in m.loadings.items()}})
+                    for m in ident.soft_modes if seen(m.loadings)]})
         view.histograms = []
         return view
 
-    def plot(self, path: str | None = None, **kw):
+    def plot(self, path: str | Path | None = None, **kw):
+        """Draw this result, writing it to the file ``path`` when given:
+        :func:`rietx.viz.plots.plot_result`, forwarding ``**kw``."""
         from ..viz.plots import plot_result
 
         return plot_result(self, path=path, **kw)
 
     def parameter(self, path: str) -> RefinedParameter:
+        """The refined row at the parameter dot-path ``path``; ``KeyError``
+        when no row carries it."""
         for p in self.parameters:
             if p.path == path:
                 return p

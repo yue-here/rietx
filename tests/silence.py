@@ -631,6 +631,34 @@ def _not_freed_silent() -> list:
     return _not_freed(["vars.B", "vars.b_0", "vars.b_1"])
 
 
+def _width_held(*held: dict[str, list[str]]) -> list:
+    """``INSTRUMENT_WIDTH_HELD``'s builder on a two-stage plan whose stages held the
+    instrument widths ``held`` names, the last entry the answer's stage
+    (``tests/test_width_twin_hold.py``)."""
+    from rietx.refine import _instrument_width_held_diagnostics
+    from rietx.schemas.results import StageResult
+
+    stages = [StageResult(name=f"s{k}", status="converged", n_iterations=1,
+                          cost_initial=1.0, cost_final=1.0,
+                          freed=["instrument.profile.y"] if not beside else [],
+                          width_twins_held=beside)
+              for k, beside in enumerate(held)]
+    return _instrument_width_held_diagnostics(stages)
+
+
+def _width_held_fires() -> list:
+    """The last stage held Y against a free Lorentzian strain."""
+    return _width_held({}, {"instrument.profile.y": ["phases.0.lor_strain"]})
+
+
+def _width_held_silent() -> list:
+    """No stage held a width; an earlier stage held one and the last did not;
+    a result stored before the field."""
+    return (_width_held({}, {})
+            + _width_held({"instrument.profile.y": ["phases.0.lor_strain"]}, {})
+            + _width_held({}, None))
+
+
 def _reseed(**escalation) -> list:
     """``SEQUENTIAL_RESEED``'s builder on one synthetic converged entry,
     escalated as ``escalation`` says."""
@@ -1160,8 +1188,9 @@ def _peak_width_silent() -> list:
     return _peak_width(-2e-4) + _peak_width(2e-3)
 
 
-def _peak_eq_shared(mo: bool, per_histogram: list) -> list:
-    """The sharing note for brucite's ``w*tan(theta)`` over a Cu pattern and a
+def _peak_eq_shared(mo: bool, per_histogram: list,
+                    expression: str = "w*tan(theta)") -> list:
+    """The sharing note for brucite's ``expression`` over a Cu pattern and a
     second pattern, at Mo Kα or at Cu again."""
     from rietx.params.multi import SharingMap
     from tests.test_peak_equations import (
@@ -1174,7 +1203,7 @@ def _peak_eq_shared(mo: bool, per_histogram: list) -> list:
     cu = _instrument()
     other = _mo(cu) if mo else cu.model_copy(deep=True)
     return _shared_across_wavelengths(
-        [_eq("lor_fwhm", "w*tan(theta)", w=0.02)], [cu, other],
+        [_eq("lor_fwhm", expression, w=0.02)], [cu, other],
         sharing=SharingMap(per_histogram=per_histogram))
 
 
@@ -1184,9 +1213,11 @@ def _peak_eq_shared_fires() -> list:
 
 
 def _peak_eq_shared_silent() -> list:
-    """Two Cu patterns sharing it, and Cu and Mo patterns each with its own."""
+    """Two Cu patterns sharing it, Cu and Mo patterns each with its own, and
+    Cu and Mo patterns sharing it in an equation that reads ``wavelength``."""
     return (_peak_eq_shared(False, [])
-            + _peak_eq_shared(True, ["phases.*.peak_equations.*"]))
+            + _peak_eq_shared(True, ["phases.*.peak_equations.*"])
+            + _peak_eq_shared(True, [], "w*wavelength/cos(theta)"))
 
 
 def _qpa_factor(p: float, unmeasured: list) -> list:
@@ -1292,6 +1323,8 @@ SILENCE: dict[str, Pair] = {
     "VARIABLE_NOT_FREED": Pair(
         _not_freed_fires, _not_freed_silent,
         "tests/test_tie_expression.py, tests/test_parametric_expression.py"),
+    "INSTRUMENT_WIDTH_HELD": Pair(
+        _width_held_fires, _width_held_silent, "tests/test_width_twin_hold.py"),
     "PATTERN_NET_HAS_BACKGROUND": Pair(
         _net_background_fires, _net_background_silent, "tests/test_readers.py"),
     "PATTERN_SIGMA_NONPOSITIVE": Pair(

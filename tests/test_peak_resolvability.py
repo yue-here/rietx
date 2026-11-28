@@ -122,7 +122,7 @@ def test_flat_topped_lines_are_reported_once(tmp_path):
     truth = _si_lines()
     data = _silicon_728(tmp_path, steep=False, split=0.012)
     ins = rx.Instrument.debye_scherrer(wavelength=LAM)
-    pl, det, fits = pick_peaks_with_state(data, ins, two_theta_range=RANGE)
+    pl, det, fits = pick_peaks_with_state(data, ins, two_theta_limits=RANGE)
     draw_pick("resolvability_flat_top", data, ins, pl, det, fits, truth=truth,
               title="#728 arm c1: each silicon line three copies 0.012 deg apart")
     use = pl.usable()
@@ -139,7 +139,7 @@ def test_a_steep_flank_is_capped_not_listed(tmp_path):
     truth = _si_lines()
     data = _silicon_728(tmp_path, steep=True, split=0.0)
     ins = rx.Instrument.debye_scherrer(wavelength=LAM)
-    pl, det, fits = pick_peaks_with_state(data, ins, two_theta_range=RANGE)
+    pl, det, fits = pick_peaks_with_state(data, ins, two_theta_limits=RANGE)
     draw_pick("resolvability_steep_flank", data, ins, pl, det, fits, truth=truth,
               title="#728 arm c2: the flank's components capped at five times the width law")
     use = pl.usable()

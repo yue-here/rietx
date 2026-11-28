@@ -46,15 +46,23 @@ assert [r.stage for r in plan_ref.stage_reports_] == [
 # freeing nothing new, started from its answer, ends lower than either.
 # Moved with WP-2222 (closing stage off by default, 2026-11-19): the preset
 # ends at its `profile` stage, 0.0945 -> 0.0988, the hand-run `profile` stage
-# 0.0970 -> 0.1022 and the extra stage 0.0945 -> 0.0940.
-assert f"{result.statistics.rwp:.4f}" == "0.1022"
+# 0.0970 -> 0.1022 and the extra stage 0.0945 -> 0.0940.  Moved with WP-2317 R7
+# (a stage past its window fraction re-solves on fresh windows, and a stage a later
+# one refits sizes its slack from what it frees, 2026-11-27): the hand-run `profile`
+# stage 0.1022 -> 0.0940, the preset's stages 0.6050, 0.4921, 0.4920, 0.1932, 0.0988
+# -> 0.6063, 0.4926, 0.4923, 0.1944, 0.0939.
+assert f"{result.statistics.rwp:.4f}" == "0.0940"
 assert [f"{r.rwp:.4f}" for r in plan_ref.stage_reports_] == [
-    "0.6050", "0.4921", "0.4920", "0.1932", "0.0988"]
+    "0.6063", "0.4926", "0.4923", "0.1944", "0.0939"]
+# "4.4 %" and "3.4 %"
+assert f"{100 * result.stages[-1].window_refit_loss:.1f}" == "4.4"
+assert f"{100 * plan_ref.result_.stages[-1].window_refit_loss:.1f}" == "3.4"
+
 assert [s.name for s in plan_ref.result_.stages][-1] == "profile"
 assert result.stages[-1].window_area_tol == 0.02  # `run_stage`'s default windows
 assert plan_ref.result_.stages[-1].window_area_tol is None  # a declared stage records none
 assert sorted(p.path for p in result.parameters) == sorted(
     p.path for p in plan_ref.result_.parameters)
-assert "FROZEN_COMPILE_STALE" in {d.code for d in result.diagnostics}
+assert "FROZEN_COMPILE_STALE" not in {d.code for d in result.diagnostics}
 again = ref.branch().run_stage(data, rx.Stage("again", []), two_theta_limits=(15, 130))
 assert f"{again.statistics.rwp:.4f}" == "0.0940"

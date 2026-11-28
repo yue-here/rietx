@@ -343,7 +343,7 @@ class NeutronSource(Base):
         degenerate with the phase scales in any case.  A harmonic's weight is
         the *stored* :class:`Parameter` off :attr:`harmonics`, passed by
         reference rather than copied, which is what makes a refined value
-        survive the write-back (``params.vector.ParameterTable.write_back``
+        survive the write-back (``params.vector.ParameterTable.apply_to_models``
         reaches it as ``instrument.source.lines.i.weight``).
 
         Building the list here rather than materialising the extra lines into a
@@ -894,8 +894,8 @@ class Source(_InheritsDeclaredDefaults):
     """
 
     kind: Literal["xray_cw"] = "xray_cw"
-    #: The *declared* lines.  Harmonics are appended by :attr:`spectrum`, not
-    #: stored here — see :attr:`harmonics`.
+    #: The *declared* lines.  Harmonics are refused on this radiation — see
+    #: :attr:`harmonics`.
     lines: list[EmissionLine]
     polarization: Parameter = Field(
         default_factory=lambda: Parameter(value=0.5, min=0.0, max=1.0)
@@ -1654,6 +1654,13 @@ class BackgroundFixedPlusChebyshev(_InheritsDeclaredDefaults):
     can, a blank capillary, a matrix-only scan, an empty furnace.  Holding it
     inside the model keeps the Poisson weights correct where subtracting it
     would not.
+
+    A measurement is what this model is for.  Holding an estimate is possible
+    but not recommended, whichever estimator made it.  SNIP is the measured
+    case: a held SNIP curve takes intensity from the tails of the reflections
+    and biases Biso high (:func:`rietx.background.snip`), and
+    the background-absorption screen cannot see a held curve.  Co-refine a
+    :class:`BackgroundChebyshev` or :class:`BackgroundPSpline` instead.
 
     ``scale`` is the multiplier the measured case needs, and it is TOPAS's
     ``bkg_file("f.xy", @, s)`` against its ``bkg_file("f.xy")`` (Coelho,

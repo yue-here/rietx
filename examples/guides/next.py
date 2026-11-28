@@ -63,9 +63,9 @@ for p in c.freed:
 print(f"dBIC {c.delta_bic:+.1f} at N_eff {c.n_effective:.0f} (raw N: {c.delta_bic_raw_n:+.0f})")
 # guide: compare end
 
-# The page's warning: extinction, freed from the fit that was not re-solved,
-# stays on its floor at 0 and still scores a large ΔBIC, all of it the
-# re-solve's gain. Freed from `base`, the same parameter is refused.
+# The page's warning: compare against the re-solved branch.  Since WP-2317 R7
+# the `profile` stage has re-solved itself, so extinction freed from `ref` or
+# from `base` stays on its floor at 0 and scores alike.
 direct = ref.branch()
 direct.run_stage(data, rx.Stage("extinction", ["phases.0.extinction"]))
 c_direct = compare_freed(ref, direct)
@@ -76,8 +76,8 @@ c_paired = compare_freed(base, paired)
 # extinction, which sits on its floor with the data pushing it below.
 narrowed_again = base.suggest(data, include="phases.*", exclude=["*.occ"])
 
-# The page's measurement of why the re-solve moved: the same profile stage,
-# given wider peak windows, ends close to where the re-solve lands.
+# The page's declared-margin stage: a stage that declares its own window
+# slack is never re-solved, and ends close to where the re-solve lands.
 wide = rx.Refinement(rx.Structure.from_cif(examples_dir() / "fluorapatite.cif"), instrument)
 wide.run_stage(data, rx.Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
                two_theta_limits=(15, 130))
@@ -96,39 +96,44 @@ assert [round(g.delta_bic) for g in at_cell.groups] == [784, 329, 263, 201, 45]
 # After the widths: the Kα2 weight leads, then two occupancies.
 assert [g.members[0].path for g in at_profile.groups[:3]] == [
     "instrument.source.lines.1.weight", "phases.0.atoms.2.occ", "phases.0.atoms.6.occ"]
-assert [round(g.gain) for g in at_profile.groups[:3]] == [478, 215, 182]
-assert [f"{g.delta_bic:+.1f}" for g in at_profile.groups[:3]] == ["+15.7", "+3.3", "+1.7"]
+# Moved with WP-2317 R7 (the `profile` stage re-solves on fresh windows, 2026-11-27):
+# gains 478, 215, 182 -> 475, 214, 181 and ΔBIC +15.7, +3.3, +1.7 -> +31.5, +10.1, +7.4.
+assert [round(g.gain) for g in at_profile.groups[:3]] == [475, 214, 181]
+assert [f"{g.delta_bic:+.1f}" for g in at_profile.groups[:3]] == ["+31.5", "+10.1", "+7.4"]
 assert {"instrument.geometry.axial_sl", "instrument.geometry.axial_hl"} <= {
     c.path for c in at_profile.non_separable}
-# Narrowed to the phase without occupancies, ΔBIC refuses what is left, and
-# `best_or_none` still names it: it gates on the noise floor and on a tie.
+# Narrowed to the phase without occupancies, extinction is left, and `best_or_none`
+# names it: it gates on the noise floor and on a tie.  Before WP-2317 R7 (2026-11-27)
+# this query ran on the stale `profile` answer, where ΔBIC refused it (−1.8, gain
+# 104.5, N_eff 915, floor 29.96); it now runs on the re-solved one.
 assert narrowed.best_or_none().path == "phases.0.extinction"
-assert narrowed.groups[0].delta_bic < 0
-assert "ΔBIC refuses it" in narrowed.summary
-assert f"{narrowed.groups[0].gain:.1f}" == "104.5"
-# −1.2994 to −1.2997 between starts 1e-14 apart before WP-2222 (closing stage off by
-# default, 2026-11-19), −1.7986 now: one decimal, as the summary prints it
-assert f"{narrowed.groups[0].delta_bic:.1f}" == "-1.8"
-assert round(narrowed.n_effective) == 915 and narrowed.n_evaluated == 24
-assert round(narrowed.noise_floor, 2) == 29.96
+assert f"{narrowed.groups[0].gain:.1f}" == "106.3"
+assert f"{narrowed.groups[0].delta_bic:+.1f}" == "+1.4"
+assert narrowed.groups[0].members[0].gradient > 0  # "the data push it below 0"
+assert round(narrowed.n_effective) == 1297 and narrowed.n_evaluated == 24
+assert round(narrowed.noise_floor, 2) == 25.31
 assert sorted(c.path for c in narrowed.non_separable) == [
     "phases.0.gauss_size", "phases.0.gauss_strain", "phases.0.lor_size", "phases.0.lor_strain"]
 # The re-solve, and the comparison against it.  Every figure below moved with
 # WP-2222 (closing stage off by default, 2026-11-19), the stages ending at their
 # own 2 % windows: Rwp 0.0970 -> 0.1022, 0.0945 -> 0.0940, 0.0952 -> 0.0947.
-assert f"{ref.result_.statistics.rwp:.4f}" == "0.1022"
+# WP-2317 R7: the `profile` stage re-solved itself ("4.4 %"), 0.1022 -> 0.0940.
+assert f"{ref.result_.statistics.rwp:.4f}" == "0.0940"
+assert f"{100 * ref.result_.stages[-1].window_refit_loss:.1f}" == "4.4"
 assert f"{again.statistics.rwp:.4f}" == "0.0940"
 assert f"{wide_profile.statistics.rwp:.4f}" == "0.0947"
+assert wide_profile.stages[-1].window_refit_loss is None
 assert round(100 * (1 - c.freed[0].value / 0.5)) == 7
 assert [p.path for p in c.freed] == ["instrument.source.lines.1.weight"]
 assert c.freed[0].held_at == 0.5
 assert f"{c.freed[0].value:.3f}" == "0.464" and round(c.freed[0].esd * 1000) == 6
 assert f"{c.freed[0].t_ratio:+.1f}" == "-6.0"
-assert f"{c.delta_bic:+.1f}" == "+31.0" and round(c.n_effective) == 1297
+assert f"{c.delta_bic:+.1f}" == "+30.9" and round(c.n_effective) == 1295
 assert round(c.delta_bic_raw_n) == 161
-# The warning's numbers: extinction does not move, yet the unpaired ΔBIC is large.
+# The warning's numbers: extinction does not move, and with the `profile` stage
+# re-solved (WP-2317 R7) both branches score it alike (+148 unpaired before).
 assert c_direct.freed[0].value == 0.0 and c_paired.freed[0].value == 0.0
-assert round(c_direct.delta_bic) == 148 and round(c_paired.delta_bic) == -7
+assert round(c_direct.delta_bic) == round(c_paired.delta_bic) == -7
 assert narrowed_again.groups[0].members[0].path == "phases.0.extinction"
 assert f"{narrowed_again.groups[0].delta_bic:+.1f}" == "+1.4"
 assert narrowed_again.groups[0].members[0].gradient > 0  # χ² falls below the floor

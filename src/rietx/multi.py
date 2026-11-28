@@ -30,12 +30,16 @@ from contextlib import contextmanager
 import numpy as np
 
 from . import runs
+from ._nearmiss import check_choice
 from .backend.api import backend_dtype_note
 from .crystallography.structure_factor import phase_orbit_split
 from .crystallography.twins import merge_site_twins
 from .history.events import _attach_progress, as_event_stream
 from .model.forward import (
     PHASE_SUPPORT_SIGMA,
+    apertures_to_lift,
+    axial_lift_start,
+    axial_partner,
     compile_model,
     orbit_split_of,
     recorded_window_tol,
@@ -44,6 +48,7 @@ from .model.forward import (
 from .model.microstructure import floored_paths, microstructure_table
 from .optimize.blocked import BlockJacobian
 from .optimize.cancel import RefinementCancelled
+from .optimize.identifiability import soft_modes, top_correlations
 from .optimize.least_squares import (
     DEFAULT_SOLVER,
     SOLVERS,
@@ -59,6 +64,7 @@ from .optimize.least_squares import (
 from .optimize.statistics import (
     background_absorption,
     compute_statistics,
+    extra_peak_absorption,
     roughness_absorption,
 )
 from .params.multi import (
@@ -113,6 +119,7 @@ from .refine import (
     _guard_diagnostics,
     _harmonic_diagnostics,
     _held_scale_phases,
+    _instrument_width_held_diagnostics,
     _judge_magnetic_groups,
     _lineless_phases,
     _low_angle_diagnostics,
@@ -134,6 +141,7 @@ from .refine import (
     _phase_support_diagnostics,
     _quantify_phases,
     _radiation,
+    _reader_diagnostics,
     _refuse_without_phases,
     _reported_support_sigma,
     _resolve_specimen_absorption,
@@ -164,7 +172,7 @@ from .refine import (
 )
 from .report.magnetic import moment_angle_stationary_diagnostics
 from .report.schemas import THRESHOLDS_VERSION
-from .schemas.common import Diagnostic, Parameter, Provenance
+from .schemas.common import Diagnostic, Parameter, Provenance, check_mode
 from .schemas.instrument import Instrument
 from .schemas.parametric import (
     CoordinateTable,
@@ -289,6 +297,8 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
                       "histogram the model does not describe"),
     "_low_angle_diagnostics": (
         (HISTOGRAM,), "the region below one pattern's first reflection"),
+    "_reader_diagnostics": (
+        (HISTOGRAM,), "what one file's reader repaired or noticed (WP-2304)"),
     "_air_scatter_undeclared_diagnostics": (
         (HISTOGRAM,), "one histogram's residual against its own background"),
     "_qpa_esd_unavailable_diagnostics": (
@@ -387,6 +397,10 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
         (FIT,), "a parent-cell phase's strains are shared model parameters, "
                 "so the held-strain record is the fit's, read off the plan's "
                 "freed paths (WP-1419)"),
+    "_instrument_width_held_diagnostics": (
+        (FIT,), "the instrument width hold is one test over every histogram's sums "
+                "(_hold_width_twins_multi), so the held widths are the fit's, "
+                "read off the answer's stage (WP-2225)"),
     # -- deliberately not computed ---------------------------------------------
     "_site_glob_diagnostics": (
         (ABSENT,), "not called from multi.py yet: a single fit reports a glob "
@@ -876,6 +890,21 @@ def _joint_reach_beyond_self(columns: list[str], reach: dict[str, list[str]]
         other = [q for q in reach.get(c, [c]) if q != c]
         if other:
             out[c] = other
+    return out
+
+
+def _seeded_values(mtable, columns: list[str]) -> dict[str, float]:
+    """Each seeded column at the value its seed wrote, read off the entry.
+
+    ``StageResult.seeded``'s second writer, as in ``refine._run_stage``: the
+    isotropic ray gives every Stephens DOF its own coefficient.  A shared
+    column holds one value in every histogram, so histogram 0's is read.
+    """
+    out: dict[str, float] = {}
+    for c in columns:
+        h = mtable._owner(c) or 0
+        table = mtable.tables[h]
+        out[c] = table.entries[table._paths[mtable._unscope(h, c)]].value
     return out
 
 
@@ -1491,16 +1520,10 @@ class MultiHistogramRefinement:
                  parametric: list[ParametricEquation] | None = None,
                  variables: dict[str, Parameter] | None = None,
                  backend: str = "numpy", solver: str = DEFAULT_SOLVER):
-        if backend != "numpy":
-            from .backend import resolve_backend
+        from .backend.api import check_backend
 
-            try:
-                resolve_backend(backend)  # fail fast with the install hint
-            except ValueError as exc:
-                raise NotImplementedError(str(exc)) from exc
-        if solver not in SOLVERS:
-            raise ValueError(f"unknown solver {solver!r}; "
-                             f"available: {', '.join(SOLVERS)}")
+        check_backend(backend)
+        check_choice("solver", solver, SOLVERS)
         self._backend = backend
         self._solver = solver
         instruments = list(instruments)
@@ -1632,6 +1655,8 @@ class MultiHistogramRefinement:
         ``set_values`` on the joint fit are not built (#1205's ruling), and the
         plan's globs are how a joint fit frees a row.
         """
+        if mode is not None:
+            check_mode(mode)
         if mode is None:
             mode = self.result_.mode if self.result_ is not None else "rietveld"
         mt = self.mtable
@@ -1720,6 +1745,7 @@ class MultiHistogramRefinement:
         joint fit is its event log, and :meth:`report` builds the answer's
         report per histogram.
         """
+        check_mode(mode)
         _refuse_without_phases(self.mtable.structures[0], "refine_multi")
         data = list(data)
         n = self.n_histograms
@@ -1833,10 +1859,11 @@ class MultiHistogramRefinement:
         quotes the same size.  The separability caveat beside it is the
         report's own, from this histogram's 2θ range.
 
-        The background section reads this histogram's own absorption screen.
-        The identifiability section has no correlation, soft-mode or
-        exchangeability table, because the joint path does not run those
-        screens.
+        The background section reads this histogram's own absorption screen,
+        and its declared peaks are screened on its own rows.  The
+        identifiability section quotes the joint matrix's worst correlations
+        and softest modes, the fit's, in every histogram's report (WP-2028);
+        it has no exchangeability table, which the joint path does not run.
 
         The report reads the result's curves and models, which come from a
         compile at the answer (:meth:`_final_compiles`, WP-1421), as a single
@@ -1996,6 +2023,8 @@ class MultiHistogramRefinement:
         # for the closing stage of a plan that fixes (WP-2208)
         stages = plan.run_stages(paths=self.mtable.row_names())
         n_stages = len(stages)
+        # what an earlier stage left free: the aperture lift's gate (WP-1955)
+        refined_before: set[str] = set()
         for index, (stage, ftol, window_tol) in enumerate(
                 zip(stages, plan.stage_ftols(), plan.stage_window_tols(),
                     strict=True), start=1):
@@ -2053,9 +2082,32 @@ class MultiHistogramRefinement:
                 for tab in self.mtable.tables:
                     tab.refuse_partial_turns(joint=True)
                 seeded: dict[str, float] = {}
+                # the single-histogram runner's lift (``_run_stage``,
+                # WP-1955): an FCJ aperture this stage frees on zero starts
+                # off it, unless an earlier stage already refined it, before
+                # the plan's seed
+                for path in apertures_to_lift([p for p in freed
+                                               if p not in refined_before]):
+                    # the partner's live value, so S/L's lift is already in it
+                    mt = self.mtable
+                    partner = axial_partner(path)
+                    h = mt._owner(partner) or 0
+                    start = axial_lift_start(
+                        path, mt.decode(mt.x0())[h][mt._unscope(h, partner)])
+                    seeded.update(dict.fromkeys(
+                        mt.seed_floored([path], start), start))
+                refined_before.update(self.mtable.free_paths)
                 if stage.seed:
-                    seeded = dict.fromkeys(
-                        self.mtable.seed_floored(freed, stage.seed), stage.seed)
+                    seeded.update(dict.fromkeys(
+                        self.mtable.seed_floored(freed, stage.seed), stage.seed))
+                if stage.strain_seed:
+                    # the single runner's second seed (``_run_stage``): the
+                    # Stephens DOFs are unbounded below, so the seed above
+                    # never sees them; each enters ``seeded`` at the value
+                    # written, before the support hold reads it
+                    seeded.update(_seeded_values(
+                        self.mtable,
+                        self.mtable.seed_stephens(freed, stage.strain_seed)))
                 self.mtable.apply_to_models()
                 # the single-histogram runner's rule (``_run_stage``, #598): the
                 # moment frames follow the cell this stage starts from, and the
@@ -2469,14 +2521,19 @@ class MultiHistogramRefinement:
         # The slices are kept for the loop: with a correlation matrix each is
         # a dense copy, taken once per histogram.
         per_stderr, per_corr, per_esds = [], [], []
+        # a tie the data determine keeps its esd (WP-2230), per histogram's
+        # columns as the esds are
+        sub = outcome.discarded_subspace
         for h_table, h_theta, cm in zip(mt.tables, thetas,
                                         map(mt.col_map, range(n))):
             s_h = stderr[cm] if stderr is not None else None
             corr_h = corr[np.ix_(cm, cm)] if corr is not None else None
             per_stderr.append(s_h)
             per_corr.append(corr_h)
-            per_esds.append(h_table.stderr_physical(h_theta, s_h, corr_h)
-                            if s_h is not None else {})
+            per_esds.append(h_table.stderr_physical(
+                h_theta, s_h, corr_h,
+                discarded=None if sub is None else sub.take(cm))
+                if s_h is not None else {})
         # one bound test, three consumers: the rows' at_bound flag, the
         # BOUND_HIT/FLOOR_HIT diagnostics (WP-1076, WP-1929) and the
         # declared-peak diagnostics (WP-2141)
@@ -2510,6 +2567,7 @@ class MultiHistogramRefinement:
         histograms: list[HistogramResult] = []
         top_bg: list[GuardFinding] = []
         absorption_table: dict[str, float] = {}
+        peak_table: dict[str, float] = {}
         joint_unmeasured = _joint_unmeasured_phases(models, mt, stage_results)
         for h in range(n):
             table = mt.tables[h]
@@ -2556,6 +2614,13 @@ class MultiHistogramRefinement:
                 # below (``Identifiability``'s rule), scoped like them
                 absorption_table.update(
                     {f"hist.{h}.{p}": r2 for p, r2 in screened.items()})
+                # the declared-peak screen on the same rows (WP-2028, #1205's
+                # ruling): a declared peak is one instrument's, so it is
+                # screened where it lives, scoped like the background's
+                peak_table.update(
+                    {f"hist.{h}.{p}": r2 for p, r2 in extra_peak_absorption(
+                        jh, table.free_paths,
+                        model.peak_component_prefixes()).items()})
                 for path, r2 in sorted(screened.items(), key=lambda kv: -kv[1]):
                     if r2 > BACKGROUND_ABSORPTION_GUARD:
                         # ``hist.h.<path>`` is this surface's own addressing —
@@ -2666,6 +2731,7 @@ class MultiHistogramRefinement:
                                                 ticks, tick_support))
             diags.extend(_air_scatter_undeclared_diagnostics(model, values,
                                                              y_calc, stats))
+            diags.extend(_reader_diagnostics(model, diags))
 
             histograms.append(HistogramResult(
                 label=model.meta.get("label", "") or f"hist{h}",
@@ -2700,8 +2766,8 @@ class MultiHistogramRefinement:
         # is exactly 1.0.  With a correlation matrix this is a dense n x n, so
         # a second build here would double the cost for the same dict.
         esd_hist0 = per_esds[0] if per_esds else {}
-        parameters = self._parameters(thetas, stderr, corr, at_bounds, esd_hist0,
-                                      answer_runaway, outcome.esd_inflation)
+        parameters = self._parameters(at_bounds, per_esds, answer_runaway,
+                                      outcome.esd_inflation)
         diagnostics = list(opening_diags) + self._top_diagnostics(
             outcome, correlation_guard, top_bg, at_bounds, models)
         # what a parametric declaration did to each pattern's dependent that
@@ -2804,6 +2870,9 @@ class MultiHistogramRefinement:
         diagnostics = diagnostics + _parent_strain_held_diagnostics(
             stage_results, [_unscoped(p) for p in mt.free_paths],
             self.mtable.structures[0])
+        # the held instrument widths of the answer's stage, which hold one
+        # sum across every histogram (WP-2225)
+        diagnostics = diagnostics + _instrument_width_held_diagnostics(stage_results)
         # a phase whose scales and B no histogram's range can separate, and
         # what its fraction is conditional on (WP-1534)
         diagnostics = diagnostics + _scale_b_ridge_diagnostics(
@@ -2850,8 +2919,8 @@ class MultiHistogramRefinement:
             # each histogram's background screen, ``hist.<h>.``-scoped, so
             # ``for_histogram`` hands a report its own (WP-1341); ``None``
             # where nothing was screened, the single fit's empty state
-            identifiability=(Identifiability(background_absorption=absorption_table)
-                             if absorption_table else None),
+            identifiability=_joint_identifiability(
+                outcome, mt.free_paths, absorption_table, peak_table),
             # the declared coefficients in user units at the reference, read
             # off histogram 0's slice of the joint covariance (a coefficient
             # is shared, so its marginal is the joint one), and each equation with
@@ -2955,9 +3024,13 @@ class MultiHistogramRefinement:
                         vary=bool(e.vary), unit=table._units.get(path), reference=None))
         return rows
 
-    def _parameters(self, thetas, stderr, corr, at_bounds, esd0,
-                    answer_runaway=(), esd_inflation=None) -> list[RefinedParameter]:
+    def _parameters(self, at_bounds, per_esds, answer_runaway=(),
+                    esd_inflation=None) -> list[RefinedParameter]:
+        """The result's rows; ``per_esds[h]`` is histogram ``h``'s
+        :meth:`~rietx.params.vector.ParameterTable.stderr_physical` map, built
+        once by the caller (a dense build per histogram with a correlation)."""
         mt = self.mtable
+        esd0 = per_esds[0] if per_esds else {}
         params: list[RefinedParameter] = []
         # The single-histogram rule (``refine._build_result``): a cell the
         # answer-producing stage's CELL_RUNAWAY names has its esd withheld,
@@ -2998,10 +3071,7 @@ class MultiHistogramRefinement:
                     at_bound=(e.path in on_bound) if e.path in tested else None,
                     equations=equations.get(e.path, [])))
         for h, table in enumerate(mt.tables):
-            cm = mt.col_map(h)
-            esd = (table.stderr_physical(thetas[h], stderr[cm],
-                                         corr[np.ix_(cm, cm)] if corr is not None else None)
-                   if stderr is not None else {})
+            esd = per_esds[h] if per_esds else {}
             for e in table.entries:
                 if not _row_shared(mt, e) and e.path in moving[h]:
                     row = f"hist.{h}.{e.path}"
@@ -3124,6 +3194,44 @@ def _seed_joint_pawley(models, previous, mtable, stage) -> None:
             model.lebail_update(table.decode(table.x0()),
                                 n_cycles=_pawley_seed_cycles(stage))
         model.build_pawley_restraint()
+
+
+def _joint_identifiability(outcome, free: list[str],
+                           background: dict[str, float],
+                           peaks: dict[str, float]) -> Identifiability | None:
+    """The joint result's identifiability carrier (WP-1341, WP-2028).
+
+    The two screens each histogram runs on its own rows, ``background`` and
+    ``peaks``, keyed ``hist.<h>.``, beside the parameter-space tables
+    ``check_guards`` measures after its loop, asked here of the **joint**
+    matrix, since that is what was solved (#1205's ruling): the worst |ρ|
+    pairs of the joint correlation, which ``HIGH_CORRELATION`` thresholds,
+    and the softest modes of the joint unit-column normal matrix, named by
+    the joint paths (shared bare, a histogram's own ``hist.<h>.``).  A mode
+    can then mix a shared B with each pattern's scale, which no histogram's
+    own rows can show.  The single fit's held-parameter exchangeability scan
+    is not run: the ruling named the two tables, and the scan re-compiles a
+    model, which a joint fit has one of per histogram.
+
+    ``None`` where nothing was measured, the single fit's empty state.
+    """
+    top: list = []
+    modes: list = []
+    if outcome.correlation is not None and len(free) > 1:
+        top = top_correlations(np.asarray(outcome.correlation), free)
+    if outcome.jac is not None and len(free) > 1:
+        try:
+            modes = soft_modes(outcome.jac, free)
+        except np.linalg.LinAlgError:
+            # ``check_guards``' rule: the covariance already failed to form and
+            # said so (COVARIANCE_UNAVAILABLE); anywhere it formed, stay loud
+            if getattr(outcome, "covariance_error", None) is None:
+                raise
+    if not (background or peaks or top or modes):
+        return None
+    return Identifiability(background_absorption=background,
+                           extra_peak_absorption=peaks,
+                           top_correlations=top, soft_modes=modes)
 
 
 def _row_shared(mtable, entry) -> bool:
@@ -3368,8 +3476,15 @@ def _peak_equation_sharing_diagnostics(mtable) -> list[Diagnostic]:
     joint fit, :func:`~rietx.params.multi.row_shared`, and no parametric
     equation's target), whose target carries degrees, in a joint fit whose
     patterns declare at least two different wavelengths.  Silent with one
-    wavelength, with a source that declares no line, and for an
-    ``intensity_factor``, a pure number.
+    wavelength, with a source that declares no line, for an
+    ``intensity_factor``, a pure number, and for an equation whose expression
+    reads ``wavelength`` (WP-2152): the user wrote its λ dependence, as a
+    parametric equation states a driven coefficient's.  The parametric silence
+    is per coefficient, but this one covers the whole expression.  A phase
+    holds one equation per target, so a strain term beside the λ-reading one
+    (``+ w*tan(theta)``), rightly shared, is silent.  So is a size term in
+    degrees there (``+ x/cos(theta)``), the known limit.  Another target's
+    degree-only equation on the same phase warns.
     """
     lams = [_longest_wavelength(ins) for ins in mtable.instruments]
     if any(lam is None for lam in lams) or len(set(lams)) < 2:
@@ -3391,7 +3506,7 @@ def _peak_equation_sharing_diagnostics(mtable) -> list[Diagnostic]:
             phase = mtable.structures[0].phases[int(base.split(".")[1])]
             eq = phase.peak_equations[int(index)]
             owner = f"Phase {base.split('.')[1]} ({phase.name})"
-        if eq.target == "intensity_factor":
+        if eq.target == "intensity_factor" or "wavelength" in eq.reads():
             continue
         unit = "deg²" if eq.target == "gauss_fwhm_squared" else "degrees"
         noun = "its coefficient" if len(names) == 1 else "its coefficients"
@@ -4038,6 +4153,7 @@ def refine_multi(data: list[PatternData], structure: Structure | list[Structure]
     ``basis="expression"`` equation refines (WP-1964), and ``mode``,
     ``events``, ``cancel``, ``telemetry``, ``label`` and ``progress`` its
     ``fit``'s."""
+    check_mode(mode)
     ref = MultiHistogramRefinement(structure, instruments, sharing=sharing,
                                    coordinates=coordinates, parametric=parametric,
                                    variables=variables,

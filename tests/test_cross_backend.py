@@ -127,22 +127,8 @@ KINK_PATHS = frozenset({"instrument.geometry.axial_sl",
 #: longer uses it (WP-1955).  Every column under it in the matrix was live: the
 #: aperture at zero (2.6e-8 of the largest) and nac's two Biso and six
 #: background columns (1.3e-9 to 1.3e-7).  Every backend met nac's at its own
-#: scale, within 2.4e-7.  The aperture at zero is a known defect, below.
+#: scale, within 2.4e-7.
 DEAD_COL_FRAC = 1e-6
-
-#: why the numpy column of an aperture at its bound of zero is not yet right.
-#: It sits 0.232 rel-L2 off its one-sided difference, on both apertures.
-#: Ruled by Yue 2026-11-02: the exact column returns with WP-1955 task 5, a
-#: lift off a zero aperture, as one change to what a fit returns.
-ZERO_APERTURE_DEFECT = ("WP-1955 task 5: the numpy column of an aperture at "
-                        "zero is 0.232 rel-L2 off; the exact column lands "
-                        "with the lift off a zero aperture")
-
-#: (config, path) columns the agreement matrix leaves out, each a known defect
-#: that a strict xfail elsewhere still holds.  The reference column is numpy's,
-#: so every backend's row would fail on it.  When the strict xfail turns into
-#: a pass, remove the entry here too.
-KNOWN_DEFECT_COLUMNS = {("axial_one_zero", "instrument.geometry.axial_hl")}
 
 #: the multi-histogram reference's FD step, the v0.2 harness's rule (applied
 #: ±h, centrally); the single-histogram reference takes the package's own
@@ -245,11 +231,13 @@ def _state_families_tied():
     was written for.  So this row is where the choice is checked against three
     independent opinions.
 
-    Three shapes, one per outcome of that choice: an identity tie and a general
-    affine one (scale ≠ 1 **and** a constant) on the peak-chain branch, which is
-    widened to cover them, and a background tie the gate sends to the
-    whole-model FD fallback instead — so the one column numpy finite-differences
-    is compared against exact ones.
+    Four shapes, one per outcome of that choice: an identity tie and a general
+    affine one (scale ≠ 1 **and** a constant) on the site branch, which
+    reads its coefficients off C (WP-2314); a general affine tie between two
+    width scalars on the peak chain, which finite-differences θ through
+    ``decode``; and a background tie the gate sends to the whole-model FD
+    fallback instead — so the one column numpy finite-differences is compared
+    against exact ones.
     """
     structure, ins, pattern = _lab_state()
     table = ParameterTable(structure, ins)
@@ -258,6 +246,8 @@ def _state_families_tied():
                   AffineTie.identity("phases.0.atoms.0.occ"))
     table.set_tie("phases.0.atoms.1.biso",
                   AffineTie(terms=(("phases.0.atoms.0.biso", 2.0),), const=0.1))
+    table.set_tie("phases.0.gauss_strain",
+                  AffineTie(terms=(("phases.0.lor_size", 2.0),), const=0.001))
     table.set_tie("instrument.background.c1",
                   AffineTie.identity("instrument.background.c0"))
     table.refresh_ties()
@@ -395,8 +385,9 @@ def _state_families_variable():
     peak chain, and the two disagree by ~1e-6.  The traced backends walk
     straight through C either way and so are the independent opinion.
 
-    Three shapes, one per branch the reach can name: four Biso rows on the peak
-    chain (several reached paths, all direct), a phase scale at coefficient 1
+    Three shapes, one per branch the reach can name: Biso rows on the
+    site branch, the peak chain before WP-2314 (several reached paths,
+    all direct), a phase scale at coefficient 1
     on the closed-form ``_scale_column`` (one reached path, the case that is
     licensed to keep the linear branches), and a Wyckoff DOF, where the reach is
     ``[…x, …dof.0]`` and only the *directly* driven ``dof.0`` may name the
@@ -1356,13 +1347,57 @@ def _state_extinction_strong():
     return model, table, {}
 
 
+def _state_site_scalars():
+    """Biso and occupancy columns from the structure-factor cache (WP-2314).
+
+    The analytic branch ``_site_column`` sums ∂|F|²/∂B_j and
+    ∂|F|²/∂occ_j through C over every Biso and occupancy row one column
+    moves, so its reach is new: N's Biso following C's, N's occupancy the
+    remainder of C's (coefficient −1), and a named variable driving two
+    occupancies at coefficients 1 and 0.5.  Dispersion is on, so each
+    gradient carries its B term, and extinction at 30 puts the chain's
+    G = E + x·dE/dx factor in every column.  The phase scale and a cell
+    length ride along on their own branches.  The exact oracles are
+    ``tests/test_biso_occ_columns.py``'s; this row is the traced backends'
+    opinion.
+    """
+    from tests.test_biso_occ_columns import ISO_BISO, OCC, site_scalar_state
+
+    model, table = site_scalar_state(
+        extinction=30.0, free=(*ISO_BISO, *OCC),
+        extra_free=("phases.0.scale", "phases.0.cell.a"),
+        window_area_tol=WINDOW_AREA_TOL)
+    return model, table, {}
+
+
+def _state_site_cross_atom():
+    """Columns reaching across atoms, from the structure-factor cache
+    (WP-2314 angle 4).
+
+    ``_site_column`` sums the cached ∂|F|² of every site row a column moves,
+    weighted by the row's ∂p/∂θ_c, so its reach is new: three coordinate
+    DOFs carried onto a second atom (the co-sited tie), a named variable
+    driving one atom's coordinate DOF and ADP DOF, and a second driving one
+    atom's Biso and another's occupancy.  Dispersion is on and extinction at
+    30, so every column carries the B term and the chain's G factor.  The
+    exact oracle is ``tests/test_cross_atom_columns.py``'s chain rule; this
+    row is the traced backends' opinion.
+    """
+    from tests.test_cross_atom_columns import cross_atom_state
+
+    model, table = cross_atom_state(extinction=30.0,
+                                    window_area_tol=WINDOW_AREA_TOL)
+    return model, table, {}
+
+
 def _state_distortion_modes():
     """WP-1419: a child refined on its mode amplitudes, the coordinates derived.
 
     NaTaO₃'s P4/mbm child of the cubic perovskite (one M-point mode on O2),
     stated by ``displacive_statement`` and set off its seed to 0.2 Å: an
-    amplitude column falls to ``_peak_chain_column`` and reaches O2's x and
-    y through C; the traced backends differentiate the same affine rows.
+    amplitude column reaches O2's x and y through C, and numpy takes
+    ``_site_column`` for it (WP-2314 angle 4; the peak chain before).  The
+    traced backends differentiate the same affine rows.
     The cell, scale and Biso free beside it.
     """
     from rietx.crystallography.representation.distortion import displacive_statement
@@ -1461,9 +1496,79 @@ def _state_peak_equations():
     return model, table, {}
 
 
+def _state_peak_equations_wavelength():
+    """A phase's size and shift terms reading ``wavelength``, with λ free
+    beside their coefficients (WP-2152).
+
+    The λ column takes the scalar chain, which finite-differences the peak
+    scalars through ``decode``.  The equations read λ off the Bragg angle
+    (``ReflectionFrame.bindings``), so the column carries their share of the
+    width and position, and this row holds it to the whole-model difference
+    and to autodiff.  That the equation reads the moved λ at all is
+    ``test_peak_equations``' free-λ twin, since every method here would agree
+    on a residual that froze it.  The cell is held, since a free λ beside a
+    free cell is refused.
+    """
+    from rietx.schemas.peak_equation import PeakEquation
+
+    p = Parameter
+    structure = make_lab6()
+    structure.phases[0].peak_equations = [
+        PeakEquation(target="lor_fwhm", expression="y*wavelength/cos(theta)",
+                     coefficients={"y": p(value=0.03)}),
+        PeakEquation(target="shift", expression="z*wavelength*tan(theta)",
+                     coefficients={"z": p(value=0.01)}),
+    ]
+    ins = Instrument.debye_scherrer(wavelength=1.5406)
+    ins.source.dispersion = None
+    tt = np.arange(15.0, 95.0, 0.02)
+    rng = np.random.default_rng(2152)
+    pattern = PatternData(two_theta=tt.tolist(),
+                          intensity=(50.0 + 10.0 * rng.random(len(tt))).tolist())
+    table = ParameterTable(structure, ins)
+    table.set_vary(["*"], False)
+    for path in ("phases.0.scale", "instrument.source.lines.0.wavelength",
+                 "phases.0.peak_equations.*"):
+        assert table.set_vary([path], True), path
+    model = compile_model(structure, ins, pattern, mode="rietveld",
+                          moving_paths=set(table.moving_paths),
+                          window_area_tol=WINDOW_AREA_TOL)
+    return model, table, {}
+
+
+def _state_pawley_merged():
+    """WP-2315: a Pawley block with lattice-merged columns, whose traced
+    residual spreads a column over its members through a frozen dense map,
+    where numpy gathers.  Cubic LaB6 to 110° (Cu): (2 2 1)/(3 0 0) and two
+    more pairs are one column each."""
+    from tests.test_pawley import _overlapped_lab6
+
+    structure, instrument = _overlapped_lab6()
+    instrument.source.dispersion = None
+    grid = np.arange(15.0, 110.0, 0.03)
+    pattern = PatternData(two_theta=grid.tolist(),
+                          intensity=(50.0 + 0.0 * grid).tolist())
+    table = ParameterTable(structure, instrument)
+    table.set_vary(["*"], False)
+    for path in ("phases.0.cell.a", "instrument.profile.w",
+                 "instrument.background.c0"):
+        table.set_vary([path], True)
+    model = compile_model(structure, instrument, pattern, mode="pawley",
+                          moving_paths=set(table.moving_paths),
+                          window_area_tol=WINDOW_AREA_TOL)
+    assert model.pawley.merged, "the state must carry a merged column"
+    model.lebail_update(table.decode(table.x0()), n_cycles=3)
+    model.build_pawley_restraint()
+    return model, table, {}
+
+
 CONFIGS = {"families": _state_families,
+           "pawley_merged": _state_pawley_merged,
            "peak_equations": _state_peak_equations,
+           "peak_equations_wavelength": _state_peak_equations_wavelength,
            "distortion_modes": _state_distortion_modes,
+           "site_scalars": _state_site_scalars,
+           "site_cross_atom": _state_site_cross_atom,
            "texture": _state_texture,
            "bodies": _state_bodies,
            "bodies_site": _state_bodies_site,
@@ -1514,6 +1619,7 @@ CONFIG_PARAMS = [
     _config("families_voigt"),
     _config("texture"),
     _config("peak_equations"),
+    _config("peak_equations_wavelength"),
     _config("axial_one_zero"),
     _config("sharp_widths"),
     _config("families_tied"),
@@ -1537,6 +1643,8 @@ CONFIG_PARAMS = [
     _config("extinction_strong"),
     _config("stephens_over_lor_strain"),
     _config("distortion_modes"),
+    _config("site_scalars"),
+    _config("site_cross_atom"),
     _config("bodies_site"),
     # the state imports test_parent_cell's LaMnO₃ child, whose candidate search
     # is cached per process: sharing that module's group pays it once
@@ -1545,6 +1653,7 @@ CONFIG_PARAMS = [
     _config("bodies_site_fixed"),
     _config("toy_lebail"),
     _config("toy_pawley"),
+    _config("pawley_merged"),
     _config("toy_rich"),
     _config("toy_restraints"),
     _config("toy_capillary"),
@@ -1789,11 +1898,7 @@ def test_jacobian_matches_analytic(method, config):
 
     J_ref = _analytic_jacobian(config, model, table)(theta)
     J_test = build(config, model, table)(theta)   # may skip (optional backend)
-    labels = _labels(model, table)
-    keep = [c for c, p in enumerate(labels)
-            if (config, p) not in KNOWN_DEFECT_COLUMNS]
-    J_ref, J_test = J_ref[:, keep], J_test[:, keep]
-    _assert_columns(J_ref, J_test, [labels[c] for c in keep],
+    _assert_columns(J_ref, J_test, _labels(model, table),
                     rel_max=rel_max, cos_min=cos_min,
                     kink=_kink_paths(model, table),
                     what=f"{config}/{method} ")
@@ -1878,10 +1983,7 @@ def _zero_aperture_state(path: str):
 @pytest.mark.xdist_group("xb-axial_one_zero")
 @pytest.mark.parametrize("path", ["instrument.geometry.axial_hl",
                                   "instrument.geometry.axial_sl"])
-@pytest.mark.parametrize("name", [
-    pytest.param("numpy", marks=pytest.mark.xfail(
-        strict=True, raises=AssertionError, reason=ZERO_APERTURE_DEFECT)),
-    "jax", "torch"])
+@pytest.mark.parametrize("name", ["numpy", "jax", "torch"])
 def test_a_zero_aperture_column_meets_its_one_sided_difference(name, path):
     """WP-1953, WP-1955: an aperture's column at its bound of zero is the
     feasible side's, measured at its own scale, on every backend.
@@ -1889,19 +1991,19 @@ def test_a_zero_aperture_column_meets_its_one_sided_difference(name, path):
     The column's norm is 0.047 against a largest column of 1.8e6, and until
     WP-1955 the matrix skipped any column under ``DEAD_COL_FRAC`` of the
     largest, so this test held it alone.  The matrix now checks small columns,
-    but leaves this one out while its numpy reference is the known defect
-    (``KNOWN_DEFECT_COLUMNS``).
+    this one included.
     Wrong, it was 3360 on jax, because the FCJ kink was capped by ξ_max and the
     two tie at one zero aperture, where jax gives each side half the
     derivative.  Fixed, jax and torch meet the one-sided central difference to
     1.5e-3; the bar leaves 13× room for that difference's own truncation.
 
-    The numpy column is 0.232 rel-L2 off, on both apertures, and its row is a
-    strict xfail.  The column is the small residue of node terms some 1e5
-    times larger that cancel, and a forward difference of the nodes puts its
-    O(h) error, 0.013 in norm, into that residue.  A second-order difference
-    at 3e-6 meets the reference to 1.8e-3, but it also strands a fit at a
-    zero aperture, so it waits for WP-1955 task 5 (ruled by Yue 2026-11-02).
+    The numpy column was 0.232 rel-L2 off, on both apertures.  The column is
+    the small residue of node terms some 1e5 times larger that cancel, and a
+    first-order forward difference of the nodes put its O(h) error, 0.013 in
+    norm, into that residue.  The second-order difference at 3e-6 meets the
+    reference to 1.8e-3.  The exact column strands a fit at a zero aperture,
+    so it landed with the lift off zero (``forward.apertures_to_lift``,
+    WP-1955 task 5, ruled by Yue 2026-11-02).
     """
     config, model, table = _zero_aperture_state(path)
     theta = _theta(model, table)
@@ -1913,6 +2015,27 @@ def test_a_zero_aperture_column_meets_its_one_sided_difference(name, path):
     # alone in its own slice, the column is the largest, so it is live
     _assert_columns(ref, col, [path], rel_max=KINK_REL_L2_MAX,
                     cos_min=KINK_COSINE_MIN, what=f"{name} at 0: ")
+
+
+@pytest.mark.parametrize("gap", [1e-6, 5e-6])
+def test_an_aperture_just_under_the_other_is_differenced_on_its_own_side(gap):
+    """WP-1955: the numpy node derivatives stay off the S/L = H/L kink.
+
+    The second-order stencil steps 2h = 6e-6, so an aperture lying under the
+    other by less than that would difference across the kink.  Forward, the
+    H/L column sat 7.7e-5 to 2.2e-3 rel-L2 off jax's at gaps of 1e-6 to
+    5.9e-6; mirrored it sits at 6e-9 to 1.3e-8, as interior apertures do.
+    The bar sits between the two.
+    """
+    pytest.importorskip("jax")
+    model, table, _extras = _families_state(axial_hl=0.02, axial_sl=0.02 + gap)
+    theta = table.x0()
+    path = "instrument.geometry.axial_hl"
+    c = list(table.free_paths).index(path)
+    exact = _jacobian_for(model, table, "jax")(theta)[:, [c]]
+    col = _jacobian_for(model, table, "numpy")(theta)[:, [c]]
+    _assert_columns(exact, col, [path], rel_max=1e-5, cos_min=COSINE_MIN,
+                    what=f"numpy at a gap of {gap:g}: ")
 
 
 @pytest.mark.parametrize("name", ["numpy", "jax", "torch"])
@@ -2355,8 +2478,10 @@ FD_ESD_RATIO_BAR = 0.01
 #: configs whose every column is exact, so no column takes a finite difference.
 #: ``extra_components`` joined when the hump's columns became the closed form
 #: (WP-2116): its other columns are a phase scale and background coefficients.
+#: ``site_cross_atom`` frees only site columns, every one ``_site_column``'s
+#: since WP-2314 angle 4.
 #: Listed rather than skipped, so a column that falls back to FD here fails.
-NO_FD_CONFIGS = frozenset({"extra_components"})
+NO_FD_CONFIGS = frozenset({"extra_components", "site_cross_atom"})
 
 
 def _fd_taken(model, table, theta, monkeypatch):
@@ -2543,7 +2668,7 @@ def test_fd_columns_hold_at_every_protocol_answer(family, monkeypatch):
 
     ref, _res = _protocol(family)
     model = ref._model
-    _result, table, theta, _se, _corr = ref._answer_covariance
+    _result, table, theta, _se, _corr = ref._answer_covariance[:5]
     theta = np.asarray(theta, dtype=np.float64)
     jac, fd = _fd_taken(model, table, theta, monkeypatch)
     oracle, oracle_2h = _forward_richardson(model, table, theta)

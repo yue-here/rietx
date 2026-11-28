@@ -19,7 +19,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Literal
 
-from .._nearmiss import did_you_mean
+from .._nearmiss import check_choice, did_you_mean
 from ..schemas.common import Mode
 
 # INTERMEDIATE_FTOL, CORRELATION_GUARD, PHASE_SUPPORT_SIGMA and
@@ -187,7 +187,7 @@ class Stage:
     #: is ~0.1°); a fit that *tests a hypothesis it must not walk toward* —
     #: the indexing Le Bail validation, whose candidate may be metrically
     #: wrong by design — declares the capture range its verdict needs
-    #: (``indexing.workflow.VALIDATION_WINDOW_SLACK_DEG``).  ``None`` = the
+    #: (``indexing.workflow.VALIDATION_SLACK_BOUNDS_DEG``).  ``None`` = the
     #: default; frozen at stage compile like every other discrete choice.
     window_slack_deg: float | None = None
     #: path globs this stage **fixes** after it frees ``turn_on`` (WP-2208,
@@ -385,6 +385,27 @@ def fixed_at_end(stages: Iterable[Stage],
     return out
 
 
+def refit_later(path: str, later: Iterable[Stage]) -> bool:
+    """Whether a path free now is free again in one of the ``later`` stages.
+
+    Read as :func:`fixed_at_end` reads a plan: the flags carry, ``turn_on``
+    frees and then ``turn_off`` fixes, so a free path stays free into the next
+    stage unless that stage's ``turn_off`` matches it.  This is the test of
+    "a later stage refits this stage's answer" that sizes a stage's window
+    slack (WP-2317 R7): a stage whose free path no later stage refits has a
+    final answer for it, and keeps the uniform slack.
+    """
+    free = True
+    for stage in later:
+        if any(fnmatch.fnmatchcase(path, g) for g in stage.turn_on):
+            free = True
+        if any(fnmatch.fnmatchcase(path, g) for g in stage.turn_off):
+            free = False
+        if free:
+            return True
+    return False
+
+
 @dataclass
 class RefinementPlan:
     stages: list[Stage]
@@ -400,7 +421,7 @@ class RefinementPlan:
     #: converge only by alternating.  ``1`` is the single run every fit made
     #: before this field, bit for bit.  Above 1 under ``mode="lebail"``,
     #: ``Refinement.fit`` repeats the plan, keeps the best pass and records why
-    #: it stopped (:data:`LEBAIL_ALTERNATION_STOPPED`).  Ignored in every
+    #: it stopped (``LEBAIL_ALTERNATION_STOPPED``).  Ignored in every
     #: other mode, where there is nothing to alternate.
     lebail_passes: int = 1
     #: the absent-phase hold's threshold, in esds of the phase's scale against
@@ -492,7 +513,7 @@ class RefinementPlan:
         """The tolerance each stage runs at, in order — the one authority.
 
         Both runners ask this rather than reading ``stage.ftol``
-        (``Refinement._run_stage`` through ``fit``, ``MultiRefinement.fit``),
+        (``Refinement._run_stage`` through ``fit``, ``MultiHistogramRefinement.fit``),
         because the answer needs a fact no stage has: **whether it is the
         last**.  A plan is the only object that knows, so the rule lives here
         and is applied once per fit instead of restated per call site.
@@ -1285,6 +1306,7 @@ class GuardFinding:
                                ) -> "GuardFinding":
         """``width="lorentzian"`` is Γ_L's finding: one code for both widths,
         since the action is the same for either (WP-2002)."""
+        check_choice("width", width, ("gaussian", "lorentzian"))
         if width == "lorentzian":
             return cls("RESOLUTION_NOT_POSITIVE",
                        ("instrument.profile.x", "instrument.profile.y"),
@@ -1539,7 +1561,8 @@ def check_hump_width(table, model) -> list[GuardFinding]:
     ``optimize.least_squares.gaussian_width_inequalities``).  This guard's
     floor of 10·√ε, 1e-3°, sits a decade above that, and the inequality also
     counts the phase's Gaussian terms, which this instrument-only width does
-    not.  So the abstention can still happen under LM.
+    not, nor a width peak equation's term (WP-2153).  So the abstention can
+    still happen under LM.
     """
     from ..model.profiles.caglioti import _MIN_GAMMA_G2
 
@@ -1618,8 +1641,8 @@ def check_stephens_positive(table, model) -> list[GuardFinding]:
     definiteness), which is why it cannot be a box bound.  The default LM
     driver carries it as a linear inequality (``optimize/lm.py``), and then
     this guard falls silent because there is nothing left to report.  It is
-    the only check under ``solver="trf"``, and in a joint fit under either
-    driver, since ``run_multi_least_squares`` builds no cone.
+    the only check under ``solver="trf"``.  A joint fit's LM step holds one
+    cone per histogram (``_joint_positivity_inequalities``, WP-2239).
 
     Zero is *inside* the physical set, and the test is one-sided for that
     reason: an all-zero block is the exact no-broadening identity, and a
@@ -1756,6 +1779,14 @@ def check_peak_width_positive(table, model) -> list[GuardFinding]:
     terms' floored value plus the equation's, so a dip the instrument's own
     U, V and W cause stays ``RESOLUTION_NOT_POSITIVE``'s.  Zero is a legal Γ_L,
     so that test is one-sided.  A phase with no width equation is skipped.
+
+    Under the default LM driver the total, the equation's term included, is
+    held inside the step wherever that term is exact at the stage's frozen
+    angles (WP-2153).  So there this fires on a term that function leaves
+    out (``optimize.least_squares._equation_width_rows`` lists the cases), on
+    a start already below zero, which no row can restore, and on what a
+    moving cell or zero shift does between the frozen angles and the answer.
+    Under TRF it is the only check.
     """
     import numpy as np
 
@@ -2104,9 +2135,10 @@ def check_resolution_positive(table, model) -> list[GuardFinding]:
     over zero does not make U, V, W quotable.  Read a firing as "this
     resolution function is not quotable", never as a verdict on the sample.
 
-    This is TRF's guard, and a joint fit's.  The LM driver on a single
-    histogram also holds the **total** Γ_G², each phase's Gaussian size and
-    strain included, at or above ``caglioti._MIN_GAMMA_G2`` at every
+    This is TRF's guard.  The LM driver, on a single histogram and on each
+    histogram of a joint fit, also holds the **total** Γ_G², each phase's
+    Gaussian size and strain included, and a width peak equation's term where
+    that term is exact (WP-2153), at or above ``caglioti._MIN_GAMMA_G2`` at every
     reflection, as a linear inequality (WP-1938 D7,
     ``optimize.least_squares.gaussian_width_inequalities``), and the total
     Γ_L at or above zero (``lorentzian_width_inequalities``).  That keeps the
@@ -2155,7 +2187,7 @@ def check_resolution_positive(table, model) -> list[GuardFinding]:
 
 #: a free column counts as "on its bound" within this fraction of **the closest
 #: bound's own magnitude**, floored at 1 — scipy's ``rtol`` from
-#: ``optimize._lsq.common.find_active_constraints``, which is the test TRF
+#: ``scipy.optimize._lsq.common.find_active_constraints``, which is the test TRF
 #: itself uses to fill ``OptimizeResult.active_mask``.  Quoted rather than
 #: chosen: the diagnostic and the solver then cannot hold different opinions
 #: about the same column, and the value is calibrated to how far
@@ -2628,5 +2660,9 @@ def check_guards(table, outcome, threshold: float,
     if pressed and sd_internal is not None:
         report.at_bounds += tied_bound_findings(
             table, pressed,
-            table.stderr_physical(outcome.theta, sd_internal, outcome.correlation))
+            # the result's own esds, a tie the data determine included
+            # (WP-2230), as the joint fit's per-histogram build reads them
+            table.stderr_physical(
+                outcome.theta, sd_internal, outcome.correlation,
+                discarded=getattr(outcome, "discarded_subspace", None)))
     return report

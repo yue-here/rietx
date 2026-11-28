@@ -704,7 +704,9 @@ def test_the_shipped_bt1_pattern_refines_alike_on_coordinates_and_on_modes(bt1):
     # the exact half: the coordinate fit's answer, restated, draws the same pattern
     restated = D.displacive_statement(lamno3_parent(), ref_c.structure.phases[0], LAMNO3_T)
     tt = np.asarray(res_c.two_theta)
-    y_c = np.asarray(ref_c.predict(tt))
+    # both from unfitted objects, so both compile at one peak cut: a fitted one
+    # compiles at its fit's (WP-2235)
+    y_c = np.asarray(rx.Refinement(ref_c.structure, ref_c.instrument).predict(tt))
     y_m = np.asarray(rx.Refinement(Structure(phases=[restated.phase]), ref_c.instrument)
                      .predict(tt))
     assert np.max(np.abs(y_m - y_c)) <= 1e-10 * np.max(y_c)
@@ -770,3 +772,80 @@ def test_a_p1_supercell_with_every_mode_builds_in_one_pass():
                           moving_paths=set(table.moving_paths))
     jac = _jacobian_for(model, table, "numpy")(table.x0())
     assert jac.shape[1] == 117 and np.all(np.isfinite(jac))
+
+
+# --------------------------------------------------------------------------
+# March-Dollase on a stated child averages over the child's group (#1533 R4)
+# --------------------------------------------------------------------------
+def _r4_child() -> rx.Phase:
+    """The Pm child of #1533's R4: the shipped Pnma LaMnO₃, k = (½, ½, 0) S1 (rank 2)#3.
+
+    Its axes are A = 2a, B = a+b, C = c, so the child keeps Pnma's mirror ⊥ b as
+    R = [[1,1,0],[0,−1,0],[0,0,1]], and Rᵀ·(1,1,1) = (1,0,1).  The moments are
+    zeroed: the question is the orbit, not the magnetic intensity.
+    """
+    from rietx.crystallography.magnetic import isotropy
+    from rietx.crystallography.magnetic.operators import parse_transform
+    from rietx.crystallography.magnetic.supercell import magnetic_supercell
+    from tests.test_parent_cell import _lamno3
+
+    parent = _lamno3()
+    mn = next(a for a in parent.atoms if a.species.startswith("Mn"))
+    (cand,) = [c for c in isotropy.candidates(parent.space_group,
+                                              (mn.x.value, mn.y.value, mn.z.value),
+                                              (0.5, 0.5, 0)).candidates
+               if c.irrep_label == "S1" and c.direction.label == "(rank 2)#3"]
+    st = magnetic_supercell(parent, cand, nuclear_group="magnetic",
+                            magnetic_species=["Mn"], ion="Mn3+")
+    big, small = parse_transform(st.transform)
+    transform = (np.array([[float(v) for v in row] for row in big]),
+                 np.array([float(v) for v in small]))
+    phase = D.displacive_statement(parent, st.phase, transform, seed=0.0).phase
+
+    def zero(m):
+        return m.model_copy(update={c: getattr(m, c).model_copy(update={"value": 0.0, "vary": False})
+                                    for c in ("crystalaxis_x", "crystalaxis_y", "crystalaxis_z")})
+    return phase.model_copy(update={"atoms": [
+        a if a.moment is None else a.model_copy(update={"moment": zero(a.moment)})
+        for a in phase.atoms]})
+
+
+def test_march_dollase_on_a_stated_child_averages_over_the_childs_group():
+    """#1533 R4's discriminating arm, kept as its regression arm (hostile compare item 1).
+
+    The claimed pair (1,1,1)/(1,0,1) is related by the child's own mirror, so it
+    is equal at every state.  That alone cannot tell the child's group from the
+    parent's, which also relates it.  The discriminator is (1,1,1)/(1,1,−1),
+    related only by the parent's mirror ⊥ c: equal at the parent (positive arm),
+    and it must split once every non-identity mode moves, or the March-Dollase
+    orbit is averaged over a group larger than the child's.  (1,2,1) against
+    (1,1,1) differs in the middle index alone, so no part of the axis is dropped.
+    Measured 2026-11-25 on main 0e79e455f, macOS arm64: claimed pair ≤ 1e-15,
+    parent-only pair 0.049 moved and ≤ 2e-15 at the parent, middle index 0.067.
+    """
+    from rietx.schemas.structure import PreferredOrientation
+
+    child = _r4_child()
+    tt = np.arange(5.0, 120.0, 0.05)
+    modes = child.distortion_modes.modes
+    rng = np.random.default_rng(11)    # the hostile arm's draw: every mode 0.02-0.06 Å, random sign
+    amps = rng.uniform(0.02, 0.06, len(modes)) * rng.choice([-1, 1], len(modes))
+    moved = {f"phases.0.distortion_modes.modes.{m}.amplitude": float(a) for m, a in enumerate(amps)}
+    moved["phases.0.parent_cell.strain.0"] = 2e-3
+
+    def y(axis, values):
+        po = PreferredOrientation(axis=axis, r=P_(value=0.8, vary=False, min=0.05))
+        ref = rx.Refinement(Structure(phases=[child.model_copy(
+            update={"preferred_orientation": po}, deep=True)]), neutron(), history=False)
+        if values:
+            ref.set_values(values)
+        return np.asarray(ref.predict(tt))
+
+    def gap(a1, a2, values):
+        y1 = y(a1, values)
+        return float(np.max(np.abs(y1 - y(a2, values))) / y1.max())
+
+    assert gap((1, 1, 1), (1, 0, 1), moved) < 1e-12
+    assert gap((1, 1, 1), (1, 1, -1), {}) < 1e-12            # parent-related at the parent
+    assert gap((1, 1, 1), (1, 1, -1), moved) > 1e-3          # and only there
+    assert gap((1, 1, 1), (1, 2, 1), moved) > 1e-3

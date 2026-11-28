@@ -140,6 +140,24 @@ rule above applies to the form factors.
 
 ### Inherited
 
+- **2026-11-28, from the issue triage (#1832, a bug): `magnetic_supercell` refuses
+  a parent with a co-occupied site and blames the cell transform.** Mn₃ReO₆ in
+  `P 1 21/n 1` (10 K deposit, doi:10.7488/ds/1359) has Re1 (Re, occ 0.817) and
+  Reb (Mn, occ 0.183) at one position, (0, ½, 0). With MAGNDATA 0.551's own
+  transform `2a,2b,c;0,0,0`, the call raises "one orbit … joins atoms from more
+  than one parent site ([5, 6]) … which means the cell transform is wrong".
+  Checked at `02341ffdb`: in `crystallography/magnetic/supercell.py`,
+  `_partition_into_child_orbits` (`:902`) merges the child images of the two
+  co-located atoms through `_same_site`, and the parent-index test (`:936-942`)
+  then fires. The reporter says the same call passes with Reb removed; not
+  re-run here. Co-sited magnetic atoms are already a ruled case elsewhere on
+  this path (WP-1418's 2026-11-19 entry, #1692: the support test reads
+  Σ occ·f·m). The reporter offers two fixes: carry the mixed site through, so
+  each species keeps its own child atoms at the shared positions, or refuse
+  with a message naming the co-occupied site. Which one is a magnetic-path
+  design call, so it is Mike's under #1075. It goes to him on the issue and is
+  not ruled here. Either way the message stops naming the transform for a
+  case the transform did not cause.
 - **From WP-2060 (2026-11-07, PR #1459): an angle's unasked interval can come from a fit that
   missed its minimum, and nothing says so.** Mike's ruling on #1075 withholds a flagged site's
   *modulus* profile when its refits find the data χ² a whole cut or more below the fit; the
@@ -207,24 +225,17 @@ rule above applies to the form factors.
   they were measured on one synthetic ramp, one two-pattern pair and one real k ≠ 0 ramp
   (PR #1073), and the bracket-folding rule changed after they landed (#589); then drop
   the prose sentence.
-
-- **From WP-2010 (2026-11-02, repair of its 2026-11-01 work): the report sentence below
-  is reversed.** The maintainer ruled on 2026-11-01 (#1288) that the fit report carries
-  no validation verdict either, since an agent reads it between stages while choosing
-  what to free. So nothing a caller reads says the moment has no independent
-  measurement, and there is no wording for this WP to adopt; the record stays in the
-  validation matrix and `docs/VALIDATION.md`. The verify/validate half of the note below
-  still holds.
-- **From WP-2010 (2026-10-27): the magnetic "not yet validated" label became a report
-  sentence, and a published moment would verify, not validate.** The maintainer ruled
-  that the validation record is for the developers (DESIGN.md § Rules, 2, narrowed that
-  day): no help entry or `capabilities()` arm says a feature is unvalidated. What a
-  caller sees instead is one sentence in the fit report beside a moment, saying the
-  package's moment has no independent measurement, read from 2010's feature registry. A
-  published moment refined from the same pattern verifies the code; an independently
-  measured moment (magnetometry, a single-crystal experiment) would validate it. The
-  2026-10-19 note below describes the label as first proposed; 2010's task list
-  carries the wording change for this file.
+- **From WP-2010 (2026-10-27, revised 2026-11-01): the magnetic "not yet validated" state
+  lives only in the validation record, and a published moment would verify, not
+  validate.** The maintainer ruled that the validation record is for the developers
+  (DESIGN.md § Rules, 2, narrowed that day): no help entry, `capabilities()` arm or fit
+  report says a feature is unvalidated. The ruling of 2026-11-01 removed the report
+  sentence this note once expected, on the ground that the report is read between
+  stages and a sentence that depends only on which parameters are free can only prompt
+  changing them. The moment's state is in `docs/VALIDATION.md` § Features, derived from
+  the matrix. A published moment refined from the same pattern verifies the code; an
+  independently measured moment (magnetometry, a single-crystal experiment) would
+  validate it. The 2026-10-19 note below describes the label as first proposed.
 - **From WP-2002 (2026-10-23, 8th session, PR #1113): a joint fit can hold a moment direction its record does not name.** In `MultiHistogramRefinement.fit`, a phase `_rehold_multi` releases is then scanned by `_rehold_flat_moments_multi` (`multi.py` ~852); a direction it finds flat is restored and held in the table, but `held` (~1496) subtracts `released`, so that path is missing from `held` and from `carried_hold`, the next stage does not lift it, and `StageResult.collapsed` is then not a subset of `held`. Found by the lane that added `collapsed`; predates it; a fix may move values.
 - **2026-10-23, from [1326](1326-satellites-without-a-moment.md)'s close: a
   k ≠ 0 moment refined on real data, and the published structure each pattern

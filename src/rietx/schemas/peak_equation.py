@@ -46,10 +46,13 @@ PeakTarget = Literal["lor_fwhm", "gauss_fwhm", "gauss_fwhm_squared", "shift",
 INSTRUMENT_TARGETS = frozenset({"shift"})
 
 #: the names a peak equation binds to the reflection it is evaluated on:
-#: Miller indices, multiplicity, d (Å), the Bragg angle θ in radians, and 2θ in
-#: degrees where the peak sits before the phase's equations act
-REFLECTION_NAMES = ("h", "k", "l", "m", "d", "theta", "two_theta")
-#: the names an instrument-level equation may read
+#: Miller indices, multiplicity, d (Å), the Bragg angle θ in radians, 2θ in
+#: degrees where the peak sits before the phase's equations act, and the
+#: emission line's λ in Å (WP-2152), so each line's image reads its own
+REFLECTION_NAMES = ("h", "k", "l", "m", "d", "theta", "two_theta", "wavelength")
+#: the names an instrument-level equation may read.  ``wavelength`` is not one:
+#: the instrument's shift is also evaluated at angles no emission line owns
+#: (the window the reflections are generated over), so λ has no value there
 INSTRUMENT_NAMES = frozenset({"theta", "two_theta"})
 #: the names a condition may read: integers frozen for the stage, so the
 #: branch a reflection takes cannot change during a solve
@@ -110,8 +113,11 @@ class PeakEquation(Base):
 
     ``expression`` reads the coefficients by name and the reflection through
     ``h``, ``k``, ``l``, ``m`` (multiplicity), ``d`` (Å), ``theta`` (the Bragg
-    angle, radians, so ``tan(theta)`` works) and ``two_theta`` (degrees, where
-    the peak sits before the phase's equations act).  ``orbit_mean(x)``
+    angle, radians, so ``tan(theta)`` works), ``two_theta`` (degrees, where
+    the peak sits before the phase's equations act) and ``wavelength`` (Å, the
+    emission line the peak is drawn at).  ``wavelength`` writes a size term
+    once, as ``y*wavelength/cos(theta)``, for patterns at several wavelengths.
+    ``orbit_mean(x)``
     averages ``x`` over the reflection's Laue orbit, and ``harmonic(l, n)`` is
     the symmetrised spherical harmonic K_l^n of the reflection's direction.  A
     condition inside ``if(...)`` may read only ``h``, ``k``, ``l`` and ``m``,
@@ -253,4 +259,4 @@ def check_level(equations: list[PeakEquation], level: str,
                 f"instrument peak_equations.{i}: the expression reads {what}, "
                 "which belong to a phase's reflections. The instrument's "
                 "equation reads theta and two_theta only; an equation in hkl "
-                "goes on Phase.peak_equations")
+                "or wavelength goes on Phase.peak_equations")

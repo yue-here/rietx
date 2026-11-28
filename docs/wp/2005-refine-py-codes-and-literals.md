@@ -1,6 +1,6 @@
 # WP-2005 — `refine.py`'s codes and its inline literals
 
-Milestone: generality · Status: 🔄 2026-11-17 — part 2: 44 of 75 codes tiered; 31 wait on the maintainer's batch (`2005-batch/batch.md`), PR #1638
+Milestone: generality · Status: 🔄 2026-11-21 — 44 of 75 codes tiered; the other 31 answered in `2005-batch/rulings.md` (9 settled by Claude, 19 consent lines and 1 brief for the maintainer, 2 for Mike), nothing approved yet
 Track: The audits
 Depends on: 2002
 Priority: P3 2026-10-23 — 2002 closed, its last item touching no code here; codes, not actions; a verdict here is a flag the caller reads, and the workaround is to read past it
@@ -106,6 +106,22 @@ its tier.
   `help.py` ~3037 carries the "Raise the lower limit" sentence. The 12/12 and
   3/3 counts are the issue's, not re-run here. The retext is a `suggestion=`
   site, so it goes in this WP's batch to the maintainer.
+- **2026-11-25, from the issue triage (issue #1830): the Le Bail stop record should state the
+  rise it rejected.** On a real neutron pattern Mike's second Le Bail pass raised Rwp from
+  28.6 % to 45.2 %. Pass 1 was kept and `usable` stayed True, under the same
+  `LEBAIL_ALTERNATION_STOPPED` warning a 0.004-point rise gets. He offers three options: an
+  error past a ratio, the rise as a number a caller can threshold, or no change. Checked
+  against the tree at `21c574dc6`: `refine._lebail_stop_diagnostic` makes a non-monotone stop
+  a `warning` with `value` = the kept pass's Rwp, and the per-pass Rwp only in the message.
+  `2005-batch/rulings.md` already settles this code as one `info` record naming why the passes
+  stopped (2026-11-22, checked blind). **Decided 2026-11-25** (settled by Claude under the
+  maintainer's rulings of 2026-11-03 and 2026-11-16, "a field, and the caller decides", and
+  WP-2003 C1's sibling, where a series Rwp fence acts by no default and its ratio rides on
+  `SeriesEntry.rwp_over_median`): the error threshold is declined, because its evidence is an
+  Rwp comparison. When this WP writes the `info` record, the record carries the rejected
+  pass's Rwp beside the kept one's as numbers, so a caller who wants Mike's gate writes it.
+  The kept pass is still the best one the alternation visited. If issue #1828 retires Le Bail
+  as a user mode (WP-2062), this applies wherever the alternation stays.
 
 ## Non-goals
 
@@ -157,6 +173,28 @@ its tier.
 - `docs/milestones/generality.md`; WP-1985; WP-1076 (a declared name is a claim).
 
 ## Handover log
+
+- **2026-11-21** — the batch's 31 codes answered, docs only (ghostshift runner, unattended, a
+  rulings job). The maintainer asked for the clear calls to be ruled and only the hard ones
+  brought to him. `2005-batch/rulings.md` holds the answers. Nine are settled by Claude, most
+  of them by sending a tier-3 threshold back for its three-family measurement before
+  approval. Nineteen wait on him as one-line consent lines, because each changes what a
+  reader receives or needs a tier-3 approval. `HIGH_CORRELATION` has a full brief, because
+  the agent skill's body rule 7 tells an agent to act at 0.98 and the record's judgement
+  ground says a warning needs every refiner to act. The two magnetic codes are Mike's, with a
+  question drafted for #1075. Nothing is approved, and no `src/`, `tests/` or `_audit.py` line
+  changed.
+  *Settled for the next session*: Questions E and F (`rulings.md`). Two premises in
+  `batch.md` were wrong. McCusker et al. (1999) is in the maintainer's Zotero library, and §§
+  2 and 9 confirm 5 steps per FWHM and 3 and 5 observations per parameter. Under
+  `ROUGHNESS_OUTSIDE_REGIME`, half of sin θ_min is the turnover of Pitschke's u(1 − u), so it
+  is not rietx's own number.
+  *Measured*: a correct model of flat Poisson data reads Rwp above `MODEL_FAR_FROM_DATA_RWP`
+  (0.8) below about 0.65 counts per step under √max(y,1) weights (numpy simulation, 2-4 × 10⁵
+  draws per point).
+  Next: the maintainer answers the 19 consent lines and the `HIGH_CORRELATION` brief, and
+  approves posting the question to Mike. Then the next session lands what he approves, runs
+  the measurements the settled rows ask for, and tiers the rows they free.
 
 - **2026-11-17** — part 2, the tiers, in PR #1638 (ghostshift runner, unattended).
   Ruled by Yue, 2026-11-16 (decision walk): run 2005-2007 now under the gate as written.

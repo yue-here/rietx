@@ -50,7 +50,7 @@ ref = rx.Refinement(structure, instrument, backend="numpy", solver="trf")
 `"numpy"` and `"lm"`, a bounded Levenberg-Marquardt, are the defaults.
 `solver="trf"` selects scipy's Trust Region Reflective, the default before 1.8, which reproduces a number measured before then.
 From a poor start it can stop in a basin the default driver leaves ([Solvers](../theory/estimation.md#solvers)).
-An unknown solver raises `ValueError` and an unknown backend `NotImplementedError`.
+An unknown solver or backend raises `ValueError` that names the valid choices.
 A backend whose optional dependency is missing raises `ImportError` with the install command.
 `Capabilities.backends` and `Capabilities.solvers` report what this installation has ([Backends](programs.md#backends)).
 
@@ -312,8 +312,8 @@ The closing stage takes the last declared stage's iteration budget, Le Bail cycl
 It takes the solver's default tolerance, as the last declared stage does.
 `RefinementResult.stages` ends with it under the name `closing`, and `StageResult.window_area_tol` and `NodeAction.window_area_tol` record the fraction.
 A declared stage records `None`, the declared stages' 2 %.
-`compile_model` and `Refinement.predict` evaluate outside a fit at `CLOSING_WINDOW_TOL`, so a synthetic pattern carries near-complete tails.
-Rebuild a fit's own curve with `window_area_tol=recorded_window_tol(result.stages[-1].window_area_tol)` (`rietx.model.forward.recorded_window_tol`).
+`compile_model`, and `Refinement.predict` before a fit, evaluate at `CLOSING_WINDOW_TOL`, so a synthetic pattern carries near-complete tails.
+After a fit, `Refinement.predict` draws the fit's own curve, as `compile_model` does given `window_area_tol=recorded_window_tol(result.stages[-1].window_area_tol)`.
 At any window fraction under the declared stages' 2 %, the axial-divergence asymmetry is sampled at a finer node rule as well.
 So a `closing_window_tol` loosened past 1e-3 loosens the windows alone.
 
@@ -364,14 +364,14 @@ A stage that reaches it ends with status `max_iter` and reports [`STAGE_MAX_ITER
 
 `Stage.seed` and `Stage.strain_seed` both start a parameter away from an exact zero, and they are not interchangeable.
 
-- `Stage.seed` lifts each parameter the stage frees that sits exactly on a lower bound of 0 or above to the given value. A value already above its bound starts where it is, and a parameter that can go negative, such as Caglioti `U` and `V` or the zero shift, is never seeded. The surface-roughness stage seeds at 0.3, because Suortti roughness has no effect at b = 0 and the data see it best near b = 0.2 to 0.5. It is the only shipped stage that seeds. Extinction and the two magnetic widths are freed from 0 with no seed, since each one's column at 0 is its physical one. `StageResult.seeded` lists every row a stage lifted.
+- `Stage.seed` lifts each parameter the stage frees that sits exactly on a lower bound of 0 or above to the given value. A value already above its bound starts where it is, and a parameter that can go negative, such as Caglioti `U` and `V` or the zero shift, is never seeded. The surface-roughness stage seeds at 0.3, because Suortti roughness has no effect at b = 0 and the data see it best near b = 0.2 to 0.5. It is the only built-in stage that seeds. Extinction and the two magnetic widths are freed from 0 with no seed, since each one's column at 0 is its physical one. `StageResult.seeded` lists every row a stage lifted.
 - `Stage.strain_seed` puts a freed, all-zero Stephens block on a small isotropic microstrain, in ppm of ΔM/M. Those coefficients can go negative, so `Stage.seed` does not reach them, and at zero the square root in their width law has unbounded slope.
 
 `Stage.lebail_cycles` caps the Le Bail cycles run before and after each solve, and `Stage.lebail_tol` ends them early ([the stop](../theory/forward-model.md#le-bail-mode)).
 At `0.0` exactly `lebail_cycles` plain cycles run.
 `StageResult.lebail_cycles_run` and `StageResult.lebail_settled` record what ran. A cut in the last stage warns `LEBAIL_CYCLES_AT_CAP`.
 `Stage.restraint_weight_scale` weights the restraints against the data for the stage ([How to restrain a bond length or an angle](../guides/restrain.md)).
-`Stage.window_slack_deg` replaces the default capture margin in °2θ around each reflection's evaluation window.
+`Stage.window_slack_deg` replaces each window's default margin. `StageResult.window_refit_loss` marks a re-solve.
 The indexing Le Bail validation sets it, because it holds a candidate cell fixed and a wrong candidate displaces peaks by whole degrees.
 Leave it unset in ordinary plans.
 
@@ -469,7 +469,7 @@ Both drivers accept a step only when it lowers the cost, so `cost_final` never e
 ### Names that free nothing
 
 `StageResult.freed` is the field to read when a stage did nothing.
-A pattern that matches no parameter is not an error, because that is how the shipped plans reach a component your model may not declare.
+A pattern that matches no parameter is not an error, because that is how the built-in plans reach a component your model may not declare.
 `lab_sample_refine` frees `phases.*.microstrain.dof.*` whether or not a phase carries a Stephens block.
 
 A literal name, with no `*`, `?` or `[`, names one parameter.
@@ -488,7 +488,7 @@ An atom's coordinates refine along the directions its site symmetry allows, as `
 A cubic cell's `b` follows `a`.
 A stage naming such a parameter frees nothing for it, so [`STAGE_PATH_NOT_FREE`](diagnostics-stages.md#stage_path_not_free) reports it at `warning` before the first stage runs, with the names that would free it.
 For an oxygen on 16h in I4<sub>1</sub>/amd, `phases.0.atoms.2.x` is fixed at 0, and `y` and `z` follow `dof.0` and `dof.1`.
-A name you tied yourself is not reported, and neither is an instrument name: the shipped plans name `instrument.geometry.sample_displacement`, which a capillary geometry locks.
+A name you tied yourself is not reported, and neither is an instrument name: the built-in plans name `instrument.geometry.sample_displacement`, which a capillary geometry locks.
 A pattern can reach too far the other way: `phases.0.atoms.2.*` frees the site's `occ` and `biso` beside its directions, so write `phases.0.atoms.2.dof.*` for the position alone.
 
 A joint fit has one more way to do nothing, which is to do it on one histogram only ([How to fit an X-ray and a neutron pattern together](../guides/joint.md)).
