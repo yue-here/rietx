@@ -3071,17 +3071,21 @@ class CompiledModel:
     # analytic Jacobian support
     # ------------------------------------------------------------------
     def structural_f2_grads(self, ip: int, values: dict[str, float],
-                            xyz_atoms=(), u_atoms=()
-                            ) -> tuple[dict[int, np.ndarray], dict[int, np.ndarray]]:
-        """``({j: (N, 3)}, {j: (N, 6)})``: ∂|F_N|²/∂xyz and ∂|F_N|²/∂U^ij of
-        phase ip's atoms (WP-2314).
+                            xyz_atoms=(), u_atoms=(), biso_atoms=(), occ_atoms=()
+                            ) -> tuple[dict[int, np.ndarray], dict[int, np.ndarray],
+                                       dict[int, np.ndarray], dict[int, np.ndarray]]:
+        """``({j: (N, 3)}, {j: (N, 6)}, {j: (N,)}, {j: (N,)})``: ∂|F_N|² by
+        the coordinates, the U^ij, the Biso and the occupancy of phase ip's
+        atoms (WP-2314).
 
         Every atom asked for at once, from one expansion of the structure
         factor (``structure_factor.d_f2_d_sites``), because A is the
         expensive half and every atom's bracket comes from the same terms.
         The caller caches it for one Jacobian evaluation, as it does
-        :meth:`moment_f2_grads`.  Each array is bit-identical to the
-        single-atom kernel's (``tests/test_structural_hoist.py``).
+        :meth:`moment_f2_grads`.  The coordinate and U^ij arrays are
+        bit-identical to the single-atom kernels'
+        (``tests/test_structural_hoist.py``); the Biso and occupancy arrays
+        are held to their exact oracles (``tests/test_biso_occ_columns.py``).
         """
         cp = self.phases[ip]
         cell = tuple(values[f"phases.{ip}.cell.{k}"]
@@ -3089,7 +3093,8 @@ class CompiledModel:
         d = d_spacings(cp.reflections.index, *cell)
         xyz, occ, biso, uaniso, astar = self._site_values(ip, values, cell)
         return d_f2_d_sites(cp.reflections.hkl, d, cp.sites, xyz, occ, biso,
-                            uaniso, astar, xyz_atoms=xyz_atoms, u_atoms=u_atoms)
+                            uaniso, astar, xyz_atoms=xyz_atoms, u_atoms=u_atoms,
+                            biso_atoms=biso_atoms, occ_atoms=occ_atoms)
 
     def coordinate_intensity_grad(self, ip: int, j: int, coeffs: np.ndarray,
                                   values: dict[str, float], f2_grads=None
@@ -3238,6 +3243,31 @@ class CompiledModel:
             return [moved]
         return [[np.zeros_like(col) for col in moved], moved]
 
+    def site_scalar_intensity_grad(self, ip: int, df2: np.ndarray,
+                                   values: dict[str, float]
+                                   ) -> list[np.ndarray] | None:
+        """Per-line ∂intensity for a column moving Biso or occupancy rows of
+        phase ip only (WP-2314).
+
+        ``df2`` is the column's ∂|F_N|², already summed through C over the
+        rows it moves, from :meth:`structural_f2_grads`.  Biso and occupancy
+        enter the intensity through |F_N|² alone, so the chain is the
+        coordinate columns' (:meth:`_f2_derivative_chain`), with the same
+        nuclear mask.  ``None`` where :meth:`structural_grad_supported` says
+        the nuclear derivative is not the whole one (a moment reads both) or
+        outside Rietveld mode, where intensities are extracted.
+        """
+        if self.mode != "rietveld" or not self.structural_grad_supported(ip):
+            return None
+        cp = self.phases[ip]
+        cell = tuple(values[f"phases.{ip}.cell.{k}"]
+                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+        d = d_spacings(cp.reflections.index, *cell)
+        nuc = self._nuclear_mask(ip)
+        if nuc is not None:
+            df2 = df2 * nuc
+        return self._f2_derivative_chain(ip, values, cell, d, df2)
+
     def _structural_intensity_grad(self, ip: int, j: int, coeffs: np.ndarray,
                                    values: dict[str, float], f2_grads, adp: bool
                                    ) -> list[np.ndarray] | None:
@@ -3270,9 +3300,10 @@ class CompiledModel:
         Everything :meth:`phase_peaks` applies after the structure factor, for
         a parameter that moves only |F|²: scale · multiplicity · P · w · Lp ·
         G · absorption · roughness, with G = E + x·dE/dx where extinction is
-        evaluated.  The coordinate and ADP columns reach it with ∂|F_N|², the
-        moment columns (WP-1327) with ∂(p²⟨|F_⊥|²⟩) — both are terms of the
-        one total |F|² that the non-split draw scales and attenuates.
+        evaluated.  The coordinate, ADP, Biso and occupancy columns reach it
+        with ∂|F_N|², the moment columns (WP-1327) with ∂(p²⟨|F_⊥|²⟩) — both
+        are terms of the one total |F|² that the non-split draw scales and
+        attenuates.
 
         ``f2_total`` is that total, when the caller already holds it; it is
         read only where extinction is evaluated, and built here only then —
@@ -3293,13 +3324,13 @@ class CompiledModel:
         if P is not None:
             d_base = d_base * P
         # extinction couples |F|² into the intensity twice (as the prefactor
-        # and through x ∝ |F|²), so a coordinate/ADP move chains through the
-        # factor G = E + x·dE/dx (see model/extinction.py) — at ext=0, x=0
-        # makes G exactly 1 (purity (b)), so the stage that cannot move ext off
-        # zero skips it exactly as ``phase_peaks`` does, and every other stage
-        # applies it unconditionally.  Only these pure-analytic columns need it
-        # explicitly; the scale/occ/biso/cell/extinction columns pick it up
-        # from the FD-of-phase_peaks chain.
+        # and through x ∝ |F|²), so a coordinate, ADP, Biso or occupancy move
+        # chains through the factor G = E + x·dE/dx (see model/extinction.py)
+        # — at ext=0, x=0 makes G exactly 1 (purity (b)), so the stage that
+        # cannot move ext off zero skips it exactly as ``phase_peaks`` does,
+        # and every other stage applies it unconditionally.  Only these
+        # pure-analytic columns need it explicitly; the scale/cell/extinction
+        # columns pick it up from the FD-of-phase_peaks chain.
         ext = values.get(f"phases.{ip}.extinction", 0.0)
         # the extinction variable x is built from the whole reflection, so the
         # magnetic term belongs in it exactly as it does in ``phase_peaks``
