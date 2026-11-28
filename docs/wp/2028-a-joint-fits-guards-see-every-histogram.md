@@ -217,7 +217,11 @@ that caveat until 1421 lands.
 ## Non-goals
 
 - The joint fit's compile at the answer (the #272 sibling): WP-1421.
-- The report's cost, and `stage_reports=` on a joint fit: WP-1335.
+- `stage_reports=` on a joint fit (2026-11-24): not built, and nothing is filed for it.
+  The cost of a report was WP-1335's, closed 2026-11-03 with the cut stopping at about a
+  third. The option reopens when a user or an agent asks for a joint fit's stage
+  trajectory. Ground: DESIGN-RULES Rule 5, Direction (nothing is built before a case needs
+  it). WP-1335's close entry says the same.
 - Tiering the single fit's report gates: WP-2004, which touches no joint-fit
   code.
 - Issue #442 (`unreached_histograms`), which the maintainer tied to the TOF
