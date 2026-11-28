@@ -1426,6 +1426,7 @@ def _close(trial: MagneticTrial, data, limits, mask) -> MagneticTrial:
                            window_area_tol=plan.closing_window_tol,
                            correlation_guard=plan.correlation_guard,
                            phase_support_sigma=plan.phase_support_sigma,
+                           shift_over_esd_tol=plan.shift_over_esd_tol,
                            telemetry=False)
     moments, _n, _pairs = _moment_rows(ref, result, ref.fitted_structure)
     # measured on the moments it is reported beside, where the trial took one

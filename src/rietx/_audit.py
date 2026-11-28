@@ -3063,6 +3063,15 @@ ROWS: tuple[Row, ...] = (
                  "converges when a closing stage follows it (WP-2045 option 5, ruled "
                  "2026-10-24)."),
         approved="2026-11-01"),
+    Row("rietx.schemas.results.StageResult.shift_over_esd_tol", "action", tier=2, ambiguity=1,
+        evidence=("the record of the shift test PlanSpec:shift_over_esd_tol and "
+                  "run_stage:shift_over_esd_tol run (those rows' evidence), written by the "
+                  "three stage runners on every stage, None where the stage stopped on its "
+                  "ftol alone; termination reads shift_over_esd where the test ended the solve"),
+        grounds=("Records the action rather than taking one, for StageResult.ftol's reason: "
+                 "a consumer comparing two fits needs to know how each was converged, and a "
+                 "cherry-pick replays the recorded stop (R6, ruled 2026-11-27)."),
+        approved="2026-11-27"),
     Row("rietx.schemas.results.StageResult.window_area_tol", "action", tier=2, ambiguity=1,
         evidence=("the record of the closing stage PlanSpec:closing_window_tol runs (that "
                   "row's evidence: BGMN's closing run by default), written by both stage "
@@ -6570,6 +6579,18 @@ ROWS: tuple[Row, ...] = (
                  "floors'; B9, no chosen limit on a quantity that stays physical); the far bound and "
                  "the ceiling are TCHZ_CEILING_DEG's (the sixth round's Q7, ruled 2026-10-21)."),
         approved="2026-10-23"),
+    Row("rietx.schemas.plan.SHIFT_OVER_ESD_TOL", "constant", tier=2, value=0.1,
+        evidence=("McCusker et al. 1999 J. Appl. Cryst. 32, 36-50, 7: a refinement has converged when "
+                  "the largest shift/esd of the final cycle is 0.1 or less, the band "
+                  "optimize.statistics.MAX_SHIFT_CONVERGED quotes (held equal by test); checkCIF "
+                  "raises alert B above 0.10; FullProf stops on shifts under Eps x esd (0.2 or "
+                  "lower) on undamped cycles (docs/practice.md, When a fit stops); read on the "
+                  "undamped Gauss-Newton step, since on the damped one 0.2 and GSAS-II's 1e-3 "
+                  "ended cpd-1f 18 esd off (docs/wp/2317-probe/convnoise/RESULTS.md); against "
+                  "the 1e-9 stop on development data, macOS arm64: CuCr2O4 ramp 363 against 1 293 "
+                  "evaluations, worst 1.2 esd (1 wt% CuO cell), main phase under 0.053; cpd-1 "
+                  "chain 322 against 517, worst 0.071; single fits under 0.06 esd, 0-9 % "
+                  "saved (probe); as shipped, docs/wp/2317-probe/r6/RESULTS.md")),
     Row("rietx.schemas.plan.PlanSpec:stages", "default", tier=1, ambiguity=1, value=(),
         evidence="arithmetic: the empty container; resolve_plan supplies every plan a fit runs"),
     Row("rietx.schemas.plan.PlanSpec:correlation_guard", "default", value=0.98),
@@ -6632,6 +6653,25 @@ ROWS: tuple[Row, ...] = (
                  "sixth round's Q2 default (option 3, 2026-10-21), which stays the opt-in "
                  "at CLOSING_WINDOW_TOL for an answer to publish."),
         approved="2026-11-19"),
+    Row("rietx.schemas.plan.PlanSpec:shift_over_esd_tol", "default", tier=2, ambiguity=1,
+        value=0.1,
+        evidence=("McCusker et al. 1999 J. Appl. Cryst. 32, 36-50, 7: a refinement has converged when "
+                  "the largest shift/esd of the final cycle is 0.1 or less, the band "
+                  "optimize.statistics.MAX_SHIFT_CONVERGED quotes (held equal by test); checkCIF "
+                  "raises alert B above 0.10; FullProf stops on shifts under Eps x esd (0.2 or "
+                  "lower) on undamped cycles (docs/practice.md, When a fit stops); read on the "
+                  "undamped Gauss-Newton step, since on the damped one 0.2 and GSAS-II's 1e-3 "
+                  "ended cpd-1f 18 esd off (docs/wp/2317-probe/convnoise/RESULTS.md); against "
+                  "the 1e-9 stop on development data, macOS arm64: CuCr2O4 ramp 363 against 1 293 "
+                  "evaluations, worst 1.2 esd (1 wt% CuO cell), main phase under 0.053; cpd-1 "
+                  "chain 322 against 517, worst 0.071; single fits under 0.06 esd, 0-9 % "
+                  "saved (probe); as shipped, docs/wp/2317-probe/r6/RESULTS.md"),
+        grounds=("Rule 5 Arithmetic accuracy: the accuracy other programs' users publish, read in "
+                 "each quantity's esd; R6 ruled 2026-11-27 ('Start with your recommendation. "
+                 "Consider best practice.'), the level re-settled by Claude the same day under "
+                 "R0 clarified; None in WP-2222's three compounding places (lab_calibrate, a "
+                 "carried Pawley series, the guides that publish numbers)."),
+        approved="2026-11-27"),
     Row("rietx.schemas.plan.PlanSpec:lebail_passes", "default", tier="caller", ambiguity=1, value=1,
         evidence="opt-in: lebail_passes > 1, default 1 (one run, bit-identical to pre-WP-1323)"),
     Row("rietx.schemas.plan.PlanSpec:phase_support_sigma", "default", tier=3, ambiguity=1, value=3.0,
@@ -6862,6 +6902,15 @@ ROWS: tuple[Row, ...] = (
                  "so the 3 sigma is rietx's own, a caller sets another or None for off (B1, "
                  "ruled 2026-10-19)."),
         approved="2026-10-19"),
+    Row("rietx.refine.Refinement.run_stage:shift_over_esd_tol", "default", tier=2, ambiguity=1,
+        value=0.1,
+        evidence=("SHIFT_OVER_ESD_TOL's row; a stage run by hand is its own answer, so it "
+                  "stops where a plan's last stage stops; a stage declaring its own ftol "
+                  "stops on that alone, and cherry_pick passes a node's recorded value "
+                  "(None for a node written before the field)"),
+        grounds=("run_stage:window_area_tol's grounds: a stage driven by hand costs what the "
+                 "same stage in a plan costs (WP-2222); R6 ruled 2026-11-27."),
+        approved="2026-11-27"),
     Row("rietx.refine.Refinement.run_stage:events", "default", tier="invariant", ambiguity=1, value=None,
         evidence=("answer-invariant: an observation channel; "
                   "tests/test_answer_invariant_defaults.py asserts the answer bit-identical with it"

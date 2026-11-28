@@ -220,10 +220,13 @@ def profile_fraction(refinement, data, phase: int | str, *,
                 try:
                     trial.set_values({axis: value})
                     # under the plan settings the caller's fit ran with
-                    # (``Refinement._plan_settings``, WP-2002 B1)
+                    # (``Refinement._plan_settings``, WP-2002 B1), stopped on
+                    # the solver's 1e-9 as an interval refit is (WP-2317):
+                    # a profile compares χ² between refits
                     r = trial.run_stage(data, Stage(f"profile:{axis}", []),
                                         telemetry=False,
-                                        **trial._plan_settings)
+                                        **{**trial._plan_settings,
+                                           "shift_over_esd_tol": None})
                 except Exception as exc:  # an unmeasurable point, not a crash
                     points.append(FractionProfilePoint(**point, error=str(exc)))
                     continue

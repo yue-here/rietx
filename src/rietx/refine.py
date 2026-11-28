@@ -2733,10 +2733,13 @@ class Refinement:
         #: closing stage's (WP-2002, the sixth round's Q1 and Q2): a trial that
         #: compares its χ² with the fit's must compile the same windows, since
         #: the 2 % and 0.1 % windows of one answer differ by 37-1730 in χ².
+        #: ``shift_over_esd_tol`` is the answer stage's shift test (WP-2317), so
+        #: a trial stops as the fit's own last stage did.
         self._plan_settings: dict[str, float | None] = {
             "correlation_guard": CORRELATION_GUARD,
             "phase_support_sigma": PHASE_SUPPORT_SIGMA,
-            "window_area_tol": None}
+            "window_area_tol": None,
+            "shift_over_esd_tol": SHIFT_OVER_ESD_TOL}
 
         # history state
         self.history: RefinementTree | None = None
@@ -6465,7 +6468,8 @@ class Refinement:
                 # run_stage, whose None is the closing fraction, so a plan with
                 # closing_window_tol=None would refit at 0.1 % windows against
                 # a χ² measured at the declared 2 %
-                "window_area_tol": recorded_window_tol(plan.stage_window_tols()[-1])}
+                "window_area_tol": recorded_window_tol(plan.stage_window_tols()[-1]),
+                "shift_over_esd_tol": plan.shift_over_esd_tol}
             _apply_esds(table, self.result_, self.structure, self.instrument)
             self._answer_covariance = (self.result_, table, outcome.theta,
                                        outcome.stderr_internal,
@@ -7127,7 +7131,8 @@ class Refinement:
             self._fit_pattern = data
             self._plan_settings = {"correlation_guard": correlation_guard,
                                    "phase_support_sigma": phase_support_sigma,
-                                   "window_area_tol": window_area_tol}
+                                   "window_area_tol": window_area_tol,
+                                   "shift_over_esd_tol": shift_over_esd_tol}
             _apply_esds(table, self.result_, self.structure, self.instrument)
             self._answer_covariance = (self.result_, table, outcome.theta,
                                        outcome.stderr_internal,
