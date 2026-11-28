@@ -8282,7 +8282,7 @@ def _guard_diagnostics(guard) -> list[Diagnostic]:
             message=f"The background can reproduce most of {msg}.",
             suggestion="Stiffen the background (fewer Chebyshev terms, a "
                        "larger P-spline lambda_smooth, coarser knots), or hold "
-                       "an estimated curve additively.",
+                       "a measured blank additively.",
         ))
     for finding in guard.roughness_correlations:
         msg = str(finding)
