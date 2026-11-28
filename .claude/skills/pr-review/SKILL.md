@@ -268,9 +268,13 @@ line if the checkpoint ended it. Close with
 4. **Bench and merged tree.** One worktree, one venv; never one per PR.
    - **Read before you execute**: the bench runs the branch's code
      (`uv pip install -e .` runs its build config, pytest imports its
-     `conftest.py`). Read every hunk to `pyproject.toml`, `setup.py`, any
-     `conftest.py`, `.github/**`, `.claude/hooks/**` and `.claude/settings*.json`
-     first; a workflow change is a question for the user, not a finding.
+     `conftest.py`, `npm --prefix gui ci` installs what its lockfile resolves).
+     First read every hunk to a path `triage.jq`'s `execution` matches: the
+     Python build and test config, `.github/**`, `.claude/hooks/**`,
+     `.claude/settings*.json`, and the GUI and docs builds' config, scripts and
+     lockfile (WP-2313). Read a lockfile hunk by property: the packages it adds
+     or moves, a new `hasInstallScript`, a `resolved` host off the registry. A
+     workflow change is a question for the user, not a finding.
      **The rest of `.claude/` is text, not execution** — skills, commands and
      agent definitions are markdown the bench never runs, and treating the whole
      directory as execution-shaped batched three PRs that only sync markdown.

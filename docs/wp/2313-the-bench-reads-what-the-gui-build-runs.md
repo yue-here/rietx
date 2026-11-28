@@ -79,7 +79,7 @@ This is the repo's process machinery and makes no package decision.
 ## Tasks
 
 - [x] List the files the step 5 ladders execute, `gui/` and docs builds included
-- [ ] Widen step 4's list and `triage.jq`'s `execution` pattern together
+- [x] Widen step 4's list and `triage.jq`'s `execution` pattern together
 - [ ] Extend `test_the_triage_rows_carry_what_the_rank_reads` with a `gui/package.json` row
 - [ ] Skill: none. These are the repo's own review commands
 
