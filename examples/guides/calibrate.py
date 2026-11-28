@@ -49,6 +49,7 @@ def refine_sample(profile, data):
     # A size and strain to quote: end with the closing stage, as lab_calibrate does.
     plan = rx.RefinementPlan.lab_sample_refine()
     plan.closing_window_tol = CLOSING_WINDOW_TOL
+    plan.shift_over_esd_tol = None
     return rx.Refinement(ceo2(), instrument).fit(data, plan=plan)
 
 

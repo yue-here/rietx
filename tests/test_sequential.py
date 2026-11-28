@@ -1111,8 +1111,12 @@ def test_the_ladder_stops_at_the_first_rung_that_works(thermal_patterns):
     assert rescued.statistics.rwp == pytest.approx(0.10)
     # no fence fires: the chain was never broken, only re-walked
     assert "SEQUENTIAL_RESEED" not in [d.code for d in series.diagnostics]
-    # both attempts are charged to the pattern (the n_iterations contract)
-    assert rescued.n_iterations > series[0].n_iterations
+    # both attempts are charged to the pattern (the n_iterations contract):
+    # more than the kept attempt's own stages.  Read against pattern 0's cold
+    # fit until WP-2317 R6, whose shift test makes each warm attempt cost 6
+    # iterations to the cold fit's 12 (2026-11-28)
+    kept = sum(s.n_iterations for s in runner.results_[1].stages)
+    assert rescued.n_iterations > kept
 
 
 def test_the_cold_rung_is_reached_only_when_the_warm_ones_fail(thermal_patterns):

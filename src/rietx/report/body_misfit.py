@@ -372,6 +372,8 @@ def _fit(ref, structure, data, globs, max_iter, drop=None, ties=None):
                         # (``Refinement._plan_settings``, WP-2002 B1)
                         correlation_guard=trial._plan_settings["correlation_guard"],
                         phase_support_sigma=trial._plan_settings["phase_support_sigma"],
+                        # and its last stage's stop (WP-2317 R6)
+                        shift_over_esd_tol=trial._plan_settings["shift_over_esd_tol"],
                         # and no closing stage: the two arms are compared with
                         # each other, never with the fit, so their windows need
                         # only agree, and a trial the package discards pays for

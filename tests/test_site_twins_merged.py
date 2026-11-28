@@ -1603,7 +1603,12 @@ def test_a_hook_tie_on_a_renumbered_sites_dof_is_reanchored_not_added_twice(pbso
     # divergence as a rejection in this test.
     monkeypatch.setattr(sequential, "_rejected",
                         lambda fit: fit.status == "diverged")
-    plan = RefinementPlan(stages=[Stage("dz", ["vars.*"], max_iter=8)])
+    # At Rwp 0.999 χ²_red is 4.1e4, so dz's esd reads 13 against the 0.022
+    # the old stop moves it, and the shift test stops at its first iteration
+    # with z unmoved.  The re-anchor needs a fit that moves z, so this
+    # fixture keeps the old stop (WP-2317 R6)
+    plan = RefinementPlan(stages=[Stage("dz", ["vars.*"], max_iter=8)],
+                          shift_over_esd_tol=None)
     series = SequentialRefinement(start, INSTRUMENT).fit(
         [data, data], plan=plan, prepare=prepare, constrain=constrain)
     assert series[1].seeded_from == 0

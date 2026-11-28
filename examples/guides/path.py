@@ -15,9 +15,11 @@ from _lab6_ramp import TEMPERATURES, TRUE_A, ramp, simulate, starting_model
 import rietx as rx
 from rietx.schemas.plan import CLOSING_WINDOW_TOL
 
-# Each pattern's fit ends with the closing stage, for an answer to publish.
+# Each pattern's fit ends with the closing stage and the solver's tight stop,
+# for an answer to publish.
 plan = rx.RefinementPlan.mccusker_default()
 plan.closing_window_tol = CLOSING_WINDOW_TOL
+plan.shift_over_esd_tol = None
 patterns = ramp()
 series = rx.refine_sequential(patterns, *starting_model(), plan=plan,
                               x=TEMPERATURES, x_label="T (K)", direction="both")

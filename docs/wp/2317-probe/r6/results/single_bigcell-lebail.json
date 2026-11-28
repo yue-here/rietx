@@ -1,0 +1,520 @@
+{
+ "platform": "Darwin arm64",
+ "python": "3.12.10",
+ "rietx": "1.13.0.dev0",
+ "venv": "/Users/yue/Code/rietx/.claude/worktrees/agent-a49d976a006c74f97/.venv",
+ "summary": {
+  "key": "bigcell-lebail",
+  "worst_esd": 0.01538083268544621,
+  "worst_at": "phases.0.cell.a",
+  "nfev": {
+   "tight": [
+    26,
+    26
+   ],
+   "shipped": [
+    23,
+    23
+   ]
+  },
+  "njev": {
+   "tight": [
+    29,
+    29
+   ],
+   "shipped": [
+    25,
+    25
+   ]
+  },
+  "wall_s": {
+   "tight": [
+    39.99,
+    37.6
+   ],
+   "shipped": [
+    38.78,
+    34.26
+   ]
+  },
+  "shipped_terminations": [
+   "shift_over_esd"
+  ],
+  "last_stage": {
+   "tight": {
+    "name": "profile",
+    "n_iterations": 6,
+    "termination": "exhausted_fp64",
+    "shift_over_esd_tol": null
+   },
+   "shipped": {
+    "name": "profile",
+    "n_iterations": 3,
+    "termination": "shift_over_esd",
+    "shift_over_esd_tol": 0.1
+   }
+  },
+  "rwp": {
+   "tight": 0.03714156805146765,
+   "shipped": 0.03714473343503047
+  }
+ },
+ "runs": [
+  {
+   "arm": "tight",
+   "wall_s": 39.99003695813008,
+   "nfev": 26,
+   "njev": 29,
+   "n_solves": 5,
+   "terminations": [],
+   "rwp": 0.03714156805146765,
+   "last_stage": {
+    "name": "profile",
+    "n_iterations": 6,
+    "termination": "exhausted_fp64",
+    "shift_over_esd_tol": null
+   },
+   "values": {
+    "phases.0.cell.a": [
+     12.197585088616206,
+     0.00020530072485952587
+    ],
+    "phases.0.cell.b": [
+     36.753769958790365,
+     0.0007120584574586991
+    ],
+    "phases.0.cell.c": [
+     3.951841053665784,
+     6.430259999159518e-05
+    ],
+    "instrument.zero_shift": [
+     -0.003729237363444879,
+     0.0005177972168607554
+    ],
+    "instrument.profile.u": [
+     0.015222162830197023,
+     0.003812260171380779
+    ],
+    "instrument.profile.v": [
+     -0.012091394015351855,
+     0.0038064329084269767
+    ],
+    "instrument.profile.w": [
+     0.01141113143843371,
+     0.0008830472519797567
+    ],
+    "instrument.profile.x": [
+     0.02739061327625177,
+     0.002077563087987892
+    ],
+    "instrument.profile.y": [
+     -0.03520335023369327,
+     0.006444441082464329
+    ],
+    "instrument.background.c0": [
+     905.737458254285,
+     1.9004339954016904
+    ],
+    "instrument.background.c1": [
+     14.08850667756406,
+     3.256123368483573
+    ],
+    "instrument.background.c2": [
+     -14.60439223717357,
+     3.1603357543232766
+    ],
+    "instrument.background.c3": [
+     18.577000858705603,
+     3.0013544269249723
+    ],
+    "instrument.background.c4": [
+     -12.554726561457395,
+     2.9679393082478227
+    ],
+    "instrument.background.c5": [
+     7.079796234279283,
+     2.887651046375924
+    ],
+    "instrument.background.c6": [
+     -2.8431773372622255,
+     2.890262479972585
+    ],
+    "instrument.background.c7": [
+     7.4937598729593295,
+     2.7654749109985826
+    ],
+    "instrument.background.c8": [
+     -12.907526265069338,
+     2.7262712687408177
+    ],
+    "instrument.background.c9": [
+     15.83664202904627,
+     2.618734405642836
+    ],
+    "instrument.background.c10": [
+     -9.158983306480426,
+     2.6018157614613533
+    ],
+    "instrument.background.c11": [
+     5.867765032296574,
+     2.4522946419836074
+    ],
+    "instrument.background.c12": [
+     -3.104562871370295,
+     2.4768201019407106
+    ],
+    "instrument.background.c13": [
+     -1.2499087330868353,
+     2.278287336710484
+    ],
+    "instrument.background.c14": [
+     -2.7073480067432167,
+     2.2815661326375674
+    ]
+   }
+  },
+  {
+   "arm": "shipped",
+   "wall_s": 38.781349499942735,
+   "nfev": 23,
+   "njev": 25,
+   "n_solves": 5,
+   "terminations": [
+    "shift_over_esd"
+   ],
+   "rwp": 0.03714473343503047,
+   "last_stage": {
+    "name": "profile",
+    "n_iterations": 3,
+    "termination": "shift_over_esd",
+    "shift_over_esd_tol": 0.1
+   },
+   "values": {
+    "phases.0.cell.a": [
+     12.197588246312305,
+     0.0002053177726242032
+    ],
+    "phases.0.cell.b": [
+     36.75377247165678,
+     0.0007121218000324895
+    ],
+    "phases.0.cell.c": [
+     3.9518412663786053,
+     6.430481848680962e-05
+    ],
+    "instrument.zero_shift": [
+     -0.00372800091620359,
+     0.0005177877538652893
+    ],
+    "instrument.profile.u": [
+     0.015183843269647251,
+     0.0038128515380818815
+    ],
+    "instrument.profile.v": [
+     -0.012049405072078214,
+     0.00380744277158699
+    ],
+    "instrument.profile.w": [
+     0.011408409684879516,
+     0.0008831931312003158
+    ],
+    "instrument.profile.x": [
+     0.027387532695273525,
+     0.0020775358407516954
+    ],
+    "instrument.profile.y": [
+     -0.035229789581408016,
+     0.006444389751690941
+    ],
+    "instrument.background.c0": [
+     905.738865800157,
+     1.9003634790138995
+    ],
+    "instrument.background.c1": [
+     14.086930804393765,
+     3.2559971442713005
+    ],
+    "instrument.background.c2": [
+     -14.604449768124502,
+     3.1602154546067367
+    ],
+    "instrument.background.c3": [
+     18.57724167737478,
+     3.0012364525964936
+    ],
+    "instrument.background.c4": [
+     -12.554655742067231,
+     2.9678235272244455
+    ],
+    "instrument.background.c5": [
+     7.078266180500761,
+     2.8875391184120303
+    ],
+    "instrument.background.c6": [
+     -2.8415283715252952,
+     2.8901526028216593
+    ],
+    "instrument.background.c7": [
+     7.492678635725723,
+     2.765367553381772
+    ],
+    "instrument.background.c8": [
+     -12.90703771452028,
+     2.7261666721314084
+    ],
+    "instrument.background.c9": [
+     15.836947234609525,
+     2.618631735050321
+    ],
+    "instrument.background.c10": [
+     -9.158552438444909,
+     2.6017153438692078
+    ],
+    "instrument.background.c11": [
+     5.8672377606200055,
+     2.4521988355174393
+    ],
+    "instrument.background.c12": [
+     -3.103544660403617,
+     2.4767244376057134
+    ],
+    "instrument.background.c13": [
+     -1.2504203219096626,
+     2.278198216947405
+    ],
+    "instrument.background.c14": [
+     -2.7057287223920254,
+     2.281477076819472
+    ]
+   }
+  },
+  {
+   "arm": "tight",
+   "wall_s": 37.604011917021126,
+   "nfev": 26,
+   "njev": 29,
+   "n_solves": 5,
+   "terminations": [],
+   "rwp": 0.03714156805146765,
+   "last_stage": {
+    "name": "profile",
+    "n_iterations": 6,
+    "termination": "exhausted_fp64",
+    "shift_over_esd_tol": null
+   },
+   "values": {
+    "phases.0.cell.a": [
+     12.197585088616206,
+     0.00020530072485952587
+    ],
+    "phases.0.cell.b": [
+     36.753769958790365,
+     0.0007120584574586991
+    ],
+    "phases.0.cell.c": [
+     3.951841053665784,
+     6.430259999159518e-05
+    ],
+    "instrument.zero_shift": [
+     -0.003729237363444879,
+     0.0005177972168607554
+    ],
+    "instrument.profile.u": [
+     0.015222162830197023,
+     0.003812260171380779
+    ],
+    "instrument.profile.v": [
+     -0.012091394015351855,
+     0.0038064329084269767
+    ],
+    "instrument.profile.w": [
+     0.01141113143843371,
+     0.0008830472519797567
+    ],
+    "instrument.profile.x": [
+     0.02739061327625177,
+     0.002077563087987892
+    ],
+    "instrument.profile.y": [
+     -0.03520335023369327,
+     0.006444441082464329
+    ],
+    "instrument.background.c0": [
+     905.737458254285,
+     1.9004339954016904
+    ],
+    "instrument.background.c1": [
+     14.08850667756406,
+     3.256123368483573
+    ],
+    "instrument.background.c2": [
+     -14.60439223717357,
+     3.1603357543232766
+    ],
+    "instrument.background.c3": [
+     18.577000858705603,
+     3.0013544269249723
+    ],
+    "instrument.background.c4": [
+     -12.554726561457395,
+     2.9679393082478227
+    ],
+    "instrument.background.c5": [
+     7.079796234279283,
+     2.887651046375924
+    ],
+    "instrument.background.c6": [
+     -2.8431773372622255,
+     2.890262479972585
+    ],
+    "instrument.background.c7": [
+     7.4937598729593295,
+     2.7654749109985826
+    ],
+    "instrument.background.c8": [
+     -12.907526265069338,
+     2.7262712687408177
+    ],
+    "instrument.background.c9": [
+     15.83664202904627,
+     2.618734405642836
+    ],
+    "instrument.background.c10": [
+     -9.158983306480426,
+     2.6018157614613533
+    ],
+    "instrument.background.c11": [
+     5.867765032296574,
+     2.4522946419836074
+    ],
+    "instrument.background.c12": [
+     -3.104562871370295,
+     2.4768201019407106
+    ],
+    "instrument.background.c13": [
+     -1.2499087330868353,
+     2.278287336710484
+    ],
+    "instrument.background.c14": [
+     -2.7073480067432167,
+     2.2815661326375674
+    ]
+   }
+  },
+  {
+   "arm": "shipped",
+   "wall_s": 34.2584842920769,
+   "nfev": 23,
+   "njev": 25,
+   "n_solves": 5,
+   "terminations": [
+    "shift_over_esd"
+   ],
+   "rwp": 0.03714473343503047,
+   "last_stage": {
+    "name": "profile",
+    "n_iterations": 3,
+    "termination": "shift_over_esd",
+    "shift_over_esd_tol": 0.1
+   },
+   "values": {
+    "phases.0.cell.a": [
+     12.197588246312305,
+     0.0002053177726242032
+    ],
+    "phases.0.cell.b": [
+     36.75377247165678,
+     0.0007121218000324895
+    ],
+    "phases.0.cell.c": [
+     3.9518412663786053,
+     6.430481848680962e-05
+    ],
+    "instrument.zero_shift": [
+     -0.00372800091620359,
+     0.0005177877538652893
+    ],
+    "instrument.profile.u": [
+     0.015183843269647251,
+     0.0038128515380818815
+    ],
+    "instrument.profile.v": [
+     -0.012049405072078214,
+     0.00380744277158699
+    ],
+    "instrument.profile.w": [
+     0.011408409684879516,
+     0.0008831931312003158
+    ],
+    "instrument.profile.x": [
+     0.027387532695273525,
+     0.0020775358407516954
+    ],
+    "instrument.profile.y": [
+     -0.035229789581408016,
+     0.006444389751690941
+    ],
+    "instrument.background.c0": [
+     905.738865800157,
+     1.9003634790138995
+    ],
+    "instrument.background.c1": [
+     14.086930804393765,
+     3.2559971442713005
+    ],
+    "instrument.background.c2": [
+     -14.604449768124502,
+     3.1602154546067367
+    ],
+    "instrument.background.c3": [
+     18.57724167737478,
+     3.0012364525964936
+    ],
+    "instrument.background.c4": [
+     -12.554655742067231,
+     2.9678235272244455
+    ],
+    "instrument.background.c5": [
+     7.078266180500761,
+     2.8875391184120303
+    ],
+    "instrument.background.c6": [
+     -2.8415283715252952,
+     2.8901526028216593
+    ],
+    "instrument.background.c7": [
+     7.492678635725723,
+     2.765367553381772
+    ],
+    "instrument.background.c8": [
+     -12.90703771452028,
+     2.7261666721314084
+    ],
+    "instrument.background.c9": [
+     15.836947234609525,
+     2.618631735050321
+    ],
+    "instrument.background.c10": [
+     -9.158552438444909,
+     2.6017153438692078
+    ],
+    "instrument.background.c11": [
+     5.8672377606200055,
+     2.4521988355174393
+    ],
+    "instrument.background.c12": [
+     -3.103544660403617,
+     2.4767244376057134
+    ],
+    "instrument.background.c13": [
+     -1.2504203219096626,
+     2.278198216947405
+    ],
+    "instrument.background.c14": [
+     -2.7057287223920254,
+     2.281477076819472
+    ]
+   }
+  }
+ ]
+}

@@ -328,7 +328,10 @@ def _free_paths(result) -> list[str]:
 def _fit_one_stage(ref, data, free: Iterable[str], *, mode, limits, name: str):
     from ..strategy.staged import RefinementPlan, Stage
 
-    plan = RefinementPlan(stages=[Stage(name=name, turn_on=list(free))])
+    # the caller's fit's last-stage stop (``Refinement._plan_settings``,
+    # WP-2317 R6): the row reads this refit against that fit
+    plan = RefinementPlan(stages=[Stage(name=name, turn_on=list(free))],
+                          shift_over_esd_tol=ref._plan_settings["shift_over_esd_tol"])
     return ref.fit(data, mode=mode, plan=plan, two_theta_limits=limits, telemetry=False)
 
 

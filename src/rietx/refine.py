@@ -174,9 +174,11 @@ from .schemas.interval import PARAMETER_INTERVAL_LEVEL, PARAMETER_INTERVAL_MAX_R
 from .schemas.params import ParameterRow, TieSpec
 from .schemas.pattern import PatternData, require_two_theta
 from .schemas.plan import (
+    SHIFT_OVER_ESD_TOL,
     PlanSpec,
     check_closing_window_tol,
     check_phase_support_sigma,
+    check_shift_over_esd_tol,
 )
 from .schemas.results import (
     DELIVERABLES,
@@ -2767,10 +2769,13 @@ class Refinement:
         #: closing stage's (WP-2002, the sixth round's Q1 and Q2): a trial that
         #: compares its χ² with the fit's must compile the same windows, since
         #: the 2 % and 0.1 % windows of one answer differ by 37-1730 in χ².
+        #: ``shift_over_esd_tol`` is the answer stage's shift test (WP-2317), so
+        #: a trial stops as the fit's own last stage did.
         self._plan_settings: dict[str, float | None] = {
             "correlation_guard": CORRELATION_GUARD,
             "phase_support_sigma": PHASE_SUPPORT_SIGMA,
-            "window_area_tol": None}
+            "window_area_tol": None,
+            "shift_over_esd_tol": SHIFT_OVER_ESD_TOL}
 
         # history state
         self.history: RefinementTree | None = None
@@ -5118,7 +5123,9 @@ class Refinement:
             phase_support_sigma=node.action.phase_support_sigma,
             # a declared stage's record says None and ran at the declared 2 %,
             # which run_stage's own None is again since WP-2222
-            window_area_tol=recorded_window_tol(node.action.window_area_tol))
+            window_area_tol=recorded_window_tol(node.action.window_area_tol),
+            # None for a node written before the field: its ftol alone
+            shift_over_esd_tol=node.action.shift_over_esd_tol)
 
     # ------------------------------------------------------------------
     # fitting
@@ -5218,6 +5225,7 @@ class Refinement:
                    correlation_guard: float, events=None, cancel=None,
                    stage_index: int = 1, n_stages: int = 1,
                    ftol: float | None = None,
+                   shift_tol: float | None = None,
                    prior_significance: np.ndarray | None = None,
                    phase_support_sigma: float | None = PHASE_SUPPORT_SIGMA,
                    window_area_tol: float | None = None,
@@ -5246,7 +5254,8 @@ class Refinement:
         """
         kw = dict(correlation_guard=correlation_guard, events=events,
                   cancel=cancel, stage_index=stage_index, n_stages=n_stages,
-                  ftol=ftol, phase_support_sigma=phase_support_sigma,
+                  ftol=ftol, shift_tol=shift_tol,
+                  phase_support_sigma=phase_support_sigma,
                   window_area_tol=window_area_tol,
                   later_stages=later_stages)
         # where the stage found the model, for the test below
@@ -5332,6 +5341,7 @@ class Refinement:
                      correlation_guard: float, events=None, cancel=None,
                      stage_index: int = 1, n_stages: int = 1,
                      ftol: float | None = None,
+                     shift_tol: float | None = None,
                      prior_significance: np.ndarray | None = None,
                      phase_support_sigma: float | None = PHASE_SUPPORT_SIGMA,
                      window_area_tol: float | None = None,
@@ -5605,6 +5615,9 @@ class Refinement:
         # RefinementPlan.stage_ftols for a plan, the stage's own for the
         # single-stage verb, which has no plan and therefore no notion of last.
         stage_ftol = {} if ftol is None else {"ftol": ftol}
+        # and the shift test (WP-2317 R6), decided by the same caller
+        if shift_tol is not None:
+            stage_ftol["shift_tol"] = shift_tol
         # what the stage starts from, kept for the collapse case below
         start_values = table.decode(table.x0())
         # and for a solve stopped on a non-finite model (WP-2048): the Pawley
@@ -6608,7 +6621,10 @@ class Refinement:
                 # run_stage, whose None is the closing fraction, so a plan with
                 # closing_window_tol=None would refit at 0.1 % windows against
                 # a χ² measured at the declared 2 %
-                "window_area_tol": recorded_window_tol(plan.stage_window_tols()[-1])}
+                "window_area_tol": recorded_window_tol(plan.stage_window_tols()[-1]),
+                # the test the answer stage ran, not the plan's field: a last
+                # stage declaring its own ftol ran none (WP-2317 R6)
+                "shift_over_esd_tol": plan.stage_shift_tols()[-1]}
             _apply_esds(table, self.result_, self.structure, self.instrument)
             self._answer_covariance = (self.result_, table, outcome.theta,
                                        outcome.stderr_internal,
@@ -6731,6 +6747,11 @@ class Refinement:
         # replays its fixes over (WP-2208, ``staged.fixed_at_end``)
         stages = plan.run_stages(paths=[e.path for e in table.entries])
         ftols = plan.stage_ftols()
+        shift_tols = plan.stage_shift_tols()
+        # only the LM driver runs the test, so a trf stage records none
+        # rather than a test that never ran (WP-2317 R6; WP-1076's rule)
+        if self._solver != "lm":
+            shift_tols = [None] * len(shift_tols)
         window_tols = plan.stage_window_tols()
         # a dataclass validates nothing, so the plan's threshold is checked
         # where it is read, in the words its mirror uses (WP-2002, B1)
@@ -6758,13 +6779,14 @@ class Refinement:
         #: what an earlier stage of this fit left free (the aperture lift's
         #: gate, WP-1955)
         refined_before: set[str] = set()
-        for k, (stage, ftol, window_tol) in enumerate(
-                zip(stages, ftols, window_tols, strict=True), start=1):
+        for k, (stage, ftol, shift_tol, window_tol) in enumerate(
+                zip(stages, ftols, shift_tols, window_tols, strict=True), start=1):
             with self._abandon_on_cancel(cancel, stage.name, stage_results, stream):
                 model, outcome, guard, freed, hold = self._run_stage(
                     stage, data, mode, table, model, two_theta_limits,
                     plan.correlation_guard, events=stream, cancel=cancel,
                     stage_index=k, n_stages=len(stages), ftol=ftol,
+                    shift_tol=shift_tol,
                     # still the previous stage's here: the support hold
                     # starts from that answer as well as the screen (WP-1523)
                     prior_significance=answer_significance,
@@ -6835,6 +6857,7 @@ class Refinement:
                 n_degenerate_cell_probes=outcome.n_degenerate_cell_probes,
                 n_lapack_fallbacks=outcome.n_lapack_fallbacks,
                 ftol=ftol, window_area_tol=window_tol,
+                shift_over_esd_tol=shift_tol,
                 held=hold.held, released=hold.released,
                 held_reach=hold.reach,
                 scale_b_held=hold.scale_b_held,
@@ -6881,10 +6904,11 @@ class Refinement:
                     # the windows _run_stage compiled (WP-2317 R7), so a
                     # replay draws the model the stage solved
                     movement_slack=hold.movement_slack,
-                    # and the plan's two settings, for the same reason
-                    # (WP-2002, B1)
+                    # and the plan's settings, for the same reason
+                    # (WP-2002, B1; WP-2317)
                     phase_support_sigma=phase_support_sigma,
                     correlation_guard=plan.correlation_guard,
+                    shift_over_esd_tol=shift_tol,
                 ), model, table, outcome, stage_diagnostics,
                     held_scales=_held_scale_phases(stage_results[-1]),
                     window_loss=stage_results[-1].window_loss)
@@ -7035,6 +7059,7 @@ class Refinement:
                   correlation_guard: float = CORRELATION_GUARD,
                   phase_support_sigma: float | None = PHASE_SUPPORT_SIGMA,
                   window_area_tol: float | None = None,
+                  shift_over_esd_tol: float | None = SHIFT_OVER_ESD_TOL,
                   events=None, cancel=None, telemetry=None,
                   label: str | None = None) -> RefinementResult:
         """Run a single stage from the current state, recording a child node.
@@ -7069,11 +7094,23 @@ class Refinement:
         tails, at about 1.5-2× the stage's time.  :meth:`cherry_pick` passes a
         recorded node's.  The stage's ``window_area_tol`` records the fraction
         it ran at.
+
+        ``shift_over_esd_tol`` is where the stage stops, as a plan's last
+        stage does (``RefinementPlan.shift_over_esd_tol``, WP-2317 R6): at the
+        first point where no free parameter's undamped shift reaches that
+        fraction of its esd.  A stage run by hand is its own answer, so it
+        takes the plan's default.  A stage declaring its own ``ftol`` stops on
+        that alone, and ``None`` stops on the solver's 1e-9.  The stage's
+        ``shift_over_esd_tol`` records which it ran.
         """
         if mode is not None:
             check_mode(mode)
         _refuse_without_phases(self.structure, "run_stage")
         phase_support_sigma = check_phase_support_sigma(phase_support_sigma)
+        shift_over_esd_tol = check_shift_over_esd_tol(shift_over_esd_tol)
+        # a stage's own ftol replaces the test, and trf has no test to run
+        if stage.ftol is not None or self._solver != "lm":
+            shift_over_esd_tol = None
         if window_area_tol is not None:
             try:
                 window_area_tol = check_closing_window_tol(window_area_tol)
@@ -7130,7 +7167,7 @@ class Refinement:
                         # no plan here, so no notion of an intermediate stage: one
                         # stage run on its own is the state the caller is asking
                         # for, and it takes its own ftol or the solver default
-                        ftol=stage.ftol,
+                        ftol=stage.ftol, shift_tol=shift_over_esd_tol,
                         phase_support_sigma=phase_support_sigma,
                         window_area_tol=window_area_tol)
             finally:
@@ -7176,6 +7213,7 @@ class Refinement:
                 n_degenerate_cell_probes=outcome.n_degenerate_cell_probes,
                 n_lapack_fallbacks=outcome.n_lapack_fallbacks,
                 ftol=stage.ftol, window_area_tol=window_area_tol,
+                shift_over_esd_tol=shift_over_esd_tol,
                 held=hold.held, released=hold.released,
                 held_reach=hold.reach,
                 scale_b_held=hold.scale_b_held,
@@ -7229,6 +7267,7 @@ class Refinement:
                     window_area_tol=window_area_tol,
                     phase_support_sigma=phase_support_sigma,
                     correlation_guard=correlation_guard,
+                    shift_over_esd_tol=shift_over_esd_tol,
                 ), model, table, outcome, diagnostics,
                     held_scales=_held_scale_phases(stage_result),
                     window_loss=stage_result.window_loss)
@@ -7259,7 +7298,8 @@ class Refinement:
             self._fit_pattern = data
             self._plan_settings = {"correlation_guard": correlation_guard,
                                    "phase_support_sigma": phase_support_sigma,
-                                   "window_area_tol": window_area_tol}
+                                   "window_area_tol": window_area_tol,
+                                   "shift_over_esd_tol": shift_over_esd_tol}
             _apply_esds(table, self.result_, self.structure, self.instrument)
             self._answer_covariance = (self.result_, table, outcome.theta,
                                        outcome.stderr_internal,

@@ -260,6 +260,9 @@ def test_the_hostile_pairs_runaway_reports_its_stale_windows(monkeypatch):
     names = [s.name for s in plan.stages]
     axial = plan.stages.pop(names.index("lines_axial"))
     plan.stages.insert(names.index("sample_broadening"), axial)
+    # and that time's stop, the 1e-9 one: under WP-2317's shift test the warm
+    # stage stops before it reaches the runaway this test records
+    plan.shift_over_esd_tol = None
     structure = rx.Structure(phases=_phases())
     ins = qarr_instrument()
     patterns = [rx.read_pattern(DATA / f"{s}.prn") for s in SAMPLE1[:2]]

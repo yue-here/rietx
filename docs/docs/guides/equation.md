@@ -18,7 +18,7 @@ This fits a straight line a(T) = a₀ + a₁(T − T<sub>ref</sub>) to the seven
 
 <!-- output of examples/guides/equation.py -->
 ```text
-[1] 4.1628327080 +/- 1.6e-06 Å
+[1] 4.1628327014 +/- 1.6e-06 Å
 [T] 0.0000207819 +/- 8.2e-09 Å/K
 form rejected: False (statistic 9.3, cut 11.1)
 ```
@@ -76,7 +76,7 @@ A pattern that cannot see the phase adds nothing to the statistic, and `PARAMETR
 
 <!-- output of examples/guides/equation.py -->
 ```text
-a: phases.0.cell.a at T=293 = 4.1564527(30) Å (extrapolating in T; form not rejected)
+a: phases.0.cell.a at T=293 = 4.1564526(30) Å (extrapolating in T; form not rejected)
 ```
 
 293 K lies below the fitted range of 300-900 K, so the line says it is extrapolating.

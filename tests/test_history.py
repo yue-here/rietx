@@ -656,12 +656,14 @@ def test_a_cherry_pick_replays_the_plan_settings_the_stage_ran_at(pattern):
 
 def test_the_hold_switched_off_is_recorded_and_rendered():
     """``None`` is a setting, not an absence: the node says the hold was off
-    and the rendered call switches it off again."""
+    and the rendered call switches it off again.  The node's own
+    ``shift_over_esd_tol`` default is a node written before WP-2317, which ran
+    no shift test, so its line names that too."""
     action = rx.NodeAction(kind="stage", name="cell", turn_on=["phases.*.cell.*"],
                            phase_support_sigma=None)
     assert action.api_call() == (
         "ref.run_stage(data, rx.Stage('cell', ['phases.*.cell.*'], "
-        "max_iter=100), phase_support_sigma=None)")
+        "max_iter=100), phase_support_sigma=None, shift_over_esd_tol=None)")
     reloaded = rx.NodeAction.model_validate_json(action.model_dump_json())
     assert reloaded.phase_support_sigma is None
 

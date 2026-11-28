@@ -459,6 +459,9 @@ class Project:
             # (WP-2002, B1)
             kw.setdefault("phase_support_sigma", self.doc.plan.phase_support_sigma)
             kw.setdefault("correlation_guard", self.doc.plan.correlation_guard)
+            # and its shift test (WP-2317 R6), so a project whose plan keeps
+            # the solver's 1e-9 stop drives its stages by hand at it too
+            kw.setdefault("shift_over_esd_tol", self.doc.plan.shift_over_esd_tol)
         return self.refinement.run_stage(self.data, stage, **kw)
 
     def __repr__(self) -> str:  # pragma: no cover - convenience

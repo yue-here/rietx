@@ -90,13 +90,13 @@ A pattern that did not refine the parameter has no point in the trajectory, so `
 
 <!-- output of examples/guides/series.py -->
 ```text
-p000  cold   35 evaluations
-p001  warm   12 evaluations
-p002  warm   12 evaluations
-p003  warm   12 evaluations
-p004  warm   12 evaluations
-p005  warm   12 evaluations
-p006  warm   12 evaluations
+p000  cold   34 evaluations
+p001  warm   10 evaluations
+p002  warm    9 evaluations
+p003  warm   10 evaluations
+p004  warm    9 evaluations
+p005  warm   10 evaluations
+p006  warm   10 evaluations
 ```
 
 The first pattern runs the whole plan from your starting model.

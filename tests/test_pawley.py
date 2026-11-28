@@ -272,7 +272,8 @@ def test_a_one_stage_pawley_fit_from_a_seed_that_partitioned_nothing_is_not_lock
 
     plan = RefinementPlan(stages=[Stage("all", [
         "instrument.background.*", "phases.*.cell.*", "instrument.profile.w",
-        "instrument.geometry.zero_shift"])], closing_window_tol=None)
+        "instrument.geometry.zero_shift"])], closing_window_tol=None,
+        shift_over_esd_tol=None)  # a precision check: the 1e-9 stop (WP-2317 R6)
     pattern, _, _ = _synth_overlapped()
     base, _ = _unit_fit(pattern, plan=plan)
     high, model = _unit_fit(pattern, background_factor=100.0, plan=plan)

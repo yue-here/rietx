@@ -27,6 +27,7 @@ The assertions read the mechanism rather than the readings, which sit within
 
 from __future__ import annotations
 
+import dataclasses
 import os
 from pathlib import Path
 from types import SimpleNamespace
@@ -88,8 +89,12 @@ def test_a_blank_pair_past_the_screen_is_judged_by_its_marginal_z(
     pattern sees the phase.  Per histogram, each pattern holds its own copy.
     """
     events: list[dict] = []
+    # the noise crossing 3σ is where the 1e-9 stop's answers landed; the
+    # shift test's land under it, so the fixture keeps the old stop (WP-2317 R6)
+    plan = dataclasses.replace(rx.RefinementPlan.mccusker_default(),
+                               shift_over_esd_tol=None)
     _, result, record = _joint_fit(blank, monkeypatch, sharing=sharing,
-                                   events=events)
+                                   plan=plan, events=events)
     assert any(s >= PHASE_SUPPORT_SIGMA > z for row in record for s, z in row), record
     assert all(z < PHASE_SUPPORT_SIGMA for row in record for _, z in row), record
     cells = ({"phases.0.cell.a"} if sharing is None

@@ -82,13 +82,13 @@ Declared on the minor phase, it trades against the scale:
 
 <!-- output of examples/guides/qpa.py -->
 ```text
-NAC    96.32 ± 3.71 wt%
-CaF2    3.68 ± 3.71 wt%
+NAC    96.31 ± 3.74 wt%
+CaF2    3.69 ± 3.74 wt%
 HIGH_CORRELATION | Correlated pair: phases.1.scale ~ phases.1.extinction (ρ=+0.998). Flagged in stages: extinction, roughness.
 ```
 
 With a few weak peaks, the extinction and the scale can scale the same intensities.
-The fraction moves from 1.35 to 3.68 wt %, and its esd from 0.12 to 3.71 wt %.
+The fraction moves from 1.35 to 3.69 wt %, and its esd from 0.12 to 3.74 wt %.
 Rwp falls from 0.089 to 0.083, so Rwp would choose the fit with the meaningless fraction.
 
 ## Check that the fraction has one answer
@@ -133,7 +133,7 @@ CaF2  µR 0.0014  1.41 -> 1.42 wt%
 ```
 
 The radii here are assumed, to show the call.
-At 0.414 Å both phases absorb so little that the correction moves each fraction by 0.01 wt %.
+At 0.414 Å both phases absorb so little that the correction moves each fraction by about 0.001 wt %, which shows only as the last printed digit rounding the other way.
 With Cu Kα and a heavy phase it can move a fraction by several wt %.
 
 The corrected fraction is reported beside the uncorrected one, and the esd belongs to the uncorrected one: the radii's uncertainty is not statistical.

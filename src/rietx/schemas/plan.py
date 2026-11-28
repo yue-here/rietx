@@ -174,6 +174,66 @@ def check_phase_support_sigma(value: Any) -> float | None:
 CLOSING_WINDOW_TOL = 1e-3
 
 
+#: Where a plan's last declared stage stops, in the esd of each free parameter
+#: (WP-2317 R6, ruled 2026-11-27): at the first point where no free
+#: parameter's undamped Gauss-Newton shift reaches this fraction of its esd
+#: (``optimize.lm._max_shift_over_esd``).  What
+#: :attr:`PlanSpec.shift_over_esd_tol` and
+#: ``strategy.staged.RefinementPlan.shift_over_esd_tol`` default to, here for
+#: :data:`INTERMEDIATE_FTOL`'s reason.
+#:
+#: **0.1 is the field's test of a published refinement**: converged when the
+#: largest shift/esd of the final cycle is 0.1 or less (McCusker et al. 1999,
+#: *J. Appl. Cryst.* **32**, 36-50, §7, the band
+#: ``optimize.statistics.MAX_SHIFT_CONVERGED`` quotes; checkCIF raises alert B
+#: above 0.10).  It is the accuracy other programs' users publish, which is
+#: Rule 5's bar.  The programs' own default stops are not that accuracy: run
+#: inside rietx on the damped step, GSAS-II's 1e-3 change in χ² and FullProf's
+#: 0.2 ended a pattern of the cpd-1 series 18 esd from its answer and reported
+#: convergence.  So the test reads the undamped step, as FullProf's own
+#: undamped cycles do.
+#:
+#: **What it buys, measured 2026-11-28** against the 1e-9 stop it replaces
+#: (``docs/wp/2317-probe/r6/RESULTS.md``; macOS arm64, development data): the
+#: 17-pattern CuCr₂O₄ ramp took 848 evaluations against 1 326, its worst
+#: quantity the cell of a 1 wt% CuO phase 0.68 esd off and the main phase
+#: within 0.006 esd; the 8-pattern cpd-1 chain took 453 against 504, worst
+#: 0.13 esd (the axial term), weight fractions within 0.03 esd.  Single fits
+#: stay under 0.04 esd, saving 5-14 % of a fit's evaluations.  The esd the
+#: test reads takes χ²_red at no more than 1 (``lm._max_shift_over_esd``),
+#: so a fit far from the data cannot stop on it.  An ordinary
+#: series keeps the test: neither chain's departure grew from one pattern to
+#: the next, so it is not one of the compounding places below.
+#: A departure of one esd sits inside the error bar the user is shown.
+#: ``None`` stops on the solver's 1e-9 alone, every fit before WP-2317 bit for
+#: bit, and is what the three places an error compounds declare: the
+#: ``lab_calibrate`` preset, a Pawley series carrying its intensities, and the
+#: guides that publish numbers (WP-2222's three).
+SHIFT_OVER_ESD_TOL = 0.1
+
+
+def check_shift_over_esd_tol(value: Any) -> float | None:
+    """``value`` as a plan's ``shift_over_esd_tol``, or ``ValueError``.
+
+    The one check behind :attr:`PlanSpec.shift_over_esd_tol`, the dataclass
+    plan's field (read where the runners read it, since a dataclass validates
+    nothing), ``Refinement.run_stage``'s keyword and the ``.rxt`` parser.
+    ``None`` is a value, the stop on 1e-9 alone.  Zero or a negative can never
+    be met, an infinity would stop every stage where it starts, and a NaN
+    compares false both ways, so all four are refused.
+    """
+    if value is None:
+        return None
+    if (isinstance(value, bool) or not isinstance(value, numbers.Real)
+            or not math.isfinite(value) or value <= 0.0):
+        raise ValueError(
+            f"shift_over_esd_tol is the fraction of its esd every free "
+            f"parameter's shift must fall under for the last stage to stop, "
+            f"a positive finite number such as 0.1, or None to stop on the "
+            f"solver's 1e-9 change in chi2 alone; got {value!r}")
+    return float(value)
+
+
 def check_closing_window_tol(value: Any) -> float | None:
     """``value`` as a closing stage's window area fraction, or ``None`` for no closing stage.
 
@@ -320,6 +380,16 @@ class PlanSpec(Base):
             "the fit time, the opt-in for an answer to publish.  Any value "
             "under 2 % keeps the closing stage's finer axial-divergence "
             "sampling (WP-2002, off by default since WP-2222)"))
+    shift_over_esd_tol: float | None = Field(
+        SHIFT_OVER_ESD_TOL, description=(
+            "where the last declared stage (and the closing stage) stops: at "
+            "the first point where no free parameter's undamped Gauss-Newton "
+            "shift reaches this fraction of its esd, unless the stage "
+            "declares its own ftol.  0.1 is the field's test of a converged "
+            "refinement (McCusker et al. 1999, section 7).  null = stop on "
+            "the solver's 1e-9 change in chi2 alone, every fit before "
+            "WP-2317; on a 17-pattern series 0.1 took 848 evaluations "
+            "against 1 326, its worst quantity 0.68 esd off"))
 
     @field_validator("phase_support_sigma")
     @classmethod
@@ -330,6 +400,13 @@ class PlanSpec(Base):
     @classmethod
     def _a_fraction_or_none(cls, value: Any) -> float | None:
         return check_closing_window_tol(value)
+
+    # before coercion, so True and "0.1" are refused here as the dataclass
+    # and run_stage refuse them, rather than read as 1.0 and 0.1
+    @field_validator("shift_over_esd_tol", mode="before")
+    @classmethod
+    def _a_shift_or_none(cls, value: Any) -> float | None:
+        return check_shift_over_esd_tol(value)
 
     @model_validator(mode="before")
     @classmethod
@@ -368,7 +445,8 @@ class PlanSpec(Base):
                    intermediate_ftol=plan.intermediate_ftol,
                    lebail_passes=plan.lebail_passes,
                    phase_support_sigma=plan.phase_support_sigma,
-                   closing_window_tol=plan.closing_window_tol)
+                   closing_window_tol=plan.closing_window_tol,
+                   shift_over_esd_tol=plan.shift_over_esd_tol)
 
     def to_plan(self) -> Any:
         from ..strategy.staged import RefinementPlan
@@ -378,7 +456,8 @@ class PlanSpec(Base):
                               intermediate_ftol=self.intermediate_ftol,
                               lebail_passes=self.lebail_passes,
                               phase_support_sigma=self.phase_support_sigma,
-                              closing_window_tol=self.closing_window_tol)
+                              closing_window_tol=self.closing_window_tol,
+                              shift_over_esd_tol=self.shift_over_esd_tol)
 
     def preset_name(self) -> str | None:
         """The registered preset this plan equals, or ``None`` if it was edited.

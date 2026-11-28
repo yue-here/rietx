@@ -53,7 +53,7 @@ PLAN = rx.RefinementPlan(stages=[
                                            "instrument.profile.v",
                                            "instrument.profile.w",
                                            "instrument.profile.x"]),
-])
+], shift_over_esd_tol=None)  # a precision check: the 1e-9 stop (WP-2317 R6)
 
 
 def _models(true: bool):

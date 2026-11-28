@@ -129,9 +129,10 @@ def test_an_applicable_action_is_one_stage_named_after_its_kind():
     from rietx.schemas.history import NodeAction
 
     # the node an applied stage writes: since WP-2222 run_stage runs on the
-    # declared stages' windows, so the node records no fraction
-    assert line == NodeAction(kind="stage", name=stage.name,
-                              turn_on=stage.turn_on).api_call()
+    # declared stages' windows, so the node records no fraction; and since
+    # WP-2317 R6 it records run_stage's default shift test, 0.1
+    assert line == NodeAction(kind="stage", name=stage.name, turn_on=stage.turn_on,
+                              shift_over_esd_tol=0.1).api_call()
 
     with pytest.raises(ValueError, match="not carried out by a stage"):
         stage_for(_action("collect_better_data"))
@@ -151,8 +152,13 @@ def test_the_echoed_line_carries_the_plan_settings_the_stage_will_run_at():
     line = api_call(stage, plan=plan)
     assert line.endswith("correlation_guard=0.9, phase_support_sigma=None)")
     assert line == NodeAction(kind="stage", name=stage.name, turn_on=stage.turn_on,
-                              phase_support_sigma=None,
-                              correlation_guard=0.9).api_call()
+                              phase_support_sigma=None, correlation_guard=0.9,
+                              shift_over_esd_tol=0.1).api_call()
+    # the shift test run_stage applies by default prints nothing (WP-2317 R6),
+    # and a stored plan that keeps the solver's 1e-9 stop names it
+    assert "shift_over_esd_tol" not in api_call(stage)
+    assert api_call(stage, plan=PlanSpec(shift_over_esd_tol=None)).endswith(
+        "shift_over_esd_tol=None)")
 
 
 def test_advice_kinds_refuse_in_their_own_words_rather_than_silently():

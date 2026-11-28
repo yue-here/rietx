@@ -1396,7 +1396,9 @@ def _fit(structure, instrument, data, plan, ties=None, limits=None, hold=()):
             correlation_guard=plan.correlation_guard,
             # and its closing stage, so a continued trial ends on the windows
             # every other trial's χ² was measured on (WP-2002)
-            closing_window_tol=plan.closing_window_tol),
+            closing_window_tol=plan.closing_window_tol,
+            # and the stop its answer stage ran (WP-2317 R6)
+            shift_over_esd_tol=plan.shift_over_esd_tol),
             two_theta_limits=limits, telemetry=False)
     return ref, result
 
@@ -1426,6 +1428,7 @@ def _close(trial: MagneticTrial, data, limits, mask) -> MagneticTrial:
                            window_area_tol=plan.closing_window_tol,
                            correlation_guard=plan.correlation_guard,
                            phase_support_sigma=plan.phase_support_sigma,
+                           shift_over_esd_tol=plan.shift_over_esd_tol,
                            telemetry=False)
     moments, _n, _pairs = _moment_rows(ref, result, ref.fitted_structure)
     # measured on the moments it is reported beside, where the trial took one
@@ -2357,7 +2360,8 @@ def solve_magnetic(refinement, data, *, phase: int = 0,
     nuclear_plan = RefinementPlan(stages=nuclear_stages,
                                   phase_support_sigma=plan.phase_support_sigma,
                                   correlation_guard=plan.correlation_guard,
-                                  closing_window_tol=plan.closing_window_tol)
+                                  closing_window_tol=plan.closing_window_tol,
+                                  shift_over_esd_tol=plan.shift_over_esd_tol)
 
     def enumerate_for(k_try):
         """Candidate classes for one k, or a sentence saying why there are none."""

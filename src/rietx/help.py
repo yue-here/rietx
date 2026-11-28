@@ -5226,7 +5226,7 @@ STAGE_FIELD_HELP: dict[str, HelpEntry] = {
         ),
         default="100",
         typical="20-100",
-        anchor="theory/estimation.html#convergence",
+        anchor="theory/convergence.html#the-criterion",
     ),
     "ftol": HelpEntry(
         title="Stage stopping tolerance",
@@ -5234,12 +5234,14 @@ STAGE_FIELD_HELP: dict[str, HelpEntry] = {
             "This stage's own relative tolerance on the decrease in cost. It overrides "
             "the plan's schedule. Empty takes the value from the plan: every declared "
             "stage but the last stops at the plan's `intermediate_ftol`, and the last "
-            "declared stage and the closing stage stop at the solver's 1e-9. The history records the tolerance a stage ran at and "
+            "declared stage and the closing stage stop at the solver's 1e-9 or, "
+            "sooner, on the plan's `shift_over_esd_tol`. A stage that declares its "
+            "own value stops on it alone. The history records the tolerance a stage ran at and "
             "not the one it declared, so a cherry-pick replays what happened."
         ),
         default="null",
         typical="leave empty unless reproducing a specific run",
-        anchor="theory/estimation.html#convergence",
+        anchor="theory/convergence.html#the-criterion",
     ),
     "lebail_cycles": HelpEntry(
         title="Le Bail cycles",
@@ -5853,7 +5855,7 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "no claim that the fit is good, since a model that matches nothing can "
             "converge. Quality is in `diagnostics`, and `usable` reads both."
         ),
-        anchor="theory/estimation.html#convergence",
+        anchor="theory/convergence.html#the-criterion",
     ),
     "RefinementResult.mode": HelpEntry(
         title="Intensity mode",
@@ -6196,7 +6198,7 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "`diverged`. Earlier stages of a plan stop at a looser tolerance on "
             "purpose (`ftol`), so the last stage's exit is the one about the answer."
         ),
-        anchor="theory/estimation.html#convergence",
+        anchor="theory/convergence.html#the-criterion",
     ),
     "StageResult.lebail_cycles_run": HelpEntry(
         title="Le Bail cycles run",
@@ -6255,7 +6257,19 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "closing stage take; an earlier stage takes the plan's `intermediate_ftol` "
             "unless it declares its own."
         ),
-        anchor="theory/estimation.html#convergence",
+        anchor="theory/convergence.html#the-criterion",
+    ),
+    "StageResult.shift_over_esd_tol": HelpEntry(
+        title="Shift test the stage stopped on",
+        description=(
+            "The fraction of its esd that every free parameter's undamped shift had to "
+            "fall under for this stage to stop. A plan's last declared stage and its "
+            "closing stage take the plan's `shift_over_esd_tol`, 0.1 by default, the "
+            "convergence test of McCusker et al. (1999). `None` means the stage stopped "
+            "on its `ftol` alone: an earlier stage, a stage declaring its own `ftol`, "
+            "or a plan that sets the field to `None`."
+        ),
+        anchor="theory/convergence.html#the-stop-on-the-last-stage",
     ),
     "StageResult.window_area_tol": HelpEntry(
         title="Profile window fraction",
@@ -6314,15 +6328,17 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "`exhausted_fp64` when it met its own convergence test. It writes "
             "`slow_descent` when the cost was still falling, but so slowly that "
             "another 300 evaluations would have moved the parameters by less than "
-            "one esd. Both have `status` `converged`, and `STAGE_SLOW_DESCENT` names "
-            "a stage stopped the second way. It writes `max_nfev`, with `status` "
+            "one esd. It writes `shift_over_esd` when no free parameter's undamped "
+            "shift reached the stage's `shift_over_esd_tol` of its esd. All three "
+            "have `status` `converged`, and `STAGE_SLOW_DESCENT` names "
+            "a stage stopped the slow way. It writes `max_nfev`, with `status` "
             "`max_iter`, when the budget ran out. `solver=\"trf\"` writes "
             "scipy's `ftol`, `xtol`, `gtol`, `ftol+xtol` and `max_nfev`. A model "
             "that stopped being finite writes `non_finite_residual` or "
             "`non_finite_jacobian`, with `status` `diverged`. `None` means "
             "a result stored before the field, or a stage with nothing free."
         ),
-        anchor="theory/estimation.html#convergence",
+        anchor="theory/convergence.html#the-criterion",
     ),
     "StageResult.n_constraint_truncations": HelpEntry(
         title="Steps held on a constraint",

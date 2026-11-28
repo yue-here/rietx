@@ -50,6 +50,7 @@ import rietx.report.distortion as RD
 from rietx.crystallography.cif import structure_from_cif
 from rietx.crystallography.magnetic.isotropy import distortion_candidates
 from rietx.crystallography.representation import distortion as D
+from rietx.schemas.plan import SHIFT_OVER_ESD_TOL
 from rietx.schemas.structure import Structure
 
 #: the module, not the ``rietx.refine`` function the package exports under that name
@@ -188,7 +189,7 @@ def synthetic(phase, seed: int, stream: int) -> rx.PatternData:
 
 
 def native_fit(statement, data, *, tie: bool = True, start=None, max_iter: int = 1000,
-               instrument=None, free=None):
+               instrument=None, free=None, shift_over_esd_tol=SHIFT_OVER_ESD_TOL):
     """The native path: one stage freeing the BT-1 set, Biso tied per parent site."""
     inst = instrument or bt1_nuclear()[1]
     free = free if free is not None else _protocol()[2]
@@ -198,7 +199,8 @@ def native_fit(statement, data, *, tie: bool = True, start=None, max_iter: int =
         for path, source, coeff, _ in statement.biso_ties:
             ref.tie(path, {source: coeff})
     result = ref.fit(data, plan=rx.RefinementPlan(stages=[rx.Stage(name="all", turn_on=free,
-                                                                   max_iter=max_iter)]),
+                                                                   max_iter=max_iter)],
+                                                  shift_over_esd_tol=shift_over_esd_tol),
                      telemetry=False)
     return ref, result
 
@@ -646,7 +648,9 @@ def test_a_det_meets_the_bisected_crossing(which):
     truth, start = child(which)
     _, inst, tt, sigma = bt1_nuclear()
     data = synthetic(truth.phase, 0, STREAM["gamma_null" if which is GAMMA else "zone_null"])
-    ref, result = native_fit(start, data)
+    # a precision check: the 1e-9 stop (WP-2317 R6), which the restricted
+    # refits inherit; at the shift test p = 4 misses by 2.3 % against 2.1 %
+    ref, result = native_fit(start, data, shift_over_esd_tol=None)
     no_biso_negative(result)
     phase = ref.structure.phases[0]
     tested = block_key(phase, which[1])

@@ -309,10 +309,14 @@ def _walk(refinement, data, path: str, start: float, sign: int, limit: float,
             runs += 1
             try:
                 # under the plan settings the caller's fit ran with
-                # (``Refinement._plan_settings``, WP-2002 B1)
+                # (``Refinement._plan_settings``, WP-2002 B1), but stopped on
+                # the solver's 1e-9 rather than the shift test (WP-2317): the
+                # settle test reads χ² to a hundredth of the threshold, finer
+                # than a stop at a tenth of each esd promises
                 r = trial.run_stage(data, Stage(f"interval:{path}", []),
                                     telemetry=False, cancel=cancel,
-                                    **trial._plan_settings)
+                                    **{**trial._plan_settings,
+                                       "shift_over_esd_tol": None})
             except RefinementCancelled:
                 raise                 # the caller's stop, not this point's
             except Exception as exc:  # an unmeasurable point ends the side

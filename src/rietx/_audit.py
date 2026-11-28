@@ -3087,6 +3087,15 @@ ROWS: tuple[Row, ...] = (
                  "converges when a closing stage follows it (WP-2045 option 5, ruled "
                  "2026-10-24)."),
         approved="2026-11-01"),
+    Row("rietx.schemas.results.StageResult.shift_over_esd_tol", "action", tier=2, ambiguity=1,
+        evidence=("the record of the shift test PlanSpec:shift_over_esd_tol and "
+                  "run_stage:shift_over_esd_tol run (those rows' evidence), written by the "
+                  "three stage runners on every stage, None where the stage stopped on its "
+                  "ftol alone; termination reads shift_over_esd where the test ended the solve"),
+        grounds=("Records the action rather than taking one, for StageResult.ftol's reason: "
+                 "a consumer comparing two fits needs to know how each was converged, and a "
+                 "cherry-pick replays the recorded stop (R6, ruled 2026-11-27)."),
+        approved="2026-11-27"),
     Row("rietx.schemas.results.StageResult.window_refit_loss", "action", tier=3, ambiguity=1,
         evidence=("the share of Bragg intensity the stage's first windows dropped at its first "
                   "answer (fresh windows against frozen, window_loss's measure) when it passed "
@@ -5396,6 +5405,16 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.optimize.lm._EIGEN_CUT_PER_ROW", "constant", tier=1, value=2.220446049250313e-16,
         evidence=("numerical floor: eps*m, the rounding error of one inner product over m terms "
                   "(Higham 2002 §3.1; docstring)")),
+    Row("rietx.optimize.lm._SHIFT_CHI2_CAP", "constant", tier=1, value=1.0,
+        evidence=("arithmetic: 1 is chi2_red's expected value under correct weights, so the "
+                  "shift test's esd is never wider than the counting-statistics one and the "
+                  "min() can only stop a fit later than either reading (lm._max_shift_over_esd "
+                  "docstring); on the scaled esd tutorial 05's warm 2 % jump stopped at chi2_red "
+                  "632, Rwp 0.966, and capped reaches Rwp 0.0395 "
+                  "(test_instrument_hold_noise::test_the_tutorials_step_is_reached_warm); GSAS-II "
+                  "5.8.4 prints shift/esd on the GOF-scaled esd and does not stop on it "
+                  "(GSASIIstrMain.py:397-402); the cost is evaluations only: CuCr2O4 ramp 848 "
+                  "against 765 uncapped, cpd-1 453 against 403 (docs/wp/2317-probe/r6/RESULTS.md)")),
     Row("rietx.optimize.lm._INNER_MAX", "constant", tier="invariant", value=18,
         evidence=("answer-invariant: on nine acceptance configurations an iteration that took "
                   "a step tried at most 6 damped trials and a stage's last iteration up to 9 "
@@ -6673,6 +6692,22 @@ ROWS: tuple[Row, ...] = (
                  "floors'; B9, no chosen limit on a quantity that stays physical); the far bound and "
                  "the ceiling are TCHZ_CEILING_DEG's (the sixth round's Q7, ruled 2026-10-21)."),
         approved="2026-10-23"),
+    Row("rietx.schemas.plan.SHIFT_OVER_ESD_TOL", "constant", tier=2, value=0.1,
+        evidence=("McCusker et al. 1999 J. Appl. Cryst. 32, 36-50, 7: a refinement has converged when "
+                  "the largest shift/esd of the final cycle is 0.1 or less, the band "
+                  "optimize.statistics.MAX_SHIFT_CONVERGED quotes (held equal by test); checkCIF "
+                  "raises alert B above 0.10; FullProf stops on shifts under Eps x esd (0.2 or "
+                  "lower) on undamped cycles (docs/practice.md, When a fit stops); read on the "
+                  "undamped Gauss-Newton step, since on the damped one 0.2 and GSAS-II's 1e-3 "
+                  "ended cpd-1f 18 esd off (docs/wp/2317-probe/convnoise/RESULTS.md); against "
+                  "the 1e-9 stop on development data as shipped, macOS arm64 "
+                  "(docs/wp/2317-probe/r6/RESULTS.md): CuCr2O4 ramp 848 against 1 326 "
+                  "evaluations, worst 0.68 esd (1 wt% CuO cell, last pattern), main phase under "
+                  "0.006; cpd-1 chain 453 against 504, worst 0.13 (axial_sl), weight fractions "
+                  "under 0.03; neither chain's departure grows from pattern to pattern; "
+                  "single fits under 0.04 esd, 5-14 % of evaluations saved; esd read at "
+                  "chi2_red capped at 1, since tutorial 05's warm 2 % jump stopped at chi2_red 632 "
+                  "(Rwp 0.966) on the scaled esd")),
     Row("rietx.schemas.plan.PlanSpec:stages", "default", tier=1, ambiguity=1, value=(),
         evidence="arithmetic: the empty container; resolve_plan supplies every plan a fit runs"),
     Row("rietx.schemas.plan.PlanSpec:correlation_guard", "default", value=0.98),
@@ -6735,6 +6770,33 @@ ROWS: tuple[Row, ...] = (
                  "sixth round's Q2 default (option 3, 2026-10-21), which stays the opt-in "
                  "at CLOSING_WINDOW_TOL for an answer to publish."),
         approved="2026-11-19"),
+    Row("rietx.schemas.plan.PlanSpec:shift_over_esd_tol", "default", tier=2, ambiguity=1,
+        value=0.1,
+        evidence=("McCusker et al. 1999 J. Appl. Cryst. 32, 36-50, 7: a refinement has converged when "
+                  "the largest shift/esd of the final cycle is 0.1 or less, the band "
+                  "optimize.statistics.MAX_SHIFT_CONVERGED quotes (held equal by test); checkCIF "
+                  "raises alert B above 0.10; FullProf stops on shifts under Eps x esd (0.2 or "
+                  "lower) on undamped cycles (docs/practice.md, When a fit stops); read on the "
+                  "undamped Gauss-Newton step, since on the damped one 0.2 and GSAS-II's 1e-3 "
+                  "ended cpd-1f 18 esd off (docs/wp/2317-probe/convnoise/RESULTS.md); against "
+                  "the 1e-9 stop on development data as shipped, macOS arm64 "
+                  "(docs/wp/2317-probe/r6/RESULTS.md): CuCr2O4 ramp 848 against 1 326 "
+                  "evaluations, worst 0.68 esd (1 wt% CuO cell, last pattern), main phase under "
+                  "0.006; cpd-1 chain 453 against 504, worst 0.13 (axial_sl), weight fractions "
+                  "under 0.03; neither chain's departure grows from pattern to pattern; "
+                  "single fits under 0.04 esd, 5-14 % of evaluations saved; esd read at "
+                  "chi2_red capped at 1, since tutorial 05's warm 2 % jump stopped at chi2_red 632 "
+                  "(Rwp 0.966) on the scaled esd"),
+        grounds=("Rule 5 Arithmetic accuracy: the accuracy other programs' users publish, read in "
+                 "each quantity's esd; R6 ruled 2026-11-27 ('Start with your recommendation. "
+                 "Consider best practice.'), the level re-settled by Claude the same day under "
+                 "R0 clarified; None in WP-2222's three compounding places (lab_calibrate, a "
+                 "carried Pawley series, the guides that publish numbers).  An ordinary "
+                 "warm-started series keeps 0.1, settled by Claude 2026-11-28 under Rule 5: "
+                 "its departure does not grow along the chain, so it is not a compounding "
+                 "case, and GSAS-II's own sequential stop leaves the same ramp's CuO cell "
+                 "10.5 esd off (docs/wp/2317-probe/foreign_stops/RESULTS.md)."),
+        approved="2026-11-27"),
     Row("rietx.schemas.plan.PlanSpec:lebail_passes", "default", tier="caller", ambiguity=1, value=1,
         evidence="opt-in: lebail_passes > 1, default 1 (one run, bit-identical to pre-WP-1323)"),
     Row("rietx.schemas.plan.PlanSpec:phase_support_sigma", "default", tier=3, ambiguity=1, value=3.0,
@@ -6970,6 +7032,15 @@ ROWS: tuple[Row, ...] = (
                  "so the 3 sigma is rietx's own, a caller sets another or None for off (B1, "
                  "ruled 2026-10-19)."),
         approved="2026-10-19"),
+    Row("rietx.refine.Refinement.run_stage:shift_over_esd_tol", "default", tier=2, ambiguity=1,
+        value=0.1,
+        evidence=("SHIFT_OVER_ESD_TOL's row; a stage run by hand is its own answer, so it "
+                  "stops where a plan's last stage stops; a stage declaring its own ftol "
+                  "stops on that alone, and cherry_pick passes a node's recorded value "
+                  "(None for a node written before the field)"),
+        grounds=("run_stage:window_area_tol's grounds: a stage driven by hand costs what the "
+                 "same stage in a plan costs (WP-2222); R6 ruled 2026-11-27."),
+        approved="2026-11-27"),
     Row("rietx.refine.Refinement.run_stage:events", "default", tier="invariant", ambiguity=1, value=None,
         evidence=("answer-invariant: an observation channel; "
                   "tests/test_answer_invariant_defaults.py asserts the answer bit-identical with it"

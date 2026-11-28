@@ -68,7 +68,8 @@ everything = rx.RefinementPlan(stages=[rx.Stage("all", [
     "phases.0.scale", *BACKGROUND, "phases.0.atoms.*.moment.dof*",
     "instrument.zero_shift", "phases.0.cell.*", "phases.0.atoms.*.dof.*",
     "phases.0.atoms.*.biso", *(f"instrument.profile.{k}" for k in "uvwx")],
-    max_iter=200)], intermediate_ftol=1e-6, closing_window_tol=CLOSING_WINDOW_TOL)
+    max_iter=200)], intermediate_ftol=1e-6, closing_window_tol=CLOSING_WINDOW_TOL,
+    shift_over_esd_tol=None)
 
 ROUNDS = 5
 previous = moment.magnitude

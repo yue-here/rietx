@@ -22,7 +22,7 @@ from typing import Literal
 from .._nearmiss import check_choice, did_you_mean
 from ..schemas.common import Mode
 
-# INTERMEDIATE_FTOL, CORRELATION_GUARD, PHASE_SUPPORT_SIGMA and
+# INTERMEDIATE_FTOL, CORRELATION_GUARD, PHASE_SUPPORT_SIGMA, SHIFT_OVER_ESD_TOL and
 # CLOSING_WINDOW_TOL are defined beside the mirror because the pydantic fields
 # need them at class-definition time and this module is the *upper* layer;
 # they are re-exported here, where plan policy is read.
@@ -31,8 +31,10 @@ from ..schemas.plan import (
     CORRELATION_GUARD,
     INTERMEDIATE_FTOL,
     PHASE_SUPPORT_SIGMA,
+    SHIFT_OVER_ESD_TOL,
     PlanSpec,
     check_closing_window_tol,
+    check_shift_over_esd_tol,
 )
 
 #: The name of the stage :meth:`RefinementPlan.closing_stage` appends.
@@ -451,6 +453,15 @@ class RefinementPlan:
     #: every fit before the field, bit for bit; :data:`CLOSING_WINDOW_TOL` is
     #: the opt-in for an answer to publish.
     closing_window_tol: float | None = None
+    #: where the last declared stage and the closing stage stop, in esd: at
+    #: the first point where no free parameter's undamped Gauss-Newton shift
+    #: reaches this fraction of its esd, the 1e-9 change in χ² still the
+    #: backstop (WP-2317 R6).  :data:`SHIFT_OVER_ESD_TOL` says what 0.1 is,
+    #: costs and buys.  A stage declaring its own :attr:`Stage.ftol` stops on
+    #: that alone.  ``None`` stops every stage on its ftol, which reproduces
+    #: every fit before the field bit for bit.  :meth:`stage_shift_tols`
+    #: applies it.
+    shift_over_esd_tol: float | None = SHIFT_OVER_ESD_TOL
 
     def closing_stage(self, paths: Iterable[str | tuple[str, ...]] | None = None) -> Stage | None:
         """The stage a fit runs after the declared ones, or ``None``.
@@ -544,6 +555,23 @@ class RefinementPlan:
         endpoints = {len(self.stages) - 1, len(stages) - 1}
         return [s.ftol if s.ftol is not None
                 else (None if i in endpoints else self.intermediate_ftol)
+                for i, s in enumerate(stages)]
+
+    def stage_shift_tols(self) -> list[float | None]:
+        """The shift test each stage runs, in esd, in order (WP-2317 R6).
+
+        Parallel to :meth:`run_stages` and :meth:`stage_ftols`, and for the
+        same reason a plan answers it: only the plan knows which stage is
+        last.  The last declared stage and the closing stage take
+        :attr:`shift_over_esd_tol`, unless the stage declares its own
+        :attr:`Stage.ftol`, which it then stops on alone.  Every other stage
+        takes ``None`` and stops on its ftol, since an intermediate stage's
+        job is to seed the next.
+        """
+        tol = check_shift_over_esd_tol(self.shift_over_esd_tol)
+        stages = self.run_stages()
+        endpoints = {len(self.stages) - 1, len(stages) - 1}
+        return [tol if i in endpoints and s.ftol is None else None
                 for i, s in enumerate(stages)]
 
     def __getattr__(self, name: str):
@@ -730,8 +758,10 @@ class RefinementPlan:
         pair of ``examples/guides/calibrate.py`` the sample's size and strain
         land 2.9 and 2.4 esd from the truth with no closing stage anywhere,
         1.3 and 0.8 esd with it in the calibration alone, and 0.3 and 0.4
-        esd with it in the sample fit too (WP-2222, ruled 2026-11-19)."""
-        return cls(closing_window_tol=CLOSING_WINDOW_TOL, stages=[
+        esd with it in the sample fit too (WP-2222, ruled 2026-11-19).
+        For the same reason its stages stop on the solver's 1e-9 rather than
+        the shift test (``shift_over_esd_tol=None``, WP-2317 R6)."""
+        return cls(closing_window_tol=CLOSING_WINDOW_TOL, shift_over_esd_tol=None, stages=[
             Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
             Stage("zero_disp", ["instrument.zero_shift",
                                 "instrument.geometry.sample_displacement"]),

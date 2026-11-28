@@ -1,0 +1,488 @@
+{
+ "platform": "Darwin arm64",
+ "python": "3.12.10",
+ "rietx": "1.13.0.dev0",
+ "venv": "/Users/yue/Code/rietx/.claude/worktrees/agent-a49d976a006c74f97/.venv",
+ "summary": {
+  "key": "fap",
+  "worst_esd": 0.015698298071954227,
+  "worst_at": "instrument.geometry.axial_sl",
+  "nfev": {
+   "tight": [
+    40,
+    40
+   ],
+   "shipped": [
+    35,
+    35
+   ]
+  },
+  "njev": {
+   "tight": [
+    43,
+    43
+   ],
+   "shipped": [
+    37,
+    37
+   ]
+  },
+  "wall_s": {
+   "tight": [
+    1.81,
+    1.8
+   ],
+   "shipped": [
+    1.63,
+    1.59
+   ]
+  },
+  "shipped_terminations": [
+   "shift_over_esd"
+  ],
+  "last_stage": {
+   "tight": {
+    "name": "biso",
+    "n_iterations": 9,
+    "termination": "exhausted_fp64",
+    "shift_over_esd_tol": null
+   },
+   "shipped": {
+    "name": "biso",
+    "n_iterations": 4,
+    "termination": "shift_over_esd",
+    "shift_over_esd_tol": 0.1
+   }
+  },
+  "rwp": {
+   "tight": 0.09249778556290755,
+   "shipped": 0.0924966923808962
+  }
+ },
+ "runs": [
+  {
+   "arm": "tight",
+   "wall_s": 1.8144883329514414,
+   "nfev": 40,
+   "njev": 43,
+   "n_solves": 6,
+   "terminations": [],
+   "rwp": 0.09249778556290755,
+   "last_stage": {
+    "name": "biso",
+    "n_iterations": 9,
+    "termination": "exhausted_fp64",
+    "shift_over_esd_tol": null
+   },
+   "values": {
+    "phases.0.cell.a": [
+     9.372497750001537,
+     8.795421962525013e-05
+    ],
+    "phases.0.cell.b": [
+     9.372497750001537,
+     8.795421962525013e-05
+    ],
+    "phases.0.cell.c": [
+     6.886433609674063,
+     8.109055394177395e-05
+    ],
+    "phases.0.scale": [
+     0.0009642497572569003,
+     5.87938821440849e-06
+    ],
+    "phases.0.lor_size": [
+     0.024598533077432115,
+     0.0014495794092788743
+    ],
+    "phases.0.lor_strain": [
+     0.03695328952269406,
+     0.0029587893152288104
+    ],
+    "phases.0.atoms.0.biso": [
+     0.3799417131474172,
+     0.05348350599276944
+    ],
+    "phases.0.atoms.1.biso": [
+     0.2553522537860003,
+     0.0426032073954255
+    ],
+    "phases.0.atoms.2.biso": [
+     0.2522937878565791,
+     0.0591662284140105
+    ],
+    "phases.0.atoms.3.biso": [
+     1.1697925171861665,
+     0.21064977359011278
+    ],
+    "phases.0.atoms.4.biso": [
+     0.36467436245310064,
+     0.1512924898620044
+    ],
+    "phases.0.atoms.5.biso": [
+     0.6015478762749125,
+     0.15904304151178877
+    ],
+    "phases.0.atoms.6.biso": [
+     0.5375981600968973,
+     0.10780735332125511
+    ],
+    "instrument.geometry.sample_displacement": [
+     0.06930279823169136,
+     0.0017035274769999571
+    ],
+    "instrument.geometry.axial_sl": [
+     0.01680080022765683,
+     0.0013550805992938785
+    ],
+    "instrument.background.c0": [
+     155.6761916323504,
+     0.9714316829032954
+    ],
+    "instrument.background.c1": [
+     -172.76853395900716,
+     1.7625614447827025
+    ],
+    "instrument.background.c2": [
+     122.96470767809092,
+     1.4549478478423183
+    ],
+    "instrument.background.c3": [
+     -71.9213648465211,
+     1.3722216372227627
+    ],
+    "instrument.background.c4": [
+     35.07096103475516,
+     1.0684581213561763
+    ],
+    "instrument.background.c5": [
+     -15.295553148608718,
+     0.9872070470808534
+    ],
+    "qpa.fluorapatite": [
+     1.0,
+     0.0
+    ]
+   }
+  },
+  {
+   "arm": "shipped",
+   "wall_s": 1.6333045000210404,
+   "nfev": 35,
+   "njev": 37,
+   "n_solves": 6,
+   "terminations": [
+    "shift_over_esd"
+   ],
+   "rwp": 0.0924966923808962,
+   "last_stage": {
+    "name": "biso",
+    "n_iterations": 4,
+    "termination": "shift_over_esd",
+    "shift_over_esd_tol": 0.1
+   },
+   "values": {
+    "phases.0.cell.a": [
+     9.372496986617744,
+     8.795606203063187e-05
+    ],
+    "phases.0.cell.b": [
+     9.372496986617744,
+     8.795606203063187e-05
+    ],
+    "phases.0.cell.c": [
+     6.886433073033723,
+     8.108878852648511e-05
+    ],
+    "phases.0.scale": [
+     0.0009642659374234477,
+     5.879111431584973e-06
+    ],
+    "phases.0.lor_size": [
+     0.024615286547767123,
+     0.0014494434517853443
+    ],
+    "phases.0.lor_strain": [
+     0.03692582624931647,
+     0.002958505559400122
+    ],
+    "phases.0.atoms.0.biso": [
+     0.3799961797471799,
+     0.05348000960195913
+    ],
+    "phases.0.atoms.1.biso": [
+     0.255407414267322,
+     0.04260056654732875
+    ],
+    "phases.0.atoms.2.biso": [
+     0.2523678618395814,
+     0.059162740610185734
+    ],
+    "phases.0.atoms.3.biso": [
+     1.1697635067599983,
+     0.21063383936408356
+    ],
+    "phases.0.atoms.4.biso": [
+     0.3647435372621518,
+     0.15128337130859662
+    ],
+    "phases.0.atoms.5.biso": [
+     0.6015926674857174,
+     0.15903273162525997
+    ],
+    "phases.0.atoms.6.biso": [
+     0.5376381094959812,
+     0.1078003989887529
+    ],
+    "instrument.geometry.sample_displacement": [
+     0.0693255292893487,
+     0.0017038693870618698
+    ],
+    "instrument.geometry.axial_sl": [
+     0.01677952776849759,
+     0.001356993432634519
+    ],
+    "instrument.background.c0": [
+     155.67586844224914,
+     0.9713741985206049
+    ],
+    "instrument.background.c1": [
+     -172.7662941727782,
+     1.762457706019971
+    ],
+    "instrument.background.c2": [
+     122.96567985337622,
+     1.4548644072234014
+    ],
+    "instrument.background.c3": [
+     -71.92340903942639,
+     1.3721434391103025
+    ],
+    "instrument.background.c4": [
+     35.07242332241182,
+     1.0683975693806282
+    ],
+    "instrument.background.c5": [
+     -15.296294664705554,
+     0.9871507212012673
+    ],
+    "qpa.fluorapatite": [
+     1.0,
+     0.0
+    ]
+   }
+  },
+  {
+   "arm": "tight",
+   "wall_s": 1.7950395829975605,
+   "nfev": 40,
+   "njev": 43,
+   "n_solves": 6,
+   "terminations": [],
+   "rwp": 0.09249778556290755,
+   "last_stage": {
+    "name": "biso",
+    "n_iterations": 9,
+    "termination": "exhausted_fp64",
+    "shift_over_esd_tol": null
+   },
+   "values": {
+    "phases.0.cell.a": [
+     9.372497750001537,
+     8.795421962525013e-05
+    ],
+    "phases.0.cell.b": [
+     9.372497750001537,
+     8.795421962525013e-05
+    ],
+    "phases.0.cell.c": [
+     6.886433609674063,
+     8.109055394177395e-05
+    ],
+    "phases.0.scale": [
+     0.0009642497572569003,
+     5.87938821440849e-06
+    ],
+    "phases.0.lor_size": [
+     0.024598533077432115,
+     0.0014495794092788743
+    ],
+    "phases.0.lor_strain": [
+     0.03695328952269406,
+     0.0029587893152288104
+    ],
+    "phases.0.atoms.0.biso": [
+     0.3799417131474172,
+     0.05348350599276944
+    ],
+    "phases.0.atoms.1.biso": [
+     0.2553522537860003,
+     0.0426032073954255
+    ],
+    "phases.0.atoms.2.biso": [
+     0.2522937878565791,
+     0.0591662284140105
+    ],
+    "phases.0.atoms.3.biso": [
+     1.1697925171861665,
+     0.21064977359011278
+    ],
+    "phases.0.atoms.4.biso": [
+     0.36467436245310064,
+     0.1512924898620044
+    ],
+    "phases.0.atoms.5.biso": [
+     0.6015478762749125,
+     0.15904304151178877
+    ],
+    "phases.0.atoms.6.biso": [
+     0.5375981600968973,
+     0.10780735332125511
+    ],
+    "instrument.geometry.sample_displacement": [
+     0.06930279823169136,
+     0.0017035274769999571
+    ],
+    "instrument.geometry.axial_sl": [
+     0.01680080022765683,
+     0.0013550805992938785
+    ],
+    "instrument.background.c0": [
+     155.6761916323504,
+     0.9714316829032954
+    ],
+    "instrument.background.c1": [
+     -172.76853395900716,
+     1.7625614447827025
+    ],
+    "instrument.background.c2": [
+     122.96470767809092,
+     1.4549478478423183
+    ],
+    "instrument.background.c3": [
+     -71.9213648465211,
+     1.3722216372227627
+    ],
+    "instrument.background.c4": [
+     35.07096103475516,
+     1.0684581213561763
+    ],
+    "instrument.background.c5": [
+     -15.295553148608718,
+     0.9872070470808534
+    ],
+    "qpa.fluorapatite": [
+     1.0,
+     0.0
+    ]
+   }
+  },
+  {
+   "arm": "shipped",
+   "wall_s": 1.5928290840238333,
+   "nfev": 35,
+   "njev": 37,
+   "n_solves": 6,
+   "terminations": [
+    "shift_over_esd"
+   ],
+   "rwp": 0.0924966923808962,
+   "last_stage": {
+    "name": "biso",
+    "n_iterations": 4,
+    "termination": "shift_over_esd",
+    "shift_over_esd_tol": 0.1
+   },
+   "values": {
+    "phases.0.cell.a": [
+     9.372496986617744,
+     8.795606203063187e-05
+    ],
+    "phases.0.cell.b": [
+     9.372496986617744,
+     8.795606203063187e-05
+    ],
+    "phases.0.cell.c": [
+     6.886433073033723,
+     8.108878852648511e-05
+    ],
+    "phases.0.scale": [
+     0.0009642659374234477,
+     5.879111431584973e-06
+    ],
+    "phases.0.lor_size": [
+     0.024615286547767123,
+     0.0014494434517853443
+    ],
+    "phases.0.lor_strain": [
+     0.03692582624931647,
+     0.002958505559400122
+    ],
+    "phases.0.atoms.0.biso": [
+     0.3799961797471799,
+     0.05348000960195913
+    ],
+    "phases.0.atoms.1.biso": [
+     0.255407414267322,
+     0.04260056654732875
+    ],
+    "phases.0.atoms.2.biso": [
+     0.2523678618395814,
+     0.059162740610185734
+    ],
+    "phases.0.atoms.3.biso": [
+     1.1697635067599983,
+     0.21063383936408356
+    ],
+    "phases.0.atoms.4.biso": [
+     0.3647435372621518,
+     0.15128337130859662
+    ],
+    "phases.0.atoms.5.biso": [
+     0.6015926674857174,
+     0.15903273162525997
+    ],
+    "phases.0.atoms.6.biso": [
+     0.5376381094959812,
+     0.1078003989887529
+    ],
+    "instrument.geometry.sample_displacement": [
+     0.0693255292893487,
+     0.0017038693870618698
+    ],
+    "instrument.geometry.axial_sl": [
+     0.01677952776849759,
+     0.001356993432634519
+    ],
+    "instrument.background.c0": [
+     155.67586844224914,
+     0.9713741985206049
+    ],
+    "instrument.background.c1": [
+     -172.7662941727782,
+     1.762457706019971
+    ],
+    "instrument.background.c2": [
+     122.96567985337622,
+     1.4548644072234014
+    ],
+    "instrument.background.c3": [
+     -71.92340903942639,
+     1.3721434391103025
+    ],
+    "instrument.background.c4": [
+     35.07242332241182,
+     1.0683975693806282
+    ],
+    "instrument.background.c5": [
+     -15.296294664705554,
+     0.9871507212012673
+    ],
+    "qpa.fluorapatite": [
+     1.0,
+     0.0
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,376 @@
+{
+ "platform": "Darwin arm64",
+ "python": "3.12.10",
+ "rietx": "1.13.0.dev0",
+ "venv": "/Users/yue/Code/rietx/.claude/worktrees/agent-a49d976a006c74f97/.venv",
+ "summary": {
+  "key": "bigcell-pawley",
+  "worst_esd": 0.03545585923119721,
+  "worst_at": "instrument.profile.v",
+  "nfev": {
+   "tight": [
+    43,
+    43
+   ],
+   "shipped": [
+    37,
+    37
+   ]
+  },
+  "njev": {
+   "tight": [
+    44,
+    44
+   ],
+   "shipped": [
+    38,
+    38
+   ]
+  },
+  "wall_s": {
+   "tight": [
+    4.53,
+    4.41
+   ],
+   "shipped": [
+    4.65,
+    4.62
+   ]
+  },
+  "shipped_terminations": [
+   "shift_over_esd"
+  ],
+  "last_stage": {
+   "tight": {
+    "name": "profile",
+    "n_iterations": 14,
+    "termination": "ftol_runs",
+    "shift_over_esd_tol": null
+   },
+   "shipped": {
+    "name": "profile",
+    "n_iterations": 8,
+    "termination": "shift_over_esd",
+    "shift_over_esd_tol": 0.1
+   }
+  },
+  "rwp": {
+   "tight": 0.03088232459503238,
+   "shipped": 0.030882670898638814
+  }
+ },
+ "runs": [
+  {
+   "arm": "tight",
+   "wall_s": 4.534490584162995,
+   "nfev": 43,
+   "njev": 44,
+   "n_solves": 5,
+   "terminations": [],
+   "rwp": 0.03088232459503238,
+   "last_stage": {
+    "name": "profile",
+    "n_iterations": 14,
+    "termination": "ftol_runs",
+    "shift_over_esd_tol": null
+   },
+   "values": {
+    "phases.0.cell.a": [
+     12.192697664943543,
+     0.000372683532150225
+    ],
+    "phases.0.cell.b": [
+     36.73608222847405,
+     0.0012057569846248123
+    ],
+    "phases.0.cell.c": [
+     3.9501732002993046,
+     0.00011763255247956442
+    ],
+    "instrument.zero_shift": [
+     -0.017245942996095703,
+     0.0010026864029294318
+    ],
+    "instrument.profile.u": [
+     -0.00029449167840342244,
+     0.005113015612906859
+    ],
+    "instrument.profile.v": [
+     -0.004044800006525308,
+     0.0054378105945701895
+    ],
+    "instrument.profile.w": [
+     0.009746946961266607,
+     0.0011775792573990005
+    ],
+    "instrument.profile.x": [
+     0.03590381300322452,
+     0.003700192080550432
+    ],
+    "instrument.profile.y": [
+     -0.04508717101739444,
+     0.015473352233769227
+    ],
+    "instrument.background.c0": [
+     915.1212109940286,
+     9.455267176512923
+    ],
+    "instrument.background.c1": [
+     4.957082554159793,
+     16.420155518159497
+    ],
+    "instrument.background.c2": [
+     -0.6738708093081537,
+     14.07104317631977
+    ],
+    "instrument.background.c3": [
+     -0.43584063792898814,
+     13.245656719652189
+    ],
+    "instrument.background.c4": [
+     -2.696059853951205,
+     10.441445153756298
+    ],
+    "instrument.background.c5": [
+     -0.599037967675604,
+     7.0001179224237715
+    ]
+   }
+  },
+  {
+   "arm": "shipped",
+   "wall_s": 4.648042791988701,
+   "nfev": 37,
+   "njev": 38,
+   "n_solves": 5,
+   "terminations": [
+    "shift_over_esd"
+   ],
+   "rwp": 0.030882670898638814,
+   "last_stage": {
+    "name": "profile",
+    "n_iterations": 8,
+    "termination": "shift_over_esd",
+    "shift_over_esd_tol": 0.1
+   },
+   "values": {
+    "phases.0.cell.a": [
+     12.192694877072844,
+     0.0003726947356974274
+    ],
+    "phases.0.cell.b": [
+     36.73606706548091,
+     0.0012056855179912456
+    ],
+    "phases.0.cell.c": [
+     3.9501725137778343,
+     0.0001176084772556119
+    ],
+    "instrument.zero_shift": [
+     -0.017256495593302223,
+     0.001002704543219719
+    ],
+    "instrument.profile.u": [
+     -0.00013665030087136443,
+     0.005115978773351261
+    ],
+    "instrument.profile.v": [
+     -0.004237602253492302,
+     0.005438115739114099
+    ],
+    "instrument.profile.w": [
+     0.009787665815305793,
+     0.0011776760236052993
+    ],
+    "instrument.profile.x": [
+     0.035815555282439314,
+     0.0036997530936471634
+    ],
+    "instrument.profile.y": [
+     -0.044731209727919566,
+     0.015470558632776013
+    ],
+    "instrument.background.c0": [
+     915.0362871395163,
+     9.469200421296534
+    ],
+    "instrument.background.c1": [
+     4.834261518863592,
+     16.448733237086902
+    ],
+    "instrument.background.c2": [
+     -0.7037878956101069,
+     14.094332225623374
+    ],
+    "instrument.background.c3": [
+     -0.41840349485924616,
+     13.263092848645075
+    ],
+    "instrument.background.c4": [
+     -2.6853391909549056,
+     10.452230686736186
+    ],
+    "instrument.background.c5": [
+     -0.5912337225377153,
+     7.003894158774603
+    ]
+   }
+  },
+  {
+   "arm": "tight",
+   "wall_s": 4.413624332984909,
+   "nfev": 43,
+   "njev": 44,
+   "n_solves": 5,
+   "terminations": [],
+   "rwp": 0.03088232459503238,
+   "last_stage": {
+    "name": "profile",
+    "n_iterations": 14,
+    "termination": "ftol_runs",
+    "shift_over_esd_tol": null
+   },
+   "values": {
+    "phases.0.cell.a": [
+     12.192697664943543,
+     0.000372683532150225
+    ],
+    "phases.0.cell.b": [
+     36.73608222847405,
+     0.0012057569846248123
+    ],
+    "phases.0.cell.c": [
+     3.9501732002993046,
+     0.00011763255247956442
+    ],
+    "instrument.zero_shift": [
+     -0.017245942996095703,
+     0.0010026864029294318
+    ],
+    "instrument.profile.u": [
+     -0.00029449167840342244,
+     0.005113015612906859
+    ],
+    "instrument.profile.v": [
+     -0.004044800006525308,
+     0.0054378105945701895
+    ],
+    "instrument.profile.w": [
+     0.009746946961266607,
+     0.0011775792573990005
+    ],
+    "instrument.profile.x": [
+     0.03590381300322452,
+     0.003700192080550432
+    ],
+    "instrument.profile.y": [
+     -0.04508717101739444,
+     0.015473352233769227
+    ],
+    "instrument.background.c0": [
+     915.1212109940286,
+     9.455267176512923
+    ],
+    "instrument.background.c1": [
+     4.957082554159793,
+     16.420155518159497
+    ],
+    "instrument.background.c2": [
+     -0.6738708093081537,
+     14.07104317631977
+    ],
+    "instrument.background.c3": [
+     -0.43584063792898814,
+     13.245656719652189
+    ],
+    "instrument.background.c4": [
+     -2.696059853951205,
+     10.441445153756298
+    ],
+    "instrument.background.c5": [
+     -0.599037967675604,
+     7.0001179224237715
+    ]
+   }
+  },
+  {
+   "arm": "shipped",
+   "wall_s": 4.622264957986772,
+   "nfev": 37,
+   "njev": 38,
+   "n_solves": 5,
+   "terminations": [
+    "shift_over_esd"
+   ],
+   "rwp": 0.030882670898638814,
+   "last_stage": {
+    "name": "profile",
+    "n_iterations": 8,
+    "termination": "shift_over_esd",
+    "shift_over_esd_tol": 0.1
+   },
+   "values": {
+    "phases.0.cell.a": [
+     12.192694877072844,
+     0.0003726947356974274
+    ],
+    "phases.0.cell.b": [
+     36.73606706548091,
+     0.0012056855179912456
+    ],
+    "phases.0.cell.c": [
+     3.9501725137778343,
+     0.0001176084772556119
+    ],
+    "instrument.zero_shift": [
+     -0.017256495593302223,
+     0.001002704543219719
+    ],
+    "instrument.profile.u": [
+     -0.00013665030087136443,
+     0.005115978773351261
+    ],
+    "instrument.profile.v": [
+     -0.004237602253492302,
+     0.005438115739114099
+    ],
+    "instrument.profile.w": [
+     0.009787665815305793,
+     0.0011776760236052993
+    ],
+    "instrument.profile.x": [
+     0.035815555282439314,
+     0.0036997530936471634
+    ],
+    "instrument.profile.y": [
+     -0.044731209727919566,
+     0.015470558632776013
+    ],
+    "instrument.background.c0": [
+     915.0362871395163,
+     9.469200421296534
+    ],
+    "instrument.background.c1": [
+     4.834261518863592,
+     16.448733237086902
+    ],
+    "instrument.background.c2": [
+     -0.7037878956101069,
+     14.094332225623374
+    ],
+    "instrument.background.c3": [
+     -0.41840349485924616,
+     13.263092848645075
+    ],
+    "instrument.background.c4": [
+     -2.6853391909549056,
+     10.452230686736186
+    ],
+    "instrument.background.c5": [
+     -0.5912337225377153,
+     7.003894158774603
+    ]
+   }
+  }
+ ]
+}

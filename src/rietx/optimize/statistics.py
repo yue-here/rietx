@@ -1480,10 +1480,12 @@ OBS_PER_PARAMETER_PREFERRED = 5.0
 
 #: The convergence band of McCusker et al. (1999) §7: a refinement has
 #: converged when the maximum shift/esd in the final cycle is ≤ 0.1.  Quoted,
-#: never tuned, and it gates nothing — it sets the level of one report
-#: sentence, and on a fit that stopped on its iteration budget the measured
-#: quantity (``Statistics.max_shift_over_esd``) says *how far* the solve was
-#: still moving in esd units.
+#: never tuned.  Here it sets the level of one report sentence, and on a fit
+#: that stopped on its iteration budget the measured quantity
+#: (``Statistics.max_shift_over_esd``) says *how far* the solve was still
+#: moving in esd units.  The stop a plan's last stage runs quotes the same
+#: number as ``schemas.plan.SHIFT_OVER_ESD_TOL`` (WP-2317 R6), held equal by
+#: test; that one reads the undamped step, this one the damped step taken.
 MAX_SHIFT_CONVERGED = 0.1
 
 #: Half-width of a reflection's interval, in its own FWHMs — Altomare et al.

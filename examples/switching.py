@@ -28,25 +28,27 @@ OXYGENS = ["phases.0.atoms.4.biso", "phases.0.atoms.5.biso", "phases.0.atoms.6.b
 LIMITS = (15, 130)
 
 # The lines each page quotes, as the page prints them.
+# Every fitted number here moved with WP-2317 R6 (2026-11-28; the last stage stops on the
+# shift test): beq 0.382804 -> 0.382098, U -1.57916 -> -1.59458 centidegrees².
 TOPAS_SITES = [
-    "site O5 x O5_x 0.324668 y O5_y 0.484847 z ! 0.25 occ O ! 1.0 beq O5_biso 0.382804",
-    "site O6 x O6_x 0.591016 y O6_y 0.468991 z ! 0.25 occ O ! 1.0 beq O5_biso 0.382804",
-    "site O7 x O7_x 0.33985 y O7_y 0.257709 z O7_z 0.0704391 occ O ! 1.0 beq O5_biso 0.382804",
+    "site O5 x O5_x 0.324668 y O5_y 0.48485 z ! 0.25 occ O ! 1.0 beq O5_biso 0.382098",
+    "site O6 x O6_x 0.591019 y O6_y 0.468993 z ! 0.25 occ O ! 1.0 beq O5_biso 0.382098",
+    "site O7 x O7_x 0.339853 y O7_y 0.257712 z O7_z 0.0704376 occ O ! 1.0 beq O5_biso 0.382098",
 ]
 TOPAS_EXCERPT = [
     'xdd "refined.xye" xye_format',
     "  weighting = 1 / SigmaYobs^2;",
-    "  bkg @ 154.768 -172.223 123.708 -71.9987 35.2492 -15.3107",
+    "  bkg @ 154.767 -172.228 123.71 -71.9987 35.2467 -15.3097",
     "  th2_offset ! 0",
-    "  th2_offset = -2*Rad*(0.0632254)*Cos(Th)/217.5;",
+    "  th2_offset = -2*Rad*(0.0632199)*Cos(Th)/217.5;",
     "str",
-    "  scale p0_scale 0.000470097 min 0",
+    "  scale p0_scale 0.000470078 min 0",
     "  a p0_cell_a 9.37331",
     "  b p0_cell_a 9.37331",
 ]
 INSTPRM = [
-    "Type:PXC", "Lam1:1.54059", "Lam2:1.54443", "Zero:-0.0365497", "I(L2)/I(L1):0.5",
-    "Polariz.:0.5", "U:-1.57916", "V:2.93629", "W:2.28639", "X:2.74811", "Y:3.98994",
+    "Type:PXC", "Lam1:1.54059", "Lam2:1.54443", "Zero:-0.0365507", "I(L2)/I(L1):0.5",
+    "Polariz.:0.5", "U:-1.59458", "V:2.96895", "W:2.27659", "X:2.75011", "Y:3.98437",
 ]
 # fullprof.md prints these runs with `...` between them; each run is
 # consecutive in the file, so an atom's codeword line is the one under it.
@@ -146,7 +148,7 @@ def gsas2_page(out: Path) -> None:
                      for line in path.read_text(encoding="utf-8").splitlines()
                      if line.startswith("U:"))
     u_rietx = rx.read_gsas2_instprm(path).profile.u.value
-    assert same("-0.000875675", cut(repr(u_rietx)))
+    assert same("-0.000884223", cut(repr(u_rietx)))
     assert math.isclose(u_instprm * 8 * math.log(2) * 1e-4, u_rietx, rel_tol=1e-6)
 
 

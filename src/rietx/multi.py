@@ -2025,9 +2025,12 @@ class MultiHistogramRefinement:
         n_stages = len(stages)
         # what an earlier stage left free: the aperture lift's gate (WP-1955)
         refined_before: set[str] = set()
-        for index, (stage, ftol, window_tol) in enumerate(
-                zip(stages, plan.stage_ftols(), plan.stage_window_tols(),
-                    strict=True), start=1):
+        for index, (stage, ftol, shift_tol, window_tol) in enumerate(
+                zip(stages, plan.stage_ftols(),
+                    # only the LM driver runs the shift test (WP-2317 R6)
+                    plan.stage_shift_tols() if self._solver == "lm"
+                    else [None] * len(stages),
+                    plan.stage_window_tols(), strict=True), start=1):
             with self._abandon_on_cancel(cancel, stage.name, stage_results, stream):
                 freed = self.mtable.set_vary(stage.turn_on, True)
                 # what the glob matched and a hold refused (WP-1435): here only
@@ -2128,6 +2131,9 @@ class MultiHistogramRefinement:
                 pawley_start = ([None if m.pawley is None else m.pawley_x0()
                                  for m in models] if mode == "pawley" else None)
                 stage_ftol = {} if ftol is None else {"ftol": ftol}
+                # the shift test (WP-2317 R6), on the joint columns
+                if shift_tol is not None:
+                    stage_ftol["shift_tol"] = shift_tol
                 # A phase the data cannot see is flat here too (WP-1301), and
                 # each entry is judged where it lives (``_unseen``, WP-1325): a
                 # shared cell only when no histogram sees the phase, the rule
@@ -2391,6 +2397,7 @@ class MultiHistogramRefinement:
                     n_degenerate_cell_probes=outcome.n_degenerate_cell_probes,
                     n_lapack_fallbacks=outcome.n_lapack_fallbacks,
                     ftol=ftol, window_area_tol=window_tol,
+                    shift_over_esd_tol=shift_tol,
                     held=held, released=released,
                     held_reach={c: v for c, v in held_reach.items() if c in still},
                     scale_b_held=dict(scale_b_held),

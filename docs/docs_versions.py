@@ -133,6 +133,8 @@ RETIRED: dict[str, str] = {
 #: on PyPI's release pages) goes where the current README sends the same
 #: feature.  tests/test_manual.py checks all three sets against the built manual.
 MOVED_ANCHORS: dict[str, dict[str, str]] = {
+    # Convergence left the estimation chapter for its own (WP-2317 R6).
+    "estimation": {"convergence": "theory/convergence"},
     "using/glossary": {
         "glossary": "reference/parameters",
         "looking-one-up-in-code": "reference/settings#looking-one-up-in-code",

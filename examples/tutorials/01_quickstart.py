@@ -151,7 +151,7 @@ result
 # Read the [summary](https://rietx.org/docs/stable/reference/result.html#printing-a-result) from the top.
 #
 # 1. Each stage line gives its status, the residual evaluations it took and its `ftol`.
-#    [`ftol`](https://rietx.org/docs/stable/reference/refinement.html#stage-tolerances) is the relative fall in χ² below which the stage stops.
+#    [`ftol`](https://rietx.org/docs/stable/reference/stopping.html) is the relative fall in χ² below which the stage stops.
 #    The first five stages stop at `ftol=1e-06`, a looser tolerance than the solver's own, because a later stage refines their parameters again.
 #    The `closing` stage runs at the solver's default, and its values are the ones to quote.
 #    `max|Δθ|/esd` is the largest final step of any parameter in units of its own esd.

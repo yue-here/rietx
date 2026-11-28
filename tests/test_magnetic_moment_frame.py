@@ -192,7 +192,9 @@ def test_the_start_at_truth_control_is_unchanged(cw_declared):
     driver's +0.09520 are one minimum, their χ² equal to 4e-13 (WP-1938).
     """
     ref, result = _fit(cw_declared, 101.0,
-                       dataclasses.replace(PLAN_3, closing_window_tol=None))
+                       dataclasses.replace(PLAN_3, closing_window_tol=None,
+                                           # a precision check: the 1e-9 stop (WP-2317 R6)
+                                           shift_over_esd_tol=None))
     m_back, cell = _written_back(ref)
     np.testing.assert_allclose(m_back * [1.0, np.sign(m_back[1]), 1.0],
                                [2.49970, 0.09520, 2.49298], atol=2e-5)

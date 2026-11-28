@@ -34,7 +34,7 @@ from .instrument import Instrument
 # lives in ``schemas/plan.py`` (WP-1004); the compat re-export was deleted
 # pre-freeze (WP-1003), so import both from there.
 from .params import TieSpec
-from .plan import CORRELATION_GUARD, PHASE_SUPPORT_SIGMA, PlanSpec
+from .plan import CORRELATION_GUARD, PHASE_SUPPORT_SIGMA, SHIFT_OVER_ESD_TOL, PlanSpec
 from .results import Statistics
 from .structure import Structure
 
@@ -81,6 +81,13 @@ class NodeAction(Base):
     fields ran under unless a plan set another guard, so an old node loads
     and replays as it always did.  Written on ``"stage"`` nodes only; every
     other kind carries the defaults, which is what ``replay`` reads them at.
+
+    ``shift_over_esd_tol`` (WP-2317 R6) is the shift test the stage stopped
+    on, for the same reason: a plan's last stage takes it from
+    ``RefinementPlan.shift_over_esd_tol``, so a cherry-pick that rebuilt the
+    ``Stage`` alone would replay a stage that stopped at 0.1 esd as one run
+    to the solver's 1e-9.  ``None`` is the ftol alone, what every node written
+    before the field ran, so an old node replays as it always did.
 
     ``window_area_tol`` (WP-2002, the sixth round's Q1 and Q2) is the area
     fraction the stage's windows were compiled to drop, a ``run_stage``
@@ -133,6 +140,10 @@ class NodeAction(Base):
     phase_support_sigma: float | None = 3.0
     #: the |ρ| the stage's correlation guard reported above, written beside it
     correlation_guard: float = 0.98
+    #: the shift test the stage stopped on, in esd (``None``: its ftol alone,
+    #: what every node written before the field ran), a ``run_stage``
+    #: keyword for ``phase_support_sigma``'s reason (WP-2317 R6)
+    shift_over_esd_tol: float | None = None
     ties: dict[str, TieSpec] = Field(default_factory=dict)
     untied: list[str] = Field(default_factory=list)
     #: ``"set_variable"``'s own arguments (WP-1119), by the same rule as
@@ -188,7 +199,10 @@ class NodeAction(Base):
                  ("phase_support_sigma", self.phase_support_sigma,
                   PHASE_SUPPORT_SIGMA),
                  ("window_area_tol", recorded_window_tol(self.window_area_tol),
-                  WINDOW_AREA_TOL))
+                  WINDOW_AREA_TOL),
+                 # read by run_stage only where the stage declares no ftol
+                 ("shift_over_esd_tol", self.shift_over_esd_tol,
+                  SHIFT_OVER_ESD_TOL if self.ftol is None else self.shift_over_esd_tol))
                 if v != off)
             return (f"ref.run_stage(data, rx.Stage({self.name!r}, {self.turn_on!r}, "
                     f"max_iter={self.max_iter}{extras}){settings})")
