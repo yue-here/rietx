@@ -1234,7 +1234,8 @@ def test_the_verb_exclusions_are_live_and_reasoned():
 #: share, so its codes fire from either and carry neither suffix.
 FOREIGN_FILE_PREFIXES = ("RECIPE_", "TOPAS_", "FULLPROF_", "GSAS_PRM_",
                           "GSAS_EXP_", "GSAS_FIELD_", "GSAS2_GPX_",
-                          "GSAS2_INSTPRM_", "GSAS2_CIF_", "GSAS_IPARM_")
+                          "GSAS2_INSTPRM_", "GSAS2_CIF_", "GSAS_IPARM_",
+                          "JANA_")
 
 _CODE_ROW = re.compile(r"^\| `([A-Z][A-Z0-9_]+)`")
 

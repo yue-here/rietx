@@ -3432,6 +3432,74 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "`load_instrument_profile`, and refine the sample with `lab_sample_refine`."
         ),
     ),
+    "JANA_CONSTRAINTS_NOT_CARRIED": HelpEntry(
+        title="Jana's constraint commands were not carried",
+        description=(
+            "The REFINE section of the .m50 holds constraint commands, which tie or "
+            "fix parameters beyond the .m40 refinement keys. "
+            "The reader does not apply them, so each parameter is free or held only as "
+            "its own key says. Tie or hold those parameters yourself to reproduce the "
+            "Jana protocol."
+        ),
+    ),
+    "JANA_COORDINATES_SYMMETRY_FIXED": HelpEntry(
+        title="Jana coordinate keys on a fully fixed site",
+        description=(
+            "A site carries a coordinate key but sits on a fully fixed special position, "
+            "where symmetry leaves no direction to move, so its coordinates are held. "
+            "Nothing to do."
+        ),
+    ),
+    "JANA_KEYS_MAY_BE_IGNORED": HelpEntry(
+        title="Jana's refinement keys may not be the refined set",
+        description=(
+            "Jana's automatic mode ignores the .m40 refinement keys of everything but "
+            "scales and occupancies, and the Jana98 manual gives it as the default. The "
+            ".m50 did not switch it off, so the vary flags read from the keys may not "
+            "be the parameters the Jana run refined. Check the run's protocol before "
+            "reusing it."
+        ),
+    ),
+    "JANA_NOT_CARRIED": HelpEntry(
+        title="Parts of a Jana set were not carried",
+        description=(
+            "The message lists what the Jana files state that the structure does not "
+            "hold: the .m50 cell, taken and held, where the .m41 states none for the "
+            "phase; a stated neutron scattering length or tabulated form factor, which "
+            "rietx replaces with its own; and .m40 lines after the declared atoms. "
+            "The model returned by the reader still has every number."
+        ),
+    ),
+    "JANA_PRINTED_DIGIT_REPAIRED": HelpEntry(
+        title="A Jana value was read within its last printed digit",
+        description=(
+            "Each number in a Jana file stands for any value within half a unit of its "
+            "own last printed digit. An occupancy that lies that close to a full site is "
+            "read as full, and a `U^ij` that lies that close to the form its site's "
+            "symmetry allows is moved onto it, as the CIF reader does. A value further "
+            "off is refused, naming the site. Nothing to do; the message names the sites."
+        ),
+    ),
+    "JANA_REFINE_KEY_MERGED": HelpEntry(
+        title="Jana keys on some of a site's directions free all of them",
+        description=(
+            "A structure carries one refine flag for an atom's coordinates and one for "
+            "its `U^ij`, each freeing every direction the site's symmetry allows. Jana "
+            "keys each value, so a key on some allowed directions frees the rest, which "
+            "the Jana run held. The message names each atom and the held directions. A "
+            "held coordinate can be what fixed a polar group's origin. Hold them again "
+            "with `Refinement.hold`, or set `Phase.floating_origin`, before you compare "
+            "the fit with the Jana run."
+        ),
+    ),
+    "JANA_SCALE_NOT_COMPARABLE": HelpEntry(
+        title="The Jana scale was not carried",
+        description=(
+            "Jana's scale is not a rietx scale, so the phase scale is seeded at a small "
+            "value and the message quotes the .m40's scale line. Refine the scale before "
+            "you trust anything derived from it."
+        ),
+    ),
     "K_SEARCH_PARTNER": HelpEntry(
         title="The cell's metric pairs this propagation vector with another",
         description=(
