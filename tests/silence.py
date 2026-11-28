@@ -1135,6 +1135,31 @@ def _sigma_nonpositive_silent() -> list:
                          nonpositive_sigma="poisson"))
 
 
+def _not_counts_xy(y: list[float]) -> list:
+    """Twelve points of an ``.xy`` with no σ column whose intensities are ``y``, read."""
+    from rietx.io.readers import read_pattern
+    from tests.test_readers import write_xy
+
+    tt = [10.0 + 0.02 * i for i in range(12)]
+    found: list = []
+    with tempfile.TemporaryDirectory() as tmp:
+        read_pattern(write_xy(pathlib.Path(tmp) / "n.xy", tt, y), diagnostics=found)
+    return found
+
+
+def _not_counts_fires() -> list:
+    """A pattern normalised below one count, and one point below zero."""
+    return (_not_counts_xy([(500.0 + i % 7) / 1000.0 for i in range(12)])
+            + _not_counts_xy([-3.0 if i == 4 else 500.0 + i % 7 for i in range(12)]))
+
+
+def _not_counts_silent() -> list:
+    """Integer counts with a zero among them, and a column scaled by 1.37 that
+    never drops below one: the floor binds on no value that is not a count."""
+    return (_not_counts_xy([0.0 if i == 4 else 500.0 + i % 7 for i in range(12)])
+            + _not_counts_xy([1.37 * (500.0 + i % 7) for i in range(12)]))
+
+
 # ------------------------------------------------------------ peak equations
 
 
@@ -1293,6 +1318,8 @@ SILENCE: dict[str, Pair] = {
         _unsupported_fires, _unsupported_silent, "tests/test_modulus_interval.py"),
     "PARAMETRIC_OUT_OF_RANGE": Pair(
         _parametric_range_fires, _parametric_range_silent, "tests/test_parametric_series.py"),
+    "PATTERN_INTENSITY_NOT_COUNTS": Pair(
+        _not_counts_fires, _not_counts_silent, "tests/test_readers_robust.py"),
     "VARIABLE_NOT_FREED": Pair(
         _not_freed_fires, _not_freed_silent,
         "tests/test_tie_expression.py, tests/test_parametric_expression.py"),

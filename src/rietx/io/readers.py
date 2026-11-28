@@ -119,6 +119,22 @@ def read_pattern(path: str | Path, *, diagnostics: list[Diagnostic] | None = Non
     σ at all states no weight anywhere and is not read, and the same code says
     so.  The ``xy`` and ``chi`` readers declined one in silence until WP-1952;
     they now hand it here.
+
+    **A pattern with no usable σ whose intensities no count can take says so**
+    (``PATTERN_INTENSITY_NOT_COUNTS``, WP-1952, WP-2002 B5.2).  With no σ the
+    fit weights each point by the Poisson σ = √max(y, 1), which is right for
+    raw counts and, up to one constant factor that moves χ² but no parameter
+    and no esd (an esd carries √χ²_red), for any column proportional to them
+    and never below 1.  Where it is wrong is the floor: an intensity between 0
+    and 1, or below 0, is not a count, and the fallback gives it σ = 1.  A
+    pattern normalised below one count gets weight 1 on every point that way,
+    an unweighted fit, in silence.  So such points are counted and placed,
+    with no threshold: one of them is already proof the column is not raw
+    counts.  A zero is not counted: on raw counts one count at a zero count is
+    the floor's purpose, and on a scaled column the fractional or negative
+    values are what show the scale.  It fires beside
+    ``PATTERN_INTENSITY_SCALED`` too, since that code cannot say how many
+    points sit at the floor.
     """
     p = Path(path)
     fmt = identify_format(p)
@@ -136,6 +152,7 @@ def read_pattern(path: str | Path, *, diagnostics: list[Diagnostic] | None = Non
                              f"{list(NONPOSITIVE_SIGMA_RULES)}, got {rule!r}")
         data = fmt.read(p, diagnostics=notes, **kwargs)
         notes.extend(_apply_nonpositive_sigma(data, rule, p.name))
+        notes.extend(_not_counts_diagnostics(data, p.name))
         notes.extend(_axis_diagnostics(data, fmt, p.name))
         notes.extend(_constant_sigma_diagnostics(data, fmt, p.name))
         notes.extend(_dead_channel_diagnostics(data, p.name))
@@ -197,6 +214,37 @@ def _apply_nonpositive_sigma(data: PatternData, rule: str,
                     "wrote σ = √0, read it with nonpositive_sigma='poisson' "
                     "to weight them at σ = √max(y, 1), one count at a zero "
                     "count."))]
+
+
+def _not_counts_diagnostics(data: PatternData, name: str) -> list[Diagnostic]:
+    """``PATTERN_INTENSITY_NOT_COUNTS`` — :func:`read_pattern` says why it is here."""
+    if data.sigma is not None:
+        return []
+    y = np.asarray(data.y(), dtype=np.float64)
+    frac = np.isfinite(y) & (y > 0) & (y < 1)
+    neg = np.isfinite(y) & (y < 0)
+    bad = frac | neg
+    if not bad.any():
+        return []
+    n_frac, n_neg = int(frac.sum()), int(neg.sum())
+    parts = ([f"{n_frac} between 0 and 1"] if n_frac else []) + (
+        [f"{n_neg} below 0"] if n_neg else [])
+    unit = "°" if data.axis == "two_theta" else " µs"
+    label = "2θ" if data.axis == "two_theta" else "flight time"
+    spans, shown = _point_runs(data.x(), np.flatnonzero(bad), unit)
+    n = int(bad.sum())
+    has = "has" if n == 1 else "have"
+    return [Diagnostic(
+        level="warning", code="PATTERN_INTENSITY_NOT_COUNTS",
+        message=(f"{name}: the pattern carries no usable σ, so each point is "
+                 f"weighted by the Poisson σ = √max(y, 1). "
+                 f"{n} of {y.size} points {has} an intensity no count can "
+                 f"take ({' and '.join(parts)}), at {label} {shown}."),
+        where=[f"{lo:.3f}-{hi:.3f}" for lo, hi in spans],
+        value=float(n),
+        suggestion=("If the intensities were scaled or had a background "
+                    "subtracted, supply σ carried from the raw counts, or quote "
+                    "χ² and esds knowing the weights are assumed."))]
 
 
 def _constant_sigma_diagnostics(data: PatternData, fmt: PatternFormat,
