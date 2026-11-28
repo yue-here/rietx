@@ -88,7 +88,7 @@ from .model.forward import (
     recorded_window_tol,
     window_loss,
 )
-from .model.geometry import cell_volumes, geometry_table
+from .model.geometry import cell_volumes, fit_geometry_table
 from .model.microstructure import floored_paths, microstructure_table
 from .model.origin import CompiledOrigin, OriginPhaseRows, compile_origin
 from .model.peak_equations import WIDTH_TARGETS
@@ -7638,7 +7638,7 @@ class Refinement:
         """Distances, angles and torsions with esds, or the ones ``request`` names.
 
         With no ``request``, the whole bonding table
-        (:func:`~rietx.model.geometry.geometry_table`): bonds, contacts, angles
+        (:func:`~rietx.model.geometry.fit_geometry_table`): bonds, contacts, angles
         and torsions over bonded chains, the one ``result_.geometry`` carries.
         With a :class:`~rietx.schemas.results.GeometryRequest` (or a dict
         validated as one), only the distances, angles and torsions it names,
@@ -10086,7 +10086,7 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # ``with_geometry=False`` is a trajectory rung's: its report is projected
     # onto a StageReport that carries no geometry, and the search was a third
     # of a rung's result build (WP-1335)
-    geometry = (geometry_table(model, table, theta, structure,
+    geometry = (fit_geometry_table(model, table, theta, structure,
                                stderr_internal=stderr_internal,
                                correlation=correlation, discarded=discarded)
                 if with_geometry else None)
