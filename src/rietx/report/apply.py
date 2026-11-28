@@ -183,17 +183,22 @@ def api_call(stage: StageSpec, *, plan=None) -> str:
     Rendered by :meth:`NodeAction.api_call`, which is what the history panel
     already prints for a stage node — so the line an Apply button shows as its
     tooltip and the line that node prints afterwards come from one function rather
-    than from two spellings that can drift.  ``plan`` is the plan whose two
+    than from two spellings that can drift.  ``plan`` is the plan whose three
     settings the stage will run at (a project's stored one, which
     ``Project.run_stage`` passes on), since the node records them and its line
     then names any that differ from the default (WP-2002, B1).
     """
     from ..model.forward import WINDOW_AREA_TOL
     from ..schemas.history import NodeAction
+    from ..schemas.plan import SHIFT_OVER_ESD_TOL
 
-    settings = ({} if plan is None else
+    # the shift test run_stage applies when given none (WP-2317 R6), or the
+    # stored plan's, which ``Project.run_stage`` passes on: NodeAction's own
+    # None would print a keyword the node never records
+    settings = ({"shift_over_esd_tol": SHIFT_OVER_ESD_TOL} if plan is None else
                 {"correlation_guard": plan.correlation_guard,
-                 "phase_support_sigma": plan.phase_support_sigma})
+                 "phase_support_sigma": plan.phase_support_sigma,
+                 "shift_over_esd_tol": plan.shift_over_esd_tol})
     # the fraction run_stage records when given none (the declared stages' 2 %
     # since WP-2222), so the tooltip and the node's line agree
     return NodeAction(kind="stage", name=stage.name, turn_on=list(stage.turn_on),

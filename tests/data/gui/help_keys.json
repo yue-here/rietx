@@ -555,6 +555,7 @@
   "result_fields:StageResult.rwp",
   "result_fields:StageResult.scale_b_held",
   "result_fields:StageResult.seeded",
+  "result_fields:StageResult.shift_over_esd_tol",
   "result_fields:StageResult.status",
   "result_fields:StageResult.termination",
   "result_fields:StageResult.unknown_paths",

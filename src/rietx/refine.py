@@ -6622,7 +6622,9 @@ class Refinement:
                 # closing_window_tol=None would refit at 0.1 % windows against
                 # a χ² measured at the declared 2 %
                 "window_area_tol": recorded_window_tol(plan.stage_window_tols()[-1]),
-                "shift_over_esd_tol": plan.shift_over_esd_tol}
+                # the test the answer stage ran, not the plan's field: a last
+                # stage declaring its own ftol ran none (WP-2317 R6)
+                "shift_over_esd_tol": plan.stage_shift_tols()[-1]}
             _apply_esds(table, self.result_, self.structure, self.instrument)
             self._answer_covariance = (self.result_, table, outcome.theta,
                                        outcome.stderr_internal,

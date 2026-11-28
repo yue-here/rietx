@@ -31,8 +31,9 @@ from rietx.strategy.staged import RefinementPlan, Stage
 pytestmark = pytest.mark.xdist_group("body-misfit")
 
 
-def _fitted(stretch: float):
-    """The truth pattern, fitted with a body whose C–Br is ``stretch`` Å long."""
+def _fitted(stretch: float, **plan_kw):
+    """The truth pattern, fitted with a body whose C–Br is ``stretch`` Å long;
+    ``plan_kw`` are the fit's plan settings, which the check's arms inherit."""
     pattern = trb.synthesize(trb.body_structure(trb.Q_TRUE))
     orig = trb.c6br
 
@@ -49,7 +50,7 @@ def _fitted(stretch: float):
         trb.c6br = orig
     ref = Refinement(start, trb.INS, history=False)
     ref.fit(pattern, plan=RefinementPlan(stages=[
-        Stage("body", trb.BODY_GLOBS, max_iter=200)]))
+        Stage("body", trb.BODY_GLOBS, max_iter=200)], **plan_kw))
     return ref, pattern
 
 
@@ -108,8 +109,10 @@ def test_the_right_body_does_not_fire(right):
 
 def test_a_silence_from_a_short_refit_is_not_judged():
     """One iteration per arm: a released arm stopped on its budget has not
-    shown the body fits, so the row reads ``None`` and says why (WP-2220)."""
-    ref, pattern = _fitted(0.0)
+    shown the body fits, so the row reads ``None`` and says why (WP-2220).
+    The fit keeps the solver's 1e-9 stop, which its arms inherit: from the
+    truth the shift test (WP-2317 R6) would call one iteration converged."""
+    ref, pattern = _fitted(0.0, shift_over_esd_tol=None)
     out = ref.check_rigid_bodies(pattern, max_iter=1)
     (row,) = out.rows
     # a silence stays open only where the released arm stopped short
