@@ -1179,6 +1179,21 @@ ROWS: tuple[Row, ...] = (
                   '(tests/test_projects_fullprof.py::test_an_ambiguous_cross_atom_tie_still_refuses)'),
         grounds=('The Structure has no tie field, so a loss is forced by the model and each arm '
                  'names the restoring call.')),
+    Row("GEOMETRY_UNSTATED", "code", tier=3, ambiguity=3,
+        evidence=("warning; fires on every fit whose Geometry.kind is 'unstated', the default "
+                  "of a hand-built Geometry (WP-2015). Under it no displacement, transparency, "
+                  "capillary offset or absorption is applied or freed, and on a Bragg-Brentano "
+                  "pattern a displacement fitted as a zero leaves a tan-theta remainder the "
+                  "cell absorbs (measured, WP-2015: NIST SRM 660c's cell 70 ppm above its reference "
+                  "with the displacement held, 12 ppm below with it freed in place of the zero; issue #1233). TOPAS applies "
+                  "no geometry correction unless a macro names it (Technical Reference v9 "
+                  "§ 1.3); GSAS-II 5.8.4 always picks a geometry (GSASIIfiles.py:509-519)"),
+        grounds=("The geometry is a fact about the caller's instrument, outside the pattern; "
+                 "with none stated nothing geometry-specific is acted on, and the user is "
+                 "told to state it as a warning/notification (B9, ruled 2026-10-19)."),
+        approved="2026-10-19", response="warning",
+        responds=("state instrument.geometry.kind and refit before quoting a cell, since a "
+                  "position aberration the stated geometry has was left unmodelled")),
     Row("GSAS2_CIF_DEUTERIUM_AS_D", "code", tier=1, ambiguity=1,
         evidence=('read the site at gsas2.py:2131: fires when deuterium sites are written as D '
                   "(2H respelled). D is the symbol GSAS-II's importer reads as deuterium, and "
@@ -3240,6 +3255,19 @@ ROWS: tuple[Row, ...] = (
         evidence=("opt-in: Geometry.mu_r/mu_t or capillary_radius_mm/thickness_mm, default None "
                   "(off); choosing flat_plate_transmission applies sec theta; Rouse et al. (1970) "
                   "Acta Cryst. A26, 682 (docstring)")),
+    Row("rietx.schemas.results.RefinementResult.assumed_instrument", "action", tier=3,
+        ambiguity=1,
+        evidence=("records, and changes nothing: the instrument facts a fit held at the "
+                  "package's own value (an unstated geometry; polarisation at 0.5 or 0.99; a "
+                  "Kα2/Kα1 weight at KA2_RATIO), read off the table's held entries, so a refined "
+                  "value is never listed (WP-2015). A wrong K moved a refined Biso by 12 sigma "
+                  "at near-unchanged Rwp (WP-1311 item 2); the 0.99 is one facility's "
+                  "(APS 11-BM). Read off values, so a caller who typed the same number is "
+                  "listed too, which the field's docstring says"),
+        grounds=("The result records which instrument facts the package assumed rather than "
+                 "read: the geometry, the polarisation and the Kα2/Kα1 ratio (B9's fourth "
+                 "bullet, ruled 2026-10-19)."),
+        approved="2026-10-19"),
     Row("rietx.schemas.results.RefinementResult.qpa", "action", tier=1, ambiguity=1,
         evidence=("arithmetic: a phase's scale is not measured where its column is zero at the "
                   "answer (no reflection in the fitted range), or where the last stage held it "
@@ -5785,6 +5813,11 @@ ROWS: tuple[Row, ...] = (
                   "substitution is reported; the maintainer's choice on issue #202")),
     Row("rietx.refine.STRAIN_FLAG_WIDTH", "constant", value=1.5),
     Row("rietx.refine._CENTROID_SITES_NAMED", "constant", value=12),
+    Row("rietx.refine._SUPPLIED_POLARIZATION", "constant", tier=1, value=(0.5, 0.99),
+        evidence=("arithmetic: the two polarisation values the package's presets and the "
+                  "Source default supply (0.5, the unpolarised beam; "
+                  "DEBYE_SCHERRER_POLARIZATION), so equality with one is what "
+                  "RefinementResult.assumed_instrument tests; decides only what is listed")),
     Row("rietx.report.NOMINAL_AXIAL_APERTURE", "constant", tier=3, value=0.02,
         evidence=("the S/L = H/L at which the report borrows its asymmetry column when a fit "
                   "declares both apertures 0; it shapes only that borrowed dOmega/d(S/L) column, "
@@ -5987,8 +6020,8 @@ ROWS: tuple[Row, ...] = (
                   "debye_scherrer's signature default until the B14 lift"),
         grounds=("The beam's polarisation is a fact about the caller's instrument, outside the "
                  "pattern; 0.99 stays the preset's held value (B9, ruled 2026-10-19). B9 also "
-                 "asked for it to be recorded as assumed; nothing writes that record yet, "
-                 "and WP-2015 owes it (its task on the assumed instrument facts)."),
+                 "asked for it to be recorded as assumed: RefinementResult.assumed_instrument "
+                 "lists it when held there (WP-2015)."),
         approved="2026-10-19"),
     Row("rietx.schemas.instrument.EXTRA_PEAK_FWHM_MAX", "constant", tier=1, value=0.5,
         evidence=("arithmetic: the frozen evaluation window is k(eta.max) * fwhm.max + "
@@ -6016,7 +6049,7 @@ ROWS: tuple[Row, ...] = (
                   "with measured integrated ratios a few percent above it (Hoelzer et al. 1997, "
                   "the B14 review's source) and a diffracted-beam monochromator clipping it; "
                   "lab_bragg_brentano refines it and mccusker_default holds it, a B9 assumption "
-                  "whose record WP-2015 owes; the bragg_brentano and flat_plate_transmission signature default "
+                  "RefinementResult.assumed_instrument records (WP-2015); the bragg_brentano and flat_plate_transmission signature default "
                   "until the B14 lift")),
     Row("rietx.schemas.instrument.PACKING_FRACTION", "constant", tier=3, value=0.6,
         evidence=("docstring: 0.3-0.6 typical for a tapped powder, 0.64 random close packing of "
@@ -6748,7 +6781,7 @@ ROWS: tuple[Row, ...] = (
         evidence=("physics: K = 0.5 is the unpolarised beam (docstring; GSAS POLA convention); a "
                   "monochromated lab beam or a synchrotron (K ~ 0.99) built without K is fitted at "
                   "0.5, and a wrong K moved Biso by 12 sigma at near-unchanged Rwp (WP-1311); "
-                  "recorded as assumed in WP-2015"),
+                  "recorded as assumed in RefinementResult.assumed_instrument (WP-2015)"),
         grounds=("The beam's polarisation is a fact about the caller's instrument, outside the "
                  "pattern; 0.5 stays the held start and the result records it as assumed (B9, "
                  "ruled 2026-10-19)."),
@@ -6772,12 +6805,24 @@ ROWS: tuple[Row, ...] = (
                   "; seven programs, 2026-10-21 (docs/practice.md): none defaults to Le Bail; FullProf, RIETAN-FP and TOPAS make the user state it")),
     Row("rietx.refine.Refinement.fit:plan", "default", tier=3, ambiguity=1, value="mccusker_default",
         evidence=("McCusker et al. (1999) J. Appl. Cryst. 32, 36, the order only (docstring); no "
-                  "program ships a default plan; it frees the zero and no displacement, which "
-                  "lab_bragg_brentano frees; changed by WP-2015 (the declared geometry picks the "
-                  "plan)"),
+                  "program ships a default plan; it frees the zero, and on bragg_brentano the "
+                  "specimen displacement in its place, never both (staged._GEOMETRY_SWAPS, WP-2015; "
+                  "Yue's ruling of 2026-11-16 on the first version, which freed both), leaving the Ka2 "
+                  "ratio and axial terms held. Measured (WP-2015, three Bragg-Brentano families, "
+                  "cell against reference, zero only -> displacement in its place): NIST SRM 660c "
+                  "a +70 -> -12 ppm (3.2 ppm esd), displacement -0.066 mm against NIST's -0.079; "
+                  "IUCr CPD corundum a -329 -> -130 and c -297 -> -105 ppm, c/a +32 -> +26 ppm "
+                  "(Le Bail c/a -73 -> -82 ppm); GSAS-II LabData fluorapatite (cross-code) a "
+                  "-6 -> +96 ppm and c -9 -> +94 ppm from GSAS's fit, 0.8 -> 12.8 esd, so that "
+                  "family lands further than the zero-only plan and is Yue's call. Freeing both "
+                  "raised HIGH_CORRELATION on all three (cell esd 2.7x to 13x) and FLAT_DIRECTION on "
+                  "fluorapatite. Literature: GSAS-II 5.8.4 (displacement, never with the zero), "
+                  "Cline et al. 2015 §6, Rowles 2021 §3.4.1, McCusker et al. 1999 §5. Dissent: MAUD's "
+                  "wizard frees the zero and not the displacement (docs/practice.md)"),
         grounds=("A default must be some plan, and the one run is recorded; it frees nothing "
-                 "geometry-specific, which the ruling keeps for an unstated geometry, and WP-2015 "
-                 "picks by declared geometry (B7, ruled 2026-10-19)."),
+                 "geometry-specific on an unstated, capillary or transmission geometry, and on a "
+                 "stated bragg_brentano frees its displacement and holds the zero (Yue, 2026-11-16, "
+                 "after B7 of 2026-10-19; the fluorapatite family is open with him)."),
         approved="2026-10-19"),
     Row("rietx.refine.Refinement.fit:refit", "default", tier=2, ambiguity=1, value="single",
         evidence=("TOPAS, GSAS-II and FullProf run one solve of whatever is free from the "
@@ -6882,12 +6927,24 @@ ROWS: tuple[Row, ...] = (
                   "; seven programs, 2026-10-21 (docs/practice.md): none defaults to Le Bail; FullProf, RIETAN-FP and TOPAS make the user state it")),
     Row("rietx.refine.refine:plan", "default", tier=3, ambiguity=1, value="mccusker_default",
         evidence=("McCusker et al. (1999) J. Appl. Cryst. 32, 36, the order only (docstring); no "
-                  "program ships a default plan; it frees the zero and no displacement, which "
-                  "lab_bragg_brentano frees; changed by WP-2015 (the declared geometry picks the "
-                  "plan)"),
+                  "program ships a default plan; it frees the zero, and on bragg_brentano the "
+                  "specimen displacement in its place, never both (staged._GEOMETRY_SWAPS, WP-2015; "
+                  "Yue's ruling of 2026-11-16 on the first version, which freed both), leaving the Ka2 "
+                  "ratio and axial terms held. Measured (WP-2015, three Bragg-Brentano families, "
+                  "cell against reference, zero only -> displacement in its place): NIST SRM 660c "
+                  "a +70 -> -12 ppm (3.2 ppm esd), displacement -0.066 mm against NIST's -0.079; "
+                  "IUCr CPD corundum a -329 -> -130 and c -297 -> -105 ppm, c/a +32 -> +26 ppm "
+                  "(Le Bail c/a -73 -> -82 ppm); GSAS-II LabData fluorapatite (cross-code) a "
+                  "-6 -> +96 ppm and c -9 -> +94 ppm from GSAS's fit, 0.8 -> 12.8 esd, so that "
+                  "family lands further than the zero-only plan and is Yue's call. Freeing both "
+                  "raised HIGH_CORRELATION on all three (cell esd 2.7x to 13x) and FLAT_DIRECTION on "
+                  "fluorapatite. Literature: GSAS-II 5.8.4 (displacement, never with the zero), "
+                  "Cline et al. 2015 §6, Rowles 2021 §3.4.1, McCusker et al. 1999 §5. Dissent: MAUD's "
+                  "wizard frees the zero and not the displacement (docs/practice.md)"),
         grounds=("A default must be some plan, and the one run is recorded; it frees nothing "
-                 "geometry-specific, which the ruling keeps for an unstated geometry, and WP-2015 "
-                 "picks by declared geometry (B7, ruled 2026-10-19)."),
+                 "geometry-specific on an unstated, capillary or transmission geometry, and on a "
+                 "stated bragg_brentano frees its displacement and holds the zero (Yue, 2026-11-16, "
+                 "after B7 of 2026-10-19; the fluorapatite family is open with him)."),
         approved="2026-10-19"),
     Row("rietx.refine.refine:refit", "default", tier=2, ambiguity=1, value="single",
         evidence=("TOPAS, GSAS-II and FullProf run one solve of whatever is free from the "
@@ -7401,6 +7458,9 @@ ROWS: tuple[Row, ...] = (
                   'restoring call (tie_equal on the column or DOF paths, tie with scale= for a '
                   'signed group); the DOF-path rule is tested '
                   '(test_a_recoverable_coordinate_tie_restores_on_the_dof_path)')),
+    Row("GEOMETRY_UNSTATED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: names the field and the three presets that state it, and ranks "
+                  "none of them; which geometry the instrument has is the caller's")),
     Row("GSAS2_CIF_FIELD_NOT_WRITTEN.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence=('read gsas2.py:2164: tells the caller to set the listed terms in GSAS-II; '
                   'names no value')),

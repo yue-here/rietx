@@ -35,7 +35,9 @@ from rietx.backend.api import BACKEND_NAMES
 from rietx.model import forward
 from rietx.optimize.least_squares import SOLVERS
 from rietx.schemas.common import Mode
+from rietx.schemas.plan import PlanSpec
 from rietx.strategy.refit import REFIT_MODES
+from rietx.strategy.staged import PLAN_PRESETS
 from tests import api_surface
 from tests.test_refine_synthetic import perturbed_models, synthesize
 
@@ -193,6 +195,9 @@ CASES: dict[tuple[str, str], tuple] = {
     ("refine", "refit"): (lambda c, v: rx.refine(c.data, *perturbed_models(), refit=v),
                           REFIT_MODES),
     ("Refinement.fit", "mode"): (lambda c, v: _fresh().fit(c.data, mode=v), MODES),
+    ("PlanSpec.preset_name", "mode"): (
+        lambda c, v: PlanSpec.from_plan(PLAN_PRESETS["mccusker_default"]()).preset_name(v),
+        MODES),
     ("Refinement.fit", "plan"): (lambda c, v: _fresh().fit(c.data, plan=v), None),
     ("Refinement.fit", "refit"): (lambda c, v: _fresh().fit(c.data, refit=v), REFIT_MODES),
     ("Refinement.run_stage", "mode"): (

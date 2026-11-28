@@ -1214,11 +1214,20 @@ def test_lebail_gap_mechanics(truth):
 # ----------------------------------------------------------------------
 # WP-1056 — identifiability: is the converged answer the only one?
 # ----------------------------------------------------------------------
-def _fit_and_report(structure, start_ins, data, stem, plan="mccusker_default",
+def _fit_and_report(structure, start_ins, data, stem, plan=None,
                     zoom=(18.0, 45.0)):
-    """One staged fit to convergence, its report, and the house PNGs."""
+    """One staged fit to convergence, its report, and the house PNGs.
+
+    ``plan=None`` is ``mccusker_default`` *as a plan object*, so a
+    Bragg-Brentano instrument does not gain the displacement the name now
+    adds on that geometry (WP-2015): these tests plant an error the baseline
+    holds and ask the report to find it, which needs the displacement held.
+    """
+    from rietx.strategy.staged import PLAN_PRESETS
     from rietx.viz.plots import plot_result
 
+    if plan is None:
+        plan = PLAN_PRESETS["mccusker_default"]()
     ref = rx.Refinement(structure, start_ins)
     result = ref.fit(data, plan=plan)
     report = ref.report()
@@ -1309,8 +1318,11 @@ def test_position_templates_and_actions_agree_geometry_by_geometry():
         offered = set(names)
         acted = set(_POSITION_ACTIONS_BY_GEOMETRY[geometry])
         assert acted <= offered, geometry     # no unreachable action anywhere
-        expected_gap = ({"cos_theta", "sin_2theta"}
-                        if geometry == "flat_plate_transmission" else set())
+        expected_gap = {
+            "flat_plate_transmission": {"cos_theta", "sin_2theta"},
+            # WP-2015: every shape is evidence, none a geometry's parameter
+            "unstated": {"cos_theta", "sin_2theta", "cos_2theta"},
+        }.get(geometry, set())
         assert offered - acted == expected_gap, geometry
     # and in *every* geometry each suggested path is one that geometry's own
     # table can free — the defect that motivated the keying was a capillary
@@ -1322,6 +1334,7 @@ def test_position_templates_and_actions_agree_geometry_by_geometry():
     from rietx.schemas.instrument import Instrument
 
     instruments = {
+        "unstated": Instrument(source=Instrument.bragg_brentano().source),
         "bragg_brentano": Instrument.bragg_brentano(),
         "debye_scherrer": Instrument.debye_scherrer(wavelength=1.5406,
                                                     goniometer_radius_mm=200.0),

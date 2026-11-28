@@ -417,7 +417,8 @@ def build_report(result: RefinementResult, *, model=None, values=None,
         # reached the veto as a string with no stages and vetoed nothing
         from ..strategy.staged import resolve_plan
 
-        plan = resolve_plan(plan, result.mode)
+        plan = resolve_plan(plan, result.mode,
+                            model.geometry_kind if model is not None else None)
     report = build_layer0(result, top_n=top_n, match_tol_deg=match_tol_deg,
                           min_peak_sigma=min_peak_sigma)
     # Soft-restraint deviations are model-free (carried from the result), so they
