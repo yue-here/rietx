@@ -85,6 +85,7 @@ Cracknell
 [cC]rystallites
 [cC]rystallographer
 [cC]yclohexane
+[cC]yclotomic
 Daams
 Dal
 [dD]e

@@ -73,6 +73,7 @@ from ..symmetry import (
 )
 from .form_factor import approximation_name, j0, j2, resolve_g
 from .moments import moment_frame, moment_from_dofs
+from .operators import magnetically_allowed
 
 #: p = γ·r₀/2, the magnetic scattering length of one Bohr magneton, in **fm**
 #: — the unit ``crystallography.neutron``'s Sears table gives b in, which is
@@ -559,6 +560,36 @@ def lattice_allows_orbit(hkl, group, magnetic_group) -> np.ndarray:
     phase = (members @ np.array(shifts, dtype=np.int64).T) % den   # (N, R, m)
     want = np.where(np.array(signs) == 1, 0, den // 2)         # (m,)
     return np.any(np.all(phase == want, axis=2), axis=1)
+
+
+def magnetic_family_rows(magnetic_group, members: np.ndarray, seg: np.ndarray,
+                         n: int) -> np.ndarray:
+    """``(n,)`` bool: the rows the separate magnetic-width family is built on.
+
+    A row's magnetic intensity is the average of |F_⊥|² over its parent Laue
+    orbit (``members``/``seg``, the layout ``preferred_orientation.orbit_layout``
+    freezes), so a row is kept when **any** member h of that orbit is one the magnetic group
+    lets scatter (:func:`~rietx.crystallography.magnetic.operators.magnetically_allowed`,
+    exact).  Testing the representative alone is wrong for the same reason it
+    is in :func:`lattice_allows_orbit`: the magnetic group is lower than the
+    parent, so one member can be forbidden and another allowed.  The members
+    are the parent images g·h, which is also every magnetic domain
+    (g·MSG·g⁻¹ forbids g·h iff the group forbids h) and every arm of the star,
+    so one ``any`` covers domains and arms.
+
+    A row this returns False on has F_⊥ = 0 identically by symmetry, so
+    dropping its window removes work and no physics; the rule is a function of
+    the operator list and the frozen hkl list only, decided at compile
+    (frozen-per-stage discreteness).
+    """
+    rows = np.zeros(n, dtype=bool)
+    if len(members) == 0:
+        return rows
+    unique, inverse = np.unique(np.asarray(members, dtype=np.int64), axis=0,
+                                return_inverse=True)
+    allowed = magnetically_allowed(magnetic_group, unique)[np.ravel(inverse)]
+    np.logical_or.at(rows, np.asarray(seg, dtype=np.int64), allowed)
+    return rows
 
 
 def applied_centrings(group) -> np.ndarray:

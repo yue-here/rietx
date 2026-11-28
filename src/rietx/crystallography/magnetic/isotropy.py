@@ -2883,25 +2883,13 @@ def group_absences(group: MagneticGroup, refl: ReflectionSet) -> np.ndarray:
     different routes — a group here, a configuration there — and one containing
     the other is the check.
 
+    The decision is exact: :func:`~rietx.crystallography.magnetic.operators.magnetically_allowed`
+    reduces the stabiliser's character sum modulo a cyclotomic polynomial in
+    integers, so no floating-point value and no threshold decides a row.
+
     Returns a boolean mask over ``refl.hkl``.
     """
-    ops = group.all_operations()
-    rotations = np.array([op.rotation for op in ops], dtype=np.int64)
-    signs = np.array([op.time_reversal * op.determinant for op in ops], dtype=np.float64)
-    shifts = np.array([[float(v) for v in op.translation] for op in ops])
-    mask = np.zeros(len(refl), dtype=bool)
-    for i, h in enumerate(refl.hkl):
-        rows: list[np.ndarray] = []
-        for g in range(len(ops)):
-            if not np.array_equal(rotations[g].T @ h, h):
-                continue
-            phase = np.exp(2j * np.pi * float(h @ shifts[g]))
-            rows.append(signs[g] * phase * rotations[g].astype(np.float64) - np.eye(3))
-        if not rows:
-            continue
-        _, s, _ = np.linalg.svd(np.vstack(rows))
-        mask[i] = bool(np.all(s > 1e-9))
-    return mask
+    return ~_operators.magnetically_allowed(group, refl.hkl)
 
 
 def determinable_amplitudes(candidate: MagneticCandidate, refl: ReflectionSet, *,

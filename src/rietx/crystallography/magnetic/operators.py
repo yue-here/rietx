@@ -1468,3 +1468,111 @@ def _close(operations, *, limit: int = 4096) -> list[MagneticOperator]:
                 f"input is not a magnetic space group in this cell")
         frontier = new
     return found
+
+
+# --------------------------------------------------------------------------
+# which reflections the group forbids: exact integer arithmetic
+# --------------------------------------------------------------------------
+
+@functools.lru_cache(maxsize=None)
+def _cyclotomic(n: int) -> tuple[int, ...]:
+    """Φₙ's integer coefficients, constant term first.
+
+    Φₙ = (xⁿ − 1) / ∏_{d | n, d < n} Φ_d, each division exact over the
+    integers because every Φ_d is monic.
+    """
+    poly = [-1] + [0] * (n - 1) + [1]
+    for d in range(1, n):
+        if n % d:
+            continue
+        div = _cyclotomic(d)
+        quotient = [0] * (len(poly) - len(div) + 1)
+        for i in range(len(quotient) - 1, -1, -1):
+            c = poly[i + len(div) - 1]
+            quotient[i] = c
+            for j, b in enumerate(div):
+                poly[i + j] -= c * b
+        if any(poly[:len(div) - 1]):  # pragma: no cover - Φ_d always divides
+            raise ArithmeticError(f"Φ_{d} does not divide x^{n} − 1")
+        poly = quotient
+    return tuple(poly)
+
+
+@functools.lru_cache(maxsize=None)
+def _power_residues(n: int) -> np.ndarray:
+    """``(n, φ(n))`` int — row a holds xᵃ mod Φₙ, constant term first.
+
+    Φₙ is the minimal polynomial of ζₙ = e^{2πi/n} over the rationals, so an
+    integer combination Σ cₐ ζₙᵃ is zero **iff** Σ cₐ·(row a) is the zero
+    vector.  That is the whole of the exactness: no root of unity is ever
+    evaluated.
+    """
+    phi = _cyclotomic(n)
+    deg = len(phi) - 1
+    rows = np.zeros((n, deg), dtype=np.int64)
+    current = [1] + [0] * (deg - 1) if deg else []
+    for a in range(n):
+        if deg:
+            rows[a] = current
+            # multiply by x, then fold the overflowing xᵈᵉᵍ back with Φₙ (monic)
+            top = current[-1]
+            current = [0] + current[:-1]
+            current = [c - top * p for c, p in zip(current, phi[:deg])]
+    # the cache hands this one array to every caller: a write would change every later answer
+    rows.flags.writeable = False
+    return rows
+
+
+def magnetically_allowed(group: "MagneticGroup", hkl) -> np.ndarray:
+    """``(N,)`` bool: whether the group lets M(h) be non-zero, in exact arithmetic.
+
+    For an operation (R, t, ε) the magnetic structure factor obeys
+    M(h) = ε·det(R)·R·e^{2πi h·t}·M(Rᵀh) (Gallego, Tasci, de la Flor,
+    Perez-Mato & Aroyo, 2012, *J. Appl. Cryst.* **45**, 1236, the MAGNEXT
+    computation).  The operations with Rᵀh = h form a group H_h (modulo
+    lattice translations), and g ↦ ε_g·det(R_g)·e^{2πi h·t_g}·R_g is a
+    representation of it, since h·(t₁ + R₁t₂) = h·t₁ + (R₁ᵀh)·t₂.  M(h) can
+    be non-zero iff that representation fixes a vector, and the dimension of
+    its fixed space is the character average (Serre, 1977, *Linear
+    Representations of Finite Groups*, Springer, § 2.3):
+
+        dim = (1/|H_h|)·Σ_{g ∈ H_h} ε_g·det(R_g)·tr(R_g)·ζ_D^{a_g},
+
+    with D the common denominator of the translations and a_g = D·(h·t_g)
+    mod D.  The sum is an integer combination of powers of ζ_D, reduced
+    modulo the cyclotomic polynomial Φ_D in integers (:func:`_power_residues`):
+    the reflection is forbidden iff the remainder is zero.  No floating-point
+    number and no threshold enter the decision.
+
+    ``hkl`` are integer indices in the group's own cell.
+    """
+    ops = group.all_operations()
+    h = np.asarray(hkl, dtype=np.int64).reshape(-1, 3)
+    if len(h) == 0:
+        return np.zeros(0, dtype=bool)
+    rot = np.array([op.rotation for op in ops], dtype=np.int64)            # (G, 3, 3)
+    den = lcm(*(Fraction(v).denominator for op in ops for v in op.translation))
+    shift = np.array([[int(Fraction(v) * den) for v in op.translation] for op in ops],
+                     dtype=np.int64)                                       # (G, 3), exact
+    weight = np.array([op.time_reversal * op.determinant * int(np.trace(r))
+                       for op, r in zip(ops, rot)], dtype=np.int64)        # (G,)
+    # Rᵀh, the reciprocal-space action (root CLAUDE.md), for every pair
+    fixed = np.all(np.einsum("gji,nj->ngi", rot, h) == h[:, None, :], axis=2)   # (N, G)
+    power = (h @ shift.T) % den                                            # (N, G)
+    coeff = np.zeros((len(h), den), dtype=np.int64)
+    rows, cols = np.nonzero(fixed)
+    np.add.at(coeff, (rows, power[rows, cols]), weight[cols])
+    if den == 1:
+        residue = coeff                                                   # ζ₁ = 1
+    else:
+        residue = coeff @ _power_residues(den)
+    # the theorem's own check: the character average is a whole number, so a
+    # remainder that is not a constant multiple of |H_h| means the operation
+    # list is not a group modulo lattice translations
+    order = fixed.sum(axis=1)
+    if np.any(residue[:, 1:]) or np.any(residue[:, 0] % order):
+        raise ArithmeticError(
+            "the character sum of a reflection's stabiliser is not a whole "
+            "multiple of its order; the operation list is not a magnetic "
+            "space group modulo lattice translations")
+    return residue[:, 0] != 0

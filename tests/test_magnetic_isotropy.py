@@ -23,6 +23,8 @@ The magnetic space-group numbers of arm A are **derived**, not quoted.  What
 they were checked against is written at the test.
 """
 
+import dataclasses
+import math
 import re
 from fractions import Fraction
 
@@ -1242,6 +1244,32 @@ def test_the_type_iv_absence_rule_is_the_one_derived_by_hand():
             assert by_family == {tuple(h) for h, absent
                                  in zip(reflections.hkl.tolist(), rule) if absent}
             assert int(rule.sum()) == 40 and len(reflections) == 92
+
+
+def test_the_absence_decision_is_exact_not_a_floating_point_cut():
+    """The absence decision is symmetry-exact, not a tolerance.
+
+    Scaling every index by n = 1 + D·2⁵³, with D the common denominator of the
+    group's translations, keeps each row's stabiliser (Rᵀ(nh) = nh iff
+    Rᵀh = h) and h·t modulo 1 ((n − 1)·h·t is an integer), so the exact answer
+    cannot move.  A decision taken through ``float(h·t)`` loses the fractional
+    part above 2⁵³ and flips the type IV rows, where h·t is a half-integer: the
+    singular-value cut this replaced fails here (measured, 2026-11-19).
+    """
+    found = isotropy.candidates("P b c m", (0.308, 0.114, 0.07),
+                                (Fraction(1, 2), Fraction(0), Fraction(0)))
+    reflections = isotropy.reflections(found.lattice, 2.5)
+    checked = 0
+    for candidate in found:
+        ops = candidate.group.all_operations()
+        den = math.lcm(*(Fraction(v).denominator for op in ops for v in op.translation))
+        n = 1 + den * 2 ** 53
+        scaled = dataclasses.replace(reflections, hkl=reflections.hkl.astype(np.int64) * n)
+        small = isotropy.group_absences(candidate.group, reflections)
+        assert 0 < int(small.sum()) < len(reflections)
+        assert np.array_equal(isotropy.group_absences(candidate.group, scaled), small)
+        checked += 1
+    assert checked == len(found) > 0
 
 
 @pytest.mark.parametrize("case", DOMAIN_CASES, ids=[c[0] for c in DOMAIN_CASES])

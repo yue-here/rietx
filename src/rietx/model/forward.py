@@ -76,6 +76,7 @@ from ..crystallography.magnetic.scattering import (
     d_magnetic_f2_d_dofs,
     magnetic_f2,
     magnetic_f2_angle_block,
+    magnetic_family_rows,
     magnetic_reflections,
     merge_magnetic,
 )
@@ -1170,6 +1171,13 @@ class CompiledPhase:
     win_mag: np.ndarray | None = None       # (n_lines, N, 2) int
     fcj_n_mag: np.ndarray | None = None     # (n_lines, N) int
     batch_mag: BatchLayout | None = None
+    # (N,) bool, beside ``win_mag``: the rows the magnetic family covers,
+    # those with a Laue-orbit member the magnetic group lets scatter
+    # (``scattering.magnetic_family_rows``).  Every other row's magnetic
+    # window is empty, because F_⊥ is zero there by symmetry.  Frozen at
+    # compile with the windows; ``window_sizing`` reads it so that a re-sizing
+    # of the family never re-opens a row the compile closed.
+    mag_rows: np.ndarray | None = None
     # WP-2107.  The phase's peak equations by target, and the frozen frame
     # (hkl, multiplicity, orbit images, harmonic coefficients) they are
     # evaluated on.  ``None`` is exactly off: a phase declaring none reaches
@@ -5269,11 +5277,12 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         # exactly zero on them (which is the absence condition, not a
         # tolerance).  Only for a phase that declares a moment; every other
         # phase enumerates the list it always did.
-        magnetic_mask = None
+        magnetic_mask = magnetic_group = None
         if magnetic_wanted(phase, instrument.source):
+            magnetic_group = phase.magnetic_symmetry.group()
             extra = magnetic_reflections(
                 group, cell, lam_gen, hi_eff, two_theta_min=gen_min,
-                magnetic_group=phase.magnetic_symmetry.group())
+                magnetic_group=magnetic_group)
             refl, magnetic_mask = merge_magnetic(refl, extra)
         f_anom = None
         # The source decides the radiation, exactly as it decides f_anom: a
@@ -5484,6 +5493,19 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                 reflection_orbits(group, refl.hkl))
         cp.batch = _batch_layout(win, fcj_n, tt)
         if mag_split:
+            # The second family covers only the rows the magnetic group lets
+            # scatter: a row none of whose Laue-orbit members (domains and
+            # arms included) is allowed has F_⊥ = 0 identically, so its window
+            # would draw an exact zero at full cost (NiO's nuclear rows at
+            # k = (½ ½ ½)).  Exact, from the operator list, and frozen here
+            # like the windows themselves.  ``mag_split`` implies a moment
+            # model, and a moment is refused without ``magnetic_symmetry``, so
+            # the group is always there to read.
+            covered = magnetic_family_rows(magnetic_group, cp.mag_members,
+                                           cp.mag_seg, n)
+            win_mag[:, ~covered, :] = 0
+            fcj_n_mag[:, ~covered] = 0
+            cp.mag_rows = covered
             cp.batch_mag = _batch_layout(win_mag, fcj_n_mag, tt)
         # the off-state gate (see the field): ext is exactly its identity and
         # nothing this stage moves can take it off there
@@ -5762,6 +5784,13 @@ def window_sizing(model: CompiledModel, values: dict[str, float],
                 live = valid & (i1 > i0)
                 fcj_n[il, live] = fcj_node_counts(pos[live], gamma[live], sl, hl,
                                                   closing=closing)
+        if component == 1 and cp.mag_rows is not None:
+            # the rows the compile left out of the magnetic family stay out:
+            # F_⊥ is zero there by symmetry, so they need no window at any
+            # value (``CompiledPhase.mag_rows``)
+            win[:, ~cp.mag_rows, :] = 0
+            fcj_n[:, ~cp.mag_rows] = 0
+            halves[:, ~cp.mag_rows] = np.nan
         out.append((win, fcj_n, halves))
     return out
 

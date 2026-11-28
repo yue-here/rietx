@@ -1,6 +1,6 @@
 # WP-1343 — the magnetic peaks are broader, and the moment pays for it
 
-Milestone: magnetic · Status: 🔄 2026-10-25 — 12 of 12 tasks done; PR #1111 merged (the synthetic k = 0 case, a wide esd and the path named); open: the maintainer's choice of fix for `MAGNETIC_WIDTH_UNMODELLED`'s silence where every magnetic reflection is also nuclear (a strict xfail holds the case)
+Milestone: magnetic · Status: 🔄 2026-11-24 — 12 of 12 tasks done; PR #1111 merged (the synthetic k = 0 case, a wide esd and the path named); PR #1706 (open) builds the separate magnetic-width family only on the rows the magnetic group allows; open: the maintainer's choice of fix for `MAGNETIC_WIDTH_UNMODELLED`'s silence where every magnetic reflection is also nuclear (a strict xfail holds the case)
 Depends on: 1327 (the moment, the magnetic |F_⊥|², the shared scale);
 1326 soft (the satellites that make the term identifiable)
 Priority: P2 2026-10-05 — was P3: `STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT` fires on a warm refit under `fit` (#729), a flag firing wrongly whose workaround is `run_stage`
@@ -511,6 +511,35 @@ the cheaper of the two at the time; the skill row is required either way.
   observed-width measurement this WP deliberately does not wait on.
 
 ## Handover log
+
+- **2026-11-24** — PR #1706 (open, in review). When a phase's separate magnetic width is
+  active (`CompiledModel.mag_split`), the second frozen family of windows was sized and
+  evaluated for every reflection of the phase, including rows where F⊥ is zero by
+  symmetry (NiO's nuclear rows at k = (½ ½ ½)). The PR builds that family only on the
+  rows the magnetic space group lets scatter. Two changes carry it.
+  `operators.magnetically_allowed` decides a row's absence exactly, as the dimension of
+  the stabiliser's character average reduced modulo a cyclotomic polynomial in integer
+  arithmetic, and `isotropy.group_absences` delegates to it.
+  `scattering.magnetic_family_rows` keeps a row when any member of its Laue orbit is
+  allowed; the result is frozen with the windows as `CompiledPhase.mag_rows`, and
+  `window_sizing(component=1)` keeps the uncovered rows empty. No new constant,
+  diagnostic or result field.
+  *Ruling*: symmetry-exact, no tolerance, no option to turn it off. **Ruled by Mike**
+  (magnetic-path design owner).
+  *Measured*: ISIS WISH NiO bank 3 (run 29726), per residual evaluation, on a local copy
+  of the T-6 branch with the same few lines applied to the bank's compile: 0.448 s to
+  0.314-0.317 s, against 0.174 s for the nuclear family alone, so the magnetic family
+  went from 2.6× to 1.8× the nuclear one. Magnetic window points fell from 165 471 to
+  84 454, and the evaluated pattern was bit-identical. On CW (CrSBr, k = (0 0 ½)) the
+  fit is bit-identical to main and the evaluation goes from 0.36-0.42 ms to
+  0.26-0.28 ms. The exact decision moves 0 of 4 466 rows against the old float cut
+  across 35 candidate groups.
+  *Next user*: the TOF T-6 branch builds its own `win_mag` in `forward_tof.py`, which
+  does not reach `compile_model`. When it merges main it needs the same few lines there:
+  call `magnetic_family_rows` after the orbit layout, zero the uncovered windows, and set
+  `cp.mag_rows`. Until then the TOF magnetic family still covers every row.
+  *Status*: moved to 2026-11-24 with a line for #1706. The open question (the k = 0
+  silence of `MAGNETIC_WIDTH_UNMODELLED`) is unchanged.
 
 - **2026-11-24** — repair, by a ghostshift runner, PR #1817. The session-start hook
   flagged this WP because a `WP-1343:` commit of 2026-11-18 was newer than the last entry
