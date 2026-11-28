@@ -769,7 +769,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 
 | WP | Title | Status | Priority | Depends on |
 |---|---|---|---|---|
-| [1315](1315-zip-collection-reader.md) | A zip of patterns is N scans | ⬜ | P3 | — |
+| [1315](1315-zip-collection-reader.md) | A zip of patterns is N scans | ✅ 2026-11-16 | — | — |
 | [1316](1316-hdf5-multiscan-reader.md) | A NeXus/HDF5 multi-scan reader, behind an extra | ⬜ | P3 | — |
 
 ### <a id="unscheduled-the-formats-a-lab-still-has"></a>The formats a lab still has

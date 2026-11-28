@@ -80,8 +80,12 @@ REAL_FIXTURES = [
 #: vendored and truncated above, but **no V5 file exists anywhere**, and V5's
 #: header is 810 bytes against V3's 250 — so a cut lands at depths the V3 file
 #: cannot reach, and this arm is the only truncation coverage that version has.
+#: ``zip`` is the seventh: a plain zip of patterns has no real fixture that may
+#: be vendored (WP-1315, ``tests/data/README.md`` § Zip collections), and its
+#: members are *stored*, so a cut lands in GSAS text a sniff can read through
+#: the archive's bytes — the mis-dispatch the format was added to end.
 SYNTHETIC_FIXTURES = ["uxd", "rasx", "brml", "raw4", "raw3", "raw2", "gsas_esd",
-                      "udf", "philips_v5"]
+                      "udf", "philips_v5", "zip"]
 
 
 def _synthesize(kind: str, path: Path) -> Path:
@@ -100,6 +104,14 @@ def _synthesize(kind: str, path: Path) -> Path:
         write_raw4,
     )
 
+    if kind == "zip":
+        import zipfile
+
+        from tests.test_reader_zip import fxye_text, write_zip_collection
+
+        return write_zip_collection(path, [("a/first.fxye", fxye_text(200)),
+                                           ("b/second.fxye", fxye_text(200))],
+                                    compression=zipfile.ZIP_STORED)
     if kind == "udf":
         return write_udf(path, [500 + i % 7 for i in range(400)])
     if kind == "philips_v5":
@@ -764,7 +776,7 @@ _NF_BAD = (float("nan"), float("inf"), float("-inf"))
 #: from a start and a step has no ``x``.
 _NF_COLUMNS = {"xy": "xys", "chi": "xy", "gsas_fxye": "xys", "gsas_esd": "ys",
                "ras": "xy", "uxd": "xy", "xrdml": "y", "udf": "y", "rasx": "xy",
-               "brml": "xy", "pdcif": "xys"}
+               "brml": "xy", "pdcif": "xys", "zip_collection": "xys"}
 #: Bruker RAW stores float32 counts, and a non-finite one is its evidence that
 #: the stride is wrong: the reader refuses the file, and that refusal stays.
 _NF_REFUSED = {"raw4": "y", "raw3": "x"}
@@ -822,6 +834,12 @@ def _nonfinite_file(kind: str, column: str, bad: float, d: Path) -> Path:
         return _write_pdcif(d / "a.cif", {"_pd_meas_2theta_scan": tt,
                                           "_pd_meas_counts_total": y,
                                           "_pd_meas_counts_total_su": s})
+    if kind == "zip_collection":
+        # one member, so the archive adds nothing to the reader's one report
+        from tests.test_reader_zip import write_zip_collection
+
+        member = write_xy(d / "a.xye", tt, y, s)
+        return write_zip_collection(d / "a.zip", [("a.xye", member.read_bytes())])
     if kind == "raw4":
         return write_raw4(d / "a.raw", [dict(start=10.0, step=0.02, intensity=y)])
     assert kind == "raw3"

@@ -66,6 +66,7 @@ from .udf import UDF, read_udf
 from .uxd import UXD, read_uxd
 from .xrdml import XRDML, read_xrdml
 from .xy import XY, read_xy
+from .zip_collection import ZIP_COLLECTION, read_zip_collection
 
 #: Every format ``read_pattern`` accepts, **in dispatch order** (see above).
 #: ``BRUKER_RAW`` is first: its magic bytes name the format *and* its version at
@@ -75,7 +76,12 @@ from .xy import XY, read_xy
 #: matters more here than usual, since ``.raw`` is written by six unrelated
 #: vendors and ``.rd`` by two, so neither reader may trust a suffix.
 #: ``RASX`` and ``BRML`` follow, sharing a zip's magic and
-#: separated by their manifests rather than by it; then ``RAS``, ``UXD``,
+#: separated by their manifests rather than by it.  ``ZIP_COLLECTION`` (WP-1315)
+#: comes straight after them: a zip neither manifest claims is a plain archive,
+#: claimed once a member is claimed by another entry, and it sits above every
+#: text sniff because a *stored* archive shows its first member's text to them
+#: (``gsas`` claimed one by its ``BANK`` record and failed on the zip's bytes).
+#: Then ``RAS``, ``UXD``,
 #: ``XRDML`` and ``UDF``, each recognised by a first line, a root element or a
 #: required pair of header keys its own spec mandates, which is stronger
 #: evidence than the suffix and loose-text sniffs below them.  ``UDF`` sits with
@@ -87,7 +93,8 @@ from .xy import XY, read_xy
 #: ``XY``, the one entry its files fell to, so it can shadow no reader;
 #: ``RAW_UNKNOWN`` sits below ``XY``, for the reason in the module docstring.
 PATTERN_FORMATS: tuple[PatternFormat, ...] = (BRUKER_RAW, PHILIPS_RD, RASX, BRML,
-                                              RAS, UXD, XRDML, UDF, PDCIF, GSAS,
+                                              ZIP_COLLECTION, RAS, UXD, XRDML,
+                                              UDF, PDCIF, GSAS,
                                               CHI, DIF, PEAK_LIST,
                                               TOTAL_SCATTERING, XY,
                                               RAW_UNKNOWN)
@@ -128,6 +135,7 @@ __all__ = [
     "read_uxd",
     "read_xrdml",
     "read_xy",
+    "read_zip_collection",
     "reader_options_for",
     "sigma_by_arithmetic",
     "sigma_from_cps",

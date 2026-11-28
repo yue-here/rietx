@@ -2324,10 +2324,15 @@ def test_a_zip_that_is_not_a_rasx_is_not_claimed(tmp_path):
     with zipfile.ZipFile(p, "w") as archive:
         archive.writestr("notes.txt", "not a diffraction file at all")
 
+    with pytest.raises(ValueError, match="other.rasx is not a powder pattern"):
+        identify_format(p)       # no reader claims it, rasx least of all
     with pytest.raises(ValueError) as refusal:
         rx.read_pattern(p)
     assert "other.rasx" in str(refusal.value)
-    assert "Supported" in str(refusal.value)
+    # a zip whose only member is text with no profile holds no pattern, so no
+    # reader claims it (WP-1315, decisions walk item 1): the refusal is the
+    # registry's, naming the file
+    assert "not a powder pattern this build can read" in str(refusal.value)
 
 
 def test_the_attenuator_column_is_reported_here_exactly_as_in_ras(tmp_path):

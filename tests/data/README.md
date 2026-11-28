@@ -1100,6 +1100,30 @@ a whole position-sensitive-detector frame — while its `ScanAxes` still declare
 `AxisId="TwoTheta"`, so the axis check passes and **only the recorded view's own
 length says the rows are not a profile**.
 
+### Zip collections — a plain zip of patterns, with no vendorable file (WP-1315)
+
+A `zip_collection` is a person's archive, not a vendor format: single-pattern
+files zipped for transport. **No fixture is vendored.** The one real archive
+measured is private beamtime data with no vendoring grant (issue #134), so every
+case is built inline by `write_zip_collection` in `tests/test_reader_zip.py`,
+and the synthetic arm of `test_readers_robust.py` truncates a stored one.
+
+What the real archive established, read-only and without extracting it:
+
+| Fact | Value | What it decided |
+|---|---|---|
+| Members | 3802, of which 1372 are GSAS `.fxye` | the reader enumerates *patterns*, not members: `scan=k` counts only members a reader claims |
+| Compression | DEFLATE (`compress_type` 8), 327 MB | a member is read through the container cap, never trusted at its declared size |
+| A lock file among the members | an office suite's `.~lock…#` | dotfiles are skipped, never counted |
+| `identify_format` on main | refused cleanly ("looks binary") | the patterns were unreachable without extracting to disk |
+
+**The stored-zip mis-dispatch was measured on a synthetic archive**, one stored
+`.fxye` member: its `BANK` record lands inside the 4 kB head sniff, `gsas`
+claimed the archive, and `read_gsas` failed on the `PK\x03\x04` bytes. The
+real archive is deflated and never showed it.
+`test_a_stored_zip_of_gsas_text_is_a_zip_not_a_gsas_file` fails on the parent
+commit for that reason.
+
 ### `bruker_raw4_scrambled.raw` — a real header whose intensities are not real
 
 `.raw` is DIFFRAC's binary: after a 61-byte preamble the file is a chain of

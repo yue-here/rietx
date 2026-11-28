@@ -187,7 +187,8 @@ READER_OPTIONS: dict[str, ReaderOption] = {
 #: here rather than a string that works until someone reads it.
 METADATA_KEYS: dict[str, str] = {
     "source_file": "the file's own name, as opened",
-    "format": "the registered format that claimed it",
+    "format": "the registered format that claimed it; for a member of a "
+              "zip_collection archive, the reader that claimed the member",
     "block": "the pdCIF data block read, when the file held more than one",
     "title": "the file's own title line, verbatim",
     "sample": "the sample name the file records",
