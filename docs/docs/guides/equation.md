@@ -151,7 +151,7 @@ The other route is GSAS-II's: run the patterns as a series, then fit the equatio
 phases.0.cell.a = a0 + k*(T - 600), fitted to the forward chain's trajectory (7 points)
   χ² 7.237 on 5 dof, χ²/ν 1.45
   a0 = 4.162832875 ± 2.0e-06 (unscaled ± 1.6e-06)
-  k = 2.07815704e-05 ± 9.9e-09 (unscaled ± 8.2e-09)
+  k = 2.078157039e-05 ± 9.9e-09 (unscaled ± 8.2e-09)
 ```
 
 `a0` is the lattice parameter a at 600 K and `k` the slope, the two numbers the declared line gave above.
