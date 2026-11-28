@@ -140,6 +140,24 @@ rule above applies to the form factors.
 
 ### Inherited
 
+- **2026-11-28, from the issue triage (#1832, a bug): `magnetic_supercell` refuses
+  a parent with a co-occupied site and blames the cell transform.** Mn₃ReO₆ in
+  `P 1 21/n 1` (10 K deposit, doi:10.7488/ds/1359) has Re1 (Re, occ 0.817) and
+  Reb (Mn, occ 0.183) at one position, (0, ½, 0). With MAGNDATA 0.551's own
+  transform `2a,2b,c;0,0,0`, the call raises "one orbit … joins atoms from more
+  than one parent site ([5, 6]) … which means the cell transform is wrong".
+  Checked at `02341ffdb`: in `crystallography/magnetic/supercell.py`,
+  `_partition_into_child_orbits` (`:902`) merges the child images of the two
+  co-located atoms through `_same_site`, and the parent-index test (`:936-942`)
+  then fires. The reporter says the same call passes with Reb removed; not
+  re-run here. Co-sited magnetic atoms are already a ruled case elsewhere on
+  this path (WP-1418's 2026-11-19 entry, #1692: the support test reads
+  Σ occ·f·m). The reporter offers two fixes: carry the mixed site through, so
+  each species keeps its own child atoms at the shared positions, or refuse
+  with a message naming the co-occupied site. Which one is a magnetic-path
+  design call, so it is Mike's under #1075. It goes to him on the issue and is
+  not ruled here. Either way the message stops naming the transform for a
+  case the transform did not cause.
 - **From WP-2060 (2026-11-07, PR #1459): an angle's unasked interval can come from a fit that
   missed its minimum, and nothing says so.** Mike's ruling on #1075 withholds a flagged site's
   *modulus* profile when its refits find the data χ² a whole cut or more below the fit; the

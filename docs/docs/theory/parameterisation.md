@@ -562,7 +562,7 @@ that the child lost maps it to a domain-related structure with the same powder p
 and the fixed subspace of $D(G)$ is the identity irrep's: the parent's own free
 coordinates. Every other amplitude has an exactly zero gradient at
 $\mathbf{A} = \mathbf{0}$, the whole block at once, and a fit started there
-moves only by its finite difference's step. The parameter table refuses to
+has no gradient to follow. The parameter table refuses to
 free such a block. {func}`~rietx.crystallography.representation.distortion.displacive_statement`
 seeds a child that sits at its parent with a vector of norm
 {{ DISTORTION_SEED }} Å in the span of the non-identity modes, along a
