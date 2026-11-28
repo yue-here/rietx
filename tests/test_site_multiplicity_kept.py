@@ -9,13 +9,14 @@ tolerance.  Before WP-2052 the next compile counted the site at 4 positions
 with the occupancy unchanged: 10 O per cell in place of 12, χ²_red 23 and
 O1 Biso -1.6 on noise-free data.
 """
+import dataclasses
 from pathlib import Path
 
 import numpy as np
 import pytest
 
 import rietx as rx
-from rietx.model.forward import compile_model, orbit_split_of
+from rietx.model.forward import WINDOW_MIN_DEG, compile_model, orbit_split_of
 from rietx.refine import _multiplicity_kept_diagnostics
 from rietx.schemas.plan import CLOSING_WINDOW_TOL
 from rietx.viz.plots import plot_result
@@ -111,10 +112,14 @@ def test_stage_boundaries_keep_the_split_too(truth):
     whose column the snapped compile had zeroed, and the result read 10 O at
     χ²_red 44.5.
     """
-    stages = [rx.Stage("scale", ["phases.*.scale"]),
-              rx.Stage("xyz", ["phases.*.scale", "phases.*.atoms.*.dof.*"]),
-              ALL,
-              rx.Stage("occ", [*ALL.turn_on, f"phases.*.atoms.{O1}.occ"])]
+    # one declared slack on every stage: since WP-2317 (R7) a stage a later
+    # one refits sizes its windows from what it frees, so each boundary would
+    # change the windows and the cost with them (1 382 -> 22 here)
+    stages = [dataclasses.replace(s, window_slack_deg=WINDOW_MIN_DEG) for s in (
+        rx.Stage("scale", ["phases.*.scale"]),
+        rx.Stage("xyz", ["phases.*.scale", "phases.*.atoms.*.dof.*"]),
+        ALL,
+        rx.Stage("occ", [*ALL.turn_on, f"phases.*.atoms.{O1}.occ"]))]
     ref, res = _split_pair_fit(truth, stages)
     o1 = ref.structure.phases[0].atoms[O1]
     assert abs(o1.y.value - 0.25) < 1e-3          # no walk

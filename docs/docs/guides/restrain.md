@@ -57,7 +57,7 @@ It refines the GSAS-II tutorial pattern that ships with rietx.
 bond [2, 4] 1.552 +1.2
 bond [2, 5] 1.573 +3.3
 bond [2, 6] 1.526 -1.4
-angle [4, 2, 5] 110.833 +1.4
+angle [4, 2, 5] 110.834 +1.4
 ['fluorapatite P3', 'fluorapatite O6'] The bond restraint deviates +3.3σ from its target (1.573 vs 1.54).
 ```
 
