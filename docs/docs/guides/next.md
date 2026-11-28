@@ -84,7 +84,7 @@ free phases.0.extinction next: predicted Δχ² 106, ΔBIC +1.4 (24 candidate(s)
 
 Extinction clears the noise floor, with a ΔBIC of +1.4.
 `best_or_none()` returns it, because it checks the floor and the tie and does not check ΔBIC.
-Read `delta_bic` before you free what `best_or_none()` names, since a negative one means the gain does not pay for the parameter.
+Read `delta_bic` before you free what `best_or_none()` names, since a negative one means the criterion prefers the fit without the parameter.
 
 A positive `delta_bic` is not enough either.
 Extinction sits on its lower bound of 0, and the data push it below 0, so freeing it moves nothing.
