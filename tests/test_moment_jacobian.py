@@ -15,17 +15,17 @@ forward orbit sum of one atom at ∂m/∂d) chained through the same intensity
 factors as the coordinate columns.  The derivation is in the WP-1327
 PR #1206's description (and, once written, the WP-1327 handover).
 
-**Angles are built and checked here, and dispatched only on request.**  The
-derivative covers them (the same function returns their rows), and every
-test below holds the angle columns ``_moment_column`` builds to the same
-oracle.  ``_make_jacobian(..., moment_angles=True)`` lets the branch claim
-them, and ``test_a_dispatched_angle_column_meets_the_exact_oracle`` pins the
-dispatched column there, on synthetic and real data.  The default dispatch
-declines them by name (``_moment_reach_ok``'s docstring), because an exact
-angle column is zero at a symmetry-fixed seed and a solver cannot leave it
-where it is a maximum, which the forward difference escaped only by its
-truncation; ``test_an_exact_angle_column_cannot_leave_a_symmetric_seed``
-pins that measured reason, so the decline cannot outlive it unnoticed.
+**Angles are dispatched too, except on the symmetry floor** (issue #1404).
+The derivative covers them (the same function returns their rows), and
+``_make_jacobian`` claims every moment column, angles included;
+``test_a_dispatched_angle_column_meets_the_exact_oracle`` pins the
+dispatched column on synthetic and real data.  An exact angle column is
+zero at a direction the symmetry fixes, and a solver cannot leave such a
+direction where it is a maximum, so at a build where the angle column is at
+most ``MOMENT_DIRECTION_SUPPORT`` of its site's modulus column it takes the
+forward difference instead (``_moment_angle_on_floor``).
+``test_an_angle_column_on_the_floor_takes_the_forward_difference`` pins
+both halves of that rule at the frame fixture's symmetric start.
 
 **Why the oracle is exact, not a forward difference.**  F is linear in every
 moment, the moment is linear in the modulus and in (cos α, sin α) for each
@@ -330,16 +330,24 @@ def _oracle_errors(name):
 
 # ======================================================== the branch is taken
 
-@pytest.mark.parametrize("angles", [False, True], ids=["default", "angles"])
 @pytest.mark.parametrize("name", [*ALL_STATES, *REAL_STATES])
-def test_the_dispatch_takes_the_branch_exactly_where_it_claims(name, angles):
+def test_the_dispatch_takes_the_branch_exactly_where_it_claims(name, monkeypatch):
     """Which columns the analytic branch claims, asserted — not inferred
-    from agreement, which a peak-chain column would also give: by default
-    every modulus column of a supported phase and no angle; with
-    ``moment_angles`` every moment column, angles included; nothing on a
-    split draw with live extinction either way.  And a claimed column *is*
-    the built one."""
+    from agreement, which a peak-chain column would also give: every moment
+    column of a supported phase, angles included, and nothing on a split
+    draw with live extinction.  And a claimed column *is* the built one:
+    no state here starts an angle on the symmetry floor, which the spy on
+    the floor test asserts rather than assumes."""
     model, table = _cached(name)
+    floor = []
+    real_floor = lsq._moment_angle_on_floor
+
+    def floor_spy(column_norm, modulus_norm):
+        hit = real_floor(column_norm, modulus_norm)
+        floor.append(hit)
+        return hit
+
+    monkeypatch.setattr(lsq, "_moment_angle_on_floor", floor_spy)
     supported = model.moment_grad_supported(0)
     assert supported is (name != "split_extinction_live")
     if name.startswith("split"):
@@ -353,13 +361,14 @@ def test_the_dispatch_takes_the_branch_exactly_where_it_claims(name, angles):
 
     lsq._moment_column = spy
     try:
-        J = _make_jacobian(model, table, moment_angles=angles)(table.x0())
+        J = _make_jacobian(model, table)(table.x0())
     finally:
         lsq._moment_column = real
     cols = _moment_columns(table)
-    want = ([c for c, kind, _ in cols if angles or kind == "modulus"]
-            if supported else [])
+    want = [c for c, _kind, _ in cols] if supported else []
     assert sorted(taken) == want, (taken, want)
+    n_angles = sum(kind == "angle" for c, kind, _ in cols if c in want)
+    assert floor == [False] * n_angles, floor
     for c, _kind, reach in cols:
         if c in want:
             np.testing.assert_array_equal(
@@ -408,12 +417,13 @@ def _angle_columns(table):
 @pytest.mark.parametrize("name", ANGLE_EXACT_STATES)
 def test_a_dispatched_angle_column_meets_the_exact_oracle(name):
     """The analytic angle branch, pinned where it is dispatched: every angle
-    column of ``_make_jacobian(..., moment_angles=True)`` meets the exact
-    oracle, on the synthetic states and on the two real LaMnO₃ ones.
+    column of ``_make_jacobian`` meets the exact oracle, on the synthetic
+    states and on the two real LaMnO₃ ones.
 
     The bar is the one the *peak chain* cannot meet, so this test fails the
-    moment the branch stops claiming an angle (the default dispatch, asserted
-    below as the positive arm, sits at ≥ 7e-8 on every column here).
+    moment the branch stops claiming an angle (the pre-branch dispatch,
+    ``moment_grad_supported`` forced off and asserted below as the positive
+    arm, sits at ≥ 7e-8 on every column here).
     Measured worst (darwin/arm64, ``[dev,jax]``, 2026-11-04): 2.6e-14 on the
     synthetic states, 1.1e-13 on LaMnO₃ (the Pnma azimuth, the smallest
     column); the real-data bar is ``REAL_ORACLE_BAR``, ~10× that.
@@ -424,13 +434,17 @@ def test_a_dispatched_angle_column_meets_the_exact_oracle(name):
     cols = _angle_columns(table)
     assert cols, "no free moment angle in the state — the test would prove nothing"
     bar = REAL_ORACLE_BAR if name in REAL_STATES else ORACLE_BAR
-    J_on = _make_jacobian(model, table, moment_angles=True)(theta)
-    J_off = _make_jacobian(model, table)(theta)
+    J_on = _make_jacobian(model, table)(theta)
+    model.moment_grad_supported = lambda ip: False      # the pre-branch dispatch
+    try:
+        J_off = _make_jacobian(model, table)(theta)
+    finally:
+        del model.moment_grad_supported
     for c, _reach in cols:
         truth = _oracle_column(residual, theta, c, "angle")
         e_on, e_off = _rel(truth, J_on[:, c]), _rel(truth, J_off[:, c])
         print(f"{name} {table.free_paths[c]}: dispatched {e_on:.1e}, "
-              f"default (peak chain) {e_off:.1e}")
+              f"pre-branch (peak chain) {e_off:.1e}")
         assert e_on < bar, (table.free_paths[c], e_on)
         assert e_off > 1e3 * bar, (table.free_paths[c], e_off)
     # the rows below the data, which a moment reaches nowhere, are untouched
@@ -449,7 +463,7 @@ def test_a_dispatched_angle_column_meets_central_differences(name):
     model, table = _cached(name)
     theta = table.x0()
     fd = _central_fd_jacobian(name, model, table)(theta)
-    J_on = _make_jacobian(model, table, moment_angles=True)(theta)
+    J_on = _make_jacobian(model, table)(theta)
     cols = _angle_columns(table)
     assert cols
     for c, _reach in cols:
@@ -534,27 +548,10 @@ def test_a_wrong_projection_fails_the_oracle(monkeypatch):
     assert max(errs) > 1e3 * ORACLE_BAR, errs
 
 
-# ======================================================== why angles decline
+# ======================================================== the symmetry floor
 
-def test_an_exact_angle_column_cannot_leave_a_symmetric_seed():
-    """The measured reason ``_moment_reach_ok`` declines an angle.
-
-    ``test_magnetic_moment_frame``'s fixture (P 1 2/m 1, n = 3, the moment
-    seeded at its truth (2.5, 0, 2.5), so the azimuth starts at exactly 0,
-    a direction the b-axis mirror makes the pattern even about).  There the
-    exact azimuth column is roundoff — measured 2.3e-16 of the modulus
-    column — so a solver driven by it has nothing to move the azimuth with
-    (whether round-off alone does depends on the platform, below), while
-    the peak chain's forward difference reads ½·r″·h, measured 7.6e-7 of it,
-    and walks off.  With the analytic azimuth dispatched (measured
-    2026-10-28 on darwin/arm64, before the decline), that file's fits from
-    β₀ = 101.1° and 103.0° stopped at φ = 0 with χ² 10.9 and 3.7 above the
-    minima at φ = ±0.047 the peak chain reaches, and failed its pinned |m|.
-    On linux/x86-64 the round-off column walked off unaided, so the stall is
-    the platform's and the decline's reason is that it can happen.  When an angle is seeded
-    off its stationary point before the stage that frees it, this test is
-    the one to change, and the angle can join the branch.
-    """
+def _frame_azimuth_state():
+    """``test_magnetic_moment_frame``'s fixture at its symmetric start."""
     import tests.test_magnetic_moment_frame as T
 
     instrument = rx.Instrument.constant_wavelength_neutron(2.4, fwhm_deg=0.25)
@@ -565,24 +562,80 @@ def test_an_exact_angle_column_cannot_leave_a_symmetric_seed():
     table.set_vary(T.BASE + T.MOMENT, True)
     model = compile_model(structure, instrument, data,
                           moving_paths=set(table.moving_paths))
-    theta = table.x0()
     free = table.free_paths
     base = "phases.0.atoms.0.moment"
-    azimuth, modulus = free.index(f"{base}.dof2"), free.index(f"{base}.dof0")
+    return model, table, free.index(f"{base}.dof2"), free.index(f"{base}.dof0")
+
+
+def test_an_angle_column_on_the_floor_takes_the_forward_difference(monkeypatch):
+    """The rule ruled on issue #1404, both halves, at one fixture.
+
+    ``test_magnetic_moment_frame``'s fixture (P 1 2/m 1, n = 3, the moment
+    seeded at its truth (2.5, 0, 2.5), so the azimuth starts at exactly 0,
+    a direction the b-axis mirror makes the pattern even about).  There the
+    exact azimuth column is round-off, measured 2.3e-16 of the modulus
+    column, so a solver handed it has nothing to move the azimuth with,
+    while the forward difference reads ½·r″·h, measured 7.6e-7 of it, and
+    walks off.  With the exact column dispatched there (measured 2026-10-28
+    on darwin/arm64), that file's fits from β₀ = 101.1° and 103.0° stopped
+    at φ = 0 with χ² 10.9 and 3.7 above the minima at φ = ±0.047; on
+    linux/x86-64 the round-off column walked off unaided, so the stall is
+    the platform's and the rule exists because it can happen.
+
+    So at the symmetric start the dispatched column **is** the forward
+    difference the pre-branch dispatch builds, bit for bit; with the
+    fallback removed it is the exact zero column (the arm that fails).
+    And 1e-4 rad off the direction the column is above the floor (measured
+    1.5e-4 of the modulus column, 150× the floor; the column grows linearly
+    off the direction, so the band it substitutes in is ±6.5e-7 rad here)
+    and meets the exact oracle, so the substitution is confined to the point
+    the symmetry fixes.  That error is taken against the modulus column, the
+    scale the floor is defined on: against its own small column the oracle's
+    round-off reads 6.6e-11 (2026-11-20, darwin/arm64), while against the
+    modulus column it is 1.0e-14, constant from 1e-6 to 1e-2 rad off, and the
+    forward difference there sits at 7.6e-7.
+    """
+    model, table, azimuth, modulus = _frame_azimuth_state()
+    theta = table.x0()
     assert abs(theta[azimuth]) < 1e-15        # 0 up to the frame's rounding
     cols = {c: reach for c, _k, reach in _moment_columns(table)}
     built = _built_column(model, table, theta, azimuth, cols[azimuth])
     norm = np.linalg.norm(_built_column(model, table, theta, modulus,
                                         cols[modulus]))
-    fd = _make_jacobian(model, table)(theta)[:, azimuth]
-    dispatched = _make_jacobian(model, table, moment_angles=True)(theta)[:, azimuth]
+    model.moment_grad_supported = lambda ip: False      # the pre-branch dispatch
+    try:
+        fd = _make_jacobian(model, table)(theta)[:, azimuth]
+    finally:
+        del model.moment_grad_supported
+    dispatched = _make_jacobian(model, table)(theta)[:, azimuth]
     print(f"azimuth/modulus: exact {np.linalg.norm(built) / norm:.1e}, "
-          f"peak chain {np.linalg.norm(fd) / norm:.1e}")
+          f"forward difference {np.linalg.norm(fd) / norm:.1e}")
     assert np.linalg.norm(built) < 1e-13 * norm
     assert np.linalg.norm(fd) > 1e-9 * norm
-    # asked for, the branch hands the solver that exact zero column
-    np.testing.assert_array_equal(dispatched[:len(model.tt)],
-                                  built[:len(model.tt)])
+    np.testing.assert_array_equal(dispatched, fd)
+    # the fallback removed: the branch hands the solver the exact zero column
+    monkeypatch.setattr(lsq, "_moment_angle_on_floor", lambda *a: False)
+    bare = _make_jacobian(model, table)(theta)[:, azimuth]
+    np.testing.assert_array_equal(bare[:len(model.tt)], built[:len(model.tt)])
+    monkeypatch.undo()
+    # 1e-4 rad off the direction: exact, far above the floor
+    off = theta.copy()
+    off[azimuth] += 1e-4
+    truth = _oracle_column(_make_residual(model, table), off, azimuth, "angle")
+    col = _make_jacobian(model, table)(off)[:, azimuth]
+    model.moment_grad_supported = lambda ip: False
+    try:
+        fd_off = _make_jacobian(model, table)(off)[:, azimuth]
+    finally:
+        del model.moment_grad_supported
+    err = np.linalg.norm(truth - col) / norm
+    err_fd = np.linalg.norm(truth - fd_off) / norm
+    ratio = np.linalg.norm(col) / norm
+    print(f"1e-4 rad off: exact {err:.1e}, forward difference {err_fd:.1e} "
+          f"of the modulus column; azimuth/modulus {ratio:.1e}")
+    assert err < ORACLE_BAR, err
+    assert err_fd > 1e3 * ORACLE_BAR, err_fd
+    assert ratio > 1e2 * lsq.MOMENT_DIRECTION_SUPPORT, ratio
 
 
 # ======================================================== a whole fit
@@ -628,16 +681,18 @@ def test_a_fit_reaches_the_same_minimum_and_esds_either_way():
     stops inside its tolerance.  What must agree is what the data decides —
     χ², the values on the scale of their esds, and the esds.
 
-    Measured on two platforms ([dev,jax], Python 3.12; the linux run three
-    times, identical each time), χ² / values / esds:
+    Since the angle columns joined the branch (issue #1404) the analytic arm
+    builds all four moment columns exactly, the moduli and the angles.
+    Measured on two platforms (Python 3.12), χ² / values / esds:
 
-    * darwin/arm64, 2026-10-28: 2.1e-16 relative, 1.0e-9 esd, 5.9e-7 relative;
-    * linux/x86-64 (numpy 2.5.3, scipy 1.18.1), 2026-10-31: 4.1e-9 esd for the
-      values, 6.0e-7 relative for the esds.
+    * darwin/arm64, 2026-11-20: 4.3e-16 relative, 4.0e-9 esd, 2.3e-6 relative;
+    * linux/x86-64 (numpy 2.5.3), 2026-11-20: 2.1e-16 relative, 1.5e-9 esd,
+      2.3e-6 relative.
 
-    The esds agree across platforms to 2 %, so the esd bar sits at 10× the
-    larger; the values differ by 4× between platforms and both are four
-    decades under their bar.  The χ²
+    The esds agree across platforms to the two digits printed, so the esd bar
+    sits at 10× the larger; the values differ by 3× between platforms and both
+    are four decades under their bar.  (With the moduli alone exact, before
+    #1404: 1.0e-9 / 4.1e-9 esd and 5.9e-7 / 6.0e-7 relative.)  The χ²
     and value bars are wider on purpose: the difference between two
     converged fits senses where each solver stopped (tests/CLAUDE.md
     § Budgets in tests), so they are set at what "the same minimum" means —
@@ -649,7 +704,9 @@ def test_a_fit_reaches_the_same_minimum_and_esds_either_way():
     moment.
     """
     a, b = _fit_arm(True), _fit_arm(False)
-    assert abs(a.statistics.chi2 - b.statistics.chi2) / a.statistics.chi2 < 1e-9
+    dchi2 = abs(a.statistics.chi2 - b.statistics.chi2) / a.statistics.chi2
+    print(f"χ² {dchi2:.1e} relative")
+    assert dchi2 < 1e-9
     ra = {p.path: p for p in a.parameters}
     rb = {p.path: p for p in b.parameters}
     assert ra.keys() == rb.keys()
@@ -665,4 +722,31 @@ def test_a_fit_reaches_the_same_minimum_and_esds_either_way():
         de = max(de, abs(p.stderr - q.stderr) / p.stderr)
     print(f"max |dv|/esd {dv:.1e}, max rel d(esd) {de:.1e}")
     assert dv < 1e-4
-    assert de < 6e-6
+    assert de < 2.5e-5
+
+
+def test_a_generic_start_never_takes_the_forward_difference(monkeypatch):
+    """The floor test's negative arm on a start no symmetry fixes: the
+    two-site in-plane fit above never meets the floor (asserted on every
+    angle column of every build, by a spy), and is bit-identical with the
+    fallback removed — so on such a fit the rule is the exact columns and
+    nothing else."""
+    seen = []
+    real = lsq._moment_angle_on_floor
+
+    def spy(column_norm, modulus_norm):
+        hit = real(column_norm, modulus_norm)
+        seen.append((column_norm / modulus_norm, hit))
+        return hit
+
+    monkeypatch.setattr(lsq, "_moment_angle_on_floor", spy)
+    a = _fit_arm(True)
+    assert seen, "no angle column reached the floor test"
+    assert not any(hit for _r, hit in seen), min(r for r, _h in seen)
+    print(f"{len(seen)} angle columns tested, smallest ratio "
+          f"{min(r for r, _h in seen):.1e}")
+    monkeypatch.setattr(lsq, "_moment_angle_on_floor", lambda *args: False)
+    b = _fit_arm(True)
+    assert a.statistics.chi2 == b.statistics.chi2
+    assert [(p.path, p.value, p.stderr) for p in a.parameters] == \
+        [(p.path, p.value, p.stderr) for p in b.parameters]

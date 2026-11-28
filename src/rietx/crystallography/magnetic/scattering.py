@@ -644,11 +644,11 @@ def magnetic_f2(members, seg, counts, stol, msites: MagneticSites, cell,
     that is still refining, the traced twin **declines by name**
     (``backend.traced.make_traced_residual``) and jax/torch fall back to the
     host path for a magnetic phase.  The numpy answer is exact, and so is
-    the Jacobian column for a moment modulus: analytic since WP-1327's last
-    task (:func:`d_magnetic_f2_d_dofs`,
-    ``optimize.least_squares._moment_column``).  An angle column, and a split
-    draw with extinction evaluated, take the peak chain's re-run of the
-    forward model.
+    every moment Jacobian column, modulus and angle: analytic since WP-1327's
+    last task (:func:`d_magnetic_f2_d_dofs`,
+    ``optimize.least_squares._moment_column``).  An angle column on the
+    symmetry floor (issue #1404), and a split draw with extinction evaluated,
+    take the peak chain's re-run of the forward model.
     """
     m_hkl = np.asarray(members, dtype=np.float64)
     seg_i = np.asarray(seg, dtype=np.int64)

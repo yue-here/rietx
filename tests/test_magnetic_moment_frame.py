@@ -159,6 +159,13 @@ def test_the_written_back_moment_is_the_fitted_one_after_the_angle_moved(cw, bet
     On main the written-back |m| sat 0.4σ, 2.2σ and 9σ from the refined
     modulus, scaling with the move, and ``fitted_structure`` re-evaluated
     9.5e-4, 4.8e-3 and 1.9e-2 of the peak height from ``y_calc``.
+
+    The moment stage starts the azimuth at 0, a direction the b-axis mirror
+    fixes, so these rows also pin the angle columns' floor rule (issue
+    #1404): with the forward difference on the floor removed, the fits from
+    101.1° and 103.0° stopped at φ = 0 with |m| 3.1804 and 3.1766 instead of
+    3.1772 at φ = ±0.047 (2026-11-20, darwin/arm64), the first outside the
+    pin below.
     """
     ref, result = _fit(cw, beta0, PLAN_3)
     assert result.status == "converged"
@@ -241,17 +248,117 @@ def test_a_series_moment_row_states_the_written_back_moment(cw):
                                rtol=0, atol=1e-9)
 
 
+@pytest.fixture(scope="module")
+def cw_seed11():
+    """Noise seed 11, where the minimum lies on the symmetric direction."""
+    instrument = rx.Instrument.constant_wavelength_neutron(2.4, fwhm_deg=0.25)
+    data, scale = _simulate(instrument, seed=11)
+    return instrument, data, scale
+
+
+#: the zeroed azimuth's standard error on ``cw_seed11``, read from its profile
+#: interval (±0.108 rad at 95 %, 2026-11-20, darwin/arm64): the scale the
+#: residual azimuth is printed against, not asserted, since the row runs
+#: without intervals
+AZIMUTH_SIGMA = 0.055
+
+
+@pytest.mark.parametrize("beta0", [101.1, 101.5, 103.0])
+def test_a_minimum_on_the_symmetric_direction_is_not_pushed_off(cw_seed11, beta0):
+    """The angle floor rule's negative arm (issue #1404).
+
+    On noise seed 11 the minimum is at φ = 0 itself, so the forward
+    difference the rule hands an angle on the floor must not walk a fit off
+    it.  Each fit is compared with the forward-difference fit
+    (``moment_grad_supported`` forced off, every moment column by the peak
+    chain): χ² no more than 5e-8 relative above it, |m| within 1.5e-3 of its
+    esd, and the azimuth zeroed by the stationary-angle test in both.  The
+    bars are ten times the largest spread measured between the arms across
+    platforms (4.4e-9 relative in χ² on CI py3.11, 1.4e-4 esd in |m| on CI
+    py3.14; tests/CLAUDE.md § Budgets), one-sided in χ² because a push off a
+    minimum can only raise it.  With the azimuth held at 1.1e-2 rad (0.2σ_φ)
+    in the rule arm from 103.0°, both bars fail: χ² 3.9e-7 above, |m| 4.9e-3
+    esd off (2026-11-24, darwin/arm64).  The χ² bar is on χ², not χ²_red, so
+    an arm with one parameter fewer is compared on the same footing; a held
+    angle is not zeroed, so that plant fails first at the zeroed assert, with
+    the full message.  Neither arm lands on φ = 0 to round-off, and neither
+    did before.  A zeroed angle has no esd, so the residual is read against
+    its profile interval, ±0.108 rad at 95 % (σ_φ ≈ 0.055 rad), and printed
+    as that fraction, not asserted: from 103.0° it is 3.0e-4 rad (0.005σ_φ)
+    here against 1.2e-4 rad (0.002σ_φ) for the forward difference, and under
+    1e-6 rad from 101.1° and 101.5° in both (2026-11-20, darwin/arm64).
+    """
+    from rietx.model.forward import CompiledModel
+
+    def arm(exact):
+        real = CompiledModel.moment_grad_supported
+        if not exact:
+            CompiledModel.moment_grad_supported = lambda self, ip: False
+        try:
+            ref, result = _fit(cw_seed11, beta0, PLAN_3)
+        finally:
+            CompiledModel.moment_grad_supported = real
+        m_back, cell = _written_back(ref)
+        row = ref.report().magnetic[0]
+        # every entry, so the row still reports an azimuth no stage freed
+        azimuth = next(p for p in ref.parameters()
+                       if p.path == "phases.0.atoms.0.moment.dof2")
+        zeroed = {q for st in result.stages
+                  for t in (st.moment_angle_tests or []) if t.zeroed
+                  for q in t.paths}
+        return (result, moment_magnitude(m_back, cell), row.magnitude_esd,
+                azimuth, zeroed)
+
+    a, b = arm(True), arm(False)
+
+    def total(result):
+        st = result.statistics
+        return st.chi2 * (st.n_points - st.n_free_parameters)
+
+    lines = [f"β₀ {beta0}"]
+    for name, (result, m, esd, azimuth, zeroed) in (("rule", a), ("forward difference", b)):
+        esd_s = f"{esd:.2e}" if esd is not None else "None"
+        lines.append(f"{name}: {result.status}, zeroed {sorted(zeroed)}, "
+                     f"χ²_red {result.statistics.chi2:.12f}, |m| {m:.7f} (esd {esd_s}), "
+                     f"azimuth {azimuth.value:+.3e} rad = "
+                     f"{azimuth.value / AZIMUTH_SIGMA:+.4f} σ_φ")
+    rel = (total(a[0]) - total(b[0])) / total(b[0])
+    dm = abs(a[1] - b[1]) / b[2] if b[2] else float("nan")
+    lines.append(f"χ² rule above forward difference {rel:+.2e} relative (bar 5e-8), "
+                 f"|Δm| {dm:.2e} esd (bar 1.5e-3)")
+    message = "\n".join(lines)
+    print(message)
+    for result, _m, _esd, _azimuth, zeroed in (a, b):
+        assert result.status == "converged", message
+        assert "phases.0.atoms.0.moment.dof2" in zeroed, message
+    assert rel < 5e-8, message
+    assert dm < 1.5e-3, message
+
+
 # --------------------------------------------------------------------------
 # the joint path builds its tables once too (params/multi.py)
 # --------------------------------------------------------------------------
-def test_the_joint_path_writes_back_the_moment_it_fitted():
+def test_the_joint_path_writes_back_the_moment_it_fitted(monkeypatch):
     instruments = [rx.Instrument.constant_wavelength_neutron(2.4, fwhm_deg=0.25),
                    rx.Instrument.constant_wavelength_neutron(1.8, fwhm_deg=0.25)]
     sims = [_simulate(ins, seed) for ins, seed in zip(instruments, (7, 11), strict=True)]
     data = [d for d, _ in sims]
     structure = rx.Structure(phases=[_phase(103.0, scale=sims[0][1])])
+    # the joint fit's Jacobians apply the angle floor rule (issue #1404): its
+    # moment stage starts the azimuth on the mirror's direction, so the floor
+    # test fires there, and the rule then gives way to the exact column
+    from rietx.optimize import least_squares as lsq
+
+    real_floor, floor = lsq._moment_angle_on_floor, []
+
+    def floor_spy(column_norm, modulus_norm):
+        floor.append(real_floor(column_norm, modulus_norm))
+        return floor[-1]
+
+    monkeypatch.setattr(lsq, "_moment_angle_on_floor", floor_spy)
     ref = rx.MultiHistogramRefinement(structure, instruments)
     result = ref.fit(data, plan=PLAN_3)
+    assert any(floor) and not all(floor), floor
     dofs = [_dof_value(result, k) for k in range(3)]
     for h in range(len(data)):
         # the joint path has no result-time compile (#272 is single-histogram),

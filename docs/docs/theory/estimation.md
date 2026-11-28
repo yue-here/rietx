@@ -23,7 +23,7 @@ The Jacobian is assembled column by column, exact wherever it can be:
 linear for the background; analytic for per-peak position, width, mixing
 and intensity, for coordinates, anisotropic ADPs, Biso and occupancy over
 the frozen operator subsets (ties across atoms and distortion modes
-included), for magnetic-moment moduli and for the FCJ apertures; a forward
+included), for magnetic moments and for the FCJ apertures; a forward
 difference otherwise.
 Under a differentiable backend the same residual is traced and columns
 come from forward-mode autodiff, whose cost scales with the parameter

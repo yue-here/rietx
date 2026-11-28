@@ -122,6 +122,12 @@ MOMENT_DOF_PATH = re.compile(r"^phases\.\d+\.atoms\.\d+\.moment\.dof\d+$")
 #: stopped at that direction.  An angle that passes stays free and keeps its value.
 #: Only its column leaves the covariance.
 #:
+#: **The Jacobian's floor** (``optimize.least_squares._moment_angle_on_floor``,
+#: issue #1404) reads the same ratio at every build: an exact angle column at or
+#: under this fraction of its sites' largest modulus column takes the forward
+#: difference for that build, because a solver handed the zero column cannot
+#: leave a direction that is a maximum along the angle.
+#:
 #: **Measured, not chosen.**  On the cubic collinear test structure the
 #: orbit-averaged intensity is provably independent of the moment direction.
 #: There the two angle DOFs respond at ~1e-15 of the modulus's response to the

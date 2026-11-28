@@ -901,10 +901,11 @@ def _state_magnetic_angles_tied():
     affine tie between two sites' moduli, and a named variable driving one of
     them, are new ways to widen C onto it, which is what obliges a row here
     (root CLAUDE.md § Backends).  The angles
-    beside it — a site's own azimuth, and a named variable driving the other
-    site's — are columns the dispatch declines by name and builds on the peak
-    chain (``_moment_reach_ok``), so this row also holds that the decline
-    leaves them right.  ``test_moment_jacobian`` holds every column of the
+    beside it are a site's own azimuth, which the branch claims, and a named
+    variable driving the other site's, a column the dispatch declines by its
+    name (``vars.PHI`` is no moment path) and builds on the peak chain, so
+    this row also holds that the decline leaves it right.
+    ``test_moment_jacobian`` holds every column of the
     same state to an exact oracle; here the ``fd`` opinion meets the
     assembled Jacobian, and the traced rows decline by name as on
     ``magnetic``.
@@ -927,10 +928,10 @@ def _state_magnetic_angles_tied():
 def _state_magnetic_angles_analytic():
     """WP-1327's analytic moment branch with the angle columns claimed.
 
-    The reference of this config is ``_make_jacobian(..., moment_angles=True)``
-    (``MOMENT_ANGLE_CONFIGS``), so the angle columns every row meets are the
-    analytic ones, a derivative path ``magnetic_angles_tied`` (whose angles
-    the default dispatch declines) never reaches.  The shapes: site 0 free in
+    The reference claims every moment column here, angles included, and no
+    angle starts on the symmetry floor (issue #1404), so the angle columns
+    every row meets are the analytic ones, including an angle column reaching
+    two sites, which ``magnetic_angles_tied`` lacks.  The shapes: site 0 free in
     all three DOFs (modulus, polar, azimuth, n = 3); site 1's polar angle
     following site 0's by an affine tie (−1, + 0.4), so one angle column
     reaches two sites; the scale, a background term and the zero shift beside
@@ -1709,21 +1710,10 @@ def _kink_paths(model, table) -> frozenset[str]:
 _JACOBIAN_CACHE: dict[tuple[str, str], object] = {}
 
 
-#: configs whose numpy reference lets the analytic moment branch claim the
-#: moment **angle** columns (``_make_jacobian(..., moment_angles=True)``,
-#: WP-1327), so every row of ``test_jacobian_matches_analytic`` meets that
-#: branch rather than the default dispatch's forward difference.  The FD-oracle
-#: tests further down build their own default Jacobian and so still read the
-#: forward-difference angle columns here, as on ``magnetic_angles_tied``
-MOMENT_ANGLE_CONFIGS = frozenset({"magnetic_angles_analytic"})
-
-
 def _for_backend(config: str, model, table, name: str):
     key = (config, name)
     if key not in _JACOBIAN_CACHE:
-        _JACOBIAN_CACHE[key] = _jacobian_for(
-            model, table, name,
-            moment_angles=name == "numpy" and config in MOMENT_ANGLE_CONFIGS)
+        _JACOBIAN_CACHE[key] = _jacobian_for(model, table, name)
     return _JACOBIAN_CACHE[key]
 
 
@@ -1939,7 +1929,7 @@ def test_the_angle_config_s_reference_claims_every_moment_column(monkeypatch):
     """``magnetic_angles_analytic``'s reference is the analytic angle branch,
     asserted rather than assumed: every column moving a moment DOF goes
     through ``_moment_column``, the angles and the tied angle included.  A
-    reference that silently fell back to the default dispatch would hand the
+    reference that silently fell back to the pre-branch dispatch would hand the
     matrix the peak chain's angle columns and still agree with the ``fd`` row
     at its bar, which is the guard going quiet this test exists against — so
     the spy is asked of the matrix's own reference (``_analytic_jacobian``),
@@ -1962,7 +1952,6 @@ def test_the_angle_config_s_reference_claims_every_moment_column(monkeypatch):
               if any(lsq._MOMENT_PATH.match(q) for q in [p, *extras[c]])]
     assert len(moment) == 3, table.free_paths
     assert sorted(taken) == moment, (taken, moment)
-    assert MOMENT_ANGLE_CONFIGS <= set(CONFIGS)
 
 
 #: S/L on its bound of zero beside a positive H/L: the mirror of
