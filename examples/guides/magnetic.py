@@ -37,7 +37,8 @@ moment = [f"phases.0.atoms.{site}.moment.dof0", f"phases.0.atoms.{site}.moment.d
 plan = rx.RefinementPlan(stages=[
     rx.Stage("moment", [SCALE, *BACKGROUND, *moment], max_iter=200),
     rx.Stage("everything", [SCALE, *BACKGROUND, *moment, *REST], max_iter=200)],
-    intermediate_ftol=1e-6, closing_window_tol=CLOSING_WINDOW_TOL)
+    intermediate_ftol=1e-6, closing_window_tol=CLOSING_WINDOW_TOL,
+    shift_over_esd_tol=None)
 
 ref = rx.Refinement(model, nuclear.fitted_instrument.model_copy(deep=True))
 result = ref.fit(data, plan=plan, two_theta_limits=LIMITS)

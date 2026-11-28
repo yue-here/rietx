@@ -1476,8 +1476,12 @@ class SequentialRefinement:
             # unmodelled.  Cut the data at 72 deg and the carried chain
             # without the closing stage lands within 0.05 esd.  WP-2228's
             # fix replaces this rule.  A plan's None cannot be told from the
-            # default, so the way out is carry_hkl_intensities=False.
-            base_plan = replace(base_plan, closing_window_tol=CLOSING_WINDOW_TOL)
+            # default, so the way out is carry_hkl_intensities=False.  The
+            # same chain keeps the solver's 1e-9 stop rather than the shift
+            # test, for the same reason (WP-2317 R6): what one pattern leaves
+            # in its intensities, the next one inherits.
+            base_plan = replace(base_plan, closing_window_tol=CLOSING_WINDOW_TOL,
+                                shift_over_esd_tol=None)
         # A plan that fixes is refit stage by stage (WP-2208): one stage cannot
         # replay a fix a later stage undoes, so the collapse would free what
         # the plan left fixed.  The entry's ``rung`` reads "warm_staged".

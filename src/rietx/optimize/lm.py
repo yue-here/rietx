@@ -122,7 +122,7 @@ from scipy import sparse
 from scipy.optimize import lsq_linear, nnls
 
 from ..backend.linalg64 import require_fp64, to_host_fp64
-from . import bccg, lapack
+from . import bccg, lapack, statistics
 from .blocked import BlockJacobian
 
 #: λ schedule constants, Coelho (2018) equation (9).  λ starts at 0 (pure
@@ -397,9 +397,15 @@ class LMOutcome:
     #: the bounded model's minimum is the current point), ``no_descent`` (the
     #: inner loop found nothing downhill even at large λ), ``slow_descent``
     #: (the rest of the budget would buy less than :data:`SLOW_DESCENT_ESD`
-    #: esd of travel, WP-1334), ``max_nfev`` (the evaluation budget, TRF's
-    #: token for the same stop).
+    #: esd of travel, WP-1334), ``shift_over_esd`` (every shift of the
+    #: undamped step under ``shift_tol`` of its esd, WP-2317), ``max_nfev``
+    #: (the evaluation budget, TRF's token for the same stop).
     termination: str = "max_nfev"
+    #: the largest shift over its esd in the undamped step at the last point
+    #: the shift test read (:func:`_max_shift_over_esd`, a bound where A is
+    #: sparse), which is the returned point when the test ended the run.
+    #: Written only under ``shift_tol``; ``None`` where the test was not run.
+    gauss_newton_shift: float | None = None
     #: the bounds that hold the returned point, scipy's ``active_mask``
     #: convention (−1 lower, +1 upper, 0 neither) and exact: the variable sits
     #: *on* the bound, the step having landed it there, and the gradient at
@@ -448,6 +454,7 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
              normal_equations: Callable[[np.ndarray, np.ndarray],
                                         tuple] | None = None,
              check: Callable[[], None] | None = None,
+             shift_tol: float | None = None,
              ) -> LMOutcome:
     """Minimise ``S(θ) = r(θ)ᵀr(θ)`` subject to ``lo ≤ θ ≤ hi`` (and ``T·θ+c ≥ 0``).
 
@@ -465,6 +472,17 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
     downhill step even at large λ.  Both are convergence, including at the
     first outer iteration: a stage that starts at its minimum has nothing
     downhill to find.
+
+    ``shift_tol``, when given, adds the shift test (WP-2317;
+    :func:`_max_shift_over_esd` has the rule and its sources): each outer
+    iteration first solves the
+    undamped step at the point it stands on, and stops there, before stepping,
+    when no free parameter would move by ``shift_tol`` of its esd.  The step
+    costs one solve beside the trial steps.  Where λ is 0, as Coelho's
+    schedule starts it, that solve is the first trial's step and is reused.
+    The point is not moved by the step it tested, so the answer lies within
+    ``shift_tol`` esd of the model's minimum along every parameter, and the
+    Jacobian already formed there is the one returned.
 
     **Each column keeps the largest norm it has had this stage** as its
     scale (Moré, J. J. (1978). *Lecture Notes in Mathematics* **630**,
@@ -562,6 +580,7 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
     status = 0
     n_outer = 0
     termination = "max_nfev"
+    gauss_newton_shift = None
     scale = None
     # the largest norm each column of J has had this stage, apart from any
     # curvature held for it, so a dropped curvature leaves its scale too
@@ -589,41 +608,59 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
         scale = np.maximum(col_max, np.sqrt(curvature))
         lam_start = lam
 
+        # the shift test (WP-2317 R6, :func:`_max_shift_over_esd`): the
+        # undamped step from where we stand, read before any trial
+        pending = None
+        if shift_tol is not None:
+            if check is not None:
+                check()
+            undamped = _trial_step(A, b, 0.0, x, lo, hi, ineqs, n_rows=len(r),
+                                   scale=scale, check=check)
+            gauss_newton_shift = _max_shift_over_esd(
+                A, _landed(undamped[0], undamped[1], x, lo, hi) - x, s,
+                n_dof=len(r) - len(x))
+            if gauss_newton_shift < shift_tol:
+                # a would-be stop, so a held curvature is read again first,
+                # as at the other stops below
+                turned = _turned_curvatures(curvature, residual, x, s, lo, hi, ineqs)
+                if turned:
+                    curvature[turned] = 0.0
+                    small_runs = 0
+                    lam = min(lam, lam_start)
+                    continue
+                status = 1
+                termination = "shift_over_esd"
+                break
+            if lam == 0.0:
+                # the first trial's own step: the same solve at the same λ
+                pending = undamped
+
         accepted = False
         exhausted = False
         spent = False
         for _inner in range(_INNER_MAX):
             if check is not None:
                 check()
-            step, side = _solve_step(A, b, lam, x, lo, hi, n_rows=len(r),
-                                     scale=scale, check=check)
-            crossed = [iq.label for iq in ineqs if iq.crossed(x, step)]
+            if pending is not None:
+                (step, side, crossed), pending = pending, None
+            else:
+                step, side, crossed = _trial_step(A, b, lam, x, lo, hi, ineqs,
+                                                  n_rows=len(r), scale=scale,
+                                                  check=check)
             if crossed:
-                # the box-only step leaves the feasible set: solve the same
-                # model over the box and the rows together (WP-1938 D8)
+                # the box-only step left the feasible set, and the step is the
+                # same model solved over the box and the rows together
+                # (WP-1938 D8)
                 n_truncated += 1
                 for label in crossed:
                     truncated_by[label] = truncated_by.get(label, 0) + 1
-                try:
-                    step, side = _solve_constrained_step(A, b, lam, x, lo, hi, ineqs,
-                                                         n_rows=len(r), scale=scale)
-                except _NoConstrainedStep:
-                    # nnls ran out of iterations: shorten the box-only step to
-                    # the first row it reaches, the pre-D8 rule without the
-                    # projection
-                    tau = min(iq.max_feasible_fraction(x, step) for iq in ineqs)
-                    step, side = tau * step, np.zeros_like(side)
             if not np.any(step):
                 # the model's minimum over the box and the rows is where we
                 # stand
                 exhausted = True
                 break
             floor = -_PREDICTED_FLOOR * max(abs(s), 1.0)
-            x_try = _clip_to_bounds(x + step, lo, hi)
-            # a variable the solve put on a bound lands on it exactly:
-            # (lo − x)·d/d need not round back to lo − x, and the active set is
-            # read as x == bound
-            x_try = np.where(side < 0, lo, np.where(side > 0, hi, x_try))
+            x_try = _landed(step, side, x, lo, hi)
             step = x_try - x            # the *taken* step, after every clamp
             promise = -float(step @ b)
             if promise >= 0.0:
@@ -688,9 +725,7 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
         if (not accepted or small_runs >= _CONVERGED_RUNS) and np.any(curvature > 0.0):
             # a would-be stop: a held curvature that has turned negative made
             # a maximum read as a minimum, so it is dropped and the stage goes on
-            turned = [i for i in np.flatnonzero(curvature > 0.0)
-                      if (c := _measured_curvature(residual, x, s, int(i), lo, hi, ineqs))
-                      is not None and c < 0.0]
+            turned = _turned_curvatures(curvature, residual, x, s, lo, hi, ineqs)
             if turned:
                 # λ climbed against the dropped diagonal: left there, the
                 # next iteration's first trial is too short to measure and
@@ -728,8 +763,11 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
     # reads it together with ``fun``, and a stale one silently mis-scales
     # every esd.  Re-evaluating at an already-visited θ is nearly free: the
     # FCJ node memo (WP-0605) keys on exact input equality.
-    J = jacobian(x)
-    n_jev += 1
+    if termination != "shift_over_esd":
+        # the shift test stops before stepping, at the point whose Jacobian
+        # it has just formed
+        J = jacobian(x)
+        n_jev += 1
     at_bounds = (np.isclose(x, lo) & np.isfinite(lo)) | (np.isclose(x, hi) & np.isfinite(hi))
     n_bound_hits = int(np.count_nonzero(at_bounds))
     # ½∇S = Jᵀr: positive means S falls as the variable decreases
@@ -742,7 +780,51 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
                      n_bound_hits=n_bound_hits, n_truncated=n_truncated,
                      truncated_by=truncated_by,
                      n_stalled=n_stalled, termination=termination,
-                     active_mask=active)
+                     active_mask=active, gauss_newton_shift=gauss_newton_shift)
+
+
+def _trial_step(A, b: np.ndarray, lam: float, x: np.ndarray, lo: np.ndarray,
+                hi: np.ndarray, ineqs: list[LinearInequality], *, n_rows: int,
+                scale: np.ndarray | None,
+                check: Callable[[], None] | None) -> tuple[np.ndarray, np.ndarray, list[str]]:
+    """One trial step at damping ``lam``: the box-only step, or, where it
+    crosses an inequality row, the same model solved over the box and the rows
+    together (WP-1938 D8).  Returns the step, the bound each variable was
+    solved onto, and the labels of the rows the box-only step crossed."""
+    step, side = _solve_step(A, b, lam, x, lo, hi, n_rows=n_rows,
+                             scale=scale, check=check)
+    crossed = [iq.label for iq in ineqs if iq.crossed(x, step)]
+    if crossed:
+        try:
+            step, side = _solve_constrained_step(A, b, lam, x, lo, hi, ineqs,
+                                                 n_rows=n_rows, scale=scale)
+        except _NoConstrainedStep:
+            # nnls ran out of iterations: shorten the box-only step to the
+            # first row it reaches, the pre-D8 rule without the projection
+            tau = min(iq.max_feasible_fraction(x, step) for iq in ineqs)
+            step, side = tau * step, np.zeros_like(side)
+    return step, side, crossed
+
+
+def _landed(step: np.ndarray, side: np.ndarray, x: np.ndarray,
+            lo: np.ndarray, hi: np.ndarray) -> np.ndarray:
+    """The point ``step`` from ``x`` lands on: clipped to the box, with a
+    variable the solve put on a bound landed on it exactly, since
+    (lo − x)·d/d need not round back to lo − x and the active set is read as
+    x == bound."""
+    x_try = _clip_to_bounds(x + step, lo, hi)
+    x_try = np.where(side < 0, lo, np.where(side > 0, hi, x_try))
+    return x_try
+
+
+def _turned_curvatures(curvature: np.ndarray, residual, x: np.ndarray, s: float,
+                       lo: np.ndarray, hi: np.ndarray,
+                       ineqs: list[LinearInequality]) -> list[int]:
+    """The coordinates whose held curvature now measures negative, read at a
+    would-be stop (:func:`minimize`): a maximum must not read as a minimum."""
+    return [int(i) for i in np.flatnonzero(curvature > 0.0)
+            if (c := _measured_curvature(residual, x, s, int(i), lo, hi, ineqs))
+            is not None and c < 0.0]
 
 
 def _descent_too_slow(accepted_at: list[int], accepted_s: list[float],
@@ -765,6 +847,69 @@ def _descent_too_slow(accepted_at: list[int], accepted_s: list[float],
     s_now = accepted_s[-1]
     projected = (accepted_s[i] - s_now) * _SLOW_DESCENT_HORIZON / window
     return projected < SLOW_DESCENT_ESD ** 2 * s_now / n_dof
+
+
+def _max_shift_over_esd(A, step: np.ndarray, s: float, *, n_dof: int) -> float:
+    """The largest |Δ_i|/σ_i of ``step``, the shift test's reading (WP-2317 R6).
+
+    **The rule**, ruled 2026-11-27.  Given ``shift_tol``, :func:`minimize`
+    stops, with termination ``shift_over_esd``, at the first accepted point
+    where every free parameter's shift in the *undamped* Gauss-Newton step,
+    solved over the box and the inequality rows, is under ``shift_tol`` of its
+    esd.  That is the field's test of a converged refinement, the shift over
+    its esd in the final cycle (McCusker, L. B., Von Dreele, R. B., Cox, D. E.,
+    Louër, D. & Scardi, P. (1999). *J. Appl. Cryst.* **32**, 36-50, §7; the
+    test behind FullProf's ``Eps``).  The step tested is the undamped one,
+    never the damped step the driver takes, because a crawl keeps its damped
+    steps short at any distance from the minimum.  Tested on the damped step,
+    a 0.2 stop ended a fit of the cpd-1 series 18 esd from its answer and
+    called it converged (``docs/wp/2317-probe/convnoise/RESULTS.md``).
+    FullProf's own steps are undamped, and its 0.2 stopped within 0.08 esd of
+    its tight answer there (``docs/wp/2317-probe/foreign_stops/``).
+
+    **The esd is the driver's own reading**, √(χ²_red · (A⁺)_ii), χ²_red =
+    ``s``/``n_dof`` over every row the driver sees (as the slow-descent rule
+    reads it), and A Jacobi-equilibrated before a pseudo-inverse that inverts
+    each kept eigenvalue by its magnitude, as
+    :func:`.statistics.normal_covariance` does, at its cut
+    (:data:`.statistics.PINV_RCOND`).  It leaves out the Bérar-Lelann factor the reported
+    esd carries, which is never under 1, so this test is the stricter reading.
+    A column with no gradient has no esd: a shift along it reads infinite, and
+    none reads 0.
+
+    **Where A is sparse** (a Pawley block past :data:`BVLS_MAX_COLUMNS`) the
+    diagonal of A⁻¹ costs a dense eigensolve per iteration, so the bound is
+    read instead: Δ_i² ≤ (A⁻¹)_ii · ΔᵀAΔ (Cauchy-Schwarz in A's inner
+    product), so the joint shift √(ΔᵀAΔ / χ²_red) is never under the largest
+    single one, and a stop it allows the exact reading allows too.  A dense A
+    is read exactly at any size, since forming JᵀJ costs more than its
+    eigensolve once there are more rows than columns.
+    """
+    if n_dof <= 0 or not s > 0.0:
+        return float("inf") if np.any(step) else 0.0
+    chi2 = s / n_dof
+    if sparse.issparse(A):
+        if A.shape[0] > BVLS_MAX_COLUMNS:
+            q = float(step @ (A @ step))
+            return float(np.sqrt(max(q, 0.0) / chi2))
+        A = A.toarray()
+    A = np.asarray(A, dtype=np.float64)
+    d = np.sqrt(np.maximum(np.diag(A), 0.0))
+    live = d > 0.0
+    if np.any(step[~live]):
+        return float("inf")
+    if not np.any(live):
+        return 0.0
+    dl = d[live]
+    w, V = lapack.eigh(A[np.ix_(live, live)] / np.outer(dl, dl))
+    mag = np.abs(w)
+    keep = mag > statistics.PINV_RCOND * float(np.max(mag))
+    inv_diag = (V[:, keep] ** 2) @ (1.0 / mag[keep])
+    sigma = np.sqrt(chi2 * inv_diag) / dl
+    shift = np.abs(step[live])
+    with np.errstate(divide="ignore", invalid="ignore"):
+        ratio = np.where(shift > 0.0, shift / sigma, 0.0)
+    return float(np.max(ratio))
 
 
 def _normal_equations(J, r: np.ndarray) -> tuple[np.ndarray, np.ndarray]:

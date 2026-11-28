@@ -1152,6 +1152,17 @@ class StageResult(Base):
     #: fits' parameter shifts needs to know whether they were converged the
     #: same way.
     ftol: float | None = None
+    #: the shift test this stage stopped on, in esd: the solve ended at the
+    #: first point where no free parameter's undamped Gauss-Newton shift
+    #: reached this fraction of its esd, ftol still the backstop (WP-2317 R6;
+    #: ``RefinementPlan.shift_over_esd_tol``, which a plan's last declared and
+    #: closing stages take).  ``None`` for a stage that stopped on its ftol
+    #: alone: every intermediate stage, a stage declaring its own ftol, a
+    #: stage under ``solver="trf"``'s plan where the test was asked but the
+    #: driver has none, and every stage of every fit before WP-2317.
+    #: Recorded for ``ftol``'s reason.  ``termination`` reads
+    #: ``shift_over_esd`` where the test, not the ftol, ended the solve.
+    shift_over_esd_tol: float | None = None
     #: the fraction of each peak's area this stage's windows dropped, or
     #: ``None`` for ``forward.WINDOW_AREA_TOL`` — what every declared stage
     #: takes.  A plan's closing stage runs at ``closing_window_tol`` (WP-2002,
@@ -1208,7 +1219,9 @@ class StageResult(Base):
     #: ``no_descent`` or ``exhausted_fp64`` (nothing downhill the cost can
     #: resolve), ``slow_descent`` (``optimize.lm.SLOW_DESCENT_ESD``: at its
     #: last rate another 300 evaluations would have lowered χ² by less than
-    #: one esd's worth) and ``max_nfev`` (the budget ran out).  ``solver="trf"``
+    #: one esd's worth), ``shift_over_esd`` (no free parameter's undamped
+    #: shift reached :attr:`shift_over_esd_tol` of its esd, WP-2317) and
+    #: ``max_nfev`` (the budget ran out).  ``solver="trf"``
     #: writes scipy's ``ftol``, ``xtol``, ``gtol``, ``ftol+xtol`` and
     #: ``max_nfev``.  A model that stopped being finite writes
     #: ``non_finite_residual`` or ``non_finite_jacobian`` (WP-2048).  The

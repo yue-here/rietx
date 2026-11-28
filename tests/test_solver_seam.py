@@ -188,7 +188,8 @@ def test_lm_eval_stream_carries_every_measured_trial(pattern):
     terminations = [e["data"]["termination"] for e in seen
                     if e["kind"] == "stage_end"]
     assert terminations and all(
-        t in {"ftol_runs", "exhausted_fp64", "no_descent", "max_nfev"}
+        t in {"ftol_runs", "exhausted_fp64", "no_descent", "shift_over_esd",
+              "max_nfev"}
         for t in terminations), terminations
     for stage, evals in per_stage.items():
         assert all(np.isfinite(e["cost"]) for e in evals)
@@ -327,6 +328,7 @@ def _spy_least_squares(monkeypatch):
         res = original_lm(*args, **kwargs)
         calls.append({"driver": "lm", "max_nfev": kwargs.get("max_nfev"),
                       "ftol": kwargs.get("ftol"), "xtol": None, "gtol": None,
+                      "shift_tol": kwargs.get("shift_tol"),
                       "n_par": len(res.x), "nfev": int(res.nfev),
                       "njev": int(res.njev), "status": int(res.status)})
         return res
@@ -393,6 +395,36 @@ def test_stage_ftol_reaches_the_solver_and_only_its_own_stage(pattern, monkeypat
     # the last declared stage and the closing stage, at the runner's default
     assert calls[-2]["ftol"] == calls[-1]["ftol"]
     assert calls[-1]["ftol"] not in (1e-4, plan.intermediate_ftol)
+
+
+def test_the_shift_test_reaches_the_driver_on_the_endpoints_alone(pattern, monkeypatch):
+    """``RefinementPlan.shift_over_esd_tol`` (WP-2317 R6) arrives at the LM
+    driver on the last declared stage and the closing stage, and on no stage
+    declaring its own ``ftol``; ``None`` sends it nowhere."""
+    import rietx as rx
+
+    calls = _spy_least_squares(monkeypatch)
+    structure, instrument = perturbed_models()
+    plan = rx.RefinementPlan.mccusker_default()
+    plan.closing_window_tol = CLOSING_WINDOW_TOL
+    result = refine(pattern, structure, instrument, plan=plan, solver="lm")
+    assert [c["shift_tol"] for c in calls] == plan.stage_shift_tols()
+    assert [c["shift_tol"] for c in calls][-2:] == [plan.shift_over_esd_tol] * 2
+    assert {c["shift_tol"] for c in calls[:-2]} == {None}
+    assert [s.shift_over_esd_tol for s in result.stages] == plan.stage_shift_tols()
+
+    calls.clear()
+    plan.stages[-1].ftol = 1e-9
+    plan.shift_over_esd_tol = 0.2
+    refine(pattern, *perturbed_models(), plan=plan, solver="lm")
+    # a stage's own ftol is its whole stop, the closing stage inheriting it
+    assert {c["shift_tol"] for c in calls} == {None}
+
+    calls.clear()
+    plan.stages[-1].ftol = None
+    plan.shift_over_esd_tol = None
+    refine(pattern, *perturbed_models(), plan=plan, solver="lm")
+    assert {c["shift_tol"] for c in calls} == {None}
 
 
 @pytest.mark.parametrize("solver", SOLVERS)

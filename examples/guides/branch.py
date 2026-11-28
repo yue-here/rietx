@@ -20,7 +20,8 @@ instrument.background = rx.BackgroundChebyshev.with_terms(6)
 ref = rx.Refinement(structure, instrument)
 limits = (15, 130)
 # Each stage runs on the closing stage's windows, so the two orders compare one objective.
-fine = dict(two_theta_limits=limits, window_area_tol=CLOSING_WINDOW_TOL)
+fine = dict(two_theta_limits=limits, window_area_tol=CLOSING_WINDOW_TOL,
+            shift_over_esd_tol=None)
 
 ref.run_stage(data, rx.Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
               **fine)

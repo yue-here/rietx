@@ -3487,7 +3487,7 @@ def _tracked(residual, tracker: _StepTracker, events, stage: str, table):
 
 def _lm_outcome(residual, jacobian, x0, lo, hi, *, max_nfev, ftol,
                 inequalities, events, stage: str, track=None, table=None,
-                normal_equations=None, cancel=None):
+                normal_equations=None, cancel=None, shift_tol=None):
     """Run the bounded-LM driver, adapted to the scipy result shape.
 
     The two drivers are kept interchangeable at exactly this point: everything
@@ -3506,7 +3506,8 @@ def _lm_outcome(residual, jacobian, x0, lo, hi, *, max_nfev, ftol,
     derivative information, like scipy's finite-difference Jacobian calls, so
     they emit nothing and ``nfev`` leaves them out (WP-1953).
     ``normal_equations`` is the driver's own (:func:`.lm.minimize`), and
-    ``cancel`` is also read inside each step's bounded solve.
+    ``cancel`` is also read inside each step's bounded solve.  ``shift_tol``
+    is the driver's shift test (WP-2317), ``None`` for none.
     """
     from . import lm as lm_mod
 
@@ -3531,7 +3532,8 @@ def _lm_outcome(residual, jacobian, x0, lo, hi, *, max_nfev, ftol,
                            on_trial=trial_cb if events is not None else None,
                            normal_equations=normal_equations,
                            check=(None if cancel is None
-                                  else _cancel_check(cancel, stage)))
+                                  else _cancel_check(cancel, stage)),
+                           shift_tol=shift_tol)
 
 
 class _StepTracker:
@@ -3818,7 +3820,8 @@ def _check_magnetic_width_compiled(model: CompiledModel,
 def _drive_single(model: CompiledModel, table: ParameterTable, residual, jacobian,
                   x0: np.ndarray, lo: np.ndarray, hi: np.ndarray, *, n_table: int,
                   n_aux: int, max_nfev: int, ftol: float, events, stage: str,
-                  tracker, backend: str, solver: str, cancel=None):
+                  tracker, backend: str, solver: str, cancel=None,
+                  shift_tol: float | None = None):
     """One driver run of :func:`run_least_squares`, either driver's result
     shape; a function of its own so that one ``try`` covers both drivers
     (WP-2048)."""
@@ -3847,7 +3850,8 @@ def _drive_single(model: CompiledModel, table: ParameterTable, residual, jacobia
         res = _lm_outcome(residual, jacobian, x0, lo, hi, max_nfev=max_nfev,
                           ftol=ftol, inequalities=ineqs, events=events, stage=stage,
                           track=tracker, table=table,
-                          normal_equations=normal_equations, cancel=cancel)
+                          normal_equations=normal_equations, cancel=cancel,
+                          shift_tol=shift_tol)
     else:
         with lapack.scipy_trf():
             res = least_squares(residual, x0, jac=jacobian, bounds=(lo, hi), method="trf",
@@ -3862,14 +3866,19 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
                       backend: str = "numpy",
                       solver: str = DEFAULT_SOLVER,
                       cancel=None,
-                      phase_support_sigma: float | None = PHASE_SUPPORT_SIGMA
+                      phase_support_sigma: float | None = PHASE_SUPPORT_SIGMA,
+                      shift_tol: float | None = None
                       ) -> LSQOutcome:
     """Solve one stage.  ``cancel`` — a :class:`~.cancel.CancelToken`, read
     between residual evaluations; a set token raises
     :class:`~.cancel.RefinementCancelled` out of this call, leaving the model
     and table exactly as the last accepted evaluation found them.
     ``phase_support_sigma`` is the plan's, which decides the default cell
-    window (:func:`_freeze_cell_windows`); ``None`` windows no cell."""
+    window (:func:`_freeze_cell_windows`); ``None`` windows no cell.
+    ``shift_tol`` stops the default driver once no free parameter's undamped
+    step is that many of its esds (WP-2317; :func:`.lm._max_shift_over_esd`).
+    ``None``, the default here, stops on ``ftol`` alone, and ``solver="trf"``
+    has no such test."""
     if solver not in SOLVERS:
         raise ValueError(f"unknown solver {solver!r}; available: {', '.join(SOLVERS)}")
     lapack_start = lapack.retries()
@@ -3959,7 +3968,7 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
                             n_table=n_table, n_aux=n_aux, max_nfev=max_nfev,
                             ftol=ftol, events=events, stage=stage,
                             tracker=tracker, backend=backend, solver=solver,
-                            cancel=cancel)
+                            cancel=cancel, shift_tol=shift_tol)
     except _NonFiniteJacobian as stop:
         return stopped("jacobian", stop.columns)
     if solver == "lm":
@@ -4175,7 +4184,8 @@ def run_multi_least_squares(models: list[CompiledModel],
                             solver: str = DEFAULT_SOLVER,
                             events=None, stage: str = "",
                             cancel=None,
-                            phase_support_sigma: float | None = PHASE_SUPPORT_SIGMA
+                            phase_support_sigma: float | None = PHASE_SUPPORT_SIGMA,
+                            shift_tol: float | None = None
                             ) -> LSQOutcome:
     """Joint solve of several histograms stacked into one residual (WP-0308).
 
@@ -4218,7 +4228,8 @@ def run_multi_least_squares(models: list[CompiledModel],
     (WP-1341).  An ``eval`` is one evaluation of the *stacked* residual, so
     its ``cost`` and its ``values`` are the joint solve's, aligned with
     ``mtable.free_paths``.  ``phase_support_sigma`` is
-    :func:`run_least_squares`' own too (WP-2002, B1).
+    :func:`run_least_squares`' own too (WP-2002, B1), and so is
+    ``shift_tol`` (WP-2317), the shift read on the joint columns.
 
     The stacked Jacobian is held one of two ways (WP-1325), chosen by
     :func:`.blocked.choose_layout` and recorded on
@@ -4328,7 +4339,7 @@ def run_multi_least_squares(models: list[CompiledModel],
                                       mtable, x0[:n_table], lo[:n_table],
                                       hi[:n_table]), n_aux),
                               events=events, stage=stage, track=tracker, table=mtable,
-                              cancel=cancel)
+                              cancel=cancel, shift_tol=shift_tol)
         else:
             with lapack.scipy_trf():
                 res = least_squares(residual, x0, jac=jacobian, bounds=(lo, hi),

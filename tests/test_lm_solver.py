@@ -1000,3 +1000,102 @@ def test_the_overshoot_branch_stalls_on_the_cusp(monkeypatch):
         assert fired == 0
         assert free.nfev < 50
         assert abs(free.x[0]) < 1e-9
+
+
+# ----------------------------------------------------------------------
+# the shift test (WP-2317 R6)
+def _esds(J, r, n_par):
+    """Each parameter's esd at a point, √(χ²_red · pinv(JᵀJ)_ii), Jacobi
+    equilibrated: the reading the shift test makes, written out here."""
+    A = J.T @ J
+    d = np.sqrt(np.diag(A))
+    C = np.linalg.pinv(A / np.outer(d, d), hermitian=True)
+    return np.sqrt(float(r @ r) / (len(r) - n_par) * np.diag(C)) / d
+
+
+def test_the_shift_reading_is_the_largest_shift_over_its_esd():
+    """On a linear model the undamped step from any point is the whole way to
+    the minimum, so the reading is max |θ* − θ|/σ exactly, and the sparse
+    bound √(ΔᵀAΔ/χ²_red) is never under it."""
+    from scipy import sparse
+
+    residual, jacobian, best = _linear_problem(n_data=60, n_par=5, seed=4)
+    x = best + np.array([0.3, -0.2, 0.05, 0.4, -0.1])
+    J, r = jacobian(x), residual(x)
+    step = best - x
+    s = float(r @ r)
+    exact = lm._max_shift_over_esd(J.T @ J, step, s, n_dof=55)
+    assert exact == pytest.approx(float(np.max(np.abs(step) / _esds(J, r, 5))),
+                                  rel=1e-10)
+    # at or under the cut a sparse A is read exactly
+    bound = lm._max_shift_over_esd(sparse.csr_matrix(J.T @ J), step, s, n_dof=55)
+    assert bound == pytest.approx(exact, rel=1e-12)
+    A_big = sparse.csr_array(np.kron(np.eye(30), J.T @ J))      # past the cut
+    big = lm._max_shift_over_esd(A_big, np.tile(step, 30), 30 * s, n_dof=30 * 55)
+    assert big >= exact
+    # a shift along a column with no gradient has no esd to be small against
+    A0 = J.T @ J
+    A0[:, 0] = 0.0
+    A0[0, :] = 0.0
+    assert lm._max_shift_over_esd(A0, step, s, n_dof=55) == np.inf
+    assert lm._max_shift_over_esd(A0, np.r_[0.0, step[1:]], s, n_dof=55) < np.inf
+
+
+def test_the_shift_test_stops_within_its_fraction_of_the_esd():
+    """From a start far off, the test ends the run on ``shift_over_esd``
+    within a tenth of an esd of the 1e-9 answer, on fewer evaluations, and
+    hands back the residual and Jacobian of the point it returns."""
+    residual, jacobian, _ = _exponential_problem()
+    x0 = np.array([1.0, -0.3, 0.0])
+    lo, hi = np.full(3, -np.inf), np.full(3, np.inf)
+    tight = lm.minimize(residual, jacobian, x0, lo=lo, hi=hi)
+    loose = lm.minimize(residual, jacobian, x0, lo=lo, hi=hi, shift_tol=0.1)
+    assert (loose.status, loose.termination) == (1, "shift_over_esd")
+    assert loose.gauss_newton_shift < 0.1
+    assert tight.gauss_newton_shift is None
+    esd = _esds(tight.jac, tight.fun, 3)
+    assert float(np.max(np.abs(loose.x - tight.x) / esd)) < 0.1
+    assert loose.nfev < tight.nfev
+    np.testing.assert_array_equal(loose.jac, jacobian(loose.x))
+    np.testing.assert_array_equal(loose.fun, residual(loose.x))
+
+
+def test_a_start_at_the_minimum_stops_on_the_shift_test_unmoved():
+    residual, jacobian, best = _linear_problem()
+    lo, hi = _UNBOUNDED
+    out = lm.minimize(residual, jacobian, best, lo=lo, hi=hi, shift_tol=0.1)
+    assert (out.status, out.termination, out.nfev) == (1, "shift_over_esd", 1)
+    np.testing.assert_array_equal(out.x, best)
+
+
+def test_a_crawl_does_not_pass_the_shift_test():
+    """The trap the test reads the undamped step to avoid.  At λ = 300 the
+    damped step is short at any distance, so a test on it would stop here,
+    three esd from the minimum.  The undamped step measures the distance."""
+    residual, jacobian, best = _linear_problem(n_data=60, n_par=4, seed=2)
+    esd = _esds(jacobian(best), residual(best), 4)
+    x = best + 3.0 * esd
+    lo, hi = _UNBOUNDED
+    J, r = jacobian(x), residual(x)
+    A, b = lm._normal_equations(J, r)
+    scale = np.sqrt(np.diag(A))
+    s = float(r @ r)
+    damped, _ = lm._solve_step(A, b, 300.0, x, lo, hi, n_rows=60, scale=scale)
+    undamped, _ = lm._solve_step(A, b, 0.0, x, lo, hi, n_rows=60, scale=scale)
+    assert lm._max_shift_over_esd(A, damped, s, n_dof=56) < 0.1
+    assert lm._max_shift_over_esd(A, undamped, s, n_dof=56) > 2.0
+    out = lm.minimize(residual, jacobian, x, lo=lo, hi=hi, shift_tol=0.1)
+    assert out.termination == "shift_over_esd"
+    assert float(np.max(np.abs(out.x - best) / esd)) < 0.1
+
+
+def test_the_shift_test_off_is_the_driver_before_it():
+    """``shift_tol=None`` takes the code path the driver had before the test,
+    and a test that never fires leaves the run as it was, to the bit."""
+    residual, jacobian, _ = _exponential_problem()
+    x0 = np.array([1.0, -0.3, 0.0])
+    lo, hi = np.full(3, -np.inf), np.full(3, np.inf)
+    off = lm.minimize(residual, jacobian, x0, lo=lo, hi=hi)
+    never = lm.minimize(residual, jacobian, x0, lo=lo, hi=hi, shift_tol=1e-300)
+    np.testing.assert_array_equal(off.x, never.x)
+    assert (off.nfev, off.termination) == (never.nfev, never.termination)
