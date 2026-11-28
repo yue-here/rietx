@@ -1,6 +1,6 @@
 """Synthetic patterns whose weak lines decide the indexing answer (WP-2078 task 2).
 
-Three builders, each drawn by the package's own forward model
+Four builders, each drawn by the package's own forward model
 (``Refinement.predict``) with Poisson counting noise from a fixed seed, so a
 test rebuilds the same pattern every run and no data file is read:
 
@@ -10,6 +10,9 @@ test rebuilds the same pattern every run and no data file is read:
 * :func:`weak_superlattice` (b): a host whose weak lines are its own, the
   ordering reflections of a superlattice.  The supercell is the truth, and the
   subcell is what a search loses it to.
+* :func:`weak_superlattice_with_trace` (WP-2147): (b) with (a)'s trace phase,
+  so the superlattice's ordering lines and a foreign phase's lines sit under
+  one floor together.
 * :func:`planted_silicon` (c): WP-1969's synthetic Si (issue #933) with twelve
   Gaussian lines planted at 1-5 % of the strongest.
 
@@ -31,9 +34,10 @@ from dataclasses import dataclass, field
 import numpy as np
 
 import rietx as rx
+from rietx.indexing.engines import weak_line_floor
 from rietx.schemas.indexing import PeakList
 
-#: the synchrotron wavelength of WP-1969's Si reproducer, used for all three
+#: the synchrotron wavelength of WP-1969's Si reproducer, used by every builder
 LAM = 0.825739
 
 
@@ -116,15 +120,11 @@ def floored(peaks: PeakList, fraction: float) -> PeakList:
     """``peaks`` cut to its usable lines at or above ``fraction`` of the strongest.
 
     Issue #1291's treatment, as a list: every usable line whose intensity is at
-    least ``fraction`` × the strongest usable line's, and nothing else.  On a
-    position-only list (one intensity everywhere) it removes nothing.
+    least ``fraction`` × the strongest usable line's, and nothing else usable
+    (flagged lines stay, unusable as before).  On a position-only list (one
+    intensity everywhere) it removes nothing.
     """
-    usable = peaks.usable()
-    top = max(p.intensity for p in usable)
-    keep = [p for p in usable if p.intensity >= fraction * top]
-    return PeakList(peaks=keep, wavelength=peaks.wavelength,
-                    two_theta_min=peaks.two_theta_min,
-                    two_theta_max=peaks.two_theta_max, source=peaks.source)
+    return weak_line_floor(peaks, fraction)
 
 
 def _grid(lo: float, hi: float) -> np.ndarray:
@@ -132,7 +132,7 @@ def _grid(lo: float, hi: float) -> np.ndarray:
 
 
 def _pick(name, data, ins, rng_tt, cell, centring, weak) -> WeakLineFixture:
-    peaks = rx.pick_peaks(data, ins, two_theta_range=rng_tt)
+    peaks = rx.pick_peaks(data, ins, two_theta_limits=rng_tt)
     return WeakLineFixture(name=name, data=data, instrument=ins, peaks=peaks,
                            cell=tuple(float(v) for v in cell),
                            centring=centring, two_theta_range=rng_tt,
@@ -260,11 +260,43 @@ def weak_superlattice(antisite: float = 0.1, seed: int = 5,
     cif = _double_perovskite(antisite)
     y = _profile(cif, ins, tt)
     data = _counts(y / y.max() * 1.3e6, tt, 7700.0, seed)
+    return _pick("weak_superlattice", data, ins, two_theta_range,
+                 (A_DP,) * 3 + (90.0,) * 3, "F",
+                 _ordering_lines(cif, two_theta_range))
+
+
+def _ordering_lines(cif: str, two_theta_range) -> np.ndarray:
+    """2θ of the double perovskite's ordering lines in ``two_theta_range``."""
     all_lines = _lines(cif, two_theta_range)
     d = LAM / (2.0 * np.sin(np.radians(all_lines / 2.0)))
     hkl2 = (A_DP / d) ** 2
     # h, k, l all odd ⇔ h² + k² + l² ≡ 3 (mod 8)
-    weak = all_lines[(np.abs(hkl2 - np.round(hkl2)) < 1e-3)
+    return all_lines[(np.abs(hkl2 - np.round(hkl2)) < 1e-3)
                      & (np.round(hkl2).astype(int) % 8 == 3)]
-    return _pick("weak_superlattice", data, ins, two_theta_range,
-                 (A_DP,) * 3 + (90.0,) * 3, "F", weak)
+
+
+def weak_superlattice_with_trace(trace: float = 0.02, antisite: float = 0.1,
+                                 seed: int = 5,
+                                 two_theta_range: tuple[float, float] = SUB_RANGE,
+                                 ) -> WeakLineFixture:
+    """(b) with an α-MoO₃ trace whose strongest line is ``trace`` × the host's (WP-2147).
+
+    The double perovskite of :func:`weak_superlattice` and the oxide of
+    :func:`weak_second_phase`, summed the way (a) sums them: each phase is
+    normalised to its own strongest line, so ``trace`` is the ratio of the two
+    phases' strongest peak heights.  MoO₃ is a reactant of the usual
+    solid-state route to Sr₂FeMoO₆, so an unreacted trace is the plausible
+    impurity.  ``weak_two_theta`` holds the host's ordering lines, as in (b);
+    the oxide's positions are ``_lines(MOO3_CIF, ...)``.  Counts, background
+    and seed as (b).
+    """
+    ins = _instrument()
+    tt = _grid(*two_theta_range)
+    cif = _double_perovskite(antisite)
+    host = _profile(cif, ins, tt)
+    imp = _profile(MOO3_CIF, ins, tt)
+    y = (host / host.max() + trace * imp / imp.max()) * 1.3e6
+    data = _counts(y, tt, 7700.0, seed)
+    return _pick("weak_superlattice_with_trace", data, ins, two_theta_range,
+                 (A_DP,) * 3 + (90.0,) * 3, "F",
+                 _ordering_lines(cif, two_theta_range))

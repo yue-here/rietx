@@ -13,7 +13,7 @@ Unlike the FAP acceptance there is no other code's protocol to mirror — the
 comparison target is the *weighed composition*, not another Rietveld result —
 so the protocol is this package's own lab QPA plan, stated here and identical
 for every mixture: scale+background → zero+displacement → cells → instrument
-profile → per-phase size/strain broadening → Kα2 ratio + axial → Biso, with
+profile → Kα2 ratio + axial → per-phase size/strain broadening → Biso, with
 atomic coordinates held at single-crystal literature values, no internal
 standard, and (sample 2) a March-Dollase r on brucite's (001) as the only
 texture parameter.  Fractions are Hill-Howard ZMV over the modelled
@@ -227,11 +227,14 @@ def qpa_plan(*, biso_globs: tuple[str, ...] = ("phases.*.atoms.*.biso",),
         rx.Stage("profile_w", ["instrument.profile.w"]),
         rx.Stage("profile", ["instrument.profile.u", "instrument.profile.v",
                              "instrument.profile.x", "instrument.profile.y"]),
+        # Axial and Kα2 before the specimen widths (WP-2017 § Inherited,
+        # 2026-11-19): from sample_broadening on, the width twin hold freezes
+        # U, X and Y, so they must have seen the asymmetry terms first.
+        rx.Stage("lines_axial", ["instrument.source.lines.*.weight",
+                                 "instrument.geometry.axial_sl"]),
         rx.Stage("sample_broadening",
                  ["phases.*.lor_size", "phases.*.lor_strain",
                   "phases.*.gauss_size", "phases.*.gauss_strain"], seed=1e-4),
-        rx.Stage("lines_axial", ["instrument.source.lines.*.weight",
-                                 "instrument.geometry.axial_sl"]),
         rx.Stage("biso", list(biso_globs)),
     ]
     if texture:
@@ -266,7 +269,7 @@ def _fit(sample: str, phases: list[rx.Phase], *, plan: rx.RefinementPlan,
     name = label or sample
     result.plot(path=str(OUT / f"qarr_{name}.png"))
     result.plot(path=str(OUT / f"qarr_{name}_lowangle.png"),
-                two_theta_range=(15.0, 60.0))
+                two_theta_limits=(15.0, 60.0))
     import matplotlib.pyplot as plt
     plt.close("all")   # plot() hands back live figures; 24 of them add up
     return ref, result

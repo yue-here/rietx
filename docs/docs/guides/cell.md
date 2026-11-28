@@ -18,9 +18,9 @@ This runs `mccusker_structural` on the fluorapatite pattern that ships with riet
 
 <!-- output of examples/guides/cell.py -->
 ```text
-phases.0.cell.a  9.370962(83)  free True
-phases.0.cell.b  9.370962(83)  free False
-phases.0.cell.c  6.885324(80)  free True
+phases.0.cell.a  9.370962(82)  free True
+phases.0.cell.b  9.370962(82)  free False
+phases.0.cell.c  6.885326(79)  free True
 V = 523.629(12) Å³
 ```
 
@@ -44,7 +44,7 @@ Quote `stderr`.
 
 <!-- output of examples/guides/cell.py -->
 ```text
-Bérar-Lelann factor 2.17
+Bérar-Lelann factor 2.16
 ```
 
 Neighbouring points of a step scan have correlated residuals, so they carry less independent information than their number suggests.
@@ -67,8 +67,8 @@ Refining again with only the tutorial's wavelengths:
 
 <!-- output of examples/guides/cell.py -->
 ```text
-a with rietx's Cu Ka      9.370962(83)
-a with the tutorial's     9.370341(84)
+a with rietx's Cu Ka      9.370962(82)
+a with the tutorial's     9.370341(82)
 difference 66 ppm, 7.5 esd
 ```
 

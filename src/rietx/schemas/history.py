@@ -34,7 +34,7 @@ from .instrument import Instrument
 # lives in ``schemas/plan.py`` (WP-1004); the compat re-export was deleted
 # pre-freeze (WP-1003), so import both from there.
 from .params import TieSpec
-from .plan import CLOSING_WINDOW_TOL, CORRELATION_GUARD, PHASE_SUPPORT_SIGMA, PlanSpec
+from .plan import CORRELATION_GUARD, PHASE_SUPPORT_SIGMA, PlanSpec
 from .results import Statistics
 from .structure import Structure
 
@@ -124,6 +124,10 @@ class NodeAction(Base):
     window_slack_deg: float | None = None
     #: the area fraction the stage's windows dropped (``None``: the default)
     window_area_tol: float | None = None
+    #: whether the stage's windows carried the movement slack sized from what
+    #: it frees (WP-2317 R7), which a plan gives a stage a later stage refits;
+    #: ``False`` is the uniform slack every node written before the field ran
+    movement_slack: bool = False
     #: the absent-phase hold's threshold the stage ran at (``None``: the hold
     #: was off), written by ``Refinement._run_plan`` and ``run_stage``
     phase_support_sigma: float | None = 3.0
@@ -174,9 +178,9 @@ class NodeAction(Base):
             # with run_stage's own defaults, never with this class's literals:
             # a retuned constant must not drop a keyword the line needs.  The
             # window is the fraction the stage ran at, a recorded None being a
-            # declared stage's 2 %, and run_stage's own default is the closing
-            # fraction (the seventh round's Q1)
-            from ..model.forward import recorded_window_tol
+            # declared stage's 2 %, and run_stage's own default is that 2 % too
+            # since WP-2222 (the closing fraction before it, the seventh round's Q1)
+            from ..model.forward import WINDOW_AREA_TOL, recorded_window_tol
 
             settings = "".join(
                 f", {n}={v!r}" for n, v, off in
@@ -184,7 +188,7 @@ class NodeAction(Base):
                  ("phase_support_sigma", self.phase_support_sigma,
                   PHASE_SUPPORT_SIGMA),
                  ("window_area_tol", recorded_window_tol(self.window_area_tol),
-                  CLOSING_WINDOW_TOL))
+                  WINDOW_AREA_TOL))
                 if v != off)
             return (f"ref.run_stage(data, rx.Stage({self.name!r}, {self.turn_on!r}, "
                     f"max_iter={self.max_iter}{extras}){settings})")
@@ -253,6 +257,21 @@ class NodeAction(Base):
         return f"# model edited: {self.name or 'structure/instrument replaced'}"
 
 
+class MergedGroup(Base):
+    """Reflections refined as one Pawley intensity (WP-2315, ruling R5 (b)).
+
+    Their d-spacings agree in every cell the space group allows, such as cubic
+    (3 3 3) and (5 1 1), or (h k l) and (k h l) under 4/m, so the pattern
+    measures only their sum.  ``intensity`` is that sum and ``stderr`` its esd
+    from the fit, ``None`` before one has run.  No member has a measured
+    intensity of its own.
+    """
+
+    hkl: list[list[int]]  # the members, (M, 3)
+    intensity: float
+    stderr: float | None = None
+
+
 class ReflectionState(Base):
     """Per-hkl intensities, the state that is *not* in the parameter vector.
 
@@ -286,6 +305,15 @@ class ReflectionState(Base):
     kind: Literal["lebail_extracted", "pawley_refined"] = "lebail_extracted"
     stderr: list[float] | None = None  # Pawley has esds; Le Bail does not
     varied: bool = False  # were these free in θ?
+    #: Pawley only: the phase's lattice-merged groups (WP-2315), written by
+    #: ``refine._extract_reflections``.  A member's own ``intensity`` row is
+    #: its share of the group's sum by multiplicity and its ``stderr`` row is
+    #: ``inf``; the measured value is here.  ``[]`` when the phase merged
+    #: none, which includes a phase whose model reads hkl and so declines
+    #: the merge (``model.forward._lattice_merge_groups``), and ``None``
+    #: where no merge was examined: Le Bail, and a node written before
+    #: WP-2315.
+    merged_groups: list[MergedGroup] | None = None
 
 
 class RefinementState(Base):

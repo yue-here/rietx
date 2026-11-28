@@ -72,6 +72,7 @@ ZERO = "instrument.zero_shift"
 def data() -> PatternData:
     structure = make_lab6()
     structure.phases[0].cell.a.value = A_TRUE
+    structure.phases[0].cell.b.value = structure.phases[0].cell.c.value = structure.phases[0].cell.a.value  # the cell's ties follow a
     ins = Instrument.debye_scherrer(wavelength=1.5406)
     tt = np.arange(15.0, 110.0, 0.02)
     empty = PatternData(two_theta=tt.tolist(),
@@ -89,6 +90,7 @@ def _seeded():
     """LaB6 500 ppm large, so a free zero shift tries to absorb the error."""
     structure = make_lab6()
     structure.phases[0].cell.a.value = A_TRUE * 1.0005
+    structure.phases[0].cell.b.value = structure.phases[0].cell.c.value = structure.phases[0].cell.a.value  # the cell's ties follow a
     return structure
 
 
@@ -376,7 +378,7 @@ def test_the_rows_render(data):
         result = _fit_at(data, 1e-4, *stages)
         plot_result(result, path=str(out / f"bound_hit_{name}.png"))
         plot_result(result, path=str(out / f"bound_hit_{name}_zoom.png"),
-                    two_theta_range=(20.0, 35.0))
+                    two_theta_limits=(20.0, 35.0))
 
 
 def test_a_width_on_its_floor_is_read_against_its_floor():

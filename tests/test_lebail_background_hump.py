@@ -47,6 +47,8 @@ import pytest
 import rietx as rx
 from rietx.background import diagnose, snip
 from rietx.background.auto import HUMP_TRIGGER
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
+from rietx.strategy.staged import PLAN_PRESETS
 from tests.test_auto_background_seed import _neutron, _phase
 
 GRID = np.arange(10.0, 150.0, 0.1)
@@ -83,14 +85,17 @@ def _fit(data: rx.PatternData, background, name: str, hump: bool, zoom: bool = F
     ins = _neutron()
     ins.background = background
     ref = rx.Refinement(rx.Structure(phases=[_phase(0.02)]), ins)
-    result = ref.fit(data, mode="lebail", plan="profile_only", telemetry=False)
+    # declared, not inherited: off by default since WP-2222
+    plan = PLAN_PRESETS["profile_only"]()
+    plan.closing_window_tol = CLOSING_WINDOW_TOL
+    result = ref.fit(data, mode="lebail", plan=plan, telemetry=False)
     from rietx.viz.plots import plot_result
     out = Path(__file__).parent / "output"
     out.mkdir(exist_ok=True)
     plot_result(result, path=str(out / f"lebail_hump_{name}.png"))
     if zoom:
         plot_result(result, path=str(out / f"lebail_hump_{name}_zoom.png"),
-                    two_theta_range=(30.0, 70.0))
+                    two_theta_limits=(30.0, 70.0))
     widths = {p.path.rsplit(".", 1)[-1]: (p.value, p.stderr) for p in result.parameters
               if p.path.startswith("instrument.profile.")}
     ratio = (np.interp(HUMP_CENTRE, result.two_theta, result.y_background)

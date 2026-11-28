@@ -30,6 +30,8 @@ docstring holds the rules.
 | `cod_1550439.cif` | Perhydropyrene, C₁₆H₂₆, at **350 K**: van de Streek, Alig, Parsons & Vella-Zarb (2019) *IUCrJ* 6, 136–144, doi:10.1107/S205225251801686X, space group P 1 2₁/n 1, a = 14.3334, b = 5.56223, c = 8.53021 Å, β = 92.0219°, Z = 2, so the 21 listed atoms are half a molecule about the 2a inversion centre. Vendored untrimmed; sha256 `df0769b7b33116d62048739a4206cc3394072e3e06775fd0422ad11d5d5f639e`. WP-1807's monoclinic case, a body on −1 (`test_rigid_body_special.py`) | Crystallography Open Database entry 1550439 (CC0 public-domain dedication) | COD (public domain dedication); the paper is CC BY 2.0 UK |
 | `cod_1567181.cif` | Glutaric acid–isonicotinamide cocrystal, form II, C₅H₈O₄·C₆H₆N₂O, at 298 K: Linberg, Röder, Al-Sabbagh, Emmerling & Michalchuk (2023) *Faraday Discuss.* 241, 178–193, doi:10.1039/d2fd00115b, space group P 1 2₁/a 1, a = 26.371, b = 5.2029, c = 8.904 Å, β = 99.325°, refined in TOPAS-6 from laboratory Cu Kα₁ powder data. Carries the authors' `_geom_torsion` loop, 18 torsions to 0.01° written by TOPAS's CIF macro, among them a gauche C2–C3–C4–C5 of 64.66° and the amide's −13.40°. Vendored untrimmed, byte-identical to the COD's copy on 2026-10-31; sha256 `8956c5574e00fc43852ab76f4dd8d6bf047ebb87b0b2e99f4d9b4a795ab2fa1c`. WP-1815's published reference for torsion values, their Klyne–Prelog sign and the table's completeness (`test_geometry_torsions.py`) | Crystallography Open Database entry 1567181 (CC0 public-domain dedication) | COD (public domain dedication) |
 | `cod_7252065.cif` | Benzoic acid, C₇H₆O₂, single-crystal structure: Rajput & Dalvi (2026) *CrystEngComm* 28, 3874–3883, doi:10.1039/d6ce00164e, space group P 1 2₁/n 1, a = 5.507, b = 5.1404, c = 21.964 Å, β = 97.038°, refined in SHELXL-2019/2. Carries the authors' `_geom_torsion` loop, 12 torsions to 0.1° with esds, written by SHELXL, every one within 1.5° of 0° or 180°. Vendored untrimmed, byte-identical to the COD's copy on 2026-10-31; sha256 `e2231fee9620e8fa32b4e94eb11260efd73bae987edb60afe97427040ea4d296`. WP-1815's second program for the torsion sign, where the angles sit next to the ±180° cut (`test_geometry_torsions.py`) | Crystallography Open Database entry 7252065 (CC0 public-domain dedication) | COD (public domain dedication) |
+| `cod_2107344.cif` | Nb₁₈W₁₆O₉₃, a tetragonal-tungsten-bronze superstructure: Stephenson (1968) *Acta Cryst.* B 24, 637–653, "A structural investigation of some stable phases in the region Nb₂O₅·WO₃–WO₃", space group P b a m, a = 12.195, b = 36.740, c = 3.951 Å, V = 1 770.2 Å³, Z = 1, 43 sites. Eight sites are Nb 0.6 / W 0.4 pairs at one position, and two pentagonal-channel W sites (occupancy 0.5) each have an O site (occupancy 0.375) half a cell along c. Every Uiso is 0.0 in the file, so its users declare Biso. Checked on the vendored file (`test_large_cell_refinement.py` and a one-off script): the cell content is Nb₁₈W₁₆O₉₃, each metal's six nearest O lie 1.64–2.39 Å away, and no two images are under 1.6 Å apart except a mixed pair. Vendored untrimmed, as fetched on 2026-11-27; sha256 `014fbb4feb17456bdbb7ed66b1908a9b0b778764e8a16c718129da0c6db94958`. The real large cell closest to the 12 × 36 × 4 Å cell a user reported: the bench's `bigcell-*` cases (WP-2317) and the orthorhombic rows of `test_large_cell_refinement.py` simulate their patterns from it | COD entry 2107344 (from IUCr Journals) | COD (public domain dedication); the file asks for attribution to the journal article, given here |
+| `cod_2107337.cif` | H-Nb₂O₅, Kato (1976) *Acta Cryst.* B 32, 764–767, "Structure refinement of H-Nb₂O₅", space group P 1 2/m 1, a = 21.153, b = 3.8233, c = 19.356 Å, β = 119.8°, V = 1 358.4 Å³, Z = 14, 51 sites, every one Nb or O. Nb1 is the split tetrahedral site, two half-occupied images 1.75 Å apart across the mirror. Every Uiso is 0.0 in the file, so its users declare Biso. Checked on the vendored file as for `cod_2107344.cif`: the cell content is Nb₂₈O₇₀, the shortest Nb–O is 1.75 Å, and each octahedral Nb's sixth O lies within 2.48 Å. Vendored untrimmed, as fetched on 2026-11-27; sha256 `41dd49ca018beda3a5adf53c2b513c2f64e2a3ab71fc55b17ce9ce0ea801806e`. The monoclinic large cell of `test_large_cell_refinement.py` (WP-2317) | COD entry 2107337 (from IUCr Journals) | COD (public domain dedication); the file asks for attribution to the journal article, given here |
 | `polyhedra_phases.json` | WP-1466's measured phase set for the structure viewer's coordination polyhedra: 21 phases, one per line, each as cell, space group and sites, with the shells a chemist draws first written beside it before the run. Written by `docs/wp/1466-measure/measure.py --fixture`; `test_structure3d.py` holds the default picture to it | 17 Crystallography Open Database entries, named in each row's `source`; the two COD files above and `fluorapatite.cif`; and an olivine built from COD 9007377 by putting Fe at 0.1 beside Mg on both M sites | COD (public domain dedication) |
 | `nist_srm660c_100a.cif` | NIST SRM 660c LaB6 certification dataset incl. measured profile (5332 pts in 24 stitched scan regions, Cu Kα + graphite post-monochromator, NIST DBD, R = 217.5 mm) — v0.2 lab-instrument acceptance (`test_acceptance_srm660c.py`) | NIST Public Data Repository mds2-2315 (data.nist.gov) | NIST open data license (U.S. Government work) |
 | `FAP.XRA` | Fluorapatite Ca₅(PO₄)₃F powder pattern, conventional lab Bragg-Brentano, Cu Kα doublet, 15-130.04° 2θ, 5753 pts, GSAS STD (counts-only) format — v0.2 cross-code acceptance (`test_acceptance_fap.py`) | GSAS-II tutorials repo, `LabData/data/` (github.com/AdvancedPhotonSource/GSAS-II-tutorials) | Argonne/APS tutorial data (U.S. Government work; publicly distributed) |
@@ -74,8 +76,8 @@ docstring holds the rules.
 | `hl2_peaks.txt` | 74 peak positions (2θ, d, I_rel) from a **genuinely unindexed** laboratory pattern, Cu Kα1 — the abstention fixture, whose correct answer is "we do not know" | Our own derived product: peaks picked from `HL2-1_2.xy` in the `examples/` folder of datalab-org/guillemot (MIT), which is *not* vendored here | Derived table, carried with attribution |
 | `absorption_cylinder_rouse.dat` | Cylinder **transmission** factor A (not A\* = 1/A) vs µR and sin²θ, 4 dp — 80 values: the full sin²θ = 0 column (µR 0.00–0.50 step 0.01) plus four complete µR = 0.50 / 1.00 rows. Ground truth for the WP-0501 capillary absorption correction (`test_absorption.py`) | Rouse, Cooper, York & Chakera (1970), *Acta Cryst.* **A26**, 682-691, Table 1(a)/(b) | Published table, transcribed with attribution; no code involved |
 | `backend_goldens/toy_anomalous_y_obs.npy` | The **frozen synthetic observed pattern** of the `toy_anomalous` bit-identity state (`tests/test_backend_shim.py`): 3 350 float64 intensities on `np.arange(28.0, 95.0, 0.02)` °2θ, 25.0 to 6000.45, SHA-256 of the file `5e3d1a3bf8da1a3e`.  Generated by the state's own former simulation, at main `8a47e888`: zincite (`tests/test_dispersion.zincite`) with scale 6.0e-3, an anisotropic Zn site, Cu Kα Bragg-Brentano with dispersion on, `profile.w` 1.2e-2 and a 4-term Chebyshev background, evaluated with `cell.a + 0.004` and `atoms[1].z + 0.003`, plus a flat 25.  Noiseless: no random number and no seed enter it.  Evaluated on macOS 26.7.1 arm64, Python 3.12.13, numpy 2.5.2, 2026-10-08, and identical over two processes.  Frozen because the evaluation goes through libm and moved with the macOS major (#760); see § backend_goldens/ | Generated in this repository (WP-1928) | Synthetic; no external source |
-| `planted_series/table.csv` | `SeriesResult.to_table()` of the **synthetic planted-events series** of issue #141 (`tests/planted_series.py`): 248 patterns of a cooling ramp of a generic cubic perovskite, seed 0, events planted at 50 (background step), 87 (blank frame), 124 (an unmodelled rock-salt phase appearing and growing) and 186 (cubic → tetragonal), fitted with one fixed cubic model under `mccusker_default`, `refit="single"`. Columns `index, label, T (K), status, rung, rwp, gof` and the cell edge, scale, zero shift, W and background constant with their esds, six significant figures; 38 578 bytes. The patterns themselves are not vendored: `python -m tests.planted_series --out DIR` regenerates them and this file | Generated in this repository (#141) | Synthetic; no external source |
-| `planted_series/signals.json`, `planted_series/null_signals.json` | The same run's signals, read off its `SeriesResult` (`planted_series.signals`): the entries above the Rwp fence, the flagged steps, reseeds, quarantines, `PHASE_UNCONSTRAINED` entries and the series-level codes, with the signal marking each planted event (`planted_series.surfaced`); and the null series' (same ramp and noise, no event, `--null`), all empty. 8 697 and 199 bytes. `test_planted_series.py`'s slow row regenerates both and compares | Generated in this repository (#141) | Synthetic; no external source |
+| `planted_series/table.csv` | `SeriesResult.to_table()` of the **synthetic planted-events series** of issue #141 (`tests/planted_series.py`): 248 patterns of a cooling ramp of a generic cubic perovskite, seed 0, events planted at 50 (background step), 87 (blank frame), 124 (an unmodelled rock-salt phase appearing and growing) and 186 (cubic → tetragonal), fitted with one fixed cubic model under `mccusker_default`, `refit="single"`. Columns `index, label, T (K), status, rung, rwp, gof` and the cell edge, scale, zero shift, W and background constant with their esds, six significant figures; 38 234 bytes. The patterns themselves are not vendored: `python -m tests.planted_series --out DIR` regenerates them and this file | Generated in this repository (#141) | Synthetic; no external source |
+| `planted_series/signals.json`, `planted_series/null_signals.json` | The same run's signals, read off its `SeriesResult` (`planted_series.signals`): the entries above the Rwp fence, the flagged steps, reseeds, quarantines, `PHASE_UNCONSTRAINED` entries and the series-level codes, with the signal marking each planted event (`planted_series.surfaced`); and the null series' (same ramp and noise, no event, `--null`), all empty. 7 848 and 7 589 bytes. `test_planted_series.py`'s slow row regenerates both and compares | Generated in this repository (#141) | Synthetic; no external source |
 | `d1b_co3o4_quench/300q-1p5K_1.dat` | Co₃O₄ quenched from **300 K**, measured at **1.5 K**. ILL D1B, λ = 2.52 Å; a **spreadsheet export**, eight tab-separated columns, no `XYDATA` heading; rietx reads columns 1–3 and drops row 1 (`PATTERN_ROWS_DROPPED`), 1 279 points from 0.89°; 66729 B, SHA-256 `08005a2c1808ec9a09ce2014c89b38b1976619deeb0926c206d62a6b4f0ed5c6`. Reference values: k = 0; Γ₇ on 8a (the two A-site Co antiparallel), no 16d moment (pp. 104104-6, -7); ordered A-site moment **2.40 ± 0.02 μ_B, read off Fig. 8** (p. 104104-7; no printed value); the text quotes "2.4 μ_B" for the low-quench samples | ILL D1B, same experiment (no heading: see the section). Data of Sparks *et al.*, *Phys. Rev. B* **99**, 104104 (2019), doi:10.1103/PhysRevB.99.104104 (§ "WP-2003 family D" below) | CC BY 4.0, released for this repository by M. W. Gaultois, a co-author of the study ([release comment](https://github.com/yue-here/rietx/pull/1162#issuecomment-6392651748)); test data only, nothing enters the wheel |
 | `d1b_co3o4_quench/300q-100K.dat` | Co₃O₄ quenched from **300 K**, measured at **100 K**. ILL D1B, λ = 2.52 Å; 1 280 points, 0.79–128.69° 2θ at 0.1°, FullProf `XYDATA` (2θ, counts, σ), CRLF; 52800 B, SHA-256 `1fd05676419d405d6dd0a512734b16af54f180a664f9dceabe7cc73ed22ede6c`. Reference values: above T_N ≈ 40 K (stated, p. 104104-2): no ordered moment; the paper shows refinements at 1.5 K and 300 K only (Fig. 7, p. 104104-6) | ILL D1B, 13-Nov-11, run 129864 129853>129864, heading title `edurneorf Co3O4-quenched_RT_100K`. Data of Sparks *et al.*, *Phys. Rev. B* **99**, 104104 (2019), doi:10.1103/PhysRevB.99.104104 (§ "WP-2003 family D" below) | CC BY 4.0, released for this repository by M. W. Gaultois, a co-author of the study ([release comment](https://github.com/yue-here/rietx/pull/1162#issuecomment-6392651748)); test data only, nothing enters the wheel |
 | `d1b_co3o4_quench/300q-300K.dat` | Co₃O₄ quenched from **300 K**, measured at **300 K**. ILL D1B, λ = 2.52 Å; 1 280 points, 0.79–128.69° 2θ at 0.1°, FullProf `XYDATA` (2θ, counts, σ), CRLF; 52798 B, SHA-256 `8c1f031254181a4801fb6280b0a8664b767b293c6f865c119cbf4fd4866cd576`. Reference values: above T_N ≈ 40 K (stated, p. 104104-2): no ordered moment; nuclear F d -3 m only (the paper fits its 300 K patterns so, Fig. 7(b), p. 104104-6) | ILL D1B, 15-Nov-11, run 130033 130022>130033, heading title `SparksLave Co-quenched_RT_300K`. Data of Sparks *et al.*, *Phys. Rev. B* **99**, 104104 (2019), doi:10.1103/PhysRevB.99.104104 (§ "WP-2003 family D" below) | CC BY 4.0, released for this repository by M. W. Gaultois, a co-author of the study ([release comment](https://github.com/yue-here/rietx/pull/1162#issuecomment-6392651748)); test data only, nothing enters the wheel |
@@ -131,15 +133,15 @@ Reference values used in acceptance tests:
   temperature/calibration — the acceptance test therefore checks internal
   consistency (Le Bail vs Rietveld) and agreement with the 11-BM wavelength
   calibration rather than a certificate-grade absolute value.
-- LaB6 SRM 660c certified lattice parameter: a = 4.156826(8) Å **at 22.5 °C**
-  (expanded uncertainty, k = 2; NIST certificate,
-  tsapps.nist.gov/srmext/certificates/660c.pdf).  The `…_100a` data block was
-  measured at 20.85 °C and its CIF records NIST's own recomputed cell for
-  exactly this dataset, **a = 4.156780 Å** — the value the acceptance test
-  compares against (consistent with the certificate via the Sirota et al. 1998
-  thermal expansion used by NIST).  The certificate/CIF wavelength scale is
-  λ(Cu Kα1) = 1.5405929 Å (Hölzer et al. 1997), which is what
-  `Instrument.bragg_brentano(radiation="CuKa")` ships.
+- LaB6 SRM 660c certified lattice parameter: a = 4.156826 ± 0.00008 Å
+  **at 22.5 °C** (0.415 682 6 nm ± 0.000 008 nm, expanded uncertainty, k = 2,
+  19 ppm; NIST certificate, tsapps.nist.gov/srmext/certificates/660c.pdf).
+  The `…_100a` data block was measured at 20.85 °C and its CIF records NIST's
+  own recomputed cell for exactly this dataset, **a = 4.156780 Å** — the
+  value the acceptance test compares against (consistent with the certificate
+  via the Sirota et al. 1998 thermal expansion used by NIST).  The
+  certificate/CIF wavelength scale is λ(Cu Kα1) = 1.5405929 Å (Hölzer et al.
+  1997), which is what `Instrument.bragg_brentano(radiation="CuKa")` ships.
 - SRM 660c auxiliary references: CIF-recorded specimen displacement
   −0.07877 mm (the v0.2 fit recovers −0.0801 mm with zero fixed);
   Hölzer integrated Kα2/Kα1 intensity ratio ≈ 0.52 (fit: 0.513).
@@ -615,6 +617,47 @@ old polynomial. At x ≥ 1e-3 the two slopes agree to the last digit. The other
 nine states reproduced bit-for-bit and were not re-captured. Both recaptured
 states pass twice over.
 
+**WP-1955 re-baseline (2026-11-02)**: `srm660c` and `toy_rich` again, the two
+states that free the axial apertures, on macOS 26.7.2 arm64 (Python 3.12.10,
+numpy 2.5.4, scipy 1.18.1). The FCJ node derivatives became a second-order
+forward difference at 3e-6 in place of a first-order one at 1e-7. Only the two
+aperture columns of `jacobian` moved: by 1.1e-5 of their norm in `srm660c`,
+and by 6.7e-6 (S/L) and 3.0e-6 (H/L) in `toy_rich`. Every other key is
+bit-identical. The other eight states reproduced bit-for-bit and were not
+re-captured.
+
+**WP-2315 re-baseline (2026-11-27)**: `toy_pawley` only, on macOS 26.7.2 arm64
+(Python 3.12.10, numpy 2.5.5). The Pawley overlap restraint's target became
+equal F², a share of m_k/Σm per member, in place of an equal 1/n share of the
+group's intensity. Only the restraint rows moved: 12 of the 18 rows of
+`residual` (rows 3250 onward), and 24 entries of `jacobian` in those rows. These
+are the overlap groups whose members have unequal multiplicities. A group with
+equal multiplicities gives the old rows bit for bit. `pawley_x0`, `theta` and
+`y_calc` are bit-identical. The toy has no lattice-forced coincidence, so it
+merges no column. The other ten states reproduced bit-for-bit and were not
+re-captured.
+
+**WP-2315 re-baseline, second event (2026-11-27)**: `srm660c` and `nac`, on the
+same machine. `generate_reflections` now keeps reflections of equal d (within
+1e-12 relative) in the order their orbits are first met, where numpy's
+unstable argsort had left that order to the platform: Linux CI swapped LaB6's
+(2 2 1) and (3 0 0) between two fits that macOS kept in place. Only the order
+in which tied reflections are summed moved. `theta` is bit-identical, and the
+largest change in `y_calc`, `residual` and `jacobian` is 1.6e-16 of the key's
+largest value. The other nine states reproduced bit-for-bit.
+
+**WP-2314 re-baseline (2026-11-28)**: `toy_roughness`, `toy_restraints`,
+`toy_anomalous`, `nac` and `srm660c`, the five states that free a Biso or an
+occupancy, on macOS 26.7.2 arm64 (Python 3.12.10, numpy 2.5.5). Those columns are
+now analytic, from the structure-factor expansion the coordinate columns share,
+where the peak chain finite-differenced them. Only the `jacobian` key moved,
+and inside it only those columns: one Biso or occupancy column per toy state,
+two Biso columns in `nac` and in `srm660c`. Each moved by 0.9e-7 to 4.0e-7 of
+its norm. Against a Richardson-extrapolated central difference of the residual
+the old columns were off by exactly that, and the new ones by 5e-13 to 8e-10,
+the oracle's own precision. The other five states reproduced bit-for-bit and
+were not re-captured.
+
 These are *environment-pinned* bit patterns, not physical reference values: a
 different BLAS/numpy build may legitimately differ in final bits.  **WP-1002
 measured which half of that sentence is true.**  The *numpy* half is not:
@@ -784,7 +827,7 @@ of the *specimen* rather than a convenience:
   be measured against its own certificate first (WP-1023).
 * **The cell is certified in the same file the pattern is in**, at this data
   block's own temperature (4.156780 Å at 20.85 °C — not the certificate's
-  4.156826(8) Å at 22.5 °C, which is the wrong comparison here).
+  4.156826 ± 0.00008 Å (k = 2) at 22.5 °C, which is the wrong comparison here).
 
 Its 2θ range, 20.3-150.9° in 24 stitched regions, is also what makes it
 demanding: axial divergence reverses the sign of its tail at 90°, and both signs
@@ -1830,7 +1873,8 @@ also have a 100 K or 300 K scan:
   checks rule out a wrong nominal λ, which would move every line together. The
   Co₃O₄ 300 K patterns of the same experiment index at λ = 2.524 Å with zero near
   0 on Co₃O₄'s room-temperature cell (8.084 Å, Smith & Hobson, *Acta Cryst.* B,
-  1973); at that λ and zero the garnet's cell is 12.378 Å, against YIG's 12.376 Å
+  1973); at that λ the garnet's cell is 12.387 Å with the zero fixed at 0 and
+  12.371 Å with the zero free (−0.06°), against YIG's 12.376 Å
   (Geller & Gilleo, *J. Phys. Chem. Solids*, 1957), and YAG's would need
   λ = 2.45 Å. Independent of λ, with each structure scaled to the whole pattern,
   (220) is about 24 times stronger than YIG's nuclear structure factors give and

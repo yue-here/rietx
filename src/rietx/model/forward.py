@@ -95,13 +95,13 @@ from ..crystallography.stephens import S_NAMES, monomial_matrix, strain_width_de
 from ..crystallography.structure_factor import (
     PhaseSites,
     compile_phase_sites,
-    d_f2_d_uaniso,
-    d_f2_d_xyz,
+    d_f2_d_sites,
     structure_factors_squared,
 )
 from ..crystallography.symmetry import (
     ReflectionSet,
     generate_reflections,
+    lattice_coincidences,
     reflection_orbits,
     resolve_group,
 )
@@ -143,6 +143,17 @@ from .corrections import (
 )
 from .extinction import sabine_extinction, sabine_extinction_and_dx
 from .origin import CompiledOrigin, origin_residual
+from .peak_equations import (
+    WIDTH_TARGETS,
+    CompiledPeakEquation,
+    PhasePeakEquations,
+    check_orbits,
+    compile_equation,
+    compile_frame,
+    evaluate_angle,
+)
+from .peak_equations import evaluate as evaluate_peak_equation
+from .peak_equations import gradient as peak_equation_gradient
 from .preferred_orientation import (
     TEXTURE_SAMPLE_PSI_DEG,
     TEXTURE_SPHERE_SAMPLES,
@@ -154,7 +165,7 @@ from .preferred_orientation import (
     texture_index,
     texture_term_weights,
 )
-from .profiles.caglioti import gaussian_fwhm, lorentzian_fwhm
+from .profiles.caglioti import _MIN_GAMMA_G2, gaussian_fwhm, lorentzian_fwhm
 from .profiles.fcj import (
     fcj_extent_deg,
     fcj_live,
@@ -168,6 +179,7 @@ from .profiles.pseudovoigt import (
     pseudo_voigt_basis,
     pseudo_voigt_derivs,
     tch_gamma_eta,
+    tch_gamma_eta_partials,
 )
 from .profiles.voigt import (
     GAUSS_FWHM_TO_SIGMA,
@@ -175,6 +187,7 @@ from .profiles.voigt import (
     voigt,
     voigt_basis,
     voigt_derivs,
+    voigt_fwhm,
 )
 from .restraints import (
     CompiledRestraints,
@@ -209,15 +222,136 @@ from .restraints import (
 #: Since WP-2002 it is the **declared stages'** fraction only.  The answer is
 #: measured in the closing stage at ``schemas.plan.CLOSING_WINDOW_TOL``, and
 #: every compile that does not say otherwise uses that fraction too: a
-#: ``predict`` on a grid, a synthetic pattern, a stage run by hand (the
-#: seventh round's Q1).  The plan runner asks for this one by name, through
-#: :func:`recorded_window_tol`.
+#: ``predict`` on a grid before any fit, a synthetic pattern, a stage run by
+#: hand (the seventh round's Q1).  After a fit, ``predict`` on a grid compiles
+#: at the last stage's fraction (WP-2235).  The plan runner asks for this
+#: one by name, through :func:`recorded_window_tol`.
 WINDOW_AREA_TOL = 2e-2
 #: Absolute slack added to every half-width: windows are frozen per stage,
 #: so a peak must stay inside its window while zero-shift, displacement and
-#: the cell move it during the stage — this is movement headroom, not tail
-#: coverage (a cold fit's zero error is instrument-scale, ~0.1°).
+#: the cell move it during the stage.  It was chosen as movement headroom
+#: (a cold fit's zero error is instrument-scale, ~0.1°), and it is tail room
+#: as well, which the next paragraph's answer stage depends on.
+#:
+#: Since WP-2317 (R7) it is the slack of every compile but the stage compile
+#: of a stage that a later stage of its plan refits (``compile_model``'s
+#: ``movement_slack``), and the **ceiling** of the slack that stage sizes from
+#: what it frees (:data:`WINDOW_MOVE_FWHM`), so no stage computes more points
+#: than before.  Its tail room is load-bearing on the stage whose answer is
+#: the result: sized from the frees there, a series' cell esds doubled.
 WINDOW_MIN_DEG = 0.3
+#: How far a stage may move a peak inside its frozen window, in multiples of
+#: that peak's own FWHM, for each position family the stage can move (WP-2317
+#: R7, ruled 2026-11-27).  A family is zero shift, specimen displacement,
+#: transparency, each capillary offset, and the strain a free cell or a free
+#: wavelength carries.  Each family's 2θ shape is the physics' (1 for the
+#: zero, cos θ for displacement, sin 2θ for transparency and the along-beam
+#: offset, cos 2θ for the across-beam one, tan θ for Δd/d), scaled so that the
+#: reflection in range it moves most gets the whole allowance; a stage's slack
+#: at a reflection is the sum over the families it moves, capped at
+#: :data:`WINDOW_MIN_DEG`.  A stage moving none gets half the local point
+#: step and nothing more (:func:`movement_slack_deg`), since nothing in it can
+#: move a peak.
+#:
+#: The bound on a stage's movement is not this number but the re-solve the
+#: staged runner makes, once, when a stage ends past its window tolerance
+#: (``StageResult.window_refit_loss``): the allowance only sets how often that
+#: re-solve is paid.  It sizes only a stage that a later stage refits, since
+#: the answer stage's tail room is in the esds a result reports.  3 covers the movements measured on the four acceptance
+#: protocols with room: 1.17 FWHM at most from their own starts and 2.43 from a
+#: zero 0.1° off (cpd-1a, the ``zero_disp`` stage).  A cell 0.3 % off moves
+#: peaks 6-21 FWHM in a stage, past any modest allowance and past the old
+#: 0.3° too (1.15° on SRM 660c); the refit and the next stage's recompile
+#: carry that case.  *(Chosen: WP-2317, 2026-11-27 — the measured movements,
+#: with the refit as the bound.)*
+WINDOW_MOVE_FWHM = 3.0
+
+#: The 2θ shape of each position family's shift, as a function of θ in
+#: radians (``corrections``' formulas, the scale dropped): what
+#: :data:`WINDOW_MOVE_FWHM` is spread over.
+_MOVE_SHAPES = {
+    "zero": lambda th: np.ones_like(th),
+    "displacement": np.cos,
+    "transparency": lambda th: np.sin(2.0 * th),
+    "capillary_along": lambda th: np.sin(2.0 * th),
+    "capillary_across": lambda th: np.cos(2.0 * th),
+    "strain": np.tan,
+}
+
+
+def moving_position_families(moving_paths: set[str] | None, ip: int,
+                             geometry_kind: str) -> tuple[str, ...] | None:
+    """The position families a stage can move for phase ``ip`` (WP-2317 R7).
+
+    ``None`` where no claim is made (``moving_paths is None``), which sizes
+    the uniform :data:`WINDOW_MIN_DEG`.  Read off ``moving_paths``, so a tie
+    or a variable driving a cell counts as the cell (root ``CLAUDE.md``: "can
+    this parameter move?" is ``moving_paths``).
+    """
+    if moving_paths is None:
+        return None
+    out = []
+    if "instrument.zero_shift" in moving_paths:
+        out.append("zero")
+    if geometry_kind == "bragg_brentano":
+        if "instrument.geometry.sample_displacement" in moving_paths:
+            out.append("displacement")
+        if "instrument.geometry.sample_transparency" in moving_paths:
+            out.append("transparency")
+    elif geometry_kind == "debye_scherrer":
+        if f"instrument.geometry.{CAPILLARY_OFFSETS[0]}" in moving_paths:
+            out.append("capillary_along")
+        if f"instrument.geometry.{CAPILLARY_OFFSETS[1]}" in moving_paths:
+            out.append("capillary_across")
+    # the wavelength's spelling has one authority, ``params.vector``'s, which
+    # imports from this package's neighbours, hence the late import
+    from ..params.vector import _is_wavelength
+    cell = f"phases.{ip}.cell."
+    if any(p.startswith(cell) or _is_wavelength(p) for p in moving_paths):
+        out.append("strain")
+    return tuple(out)
+
+
+def window_slack_shape(families: tuple[str, ...], theta_deg: np.ndarray,
+                       in_range: np.ndarray) -> np.ndarray:
+    """Σ over ``families`` of each one's 2θ shape at every reflection, each
+    scaled to 1 at the reflection in range it moves most (``in_range``; every
+    finite one where none is).  Times :data:`WINDOW_MOVE_FWHM` and the
+    reflection's FWHM it is the stage's movement slack (WP-2317 R7)."""
+    th = np.radians(np.asarray(theta_deg, dtype=np.float64))
+    total = np.zeros_like(th)
+    for fam in families:
+        s = np.nan_to_num(np.abs(_MOVE_SHAPES[fam](th)), nan=0.0, posinf=0.0)
+        ref = s[in_range] if in_range.any() else s
+        top = float(ref.max()) if ref.size else 0.0
+        if top > 0.0:
+            total = total + s / top
+    return total
+
+
+def movement_slack_deg(shape: np.ndarray, gamma: np.ndarray,
+                       half_step: np.ndarray) -> np.ndarray:
+    """The movement slack a stage's rule gives each window, in degrees.
+
+    ``half_step`` (:func:`grid_half_step`) is added under the cap because a
+    window takes the points within ±half of the peak, so the cells it draws
+    can stop up to half a step short of ±half.  Without it a stage moving
+    nothing drops up to 2.02 % of a peak's area against
+    :data:`WINDOW_AREA_TOL`'s 2 % (FAP and NAC ``scale_bkg``, measured
+    2026-11-27); the old uniform slack hid that.
+    """
+    return np.minimum(WINDOW_MIN_DEG, WINDOW_MOVE_FWHM * gamma * shape + half_step)
+
+
+def grid_half_step(tt: np.ndarray, pos: np.ndarray) -> np.ndarray:
+    """Half the grid's point step at each peak position, interpolated
+    between the steps and clamped at the grid's ends."""
+    tt = np.asarray(tt, dtype=np.float64)
+    pos = np.asarray(pos, dtype=np.float64)
+    if tt.size < 2:
+        return np.zeros_like(pos)
+    p = np.where(np.isfinite(pos), pos, tt[0])
+    return 0.5 * np.interp(p, tt[1:], np.diff(tt))
 
 def recorded_window_tol(tol: float | None) -> float:
     """A stage's window fraction as a record or a plan states it, for a compile.
@@ -308,8 +442,90 @@ def window_fwhm_mult_interp(eta: np.ndarray, tol: float | None = None) -> np.nda
 #: ``predict()`` at given values does not depend on which parameters are free
 #: (#774); and, for the optimiser, when either is about to be *refined* from
 #: zero, so the finite-difference Jacobian sees a live parameter instead of a
-#: frozen zero-node profile
+#: frozen zero-node profile.  It is not where a lifted ratio starts: that is
+#: :data:`AXIAL_SL_START` / :data:`AXIAL_HL_START`, kept apart so that a
+#: change to this floor cannot move a start (WP-1955, the review of #1372).
 AXIAL_SIZING_FLOOR = 0.02
+
+#: Where a stage starts S/L, and H/L, when it frees one sitting on zero
+#: (:func:`axial_lift_start`, WP-1955).  Two numbers and not one, because the
+#: pattern is symmetric in the pair: at S/L = H/L the two columns are
+#: identical and a step keeps them equal, so a fit started on that line can
+#: stop on it, 0.005 to 0.017 from the truth, with an esd that excludes the
+#: truth (the review of #1372, synthetic rutile at lab counts).  No code needs
+#: either to equal :data:`AXIAL_SIZING_FLOOR`; ``compile_model`` reads
+#: ``max(value, AXIAL_SIZING_FLOOR)``.
+AXIAL_SL_START = 0.02
+AXIAL_HL_START = 0.01
+
+#: Step of the forward second-order difference that gives a node's derivative
+#: with respect to an aperture (:func:`_aperture_node_derivs`).
+AXIAL_NODE_STEP = 3e-6
+
+#: The two FCJ axial ratios, S/L and H/L.
+AXIAL_PATHS = ("instrument.geometry.axial_sl", "instrument.geometry.axial_hl")
+
+
+def apertures_to_lift(freed: list[str]) -> list[str]:
+    """The paths in ``freed`` that are an FCJ axial ratio, the rows a stage
+    may lift when they sit on zero (WP-1955), S/L's before H/L's.
+
+    A path may carry a multi-histogram scope (``hist.{h}.``).  The runner's
+    ``seed_floored`` then writes only a row on its floor: a row whose value
+    equals its lower bound is moved (a typed 0 and a value = min = 0.005 alike),
+    and one above its bound is not.
+
+    Why a lift.  The FCJ profile is quadratic in an aperture at zero, so the
+    exact column there is nearly zero: 0.047 against a largest of 1.8e6 with
+    the other aperture live, and smaller still with both at zero.
+    Gauss-Newton sees no way off the bound, and a step taken from it is tens
+    to thousands of units long.  Measured on this branch (WP-1955's handover
+    entry), **on the route that frees both ratios, which no shipped plan takes
+    since WP-2012**: #1075's repro 1 ends ``converged`` at S/L = H/L = 0 and
+    Rwp 0.0834, lifted at 0.0453 beside TRF's 0.0454.  On the shipped
+    ``lab_bragg_brentano`` route (S/L alone) it goes from S/L 0.00008 ± 1.29,
+    Rwp 0.0831, to 0.04531 ± 0.00018, Rwp 0.0630 (the review of #1372).
+    WP-2003 X17's warm CPD 1c collapses to Rwp 10.7, lifted converges at
+    0.10881 in 43 evaluations against the independent fit's 0.10901; and the
+    calibrate guide's second calibration stays on zero.  The review moved the
+    start alone over 0.001 to 0.05 on that one pattern (S/L alone, H/L held at
+    0) and every start returned the same answer: it is leaving zero that
+    cures the stall, not the value left to.  From the lift the fit can still
+    walk back to zero: CPD 1b does, ending on its floor.
+    """
+    return sorted((p for p in freed
+                   if (p.split(".", 2)[2] if p.startswith("hist.") else p)
+                   in AXIAL_PATHS),
+                  key=lambda p: p.endswith("axial_hl"))
+
+
+def axial_partner(path: str) -> str:
+    """The other FCJ axial ratio of ``path``'s own instrument or histogram."""
+    scope, name = path.rsplit(".", 1)
+    sl_name, hl_name = (p.rsplit(".", 1)[1] for p in AXIAL_PATHS)
+    return f"{scope}.{hl_name if name == sl_name else sl_name}"
+
+
+def axial_lift_start(path: str, partner_value: float) -> float:
+    """Where ``path`` (one of :func:`apertures_to_lift`'s answer) starts:
+    S/L at :data:`AXIAL_SL_START`, H/L at :data:`AXIAL_HL_START`, but never at
+    ``partner_value``, the value its partner ratio has when it is written
+    (WP-1955).
+
+    Equal values put the pair on the S/L = H/L line, where the two columns are
+    identical and a step keeps them so, and a fit there can end ``converged``
+    0.005 to 0.017 from the truth with an esd that excludes it (the review of
+    #1372).  A start that would meet the partner takes the other ratio's
+    number instead.  Callers write S/L first and read the partner's *live*
+    value, so a partner that was lifted counts at its start and one that
+    could not be (a start the caller chose, above its floor) at its own.  Both
+    lifted: S/L 0.02, H/L 0.01.  By the symmetry of the pair either order is a
+    valid answer, so two histograms of one instrument may land on opposite
+    orders in a joint fit.
+    """
+    own, other = ((AXIAL_SL_START, AXIAL_HL_START) if path.endswith("axial_sl")
+                  else (AXIAL_HL_START, AXIAL_SL_START))
+    return other if partner_value == own else own
 
 #: How far outside the fitted range, in °2θ, a reflection is still generated
 #: (``compile_model``, and the satellite report arm, through
@@ -342,10 +558,41 @@ REFLECTION_MARGIN_DEG = 0.5
 #: always the refined one.
 MAGNETIC_SIZING_FLOOR = 0.1
 
-#: Distinct keys :meth:`CompiledModel._memo` holds per slot.  Two, because a
-#: Jacobian column alternates between the expansion point and one perturbed
-#: state; see that method for the measurement and for why this is capped.
+#: Recent keys :meth:`CompiledModel._memo` holds per slot, *beside* the pinned
+#: expansion point (:class:`_MemoSlot`).  The pin is what a Jacobian's
+#: alternation needs; this list is only the residual's trail between
+#: Jacobians, and that method carries the measurement sizing it.
 _MEMO_DEPTH = 2
+
+#: Set while :meth:`CompiledModel.derivative_bases` builds the expansion
+#: point's peaks, so :meth:`CompiledModel._memo` pins what it hands back there
+#: (WP-1945).  Private and scoped by :func:`_pinning_expansion_point`.
+_MEMO_PIN: ContextVar[bool] = ContextVar("_MEMO_PIN", default=False)
+
+
+@contextmanager
+def _pinning_expansion_point():
+    """Every memo lookup inside the block pins its entry (WP-1945)."""
+    token = _MEMO_PIN.set(True)
+    try:
+        yield
+    finally:
+        _MEMO_PIN.reset(token)
+
+
+class _MemoSlot:
+    """One memo slot: the pinned expansion point and the recent keys.
+
+    ``pin`` is the ``(key, value)`` the last :meth:`derivative_bases` asked
+    for, and no run of other keys evicts it; ``recent`` is a most-recent-first
+    list of at most :data:`_MEMO_DEPTH` other entries.
+    """
+
+    __slots__ = ("pin", "recent")
+
+    def __init__(self) -> None:
+        self.pin: tuple | None = None
+        self.recent: list[tuple] = []
 
 
 def _freeze(value) -> None:
@@ -407,6 +654,45 @@ def _cached_fcj_nodes(cp: "CompiledPhase", il: int, k: int, variant: int,
     phi, omega = fcj_offsets_weights(two_theta_deg, sl, hl, n_nodes)
     cache[key] = (tt, s, h, phi, omega)
     return phi, omega
+
+
+def _aperture_node_derivs(nodes, two_theta_deg, sl: float, hl: float, n: int,
+                          h: float, which: int) -> tuple[np.ndarray, np.ndarray]:
+    """∂(2φ_q, ω_q)/∂(S/L or H/L) for the FCJ nodes, by a forward
+    second-order difference (``which`` 0 is S/L, 1 is H/L).
+
+    (−3f(0) + 4f(h) − f(2h)) / 2h steps only into the feasible side, so it is
+    the same rule at an aperture on its bound of zero as above it.  A
+    first-order forward difference was not good enough there (WP-1955): at
+    one zero aperture the column is the residue of node terms about 1e5 times
+    its size, which cancel because the profile is quadratic in that aperture,
+    and the difference's O(h) error, 0.013 in norm, was 23 % of a column of
+    0.047.  The O(h²) form costs one more node evaluation per aperture.
+
+    The caller's step, 3e-6, is from a scan against jax's exact column: below
+    it rounding grows as 1/h, above it the h² term.  At one zero aperture
+    1e-7 sat 8.9e-3 rel-L2 off and 3e-6 sits 5.3e-4; at interior apertures
+    every step from 3e-7 to 1e-5 is under 2e-7.
+
+    The nodes have a kink at S/L = H/L (``min(sl, hl)`` in the overlap
+    weight).  An aperture lying under the other by at most 2h would step
+    across it, and the stencil would mix the two sides: 2.2e-3 rel-L2 off
+    jax's column at a gap of 1e-6, where the first-order rule sat at 3e-6.
+    There the stencil mirrors to (3f(0) − 4f(−h) + f(−2h)) / 2h, which stays
+    on the aperture's own side and is feasible whenever the aperture is at
+    least 2h.
+    """
+    own, other = (sl, hl) if which == 0 else (hl, sl)
+    step = -h if 0.0 < other - own <= 2.0 * h and own >= 2.0 * h else h
+
+    def at(k):
+        return fcj_offsets_weights_batch(
+            two_theta_deg, sl + (k if which == 0 else 0.0),
+            hl + (k if which == 1 else 0.0), n)
+
+    f1, f2 = at(step), at(2.0 * step)
+    return tuple((4.0 * b - 3.0 * a - c) / (2.0 * step)
+                 for a, b, c in zip(nodes, f1, f2, strict=True))
 
 
 @dataclass
@@ -552,15 +838,27 @@ def _batch_layout(win: np.ndarray, fcj_n: np.ndarray, tt: np.ndarray
 PAWLEY_OVERLAP_FWHM_FRAC = 0.5
 #: soft equal-split restraint weight for overlapped Pawley groups.  With the
 #: per-group intensity scaling in ``build_pawley_restraint`` this makes the
-#: split-direction esd ≈ (group intensity)/√λ, i.e. an unresolved split is
-#: reported with an esd of order its own value (≈100 % at λ=1) rather than the
-#: spuriously tight one a bare pseudo-inverse of a singular JᵀJ would give.
+#: split-direction esd ≈ s/√λ, s the group intensity (or, for a group under
+#: ``PAWLEY_GROUP_SCALE_FLOOR_REL`` of its phase, that floor), i.e. an
+#: unresolved split is reported with an esd of order its own value (≈100 % at
+#: λ=1) or larger, rather than the spuriously tight one a bare pseudo-inverse
+#: of a singular JᵀJ would give.
 PAWLEY_OVERLAP_LAMBDA = 1.0
 #: floor on the scale of the off-data ridge in ``build_pawley_restraint``, in
 #: the Pawley block's intensity units: the ridge is as wide as the phase's
 #: largest on-data intensity, and never narrower than this, which a phase
 #: with no on-data reflection falls back to (WP-1459, outside PR #453)
 PAWLEY_OFF_DATA_SCALE_FLOOR = 1.0
+#: floor on an overlap group's restraint scale, as a fraction of its phase's
+#: largest on-data intensity, so the scale is never read off a seed the
+#: partition emptied (WP-2311).  A pair on ``LEBAIL_INTENSITY_FLOOR`` had
+#: rows weighing (1 − 1/2)·√λ/1e-10 = 5e9, which equilibration turned into a group sum
+#: the trust region could not move, rebuilt from the stuck value every stage.
+#: Synthetic LaB6 under a declared background 10x and 100x the data: any value
+#: from 1 down to 1e-8 recovers the true start's fit exactly, 1e-9 locks again.
+#: *(Chosen: WP-2311, 2026-11-26 — four decades inside that window either
+#: side; below it a group is weaker than any line a pattern resolves.)*
+PAWLEY_GROUP_SCALE_FLOOR_REL = 1e-4
 
 
 
@@ -569,7 +867,7 @@ def _line_image_deg(tt_primary, lam_ratio: float, xp):
 
     sin θ_l = (λ_l/λ_0)·sin θ_0, which is the same ghost transform
     ``background.diagnostics`` uses and the same one
-    ``indexing.peakfit._line_pos`` applies to a fitted position.  Written in
+    ``indexing.peakfit._GroupModel._line_pos`` applies to a fitted position.  Written in
     ``xp`` ops because ``tt_primary`` is θ-derived: this is on the traced path
     for every backend.
 
@@ -742,6 +1040,11 @@ class CompiledPhase:
     # True where no emission line's compile-time centre lies on the fitted
     # data (``PawleyBlock.off_data``; None outside pawley mode)
     off_data: np.ndarray | None = None  # (N,) bool
+    # Pawley mode: the reflections whose d agree in every cell of the setting
+    # (``symmetry.lattice_coincidences``), local indices, each list one Pawley
+    # column (WP-2315, ruling R5 (b)).  Empty outside pawley mode and on a
+    # phase whose model can tell the members apart (``_lattice_merge_groups``).
+    lattice_groups: list[list[int]] = field(default_factory=list)
     # March-Dollase preferred orientation: the frozen symmetry orbit of every
     # reflection (flattened; see preferred_orientation.orbit_layout) plus the
     # fixed integer axis.  None unless the phase carries a PO block in Rietveld
@@ -802,7 +1105,7 @@ class CompiledPhase:
     # profile width leaves both the cell block and |F|² alone.  ``None`` keeps
     # the hot loop exactly as it was; numpy path only, for the reason the FCJ
     # memo is numpy-only.
-    scalar_cache: dict[str, tuple] | None = None
+    scalar_cache: dict[str, _MemoSlot] | None = None
     # WP-1326.  ``satellites`` is the second ReflectionSet, frozen at stage
     # compile beside the nuclear one, kept whole so a caller can ask what was
     # generated and from which k; ``reflections`` above is the **merge** of the
@@ -867,6 +1170,17 @@ class CompiledPhase:
     win_mag: np.ndarray | None = None       # (n_lines, N, 2) int
     fcj_n_mag: np.ndarray | None = None     # (n_lines, N) int
     batch_mag: BatchLayout | None = None
+    # WP-2107.  The phase's peak equations by target, and the frozen frame
+    # (hkl, multiplicity, orbit images, harmonic coefficients) they are
+    # evaluated on.  ``None`` is exactly off: a phase declaring none reaches
+    # every expression below as it always did.
+    peq: PhasePeakEquations | None = None
+    # WP-2317 R7.  The movement-slack shape the stage sized this phase's
+    # windows with (``window_slack_shape``), one row per emission line, so
+    # ``window_sizing`` reapplies the compile's rule at other widths.  ``None``
+    # is the uniform ``CompiledModel.window_slack_deg``: a caller's declared
+    # slack, a compile making no claim, or a phase a shift equation moves.
+    window_slack_shape: np.ndarray | None = None  # (n_lines, N)
 
 
 @dataclass
@@ -1020,15 +1334,21 @@ class CompiledModel:
     # FitReport reads it to know which precision it was handed
     # (``report._reading_models``).
     window_area_tol: float | None = None
-    # The absolute capture slack every window half-width carries, as
-    # ``compile_model`` resolved it (``WINDOW_MIN_DEG`` unless a stage set
-    # ``window_slack_deg``), so ``rewindow`` sizes by the compile's rule.
+    # The absolute capture slack a window half-width carries where the slack
+    # is uniform, as ``compile_model`` resolved it (``WINDOW_MIN_DEG`` unless a
+    # stage set ``window_slack_deg``), so ``rewindow`` sizes by the compile's
+    # rule.  A phase carrying ``window_slack_shape`` is sized by that instead
+    # (WP-2317 R7), and this is then its ceiling.
     window_slack_deg: float = WINDOW_MIN_DEG
+    # WP-2107.  The instrument's ``shift`` equation, which moves every phase's
+    # peaks and reads only the angle, so it sits in ``_position_shift_deg``
+    # beside the zero and the geometry's shifts.  ``None`` is exactly off.
+    inst_shift: CompiledPeakEquation | None = None
     # The origin restraint of a ``Phase.floating_origin = "centroid"`` phase
     # (WP-1912, Flack & Schwarzenbach 1988; ``model.origin``): one row per
     # direction this solve's free set can slide the phase along.  ``None``
     # everywhere else, and then no row exists.  Written by the stage runner
-    # (``refine._attach_origin``) once the stage's free set is final, since
+    # (``model.origin.compile_origin``) once the stage's free set is final, since
     # the rows depend on it and ``compile_model`` sees only what may move; so
     # frozen per solve, never per evaluation.  Its own block below the soft
     # restraints, and deliberately NOT scaled by ``restraint_weight_scale``:
@@ -1039,6 +1359,15 @@ class CompiledModel:
     # ``RefinementResult.sigma_rule`` carries.  ``None`` only on a model built
     # without ``compile_model``.
     sigma_rule: SigmaRule | None = None
+    # What the reader repaired or noticed in the file (``PatternData.diagnostics``,
+    # WP-2304), carried so the result builder can hand it on: by then the
+    # pattern itself is out of reach.  Empty on a pattern built by hand.
+    reader_notes: tuple = ()
+    # Whether the fitted channels' σ are one value, read before a measured
+    # background widens them: what settles ``PATTERN_SIGMA_CONSTANT`` once a
+    # caller's own σ varies (WP-2304).  ``None`` only on a model built without
+    # ``compile_model``.
+    sigma_uniform: bool | None = None
     meta: dict = field(default_factory=dict)
 
     # ------------------------------------------------------------------
@@ -1175,7 +1504,10 @@ class CompiledModel:
         because it answers a question about the *goniometer*: "how narrow can a
         real reflection be here?".  That is the scale a background peak's width
         is judged against (``strategy.staged.check_hump_width``), and
-        it must not depend on which phase one happens to ask about.
+        it must not depend on which phase one happens to ask about.  It reads
+        the TCH quintic under either shape, so under ``"voigt"`` it sits up to
+        0.43 % from :meth:`peak_fwhm`'s Olivero-Longbothum width (WP-1926): a
+        scale, not a reported width.
 
         Evaluate-only and off the hot path: plain floats in, the shared
         ``profiles`` functions through the active backend.
@@ -1226,6 +1558,13 @@ class CompiledModel:
                 values[f"instrument.geometry.{CAPILLARY_OFFSETS[0]}"],
                 values[f"instrument.geometry.{CAPILLARY_OFFSETS[1]}"],
                 self.radius_mm)
+        if self.inst_shift is not None:
+            # WP-2107: the instrument's equation reads the Bragg θ (radians)
+            # and the 2θ every term above has already moved the peak to
+            xp = get_backend()
+            shift = shift + evaluate_angle(
+                self.inst_shift, values, theta=xp.radians(theta),
+                two_theta=tt_bragg + shift)
         return shift
 
     def generation_window(self, values: dict[str, float]) -> tuple[float, float]:
@@ -1244,12 +1583,20 @@ class CompiledModel:
                                                              values))
 
     def apparent_two_theta(self, tt_bragg: np.ndarray,
-                           values: dict[str, float]) -> np.ndarray:
+                           values: dict[str, float], *, phase: int | None = None,
+                           d=None) -> np.ndarray:
         """Where a reflection at Bragg angle ``tt_bragg`` is drawn, in °2θ.
 
         The Bragg angle plus :meth:`_position_shift_deg`.  Pass one emission
         line's angles at a time: each line has its own θ, so a Kα2 image takes
         a different shift from its Kα1 partner.
+
+        ``phase`` adds that phase's ``shift`` equation (WP-2107), and then
+        ``tt_bragg`` must be the phase's own reflection list at one line, since
+        the equation reads each reflection's indices.  ``d`` is that list's
+        d-spacings, taken off the cell when not given.  A caller holding angles
+        that are no reflection list (the satellite report's lattice) passes no
+        phase and reads the pattern level.
 
         It is one function because the forward model and every builder of a
         position owe each other the same answer to *where is the peak*.  The
@@ -1260,8 +1607,13 @@ class CompiledModel:
         2·s·cosθ/R (0.26° at 27° for s = 0.5 mm on a 217.5 mm circle) while
         the calculated curve sat on the data.
         """
-        return tt_bragg + self._position_shift_deg(0.5 * tt_bragg, tt_bragg,
-                                                   values)
+        drawn = tt_bragg + self._position_shift_deg(0.5 * tt_bragg, tt_bragg,
+                                                    values)
+        peq = None if phase is None else self.phases[phase].peq
+        if peq is None or not peq.has("shift"):
+            return drawn
+        return drawn + self.phase_term(phase, "shift", values, tt_bragg, d=d,
+                                       drawn=drawn)
 
     def reflection_positions(self, ip: int, values: dict[str, float]
                              ) -> tuple[np.ndarray, np.ndarray]:
@@ -1309,7 +1661,7 @@ class CompiledModel:
         out = []
         for lam in self.line_lambdas(values):
             bragg = cp.reflections.two_theta(cell, lam)
-            out.append((bragg, self.apparent_two_theta(bragg, values)))
+            out.append((bragg, self.apparent_two_theta(bragg, values, phase=ip)))
         return out
 
     def _absorption(self, tt_bragg: np.ndarray) -> np.ndarray | float:
@@ -1372,11 +1724,58 @@ class CompiledModel:
         elif self.geometry_kind == "debye_scherrer" and self.radius_mm:
             key.extend(float(values[f"instrument.geometry.{name}"])
                        for name in CAPILLARY_OFFSETS)
+        if self.inst_shift is not None:
+            key.extend(self.inst_shift.key(values))
         return tuple(key)
 
+    def _phase_cell(self, ip: int, values: dict[str, float]) -> tuple:
+        return tuple(values[f"phases.{ip}.cell.{k}"]
+                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+
+    def phase_term(self, ip: int, target: str, values: dict[str, float],
+                   tt_bragg, *, d=None, drawn=None):
+        """Phase ip's ``target`` equation at one emission line's reflections.
+
+        ``tt_bragg`` is that line's Bragg 2θ of every reflection; ``d`` the
+        reflections' d-spacings (taken off the cell when not given); ``drawn``
+        the 2θ the pattern-level terms draw them at (taken from
+        :meth:`apparent_two_theta` when not given), which is what ``two_theta``
+        reads (WP-2107).  The value is on the active backend, one per
+        reflection.
+        """
+        cp = self.phases[ip]
+        eq = cp.peq.equations[target]
+        cell = self._phase_cell(ip, values)
+        if d is None:
+            d = d_spacings(cp.reflections.index, *cell)
+        if drawn is None:
+            drawn = self.apparent_two_theta(tt_bragg, values)
+        xp = get_backend()
+        return evaluate_peak_equation(
+            eq, values, cp.peq.frame.at(cell), d=d,
+            theta=xp.radians(0.5 * tt_bragg), two_theta=drawn)
+
+    def _peq_key(self, ip: int, values: dict[str, float], targets) -> tuple:
+        """What phase ip's ``targets`` equations read beyond the cell and λ:
+        their coefficients, and the pattern-level shift their ``two_theta``
+        follows.  ``()`` for a phase with none of them."""
+        peq = self.phases[ip].peq
+        if peq is None or not peq.has(*targets):
+            return ()
+        return (peq.key(values, targets), self._shift_key(values))
+
     def _width_block(self, ip: int, values: dict[str, float],
-                     tt_bragg_lines: list, aniso, *, magnetic: bool = False):
+                     tt_bragg_lines: list, aniso, *, magnetic: bool = False,
+                     d=None):
         """The (w₁, w₂) pair of every emission line, at the current widths.
+
+        A phase's width equations (WP-2107) add where the built-in terms do:
+        a ``gauss_fwhm`` equation's square and a ``gauss_fwhm_squared`` one's
+        value to Γ_G² before its floor, a ``lor_fwhm`` one's value to Γ_L.
+        They read the reflection list, so ``tt_bragg_lines`` must be the
+        phase's own (``d`` its d-spacings, taken off the cell when not given)
+        whenever the phase carries one.  Both components take them: the
+        magnetic one is the nuclear one widened (WP-1343).
 
         ``magnetic=True`` returns the **magnetic component's** pair (WP-1343):
         the same two laws with ``magnetic_lor_size`` added to the 1/cosθ
@@ -1397,7 +1796,25 @@ class CompiledModel:
         ``+ 0.0``, so that a phase with no magnetic component reaches the same
         expression it always did.
         """
-        out = []
+        return [self._peak_widths(*self._line_fwhms(ip, values, tt_bragg, aniso,
+                                                    magnetic=magnetic, d=d))
+                for tt_bragg in tt_bragg_lines]
+
+    def _line_fwhms(self, ip: int, values: dict[str, float], tt_bragg, aniso, *,
+                    magnetic: bool = False, d=None):
+        """(Γ_G, Γ_L) of phase ip at one emission line: :meth:`_width_block`'s
+        arithmetic, which :meth:`peak_equation_partials` reads too."""
+        theta = 0.5 * tt_bragg  # Bragg angle drives the widths
+        extra_g2 = extra_l = None
+        peq = self.phases[ip].peq
+        if peq is not None and peq.has(*WIDTH_TARGETS):
+            extra_g2, extra_l = self._width_terms(ip, values, tt_bragg, d)
+        gam_g = gaussian_fwhm(theta, values["instrument.profile.u"],
+                              values["instrument.profile.v"],
+                              values["instrument.profile.w"],
+                              values[f"phases.{ip}.gauss_size"],
+                              values[f"phases.{ip}.gauss_strain"],
+                              extra_squared=extra_g2)
         if magnetic:
             x_l = (values["instrument.profile.x"]
                    + values[f"phases.{ip}.lor_size"]
@@ -1405,23 +1822,119 @@ class CompiledModel:
             y_l = (values["instrument.profile.y"]
                    + self.lor_strain_term(ip, values)
                    + values[f"phases.{ip}.magnetic_lor_strain"])
-        for tt_bragg in tt_bragg_lines:
-            theta = 0.5 * tt_bragg  # Bragg angle drives the widths
-            gam_g = gaussian_fwhm(theta, values["instrument.profile.u"],
-                                  values["instrument.profile.v"],
-                                  values["instrument.profile.w"],
-                                  values[f"phases.{ip}.gauss_size"],
-                                  values[f"phases.{ip}.gauss_strain"])
-            if magnetic:
-                gam_l = lorentzian_fwhm(theta, x_l, y_l, aniso)
+            gam_l = lorentzian_fwhm(theta, x_l, y_l, aniso)
+        else:
+            gam_l = lorentzian_fwhm(
+                theta,
+                values["instrument.profile.x"] + values[f"phases.{ip}.lor_size"],
+                values["instrument.profile.y"] + self.lor_strain_term(ip, values),
+                aniso)
+        if extra_l is not None:
+            gam_l = gam_l + extra_l
+        return gam_g, gam_l
+
+    def peak_equation_partials(self, ip: int, values: dict[str, float], path: str
+                               ) -> list[tuple] | None:
+        """Exact ∂(pos, w₁, w₂, intensity)/∂c per emission line for one phase
+        coefficient ``path`` (WP-2107), numpy, or ``None`` where it is not one
+        of phase ip's or the exact form does not hold.
+
+        The equation's own gradient (:func:`~rietx.model.peak_equations.gradient`)
+        carried through the one seam its target enters at:
+
+        * ``shift`` adds to the drawn position, so ∂pos = ∂f.
+        * ``lor_fwhm`` adds to Γ_L, so ∂Γ_L = ∂f.
+        * ``gauss_fwhm_squared`` adds to Γ_G² before the floor, so
+          ∂Γ_G = ∂f/(2Γ_G), and 0 on the floor, where Γ_G is constant.
+          ``gauss_fwhm`` adds f², so ∂Γ_G = f·∂f/Γ_G.
+        * Γ_G and Γ_L reach (w₁, w₂) through TCHZ's partials
+          (:func:`~rietx.model.profiles.pseudovoigt.tch_gamma_eta_partials`)
+          or the true Voigt's two divisions, which are linear.
+        * ``intensity_factor`` multiplies, so ∂I = (I/F)·∂F.  At F = 0 the
+          quotient is 0/0, so the method returns ``None`` and the caller
+          takes the scalar chain, which stays correct there.
+
+        No target reads another's value, and ``two_theta`` reads the position
+        before the phase's own ``shift``, so a phase coefficient reaches
+        nothing else.  Only the nuclear component: a phase whose magnetic
+        component is drawn on its own family (:meth:`mag_split`) carries the
+        equations there too, so ``_make_jacobian`` sends its coefficients to
+        the scalar chain instead, as it does the March and texture columns.
+        """
+        cp = self.phases[ip]
+        peq = cp.peq
+        if peq is None:
+            return None
+        hit = next(((target, k) for target, eq in peq.equations.items()
+                    for k, (_, p) in enumerate(eq.paths) if p == path), None)
+        if hit is None:
+            return None
+        target, k = hit
+        eq = peq.equations[target]
+        cell = self._phase_cell(ip, values)
+        d, tt_lines = self._cell_block(cp, cell, self.line_lambdas(values))
+        frame = peq.frame.at(cell)
+        peaks = (self.phase_peaks(ip, values) if target == "intensity_factor"
+                 else None)
+        aniso = (self.strain_width(ip, values, d)
+                 if target in WIDTH_TARGETS else None)
+        out = []
+        for il, tt in enumerate(tt_lines):
+            f, parts = peak_equation_gradient(
+                eq, values, frame, d=d, theta=np.radians(0.5 * tt),
+                two_theta=self.apparent_two_theta(tt, values))
+            g = parts[k]
+            zero = np.zeros_like(g)
+            if target == "shift":
+                out.append((g, zero, zero, zero))
+                continue
+            if target == "intensity_factor":
+                inten = np.asarray(peaks[il][3], dtype=np.float64)
+                live = inten != 0.0
+                if np.any(live & (f == 0.0)):
+                    return None
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    out.append((zero, zero, zero,
+                                np.where(live, inten / f * g, 0.0)))
+                continue
+            gam_g, gam_l = self._line_fwhms(ip, values, tt, aniso, d=d)
+            gam_g = np.asarray(gam_g, dtype=np.float64)
+            d_g = d_l = zero
+            if target == "lor_fwhm":
+                d_l = g
             else:
-                gam_l = lorentzian_fwhm(
-                    theta,
-                    values["instrument.profile.x"] + values[f"phases.{ip}.lor_size"],
-                    values["instrument.profile.y"] + self.lor_strain_term(ip, values),
-                    aniso)
-            out.append(self._peak_widths(gam_g, gam_l))
+                d_g2 = g if target == "gauss_fwhm_squared" else 2.0 * f * g
+                floored = gam_g == np.sqrt(_MIN_GAMMA_G2)
+                d_g = np.where(floored, 0.0, d_g2 / (2.0 * gam_g))
+            if self.shape == "voigt":
+                d_w1, d_w2 = fwhm_to_voigt_params(d_g, d_l)
+            else:
+                pg, pl, eg, el = tch_gamma_eta_partials(
+                    gam_g, np.asarray(gam_l, dtype=np.float64))
+                d_w1, d_w2 = pg * d_g + pl * d_l, eg * d_g + el * d_l
+            out.append((zero, d_w1, d_w2, zero))
         return out
+
+    def _width_terms(self, ip: int, values: dict[str, float], tt_bragg, d=None):
+        """(term of Γ_G², term of Γ_L) phase ip's width equations add at one
+        line, each ``None`` where the phase has no such equation (WP-2107).
+
+        A ``gauss_fwhm`` value g enters Γ_G² as g², a ``gauss_fwhm_squared``
+        value as it stands; both sum when both are declared.
+        """
+        peq = self.phases[ip].peq
+        drawn = self.apparent_two_theta(tt_bragg, values)
+        g2 = lor = None
+        if "gauss_fwhm" in peq.equations:
+            g = self.phase_term(ip, "gauss_fwhm", values, tt_bragg, d=d, drawn=drawn)
+            g2 = g * g
+        if "gauss_fwhm_squared" in peq.equations:
+            sq = self.phase_term(ip, "gauss_fwhm_squared", values, tt_bragg, d=d,
+                                 drawn=drawn)
+            g2 = sq if g2 is None else g2 + sq
+        if "lor_fwhm" in peq.equations:
+            lor = self.phase_term(ip, "lor_fwhm", values, tt_bragg, d=d, drawn=drawn)
+        return g2, lor
 
     def line_lambdas(self, values: dict[str, float]) -> list:
         """λ per emission line, from θ where it is a row and frozen otherwise.
@@ -1498,47 +2011,71 @@ class CompiledModel:
         this repository.  Freezing the arrays costs nothing per call and turns
         the corruption into a ``ValueError`` naming the write.
 
-        **Two keys deep, because a Jacobian alternates between exactly two**
-        (WP-1121).  A column perturbs one parameter and leaves the rest at the
-        expansion point, so a run of columns that do not touch this block all
-        want the *same* base key — and one cell column between two of them is
-        enough to evict it from a one-deep slot, which then rebuilds a block
-        the perturbation could not have changed.  Measured on the trigger cold
-        fit: 63.6 % of column-seam lookups hit at depth 1 against 72.9 % with
-        an unbounded cache, the gap worth 0.29 s of 8.8 s, and |F|² alone —
-        145 µs a build — carrying 0.17 s of it.
+        **The expansion point is pinned, because no depth holds it** (WP-1945,
+        correcting WP-1121).  A column perturbs one parameter and leaves the
+        rest at the expansion point, so a run of columns that do not touch
+        this block all want the *same* base key.  WP-1121 read that as an
+        alternation of two arms and kept two keys, least recently used first.
+        But a phase with two cell columns pushes the base out of two slots, so
+        the next column of that phase rebuilt every block at a state the memo
+        had already built: 129 of trigger's 172 ``lor_size`` columns rebuilt
+        the cell block and |F|², and none does pinned.  A deeper list only
+        moves the edge, since trigger's monoclinic phase has four cell
+        columns.  So
+        :meth:`derivative_bases`, which builds the peaks every column is
+        differenced against, runs its ``phase_peaks`` calls under
+        :func:`_pinning_expansion_point`, and the entry each lookup there
+        returns becomes the slot's ``pin``: replaced by the next expansion
+        point, never by a column.  An entry already on the recent trail moves
+        to the pin unbuilt, which is the accepted step's case (residual at the
+        trial point, then the Jacobian there).
 
-        Depth is capped rather than unbounded because the keys are decoded θ:
-        an unbounded map grows one entry per distinct parameter vector and a
-        fit visits thousands, so it is a leak wearing a cache's clothes.  Two
-        is what the *access pattern* asks for, not a tuning constant — the
-        alternation has two arms, and **depth 8 was measured to build exactly
-        the same 35 596 blocks as depth 2** on the trigger fit, to the call.
-        What the remaining 8 pp of the unbounded figure would take is a key
-        last seen in an *earlier Jacobian*, thousands of lookups ago; no cache
-        that is not a leak reaches it, and reading that gap as headroom is the
-        mistake this note exists to stop.
+        **The two-key measurement that sized the old depth could not have
+        come out any other way.**  The lookup then compared ``held[0]`` and
+        ``held[1]`` and nothing else, whatever ``_MEMO_DEPTH`` was, so depth
+        8 held six keys no lookup ever returned and built exactly the blocks
+        depth 2 built.  For the same reason the gap between depth 1 and an
+        unbounded cache was not keys from an *earlier Jacobian*: it was mostly
+        this one's evicted expansion point.  The lookup now scans every entry.
+
+        What remains is ``recent``, the trail of other keys, capped because
+        the keys are decoded θ: an unbounded map grows one entry per distinct
+        parameter vector and a fit visits thousands, so it is a leak wearing a
+        cache's clothes.  With the pin in place the trail's depth barely
+        matters, measured over nac, cpd-1a, cpd-2 and trigger by WP-1945's
+        replay probe (its handover names the script and holds the tables):
+        9732, 9724 and 9631 block builds on trigger at depth 1, 2 and 8,
+        against 11 428 for the shipped two-key memo.  It stays at 2.  Every count, Rwp and
+        refined value was bit-identical at all three depths, as a memo hit
+        must be.
         """
         cache = cp.scalar_cache
         if cache is None or get_backend().name != "numpy":
             return build()
         key = key_fn()
         held = cache.get(slot)
-        if held is not None:
-            if held[0][0] == key:
-                return held[0][1]
-            if len(held) > 1 and held[1][0] == key:
-                # promote, so an alternation keeps hitting rather than
-                # evicting the arm it is about to want again
-                held[0], held[1] = held[1], held[0]
-                return held[0][1]
+        if held is None:
+            held = cache[slot] = _MemoSlot()
+        pinning = _MEMO_PIN.get()
+        if held.pin is not None and held.pin[0] == key:
+            return held.pin[1]
+        recent = held.recent
+        for i, entry in enumerate(recent):
+            if entry[0] == key:
+                del recent[i]
+                if pinning:
+                    held.pin = entry
+                else:
+                    # most recent first, so the trail evicts its oldest key
+                    recent.insert(0, entry)
+                return entry[1]
         value = build()
         _freeze(value)
-        if held is None:
-            cache[slot] = [(key, value)]
+        if pinning:
+            held.pin = (key, value)
         else:
-            held.insert(0, (key, value))
-            del held[_MEMO_DEPTH:]
+            recent.insert(0, (key, value))
+            del recent[_MEMO_DEPTH:]
         return value
 
     def _atom_key(self, ip: int, values: dict[str, float]) -> tuple:
@@ -1824,6 +2361,20 @@ class CompiledModel:
         return surface_roughness_pitschke(tt_bragg, values[f"{base}.c"],
                                           values[f"{base}.tau"])
 
+    def _intensity_factor(self, ip: int, values: dict[str, float], tt_bragg, d):
+        """Phase ip's ``intensity_factor`` equation at one line, or ``None``.
+
+        **Every site that folds intensity by hand must call this**, for the
+        reason :meth:`_roughness_factor` states: the analytic coordinate, ADP,
+        March and texture columns bypass :meth:`phase_peaks`, and one that
+        skips the factor comes back short by exactly 1/F − 1 (43 % at F = 0.7
+        in the probe that scoped WP-2107).
+        """
+        peq = self.phases[ip].peq
+        if peq is None or not peq.has("intensity_factor"):
+            return None
+        return self.phase_term(ip, "intensity_factor", values, tt_bragg, d=d)
+
     def _peak_widths(self, gam_g: np.ndarray, gam_l: np.ndarray
                      ) -> tuple[np.ndarray, np.ndarray]:
         """(w₁, w₂) from component FWHMs: (Γ, η) for TCHZ, (σ, γ_HWHM) for Voigt."""
@@ -1839,23 +2390,30 @@ class CompiledModel:
         function need".  Under TCHZ ``w1`` already *is* Γ; under the true Voigt
         the pair is (σ, γ_HWHM), which inverts to the component FWHMs exactly
         (:func:`~rietx.model.profiles.voigt.fwhm_to_voigt_params` is two
-        divisions) and then goes through the same TCH quintic.  That last step
-        is the ~1 % approximation ``compile_model`` already relies on for
-        window sizing and FCJ node counts, and for the same reason: the quintic
-        is *fit* to the true Voigt FWHM.
+        divisions) and then goes through Olivero & Longbothum (1977)
+        (:func:`~rietx.model.profiles.voigt.voigt_fwhm`, 0.024 % worst), the width of
+        the shape actually evaluated (WP-1926, decided 2026-10-08).  The TCH
+        quintic (0.43 % worst against the Voigt) stays what
+        :meth:`peak_gamma_eta` returns, because window sizing and FCJ node
+        counts read it under either shape and are frozen per stage.
 
         Evaluate-only, and never in the hot loop — nothing in the residual
         needs a combined width.
         """
+        if self.shape == "voigt":
+            return voigt_fwhm(np.asarray(w1, dtype=np.float64) * GAUSS_FWHM_TO_SIGMA,
+                              2.0 * np.asarray(w2, dtype=np.float64))
         return self.peak_gamma_eta(w1, w2)[0]
 
     def peak_gamma_eta(self, w1: np.ndarray, w2: np.ndarray
                        ) -> tuple[np.ndarray, np.ndarray]:
         """TCHZ (Γ, η) from a :meth:`phase_peaks` width pair, under either shape.
 
-        :meth:`peak_fwhm`'s reading with the mixing parameter beside it, for a
+        The TCH quintic's reading with the mixing parameter beside it, for a
         consumer that sizes a window by ``compile_model``'s rule
-        (:func:`rewindow`).  Evaluate-only, like :meth:`peak_fwhm`.
+        (:func:`rewindow`).  Under ``"voigt"`` its Γ is the quintic, not
+        :meth:`peak_fwhm`'s Olivero-Longbothum width: window sizing keeps the
+        rule ``compile_model`` froze.  Evaluate-only, like :meth:`peak_fwhm`.
         """
         if self.shape == "voigt":
             gam_g = np.asarray(w1, dtype=np.float64) * GAUSS_FWHM_TO_SIGMA
@@ -2095,8 +2653,9 @@ class CompiledModel:
         # exactly what it depends on, which is what a Jacobian column's
         # perturbation is compared against.
         positions = self._memo(
-            cp, "pos", lambda: (cell_key(), self._shift_key(values)),
-            lambda: [self.apparent_two_theta(tt, values)
+            cp, "pos", lambda: (cell_key(), self._shift_key(values),
+                                self._peq_key(ip, values, ("shift",))),
+            lambda: [self.apparent_two_theta(tt, values, phase=ip, d=d)
                      for tt in tt_bragg_lines])
 
         def width_key():
@@ -2109,12 +2668,14 @@ class CompiledModel:
                     float(values[f"phases.{ip}.gauss_size"]),
                     float(values[f"phases.{ip}.gauss_strain"]),
                     float(values[f"phases.{ip}.lor_size"]),
-                    float(self.lor_strain_term(ip, values)))
+                    float(self.lor_strain_term(ip, values)),
+                    self._peq_key(ip, values, WIDTH_TARGETS))
 
         if component == 0:
             widths = self._memo(cp, "widths", width_key,
                                 lambda: self._width_block(ip, values,
-                                                          tt_bragg_lines, aniso))
+                                                          tt_bragg_lines, aniso,
+                                                          d=d))
         else:
             widths = self._memo(
                 cp, "widths_mag",
@@ -2122,7 +2683,7 @@ class CompiledModel:
                          float(values[f"phases.{ip}.magnetic_lor_size"]),
                          float(values[f"phases.{ip}.magnetic_lor_strain"])),
                 lambda: self._width_block(ip, values, tt_bragg_lines, aniso,
-                                          magnetic=True))
+                                          magnetic=True, d=d))
         if self.mode in ("lebail", "pawley"):
             lp_lines = absorb_lines = None
         else:
@@ -2136,6 +2697,17 @@ class CompiledModel:
             absorb_lines = self._memo(
                 cp, "abs", cell_key,
                 lambda: [self._absorption(tt) for tt in tt_bragg_lines])
+        # WP-2107: an ``intensity_factor`` equation, per line since it may
+        # read θ.  Rietveld only: compile refuses one under Le Bail or Pawley,
+        # whose extracted intensities would absorb it.
+        factor_lines = None
+        if cp.peq is not None and cp.peq.has("intensity_factor"):
+            factor_lines = self._memo(
+                cp, "peq_intensity",
+                lambda: (cell_key(),
+                         self._peq_key(ip, values, ("intensity_factor",))),
+                lambda: [self.phase_term(ip, "intensity_factor", values, tt, d=d)
+                         for tt in tt_bragg_lines])
 
         out = []
         for il, lam in enumerate(lams):
@@ -2170,6 +2742,8 @@ class CompiledModel:
                 rough = self._roughness_factor(tt_bragg, values)
                 if rough is not None:
                     intensity = intensity * rough
+                if factor_lines is not None:
+                    intensity = intensity * factor_lines[il]
             # a reflection pushed off the sphere (λ/2d > 1 → NaN position)
             # carries exactly zero intensity: Lp of a NaN angle is NaN, and the
             # masked profile (purity (c)) would otherwise multiply NaN·0
@@ -2624,8 +3198,34 @@ class CompiledModel:
     # ------------------------------------------------------------------
     # analytic Jacobian support
     # ------------------------------------------------------------------
+    def structural_f2_grads(self, ip: int, values: dict[str, float],
+                            xyz_atoms=(), u_atoms=(), biso_atoms=(), occ_atoms=()
+                            ) -> tuple[dict[int, np.ndarray], dict[int, np.ndarray],
+                                       dict[int, np.ndarray], dict[int, np.ndarray]]:
+        """``({j: (N, 3)}, {j: (N, 6)}, {j: (N,)}, {j: (N,)})``: ∂|F_N|² by
+        the coordinates, the U^ij, the Biso and the occupancy of phase ip's
+        atoms (WP-2314).
+
+        Every atom asked for at once, from one expansion of the structure
+        factor (``structure_factor.d_f2_d_sites``), because A is the
+        expensive half and every atom's bracket comes from the same terms.
+        The caller caches it for one Jacobian evaluation, as it does
+        :meth:`moment_f2_grads`.  The coordinate and U^ij arrays are
+        bit-identical to the single-atom kernels'
+        (``tests/test_structural_hoist.py``); the Biso and occupancy arrays
+        are held to their exact oracles (``tests/test_biso_occ_columns.py``).
+        """
+        cp = self.phases[ip]
+        cell = tuple(values[f"phases.{ip}.cell.{k}"]
+                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+        d = d_spacings(cp.reflections.index, *cell)
+        xyz, occ, biso, uaniso, astar = self._site_values(ip, values, cell)
+        return d_f2_d_sites(cp.reflections.hkl, d, cp.sites, xyz, occ, biso,
+                            uaniso, astar, xyz_atoms=xyz_atoms, u_atoms=u_atoms,
+                            biso_atoms=biso_atoms, occ_atoms=occ_atoms)
+
     def coordinate_intensity_grad(self, ip: int, j: int, coeffs: np.ndarray,
-                                  values: dict[str, float]
+                                  values: dict[str, float], f2_grads=None
                                   ) -> list[np.ndarray] | None:
         """Per-line ∂intensity/∂u for a coordinate DOF u of atom j, phase ip.
 
@@ -2637,11 +3237,16 @@ class CompiledModel:
         positions and widths do not depend on coordinates, so the intensity
         scalar is the whole chain.  Le Bail intensities are extracted, not
         computed, so there is nothing to differentiate: returns ``None``.
+
+        ``f2_grads`` is the ``{j: (N, 3)}`` half of :meth:`structural_f2_grads`
+        at these ``values``, when the caller holds it; without it the
+        structure factor is expanded for this one atom.
         """
-        return self._structural_intensity_grad(ip, j, coeffs, values, d_f2_d_xyz)
+        return self._structural_intensity_grad(ip, j, coeffs, values, f2_grads, False)
 
     def adp_intensity_grad(self, ip: int, j: int, coeffs: np.ndarray,
-                           values: dict[str, float]) -> list[np.ndarray] | None:
+                           values: dict[str, float], f2_grads=None
+                           ) -> list[np.ndarray] | None:
         """Per-line ∂intensity/∂u for an anisotropic-ADP DOF of atom j.
 
         The exact analogue of :meth:`coordinate_intensity_grad` with
@@ -2649,8 +3254,9 @@ class CompiledModel:
         constraint block restricted to the atom's six U rows) — see
         ``structure_factor.d_f2_d_uaniso``.  ADPs, like coordinates, move only
         the intensity scalar, not the peak positions or widths.
+        ``f2_grads`` is the ``{j: (N, 6)}`` half of :meth:`structural_f2_grads`.
         """
-        return self._structural_intensity_grad(ip, j, coeffs, values, d_f2_d_uaniso)
+        return self._structural_intensity_grad(ip, j, coeffs, values, f2_grads, True)
 
     def structural_grad_supported(self, ip: int) -> bool:
         """Whether the analytic coordinate/ADP columns are exact for this phase.
@@ -2765,18 +3371,44 @@ class CompiledModel:
             return [moved]
         return [[np.zeros_like(col) for col in moved], moved]
 
-    def _structural_intensity_grad(self, ip: int, j: int, coeffs: np.ndarray,
-                                   values: dict[str, float], kernel
-                                   ) -> list[np.ndarray] | None:
+    def site_intensity_grad(self, ip: int, df2: np.ndarray,
+                            values: dict[str, float]
+                            ) -> list[np.ndarray] | None:
+        """Per-line ∂intensity for a column moving site rows of phase ip only
+        (WP-2314): coordinates, U^ij, Biso and occupancy, of any atoms.
+
+        ``df2`` is the column's ∂|F_N|², already summed over the rows it
+        moves from :meth:`structural_f2_grads`.  Every site row enters the
+        intensity through |F_N|² alone, so the chain is the coordinate
+        columns' (:meth:`_f2_derivative_chain`), with the same nuclear mask.
+        ``None`` where :meth:`structural_grad_supported` says the nuclear
+        derivative is not the whole one (a moment reads both) or outside
+        Rietveld mode, where intensities are extracted.
+        """
         if self.mode != "rietveld" or not self.structural_grad_supported(ip):
             return None
         cp = self.phases[ip]
         cell = tuple(values[f"phases.{ip}.cell.{k}"]
                      for k in ("a", "b", "c", "alpha", "beta", "gamma"))
         d = d_spacings(cp.reflections.index, *cell)
-        xyz, occ, biso, uaniso, astar = self._site_values(ip, values, cell)
-        df2 = kernel(cp.reflections.hkl, d, cp.sites, xyz, occ, biso, j, uaniso, astar
-                     ) @ np.asarray(coeffs, dtype=np.float64)
+        nuc = self._nuclear_mask(ip)
+        if nuc is not None:
+            df2 = df2 * nuc
+        return self._f2_derivative_chain(ip, values, cell, d, df2)
+
+    def _structural_intensity_grad(self, ip: int, j: int, coeffs: np.ndarray,
+                                   values: dict[str, float], f2_grads, adp: bool
+                                   ) -> list[np.ndarray] | None:
+        if self.mode != "rietveld" or not self.structural_grad_supported(ip):
+            return None
+        if f2_grads is None:
+            f2_grads = self.structural_f2_grads(
+                ip, values, *(((), (j,)) if adp else ((j,), ())))[1 if adp else 0]
+        cp = self.phases[ip]
+        cell = tuple(values[f"phases.{ip}.cell.{k}"]
+                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+        d = d_spacings(cp.reflections.index, *cell)
+        df2 = f2_grads[j] @ np.asarray(coeffs, dtype=np.float64)
         # a satellite or a parent-forbidden row has no nuclear structure
         # factor, so it has no derivative of one either — the same mask
         # ``_nuclear_f2`` applies to the forward model, applied here so the
@@ -2796,9 +3428,10 @@ class CompiledModel:
         Everything :meth:`phase_peaks` applies after the structure factor, for
         a parameter that moves only |F|²: scale · multiplicity · P · w · Lp ·
         G · absorption · roughness, with G = E + x·dE/dx where extinction is
-        evaluated.  The coordinate and ADP columns reach it with ∂|F_N|², the
-        moment columns (WP-1327) with ∂(p²⟨|F_⊥|²⟩) — both are terms of the
-        one total |F|² that the non-split draw scales and attenuates.
+        evaluated.  The coordinate, ADP, Biso and occupancy columns reach it
+        with ∂|F_N|², the moment columns (WP-1327) with ∂(p²⟨|F_⊥|²⟩) — both
+        are terms of the one total |F|² that the non-split draw scales and
+        attenuates.
 
         ``f2_total`` is that total, when the caller already holds it; it is
         read only where extinction is evaluated, and built here only then —
@@ -2819,13 +3452,13 @@ class CompiledModel:
         if P is not None:
             d_base = d_base * P
         # extinction couples |F|² into the intensity twice (as the prefactor
-        # and through x ∝ |F|²), so a coordinate/ADP move chains through the
-        # factor G = E + x·dE/dx (see model/extinction.py) — at ext=0, x=0
-        # makes G exactly 1 (purity (b)), so the stage that cannot move ext off
-        # zero skips it exactly as ``phase_peaks`` does, and every other stage
-        # applies it unconditionally.  Only these pure-analytic columns need it
-        # explicitly; the scale/occ/biso/cell/extinction columns pick it up
-        # from the FD-of-phase_peaks chain.
+        # and through x ∝ |F|²), so a coordinate, ADP, Biso or occupancy move
+        # chains through the factor G = E + x·dE/dx (see model/extinction.py)
+        # — at ext=0, x=0 makes G exactly 1 (purity (b)), so the stage that
+        # cannot move ext off zero skips it exactly as ``phase_peaks`` does,
+        # and every other stage applies it unconditionally.  Only these
+        # pure-analytic columns need it explicitly; the scale/cell/extinction
+        # columns pick it up from the FD-of-phase_peaks chain.
         ext = values.get(f"phases.{ip}.extinction", 0.0)
         # the extinction variable x is built from the whole reflection, so the
         # magnetic term belongs in it exactly as it does in ``phase_peaks``
@@ -2854,6 +3487,11 @@ class CompiledModel:
             rough = self._roughness_factor(tt_bragg, values)
             if rough is not None:
                 col = col * rough
+            # a peak equation's intensity factor reads no coordinate, so it
+            # chains through unchanged, as roughness does (WP-2107)
+            factor = self._intensity_factor(ip, values, tt_bragg, d)
+            if factor is not None:
+                col = col * factor
             out.append(col)
         return out
 
@@ -2941,6 +3579,11 @@ class CompiledModel:
             rough = self._roughness_factor(tt_bragg, values)
             if rough is not None:
                 col = col * rough
+            # a peak equation's intensity factor reads no coordinate, so it
+            # chains through unchanged, as roughness does (WP-2107)
+            factor = self._intensity_factor(ip, values, tt_bragg, d)
+            if factor is not None:
+                col = col * factor
             out.append(col)
         return out
 
@@ -2994,6 +3637,12 @@ class CompiledModel:
         if path.startswith("phases."):
             return True
         if path in ("instrument.zero_shift", "instrument.polarization"):
+            return True
+        # an instrument peak equation (WP-2107) moves the drawn position of
+        # every phase's reflections, and through ``two_theta`` whatever a
+        # phase equation reads of it, all per-peak scalars; a declared peak
+        # is drawn where it is declared and never reads it
+        if path.startswith("instrument.peak_equations."):
             return True
         if path.startswith("instrument.geometry.sample_"):
             return True
@@ -3102,7 +3751,7 @@ class CompiledModel:
             axial_derivs = False
         sl = values["instrument.geometry.axial_sl"]
         hl = values["instrument.geometry.axial_hl"]
-        h_pos, h_ax = 1e-5, 1e-7
+        h_pos, h_ax = 1e-5, AXIAL_NODE_STEP
         # d_sl/d_hl exist only while the aberration acts; at both apertures
         # zero the axial columns fall back to FD (``axial_ok``)
         build_axial = axial_derivs and fcj_live(sl, hl)
@@ -3121,9 +3770,13 @@ class CompiledModel:
             if cp.batch_mag is not None:
                 jobs.append((ip, cp, 1, cp.batch_mag))
         for ip, cp, component, lay in jobs:
-            peaks = self.phase_peaks(
-                ip, values, None if intensities is None else intensities[ip],
-                component=component)
+            # the expansion point every peak-chain column of this Jacobian
+            # differences against: pinned, so no run of columns evicts it
+            # (``_memo``, WP-1945)
+            with _pinning_expansion_point():
+                peaks = self.phase_peaks(
+                    ip, values, None if intensities is None else intensities[ip],
+                    component=component)
             if component:
                 peaks_mag[ip] = peaks
             else:
@@ -3183,19 +3836,16 @@ class CompiledModel:
                     pos[rows_b] + h_pos, sl, hl, n)
                 axl = axh = None
                 if d_sl is not None:
-                    axl = fcj_offsets_weights_batch(
-                        pos[rows_b], sl + h_ax, hl, n)
-                    axh = fcj_offsets_weights_batch(
-                        pos[rows_b], sl, hl + h_ax, n)
+                    axl = _aperture_node_derivs(nodes, pos[rows_b], sl, hl,
+                                                n, h_ax, 0)
+                    axh = _aperture_node_derivs(nodes, pos[rows_b], sl, hl,
+                                                n, h_ax, 1)
                 if fast and compiled.bases_fcj(
                         omega, d_pos, d_gamma, d_eta, d_sl, d_hl, lay.x,
                         rows_b, w1, w2, lay.width, nodes[0], nodes[1],
                         (shift[0] - nodes[0]) / h_pos,
                         (shift[1] - nodes[1]) / h_pos,
-                        None if axl is None else
-                        ((axl[0] - nodes[0]) / h_ax, (axl[1] - nodes[1]) / h_ax,
-                         (axh[0] - nodes[0]) / h_ax,
-                         (axh[1] - nodes[1]) / h_ax)):
+                        None if axl is None else (*axl, *axh)):
                     continue
                 for a in range(0, len(rows_b), _BASES_CHUNK_ROWS):
                     rs = rows_b[a:a + _BASES_CHUNK_ROWS]
@@ -3216,8 +3866,7 @@ class CompiledModel:
                     for planes, var in ((d_sl, axl), (d_hl, axh)):
                         if planes is None:
                             continue
-                        dphi = (var[0][s] - phi) / h_ax
-                        dom = (var[1][s] - om) / h_ax
+                        dphi, dom = var[0][s], var[1][s]
                         planes[rs] = (_node_mix(dom, pv)
                                       - _node_mix(om * dphi, ddx))
             # Make the planes scatter-safe for the batched accumulators
@@ -3553,7 +4202,14 @@ class CompiledModel:
     # Pawley intensity block (per-hkl intensities as free parameters)
     # ------------------------------------------------------------------
     def pawley_x0(self) -> np.ndarray:
-        """Current per-hkl intensities, flat in phase order — the block's θ₀."""
+        """Current Pawley columns, flat in phase order — the block's θ₀.
+
+        One per reflection, or a merged group's summed intensity
+        (:attr:`PawleyBlock.merged`, WP-2315).  Outside pawley mode, the
+        per-hkl buffers concatenated.
+        """
+        if self.pawley is not None and not self.pawley.is_identity:
+            return self.pawley.columns_from([cp.hkl_intensity for cp in self.phases])
         return np.concatenate([np.asarray(cp.hkl_intensity, dtype=np.float64)
                                for cp in self.phases]) if self.phases else np.zeros(0)
 
@@ -3574,17 +4230,26 @@ class CompiledModel:
         The hot-loop counterpart of the buffers: the residual/Jacobian
         closures split the θ tail with this and pass the slices through
         ``evaluate``/``derivative_bases``, never touching ``hkl_intensity``.
+        A merged column is spread over its members by equal F²
+        (:meth:`PawleyBlock.expand`, WP-2315).
         """
-        return [vec[a:b] for (a, b) in self.pawley.phase_slices]
+        pb = self.pawley
+        if pb.is_identity:
+            return [vec[a:b] for (a, b) in pb.phase_slices]
+        xp = get_backend()
+        return [pb.expand(vec, ip, xp) for ip in range(len(pb.phase_slices))]
 
     def set_pawley_intensities(self, vec: np.ndarray) -> None:
-        """Commit a flat intensity vector to the at-rest per-phase buffers.
+        """Commit a column vector to the at-rest per-phase buffers.
 
         Called once per solve, after TRF returns — never from inside the
-        residual (purity contract).
+        residual (purity contract).  A merged group's members take its sum
+        split by equal F², the split drawn and never measured (WP-2315).
         """
-        for cp, (a, b) in zip(self.phases, self.pawley.phase_slices, strict=True):
-            cp.hkl_intensity = np.array(vec[a:b], dtype=np.float64)
+        pb = self.pawley
+        for ip, cp in enumerate(self.phases):
+            cp.hkl_intensity = np.array(pb.expand(np.asarray(vec, dtype=np.float64), ip),
+                                        dtype=np.float64)
 
     def pawley_restraint_residual(self, vec: np.ndarray) -> np.ndarray | None:
         """√λ·R·I overlap-restraint rows appended to the residual (or None)."""
@@ -3631,10 +4296,18 @@ class CompiledModel:
     def build_pawley_restraint(self, lam: float = PAWLEY_OVERLAP_LAMBDA) -> None:
         """Build the equal-split restraint rows for the current intensities.
 
-        One row per member of every overlapped group: √λ/s·(δ_kj − 1/n) over the
-        group, where s is the group's current mean intensity.  The rows sum to
-        zero, so they penalise deviations of the *split* from an equal partition
-        while leaving the group *sum* (the data-determined quantity) free.  Run
+        One row per member (column) of every overlapped group:
+        √λ/s·(δ_kj − m_k/Σm) over the group, where s is the group's current
+        mean intensity, floored as the last paragraph says, and m a column's
+        multiplicity (:attr:`PawleyBlock.col_mult`).  The rows sum to zero, so
+        they penalise deviations of the *split* from an equal-F² partition
+        while leaving the group *sum* (the data-determined quantity) free.
+        Equal F² is the equipartition convention: a Pawley intensity is the
+        whole peak, multiplicity included, so equal F² puts each member's
+        share at its multiplicity's (WP-2315; until then the target was equal
+        peak intensity, 1/n, which it still is wherever the multiplicities
+        agree, bit for bit).  A lattice-forced coincidence never reaches these
+        rows, being one column already (:attr:`PawleyBlock.merged`).  Run
         after the intensities are seeded/carried so s reflects a realistic
         scale; constant during the least-squares run, like the background
         penalty.
@@ -3657,25 +4330,54 @@ class CompiledModel:
         overlap rows' large-but-honest answer — while a reflection the data
         do reach has a column far more precise than a prior as wide as the
         strongest reflection.
+
+        **A group's scale is floored relative to its phase, never in intensity
+        units** (WP-2311): s ≥ ``PAWLEY_GROUP_SCALE_FLOOR_REL`` × the phase's
+        largest on-data intensity.  The seed partitions max(y_obs − bkg, 0), so
+        a declared background above the data leaves whole groups on
+        ``LEBAIL_INTENSITY_FLOOR``; an absolute floor of 1e-10 then weighed
+        their rows at 5e9, the equilibrated step could not move the group's
+        sum (free in exact arithmetic, the rows summing to zero), and every
+        later stage rebuilt s from the stuck value.
+
+        **A phase nothing has measured gets no group rows for the stage.**
+        Where every on-data intensity of a phase sits on
+        ``LEBAIL_INTENSITY_FLOOR`` (the seed partitioned nothing under it),
+        there is no intensity to floor against, and any scale written here
+        would be a number of counts.  Its splits are then flat directions for
+        the stage, which the damped step leaves alone and the covariance
+        reports as unmeasured rather than tight; the next stage builds the
+        rows from what this one measured.  Measured on the overlapped Cu-LaB6
+        fixture under a one-stage plan and a background 100× the data: Rwp
+        0.2365 with the rows at 5e9, against 0.1620 from the true start.
         """
         pb = self.pawley
         if pb is None or not (pb.groups or pb.off_data):
             return
         intens = self.pawley_x0()
-        rows: list[np.ndarray] = []
-        for g in pb.groups:
-            s = max(float(np.mean(intens[g])), 1e-10)
-            n = len(g)
-            for k in g:
-                row = np.zeros(pb.n, dtype=np.float64)
-                for j in g:
-                    row[j] = (np.sqrt(lam) / s) * ((1.0 if j == k else 0.0) - 1.0 / n)
-                rows.append(row)
         off = np.zeros(pb.n, dtype=bool)
         off[pb.off_data] = True
+        # each phase's largest on-data intensity: the ridge's width below, and
+        # the group scale's floor relative to it
+        top = np.zeros(pb.n, dtype=np.float64)
         for a, b in pb.phase_slices:
             on = intens[a:b][~off[a:b]]
-            s = max(float(on.max()) if len(on) else 0.0, PAWLEY_OFF_DATA_SCALE_FLOOR)
+            top[a:b] = float(on.max()) if len(on) else 0.0
+        rows: list[np.ndarray] = []
+        for g in pb.groups:
+            if top[g[0]] <= LEBAIL_INTENSITY_FLOOR:
+                continue                 # a phase nothing has measured yet
+            s = max(float(np.mean(intens[g])),
+                    PAWLEY_GROUP_SCALE_FLOOR_REL * float(top[g[0]]))
+            m = np.asarray(pb.col_mult, dtype=np.float64)[g]
+            frac = m / float(np.sum(m))
+            for kk, k in enumerate(g):
+                row = np.zeros(pb.n, dtype=np.float64)
+                for j in g:
+                    row[j] = (np.sqrt(lam) / s) * ((1.0 if j == k else 0.0) - frac[kk])
+                rows.append(row)
+        for a, b in pb.phase_slices:
+            s = max(float(top[a]) if b > a else 0.0, PAWLEY_OFF_DATA_SCALE_FLOOR)
             for k in np.flatnonzero(off[a:b]):
                 row = np.zeros(pb.n, dtype=np.float64)
                 row[a + k] = np.sqrt(lam) / s
@@ -3704,12 +4406,106 @@ class PawleyBlock:
     members of each overlapped group so those splits can be flagged unresolved.
     """
 
-    n: int                                   # total intensities across phases
-    phase_slices: list[tuple[int, int]]      # (start, stop) into the flat vector
-    groups: list[list[int]]                  # overlapped groups (flat idx), size ≥ 2
-    off_data: list[int] = field(default_factory=list)  # centred off the data (flat idx)
+    n: int                                   # intensity columns across phases
+    phase_slices: list[tuple[int, int]]      # (start, stop) into the column vector
+    groups: list[list[int]]                  # overlapped groups (column idx), size ≥ 2
+    off_data: list[int] = field(default_factory=list)  # centred off the data (column idx)
     restraint: np.ndarray | None = None      # (n_rows, n) √λ-scaled restraint rows
-    stderr: np.ndarray | None = None         # per-intensity esd, filled post-solve
+    stderr: np.ndarray | None = None         # per-column esd, filled post-solve
+    #: WP-2315 (ruling R5 (b)).  A column is a reflection, or a group of
+    #: reflections whose d agree in every cell of the setting
+    #: (``CompiledPhase.lattice_groups``), which carries the group's **sum**.
+    #: ``refl_slices`` are each phase's rows of the flat reflection list (the
+    #: per-phase ``hkl_intensity`` buffers concatenated); ``refl_col`` maps a
+    #: flat reflection to its global column and ``share`` gives its fraction of
+    #: that column, mᵢ/Σm (equal F²), and 1 for a column of one reflection.
+    #: ``col_mult`` is each column's multiplicity, the members' summed, which the
+    #: overlap restraint's equal-F² target reads.  ``merged`` lists each merged
+    #: group's flat reflection indices.  Empty arrays only on a hand-built block,
+    #: which then reads as one column per reflection.
+    refl_slices: list[tuple[int, int]] = field(default_factory=list)
+    refl_col: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.intp))
+    share: np.ndarray = field(default_factory=lambda: np.zeros(0))
+    col_mult: np.ndarray = field(default_factory=lambda: np.zeros(0))
+    merged: list[list[int]] = field(default_factory=list)
+    _dense: dict = field(default_factory=dict, repr=False)
+
+    def __post_init__(self) -> None:
+        if not self.refl_slices:          # a hand-built block: one column a reflection
+            self.refl_slices = list(self.phase_slices)
+            self.refl_col = np.arange(self.n, dtype=np.intp)
+            self.share = np.ones(self.n)
+            if not len(self.col_mult):
+                self.col_mult = np.ones(self.n)
+
+    @property
+    def is_identity(self) -> bool:
+        """One column per reflection: the layout before WP-2315, bit for bit."""
+        return not self.merged
+
+    def column_members(self, col: int) -> list[tuple[int, int]]:
+        """(phase index, in-phase reflection index) of every reflection in a column."""
+        for ip, (a, b) in enumerate(self.phase_slices):
+            if a <= col < b:
+                r0, r1 = self.refl_slices[ip]
+                rows = np.flatnonzero(self.refl_col[r0:r1] == col)
+                return [(ip, int(k)) for k in rows]
+        raise IndexError(col)
+
+    def expand(self, vec, ip: int, xp=None):
+        """Phase ip's per-reflection intensities from the column vector ``vec``.
+
+        A phase with no merged group is the plain slice (a view), so a fit
+        that merges nothing runs the arithmetic it always did.  Otherwise
+        each reflection is its column's value times its ``share``: a numpy
+        gather, or on a traced backend a frozen dense map through
+        ``xp.matmul``, since a θ-derived tensor takes no numpy index array
+        on every backend (root ``CLAUDE.md``'s hot-path rule).
+        """
+        a, b = self.phase_slices[ip]
+        r0, r1 = self.refl_slices[ip]
+        local = vec[a:b]
+        if r1 - r0 == b - a:
+            return local
+        cols = self.refl_col[r0:r1] - a
+        share = self.share[r0:r1]
+        if xp is None or getattr(xp, "name", "numpy") == "numpy":
+            return np.asarray(local)[cols] * share
+        dense = self._dense.get(ip)
+        if dense is None:
+            dense = np.zeros((r1 - r0, b - a), dtype=np.float64)
+            dense[np.arange(r1 - r0), cols] = share
+            self._dense[ip] = dense
+        return xp.matmul(xp.asarray(dense, dtype=np.float64), local)
+
+    def columns_from(self, intensities: list[np.ndarray]) -> np.ndarray:
+        """The column vector a set of per-phase reflection buffers sums to."""
+        out = np.zeros(self.n, dtype=np.float64)
+        for ip, buf in enumerate(intensities):
+            a, b = self.phase_slices[ip]
+            r0, r1 = self.refl_slices[ip]
+            buf = np.asarray(buf, dtype=np.float64)
+            if r1 - r0 == b - a:
+                out[a:b] = buf
+            else:
+                out[a:b] = np.bincount(self.refl_col[r0:r1] - a, weights=buf,
+                                       minlength=b - a)
+        return out
+
+    def member_stderr(self, ip: int) -> np.ndarray | None:
+        """Phase ip's per-reflection esds: its column's for a reflection alone,
+        ``inf`` for a member of a merged group, whose own value the data never
+        measured (the absent esd's spelling, ``LSQOutcome.discarded``)."""
+        if self.stderr is None:
+            return None
+        a, b = self.phase_slices[ip]
+        r0, r1 = self.refl_slices[ip]
+        sd = np.asarray(self.stderr, dtype=np.float64)
+        if r1 - r0 == b - a:
+            return sd[a:b].copy()
+        out = sd[self.refl_col[r0:r1]].copy()
+        out[self.share[r0:r1] != 1.0] = np.inf
+        return out
 
 
 @dataclass
@@ -4194,7 +4990,8 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                   restraint_weight_scale: float = 1.0,
                   window_slack_deg: float | None = None,
                   window_area_tol: float | None = None,
-                  orbit_split: list | None = None) -> CompiledModel:
+                  orbit_split: list | None = None,
+                  movement_slack: bool = False) -> CompiledModel:
     """Freeze reflection lists, orbits, windows and FCJ nodes for one stage.
 
     ``moving_paths`` is every parameter the coming stage can move, or ``None``
@@ -4220,11 +5017,22 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
     slack added to every window half-width (``Stage.window_slack_deg`` has
     the two-jobs story); ``None`` — every ordinary caller — is the default.
 
+    ``movement_slack`` sizes that slack per reflection from the position
+    families ``moving_paths`` can move (:data:`WINDOW_MOVE_FWHM`, WP-2317 R7)
+    where no ``window_slack_deg`` is declared.  Only the staged runner's
+    stage compile passes it, since only a solve moves a peak and that runner
+    re-solves a stage whose windows went stale.  Every other compile, a
+    fresh one at an answer included, keeps the uniform
+    :data:`WINDOW_MIN_DEG`, whose tail room the reported statistics were
+    measured with.
+
     ``window_area_tol`` is the area each window may drop from its peak, for the
     phase windows and the declared sharp peaks alike.  ``None`` is
-    ``schemas.plan.CLOSING_WINDOW_TOL``, the fraction an answer is measured
-    at, so a model evaluated outside a fit is the model a default fit's answer
-    came from (WP-2002, the seventh round's Q1).  The plan runner passes
+    ``schemas.plan.CLOSING_WINDOW_TOL``, so a model evaluated outside a fit
+    carries near-complete tails (WP-2002, the seventh round's Q1).  A default
+    fit's answer comes from ``WINDOW_AREA_TOL`` windows since the closing
+    stage went off by default (WP-2222), so rebuilding a fit's own curve
+    passes :func:`recorded_window_tol` of its last stage's record.  The plan runner passes
     ``WINDOW_AREA_TOL`` for a declared stage and the plan's
     ``closing_window_tol`` for its closing stage; a caller rebuilding a stage
     from its record passes :func:`recorded_window_tol` of the recorded value.
@@ -4291,6 +5099,7 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         mask &= window
     tt, y_obs, sigma = tt_all[mask], y_all[mask], s_all[mask]
     sigma_rule = pattern.sigma_rule(window)
+    sigma_uniform = bool(sigma.size) and bool(np.all(sigma == sigma[0]))
     if len(tt) < 10:
         why = ""
         if sigma_rule.n_nonpositive_excluded:
@@ -4344,7 +5153,25 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         hl_eff = max(hl_eff, AXIAL_SIZING_FLOOR)
     fcj_on = fcj_live(sl_eff, hl_eff)
 
+    # WP-2107: the instrument's shift equation, evaluated at the values the
+    # stage compiles from wherever the compile places a peak
+    inst_shift = None
+    inst_values: dict[str, float] = {}
+    for j, eq in enumerate(instrument.peak_equations):
+        inst_shift = compile_equation(eq, "instrument", j)
+        inst_values = {path: eq.coefficients[name].value
+                       for name, path in inst_shift.paths}
+
     def _shift_est(theta: np.ndarray, tt_bragg: np.ndarray) -> np.ndarray | float:
+        shift = _geometry_shift_est(theta, tt_bragg)
+        if inst_shift is not None:
+            shift = shift + evaluate_angle(inst_shift, inst_values,
+                                           theta=np.radians(theta),
+                                           two_theta=tt_bragg + shift)
+        return shift
+
+    def _geometry_shift_est(theta: np.ndarray, tt_bragg: np.ndarray
+                            ) -> np.ndarray | float:
         shift = zero
         if geom.kind == "bragg_brentano":
             s = geom.sample_displacement.value
@@ -4374,6 +5201,7 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
 
     phases: list[CompiledPhase] = []
     restraint_items: list = []
+    restraint_findings: list = []
     for ip, phase in enumerate(structure.phases):
         cell = phase.cell.lengths_angles()
         # The phase's own operation list when it carries one: a child cell
@@ -4385,6 +5213,40 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         group = resolve_group(phase.space_group, phase.symmetry_operations)
         refl = _omit_reflections(generate_reflections(
             group, cell, lam_gen, two_theta_max=hi_eff, two_theta_min=gen_min))
+        # WP-2107: the phase's peak equations, compiled against this list
+        eqs: dict[str, CompiledPeakEquation] = {}
+        peq_values: dict[str, float] = {}
+        if phase.peak_equations:
+            _refuse_peak_equations(phase, ip, mode)
+            for j, eq in enumerate(phase.peak_equations):
+                eqs[eq.target] = compile_equation(eq, f"phases.{ip}", j)
+                peq_values.update({path: eq.coefficients[name].value
+                                   for name, path in eqs[eq.target].paths})
+
+        def _term(target, refl, frame, tt_bragg, drawn):
+            return np.asarray(evaluate_peak_equation(
+                eqs[target], peq_values, frame, d=d_spacings(refl.index, *cell),
+                theta=np.radians(0.5 * tt_bragg), two_theta=drawn), dtype=np.float64)
+
+        if "shift" in eqs and len(refl):
+            # ``generation_window`` runs before any reflection exists, so it
+            # cannot bound a shift in hkl.  The margin is the largest shift
+            # the equation gives over the list generated without it, applied
+            # to both edges and generated once more; every reader filters on
+            # the drawn position, so a superset costs nothing.
+            frame0 = compile_frame(group, refl, cell, list(eqs.values()))
+            widest = 0.0
+            for lam in lams:
+                tt_b = refl.two_theta(cell, lam)
+                moved = _term("shift", refl, frame0, tt_b,
+                              tt_b + _shift_est(0.5 * tt_b, tt_b))
+                moved = moved[np.isfinite(moved)]
+                if moved.size:
+                    widest = max(widest, float(np.max(np.abs(moved))))
+            if widest > 0.0:
+                refl = _omit_reflections(generate_reflections(
+                    group, cell, lam_gen, two_theta_max=min(hi_eff + widest, 180.0),
+                    two_theta_min=max(gen_min - widest, 0.05)))
         # WP-1326: a declared propagation vector adds the satellites at
         # Q = H ± k as a second ReflectionSet, frozen here with the nuclear one
         # and merged into a single list (see ``CompiledPhase.satellites``).
@@ -4475,6 +5337,19 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
             win_mag = np.zeros((n_lines, n, 2), dtype=np.int64)
             fcj_n_mag = np.zeros((n_lines, n), dtype=np.int64)
 
+        # WP-2317 R7: the position families this stage can move for this
+        # phase, which size its windows' movement slack.  ``None`` is the
+        # uniform slack: a caller's declared one, a compile making no claim
+        # (``gate_off_states`` is that test), or a shift equation, whose reach
+        # the families do not describe
+        move_families = (
+            None if (not movement_slack or window_slack_deg is not None
+                     or inst_shift is not None or "shift" in eqs)
+            else moving_position_families(moving_paths if gate_off_states else None,
+                                          ip, geom.kind))
+        slack_shape = (None if move_families is None
+                       else np.zeros((n_lines, n), dtype=np.float64))
+
         def _size_family(win, fcj_n, extra_size: float, extra_strain: float,
                          *, primary: bool):
             """Fill one component's frozen windows and FCJ node counts.
@@ -4491,9 +5366,25 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                 tt_bragg = refl.two_theta(cell, lam)
                 theta = 0.5 * tt_bragg
                 pos = tt_bragg + _shift_est(theta, tt_bragg)
+                # WP-2107: the windows follow the phase's equations, read at
+                # the values the stage compiles from (the forward's own
+                # evaluation, ``model.peak_equations.evaluate``)
+                extra_g2 = extra_l = None
+                if eqs:
+                    drawn = pos
+                    if "shift" in eqs:
+                        pos = pos + _term("shift", refl, frame, tt_bragg, drawn)
+                    if "gauss_fwhm" in eqs:
+                        extra_g2 = _term("gauss_fwhm", refl, frame, tt_bragg, drawn) ** 2
+                    if "gauss_fwhm_squared" in eqs:
+                        sq = _term("gauss_fwhm_squared", refl, frame, tt_bragg, drawn)
+                        extra_g2 = sq if extra_g2 is None else extra_g2 + sq
+                    if "lor_fwhm" in eqs:
+                        extra_l = _term("lor_fwhm", refl, frame, tt_bragg, drawn)
                 g_est = gaussian_fwhm(theta, instrument.profile.u.value,
                                       instrument.profile.v.value, instrument.profile.w.value,
-                                      phase.gauss_size.value, phase.gauss_strain.value)
+                                      phase.gauss_size.value, phase.gauss_strain.value,
+                                      extra_squared=extra_g2)
                 x_l = instrument.profile.x.value + phase.lor_size.value
                 # a Stephens block replaces lor_strain (WP-1467,
                 # CompiledModel.lor_strain_term), so it sizes nothing here
@@ -4504,17 +5395,32 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                     y_l = y_l + extra_strain
                 l_est = lorentzian_fwhm(theta, x_l, y_l,
                                         0.0 if aniso_est is None else aniso_est)
+                if extra_l is not None:
+                    # floored for sizing alone: a negative Γ_L gives a NaN
+                    # width, which would size an empty window and drop the
+                    # reflection unseen (PEAK_WIDTH_NOT_POSITIVE reports it)
+                    l_est = np.maximum(l_est + extra_l, 0.0)
                 # TCHZ combined (Γ, η) is a compile-time proxy for window sizing
                 # and FCJ node counts under *both* shapes: it tracks the true
-                # Voigt FWHM to ~1 % (that is what the TCH quintic is fit to),
+                # Voigt FWHM to 0.43 % at worst (measured, tests/test_voigt.py;
+                # that is what the TCH quintic is fit to),
                 # far inside the area criterion's own resolution.
                 gamma_est, eta_est = tch_gamma_eta(g_est, l_est)
                 if primary:
                     if il == 0:  # primary line drives Pawley overlap grouping
                         tt_primary, fwhm_primary = pos.copy(), gamma_est.copy()
                     on_data[:] |= (pos >= tt_min) & (pos <= tt_max)
-                slack = (WINDOW_MIN_DEG if window_slack_deg is None
-                         else window_slack_deg)
+                if move_families is None:
+                    slack = (WINDOW_MIN_DEG if window_slack_deg is None
+                             else window_slack_deg)
+                else:
+                    # WP-2317 R7: sized from what the stage can move, over
+                    # the reflections the fitted range draws
+                    shape = window_slack_shape(
+                        move_families, theta,
+                        np.isfinite(pos) & (pos >= tt_min) & (pos <= tt_max))
+                    slack_shape[il] = shape
+                    slack = movement_slack_deg(shape, gamma_est, grid_half_step(tt, pos))
                 half = window_fwhm_mult(eta_est, window_area_tol) * gamma_est + slack
                 if fcj_on:
                     half = half + fcj_extent_deg(pos, sl_eff, hl_eff)
@@ -4527,6 +5433,16 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                             fcj_n[il, k] = fcj_node_count(float(pos[k]), float(gamma_est[k]),
                                                           sl_eff, hl_eff, closing=closing_precision)
 
+        frame = None
+        if eqs:
+            frame = compile_frame(group, refl, cell, list(eqs.values()))
+            tt_b = refl.two_theta(cell, lams[0])
+            drawn0 = tt_b + _shift_est(0.5 * tt_b, tt_b)
+            for j, eq in enumerate(phase.peak_equations):
+                check_orbits(eqs[eq.target], peq_values, frame,
+                             d=d_spacings(refl.index, *cell),
+                             theta=np.radians(0.5 * tt_b), two_theta=drawn0,
+                             where=f"phases.{ip}.peak_equations.{j} ({eq.target})")
         _size_family(win, fcj_n, 0.0, 0.0, primary=True)
         if mag_split:
             # The widths the stage can *reach*, not the ones it starts at: a
@@ -4552,7 +5468,9 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         cp = CompiledPhase(reflections=refl, sites=sites, win=win, fcj_n=fcj_n,
                            strain_monomials=strain_monomials,
                            satellites=satellites,
-                           win_mag=win_mag, fcj_n_mag=fcj_n_mag)
+                           win_mag=win_mag, fcj_n_mag=fcj_n_mag,
+                           peq=None if frame is None else PhasePeakEquations(eqs, frame),
+                           window_slack_shape=slack_shape)
         if satellites is not None:
             cp.nuclear_mask = (~refl.is_satellite).astype(np.float64)
         if magnetic_mask is not None:
@@ -4587,6 +5505,7 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         if mode == "pawley":
             cp.tt_primary, cp.fwhm_primary = tt_primary, fwhm_primary
             cp.off_data = ~on_data
+            cp.lattice_groups = _lattice_merge_groups(group, cp)
         # March-Dollase preferred orientation acts on *calculated* structure-
         # factor intensities, so it is a Rietveld-mode correction only — Le Bail
         # and Pawley intensities are empirical and would absorb it.  Freeze the
@@ -4610,7 +5529,8 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         # intensities and never compute the coordinates a bond would need.  The
         # PBC image is frozen for the stage here, at the compile-time cell/coords.
         if mode == "rietveld" and phase.restraints:
-            restraint_items.extend(resolve_phase_restraints(phase, ip, sites, cell))
+            restraint_items.extend(resolve_phase_restraints(
+                phase, ip, sites, cell, restraint_findings))
         phases.append(cp)
 
     # background compilation — always linear: paths + design rows (+ penalty)
@@ -4721,12 +5641,15 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                     "PeakComponent.")
 
     pawley = _build_pawley_block(phases) if mode == "pawley" else None
-    restraints = CompiledRestraints(restraint_items) if restraint_items else None
+    restraints = (CompiledRestraints(restraint_items, restraint_findings)
+                  if restraint_items else None)
 
     return CompiledModel(
         tt=tt, y_obs=y_obs, sigma=sigma, tt_min=tt_min, tt_max=tt_max,
         sigma_measured=pattern.sigma is not None,
         sigma_rule=sigma_rule,
+        reader_notes=tuple(pattern.diagnostics),
+        sigma_uniform=sigma_uniform,
         wavelength=instrument.source.primary_wavelength,
         line_wavelengths=lams,
         harmonic_orders=harmonic_orders,
@@ -4754,7 +5677,30 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         window_area_tol=float(window_area_tol),
         window_slack_deg=float(WINDOW_MIN_DEG if window_slack_deg is None
                                else window_slack_deg),
+        inst_shift=inst_shift,
     )
+
+
+def _refuse_peak_equations(phase, ip: int, mode: str) -> None:
+    """Refuse a phase's peak equations where the compile cannot honour them.
+
+    An ``intensity_factor`` under Le Bail or Pawley would be absorbed by the
+    extracted intensities and leave its coefficients flat, so it is refused
+    there.  A satellite reflection is labelled by its order, not by an hkl the
+    orbit images and ``harmonic`` could read, so a phase with a propagation
+    vector takes none (WP-2107).
+    """
+    if mode != "rietveld" and any(eq.target == "intensity_factor"
+                                  for eq in phase.peak_equations):
+        raise ValueError(
+            f"phases.{ip} ({phase.name!r}): an intensity_factor peak equation "
+            f"under {mode}, whose extracted intensities would absorb it. Drop "
+            "the equation for this fit, or fit in Rietveld mode")
+    if phase.propagation_vector is not None:
+        raise ValueError(
+            f"phases.{ip} ({phase.name!r}): peak equations on a phase with a "
+            "propagation vector. A satellite reflection carries no hkl of the "
+            "phase's lattice for the equation to read")
 
 
 def window_sizing(model: CompiledModel, values: dict[str, float],
@@ -4769,7 +5715,7 @@ def window_sizing(model: CompiledModel, values: dict[str, float],
     ``compile_model``'s rule: a half-width of k(η)·Γ plus the slack, plus the
     FCJ extent while the aberration acts.  It reads the peaks the forward
     model draws at ``values`` (``phase_peaks``) where the compile reads its
-    own width estimate, so the two agree to that estimate's ~1 % and not to
+    own width estimate, so the two agree to that estimate's 0.43 % and not to
     the bit; k(η) comes off :func:`window_fwhm_mult_interp`'s table.  The
     arrays have the compile's shapes, so a caller can compare them with
     ``CompiledPhase.win`` and ``.fcj_n`` before building anything.  The
@@ -4800,7 +5746,12 @@ def window_sizing(model: CompiledModel, values: dict[str, float],
                 model.phase_peaks(ip, values, component=component)):
             pos = np.asarray(pos, dtype=np.float64)
             gamma, eta = model.peak_gamma_eta(w1, w2)
-            half = window_fwhm_mult_interp(eta, tol) * gamma + model.window_slack_deg
+            # the compile's slack rule at these widths (WP-2317 R7)
+            slack = (model.window_slack_deg if cp.window_slack_shape is None
+                     else movement_slack_deg(cp.window_slack_shape[il],
+                                             np.asarray(gamma, dtype=np.float64),
+                                             grid_half_step(tt, pos)))
+            half = window_fwhm_mult_interp(eta, tol) * gamma + slack
             if fcj_on:
                 half = half + fcj_extent_deg(pos, sl, hl)
             valid = np.isfinite(pos) & np.isfinite(half)
@@ -4880,27 +5831,99 @@ def _overlap_groups(tt: np.ndarray, fwhm: np.ndarray) -> list[list[int]]:
     return groups
 
 
+def _lattice_merge_groups(group, cp: CompiledPhase) -> list[list[int]]:
+    """The phase's lattice-forced coincidences that become one Pawley column.
+
+    ``symmetry.lattice_coincidences`` finds the reflections whose d agree in
+    every cell the setting allows (WP-2315, ruling R5 (b)).  Their peaks are
+    then drawn at one position with one width, so the pattern sees only the
+    group's summed intensity, and the column carries that sum.
+
+    **A phase whose model can tell the members apart keeps one column per
+    member**, with the overlap restraint of :meth:`CompiledModel.
+    build_pawley_restraint` on them.  In Pawley mode an intensity is drawn as
+    ``hkl_intensity`` × the line weight (:meth:`CompiledModel.phase_peaks`):
+    no Lp, texture, extinction or absorption factor enters, so the members of
+    a group differ only where a term reads hkl rather than d or θ.  Three do,
+    and each declines the merge for the whole phase, present or free:
+
+    * a Stephens block (``strain_monomials``): Λ(hkl) differs between 333
+      and 511, or between hkl and khl under 4/m, so the widths differ;
+    * a peak equation (``peq``), which may read h, k, l or a direction
+      (``model.peak_equations.ReflectionFrame``);
+    * satellites or a magnetic component (``nuclear_mask``), whose rows are
+      not lattice points of the nuclear metric.
+
+    Every other width and position term is a function of θ or d.
+    """
+    if (cp.strain_monomials is not None or cp.peq is not None
+            or cp.nuclear_mask is not None or cp.magnetic is not None):
+        return []
+    return lattice_coincidences(group, cp.reflections.hkl)
+
+
 def _build_pawley_block(phases: list[CompiledPhase]) -> PawleyBlock:
     """Assemble the flat intensity layout and overlapped-group list.
+
+    One column per reflection, except that each of a phase's
+    ``lattice_groups`` is one column carrying the group's summed intensity
+    (WP-2315).  Columns follow the reflection order, a merged group at its
+    first member's place, so the block of each phase stays contiguous.  The
+    overlap groups (``_overlap_groups``) and the off-data list are mapped onto
+    those columns.
 
     The restraint rows themselves are built later (once the intensities are
     seeded to a realistic scale) by ``CompiledModel.build_pawley_restraint``.
     """
     phase_slices: list[tuple[int, int]] = []
+    refl_slices: list[tuple[int, int]] = []
     groups: list[list[int]] = []
     off_data: list[int] = []
+    merged: list[list[int]] = []
+    refl_col: list[np.ndarray] = []
+    shares: list[np.ndarray] = []
+    col_mult: list[np.ndarray] = []
     offset = 0
+    r_offset = 0
     for cp in phases:
         n = len(cp.reflections)
-        phase_slices.append((offset, offset + n))
+        mult = np.asarray(cp.reflections.multiplicity, dtype=np.float64)
+        # the column of each reflection: its own, or its group's first member's
+        lead = np.arange(n)
+        for g in cp.lattice_groups:
+            lead[g] = g[0]
+            merged.append([r_offset + k for k in g])
+        firsts = np.unique(lead)
+        local = np.searchsorted(firsts, lead)          # reflection → local column
+        n_col = len(firsts)
+        m_col = np.bincount(local, weights=mult, minlength=n_col)
+        # equal F² within a group: a Pawley intensity is the whole peak, so
+        # each member's share of the column is its multiplicity's
+        share = np.ones(n, dtype=np.float64)
+        for g in cp.lattice_groups:
+            share[g] = mult[g] / m_col[local[g[0]]]
+        phase_slices.append((offset, offset + n_col))
+        refl_slices.append((r_offset, r_offset + n))
+        refl_col.append(offset + local)
+        shares.append(share)
+        col_mult.append(m_col)
         if cp.tt_primary is not None and n:
             for g in _overlap_groups(cp.tt_primary, cp.fwhm_primary):
-                groups.append([offset + k for k in g])
+                cols = sorted({int(offset + local[k]) for k in g})
+                if len(cols) >= 2:
+                    groups.append(cols)
         if cp.off_data is not None:
-            off_data.extend(offset + int(k) for k in np.flatnonzero(cp.off_data))
-        offset += n
+            off_data.extend(sorted({int(offset + local[k])
+                                    for k in np.flatnonzero(cp.off_data)}))
+        offset += n_col
+        r_offset += n
+    def cat(parts, dt):
+        return np.concatenate(parts).astype(dt) if parts else np.zeros(0, dtype=dt)
+
     return PawleyBlock(n=offset, phase_slices=phase_slices, groups=groups,
-                       off_data=off_data)
+                       off_data=off_data, refl_slices=refl_slices,
+                       refl_col=cat(refl_col, np.intp), share=cat(shares, np.float64),
+                       col_mult=cat(col_mult, np.float64), merged=merged)
 
 
 def seed_phase_scales(structure: Structure, instrument: Instrument,

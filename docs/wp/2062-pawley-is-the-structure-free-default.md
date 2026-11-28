@@ -2,8 +2,8 @@
 
 Milestone: unscheduled · Status: ⬜
 Track: What fires, and what stays silent
-Depends on: 2011 (the indexer's validation, built provisionally as Pawley); 1910 soft (the extinction screen's fits)
-Priority: P2 2026-11-01 — decided: Pawley at every site, its known bugs fixed first; A1 already sends every `index_pattern` user through Pawley, unit dependence included
+Depends on: 2011 (the indexer's validation, built provisionally as Pawley); 2311 (the unit dependence, its first bug task); 1910 soft (the extinction screen's fits)
+Priority: P2 2026-11-26 — WP-2311 fixed the unit dependence and left decision 0 standing, so its remaining bug tasks come next; A1 already sends every `index_pattern` user through Pawley
 
 ## Goal
 
@@ -159,6 +159,104 @@ above, which come from lab and synchrotron single-phase patterns
 
 ### Inherited
 
+- **2026-11-28, from the issue triage (#1852, a bug in an output): the sum
+  `PAWLEY_OVERLAP_UNRESOLVED` names as the datum has no esd anywhere.** The
+  diagnostic says "Use the group's summed intensity as the datum". The fit
+  forms the full covariance of table and intensities, then keeps the
+  intensities' esds (`model.pawley.stderr = stderr_full[n_table:]`) and slices
+  the correlation to the table block (`corr_full[:n_table, :n_table]`,
+  `optimize/least_squares.py:3910-3914` at `02341ffdb`; the blocked path does
+  the same). `_pawley_unresolved_diagnostics` (`refine.py:10560`) reads only the
+  per-member esds. So a caller can form only √(σ₁² + σ₂²). The reporter's
+  synthetic case (`P m m m`, a = 5.000, b = 5.003 Å, the (0 1 2)/(1 0 2) pair):
+  ρ = −0.919, the sum's esd from the covariance 2.98, the caller's √(σ₁² + σ₂²)
+  10.29, so the caller's number overstates the datum's uncertainty 3.5×. Their
+  numbers, not re-run here; the code path is as they describe. The reporter
+  offers (a) the group's sum and its esd gᵀCg on the diagnostic or on a typed
+  overlap-group row, or (b) the intensity block of the correlation, or a
+  `sum_esd(indices)` helper, on the result. Rule 4 ("the statistic travels with
+  any verdict") leans to (a): the verdict is the group's, so its statistic rides
+  with it. That is an API shape the session working this settles under Rules 4
+  and 5. A bug task beside the two absolute floors below.
+- **2026-11-27, from WP-2317: on a large cell Pawley is 3-7× faster than Le Bail
+  and lands at a third of its Rwp.**
+  - Measured on a synthetic 12 × 36 × 4 Å cell (one run each, Linux, `[dev]`):
+    Pawley 23.7 s, Rwp 0.045 against Le Bail 154.9 s, Rwp 0.151 at 899
+    reflections; Pawley 125.4 s, 0.042 against Le Bail 351.8 s, 0.145 at 1 601.
+  - WP-2317 puts Rule 5's Le Bail fence (R3) to the maintainer, including
+    whether "route a large cell to Pawley" is the answer for a user at the wall
+    on Le Bail. That would close WP-2316 on its angle 9. *Ruled 2026-11-27: the
+    fence is lifted and Le Bail follows practice, so WP-2316 proceeds. This WP's
+    route (a), Pawley as the default where rietx picks, is unchanged.*
+  - WP-2316 task 1 asks why Le Bail lands so much worse here. Its answer may
+    bear on this WP's site-by-site choice. *Answered 2026-11-27 by WP-2316:
+    the threefold Rwp came from the probe's unseeded background, so the
+    "third of its Rwp" above does not hold for a fit seeded as the skill
+    says (seeded Chebyshev: Le Bail 0.047, Pawley 0.044). What does bear
+    on this WP: a Pawley fit started from Le Bail's wrong answer climbs
+    back to 0.0445, while a Le Bail partition at that answer settles at
+    0.1395 whatever intensities it starts from. Pawley's joint solve leaves the valley the unseeded start
+    leads into, and Le Bail's alternation of partition and solve does not.*
+  - WP-2315 (filed, not started) plans to make the large Pawley step faster.
+- **2026-11-26, from WP-2311 (closed): the unit dependence is fixed, decision 0
+  stands, and this WP is unblocked.** The 2026-10-28 reading was a start
+  dependence. The probe rescaled the data but left the declared background in
+  counts, and the equal-split restraint's absolute 1e-10 floor then locked the
+  overlap groups the seed had emptied. On real data, groups that collapsed in
+  the first stage locked the same way (NAC −1.8e-4 Rwp, magnetite −6.3e-4,
+  counts and scaled units now agree). Fixed by
+  `PAWLEY_GROUP_SCALE_FLOOR_REL`; a phase with nothing measured gets no group
+  rows for the stage. Two absolute floors remain in the Pawley path, both for
+  this WP's bug list:
+  - **For Yue:** `PAWLEY_OFF_DATA_SCALE_FLOOR` = 1.0 is in counts and binds on
+    a pattern scaled to a maximum of 1. That is a 5.7e-6 Rwp gap on zircon's
+    true cell and 7e-7 on corundum's, and none at 1e-10 (WP-2311 Finding 4).
+    It is tier 3 at 1.0 by WP-2011 ruling 3. A relative form needs an anchor
+    for a phase with no measured on-data intensity, and the ruling is yours.
+  - `_pawley_unresolved_diagnostics` (`model/forward.py`) divides each esd by
+    max(|I|, 1e-10). In small enough units that floor decides
+    `PAWLEY_OVERLAP_UNRESOLVED`. Unmeasured: nothing in WP-2311's probes
+    reached it.
+
+  And one start dependence that is not the restraint's (WP-2311 Finding 6).
+  A one-stage Pawley plan (background, cell, w and the shift freed together)
+  from a declared background 70× above the data reads Rwp 0.449 against
+  0.162, with or without the group rows. The seed leaves 19 of 20 reflections
+  on the partition floor, and the joint solve lands in another basin. Staged
+  plans that refine the background first recover. The seed is one Le Bail
+  partition against the declared background. Whether it should partition
+  against a fitted background, or the plan should always lead with the
+  background, is this WP's to decide before Pawley reaches a site where a
+  caller's own one-stage plan meets a bad background.
+
+- **2026-11-26, from WP-2311: the unit dependence is its own WP.** At Yue's request, this
+  WP's first bug task (synthetic LaB6's true cell at Rwp 0.164 on counts and 0.262 rescaled)
+  moved to WP-2311, and this WP now depends on it. That task has its own goal, its own suspects
+  and a scale-invariance test to land. The bugs-first order is unchanged: no site here moves
+  before WP-2311 closes, and if WP-2311 finds the dependence belongs to the method, decision 0
+  goes back to Yue.
+  Read on `main` at `68dae52c` while filing it, not ticked here: WP-2076's PR #1460 (merged)
+  looks like it has delivered two of this WP's open tasks. `indexing/extinction.py` sets
+  `SCREEN_MODE = "pawley"` for the shared, reference and class fits, and `hamilton_justified`
+  is passed `n_free_parameters` alone (`:1527`). Only the cell-free prefit is still Le Bail
+  (`:1083`). The next session on this WP checks both against its task lines and ticks them.
+
+- **2026-11-19, from WP-2219: a Pawley fit's discarded direction is never named.**
+  `staged.py`'s guard skips every solve with `outcome.n_aux`, because the intensity block
+  lies outside `outcome.jac`. So `COVARIANCE_DIRECTION_DISCARDED` cannot fire on a Pawley
+  fit. WP-2219 owns the fix, which tests the augmented matrix. Once Pawley is the
+  default, read that WP's Pawley count before quoting Pawley esds as complete.
+  **Update 2026-11-21, from WP-2219 (PR #1718, merged):** the guard now tests the matrix
+  augmented by the intensity block, so a Pawley solve's discarded direction is named and its
+  parameters carry no esd. Over the full suite, 357 Pawley solves discarded a direction and
+  touched 6 758 intensity columns: 5 800 in overlap groups, 423 off the data and 535 in
+  neither. WP-2230 owns the 535.
+  **Update 2026-11-21, from WP-2230 (PR #1736):** the 535 were a subtraction artefact, so
+  nothing here grows. The 423 off-data intensities were also inside the 5 800. The other 958
+  came from one joint Pawley fit, whose block the probe could not see. They are the cubic
+  (330)/(411) coincidence, grouped and centred just past the data's end. On the merged tree
+  every touched intensity sits in an overlap group, and none is cross-phase.
+
 - **2026-11-15, from the issue triage (issue #1552): the Le Bail partition clips each
   channel's net count at zero, and that biases the intensities up and the background
   down. Decide it or retire it with this move.** `lebail_update` hands the reflections
@@ -190,6 +288,8 @@ above, which come from lab and synchrotron single-phase patterns
   The arm was retired to this WP on 2026-11-13, settled by Claude under Yue's
   2026-11-05 ruling, and Yue raised no objection. If this WP retires Le Bail from the
   structure-free sites, the joint refusal is already the end state and needs no work.
+
+- **2026-11-08, from the issue triage (#1451): the empty-phase refusal does not name the structure-free route.** `Phase(atoms=[])` raises `phase 'bare' has no atoms` (`schemas/structure.py:1762`). The rule stands (the `lebail_scaffold` docstring: "The dummy atom is mandatory, not a convenience"), but the message names no way out. `rietx.schemas.structure.lebail_scaffold` (`:1974`), which both structure-free modes use, is not a top-level export, and the manual names it once (`docs/docs/start/first-fit.md:230`). An agent needing a bare-cell phase for an approximant Le Bail met only the refusal and wrote a dummy site by hand. Checked against the tree at `63d7c120a`: the issue's snippet raises that `ValidationError` and `hasattr(rietx, "lebail_scaffold")` is `False`. The reporter's suggestion: keep the rule, have the refusal name `lebail_scaffold(space_group, cell)` and say the lebail and pawley modes hold its dummy atom fixed, and export the scaffold beside `Phase`. The message is cheap. A top-level export grows the public surface (`tests/api_surface.py` partition, the skill's API page at its cap), so it is the maintainer's call, best made with decision 3's rename, which keeps `lebail_scaffold`'s name.
 
 - **From WP-1542, 2026-11-05: whether a Le Bail result's final compile should
   re-partition. Decide it or retire it with this move.** `_final_compile` carries the
@@ -337,6 +437,53 @@ above, which come from lab and synchrotron single-phase patterns
   was written to follow the site choice): WP-1542 drops one priority rung,
   P2 to P3. A user who picks `mode="lebail"` still meets its background.
 
+**The record, 2026-11-23.** The first entry is Yue's ruling. Claude settled the
+others. An earlier settlement by Claude is evidence for a later session, never a
+ruling.
+
+- **Ruled 2026-11-23 (Yue), on the indexing GUI:** "the default structure-free
+  fit should be pawley." Yue gave it during WP-2240's review of the indexing
+  workflow. It agrees with decisions 0 and 1 of 2026-11-01. Its text names no
+  site and no order of work.
+- **B2, B1 and C move to Pawley, after this WP's open bug tasks.** B2 is the
+  wizard's `modeFor` (`gui/src/lib/wizard.ts:313`), which picks `lebail` for a
+  typed cell. B1 is `POST /api/index/adopt` when the request names no mode
+  (`gui/session.py:3087`). C is `docs/skill/rietx/SKILL.md`'s advice that Le Bail
+  "is for a cell without a trusted structure" (`:84`). The bug tasks come first,
+  and the unit dependence comes first among them. The 2026-11-23 ruling does not
+  lift decision 0's bugs-first order. Reading it as a waiver would amend
+  decision 0, and that call is Yue's. Until the bugs are fixed, a skill row
+  sending agents to Pawley would send them to `compare_rivals`, which raises
+  there. Settled by Claude under decisions 0 and 1 and the 2026-11-23 ruling,
+  2026-11-23; checked blind.
+- **The extinction screen's cell-free prefit (part of A2) is measured before it
+  moves.** WP-2076 left the prefit on Le Bail and called its move a new
+  question, with eleven screens as its bar (§ Inherited, 2026-11-07). Decision 0
+  covers A2, so the direction is decided. Measure the prefit under Pawley on
+  those eleven screens first. It lands after the bug tasks, like every site. If
+  a ranking regresses, the move goes back to Yue. Settled by Claude under
+  decisions 0 and 1, with WP-2076's note as the bar, 2026-11-23; checked blind.
+- **Report layer 0's `lebail_gap` stays on Le Bail.** It is no fit a user is
+  given. It partitions the intensities once at the converged Rietveld state and
+  runs no least squares (`report/layer0.py:214-252`). § Context already lists it
+  among the names that stay true either way. Moving it would add a solve to every
+  Rietveld report and change a number on each, which changes a default for every
+  user. Settled by Claude under this WP's definition of a site, 2026-11-23;
+  checked blind.
+- **`validate_by_lebail` runs Pawley, and the whole `lebail` family is renamed
+  in one change.** The family is decision 3's list. No name in it is renamed
+  alone. The change lands after the unit-dependence task, because that task can
+  reopen decision 0 and return A1 to Le Bail. If a renamed field is stored in a
+  document, its migration is a stored-format change, and that goes to Yue.
+  Decision 3's reader-output step stands. Settled by Claude under the 2026-10-28
+  ruling that the names break once and the 2026-11-23 ruling that API naming is
+  Claude's call, 2026-11-23; checked blind.
+- **The three tier-3 Pawley constants reopen when the first of B1, B2, C or the
+  prefit lands.** They are `PAWLEY_OVERLAP_FWHM_FRAC`, `PAWLEY_OVERLAP_LAMBDA`
+  and `PAWLEY_OFF_DATA_SCALE_FLOOR`. This names the trigger for the last task
+  below. Settled by Claude under that task and the generality rule
+  (`docs/milestones/generality.md` § The rule), 2026-11-23; checked blind.
+
 ## Tasks
 
 - [x] Fill § Practice from the survey, and add its section to
@@ -344,10 +491,17 @@ above, which come from lab and synchrotron single-phase patterns
 - [x] The maintainer's five decisions (0-4), each recorded as `Decided YYYY-MM-DD:`.
       Recorded 2026-11-01 above: 0 and 1 decided by the maintainer, 1's D and
       2-4 settled by Claude.
-- [ ] Find the unit dependence: synthetic LaB6's true cell validates at Rwp
-      0.164 on raw counts and 0.262 with pattern and σ divided by the maximum
-      count, where Le Bail reads 0.2339 and 0.2338. Fix it, or show it belongs
-      to the method and bring decision 0 back.
+- [x] The unit dependence, **moved to WP-2311 on 2026-11-26**: synthetic
+      LaB6's true cell validates at Rwp 0.164 on raw counts and 0.262 with
+      pattern and σ divided by the maximum count, where Le Bail reads 0.2339
+      and 0.2338. Tick this when WP-2311 closes. If it shows the dependence
+      belongs to the method, decision 0 comes back to Yue. *(2026-11-26,
+      WP-2311: not a unit dependence, and not the method's. The probe rescaled
+      the data but left the declared background in counts, so the fit started
+      from a background up to 100× above the data. The seed then emptied whole
+      overlap groups, and the equal-split restraint's absolute 1e-10 floor
+      locked them. Fixed by `PAWLEY_GROUP_SCALE_FLOOR_REL`; decision 0 stands.
+      WP-2311 § Findings.)*
 - [ ] The extinction screen's Hamilton test adds `n_lines + n_free_parameters`
       (`indexing/extinction.py:1137-1141`), and Pawley's `n_free_parameters`
       already counts the intensities. Count them once, before A2 moves.
@@ -386,6 +540,18 @@ green, and no ranking or class decision on the acceptance suites lost.
   issue #740, WP-1910, WP-1953 (large Pawley stages), WP-2011.
 
 ## Handover log
+
+- **2026-11-23** — decisions recorded, nothing run. Yue ruled on the indexing
+  GUI that the default structure-free fit should be Pawley. That agrees with
+  decisions 0 and 1. Claude settled five consequences, in § Decisions, the
+  record of 2026-11-23. Sites B1, B2 and C move after the bug tasks. The prefit
+  is measured on WP-2076's eleven screens first. `lebail_gap` stays. The
+  `lebail` names are renamed together after the unit-dependence task. The
+  Pawley constants reopen with the first site that lands. A first check and a
+  blind second check agreed on each (maintainer-local,
+  `~/.cache/ghostshift/rietx/decision-check-2026-11-23/`). Recorded by a
+  ghostshift runner. No task was ticked or reordered. *Next:* the unit
+  dependence, as before.
 
 - **2026-11-02** — the five decisions are recorded (§ Decisions, the record
   of 2026-11-01). The maintainer chose Pawley as the end state at every site

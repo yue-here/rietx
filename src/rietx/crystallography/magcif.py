@@ -735,6 +735,8 @@ def read_magnetic_symmetry(block, text: str, path: str, *,
     names and the ``transform_BNS_Pp_abc`` string carried as the metadata they
     are.  The parent k is not stored: a file that reaches here states k = 0 or
     none (:func:`refuse_a_magnetic_supercell` refuses every other k first).
+    A stated BNS or OG number the operators do not generate is refused, never
+    stored or replaced (:func:`_check_stated_numbers`).
 
     ``uni_number`` is *derived* rather than read: no magCIF states one and
     MAGNDATA does not either, but it is a deterministic function of the
@@ -782,7 +784,7 @@ def read_magnetic_symmetry(block, text: str, path: str, *,
     symbol = _value(block, "_space_group_magn.name_BNS")
     if found is not None:
         bns, og, symbol = _check_stated_numbers(
-            found, bns, og, symbol, path, len(centerings),
+            found, bns, og, symbol, path, list(operations), list(centerings),
             diagnostics=diagnostics)
     return MagneticSymmetry(
         operations=list(operations),
@@ -796,53 +798,87 @@ def read_magnetic_symmetry(block, text: str, path: str, *,
 
 
 def _check_stated_numbers(found, bns: str | None, og: str | None,
-                          symbol: str | None, path: str, n_centerings: int, *,
+                          symbol: str | None, path: str,
+                          operations: list[str], centerings: list[str], *,
                           diagnostics: list[Diagnostic] | None):
-    """The BNS/OG numbers and BNS name to store, checked against the operators (#605).
+    """The BNS/OG numbers and BNS name to store, or a refusal (#605, #193 3b).
 
     ``found`` is what :func:`~rietx.crystallography.magnetic.operators.identify`
     makes of the file's own operator list.  A BNS or OG number is a label of
     the group's *type*, the same in every setting, so a stated number that is
-    not ``found``'s contradicts the operators beside it.  The operators are the
-    model (D-4) and the numbers metadata, so the operators' own numbers are
-    stored and ``CIF_MAGNETIC_NUMBER_MISMATCH`` (warning) names both.  The
-    stated ``name_BNS`` is kept only while every stated number agrees: no
-    dependency here maps a symbol to a group, so a name cannot be checked on
-    its own, and one written beside a contradicted number is no more
-    trustworthy than the number.  A number the file does not state is left
-    unstated, which keeps the stored record what the file said wherever it
-    agrees with itself.
+    not ``found``'s contradicts the operators beside it, and a file in a
+    non-standard setting of its stated group is no mismatch.  A number the
+    file does not state is left unstated, which keeps the stored record what
+    the file said.
 
-    The reader cannot tell which side is wrong.  A mistyped number (136.498
-    beside the 136.499 operators) leaves the operators right; a forgotten
-    anti-centring in the centring loop leaves the number right and the
-    operators a different, smaller group (12.62 stated, 10.46 read).  So the
-    message says both, and a group that cannot be named (``identify`` raises)
-    is not checked at all.
+    **A contradiction is refused, never resolved** (#193 amendment 3b, which
+    reversed #605's warning; the nuclear reader's twin is #913).  The reader
+    cannot tell which side is wrong.  A mistyped number (62.447 beside the
+    62.448 operators) leaves the operators right; a forgotten anti-centring
+    in the centring loop leaves the number right and the operators a
+    different, smaller group (12.62 stated, 10.46 read), and storing the
+    operators' number then let a model built on the wrong group go on into a
+    fit.  So nothing is stored: :class:`MagCifError` names the file, each
+    stated number with its tag, and the group the loops generate, and
+    ``CIF_MAGNETIC_NUMBER_MISMATCH`` (error) goes on ``diagnostics`` first.
+    Beside them it states each side's operation count per cell, the stated
+    group's in its standard setting, because that count is what separates the
+    two causes: a forgotten centring line halves the loops' count while a
+    mistyped number leaves the two equal.  Which line to correct is the
+    caller's, who has the source of the file.  A group ``identify`` cannot
+    name is not checked at all (the caller passes no ``found``).
     """
     stated = {"number_BNS": (bns, found.bns_number),
               "number_OG": (og, found.og_number)}
-    wrong = {tag: pair for tag, pair in stated.items()
-             if pair[0] is not None and pair[0] != pair[1]}
+    wrong = {tag: s for tag, (s, d) in stated.items()
+             if s is not None and s != d}
     if not wrong:
         return bns, og, symbol
+    named = " and ".join(f"_space_group_magn.{tag} {s!r}"
+                         + (f" (name_BNS {symbol!r})"
+                            if tag == "number_BNS" and symbol is not None else "")
+                         for tag, s in wrong.items())
+    sizes = "; ".join(_stated_group_size(tag, s) for tag, s in wrong.items())
+    loops = (f"the file's loops list {len(operations)} operation"
+             f"{'' if len(operations) == 1 else 's'} × {len(centerings)} "
+             f"centring{'' if len(centerings) == 1 else 's'} = "
+             f"{len(operations) * len(centerings)}")
+    message = (
+        f"{path} states {named}, but its _space_group_symop_magn_operation and "
+        f"_space_group_symop_magn_centering loops generate BNS "
+        f"{found.bns_number} (OG {found.og_number}, UNI {found.uni_number}). "
+        f"A group number names one group in every setting, so the two "
+        f"contradict each other. {sizes}; {loops}.")
+    fix = " and ".join(f"{tag} to {stated[tag][1]}" for tag in wrong)
+    suggestion = (
+        f"If the loops are the source's, set {fix}; if the number is, correct "
+        f"the operation or centring loop to the source's.")
+    record = Diagnostic(
+        level="error", code="CIF_MAGNETIC_NUMBER_MISMATCH",
+        where=["phases.0.magnetic_symmetry.bns_number"],
+        message=message, suggestion=suggestion)
     if diagnostics is not None:
-        named = "; ".join(f"_space_group_magn.{tag} {s!r} against {d!r}"
-                          for tag, (s, d) in wrong.items())
-        dropped = (f" and the stated name_BNS {symbol!r} is dropped"
-                   if symbol is not None else "")
-        diagnostics.append(Diagnostic(
-            level="warning", code="CIF_MAGNETIC_NUMBER_MISMATCH",
-            where=["phases.0.magnetic_symmetry.bns_number"],
-            message=(f"{path} states a magnetic group its own operators are "
-                     f"not: {named} (the operators' own, BNS "
-                     f"{found.bns_number}, UNI {found.uni_number}). The "
-                     f"operators' numbers are stored{dropped}."),
-            suggestion=(
-                "Check the operator and centring loops against the source "
-                f"of the file (this file lists {n_centerings} centring "
-                f"translation{'' if n_centerings == 1 else 's'}).")))
-    return found.bns_number, found.og_number, None
+        diagnostics.append(record)
+    raise MagCifError(f"{record.code}: {message} {suggestion}")
+
+
+def _stated_group_size(tag: str, stated: str) -> str:
+    """One clause: the stated group's operation count per cell, standard setting.
+
+    Read from spglib's database through
+    :func:`~rietx.crystallography.magnetic.operators.magnetic_group`; a number
+    naming no group in it says so instead, which is itself the evidence that
+    the number is the wrong side.
+    """
+    from .magnetic.operators import magnetic_group
+
+    try:
+        operations, centerings = magnetic_group(stated).xyz_strings()
+    except (ValueError, KeyError):
+        return f"{tag} {stated!r} names no magnetic space group"
+    return (f"{tag} {stated!r} has {len(operations)} × {len(centerings)} = "
+            f"{len(operations) * len(centerings)} operations per cell in its "
+            f"standard setting")
 
 
 def refuse_a_magnetic_supercell(block, text: str, path: str) -> None:
@@ -1039,6 +1075,20 @@ def nuclear_operations(magnetic_symmetry) -> tuple[str, ...]:
     return tuple(out)
 
 
+#: Two images of a site closer than this, in every fractional coordinate, are
+#: counted as one position by :func:`_orbit_size`.  So a site stated within
+#: half of it of a parent mirror, 2-fold axis or inversion centre (two images
+#: 2d apart) counts as on it, and the parent is taken as the nuclear group; the
+#: site is then stored on the position and reported as
+#: ``CIF_SITE_TWINS_MERGED``.  Off a 4-fold axis neighbouring images are only
+#: d apart, so a site 5e-4 < d < 1e-3 off one takes the parent and is *not*
+#: moved, expanding to images the file does not state (WP-1918, open).
+#: Measured on the 106 MAGNDATA files
+#: read under a parent above their own group: no stated coordinate moves more
+#: than 3.1e-5 Å (#1797).  ``io/projects/topas.py`` imports the same count.
+_ORBIT_MERGE_TOL = 1e-3
+
+
 def _orbit_size(ops, xyz) -> int:
     """How many distinct positions (mod 1) the operations ``ops`` carry ``xyz`` to."""
     point = np.asarray(xyz, dtype=np.float64)
@@ -1047,7 +1097,7 @@ def _orbit_size(ops, xyz) -> int:
         image = (np.asarray(op.rot, dtype=np.float64) @ point
                  + np.asarray(op.tran, dtype=np.float64)) / op.DEN
         image = image - np.floor(image)
-        if not any(np.max(np.abs((image - q) - np.round(image - q))) < 1e-3
+        if not any(np.max(np.abs((image - q) - np.round(image - q))) < _ORBIT_MERGE_TOL
                    for q in images):
             images.append(image)
     return len(images)
@@ -1914,7 +1964,8 @@ def refuse_contradicting_numbers(magnetic, phase_name: str) -> None:
     setting, so it can be checked against
     :func:`~rietx.crystallography.magnetic.operators.identify` of the stored
     operator list.  A phase read from a magCIF already agrees
-    (:func:`read_magnetic_symmetry` stores the operators' own numbers), and so
+    (:func:`read_magnetic_symmetry` refuses a file whose numbers its operators
+    contradict, #193 amendment 3b), and so
     does one built from a number or by ``magnetic_supercell``; a
     ``MagneticSymmetry`` built by hand with a wrong number is the case left,
     and writing it would put a group into the file that its own loops

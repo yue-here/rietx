@@ -430,12 +430,12 @@ def test_zincite_stays_in_the_cell_and_quotes_the_honest_esd(zincite_fits,
     free = {p.path for p in result.parameters if p.vary}
     assert "phases.0.atoms.1.dof.0" in free
     assert "phases.0.atoms.0.dof.0" not in free
-    # unheld, each z of the flat pair is quoted at half the uncertainty of
-    # their difference, which is what the held O carries
+    # unheld, neither z of the flat pair has an esd: only their difference is
+    # measured, and the held O carries it (WP-2219; before, each z quoted half
+    # of it, the pseudo-inverse's minimum-norm share)
     loose_ref, loose = zincite_fits["lm", None]
     assert "FLAT_DIRECTION" in {d.code for d in loose.diagnostics}
-    half = loose_ref.fitted_structure.phases[0].atoms[1].z.stderr
-    assert o.z.stderr == pytest.approx(2 * half, rel=0.05)
+    assert all(a.z.stderr is None for a in loose_ref.fitted_structure.phases[0].atoms)
     # and the CIF quotes Zn without an esd and O with the honest one
     path = tmp_path / "zincite.cif"
     ref.write_cif(path)
@@ -469,7 +469,7 @@ def test_zincite_fit_pictures(zincite_fits):
     for (solver, origin), (_, result) in zincite_fits.items():
         name = f"floating_origin_zincite_{solver}_{origin or 'free'}"
         _save_fit_png(result, name)
-        _save_fit_png(result, f"{name}_zoom", two_theta_range=(30.0, 40.0))
+        _save_fit_png(result, f"{name}_zoom", two_theta_limits=(30.0, 40.0))
     held = zincite_fits["lm", "hold"][1].statistics.rwp
     free = zincite_fits["lm", None][1].statistics.rwp
     assert held == pytest.approx(free, rel=1e-6)
@@ -922,7 +922,7 @@ def test_the_centroid_keeps_every_esd_and_the_hold_s_answer(zincite_fits,
     assert abs(rows.a @ (end - start)) / rows.a.sum() < 1e-6
     assert zn.z.stderr == pytest.approx(o.z.stderr, rel=1e-6)
     assert zn.z.stderr == pytest.approx(held_o.z.stderr / np.sqrt(2), rel=0.05)
-    _, table, _, _, corr = ref._answer_covariance
+    _, table, _, _, corr = ref._answer_covariance[:5]
     i, j = (table.free_paths.index(f"phases.0.atoms.{k}.dof.0") for k in (0, 1))
     # the z block of A′ is diagonal; what is left (−0.059 measured, against
     # −1.000 unrestrained) comes through the other free parameters
@@ -1074,7 +1074,7 @@ def test_three_sites_solve_eq_21_and_diagonalise_the_z_block():
     np.testing.assert_allclose(a * (a.sum() - a), b, rtol=1e-3)
     assert "FLAT_DIRECTION" not in {d.code for d in result.diagnostics}
     # eq 20 where J is: the restraint re-measured at the answer
-    _, table, _, _, _ = ref._answer_covariance
+    _, table, _, _, _ = ref._answer_covariance[:5]
     model = ref._model
     model.origin = compile_origin(model, table)
     jac = _jacobian_for(model, table, "numpy")(table.x0())

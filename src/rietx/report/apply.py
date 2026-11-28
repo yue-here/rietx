@@ -144,7 +144,7 @@ RECIPES: dict[ActionKind, Recipe] = {
         kind="decrease_background_flexibility", how="advice",
         note="the safe direction of the same model edit, and still an edit rather "
              "than a stage: fewer Chebyshev terms, a larger P-spline "
-             "lambda_smooth, coarser knots, or hold an estimated curve "
+             "lambda_smooth, coarser knots, or hold a measured blank "
              "additively. Expect Rwp to get worse — that is what stiffening a "
              "background costs, and an unbiased ADP is what it buys; "
              "report.background.worst_absorption is where you see it bought."),
@@ -188,16 +188,16 @@ def api_call(stage: StageSpec, *, plan=None) -> str:
     ``Project.run_stage`` passes on), since the node records them and its line
     then names any that differ from the default (WP-2002, B1).
     """
+    from ..model.forward import WINDOW_AREA_TOL
     from ..schemas.history import NodeAction
-    from ..schemas.plan import CLOSING_WINDOW_TOL
 
     settings = ({} if plan is None else
                 {"correlation_guard": plan.correlation_guard,
                  "phase_support_sigma": plan.phase_support_sigma})
-    # the fraction run_stage records when given none (WP-2002, the seventh
-    # round's Q1), so the tooltip and the node's line agree
+    # the fraction run_stage records when given none (the declared stages' 2 %
+    # since WP-2222), so the tooltip and the node's line agree
     return NodeAction(kind="stage", name=stage.name, turn_on=list(stage.turn_on),
-                      max_iter=stage.max_iter, window_area_tol=CLOSING_WINDOW_TOL,
+                      max_iter=stage.max_iter, window_area_tol=WINDOW_AREA_TOL,
                       **settings).api_call()
 
 

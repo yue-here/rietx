@@ -1,0 +1,72 @@
+{
+ "1": {
+  "pick": "B",
+  "n": 2,
+  "leaked": false
+ },
+ "2": {
+  "pick": "A",
+  "n": 2,
+  "leaked": true
+ },
+ "3": {
+  "pick": "B",
+  "n": 3,
+  "leaked": false
+ },
+ "4": {
+  "pick": "A",
+  "n": 2,
+  "leaked": true
+ },
+ "5": {
+  "pick": "C",
+  "n": 3,
+  "leaked": true
+ },
+ "6": {
+  "pick": "C",
+  "n": 3,
+  "leaked": true
+ },
+ "7": {
+  "pick": "A",
+  "n": 2,
+  "leaked": false
+ },
+ "8": {
+  "pick": "A",
+  "n": 2,
+  "leaked": false
+ },
+ "9": {
+  "pick": "B",
+  "n": 2,
+  "leaked": false
+ },
+ "10": {
+  "pick": "B",
+  "n": 2,
+  "leaked": true
+ },
+ "11": {
+  "pick": "A",
+  "n": 2,
+  "leaked": true
+ },
+ "12": {
+  "pick": "A",
+  "n": 2,
+  "leaked": false
+ },
+ "13": {
+  "pick": "A",
+  "n": 2,
+  "leaked": true
+ },
+ "14": {
+  "pick": "A",
+  "n": 2,
+  "leaked": true
+ }
+}

@@ -86,12 +86,58 @@ The holder's lines then fix the holder's height, and the offset carries that to 
 This is where Stinton and Evans's gain in precision comes from.
 [How to keep a parameter fixed whatever the plan frees](hold.md) explains `hold`.
 
+## Share the holder across a series
+
+A series of patterns of one holder can share the holder's lattice parameter and its offset, while each pattern keeps its own specimen height.
+This is the setting of Stinton and Evans's first example, where the holder fixes each data set's height {cite}`stinton2007`.
+The script makes five patterns of the same fluorapatite over the same aluminium holder, with the specimen surface at five heights between −0.060 mm and 0.090 mm.
+The holder sits 0.120 mm below the specimen in each.
+
+A joint fit has no `tie`, so each formula becomes a `ParametricEquation` with `basis="expression"`.
+The four variables are passed to `MultiHistogramRefinement` as `variables`:
+
+```{literalinclude} ../../../examples/guides/holder_cell.py
+:language: python
+:start-after: "# guide: series start"
+:end-before: "# guide: series end"
+```
+
+<!-- output of examples/guides/holder_cell.py -->
+```text
+vars.a_holder        4.049470(77) made with 4.0495
+vars.offset          -0.11943(96) made with -0.12
+vars.zero            0.0120(54)   made with 0.012
+hist.0.vars.height   0.0401(97)   made with 0.04
+hist.1.vars.height   -0.0299(97)  made with -0.03
+hist.2.vars.height   0.0900(97)   made with 0.09
+hist.3.vars.height   0.0100(97)   made with 0.01
+hist.4.vars.height   -0.0600(97)  made with -0.06
+```
+
+Each variable is one number across the five patterns, unless `SharingMap.per_histogram` names it.
+Here only `height` is named, so it comes back as one row per pattern, `hist.<k>.vars.height`.
+The zero shift is one number too, because the five patterns come from one instrument.
+Every parameter under `instrument.` is otherwise one per pattern, so each pattern refines its own area and width for each line.
+`shared=["instrument.profile.*"]` gives the five patterns one instrument profile.
+
+The variables are declared with `vary=False`, so only the stages that name them free them.
+A stage reaching an equation's target would otherwise free every variable its formula names.
+The plan is the single-pattern plan from the first section, reused unchanged.
+
+Every recovered value lies within 1.5 esd of the value the patterns were made with.
+The offset's esd is 0.00096 mm, against 0.0021 mm from one pattern, close to the factor 1/√5 that five patterns give.
+The zero shift still trades against each height, and the fit reports each pair as `FLAT_DIRECTION`.
+The five heights and the zero shift move together.
+Here the five heights miss the values they were made with by amounts that agree to under a tenth of their esd.
+So the differences between the heights are measured better than the esd of each height says.
+
+[Parametric refinement](../reference/parametric.md#formula-equations) describes formula equations in a joint fit.
+
 ## Limitations
 
 - Each line's width and Lorentzian fraction refine on their own, not from the instrument's Caglioti terms.
 - A declared line's Kα2 image sits at the Bragg image of its Kα1 centre, as [How to fit a peak from the sample holder](holder.md) describes, while a phase applies the zero and displacement shifts at each wavelength. On this pattern the two placements differ by 0.00025° or less, about a tenth of the esd of a line centre.
 - rietx gives the holder no phase fraction, since it is no phase.
-- This page fits one pattern. Sharing the offset across several patterns is not shown here.
 
 The full script is `examples/guides/holder_cell.py`.
 

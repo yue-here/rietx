@@ -137,6 +137,15 @@ form here follows WP-1119's decision 4, which kept strings out of storage.
   the origin at c_w = 0. What this item can reuse is the shape: a linear row
   whose partials are a constant matrix over entry paths, chained through C
   (`origin.origin_partials`, beside `restraints.restraint_partials`).
+- **2026-11-22, from the issue triage (#212): this WP is in PR #1642.** The
+  PR is mustachefeeling's, open at `4a8b86278`, mergeable, with checks green
+  on 2026-11-22. Its claim matches the issue and the 2026-10-13 decisions:
+  `LinearRestraint` on `Structure.restraints`, (path, coefficient) pairs in
+  the `soft_restraint` block, and `elemental_ratio_restraint` for a
+  conserved ratio. The issue's hard-constraint form is served apart, by
+  WP-2118's `Refinement.tie(path, expression=...)` (✅ 2026-11-07). The PR
+  carries no closing keyword by design, so #212 is closed by hand once
+  #1642 merges, naming both.
 
 ## Non-goals
 

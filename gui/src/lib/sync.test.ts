@@ -12,8 +12,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  EDITED_LINES_MAX_CELLS,
   STALE_NOTICE,
   canApply,
+  editedLines,
   initial,
   minimalChange,
   reduce,
@@ -254,5 +256,71 @@ describe("minimalChange", () => {
         : before.slice(0, change.from) + change.insert + before.slice(change.to);
       expect(applied).toBe(after);
     }
+  });
+});
+
+describe("a buffer restored from the recovery copy (WP-2213)", () => {
+  const typed = DOC + "# my note\nlimits 3 60\n";
+
+  it("comes back dirty over the rendering it was typed against", () => {
+    const state = run([{ kind: "restored", text: DOC, revision: "r1", buffer: typed, kept: "r1" }]);
+    expect(state.phase).toBe("dirty");
+    expect(state.stale).toBe(false);
+    expect(state.buffer).toBe(typed);
+    expect(state.base).toBe(DOC);
+    expect(canApply(state)).toBe(true);
+    // the pane re-reading on its next head move adopts nothing over it
+    expect(run([{ kind: "rendered", text: DOC, revision: "r1" }], state)).toEqual(state);
+  });
+
+  it("comes back stale when the project has moved since, with re-read the one exit", () => {
+    const state = run([{ kind: "restored", text: MOVED, revision: "r2", buffer: typed, kept: "r1" }]);
+    expect(state.stale).toBe(true);
+    expect(state.notice).toBe(STALE_NOTICE);
+    expect(state.buffer).toBe(typed);
+    expect(canApply(state)).toBe(false);
+    // kept again, it still names the revision it was typed against
+    expect(state.revision).toBe("r1");
+    expect(run([{ kind: "rendered", text: MOVED, revision: "r2" }], state).stale).toBe(true);
+    const reread = run([{ kind: "rendered", text: MOVED, revision: "r2", force: true }], state);
+    expect(reread.phase).toBe("clean");
+    expect(reread.buffer).toBe(MOVED);
+  });
+
+  it("is a clean pane when the kept buffer reads like the rendering", () => {
+    const state = run([{ kind: "restored", text: DOC, revision: "r2", buffer: DOC, kept: "r1" }]);
+    expect(state.phase).toBe("clean");
+    expect(state.stale).toBe(false);
+  });
+});
+
+describe("editedLines (WP-2231)", () => {
+  const BASE = "a\nb\nc\nd\n";
+
+  it("marks nothing when the buffer is the rendering", () => {
+    expect(editedLines(BASE, BASE)).toEqual([]);
+  });
+
+  it("marks a typed value's own line", () => {
+    expect(editedLines(BASE, "a\nB\nc\nd\n")).toEqual([2]);
+  });
+
+  it("marks an inserted line and not the lines after it", () => {
+    expect(editedLines(BASE, "a\nnew\nb\nc\nd\n")).toEqual([2]);
+  });
+
+  it("marks nothing for a deleted line, which has no line left to mark", () => {
+    expect(editedLines(BASE, "a\nc\nd\n")).toEqual([]);
+  });
+
+  it("marks two separate edits and the lines between them alone", () => {
+    expect(editedLines(BASE, "A\nb\nc\nD\n")).toEqual([1, 4]);
+  });
+
+  it("marks the whole middle when the table would be too large", () => {
+    const n = Math.ceil(Math.sqrt(EDITED_LINES_MAX_CELLS)) + 2;
+    const base = Array.from({ length: n }, (_, i) => `x${i}`).join("\n");
+    const buffer = Array.from({ length: n }, (_, i) => `y${i}`).join("\n");
+    expect(editedLines(base, buffer)).toHaveLength(n);
   });
 });

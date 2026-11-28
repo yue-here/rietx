@@ -17,6 +17,9 @@
 :root {
   --text: 14px;
   --text-sm: 13px;
+  /* a band's name in Parameters: where the next phase starts, findable at a
+     glance (the prototype's 17 px) */
+  --text-band: 17px;
   --frame-h: 36px;
   --status-h: 24px;
   --tab-h: 36px;
@@ -50,7 +53,7 @@ h3 {
    filled primary at the weight of a label. The registers keep their meaning
    from app.css (one filled primary, every other action outlined); only the
    geometry is the rebuild's. */
-button:not(.pick, .tab, .link, .ib, .mbtn) {
+button:not(.pick, .tab, .link, .ib, .mbtn, .step) {
   height: 30px;
   padding: 0 12px;
   border-radius: 8px;
@@ -58,7 +61,7 @@ button:not(.pick, .tab, .link, .ib, .mbtn) {
   font-weight: 500;
 }
 
-button.ghost:not(.pick, .tab, .link, .ib, .mbtn) {
+button.ghost:not(.pick, .tab, .link, .ib, .mbtn, .step) {
   font-weight: 400;
 }
 
@@ -196,4 +199,187 @@ button.ghost:not(.pick, .tab, .link, .ib, .mbtn) {
 
 .tabs .tab:disabled {
   cursor: default;
+}
+
+/* A workflow's step strip, across the model panel (the prototype's, round 4
+   and round 11): each step a borderless button holding its number in a ring
+   and its name, the current one raised on the hover ground in the text ink,
+   a › between steps. It takes the tab strip's height, so choosing a workflow
+   moves nothing under it. */
+.steps {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: var(--tab-h);
+  padding: 0 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.steps .step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  font-size: var(--text);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.steps .step[aria-current="step"] {
+  background: var(--hover);
+  color: var(--fg);
+}
+
+.steps .step b {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid currentColor;
+  border-radius: 9px;
+  font: 500 var(--text-xs) / 1 var(--mono-family);
+}
+
+.steps .ar {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.steps .sright {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.steps .loop {
+  font-size: var(--text-sm);
+  font-weight: 400;
+}
+
+@media (hover: hover) {
+  .steps .step:hover:not([aria-current="step"]) {
+    color: var(--fg);
+  }
+}
+
+/* A graph's title line (WP-2216, shared by every graph since WP-2218): what the
+   graph shows on the left, in words (`gui/STYLE.md` § Layout), and the view's
+   controls on the right. One drawing for the Pattern, Peaks and Background
+   graphs, so the line is the same height and the title in the same place on
+   each tab. */
+/* the title gives way first, with an ellipsis (B1, 2026-11-09) */
+.ghead {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  padding: 2px 16px;
+}
+
+.gtitle {
+  flex: 1 1 0;
+  min-width: 9em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gtitle b {
+  font-weight: 600;
+}
+
+.gtitle > span {
+  margin-left: 10px;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.gtitle .num {
+  font-family: var(--mono-family);
+}
+
+.gtitle .bad {
+  color: var(--bad);
+}
+
+.gtitle b.pv {
+  color: var(--accent-ink);
+}
+
+.gctl {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+/* a control's label and its control, one group: the graphs' title lines
+   and the action bar's Refine choice draw it alike */
+.vg {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+/* Variants of a register that one piece draws at its own geometry. They are
+   declared here rather than in the piece, because `lib/style.test.ts` fails a
+   piece that sets a register's size, padding or radius (WP-2246). Each was
+   moved from its piece unchanged, and now holds for the whole page, so its
+   class names (`words`, `op`, `jump`) mean this variant wherever they appear. */
+
+/* an icon button that carries a word instead of an icon: the Plan's
+   "+ Stage" and each stage's add */
+.ib.words {
+  padding: 0 8px;
+  font-size: var(--text);
+}
+
+/* an option row in the Plan's add dialog: a button laid out as a list row */
+button.op {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: auto;
+  min-height: 28px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--fg);
+  font-size: var(--text-sm);
+  font-weight: 400;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.op:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+
+@media (hover: hover) {
+  button.op:hover:not(:disabled) {
+    background: var(--hover);
+  }
+}
+
+/* the Parameters links row: a word per band, underlined at rest */
+.jump .link {
+  padding: 2px 0;
+  color: var(--accent-ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }

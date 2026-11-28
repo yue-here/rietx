@@ -199,7 +199,7 @@ def test_a_tied_row_inherits_a_withheld_esd(default_fit):
     reset cell free.
     """
     ref, result = default_fit
-    kept, table, theta, stderr_internal, correlation = ref._answer_covariance
+    kept, table, theta, stderr_internal, correlation = ref._answer_covariance[:5]
     assert kept is result
 
     def rebuild(cell_runaway):

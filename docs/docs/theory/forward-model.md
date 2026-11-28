@@ -117,13 +117,67 @@ the refined parameters by 0.001 esd.
 The per-$hkl$ intensities sit inside the least-squares problem
 {cite}`pawley1981`, as an off-table parameter block appended to $\theta$.
 Equation {eq}`fm-lebail` is then used for at most three cycles, to seed the block
-before the first solve. Reflections whose primary-line centres sit within
+before the first solve.
+
+Some reflections share a d-spacing in every cell their space group allows:
+cubic (3 3 3) and (5 1 1), or $(h\,k\,l)$ and $(k\,h\,l)$ under $4/m$, $\bar 3$ or
+$6/m$. No powder pattern of the phase can separate their intensities, so they
+are one column of the block, carrying the group's sum $I_G$. The test is exact.
+The cells a setting allows are the reciprocal metrics $G^*$ with
+$G^* = R\,G^*R^\top$ for each rotation $R$ of the group, and two reflections
+$\mathbf h_1$, $\mathbf h_2$ have equal $d$ in all of them exactly when
+
+```{math}
+:label: fm-pawley-lattice
+
+\sum_{R} \big(R^\top\mathbf h_1\big)\big(R^\top\mathbf h_1\big)^{\!\top}
+ \;=\; \sum_{R} \big(R^\top\mathbf h_2\big)\big(R^\top\mathbf h_2\big)^{\!\top},
+\qquad I_k = \frac{m_k}{\sum_{j\in G} m_j}\, I_G ,
+```
+
+{source}`rietx.crystallography.symmetry.lattice_coincidences`
+
+an identity between integer matrices. It reproduces GSAS-II's per-Laue-class
+rules in every class {cite}`toby2013`. Each member $k$ is drawn at its share by
+multiplicity $m_k$, which is equal $F^2$, since a Pawley intensity is the whole
+peak. The share is drawn, never measured: a member's esd is infinite, and the
+group's sum and its esd are recorded as a `MergedGroup`. A phase whose model
+reads $hkl$ rather than $d$ keeps one column per member, since its members'
+peaks differ: a Stephens strain block, a peak equation, satellites or a magnetic
+component.
+
+Columns whose primary-line centres sit within
 {{ PAWLEY_OVERLAP_FWHM_FRAC }} × their mean FWHM form an overlapped group and
-receive a soft equal-split restraint, scaled so that the split-direction esd is
-of order the group intensity itself. An unresolved split is then reported at
-≈100 % uncertainty, where a bare pseudo-inverse of a singular $J^\top J$ would
-report a spuriously tight one. Such groups come back flagged
-`PAWLEY_OVERLAP_UNRESOLVED`.
+receive a soft restraint towards equal $F^2$, one row per member $k$ of a group
+$g$,
+
+```{math}
+:label: fm-pawley-split
+
+r_{gk} \;=\; \frac{\sqrt{\lambda}}{s_g}
+  \Big(I_k - \frac{m_k}{\sum_{j\in g} m_j}\textstyle\sum_{j\in g} I_j\Big),
+\qquad s_g = \max\!\big(\bar I_g,\; \rho\, s_p\big),
+```
+
+{source}`rietx.model.forward.CompiledModel.build_pawley_restraint`
+
+where $\bar I_g$ is the group's mean intensity when the stage starts, $s_p$ the
+phase's largest on-data intensity of equation {eq}`fm-pawley-ridge`, and
+$\rho$ = {{ PAWLEY_GROUP_SCALE_FLOOR_REL }}. The rows sum to zero, so they
+leave the group's sum to the data and weigh only its split, whose esd is then of
+order $s_g$: the group intensity itself, or more for a group under the floor. An unresolved split is reported at ≈100 %
+uncertainty, where a bare pseudo-inverse of a singular $J^\top J$ would report a
+spuriously tight one. Such groups come back flagged `PAWLEY_OVERLAP_UNRESOLVED`.
+The floor $\rho\, s_p$ is relative to the phase, never a number of counts. The
+seed partitions $\max(y_\text{obs} - y_\text{bkg}, 0)$, so a declared
+background above the data empties whole groups. With an absolute floor of
+$10^{-10}$ their rows weighed $5\times10^{9}$. Column equilibration then put the
+group's sum out of the trust region's reach, so the fit kept the seed's empty
+groups (WP-2311). Where the seed empties a phase entirely, so that its every
+on-data intensity sits on the partition's floor, no intensity is left to
+scale against. That phase gets no group rows for the stage: its splits are flat
+directions the damped step leaves alone, and the next stage builds the rows
+from what this one measured.
 
 The reflection list runs 0.5° past each end of the fitted window, so that a
 reflection a stage moves onto the data is modelled. A reflection with no
@@ -148,6 +202,44 @@ $10^{12}$, and TRF's step test, which is relative to $\lVert x\rVert$, ended
 warm refits early (WP-1459). The result names the ridged reflections, one
 `PAWLEY_OFF_DATA_RIDGED` diagnostic per phase, because their intensities are
 the ridge's and not the data's.
+
+## Peak equations
+
+A peak equation adds a term written by the user to reflection $k$ of phase $p$
+at emission line $l$, evaluated at that reflection's indices, multiplicity,
+d-spacing and Bragg angle {cite}`stinton2007`, and at the line's wavelength
+$\lambda_l = 2d\sin\theta$. A size term written as $y\lambda_l/\cos\theta$ is
+then Scherrer's {eq}`ms-scherrer` at every line and every wavelength with one
+$y$. With $g$, $q$, $\ell$, $s$ and
+$f$ the values of the `gauss_fwhm`, `gauss_fwhm_squared`, `lor_fwhm`, `shift`
+and `intensity_factor` equations, each zero (or one, for $f$) where it is not
+declared, the reflection's widths, position and intensity become
+
+```{math}
+:label: fm-peak-equation
+
+\Gamma_{G,pkl}^2 = \Gamma_{G,\mathrm{built\text{-}in}}^2 + g^2 + q,\quad
+\Gamma_{L,pkl} = \Gamma_{L,\mathrm{built\text{-}in}} + \ell,\quad
+2\theta_{pkl} = 2\theta_{\mathrm{drawn}} + s,\quad
+I_{pk} \to f \cdot I_{pk}.
+```
+
+{source}`rietx.model.forward.CompiledModel.phase_term`
+
+Gaussian terms add in variance and Lorentzian ones in FWHM, the composition the
+built-in terms already follow, and $f$ multiplies the intensity of
+{eq}`fm-rietveld`. The
+Gaussian sum is floored as the built-in one is, so a negative $q$ is legal while
+the total stays above zero. An instrument-level `shift` reads the angle alone and
+is added to every phase's position before the phase's own `shift`, whose
+`two_theta` is that drawn position. Each coefficient $c$ of an equation is a
+parameter, and its Jacobian column is exact: the chain rule through the
+equation's own derivative $\partial v/\partial c$ and the peak function's
+partials in position, Γ and η, with the TCH partials
+$\partial(\Gamma, \eta)/\partial(\Gamma_G, \Gamma_L)$ differentiated from
+{cite}`thompson1987`. A reflection is one representative of its Laue orbit, so
+an equation must give every image of the orbit one value; the compile refuses
+one that does not.
 
 ## The residual row layout
 
