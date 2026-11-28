@@ -708,7 +708,9 @@ stage refits". A stage whose cell a later stage fixes now keeps the old
 uniform windows, as the last stage does. The Le Bail warning that runner 2
 flagged is a correct reading. The package gave the same warning at the same
 state before R7, and R7 now reaches that state from every near start. The
-Le Bail slow row RESULT_SLOW.
+Le Bail slow row did run away under R7, past twice its documented time. A
+stage now re-solves only an answer that fits the data better than the
+stage's start, each read on windows that hold its peaks.
 
 **For the maintainer** (the top of the PR body).
 1. *Stored-format change.* `NodeAction.movement_slack: bool = False` is
@@ -743,6 +745,20 @@ Le Bail slow row RESULT_SLOW.
   replay compiles what ran (`79d6f4bc9`). Tests: a later `turn_off` keeps the
   uniform slack and records `False`; the closing stage refits what the plan
   leaves free, and a declared `turn_off` reaches it (`373f6f42e`).
+- **The slow row's runaway, fixed** (`63d154e1c`). Alone, through
+  `serial.py`, it was killed at the 3 208 s cap. The same fit on the base tree
+  took 246 s. A stage-event probe showed why: the `profile` stage of pass 1
+  ends on windows dropping 87-95 % of the intensity, and R7 re-solved it from
+  there. That walk widened the peaks until the closing stage's Le Bail
+  partition, on windows at 1e-3 of those peaks, ran for minutes (a stack dump
+  sat in `_settled_partition`). `refine._improved_on_fresh_windows` compares
+  the weighted residual at the stage's start, on its own windows, with the one
+  at its answer, on windows sized there. A stage no better keeps its first
+  answer and its loss, as before R7, and `STAGE_WINDOWS_STALE` reports it on
+  the last stages. The probe now ends in 435 s (pass 1 of 2 kept, 91.2 % then
+  335.1 %), on a machine running a suite beside it. The near Le Bail starts
+  read the same to three decimals. Tests: the gate both ways on the synthetic
+  fit, and a stage it refuses keeps its loss.
 - The judge's stale texts: `STAGE_WINDOWS_STALE`'s help, the skill row's
   73 % moved to `window_refit_loss`, `WINDOW_MIN_DEG`'s comment (it is tail
   room too), a test docstring. Audit evidence for `window_refit_loss` now

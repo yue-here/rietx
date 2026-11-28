@@ -3070,8 +3070,11 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.schemas.results.StageResult.window_refit_loss", "action", tier=3, ambiguity=1,
         evidence=("the share of Bragg intensity the stage's first windows dropped at its first "
                   "answer (fresh windows against frozen, window_loss's measure) when it passed "
-                  "the stage's window fraction, so the stage solved once more on windows sized "
-                  "there; written by both of Refinement's stage runners, None on a stage that "
+                  "the stage's window fraction and the answer, on windows sized there, fits "
+                  "better than the stage's start on its own (refine._improved_on_fresh_windows), "
+                  "so the stage solved once more on windows sized there; without that test the "
+                  "Le Bail alternation's +2 % start ran past 3208 s against the base's 246 s, "
+                  "a re-solved runaway profile stage widening its peaks; written by both of Refinement's stage runners, None on a stage that "
                   "did not re-solve, a stage with a declared window_slack_deg, a non-finite stop "
                   "and every joint-fit stage. Measured 2026-11-27 (development data): from a "
                   "cell 0.3 % long it fired once in 4 families (SRM 660c, 291 -> 278 residual "
