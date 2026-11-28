@@ -11,6 +11,7 @@ import dataclasses
 import io
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from rietx import MultiHistogramRefinement, Refinement, Stage, runs
@@ -291,6 +292,30 @@ def test_each_histogram_gets_its_own_report(two_patterns):
         assert (result.for_histogram(h).identifiability.background_absorption
                 == mine)
         assert report.background.worst_absorption == max(mine.values())
+    # the joint solve's matrix, over the joint free paths with a unit
+    # diagonal (ruled on #1475, 2026-11-17)
+    corr = result.identifiability.correlation
+    assert corr is not None and corr.paths == list(ref.mtable.free_paths)
+    full = corr.matrix()
+    assert full.shape == (len(corr.paths),) * 2
+    assert np.allclose(np.diag(full), 1.0)
+    # no HIGH_CORRELATION fires on this fixture, so the row-for-entry check
+    # is the brucite joint fit's (tests/test_suite_alarms.py)
+    for h in (0, 1):
+        # a view's block, spelled as its parameters are (WP-1341): every free
+        # row it lists is in its matrix, no other histogram's row is, and
+        # each entry is the joint one
+        view = result.for_histogram(h)
+        mine = view.identifiability.correlation
+        own = f"hist.{h}."
+        joint_of = {p.removeprefix(own): p for p in corr.paths
+                    if p.startswith(own) or not p.startswith("hist.")}
+        assert mine.paths == list(joint_of)
+        assert {p.path for p in view.parameters if p.vary} <= set(mine.paths)
+        assert not any(p.startswith("hist.") for p in mine.paths)
+        for a in mine.paths:
+            for b in mine.paths:
+                assert mine.rho(a, b) == corr.rho(joint_of[a], joint_of[b])
 
 
 def test_a_cancelled_second_fit_leaves_the_first_report_alone(two_patterns):

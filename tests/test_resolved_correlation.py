@@ -111,3 +111,28 @@ def test_top_correlations_quotes_no_undetermined_pair():
     assert {(p.path_a, p.path_b) for p in quoted} == {
         ("a", "b"), ("a", "e"), ("b", "e"), ("c", "d")}
 
+
+
+def test_a_joint_block_jacobian_is_resolved_as_its_dense_twin():
+    """WP-1990 on #1475: a joint fit kept in blocks was returned unprojected,
+    so its stored matrix quoted a rounding ρ the dense layout blanks.  Two
+    histograms' blocks, each over the shared columns 0 and 1 and its own
+    two, the unresolved direction in histogram 0's."""
+    from rietx.optimize.blocked import BlockJacobian
+
+    # histogram 0's columns 0, 1 and 4 (the direction) are its own joint
+    # columns 2, 3 and 4; its 2 and 3 are the shared 0 and 1
+    j = _jac(noise_seed=1)
+    rng = np.random.default_rng(5)
+    j1 = rng.standard_normal((300, 4))          # shared 0, 1 + its own 5, 6
+    maps = [np.array([2, 3, 0, 1, 4]), np.array([0, 1, 5, 6])]
+    block = BlockJacobian([j, j1], maps, [400, 300], [0, 0], 7)
+    dense = block.toarray()
+    full = _full(dense)
+    rho_d, un_d = resolved_correlation(full, dense)
+    rho_b, un_b = resolved_correlation(full, block)
+    assert list(np.flatnonzero(un_d)) == [2, 3, 4]   # the dense layout blanks
+    np.testing.assert_array_equal(un_b, un_d)
+    np.testing.assert_array_equal(np.isnan(rho_b), np.isnan(rho_d))
+    finite = np.isfinite(rho_d)
+    np.testing.assert_allclose(rho_b[finite], rho_d[finite], rtol=0, atol=1e-9)

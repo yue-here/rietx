@@ -57,6 +57,7 @@ from .optimize.least_squares import (
     _longest_line_wavelength,
     _multi_closures,
     covariance_estimates,
+    covariance_jacobian,
     rechart_outcome,
     run_multi_least_squares,
     stationary_columns,
@@ -65,6 +66,7 @@ from .optimize.statistics import (
     background_absorption,
     compute_statistics,
     extra_peak_absorption,
+    resolved_correlation,
     roughness_absorption,
 )
 from .params.multi import (
@@ -186,6 +188,7 @@ from .schemas.params import ParameterRow, TieSpec
 from .schemas.pattern import PatternData, require_two_theta
 from .schemas.plan import PlanSpec, check_phase_support_sigma
 from .schemas.results import (
+    CorrelationMatrix,
     HistogramResult,
     Identifiability,
     RefinedParameter,
@@ -1862,8 +1865,9 @@ class MultiHistogramRefinement:
         The background section reads this histogram's own absorption screen,
         and its declared peaks are screened on its own rows.  The
         identifiability section quotes the joint matrix's worst correlations
-        and softest modes, the fit's, in every histogram's report (WP-2028);
-        it has no exchangeability table, which the joint path does not run.
+        and softest modes, the fit's, in every histogram's report (WP-2028),
+        and carries the joint correlation matrix itself (WP-1990); it has no
+        exchangeability table, which the joint path does not run.
 
         The report reads the result's curves and models, which come from a
         compile at the answer (:meth:`_final_compiles`, WP-1421), as a single
@@ -2516,6 +2520,16 @@ class MultiHistogramRefinement:
         thetas = mt.split(outcome.theta)
         stderr = outcome.stderr_internal
         corr = outcome.correlation
+        # the joint solve's whole correlation matrix, the one ``_top_diagnostics``
+        # thresholds (WP-1990, ruled on #1475), with a pair the data do not
+        # determine blanked as ``check_guards`` blanks it (WP-2050); ``None``
+        # where it was not formed.  The esds below read the solver's own.
+        free_joint = list(mt.free_paths)
+        resolved = _resolved_joint_correlation(outcome, free_joint)
+        joint_correlation = (
+            CorrelationMatrix.from_square(free_joint, resolved)
+            if resolved is not None and len(free_joint) > 1
+            and np.shape(resolved) == (len(free_joint),) * 2 else None)
         n_data = [len(m.tt) for m in models]
         data_off = np.concatenate([[0], np.cumsum(n_data)]).astype(int)
 
@@ -2776,7 +2790,7 @@ class MultiHistogramRefinement:
         parameters = self._parameters(at_bounds, per_esds, answer_runaway,
                                       outcome.esd_inflation)
         diagnostics = list(opening_diags) + self._top_diagnostics(
-            outcome, correlation_guard, top_bg, at_bounds, models)
+            outcome, correlation_guard, top_bg, at_bounds, models, resolved)
         # what a parametric declaration did to each pattern's dependent that
         # no bound the solve saw could stop (WP-1325, FIT)
         diagnostics = diagnostics + _parametric_range_diagnostics(mt)
@@ -2927,7 +2941,8 @@ class MultiHistogramRefinement:
             # ``for_histogram`` hands a report its own (WP-1341); ``None``
             # where nothing was screened, the single fit's empty state
             identifiability=_joint_identifiability(
-                outcome, mt.free_paths, absorption_table, peak_table),
+                outcome, mt.free_paths, absorption_table, peak_table,
+                joint_correlation, resolved),
             # the declared coefficients in user units at the reference, read
             # off histogram 0's slice of the joint covariance (a coefficient
             # is shared, so its marginal is the joint one), and each equation with
@@ -3091,7 +3106,7 @@ class MultiHistogramRefinement:
         return params
 
     def _top_diagnostics(self, outcome, correlation_guard, bg_scoped,
-                         at_bounds, models) -> list[Diagnostic]:
+                         at_bounds, models, resolved=None) -> list[Diagnostic]:
         mt = self.mtable
         free = mt.free_paths
         report = GuardReport(background_correlations=bg_scoped)
@@ -3107,12 +3122,12 @@ class MultiHistogramRefinement:
         report.nonpositive_texture = _texture_once(mt, models)
         report.nonpositive_peak_width = _first_per_path(
             mt, models, check_peak_width_positive)
-        if outcome.correlation is not None and len(free) > 1:
+        if resolved is not None and len(free) > 1:
             # the single fit's loop (``check_guards``' rule), on the joint
-            # correlation matrix
+            # correlation matrix the result carries (WP-1990), a pair the
+            # data do not determine never crossing the threshold (WP-2050)
             report.high_correlations, report.flat_directions = (
-                _correlation_findings(np.asarray(outcome.correlation), free,
-                                      correlation_guard))
+                _correlation_findings(resolved, free, correlation_guard))
         if outcome.jac is not None and len(free) > 1:
             try:
                 # the matrix the covariance cut (``check_guards``' rule)
@@ -3124,6 +3139,30 @@ class MultiHistogramRefinement:
         report.at_bounds = at_bounds
         return (_guard_diagnostics(report) + _size_sharing_diagnostics(mt)
                 + _peak_equation_sharing_diagnostics(mt))
+
+
+def _resolved_joint_correlation(outcome, free: list[str]) -> np.ndarray | None:
+    """The joint solve's correlation matrix as ``check_guards`` reads a single
+    fit's (WP-2050): every direction the Jacobian cannot resolve projected out,
+    so a pair the data do not determine is ``nan`` and never a number.  The
+    result's matrix and the ``HIGH_CORRELATION`` loop both read this one, so
+    they cannot disagree (WP-1990).  ``None`` where no correlation was formed.
+
+    The single fit's guards, word for word: a Pawley solve (``n_aux``) keeps
+    the solver's matrix, and a Gram that does not eigensolve is the stage's
+    ``COVARIANCE_UNAVAILABLE`` to report, not a second raise.
+    """
+    if outcome.correlation is None:
+        return None
+    corr = np.asarray(outcome.correlation)
+    if outcome.jac is None or outcome.n_aux or len(free) < 2:
+        return corr
+    try:
+        corr, _ = resolved_correlation(corr, covariance_jacobian(outcome, free))
+    except np.linalg.LinAlgError:
+        if getattr(outcome, "covariance_error", None) is None:
+            raise
+    return corr
 
 
 def _refuse_joint_mode(mtable, mode: str) -> None:
@@ -3205,7 +3244,10 @@ def _seed_joint_pawley(models, previous, mtable, stage) -> None:
 
 def _joint_identifiability(outcome, free: list[str],
                            background: dict[str, float],
-                           peaks: dict[str, float]) -> Identifiability | None:
+                           peaks: dict[str, float],
+                           correlation: CorrelationMatrix | None = None,
+                           resolved: np.ndarray | None = None
+                           ) -> Identifiability | None:
     """The joint result's identifiability carrier (WP-1341, WP-2028).
 
     The two screens each histogram runs on its own rows, ``background`` and
@@ -3220,12 +3262,17 @@ def _joint_identifiability(outcome, free: list[str],
     is not run: the ruling named the two tables, and the scan re-compiles a
     model, which a joint fit has one of per histogram.
 
+    ``correlation`` is the whole joint matrix as the result stores it (WP-1990)
+    and ``resolved`` the same matrix as an array, with a pair the data do not
+    determine blanked (WP-2050): ``top_correlations`` reads that one, so a
+    pair it quotes is the field's entry bit for bit.
+
     ``None`` where nothing was measured, the single fit's empty state.
     """
     top: list = []
     modes: list = []
-    if outcome.correlation is not None and len(free) > 1:
-        top = top_correlations(np.asarray(outcome.correlation), free)
+    if resolved is not None and len(free) > 1:
+        top = top_correlations(np.asarray(resolved), free)
     if outcome.jac is not None and len(free) > 1:
         try:
             modes = soft_modes(outcome.jac, free)
@@ -3234,11 +3281,12 @@ def _joint_identifiability(outcome, free: list[str],
             # said so (COVARIANCE_UNAVAILABLE); anywhere it formed, stay loud
             if getattr(outcome, "covariance_error", None) is None:
                 raise
-    if not (background or peaks or top or modes):
+    if not (background or peaks or top or modes or correlation is not None):
         return None
     return Identifiability(background_absorption=background,
                            extra_peak_absorption=peaks,
-                           top_correlations=top, soft_modes=modes)
+                           top_correlations=top, soft_modes=modes,
+                           correlation=correlation)
 
 
 def _row_shared(mtable, entry) -> bool:

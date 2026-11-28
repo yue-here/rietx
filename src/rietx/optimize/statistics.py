@@ -493,7 +493,10 @@ def resolved_correlation(corr: np.ndarray, jac: np.ndarray
     test with this cut: the subspace adds at least ``Σ_gone v_i²/cut`` to
     column *i*'s equilibrated variance, and the column is unresolved when that
     is at least the variance the resolved directions give it.  A dead column
-    and a joint fit's :class:`~.blocked.BlockJacobian` are left as they are.
+    is left as it is.  A joint fit's :class:`~.blocked.BlockJacobian` is
+    asked the same question of the same Gram, formed block by block, so a
+    joint fit's correlation matrix is resolved whichever layout its solve
+    took (WP-1990).
 
     **Limits, measured or by construction.**  The error premise holds for the
     width columns it was measured on; ``FD_STEP``'s audit row records other
@@ -517,14 +520,23 @@ def resolved_correlation(corr: np.ndarray, jac: np.ndarray
     n = corr.shape[0]
     unresolved = np.zeros(n, dtype=bool)
     if _is_blocked(jac):
-        return corr, unresolved
-    jac = to_host_fp64(jac)
-    if jac.ndim != 2 or jac.shape[1] != n:
-        return corr, unresolved
-    s = column_rescale(jac)
-    if s is not None:
-        jac = jac * s
-    JTJ = jac.T @ jac
+        if jac.n_cols != n:
+            return corr, unresolved
+        # the same unit-column Gram, summed block by block, so a joint fit
+        # kept in blocks never assembles its dense twin (WP-1990)
+        s = column_rescale(jac)
+        JTJ = np.zeros((n, n))
+        for b, cm in zip(jac.blocks, jac.col_maps, strict=True):
+            bs = b if s is None else b * s[cm]
+            JTJ[np.ix_(cm, cm)] += bs.T @ bs
+    else:
+        jac = to_host_fp64(jac)
+        if jac.ndim != 2 or jac.shape[1] != n:
+            return corr, unresolved
+        s = column_rescale(jac)
+        if s is not None:
+            jac = jac * s
+        JTJ = jac.T @ jac
     JTJ = 0.5 * (JTJ + JTJ.T)
     d = np.sqrt(np.diag(JTJ))
     live = np.flatnonzero(d > 0.0)

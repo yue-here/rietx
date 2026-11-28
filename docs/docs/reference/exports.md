@@ -1,6 +1,6 @@
 # Exports and derived tables
 
-This page gives the three export writers, the calculated pattern and tick positions a result carries, the reflection list behind them, the items a refinement CIF holds, and the value(esd) notation every writer uses.
+This page gives the four export writers, the calculated pattern and tick positions a result carries, the reflection list behind them, the items a refinement CIF holds, and the value(esd) notation every writer uses.
 
 [How to export the refined structure as a CIF and the reflection list as a table](../guides/export.md) gives the procedure and reads both files back.
 [Files written for other programs](foreign-writers.md) gives the TOPAS, FullProf, GSAS and GSAS-II files.
@@ -13,11 +13,18 @@ This page gives the three export writers, the calculated pattern and tick positi
 | `write_refinement_cif` | the refined structure, the fit and the pattern, as a CIF |
 | `write_reflection_table` | one row per emission line and reflection: hkl, d, 2θ, \|F\|² and intensity |
 | `write_qpa_table` | the quantitative phase analysis |
+| `rietx.io.exporters.write_correlation_table` | the parameter correlation matrix, one row and one column per free parameter |
 
-`Refinement.write_cif`, `Refinement.write_reflection_table` and `Refinement.write_qpa_table` write the same files from the last fit.
+`Refinement.write_cif`, `Refinement.write_reflection_table`, `Refinement.write_qpa_table` and `Refinement.write_correlation_table` write the same files from the last fit.
 `Refinement.write_cif` also writes the reflection loop, which only a fit's compiled model can build.
 `write_refinement_cif` takes the result, the structure and the instrument, so take `structure` from `Refinement.fitted_structure`, which holds the refined values and their esds.
 A table's suffix `.tsv` or `.tab` makes it tab-separated.
+
+The correlation table is a labelled square: its first row is `path` followed by each dot-path, and each later row is a dot-path followed by its ρ against every other.
+Both halves and the unit diagonal are written, so a spreadsheet reads it as it stands.
+An empty cell is a pair the data does not determine, never a zero.
+`rietx.io.exporters.write_correlation_table` takes a result or its `Identifiability.correlation`, and refuses a result that carries none ([Identifiability](result.md#identifiability)).
+`rietx.io.exporters.correlation_table_csv` returns the same text.
 
 `rietx.viz.html.write_html` writes the interactive page, and `RefinementResult.plot` writes the static figure.
 Both work on a base install.

@@ -127,6 +127,54 @@ def test_brucites_correlation_findings_do_not_move_under_a_rounding_nudge():
 
 @pytest.mark.slow
 @pytest.mark.xdist_group("brucite-nudge")
+@pytest.mark.parametrize("layout", ["dense", "blocked"])
+def test_a_joint_fit_carries_no_number_for_a_pair_the_data_do_not_determine(layout):
+    """WP-1990 on #1475: the joint result's correlation matrix is resolved as
+    a single fit's is (WP-2050).  Brucite's pattern fitted twice, each copy on
+    its own instrument, keeps the flat Gaussian-size, Gaussian-strain and W
+    direction, now with both histograms' W.  Before the fix the joint result
+    stored all 124 pairs of those four against the other 31 free columns as
+    numbers (±0.0106 against the cell); each is ``None`` here, in either
+    layout of the joint Jacobian."""
+    import copy
+
+    from rietx import MultiHistogramRefinement
+    from rietx.optimize import blocked
+    from rietx.viz import compare
+
+    standard = STANDARD_BY_KEY["brucite"]
+    if not standard.available(compare.default_data_dir()):
+        pytest.skip("brucite's files are not here")
+    inputs = standard.build(compare.default_data_dir())
+    was = blocked.set_layout(layout)
+    try:
+        result = MultiHistogramRefinement(
+            inputs.structure, [inputs.instrument, copy.deepcopy(inputs.instrument)]
+        ).fit([inputs.data, copy.deepcopy(inputs.data)], plan=inputs.plan,
+              two_theta_limits=inputs.two_theta_limits, telemetry=False)
+    finally:
+        blocked.set_layout(was)
+    corr = result.identifiability.correlation
+    size, strain, w = FLAT_TRIPLE
+    members = {size, strain, f"hist.0.{w}", f"hist.1.{w}"}
+    assert members <= set(corr.paths), sorted(corr.paths)
+    others = [p for p in corr.paths if p not in members]
+    assert len(others) > 1
+    assert all(corr.rho(m, p) is None for m in members for p in others)
+    # the resolved pairs stay numbers, and each HIGH_CORRELATION row quotes
+    # its pair's entry, never a blank one (42 rows on this fit)
+    assert all(corr.rho(a, b) is not None for a in others for b in others)
+    high = [d for d in result.diagnostics if d.code == "HIGH_CORRELATION"]
+    assert high
+    for d in high:
+        assert corr.rho(*d.where) == pytest.approx(d.value, abs=1e-12), d.where
+    # a view's block keeps the blanks, under its own spelling
+    view = result.for_histogram(1).identifiability.correlation
+    assert view.rho(w, "phases.0.cell.a") is None
+
+
+@pytest.mark.slow
+@pytest.mark.xdist_group("brucite-nudge")
 @pytest.mark.parametrize("key", ["brucite", "corundum", "zincite", "fluorite"])
 def test_the_closing_stage_names_the_flat_width_triple_unresolved(key, monkeypatch):
     """WP-2050, ruled 2026-11-01: no message says which correlations the guard

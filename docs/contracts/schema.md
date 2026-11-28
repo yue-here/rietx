@@ -800,6 +800,12 @@ refines as before.  A bump rather than "also in 0.61" because 1.12.0 shipped
 0.61: a 1.12 build refuses a phase or instrument carrying the key, and the
 version now says why.
 
+Also in 0.62 (WP-1990): ``Identifiability.correlation``, the full parameter
+correlation matrix at the answer as a ``CorrelationMatrix`` (paths in table
+order, packed lower triangle).  Additive and defaulted to ``None``, "not
+measured", the 0.25 → 0.26 rule; an older build refuses a result carrying
+the key.
+
 Also in 0.62 (WP-2081): ``SeriesEntry.held_values``, every path the
 caller held on a pattern with the value it was held at.  Additive and
 defaulted to ``None``, the 0.25 → 0.26 rule; an older build refuses an entry
