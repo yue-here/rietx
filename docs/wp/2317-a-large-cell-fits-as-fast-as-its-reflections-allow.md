@@ -727,7 +727,10 @@ stage's start, each read on windows that hold its peaks.
    under the pre-WP-2045 tolerance schedule) now re-solves, and
    `STAGE_WINDOWS_STALE` reads the second solve, so the warning no longer
    fires; the 73 % stays on `StageResult.window_refit_loss`. The judge called
-   this weak: the code has no fit-level case left that fires it. (ii) A fit
+   this weak: the code has no fit-level case left that fires it. The re-solve
+   gate below does not change this case, since its answer beats its start on
+   fresh windows (`test_the_hostile_pairs_runaway_reports_its_stale_windows`
+   passed alone, 41 s). (ii) A fit
    with `lebail_passes` > 1 from a near start now ends with the
    `LEBAIL_ALTERNATION_STOPPED` warning where it ended with `info`. Settled
    by Claude as a correct reading (below), and a blind reviewer agreed.
