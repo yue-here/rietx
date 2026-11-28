@@ -51,6 +51,7 @@ from .bruker_raw import BRUKER_RAW, read_bruker_raw
 from .chi import CHI, read_chi
 from .dif import DIF, read_dif
 from .gsas import GSAS, GSASBank, gsas_banks, read_gsas
+from .hdf5 import HDF5, list_hdf5_scans, read_hdf5
 from .pdcif import PDCIF, read_pdcif
 from .peaklist import PEAK_LIST, read_peaklist
 from .philips_rd import PHILIPS_RD, read_philips_rd
@@ -74,7 +75,10 @@ from .xy import XY, read_xy
 #: pair is disjoint by construction — ``RAW…`` against ``V3RD``/``V5RD`` — which
 #: matters more here than usual, since ``.raw`` is written by six unrelated
 #: vendors and ``.rd`` by two, so neither reader may trust a suffix.
-#: ``RASX`` and ``BRML`` follow, sharing a zip's magic and
+#: ``HDF5`` is third on the same footing: an eight-byte signature at offset 0
+#: that neither of the two above shares, recognised whether or not h5py is
+#: installed, so a file this build cannot open is refused by name rather than
+#: reaching ``XY`` as binary (WP-1316).  ``RASX`` and ``BRML`` follow, sharing a zip's magic and
 #: separated by their manifests rather than by it; then ``RAS``, ``UXD``,
 #: ``XRDML`` and ``UDF``, each recognised by a first line, a root element or a
 #: required pair of header keys its own spec mandates, which is stronger
@@ -86,9 +90,9 @@ from .xy import XY, read_xy
 #: copies; ``TOTAL_SCATTERING`` (issue #1240) beside both and directly above
 #: ``XY``, the one entry its files fell to, so it can shadow no reader;
 #: ``RAW_UNKNOWN`` sits below ``XY``, for the reason in the module docstring.
-PATTERN_FORMATS: tuple[PatternFormat, ...] = (BRUKER_RAW, PHILIPS_RD, RASX, BRML,
-                                              RAS, UXD, XRDML, UDF, PDCIF, GSAS,
-                                              CHI, DIF, PEAK_LIST,
+PATTERN_FORMATS: tuple[PatternFormat, ...] = (BRUKER_RAW, PHILIPS_RD, HDF5, RASX,
+                                              BRML, RAS, UXD, XRDML, UDF, PDCIF,
+                                              GSAS, CHI, DIF, PEAK_LIST,
                                               TOTAL_SCATTERING, XY,
                                               RAW_UNKNOWN)
 
@@ -108,6 +112,7 @@ __all__ = [
     "decode",
     "gsas_banks",
     "head",
+    "list_hdf5_scans",
     "looks_binary",
     "metadata",
     "multiscan_default",
@@ -117,6 +122,7 @@ __all__ = [
     "read_chi",
     "read_dif",
     "read_gsas",
+    "read_hdf5",
     "read_pdcif",
     "read_peaklist",
     "read_philips_rd",

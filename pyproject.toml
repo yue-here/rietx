@@ -102,6 +102,15 @@ viz = []
 # nothing a base install lacks, and installing it never needs node.
 gui = []
 jax = ["jax>=0.4.30"]
+# NeXus/HDF5 pattern files (WP-1316, issue #135): read_pattern opens a .nxs/.h5
+# reel only with h5py installed.  An extra because it can only *add* a format
+# (the numba precedent in src/rietx/io/CLAUDE.md): there is no pure-python
+# HDF5, so without it the format is recognised, refused by name with this
+# install line, and reported unavailable by capabilities().  Named for the
+# dependency, not a NeXus definition, since attribute-less HDF5 reads too.
+# The floor is not a measured one: the reader uses File, visititems and attrs,
+# unchanged across h5py 3.x; it was written and tested against 3.16.
+hdf5 = ["h5py>=3.8"]
 # EXPERIMENTAL, and deliberately not part of [dev]: torch is a ~500 MB
 # dependency whose CPU Jacobian is ~10x slower than the analytic numpy one and
 # whose Apple-GPU path is slower still (measured — docs/milestones/v0.4.md).
@@ -141,11 +150,12 @@ docs = [
 # which brings its own kernel.
 notebooks = ["ipykernel>=6.29", "nbclient>=0.10", "nbformat>=5.10"]
 dev = [
-    # Two user-facing extras ride along rather than being restated here: docs
+    # Three user-facing extras ride along rather than being restated here: docs
     # so tests/test_manual.py builds the theory manual in the standard suite
-    # instead of importorskip-ing out, and notebooks so the display tests and
-    # the tutorials meet a real kernel.
-    "rietx[docs,notebooks]",
+    # instead of importorskip-ing out, notebooks so the display tests and
+    # the tutorials meet a real kernel, and hdf5 so the NeXus reader's tests
+    # run rather than skip (its no-h5py path is tested by blocking the import).
+    "rietx[docs,notebooks,hdf5]",
     # <9.2 until a pytest-xdist release carries the fix for pytest-xdist#1386:
     # 9.2.0 moved the node id xdist rewrites to group a case, so every
     # xdist_group mark is ignored (tests/conftest.py, `_refuse_ungrouped`)

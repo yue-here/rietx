@@ -44,6 +44,14 @@ exists to catch.
 #: ``pip install 'NAME[extra]'`` hints, and the manual's ``release``.
 DIST_NAME = "rietx"
 
+#: The optional-dependency extra that lets ``read_pattern`` open NeXus/HDF5
+#: files (WP-1316): ``pip install 'NAME[hdf5]'`` pulls h5py.  It names the
+#: dependency rather than the application definition, because the reader also
+#: takes attribute-less HDF5 that no NeXus definition describes (issue #135,
+#: the reporter's answer of 2026-10-12).  An extra can only add: the base
+#: install stays without h5py, and recognises such a file in order to say so.
+HDF5_EXTRA = "hdf5"
+
 #: Conventional suffix of a project *directory* (``project.py``).  Not
 #: enforced there; the GUI wizard is what actually offers it.
 PROJECT_SUFFIX = ".rex"

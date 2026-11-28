@@ -81,7 +81,7 @@ REAL_FIXTURES = [
 #: header is 810 bytes against V3's 250 — so a cut lands at depths the V3 file
 #: cannot reach, and this arm is the only truncation coverage that version has.
 SYNTHETIC_FIXTURES = ["uxd", "rasx", "brml", "raw4", "raw3", "raw2", "gsas_esd",
-                      "udf", "philips_v5"]
+                      "udf", "philips_v5", "hdf5", "hdf5_bare"]
 
 
 def _synthesize(kind: str, path: Path) -> Path:
@@ -100,6 +100,18 @@ def _synthesize(kind: str, path: Path) -> Path:
         write_raw4,
     )
 
+    if kind in ("hdf5", "hdf5_bare"):
+        # no archive file may ship (WP-1316), so both tiers are synthesized:
+        # a cut lands in the superblock, the object headers and the block
+        pytest.importorskip("h5py")
+        from tests.writers_hdf5 import reel, write_bare_hdf5, write_nexus
+
+        tt, block = reel(n_scans=6, n_points=400)
+        if kind == "hdf5":
+            return write_nexus(path, tt, block,
+                               series=("temperature",
+                                       [300.0 + 10 * i for i in range(6)], "K"))
+        return write_bare_hdf5(path, tt, block)
     if kind == "udf":
         return write_udf(path, [500 + i % 7 for i in range(400)])
     if kind == "philips_v5":
@@ -764,7 +776,7 @@ _NF_BAD = (float("nan"), float("inf"), float("-inf"))
 #: from a start and a step has no ``x``.
 _NF_COLUMNS = {"xy": "xys", "chi": "xy", "gsas_fxye": "xys", "gsas_esd": "ys",
                "ras": "xy", "uxd": "xy", "xrdml": "y", "udf": "y", "rasx": "xy",
-               "brml": "xy", "pdcif": "xys"}
+               "brml": "xy", "pdcif": "xys", "hdf5": "xys"}
 #: Bruker RAW stores float32 counts, and a non-finite one is its evidence that
 #: the stride is wrong: the reader refuses the file, and that refusal stays.
 _NF_REFUSED = {"raw4": "y", "raw3": "x"}
@@ -793,6 +805,11 @@ def _nonfinite_file(kind: str, column: str, bad: float, d: Path) -> Path:
                 for i, v in enumerate(seq)]
 
     tt, y, s = put(_NF_TT, "x"), put(_NF_Y, "y"), put(_NF_S, "s")
+    if kind == "hdf5":
+        pytest.importorskip("h5py")
+        from tests.writers_hdf5 import write_nexus
+
+        return write_nexus(d / "a.nxs", tt, y, errors=s)
     if kind == "xy":
         return write_xy(d / "a.xye", tt, y, s)
     if kind == "chi":

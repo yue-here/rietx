@@ -206,6 +206,12 @@ class ReaderCapability(Base):
     #: client reads it to tell "we can open this" from "we know what this is
     #: and it is the wrong kind of file", which are different answers
     refuses: str | None = None
+    #: whether this build can read the format *here* — ``False`` when the
+    #: optional dependency it needs does not import (WP-1316).  The entry is
+    #: still listed, because the file is still recognised and refused by name
+    available: bool = True
+    #: the module the format needs beyond the base install, or ``None``
+    requires: str | None = None
 
 
 class ProjectFormatCapability(Base):
@@ -391,7 +397,9 @@ def capabilities() -> Capabilities:
             ReaderCapability(name=f.name, title=f.title,
                              extensions=list(f.extensions), sniff=f.sniff,
                              sigma=f.sigma, options=list(f.options),
-                             refuses=f.refuses)
+                             refuses=f.refuses,
+                             available=_importable(f.requires),
+                             requires=f.requires)
             for f in PATTERN_FORMATS],
         project_formats=[
             ProjectFormatCapability(name=f.name, title=f.title,
@@ -407,6 +415,19 @@ def capabilities() -> Capabilities:
         features=_features(),
         compiled_kernels_unavailable=compiled.unavailable(),
     )
+
+
+def _importable(module: str | None) -> bool:
+    """Whether ``module`` would import here, without importing it.  ``None``
+    needs nothing.  A module set to ``None`` in ``sys.modules`` (how an import
+    is blocked) gets ``None`` back from ``find_spec`` and counts as absent; a
+    spec lookup that raises counts as absent too."""
+    if module is None:
+        return True
+    try:
+        return importlib.util.find_spec(module) is not None
+    except (ImportError, ValueError):
+        return False
 
 
 def _backend(name: str) -> BackendCapability:

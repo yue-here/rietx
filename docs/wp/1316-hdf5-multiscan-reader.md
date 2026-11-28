@@ -1,6 +1,6 @@
 # WP-1316 — a NeXus/HDF5 multi-scan reader, behind an extra
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-16 — reader, extra and σ tiers in PR #1607; the Poisson self-check and follow-ups in #1618
 Track: One file, many patterns
 Depends on: —
 Priority: P3 2026-09-23 — a reader nobody is waiting for; the reel exports as files
@@ -66,6 +66,26 @@ standard's own examples with licence checked per file. Real-file facts
 (block shapes `(3134, 2051)`, `(27, 3590)`; the discriminators; the
 counts-vs-synthetic check) go in `tests/data/README.md` without the files.
 
+**The extra is `hdf5`** (the reporter's answer on #135, 2026-10-12, folded
+from `### Inherited` on 2026-11-16): it names the dependency (h5py), not the
+application definition, since the reader also takes attribute-less HDF5
+through axis discovery and `nexus` would describe less than it reads. The
+`_about.py` token is `HDF5_EXTRA`.
+
+- The tier of each rule this WP adds ([generality § The rule](../milestones/generality.md#the-rule)):
+  the 0°/180° ends of a found 2θ axis are physics (tier 1); the span floors
+  (`MIN_TWO_THETA_SPAN_DEG` 5°, `MAX_Q_PER_ANGSTROM` 30, `MIN_Q_SPAN_PER_ANGSTROM`
+  1) are new judgement (tier 3), from the maintainer's prototype on the
+  archive's ~1290 HDF5 files (issue #135), one family by lab. They decide
+  which dataset the **search** tier takes as the axis — never a declared one —
+  and every reading they admit carries `PATTERN_X_AXIS_ASSUMED`; a found axis
+  that fits Q but is too narrow for 2θ is refused naming both readings. Among
+  declared axes the abscissa is a 2θ name, else the one name the axis rule
+  refuses, else an unclassified axis only where nothing else could be one (a
+  1-D signal's, or the sole one on a 2-D signal's last dimension, NeXus's
+  fastest-varying, tier 3); two unknown axes are refused. No action on the data, no default, no new
+  code: the σ tiers and the axis rule are the existing ones.
+
 ### Inherited
 
 - **2026-11-17, from the issue triage round (issue #1446).** Decided
@@ -76,14 +96,6 @@ counts-vs-synthetic check) go in `tests/data/README.md` without the files.
   message. Recognising one needs the NeXus structure (an `NXevent_data` group,
   or per-pixel detector data without a focused `NXdata`), which only h5py can
   read, so the distinction lives here once h5py is present.
-
-- **2026-10-13, from the issue triage (#135): the reporter's answer on the
-  extra's name is `hdf5`.** Posted 2026-10-12: the extra names the dependency
-  (h5py), not the application definition, and the reader also takes
-  attribute-less I11-style HDF5 through axis discovery, so `nexus` would
-  describe less than it reads. That answers the first open item of the
-  2026-09-01 handover from the reporter's side; the `_about.py` format token
-  is still this WP's to spell, and no date is asked for.
 
 ## Non-goals
 
@@ -98,14 +110,15 @@ counts-vs-synthetic check) go in `tests/data/README.md` without the files.
 
 ## Tasks
 
-- [ ] The extra: `[hdf5]` in `pyproject.toml`, soft import, `capabilities()`
+- [x] The extra: `[hdf5]` in `pyproject.toml`, soft import, `capabilities()`
       formats arm gated on the import; the format token spelled in
       `_about.py`.
-- [ ] The reader: magic dispatch, tiered axis authority, block orientation,
+- [x] The reader: magic dispatch, tiered axis authority, block orientation,
       `scan=`/`ScanInfo`/`PATTERN_MULTISCAN_DEFAULTED`, refusals naming the
       file.
-- [ ] σ tiers + the Poisson self-check as a diagnostic.
-- [ ] Synthetic fixtures + `test_readers_robust.py` arm + the README facts
+- [x] σ tiers.
+- [ ] The Poisson self-check as a diagnostic.
+- [x] Synthetic fixtures + `test_readers_robust.py` arm + the README facts
       row; skill row and manual line.
 
 ## Acceptance
@@ -131,6 +144,52 @@ The shipping PR carries `Closes #135`.
   precedent; WP-1110 item 17.
 
 ## Handover log
+
+- **2026-11-16** — first slice, PR #1607 (ghostshift runner). `read_pattern`
+  now opens a NeXus/HDF5 in-situ reel as N scans when h5py is installed
+  (`pip install 'rietx[hdf5]'`), and without it recognises the file and refuses
+  it by name with that line, where it used to fall to the ASCII reader as
+  "binary". A file that declares its patterns (`NXdata` `@signal`/`@axes`) is
+  trusted; one that declares nothing is searched and always says the axis was
+  assumed; a Q, d, ω, φ, radian or temperature axis is refused rather than read
+  as 2θ. The Poisson self-check is not built; it and six smaller follow-ups are
+  issue #1618.
+  - *Done:* `[hdf5]` extra (h5py ≥ 3.8; also in `[dev]` so CI runs the tests),
+    `_about.HDF5_EXTRA`, `PatternFormat.requires`, `ReaderCapability.available`
+    / `.requires` (the format stays listed, `available=False`, rather than being
+    dropped — the acceptance's "reports it unavailable"), `io/formats/hdf5.py`
+    third in dispatch, `tests/test_reader_hdf5.py` (33), `tests/writers_hdf5.py`,
+    the robust harness's `hdf5`/`hdf5_bare` truncation arms and `hdf5` non-finite
+    row (+11), the manual's pattern-files rows, the io/CLAUDE.md row, the skill's
+    `PATTERN_X_AXIS_ASSUMED` row, the `tests/data/README.md` facts section. A
+    read-only review found two silent misreads (a temperature taken as x; a 2θ
+    in radians read as degrees), both fixed with tests, plus pyFAI's
+    unit-suffixed names, a float legacy `@signal`, non-finite ranges in
+    `list_scans`. The generality judge's findings: span discriminators *weak*
+    (one family; the narrow-span refusal now names both Q and a narrow 2θ
+    window), `_x_dim`'s last-dimension fallback *weak* (now refuses two unknown
+    axes, or one on the first dimension), tie-break and σ *hold*; it recommends
+    walking `hdf5.py` in `_audit.WALKED` (a question for the maintainer below).
+  - *Measured:* fast selection on the final tree (d6c106076), `[dev]` + h5py 3.16.0,
+    darwin/arm64, `-n 4`, beside other sessions' work (the workstation was
+    memory-saturated: two co-tenant runs not admitted in 20 and 12 min):
+    14730 passed, 432 skipped, 32 xfailed, 0 failed, 14:28. This session adds
+    44 tests, all passes with h5py present: 33 in `test_reader_hdf5.py` and 11
+    `hdf5` rows in `test_readers_robust.py`; without h5py all 44 skip (the module
+    and the arms `importorskip`). `tests.added_test_times`: 0.14 s over the
+    27 functions, none near the tail. Workstation canary (`923890c77`, 7 files):
+    607 passed, 1 skipped, 1 failed (this branch's `io/CLAUDE.md` cap, fixed).
+    `python -m tests.reader_output`: exit 0, unchanged.
+  - *Gotchas:* `io/CLAUDE.md` is at its 572-line cap (`test_docs_consistency`);
+    the row fitted by joining one wrapped paragraph. The workstation's shared venv has no
+    h5py: the prcheck installed it `--no-deps --target` into the job dir and
+    put that on `PYTHONPATH`, leaving the venv alone.
+  - *Open question for the maintainer:* should `io/formats/hdf5.py` join
+    `_audit.WALKED`? Then `MAX_TWO_THETA_DEG` is tier 1 and the three span
+    floors tier 3 (grounds: the prototype's archive family, one by lab; every
+    reading they admit warns), each needing your dated approval.
+  - *Next:* the Poisson self-check (#1618 item 1), which needs a code and an
+    audit row; then a way to choose among several `NXdata` groups (#1618 item 2).
 
 - **2026-09-01** — created, from issue #135 (2026-09-01 triage). Settled:
   tiers, discriminators, the extra's shape; first open item is the extra's
