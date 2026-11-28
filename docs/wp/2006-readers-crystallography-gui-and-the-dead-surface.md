@@ -46,6 +46,12 @@ promise stages every break).
 
 ### Inherited
 
+- **From [1813](1813-fragment-io.md) (2026-11-16): `fragments.COLLINEAR_TOL` has a
+  second consumer.** Besides `from_zmatrix`'s refusal of a collinear reference triple
+  B, C, D, `to_zmatrix` now writes an atom A lying within it of its reference line B–C
+  at exactly 0° or 180°, moving A by at most r·1e-6 Å. The row is still `unaudited`
+  (on `UNAUDITED_BASELINE`); tier it naming both uses.
+
 Pruned 2026-11-17 (part 2's session; the handover entry says why each other entry went).
 
 - **2026-11-28, from the issue triage (#1836, a process question): Mike's reading of

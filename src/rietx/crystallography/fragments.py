@@ -67,6 +67,34 @@ references which lines each line's internals can move.  Nothing here refines:
 the parameters, their paths and their composition with a body's pose are the
 rigid-body table's.
 
+**Writing a Z-matrix** (:func:`to_zmatrix`) is the reverse: each line's
+internal coordinates are measured off the positions in the convention above,
+so :func:`from_zmatrix` rebuilds the fragment up to a rigid motion (never its
+mirror image, the dihedral signs being kept).  The reference atoms are a
+construction choice, the caller's when given; otherwise each line's b is the
+nearest earlier atom among those *declared* bonded to it, else the nearest
+earlier atom.  c and d are the pair of earlier atoms that puts B, C, D
+furthest from a line (the largest sine at C), because a nearly collinear
+reference triple makes the dihedral's half-plane ill-conditioned; a triple
+that the 0°/180° writes below put on one line is never chosen, whatever its
+sine at C (the write judged it at B); exact ties
+go to atoms declared bonded, then to nearer ones.  Distance only orders the
+candidates; it declares no bond.  An atom on its reference line B–C (sine
+under :data:`COLLINEAR_TOL`) is written at exactly 0° or 180° with an inert
+dihedral, which is how :func:`from_zmatrix` accepts it, so a linear molecule
+writes and reads back without a dummy; the write moves that atom by at most
+r·:data:`COLLINEAR_TOL` (r its distance to B).  The writer adds no dummy: an atom off
+a line on which every earlier atom lies has no dihedral reference and is
+refused, and putting an off-line atom earlier in the order resolves it.
+
+**XYZ** (:func:`from_xyz`, :func:`read_xyz`) is the bare molecular format:
+an atom count, a comment line, then one line per atom holding its element and
+its Cartesian coordinates in Å.  It states nothing else (no cell, no bond, no
+bond order, no symmetry), so a fragment read from it declares the bonds its
+caller passes and no others, and a coordinate-only file is untrusted for an
+aromatic or multiple-bond body until those are declared.  One frame is read;
+a file holding several is refused rather than cut.
+
 Internal: nothing here is exported from ``rietx.crystallography`` or
 ``rietx``.  Lengths are in Å and the Z-matrix's angles and dihedrals, which a
 caller types, in degrees.
@@ -75,9 +103,12 @@ caller types, in degrees.
 from __future__ import annotations
 
 import math
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 
+import gemmi
 import numpy as np
 
 #: The Z-matrix species of a dummy point: placed, used as a reference, then
@@ -91,6 +122,10 @@ DUMMY: str = "X"
 #: less than 2e-4° is a typing error, not a geometry.
 COLLINEAR_TOL: float = 1e-6
 
+# zmatrix_points' remedy for a collinear reference triple, which to_zmatrix,
+# refusing dummies, replaces with its own
+_DUMMY_ADVICE = f"insert a dummy atom (species {DUMMY!r}) off the line"
+
 #: An eigenvalue of the inertia tensor below this fraction of the largest is a
 #: null rotation.  I's eigenvalues scale as the squared distance from an axis,
 #: so 1e-6 counts a fragment as linear when its atoms sit within ~1e-3 of its
@@ -100,6 +135,13 @@ INERTIA_RANK_TOL: float = 1e-6
 
 #: The largest eigenvalue (Å²) below which the atoms coincide: no rotation DOF.
 _COINCIDENT_A2 = 1e-20
+
+# XYZ tokens: an ASCII count or atomic number, a plain decimal coordinate
+# (no nan/inf, no underscores, no Fortran D exponent), and the letters a
+# symbol may have
+_DIGITS = re.compile(r"[0-9]+")
+_DECIMAL = re.compile(r"[+-]?(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
+_SYMBOL = re.compile(r"[A-Za-z]{1,2}")
 
 
 @dataclass(frozen=True, eq=False)
@@ -416,8 +458,7 @@ def zmatrix_points(refs: Sequence[Sequence[int]], values: Sequence[Sequence[floa
             raise ValueError(
                 f"{who(i)}: reference atoms {names_} are "
                 f"collinear, so the dihedral about {ref[0]}–{ref[1]} is "
-                f"undefined; insert a dummy atom (species {DUMMY!r}) off "
-                f"the line")
+                f"undefined; {_DUMMY_ADVICE}")
         else:
             pos[i] = _place(b, c, d, r, angle, dihedral)
         if not tangents:
@@ -524,3 +565,276 @@ def from_zmatrix(lines: Sequence[Sequence], bonds=None) -> Fragment:
     xyz = np.array([pos[i] for i in keep]).reshape(-1, 3)
     return Fragment(tuple(species[i] for i in keep), xyz,
                     None if declared is None else tuple(declared))
+
+
+def from_xyz(text: str, bonds=None, *, source: str = "XYZ text") -> Fragment:
+    """A fragment from the text of a bare XYZ file: one frame, Å, Cartesian.
+
+    The format (module docstring, "XYZ"): line 1 is the atom count, line 2 a
+    comment, which is ignored, and each of the next ``count`` lines holds an
+    element and three Cartesian coordinates in Å, separated by whitespace.  An
+    element is a one- or two-letter symbol in any case or an atomic number
+    1–118, and is stored as its symbol's standard spelling (``fe`` and ``26``
+    are ``Fe``).  A coordinate is a decimal number, an exponent allowed.
+    Lines end at ``\n``, a ``\r`` before it is dropped, a byte-order mark
+    before line 1 is dropped, and blank lines after the frame are allowed.
+
+    ``bonds`` are declared by the caller as pairs of 0-based atom indices in
+    file order (:class:`Fragment`); a file states none, and none is inferred.
+    ``source`` only names the text in the refusals (:func:`read_xyz` passes
+    the path).
+
+    Refusals (``ValueError``, naming ``source`` and the line): a first line
+    that is not a non-negative integer count, fewer atom lines than the count,
+    an atom line with other than four fields, a coordinate that is not a
+    decimal number (``nan``, ``inf``, ``1_0`` and Fortran's ``1.0D0`` among
+    them) or overflows a double (``1e400``), an element that is neither a
+    known symbol, the whole token, nor an atomic number 1–118 (a site label
+    such as ``C1`` or ``Fe3``, a name such as ``Carbon`` and a charge such as
+    ``Na+`` are not elements, and :data:`DUMMY` is the Z-matrix dummy, not an
+    atom), and anything but blank
+    lines after the frame, which is a second frame or a miscount: this reader
+    takes one frame.
+    """
+    lines = [line.removesuffix("\r") for line in text.removeprefix("\ufeff").split("\n")]
+    if lines[-1] == "":
+        lines.pop()  # the final line end closes a line; it opens none
+    if not lines or not lines[0].strip():
+        raise ValueError(f"{source}: line 1 must hold the atom count; it is empty")
+    head = lines[0].split()
+    count = int(head[0]) if len(head) == 1 and _DIGITS.fullmatch(head[0]) else -1
+    if count < 0:
+        raise ValueError(f"{source}: line 1 must hold the atom count, a "
+                         f"non-negative integer; it reads {lines[0].strip()!r}")
+    body = lines[2:2 + count]
+    if len(body) < count:
+        raise ValueError(f"{source}: line 1 counts {count} atoms but the file "
+                         f"has {len(body)} atom lines after the comment line")
+    species: list[str] = []
+    xyz: list[tuple[float, float, float]] = []
+    for k, line in enumerate(body):
+        where = f"{source}, line {k + 3}"
+        fields = line.split()
+        if len(fields) != 4:
+            raise ValueError(f"{where}: an atom line holds an element and three "
+                             f"coordinates (4 fields); it has {len(fields)}: "
+                             f"{line.strip()!r}")
+        element = fields[0]
+        if _DIGITS.fullmatch(element):
+            z = int(element)
+            if not 1 <= z <= 118:
+                raise ValueError(f"{where}: atomic number {z} is not 1–118")
+            element = gemmi.Element(z).name
+        else:
+            # gemmi reads a token by its leading letters ('Carbon' is Ca,
+            # 'Fe3' is Fe), so the whole token must spell the symbol
+            name = gemmi.Element(element).name if _SYMBOL.fullmatch(element) else DUMMY
+            if name == DUMMY or name.lower() != element.lower():
+                raise ValueError(f"{where}: {element!r} is not an element symbol"
+                                 + (" (it is the Z-matrix dummy)" if element == DUMMY
+                                    else ""))
+            element = name
+        if not all(_DECIMAL.fullmatch(v) for v in fields[1:]):
+            raise ValueError(f"{where}: a coordinate is not a decimal number: "
+                             f"{line.strip()!r}")
+        point = tuple(float(v) for v in fields[1:])
+        if not all(math.isfinite(v) for v in point):
+            raise ValueError(f"{where}: a coordinate overflows a double: "
+                             f"{line.strip()!r}")
+        species.append(element)
+        xyz.append(point)
+    for k, line in enumerate(lines[2 + count:], start=3 + count):
+        if line.strip():
+            raise ValueError(f"{source}, line {k}: text after the {count} atoms "
+                             f"of line 1's count ({line.strip()!r}); a second "
+                             f"frame or a miscount, and this reader takes one frame")
+    return Fragment(tuple(species), np.array(xyz, dtype=np.float64).reshape(-1, 3),
+                    bonds)
+
+
+def read_xyz(path, bonds=None) -> Fragment:
+    """A fragment from a bare XYZ file (:func:`from_xyz`, which has the format
+    and the refusals; ``bonds`` are the caller's, in file order)."""
+    p = Path(path)
+    return from_xyz(p.read_text(encoding="utf-8-sig"), bonds, source=str(p))
+
+
+def _measure(x, i, ref):
+    """Line i's internal coordinates (r, angle, dihedral) read off positions x
+    for the reference lines ``ref``, with an angle whose sine is under
+    :data:`COLLINEAR_TOL` written as exactly 0° or 180° (dihedral 0°)."""
+    out = []
+    if len(ref) >= 1:
+        out.append(float(np.linalg.norm(x[i] - x[ref[0]])))
+    if len(ref) >= 2:
+        u, v = x[i] - x[ref[0]], x[ref[1]] - x[ref[0]]
+        on_line = _collinear_sine(x[i], x[ref[0]], x[ref[1]]) < COLLINEAR_TOL
+        if on_line:
+            out.append(0.0 if float(u @ v) > 0.0 else 180.0)
+        else:
+            out.append(math.degrees(math.atan2(float(np.linalg.norm(np.cross(u, v))),
+                                               float(u @ v))))
+    if len(ref) >= 3:
+        if on_line:
+            out.append(0.0)
+        else:
+            b1, b2, b3 = x[ref[0]] - x[i], x[ref[1]] - x[ref[0]], x[ref[2]] - x[ref[1]]
+            n1, n2 = np.cross(b1, b2), np.cross(b2, b3)
+            out.append(math.degrees(math.atan2(float(np.linalg.norm(b2) * (b1 @ n2)),
+                                               float(n1 @ n2))))
+    return tuple(out)
+
+
+def _sines(p, q, r) -> np.ndarray:
+    """:func:`_collinear_sine` broadcast over stacked points: the sine at q
+    between q→p and q→r, 0 where a length is 0."""
+    u, v = p - q, r - q
+    den = np.linalg.norm(u, axis=-1) * np.linalg.norm(v, axis=-1)
+    cross = np.linalg.norm(np.cross(u, v), axis=-1)
+    return np.divide(cross, den, out=np.zeros_like(cross), where=den > 0.0)
+
+
+def _choose_refs(fragment: Fragment) -> list[tuple[int, ...]]:
+    """Each line's reference lines, chosen from the earlier atoms (module
+    docstring, "Writing a Z-matrix"): declared bonds first, then distance.
+
+    A line's candidate triples are judged together, as arrays: O(n³)
+    arithmetic over the fragment (about 0.2 s for 200 atoms) and O(n²)
+    memory per line."""
+    x = fragment.xyz
+    n = len(fragment)
+    bonded = np.zeros((n, n), dtype=bool)
+    for i, j in fragment.bonds or ():
+        bonded[i, j] = bonded[j, i] = True
+    dist = np.linalg.norm(x[:, None, :] - x[None, :, :], axis=-1)
+
+    def ranked(pool, near):
+        """``pool`` in preference order seen from ``near``: declared bonded
+        first, then nearer, then lower index."""
+        pool = np.asarray(pool, dtype=np.intp)
+        return pool[np.lexsort((pool, dist[near, pool], ~bonded[near, pool]))]
+
+    # the atoms each 0°/180° write puts exactly on one line: no triple among
+    # them can be a dihedral's reference once written
+    written_lines = np.zeros((0, n), dtype=bool)
+    refs: list[tuple[int, ...]] = []
+    for i in range(n):
+        if i < 2:
+            refs.append(tuple(range(i))[-1:])
+            continue
+        earlier = np.arange(i)
+        b = int(ranked(earlier, i)[0])
+        cs = ranked(earlier[earlier != b], b)
+        c0 = int(cs[0])
+        if _collinear_sine(x[i], x[b], x[c0]) < COLLINEAR_TOL:
+            # the angle is written as 0° or 180° and the dihedral is inert
+            on = written_lines[:, b] & written_lines[:, c0]
+            if on.any():
+                written_lines[np.argmax(on), i] = True
+            else:
+                row = np.zeros((1, n), dtype=bool)
+                row[0, [b, c0, i]] = True
+                written_lines = np.vstack([written_lines, row])
+            if i > 2:
+                refs.append((b, c0, int(ranked(earlier[(earlier != b) & (earlier != c0)],
+                                               c0)[0])))
+                continue
+        if i == 2:
+            refs.append((b, c0))
+            continue
+        # the best-conditioned dihedral: a triple B, C, D barely off its line
+        # turns D's half-plane by O(1) under the ~r·COLLINEAR_TOL an earlier
+        # 0°/180° write moves an atom, so the largest sine at C wins and the
+        # preference order only breaks ties.  A triple the writes put on one
+        # line is out whatever its sine at C: the write judged it at B
+        # (atoms 0, 2, 1 of a C, C, C, H with atom 2 0.8e-6 of a radian off
+        # the line 0–1 have a sine of 1.2e-6 at 2, and of 0 once 2 is written)
+        cs = cs[_sines(x[i], x[b], x[cs]) >= COLLINEAR_TOL]
+        if len(cs):
+            at_c = _sines(x[b], x[cs][:, None, :], x[None, :i, :])
+            lines_b = written_lines[written_lines[:, b]]
+            written = (lines_b[:, cs][:, :, None] & lines_b[:, None, :i]).any(axis=0)
+            admitted = ((earlier[None, :] != b) & (earlier[None, :] != cs[:, None])
+                        & ~written & (at_c >= COLLINEAR_TOL))
+        if not len(cs) or not admitted.any():
+            raise ValueError(
+                f"to_zmatrix: atom {i} ({fragment.species[i]}) is off the line "
+                f"that atoms 0–{i - 1} lie on, so no earlier atoms give it a "
+                f"dihedral; put an atom off that line earlier in the order")
+        best = at_c[admitted].max()
+        k, d = np.nonzero(admitted & (at_c == best))
+        c = cs[k]
+        # exact ties: c in its order from b, then d in its order from c
+        first = np.lexsort((d, dist[c, d], ~bonded[c, d], k))[0]
+        refs.append((b, int(c[first]), int(d[first])))
+    return refs
+
+
+def to_zmatrix(fragment: Fragment, refs=None) -> list[tuple]:
+    """The fragment as Z-matrix lines, in :func:`from_zmatrix`'s form.
+
+    One line per atom, in the fragment's order: ``(species,)``,
+    ``(species, b, r)``, ``(species, b, r, c, angle)``, then
+    ``(species, b, r, c, angle, d, dihedral)``, with r in Å and the angles in
+    degrees, measured off the fragment's positions in :func:`from_zmatrix`'s
+    convention.  ``from_zmatrix(to_zmatrix(f), f.bonds)`` is ``f`` up to a
+    rigid motion, its mirror image excluded, with every bond intact.
+
+    ``refs`` gives each line's reference atoms as earlier indices, ``()``,
+    ``(b,)``, ``(b, c)``, then ``(b, c, d)``.  Without it they are chosen
+    (module docstring, "Writing a Z-matrix"): b is the nearest earlier atom
+    bonded to the line's atom, else the nearest earlier atom; c and d are the
+    earlier pair that makes B, C, D furthest from collinear (the largest sine
+    at C, never three atoms the 0°/180° writes put on one line).  An atom on its
+    reference line within :data:`COLLINEAR_TOL` is written at exactly 0° or
+    180° with an inert 0° dihedral, the form :func:`from_zmatrix` accepts
+    there, which moves it by at most r·:data:`COLLINEAR_TOL`.
+
+    Refusals (``ValueError``): an atom of species :data:`DUMMY`, which
+    :func:`from_zmatrix` would drop; with ``refs`` chosen here, an atom off
+    a line every earlier atom lies on (no dihedral reference exists without a
+    dummy); with ``refs`` given, a malformed reference (an index that is not
+    a finite integer naming an earlier atom among them); and a reference
+    triple that is collinear as placed, refused with :func:`zmatrix_points`'s
+    words naming the line, and with the writer's advice (other ``refs``, or
+    another order) in place of a dummy.
+    """
+    x = fragment.xyz
+    for i, s in enumerate(fragment.species):
+        if s == DUMMY:
+            raise ValueError(f"to_zmatrix: atom {i} has species {DUMMY!r}, the "
+                             f"Z-matrix dummy, which from_zmatrix drops")
+    if refs is None:
+        refs = _choose_refs(fragment)
+    else:
+        refs = [tuple(ref) for ref in refs]
+        if len(refs) != len(fragment):
+            raise ValueError(f"to_zmatrix: {len(refs)} reference rows for "
+                             f"{len(fragment)} atoms")
+        for i, ref in enumerate(refs):
+            if len(ref) != min(i, 3) or any(
+                    isinstance(k, bool) or not isinstance(k, (int, float, np.number))
+                    or not math.isfinite(k) or int(k) != k or not 0 <= k < i
+                    for k in ref):
+                raise ValueError(f"to_zmatrix: line {i} ({fragment.species[i]}) "
+                                 f"takes {min(i, 3)} earlier atom indices; got {ref}")
+        refs = [tuple(int(k) for k in ref) for ref in refs]
+    values = [_measure(x, i, ref) for i, ref in enumerate(refs)]
+    # the placement's own refusals, with its words, before anything is
+    # returned; the dummy it advises is refused here, so the advice is the
+    # writer's
+    try:
+        zmatrix_points(refs, values, names=fragment.species)
+    except ValueError as err:
+        if _DUMMY_ADVICE not in str(err):
+            raise
+        raise ValueError("to_zmatrix: " + str(err).replace(
+            _DUMMY_ADVICE, "pass refs whose three reference atoms are off a "
+            "line, or put an atom off that line earlier in the order")) from None
+    lines: list[tuple] = []
+    for s, ref, val in zip(fragment.species, refs, values, strict=True):
+        line: list = [s]
+        for k, v in zip(ref, val, strict=True):
+            line += [k, v]
+        lines.append(tuple(line))
+    return lines
