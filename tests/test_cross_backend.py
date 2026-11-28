@@ -232,7 +232,7 @@ def _state_families_tied():
     independent opinions.
 
     Four shapes, one per outcome of that choice: an identity tie and a general
-    affine one (scale ≠ 1 **and** a constant) on the site-scalar branch, which
+    affine one (scale ≠ 1 **and** a constant) on the site branch, which
     reads its coefficients off C (WP-2314); a general affine tie between two
     width scalars on the peak chain, which finite-differences θ through
     ``decode``; and a background tie the gate sends to the whole-model FD

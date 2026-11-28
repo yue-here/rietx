@@ -154,7 +154,7 @@ def _chain_rule(model, table, theta, c: int) -> np.ndarray:
     return -col / model.sigma
 
 
-def _richardson(table, residual, theta, c: int, h: float) -> np.ndarray:
+def _richardson(residual, theta, c: int, h: float) -> np.ndarray:
     def central(step):
         up, down = theta.copy(), theta.copy()
         up[c] += step
@@ -197,7 +197,7 @@ def test_a_cross_atom_column_meets_the_converged_difference():
     J = _make_jacobian(model, table)(theta)
     residual = _make_residual(model, table)
     for c, path in enumerate(table.free_paths):
-        want = _richardson(table, residual, theta, c, 1e-3)
+        want = _richardson(residual, theta, c, 1e-3)
         assert np.linalg.norm(J[:, c] - want) <= 1e-7 * np.linalg.norm(want), path
 
 
@@ -237,7 +237,7 @@ def test_a_mode_column_is_the_chain_rule_over_the_cache(monkeypatch):
     assert c in seen
     want = _chain_rule(model, table, theta, c)
     assert np.linalg.norm(J[:, c] - want) <= 1e-12 * np.linalg.norm(want)
-    fd = _richardson(table, residual, theta, c, 1e-3)
+    fd = _richardson(residual, theta, c, 1e-3)
     assert np.linalg.norm(J[:, c] - fd) <= 1e-7 * np.linalg.norm(fd)
 
 
@@ -282,7 +282,7 @@ def test_a_reach_past_the_site_rows_takes_the_peak_chain(monkeypatch):
     J = _make_jacobian(model, table)(theta)
     assert seen == []
     residual = _make_residual(model, table)
-    want = _richardson(table, residual, theta, 0, 1e-4)
+    want = _richardson(residual, theta, 0, 1e-4)
     assert np.linalg.norm(J[:, 0] - want) <= 1e-4 * np.linalg.norm(want)
 
 

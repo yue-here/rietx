@@ -1590,12 +1590,15 @@ def _site_column(model: CompiledModel, table: ParameterTable,
     beyond the site rows it moves.
     """
     g_xyz, g_u, g_biso, g_occ = grads
+    # the column of ∂p/∂θ read once: a mode can reach a hundred site rows,
+    # and a scalar index into a sparse matrix costs ~5 µs a call
+    lj_c = lj[:, [c]].toarray().ravel()
     df2 = None
     for q in reach:
         m = _SITE_ROW_PATH.match(q)
         if m is None:
             continue
-        w = float(lj[table._paths[q], c])
+        w = float(lj_c[table._paths[q]])
         if w == 0.0:
             continue
         j, name = int(m.group(2)), m.group(3)
