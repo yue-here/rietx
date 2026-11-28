@@ -787,7 +787,16 @@ its fixture back onto the 1e-9 stop's numbers. The fast suite
 (`-m "not slow"`, run while the audit table was being edited) gave 9 failed,
 15 948 passed, 467 skipped, 30 xfailed, 7 errors: the 7 errors and one failure
 were the mid-run edit (green on re-run), seven were the guides above, one the
-theory page's plain-text Rwp. FULLSUITE.
+theory page's plain-text Rwp. The full suite on `origin/main` (0f4894d58) merged in, through
+`serial.py`, `[dev]`, macOS arm64: 4 failed, 16 926 passed, 478 skipped, 50
+xfailed, 1 xpassed in 38 min. The four were slow rows the stop moved: the
+wavelength solo fixture and the hostile-pairs runaway now run at the 1e-9 stop
+they pin (a 0.013 esd move in `y` against a 1e-4 pin; a runaway the shift test
+now stops short of), the LaB₆ hump accepts `shift_over_esd`, and the null
+planted series' largest scale step, a tie at 3.417 against 3.400 esd, changed
+places (`null_signals.json` re-pinned). Re-run after the fixes: 12 passed. The
+whole suite was not re-run after those test-only edits. The 18 tests R6 added
+cost 5.5 s in the fast run (local junit, one loaded run).
 
 **Code review.** Not re-run: this session's code change is one capped
 expression and its constant; the 7th session's `/code-review high --fix` read
