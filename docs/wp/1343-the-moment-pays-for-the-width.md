@@ -254,6 +254,26 @@ the cheaper of the two at the time; the skill row is required either way.
 
 ### Inherited
 
+- **2026-11-28, from the issue triage (#1831, a bug): `MAGNETIC_WIDTH_UNMODELLED`
+  counts extinct child reflections as magnetic lines.** `report/magnetic.py`
+  `_classified_reflections` puts a row in `mag_rows` when f_mag / (f_nuc + f_mag)
+  ≥ 1 − `MAGNETIC_WIDTH_PURITY` and f_mag > 0 (`:716-717` at `02341ffdb`). There
+  is no absolute floor, so a row with f_nuc = 0 and a round-off f_mag (about
+  1e-28) has a fraction of exactly 1.0 and passes. The reporter's case is a
+  Mn₃ReO₆ `P_S-1` child in its 2a × 2b × c supercell at k = (½ ½ 0) (D20 10 K,
+  doi:10.7488/ds/1359): (0 0 1), (1 0 −1) and (0 1 0), all forbidden by the
+  parent, are listed as magnetic lines fitted too narrow. The width statistic
+  then reads the flank of the real (½ ½ 0) line 0.43° away and bare
+  background. In their set the warning fires in some Biso arms and not others
+  at nearly the same misfit (z ≈ 3.3-3.6), which this would explain. The code
+  path is as they describe; the real-data run was not repeated here. Their
+  ask: leave out rows whose |F_m|² falls below a floor relative to the phase's
+  strongest magnetic row, and a test that the parent-forbidden rows of a
+  k = (½ ½ 0) `P_S-1` child never enter `mag_rows`. Leaving round-off rows out
+  is the data settling it; the floor's value is a new tier-3 number on the
+  magnetic path, so it is Mike's to rule under #1075, with an `_audit` row.
+  Same function as this WP's open item (the silence where every magnetic
+  reflection is also nuclear), so one session reads both.
 - **2026-10-12, from [1929](1929-an-esd-follows-where-the-solver-stopped-beside-a-flat-column.md):
   the moment rung reads moduli by name and skips a tied one.**
   `refine._moment_rung` keeps only untied `dof0` entries. A modulus a
