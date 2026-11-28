@@ -20,6 +20,9 @@ constrained step.  Nothing it prints is a structural claim.
             fap-index       index_pattern on FAP.XRA, as the fap_index fixture
                             (hexagonal and trigonal, preset "full"): every
                             candidate's Pawley validation fit
+            bench:KEY       a single-fit case of examples/bench_refinement.py
+                            (e.g. bigcell-pawley, bigcell-pawley-120), run
+                            as that harness's _run_once runs it
     SOLVER  lm (default) | trf
 
     PROBE=path   run a variant of probe 1 in its place (bigcell only).  The
@@ -120,6 +123,17 @@ elif case == "fap-index":
     res = index_pattern(pick_peaks(data, ins), data=data, instrument=ins, spec=spec,
                         preset="full")
     print(f"index_pattern: {len(res.candidates)} candidates")
+elif case.startswith("bench:"):
+    sys.path.insert(0, str(ROOT / "examples"))
+    import bench_refinement as bench
+    setup = next(c for c in bench.CASES if c.key == case.split(":", 1)[1]).build()
+    ref = rx.Refinement(setup.structure.model_copy(deep=True),
+                        setup.instrument.model_copy(deep=True), history=False)
+    if setup.prepare is not None:
+        setup.prepare(ref)
+    t0 = time.perf_counter()
+    result = ref.fit(setup.data, plan=setup.plan, mode=setup.mode,
+                     two_theta_limits=setup.limits, telemetry=False)
 else:
     raise SystemExit(f"unknown case {case!r}")
 wall = time.perf_counter() - t0
