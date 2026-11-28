@@ -231,11 +231,13 @@ def _state_families_tied():
     was written for.  So this row is where the choice is checked against three
     independent opinions.
 
-    Three shapes, one per outcome of that choice: an identity tie and a general
-    affine one (scale ≠ 1 **and** a constant) on the peak-chain branch, which is
-    widened to cover them, and a background tie the gate sends to the
-    whole-model FD fallback instead — so the one column numpy finite-differences
-    is compared against exact ones.
+    Four shapes, one per outcome of that choice: an identity tie and a general
+    affine one (scale ≠ 1 **and** a constant) on the site-scalar branch, which
+    reads its coefficients off C (WP-2314); a general affine tie between two
+    width scalars on the peak chain, which finite-differences θ through
+    ``decode``; and a background tie the gate sends to the whole-model FD
+    fallback instead — so the one column numpy finite-differences is compared
+    against exact ones.
     """
     structure, ins, pattern = _lab_state()
     table = ParameterTable(structure, ins)
@@ -244,6 +246,8 @@ def _state_families_tied():
                   AffineTie.identity("phases.0.atoms.0.occ"))
     table.set_tie("phases.0.atoms.1.biso",
                   AffineTie(terms=(("phases.0.atoms.0.biso", 2.0),), const=0.1))
+    table.set_tie("phases.0.gauss_strain",
+                  AffineTie(terms=(("phases.0.lor_size", 2.0),), const=0.001))
     table.set_tie("instrument.background.c1",
                   AffineTie.identity("instrument.background.c0"))
     table.refresh_ties()
@@ -381,8 +385,9 @@ def _state_families_variable():
     peak chain, and the two disagree by ~1e-6.  The traced backends walk
     straight through C either way and so are the independent opinion.
 
-    Three shapes, one per branch the reach can name: four Biso rows on the peak
-    chain (several reached paths, all direct), a phase scale at coefficient 1
+    Three shapes, one per branch the reach can name: Biso rows on the
+    site-scalar branch, the peak chain before WP-2314 (several reached paths,
+    all direct), a phase scale at coefficient 1
     on the closed-form ``_scale_column`` (one reached path, the case that is
     licensed to keep the linear branches), and a Wyckoff DOF, where the reach is
     ``[…x, …dof.0]`` and only the *directly* driven ``dof.0`` may name the
@@ -1342,6 +1347,29 @@ def _state_extinction_strong():
     return model, table, {}
 
 
+def _state_site_scalars():
+    """Biso and occupancy columns from the structure-factor cache (WP-2314).
+
+    The analytic branch ``_site_scalar_column`` sums ∂|F|²/∂B_j and
+    ∂|F|²/∂occ_j through C over every Biso and occupancy row one column
+    moves, so its reach is new: N's Biso following C's, N's occupancy the
+    remainder of C's (coefficient −1), and a named variable driving two
+    occupancies at coefficients 1 and 0.5.  Dispersion is on, so each
+    gradient carries its B term, and extinction at 30 puts the chain's
+    G = E + x·dE/dx factor in every column.  The phase scale and a cell
+    length ride along on their own branches.  The exact oracles are
+    ``tests/test_biso_occ_columns.py``'s; this row is the traced backends'
+    opinion.
+    """
+    from tests.test_biso_occ_columns import ISO_BISO, OCC, site_scalar_state
+
+    model, table = site_scalar_state(
+        extinction=30.0, free=(*ISO_BISO, *OCC),
+        extra_free=("phases.0.scale", "phases.0.cell.a"),
+        window_area_tol=WINDOW_AREA_TOL)
+    return model, table, {}
+
+
 def _state_distortion_modes():
     """WP-1419: a child refined on its mode amplitudes, the coordinates derived.
 
@@ -1518,6 +1546,7 @@ CONFIGS = {"families": _state_families,
            "peak_equations": _state_peak_equations,
            "peak_equations_wavelength": _state_peak_equations_wavelength,
            "distortion_modes": _state_distortion_modes,
+           "site_scalars": _state_site_scalars,
            "texture": _state_texture,
            "bodies": _state_bodies,
            "bodies_site": _state_bodies_site,
@@ -1592,6 +1621,7 @@ CONFIG_PARAMS = [
     _config("extinction_strong"),
     _config("stephens_over_lor_strain"),
     _config("distortion_modes"),
+    _config("site_scalars"),
     _config("bodies_site"),
     # the state imports test_parent_cell's LaMnO₃ child, whose candidate search
     # is cached per process: sharing that module's group pays it once

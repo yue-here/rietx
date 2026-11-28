@@ -201,6 +201,15 @@ first.
 
 ### Inherited
 
+- **2026-11-28, from WP-2314 angle 3: Biso and occupancy have left the peak
+  chain.** In Rietveld mode a Biso or occupancy column is now analytic, built
+  from the structure-factor cache (`least_squares._site_scalar_column`), when
+  every path it moves is a Biso or occupancy row of one phase. So the "Biso
+  columns batched" half of this WP's open |F|² task has no Biso column left
+  to batch, except one whose tie reaches something else (a cell, a
+  coordinate, a derived row) or a phase carrying a moment. Those still take
+  the peak chain. The cell half of the task is unchanged. Re-scope that task
+  before starting it.
 - **2026-11-27, from WP-2314 (filed under WP-2317): the structural columns'
   structure factor has an owner now.**
   - On a 40-atom phase, `_structural_column` rebuilds A once per coordinate
