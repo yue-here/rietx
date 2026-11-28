@@ -482,7 +482,7 @@ transcriptions were deliberately not copied. TOPAS is a black box.
 
 ## Handover log
 
-- **2026-11-28** (`/pr-review`, post-merge bookkeeping; PR #PRNUM) — PR #1378 merged from outside
+- **2026-11-28** (`/pr-review`, post-merge bookkeeping; PR #1889) — PR #1378 merged from outside
   as `917b74174`. It closes the four follow-ups the 2026-11-03 entry listed for the two k readers.
   A file that states k ≠ 0 now reaches the supercell refusal in two cases where it read as k = 0
   before. One is a loop listing `kxkykz` before its id column. The other is a bracketed k inside

@@ -281,7 +281,7 @@ reachable.
 ## Handover log
 
 - **2026-11-28** — post-merge bookkeeping for PR #1597 (maintainer side, ghostshift runner; PR
-  #PRNUM). PR #1597 merged today as `0f4894d58`. Yue answered the question task 2 was waiting on, on
+  #1889). PR #1597 merged today as `0f4894d58`. Yue answered the question task 2 was waiting on, on
   2026-11-17, posted on #1597. A group finding replaces the pair rows in
   `RefinementResult.diagnostics`. It is built in `check_guards` at every stage where pairs are built
   today, and it lands after PR #1475 (WP-1990). The goal is one finding per degeneracy, since a pair

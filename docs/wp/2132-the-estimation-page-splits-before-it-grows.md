@@ -121,7 +121,7 @@ a question for this WP to measure and report, never to build unasked.
 ## Handover log
 
 - **2026-11-28** — post-merge bookkeeping for PR #1578 (maintainer side, ghostshift runner; PR
-  #PRNUM). PR #1578 merged today as `9eb1e3352`. It carried the 2026-11-16 measurement and the three
+  #1889). PR #1578 merged today as `9eb1e3352`. It carried the 2026-11-16 measurement and the three
   questions in the entry below. All of them, plus the budget, were settled in the maintainer's
   decisions walk on 2026-11-16 and posted on #1578 on 2026-11-17. Claude settled each call. None is
   a ruling of Yue's, and Yue may reverse any of them. The split can now be built. Mike said on #1578
