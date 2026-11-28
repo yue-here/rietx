@@ -262,6 +262,16 @@ and have no free factor to measure, so this file's old list named them without c
   start-dependent X/Y split behind cpd-1a's Biso row: in a sample-only plan the data fix only
   each twin pair's sum. The hold's design is WP-2225's. Reproduce the trigger arms with
   `2017-batch/trigger_twin_hold.py` (about 10 s, macOS arm64, worktree `[dev]` venv).
+- **2026-11-28, from the issue triage (issue #1629, WP-1448's follow-ups): two tier-3 rows
+  whose comments argue a choice with no record of the alternatives.**
+  `background.select.PEAK_MASK_SIGMA` ("a conventional 3σ, no source cited") and
+  `schemas.interval.PARAMETER_INTERVAL_CHI2_TOL` (group O). Checked against the tree at
+  `300853e90`: both rows are tier 3, approved 2026-10-19 under B12 and B10. When a group
+  re-measures either one, check whether `docs/milestones/generality.md`'s B12 or B10 section
+  states what was rejected. If it does, the comment takes a `*(Chosen: …)*` tag pointing there
+  (root CLAUDE.md, WP-1448). If it does not, the group's own handover entry is the record of
+  that day. Settled by Claude 2026-11-28 under WP-1448's rule: no record is written after the
+  fact.
 
 ## Non-goals
 
