@@ -3371,19 +3371,19 @@ class CompiledModel:
             return [moved]
         return [[np.zeros_like(col) for col in moved], moved]
 
-    def site_scalar_intensity_grad(self, ip: int, df2: np.ndarray,
-                                   values: dict[str, float]
-                                   ) -> list[np.ndarray] | None:
-        """Per-line ∂intensity for a column moving Biso or occupancy rows of
-        phase ip only (WP-2314).
+    def site_intensity_grad(self, ip: int, df2: np.ndarray,
+                            values: dict[str, float]
+                            ) -> list[np.ndarray] | None:
+        """Per-line ∂intensity for a column moving site rows of phase ip only
+        (WP-2314): coordinates, U^ij, Biso and occupancy, of any atoms.
 
-        ``df2`` is the column's ∂|F_N|², already summed through C over the
-        rows it moves, from :meth:`structural_f2_grads`.  Biso and occupancy
-        enter the intensity through |F_N|² alone, so the chain is the
-        coordinate columns' (:meth:`_f2_derivative_chain`), with the same
-        nuclear mask.  ``None`` where :meth:`structural_grad_supported` says
-        the nuclear derivative is not the whole one (a moment reads both) or
-        outside Rietveld mode, where intensities are extracted.
+        ``df2`` is the column's ∂|F_N|², already summed over the rows it
+        moves from :meth:`structural_f2_grads`.  Every site row enters the
+        intensity through |F_N|² alone, so the chain is the coordinate
+        columns' (:meth:`_f2_derivative_chain`), with the same nuclear mask.
+        ``None`` where :meth:`structural_grad_supported` says the nuclear
+        derivative is not the whole one (a moment reads both) or outside
+        Rietveld mode, where intensities are extracted.
         """
         if self.mode != "rietveld" or not self.structural_grad_supported(ip):
             return None
