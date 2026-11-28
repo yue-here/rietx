@@ -307,7 +307,7 @@ free swap under LM.
 
 ## Handover log
 
-### 2026-11-28 (3rd session) — one eigensolve for the covariance and its discard test (ghostshift runner; PR #PRNUM)
+### 2026-11-28 (3rd session) — one eigensolve for the covariance and its discard test (ghostshift runner; PR #1883)
 
 A large Pawley fit now eigendecomposes each stage's normal matrix once
 where it did so twice. The covariance inverts that matrix, and the test
