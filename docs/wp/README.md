@@ -67,7 +67,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2245](2245-the-pattern-graph-s-axis-and-gutter.md) | The Pattern graph's empty difference axis and its blank right margin | 2026-11-24 | P3 | [gui-overhaul](#gui-overhaul) |
 | [2246](2246-the-register-guard-reads-the-rebuilt-page.md) | The register guard reads the rebuilt page: `lib/style.test.ts` scans `gui/src/next/` | 2026-11-25 | P3 | [gui-overhaul](#gui-overhaul) |
 | [2314](2314-a-structural-jacobian-costs-one-structure-factor.md) | A structural Jacobian costs one structure factor, not one per column | 2026-11-27 | P2 | [Unscheduled](#unscheduled-a-large-cell) |
-| [2315](2315-a-large-pawley-step-pays-for-the-rows-that-bind.md) | A large Pawley step pays for the rows that bind, not for every intensity | 2026-11-27 | P2 | [Unscheduled](#unscheduled-a-large-cell) |
+| [2315](2315-a-large-pawley-step-pays-for-the-rows-that-bind.md) | A large Pawley step pays for the rows that bind, not for every intensity | 2026-11-28 | P2 | [Unscheduled](#unscheduled-a-large-cell) |
 | [2316](2316-a-le-bail-partition-costs-what-its-overlaps-need.md) | A Le Bail partition costs what its overlaps need, not thousands of cycles | 2026-11-27 | P2 | [Unscheduled](#unscheduled-a-large-cell) |
 | [2317](2317-a-large-cell-fits-as-fast-as-its-reflections-allow.md) | A large cell fits as fast as its reflections allow: the case, the bar, and the rulings in the way | 2026-11-28 | P2 | [Unscheduled](#unscheduled-a-large-cell) |
 
@@ -607,6 +607,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2061](2061-a-crystallite-has-a-shape.md) | A crystallite has a shape: hkl-dependent size broadening on the analytical profile | ⬜ | P3 | — ([1343](1343-the-moment-pays-for-the-width.md) soft) |
 | [2070](2070-a-second-cw-neutron-line-that-is-not-a-harmonic.md) | A second CW neutron line that is not a harmonic, with its own weight and offset | ⬜ | P3 | — |
 | [2146](2146-the-facility-iparm-files-read-with-their-repairs-recorded.md) | The ISIS iparm files read, with each repair recorded | ⬜ | P3 | — ([2032](2032-the-tof-readers-t1-follow-ups.md), [1927](1927-tof-t1-the-axis-and-its-readers.md) soft) |
+| [2318](2318-a-tof-bank-refines-its-absorption.md) | A time-of-flight bank refines its absorption factor | ⬜ | P3 | #1548 |
 
 ### <a id="unscheduled-what-fires-and-what-stays-silent"></a>What fires, and what stays silent
 
@@ -848,7 +849,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | WP | Title | Status | Priority | Depends on |
 |---|---|---|---|---|
 | [2314](2314-a-structural-jacobian-costs-one-structure-factor.md) | A structural Jacobian costs one structure factor, not one per column | 🔄 2026-11-27 | P2 | — ([2317](2317-a-large-cell-fits-as-fast-as-its-reflections-allow.md), [1945](1945-the-peak-chain-columns-built-in-one-pass-per-phase.md) soft) |
-| [2315](2315-a-large-pawley-step-pays-for-the-rows-that-bind.md) | A large Pawley step pays for the rows that bind, not for every intensity | 🔄 2026-11-27 | P2 | — ([2317](2317-a-large-cell-fits-as-fast-as-its-reflections-allow.md) soft) |
+| [2315](2315-a-large-pawley-step-pays-for-the-rows-that-bind.md) | A large Pawley step pays for the rows that bind, not for every intensity | 🔄 2026-11-28 | P2 | — ([2317](2317-a-large-cell-fits-as-fast-as-its-reflections-allow.md) soft) |
 | [2316](2316-a-le-bail-partition-costs-what-its-overlaps-need.md) | A Le Bail partition costs what its overlaps need, not thousands of cycles | 🔄 2026-11-27 | P2 | — ([2317](2317-a-large-cell-fits-as-fast-as-its-reflections-allow.md), [2017](2017-the-second-pass-every-tier-3-threshold-on-three-families.md), [2062](2062-pawley-is-the-structure-free-default.md) soft) |
 | [2317](2317-a-large-cell-fits-as-fast-as-its-reflections-allow.md) | A large cell fits as fast as its reflections allow: the case, the bar, and the rulings in the way | 🔄 2026-11-28 | P2 | — |
 
