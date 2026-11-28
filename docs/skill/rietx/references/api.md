@@ -135,7 +135,7 @@ None nests inside another. An `rx.IndexingResult` carries no `cell` key by desig
 - `rx.IndexingResult.best_or_none() -> CellCandidate | None` — The single candidate, or None.
 - `rx.IndexingResult.evidence() -> IndexingEvidence` — The machine-readable evidence view (WP-1043).
 - `rx.SuggestionResult` — Ranked, gated answer to "which parameter should be freed next?".
-  Fields: `groups: list[CandidateGroup] = []`, `non_separable: list[ParameterCandidate] = []`, `skipped: list[str] = []`, `n_evaluated: int = 0`, `chi2_red: float`, `noise_floor: float`, `summary: str`, `n_effective: float | None = None`
+  Fields: `groups: list[CandidateGroup] = []`, `non_separable: list[ParameterCandidate] = []`, `bound_limited: list[ParameterCandidate] = []`, `skipped: list[str] = []`, `n_evaluated: int = 0`, `chi2_red: float`, `noise_floor: float`, `summary: str`, `n_effective: float | None = None`
 - `rx.CandidateGroup` — One candidate, or a tie of candidates the data cannot split.
   Fields: `members: list[ParameterCandidate]`, `gain: float`, `resolved: bool`, `delta_bic: float`, `delta_bic_raw_n: float | None = None`
 

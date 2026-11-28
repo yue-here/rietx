@@ -2177,6 +2177,7 @@ def test_the_capability_flag_is_derived_from_the_fields():
     # ``Phase.distortion_modes``, in the same number, and WP-1944's optional
     # ``Phase.extinction`` 0.61, which WP-1419 C2's ``Phase.parent_cell`` shares,
     # and WP-2107's ``Phase.peak_equations`` and ``Instrument.peak_equations`` 0.62.
+    # and WP-1998's ``ParameterCandidate.gain_unbounded`` and ``SuggestionResult.bound_limited`` in the same number.
     assert caps.schema_version == "0.62"
 
 

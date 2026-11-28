@@ -800,6 +800,14 @@ refines as before.  A bump rather than "also in 0.61" because 1.12.0 shipped
 0.61: a 1.12 build refuses a phase or instrument carrying the key, and the
 version now says why.
 
+Also 0.62 (WP-1998): ``ParameterCandidate.gain_unbounded`` and
+``SuggestionResult.bound_limited``, both additive and defaulted (``None``
+and an empty list).  0.26 → 0.27 recorded the same kind of change on the
+same types (``delta_bic_raw_n``, ``n_effective``).  ``gain`` itself now
+means the gain the candidate's bounds let it reach, so a saved number does
+not compare with 1.12.0's.  An older build refuses a document carrying
+either new key.
+
 Also in 0.62 (WP-2081): ``SeriesEntry.held_values``, every path the
 caller held on a pattern with the value it was held at.  Additive and
 defaulted to ``None``, the 0.25 → 0.26 rule; an older build refuses an entry
