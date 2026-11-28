@@ -1,6 +1,6 @@
 # WP-2132 — the Estimation page splits before it grows
 
-Milestone: unscheduled · Status: 🔄 2026-11-16 — measured and reported; the split waits on three maintainer questions (handover log)
+Milestone: unscheduled · Status: 🔄 2026-11-28 — the four split questions settled by Claude on 2026-11-16 (handover log); the split, tasks 3-6, is next
 Track: The repo's own process
 Depends on: —
 Priority: P3 2026-11-09 — no reader sees a defect yet, but the next sentence added to the Theory tab's Estimation chapter fails the page contract, and two open PRs already edit that page; the workaround is trimming text that is right
@@ -52,6 +52,8 @@ second choice leaves both halves near 23 000: moving the esd rows keeps 21 123 s
 moves 24 524, and moving the last group keeps 30 522 and moves 15 125 (first row 5 840 now). Which
 boundary, and the new page's title, is this WP's first decision. The Theory tab's titles are short
 nouns (`Estimation`, `Profiles`, `Background`), so the title should be one too.
+*Settled by Claude, 2026-11-16:* the esd rows move, under the title "Esds and intervals" (handover
+log, 2026-11-28).
 
 **What a move breaks.** 27 links from other manual pages name a section of this page by fragment,
 over 13 of its 16 sections, and 9 places under `src/` cite `theory/estimation`. Sphinx's `-W` build
@@ -101,6 +103,7 @@ a question for this WP to measure and report, never to build unasked.
 - [ ] Split the page along one H2 boundary: the new chapter's file, its H1 and answer sentence, both lines in `theory/index.md`, and the old page's answer sentence narrowed to what it keeps.
 - [ ] Move every inbound link: the 27 fragment links in the manual (the `-W` build finds a miss) and the 9 `theory/estimation` citations under `src/` (grep finds them).
 - [ ] Report the headroom of every twin after the split, and whether a growth budget below the cap, on `tests/skill_caps.py`'s pattern, is worth proposing. Propose; build nothing.
+  2026-11-16: no budget and no headroom report, settled by Claude (handover log, 2026-11-28); what remains is the after-split headroom.
 - [ ] Tests: `tests/test_manual.py` and `tests/test_manual_api.py` green on the split tree.
 - [ ] Skill: none. The skill does not cite this page (grep at `9979cee7c`).
 
@@ -116,6 +119,35 @@ a question for this WP to measure and report, never to build unasked.
 - Issue #1495; PR #1383 and its review; PR #1473; WP-1978 (the page contract); WP-1975 § F8 (the cap).
 
 ## Handover log
+
+- **2026-11-28** — post-merge bookkeeping for PR #1578 (maintainer side, ghostshift runner; PR
+  #PRNUM). PR #1578 merged today as `9eb1e3352`. It carried the 2026-11-16 measurement and the three
+  questions in the entry below. All of them, plus the budget, were settled in the maintainer's
+  decisions walk on 2026-11-16 and posted on #1578 on 2026-11-17. Claude settled each call. None is
+  a ruling of Yue's, and Yue may reverse any of them. The split can now be built. Mike said on #1578
+  (2026-11-18) that he will build it as its own PR.
+
+  *Settled* (the four calls, as posted on #1578):
+  - **Boundary.** The esd rows move, from "Esds and the Bérar-Lelann inflation" through "A scale and
+    a B the range cannot separate". Settled by Claude under the 2026-11-16 measurement: halves of
+    21 123 and 24 524 source characters, against 30 522 and 15 125 for the solve-and-steer cut.
+    Alternative: the solve-and-steer rows.
+  - **Title.** "Esds and intervals". Settled by Claude under rietx convention: the manual says "esd"
+    throughout. Alternative: "Standard uncertainties", the IUCr term.
+  - **Timing.** Split now, without waiting for #1383 and #1473. Settled by Claude under the
+    2026-11-16 measurement: #1383 moves this twin by +1 character and #1473 by 0, so their rebase
+    is a hunk move. Alternative: wait for both, as task 1 said.
+  - **Budget.** No growth budget. Settled by Claude under the smallest-thing rule. The only recent
+    overflow came from citation renumbering, which a source-delta budget cannot see, and the cap
+    test already catches an overflow. Alternative: option A, a headroom report with no gate.
+
+  *Checked against `origin/main` at `0f4894d58`:* the page is not split yet (16 H2s, 45 805 source
+  bytes). #1383 and #1473 are both still open. No checklist item landed with #1578, so none is
+  ticked.
+
+  Next: task 3 on the esd-row boundary under the title "Esds and intervals". Then task 4, recounting
+  the links first (28 fragment links and 9 `src/` citations on 2026-11-16). Then task 5's
+  after-split headroom table, and task 6's tests. Mike's claim holds the WP.
 
 - **2026-11-16** — measured and reported, nothing split (ghostshift runner; PR #1578). The page is
   not about to break from the two PRs the WP was waiting on: on current main it has 60 characters to
