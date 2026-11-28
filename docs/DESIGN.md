@@ -539,6 +539,12 @@ before the exports joined the page. It is 1.36 MB with them. The `gui` extra
 is empty and the `viz` extra is matplotlib alone. The measurements and the
 decisions are in the two WP files.
 
+*Amendment (2026-11-01, validation verdicts).* The fit report joins the
+surfaces that carry no validation verdict (DESIGN-RULES Rule 2). An agent reads
+the report between stages. It still chooses what to free there. A sentence there
+would read the same for every fit with the same free parameters. Moved
+here from the rule on 2026-11-27 to make room for the accuracy ruling.
+
 ## Absorption: a correction that cannot improve the fit
 
 Cylindrical (capillary) absorption, WP-0501, is worth recording as a design
@@ -853,3 +859,11 @@ mistake is not made twice; the narrative stays in the WP file or milestone recor
   the unanimity test and the skill's role. Absorbed the same day into Rule 1 and Rule 3,
   after a review found it was a design rule in the purpose's slot (generality record
   § The fourth review, and this file's commit history).
+- **2026-11-05, the Le Bail fence.** Rule 5 held back any Le Bail change that moved
+  every fit's numbers until Pawley became the default (WP-2062). It grew from a
+  delegated settlement during WP-1542 ("we should be moving away from le bail to
+  pawley as default anyway"), which also built the settled partition: intensities
+  re-extracted to 1e-7 with the model frozen, where every surveyed program
+  re-extracts once per least-squares cycle. Lifted 2026-11-27 (WP-2317 R2-R3): Le
+  Bail follows practice. The same day R0 replaced bit-identity as a speed change's
+  bar with verification at fixed parameters.

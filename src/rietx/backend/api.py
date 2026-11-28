@@ -667,6 +667,22 @@ EXPERIMENTAL_BACKENDS = frozenset(TORCH_DEVICES)
 _BACKEND_NAMES = BACKEND_NAMES   # internal alias, kept for existing call sites
 
 
+def check_backend(name: str) -> None:
+    """Refuse a backend this build cannot run, at the call that names it.
+
+    An unknown name is a ``ValueError`` naming the choices
+    (:func:`rietx._nearmiss.check_choice`, WP-2302); a known one whose optional
+    dependency is missing is :func:`resolve_backend`'s ``ImportError`` with the
+    install hint.  ``resolve_backend`` caches the instance, so a constructor
+    calling this pays one import.
+    """
+    from .._nearmiss import check_choice
+
+    check_choice("backend", name, BACKEND_NAMES)
+    if name != "numpy":
+        resolve_backend(name)
+
+
 def resolve_backend(name: str) -> Backend:
     """A (cached) backend instance by name; jax/torch are imported lazily here."""
     global _JAX_BACKEND
