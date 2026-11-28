@@ -20,6 +20,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [1418](1418-the-magnetic-structure-is-determined.md) | The magnetic structure is determined, not only stated | 2026-11-24 | P2 | [magnetic](#magnetic) |
 | [1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md) | A child structure refined on its mode amplitudes | 2026-10-30 | P3 | [magnetic](#magnetic) |
 | [1453](1453-both-directions-name-the-lower-cost.md) | Both directions name the lower cost | 2026-11-28 | P3 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
+| [1460](1460-one-degeneracy-one-finding.md) | One degeneracy, one finding | 2026-11-16 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1522](1522-the-gui-says-what-the-read-repaired.md) | The GUI says what reading the project repaired | 2026-11-16 | P3 | [Unscheduled](#unscheduled-render-what-the-fit-already-knows) |
 | [1536](1536-the-structure-figure-as-an-svg.md) | The structure figure as an SVG | 2026-11-28 | P3 | [rietview](#rietview) |
 | [1539](1539-the-declared-optics-reach-every-caller.md) | The declared optics reach every caller and every reader | 2026-10-03 | P4 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
@@ -57,6 +58,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2072](2072-the-le-bail-and-pawley-cell-against-the-srm-660c-certificate.md) | The Le Bail and Pawley cell, validated against the SRM 660c certificate | 2026-11-16 | P3 | [Unscheduled](#unscheduled-the-fit-has-no-reference) |
 | [2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md) | The extinction screen names a wrong class at a correct cell | 2026-11-13 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-16 | P2 | [series](#series) |
+| [2132](2132-the-estimation-page-splits-before-it-grows.md) | The Estimation page splits before it grows | 2026-11-16 | P3 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2140](2140-every-atom-is-named-by-its-unique-label.md) | Every atom is named by its unique label | 2026-11-28 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2148](2148-a-held-standard-cell-pins-the-wavelength.md) | A held standard's cell pins the wavelength, and a skipped λ is said | 2026-11-16 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2211](2211-the-history-table.md) | The History table: Compare on the pattern, Restore as pending edits | 2026-11-23 | P2 | [gui-overhaul](#gui-overhaul) |
@@ -638,7 +640,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1456](1456-an-editable-install-stamps-what-it-runs.md) | An editable install stamps what it runs | ✅ 2026-09-27 | — | — |
 | [1457](1457-the-stage-rwp-leaves-out-the-declared-peaks.md) | The stage Rwp leaves out the declared peaks | ✅ 2026-09-29 | — | — |
 | [1458](1458-a-tick-with-nothing-behind-it.md) | A tick with nothing behind it moves the low-angle boundary | ✅ 2026-09-24 | — | — ([1327](1327-magnetic-structure.md) soft) |
-| [1460](1460-one-degeneracy-one-finding.md) | One degeneracy, one finding | ⬜ | P3 | — ([1454](1454-auto-background-choices-survive-the-fit.md), [1302](1302-error-is-documentation.md) soft) |
+| [1460](1460-one-degeneracy-one-finding.md) | One degeneracy, one finding | 🔄 2026-11-16 | P3 | — ([1454](1454-auto-background-choices-survive-the-fit.md), [1302](1302-error-is-documentation.md) soft) |
 | [1463](1463-a-phase-at-zero-withholds-every-esd.md) | A phase at zero withholds every esd | ✅ 2026-09-28 | — | — ([1320](1320-qpa-multimodal-fraction.md) soft) |
 | [1465](1465-a-width-that-became-background.md) | A phase width that became background, and an absorption screen that never ran | ✅ 2026-09-27 | — | — |
 | [1467](1467-a-stephens-block-on-a-frozen-floor.md) | A Stephens block on a frozen floor, and a clamp the solver leans on | ✅ 2026-11-02 | — | — ([1318](1318-strain-surface.md) soft) |
@@ -920,7 +922,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2077](2077-the-workflow-sees-ghostshift-runners.md) | The WP workflow sees ghostshift's runners | ✅ 2026-11-02 | — | — |
 | [2119](2119-the-design-record-says-how-a-design-is-chosen.md) | The design record says how a design is chosen | ✅ 2026-11-07 | — | — |
 | [2122](2122-the-mark-redrawn.md) | The mark's bar redrawn, and the header lockup set on the type | ✅ 2026-11-08 | — | — |
-| [2132](2132-the-estimation-page-splits-before-it-grows.md) | The Estimation page splits before it grows | ⬜ | P3 | — |
+| [2132](2132-the-estimation-page-splits-before-it-grows.md) | The Estimation page splits before it grows | 🔄 2026-11-16 | P3 | — |
 | [2134](2134-the-gui-rulebook-condensed.md) | The GUI rulebook keeps rules, and its evidence moves out | ✅ 2026-11-10 | — | — |
 | [2143](2143-a-case-only-rename-works-on-windows.md) | A case-only rename works on Windows, and its recovery copy follows the folder | ✅ 2026-11-12 | — | — |
 | [2145](2145-the-gui-boot-test-waits-as-long-as-the-boot.md) | The `rietx watch` GUI boot test waits as long as the watcher does | ✅ 2026-11-13 | — | — |
