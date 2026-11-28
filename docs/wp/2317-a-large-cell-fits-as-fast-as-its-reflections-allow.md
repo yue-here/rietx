@@ -1,6 +1,6 @@
 # WP-2317 — a large cell fits as fast as its reflections allow: the case, the bar, and the rulings in the way
 
-Milestone: unscheduled · Status: 🔄 2026-11-28 — R0, R2, R3 and R5-R7 ruled, R4 unruled; R7 built on wp2317-window-slack, its suites and PR open; task 1 waits on the maintainer; R6, 5, 7 and 8 open
+Milestone: unscheduled · Status: 🔄 2026-11-28 — R0, R2, R3 and R5-R7 ruled, R4 unruled; R7 built, in PR #1881, waiting on the maintainer; task 1 waits on the maintainer; R6, 5, 7 and 8 open
 Track: A large cell
 Depends on: —
 Priority: P2 2026-11-27 — the scoping WP of a track the maintainer opened for a user at the wall (slowdowns on a 12 × 36 × 4 Å cell); 2314, 2315 and 2316 read its case, its bar and its rulings
@@ -701,7 +701,7 @@ what it costs here.
 
 ### 2026-11-28 (2nd session) — R7's handover: the slack follows what a later stage refits, the Le Bail warning read, the PR opened (runner 3)
 
-R7 is in a pull request, #PRNUM, which waits on the maintainer for a
+R7 is in a pull request, #1881, which waits on the maintainer for a
 stored-format change. The generality judge found that a stage sized its
 windows whenever any stage came after it, while the rule says "a stage a later
 stage refits". A stage whose cell a later stage fixes now keeps the old
