@@ -144,9 +144,83 @@ def _column_in_range(col: np.ndarray) -> np.ndarray:
     return col if s is None else col * s[0]
 
 
+def _equilibrated_normal(jac: np.ndarray
+                         ) -> tuple[np.ndarray, np.ndarray, np.ndarray | None,
+                                    np.ndarray]:
+    """``(E, 1/d, s, live)``: the Jacobi-equilibrated normal matrix
+    ``E = D·JᵀJ·D``, its column scales before the power-of-two factor, that
+    factor, and which columns have a gradient (``d > 0``).
+
+    The one build :func:`normal_factors`, :func:`discarded_directions` and
+    :func:`equilibrated_eigen` share, so the matrix each eigensolves is the
+    same matrix to the bit.  ``1/d`` is 0 on a gradient-free column, and
+    ``s`` is :func:`column_rescale`'s, ``None`` where it had nothing to do.
+    """
+    jac = to_host_fp64(jac)
+    s = column_rescale(jac)
+    if s is not None:
+        # exact, and only on the far columns: E = D·JᵀJ·D is unchanged by a
+        # column scale, so only the returned 1/d carries it back
+        jac = jac * s
+    JTJ = jac.T @ jac
+    JTJ = 0.5 * (JTJ + JTJ.T)  # kill the fp asymmetry before the eigensolve
+    d = np.sqrt(np.diag(JTJ))
+    live = d > 0.0
+    inv_d = np.where(live, 1.0 / np.where(live, d, 1.0), 0.0)
+    return JTJ * np.outer(inv_d, inv_d), inv_d, s, live
+
+
+@dataclass(frozen=True)
+class EquilibratedEigen:
+    """One eigendecomposition of :func:`_equilibrated_normal`'s ``E``, for the
+    two readers of one covariance solve (WP-2315).
+
+    :func:`normal_factors` inverts ``E`` and :func:`discarded_directions`
+    asks which directions that inverse cut.  Each used to build ``E`` and
+    eigensolve it again, and on a Pawley fit ``E`` is the intensity block's
+    size: 1 583 columns on ``bigcell-pawley-120``, ten such ``eigh`` a fit.
+    Handed this, each reads the one decomposition.  Its input is the matrix
+    each would have built, through the same call, so every esd, correlation
+    and discard verdict is the one the two solves gave.  ``lam``/``vec`` are
+    ``eigh``'s own and are only read, never written.
+    """
+
+    lam: np.ndarray
+    vec: np.ndarray
+    inv_d: np.ndarray            # 1/d before the power-of-two factor
+    rescale: np.ndarray | None   # :func:`column_rescale`'s factor
+    live: np.ndarray             # d > 0
+    n_cols: int
+
+
+def equilibrated_eigen(jac: np.ndarray) -> EquilibratedEigen | None:
+    """``E``'s eigendecomposition, or ``None`` where a reader takes its own
+    path: a joint fit's :class:`~.blocked.BlockJacobian` (its Schur
+    complement, WP-1325) and a Jacobian with no column.
+
+    Pass the result, with the same ``jac``, to :func:`normal_factors` and
+    :func:`discarded_directions` as ``eigen=``.  Raises
+    ``np.linalg.LinAlgError`` where both LAPACK drivers fail
+    (:mod:`.lapack`), as either reader would have.
+    """
+    if _is_blocked(jac) or np.shape(jac)[1] == 0:
+        return None
+    e, inv_d, s, live = _equilibrated_normal(jac)
+    lam, vec = lapack.eigh(e)
+    return EquilibratedEigen(lam, vec, inv_d, s, live, e.shape[0])
+
+
+def _check_eigen(eigen: EquilibratedEigen, jac) -> None:
+    if eigen.n_cols != np.shape(jac)[1]:
+        raise ValueError(f"an eigendecomposition of {eigen.n_cols} columns was "
+                         f"handed a Jacobian of {np.shape(jac)[1]}; build it "
+                         f"with equilibrated_eigen(jac) on this Jacobian")
+
+
 def normal_factors(jac: np.ndarray, resid: np.ndarray, n_free: int, *,
                    chi2_floor: bool = False,
                    what: str = "residual entering the covariance solve",
+                   eigen: EquilibratedEigen | None = None,
                    ) -> tuple[np.ndarray, np.ndarray, float]:
     """The equilibrated inverse ``K`` and the column scales ``1/d``.
 
@@ -161,27 +235,25 @@ def normal_factors(jac: np.ndarray, resid: np.ndarray, n_free: int, *,
     A joint fit's :class:`~.blocked.BlockJacobian` takes the same contract
     through the Schur complement of its arrow (:func:`.blocked.normal_factors`,
     WP-1325), never one pseudo-inverse of the whole matrix.
+
+    ``eigen`` is :func:`equilibrated_eigen` of this ``jac``, for a caller that
+    also asks :func:`discarded_directions`: the inverse is then read off it
+    rather than off a second ``eigh`` of the same matrix, to the same bits.
     """
     if _is_blocked(jac):
         from .blocked import normal_factors as blocked_factors
 
         return blocked_factors(jac, resid, n_free, chi2_floor=chi2_floor, what=what)
     require_fp64(resid, what)
-    jac = to_host_fp64(jac)
-    s = column_rescale(jac)
-    if s is not None:
-        # exact, and only on the far columns: E = D·JᵀJ·D is unchanged by a
-        # column scale, so only the returned 1/d carries it back
-        jac = jac * s
-    JTJ = jac.T @ jac
-    JTJ = 0.5 * (JTJ + JTJ.T)  # kill the fp asymmetry before the eigensolve
     chi2_red = float(resid @ resid) / max(len(resid) - n_free, 1)
     scale = max(chi2_red, 1.0) if chi2_floor else chi2_red
-
-    d = np.sqrt(np.diag(JTJ))
-    live = d > 0.0
-    inv_d = np.where(live, 1.0 / np.where(live, d, 1.0), 0.0)
-    k = _psd_pinv(JTJ * np.outer(inv_d, inv_d), PINV_RCOND) * scale
+    if eigen is None:
+        e, inv_d, s, _ = _equilibrated_normal(jac)
+        k = _psd_pinv(e, PINV_RCOND) * scale
+    else:
+        _check_eigen(eigen, jac)
+        inv_d, s = eigen.inv_d, eigen.rescale
+        k = _psd_pinv_of(eigen.lam, eigen.vec, PINV_RCOND) * scale
     if s is not None:
         inv_d = inv_d * s
     return k, inv_d, chi2_red
@@ -215,7 +287,11 @@ def _psd_pinv(a: np.ndarray, rcond: float) -> np.ndarray:
     if a.size == 0:
         m, n = a.shape[-2:]
         return np.empty(a.shape[:-2] + (n, m), dtype=a.dtype)
-    lam, u = lapack.eigh(a)
+    return _psd_pinv_of(*lapack.eigh(a), rcond)
+
+
+def _psd_pinv_of(lam: np.ndarray, u: np.ndarray, rcond: float) -> np.ndarray:
+    """:func:`_psd_pinv` from ``eigh``'s ``(lam, u)``, which it only reads."""
     s = np.abs(lam)
     order = np.argsort(s)[..., ::-1]
     s = np.take_along_axis(s, order, axis=-1)
@@ -230,7 +306,8 @@ def _psd_pinv(a: np.ndarray, rcond: float) -> np.ndarray:
     return np.matmul(u, np.multiply(s[..., None], uh))
 
 
-def discarded_directions(jac: np.ndarray, *, basis: bool = False
+def discarded_directions(jac: np.ndarray, *, basis: bool = False,
+                         eigen: EquilibratedEigen | None = None,
                          ) -> tuple[int, np.ndarray] | tuple[int, np.ndarray, np.ndarray]:
     """How many directions of the equilibrated normal matrix ``_psd_pinv`` discards
     beyond dead columns, and which columns they *touch* (WP-1535).
@@ -268,25 +345,26 @@ def discarded_directions(jac: np.ndarray, *, basis: bool = False
     *lost* half of the touched test, read for any c and not only a unit
     vector).  :func:`estimable` is that test.  ``B`` has no columns where
     nothing is touched.
+
+    ``eigen`` is :func:`equilibrated_eigen` of this ``jac``, shared with
+    :func:`normal_factors` so one covariance solve eigensolves its matrix
+    once (WP-2315); the answer is the one this function's own ``eigh`` gives.
     """
     if _is_blocked(jac):
         from .blocked import discarded_directions as blocked_discarded
 
         return blocked_discarded(jac, basis=basis)
-    jac = to_host_fp64(jac)
-    s = column_rescale(jac)
-    if s is not None:
-        jac = jac * s
-    JTJ = jac.T @ jac
-    JTJ = 0.5 * (JTJ + JTJ.T)
-    d = np.sqrt(np.diag(JTJ))
-    live = d > 0.0
-    none = ((0, np.zeros(0, dtype=np.intp), np.zeros((jac.shape[1], 0)))
+    n_cols = np.shape(jac)[1]
+    none = ((0, np.zeros(0, dtype=np.intp), np.zeros((n_cols, 0)))
             if basis else (0, np.zeros(0, dtype=np.intp)))
+    if eigen is None:
+        e, inv_d, s, live = _equilibrated_normal(jac)
+    else:
+        _check_eigen(eigen, jac)
+        inv_d, s, live = eigen.inv_d, eigen.rescale, eigen.live
     if live.sum() < 2:
         return none
-    inv_d = np.where(live, 1.0 / np.where(live, d, 1.0), 0.0)
-    lam, vec = lapack.eigh(JTJ * np.outer(inv_d, inv_d))
+    lam, vec = lapack.eigh(e) if eigen is None else (eigen.lam, eigen.vec)
     cut = PINV_RCOND * np.abs(lam).max()
     gone = np.abs(lam) <= cut
     # a dead column is its own eigenvector at zero, and not this function's

@@ -382,3 +382,87 @@ def test_the_lab6_width_triple_has_no_short_esd_in_a_joint_fit():
     for path in paths:
         row = rows[path]
         assert row.stderr is None or row.stderr > _SHORT * abs(row.value), (path, row)
+
+
+# ----------------------------------------------------------------------
+# One eigensolve for the covariance and the discard test (WP-2315)
+# ----------------------------------------------------------------------
+# ``_guarded_covariance`` hands ``normal_factors`` and ``discarded_directions``
+# one ``equilibrated_eigen`` of their shared matrix, where each used to build
+# and eigensolve it.  The input to ``eigh`` is the same array either way, so
+# the bar is equality to the bit within one process, never a tolerance.
+# Across BLAS builds nothing here is claimed.
+
+
+def _guarded_both_ways(monkeypatch, jac, resid, n_data):
+    from rietx.optimize import least_squares
+
+    out = {}
+    for share in (True, False):
+        monkeypatch.setattr(least_squares, "_SHARE_EIGEN", share)
+        out[share] = least_squares._guarded_covariance(jac, resid, jac.shape[1],
+                                                       n_data)
+    return out[True], out[False]
+
+
+def _assert_same_answer(shared, separate):
+    stderr, corr, factor, error, discards, subspace = shared
+    assert error is None and separate[3] is None
+    assert np.array_equal(stderr, separate[0])
+    assert np.array_equal(corr, separate[1])
+    assert factor == separate[2]
+    assert discards[0] == separate[4][0]
+    assert np.array_equal(discards[1], separate[4][1])
+    if subspace is None:
+        assert separate[5] is None
+    else:
+        assert np.array_equal(subspace.lost, separate[5].lost)
+        assert np.array_equal(subspace.stderr, separate[5].stderr)
+
+
+@pytest.mark.parametrize("case", ["plain", "combination", "dead", "far"])
+def test_one_eigensolve_gives_both_readers_their_own_answer(monkeypatch, case):
+    """Every esd, correlation, discard count, touched set and basis is the
+    two-solve path's to the bit, on each branch the readers take: nothing
+    discarded, a three-column combination (touched, with a basis), a dead
+    column, and a column of 1e-170 that ``column_rescale`` lifts."""
+    j = _jac(n=400, seed=1)
+    j = np.hstack([j, _jac(n=400, seed=2)])
+    if case == "combination":
+        j[:, 4] = j[:, 0] + j[:, 1]
+    elif case == "dead":
+        j[:, 2] = 0.0
+        j[:, 4] = j[:, 0] + j[:, 1]
+    elif case == "far":
+        j[:, 7] *= 1e-170
+        j[:, 4] = j[:, 0] + j[:, 1]
+    resid = np.random.default_rng(4).standard_normal(400)
+    shared, separate = _guarded_both_ways(monkeypatch, j, resid, 400)
+    _assert_same_answer(shared, separate)
+    assert (shared[4][0] > 0) == (case != "plain")
+
+
+def test_a_pawley_fit_is_the_two_solve_fit_to_the_bit(monkeypatch):
+    """The whole fit, since a stage's esds reach the next stage (the bound
+    test, the support test): every table value and esd (an unmeasured row's
+    is ``None``), every Pawley intensity esd and every diagnostic agree
+    exactly."""
+    from rietx.optimize import least_squares
+    from tests.test_pawley import _overlapped_lab6, _synth_overlapped
+
+    pattern, _, _ = _synth_overlapped()
+    runs = {}
+    for share in (True, False):
+        monkeypatch.setattr(least_squares, "_SHARE_EIGEN", share)
+        s, ins = _overlapped_lab6(a=4.160, w=1e-2)
+        ref = Refinement(s, ins, history=False)
+        result = ref.fit(pattern, mode="pawley")
+        runs[share] = (
+            [(p.path, p.value, p.stderr) for p in result.parameters],
+            np.array(ref._model.pawley.stderr, dtype=float),
+            [d.code for d in result.diagnostics],
+        )
+    shared, separate = runs[True], runs[False]
+    assert shared[0] == separate[0]
+    assert np.array_equal(shared[1], separate[1], equal_nan=True)
+    assert shared[2] == separate[2]

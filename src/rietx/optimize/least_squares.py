@@ -660,6 +660,12 @@ def _rechart_matrix(outcome: LSQOutcome, theta: np.ndarray,
                    stderr_internal=stderr, correlation=corr, residual_cosine=cosine)
 
 
+#: Whether :func:`_guarded_covariance` eigensolves its matrix once for the
+#: covariance and the discard test together (WP-2315).  Off only for probes
+#: comparing against the two-solve path, as ``bccg._REUSE_STALE_FACTOR``.
+_SHARE_EIGEN = True
+
+
 def _guarded_covariance(jac, fun, n_free: int, n_data: int
                         ) -> tuple[np.ndarray | None, np.ndarray | None,
                                    float | None, str | None,
@@ -703,16 +709,20 @@ def _guarded_covariance(jac, fun, n_free: int, n_data: int
     ``None`` where nothing was touched.
     Returns ``(stderr, corr, factor, error, discards, subspace)``.
     """
-    from .statistics import discarded_directions
+    from .statistics import discarded_directions, equilibrated_eigen
 
     try:
+        # one eigensolve for both readers (WP-2315): the covariance inverts
+        # it and the discard test reads the cut off it, as each did off its own
+        eigen = equilibrated_eigen(jac) if _SHARE_EIGEN else None
         stderr, corr, factor = _covariance_and_inflation(jac, fun, n_free,
-                                                         n_data=n_data)
+                                                         n_data=n_data,
+                                                         eigen=eigen)
     except np.linalg.LinAlgError as exc:
         return None, None, None, repr(exc), None, None
     # outside the guard: where the covariance did form, a failure of the
     # discard test stays loud, as it was in ``check_guards`` before WP-2219
-    n_gone, touched, basis = discarded_directions(jac, basis=True)
+    n_gone, touched, basis = discarded_directions(jac, basis=True, eigen=eigen)
     discards = (n_gone, touched)
     subspace = None
     if len(touched):
@@ -4370,7 +4380,7 @@ def covariance_estimates(jac: np.ndarray, fun: np.ndarray, n_free: int,
 
 
 def _covariance_and_inflation(jac: np.ndarray, fun: np.ndarray, n_free: int,
-                              n_data: int | None = None
+                              n_data: int | None = None, *, eigen=None
                               ) -> tuple[np.ndarray, np.ndarray, float]:
     """:func:`covariance_estimates`' esds and correlation, and the Bérar-Lelann
     factor those esds were multiplied by.
@@ -4393,7 +4403,7 @@ def _covariance_and_inflation(jac: np.ndarray, fun: np.ndarray, n_free: int,
     data = fun if n_data is None else fun[:n_data]
     # ``normal_covariance`` in its two factors, so the esd below can be taken
     # where the product overflows
-    k, inv_d, _chi2_red = normal_factors(jac, data, n_free)
+    k, inv_d, _chi2_red = normal_factors(jac, data, n_free, eigen=eigen)
     live = inv_d > 0.0
     cov = covariance_from_factors(k, inv_d)
     # Normalise the correlation by the *raw* (un-inflated) sqrt-diagonal so it is
