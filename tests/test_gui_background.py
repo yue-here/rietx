@@ -239,8 +239,9 @@ def test_a_pending_hold_is_held_for_that_answer_alone(tmp_path_factory, tmp_path
 def test_a_pending_glob_hold_is_held_as_the_hold_verb_resolves_it(tmp_path_factory, tmp_path):
     """A pending hold may be a glob, as the hold verb takes one (WP-2218 review):
     the band is the one every matching path held gives. A glob matching
-    nothing is an empty sweep, as ``Refinement.hold`` takes it, so the band
-    accepts what Apply accepts (review of #1683, finding 2)."""
+    nothing is an empty sweep, which ``Refinement.hold`` accepts with a warning
+    (WP-2303), so the band accepts what Apply accepts (review of #1683,
+    finding 2)."""
     project = _unfitted(tmp_path_factory)
     session = GuiSession(project, state_dir=tmp_path)
     paths = ["instrument.background.c4", "instrument.background.c5"]

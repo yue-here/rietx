@@ -9045,7 +9045,7 @@ def _path_hint(path: str, known, instrument=None) -> str:
     """
     current = retired_spelling(path)
     if current is not None:
-        return f"it is a spelling retired after v1.2, now spelled {current!r}."
+        return _retired_words(current)
     if (hit := undeclared_opt_in(path, known, instrument)) is not None:
         row, owner = hit
         # "a parameter of", never "exists once declared": an indexed family
@@ -9053,6 +9053,11 @@ def _path_hint(path: str, known, instrument=None) -> str:
         return (f"it is a parameter of {row.name}, which {_owner_words(owner)} "
                 f"does not declare. Declare it with {row.declaration}.")
     return did_you_mean(path, known, n=1)
+
+
+def _retired_words(current: str) -> str:
+    """The clause naming a retired spelling's current one, for an unknown path."""
+    return f"it is a spelling retired after v1.2, now spelled {current!r}."
 
 
 def _empty_match_findings(verb: str, globs, known) -> list[str]:
@@ -9070,7 +9075,9 @@ def _empty_match_findings(verb: str, globs, known) -> list[str]:
 
     A retired spelling is named with its current one; any other pattern is
     pointed at the full list, because the nearest *path* to a pattern is
-    rarely the pattern the caller meant.
+    rarely the pattern the caller meant.  A pattern with a ``[`` is told why
+    first, as the manual's parameter-table page warns: fnmatch reads
+    ``phases[0]`` as a set of characters, and no name has brackets.
     """
     out = []
     for glob in dict.fromkeys(globs):
@@ -9078,9 +9085,12 @@ def _empty_match_findings(verb: str, globs, known) -> list[str]:
                                         for p in known):
             continue
         current = retired_spelling(glob)
-        tail = (f" It is a spelling retired after v1.2, now spelled {current!r}."
-                if current is not None
-                else " Refinement.parameters() lists every path.")
+        words = _retired_words(current) if current is not None else ""
+        tail = (f" {words[:1].upper()}{words[1:]}" if current is not None
+                else (" No parameter name contains square brackets, and the "
+                      "match reads [...] as a set of characters."
+                      if "[" in glob else "")
+                + " Refinement.parameters() lists every path.")
         out.append(f"{verb} nothing for {glob!r}, which matches no parameter "
                    "of this model." + tail)
     return out

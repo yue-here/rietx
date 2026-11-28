@@ -365,8 +365,10 @@ A path of an opt-in correction the model does not declare names the declaration 
 For extinction on a phase that declares none, it names `phase.extinction = 0.0`.
 `set_vary` checks every literal in the call before it changes anything, so a list with one wrong name leaves the model and the history as they were.
 A pattern that matches no parameter returns `[]` and warns with a `UserWarning` naming the pattern.
-`Refinement.hold`, `Refinement.unhold`, `Refinement.untie` and `Refinement.tie_equal` warn the same way.
-A pattern whose rows were declined or were already as asked stays silent, so a repeated `hold` says nothing.
+`Refinement.hold`, `Refinement.unhold` and `Refinement.untie` warn the same way.
+`Refinement.tie_equal` warns for such a pattern when its other patterns tie a group, and raises when no pattern matches anything.
+A pattern that matched rows and changed none of them stays silent, so a repeated `hold` says nothing.
+The exceptions are `set_vary`'s, in the next paragraph.
 A stage's pattern that matches nothing also stays silent, since plans reach components that some models lack.
 
 `set_vary` warns with a `UserWarning` when it frees nothing for a row that exists.

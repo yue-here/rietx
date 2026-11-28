@@ -61,9 +61,9 @@ is the one the applied hold gives. A hold may be a glob, resolved as
 moves the background's band through the covariance too. A pending *release*
 needs no arm: a released parameter comes back fixed (``Refinement.unhold``), so
 its band is the held one. A literal path the table does not have is refused,
-never ignored, while a glob matching nothing is an empty sweep, as the hold
-verb takes it (``params.vector.is_literal_path``), so the band never refuses
-a hold that Apply accepts.
+never ignored, while a glob matching nothing is an empty sweep
+(``params.vector.is_literal_path``). The hold verb accepts that glob too and
+warns (WP-2303), so the band never refuses a hold that Apply accepts.
 """
 
 from __future__ import annotations
