@@ -6488,13 +6488,38 @@ ROWS: tuple[Row, ...] = (
                  "with the pick; kept at the measured value, untested beyond its one family (B12, "
                  "ruled 2026-10-19)."),
         approved="2026-10-19"),
-    Row("rietx.strategy.magnetic.SOLVE_MINIMUM_RTOL", "constant", tier=3, value=0.0001,
-        evidence=("WP-1327: no stated source, never measured; gates the reported n_minima count, "
-                  "not the pick"),
+    Row("rietx.strategy.magnetic.SOLVE_MINIMUM_MODULUS_SIGMA", "constant", tier=3, value=3.0,
+        evidence=("#1424 (ruled 2026-11-12: distinct minima counted by moduli, replacing "
+                  "SOLVE_MINIMUM_RTOL's Rwp test at 1e-4, never measured, which miscounted the "
+                  "two-site swap on 15/24 draws). Per site, |dm| > 3 combined esds at the "
+                  "ranking's windows; equal to report.schemas.MOMENT_SUPPORT_SIGMA (itself in "
+                  "the unaudited baseline), so an esd multiple and not a value placed on these "
+                  "fits. Synthetic k = 0 neutron P n m a: the two-site set (Mn1 4b, Mn2 4a, "
+                  "3.5/0.7 muB) records both assignments on 24/24 draws; a four-site set whose "
+                  "weak pair (0.6/0.3 muB beside 3.5) swaps under an exact c/2 symmetry has its "
+                  "two weak orderings 3.7-14 combined esds apart (best stop of each ordering; the "
+                  "closest draw clears 3 by 1.2x, and one draw is split at 2.98 / 3.02), "
+                  "0.052-0.089 of the largest |m|, overlapping the 0.058 one two-site group's "
+                  "starts spread by (a wrong class answering ~0.13 muB), so the 0.1 x largest "
+                  "|m| test this replaces counted them as one on 12/12 draws; the same set at "
+                  "0.45/0.45 is one minimum on 12/12; one assignment's stops also fall into a "
+                  "third group on 3 of 48 true-class cases in the probe's recorded stops. End to "
+                  "end at this rule (56 draws, macOS arm64 and x86-64 Linux): the grouping "
+                  "equals an offline replica of the rule on 320/320 calls; two-site both "
+                  "assignments 24/24, two-site B(Mn2) = 1.2 truth first 8/8, four-site weak "
+                  "0.6/0.3 both orderings 12/12, 0.45/0.45 one entry 12/12; where a third "
+                  "entry lands differs by platform, which assignments are recorded does not. "
+                  "Gates the reported n_minima, "
+                  "MagneticTrial.minima and the stopped-at-N-places caveat, never the pick (the "
+                  "lowest chi2 start wins); synthetic P n m a sets only, untested beyond them"),
         grounds=("Rare feature inside solve_magnetic, a pick verb whose whole ranking travels "
-                 "with the pick; kept at its value, which no family measured (B12, ruled "
-                 "2026-10-19)."),
-        approved="2026-10-19"),
+                 "with the pick. Two stops count as one minimum when every site's |m| agrees "
+                 "within the support test's esd multiple (equal to MOMENT_SUPPORT_SIGMA), a bar "
+                 "stated before these fits and not read off them; the count says the starts "
+                 "ended apart, not that the data choose between them. Provisional, untested "
+                 "beyond synthetic k = 0 neutron P n m a sets of two and four magnetic sites "
+                 "(the B12 clause, ruled 2026-10-19; this row ruled 2026-11-25)."),
+        approved="2026-11-25"),
     Row("rietx.strategy.magnetic.SOLVE_RELEASE_FRACTION", "constant", tier=3, value=0.05,
         evidence=("WP-1327: Ba6Co6 (GSAS-II Magnetic-III tutorial, not vendored), released from "
                   "the one-site leg: Rwp 0.08752 (the published answer) against 0.08952 flat; one "

@@ -1,0 +1,3 @@
+- **`solve_magnetic` records every place its starts stop** (#1424). `MagneticTrial.minima` lists them lowest χ² first, each with the starts that ended there, its χ², every start's χ², and every site's |m| and esd.
+  Two starts are told apart when some site's |m| differs by more than three combined esds, so `MagneticTrial.n_minima` and the caveat count them that way; the caveat now says how many places the starts stopped at, and that the count is measured on synthetic P n m a sets only.
+  Before, they were counted by Rwp, which two minima can share: when two sites can swap moduli at about one unit of χ², the old count was wrong on 15 of 24 simulated patterns, reporting one assignment only on 9 of them.
