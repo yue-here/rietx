@@ -499,8 +499,8 @@ def test_the_png_carries_its_chunks_and_the_array(tmp_path, nac):
 
 
 def test_a_jpeg_is_refused(tmp_path, nac):
-    # the refusal names every suffix it takes (WP-1536 D1)
-    with pytest.raises(ValueError, match=r"writes \.png or \.svg"):
+    # the refusal names every suffix it takes (WP-1536 D1, WP-1537)
+    with pytest.raises(ValueError, match=r"writes \.png, \.svg, \.pov, \.glb.*not JPEG"):
         render_structure(nac, path=tmp_path / "nac.jpg")
 
 
@@ -1554,6 +1554,280 @@ def test_carbon_is_lighter_on_a_dark_ground_only(monkeypatch):
     assert s3.dark_ground_colours(molecule["sites"]) == {}
     clash = render_structure(molecule, size=200, background="#151515")
     assert carbon(clash) == {s3._CPK["C"]}
+
+
+# ----------------------------------------------------------------------
+# the scene for a ray tracer: POV-Ray and glTF (WP-1537)
+# ----------------------------------------------------------------------
+
+POV_CASE = DATA / "figure3d_one_ellipsoid.pov"
+_NUMBER = re.compile(r"-?\d+(?:\.\d+)?(?:e[-+]?\d+)?")
+
+
+def _pov_numbers(text: str) -> list[float]:
+    return [float(x) for x in _NUMBER.findall(text)]
+
+
+def _pov_matrix(text: str) -> tuple[np.ndarray, np.ndarray]:
+    """A POV-Ray ``matrix <...>`` read as POV-Ray reads it: the images of x,
+    y and z in turn, so the 3×3 that maps a column vector has them as columns."""
+    n = _pov_numbers(text)
+    assert len(n) == 12, text
+    return np.array(n[:9]).reshape(3, 3).T, np.array(n[9:])
+
+
+def _pov_atoms(text: str) -> list[tuple[np.ndarray, np.ndarray]]:
+    return [_pov_matrix(m) for m in re.findall(
+        r"sphere \{ 0, 1  // atom \d+\n.*?\n\s+(matrix <[^>]*>)", text, re.S)]
+
+
+def _pov_camera(text: str) -> dict:
+    block = re.search(r"camera \{(.*?)\n\}", text, re.S).group(1)
+    out = {}
+    for key in ("location", "direction", "right", "up"):
+        out[key] = np.array(_pov_numbers(re.search(rf"{key} (<[^>]*>)", block).group(1)))
+    return out
+
+
+def _glb(data: bytes) -> tuple[dict, bytes]:
+    """A GLB read by the container's own rules: header, then a JSON chunk and
+    a BIN chunk, each 4-byte aligned, the lengths adding up to the file."""
+    magic, version, total = struct.unpack_from("<III", data, 0)
+    assert (magic, version, total) == (0x46546C67, 2, len(data))
+    n_json, kind = struct.unpack_from("<II", data, 12)
+    assert kind == 0x4E4F534A and n_json % 4 == 0
+    doc = json.loads(data[20:20 + n_json])
+    n_bin, kind = struct.unpack_from("<II", data, 20 + n_json)
+    assert kind == 0x004E4942 and n_bin % 4 == 0
+    assert 28 + n_json + n_bin == len(data)
+    binary = data[28 + n_json:]
+    assert doc["buffers"] == [{"byteLength": n_bin}]
+    return doc, binary
+
+
+def _accessor(doc: dict, binary: bytes, k: int) -> np.ndarray:
+    acc = doc["accessors"][k]
+    view = doc["bufferViews"][acc["bufferView"]]
+    assert view["byteOffset"] % 4 == 0
+    assert view["byteOffset"] + view["byteLength"] <= len(binary)
+    dtype, width = {5126: ("<f4", 4), 5125: ("<u4", 4)}[acc["componentType"]]
+    per = {"SCALAR": 1, "VEC3": 3}[acc["type"]]
+    assert view["byteLength"] == acc["count"] * per * width
+    raw = np.frombuffer(binary, dtype=dtype, count=acc["count"] * per,
+                        offset=view["byteOffset"] + acc.get("byteOffset", 0))
+    return raw.reshape(-1, per) if per > 1 else raw
+
+
+def _check_glb(doc: dict, binary: bytes) -> None:
+    """What the Khronos validator checks first, by hand: accessor bounds, the
+    POSITION min/max, unit normals, indices inside their vertex count."""
+    for mesh in doc["meshes"]:
+        for prim in mesh["primitives"]:
+            pos = _accessor(doc, binary, prim["attributes"]["POSITION"])
+            acc = doc["accessors"][prim["attributes"]["POSITION"]]
+            assert acc["min"] == pos.min(axis=0).tolist()
+            assert acc["max"] == pos.max(axis=0).tolist()
+            normals = _accessor(doc, binary, prim["attributes"]["NORMAL"])
+            assert np.allclose(np.linalg.norm(normals, axis=1), 1.0, atol=1e-6)
+            idx = _accessor(doc, binary, prim["indices"])
+            assert idx.size % 3 == 0 and idx.max() < len(pos)
+            assert 0 <= prim["material"] < len(doc["materials"])
+    for node in doc["nodes"]:
+        assert "matrix" not in node        # TRS only, so no shear can slip in
+
+
+def _node_matrix(node: dict) -> np.ndarray:
+    from rietx.viz.figure3d import scene3d
+    return scene3d.rotation_of(node["rotation"]) * np.asarray(node["scale"])
+
+
+def test_a_pov_scene_draws_each_atom_where_the_png_did_and_in_its_depth_order(nac, tmp_path):
+    """The handedness check, on NAC (I2₁3, chiral).  Each atom's centre is
+    taken through RIETX_VIEW and POV-Ray's orthographic camera as POV-Ray
+    reads them (left-handed: x right, y up, z into the screen) and lands on
+    the PNG's pixel, at the PNG's depth with the sign POV-Ray's frame gives
+    it.  Written without the mirror, the picture is NAC's enantiomer: the same
+    pixels with every depth reversed, so the depth is what this checks."""
+    path = tmp_path / "nac.pov"
+    fig = render_structure(nac, mode="ellipsoid", size=300, path=path)
+    text = path.read_text(encoding="utf-8")
+    view, shift = _pov_matrix(re.search(r"RIETX_VIEW = transform \{ (matrix <[^>]*>)",
+                                        text).group(1))
+    assert not shift.any()
+    assert np.linalg.det(view) == pytest.approx(-1.0)        # the mirror is in it
+    cam = _pov_camera(text)
+    assert cam["direction"].tolist() == [0.0, 0.0, 1.0]
+    width, height = fig.image.shape[1], fig.image.shape[0]
+    assert f"+W{width} +H{height}" in text
+    atoms = _pov_atoms(text)
+    assert len(atoms) == len(fig.atoms)
+    depths = np.array([a["depth"] for a in fig.atoms])
+    assert np.ptp(depths) > 1.0          # a depth order to get wrong
+    for (m, pos), drawn in zip(atoms, fig.atoms):
+        p = view @ pos
+        u = (p[0] - cam["location"][0]) / cam["right"][0] * width + width / 2
+        v = height / 2 - (p[1] - cam["location"][1]) / cam["up"][1] * height
+        assert (u, v) == pytest.approx((drawn["x"], drawn["y"]), abs=1e-6)
+        assert p[2] == pytest.approx(-drawn["depth"], abs=1e-9)
+        assert p[2] > cam["location"][2]          # in front of the camera
+    # the key light comes from LOOK's view-space direction, mirrored
+    light = re.search(r"light_source \{\n\s+(<[^>]*>).*?point_at (<[^>]*>)", text, re.S)
+    toward = np.array(_pov_numbers(light.group(1))) - np.array(_pov_numbers(light.group(2)))
+    look = np.asarray(sc.LOOK["light"]) / np.linalg.norm(sc.LOOK["light"])
+    assert toward / np.linalg.norm(toward) == pytest.approx(look * [1, 1, -1], abs=1e-9)
+    # the frame POV-Ray is told to draw is the PNG's, in Å
+    ppa = fig.pixels_per_angstrom
+    assert cam["right"][0] == pytest.approx(width / ppa) and cam["up"][1] == pytest.approx(
+        height / ppa)
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+    (OUTPUT / "nac_ellipsoid.pov").write_text(text, encoding="utf-8")
+    _save(fig, "nac_ellipsoid_for_pov")
+
+
+def test_a_pov_atoms_matrix_is_the_shapes_columns(tmp_path):
+    """POV-Ray's ``matrix`` lists the images of x, y and z, so it takes M's
+    columns; row by row it would draw Mᵀ, a different ellipsoid whenever M is
+    not symmetric, as this general monoclinic one is not."""
+    geo = _one_atom(_general_ellipsoid())
+    shape = np.asarray(sc.build_scene(geo, "ellipsoid")["atoms"][0]["shape"]).reshape(3, 3)
+    assert np.abs(shape - shape.T).max() > 1e-3
+    path = tmp_path / "one.pov"
+    render_structure(geo, mode="ellipsoid", size=64, path=path)
+    [(m, pos)] = _pov_atoms(path.read_text(encoding="utf-8"))
+    assert np.allclose(m, shape, rtol=0, atol=1e-11)
+    assert np.allclose(pos, geo["atoms"][0]["pos"], rtol=0, atol=1e-11)
+    rng = np.random.default_rng(1537)
+    u = rng.normal(size=(50, 3))
+    u /= np.linalg.norm(u, axis=1)[:, None]
+    # every point of POV-Ray's unit sphere lands on the ellipsoid the PNG solves
+    on = (u @ m.T) @ np.linalg.inv(shape).T
+    assert np.allclose(np.linalg.norm(on, axis=1), 1.0, atol=1e-10)
+
+
+def test_the_pov_text_matches_the_committed_small_case(tmp_path):
+    """The whole text, unrendered, against ``tests/data/figure3d_one_ellipsoid.pov``:
+    the words exactly, the numbers to 1e-9 (a platform's last bits move them).
+    After a deliberate change, regenerate it with the call below and read the diff."""
+    path = tmp_path / "one.pov"
+    render_structure(_one_atom(_general_ellipsoid()), mode="ellipsoid", size=64, path=path)
+    ours, theirs = path.read_text(encoding="utf-8"), POV_CASE.read_text(encoding="utf-8")
+    assert _NUMBER.sub("#", ours) == _NUMBER.sub("#", theirs)
+    assert np.allclose(_pov_numbers(ours), _pov_numbers(theirs), rtol=1e-9, atol=1e-9)
+
+
+def test_a_glb_parses_and_its_nodes_are_each_atoms_shape(nac, tmp_path):
+    """The container (magic, version, chunk lengths), the validator's first
+    checks by hand, each atom's node reproducing its ``shape`` to 1e-12 up to
+    the sign of an axis (the ellipsoid and its rings are symmetric under it),
+    and the camera: looking down the view's -z with half the frame as its
+    magnification."""
+    from rietx.viz.figure3d import scene3d
+    for mode in ("ball", "ellipsoid"):
+        path = tmp_path / f"nac_{mode}.glb"
+        fig = render_structure(nac, mode=mode, size=300, path=path)
+        doc, binary = _glb(path.read_bytes())
+        _check_glb(doc, binary)
+        assert {"KHR_lights_punctual", "KHR_materials_unlit"} <= set(doc["extensionsUsed"])
+        R = np.asarray(fig.rotation)
+        nodes = {n["name"]: n for n in doc["nodes"] if n["name"].startswith("atom ")}
+        assert len(nodes) == len(fig.atoms)
+        geometry = s3.build(nac)
+        scene = sc.build_scene(geometry, mode, polyhedra=sc.shown_polyhedra(
+            geometry, mode == "ball", None, [], True))
+        for atom in scene["atoms"]:
+            node = nodes[f"atom {atom['index']}"]
+            m = np.asarray(atom["shape"]).reshape(3, 3)
+            got = _node_matrix(node)
+            signs = np.sign(np.sum(got * m, axis=0))
+            assert np.abs(got * signs - m).max() < 1e-12
+            assert np.abs(np.asarray(node["translation"]) - atom["pos"]).max() < 1e-12
+        # a bond half's node carries the unit cylinder (y from 0 to 1) from
+        # its atom to the bond's middle
+        half = scene["halves"][0]
+        node = next(n for n in doc["nodes"] if n["name"] == f"bond {half['bond']}")
+        ends = [_node_matrix(node) @ y + node["translation"] for y in ([0, 0, 0], [0, 1, 0])]
+        assert np.abs(np.array(ends) - [half["from"], half["to"]]).max() < 1e-12
+        # every stroke of the letters lies in the camera's plane, on the PNG's pixels
+        to_px = np.array([[1, 0, 0], [0, -1, 0]]) * fig.pixels_per_angstrom
+        for node in (n for n in doc["nodes"] if n["name"] == "stroke"):
+            for y in ([0, 0, 0], [0, 1, 0]):
+                v = R @ (_node_matrix(node) @ y + node["translation"])
+                px = to_px @ v - to_px @ [fig.origin[0], fig.origin[1], 0]
+                assert 0 <= px[0] <= fig.image.shape[1] and 0 <= px[1] <= fig.image.shape[0]
+        strokes = [n for n in doc["nodes"] if n["name"] == "stroke"]
+        assert strokes and len({round(float((R @ n["translation"])[2]), 9) for n in strokes}) == 1
+        # the light shines down its own -z, toward -LOOK['light'] in the view
+        light = next(n for n in doc["nodes"] if "extensions" in n)
+        shines = R @ -scene3d.rotation_of(light["rotation"])[:, 2]
+        look = np.asarray(sc.LOOK["light"]) / np.linalg.norm(sc.LOOK["light"])
+        assert np.abs(shines + look).max() < 1e-12
+        camera = next(n for n in doc["nodes"] if "camera" in n)
+        assert np.abs(scene3d.rotation_of(camera["rotation"]) - R.T).max() < 1e-12
+        ortho = doc["cameras"][0]["orthographic"]
+        ppa = fig.pixels_per_angstrom
+        assert ortho["xmag"] == pytest.approx(fig.image.shape[1] / ppa / 2)
+        assert ortho["ymag"] == pytest.approx(fig.image.shape[0] / ppa / 2)
+        OUTPUT.mkdir(parents=True, exist_ok=True)
+        (OUTPUT / f"nac_{mode}.glb").write_bytes(path.read_bytes())
+
+
+def test_a_sheared_shape_is_baked_into_its_own_mesh(tmp_path):
+    """glTF allows no shear in a node, so an atom whose matrix does not
+    decompose carries it in its points: each is ``M·u`` of the unit sphere's."""
+    from rietx.viz.figure3d import scene3d
+    unit, band, rest = scene3d.ring_sphere()
+    for last in (0.1, -0.1):             # a mirroring matrix is folded, not drawn inside out
+        geo = _one_atom(_general_ellipsoid())
+        geo["atoms"] = [dict(geo["atoms"][0], ellipsoid=[[0.2, 0.08, 0.0], [0.0, 0.15, 0.0],
+                                                         [0.0, 0.0, last]])]
+        shape = np.asarray(sc.build_scene(geo, "ellipsoid")["atoms"][0]["shape"]).reshape(3, 3)
+        assert scene3d.trs(shape) is None
+        path = tmp_path / "sheared.glb"
+        render_structure(geo, mode="ellipsoid", size=64, path=path)
+        doc, binary = _glb(path.read_bytes())
+        _check_glb(doc, binary)
+        [node] = [n for n in doc["nodes"] if n["name"].startswith("atom ")]
+        assert "rotation" not in node and "scale" not in node
+        prims = doc["meshes"][node["mesh"]]["primitives"]
+        pts = _accessor(doc, binary, prims[0]["attributes"]["POSITION"])
+        folded = shape if last > 0 else shape @ np.diag([-1.0, 1.0, 1.0])
+        assert np.abs(pts - unit @ folded.T).max() < 1e-6       # float32
+        for prim in prims:
+            tri = pts[_accessor(doc, binary, prim["indices"]).reshape(-1, 3)].astype(float)
+            n = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0])
+            assert (np.einsum("ij,ij->i", n, tri.sum(axis=1)) > 0).all()
+
+
+def test_the_ringed_sphere_lays_its_triangles_on_the_rings_edges():
+    """The band is where the smallest unit-frame coordinate is under
+    ``ring_width``, the shader's rule: every band triangle lies inside it and
+    every other triangle outside, and the two cover the sphere."""
+    from rietx.viz.figure3d import scene3d
+    points, band, rest = scene3d.ring_sphere()
+    w = sc.LOOK["ring_width"]
+    assert np.allclose(np.linalg.norm(points, axis=1), 1.0, atol=1e-15)
+
+    def least(tris):
+        corners = points[np.asarray(tris)]
+        return np.abs(corners).min(axis=2).max(axis=1), np.abs(corners).min(axis=2).min(axis=1)
+
+    hi, _ = least(band)
+    _, lo = least(rest)
+    assert hi.max() <= w + 1e-12 and lo.min() >= w - 1e-12
+    corners = points[np.asarray(band + rest)]
+    area = 0.5 * np.linalg.norm(np.cross(corners[:, 1] - corners[:, 0],
+                                         corners[:, 2] - corners[:, 0]), axis=1).sum()
+    assert area == pytest.approx(4 * np.pi, rel=0.01)
+    # wound outward, as glTF's front faces are
+    n = np.cross(corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0])
+    assert (np.einsum("ij,ij->i", n, corners.sum(axis=1)) > 0).all()
+
+
+@pytest.mark.parametrize("suffix", [".pov", ".glb"])
+@pytest.mark.parametrize("kw", [{"outline": True}, {"depth_cue": True}])
+def test_a_png_only_switch_is_refused_with_a_scene(nac, tmp_path, suffix, kw):
+    with pytest.raises(ValueError, match="PNG renderer's own"):
+        render_structure(nac, path=tmp_path / f"nac{suffix}", **kw)
 
 
 # ----------------------------------------------------------------------

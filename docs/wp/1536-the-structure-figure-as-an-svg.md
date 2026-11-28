@@ -147,6 +147,11 @@ change no reported number.
   task, the GUI export menu, is GUI work and stays with the issue until the GUI track takes
   it into the rebuilt Structure graph (WP-2218, open in PR #1673; inventory row 79 of
   WP-2214 homes the PNG export there).
+- **2026-11-17, from [1537](1537-the-structure-scene-for-a-ray-tracer.md): the suffix
+  dispatch is a tuple.** `render.WRITERS` lists the suffixes `path=` accepts (`.png`, `.svg`,
+  `.pov`, `.glb`) and `render_structure` branches on it where it writes. `outline=` and
+  `depth_cue=` are refused with a `.pov` or `.glb` scene only; the SVG draws both, as the PNG
+  does. The GUI's export menu, which lists SVG, is issue #1667.
 
 ## Non-goals
 
