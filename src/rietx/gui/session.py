@@ -1245,7 +1245,11 @@ class GuiSession:
         "nothing chose, and ``fit`` would default".
         """
         p = self._need_project()
-        effective = PlanSpec.from_plan(self._effective_plan())
+        # the stored spec as it stands, not converted to a runnable plan and
+        # back: an old project may hold a stage budget of 0 that a run refuses
+        # but that the editor must still show, so it can be corrected (WP-1947)
+        effective = (p.doc.plan if p.doc.plan is not None
+                     else PlanSpec.from_plan(self._effective_plan()))
         return {"plan": effective.model_dump(mode="json"),
                 "selected": p.doc.plan is not None,
                 "preset": effective.preset_name(),
@@ -1265,6 +1269,17 @@ class GuiSession:
                 resolve_plan(_as_plan_argument(body["preset"]), p.doc.mode))
         elif "plan" in body:
             spec = _validate(PlanSpec, body["plan"], "plan")
+            # a stored plan may hold a budget under one iteration (an old
+            # file opens), but new input does not: the run would refuse it
+            # at every conversion (WP-1947)
+            short = [i for i, st in enumerate(spec.stages) if st.max_iter < 1]
+            if short:
+                raise GuiError(
+                    f"plan failed validation: stage {spec.stages[short[0]].name!r} "
+                    f"has max_iter={spec.stages[short[0]].max_iter}; a stage "
+                    "takes at least one iteration at plan.stages."
+                    f"{short[0]}.max_iter",
+                    where=[f"plan.stages.{i}.max_iter" for i in short])
         else:
             raise GuiError("send either {'preset': name} or {'plan': {...}}")
         if not spec.stages:

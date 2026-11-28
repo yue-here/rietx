@@ -146,7 +146,8 @@ A plan gives that slack to every stage a later stage refits, and `replay` compil
 import rietx as rx
 
 action = rx.NodeAction(kind="stage", name="cell",
-                       turn_on=["phases.*.cell.*"], max_iter=200)
+                       turn_on=["phases.*.cell.*"], max_iter=200,
+                       lebail_cycles=25000, lebail_tol=1e-7)
 assert action.api_call() == (
     "ref.run_stage(data, rx.Stage('cell', ['phases.*.cell.*'], max_iter=200))")
 ```
@@ -157,7 +158,8 @@ A closing stage's line names its fraction, `window_area_tol=0.001` for the opt-i
 
 The line is computed from the fields, so it cannot disagree with them.
 A stage's line always carries `max_iter`.
-It carries `seed`, `strain_seed`, `restraint_weight_scale`, `ftol` and `window_slack_deg` where they differ from the `Stage` default, and it never carries `lebail_cycles`.
+It carries `seed`, `strain_seed`, `restraint_weight_scale`, `ftol`, `window_slack_deg`, `lebail_cycles` and `lebail_tol` where they differ from the `Stage` default.
+The `Stage` default is compared, not the `NodeAction` one, so a node written without the two partition settings renders the `3` and `0.0` it ran at.
 Two kinds render a line that does not run.
 An `edit_model` node renders a comment naming the edit, because the models it installed are in its state and in no argument.
 A `merge` renders `ref.merge(...)` followed by its name as a comment.

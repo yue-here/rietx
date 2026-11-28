@@ -2198,6 +2198,36 @@ def test_plan_selection_and_the_preset_it_matches(blank, tmp_path, pattern_file)
     assert client.get("/api/plans")[1]["plans"][0]["when_to_use"]
 
 
+def test_a_plan_with_no_iteration_budget_is_refused_at_input_not_on_read(
+        blank, tmp_path, pattern_file):
+    """New input meets the refusal where it enters (WP-1947, review of #1640).
+
+    ``StageSpec`` takes a stored ``max_iter`` of 0 so that an old project
+    opens, which leaves the plan route as the place a new plan is refused:
+    4xx at the stage's own path, with nothing stored.
+    """
+    session, client = blank
+    project = _open(session, tmp_path / "plan.rex", pattern_file)
+    before = client.get("/api/plan")[1]["plan"]
+    edited = {**before, "stages": [
+        {**before["stages"][0], "max_iter": 0}, *before["stages"][1:]]}
+    status, payload = client.put("/api/plan", {"plan": edited})
+    assert status == 400, payload
+    assert payload["error"]["where"] == ["plan.stages.0.max_iter"]
+    assert "max_iter=0" in payload["error"]["message"]
+    assert project.doc.plan.stages[0].max_iter == before["stages"][0]["max_iter"]
+    assert client.get("/api/plan")[1]["plan"] == before
+
+    # an old project holding a budget of 0 still shows its plan, so the editor
+    # can correct it, and a corrected plan is stored
+    project.doc.plan = type(project.doc.plan).model_validate(
+        {**project.doc.plan.model_dump(mode="json"), "stages": edited["stages"]})
+    status, payload = client.get("/api/plan")
+    assert status == 200, payload
+    assert payload["plan"]["stages"][0]["max_iter"] == 0
+    assert client.put("/api/plan", {"plan": before})[0] == 200
+
+
 # ----------------------------------------------------------------------
 # the plan resolved against the live table (WP-1208)
 # ----------------------------------------------------------------------
