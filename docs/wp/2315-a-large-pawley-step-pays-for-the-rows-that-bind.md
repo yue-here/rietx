@@ -382,7 +382,11 @@ xfailed, 8.7 min; full suite 16 853 passed, 468 skipped, 49 xfailed, 1
 xpassed, 33.8 min, no failure. The one added test costs 0.06 s locally.
 No main run on this machine to diff the counts against, so the count check
 rests on the one added test. `tests.reader_output`: unchanged against the
-merge-base.
+merge-base. Main then moved by 11 commits, WP-2314's angle 3 among them
+(`structure_factor.py`, `forward.py`, goldens), none in `bccg.py`. On
+a9d61c21e, with that main merged in: fast selection 15 904 passed, 462
+skipped, 30 xfailed, 8.8 min, and `test_acceptance_fap.py`'s Pawley row
+passed. The full suite was not rerun on that tree.
 
 *Review* (`/code-review high --fix`): five findings, four docstring fixes
 taken (each path's rebuild rule stated exactly, the "same stop" claim
