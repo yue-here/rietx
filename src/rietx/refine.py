@@ -6746,6 +6746,10 @@ class Refinement:
         stages = plan.run_stages(paths=[e.path for e in table.entries])
         ftols = plan.stage_ftols()
         shift_tols = plan.stage_shift_tols()
+        # only the LM driver runs the test, so a trf stage records none
+        # rather than a test that never ran (WP-2317 R6; WP-1076's rule)
+        if self._solver != "lm":
+            shift_tols = [None] * len(shift_tols)
         window_tols = plan.stage_window_tols()
         # a dataclass validates nothing, so the plan's threshold is checked
         # where it is read, in the words its mirror uses (WP-2002, B1)
@@ -7101,8 +7105,10 @@ class Refinement:
             check_mode(mode)
         _refuse_without_phases(self.structure, "run_stage")
         phase_support_sigma = check_phase_support_sigma(phase_support_sigma)
-        shift_over_esd_tol = (check_shift_over_esd_tol(shift_over_esd_tol)
-                              if stage.ftol is None else None)
+        shift_over_esd_tol = check_shift_over_esd_tol(shift_over_esd_tol)
+        # a stage's own ftol replaces the test, and trf has no test to run
+        if stage.ftol is not None or self._solver != "lm":
+            shift_over_esd_tol = None
         if window_area_tol is not None:
             try:
                 window_area_tol = check_closing_window_tol(window_area_tol)

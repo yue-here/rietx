@@ -2023,7 +2023,10 @@ class MultiHistogramRefinement:
         # what an earlier stage left free: the aperture lift's gate (WP-1955)
         refined_before: set[str] = set()
         for index, (stage, ftol, shift_tol, window_tol) in enumerate(
-                zip(stages, plan.stage_ftols(), plan.stage_shift_tols(),
+                zip(stages, plan.stage_ftols(),
+                    # only the LM driver runs the shift test (WP-2317 R6)
+                    plan.stage_shift_tols() if self._solver == "lm"
+                    else [None] * len(stages),
                     plan.stage_window_tols(), strict=True), start=1):
             with self._abandon_on_cancel(cancel, stage.name, stage_results, stream):
                 freed = self.mtable.set_vary(stage.turn_on, True)

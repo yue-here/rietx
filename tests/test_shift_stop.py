@@ -147,3 +147,15 @@ def test_a_profile_interval_refits_to_the_solvers_own_stop(fitted, pattern, monk
     interval = ref.profile_interval(pattern, "phases.0.cell.a", max_refits=6)
     assert seen and set(seen) == {None}
     assert interval is not None
+
+
+def test_a_trf_fit_records_no_shift_test(pattern):
+    # only the LM driver runs the test, so a trf stage records none rather
+    # than a test that never ran (WP-1076's rule; generality review of R6)
+    structure, ins = perturbed_models()
+    ref = rx.Refinement(structure, ins, solver="trf")
+    result = ref.fit(pattern, plan=_plan())
+    assert [s.shift_over_esd_tol for s in result.stages] == [None, None]
+    assert "shift_over_esd" not in {s.termination for s in result.stages}
+    out = ref.run_stage(pattern, rx.Stage("polish", ["phases.*.scale"]))
+    assert ref.history[out.node_id].action.shift_over_esd_tol is None
