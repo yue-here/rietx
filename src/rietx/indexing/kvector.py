@@ -18,6 +18,9 @@ question as a public call an agent composes by hand:
 * :func:`score_kgrid` scores every k of the strata it is given;
 * :func:`kgrid_null` measures, for one pattern, the grid maximum of the score
   under shuffles of the peak positions, and reports the whole sample;
+* :func:`kgrid_bound` gives, for the k a grid search scored, the score that
+  chance reaches with probability at most α anywhere on them (Boole's
+  inequality over the k scored);
 * :func:`kvector_equivalents` lists what the positions cannot separate from a
   k: the arms of its star, −k, and the images of k under the metric's
   near-symmetries.
@@ -26,7 +29,8 @@ question as a public call an agent composes by hand:
 default.**  No call sorts by score, returns a single best row, or compares a
 score with the null.  The match radius, the grid's denominator, the strata, the
 band, the null's exclusion windows, its shuffle count, its percentile and its
-seed are all required arguments.  The ranking, ``best_or_none()`` and the
+seed, and the bound's α and weighting, are all required arguments.  The
+ranking, ``best_or_none()`` and the
 warnings that read a margin are the heuristic's (issue #795, K1b).
 
 **What a grid record claims, and what it does not** (the maintainer's
@@ -99,6 +103,7 @@ __all__ = [
     "KGridRow",
     "KGridScores",
     "KNull",
+    "KBound",
     "KEquivalent",
     "KEquivalents",
     "as_kpeaks",
@@ -107,6 +112,7 @@ __all__ = [
     "score_kvector",
     "score_kgrid",
     "kgrid_null",
+    "kgrid_bound",
     "kvector_equivalents",
 ]
 
@@ -236,6 +242,26 @@ def _harmonics(harmonics) -> tuple[int, ...]:
             f"harmonics must be distinct positive orders, got {harmonics!r}: "
             "order m covers both satellites H ± m·k")
     return out
+
+
+def _scoring_exclusions(exclude, tt: np.ndarray, lo: float, hi: float):
+    """``exclude`` as (centre, half-width) pairs and the allowed intervals, or
+    ``((), None)`` when there are none.  A peak strictly inside a window is
+    refused: the windows say where no peak can be, and the peak says otherwise."""
+    pairs, allowed = _exclude_windows(exclude, lo, hi)
+    if not pairs:
+        return pairs, None
+    c = np.array([x for x, _ in pairs])
+    h = np.array([w for _, w in pairs])
+    inside = np.abs(tt[:, None] - c[None, :]) < h[None, :]
+    if inside.any():
+        i, w = (int(x[0]) for x in np.nonzero(inside))
+        raise ValueError(
+            f"{int(inside.any(axis=1).sum())} peak(s) lie inside an exclusion window, the first "
+            f"at {float(tt[i])}° 2θ inside the window {float(c[w])} ± {float(h[w])}°: the "
+            "windows state where the peaks were sorted off, so a peak inside one contradicts "
+            "them. Drop that peak from the list, or narrow or remove that window, so the two agree")
+    return pairs, allowed
 
 
 # --------------------------------------------------------------------------
@@ -614,8 +640,36 @@ def _poisson_binomial_tail(p: np.ndarray, n: np.ndarray) -> np.ndarray:
     return tail[np.arange(rows), np.clip(n, 0, big_n)]
 
 
-def _score_rows(windows, tt: np.ndarray, lo: float, hi: float, band: float):
-    """matched (rows, N) bool, p (rows, N), n (rows,), P (rows,), score (rows,)."""
+def _allowed_coordinate(allowed: np.ndarray, hi: float, x: np.ndarray) -> np.ndarray:
+    """u(x), the measure of the allowed intervals below x: flat across an
+    exclusion window and of unit slope elsewhere.  Past ``hi`` it keeps unit
+    slope, so the padded window slots stay past every peak."""
+    knots = allowed.ravel()
+    lengths = allowed[:, 1] - allowed[:, 0]
+    level = np.repeat(np.concatenate([[0.0], np.cumsum(lengths)[:-1]]), 2)
+    level[1::2] += lengths
+    return np.interp(x, knots, level) + np.maximum(x - hi, 0.0)
+
+
+def _allowed_windows(windows, allowed: np.ndarray, hi: float):
+    """The windows' starts, ends and running covered length in the allowed
+    coordinate: built once per block and shared by every peak list scored on it."""
+    s, e, _ = windows
+    su = _allowed_coordinate(allowed, hi, s)
+    eu = _allowed_coordinate(allowed, hi, e)
+    cu = np.zeros_like(su)
+    cu[:, 1:] = np.cumsum(eu - su, axis=1)[:, :-1]
+    return su, eu, cu
+
+
+def _score_rows(windows, tt: np.ndarray, lo: float, hi: float, band: float,
+                allowed: np.ndarray | None = None, uwin=None):
+    """matched (rows, N) bool, p (rows, N), n (rows,), P (rows,), score (rows,).
+
+    With ``allowed`` (the (m, 2) intervals :func:`_exclude_windows` leaves),
+    every measure is taken in the allowed coordinate u: pᵢ is the share of the
+    allowed part of the band that the windows' allowed parts cover.  ``uwin``
+    is :func:`_allowed_windows` of the same windows, when the caller has it."""
     s, e, cumex = windows
     rows = np.arange(s.shape[0])[:, None]
     if len(tt) == 0:
@@ -627,9 +681,19 @@ def _score_rows(windows, tt: np.ndarray, lo: float, hi: float, band: float):
     matched = (j >= 0) & (tt[None, :] <= e[rows, jj])
     a = np.maximum(lo, tt - band)
     b = np.minimum(hi, tt + band)
-    covered = (_covered_to(s, e, cumex, _locate(s, b), b)
-               - _covered_to(s, e, cumex, _locate(s, a), a))
-    p = np.clip(covered / (b - a)[None, :], 0.0, 1.0)
+    if allowed is None:
+        covered = (_covered_to(s, e, cumex, _locate(s, b), b)
+                   - _covered_to(s, e, cumex, _locate(s, a), a))
+        p = np.clip(covered / (b - a)[None, :], 0.0, 1.0)
+    else:
+        su, eu, cu = uwin if uwin is not None else _allowed_windows(windows, allowed, hi)
+        au = _allowed_coordinate(allowed, hi, a)
+        bu = _allowed_coordinate(allowed, hi, b)
+        covered = (_covered_to(su, eu, cu, _locate(su, bu), bu)
+                   - _covered_to(su, eu, cu, _locate(su, au), au))
+        span = (bu - au)[None, :]
+        p = np.clip(np.divide(covered, span, out=np.zeros_like(covered), where=span > 0),
+                    0.0, 1.0)
     n = matched.sum(axis=1)
     big_p = _poisson_binomial_tail(p, n)
     with np.errstate(divide="ignore"):
@@ -654,6 +718,7 @@ class KScore:
     ``offsets_deg`` is each peak's signed distance to its nearest satellite
     (peak minus satellite, NaN with no satellite in range), and
     ``n_positions`` the number of distinct satellite positions in range.
+    ``exclude`` holds the windows the bands were cut by, ``()`` for none.
 
     A single-hypothesis P: it is not corrected for having looked at other k,
     which is what :func:`kgrid_null` measures.
@@ -674,10 +739,11 @@ class KScore:
     n_positions: int
     peaks: KPeaks
     parent: KParent
+    exclude: tuple[tuple[float, float], ...]
 
 
 def score_kvector(peaks, parent: KParent, k, *, radius: float, band_deg: float,
-                  harmonics: Sequence[int] = (1,)) -> KScore:
+                  harmonics: Sequence[int] = (1,), exclude=()) -> KScore:
     """The local chance score of the k the caller names (issue #795, D3).
 
     Positions come from the existing exact generator,
@@ -702,6 +768,24 @@ def score_kvector(peaks, parent: KParent, k, *, radius: float, band_deg: float,
     scores 2k or 3k alone, as its own hypothesis.  Whether a 2k or 3k residue
     is present is a test this module does not make.
 
+    **The null P is exact under**, written out for the bound
+    (:func:`kgrid_bound`): the peaks are independent, and peak i lies
+    uniformly on its band, so that it matches with probability pᵢ.  The band
+    is centred on the peak as observed, so pᵢ is a plug-in: exact when the
+    windows cover the same share of the band about where the peak would sit
+    by chance as of the band about where it sits.  This is a *local* null,
+    each peak moved only within its own band; :func:`kgrid_null`'s shuffle
+    draws over the whole range instead.
+
+    ``exclude`` (default none) is the (centre, half-width) windows the peaks
+    were sorted off, the ones :func:`kgrid_null` is given: a peak cannot sit
+    in them, so the local null puts peak i uniformly on the **allowed** part
+    of its band, and pᵢ becomes the share of that part the windows' allowed
+    parts cover.  Without it pᵢ is taken over the whole band, which on the
+    synthetic Pnma family (±0.12° about every nuclear line, 15 % of the range)
+    understates the match probability by up to 7 % a peak for some k and
+    overstates it for most.  A peak inside a window is refused.
+
     What this does **not** do: it does not rank, does not choose a k, and does
     not score absent lines: a k predicting satellites where no peak is
     observed is not penalised, only charged through the coverage of the bands
@@ -719,8 +803,10 @@ def score_kvector(peaks, parent: KParent, k, *, radius: float, band_deg: float,
         raise ValueError(f"k = {format_kvector(kk)} is a reciprocal-lattice vector "
                          "(k = 0): its satellites are the nuclear lines")
     lo, hi = parent_.two_theta_min, parent_.two_theta_max
+    pairs, allowed = _scoring_exclusions(exclude, tt, lo, hi)
     pos = _positions(parent_, [kk], orders)[0]
-    matched, p, n, big_p, score = _score_rows(_windows([pos], r, lo, hi), tt, lo, hi, band)
+    matched, p, n, big_p, score = _score_rows(_windows([pos], r, lo, hi), tt, lo, hi, band,
+                                              allowed)
     if len(pos) and len(tt):
         j = np.clip(np.searchsorted(pos, tt), 1, max(len(pos) - 1, 1))
         left = pos[np.clip(j - 1, 0, len(pos) - 1)]
@@ -736,7 +822,7 @@ def score_kvector(peaks, parent: KParent, k, *, radius: float, band_deg: float,
         matched=tuple(int(i) for i in np.flatnonzero(m)),
         unmatched=tuple(int(i) for i in np.flatnonzero(~m)),
         offsets_deg=tuple(float(x) for x in off), n_positions=len(pos),
-        peaks=kp, parent=parent_)
+        peaks=kp, parent=parent_, exclude=pairs)
 
 
 # --------------------------------------------------------------------------
@@ -900,6 +986,7 @@ class KGridScores:
     radius: float
     band_deg: float
     harmonics: tuple[int, ...]
+    exclude: tuple[tuple[float, float], ...]
     rows: tuple[KGridRow, ...]
     grid_step: float
     denominators: tuple[int, ...]
@@ -932,12 +1019,13 @@ def _stratum_positions(parent, stratum, orders, built, i):
 
 
 def score_kgrid(peaks, parent: KParent, strata, *, radius: float, band_deg: float,
-                harmonics: Sequence[int] = (1,), budget=None) -> KGridScores:
+                harmonics: Sequence[int] = (1,), budget=None, exclude=()) -> KGridScores:
     """:func:`score_kvector` for every k of ``strata``, in the caller's order.
 
     ``strata`` is a sequence of :class:`KStratum` (from :func:`kgrid_strata`,
     in the order to search them) or a :class:`KGridPositions` built from them.
-    Every row equals what :func:`score_kvector` returns for its k.
+    Every row equals what :func:`score_kvector` returns for its k, ``exclude``
+    included.
 
     ``budget`` is an :class:`~rietx.indexing.engines.Budget` or
     :class:`~rietx.indexing.engines.Deadline` read before every vectorised
@@ -962,6 +1050,7 @@ def score_kgrid(peaks, parent: KParent, strata, *, radius: float, band_deg: floa
     band = _positive(band_deg, "band_deg")
     strata_, orders, built = _grid_source(parent, strata, harmonics)
     lo, hi = parent.two_theta_min, parent.two_theta_max
+    pairs, allowed = _scoring_exclusions(exclude, tt, lo, hi)
     rows: list[KGridRow] = []
     searched, left, cut = [], [], []
     for i, st in enumerate(strata_):
@@ -977,7 +1066,8 @@ def score_kgrid(peaks, parent: KParent, strata, *, radius: float, band_deg: floa
             if pos is None:
                 pos = _stratum_positions(parent, st, orders, built, i)
             block = pos[c:c + _CHUNK]
-            matched, _p, n, big_p, score = _score_rows(_windows(block, r, lo, hi), tt, lo, hi, band)
+            matched, _p, n, big_p, score = _score_rows(_windows(block, r, lo, hi), tt, lo, hi,
+                                                       band, allowed)
             for t, kk in enumerate(st.kvectors[c:c + _CHUNK]):
                 m = matched[t] if len(tt) else np.zeros(0, dtype=bool)
                 rows.append(KGridRow(
@@ -990,7 +1080,7 @@ def score_kgrid(peaks, parent: KParent, strata, *, radius: float, band_deg: floa
         searched.append(st.name)
     return KGridScores(
         parent=parent, peaks=kp, radius=r, band_deg=band, harmonics=orders,
-        rows=tuple(rows), grid_step=_grid_step(strata_, searched, cut),
+        exclude=pairs, rows=tuple(rows), grid_step=_grid_step(strata_, searched, cut),
         denominators=tuple(s.denominator for s in strata_ if s.name in set(searched)),
         strata_searched=tuple(searched), strata_cut=tuple(cut), strata_left=tuple(left),
         coverage=_coverage(strata_, searched, left, cut),
@@ -1030,6 +1120,7 @@ class KNull:
     band_deg: float
     harmonics: tuple[int, ...]
     exclude: tuple[tuple[float, float], ...]
+    exclude_in_score: bool
     seed: int
     n_shuffles: int
     percentile: float
@@ -1093,7 +1184,8 @@ def _draw(allowed: np.ndarray, rng: np.random.Generator, shape) -> np.ndarray:
 
 def kgrid_null(peaks, parent: KParent, strata, *, radius: float, band_deg: float,
                exclude, n_shuffles: int, percentile: float, seed: int,
-               harmonics: Sequence[int] = (1,), budget=None) -> KNull:
+               harmonics: Sequence[int] = (1,), budget=None,
+               exclude_in_score: bool = False) -> KNull:
     """The grid maximum of the score under shuffles of this pattern's peaks.
 
     Each shuffle draws as many positions as ``peaks`` holds, uniformly over the
@@ -1105,6 +1197,12 @@ def kgrid_null(peaks, parent: KParent, strata, *, radius: float, band_deg: float
     harmonics as :func:`score_kgrid`, and its maximum over the grid is kept.
     ``seed`` makes the sample reproducible: the same seed gives the identical
     sample.
+
+    ``exclude_in_score`` says which score the shuffles are scored with, and
+    must match the one the real peaks were scored with: ``False`` (the
+    default) is :func:`score_kgrid` without ``exclude``; ``True`` is
+    :func:`score_kgrid` with ``exclude`` = these windows, each pᵢ taken on its
+    band's allowed part.  The draws avoid the windows either way.
 
     The look-elsewhere effect is the reason: a grid of 10⁴-10⁵ k reaches a
     single-hypothesis P of 10⁻⁴ or less on random positions (issue #795, the
@@ -1137,6 +1235,8 @@ def kgrid_null(peaks, parent: KParent, strata, *, radius: float, band_deg: float
     lo, hi = parent.two_theta_min, parent.two_theta_max
     pairs, allowed = _exclude_windows(exclude, lo, hi)
     draws = _draw(allowed, np.random.default_rng(seed_), (n_sh, big_n))
+    in_score = bool(exclude_in_score)
+    score_allowed = allowed if in_score and pairs else None
 
     best = np.full(n_sh, -np.inf)
     at_best = np.zeros(n_sh, dtype=np.int64)
@@ -1155,8 +1255,10 @@ def kgrid_null(peaks, parent: KParent, strata, *, radius: float, band_deg: float
             if pos is None:
                 pos = _stratum_positions(parent, st, orders, built, i)
             win = _windows(pos[c:c + _CHUNK], r, lo, hi)
+            uwin = None if score_allowed is None else _allowed_windows(win, score_allowed, hi)
             for s_ in range(n_sh):
-                _m, _p, n, _bp, score = _score_rows(win, draws[s_], lo, hi, band)
+                _m, _p, n, _bp, score = _score_rows(win, draws[s_], lo, hi, band,
+                                                    score_allowed, uwin)
                 t = int(np.argmax(score))
                 if score[t] > best[s_]:
                     best[s_], at_best[s_] = score[t], n[t]
@@ -1172,7 +1274,8 @@ def kgrid_null(peaks, parent: KParent, strata, *, radius: float, band_deg: float
         sample = tuple(float("nan") for _ in best)
     return KNull(
         parent=parent, n_peaks=big_n, radius=r, band_deg=band, harmonics=orders,
-        exclude=pairs, seed=seed_, n_shuffles=n_sh, percentile=pct, threshold=threshold,
+        exclude=pairs, exclude_in_score=in_score, seed=seed_, n_shuffles=n_sh,
+        percentile=pct, threshold=threshold,
         sample=sample, matched_at_max=tuple(int(x) for x in at_best),
         max_matched=tuple(int(x) for x in most),
         shuffles=tuple(tuple(float(x) for x in row) for row in draws),
@@ -1182,6 +1285,118 @@ def kgrid_null(peaks, parent: KParent, strata, *, radius: float, band_deg: float
         coverage=_coverage(strata_, searched, left, cut),
         budget_seconds=None if budget is None else float(budget.seconds),
         budget_expired=bool(left or cut), elapsed_seconds=time.perf_counter() - t0)
+
+
+# --------------------------------------------------------------------------
+# 4b. the analytic bound, as a reported number
+# --------------------------------------------------------------------------
+
+Weighting = Literal["flat", "stratum"]
+
+
+@dataclass(frozen=True, repr=False)
+class KBound:
+    """Boole's bound on the grid maximum of the score (:func:`kgrid_bound`).
+
+    ``strata`` names every stratum with at least one k scored, in row order,
+    ``n_scored`` the number of k scored in each (n_s; a stratum a budget cut
+    counts the points it scored), ``weights`` the share wₛ of ``alpha`` each
+    stratum is given (they sum to 1), and ``thresholds`` the score each
+    stratum's k are held to, log₁₀(n_s / (wₛ·α)).  ``n_total`` is N = Σ n_s.
+    ``exclude`` is the scored peaks' ``exclude``, the windows the null the
+    bound guarantees is taken outside of.  The grid-level facts
+    (``grid_step``, ``coverage``) are the scores'.  Nothing here compares a
+    row with a threshold.
+    """
+
+    alpha: float
+    weighting: Weighting
+    strata: tuple[str, ...]
+    n_scored: tuple[int, ...]
+    weights: tuple[float, ...]
+    thresholds: tuple[float, ...]
+    n_total: int
+    exclude: tuple[tuple[float, float], ...]
+    grid_step: float
+    coverage: str
+
+    def __repr__(self) -> str:
+        cells = ", ".join(f"{s} ({n} k) {t:.3f}" for s, n, t in
+                          zip(self.strata, self.n_scored, self.thresholds))
+        return (f"KBound(alpha={self.alpha:g}, {self.weighting}, N={self.n_total}: {cells}; "
+                f"{self.coverage})")
+
+
+def kgrid_bound(scores: KGridScores, *, alpha: float, weighting: Weighting) -> KBound:
+    """The score above which a grid maximum is unlikely by chance, at level ``alpha``.
+
+    **The guarantee.**  Every row's P is a valid p-value under the local null
+    :func:`score_kvector` writes out (peaks independent, each uniform on the
+    allowed part of its band), so P(P_k ≤ t) ≤ t for each k scored.  Boole's
+    inequality, P(A₁ ∪ … ∪ A_N) ≤ Σ P(Aⱼ) for any events (the Bonferroni
+    correction), bounds the chance that *any* k reaches its stratum's
+    threshold: with n_s k scored in stratum s and thresholds
+    log₁₀(n_s / (wₛ·α)),
+
+        P(some k has score ≥ its threshold) ≤ Σ_s n_s · wₛ·α / n_s = α,
+
+    whatever the correlation between k.  Correlated k make it conservative,
+    never invalid.  It holds for the k actually scored, a budget's cut
+    included, and for nothing off the grid (``coverage``).
+
+    No free factor enters: no oversampling factor, no effective number of
+    independent k, no margin.  The maximum of a periodogram over a frequency
+    grid is the same look-elsewhere question in astronomy, where the
+    multiple-trial form with an effective number of independent frequencies
+    is a heuristic (Baluev, R. V. (2008), *Mon. Not. R. Astron. Soc.* **385**,
+    1279-1285, § 3) and its naive version underestimates the false-alarm
+    probability, while the grid is oversampled by a chosen number of points
+    per peak (VanderPlas, J. T. (2018), *Astrophys. J. Suppl. Ser.* **236**,
+    16, §§ 7.1 and 7.4.2).  This bound needs neither number.
+
+    ``weighting`` splits ``alpha`` across the strata, and both are the
+    caller's (no default): ``"flat"`` gives each k the same share,
+    wₛ = n_s/N, so every k is held to log₁₀(N/α); ``"stratum"`` gives each
+    stratum scored the same share, wₛ = 1/S, so a stratum of few k (a point or
+    a line) is held to a lower bar than the general stratum.  A k search
+    tries the points, then the lines, then the planes (Wills, A. S. (2009),
+    *Z. Kristallogr. Suppl.* **30**, 39-44, § 3.1); that is a search order,
+    and whether it should also lower a stratum's bar is not something that
+    paper says.  The bound holds for either weighting; which one a verdict
+    reads is the heuristic's.
+
+    What this does **not** do: no comparison of any row with a threshold, no
+    verdict, no ranking.  It is valid for the statistic the scores were
+    computed with: scores taken without ``exclude`` on peaks that were sorted
+    off windows are not covered by the guarantee (:func:`score_kvector`).
+    """
+    if not isinstance(scores, KGridScores):
+        raise TypeError(f"kgrid_bound takes the KGridScores of score_kgrid, got "
+                        f"{type(scores).__name__}")
+    a = float(alpha)
+    if not 0.0 < a < 1.0:
+        raise ValueError(f"alpha must lie in (0, 1), got {alpha!r}")
+    if weighting not in ("flat", "stratum"):
+        raise ValueError(f"weighting must be 'flat' (wₛ = n_s/N) or 'stratum' (wₛ = 1/S), "
+                         f"got {weighting!r}")
+    counts: dict[str, int] = {}
+    for row in scores.rows:
+        counts[row.stratum] = counts.get(row.stratum, 0) + 1
+    if not counts:
+        raise ValueError("no k was scored, so there is nothing to bound: the search "
+                         "stopped before its first block")
+    names = tuple(counts)
+    n_s = tuple(counts[name] for name in names)
+    total = sum(n_s)
+    if weighting == "flat":
+        w = tuple(n / total for n in n_s)
+        t = tuple(math.log10(total / a) for _ in n_s)
+    else:
+        w = tuple(1.0 / len(n_s) for _ in n_s)
+        t = tuple(math.log10(len(n_s) * n / a) for n in n_s)
+    return KBound(alpha=a, weighting=weighting, strata=names, n_scored=n_s, weights=w,
+                  thresholds=t, n_total=total, exclude=scores.exclude,
+                  grid_step=scores.grid_step, coverage=scores.coverage)
 
 
 # --------------------------------------------------------------------------

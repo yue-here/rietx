@@ -234,6 +234,7 @@ DEFAULT_SEATS: dict[str, int] = {
     "rietx.indexing.kvector.score_kvector": 2007,
     "rietx.indexing.kvector.score_kgrid": 2007,
     "rietx.indexing.kvector.kgrid_null": 2007,
+    "rietx.indexing.kvector.kgrid_bound": 2007,
     "rietx.indexing.kvector.kvector_equivalents": 2007,
     "rietx.crystallography.representation.subgroups.maximal": 2006,
 }
@@ -7306,6 +7307,12 @@ ROWS: tuple[Row, ...] = (
         evidence=("opt-in: budget=None sets no cap; a Budget or Deadline is passed by name, and "
                   "it is read before every block of _CHUNK k, so a cut stops every shuffle at "
                   "the same k, inside a stratum if need be, and names strata_cut and strata_left")),
+    Row("rietx.indexing.kvector.kgrid_null:exclude_in_score", "default", tier="caller",
+        ambiguity=1, value=False,
+        evidence=("opt-in: False scores the shuffles with score_kgrid's statistic without "
+                  "exclude, the one main computed before the switch existed; True scores them "
+                  "with pᵢ on each band's allowed part, matching score_kgrid(exclude=...). The "
+                  "caller names which statistic the real peaks were scored with")),
     Row("rietx.indexing.kvector.kgrid_null:harmonics", "default", tier=1, ambiguity=1,
         value=(1,),
         evidence=("definition: (1,) is the first-order hypothesis H ± k; another order is "
@@ -7315,10 +7322,20 @@ ROWS: tuple[Row, ...] = (
         evidence=("opt-in: budget=None sets no cap; a Budget or Deadline is passed by name, and "
                   "it is read before every block of _CHUNK k, and a cut is reported as "
                   "strata_cut and strata_left, never as a smaller search called complete")),
+    Row("rietx.indexing.kvector.score_kgrid:exclude", "default", tier="caller", ambiguity=1,
+        value=(),
+        evidence=("opt-in: () takes each pᵢ over the whole band, as before the argument "
+                  "existed (bit-identical); the windows the peaks were sorted off are the "
+                  "caller's, passed by name, and then take pᵢ on the band's allowed part")),
     Row("rietx.indexing.kvector.score_kgrid:harmonics", "default", tier=1, ambiguity=1,
         value=(1,),
         evidence=("definition: (1,) is the first-order hypothesis H ± k; another order is "
                   "another hypothesis the caller names (issue #795, K1a)")),
+    Row("rietx.indexing.kvector.score_kvector:exclude", "default", tier="caller", ambiguity=1,
+        value=(),
+        evidence=("opt-in: () takes each pᵢ over the whole band, as before the argument "
+                  "existed (bit-identical); the windows the peaks were sorted off are the "
+                  "caller's, passed by name, and then take pᵢ on the band's allowed part")),
     Row("rietx.indexing.kvector.score_kvector:harmonics", "default", tier=1, ambiguity=1,
         value=(1,),
         evidence=("definition: (1,) is the first-order hypothesis H ± k; (2,) or (3,) scores 2k "
