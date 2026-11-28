@@ -1595,7 +1595,7 @@ ROWS: tuple[Row, ...] = (
         response="info",
         responds="nothing: the held paths stayed where the caller held them",
         evidence=("opt-in: Refinement.hold(), nothing held by default "
-                  "(StageResult.blocked_by_hold's row, caller); the package calls hold only "
+                  "(StageResult.blocked_by_hold records what it refused); the package calls hold only "
                   "at strategy/magnetic.py:1369, under solve_magnetic(tie_to_parent=True), "
                   "default False; refine.py:4184 and sequential.py:1412 are docstrings "
                   "(searched 2026-11-17); reports which turn_on glob met the caller's hold "
@@ -2805,6 +2805,21 @@ ROWS: tuple[Row, ...] = (
                  "and GSAS-II prints a warning on a variable it freezes at a limit "
                  "(docs/practice.md § When one twin reaches its limit, and a re-run)."),
         approved="2026-11-20"),
+    Row("WAVELENGTH_NOT_FREED", "code", tier=1, ambiguity=1,
+        evidence=("info; a record of an act the package took (WP-2148, issue #1550). Fires "
+                  "exactly when a stage's turn_on reached a wavelength and set_vary declined "
+                  "it because no phase in the pattern had a held cell length "
+                  "(ParameterTable.wavelength_pin), the path riding on "
+                  "StageResult.blocked_by_hold beside the caller's holds. Before it the skip "
+                  "was silent: a synthetic Si-held + CeO2 pattern freeing the CeO2 cell and "
+                  "lambda in one stage reported converged with lambda dropped and the CeO2 "
+                  "cell 496 ppm low (z -109)"),
+        grounds=("Physics: d = lambda/(2 sin theta) fixes only the product, so lambda beside "
+                 "cells that all move is an exactly flat direction (Bragg's law); declining "
+                 "it is the fence's act and the diagnostic says it took it."),
+        response="info",
+        responds=("read the cells as measured against the declared wavelength, and hold a "
+                  "standard's cell before rerunning if the wavelength was meant to refine")),
     Row("XRDML_ATTENUATOR_APPLIED", "code", tier=1, ambiguity=1,
         evidence=('info; fires when a PANalytical beamAttenuationFactors array is not 1 over '
                   'some finite points; the factor is multiplied into y and sigma is '
@@ -3005,9 +3020,14 @@ ROWS: tuple[Row, ...] = (
                   "fit stopped short, every refiner would refit, and the caller's own fit is "
                   "untouched; tests/test_distortion_totals.py::"
                   "test_a_restricted_fit_below_the_full_one_restarts_the_full_fit")),
-    Row("rietx.schemas.results.StageResult.blocked_by_hold", "action", tier="caller", ambiguity=1,
-        evidence=("opt-in: Refinement.hold(), nothing held by default; the caller's hold outranks a"
-                  " plan glob (WP-1435)")),
+    Row("rietx.schemas.results.StageResult.blocked_by_hold", "action", tier=1, ambiguity=1,
+        evidence=("arithmetic: the turn_on paths a stage's glob matched and left fixed, recorded and "
+                  "moving no value. Three writers, each reading the table that did the refusing: "
+                  "the caller's Refinement.hold (WP-1435, opt-in, nothing held by default), the "
+                  "floating-origin coordinate hold (WP-1912, also on the joint runner's "
+                  "MultiParameterTable.blocked_by_hold) and the wavelength the lambda-cell fence "
+                  "declined (WP-2148, refine._run_stage). Three runners build the StageResult: "
+                  "Refinement._run_plan, Refinement.run_stage and the joint _run_plan")),
     Row("rietx.schemas.results.StageResult.seeded", "action", tier=3, ambiguity=1,
         evidence=("the one shipped seed of a stage's own is _ROUGHNESS_STAGE's 0.3, recorded per "
                   "model; the runner also writes a row here itself, an FCJ axial ratio a stage "
@@ -7998,6 +8018,11 @@ ROWS: tuple[Row, ...] = (
                   "intent")),
     Row("WAVELENGTH_CALIBRATION.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence="arithmetic: points at the instrument's own record; picks no verdict"),
+    Row("WAVELENGTH_NOT_FREED.suggestion", "suggestion", tier=1, ambiguity=1,
+        value=1,
+        evidence=("physics: names the one hold that makes the wavelength measurable in one "
+                  "pattern, a standard's cell (Bragg's law); it is advice only if the "
+                  "caller meant to calibrate the wavelength, which the plan asking for it says")),
     Row("INSTRUMENT_WIDTH_HELD.suggestion", "suggestion", tier=2, ambiguity=1, value=1,
         evidence=("practice: every program that separates instrument from specimen "
                   "broadening fixes the instrument from a standard (FullProf's resolution "

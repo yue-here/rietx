@@ -25,8 +25,8 @@ reasons make a row un-refinable and they are distinguishable on purpose:
   (WP-1435), or through ``Phase.floating_origin``, which holds one
   coordinate per floating-origin direction (WP-1912; ``origin_axis`` says
   which).  The only one a caller both created and can lift;
-* ``needs_held_cell`` — a wavelength this histogram's free cell makes
-  degenerate.  The only *dynamic* one: another parameter's state decides it.
+* ``needs_held_cell`` — a wavelength no held cell in this histogram pins
+  (WP-2148: one phase's held cell is enough).  The only *dynamic* one: another parameter's state decides it.
 
 :attr:`ParameterRow.refinable` is the single predicate over the five, so a
 front end has one rule to grey a row by rather than five it could get wrong.
@@ -176,15 +176,17 @@ class ParameterRow(Base):
     held: bool = False
     esd: float | None = None
     mode_fixed: bool = False
-    #: A wavelength that cannot be freed **right now** because this histogram's
-    #: cell is free, making the two an exactly flat direction.  The fourth
+    #: A wavelength that cannot be freed **right now** because no phase in this
+    #: histogram has a held cell, making λ and the cells an exactly flat direction.  The fourth
     #: held-reason, and the only *dynamic* one: unlike ``locked`` it is not a
     #: fact about the parameter, and unlike ``mode_fixed`` it is undone by
     #: holding the cell rather than by changing the mode.  It exists because
     #: ``refinable`` promises "``set_vary`` could free this", and with a free
     #: cell ``set_vary`` skips the row — so without this flag the promise would
     #: be false while ``held_because`` said nothing (the defaulted-``False``
-    #: failure WP-1076 removes).
+    #: failure WP-1076 removes).  Since WP-2148 it is the fence's own predicate
+    #: (``ParameterTable.wavelength_pin``): one phase with a held cell, a
+    #: standard in the mixture, pins the scale, whatever the others do.
     needs_held_cell: bool = False
     #: The rigid body whose map writes this row (WP-1805), or ``None``.  A
     #: body atom's x, y, z are locked like a symmetry-fixed coordinate, and
@@ -255,6 +257,6 @@ class ParameterRow(Base):
             return ("held by this refinement: declared with hold(), so no "
                     "stage's turn_on frees it until unhold()")
         if self.needs_held_cell:
-            return ("a free wavelength needs this histogram's cell held: "
+            return ("a free wavelength needs a phase's cell held in this histogram: "
                     "d = lambda/(2 sin theta) fixes only the product")
         return ""

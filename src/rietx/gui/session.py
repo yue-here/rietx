@@ -1306,8 +1306,8 @@ class GuiSession:
         nothing a run would see; and calling the real ``set_vary`` — rather
         than a matcher written here — is what keeps the answer honest about the
         rules that live in it (a tied or locked entry never matches however
-        broad the glob, and a wavelength does not match while this histogram's
-        cell is free).  The one rule that lives in ``_run_stage`` instead is
+        broad the glob, and a wavelength does not match while no phase in this
+        histogram has a held cell).  The one rule that lives in ``_run_stage`` instead is
         the intensity mode's force-fix, so that is applied here the same way it
         is applied there, through :func:`~rietx.refine.mode_fixed_column` —
         which asks what each column moves, so a tie cannot carry a structural
