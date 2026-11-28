@@ -1,0 +1,19 @@
+reference ftol1e-9: 10 nudges; clusters 1, members [11]; discriminators (>1 esd) []
+floor K=3: max 0.504 (cpd-1h:instrument.geometry.axial_sl), P90 0.445
+floor K=5: max 0.504 (cpd-1h:instrument.geometry.axial_sl), P90 0.386
+floor K=10: max 0.504 (cpd-1h:instrument.geometry.axial_sl), P90 0.239
+per-seed worst departure: 0:0.504, 1:0.0714, 2:0.209, 3:0.209, 4:0.0558, 5:0.0953, 6:0.0714, 7:0.016, 8:0.0714, 9:0.00135
+n_free per pattern identical across seeds: True
+
+| stop | K | naive (param) | floor max | floor_sub | floor_cmp | floor_glob | paired max / median / min (param) | pairs used / split | evals total (ref ~) |
+|---|---|---|---|---|---|---|---|---|---|
+| ftol1e-6 | 5 | 0.216 FAIL (cpd-1h:instrument.profile.v) | 0.504 | 0.102 FAIL (cpd-1g:instrument.geometry.axial_sl) | FAIL | 0 pass | 0.411 / 0.222 / 0.112 FAIL (cpd-1h:instrument.geometry.axial_sl) | 5 / 0 | 419 (517) |
+| ftol1e-6 | 10 | 0.216 FAIL (cpd-1h:instrument.profile.v) | 0.504 | 0.102 FAIL (cpd-1g:instrument.geometry.axial_sl) | FAIL | 0 pass | 0.411 / 0.226 / 0.112 FAIL (cpd-1h:instrument.geometry.axial_sl) | 10 / 0 | 419 (517) |
+| gsas | 5 | 18 FAIL (cpd-1f:instrument.geometry.axial_sl) | 0.504 | 18 FAIL (cpd-1f:instrument.geometry.axial_sl) | FAIL | 17.5 FAIL | 18 / 18 / 18 FAIL (cpd-1f:instrument.geometry.axial_sl) | 5 / 0 | 269 (517) |
+| gsas | 10 | 18 FAIL (cpd-1f:instrument.geometry.axial_sl) | 0.504 | 18 FAIL (cpd-1f:instrument.geometry.axial_sl) | FAIL | 17.5 FAIL | 18 / 18 / 18 FAIL (cpd-1f:instrument.geometry.axial_sl) | 10 / 0 | 269 (517) |
+| numpy | 5 | 0.0714 pass (cpd-1d:instrument.geometry.axial_sl) | 0.504 | 3.59e-07 pass (cpd-1b:instrument.background.c0) | pass | 0 pass | 0.351 / 0.207 / 0.0558 FAIL (cpd-1h:instrument.geometry.axial_sl) | 5 / 0 | 512 (517) |
+| numpy | 10 | 0.0714 pass (cpd-1d:instrument.geometry.axial_sl) | 0.504 | 1.09e-08 pass (cpd-1a:phases.0.atoms.0.biso) | pass | 0 pass | 0.351 / 0.0714 / 0.0558 FAIL (cpd-1h:instrument.geometry.axial_sl) | 10 / 0 | 512 (517) |
+
+gsas paired worst per seed: none:18(cpd-1f:axial_sl); 0:18(cpd-1f:axial_sl); 1:18(cpd-1f:axial_sl); 2:18(cpd-1f:axial_sl); 3:18(cpd-1f:axial_sl); 4:18(cpd-1f:axial_sl); 5:18(cpd-1f:axial_sl); 6:18(cpd-1f:axial_sl); 7:18(cpd-1f:axial_sl); 8:18(cpd-1f:axial_sl); 9:18(cpd-1f:axial_sl)
+ftol1e-6 paired worst per seed: none:0.216(cpd-1h:v); 0:0.411(cpd-1h:axial_sl); 1:0.222(cpd-1h:v); 2:0.112(cpd-1g:axial_sl); 3:0.112(cpd-1g:axial_sl); 4:0.23(cpd-1h:v); 5:0.232(cpd-1h:v); 6:0.215(cpd-1h:v); 7:0.232(cpd-1h:v); 8:0.246(cpd-1h:v); 9:0.217(cpd-1h:v)
+numpy paired worst per seed: none:0.0714(cpd-1d:axial_sl); 0:0.351(cpd-1h:axial_sl); 1:0.0716(cpd-1d:axial_sl); 2:0.207(cpd-1h:v); 3:0.222(cpd-1h:v); 4:0.0558(cpd-1e:axial_sl); 5:0.0658(cpd-1e:axial_sl); 6:0.0708(cpd-1d:axial_sl); 7:0.11(cpd-1h:v); 8:0.0713(cpd-1d:axial_sl); 9:0.0712(cpd-1d:axial_sl)

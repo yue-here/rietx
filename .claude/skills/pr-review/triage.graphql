@@ -1,0 +1,25 @@
+# /pr-review triage: every open PR, a page of 15 at a time (WP-2312).
+# Run as `gh api graphql --paginate --slurp`; gh fills $endCursor.
+# The page size is set by time, not nodes: mergeStateStatus costs GitHub
+# about 0.15 s a PR, and a page past ~10 s comes back HTTP 502 or 504.
+query($owner: String!, $name: String!, $endCursor: String) {
+  repository(owner: $owner, name: $name) {
+    pullRequests(states: OPEN, first: 15, after: $endCursor,
+                 orderBy: {field: CREATED_AT, direction: ASC}) {
+      totalCount
+      pageInfo { hasNextPage endCursor }
+      nodes {
+        number title author { login } headRefOid updatedAt changedFiles
+        mergeStateStatus isDraft
+        files(first: 100) { totalCount nodes { path additions deletions } }
+        latestReviews(first: 20) {
+          nodes { author { login } authorAssociation state submittedAt commit { oid } }
+        }
+        statusCheckRollup: commits(last: 1) {
+          nodes { commit { statusCheckRollup { state } } }
+        }
+        commits(first: 100) { totalCount nodes { commit { messageHeadline } } }
+      }
+    }
+  }
+}

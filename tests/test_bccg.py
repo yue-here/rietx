@@ -320,6 +320,41 @@ def test_a_failed_factorisation_falls_back_to_plain_cg(monkeypatch):
                                atol=1e-8 * float(np.max(np.abs(y_dense))))
 
 
+def _counting_factor(monkeypatch) -> list[int]:
+    """Count :func:`bccg._factor`'s builds, the cost WP-2315 Angle 4 cuts."""
+    built = [0]
+    real = bccg._factor
+
+    def factor(*args, **kwargs):
+        built[0] += 1
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(bccg, "_factor", factor)
+    return built
+
+
+def test_a_stale_superset_factor_reaches_the_same_minimiser(monkeypatch):
+    """WP-2315 Angle 4: a variable the CG cuts onto its bound shrinks the
+    free set, and the incomplete LU built on the larger set preconditions the
+    smaller one.  Only the CG's path moves: it stops at the same residual
+    floor, so it lands on the box minimiser the refactoring path reaches,
+    within that floor, with the same variables on their bound, inside the
+    default budget of 2n products.  Measured on this case: 115 builds become
+    1."""
+    H, g, lo, hi = _banded_box_qp()
+    built = _counting_factor(monkeypatch)
+    monkeypatch.setattr(bccg, "_REUSE_STALE_FACTOR", False)
+    y_fresh, side_fresh = bccg.projected_cg(H, g, lo, hi)
+    fresh = built[0]
+    monkeypatch.setattr(bccg, "_REUSE_STALE_FACTOR", True)
+    built[0] = 0
+    y, side = bccg.projected_cg(H, g, lo, hi)
+    assert built[0] == 1 and fresh > 50
+    np.testing.assert_allclose(y, y_fresh, rtol=0.0,
+                               atol=1e-8 * float(np.max(np.abs(y_fresh))))
+    assert np.array_equal(side, side_fresh) and np.count_nonzero(side) > 50
+
+
 class _Counting(np.ndarray):
     """A dense H that counts its products, the cost :func:`bccg.projected_cg`
     budgets."""
