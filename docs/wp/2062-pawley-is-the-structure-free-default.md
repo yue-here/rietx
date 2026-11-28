@@ -167,6 +167,25 @@ above, which come from lab and synchrotron single-phase patterns
   the direction (#1577, comment 6963408737). Owed here: whether the gap is Le Bail's partition
   (Pawley agrees with Rietveld), read when the default changes.
 
+- **2026-11-28, from the issue triage (#1852, a bug in an output): the sum
+  `PAWLEY_OVERLAP_UNRESOLVED` names as the datum has no esd anywhere.** The
+  diagnostic says "Use the group's summed intensity as the datum". The fit
+  forms the full covariance of table and intensities, then keeps the
+  intensities' esds (`model.pawley.stderr = stderr_full[n_table:]`) and slices
+  the correlation to the table block (`corr_full[:n_table, :n_table]`,
+  `optimize/least_squares.py:3910-3914` at `02341ffdb`; the blocked path does
+  the same). `_pawley_unresolved_diagnostics` (`refine.py:10560`) reads only the
+  per-member esds. So a caller can form only √(σ₁² + σ₂²). The reporter's
+  synthetic case (`P m m m`, a = 5.000, b = 5.003 Å, the (0 1 2)/(1 0 2) pair):
+  ρ = −0.919, the sum's esd from the covariance 2.98, the caller's √(σ₁² + σ₂²)
+  10.29, so the caller's number overstates the datum's uncertainty 3.5×. Their
+  numbers, not re-run here; the code path is as they describe. The reporter
+  offers (a) the group's sum and its esd gᵀCg on the diagnostic or on a typed
+  overlap-group row, or (b) the intensity block of the correlation, or a
+  `sum_esd(indices)` helper, on the result. Rule 4 ("the statistic travels with
+  any verdict") leans to (a): the verdict is the group's, so its statistic rides
+  with it. That is an API shape the session working this settles under Rules 4
+  and 5. A bug task beside the two absolute floors below.
 - **2026-11-27, from WP-2317: on a large cell Pawley is 3-7× faster than Le Bail
   and lands at a third of its Rwp.**
   - Measured on a synthetic 12 × 36 × 4 Å cell (one run each, Linux, `[dev]`):
@@ -174,7 +193,9 @@ above, which come from lab and synchrotron single-phase patterns
     reflections; Pawley 125.4 s, 0.042 against Le Bail 351.8 s, 0.145 at 1 601.
   - WP-2317 puts Rule 5's Le Bail fence (R3) to the maintainer, including
     whether "route a large cell to Pawley" is the answer for a user at the wall
-    on Le Bail. That would close WP-2316 on its angle 9.
+    on Le Bail. That would close WP-2316 on its angle 9. *Ruled 2026-11-27: the
+    fence is lifted and Le Bail follows practice, so WP-2316 proceeds. This WP's
+    route (a), Pawley as the default where rietx picks, is unchanged.*
   - WP-2316 task 1 asks why Le Bail lands so much worse here. Its answer may
     bear on this WP's site-by-site choice. *Answered 2026-11-27 by WP-2316:
     the threefold Rwp came from the probe's unseeded background, so the

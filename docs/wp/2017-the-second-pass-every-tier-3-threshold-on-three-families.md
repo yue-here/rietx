@@ -659,6 +659,14 @@ and have no free factor to measure, so this file's old list named them without c
 
 ### Inherited
 
+- **2026-11-28, from WP-2314: corundum's roughness fence now passes on
+  macOS arm64.** `test_surface_roughness.py`'s
+  `test_qarr_pure_phases_cannot_constrain_roughness[corundum]`, a non-strict
+  xfail citing this WP, xpassed in WP-2314's full selection. Run alone on
+  main at 02341ffdb (a `git archive` snapshot, darwin arm64, `[dev]` venv)
+  it xpasses too, so the change is not WP-2314's.
+  Whether the walk to b = 4.92 ± 3.52 still happens, or the mark is stale,
+  is this WP's to read; nobody changed the mark.
 - **From WP-2317 / WP-2316 (2026-11-27): group Q's `lebail_tol` has a cost
   measured on a large cell.**
   - On a synthetic 12 × 36 × 4 Å cell (899 / 1 601 reflections, Cu Kα), a Le
