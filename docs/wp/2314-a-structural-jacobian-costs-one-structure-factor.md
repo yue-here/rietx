@@ -1,6 +1,6 @@
 # WP-2314 — a structural Jacobian costs one structure factor, not one per column
 
-Milestone: unscheduled · Status: 🔄 2026-11-27 — angle 1 (the hoist) landed byte-equal, its runaway guard settled as a count; angles 2-7 wait for WP-2317's R0
+Milestone: unscheduled · Status: 🔄 2026-11-28 — angles 1 (the hoist) and 3 (Biso and occupancy columns) landed; angles 2 and 4-7 open
 Track: A large cell
 Depends on: 2317 soft (its `bigcell-structural` case and ruling R0); 1945 soft (its open task on batched Biso columns, see Context)
 Priority: P2 2026-11-27 — the maintainer's large-cell track, ruled to proceed whatever the user's case shows (cells this size are met in the wild); a 40-atom structural fit spends most of its time rebuilding one structure factor per column, and the user's Rietveld stages take ~25 min each
@@ -260,6 +260,125 @@ is held, and rebuilt per evaluation where the cell is free.
 - WP-1327's `moment_f2_grads`: the cached-per-evaluation shape this copies.
 
 ## Handover log
+
+- **2026-11-28** — Angle 3 landed: Biso and occupancy columns from the
+  cache (PR #PRNUM, a ghostshift runner). A Biso or occupancy column no
+  longer re-runs the whole phase's structure factor. It is now analytic,
+  built from the one expansion per phase that the coordinate columns
+  already share, and exact rather than a finite difference. On
+  `bigcell-structural` one Jacobian costs about half what it did on main,
+  and the fit runs 1.6× faster. Every refined value moved by at most 4e-6
+  of its esd, and the stage iteration counts are identical. The ≥ 10×
+  target is still far off. What remains is mostly the cell columns, whose
+  finite difference re-expands |F|² at a perturbed cell.
+  - *Done:* `structure_factor.d_f2_d_sites` also returns ∂|F|²/∂B_j and
+    ∂|F|²/∂occ_j, from the same pass over the sites, and so a 4-tuple now.
+    The real scattering amplitude is factored out of `_orbit_terms` as
+    `_scattering_factor`, bit-identically, so the occupancy derivative reads
+    it bare and never divides by an occupancy.
+    `CompiledModel.structural_f2_grads` passes the two new atom lists
+    through, and `site_scalar_intensity_grad` chains a summed ∂|F|² through
+    the coordinate columns' chain with the nuclear mask. In `_make_jacobian`
+    the new `_site_scalar_column` claims a column when every path it moves
+    is a Biso or occupancy row of one phase (`_site_scalar_reach_ok`). It
+    sums each row's gradient weighted by the column's coefficient, read from
+    `ParameterTable.local_jacobian` where a formula block writes the row and
+    from C elsewhere. So the co-sited Nb/W Biso ties, an occupancy remainder
+    (occ_W = 1 − occ_Nb), a formula tie and a named variable over several
+    sites all take the branch. A column reaching anything else, a phase with
+    a moment, or a non-Rietveld mode keeps the peak chain.
+    `tests/test_biso_occ_columns.py` holds the exact oracles: occupancy by a
+    central difference at half the value, Biso by the quadratic in
+    t = exp(−B s²) through three points, and a whole occupancy column
+    against a central difference of the residual at a 100 % step
+    (extinction off makes the pattern quadratic in occupancy). It also holds
+    the count guard the second entry owed, with Biso free, and its negative
+    control. `test_cross_backend.py` gains the `site_scalars` row
+    (dispersion on, extinction at 30, the three tie shapes). The manual's
+    estimation page names the new columns. WP-1945's `### Inherited` is told
+    that its "Biso columns batched" half has nothing left to batch.
+  - *Measured* (this Mac, darwin arm64, Python 3.12.10, `[dev]` venv,
+    compiled tier on; main at 8e691ccb8 from a `git archive` snapshot first
+    on `sys.path`; three runs each, interleaved main/branch, under the suite
+    lock; driver `~/.cache/ghostshift/rietx/wp-2314-a3/drive_a3.py`, outside
+    the tree, running `examples/bench_refinement.py`'s `bigcell-structural`
+    setup with its co-sited ties):
+
+    | | main | branch |
+    |---|---|---|
+    | fit wall | 17.7-18.5 s | 11.1-11.2 s |
+    | all 119 Jacobians | 14.3-14.8 s | 7.5-7.6 s |
+    | one Jacobian | 120-125 ms | 63-64 ms |
+    | `_orbit_terms` calls per Jacobian, median (max) | 774 (2 279) | 774 (774) |
+    | `_orbit_terms` calls in the Jacobians, whole fit | 146 716 | 62 436 |
+    | Rwp | 0.035183632067171684 | 0.035183632067218515 |
+
+    Each arm's three runs are bit-identical to each other. Over the 219
+    parameters with an esd the largest move is 3.6e-6 esd (atom 10's Biso,
+    15.4175 Å², esd 5.33). The largest relative change of an esd is 7e-7,
+    and Rwp moved by 1.3e-12 relative. The stage iteration counts are
+    identical on both arms (the `biso` stage 33). A profiled branch run
+    (13.1 s, the profiler's overhead included) puts 6.1 s of the 8.8 s of
+    Jacobians in `_chained_columns`, the peak-chain columns, with 1 645
+    `_total_f2` calls. Those are the columns whose |F|² moves through d, the
+    cell lengths first. The ratio is 1.9× per Jacobian, against the WP's
+    ≥ 10× target over angle 1.
+  - *Moved numbers, under R0.* The residual is untouched. Only the
+    Jacobian's Biso and occupancy columns changed, from a forward difference
+    to the exact derivative. That changes the solver's path, never the
+    model, so it is a speed change under DESIGN-RULES Rule 5 *Arithmetic
+    accuracy* and its error is read in esd: 3.6e-6 esd at most, beside the
+    0.2-0.5 esd a 1-ulp `exp` change already moves a converged fit (WP-2317
+    R0). Five backend goldens (`toy_roughness`, `toy_restraints`,
+    `toy_anomalous`, `nac`, `srm660c`) were re-pinned in the same change.
+    Only their Biso and occupancy columns moved, and the new columns sit
+    5e-13 to 8e-10 from a Richardson-extrapolated difference where the old
+    sat 0.9-4.0e-7 from it (`tests/data/README.md` § WP-2314 re-baseline).
+    Every bar the new tests assert is a rounding bound, not a byte
+    comparison, so Linux x86_64 OpenBLAS is held to it too.
+  - *Gates:* GATES
+  - *Review:* `/code-review high --fix` found no correctness bug. It added
+    the scattering-factor citations to `_scattering_factor`, named Biso and
+    occupancy in `sabine_extinction_and_dx`'s docstring, and made the
+    ADP-hump block reuse the one local Jacobian per call. It also found
+    that `families_tied` in `test_cross_backend.py` lost coverage: its
+    general affine tie now takes the new branch, so no traced row crossed
+    the peak chain under a tie. The row gains an affine tie between two
+    width scalars (gauss_strain = 2·lor_size + 0.001), traced to the peak
+    chain; it passes the `fd`, `jax` and `jax+fp32` methods. The fast run
+    found one real defect before the review: a formula tie onto a Biso
+    (`2 * B_La + 0.1`) was declined while the equal matrix tie took the
+    branch, so the two spellings differed by 4e-5 (`test_tie_expression`). The coefficients now come from
+    `local_jacobian`, and the two agree to rounding.
+  - *Settled by Claude:*
+    1. A column reaching a row a formula block writes takes the branch,
+       with its coefficients read from `ParameterTable.local_jacobian`.
+       Declining such a column to the peak chain was the alternative.
+       Settled under root CLAUDE.md, "An analytic Jacobian branch claims
+       what one parameter name reaches", and `test_tie_expression`'s
+       existing rule that a linear formula meets the matrix tie to
+       rounding. `local_jacobian` is exact for a formula row, where C holds
+       no coefficient; declining made the two spellings of one tie differ
+       by 4e-5.
+    2. The Biso and occupancy columns moved off the forward difference, so
+       every fit freeing one moves at the 1e-6-esd level and five goldens
+       were re-pinned. Settled under DESIGN-RULES Rule 5 *Arithmetic
+       accuracy* and WP-2317's R0: the residual is unchanged and the move is
+       read in esd. WP-1121's analytic scale column is the precedent for
+       the re-pin.
+    3. The occupancy derivative recomputes f₀ and exp(−B s²) for its atom
+       rather than dividing the cached amplitude by the occupancy. The
+       division was the alternative. Settled under Rule 4 (*A new API*): an
+       occupancy at 0 is a legal start, and division there is undefined.
+  - *Generality:* no heuristic, threshold or default added and `_audit.py`
+    untouched, so no judge.
+  - *Next:*
+    1. Angle 2 (the Ω·∂I block) and the cell columns are what is left of
+       the Jacobian. The cell columns are WP-1945's cell family; read its
+       Tasks before starting angle 7 here, because the profile says |F|² at
+       a perturbed d is now the largest single cost.
+    2. Angle 4 (cross-atom reach) can reuse `_site_scalar_column`'s shape:
+       a contraction of the cached brackets over a declared reach.
 
 - **2026-11-27** (second session) — The runaway guard the Tests item owed is
   a count of structure-factor expansions, not a timer (PR #1865, a
