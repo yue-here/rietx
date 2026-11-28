@@ -7892,7 +7892,7 @@ class Refinement:
             raise RuntimeError("no QPA on this result (Rietveld fits only)")
         write_qpa_table(self.result_.qpa, path, **kw)
 
-    def write_correlation_table(self, path, **kw) -> None:
+    def write_correlation_table(self, path: str | Path, **kw) -> None:
         """Write the last fit's full parameter correlation matrix to CSV/TSV
         (WP-1990; see :func:`rietx.io.exporters.write_correlation_table`)."""
         from .io.exporters import write_correlation_table
