@@ -220,6 +220,17 @@ and have no free factor to measure, so this file's old list named them without c
     WP. Group Q's question: whether the cap, or the tolerance it serves,
     suffices on a 296-reflection neutron pattern (macOS arm64, `[dev]`,
     development data).
+  - The control, run 2026-11-28 on the branch merged with main
+    `300853e90`: R7's code with the uniform 0.3° slack on every stage
+    (`staged.refit_later` patched to `False`, so the re-solve stays). The
+    same four starts took 9 188, 10 094, 25 000 and 7 742 closing-stage
+    cycles at Rwp 17.30, 17.32, 17.30 and 17.31 %, which is main's to the
+    cycle. R7 as shipped took 25 000, 25 000, 22 376 and 22 682 at Rwp
+    16.94-16.97 % on every start. So the sized slack of the intermediate
+    stages causes the whole extra cost and the 0.35-point Rwp drop. The
+    re-solve plays no part, since no stage re-solved in either arm. The two
+    arms' refined values differ by at most 0.28 esd (cell c), background
+    coefficients aside.
 
 - **2026-11-28, from WP-2314: corundum's roughness fence now passes on
   macOS arm64.** `test_surface_roughness.py`'s
