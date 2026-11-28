@@ -2,7 +2,7 @@
  "platform": "Darwin arm64",
  "python": "3.12.10",
  "rietx": "1.13.0.dev0",
- "venv": "/Users/yue/Code/rietx/.claude/worktrees/agent-a012e8e6a091bad86/.venv",
+ "venv": "/Users/yue/Code/rietx/.claude/worktrees/agent-a49d976a006c74f97/.venv",
  "summary": {
   "key": "bigcell-structural",
   "worst_esd": 0.010851808143745352,
@@ -29,12 +29,12 @@
   },
   "wall_s": {
    "tight": [
-    24.43,
-    24.27
+    16.12,
+    16.84
    ],
    "shipped": [
-    21.73,
-    22.52
+    17.32,
+    15.01
    ]
   },
   "shipped_terminations": [
@@ -62,7 +62,7 @@
  "runs": [
   {
    "arm": "tight",
-   "wall_s": 24.428062374936417,
+   "wall_s": 16.124954249942675,
    "nfev": 116,
    "njev": 117,
    "n_solves": 11,
@@ -959,7 +959,7 @@
   },
   {
    "arm": "shipped",
-   "wall_s": 21.7250386250671,
+   "wall_s": 17.316444333875552,
    "nfev": 104,
    "njev": 105,
    "n_solves": 11,
@@ -1858,7 +1858,7 @@
   },
   {
    "arm": "tight",
-   "wall_s": 24.269161166856065,
+   "wall_s": 16.841507958015427,
    "nfev": 116,
    "njev": 117,
    "n_solves": 11,
@@ -2755,7 +2755,7 @@
   },
   {
    "arm": "shipped",
-   "wall_s": 22.5232548750937,
+   "wall_s": 15.008124124957249,
    "nfev": 104,
    "njev": 105,
    "n_solves": 11,

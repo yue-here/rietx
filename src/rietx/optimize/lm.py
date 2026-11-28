@@ -245,6 +245,9 @@ _POLISH_STATIONARY = 1e-8
 #: residual rows) × λmax are discarded from the step: the scale of the
 #: rounding error in one entry of JᵀJ (see :func:`_solve_step`).
 _EIGEN_CUT_PER_ROW = float(np.finfo(np.float64).eps)
+#: the largest χ²_red the shift test widens its esd by (:func:`_max_shift_over_esd`,
+#: WP-2317): 1, the value correct weights give χ²_red, past which it may be misfit
+_SHIFT_CHI2_CAP = 1.0
 #: Largest system the step solves exactly by BVLS; above it the step is
 #: projected CG's (:func:`_solve_step`, WP-1953).  Measured on Pawley-shaped
 #: systems (one banded column per reflection plus 13 dense ones, macOS arm64,
@@ -925,7 +928,7 @@ def _max_shift_over_esd(A, step: np.ndarray, s: float, *, n_dof: int) -> float:
         return float("inf") if np.any(step) else 0.0
     # χ²_red widens σ only up to 1, the value correct weights give it (the
     # docstring's gate): above 1 it may be misfit rather than noise
-    chi2 = min(s / n_dof, 1.0)
+    chi2 = min(s / n_dof, _SHIFT_CHI2_CAP)
     if sparse.issparse(A):
         if A.shape[0] > BVLS_MAX_COLUMNS:
             q = float(step @ (A @ step))

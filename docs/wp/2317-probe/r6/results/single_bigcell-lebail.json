@@ -2,7 +2,7 @@
  "platform": "Darwin arm64",
  "python": "3.12.10",
  "rietx": "1.13.0.dev0",
- "venv": "/Users/yue/Code/rietx/.claude/worktrees/agent-a012e8e6a091bad86/.venv",
+ "venv": "/Users/yue/Code/rietx/.claude/worktrees/agent-a49d976a006c74f97/.venv",
  "summary": {
   "key": "bigcell-lebail",
   "worst_esd": 0.01538083268544621,
@@ -29,12 +29,12 @@
   },
   "wall_s": {
    "tight": [
-    51.38,
-    53.66
+    39.99,
+    37.6
    ],
    "shipped": [
-    54.64,
-    50.57
+    38.78,
+    34.26
    ]
   },
   "shipped_terminations": [
@@ -62,7 +62,7 @@
  "runs": [
   {
    "arm": "tight",
-   "wall_s": 51.38264137506485,
+   "wall_s": 39.99003695813008,
    "nfev": 26,
    "njev": 29,
    "n_solves": 5,
@@ -175,7 +175,7 @@
   },
   {
    "arm": "shipped",
-   "wall_s": 54.6408499579411,
+   "wall_s": 38.781349499942735,
    "nfev": 23,
    "njev": 25,
    "n_solves": 5,
@@ -290,7 +290,7 @@
   },
   {
    "arm": "tight",
-   "wall_s": 53.661783165996894,
+   "wall_s": 37.604011917021126,
    "nfev": 26,
    "njev": 29,
    "n_solves": 5,
@@ -403,7 +403,7 @@
   },
   {
    "arm": "shipped",
-   "wall_s": 50.5731159998104,
+   "wall_s": 34.2584842920769,
    "nfev": 23,
    "njev": 25,
    "n_solves": 5,

@@ -80,14 +80,14 @@ Measured against the same plans with `shift_over_esd_tol=None`, on macOS arm64 w
 
 | Fit | Evaluations | Largest departure from the 1e-9 answer |
 |---|---|---|
-| SRM 660c LaB6 | 71 → 66 | 0.016 esd |
-| fluorapatite | 40 → 34 | 0.046 esd |
-| 11-BM NAC | 49 → 43 | 0.010 esd |
-| cpd-1a | 165 → 143 | 0.052 esd |
-| CuCr₂O₄ ramp, 17 patterns | 1 326 → 765 | 0.72 esd, the cell of a 1 wt% phase |
-| cpd-1 chain, 8 patterns | 504 → 403 | 0.45 esd, `instrument.geometry.axial_sl` |
+| SRM 660c LaB6 | 71 → 67 | 0.003 esd |
+| fluorapatite | 40 → 35 | 0.016 esd |
+| 11-BM NAC | 49 → 44 | 0.004 esd |
+| cpd-1a | 165 → 145 | 0.030 esd |
+| CuCr₂O₄ ramp, 17 patterns | 1 326 → 848 | 0.68 esd, the cell of a 1 wt% phase |
+| cpd-1 chain, 8 patterns | 504 → 453 | 0.13 esd, `instrument.geometry.axial_sl` |
 
-Rwp agreed to 5e-6 on every single fit.
+Rwp agreed to 4e-6 on every single fit.
 Every weight fraction stayed within 0.071 esd.
 A series runs the test on every pattern.
 Along both chains the departure did not grow from one pattern to the next, since each pattern is refitted to its own stop.

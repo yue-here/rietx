@@ -2,7 +2,7 @@
  "platform": "Darwin arm64",
  "python": "3.12.10",
  "rietx": "1.13.0.dev0",
- "venv": "/Users/yue/Code/rietx/.claude/worktrees/agent-a012e8e6a091bad86/.venv",
+ "venv": "/Users/yue/Code/rietx/.claude/worktrees/agent-a49d976a006c74f97/.venv",
  "summary": {
   "key": "bigcell-pawley",
   "worst_esd": 0.03545585923119721,
@@ -29,12 +29,12 @@
   },
   "wall_s": {
    "tight": [
-    6.44,
-    6.5
+    4.53,
+    4.41
    ],
    "shipped": [
-    6.61,
-    6.53
+    4.65,
+    4.62
    ]
   },
   "shipped_terminations": [
@@ -62,7 +62,7 @@
  "runs": [
   {
    "arm": "tight",
-   "wall_s": 6.444656832842156,
+   "wall_s": 4.534490584162995,
    "nfev": 43,
    "njev": 44,
    "n_solves": 5,
@@ -139,7 +139,7 @@
   },
   {
    "arm": "shipped",
-   "wall_s": 6.614184665959328,
+   "wall_s": 4.648042791988701,
    "nfev": 37,
    "njev": 38,
    "n_solves": 5,
@@ -218,7 +218,7 @@
   },
   {
    "arm": "tight",
-   "wall_s": 6.50129658379592,
+   "wall_s": 4.413624332984909,
    "nfev": 43,
    "njev": 44,
    "n_solves": 5,
@@ -295,7 +295,7 @@
   },
   {
    "arm": "shipped",
-   "wall_s": 6.528148458106443,
+   "wall_s": 4.622264957986772,
    "nfev": 37,
    "njev": 38,
    "n_solves": 5,

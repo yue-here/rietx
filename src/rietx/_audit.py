@@ -5388,6 +5388,16 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.optimize.lm._EIGEN_CUT_PER_ROW", "constant", tier=1, value=2.220446049250313e-16,
         evidence=("numerical floor: eps*m, the rounding error of one inner product over m terms "
                   "(Higham 2002 §3.1; docstring)")),
+    Row("rietx.optimize.lm._SHIFT_CHI2_CAP", "constant", tier=1, value=1.0,
+        evidence=("arithmetic: 1 is chi2_red's expected value under correct weights, so the "
+                  "shift test's esd is never wider than the counting-statistics one and the "
+                  "min() can only stop a fit later than either reading (lm._max_shift_over_esd "
+                  "docstring); on the scaled esd tutorial 05's warm 2 % jump stopped at chi2_red "
+                  "632, Rwp 0.966, and capped reaches Rwp 0.0395 "
+                  "(test_instrument_hold_noise::test_the_tutorials_step_is_reached_warm); GSAS-II "
+                  "5.8.4 prints shift/esd on the GOF-scaled esd and does not stop on it "
+                  "(GSASIIstrMain.py:397-402); the cost is evaluations only: CuCr2O4 ramp 848 "
+                  "against 765 uncapped, cpd-1 453 against 403 (docs/wp/2317-probe/r6/RESULTS.md)")),
     Row("rietx.optimize.lm._INNER_MAX", "constant", tier="invariant", value=18,
         evidence=("answer-invariant: on nine acceptance configurations an iteration that took "
                   "a step tried at most 6 damped trials and a stage's last iteration up to 9 "
@@ -6674,11 +6684,13 @@ ROWS: tuple[Row, ...] = (
                   "undamped Gauss-Newton step, since on the damped one 0.2 and GSAS-II's 1e-3 "
                   "ended cpd-1f 18 esd off (docs/wp/2317-probe/convnoise/RESULTS.md); against "
                   "the 1e-9 stop on development data as shipped, macOS arm64 "
-                  "(docs/wp/2317-probe/r6/RESULTS.md): CuCr2O4 ramp 765 against 1 326 "
-                  "evaluations, worst 0.72 esd (1 wt% CuO cell, last pattern), main phase under "
-                  "0.006; cpd-1 chain 403 against 504, worst 0.45 (axial_sl), weight fractions "
-                  "under 0.05; neither chain's departure grows from pattern to pattern; "
-                  "single fits under 0.06 esd, 6-16 % of evaluations saved")),
+                  "(docs/wp/2317-probe/r6/RESULTS.md): CuCr2O4 ramp 848 against 1 326 "
+                  "evaluations, worst 0.68 esd (1 wt% CuO cell, last pattern), main phase under "
+                  "0.006; cpd-1 chain 453 against 504, worst 0.13 (axial_sl), weight fractions "
+                  "under 0.03; neither chain's departure grows from pattern to pattern; "
+                  "single fits under 0.04 esd, 5-14 % of evaluations saved; esd read at "
+                  "chi2_red capped at 1, since tutorial 05's warm 2 % jump stopped at chi2_red 632 "
+                  "(Rwp 0.966) on the scaled esd")),
     Row("rietx.schemas.plan.PlanSpec:stages", "default", tier=1, ambiguity=1, value=(),
         evidence="arithmetic: the empty container; resolve_plan supplies every plan a fit runs"),
     Row("rietx.schemas.plan.PlanSpec:correlation_guard", "default", value=0.98),
@@ -6751,11 +6763,13 @@ ROWS: tuple[Row, ...] = (
                   "undamped Gauss-Newton step, since on the damped one 0.2 and GSAS-II's 1e-3 "
                   "ended cpd-1f 18 esd off (docs/wp/2317-probe/convnoise/RESULTS.md); against "
                   "the 1e-9 stop on development data as shipped, macOS arm64 "
-                  "(docs/wp/2317-probe/r6/RESULTS.md): CuCr2O4 ramp 765 against 1 326 "
-                  "evaluations, worst 0.72 esd (1 wt% CuO cell, last pattern), main phase under "
-                  "0.006; cpd-1 chain 403 against 504, worst 0.45 (axial_sl), weight fractions "
-                  "under 0.05; neither chain's departure grows from pattern to pattern; "
-                  "single fits under 0.06 esd, 6-16 % of evaluations saved"),
+                  "(docs/wp/2317-probe/r6/RESULTS.md): CuCr2O4 ramp 848 against 1 326 "
+                  "evaluations, worst 0.68 esd (1 wt% CuO cell, last pattern), main phase under "
+                  "0.006; cpd-1 chain 453 against 504, worst 0.13 (axial_sl), weight fractions "
+                  "under 0.03; neither chain's departure grows from pattern to pattern; "
+                  "single fits under 0.04 esd, 5-14 % of evaluations saved; esd read at "
+                  "chi2_red capped at 1, since tutorial 05's warm 2 % jump stopped at chi2_red 632 "
+                  "(Rwp 0.966) on the scaled esd"),
         grounds=("Rule 5 Arithmetic accuracy: the accuracy other programs' users publish, read in "
                  "each quantity's esd; R6 ruled 2026-11-27 ('Start with your recommendation. "
                  "Consider best practice.'), the level re-settled by Claude the same day under "
