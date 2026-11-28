@@ -1,6 +1,6 @@
 # WP-2303 — A glob a caller passes that matches nothing says so
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-28 — claimed by @yue-here (ghostshift runner)
 Track: What fires, and what stays silent
 Depends on: — (2300 soft: it owns how a series declares a parameter fixed)
 Priority: P2 2026-11-23 — a misspelt glob in `hold` holds nothing and the parameter refines, with no word; the workaround is reading the return value
