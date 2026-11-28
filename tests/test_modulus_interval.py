@@ -93,7 +93,11 @@ def _fitted(seed: int):
         rx.Stage("cell", ["phases.*.cell.*", "instrument.zero_shift",
                           "instrument.profile.w"]),
         rx.Stage("moment", [MOD])],
-        closing_window_tol=CLOSING_WINDOW_TOL)   # declared, not inherited: off by default since WP-2222
+        closing_window_tol=CLOSING_WINDOW_TOL,   # declared, not inherited: off by default since WP-2222
+        # the issue's repro: the 1e-9 stop crawls m to 0 on its dead column,
+        # where the esd passes 1e3; the shift test stops at m = 3e-6, esd 457
+        # (WP-2317 R6)
+        shift_over_esd_tol=None)
     result = ref.fit(data, plan=plan, telemetry=False)
     return ref, data, result
 

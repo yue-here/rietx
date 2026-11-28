@@ -208,7 +208,8 @@ def test_a_cancelled_joint_stage_is_abandoned(two_patterns):
         Stage("scale+bkg", turn_on=["phases.*.scale", "instrument.background.*"]),
         Stage("zero", turn_on=["instrument.zero_shift"]),
         Stage("cell", turn_on=["phases.*.cell.*"]),
-    ], intermediate_ftol=None)
+    ], intermediate_ftol=None,
+        shift_over_esd_tol=None)  # a precision check: the 1e-9 stop (WP-2317 R6)
     token = CancelToken()
     log: list[dict] = []
 
@@ -236,7 +237,8 @@ def test_a_cancelled_joint_stage_is_abandoned(two_patterns):
     # the declared stages' working state; the closing stage is tests/test_closing_stage.py's
     done.fit(two_patterns, plan=RefinementPlan(stages=plan.stages[:2],
                                                intermediate_ftol=None,
-                                               closing_window_tol=None))
+                                               closing_window_tol=None,
+                                               shift_over_esd_tol=None))
     for h in (0, 1):
         assert (ref.fitted_structures[h].model_dump()
                 == done.fitted_structures[h].model_dump())

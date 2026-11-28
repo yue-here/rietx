@@ -22,6 +22,7 @@ fitted models, and the unfitted models the script began from.
 
 from __future__ import annotations
 
+import dataclasses
 import os
 from pathlib import Path
 
@@ -207,8 +208,13 @@ def test_a_blank_frame_past_the_screen_is_judged_by_its_marginal_z(
     _, starts = issue_481
     pattern = _draw(_lab6(A0, 0.0), np.random.default_rng(107))
     events: list[dict] = []
+    # the noise lifts the screen past 3σ at the 1e-9 stop's answers; the
+    # shift test's answers read 2.2-2.7 and never reach this path, so the
+    # fixture keeps the old stop (WP-2317 R6)
+    plan = dataclasses.replace(rx.RefinementPlan.mccusker_default(),
+                               shift_over_esd_tol=None)
     result, record = _fit(*starts["unfitted"](), pattern, monkeypatch,
-                          events=events)
+                          plan=plan, events=events)
     assert any(s >= PHASE_SUPPORT_SIGMA for s, _ in record), record
     _assert_unseen(result, record)
     _assert_prior_holds(result, events)

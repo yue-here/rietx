@@ -309,7 +309,7 @@ def test_a_gain_over_a_short_caller_fit_is_not_judged(biso_pair):
 PEAK = [f"instrument.extra_components.0.{n}" for n in ("area", "center", "fwhm")]
 
 
-def _absent_peak(seed):
+def _absent_peak(seed, **stage_kw):
     """#1686: a peak declared at area 0 over a pattern that has none."""
     from rietx.schemas.instrument import PeakComponent
 
@@ -321,7 +321,7 @@ def _absent_peak(seed):
         fwhm=rx.Parameter(value=0.08, min=0.005, max=0.5, unit="deg"))
     ref = _fit(_lab6(), _lab6_instrument([peak]), data)
     full = ref.branch()
-    full.run_stage(data, rx.Stage("peak", BASE + PEAK), telemetry=False)
+    full.run_stage(data, rx.Stage("peak", BASE + PEAK), telemetry=False, **stage_kw)
     _plot(full.result_, f"1686_seed{seed}")
     return full, compare_freed(ref, full)
 
@@ -347,7 +347,10 @@ def test_a_peak_the_fit_could_not_move_names_its_dead_columns():
 
 
 def test_a_position_on_its_bound_is_marked():
-    full, c = _absent_peak(7)
+    # the absent peak's centre reaches its bound on the 1e-9 stop's crawl; the
+    # shift test stops at its start, 46.0, so this fixture keeps the old stop
+    # (WP-2317 R6)
+    full, c = _absent_peak(7, shift_over_esd_tol=None)
     rows = {p.path.rsplit(".", 1)[1]: p for p in c.freed}
     assert rows["center"].value == pytest.approx(46.5)
     assert rows["center"].at_bound is True

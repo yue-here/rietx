@@ -634,6 +634,12 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
                     small_runs = 0
                     lam = min(lam, lam_start)
                     continue
+                if undamped[2]:
+                    # the rows hold the step the stop rests on, so the stage
+                    # pressed them even where it stops at its start
+                    n_truncated += 1
+                    for label in undamped[2]:
+                        truncated_by[label] = truncated_by.get(label, 0) + 1
                 status = 1
                 termination = "shift_over_esd"
                 gauss_newton_step = tested
