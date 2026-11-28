@@ -4,7 +4,7 @@ Before angle 3 a Biso or occupancy column went to the peak chain, which
 re-runs ``phase_peaks`` at a perturbed θ, so every such column re-expanded
 the whole phase's structure factor.  Now ``structure_factor.d_f2_d_sites``
 returns ∂|F|²/∂B_j and ∂|F|²/∂occ_j from the one expansion the coordinate
-columns already share, and ``_site_scalar_column`` sums them through C.
+columns already share, and ``_site_column`` sums them through C.
 
 The oracles are exact, as the root CLAUDE.md asks of a new branch.  ⟨|F|²⟩
 is quadratic in occ_j, so a central difference in occupancy is exact at any
@@ -204,15 +204,15 @@ def test_the_site_scalar_gradients_meet_their_exact_oracles(dispersion):
 
 
 def _claimed(monkeypatch) -> list[int]:
-    """The columns ``_site_scalar_column`` builds, in order."""
+    """The columns ``_site_column`` builds, in order."""
     seen: list[int] = []
-    real = LS._site_scalar_column
+    real = LS._site_column
 
     def record(model, table, bases, values, c, *a, **k):
         seen.append(c)
         return real(model, table, bases, values, c, *a, **k)
 
-    monkeypatch.setattr(LS, "_site_scalar_column", record)
+    monkeypatch.setattr(LS, "_site_column", record)
     return seen
 
 
@@ -343,6 +343,6 @@ def test_the_count_guard_trips_on_the_peak_chain(monkeypatch):
     """The guard above is evidence only if its counter sees a return.  With
     the branch declining every column, the peak chain builds them, and the
     count grows with the free columns."""
-    monkeypatch.setattr(LS, "_site_scalar_reach_ok", lambda *a, **k: False)
+    monkeypatch.setattr(LS, "_site_reach_ok", lambda *a, **k: False)
     counts = _expansions_per_jacobian(monkeypatch)
     assert counts["all"][0] > 2 * counts["one"][0], counts

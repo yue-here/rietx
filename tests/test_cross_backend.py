@@ -386,7 +386,7 @@ def _state_families_variable():
     straight through C either way and so are the independent opinion.
 
     Three shapes, one per branch the reach can name: Biso rows on the
-    site-scalar branch, the peak chain before WP-2314 (several reached paths,
+    site branch, the peak chain before WP-2314 (several reached paths,
     all direct), a phase scale at coefficient 1
     on the closed-form ``_scale_column`` (one reached path, the case that is
     licensed to keep the linear branches), and a Wyckoff DOF, where the reach is
@@ -1350,7 +1350,7 @@ def _state_extinction_strong():
 def _state_site_scalars():
     """Biso and occupancy columns from the structure-factor cache (WP-2314).
 
-    The analytic branch ``_site_scalar_column`` sums ∂|F|²/∂B_j and
+    The analytic branch ``_site_column`` sums ∂|F|²/∂B_j and
     ∂|F|²/∂occ_j through C over every Biso and occupancy row one column
     moves, so its reach is new: N's Biso following C's, N's occupancy the
     remainder of C's (coefficient −1), and a named variable driving two
@@ -1370,13 +1370,34 @@ def _state_site_scalars():
     return model, table, {}
 
 
+def _state_site_cross_atom():
+    """Columns reaching across atoms, from the structure-factor cache
+    (WP-2314 angle 4).
+
+    ``_site_column`` sums the cached ∂|F|² of every site row a column moves,
+    weighted by the row's ∂p/∂θ_c, so its reach is new: three coordinate
+    DOFs carried onto a second atom (the co-sited tie), a named variable
+    driving one atom's coordinate DOF and ADP DOF, and a second driving one
+    atom's Biso and another's occupancy.  Dispersion is on and extinction at
+    30, so every column carries the B term and the chain's G factor.  The
+    exact oracle is ``tests/test_cross_atom_columns.py``'s chain rule; this
+    row is the traced backends' opinion.
+    """
+    from tests.test_cross_atom_columns import cross_atom_state
+
+    model, table = cross_atom_state(extinction=30.0,
+                                    window_area_tol=WINDOW_AREA_TOL)
+    return model, table, {}
+
+
 def _state_distortion_modes():
     """WP-1419: a child refined on its mode amplitudes, the coordinates derived.
 
     NaTaO₃'s P4/mbm child of the cubic perovskite (one M-point mode on O2),
     stated by ``displacive_statement`` and set off its seed to 0.2 Å: an
-    amplitude column falls to ``_peak_chain_column`` and reaches O2's x and
-    y through C; the traced backends differentiate the same affine rows.
+    amplitude column reaches O2's x and y through C, and numpy takes
+    ``_site_column`` for it (WP-2314 angle 4; the peak chain before).  The
+    traced backends differentiate the same affine rows.
     The cell, scale and Biso free beside it.
     """
     from rietx.crystallography.representation.distortion import displacive_statement
@@ -1547,6 +1568,7 @@ CONFIGS = {"families": _state_families,
            "peak_equations_wavelength": _state_peak_equations_wavelength,
            "distortion_modes": _state_distortion_modes,
            "site_scalars": _state_site_scalars,
+           "site_cross_atom": _state_site_cross_atom,
            "texture": _state_texture,
            "bodies": _state_bodies,
            "bodies_site": _state_bodies_site,
@@ -1622,6 +1644,7 @@ CONFIG_PARAMS = [
     _config("stephens_over_lor_strain"),
     _config("distortion_modes"),
     _config("site_scalars"),
+    _config("site_cross_atom"),
     _config("bodies_site"),
     # the state imports test_parent_cell's LaMnO₃ child, whose candidate search
     # is cached per process: sharing that module's group pays it once
@@ -2455,8 +2478,10 @@ FD_ESD_RATIO_BAR = 0.01
 #: configs whose every column is exact, so no column takes a finite difference.
 #: ``extra_components`` joined when the hump's columns became the closed form
 #: (WP-2116): its other columns are a phase scale and background coefficients.
+#: ``site_cross_atom`` frees only site columns, every one ``_site_column``'s
+#: since WP-2314 angle 4.
 #: Listed rather than skipped, so a column that falls back to FD here fails.
-NO_FD_CONFIGS = frozenset({"extra_components"})
+NO_FD_CONFIGS = frozenset({"extra_components", "site_cross_atom"})
 
 
 def _fd_taken(model, table, theta, monkeypatch):

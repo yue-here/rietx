@@ -20,9 +20,10 @@ full-model finite differences:
 * **site-DOF columns** — Wyckoff coordinate and anisotropic-ADP DOFs, whose
   ∂|F|²/∂p is analytic over the frozen op subsets and chains through the
   site's constraint directions;
-* **site-scalar columns** — Biso and occupancy, whose ∂|F|²/∂p comes from the
-  same structure-factor expansion (WP-2314), summed through C over every Biso
-  and occupancy row of one phase the column moves;
+* **site columns** — Biso, occupancy, and any column whose reach crosses
+  atoms (a tie between two atoms' coordinates, a distortion mode): ∂|F|²/∂p for every site row comes from the same structure-factor
+  expansion (WP-2314), summed through ∂p/∂θ over every site row of one phase
+  the column moves;
 * **axial columns** — S/L, H/L through the analytic node-weighted bases;
 * **plain forward differences** — anything else (fallback only).
 """
@@ -99,8 +100,17 @@ DEFAULT_SOLVER = "lm"
 #: ADPs (``adp``, tied to the six U^ij).  Both get analytic columns that chain
 #: the structure-factor derivative through the site's constraint directions.
 _STRUCTURAL_PATH = re.compile(r"^phases\.(\d+)\.atoms\.(\d+)\.(dof|adp)\.\d+$")
-#: an atom's Biso or occupancy (WP-2314's analytic branch, ``_site_scalar_column``)
-_SITE_SCALAR_PATH = re.compile(r"^phases\.(\d+)\.atoms\.(\d+)\.(biso|occ)$")
+#: every site row the structure factor reads (``CompiledModel._site_values``,
+#: ``_atom_key``): ``_site_column`` has a cached ∂|F_N|² for each
+_SITE_ROW_PATH = re.compile(
+    r"^phases\.(\d+)\.atoms\.(\d+)\.(x|y|z|u11|u22|u33|u12|u13|u23|biso|occ)$")
+#: a parameter of phase N the data rows never read: a site-symmetry DOF or a
+#: distortion-mode amplitude.  It moves the pattern only through the site
+#: rows its column of C lists beside it (WP-2314 angle 4).  A rigid body's
+#: parameters are not here: ``_site_reach_ok`` says why.
+_SITE_PARENT_PATH = re.compile(
+    r"^phases\.(\d+)\.(?:atoms\.\d+\.(?:dof|adp)\.\d+"
+    r"|distortion_modes\.modes\.\d+\.amplitude)$")
 #: a moment DOF, with its phase, atom and DOF index (WP-1327's analytic branch)
 _MOMENT_PATH = re.compile(r"^phases\.(\d+)\.atoms\.(\d+)\.moment\.dof(\d+)$")
 #: March-Dollase coefficient — an analytic intensity-multiplier column
@@ -1555,59 +1565,98 @@ def _structural_column(model: CompiledModel, table: ParameterTable,
     return _accumulate(len(model.tt), [(pp.layout, terms)])
 
 
-def _site_scalar_column(model: CompiledModel, table: ParameterTable,
-                        bases: DerivativeBases, values: dict[str, float], c: int,
-                        ip: int, reach: list[str],
-                        grads: tuple[dict[int, np.ndarray], dict[int, np.ndarray]],
-                        lj: sparse.csc_matrix) -> np.ndarray:
-    """∂y/∂θ_c for a column moving Biso and occupancy rows of phase ip only
-    (WP-2314).
+def _site_column(model: CompiledModel, table: ParameterTable,
+                 bases: DerivativeBases, values: dict[str, float], c: int,
+                 ip: int, reach: list[str],
+                 grads: tuple[dict[int, np.ndarray], dict[int, np.ndarray],
+                              dict[int, np.ndarray], dict[int, np.ndarray]],
+                 lj: sparse.csc_matrix) -> np.ndarray:
+    """∂y/∂θ_c for a column moving site rows of phase ip only (WP-2314).
 
-    Both enter the intensity through |F_N|² alone, so only the intensity
-    scalar moves.  ``grads`` is the ``({j: ∂|F|²/∂B_j}, {j: ∂|F|²/∂occ_j})``
-    half of :meth:`CompiledModel.structural_f2_grads` at this θ.  The column's
-    ∂|F|² is their sum weighted by ∂p_q/∂θ_c over the rows it moves, read off
-    ``lj``, the table's :meth:`~ParameterTable.local_jacobian` at θ.  That is
-    C itself on a table without a derived block, so a tie between two atoms'
-    Biso, an occupancy constraint such as occ_W = 1 − occ_Nb, or a named
-    variable driving several sites is carried exactly, and a row a formula
-    writes takes the formula's own derivative there.  ``reach`` is every path
-    the column moves, its own included; :func:`_site_scalar_reach_ok` has
-    checked that nothing else is in it.
+    A site row is what the structure factor reads of an atom: its x, y, z,
+    U^ij, Biso and occupancy.  Each enters the pattern through |F_N|² alone,
+    so only the intensity scalar moves.  ``grads`` is
+    :meth:`CompiledModel.structural_f2_grads` at this θ, ``({j: ∂/∂xyz},
+    {j: ∂/∂U}, {j: ∂/∂B}, {j: ∂/∂occ})``.  The column's ∂|F|² is the sum over
+    the site rows it moves of each row's gradient weighted by ∂p_q/∂θ_c, read
+    off ``lj``, the table's :meth:`~ParameterTable.local_jacobian` at θ.  So
+    this is the chain rule over the cached brackets, and it carries a tie
+    between two atoms' coordinates or Biso, an occupancy remainder
+    (occ_W = 1 − occ_Nb), a named variable over several sites, a
+    distortion-mode amplitude (affine, through C) and a row a formula writes
+    (through the formula's own derivative).  ``reach`` is every path the column moves, its
+    own included; :func:`_site_reach_ok` has checked that each is a site row
+    or a parameter the data rows never read, which contributes nothing here
+    beyond the site rows it moves.
     """
-    g_biso, g_occ = grads
+    g_xyz, g_u, g_biso, g_occ = grads
     df2 = None
     for q in reach:
-        m = _SITE_SCALAR_PATH.match(q)
+        m = _SITE_ROW_PATH.match(q)
+        if m is None:
+            continue
         w = float(lj[table._paths[q], c])
         if w == 0.0:
             continue
-        g = (g_biso if m.group(3) == "biso" else g_occ)[int(m.group(2))]
+        j, name = int(m.group(2)), m.group(3)
+        if name == "biso":
+            g = g_biso[j]
+        elif name == "occ":
+            g = g_occ[j]
+        elif name in ("x", "y", "z"):
+            g = g_xyz[j][:, "xyz".index(name)]
+        else:
+            g = g_u[j][:, U_NAMES.index(name)]
         term = w * g
         df2 = term if df2 is None else df2 + term
     if df2 is None:
         return np.zeros(len(model.tt))
-    dint = model.site_scalar_intensity_grad(ip, df2, values)
+    dint = model.site_intensity_grad(ip, df2, values)
     pp = bases.planes[ip]
     coef = np.where(pp.finite, _gather_per_line(pp.layout, dint), 0.0)
     terms = [(coef, pp.omega)] if np.any(coef != 0.0) else []
     return _accumulate(len(model.tt), [(pp.layout, terms)])
 
 
-def _site_scalar_reach_ok(ip: str, path: str, extra: list[str]) -> bool:
-    """Whether ``_site_scalar_column`` claims this column.
+def _site_reach_ok(ip: str, path: str, extra: list[str]) -> bool:
+    """Whether ``_site_column`` claims this column.
 
-    Its reach is the Biso and occupancy rows of phase ``ip``, any atom, since
-    it sums each row's ∂|F|² weighted by that row's ∂p/∂θ_c.  A column
-    reaching anything else (a coordinate, a cell, another phase) is declined
-    and takes the peak chain, which decodes through every row and is exact
-    for it.
+    Its reach is phase ``ip``'s site rows, any atom (``_SITE_ROW_PATH``), and
+    the parameters of that phase the data rows never read
+    (``_SITE_PARENT_PATH``: a site-symmetry DOF, a distortion-mode amplitude)
+    or a named variable.  Such a parameter moves the pattern only through the
+    site rows the column's reach lists beside it, so it adds nothing the
+    branch misses.  A column reaching anything else (a cell, a moment,
+    another phase) is declined and takes the peak chain, which decodes
+    through every row and is exact for it.  At least one site row must be
+    reached, or the column has nothing to sum.
+
+    **A rigid body's columns are declined too, and the reason is measured.**
+    The body's derived block returns partials of rounding size, ~1e-17,
+    where the true partial is zero: an atom at the turn's centre, whose
+    template position is a difference that came out at 1e-17 rather than 0.
+    Summed analytically that is a column of ~1e-13 against 1e3-1e5 for its
+    neighbours.  The covariance reads a column that is not exactly zero as
+    live (``statistics.normal_covariance``).  On a turn that moves only
+    zero-occupancy atoms (``test_rigid_body``'s ``RIGID_BODY_UNSUPPORTED``
+    case) the noise column is a multiple of the origin's, so the origin's x
+    esd went missing too and the finding named it among the DOFs that
+    measured nothing.  The peak chain's difference cannot see
+    a 1e-17 partial, since the step moves the atom by less than half its
+    coordinate's ulp, so it returns that column exactly zero.  A body column
+    waits for a block whose partials are exact at a zero.
     """
+    site = False
     for q in (path, *extra):
-        m = _SITE_SCALAR_PATH.match(q)
-        if m is None or m.group(1) != ip:
+        if is_variable_path(q):
+            continue
+        if (m := _SITE_ROW_PATH.match(q)) is not None:
+            site = True
+        elif (m := _SITE_PARENT_PATH.match(q)) is None:
             return False
-    return True
+        if m.group(1) != ip:
+            return False
+    return site
 
 
 def _moment_column(model: CompiledModel, table: ParameterTable,
@@ -2120,8 +2169,8 @@ def _column_identities(table: ParameterTable, extras: list[list[str]]
       that read their coefficients off C may have it.  Those are
       ``_peak_chain_column`` (it perturbs θ and decodes, so every coefficient
       and constant is carried), ``_structural_column`` (it reads the atom's
-      rows out of C) and ``_site_scalar_column`` (it reads every Biso and
-      occupancy row it moves out of C).  The closed-form linear branches exclude themselves,
+      rows out of C) and ``_site_column`` (it reads every site row it moves
+      out of the local Jacobian).  The closed-form linear branches exclude themselves,
       since each requires ``own``: true where the column is its named path's
       own (nothing else reached, at coefficient 1), false for one path at any
       other coefficient, whose ``extra`` is empty too.  Testing ``extra``
@@ -2179,16 +2228,28 @@ def _column_identities(table: ParameterTable, extras: list[list[str]]
     return out
 
 
-def _within_atom(extra: list[str], ip: str, j: str) -> bool:
-    """Whether every path this column also moves belongs to atom ``j`` of ``ip``.
+def _within_atom(extra: list[str], ip: str, j: str, kind: str) -> bool:
+    """Whether every path this column also moves is one ``_structural_column``
+    reads: atom ``j``'s x, y, z rows for a coordinate DOF (``kind`` "dof"),
+    its six U rows for an ADP DOF ("adp"), or another DOF of that kind on
+    that atom.
 
-    The reach ``_structural_column`` accounts for: it reads the coefficients of
-    one atom's x/y/z (or six U) rows.  The site-symmetry ties always satisfy
-    this — that is the case it was written for — while a user tie between two
-    atoms' DOFs does not, and would otherwise contribute only the near atom.
+    The site-symmetry ties always satisfy this, which is the case the branch
+    was written for.  A user tie between two atoms' DOFs does not, and
+    neither does a column that also reaches the atom's Biso or occupancy:
+    the branch reads only one atom's x/y/z (or U) coefficients, so either
+    would come back short.  Both take ``_site_column`` instead (WP-2314
+    angle 4), which sums every site row the column moves.
     """
+    rows = ("x", "y", "z") if kind == "dof" else U_NAMES
     prefix = f"phases.{ip}.atoms.{j}."
-    return all(p.startswith(prefix) for p in extra)
+    for p in extra:
+        if not p.startswith(prefix):
+            return False
+        rest = p[len(prefix):]
+        if rest not in rows and not re.fullmatch(rf"{kind}\.\d+", rest):
+            return False
+    return True
 
 
 def _affected_phases(model: CompiledModel, path: str, extra: list[str]):
@@ -2419,29 +2480,34 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
     # partials are a constant of the solve: scattered once, never per call
     o_phys = (None if model.origin is None or not n_table
               else origin_partials(model.origin, table))
-    # WP-2314: the atoms whose coordinate, ADP, Biso or occupancy columns the
-    # structural and site-scalar branches may build, per phase, so one
-    # expansion of each phase's structure factor per evaluation serves them
-    # all.  A superset is harmless (an atom asked for and never read costs
-    # one bracket); a column whose atom is missing would raise, never return
+    # WP-2314: the atoms whose coordinate, ADP, Biso or occupancy gradients
+    # the structural and site branches may read, per phase, so one expansion
+    # of each phase's structure factor per evaluation serves them all.  A
+    # superset is harmless (an atom asked for and never read costs one
+    # bracket); a column whose atom is missing would raise, never return
     # short.
     struct_atoms: dict[int, tuple[set[int], set[int], set[int], set[int]]] = {}
-    # the Biso and occupancy columns' claim, decided once (C is frozen)
-    site_scalar = [bool((ss := _SITE_SCALAR_PATH.match(path))
-                        and _site_scalar_reach_ok(ss.group(1), path, extra))
-                   for path, extra, _own in identities]
-    for (path, extra, _own), scalar in zip(identities, site_scalar, strict=True):
+    # the site columns' claim, decided once (C is frozen): every path the
+    # column moves is a site row of one phase or a parameter of it the data
+    # rows never read (``_site_reach_ok``)
+    site_claim = [bool(path.startswith("phases.")
+                       and _site_reach_ok(path.split(".")[1], path, extra))
+                  for path, extra, _own in identities]
+    for (path, extra, _own), site in zip(identities, site_claim, strict=True):
         if ((dof := _STRUCTURAL_PATH.match(path))
-                and _within_atom(extra, dof.group(1), dof.group(2))):
+                and _within_atom(extra, dof.group(1), dof.group(2), dof.group(3))):
             want = struct_atoms.setdefault(int(dof.group(1)),
                                            (set(), set(), set(), set()))
             want[0 if dof.group(3) == "dof" else 1].add(int(dof.group(2)))
-        elif scalar:
+        elif site:
             for q in (path, *extra):
-                ss = _SITE_SCALAR_PATH.match(q)
-                want = struct_atoms.setdefault(int(ss.group(1)),
+                if (row := _SITE_ROW_PATH.match(q)) is None:
+                    continue
+                want = struct_atoms.setdefault(int(row.group(1)),
                                                (set(), set(), set(), set()))
-                want[2 if ss.group(3) == "biso" else 3].add(int(ss.group(2)))
+                name = row.group(3)
+                want[0 if name in ("x", "y", "z") else 2 if name == "biso"
+                     else 3 if name == "occ" else 1].add(int(row.group(2)))
 
     def jacobian(theta: np.ndarray) -> np.ndarray:
         if model.pawley is not None:
@@ -2495,7 +2561,7 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
                     ip, values, *(sorted(w) for w in struct_atoms[ip]))
             return struct_grads[ip]
 
-        # ∂p/∂θ at this θ, shared by the site-scalar and hump columns: C
+        # ∂p/∂θ at this θ, shared by the site and hump columns: C
         # itself unless a derived row (a formula) sets one of their paths,
         # whose coefficient then moves with θ
         lj_now: list[sparse.csc_matrix] = []
@@ -2527,7 +2593,7 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
                     fd_cols.append(c)
             elif ((dof := _STRUCTURAL_PATH.match(path)) and model.mode == "rietveld"
                     and model.structural_grad_supported(int(dof.group(1)))
-                    and _within_atom(extra, dof.group(1), dof.group(2))):
+                    and _within_atom(extra, dof.group(1), dof.group(2), dof.group(3))):
                 g_xyz, g_u, _gb, _go = get_struct_grads(int(dof.group(1)))
                 rows, grad = (
                     (("x", "y", "z"),
@@ -2537,12 +2603,12 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
                 J[:n_data, c] = -sqrt_w * _structural_column(
                     model, table, get_bases(), values, c,
                     int(dof.group(1)), int(dof.group(2)), rows, grad)
-            elif (site_scalar[c] and model.mode == "rietveld"
+            elif (site_claim[c] and model.mode == "rietveld"
                     and model.structural_grad_supported(
                         ip := int(path.split(".")[1]))):
-                J[:n_data, c] = -sqrt_w * _site_scalar_column(
+                J[:n_data, c] = -sqrt_w * _site_column(
                     model, table, get_bases(), values, c, ip, [path, *extra],
-                    get_struct_grads(ip)[2:], get_lj())
+                    get_struct_grads(ip), get_lj())
             elif ((mom := _MOMENT_PATH.match(path))
                     and model.moment_grad_supported(int(mom.group(1)))
                     and _moment_reach_ok(path, extra, angles=moment_angles)):
