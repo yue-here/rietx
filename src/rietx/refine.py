@@ -86,6 +86,7 @@ from .model.forward import (
     compile_model,
     orbit_split_of,
     recorded_window_tol,
+    rewindow,
     window_loss,
 )
 from .model.geometry import cell_volumes, geometry_table
@@ -554,6 +555,31 @@ class _StageHold:
     movement_slack: bool = False
     #: ``StageResult.rwp`` (WP-1334), the same frozen model at the same answer
     rwp: float | None = None
+
+
+def _improved_on_fresh_windows(model: CompiledModel, found: dict[str, float],
+                               answer: dict[str, float]) -> bool:
+    """Whether a stage's answer fits the data better than where the stage
+    found the model, each read on windows that hold its peaks (WP-2317 R7).
+
+    The stage's frozen windows were sized where it started, so they read the
+    start; :func:`~rietx.model.forward.rewindow` sizes them at the answer.
+    The measure is the weighted residual the solve minimises (Rwp, for one
+    data set and one σ).  An answer that is no better there fitted the
+    intensity its windows dropped, not the data, and a second solve from it
+    polishes that walk: on the Le Bail alternation's +2 % start, the
+    re-solved profile stage widened its peaks until the closing stage's
+    partition ran for minutes (``tests/test_lebail_alternation.py``).
+    Such a stage keeps its first answer and its window loss, as every stage
+    did before R7, and ``STAGE_WINDOWS_STALE`` reports it on the last stages.
+    """
+    def rwp(m: CompiledModel, values: dict[str, float]) -> float:
+        y, bkg = m.evaluate_with_background(values)
+        return compute_statistics(m.y_obs, y, m.sigma, n_free=0,
+                                  y_background=bkg).rwp
+
+    before, after = rwp(model, found), rwp(rewindow(model, answer), answer)
+    return bool(np.isfinite(after) and after < before)
 
 
 def _add_formula(table: ParameterTable, path: str, expression) -> None:
@@ -5223,6 +5249,8 @@ class Refinement:
                   ftol=ftol, phase_support_sigma=phase_support_sigma,
                   window_area_tol=window_area_tol,
                   later_stages=later_stages)
+        # where the stage found the model, for the test below
+        found = table.decode(table.x0())
         model, outcome, guard, freed, hold = self._solve_stage(
             stage, data, mode, table, model, two_theta_limits,
             prior_significance=prior_significance,
@@ -5230,7 +5258,9 @@ class Refinement:
         first_loss = hold.window_loss
         if (stage.window_slack_deg is None and outcome.non_finite is None
                 and first_loss is not None
-                and first_loss > recorded_window_tol(window_area_tol)):
+                and first_loss > recorded_window_tol(window_area_tol)
+                and _improved_on_fresh_windows(model, found,
+                                               table.decode(outcome.theta))):
             first, first_hold = outcome, hold
             # the stage again, from its answer: no seed (a row the solve put
             # back on its floor is where the data put it, WP-1938) and no

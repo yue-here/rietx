@@ -252,3 +252,33 @@ def test_the_closing_stage_refits_what_the_plan_leaves_free(pattern, monkeypatch
         closing_window_tol=CLOSING_WINDOW_TOL))
     assert len(res.stages) == 3
     assert [x for x in asked if x is not None] == expected
+
+
+def test_a_stage_no_better_on_fresh_windows_is_not_re_solved(pattern, monkeypatch):
+    """An answer that fits the data no better than the stage's start, each on
+    windows sized there, fitted its windows' loss: the stage keeps it and its
+    loss rather than polishing the walk (the Le Bail +2 % start's runaway)."""
+    monkeypatch.setattr(refine_mod, "window_loss", lambda model, values: 0.5)
+    monkeypatch.setattr(refine_mod, "_improved_on_fresh_windows",
+                        lambda model, found, answer: False)
+    structure, ins = perturbed_models()
+    ref = rx.Refinement(structure, ins, history=False)
+    res = ref.fit(pattern, plan=rx.RefinementPlan(stages=[
+        rx.Stage("cell", ["phases.*.scale", "phases.*.cell.*"], max_iter=40)]))
+    (stage,) = res.stages
+    assert stage.window_refit_loss is None and stage.window_loss == 0.5
+
+
+def test_the_fresh_window_test_reads_the_start_on_its_own_windows(pattern):
+    """The real test, both ways, on the synthetic fit: a cell answer is better
+    than the perturbed start, and the start is not better than itself."""
+    structure, ins = perturbed_models()
+    ref = rx.Refinement(structure, ins, history=False)
+    table = ParameterTable(structure, ins)
+    start = table.decode(table.x0())
+    model = refine_mod.compile_model(structure, ins, pattern)
+    res = ref.fit(pattern, plan=rx.RefinementPlan(stages=[
+        rx.Stage("cell", ["phases.*.scale", "phases.*.cell.*"], max_iter=40)]))
+    answer = dict(start, **{p.path: p.value for p in res.parameters})
+    assert refine_mod._improved_on_fresh_windows(model, start, answer)
+    assert not refine_mod._improved_on_fresh_windows(model, start, start)
