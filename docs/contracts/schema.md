@@ -800,6 +800,11 @@ refines as before.  A bump rather than "also in 0.61" because 1.12.0 shipped
 0.61: a 1.12 build refuses a phase or instrument carrying the key, and the
 version now says why.
 
+Also in 0.62 (WP-1969, #933): ``PeakFlag`` gains ``residue_misfit``, written
+only by ``index_residue`` on a pick standing on the subtracted phase's
+profile.  Additive: no existing list carries it, and an older build refuses
+a list that does.
+
 Also in 0.62 (WP-2081): ``SeriesEntry.held_values``, every path the
 caller held on a pattern with the value it was held at.  Additive and
 defaulted to ``None``, the 0.25 → 0.26 rule; an older build refuses an entry
