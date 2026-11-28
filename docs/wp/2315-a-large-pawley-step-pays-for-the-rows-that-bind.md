@@ -1,9 +1,9 @@
 # WP-2315 — a large Pawley step pays for the rows that bind, not for every intensity
 
-Milestone: unscheduled · Status: 🔄 2026-11-28 — task 1, the cached |T| and Angle 9 done; Angles 0-2 held, since the real-structure bench crosses no width row; Angle 4, now the leading cost, open
+Milestone: unscheduled · Status: 🔄 2026-11-28 — task 1, the cached |T|, Angle 9 and Angle 4 done (the 120° fit 1.8× faster); Angles 0-2 held, since the real-structure bench crosses no width row; the 3× target open
 Track: A large cell
 Depends on: 2317 soft (its `bigcell-pawley` case and rulings R0, R4 (settled 2026-11-28), R5)
-Priority: P2 2026-11-28 — the maintainer's large-cell track, ruled to proceed whatever the user's case shows; the real-structure bench crosses no width row, so what reaches it is Angle 4 (`spilu`, about half the 120° fit)
+Priority: P2 2026-11-28 — the maintainer's large-cell track, ruled to proceed whatever the user's case shows; the real-structure bench crosses no width row, so what reaches it is Angle 4, done 2026-11-28, and what it left (the CG's products and the covariance `eigh`)
 
 ## Goal
 
@@ -302,6 +302,123 @@ free swap under LM.
   (variable projection, angle 7).
 
 ## Handover log
+
+### 2026-11-28 (2nd session) — Angle 4: the incomplete LU is kept while the free set only shrinks (ghostshift runner; PR #1878)
+
+The large Pawley fit at 2θ ≤ 120° now takes about 8 s where it took about
+14.5 s. Almost all of the saving is one change. The step's conjugate-gradient
+solve used to rebuild its incomplete-LU preconditioner every time an
+intensity landed on its zero floor, about 33 times a solve. It now keeps the
+factor it has, because a factor built on a larger free set still
+preconditions a smaller one. The solve takes about twice as many cheap
+matrix products and stops at the same residual floor, and every fitted
+parameter on five cases moved by less than a millionth of its esd. Reusing
+the factor across λ retries, the WP's other half of Angle 4, was built and
+dropped: on those five cases 3 of 300 solves were retries. The 3× target is
+not reached. What is left of the 120° fit is the CG's products, a dense
+eigendecomposition outside the step, and the rest of the model.
+
+*Done.*
+- `bccg.projected_cg`: a sparse H's incomplete LU is rebuilt only when the
+  free set gains a variable the factor was not built on. A shrink keeps it,
+  and `_preconditioned` solves on the factor's set with r zero on the
+  variables fixed since and drops the answer there. A failed factor is
+  rebuilt on any change, as before. The dense Cholesky path is unchanged.
+  `_REUSE_STALE_FACTOR` switches it off for probes, as `_PRECONDITION_DENSE`
+  does for WP-2011's.
+- `tests/test_bccg.py::test_a_stale_superset_factor_reaches_the_same_minimiser`:
+  on the banded Pawley-shaped box QP the stale path builds once (the
+  refactoring path 115 times), lands within 1e-8 of the largest component
+  of the refactoring path's answer, and puts the same variables on their
+  bound, inside the default 2n budget.
+- The λ-retry cache (a `FactorCache` threaded from `lm.minimize` through
+  `_solve_step`) was built, measured and removed before commit.
+- The probe is a scratch script outside the tree: it wraps
+  `_factor`, `_preconditioned` and `projected_cg` and counts builds by kind
+  (first, shrink, grow), CG directions and Hessian products per solve.
+
+*The bar.* Under R0 clarified (WP-2317) this is a speed change, and a speed
+change leaves the model as it was. The CG's stopping rule is untouched
+(‖r‖² ≤ `_PCG_TOL`²·‖g‖²), so a converged solve returns the same box
+minimiser to that floor. A solve that spends its 2n budget returns its best
+point on either path, so the bar on the fit is measured, not derived: every
+parameter in esd units, the convention of
+`test_compiled_kernels.FIT_THETA_ESD`. No byte-equality is claimed on any
+BLAS; the move is the CG tolerance's, far above rounding.
+
+*Measured* (macOS arm64, `[dev]`, compiled tier on, Accelerate; main is a
+`git archive` of 20366d726 run by `PYTHONPATH`, the branch at a7a0b7ef6;
+every run under the shift's suite lock).
+- Interleaved bench, three rounds, `--configs off`, main then branch each
+  round: `bigcell-pawley-120` 14.25-14.73 s → 7.87-8.28 s (1.8×);
+  `bigcell-pawley` 3.76-3.83 s → 2.47-2.67 s (1.5×). Same Rwp to the
+  printed digits and the same evaluations per stage (2, 8, 11, 8, 14).
+- Counts, one run each (product counting on, so walls run high):
+
+| case | solves | builds | factorisation | products | solves at budget | λ retries |
+|---|---|---|---|---|---|---|
+| `bigcell-pawley-120` main | 39 | 1 290 | 10.3 s | 5 887 | 1 | 0 |
+| `bigcell-pawley-120` branch | 39 | 67 | 0.5 s | 11 481 | 2 | 0 |
+| `bigcell-pawley` main | 39 | 707 | 1.67 s | 1 699 | 0 | 0 |
+| `bigcell-pawley` branch | 39 | 63 | 0.18 s | 3 321 | 0 | 0 |
+| NAC Pawley main / branch | 50 | 212 / 55 | 0.05 / 0.02 s | 700 / 731 | 0 | 0 |
+| FAP.XRA Pawley main / branch | 31 | 71 / 38 | 0.02 / 0.01 s | 300 / 383 | 0 | 0 |
+| FAP.XRA `index_pattern` main / branch | 141 | 326 / 172 | 0.11 / 0.06 s | 1 422 / 1 575 | 0 | 3 |
+
+  On main 1 223 of the 120° case's 1 290 builds were shrinks, 28 grows and
+  39 a solve's first.
+- Fit shift, branch against main, in esd units: 120° worst 2.4e-7
+  (`instrument.profile.u`), 90° 2.1e-7, NAC 1.3e-9, FAP.XRA 2.6e-8. Rwp
+  relative 3.3e-10, 7.2e-10, 8.6e-14, 1.3e-13.
+- Profile, 120°, one run each: main 14.9 s with `gstrf` 7.3 s over 1 290
+  calls; branch 8.2 s with `projected_cg` 2.9 s (sparse products 1.35 s
+  over 11 889, ILU solves 0.66 s over 9 857, `gstrf` 0.43 s over 67) and
+  `eigh` 1.6 s over 15 calls from `statistics.normal_factors` and
+  `discarded_directions`, outside the step.
+
+*Tests* (macOS arm64, `[dev]`, on fb29877ac, origin/main 5a06184af merged
+in): fast selection (`-m "not slow"`) 15 892 passed, 457 skipped, 30
+xfailed, 8.7 min; full suite 16 853 passed, 468 skipped, 49 xfailed, 1
+xpassed, 33.8 min, no failure. The one added test costs 0.06 s locally.
+No main run on this machine to diff the counts against, so the count check
+rests on the one added test. `tests.reader_output`: unchanged against the
+merge-base.
+
+*Review* (`/code-review high --fix`): five findings, four docstring fixes
+taken (each path's rebuild rule stated exactly, the "same stop" claim
+limited to a converged solve, the timing quoted as a range). One left: a
+stale factor kept however far the free set shrinks could spend the 2n
+budget on a case where most intensities floor in one solve. The 120° case
+went from 1 to 2 budget-bound solves with the fit unchanged, and the four
+other cases had none. A refactor-by-fraction rule is a new number, so it
+waits for a case that needs it (Next 2).
+
+*Not done.* WP-2317's `### Inherited` is not edited: another runner is
+working in that file today, and this WP already owns the result.
+
+*Settled by Claude* (for blind review):
+- Accept the path change under R0 clarified as a speed change, on the
+  measured shift (≤ 2.4e-7 esd). Alternative: hold it as a kind (b) move
+  and ask for a ruling.
+- Drop the λ-retry cache: 3 of 300 solves were retries, a few milliseconds.
+  Alternative: keep it for the WP's completeness.
+- Keep the factor however far the free set shrinks, with no threshold.
+  Alternative: rebuild once the free set falls below a fraction of the
+  factored set, a new number with an audit row.
+- No generality review: the change adds no threshold and no automatic
+  action on a result, only a solver path. Alternative: send it as an
+  always-on rule.
+
+*Next.*
+1. The 3× target against what is left at 120° (about 8 s): the CG's
+   products and ILU solves (about 2 s), `eigh` in the covariance (1.6 s,
+   15 calls, outside the step) and the model. The eigh is in
+   `optimize/statistics.py`, not in this WP's seam; say there whether it
+   belongs to WP-2317 or here before building.
+2. A rebuild rule by how far the free set has shrunk would cut the doubled
+   products. Measure it only with a case that hits the 2n budget more than
+   twice, since it needs a number.
+3. Angles 0-2 as before: only once a case crosses a width row.
 
 ### 2026-11-28 — Angles 0-2 held: the real-structure bench crosses no row (ghostshift runner; PR #1875)
 
