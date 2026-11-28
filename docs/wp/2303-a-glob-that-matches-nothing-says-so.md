@@ -56,13 +56,13 @@ Tier: none. The warning reports a fact about the call.
 
 ## Tasks
 
-- [ ] Read each internal caller above; route those that may match nothing through the table.
-- [ ] Warn on a caller's pattern that matches nothing, in the five verbs, through the
+- [x] Read each internal caller above; route those that may match nothing through the table.
+- [x] Warn on a caller's pattern that matches nothing, in the five verbs, through the
   existing `_set_vary_findings` channel; keep "matched, changed nothing" silent.
 - [ ] The GUI callers report the same fact in the GUI's message channel.
 - [ ] Count warnings the change adds to the fast suite before and after; each new one is either
   a real typo in a test (fix the test) or a caller to route.
-- [ ] Tests: each verb warns on an empty match, stays silent on a repeat and on a plan.
+- [x] Tests: each verb warns on an empty match, stays silent on a repeat and on a plan.
 - [ ] Skill: a trap row only if the skill describes these verbs as silent; else none.
 
 ## Acceptance
