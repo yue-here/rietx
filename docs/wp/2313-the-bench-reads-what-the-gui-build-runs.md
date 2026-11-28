@@ -1,9 +1,8 @@
 # WP-2313 — the bench reads what the GUI build runs
 
-Milestone: unscheduled · Status: 🔄 2026-11-28 — claimed by @yue-here (ghostshift runner)
+Milestone: unscheduled · Status: ✅ 2026-11-28 — /pr-review reads first, and the all mode batches, the GUI and docs builds' machinery and the Python side's other install-time config (PR #1877)
 Track: The repo's own process
 Depends on: —
-Priority: P3 2026-11-27 — process: an outside PR's npm scripts can run in the `/pr-review` bench unread; rare, since few PRs edit `gui/package.json`
 
 ## Goal
 
@@ -102,4 +101,36 @@ This is the repo's process machinery and makes no package decision.
 
 ## Handover log
 
+- **2026-11-28** — closed, PR #1877. Before this, `/pr-review` could build a
+  contributor's GUI change on the maintainer's machine without first reading
+  the npm scripts, lockfile and config that the build runs. Those files now
+  sit on the list the bench reads first, and the unattended `all` mode holds
+  any PR touching them for the maintainer, like the rest of the list. The code
+  review found the same gap on the Python side: three config files can change
+  what the venv install or pytest runs, and none was listed. A ghostshift
+  runner did this session, from a draft opened at the start.
+  - *Done*: `triage.jq`'s `execution` pattern gains `gui/package.json`, its
+    lockfile, `gui/.npmrc`, gui's top-level config files, `gui/scripts/`,
+    `docs/docs/conf.py`, `hatch.toml`, `uv.toml`, `pytest.ini`/`.pytest.ini`
+    and `.mcp.json`. Step 4 now points at that pattern instead of restating
+    it, and says how to read a lockfile hunk. Pass A's line names the pattern.
+    The triage-row test pins every new alternation, plus two negatives: a
+    config-named file under `gui/src/`, and `tox.ini`.
+  - *Settled*: the open question. The widened list batches. Grounds and the
+    rejected second tier are in Context.
+  - *Measured*: authorship on `main` since 2026-08-01. The GUI build's files
+    took 9 commits and `docs/docs/conf.py` took 16, with no outside author
+    among them. `reference_pages.py` and `sphinx_shared.py` took 13 outside
+    commits, which is why they stay off. In the lockfile only `fsevents`
+    carries an install script.
+  - *Review*: `/code-review high --fix` made six findings. Five were
+    accepted: `hatch.toml`, `uv.toml` and the pytest ini files joined the
+    pattern, the WP's ladder note was corrected, and the test now pins each
+    new row. `tox.ini` and `setup.cfg` were dropped again, since pytest ranks
+    them below `pyproject.toml`. The sixth, `.mcp.json`, came back as
+    pre-existing and outside scope. It was taken here anyway, because it is
+    the settings files' sibling and no outside PR has carried one.
+  - *Tests*: the acceptance command, `tests/test_workflow_hooks.py` and `tests/test_docs_consistency.py`, gave 180 passed, 0 skipped (this worktree's `[dev]` venv, CPython 3.12.10, macOS arm64), on the final tree. The change adds no test, so the count moved by none. CI's lint job, run here step for step, exited 0 at every step.
+  - *Next*: none. Should outside PRs start editing these files, count them
+    and narrow the list, as `156a274d4` did for `.claude/`.
 - **2026-11-27** — filed from WP-2312's code review. No open WP owns `/pr-review`'s execution list: WP-2312 is closing, 1988 watches a PR after it opens, and 2238 cuts the calls that reach the maintainer.

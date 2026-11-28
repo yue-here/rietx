@@ -66,7 +66,6 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2243](2243-the-series-workflow.md) | The series workflow at `/next`: patterns, first fit, run, results, with Trends and Map | 2026-11-24 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2245](2245-the-pattern-graph-s-axis-and-gutter.md) | The Pattern graph's empty difference axis and its blank right margin | 2026-11-24 | P3 | [gui-overhaul](#gui-overhaul) |
 | [2246](2246-the-register-guard-reads-the-rebuilt-page.md) | The register guard reads the rebuilt page: `lib/style.test.ts` scans `gui/src/next/` | 2026-11-25 | P3 | [gui-overhaul](#gui-overhaul) |
-| [2313](2313-the-bench-reads-what-the-gui-build-runs.md) | The bench reads what the GUI build runs | 2026-11-28 | P3 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2314](2314-a-structural-jacobian-costs-one-structure-factor.md) | A structural Jacobian costs one structure factor, not one per column | 2026-11-27 | P2 | [Unscheduled](#unscheduled-a-large-cell) |
 | [2315](2315-a-large-pawley-step-pays-for-the-rows-that-bind.md) | A large Pawley step pays for the rows that bind, not for every intensity | 2026-11-28 | P2 | [Unscheduled](#unscheduled-a-large-cell) |
 | [2316](2316-a-le-bail-partition-costs-what-its-overlaps-need.md) | A Le Bail partition costs what its overlaps need, not thousands of cycles | 2026-11-27 | P2 | [Unscheduled](#unscheduled-a-large-cell) |
@@ -931,7 +930,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2241](2241-the-nightly-red-of-2026-11-20-to-22.md) | The nightly red of 2026-11-20 to 11-22: Windows path checks, the width triple's esd, and a lost runner | ✅ 2026-11-23 | — | — |
 | [2307](2307-the-design-rules-load-into-every-session.md) | The design rules load into every session | ✅ 2026-11-23 | — | — |
 | [2312](2312-the-review-commands-see-the-whole-backlog.md) | The review commands see the whole backlog | ✅ 2026-11-27 | — | — |
-| [2313](2313-the-bench-reads-what-the-gui-build-runs.md) | The bench reads what the GUI build runs | 🔄 2026-11-28 | P3 | — |
+| [2313](2313-the-bench-reads-what-the-gui-build-runs.md) | The bench reads what the GUI build runs | ✅ 2026-11-28 | — | — |
 
 ### <a id="unscheduled-candidates-named-on-a-use-case-not-yet-on-a-measurement"></a>Candidates — named on a use case, not yet on a measurement
 
