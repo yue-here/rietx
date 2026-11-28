@@ -3384,6 +3384,10 @@ class CompiledModel:
         ``None`` where :meth:`structural_grad_supported` says the nuclear
         derivative is not the whole one (a moment reads both) or outside
         Rietveld mode, where intensities are extracted.
+
+        ``df2`` may be (N, K), K columns at once; each comes back as a
+        one-column call would return it, bit for bit (the chain's docstring
+        says why).  The Jacobian asks this once per phase (WP-2314 angle 2).
         """
         if self.mode != "rietveld" or not self.structural_grad_supported(ip):
             return None
@@ -3391,9 +3395,14 @@ class CompiledModel:
         cell = tuple(values[f"phases.{ip}.cell.{k}"]
                      for k in ("a", "b", "c", "alpha", "beta", "gamma"))
         d = d_spacings(cp.reflections.index, *cell)
+        # a satellite or a parent-forbidden row has no nuclear structure
+        # factor, so it has no derivative of one either — the same mask
+        # ``_nuclear_f2`` applies to the forward model, applied here so the
+        # analytic column and the residual cannot disagree about a row the
+        # forward model puts at exactly zero
         nuc = self._nuclear_mask(ip)
         if nuc is not None:
-            df2 = df2 * nuc
+            df2 = df2 * (nuc[:, None] if np.ndim(df2) == 2 else nuc)
         return self._f2_derivative_chain(ip, values, cell, d, df2)
 
     def _structural_intensity_grad(self, ip: int, j: int, coeffs: np.ndarray,
@@ -3404,20 +3413,8 @@ class CompiledModel:
         if f2_grads is None:
             f2_grads = self.structural_f2_grads(
                 ip, values, *(((), (j,)) if adp else ((j,), ())))[1 if adp else 0]
-        cp = self.phases[ip]
-        cell = tuple(values[f"phases.{ip}.cell.{k}"]
-                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
-        d = d_spacings(cp.reflections.index, *cell)
-        df2 = f2_grads[j] @ np.asarray(coeffs, dtype=np.float64)
-        # a satellite or a parent-forbidden row has no nuclear structure
-        # factor, so it has no derivative of one either — the same mask
-        # ``_nuclear_f2`` applies to the forward model, applied here so the
-        # analytic column and the residual cannot disagree about a row the
-        # forward model puts at exactly zero
-        nuc = self._nuclear_mask(ip)
-        if nuc is not None:
-            df2 = df2 * nuc
-        return self._f2_derivative_chain(ip, values, cell, d, df2)
+        return self.site_intensity_grad(
+            ip, f2_grads[j] @ np.asarray(coeffs, dtype=np.float64), values)
 
     def _f2_derivative_chain(self, ip: int, values: dict[str, float],
                              cell: tuple, d: np.ndarray, df2: np.ndarray,
@@ -3437,20 +3434,33 @@ class CompiledModel:
         read only where extinction is evaluated, and built here only then —
         a stage that cannot move extinction off zero pays no structure-factor
         evaluation per column for a factor it multiplies by exactly 1.
+
+        ``df2`` may carry a column axis, (N, K) for K columns of one phase
+        (WP-2314 angle 2).  Every factor is then built once and broadcast
+        down the column axis, and each column meets the same multiplies in
+        the same order as a one-column call, so column k of the result is
+        bit-identical to the call with ``df2[:, k]``.  The chain's cost is
+        then one per phase per Jacobian, where it was one per column.
         """
         cp = self.phases[ip]
-        d_base = values[f"phases.{ip}.scale"] * cp.reflections.multiplicity * df2
+        if np.ndim(df2) == 2:
+            def ax(f):
+                return f[:, None] if np.ndim(f) == 1 else f
+        else:
+            def ax(f):
+                return f
+        d_base = ax(values[f"phases.{ip}.scale"] * cp.reflections.multiplicity) * df2
         # March-Dollase P multiplies the intensity and does not depend on the
         # coordinates/ADPs, so a structural move chains through it unchanged —
         # the analytic column must carry the same P the forward model folded in
         # (P ≡ None when off).  The r column itself comes from po_intensity_grad.
         P = self._po_factors(ip, values, cell)
         if P is not None:
-            d_base = d_base * P
+            d_base = d_base * ax(P)
         # the texture multiplier chains through unchanged for the same reason
         P = self._texture_factors(ip, values, cell)
         if P is not None:
-            d_base = d_base * P
+            d_base = d_base * ax(P)
         # extinction couples |F|² into the intensity twice (as the prefactor
         # and through x ∝ |F|²), so a coordinate, ADP, Biso or occupancy move
         # chains through the factor G = E + x·dE/dx (see model/extinction.py)
@@ -3475,23 +3485,23 @@ class CompiledModel:
         for il, lam in enumerate(self.line_lambdas(values)):
             w_line = values[f"instrument.source.lines.{il}.weight"]
             tt_bragg = two_theta_deg(d, lam)
-            col = d_base * w_line * lorentz_polarization(
-                tt_bragg, values["instrument.polarization"])
+            col = d_base * w_line * ax(lorentz_polarization(
+                tt_bragg, values["instrument.polarization"]))
             if not cp.skip_extinction:
                 E, dEdx, x = sabine_extinction_and_dx(f2, lam, vol, tt_bragg, ext)
-                col = col * (E + x * dEdx)
-            col = col * self._absorption(tt_bragg)
+                col = col * ax(E + x * dEdx)
+            col = col * ax(self._absorption(tt_bragg))
             # roughness scales the intensity and does not depend on the
             # coordinates/ADPs, so a structural move chains through it
             # unchanged — carry exactly what phase_peaks folded in.
             rough = self._roughness_factor(tt_bragg, values)
             if rough is not None:
-                col = col * rough
+                col = col * ax(rough)
             # a peak equation's intensity factor reads no coordinate, so it
             # chains through unchanged, as roughness does (WP-2107)
             factor = self._intensity_factor(ip, values, tt_bragg, d)
             if factor is not None:
-                col = col * factor
+                col = col * ax(factor)
             out.append(col)
         return out
 

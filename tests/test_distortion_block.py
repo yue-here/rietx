@@ -226,25 +226,25 @@ def test_an_amplitude_column_is_a_site_column_and_reaches_every_moved_atom(monke
 
     An amplitude matches no ``_STRUCTURAL_PATH``.  Its reach is the moved
     atom's x and y (z is held by the site) and nothing the data rows read
-    besides, so ``_site_column`` claims it and sums the cached ∂|F|²/∂x and
+    besides, so ``_site_df2`` claims it and sums the cached ∂|F|²/∂x and
     ∂|F|²/∂y through C (WP-2314 angle 4; before it, the peak chain did).  The
     column equals a central difference of the residual.
     """
     model, table = _model_and_table(_phase(0.2))
     assert table.column_reach()[AMP] == [AMP, "phases.0.atoms.3.x", "phases.0.atoms.3.y"]
     calls: dict[str, list[str]] = {"peak": [], "site": []}
-    peak, site = LS._peak_chain_column, LS._site_column
+    peak, site = LS._peak_chain_column, LS._site_df2
 
     def record_peak(model, table, bases, theta, values, c, path, *a, **k):
         calls["peak"].append(path)
         return peak(model, table, bases, theta, values, c, path, *a, **k)
 
-    def record_site(model, table, bases, values, c, *a, **k):
+    def record_site(table, c, *a, **k):
         calls["site"].append(table.free_paths[c])
-        return site(model, table, bases, values, c, *a, **k)
+        return site(table, c, *a, **k)
 
     monkeypatch.setattr(LS, "_peak_chain_column", record_peak)
-    monkeypatch.setattr(LS, "_site_column", record_site)
+    monkeypatch.setattr(LS, "_site_df2", record_site)
     theta = table.x0()
     jac = LS._jacobian_for(model, table, "numpy")(theta)
     assert AMP in calls["site"] and AMP not in calls["peak"]

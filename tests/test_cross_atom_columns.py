@@ -5,7 +5,7 @@ Before angle 4 such a column went to the peak chain, which re-runs
 structure factor.  Three shapes reach across atoms here: a tie between two
 atoms' coordinates (two species on one site), a named variable over several
 sites or over one atom's coordinate and ADP, and a distortion-mode amplitude.
-Each is now ``_site_column``: the cached ∂|F|²/∂p of every site row the
+Each is now ``_site_df2``: the cached ∂|F|²/∂p of every site row the
 column moves, summed with the row's ∂p/∂θ_c from the table's local Jacobian.
 A rigid body's columns keep the peak chain, for the reason
 ``_site_reach_ok``'s docstring measures.
@@ -105,15 +105,15 @@ def _theta(table):
 
 
 def _claimed(monkeypatch) -> list[int]:
-    """The columns ``_site_column`` builds, in order."""
+    """The columns the site branch claims (``_site_df2``), in order."""
     seen: list[int] = []
-    real = LS._site_column
+    real = LS._site_df2
 
-    def record(model, table, bases, values, c, *a, **k):
+    def record(table, c, *a, **k):
         seen.append(c)
-        return real(model, table, bases, values, c, *a, **k)
+        return real(table, c, *a, **k)
 
-    monkeypatch.setattr(LS, "_site_column", record)
+    monkeypatch.setattr(LS, "_site_df2", record)
     return seen
 
 
@@ -168,7 +168,7 @@ def _richardson(residual, theta, c: int, h: float) -> np.ndarray:
 @pytest.mark.parametrize("extinction", [0.0, 30.0], ids=["no-ext", "ext"])
 def test_a_cross_atom_column_is_the_chain_rule_over_the_cache(
         dispersion, extinction, monkeypatch):
-    """Every column of the tied state is ``_site_column``'s, and each equals
+    """Every column of the tied state is ``_site_df2``'s, and each equals
     the chain rule over single-atom kernels to rounding: 1e-12 of the
     column's norm, against 1.9e-16 measured on darwin/arm64.  Extinction at
     30 makes the chain's G = E + x·dE/dx factor live.  The co-sited tie, the
@@ -222,7 +222,7 @@ def test_a_tied_column_is_the_sum_of_its_untied_columns():
 
 def test_a_mode_column_is_the_chain_rule_over_the_cache(monkeypatch):
     """A distortion-mode amplitude reaches its atoms' coordinates through C.
-    It is ``_site_column``'s, equals the chain rule over single-atom kernels
+    It is ``_site_df2``'s, equals the chain rule over single-atom kernels
     to 1e-12 of its norm (1.1e-15 measured on darwin/arm64), and meets a
     Richardson-extrapolated difference to 1e-7 of its norm (9.6e-12
     measured)."""

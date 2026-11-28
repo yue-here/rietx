@@ -1350,7 +1350,7 @@ def _state_extinction_strong():
 def _state_site_scalars():
     """Biso and occupancy columns from the structure-factor cache (WP-2314).
 
-    The analytic branch ``_site_column`` sums ∂|F|²/∂B_j and
+    The analytic branch ``_site_df2`` sums ∂|F|²/∂B_j and
     ∂|F|²/∂occ_j through C over every Biso and occupancy row one column
     moves, so its reach is new: N's Biso following C's, N's occupancy the
     remainder of C's (coefficient −1), and a named variable driving two
@@ -1374,7 +1374,7 @@ def _state_site_cross_atom():
     """Columns reaching across atoms, from the structure-factor cache
     (WP-2314 angle 4).
 
-    ``_site_column`` sums the cached ∂|F|² of every site row a column moves,
+    ``_site_df2`` sums the cached ∂|F|² of every site row a column moves,
     weighted by the row's ∂p/∂θ_c, so its reach is new: three coordinate
     DOFs carried onto a second atom (the co-sited tie), a named variable
     driving one atom's coordinate DOF and ADP DOF, and a second driving one
@@ -1396,7 +1396,7 @@ def _state_distortion_modes():
     NaTaO₃'s P4/mbm child of the cubic perovskite (one M-point mode on O2),
     stated by ``displacive_statement`` and set off its seed to 0.2 Å: an
     amplitude column reaches O2's x and y through C, and numpy takes
-    ``_site_column`` for it (WP-2314 angle 4; the peak chain before).  The
+    ``_site_df2`` for it (WP-2314 angle 4; the peak chain before).  The
     traced backends differentiate the same affine rows.
     The cell, scale and Biso free beside it.
     """
@@ -2478,7 +2478,7 @@ FD_ESD_RATIO_BAR = 0.01
 #: configs whose every column is exact, so no column takes a finite difference.
 #: ``extra_components`` joined when the hump's columns became the closed form
 #: (WP-2116): its other columns are a phase scale and background coefficients.
-#: ``site_cross_atom`` frees only site columns, every one ``_site_column``'s
+#: ``site_cross_atom`` frees only site columns, every one ``_site_df2``'s
 #: since WP-2314 angle 4.
 #: Listed rather than skipped, so a column that falls back to FD here fails.
 NO_FD_CONFIGS = frozenset({"extra_components", "site_cross_atom"})

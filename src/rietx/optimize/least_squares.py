@@ -30,7 +30,6 @@ full-model finite differences:
 
 from __future__ import annotations
 
-import functools
 import math
 import re
 from dataclasses import dataclass, field, replace
@@ -101,7 +100,7 @@ DEFAULT_SOLVER = "lm"
 #: the structure-factor derivative through the site's constraint directions.
 _STRUCTURAL_PATH = re.compile(r"^phases\.(\d+)\.atoms\.(\d+)\.(dof|adp)\.\d+$")
 #: every site row the structure factor reads (``CompiledModel._site_values``,
-#: ``_atom_key``): ``_site_column`` has a cached ∂|F_N|² for each
+#: ``_atom_key``): ``_site_df2`` has a cached ∂|F_N|² for each
 _SITE_ROW_PATH = re.compile(
     r"^phases\.(\d+)\.atoms\.(\d+)\.(x|y|z|u11|u22|u33|u12|u13|u23|biso|occ)$")
 #: a parameter of phase N the data rows never read: a site-symmetry DOF or a
@@ -1554,55 +1553,46 @@ def _require_basis(basis: np.ndarray | None, path: str, what: str) -> None:
             f"optimize/least_squares.py")
 
 
-def _structural_column(model: CompiledModel, table: ParameterTable,
-                       bases: DerivativeBases, values: dict[str, float],
-                       c: int, ip: int, j: int, rows: tuple[str, ...],
-                       grad) -> np.ndarray:
-    """∂y/∂θ_c for a coordinate or ADP DOF: only the intensity scalar moves.
+def _structural_df2(g: np.ndarray, coeffs: np.ndarray) -> np.ndarray:
+    """∂|F_N|²/∂θ_c for a coordinate or ADP DOF of one atom: only |F|² moves.
 
-    The constraint direction ∂p/∂θ_c is read off the affine constraint block
-    (the DOF's column of C restricted to the atom's ``rows``), so the analytic
-    column follows whatever site-symmetry basis WP-0301 wired — displacement
-    directions for x, y, z; U^ij patterns for the six ADP components.
+    ``g`` is the atom's cached ∂|F_N|² by its x, y, z (N, 3) or its U^ij
+    (N, 6), from :meth:`CompiledModel.structural_f2_grads`.  ``coeffs`` is
+    the constraint direction ∂p/∂θ_c, the DOF's column of the affine block C
+    restricted to the atom's rows, so the column follows whatever
+    site-symmetry basis WP-0301 wired: displacement directions for x, y, z,
+    U^ij patterns for the six ADP components.  :func:`_site_columns` lays
+    it onto the pattern with the phase's other site columns.
     """
-    C, _ = table.constraint_block()
-    coeffs = np.array([C[table._paths[f"phases.{ip}.atoms.{j}.{name}"], c]
-                       for name in rows], dtype=np.float64)
-    dint = grad(ip, j, coeffs, values)
-    pp = bases.planes[ip]
-    coef = np.where(pp.finite, _gather_per_line(pp.layout, dint), 0.0)
-    terms = [(coef, pp.omega)] if np.any(coef != 0.0) else []
-    return _accumulate(len(model.tt), [(pp.layout, terms)])
+    return g @ coeffs
 
 
-def _site_column(model: CompiledModel, table: ParameterTable,
-                 bases: DerivativeBases, values: dict[str, float], c: int,
-                 ip: int, reach: list[str],
-                 grads: tuple[dict[int, np.ndarray], dict[int, np.ndarray],
-                              dict[int, np.ndarray], dict[int, np.ndarray]],
-                 lj: sparse.csc_matrix) -> np.ndarray:
-    """∂y/∂θ_c for a column moving site rows of phase ip only (WP-2314).
+def _site_df2(table: ParameterTable, c: int, reach: list[str],
+              grads: tuple[dict[int, np.ndarray], dict[int, np.ndarray],
+                           dict[int, np.ndarray], dict[int, np.ndarray]],
+              lj_cols: dict[int, np.ndarray]) -> np.ndarray | None:
+    """∂|F_N|²/∂θ_c for a column moving site rows of one phase only (WP-2314).
 
     A site row is what the structure factor reads of an atom: its x, y, z,
     U^ij, Biso and occupancy.  Each enters the pattern through |F_N|² alone,
     so only the intensity scalar moves.  ``grads`` is
     :meth:`CompiledModel.structural_f2_grads` at this θ, ``({j: ∂/∂xyz},
     {j: ∂/∂U}, {j: ∂/∂B}, {j: ∂/∂occ})``.  The column's ∂|F|² is the sum over
-    the site rows it moves of each row's gradient weighted by ∂p_q/∂θ_c, read
-    off ``lj``, the table's :meth:`~ParameterTable.local_jacobian` at θ.  So
-    this is the chain rule over the cached brackets, and it carries a tie
-    between two atoms' coordinates or Biso, an occupancy remainder
-    (occ_W = 1 − occ_Nb), a named variable over several sites, a
-    distortion-mode amplitude (affine, through C) and a row a formula writes
-    (through the formula's own derivative).  ``reach`` is every path the column moves, its
-    own included; :func:`_site_reach_ok` has checked that each is a site row
-    or a parameter the data rows never read, which contributes nothing here
-    beyond the site rows it moves.
+    the site rows it moves of each row's gradient weighted by ∂p_q/∂θ_c,
+    ``lj_cols[c]``, column c of the table's
+    :meth:`~ParameterTable.local_jacobian` at θ as a dense vector (one
+    sparse read per Jacobian serves every site column).  So this is the chain rule over the cached
+    brackets, and it carries a tie between two atoms' coordinates or Biso,
+    an occupancy remainder (occ_W = 1 − occ_Nb), a named variable over
+    several sites, a distortion-mode amplitude (affine, through C) and a row
+    a formula writes (through the formula's own derivative).  ``reach`` is
+    every path the column moves, its own included; :func:`_site_reach_ok`
+    has checked that each is a site row or a parameter the data rows never
+    read, which contributes nothing here beyond the site rows it moves.
+    ``None`` when no site row it reaches has a nonzero weight.
     """
     g_xyz, g_u, g_biso, g_occ = grads
-    # the column of ∂p/∂θ read once: a mode can reach a hundred site rows,
-    # and a scalar index into a sparse matrix costs ~5 µs a call
-    lj_c = lj[:, [c]].toarray().ravel()
+    lj_c = lj_cols[c]
     df2 = None
     for q in reach:
         m = _SITE_ROW_PATH.match(q)
@@ -1622,17 +1612,45 @@ def _site_column(model: CompiledModel, table: ParameterTable,
             g = g_u[j][:, U_NAMES.index(name)]
         term = w * g
         df2 = term if df2 is None else df2 + term
-    if df2 is None:
-        return np.zeros(len(model.tt))
-    dint = model.site_intensity_grad(ip, df2, values)
+    return df2
+
+
+def _site_columns(model: CompiledModel, bases: DerivativeBases,
+                  values: dict[str, float], ip: int,
+                  df2s: list[np.ndarray | None]) -> list[np.ndarray]:
+    """The pattern columns ∂y/∂θ of phase ip's site columns, from their ∂|F_N|².
+
+    One (N, K) block through the intensity chain (WP-2314 angle 2), where
+    each column used to build the chain's factors again: the d-spacings,
+    Lorentz-polarisation, preferred orientation, absorption and the rest,
+    none of which a site row moves.  Each column then meets the same
+    multiplies in the same order it met alone
+    (:meth:`CompiledModel._f2_derivative_chain`), the same gather and the
+    same accumulation onto the pattern, so every column is bit-identical to
+    the one-column build.  A ``None`` entry is a column with no nonzero
+    weight and comes back as zeros.
+    """
+    live = [k for k, df2 in enumerate(df2s) if df2 is not None]
+    out = [np.zeros(len(model.tt)) for _ in df2s]
+    if not live:
+        return out
+    block = np.stack([df2s[k] for k in live], axis=1)
+    dint = model.site_intensity_grad(ip, block, values)
     pp = bases.planes[ip]
-    coef = np.where(pp.finite, _gather_per_line(pp.layout, dint), 0.0)
-    terms = [(coef, pp.omega)] if np.any(coef != 0.0) else []
-    return _accumulate(len(model.tt), [(pp.layout, terms)])
+    lay = pp.layout
+    gathered = np.empty((len(lay.i0), len(live)))
+    for il in range(len(lay.line_ptr) - 1):
+        a, b = int(lay.line_ptr[il]), int(lay.line_ptr[il + 1])
+        gathered[a:b] = dint[il][lay.k[a:b]]
+    for n, k in enumerate(live):
+        coef = np.where(pp.finite, gathered[:, n], 0.0)
+        terms = [(coef, pp.omega)] if np.any(coef != 0.0) else []
+        out[k] = _accumulate(len(model.tt), [(lay, terms)])
+    return out
 
 
 def _site_reach_ok(ip: str, path: str, extra: list[str]) -> bool:
-    """Whether ``_site_column`` claims this column.
+    """Whether ``_site_df2`` claims this column.
 
     Its reach is phase ``ip``'s site rows, any atom (``_SITE_ROW_PATH``), and
     the parameters of that phase the data rows never read
@@ -2181,8 +2199,8 @@ def _column_identities(table: ParameterTable, extras: list[list[str]]
     * it reaches several, or one at any other coefficient: only the branches
       that read their coefficients off C may have it.  Those are
       ``_peak_chain_column`` (it perturbs θ and decodes, so every coefficient
-      and constant is carried), ``_structural_column`` (it reads the atom's
-      rows out of C) and ``_site_column`` (it reads every site row it moves
+      and constant is carried), ``_structural_df2`` (it reads the atom's
+      rows out of C) and ``_site_df2`` (it reads every site row it moves
       out of the local Jacobian).  The closed-form linear branches exclude themselves,
       since each requires ``own``: true where the column is its named path's
       own (nothing else reached, at coefficient 1), false for one path at any
@@ -2242,7 +2260,7 @@ def _column_identities(table: ParameterTable, extras: list[list[str]]
 
 
 def _within_atom(extra: list[str], ip: str, j: str, kind: str) -> bool:
-    """Whether every path this column also moves is one ``_structural_column``
+    """Whether every path this column also moves is one ``_structural_df2``
     reads: atom ``j``'s x, y, z rows for a coordinate DOF (``kind`` "dof"),
     its six U rows for an ADP DOF ("adp"), or another DOF of that kind on
     that atom.
@@ -2251,7 +2269,7 @@ def _within_atom(extra: list[str], ip: str, j: str, kind: str) -> bool:
     was written for.  A user tie between two atoms' DOFs does not, and
     neither does a column that also reaches the atom's Biso or occupancy:
     the branch reads only one atom's x/y/z (or U) coefficients, so either
-    would come back short.  Both take ``_site_column`` instead (WP-2314
+    would come back short.  Both take ``_site_df2`` instead (WP-2314
     angle 4), which sums every site row the column moves.
     """
     rows = ("x", "y", "z") if kind == "dof" else U_NAMES
@@ -2506,6 +2524,10 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
     site_claim = [bool(path.startswith("phases.")
                        and _site_reach_ok(path.split(".")[1], path, extra))
                   for path, extra, _own in identities]
+    site_idx = [c for c, site in enumerate(site_claim) if site]
+    # each structural column's constraint direction, read off C once (C is
+    # frozen for the run)
+    struct_coeffs: dict[int, np.ndarray] = {}
     for (path, extra, _own), site in zip(identities, site_claim, strict=True):
         if ((dof := _STRUCTURAL_PATH.match(path))
                 and _within_atom(extra, dof.group(1), dof.group(2), dof.group(3))):
@@ -2585,6 +2607,20 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
                     np.asarray(theta_t, dtype=np.float64)).tocsc())
             return lj_now[0]
 
+        # the site columns' ∂p/∂θ as dense vectors, one sparse read for them
+        # all (a scalar index into a sparse matrix costs ~5 µs a call)
+        lj_cols: dict[int, np.ndarray] = {}
+
+        def get_lj_cols() -> dict[int, np.ndarray]:
+            if not lj_cols and site_idx:
+                lj_cols.update(zip(site_idx, get_lj()[:, site_idx].toarray().T,
+                                   strict=True))
+            return lj_cols
+
+        # WP-2314 angle 2: each site column's ∂|F_N|², per phase, laid onto
+        # the pattern as one block after the dispatch (``_site_columns``)
+        site_pending: dict[int, list[tuple[int, np.ndarray | None]]] = {}
+
         for c, (path, extra, own) in enumerate(identities):
             if bkg_mix[c] is not None:
                 # y is linear in the coefficient: ∂y/∂c_n = basis row; the
@@ -2607,21 +2643,22 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
             elif ((dof := _STRUCTURAL_PATH.match(path)) and model.mode == "rietveld"
                     and model.structural_grad_supported(int(dof.group(1)))
                     and _within_atom(extra, dof.group(1), dof.group(2), dof.group(3))):
-                g_xyz, g_u, _gb, _go = get_struct_grads(int(dof.group(1)))
-                rows, grad = (
-                    (("x", "y", "z"),
-                     functools.partial(model.coordinate_intensity_grad, f2_grads=g_xyz))
-                    if dof.group(3) == "dof" else
-                    (U_NAMES, functools.partial(model.adp_intensity_grad, f2_grads=g_u)))
-                J[:n_data, c] = -sqrt_w * _structural_column(
-                    model, table, get_bases(), values, c,
-                    int(dof.group(1)), int(dof.group(2)), rows, grad)
+                ip, j = int(dof.group(1)), int(dof.group(2))
+                g_xyz, g_u, _gb, _go = get_struct_grads(ip)
+                coord = dof.group(3) == "dof"
+                if c not in struct_coeffs:
+                    struct_coeffs[c] = np.array(
+                        [coef_c[table._paths[f"phases.{ip}.atoms.{j}.{name}"], c]
+                         for name in (("x", "y", "z") if coord else U_NAMES)],
+                        dtype=np.float64)
+                site_pending.setdefault(ip, []).append(
+                    (c, _structural_df2((g_xyz if coord else g_u)[j], struct_coeffs[c])))
             elif (site_claim[c] and model.mode == "rietveld"
                     and model.structural_grad_supported(
                         ip := int(path.split(".")[1]))):
-                J[:n_data, c] = -sqrt_w * _site_column(
-                    model, table, get_bases(), values, c, ip, [path, *extra],
-                    get_struct_grads(ip), get_lj())
+                site_pending.setdefault(ip, []).append(
+                    (c, _site_df2(table, c, [path, *extra], get_struct_grads(ip),
+                                  get_lj_cols())))
             elif ((mom := _MOMENT_PATH.match(path))
                     and model.moment_grad_supported(int(mom.group(1)))
                     and _moment_reach_ok(path, extra, angles=moment_angles)):
@@ -2658,6 +2695,12 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
                 chain_cols.append(c)
             else:
                 fd_cols.append(c)
+
+        for ip, pending in site_pending.items():
+            cols = _site_columns(model, get_bases(), values, ip,
+                                 [df2 for _c, df2 in pending])
+            for (c, _df2), col in zip(pending, cols, strict=True):
+                J[:n_data, c] = -sqrt_w * col
 
         if chain_cols:
             _chained_columns(model, table, get_bases(), theta_t, values,

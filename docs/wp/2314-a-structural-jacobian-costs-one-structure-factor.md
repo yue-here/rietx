@@ -1,6 +1,6 @@
 # WP-2314 — a structural Jacobian costs one structure factor, not one per column
 
-Milestone: unscheduled · Status: 🔄 2026-11-28 — angles 1, 3 and 4 (the hoist, Biso and occupancy, cross-atom reach) landed, angle 4 in PR #1882 at 1.8-2.1× per Jacobian over main; angles 2 and 5-7 and the rigid-body columns open
+Milestone: unscheduled · Status: 🔄 2026-11-28 — angles 1-4 landed (angle 2, the shared intensity chain, in PR #1884 at 1.2-1.35× per Jacobian, byte-equal); angles 5-7 and the rigid-body columns open
 Track: A large cell
 Depends on: 2317 soft (its `bigcell-structural` case and ruling R0); 1945 soft (its open task on batched Biso columns, see Context)
 Priority: P2 2026-11-27 — the maintainer's large-cell track, ruled to proceed whatever the user's case shows (cells this size are met in the wild); a 40-atom structural fit spends most of its time rebuilding one structure factor per column, and the user's Rietveld stages take ~25 min each
@@ -215,7 +215,11 @@ is held, and rebuilt per evaluation where the cell is free.
       column on the bench case and the structural goldens.
       *(2026-11-27: all 83 Jacobians of the bench fit hash equal;
       `test_backend_shim.py`'s 19 goldens pass.)*
-- [ ] Angle 2, the Ω·∂I block. Columns within R0 (a)'s bound of angle 1's.
+- [x] Angle 2, the Ω·∂I block. Columns within R0 (a)'s bound of angle 1's.
+      *(2026-11-28: the intensity chain once per phase over an (N, K) block
+      of ∂|F_N|², every Jacobian byte-equal, `tests/test_site_column_block.py`.
+      The accumulation onto the pattern stays one call per column; the
+      handover entry says why.)*
 - [x] Angle 3, Biso/occupancy, with the exact oracles above, the reach declared,
       and a `test_cross_backend.py` config.
       *(2026-11-28: analytic, from the angle 1 cache. The reach is the Biso and
@@ -272,6 +276,82 @@ is held, and rebuilt per evaluation where the cell is free.
 
 ## Handover log
 
+- **2026-11-28** (fourth session) — Angle 2 landed in PR #1884 (a
+  ghostshift runner). Every coordinate, ADP, Biso and occupancy column now
+  shares one pass through the intensity factors per phase per Jacobian.
+  Before, each column rebuilt the same scale, multiplicity, Lorentz,
+  preferred-orientation, extinction and absorption factors for itself. The
+  arithmetic per column is unchanged, so every Jacobian of the bench fit is
+  byte-equal to main's and no number moves. On `bigcell-structural` one
+  Jacobian costs 1.2-1.35× less and the fit runs 1.1-1.2× faster, measured
+  on a loaded machine. The largest cost left is the structure factor the
+  cell columns rebuild once per column, about a quarter of the profiled fit.
+  - *Picked on a profile* (this Mac, darwin arm64, `[dev]` venv, compiled
+    tier on, one cProfile run of the bench fit on main cd4a461f1, loaded
+    machine, so shares only; 11.1 s profiled, 6.2 s in 118 Jacobians).
+    `_structural_column` and `_site_column` took 2.2 s, 20 % of the fit: the
+    per-column chain and its d-spacings 1.06 s, sparse reads of C and the
+    local Jacobian 0.52 s, the accumulation onto the pattern 0.47 s. The
+    cell family took 1.85 s (WP-1945's). `structural_f2_grads`, the target
+    of angles 5-7, took 0.83 s, 7.5 %. So angle 2 was the largest share this
+    WP owns, and it needs no decision.
+  - *Done:* `CompiledModel._f2_derivative_chain` and `site_intensity_grad`
+    take an (N, K) block of ∂|F_N|² and broadcast each factor down the
+    column axis. The two site branches of `_make_jacobian` now only build
+    each column's ∂|F_N|² (`_structural_df2`, `_site_df2`) and queue it per
+    phase. `_site_columns` then runs the chain once per phase, gathers the
+    block onto the peak rows, and accumulates each column as before. The
+    constraint directions are read off C once per run and the site
+    columns' local Jacobian in one sparse read per Jacobian.
+    `_structural_intensity_grad` now goes through `site_intensity_grad`, so
+    the nuclear mask has one copy.
+  - *Measured* (same Mac and venv; main at cd4a461f1 as a `git archive`
+    snapshot first on `sys.path`, the branch at 9c8f1dd48; seven
+    interleaved main/branch pairs under the suite lock, another runner's
+    two processes at 100 % CPU throughout, driver
+    `~/.cache/ghostshift/rietx/wp-2314-a7/jachash.py`, outside the tree):
+    all 118 Jacobians of the fit hash equal to main's in every pair, and
+    the refined values, esds and Rwp are equal. On the last four pairs,
+    with CPU time recorded:
+
+    | | main | branch | pairwise |
+    |---|---|---|---|
+    | fit wall | 7.8-9.4 s | 6.4-8.5 s | 1.09-1.21× |
+    | one Jacobian | 35-43 ms | 26-35 ms | 1.21-1.35× |
+    | CPU in Jacobians | 5.7-6.8 s | 4.4-5.9 s | 1.13-1.28× |
+
+    The first three pairs ran under heavier load (main 7.4-10.5 s, branch
+    8.9-9.5 s) and rank nothing.
+  - *Gates* (darwin arm64, `[dev]` venv): the fast selection on main
+    (300853e90) merged into the branch, 15 933 passed, 467 skipped,
+    30 xfailed, none failed. The branch adds 7 cases there, all in
+    `tests/test_site_column_block.py` and all passing, 0.26 s in the local
+    junit. No golden moved. Ruff, Vale (0 errors) and
+    `tests.reader_output` (exit 0, unchanged) are clean. The full selection
+    was not run: every Jacobian of the bench fit is byte-equal to main's,
+    so no measured number can move (`tests/CLAUDE.md` § Running).
+  - *Review:* `/code-review high --fix` found no bug and five nits. Fixed:
+    the new test's docstrings now say the oracle shares the one-column
+    chain and name the five chain factors the fixture turns on; DESIGN.md
+    no longer names `_structural_column`; the duplicate nuclear-mask path
+    in `_structural_intensity_grad` now calls `site_intensity_grad`.
+    Declined: chunking the (N, K) block for memory. The block is the size
+    of the gradient cache `structural_f2_grads` already holds per Jacobian,
+    and smaller than the Jacobian itself, which has a row per pattern point
+    where the block has one per reflection. The generality judge was not
+    dispatched: no `_audit.py` row and no heuristic was added. No rulebook
+    was edited.
+  - *Next:* (1) The cell columns' structure factor. Each cell column's
+    `phase_peaks` rebuilds the whole |F|² at its perturbed d: 589
+    `_total_f2` calls, about 3 s of the 13 s first profiled run, and nearly
+    nine tenths of every `_orbit_terms` call in the fit. Angles 5-7 (the
+    vectorised site loop, f₀ once per species, a compiled orbit kernel)
+    cut that cost for every structure factor, with goldens re-pinned under
+    R0; WP-1945's cell task cuts the number of calls, bit-identically. Do
+    the one whose owner is free first. (2) The accumulation onto the
+    pattern is still one compiled call per column, 0.47 s profiled. A
+    batched form needs a kernel or a scatter order proved equal to the
+    compiled one. (3) The rigid-body columns, as before.
 - **2026-11-28** (third session) — Angle 4 is measured and in PR #1882 (a
   ghostshift runner, continuing the second session's branch). A column that
   moves several atoms' site rows no longer re-runs the whole phase's
