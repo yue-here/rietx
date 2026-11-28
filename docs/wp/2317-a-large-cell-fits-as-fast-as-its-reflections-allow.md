@@ -784,7 +784,28 @@ already warned. The kept answer is 0.019 Rwp points lower than the old fixed
 point. The alternation's own fixed point (13.928 % from −1 %) sits above its
 best single pass, which is group Q's threshold question in WP-2017.
 
-**Measured.** RESULT_NUMBERS
+**Measured** (macOS arm64, this worktree's `[dev]` venv, a machine shared
+with other runners' suites).
+- The Le Bail slow row alone, through `serial.py`: killed at the 3 208 s cap
+  before the gate, 613 s after it (passed). The hostile pair's runaway test
+  alone: passed, 41 s.
+- Fast suite, on the tree merged with `5a06184af` and the gate: 1 failed,
+  15 904 passed, 457 skipped, 30 xfailed (534 s). The failure was
+  `test_audit_delta`, from an `_audit.py` edit made while the run was going;
+  it and the audit, help and slack files then passed (148). Passed plus failed
+  moved +5 against runner 2's run, the five tests this session added. The
+  added tests cost 2.0 s in all (`tests.added_test_times`, local junit).
+- Full suite, on `8f46a9e67` (main `9f3dd5542` merged): 2 failed, 16 880
+  passed, 473 skipped, 49 xfailed, 1 xpassed (2 226 s). Both failures are
+  Le Bail slow rows, and neither is attributed yet:
+  `test_lebail_cycles.py::test_the_tolerance_meets_its_bar[lamno3]` (a stage's
+  partition ran to the 25 000-cycle cap; the bar is half of it) and
+  `test_cell_runaway_safety.py::…[nudged]` (the macOS-only pin that the
+  nudged start reaches a non-finite model; `CELL_RUNAWAY` still fires and
+  restores the cell). The latest nightly on main passed on Linux
+  (2026-11-27), and the second pin is not run there. A run of both on a
+  snapshot of main was queued behind two other runners' jobs when this
+  session handed off (`main_two.log` in the shift's scratch).
 
 **Generality** (the judge's verdicts, `generality-review`, on the branch at
 `792d98170`; its full tables are in the PR body).
@@ -803,7 +824,11 @@ shape traced. Its one gap, a closing-stage test, is added. It also noted that
 an intermediate stage's report and node carry the narrower windows' esds,
 which a branch from that node inherits.
 
-**Next.** (1) The maintainer's three items. (2) The joint runner's re-solve
+**Next.** (0) Attribute the two full-suite failures: run both on main
+(the snapshot recipe: `git archive` main into scratch, `PYTHONPATH=<it>/src`,
+through `serial.py`). If main passes, they are R7's: the `lamno3` cap is the
+slow row's class (a partition that does not settle on a re-solved answer), so
+read its stage events first. Then mark PR #1881 ready. (1) The maintainer's three items. (2) The joint runner's re-solve
 (`multi.py`'s stage loop is inline, so the stage body is factored first). (3)
 The series measurement item 3 names, if the maintainer wants it before
 approving 3 FWHM.
