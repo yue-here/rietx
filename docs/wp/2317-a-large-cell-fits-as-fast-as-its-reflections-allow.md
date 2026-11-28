@@ -607,6 +607,15 @@ what it costs here.
   Task 1's re-rating of 2314-2316 starts from these numbers. The driver,
   `2314-probe/drive_bigcell.py`, runs both arms and prints a bit-level digest.
 
+- **From WP-2315, 2026-11-28:** for R4's cost, the real-structure bench cases
+  never reach the constrained step. `bigcell-pawley` and `bigcell-pawley-120`
+  carry 3 544 and 6 272 width rows in their last stage and cross none, so the
+  in-step floor costs them nothing. Probe 1 still crosses on the same tree,
+  with the same instrument and start, so its crossings came from its
+  invented structure, not the U = V = Y = 0 truth. On the 120° case about
+  half the 15 s fit is `spilu`'s factorisation (WP-2315 Angle 4). WP-2315's
+  Context § Re-read on the real structure has the table.
+
 ## Non-goals
 
 - The fixes themselves: WP-2314 (structural columns), WP-2315 (Pawley step),
