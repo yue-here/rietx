@@ -77,7 +77,7 @@ def si():
     obs = np.random.default_rng(1).poisson(y / y.max() * 1.3e6 + 7700.0).astype(float)
     data = rx.PatternData(two_theta=tt.tolist(), intensity=obs.tolist(),
                           sigma=np.sqrt(np.maximum(obs, 1.0)).tolist())
-    return data, instrument, rx.pick_peaks(data, instrument, two_theta_range=LIMITS)
+    return data, instrument, rx.pick_peaks(data, instrument, two_theta_limits=LIMITS)
 
 
 def _cubic_f(a: float) -> CellCandidate:
@@ -137,9 +137,11 @@ def test_the_same_pattern_at_its_own_cell_passes_the_gate(si):
 
 
 def test_a_cell_outside_the_prefits_basin_reaches_the_gate(si):
-    """1 % off at this resolution: the prefit cannot bring it back, and the
-    screen says so rather than ranking on the wreckage."""
-    screen = _screen(si, 1.01)
+    """2 % off at this resolution: the prefit cannot bring it back, and the
+    screen says so rather than ranking on the wreckage.  Since WP-2317 (R7)
+    the prefit's re-solve on fresh windows brings a 1 % cell back (prefit Rwp
+    0.012), so the case starts at 2 %, where the cell lands 8 % long."""
+    screen = _screen(si, 1.02)
     assert screen.prefit_rwp is not None
     assert screen.status == "unreliable"
     assert screen.best_or_none() is None
@@ -151,7 +153,7 @@ def test_a_cell_outside_the_prefits_basin_reaches_the_gate(si):
 def test_the_unreliable_suggestion_lists_the_causes_without_ranking_them(si):
     """Round 4 (#939): a second phase and weak data trip the gate at a right
     cell, so the suggestion may not name the cell the first suspect."""
-    screen = _screen(si, 1.01)
+    screen = _screen(si, 1.02)
     diag = next(d for d in screen.diagnostics
                 if d.code == "EXTINCTION_SCREEN_UNRELIABLE")
     text = diag.suggestion
@@ -239,9 +241,9 @@ def test_the_message_says_weak_data_when_no_fit_could_pass(si):
 
 
 def test_the_message_says_misfit_when_the_data_could_pass(si):
-    """S ≫ N: the 1 % cell the prefit cannot bring back.  A noise-only fit would
-    read 0.024, so the gate's 1.17 is misfit, and the message says by how much."""
-    screen = _screen(si, 1.01)
+    """S ≫ N: the 2 % cell the prefit cannot bring back.  A noise-only fit would
+    read 0.024, so the gate's reading is misfit, and the message says by how much."""
+    screen = _screen(si, 1.02)
     assert screen.status == "unreliable"
     assert screen.perfect_fit_rwp_net < 0.1 * REFERENCE_NET_RWP_MAX
     message = next(d.message for d in screen.diagnostics
@@ -305,7 +307,7 @@ def _pbso4_inputs(factor: float = 1.0):
                             weight=rx.Parameter(value=0.5, min=0.0, max=1.0))],
         polarization=rx.Parameter(value=0.5, min=0.0, max=1.0), dispersion=None)
     limits = (15.0, float(x.max()))
-    peaks = rx.pick_peaks(data, instrument, two_theta_range=limits)
+    peaks = rx.pick_peaks(data, instrument, two_theta_limits=limits)
     cell = tuple(v * factor for v in (6.9644, 5.4038, 8.4956)) + (90.0, 90.0, 90.0)
     candidate = CellCandidate(cell=cell, cell_esd=(0.0,) * 6, system="orthorhombic",
                               centring="P", volume=float(np.prod(cell[:3])))

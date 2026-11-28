@@ -176,6 +176,14 @@ opt-in switch, so it is tiered in the batch before it lands (the judge's item 5,
 
 ### Inherited
 
+- **2026-11-03, from WP-1955 (PR #1372).** X17's floored-aperture collapse is
+  fixed by a lift: a stage that newly frees an FCJ axial ratio sitting on zero
+  starts it at 0.02 (`forward.apertures_to_lift`), warm collapsed refits
+  included. Re-measured on X17's probe (independent 1b under `qpa_plan()`, then
+  a warm 1c): closing stage off, Rwp 10.73 → 0.10881 in 43 evaluations
+  (independent 1c 0.10901); on, 0.10495 (independent 0.10518). 1b itself still
+  walks back to its floor. X17's row can say fixed; C2 question 5 and the fence
+  are untouched, since they catch other collapses.
 - **2026-11-19, from WP-2222: does a carried Le Bail chain drift without the closing
   stage?** WP-2222 turned the closing stage off by default. A Pawley series that carries
   per-hkl intensities then drifted: Rwp 0.0339, 0.0345, 0.0347, 0.0372 down the four-pattern
@@ -206,6 +214,19 @@ opt-in switch, so it is tiered in the batch before it lands (the judge's item 5,
   reaches the truth. Neither the Rwp fence nor `_rejected` escalates it. WP-2080
   owns the trigger and its ruling; nothing here changes unless that ruling asks C1
   to be revisited.
+
+- **2026-11-28, from the issue triage (issue #1590): `verify_steps` counting tied rows.**
+  This is *Next* item 2's first declined review finding, filed as an issue by WP-1524. Checked
+  against the tree at `300853e90`: `_series_steps` still writes one row per path, and
+  `examples/guides/path.py` still prints `cell.a`, `cell.b` and `cell.c` at p003→p004, each
+  15,810 esd, so `verify_steps=3` refits one pair and the fourth row (p004→p005, −14,062 esd)
+  reads "not refitted". `SeriesResult.moved_paths` already drops a tied path that repeats an
+  earlier one's values. `_verify_steps` refits each pattern once however many rows touch it,
+  so two *independent* paths stepping at one pair also share one refit. Dropping exact tied
+  repeats from `steps` would not change that case, and counting distinct pairs would. The
+  issue asks the maintainer which of three answers holds; the 2026-11-28 triage batch carries
+  it to him. The guide's assertion (`path.py` line 50) and `docs/docs/guides/path.md` line 80
+  move with either change.
 
 ## Non-goals
 
@@ -1297,3 +1318,5 @@ Author's answers: items 4 and 5's wording corrections are applied (`db61420`); i
 - **2026-10-18** — created, from the milestone's opening session. 1317 (the series
   scrubber) and 1325 (parametric series) are open and adjacent; neither owns the fences,
   and this WP changes no view.
+
+*Pointer, 2026-11-21:* a rulings pass settled the ranking criterion, `fit:refit`, `relative_paths`/`angle_paths` and C10 q1, and listed what still awaits the maintainer, in `../milestones/generality.md` § Decisions (its last seven entries).

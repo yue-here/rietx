@@ -121,6 +121,7 @@ from pathlib import Path
 
 import numpy as np
 
+from .._nearmiss import check_choice
 from ..crystallography.magnetic import isotropy as _isotropy
 from ..crystallography.magnetic import moments as _moments
 from ..crystallography.magnetic.form_factor import (
@@ -132,6 +133,7 @@ from ..crystallography.magnetic.form_factor import (
 from ..crystallography.magnetic.isotropy import MagneticCandidate, analyse
 from ..crystallography.magnetic.moments import tilted_seed, warm_seed
 from ..crystallography.magnetic.supercell import (
+    SUPERCELL_NUCLEAR_GROUPS,
     anti_translation_residual,
     anti_translation_ties,
     magnetic_supercell,
@@ -200,8 +202,8 @@ SOLVE_D_MIN = 1.5
 #: subspace** (:func:`~rietx.crystallography.magnetic.moments.tilted_seed`,
 #: mostly along the allowed basis's first row and, since issue #390's tilt,
 #: with a small nonzero component on every other row too when the basis has
-#: more than one — see :data:`~rietx.crystallography.magnetic.moments.
-#: SEED_TILT`), which is the one thing a seed here must not get wrong.
+#: more than one — see
+#: :data:`~rietx.crystallography.magnetic.moments.SEED_TILT`), which is the one thing a seed here must not get wrong.
 SOLVE_SEED_MU_B = 2.0
 
 #: Alias of :data:`~rietx.crystallography.magnetic.moments.SEED_TILT`, kept
@@ -2163,6 +2165,7 @@ def solve_magnetic(refinement, data, *, phase: int = 0,
     returns a ranked list with a stated criterion and an abstention reason,
     never a confident wrong singleton.
     """
+    check_choice("nuclear_group", nuclear_group, SUPERCELL_NUCLEAR_GROUPS)
     from ..crystallography.satellites import zone_boundary_candidates
     from ..params.vector import ParameterTable
     from ..report.layer2 import delta_bic

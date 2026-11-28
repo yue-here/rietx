@@ -65,38 +65,51 @@ nothing. They have not been re-checked under this line.
 
 ## Triage — the no-argument mode
 
-One network call, no checkout, no diff:
+One paginated network call, no checkout, no diff. The raw pages go to a
+file, and only the jq rows are read:
 
 ```sh
-gh pr list --state open --limit 30 \
-  --json number,title,author,files,changedFiles,mergeStateStatus,latestReviews,headRefOid,updatedAt,statusCheckRollup,commits
+gh api graphql --paginate --slurp -F owner='{owner}' -F name='{repo}' \
+  -F query=@.claude/skills/pr-review/triage.graphql > <scratchpad>/triage.json
+jq -c -f .claude/skills/pr-review/triage.jq <scratchpad>/triage.json
 ```
 
-- **Reviewable size is a jq filter over `files[]`**, excluding
-  `^tests/data/|^src/rietx/data/` — never a diff (#125: 48,791 lines, 708
-  reviewable).
+- **The rows are every open PR.** `open` is GitHub's own count, taken on the
+  first page, so `rows` shorter than `open` means a page was lost or a PR
+  closed while the call paged. Rerun once to tell which. The triage's first
+  line then says `ranked N of M open`, collision degree is marked as counting those N
+  alone, and the `all` mode's report says the rest were not seen. Measured on
+  2026-11-27 (WP-2312): 84 of 84 PRs in 6 pages and 17 s, 296 kB raw and 42 kB
+  of rows. `gh pr list` cannot do this. Its page of 100 timed out without
+  `commits`, and with `commits` gh's query would also pass GitHub's node limit.
+- **A page is sized by time.** A row costs GitHub 0.17-0.31 s, mostly for
+  `mergeStateStatus`, and a request past about 10 s comes back HTTP 502 or 504. Rerun a 502
+  or 504 once. A second one, or any other refusal, is a stop. Never drop a
+  field to make it pass, since every field here feeds a rank.
+- **`reviewable` sums `files[]` lines outside `^tests/data/|^src/rietx/data/`**.
+  Never read a diff for it (#125: 48,791 lines, 708 reviewable).
 - **`mergeStateStatus`, not `mergeable`**: `BLOCKED` PRs report `MERGEABLE`;
   `DIRTY` is the conflict, `CLEAN` the only state step 9 merges from.
-- **`changedFiles` beside `files[]`**: the array caps at 100 and under-reports
-  size and collision degree downward; when they differ, say so.
+- **`filesListed` below `changedFiles`** means the 100-file cap hid the rest.
+  `reviewable`, `degree`, `governance` and `execution` then under-count, so say so.
 - **`latestReviews[].commit`** is the sha a *review* (not a comment) was posted
-  at — what makes the `all` mode's skip check a field.
-- **`commits[].messageHeadline` is the only place a contributor's WP work is
-  visible**: a PR prefixing its commits `WP-NNNN:` edits no `docs/wp/` file, so
-  `files[]` cannot see it (#98: 45 `WP-1118:` commits, every one of them in
-  `src/` and `tests/`). The field carries each commit's *body* too: it took the
-  call from 27 kB to 60 kB on a three-PR backlog, so read it through jq, never
-  raw.
+  at. That makes the `all` mode's skip check a field. gh's own
+  `--json latestReviews` never asks GitHub for it and prints an empty sha.
+- **`wpCommits` is the only place a contributor's WP work is visible**: a PR
+  prefixing its commits `WP-NNNN:` edits no `docs/wp/` file, so `files[]`
+  cannot see it (#98: 45 `WP-1118:` commits, every one of them in `src/` and
+  `tests/`). It reads the first 100 commits. A `commitsTotal` above 100 says
+  the rest went unread.
 
 Print one row per PR — number, title, reviewable lines, merge state, CI,
 whether a maintainer has commented — **and the reason for its rank**:
 
 1. **Touches an in-flight WP** — `Status:` 🔄 in a `docs/wp/[0-9]*.md` the PR
-   edits, **or** a `WP-NNNN:` commit prefix naming one. Either way a live
-   session owns that WP's file.
-2. **Outside PR edits `docs/ROADMAP.md` or `docs/wp/**`** — a governance
-   question for the user (`CONTRIBUTING.md` § Maintainer-only machinery), cheap
-   and blocking nothing. Author-conditional: on the maintainer's own PR it is
+   edits (a `WP-NNNN` in `governance`), **or** a `WP-NNNN:` commit prefix
+   naming one (`wpCommits`). Either way a live session owns that WP's file.
+2. **Outside PR edits `docs/ROADMAP.md` or `docs/wp/**`** (`governance`) — a
+   governance question for the user (`CONTRIBUTING.md` § Maintainer-only
+   machinery), cheap and blocking nothing. Author-conditional: on the maintainer's own PR it is
    the work. **The edits CONTRIBUTING hands a contributor are not the
    question**: a claim (the WP's `Status:` line set to `🔄 <date> — claimed by
    @…`, with `docs/wp/README.md` regenerated), and, for the work the PR does,
@@ -114,9 +127,9 @@ whether a maintainer has commented — **and the reason for its rank**:
    is a conflict, and the lines after the tree name the conflicted paths. It
    runs in the bench because any other tree's row merge hides an index
    conflict (§ Where this command runs).
-4. **Collision degree** (files shared with other open PRs), ascending — every
-   merge stales the diffs sharing a file with it.
-5. **Reviewable lines**, ascending.
+4. **Collision degree** (`degree`: files shared with other open PRs),
+   ascending — every merge stales the diffs sharing a file with it.
+5. **Reviewable lines** (`reviewable`), ascending.
 
 **Name every PR by another author first, above the ranked rows.** That means
 an author outside `KNOWN_AUTHORS` in `.claude/skills/issue-review/backlog.py`,
@@ -153,7 +166,7 @@ bookkeeping syncs, and nothing beyond them.
 - Outside edit to `docs/ROADMAP.md` / `docs/wp/**` beyond the edits rank 2
   lists → question to the batch; the PR **stays** (its code
   half is reviewable).
-- Touches an execution-shaped path (step 4's list) → batch.
+- Touches an execution-shaped path (`execution`, read at step 4) → batch.
 - Already reviewed and nothing since → skip, naming the sha. Test:
   `latestReviews[].commit == headRefOid` **and** `updatedAt` no later than that
   review's `submittedAt` (keyed on the sha alone it skips forever a contributor
@@ -234,7 +247,7 @@ line if the checkpoint ended it. Close with
 
 1. **Read the thread once** — `gh pr view N --comments`; it is the record.
    Earlier rounds → review only `<last-reviewed-sha>..<head>`
-   (`latestReviews[].commit`) and say which round. Once the branch has taken
+   (the triage row's `latestReviews[].commit`) and say which round. Once the branch has taken
    main in, by a rebase or a step-4 sync, that range carries main's changes
    too. Diff the two merged trees instead: `git diff A B`, where A and B are
    the trees `git merge-tree --write-tree origin/main` prints for the
@@ -255,9 +268,14 @@ line if the checkpoint ended it. Close with
 4. **Bench and merged tree.** One worktree, one venv; never one per PR.
    - **Read before you execute**: the bench runs the branch's code
      (`uv pip install -e .` runs its build config, pytest imports its
-     `conftest.py`). Read every hunk to `pyproject.toml`, `setup.py`, any
-     `conftest.py`, `.github/**`, `.claude/hooks/**` and `.claude/settings*.json`
-     first; a workflow change is a question for the user, not a finding.
+     `conftest.py`, `npm --prefix gui ci` installs what its lockfile resolves).
+     First read every hunk to a path `triage.jq`'s `execution` matches: the
+     Python build and test config, `.github/**`, `.claude/hooks/**`,
+     `.claude/settings*.json`, `.mcp.json`, and the GUI and docs builds'
+     config, scripts and lockfile (WP-2313). Read a lockfile hunk by property:
+     the packages it adds or moves, a new `hasInstallScript`, a `resolved` host
+     off the registry. A workflow change is a question for the user, not a
+     finding.
      **The rest of `.claude/` is text, not execution** — skills, commands and
      agent definitions are markdown the bench never runs, and treating the whole
      directory as execution-shaped batched three PRs that only sync markdown.
@@ -306,11 +324,12 @@ line if the checkpoint ended it. Close with
    of 9 open fork PRs on 2026-10-01). Otherwise ask for a rebase.
 
    - **`docs/wp/README.md`**: regenerate it with `wp_index.py`.
-   - **The schema number**, `src/rietx/schemas/common.py` and the pin in
-     `tests/test_magnetic.py`. It moves once per release cycle (the comment
-     above `SCHEMA_VERSION`, decided 2026-10-15). The first change after a
-     release bumps it, and every later change adds an `Also in M` note under
-     that number. So a sync never renumbers onto main. Read R, the number at
+   - **The schema number**, `src/rietx/schemas/common.py`, its notes in
+     `docs/contracts/schema.md` and the pin in `tests/test_magnetic.py`. It
+     moves once per release cycle (the comment above `SCHEMA_VERSION`,
+     decided 2026-10-15). The first change after a release bumps it, and
+     every later change adds an `Also in M` note under that number in the
+     notes file. So a sync never renumbers onto main. Read R, the number at
      the last release tag (`git show <tag>:src/rietx/schemas/common.py`), and
      M, main's number. Where M is R, main has not bumped this cycle, and the
      PR's own bump merges as written. Where M is past R, the PR's change
@@ -328,7 +347,10 @@ line if the checkpoint ended it. Close with
      no document carries. The block's grep is whole-word: without `-w`, 0.50
      matched 0.500000E+01 in #911's GSAS fixtures.
      `INDEXING_THRESHOLDS_VERSION` in `src/rietx/schemas/indexing.py` moves
-     the same way, with `Also <M>` notes and no pin. On 2026-10-30 #1107
+     the same way, with `Also <M>` notes in
+     `docs/contracts/indexing-thresholds.md` and no pin.
+     `tests/test_capabilities.py::test_every_contract_bump_carries_its_note`
+     fails when the newest note is not under the constant's value. On 2026-10-30 #1107
      and #1123 both added 0.60 notes, and the sync kept both, #1123's first
      (`2da66e61`).
    - **`docs/releases/<next>.md`**, the staging file: keep both sides when
@@ -418,7 +440,9 @@ line if the checkpoint ended it. Close with
    row (root CLAUDE.md § skill: the body, or the task shape's reference),
    physics with prose but no Theory-tab equation, a skill row telling
    agents to call a `caller` verb (it makes the verb a default path), a
-   finding from one dataset written into a CLAUDE.md as a rule.
+   finding written into a CLAUDE.md (an incident, a sha, one dataset's
+   number: a rulebook takes the rule, a one-clause reason and a pointer;
+   protocol rule 4, WP-2009).
 6b. **The generality audit table** (WP-2014). Every decision the package
    makes on its own has a row in `src/rietx/_audit.py` with a tier, and an
    author choosing their own tier is the self-certification the table exists
@@ -441,16 +465,30 @@ line if the checkpoint ended it. Close with
    - **Post the proposed rows** in the PR's step-8 review, each with the
      judge's one-line verdict. In the `all` mode that review waits for the
      judge and goes out in the apply pass.
-   - **Tier-3 rows and tier-2 actions go to the batch, grouped by class**:
-     one question for every row resting on the same evidence (WP-2002 ruled
-     256 rows as 16 classes). After a ruling, write `grounds` and `approved`
-     (the ruling's date) into the PR's rows. Push them to its branch where
+   - **Settle the clear classes of tier-3 constant and suggestion rows, and
+     batch the rest** (ruled 2026-11-22, WP-2238). A class is every row
+     resting on the same evidence (WP-2002 ruled 256 rows as 16 classes). A
+     class of constants or suggestions that the judge called `holds`, and
+     which none of the maintainer's triggers reaches (the maintainer's
+     instructions, § "Before you bring me a decision"; a constant setting a
+     warning's or an action's threshold is one), is approved by that verdict.
+     A tier-3 code, action or default row, and a tier-2 action, always goes
+     to the batch (`tests/test_audit_table.py` refuses `approved_by="checked"`
+     on one), and so does a class the judge did not call `holds`. List the
+     approved classes under **Settled for you**,
+     and show the maintainer a random one in ten. Every other class goes to
+     the batch as one question. After a settlement or a ruling, write
+     `grounds` and `approved` (that day's date) into the PR's rows, and
+     `approved_by="checked"` on a settled one. A settled row's `grounds` ends
+     "settled by Claude under <grounds>". Push them to
+     its branch where
      `gh pr view N --json maintainerCanModify` says true; otherwise ask the
      contributor in the review.
 6c. **What a reader receives** (ruled 2026-11-01). The package should pass no
-   junk back to a reader, a person or an agent, so every change to what a
-   reader receives goes to the user before merge. A PR changes it when either
-   holds:
+   junk back to a reader, a person or an agent. Since 2026-11-22 (WP-2238)
+   each change is settled here, checked blind, and the user reads the whole
+   diff once per release (`docs/RELEASING.md` step 2). A PR changes it when
+   either holds:
    - `.venv/bin/python -m tests.reader_output`, run in the bench on the merged
      tree, exits 1. It prints the diff of one standard fit's printed result,
      report and diagnostics against the base (about 25 s).
@@ -458,8 +496,10 @@ line if the checkpoint ended it. Close with
      generated `docs/skill/rietx/references/api*.md`. A diagnostic code new
      to the audit table (step 6b's printout) counts too.
 
-   Either way it is a question for the batch: the before and after text, and
-   your reading of whether each added line tells this fit's reader something.
+   Either way, read whether each added line tells this fit's reader something,
+   then give a fresh subagent the before and after text without your reading
+   and have it judge the same. Agreement settles the PR; a disagreement goes
+   to the batch with both readings.
    A line that reads the same for every fit, repeats another field, or gives
    no action is the junk the ruling names. #1266 added 930 characters to every
    report that way, and it reached the user only because its author flagged it.

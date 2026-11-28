@@ -64,7 +64,13 @@ import gemmi
 import numpy as np
 
 from ..adp import cartesian_basis
-from ..symmetry import SITE_TOL, ReflectionSet, as_group, generate_reflections
+from ..symmetry import (
+    SITE_TOL,
+    ReflectionSet,
+    _order_by_d,
+    as_group,
+    generate_reflections,
+)
 from .form_factor import approximation_name, j0, j2, resolve_g
 from .moments import moment_frame, moment_from_dofs
 
@@ -401,16 +407,14 @@ def _axial_matrices(group, xyz, rot, tran, phase_name, label) -> np.ndarray:
     ``MagneticGroup`` whose ``all_operations()`` iterated in a different
     order, and Q23 measured this reach exactly this function: reordering
     could pick a different first match — and so a different sign — for an
-    image with more than one stabiliser (measured on
-    ``test_epsilon_bookkeeping.py::test_moment_path_is_clean_by_design``
-    with an unordered ``set()`` in ``_close_operations``). This is now moot:
+    image with more than one stabiliser (measured by WP-1327's Q23 with an
+    unordered ``set()`` in ``_close_operations``). This is now moot:
     ``operators.MagneticGroup.from_operations`` sorts canonically by
     ``(rotation, translation, time_reversal)`` before choosing coset
     representatives, so ``all_operations()`` is bit-identical for any input
     order of the same set, and "the first match" is now a property of the
-    *image*, never of the caller's enumeration order (see
-    ``tests/test_operator_order_independence.py``, which checks this
-    end to end through ``compile_magnetic_sites``).
+    *image*, never of the caller's enumeration order
+    (``tests/test_magnetic_operators.py::test_the_canonical_order_is_a_property_of_the_group_not_of_the_input_order``).
     """
     ops_all = group.all_operations()
     images = [op.act_on_site(xyz) for op in ops_all]
@@ -596,7 +600,7 @@ def merge_magnetic(nuclear: ReflectionSet, extra: ReflectionSet
     mult = np.concatenate([nuclear.multiplicity, extra.multiplicity])
     d = np.concatenate([nuclear.d, extra.d])
     nuc = np.concatenate([np.ones(len(nuclear)), np.zeros(len(extra))])
-    sort = np.argsort(-d, kind="stable")
+    sort = _order_by_d(d)  # the nuclear list's tie rule, nuclear rows first
     merged = ReflectionSet(hkl=hkl[sort], multiplicity=mult[sort], d=d[sort],
                            spacegroup=nuclear.spacegroup,
                            operations=nuclear.operations,

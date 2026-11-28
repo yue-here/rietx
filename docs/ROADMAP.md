@@ -106,7 +106,7 @@ opened 2026-09-18 as v1.6; [generality](#generality--every-decision-rietx-makes-
 opened 2026-10-18; [parametric](#parametric--a-parametric-refinement-written-by-hand-ports-to-rietx)
 opened 2026-11-04; [gui-overhaul](#gui-overhaul--the-gui-redesigned-around-the-pattern-and-the-model) opened 2026-11-08; rietview, rigid-bodies and structure-solution were queued as v1.7, v1.8 and v1.9. Threads #286, #426, #561 and #562 quote those
 numbers, so each row in § Milestones says which it was. **Neutron TOF stays at
-[§ v2+](#v2--fenced)** behind issue #193, but for its T-1 cut ([1927](wp/1927-tof-t1-the-axis-and-its-readers.md), 2026-10-08).
+[§ v2+](#v2--fenced)** behind issue #193, but for the cuts named there.
 
 **Ten silent-answer fixes have landed since 1.5.0** (1434, 1435, 1432,
 1342, 1415, 1442, 1414, 1454, 1456, 1465), staged in the notes and narrated
@@ -453,9 +453,7 @@ Opened 2026-11-16 by the maintainer ([record](milestones/series.md)), beside par
 
 Opened by evidence — an issue, an agent round, a measurement — and owned by no
 milestone yet. Grouped by what the evidence says; each WP file carries it in
-full, with the issues it closes. Most of the 13xx rows come from the
-2026-09-01 issue triage (PRs #205, #213) and the day after; 1119, 1130 and
-1133 are older; 1414–1420 are the 2026-09-15 triage's.
+full, with the issues it closes.
 
 #### Coming from another code
 
@@ -553,6 +551,11 @@ milestone for what left § v2+ that day; 1517 counts the eight steers.
 
 The WPs are in [the index](wp/README.md#unscheduled-data-and-metadata-in-a-structure-out).
 
+#### A large cell
+
+Three slow paths on a 12 × 36 × 4 Å cell; 2317 holds the bar and the rulings.
+The WPs are in [the index](wp/README.md#unscheduled-a-large-cell).
+
 #### The repo's own process
 
 The WPs are in [the index](wp/README.md#unscheduled-the-repo-s-own-process).
@@ -572,15 +575,15 @@ scope creep. Each item names what fenced it.
   (Cheary-Coelho 1992) — **with** the peaks buffer, never before
   ([1122](wp/1122-compiled-peaks-buffer.md) measured shape reuse below break-even
   without one); neutron **TOF** (CW landed in 1134; issue #193; the energy-dependent resonant absorption at S(Q) is #193's rung T-4, from #113;
-  raw TOF reduction (per-pixel NeXus, vanadium, empty can, grouping) is out of scope, not fenced: ruled 2026-11-16 on #1446, and [2146](wp/2146-the-facility-iparm-files-read-with-their-repairs-recorded.md) carries the how-to and the refusal) — **built through rather than deferred**: the
-  fork's branch is visible (`tof-cleanroom-20260923`); **decided 2026-09-24: held until magnetic
+  raw TOF reduction (per-pixel NeXus, vanadium, empty can, grouping) is out of scope, not fenced: ruled 2026-11-16 on #1446, and [2146](wp/2146-the-facility-iparm-files-read-with-their-repairs-recorded.md) carries the how-to and the refusal) — **decided 2026-09-24: held until magnetic
   closes**, then cut T-1, T-2/T-3, T-5; **amended 2026-10-08: T-1 (axis, readers) cut as
-  [1927](wp/1927-tof-t1-the-axis-and-its-readers.md)**, closed 2026-10-23 with T-2's inheritance in its Context; the rest still waiting, with #442 (a bank's CW
-  width rows) decided inside T-1, and #618 (Mantid's instrument values: with provenance,
-  never the files), and #1067 (TOF pulse shapes as a registry, after T-2/T-3) — and issue #362 lists the constant-wavelength reads
-  (`CompiledModel.tt`, `line_wavelengths`, `sigma_measured`; `viz/snapshot.py` and
-  23 more sites) a second compiled-model class meets, so the accessor seam it
-  proposes waits for that class rather than preceding it; difference Fourier /
+  [1927](wp/1927-tof-t1-the-axis-and-its-readers.md)**; **amended 2026-11-11: T-2/T-3 opened
+  (PR #1548), then T-5, then T-6 (magnetic), each after the previous merge** (#1868, 2026-11-27, is
+  T-6's moment term; #1867's absorption factor left this fence that day as [2318](wp/2318-a-tof-bank-refines-its-absorption.md)). Also #442 (a bank's CW
+  width rows, decided inside T-1), #618 (Mantid's instrument values: with provenance,
+  never the files), #1067 (TOF pulse shapes as a registry, after T-2/T-3) and #362 (an
+  accessor seam for the constant-wavelength reads, waiting for the second compiled-model
+  class); difference Fourier /
   maximum-entropy maps (McCusker §6; the partition input exists in `lebail_update`, the consumer is
   structure completion; #197); internal-standard and amorphous QPA; **modulated
   structures** (superspace — 1314 reads Jana's files without them; #258 the shared

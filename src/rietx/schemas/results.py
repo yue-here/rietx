@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import functools
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, ClassVar, Literal
 
 import numpy as np
@@ -364,9 +365,9 @@ class Identifiability(Base):
     a new field on an existing shape not being a new shape.  **That is no
     longer the rule.**  Since WP-1117 the only question is whether a consumer
     could *notice*, and a new field on a result is noticeable, so an addition
-    of this shape now bumps the version like any other: the comment beside
-    :data:`~rietx.schemas.common.SCHEMA_VERSION` is the changelog, and three of
-    its entries are additive defaulted fields.  Corrected here rather than
+    of this shape now bumps the version like any other: the notes for
+    :data:`~rietx.schemas.common.SCHEMA_VERSION` in ``docs/contracts/schema.md``
+    are the changelog, and three of them are additive defaulted fields.  Corrected here rather than
     deleted because this is the sentence that talked a later reader out of a
     bump it owed.
 
@@ -1180,6 +1181,19 @@ class StageResult(Base):
     #: stage with no Bragg intensity to compare.  Writers: the three runners
     #: that build a ``StageResult``.
     window_loss: float | None = None
+    #: the ``window_loss`` this stage's first solve ended on, where it passed
+    #: ``recorded_window_tol(window_area_tol)`` and the stage was compiled
+    #: again at that answer and solved once more from it (WP-2317 R7).  The
+    #: stage sizes its windows' movement slack from the position parameters it
+    #: can move, and this refit is what bounds a movement past them; the
+    #: record's ``window_loss``, cost and iterations are then the second
+    #: solve's answer, the first solve's starting cost and both solves'
+    #: iterations.  ``None`` where no refit ran: the first loss was within the
+    #: tolerance (``window_loss`` says by how much), the stage declared its own
+    #: ``window_slack_deg``, it stopped on a non-finite model, or it ran in a
+    #: joint fit, whose runner does not refit.  Writers: ``Refinement``'s two
+    #: stage runners.
+    window_refit_loss: float | None = None
     #: the Le Bail cycles this stage's partitions ran, in order: before the
     #: solve, then after it (a Pawley seed is the one entry).  A stage the
     #: solve stopped has only the partition before it.  Empty where none ran:
@@ -1241,7 +1255,7 @@ class StageResult(Base):
     #: and 0 only means this particular stage never reached one.
     #: Additive field, defaulted to 0 (the honest "never happened" state);
     #: bumped with this change, ``SCHEMA_VERSION`` 0.19 → 0.20 (see the
-    #: changelog entry in ``schemas/common.py``).
+    #: note in ``docs/contracts/schema.md``).
     n_degenerate_cell_probes: int = 0
     #: decompositions this stage's solve and esds repeated with LAPACK's
     #: QR-iteration driver because the divide-and-conquer driver stopped
@@ -1416,7 +1430,13 @@ class StageResult(Base):
     #: reason.  It feeds ``STAGE_FREED_NOTHING``.
     unreached_histograms: dict[int, list[str]] | None = None
     #: each row this stage lifted before solving, and the value it started at
-    #: in column units (WP-1930).  Two writers put a row here.  The stage's own
+    #: in column units (WP-1930).  Three writers put a row here.  The runner
+    #: itself starts an FCJ axial ratio the stage newly frees on zero at
+    #: :data:`~rietx.model.forward.AXIAL_SL_START` (S/L) or
+    #: :data:`~rietx.model.forward.AXIAL_HL_START` (H/L), never at its
+    #: partner's value
+    #: (:func:`~rietx.model.forward.apertures_to_lift`, WP-1955), on every
+    #: stage and in both runners.  The stage's own
     #: :attr:`~rietx.strategy.staged.Stage.seed`, through
     #: :meth:`~rietx.params.vector.ParameterTable.seed_floored`, starts a
     #: freed row sitting exactly on a floor of 0 or above at the seed.  Its
@@ -1425,8 +1445,10 @@ class StageResult(Base):
     #: all-zero Stephens block on the isotropic ray, and every DOF of that block
     #: is here at the value the seed wrote, a zero coefficient of the ray
     #: included (WP-2002, B14).  Those rows sit at zero rather than on a floor,
-    #: since a Stephens DOF is unbounded below.  The joint fit's runner seeds
-    #: no Stephens block, so its stages carry the first writer's rows alone.
+    #: since a Stephens DOF is unbounded below.  The joint fit's runner writes
+    #: both seeds through :class:`~rietx.params.multi.MultiParameterTable`'s
+    #: twins, keyed by the joint column (WP-2239): a shared block's DOFs under
+    #: their bare paths, a per-histogram one's under ``hist.N.``.
     #: WP-1930's floor seed sized by unit went with WP-1938: it existed because
     #: a softplus column at its floor was twelve orders below its neighbours,
     #: and a row refined in its own units has its physical column there.
@@ -1551,8 +1573,8 @@ class HistogramResult(Base):
     #: Which reflection each of those ticks is, index for index, as the orbit
     #: representative ``h k l`` (WP-1438).  A **companion**, not a change of
     #: shape: :attr:`ticks` has four readers that want a list of positions and
-    #: none of them wants this, so the pairing is by index and
-    #: ``tests/test_ticks.py`` pins the two lengths equal per phase.
+    #: none of them wants this, so the pairing is by index, one entry per
+    #: position for each phase.
     #:
     #: Absent for a phase's key rather than empty when there is nothing to
     #: say, which is the case the reserved declared-peaks key is in: a peak
@@ -2189,8 +2211,8 @@ class RefinementResult(Base):
     #: Which reflection each of those ticks is, index for index, as the orbit
     #: representative ``h k l`` (WP-1438).  A **companion**, not a change of
     #: shape: :attr:`ticks` has four readers that want a list of positions and
-    #: none of them wants this, so the pairing is by index and
-    #: ``tests/test_ticks.py`` pins the two lengths equal per phase.
+    #: none of them wants this, so the pairing is by index, one entry per
+    #: position for each phase.
     #:
     #: Absent for a phase's key rather than empty when there is nothing to
     #: say, which is the case the reserved declared-peaks key is in: a peak
@@ -2549,12 +2571,16 @@ class RefinementResult(Base):
         view.histograms = []
         return view
 
-    def plot(self, path: str | None = None, **kw):
+    def plot(self, path: str | Path | None = None, **kw):
+        """Draw this result, writing it to the file ``path`` when given:
+        :func:`rietx.viz.plots.plot_result`, forwarding ``**kw``."""
         from ..viz.plots import plot_result
 
         return plot_result(self, path=path, **kw)
 
     def parameter(self, path: str) -> RefinedParameter:
+        """The refined row at the parameter dot-path ``path``; ``KeyError``
+        when no row carries it."""
         for p in self.parameters:
             if p.path == path:
                 return p

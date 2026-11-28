@@ -194,7 +194,7 @@ def _fit(name: str, phase: rx.Phase, plan: rx.RefinementPlan, tag: str,
     OUT.mkdir(exist_ok=True)
     result.plot(path=str(OUT / f"stephens_{tag}.png"))
     result.plot(path=str(OUT / f"stephens_{tag}_lowangle.png"),
-                two_theta_range=(15.0, 60.0))
+                two_theta_limits=(15.0, 60.0))
     import matplotlib.pyplot as plt
 
     plt.close("all")
@@ -215,7 +215,7 @@ def _fit_with_solver(name: str, phase: rx.Phase, plan: rx.RefinementPlan,
     OUT.mkdir(exist_ok=True)
     result.plot(path=str(OUT / f"stephens_{tag}.png"))
     result.plot(path=str(OUT / f"stephens_{tag}_lowangle.png"),
-                two_theta_range=(15.0, 60.0))
+                two_theta_limits=(15.0, 60.0))
     import matplotlib.pyplot as plt
 
     plt.close("all")

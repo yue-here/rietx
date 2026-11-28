@@ -27,7 +27,7 @@ from rietx import Parameter
 
 a = Parameter(value=4.15689, min=4.0, max=4.3, vary=True, unit="A")
 width = Parameter.positive(1e-3, vary=True, unit="deg^2")
-assert width.min == 0.0
+assert width.min == 0.0   # positive() set the lower bound to 0.0
 ```
 
 `Parameter.positive` builds a quantity with no meaning below zero, such as a peak width, a scale or an absorption coefficient.
@@ -63,6 +63,7 @@ It is `None` on a parameter that was never free, and on a free one whose esd cou
 | `PatternData.sigma` | `list[float]` or `None` | `None` | per-point esd from the file; `None` selects the Poisson fallback |
 | `PatternData.excluded_regions` | `list[tuple[float, float]]` | `[]` | intervals left out of the fit, on whichever axis is set |
 | `PatternData.metadata` | `dict[str, str]` | `{}` | what the reader found in the file header |
+| `PatternData.diagnostics` | `list[Diagnostic]` | `[]` | what the reader repaired or noticed in the file; every fit on the pattern repeats those that still bear on it in its own `diagnostics` |
 
 Exactly one of `two_theta` and `tof` is set, and a pattern that sets both or neither is refused.
 A pattern needs at least two points, and `sigma` needs one value per point.
@@ -129,7 +130,7 @@ Hold the curve with `BackgroundFixedPlusChebyshev`, or refine it under the smoot
 
 `PatternData.plot` draws the pattern as read, before any model exists.
 It forwards to `rietx.viz.plots.plot_pattern`, the data panel of `RefinementResult.plot` with nothing modelled in it.
-It takes the same `two_theta_range=`, `x_axis=`, `wavelength=`, `y_scale=`, `style=`, `figsize=`, `font_size=`, `dpi=` and `title=` keywords, so a peak reaches the same height in both figures.
+It takes the same `two_theta_limits=`, `x_axis=`, `wavelength=`, `y_scale=`, `style=`, `figsize=`, `font_size=`, `dpi=` and `title=` keywords, so a peak reaches the same height in both figures.
 `path=` writes the figure to a file.
 An excluded region is shaded over channels that are still drawn.
 σ is not drawn, even when the file carried it.
@@ -182,7 +183,7 @@ folder = examples_dir()
 data = rx.read_pattern(folder / "FAP.XRA")
 ref = rx.Refinement(rx.Structure.from_cif(folder / "fluorapatite.cif"),
                     rx.Instrument.bragg_brentano(radiation="CuKa"))
-fig = data.plot(model=ref, two_theta_range=(25, 40))
+fig = data.plot(model=ref, two_theta_limits=(25, 40))
 ```
 
 ### Time-of-flight patterns
@@ -258,7 +259,7 @@ A `microstrain` block and a free `lor_strain` refine the same column.
 
 The four broadening terms are the specimen's half of the peak width.
 Gaussian variances add under convolution, and Lorentzian widths add, so the Gaussian pair is in deg² and the Lorentzian pair in deg.
-Each term has the same angular shape as an instrument term, so one pattern cannot separate the two halves, and no shipped plan frees both.
+Each term has the same angular shape as an instrument term, so one pattern cannot separate the two halves, and no built-in [plan](../concepts/plans.md) frees both.
 `mccusker_default` frees the instrument widths and none of these four.
 `lab_sample_refine` frees these four and none of the instrument's.
 [How to calibrate an instrument on a standard and reuse it](../guides/calibrate.md) gives the procedure.
@@ -384,7 +385,7 @@ A bound stated on the parent's cell carries over to the child's `parent_cell.cel
 
 Coordinates do not refine as x, y and z.
 The parameter table refines one shift per direction the site symmetry allows, and ties x, y and z to those shifts.
-A fully fixed special position therefore has no free entry, and `vary=True` on one of its coordinates raises.
+A fully fixed special position therefore has no free entry, and `vary=True` on one of its coordinates raises `ValueError` when the fit starts or `Refinement.parameters` is called, with a message that names the atom and says it sits on a fully fixed special position.
 The refusal names every such site at once, a rigid body's origin among them.
 `Refinement.fix_special_positions` clears `vary` on every such coordinate and returns their names.
 The [parameter map](parameters.md#atoms) gives the names of the shifts.
@@ -438,14 +439,17 @@ assert lab6.phases[0].cell.lengths_angles()[:3] == (4.15689, 4.15689, 4.15689)
 | `shift` | degrees 2θ | added to the peak position |
 | `intensity_factor` | 1 | multiplies the reflection's intensity |
 
-The expression reads the coefficients by name, and the reflection through seven names.
+The expression reads the coefficients by name, and the reflection through eight names.
 `h`, `k` and `l` are the Miller indices, `m` the multiplicity and `d` the d-spacing in Å.
 `theta` is the Bragg angle in radians, so `tan(theta)` works.
 `two_theta` is in degrees, where the peak sits before the phase's own equations act.
+`wavelength` is the λ in Å of the emission line the peak is drawn at, so each line's image reads its own.
+It follows a refined λ.
 `orbit_mean(x)` and `harmonic(l, n)` read the reflection's orbit and direction ([Expressions](expressions.md)).
 
 A phase holds at most one equation per target, so a sum goes in one expression.
 `Instrument.peak_equations` takes `shift` alone and reads only `theta` and `two_theta`, because it moves every phase's peaks.
+It cannot read `wavelength`, since it is also evaluated at angles no emission line owns, such as the window the reflections are generated over.
 Each coefficient is a parameter under its equation's path, such as `phases.0.peak_equations.0.w` or `instrument.peak_equations.0.sq`.
 The second index counts the equations in their list, and the last part is the coefficient's name.
 A plan frees it only by naming that path, since no preset does.
@@ -525,7 +529,7 @@ The block replaces it: the width reads zero for `lor_strain` while a block is de
 
 σ²(M) ≥ 0 couples all fifteen coefficients, so it cannot be a bound.
 The default solver holds it as a linear inequality.
-Under `solver="trf"`, and in a joint fit, [`STEPHENS_STRAIN_NOT_POSITIVE`](diagnostics-corrections.md#stephens_strain_not_positive) reports where it fails.
+Under `solver="trf"`, [`STEPHENS_STRAIN_NOT_POSITIVE`](diagnostics-corrections.md#stephens_strain_not_positive) reports where it fails.
 
 ### March-Dollase preferred orientation
 

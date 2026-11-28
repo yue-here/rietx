@@ -1,6 +1,6 @@
 # WP-1418 — the magnetic structure is determined, not only stated
 
-Milestone: magnetic · Status: 🔄 2026-11-20 — M-6 and M-7 landed (PR #389), the #439 row (PR #449), M-7's frame fix (PR #536), #455's Gram path (PR #535) and basis fix (PR #532), #563's sign text (PR #564), M-9's verb `solve_magnetic` with its Part 1 section and skill rows (PR #592), #565's certificates part 1 (PR #582), #679's displacive group (PR #680), #607's operator-list check (PR #785), #608's domain count (PR #786), #565's certificates part 2 (PR #772), #724's `tie_to_parent` opt-in (PR #746), #565's certificates part 3 (PR #809), #820's first test made machine-independent (PR #829), #565's certificates part 4 (PR #853) and its follow-ups (PR #1228), #820's option (a) (PR #953), #565's certificates part 5 (PR #936), #458's recipe as a guide (PR #1074), the LaMnO₃ acceptance on real data (PR #1086), the `magnetic_structural` preset with `PLAN_FREES_NO_MOMENT` (PR #1204, `502316ac`, #1082), #1197's right-handed magnetic cell (PR #1296), M-8's K1a (PR #1549) and its review follow-ups (PR #1703); M-8's K1b, M-9's `help.py` entries, Part 2 and the M-9 PNGs remain
+Milestone: magnetic · Status: 🔄 2026-11-24 — M-6 and M-7 landed (PR #389), the #439 row (PR #449), M-7's frame fix (PR #536), #455's Gram path (PR #535) and basis fix (PR #532), #563's sign text (PR #564), M-9's verb `solve_magnetic` with its Part 1 section and skill rows (PR #592), #565's certificates part 1 (PR #582), #679's displacive group (PR #680), #607's operator-list check (PR #785), #608's domain count (PR #786), #565's certificates part 2 (PR #772), #724's `tie_to_parent` opt-in (PR #746), #565's certificates part 3 (PR #809), #820's first test made machine-independent (PR #829), #565's certificates part 4 (PR #853) and its follow-ups (PR #1228), #820's option (a) (PR #953), #565's certificates part 5 (PR #936), #458's recipe as a guide (PR #1074), the LaMnO₃ acceptance on real data (PR #1086), the `magnetic_structural` preset with `PLAN_FREES_NO_MOMENT` (PR #1204, `502316ac`, #1082), #1197's right-handed magnetic cell (PR #1296), M-8's K1a (PR #1549), its review follow-ups (PR #1703) and its in-stratum budget cut (PR #1732); M-8's K1b, M-9's `help.py` entries, Part 2 and the M-9 PNGs remain
 Depends on: PR #290's `crystallography.magnetic` (landed 2026-09-10);
 1326 (the k candidates) for the k-search rung; 1327 (the moment, the hold)
 for the determination verb. The irrep and isotropy rungs depend on nothing
@@ -125,6 +125,30 @@ MAGNDATA magCIF entries serve the round-trip and span tests with no pattern.
 
 ### Inherited
 
+- **2026-11-28, from the issue triage (#1851, a bug): the ≤ 64 denominator fence
+  on k holds for a float only.** Reproduced at `02341ffdb` on a `P 1` phase:
+  `propagation_vector=("0.3354", "0", "0")`, `("1677/5000", "0", "0")` and
+  `(Fraction(1677, 5000), 0, 0)` are each accepted and stored as
+  `('1677/5000', '0', '0')`; `(0.3354, 0, 0)` is refused. `_as_fraction`
+  (`crystallography/representation/irreps.py:214`) returns a `Fraction` as it
+  is and parses a `str` with `Fraction(value)`, and only the float branch
+  compares against `K_MAX_DENOMINATOR`. `Phase._canonical_k` and
+  `satellites.check_propagation_vector` both route through it. The code holds
+  two readings of what 64 fences. The float branch uses it to read a float as
+  a rational (`limit_denominator(64)` within `K_FLOAT_TOL`) and its message
+  ends "Pass an exact Fraction if the value is rational", which invites any
+  denominator. `as_propagation_vector`'s docstring and
+  `check_candidate_denominators` treat 64 as the commensurate fence for every
+  spelling. The reporter offers (a) refuse a string or `Fraction` past 64 as
+  the float is refused, and drop the invitation from the float message; (b)
+  sanction an exact rational past 64 as a commensurate approximant the caller
+  chose, documented, with the misuse test, deciding whether a decimal string
+  counts as exact; (c) route every spelling past 64 to the incommensurate rung
+  once it exists (WP-1993, #678). Rule 1's input paragraph bears on it: one
+  value, two spellings, two outcomes. Which option is a magnetic-path call
+  (`K_MAX_DENOMINATOR` already holds by Mike's ruling, WP-2006), so it is Mike's
+  under #1075, asked on the issue and not ruled here. No test passes a decimal
+  string or a large-denominator `Fraction` as k today.
 - **2026-11-19, from the issue triage (PR #1697; issue #1692): on co-sited magnetic atoms the support
   test reads Σ occ·f·m, not each modulus. Ruled by Mike on #1692 (2026-11-18), a magnetic-path
   call under #1075.** Decided 2026-11-18 (Mike): at a position shared by co-sited magnetic
@@ -1021,6 +1045,22 @@ no magnetic model declared.
 - The full register with DOIs is issue #256's comment of 2026-09-06.
 
 ## Handover log
+
+### 2026-11-24 — K1a's budget now stops a search inside a stratum (PR #1732)
+
+A time budget on the k-grid search now holds to within one block of work. Before, the search read its budget only between strata, so a stratum that had started ran to its end. The general stratum of the 1/64 `P n m a` grid holds 29 791 k. On a 245-peak list the 100-shuffle null then ran past nine minutes under a 120 s budget. Now the search stops at the first expired read, and the result names the stratum it cut and how many of its points were scored. Nothing reads a cut search yet. Whether anything may be read off one is K1b's question.
+
+*Done.* PR #1732 (outside contributor, head `5cd80a535`) merged as `3f29cebad` on 2026-11-24. It refers to #795 and closes no issue. M-8 stays unticked, so the WP stays 🔄. This entry was written by a ghostshift runner in PR #1819, which changes only this file and the index.
+
+*Checked in review.* The budget is read before each block of `_CHUNK` k (2048), the block that already bounds working memory. A block that has started is scored to its end. A cut is recorded in the new `strata_cut` field as (name, points scored, points in the stratum). `strata_searched`, `strata_cut` and `strata_left` partition the strata given, and at most one stratum is cut. The null scores each block under every shuffle before the next read, so every sample member is a maximum over the same k. `test_the_uncut_path_is_mains_bit_for_bit` reproduces main's between-strata loop and matches it exactly when the budget does not cut. `tests.audit_delta`: two rows changed, evidence only, both still tier `caller`. `tests.reader_output`: no change against `be6fad142`.
+
+*Measured.* Full suite, slow tier included, on the stack `59c31293f` (main `be6fad142` plus this PR plus #1372; arm64 Mac, `[dev]` without jax, Python 3.12, alone under the suite lock): 16 679 passed, 463 skipped, 49 xfailed, 1 xpassed and 0 failed, in about 33 min. The touched test files plus `test_audit_table.py`, `test_docs_consistency.py` and `test_manual_api.py`: 154 passed.
+
+*Follow-up, Michael's to take or leave.* `denominators` lists only the strata scored whole, while `grid_step` now includes a cut stratum. So a cut search returns rows whose denominator appears in neither `denominators` nor `strata_searched`. If K1b labels rows from `denominators`, it needs the cut stratum's denominator too.
+
+*#1734 (`kgrid_bound`, an analytic chance level for the k-search).* Reviewed clear-cut at head `37a061b80` the same day and not merged. It conflicts with #1732 on one line of `kvector.py`, the `KGridScores(...)` call, where #1732 writes `grid_step=_grid_step(...)` and #1734 adds `exclude=pairs`. It also conflicts on adjacent rows in `_audit.py`. GitHub will refuse it until it is rebased onto main. The bound counts `n_scored` from the rows of each stratum, so it already counts a cut stratum's partial points correctly. After the rebase the review asks for a test of `kgrid_bound` on a search cut inside a stratum. #1734 refers to #835 without closing it. Its bound departs from the form #835 proposed, so whether it settles #835 is Michael's call.
+
+*Next.* Michael rebases #1734 onto main. Its review gate ran on a main without #1732, so the rebased head needs a fresh merged-tree run before it merges. Michael decides whether #1734 settles #835. K1b still waits on #795's decisions 3 and 4.
 
 ### 2026-11-20 — K1a's review follow-ups merged from outside (PR #1703)
 

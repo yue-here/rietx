@@ -4218,7 +4218,8 @@ class ParameterTable:
             return target
         return None
 
-    def seed_stephens(self, paths: list[str], microstrain: float) -> list[str]:
+    def seed_stephens(self, paths: list[str], microstrain: float, *,
+                      ray_from: ParameterTable | None = None) -> list[str]:
         """Put a freed but still all-zero Stephens block on the isotropic ray.
 
         The counterpart of :meth:`seed_floored` for the anisotropic-strain
@@ -4231,29 +4232,45 @@ class ParameterTable:
         Only phases whose *whole* block is still zero are touched, so a
         deliberate starting model is never overwritten.  Returns the paths
         actually seeded.
+
+        ``ray_from`` reads the ray off another table's cell, for a joint fit
+        sharing one block across histograms whose cells differ
+        (:meth:`MultiParameterTable.seed_stephens`).  Any point of one cell's
+        ray is inside every histogram's cone, since σ²(M) is the literal
+        monomial sum and the ray makes it (hᵀG*h)², positive for any metric.
         """
         if microstrain <= 0.0:
             return []
-        wanted: dict[str, set[int]] = {}
-        for path in paths:
-            base, _, tail = path.rpartition(".microstrain.dof.")
-            if base and tail.isdigit():
-                wanted.setdefault(base, set()).add(int(tail))
+        rays = (self if ray_from is None else ray_from)._strain_unit
         seeded: list[str] = []
-        for base, _ in wanted.items():
-            unit = self._strain_unit.get(base)
-            if unit is None:
+        for base in self._stephens_seedable(paths):
+            unit = rays.get(base)
+            if unit is None or len(unit) != len(self._strain_unit[base]):
                 continue
-            dofs = [(k, self._paths[f"{base}.microstrain.dof.{k}"])
-                    for k in range(len(unit))]
-            if any(self.entries[i].value != 0.0 for _, i in dofs):
-                continue
-            for k, i in dofs:
-                self.entries[i].value = float(microstrain) ** 2 * float(unit[k])
+            for k, u in enumerate(unit):
+                i = self._paths[f"{base}.microstrain.dof.{k}"]
+                self.entries[i].value = float(microstrain) ** 2 * float(u)
                 seeded.append(self.entries[i].path)
         if seeded:
             self._rebuild()
         return seeded
+
+    def _stephens_seedable(self, paths: list[str]) -> list[str]:
+        """The phase bases :meth:`seed_stephens` would seed from ``paths``:
+        each named by a ``.microstrain.dof.k`` path, with its whole block
+        still zero."""
+        out: list[str] = []
+        for path in paths:
+            base, _, tail = path.rpartition(".microstrain.dof.")
+            if not (base and tail.isdigit()) or base in out:
+                continue
+            unit = self._strain_unit.get(base)
+            if unit is None:
+                continue
+            if all(self.entries[self._paths[f"{base}.microstrain.dof.{k}"]].value
+                   == 0.0 for k in range(len(unit))):
+                out.append(base)
+        return out
 
     # -- optimiser interface -------------------------------------------
     @property
@@ -4290,7 +4307,7 @@ class ParameterTable:
         phase's cell, and the only free *name* is then the variable's.
 
         One column-wise read of the same **C** that :attr:`moving_paths` reads
-        row-wise and that ``optimize._column_extras`` reads for the Jacobian's
+        row-wise and that ``optimize.least_squares._column_extras`` reads for the Jacobian's
         own reach gate — never a second derivation, which could disagree with
         the matrix the residual is actually built from.  An explicitly stored
         zero coefficient is not reach, matching ``moving_paths``' test rather

@@ -93,11 +93,18 @@ Two cases need a fit first.
 `predict()` with no argument has no grid until a fit has run.
 In Le Bail and Pawley mode the per-reflection intensities are extracted by a fit, so a new grid carries them over from the fitted model and there is nothing to carry before one has run.
 
-The two forms are not bit-identical on the same grid.
-`predict()` reuses the model compiled for the last stage, whose per-reflection evaluation windows were sized at the values that stage started from.
-A grid argument sizes them at the values the stage ended on.
-On a synthetic five-stage fit that changes 36 of 4200 channels, by at most 8×10⁻⁶ of the peak height, all of them in peak tails at a window edge.
-`RefinementResult.y_calc` is the first of the two: the curve the fit minimised.
+After a fit, both forms draw the fit's own curve.
+`predict()` evaluates the model the result was measured on, so it returns `RefinementResult.y_calc`.
+A grid compiles at the peak cut of the fit's last stage, whose windows leave out 2 % of each peak's area after a default fit.
+An edit such as `Refinement.set_values` keeps that cut, and so does a project reopened from its history.
+So `predict(result.two_theta)` returns `y_calc` bit for bit too.
+The exception is a site the fit left on a special position, reported as `SITE_MULTIPLICITY_KEPT`.
+There `y_calc` keeps the orbit count the fit solved at, and a grid counts the orbit afresh.
+
+A `Refinement` that has not been fitted compiles windows that leave out 0.1 % of each peak's area (`CLOSING_WINDOW_TOL`), so a synthetic pattern carries near-complete tails.
+A twin carrying the fitted values but no fit therefore draws a slightly different curve.
+On the fluorapatite tutorial under `mccusker_default` the twin's curve differs from `y_calc` on all 5751 channels, by at most 1.4×10⁻³ of the strongest peak and by 9×10⁻⁵ at the median.
+To rebuild a fit's curve from its record alone, pass `window_area_tol=recorded_window_tol(result.stages[-1].window_area_tol)` to `compile_model`.
 
 ## The reflection list
 
@@ -120,12 +127,18 @@ It takes the compiled model, the decoded parameter values and the structure, for
 | `ReflectionRow.satellite_order` | the m of Q = H + m·k, with k the propagation vector; 0 on every nuclear reflection |
 | `ReflectionRow.component` | `"total"`, or `"nuclear"` and `"magnetic"` where a magnetic peak width is active |
 | `ReflectionRow.phase_index` | the phase's index in the structure, which holds where two phases share a name |
+| `ReflectionRow.merged_group` | after a Pawley fit, the group number of a reflection whose d-spacing equals others' in every cell of its space group, or `None` |
 
 `ReflectionRow.two_theta` is the Bragg angle plus the zero shift plus the geometry's own position correction, so it matches `RefinementResult.ticks` rather than the ideal Bragg angle.
 A reflection whose 2θ is non-physical at one line's wavelength (sin θ > 1) is dropped for that line only, so a row missing from one line may be present in another.
 
 `ReflectionRow.intensity` is the whole modelled contribution under the tick.
 In Rietveld mode it is scale × multiplicity × \|F\|² × preferred orientation × line weight × Lp × extinction × absorption × roughness.
+
+After a Pawley fit, rows sharing a `ReflectionRow.merged_group` were refined as one intensity, because their d-spacings agree in every cell of the space group: cubic (3 3 3) and (5 1 1), or (h k l) and (k h l) under 4/m.
+Their summed `ReflectionRow.intensity` is measured.
+Each row's own value is its share of the sum by multiplicity and is not a measurement.
+The group's sum and its esd are `MergedGroup.intensity` and `MergedGroup.stderr`, in `ReflectionState.merged_groups`.
 
 `ReflectionRow.satellite_order` is 0 on every row of a phase that declares no `Phase.propagation_vector`.
 On a satellite row `ReflectionRow.h`, `ReflectionRow.k` and `ReflectionRow.l` stay the parent vector H, and the row reads as H and m together, the (3+1)-index spelling.
