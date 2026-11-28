@@ -234,9 +234,10 @@ corrections on 2026-11-18 (WP-2081's log). Rwp is reported and is no part of any
   shift both close between 111 and 123 K, and a joint fit with one common profile and no
   sample width closes between 123 and 134 K.
 - **No series action or code rests on a tuned threshold over a fit metric** (rules 5 and
-  6). The audit table holds no series row at `unaudited`, and each remaining thresholded
-  series code carries its owner's ruling. The one left is `SEQUENTIAL_MOMENT_ONSET`, whose
-  owner is the magnetic path's.
+  6). Each remaining thresholded series code carries its owner's ruling. Two are left, and
+  both rest on the same cut, `MOMENT_SUPPORT_SIGMA` (3σ), which the audit table still holds
+  in `UNAUDITED_BASELINE` with both codes: `SEQUENTIAL_MOMENT_ONSET` and
+  `SEQUENTIAL_MOMENT_HOLD`. Their owner is the magnetic path's.
 - **The series call refuses what it cannot honour** (rule 2). A parameter declared common
   or by equation in the series call raises, and the message names the joint call. No series
   result holds a common value by freezing one pattern's.

@@ -610,11 +610,14 @@ class MagneticOnset(Base):
     the last pattern that supported a moment and the first that did not.
     :attr:`x` is the midpoint of that pair and :attr:`x_esd` **half its width**,
     which is the honest uncertainty of a bracket and is set by the *spacing of
-    the measurements*: a ramp with 50 K steps cannot locate T_N to better than
-    ±25 K however good each fit is.  Quoting it as a critical temperature with
-    a fitted esd would be a claim about a curve nothing here fits — the
-    parametric form of m(T) is WP-1325's question and this WP's explicit
-    non-goal.
+    the measurements*: a ramp with 50 K steps cannot place the loss of support
+    to better than ±25 K however good each fit is.  It brackets where the moment
+    drops below detection, not where it vanishes: for a continuous transition
+    the moment shrinks below the support cut before it reaches zero at T_N, so
+    the last supported pattern is a lower bound on the ordering temperature,
+    not a located T_N.  Quoting it as a critical temperature with a fitted esd would
+    be a claim about a curve nothing here fits — the parametric form of m(T) is
+    WP-1325's question and this WP's explicit non-goal.
 
     :attr:`monotone` is the check that makes the bracket meaningful.  A series
     whose ``supported`` flags switch more than once along the axis has no single
