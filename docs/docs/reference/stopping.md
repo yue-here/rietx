@@ -76,17 +76,19 @@ The step is the undamped one because a damped step shrinks as the damping grows,
 
 Measured against the same plans with `shift_over_esd_tol=None`, on macOS arm64 with the `[dev]` install, 2026-11-28:
 
-| Fit | Evaluations | Largest shift |
+| Fit | Evaluations | Largest departure from the 1e-9 answer |
 |---|---|---|
-| SRM 660c LaB6 | 69 → 65 | 0.026 esd |
-| fluorapatite | 40 → 34 | 0.044 esd |
+| SRM 660c LaB6 | 71 → 66 | 0.016 esd |
+| fluorapatite | 40 → 34 | 0.046 esd |
 | 11-BM NAC | 49 → 43 | 0.010 esd |
 | cpd-1a | 165 → 143 | 0.052 esd |
-| CuCr₂O₄ ramp, 17 patterns | 1 293 → 748 | 0.72 esd, the cell of a 1 wt% phase |
-| cpd-1 chain, 8 patterns | 516 → 411 | 0.59 esd, `instrument.profile.v` |
+| CuCr₂O₄ ramp, 17 patterns | 1 326 → 765 | 0.72 esd, the cell of a 1 wt% phase |
+| cpd-1 chain, 8 patterns | 504 → 403 | 0.45 esd, `instrument.geometry.axial_sl` |
 
 Rwp agreed to 5e-6 on every single fit.
 Every weight fraction stayed within 0.071 esd.
+A series runs the test on every pattern.
+Along both chains the departure did not grow from one pattern to the next, since each pattern is refitted to its own stop.
 
 Three protocols keep the 1e-9 stop, because there an error in one answer carries into every later one.
 `RefinementPlan.lab_calibrate` sets `shift_over_esd_tol` to `None`, since the instrument it calibrates is held through every later fit.

@@ -6674,9 +6674,10 @@ ROWS: tuple[Row, ...] = (
                   "undamped Gauss-Newton step, since on the damped one 0.2 and GSAS-II's 1e-3 "
                   "ended cpd-1f 18 esd off (docs/wp/2317-probe/convnoise/RESULTS.md); against "
                   "the 1e-9 stop on development data as shipped, macOS arm64 "
-                  "(docs/wp/2317-probe/r6/RESULTS.md): CuCr2O4 ramp 748 against 1 293 "
-                  "evaluations, worst 0.72 esd (1 wt% CuO cell), main phase under 0.006; cpd-1 "
-                  "chain 411 against 516, worst 0.59 (profile v), weight fractions under 0.05; "
+                  "(docs/wp/2317-probe/r6/RESULTS.md): CuCr2O4 ramp 765 against 1 326 "
+                  "evaluations, worst 0.72 esd (1 wt% CuO cell, last pattern), main phase under "
+                  "0.006; cpd-1 chain 403 against 504, worst 0.45 (axial_sl), weight fractions "
+                  "under 0.05; neither chain's departure grows from pattern to pattern; "
                   "single fits under 0.06 esd, 6-16 % of evaluations saved")),
     Row("rietx.schemas.plan.PlanSpec:stages", "default", tier=1, ambiguity=1, value=(),
         evidence="arithmetic: the empty container; resolve_plan supplies every plan a fit runs"),
@@ -6750,15 +6751,20 @@ ROWS: tuple[Row, ...] = (
                   "undamped Gauss-Newton step, since on the damped one 0.2 and GSAS-II's 1e-3 "
                   "ended cpd-1f 18 esd off (docs/wp/2317-probe/convnoise/RESULTS.md); against "
                   "the 1e-9 stop on development data as shipped, macOS arm64 "
-                  "(docs/wp/2317-probe/r6/RESULTS.md): CuCr2O4 ramp 748 against 1 293 "
-                  "evaluations, worst 0.72 esd (1 wt% CuO cell), main phase under 0.006; cpd-1 "
-                  "chain 411 against 516, worst 0.59 (profile v), weight fractions under 0.05; "
+                  "(docs/wp/2317-probe/r6/RESULTS.md): CuCr2O4 ramp 765 against 1 326 "
+                  "evaluations, worst 0.72 esd (1 wt% CuO cell, last pattern), main phase under "
+                  "0.006; cpd-1 chain 403 against 504, worst 0.45 (axial_sl), weight fractions "
+                  "under 0.05; neither chain's departure grows from pattern to pattern; "
                   "single fits under 0.06 esd, 6-16 % of evaluations saved"),
         grounds=("Rule 5 Arithmetic accuracy: the accuracy other programs' users publish, read in "
                  "each quantity's esd; R6 ruled 2026-11-27 ('Start with your recommendation. "
                  "Consider best practice.'), the level re-settled by Claude the same day under "
                  "R0 clarified; None in WP-2222's three compounding places (lab_calibrate, a "
-                 "carried Pawley series, the guides that publish numbers)."),
+                 "carried Pawley series, the guides that publish numbers).  An ordinary "
+                 "warm-started series keeps 0.1, settled by Claude 2026-11-28 under Rule 5: "
+                 "its departure does not grow along the chain, so it is not a compounding "
+                 "case, and GSAS-II's own sequential stop leaves the same ramp's CuO cell "
+                 "10.5 esd off (docs/wp/2317-probe/foreign_stops/RESULTS.md)."),
         approved="2026-11-27"),
     Row("rietx.schemas.plan.PlanSpec:lebail_passes", "default", tier="caller", ambiguity=1, value=1,
         evidence="opt-in: lebail_passes > 1, default 1 (one run, bit-identical to pre-WP-1323)"),
