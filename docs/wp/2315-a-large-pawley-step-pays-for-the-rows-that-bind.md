@@ -1,6 +1,6 @@
 # WP-2315 — a large Pawley step pays for the rows that bind, not for every intensity
 
-Milestone: unscheduled · Status: 🔄 2026-11-27 — task 1, the cached |T| (Angle 0) and Angle 9's lattice merge (R5 (b)) done; Angles 0 (blockwise G·E⁻¹), 1-2 and 4 open
+Milestone: unscheduled · Status: 🔄 2026-11-28 — claimed by a ghostshift runner (Angles 0-2: premise check first)
 Track: A large cell
 Depends on: 2317 soft (its `bigcell-pawley` case and rulings R0, R4, R5)
 Priority: P2 2026-11-27 — the maintainer's large-cell track, ruled to proceed whatever the user's case shows (cells this size are met in the wild); real patterns on the tree reach the slow step once in 32 runs, but a large Pawley cell reaches it
