@@ -1192,6 +1192,19 @@ class StageResult(Base):
     #: stage with no Bragg intensity to compare.  Writers: the three runners
     #: that build a ``StageResult``.
     window_loss: float | None = None
+    #: the ``window_loss`` this stage's first solve ended on, where it passed
+    #: ``recorded_window_tol(window_area_tol)`` and the stage was compiled
+    #: again at that answer and solved once more from it (WP-2317 R7).  The
+    #: stage sizes its windows' movement slack from the position parameters it
+    #: can move, and this refit is what bounds a movement past them; the
+    #: record's ``window_loss``, cost and iterations are then the second
+    #: solve's answer, the first solve's starting cost and both solves'
+    #: iterations.  ``None`` where no refit ran: the first loss was within the
+    #: tolerance (``window_loss`` says by how much), the stage declared its own
+    #: ``window_slack_deg``, it stopped on a non-finite model, or it ran in a
+    #: joint fit, whose runner does not refit.  Writers: ``Refinement``'s two
+    #: stage runners.
+    window_refit_loss: float | None = None
     #: the Le Bail cycles this stage's partitions ran, in order: before the
     #: solve, then after it (a Pawley seed is the one entry).  A stage the
     #: solve stopped has only the partition before it.  Empty where none ran:

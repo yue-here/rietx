@@ -131,6 +131,10 @@ class NodeAction(Base):
     window_slack_deg: float | None = None
     #: the area fraction the stage's windows dropped (``None``: the default)
     window_area_tol: float | None = None
+    #: whether the stage's windows carried the movement slack sized from what
+    #: it frees (WP-2317 R7), which a plan gives a stage a later stage refits;
+    #: ``False`` is the uniform slack every node written before the field ran
+    movement_slack: bool = False
     #: the absent-phase hold's threshold the stage ran at (``None``: the hold
     #: was off), written by ``Refinement._run_plan`` and ``run_stage``
     phase_support_sigma: float | None = 3.0

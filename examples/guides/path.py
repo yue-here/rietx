@@ -52,7 +52,7 @@ assert [s.path for s in top] == [
     "phases.0.cell.a", "phases.0.cell.b", "phases.0.cell.c", "phases.0.cell.a"]
 assert [s.indices for s in top] == [(3, 4)] * 3 + [(4, 5)]
 assert [round(s.step, 5) for s in top] == [0.06454] * 3 + [-0.0604]
-assert [round(s.size_esd) for s in top] == [15810] * 3 + [-14062], [s.size_esd for s in top]
+assert [round(s.size_esd) for s in top] == [15811] * 3 + [-14109], [s.size_esd for s in top]
 assert [round(s.cold_ratio, 2) for s in top[:3]] == [1.00] * 3 and top[3].cold_ratio is None
 assert sum(s.cold_ratio is not None for s in series.steps) == 3
 assert [e.rung for e in series] == ["cold"] + ["warm"] * 6
