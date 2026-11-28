@@ -1,6 +1,6 @@
 # WP-2314 — a structural Jacobian costs one structure factor, not one per column
 
-Milestone: unscheduled · Status: 🔄 2026-11-28 — angles 1, 3 and 4 (the hoist, Biso and occupancy, cross-atom reach) landed; angles 2 and 5-7 and the rigid-body columns open
+Milestone: unscheduled · Status: 🔄 2026-11-28 — angles 1, 3 and 4 (the hoist, Biso and occupancy, cross-atom reach) landed, angle 4 in PR #PRNUM at 1.8-2.1× per Jacobian over main; angles 2 and 5-7 and the rigid-body columns open
 Track: A large cell
 Depends on: 2317 soft (its `bigcell-structural` case and ruling R0); 1945 soft (its open task on batched Biso columns, see Context)
 Priority: P2 2026-11-27 — the maintainer's large-cell track, ruled to proceed whatever the user's case shows (cells this size are met in the wild); a 40-atom structural fit spends most of its time rebuilding one structure factor per column, and the user's Rietveld stages take ~25 min each
@@ -272,6 +272,66 @@ is held, and rebuilt per evaluation where the cell is free.
 
 ## Handover log
 
+- **2026-11-28** (third session) — Angle 4 is measured and in PR #PRNUM (a
+  ghostshift runner, continuing the second session's branch). A column that
+  moves several atoms' site rows no longer re-runs the whole phase's
+  structure factor. That covers the co-sited coordinate ties, a named
+  variable over several sites and a distortion-mode amplitude. On
+  `bigcell-structural` one Jacobian now costs about half what it did after
+  angle 3. The fit runs 1.5× faster than
+  main. The tied columns are now exact where they were a finite difference,
+  so the converged values moved, by at most 2.3e-4 of an esd. The ≥ 10×
+  target is still far off. The cell columns are now the largest single cost
+  left, and they belong to WP-1945.
+  - *Measured* (this Mac, darwin arm64, Python 3.12.10, `[dev]` venv,
+    compiled tier on; main at 02341ffdb and the branch at 90ff6f334, each a
+    `git archive` snapshot first on `sys.path`; three runs each, interleaved
+    main/branch, under the suite lock, on a quiet machine; driver
+    `~/.cache/ghostshift/rietx/wp-2314-next/drive_plain.py`, outside the
+    tree, running `examples/bench_refinement.py`'s `bigcell-structural`
+    setup):
+
+    | | main | branch |
+    |---|---|---|
+    | fit wall | 10.6-11.6 s | 7.2-7.4 s |
+    | all Jacobians | 7.3-8.0 s (119) | 3.9-4.0 s (118) |
+    | one Jacobian | 61-68 ms | 33-34 ms |
+    | `_orbit_terms` calls per Jacobian, median (max) | 774 (774) | 172 (172) |
+    | `_orbit_terms` calls in the Jacobians, whole fit | 62 436 | 17 114 |
+    | Rwp | 0.035183632067218515 | 0.03518363207014945 |
+
+    Each arm's three runs are bit-identical to each other. Over the 219
+    parameters with an esd the largest move is 2.3e-4 esd (atom 10's Biso),
+    and the median is 2.4e-5 esd. No esd changed by more than 3e-5 of
+    itself, and Rwp moved by 8.3e-11 relative. Two stages took one iteration
+    fewer (`biso` 33 to 32, `roughness` 14 to 13). The move is the change of
+    method, a finite difference replaced by the exact column, so it is a
+    kind (b) move under R0 and is judged in esd. A per-family timer run
+    (same machine, one run each) puts main's tied coordinate columns at
+    3.8 s of 7.3 s of Jacobians; on the branch they are 0.55 s of 3.9 s in
+    `_site_column`, and the cell columns, 1.26 s on both arms, are the
+    largest family left.
+  - *Gates* (darwin arm64, `[dev]` venv): the fast selection on the
+    branch before main was merged: 15 919 passed, 467 skipped, 30 xfailed.
+    The branch adds 21 cases there: `test_cross_atom_columns.py`'s 13 pass,
+    and `test_cross_backend.py`'s `site_cross_atom` row passes 3 and skips 5,
+    the jax and torch rows this venv lacks. No golden moved in the fast
+    selection. The full selection on main (79010c3c3)
+    merged into the branch, once: 16 880 passed, 478 skipped, 49 xfailed,
+    1 xpassed. The xpass is `test_surface_roughness`'s corundum case, a
+    non-strict xfail. It xpasses on main's snapshot too (02341ffdb, same
+    venv), so it is not this branch's; WP-2017's `### Inherited` has it. The added tests cost 1.08 s in
+    the fast run (junit, local), 1.07 s of it in
+    `test_cross_atom_columns.py`, whose slowest test is the rigid-body
+    decline at 0.52 s over three cases.
+  - *Review:* the second session's `/code-review high --fix` stands; this
+    session changed no code. No rulebook was edited. The generality judge
+    was not dispatched: the branch touches no `_audit.py` row and adds no
+    heuristic, since `_site_reach_ok` is a dispatch on what a column reaches.
+  - *Next:* (1) angle 7 or WP-1945's cell family, now a third of a
+    Jacobian on the bench case (WP-1945's `### Inherited` says so). (2) The
+    rigid-body columns, once the body block's partials are exact at zero.
+    (3) Angles 2, 5 and 6 as before.
 - **2026-11-28** (second session) — Angle 4 is in the branch
   `wp2314-cross-atom-reach`, unmeasured end to end and with no PR yet (a
   ghostshift runner that stopped at its context cap). A column that moves
