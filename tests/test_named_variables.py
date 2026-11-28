@@ -63,7 +63,7 @@ def _plot(result, tag: str) -> None:
     OUT.mkdir(exist_ok=True)
     result.plot(path=str(OUT / f"vars_{tag}.png"))
     result.plot(path=str(OUT / f"vars_{tag}_lowangle.png"),
-                two_theta_range=(3.0, 10.0))
+                two_theta_limits=(3.0, 10.0))
 
 
 def four_site_models(*, true: bool, master_max: float = 25.0):

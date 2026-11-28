@@ -12,9 +12,21 @@ can be rebuilt instead of being a directory somebody kept
 unchanged — same seed, same grid, same order of draws — so the patterns are
 byte-for-byte the ones that run was given, which is what makes the baseline's
 economics comparable at all.  `test_episode_ramp.py` asserts that against the
-preserved copy when it is present and skips when it is not.  The half that is
-new is the writer: the original script simulated and refined in one process and
-never wrote the patterns out.
+preserved copy when it is present and skips when it is not, and against that
+copy's digest on every machine.  The half that is new is the writer: the original
+script simulated and refined in one process and never wrote the patterns out.
+
+**One quirk of the original is part of the data: the windows' cell.**  Its loop
+wrote the host's ``cell.a`` alone.  The parameter table ties b and c to a, so
+the peaks were drawn on the cubic cell, but ``compile_model`` reads the *stored*
+cell to place its frozen windows, and that still held the CIF's b and c.  At
+720 °C a window sits up to 0.26° off its place, on a half-width near 1°.  The
+noise-free patterns differ by at most 4.0 counts (0.25 σ).  The sampled counts
+differ far more, because numpy's Poisson sampler takes a varying number of
+random numbers per channel: with the windows on the cubic cell, 75 016 of
+153 068 channels moved.  The table has refused a stale tie since WP-2150, so
+`simulate` builds it from the cubic cell and compiles the windows from a copy
+that keeps the CIF's b and c.
 
 **The truth, which the agent is told none of.** NAC (COD 1000236) on a Cu Kα
 Bragg-Brentano geometry, 15-60° 2θ at 0.02°:
@@ -116,9 +128,11 @@ def simulate(n: int = N_PATTERNS) -> tuple[np.ndarray, list[np.ndarray]]:
 
     rng = np.random.default_rng(SEED)
     counts: list[np.ndarray] = []
+    cif_b = truth.phases[0].cell.b.value
+    cif_c = truth.phases[0].cell.c.value
     for T in temps:
-        truth.phases[0].cell.a.value = a_of_T(T)
-        truth.phases[0].cell.b.value = truth.phases[0].cell.c.value = truth.phases[0].cell.a.value  # the cell's ties follow a
+        cell = truth.phases[0].cell
+        cell.a.value = cell.b.value = cell.c.value = a_of_T(T)  # the cell's ties follow a
         truth.phases[1].scale.value = 4.0e-4 * w_of_T(T)
         # at the declared stages' windows, the draw the registered baseline
         # was captured from: predict's default became the closing stage's
@@ -126,7 +140,11 @@ def simulate(n: int = N_PATTERNS) -> tuple[np.ndarray, list[np.ndarray]]:
         # channels
         table = ParameterTable(truth, ins)
         grid = rx.PatternData(two_theta=GRID.tolist(), intensity=np.zeros_like(GRID).tolist())
-        y = compile_model(truth, ins, grid, mode="rietveld",
+        # the baseline's windows (module docstring): the CIF's b and c
+        windows = truth.model_copy(deep=True)
+        windows.phases[0].cell.b.value = cif_b
+        windows.phases[0].cell.c.value = cif_c
+        y = compile_model(windows, ins, grid, mode="rietveld",
                           moving_paths=set(table.moving_paths),
                           window_area_tol=WINDOW_AREA_TOL).evaluate(table.decode(table.x0()))
         counts.append(rng.poisson(np.maximum(y, 0.0)).astype(float))
