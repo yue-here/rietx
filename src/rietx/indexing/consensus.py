@@ -684,6 +684,13 @@ def caveats_for(cand: CellCandidate, *, engines_run: Sequence[str],
         out.append("not_validated")
     elif cand.lebail.status in ("failed", "diverged"):
         out.append("validation_failed")
+    elif (cand.lebail.absent_source == "line_screen"
+          and cand.lebail.predicted_but_absent_uncancellable is None
+          and cand.lebail.predicted_but_absent_uncancellable_in_window is None):
+        # asked, not measured (#1612): a peak list with no usable line leaves
+        # nothing testable, so the counts are None and the state is capping
+        # like not_validated, never "0 absent, no caveat"
+        out.append("not_validated")
     elif cand.lebail.predicted_but_absent_uncancellable_in_window is not None:
         # the line screen's count (C3): the uncancellable absences inside de
         # Wolff's window, which every truth measured reads at 0-2 and every

@@ -855,3 +855,79 @@ def test_the_excess_reads_the_density_against_the_cleanest_candidate():
     alone = screened("cubic", "I", a_i, 2, 20)
     absence_excess([alone])
     assert alone.lebail.predicted_but_absent_excess_in_window == 0.0
+
+
+def test_a_list_with_no_usable_line_reads_zero_width_rather_than_raising(si):
+    """#1468 item 1: ``fwhm_at`` interpolated over an empty ``obs_tt`` and numpy
+    raised; it answers zeros as ``half_width_at`` beside it does.  The list is
+    the issue's own: ``pick_peaks`` on a pattern divided by its maximum, with
+    no σ column, so the Poisson fallback puts every point under the noise.  A
+    direct ``validate_by_lebail`` reached the screen with it and raised.
+
+    Such a list leaves no predicted line testable, so validate_by_lebail
+    declines (maintainer's request, #1612): the four absence counts are
+    None and caveats_for caps the state, so the true cell and the
+    8-fold supercell cP 2a0 no longer read alike as "converged, 0 absent"."""
+    from rietx.indexing.screen import PatternScreen, screen_candidate
+    from rietx.indexing.workflow import validate_by_lebail
+
+    data, ins, _peaks = si
+    y = np.asarray(data.y(), dtype=np.float64)
+    norm = rx.PatternData(two_theta=list(data.tt()), intensity=list(y / y.max()))
+    peaks = pick_peaks(norm, ins, two_theta_range=LIM)
+    assert not peaks.usable()
+    pattern = PatternScreen.from_peaks(peaks, q_match=absence_window(peaks),
+                                       data=norm, instrument=ins)
+    tt = np.array([20.0, 30.0, 40.0])
+    assert np.array_equal(pattern.fwhm_at(tt), np.zeros(3))
+    assert np.array_equal(pattern.half_width_at(tt), np.zeros(3))
+    assert pattern.fwhm_at(np.zeros(0)).shape == (0,)
+    system, centring, cell = SI_CELLS["truth cF"]
+    screen = screen_candidate(pattern, cell, system, centring)
+    assert len(screen.two_theta) and not screen.seen.any()
+    assert not screen.testable.any() and screen.n_lines_in_window == 0
+    for name in ("truth cF", "cP 2a0"):  # the right cell and a wrong one read alike
+        system, centring, cell = SI_CELLS[name]
+        assert not screen_candidate(pattern, cell, system, centring).testable.any()
+        v = validate_by_lebail(_candidate(system, centring, cell), norm, ins, peaks=peaks)
+        assert v.status == "converged" and v.absent_source == "line_screen"
+        assert v.predicted_but_absent_uncancellable is None
+        assert v.predicted_but_absent_uncancellable_in_window is None
+        assert v.n_lines_screened is None and v.n_lines_screened_in_window is None
+        assert v.predicted_but_absent_density_in_window is None
+        cand = _candidate(system, centring, cell)
+        cand.lebail = v
+        caveats = caveats_for(cand, engines_run=[], panel_disagrees=False,
+                              validated=True, search_complete={},
+                              shift_allowance_assumed=False)
+        assert "not_validated" in caveats
+
+
+def test_the_declined_state_is_not_printed_as_a_count_by_the_title_or_the_evidence(si):
+    """#1612 round 2: the declined state keeps ``predicted_but_absent`` at its
+    default 0, so the two readers that copied it printed "0/N predicted but
+    absent" (``plot_validation``'s title) and a 0 count in the agent-facing
+    ``CandidateEvidence``.  Both now say it was not screened / carry None; a
+    screened validation still prints its count."""
+    from rietx.indexing.workflow import validate_by_lebail
+    from rietx.schemas.indexing import candidate_evidence
+    from rietx.viz.indexing import _validation_title
+
+    data, ins, peaks_ok = si
+    y = np.asarray(data.y(), dtype=np.float64)
+    norm = rx.PatternData(two_theta=list(data.tt()), intensity=list(y / y.max()))
+    peaks = pick_peaks(norm, ins, two_theta_range=LIM)
+    assert not peaks.usable()
+    system, centring, cell = SI_CELLS["truth cF"]
+    cand = _candidate(system, centring, cell)
+    cand.lebail = validate_by_lebail(cand, norm, ins, peaks=peaks)
+    assert cand.lebail.predicted_but_absent == 0
+    title = _validation_title(cand.lebail)
+    assert "absences not screened (no usable line)" in title
+    assert "predicted but absent" not in title
+    assert candidate_evidence(0, cand).predicted_but_absent is None
+    # a screened validation keeps its count in both readers
+    cand.lebail = validate_by_lebail(cand, data, ins, peaks=peaks_ok)
+    assert "predicted but absent" in _validation_title(cand.lebail)
+    assert (candidate_evidence(0, cand).predicted_but_absent
+            == cand.lebail.predicted_but_absent)

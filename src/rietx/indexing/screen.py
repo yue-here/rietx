@@ -264,10 +264,15 @@ class PatternScreen:
         return self.grid_tt is not None
 
     def fwhm_at(self, two_theta: np.ndarray) -> np.ndarray:
-        """The measured width law, interpolated between the usable lines."""
+        """The measured width law, interpolated between the usable lines.
+
+        Zero everywhere on a list with no usable line, as
+        :meth:`half_width_at` is: there is no law to interpolate (#1468)."""
+        pos = np.asarray(two_theta, dtype=np.float64)
+        if not len(self.obs_tt):
+            return np.zeros_like(pos)
         order = np.argsort(self.obs_tt)
-        return np.interp(np.asarray(two_theta, dtype=np.float64),
-                         self.obs_tt[order], self.obs_fwhm[order])
+        return np.interp(pos, self.obs_tt[order], self.obs_fwhm[order])
 
     def half_width_at(self, two_theta: np.ndarray) -> np.ndarray:
         """The reversed half-width at these positions against the nearest line."""
