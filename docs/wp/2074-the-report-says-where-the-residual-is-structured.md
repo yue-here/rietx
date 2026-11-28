@@ -62,7 +62,41 @@ on demand only (a function a caller or agent runs), or the bulge alone always on
 
 ### Inherited
 
-(none)
+- 2026-11-16, from the issue triage (issue #1568): the off-region residual per
+  region, head (first 10 % of the fitted range), middle and tail (last 10 %),
+  each with three numbers: the RMS of the binned mean z over off-peak channels
+  (the range cut into 40 equal bins; off-peak = more than 3 FWHM from every
+  reflection, with a valley fallback where a bin holds fewer than 3), the worst
+  bin (signed mean and 2θ), and a wave count; printed beside
+  `worst_absorption`. It is #1215's edge window in a simpler form, report only.
+  The issue's measurement (seven public patterns in the tree, five backgrounds
+  each, at 740931532; not re-run in triage): the ranking of backgrounds within a
+  pattern matches a refiner's read on five of seven; no threshold holds across
+  patterns (SRM 660c's tail at 0.6-1.0 σ went unflagged, SRM 1976a's at
+  1.0-1.2 σ in arms B and D (0.57 in C) was flagged); the one miss, Cr₂WO₆ with a
+  P-spline at λ = 0.01, is ranked best by every residual measure and caught by
+  `BACKGROUND_ABSORPTION` alone (`worst_absorption` 0.157 against 0.074-0.083).
+  So a residual row read alone rewards an over-flexible background, which bears
+  on this WP's open ruling. A tail row must print its worst bin's on-peak share
+  and the nearest lines' residual: on SRM 1976a every background under-fits the
+  116-118° cluster by up to +8σ and the background rises under it. Its three
+  open questions join the tier-3 choices: region width and bin count against
+  #1215's 1° and 3° windows; the valley fallback's misfit or "no off-peak
+  channels"; these rows here or in the summary line now. From #1569:
+  `worst_absorption` is blind to a held background curve, so the pair cannot be
+  read together on a held-SNIP fit. Checked against the tree at bc77a934e:
+  `BackgroundEvidence` (`report/schemas.py:777`) carries the whole-pattern
+  off-region χ²_red and Durbin-Watson and `worst_absorption`, and no per-region
+  field; `report/background.py` builds one off-region mask over the whole range.
+  No other open WP owns a residual row.
+  **Accepted by Yue, 2026-11-17:** the coherent-residual scan, the bulge and the
+  replica table are built as on-demand functions with no always-printed rows
+  (#1215, #1216, #1218, and #1568 by this fold), since on all four real patterns
+  the scan is never quiet and the replica count is never zero, WP-2037 made
+  quiet the default, and the maintainer's 2026-11-03 reversal ruled out summary lines
+  restating what a reader inspects. Their tier-3 constants come back as rows
+  later. This settles the "always on, on demand, or the bulge alone" decision
+  above for the per-region rows too.
 
 ## Non-goals
 
