@@ -753,10 +753,12 @@ cases). Points per evaluation in declared stages: 0.20-0.22× on 11-BM NAC,
 - **A hang.** `pytest tests/test_lebail_alternation.py -n 4` ran 67 minutes
   with one worker at 100 % CPU, killed by the shift lead. That command omitted
   `-m "not slow"`, and the file's one slow row says its partitions took 1 604 s
-  alone on an arm64 Mac, so the slow row is the likely cause. A serial capped
-  rerun of the fast rows was running when the session stopped; check
-  `tests/test_lebail_alternation.py -m "not slow"` passes before anything else.
-  The Le Bail edits are uncommitted in the worktree if that run did not finish.
+  alone on an arm64 Mac, so the slow row is the likely cause. The file's fast
+  rows then passed serially under a 470 s cap: 12 passed, 1 deselected, 8 s.
+  Not yet known: whether the slow row
+  (`test_the_state_the_loop_keeps_is_the_state_a_hand_loop_would_continue_from`)
+  hangs under R7 or only takes its documented time. Run it alone through
+  `serial.py` under a cap before the full suite.
 - Not run: fast suite 2 with junit, full suite (`serial.py`), reader_output,
   generality judge (runner 1's verdict on the audit rows is not on disk), CI
   lint steps after the latest commits (ruff and Vale were clean at the merge).
@@ -788,8 +790,7 @@ over a dormant tree by copying its files, restoring it with `git show`, and
 `git worktree remove`. `rietx.refine` the attribute is a function, so a probe
 imports the module with `importlib.import_module`.
 
-**Next.** (1) Confirm the Le Bail file's fast rows pass, serially and capped;
-commit its edits. (2) Fast suite with junit, then the full suite through
+**Next.** (1) Time the Le Bail slow row alone, capped. (2) Fast suite with junit, then the full suite through
 `serial.py`. (3) `tests.reader_output`; dispatch the generality judge on the
 audit rows. (4) Open the PR as a draft with the two maintainer items at the
 top, name it here, push, mark it ready. (5) Follow-up, unowned: the joint
