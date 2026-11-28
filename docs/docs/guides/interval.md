@@ -63,7 +63,7 @@ Here it is on the Biso of Ca1:
 0.479 ± 0.060  one-sided False: 0.368 to 0.594
 ```
 
-The ends are 1.84 esd below the value and 1.92 above.
+The ends are 1.8 esd below the value and 1.9 above.
 Where χ² is a parabola in the parameter they would both be 1.96 esd, so here the esd is a fair summary and the interval adds little.
 Profile a row away from its bounds when it is strongly correlated with a row that is on one: the bound can stop it on one side.
 

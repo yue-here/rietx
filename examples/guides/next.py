@@ -28,7 +28,8 @@ s = ref.suggest(data)
 print(f"noise floor {s.noise_floor:.0f} | best: {s.best_or_none()}")
 for group in s.groups:
     paths = ", ".join(m.path for m in group.members)
-    print(f"{paths:<45} gain {group.gain:8.0f}  dBIC {group.delta_bic:+6.0f}  resolved {group.resolved}")
+    gain = round(group.gain, -1)  # to the nearest ten, against a floor near 700
+    print(f"{paths:<45} gain {gain:8.0f}  dBIC {group.delta_bic:+6.0f}  resolved {group.resolved}")
 # guide: end
 at_cell = s
 
@@ -91,7 +92,9 @@ assert at_cell.best_or_none() is None
 assert [len(g.members) for g in at_cell.groups] == [2, 2, 1, 2, 2]
 assert [g.resolved for g in at_cell.groups] == [False, False, True, False, False]
 assert round(at_cell.noise_floor) == 693
-assert [round(g.gain) for g in at_cell.groups] == [320367, 187880, 156361, 128989, 39377]  # 320546, 188336, 156103, 129904, 39894 before the chi2_red cap of WP-2317 R6 (2026-11-28)
+# To the nearest ten: the fourth gain is 128988.50 to the hundredth, so its
+# last digit is rounding's choice on each platform (WP-2317 R6, 2026-11-28).
+assert [round(g.gain, -1) for g in at_cell.groups] == [320370, 187880, 156360, 128990, 39380]
 assert [round(g.delta_bic) for g in at_cell.groups] == [783, 329, 263, 200, 45]  # 783, 330, 262, 202, 45 before the chi2_red cap of WP-2317 R6 (2026-11-28)
 # After the widths: the Kα2 weight leads, then two occupancies.
 assert [g.members[0].path for g in at_profile.groups[:3]] == [

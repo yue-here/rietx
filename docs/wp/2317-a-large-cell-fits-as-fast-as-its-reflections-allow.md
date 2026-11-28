@@ -813,6 +813,19 @@ scaling was not checked. Its remaining gap, not done: the test's own reading
 the reported `max_shift_over_esd` reads smaller than the value the stop
 compared with 0.1. Added as a task.
 
+**CI fix (steward runner).** `fast py3.14 1/4` failed `guides/interval.py`: the
+lower end of Ca1's Biso interval is 1.8450 esd below the value to six figures
+(1.844999996 on macOS), so its two-decimal quote "1.84" is rounding's choice.
+Scaling W's start by 1 + k·1e-14 moves it between 1.844999 and 1.845001, and
+Linux py3.14 printed 1.85. The page and script now quote both ends to one
+decimal (1.8 below, 1.9 above). The same sweep, intensities scaled by
+1 + k·1e-14 at k = 1, −3, 7, 20, −100 and 300, ran every guide, `switching.py`
+and tutorial 01. One more quote moved: `next.py`'s fourth cell-pause gain is
+128988.50, printing 128988 at k = −3 and −100. That block now prints gains to
+the nearest ten, against a noise floor of 693. Every other guide printed the
+same at every k. Closest margin left: the profile pause's third gain, 180.4968,
+0.003 from a half, steady to four decimals under the sweep.
+
 **Next.**
 1. CI on the PR (#1890). The maintainer merges.
 2. Then the new task: carry the shift test's own reading onto `StageResult`.

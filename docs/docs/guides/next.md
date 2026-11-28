@@ -19,11 +19,11 @@ This runs two stages by hand on the GSAS-II tutorial fluorapatite pattern that s
 <!-- output of examples/guides/next.py -->
 ```text
 noise floor 693 | best: None
-instrument.profile.x, phases.0.lor_size       gain   320367  dBIC   +783  resolved False
+instrument.profile.x, phases.0.lor_size       gain   320370  dBIC   +783  resolved False
 instrument.profile.y, phases.0.lor_strain     gain   187880  dBIC   +329  resolved False
-instrument.profile.w                          gain   156361  dBIC   +263  resolved True
-phases.0.gauss_size, instrument.profile.v     gain   128989  dBIC   +200  resolved False
-instrument.profile.u, phases.0.gauss_strain   gain    39377  dBIC    +45  resolved False
+instrument.profile.w                          gain   156360  dBIC   +263  resolved True
+phases.0.gauss_size, instrument.profile.v     gain   128990  dBIC   +200  resolved False
+instrument.profile.u, phases.0.gauss_strain   gain    39380  dBIC    +45  resolved False
 ```
 
 Each group's `gain` is the fall in χ² that freeing the group would give, predicted from the derivatives at the current values.

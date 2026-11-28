@@ -46,9 +46,11 @@ assert f"{1.645 * row.stderr:.1f}" == "3.2"
 assert 0.2 < interval.upper / (1.645 * row.stderr) < 0.25
 assert structure.phases[0].atoms[0].label == "Ca1"
 assert f"{biso.lower:.3f} to {biso.upper:.3f}" == "0.368 to 0.594"  # 0.593 before the chi2_red cap of WP-2317 R6 (2026-11-28)
-# "1.84 esd below the value and 1.92 above"
-assert f"{(biso.value - biso.lower) / biso.stderr:.2f}" == "1.84"  # 1.86 before the chi2_red cap of WP-2317 R6 (2026-11-28)
-assert f"{(biso.upper - biso.value) / biso.stderr:.2f}" == "1.92"  # 1.90 before the chi2_red cap of WP-2317 R6 (2026-11-28)
+# "1.8 esd below the value and 1.9 above".  One decimal, because the lower
+# ratio is 1.8450 to six figures: a rounding-level change of a start value
+# moves it across 1.845, so its second decimal is 4 or 5 by platform (WP-2317 R6).
+assert f"{(biso.value - biso.lower) / biso.stderr:.1f}" == "1.8"
+assert f"{(biso.upper - biso.value) / biso.stderr:.1f}" == "1.9"
 assert interval.fit_is_minimum and biso.fit_is_minimum
 # The working state is left where the fit put it.
 assert ref.result_ is result
