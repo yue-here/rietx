@@ -144,7 +144,7 @@ RECIPES: dict[ActionKind, Recipe] = {
         kind="decrease_background_flexibility", how="advice",
         note="the safe direction of the same model edit, and still an edit rather "
              "than a stage: fewer Chebyshev terms, a larger P-spline "
-             "lambda_smooth, coarser knots, or hold an estimated curve "
+             "lambda_smooth, coarser knots, or hold a measured blank "
              "additively. Expect Rwp to get worse — that is what stiffening a "
              "background costs, and an unbiased ADP is what it buys; "
              "report.background.worst_absorption is where you see it bought."),

@@ -308,6 +308,18 @@ def test_a_list_that_disagrees_with_a_plain_symbol_is_refused():
         _phase("P n m a", ["x,y,z", "-x,y,-z"])
 
 
+def test_a_list_in_the_symbols_other_setting_is_refused_naming_that_setting():
+    """Issue #1835: origin choice 2's 192 operations under the bare symbol are
+    one group in its other setting, so the remedy names that setting rather
+    than a doubled cell's bracket.  The constructor still refuses, having no
+    channel to report a relabel."""
+    ops = [op.triplet() for op in gemmi.SpaceGroup("F d -3 m:2").operations()]
+    with pytest.raises(ValueError, match=r"Label the phase 'F d -3 m:2'") as info:
+        _phase("F d -3 m", ops)
+    assert "bracketing" not in str(info.value)
+    assert tuple(_phase("F d -3 m:2", ops).symmetry_operations)
+
+
 def test_the_same_list_is_accepted_once_the_label_is_bracketed():
     """The refusal above is about the *claim*, and bracketing withdraws it."""
     phase = _phase("P 1 2 1 [unnamed in this cell]", ["x,y,z", "-x,y,-z"])
