@@ -62,9 +62,9 @@ rietx has three calls for the same jobs, `tie` taking either a source or an expr
 The three oxygen sites of fluorapatite share one displacement parameter in TOPAS like this (lines from a file rietx wrote, with each number cut to six significant figures):
 
 ```text
-site O5 x O5_x 0.324668 y O5_y 0.484847 z ! 0.25 occ O ! 1.0 beq O5_biso 0.382804
-site O6 x O6_x 0.591016 y O6_y 0.468991 z ! 0.25 occ O ! 1.0 beq O5_biso 0.382804
-site O7 x O7_x 0.33985 y O7_y 0.257709 z O7_z 0.0704391 occ O ! 1.0 beq O5_biso 0.382804
+site O5 x O5_x 0.324668 y O5_y 0.48485 z ! 0.25 occ O ! 1.0 beq O5_biso 0.382098
+site O6 x O6_x 0.591019 y O6_y 0.468993 z ! 0.25 occ O ! 1.0 beq O5_biso 0.382098
+site O7 x O7_x 0.339853 y O7_y 0.257712 z O7_z 0.0704376 occ O ! 1.0 beq O5_biso 0.382098
 ```
 
 In rietx it is one call:
@@ -356,11 +356,11 @@ These lines are an excerpt, with each number cut to six significant figures:
 ```text
 xdd "refined.xye" xye_format
   weighting = 1 / SigmaYobs^2;
-  bkg @ 154.768 -172.223 123.708 -71.9987 35.2492 -15.3107
+  bkg @ 154.767 -172.228 123.71 -71.9987 35.2467 -15.3097
   th2_offset ! 0
-  th2_offset = -2*Rad*(0.0632254)*Cos(Th)/217.5;
+  th2_offset = -2*Rad*(0.0632199)*Cos(Th)/217.5;
 str
-  scale p0_scale 0.000470097 min 0
+  scale p0_scale 0.000470078 min 0
   a p0_cell_a 9.37331
   b p0_cell_a 9.37331
 ```

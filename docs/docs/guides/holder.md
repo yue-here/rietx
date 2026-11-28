@@ -69,7 +69,7 @@ The script fits the pattern three ways and compares each with the fit to the pat
 
 <!-- output of examples/guides/holder.py -->
 ```text
-ignored   largest move 1.90 esd, phases.0.atoms.6.x
+ignored   largest move 1.91 esd, phases.0.atoms.6.x
 excluded  largest move 0.25 esd, phases.0.atoms.6.x
 declared  largest move 0.22 esd, phases.0.atoms.6.x
 ```
@@ -156,7 +156,7 @@ warning[BOUND_HIT]: instrument.extra_components.0.center refined to its bound (�
 warning[BOUND_HIT]: instrument.extra_components.0.fwhm refined to its bound (ρ=-0.031).
   at: instrument.extra_components.0.fwhm
   help: Widen the bound or fix the parameter.
-warning[BOUND_HIT]: instrument.extra_components.0.eta refined to its bound (ρ=-0.030).
+warning[BOUND_HIT]: instrument.extra_components.0.eta refined to its bound (ρ=-0.029).
   at: instrument.extra_components.0.eta
   help: Widen the bound or fix the parameter.
 ```

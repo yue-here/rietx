@@ -149,17 +149,17 @@ rx.write_gsas2_instprm(ref.fitted_instrument, "refined.instprm")
 Type:PXC
 Lam1:1.54059
 Lam2:1.54443
-Zero:-0.0365497
+Zero:-0.0365507
 I(L2)/I(L1):0.5
 Polariz.:0.5
-U:-1.57916
-V:2.93629
-W:2.28639
-X:2.74811
-Y:3.98994
+U:-1.59458
+V:2.96895
+W:2.27659
+X:2.75011
+Y:3.98437
 ```
 
-The `.instprm` states U = −1.57916 centidegrees², and rietx's own value is −0.000875675 degrees².
+The `.instprm` states U = −1.59458 centidegrees², and rietx's own value is −0.000884223 degrees².
 `rx.read_gsas2_instprm` reads the file back and converts.
 
 GSAS-II states one axial divergence, `SH/L`, as the sum of the specimen and detector terms.

@@ -25,7 +25,7 @@ The instrument's 2θ scale bends along a calibration curve about 60°, which mov
 phases.0.peak_equations.0.w0      0.1529 +/- 0.0055
 phases.0.peak_equations.0.w1      0.0593 +/- 0.0011
 phases.0.peak_equations.1.p       0.7039 +/- 0.0129
-instrument.peak_equations.0.sq    2.4389 +/- 0.0394
+instrument.peak_equations.0.sq    2.4388 +/- 0.0394
 instrument.peak_equations.0.ln   -1.4911 +/- 0.0150
 GoF 1.02
 ```

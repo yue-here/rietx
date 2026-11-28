@@ -57,7 +57,7 @@ assert result.parameter("phases.0.cell.b").stderr == result.parameter("phases.0.
 assert f"{volume.stderr_diagonal:.3f}" == "0.011"
 assert rx.format_su(a.value, a.stderr) == "9.370962(82)"
 assert rx.format_su(volume.volume, volume.stderr) == "523.629(12)"
-assert f"{result.statistics.esd_inflation:.2f}" == "2.16"  # 2.15 before WP-2317 R7 (2026-11-27)
+assert f"{result.statistics.esd_inflation:.2f}" == "2.15"  # 2.16 before WP-2317 R6 (2026-11-28); 2.15 before WP-2317 R7 (2026-11-27)
 assert f"{(a.value / b.value - 1) * 1e6:.0f}" == "66"
 cell = gsas.phases[0].cell
 assert rx.format_su(cell.a, cell.esd_a) == "9.371724(36)"
