@@ -104,6 +104,8 @@ code, action or default row, every tier-2 action, a constant that sets the
 threshold of a warning or an automatic action, every change to a value that
 alters what a default does for every user, and every row whose crux is a value
 judgement. Either may write the field into your branch. Ruled 2026-11-22.
+A ruling belongs to the value it approved, so a pull request that retunes such a row's
+value waits for a new ruling, and CI fails it until the row carries a later date.
 
 **Land the machinery first.** Machinery is what a caller operates: a model,
 a fit, a reported quantity. A heuristic is a choice rietx makes for the
