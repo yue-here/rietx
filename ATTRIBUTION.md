@@ -498,6 +498,12 @@ each with its licence text beside it.
   gemmi is already a dependency — its f″ is sound (and is used as a test
   oracle) but its f′ disagrees with every published tabulation for several
   lanthanides and actinides.
+  **Above 70 keV (WP-1925)** nothing is bundled: `crystallography/dispersion.py`
+  computes rows at runtime to 200 keV, taking f″ from `gemmi.cromer_liberman`
+  (the sound half, above) and computing f′ from that f″ by the dispersion
+  (Kramers–Kronig) relation, anchored on this file's own f′. gemmi's f′ is
+  still not used: above the K edge of Z ≥ 79 it has excursions of tens of
+  electrons (measured 2026-11-17). gemmi is MPL-2.0 and called as a library.
 - Magnetic **form-factor coefficients** in
   `src/rietx/crystallography/magnetic/form_factor.py` (`_J0`, `_J2`) — the
   ⟨j₀⟩ and ⟨j₂⟩ analytic-fit coefficients of Brown, P. J., *International

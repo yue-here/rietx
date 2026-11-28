@@ -511,8 +511,17 @@ def test_hydrogen_is_zero_not_a_refusal():
 def test_out_of_band_wavelength_is_refused():
     with pytest.raises(ValueError, match="outside the tabulated"):
         dispersion("Fe", 6.0)      # 2.07 keV, below the 3 keV floor
-    with pytest.raises(ValueError, match="outside the tabulated"):
-        dispersion("Fe", 0.1)      # 124 keV, above the 70 keV ceiling
+    with pytest.raises(ValueError, match="outside the tabulated 3-200 keV"):
+        dispersion("Fe", 0.05)     # 248 keV, above the 200 keV ceiling
+
+
+def test_the_refusal_names_both_ways_round_it():
+    """WP-1925: whoever hits the band edge is told what to type, not sent to
+    the source."""
+    with pytest.raises(ValueError) as exc:
+        dispersion("U", 0.05)
+    assert "Dispersion.overrides" in str(exc.value)
+    assert "Source.dispersion = None" in str(exc.value)
 
 
 def test_unknown_element_is_refused():
@@ -812,12 +821,269 @@ def test_no_report_for_a_light_structure_at_short_wavelength():
 
 
 def test_lookup_failure_never_blocks_a_refinement():
-    """An untabulated element is skipped, not raised: describing the omission
-    must not be able to break a fit that would otherwise run."""
+    """A failed lookup is reported, not raised: describing the omission must
+    not be able to break a fit that would otherwise run.  Since WP-1925 the
+    element is named rather than skipped; He is zero, not a failure."""
     import rietx as rx
     from rietx.refine import _dispersion_diagnostics
 
     structure = _zincite_structure()
-    structure.phases[0].atoms[1].species = "He"      # absent from the table
-    ins = rx.Instrument.debye_scherrer(wavelength=6.0)   # outside 3-70 keV
-    assert _dispersion_diagnostics(structure, ins) == []
+    structure.phases[0].atoms[1].species = "He"      # zero at every energy
+    ins = rx.Instrument.debye_scherrer(wavelength=6.0)   # below 3 keV
+    ins.source.dispersion = None
+    (d,) = _dispersion_diagnostics(structure, ins)
+    assert "cannot size it for Zn," in d.message
+    assert "He" not in d.message
+    assert d.level == "info"
+
+
+def test_an_edge_interval_decline_is_a_warning():
+    """Inside an edge interval the table refuses where the neglect is
+    largest, so the unsized element is a warning, not info."""
+    import rietx as rx
+    from rietx.crystallography.attenuation import _HC_EV_ANGSTROM
+    from rietx.crystallography.dispersion import edge_intervals
+    from rietx.refine import _dispersion_diagnostics
+
+    lo, hi = edge_intervals("Zn")[0]
+    ins = rx.Instrument.debye_scherrer(
+        wavelength=_HC_EV_ANGSTROM / np.sqrt(lo * hi))
+    ins.source.dispersion = None
+    (d,) = _dispersion_diagnostics(_zincite_structure(), ins)
+    assert "cannot size it for Zn" in d.message
+    assert d.level == "warning"
+
+
+# ----------------------------------------------------------------------
+# above the bundled 70 keV (WP-1925)
+# ----------------------------------------------------------------------
+def _at_kev(kev: float) -> float:
+    from rietx.crystallography.attenuation import _HC_EV_ANGSTROM
+
+    return _HC_EV_ANGSTROM / (kev * 1e3)
+
+
+def test_the_bundled_rows_are_served_as_read():
+    """Every number inside 3-70 keV is the file's own: the continuation only
+    appends rows, so a pinned value in the band cannot move."""
+    from rietx.crystallography.dispersion import (
+        _load_table,
+        _table_for,
+        bundled_band,
+    )
+
+    for sym, rows in _load_table().items():
+        served = _table_for(sym)
+        assert np.array_equal(served[:len(rows)], rows), sym
+        assert bundled_band(sym) == (rows[0, 0], rows[-1, 0])
+
+
+@pytest.mark.parametrize("sym", ["Si", "Fe", "Mo", "Sn", "Pb", "U"])
+def test_the_70_kev_boundary_is_continuous(sym):
+    """Both sides of the bundled top give the same pair to well under the
+    grid's own step, so nothing a fit sees jumps at 70 keV."""
+    below = dispersion(sym, _at_kev(69.9))
+    above = dispersion(sym, _at_kev(70.1))
+    assert abs(above[0] - below[0]) < 0.01
+    assert above[1] == pytest.approx(below[1], rel=0.01)
+
+
+@pytest.mark.parametrize("sym", ["Si", "Fe", "Mo", "Sn", "La", "W", "Pb", "U"])
+def test_the_dispersion_integral_reproduces_the_bundled_f_prime(sym):
+    """The positive control for computing f′ from f″: anchored on 35-55 keV
+    only, the same computation predicts the bundled f′ over 55-70 keV,
+    including W's K edge at 69.5 keV (rows within 1 keV of an edge are left
+    out, where the table itself is only atomic)."""
+    import gemmi
+
+    from rietx.crystallography.dispersion import (
+        _dispersion_integral,
+        _kk_samples,
+        _load_table,
+        edges,
+    )
+
+    rows = _load_table()[sym]
+    rows = rows[rows[:, 0] >= 35e3]
+    eps, f2 = _kk_samples(gemmi.Element(sym).atomic_number)
+    computed = _dispersion_integral(rows[:, 0], eps, f2)
+    fit = rows[:, 0] <= 55e3
+    c = np.median(rows[fit, 1] - computed[fit])
+    far = np.array([all(abs(e - x) > 1000 for x in edges(sym))
+                    for e in rows[:, 0]])
+    held = ~fit & far
+    assert held.sum() > 20
+    assert np.abs(rows[held, 1] - computed[held] - c).max() < 0.01
+
+
+@pytest.mark.parametrize(("sym", "kev"), [
+    ("Si", 80), ("Si", 130), ("Si", 200), ("Fe", 100), ("Fe", 200),
+    ("Mo", 130), ("W", 100), ("W", 200), ("Pb", 80), ("U", 80), ("U", 100)])
+def test_matches_gemmi_where_its_f_prime_is_regular(sym, kev):
+    """An independent code path for the same Cromer-Liberman physics; f″ is
+    gemmi's by construction, f′ is computed here and must land on gemmi's
+    wherever gemmi's is free of the excursions below."""
+    import gemmi
+
+    fp, fpp = dispersion(sym, _at_kev(kev))
+    g = gemmi.cromer_liberman(z=gemmi.Element(sym).atomic_number,
+                              energy=kev * 1e3)
+    assert fp == pytest.approx(g[0], abs=0.01)
+    assert fpp == pytest.approx(g[1], rel=1e-4)      # log-log between rows
+
+
+def test_gemmis_own_f_prime_is_not_what_is_served():
+    """Why f′ is computed: above Pb's K edge gemmi's f′ swings by tens of
+    electrons between neighbouring energies (−32.8 e at 100 keV with gemmi
+    0.7.5, measured 2026-11-17; not asserted, so a gemmi fix cannot fail
+    this).  The served f′ stays between its 95 and 105 keV values, as a
+    curve with no edge between them must."""
+    lo = dispersion("Pb", _at_kev(95))[0]
+    mid = dispersion("Pb", _at_kev(100))[0]
+    hi = dispersion("Pb", _at_kev(105))[0]
+    assert min(lo, hi) - 0.01 <= mid <= max(lo, hi) + 0.01
+    assert -3.0 < mid < -1.0
+
+
+@pytest.mark.parametrize("sym", ["Sn", "W", "Pb", "Bi"])
+def test_f_double_prime_above_70_kev_reproduces_mcmaster(sym):
+    """f″ above the bundled band against the McMaster photoelectric cross
+    section by the optical theorem, to 3 %, at 100 and 119 keV (McMaster
+    stops at 120 keV, and its photoelectric column for U is not usable
+    there, so Bi stands in for the heaviest)."""
+    from rietx.crystallography.attenuation import photoelectric_cross_section
+    from rietx.crystallography.dispersion import photoabsorption_barn
+
+    for kev in (100.0, 119.0):
+        lam = _at_kev(kev)
+        fpp = dispersion(sym, lam)[1]
+        ratio = (photoabsorption_barn(fpp, lam)
+                 / photoelectric_cross_section(sym, lam))
+        assert ratio == pytest.approx(1.0, abs=0.03), (sym, kev)
+
+
+@pytest.mark.parametrize(("sym", "kev"), [
+    ("Pt", 78.4), ("Au", 80.7), ("Pb", 88.0), ("Bi", 90.5), ("U", 115.6)])
+def test_a_k_edge_in_the_new_range_is_found_and_refused(sym, kev):
+    """The edge guard holds above 70 keV: each K edge is detected within
+    0.5 % of its energy, and a wavelength in its interval is refused."""
+    from rietx.crystallography.attenuation import _HC_EV_ANGSTROM
+    from rietx.crystallography.dispersion import edge_intervals, edges, resolve
+
+    (edge,) = [e for e in edges(sym) if e > 70e3]
+    assert edge == pytest.approx(kev * 1e3, rel=0.005)
+    (lo, hi), = [iv for iv in edge_intervals(sym) if iv[0] > 70e3]
+    with pytest.raises(ValueError, match="contains an absorption edge"):
+        dispersion(sym, _HC_EV_ANGSTROM / np.sqrt(lo * hi))
+    below, above = _HC_EV_ANGSTROM / (0.98 * lo), _HC_EV_ANGSTROM / (1.02 * hi)
+    with pytest.raises(ValueError, match="an absorption edge lies between"):
+        resolve([sym], (below, above))
+
+
+def test_elements_past_uranium_keep_the_bundled_band():
+    """gemmi's Cromer-Liberman stops at Z = 92, so Np-Cf are still refused
+    above 70 keV, by the band message rather than with a zero."""
+    assert dispersion("Np", _at_kev(69.0))[1] > 0.0
+    with pytest.raises(ValueError, match="3-70 keV band for Np"):
+        dispersion("Np", _at_kev(80.0))
+
+
+def test_a_model_at_130_kev_predicts_with_a_stated_pair():
+    """The WP's acceptance: a uranium model at 130 keV compiles with the
+    default block, and the pair it uses is the lookup's."""
+    from rietx import Instrument, PatternData
+    from rietx.crystallography.dispersion import resolve
+    from rietx.model.forward import compile_model
+    from rietx.schemas.instrument import Dispersion
+    from rietx.schemas.structure import Structure
+
+    lam = _at_kev(130.0)
+    ph = Phase(name="U", space_group="C m c m",
+               cell=_cell((2.854, 5.869, 4.955, 90.0, 90.0, 90.0)),
+               atoms=[_atom("U", "U", (0.0, 0.1025, 0.25), 0.5)])
+    ins = Instrument.debye_scherrer(wavelength=lam)
+    assert ins.source.dispersion is not None
+    tt = np.arange(1.0, 12.0, 0.01)
+    pattern = PatternData(two_theta=tt.tolist(),
+                          intensity=np.zeros_like(tt).tolist())
+    from rietx.params.vector import ParameterTable
+
+    def predicted(block):
+        ins.source.dispersion = block
+        structure = Structure(phases=[ph])
+        model = compile_model(structure, ins, pattern, mode="rietveld")
+        table = ParameterTable(structure, ins)
+        return np.asarray(model.evaluate(table.decode(table.x0())))
+
+    on, off = predicted(Dispersion()), predicted(None)
+    fp, fpp = dispersion("U", lam)
+    assert -2.5 < fp < -1.5 and 2.0 < fpp < 3.0
+    # |f|² at k = 0 falls by ((Z + f′)² + f″²)/Z² − 1 ≈ −4 %, and the peak
+    # (high f₀, low angle) moves by about that
+    assert on.max() / off.max() - 1.0 == pytest.approx(
+        ((92 + fp) ** 2 + fpp ** 2) / 92 ** 2 - 1.0, abs=0.01)
+    assert resolve(["U"], (lam,))["U"] == complex(fp, fpp)
+
+
+def test_the_zero_elements_have_an_unbounded_band():
+    """H, D and He are zero at every energy, so `read_recipe`'s band check
+    must not refuse them (it read `KeyError` before this was handled)."""
+    from rietx.crystallography.dispersion import bundled_band
+
+    for sym in ("H", "D", "He", "2H"):
+        assert bundled_band(sym) == (0.0, float("inf"))
+
+
+def test_an_element_the_table_cannot_size_is_named_not_skipped():
+    """WP-1925: with dispersion off outside the band, the diagnostic says the
+    correction is off *and* not sized, rather than saying nothing."""
+    import rietx as rx
+    from rietx.refine import _dispersion_diagnostics
+
+    structure = _zincite_structure()
+    ins = rx.Instrument.debye_scherrer(wavelength=_at_kev(250.0))
+    ins.source.dispersion = None
+    (d,) = _dispersion_diagnostics(structure, ins)
+    assert d.code == "DISPERSION_NEGLECTED"
+    assert d.level == "info"
+    assert "cannot size it for Zn, O" in d.message
+
+
+def test_the_neglect_is_sized_at_130_kev():
+    """Inside the new band a declined correction is sized like any other:
+    uranium's 4 % moves it past the 2 % floor."""
+    import rietx as rx
+    from rietx.refine import _dispersion_diagnostics
+    from rietx.schemas.structure import Structure
+
+    ph = Phase(name="U", space_group="C m c m",
+               cell=_cell((2.854, 5.869, 4.955, 90.0, 90.0, 90.0)),
+               atoms=[_atom("U", "U", (0.0, 0.1025, 0.25), 0.5)])
+    ins = rx.Instrument.debye_scherrer(wavelength=_at_kev(130.0))
+    ins.source.dispersion = None
+    (d,) = _dispersion_diagnostics(Structure(phases=[ph]), ins)
+    assert "changes the scattering power of U" in d.message
+    assert "cannot size" not in d.message
+
+
+def test_the_integral_grid_is_converged(monkeypatch):
+    """`_KK_SAMPLES`' ratio halved moves the computed f′ by under 1e-3 e
+    from 72 to 199 keV, away from edges (measured over every Z = 3-92 on
+    2026-11-17: 3.6e-4 e at worst, Pa; every seventh element here)."""
+    import gemmi
+
+    from rietx.crystallography import dispersion as disp
+
+    energies = np.array([72e3, 90e3, 110e3, 130e3, 160e3, 199e3])
+    lo, hi, _ = disp._KK_SAMPLES
+    for z in range(3, 93, 7):
+        coarse = disp._kk_samples(z)
+        monkeypatch.setattr(disp, "_KK_SAMPLES", (lo, hi, 1.001))
+        fine = disp._kk_samples(z)
+        monkeypatch.undo()
+        sym = gemmi.Element(z).name
+        far = np.array([all(abs(e - x) > 1000 for x in disp.edges(sym))
+                        for e in energies])
+        moved = np.abs(disp._dispersion_integral(energies[far], *coarse)
+                       - disp._dispersion_integral(energies[far], *fine))
+        assert moved.max() < 1e-3, sym
