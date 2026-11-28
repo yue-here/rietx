@@ -1,6 +1,6 @@
 # WP-2314 — a structural Jacobian costs one structure factor, not one per column
 
-Milestone: unscheduled · Status: 🔄 2026-11-28 — angles 1 (the hoist) and 3 (Biso and occupancy columns) landed; angles 2 and 4-7 open
+Milestone: unscheduled · Status: 🔄 2026-11-28 — angles 1, 3 and 4 (the hoist, Biso and occupancy, cross-atom reach) landed; angles 2 and 5-7 and the rigid-body columns open
 Track: A large cell
 Depends on: 2317 soft (its `bigcell-structural` case and ruling R0); 1945 soft (its open task on batched Biso columns, see Context)
 Priority: P2 2026-11-27 — the maintainer's large-cell track, ruled to proceed whatever the user's case shows (cells this size are met in the wild); a 40-atom structural fit spends most of its time rebuilding one structure factor per column, and the user's Rietveld stages take ~25 min each
@@ -222,7 +222,15 @@ is held, and rebuilt per evaluation where the cell is free.
       occupancy rows of one phase, summed through C, so the co-sited ties take
       the branch. `test_cross_backend.py`'s `site_scalars` row; five backend
       goldens re-pinned, `tests/data/README.md` § WP-2314 re-baseline.)*
-- [ ] Angle 4, cross-atom reach, the same three obligations.
+- [x] Angle 4, cross-atom reach, the same three obligations.
+      *(2026-11-28: ties across atoms, named variables and distortion-mode
+      amplitudes, by `_site_column`, the chain rule over the cached site
+      gradients. `test_cross_backend.py`'s `site_cross_atom` row. Rigid
+      bodies and Z-matrices were declined, measured; the item below.)*
+- [ ] Rigid-body and Z-matrix columns from the cache, once the body block's
+      partials are exact where the true partial is zero (an atom at a turn's
+      centre now gets ~1e-17, which an analytic sum turns into a live noise
+      column; `_site_reach_ok`'s docstring).
 - [ ] Angles 5-6. The full suite, since jax/torch goldens move. Every moved number
       checked against R0 (a).
 - [ ] Angle 7, decided on the remaining structure-factor share.
@@ -233,10 +241,13 @@ is held, and rebuilt per evaluation where the cell is free.
       a wall-clock budget on `bigcell-structural`; the docstring of
       `test_one_expansion_serves_every_structural_column` says why. A
       negative control now shows the count trips on a per-atom expansion.)*
-- [ ] Tests: the oracle tests for angles 3 and 4, landing with each angle.
+- [x] Tests: the oracle tests for angles 3 and 4, landing with each angle.
       *(Angle 3's landed, 2026-11-28: `tests/test_biso_occ_columns.py`, the
       exact oracles plus the count guard with Biso free and its negative
-      control. Angle 4's are owed.)*
+      control. Angle 4's, 2026-11-28: `tests/test_cross_atom_columns.py`, the
+      chain rule over single-atom kernels, a tied column as the sum of its
+      untied ones, a Richardson difference, and the count guard with its
+      negative control.)*
 - [ ] Skill: none (no API change).
 
 ## Acceptance
@@ -260,6 +271,62 @@ is held, and rebuilt per evaluation where the cell is free.
 - WP-1327's `moment_f2_grads`: the cached-per-evaluation shape this copies.
 
 ## Handover log
+
+- **2026-11-28** (second session) — Angle 4 is in the branch
+  `wp2314-cross-atom-reach`, unmeasured end to end and with no PR yet (a
+  ghostshift runner that stopped at its context cap). A column that moves
+  several atoms' site rows no longer re-runs the whole phase's structure
+  factor. The co-sited Nb/W coordinate ties of `bigcell-structural`, a named
+  variable over several sites, and a distortion-mode amplitude now take the
+  analytic chain rule over the cached site gradients. A profile picked this
+  angle: those tied coordinate columns were half of the Jacobian's time,
+  against a sixth for the cell columns. Rigid-body columns were declined
+  after a measured failure.
+  - *Why angle 4 and not angle 7:* one bench fit with a timer per column
+    family (this Mac, darwin arm64, `[dev]` venv, on a loaded machine, so
+    the shares hold and the seconds do not) put 10.8 s of 21.2 s of
+    Jacobians in the peak-chain coordinate columns (1 050 calls, the 14
+    co-sited DOF columns), 3.3 s in the cell columns (327 calls), 1.9 s in
+    `_structural_column`, 1.7 s in `derivative_bases` and 1.5 s in
+    `structural_f2_grads`. The last entry's reading that the cell columns
+    led was wrong: the tied coordinate columns had never left the peak
+    chain. Angle 7 waits, since the cell share is WP-1945's cell family and
+    is now the largest peak-chain cost.
+  - *Done:* `_site_scalar_column` is now `_site_column` and
+    `site_scalar_intensity_grad` is `site_intensity_grad`. The branch claims
+    a column when every path it moves is a site row of one phase (x, y, z,
+    U^ij, Biso, occupancy) or a parameter the data rows never read (a
+    site-symmetry DOF, a mode amplitude, a variable): `_site_reach_ok`.
+    `_within_atom` admits only the rows `_structural_column` reads, so a DOF
+    column that also reaches its atom's ADP or Biso is summed whole; it was
+    short before. A rigid body stays on the peak chain: its block returns
+    ~1e-17 partials where the truth is zero, the analytic sum makes a
+    1e-13 noise column, and `test_rigid_body`'s `RIGID_BODY_UNSUPPORTED`
+    case then lost the origin's esd. The open item above holds it. New
+    `tests/test_cross_atom_columns.py`; `test_cross_backend.py` gains
+    `site_cross_atom` (in `NO_FD_CONFIGS`); the distortion test now asserts
+    the new dispatch.
+  - *Measured* (darwin arm64, `[dev]` venv): at the bench's start θ the 14
+    co-sited DOF columns moved by 2.1-7.1e-5 relative, and every other
+    coordinate and Biso column is byte-equal to main's (02341ffdb). Against
+    a Richardson difference the new columns sit 6e-12 to 4e-10 off, the old
+    2.4e-5 to 7.1e-5. On the test fixture the chain-rule oracle holds to
+    1.9e-16 and a tied column equals its untied pair to 1.7e-16. Jacobian
+    rows touched pass `fd`, `jax` and `jax+fp32` in the `[dev,jax]` scratch
+    venv (35 passed, 21 skipped, torch absent). The touched test modules
+    pass under `[dev]` (207 passed, 210 skipped). CI's lint steps and Vale
+    are clean (no warning on a changed line).
+  - *Review:* `/code-review high --fix` found no correctness bug. It put the
+    estimation page back under its 50 000-character cap, read the local
+    Jacobian column once per site column, and fixed stale branch names.
+  - *Next:* (1) read the interleaved timing, main against the branch, from
+    `~/.cache/ghostshift/rietx/wp-2314-next/` (`interleave.sh`, logs
+    `main_N.log`, `branch_N.log`, `fam_*.log`) or rerun it under the suite
+    lock, and fill this entry's fit and per-Jacobian figures. (2) Run the
+    fast suite; any golden with a cross-atom tie or a mode amplitude moves
+    and is re-pinned with its move in esd (R0). (3) The full suite once,
+    then `/wp-handover` from step 7 and the PR. (4) After that, angle 7 or
+    WP-1945's cell family is the largest Jacobian cost left.
 
 - **2026-11-28** — Angle 3 landed: Biso and occupancy columns from the
   cache (PR #1876, a ghostshift runner). A Biso or occupancy column no
