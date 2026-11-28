@@ -49,7 +49,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2008](2008-the-skill-read-against-the-table.md) | The skill slimmed to the API, the feedback surface and sourced traps | 2026-11-19 | P3 | [generality](#generality-the-prose) |
 | [2012](2012-the-axial-ratios-are-interchangeable.md) | The two axial-divergence ratios are interchangeable, and a fit reports one branch | 2026-11-03 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2017](2017-the-second-pass-every-tier-3-threshold-on-three-families.md) | The second pass: every surviving tier-3 threshold measured on three families | 2026-11-09 | P2 | [generality](#generality-the-audits) |
-| [2018](2018-the-clash-table-measured.md) | The clash table: actions that read or move the same parameter, measured both ways | 2026-11-09 | P3 | [generality](#generality-the-audits) |
+| [2018](2018-the-clash-table-measured.md) | The clash table: actions that read or move the same parameter, measured both ways | 2026-11-16 | P3 | [generality](#generality-the-audits) |
 | [2020](2020-opt-in-sets-of-bounds-and-defaults-per-scenario.md) | Opt-in sets of bounds and defaults for a scenario, tested on the datasets they name | 2026-11-22 | P2 | [generality](#generality-the-registry-and-the-guard) |
 | [2028](2028-a-joint-fits-guards-see-every-histogram.md) | A joint fit's guards see every histogram | 2026-11-28 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2036](2036-main-is-green-on-every-nightly-leg.md) | Main is green on every nightly leg: a full suite that finishes, two Windows tooling tests, and answers that move with the platform | 2026-11-21 | P2 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
@@ -486,7 +486,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2015](2015-the-declared-geometry-picks-the-plan.md) | The declared geometry picks the plan, and a geometry can be unstated | ⬜ | P2 | — |
 | [2016](2016-a-cif-adp-off-symmetry-by-rounding-is-projected.md) | A literature CIF's U^ij that breaks site symmetry only by rounding is projected, and says so | ✅ 2026-11-02 | — | — |
 | [2017](2017-the-second-pass-every-tier-3-threshold-on-three-families.md) | The second pass: every surviving tier-3 threshold measured on three families | 🔄 2026-11-09 | P2 | [2002](2002-the-single-fit-actions.md) |
-| [2018](2018-the-clash-table-measured.md) | The clash table: actions that read or move the same parameter, measured both ways | 🔄 2026-11-09 | P3 | — |
+| [2018](2018-the-clash-table-measured.md) | The clash table: actions that read or move the same parameter, measured both ways | 🔄 2026-11-16 | P3 | — |
 | [2225](2225-a-held-instrument-width-stops-a-staged-fit-short.md) | A held instrument width stops a staged fit short of its own plan's point | ✅ 2026-11-20 | — | [2002](2002-the-single-fit-actions.md) ([2017](2017-the-second-pass-every-tier-3-threshold-on-three-families.md), [2224](2224-a-refit-of-a-converged-model-runs-one-stage.md) soft) |
 
 ### <a id="generality-the-prose"></a>The prose
