@@ -412,6 +412,26 @@ class QPATrajectory(Trajectory):
     #: (``QuantitativePhaseAnalysis.unmeasured_phases``), so the point is a
     #: fraction of the other phases only.  Empty where every phase was seen.
     unmeasured: list[list[str]] = Field(default_factory=list)
+    #: per point, the phase's ``PhaseQuantity.support_sigma`` in that pattern:
+    #: how many esds from zero its scale was.  ``None`` where the pattern's
+    #: record carries none (a result stored before WP-2073).  A number, never a
+    #: verdict: no threshold is applied and no point is dropped for it.
+    support_sigma: list[float | None] = Field(default_factory=list)
+    #: per point, the phase's paths that pattern's fraction was conditional on
+    #: (``PhaseQuantity.conditional_on``), as the row carries it: ``[]`` where
+    #: nothing was held or on a bound, ``None`` where the row made no such
+    #: measurement (a result stored before WP-2073, or a replay with neither a
+    #: guard nor a stage record).
+    conditional_on: list[list[str] | None] = Field(default_factory=list)
+    #: per point, whether the pattern carried ``PHASE_UNCONSTRAINED`` on this
+    #: phase.  Such a point is **kept**: its scale was still measured and only
+    #: its structure was held (WP-2073, ruled 2026-11-17), so its fraction is
+    #: a measurement conditional on the held values, which the flag says.
+    #: The finding is this phase's when a path it names is the phase's own
+    #: (``phases.<i>.``, scoped or not) or is on the row's ``conditional_on``,
+    #: which places a held ``vars.X`` on the phase whose cell it drives
+    #: (``StageResult.held_reach``), where the finding names ``vars.X`` alone.
+    unconstrained: list[bool] = Field(default_factory=list)
 
     @property
     def basis_changes(self) -> bool:
@@ -420,7 +440,7 @@ class QPATrajectory(Trajectory):
 
     def __str__(self) -> str:
         text = super().__str__()
-        if not any(self.unmeasured):
+        if not any(self.unmeasured) and not any(self.unconstrained):
             return text
         notes = []
         for k, u in enumerate(self.unmeasured):
@@ -428,6 +448,14 @@ class QPATrajectory(Trajectory):
                 label = self.labels[k] if k < len(self.labels) else ""
                 notes.append(f"  {label or f'point {k}'}: relative to the phases "
                              f"seen; {', '.join(u)} not measured")
+        for k, flagged in enumerate(self.unconstrained):
+            if flagged:
+                label = self.labels[k] if k < len(self.labels) else ""
+                paths = (self.conditional_on[k] if k < len(self.conditional_on)
+                         else None)
+                notes.append(f"  {label or f'point {k}'}: PHASE_UNCONSTRAINED on "
+                             f"this phase; the fraction is conditional on "
+                             f"{', '.join(paths or ()) or 'held values'}")
         return "\n".join([text, *notes])
 
 
@@ -1122,7 +1150,10 @@ class SeriesResult(Base):
     def qpa_trajectory(self, phase: str) -> QPATrajectory:
         """A phase's weight fraction (as a percentage) across the series,
         with the phases each point leaves out of its basis
-        (:attr:`QPATrajectory.unmeasured`)."""
+        (:attr:`QPATrajectory.unmeasured`) and what each point rests on
+        (:attr:`QPATrajectory.support_sigma`, ``conditional_on`` and
+        ``unconstrained``: a point whose pattern held the phase's structure is
+        kept and marked)."""
         traj = QPATrajectory(path=f"qpa.{phase}", x_label=self.x_label, phase=phase)
         for i, (e, xv) in enumerate(zip(self.entries, self.x, strict=True)):
             if e.qpa is None:
@@ -1138,6 +1169,16 @@ class SeriesResult(Base):
             traj.labels.append(e.label)
             traj.positions.append(i)
             traj.unmeasured.append(list(e.qpa.unmeasured_phases))
+            traj.support_sigma.append(row.support_sigma)
+            # as the row carries it: ``None`` (no measurement) is not ``[]``
+            traj.conditional_on.append(None if row.conditional_on is None
+                                       else list(row.conditional_on))
+            ip = next(k for k, r in enumerate(e.qpa.phases) if r.name == phase)
+            own = set(row.conditional_on or ())
+            traj.unconstrained.append(any(
+                d.code == "PHASE_UNCONSTRAINED"
+                and any(f"phases.{ip}." in w or w in own for w in d.where)
+                for d in e.diagnostics))
         return traj
 
     def agreement_trajectory(self, phase: str, *,

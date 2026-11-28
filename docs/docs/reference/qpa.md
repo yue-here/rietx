@@ -28,6 +28,7 @@ for row in result.qpa.phases:
 | `QuantitativePhaseAnalysis.unmeasured_held` | the part of that list a stage held while a reflection is in range at the answer |
 | `QuantitativePhaseAnalysis.microabsorption` | the `MicroabsorptionCorrection` record, when the correction ran |
 | `QuantitativePhaseAnalysis.microabsorption_skipped` | why it did not run, when a phase asked for it |
+| `QuantitativePhaseAnalysis.esd_basis` | where the esds came from when `Refinement.qpa` was given a covariance, and `None` otherwise |
 
 `PhaseQuantity` is one phase's row.
 
@@ -42,6 +43,8 @@ for row in result.qpa.phases:
 | `PhaseQuantity.zmv` | their product, the quantity the fractions are proportional to |
 | `PhaseQuantity.z` | formula units per cell |
 | `PhaseQuantity.molar_mass` | one formula unit's mass, in g/mol |
+| `PhaseQuantity.support_sigma` | how many esds from zero the phase's scale is, the number `PHASE_UNCONSTRAINED` decides on (on a joint fit, in this row's histogram, and the finding reads the largest) |
+| `PhaseQuantity.conditional_on` | the phase's paths the answer held at a handed-in value or left on a bound |
 | `PhaseQuantity.particle_radius_um` | the particle radius you supplied, in µm, when the correction ran |
 | `PhaseQuantity.mu_cm` | the phase's linear attenuation coefficient µ, in cm⁻¹ |
 | `PhaseQuantity.mu_r` | its µ·R, with R the particle radius |
@@ -49,6 +52,17 @@ for row in result.qpa.phases:
 | `PhaseQuantity.weight_fraction_corrected` | the fraction after that correction |
 
 The last five fields are `None` unless the microabsorption correction ran.
+
+`PhaseQuantity.support_sigma` and `PhaseQuantity.conditional_on` say what the fraction rests on, so a reader of `result.qpa` alone sees them (WP-2073).
+`PhaseQuantity.support_sigma` is written for every phase of a Rietveld fit, whether or not [`PHASE_UNCONSTRAINED`](diagnostics-refinement.md#phase_unconstrained) fired, and is that finding's own number rather than a second test.
+On a joint fit each `HistogramResult.qpa` row carries the reading in its own histogram, the scale that row's fraction is formed from.
+The joint `PHASE_UNCONSTRAINED` decides on the largest of those readings over the histograms, so a phase plain in one pattern and absent from another has a low `support_sigma` in one row while no finding fires.
+`PhaseQuantity.conditional_on` lists the phase's paths that the answer stage held (`StageResult.held`) and the phase's paths at a [`BOUND_HIT`](diagnostics-refinement.md#bound_hit).
+A width on its zero floor ([`FLOOR_HIT`](diagnostics-refinement.md#floor_hit)) is not listed, because zero width is the correction off.
+An empty list means that nothing was held and nothing sat on a bound.
+Neither field decides anything: no threshold applies, and the fraction is quoted either way.
+The QPA table carries a `#` caveat naming each such phase, its paths and its support.
+Both fields are `None` on a row from `Refinement.qpa`, which measures neither.
 
 `PhaseQuantity.cell_mass` and `PhaseQuantity.cell_volume` are the unambiguous quantities.
 `PhaseQuantity.z` and `PhaseQuantity.molar_mass` split the cell mass into an integer count and a formula-unit mass, and fall back to `z = 1` with `molar_mass` equal to `cell_mass` when the composition does not reduce to integers under refined occupancies.
@@ -156,7 +170,7 @@ When `FractionProfile.fit_admissible` is `False`, a pinned refit found χ² lowe
 Every profile of a fit with an esd carries a [`QPA_FRACTION_RANGE`](diagnostics-refinement.md#qpa_fraction_range) info record.
 It names the range and the widths that produced it, and its value is `FractionProfile.excess`, the farthest admissible fraction's distance from the fit's in the esd's 95 % half-widths.
 Below 1, the profile confirms the esd: the controls reached at most 0.79.
-Well above 1, the fraction is not determined by this pattern, whatever its esd says, so quote the range rather than the point: the synthetic trace below reached about 99.
+Well above 1, the fraction is not determined by this pattern, whatever its esd says, so quote the range rather than the point, once the fit is admissible (when `FractionProfile.fit_admissible` is `False` the suggestion first names an unmodelled background or broad feature as the reading, because a range computed on a fit that did not reach the lowest basin is not a range of the fraction): the synthetic trace below reached about 99.
 Before 1.10 the record was the warning `QPA_FRACTION_UNDETERMINED`, which fired only past an excess of 2, a number chosen rather than measured.
 The basins separate only on information the fit does not have: a width held at a value the specimen justifies, a background that can take the hump itself, or more counts on the phase's strongest lines.
 
@@ -166,6 +180,61 @@ The fit reports CaF₂ at 0.93 ± 0.33 wt %, and the profile admits everything f
 A wrong Z·M·V is a different failure.
 A wrong site multiplicity or a wrong space-group setting ([`SITE_SNAPPED_TO_SPECIAL_POSITION`](diagnostics-structures.md#site_snapped_to_special_position), [`SPACE_GROUP_SETTING_ASSUMED`](diagnostics-structures.md#space_group_setting_assumed)) moves the Z·M·V factor of one phase by a fixed multiple, at unchanged Rwp.
 A width profile cannot see that, and it finds only the case where the pattern admits several fractions at once.
+
+### A profile that confirms the esd
+
+A profile that confirms the esd does not establish that the phase exists.
+The profile tests whether the pattern admits other fractions, and it cannot test whether the intensity the phase took is its own.
+A phase that is not in the specimen, with lines close to another phase's, can take intensity the model lacks, such as a broad component under the other phase's lines.
+It then reports a fraction with an ordinary esd, [`PHASE_UNCONSTRAINED`](diagnostics-refinement.md#phase_unconstrained) stays silent because the phase's lines do carry intensity, and the profile stays inside the esd.
+
+Issue #1213 measured this on rietx's own simulated data.
+The specimen was LaB₆ alone, with a broad LaB₆ component the model lacked, and the model added a cubic perovskite whose lines lie within 0.3 % of LaB₆'s.
+The fit reported the absent perovskite at 17.7 ± 2.2 wt %, with [`BOUND_HIT`](diagnostics-refinement.md#bound_hit) and [`BACKGROUND_ABSORPTION`](diagnostics-refinement.md#background_absorption), and its profile reached an excess of 0.31 with the fit admissible.
+A real CaF₂ phase at 3 nm in the same family draws `BACKGROUND_ABSORPTION` too, and `BOUND_HIT` under the same bounds, so every single-fit rule the issue tested either fired on both or missed the absent phase.
+
+The check that separated them is a rival model.
+Add a broad copy of the phase whose lines coincide (here a second LaB₆ phase with a small size seeded), free its scale and its size, and refit.
+An absent phase that only held the missing component falls to nothing, because the rival describes that component better: 9 of 9 such fits fell to 0.05 wt % or less.
+A real phase keeps its fraction: 0 of 15 fits moved.
+In the negative runs the rival was the component that generated the data, the most favourable case a rival can be.
+These counts come from one synthetic family, LaB₆ with one cubic minor phase under a laboratory Cu Kα source, and are untested beyond it.
+`tests/test_qpa.py` carries the issue's four cases as fixtures (the rival-model refits are not among them).
+
+## Fractions at given values
+
+`Refinement.qpa(data)` gives the weight fractions at the values the refinement holds, with no fit (WP-2073).
+It reads `Refinement.structure` as it stands, whether a fit, `Refinement.set_values` or your own typing put the values there, and it compiles `data` to find which phases have a reflection in range.
+`Refinement.result_` and the history are untouched, and the answer is a `QuantitativePhaseAnalysis`.
+`Refinement.set_values` refuses a tied path, such as a cubic `cell.b` that follows `cell.a`, so `values` names untied paths only: set the source of a tie, and the tie follows.
+
+<!-- api-doc: no-exec — needs a pattern and a refinement; tests/test_qpa.py runs this call on issue #1213's real weak case -->
+```python
+ref = rx.Refinement(structure, instrument)
+ref.set_values(values)
+qpa = ref.qpa(data)
+print(qpa.phases[1].weight_fraction)         # the fit's fraction at these values, bit for bit
+print(qpa.phases[1].weight_fraction_stderr)  # None: no covariance was given
+```
+
+With no covariance every esd is `None`.
+An esd on a fraction comes from the covariance of the scales a fit refined, and nothing here refined one.
+Pass `scale_cov` to propagate one: the covariance of the scales of the phases that have a reflection in range, in phase order, square.
+The esds are then propagated through the whole of it, correlations included.
+Take it from the full covariance of a fit, which marginalises the background and every other parameter.
+A block from a solve that held them drops the scales' correlations with them, and an esd then moves by ×0.71 to ×1.15, in both directions.
+`QuantitativePhaseAnalysis.esd_basis` says so whenever `scale_cov` was given, and the QPA table repeats it.
+
+`PhaseQuantity.support_sigma` and `PhaseQuantity.conditional_on` stay `None` on these rows: they are measurements of a fit's answer stage.
+
+`Refinement.qpa` raises `ValueError` where there is no fraction to form, and the message says which case holds.
+The cases are a model with no phase, a `data` range that holds no reflection of any phase, and scales whose Σ S·ZMV is not positive, with the scales at or below zero named.
+A fit reports the same cases inside its result instead (`QPA_UNAVAILABLE`, `QuantitativePhaseAnalysis.unmeasured_phases`), because there QPA is one field of an answer.
+
+A plan of one empty stage gives the same fractions inside a full `RefinementResult`, with statistics and diagnostics, when you want those.
+`Refinement.fit` with `rx.RefinementPlan(stages=[rx.Stage("evaluate", [])])` evaluates the model where it stands, with 0 free parameters, and its esds are `None` for the same reason.
+`Refinement.run_stage` with an empty stage does not do this on a refinement that has already fitted: it continues the previous fit's free set, so the values you set are refitted away.
+`Refinement` copies the `Structure` it is given, so the values live on `Refinement.structure`, while your own `Structure` still holds what you built it with.
 
 ## Scope
 
@@ -252,4 +321,4 @@ A corrected fraction still 11 wt % from the weighed value is evidence that this 
 `Refinement.write_qpa_table` writes the table to a CSV file, or a tab-separated one for a `.tsv` or `.tab` suffix ([Exports and derived tables](exports.md)).
 The file opens with `#` comment lines stating the crystalline-only scope and, where it applies, the microabsorption correction or why it was skipped.
 A joint fit reports a `QuantitativePhaseAnalysis` per pattern on `HistogramResult.qpa`, and a series reports one per pattern on `SeriesEntry.qpa`.
-`SeriesResult.qpa_trajectory` turns one phase's fraction into a trajectory across the series ([Sequential refinement](series.md)).
+`SeriesResult.qpa_trajectory` turns one phase's fraction into a trajectory across the series ([Sequential refinement](series.md)). `QPATrajectory.support_sigma`, `QPATrajectory.conditional_on` and `QPATrajectory.unconstrained` give, per point, the phase's `PhaseQuantity.support_sigma`, its `PhaseQuantity.conditional_on` as the row carries it (`None` stays `None`, distinct from an empty list) and whether the pattern carried `PHASE_UNCONSTRAINED` on it. A point whose pattern held the phase's structure is kept and marked, not dropped: its scale was still measured, and only its structure was held. No threshold decides the mark. A finding marks the point when a path it names is the phase's own or is on the row's `PhaseQuantity.conditional_on`, so a held variable driving the phase's cell, which the finding names alone, marks it too.

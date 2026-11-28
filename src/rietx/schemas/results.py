@@ -480,6 +480,30 @@ class PhaseQuantity(Base):
     mu_r: float | None = None                       # µ_p·R_p (fence: ≤ 0.05)
     particle_radius_um: float | None = None         # R_p as supplied, µm
 
+    # -- what the fraction rests on (WP-2073); None where unmeasured --
+    #: How many esds from zero the phase's scale is, the one number the support
+    #: hold and ``PHASE_UNCONSTRAINED`` decide on (the scale over its esd
+    #: against counting noise, or the screen ``‖y_p/σ‖₂`` where that is already
+    #: lower: at most that many σ either way).  Written for every phase of a
+    #: Rietveld fit, whether or not the finding fired, so a reader of
+    #: ``result.qpa`` alone sees it.  A projection of that test, never a second
+    #: one, pinned equal to it as ``RefinedParameter.at_bound`` is pinned to
+    #: ``bound_findings``.  On a joint fit a ``HistogramResult.qpa`` row carries
+    #: its own histogram's reading, the scale that row's fraction is formed
+    #: from; the joint ``PHASE_UNCONSTRAINED`` decides on the largest of them
+    #: over the histograms, so one row may read low while no finding fires.
+    #: ``None`` where no fit measured it (``Refinement.qpa``).
+    support_sigma: float | None = None
+    #: The phase's paths its fraction is conditional on at the answer: held at a
+    #: handed-in value by the answer stage (``StageResult.held``, including the
+    #: scale–B hold's columns) or on a bound (``BOUND_HIT``; not
+    #: ``FLOOR_HIT``, a width on its zero floor being the correction off).
+    #: The phase's own ``scale`` is not listed (a held scale leaves no
+    #: fraction).  ``[]`` is a measurement: nothing was held and nothing was on
+    #: a bound; ``None`` is none made (``Refinement.qpa``, or a replay with neither
+    #: a guard nor a stage record).
+    conditional_on: list[str] | None = None
+
 
 class MicroabsorptionCorrection(Base):
     """Mixture-level record of the Brindley correction (Brindley, 1945).
@@ -597,6 +621,15 @@ class QuantitativePhaseAnalysis(Base):
     # Both None ⇔ no phase asked for a correction.
     microabsorption: MicroabsorptionCorrection | None = None
     microabsorption_skipped: str | None = None
+    #: Where the fractions' esds came from, when it was not a fit's own
+    #: covariance (WP-2073): ``Refinement.qpa(data, scale_cov=...)`` writes the
+    #: sentence, a fit's QPA leaves it ``None``.  It says the esds are
+    #: propagated from a scale covariance the caller supplied, and that a block
+    #: taken with the background and every other parameter held drops the
+    #: scales' correlations with them, which moves an esd by ×0.71 to ×1.15 in
+    #: both directions (WP-1072).  ``None`` is not "measured": a fraction with
+    #: no esd carries ``weight_fraction_stderr`` ``None`` either way.
+    esd_basis: str | None = None
 
 
 class PhaseAgreement(Base):

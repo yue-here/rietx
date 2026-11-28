@@ -4210,7 +4210,11 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "minimum where the fit stopped: the scale of a weak phase trades against "
             "its width, and the data do not choose. Then quote the range and the "
             "widths that produced it. A width the specimen justifies, a background "
-            "that takes the broad hump, or longer counting can narrow the range."
+            "that takes the broad hump, or longer counting can narrow the range. "
+            "If the pinned refit found a lower χ² than the fit, the fit did not "
+            "reach the lowest basin and this is not a range of the fraction: read "
+            "the lower fit first as an unmodelled background or broad feature, and "
+            "quote the range only from an admissible fit."
         ),
     ),
     "QPA_INTENSITY_FACTOR": HelpEntry(
@@ -4732,13 +4736,16 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
     "SIZE_UNUSUALLY_SMALL": HelpEntry(
         title="Crystallite size is unusually small",
         description=(
-            "A phase's refined size broadening implies a crystallite size below the "
+            "A phase's size broadening implies a crystallite size below the "
             "range seen in solved refinements. Nanocrystalline material can be this "
             "small, so the fit may be right. A small size also broadens every line and "
             "competes with the background. Check that the broad lines are size "
             "broadening and not an unmodelled peak shape, strain, an amorphous component "
             "or a second phase. If the size is on its limit, the bound set the width and "
-            "nothing was measured."
+            "nothing was measured. If the answer stage held the size rather than "
+            "refining it (a phase the data cannot see, your own hold, or a plan that "
+            "never freed it), the message says held at: the number is the value that "
+            "stage started from, not a measurement."
         ),
     ),
     "SOLVE_B_TIED_PER_PARENT_SITE": HelpEntry(
@@ -4897,12 +4904,16 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
     "STRAIN_UNUSUALLY_LARGE": HelpEntry(
         title="Strain broadening is unusually large",
         description=(
-            "A phase's refined strain broadening is far above the range seen in solved "
+            "A phase's strain broadening is far above the range seen in solved "
             "refinements. It is physically possible, so the fit is finished and may be "
             "right. A strain this large reaches across the pattern and competes with the "
             "background and with overlapping phases. Check that the broad lines belong "
             "to this phase and not to an unmodelled peak shape, an amorphous component "
-            "or a second phase. If the strain is on its limit, the bound set the width."
+            "or a second phase. If the strain is on its limit, the bound set the width. "
+            "If the answer stage held the strain rather than refining it (a phase the "
+            "data cannot see, your own hold, or a plan that never freed it), the "
+            "message says held at: the number is the value that stage started from, "
+            "not a measurement."
         ),
     ),
     "TEXTURE_NOT_POSITIVE": HelpEntry(
