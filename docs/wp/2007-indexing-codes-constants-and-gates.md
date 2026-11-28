@@ -83,6 +83,16 @@ ranking over one population and is the regression gate, not a family.
 - **From WP-1986 (2026-10-22, PR #1099), writing the indexing reference.** Two gate behaviours to rule on while tiering. (1) A candidate the ambiguity search never reached gets `geometric_ambiguity` (`indexing/consensus.py:627-632`), a refuting caveat, so under a binding whole-run ceiling every unreached candidate grades `low`; seven comments in `consensus.py`/`workflow.py` call that case *capping*, and `src/rietx/indexing/CLAUDE.md` § The scheduler says the streamed lists treat it as capping. Which is meant decides the wording WP-2013 fixes. (2) `VALIDATION_RESERVE_FRACTION` (`indexing/engines.py:2293-2309`) is there so the first click's shortlist arrives validated, and a default `index_pattern` on the bundled fluorapatite (2026-10-22, Linux `[dev]`, 130.7 s) validated none of its 12 candidates; the default qarr corundum run (121.3 s) entered four systems and ranked the certified R cell first.
 
 - 2026-10-26 issue triage: #1059 is the outside contributor's (mustachefeeling) claim on this WP. It starts after the gate ruling and after their open indexing PRs land, and runs `tests.bethanechol_benchmark` alone before and after. Checked against the tree at c0e32ab29: status ⬜, nothing started.
+- **2026-11-28, from the issue triage (issue #1629, WP-1448's follow-ups): two choices with no
+  record of their alternatives.** Checked against the tree at `300853e90`. (1)
+  `background.diagnostics.GHOST_RATIO_TOL` is still `unaudited`, and B13 above hands it here.
+  Its 1.3/1.5/2.0/3.0 sweep is written only in its docstring. When its row is tiered, the
+  row's `evidence` carries that sweep. A `*(Chosen: …)*` tag (root CLAUDE.md, WP-1448) may
+  then point at the record of that day. (2) `indexing.fom`'s ⟨ΔQ⟩ floor (the median σ(Q),
+  `fom.py` ~352-380) is "this package's own" and has no row and no record of what was
+  rejected. Settled by Claude 2026-11-28 under WP-1448's rule ("inventing a record for them
+  would be the failure this WP describes"): a record and a tag are written when the value is
+  next chosen, never reconstructed after the fact.
 
 ## Non-goals
 

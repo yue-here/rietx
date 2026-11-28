@@ -78,6 +78,14 @@ Pruned 2026-11-17 (part 2's session; the handover entry says why each other entr
 - **From WP-2001 (2026-10-19): numbers inside a dict, list or array.** The constant walk sees module-level numbers and tuples of numbers only, so a number held in a dict, list or array in `crystallography/` and the walked `io/` and `gui/` files is audited by hand. Nobody has looked yet; part 2 did not.
 - **From [2014](2014-a-heuristic-meets-the-judge-on-every-path.md)'s close, confirmed 2026-11-17: a silent repair in the FullProf reader.** `fullprof._OCCUPANCY_RTOL = 5e-3` lets per-site occupancy ratios spread 0.5 % and then builds 1.0 on every site with no diagnostic (`io/projects/fullprof.py` around lines 2364 and 3635). A probe that scaled one site's Occ by 0.996 built every site full with no record; 0.995 is refused. The constant's comment puts the file's rounding at 2e-5. The same constant gates the magnetic Scale × f² match (around line 2730). A fix adds a record or narrows the bound, and either changes what `read_project` returns, so it goes to the maintainer. The row is a tier-3 candidate in `2006-batch/tiers.md`.
 - **2026-10-20, from [1986](1986-guides-and-theory-move-over-and-the-old-tree-retires.md): declared names with no writer.** `PhaseMicrostructure.separable` and `.size_strain_collinearity` (written only on the report's copy) and `ProjectFormat.refuses` (set by no member). Re-checked 2026-11-17; the write, retire or document choice is in `2006-batch/surface.md` for the maintainer. The third, `SuggestedAction.vetoed_by`'s docstring, was fixed in part 2.
+- **2026-11-28, from the issue triage (issue #1629, WP-1448's follow-ups): two constants whose
+  original choice has no record.** `crystallography.cif.CIF_ANGLE_CORRECT_MAX_DEG` and
+  `crystallography.symmetry.SYMMETRY_ANGLE_TOL_DEG` predate the WP-1066 rename, so the
+  alternatives first weighed are lost. Checked against the tree at `300853e90`: both are still
+  `unaudited`, and item 16 of § Rulings settles them at tier 3. The successor that writes those rows
+  writes their `evidence` as the record of that day. A `*(Chosen: …)*` tag (root CLAUDE.md,
+  WP-1448) may point at it only if that record names what was rejected. Settled by Claude
+  2026-11-28 under WP-1448's rule: no record of the original choice is reconstructed.
 
 ## Non-goals
 
