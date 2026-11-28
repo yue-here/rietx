@@ -198,15 +198,17 @@ def _kernel_args(model, values):
     return cp.reflections.hkl, d, cp.sites, xyz, occ, biso, uaniso, astar
 
 
-def _pre_change_grads(self, ip, values, xyz_atoms=(), u_atoms=()):
+def _pre_change_grads(self, ip, values, xyz_atoms=(), u_atoms=(),
+                      biso_atoms=(), occ_atoms=()):
     """``CompiledModel.structural_f2_grads`` built the pre-change way, one
-    whole expansion per atom."""
-    assert ip == 0
+    whole expansion per atom.  No fixture here frees a Biso or an
+    occupancy, so those halves are never asked for."""
+    assert ip == 0 and not biso_atoms and not occ_atoms
     hkl, d, sites, xyz, occ, biso, uaniso, astar = _kernel_args(self, values)
     return ({j: _pre_d_f2_d_xyz(hkl, d, sites, xyz, occ, biso, j, uaniso, astar)
              for j in xyz_atoms},
             {j: _pre_d_f2_d_uaniso(hkl, d, sites, xyz, occ, biso, j, uaniso, astar)
-             for j in u_atoms})
+             for j in u_atoms}, {}, {})
 
 
 @pytest.mark.parametrize("dispersion", [True, False], ids=["dispersion", "none"])
@@ -218,8 +220,8 @@ def test_every_atoms_gradient_is_the_pre_change_kernels_bytes(dispersion):
     atoms = range(sites.n_asym)
     aniso = [j for j in atoms if sites.aniso[j]]
     assert aniso == [0, 2]
-    g_xyz, g_u = d_f2_d_sites(hkl, d, sites, xyz, occ, biso, uaniso, astar,
-                              xyz_atoms=atoms, u_atoms=aniso)
+    g_xyz, g_u, _gb, _go = d_f2_d_sites(hkl, d, sites, xyz, occ, biso, uaniso,
+                                        astar, xyz_atoms=atoms, u_atoms=aniso)
     for j in atoms:
         want = _pre_d_f2_d_xyz(hkl, d, sites, xyz, occ, biso, j, uaniso, astar)
         assert np.any(want != 0.0)

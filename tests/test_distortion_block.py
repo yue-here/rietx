@@ -221,33 +221,33 @@ def _model_and_table(phase):
     return model, table
 
 
-def test_an_amplitude_column_is_the_peak_chain_one_and_reaches_every_moved_atom(monkeypatch):
+def test_an_amplitude_column_is_a_site_column_and_reaches_every_moved_atom(monkeypatch):
     """The dispatch is asserted, not assumed (kickoff Fable review § 2).
 
-    No analytic branch claims an amplitude: it matches no ``_STRUCTURAL_PATH``
-    and falls to ``_peak_chain_column``, which perturbs θ and decodes through
-    C, so it is exact in what it reaches.  Its reach is the moved atom's x and
-    y (z is held by the site), and the column equals a central difference of
-    the residual.
+    An amplitude matches no ``_STRUCTURAL_PATH``.  Its reach is the moved
+    atom's x and y (z is held by the site) and nothing the data rows read
+    besides, so ``_site_column`` claims it and sums the cached ∂|F|²/∂x and
+    ∂|F|²/∂y through C (WP-2314 angle 4; before it, the peak chain did).  The
+    column equals a central difference of the residual.
     """
     model, table = _model_and_table(_phase(0.2))
     assert table.column_reach()[AMP] == [AMP, "phases.0.atoms.3.x", "phases.0.atoms.3.y"]
-    calls: dict[str, list[str]] = {"peak": [], "structural": []}
-    peak, structural = LS._peak_chain_column, LS._structural_column
+    calls: dict[str, list[str]] = {"peak": [], "site": []}
+    peak, site = LS._peak_chain_column, LS._site_column
 
     def record_peak(model, table, bases, theta, values, c, path, *a, **k):
         calls["peak"].append(path)
         return peak(model, table, bases, theta, values, c, path, *a, **k)
 
-    def record_structural(model, table, bases, values, c, *a, **k):
-        calls["structural"].append(table.free_paths[c])
-        return structural(model, table, bases, values, c, *a, **k)
+    def record_site(model, table, bases, values, c, *a, **k):
+        calls["site"].append(table.free_paths[c])
+        return site(model, table, bases, values, c, *a, **k)
 
     monkeypatch.setattr(LS, "_peak_chain_column", record_peak)
-    monkeypatch.setattr(LS, "_structural_column", record_structural)
+    monkeypatch.setattr(LS, "_site_column", record_site)
     theta = table.x0()
     jac = LS._jacobian_for(model, table, "numpy")(theta)
-    assert AMP in calls["peak"] and AMP not in calls["structural"]
+    assert AMP in calls["site"] and AMP not in calls["peak"]
     c = table.free_paths.index(AMP)
     residual = LS._make_residual(model, table)
     h = 1e-5

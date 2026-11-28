@@ -63,7 +63,7 @@ a separate vocabulary with no rows here, so a code met outside
 | `GEOMETRY_UNSTATED` | Quote the cell before the geometry is stated. The instrument was built without `Geometry(kind=...)`, so no displacement, offset or absorption correction ran and the default plan freed no specimen displacement. State the kind, or build the instrument with a preset, and refit |
 | `BRINDLEY_OUTSIDE_REGIME` | Prefer the corrected fractions: past µR ≈ 0.05 the "correction" can be further from truth than none, the QPA round robin's community-wide finding (Madsen et al. 2001; Scarlett et al. 2002) |
 | `MICROABSORPTION_SKIPPED` | Assume microabsorption was handled |
-| `PAWLEY_OVERLAP_UNRESOLVED` | Use an individual reflection intensity from the group |
+| `PAWLEY_OVERLAP_UNRESOLVED` | Use an individual reflection intensity from the group. Groups whose d agree in every cell are usually merged instead, their sums in `ReflectionState.merged_groups` |
 | `PAWLEY_OFF_DATA_RIDGED` | (info) Export or use a named intensity. One row per phase |
 | `DATA_SUPPORT_LOW` | Read the esds as the whole story. `warning` below three effective observations per structural parameter, `info` between three and five; the counts are on `result.data_support`. Start cutting parameters from `result.identifiability`. More points across the same peaks raise N and nothing else |
 | `PATTERN_UNDERSAMPLED` | Quote integrated intensities, ADPs or QPA fractions and expect the step size not to be the limit. **No choice made after the fact repairs it.** The number is `PatternDiagnostics.steps_per_fwhm`, from `diagnose(data)` before any refinement. It fires under five steps across the median resolved peak's FWHM; above ten there is no code at all, since oversampling costs beam time, not validity |

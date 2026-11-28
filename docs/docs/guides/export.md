@@ -56,9 +56,9 @@ Check the file with the IUCr's checkCIF service before you submit it.
 
 <!-- output of examples/guides/export.py -->
 ```text
-phase,line,wavelength,h,k,l,d,two_theta,multiplicity,f_squared,intensity,satellite_order,component
-fluorapatite,0,1.5405929,1,0,1,5.2502979,16.821212,12,129.34058,64.662521,0,total
-fluorapatite,0,1.5405929,2,-1,0,4.685481,18.872873,6,151.50396,29.915997,0,total
+phase,line,wavelength,h,k,l,d,two_theta,multiplicity,f_squared,intensity,satellite_order,component,merged_group
+fluorapatite,0,1.5405929,1,0,1,5.2502979,16.821212,12,129.34058,64.662521,0,total,
+fluorapatite,0,1.5405929,2,-1,0,4.685481,18.872873,6,151.50396,29.915997,0,total,
 658 rows
 ```
 

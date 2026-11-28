@@ -6,7 +6,7 @@ never reaches (WP-2314 to WP-2316). These tests put two published structures
 from the Crystallography Open Database through the fit paths a user takes:
 
 - COD 2107344, Nb₁₈W₁₆O₉₃ (Stephenson 1968), Pbam, 12.195 × 36.740 × 3.951 Å,
-  V = 1 770 Å³, 43 sites, nine of them Nb/W pairs sharing a position. The
+  V = 1 770 Å³, 43 sites, eight of them Nb/W pairs sharing a position. The
   cell is the closest real one to the 12 × 36 × 4 Å cell a user reported.
 - COD 2107337, H-Nb₂O₅ (Kato 1976), P2/m, 21.153 × 3.823 × 19.356 Å,
   β = 119.8°, V = 1 358 Å³, 51 sites, the monoclinic case.
@@ -75,16 +75,38 @@ def large_cell_phase(cif: Path, *, scale: float, drift: float = 0.0) -> rx.Phase
     return phase
 
 
-def co_sited(phase: rx.Phase) -> list[tuple[int, int]]:
-    """(later, first) atom-index pairs at one position, to 1e-4 in each coordinate."""
-    first: dict[tuple[float, float, float], int] = {}
+#: Å: two atoms closer than this share a site. The nearest distinct pair in the
+#: cells here is 1.6 Å apart (`test_a_cod_large_cell_reads_whole`), and a mixed
+#: site's two species differ by under 1e-3 Å.
+CO_SITED_TOL = 0.01
+
+
+def co_sited(phase: rx.Phase, tol: float = CO_SITED_TOL) -> list[tuple[int, int]]:
+    """(later, first) atom-index pairs closer than ``tol`` Å, periodic images included.
+
+    Decided by distance and not by rounding the coordinates: a rounded key
+    puts two atoms 1e-12 apart in different bins when a coordinate sits on a
+    bin edge (Nb8 and W8 at x = 0.42515 do, at 1e-4), so one ulp of drift in
+    a start value changed the tie count. The fractional difference is wrapped
+    into [-0.5, 0.5) before it is converted to Å, which finds any pair closer
+    than the shortest cell translation.
+    """
+    import gemmi
+
+    c = phase.cell
+    orth = np.array(gemmi.UnitCell(c.a.value, c.b.value, c.c.value, c.alpha.value,
+                                   c.beta.value, c.gamma.value).orth.mat.tolist())
+    xyz = np.array([[a.x.value, a.y.value, a.z.value] for a in phase.atoms])
+    first: list[int] = []
     pairs = []
-    for j, atom in enumerate(phase.atoms):
-        key = (round(atom.x.value, 4), round(atom.y.value, 4), round(atom.z.value, 4))
-        if key in first:
-            pairs.append((j, first[key]))
+    for j in range(len(xyz)):
+        for i in first:
+            d = xyz[j] - xyz[i]
+            if np.linalg.norm((d - np.round(d)) @ orth.T) < tol:
+                pairs.append((j, i))
+                break
         else:
-            first[key] = j
+            first.append(j)
     return pairs
 
 
@@ -228,6 +250,40 @@ def test_a_cod_large_cell_reads_whole(cif):
         shortest = min(shortest, r[r > 1e-3].min())
     assert shortest > 1.6, shortest
     ParameterTable(rx.Structure(phases=[phase]), large_cell_instrument())
+
+
+@pytest.mark.parametrize("cif, n_pairs", [(NB18W16O93, 8), (H_NB2O5, 0)],
+                         ids=["Nb18W16O93", "H-Nb2O5"])
+@pytest.mark.parametrize("seed", [0, 1, 2, 3])
+def test_co_siting_is_blind_to_a_one_part_in_1e12_drift(cif, n_pairs, seed):
+    """The co-sited pairs do not change when every coordinate is multiplied by
+    1 + 1e-12·u, u uniform in [-1, 1].
+
+    The grouping once rounded coordinates to 1e-4, and Nb8 and W8 of
+    COD 2107344 sit at x = 0.42515, on a rounding edge: a drift of 1e-12 put
+    them in different bins and the structural fit had 120 free parameters
+    instead of 117. A distance test has no edge, and the count is the same
+    for every tolerance from 1e-3 to 1.5 Å (measured), so it is a property of
+    the structure.
+    """
+    reference = co_sited(large_cell_phase(cif, scale=1.0))
+    assert len(reference) == n_pairs
+    phase = large_cell_phase(cif, scale=1.0)
+    u = np.random.default_rng(seed).uniform(-1.0, 1.0, (len(phase.atoms), 3))
+    for atom, row in zip(phase.atoms, u):
+        for name, r in zip("xyz", row):
+            par = getattr(atom, name)
+            par.value *= 1.0 + 1e-12 * r
+    assert co_sited(phase) == reference
+
+
+def test_co_siting_finds_a_pair_across_the_cell_edge():
+    """x = 0.99999 and x = 0.00001 are 2.4e-4 Å apart through the cell face."""
+    phase = large_cell_phase(NB18W16O93, scale=1.0)
+    a, b = phase.atoms[0], phase.atoms[1]
+    a.x.value, a.y.value, a.z.value = 0.99999, 0.25, 0.5
+    b.x.value, b.y.value, b.z.value = 0.00001, 0.25, 0.5
+    assert (1, 0) in co_sited(phase)
 
 
 def _structural_plan() -> RefinementPlan:

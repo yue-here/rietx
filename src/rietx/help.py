@@ -3934,9 +3934,13 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "Several reflections overlap so strongly that the data fix their summed "
             "intensity but not how it divides among them. At least one individual "
-            "intensity has a large relative esd. The split shown comes from the "
-            "equal-split restraint. Use the summed intensity of the group as the datum. "
-            "Individual values from the group are not measurements."
+            "intensity has a large relative esd. The split shown comes from a "
+            "restraint towards equal F². Use the summed intensity of the group as the "
+            "datum. Individual values from the group are not measurements. Reflections "
+            "whose d-spacings agree in every cell of the space group are refined as one "
+            "intensity instead, and their sums are in ReflectionState.merged_groups. A "
+            "phase with a Stephens strain block, a peak equation, satellites or a "
+            "magnetic component keeps them apart, so they can reach this code there."
         ),
     ),
     "PEAK_POSITION_AT_BOUND": HelpEntry(

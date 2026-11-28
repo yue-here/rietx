@@ -125,6 +125,30 @@ MAGNDATA magCIF entries serve the round-trip and span tests with no pattern.
 
 ### Inherited
 
+- **2026-11-28, from the issue triage (#1851, a bug): the ≤ 64 denominator fence
+  on k holds for a float only.** Reproduced at `02341ffdb` on a `P 1` phase:
+  `propagation_vector=("0.3354", "0", "0")`, `("1677/5000", "0", "0")` and
+  `(Fraction(1677, 5000), 0, 0)` are each accepted and stored as
+  `('1677/5000', '0', '0')`; `(0.3354, 0, 0)` is refused. `_as_fraction`
+  (`crystallography/representation/irreps.py:214`) returns a `Fraction` as it
+  is and parses a `str` with `Fraction(value)`, and only the float branch
+  compares against `K_MAX_DENOMINATOR`. `Phase._canonical_k` and
+  `satellites.check_propagation_vector` both route through it. The code holds
+  two readings of what 64 fences. The float branch uses it to read a float as
+  a rational (`limit_denominator(64)` within `K_FLOAT_TOL`) and its message
+  ends "Pass an exact Fraction if the value is rational", which invites any
+  denominator. `as_propagation_vector`'s docstring and
+  `check_candidate_denominators` treat 64 as the commensurate fence for every
+  spelling. The reporter offers (a) refuse a string or `Fraction` past 64 as
+  the float is refused, and drop the invitation from the float message; (b)
+  sanction an exact rational past 64 as a commensurate approximant the caller
+  chose, documented, with the misuse test, deciding whether a decimal string
+  counts as exact; (c) route every spelling past 64 to the incommensurate rung
+  once it exists (WP-1993, #678). Rule 1's input paragraph bears on it: one
+  value, two spellings, two outcomes. Which option is a magnetic-path call
+  (`K_MAX_DENOMINATOR` already holds by Mike's ruling, WP-2006), so it is Mike's
+  under #1075, asked on the issue and not ruled here. No test passes a decimal
+  string or a large-denominator `Fraction` as k today.
 - **2026-11-19, from the issue triage (PR #1697; issue #1692): on co-sited magnetic atoms the support
   test reads Σ occ·f·m, not each modulus. Ruled by Mike on #1692 (2026-11-18), a magnetic-path
   call under #1075.** Decided 2026-11-18 (Mike): at a position shared by co-sited magnetic

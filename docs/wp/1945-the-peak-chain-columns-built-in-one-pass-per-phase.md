@@ -201,6 +201,25 @@ first.
 
 ### Inherited
 
+- **2026-11-28, from WP-2314 angle 4: the cell columns are now the largest
+  peak-chain cost on a large structural fit.** A coordinate column whose
+  reach crosses atoms (a co-sited tie, a named variable, a distortion-mode
+  amplitude) now takes the analytic `least_squares._site_column`, as Biso
+  and occupancy did after angle 3. On `bigcell-structural` (darwin arm64,
+  one timed run per arm, quiet machine) that took the tied coordinate
+  columns from 3.8 s of 7.3 s of Jacobians to 0.55 s of 3.9 s. The cell
+  columns cost 1.26 s on both arms, about a third of what is left. So this
+  WP's |F|² task is now the cell half alone, and it is the next large cost
+  on that case.
+- **2026-11-28, from WP-2314 angle 3: Biso and occupancy have left the peak
+  chain.** In Rietveld mode a Biso or occupancy column is now analytic, built
+  from the structure-factor cache (`least_squares._site_scalar_column`), when
+  every path it moves is a Biso or occupancy row of one phase. So the "Biso
+  columns batched" half of this WP's open |F|² task has no Biso column left
+  to batch, except one whose tie reaches something else (a cell, a
+  coordinate, a derived row) or a phase carrying a moment. Those still take
+  the peak chain. The cell half of the task is unchanged. Re-scope that task
+  before starting it.
 - **2026-11-27, from WP-2314 (filed under WP-2317): the structural columns'
   structure factor has an owner now.**
   - On a 40-atom phase, `_structural_column` rebuilds A once per coordinate
