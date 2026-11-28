@@ -1,0 +1,15 @@
+## M1 floor vs K (reference = shipped plan; reported esd of the unnudged fit)
+
+### bigcellT: n nudges = 10
+| K | max (all) | P90 of per-seed worst | max cell | max zero/disp | max profile | max Biso/coords | max scale | max background | max W |
+|---|---|---|---|---|---|---|---|---|---|
+| 3 | 1.91e-06 | 1.77e-06 | 9.6e-08 | 2.3e-08 | 8.5e-08 | 1.9e-06 | 4.8e-08 | 1.6e-07 | 0 |
+| 5 | 4.46e-06 | 3.44e-06 | 1.6e-07 | 4.4e-08 | 2.1e-07 | 4.5e-06 | 7.2e-08 | 4e-07 | 0 |
+| 10 | 4.46e-06 | 2.16e-06 | 1.6e-07 | 6.7e-08 | 2.1e-07 | 4.5e-06 | 1.1e-07 | 4e-07 | 0 |
+
+basins: 1; members [11] (unnudged in basin 0)
+  basin 0: chi2_red 1.961374 (S = 8106.36), spread within 1.36e-10
+
+n_free per seed: [117]
+cw1e-2 vs cw1e-3, background included: naive 1.63 (instrument.background.c0), floor max 3e-05, floor_sub 1.63, floor_glob 1.63, paired 1.63/1.63 (instrument.background.c0), pairs 5 split 0, R basins 1
+cw1e-2 vs cw1e-3, background excluded: naive 0.456 (phases.0.atoms.10.biso), floor max 3e-05, floor_sub 0.456, floor_glob 0.455, paired 0.456/0.456 (phases.0.atoms.10.biso), pairs 5 split 0, R basins 1

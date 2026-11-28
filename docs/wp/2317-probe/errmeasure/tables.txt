@@ -1,0 +1,299 @@
+## M1 floor vs K (reference = shipped plan; reported esd of the unnudged fit)
+
+### srm660c: n nudges = 20
+| K | max (all) | P90 of per-seed worst | max cell | max zero/disp | max profile | max Biso/coords | max scale | max background | max W |
+|---|---|---|---|---|---|---|---|---|---|
+| 3 | 1.86e-07 | 1.85e-07 | 1.5e-07 | 3.2e-08 | 1.9e-07 | 3.6e-08 | 3.6e-08 | 4.8e-08 | 0 |
+| 5 | 1.96e-07 | 1.92e-07 | 1.5e-07 | 5e-08 | 2e-07 | 3.6e-08 | 3.6e-08 | 4.9e-08 | 0 |
+| 10 | 2.34e-07 | 2e-07 | 2.3e-07 | 8.2e-08 | 2e-07 | 3.6e-08 | 3.6e-08 | 4.9e-08 | 0 |
+| 20 | 2.34e-07 | 1.91e-07 | 2.3e-07 | 8.2e-08 | 2e-07 | 3.6e-08 | 3.6e-08 | 4.9e-08 | 0 |
+
+basins: 1; members [21] (unnudged in basin 0)
+  basin 0: chi2_red 3.564616 (S = 18942.37), spread within 1.24e-09
+
+### fap: n nudges = 20
+| K | max (all) | P90 of per-seed worst | max cell | max zero/disp | max profile | max Biso/coords | max scale | max background | max W |
+|---|---|---|---|---|---|---|---|---|---|
+| 3 | 4.91e-08 | 4.86e-08 | 4.1e-08 | 2e-08 | 2.8e-08 | 4.6e-08 | 4.9e-08 | 1.6e-08 | 0 |
+| 5 | 5.19e-08 | 5.08e-08 | 5.2e-08 | 4.1e-08 | 4.2e-08 | 4.6e-08 | 4.9e-08 | 1.6e-08 | 0 |
+| 10 | 1e-07 | 6.44e-08 | 1e-07 | 7.1e-08 | 7e-08 | 6e-08 | 4.9e-08 | 1.6e-08 | 0 |
+| 20 | 1.02e-07 | 8.88e-08 | 1e-07 | 9.6e-08 | 1e-07 | 6.9e-08 | 4.9e-08 | 1.6e-08 | 0 |
+
+basins: 1; members [21] (unnudged in basin 0)
+  basin 0: chi2_red 2.728432 (S = 15633.91), spread within 2.57e-09
+
+### nac: n nudges = 20
+| K | max (all) | P90 of per-seed worst | max cell | max zero/disp | max profile | max Biso/coords | max scale | max background | max W |
+|---|---|---|---|---|---|---|---|---|---|
+| 3 | 1.15e-07 | 1.01e-07 | 1.1e-07 | 2e-08 | 7.2e-09 | 3.7e-08 | 1.2e-08 | 2.3e-09 | 1.6e-09 |
+| 5 | 1.15e-07 | 1.05e-07 | 1.1e-07 | 2e-08 | 7.2e-09 | 3.7e-08 | 1.2e-08 | 2.3e-09 | 5.5e-09 |
+| 10 | 1.42e-07 | 1.34e-07 | 1.4e-07 | 2.8e-08 | 7.2e-09 | 3.7e-08 | 1.2e-08 | 2.6e-09 | 1.1e-08 |
+| 20 | 1.42e-07 | 1.19e-07 | 1.4e-07 | 3.5e-08 | 7.9e-09 | 3.9e-08 | 1.8e-08 | 3.5e-09 | 1.1e-08 |
+
+basins: 1; members [21] (unnudged in basin 0)
+  basin 0: chi2_red 12.484561 (S = 274398.16), spread within 4.79e-08
+
+### cpd1a: n nudges = 20
+| K | max (all) | P90 of per-seed worst | max cell | max zero/disp | max profile | max Biso/coords | max scale | max background | max W |
+|---|---|---|---|---|---|---|---|---|---|
+| 3 | 1.39e-06 | 1.3e-06 | 1.4e-06 | 1.4e-06 | 5.9e-07 | 9.6e-08 | 9.6e-08 | 9e-08 | 9.5e-08 |
+| 5 | 1.39e-06 | 1.22e-06 | 1.4e-06 | 1.4e-06 | 5.9e-07 | 9.6e-08 | 9.6e-08 | 9e-08 | 9.5e-08 |
+| 10 | 1.39e-06 | 1.13e-06 | 1.4e-06 | 1.4e-06 | 6.2e-07 | 9.6e-08 | 1e-07 | 9.8e-08 | 1.1e-07 |
+| 20 | 1.47e-06 | 1.3e-06 | 1.5e-06 | 1.5e-06 | 7.1e-07 | 1e-07 | 1.4e-07 | 1.3e-07 | 1.4e-07 |
+
+basins: 1; members [21] (unnudged in basin 0)
+  basin 0: chi2_red 1.835548 (S = 13239.81), spread within 9.74e-10
+
+### bigcell: n nudges = 20
+| K | max (all) | P90 of per-seed worst | max cell | max zero/disp | max profile | max Biso/coords | max scale | max background | max W |
+|---|---|---|---|---|---|---|---|---|---|
+| 3 | 4.34 | 3.47 | 0.039 | 0.01 | 0.011 | 4.3 | 0.014 | 0.061 | 0 |
+| 5 | 4.34 | 4.34 | 0.039 | 0.01 | 0.011 | 4.3 | 0.014 | 0.061 | 0 |
+| 10 | 4.34 | 4.34 | 0.039 | 0.01 | 0.011 | 4.3 | 0.014 | 0.061 | 0 |
+| 20 | 4.34 | 4.34 | 0.039 | 0.01 | 0.011 | 4.3 | 0.014 | 0.061 | 0 |
+
+basins: 2; members [13, 8] (unnudged in basin 0)
+  basin 0: chi2_red 1.961374 (S = 8106.36), spread within 1.52e-10
+  basin 1: chi2_red 1.962438 (S = 8110.76), spread within 1.70e-09
+  separating (|centre0 - centre1| / esd): phases.0.atoms.27.y 4.34, phases.0.atoms.27.x 4.05, phases.0.atoms.23.y 3.26, phases.0.atoms.23.x 3.02, phases.0.atoms.23.biso 0.12, phases.0.atoms.27.biso 0.12, phases.0.atoms.4.y 0.10, phases.0.atoms.18.x 0.08
+  largest within-basin departure from its centre: 1.88e-03 esd
+  params moving between basins by >0.1/0.3/1 esd: {0.1: 6, 0.3: 4, 1.0: 4}
+
+## M2 readings (K = 5 nudges/pairs; bar 0.1 esd)
+
+| setting | fixture | ref | naive (param) | floor max | floor_sub | floor_cmp | floor_glob (naive - max floor) | paired max / median (param) | pairs used / split |
+|---|---|---|---|---|---|---|---|---|---|
+| ftol1e-6 | srm660c | ref | 0 pass (phases.0.cell.a) | 2e-07 | 0 pass | pass | 0 pass | 0 / 0 pass (phases.0.cell.a) | 5 / 0 (R basins 1) |
+| ftol1e-6 | fap | ref | 0.000393 pass (instrument.geometry.axial_sl) | 5.2e-08 | 0.000393 pass | pass | 0.000393 pass | 0.000393 / 0.000393 pass (instrument.geometry.axial_sl) | 5 / 0 (R basins 1) |
+| ftol1e-6 | nac | ref | 0.000507 pass (phases.1.cell.a) | 1.1e-07 | 0.000507 pass | pass | 0.000507 pass | 0.000507 / 0.000507 pass (phases.1.cell.a) | 5 / 0 (R basins 1) |
+| ftol1e-6 | cpd1a | ref | 0.00272 pass (phases.0.atoms.0.biso) | 1.4e-06 | 0.00272 pass | pass | 0.00272 pass | 0.00272 / 0.00272 pass (phases.0.atoms.0.biso) | 5 / 0 (R basins 1) |
+| ftol1e-6 | bigcell | ref | 0.0075 pass (phases.0.atoms.4.y) | 4.3 | 0.000703 pass | pass | 0 pass | 0.0075 / 0.00748 pass (phases.0.atoms.4.y) | 5 / 0 (R basins 2) |
+| gsas | srm660c | ref | 0.0464 pass (instrument.profile.w) | 2e-07 | 0.0464 pass | pass | 0.0464 pass | 0.0464 / 0.0464 pass (instrument.profile.w) | 5 / 0 (R basins 1) |
+| gsas | fap | ref | 0.0442 pass (instrument.geometry.axial_sl) | 5.2e-08 | 0.0442 pass | pass | 0.0442 pass | 0.0442 / 0.0442 pass (instrument.geometry.axial_sl) | 5 / 0 (R basins 1) |
+| gsas | nac | ref | 0.0267 pass (phases.1.cell.a) | 1.1e-07 | 0.0267 pass | pass | 0.0267 pass | 0.0267 / 0.0267 pass (phases.1.cell.a) | 5 / 0 (R basins 1) |
+| gsas | cpd1a | ref | 0.058 pass (phases.0.atoms.0.biso) | 1.4e-06 | 0.058 pass | pass | 0.058 pass | 0.058 / 0.058 pass (phases.0.atoms.0.biso) | 5 / 0 (R basins 1) |
+| gsas | bigcell | ref | 0.00902 pass (phases.0.atoms.4.y) | 4.3 | 0.000989 pass | pass | 0 pass | 0.00902 / 0.009 pass (phases.0.atoms.4.y) | 5 / 0 (R basins 2) |
+| ftol1e-3 | srm660c | ref | 0.0257 pass (instrument.profile.v) | 2e-07 | 0.0257 pass | pass | 0.0257 pass | 0.0257 / 0.0257 pass (instrument.profile.v) | 5 / 0 (R basins 1) |
+| ftol1e-3 | fap | ref | 0.00472 pass (instrument.geometry.axial_sl) | 5.2e-08 | 0.00472 pass | pass | 0.00472 pass | 0.00472 / 0.00472 pass (instrument.geometry.axial_sl) | 5 / 0 (R basins 1) |
+| ftol1e-3 | nac | ref | 0.00374 pass (phases.1.cell.a) | 1.1e-07 | 0.00374 pass | pass | 0.00374 pass | 0.00374 / 0.00374 pass (phases.1.cell.a) | 5 / 0 (R basins 1) |
+| ftol1e-3 | cpd1a | ref | 0.016 pass (phases.0.atoms.0.biso) | 1.4e-06 | 0.016 pass | pass | 0.016 pass | 0.016 / 0.016 pass (phases.0.atoms.0.biso) | 5 / 0 (R basins 1) |
+| ftol1e-3 | bigcell | ref | 0.0075 pass (phases.0.atoms.4.y) | 4.3 | 0.000703 pass | pass | 0 pass | 0.0075 / 0.00748 pass (phases.0.atoms.4.y) | 5 / 0 (R basins 2) |
+| ftol1e-2 | srm660c | ref | 0.0257 pass (instrument.profile.v) | 2e-07 | 0.0257 pass | pass | 0.0257 pass | 0.0257 / 0.0257 pass (instrument.profile.v) | 5 / 0 (R basins 1) |
+| ftol1e-2 | fap | ref | 0.0151 pass (instrument.geometry.axial_sl) | 5.2e-08 | 0.0151 pass | pass | 0.0151 pass | 0.0151 / 0.0151 pass (instrument.geometry.axial_sl) | 5 / 0 (R basins 1) |
+| ftol1e-2 | nac | ref | 0.00374 pass (phases.1.cell.a) | 1.1e-07 | 0.00374 pass | pass | 0.00374 pass | 0.00374 / 0.00374 pass (phases.1.cell.a) | 5 / 0 (R basins 1) |
+| ftol1e-2 | cpd1a | ref | 0.016 pass (phases.0.atoms.0.biso) | 1.4e-06 | 0.016 pass | pass | 0.016 pass | 0.016 / 0.016 pass (phases.0.atoms.0.biso) | 5 / 0 (R basins 1) |
+| ftol1e-2 | bigcell | ref | 0.0075 pass (phases.0.atoms.4.y) | 4.3 | 0.000703 pass | pass | 0 pass | 0.0075 / 0.00748 pass (phases.0.atoms.4.y) | 5 / 0 (R basins 2) |
+| ftol1e-1 | srm660c | ref | 0.0342 pass (instrument.profile.w) | 2e-07 | 0.0342 pass | pass | 0.0342 pass | 0.0342 / 0.0342 pass (instrument.profile.w) | 5 / 0 (R basins 1) |
+| ftol1e-1 | fap | ref | 0.0151 pass (instrument.geometry.axial_sl) | 5.2e-08 | 0.0151 pass | pass | 0.0151 pass | 0.0151 / 0.0151 pass (instrument.geometry.axial_sl) | 5 / 0 (R basins 1) |
+| ftol1e-1 | nac | ref | 0.00996 pass (phases.1.cell.a) | 1.1e-07 | 0.00996 pass | pass | 0.00996 pass | 0.00996 / 0.00996 pass (phases.1.cell.a) | 5 / 0 (R basins 1) |
+| ftol1e-1 | cpd1a | ref | 0.0307 pass (phases.0.atoms.0.biso) | 1.4e-06 | 0.0307 pass | pass | 0.0307 pass | 0.0307 / 0.0307 pass (phases.0.atoms.0.biso) | 5 / 0 (R basins 1) |
+| ftol1e-1 | bigcell | ref | 0.0075 pass (phases.0.atoms.4.y) | 4.3 | 0.000703 pass | pass | 0 pass | 0.0075 / 0.00748 pass (phases.0.atoms.4.y) | 5 / 0 (R basins 2) |
+| cw1e-2 | srm660c | cw1e-3 | 0.462 FAIL (instrument.background.c0) | 1.4e-07 | 0.462 FAIL | FAIL | 0.462 FAIL | 0.462 / 0.462 FAIL (instrument.background.c0) | 5 / 0 (R basins 1) |
+| cw1e-2 | fap | cw1e-3 | 1.31 FAIL (instrument.background.c0) | 6.6e-08 | 1.31 FAIL | FAIL | 1.31 FAIL | 1.31 / 1.31 FAIL (instrument.background.c0) | 5 / 0 (R basins 1) |
+| cw1e-2 | nac | cw1e-3 | 0.29 FAIL (instrument.background.c0) | 1.4e-07 | 0.29 FAIL | FAIL | 0.29 FAIL | 0.29 / 0.29 FAIL (instrument.background.c0) | 5 / 0 (R basins 1) |
+| cw1e-2 | cpd1a | cw1e-3 | 0.691 FAIL (instrument.background.c3) | 1.4e-06 | 0.691 FAIL | FAIL | 0.691 FAIL | 0.691 / 0.691 FAIL (instrument.background.c3) | 5 / 0 (R basins 1) |
+| cw1e-2 | bigcell | cw1e-3 | 1.63 FAIL (instrument.background.c0) | 4 | 1.56 FAIL | FAIL | 0 pass | 1.63 / 1.63 FAIL (instrument.background.c0) | 5 / 0 (R basins 2) |
+| cw1e-1 | srm660c | cw1e-3 | 6.04 FAIL (instrument.background.c0) | 1.4e-07 | 6.04 FAIL | FAIL | 6.04 FAIL | 6.04 / 6.04 FAIL (instrument.background.c0) | 5 / 0 (R basins 1) |
+| cw1e-1 | fap | cw1e-3 | 5.45 FAIL (instrument.background.c0) | 6.6e-08 | 5.45 FAIL | FAIL | 5.45 FAIL | 5.45 / 5.45 FAIL (instrument.background.c0) | 5 / 0 (R basins 1) |
+| cw1e-1 | nac | cw1e-3 | 0.413 FAIL (instrument.background.c0) | 1.4e-07 | 0.413 FAIL | FAIL | 0.413 FAIL | 0.413 / 0.413 FAIL (instrument.background.c0) | 5 / 0 (R basins 1) |
+| cw1e-1 | cpd1a | cw1e-3 | 2.42 FAIL (instrument.background.c2) | 1.4e-06 | 2.42 FAIL | FAIL | 2.42 FAIL | 2.42 / 2.42 FAIL (instrument.background.c2) | 5 / 0 (R basins 1) |
+| cw1e-1 | bigcell | cw1e-3 | 7.17 FAIL (instrument.background.c0) | 4 | 7.1 FAIL | FAIL | 3.14 FAIL | 7.2 / 7.17 FAIL (instrument.background.c0) | 5 / 0 (R basins 2) |
+| cwNone | srm660c | cw1e-3 | 0.716 FAIL (instrument.background.c0) | 1.4e-07 | 0.716 FAIL | FAIL | 0.716 FAIL | 0.716 / 0.716 FAIL (instrument.background.c0) | 5 / 0 (R basins 1) |
+| cwNone | fap | cw1e-3 | 2.25 FAIL (instrument.background.c0) | 6.6e-08 | 2.25 FAIL | FAIL | 2.25 FAIL | 2.25 / 2.25 FAIL (instrument.background.c0) | 5 / 0 (R basins 1) |
+| cwNone | nac | cw1e-3 | 0.349 FAIL (instrument.background.c0) | 1.4e-07 | 0.349 FAIL | FAIL | 0.349 FAIL | 0.349 / 0.349 FAIL (instrument.background.c0) | 5 / 0 (R basins 1) |
+| cwNone | cpd1a | cw1e-3 | 1.3 FAIL (instrument.background.c2) | 1.4e-06 | 1.3 FAIL | FAIL | 1.3 FAIL | 1.3 / 1.3 FAIL (instrument.background.c2) | 5 / 0 (R basins 1) |
+| cwNone | bigcell | cw1e-3 | 3 FAIL (instrument.background.c0) | 4 | 2.93 FAIL | FAIL | 0 pass | 3 / 3 FAIL (instrument.background.c0) | 5 / 0 (R basins 2) |
+
+## M2 readings (K = 10 nudges/pairs; bar 0.1 esd)
+
+| setting | fixture | ref | naive (param) | floor max | floor_sub | floor_cmp | floor_glob (naive - max floor) | paired max / median (param) | pairs used / split |
+|---|---|---|---|---|---|---|---|---|---|
+| ftol1e-6 | srm660c | ref | 0 pass (phases.0.cell.a) | 2.3e-07 | 0 pass | pass | 0 pass | 0 / 0 pass (phases.0.cell.a) | 10 / 0 (R basins 1) |
+| ftol1e-6 | fap | ref | 0.000393 pass (instrument.geometry.axial_sl) | 1e-07 | 0.000393 pass | pass | 0.000393 pass | 0.000393 / 0.000393 pass (instrument.geometry.axial_sl) | 10 / 0 (R basins 1) |
+| ftol1e-6 | nac | ref | 0.000507 pass (phases.1.cell.a) | 1.4e-07 | 0.000507 pass | pass | 0.000507 pass | 0.000507 / 0.000507 pass (phases.1.cell.a) | 10 / 0 (R basins 1) |
+| ftol1e-6 | cpd1a | ref | 0.00272 pass (phases.0.atoms.0.biso) | 1.4e-06 | 0.00272 pass | pass | 0.00272 pass | 0.00272 / 0.00272 pass (phases.0.atoms.0.biso) | 10 / 0 (R basins 1) |
+| ftol1e-6 | bigcell | ref | 0.0075 pass (phases.0.atoms.4.y) | 4.3 | 0.000611 pass | pass | 0 pass | 0.00751 / 0.00749 pass (phases.0.atoms.4.y) | 10 / 0 (R basins 2) |
+| gsas | srm660c | ref | 0.0464 pass (instrument.profile.w) | 2.3e-07 | 0.0464 pass | pass | 0.0464 pass | 0.0464 / 0.0464 pass (instrument.profile.w) | 10 / 0 (R basins 1) |
+| gsas | fap | ref | 0.0442 pass (instrument.geometry.axial_sl) | 1e-07 | 0.0442 pass | pass | 0.0442 pass | 0.0442 / 0.0442 pass (instrument.geometry.axial_sl) | 10 / 0 (R basins 1) |
+| gsas | nac | ref | 0.0267 pass (phases.1.cell.a) | 1.4e-07 | 0.0267 pass | pass | 0.0267 pass | 0.0267 / 0.0267 pass (phases.1.cell.a) | 10 / 0 (R basins 1) |
+| gsas | cpd1a | ref | 0.058 pass (phases.0.atoms.0.biso) | 1.4e-06 | 0.058 pass | pass | 0.058 pass | 0.058 / 0.058 pass (phases.0.atoms.0.biso) | 10 / 0 (R basins 1) |
+| gsas | bigcell | ref | 0.00902 pass (phases.0.atoms.4.y) | 4.3 | 0.000897 pass | pass | 0 pass | 0.00903 / 0.00901 pass (phases.0.atoms.4.y) | 10 / 0 (R basins 2) |
+| ftol1e-3 | srm660c | ref | 0.0257 pass (instrument.profile.v) | 2.3e-07 | 0.0257 pass | pass | 0.0257 pass | 0.0257 / 0.0257 pass (instrument.profile.v) | 10 / 0 (R basins 1) |
+| ftol1e-3 | fap | ref | 0.00472 pass (instrument.geometry.axial_sl) | 1e-07 | 0.00472 pass | pass | 0.00472 pass | 0.00472 / 0.00472 pass (instrument.geometry.axial_sl) | 10 / 0 (R basins 1) |
+| ftol1e-3 | nac | ref | 0.00374 pass (phases.1.cell.a) | 1.4e-07 | 0.00374 pass | pass | 0.00374 pass | 0.00374 / 0.00374 pass (phases.1.cell.a) | 10 / 0 (R basins 1) |
+| ftol1e-3 | cpd1a | ref | 0.016 pass (phases.0.atoms.0.biso) | 1.4e-06 | 0.016 pass | pass | 0.016 pass | 0.016 / 0.016 pass (phases.0.atoms.0.biso) | 10 / 0 (R basins 1) |
+| ftol1e-3 | bigcell | ref | 0.0075 pass (phases.0.atoms.4.y) | 4.3 | 0.000611 pass | pass | 0 pass | 0.00751 / 0.00749 pass (phases.0.atoms.4.y) | 10 / 0 (R basins 2) |
+| ftol1e-2 | srm660c | ref | 0.0257 pass (instrument.profile.v) | 2.3e-07 | 0.0257 pass | pass | 0.0257 pass | 0.0257 / 0.0257 pass (instrument.profile.v) | 10 / 0 (R basins 1) |
+| ftol1e-2 | fap | ref | 0.0151 pass (instrument.geometry.axial_sl) | 1e-07 | 0.0151 pass | pass | 0.0151 pass | 0.0151 / 0.0151 pass (instrument.geometry.axial_sl) | 10 / 0 (R basins 1) |
+| ftol1e-2 | nac | ref | 0.00374 pass (phases.1.cell.a) | 1.4e-07 | 0.00374 pass | pass | 0.00374 pass | 0.00374 / 0.00374 pass (phases.1.cell.a) | 10 / 0 (R basins 1) |
+| ftol1e-2 | cpd1a | ref | 0.016 pass (phases.0.atoms.0.biso) | 1.4e-06 | 0.016 pass | pass | 0.016 pass | 0.016 / 0.016 pass (phases.0.atoms.0.biso) | 10 / 0 (R basins 1) |
+| ftol1e-2 | bigcell | ref | 0.0075 pass (phases.0.atoms.4.y) | 4.3 | 0.000611 pass | pass | 0 pass | 0.00751 / 0.00749 pass (phases.0.atoms.4.y) | 10 / 0 (R basins 2) |
+| ftol1e-1 | srm660c | ref | 0.0342 pass (instrument.profile.w) | 2.3e-07 | 0.0342 pass | pass | 0.0342 pass | 0.0342 / 0.0342 pass (instrument.profile.w) | 10 / 0 (R basins 1) |
+| ftol1e-1 | fap | ref | 0.0151 pass (instrument.geometry.axial_sl) | 1e-07 | 0.0151 pass | pass | 0.0151 pass | 0.0151 / 0.0151 pass (instrument.geometry.axial_sl) | 10 / 0 (R basins 1) |
+| ftol1e-1 | nac | ref | 0.00996 pass (phases.1.cell.a) | 1.4e-07 | 0.00996 pass | pass | 0.00996 pass | 0.00996 / 0.00996 pass (phases.1.cell.a) | 10 / 0 (R basins 1) |
+| ftol1e-1 | cpd1a | ref | 0.0307 pass (phases.0.atoms.0.biso) | 1.4e-06 | 0.0307 pass | pass | 0.0307 pass | 0.0307 / 0.0307 pass (phases.0.atoms.0.biso) | 10 / 0 (R basins 1) |
+| ftol1e-1 | bigcell | ref | 0.0075 pass (phases.0.atoms.4.y) | 4.3 | 0.000611 pass | pass | 0 pass | 0.00751 / 0.00749 pass (phases.0.atoms.4.y) | 10 / 0 (R basins 2) |
+| cw1e-2 | srm660c | cw1e-3 | 0.462 FAIL (instrument.background.c0) | 1.9e-07 | 0.462 FAIL | FAIL | 0.462 FAIL | 0.462 / 0.462 FAIL (instrument.background.c0) | 10 / 0 (R basins 1) |
+| cw1e-2 | fap | cw1e-3 | 1.31 FAIL (instrument.background.c0) | 8.7e-08 | 1.31 FAIL | FAIL | 1.31 FAIL | 1.31 / 1.31 FAIL (instrument.background.c0) | 10 / 0 (R basins 1) |
+| cw1e-2 | nac | cw1e-3 | 0.29 FAIL (instrument.background.c0) | 1.5e-07 | 0.29 FAIL | FAIL | 0.29 FAIL | 0.29 / 0.29 FAIL (instrument.background.c0) | 10 / 0 (R basins 1) |
+| cw1e-2 | cpd1a | cw1e-3 | 0.691 FAIL (instrument.background.c3) | 1.4e-06 | 0.691 FAIL | FAIL | 0.691 FAIL | 0.691 / 0.691 FAIL (instrument.background.c3) | 10 / 0 (R basins 1) |
+| cw1e-2 | bigcell | cw1e-3 | 1.63 FAIL (instrument.background.c0) | 4 | 1.56 FAIL | FAIL | 0 pass | 1.63 / 1.63 FAIL (instrument.background.c0) | 10 / 0 (R basins 2) |
+| cw1e-1 | srm660c | cw1e-3 | 6.04 FAIL (instrument.background.c0) | 1.9e-07 | 6.04 FAIL | FAIL | 6.04 FAIL | 6.04 / 6.04 FAIL (instrument.background.c0) | 10 / 0 (R basins 1) |
+| cw1e-1 | fap | cw1e-3 | 5.45 FAIL (instrument.background.c0) | 8.7e-08 | 5.45 FAIL | FAIL | 5.45 FAIL | 5.45 / 5.45 FAIL (instrument.background.c0) | 10 / 0 (R basins 1) |
+| cw1e-1 | nac | cw1e-3 | 0.413 FAIL (instrument.background.c0) | 1.5e-07 | 0.413 FAIL | FAIL | 0.413 FAIL | 0.413 / 0.413 FAIL (instrument.background.c0) | 10 / 0 (R basins 1) |
+| cw1e-1 | cpd1a | cw1e-3 | 2.42 FAIL (instrument.background.c2) | 1.4e-06 | 2.42 FAIL | FAIL | 2.42 FAIL | 2.42 / 2.42 FAIL (instrument.background.c2) | 10 / 0 (R basins 1) |
+| cw1e-1 | bigcell | cw1e-3 | 7.17 FAIL (instrument.background.c0) | 4 | 7.1 FAIL | FAIL | 3.14 FAIL | 7.2 / 7.17 FAIL (instrument.background.c0) | 10 / 0 (R basins 2) |
+| cwNone | srm660c | cw1e-3 | 0.716 FAIL (instrument.background.c0) | 1.9e-07 | 0.716 FAIL | FAIL | 0.716 FAIL | 0.716 / 0.716 FAIL (instrument.background.c0) | 10 / 0 (R basins 1) |
+| cwNone | fap | cw1e-3 | 2.25 FAIL (instrument.background.c0) | 8.7e-08 | 2.25 FAIL | FAIL | 2.25 FAIL | 2.25 / 2.25 FAIL (instrument.background.c0) | 10 / 0 (R basins 1) |
+| cwNone | nac | cw1e-3 | 0.349 FAIL (instrument.background.c0) | 1.5e-07 | 0.349 FAIL | FAIL | 0.349 FAIL | 0.349 / 0.349 FAIL (instrument.background.c0) | 10 / 0 (R basins 1) |
+| cwNone | cpd1a | cw1e-3 | 1.3 FAIL (instrument.background.c2) | 1.4e-06 | 1.3 FAIL | FAIL | 1.3 FAIL | 1.3 / 1.3 FAIL (instrument.background.c2) | 10 / 0 (R basins 1) |
+| cwNone | bigcell | cw1e-3 | 3 FAIL (instrument.background.c0) | 4 | 2.93 FAIL | FAIL | 0 pass | 3 / 3 FAIL (instrument.background.c0) | 10 / 0 (R basins 2) |
+
+### the same, background coefficients excluded (K = 5)
+
+## M2 readings (K = 5 nudges/pairs; bar 0.1 esd)
+
+| setting | fixture | ref | naive (param) | floor max | floor_sub | floor_cmp | floor_glob (naive - max floor) | paired max / median (param) | pairs used / split |
+|---|---|---|---|---|---|---|---|---|---|
+| ftol1e-6 | srm660c | ref | 0 pass (phases.0.cell.a) | 2e-07 | 0 pass | pass | 0 pass | 0 / 0 pass (phases.0.cell.a) | 5 / 0 (R basins 1) |
+| ftol1e-6 | fap | ref | 0.000393 pass (instrument.geometry.axial_sl) | 5.2e-08 | 0.000393 pass | pass | 0.000393 pass | 0.000393 / 0.000393 pass (instrument.geometry.axial_sl) | 5 / 0 (R basins 1) |
+| ftol1e-6 | nac | ref | 0.000507 pass (phases.1.cell.a) | 1.1e-07 | 0.000507 pass | pass | 0.000507 pass | 0.000507 / 0.000507 pass (phases.1.cell.a) | 5 / 0 (R basins 1) |
+| ftol1e-6 | cpd1a | ref | 0.00272 pass (phases.0.atoms.0.biso) | 1.4e-06 | 0.00272 pass | pass | 0.00272 pass | 0.00272 / 0.00272 pass (phases.0.atoms.0.biso) | 5 / 0 (R basins 1) |
+| ftol1e-6 | bigcell | ref | 0.0075 pass (phases.0.atoms.4.y) | 4.3 | 0.000703 pass | pass | 0 pass | 0.0075 / 0.00748 pass (phases.0.atoms.4.y) | 5 / 0 (R basins 2) |
+| gsas | srm660c | ref | 0.0464 pass (instrument.profile.w) | 2e-07 | 0.0464 pass | pass | 0.0464 pass | 0.0464 / 0.0464 pass (instrument.profile.w) | 5 / 0 (R basins 1) |
+| gsas | fap | ref | 0.0442 pass (instrument.geometry.axial_sl) | 5.2e-08 | 0.0442 pass | pass | 0.0442 pass | 0.0442 / 0.0442 pass (instrument.geometry.axial_sl) | 5 / 0 (R basins 1) |
+| gsas | nac | ref | 0.0267 pass (phases.1.cell.a) | 1.1e-07 | 0.0267 pass | pass | 0.0267 pass | 0.0267 / 0.0267 pass (phases.1.cell.a) | 5 / 0 (R basins 1) |
+| gsas | cpd1a | ref | 0.058 pass (phases.0.atoms.0.biso) | 1.4e-06 | 0.058 pass | pass | 0.058 pass | 0.058 / 0.058 pass (phases.0.atoms.0.biso) | 5 / 0 (R basins 1) |
+| gsas | bigcell | ref | 0.00902 pass (phases.0.atoms.4.y) | 4.3 | 0.000989 pass | pass | 0 pass | 0.00902 / 0.009 pass (phases.0.atoms.4.y) | 5 / 0 (R basins 2) |
+| ftol1e-3 | srm660c | ref | 0.0257 pass (instrument.profile.v) | 2e-07 | 0.0257 pass | pass | 0.0257 pass | 0.0257 / 0.0257 pass (instrument.profile.v) | 5 / 0 (R basins 1) |
+| ftol1e-3 | fap | ref | 0.00472 pass (instrument.geometry.axial_sl) | 5.2e-08 | 0.00472 pass | pass | 0.00472 pass | 0.00472 / 0.00472 pass (instrument.geometry.axial_sl) | 5 / 0 (R basins 1) |
+| ftol1e-3 | nac | ref | 0.00374 pass (phases.1.cell.a) | 1.1e-07 | 0.00374 pass | pass | 0.00374 pass | 0.00374 / 0.00374 pass (phases.1.cell.a) | 5 / 0 (R basins 1) |
+| ftol1e-3 | cpd1a | ref | 0.016 pass (phases.0.atoms.0.biso) | 1.4e-06 | 0.016 pass | pass | 0.016 pass | 0.016 / 0.016 pass (phases.0.atoms.0.biso) | 5 / 0 (R basins 1) |
+| ftol1e-3 | bigcell | ref | 0.0075 pass (phases.0.atoms.4.y) | 4.3 | 0.000703 pass | pass | 0 pass | 0.0075 / 0.00748 pass (phases.0.atoms.4.y) | 5 / 0 (R basins 2) |
+| ftol1e-2 | srm660c | ref | 0.0257 pass (instrument.profile.v) | 2e-07 | 0.0257 pass | pass | 0.0257 pass | 0.0257 / 0.0257 pass (instrument.profile.v) | 5 / 0 (R basins 1) |
+| ftol1e-2 | fap | ref | 0.0151 pass (instrument.geometry.axial_sl) | 5.2e-08 | 0.0151 pass | pass | 0.0151 pass | 0.0151 / 0.0151 pass (instrument.geometry.axial_sl) | 5 / 0 (R basins 1) |
+| ftol1e-2 | nac | ref | 0.00374 pass (phases.1.cell.a) | 1.1e-07 | 0.00374 pass | pass | 0.00374 pass | 0.00374 / 0.00374 pass (phases.1.cell.a) | 5 / 0 (R basins 1) |
+| ftol1e-2 | cpd1a | ref | 0.016 pass (phases.0.atoms.0.biso) | 1.4e-06 | 0.016 pass | pass | 0.016 pass | 0.016 / 0.016 pass (phases.0.atoms.0.biso) | 5 / 0 (R basins 1) |
+| ftol1e-2 | bigcell | ref | 0.0075 pass (phases.0.atoms.4.y) | 4.3 | 0.000703 pass | pass | 0 pass | 0.0075 / 0.00748 pass (phases.0.atoms.4.y) | 5 / 0 (R basins 2) |
+| ftol1e-1 | srm660c | ref | 0.0342 pass (instrument.profile.w) | 2e-07 | 0.0342 pass | pass | 0.0342 pass | 0.0342 / 0.0342 pass (instrument.profile.w) | 5 / 0 (R basins 1) |
+| ftol1e-1 | fap | ref | 0.0151 pass (instrument.geometry.axial_sl) | 5.2e-08 | 0.0151 pass | pass | 0.0151 pass | 0.0151 / 0.0151 pass (instrument.geometry.axial_sl) | 5 / 0 (R basins 1) |
+| ftol1e-1 | nac | ref | 0.00996 pass (phases.1.cell.a) | 1.1e-07 | 0.00996 pass | pass | 0.00996 pass | 0.00996 / 0.00996 pass (phases.1.cell.a) | 5 / 0 (R basins 1) |
+| ftol1e-1 | cpd1a | ref | 0.0307 pass (phases.0.atoms.0.biso) | 1.4e-06 | 0.0307 pass | pass | 0.0307 pass | 0.0307 / 0.0307 pass (phases.0.atoms.0.biso) | 5 / 0 (R basins 1) |
+| ftol1e-1 | bigcell | ref | 0.0075 pass (phases.0.atoms.4.y) | 4.3 | 0.000703 pass | pass | 0 pass | 0.0075 / 0.00748 pass (phases.0.atoms.4.y) | 5 / 0 (R basins 2) |
+| cw1e-2 | srm660c | cw1e-3 | 0.047 pass (phases.0.atoms.1.biso) | 1.4e-07 | 0.047 pass | pass | 0.047 pass | 0.047 / 0.047 pass (phases.0.atoms.1.biso) | 5 / 0 (R basins 1) |
+| cw1e-2 | fap | cw1e-3 | 0.052 pass (phases.0.atoms.4.biso) | 6.6e-08 | 0.052 pass | pass | 0.052 pass | 0.052 / 0.052 pass (phases.0.atoms.4.biso) | 5 / 0 (R basins 1) |
+| cw1e-2 | nac | cw1e-3 | 0.00985 pass (instrument.profile.x) | 1.4e-07 | 0.00985 pass | pass | 0.00985 pass | 0.00985 / 0.00985 pass (instrument.profile.x) | 5 / 0 (R basins 1) |
+| cw1e-2 | cpd1a | cw1e-3 | 0.183 FAIL (phases.0.atoms.0.biso) | 1.4e-06 | 0.183 FAIL | FAIL | 0.183 FAIL | 0.183 / 0.183 FAIL (phases.0.atoms.0.biso) | 5 / 0 (R basins 1) |
+| cw1e-2 | bigcell | cw1e-3 | 0.456 FAIL (phases.0.atoms.10.biso) | 4 | 0.367 FAIL | FAIL | 0 pass | 0.627 / 0.456 FAIL (phases.0.atoms.27.x) | 5 / 0 (R basins 2) |
+| cw1e-1 | srm660c | cw1e-3 | 1.03 FAIL (instrument.profile.x) | 1.4e-07 | 1.03 FAIL | FAIL | 1.03 FAIL | 1.03 / 1.03 FAIL (instrument.profile.x) | 5 / 0 (R basins 1) |
+| cw1e-1 | fap | cw1e-3 | 1.82 FAIL (phases.0.lor_size) | 6.6e-08 | 1.82 FAIL | FAIL | 1.82 FAIL | 1.82 / 1.82 FAIL (phases.0.lor_size) | 5 / 0 (R basins 1) |
+| cw1e-1 | nac | cw1e-3 | 0.0316 pass (instrument.profile.x) | 1.4e-07 | 0.0316 pass | pass | 0.0316 pass | 0.0316 / 0.0316 pass (instrument.profile.x) | 5 / 0 (R basins 1) |
+| cw1e-1 | cpd1a | cw1e-3 | 0.518 FAIL (phases.0.scale) | 1.4e-06 | 0.518 FAIL | FAIL | 0.518 FAIL | 0.518 / 0.518 FAIL (phases.0.scale) | 5 / 0 (R basins 1) |
+| cw1e-1 | bigcell | cw1e-3 | 3.14 FAIL (phases.0.atoms.16.biso) | 4 | 3.14 FAIL | FAIL | 0 pass | 3.65 / 3.14 FAIL (phases.0.atoms.27.x) | 5 / 0 (R basins 2) |
+| cwNone | srm660c | cw1e-3 | 0.0979 pass (instrument.profile.x) | 1.4e-07 | 0.0979 pass | pass | 0.0979 pass | 0.0979 / 0.0979 pass (instrument.profile.x) | 5 / 0 (R basins 1) |
+| cwNone | fap | cw1e-3 | 0.42 FAIL (phases.0.lor_size) | 6.6e-08 | 0.42 FAIL | FAIL | 0.42 FAIL | 0.42 / 0.42 FAIL (phases.0.lor_size) | 5 / 0 (R basins 1) |
+| cwNone | nac | cw1e-3 | 0.0194 pass (instrument.profile.x) | 1.4e-07 | 0.0194 pass | pass | 0.0194 pass | 0.0194 / 0.0194 pass (instrument.profile.x) | 5 / 0 (R basins 1) |
+| cwNone | cpd1a | cw1e-3 | 0.307 FAIL (phases.1.scale) | 1.4e-06 | 0.307 FAIL | FAIL | 0.307 FAIL | 0.307 / 0.307 FAIL (phases.1.scale) | 5 / 0 (R basins 1) |
+| cwNone | bigcell | cw1e-3 | 0.742 FAIL (phases.0.atoms.35.y) | 4 | 0.715 FAIL | FAIL | 0 pass | 1.05 / 0.742 FAIL (phases.0.atoms.23.y) | 5 / 0 (R basins 2) |
+
+## M3 injected error on bigcell (reference = 'refit', the same two-step fit with nothing held)
+
+| injection | K | naive (param) | floor_sub | floor_cmp | floor_glob | paired max / min (param) | pairs used / split | injected param: naive, F_p, paired per pair |
+|---|---|---|---|---|---|---|---|---|
+| phases.0.atoms.23.x +0.4 | 5 | 0.4 FAIL (phases.0.atoms.23.x) | 0.189 FAIL | FAIL | 0 pass | 0.523 / 0.4 FAIL (phases.0.atoms.27.x) | 5 / 0 | 0.4, 3.02, [+0.400, +0.400, +0.399, +0.400, +0.399]; set moved it 0.4000-0.4000 |
+| phases.0.atoms.23.x +0.4 | 10 | 0.4 FAIL (phases.0.atoms.23.x) | 0.189 FAIL | FAIL | 0 pass | 0.525 / 0.4 FAIL (phases.0.atoms.27.x) | 10 / 0 | 0.4, 3.02, [+0.400, +0.400, +0.399, +0.400, +0.399, +0.400, +0.400, +0.400, +0.400, +0.400]; set moved it 0.4000-0.4000 |
+| phases.0.atoms.4.y +0.4 | 5 | 0.4 FAIL (phases.0.atoms.4.y) | 0.302 FAIL | FAIL | 0 pass | 0.4 / 0.399 FAIL (phases.0.atoms.4.y) | 5 / 0 | 0.4, 0.098, [+0.400, +0.400, +0.399, +0.400, +0.399]; set moved it 0.4000-0.4000 |
+| phases.0.atoms.4.y +0.4 | 10 | 0.4 FAIL (phases.0.atoms.4.y) | 0.302 FAIL | FAIL | 0 pass | 0.4 / 0.399 FAIL (phases.0.atoms.4.y) | 10 / 0 | 0.4, 0.098, [+0.400, +0.400, +0.399, +0.400, +0.399, +0.400, +0.400, +0.400, +0.400, +0.400]; set moved it 0.4000-0.4000 |
+
+## M4 direction of cell moves under the window settings (paired, same basin)
+
+| setting | fixture | param | n pairs | n positive | median shift/esd | min | max |
+|---|---|---|---|---|---|---|---|
+| cw1e-2 | srm660c | phases.0.cell.a | 11 | 11 | 0.0126 | 0.0126 | 0.0126 |
+| cw1e-2 | srm660c | phases.0.cell.b | 11 | 11 | 0.0126 | 0.0126 | 0.0126 |
+| cw1e-2 | srm660c | phases.0.cell.c | 11 | 11 | 0.0126 | 0.0126 | 0.0126 |
+| cw1e-2 | fap | phases.0.cell.a | 11 | 11 | 0.00315 | 0.00315 | 0.00315 |
+| cw1e-2 | fap | phases.0.cell.b | 11 | 11 | 0.00315 | 0.00315 | 0.00315 |
+| cw1e-2 | fap | phases.0.cell.c | 11 | 11 | 0.014 | 0.014 | 0.014 |
+| cw1e-2 | nac | phases.0.cell.a | 11 | 0 | -0.000375 | -0.000375 | -0.000375 |
+| cw1e-2 | nac | phases.0.cell.b | 11 | 0 | -0.000375 | -0.000375 | -0.000375 |
+| cw1e-2 | nac | phases.0.cell.c | 11 | 0 | -0.000375 | -0.000375 | -0.000375 |
+| cw1e-2 | nac | phases.1.cell.a | 11 | 11 | 0.00155 | 0.00155 | 0.00155 |
+| cw1e-2 | nac | phases.1.cell.b | 11 | 11 | 0.00155 | 0.00155 | 0.00155 |
+| cw1e-2 | nac | phases.1.cell.c | 11 | 11 | 0.00155 | 0.00155 | 0.00155 |
+| cw1e-2 | cpd1a | phases.0.cell.a | 11 | 0 | -0.0019 | -0.0019 | -0.0019 |
+| cw1e-2 | cpd1a | phases.0.cell.b | 11 | 0 | -0.0019 | -0.0019 | -0.0019 |
+| cw1e-2 | cpd1a | phases.0.cell.c | 11 | 0 | -0.0191 | -0.0191 | -0.0191 |
+| cw1e-2 | cpd1a | phases.1.cell.a | 11 | 0 | -0.01 | -0.01 | -0.01 |
+| cw1e-2 | cpd1a | phases.1.cell.b | 11 | 0 | -0.01 | -0.01 | -0.01 |
+| cw1e-2 | cpd1a | phases.1.cell.c | 11 | 0 | -0.012 | -0.012 | -0.012 |
+| cw1e-2 | cpd1a | phases.2.cell.a | 11 | 0 | -0.0162 | -0.0162 | -0.0162 |
+| cw1e-2 | cpd1a | phases.2.cell.b | 11 | 0 | -0.0162 | -0.0162 | -0.0162 |
+| cw1e-2 | cpd1a | phases.2.cell.c | 11 | 0 | -0.0162 | -0.0162 | -0.0162 |
+| cw1e-2 | bigcell | phases.0.cell.a | 11 | 11 | 0.00213 | 0.00213 | 0.00408 |
+| cw1e-2 | bigcell | phases.0.cell.b | 11 | 11 | 0.0549 | 0.0549 | 0.0576 |
+| cw1e-2 | bigcell | phases.0.cell.c | 11 | 0 | -0.0223 | -0.0223 | -0.0218 |
+| cw1e-1 | srm660c | phases.0.cell.a | 11 | 11 | 0.325 | 0.325 | 0.325 |
+| cw1e-1 | srm660c | phases.0.cell.b | 11 | 11 | 0.325 | 0.325 | 0.325 |
+| cw1e-1 | srm660c | phases.0.cell.c | 11 | 11 | 0.325 | 0.325 | 0.325 |
+| cw1e-1 | fap | phases.0.cell.a | 11 | 0 | -0.831 | -0.831 | -0.831 |
+| cw1e-1 | fap | phases.0.cell.b | 11 | 0 | -0.831 | -0.831 | -0.831 |
+| cw1e-1 | fap | phases.0.cell.c | 11 | 0 | -0.648 | -0.648 | -0.648 |
+| cw1e-1 | nac | phases.0.cell.a | 11 | 0 | -0.000524 | -0.000524 | -0.000524 |
+| cw1e-1 | nac | phases.0.cell.b | 11 | 0 | -0.000524 | -0.000524 | -0.000524 |
+| cw1e-1 | nac | phases.0.cell.c | 11 | 0 | -0.000524 | -0.000524 | -0.000524 |
+| cw1e-1 | nac | phases.1.cell.a | 11 | 0 | -0.00152 | -0.00152 | -0.00152 |
+| cw1e-1 | nac | phases.1.cell.b | 11 | 0 | -0.00152 | -0.00152 | -0.00152 |
+| cw1e-1 | nac | phases.1.cell.c | 11 | 0 | -0.00152 | -0.00152 | -0.00152 |
+| cw1e-1 | cpd1a | phases.0.cell.a | 11 | 0 | -0.0607 | -0.0607 | -0.0607 |
+| cw1e-1 | cpd1a | phases.0.cell.b | 11 | 0 | -0.0607 | -0.0607 | -0.0607 |
+| cw1e-1 | cpd1a | phases.0.cell.c | 11 | 11 | 0.181 | 0.181 | 0.181 |
+| cw1e-1 | cpd1a | phases.1.cell.a | 11 | 11 | 0.0356 | 0.0356 | 0.0356 |
+| cw1e-1 | cpd1a | phases.1.cell.b | 11 | 11 | 0.0356 | 0.0356 | 0.0356 |
+| cw1e-1 | cpd1a | phases.1.cell.c | 11 | 0 | -0.0488 | -0.0488 | -0.0488 |
+| cw1e-1 | cpd1a | phases.2.cell.a | 11 | 11 | 0.0307 | 0.0307 | 0.0307 |
+| cw1e-1 | cpd1a | phases.2.cell.b | 11 | 11 | 0.0307 | 0.0307 | 0.0307 |
+| cw1e-1 | cpd1a | phases.2.cell.c | 11 | 11 | 0.0307 | 0.0307 | 0.0307 |
+| cw1e-1 | bigcell | phases.0.cell.a | 11 | 11 | 0.221 | 0.22 | 0.221 |
+| cw1e-1 | bigcell | phases.0.cell.b | 11 | 8 | 0.0203 | -0.079 | 0.0203 |
+| cw1e-1 | bigcell | phases.0.cell.c | 11 | 0 | -0.228 | -0.274 | -0.228 |
+| cwNone | srm660c | phases.0.cell.a | 11 | 11 | 0.0259 | 0.0259 | 0.0259 |
+| cwNone | srm660c | phases.0.cell.b | 11 | 11 | 0.0259 | 0.0259 | 0.0259 |
+| cwNone | srm660c | phases.0.cell.c | 11 | 11 | 0.0259 | 0.0259 | 0.0259 |
+| cwNone | fap | phases.0.cell.a | 11 | 0 | -0.181 | -0.181 | -0.181 |
+| cwNone | fap | phases.0.cell.b | 11 | 0 | -0.181 | -0.181 | -0.181 |
+| cwNone | fap | phases.0.cell.c | 11 | 0 | -0.114 | -0.114 | -0.114 |
+| cwNone | nac | phases.0.cell.a | 11 | 0 | -0.000511 | -0.000511 | -0.00051 |
+| cwNone | nac | phases.0.cell.b | 11 | 0 | -0.000511 | -0.000511 | -0.00051 |
+| cwNone | nac | phases.0.cell.c | 11 | 0 | -0.000511 | -0.000511 | -0.00051 |
+| cwNone | nac | phases.1.cell.a | 11 | 0 | -0.00137 | -0.00137 | -0.00137 |
+| cwNone | nac | phases.1.cell.b | 11 | 0 | -0.00137 | -0.00137 | -0.00137 |
+| cwNone | nac | phases.1.cell.c | 11 | 0 | -0.00137 | -0.00137 | -0.00137 |
+| cwNone | cpd1a | phases.0.cell.a | 11 | 0 | -0.0395 | -0.0395 | -0.0395 |
+| cwNone | cpd1a | phases.0.cell.b | 11 | 0 | -0.0395 | -0.0395 | -0.0395 |
+| cwNone | cpd1a | phases.0.cell.c | 11 | 11 | 0.0696 | 0.0696 | 0.0696 |
+| cwNone | cpd1a | phases.1.cell.a | 11 | 11 | 0.0103 | 0.0103 | 0.0103 |
+| cwNone | cpd1a | phases.1.cell.b | 11 | 11 | 0.0103 | 0.0103 | 0.0103 |
+| cwNone | cpd1a | phases.1.cell.c | 11 | 0 | -0.0011 | -0.0011 | -0.00109 |
+| cwNone | cpd1a | phases.2.cell.a | 11 | 11 | 0.00506 | 0.00506 | 0.00506 |
+| cwNone | cpd1a | phases.2.cell.b | 11 | 11 | 0.00506 | 0.00506 | 0.00506 |
+| cwNone | cpd1a | phases.2.cell.c | 11 | 11 | 0.00506 | 0.00506 | 0.00506 |
+| cwNone | bigcell | phases.0.cell.a | 11 | 11 | 0.00931 | 0.00931 | 0.0135 |
+| cwNone | bigcell | phases.0.cell.b | 11 | 11 | 0.0132 | 0.006 | 0.0132 |
+| cwNone | bigcell | phases.0.cell.c | 11 | 0 | -0.0857 | -0.0857 | -0.0849 |
+
+SRM 660c a: shipped answer 4.1568836 A, esd 1.49e-05 A (3.57 ppm); certificate 4.156882 (5.1 ppm); answer - cert = +0.4 ppm = +0.1 esd = +0.08 u_cert
+
+moves of exactly zero: 11
+moves inside 0.1 esd: 66, further from certificate 22 (33%); signs +22/-44
+moves outside 0.1 esd: 11, further from certificate 11 (100%); signs +11/-0
+
+  cw1e-1: n 11, shift/esd median +0.325 range [+0.325, +0.325], further 11
+  cw1e-2: n 11, shift/esd median +0.0126 range [+0.0126, +0.0126], further 11
+  cwNone: n 11, shift/esd median +0.0259 range [+0.0259, +0.0259], further 11
+  ftol1e-1: n 11, shift/esd median -0.00753 range [-0.00753, -0.00753], further 0
+  ftol1e-2: n 11, shift/esd median -0.00359 range [-0.00359, -0.00359], further 0
+  ftol1e-3: n 11, shift/esd median -0.00359 range [-0.00359, -0.00359], further 0
+  ftol1e-6: n 11, shift/esd median +0 range [+0, +0], further 0
+  gsas: n 11, shift/esd median -0.0112 range [-0.0112, -0.0112], further 0
+

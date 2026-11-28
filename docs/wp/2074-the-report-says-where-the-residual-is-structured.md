@@ -3,13 +3,15 @@
 Milestone: unscheduled · Status: ⬜
 Track: Render what the fit already knows
 Depends on: — (2004 soft: the report's tiers and thresholds land there first; 1931 soft: the auto P-spline's low-edge error is what every row meets first)
-Priority: P3 2026-10-31 — a view over what the fit already knows: report-only rows over stored curves, no action, no code; waits on the maintainer's ruling on whether the report grows them
+Priority: P3 2026-11-28 — a view over what the fit already knows: on-demand functions over stored curves, no action, no code; the surface was ruled 2026-11-17 (#1585), the tier-3 choices are still owed
 
 ## Goal
 
 A FitReport states, as numbers in data units, where its residual is coherent and how large
 that is, how far the fitted background bulges above its own lower hull, and which isolated
 lines carry a shifted copy of their own profile. Nothing in the fit changes and no code fires.
+*Since 2026-11-17:* each of these is a function a caller or agent runs on demand, and the
+report prints no row for them by default (Yue's ruling; see the decision below).
 
 ## Context
 
@@ -60,9 +62,51 @@ the scan is never quiet and the replica count is never zero. Options: always on 
 on demand only (a function a caller or agent runs), or the bulge alone always on. WP-2037's
 "attention is a cost" ruling bears on it. Then the tier-3 choices, dated.
 
+*Decided 2026-11-17 by Yue: on demand only.* The scan, the bulge and the replica table are
+built as on-demand functions with no always-printed rows. Recorded in the maintainer's note on
+#1585 (2026-11-17, "WP-2074, accepted by Yue") and in `### Inherited` below. The grounds: on
+all four real patterns the scan is never quiet and the replica count is never zero; WP-2037
+made quiet the default; the 2026-11-03 reversal ruled out summary lines that restate what a
+reader inspects. The tier-3 choices are not decided. The ruling says their constants come back
+as rows later.
+
 ### Inherited
 
-(none)
+- 2026-11-16, from the issue triage (issue #1568): the off-region residual per
+  region, head (first 10 % of the fitted range), middle and tail (last 10 %),
+  each with three numbers: the RMS of the binned mean z over off-peak channels
+  (the range cut into 40 equal bins; off-peak = more than 3 FWHM from every
+  reflection, with a valley fallback where a bin holds fewer than 3), the worst
+  bin (signed mean and 2θ), and a wave count; printed beside
+  `worst_absorption`. It is #1215's edge window in a simpler form, report only.
+  The issue's measurement (seven public patterns in the tree, five backgrounds
+  each, at 740931532; not re-run in triage): the ranking of backgrounds within a
+  pattern matches a refiner's read on five of seven; no threshold holds across
+  patterns (SRM 660c's tail at 0.6-1.0 σ went unflagged, SRM 1976a's at
+  1.0-1.2 σ in arms B and D (0.57 in C) was flagged); the one miss, Cr₂WO₆ with a
+  P-spline at λ = 0.01, is ranked best by every residual measure and caught by
+  `BACKGROUND_ABSORPTION` alone (`worst_absorption` 0.157 against 0.074-0.083).
+  So a residual row read alone rewards an over-flexible background, which bears
+  on this WP's open ruling. A tail row must print its worst bin's on-peak share
+  and the nearest lines' residual: on SRM 1976a every background under-fits the
+  116-118° cluster by up to +8σ and the background rises under it. Its three
+  open questions join the tier-3 choices: region width and bin count against
+  #1215's 1° and 3° windows; the valley fallback's misfit or "no off-peak
+  channels"; these rows here or in the summary line now. From #1569:
+  `worst_absorption` is blind to a held background curve, so the pair cannot be
+  read together on a held-SNIP fit. Checked against the tree at bc77a934e:
+  `BackgroundEvidence` (`report/schemas.py:777`) carries the whole-pattern
+  off-region χ²_red and Durbin-Watson and `worst_absorption`, and no per-region
+  field; `report/background.py` builds one off-region mask over the whole range.
+  No other open WP owns a residual row.
+  **Accepted by Yue, 2026-11-17:** the coherent-residual scan, the bulge and the
+  replica table are built as on-demand functions with no always-printed rows
+  (#1215, #1216, #1218, and #1568 by this fold), since on all four real patterns
+  the scan is never quiet and the replica count is never zero, WP-2037 made
+  quiet the default, and the maintainer's 2026-11-03 reversal ruled out summary lines
+  restating what a reader inspects. Their tier-3 constants come back as rows
+  later. This settles the "always on, on demand, or the bulge alone" decision
+  above for the per-region rows too.
 
 ## Non-goals
 
@@ -76,8 +120,9 @@ on demand only (a function a caller or agent runs), or the bulge alone always on
 
 ## Tasks
 
-- [ ] The maintainer's ruling on surface (always on, on demand, bulge only) and the tier-3
-      choices; rows into `_audit` with tiers.
+- [x] The maintainer's ruling on surface (always on, on demand, bulge only): on demand only,
+      Yue 2026-11-17 (#1585).
+- [ ] The tier-3 choices; rows into `_audit` with tiers.
 - [ ] Null texts beside χ²_red (sd √(2/(N−P))), DW (≈ 2/√N) and the off-region pair: text only.
 - [ ] Coherent-residual scan + edge windows + Σz/√N with the counts-σ offset, per contiguous
       fitted run; cached Monte Carlo null (or the Siegmund–Worsley tail, as ruled).
@@ -112,6 +157,23 @@ J. Appl. Cryst. 20, 356; Davies 1977, Biometrika 64, 247; Davies 1987, Biometrik
 
 ## Handover log
 
+- **2026-11-28** — Post-merge bookkeeping for PR #1585, merged on 2026-11-28 as merge commit
+  fa28c2fc4. That PR folded issue #1568 into this WP's `### Inherited` and recorded Yue's
+  2026-11-17 acceptance there. This entry marks the WP's open decision as decided. The report
+  grows no always-printed residual-structure rows; the scan, the bulge and the replica table
+  become functions a caller or agent runs. The tier-3 choices stay open.
+  *Done* (PR #1888, docs only): the decision paragraph marked decided, with where the ruling
+  is recorded; a dated note under the Goal; the first task split into its decided half (ticked)
+  and the tier-3 half (open); the Priority line re-dated, tier unchanged. What decided it: the
+  maintainer's note on #1585 of 2026-11-17, posted from Yue's account, files the WP-2074 item
+  under "Yue's rulings" as "accepted by Yue". The parallel note on #1582 files Claude's
+  settlements under a separate heading. Yue's 2026-11-23 review of #1585 said marking the
+  paragraph decided falls to us after the merge.
+  *Not settled by the ruling's text:* whether task 2's null texts beside χ²_red and DW are
+  always-printed lines the ruling excludes. Read that before building task 2.
+  *Next:* the tier-3 choices (scale set, edge widths, on-peak cut, isolation radius, 20σ floor,
+  δ range, and #1568's region width and bin count), then the functions. WP-2004 and WP-1931
+  are the soft dependencies to check first.
 - **2026-10-31** — created from the issue triage (#1215, #1216, #1218 S1). No open WP owns a
   residual-structure row: WP-2004 tiers existing gates and adds none; WP-2054 owns the
   asymmetry direction only; WP-1931 owns the auto background's order; WP-1977 owns Layer 0's

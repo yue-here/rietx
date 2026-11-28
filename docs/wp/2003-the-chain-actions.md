@@ -215,6 +215,19 @@ opt-in switch, so it is tiered in the batch before it lands (the judge's item 5,
   owns the trigger and its ruling; nothing here changes unless that ruling asks C1
   to be revisited.
 
+- **2026-11-28, from the issue triage (issue #1590): `verify_steps` counting tied rows.**
+  This is *Next* item 2's first declined review finding, filed as an issue by WP-1524. Checked
+  against the tree at `300853e90`: `_series_steps` still writes one row per path, and
+  `examples/guides/path.py` still prints `cell.a`, `cell.b` and `cell.c` at p003→p004, each
+  15,810 esd, so `verify_steps=3` refits one pair and the fourth row (p004→p005, −14,062 esd)
+  reads "not refitted". `SeriesResult.moved_paths` already drops a tied path that repeats an
+  earlier one's values. `_verify_steps` refits each pattern once however many rows touch it,
+  so two *independent* paths stepping at one pair also share one refit. Dropping exact tied
+  repeats from `steps` would not change that case, and counting distinct pairs would. The
+  issue asks the maintainer which of three answers holds; the 2026-11-28 triage batch carries
+  it to him. The guide's assertion (`path.py` line 50) and `docs/docs/guides/path.md` line 80
+  move with either change.
+
 ## Non-goals
 
 - The holds inside one stage: 2002, already landed when this starts.

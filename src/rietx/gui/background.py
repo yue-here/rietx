@@ -80,6 +80,7 @@ from ..optimize.least_squares import _make_jacobian, _make_residual, fd_step
 from ..optimize.statistics import (
     berar_lelann_factor,
     discarded_directions,
+    equilibrated_eigen,
     normal_factors,
 )
 from ..params.vector import is_literal_path
@@ -168,7 +169,9 @@ def band_esd(model, table) -> tuple[np.ndarray | None, dict[str, Any]]:
     jac = np.asarray(_make_jacobian(model, table)(theta), dtype=np.float64)
     n_data = row_layout.layout(model)[0].n
     data = resid[:n_data]
-    k, inv_d, chi2_red = normal_factors(jac, data, jac.shape[1])
+    # one eigensolve for the inverse and the discard test below (WP-2315)
+    eigen = equilibrated_eigen(jac)
+    k, inv_d, chi2_red = normal_factors(jac, data, jac.shape[1], eigen=eigen)
     factor = berar_lelann_factor(data)
     facts["chi2_red"] = chi2_red
     facts["esd_inflation"] = factor
@@ -191,7 +194,7 @@ def band_esd(model, table) -> tuple[np.ndarray | None, dict[str, Any]]:
     # (WP-2219, ``least_squares._guarded_covariance``), so neither has a band
     # it moves: the pseudo-inverse's spread there is short by a factor nothing
     # bounds
-    _, discarded = discarded_directions(jac)
+    _, discarded = discarded_directions(jac, eigen=eigen)
     if set(discarded.tolist()) & {k for k, c in zip(touches, g.T, strict=True)
                                   if np.any(c != 0.0)}:
         facts["band_absent"] = "unmeasured"

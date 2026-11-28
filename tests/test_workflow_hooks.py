@@ -17,6 +17,7 @@ import importlib.util
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -1223,6 +1224,39 @@ def test_gh_declining_is_not_an_empty_table(
     assert claim.open_prs(repo) == []
 
 
+def test_a_listing_at_gh_s_limit_reads_as_possibly_cut_off(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """gh stops at ``--limit`` and says nothing, so a list that reached it may
+    be the first part of a longer backlog (WP-2312).  The limit asked for is
+    the constant the guard compares against, so the two cannot drift."""
+    asked = []
+
+    def fake(root, *a, **k):
+        asked.append(a)
+        return json.dumps([_pr(n, f"pr {n}") for n in range(1, claim.OPEN_PR_LIMIT + 1)])
+
+    monkeypatch.setattr(claim, "_gh", fake)
+    prs = claim.open_prs(repo)
+    listing = asked[0]
+    assert listing[listing.index("--limit") + 1] == str(claim.OPEN_PR_LIMIT)
+    assert claim.listing_cut(prs)
+    assert not claim.listing_cut(prs[:-1])
+    assert not claim.listing_cut(None)  # "could not look" is its own answer
+
+
+def test_a_pr_missing_from_a_cut_list_is_unknown_not_closed() -> None:
+    """A ghostshift claim naming a PR past the cut read as closed and was
+    dropped from ``status`` (WP-2312); only an uncut list can say closed."""
+    from types import SimpleNamespace
+
+    cut = [SimpleNamespace(number=n) for n in range(1, claim.OPEN_PR_LIMIT + 1)]
+    assert claim.pr_open_in(cut)(1) is True
+    assert claim.pr_open_in(cut)(99_999) is None
+    assert claim.pr_open_in(cut[:-1])(99_999) is False
+    assert claim.pr_open_in(None)(1) is None
+
+
 def test_one_broad_issue_does_not_fill_the_table_with_one_pr(
     repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1589,6 +1623,123 @@ def test_the_issue_file_carries_body_comments_and_both_reference_kinds() -> None
     for needle in ("# #390 — issue 390", "body of 390", "### them · 2026-09-18T20:31:01Z", "a reply",
                    "cited by: WP-1418 ⬜", "PR #391 (2026-09-18)", "PR #326 (2026-09-15)"):
         assert needle in text
+
+
+def test_the_table_notes_a_listing_that_reached_gh_s_limit(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    """Both listings are read against their limit before ``only`` narrows the
+    issues, since the limit is on what gh returned (WP-2312)."""
+    from types import SimpleNamespace
+
+    issues = [_issue(n) for n in range(1, backlog.ISSUE_LIMIT + 1)]
+    prs = [SimpleNamespace(number=10_000 + n, author="someone", issues=())
+           for n in range(backlog.wp_claim.OPEN_PR_LIMIT)]
+    monkeypatch.setattr(backlog, "fetch_issues", lambda root: (issues, None))
+    monkeypatch.setattr(backlog.wp_claim, "open_prs", lambda root: prs)
+    monkeypatch.setattr(backlog, "merged_pr_references", lambda root: ([], None))
+    monkeypatch.setattr(backlog, "commit_references", lambda root, since: [])
+    monkeypatch.chdir(repo)
+
+    assert backlog.main(["backlog.py", str(repo / "out"), "7"]) == 0
+    out = capsys.readouterr().out
+    assert f"limit of {backlog.ISSUE_LIMIT} open issues" in out
+    assert f"limit of {backlog.wp_claim.OPEN_PR_LIMIT} open PRs" in out
+
+    monkeypatch.setattr(backlog, "fetch_issues", lambda root: (issues[:-1], None))
+    monkeypatch.setattr(backlog.wp_claim, "open_prs", lambda root: prs[:-1])
+    assert backlog.main(["backlog.py", str(repo / "out")]) == 0
+    assert "limit of" not in capsys.readouterr().out
+
+
+def test_the_landed_column_says_how_far_back_it_can_see() -> None:
+    """A merged PR's body reaches the table only through the merged listing,
+    since the commit parser skips merges; a full listing whose oldest-opened PR
+    is newer than the oldest open issue (gh lists by creation, not merge), or a
+    shallow clone, is said (WP-2312)."""
+    def merged(n: int, day: str):
+        return [backlog.Reference("merged PR", f"PR #{i}", frozenset(), False, day) for i in range(n)]
+
+    full = merged(backlog.MERGED_LIMIT, "2026-11-01")
+    (note,) = backlog.reach_notes(full, "2026-09-01", shallow=False)
+    assert "opened since 2026-11-01" in note
+    assert backlog.reach_notes(full, "2026-11-02", shallow=False) == []  # reaches past it
+    assert backlog.reach_notes(full[:-1], "2026-09-01", shallow=False) == []  # the whole list
+    assert backlog.reach_notes(None, "2026-09-01", shallow=False) == []  # gh declined: main says so
+    (note,) = backlog.reach_notes([], "2026-09-01", shallow=True)
+    assert "shallow" in note
+
+
+_TRIAGE = ROOT / ".claude" / "skills" / "pr-review"
+
+
+def _triage_node(number: int, files: list, headlines: list, rollup: list) -> dict:
+    return {
+        "number": number, "title": f"PR {number}", "author": {"login": "someone"},
+        "headRefOid": f"{number:040d}", "updatedAt": "2026-11-27T00:00:00Z",
+        "changedFiles": len(files), "mergeStateStatus": "CLEAN", "isDraft": False,
+        "files": {"totalCount": len(files),
+                  "nodes": [{"path": p, "additions": a, "deletions": d} for p, a, d in files]},
+        "latestReviews": {"nodes": [{"author": {"login": "yue-here"}, "authorAssociation": "OWNER",
+                                     "state": "COMMENTED", "submittedAt": "2026-11-26T00:00:00Z",
+                                     "commit": {"oid": "f" * 40}}]},
+        "statusCheckRollup": {"nodes": rollup},
+        "commits": {"totalCount": len(headlines),
+                    "nodes": [{"commit": {"messageHeadline": h}} for h in headlines]},
+    }
+
+
+@pytest.mark.skipif(shutil.which("jq") is None, reason="jq is not installed")
+def test_the_triage_rows_carry_what_the_rank_reads(tmp_path: Path) -> None:
+    """`/pr-review` triage pages through every open PR with its own GraphQL
+    query and reads only the rows `triage.jq` computes (WP-2312), so the rank's
+    inputs (reviewable lines, collision degree, the WP evidence) are pinned
+    here, and every field the fixture feeds the filter is one the query asks for."""
+    one = _triage_node(1, [("src/a.py", 10, 2), ("tests/data/big.xy", 900, 0),
+                           ("docs/wp/1234-x.md", 3, 1), ("tests/conftest.py", 1, 0)],
+                       ["WP-1234: the work", "a fix", "WP-1234: more"],
+                       [{"commit": {"statusCheckRollup": {"state": "SUCCESS"}}}])
+    # the bench runs the GUI build's scripts and root config, the docs build's conf.py and the
+    # installer's and its own session's config; gui/src/, config-named or not, is read in the diff
+    two = _triage_node(2, [("src/a.py", 1, 1), ("docs/ROADMAP.md", 2, 0), ("gui/package.json", 1, 0),
+                           ("gui/vite.config.ts", 1, 0), ("gui/src/App.svelte", 4, 4),
+                           ("gui/src/lib/x.config.ts", 1, 0), ("gui/scripts/vendor.py", 1, 0),
+                           ("docs/docs/conf.py", 1, 0), ("hatch.toml", 1, 0), ("uv.toml", 1, 0),
+                           (".mcp.json", 1, 0), ("tox.ini", 1, 0)],
+                       ["no prefix"], [])
+    pages = [{"data": {"repository": {"pullRequests": {
+        "totalCount": 3, "pageInfo": {"hasNextPage": h, "endCursor": "c"}, "nodes": [n]}}}}
+        for n, h in ((one, True), (two, False))]
+    raw = tmp_path / "triage.json"
+    raw.write_text(json.dumps(pages), encoding="utf-8")
+    out = subprocess.run(["jq", "-c", "-f", str(_TRIAGE / "triage.jq"), str(raw)],
+                         capture_output=True, encoding="utf-8", check=True).stdout
+    table = json.loads(out)
+    assert table["open"] == 3 and len(table["rows"]) == 2  # a lost page shows
+    first, second = table["rows"]
+    assert first["reviewable"] == 12 + 4 + 1  # tests/data/ is not reviewed
+    assert first["degree"] == second["degree"] == 1  # src/a.py is shared
+    assert first["governance"] == ["WP-1234"] and second["governance"] == ["ROADMAP.md"]
+    assert first["execution"] == ["tests/conftest.py"]
+    assert second["execution"] == ["gui/package.json", "gui/vite.config.ts", "gui/scripts/vendor.py",
+                                   "docs/docs/conf.py", "hatch.toml", "uv.toml", ".mcp.json"]
+    assert first["wpCommits"] == ["WP-1234"] and second["wpCommits"] == []
+    assert first["latestReviews"][0]["commit"] == "f" * 40
+    assert (first["ci"], second["ci"]) == ("SUCCESS", None)
+    # GitHub's `files` and `latestReviews` are nullable: one null PR must not sink the triage
+    bare = {**_triage_node(3, [], [], []), "files": None, "latestReviews": None, "changedFiles": 5}
+    raw.write_text(json.dumps([{"data": {"repository": {"pullRequests": {
+        "totalCount": 1, "pageInfo": {"hasNextPage": False, "endCursor": None},
+        "nodes": [bare]}}}}]), encoding="utf-8")
+    row = json.loads(subprocess.run(["jq", "-c", "-f", str(_TRIAGE / "triage.jq"), str(raw)],
+                                    capture_output=True, encoding="utf-8",
+                                    check=True).stdout)["rows"][0]
+    assert (row["filesListed"], row["changedFiles"], row["latestReviews"]) == (0, 5, [])
+    query = (_TRIAGE / "triage.graphql").read_text(encoding="utf-8")
+    nested = {"totalCount", "nodes", "path", "additions", "deletions", "login", "authorAssociation",
+              "state", "submittedAt", "commit", "oid", "messageHeadline"}
+    for name in {k for node in (one, two) for k in node} | nested:
+        assert re.search(rf"\b{name}\b", query), name
 
 
 # --------------------------------------------------------------------------- #
