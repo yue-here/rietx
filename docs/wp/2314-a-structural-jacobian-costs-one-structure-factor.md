@@ -1,6 +1,6 @@
 # WP-2314 — a structural Jacobian costs one structure factor, not one per column
 
-Milestone: unscheduled · Status: 🔄 2026-11-28 — angles 1-4 landed (angle 2, the shared intensity chain, in PR #PRNUM at 1.2-1.35× per Jacobian, byte-equal); angles 5-7 and the rigid-body columns open
+Milestone: unscheduled · Status: 🔄 2026-11-28 — angles 1-4 landed (angle 2, the shared intensity chain, in PR #1884 at 1.2-1.35× per Jacobian, byte-equal); angles 5-7 and the rigid-body columns open
 Track: A large cell
 Depends on: 2317 soft (its `bigcell-structural` case and ruling R0); 1945 soft (its open task on batched Biso columns, see Context)
 Priority: P2 2026-11-27 — the maintainer's large-cell track, ruled to proceed whatever the user's case shows (cells this size are met in the wild); a 40-atom structural fit spends most of its time rebuilding one structure factor per column, and the user's Rietveld stages take ~25 min each
@@ -276,7 +276,7 @@ is held, and rebuilt per evaluation where the cell is free.
 
 ## Handover log
 
-- **2026-11-28** (fourth session) — Angle 2 landed in PR #PRNUM (a
+- **2026-11-28** (fourth session) — Angle 2 landed in PR #1884 (a
   ghostshift runner). Every coordinate, ADP, Biso and occupancy column now
   shares one pass through the intensity factors per phase per Jacobian.
   Before, each column rebuilt the same scale, multiplicity, Lorentz,
