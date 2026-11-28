@@ -1,9 +1,9 @@
 # WP-2315 — a large Pawley step pays for the rows that bind, not for every intensity
 
-Milestone: unscheduled · Status: 🔄 2026-11-28 — claimed by a ghostshift runner (Angles 0-2: premise check first)
+Milestone: unscheduled · Status: 🔄 2026-11-28 — task 1, the cached |T| and Angle 9 done; Angles 0-2 held, since the real-structure bench crosses no width row; Angle 4, now the leading cost, open
 Track: A large cell
 Depends on: 2317 soft (its `bigcell-pawley` case and rulings R0, R4, R5)
-Priority: P2 2026-11-27 — the maintainer's large-cell track, ruled to proceed whatever the user's case shows (cells this size are met in the wild); real patterns on the tree reach the slow step once in 32 runs, but a large Pawley cell reaches it
+Priority: P2 2026-11-28 — the maintainer's large-cell track, ruled to proceed whatever the user's case shows; the real-structure bench crosses no width row, so what reaches it is Angle 4 (`spilu`, about half the 120° fit)
 
 ## Goal
 
@@ -12,7 +12,7 @@ box-only step costs, because two things change:
 - the constrained solve sees only the rows and box limits that can bind;
 - the work the dense route spends on the intensity block goes.
 
-On `bigcell-pawley` at 2θ ≤ 120° the fit runs at least 3× faster (target), with
+On `bigcell-pawley-120` (2θ ≤ 120°) the fit runs at least 3× faster (target), with
 every moved number answering to WP-2317's ruling R0.
 
 ## Context
@@ -132,6 +132,30 @@ instrument profiles, which is the probe's open question. The probe is
   and no real pattern on the tree reaches it. Whether the user's pattern
   does is WP-2317 task 1's question.
 
+**Re-read on the real structure (2026-11-28; macOS arm64, `[dev]`, compiled
+tier on, rietx 1.13.0.dev0 at 8e691ccb8).** Since WP-2317's 4th session the
+bench cases carry Nb₁₈W₁₆O₉₃ (COD 2107344, Pbam) on probe 1's instrument,
+broadening, start offsets and plan. Neither case crosses a width row, so the
+constrained step costs nothing on either. The probe is
+`count_crossings.py bench:<case>`.
+
+| case | free columns (886 or 1 569 intensities, the rest the model's) | width rows (last stage) | crossings | constrained step | fit wall (min-max of 3) | Rwp |
+|---|---|---|---|---|---|---|
+| `bigcell-pawley` (2θ ≤ 90°) | 892-901 | 3 544 | 0 | 0 s | 3.84-4.03 s | 0.03088 |
+| `bigcell-pawley-120` | 1 575-1 583 | 6 272 | 0 | 0 s | 14.70-15.36 s | 0.02999 |
+| probe 1, 2θ ≤ 90°, same tree | 919-928 | 3 652 | 28 (Γ_L) | 9.5 s | 14.6 s (one run) | 0.04467 |
+
+- The instrument and the start are the same as probe 1's, so the crossings
+  were a property of probe 1's invented structure and intensities. The
+  U = V = Y = 0 truth suspected above is shared by both and is not the
+  cause.
+- One profiled run of `bigcell-pawley-120` (15.4 s under the profiler):
+  `spilu`'s factorisation (`gstrf`) is 7.3 s over 1 290 builds, about half
+  the fit. `eigh` is 1.7 s over 15 calls, none in a step, since no
+  constrained step ran. So Angle 4, the
+  preconditioner, is the leading cost on the bench. Angles 0-3 wait on a case
+  that crosses.
+
 **The ruling this touches (WP-2317's R4).** Practice (`docs/practice.md`
 § Peak-width limits) floors by value: GSAS-II per reflection, FullProf at
 Γ_G = 1e-10, while RIETAN-FP rejects a step to a negative width. rietx holds the
@@ -195,29 +219,6 @@ free swap under LM.
    cubic, tetragonal, trigonal and hexagonal phases. It cannot shrink probe 1,
    whose P2₁2₁2₁ metric forces no coincidence.
 
-### Inherited
-
-- **From WP-2317, 2026-11-27 (task 2 and the cross-code timing).** The bench
-  cases are `bigcell-pawley` (2θ ≤ 90°) and `bigcell-pawley-120` in
-  `examples/bench_refinement.py`; their ranges are in WP-2317's Context. GSAS-II
-  5.8.4 on the same patterns and free set took about 2.5-3× rietx's wall and
-  landed at Rwp 0.0702 and 0.0610 against rietx's 0.0447 and 0.0420. 41-43 % of
-  GSAS-II's χ² sits below 6°, the tail of (0 2 0) at 4.9°, which GSAS-II does
-  not draw. The measurement that bears on angle 7 and R5: GSAS-II ties
-  reflections whose d agree to 1e-4 (`GetPawleyConstr`), and this cell has
-  b = 3a exactly, so it refines **352 independent intensities at 90° and 540
-  at 120°, where rietx carries 913 and 1 606 columns**. rietx holds an exact
-  overlap by an equal-split restraint row; GSAS-II removes it from the
-  dimension.
-- **From WP-2317, 2026-11-27 (4th session): the cases are now a real
-  structure.** `bigcell-pawley` and `bigcell-pawley-120` carry Nb₁₈W₁₆O₉₃
-  (COD 2107344, Pbam, 12.195 × 36.740 × 3.951 Å): 886 and 1 569 intensity
-  columns where probe 1 had 913 and 1 606. Its b is not 3a, so the exact
-  overlaps behind the 352-against-913 count above are gone, and that count
-  describes probe 1 only. The figures above are probe 1's; this WP's "before"
-  and its 3× target are re-read on the new cases. WP-2317's Context has the
-  new ranges.
-
 ## Non-goals
 
 - Which structure-free method is the default: WP-2062.
@@ -237,6 +238,9 @@ free swap under LM.
       Angle 0 since withdrawn (the `bigcell-pawley` bench case is not on the
       tree yet): main 55.0-55.4 s, that branch 52.6-52.9 s, three runs each.
       The split is in the handover log. The cached |T| alone was not timed.*
+      *"Before" re-read 2026-11-28 on the real-structure cases: 3.84-4.03 s
+      at 90° and 14.70-15.36 s at 120°, three runs each, with no crossing
+      (Context § Re-read on the real structure).*
 - [x] Angle 0, its bit-identical part. *Done 2026-11-27:
       `LinearInequality.crossed` keeps |T|, bit-identical by construction.
       The blockwise G·E⁻¹ (`lm._rows_in_z`) was byte-equal on macOS
@@ -245,8 +249,11 @@ free swap under LM.
 - [ ] Angles 0 (blockwise G·E⁻¹), 1 and 2. The blockwise, pruned and Cholesky
       steps equal to the full step within the
       polish tolerance (`_POLISH_FEASIBLE`) on the existing constrained-step cases
-      and the bench case. The audit row for the slack.
-- [ ] Angle 4, measured.
+      and the bench case. The audit row for the slack. *Held 2026-11-28:
+      neither bench case crosses a row, so nothing on the tree but probe 1
+      exercises the step. Start this item on a case that crosses.*
+- [ ] Angle 4, measured. *The leading cost on `bigcell-pawley-120` since
+      2026-11-28: `spilu` is about half the fit.*
 - [ ] Angle 3 only if 0-2 and 4 leave the constrained step above ~10 % of the fit.
 - [ ] Put angles 5-7 to the maintainer only if 0-4 miss the target, with the
       measured remainder and each one's Rule 1 kind.
@@ -262,13 +269,13 @@ free swap under LM.
 
 ## Acceptance
 
-- `bigcell-pawley` at 2θ ≤ 120° is ≥ 3× faster than main's, measured interleaved
+- `bigcell-pawley-120` (2θ ≤ 120°) is ≥ 3× faster than main's, measured interleaved
   in the same session (target; the measured min-max is recorded).
 - The constrained step is under 10 % of the fit.
 - Every Pawley acceptance number is within its envelope.
 
 ```sh
-.venv/bin/python examples/bench_refinement.py --cases bigcell-pawley
+.venv/bin/python examples/bench_refinement.py --cases bigcell-pawley,bigcell-pawley-120
 .venv/bin/python -m pytest tests/test_lm_solver.py tests/test_bccg.py tests/test_pawley.py
 .venv/bin/python -m pytest -n auto --dist loadgroup -m "not slow"
 ```
@@ -283,6 +290,78 @@ free swap under LM.
   (variable projection, angle 7).
 
 ## Handover log
+
+### 2026-11-28 — Angles 0-2 held: the real-structure bench crosses no row (ghostshift runner; PR #1875)
+
+The expensive constrained step this WP set out to shrink is not reached by
+either bench case now that they carry a real structure. Both cases ran their
+five least-squares stages with no crossing of a width row, so the step cost
+nothing in fits of 3.84-4.03 s and 14.70-15.36 s. Probe 1's invented structure still crosses
+on today's tree, with the same instrument and start, so its crossings came
+from that structure. This session wrote no solver code. Angles 0-2 would
+optimise a path no case on the tree but probe 1 exercises. On the 120° case
+about half the fit is now the incomplete-LU preconditioner's factorisation,
+which is Angle 4.
+
+*Done.*
+- `count_crossings.py` gained `bench:KEY`, which runs a single-fit case of
+  `examples/bench_refinement.py` under the crossing counter.
+- Context § Re-read on the real structure carries the table, the profiled
+  split and the new "before". Tasks 2, the Angles 0-2 item and Angle 4 carry
+  dated notes. The Status and Priority lines say what reaches the bench.
+- `### Inherited` deleted. Its first bullet's numbers are probe 1's GSAS-II
+  timing and the b = 3a overlap count, both kept in WP-2317's Context, and
+  R5 was built as Angle 9. Its second bullet asked for the "before" to be
+  re-read on the new cases, which this entry does.
+- WP-2317's `### Inherited` has a bullet for R4: no step on the bench
+  crosses a width row.
+
+*Measured* (macOS arm64, `[dev]`, compiled tier on, Accelerate, rietx
+1.13.0.dev0 at 8e691ccb8; every run under the shift's suite lock).
+- Crossings: the Context table. The last stage (`profile`) carries 3 544
+  width rows at 90° and 6 272 at 120°. The `profile_w` stage carries one.
+  No other stage carries any.
+- Bench, three runs each, `--configs off`: 3.84-4.03 s at 90°, 14.70-15.36 s
+  at 120°, Rwp 0.03088 and 0.02999, five stages converged.
+- Profile, 120°, one run: `gstrf` 7.3 s over 1 290 factorisations, `eigh`
+  1.7 s over 15 calls (no constrained step ran), sparse matrix-vector
+  products 0.7 s. The five least-squares runs took 11.6 s of the 15.1 s fit
+  in the crossing probe's run; the rest is outside them and was not split.
+- Probe 1 at 90° on this tree, one run: 28 crossings, all on the Lorentzian
+  rows of the last stage, and 9.5 s of its 14.6 s in the constrained step
+  (the 2nd session read 22 crossings and 8.6 s of 13.6 s).
+
+*Not done.* No suite ran: the branch changes a probe script under
+`docs/wp/` and the WP files, which CI's planning set treats as docs.
+
+*Review* (`/code-review high --fix`): seven findings. Five taken: the probe
+refuses an unknown or a series case and drops runs a case's build makes; the
+Context table names free columns, not intensities; the Goal, Acceptance and
+command name `bigcell-pawley-120`; this entry quotes ranges. Two left: the
+probe 1 placeholders, since filled from the run; and whether the 3× target
+still fits a 15 s fit with no crossing, which Next item 1 re-reads.
+
+*Settled by Claude* (for blind review):
+- Stop at the premise, under the brief's own rule ("if it no longer crosses
+  … stop with a docs-only PR"). Alternative: build Angles 0-2 for the
+  maintainer's "cells this size are met in the wild", tested on probe 1.
+- Keep P2 rather than drop to P3. The maintainer ruled the track to proceed
+  whatever the user's case shows, and Angle 4 reaches the bench.
+  Alternative: P3, as the 2nd session's next-step said for a case that does
+  not cross.
+
+*Next.*
+1. Angle 4 on `bigcell-pawley-120`: count CG products against `spilu`
+   builds, then try reusing the factor across λ retries (λ moves only the
+   diagonal) and a stale superset factor as the fixed set grows. Each moves
+   numbers at rounding level at most, so R0 governs it. Re-read the 3×
+   target against what Angle 4 can remove: `spilu` is about half the fit,
+   so 3× needs more than the preconditioner.
+2. Angles 0-2 only once a case crosses: the user's pattern (WP-2317 task 1),
+   or a bench case whose truth presses Γ_L. The design notes in the Angles
+   list stand. Pruning keeps the polish's inputs, so a pruned step that finds
+   the same active rows, in the same order, gives the same polished step.
+3. Why probe 1's structure presses on Γ_L is still unmeasured.
 
 ### 2026-11-27 (4th session) — Angle 9, the lattice merge (ghostshift runner; PR #1869)
 
@@ -361,6 +440,13 @@ belongs to the protocol and is the same on main.
 `tests.reader_output` exit 0 on the tree before the `MergedGroup` record.
 After it, on the final tree: fast selection 16 069 passed, 268 skipped, 30 xfailed, 18 min (one test edited after the run: `test_satellites`' key list gains `merged_groups`; that file passes alone), and `tests.reader_output` exit 0. The seven added tests cost 2.6 s locally, 2.25 s of it `test_pawley_lattice_merge.py`, none in the slow tail. Count check: passed + failed moved by 4 against the earlier fast run (16 066 → 16 070, the two now-fixed failures included), where 5 tests were added since. The one-test gap was not traced. The full suite was not rerun after the record:
 the record moves no fitted number (the coordinator's rule for this item).
+
+*Review* (`/code-review high --fix`): seven findings. Five taken: the probe
+refuses an unknown or a series case and drops runs a case's build makes; the
+Context table names free columns, not intensities; the Goal, Acceptance and
+command name `bigcell-pawley-120`; this entry quotes ranges. Two left: the
+probe 1 placeholders, since filled from the run; and whether the 3× target
+still fits a 15 s fit with no crossing, which Next item 1 re-reads.
 
 *Settled by Claude* (for blind review):
 - Detection by the orbit's second moment in `symmetry.py`, not by calling
