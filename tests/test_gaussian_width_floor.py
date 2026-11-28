@@ -16,6 +16,7 @@ obs/calc/diff PNGs of the LM fits go to ``tests/output/``.
 
 from __future__ import annotations
 
+import dataclasses
 import re
 from pathlib import Path
 from types import SimpleNamespace
@@ -27,7 +28,7 @@ import rietx as rx
 import rietx.optimize.least_squares as ls
 from rietx import Instrument, PatternData, Refinement
 from rietx.io.instrument_profile import read_gsas2_instprm, read_gsas_prm
-from rietx.model.forward import compile_model
+from rietx.model.forward import WINDOW_MIN_DEG, compile_model
 from rietx.model.profiles.caglioti import _MIN_GAMMA_G2, gaussian_fwhm
 from rietx.params.vector import ParameterTable
 from rietx.schemas.common import Parameter
@@ -80,14 +81,20 @@ def pattern() -> PatternData:
     return PatternData(two_theta=model.tt.tolist(), intensity=y.tolist())
 
 
-def _fit(pattern, solver, *, w_min=None):
+#: ``PLAN`` on the uniform windows every stage ran before WP-2317 (R7): a
+#: declared slack is never re-solved
+PLAN_UNIFORM = rx.RefinementPlan(stages=[
+    dataclasses.replace(s, window_slack_deg=WINDOW_MIN_DEG) for s in PLAN.stages])
+
+
+def _fit(pattern, solver, *, w_min=None, plan=PLAN):
     structure, ins = _models(true=False)
     if w_min is not None:
         # written on the Parameter itself, which ProfileTCHZ's validator does
         # not see: the only way left to put W's floor back at 0
         ins.profile.w.min = w_min
     ref = Refinement(structure, ins, solver=solver, history=False)
-    return ref, ref.fit(pattern, plan=PLAN)
+    return ref, ref.fit(pattern, plan=plan)
 
 
 def _g2_at_reflections(ref, result) -> np.ndarray:
@@ -114,9 +121,11 @@ def trf(pattern):
 def test_with_w_bounded_at_zero_and_no_rows_lm_stops_under_the_clamp(
         pattern, trf, monkeypatch):
     """The trap both remedies exist for: it must still be reachable, or the
-    tests below prove nothing."""
+    tests below prove nothing.  Reached on the uniform windows: under
+    WP-2317's (R7) sized slack and re-solve the fit leaves the clamp here
+    (Γ_G² 1.4e-5 to 2.4e-5 deg² at the ticks)."""
     monkeypatch.setattr(ls, "gaussian_width_inequalities", lambda m, t, x: [])
-    ref, result = _fit(pattern, "lm", w_min=0.0)
+    ref, result = _fit(pattern, "lm", w_min=0.0, plan=PLAN_UNIFORM)
     _draw(result, "gaussian_width_floor_off_lm")
     assert ref.instrument.profile.w.min == 0.0
     assert np.all(_g2_at_reflections(ref, result) < _MIN_GAMMA_G2)

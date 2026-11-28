@@ -193,6 +193,45 @@ and have no free factor to measure, so this file's old list named them without c
 
 ### Inherited
 
+- **From WP-2317 R7 (2026-11-28): group Q's `LEBAIL_CONVERGED_REL` now
+  warns on every near start of LaB₆ + cBN.**
+  - At 5.1-25°, `profile_only`, `lebail_passes = 8`: since R7 every cell start
+    from −0.15 % to +0.6 % reads pass 1 at Rwp 13.918 % and pass 2 at
+    13.927 %, a rise of 6.5e-4 relative against the 1e-4 band, so
+    `LEBAIL_ALTERNATION_STOPPED` is a warning. Before R7 the starts from
+    +0.2 % to +0.52 % gave the same verdict (13.918 then 13.935 %).
+  - From −1 % the alternation settles at 13.928 %, above pass 1's 13.918 %.
+    So the alternation's fixed point sits above the best single pass.
+  - Group Q's question: whether a rise of 0.009 Rwp points should send a
+    user to "check the cell and the background". It is the threshold's
+    question, not R7's (macOS arm64, `[dev]`, development data).
+- **From WP-2317 R7 (2026-11-28): group Q's `lebail_cycles` cap of 25 000
+  is marginal on LaMnO₃.**
+  - `test_lebail_cycles.py`'s `test_the_tolerance_meets_its_bar[lamno3]`
+    asserts the cap holds twice the dearest partition. The row fits
+    `profile_only` in Le Bail mode with the closing stage declared.
+  - Its closing stage's partition took 9 188 cycles on main at the pinned
+    start. Three starts 1e-4 apart in a (about 0.1 esd) took 10 094,
+    25 000 and 7 742 on main. Under R7 the same four starts took 25 000,
+    25 000, 22 376 and 22 682. So R7's fit there now carries
+    `LEBAIL_CYCLES_AT_CAP`.
+  - The answers agree within 0.2 esd, and R7's Rwp reads 16.95 % against
+    17.30 %. Bar 1 reads 0.048 σ. The row is a non-strict xfail citing this
+    WP. Group Q's question: whether the cap, or the tolerance it serves,
+    suffices on a 296-reflection neutron pattern (macOS arm64, `[dev]`,
+    development data).
+  - The control, run 2026-11-28 on the branch merged with main
+    `300853e90`: R7's code with the uniform 0.3° slack on every stage
+    (`staged.refit_later` patched to `False`, so the re-solve stays). The
+    same four starts took 9 188, 10 094, 25 000 and 7 742 closing-stage
+    cycles at Rwp 17.30, 17.32, 17.30 and 17.31 %, which is main's to the
+    cycle. R7 as shipped took 25 000, 25 000, 22 376 and 22 682 at Rwp
+    16.94-16.97 % on every start. So the sized slack of the intermediate
+    stages causes the whole extra cost and the 0.35-point Rwp drop. The
+    re-solve plays no part, since no stage re-solved in either arm. The two
+    arms' refined values differ by at most 0.28 esd (cell c), background
+    coefficients aside.
+
 - **2026-11-28, from WP-2314: corundum's roughness fence now passes on
   macOS arm64.** `test_surface_roughness.py`'s
   `test_qarr_pure_phases_cannot_constrain_roughness[corundum]`, a non-strict
