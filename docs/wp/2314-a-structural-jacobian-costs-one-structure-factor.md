@@ -322,7 +322,12 @@ is held, and rebuilt per evaluation where the cell is free.
 
     The first three pairs ran under heavier load (main 7.4-10.5 s, branch
     8.9-9.5 s) and rank nothing.
-  - *Gates* (darwin arm64, `[dev]` venv): FASTSUITE. The full selection
+  - *Gates* (darwin arm64, `[dev]` venv): the fast selection on main
+    (300853e90) merged into the branch, 15 933 passed, 467 skipped,
+    30 xfailed, none failed. The branch adds 7 cases there, all in
+    `tests/test_site_column_block.py` and all passing, 0.26 s in the local
+    junit. No golden moved. Ruff, Vale (0 errors) and
+    `tests.reader_output` (exit 0, unchanged) are clean. The full selection
     was not run: every Jacobian of the bench fit is byte-equal to main's,
     so no measured number can move (`tests/CLAUDE.md` § Running).
   - *Review:* `/code-review high --fix` found no bug and five nits. Fixed:
