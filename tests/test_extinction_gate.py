@@ -137,9 +137,11 @@ def test_the_same_pattern_at_its_own_cell_passes_the_gate(si):
 
 
 def test_a_cell_outside_the_prefits_basin_reaches_the_gate(si):
-    """1 % off at this resolution: the prefit cannot bring it back, and the
-    screen says so rather than ranking on the wreckage."""
-    screen = _screen(si, 1.01)
+    """2 % off at this resolution: the prefit cannot bring it back, and the
+    screen says so rather than ranking on the wreckage.  Since WP-2317 (R7)
+    the prefit's re-solve on fresh windows brings a 1 % cell back (prefit Rwp
+    0.012), so the case starts at 2 %, where the cell lands 8 % long."""
+    screen = _screen(si, 1.02)
     assert screen.prefit_rwp is not None
     assert screen.status == "unreliable"
     assert screen.best_or_none() is None
@@ -151,7 +153,7 @@ def test_a_cell_outside_the_prefits_basin_reaches_the_gate(si):
 def test_the_unreliable_suggestion_lists_the_causes_without_ranking_them(si):
     """Round 4 (#939): a second phase and weak data trip the gate at a right
     cell, so the suggestion may not name the cell the first suspect."""
-    screen = _screen(si, 1.01)
+    screen = _screen(si, 1.02)
     diag = next(d for d in screen.diagnostics
                 if d.code == "EXTINCTION_SCREEN_UNRELIABLE")
     text = diag.suggestion
@@ -239,9 +241,9 @@ def test_the_message_says_weak_data_when_no_fit_could_pass(si):
 
 
 def test_the_message_says_misfit_when_the_data_could_pass(si):
-    """S ≫ N: the 1 % cell the prefit cannot bring back.  A noise-only fit would
-    read 0.024, so the gate's 1.17 is misfit, and the message says by how much."""
-    screen = _screen(si, 1.01)
+    """S ≫ N: the 2 % cell the prefit cannot bring back.  A noise-only fit would
+    read 0.024, so the gate's reading is misfit, and the message says by how much."""
+    screen = _screen(si, 1.02)
     assert screen.status == "unreliable"
     assert screen.perfect_fit_rwp_net < 0.1 * REFERENCE_NET_RWP_MAX
     message = next(d.message for d in screen.diagnostics
