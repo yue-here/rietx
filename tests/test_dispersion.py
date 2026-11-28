@@ -22,7 +22,7 @@ import math
 import numpy as np
 import pytest
 
-from rietx.crystallography.dispersion import dispersion
+from rietx.crystallography.dispersion import OUT_OF_BAND_ESCAPE, dispersion
 from rietx.crystallography.lattice import d_spacings
 from rietx.crystallography.scattering import f0
 from rietx.crystallography.structure_factor import (
@@ -513,6 +513,56 @@ def test_out_of_band_wavelength_is_refused():
         dispersion("Fe", 6.0)      # 2.07 keV, below the 3 keV floor
     with pytest.raises(ValueError, match="outside the tabulated"):
         dispersion("Fe", 0.1)      # 124 keV, above the 70 keV ceiling
+
+
+def test_the_out_of_band_refusal_names_the_way_out():
+    """The refusal says ``dispersion = None`` and what it costs (WP-1532).
+
+    Issue #661: an agent at 74 keV found the escape only in the
+    ``Dispersion`` docstring.  The cost stated is the true one: out of band
+    no ``DISPERSION_NEGLECTED`` sizes the neglect (WP-1532 review), so the
+    message must not promise one.  The fit check below pins that silence
+    against a positive arm in band; when WP-1925 makes it speak, this test
+    fails and the message changes with it.
+    """
+    import rietx as rx
+    from rietx.refine import _dispersion_diagnostics
+
+    with pytest.raises(ValueError) as caught:
+        dispersion("Si", 0.1665)   # 74.5 keV, a PDF beamline
+    assert str(caught.value).endswith(OUT_OF_BAND_ESCAPE)
+    assert "`instrument.source.dispersion = None`" in OUT_OF_BAND_ESCAPE
+    assert "no DISPERSION_NEGLECTED then sizes the neglect" in OUT_OF_BAND_ESCAPE
+    assert "then reports DISPERSION_NEGLECTED" not in OUT_OF_BAND_ESCAPE
+
+    tungsten = rx.Structure(phases=[rx.Phase(
+        name="W", space_group="I m -3 m", cell=rx.Cell(
+            a=rx.Parameter(value=3.1652), b=rx.Parameter(value=3.1652),
+            c=rx.Parameter(value=3.1652), alpha=rx.Parameter(value=90.0),
+            beta=rx.Parameter(value=90.0), gamma=rx.Parameter(value=90.0)),
+        atoms=[rx.Atom(label="W1", species="W", x=rx.Parameter(value=0.0),
+                       y=rx.Parameter(value=0.0), z=rx.Parameter(value=0.0),
+                       biso=rx.Parameter(value=0.2))])])
+    codes = {}
+    for lam in (0.20, 0.1665):     # 62 keV in band, 74.5 keV out of band
+        ins = rx.Instrument.debye_scherrer(wavelength=lam)
+        ins.source.dispersion = None
+        codes[lam] = [d.code for d in _dispersion_diagnostics(tungsten, ins)]
+    assert codes == {0.20: ["DISPERSION_NEGLECTED"], 0.1665: []}
+
+
+def test_the_fullprof_pair_check_drops_the_way_out():
+    """A ``.pcr``'s stated pair is checked, not computed, so the advice goes.
+
+    ``_dispersion_disagreement`` feeds the reader's refusal and the writer's;
+    the writer refuses ``dispersion = None`` itself, so the escape there would
+    send the caller into the next refusal (WP-1532 review).
+    """
+    from rietx.io.projects.fullprof import _dispersion_disagreement
+
+    why = _dispersion_disagreement("Si", 0.0, 0.0, 0.1665)
+    assert "outside the tabulated" in why
+    assert "dispersion = None" not in why
 
 
 def test_unknown_element_is_refused():

@@ -1,9 +1,8 @@
 # WP-1532 — the skill passages a driving agent needed: fourteen rows, placed where each is cheapest
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: ✅ 2026-11-16 — PR #1596
 Track: The repo's own process
 Depends on: — (PR #660 soft: the docstring and diagnostic-text half of the same findings)
-Priority: P3 2026-10-02 — each row is a wrong turn an agent took, and a reader of the docstrings could recover from it
 
 ## Goal
 
@@ -55,84 +54,31 @@ on a fresh `Refinement` raises "call fit() first". `Atom(species="Li7")`
 constructs, so the refusal the issue quotes happens later, at evaluation.
 The row needs that check before it is written.
 
-### Inherited
+### Where each row went (2026-11-16, checked at `bc77a934e`)
 
-- **2026-11-06, from the issue triage (issue #1381): the reflection-table
-  row is WP-1947's, so this WP places thirteen rows.** The row documented
-  `run_stage` with `turn_on=[]` and `max_iter=0`, a spelling WP-1947 replaces
-  with a documented call and records as fragile (its handover: `max_iter=0`
-  raises scipy's `max_nfev` message). WP-1947's skill task already rewrites
-  this row for the new call. Writing it here first would teach the old
-  spelling and spend `api.md` bytes the entry below says are scarce.
-  Decided 2026-11-06: drop the row here; WP-1947 writes it. Settled by
-  Claude on the reporter's recommendation, both WPs being P3 and ⬜ with no
-  consumer waiting. Checked against the tree at `a84379aac`:
-  `docs/wp/1947-…md` line 138 names this row, and no file under
-  `docs/skill/rietx/` mentions `max_iter=0`.
+The Inherited entries (WP-1947's reflection-table row, the WP-1920 split,
+WP-1907's claims test, WP-1906's body budget, issue #728's fifteenth row,
+WP-1510's `api.md` headroom, PR #660's merge) were consumed by this table and
+pruned. The body sits at 16 981 of its 17 000 B budget, so no row went there;
+`api.md` (35 780 of 39 000 B) took none either. Cheapest place first:
 
-- **2026-10-11, from WP-1920 (closed, PR #906): the split landed.** It
-  supersedes WP-1510's entry below. `api.md` is 33 292 B, and every `api*.md`
-  has one ceiling of 39 000 B. The readers and writers for another program's
-  file are in `api-io.md`. A row for one of those names lands there, and
-  `tests/test_skill.py` refuses a name with entry rows in two indexes.
-
-- **From WP-1907 (2026-10-07), a number in the body is now a claim.**
-  `tests/test_skill_claims.py` fails on any number in `SKILL.md` that is
-  neither a `CLAIMS` row (checked against the package) nor a `NOT_CLAIMS` row
-  (with its reason). A passage this WP adds to the body that quotes a value
-  adds its row in the same change. A `(Measured: WP-NNNN …)` tag must name a
-  WP that is in the index (`test_skill.py`).
-
-- **From WP-1906 (2026-10-06), the body these rows land on.** `SKILL.md`'s
-  body is 16 999 B against `SKILL_BUDGET_BYTES` (17 000; WP-1906 closed
-  2026-10-07), so every byte a
-  row adds to the body is paid by a cut there. Rules keep their numbers 1-22;
-  the stop conditions are now 23-25. A row an agent needs at fit time takes
-  the cheapest place first (`help.py`, a `Diagnostic.suggestion`, a
-  reference row) and the body last. A body change is measured as WP-1906's
-  was: `tests/eval_skill/PROTOCOL.md` § Rounds F1 and F2.
-- **2026-10-05, from the issue triage (issue #728, part 2): the skill shows
-  the extinction screen only on `best_or_none()`, so an agent re-ran
-  `index_pattern` to get a candidate to screen.** It looked for `.classes`
-  on the result (the field is `.candidates`) and rebuilt the search inside its
-  script. *Checked at `32ef5a6`*: the call the issue proposes exists, except
-  that `data` is required for the screen's Le Bail fits.
-  `determine_extinction_symbol(data, candidate, instrument, *, peaks=None, …)`
-  (`extinction.py:654`) takes any `CellCandidate`. `diagnostics-indexing.md`
-  (lines 188-202) screens `idx.best_or_none()` and says "do NOT take
-  candidates[0]", but not what to screen when it abstains, which is the
-  normal first outcome. `IndexingResult.classes` raises a bare
-  `AttributeError` with no pointer (`Base.__getattr__` lists fields only up to
-  12). A fifteenth row beside #661's fourteen: one line showing the screen on a
-  chosen `idx.candidates[i]`, placed cheapest first. `diagnostics-indexing.md`
-  is closed to growth, so it needs a cut or goes in the docstring. No new
-  signature is needed.
-  - *2026-10-11, from the issue triage (#728):* PR #754 put the one-call
-    screen in the manual (`docs/manual/using/indexing.md:1218`, on
-    `idx.candidates[0]`, with a note that the field is `.candidates`). The
-    skill row is still open. Checked against the tree at 7d9be3cb: no file
-    under `docs/skill/rietx/` screens a chosen `candidates[i]`.
-
-- **From WP-1510 (2026-10-03): `api.md` has 95 B of headroom left.** WP-1539
-  raised `API_INDEX_MAX_BYTES` to 39 600, and WP-1510's `index_pattern(formula=,
-  temperature=)` took it to 39 700 at 39 605 B. The ceiling is now 300 B under
-  the 40 kB truncation it guards. So any row this WP adds to `api.md` meets the
-  split decision first, and that decision is due now.
-
-- **2026-10-11, from the issue triage (#661): PR #660 merged on 2026-10-02,
-  so this file's "if PR #660 merges" clauses are due.** It carried the
-  width-box sentence on `ProfileTCHZ` (`schemas/instrument.py:954`) and the
-  `TOPAS_BLOCK_SKIPPED` suggestion (`io/projects/topas.py:3580`);
-  `diagnostics-projects.md` (line 54) does not yet quote that suggestion. Two
-  rows change. The `reflection_table()` row has a cheaper route:
-  `Refinement.predict` needs no fit (`refine.py:4950`), while
-  `reflection_table()` still raises "call fit() first" (`:5301`). The
-  `coverage.partial == False` row is stale after #651: undefined `name(`
-  calls now go to `Coverage.unread_calls`, and only a bare misspelt keyword
-  stays silent. WP-1905 turned the mapping-table rows into the
-  `fap-gsas-reproduce` eval case (PR #699). Checked against the tree at
-  7d9be3cb: no file under `docs/skill/rietx/` mentions `background_terms`,
-  `max_iter=0`, `Zero_Error`/`Specimen_Displacement` or the isotope spellings.
+| # | row (issue #661) | placed | where |
+|---|---|---|---|
+| 1 | σ floor at 10⁻³ × median | declined: stale | `_floor_sigma` is gone; WP-1952 honours a stated σ and leaves σ ≤ 0 out of the fit, which the body row and root CLAUDE.md already say |
+| 2 | match another program's background order | reference | `diagnostics-projects.md`'s TOPAS mapping block, the `bkg` row (`model.background_terms`); the default `BackgroundChebyshev` still carries 4 terms (measured) |
+| 3 | f′/f″ above 70 keV, `dispersion = None` | package output | the band refusal ends on `dispersion.OUT_OF_BAND_ESCAPE`, which also says no `DISPERSION_NEGLECTED` sizes the neglect out of band (WP-1925's silence); the "TOPAS zeroes above 30 keV" clause is declined (a claim from the program's own prose, and WP-1925's measurement) |
+| 4 | TCHZ bound box per preset | declined: placed | the `ProfileTCHZ` docstring states both boxes (PR #660, rewritten by WP-2002, which changed the boxes the issue quotes) |
+| 5 | two starts, two basins | reference | `numbers.md`, after "an esd is a number about one basin" |
+| 6 | `RESOLUTION_NOT_POSITIVE` is revisable | reference | `history.md`, rule 1 of reading the rungs, for every `_REVISABLE_CODES` member |
+| 7 | reflection table without a fit | moved | WP-1947 (issue #1381) |
+| 8 | a coordinate `dof` reads 0 after a fit | package output | `help.py`'s `phases.*.atoms.*.dof.*` entry; measured: `dof.0` = 0.0 and `x` at the fitted value, one esd for both |
+| 9 | flattened background paths | declined: placed | `STAGE_PATH_UNKNOWN` already answers `instrument.background.chebyshev.c0` with "Did you mean 'instrument.background.c0'?" (measured) |
+| 10 | TOPAS-to-rietx mapping table | reference | `diagnostics-projects.md`, a block before the `RECIPE_*` family; `LP_Factor` maps to `model.lp_factor` and `to_structure(scale="rietx")`, which landed after the issue |
+| 11 | `coverage.partial == False` is no proof | declined: placed | the `TOPAS_FEATURES_NOT_IMPORTED` row already says it (`unread_calls`, the silent bare keyword, after #651); the issue's "compare χ² with the file's `gof`" contradicts that row's "not comparable" and is not written |
+| 12 | `TOPAS_BLOCK_SKIPPED` suggestion | reference | one clause on the row: the refusal names the line to add (`_skipped_remedy`) |
+| 13 | origin-choice suffix | declined: placed | the `SPACE_GROUP_SETTING_ASSUMED` row says to write the suffix (`"F d -3 m:2"`), and the message quotes each setting's contents |
+| 14 | isotope spellings | package output | the neutron parser's refusal of an element-then-number label names the mass-first spelling (`Li7` → `7Li`) and, for a site label such as `N15`, the bare element; it fires at evaluation, not at `Atom(...)` |
+| 15 | issue #728: screen a chosen `candidates[i]` | reference | `diagnostics-indexing.md`, load-bearing point 2 |
 
 ## Non-goals
 
@@ -141,13 +87,13 @@ The row needs that check before it is written.
 
 ## Tasks
 
-- [ ] Place each of the fourteen rows: the package's own text, a reference
+- [x] Place each of the fourteen rows: the package's own text, a reference
       row, the body (paid for by a cut), or declined with a reason, recorded
       row by row in the handover
-- [ ] The f′/f″ raise names `dispersion = None` in its own message (the
+- [x] The f′/f″ raise names `dispersion = None` in its own message (the
       issue's note, left out of PR #660)
-- [ ] `rietx skill --install . --copy` re-syncs the two committed copies
-- [ ] Skill: this WP is the skill change
+- [x] `rietx skill --install . --copy` re-syncs the two committed copies
+- [x] Skill: this WP is the skill change
 
 ## Acceptance
 
@@ -162,6 +108,54 @@ The row needs that check before it is written.
 - `CONTRIBUTING.md` § The agent skill; `tests/skill_caps.py`.
 
 ## Handover log
+
+- **2026-11-16** — closed (ghostshift runner, PR #1596). Every row issue #661
+  proposed, and #728's fifteenth, now has a place or a reason it has none,
+  and the skill body grew by nothing. An agent that hits the 70 keV refusal or
+  writes `Li7` on a neutron model is now told the fix by the refusal itself;
+  the help for a coordinate DOF says why it reads 0. A TOPAS user has a table
+  of where the file's instrument goes. Six rows needed nothing, because later
+  work had already placed them or removed what they described.
+  *Done*: the placement table above (Context), row by row. Package output:
+  `dispersion.OUT_OF_BAND_ESCAPE` on the band refusal (stripped by
+  `io/recipe.py` and `io/projects/fullprof.py`, which have taken or refuse
+  the escape), the neutron hint for a tabulated element-first nuclide,
+  `help.py`'s `dof.*` entry. References: `diagnostics-projects.md`,
+  `history.md`, `numbers.md`, `diagnostics-indexing.md`; copies re-synced.
+  *Measured* (macOS arm64, worktree venv `[dev]`; the workstation, Linux,
+  `rietx-py312` venv): the 74.5 keV refusal and its escape, `Li7` refused
+  at `predict` with the hint and `7Li` evaluating, `dof.0` = 0.0 after a fit
+  with `x` carrying the value, `STAGE_PATH_UNKNOWN` answering
+  `instrument.background.chebyshev.c0` with the flat path, the default
+  `BackgroundChebyshev` at 4 terms. Acceptance (`test_skill`, `test_skill_cli`,
+  `test_docs_consistency`, `test_skill_claims`, `test_help` with the touched
+  files): 412 passed, Mac. Canary on the workstation: 383 passed. Fast suite
+  on the workstation: 14 853 passed, 280 skipped, 32 xfailed, 0 failed in 524 s on 8 cores (6.1 GB, 752 % CPU) at `0103adba7`, the code of this branch's head; the three added tests cost 0.00 s each. `tests.reader_output`: exit 0, unchanged.
+  Ruff clean. Skill caps: four references grew (+239, +1323 then +1.5 kB,
+  +352, +220 B), each far under budget.
+  *Review*: a read-only review subagent (the runner may not run
+  `/code-review`) found the FullProf leak of the escape, an isotope hint
+  inventing `1O`/`3Fe`, "the same esd" wrong for a (x, 2x, ¼) site, and
+  "repaired" overclaiming for a code whose parameter a later stage stopped
+  freeing; all four fixed in `0103adba7`. Not checkable from the repo: the
+  TOPAS-mapping signs (`Zero_Error`, `Specimen_Displacement`) are issue #661's
+  measurements against the program's output, cited as such.
+  *Second review* (2026-11-16): the escape said "the fit then reports
+  DISPERSION_NEGLECTED", but out of band `_dispersion_diagnostics` skips
+  every element and reports nothing; the escape now says no
+  `DISPERSION_NEGLECTED` sizes the neglect, and its test pins the silence
+  (W at 74.5 keV) against a reporting arm (W at 62 keV). The isotope hint
+  fired on site labels (`H1`, `C13`, `N15`, `O18`); it now names both
+  readings, the mass-first isotope and the bare element. Making the
+  diagnostic speak out of band stays WP-1925's.
+  *Generality*: no heuristic, threshold or default added; two refusal texts
+  and reference prose only, no `_audit.py` change.
+  *Forward*: WP-1925's Inherited (the refusal now names the workaround).
+  Overlaps with open PRs: #1579 edits `help.py` and
+  `diagnostics-indexing.md` (other entries and lines), #1592 `api.md` (not
+  touched here).
+  Next: none for this WP. A maintainer may want the TOPAS mapping signs
+  re-measured on the TOPAS VM before trusting the table beyond the issue.
 
 - **2026-10-02** — created, from the 2026-10-02 issue triage (issue #661).
   Checked against the tree at `ca9bda29`: the byte counts match the issue,

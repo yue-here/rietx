@@ -874,7 +874,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1452](1452-spglib-to-moyo.md) | Spglib to moyo, once | ⬜ | P3 | [1327](1327-magnetic-structure.md), [1418](1418-the-magnetic-structure-is-determined.md), [1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md) |
 | [1506](1506-a-planning-doc-pr-runs-what-reads-it.md) | A planning-doc PR runs the tests that read it, and CI gates on one check | ✅ 2026-10-09 | — | — |
 | [1507](1507-the-index-is-read-off-the-wp-files.md) | The WP index is read off the WP files | ✅ 2026-10-23 | — | — ([1506](1506-a-planning-doc-pr-runs-what-reads-it.md) soft) |
-| [1532](1532-the-skill-passages-a-driving-agent-needed.md) | The skill passages a driving agent needed: fourteen rows, placed where each is cheapest | ⬜ | P3 | — (#660 soft) |
+| [1532](1532-the-skill-passages-a-driving-agent-needed.md) | The skill passages a driving agent needed: fourteen rows, placed where each is cheapest | ✅ 2026-11-16 | — | — (#660 soft) |
 | [1540](1540-a-milestone-is-named-a-release-is-numbered.md) | A milestone is named, a release is numbered | ✅ 2026-10-03 | — | — |
 | [1541](1541-cut-1-6-0.md) | Cut 1.6.0 from what main holds | ✅ 2026-10-03 | — | [1540](1540-a-milestone-is-named-a-release-is-numbered.md) |
 | [1546](1546-cut-1-7-0.md) | Cut 1.7.0 from what main holds | ✅ 2026-10-09 | — | [1541](1541-cut-1-6-0.md) |

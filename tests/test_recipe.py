@@ -469,6 +469,7 @@ def test_dispersion_is_declined_off_the_table_and_said(lab6):
     (d,) = [x for x in lab6.diagnostics
             if x.code == "RECIPE_DISPERSION_DECLINED"]
     assert "74.4" in d.message                        # E = 74.465 keV
+    assert "dispersion = None" not in d.message      # already taken: not advised
 
 
 def test_dispersion_stays_on_inside_the_table(lab6_doc):

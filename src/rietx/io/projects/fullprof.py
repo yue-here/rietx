@@ -1020,11 +1020,14 @@ def _dispersion_disagreement(element: str, fp: float, fpp: float,
     ``io/CLAUDE.md`` § Project writers): within :data:`_DISPERSION_ATOL_E` of
     plain Cromer-Liberman at ``lam``, and rietx has a value there.
     """
-    from ...crystallography.dispersion import dispersion
+    from ...crystallography.dispersion import OUT_OF_BAND_ESCAPE, dispersion
     try:
         ours = dispersion(element, lam)
     except (KeyError, ValueError) as exc:
-        return f"rietx has no value for it at {lam} Å ({exc})"
+        # the table's own way out is no advice here: a file's stated pair is
+        # being checked, and its writer refuses `dispersion = None` (WP-1532)
+        reason = str(exc).removesuffix(OUT_OF_BAND_ESCAPE)
+        return f"rietx has no value for it at {lam} Å ({reason})"
     if max(abs(fp - ours[0]), abs(fpp - ours[1])) > _DISPERSION_ATOL_E:
         return f"rietx computes {ours[0]:.4g} / {ours[1]:.4g} at {lam} Å"
     return None
