@@ -353,27 +353,29 @@ def projected_cg(H, g: np.ndarray, lo: np.ndarray, hi: np.ndarray, *,
     the free block H_ff preconditioned by its incomplete LU (Saad, Y. (2003).
     *Iterative Methods for Sparse Linear Systems*, 2nd ed., ch. 10.
     Philadelphia: SIAM), ``scipy.sparse.linalg.spilu`` at scipy's own drop
-    tolerance and fill factor.  The factor is rebuilt when a variable joins
-    the free set, and kept when variables only leave it (WP-2315): the CG
-    then solves with the factor on the set it was built on, r zero on the
-    variables fixed since, and drops the answer there.  That changes the
-    CG's path and not where it stops, which is the same residual floor
-    (:data:`_PCG_TOL`).  On ``bigcell-pawley-120`` (1 575 columns) the
-    rebuilds fell from 1 290 to 67 and the factorisation from 10.3 s to
-    0.5 s, while the Hessian products rose from 5 887 to 11 481; the fit took
-    the same iterations per stage and moved every parameter under 3e-7 of
-    its esd (macOS arm64, ``[dev]``).  A factor that failed is rebuilt on
-    any change, as before.  The step length is
+    tolerance and fill factor.  The factor is rebuilt when the free set
+    gains a variable it was not built on, and kept while the free set stays
+    inside the set it was built on (WP-2315): the CG then solves with the
+    factor on that set, r zero on the variables fixed since, and drops the
+    answer there.  That changes the CG's path, and a converged solve stops
+    at the same residual floor (:data:`_PCG_TOL`); one that spends its
+    ``budget`` first stops elsewhere, as on either path.  On
+    ``bigcell-pawley-120`` (1 575 columns) the rebuilds fell from 1 290 to
+    67, while the Hessian products rose from 5 887 to 11 481, and the fit
+    went from 14.25-14.73 s to 7.87-8.28 s; it took the same iterations per
+    stage and moved every parameter under 3e-7 of its esd (macOS arm64,
+    ``[dev]``).  A factor that failed is rebuilt on any change, as before.
+    The step length is
     ``(r·z)/(pᵀHp)`` with ``z = M⁻¹r``, which is the exact line minimiser
     along p because ``p·r = r·z`` holds for any preconditioner, so every
     segment still lowers the model.  A factorisation that fails, or a
     direction with ``r·z ≤ 0``, takes the unpreconditioned direction r, and a
     switch between the two restarts the recurrence (β = 0).  **A dense H is
     preconditioned by the exact Cholesky factor of its free block**, rebuilt
-    on the same rule: a direction is then the face's Newton step, so CG on a
-    face ends in one product.  A block that is not numerically positive
-    definite has its diagonal raised until it factors (:func:`_factor`, as
-    Lin & Moré's ICFS does): at λ = 0 a pseudo-symmetric Pawley block is
+    whenever the free set differs from the one it was built on: a direction
+    is then the face's Newton step, so CG on a face ends in one product.  A
+    block that is not numerically positive definite has its diagonal raised
+    until it factors (:func:`_factor`, as Lin & Moré's ICFS does): at λ = 0 a pseudo-symmetric Pawley block is
     singular, and the worst systems of two such candidates had 23-54
     eigenvalues within 2e-15 of zero, some negative.  Unshifted, 260 of 893
     and 234 of 835 factorisations failed on two such validations, and the
