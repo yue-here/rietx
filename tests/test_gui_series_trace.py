@@ -13,6 +13,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
+
 from rietx import help as rx_help
 from rietx.gui.series import OTHER_MARK, TRACE_VOCABULARY, result_payload, trace
 from rietx.schemas.common import Diagnostic
@@ -104,11 +106,33 @@ def test_a_series_verdict_marks_the_pattern_its_where_names():
 
 
 def test_a_verdict_on_an_unlabelled_pattern_is_found_by_its_index():
-    """``where=[entry.label or str(entry.index)]`` is the fences' own key."""
+    """``schemas.sequential._pattern_name`` is the fences' own key: the label,
+    or the index where there is none."""
     series = SeriesResult(
         entries=[SeriesEntry(index=0), SeriesEntry(index=1)],
         diagnostics=[_verdict("SEQUENTIAL_RESEED", ["1"])])
     assert [p["marks"] for p in trace(series)["points"]] == [[], ["SEQUENTIAL_RESEED"]]
+
+
+@pytest.mark.parametrize("patterns", [
+    # two labels alike
+    {"entries": [SeriesEntry(index=0, label="T300"), SeriesEntry(index=1, label="T300")]},
+    # a label alike to an unlabelled pattern's index, which its fences write
+    {"entries": [SeriesEntry(index=0, label="1"), SeriesEntry(index=1)]},
+    # a fitted pattern and a failed one
+    {"entries": [SeriesEntry(index=0, label="T300")],
+     "failures": [SeriesFailure(index=1, label="T300", exception="E()")]},
+], ids=["two-labels", "label-and-index", "entry-and-failure"])
+def test_two_patterns_under_one_name_are_refused(patterns):
+    """A fence names its pattern only by that name, so the trace would mark
+    whichever it met first (#1395's review). Refused, naming both, from a
+    constructor and from a stored document alike."""
+    with pytest.raises(ValueError, match=r"both named .* \(pattern 0\) and .* \(pattern 1\)"):
+        SeriesResult(**patterns)
+    stored = {key: [p.model_dump(mode="json") for p in rows]
+              for key, rows in patterns.items()}
+    with pytest.raises(ValueError, match="Give each pattern its own label"):
+        SeriesResult.model_validate(stored)
 
 
 def test_a_backward_chain_failure_does_not_mark_a_fitted_pattern_failed():

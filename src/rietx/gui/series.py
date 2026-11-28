@@ -42,7 +42,7 @@ from typing import Any
 import numpy as np
 
 from ..schemas.pattern import PatternData
-from ..schemas.sequential import SeriesResult, _rejected
+from ..schemas.sequential import SeriesResult, _pattern_name, _rejected
 from ..sequential import (
     DIRECTIONS,
     REFIT_MODES,
@@ -325,7 +325,8 @@ def setup_payload(setup: SeriesSetup, *, running: bool, has_result: bool,
 #:
 #: - a **series verdict on a pattern**: a ``SeriesResult.diagnostics`` row whose
 #:   ``where`` names one pattern, as the per-pattern fences all do
-#:   (``where=[entry.label or str(entry.index)]``).  The codes are an open
+#:   (``schemas.sequential._pattern_name``, a name the series refuses to
+#:   give two patterns).  The codes are an open
 #:   vocabulary (root ``CLAUDE.md``, Guards), so a code this table has no row for
 #:   is still drawn, with :data:`OTHER_MARK` and its own name.  A series-level
 #:   row with no pattern in ``where`` (``SEQUENTIAL_PERSISTENT_FINDING``,
@@ -398,7 +399,7 @@ def trace(series: SeriesResult,
             "rwp": stats.rwp if stats is not None else None,
             "marks": [],
             "findings": [{"code": c, "level": v} for c, v in sorted(levels.items())]}
-        names[entry.label or str(entry.index)] = entry.index
+        names[_pattern_name(entry.index, entry.label)] = entry.index
     for failure in series.failures:
         at = (coordinates[failure.index]
               if coordinates is not None and failure.index < len(coordinates)
@@ -406,7 +407,7 @@ def trace(series: SeriesResult,
         points.setdefault(failure.index, {
             "index": failure.index, "label": failure.label, "x": at,
             "status": "failed", "rwp": None, "marks": [], "findings": []})
-        names.setdefault(failure.label or str(failure.index), failure.index)
+        names.setdefault(_pattern_name(failure.index, failure.label), failure.index)
     for d in series.diagnostics:
         if d.where and d.where[0] in names:
             point = points[names[d.where[0]]]

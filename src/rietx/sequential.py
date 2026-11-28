@@ -204,6 +204,7 @@ from .schemas.sequential import (
     SeriesFailure,
     SeriesResult,
     SeriesStep,
+    _pattern_name,
     _rejected,
 )
 from .schemas.structure import (
@@ -378,15 +379,21 @@ def unique_labels(names: Sequence[str]) -> list[str]:
     with the same basename from two directories is an ordinary series, and a
     panel whose list disagrees with the result's ``entry.label`` would be showing
     a name that names nothing (WP-1016).
+
+    Every name returned is distinct, a generated one included: in
+    ``["a", "a", "a_1"]`` the second ``a`` becomes ``a_1``, so the third is
+    suffixed in turn (``a_1_2``) rather than left sharing it.  A series
+    diagnostic finds its pattern by this name, and
+    :class:`~rietx.schemas.sequential.SeriesResult` refuses two patterns under
+    one (#1395's review).
     """
     seen: set[str] = set()
     unique = []
     for i, name in enumerate(names):
-        if name in seen:
-            unique.append(f"{name}_{i}")
-        else:
-            seen.add(name)
-            unique.append(name)
+        while name in seen:
+            name = f"{name}_{i}"
+        seen.add(name)
+        unique.append(name)
     return unique
 
 
@@ -398,6 +405,9 @@ def _labels_for(patterns: Sequence[PatternData],
         if len(out) != len(patterns):
             raise ValueError(f"labels has {len(out)} entries for "
                              f"{len(patterns)} patterns")
+        # an empty label is no name: the series diagnostics would fall back
+        # to the index, which another pattern's label may already be
+        out = [v or f"p{i:03d}" for i, v in enumerate(out)]
     else:
         out = []
         for i, d in enumerate(patterns):
@@ -2500,7 +2510,7 @@ def _reseed_diagnostics(entry: SeriesEntry) -> list[Diagnostic]:
                   "point of the series.")
     return [Diagnostic(
         level="warning", code="SEQUENTIAL_RESEED",
-        where=[entry.label or str(entry.index)],
+        where=[_pattern_name(entry.index, entry.label)],
         message=(f"Pattern {entry.index} ({entry.label}) was refitted from the "
                  f"initial model, because warm-starting from its neighbour "
                  f"{how}.{fit}"),
@@ -2537,7 +2547,7 @@ def _unrecovered_diagnostics(entry: SeriesEntry,
              + " the chain tried")
     return [Diagnostic(
         level="warning", code="SEQUENTIAL_UNRECOVERED",
-        where=[entry.label or str(entry.index)],
+        where=[_pattern_name(entry.index, entry.label)],
         message=(f"Pattern {entry.index} ({entry.label}) was still rejected "
                  f"{after} ({rungs}): the attempt kept, the {entry.rung} rung, "
                  f"{_rejection(entry)}. It seeded no successor and its Rwp was "
@@ -2706,7 +2716,7 @@ def _series_pattern_failed_diagnostic(failure: "SeriesFailure", *,
                        "series.")
     return Diagnostic(
         level="warning", code="SERIES_PATTERN_FAILED",
-        where=[failure.label or str(failure.index)], value=None,
+        where=[_pattern_name(failure.index, failure.label)], value=None,
         message=(f"Pattern {failure.index} ({failure.label}) raised "
                  f"{failure.exception} on every rung the chain tried"
                  f"{consequence}"),

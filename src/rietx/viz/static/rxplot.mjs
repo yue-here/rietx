@@ -1458,7 +1458,54 @@ export function trajectory(uPlot, host, traj, spec) {
 // ---------------------------------------------------------------- the trace
 
 /** The glyphs a trace can draw for a series verdict, as `marks` names them. */
-const TRACE_GLYPHS = ["bar", "cross", "ring", "tick"];
+export const TRACE_GLYPHS = ["bar", "cross", "ring", "tick"];
+
+/**
+ * Where `trace` draws each pattern's marks, in canvas pixels: the drawing's
+ * DOM-free half, so `node --test` checks it (`tests/rxplot.test.mjs`).
+ *
+ * `px[i]` is pattern `i`'s x in canvas pixels, `box` the plot's
+ * `{ top, width, height }`, `findings` and `marks` as `trace`'s `data` has
+ * them, and `r` the device-pixel ratio. Returns:
+ *
+ * - `bar`: the width of a findings bar and of a "bar" glyph's column, 0.6 of
+ *   the spacing between patterns, between one and six device pixels.
+ * - `findings`: `{ i, x, y, w, h }` for each pattern with a nonzero count, up
+ *   from the bottom, the largest count a third of the pane's height.
+ * - `glyphs`: per pattern, its glyphs in `TRACE_GLYPHS` order, each
+ *   `{ i, glyph, cx, cy }` stacked down from the top by slot. A "bar" is the
+ *   whole column instead, `{ i, glyph, x, y, w, h }`, and keeps its slot.
+ * - `half`: a stroked glyph's half-size.
+ */
+export function traceLayout(px, box, findings, marks, r) {
+  const n = px.length, { top, width, height } = box;
+  const wide = n > 1 ? Math.abs(px[1] - px[0]) : width;
+  const bar = Math.max(r, Math.min(6 * r, 0.6 * wide));
+  const most = Math.max(1, ...findings);
+  const out = { bar, findings: [], glyphs: [], half: 4 * r };
+  for (let i = 0; i < n; i++) {
+    const k = findings[i];
+    if (!k) continue;
+    const h = (k / most) * height / 3;
+    out.findings.push({ i, x: px[i] - bar / 2, y: top + height - h, w: bar, h });
+  }
+  const gap = 11 * r;
+  for (let i = 0; i < n; i++) {
+    const glyphs = TRACE_GLYPHS.filter((g) => marks[i]?.includes(g));
+    glyphs.forEach((glyph, k) => {
+      out.glyphs.push(glyph === "bar"
+        ? { i, glyph, x: px[i] - bar / 2, y: top, w: bar, h: height }
+        : { i, glyph, cx: px[i], cy: top + 7 * r + k * gap });
+    });
+  }
+  return out;
+}
+
+/** The shaded step between two canvas x positions, in either order: its left
+ *  edge and width, never narrower than two device pixels `r`. */
+export function traceBand(a, b, r) {
+  return { x: Math.min(a, b), w: Math.max(Math.abs(b - a), 2 * r) };
+}
 
 /**
  * A series on the experiment's own axis, for scrubbing (WP-1317): the series
@@ -1495,7 +1542,6 @@ const TRACE_GLYPHS = ["bar", "cross", "ring", "tick"];
 export function trace(uPlot, host, data, spec) {
   const n = data.index.length, xs = Float64Array.from(data.index);
   const y = (i) => (data.y ? finite(data.y[i]) : null);
-  const most = Math.max(1, ...data.findings);
   const state = { at: spec.at ?? null, step: spec.step ?? null };
 
   function extent() {
@@ -1509,29 +1555,23 @@ export function trace(uPlot, host, data, spec) {
 
   function draw(u) {
     const c = spec.colors(), r = devicePixelRatio, { ctx } = u, { left, top, width, height } = u.bbox;
-    const X = (i) => u.valToPos(xs[i], "x", true);
-    const wide = n > 1 ? Math.abs(X(1) - X(0)) : width;
+    const px = Array.from(xs, (v) => u.valToPos(v, "x", true));
+    const lay = traceLayout(px, { top, width, height }, data.findings, data.marks, r);
     ctx.save();
     ctx.beginPath();
     ctx.rect(left, top, width, height);
     ctx.clip();
     ctx.setLineDash([]);
     if (state.step) {
-      const a = u.valToPos(state.step[0], "x", true), b = u.valToPos(state.step[1], "x", true);
+      const band = traceBand(u.valToPos(state.step[0], "x", true), u.valToPos(state.step[1], "x", true), r);
       ctx.globalAlpha = 0.16;
       ctx.fillStyle = c.line;
-      ctx.fillRect(Math.min(a, b), top, Math.max(Math.abs(b - a), 2 * r), height);
+      ctx.fillRect(band.x, top, band.w, height);
       ctx.globalAlpha = 1;
     }
     // the findings, up from the bottom, at most a third of the pane
     ctx.fillStyle = c.muted;
-    const bar = Math.max(r, Math.min(6 * r, 0.6 * wide));
-    for (let i = 0; i < n; i++) {
-      const k = data.findings[i];
-      if (!k) continue;
-      const h = (k / most) * height / 3;
-      ctx.fillRect(X(i) - bar / 2, top + height - h, bar, h);
-    }
+    for (const f of lay.findings) ctx.fillRect(f.x, f.y, f.w, f.h);
     if (data.y) {
       ctx.strokeStyle = c.line;
       ctx.lineWidth = 1.4 * r;
@@ -1541,7 +1581,7 @@ export function trace(uPlot, host, data, spec) {
         const v = y(i);
         if (v == null) { open = false; continue; }
         const Y = u.valToPos(v, "y", true);
-        if (open) ctx.lineTo(X(i), Y); else ctx.moveTo(X(i), Y);
+        if (open) ctx.lineTo(px[i], Y); else ctx.moveTo(px[i], Y);
         open = true;
       }
       ctx.stroke();
@@ -1549,25 +1589,22 @@ export function trace(uPlot, host, data, spec) {
     // the verdicts, stacked down from the top in glyph order
     ctx.strokeStyle = c.warn;
     ctx.fillStyle = c.warn;
-    const d = 4 * r, gap = 11 * r;
-    for (let i = 0; i < n; i++) {
-      const glyphs = TRACE_GLYPHS.filter((g) => data.marks[i]?.includes(g));
-      glyphs.forEach((g, k) => {
-        const cx = X(i), cy = top + 7 * r + k * gap;
-        ctx.lineWidth = 1.6 * r;
-        ctx.beginPath();
-        if (g === "bar") {
-          ctx.globalAlpha = 0.35;
-          ctx.fillRect(cx - bar / 2, top, bar, height);
-          ctx.globalAlpha = 1;
-          return;
-        }
-        if (g === "ring") ctx.arc(cx, cy, d, 0, 2 * Math.PI);
-        else if (g === "cross") {
-          ctx.moveTo(cx - d, cy - d); ctx.lineTo(cx + d, cy + d); ctx.moveTo(cx - d, cy + d); ctx.lineTo(cx + d, cy - d);
-        } else { ctx.moveTo(cx, cy - d); ctx.lineTo(cx, cy + d); }
-        ctx.stroke();
-      });
+    const d = lay.half;
+    for (const g of lay.glyphs) {
+      ctx.lineWidth = 1.6 * r;
+      ctx.beginPath();
+      if (g.glyph === "bar") {
+        ctx.globalAlpha = 0.35;
+        ctx.fillRect(g.x, g.y, g.w, g.h);
+        ctx.globalAlpha = 1;
+        continue;
+      }
+      const { cx, cy } = g;
+      if (g.glyph === "ring") ctx.arc(cx, cy, d, 0, 2 * Math.PI);
+      else if (g.glyph === "cross") {
+        ctx.moveTo(cx - d, cy - d); ctx.lineTo(cx + d, cy + d); ctx.moveTo(cx - d, cy + d); ctx.lineTo(cx + d, cy - d);
+      } else { ctx.moveTo(cx, cy - d); ctx.lineTo(cx, cy + d); }
+      ctx.stroke();
     }
     if (state.at != null) {
       const at = u.valToPos(state.at, "x", true);

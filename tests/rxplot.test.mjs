@@ -11,7 +11,7 @@ import {test} from 'node:test';
 import {
   chi2Base, difference, hklLabel, lower, nearest, nearestXY, partition, phaseInk, positive, scatter, sqrtSplits,
   tickDecimals, tickHeight,
-  tickLabels, tsv, unpack, upper,
+  tickLabels, TRACE_GLYPHS, traceBand, traceLayout, tsv, unpack, upper,
 } from '../src/rietx/viz/static/rxplot.mjs';
 
 // ------------------------------------------------------------------ lookups
@@ -187,4 +187,58 @@ test('a table is tab-separated, every number in full and every gap empty', () =>
   const text = tsv(['x', 'y'], [[0.1 + 0.2, null], [2, NaN], [3, -Infinity], [4, 0]]);
   assert.equal(text, 'x\ty\n0.30000000000000004\t\n2\t\n3\t\n4\t0');
   assert.equal(tsv(['x'], []), 'x');
+});
+
+// ------------------------------------------------------------------ the trace
+// `trace`'s positions (WP-1317), checked off the canvas. The patterns sit at
+// 100, 120 and 140 px, so a mark drawn at its neighbour's place is off by 20;
+// the pane is 300 wide and 90 tall, so a height read off the wrong axis is off
+// by more than the pane.
+const PX = [100, 120, 140], BOX = {top: 10, width: 300, height: 90};
+
+test('a findings bar stands on its own pattern, up from the bottom, a third of the pane at most', () => {
+  const lay = traceLayout(PX, BOX, [0, 3, 6], [[], [], []], 1);
+  assert.equal(lay.bar, 6);   // 0.6 of the 20 px spacing is 12, capped at six device pixels
+  assert.deepEqual(lay.findings, [
+    // no count, no bar: the first pattern has none
+    {i: 1, x: 117, y: 85, w: 6, h: 15},
+    // the largest count: a third of the 90 px pane, its foot on the bottom edge
+    {i: 2, x: 137, y: 70, w: 6, h: 30},
+  ]);
+  for (const f of lay.findings) assert.equal(f.y + f.h, BOX.top + BOX.height);
+});
+
+test('a findings bar is 0.6 of the spacing, between one and six device pixels', () => {
+  const at = (px, r) => traceLayout(px, BOX, px.map(() => 1), px.map(() => []), r).bar;
+  assert.equal(at([0, 5], 1), 3);
+  assert.equal(at([0, 1], 1), 1);          // never thinner than a device pixel
+  assert.equal(at([0, 1], 2), 2);
+  assert.equal(at([0, 100], 2), 12);       // never wider than six of them
+  assert.equal(at([5, 0], 1), 3);          // a reversed axis spaces them the same
+  assert.equal(at([50], 1), 6);            // one pattern: the whole pane is its spacing
+  // ... the pane's width, not its height: 0.6 of 5 px is 3, of 90 px capped at 6
+  assert.equal(traceLayout([2], {top: 0, width: 5, height: 90}, [1], [[]], 1).bar, 3);
+});
+
+test('the glyphs stack down from the top in glyph order, on the pattern that carries them', () => {
+  const lay = traceLayout(PX, BOX, [0, 0, 0], [['ring', 'cross'], [], ['tick']], 2);
+  assert.deepEqual(lay.glyphs, [
+    // the order is TRACE_GLYPHS', not the order the marks were listed in
+    {i: 0, glyph: 'cross', cx: 100, cy: 24},   // top + 7r
+    {i: 0, glyph: 'ring', cx: 100, cy: 46},    // one slot down: + 11r
+    {i: 2, glyph: 'tick', cx: 140, cy: 24},
+  ]);
+  assert.equal(lay.half, 8);
+  assert.deepEqual(TRACE_GLYPHS, ['bar', 'cross', 'ring', 'tick']);
+});
+
+test("a bar glyph is its pattern's whole column, and a name no glyph has draws nothing", () => {
+  const lay = traceLayout(PX, BOX, [0, 0, 0], [[], ['bar'], ['SERIES_PATTERN_FAILED']], 1);
+  assert.deepEqual(lay.glyphs, [{i: 1, glyph: 'bar', x: 117, y: 10, w: 6, h: 90}]);
+});
+
+test('the step band spans its two patterns in either order, two device pixels at least', () => {
+  assert.deepEqual(traceBand(140, 100, 1), {x: 100, w: 40});
+  assert.deepEqual(traceBand(100, 140, 1), {x: 100, w: 40});
+  assert.deepEqual(traceBand(120, 120, 2), {x: 120, w: 4});
 });
