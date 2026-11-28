@@ -130,12 +130,18 @@ class ReflectionRow:
     #: the phase's index in the structure: a link that holds where two phases
     #: share a name (WP-1933, the refinement CIF's ``_pd_refln_phase_id``)
     phase_index: int = 0
+    #: Pawley only: the phase's group number for a reflection whose d agrees
+    #: with others' in every cell of its space group (WP-2315, ruling R5 (b)).
+    #: The rows of one group share one refined intensity.  Their summed
+    #: ``intensity`` is measured; each row's own is its share by multiplicity
+    #: (equal F²) and is **not** a measurement.  ``None`` for every other row.
+    merged_group: int | None = None
 
 
 REFLECTION_COLUMNS = (
     "phase", "line", "wavelength", "h", "k", "l", "d",
     "two_theta", "multiplicity", "f_squared", "intensity", "satellite_order",
-    "component",
+    "component", "merged_group",
 )
 
 
@@ -170,6 +176,7 @@ def reflection_table(model: CompiledModel, values: dict[str, float],
         # must be computed from
         order = cp.reflections.satellite_order
         d = d_spacings(cp.reflections.index, *cell)
+        group_of = _merged_group_numbers(model, ip, len(hkl))
 
         def _emit(peaks, f2, component: str) -> None:
             for il, (pos, _gamma, _eta, intensity) in enumerate(peaks):
@@ -186,6 +193,7 @@ def reflection_table(model: CompiledModel, values: dict[str, float],
                         intensity=float(intensity[j]),
                         satellite_order=0 if order is None else int(order[j]),
                         component=component, phase_index=ip,
+                        merged_group=group_of[j],
                     ))
 
         if model.mag_split(ip):
@@ -210,6 +218,23 @@ def reflection_table(model: CompiledModel, values: dict[str, float],
     return rows
 
 
+def _merged_group_numbers(model: CompiledModel, ip: int, n: int) -> list[int | None]:
+    """Each reflection's lattice-merged group number in phase ``ip``, 0-based
+    in the order of the groups' first members, or ``None`` (WP-2315)."""
+    out: list[int | None] = [None] * n
+    pb = model.pawley
+    if pb is None or not pb.merged:
+        return out
+    r0, r1 = pb.refl_slices[ip]
+    number = 0
+    for g in pb.merged:
+        if r0 <= g[0] < r1:
+            for r in g:
+                out[r - r0] = number
+            number += 1
+    return out
+
+
 def write_reflection_table(rows: list[ReflectionRow], path: str | Path, *,
                            delimiter: str | None = None) -> None:
     """Write reflection rows to CSV/TSV (delimiter inferred from suffix)."""
@@ -225,6 +250,7 @@ def write_reflection_table(rows: list[ReflectionRow], path: str | Path, *,
                 _g(r.two_theta), r.multiplicity,
                 "" if r.f_squared is None else _g(r.f_squared), _g(r.intensity),
                 r.satellite_order, r.component,
+                "" if r.merged_group is None else r.merged_group,
             ])
 
 
