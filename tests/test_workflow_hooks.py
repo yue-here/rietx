@@ -1699,7 +1699,14 @@ def test_the_triage_rows_carry_what_the_rank_reads(tmp_path: Path) -> None:
                            ("docs/wp/1234-x.md", 3, 1), ("tests/conftest.py", 1, 0)],
                        ["WP-1234: the work", "a fix", "WP-1234: more"],
                        [{"commit": {"statusCheckRollup": {"state": "SUCCESS"}}}])
-    two = _triage_node(2, [("src/a.py", 1, 1), ("docs/ROADMAP.md", 2, 0)], ["no prefix"], [])
+    # the bench runs the GUI build's scripts and root config, the docs build's conf.py and the
+    # installer's and its own session's config; gui/src/, config-named or not, is read in the diff
+    two = _triage_node(2, [("src/a.py", 1, 1), ("docs/ROADMAP.md", 2, 0), ("gui/package.json", 1, 0),
+                           ("gui/vite.config.ts", 1, 0), ("gui/src/App.svelte", 4, 4),
+                           ("gui/src/lib/x.config.ts", 1, 0), ("gui/scripts/vendor.py", 1, 0),
+                           ("docs/docs/conf.py", 1, 0), ("hatch.toml", 1, 0), ("uv.toml", 1, 0),
+                           (".mcp.json", 1, 0), ("tox.ini", 1, 0)],
+                       ["no prefix"], [])
     pages = [{"data": {"repository": {"pullRequests": {
         "totalCount": 3, "pageInfo": {"hasNextPage": h, "endCursor": "c"}, "nodes": [n]}}}}
         for n, h in ((one, True), (two, False))]
@@ -1713,7 +1720,9 @@ def test_the_triage_rows_carry_what_the_rank_reads(tmp_path: Path) -> None:
     assert first["reviewable"] == 12 + 4 + 1  # tests/data/ is not reviewed
     assert first["degree"] == second["degree"] == 1  # src/a.py is shared
     assert first["governance"] == ["WP-1234"] and second["governance"] == ["ROADMAP.md"]
-    assert first["execution"] == ["tests/conftest.py"] and second["execution"] == []
+    assert first["execution"] == ["tests/conftest.py"]
+    assert second["execution"] == ["gui/package.json", "gui/vite.config.ts", "gui/scripts/vendor.py",
+                                   "docs/docs/conf.py", "hatch.toml", "uv.toml", ".mcp.json"]
     assert first["wpCommits"] == ["WP-1234"] and second["wpCommits"] == []
     assert first["latestReviews"][0]["commit"] == "f" * 40
     assert (first["ci"], second["ci"]) == ("SUCCESS", None)
