@@ -1,6 +1,6 @@
 # WP-2317 — a large cell fits as fast as its reflections allow: the case, the bar, and the rulings in the way
 
-Milestone: unscheduled · Status: 🔄 2026-11-28 — R0, R2, R3 and R5-R7 ruled and recorded, R4 unruled; R7 landed in PR #1881; R6 built, its false stop far from the data fixed, PR open (handover, 8th session); task 1 waits on the maintainer; 5, 7, 8 and R6's record field open
+Milestone: unscheduled · Status: 🔄 2026-11-28 — R0, R2, R3 and R5-R7 ruled and recorded, R4 unruled; R7 landed in PR #1881; R6 built, its false stop far from the data fixed, PR #1890 (handover, 8th session); task 1 waits on the maintainer; 5, 7, 8 and R6's record field open
 Track: A large cell
 Depends on: —
 Priority: P2 2026-11-27 — the scoping WP of a track the maintainer opened for a user at the wall (slowdowns on a 12 × 36 × 4 Å cell); 2314, 2315 and 2316 read its case, its bar and its rulings
@@ -657,7 +657,7 @@ what it costs here.
       *Built 2026-11-28 (6th session) on `wp2317-stopping-rule`; the goldens
       re-pin after R7's #1881 merges.*
       *Done 2026-11-28 (8th session): re-pinned on R7, the esd capped at
-      χ²_red = 1 so a fit far from the data cannot stop; PR PRNUM.*
+      χ²_red = 1 so a fit far from the data cannot stop; PR #1890.*
 - [ ] R6's record: carry the shift test's own reading
       (`LMOutcome.gauss_newton_shift`) onto `StageResult`, since under the cap
       the reported `max_shift_over_esd` reads smaller than the value the stop
@@ -814,7 +814,7 @@ the reported `max_shift_over_esd` reads smaller than the value the stop
 compared with 0.1. Added as a task.
 
 **Next.**
-1. CI on the PR (PRNUM). The maintainer merges.
+1. CI on the PR (#1890). The maintainer merges.
 2. Then the new task: carry the shift test's own reading onto `StageResult`.
 3. The joint runner's re-solve and `backend="jax"` on the bench stay open, as
    does the user's case (task 1).
