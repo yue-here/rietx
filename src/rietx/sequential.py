@@ -110,6 +110,18 @@ escalations moved no value past 7.2e-4 esd, and on the planted series it
 climbed every pattern from T134, where an unmodelled phase appears, for 4.1×
 the evaluations.  Rwp tracks Rexp, so it rose on falling counts under a right
 model as readily as on a wrong one (WP-1469).
+
+**No GoF step retries a pattern** (WP-2080, the maintainer's ruling of
+2026-11-16).  A collapsed warm rung that converged clean can still stop in a
+wrong basin: on issue #1214's two-phase chain it kept a minor phase's ``c``
+0.34 Å off at twice its seed pattern's GoF, under the Rwp fence, while the
+staged plan from the same start found the truth.  Whether to rerun such a
+pattern is the caller's call, because two refiners would act differently on
+the same ratio (DESIGN.md § Rules, 1) and GoF is Rwp over its expected value
+(§ Rules, 4).  So the ratio is a record and no trigger:
+``SeriesEntry.warm_gof_over_seed`` is the first warm attempt's GoF over the GoF
+of the pattern its warm start came from, written on every warm pattern, and
+``refit="stages"`` is the rerun.
 Two candidates were considered and rejected, and the reasons are the rule a new
 trigger has to satisfy.  *Guard findings* (``HIGH_CORRELATION``, at-bounds) fire
 legitimately on perfectly converged patterns: a correlated pair is a property of
@@ -1760,6 +1772,8 @@ class SequentialRefinement:
         previous: tuple[Structure, Instrument] | None = None
         #: the series index ``previous`` was fitted on: ``SeriesEntry.seeded_from``
         previous_index: int | None = None
+        #: that pattern's GoF, the reference of the GoF step (WP-2080)
+        previous_gof: float | None = None
         previous_hkl: list = []
         #: the last accepted pattern's named-variable values, by bare name.
         #: Beside ``previous_hkl`` and for its reason: a variable lives outside
@@ -1808,6 +1822,9 @@ class SequentialRefinement:
             best_ref = best = None
             best_rung = ""
             best_truncated = False
+            #: the first returned attempt's GoF over the seed's, a record
+            #: that triggers nothing (WP-2080)
+            gof_ratio: float | None = None
             tried: list[str] = []
             rwp_of: dict[str, float] = {}
             #: every rung that raised rather than returned, with ``repr(exc)``
@@ -1876,6 +1893,8 @@ class SequentialRefinement:
                 truncated = (not tried and budget is not None
                              and _cut_by_bound(result, unbounded_plan, rung_plan))
                 bound_hit = bound_hit or truncated
+                if warm and not tried:
+                    gof_ratio = _gof_over_seed(result, previous_gof)
                 tried.append(rung)
                 rwp_of[rung] = result.statistics.rwp
                 rung_peak.append(_stage_peak(result))
@@ -1972,6 +1991,7 @@ class SequentialRefinement:
             # the kept attempt's Rwp over the accepted median it would have
             # been fenced against, a record with no threshold (WP-2003, C1)
             entry.rwp_over_median = _rwp_over_median(best, accepted_rwp)
+            entry.warm_gof_over_seed = gof_ratio
 
             entries[k] = entry
             results[k] = best
@@ -2015,6 +2035,8 @@ class SequentialRefinement:
                 pending_floor = [to_series.get(p, p) for p in floored_own]
                 previous = (carried, models[k][1])
                 previous_index = k
+                previous_gof = (entry.statistics.gof
+                                if entry.statistics is not None else None)
                 previous_hkl = _extract_reflections(best_ref._model)
                 previous_vars = {name: prm.value
                                  for name, prm in best_ref._variables.items()}
@@ -2454,6 +2476,28 @@ def _rwp_over_median(result: RefinementResult,
     if not median > 0:
         return None
     return float(result.statistics.rwp) / median
+
+
+def _gof_over_seed(result: RefinementResult | None,
+                   seed_gof: float | None) -> float | None:
+    """``result``'s GoF over ``seed_gof``, the GoF of the pattern its warm start
+    came from, or ``None`` (WP-2080).
+
+    The record :attr:`SeriesEntry.warm_gof_over_seed` carries, and no trigger.
+    GoF, not Rwp: GoF divides the misfit by the pattern's own counting noise,
+    so a seed at a different R\\ :sub:`exp` does not move the reference, which
+    is how issue #1214's first rung sat under the Rwp fence at twice its seed's
+    GoF.  The seed, not a median: the ratio is a fact about one warm start.
+    ``None`` where there is no
+    attempt, no seed, or either GoF is not a positive finite number.
+    """
+    if result is None or result.statistics is None or seed_gof is None:
+        return None
+    gof = float(result.statistics.gof)
+    if not (np.isfinite(gof) and gof > 0 and np.isfinite(seed_gof)
+            and seed_gof > 0):
+        return None
+    return gof / float(seed_gof)
 
 
 def _reseed_needed(result: RefinementResult, accepted_rwp: list[float],

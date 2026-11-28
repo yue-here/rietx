@@ -3118,6 +3118,13 @@ ROWS: tuple[Row, ...] = (
                   "ruled by the maintainer 2026-11-03: inspecting each pattern's metrics "
                   "is part of reading any series, so a ranked line would be noise "
                   "(2003-batch/batch.md, decision 2)")),
+    Row("rietx.schemas.sequential.SeriesEntry.warm_gof_over_seed", "action", tier=1,
+        ambiguity=3,
+        evidence=("arithmetic: the first warm attempt's GoF over the GoF of the pattern its "
+                  "warm start came from (sequential.py _gof_over_seed), recorded on every warm "
+                  "pattern and read by nothing: no threshold, no trigger, so a high value is "
+                  "the caller's to rerun with refit='stages' (WP-2080, the maintainer's ruling "
+                  "of 2026-11-16: a record, no automatic retry)")),
     Row("rietx.schemas.sequential.SeriesResult.code_counts", "action", tier=1, ambiguity=3,
         evidence=("arithmetic: every per-pattern (code, where path) pair counted once per "
                   "pattern, with the series length and the worst level, largest count "

@@ -224,6 +224,17 @@ class SeriesEntry(Base):
     #: had been accepted, and in a document written before the field.
     #: Written by ``SequentialRefinement._chain``.
     rwp_over_median: float | None = None
+    #: The **first** warm attempt's GoF over the GoF of the pattern its warm
+    #: start came from (:attr:`seeded_from`), WP-2080: a record, and no
+    #: trigger.  Nothing retries a pattern on it (the maintainer's ruling of
+    #: 2026-11-16); a high value is a reason to rerun with ``refit="stages"``.
+    #: GoF and not Rwp because it divides the misfit by the pattern's own noise:
+    #: issue #1214's first rung sat under the Rwp fence at 2.01 times its seed's
+    #: GoF, with a minor phase's ``c`` 0.34 Å off.  Recorded under
+    #: ``refit="stages"`` and ``reseed=False`` too.  ``None`` where there was no
+    #: warm start, where the first attempt raised, and in a document written
+    #: before the field.  Written by ``SequentialRefinement._chain``.
+    warm_gof_over_seed: float | None = None
     #: The series index of the pattern whose fitted state seeded this
     #: pattern's warm rungs (WP-2003): the last pattern accepted before it in
     #: the walk.  That is not the pattern walked just before it when that one

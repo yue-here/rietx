@@ -117,6 +117,9 @@ export interface SeriesEntry {
   n_iterations: number;
   reseeded: boolean;
   rwp_warm: number | null;
+  /** the first warm refit's GoF over its seed pattern's, a record that
+   *  triggers nothing (WP-2080); absent in a document written before the field */
+  warm_gof_over_seed?: number | null;
   /** which attempt of the escalation ladder produced these values (WP-1051);
    *  the first pattern of a chain is always `"cold"`, having nothing to warm
    *  from, so this is *not* the same question as `reseeded` */
