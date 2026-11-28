@@ -12,6 +12,7 @@ Every displayed equation carries a source line naming that symbol, and the build
 - [Microstructure](microstructure.md) reads the width coefficients as a size and a strain.
 - [Background](background.md) gives the background models and the bias a flexible one causes.
 - [Estimation](estimation.md) states what the fit minimises and how each esd is computed.
+- [Convergence](convergence.md) states when a fit counts as converged, and the shift test that stops a plan's last stage.
 - [Parameterisation and constraints](parameterisation.md) builds the parameter vector and ties its entries.
 - [A parameter as a function of each pattern's coordinates](parametric.md) holds one parameter of a joint fit to a declared function of where each pattern sits.
 - [Representation analysis](representation-analysis.md) derives the magnetic structures a propagation vector allows.
@@ -94,6 +95,7 @@ corrections
 microstructure
 background
 estimation
+convergence
 parameterisation
 parametric
 representation-analysis

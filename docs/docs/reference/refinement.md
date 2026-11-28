@@ -145,16 +145,17 @@ Lab: calibrate on a standard
 `pawley_default` is the only Pawley preset, and every preset but `profile_only` and `pawley_default` is Rietveld only.
 `Capabilities.plans` carries the same four facts as `PlanCapability` rows ([Plans](programs.md#plans)).
 
-A `RefinementPlan` holds its stages and five settings.
+A `RefinementPlan` holds its stages and six settings.
 
 | Field | Default | Holds |
 |---|---|---|
 | `RefinementPlan.stages` | required | the `Stage` list, in order |
 | `RefinementPlan.correlation_guard` | 0.98 | the \|ρ\| above which a stage reports a correlated pair |
-| `RefinementPlan.intermediate_ftol` | 1e-6 | the tolerance every declared stage but the last stops at ([Stage tolerances](#stage-tolerances)) |
+| `RefinementPlan.intermediate_ftol` | 1e-6 | the tolerance every declared stage but the last stops at ([Stage tolerances](stopping.md)) |
 | `RefinementPlan.lebail_passes` | 1 | the cap on Le Bail passes ([Le Bail passes](#le-bail-passes)) |
 | `RefinementPlan.phase_support_sigma` | 3 | the number of esds a phase's scale must sit from zero for the stage to treat the phase as seen; `None` skips the test ([Held parameters](#held-parameters)) |
 | `RefinementPlan.closing_window_tol` | `None` | `None` runs no closing stage; a fraction asks for one whose windows drop that much of each peak's area, 1e-3 for an answer to publish ([The closing stage](#the-closing-stage)) |
+| `RefinementPlan.shift_over_esd_tol` | 0.1 | the last stage stops once no free parameter's undamped shift reaches this fraction of its esd; `None` stops on the solver's 1e-9 alone ([The shift test](stopping.md#the-shift-test)) |
 
 ```python
 import rietx as rx
@@ -204,75 +205,6 @@ Three diagnostics report the outcome.
 It asks whether several strong reflections carry a Kβ or tungsten Lα line at one common ratio, and needs no structure.
 It cannot see a contamination below about 10 % of the parent peak.
 The harmonic stage needs a converged model, and it finds a contamination whose peaks overlap the fundamental's too closely for a peak search to separate.
-
-## Stage tolerances
-
-`RefinementPlan.stage_ftols` gives the termination tolerance each stage runs at.
-The tolerance is the relative decrease in cost below which the solver stops.
-
-```python
-import rietx as rx
-
-plan = rx.RefinementPlan.lab_bragg_brentano()
-assert plan.intermediate_ftol == 1e-6
-
-ftols = plan.stage_ftols()
-assert len(ftols) == len(plan.run_stages())
-assert set(ftols[:-1]) == {1e-6} and ftols[-1] is None
-```
-
-The list is parallel to `RefinementPlan.run_stages`: the declared stages, then the closing stage when the plan asks for one ([The closing stage](#the-closing-stage)).
-Three rules decide a stage's tolerance, in this order.
-
-1. A stage that declares `Stage.ftol` runs at it.
-2. The last declared stage runs at the solver's default of 1e-9, shown as `None`, because it produces the answer. A closing stage after it runs at 1e-9 too.
-3. Every other stage runs at `RefinementPlan.intermediate_ftol`.
-
-A one-stage plan is therefore all last stage, and nothing is loosened.
-`StageResult.ftol` records the tolerance each stage ran at, so a result says which schedule produced it.
-`PlanSpec.intermediate_ftol` carries the setting into a project file and a history header, and the GUI's text document writes it as the `tolerance` line ([The GUI as a text document and a wire](gui-power.md)).
-
-### Cost of the loose schedule
-
-Each stage frees its parameters on top of everything already free.
-A parameter an early stage left short of convergence keeps refining in every later stage, and the last stage converges all of them together at 1e-9.
-So stopping the earlier stages sooner moves the answer little, on any plan.
-
-Measured on five single fits from the acceptance suites against the same plans with `intermediate_ftol=None`, the closing stage in both, three interleaved rounds each, on macOS arm64 with the `[dev]` install, 2026-11-02:
-
-| Fit | Evaluations | Wall clock in s | Largest shift |
-|---|---|---|---|
-| fluorapatite | 52 → 49 (1.06×) | 1.34-1.62 → 1.30-1.35 | 0.000 esd |
-| 11-BM NAC | 51 → 46 (1.11×) | 0.52-0.55 → 0.50-0.60 | 0.000 esd |
-| cpd-1a | 277 → 175 (1.58×) | 2.18-2.28 → 1.89-1.97 | 0.0004 esd |
-| SRM 660c LaB6 | 116 → 90 (1.29×) | 0.55-0.57 → 0.48-1.26 | 8.82 esd, between two minima |
-| cpd-1a, absent zircon | 1221 → 311 (3.93×) | 21.5-22.4 → 9.6-11.0 | 0.0092 esd |
-
-Rwp agreed to 1e-6 in every case.
-LaB6's 1.26 s was the process's first fit.
-The 8.82 esd is `Geometry.axial_sl` against `Geometry.axial_hl`.
-The two ratios can trade places for an equally good fit, and each schedule lands in a different one.
-The absent zircon phase has nothing to fit, and at 1e-9 two of its stages run to their limit of 400 evaluations.
-
-A series is the case to measure rather than assume.
-Each warm start begins from its predecessor's answer, so a small difference in one answer can change how many recovery rungs the next pattern needs.
-The per-fit bound above therefore does not carry over to a chain, and the difference can go either way.
-A chain on this schedule has not been measured.
-
-### Converging every stage
-
-Set `intermediate_ftol` to `None`:
-
-```python
-import rietx as rx
-
-plan = rx.RefinementPlan.lab_bragg_brentano()
-plan.intermediate_ftol = None
-assert plan.stage_ftols() == [None] * len(plan.run_stages())
-```
-
-Every stage then stops at the solver's default, as every fit before 1.1 did, to the bit.
-Use it for a number going into a paper, for a number reproduced from an earlier release, and in a test that pins a value.
 
 ## The closing stage
 
@@ -395,7 +327,7 @@ assert spec.correlation_guard == plan.correlation_guard
 `PlanSpec.from_plan` and `PlanSpec.to_plan` convert a plan, and `StageSpec.from_stage` and `StageSpec.to_stage` a stage.
 `PlanSpec.stages` is a list of `StageSpec`.
 A `StageSpec` carries every `Stage` field under the same name: `StageSpec.name`, `StageSpec.turn_on`, `StageSpec.turn_off`, `StageSpec.lebail_tol`, `StageSpec.max_iter`, `StageSpec.ftol`, `StageSpec.lebail_cycles`, `StageSpec.seed`, `StageSpec.strain_seed`, `StageSpec.restraint_weight_scale` and `StageSpec.window_slack_deg`.
-`PlanSpec.correlation_guard`, `PlanSpec.intermediate_ftol`, `PlanSpec.lebail_passes` and `PlanSpec.phase_support_sigma` carry the plan's four settings.
+`PlanSpec.correlation_guard`, `PlanSpec.intermediate_ftol`, `PlanSpec.lebail_passes`, `PlanSpec.phase_support_sigma` and `PlanSpec.shift_over_esd_tol` carry five of the plan's settings.
 
 Anything that takes one of the pair takes the other.
 `fit` accepts a `PlanSpec` read back from a project or a history header, and validating a `RefinementPlan` as a `PlanSpec` converts it:
@@ -445,6 +377,7 @@ for stage in result.stages:
 | `StageResult.cost_initial`, `StageResult.cost_final` | the cost the stage started from and the cost it reached |
 | `StageResult.freed` | the parameters this stage's patterns freed, less any the stage held |
 | `StageResult.ftol` | the tolerance it ran at; `None` is the solver default |
+| `StageResult.shift_over_esd_tol` | the shift test it ran, as a fraction of each esd; `None` when it ran none ([The shift test](stopping.md#the-shift-test)) |
 | `StageResult.n_constraint_truncations` | steps the `lm` driver held on a linear inequality |
 | `StageResult.n_degenerate_cell_probes` | trial cells the residual refused for zero or negative volume |
 | `StageResult.n_lapack_fallbacks` | LAPACK calls repeated with a second driver after the first failed to converge, the same answer by another route |

@@ -5201,7 +5201,7 @@ STAGE_FIELD_HELP: dict[str, HelpEntry] = {
         ),
         default="100",
         typical="20-100",
-        anchor="theory/estimation.html#convergence",
+        anchor="theory/convergence.html#the-criterion",
     ),
     "ftol": HelpEntry(
         title="Stage stopping tolerance",
@@ -5216,7 +5216,7 @@ STAGE_FIELD_HELP: dict[str, HelpEntry] = {
         ),
         default="null",
         typical="leave empty unless reproducing a specific run",
-        anchor="theory/estimation.html#convergence",
+        anchor="theory/convergence.html#the-criterion",
     ),
     "lebail_cycles": HelpEntry(
         title="Le Bail cycles",
@@ -5823,7 +5823,7 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "no claim that the fit is good, since a model that matches nothing can "
             "converge. Quality is in `diagnostics`, and `usable` reads both."
         ),
-        anchor="theory/estimation.html#convergence",
+        anchor="theory/convergence.html#the-criterion",
     ),
     "RefinementResult.mode": HelpEntry(
         title="Intensity mode",
@@ -6166,7 +6166,7 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "`diverged`. Earlier stages of a plan stop at a looser tolerance on "
             "purpose (`ftol`), so the last stage's exit is the one about the answer."
         ),
-        anchor="theory/estimation.html#convergence",
+        anchor="theory/convergence.html#the-criterion",
     ),
     "StageResult.lebail_cycles_run": HelpEntry(
         title="Le Bail cycles run",
@@ -6225,7 +6225,7 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "closing stage take; an earlier stage takes the plan's `intermediate_ftol` "
             "unless it declares its own."
         ),
-        anchor="theory/estimation.html#convergence",
+        anchor="theory/convergence.html#the-criterion",
     ),
     "StageResult.shift_over_esd_tol": HelpEntry(
         title="Shift test the stage stopped on",
@@ -6237,7 +6237,7 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "on its `ftol` alone: an earlier stage, a stage declaring its own `ftol`, "
             "or a plan that sets the field to `None`."
         ),
-        anchor="theory/estimation.html#convergence",
+        anchor="theory/convergence.html#the-stop-on-the-last-stage",
     ),
     "StageResult.window_area_tol": HelpEntry(
         title="Profile window fraction",
@@ -6292,7 +6292,7 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "`non_finite_jacobian`, with `status` `diverged`. `None` means "
             "a result stored before the field, or a stage with nothing free."
         ),
-        anchor="theory/estimation.html#convergence",
+        anchor="theory/convergence.html#the-criterion",
     ),
     "StageResult.n_constraint_truncations": HelpEntry(
         title="Steps held on a constraint",

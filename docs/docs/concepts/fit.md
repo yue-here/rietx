@@ -108,7 +108,7 @@ This is separate from `Refinement.hold`, which you set and which lasts until you
 The default solver is a bounded Levenberg-Marquardt with an analytic Jacobian, in double precision.
 Each parameter refines in its own units, and its `min` and `max` are hard bounds.
 Every stage but the last stops at a looser tolerance, since the parameters it frees keep refining in every later stage.
-The [solvers](../theory/estimation.md#solvers) and [convergence](../theory/estimation.md#convergence) sections give the details.
+The [solvers](../theory/estimation.md#solvers) and [convergence](../theory/convergence.md) sections give the details.
 
 ### Checking the answer
 
@@ -131,6 +131,7 @@ It is `None` on a result stored before the field existed.
 A stage the slow-descent rule stopped reads `slow_descent`: at the rate its cost was falling, another 300 evaluations would have moved the answer by less than one esd.
 Its status is `converged`, and the result carries a `STAGE_SLOW_DESCENT` diagnostic naming the stage.
 The rule reads how fast the cost was falling, not how far the minimum is.
+A plan's last stage usually reads `shift_over_esd`: no free parameter's undamped shift had reached a tenth of its esd, the field's test of a converged refinement ([The shift test](../reference/stopping.md#the-shift-test)).
 [About correlations and esds](correlations.md) explains what an esd here does and does not measure.
 
 `Refinement.report()` builds a `FitReport` from the last fit.

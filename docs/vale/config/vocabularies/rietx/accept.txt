@@ -369,6 +369,7 @@ Uiso
 [uU]ncalibrated
 [uU]ncentred
 [uU]nconverged
+[uU]ndamped
 [uU]nderdetermined
 Ungaretti
 [uU]niaxial

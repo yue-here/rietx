@@ -288,18 +288,18 @@ penalty actually minimised is `weight_scale · restraint_chi2`.
 **8.20 Intermediate stages are not converged, on purpose, and the last one is.**
 A staged plan stops every stage but the last at `ftol = 1e-6` rather than the
 solver's `1e-9` (`RefinementPlan.intermediate_ftol`, default since 1.1). The
-reason is 8.13's mechanism seen from the other side: those long stages are
+reason is 8.13's mechanism: those long stages are
 walking a near-degenerate direction at ≈0.93 per iteration, and 99.99 % of the
 cost decrease is banked by evaluation 55 of 93 — the rest is digits the next
-stage refines again anyway, because stages are cumulative and the last one
-polishes everything at `1e-9`. Measured behind the closing stage on fluorapatite,
+stage refines again, because stages are cumulative and the last one
+polishes everything. Measured behind the closing stage on fluorapatite,
 NAC and cpd-1a: 1.06-1.58× fewer evaluations, every parameter within 0.0004 esd
 of the fully converged plan. With an absent phase it is 3.9×.
-**Corollary for the agent, in three parts.** Do not read a small parameter
+**Corollary, in three parts.** Do not read a small parameter
 difference between a 1.0.x number and a 1.1 number as a physics change; check
-`StageResult.ftol` first. Set `intermediate_ftol = None` when a number is going
-into a paper, or when you are reproducing an earlier release, and say that you
-did. And **measure a series rather than assuming it**: the same chained
+`StageResult.ftol` and `.termination` first. Set `intermediate_ftol` and
+`shift_over_esd_tol` to `None` when a number is going into a paper, or when you
+are reproducing an earlier release, and say that you did. And **measure a series rather than assuming it**: the same chained
 ten-pattern comparison came out 1.04× *worse* on one tree and 1.12× *better* on
 the next, one commit apart, because each pattern warm-starts from its
 predecessor and a different seed changes how many recovery rungs the next one

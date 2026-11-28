@@ -20,6 +20,7 @@ Most of them are built from the code that owns their facts, so they match the ve
 - [The parameter table](parameter-table.md) gives the fields of a `ParameterRow`, why a row cannot be freed, ties and restraints, the bounds a fit runs in, what `set_vary` and `set_values` return and refuse, the rows a result reports, and the profile interval.
 - [Stage settings, flags and options](settings.md) lists the other names rietx uses: stage settings, peak flags, peak origins, reader options, instrument preset fields and indexing search settings.
 - [Plan presets](plans.md) draws each preset's stages.
+- [Stage tolerances](stopping.md) gives when each stage stops: the tolerance on the fall in cost, and the shift test on the last stage.
 - [The refinement](refinement.md) gives the calls that run a fit and where each setting goes, the fit modes, the plan and stage objects and their stored form, what each stage records, the guard findings, the event stream, cancellation and the provenance record.
 - [Magnetic refinement](magnetic.md) gives the satellite test for unexplained intensity, the moment and magnetic space group fields, what the report says about a moment, the magnetic peak width, and `solve_magnetic` with its answer types.
 - [Peak lists for indexing](peaks.md) gives what `pick_peaks` and `fit_peaks` return and refuse, the fields of a `PeakList` and an `ObservedPeak`, the peak flags, and whether a list can be indexed, with its systematic-shift screen.
@@ -72,6 +73,7 @@ parameter-table
 settings
 plans
 refinement
+stopping
 magnetic
 peaks
 indexing
