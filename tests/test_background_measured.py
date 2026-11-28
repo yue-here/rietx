@@ -715,3 +715,23 @@ def test_a_stage_spec_reaches_the_scale_by_name():
     spec = StageSpec(name="blank", turn_on=[SCALE_PATH])
     table.set_vary(list(spec.turn_on), True)
     assert set(table.free_paths) - before == {SCALE_PATH}
+
+
+def test_the_absorption_remedies_hold_a_measured_blank_never_an_estimate():
+    """A held curve has no free columns, so holding an estimate silences the
+    BACKGROUND_ABSORPTION screen without testing for the bias (#1657 round 3).
+    The three texts that hand the remedy to a reader name a measured blank."""
+    import importlib
+
+    refine_module = importlib.import_module("rietx.refine")
+    from rietx.help import DIAGNOSTIC_HELP
+    from rietx.report.apply import RECIPES
+
+    help_text = DIAGNOSTIC_HELP["BACKGROUND_ABSORPTION"].description
+    note = RECIPES["decrease_background_flexibility"].note
+    source = " ".join(Path(refine_module.__file__).read_text(encoding="utf-8").split())
+    assert "hold a measured blank fixed" in help_text
+    assert "hold a measured blank additively" in " ".join(note.split())
+    assert "hold a measured blank additively" in source.replace('" "', "")
+    for text in (help_text, note, source.replace('" "', "")):
+        assert "hold an estimated" not in " ".join(text.split())
