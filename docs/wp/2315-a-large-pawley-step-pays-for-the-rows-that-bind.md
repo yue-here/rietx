@@ -1,6 +1,6 @@
 # WP-2315 — a large Pawley step pays for the rows that bind, not for every intensity
 
-Milestone: unscheduled · Status: 🔄 2026-11-28 — task 1, the cached |T|, Angle 9 and Angle 4 done (the 120° fit 1.8× faster); Angles 0-2 held, since the real-structure bench crosses no width row; the 3× target open
+Milestone: unscheduled · Status: 🔄 2026-11-28 — task 1, the cached |T|, Angle 9, Angle 4 and the shared covariance eigensolve done (the 120° fit about 2.2× faster); Angles 0-2 held, since the real-structure bench crosses no width row; the 3× target open
 Track: A large cell
 Depends on: 2317 soft (its `bigcell-pawley` case and rulings R0, R4 (settled 2026-11-28), R5)
 Priority: P2 2026-11-28 — the maintainer's large-cell track, ruled to proceed whatever the user's case shows; the real-structure bench crosses no width row, so what reaches it is Angle 4, done 2026-11-28, and what it left (the CG's products and the covariance `eigh`)
@@ -266,6 +266,10 @@ free swap under LM.
       variables only leave the free set. The 120° fit went from
       14.25-14.73 s to 7.87-8.28 s, 1.8×, and every parameter moved under
       3e-7 esd.*
+- [x] The covariance `eigh` (the 2nd session's Next 1). *Done 2026-11-28:
+      `statistics.equilibrated_eigen` is solved once a stage and read by
+      both `normal_factors` and `discarded_directions`, bit-identical by
+      construction. The 120° fit went from 7.83-7.97 s to 6.78-6.82 s.*
 - [ ] Angle 3 only if 0-2 and 4 leave the constrained step above ~10 % of the fit.
 - [ ] Put angles 5-7 to the maintainer only if 0-4 miss the target, with the
       measured remainder and each one's Rule 1 kind.
@@ -302,6 +306,117 @@ free swap under LM.
   (variable projection, angle 7).
 
 ## Handover log
+
+### 2026-11-28 (3rd session) — one eigensolve for the covariance and its discard test (ghostshift runner; PR #PRNUM)
+
+A large Pawley fit now eigendecomposes each stage's normal matrix once
+where it did so twice. The covariance inverts that matrix, and the test
+for directions the data do not move reads the same decomposition. Both
+used to build the matrix and solve it again. The input to the solve is
+the same array either way, so every esd, correlation and "no esd"
+verdict is the one the two solves gave, bit for bit on one machine.
+On the 120° bench case the fit went from about 7.9 s to about 6.8 s, and
+the 90° case from about 2.43 s to about 2.19 s.
+The 3× target is still not reached.
+
+*Done.*
+- `statistics.equilibrated_eigen(jac)` builds the Jacobi-equilibrated
+  normal matrix through the one builder `normal_factors` and
+  `discarded_directions` now share (`_equilibrated_normal`), and
+  eigensolves it. Both readers take it as `eigen=`. Without it each
+  builds and solves as before. A reader refuses a decomposition built
+  from another Jacobian object, since `_without_columns` makes a copy of
+  the same shape with a different answer. A joint fit's
+  `BlockJacobian` and a Jacobian with no column get `None` and keep their
+  own paths.
+- `_guarded_covariance` builds it inside its `LinAlgError` guard and hands
+  it to both. `_SHARE_EIGEN` switches it off for probes, as
+  `bccg._REUSE_STALE_FACTOR` does.
+- The sibling: `gui/background.py`'s band esd asked both readers of one
+  Jacobian, and now shares one decomposition too. The other eigensolves
+  on the covariance path (`resolved_correlation`, `soft_modes`) read the
+  table columns only, 6-15 a stage here, and were left.
+- Tests (`tests/test_discarded_direction.py`): the two paths equal to the
+  bit on four synthetic Jacobians (nothing discarded, a three-column
+  combination, a dead column, a 1e-170 column `column_rescale` lifts);
+  a whole Pawley fit (LaB₆ overlap, numpy path declared) equal in every
+  table value and esd, every intensity esd and every diagnostic; the
+  refusal of a foreign Jacobian.
+
+*The bar.* The brief asked that any faster route reproduce every esd and
+every `unmeasured_rows` verdict. This route does by construction: the
+matrix handed to `eigh` is built by the same code from the same Jacobian,
+and the decomposition is only read. The tests assert equality, never a
+tolerance. Nothing is claimed across BLAS builds. Under R0 this is
+neither a rounding move nor a change of method, so no golden moves.
+
+*Measured* (macOS arm64, `[dev]`, compiled tier on, Accelerate; main a
+`git archive` of 20a0fcd1a and the branch of 925628e55, each run by
+`PYTHONPATH`; every run under the shift's suite lock).
+- Interleaved bench, three rounds, `--configs off`, main then branch each
+  round: `bigcell-pawley-120` 7.83-7.97 s → 6.78-6.82 s (1.16×);
+  `bigcell-pawley` 2.42-2.44 s → 2.18-2.19 s (1.11×). Same Rwp to the
+  printed digits and the same evaluations per stage (2, 8, 11, 8, 14).
+- Profile, 120°, one run each: main 8.54 s with `eigh` 1.65 s over 15
+  calls; branch 7.40 s with `eigh` 0.81 s over 10. The rest of the saving
+  is the second dense JᵀJ (`_equilibrated_normal` is 0.24 s over 5).
+- What is left on the branch's profiled 7.07 s fit: `projected_cg`
+  2.89 s (sparse products 1.36 s over 11 889, ILU solves 0.75 s over
+  9 857, `spilu` 0.48 s over 67); the covariance 1.21 s (its one `eigh`
+  0.81 s over 5); the Jacobian 0.93 s over 44; the step's normal
+  equations 0.75 s over 39 (sparse JᵀJ products); the residual 0.22 s.
+- Where the eighs were (`count_eigh.py`, one run, one thread, no timing):
+  per stage, two of the 1 575-1 583-column matrix (`normal_factors`
+  through `_psd_pinv`, then `discarded_directions`), ten a fit; plus one
+  6-15-column `soft_modes` a stage.
+
+*Tests* (macOS arm64, `[dev]`, on 925628e55, which is origin/main
+20a0fcd1a plus this branch): fast selection (`-m "not slow"`) 15 910
+passed, 462 skipped, 30 xfailed, 8.4 min, no failure. The six added cases
+(three tests) cost 0.31 s locally, 0.30 s of it the whole Pawley fit. No
+main run on this machine to diff the counts against. The full suite was
+not run: the change is bit-identical by construction, so it cannot move
+a measured number. `tests.reader_output`: unchanged against the
+merge-base. CI's lint steps, Vale included, ran clean (Vale: 0 errors,
+283 warnings, none on a line this branch wrote).
+
+*Review* (`/code-review high --fix`): six nits, four taken (the
+foreign-Jacobian refusal and its test, `eq=False` on the dataclass, a
+docstring that still promised a second `eigh`, the whole-fit test
+declaring the numpy path). Two declined. The shared decomposition keeps
+one n² array (about 20 MB at 1 583 columns) alive while the covariance is
+assembled, which is the price of not solving twice. The GUI band has no
+test of its own comparing the two paths; the readers' shared path is
+tested, and a switch or a GUI test for it is more than the change needs.
+
+*Settled by Claude* (for blind review):
+- The covariance `eigh` belongs here, not to WP-2317: this WP's Priority
+  line owns what Angle 4 left of the 120° fit. Alternative: file it under
+  WP-2317, which owns the bench.
+- Take the shared decomposition, bit-identical, before any faster
+  eigensolver. A Cholesky inverse with `eigvalsh` for the cut would cost
+  less again but moves every esd by rounding and can move a discard
+  verdict at the cut, so it is a rounding move under R0 with goldens to
+  re-pin. Alternative: take that route now.
+- No generality review: the change adds no threshold, no default and no
+  automatic action. Alternative: send it as an always-on rule.
+
+*Next.*
+1. Against the "before" re-read on this machine (14.70-15.36 s, Context
+   § Re-read on the real structure) the 3× target is about 5 s. The fit
+   is now about 6.8 s, 2.2-2.3× across sessions (not interleaved). The CG
+   is the largest piece left (about 40 % of the fit), and Angle 4's stale
+   factor doubled its products. The 2nd session held a rebuild rule by
+   how far the free set has shrunk for a case hitting the 2n budget more
+   than twice. At 40 % of the fit the doubled products are reason to
+   measure it on the 120° case now: products against builds, with the
+   fraction as a new number and its audit row.
+2. The covariance's one `eigh` (0.81 s) has two faster routes, both
+   rounding moves under R0: a Cholesky inverse where `eigvalsh` shows
+   nothing under the cut, and a block route through the Pawley block's
+   banded structure. Either must show every discard verdict unchanged on
+   the goldens and re-pin them in the same change.
+3. Angles 0-2 as before, only once a case crosses a width row.
 
 ### 2026-11-28 (2nd session) — Angle 4: the incomplete LU is kept while the free set only shrinks (ghostshift runner; PR #1878)
 
