@@ -173,6 +173,8 @@ class SharingMap:
     shared: list[str] = field(default_factory=list)
 
     def is_shared(self, path: str) -> bool:
+        """Whether the parameter dot-path ``path`` is one value for every
+        pattern, rather than one per pattern."""
         if any(fnmatch.fnmatchcase(path, g) for g in self.per_histogram):
             return False
         if any(fnmatch.fnmatchcase(path, g) for g in self.shared):
@@ -829,8 +831,9 @@ class MultiParameterTable:
                 if i is None:
                     raise ValueError(
                         f"parametric equation {name!r}: target {r.target!r} is not a "
-                        f"parameter of histogram {h}'s model; list them with "
-                        f"[e.path for e in mtable.tables[{h}].entries]")
+                        f"parameter of histogram {h}'s model. To list them, build the "
+                        "refinement without parametric= and read the paths from its "
+                        ".parameters(), dropping any 'hist.<h>.' prefix")
                 why = _target_refusal(table, table.entries[i])
                 if why:
                     raise ValueError(f"parametric equation {name!r}: {r.target} in "
@@ -939,8 +942,9 @@ class MultiParameterTable:
                 if i is None:
                     raise ValueError(
                         f"parametric equation {r.name!r}: target {r.target!r} is not a "
-                        f"parameter of histogram {h}'s model; list them with "
-                        f"[e.path for e in mtable.tables[{h}].entries]")
+                        f"parameter of histogram {h}'s model. To list them, build the "
+                        "refinement without parametric= and read the paths from its "
+                        ".parameters(), dropping any 'hist.<h>.' prefix")
                 why = _target_refusal(table, table.entries[i])
                 if why:
                     raise ValueError(f"parametric equation {r.name!r}: {r.target} in "
@@ -1382,6 +1386,63 @@ class MultiParameterTable:
             want = [p for p in wants[h] if p not in declined]
             for p in table.seed_floored(want, value):
                 # once per shared column, as :meth:`set_vary` returns it
+                if self._canonical(h, p) not in seeded:
+                    seeded.append(self._canonical(h, p))
+        if seeded:
+            self._rebuild_columns()
+        return seeded
+
+    def seed_stephens(self, scoped_paths: list[str],
+                      microstrain: float) -> list[str]:
+        """Put each freed, all-zero Stephens block on the isotropic ray (per
+        histogram); see the single-histogram :meth:`ParameterTable.seed_stephens`.
+
+        S_HKL are λ-free, so the default sharing gives one block to every
+        histogram, and :meth:`seed_floored`'s rule holds: a shared block is
+        seeded in every histogram or in none.  It is declined when any
+        histogram's copy is not all zero.  The ray reads the cell, so under a
+        per-histogram cell (``SharingMap(per_histogram=["phases.*.cell.*"])``)
+        each histogram would compute its own; a shared block takes
+        **histogram 0's ray** in all of them.  That start is inside every
+        histogram's cone, which is all a seed needs, while seeding each
+        histogram from its own cell would give one column several values and
+        the last write would win ``x0``.  A block the sharing gives each
+        histogram whole (every DOF of it per-histogram) is seeded from that
+        histogram's own cell, as a single fit would seed it.  A block with
+        any DOF shared, freed or not, takes histogram 0's ray, since its
+        shared column can hold only one value.
+        """
+        if microstrain <= 0.0:
+            return []
+        wants = []
+        for h in range(len(self.tables)):
+            want = [self._unscope(h, p) for p in scoped_paths
+                    if self._owner(p) in (None, h)]
+            wants.append([w for w in want if w is not None
+                          and ".microstrain.dof." in w])
+
+        def base(p: str) -> str:
+            return p.rpartition(".microstrain.dof.")[0]
+
+        def per_histogram(b: str) -> bool:
+            # every DOF of the block, freed or not, is each histogram's own
+            n = max(len(t._strain_unit.get(b, ())) for t in self.tables)
+            return n > 0 and not any(
+                self.sharing.is_shared(f"{b}.microstrain.dof.{k}") for k in range(n))
+
+        bases = {base(p) for w in wants for p in w}
+        own = {b for b in bases if per_histogram(b)}
+        shared = bases - own
+        declined = {b for b in shared for h, table in enumerate(self.tables)
+                    if b not in table._stephens_seedable(
+                        [p for p in wants[h] if base(p) == b])}
+        seeded: list[str] = []
+        for h, table in enumerate(self.tables):
+            joint = [p for p in wants[h] if base(p) in shared - declined]
+            mine = [p for p in wants[h] if base(p) in own]
+            done = (table.seed_stephens(joint, microstrain, ray_from=self.tables[0])
+                    + table.seed_stephens(mine, microstrain))
+            for p in done:
                 if self._canonical(h, p) not in seeded:
                     seeded.append(self._canonical(h, p))
         if seeded:

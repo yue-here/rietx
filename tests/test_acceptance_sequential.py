@@ -226,10 +226,13 @@ def test_the_hostile_pairs_runaway_reports_its_stale_windows(monkeypatch):
     stage still runs to ``axial_sl`` 558, and its record says so.
 
     At that answer its frozen windows drop 73 % of the Bragg intensity that
-    windows sized there hold, against the 2 % each may drop.  The closing
-    compile at that answer would run for tens of minutes, so the test reads the
-    warm stage's ``stage_end`` event, which carries ``window_loss`` as the stage
-    ends, and stops the fit at the closing compile as the test above does.
+    windows sized there hold, against the 2 % each may drop.  Since WP-2317
+    (R7) the stage then solves once more on windows sized there, which stays
+    at the runaway: the record carries the 73 % as ``window_refit_loss``, and
+    the second solve's windows hold their peaks.  The closing compile at that
+    answer would run for tens of minutes, so the test reads the warm stage's
+    ``stage_end`` event, which carries both losses as the stage ends, and stops
+    the fit at the closing compile as the test above does.
     """
     _require_data()
     refine_mod = importlib.import_module("rietx.refine")
@@ -250,6 +253,13 @@ def test_the_hostile_pairs_runaway_reports_its_stale_windows(monkeypatch):
 
     monkeypatch.setattr(refine_mod, "compile_model", guarded)
     monkeypatch.setattr(rx.RefinementPlan, "stage_ftols", pre_2045)
+    # and the stage order of that time: lines_axial after sample_broadening.
+    # qpa_plan moved it ahead on 2026-11-19 (WP-2017 § Inherited), and cpd-1b's
+    # warm stage then stops at a sane axial ratio, so the runaway needs this.
+    plan = qpa_plan()
+    names = [s.name for s in plan.stages]
+    axial = plan.stages.pop(names.index("lines_axial"))
+    plan.stages.insert(names.index("sample_broadening"), axial)
     structure = rx.Structure(phases=_phases())
     ins = qarr_instrument()
     patterns = [rx.read_pattern(DATA / f"{s}.prn") for s in SAMPLE1[:2]]
@@ -262,11 +272,12 @@ def test_the_hostile_pairs_runaway_reports_its_stale_windows(monkeypatch):
 
     with pytest.raises(_Runaway):
         rx.SequentialRefinement(structure, ins).fit(
-            patterns, labels=list(SAMPLE1[:2]), plan=qpa_plan(), events=listen)
+            patterns, labels=list(SAMPLE1[:2]), plan=plan, events=listen)
     cpd_1a = [e["window_loss"] for e in ends if e["series_index"] == 0]
     assert all(x < 0.02 for x in cpd_1a), cpd_1a
     warm = [e for e in ends if e["series_index"] == 1][-1]
-    assert warm["window_loss"] > 0.5, warm
+    assert warm["window_refit_loss"] > 0.5, warm
+    assert warm["window_loss"] < 0.02, warm
 
 
 # -- accuracy: a chained fit must be as good as an unchained one ----------

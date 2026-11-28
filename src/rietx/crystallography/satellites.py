@@ -90,6 +90,7 @@ from .symmetry import (
     MAX_HKL_GRID_POINTS,
     OperatorGroup,
     ReflectionSet,
+    _order_by_d,
     get_spacegroup,
     rotation_matrices,
 )
@@ -504,7 +505,7 @@ def satellite_reflections(sg_symbol,
             f"satellite representative {row.tolist()} (in {q}ths) is not "
             f"H ± k for the declared k {format_kvector(kk)}")
 
-    sort = np.argsort(-d_reps)
+    sort = _order_by_d(d_reps)
     return ReflectionSet(hkl=hkl[sort], multiplicity=mult[sort], d=d_reps[sort],
                          spacegroup=sg.xhm(), satellite_order=order[sort],
                          propagation_vector=tuple(float(x) for x in kk))
@@ -535,7 +536,7 @@ def satellite_d_spacings(space_group,
             out.append(np.zeros(0, dtype=np.float64))
             continue
         d_reps = orbits[2]
-        out.append(d_reps[np.argsort(-d_reps)])
+        out.append(d_reps[_order_by_d(d_reps)])
     return out
 
 
@@ -561,7 +562,7 @@ def merge_satellites(nuclear: ReflectionSet, sat: ReflectionSet) -> ReflectionSe
     d = np.concatenate([nuclear.d, sat.d])
     order = np.concatenate([np.zeros(len(nuclear), dtype=np.int64),
                             sat.satellite_order.astype(np.int64)])
-    sort = np.argsort(-d, kind="stable")
+    sort = _order_by_d(d)  # the nuclear list's tie rule, nuclear rows first
     return ReflectionSet(hkl=hkl[sort], multiplicity=mult[sort], d=d[sort],
                          spacegroup=nuclear.spacegroup,
                          extra=dict(nuclear.extra),
@@ -743,7 +744,14 @@ def _zone_boundary_candidates(sg) -> tuple[KCandidate, ...]:
         if held is None or _shortest_spelling_key(kk) < _shortest_spelling_key(held):
             stars[arms] = kk
     raw: list[KVector] = sorted(stars.values())
-    if sg.crystal_system_str() in ("hexagonal", "trigonal"):
+    # (⅓, ⅓, ·) is K/H only on a tabulated setting's axes.  An operation list's
+    # own crystal system is basis-free (issue #1688), so read the setting: an
+    # unnamed child's axes are no tabulated setting's, and there it is no point.
+    try:
+        setting = sg.closest_type if isinstance(sg, OperatorGroup) else sg
+    except ValueError:
+        setting = None
+    if setting is not None and setting.crystal_system_str() in ("hexagonal", "trigonal"):
         raw.extend(_TRIGONAL_POINTS)
     out: list[KCandidate] = []
     seen: set[frozenset[KVector]] = set()

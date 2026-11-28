@@ -16,6 +16,7 @@ pattern with an impurity phase.
 | [](tutorials/02_simple_rietveld.ipynb) | A staged Rietveld refinement, the parameter table, bond lengths, the refined structure drawn, and a project | {download}`02_simple_rietveld.ipynb <tutorials/02_simple_rietveld.ipynb>` |
 | [](tutorials/02b_steering_a_refinement.ipynb) | Tying three atoms' Biso, two parameters the data cannot separate, going back in the history and holding one, and the verdict for a structure | {download}`02b_steering_a_refinement.ipynb <tutorials/02b_steering_a_refinement.ipynb>` |
 | [](tutorials/03_peaks_indexing_lebail.ipynb) | Picking peaks, indexing with a narrowed search, when the indexer names a cell, and checking a candidate cell with Le Bail | {download}`03_peaks_indexing_lebail.ipynb <tutorials/03_peaks_indexing_lebail.ipynb>` |
+| [](tutorials/03b_when_the_indexer_abstains.ipynb) | The same search on a shorter scan, why the indexer abstains, and which caveats a longer scan closes | {download}`03b_when_the_indexer_abstains.ipynb <tutorials/03b_when_the_indexer_abstains.ipynb>` |
 | [](tutorials/04_peak_shape_and_microstructure.ipynb) | Calibrating an instrument on a standard, then measuring crystallite size and strain against a known truth | {download}`04_peak_shape_and_microstructure.ipynb <tutorials/04_peak_shape_and_microstructure.ipynb>` |
 | [](tutorials/05_sequential_fits.ipynb) | Fitting a heating ramp pattern by pattern, a parameter's trajectory, and what the series reports when one frame fails | {download}`05_sequential_fits.ipynb <tutorials/05_sequential_fits.ipynb>` |
 | [](tutorials/06_your_own_data.ipynb) | A template for your own pattern and CIFs: change the marked cells and run it top to bottom | {download}`06_your_own_data.ipynb <tutorials/06_your_own_data.ipynb>` |
@@ -25,7 +26,7 @@ laboratory Cu Kα pattern.
 Notebooks 03 to 05 build their patterns in the notebook, so each fit can be
 checked against the values it was built from.
 Notebook 06 is a template rather than a tutorial, committed without outputs.
-It runs on the fluorapatite files as shipped, and you replace them with your own.
+It runs on the fluorapatite files included with the package, and you replace them with your own.
 
 <!-- Guard note (WP-1916, WP-1986): tests/test_manual_api.py checks the names
 on this page and never in the notebooks, so a rietx name in a notebook's
@@ -42,6 +43,7 @@ tutorials/01_quickstart
 tutorials/02_simple_rietveld
 tutorials/02b_steering_a_refinement
 tutorials/03_peaks_indexing_lebail
+tutorials/03b_when_the_indexer_abstains
 tutorials/04_peak_shape_and_microstructure
 tutorials/05_sequential_fits
 tutorials/06_your_own_data

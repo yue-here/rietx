@@ -1,9 +1,9 @@
 # WP-1453 — both directions name the lower cost
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-28 — task 1 measured (#1594); option 1 ruled (one cost pair per pattern) and not started; option 2 deferred to #1402's B2
 Track: A long run is not one fit
 Depends on: — (1420 soft: its fixture may serve this one)
-Priority: P3 2026-09-24 — `SEQUENTIAL_PATH_DEPENDENT` already fires but does not say which answer to quote; whether the package's own passes disagree in cost is unmeasured
+Priority: P3 2026-11-15 — `SeriesResult.direction_gaps` already lists the gap but does not say which answer to quote; the package's own passes now measured to disagree in cost on one public ramp (issue #1556, relative Rwp up to 1.4e-3), which keeps the row at P3: a diagnostic that says less than it could
 
 ## Goal
 
@@ -13,15 +13,22 @@ one.
 
 ## Context
 
-**What the package does now.** `direction="both"` runs the chain each way
-and reports `SEQUENTIAL_PATH_DEPENDENT` where a parameter disagrees beyond
-its esds. The docstring says so plainly: "The reported entries are the
-forward ones" (`src/rietx/sequential.py:743-745`).
-`_path_dependence_diagnostics` (`sequential.py:1937`) compares parameter
-values and never costs.
+**What the package does now** *(superseded in part, 2026-11-16, checked
+against the tree at `bc77a934e`: WP-2003 removed `SEQUENTIAL_PATH_DEPENDENT`
+and its 3σ bar).* `direction="both"` runs the chain each way and lists every
+path's gap at every pattern, unthresholded, as `SeriesResult.direction_gaps`:
+one `DirectionGap` row per path and pattern, carrying both values, the signed
+gap, the gap over the combined esd and both kept rungs
+(`schemas/sequential.py:496`). The docstring still says "The reported entries
+are the forward ones" (`src/rietx/sequential.py:1317-1318`). Its writer,
+`_direction_gaps` (`sequential.py:3444`), compares parameter values and never
+costs. The backward chain itself rides on the result as `series.backward`
+(WP-1076), so each pattern's backward `Statistics` is already readable at
+`series.backward.entries[j].statistics`; what nothing does is put the two
+costs side by side or say which is lower.
 
 Within one pattern the ladder already ranks attempts. `_prefer` and
-`_better` (`sequential.py:1550`) rank a diverged fit below a finished one,
+`_better` (`sequential.py:2393-2418`) rank a diverged fit below a finished one,
 rank a truncated attempt below a completed one, and then go on Rwp. A
 backward pass is two more attempts at the same pattern, and nothing ranks
 them against the forward one.
@@ -51,12 +58,71 @@ chain pruned phases, so the two passes sometimes fitted different phase
 sets, and the agent ranked on BIC. With one phase list, χ² compares
 directly.
 
+**A public series** (issue #1556 § 1, 2026-11-15, folded from Inherited). On
+the 11-BM CuCr₂O₄ + CuO ramp (`tests/data/seqrefine_cucr2o4/`, 17 patterns,
+6.8-288.7 K, `direction="both"`) the reporter measured the relative Rwp
+difference, forward minus backward, on the same points: up to 1.4e-3 (OH_49),
+7.5e-4 (OH_41) and −8.3e-4 (OH_53). With CuO's cell held the two chains agree
+to 1.4e-8 or better on 16 of 17 patterns, so the weak minor phase's cell
+carries the history, not the cold start. The reporter proposes option 1 as a
+χ² pair on each `DirectionGap` (Σw·Δ² on the same points), offering
+`forward_chi2` and `backward_chi2` and leaving the names to the maintainer
+(the issue's question 1, open). χ² is unchanged by any exact equivalence, so
+the pair needs no ruling on the issue's § 2.
+
+**The package's own passes, measured** (task 1, 2026-11-16, `[dev]`, darwin
+arm64, tree `bc77a934e`). Issue #267's two-basin construction as WP-1420's
+PR #1401 builds it (`tests/test_identity_point_seed.py` helpers, the
+`tests/repro_1420.py chains` loop): a Cu `F m -3 m` parent and its
+`I 4/m m m` subgroup, present from p004 at 0.15, 0.25 and 0.40 of the
+parent's scale, seven noise draws (20260904 and 1-6), each sign of the true
+distortion, so 42 series. The subgroup starts at the identity point,
+`carry=("*",)`, `direction="both"`, defaults otherwise. Measured before
+WP-1420's probe rung, which was never built (its tasks 2-5 went to issue
+#1402). The cost is Σw·Δ² = `Statistics.chi2`·(N − P) per pattern and pass;
+N was the same in both passes on all 336 pattern pairs.
+
+- **They disagree, and only across basins.** At 36 of the 168 present
+  pairs (p004-p007; 9 of 42 series, three per fraction) the two passes sat
+  on opposite sides of the identity point. Σw·Δ² differed there by 3.6-6.8 %
+  at 0.15, 11-15 % at 0.25 and 33-39 % at 0.40, taken over the lower
+  (forward) pass's Σw·Δ², always at equal P. The relative Rwp gap, 1.8e-2 to
+  1.5e-1, is taken over the higher (backward) pass's Rwp; at equal N, Rwp
+  goes as √(Σw·Δ²), so over the forward pass it is 1.8e-2 to 1.8e-1, and a
+  39 % cost gap is an 18 % Rwp gap there. The lower-cost pass was on the
+  true side in 36 of 36, and it was the forward pass every time: the backward chain's
+  cold start at p007 from the identity point fell to the wrong side in all
+  42 series, as WP-1420 measured for cold fits. `direction_gaps` already
+  saw these patterns (cell `|gap_esd|` 29-56 there); what it cannot say is
+  which side is lower.
+- **Agreement is not correctness.** At the other 132 present pairs both
+  passes sat on the same wrong side, at costs equal to 1.7e-6 relative or
+  better. A cost comparison is silent there, exactly as the value gaps are.
+- **Off the onset the passes fit different parameter sets.** At p000-p003,
+  where the subgroup is absent, P differed between the passes in 39 of 56
+  (draw, sign, pattern) cases (WP-1301 holds the subgroup in one pass and not
+  the other). The count is the same at every fraction, because the
+  pre-onset patterns do not depend on the fraction: p000-p003 are
+  byte-identical across the three, so the 117 of 168 pairs over all three
+  fractions are those 39 cases counted three times, not 117 independent
+  ones. Σw·Δ² differed by up to 1.15e-3 relative (relative Rwp ≤ 5.7e-4).
+  The pass with more free parameters was lower at 86 of the 117 pairs and
+  higher at 31; that split too is over the 39 cases three times, though not
+  identically, since the backward cost there moves with the fraction (the
+  PR #1594 review's rerun found 28/11 at 0.15 and 27/12 at 0.40).
+  These noise-level differences are the size of #1556's CuCr₂O₄ ones
+  (relative Rwp ≤ 1.4e-3), and a lower cost at a different P is not a better
+  fit, which is "Two limits" above, now measured.
+
 **The design question.** A per-pattern best mixes the two passes, so the
 returned trajectory is no longer one chain. Each entry is still a converged
 optimum of its own pattern. The options:
 
 1. Report only. Each `SEQUENTIAL_PATH_DEPENDENT` finding carries the two
    costs, and the entries carry the backward cost beside the forward one.
+   *(2026-11-16: the finding is now a `DirectionGap` row, one per path, so a
+   per-pattern pair there repeats on every path's row at that pattern; and
+   the entries' backward cost is already reachable through `series.backward`.)*
 2. `keep="lower_cost"` returns the better pass per pattern and marks which
    one it took.
 3. A cold rung at every pattern the two passes disagree on, ranked by
@@ -67,45 +133,54 @@ its writer named at review (root CLAUDE.md, a declared name is a claim).
 
 ### Inherited
 
-- **From WP-1417, 2026-09-27: the ΔBIC this WP's Non-goals defers to
-  is settled.** 1417 closed with ΔBIC at N/f² and
-  `report.compare_freed` for nested pairs. Two models with different
-  phase sets are not nested, so `compare_freed` refuses them. A hand
-  comparison takes each `Statistics.chi2` (reduced) back to Σw·Δ² at
-  its own N − P before `report.delta_bic`.
-
-- **2026-09-24, from a review of the open WPs: task 1's fixture can be fixed
-  out from under it.** Task 1 closes this WP if the two passes never
-  disagree in cost, and it names WP-1420's #267 fixture as a candidate.
-  1420's probe rung is written to bring the forward chain into the right
-  basin on that fixture at all three fractions. Once it lands, the passes
-  may agree there because 1420 fixed the forward chain, and a close on that
-  measurement would be wrong. So measure before 1420's rung lands, or on a
-  two-basin series with no held phase, and record which in the handover.
-
 ## Non-goals
 
 - Choosing between different models. With different phase sets the
   comparison needs an information criterion, and WP-1417 owns ΔBIC at powder
-  channel counts.
+  channel counts. 1417 closed with ΔBIC at N/f² and `report.compare_freed`
+  for nested pairs, which refuses two models with different phase sets; a
+  hand comparison takes each `Statistics.chi2` (reduced) back to Σw·Δ² at its
+  own N − P before `report.delta_bic`.
 - Changing how a single chain seeds its successor.
 
 ## Tasks
 
-- [ ] Measure whether the package's own passes disagree in cost: a synthetic
+- [x] Measure whether the package's own passes disagree in cost: a synthetic
       series with a known two-basin pattern, run with `direction="both"`.
       The WP-1420 fixture (issue #267) may already be one. If the passes
       never disagree in cost, close this WP on that measurement.
-- [ ] Option 1: the costs on the finding and on the entry.
-- [ ] Decide whether option 2 or 3 ships, and write the decision here.
+      *(2026-11-16: they do, in 9 of 42 series, so the WP stays open;
+      § Context, "The package's own passes, measured".)*
+- [ ] Option 1: the two costs **once per pattern, beside the
+      `direction_gaps` rows**, not repeated on every row (ruled by the
+      maintainer, 2026-11-21: a cost belongs to a pattern's fit, not to one
+      path's gap). A projection of the costs `series.backward` already
+      carries, saying which pass is lower and by how much, with the
+      `SCHEMA_VERSION` bump it needs. *(2026-11-16: was "the costs on the
+      finding and on the entry"; WP-2003 removed the
+      `SEQUENTIAL_PATH_DEPENDENT` finding, and the entry's backward cost is
+      already reachable through `series.backward`.)*
+- [ ] ~~Decide whether option 2 or 3 ships~~ **Deferred** (ruled
+      2026-11-21): option 2 is to be ruled together with #1402's B2 (the
+      automatic two-start probe) on one set of measurements, both being
+      automatic picks between basins of one failure. #1402's own ruling is A
+      now and B1 after WP-1419, "and see what comes up as we develop".
+      Nothing to build here until that joint ruling.
 - [ ] Tests: the fixture reports the right pass at the right pattern.
+      *(Waits on PR #1401's `tests/test_identity_point_seed.py` helpers,
+      unmerged on 2026-11-16, which build the fixture and which the task 1
+      probe imported: land #1401 first, or copy the helpers.)*
 - [ ] Skill: `references/series.md`'s `direction="both"` paragraph says
       which pass to quote when the two disagree.
 
 ## Acceptance
 
-On the fixture, the finding at the disagreeing pattern names the pass with
-the lower cost, and quotes both costs.
+On the fixture, at each disagreeing pattern the series result names the
+pass with the lower cost and quotes both costs, on the `DirectionGap` rows
+or the per-pattern pair, whichever the ruling on option 1 picks.
+*(2026-11-21: the ruling picks the per-pattern pair, once per pattern beside
+the rows.)* *(2026-11-16: was "the finding at the disagreeing pattern"; WP-2003 removed
+`SEQUENTIAL_PATH_DEPENDENT`.)*
 
 ```sh
 .venv/bin/python -m pytest tests/test_sequential.py -q
@@ -119,6 +194,80 @@ the lower cost, and quotes both costs.
   rule), WP-1301 (the holds), WP-1417 (ΔBIC).
 
 ## Handover log
+
+- **2026-11-28** — **Repair, close-only bookkeeping** (ghostshift runner; PR #1886). PR #1594
+  merged on 2026-11-23 and left the session-start scan flagging this WP. The flag came from
+  dates alone. The PR's last commit, `78f8f999b`, was committed on 2026-11-22 and wrote the
+  2026-11-21 entry below, so that entry already records it. No work is missing from the log,
+  and this repair reconstructs nothing. It changes the Status line, which still said the
+  rulings were owed. The WP stays open. Option 1, its test and the skill paragraph are not
+  started.
+  *Checked on `origin/main` at `300853e90`:* PR #1594 merged at 2026-11-23 10:40 UTC. PR #1401
+  is still open, so `tests/test_identity_point_seed.py` is not on main.
+  *Next:* task 2, option 1, in `_direction_gaps`, as ruled on 2026-11-21. Then the test task:
+  land #1401 first or copy its helpers. Then the skill paragraph. Option 2 waits on the joint
+  ruling with #1402's B2.
+
+- **2026-11-21** — **Rulings recorded** (maintainer's review of PR #1594;
+  the PR merges as it stands, since it records a measurement and decides
+  neither). (1) Option 1 ships as **one cost pair per pattern beside the
+  `direction_gaps` rows**, not on every row; a projection of what
+  `series.backward` carries, with the `SCHEMA_VERSION` bump. (2) Option 2 is
+  **deferred**, to be ruled with #1402's B2 on one set of measurements.
+  (3) The WP-file edits (pruned Inherited, "superseded in part" on Context)
+  are accepted. *Next:* task 2 (option 1) in `_direction_gaps`; the test
+  task waits on #1401's `tests/test_identity_point_seed.py` helpers, and if
+  #1401 merges first the probe script can be committed beside them.
+
+- **2026-11-16** — **The package's own two passes do disagree in cost,
+  and where they do, the cheaper one was right every time.** On the
+  two-basin series from issue #267, 9 of 42 runs had the forward and
+  backward chains settle in opposite basins over the last four patterns,
+  and there the weighted residual picked the true basin in all 36 patterns, by
+  3.6 to 39 % of the cheaper pass's Σw·Δ². So this WP does not close on
+  task 1. Two limits came with it:
+  in most runs both chains settled in the same wrong basin, which no cost
+  comparison can see; and before the onset the two chains often fit
+  different numbers of parameters, so a lower cost there is not a better
+  fit. Nothing in the package changed. PR #1594.
+  *Done:* the Inherited prune (the #1556 entry folded into Context as "A
+  public series"; the WP-1417 note into Non-goals; the 2026-09-24 warning
+  discharged, since WP-1420's probe rung was never built and its tasks went
+  to issue #1402). Context's first paragraph is marked superseded in part:
+  WP-2003 removed `SEQUENTIAL_PATH_DEPENDENT`, the gaps are
+  `SeriesResult.direction_gaps` rows, and the backward costs are already
+  reachable through `series.backward`. The Priority line's code name was
+  updated to match; its tier was left alone. Task 1 ticked, with the
+  numbers in § Context, "The package's own passes, measured".
+  *Measured:* `[dev]`, darwin arm64, `bc77a934e`, run locally (two processes,
+  1.9-3.2 s a series; 84 short series in all). The probe is
+  `tests/repro_1420.py chains` from PR #1401's branch extended to read
+  `statistics.chi2·(N − P)` per pattern from `series.entries` and
+  `series.backward.entries`. It was not committed, because it imports PR
+  #1401's unmerged `tests/test_identity_point_seed.py`.
+  *Not done, and why:* option 1. It adds a field to `DirectionGap` (a
+  `SCHEMA_VERSION` bump), and issue #1556's question 1, whether and under
+  what names, is open with the maintainer. Tasks 3-5 follow from the ruling.
+  *Questions for the maintainer:* (1) Option 1: should the per-pattern cost
+  pair land, and where? On every `DirectionGap` row (#1556's
+  `forward_chi2`/`backward_chi2`), where it repeats once per path at each
+  pattern, or once per pattern beside the rows. (2) Option 2 or 3. Option 2
+  would have returned the true basin at all 36 disagreeing patterns here,
+  but it needs an equal-P condition (the 39 pre-onset cases, 117 pairs over
+  the three fractions) and a floor
+  under which two costs count as tied (pre-onset differences reach 1.15e-3
+  in Σw·Δ², the size of #1556's whole range). Option 3's cold rung from the
+  declared start would not have helped where it was measured: here the
+  backward chain's own cold start at p007 landed in the wrong basin in 42 of
+  42 series, and WP-1420's cold grid (PR #1401) found a cold single fit of
+  p004 or p007 from the identity point on the wrong side in 42 of 42. No cold
+  fit at p005-p006 was measured. Recommendation: option 1 first; then
+  option 2 limited to equal
+  P with a floor measured from noise draws; option 3 only as #1402's
+  two-sided start, if that issue's option B is taken.
+  *Next (superseded 2026-11-21 by the entry above):* the maintainer's ruling on the two questions above. Then option 1
+  in `_direction_gaps` (its one writer), the test on this construction at
+  0.15 (the smallest gap, 3.6 %), and the skill paragraph.
 
 - **2026-09-24** — created from the review of an agent session on a private
   series. The forward-only return and the value-only comparison were checked

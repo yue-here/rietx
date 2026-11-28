@@ -16,6 +16,7 @@
 # Crystallography and diffraction (the IUCr's vocabulary).
 absorber
 absorbers
+acridine
 actinide
 anisotropic
 anisotropy
@@ -23,6 +24,7 @@ antiparallel
 antiphase
 antisite
 aragonite
+aromaticity
 attenuator
 bcc
 beamline
@@ -36,6 +38,7 @@ centring
 centrings
 centrosymmetric
 centrosymmetry
+chelate
 chiral
 chirality
 CIF
@@ -49,6 +52,7 @@ cryostat
 crystallite
 crystallites
 crystallographer
+cyclohexane
 deuterated
 deuteration
 diffractometer
@@ -121,6 +125,7 @@ polyhedra
 polyimide
 pseudosymmetry
 PtGeSe
+pyridine
 pyroelectric
 rhombohedral
 rutile
@@ -148,6 +153,7 @@ translationengleiche
 triclinic
 trigonal
 trirutile
+unrecovered
 uncentred
 uniaxial
 unindexed
@@ -171,6 +177,7 @@ Uiso
 Abramowitz
 Altomare
 Avrami
+Bergmann
 Borda
 Brentano
 Brindley
@@ -215,6 +222,7 @@ Maier
 Marquardt
 Maxwellian
 Olds
+Olivero
 Pawley
 Pitschke
 Prelog

@@ -8,6 +8,7 @@ import pickle
 import re
 import types
 import typing
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -218,7 +219,7 @@ def test_atom_reusing_one_parameter_for_occ_and_biso_gets_each_fields_own_range(
 
 def test_schema_version_bumped_and_pre_fix_documents_still_load():
     """Review item 2 on PR #206: ``SCHEMA_VERSION`` must move, since the set
-    of legal ``Atom`` constructions shrank — the constant's own changelog
+    of legal ``Atom`` constructions shrank — the constant's changelog
     names this exact bump. Also pins the claim the comment makes and issue
     #209 depends on: a document written *before* this fix, carrying the
     unbounded ``biso`` the bug allowed (explicit ``-Infinity``/``Infinity``,
@@ -233,12 +234,13 @@ def test_schema_version_bumped_and_pre_fix_documents_still_load():
     as though this fix broke (review round 4 on PR #206).  What this test
     is entitled to assert is that the bump for *this* change is recorded
     and has been reached — not that nothing has happened since."""
-    import rietx.schemas.common as common
     from rietx.schemas.common import SCHEMA_VERSION
 
+    # the changelog left the source for docs/contracts/ in WP-2233
+    notes = Path(__file__).resolve().parents[1] / "docs" / "contracts" / "schema.md"
     entry = re.search(
-        r"^#: (\d+\.\d+) \u2192 (\d+\.\d+) \(issue #204\)",
-        inspect.getsource(common),
+        r"^(\d+\.\d+) \u2192 (\d+\.\d+) \(issue #204\)",
+        notes.read_text(encoding="utf-8"),
         re.M,
     )
     assert entry is not None, (
@@ -581,7 +583,7 @@ def test_pattern_validation():
 
 
 #: A small esd column in its own units: the shape of a normalised or
-#: per-monitor reduction, with one zero (a gap) that the floor exists for.
+#: per-monitor reduction, with one zero (a gap).
 _SMALL_SIGMA = [5e-4, 2e-4, 8e-4, 0.0, 5e-4]
 
 
@@ -589,36 +591,61 @@ _SMALL_SIGMA = [5e-4, 2e-4, 8e-4, 0.0, 5e-4]
 def test_sig_does_not_depend_on_the_intensitys_units(k):
     """The same pattern in two units is weighted the same (#650).
 
-    The floor was ``max(1e-3, median · 1e-3)``. Its absolute ``1e-3`` never
-    binds on counts and raised every esd of a normalised pattern to 1e-3, so a
-    fit of the k = 1 column below ran with σ doubled and χ²_red a quarter of
-    the ×1000 twin's. Scaling the column must scale the answer and nothing
-    else, the zero included.
+    A floor at an absolute ``1e-3`` once raised every esd of a normalised
+    pattern, and its relative successor gave a zero esd about a million times
+    its neighbours' weight (#897). Scaling the column must scale every weight
+    and nothing else, and the zero leaves the fit at every scale (WP-1952).
     """
     sigma = [s * k for s in _SMALL_SIGMA]
     p = PatternData(two_theta=[1.0, 2.0, 3.0, 4.0, 5.0],
                     intensity=[1.0] * 5, sigma=sigma)
-    got = p.sig()
-    want = np.array(_SMALL_SIGMA) * k
-    want[3] = 5e-4 * 1e-3 * k            # the zero: a thousandth of the median
-    np.testing.assert_allclose(got, want, rtol=1e-12)
+    keep = p.in_range_mask()
+    assert keep.tolist() == [True, True, True, False, True]
+    np.testing.assert_allclose(p.sig()[keep], np.array(_SMALL_SIGMA)[keep] * k,
+                               rtol=1e-12)
 
 
-def test_sig_on_counts_is_unchanged_by_the_relative_floor():
-    """Positive arm: a column whose median esd is ≥ 1 — every counting
-    pattern — gave this answer before #650 too, because the relative term
-    was already the larger one."""
-    p = PatternData(two_theta=[1.0, 2.0, 3.0, 4.0],
-                    intensity=[100.0, 400.0, 900.0, 0.0],
-                    sigma=[10.0, 20.0, 30.0, 0.0])
-    assert p.sig().tolist() == [10.0, 20.0, 30.0, 20.0 * 1e-3]
+def test_a_nonpositive_sigma_is_excluded_or_poisson_weighted():
+    """WP-1952 (WP-2002 B5): a σ ≤ 0 takes no weight by default, and
+    ``nonpositive_sigma="poisson"`` weights it √max(y, 1) instead. Either way
+    ``sig()`` is that Poisson value there, a placeholder when excluded."""
+    p = PatternData(two_theta=[1.0, 2.0, 3.0, 4.0, 5.0],
+                    intensity=[100.0, 400.0, 900.0, 0.0, 25.0],
+                    sigma=[10.0, 20.0, 30.0, 0.0, -5.0])
+    assert p.sig().tolist() == [10.0, 20.0, 30.0, 1.0, 5.0]
+    assert p.in_range_mask().tolist() == [True, True, True, False, False]
+    rule = p.sigma_rule()
+    assert (rule.n_file_sigma, rule.n_poisson_sigma,
+            rule.n_nonpositive_excluded) == (3, 0, 2)
+    kept = p.model_copy(update={"nonpositive_sigma": "poisson"})
+    assert kept.in_range_mask().all()
+    rule = kept.sigma_rule()
+    assert (rule.n_file_sigma, rule.n_poisson_sigma,
+            rule.n_nonpositive_excluded) == (3, 2, 0)
+    # a crop keeps the rule, and a refused spelling is a validation error
+    assert kept.crop(1.0, 5.0).nonpositive_sigma == "poisson"
+    with pytest.raises(ValidationError):
+        PatternData(two_theta=[1.0, 2.0], intensity=[1.0, 1.0],
+                    nonpositive_sigma="floor")
 
 
-def test_a_results_sig_floors_by_the_patterns_rule():
-    """`RefinementResult.sig` is documented as flooring "by `PatternData.sig`'s
-    own rule", and it carried its own copy of the expression, so it had the
-    same absolute floor. One helper now, and the two must agree on a column
-    the old floor would have raised."""
+def test_the_sigma_rule_counts_only_the_channels_a_fit_takes():
+    """An excluded region and the fit's window both narrow the counts, so the
+    record is the fit's, never the file's."""
+    p = PatternData(two_theta=[1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+                    intensity=[1.0] * 6, sigma=[1.0, 0.0, 1.0, 0.0, 1.0, 0.0],
+                    excluded_regions=[(1.5, 2.5)])
+    rule = p.sigma_rule(np.array([True, True, True, True, True, False]))
+    assert (rule.n_file_sigma, rule.n_poisson_sigma,
+            rule.n_nonpositive_excluded) == (3, 0, 1)
+    bare = PatternData(two_theta=[1.0, 2.0, 3.0], intensity=[4.0, 9.0, 16.0])
+    assert bare.sigma_rule().n_poisson_sigma == 3
+
+
+def test_a_results_sig_follows_the_patterns_rule():
+    """`RefinementResult.sig` carried its own copy of the rule once, and drifted
+    from `PatternData.sig`. One helper now, and the two must agree on a column
+    holding a zero."""
     result = _bare_result()
     result.sigma = list(_SMALL_SIGMA)
     result.y_obs = [1.0] * len(_SMALL_SIGMA)
@@ -626,6 +653,52 @@ def test_a_results_sig_floors_by_the_patterns_rule():
                     intensity=[1.0] * 5, sigma=list(_SMALL_SIGMA))
     assert result.sig().tolist() == p.sig().tolist()
     assert result.sig()[0] == pytest.approx(5e-4)
+
+
+def test_one_zero_sigma_on_a_peak_no_longer_holds_the_fit():
+    """#897's case on a synthetic LaB6: one σ = 0 at the strongest channel.
+
+    Under the old floor that point weighed about 10⁶ times its neighbours,
+    and the same fit stopped at max_iter with a = 4.15835 Å, 1.75e-3 Å from
+    the truth and 1.5e-4 Å from its start (WP-1952, measured on main). Left
+    out, the fit converges to the truth, and ``sigma_rule`` says one channel
+    went.
+    """
+    import rietx as rx
+    from rietx.model.forward import compile_model
+    from rietx.params.vector import ParameterTable
+    from rietx.schemas.instrument import Instrument
+
+    truth = make_lab6()
+    truth.phases[0].scale.value = 5e-3
+    ins = Instrument.debye_scherrer(wavelength=1.5406)
+    ins.profile.w.value = 8e-3
+    tt = np.arange(15.0, 90.0, 0.02)
+    blank = PatternData(two_theta=tt.tolist(), intensity=np.zeros_like(tt).tolist())
+    model = compile_model(truth, ins, blank, mode="rietveld")
+    table = ParameterTable(truth, ins)
+    y = model.evaluate(table.decode(table.x0())) + 40.0
+    counts = np.random.default_rng(3).poisson(y).astype(float)
+    sigma = np.sqrt(np.maximum(counts, 1.0))
+    sigma[int(np.argmax(counts))] = 0.0
+    data = PatternData(two_theta=tt.tolist(), intensity=counts.tolist(),
+                       sigma=sigma.tolist())
+
+    start = make_lab6()
+    start.phases[0].cell.a.value = 4.1585
+    start.phases[0].cell.b.value = start.phases[0].cell.c.value = start.phases[0].cell.a.value  # the cell's ties follow a
+    res = rx.Refinement(start, Instrument.debye_scherrer(wavelength=1.5406),
+                        history=False).fit(data)
+    out = Path(__file__).parent / "output"
+    out.mkdir(exist_ok=True)
+    res.plot(str(out / "sigma_rule_lab6_fit.png"))
+    assert res.status == "converged"
+    rule = res.sigma_rule
+    assert (rule.n_file_sigma, rule.n_poisson_sigma,
+            rule.n_nonpositive_excluded) == (tt.size - 1, 0, 1)
+    assert len(res.two_theta) == tt.size - 1
+    (a,) = [p.value for p in res.parameters if p.path == "phases.0.cell.a"]
+    assert abs(a - 4.1566) < 2e-4
 
 
 # ------------------------------------------------------- the one plan schema
@@ -801,6 +874,47 @@ def test_a_wrong_stage_or_plan_field_gets_the_closest_match():
         plan.stagess
 
 
+def test_an_esd_asked_for_under_its_other_spelling_names_the_field():
+    """WP-1913 (#728 item 5): the package spells an esd two ways.
+
+    ``RefinedParameter`` calls it ``stderr`` and ``ParameterRow`` calls it
+    ``esd``.  ``difflib`` alone scores the pair at 0.22, so ``.esd`` listed the
+    fields without naming the one meant.  The answer is a pointer: the
+    attribute still raises, so no reader gains a second name for one field.
+    """
+    from rietx._nearmiss import near_misses
+
+    row = rx.RefinedParameter(path="phases.0.cell.a", value=4.15, stderr=1e-5,
+                              vary=True)
+    with pytest.raises(AttributeError, match=r"no attribute 'esd'; did you mean 'stderr'\?"):
+        row.esd
+    # both directions, one word of a longer name, and case folded
+    assert near_misses("stderr", ["path", "value", "esd"]) == ["esd"]
+    assert near_misses("weight_fraction_esd",
+                       ["weight_fraction", "weight_fraction_stderr"])[0] == (
+        "weight_fraction_stderr")
+    assert near_misses("ESD", ["path", "stderr"]) == ["stderr"]
+
+
+def test_each_synonym_is_spelled_both_ways_by_some_schema_field():
+    """``_nearmiss.SYNONYMS`` claims each pair is two real spellings; a pair
+    naming a word no field uses would point a caller at a name that does not
+    exist, and nothing else would fail."""
+    from rietx._nearmiss import SYNONYMS
+    from rietx.schemas.common import Base
+
+    def subclasses(cls):
+        for sub in cls.__subclasses__():
+            yield sub
+            yield from subclasses(sub)
+
+    words = {word for cls in subclasses(Base) for field in cls.model_fields
+             for word in field.split("_")}
+    for word, other in SYNONYMS.items():
+        assert SYNONYMS[other] == word, "a pair is mapped both ways"
+        assert word in words, f"no schema field spells {word!r}"
+
+
 def test_every_public_schema_class_is_a_top_level_export():
     """WP-1302: no `Source`/`EmissionLine`/`BackgroundChebyshev`-shaped gap.
 
@@ -847,6 +961,14 @@ def test_package_getattr_names_where_a_miss_actually_lives():
         rx.identify_format
     with pytest.raises(AttributeError, match=r"no attribute 'not_a_real_export'"):
         rx.not_a_real_export
+    # issue #1837: each suggestion quoted alone, so any one can be copied
+    with pytest.raises(AttributeError, match=r"did you mean 'read_pattern', "
+                                             r"'index_pattern' or 'read_topas_inp'\?"):
+        rx.read_patern
+    # a name defined one module down is answered with that module, not a spelling
+    with pytest.raises(AttributeError,
+                       match=r"import it from rietx\.crystallography\.cif$"):
+        rx.structure_from_cif
 
 
 def test_package_getattr_reports_a_broken_submodule_as_attributeerror():

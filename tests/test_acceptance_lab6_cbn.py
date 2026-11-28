@@ -163,8 +163,9 @@ def _inputs():
 #: that a future change to ``INTERMEDIATE_FTOL_DEFAULT`` shows up here as a
 #: decision rather than as a silent shift in the numbers above.
 INTERMEDIATE_FTOL = None   # i.e. plan.intermediate_ftol left at the shipped default
-#: and the shipped closing stage (WP-2002), for the same reason:
-#: ``plan.closing_window_tol`` is left at its default, 1e-3.
+#: and the shipped closing-stage setting, for the same reason:
+#: ``plan.closing_window_tol`` is left at its default, ``None`` since WP-2222
+#: (1e-3 under WP-2002).
 
 _BASE = [
     rx.Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
@@ -537,5 +538,5 @@ def test_the_fits_render(shared, degenerate):
     for name, result in (("shared", shared), ("degenerate", degenerate)):
         result.plot(path=str(out / f"lab6_cbn_{name}.png"))
         result.plot(path=str(out / f"lab6_cbn_{name}_zoom.png"),
-                    two_theta_range=(5.1, 12.0))
+                    two_theta_limits=(5.1, 12.0))
     plt.close("all")

@@ -16,6 +16,7 @@ from pathlib import Path
 from _calibration_pair import lab6, sample, standard
 
 import rietx as rx
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
 
 work = Path(tempfile.mkdtemp())
 
@@ -45,7 +46,10 @@ from _calibration_pair import ceo2  # noqa: E402
 def refine_sample(profile, data):
     instrument = rx.load_instrument_profile(profile)
     instrument.background = rx.BackgroundChebyshev.with_terms(4)
-    return rx.Refinement(ceo2(), instrument).fit(data, plan="lab_sample_refine")
+    # A size and strain to quote: end with the closing stage, as lab_calibrate does.
+    plan = rx.RefinementPlan.lab_sample_refine()
+    plan.closing_window_tol = CLOSING_WINDOW_TOL
+    return rx.Refinement(ceo2(), instrument).fit(data, plan=plan)
 
 
 def show(label, result):
@@ -93,7 +97,9 @@ both = rx.Refinement(lab6(), instrument)
 both.hold("phases.0.cell.*")
 both_result = both.fit(first_standard, plan=both_plan)
 ratios = [both_result.parameter(f"instrument.geometry.axial_{n}") for n in ("sl", "hl")]
-assert [rx.format_su(p.value, p.stderr) for p in ratios] == ["0.02476(78)", "0.01542(87)"]
+# 2026-11-03: since WP-1955 lifts S/L off zero to 0.02, the fit lands on the
+# exchanged pair; on 2026-10-21 it came back in the made order.
+assert [rx.format_su(p.value, p.stderr) for p in ratios] == ["0.01542(87)", "0.02476(78)"]
 assert [d.code for d in both_result.diagnostics] == ["HIGH_CORRELATION"]
 assert "axial" not in str(both_result.diagnostics[0].where)
 widths = [calibrated.parameter(f"instrument.profile.{n}") for n in "uvwxy"]

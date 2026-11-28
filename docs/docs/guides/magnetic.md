@@ -62,6 +62,8 @@ On this site every direction is allowed, and the angles are measured from the ce
 The plan frees the modulus and the angle from c, and leaves the azimuth at its seed of 0.
 That keeps the component along b at zero, as the tutorial does.
 The first stage frees the moment with the scale and background only, and the second frees every nuclear term with it.
+The plan then ends with the closing stage ([The closing stage](../reference/refinement.md#the-closing-stage)), because the modulus's interval below is the number to quote.
+Without it, the interval's lower end moved in its second decimal from one machine to another.
 
 ## Read the moment
 

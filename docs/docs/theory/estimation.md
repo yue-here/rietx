@@ -19,11 +19,12 @@ minimised over the residual rows of {eq}`fm-rows` {cite}`rietveld1969`.
 Weights come from the data file's esd column when it has one;
 Poisson $\sigma = \sqrt{\max(y, 1)}$ is only the fallback for bare counts.
 
-The Jacobian is assembled column by column, exact wherever it can be: linear background columns, analytic peak-chain columns (per-peak
-position, width, mixing and intensity), analytic
-site-DOF columns for coordinates and anisotropic ADPs over the frozen operator
-subsets, analytic columns for magnetic-moment moduli, analytic axial columns for the FCJ apertures, and forward
-differences otherwise.
+The Jacobian is assembled column by column, exact wherever it can be:
+linear for the background; analytic for per-peak position, width, mixing
+and intensity, for coordinates, anisotropic ADPs, Biso and occupancy over
+the frozen operator subsets (ties across atoms and distortion modes
+included), for magnetic-moment moduli and for the FCJ apertures; a forward
+difference otherwise.
 Under a differentiable backend the same residual is traced and columns
 come from forward-mode autodiff, whose cost scales with the parameter
 count {cite}`nocedal2006`; every backend is held to per-column agreement
@@ -618,13 +619,13 @@ back between 1e-16 and 4e-15 of the largest. Before the change Linux raised no
 `HIGH_CORRELATION` there. On macOS a 1e-14 change to one start value left six
 widths at ± 0.
 
-`COVARIANCE_DIRECTION_DISCARDED` names the touched parameters and leaves their
-esds as they are. A touched set that is exactly a pair `FLAT_DIRECTION` already
-reported adds no row. On the acceptance fixtures 183 of 1 899 whole-pattern
-solves discarded such a direction, most of them within a factor of ten of the
-cut, over four to eight columns each. Marking those esds absent would blank the
-QPA, SRM 676a and brucite fixtures on a threshold that rounding sets, so the
-finding reports and the esd stays.
+A touched parameter has no esd: a generalised inverse's variance for it
+depends on the inverse taken {cite}`searle1971`. A tie or derived quantity
+on one keeps its esd where the test, asked of its gradient, does not fire. Two starts of one synthetic
+LaB₆ fit with W, `gauss_size` and `gauss_strain` free landed 140 esd apart in
+W. `COVARIANCE_DIRECTION_DISCARDED` names the touched parameters, unless
+`FLAT_DIRECTION` already reported them as a pair. The test runs on the matrix
+the covariance inverted, a Pawley intensity block included.
 
 ## Staged strategy and series
 

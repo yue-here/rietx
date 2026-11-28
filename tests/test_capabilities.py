@@ -221,8 +221,8 @@ def test_every_reader_format_appears_in_dispatch_order(caps):
     assert "BANK" in by_name["gsas"].sniff
     assert ".cif" in by_name["pdcif"].extensions
     # and it names the reader keyword a caller has to supply *and* record
-    assert by_name["pdcif"].options == ["block"]
-    assert by_name["xy"].options == ["axis"]
+    assert by_name["pdcif"].options == ["block", "nonpositive_sigma"]
+    assert by_name["xy"].options == ["axis", "nonpositive_sigma"]
     # a binary format's sniff has to say what it *refuses* too, since one of the
     # four Bruker RAW versions is recognised in order to be declined and a
     # client choosing what to offer an upload dialog reads this arm (WP-1047)
@@ -286,6 +286,47 @@ def test_every_versioned_contract_is_a_live_value(caps):
     for name, constant in live.items():
         assert getattr(caps, name) == constant
     assert caps.package_version and caps.package_version[0].isdigit()
+
+
+#: Each contract whose bump notes live in ``docs/contracts/`` (WP-2233), with
+#: the constant the notes describe.
+_CONTRACT_NOTES = {
+    "schema.md": ("rietx.schemas.common", "SCHEMA_VERSION"),
+    "report-thresholds.md": ("rietx.report.schemas", "THRESHOLDS_VERSION"),
+    "indexing-thresholds.md": ("rietx.schemas.indexing", "INDEXING_THRESHOLDS_VERSION"),
+    "project-format.md": ("rietx.schemas.project", "PROJECT_FORMAT_VERSION"),
+}
+
+#: A note's first line: ``0.4 (WP-…)``, ``0.4 → 0.5 (…)``, ````1.1```` or
+#: ``Also in 0.61``.  The last version the line names is the one it is under.
+_NOTE_LEAD = re.compile(
+    r"^(?:``)?(?:\d+\.\d+ → )?(?P<a>\d+\.\d+)(?:``)? \(|^Also (?:in )?(?P<b>\d+\.\d+)\b"
+)
+
+
+@pytest.mark.parametrize("name", sorted(_CONTRACT_NOTES))
+def test_every_contract_bump_carries_its_note(name):
+    """The newest note in a contract's history names the constant's value.
+
+    A bump with no note, or a note written under a number the constant does
+    not carry, fails here.  WP-1117's rule needs every bump to say what
+    changed, and the notes left the source for ``docs/contracts/`` in WP-2233.
+    """
+    module, const = _CONTRACT_NOTES[name]
+    value = getattr(importlib.import_module(module), const)
+    text = (Path(__file__).resolve().parents[1] / "docs" / "contracts" / name).read_text(
+        encoding="utf-8")
+    named = []
+    for para in text.split("\n\n"):
+        m = _NOTE_LEAD.match(para)
+        if m:
+            named.append(m.group("a") or m.group("b"))
+    assert named, f"docs/contracts/{name} has no version note"
+    newest = max(named, key=lambda v: tuple(int(x) for x in v.split(".")))
+    assert newest == value, (
+        f"{module}.{const} is {value!r} but the newest note in docs/contracts/{name} "
+        f"is under {newest!r}. Every bump adds a note there saying what a consumer "
+        f"could observe changed (WP-1117); write it under {value!r}.")
 
 
 def test_the_installed_distribution_resolves_under_the_name_we_ask_for(caps):
@@ -563,7 +604,7 @@ def test_the_documented_feature_keys_are_present(caps):
     expected = {
         "anisotropic_adp", "preferred_orientation", "spherical_harmonics_texture",
         "stephens_strain",
-        "primary_extinction", "restraints", "satellites", "magnetic_moments",
+        "primary_extinction", "restraints", "peak_equations", "satellites", "magnetic_moments",
         "magnetic_interchange", "surface_roughness",
         "capillary_absorption", "flat_plate_absorption", "anomalous_dispersion",
         "anomalous_dispersion_default_on", "extra_components",

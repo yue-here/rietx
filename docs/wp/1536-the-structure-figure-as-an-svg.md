@@ -1,6 +1,6 @@
 # WP-1536 — the structure figure as an SVG
 
-Milestone: rietview · Status: ⬜
+Milestone: rietview · Status: 🔄 2026-11-28 — SVG writer merged (#1606); parity, crossing pixels and PDF check open (#1614)
 Depends on: —
 Priority: P3 2026-10-02 — a workaround covers it: a 3000 px PNG, or a CIF exported to VESTA's own vector output
 
@@ -21,6 +21,9 @@ left it "until a picture shows the need". The maintainer asked for it on
 2026-10-02, together with ray-tracer input (WP-1537) and ambient occlusion
 (WP-1538). No open WP owned it: 1468 is polyhedra rules, 1504 measures the
 existing surface, and 1505 moves the code without adding to it.
+1504's task 6 (`docs/wp/1504-eval/`, fluorapatite for print) is the agent
+task an SVG answers; a later round that re-runs it measures this WP's
+surface (folded from 1504's inherited note, 2026-11-16).
 
 ### Prior art
 
@@ -67,7 +70,8 @@ rectangle closed by two half-ellipses.
   raster still runs, so `image`, `report`, `atoms` and `letters` are the
   PNG's. SVG user units are the PNG's pixels at `size`, so every position in
   `atoms` and `letters` holds for the SVG too. `dpi` sets the physical width
-  as it sets the PNG's `pHYs`. The refusal at `render.py:670` names every
+  as it sets the PNG's `pHYs`. The refusal in `render_structure` (at
+  `render.py:815` on 2026-11-16, superseding the filed `:670`) names every
   suffix it takes. JPEG stays refused.
 - **D2. Painter's algorithm, with the crossing fault repaired.** Every
   primitive gets a depth key, and the writer emits them far to near. Three
@@ -97,9 +101,17 @@ rectangle closed by two half-ellipses.
   sticks and faces, so they cannot be grouped by kind. Each element carries
   a class instead (`atom Ca1`, `stick Ca1`, `face CaO6`, `cell`), so
   Inkscape's select-same selects every Ca1.
-- **D6. No PDF writer.** `rsvg-convert` (installed here at
-  `/opt/homebrew/bin`) and Inkscape both convert SVG to PDF. Check once that
-  the gradients survive, and put the command in the manual.
+- **D6. No PDF writer.** `rsvg-convert` and Inkscape both convert SVG to
+  PDF. Check once that the gradients survive, and put the command in the
+  manual. (Superseded in part 2026-11-16: neither `rsvg-convert` nor
+  Inkscape is installed on the runner's Mac any longer, so the check needs
+  a machine that has one.)
+
+### The tier of each rule this WP adds
+
+None adds a judgement. The suffix is the caller's word for the format, and
+the stick-piece length and gradient stop count are drawing constants that
+change no reported number.
 
 ### Seams
 
@@ -108,16 +120,33 @@ rectangle closed by two half-ellipses.
   extends it.
 - A new `src/rietx/viz/figure3d/vector.py`: scene and frame to a display
   list, then the display list to SVG text. Standard library only.
-- `docs/manual/using/exports.md:219` says "There is no SVG or PDF output."
+- `docs/docs/reference/figures.md:217` says "There is no SVG or PDF output"
+  (the manual moved from `docs/manual/using/exports.md:219`; checked
+  2026-11-16).
 - `docs/skill/rietx/references/api-figure.md`: the paragraph naming what
   `path=` writes.
 
 ### Inherited
 
-- **2026-10-23, from [1504](1504-the-figure-surface-measured-with-real-agents.md) (closed): the
-  agent task an SVG answers.** 1504's tasks are in `docs/wp/1504-eval/`. Task 6, fluorapatite
-  for print, is the one an agent could answer with an SVG once this lands. A later round that
-  re-runs it measures this WP's surface. 1504 runs no further round itself.
+- **2026-11-18, from the issue triage (#1667): WP-1537's two external checks are this
+  WP's.** PR #1666 (open on 2026-11-18, head `da2f04fd2`) adds the POV-Ray and glTF writers
+  and closes WP-1537 with three tasks moved to issue #1667. Two of them land here, since this
+  WP's session works the same writers' dispatch (`render.WRITERS`), the same figures and
+  `tests/test_render_structure.py`, and already plans an external-tool check of its own
+  (`rsvg-convert`, Inkscape). (a) Render fluorapatite and NAC once in POV-Ray 3.7 and once
+  in Blender (Cycles, the imported camera), and commit each beside its PNG under
+  `docs/wp/1537-renders/`. That is WP-1537's acceptance that the chiral NAC phase (I2₁3)
+  keeps its hand in POV-Ray; the merged tests check the hand by projection without
+  rendering. (b) Run the Khronos validator on `tests/output/figure3d/nac_ball.glb` and
+  `nac_ellipsoid.glb` and fix what it reports. The npm package `gltf-validator`
+  (2.0.0-dev.3.10) declares no `bin`, so `npx gltf-validator` does not run; call its
+  `validateBytes` from a short Node script. Checked against the tree at 3f5167863: no
+  writer is on `main` yet (`render.WRITERS`, `.pov` and `.glb` absent under
+  `viz/figure3d/`), POV-Ray and Blender are not installed on the machine that checked, and
+  the npm metadata confirms no `bin`. Both tasks wait on #1666 merging. The issue's third
+  task, the GUI export menu, is GUI work and stays with the issue until the GUI track takes
+  it into the rebuilt Structure graph (WP-2218, open in PR #1673; inventory row 79 of
+  WP-2214 homes the PNG export there).
 
 ## Non-goals
 
@@ -129,15 +158,16 @@ rectangle closed by two half-ellipses.
 
 ## Tasks
 
-- [ ] Read ASE's EPS/SVG writer and VESTA's vector-export thread. Record
-  what each does about bonds and overlap in Context.
-- [ ] D1: the suffix dispatch, with the refusal naming each suffix.
-- [ ] The display list (`vector.py`): projected ellipses, trimmed and cut
+- [x] ~~Read ASE's EPS/SVG writer and VESTA's vector-export thread. Record
+  what each does about bonds and overlap in Context.~~ Superseded 2026-11-16:
+  D2 is built and tested by its own crossing case (decisions walk, settled).
+- [x] D1: the suffix dispatch, with the refusal naming each suffix.
+- [x] The display list (`vector.py`): projected ellipses, trimmed and cut
   stick pieces, faces, lines, ring arcs and letters, each with a depth key.
   Unit tests: sample points on a projected ellipse lie on the raster's
   silhouette within half a pixel, and a trimmed end lies on its atom's
   surface.
-- [ ] The SVG writer: D3's gradients, background or transparent,
+- [x] The SVG writer: D3's gradients, background or transparent,
   `outline=`, `dpi=`, D5's classes.
 - [ ] The crossing fault: 1470's baseline case drawn correctly. Rasterise the
   SVG and test the pixels where the bond passes behind the ball.
@@ -174,6 +204,107 @@ measurement set. Inkscape opens the file with one element per atom.
 - `docs/wp/1470-spike/mpl_baseline.py`, for the crossing fault.
 
 ## Handover log
+
+### 2026-11-28 — repair, close-only bookkeeping (ghostshift runner), PR #1886
+
+PR #1606 merged on 2026-11-24, and two of its commits from 2026-11-17 had no entry, so the
+session-start scan flagged this WP. This repair adds the reconstructed 2026-11-17 entry below.
+It also corrects the Status line, which still called the PR open and the ASE reading open. The
+WP stays open. The crossing pixels, parity, the PDF check, the manual's PDF command, the
+rasterised figure pairs and the skill's measured tag are not done, and issue #1614 is open.
+
+- **Checked on `origin/main` at `300853e90`.** PR #1606 merged at 2026-11-24 13:17 UTC. PR
+  #1666 (WP-1537's writers) is still open, so the two inherited external checks still wait on
+  it.
+- **Next.** Unchanged from the 2026-11-16 entry, less task 1. First the parity row on a
+  machine with playwright's chromium, which also measures #1614's items 1 to 4. Then the
+  rasterised crossing test, then `rsvg-convert -f pdf` and Inkscape once.
+
+### 2026-11-17 — review round 1 answered (reconstructed post hoc)
+
+Two commits answered the first review of PR #1606, posted on 2026-11-17. Commit `e9a6a4b2e`
+ticks task 1, reading ASE's writer, as superseded. Its reason is that D2 is built and tested
+by its own crossing case, as settled in the decisions walk. Commit `b34ec862e` changed two
+files. `figure3d/vector.py` takes the SVG title's package name from `DIST_NAME`, and
+`reference/figures.md` no longer calls the figure PNG-only. The 2026-11-24 review of round 2
+records that Yue accepted the WP-file edits on 2026-11-17. The diffs do not say more.
+
+### 2026-11-16 — first slice (ghostshift runner), PR #1606
+
+`render_structure(..., path="figure.svg")` now writes the picture as vector
+shapes: every atom an ellipse with a shaded gradient, every bond a run of short
+stick pieces, every polyhedron face a translucent polygon, the letters as text,
+each element classed by its site. Looked at side by side with the PNG on
+rutile (balls with octahedra, and ellipsoids) and on the largest corpus phase,
+the two read as the same figure. What is not yet known is how close they are
+in numbers: no rasteriser for SVG is installed where this ran, so the parity
+row, the pixel test of the crossing case and the PDF check are all still open.
+
+- **Done.** D1: `render.WRITERS` is `(".png", ".svg")`, the refusal quotes it,
+  and the raster runs either way, so `image`, `atoms`, `letters` and `report`
+  are the PNG's. The display list and writer are `figure3d/vector.py` (numpy
+  and the standard library). D2 as filed, with three choices of this session:
+  a stick is trimmed where the **first rim point** leaves its atom (the least
+  `t` over 16 rim directions, √(R² − r²) on a sphere), not where the axis
+  leaves it, since the axis trim left a background notch; **lines are trimmed
+  the same way** at any atom they end in (cell corners, polyhedron vertices),
+  or their near pieces sorted in front of the ball they start in; and a half's
+  atom is found **by position**, because a bond's far end is often an image
+  of atom `j`, not atom `j`. Pieces are no longer than the smallest drawn
+  semi-axis, floored at `PIECE_FLOOR` = 0.15 Å, and overlap by half a pixel
+  so no seam shows. Atoms tie-break on how far they reach toward the viewer,
+  so of two sites sharing a position the one the raster shows is drawn last
+  (the corpus's mixed Fe/Mg sites showed it). Each face keys on its own
+  centroid (one polygon per plane), which puts a centre atom between its
+  polyhedron's back and front faces; D2's per-polyhedron order is not kept,
+  issue #1614 item 4. D3 as filed (radial focus at the half vector, stops
+  along the ray from it; linear gradient across a stick, exact). D4, D5 as
+  filed; D5's open question is answered by the formula with its subscripts,
+  so `face TiO₆` selects every TiO₆.
+- **Review.** `/code-review` edits the main checkout, so a read-only review
+  agent read the diff instead. Fixed from it: the two trims above, quotes in a
+  site label breaking the document, one fog value for a whole half, round
+  line caps where the raster's are square, and a crossing test whose
+  assertion could not fail (the bond now tilts so a whole half would sort
+  wrong, and the test asserts per piece). Not fixed, filed as #1614: the
+  outline drawn as a centred stroke and never fogged, ring and named-face
+  fills that may seam per triangle, the radial gradient's dark rim on the
+  highlight side (a limit of D3), face order, `dominant-baseline` in librsvg,
+  and the class-token details.
+- **Measured.** Element counts at 600 px: rutile with octahedra 49 ellipses,
+  72 face polygons, 1380 line pieces, 187 kB; rutile ellipsoids 51 ellipses,
+  696 stick paths, 116 linear gradients, 33 ring arcs, 255 kB; the largest
+  `polyhedra_phases.json` phase 116 ellipses, 168 faces, 3214 line pieces,
+  436 kB. Lines dominate; if an editor slows, cut only pieces whose screen box
+  meets an atom (D2's fallback). Writing an SVG adds well under 0.1 s.
+  reader_output: exit 0, unchanged.
+- **Tests** (`[dev]` venv, macOS 26 arm64 for the targeted runs; a Linux
+  workstation for the suites): the canary selection (this file's tests,
+  `test_structure3d_browser.py`, audit_table, help, docs_consistency, skill;
+  `-n 4`) gave 401 passed, 1 skipped on 07f6ff48d. The fast selection
+  (`-m "not slow" -n 8 --dist loadgroup`, 2176fd57b, beside other
+  jobs at load 25-32) gave 14859 passed, 280 skipped, 32 xfailed, 0 failed
+  in 1005 s. Nine cases were added (seven tests), costing 1.11 s together
+  in that run's junit, the slowest the end-to-end SVG test at 0.54 s; the
+  browser module skips here as everywhere without playwright. Main's own
+  count on the same day was not run, so the +9 is the added cases, not a
+  measured delta. ruff clean; Vale 0 errors.
+- **Not done.** Task 1: reading ASE's writer is a question for the user (see
+  Next). The crossing task is half done: the order-level repair is tested, the
+  rasterised pixels are not. Parity, the PDF check and the manual's PDF
+  command need chromium (playwright) or `rsvg-convert`/Inkscape, none of
+  which is installed on the runner's Mac. The docs and skill tasks are done
+  except the PDF command and the measured tag (the skill clause is tagged a
+  hypothesis). Figure pairs: the SVG and PNG are written to
+  `tests/output/figure3d/`, the rasterised SVG is not.
+- **Next.** First, on a machine with playwright's chromium: the parity row
+  (21 phases × ball, ball with polyhedra, ellipsoid), which also measures
+  #1614's items 1-4 and decides which to repair; then the rasterised crossing
+  test from the same harness. Then `rsvg-convert -f pdf` and Inkscape once,
+  the PDF command into `figures.md`, and the measured tag on the skill clause.
+  Task 1 waits on the user's answer: the house clean-room rule says an
+  agent never opens a reference implementation's source, while this task
+  asks to read ASE's LGPL writer for concepts.
 
 ### 2026-10-02 — filed
 

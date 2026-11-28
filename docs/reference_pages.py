@@ -134,6 +134,12 @@ PARAMETER_GROUPS = (
        "These are named apart from the background curve, "
        "so a stage that frees the background does not free them too.",
        ("instrument.extra_components.*",)))),
+    ("Peak equations",
+     "A peak equation adds a term you write to each reflection's width or position, "
+     "or multiplies its intensity. "
+     "Its coefficients are named in the equation and refine like any other parameter. "
+     "The instrument's equation moves every phase's peaks.",
+     ((None, None, ("phases.*.peak_equations.*", "instrument.peak_equations.*")),)),
     ("Named variables",
      "A named variable is a parameter you declare yourself, outside the model. "
      "Model parameters follow it through ties.",
@@ -146,7 +152,7 @@ PARAMETER_GROUPS = (
 #: so the phase side and the instrument side are two pages.
 PARAMETER_PAGES = {
     "parameters.md": ("Cell and structure", "Phase amount and intensity corrections",
-                      "Microstructure", "Named variables"),
+                      "Microstructure", "Peak equations", "Named variables"),
     "parameters-instrument.md": ("Instrument", "Time of flight", "Background"),
 }
 
@@ -253,8 +259,8 @@ def parameter_map(body: str = "parameters.md") -> str:
 # ----------------------------------------------------------------------
 # The other vocabularies
 #
-# `rietx.help` holds ten.  Parameters, plans, diagnostic codes and result
-# fields have pages of their own, and the other six share
+# `rietx.help` holds eleven.  Parameters, plans, diagnostic codes and result
+# fields have pages of their own, and the other seven share
 # `reference/settings.md`, in the
 # order and under the lead sentences `_VOCABULARIES` gives (the old tree's
 # glossary, WP-1986).  That list is the one hand-written thing here, so an arm
@@ -278,6 +284,10 @@ _VOCABULARIES = [
     ("peak_origins", "Peak origins",
      "Where one line came from: detection, or a person. It records provenance "
      "and makes no judgement, and no gate in the package branches on it."),
+    ("cell_relations", "Candidate cell relations",
+     "How the GUI's candidate table relates one indexing candidate to another "
+     "reported row. The table writes a mark and the row it names, such as "
+     "`2× #1`."),
     ("reader_options", "Reader options",
      "Keyword arguments `read_pattern` accepts. A project records which ones "
      "claimed its file, because the same file can hold more than one pattern."),

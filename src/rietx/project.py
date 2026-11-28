@@ -37,14 +37,18 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 from . import _about
+from ._nearmiss import check_choice
+from .backend.api import check_backend
 from .history.store import fingerprint, holds_a_log
 from .history.tree import RefinementTree
 from .io.formats.gsas import _first_bank_number
 from .io.readers import identify_format, read_pattern, reader_options_for
-from .optimize.least_squares import DEFAULT_SOLVER
+from .optimize.least_squares import DEFAULT_SOLVER, SOLVERS
 from .refine import _VERSION, Refinement
-from .schemas.common import Diagnostic, Mode
+from .schemas.common import Diagnostic, Mode, check_mode
 from .schemas.history import NodeAction
 from .schemas.instrument import Instrument
 from .schemas.migrate import migrate_document_text
@@ -152,6 +156,11 @@ class Project:
         depending on which scan was chosen, and neither the bytes nor the
         fingerprint can say which that was.
         """
+        # every choice before the directory exists: a refusal after the
+        # history log is written strands a create that cannot be retried
+        check_mode(mode)
+        check_backend(backend)
+        check_choice("solver", solver, SOLVERS)
         root = Path(path)
         src = Path(pattern)
         if (root / PROJECT_JSON).exists():
@@ -168,6 +177,11 @@ class Project:
                 "create the project at another path")
         if not src.is_file():
             raise FileNotFoundError(f"pattern file not found: {src}")
+        # a cell the table refuses (WP-2150) is refused before the directory
+        # exists, so no project stores a root that no fit could start from
+        from .crystallography.symmetry import check_phase_cell_ties
+        for ip, phase in enumerate(structure.phases if structure is not None else []):
+            check_phase_cell_ties(phase, prefix=f"phases.{ip}")
         root.mkdir(parents=True, exist_ok=True)
 
         copied = root / src.name
@@ -178,6 +192,9 @@ class Project:
         notes: list[Diagnostic] = []
         options = reader_options_for(fmt, reader_options or {}, diagnostics=notes)
         data = read_pattern(copied, diagnostics=notes, **options)
+        # the options pre-filter above reports an ignored option into
+        # ``notes`` only, so the pattern carries the whole list (WP-2304)
+        data.diagnostics = list(notes)
         # A project is a refinement's durable form, so a pattern it cannot
         # refine has nothing to be one of — and DataRef records a
         # ``two_theta_range``, which is a 2θ by its name.
@@ -236,6 +253,8 @@ class Project:
         one; a container that silently rebound a tree to different data would be
         the confident-wrong-singleton failure one level up.
         """
+        check_backend(backend)
+        check_choice("solver", solver, SOLVERS)
         root = Path(path)
         if root.is_file() and root.name == PROJECT_JSON:
             root = root.parent
@@ -291,7 +310,8 @@ class Project:
         # inheriting the create's answer.
         require_two_theta(data, "Project.open()")
         actual_fp = fingerprint(data.x(), data.intensity)
-        if actual_fp != ref_doc.fingerprint:
+        accepted = {actual_fp, _pre_1952_gsas_fingerprint(ref_doc.reader, data)}
+        if ref_doc.fingerprint not in accepted:
             raise ValueError(
                 f"{pattern_path}: the bytes match but this version parses them "
                 f"differently (fingerprint {actual_fp[:8]}, recorded "
@@ -314,7 +334,7 @@ class Project:
                 "the model state (project.json holds only the settings)")
         history_notes: list[Diagnostic] = []
         tree = RefinementTree.load(history_path, diagnostics=history_notes)
-        if tree.header.data_fingerprint and tree.header.data_fingerprint != actual_fp:
+        if tree.header.data_fingerprint and tree.header.data_fingerprint not in accepted:
             raise ValueError(
                 f"{history_path}: this history was recorded against a different "
                 f"pattern (fingerprint {tree.header.data_fingerprint[:8]}, data "
@@ -503,6 +523,25 @@ def _data_ref(path: Path, data: PatternData, reader: str,
         two_theta_range=(tt[0], tt[-1]),
         has_sigma=data.sigma is not None,
     )
+
+
+def _pre_1952_gsas_fingerprint(reader: str, data: PatternData) -> str | None:
+    """The fingerprint the ``gsas`` reader gave this file before WP-1952.
+
+    It dropped every channel with an esd of zero or below, in silence, where
+    it now keeps them and ``read_pattern`` leaves them out of the fit.  A
+    project made before records the shorter arrays, and must still open: the
+    channels it lacks are the ones the fit now excludes, so the fit is the
+    same.  ``None`` where the two readings cannot differ.
+    """
+    if reader != "gsas" or data.sigma is None:
+        return None
+    bad = data.nonpositive_sigma_mask()
+    if not bad.any():
+        return None
+    keep = ~bad
+    return fingerprint(np.asarray(data.x())[keep],
+                       np.asarray(data.intensity, dtype=np.float64)[keep])
 
 
 def _reader_options(ref: DataRef) -> dict[str, str]:

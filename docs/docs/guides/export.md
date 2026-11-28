@@ -29,9 +29,9 @@ In a project, the GUI's export commands write the same files into the project's 
 <!-- output of examples/guides/export.py -->
 ```text
 data_fluorapatite
-_cell_length_a 9.370962(83)
-_cell_length_b 9.370962(83)
-_cell_length_c 6.885324(80)
+_cell_length_a 9.370962(82)
+_cell_length_b 9.370962(82)
+_cell_length_c 6.885326(79)
 _cell_volume 523.629(12)
 _space_group_name_H-M_alt 'P 63/m'
 11 loops
@@ -56,9 +56,9 @@ Check the file with the IUCr's checkCIF service before you submit it.
 
 <!-- output of examples/guides/export.py -->
 ```text
-phase,line,wavelength,h,k,l,d,two_theta,multiplicity,f_squared,intensity,satellite_order,component
-fluorapatite,0,1.5405929,1,0,1,5.2502971,16.821207,12,129.37451,64.568913,0,total
-fluorapatite,0,1.5405929,2,-1,0,4.6854811,18.872864,6,151.2127,29.807452,0,total
+phase,line,wavelength,h,k,l,d,two_theta,multiplicity,f_squared,intensity,satellite_order,component,merged_group
+fluorapatite,0,1.5405929,1,0,1,5.2502979,16.821212,12,129.34156,64.66301,0,total,
+fluorapatite,0,1.5405929,2,-1,0,4.685481,18.872873,6,151.50318,29.915845,0,total,
 658 rows
 ```
 

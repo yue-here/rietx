@@ -78,7 +78,11 @@ python -c "import rietx; print(rietx.__version__)"
 ```
 
 That prints the version you installed, {{ release }} for the copy this manual
-was built from. Then run a first fit, [in Python](first-fit.md) or in [the GUI](gui-quickstart.md).
+was built from. A copy of the manual is kept for each recent minor release from 1.10 on, and the version menu at
+the top of every page switches between them. Read the copy that matches your
+install. The `dev` copy describes the `main` branch, which can have calls and
+fields that no release has yet; to run what it shows,
+[install from source](#installing-from-source). Then run a first fit, [in Python](first-fit.md) or in [the GUI](gui-quickstart.md).
 
 ## Requirements
 
@@ -169,13 +173,13 @@ dichotomy search or `capabilities()` call:
 RuntimeWarning: rietx's compiled kernels did not load, because importing
 rietx_kernels raised ModuleNotFoundError (No module named 'rietx_kernels').
 Fits, structure figures and indexing run the numpy path, which is slower.
-Install the kernels with pip install "rietx-kernels>=1.4,<2", or set
+Install the kernels with pip install "rietx-kernels>=1.5,<2", or set
 RIETX_COMPILED=0 to choose the numpy path and silence this warning.
 ```
 
 The same warning names a wheel of another major version, whose kernel
-interface this rietx does not call. It also names a wheel older than 1.4, the
-oldest rietx accepts, which lacks the structure-solution engine's kernels.
+interface this rietx does not call. It also names a wheel older than 1.5, the
+oldest rietx accepts, which lacks the structure figure's depth-cued kernel.
 
 `capabilities()` answers the three questions in three fields, because they can
 disagree. `features["compiled_kernels"]` is whether the wheel loaded here.

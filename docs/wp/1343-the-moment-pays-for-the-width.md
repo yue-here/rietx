@@ -254,6 +254,26 @@ the cheaper of the two at the time; the skill row is required either way.
 
 ### Inherited
 
+- **2026-11-28, from the issue triage (#1831, a bug): `MAGNETIC_WIDTH_UNMODELLED`
+  counts extinct child reflections as magnetic lines.** `report/magnetic.py`
+  `_classified_reflections` puts a row in `mag_rows` when f_mag / (f_nuc + f_mag)
+  ≥ 1 − `MAGNETIC_WIDTH_PURITY` and f_mag > 0 (`:716-717` at `02341ffdb`). There
+  is no absolute floor, so a row with f_nuc = 0 and a round-off f_mag (about
+  1e-28) has a fraction of exactly 1.0 and passes. The reporter's case is a
+  Mn₃ReO₆ `P_S-1` child in its 2a × 2b × c supercell at k = (½ ½ 0) (D20 10 K,
+  doi:10.7488/ds/1359): (0 0 1), (1 0 −1) and (0 1 0), all forbidden by the
+  parent, are listed as magnetic lines fitted too narrow. The width statistic
+  then reads the flank of the real (½ ½ 0) line 0.43° away and bare
+  background. In their set the warning fires in some Biso arms and not others
+  at nearly the same misfit (z ≈ 3.3-3.6), which this would explain. The code
+  path is as they describe; the real-data run was not repeated here. Their
+  ask: leave out rows whose |F_m|² falls below a floor relative to the phase's
+  strongest magnetic row, and a test that the parent-forbidden rows of a
+  k = (½ ½ 0) `P_S-1` child never enter `mag_rows`. Leaving round-off rows out
+  is the data settling it; the floor's value is a new tier-3 number on the
+  magnetic path, so it is Mike's to rule under #1075, with an `_audit` row.
+  Same function as this WP's open item (the silence where every magnetic
+  reflection is also nuclear), so one session reads both.
 - **2026-10-12, from [1929](1929-an-esd-follows-where-the-solver-stopped-beside-a-flat-column.md):
   the moment rung reads moduli by name and skips a tied one.**
   `refine._moment_rung` keeps only untied `dof0` entries. A modulus a
@@ -492,6 +512,24 @@ the cheaper of the two at the time; the skill row is required either way.
 
 ## Handover log
 
+- **2026-11-24** — repair, by a ghostshift runner, PR #1817. The session-start hook
+  flagged this WP because a `WP-1343:` commit of 2026-11-18 was newer than the last entry
+  (2026-10-25). The entry below reconstructs it from `git log`. Nothing else in this file
+  changed: no task, no Status line. Mike's PR #1706 (the magnetic-width family on the
+  allowed rows only) is open and in flight, so it is not recorded here. *Next*: unchanged.
+  The maintainer's choice among the three fixes for the k = 0 silence (2026-10-25 entry)
+  is still open, and #1706 is reviewed under `/pr-review`.
+
+- **2026-11-18** (reconstructed post hoc) — PR #1682 (outside contributor), one commit
+  `c4cc61e5`, merged on 2026-11-19. It is docs only. It adds a dated sub-bullet to the
+  2026-09-30 entry, beside PR #524's Pbcm measurement. Yue answered 3e on #193 on
+  2026-11-17 and asked for that note. The note says the round-trip bar is 2σ and 5 % of the
+  planted value, as `tests/test_magnetic_width.py` asserts, because a 1σ bar on one draw
+  fails about one time in three on the seed alone. It also says the freed width came back
+  low in all three draws, at 0.2466-0.2471° against a planted 0.25° (1.16-1.36 % low), and
+  that the "1.2 %" quoted there is the pooled figure. No task, status or code changed. The
+  commit does not say why the per-draw values were not tabulated.
+
 - **2026-10-25** — PR #1111 (outside contributor) merged as `942f8db4`. It
   adds `tests/test_magnetic_width_k_zero.py` and lands the last two Tasks rows:
   the identifiability row and the k = 0 half of the Tests + PNGs row. The k = 0
@@ -679,6 +717,16 @@ the cheaper of the two at the time; the skill row is required either way.
     separable, as the WP expected: size 0.0337 ± 0.0164, strain on its
     floor, both declared unmeasured. The in-suite round trip is MnF₂ at 2σ
     and 5 % bars rather than 1σ, and its docstring argues why.
+  - **2026-11-18, the bar and the offset on file** (maintainer's answer 3e
+    on #193, 2026-11-17, who asked for the note:
+    <https://github.com/yue-here/rietx/issues/193#issuecomment-6963319037>).
+    The bar is 2σ and 5 % of the planted value, as
+    `tests/test_magnetic_width.py` asserts, because a 1σ bar on one draw
+    fails about one time in three on the seed alone. The freed width came
+    back low in all three draws of the Pbcm measurement above: 0.2466-0.2471
+    against a planted 0.25°, which is 1.16-1.36 % low (the per-draw values
+    were not tabulated). The "1.2 %" in the entry above is the pooled
+    figure. The 2σ and 5 % bar holds on all three draws.
   - **What it deliberately does not do.** No real k ≠ 0 dataset
     (Ba₂FeSbSe₅ is not vendored and its licence is unchecked), and no PNGs
     to `tests/output/`. `multi.py`'s joint report emits none of the four

@@ -121,6 +121,7 @@ from pathlib import Path
 
 import numpy as np
 
+from .._nearmiss import check_choice
 from ..crystallography.magnetic import isotropy as _isotropy
 from ..crystallography.magnetic import moments as _moments
 from ..crystallography.magnetic.form_factor import (
@@ -132,6 +133,7 @@ from ..crystallography.magnetic.form_factor import (
 from ..crystallography.magnetic.isotropy import MagneticCandidate, analyse
 from ..crystallography.magnetic.moments import tilted_seed, warm_seed
 from ..crystallography.magnetic.supercell import (
+    SUPERCELL_NUCLEAR_GROUPS,
     anti_translation_residual,
     anti_translation_ties,
     magnetic_supercell,
@@ -200,8 +202,8 @@ SOLVE_D_MIN = 1.5
 #: subspace** (:func:`~rietx.crystallography.magnetic.moments.tilted_seed`,
 #: mostly along the allowed basis's first row and, since issue #390's tilt,
 #: with a small nonzero component on every other row too when the basis has
-#: more than one — see :data:`~rietx.crystallography.magnetic.moments.
-#: SEED_TILT`), which is the one thing a seed here must not get wrong.
+#: more than one — see
+#: :data:`~rietx.crystallography.magnetic.moments.SEED_TILT`), which is the one thing a seed here must not get wrong.
 SOLVE_SEED_MU_B = 2.0
 
 #: Alias of :data:`~rietx.crystallography.magnetic.moments.SEED_TILT`, kept
@@ -1418,7 +1420,10 @@ def _close(trial: MagneticTrial, data, limits, mask) -> MagneticTrial:
     # the model's paths, which a plan that fixes needs (WP-2208)
     paths = ([r.path for r in ref.parameters()]
              if any(s.turn_off for s in plan.stages) else None)
+    # the window is named: run_stage's own default is the declared stages' 2 %
+    # since WP-2222, and a closing stage there drops the tails it exists for
     result = ref.run_stage(data, plan.closing_stage(paths), two_theta_limits=limits,
+                           window_area_tol=plan.closing_window_tol,
                            correlation_guard=plan.correlation_guard,
                            phase_support_sigma=plan.phase_support_sigma,
                            telemetry=False)
@@ -1619,7 +1624,8 @@ def _moment_rows(ref, result, structure
         held=list(result.stages[-1].held) if result.stages else [],
         esd={p.path: p.stderr for p in result.parameters
              if p.stderr is not None},
-        correlations=_moment_correlations(ref, result))
+        correlations=_moment_correlations(ref, result),
+        covariance=_live_covariance(ref, result))
     rows = [
         MomentRow(label=e.atom, ion=e.ion, magnitude=float(e.magnitude),
                   esd=None if e.magnitude_esd is None
@@ -1679,19 +1685,29 @@ def _moment_correlations(ref, result):
     degeneracy.  ``None`` when the fit kept no covariance (no esds, or
     ``ref`` holds another result's), exactly as before: a fit whose
     covariance was not measured reports each modulus on its own.
+
+    A free modulus with no esd because a discarded direction touched it
+    (WP-2219) is paired too, its ρ read through the pseudo-inverse's own
+    esds (the kept tuple's discarded subspace, WP-2230): the pair's fold then
+    asks whether the quadrature sum is determined.
     """
     from ..schemas.results import CorrelationPair
 
-    kept = getattr(ref, "_answer_covariance", None)
-    if kept is None or kept[0] is not result or kept[3] is None:
+    kept = _live_covariance(ref, result)
+    if kept is None:
         return None
-    _result, table, theta, stderr_internal, correlation = kept
+    _result, table, theta, stderr_internal, correlation = kept[:5]
+    discarded = kept[5] if len(kept) > 5 else None
+    free = set(getattr(table, "free_paths", ()) or ())
     paths = [p.path for p in result.parameters
-             if p.vary and p.stderr is not None and _MOMENT_GLOB in p.path
-             and p.path.endswith(".dof0")]
+             if p.vary and _MOMENT_GLOB in p.path and p.path.endswith(".dof0")
+             and (p.stderr is not None
+                  or (discarded is not None and p.path in free))]
     if len(paths) < 2:
         return None
-    cov = table.physical_covariance(theta, stderr_internal, correlation, paths)
+    extra = {} if discarded is None else {"discarded": discarded}
+    cov = table.physical_covariance(theta, stderr_internal, correlation, paths,
+                                    **extra)
     var = np.diag(cov)
     pairs = []
     for i in range(len(paths)):
@@ -1701,6 +1717,15 @@ def _moment_correlations(ref, result):
                     path_a=paths[i], path_b=paths[j],
                     rho=float(cov[i, j] / math.sqrt(var[i] * var[j]))))
     return pairs or None
+
+
+def _live_covariance(ref, result):
+    """``ref._answer_covariance`` when it is ``result``'s and carries esds,
+    else ``None``."""
+    kept = getattr(ref, "_answer_covariance", None)
+    if kept is None or kept[0] is not result or kept[3] is None:
+        return None
+    return kept
 
 
 def _values_of(ref):
@@ -2140,6 +2165,7 @@ def solve_magnetic(refinement, data, *, phase: int = 0,
     returns a ranked list with a stated criterion and an abstention reason,
     never a confident wrong singleton.
     """
+    check_choice("nuclear_group", nuclear_group, SUPERCELL_NUCLEAR_GROUPS)
     from ..crystallography.satellites import zone_boundary_candidates
     from ..params.vector import ParameterTable
     from ..report.layer2 import delta_bic

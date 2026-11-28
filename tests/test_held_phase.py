@@ -433,6 +433,7 @@ def _ramp_patterns(temperatures, seed: int = 20260826, grid=None):
     out = []
     for temperature in temperatures:
         truth.phases[0].cell.a.value = _ramp_a(temperature)
+        truth.phases[0].cell.b.value = truth.phases[0].cell.c.value = truth.phases[0].cell.a.value  # the cell's ties follow a
         truth.phases[1].scale.value = 4.0e-4 * _ramp_caf2_weight(temperature)
         y = rx.Refinement(truth, ins).predict(grid)
         counts = rng.poisson(np.maximum(y, 0.0)).astype(float)
@@ -954,7 +955,8 @@ def test_the_joint_path_holds_a_phase_no_histogram_can_see():
     assert result.stages[-1].held == ["phases.1.cell.a"]
     assert ref.mtable.structures[0].phases[1].cell.a.value == 5.2
     fired = [d for d in result.diagnostics if d.code == "PHASE_UNCONSTRAINED"]
-    assert len(fired) == 1 and "was held for stages cell, closing" in fired[0].message
+    # no closing stage by default since WP-2222, so the cell stage alone
+    assert len(fired) == 1 and "was held for stage cell" in fired[0].message, fired[0].message
 
 
 def _held_columns(sharing=None) -> tuple[list[str], list[str]]:
@@ -1072,7 +1074,7 @@ def test_the_blind_range_and_the_collapse_are_drawn_for_inspection(
     _, collapsed = collapsed_fit
     plot_result(collapsed, path=str(OUT / "held_phase_collapsed.png"))
     plot_result(collapsed, path=str(OUT / "held_phase_collapsed_zoom.png"),
-                two_theta_range=(26.0, 40.0))
+                two_theta_limits=(26.0, 40.0))
     plt.close("all")
     for name in ("held_phase_blind_range", "held_phase_collapsed",
                  "held_phase_collapsed_zoom"):

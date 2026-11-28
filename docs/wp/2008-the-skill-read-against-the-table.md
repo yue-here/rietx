@@ -1,6 +1,6 @@
 # WP-2008 — The skill slimmed to the API, the feedback surface and sourced traps
 
-Milestone: generality · Status: ⬜
+Milestone: generality · Status: 🔄 2026-11-19 — one ruled slice landed (#1630, the held-SNIP recipe withdrawn); every task still open
 Track: The prose
 Depends on: 2001, 2002, 2003, 2004 (2005, 2006, 2007 soft: those three move few skill rows)
 Priority: P3 2026-10-18 — down a rung from P2: nothing here can start until the audits have ruled; lifts when 2002–2004 close
@@ -145,6 +145,36 @@ and goes through the harness.
   than a row measured on rietx's own data. The issue's open question 1 (make
   the card a recorded `Instrument` provenance field that `summary()` checks)
   is a stored-format change and the maintainer's call.
+- 2026-11-16, from the issue triage (issue #1569): the judging rule "Under a
+  broad hump, hold SNIP" (`references/judging.md:75`, routed from `SKILL.md:87`
+  and from the `BACKGROUND_SMOOTHING_AT_FLEXIBLE_END` row,
+  `references/abstention.md:32`) rests on one synthetic fixture judged on
+  background/truth at the hump (WP-1542), a row measured on rietx's own data.
+  The issue ran the recipe (`w` = 3 FWHM in points, 4-term Chebyshev
+  correction, FCJ) on a synthetic LaB₆ with a broad hump: it passes the rule's
+  own check (0.983 at the hump) and puts La Biso at 0.475(16) against a truth
+  of 0.355, 7.3σ high, where co-refined Chebyshev and P-spline arms read
+  0.369-0.379. On SRM 1976a and FAP every Biso rises under the held curve too.
+  The issue's mechanism: at 3 FWHM the SNIP curve rises under each line's
+  tails, and Biso grows to remove the tail intensity the model lost.
+  `BACKGROUND_ABSORPTION` cannot see it, since the screen sees only the freed
+  background correction, never what the held SNIP curve absorbed. Checked
+  against the tree at bc77a934e with the issue's own harness, synthetic arm
+  only: La Biso 0.4749(163) held against 0.3789(158) co-refined,
+  `worst_absorption` 0.0111; the real patterns were not re-run, and a larger
+  `w` was not tried against Biso. The issue proposed three changes: the rule's
+  evidence names a structural check (Biso against truth) beside
+  background/truth, and says meanwhile that the held SNIP biases Biso up at 3
+  FWHM; the abstention row stops naming the held SNIP as the fallback; one
+  docstring sentence that `worst_absorption` does not see a held curve.
+  **Ruled by Yue, 2026-11-16 (decisions walk, decision 1):** withdraw the
+  "under a broad hump, hold SNIP" recipe everywhere now (`judging.md:75`,
+  `SKILL.md:87`, the `BACKGROUND_SMOOTHING_AT_FLEXIBLE_END` row of
+  `abstention.md`); the recipe becomes a co-refined background; add the
+  docstring sentence that the absorption screen cannot see a held curve. The
+  three changes are therefore ruled; PR #1630 (merged 2026-11-17) carries
+  them out. WP-2017's row Q (the held SNIP not re-measured on PbSO₄ and #726)
+  stays the measurement twin.
 
 ## Non-goals
 
@@ -205,6 +235,26 @@ star, puts it back, because the skill's role is now narrower than interpreting v
 - `docs/milestones/generality.md`; WP-1330, 1338, 1905, 1985; `tests/skill_caps.py`.
 
 ## Handover log
+
+- **2026-11-19 (repair)** — A repair by a ghostshift runner, in the close-only PR #1719.
+  The session-start scan flagged this WP because commit `3f5d58d23` (2026-11-17 02:07Z)
+  postdates the newest entry, dated 2026-11-16. That commit only added the PR line to
+  the 2026-11-16 entry, and #1630 merged on 2026-11-17 as `de95ea24e`, so no entry
+  was missing and none is reconstructed. The repair changed three things. The Status
+  reads 🔄, since the held-SNIP slice landed while the header still read ⬜. The
+  2026-11-16 entry now sits above the 2026-10-18 one, newest first. And this entry
+  is dated today, so the scan stops flagging. The WP is not closed: all ten tasks are
+  open, the baseline `eval_skill` round included, and the Priority line stands.
+  Next: unchanged. 2002 has closed and 2003 (🔄) and 2004 (⬜) have not, so the
+  Priority line's lift has not fired and the baseline round still waits on them.
+
+- **2026-11-16** — Ruled by Yue 2026-11-16: withdraw the held-SNIP hump recipe now (option
+  (b) of the decisions walk); the Le Bail hump guidance falls back to a co-refined
+  background. Done on branch `wp2008-withdraw-held-snip`: `judging.md` § rules 4-5, SKILL.md
+  §2 item 5 and the `BACKGROUND_SMOOTHING_AT_FLEXIBLE_END` row now say to co-refine, with
+  #1569's measurement; `optimize.statistics.background_absorption`'s docstring says the
+  screen cannot see a held curve. This WP's tasks are otherwise unchanged.
+  PR: #1630.
 
 - **2026-10-18** — created, from the milestone's opening session. The acceptance row the
   first plan had here, "the skill's reference total falls", was dropped on the second

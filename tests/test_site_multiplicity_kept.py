@@ -9,14 +9,16 @@ tolerance.  Before WP-2052 the next compile counted the site at 4 positions
 with the occupancy unchanged: 10 O per cell in place of 12, χ²_red 23 and
 O1 Biso -1.6 on noise-free data.
 """
+import dataclasses
 from pathlib import Path
 
 import numpy as np
 import pytest
 
 import rietx as rx
-from rietx.model.forward import compile_model, orbit_split_of
+from rietx.model.forward import WINDOW_MIN_DEG, compile_model, orbit_split_of
 from rietx.refine import _multiplicity_kept_diagnostics
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
 from rietx.viz.plots import plot_result
 
 P = rx.Parameter
@@ -69,12 +71,15 @@ def _fitted_oxygen(ref: rx.Refinement) -> float:
 def _split_pair_fit(data, stages):
     ref = rx.Refinement(rx.Structure(phases=[_toy(0.27, occ=0.5, free=True)]),
                         _instrument(), history=False)
-    res = ref.fit(data, plan=rx.RefinementPlan(stages=stages), telemetry=False)
+    # declared, not inherited: off by default since WP-2222.  The truth is
+    # drawn by ``predict`` on the closing windows, so χ² ≈ 0 needs them too.
+    res = ref.fit(data, plan=rx.RefinementPlan(
+        stages=stages, closing_window_tol=CLOSING_WINDOW_TOL), telemetry=False)
     return ref, res
 
 
 def test_a_split_pair_that_lands_on_its_mirror_keeps_its_atoms(truth):
-    """The default plan (one stage, then the closing stage) returns 12 O.
+    """One stage, then the closing stage, returns 12 O.
 
     Reverting the freeze returns 10 O at χ²_red 23 and Biso -1.6 here, so this
     is the test that fails on a revert.
@@ -97,7 +102,7 @@ def test_a_split_pair_that_lands_on_its_mirror_keeps_its_atoms(truth):
     out.mkdir(exist_ok=True)
     plot_result(res, path=str(out / "site_multiplicity_kept_fit.png"))
     plot_result(res, path=str(out / "site_multiplicity_kept_low.png"),
-                two_theta_range=(10.0, 40.0))
+                two_theta_limits=(10.0, 40.0))
 
 
 def test_stage_boundaries_keep_the_split_too(truth):
@@ -107,10 +112,14 @@ def test_stage_boundaries_keep_the_split_too(truth):
     whose column the snapped compile had zeroed, and the result read 10 O at
     χ²_red 44.5.
     """
-    stages = [rx.Stage("scale", ["phases.*.scale"]),
-              rx.Stage("xyz", ["phases.*.scale", "phases.*.atoms.*.dof.*"]),
-              ALL,
-              rx.Stage("occ", [*ALL.turn_on, f"phases.*.atoms.{O1}.occ"])]
+    # one declared slack on every stage: since WP-2317 (R7) a stage a later
+    # one refits sizes its windows from what it frees, so each boundary would
+    # change the windows and the cost with them (1 382 -> 22 here)
+    stages = [dataclasses.replace(s, window_slack_deg=WINDOW_MIN_DEG) for s in (
+        rx.Stage("scale", ["phases.*.scale"]),
+        rx.Stage("xyz", ["phases.*.scale", "phases.*.atoms.*.dof.*"]),
+        ALL,
+        rx.Stage("occ", [*ALL.turn_on, f"phases.*.atoms.{O1}.occ"]))]
     ref, res = _split_pair_fit(truth, stages)
     o1 = ref.structure.phases[0].atoms[O1]
     assert abs(o1.y.value - 0.25) < 1e-3          # no walk
@@ -131,8 +140,9 @@ def test_a_joint_fit_keeps_the_split_too(truth):
     multi = MultiHistogramRefinement(
         rx.Structure(phases=[_toy(0.27, occ=0.5, free=True)]),
         [_instrument(), _instrument()])
-    res = multi.fit([truth, truth], plan=rx.RefinementPlan(stages=[ALL]),
-                    telemetry=False)
+    # declared, not inherited: off by default since WP-2222
+    res = multi.fit([truth, truth], plan=rx.RefinementPlan(
+        stages=[ALL], closing_window_tol=CLOSING_WINDOW_TOL), telemetry=False)
     o1 = multi.fitted_structures[0].phases[0].atoms[O1]
     assert abs(o1.y.value - 0.25) < 5e-5
     assert res.statistics.chi2 < 1e-6

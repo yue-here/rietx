@@ -36,6 +36,8 @@ from rietx.optimize.statistics import (
     residual_is_noise,
 )
 from rietx.schemas.instrument import Dispersion
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
+from rietx.strategy.staged import PLAN_PRESETS
 from rietx.viz.plots import plot_result
 
 pytestmark = pytest.mark.xdist_group("instrument-hold-noise")
@@ -136,9 +138,9 @@ def _spy(monkeypatch):
     return read
 
 
-def _draw(result, name: str, two_theta_range=None) -> None:
+def _draw(result, name: str, two_theta_limits=None) -> None:
     OUT.mkdir(exist_ok=True)
-    plot_result(result, path=OUT / f"{name}.png", two_theta_range=two_theta_range)
+    plot_result(result, path=OUT / f"{name}.png", two_theta_limits=two_theta_limits)
 
 
 # ---- the arithmetic ---------------------------------------------------------
@@ -224,13 +226,24 @@ def test_with_nothing_to_test_there_is_no_structure(delta, n_free):
     assert residual_is_noise(delta, n_free)
 
 
+def _closed_default():
+    """``mccusker_default`` with its closing stage declared, not inherited: off
+    by default since WP-2222, and the test using this was measured with it."""
+    plan = PLAN_PRESETS["mccusker_default"]()
+    plan.closing_window_tol = CLOSING_WINDOW_TOL
+    return plan
+
+
 # ---- a phase whose peaks missed ---------------------------------------------
 
 
 def test_a_phase_whose_peaks_missed_keeps_its_instrument_free(lab6, monkeypatch, no_check):
     """Read at the first stages' answers, which come before the walk.  With the
     check the residual reads as structure and nothing of the instrument is held.
-    Without it the zero shift is held at ``zero`` and W at ``profile_w``."""
+    Without it the zero shift is held at ``zero``, and the instrument at
+    ``profile``.  Before WP-2317 (R7) the zero shift and W were held at
+    ``profile_w`` already; that stage now re-solves on fresh windows (its first
+    windows drop 53 %), and the second solve releases them."""
     data = _pattern(lab6, A_TRUE, seed=14)
 
     def run():
@@ -250,12 +263,22 @@ def test_a_phase_whose_peaks_missed_keeps_its_instrument_free(lab6, monkeypatch,
     no_check()
     held = {s.name: set(s.held) for s in run().stages}
     assert "instrument.zero_shift" in held["zero"]
-    assert {"instrument.zero_shift", "instrument.profile.w"} <= held["profile_w"]
+    assert {"instrument.zero_shift", "instrument.profile.w"} <= held["profile"]
 
 
 def test_the_tutorials_step_is_reached_warm(lab6, no_check):
-    """Tutorial 05's jump.  Without the check the warm rung fails, the ladder
-    runs out at Rwp 0.998, and the pattern is quarantined."""
+    """Tutorial 05's jump, under the tutorial's plan.  Without the check the
+    warm rung fails, the ladder runs out at Rwp 1.04, and the pattern is
+    quarantined.
+
+    Since WP-2317 (R7) this runs ``mccusker_default`` as the tutorial does,
+    with no closing stage: its one warm stage is then the answer stage, keeps
+    the uniform slack, and re-solves once on fresh windows (its first windows
+    drop 17 %).  With the closing stage declared, the warm stage sizes its
+    slack from what it frees, misses the 2 % jump, and the re-solve from that
+    answer ends at Rwp 0.95, so the ladder takes ``warm_staged`` (Rwp 0.0389).
+    Before R7 the closed plan's closing stage rescued the warm rung (0.0390)
+    and the open plan took ``warm_staged``."""
     a = [A_TRUE, 4.1566 * (1 + 5e-6 * 400) * 1.02]
     patterns = [_pattern(lab6, a[0], seed=14), _pattern(lab6, a[1], seed=15)]
 
@@ -267,7 +290,7 @@ def test_the_tutorials_step_is_reached_warm(lab6, no_check):
 
     runner, series = run()
     assert [e.rung for e in series] == ["cold", "warm"]
-    assert series.entries[1].statistics.rwp == pytest.approx(0.0390, abs=5e-4)
+    assert series.entries[1].statistics.rwp == pytest.approx(0.0395, abs=5e-4)
     _draw(runner.results_[1], "hold_noise_tutorial_step")
 
     no_check()
@@ -376,7 +399,7 @@ def test_a_fit_left_unseen_carries_the_d_that_declined_the_hold(lab6, monkeypatc
     read = _spy(monkeypatch)
     data = _pattern(lab6, A_TRUE, seed=14)
     ref = rx.Refinement(_with_cell(lab6, A_TRUE / 1.05), _start_instrument(), history=False)
-    result = ref.fit(data, plan="mccusker_default")
+    result = ref.fit(data, plan=_closed_default())
     _draw(result, "hold_noise_unreached_5pct")
     assert not PEAK_ONLY & set(result.stages[-1].held)
     d, n, p, answer = read[-1]

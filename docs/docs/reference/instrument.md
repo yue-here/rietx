@@ -20,6 +20,7 @@ Every object on this page refuses a field it does not know, and checks its bound
 | `Instrument.profile` | `ProfileTCHZ` | see [Peak width](#peak-width) | the instrument's contribution to every peak's width |
 | `Instrument.background` | `BackgroundChebyshev`, `BackgroundPSpline` or `BackgroundFixedPlusChebyshev` | four Chebyshev terms, fixed at 0 | the curve under the peaks |
 | `Instrument.extra_components` | list of `HumpComponent` and `PeakComponent` | `[]` | declared peaks added on top of the background |
+| `Instrument.peak_equations` | `list[PeakEquation]` | `[]` | a position term in the angle, added to every phase's peaks ([Peak equations](data.md#peak-equations)) |
 
 A source and a correction derived for the other radiation are refused together.
 `Geometry.surface_roughness` on a neutron source raises, because a thermal neutron beam penetrates centimetres of the specimen where an X-ray beam penetrates microns.
@@ -616,7 +617,8 @@ The order scan is a `BackgroundSelection`, the same object `rietx.background.sel
 ### Fixed curve plus Chebyshev
 
 `BackgroundFixedPlusChebyshev` holds a fixed curve in the model and refines a polynomial on top of it.
-The curve is a measured blank or an estimated baseline.
+The curve is normally a measured blank.
+An estimated curve can be held the same way, but this is not recommended. SNIP is the measured case: a held SNIP curve takes intensity from the tails of the reflections and biases Biso high, and the background-absorption screen cannot see a held curve.
 Holding it in the model keeps the counting statistics intact, where subtracting it would not.
 
 | Field | Type | Default | Meaning |

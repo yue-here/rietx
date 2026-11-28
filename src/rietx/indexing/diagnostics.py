@@ -34,6 +34,8 @@ from ..schemas.indexing import (
     _MODE_NAMES,
     INDEX_REFUTING_CAVEATS,
     MAX_RELATIVE_SIGMA_Q,
+    METRIC_DOF,
+    MIN_LINES_PER_DOF,
     PEAK_MIN_USABLE_LINES,
     PEAK_NO_INTENSITY_SIGMA,
     PEAK_POSITION_BOUND_FWHM,
@@ -576,6 +578,21 @@ def picked_undeclared(instrument: Instrument) -> dict[str, str] | None:
     return undeclared_instrument(instrument) if lab_source(instrument) else None
 
 
+def _in_system_order(systems) -> list[str]:
+    """``systems`` in the engines' search order, so two messages naming systems
+    side by side list them alike (``DataQualityReport.systems_supported`` is
+    sorted by name)."""
+    from .engines import SYSTEM_ORDER
+    wanted = set(systems)
+    return [s for s in SYSTEM_ORDER if s in wanted]
+
+
+#: the remedies that add usable lines, shared by every message whose fix is a
+#: longer list (``INDEX_DATA_INSUFFICIENT``, ``INDEX_SYSTEMS_NOT_COVERED``)
+_ADD_LINES = ("Extend the 2θ range, count for longer or re-pick with a lower "
+              "PEAK_MIN_HEIGHT_SIGMA")
+
+
 def quality_diagnostics(report: DataQualityReport, peaks: PeakList,
                         instrument: Instrument | None = None,
                         ) -> list[Diagnostic]:
@@ -591,8 +608,7 @@ def quality_diagnostics(report: DataQualityReport, peaks: PeakList,
     where_range = [f"2θ {report.two_theta_min:.2f}-{report.two_theta_max:.2f}°"]
 
     if report.abstained_reason is not None:
-        suggestion = ("Extend the 2θ range, count for longer or re-pick with "
-                      "a lower PEAK_MIN_HEIGHT_SIGMA.")
+        suggestion = _ADD_LINES + "."
         # the instrument is named first because it is the cheapest of the
         # remedies: a re-pick, where the others are a new measurement
         # only a fitted list was picked with an instrument; a position list
@@ -619,13 +635,21 @@ def quality_diagnostics(report: DataQualityReport, peaks: PeakList,
     elif report.fom_undefined:
         absent = "; ".join(f"{name}: {why}"
                            for name, why in sorted(report.fom_undefined.items()))
+        # a statement about the list, never about a search (WP-2149): this runs
+        # inside assess_peak_list, before any search exists, and a caller may run
+        # it with none.  What a run searched is IndexingResult.systems_searched,
+        # and INDEX_SYSTEMS_NOT_COVERED is its message.
+        # never empty here: an empty support list is an abstention, the branch above
+        supported = _in_system_order(report.systems_supported)
         out.append(Diagnostic(
             level="warning", code="INDEX_PANEL_REDUCED",
             message=(f"The list has {report.n_usable} usable lines, below the "
                      f"{PEAK_MIN_USABLE_LINES} that the classical figures of "
-                     "merit are defined on. The search runs over "
-                     f"{', '.join(report.systems_supported) or 'no system'} "
-                     f"and the ranking panel omits: {absent}."),
+                     f"merit are defined on, so the ranking panel omits: "
+                     f"{absent}. Only {', '.join(supported)} "
+                     f"{'has' if len(supported) == 1 else 'have'} "
+                     f"at least {MIN_LINES_PER_DOF:g} usable lines per "
+                     "metric degree of freedom, enough to determine a cell."),
             where=where_range,
             suggestion=("Read quality.fom_undefined for the reason each "
                         "figure is absent, or add lines to restore the full "
@@ -920,17 +944,65 @@ def index_diagnostics(result, instrument=None) -> list[Diagnostic]:
 
     missing = [s for s in SYSTEM_ORDER if s not in result.systems_searched]
     if missing:
+        message, suggestion = _not_covered_text(missing, result.quality)
         out.append(Diagnostic(
             level="info", code="INDEX_SYSTEMS_NOT_COVERED",
-            message=f"{len(missing)} crystal system(s) were not searched.",
-            where=missing,
-            suggestion=("Search the missing systems before you conclude "
-                        "anything about the specimen.")))
+            message=message, where=missing, suggestion=suggestion))
 
     systematic = _cell_systematic(instrument, bool(result.candidates))
     if systematic is not None:
         out.append(systematic)
     return out
+
+
+def _not_covered_text(missing: list[str], quality) -> tuple[str, str]:
+    """``INDEX_SYSTEMS_NOT_COVERED``'s message and suggestion (WP-2149).
+
+    A missing system is one of two kinds, and only one of them a search can
+    fix.  Where the list has :data:`MIN_LINES_PER_DOF` usable lines per metric
+    degree of freedom, searching it is the remedy, whatever kept it out (not
+    requested, or a budget that never reached it: ``INDEX_BUDGET_EXHAUSTED``
+    names those).  Where it has fewer, the list cannot determine a cell there
+    (the definition ``systems_supported`` carries), so the remedy is more lines.
+    Below the scoring bar it is also the only remedy, since
+    ``workflow._restrict_to_supported`` drops such a system from the request
+    again on a re-run.  At or above the bar a re-run would search it, and the
+    suggestion still names the line count, because a cell found there is not
+    over-determined.
+
+    Both kinds are read off ``quality.systems_supported``, the authority the
+    restriction itself reads, so no second record of what was dropped is kept.
+    The split never says "not requested": the result does not record the
+    request, and a system the budget left unreached was requested.
+    """
+    head = f"{len(missing)} crystal system(s) were not searched"
+    if quality is None:
+        return (head + ".", "Search the missing systems before you conclude "
+                "anything about the specimen.")
+    if not quality.supports_indexing:
+        return (head + ", because the list does not support a search.",
+                "Act on INDEX_DATA_INSUFFICIENT, which says why.")
+    supported = set(quality.systems_supported)
+    short = [s for s in missing if s not in supported]
+    searchable = [s for s in missing if s in supported]
+    message = head + "."
+    if short:
+        message += (f" The list has fewer than {MIN_LINES_PER_DOF:g} usable "
+                    "lines per metric degree of freedom in "
+                    f"{', '.join(short)}, too few to determine a cell there.")
+    parts = []
+    if searchable:
+        parts.append(f"Search {', '.join(searchable)} before you conclude "
+                     "anything about the specimen.")
+    if short:
+        needs = [(s, math.ceil(MIN_LINES_PER_DOF * METRIC_DOF[s]))
+                 for s in short]
+        (system, n), rest = needs[0], needs[1:]
+        parts.append(f"A cell in {system} needs {n} usable lines"
+                     + "".join(f", in {s} {k}" for s, k in rest)
+                     + f", and the list has {quality.n_usable}. "
+                     + _ADD_LINES + " to add lines.")
+    return message, " ".join(parts)
 
 
 def _cell_systematic(instrument, have_candidates: bool) -> Diagnostic | None:
@@ -1336,10 +1408,10 @@ def _uncounted_lines(prior, z) -> list[str]:
     not whole, so no group was removed for them and none was counted."""
     if not (prior.ordered and prior.formula and z is not None):
         return []
-    from ..crystallography.atomic_volume import formula_counts
+    from ..crystallography.atomic_volume import _exact_formula_counts
     from .extinction import uncounted_elements
 
-    skipped = uncounted_elements(z, formula_counts(prior.formula))
+    skipped = uncounted_elements(z, _exact_formula_counts(prior.formula))
     return [f"ordered: {el} not counted, {per_cell:g} atoms per cell at z={z} "
             "is not whole, so no ordered model holds it (the other elements "
             "were counted)" for el, per_cell in skipped.items()]

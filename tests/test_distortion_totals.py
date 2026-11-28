@@ -210,9 +210,10 @@ class Capture:
         self.calls = []
 
     def __call__(self, table, theta, structure, values, *, stderr_internal=None,
-                 correlation=None):
+                 correlation=None, discarded=None):
         out = RD.distortion_totals(table, theta, structure, values,
-                                   stderr_internal=stderr_internal, correlation=correlation)
+                                   stderr_internal=stderr_internal, correlation=correlation,
+                                   discarded=discarded)
         self.calls.append((table, np.array(theta), structure, dict(values), stderr_internal,
                            correlation, out))
         return out

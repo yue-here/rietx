@@ -29,6 +29,7 @@ from typing import ClassVar, Literal
 from pydantic import Field, field_validator, model_validator
 
 from .common import Base, Parameter, _InheritsDeclaredDefaults
+from .peak_equation import PeakEquation, check_level
 
 
 def _declared_extinction() -> Parameter:
@@ -72,6 +73,31 @@ def _op_key(op) -> tuple[tuple[int, ...], tuple[int, ...]]:
     """
     return (tuple(int(v) for row in op.rot for v in row),
             tuple(int(v) % op.DEN for v in op.tran))
+
+
+def _setting_matching(space_group: str, listed: set) -> str | None:
+    """The tabulated setting of ``space_group``'s type whose operations are
+    ``listed``, or ``None`` (issue #1835).
+
+    A list printed under a bare two-origin symbol (``F d -3 m``) is often the
+    other origin's: the same group, refused as a different one, with the
+    doubled-cell remedy that does not apply.  Every setting gemmi tabulates
+    for the type's number is compared, so a monoclinic list under the wrong
+    unique axis is named the same way.
+    """
+    import gemmi
+
+    from ..crystallography.symmetry import get_spacegroup
+
+    try:
+        number = get_spacegroup(space_group).number
+    except ValueError:
+        return None
+    for entry in gemmi.spacegroup_table():
+        if entry.number == number and {
+                _op_key(op) for op in entry.operations()} == listed:
+            return entry.xhm()
+    return None
 
 
 @functools.lru_cache(maxsize=64)
@@ -119,6 +145,12 @@ def _operation_list_refusal(xyz: tuple[str, ...],
                 f"symbol the list agrees with, or the closest type in "
                 f"brackets")
     if symbol_ops != listed:
+        other = _setting_matching(space_group, listed)
+        if other is not None:
+            return (f" declares {len(listed)} symmetry_operations and the space "
+                    f"group {space_group!r}, and the list is that type's other "
+                    f"setting: it equals the operations of {other!r} "
+                    f"operation for operation. Label the phase {other!r}")
         missing = len(symbol_ops - listed)
         extra = len(listed - symbol_ops)
         return (f" declares {len(listed)} symmetry_operations and the space "
@@ -154,16 +186,28 @@ class Cell(Base):
     Crystal-system constraints (e.g. cubic ``a=b=c``, α=β=γ=90°) are enforced
     by the parameter-vector compiler from the space group, not stored here.
 
-    The six parameters carry no physical bounds of their own (``min=-inf,
-    max=inf`` by default, like every other bare ``Parameter`` field) — the
-    cell-window / tie-window machinery in :mod:`rietx.params.vector`
-    (``cell_window``, ``freeze_cell_windows``, ``_tie_windows``) reads an
-    infinite stored bound as *no claim made* and this is deliberately left
-    that way (issue #283's own discussion; a schema default here is a design
-    decision for that machinery, not a local fix).  A degenerate cell reached
-    by an unbounded search is refused by
+    The six parameters carry no default box (``min=-inf, max=inf``, like
+    every other bare ``Parameter`` field), on purpose (issue #283, WP-1528).
+    A finite stored bound is the *caller's claim*:
+    :func:`~rietx.params.vector.cell_window` keeps it and skips its own
+    runaway window on that side, and
+    :meth:`~rietx.params.vector.ParameterTable.bounds` is ordered so that
+    nothing makes a side finite ahead of it.  A box here would therefore act
+    on every free cell and switch off the runaway window on its side.  It would
+    also show in ``ParameterRow`` and the ``.rxt`` document as a claim the user
+    never made.  Under ``solver="trf"`` there is a third ground: scipy scales
+    its trust region by the distance to the bounds, so a box changes the step
+    even when it is never reached (windowing every phase took the IUCr
+    ``cpd-1c`` refit from 82 iterations to its 400 budget, and its corundum
+    fraction from 6.30 to 9.04 wt %; those figures are TRF measurements).  The
+    default ``solver="lm"`` reads a box only when a step reaches it.  The limit lives in the solver instead: a
+    window frozen at each stage's start for phases the data cannot see
+    (``freeze_cell_windows``), and the post-solve
+    :func:`~rietx.refine.reset_cell_runaway`, which puts a runaway phase's
+    cell back at the stage's start (``CELL_RUNAWAY``).  A
+    degenerate cell reached by the unbounded search is refused by
     :func:`~rietx.crystallography.lattice.d_spacings` and neutralised by the
-    solver's own guard instead (``CELL_DEGENERATE_PROBE``).
+    solver's own guard (``CELL_DEGENERATE_PROBE``).
     """
 
     a: Parameter
@@ -363,8 +407,8 @@ class StephensStrain(_InheritsDeclaredDefaults):
     coefficients outside the allowed subspace is an error, not something to
     silently symmetrise.  ``min``/``max`` on a component are inert: σ²(M) ≥ 0
     couples all fifteen, so positivity is not a box.  The default LM driver
-    holds it as a linear inequality.  Under ``solver="trf"``, and in a joint
-    fit, it is a diagnostic (``STEPHENS_STRAIN_NOT_POSITIVE``).
+    holds it as a linear inequality, in a joint fit too.  Under
+    ``solver="trf"`` it is a diagnostic (``STEPHENS_STRAIN_NOT_POSITIVE``).
 
     Build one with :meth:`isotropic` — all-zero coefficients are the exact
     no-broadening identity, but they sit at the √ cusp of the width law where
@@ -1486,6 +1530,18 @@ class Phase(_InheritsDeclaredDefaults):
     # atom a mode moves has its x, y, z derived from the record's base and the
     # absolute amplitudes, which are what refine.
     distortion_modes: DistortionModes | None = None
+    # Peak equations (WP-2107): a term on each reflection's Lorentzian or
+    # Gaussian width or its position, or a factor on its intensity, written in
+    # the reflection's hkl and angle.  At most one per target; coefficients are
+    # entries at ``phases.<i>.peak_equations.<j>.<name>``, freed only by a
+    # stage the caller writes (no preset's glob reaches the path).  Empty is
+    # exactly off: a phase declaring none builds the model it always built.
+    peak_equations: list[PeakEquation] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _peak_equations_fit_the_phase(self) -> "Phase":
+        check_level(self.peak_equations, "phase", type(self).model_fields)
+        return self
 
     @model_validator(mode="after")
     def _modes_cover_the_atoms(self) -> "Phase":

@@ -5,8 +5,10 @@ restated here beyond what a row needs.  Each part of a heuristic is tiered on
 its own: (1) physics or arithmetic; (2) established practice, a citation that
 tested it or the same choice made *by default* in an established Rietveld
 program (the seven rietx-bench runs: GSAS-II, FullProf, TOPAS, RIETAN-FP,
-BGMN, MAUD, EasyDiffraction), whatever the other six do; (3) rietx's own, kept only on the record's two grounds with the
-maintainer's dated approval.  ``invariant`` is the record's answer-invariant
+BGMN, MAUD, EasyDiffraction), whatever the other six do; (3) rietx's own, kept only on the record's two grounds with a
+dated approval: the maintainer's on a code, action or default row, the
+``generality-review`` judge's agreement on a constant or suggestion row
+(``approved_by``, ruled 2026-11-22 in WP-2238; CONTRIBUTING.md § A heuristic needs its tier).  ``invariant`` is the record's answer-invariant
 class.  ``caller`` is no evidence grade: it marks a row where the package
 decided nothing for the caller, since DESIGN.md § Rules, 1 governs what the
 package decides alone.  Both must hold: the caller asked for it by name (a flag
@@ -95,6 +97,7 @@ from typing import Literal
 Kind = Literal["code", "action", "constant", "default", "suggestion"]
 Tier = Literal[1, 2, 3, "invariant", "caller", "unaudited"]
 Ambiguity = Literal[1, 2, 3]
+Approver = Literal["maintainer", "checked"]
 Response = Literal["error", "warning", "info"]
 
 KINDS: tuple[str, ...] = Kind.__args__
@@ -107,7 +110,10 @@ _STATES_AMBIGUITY = ("code", "action", "default")
 @dataclasses.dataclass(frozen=True)
 class Row:
     """One heuristic.  ``grounds`` and ``approved`` are required on a tier-3
-    row and on a tier-2 action row; ``ambiguity`` is DESIGN.md § Rules, 1's
+    row and on a tier-2 action row, and ``approved_by`` says whose approval
+    the date is: ``"checked"`` (the ``generality-review`` judge agreed) is
+    allowed on a tier-3 constant or suggestion row only, and the field is
+    read only where ``approved`` is set; ``ambiguity`` is DESIGN.md § Rules, 1's
     kind, required on an audited code, action or default row (DESIGN.md
     § Rules, 4 asks a new default or action for it) and allowed on a
     suggestion row.  ``response``, ``responds`` and ``scope`` are a code
@@ -125,6 +131,7 @@ class Row:
     response: Response | None = None
     responds: str = ""
     scope: tuple[str, ...] = ()
+    approved_by: Approver = "maintainer"
 
 
 _PACKAGE = pathlib.Path(__file__).resolve().parent
@@ -185,6 +192,7 @@ NOT_WALKED: dict[str, str] = {
     "compare_app": "the comparison page's port",
     "data": "bundled tables, read by modules the walk covers",
     "examples.py": "the shipped example projects",
+    "features.py": "the feature registry: names, help keys and Theory headings",
     "gui": ("beyond its import pre-fill and its symmetry edit gates: the server and 3D "
             "viewer's ports, payload caps and drawing tolerances"),
     "help.py": "the explanation text, and OPT_IN's declarations, which embed "
@@ -221,6 +229,12 @@ DEFAULT_SEATS: dict[str, int] = {
     "rietx.sequential.SequentialRefinement.fit": 2003,
     "rietx.indexing.workflow.index_pattern": 2007,
     "rietx.indexing.engines.SearchSpec": 2007,
+    "rietx.indexing.kvector.kgrid_strata": 2007,
+    "rietx.indexing.kvector.kgrid_positions": 2007,
+    "rietx.indexing.kvector.score_kvector": 2007,
+    "rietx.indexing.kvector.score_kgrid": 2007,
+    "rietx.indexing.kvector.kgrid_null": 2007,
+    "rietx.indexing.kvector.kvector_equivalents": 2007,
     "rietx.crystallography.representation.subgroups.maximal": 2006,
 }
 
@@ -563,14 +577,32 @@ OTHER_RECORD_FIELDS: frozenset[str] = frozenset({
 
 ROWS: tuple[Row, ...] = (
     # code: 258
-    Row("ABSORPTION_ESTIMATE_UNAVAILABLE", "code"),
-    Row("ABSORPTION_MU_R_OUT_OF_RANGE", "code"),
+    Row("ABSORPTION_ESTIMATE_UNAVAILABLE", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: fires exactly when the absorption record carries skipped, so "
+                  "the radius or thickness the caller declared entered no correction "
+                  "(refine.py _absorption_diagnostics); the record says why; gates nothing")),
+    Row("ABSORPTION_MU_R_OUT_OF_RANGE", "code", tier=2, ambiguity=1,
+        evidence=("Rouse, Cooper, York & Chakera (1970) Acta Cryst. A26, 682: the "
+                  "correction's fit domain ends at muR = 1 "
+                  "(model.absorption.CYLINDER_MU_R_MAX, tier 2); fires exactly past it and "
+                  "gates nothing")),
     Row("ABSORPTION_PLATE_THICKNESS", "code"),
     Row("ABSORPTION_THICKNESS_MATTERS", "code"),
-    Row("ADP_NOT_POSITIVE_DEFINITE", "code"),
+    Row("ADP_NOT_POSITIVE_DEFINITE", "code", tier=1, ambiguity=1,
+        evidence=("physics: a displacement tensor with a non-positive eigenvalue makes the "
+                  "Debye-Waller factor diverge at high Q; fires exactly when the smallest "
+                  "eigenvalue is <= 0 (staged.check_adp_positive_definite)")),
     Row("AIR_SCATTER_UNDECLARED", "code"),
     Row("BACKGROUND_ABSORPTION", "code"),
-    Row("BACKGROUND_ORDER_AT_CAP", "code"),
+    Row("BACKGROUND_ORDER_AT_CAP", "code", tier=1, ambiguity=1,
+        response="info",
+        responds="nothing: the chosen order is the scan's cap, not a Durbin-Watson stop",
+        scope=('all',),
+        evidence=("arithmetic: fires exactly when select_chebyshev_order's scan reached "
+                  "CHEBYSHEV_MAX_ORDER without its Durbin-Watson stop (both tier 3, approved "
+                  "2026-10-19); the pick verb is the caller's (auto_background); the code "
+                  "tiers its own part and the threshold keeps its row, as STAGE_SLOW_DESCENT "
+                  "does; settled by Claude 2026-11-17 (WP-2005)")),
     Row("BACKGROUND_SMOOTHING_AT_FLEXIBLE_END", "code", tier=1, ambiguity=1,
         evidence=("a reading of the scan's own record: fires exactly when no candidate of "
                   "select_arpls_lambda's grid reached its Durbin-Watson floor, so the "
@@ -583,13 +615,56 @@ ROWS: tuple[Row, ...] = (
         responds=("note that the baseline's smoothing strength is the grid's end and not "
                   "the scan's choice, before holding that baseline fixed"),
         scope=("all",)),
-    Row("BISO_NEGATIVE", "code"),
+    Row("BISO_NEGATIVE", "code", tier=1, ambiguity=1,
+        evidence=("physics: Biso = 8 pi^2 <u^2> cannot be negative; fires exactly when a "
+                  "refined isotropic value is below zero (staged.check_biso_negative, no "
+                  "tolerance)")),
     Row("BISO_UNUSUALLY_LARGE", "code"),
-    Row("BOUND_HIT", "code"),
-    Row("BRINDLEY_OUTSIDE_REGIME", "code"),
-    Row("BRML_ABSORBER_ENGAGED", "code"),
-    Row("CAPILLARY_OFFSET_UNAVAILABLE", "code"),
-    Row("CELL_DEGENERATE_PROBE", "code"),
+    Row("BOUND_HIT", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: one finding per path staged.bound_findings reports on a "
+                  "caller's limit that carried load; its tests are BOUND_HIT_RTOL (tier 1) "
+                  "and BOUND_HIT_ESD_FRAC, BOUND_HIT_COS_MIN (tier 3, approved 2026-10-19); "
+                  "the code tiers its own part and the threshold keeps its row, as "
+                  "STAGE_SLOW_DESCENT does; settled by Claude 2026-11-17 (WP-2005)")),
+    Row("BRINDLEY_OUTSIDE_REGIME", "code", tier=2, ambiguity=1,
+        evidence=("Brindley (1945) Phil. Mag. 36, 347: the correction's medium-powder class "
+                  "ends at mu*D = 0.1 (optimize.qpa.BRINDLEY_MU_R_FENCE, tier 2, FullProf's "
+                  "classes agree); fires exactly past it and gates nothing")),
+    Row("BRML_ABSORBER_ENGAGED", "code", tier=1, ambiguity=1,
+        evidence=('info; fires exactly when the .brml AbsorptionFactor channel is not 1 over '
+                  'some finite points (brml.py:335-355) and changes nothing in y. The convention '
+                  'was measured, not adopted: the one real file with a varying factor (FAIRmat '
+                  '23-012-AG 2theta-omega scan, 2001 points, factor 1.0 to 8.3 over 29 points; '
+                  'tests/data/README.md 1021-1050) has a stored series that runs continuously '
+                  'across the transition (120757, 151306, 182114, 213600.5, 243746.1) while y/a '
+                  'steps by 7x, and over all 2001 points y/a is whole numbers while y and y*a '
+                  'are not, so the stored intensity already includes the correction and only '
+                  'sigma goes back through the factor '
+                  '(tests/test_readers.py::test_the_bruker_absorber_is_already_applied_so_only_sigma_goes_through_it, '
+                  'real file). One real file, one family (a Bruker HRXRD thin-film scan). '
+                  'GSAS-II 5.8.4 G2pwd_BrukerBRML.py reads no absorber factor at all (grep for '
+                  'absorb, attenuat and factor finds nothing), so it uses the stored y as rietx '
+                  'does and weights it without the factor'),
+        grounds=('The act (leave y alone, derive sigma through the factor) is fixed by the '
+                 "vendor's own stored numbers, measured against that file, not chosen."),
+        response='info',
+        responds=("note that y is the vendor's corrected series and sigma was derived through "
+                  'the factor, so the named points carry a larger sigma than the Poisson value '
+                  'of y; nothing to do'),
+        scope=('all',)),
+    Row("CAPILLARY_OFFSET_UNAVAILABLE", "code", tier=1, ambiguity=1,
+        response="info",
+        responds="nothing; declare the goniometer radius to refine the capillary's offset",
+        evidence=("arithmetic: the specimen-offset terms of a capillary scale with the "
+                  "goniometer radius, so with none declared they are held at zero; fires "
+                  "exactly then (refine.py _capillary_offset_diagnostics)")),
+    Row("CELL_DEGENERATE_PROBE", "code", tier=1, ambiguity=1,
+        response="info",
+        responds=("nothing: the solver rejected those trial cells and the answer is not one "
+                  "of them"),
+        evidence=("arithmetic: a trial cell of zero or negative volume has no metric; fires "
+                  "exactly when the solver probed one in the stage (refine.py "
+                  "_degenerate_cell_diagnostics); gates nothing")),
     Row("CELL_RUNAWAY", "code", tier=3, ambiguity=1,
         evidence=("WP-1110's trigger: a visible phase sharing its cell with a 2 % trace copy ran "
                   "4.16 -> 3803 A in one stage; fired in none of WP-1523's 104 fits; names what "
@@ -597,7 +672,20 @@ ROWS: tuple[Row, ...] = (
         grounds=("The cell's reset is the package's own act, so it is said out loud with the "
                  "paths it put back (B8, ruled 2026-10-19)."),
         approved="2026-10-19"),
-    Row("CHILD_GROUP_UNNAMED", "code"),
+    Row("CHILD_GROUP_UNNAMED", "code", tier=1, ambiguity=1,
+        evidence=('a record of an absence: read the raise site at magnetic/supercell.py:1440; '
+                  'fires exactly when resolve_child_group finds no tabulated symbol whose '
+                  "operations generate the child's nuclear group in the child cell (a parent "
+                  'half translation along a doubled axis becomes a quarter, which no standard '
+                  'operation list holds), so the child carries its own operation list; the '
+                  "message names where the cell's metric constraints come from; decides nothing "
+                  'beyond that (tests/test_magnetic_supercell.py, '
+                  'tests/test_operator_list_phase.py)'),
+        grounds=('Arithmetic: whether a tabulated symbol generates an exact rational operation '
+                 'set is a lookup, and the operation list carried is the group itself.'),
+        response='info',
+        responds=('note that the child group is carried as its operation list and where its cell '
+                  'constraints come from; nothing to do')),
     Row("CIF_ADP_SYMMETRY_PROJECTED", "code", tier=1, ambiguity=1,
         evidence=("arithmetic on the file's own digits, CIF_PRINTED_ROUNDING's rule: a U^ij "
                   "printed to d decimals stands for every value within half its last "
@@ -625,7 +713,33 @@ ROWS: tuple[Row, ...] = (
         response="info",
         responds=("note that the sites' tensors were read as U_eq, and pass aniso=True if "
                   "the anisotropy is wanted")),
-    Row("CIF_CELL_ANGLE_CORRECTED", "code"),
+    Row("CIF_CELL_ANGLE_CORRECTED", "code", tier=2, ambiguity=1,
+        evidence=('read the raise site at cif.py:85-115 (_correct_symmetry_angles): fires '
+                  'exactly when a cell angle the space group fixes is stored more than '
+                  'SYMMETRY_ANGLE_TOL_DEG (1e-3 deg) and at most CIF_ANGLE_CORRECT_MAX_DEG (0.1 '
+                  'deg) from its symmetry value; the angle is read as that value and the record '
+                  'names both; past 0.1 deg nothing moves and ParameterTable refuses '
+                  '(tests/test_robustness_external.py::test_a_reported_refined_angle_is_corrected_and_named, '
+                  '::test_a_structural_disagreement_is_left_alone_and_still_raises). Practice: '
+                  'GSAS-II 5.8.4 imports the stored angle (imports/G2phase_CIF.py:415-419) and, '
+                  "once the cell refines, builds the metric from the Laue class's A terms alone "
+                  'with the symmetry-zero ones set to 0 (GSASIIstrIO.py:2014-2045 cellFill, '
+                  'GSASIIlattice.py:909 cellUnique), so the angle is put on its symmetry value '
+                  'with no threshold and no record. FullProf, TOPAS and the rest not checked.'),
+        grounds=("The act, putting a symmetry-fixed angle on its symmetry value, is GSAS-II's by "
+                 "default; the band it acts in is CIF_ANGLE_CORRECT_MAX_DEG's row, and past it "
+                 'the reader refuses rather than chooses.')),
+    Row("CIF_CELL_TIE_CORRECTED", "code", tier=1, ambiguity=1,
+        response="warning",
+        responds=("check the named cell parameter against the source before quoting it: "
+                  "the phase is refined with it equal to its source"),
+        evidence=("arithmetic on the file's own digits, CIF_PRINTED_ROUNDING's rule: a tied "
+                  "cell entry (cell_constraints' ties) is read as its source where the two "
+                  "printed numbers lie within half a last digit each of one value, or within "
+                  "the table's own tolerance (SYMMETRY_LENGTH_RTOL, SYMMETRY_ANGLE_TOL_DEG) "
+                  "where that is wider; a move within the entry's own rounding is not "
+                  "reported. Past the band the value is left and the table refuses it "
+                  "(WP-2150, issue #1669; tests/test_cell_ties.py)")),
     Row("CIF_EMPTY_BLOCK_SKIPPED", "code", tier=1, ambiguity=1,
         evidence=("a reading rule from the format's definition: cif_core.dic 3.3.0 files the "
                   "AUDIT category and its children under PUBLICATION, recording the data "
@@ -640,13 +754,115 @@ ROWS: tuple[Row, ...] = (
         response="info",
         responds=("note that the structure was read from the one block with atom sites and "
                   "which blocks, stating nothing, were skipped")),
-    Row("CIF_MAGNETIC_CENTERING_ASSUMED", "code"),
-    Row("CIF_MAGNETIC_ION_UNCHARGED", "code"),
-    Row("CIF_MAGNETIC_MAGNITUDE_ESD_NOT_STORED", "code"),
-    Row("CIF_MAGNETIC_MOMENT_ON_ALLOWED", "code"),
-    Row("CIF_MAGNETIC_NUCLEAR_GROUP", "code"),
-    Row("CIF_MAGNETIC_NUCLEAR_SETTING", "code"),
-    Row("CIF_MAGNETIC_NUMBER_MISMATCH", "code"),
+    Row("CIF_MAGNETIC_CENTERING_ASSUMED", "code", tier=2, ambiguity=1,
+        evidence=('read the raise site at magcif.py:636-653: fires exactly when a magCIF states '
+                  'an operation loop and no _space_group_symop_magn_centering.xyz loop; the '
+                  'centring is then x,y,z,+1 alone and the record names the loop that was absent '
+                  '(tests/test_magcif.py). Practice: GSAS-II 5.8.4 does the same by default, '
+                  "appending MagText2MTS('x,y,z,+1') when the centring loop is missing "
+                  '(imports/G2phase_CIF.py:385-388). Others not checked.'),
+        grounds=('GSAS-II reads a missing centring loop as the trivial centring by default, and '
+                 'the coset representatives alone are a group on a P lattice.'),
+        response='info',
+        responds=('note that the magnetic group was read with the trivial centring; add the loop '
+                  'if the group has a centring or an anti-centring')),
+    Row("CIF_MAGNETIC_ION_UNCHARGED", "code", tier=1, ambiguity=3,
+        evidence=('read the raise site at magcif.py:1985-2000: fires exactly when a magnetic '
+                  "site's ion is the bare element symbol (no moment_ions= entry and no charge in "
+                  'the type symbol) and the form-factor table has a neutral-atom entry for it, '
+                  'so the site scatters with the symbol the file wrote; the message lists the '
+                  'ions the table carries for that element (tests/test_magcif.py). Practice: '
+                  'GSAS-II 5.8.4 looks the magnetic form factor up by the atom type as written, '
+                  "and its MagFF table has neutral entries such as 'Mn' (GSASIIElem.py:117-132, "
+                  'atmdata.py:1458).'),
+        grounds=("No substitution: the form factor is the one the file's own symbol names, which "
+                 'GSAS-II also uses; which ion the chemistry implies is outside the file, so the '
+                 'code reports and picks nothing, as MAGNETIC_ION_ASSUMED does.'),
+        response='info',
+        responds=("note that the site's form factor is the neutral atom the file names, and pass "
+                  'moment_ions= if the chemistry says an ion')),
+    Row("CIF_MAGNETIC_MAGNITUDE_ESD_NOT_STORED", "code", tier=1, ambiguity=1,
+        evidence=('a record of a field not carried: read the raise site at magcif.py:2000-2010; '
+                  'fires exactly when a row states _atom_site_moment.magnitude_su, which '
+                  'Structure has no field for, and names the value dropped; the components and '
+                  'their own su are kept (tests/test_magcif.py)'),
+        grounds=('Arithmetic: the schema has no seat for a modulus su, and a refined one comes '
+                 'from FitReport.magnetic, so the record says what was not carried.'),
+        response='info',
+        responds=("note that the file's moment-magnitude su was not carried; read the refined "
+                  'esd from the fit')),
+    Row("CIF_MAGNETIC_MOMENT_ON_ALLOWED", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic on the file's own digits, CIF_PRINTED_ROUNDING's rule one field "
+                  'over: read the raise site at cif.py:994-1022 and magcif.moment_within_print '
+                  '(magcif.py:1514-1572); fires exactly when a crystal-axis moment lies off its '
+                  "site's allowed subspace and a point of that subspace lies inside the box of "
+                  "half a unit in each component's last printed place, the box capped at "
+                  'MOMENT_FORM_AGREEMENT_MU_B (0.02 mu_B) so a printed bare 0 cannot move half a '
+                  "moment; past the box the phase's own check refuses (tests/test_magcif.py)"),
+        grounds=("Arithmetic: the move is no larger than the file's own rounding, so the moment "
+                 'stored is one the file printed; the cap is tiered on its own row.'),
+        response='info',
+        responds=("note which sites' moments were read on their symmetry-allowed form and the "
+                  'largest move; nothing to do')),
+    Row("CIF_MAGNETIC_NUCLEAR_GROUP", "code", tier=3, ambiguity=2,
+        evidence=("read the raise site in magcif.resolve_nuclear_symmetry (nuclear_group='auto', "
+                  "the default, or 'parent'; under 'file' only where the two groups are the "
+                  "same operations): fires when the parent group the file names contains the file's "
+                  "operators and keeps every site's orbit, so positions refine under the parent "
+                  "and moments under the magnetic group; the suggestion names "
+                  "nuclear_group='file'. Practice: Gallego et al. (2016) J. Appl. Cryst. 49, "
+                  "1750, sec. 2.6, describe positions modelled under the paramagnetic phase's "
+                  "symmetry as the usual approximation, and MAGNDATA keeps the magnetic group's "
+                  "positional freedoms for magnetostructural work; GSAS-II 5.8.4 refines "
+                  "positions under the file's own operators (docs/practice.md, 'A magCIF in a "
+                  "non-standard orientation'). Measured (Mike, #1797, 2447 MAGNDATA snapshot "
+                  "files): 883 take this code, 777 of them at index 1 where nothing is chosen; "
+                  "in the 106 read under a parent strictly above the file's group (347 sites "
+                  "constrained more), no stated coordinate moves more than 3.1e-5 A. The orbit "
+                  "count's merge is _ORBIT_MERGE_TOL's row"),
+        grounds=("Not unanimous: a refiner looking for magnetostructural displacements would "
+                 "take the file's group (Gallego et al. 2016, sec. 2.6). Kept as a recorded "
+                 "departure: a reader builds one model before any data can rank the two, and "
+                 "the parent is the smaller of two nested models at the file's own "
+                 "coordinates, so it is where a fit starts; the code records the choice and "
+                 "names the switch. A second-kind question answered with a pick outside "
+                 "Rule 1's two cases, so a departure: it ends when a fit can test the file "
+                 "group's extra positional freedoms (displacive modes at zero amplitude) "
+                 "against the data and rank the two. The MAGNDATA counts are development "
+                 "data. Ruled by Mike on PR #1636 under #1075."),
+        approved="2026-11-23",
+        response='info',
+        responds=("note that positions refine under the parent the file names; pass "
+                  "nuclear_group='file' where the file group's extra positional freedoms "
+                  "are what the fit is for")),
+    Row("CIF_MAGNETIC_NUCLEAR_SETTING", "code", tier=1, ambiguity=1,
+        evidence=('read the raise sites at magcif.py:1186-1232: fires where the positions refine '
+                  "under the file's own group instead of the parent it names, because the "
+                  "parent's setting does not contain the file's operators or would give a site a "
+                  'different orbit (it would place atoms the file does not state or count an '
+                  "orbit twice), or because the caller passed nuclear_group='file'; the group is "
+                  'taken in a tabulated setting or carried as its operation list; the record '
+                  'names the reason (tests/test_magcif.py). Practice: GSAS-II 5.8.4 always '
+                  "refines positions under the file's operators "
+                  '(imports/G2phase_CIF.py:312-341).'),
+        grounds=("Arithmetic: where the parent cannot carry the file's atoms the file's own "
+                 "group is the only reading that reproduces them, and it is GSAS-II's default "
+                 'reading too.'),
+        response='info',
+        responds=("note that positions refine under the file's own group and why the parent "
+                  'could not carry them; nothing to do')),
+    Row("CIF_MAGNETIC_NUMBER_MISMATCH", "code", tier=1, ambiguity=3,
+        evidence=('read the raise site at magcif.py:676-725 (_check_stated_numbers): fires '
+                  'exactly when a stated _space_group_magn.number_BNS or number_OG differs from '
+                  "the numbers spglib identifies for the file's own operator and centring lists; "
+                  "the operators' numbers are stored and a stated name_BNS beside a contradicted "
+                  'number is dropped; the operators are the model either way (D-4), and the '
+                  'message names both sides because a mistyped number and a forgotten '
+                  'anti-centring look alike (tests/test_magcif.py)'),
+        grounds=('Arithmetic: the stored numbers are a deterministic function of the operators '
+                 "the model is built from; which of the file's two statements is wrong depends "
+                 "on the file's source, so the code reports both and picks neither for the "
+                 'model.')),
     Row("CIF_MAGNETIC_PARENT_TAG_UNDEFINED", "code", tier=1, ambiguity=1,
         evidence=("a record of which tag was read: the file states its parent symbol only "
                   "under _parent_space_group.name_H-M, which cif_mag.dic 0.9.9 does not "
@@ -656,19 +872,155 @@ ROWS: tuple[Row, ...] = (
         response="info",
         responds=("note that the parent symbol came from a tag no dictionary defines; the "
                   "phase is the one the _alt tag would have built")),
-    Row("CIF_MAGNETIC_SPHERICAL_ESD_NOT_STORED", "code"),
-    Row("CIF_MAGNETIC_SYMMFORM", "code"),
-    Row("CIF_MAGNETIC_UNIDENTIFIED", "code"),
-    Row("CIF_SITE_LISTED_TWICE", "code"),
-    Row("CIF_SITE_MULTIPLICITY_DISAGREES", "code"),
-    Row("CIF_SITE_TWINS_MERGED", "code"),
-    Row("CIF_SPECIES_NORMALISED", "code"),
-    Row("CONSTRAINT_ACTIVE", "code"),
-    Row("COVARIANCE_DIRECTION_DISCARDED", "code"),
-    Row("COVARIANCE_UNAVAILABLE", "code"),
+    Row("CIF_MAGNETIC_SPHERICAL_ESD_NOT_STORED", "code", tier=1, ambiguity=1,
+        evidence=('a record of a value not carried: read the raise site at magcif.py:2010-2020 '
+                  "and _components_from_row's docstring (magcif.py:1250-1260); fires exactly "
+                  'when a moment is stated only in spherical form with su values; (modulus, '
+                  'polar, azimuth) to components is nonlinear and singular on the pole, so the '
+                  "su are not propagated and the components carry stderr=None; a Cartesian row's "
+                  'su go through the linear conversion and are kept (tests/test_magcif.py)'),
+        grounds=('Arithmetic: a linear propagation of a spherical su is not exact and is '
+                 'undefined at the pole, so the components carry no esd rather than a wrong one, '
+                 "the package's absent-not-zero rule."),
+        response='info',
+        responds=('note that the moment components carry no esd from the file; restate the row '
+                  "in crystal-axis or Cartesian form if the file's esd is wanted")),
+    Row("CIF_MAGNETIC_SYMMFORM", "code", tier=1, ambiguity=3,
+        evidence=('read the raise site at magcif.py:2021-2040: fires on every site that states '
+                  "_atom_site_moment.symmform; it compares the symmform's free-parameter count "
+                  "with the rank of the moment subspace the file's own operators allow; level "
+                  'info when they agree or the string is unreadable, warning when they differ; '
+                  'no value moves, the derived subspace is used either way '
+                  '(tests/test_magcif.py)'),
+        grounds=("Arithmetic: two counts of one site's free moment components compared exactly; "
+                 "the model always takes the operators' subspace.")),
+    Row("CIF_MAGNETIC_UNIDENTIFIED", "code", tier=1, ambiguity=1,
+        evidence=('a record of an absence: read the raise site at magcif.py:2041-2048; fires '
+                  'exactly when MagneticSymmetry.uni_number is None, i.e. operators.identify '
+                  "could not match the operator list to one of the 1651 groups in spglib's "
+                  'database (three are missing from spglib 2.7.0, magcif.py:619-624); no value '
+                  'is changed or chosen. No test names the code (grep of tests/, 2026-11-17).'),
+        grounds=('Arithmetic: a database lookup that finds nothing leaves the field empty and '
+                 'says so.'),
+        response='info',
+        responds='note that no UNI number is recorded for the magnetic group; nothing to do'),
+    Row("CIF_SITE_LISTED_TWICE", "code", tier=1, ambiguity=1,
+        evidence=('read the raise site at cif.py:465-535 (_drop_listed_twice) and its pair '
+                  'finder cif.py:414-440: fires when a listed site of the same species lies '
+                  'within TWIN_DISTANCE (0.02 A) of an image of another, their occupancies sum '
+                  'past 1 + OCCUPANCY_TOLERANCE, and nothing else tells them apart (occupancy to '
+                  'OCCUPANCY_TOLERANCE, B and U^ij to DUPLICATE_U_TOLERANCE, disorder assembly '
+                  'and group exactly, and the image moment where either carries one); the copy '
+                  'is dropped; any difference is refused by name '
+                  '(tests/test_cif_sites_coincide.py::test_an_orbit_listed_twice_is_counted_once, '
+                  '::test_an_orbit_listed_twice_with_two_occupancies_is_refused, '
+                  '::test_a_copy_that_differs_in_displacement_or_disorder_is_refused). Practice: '
+                  'GSAS-II 5.8.4 keeps both rows and warns only on a repeated label '
+                  '(imports/G2phase_CIF.py:583-586), so it counts the orbit twice.'),
+        grounds=('Arithmetic: two statements identical in every field describe one orbit, and '
+                 'counting it twice overfills the position; the three thresholds that decide '
+                 "'identical' are tiered on their own rows."),
+        response='warning',
+        responds=('check the two labels against the source before quoting an occupancy, a '
+                  'density or a weight fraction, since one copy of the orbit was dropped')),
+    Row("CIF_SITE_MULTIPLICITY_DISAGREES", "code", tier=1, ambiguity=3,
+        evidence=('read the raise site at cif.py:1395-1478 (_snap_to_stated_multiplicity): fires '
+                  "exactly when a site's _atom_site_symmetry_multiplicity (or Wyckoff symbol) "
+                  'differs from the multiplicity its coordinates give, and no move within '
+                  'CIF_STATED_MULTIPLICITY_SNAP_TOL reaches the stated one (or the stated one is '
+                  'larger); nothing moves '
+                  '(tests/test_cif_stated_columns.py::test_a_stated_multiplicity_the_coordinates_cannot_reach_is_named). '
+                  "Practice: GSAS-II 5.8.4 reports the same disagreement by default, 'CIF "
+                  "multiplicity (m) differs from calculated (n)', and moves nothing "
+                  '(imports/G2phase_CIF.py:572-578).'),
+        grounds=("Arithmetic: two of the file's own statements about one site compared exactly, "
+                 'reported as GSAS-II reports it; which is wrong is outside the file.'),
+        response='warning',
+        responds=("check the site's multiplicity and the setting against the source before "
+                  'quoting a weight fraction, a density or an occupancy')),
+    Row("CIF_SITE_TWINS_MERGED", "code", tier=1, ambiguity=1,
+        evidence=('read the raise site at cif.py:346-410 (_merge_twins) and '
+                  'twins.applied_twin_merges: fires exactly when a site sits within '
+                  'TWIN_COORD_TOL (tier 1 row) of a special position and the occupancy summed '
+                  'over the atoms its images put at that place, each times images-before over '
+                  'images-after, is above 1; the site is read on the special position with its '
+                  'stated occupancy; at most 1 the site is kept and SITE_TWINS_KEPT gives both '
+                  'readings; a split site whose images stay apart is untouched '
+                  '(tests/test_site_twins_merged.py::test_the_cif_route_merges_where_the_site_would_overfill, '
+                  '::test_the_cif_route_keeps_a_half_occupied_site_and_says_both_readings, '
+                  '::test_a_split_site_is_left_split). Practice: GSAS-II 5.8.4 counts a site as '
+                  'special only when its images coincide to 2e-4 per coordinate '
+                  '(GSASIIspc.py:2236-2240), so a site 1e-3 off its mirror scatters as two atoms '
+                  'there; no program checked merges it.'),
+        grounds=('Physics: atoms that would put more than one atom at one place cannot be what '
+                 'the file means, and the only reading that keeps the stated occupancy is the '
+                 "special position; the reach is TWIN_COORD_TOL's tier-1 row."),
+        response='warning',
+        responds=("check the site's coordinates against the source before quoting an occupancy, "
+                  'a density or a weight fraction, since the site now puts fewer atoms in the '
+                  'cell')),
+    Row("CIF_SPECIES_NORMALISED", "code", tier=1, ambiguity=1,
+        evidence=('read the raise site at cif.py:1076-1085 and normalize_cif_species '
+                  '(cif.py:131-160): fires exactly when an atom-type symbol in a sign-first '
+                  "charge ('O-2', 'Ni+3') or a site label in the type column ('O1') was "
+                  'respelled to the canonical element-then-charge form, and only where the '
+                  'respelling resolves in the form-factor table; element and charge are kept; '
+                  "'T1' (a zeolite T site) and unresolvable symbols pass through to fail by name "
+                  '(tests/test_robustness_external.py, tests/test_cif_sites_coincide.py; fires '
+                  'on tests/data/cod_9007744.cif). Practice: GSAS-II 5.8.4 respells every type '
+                  'symbol to its own sign-first form (GSASIIElem.py:253-265 FixValence, '
+                  'imports/G2phase_CIF.py:579) and takes the element from the label when the '
+                  'type is missing (G2phase_CIF.py:555-561), both silently.'),
+        grounds=('Arithmetic: the respelling changes no element and no charge, only their order '
+                 'in the string, and GSAS-II respells type symbols by default.'),
+        response='info',
+        responds='note which type symbols were respelled and to what; nothing to do'),
+    Row("COMPARISON_UNCONVERGED", "code", tier=1, ambiguity=1,
+        response="warning",
+        responds=("read the comparison's delta_bic and t-ratios as not quotable, run the "
+                  "fit it names on to convergence and compare again"),
+        evidence=("arithmetic: fires exactly when either fit of a nested comparison has a "
+                  "status other than 'converged', or the fuller fit's minimised cost "
+                  "(the last stage's cost_final: data chi2 plus restraint and penalty rows) sits above the "
+                  "restricted one's by more than report.layer2.NESTED_COST_MARGIN (a model that "
+                  "contains another can reproduce it, so at both optima S_full <= "
+                  "S_restricted; the data chi2 alone carries no such bound; "
+                  "report.layer2._chi2_ordered, on distortion.py's restart precedent); "
+                  "the margin is tiered on its own row; flags and refuses nothing, since a budget stop can "
+                  "sit on the optimum (issue #1685: max_iter=2 from Biso 8 stops at the "
+                  "converged chi2); raised by compare_freed, predict_then_verify's "
+                  "comparison and rigid_body_misfit (WP-2220)")),
+    Row("CONSTRAINT_ACTIVE", "code", tier=1, ambiguity=1,
+        response="info",
+        responds=("note which width the floor held; the next fit's start decides whether it "
+                  "holds again"),
+        scope=('microstructure', 'calibration'),
+        evidence=("arithmetic: counts the LM steps held against a built-in linear inequality "
+                  "(the Stephens cone, Gamma_G^2 >= 1e-8) in the final stage; fires exactly "
+                  "when the count is above zero; the inequalities are physics (a variance "
+                  "cannot be negative); gates nothing")),
+    Row("COVARIANCE_DIRECTION_DISCARDED", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: names the parameters sharing a direction the covariance build "
+                  "dropped under PINV_RCOND (tier 1), a set no FLAT_DIRECTION pair already "
+                  "holds, whose esds the solve left absent (WP-2219; "
+                  "least_squares._guarded_covariance, staged.outcome_discarded_directions); "
+                  "a parameter that is not estimable has no standard error (Searle 1971 p. 169; "
+                  "R lm prints NA), where GSAS-II and TOPAS quote the truncated-SVD esd "
+                  "(docs/practice.md)")),
+    Row("COVARIANCE_UNAVAILABLE", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: fires exactly when the esd calculation raised after the "
+                  "solver returned (refine.py _covariance_diagnostics), so the stage's "
+                  "values stand with no esds")),
     Row("DATA_SUPPORT_LOW", "code"),
-    Row("DECLARED_RANGE_NOT_RESTORED", "code"),
-    Row("DECLARED_RANGE_RESTORED", "code"),
+    Row("DECLARED_RANGE_NOT_RESTORED", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: an older file's hand-set parameter has no limits and "
+                  "migration found no declared range for its path (schemas/migrate.py "
+                  "_not_restored_note); fires exactly then; a record of what migration did")),
+    Row("DECLARED_RANGE_RESTORED", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: migration restored the declared range of an older file's "
+                  "hand-set parameter (schemas/migrate.py _restored_note), a warning where "
+                  "the value sits on the restored limit; its level is computed, so it keeps "
+                  "no response until split")),
     Row("DISPERSION_NEGLECTED", "code"),
     Row("EXTINCTION_CONDITIONS_PARTIAL", "code"),
     Row("EXTINCTION_FORBIDDEN_INTENSITY", "code"),
@@ -688,11 +1040,21 @@ ROWS: tuple[Row, ...] = (
                   "scored against does not model the allowed lines; refine the cell or the "
                   "profile and screen again before quoting a symbol")),
     Row("EXTINCTION_SYMBOL_AMBIGUOUS", "code"),
-    Row("EXTRA_PEAK_NO_INTENSITY", "code"),
+    Row("EXTRA_PEAK_NO_INTENSITY", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: a declared extra peak's area finished on its zero floor "
+                  "within staged.BOUND_HIT_RTOL (tier 1); fires exactly then")),
     Row("EXTRA_PEAK_ON_REFLECTION", "code"),
-    Row("FLAT_DIRECTION", "code"),
+    Row("FLAT_DIRECTION", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: fires at |rho| >= staged.FLAT_DIRECTION_RHO, 1 - 5e-4, the "
+                  "half-width of rho's three-decimal print (tier 1), so it claims only "
+                  "'1.000 as printed'")),
     Row("FLAT_DIRECTION_OMITTED", "code"),
-    Row("FLOOR_HIT", "code", response="warning",
+    Row("FLOOR_HIT", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: the zero-floor half of staged.bound_findings (a scale or "
+                  "width that cannot go negative, or W's clamp), tested as BOUND_HIT is; the "
+                  "code tiers its own part and the threshold keeps its row, as "
+                  "STAGE_SLOW_DESCENT does; settled by Claude 2026-11-17 (WP-2005)"),
+        response="warning",
         responds=("quote an upper limit, not a value, for the parameter on its floor, and "
                   "check whatever trades against it before quoting an ADP, an occupancy or "
                   "a scale")),
@@ -707,10 +1069,56 @@ ROWS: tuple[Row, ...] = (
         responds=("decide per limit whether the parameter it names should be held "
                   "inside it, and set that Parameter's min and max if so"),
         scope=("all",)),
-    Row("FULLPROF_MAGNETIC_PHASE_OMITTED", "code"),
-    Row("FULLPROF_MAGNETIC_PHASE_READ", "code"),
-    Row("FULLPROF_OCCUPANCY_UNCHECKED", "code"),
-    Row("FULLPROF_ORIGIN_CHOICE", "code"),
+    Row("FULLPROF_MAGNETIC_PHASE_OMITTED", "code", tier='caller', ambiguity=1,
+        evidence=('caller: raised only under nuclear_only=True (fullprof.py to_structure '
+                  'signature, default False; grep 2026-11-17 finds no caller in src/ passing '
+                  'True, only help.py:2379 and the docstrings); read the two sites at '
+                  'fullprof.py:3730 (a Jbt 10 phase whose moments were left off) and :3743 (a '
+                  "pure magnetic phase); each reports the requested omission with the phase's "
+                  'R_Bragg and changes no value'),
+        grounds=('The caller declared the nuclear subset by name and the package chose nothing '
+                 'inside it.')),
+    Row("FULLPROF_MAGNETIC_PHASE_READ", "code", tier=1, ambiguity=1,
+        evidence=('read the site at fullprof.py:3694: fires when a Jbt = +-1 phase (or a Jbt 10 '
+                  'pair) was read onto its nuclear counterpart by magnetic_reading, which is '
+                  'equal-or-refuse: same cell to _MAGNETIC_MATCH_ATOL, every magnetic atom on a '
+                  'nuclear site, Scale x f^2 equal, k = 0, axial moment matrices only, each '
+                  "condition quoted from the FullProf manual's own statement of the format "
+                  '(fullprof.py:2530-2560); the Jbt = -1 spherical form (M, phi, theta) is '
+                  'converted only on an orthogonal cell and refused on others '
+                  '(tests/test_projects_fullprof_magnetic.py::test_a_jbt_minus1_phase_on_an_orthogonal_cell_converts_the_spherical_form)'),
+        grounds=("The format's own definition fixes the reading, and anything that is not that "
+                 'reading is refused by name.'),
+        response='info',
+        responds=('note which sites carry moments and in which group, and check the '
+                  'partial-moment flag if one is named')),
+    Row("FULLPROF_OCCUPANCY_UNCHECKED", "code", tier=1, ambiguity=3,
+        evidence=('read the site at fullprof.py:3515: fires exactly when a phase has one atom, '
+                  'since the occupancy-ratio check compares that site with itself (one equation '
+                  "in FullProf's one free common Occ factor); a probe (S/probe_single.py) on a "
+                  'synthetic single-site .pcr fires it for F m -3 m, P 42/m n m and F d -3 m '
+                  'alike'),
+        grounds=('The arithmetic fact is exact; the code does not ask whether the symbol has a '
+                 'second setting to test.')),
+    Row("FULLPROF_ORIGIN_CHOICE", "code", tier=2, ambiguity=1,
+        evidence=('read the site at fullprof.py:3774 and normalize_space_group (:1176-1257): '
+                  'FullProf writes no origin suffix, and for a symbol with two origins the '
+                  "reader takes origin 2 (F D -3 M gives F d -3 m:2). FullProf's manual states "
+                  "the same default: 'By default the program uses the setting with the inversion "
+                  "centre at the origin' (FullProf Manual, note under the space-group symbol, "
+                  'LINE 22), which is origin 2 for the centrosymmetric groups with two origins; '
+                  'one corpus spinel file agrees '
+                  '(tests/test_projects_fullprof.py::test_the_symbol_is_case_normalised_and_the_origin_chosen). '
+                  'The reader then re-derives multiplicities under the setting and refuses the '
+                  'phase if Occ x M_general/M_site stops agreeing. Checked 2026-11-17 in '
+                  "FullProf 8.20's FullProf_Manual.pdf, the note after the space-group line of "
+                  "the .pcr: 'By default the program uses the setting with the inversion centre "
+                  "at the origin'."),
+        grounds=("FullProf's documented default is the one the reader applies; no other program "
+                 'reads a FullProf file.'),
+        response='info',
+        responds=('note which setting a bare symbol was read as and check it only if the '
+                  'structure is not the standard description')),
     Row("FULLPROF_RHOMBOHEDRAL_AXES_ASSUMED", "code", tier=3, ambiguity=1,
         evidence=("warning; a .pcr states a bare R symbol beside a = b = c, "
                   "alpha = beta = gamma (fullprof._is_rhombohedral_metric), and the "
@@ -730,58 +1138,430 @@ ROWS: tuple[Row, ...] = (
         responds=("check the phase's cell against the intended structure, and quote "
                   "no cell or coordinate FullProf refined from this file, since "
                   "FullProf refined the hexagonal reading")),
-    Row("FULLPROF_RHOMBOHEDRAL_RESTATED", "code"),
-    Row("FULLPROF_SPECIES_NORMALISED", "code"),
-    Row("FULLPROF_SPECIES_WRITTEN_NEUTRAL", "code"),
-    Row("FULLPROF_TIE_DROPPED", "code"),
-    Row("GSAS2_CIF_DEUTERIUM_AS_D", "code"),
-    Row("GSAS2_CIF_FIELD_NOT_WRITTEN", "code"),
-    Row("GSAS2_CIF_RHOMBOHEDRAL_RESTATED", "code"),
-    Row("GSAS2_CIF_SETTING_IN_OPERATORS", "code"),
-    Row("GSAS2_CIF_SPECIES_WRITTEN_NEUTRAL", "code"),
-    Row("GSAS2_GPX_BACKGROUND_NOT_CARRIED", "code"),
-    Row("GSAS2_GPX_CONSTRAINT_NOT_CARRIED", "code"),
-    Row("GSAS2_GPX_COORDINATES_SYMMETRY_FIXED", "code"),
-    Row("GSAS2_GPX_ITEM_NOT_READ", "code"),
-    Row("GSAS2_GPX_PHASE_MAGNETIC", "code"),
+    Row("FULLPROF_RHOMBOHEDRAL_RESTATED", "code", tier=1, ambiguity=1,
+        evidence=("the writer's report, raised by symmetry.rhombohedral_restated_diagnostic "
+                  "(symmetry.py:196-206, level 'warning' there; called at fullprof.py:4584): a "
+                  'phase on rhombohedral axes is written on hexagonal axes (a, a, c, 90, 90, '
+                  "120) with the scale divided by 9. The format forces it: 'At present "
+                  "rhombohedral space groups must be given in the hexagonal description' "
+                  '(FullProf Manual, note under LINE 22), and the 1/9 is the arithmetic of a '
+                  "hexagonal cell's three-fold volume and multiplicities "
+                  '(tests/test_projects_fullprof.py::test_a_rhombohedral_axes_phase_is_written_in_hexagonal_axes)'),
+        grounds=('The target format admits only the hexagonal description, and the conversion is '
+                 'exact.')),
+    Row("FULLPROF_SPECIES_NORMALISED", "code", tier=1, ambiguity=1,
+        evidence=('read the site at fullprof.py:3764 and normalise_species (:880-900): a record '
+                  "of a respelling the format fixes: the file's species token is one this "
+                  'program spells its own way, and the reader writes the IUCr spelling onto the '
+                  'Structure and names both; fires once per distinct raw token that changed; '
+                  'LINE-12 user b is checked against the Sears b of the isotope its NAM names '
+                  '(_USER_B_ATOL_FM row)'),
+        grounds="A spelling convention fixed by FullProf's own Typ grammar.",
+        response='info',
+        responds=('note the respelled species and check the isotope or ion only if the file '
+                  'named one')),
+    Row("FULLPROF_SPECIES_WRITTEN_NEUTRAL", "code", tier=1, ambiguity=1,
+        evidence=("the writer's report from scattering.written_neutral_diagnostics "
+                  "(scattering.py:341-379, level 'warning' there; called at fullprof.py:4590): "
+                  "an ion that rietx's X-ray table lacks is written as its neutral atom, which "
+                  'is what rietx itself computes for it (SPECIES_FALLBACK_NEUTRAL on a fit), and '
+                  'the message gives the electron counts'),
+        grounds=('The file states the atom rietx computed, so the two programs agree by '
+                 'construction.')),
+    Row("FULLPROF_TIE_DROPPED", "code", tier=1, ambiguity=1,
+        evidence=('read the three sites at fullprof.py:3801, :3814 and :3843: a codeword tie the '
+                  'Structure cannot hold is not carried. Arm 1 (:3801) fires only under '
+                  "drop_parameter_ties=True (default False, the caller's declared choice); arm 2 "
+                  '(:3814) a cross-atom tie the caller can restore in one unambiguous tie_equal '
+                  'call (atom_tie_recoverability); arm 3 :3843 a cell tie the space group does '
+                  'not reproduce (cell_parameter_ties, _symmetry_reproduces). An ambiguous atom '
+                  'tie is refused, never dropped '
+                  '(tests/test_projects_fullprof.py::test_an_ambiguous_cross_atom_tie_still_refuses)'),
+        grounds=('The Structure has no tie field, so a loss is forced by the model and each arm '
+                 'names the restoring call.')),
+    Row("GSAS2_CIF_DEUTERIUM_AS_D", "code", tier=1, ambiguity=1,
+        evidence=('read the site at gsas2.py:2131: fires when deuterium sites are written as D '
+                  "(2H respelled). D is the symbol GSAS-II's importer reads as deuterium, and "
+                  "the message records that GSAS-II scatters D at b = 6.681 fm against rietx's "
+                  'Sears 6.671 fm '
+                  '(tests/test_projects_gsas2.py::test_a_deuterium_site_is_named_with_gsas2s_own_b)'),
+        grounds=("The importer's grammar fixes the spelling; the two tables' b values are "
+                 'stated, not chosen between.'),
+        response='info',
+        responds=('note that GSAS-II will scatter these sites at its own b, 0.01 fm above '
+                  "rietx's, when comparing intensities")),
+    Row("GSAS2_CIF_FIELD_NOT_WRITTEN", "code", tier=1, ambiguity=1,
+        evidence=('read the site at gsas2.py:2164: fires on every phase CIF written with '
+                  'diagnostics, listing the refine flags, the phase scale and sample broadening '
+                  'always, and the March-Dollase, texture, extinction, microstrain and restraint '
+                  'terms where the structure carries them; a CIF has no field for any of these. '
+                  'A record of what the format cannot hold'),
+        grounds='The target format has no field for them, so the omission is forced.'),
+    Row("GSAS2_CIF_RHOMBOHEDRAL_RESTATED", "code", tier=1, ambiguity=1,
+        evidence=("the writer's report from symmetry.rhombohedral_restated_diagnostic (called at "
+                  "gsas2.py:2022, level 'warning' in the helper): a rhombohedral-axes phase is "
+                  'restated on hexagonal axes because GSAS-II reads the bare R symbol as gemmi '
+                  'does, on hexagonal axes (gsas2.py:2010-2014, measured on 5.8.4 as a black '
+                  'box)'),
+        grounds=('The target program reads the symbol on hexagonal axes only, so the restatement '
+                 'is forced and exact.')),
+    Row("GSAS2_CIF_SETTING_IN_OPERATORS", "code", tier=1, ambiguity=1,
+        evidence=('read the site at gsas2.py:2141: fires when the bare symbol would be read two '
+                  'ways (setting_alternatives gives other origin choices) and the CIF states the '
+                  'setting in _symmetry_space_group_name_H-M, the alt name and the operators; R '
+                  "axes are excluded because they are restated. Measured on GSAS-II's own "
+                  'importer '
+                  '(tests/test_projects_gsas2.py::test_the_setting_travels_in_the_operations_and_in_the_alt_symbol)'),
+        grounds=('Writing the operators makes the importer read the stated setting, so the act '
+                 'is exact.'),
+        response='info',
+        responds=('note that the setting travels in the operators, and nothing else, for the '
+                  'named phases')),
+    Row("GSAS2_CIF_SPECIES_WRITTEN_NEUTRAL", "code", tier=1, ambiguity=1,
+        evidence=("the writer's report from scattering.written_neutral_diagnostics (called at "
+                  "gsas2.py:2025, level 'warning' in the helper): as "
+                  'FULLPROF_SPECIES_WRITTEN_NEUTRAL'),
+        grounds='As for the FullProf writer.'),
+    Row("GSAS2_GPX_BACKGROUND_NOT_CARRIED", "code", tier=1, ambiguity=1,
+        evidence=('read the site at gsas2.py:1404: fires once per histogram with a fitted '
+                  'background; the coefficients stay on model.histograms[...].background and the '
+                  "Structure/Instrument built carries no background. GSAS-II's Chebyshev, Debye "
+                  "and peak terms are not rietx's, so there is nothing to carry (a record of a "
+                  'field the model has no place for)'),
+        grounds='No equivalent background exists to receive the values.',
+        response='info',
+        responds=('choose and refine a background, since the built instrument starts with none '
+                  "of the file's")),
+    Row("GSAS2_GPX_CONSTRAINT_NOT_CARRIED", "code", tier=1, ambiguity=1,
+        evidence=('read the site at gsas2.py:1462: fires when the project states constraints; '
+                  'none is applied, all stay on model.constraints, the equivalences are counted. '
+                  'The built model has more free parameters than the refinement the file records '
+                  '(tests/test_projects_gsas2.py::test_the_constraints_are_resolved_into_names)'),
+        grounds='The Structure carries no constraint field, so the loss is forced and named.'),
+    Row("GSAS2_GPX_COORDINATES_SYMMETRY_FIXED", "code", tier=1, ambiguity=1,
+        evidence=("read the site at gsas2.py:1852: fires when sites carry GSAS-II's X refine "
+                  'flag but sit on fully fixed special positions, where a coordinate cannot move '
+                  'by symmetry (the dof set is empty); arithmetic from the site symmetry, and '
+                  'the same reading as GSAS_EXP_COORDINATES_SYMMETRY_FIXED'),
+        grounds='Site symmetry fixes it.',
+        response='info',
+        responds='nothing, the flag cannot refine anything on a fixed position'),
+    Row("GSAS2_GPX_ITEM_NOT_READ", "code", tier=1, ambiguity=1,
+        evidence=('read the site at gsas2.py:1398: one warning per entry of model.unsupported, '
+                  "the reader's own list of .gpx constructs it did not build (with the reason); "
+                  'a record of a capability limit, naming each item'),
+        grounds='A capability limit of the reader, reported item by item.'),
+    Row("GSAS2_GPX_PHASE_MAGNETIC", "code", tier=1, ambiguity=1,
+        evidence=('read the two sites at gsas2.py:1423 (a magnetic phase is not built; level '
+                  'warning) and :1449 (a nuclear phase carries a magPhases partner: warning '
+                  'where the project holds a magnetic phase, info where it holds none; the level '
+                  'is chosen at run time). Both record a phase type the reader does not build as '
+                  'magnetic'),
+        grounds='A capability limit, with the level depending on a project fact.'),
     Row("GSAS2_GPX_SCALE_NOT_COMPARABLE", "code"),
-    Row("GSAS2_GPX_SETTING_FROM_OPERATORS", "code"),
-    Row("GSAS2_GPX_SPECIES_NORMALISED", "code"),
-    Row("GSAS2_GPX_TEXTURE_CONVERTED", "code"),
-    Row("GSAS2_GPX_TEXTURE_NOT_CARRIED", "code"),
-    Row("GSAS2_INSTPRM_CONVENTION_ASSUMED", "code"),
-    Row("GSAS2_INSTPRM_FIELD_DROPPED", "code"),
-    Row("GSAS2_INSTPRM_FIELD_NOT_READ", "code"),
-    Row("GSAS2_INSTPRM_FIELD_NOT_WRITTEN", "code"),
-    Row("GSAS2_INSTPRM_GEOMETRY_ASSUMED", "code"),
-    Row("GSAS2_INSTPRM_VALUE_DEFAULTED", "code"),
-    Row("GSAS2_INSTPRM_VALUE_FLOORED", "code"),
-    Row("GSAS2_INSTPRM_VALUE_MERGED", "code"),
+    Row("GSAS2_GPX_SETTING_FROM_OPERATORS", "code", tier=1, ambiguity=1,
+        evidence=("read the site at gsas2.py:1374: fires when the project's operators settle a "
+                  'two-setting symbol; the setting is read from the operators, and the message '
+                  "says whether they confirm or overturn the bare symbol's reading. The "
+                  "operators are the file's own statement of the setting, so this is "
+                  'deterministic '
+                  '(tests/test_projects_gsas2.py::test_the_operators_settle_a_symbol_that_names_two_settings, '
+                  '::test_reading_the_setting_is_reported_rather_than_done_in_silence)'),
+        grounds='The operators state the setting; reading them is not a choice.',
+        response='info',
+        responds=('note which setting the operators gave and whether it differs from the bare '
+                  "symbol's reading")),
+    Row("GSAS2_GPX_SPECIES_NORMALISED", "code", tier=1, ambiguity=1,
+        evidence=('read the site at gsas2.py:1846: a record of a respelling the format fixes: '
+                  "the file's species token is one this program spells its own way, and the "
+                  'reader writes the IUCr spelling onto the Structure and names both; fires once '
+                  "per distinct raw token that changed; where General['Isotope'] sets an isotope "
+                  "the label becomes that isotope's own species"),
+        grounds="GSAS-II's own species grammar fixes the spelling.",
+        response='info',
+        responds=('note the respelled species and, where an isotope was named, that it now '
+                  'scatters as that isotope')),
+    Row("GSAS2_GPX_TEXTURE_CONVERTED", "code", tier=1, ambiguity=1,
+        evidence=('read the site at gsas2.py:1643 and _gsas2_texture (:1520-1650): a '
+                  'spherical-harmonics texture is carried with each coefficient multiplied by '
+                  'P_l(0) and, in the Laue classes -1, 2/m, 4/m, -3 and 6/m, by sqrt 2 on n != 0 '
+                  "terms. Measured against GSAS-II's own SHPOcal over every Laue class "
+                  '(tests/data/gsas2_sh_texture.json, made by '
+                  'tests/data/make_gsas2_sh_texture.py) by '
+                  'tests/test_projects_gsas2.py::test_a_carried_texture_is_gsas2s_multiplier; '
+                  "only Bragg-Brentano histograms convert (GSAS-II's psi = 90 deg against "
+                  "rietx's plate normal)"),
+        grounds=("A convention conversion measured against the program's own output, and refused "
+                 'where no constant converts.'),
+        response='info',
+        responds=("note that the texture coefficients are GSAS-II's rescaled, and refine them "
+                  'from these starts')),
+    Row("GSAS2_GPX_TEXTURE_NOT_CARRIED", "code", tier=1, ambiguity=1,
+        evidence=('read the site at gsas2.py:1578 (note() inside _gsas2_texture): fires, at '
+                  "warning where the texture is dropped for a reason and info where GSAS-II's P "
+                  'is 1 at every reflection, when the histograms state different coefficients, a '
+                  "histogram's sample angle follows theta (Debye-Scherrer), the order is odd, a "
+                  "term is outside the Laue class, or GSAS-II 5.8.4's function is not invariant "
+                  'in the group '
+                  '(tests/test_projects_gsas2.py::test_a_texture_no_constant_converts_is_reported; '
+                  'defects measured by noninvariant in gsas2_sh_texture.json)'),
+        grounds=("Each reason is measured against the program's functions or follows from the "
+                 'geometry.')),
+    Row("GSAS2_INSTPRM_CONVENTION_ASSUMED", "code", tier=2, ambiguity=1,
+        evidence=('read the site at instrument_profile.py:1596 and the reader at :1536-1541: '
+                  "SH/L, GSAS-II's combined (S+H)/L, is split evenly into axial_sl = axial_hl = "
+                  'SH/L / 2. GSAS-II evaluates the profile exactly so: pypowder.for:146 passes '
+                  'SPH/2.0, SPH/2.0 as S/L and H/L to PSVFCJO (GSAS-II 5.8.4), and its own .prm '
+                  'exporter writes S/L = H/L = SH/L/2 (G2export_pwdr.py:46); '
+                  'tests/test_gsas2_instprm.py::test_a_real_neutron_calibration_reads_end_to_end '
+                  'pins 0.045 each'),
+        grounds=('The same split GSAS-II makes when it evaluates the file; no other program '
+                 'stores a combined SH/L.'),
+        response='info',
+        responds=('note that the axial apertures are the even split, as GSAS-II itself evaluates '
+                  'them')),
+    Row("GSAS2_INSTPRM_FIELD_DROPPED", "code", tier=1, ambiguity=1,
+        evidence=('info; one record per TOF .instprm read, listing the keys read and not carried '
+                  '(instrument_tof.py:885-889). The list is built at instrument_tof.py:858-870 '
+                  'from two sets: _INSTPRM_ZERO_ONLY keys (beta-q, sig-q, Z, X, Y, SH/L, '
+                  'Polariz., Lam), which are carried only if exactly 0 and refused otherwise (a '
+                  'non-zero value raises, instrument_tof.py:862-868), so a dropped one held 0.0; '
+                  'and _INSTPRM_METADATA (Bank, fltPath, Azimuth), which carry no model '
+                  'parameter (DIFC, DIFA, ZERO and the angle already fix the bank). Fires '
+                  'exactly when one of those keys is present. Nothing a model number depends on '
+                  'is dropped'),
+        grounds=('Arithmetic: a zero-valued field the schema has no slot for loses nothing, and '
+                 'a non-zero one is refused, so the record states what the format cannot hold.'),
+        response='info',
+        responds=('note which keys were read and not carried; nothing to do, their values were '
+                  'zero or metadata'),
+        scope=('calibration',)),
+    Row("GSAS2_INSTPRM_FIELD_NOT_READ", "code", tier=1, ambiguity=1,
+        evidence=('read the site at instrument_profile.py:1626: fires when the file states items '
+                  'the Instrument has no place for (Bank, InstrName, Polariz. on a neutron bank '
+                  'where NeutronSource pins K = 1, Diff-type values GSAS-II does not name), each '
+                  'named with its reason; a record of a field the model cannot hold'),
+        grounds='No field exists to receive them.',
+        response='info',
+        responds='nothing, unless a named item was meant to change the profile'),
+    Row("GSAS2_INSTPRM_FIELD_NOT_WRITTEN", "code", tier=1, ambiguity=1,
+        evidence=('read the site at instrument_profile.py:1874: fires on every .instprm written '
+                  'with diagnostics: the format has no item for background, absorption, '
+                  'displacement or transparency, and no refine flags; the peak shape and extra '
+                  'components are named when the instrument carries them '
+                  '(tests/test_gsas2_instprm.py::test_the_written_file_says_what_it_could_not_state)'),
+        grounds='The format has no items for them.'),
+    Row("GSAS2_INSTPRM_GEOMETRY_ASSUMED", "code", tier=2, ambiguity=3,
+        evidence=('read the site at instrument_profile.py:1605 and :1497-1503: with no Diff-type '
+                  'the geometry is Debye-Scherrer for one wavelength and Bragg-Brentano for a '
+                  "doublet, GSAS-II's own rule: 'a single-wavelength file will set "
+                  "Debye-Scherrer mode and dual wavelength will set Bragg-Brentano' "
+                  '(GSASIIfiles.ReadInstprm docstring, GSAS-II 5.8.4); '
+                  'tests/test_gsas2_instprm.py::test_a_stated_geometry_is_read_rather_than_assumed '
+                  'is the other arm'),
+        grounds="The program's documented fallback is the one applied.",
+        response='warning',
+        responds=("set geometry.kind to the instrument's real geometry before quoting a cell, an "
+                  'ADP or a phase fraction, since the geometry decides the displacement and '
+                  'absorption corrections')),
+    Row("GSAS2_INSTPRM_VALUE_DEFAULTED", "code", tier=1, ambiguity=1,
+        evidence=('read the site at instrument_profile.py:1587: fires when an item the format '
+                  "declares (INSTPRM_CW_SINGLE or _DOUBLET, GSAS-II's own key list) is absent "
+                  'from the file, after skipping Bank, Lam/Lam1 spellings and Polariz. on '
+                  "neutron; the absent items come back at the package's default and are named "
+                  '(tests/test_gsas2_instprm.py::test_an_item_the_format_declares_and_a_file_omits_is_named)'),
+        grounds=("Which items the format declares is the format's list, and the report names "
+                 'each default taken.')),
+    Row("GSAS2_INSTPRM_VALUE_FLOORED", "code", tier=1, ambiguity=1,
+        evidence=('read the site at instrument_profile.py:1851: fires on write when SH/L '
+                  '(axial_sl + axial_hl) is below INSTPRM_SHL_FLOOR = 0.002, which GSAS-II '
+                  'applies itself (max(SH/L, 0.002) at GSASIIpwd.py:1645, :1863, :2806 in '
+                  '5.8.4); the value is written as it stands and the message says GSAS-II will '
+                  'floor it '
+                  '(tests/test_gsas2_instprm.py::test_an_axial_sum_below_gsas_ii_own_floor_is_named)'),
+        grounds=("The floor is the target program's own, so the report states what that program "
+                 'will do.')),
+    Row("GSAS2_INSTPRM_VALUE_MERGED", "code", tier=2, ambiguity=1,
+        evidence=('read the site at instrument_profile.py:1840 and the sum at :1798: unequal '
+                  'axial_sl and axial_hl are written as one SH/L = sl + hl, and read back as '
+                  "half each. SH/L is GSAS-II's (S+H)/L (GSASIIpwd.py:820 docstring) and GSAS-II "
+                  "evaluates S/L = H/L = SH/L/2 (pypowder.for:146), so the sum is the program's "
+                  'own definition and the evenness is what it computes '
+                  '(tests/test_gsas2_instprm.py::test_an_uneven_axial_pair_is_merged_and_the_merge_is_named)'),
+        grounds="The program's definition of the single parameter fixes the sum."),
     Row("GSAS_BANK_COMMENTED", "code"),
-    Row("GSAS_EXP_BACKGROUND_NOT_CARRIED", "code"),
-    Row("GSAS_EXP_COORDINATES_SYMMETRY_FIXED", "code"),
-    Row("GSAS_EXP_HISTOGRAM_NOT_READ", "code"),
-    Row("GSAS_EXP_PHASE_MAGNETIC", "code"),
+    Row("GSAS_EXP_BACKGROUND_NOT_CARRIED", "code", tier=1, ambiguity=1,
+        evidence=('read the site at gsas.py:1324: fires once per histogram with a fitted GSAS '
+                  'background function; the coefficients stay on '
+                  'model.histograms[...].background (the function code is named from '
+                  'BACKGROUND_FUNCTIONS); same ground as GSAS2_GPX_BACKGROUND_NOT_CARRIED'),
+        grounds='No equivalent background exists to receive the values.',
+        response='info',
+        responds=('choose and refine a background, since the built instrument starts with none '
+                  "of the file's")),
+    Row("GSAS_EXP_COORDINATES_SYMMETRY_FIXED", "code", tier=1, ambiguity=1,
+        evidence=("read the site at gsas.py:1638: fires when sites carry GSAS's X refine flag on "
+                  'fully fixed special positions; site symmetry leaves no direction to refine'),
+        grounds='Site symmetry fixes it.',
+        response='info',
+        responds='nothing, the flag cannot refine anything on a fixed position'),
+    Row("GSAS_EXP_HISTOGRAM_NOT_READ", "code", tier=1, ambiguity=1,
+        evidence=('read the site at gsas.py:1316: one warning per entry of model.unsupported, '
+                  "the reader's own list of histogram constructs it did not read, each with its "
+                  'reason; no where (the item is a histogram of the file, not a model path)'),
+        grounds='A capability limit of the reader, named item by item.'),
+    Row("GSAS_EXP_PHASE_MAGNETIC", "code", tier=1, ambiguity=1,
+        evidence=('read the site at gsas.py:1337: fires per phase whose GSAS type is magnetic; '
+                  'the cell and sites are on model.phases and no magnetism is built; a '
+                  'capability limit'),
+        grounds='No magnetic model is read from a .EXP.'),
     Row("GSAS_EXP_REFINE_FLAG_MERGED", "code"),
     Row("GSAS_EXP_SCALE_NOT_COMPARABLE", "code"),
-    Row("GSAS_EXP_SPECIES_NORMALISED", "code"),
-    Row("GSAS_EXP_SPECIES_WRITTEN_NEUTRAL", "code"),
-    Row("GSAS_EXP_VALUE_NARROWED", "code"),
-    Row("GSAS_FIELD_OVERFLOW", "code"),
-    Row("GSAS_IPARM_FIELD_DROPPED", "code"),
-    Row("GSAS_IPARM_LEGACY_LAYOUT", "code"),
-    Row("GSAS_IPARM_PROFILE_DECLINED", "code"),
-    Row("GSAS_IPARM_PROFILE_READ", "code"),
-    Row("GSAS_PRM_FIELD_DROPPED", "code"),
-    Row("GSAS_PRM_FIELD_NOT_WRITTEN", "code"),
+    Row("GSAS_EXP_SPECIES_NORMALISED", "code", tier=1, ambiguity=1,
+        evidence=('read the site at gsas.py:1632: a record of a respelling the format fixes: the '
+                  "file's species token is one this program spells its own way, and the reader "
+                  'writes the IUCr spelling onto the Structure and names both; fires once per '
+                  'distinct raw token that changed; GSAS spells species in upper case and with '
+                  'its own ion tokens'),
+        grounds="A spelling convention fixed by GSAS's grammar.",
+        response='info',
+        responds='note the respelled species and check the ion only if the file named one'),
+    Row("GSAS_EXP_SPECIES_WRITTEN_NEUTRAL", "code", tier=1, ambiguity=1,
+        evidence=("the writer's report from scattering.written_neutral_diagnostics (called at "
+                  "gsas.py:2046, level 'warning' in the helper): as "
+                  'FULLPROF_SPECIES_WRITTEN_NEUTRAL'),
+        grounds='As for the FullProf writer.'),
+    Row("GSAS_EXP_VALUE_NARROWED", "code", tier=1, ambiguity=1,
+        evidence=('read the site at gsas.py:2028: fires when a value needs more characters than '
+                  "a .EXP's fixed field (_WRITE_NUMBER) and was written to what fits; names the "
+                  'largest change; arithmetic of the Fortran field width, and the '
+                  'unit-cell-content record is excluded because the reader discards it'),
+        grounds="The format's field width fixes how many digits can be written.",
+        response='info',
+        responds='nothing, unless the largest named change exceeds the precision you need'),
+    Row("GSAS_FIELD_OVERFLOW", "code", tier=1, ambiguity=1,
+        evidence=('read the site at gsas.py:218: fires per record whose field holds only '
+                  'asterisks, a Fortran overflow; the field is optional and is read as absent '
+                  '(tests/test_gsas_prm.py::test_an_overflowed_prcf_cutoff_is_reported_once); '
+                  'the format defines asterisks as an overflow, so the field carries no value'),
+        grounds="The format's overflow convention leaves no number to read."),
+    Row("GSAS_IPARM_FIELD_DROPPED", "code", tier=1, ambiguity=1,
+        evidence=('info; fires when a GSAS-I TOF .iparm holds a record or field the schema has '
+                  'no slot for, listing them (instrument_tof.py:747-751). The fields it names '
+                  'are CHKSUM (instrument_tof.py:441-443; the checksum algorithm is unpublished, '
+                  'so it is read and never checked) and IECOR (no slot). A field the schema '
+                  "could hold, or a non-zero slot beyond a function's coefficients, is refused "
+                  'rather than dropped (instrument_tof.py:451-470, 556-570). Fires exactly when '
+                  'such a field is present'),
+        grounds=('Arithmetic: a checksum or a correction record with no model meaning is read, '
+                 'named and not carried; a number the model needs is never in this list.'),
+        response='info',
+        responds=('note which records were read and not carried; nothing to do, none feeds a '
+                  'model number'),
+        scope=('calibration',)),
+    Row("GSAS_IPARM_LEGACY_LAYOUT", "code", tier=2, ambiguity=1,
+        evidence=('info; three sites, raised only by rietx.io.legacy.read_lansce_iparm '
+                  '(lansce_iparm.py:238-270), which the strict reader points to and no default '
+                  'path calls. (1) An 8-coefficient type-1 PRCF set is read as slots 1-8 of the '
+                  'documented twelve. (2) A BNKPAR value one field too wide is re-read by '
+                  'whitespace tokens. (3) A non-zero fifth ICOFF pair of ITYP 1/2 is carried as '
+                  'written, nothing evaluating it. Sites 1 and 2 were measured against GSAS-II '
+                  'v5.8.2 run as a black box, one sentinel per slot: slots 2,3,4,6,7 land under '
+                  "alpha, beta-0, beta-1, sig-1, sig-2 exactly as the manual's order puts them, "
+                  'slots 1,5,8 under no name, and GSAS-II reads the same BNKPAR record the same '
+                  'way (lansce_iparm.py docstring; tests/test_lansce_iparm.py, synthetic files '
+                  "at the layout's column widths, no real bank). GSAS-II 5.8.4 source agrees "
+                  'with the strict order for function 1 (GSASIIfiles.py:308-318, PRCF1 slots 2-4 '
+                  'and PRCF2 slots 2-3). Site 3 is arithmetic (value carried unchanged)'),
+        grounds=('The same choice GSAS-II makes by default, measured against it on every slot, '
+                 "and the manual's order for the three slots it leaves unnamed."),
+        response='info',
+        responds=('note which legacy deviation was accepted and that the values were read the '
+                  'way GSAS-II reads them; nothing to do'),
+        scope=('calibration',)),
+    Row("GSAS_IPARM_PROFILE_DECLINED", "code", tier=1, ambiguity=1,
+        evidence=('info at two sites and warning at one (instrument_tof.py:495-515 and 543-550), '
+                  'so levels is two literals and no response is proposed. (a) A PRCF set whose '
+                  'number column is blank is declined, not read as set 1 (warning when the bank '
+                  'has no other set, info otherwise): the manual numbers sets 1..NTYP (Technical '
+                  'Manual p. 223), so which set it is the file does not say. (b) A bank with no '
+                  'PRCF set leaves the profile coefficients at zero (warning). (c) Sets other '
+                  'than 1 are not read, because set 1 is the default whatever its function (p. '
+                  '223) (info). Each is fixed by what the file states: nothing is invented'),
+        grounds=('Format definition: the manual makes set 1 the default and numbers the sets; '
+                 'where the file states no number or no set the package reads nothing and says '
+                 'so.')),
+    Row("GSAS_IPARM_PROFILE_READ", "code", tier=2, ambiguity=1,
+        evidence=('info; fires once per bank when PRCF set 1 (function 1 or 3) is read '
+                  '(instrument_tof.py:582-590). The coefficients are read in the order the GSAS '
+                  'Technical Manual lists them (p. 144, 148), which the manual never says is the '
+                  'record order, so the message calls it an assumption. Checked against GSAS-II: '
+                  'v5.8.2 as a black box places slots 2,3,4,6,7 of function 1 as that order says '
+                  '(lansce_iparm.py docstring), and GSAS-II 5.8.4 GSASIIfiles.py:308-341 reads '
+                  'function 1 slots 2-4 and PRCF2 slots 2-3 and function 3 PRCF1 slots 1-3 and '
+                  'PRCF2 slots 1-2 as alpha, beta-0, beta-1, sig-1, sig-2 in the same order. '
+                  'tests/test_instrument_tof.py::test_the_default_type_three_block_is_read_in_the_manuals_order '
+                  'pins it on a synthetic file; no real TOF .iparm is on disk'),
+        grounds=('The same order the established program applies by default, for both functions '
+                 'read.'),
+        response='info',
+        responds=('note which coefficient set was read and in what order; compare the profile '
+                  'against a standard if the bank matters'),
+        scope=('calibration',)),
+    Row("GSAS_PRM_FIELD_DROPPED", "code", tier=1, ambiguity=1,
+        evidence=('read the site at instrument_profile.py:683: fires per record or field the '
+                  'Instrument has no slot for (ICONS refine flags, IDAMP, KRATIO when LAM2 '
+                  'states no line, POLA on neutron, PRCF GP and past position 8, IRAD/ITYP); '
+                  'only for a record the file carried '
+                  '(tests/test_gsas_prm.py::test_a_drop_is_only_reported_for_a_record_the_file_carried)'),
+        grounds='No field exists to receive them.',
+        response='info',
+        responds='nothing, unless a named field was meant to change the profile'),
+    Row("GSAS_PRM_FIELD_NOT_WRITTEN", "code", tier=1, ambiguity=1,
+        evidence=('read the site at instrument_profile.py:1245: fires on every .prm written with '
+                  'diagnostics: geometry, displacement, transparency and absorption are not '
+                  'written, the peak shape and extra components named when present, and the PRCF '
+                  'refine flags are blank '
+                  '(tests/test_gsas_prm.py::test_the_channel_reports_what_the_instrument_does_not_carry)'),
+        grounds='The format has no records for them.'),
     Row("GSAS_PRM_GEOMETRY_ASSUMED", "code"),
-    Row("GSAS_PRM_PROFILE_SET_DEFAULTED", "code"),
-    Row("GSAS_PRM_VALUE_NARROWED", "code"),
+    Row("GSAS_PRM_PROFILE_SET_DEFAULTED", "code", tier=2, ambiguity=1,
+        evidence=('read the site at instrument_profile.py:690 and :543: with several type-3 '
+                  "profile sets and none named, set 1 is read, 'as GSAS-II's importer reads it' "
+                  '(GSASIIfiles.py:274-278 in 5.8.4 reads INS 1PRCF1 and its PRCF11/PRCF12 '
+                  'records only); a missing set 1 is refused '
+                  '(tests/test_gsas_prm.py::test_several_type_3_sets_read_the_first_and_say_so, '
+                  '::test_a_file_with_no_set_1_is_refused_rather_than_read_from_another)'),
+        grounds='The program that defines the format reads set 1 when no other is named.',
+        response='warning',
+        responds=('name the profile set with profile_set=N if it is not set 1, since the widths '
+                  'and Lorentzian terms come from the set chosen')),
+    Row("GSAS_PRM_VALUE_NARROWED", "code", tier=1, ambiguity=1,
+        evidence=('read the site at instrument_profile.py:1220: fires when a PRCF coefficient, '
+                  'after the centidegree multiplication, needs more characters than the 14 of '
+                  'the 4E15.6 record and was written to what fits (_PRM_COEFFICIENT_DIGITS); a '
+                  'converged calibration reaches it routinely through float noise; arithmetic of '
+                  'the field width'),
+        grounds="The format's field width fixes how many digits can be written.",
+        response='info',
+        responds='nothing, unless the named largest change exceeds the precision you need'),
     Row("HARMONIC_ABSENT", "code"),
     Row("HARMONIC_FRACTION", "code"),
-    Row("HARMONIC_HELD", "code"),
+    Row("HARMONIC_HELD", "code", tier=1, ambiguity=1,
+        response="info",
+        responds="nothing: the harmonic's weight is the value the caller declared",
+        evidence=("arithmetic: fires exactly when a declared harmonic's weight path is free "
+                  "in no stage, so it stays at its declared value (refine.py "
+                  "_harmonic_diagnostics); the harmonic is the caller's declaration")),
     Row("HIGH_CORRELATION", "code"),
     Row("HIGH_CORRELATION_OMITTED", "code"),
+    Row("HISTORY_CELL_TIE_CORRECTED", "code", tier=1, ambiguity=1,
+        response="info",
+        responds="nothing to do: every fit of the stored model built the entry this way",
+        evidence=("arithmetic: ParameterTable has always built a tied cell entry from its "
+                  "source, so a stored node holding another value is read as the source and "
+                  "no number the history produced moves; fires past the table's own "
+                  "tolerance only, the size it now refuses (WP-2150)")),
     Row("HISTORY_EARLIER_TREE_SKIPPED", "code", tier=1, ambiguity=1,
         response="warning",
         responds=("check that the loaded tree is the run you meant before quoting a cell, a "
@@ -794,7 +1574,15 @@ ROWS: tuple[Row, ...] = (
                   "inside the last tree, so no other choice reloads with it. Nothing is "
                   "deleted. Load, not raise, is the maintainer's ruling of 2026-11-03 (old "
                   "files must always open; WP-2031)")),
-    Row("HOLD_BLOCKED_PLAN", "code"),
+    Row("HOLD_BLOCKED_PLAN", "code", tier='caller', ambiguity=1,
+        response="info",
+        responds="nothing: the held paths stayed where the caller held them",
+        evidence=("opt-in: Refinement.hold(), nothing held by default "
+                  "(StageResult.blocked_by_hold's row, caller); the package calls hold only "
+                  "at strategy/magnetic.py:1369, under solve_magnetic(tie_to_parent=True), "
+                  "default False; refine.py:4184 and sequential.py:1412 are docstrings "
+                  "(searched 2026-11-17); reports which turn_on glob met the caller's hold "
+                  "and moves no value")),
     Row("HUMP_TOO_NARROW", "code"),
     Row("INDEX_ABSTAINED", "code"),
     Row("INDEX_BRAVAIS_AMBIGUOUS", "code"),
@@ -845,6 +1633,45 @@ ROWS: tuple[Row, ...] = (
     Row("INDEX_SYSTEMS_NOT_COVERED", "code"),
     Row("INDEX_VALIDATION_FAILED", "code"),
     Row("INDEX_VOLUME_UNPHYSICAL", "code"),
+    Row("INDEX_WEAK_LINE_RETRY", "code", tier=2, ambiguity=1,
+        evidence=("info; fires when the full list, inlier retry included, ends with no lattice "
+                  "two engines agree on (workflow._no_agreement, the inlier retry's own test, "
+                  "asked again), the search was not stopped, the caller declared no "
+                  "n_unindexed, and the floor sets at least one line aside.  WP-2078 measured "
+                  "that trigger on 19 lists (23 runs, preset full): it fired on the "
+                  "molybdenum + trace-oxide fixture (truth absent; the retry ranks it first, "
+                  "medium) and on 11-BM LaB6 + cBN (no candidate before or after), and on no "
+                  "run whose truth ranked first, SRM 660c LaB6 included.  The inlier retry's "
+                  "first-pass test alone fired on four correct mixture runs, which is why the "
+                  "trigger is read after it"),
+        grounds=("Bergmann, Le Bail, Shirley & Zlokazov (2004, Z. Kristallogr. 219, 783, "
+                 "p. 789): removing weak peaks is not for routine use and is worth a try when "
+                 "the full list gives no clear answer (docs/practice.md, Which lines an "
+                 "indexing search is given).  The action is that retry, taken only where the "
+                 "package has no answer, and the diagnostic says which list the candidates "
+                 "came from (ruled by Yue 2026-11-13: a retry, never a floor before every "
+                 "search)."),
+        response="info",
+        responds=("note that the candidates were searched and scored without the lines under "
+                  "5 % of the strongest, and check those set-aside lines against the leading "
+                  "candidate's predicted positions"),
+        scope=("all",)),
+    Row("K_SEARCH_PARTNER", "code", tier=1, ambiguity=2,
+        evidence=("a geometric fact of the cell: fires once per image of k under a near-symmetry "
+                  "of the metric (indexing.ambiguity.lattice_point_group at the caller's tol) "
+                  "that is no star arm, -k or G - k of k modulo the centred L*; on a "
+                  "pseudo-tetragonal Pnma cell (5.74 x 7.70 x 5.54 A, tol 0.08) the x <-> z "
+                  "image of k = (15/64, 7/64, 3/8) is listed (deviation 0.0735) and none on a "
+                  "5.74 x 7.70 x 6.40 A cell at the same tol; with ten planted satellites at a "
+                  "0.12 deg radius the exact image matched 2 of 10 (seed 0) and the best grid "
+                  "k within four steps of it 8 of 10, 7 of 10 on seeds 1 and 2 "
+                  "(tests/test_indexing_kvector.py, V6)"),
+        grounds=("Arithmetic: W G W^T against G is a statement about the cell alone; the code "
+                 "lists the partner as one equivalence row and never says which k is right "
+                 "(Mighell & Santoro 1975, one rank over)."),
+        response="info",
+        responds=("score the partner's neighbourhood beside k and keep every k that matches "
+                  "as a hypothesis until intensities or a sharper instrument separate them")),
     Row("K_VECTOR_UNSEPARATED", "code", tier=3, ambiguity=2,
         evidence=("info; fires when the top two k trials' best eligible ΔBIC lie within "
                   "SOLVE_K_TIE_DELTA_BIC, charged at N/f² since WP-2002 B12; Ba2FeSbSe5 1.5 K "
@@ -887,7 +1714,11 @@ ROWS: tuple[Row, ...] = (
     Row("MAGNETIC_WIDTH_MOVED_MOMENT", "code"),
     Row("MAGNETIC_WIDTH_UNMEASURED", "code"),
     Row("MAGNETIC_WIDTH_UNMODELLED", "code"),
-    Row("MICROABSORPTION_SKIPPED", "code"),
+    Row("MICROABSORPTION_SKIPPED", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: fires exactly when a particle radius was given and "
+                  "qpa.microabsorption_skipped says the Brindley correction could not run (a "
+                  "phase without a radius, or no attenuation entry at this wavelength); the "
+                  "fractions are then the uncorrected ones; gates nothing")),
     Row("MODEL_FAR_FROM_DATA", "code"),
     Row("MOMENT_ANGLE_STATIONARY", "code", tier=3, ambiguity=1,
         evidence=("WP-1929: two-site Pnma moduli 0.0015/0.0011 mu_B with the angle columns out, "
@@ -932,8 +1763,19 @@ ROWS: tuple[Row, ...] = (
                   "2026-10-19: occupancy unbounded above; an info record, ruled "
                   "2026-10-20, because noise puts a free full site above 1 about half "
                   "the time, 1.032 ± 0.025 on synthetic LaB6)")),
-    Row("ORIGIN_FIXED_ON_POLAR_AXIS", "code"),
-    Row("ORIGIN_NOT_FIXED", "code"),
+    Row("ORIGIN_FIXED_ON_POLAR_AXIS", "code", tier=1, ambiguity=1,
+        response="info",
+        responds=("nothing: the coordinates along the polar axis are quoted against the "
+                  "origin it names"),
+        evidence=("physics: along a polar axis the origin is a direction no intensity "
+                  "depends on, so a refinement must fix it (Flack & Schwarzenbach 1988, Acta "
+                  "Cryst. A44, 499; model.origin's rows); fires exactly when the package "
+                  "fixed it and names how (refine.py _origin_diagnostics, "
+                  "_centroid_finding); gates nothing")),
+    Row("ORIGIN_NOT_FIXED", "code", tier=1, ambiguity=1,
+        evidence=("physics: in a polar space group with nothing holding the origin along the "
+                  "polar axis, every coordinate along it shares one zero-gradient direction "
+                  "(Flack & Schwarzenbach 1988); fires exactly then")),
     Row("PARAMETRIC_FORM_REJECTED", "code"),
     Row("PARAMETRIC_OUT_OF_RANGE", "code", tier="caller", ambiguity=1,
         response="warning",
@@ -961,7 +1803,17 @@ ROWS: tuple[Row, ...] = (
         responds=("read the child's cell as the parent's carried through the transform; seed the "
                   "strain off zero with set_values and free it to test for a shear")),
     Row("PATTERN_DEAD_CHANNELS", "code"),
-    Row("PATTERN_DUPLICATE_POINTS", "code"),
+    Row("PATTERN_DUPLICATE_POINTS", "code", tier=1, ambiguity=1,
+        evidence=('info; fires exactly when a 2theta (or flight-time) value repeats with an '
+                  'identical intensity and the repeats are dropped (base.py:530-546). A repeat '
+                  'with a different intensity raises instead (base.py:522-529), so no datum is '
+                  'lost: the dropped point equals the kept one. io/CLAUDE.md § What a reader may '
+                  'repair classes it as a report. '
+                  'tests/test_readers.py::test_a_repeated_point_with_the_same_intensity_is_dropped'),
+        grounds='Arithmetic: dropping a point identical to its neighbour loses no information.',
+        response='info',
+        responds='note that identical repeated points were dropped; nothing to do',
+        scope=('all',)),
     Row("PATTERN_INTENSITY_NET", "code", tier=1, ambiguity=1,
         evidence=("a record of which column was read: the file states only "
                   "_pd_proc_intensity_net, and the code names it with the IUCr "
@@ -970,7 +1822,25 @@ ROWS: tuple[Row, ...] = (
         response="info",
         responds=("note which column was read as the intensity and hold the background "
                   "at zero only if the column's minimum agrees with its label")),
-    Row("PATTERN_INTENSITY_SCALED", "code"),
+    Row("PATTERN_INTENSITY_SCALED", "code", tier=1, ambiguity=1,
+        evidence=('warning; six send sites in five modules, one meaning: the stored values are y '
+                  '= c*s for a scale s the reader cannot establish, so sigma is withheld and the '
+                  'Poisson fallback applies to a quantity that may be a rate (wrong by sqrt(t)). '
+                  'Sites: base.py:744-754 (neither y nor y*t whole numbers, or no counting time, '
+                  'the Rigaku and Bruker RAW path), brml.py:321-333 (unit not counts), '
+                  'uxd.py:210-222 (cps with no usable _STEPTIME), xrdml.py:305-324 (cps with no '
+                  'counting time, or an unrecognised unit), gsas.py:1027-1040 (an STD bank with '
+                  'counter number above 1, whose value the manual does not say is a total or a '
+                  "mean). generality.md names 'sigma withheld because the scale is unknown' as "
+                  'the tier-1 example. Measured, not assumed: a .ras declaring counts and '
+                  'storing 84.3047 (and 3.4 % integral in a second), two of three real .rasx '
+                  'declaring counts and storing values no scale in 1/400..400 makes integral, '
+                  'every COUNTS block of 3774 .uxd points integral (io/CLAUDE.md § σ; '
+                  'tests/test_readers.py::test_the_declared_intensity_unit_is_a_claim_and_does_not_decide_sigma, '
+                  '::test_the_real_v4_fixture_withholds_sigma_because_no_scale_verifies, '
+                  '::test_a_udf_with_scaled_intensities_withholds_sigma_and_says_so)'),
+        grounds=('The act is withholding a number that cannot be derived, never faking one; the '
+                 "base site's decision rests on INTEGRAL_TOL, which has its own row.")),
     Row("PATTERN_MULTISCAN_DEFAULTED", "code"),
     Row("PATTERN_NET_HAS_BACKGROUND", "code", tier=3, ambiguity=3,
         evidence=("warning; fires when a column the file labels background-subtracted "
@@ -997,8 +1867,45 @@ ROWS: tuple[Row, ...] = (
                   "background is settled: tell whether a background was left in or the "
                   "range holds no empty baseline, then refine one or hold it at zero")),
     Row("PATTERN_ROWS_DROPPED", "code"),
-    Row("PATTERN_SCAN_REVERSED", "code"),
-    Row("PATTERN_SIGMA_CONSTANT", "code"),
+    Row("PATTERN_SCAN_REVERSED", "code", tier=1, ambiguity=1,
+        evidence=('info; fires exactly when the points are stored strictly high to low (every '
+                  'step <= 0 with at least one < 0) and they were reversed (base.py:505-520). '
+                  'The reversal is lossless and io/CLAUDE.md § What a reader may repair classes '
+                  'it as a report. '
+                  'tests/test_readers.py::test_a_scan_stored_high_to_low_is_reversed_and_says_so'),
+        grounds='Arithmetic: reversing the order of a measurement changes no value.',
+        response='info',
+        responds='note that the scan was stored backwards and reversed; nothing to do',
+        scope=('all',)),
+    Row("PATTERN_SIGMA_CONSTANT", "code", tier=1, ambiguity=3,
+        evidence=('warning; fires exactly when every sigma of the pattern holds one value '
+                  '(readers.py:194-215), a test of equality with no threshold. It changes '
+                  'nothing: the sigma is kept and the fit is unweighted, whichever reader '
+                  'produced the column (readers.py hook, io/CLAUDE.md § σ). Whether the constant '
+                  'is a placeholder (issue #266: xy adopted a third column of 1.0) or a real '
+                  'uniform esd is outside the pattern, so the message states the value and the '
+                  'suggestion names both readings. '
+                  'tests/test_readers_robust.py::test_a_constant_sigma_is_kept_and_reported (xy '
+                  'and gsas); silent on all 13 real fixtures '
+                  '(::test_no_real_fixture_trips_a_check_on_what_its_reader_hands_back)'),
+        grounds=('The statistic is arithmetic and the package acts on nothing; it reports the '
+                 'number with its meaning (Rule 1, third kind).')),
+    Row("PATTERN_SIGMA_NONPOSITIVE", "code", tier=1, ambiguity=1,
+        evidence=("warning; arithmetic, no threshold: fires exactly when a file's σ column "
+                  "holds an entry of zero or below, the count, how many record y = 0 and the "
+                  "2θ runs in the message, or when every entry is, and the column is not "
+                  "read. An esd of zero claims an exact intensity and a "
+                  "negative one has no meaning, so neither is a weight. GSAS-II 5.8.4's fxye "
+                  "reader zero-weights such a channel (G2pwd_fxye.py:86-91, checked "
+                  "2026-10-19); its xye reader and FullProf 8.20 replace it silently, and "
+                  "TOPAS is silent (docs/practice.md, A zero or negative esd). Ruled "
+                  "2026-10-19 (WP-2002 B5): no weight by default, warn at ingestion, an "
+                  "option to correct"),
+        response="warning",
+        responds=("quote the cell, scale and every esd as a fit of the other points, check "
+                  "the software that wrote the column, and where the points are zero counts "
+                  "read the file with nonpositive_sigma='poisson'; RefinementResult.sigma_rule "
+                  "counts what the fit weighted by which rule")),
     Row("PATTERN_TOTAL_SCATTERING", "code", tier=3, ambiguity=1,
         evidence=("error; a refusal by file shape (issue #1240). It fires when the file's own "
                   "#L line labels its first two columns r and G/g, or Q and S/F; when its "
@@ -1042,8 +1949,35 @@ ROWS: tuple[Row, ...] = (
         response="info",
         responds=("nothing: the weights are not used, sigma is the Poisson value, so quote "
                   "chi2 and esds as for a pattern with no weights")),
-    Row("PATTERN_X_AXIS_ASSUMED", "code"),
-    Row("PATTERN_X_AXIS_IMPLAUSIBLE", "code"),
+    Row("PATTERN_X_AXIS_ASSUMED", "code", tier=2, ambiguity=3,
+        evidence=('warning; fires when a format states an axis label that is absent or not one '
+                  'it recognises as 2theta and not one it recognises as another quantity, and '
+                  'the x column is then read as 2theta in degrees (base.py:586-604, check_axis; '
+                  'called by ras, rasx, uxd, xrdml, brml, bruker_raw, others). A recognisably '
+                  'non-2theta axis is refused by name in the same function, so this is only the '
+                  'unrecognisable case. Practice: GSAS-II 5.8.4 reads an x column as 2theta with '
+                  'no label check in its xye importer (G2pwd_xye.py:55-77 sets if2theta '
+                  'unconditionally for non-.chi files), and its Rigaku and PANalytical importers '
+                  'take the first column as 2theta without testing the header '
+                  '(G2pwd_rigaku.py:222-240, G2pwd_Panalytical.py:90-108). FullProf and TOPAS: '
+                  'not checked. '
+                  'tests/test_readers.py::test_an_unrecognisable_axis_is_read_as_two_theta_and_says_so'),
+        grounds=('The same default GSAS-II applies, plus a stated report; the data cannot rank '
+                 'the alternatives, so the number is reported with its meaning.')),
+    Row("PATTERN_X_AXIS_IMPLAUSIBLE", "code", tier=1, ambiguity=3,
+        evidence=('warning; fires when the x axis of a 2theta pattern starts at or below 0 '
+                  'degrees and some points are at or below 0 (readers.py:243-278). Nothing is '
+                  'changed and the message names the interval to exclude. No Bragg reflection '
+                  'lies at 2theta <= 0, which is the geometric fact; a scan through zero is real '
+                  'on a detector covering both sides, so the code reports and does not refuse '
+                  '(readers.py docstring, band 2). '
+                  'tests/test_readers_robust.py::test_an_axis_reaching_zero_is_read_and_reported '
+                  '(xy and gsas), '
+                  '::test_a_lone_point_at_zero_names_an_interval_a_project_accepts. On the 112 '
+                  'readable files of tests/data none fires and the smallest start is 0.4995 '
+                  'degrees (probe, 2026-11-17)'),
+        grounds=('The 0 degrees bound is the direct beam, physics; the code acts on nothing and '
+                 'states the number with what to do next.')),
     Row("PATTERN_ZERO_WEIGHT_EXCLUDED", "code", tier=1, ambiguity=1,
         evidence=("info; a record of an act the file's own value asks for: the pdCIF "
                   "dictionary defines _pd_proc_ls_weight = 0 as 'a data point not used for "
@@ -1052,7 +1986,12 @@ ROWS: tuple[Row, ...] = (
         response="info",
         responds=("nothing: the points of weight 0 are excluded, every other point keeps "
                   "its sigma")),
-    Row("PAWLEY_OFF_DATA_RIDGED", "code"),
+    Row("PAWLEY_OFF_DATA_RIDGED", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: a Pawley reflection with no emission line centred inside the "
+                  "fitted data has no data column, so only the ridge sets its intensity; "
+                  "fires exactly when such reflections exist; the ridge's floor "
+                  "(model.forward.PAWLEY_OFF_DATA_SCALE_FLOOR, tier 3) shapes the ridge and "
+                  "decides nothing here")),
     Row("PAWLEY_OVERLAP_UNRESOLVED", "code"),
     Row("PEAK_ASYMMETRY_UNMODELLED", "code"),
     Row("PEAK_AXIAL_TAIL", "code"),
@@ -1087,6 +2026,34 @@ ROWS: tuple[Row, ...] = (
                  "is info everywhere (Yue's ruling, #993 round 2, 2026-10-21: of the "
                  "19 usable above-bar components freed on 16 Oct, 12 moved away from "
                  "the lattice's line and 7 towards it)."),
+    Row("PEAK_EQUATION_SHARED_ACROSS_WAVELENGTHS", "code", tier=1, ambiguity=2,
+        evidence=("physics: a size-like width coefficient in degrees is (180/pi)K lambda/L, "
+                  "so one specimen needs coefficients in the ratio of the wavelengths, while "
+                  "a strain-like one reads no lambda (Scherrer; params/multi.py "
+                  "SIZE_LAMBDA_POWER); the package cannot tell which term the user wrote, so "
+                  "it warns rather than converts. Fires exactly where a degree-valued peak "
+                  "equation's coefficient is one column across patterns declaring two or more "
+                  "wavelengths (multi._peak_equation_sharing_diagnostics; maintainer's ruling "
+                  "of 2026-11-20, option a, WP-2107), unless the expression reads "
+                  "wavelength, which states the term's lambda dependence as a parametric "
+                  "equation states a driven coefficient's (WP-2152, settled by Claude under "
+                  "the maintainer's 'your call', 2026-11-22). The parametric silence is per "
+                  "coefficient and this one per equation, so a degree-valued size term or "
+                  "constant in that same expression goes unwarned"),
+        response="warning",
+        responds=("do not quote the named equation's coefficients as one size or width "
+                  "for every pattern; unshare a wavelength-dependent term's coefficient with "
+                  "SharingMap(per_histogram=...) and refit, and keep a term that reads no "
+                  "wavelength shared")),
+    Row("PEAK_WIDTH_NOT_POSITIVE", "code", tier=1, ambiguity=1,
+        evidence=("physics: a Gaussian variance and a Lorentzian FWHM cannot be negative; "
+                  "fires exactly where a phase's width peak equations take Γ_G² or Γ_L "
+                  "below zero at a fitted reflection (staged.check_peak_width_positive, "
+                  "WP-2107)"),
+        response="warning",
+        responds=("bound the named equation's coefficients or rewrite its term so it "
+                  "cannot go negative, refit, and do not quote the widths or coefficients "
+                  "until it is silent")),
     Row("PEAK_POSITION_PRECISION", "code"),
     Row("PEAK_SHOULDER_SEEDED", "code"),
     Row("PEAK_SIGMA_ASSUMED", "code"),
@@ -1118,34 +2085,218 @@ ROWS: tuple[Row, ...] = (
         responds=("read every moment in result as the value supplied, not refined, and refit "
                   "under a plan that frees phases.*.atoms.*.moment.dof* before quoting a "
                   "moment or the nuclear values beside it")),
-    Row("QPA_ESD_UNAVAILABLE", "code"),
+    Row("QPA_ESD_UNAVAILABLE", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: a weight fraction normalises by the sum of scales, so a scale "
+                  "with no measurable esd (statistics.normal_covariance drops its column) "
+                  "leaves every fraction's esd unmeasured; fires exactly then (CLAUDE.md: "
+                  "consumers mark, never clamp)")),
     Row("QPA_FRACTION_RANGE", "code", tier=1, ambiguity=3,
         evidence=("arithmetic: an info record on every width profile whose fit carries an esd, "
                   "with no threshold (B12 3(a), ruled 2026-10-19, replacing "
                   "QPA_FRACTION_UNDETERMINED); states the range and excess the profile "
                   "computed, whose cut is FRACTION_PROFILE_DCHI2's row")),
-    Row("QPA_UNAVAILABLE", "code"),
-    Row("RAS_ATTENUATOR_PRESENT", "code"),
-    Row("READER_OPTION_IGNORED", "code"),
+    Row("QPA_INTENSITY_FACTOR", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: W_p reads S_p·(ZMV)_p as the phase's whole intensity, and "
+                  "intensity = scale × factor, so the fitted scale absorbs 1/mean factor "
+                  "and the fraction moves with it; fires exactly where a measured phase of two or more carries "
+                  "an intensity_factor equation that is not 1 everywhere in range "
+                  "(WP-2107)"),
+        response="warning",
+        responds=("read the named phase's weight fraction as scaled by its mean factor, "
+                  "or normalise the factor and refit, before quoting a fraction")),
+    Row("QPA_UNAVAILABLE", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: weight fractions divide by the sum of the weighted scales, "
+                  "which is zero or less; fires exactly then (refine.py "
+                  "_qpa_unavailable_diagnostics)")),
+    Row("RAS_ATTENUATOR_PRESENT", "code", tier=2, ambiguity=3,
+        evidence=('warning; fires when a Rigaku .ras or .rasx third column (the attenuator '
+                  'factor) is not 1 over some finite points (ras.py:187-215, shared with rasx). '
+                  'The factor is not applied and sigma is not routed through it: column 2 is '
+                  'read as stored. This one is NOT measured: the structural test (which of raw '
+                  'or product runs continuously across a transition) needs a file where the '
+                  'column varies, and the five obtainable files all hold it constant (1.0 in '
+                  'four, 0.0 in one synthetic; tests/data/README.md 829-833; ras.py docstring). '
+                  'So the convention is open and the reader says so. The act taken, reading '
+                  'column 2 as stored and ignoring column 3, is what GSAS-II 5.8.4 does by '
+                  'default (G2pwd_rigaku.py:222-240 reads columns 0 and 1 only, weights '
+                  '1/max(1,y)); the other formats differ (xrdml applies, brml leaves y alone) '
+                  'because those were measured. FullProf, TOPAS: not checked. '
+                  'tests/test_readers.py::test_an_attenuator_column_is_reported_and_never_applied'),
+        grounds=('Not applying is the established default and the one the unmeasured case '
+                 'permits; the report states that the convention is unresolved.')),
+    Row("READER_OPTION_IGNORED", "code", tier=1, ambiguity=1,
+        evidence=("info; fires exactly when a reader option is passed that the chosen format's "
+                  'options tuple does not contain, and it is not applied (base.py:279-292). An '
+                  'option no format takes is a typo and raises instead (base.py:276-279), so '
+                  "this only records the format's own vocabulary against the caller's request; "
+                  'the READER_OPTIONS == union of fmt.options meta-test holds the two apart. '
+                  'tests/test_readers.py::test_an_option_this_format_does_not_take_is_dropped_but_reported; '
+                  'tests/test_tof_axis.py:620-627, 793'),
+        grounds="Arithmetic: the format's declared options decide, nothing is chosen.",
+        response='info',
+        responds=('note that the named option did not apply to this format; drop it or check '
+                  'which reader claimed the file'),
+        scope=('all',)),
     Row("RECIPE_BACKGROUND_PEAK_DEGENERATE", "code"),
     Row("RECIPE_BACKGROUND_RESEEDED", "code"),
-    Row("RECIPE_BOUND_HONOURED", "code"),
-    Row("RECIPE_CONVENTION_ASSUMED", "code"),
-    Row("RECIPE_DISPERSION_DECLINED", "code"),
+    Row("RECIPE_BOUND_HONOURED", "code", tier=1, ambiguity=1,
+        evidence=('read the site at recipe.py:266: fires when a recipe states min or max for a '
+                  "parameter and the refinement applies them as bounds (scaled to rietx's unit); "
+                  'the recipe states the bound, so applying it is the reading (upstream marks it '
+                  "'not implemented in GSAS-II', which the docstring records as a difference, "
+                  'not a drop)'),
+        grounds='The recipe states the bound.',
+        response='info',
+        responds='nothing, the stated bounds are on the parameters named'),
+    Row("RECIPE_CONVENTION_ASSUMED", "code", tier=2, ambiguity=1,
+        evidence=('read the site at recipe.py:650: SH/L is split evenly into axial_sl = axial_hl '
+                  "= SH/L / 2, the module docstring calling it 'adopted, not measured'. GSAS-II "
+                  'evaluates exactly that split (pypowder.for:146 passes SPH/2.0 for both S/L '
+                  "and H/L, 5.8.4), so the convention is the program's own; "
+                  'tests/test_recipe.py::test_the_sh_l_split_is_declared_not_measured and '
+                  '::test_this_pattern_cannot_distinguish_the_sh_l_split cover the fixture side'),
+        grounds='The same split GSAS-II makes in its own profile evaluation.',
+        response='info',
+        responds='note the axial apertures are the even split, as GSAS-II evaluates them'),
+    Row("RECIPE_DISPERSION_DECLINED", "code", tier=1, ambiguity=1,
+        evidence=('read the site at recipe.py:702: fires only when dispersion(sym, lam) raises '
+                  'ValueError for a species of the structure (the bundled Cromer-Liberman table '
+                  'spans 3-70 keV; lambda 0.1665 A is 74.5 keV) and sets Source.dispersion = '
+                  'None, so f = f0; the table has no value past its band and extrapolating would '
+                  'be wrong '
+                  '(tests/test_recipe.py::test_dispersion_is_declined_off_the_table_and_said, '
+                  '::test_dispersion_stays_on_inside_the_table)'),
+        grounds=("No tabulated value exists there; the decline is exactly the table's own "
+                 'exception.'),
+        response='info',
+        responds=("note that f' and f'' are zero for this fit, and check the heavy species whose "
+                  'K edge is near the beam')),
     Row("RECIPE_ENGINE_DEFAULT_DECLINED", "code"),
-    Row("RECIPE_FIELD_DROPPED", "code"),
-    Row("RECIPE_FIT_RANGE_CHANNELS", "code"),
-    Row("RECIPE_FLAG_DROPPED", "code"),
-    Row("RECIPE_FLAG_TRANSLATED", "code"),
-    Row("RECIPE_NOTHING_REFINED", "code"),
+    Row("RECIPE_FIELD_DROPPED", "code", tier=1, ambiguity=1,
+        evidence=('read the five sites at recipe.py:547 (Polariz. on PNC: GSAS-II applies it to '
+                  'X-ray types only), :845 (Z = 0 fixed: no constant Lorentzian to state), :954 '
+                  "(a background-peak gamma under one 2-theta step of the recipe's own pattern, "
+                  "a width the data cannot hold), :1336 (refinement_cycles: a Stage's max_iter "
+                  "is a runaway guard), :1346 (refinement_algorithm, at warning: the package's "
+                  'solver runs). Each drops a field with no counterpart or no effect and names '
+                  'it; a non-zero live value is refused, never dropped '
+                  '(tests/test_recipe.py::test_a_non_zero_z_is_refused_and_a_zero_one_is_dropped, '
+                  '::test_a_wide_hump_gamma_is_refused_and_a_narrow_one_dropped, '
+                  '::test_refinement_cycles_is_dropped_with_a_reason)'),
+        grounds=('Each is a field the model cannot hold or an identity, reported by the '
+                 'reader-repair rule.')),
+    Row("RECIPE_FIT_RANGE_CHANNELS", "code", tier=1, ambiguity=1,
+        evidence=('read the site at recipe.py:464: fires on every recipe with a fit_range; the '
+                  'mask is inclusive at both ends and zero-weight channels are left out, and the '
+                  'message gives the count and its two end angles so the channel count can be '
+                  'checked before any Rwp is compared; on the committed fixtures the mask '
+                  "selects 3767 where GSAS-II's own fit_profile.txt shows 3768 and nothing is "
+                  'snapped '
+                  '(tests/test_recipe.py::test_the_reference_engines_fit_one_more_channel_than_this_mask)'),
+        grounds=('An inclusive interval is arithmetic of the stated range; the one-channel '
+                 'difference is stated, not corrected.'),
+        response='info',
+        responds=("check the channel count against the reference engine's before comparing any "
+                  'Rwp')),
+    Row("RECIPE_FLAG_DROPPED", "code", tier=1, ambiguity=1,
+        evidence=('read the three sites at recipe.py:837 (Z flagged at zero), :962 (a '
+                  'background-peak gamma flag) and :1222 (a size or strain half whose LG_eta '
+                  'puts it at its off state): each is a refine flag the model cannot honour, '
+                  'reported at warning because the fit then has one free parameter fewer than '
+                  'the reference engine '
+                  '(tests/test_recipe.py::test_an_off_state_half_is_held_and_said)'),
+        grounds=("No parameter exists to receive the flag, and upstream's rule 4 forbids "
+                 'ignoring one silently.')),
+    Row("RECIPE_FLAG_TRANSLATED", "code", tier=1, ambiguity=1,
+        evidence=('read the site at recipe.py:1230: fires when LG_eta is flagged and both halves '
+                  "are on, so the recipe's (magnitude, eta) pair becomes two free coefficients "
+                  '(lor = eta x total, gauss = ((1 - eta) x total)^2, the units measured against '
+                  'the committed LaB6 GSAS-II output, '
+                  'tests/test_recipe.py::test_gaussian_and_lorentzian_units_are_the_measured_ones, '
+                  '::test_an_interior_eta_frees_both_halves)'),
+        grounds=("A translation of one model's parameters into another's, measured against the "
+                 "program's output."),
+        response='info',
+        responds=('note the two coefficients now refine independently where the recipe refined '
+                  'one pair')),
+    Row("RECIPE_NOTHING_REFINED", "code", tier=1, ambiguity=1,
+        evidence=('read the site at recipe.py:1358: fires exactly when _flagged_paths returns '
+                  'nothing, so the plan is one stage that frees nothing '
+                  '(tests/test_recipe.py::test_a_recipe_that_flags_nothing_is_a_simulation)'),
+        grounds='Deterministic from the flags.'),
     Row("RECIPE_PLAN_STAGED", "code"),
-    Row("RECIPE_SCALE_RESEEDED", "code"),
-    Row("RECIPE_SCHEMA_UNTESTED", "code"),
-    Row("RECIPE_ZERO_WEIGHT_EXCLUDED", "code"),
-    Row("RESOLUTION_NOT_POSITIVE", "code"),
+    Row("RECIPE_SCALE_RESEEDED", "code", tier=1, ambiguity=1,
+        evidence=('read the site at recipe.py:1263 and forward.seed_phase_scales (:4906-4935): '
+                  "the recipe's scale (every recipe says 1) is replaced by the closed-form "
+                  'factor that matches the summed calculated intensity to the data, split evenly '
+                  'across phases; arithmetic, and the one authority shared with viz.compare '
+                  '(tests/test_recipe.py::test_the_scale_is_reseeded_not_carried)'),
+        grounds="Arithmetic area matching; a foreign scale is in another code's units.",
+        response='info',
+        responds='nothing, the scales start near the data and refine from there'),
+    Row("RECIPE_SCHEMA_UNTESTED", "code", tier=1, ambiguity=1,
+        evidence=('read the site at recipe.py:320: fires exactly when schema_version is not in '
+                  'KNOWN_SCHEMA_VERSIONS, the versions the reader was checked against; nothing '
+                  'is changed'),
+        grounds='A membership test on a list of versions the reader was checked on.'),
+    Row("RECIPE_ZERO_WEIGHT_EXCLUDED", "code", tier=1, ambiguity=1,
+        evidence=('read the site at recipe.py:403: channels with weight <= 0 become excluded '
+                  'regions (their run edges), with sigma set to 1 only as a placeholder under '
+                  "the mask; a zero weight means the channel is not used (the pdCIF dictionary's "
+                  "meaning of weight 0) and the same rule as WP-1952's sigma <= 0 leaves the "
+                  'fit, never a floor'),
+        grounds='Weight 0 states no information, so the channel leaves the fit.',
+        response='info',
+        responds='nothing, the excluded intervals are in the pattern',
+        scope=('all',)),
+    Row("RESOLUTION_NOT_POSITIVE", "code", tier=1, ambiguity=1,
+        evidence=("physics: a Gaussian variance Gamma_G^2 cannot be negative; fires exactly "
+                  "where the Caglioti function goes below zero in the fitted range, past "
+                  "staged.RESOLUTION_CONE_TOL (tier 1)")),
     Row("RESOLUTION_UNCONSTRAINED", "code", response="warning",
         responds=("do not quote a width, a crystallite size or a strain from this fit; "
                   "calibrate the instrument on a standard first")),
+    Row("RESTRAINT_BODY_CONTACTS_UNCHECKED", "code", tier=1, ambiguity=1, response="warning",
+        responds=("before quoting a coordinate of a body whose torsion turned, read the "
+                  "distances between its own atoms in result.geometry.distances (a folded "
+                  "pair can be short enough to be listed as a bond): no check searched them"),
+        evidence=("arithmetic: a fact about the pair list, not a threshold.  The anti-bump "
+                  "builder skips two atoms of one rigid body in the body's own copy by default "
+                  "(model.restraints.anti_bump_restraints, exclude_same_body=True), the "
+                  "end-of-run search (stale_anti_bump_pairs) skips them always, and a declared "
+                  "torsion moves such a pair (WP-1808), so a fold no row holds is never reported "
+                  "(#1507: a chain folded to 1.498 A under a 3.0 A minimum).  Fires where the "
+                  "phase has an anti-bump row and a declared torsion's angle moved during the "
+                  "run; the message counts the rows inside the body "
+                  "(model.restraints.body_own_rows); moves no value and gates nothing.  Scope "
+                  "as RESTRAINT_PAIRS_STALE: the purposes whose numbers depend on atom "
+                  "coordinates"),
+        scope=("qpa", "structure", "magnetic")),
+    Row("RESTRAINT_ON_FIXED_BODY_GEOMETRY", "code", tier=1, ambiguity=3, response="warning",
+        responds=("read the restraint's row as no evidence on this fit, since no parameter "
+                  "moves it, and its target as no check on the refined geometry; then drop "
+                  "it, declare a body torsion that changes it, take its atoms out of the "
+                  "body and restrain them as free atoms, or keep it as the template's "
+                  "penalty"),
+        evidence=("arithmetic, no threshold: every atom of the restraint is in one copy of one "
+                  "rigid body (one frozen image, an isometry of the template, which is in "
+                  "Angstrom so the cell does not move it either), and no declared torsion of "
+                  "the body turns some of its atoms other than the two axis atoms and not the "
+                  "others; each such torsion is a rotation fixing the axis and moving the rest "
+                  "together, so the bond, angle, torsion or plane distance is the template's "
+                  "for every value of every parameter the body has and the row's partial is "
+                  "zero against each. Verified exactly, not sampled: over all 546 bonds, angles and "
+                  "torsions of a generic seven-atom body with a chained torsion, the rule "
+                  "reports the 45 that stay put when every torsion twists and the pose and "
+                  "cell move, and no other (tests/test_restraint_body_refusal.py). Read off the declaration, never "
+                  "vary, so a held torsion keeps its restraint. Only the two axis atoms count "
+                  "as on the axis, so an error lands on accepting. Action: a warning "
+                  "that keeps the row, because a competent refiner who would act otherwise "
+                  "can be named (the WP-1814 design review, 2026-11-09): one keeping a "
+                  "restraint set across a with-body and a without-body comparison, for whom "
+                  "the constant row is the template's penalty. Ruled by the maintainer, "
+                  "2026-11-13: warn, keep the row (DESIGN.md Rules, 1: the action is of the "
+                  "second or third kind, so ambiguity 3)")),
     Row("RESTRAINT_PAIRS_STALE", "code", tier=1, ambiguity=1, response="warning",
         responds=("before quoting a coordinate, or a fraction or moment read through them, "
                   "either rebuild the anti-bump list from the answer's coordinates and refit, "
@@ -1162,11 +2313,18 @@ ROWS: tuple[Row, ...] = (
         scope=("qpa", "structure", "magnetic")),
     Row("RESTRAINT_TENSION", "code"),
     Row("RIGID_BODY_MISFIT", "code"),
-    Row("RIGID_BODY_UNSUPPORTED", "code"),
+    Row("RIGID_BODY_UNSUPPORTED", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: a free rigid-body rotation or shift whose Jacobian column is "
+                  "zero has no information in the data; fires exactly then (refine.py "
+                  "_rigid_body_unsupported)")),
     Row("ROUGHNESS_ABSORPTION", "code"),
     Row("ROUGHNESS_OUTSIDE_REGIME", "code"),
     Row("ROUGHNESS_UNCONSTRAINED", "code"),
-    Row("SCALE_B_INSEPARABLE", "code"),
+    Row("SCALE_B_INSEPARABLE", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: over the fitted range a phase's scale and Biso columns "
+                  "separate by less than SCALE_B_SEPARATION_FLOOR (2*sqrt(PINV_RCOND), tier "
+                  "1), where pinv cannot tell them apart; names the hold "
+                  "StageResult.scale_b_held records (tier 1)")),
     Row("SEQUENTIAL_CANCELLED", "code", tier="caller", ambiguity=1,
         response="warning",
         responds=("the chain the message names stopped early: past the last pattern a "
@@ -1242,7 +2400,6 @@ ROWS: tuple[Row, ...] = (
         responds=("quote no cell, fraction or width from the named pattern: its kept fit "
                   "diverged or carries an error-level code after every rung, seeded no "
                   "successor and joins no median")),
-    Row("SEQUENTIAL_WIDTH_GROWTH", "code"),
     Row("SERIES_PATTERN_FAILED", "code", tier=1, ambiguity=1,
         response="warning",
         responds=("the named pattern has no fitted values in the chain the message names: in "
@@ -1253,7 +2410,25 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic: fires exactly when every rung the chain tried on a pattern raised, "
                   "one per SeriesFailure (sequential.py:2244-2278); the policy that carries on "
                   "past it is SequentialRefinement.fit:on_error's own row, tier 3")),
-    Row("SITE_SNAPPED_TO_SPECIAL_POSITION", "code", response="warning",
+    Row("SITE_SNAPPED_TO_SPECIAL_POSITION", "code", tier=2, ambiguity=1,
+        evidence=('read both raise sites. symmetry.py:1288-1340 (snap_diagnostics): a site '
+                  'within SITE_TOL (1e-4, fractional, per operation displacement) of a special '
+                  'position is expanded there, so its multiplicity is the special one; the '
+                  'stored coordinate is not rewritten. cif.py:1395-1465: a site whose file '
+                  'states a smaller multiplicity is moved onto the position within '
+                  "CIF_STATED_MULTIPLICITY_SNAP_TOL (1e-3); a move inside the file's printed "
+                  'rounding is not reported (CIF_PRINTED_ROUNDING). '
+                  '(tests/test_symmetry_orbits.py, '
+                  'tests/test_cif_stated_columns.py::test_a_stated_multiplicity_puts_a_rounded_site_on_its_position, '
+                  '::test_a_snap_past_the_files_printed_rounding_is_still_reported). Practice: '
+                  'GSAS-II 5.8.4 counts an image within 2e-4 per coordinate as the site itself '
+                  '(GenAtom, GSASIIspc.py:2236-2240) and takes the multiplicity from that count '
+                  '(SytSym, GSASIIspc.py:3402-3460), weighting the structure factor by it, so a '
+                  'near-special site is scattered as special by default with no record. '
+                  'FullProf, TOPAS not checked.'),
+        grounds=('Counting a site within a small tolerance of a special position as special is '
+                 "GSAS-II's default; the two tolerances are tiered on their own rows."),
+        response='warning',
         responds=("check the site's multiplicity against the source before quoting a weight "
                   "fraction, a density or a site's occupancy from this fit")),
     Row("SITE_DOFS_RENUMBERED", "code", tier=1, ambiguity=1,
@@ -1336,7 +2511,10 @@ ROWS: tuple[Row, ...] = (
                   "(multi.py:2539-2584); raised only in the joint fit; states and gates nothing, "
                   "since one histogram can be the intent (issue #265, WP-1414)")),
     Row("STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT", "code"),
-    Row("STAGE_MAX_ITER", "code"),
+    Row("STAGE_MAX_ITER", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: fires exactly when a stage's solver stopped at its iteration "
+                  "cap before its convergence test passed; the cap is the stage's max_iter, "
+                  "tiered on its own default row")),
     Row("STAGE_NOT_FINITE", "code", tier=1, ambiguity=1,
         evidence=("arithmetic: a NaN or an infinity in the residual at a solve's start, or "
                   "in the Jacobian at a point the driver accepted, leaves neither driver a "
@@ -1367,9 +2545,14 @@ ROWS: tuple[Row, ...] = (
                   "names a phase literal or a concrete site; the package builds one "
                   "only from a caller's own model or flags (report/body_misfit's "
                   "released arm, an internal trial whose findings are not surfaced; "
-                  "io/recipe's flagged coordinates); a user tie, a hold, and an adp.* "
-                  "glob answered by the same request's biso are excluded")),
-    Row("STAGE_PATH_UNKNOWN", "code"),
+                  "io/recipe's flagged coordinates); a user tie, a hold, an adp.* "
+                  "glob answered by the same request's biso, and a cell glob "
+                  "answered by the same request's freed parent_cell.cell rows are "
+                  "excluded")),
+    Row("STAGE_PATH_UNKNOWN", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: a stage named a path the model's ParameterTable does not "
+                  "hold, so the stage did not refine it; fires exactly then, at three sites "
+                  "(a retired spelling, an undeclared opt-in, anything else)")),
     Row("STAGE_SLOW_DESCENT", "code", tier=1, ambiguity=1,
         evidence=("arithmetic: names the stages whose StageResult.termination is "
                   "'slow_descent', the LM driver's stop under SLOW_DESCENT_ESD (WP-1334); "
@@ -1392,7 +2575,14 @@ ROWS: tuple[Row, ...] = (
                   "one family); reported only for the last stage and the one before a "
                   "closing stage, since the calibrate guide's sample_profile stage ends "
                   "at 12 % and the stages after it repair it (one synthetic fit; this "
-                  "stage selection is the session's judgement, not yet ruled)"),
+                  "stage selection is the session's judgement, not yet ruled); since "
+                  "WP-2317 R7 a stage past its fraction re-solves once on fresh windows, "
+                  "so this reads the second solve: the runaway re-solves at axial_sl 558 "
+                  "to a loss under 2 % and is silent here, recorded as "
+                  "StageResult.window_refit_loss 73 %; a fit still fires it where the "
+                  "re-solve is declined (a declared window_slack_deg 0 on a synthetic "
+                  "stage moving cell, zero and width: 45 %, "
+                  "test_window_loss.test_a_fit_whose_last_stage_outgrew_its_windows_reports_them)"),
         grounds=("No surveyed program reports this: GSAS-II, MAUD, RIETAN-FP and "
                  "EasyDiffraction resize every evaluation, TOPAS rebuilds its buffer past "
                  "a width tolerance, FullProf never does, BGMN documents no rule. The "
@@ -1403,27 +2593,222 @@ ROWS: tuple[Row, ...] = (
                   "unconfirmed: refit from starting values nearer the data rather than "
                   "polishing, and compare Rwp and the axial terms"),
         scope=("all",)),
-    Row("STEPHENS_STRAIN_NOT_POSITIVE", "code"),
+    Row("STEPHENS_STRAIN_NOT_POSITIVE", "code", tier=1, ambiguity=1,
+        evidence=("physics: sigma^2(M) is a variance and cannot be negative (Stephens 1999); "
+                  "fires exactly where the refined coefficients give one below zero past "
+                  "staged.STEPHENS_CONE_TOL (tier 1)")),
     Row("STRAIN_UNUSUALLY_LARGE", "code"),
-    Row("TEXTURE_NOT_POSITIVE", "code"),
-    Row("TOPAS_BLOCK_SKIPPED", "code"),
-    Row("TOPAS_CELL_COUPLING_DROPPED", "code"),
-    Row("TOPAS_FEATURES_NOT_IMPORTED", "code"),
-    Row("TOPAS_FEATURE_REFUSED", "code"),
-    Row("TOPAS_FIELD_NOT_WRITTEN", "code"),
-    Row("TOPAS_FIRST_RUN_READ", "code"),
-    Row("TOPAS_MAGNETIC_GROUP_READ", "code"),
-    Row("TOPAS_MAGNETIC_PART_MERGED", "code"),
-    Row("TOPAS_MOMENT_CONVENTION", "code"),
-    Row("TOPAS_MOMENT_G_HELD", "code"),
-    Row("TOPAS_MOMENT_ION_UNCHARGED", "code"),
-    Row("TOPAS_ORIGIN_TRANSLATED", "code"),
-    Row("TOPAS_PHASE_RESTATED_IN_P1", "code"),
+    Row("TEXTURE_NOT_POSITIVE", "code", tier=1, ambiguity=1,
+        evidence=("physics: a pole density cannot be negative; fires exactly where the "
+                  "truncated series goes below zero on the sphere past "
+                  "TEXTURE_POSITIVITY_TOL (tier 1)")),
+    Row("TOPAS_BLOCK_SKIPPED", "code", tier=1, ambiguity=1,
+        evidence=('read the site at topas.py:3814 and :3262: a str block that states no '
+                  'phase_name or no space_group is skipped as a phase, recorded on '
+                  'model.skipped_blocks with what it lacked and carried, and reported; '
+                  'to_structure then refuses to build while other phases would (weight fractions '
+                  'would not sum), so nothing is dropped in silence'),
+        grounds='The block cannot be named a phase; the report and the later refusal are exact.'),
+    Row("TOPAS_CELL_COUPLING_DROPPED", "code", tier=1, ambiguity=1,
+        evidence=('read the site at topas.py:3717: fires when a cell tie (b = Get(a)) is copied '
+                  'as a value and the space group does not tie the edges; silent where '
+                  '_symmetry_reproduces says it does (tests/test_projects_topas.py:3696-3733); '
+                  'the model has no tie field, so the loss is forced and the restoring call is '
+                  'named'),
+        grounds='The model cannot hold the tie, and the report is raised only where it is lost.'),
+    Row("TOPAS_FEATURES_NOT_IMPORTED", "code", tier=1, ambiguity=1,
+        evidence=('read the two sites at topas.py:3732 (constructs coverage.py declares '
+                  'REPORTED) and :3743 (calls the file makes without a definition and the table '
+                  "has no row for); the stance table is completeness-tested against the format's "
+                  'phase scope (coverage.PHASE_SCOPE, tests/test_projects_topas.py)'),
+        grounds='A per-construct declaration, each stated in coverage.py with its own reason.'),
+    Row("TOPAS_FEATURE_REFUSED", "code", tier=1, ambiguity=1,
+        evidence=('read the two sites at topas.py:3752 (constructs coverage.py declares REFUSED, '
+                  'each with a stated reason: a rigid body generates coordinates, occ_merge '
+                  'couples occupancies, a stacking-fault phase does not diffract from its cell) '
+                  'and :3761 (a time-of-flight dataset, issue #193: the build models '
+                  'constant-wavelength only); to_structure refuses to build without them, so the '
+                  "diagnostic is the reader's early notice"),
+        grounds=('Building without the construct would misrepresent the file, which is an '
+                 'exactness reason and not a threshold.')),
+    Row("TOPAS_FIELD_NOT_WRITTEN", "code", tier=1, ambiguity=1,
+        evidence=('read the site at topas.py:5329: fires when a written phase carries a texture, '
+                  'extinction or magnetic-only width the writer does not state (extinction and '
+                  'widths are written when the refined writer has instrument=); the file then '
+                  'states none of them and TOPAS computes each phase without them; names the '
+                  'phases and terms'),
+        grounds=('The writer has no TOPAS statement for them, so the omission is forced and '
+                 'listed.')),
+    Row("TOPAS_FIRST_RUN_READ", "code", tier=1, ambiguity=1,
+        evidence=('read the site at topas.py:3693: fires when a #if or #elseif tests Run_Number '
+                  'and the file states num_runs other than 1 (or one the reader cannot '
+                  "evaluate); the branches are read as Run_Number 0 reads them, TOPAS's own "
+                  'first run (tests/test_projects_topas.py:1910-1914)'),
+        grounds=('Run_Number starts at 0 in TOPAS, and a file with no num_runs has only that '
+                 'run.')),
+    Row("TOPAS_MAGNETIC_GROUP_READ", "code", tier=1, ambiguity=1,
+        evidence=("read the site at topas.py:4102: fires when the magnetic group is the file's "
+                  'own mag_space_group number resolved to BNS/OG operators in the standard '
+                  'setting, or the nuclear group was derived from it (operators with time '
+                  'reversal dropped); the coordinates are taken in the standard setting as TOPAS '
+                  "takes them, and a number whose operations are not a symmetry of the file's "
+                  'nuclear group, cell and sites is refused (check_group_is_structure_symmetry, '
+                  'issue #597)'),
+        grounds=('The file states the group; resolving its number is a lookup, with a refusal on '
+                 'mismatch.'),
+        response='info',
+        responds=('note the magnetic group and its setting, and pass magnetic_symmetry= if the '
+                  'file uses another')),
+    Row("TOPAS_MAGNETIC_PART_MERGED", "code", tier=1, ambiguity=1,
+        evidence=('read the site at topas.py:4607 and topas_ties.split_magnetic_parts '
+                  "(:153-200): a str named '<name> magnetic part' whose every site is mag_only "
+                  "and carries a moment is merged into <name>, but only after the part's scale, "
+                  "cell, space group and each matched site's position, element and occupancy "
+                  "equal the nuclear str's, and every part site has a nuclear counterpart; "
+                  'equal-or-refuse (_check_part_equals_nuclear). TOPAS has one peak shape per '
+                  'str, so a magnetic-only width needs the second str'),
+        grounds='The merge happens only where the two blocks are equal by checked arithmetic.',
+        response='info',
+        responds="nothing, the merged phase carries the part's moments and group"),
+    Row("TOPAS_MOMENT_CONVENTION", "code", tier=1, ambiguity=1,
+        evidence=('read the site at topas.py:4113 and TopasSite.moment (topas.py:324-362): mlx '
+                  'mly mlz are fractional-basis components (m = mlx a + mly b + mlz c), stored '
+                  'as crystal-axis mu_B (mlx |a|, mly |b|, mlz |c|). Measured against TOPAS-64 '
+                  "v6's own magnetic intensities: 54 equal-d pairs match to four digits where "
+                  'the crystal-axis and Cartesian readings miss by 1.58 and 1.80 '
+                  '(tests/test_magcif.py::test_topas_own_intensities_rerun_the_equal_d_pair_check, '
+                  '::test_a_topas_moment_in_the_tutorials_syntax_is_fractional)'),
+        grounds=("A convention measured against the program's own output, with a control that "
+                 'separates the readings.'),
+        response='info',
+        responds=("check the stored moment components against the file's MM_CrystalAxis_Display "
+                  'values if they are printed')),
+    Row("TOPAS_MOMENT_G_HELD", "code", tier=1, ambiguity=1,
+        evidence=("read the site at topas.py:4132: fires when a site's mg (Lande g) carries a "
+                  "refine flag; Moment.g is a plain float, so g is held at the file's value and "
+                  "the model has one free parameter fewer than the file's refinement "
+                  '(tests/test_magcif.py::test_a_refined_lande_g_is_reported_held)'),
+        grounds='The model has no g parameter, so the hold is forced and named.'),
+    Row("TOPAS_MOMENT_ION_UNCHARGED", "code", tier=1, ambiguity=1,
+        evidence=('read the site at topas.py:4145: fires when a site with a moment has an '
+                  'uncharged species (a one- or two-letter element token), so the magnetic form '
+                  "factor comes from the neutral atom's <j0>, a different curve from the ion's; "
+                  'the species is what the file wrote, so the reader supplies no charge'),
+        grounds='The file states no charge, so none is invented.',
+        response='info',
+        responds="write the site's occ with its charge (occ Cr+3) if an ion was meant"),
+    Row("TOPAS_ORIGIN_TRANSLATED", "code", tier=1, ambiguity=1,
+        evidence=('read the site at topas.py:3772 and :3289: the space-group symbol read by '
+                  "normalize_space_group differs from the raw one (TOPAS's trailing Z/S/R/H "
+                  "setting letter respelled as gemmi's :1/:2/:H/:R); a spelling of the setting "
+                  'the file states. A symbol written bare states no setting and is reported '
+                  'separately as SPACE_GROUP_SETTING_ASSUMED'),
+        grounds=("TOPAS's own setting letters name the setting; translating them is not a "
+                 'choice.'),
+        response='info',
+        responds='note the setting the file named, which is the one built'),
+    Row("TOPAS_PHASE_RESTATED_IN_P1", "code", tier='caller', ambiguity=1,
+        evidence=('caller: read the site at topas_input.py:927; fires only under '
+                  "p1_expand='auto' (or True), default False in the writer (topas_input.py:881, "
+                  'topas.py:4911), and only for a magnetic phase whose group has no TOPAS '
+                  "mag_space_group number; 'auto' declined otherwise raises "
+                  '_GroupIdentityRefusal. The P1 copy with every image tied is the same model. '
+                  'Grep 2026-11-17 finds no src caller passing p1_expand'),
+        grounds=('The caller asked for the restatement by name and the package chose nothing '
+                 'inside it.'),
+        response='info',
+        responds='nothing, the phase is the same model written in P1 with tied copies'),
     Row("TOPAS_PHASE_TERM_READ", "code"),
-    Row("TOPAS_SPECIES_NORMALISED", "code"),
-    Row("TOPAS_SPECIES_WRITTEN_NEUTRAL", "code"),
-    Row("WAVELENGTH_CALIBRATION", "code"),
-    Row("XRDML_ATTENUATOR_APPLIED", "code"),
+    Row("TOPAS_SPECIES_NORMALISED", "code", tier=1, ambiguity=1,
+        evidence=('read the site at topas.py:3700: a record of a respelling the format fixes: '
+                  "the file's species token is one this program spells its own way, and the "
+                  'reader writes the IUCr spelling onto the Structure and names both; fires once '
+                  'per distinct raw token that changed; TOPAS writes ions as Cr+3 and species '
+                  'tokens by its own grammar'),
+        grounds="A spelling convention fixed by TOPAS's grammar.",
+        response='info',
+        responds='note the respelled species and check the ion only if the file named one'),
+    Row("TOPAS_SPECIES_WRITTEN_NEUTRAL", "code", tier=1, ambiguity=1,
+        evidence=("the writer's report from scattering.written_neutral_diagnostics (called at "
+                  "topas.py:5170 and :5345, level 'warning' in the helper): as "
+                  'FULLPROF_SPECIES_WRITTEN_NEUTRAL'),
+        grounds='As for the FullProf writer.'),
+    Row("VARIABLE_NOT_FREED", "code", tier=1, ambiguity=1,
+        response="warning",
+        responds=("quote no value the named variable sets, nor the variable itself: it "
+                  "kept its start; add a stage that frees it and refit, or read it as a "
+                  "constant the caller chose"),
+        evidence=("arithmetic: fires exactly when a vars. row that other parameters "
+                  "follow (single fit: ParameterTable.entry_reach) or that a parametric "
+                  "equation declares as a coefficient (joint fit) is in no stage's "
+                  "StageResult.freed or held; no threshold; gates nothing (WP-2101, "
+                  "ruled 2026-11-19)")),
+    Row("WARM_REFIT_REJECTED", "code", tier=3, ambiguity=1,
+        response="info",
+        responds=("nothing: the result is the staged plan's answer, and the message names "
+                  "why the one-stage re-fit was discarded"),
+        evidence=("info at one site (refine.py _warm_refit_rejected, appended by "
+                  "Refinement._fit_refit); fires exactly when a re-fit's one-stage fit was "
+                  "rejected by schemas/sequential.py _rejected (diverged, or an error-level "
+                  "diagnostic) and the staged plan ran in its place, so it reports the "
+                  "package's own act and gates nothing. On the eight comparison standards "
+                  "it fires on none from a converged start (WP-2224 § Measured); its one firing is injected, tests/test_refit_single.py::test_a_rejected_one_stage_fit_falls_back_to_the_plan patching _rejected"),
+        grounds=("Says out loud that the package ran a second fit, as SEQUENTIAL_RESEED "
+                 "does for the series' ladder; the trigger is the series' own _rejected "
+                 "(ruled by the maintainer 2026-11-03) and the fallback is the 2026-11-19 "
+                 "ruling (WP-2224 § Context, design 3)."),
+        approved="2026-11-19", scope=("all",)),
+    Row("WAVELENGTH_CALIBRATION", "code", tier=1, ambiguity=1,
+        response="info",
+        responds="nothing: the message states the ppm shift of the free wavelength",
+        evidence=("arithmetic: fires exactly when a wavelength was free, and states its "
+                  "shift from the declared value in ppm with no test on its size; gates "
+                  "nothing")),
+    Row("INSTRUMENT_WIDTH_HELD", "code", tier=1, ambiguity=1,
+        response="warning",
+        responds=("quote no specimen size or strain width named in where as a measurement "
+                  "of the specimen: it is the remainder of the split the plan's stage order "
+                  "chose; calibrate the instrument on a standard and refit with a "
+                  "sample-only plan"),
+        evidence=("arithmetic: fires exactly when the last stage's "
+                  "StageResult.width_twins_held is not empty, a record the hold writes "
+                  "itself (refine._instrument_width_held_diagnostics); no threshold; "
+                  "gates nothing, "
+                  "moves no number. Physics behind the reading: the data fix only each "
+                  "pair's sum (Gaussian variances add, Lorentzian FWHMs add; Caglioti, "
+                  "Paoletti & Ricci 1958), so the held instrument value sets the specimen "
+                  "value. Measured (WP-2225 task 1): two Biso starts on cpd-1a put fluorite "
+                  "lor_strain 5.11 reported esds apart under the hold; on the eight "
+                  "comparison standards it fires on zincite, fluorite, corundum and brucite, "
+                  "the four whose plan frees an instrument and a specimen width of one "
+                  "shape (tests/data/suite_alarms.json)"),
+        grounds=("Ruled by the maintainer 2026-11-20 (WP-2225, option 3): a package-made "
+                 "hold is said aloud with what it held, as PHASE_UNCONSTRAINED says the "
+                 "absent-phase hold; TOPAS 5 marks a parameter at its limit _LIMIT_MIN_# "
+                 "and GSAS-II prints a warning on a variable it freezes at a limit "
+                 "(docs/practice.md § When one twin reaches its limit, and a re-run)."),
+        approved="2026-11-20"),
+    Row("XRDML_ATTENUATOR_APPLIED", "code", tier=1, ambiguity=1,
+        evidence=('info; fires when a PANalytical beamAttenuationFactors array is not 1 over '
+                  'some finite points; the factor is multiplied into y and sigma is '
+                  'sqrt(counts)*factor (xrdml.py:331-345, _scale 285-320). Measured on the one '
+                  'real file with a varying factor (FAIRmat m54313 GaAs 004 substrate, factor '
+                  '188 at one point): the raw series runs 1341, 14602, 1877, 13749, 1667, a dip '
+                  'of 87 % at the attenuated apex, and the product restores a monotone peak '
+                  '(352876 at the apex), so the stored counts are the attenuated ones '
+                  '(tests/data/README.md 961-980; '
+                  'tests/test_readers.py::test_the_beam_attenuator_is_applied_and_sigma_goes_through_it, '
+                  "real file); FAIRmat's reader computes the same product independently. One "
+                  'real file, one family. GSAS-II 5.8.4 G2pwd_Panalytical.py:90-100 reads the '
+                  'counts and never the factor, so it feeds the dipped series to the fit and '
+                  "weights 1/y: a dissenter by omission, which the project's notes class as a "
+                  'defect'),
+        grounds=("The act is fixed by the vendor's own stored numbers, measured on a real file, "
+                 'not chosen.'),
+        response='info',
+        responds=('note that the named points were multiplied by their attenuation factor and '
+                  'carry a larger sigma; nothing to do'),
+        scope=('all',)),
     Row("XYDATA_INTER_APPLIED", "code", tier=2, ambiguity=1,
         evidence=("info; a record of an act the file's own heading asks for. Two claims, "
                   "each at its own tier. Multiplying x by fac_x and y and sigma by fac_y "
@@ -1508,7 +2893,9 @@ ROWS: tuple[Row, ...] = (
                   "1/cos, Y with lor_strain in tan; gauss_size (1/cos^2 = 1 + tan^2) is flat with "
                   "U and W together and holding U alone removes it, so W, the constant width, is "
                   "never held (holding W too moved three CPD acceptance answers; the generality "
-                  "judge, WP-2002 9th session); "
+                  "judge, WP-2002 9th session; holding it on the triple W, gauss_size and "
+                  "gauss_strain alone moved the cpd-1 chain, WP-2219, so that triple is left "
+                  "to COVARIANCE_DIRECTION_DISCARDED and has no esd); "
                   "refine._width_twin_flats holds the instrument "
                   "terms on the null space of those totals read off C, so one seen phase with its "
                   "specimen width held holds nothing; a free Stephens block is Y's twin by rule "
@@ -1605,7 +2992,10 @@ ROWS: tuple[Row, ...] = (
         evidence=("opt-in: Refinement.hold(), nothing held by default; the caller's hold outranks a"
                   " plan glob (WP-1435)")),
     Row("rietx.schemas.results.StageResult.seeded", "action", tier=3, ambiguity=1,
-        evidence=("the one shipped seed is _ROUGHNESS_STAGE's 0.3, recorded per model. Suortti's "
+        evidence=("the one shipped seed of a stage's own is _ROUGHNESS_STAGE's 0.3, recorded per "
+                  "model; the runner also writes a row here itself, an FCJ axial ratio a stage "
+                  "newly frees on zero, started at AXIAL_SL_START / AXIAL_HL_START (WP-1955, "
+                  "whose rows carry that evidence). Suortti's "
                   "b: start-invariant from 0.3 and 0 on five lab patterns from three families "
                   "(NIST LaB6, GSAS-II FAP, CPD corundum, fluorite, zincite), every Biso, scale "
                   "and b within 2.7e-3 of the smaller esd (tests/test_seed_invariance.py). "
@@ -1614,7 +3004,9 @@ ROWS: tuple[Row, ...] = (
                   "esd; no program supplies a Pitschke start (FullProf's examples start at "
                   "1.2-1.5; docs/practice.md). Since B14 the field also records "
                   "Stage.strain_seed's Stephens rows, whose start is STRAIN_SEED_PPM's row"),
-        grounds=("The seeding action is the stage's, recorded in the field; Suortti's start is "
+        grounds=("The seeding action is the stage's, recorded in the field, except the axial "
+                 "lift, which is the runner's own and fires on every stage that newly frees a "
+                 "ratio on zero (WP-1955, amended for the review of #1372); Suortti's start is "
                  "answer-invariant and Pitschke's is kept at 0.3 because from 0.3 the fit reaches "
                  "the switched-off branch inside the model's valid range, while from 0 the lower "
                  "chi2 is one the model flags as invalid (the sixth round's Q3, ruled (c) "
@@ -1678,6 +3070,35 @@ ROWS: tuple[Row, ...] = (
                  "converges when a closing stage follows it (WP-2045 option 5, ruled "
                  "2026-10-24)."),
         approved="2026-11-01"),
+    Row("rietx.schemas.results.StageResult.window_refit_loss", "action", tier=3, ambiguity=1,
+        evidence=("the share of Bragg intensity the stage's first windows dropped at its first "
+                  "answer (fresh windows against frozen, window_loss's measure) when it passed "
+                  "the stage's window fraction and the answer, on windows sized there, fits "
+                  "better than the stage's start on its own (refine._improved_on_fresh_windows), "
+                  "so the stage solved once more on windows sized there; without that test the "
+                  "Le Bail alternation's +2 % start ran past 3208 s against the base's 246 s, "
+                  "a re-solved runaway profile stage widening its peaks; written by both of Refinement's stage runners, None on a stage that "
+                  "did not re-solve, a stage with a declared window_slack_deg, a non-finite stop "
+                  "and every joint-fit stage. Measured 2026-11-27 (development data): from a "
+                  "cell 0.3 % long it fired once in 4 families (SRM 660c, 291 -> 278 residual "
+                  "evaluations in the whole fit), from the protocols' starts and a zero 0.1 deg "
+                  "off never; on the cpd-1b runaway of "
+                  "tests/test_acceptance_sequential.py it reads 73 % and the second solve stays "
+                  "at axial_sl 558; on the guides' profile stages that widen their peaks it "
+                  "reads 2.2-4.4 %.  What the re-solve moves: a solo width stage reads a "
+                  "synthetic 400 A size as 400.35 and 401.91 A where the stale windows read "
+                  "about 409 (tests/test_joint_report.py); the paired and unpaired dBIC "
+                  "branches of examples/guides/next.py, 148 apart on the stale answer, agree; "
+                  "a hold of the zero and W the stale windows caused is released "
+                  "(tests/test_instrument_hold_noise.py)"),
+        grounds=("Ruled 2026-11-27 (WP-2317 R7): windows stay frozen within a solve, and a "
+                 "stage that ends past its own fraction re-solves once on fresh windows.  Kind 1: "
+                 "an answer computed on windows that miss its peaks is an arithmetic error.  "
+                 "GSAS-II, MAUD, RIETAN-FP and EasyDiffraction rebuild their windows every "
+                 "evaluation and TOPAS's peak buffer tracks positions; FullProf freezes them "
+                 "for a run, and its user's next run is this re-solve (docs/practice.md § Room "
+                 "for a peak to move inside its window)."),
+        approved="2026-11-27"),
     Row("rietx.schemas.results.StageResult.window_area_tol", "action", tier=2, ambiguity=1,
         evidence=("the record of the closing stage PlanSpec:closing_window_tol runs (that "
                   "row's evidence: BGMN's closing run by default), written by both stage "
@@ -1761,6 +3182,29 @@ ROWS: tuple[Row, ...] = (
                   "5x-median-and-3-sigma threshold. The summary prints one line naming the "
                   "largest and the field (2003-batch/batch.md, C4, settled by Claude "
                   "2026-10-26; its row written with C6's, ruled by the maintainer 2026-11-03)")),
+    Row("rietx.schemas.sequential.SeriesEntry.held_values", "action", tier=3, ambiguity=1,
+        evidence=("records the value each caller-held path had on the kept fit "
+                  "(sequential.py _held_values); the action is that a cold rung and a "
+                  "verify_steps refit (and the cold successor of an on_error='skip' "
+                  "failure) hold the value a warm rung would, the last accepted pattern's "
+                  "carry source (the pattern's own fit on a verify refit), limited by carry, "
+                  "where they held the caller's start before (sequential.py "
+                  "_keep_held_values). No program surveyed restarts a pattern from the "
+                  "initial models, so the question is rietx's alone; GSAS-II, FullProf, "
+                  "TOPAS and EasyDiffraction keep a fixed parameter fixed on every pattern "
+                  "(docs/practice.md § Sequential refinement). One family, the synthetic "
+                  "LaB6 thermal ramp of tests/test_sequential.py, frame 2 forced cold: zero "
+                  "shift 0.00797 on every frame and the cell 1.9-2.0 ppm from the truth, "
+                  "against 0.0 and 546 ppm off before (2081-batch/measure_cold_rung.py); a "
+                  "cold rung under a hold is rare, and no real series with one is on disk"),
+        grounds=("Series rule 6, accepted by the maintainer 2026-11-16: a retry does not "
+                 "change what value a fixed parameter has. His approval on 2026-11-18 of "
+                 "the milestone's acceptance row 'a fixed value stays fixed' names this "
+                 "fixture and value: 0.00797 on every pattern and every attempt "
+                 "(docs/milestones/series.md § Acceptance). The source, the warm rung's "
+                 "own, settled by Claude 2026-11-22 as WP-2081 question 4's option A and "
+                 "approved by the maintainer with PR #1778 on 2026-11-22."),
+        approved="2026-11-22"),
     Row("rietx.schemas.sequential.SeriesEntry.rungs_tried", "action"),
     Row("rietx.schemas.sequential.SeriesEntry.rungs_raised", "action"),
     Row("rietx.schemas.sequential.SeriesEntry.seeded_from", "action", tier=3, ambiguity=1,
@@ -1803,6 +3247,31 @@ ROWS: tuple[Row, ...] = (
                   "stable random ID rather than its number (G2VarObj, GSASIIobj.py 937-963). "
                   "A file written before 1.11 stores no names, so it opens as written "
                   "(pattern_paths None) rather than being converted at read")),
+    Row("rietx.schemas.results.RefinementResult.sigma_rule", "action", tier=2, ambiguity=3,
+        evidence=("records how many fitted channels the file's σ, the Poisson fallback "
+                  "√max(y, 1) and the σ <= 0 exclusion each covered (WP-1952, B14 ruled "
+                  "2026-10-20). The exclusion is GSAS-II 5.8.4's fxye rule for σ <= 0 "
+                  "(G2pwd_fxye.py:86-91), ruled the default 2026-10-19 (B5), and replaced a "
+                  "floor at 1e-3 of the median esd that weighed such a channel ~1e6x its "
+                  "neighbours (#897). Built by PatternData.sigma_rule from the fit's own "
+                  "window, the authority in_range_mask also reads"),
+        grounds=("The default is one program's rule, GSAS-II's fxye reader; its xye reader "
+                 "and FullProf replace such a σ instead, so the choice among them was the "
+                 "maintainer's: no weight by default, warn at ingestion, an option to correct "
+                 "(B5, ruled 2026-10-19). Yue named the default 2026-11-13: practitioners "
+                 "rarely think about weights, so the package must catch a gross weight "
+                 "error itself and must not invent a σ (√y is wrong by an unknown factor "
+                 "on a rescaled file). Kind 3: what a zero means (a zero count, an "
+                 "unmeasured channel, a writer's error) is a fact about the writing software, "
+                 "outside the pattern, and some weight must be chosen, so the default acts, "
+                 "the warning names the points and how many record y = 0, and the option "
+                 "reverses it. Measured against the deleted floor, not against Poisson: on "
+                 "the two ILL D1B files that carry σ = 0 the points are unmeasured channels "
+                 "at y = 0, where Poisson's σ = 1 would weigh each ~3000x its neighbours "
+                 "(inferred, not fitted). On a synthetic LaB6 with one σ = 0 at the strongest "
+                 "channel, the old floor stopped the fit at max_iter 1.75e-3 Å from the true "
+                 "cell; the rule converges within 2e-4 Å (tests/test_schemas.py)."),
+        approved="2026-11-13"),
     Row("rietx.schemas.results.RefinementResult.absorption", "action", tier="caller", ambiguity=1,
         evidence=("opt-in: Geometry.mu_r/mu_t or capillary_radius_mm/thickness_mm, default None "
                   "(off); choosing flat_plate_transmission applies sec theta; Rouse et al. (1970) "
@@ -2028,9 +3497,17 @@ ROWS: tuple[Row, ...] = (
         grounds=("Masks the channels the Chebyshev order scan and the arPLS lambda scan score, "
                  "both reached from auto_background (B12, ruled 2026-10-19)."),
         approved="2026-10-19"),
-    Row("rietx.crystallography.atomic_volume.TABLE_TEMPERATURE", "constant", value=298.0),
-    Row("rietx.crystallography.atomic_volume.THERMAL_EXPANSION", "constant", value=9.5e-05),
-    Row("rietx.crystallography.atomic_volume.THERMAL_EXPANSION_ESD", "constant", value=3e-06),
+    Row("rietx.crystallography.atomic_volume.TABLE_TEMPERATURE", "constant", tier=2, value=298.0,
+        evidence=('citation: Hofmann (2002) Acta Cryst. B58, 489, Table 2 quotes its atomic '
+                  'volumes at 298 K; used as the temperature the estimate is made at when the '
+                  'caller gives none (cli.py:326, solve/chemistry.py:213), which applies no '
+                  'expansion')),
+    Row("rietx.crystallography.atomic_volume.THERMAL_EXPANSION", "constant", tier=2, value=9.5e-05,
+        evidence=('citation: Hofmann (2002) Acta Cryst. B58, 489, section 3, the mean volume '
+                  'expansion coefficient 0.95(3)e-4 K^-1 fitted to his CSD sample')),
+    Row("rietx.crystallography.atomic_volume.THERMAL_EXPANSION_ESD", "constant", tier=2, value=3e-06,
+        evidence=('citation: Hofmann (2002) Acta Cryst. B58, 489, section 3, the mean error on '
+                  'THERMAL_EXPANSION, 0.03e-4 K^-1')),
     Row("rietx.crystallography.atomic_volume.VOLUME_RATIO_BOUNDS", "constant", tier=2,
         evidence=("citation: Hofmann (2002) Acta Cryst. B58, 489, section 3: past 25 % either "
                   "way lie 1746 of 182 239 CSD structures (about 1 %; typical scatter 4 %, "
@@ -2044,9 +3521,17 @@ ROWS: tuple[Row, ...] = (
                   "contents left out of the formula, reads 2.283 and does not. The lower edge "
                   "sets only Composition.volume_window's lower edge and the manual's quoted band (in_volume_window and the search read the ceiling alone)"),
         value=(0.8, 1.25)),
-    Row("rietx.crystallography.atomic_volume.VOLUME_SCATTER", "constant", value=0.04),
-    Row("rietx.crystallography.attenuation._HC_EV_ANGSTROM", "constant", value=12398.4198),
-    Row("rietx.crystallography.attenuation._NA_BARN", "constant", value=0.602214076),
+    Row("rietx.crystallography.atomic_volume.VOLUME_SCATTER", "constant", tier=2, value=0.04,
+        evidence=('citation: Hofmann (2002) Acta Cryst. B58, 489, section 3 and Table 1: the '
+                  '4.00 % standard deviation of V_obs/V_est for one crystal '
+                  '(atomic_volume.py:39)')),
+    Row("rietx.crystallography.attenuation._HC_EV_ANGSTROM", "constant", tier=1, value=12398.4198,
+        evidence=('physical constant: hc = 12398.4198 eV A (CODATA 2018, h, c and e exact), '
+                  'E[eV] = hc / lambda[A]')),
+    Row("rietx.crystallography.attenuation._NA_BARN", "constant", tier=1, value=0.602214076,
+        evidence=('physical constant: the Avogadro constant 6.02214076e23 mol^-1 (exact in SI '
+                  'since 2019) times 1e-24 cm^2 per barn, so mu/rho[cm^2/g] = sigma[barn] x '
+                  '0.602214076 / A')),
     Row("rietx.crystallography.cif.CIF_ANGLE_CORRECT_MAX_DEG", "constant", value=0.1),
     Row("rietx.crystallography.cif.CIF_PRINTED_ROUNDING", "constant", tier=1,
         evidence="arithmetic: a number printed to d decimals by rounding to the nearest "
@@ -2060,20 +3545,123 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.crystallography.cif.OCCUPANCY_TOLERANCE", "constant", value=0.01),
     Row("rietx.crystallography.dispersion.LINE_DISPERSION_TOL", "constant", value=0.01),
     Row("rietx.crystallography.dispersion.NEAR_EDGE_EV", "constant", value=50.0),
-    Row("rietx.crystallography.fragments.COLLINEAR_TOL", "constant", value=1e-06),
-    Row("rietx.crystallography.fragments.INERTIA_RANK_TOL", "constant", value=1e-06),
-    Row("rietx.crystallography.fragments._COINCIDENT_A2", "constant", value=1e-20),
-    Row("rietx.crystallography.magcif.MOMENT_FORM_AGREEMENT_MU_B", "constant", value=0.02),
-    Row("rietx.crystallography.magnetic.isotropy.CROSS_IRREP_DRAWS", "constant", value=12),
+    Row("rietx.crystallography.fragments.COLLINEAR_TOL", "constant", tier=1, value=1e-06,
+        evidence=('numerical floor on a Z-matrix reference triple: below a sine of 1e-6 at C the '
+                  "dihedral's reference direction is undefined and the line is refused by name; "
+                  'at 1e-6 that direction is still good to ~1e-9 rad from a 15-digit template '
+                  '(fragments.py:86-92). '
+                  'tests/test_fragments.py::test_a_collinear_reference_triple_is_refused_naming_it '
+                  'refuses a 180 deg triple and accepts the same triple at 170 deg and with an '
+                  'off-line dummy point; ::test_zmatrix_tangent_over_a_collinear_triple_at_180 '
+                  'reads it at 0 and 180')),
+    Row("rietx.crystallography.fragments.INERTIA_RANK_TOL", "constant", tier=1, value=1e-06,
+        evidence=('numerical setting for the inertia rank: an eigenvalue under 1e-6 of the '
+                  "largest is a null rotation, i.e. atoms within ~1e-3 of the fragment's size "
+                  'from one line (fragments.py:94-99). '
+                  'tests/test_fragments.py::test_the_rotation_dof_count_is_the_inertia_rank_with_a_near_linear_tolerance '
+                  'holds both arms: CO2 with +-5e-5 A noise keeps 2 rotations, CO2 bent by 1 deg '
+                  'has 3')),
+    Row("rietx.crystallography.fragments._COINCIDENT_A2", "constant", tier=1, value=1e-20,
+        evidence=('numerical floor: a largest inertia eigenvalue under 1e-20 A^2 (atoms within '
+                  '1e-10 A of each other) has no rotation axis, so the fragment gets no rotation '
+                  'DOF (fragments.py:101-102, 190); '
+                  'tests/test_fragments.py::test_the_rotation_dof_count_is_the_inertia_rank_with_a_near_linear_tolerance '
+                  'holds a single atom and two coincident atoms at 0')),
+    Row("rietx.crystallography.magcif.MOMENT_FORM_AGREEMENT_MU_B", "constant", value=0.02,
+        evidence=("unaudited by ruling: Mike retires the constant on PR #1636 (2026-11-23, "
+                  "corrected 11:47Z). A number within half a unit of its last printed digit "
+                  "reads as the same number (tier 1); a refusal outside that box is tier 3, "
+                  "at max(box, stated s.u.) with no floor, for the snap, two forms of one "
+                  "moment and a listed copy. Measured (Mike, #1797): 0 of 2447 MAGNDATA "
+                  "snapshot files change outcome. WP-1918 builds it and retires this row")),
+    Row("rietx.crystallography.magcif._ORBIT_MERGE_TOL", "constant", tier=3, value=0.001,
+        evidence=("decides which group a magCIF's positions refine under: _orbit_size counts "
+                  "two images closer than 1e-3 in every fractional coordinate as one, so a "
+                  "site within half of it of a parent special position takes the parent "
+                  "(CIF_MAGNETIC_NUCLEAR_GROUP) and is stored on the position "
+                  "(CIF_SITE_TWINS_MERGED); topas.py imports the same count. Measured (Mike, "
+                  "#1797, 2447 MAGNDATA snapshot files): in the 106 read under a parent above "
+                  "their own group no stated coordinate moves more than 3.1e-5 A; a print-box "
+                  "gate in its place falsely refused one of them (entry 0.92, 1/3 printed "
+                  "0.33330). Injected case: tests/test_magcif.py::test_a_site_inside_the_"
+                  "orbit_merge_counts_as_on_the_parent_position (P m' m' 2 under P m m m, "
+                  "z = 0.4 tol merged, 0.6 tol kept). The move onto the position "
+                  "(_merge_twins, TWIN_COORD_TOL 5e-4) matches the merge only where two "
+                  "images are 2d apart (a mirror, a 2-fold axis, an inversion centre). Off a "
+                  "4-fold axis neighbouring images are d apart: probed 2026-11-24, P m m m "
+                  "under P 4/m m m with O at (7e-4, 0, 0) reads under the parent unmoved, "
+                  "4 images where the file's group gives 2, with only the info code; sent to "
+                  "Mike and WP-1918. One family, never inside the band (development data)"),
+        grounds=("Rare feature, kept at a value its one family never exercises: it moved "
+                 "no MAGNDATA coordinate by more than 3.1e-5 A, and on a mirror the stated "
+                 "displacement it erases is reported by name. Dissenter: a refiner "
+                 "stating a displacement under 5e-4 off a parent special position, who "
+                 "passes nuclear_group='file'. Kept at tier 3 by Mike's ruling on PR #1636 "
+                 "(2026-11-23, 11:47Z: the merge 'stays') under #1075; his, not the judge's, "
+                 "since it sets the threshold of the parent-group pick (WP-2238)."),
+        approved="2026-11-23"),
+    Row("rietx.crystallography.magnetic.isotropy.CROSS_IRREP_DRAWS", "constant", value=12,
+        evidence=("back to Mike, unaudited: he ruled tier 3 on PR #1636 (2026-11-23), and "
+                  "the judge (2026-11-24) called it weak and an action's threshold: "
+                  "solve_magnetic calls analyse with no draws= (strategy/magnetic.py:2374) and "
+                  "refines only each class's smallest member, so a false join drops a candidate "
+                  "and the caller cannot change the count; and nothing on disk runs the known "
+                  "answer at 3 draws. Measured: "
+                  "of the cubic pairs 3 draws called equivalent, 8 % were refuted within 12 "
+                  "draws, against 0.2 % at 12 (six synthetic cubic sets); case that reaches "
+                  "it: "
+                  "tests/test_magnetic_isotropy.py::test_the_cubic_known_answer_has_four_classes_at_the_default_draws "
+                  "(P n -3 m:1, four classes at 12 draws, two at 3). Synthetic cubic sets "
+                  "only; untested beyond")),
     Row("rietx.crystallography.magnetic.isotropy.DEFAULT_CELL_SCALE", "constant", value=5.0),
     Row("rietx.crystallography.magnetic.isotropy.DUAL_AFTER_RESTART", "constant", value=1),
-    Row("rietx.crystallography.magnetic.isotropy.FARKAS_FLOOR", "constant", value=1e-12),
-    Row("rietx.crystallography.magnetic.isotropy.FARKAS_QUOTE", "constant", value=1e-10),
+    Row("rietx.crystallography.magnetic.isotropy.FARKAS_FLOOR", "constant", tier=1, value=1e-12,
+        evidence=('accept floor of a Farkas certificate: a draw is certified only when the '
+                  "projected dual's optimum is at least 1e-12, else the restarts decide it; "
+                  'every issued certificate is then checked exactly (isotropy.py:270-280). '
+                  'Measured: accepted optima 6.4e-10 to 2.0e-5, failures -3.0e-6 and below. '
+                  'tests/test_magnetic_isotropy.py::test_the_synthetic_certificate_brackets_the_known_distance '
+                  '(a boundary point at |raw| <= 1e-15 sits under the floor and is not '
+                  'certified), '
+                  '::test_a_stored_known_answer_witness_reverifies_from_its_literals, '
+                  '::test_the_quote_target_is_never_below_the_accept_floor')),
+    Row("rietx.crystallography.magnetic.isotropy.FARKAS_QUOTE", "constant", tier=1, value=1e-10,
+        evidence=('numerical setting: a quoted certificate is moved inside the PSD cone to a '
+                  'projected ratio of at least 1e-10, so the exact check cannot go either way '
+                  'between machines on a point on the boundary (ratios -4e-16 to 2e-16 there); '
+                  'two decades above FARKAS_FLOOR, three over the measured 3.4e-14 rounding '
+                  'bound (isotropy.py:282-290). '
+                  'tests/test_magnetic_isotropy.py::test_a_separation_proved_on_one_copy_appears_on_the_other '
+                  'asserts exact, ratio >= FARKAS_QUOTE and rounding bound < 1e-13; '
+                  '::test_the_quote_target_is_never_below_the_accept_floor holds both arms')),
     Row("rietx.crystallography.magnetic.isotropy.INTENSITY_RTOL", "constant", value=1e-09),
-    Row("rietx.crystallography.magnetic.isotropy.ISOMETRY_RESIDUAL", "constant", value=1e-12),
-    Row("rietx.crystallography.magnetic.isotropy.KERNEL_AMPLITUDE_RATIO", "constant", value=1.0),
+    Row("rietx.crystallography.magnetic.isotropy.ISOMETRY_RESIDUAL", "constant", tier=1, value=1e-12,
+        evidence=('numerical setting, one bound for two certificates (isometry and span '
+                  'containment): residuals and orthogonality deviations at most 1e-12 accept; '
+                  'measured accepted residuals 9.8e-16 to 2.9e-14, while a non-isometric pair '
+                  'has no intertwiner (smallest relative singular value >= 7e-2), so the bound '
+                  'fences round-off and separates nothing measured (isotropy.py:240-268). '
+                  'tests/test_magnetic_isotropy.py::test_the_rank_one_copies_of_each_known_answer_irrep_are_isometric '
+                  '(positive arm), ::test_a_singular_or_absent_intertwiner_is_no_isometry '
+                  '(negative arm, residual > 0.5), '
+                  '::test_an_isometry_is_found_in_a_multi_dimensional_intertwiner_space_and_up_to_scale')),
+    Row("rietx.crystallography.magnetic.isotropy.KERNEL_AMPLITUDE_RATIO", "constant", tier=1, value=1.0,
+        evidence=('numerical guard of a Farkas certificate on the full float stack: issued only '
+                  'when the kernel may carry at least as much amplitude as the live directions '
+                  '(rho_max >= 1), which at the quoted 1e-10 margin bounds the kernel residual '
+                  'at 2.4e-12 (isotropy.py:270-285); measured rho_max 14.9 to 143 on 20 kernel '
+                  'certificates. '
+                  'tests/test_magnetic_isotropy.py::test_the_full_stack_guard_refuses_a_kernel_the_quoted_margin_cannot_cover '
+                  'holds the refusing arm (rho ~ 0.03) and the issuing arm')),
     Row("rietx.crystallography.magnetic.isotropy.TRANSFER_FLOAT_STACK", "constant", value=1e-08),
-    Row("rietx.crystallography.magnetic.isotropy.WITHIN_IRREP_DRAWS", "constant", value=3),
+    Row("rietx.crystallography.magnetic.isotropy.WITHIN_IRREP_DRAWS", "constant", value=3,
+        evidence=("unaudited until its case lands: Mike rules tier 3 on PR #1636 "
+                  "(2026-11-23), with one case owed, since no case on disk makes 3 and 12 "
+                  "draws differ (pairs at 3 run in tests/test_magnetic_isotropy.py) (generality.md: a guard no ordinary fit reaches is recorded kept "
+                  "on an injected case). Measured: on the P n -3 m:1 known answer, 3 and 12 "
+                  "draws give the same 4 classes and 24 within-irrep verdicts. The owed case "
+                  "(a set where 3 draws join two directions of one irrep and 12 separate "
+                  "them, or evidence none can be built) is in #1797 and WP-1918")),
     Row("rietx.crystallography.magnetic.isotropy._CLOSURE_LIMIT", "constant", value=4096),
     Row("rietx.crystallography.magnetic.isotropy._PROBE_DRAWS", "constant", tier=1, value=3,
         evidence=("probability: a false DISTORTION_CHILD_LARGER needs every draw to keep an accidental "
@@ -2097,23 +3685,105 @@ ROWS: tuple[Row, ...] = (
                   "same children at Gamma, R, X and M, no false DISTORTION_CHILD_LARGER); "
                   "tests/test_distortion_candidates.py::test_a_tolerance_at_the_probe_scale_finds_extra_operations its positive arm")),
     Row("rietx.crystallography.magnetic.isotropy._SPAN_GAP", "constant", value=(1e-12, 1e-06)),
-    Row("rietx.crystallography.magnetic.moments.MOMENT_DIRECTION_SUPPORT", "constant", value=1e-06),
-    Row("rietx.crystallography.magnetic.moments.SEED_TILT", "constant", value=0.02),
-    Row("rietx.crystallography.magnetic.operators.N_MAGNETIC_SPACE_GROUPS", "constant", value=1651),
-    Row("rietx.crystallography.magnetic.operators._MAX_CODE", "constant", value=4611686018427387904),
-    Row("rietx.crystallography.magnetic.p1._WRAP_TOL", "constant", value=1e-12),
-    Row("rietx.crystallography.magnetic.scattering.INVARIANCE_MOMENT_TOL", "constant", value=0.001),
-    Row("rietx.crystallography.magnetic.scattering.INVARIANCE_POS_TOL", "constant", value=0.001),
+    Row("rietx.crystallography.magnetic.moments.MOMENT_DIRECTION_SUPPORT", "constant", tier=3, value=1e-06,
+        evidence=("a direction's response to the MOMENT_PROBE_ANGLE_RAD turn relative to the "
+                  "modulus's is ~1e-15 on the synthetic cubic collinear structure and ~1 on "
+                  "Cr2WO6 4 K (HB-2A); the cut sits between them. Cases that reach it: the "
+                  "ratio tests in tests/test_magnetic.py (below the cut at a 1e-6 step, above "
+                  "1e3 x the cut at the probe angle) and "
+                  "tests/test_stationary_moment_angle.py. Cr2WO6 4 K plus synthetic cubic and "
+                  "two-site Pnma sets; untested beyond, and a pseudo-symmetric cell could "
+                  "fall between the measured values"),
+        grounds=("Rare feature, kept at the value its one real family and the synthetic sets "
+                 "bracket: it sets which moment angles a stage frees, and every esd "
+                 "correlated with them. No dissenter found. Kept at tier 3 by Mike's ruling "
+                 "on PR #1636 (2026-11-23) under #1075; his, not the judge's, since it sets "
+                 "the threshold of the moment-angle hold, an automatic action (WP-2238)."),
+        approved="2026-11-23"),
+    Row("rietx.crystallography.magnetic.moments.SEED_TILT", "constant", tier=3, value=0.02,
+        evidence=("WP-1418: on 20 simulated MAGNDATA structures 0.15 lost 2 exact recoveries "
+                  "and 0.02 none. Case that reaches it: the slow test in "
+                  "tests/test_magnetic_solve.py that sets the tilt to 0, where the second "
+                  "component stays at 0; tests/test_magnetic_supercell.py pins the geometry "
+                  "(tan theta = SEED_TILT). It also seeds the moments magnetic_supercell "
+                  "builds, as a starting point the next fit refines. One simulated family; "
+                  "untested beyond. The alias strategy.magnetic.SOLVE_SEED_TILT keeps its own "
+                  "row"),
+        grounds=("Rare feature, kept at the measured value: which local minimum a magnetic "
+                 "solve lands in (2 of 20 lost at 0.15), and where a built supercell's "
+                 "moments start. No dissenter found. Tier 3 ruled by Mike on PR #1636 "
+                 "(2026-11-23) under #1075."),
+        approved="2026-11-24", approved_by="checked"),
+    Row("rietx.crystallography.magnetic.operators.N_MAGNETIC_SPACE_GROUPS", "constant", tier=2, value=1651,
+        evidence=('published count: Litvin (2013) Magnetic Group Tables, IUCr, the 1651 magnetic '
+                  'space groups in UNI numbering; '
+                  'tests/test_magnetic_operators.py::test_identification_round_trips_for_every_database_entry '
+                  'and ::test_every_group_closes_and_splits_into_the_two_magcif_loops iterate '
+                  "1..1651 over spglib's database")),
+    Row("rietx.crystallography.magnetic.operators._MAX_CODE", "constant", tier=1, value=4611686018427387904,
+        evidence=('arithmetic: _closure_gap packs each product into an int64 mixed-radix code '
+                  'and takes the exact pairwise loop instead once the largest code could reach '
+                  "2^62, a factor of two under int64's 2^63, so the vectorised form never "
+                  'overflows; both forms compute the same closure check '
+                  '(operators.py:1393-1432); every crystallographic case is ~1e9')),
+    Row("rietx.crystallography.magnetic.p1._WRAP_TOL", "constant", tier=1, value=1e-12,
+        evidence=('arithmetic: after x % 1.0 a coordinate within 1e-12 of 1 is the lattice point '
+                  '0 (-1e-17 % 1.0 is 1.0 in floating point, outside [0, 1)); the two values '
+                  'name one point to 1e-12 of an edge, eight orders under SITE_TOL (p1.py:68-83)')),
+    Row("rietx.crystallography.magnetic.scattering.INVARIANCE_MOMENT_TOL", "constant", value=0.001,
+        evidence=("back to Mike, unaudited: he ruled tier 3 on PR #1636 (2026-11-23), and "
+                  "the judge (2026-11-24) called it weak: Mike's own FYI is a dissent, since an "
+                  "honest 2-decimal pair (gap 0.01) reads as a magCIF and is refused as "
+                  "explicit copies, and this bar does not follow the printed-digit convention "
+                  "the reader rows are moving to; the boundary case is not on disk. Measured: "
+                  "1e-3 x max(1, |m|): fires on 0 of 2447 MAGNDATA files (Mike, #1797), since "
+                  "a magCIF lists one atom per orbit and the reader drops a listed copy "
+                  "before this check; it acts only where the phase's group lacks the "
+                  "operation relating two listed atoms (explicit copies from FullProf, TOPAS, "
+                  "a hand-built Phase or a P 1 supercell). Injected case: "
+                  "tests/test_magnetic_group_symmetry.py::test_explicit_copies_the_group_does_not_relate_are_refused "
+                  "(6 mu_B, far past the bar); a boundary case (a P -1 pair in P 1, |m| 3.16, "
+                  "passes at 0.002 and is refused at 0.01) is in #1797. Synthetic pairs; "
+                  "untested beyond")),
+    Row("rietx.crystallography.magnetic.scattering.INVARIANCE_POS_TOL", "constant", value=0.001,
+        evidence=("back to Mike, unaudited: he ruled tier 3 on PR #1636 (2026-11-23), and "
+                  "the judge (2026-11-24) called it weak: on hexagonal axes an operation such "
+                  "as (-y, x-y, z) adds two roundings in one coordinate, so an honest 3-decimal "
+                  "pair can be 1.5e-3 apart and refused, and the refusal names no nearest atom; "
+                  "the boundary case is not on disk. Measured: "
+                  "two related atoms listed separately and printed to three decimals pass, "
+                  "their images differing by at most 1e-3; at two decimals they do not. Fires "
+                  "on 0 of 2447 MAGNDATA files for the reason INVARIANCE_MOMENT_TOL's row "
+                  "gives, so MAGNDATA's print precision is not evidence for it. Injected "
+                  "cases: "
+                  "tests/test_magnetic_group_symmetry.py::test_mnf2_with_its_group_at_a_shifted_origin_is_refused "
+                  "and the origin-choice test, far past the bar; a boundary case (a P 1 pair, "
+                  "a = 4 A, 9e-4 passes, 1.1e-3 refused) is in #1797. Synthetic pairs; "
+                  "untested beyond")),
     Row("rietx.crystallography.magnetic.scattering.METRIC_TOL", "constant", value=0.001),
-    Row("rietx.crystallography.magnetic.scattering.P_MAGNETIC_FM", "constant", value=2.695),
-    Row("rietx.crystallography.magnetic.supercell.CHILD_SITE_TOL", "constant", value=0.0001),
+    Row("rietx.crystallography.magnetic.scattering.P_MAGNETIC_FM", "constant", tier=1, value=2.695,
+        evidence=('physical constant: p = gamma r_0 / 2 = 0.2695e-12 cm = 2.695 fm, the magnetic '
+                  "scattering length of one Bohr magneton (gamma = 1.913 the neutron's moment in "
+                  'nuclear magnetons, r_0 = 2.818 fm the classical electron radius, CODATA), in '
+                  'the unit of the Sears table (scattering.py:70-76); tests/test_magnetic.py '
+                  'pins the magnetic-to-nuclear scale')),
+    Row("rietx.crystallography.magnetic.supercell.CHILD_SITE_TOL", "constant", value=0.0001,
+        evidence=("an alias, CHILD_SITE_TOL = SITE_TOL, with no free factor: the child "
+                  "positions are the parent's pushed through an exact rational transform. "
+                  "Takes symmetry.SITE_TOL's tier when that row is given one (Mike on PR "
+                  "#1636, 2026-11-23: not tier 3 on its own)")),
     Row("rietx.crystallography.metric.COSINE_SNAP", "constant", tier=1, value=1e-12,
         evidence=("numerical floor: P^T.G.P puts a symmetry-forced cosine within ~2e-16 of 0 or +-1/2 "
                   "(hexagonal gamma 119.99999999999999 unsnapped); 1e-12 on a cosine is 6e-11 deg at 90, "
                   "far below any refined departure. The literal main's _child_cell_parameters already "
                   "used. test_the_cosine_snap_removes_round_off_and_nothing_physical")),
-    Row("rietx.crystallography.neutron.NEUTRON_LAMBDA_EV_ANGSTROM", "constant", value=0.286014),
-    Row("rietx.crystallography.neutron.SIGMA_ABS_REFERENCE_WAVELENGTH", "constant", value=1.798),
+    Row("rietx.crystallography.neutron.NEUTRON_LAMBDA_EV_ANGSTROM", "constant", tier=1, value=0.286014,
+        evidence=('physical constant: lambda = h / sqrt(2 m_n E) = 0.286014 A eV^0.5 / sqrt(E) '
+                  'with CODATA 2018 h, m_n and e (neutron.py:93); tests/test_neutron_cw.py')),
+    Row("rietx.crystallography.neutron.SIGMA_ABS_REFERENCE_WAVELENGTH", "constant", tier=2, value=1.798,
+        evidence=('citation: Sears (1992) Neutron News 3(3), 26 quotes absorption cross-sections '
+                  'for neutrons at 2200 m/s, which is 1.798 A by lambda = h / (m_n v); '
+                  'tests/test_neutron_cw.py scales the 1/v absorption from it')),
     Row("rietx.crystallography.representation.distortion.DISTORTION_SEED", "constant",
         tier="invariant", value=0.01,
         evidence=("answer-invariant by measured margin (WP-1419): the act is physics (chi2 is even "
@@ -2130,14 +3800,40 @@ ROWS: tuple[Row, ...] = (
         evidence=('a numerical setting measured against a finer grid: the internal translations of a (3+1)D operation are multiples of 1/2, 1/3, 1/4 and 1/6 (the commensurate part of q takes components 0, 1/2, 1/3, 2/3), and the M.v cross terms of centred and screw operations are not derived to stay on the grid; tests/test_incommensurate_irreps.py::test_the_isotropy_search_finds_the_same_groups_on_a_finer_delta_grid runs isotropy_superspace_groups at 24 and at 72 (which holds the cross products 1/3*1/3 and 1/3*1/6) over P n m a (0,0,g) and (0,g,0), P 63/m m c (0,0,g) and (1/3,1/3,g), C m c a, I 41/a m d, R -3 m, F d -3 m and P 31 2 1 (all (0,0,g) unless stated) and asserts the same groups irrep by irrep, with a positive arm (a grid of 4 finds different groups), so the 1/24 search lost no group on those lines (those cases only, at one lambda)')),
     Row("rietx.crystallography.representation.incommensurate.LINE_ATOL", "constant", tier=1, value=1e-08,
         evidence=("numerical floor: the relative rank cut of `_null` (rcond kind), s > tol*max(1, s[0]); measured and asserted: tests/test_incommensurate_irreps.py::test_line_atol_sits_in_a_gap_of_the_relative_singular_values records the relative singular values _null cuts over the isotropy groups of every irrep of P n m a at (0,0,g) and P m -3 m at (g,g,g) (344 580 values): largest dropped 7e-15, smallest kept 6.5e-2, so any tolerance from 1e-13 to 1e-2 returns the same subspaces there; 1e-8 sits inside 12 empty orders of magnitude (those cases only, not other lines). A second lambda near a rational does not move it, and cannot: lambda reaches those matrices only through exp(2 pi i lambda d.v), a character of G_k that cancels against D(g)'s factor-system phase on the epsilon=+1 operations and is one common internal-origin phase on the epsilon=-1 ones, so the singular values are lambda-free to rounding. Measured over the nine DELTA_GRID lines at lambda = 1/2, 1/3, 1/4 and each +-1e-10, +-1e-8, +-1e-6, beside 1/sqrt7 and 1/sqrt5 (207 runs, 41 359 566 values): largest dropped 9.2e-15, smallest kept 6.54e-2, none in [1e-14, 6.5e-2), the same groups at every lambda. Positive arm, tests/test_incommensurate_irreps.py::test_line_atol_gap_does_not_move_with_lambda_near_a_rational: an uncancelled phase eps (irreps at lambda, k.v at lambda+eps) puts values between pi*eps/4 and pi*eps in front of _null; eps <= 5e-9 is cut and the groups stand, eps >= 1e-8 is kept and the search finds no group, so 1e-8 tolerates a phase error of ~3e-9 and none arises (on P n m a (0,0,g), (0,g,0) and P 31 2 1 (0,0,g); the test fails at a tolerance of 1e-10 or 1e-6)")),
-    Row("rietx.crystallography.representation.irreps.IRREP_ATOL", "constant", value=1e-08),
+    Row("rietx.crystallography.representation.irreps.IRREP_ATOL", "constant", tier=1, value=1e-08,
+        evidence=('numerical setting for the irrep identity, unitarity, irreducibility and '
+                  'character checks (irreps.py:186-190); '
+                  'tests/test_magnetic_irreps.py::test_burnside_and_character_orthonormality_over_all_230_space_groups '
+                  'builds the small irreps of every group at the zone-boundary and '
+                  'denominator-3/4/6 k sets, so every check at 1e-8 passes there, and asserts '
+                  'the worst character orthonormality under 1e-10, two orders inside it')),
     Row("rietx.crystallography.representation.irreps.K_FLOAT_TOL", "constant", value=1e-09),
-    Row("rietx.crystallography.representation.irreps.K_MAX_DENOMINATOR", "constant", value=64),
-    Row("rietx.crystallography.representation.irreps._H", "constant", value=0.5),
+    Row("rietx.crystallography.representation.irreps.K_MAX_DENOMINATOR", "constant", tier=3, value=64,
+        evidence=("over MAGNDATA's 2278 commensurate entries the largest k denominator is 8. "
+                  "Injected cases: "
+                  "tests/test_magnetic_irreps.py::test_an_incommensurate_k_is_refused_by_name "
+                  "(a float 0.3123 at as_kvector), "
+                  "tests/test_satellites.py::test_a_generator_that_returns_an_unusable_k_is_refused "
+                  "(an exact 1/97 on the satellite rung), "
+                  "tests/test_indexing_kvector.py::test_the_denominator_is_required_and_bounded "
+                  "(a grid denominator of 65); "
+                  "tests/test_incommensurate_irreps.py::test_door_refusals pins the value. "
+                  "MAGNDATA only; untested beyond"),
+        grounds=("A refusal only, and one step fixes the input: 1/96 is refused on the "
+                 "satellite rung and in the k grid whatever its form, and only as_kvector "
+                 "admits it exactly, as a Fraction; the float refusal says to pass one. No "
+                 "dissenter found. Tier 3 ruled by Mike on PR #1636 (2026-11-23) under #1075."),
+        approved="2026-11-24", approved_by="checked"),
+    Row("rietx.crystallography.representation.irreps._H", "constant", tier=1, value=0.5,
+        evidence=('arithmetic: the exact rational Fraction(1, 2) used to write the '
+                  'primitive-basis tables (irreps.py:333)')),
     Row("rietx.crystallography.representation.irreps._SEEDS", "constant", value=(0, 1, 2, 3, 4, 5, 6, 7)),
-    Row("rietx.crystallography.representation.irreps._T", "constant", value=0.3333333333333333),
-    Row("rietx.crystallography.representation.irreps._TT", "constant", value=0.6666666666666666),
-    Row("rietx.crystallography.representation.irreps._ZERO", "constant", value=0.0),
+    Row("rietx.crystallography.representation.irreps._T", "constant", tier=1, value=0.3333333333333333,
+        evidence='arithmetic: the exact rational Fraction(1, 3), same tables (irreps.py:334)'),
+    Row("rietx.crystallography.representation.irreps._TT", "constant", tier=1, value=0.6666666666666666,
+        evidence='arithmetic: the exact rational Fraction(2, 3), same tables (irreps.py:335)'),
+    Row("rietx.crystallography.representation.irreps._ZERO", "constant", tier=1, value=0.0,
+        evidence='arithmetic: the exact rational Fraction(0) (irreps.py:206)'),
     Row("rietx.crystallography.representation.modes.MODE_ATOL", "constant", value=1e-09),
     Row("rietx.crystallography.representation.modes.POSITION_ATOL", "constant", value=1e-06),
     Row("rietx.crystallography.representation.order_parameter.ISOTROPY_ATOL", "constant", value=1e-08),
@@ -2199,14 +3895,55 @@ ROWS: tuple[Row, ...] = (
                   "orbit splitting; _Table.generic checks that the point's site symmetry is the "
                   "position's own and raises otherwise, so a value that hit a special position "
                   "could only raise, never mislabel")),
-    Row("rietx.crystallography.riding.RIDING_MIN_SEPARATION", "constant", value=1e-06),
-    Row("rietx.crystallography.rotation.SERIES_THRESHOLD", "constant", value=0.25),
-    Row("rietx.crystallography.rotation.UNIT_TOLERANCE", "constant", value=1e-09),
-    Row("rietx.crystallography.rotation._A_SERIES", "constant", value=(1.0, -0.16666666666666666, 0.008333333333333333, -0.0001984126984126984, 2.7557319223985893e-06, -2.505210838544172e-08)),
-    Row("rietx.crystallography.rotation._B_SERIES", "constant", value=(0.5, -0.041666666666666664, 0.001388888888888889, -2.48015873015873e-05, 2.755731922398589e-07, -2.08767569878681e-09)),
-    Row("rietx.crystallography.rotation._C_SERIES", "constant", value=(0.16666666666666666, -0.008333333333333333, 0.0001984126984126984, -2.7557319223985893e-06, 2.505210838544172e-08, -1.6059043836821613e-10)),
-    Row("rietx.crystallography.rotation._LOG_SERIES_NORM", "constant", value=1e-08),
-    Row("rietx.crystallography.satellites._ORDERS", "constant", value=(1, -1)),
+    Row("rietx.crystallography.riding.RIDING_MIN_SEPARATION", "constant", tier=1, value=1e-06,
+        evidence=('degenerate-geometry floor: an H closer than 1e-6 A to its parent has no '
+                  'direction to ride along and is refused by name (riding.py:49-50, 112-116); '
+                  'six orders under an X-H bond; '
+                  'tests/test_riding_h.py::test_an_unknown_label_and_an_h_on_its_parent_are_refused_by_name')),
+    Row("rietx.crystallography.rotation.SERIES_THRESHOLD", "constant", tier=1, value=0.25,
+        evidence=('numerical setting: below 0.25 rad A, B and C take their series, where the '
+                  "first omitted term is < 1e-16 relative and C's closed form above it is good "
+                  'to ~1e-14 (rotation.py:82-86); '
+                  'tests/test_rotation.py::test_coefficients_match_a_60_digit_series_on_both_sides_of_the_threshold '
+                  'holds A and B to 1e-15 and C to 1.5e-14 relative from 1e-9 to 1 rad and at '
+                  'the threshold +-1e-15; '
+                  '::test_jacobian_near_zero_and_across_the_series_threshold')),
+    Row("rietx.crystallography.rotation.UNIT_TOLERANCE", "constant", tier=1, value=1e-09,
+        evidence=('numerical setting: a quaternion norm or R^T R off unity by more than 1e-9 is '
+                  'refused as no rotation; a stored 15-digit record is within ~1e-15 '
+                  '(rotation.py:88-91); '
+                  'tests/test_rotation.py::test_a_quaternion_the_unit_check_passes_gives_a_matrix_the_matrix_check_passes '
+                  '(9e-10 accepted both ways, 2 x the tolerance refused), '
+                  '::test_wrong_objects_are_refused')),
+    Row("rietx.crystallography.rotation._A_SERIES", "constant", tier=1, value=(1.0, -0.16666666666666666, 0.008333333333333333, -0.0001984126984126984, 2.7557319223985893e-06, -2.505210838544172e-08),
+        evidence=('arithmetic: the Maclaurin coefficients of A = sum (-1)^k t^2k/(2k+1)! through '
+                  't^10, written as exact reciprocals of factorials (rotation.py:93-98); '
+                  'tests/test_rotation.py::test_coefficients_match_a_60_digit_series_on_both_sides_of_the_threshold '
+                  'checks the series against a 60-digit evaluation')),
+    Row("rietx.crystallography.rotation._B_SERIES", "constant", tier=1, value=(0.5, -0.041666666666666664, 0.001388888888888889, -2.48015873015873e-05, 2.755731922398589e-07, -2.08767569878681e-09),
+        evidence=('arithmetic: the Maclaurin coefficients of B = sum (-1)^k t^2k/(2k+2)! through '
+                  't^10, written as exact reciprocals of factorials (rotation.py:93-98); '
+                  'tests/test_rotation.py::test_coefficients_match_a_60_digit_series_on_both_sides_of_the_threshold '
+                  'checks the series against a 60-digit evaluation')),
+    Row("rietx.crystallography.rotation._C_SERIES", "constant", tier=1, value=(0.16666666666666666, -0.008333333333333333, 0.0001984126984126984, -2.7557319223985893e-06, 2.505210838544172e-08, -1.6059043836821613e-10),
+        evidence=('arithmetic: the Maclaurin coefficients of C = sum (-1)^k t^2k/(2k+3)! through '
+                  't^10, written as exact reciprocals of factorials (rotation.py:93-98); '
+                  'tests/test_rotation.py::test_coefficients_match_a_60_digit_series_on_both_sides_of_the_threshold '
+                  'checks the series against a 60-digit evaluation')),
+    Row("rietx.crystallography.rotation._LOG_SERIES_NORM", "constant", tier=1, value=1e-08,
+        evidence=("numerical setting: below a vector norm of 1e-8 the quaternion log's 2 "
+                  'atan2(n, w)/n is taken by its series, the closed form being 0/0 at n = 0 '
+                  '(rotation.py:101-102, 266); '
+                  'tests/test_rotation.py::test_vector_quaternion_vector_round_trip_within_8_ulp '
+                  'runs vectors on both sides (1e-300, ~1e-9, 2e-3, 5e-4 and 2000 random) and '
+                  'holds the round trip to 8 ulp')),
+    Row("rietx.crystallography.satellites._ORDERS", "constant", tier=1, value=(1, -1),
+        evidence=('physics: a phase ordering with propagation vector k scatters at Q = H + m k '
+                  'for the reciprocal-lattice H, and a single-k structure has its Fourier '
+                  'components at +k and -k, so this rung enumerates m = +1 and -1 '
+                  '(satellites.py:1-12, 366-368; Rodriguez-Carvajal (1993) Physica B 192, 55, '
+                  "and the FullProf manual's propagation-vector section, cited in the module "
+                  'docstring)')),
     Row("rietx.crystallography.site_classes.GRID", "constant", tier=1,
         evidence="Arithmetic: every translation of a gemmi space-group operation is a "
                  "multiple of 1/Op.DEN = 1/24, so the affine stabilisers are exact on the "
@@ -2244,12 +3981,35 @@ ROWS: tuple[Row, ...] = (
                  "stops after one chunk.",
         value=1728),
     Row("rietx.crystallography.spherical_harmonics._TOL", "constant", value=1e-09),
-    Row("rietx.crystallography.stephens._DEG_PER_RAD", "constant", value=57.29577951308232),
-    Row("rietx.crystallography.superspace.generation.N_BRAVAIS_CLASSES_D1", "constant", value=24),
-    Row("rietx.crystallography.superspace.generation.N_SUPERSPACE_GROUPS_D1", "constant", value=775),
-    Row("rietx.crystallography.superspace.generation._F0", "constant", value=0.0),
-    Row("rietx.crystallography.superspace.generation._GRID", "constant", value=24),
-    Row("rietx.crystallography.superspace.generation._QR_COMPONENTS", "constant", value=(0.0, 0.5, 1.0, 0.3333333333333333, 0.6666666666666666)),
+    Row("rietx.crystallography.stephens._DEG_PER_RAD", "constant", tier=1, value=57.29577951308232,
+        evidence=('arithmetic: 180/pi, the radian-to-degree conversion of the Stephens strain '
+                  'width (stephens.py:98)')),
+    Row("rietx.crystallography.superspace.generation.N_BRAVAIS_CLASSES_D1", "constant", tier=2, value=24,
+        evidence=('published count: de Wolff, Janssen & Janner (1981) Acta Cryst. A37, 625, '
+                  'section 4, and Stokes (2011) p. 49: 24 (3+1)D Bravais classes; '
+                  'tests/test_superspace.py::test_24_bravais_classes reproduces it')),
+    Row("rietx.crystallography.superspace.generation.N_SUPERSPACE_GROUPS_D1", "constant", tier=2, value=775,
+        evidence=('published count: Yamamoto, Janssen, Janner & de Wolff (1985) Acta Cryst. A41, '
+                  '528, p. 529; Stokes & Campbell (2022) Acta Cryst. A78, 364, Table 6, type-1 '
+                  'row: 775 (3+1)D superspace-group types; '
+                  'tests/test_superspace.py::test_775_superspace_groups_from_the_230_basic_groups '
+                  'reproduces it')),
+    Row("rietx.crystallography.superspace.generation._F0", "constant", tier=1, value=0.0,
+        evidence=('arithmetic: the exact rational Fraction(0) of the superspace generator '
+                  '(generation.py:76)')),
+    Row("rietx.crystallography.superspace.generation._GRID", "constant", tier=1, value=24,
+        evidence=('arithmetic and measurement: every gemmi space-group translation is a multiple '
+                  "of 1/24 (site_classes.GRID's row), so the normaliser's origin-shift search on "
+                  'the 1/24 grid meets every tabulated origin (generation.py:75, 545-566); '
+                  'tests/test_superspace.py::test_775_superspace_groups_from_the_230_basic_groups '
+                  'and ::test_24_bravais_classes reproduce the published counts on it')),
+    Row("rietx.crystallography.superspace.generation._QR_COMPONENTS", "constant", tier=1, value=(0.0, 0.5, 1.0, 0.3333333333333333, 0.6666666666666666),
+        evidence=('theory and measurement: the rational part of a (3+1)D modulation vector takes '
+                  'components 0, 1/2, 1, 1/3, 2/3 (de Wolff et al. 1981; Stokes 2011), the '
+                  "values representation.incommensurate.DELTA_GRID's row rests on too "
+                  '(generation.py:270, 305); '
+                  'tests/test_superspace.py::test_775_superspace_groups_from_the_230_basic_groups '
+                  'reproduces the published 775 from this list')),
     Row("rietx.crystallography.superspace.magnetic.N_MAGNETIC_SUPERSPACE_GROUPS_D1", "constant", tier=2, value=9303,
         evidence=('published count: Stokes & Campbell (2022), Acta Cryst. A78, 364, Table 6, the d = 1 total; tests/test_magnetic_superspace.py asserts it equals the sum of the four type counts')),
     Row("rietx.crystallography.superspace.magnetic.N_MAGNETIC_SUPERSPACE_TYPES_D1", "constant", tier=2, value=(775, 775, 3100, 4653),
@@ -2258,21 +4018,32 @@ ROWS: tuple[Row, ...] = (
         evidence=('arithmetic: the exact rational 0 (zero translation component, free-axis q component)')),
     Row("rietx.crystallography.superspace.magnetic._HALF", "constant", tier=1, value=0.5,
         evidence=('arithmetic: the exact rational 1/2, the half-lattice translation of the a/b/c/A/B/C/I centring vectors and of the half-sum over the basis')),
-    Row("rietx.crystallography.superspace.operators._ZERO3", "constant", value=(0.0, 0.0, 0.0)),
+    Row("rietx.crystallography.superspace.operators._ZERO3", "constant", tier=1, value=(0.0, 0.0, 0.0),
+        evidence=('arithmetic: the exact zero translation (Fraction(0),) x 3 of a superspace '
+                  'operator (superspace/operators.py:95)')),
     Row("rietx.crystallography.symmetry.MAX_HKL_GRID_POINTS", "constant", value=30000000),
     Row("rietx.crystallography.symmetry.SITE_TOL", "constant", value=0.0001,
         evidence=("unaudited, for the maintainer's tier. Besides site_orbit's snap it has two "
                   "rigid-body uses (WP-1807, #1005). (1) params.vector._refuse_body_off_its_"
                   "sites holds the exact invariance miss to _BODY_SITE_MISS_FACTOR x SITE_TOL, "
                   "the two positions' snap residuals (at most 6 x SITE_TOL, 8 chosen). (2) "
-                  "params.bodies.RigidBodyBlock._increment_basis compares a linear body's "
-                  "unit-vector residuals |n.u| and |u - (n.u)n|, a tilt in radians, with this "
-                  "fractional tolerance, so the two checks agree only for a body long against "
-                  "its cell: a CO2-like body (C-O 1.16 A) in the P n m a mirror passes the site "
-                  "check and is refused at '90 deg' from an O typed 4e-5 off the mirror at "
-                  "b = 6 A and 2e-5 at b = 20 A, inside the mirror's 5e-5 reach; diacetylene "
-                  "(COD 1577467) builds to 5e-5 on every atom (measured 2026-10-29)")),
+                  "params.bodies._SNAP_REACH, the snap's reach per fractional coordinate, "
+                  "from which RigidBodyBlock._axis_tilt_bound derives the linear-body axis "
+                  "test's tilt bound in radians (a derived value, whose tier follows this "
+                  "row's once given); that test compared the tilt with "
+                  "this fractional tolerance itself until #1226's finding, refusing a CO2-like "
+                  "body on the P n m a mirror whose atoms all passed the site check")),
     Row("rietx.crystallography.symmetry.SYMMETRY_ANGLE_TOL_DEG", "constant", value=0.001),
+    Row("rietx.crystallography.symmetry.SYMMETRY_LENGTH_RTOL", "constant", tier=1, value=1e-05,
+        evidence=("arithmetic on its consequence, as SYMMETRY_ANGLE_TOL_DEG was sized: the table "
+                  "builds a tied length from its source, so a stored length a relative eps off "
+                  "moves every d-spacing by at most eps from the caller's; 1e-5 bounds that at "
+                  "10 ppm, under SRM 660c's 48 ppm certificate band, and clears an indexing "
+                  "candidate's round-off (tied lengths equal to 1e-12 relative, "
+                  "test_an_indexing_candidate_still_builds). Measured 2026-11-19: 25351 tie "
+                  "checks over the fast suite, round-off at most 1e-14 relative and real "
+                  "disagreements 1e-4 and up; indexing acceptance candidates at most 1.9e-16, "
+                  "so any value from 1e-12 to 1e-4 refuses the same inputs (WP-2150)")),
     Row("rietx.crystallography.symmetry.TWIN_COORD_TOL", "constant", tier=1, value=0.0005,
         evidence=("arithmetic on the gate's role: under the one gate the reach decides only "
                   "whether atoms that would overfill one place are the same place, so the "
@@ -2300,13 +4071,44 @@ ROWS: tuple[Row, ...] = (
                   "the operation search at 3 x TWIN_COORD_TOL therefore admits every operation "
                   "an offset within TWIN_COORD_TOL can satisfy, and the snapped position is "
                   "then held to TWIN_COORD_TOL itself")),
-    Row("rietx.crystallography.symmetry._COINCIDENCE_TOL", "constant", value=1e-09),
-    Row("rietx.crystallography.symmetry._GAMMA_HEX", "constant", value=120.0),
-    Row("rietx.crystallography.symmetry._ORBIT_CHUNK_ELEMENTS", "constant", value=24000000),
-    Row("rietx.crystallography.symmetry._SITE_TOL_SLACK", "constant", value=1e-09),
+    Row("rietx.crystallography.symmetry._COINCIDENCE_TOL", "constant", tier=1, value=1e-09,
+        evidence=('numerical floor: two images of an already snapped position coincide to '
+                  'round-off, so 1e-9 is float equality and no crystallographic judgement '
+                  '(symmetry.py:795-801); tests/test_symmetry_orbits.py checks the orbit '
+                  'invariants (|G| = multiplicity x |stabiliser|) over all 564 settings with it, '
+                  'and ::test_the_guard_message_names_the_invariant shows a loose value (0.4) '
+                  'breaks them')),
+    Row("rietx.crystallography.symmetry._D_TIE_REL", "constant", tier=1, value=1e-12,
+        evidence=('numerical floor: reflections of equal d in every cell compute d a few ulps '
+                  'apart, so 1e-12 relative is float equality and orders nothing the data could '
+                  'separate; it only keeps such ties in orbit order (WP-2315, Linux swapped '
+                  "LaB6's 221/300 between two compiles); tests/test_pawley_lattice_merge.py "
+                  '::test_equal_d_keeps_input_order_whichever_way_the_last_ulp_falls')),
+    Row("rietx.crystallography.symmetry._GAMMA_HEX", "constant", tier=1, value=120.0,
+        evidence=('physics: a hexagonal or trigonal gamma on hexagonal axes is 120 deg by the '
+                  "lattice's symmetry (symmetry.py:582-583)")),
+    Row("rietx.crystallography.symmetry._ORBIT_CHUNK_ELEMENTS", "constant", tier='invariant', value=24000000,
+        evidence=('answer-invariant: a memory budget that only partitions the orbit-image stack; '
+                  'tests/test_crystallography.py::test_orbit_chunking_is_transparent holds a '
+                  '120-element chunk to the same hkl, multiplicities and d, to the bit')),
+    Row("rietx.crystallography.symmetry._SITE_TOL_SLACK", "constant", tier=1, value=1e-09,
+        evidence=('arithmetic: a relative 1e-9 that makes the SITE_TOL comparison inclusive, so '
+                  'a five-decimal deviation computed as 1.0000000000000286e-04 or '
+                  '9.999999999998899e-05 (ICSD 18318 B11 and B16, issue #215) falls on one side '
+                  'by crystallography rather than binary rounding (symmetry.py:787-793); '
+                  'tests/test_symmetry_orbits.py asserts shift <= SITE_TOL x (1 + 1e-9)')),
     Row("rietx.crystallography.symmetry._SNAP_MESSAGE_SITES", "constant", value=4),
-    Row("rietx.crystallography.symmetry._SNAP_NOISE", "constant", value=1e-12),
-    Row("rietx.crystallography.symmetry._TRANSLATION_DEN", "constant", value=12),
+    Row("rietx.crystallography.symmetry._SNAP_NOISE", "constant", tier=1, value=1e-12,
+        evidence=('numerical floor: below 1e-12 a snap did nothing and SiteOrbit.shift reports '
+                  '0.0, a site on its position averaging to itself only to an ulp or two; seven '
+                  'orders under SITE_TOL, so nothing a file could mean is swallowed '
+                  '(symmetry.py:803-809)')),
+    Row("rietx.crystallography.symmetry._TRANSLATION_DEN", "constant", tier=1, value=12,
+        evidence=("arithmetic: every translation of gemmi's 564 tabulated settings is a multiple "
+                  'of 1/12 (measured 2026-11-17: t x 12 an integer for every operation), so a '
+                  'stated operator is keyed by integers in twelfths and compared with a '
+                  'tabulated one without a tolerance (symmetry.py:518-540); '
+                  'tests/test_projects_gsas2.py and tests/test_magcif.py use operator_key')),
     Row("rietx.gui.imports.MAX_UPLOAD_BYTES", "constant", value=67108864),
     Row("rietx.gui.imports.PREVIEW_POINTS", "constant", value=900),
     Row("rietx.gui.imports.WAVELENGTH_RTOL", "constant", value=0.0005),
@@ -2412,6 +4214,16 @@ ROWS: tuple[Row, ...] = (
                  "smallest measured share that validates a heavy synchrotron pattern's true "
                  "cell.  Set under the maintainer's delegation of 2026-10-28 (WP-2011)."),
         approved="2026-10-28"),
+    Row("rietx.indexing.engines.WEAK_LINE_RETRY_FLOOR", "constant", tier=2, value=0.05,
+        evidence=("Bergmann, Le Bail, Shirley & Zlokazov (2004, Z. Kristallogr. 219, 783), "
+                  "set B: every line at or above 5 % of the strongest, offered to each "
+                  "program as a second attempt; Table 5, four programs x two entries x two "
+                  "modes, 5 better, 1 worse, 10 unchanged; the manual runs also tolerated "
+                  "8-10 unindexed lines, so the gain is not the floor's alone, and McMaille's "
+                  "default run lost its answer under it.  WP-2078: the trace-oxide fixture's "
+                  "truth ranks first at 0.5, 1, 2 and 5 %, so the value is not tuned on it; "
+                  "5 % keeps 5 of its host's 6 lines, the least margin of the four."),
+),
     Row("rietx.indexing.engines.WIDTH_ALLOWANCE_FWHM", "constant", value=1.0),
     Row("rietx.indexing.engines.WIDTH_ALLOWANCE_QUANTILE", "constant", value=0.25),
     Row("rietx.indexing.engines._INDEX_MARGIN", "constant", value=1e-06),
@@ -2470,6 +4282,26 @@ ROWS: tuple[Row, ...] = (
         approved="2026-10-21"),
     Row("rietx.indexing.fom._AGGREGATE_FLOOR_RTOL", "constant", value=1e-06),
     Row("rietx.indexing.fom._BOUNDARY_RTOL", "constant", value=1e-09),
+    Row("rietx.indexing.kvector._BLOCK", "constant", tier="invariant", value=2000.0,
+        evidence=("answer-invariant layout: the degrees each k's windows are shifted by so one "
+                  "searchsorted locates a peak in every k's list; any value past the 2θ axis and "
+                  "_PAD gives the same rows to rounding (row 2047 sits about 4.1e6 deg along the axis, "
+                  "so the shift is exact to about 1e-9 deg, not exactly); "
+                  "test_the_layout_constants_do_not_change_the_rows runs _BLOCK 5000 beside "
+                  "2000 and holds every grid row equal, and "
+                  "test_each_grid_row_is_score_kvector_of_its_k holds each to score_kvector's "
+                  "single-k answer)")),
+    Row("rietx.indexing.kvector._CHUNK", "constant", tier="invariant", value=2048,
+        evidence=("answer-invariant: the rows scored per vectorised block, bounding working "
+                  "memory; each row's arithmetic is its own, so the grid rows equal "
+                  "score_kvector's per k whatever the block: "
+                  "test_each_grid_row_is_score_kvector_of_its_k sets the block to 7 so the 1/8 "
+                  "grid's strata cross many block boundaries, and "
+                  "test_the_layout_constants_do_not_change_the_rows sets 31)")),
+    Row("rietx.indexing.kvector._PAD", "constant", tier="invariant", value=900.0,
+        evidence=("answer-invariant layout: where an unused window slot sits, past any 2θ, so "
+                  "no peak locates it; any value in (180, _BLOCK) gives the same rows "
+                  "(test_the_layout_constants_do_not_change_the_rows runs _PAD 300 beside 900)")),
     Row("rietx.indexing.peakfit._H_POS", "constant", value=1e-05),
     Row("rietx.indexing.peakfit._H_WIDTH", "constant", value=1e-07),
     Row("rietx.indexing.peakfit._SEED_GAUSS_FRACTION", "constant", value=0.8),
@@ -2545,24 +4377,74 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.io.formats.base.HEAD_BYTES", "constant", value=4096),
     Row("rietx.io.formats.base.INTEGRAL_TOL", "constant", value=0.001),
     Row("rietx.io.formats.dif._MIN_ROWS", "constant", value=3),
-    Row("rietx.io.formats.gsas.ESD_FIELD_CHARS", "constant", value=8),
-    Row("rietx.io.formats.gsas.TIME_MAP_FIELD_CHARS", "constant", value=8),
+    Row("rietx.io.formats.gsas.ESD_FIELD_CHARS", "constant", tier=1, value=8,
+        evidence=('the width of one field of an ESD bank data record, a format fact: eight '
+                  'characters per number, ten to an 80-column record (Larson and Von Dreele '
+                  "2004, LAUR 86-748, 'Powder data file formats'; the APS 11-BM Data Formats "
+                  "page states 'five pair of numbers per line (8 characters per number)'). Every "
+                  'data record of all six real ESD/STD banks on disk is 80 characters with ten '
+                  'non-blank fields (gsas.py:915-927, tests/data/README.md § GSAS ESD)'),
+        grounds=("A format's own field width, stated by its specification and verified on the "
+                 'real files.')),
+    Row("rietx.io.formats.gsas.TIME_MAP_FIELD_CHARS", "constant", tier=1, value=8,
+        evidence=('the width of one field of a TIME_MAP table record, (10I8) in Fortran terms: '
+                  'ten 8-character integers to an 80-column record, the same discipline as an '
+                  'ESD record (gsas.py:638-644). The one real file with a table, vnb5053.dat (71 '
+                  'rows), is read with it (tests/test_readers.py:1136-1170 synthetic copy, '
+                  'tests/data/README.md vnb5053 section for the real file)'),
+        grounds="A format's own field width; stated in the GSAS manual's TIME_MAP record."),
     Row("rietx.io.formats.gsas._GSAS_TIME_MAP_SCAN_BYTES", "constant", value=65536),
     Row("rietx.io.formats.peaklist._MIN_ROWS", "constant", value=8),
-    Row("rietx.io.instrument_profile.INSTPRM_SHL_FLOOR", "constant", value=0.002),
-    Row("rietx.io.instrument_profile._PRCF_TYPE_3", "constant", value=3),
-    Row("rietx.io.instrument_profile._PRM_BANK", "constant", value=1),
-    Row("rietx.io.instrument_profile._PRM_CENTIDEG", "constant", value=100.0),
-    Row("rietx.io.instrument_profile._PRM_CENTIDEG_SQUARED", "constant", value=10000.0),
-    Row("rietx.io.instrument_profile._PRM_COEFFICIENT_COLUMNS", "constant", value=15),
-    Row("rietx.io.instrument_profile._PRM_COEFFICIENT_DIGITS", "constant", value=14),
-    Row("rietx.io.instrument_profile._PRM_CUTOFF", "constant", value=0.001),
-    Row("rietx.io.instrument_profile._PRM_GAUSS_TO_DEG2", "constant", value=0.0005545177444479562),
-    Row("rietx.io.instrument_profile._PRM_PER_RECORD", "constant", value=4),
+    Row("rietx.io.instrument_profile.INSTPRM_SHL_FLOOR", "constant", tier=1, value=0.002,
+        evidence=("GSAS-II's own floor: max(SH/L, 0.002) at GSASIIpwd.py:1645, :1863 and :2806 "
+                  '(GSAS-II 5.8.4); the writer only reports it, at '
+                  'tests/test_gsas2_instprm.py::test_an_axial_sum_below_gsas_ii_own_floor_is_named')),
+    Row("rietx.io.instrument_profile._PRCF_TYPE_3", "constant", tier=1, value=3,
+        evidence=('format layout: profile function type 3 (pseudo-Voigt with microstrain) is the '
+                  "only one read and the one GSAS-II's own .prm exporter writes "
+                  "(G2export_pwdr.py:44, 'PRCF1 3 8'); types 1, 2 and 4 are refused by name "
+                  '(tests/test_gsas_prm.py::test_unsupported_prcf_profile_types_are_refused_by_name)')),
+    Row("rietx.io.instrument_profile._PRM_BANK", "constant", tier=1, value=1,
+        evidence=('format layout: the single bank the reader reads and the writer states; a '
+                  'multi-bank file is refused by name '
+                  '(tests/test_gsas_prm.py::test_multi_bank_pxcr_is_refused)')),
+    Row("rietx.io.instrument_profile._PRM_CENTIDEG", "constant", tier=1, value=100.0,
+        evidence=('unit conversion: GSAS stores LX and LY in centidegrees; the writer multiplies '
+                  'as the reader divides, and the pair round-trips '
+                  '(tests/test_gsas_prm.py::test_write_gsas_prm_round_trips_the_calibration)')),
+    Row("rietx.io.instrument_profile._PRM_CENTIDEG_SQUARED", "constant", tier=1, value=10000.0,
+        evidence=('unit conversion: GU, GV, GW are a Gaussian variance in centidegrees^2, so the '
+                  'squared factor 100^2; round-trip as for _PRM_CENTIDEG, and the .instprm '
+                  "reader's twin is tested against GSAS-II's own LaB6 peaks "
+                  '(tests/test_gsas2_instprm.py::test_gsas2s_own_lab6_peaks_have_the_width_the_read_instprm_draws)')),
+    Row("rietx.io.instrument_profile._PRM_COEFFICIENT_COLUMNS", "constant", tier=1, value=15,
+        evidence=('format layout: the PRCF continuation records are 4E15.6, fifteen columns a '
+                  "coefficient (GSAS-II's exporter writes '%15.6e' x 4, G2export_pwdr.py:45-46)")),
+    Row("rietx.io.instrument_profile._PRM_COEFFICIENT_DIGITS", "constant", tier=1, value=14,
+        evidence=('format layout: one of the fifteen columns is kept blank because the reader '
+                  'splits continuation records on whitespace; un-reserved, a converged GU of '
+                  "43.710000000000996 wrote a file this package's own reader refused (WP-1118, "
+                  'recorded in the module comment)')),
+    Row("rietx.io.instrument_profile._PRM_CUTOFF", "constant", tier=2, value=0.001,
+        evidence=("the value GSAS-II's own .prm exporter writes for the PRCF1 cutoff: 'INS  "
+                  "1PRCF1     3    8   0.00100' (GSAS-II 5.8.4, exports/G2export_pwdr.py:44); "
+                  "the reader ignores the cutoff, so the writer states GSAS's tail truncation "
+                  "for the file's reader only")),
+    Row("rietx.io.instrument_profile._PRM_GAUSS_TO_DEG2", "constant", tier=1, value=0.0005545177444479562,
+        evidence=('arithmetic: GAUSSIAN_VARIANCE_TO_FWHM_SQUARED (8 ln 2) / 100^2, the ratio of '
+                  'FWHM^2 in degrees^2 to variance in centidegrees^2; the same factor the '
+                  ".instprm path measures against GSAS-II's LaB6 output "
+                  '(tests/test_gsas2_instprm.py::test_the_reader_takes_gsas2s_variance_to_rietxs_fwhm_squared)')),
+    Row("rietx.io.instrument_profile._PRM_PER_RECORD", "constant", tier=1, value=4,
+        evidence='format layout: four coefficients to a PRCF continuation record (4E15.6)'),
     Row("rietx.io.projects.fullprof._CELL_TIE_MULTIPLIER_TOL", "constant", value=1e-06),
     Row("rietx.io.projects.fullprof._DISPERSION_ATOL_E", "constant", value=0.01),
     Row("rietx.io.projects.fullprof._MAGNETIC_MATCH_ATOL", "constant", value=0.0001),
-    Row("rietx.io.projects.fullprof._NAM_WIDTH", "constant", value=4),
+    Row("rietx.io.projects.fullprof._NAM_WIDTH", "constant", tier=1, value=4,
+        evidence=("format layout: LINE 12's NAM is 'Character A4' (FullProf manual); measured: a "
+                  "five-character GD157 stops FullProf 8.20's parse; the writer refuses longer "
+                  'isotope names (tests/test_projects_fullprof.py near :2416, the '
+                  'NAM-over-four-characters row)')),
     Row("rietx.io.projects.fullprof._OCCUPANCY_RTOL", "constant", value=0.005),
     Row("rietx.io.projects.fullprof._RHOMBOHEDRAL_ANGLE_ATOL", "constant", value=0.01),
     Row("rietx.io.projects.fullprof._RHOMBOHEDRAL_LENGTH_RTOL", "constant", value=0.001),
@@ -2582,10 +4464,30 @@ ROWS: tuple[Row, ...] = (
         evidence=("published: Abramowitz & Stegun (1964) NBS AMS 55 eqs 9.8.1-9.8.4, the closest TOPAS spelling of e^(-x)(I0 + I1), which has no Bessel function; within 3.6e-8 of i0e + i1e (tests/test_topas_whole_input.py::test_the_written_laue_factor_is_within_its_stated_bound)")),
     Row("rietx.io.projects.topas_input._LAUE_SPELLING_REL", "constant", tier="invariant", value=3.6e-08,
         evidence=("a measured bound quoted in the file's head note; it decides nothing (tests/test_topas_whole_input.py::test_the_written_laue_factor_is_within_its_stated_bound)")),
-    Row("rietx.io.projects.topas_input._SABINE_XPOL", "constant", value=0.079411),
-    Row("rietx.io.projects.topas_input._TCH_ETA", "constant", value=(1.36603, -0.47719, 0.11116)),
-    Row("rietx.io.projects.topas_input._TCH_GAMMA", "constant", value=(2.69269, 2.42843, 4.47163, 0.07842)),
-    Row("rietx.io.readers.TWO_THETA_MAX_DEG", "constant", value=180.0),
+    Row("rietx.io.projects.topas_input._SABINE_XPOL", "constant", tier=2, value=0.079411,
+        evidence=("GSAS-II's own Sabine polarisation prefactor, 0.079411, named as such in "
+                  'model/extinction.py:77 (Sabine, Von Dreele & Jorgensen 1988, Acta Cryst. A44, '
+                  "374); the writer restates rietx's constant so TOPAS computes rietx's "
+                  'extinction')),
+    Row("rietx.io.projects.topas_input._TCH_ETA", "constant", tier=2, value=(1.36603, -0.47719, 0.11116),
+        evidence=('Thompson, Cox & Hastings (1987), J. Appl. Cryst. 20, 79, the eta polynomial '
+                  '(1.36603, -0.47719, 0.11116); equal to model.profiles.pseudovoigt._TCH_ETA '
+                  '(checked 2026-11-17), which tests/test_manual.py pins against the manual; the '
+                  'TOPAS Technical Reference prints 0.1116 for the cubic term, which the writer '
+                  'deliberately does not use')),
+    Row("rietx.io.projects.topas_input._TCH_GAMMA", "constant", tier=2, value=(2.69269, 2.42843, 4.47163, 0.07842),
+        evidence=('Thompson, Cox & Hastings (1987), J. Appl. Cryst. 20, 79, the gamma polynomial '
+                  '(2.69269, 2.42843, 4.47163, 0.07842); equal to '
+                  'model.profiles.pseudovoigt._TCH_GAMMA (checked 2026-11-17)')),
+    Row("rietx.io.readers.TWO_THETA_MAX_DEG", "constant", tier=1, value=180.0,
+        evidence=('180.0 degrees: no scattering angle exceeds it, since 2theta is the angle '
+                  'between the incident and scattered beams, so an axis running past it is not '
+                  '2theta (readers.py:217-218, refusal at readers.py:234-258). A physical bound. '
+                  'tests/test_readers_robust.py::test_an_axis_past_180_degrees_is_refused_naming_the_file_and_reader '
+                  '(xy and gsas files at 8000 and 17000 centidegrees). Probe (2026-11-17, '
+                  'probe_axis.py): of the 112 readable files of tests/data none is refused, and '
+                  'the largest end is 167.75 degrees'),
+        grounds='A geometric limit of the scattering angle, not a tuned number.'),
     Row("rietx.model.absorption.CYLINDER_MU_R_MAX", "constant", tier=2, value=1.0,
         evidence=("Rouse, Cooper, York & Chakera (1970) Acta Cryst. A26, 682: fit domain 0 <= µR <="
                   " 1 (docstring); gates a warning only")),
@@ -2655,6 +4557,48 @@ ROWS: tuple[Row, ...] = (
                  "2026-10-22) keeps it at tier 3 for WP-2017's second pass over a refine-from-zero "
                  "floor of its own."),
         approved="2026-10-22"),
+    Row("rietx.model.forward.AXIAL_SL_START", "constant", tier=3, value=0.02,
+        evidence=("where a stage starts S/L when it frees one sitting on zero (WP-1955); no code "
+                  "needs it to equal AXIAL_SIZING_FLOOR, which compile_model reads as "
+                  "max(value, floor): moving the start alone over 0.05, 0.02, 0.01, 0.005, 0.002 "
+                  "and 0.001 returned S/L 0.0453117 +- 0.00018 and Rwp 0.06304 every time (one "
+                  "pattern, #1075 repro 1 under lab_bragg_brentano, the review of #1372); fails "
+                  "where the pair starts equal: synthetic rutile at lab counts (strongest line "
+                  "about 68 000), a stage freeing only the two ratios from 0/0, ended on the "
+                  "S/L = H/L line in 4 of 8 fits when both started at 0.02 (truths 0.05/0.01 and "
+                  "0.035/0.025, four seeds each) and in 0 of 8 from 0.02/0.01 "
+                  "(tests/test_lab_instrument.py::test_two_lifted_apertures_do_not_stop_on_the_"
+                  "equal_line); real data: no number moved by more than 0.02 esd (LaB6, FAP, "
+                  "cpd-1a, the review's table)"),
+        grounds=("A starting value for a degenerate-at-zero column, tier 3: invariance of the "
+                 "answer to the start is measured on one pattern and the equal-line failure on "
+                 "synthetic rutile only, so no real family and no synchrotron one behind it "
+                 "(WP-1955 task 6 owes both).  A literal of its own, not AXIAL_SIZING_FLOOR's "
+                 "row, following the 2026-11-03 ruling on NOMINAL_AXIAL_APERTURE: a retune of "
+                 "the floor by WP-2017 cannot move a start."),
+        approved="2026-11-17"),
+    Row("rietx.model.forward.AXIAL_HL_START", "constant", tier=3, value=0.01,
+        evidence=("where a stage starts H/L when it frees one sitting on zero (WP-1955), half "
+                  "of S/L's so that a pair lifted together does not sit on the S/L = H/L line, "
+                  "where the pattern's symmetry makes the two columns identical and a step keeps "
+                  "them equal; from 0.02/0.01 the true pair was reached in 8 of 8 fits on "
+                  "synthetic rutile at lab counts, against 4 of 8 from 0.02/0.02 (the review of "
+                  "#1372; tests/test_lab_instrument.py); a start that would equal the partner's "
+                  "value takes the other ratio's number (forward.axial_lift_start)"),
+        grounds=("A starting value, tier 3 on the same grounds as AXIAL_SL_START: synthetic "
+                 "evidence only, task 6 owes a real family and a synchrotron one."),
+        approved="2026-11-17"),
+    Row("rietx.model.forward.AXIAL_NODE_STEP", "constant", tier=3, value=3e-06,
+        evidence=("the step of the second-order forward difference giving a node's derivative "
+                  "with respect to an aperture, from a scan against jax's exact column (WP-1955): "
+                  "below it rounding grows as 1/h, above it the h^2 term; at one zero aperture "
+                  "1e-7 sat 8.9e-3 rel-L2 off and 3e-6 sits 5.3e-4, and at interior apertures "
+                  "every step from 3e-7 to 1e-5 is under 2e-7; it moves fits (the goldens "
+                  "re-captured)"),
+        grounds=("A numerical setting scanned on the apertures the suite carries; tier 3 until "
+                 "task 6 has tested apertures 0.001 to 0.005 and the xi cap, as the review of "
+                 "#1372 asks (the same stance as FD_STEP's row)."),
+        approved="2026-11-17"),
     Row("rietx.model.forward.LEBAIL_INTENSITY_FLOOR", "constant", tier=1, value=1e-10,
         evidence=("numerical floor: keeps a partitioned intensity positive so the next cycle's "
                   "share of the point is defined; ten orders under one count, and the partition's "
@@ -2678,6 +4622,16 @@ ROWS: tuple[Row, ...] = (
                  "first recorded invariant, a class with no conditional form (the generality "
                  "judge, 2026-10-22)."),
         approved="2026-10-21"),
+    Row("rietx.model.forward.PAWLEY_GROUP_SCALE_FLOOR_REL", "constant", tier=1, value=1e-4,
+        evidence=("numerical floor (WP-2311): an overlap group's restraint scale is never "
+                  "under this fraction of its phase's largest on-data intensity, so it is "
+                  "relative to the phase and never read off a seed the partition emptied; "
+                  "it replaced an absolute 1e-10 that weighed an emptied group's rows at 5e9 "
+                  "and left its sum where the seed put it.  Synthetic LaB6, declared background "
+                  "1x, 10x and 100x the data: every value from 1 to 1e-8 gives the true start's "
+                  "fit (cost 3415.253, the same widths), 1e-9 locks again; the scale test in "
+                  "tests/test_pawley.py pins the answer under a background start 100x high and "
+                  "under intensity and sigma rescaled by 1e-3")),
     Row("rietx.model.forward.PAWLEY_OFF_DATA_SCALE_FLOOR", "constant", tier=3, value=1.0,
         evidence=("WP-1459 (outside PR #453): the off-data ridge is as wide as the phase's "
                   "largest on-data intensity; the floor of 1 has no stated source and binds "
@@ -2710,7 +4664,8 @@ ROWS: tuple[Row, ...] = (
         grounds=("On three default paths: the peak picker's duplicate and unresolved flags, "
                  "the line screen's testable mask, and "
                  "since WP-2011 every index_pattern validation, where an overlapped group gets "
-                 "an equal-split restraint and is flagged PAWLEY_OVERLAP_UNRESOLVED rather than "
+                 "an equal-F² restraint (an equal split before WP-2315; the sweeps here predate it) "
+                 "and is flagged PAWLEY_OVERLAP_UNRESOLVED rather than "
                  "split confidently.  The validation reads the group's sum, which the restraint "
                  "leaves free, and its readings did not move over 0.25-1.0; kept at 0.5 "
                  "(WP-2011 ruling 3, 2026-10-28)."),
@@ -2778,14 +4733,64 @@ ROWS: tuple[Row, ...] = (
                  "ruled 2026-10-22)."),
         approved="2026-10-22"),
     Row("rietx.model.forward.WINDOW_MIN_DEG", "constant", tier=3, value=0.3,
-        evidence=("minimum window half-width, the room a peak has to move within one stage; "
-                  "measured 2026-10-21 on SRM 660c, FAP, cpd-1a and 11-BM NAC from starts near "
-                  "each answer and a zero 0.1 deg off: largest move 0.21 deg (1.4x margin, "
-                  "tests/test_window_domain.py); untested from a cell off its answer, where 0.3 % "
-                  "moves a 120 deg peak about 0.6 deg, and a peak leaving its window is silent"),
+        evidence=("uniform movement slack of every compile but the staged runner's stage "
+                  "compiles for a stage a later one refits: the stage whose answer is the "
+                  "result, a stage run on its own, a fresh compile at an answer, a joint fit, "
+                  "a declared shift equation, and the ceiling of the slack sized from what a "
+                  "stage frees (WINDOW_MOVE_FWHM, WP-2317 R7); measured 2026-10-21 on SRM 660c, "
+                  "FAP, cpd-1a and 11-BM NAC from starts near each answer and a zero 0.1 deg "
+                  "off: largest move 0.21 deg; from every cell length 0.3 % long, 0.68 deg "
+                  "(FAP), 0.87 (cpd-1a) and 1.15 (SRM 660c) in one stage, past it, with the "
+                  "protocol's answer unchanged since later stages recompile (2026-11-27, "
+                  "tests/test_window_domain.py, all four development data). Its tail room is "
+                  "load-bearing beyond movement: sized by WINDOW_MOVE_FWHM on a plan's last stage, the "
+                  "series guide's cell esds doubled and Rwp rose 4.1 -> 4.8 %, so the answer stage "
+                  "keeps it"),
         grounds=("A numerical setting whose domain test covers less than the domain it claims; "
-                 "tier 3 under B10 option 2 (ruled 2026-10-19) until that is measured."),
+                 "tier 3 under B10 option 2 (ruled 2026-10-19).  The cell start is measured "
+                 "since WP-2317; Refinement's runners re-solve a stage once when its window "
+                 "loss passes the stage's fraction, which covers a peak that moved or widened "
+                 "past it.  A joint fit has no re-solve, and the shift-equation stage was not "
+                 "measured from the cell start."),
         approved="2026-10-19"),
+    Row("rietx.model.forward.WINDOW_MOVE_FWHM", "constant", tier=3, value=3.0,
+        evidence=("movement allowance per position family a stage frees, in the peak's own FWHM, "
+                  "shaped by each family's 2theta dependence, plus half a point step, capped at "
+                  "WINDOW_MIN_DEG (WP-2317 R7); applied only to a stage every path of which a "
+                  "later stage of its plan frees again (strategy.staged.refit_later); measured 2026-11-27 on SRM 660c, FAP, cpd-1a and 11-BM NAC "
+                  "(all development data) and four Nb18W16O93 bench cases: largest stage "
+                  "movement 1.17 FWHM from the protocols' starts, 2.43 FWHM from a zero 0.1 deg "
+                  "off (cpd-1a zero_disp), every reflection inside its own slack; at 3 no stage "
+                  "re-solves from either start, at 1.5 SRM 660c re-solves from both (76 -> 86 "
+                  "and 98 -> 109 residual evaluations in the whole fit); from a cell 0.3 % long "
+                  "one stage of 4 families re-solves (SRM 660c); against the uniform 0.3 deg on "
+                  "the same starts, declared-stage points per evaluation 0.20-0.22x on NAC, "
+                  "0.76-0.85x on SRM 660c, 0.98-0.99x on FAP, cpd-1a and the bench cases, and "
+                  "every answer within 0.06 esd, background coefficients 0.08 "
+                  "(tests/test_window_domain.py, tests/test_window_slack.py); two series against "
+                  "the uniform 0.3 deg with the re-solve kept, shifts in esd over starts nudged "
+                  "1e-12 (2026-11-28, WP-2317, development data): the cpd-1 chain (8 lab patterns, "
+                  "qpa_plan with its closing stage, every warm stage sized; 11 starts, 360 "
+                  "quantities) moves no quantity's mean past 0.059 esd and no single pair past "
+                  "0.31, inside the 0.35 a rounding-level change gives on that chain; the CuCr2O4 "
+                  "ramp (17 11-BM patterns, mccusker_default with the closing stage declared, "
+                  "every warm stage sized; 5 starts, 425 quantities) moves none past 0.005 esd, "
+                  "and on its default route, where only the first pattern's stages size, 0.001"),
+        grounds=("Ours, a speed setting (Rule 5, Arithmetic accuracy).  A stage re-solves once "
+                 "on fresh windows when its window loss passes its fraction (R7, ruled "
+                 "2026-11-27, WP-2317), never a third time; a second solve still past it is "
+                 "warned only on the last stages (STAGE_WINDOWS_STALE).  So the allowance sets "
+                 "how often the re-solve is paid, and the measured answers moved under a tenth "
+                 "of an esd against the uniform slack's.  Widening peaks and a growing axial "
+                 "extent lose the 0.3 deg headroom they had and are covered by the re-solve "
+                 "alone.  3 is the smallest whole multiple covering every measured warm and "
+                 "cold-zero movement.  The value is Claude's under R7's ruling; the generality "
+                 "judge called it weak on 2026-11-28 for want of a series sized against "
+                 "uniform, and on the two series above judged it holds: no systematic "
+                 "departure, under the 0.071 esd the shipped stop and the 0.08 FullProf's "
+                 "leave on the cpd-1 chain.  Not measured: a series from a cold cell start or "
+                 "with a free wavelength."),
+        approved="2026-11-28", approved_by="checked"),
     Row("rietx.model.forward._BASES_CHUNK_ROWS", "constant", tier="invariant", value=128,
         evidence=("chunking of the derivative bases; bit-identical at 1, 7, 128 and 4096 rows on a "
                   "298-row node bucket, every derivative plane and the forward pattern, tchz_pv and "
@@ -2870,6 +4875,15 @@ ROWS: tuple[Row, ...] = (
         evidence=("numerical floor: eps^(1/3) = 6e-6 is the central-difference optimum; truncation "
                   "~1e-10 of the curvature (docstring); only the weights a_n, hence the covariance,"
                   " depend on it")),
+    Row("rietx.model.peak_equations.ORBIT_RTOL", "constant", tier=1, value=1e-09,
+        evidence=("numerical floor: images of a single-valued equation agree to rounding "
+                  "(order 1e-16 relative), and a branch on an index differs at the size of "
+                  "its own terms, so 1e-9 sits orders of magnitude from both (WP-2107)")),
+    Row("rietx.model.peak_equations.ORBIT_TRIALS", "constant", tier=1, value=3,
+        evidence=("numerical setting: random coefficient sets beside the stored one, since "
+                  "if(l == 0, a, b) at a = b agrees on every image; a branch-dependent "
+                  "equation agrees on a random set with probability zero, so one trial "
+                  "decides and three guard a coincidence (WP-2107)")),
     Row("rietx.model.preferred_orientation.TEXTURE_POSITIVITY_TOL", "constant", tier=1, value=1e-09,
         evidence=("numerical floor: roundoff of a quantity of order 1; lm stopped at min P -2.2e-16"
                   " on the face, trf at -0.45 (WP-1960 D4)")),
@@ -2993,6 +5007,12 @@ ROWS: tuple[Row, ...] = (
         evidence="arithmetic: sqrt(2), the Voigt argument z = (x + i gamma)/(sigma sqrt 2)"),
     Row("rietx.model.profiles.voigt._SQRT2PI", "constant", tier=1, value=2.5066282746310002,
         evidence="arithmetic: sqrt(2 pi)"),
+    Row("rietx.model.profiles.voigt._OLIVERO_FWHM", "constant", tier=2, value=(0.5346, 0.2166),
+        evidence=("Olivero & Longbothum (1977) J. Quant. Spectrosc. Radiat. Transfer 17, 233 "
+                  "(docstring); the reported FWHM of shape='voigt' only, never window sizing; "
+                  "measured within 0.024 % of the bisected Faddeeva FWHM over the whole mixing "
+                  "range, tests/test_voigt.py::"
+                  "test_olivero_reproduces_the_voigt_fwhm_to_the_bound_the_manual_quotes (WP-1926)")),
     Row("rietx.model.restraints.MIN_IMAGE_SHELL", "constant", tier=1, value=1,
         evidence=("numerical setting (tier 1's domain clause): the first pass of the minimum-image "
                   "search, which only bounds the second, sized per cell by geometry._shell; "
@@ -3021,6 +5041,11 @@ ROWS: tuple[Row, ...] = (
                   "that has no torsion (WP-1815)")),
     Row("rietx.model.restraints._DEG", "constant", tier=1, value=0.017453292519943295,
         evidence="arithmetic: pi/180"),
+    Row("rietx.model.restraints._SAME_IMAGE_TOL", "constant", tier=1, value=1e-09,
+        evidence=("numerical floor: compares an op translation plus a lattice shift, exact "
+                  "small rationals and integers, so any value far above roundoff and far "
+                  "below the smallest nonzero op translation (a fraction of a cell) "
+                  "decides the same inputs")),
     Row("rietx.model.restraints._SAME_CONTACT_A", "constant", tier=1, value=1e-06,
         evidence=("arithmetic: symmetry copies of one contact sit at exactly one distance, so "
                   "matching a contact to a listed row by distance is an identity test; 1e-6 A "
@@ -3243,7 +5268,15 @@ ROWS: tuple[Row, ...] = (
                   "lm.minimize and run_least_squares, the last declared and closing stages "
                   "(run_multi_least_squares not exercised): worst 0.0011 plain esd, cpd-1a phases.0.scale at "
                   "1e-8, 0.957-1.043x evaluations, no reference moved past 3.2e-4 esd; at 1e-10 FAP and SRM "
-                  "660c stop on exhausted fp64 with identical answers; shipped starts only"),
+                  "660c stop on exhausted fp64 with identical answers; shipped starts only; "
+                  "WP-2017 group A's hard starts, 2026-11-09 (docs/wp/2017-batch/group_a_hard_20261109_summary.md; Linux x86_64 at fabfe9b3f; every phase's cell lengths +1 % and +3 % on the four families, and cpd-1a with zircon declared): no arm changed which of the nine starts reach the "
+                  "shipped start's answer (FAP +1 % and +3 %, NAC +1 %, cpd-1a +1 % and with zircon do); there 1e-8 "
+                  "acts on FAP, NAC and cpd-1a and 1e-10 on NAC and cpd-1a, FAP's 1e-10 arm closing on exhausted "
+                  "fp64 with the shipped answer as SRM 660c's does from its shipped start, so no third family reads "
+                  "the tighter side; worst 0.0012 plain esd (cpd-1a +1 % at 1e-8), no reference moved "
+                  "past 3.6e-4 esd; failing case, the starts that miss: on SRM 660c +3 % 1e-8 moves 0.118 esd against "
+                  "a noise arm of 0.053 at 0.69x evaluations, and polished, shipped and 1e-8 sit in different wrong "
+                  "minima (Rwp 0.823 and 0.861; the answer reads 0.087); start domain, per family: FAP cells within 3 %, NAC and cpd-1a within 1 %, SRM 660c its shipped start (+1 % already misses)"),
         grounds=("The last tolerance of the schedule rietx chose (WP-1123): B7's class went to "
                  "tier 3 once its invariance test failed on cpd-1a (ruled 2026-10-19), and the "
                  "schedule was kept on four families with that failure stated (the sixth "
@@ -3251,8 +5284,12 @@ ROWS: tuple[Row, ...] = (
                  "fixed, so the maintainer delegated this value's tier to the lead on "
                  "2026-10-23: tier 3, with WP-2017 refitting the four start-test families at "
                  "1e-8 and 1e-10."
-                 "  WP-2017 group A: one answer from the shipped starts on the families its evidence names; no"
-                 " failing case sought, so its hard starts are owed before that condition is met."),
+                 "  WP-2017 group A, hard starts (2026-11-09): one answer at the answer from every start that"
+                 " reaches it, on three families at 1e-8 and two at 1e-10, where fp64 stops the rest first; the"
+                 " failing case and start domain stated in the evidence. The approval condition is not met on"
+                 " the tighter side: the maintainer ruled on 2026-11-17 that approved stays 2026-10-23 until"
+                 " a synthetic case reaches 1e-10, since an arm that changes nothing measures nothing (the"
+                 " ruling of 2026-11-05); that case is owed."),
         approved="2026-10-23"),
     Row("rietx.optimize.lm._CONVERGED_RUNS", "constant", tier=3, value=3,
         evidence=("Coelho (2018) J. Appl. Cryst. 51, 428 stops its NIST, Rosenbrock and AntiBump runs at an "
@@ -3262,14 +5299,21 @@ ROWS: tuple[Row, ...] = (
                   "WP-2017 group A, 2026-11-05 (docs/wp/2017-batch/; development data; cpd-1a and SRM 660c "
                   "validate, FAP and NAC verify): 2 and 5 on FAP, NAC, cpd-1a and SRM 660c, both arms acting on"
                   " all four: worst 0.0024 plain esd, cpd-1a profile.v, 0.891-1.132x evaluations; no reference "
-                  "moved past 1.8e-4 esd; shipped starts only"),
+                  "moved past 1.8e-4 esd; shipped starts only; "
+                  "WP-2017 group A's hard starts, 2026-11-09 (docs/wp/2017-batch/group_a_hard_20261109_summary.md; Linux x86_64 at fabfe9b3f; every phase's cell lengths +1 % and +3 % on the four families, and cpd-1a with zircon declared): no arm changed which of the nine starts reach the "
+                  "shipped start's answer; there both arms act on FAP, NAC and cpd-1a, worst 0.0245 plain esd "
+                  "(cpd-1a with zircon at 5, at its noise arm's 0.0245) and otherwise 0.0011 (cpd-1a +1 % at 2), no "
+                  "reference moved past 4.4e-4 esd; failing case, the starts that miss: on NAC +3 % both arms lose "
+                  "NAC, Rwp 0.139 to 0.80, a second minimum (polished S 33x shipped's); on cpd-1a +3 % polished S "
+                  "0.65x (2) and 1.40x (5) shipped's; on SRM 660c +3 % 2 moves 51.4 esd against a noise arm of 0.053; "
+                  "start domain, per family: FAP cells within 3 %, NAC and cpd-1a within 1 %, SRM 660c its shipped start (+1 % already misses)"),
         grounds=("A constant that decides where a solve stops, taken from the paper that "
                  "defines the algorithm; the paper did not validate it on rietx's problems, so "
                  "tier 3 until refits of three families on either side give one answer, as "
                  "B10's solver-path switches (ruled 2026-10-20)."
-                 "  WP-2017 group A: one answer from the shipped starts on the families its evidence names; no"
-                 " failing case sought, so its hard starts are owed before that condition is met."),
-        approved="2026-10-20"),
+                 "  WP-2017 group A, hard starts (2026-11-09): one answer at the answer on three families"
+                 " from every start that reaches it, the failing case and start domain stated in the evidence."),
+        approved="2026-11-17"),
     Row("rietx.optimize.lm.SLOW_DESCENT_ESD", "constant", tier=3, value=1.0,
         evidence=("WP-1334 (issue #222): a stage stops once the rest of its budget, at the "
                   "rate the last 100 evaluations lowered the cost, would lower chi2 over the next 300 by less than "
@@ -3418,14 +5462,22 @@ ROWS: tuple[Row, ...] = (
                   "WP-2017 group A, 2026-11-05 (docs/wp/2017-batch/; development data; cpd-1a and SRM 660c "
                   "validate, FAP and NAC verify): 0.8 on FAP, cpd-1a and SRM 660c, 0.2 on cpd-1a and SRM 660c "
                   "(FAP's smallest r_u 0.585; NAC never read it): worst 8.2e-6 plain esd, cpd-1a axial_sl, "
-                  "noise floor 2.4e-6; no reference moved past 2.1e-6 esd; shipped starts only"),
+                  "noise floor 2.4e-6; no reference moved past 2.1e-6 esd; shipped starts only; "
+                  "WP-2017 group A's hard starts, 2026-11-09 (docs/wp/2017-batch/group_a_hard_20261109_summary.md; Linux x86_64 at fabfe9b3f; every phase's cell lengths +1 % and +3 % on the four families, and cpd-1a with zircon declared): no arm changed which of the nine starts reach the "
+                  "shipped start's answer; there 0.8 acts on FAP, NAC and cpd-1a and 0.2 on FAP +3 % and cpd-1a, so 0.2 "
+                  "now reaches three families with SRM 660c's shipped start; worst 0.0247 plain esd (cpd-1a with "
+                  "zircon at 0.8, at its noise arm's 0.0245) and otherwise 1.7e-4, no reference moved past 2.2e-4 "
+                  "esd; failing case, the starts that miss: on NAC +3 % 0.8 loses NAC, Rwp 0.139 to 0.79 polished, "
+                  "while 0.2 sits within that start's noise; on cpd-1a +3 % 0.8 reads Rwp 2.18x shipped's; on SRM "
+                  "660c +3 % 0.8 and 0.2 move 0.317 and 0.111 esd against a noise arm of 0.053; start domain, per family: FAP cells within 3 %, NAC and cpd-1a within 1 %, SRM 660c its shipped start (+1 % already misses)"),
         grounds=("A constant that decides where a solve stops, taken from the paper that "
                  "defines the algorithm; the paper did not validate it on rietx's problems, so "
                  "tier 3 until refits of three families on either side give one answer, as "
                  "B10's solver-path switches (ruled 2026-10-20)."
-                 "  WP-2017 group A: one answer from the shipped starts on the families its evidence names; no"
-                 " failing case sought, so its hard starts are owed before that condition is met."),
-        approved="2026-10-20"),
+                 "  WP-2017 group A, hard starts (2026-11-09): one answer at the answer on three families"
+                 " either side from every start that reaches it, the failing case and start domain stated in"
+                 " the evidence."),
+        approved="2026-11-17"),
     Row("rietx.optimize.lm._NULL_CURVATURE", "constant", tier=1, value=1.4901161193847656e-08,
         evidence=("numerical floor: sqrt(eps); at the cut itself three of 1000 random problems "
                   "stayed rank-deficient, sqrt(eps) left none (docstring)")),
@@ -3543,6 +5595,28 @@ ROWS: tuple[Row, ...] = (
                   "column; 1e-6 A is far below any structural distance")),
     Row("rietx.params.bodies._DEG", "constant", tier=1, value=0.017453292519943295,
         evidence="arithmetic: degrees to radians"),
+    Row("rietx.params.bodies._SNAP_REACH", "constant", tier=1, value=0.00010000000010000001,
+        evidence=("arithmetic: site_orbit's snapped position is the mean of images each within "
+                  "SITE_TOL x (1 + _SITE_TOL_SLACK) of the typed site in every fractional "
+                  "coordinate (its step-1 test), so the mean is too, and it lies on the site's "
+                  "element. site_reach makes that a distance: |M d| is convex in d, so over the "
+                  "box it peaks at a corner, this x the cell's longest body diagonal (A). "
+                  "RigidBodyBlock._axis_tilt_bound makes that a tilt: with u the template's "
+                  "principal axis and s_i each point's offset along it from the centroid, "
+                  "n.u = sum s_i h_i / sum s_i^2 exactly (h_i the point's offset from the "
+                  "site's plane or line), so the tilt's sine is at most the reach x "
+                  "sum |s_i| / sum s_i^2. It replaces the comparison of that sine with "
+                  "SITE_TOL itself (#1226). Its tier follows SITE_TOL's: the value is SITE_TOL "
+                  "x (1 + _SITE_TOL_SLACK), both still unaudited, and the derivation has no "
+                  "free factor, so it takes whatever tier SITE_TOL is given "
+                  "(docs/milestones/generality.md, The rule). Tested: a CO2-like body (C-O 1.16 A) on the "
+                  "P n m a mirror with an O typed up to SITE_TOL/2 off it builds at b = 6 and "
+                  "20 A, as one along the P 1 2 1 2-fold does, both refused on main; a body "
+                  "exempt from the overlap refusal builds at 0.99 x the bound and is refused "
+                  "at 1.01 x, naming its atom (tests/test_rigid_body_special.py)"),
+        grounds=("Never refuses a body whose atoms all passed the site check, and a body "
+                 "tilted past it has an atom further from the element than any snap moves a "
+                 "site, so no refiner's choice turns on it")),
     Row("rietx.params.derived._DEG", "constant", tier=1, value=0.017453292519943295,
         evidence="arithmetic: degrees to radians"),
     Row("rietx.params.expression.MAX_DEPTH", "constant", tier="invariant", value=64,
@@ -3606,7 +5680,16 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.params.vector.CELL_WINDOW_ANGLE_DEG", "constant", tier=3, value=2.0,
         evidence=("TOPAS Tech Ref Version 9 § 2.17 Table 2-1 (checked 2026-10-19): angles Val +- "
                   "0.2 deg per iteration, here ten iterations' worth per stage (the ten is "
-                  "rietx's, and no angle was surveyed)"),
+                  "rietx's, and no angle was surveyed); "
+                  "WP-2017 group H, 2026-11-09 (docs/wp/2017-batch/group_h_summary.md; Linux x86_64 at fabfe9b3f): "
+                  "on 298 fits of group A, the four protocol families from the shipped starts and the nine hard "
+                  "starts at every arm, a phase took the window in 339 of 2432 solves and a free cell column was "
+                  "bounded in none, so it bound nowhere, and switched off all 13 starts are bit-identical: the "
+                  "absent-phase hold (WP-1301) holds every free column moving only those phases, on the same screen "
+                  "at the same values, before the solve freezes the window; positive arm, that hold off at each "
+                  "stage's start: LaB6 +1 % windows a free cell in 6 of 14 solves, mid-window, so no fit shows it "
+                  "binding; single fits only, the joint path's window not counted; one timed-out fit uncounted; "
+                  "group G's fits not yet counted"),
         grounds=("A guard on a barely-seen phase's cell.  Tier 3, re-tiered from 2 on "
                  "2026-10-20: TOPAS bounds every phase's cell at each iteration, while this "
                  "bounds a barely-seen phase's once per stage, ten iterations' worth, and the "
@@ -3617,7 +5700,16 @@ ROWS: tuple[Row, ...] = (
         evidence=("TOPAS Tech Ref Version 9 § 2.17 Table 2-1 (checked 2026-10-19): a, b, c within "
                   "0.995 Val - 0.05 .. 1.005 Val + 0.05, Val re-read each iteration; a stage takes "
                   "one bound pair, so 0.5 % compounds to 5.1 % over ten iterations (the ten is "
-                  "rietx's)"),
+                  "rietx's); "
+                  "WP-2017 group H, 2026-11-09 (docs/wp/2017-batch/group_h_summary.md; Linux x86_64 at fabfe9b3f): "
+                  "on 298 fits of group A, the four protocol families from the shipped starts and the nine hard "
+                  "starts at every arm, a phase took the window in 339 of 2432 solves and a free cell column was "
+                  "bounded in none, so it bound nowhere, and switched off all 13 starts are bit-identical: the "
+                  "absent-phase hold (WP-1301) holds every free column moving only those phases, on the same screen "
+                  "at the same values, before the solve freezes the window; positive arm, that hold off at each "
+                  "stage's start: LaB6 +1 % windows a free cell in 6 of 14 solves, mid-window, so no fit shows it "
+                  "binding; single fits only, the joint path's window not counted; one timed-out fit uncounted; "
+                  "group G's fits not yet counted"),
         grounds=("A guard on a barely-seen phase's cell.  Tier 3, re-tiered from 2 on "
                  "2026-10-20: TOPAS bounds every phase's cell at each iteration, while this "
                  "bounds a barely-seen phase's once per stage, ten iterations' worth, and the "
@@ -3626,7 +5718,16 @@ ROWS: tuple[Row, ...] = (
         approved="2026-10-20"),
     Row("rietx.params.vector.CELL_WINDOW_PAD_A", "constant", tier=3, value=0.05,
         evidence=("TOPAS Tech Ref Version 9 § 2.17 Table 2-1 (checked 2026-10-19): the 0.05 A pad "
-                  "on a, b, c"),
+                  "on a, b, c; "
+                  "WP-2017 group H, 2026-11-09 (docs/wp/2017-batch/group_h_summary.md; Linux x86_64 at fabfe9b3f): "
+                  "on 298 fits of group A, the four protocol families from the shipped starts and the nine hard "
+                  "starts at every arm, a phase took the window in 339 of 2432 solves and a free cell column was "
+                  "bounded in none, so it bound nowhere, and switched off all 13 starts are bit-identical: the "
+                  "absent-phase hold (WP-1301) holds every free column moving only those phases, on the same screen "
+                  "at the same values, before the solve freezes the window; positive arm, that hold off at each "
+                  "stage's start: LaB6 +1 % windows a free cell in 6 of 14 solves, mid-window, so no fit shows it "
+                  "binding; single fits only, the joint path's window not counted; one timed-out fit uncounted; "
+                  "group G's fits not yet counted"),
         grounds=("A guard on a barely-seen phase's cell.  Tier 3, re-tiered from 2 on "
                  "2026-10-20: TOPAS bounds every phase's cell at each iteration, while this "
                  "bounds a barely-seen phase's once per stage, ten iterations' worth, and the "
@@ -3802,6 +5903,17 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.report.layer0.LAYER0_MATCH_TOL_DEG", "constant", value=0.08),
     Row("rietx.report.layer2.BACKGROUND_INCREASE_CAP", "constant", value=0.6),
     Row("rietx.report.layer2.IMPURITY_SIGMA", "constant", value=8.0),
+    Row("rietx.report.layer2.NESTED_COST_MARGIN", "constant", tier=2, value=2.0,
+        evidence=("Kass & Raftery (1995) J. Am. Stat. Assoc. 90, 773: 2 ln B from 2 to 6 is "
+                  "'positive' evidence, so 2 is the band's lower edge and an excess of the "
+                  "fuller fit's minimised cost under it cannot move a delta_bic verdict; "
+                  "absolute, in the cost units delta_bic is read in; measured stopping noise "
+                  "between two converged fits of one nested pair is 1.1e-7 relative, about "
+                  "0.0006 cost units on issue #1685's fixture, so the margin holds until a "
+                  "cost near 1e7 (the docstring's known limit); replaces optimize.lm.FTOL "
+                  "(1e-9 relative, below that noise) and was chosen over GSAS-II 5.8.4's 1e-3 "
+                  "relative stop (about 6 cost units there, already 'strong'); ruled by the "
+                  "maintainer 2026-11-20 (WP-2220)")),
     Row("rietx.report.layer2.TEXTURE_AXIS_AMBIGUITY", "constant", value=0.8),
     Row("rietx.report.localisation.SPLIT_TOLERANCE_DEG", "constant", value=1e-06),
     Row("rietx.report.magnetic._MAGNETIC_WIDTH_FLOOR_DEG", "constant", value=1e-12),
@@ -3863,6 +5975,22 @@ ROWS: tuple[Row, ...] = (
                  "holds blocks of one r and of 50 to the one-r-at-a-time loop's scores, to the bit.",
         value=2097152),
     Row("rietx.report.texture._EQUIV_REF_R", "constant", value=0.5),
+    Row("rietx.report.texture._ORDER_RANK_TOL", "constant", tier=1, value=1e-08,
+        evidence=("numerical floor: the rank cut of the order screen's weighted solve "
+                  "(WP-1974), on columns scaled to their unpartitioned norm, so for a column "
+                  "orthogonal to the rest a singular value is the fraction of a harmonic "
+                  "term the extraction's partition leaves (collinear visible terms also "
+                  "give small ones); measured and asserted: tests/test_texture.py::"
+                  "test_the_order_screen_rank_tolerance_sits_in_a_gap records orders 2-8 "
+                  "over -1 (full and short range), 2/m, mmm, -3m1 (with and without O), "
+                  "6/mmm and m-3m: largest dropped 7.6e-16 (c4_3, c6_3, c8_3 on a one-atom "
+                  "-3m1 phase), smallest kept 2.1e-4 (order 8 of a P -1 phase read to 60 "
+                  "deg, collinear visible terms; 0.13 on the other six), so any tolerance "
+                  "from 1e-12 to 1e-4 gives the same ranks on these cases (roundoff is 1e-15 on "
+                  "arm64, above 1e-14 on one Linux leg).  Where visible "
+                  "terms are collinear without a gap the cut decides the rank that "
+                  "added_rank and delta-BIC read; the screen reports min_kept_sv and "
+                  "does not warn")),
     Row("rietx.schemas.fraction.FRACTION_PROFILE_DCHI2", "constant", tier=2, value=3.84,
         evidence=("Venzon & Moolgavkar (1988) Appl. Statist. 37, 87: profile-likelihood cut at the "
                   "chi-squared(1) 95 % point (docstring)")),
@@ -4070,15 +6198,8 @@ ROWS: tuple[Row, ...] = (
                   "section 6.2, docs/wp/2002-batch/rulings.md B5); GSAS-II 5.8.4's xye reader "
                   "gives w = 0 at y <= 0 instead (imports/G2pwd_xye.py:172-185, checked); one "
                   "rule for PatternData.sig, RefinementResult.sig, background.diagnostics and "
-                  "io.formats.base.sigma_from_scaled, four literals until the B14 lift")),
-    Row("rietx.schemas.pattern.SIGMA_FLOOR_RELATIVE", "constant", tier=3, value=0.001,
-        evidence=("#650 (relative floor) and WP-1952's inherited note (#897): a zero esd then "
-                  "weighs ~1e6x its neighbours; no source for the 1e-3; inline in _floor_sigma "
-                  "until the B14 lift"),
-        grounds=("Kept until WP-1952 replaces it: a channel with sigma <= 0 takes no weight by "
-                 "default, the reader warns with the count and the lines, and a reader option "
-                 "keeps such channels at one count (B5, ruled 2026-10-19)."),
-        approved="2026-10-19"),
+                  "io.formats.base.sigma_from_scaled, four literals until the B14 lift; since "
+                  "WP-1952 also the σ <= 0 points under nonpositive_sigma='poisson'")),
     Row("rietx.schemas.plan.CLOSING_WINDOW_TOL", "constant", tier=1, value=0.001,
         evidence=("numerical setting with a domain test (tests/test_window_domain.py, "
                   "test_the_closing_stage_meets_the_bar): its windows are within 0.1 sigma of "
@@ -4245,9 +6366,6 @@ ROWS: tuple[Row, ...] = (
                   "1e16 sigma of path dependence (its comment). What it guards is tiered on its "
                   "own: SeriesStep.size_esd and DirectionGap.gap_esd, which it sets to 0 under "
                   "the floor (WP-2003)")),
-    Row("rietx.sequential.WIDTH_GROWTH_FACTOR", "constant", value=3.0),
-    Row("rietx.sequential.WIDTH_GROWTH_GOF_FACTOR", "constant", value=2.0),
-    Row("rietx.sequential.WIDTH_GROWTH_SIGMA", "constant", value=3.0),
     Row("rietx.solve.cluster._ISOMETRY_RTOL", "constant", tier=1, value=1e-06,
         evidence=("equivalences(): an integer {-1, 0, 1} matrix P is an isometry of "
                   "the cell when |P^T g P - g| <= 1e-6 x max|g|, element by element. "
@@ -4568,8 +6686,16 @@ ROWS: tuple[Row, ...] = (
                  "S/L and H/L mirror (WP-2012), "
                  "not an accuracy loss from the tolerance."),
         approved="2026-11-01"),
-    Row("rietx.schemas.plan.PlanSpec:closing_window_tol", "default", tier=2, ambiguity=1, value=0.001,
-        evidence=("BGMN ends every refinement ladder with a closing run, all free and restarted "
+    Row("rietx.schemas.plan.PlanSpec:closing_window_tol", "default", tier=2, ambiguity=1, value=None,
+        evidence=("None, no closing stage, since WP-2222 (2026-11-19): TOPAS cuts each peak at "
+                  "0.001 of its own height, 2 % of a Lorentzian, as the declared "
+                  "stages' WINDOW_AREA_TOL does, and has no closing run (docs/practice.md); "
+                  "measured 2026-11-19 (macOS arm64, [dev], three interleaved rounds) the "
+                  "closing stage cost 1.2-1.3x on 11-BM NAC, 1.7x on CPD cpd-1a and cpd-2 "
+                  "and 1.9x on the bench's simulated trigger case, and moved those answers "
+                  "0.16, 0.92, 2.0 and 1.24 plain esd; a closing stage at 2e-2 equalled none "
+                  "in Rwp on cpd-1a and trigger, so its effect is the tail, not the recompile. "
+                  "The opt-in, CLOSING_WINDOW_TOL: BGMN ends every refinement ladder with a closing run, all free and restarted "
                   "from the answer, by default (manual A.4; Doebelin & Kleeberg 2015 J. Appl. "
                   "Cryst. 48, 1573, 2); RIETAN-FP's NAUTO = 2 ends with everything refining "
                   "together, its windows moving each evaluation; MAUD's wizard has no final "
@@ -4586,10 +6712,12 @@ ROWS: tuple[Row, ...] = (
                   "declared stages leave fixed (a turn_off whose glob matched last, "
                   "staged.fixed_at_end), which it keeps fixed and records in its "
                   "StageResult.fixed"),
-        grounds=("The maintainer's ruling (the sixth round's Q2, option 3, 2026-10-21): every "
-                 "plan ends with a closing stage at tight windows, which removes the 2 % "
-                 "window's error from the answer and most of a staged plan's start dependence; "
-                 "None runs the declared stages alone, bit-identical to before.")),
+        grounds=("The maintainer's ruling of 2026-11-19 (WP-2222), after users complained of "
+                 "fit time: codes such as TOPAS are fast, with accuracy their users consider "
+                 "very sufficient; turn the closing stage off by default. It reverses the "
+                 "sixth round's Q2 default (option 3, 2026-10-21), which stays the opt-in "
+                 "at CLOSING_WINDOW_TOL for an answer to publish."),
+        approved="2026-11-19"),
     Row("rietx.schemas.plan.PlanSpec:lebail_passes", "default", tier="caller", ambiguity=1, value=1,
         evidence="opt-in: lebail_passes > 1, default 1 (one run, bit-identical to pre-WP-1323)"),
     Row("rietx.schemas.plan.PlanSpec:phase_support_sigma", "default", tier=3, ambiguity=1, value=3.0,
@@ -4679,7 +6807,8 @@ ROWS: tuple[Row, ...] = (
         grounds=("B11 (ruled 2026-10-19): repeat until the intensities stop changing, with a cap, "
                  "judged against the true structure.  The number, FAP as its failing case and "
                  "LaMnO3's 150x cost were settled by Claude under the maintainer's delegation "
-                 "of 2026-11-05, and the date is that settlement's.  No "
+                 "of 2026-11-05, and the date is that settlement's, which he counted as his "
+                 "approval on 2026-11-22 (WP-2238).  No "
                  "surveyed program stops on the intensities at a fixed model, because each "
                  "extracts inside the solve (docs/practice.md); 1e-8 leaves FAP at 0.55 and "
                  "more than doubles LaMnO3's cycles."),
@@ -4694,11 +6823,16 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic: c_w = 1 is the identity, every restraint at the σ its caller "
                   "declared (bit-identical to pre-WP-1074)")),
     Row("rietx.schemas.plan.StageSpec:window_slack_deg", "default", tier=3, ambiguity=1, value=None,
-        evidence=("None resolves to WINDOW_MIN_DEG and compiles bit-identical windows and pattern "
-                  "(tests/test_window_domain.py), so it inherits that row's tier"),
+        evidence=("None is the slack a stage sizes from the position parameters it frees "
+                  "(WINDOW_MOVE_FWHM, WP-2317 R7) where a later stage of its plan frees every "
+                  "path it frees again (strategy.staged.refit_later), and WINDOW_MIN_DEG on "
+                  "the answer stage, a stage a later turn_off leaves final, a stage run on "
+                  "its own, a joint fit and a shift equation (tests/test_window_slack.py); a "
+                  "declared value keeps the caller's windows and is never re-solved"),
         grounds=("A numerical setting whose domain test covers less than the domain it claims; "
-                 "tier 3 under B10 option 2 (ruled 2026-10-19) until that is measured."),
-        approved="2026-10-19"),
+                 "tier 3 under B10 option 2 (ruled 2026-10-19), sized per stage since R7 "
+                 "(ruled 2026-11-27)."),
+        approved="2026-11-27"),
     Row("rietx.schemas.instrument.Source:kind", "default", tier=1, ambiguity=1, value="xray_cw",
         evidence="arithmetic: a union tag, no value judgement"),
     Row("rietx.schemas.instrument.Source:polarization", "default", tier=3, ambiguity=3, value={"value": 0.5, "vary": False, "min": 0.0, "max": 1.0, "unit": None, "stderr": None},
@@ -4736,6 +6870,25 @@ ROWS: tuple[Row, ...] = (
                  "geometry-specific, which the ruling keeps for an unstated geometry, and WP-2015 "
                  "picks by declared geometry (B7, ruled 2026-10-19)."),
         approved="2026-10-19"),
+    Row("rietx.refine.Refinement.fit:refit", "default", tier=2, ambiguity=1, value="single",
+        evidence=("TOPAS, GSAS-II and FullProf run one solve of whatever is free from the "
+                  "current values and stage nothing; a user stages a first approach by hand "
+                  "(docs/practice.md § Staging and what a stage holds), so a re-fit in one "
+                  "stage is what their users do. Acts only on a re-fit (the start is an "
+                  "accepted fit's answer on the same pattern, mode and channels, no value "
+                  "written since; refine.py _refit_key; and the plan frees nothing that "
+                  "fit's plan left fixed, Refinement._plan_frees), and a rejected one-stage fit falls "
+                  "back to the plan (WARM_REFIT_REJECTED). Measured from a converged start "
+                  "on the eight comparison standards (SRM 660c, corundum, zincite, "
+                  "fluorite, brucite, fluorapatite, 11-BM NAC, 11-BM LaB6: seven materials from four instruments, all development data, against rietx's own staged answer): "
+                  "8 of 8 reach the staged answer, within 0.41 esd, at 0.35-0.50 of its "
+                  "time; from a cold start one stage reaches 20 of 48, which is why a first "
+                  "fit stays staged (WP-2224 § Measured). Against: McCusker et al. (1999) free "
+                  "cumulatively and BGMN and MAUD stage by default; a parameter the converged "
+                  "fit held starts cold, and one stage freeing brucite's March-Dollase "
+                  "block ended 2.25 esd off the staged answer, so a plan releasing one runs "
+                  "staged (ruled by the maintainer 2026-11-19, 'it is a cold start'). Ruled "
+                  "by the maintainer 2026-11-19, 'Yes, by default'")),
     Row("rietx.refine.Refinement.fit:two_theta_limits", "default", tier=2, ambiguity=1, value=None,
         evidence=("GSAS-II 5.8.4 GSASIIdataGUI.py:2192-2201: a histogram's Limits default to the "
                   "full data range on import (checked)"
@@ -4771,18 +6924,24 @@ ROWS: tuple[Row, ...] = (
                   "checked"
                   "; seven programs, 2026-10-21 (docs/practice.md): the full range in GSAS-II, FullProf, RIETAN-FP, MAUD and EasyDiffraction, BGMN the instrument function's range, TOPAS's default not stated")),
     Row("rietx.refine.Refinement.run_stage:correlation_guard", "default", value=0.98),
-    Row("rietx.refine.Refinement.run_stage:window_area_tol", "default", tier=1, ambiguity=1, value=None,
-        evidence=("None resolves to schemas.plan.CLOSING_WINDOW_TOL, the windows an answer is "
-                  "measured on, and inherits that row's tier and domain test; the stage records "
-                  "the fraction it ran at"),
-        grounds=("No closing stage follows a stage driven by hand (the GUI's Run this stage "
-                 "among them), so its own windows compute its answer; at the declared stages' "
-                 "2 % that answer carried up to 0.97 esd on lab data. A caller wanting the fast "
-                 "stage passes WINDOW_AREA_TOL, and cherry_pick passes a recorded node's "
-                 "through forward.recorded_window_tol. Ruled 2026-10-21 (the seventh round's "
-                 "Q1, evaluation outside a fit at the closing windows, which the brief extended "
-                 "to this seat)."),
-        approved="2026-10-21"),
+    Row("rietx.refine.Refinement.run_stage:window_area_tol", "default", tier=2, ambiguity=1, value=None,
+        evidence=("None resolves to forward.WINDOW_AREA_TOL since WP-2222, the windows a default "
+                  "fit's declared stages measure its answer on: TOPAS's cut, 2 % of a Lorentzian, "
+                  "inside the seven programs' range (docs/practice.md, How far a peak is "
+                  "computed), as PlanSpec:closing_window_tol's row cites; until WP-2222 it "
+                  "resolved to schemas.plan.CLOSING_WINDOW_TOL; nothing follows a stage run by "
+                  "hand, so its answer keeps the declared windows' error (up to 0.97 esd on lab "
+                  "data, WP-2002); the stage records the fraction it ran at"),
+        grounds=("A stage driven by hand (the GUI's Run this stage among them) runs on the "
+                 "windows a default fit's stages run on, so it costs what the same stage in a "
+                 "plan costs: the maintainer's 2026-11-19 ruling that TOPAS-level accuracy is "
+                 "sufficient and the closing stage goes off by default (WP-2222), which "
+                 "supersedes the seventh round's Q1 extension to this seat (2026-10-21); "
+                 "approved for this seat at tier 2 on TOPAS's cut by the maintainer "
+                 "2026-11-19 (WP-2228). A Le Bail stage at a range end is WP-2228's. A "
+                 "caller wanting near-complete tails passes CLOSING_WINDOW_TOL, and "
+                 "cherry_pick passes a recorded node's through forward.recorded_window_tol."),
+        approved="2026-11-19"),
     Row("rietx.refine.Refinement.run_stage:phase_support_sigma", "default", tier=3, ambiguity=1, value=3.0,
         evidence=("WP-1523: 3 sigma, = indexing ABSENT_SIGMA by test; 20 blank fits read 1 phase "
                   "seen, 9 at the old 1 sigma; fails on a real phase at ~1/16 000 of a strong "
@@ -4821,6 +6980,25 @@ ROWS: tuple[Row, ...] = (
                  "geometry-specific, which the ruling keeps for an unstated geometry, and WP-2015 "
                  "picks by declared geometry (B7, ruled 2026-10-19)."),
         approved="2026-10-19"),
+    Row("rietx.refine.refine:refit", "default", tier=2, ambiguity=1, value="single",
+        evidence=("TOPAS, GSAS-II and FullProf run one solve of whatever is free from the "
+                  "current values and stage nothing; a user stages a first approach by hand "
+                  "(docs/practice.md § Staging and what a stage holds), so a re-fit in one "
+                  "stage is what their users do. Acts only on a re-fit (the start is an "
+                  "accepted fit's answer on the same pattern, mode and channels, no value "
+                  "written since; refine.py _refit_key; and the plan frees nothing that "
+                  "fit's plan left fixed, Refinement._plan_frees), and a rejected one-stage fit falls "
+                  "back to the plan (WARM_REFIT_REJECTED). Measured from a converged start "
+                  "on the eight comparison standards (SRM 660c, corundum, zincite, "
+                  "fluorite, brucite, fluorapatite, 11-BM NAC, 11-BM LaB6: seven materials from four instruments, all development data, against rietx's own staged answer): "
+                  "8 of 8 reach the staged answer, within 0.41 esd, at 0.35-0.50 of its "
+                  "time; from a cold start one stage reaches 20 of 48, which is why a first "
+                  "fit stays staged (WP-2224 § Measured). Against: McCusker et al. (1999) free "
+                  "cumulatively and BGMN and MAUD stage by default; a parameter the converged "
+                  "fit held starts cold, and one stage freeing brucite's March-Dollase "
+                  "block ended 2.25 esd off the staged answer, so a plan releasing one runs "
+                  "staged (ruled by the maintainer 2026-11-19, 'it is a cold start'). Ruled "
+                  "by the maintainer 2026-11-19, 'Yes, by default'")),
     Row("rietx.refine.refine:two_theta_limits", "default", tier=2, ambiguity=1, value=None,
         evidence=("GSAS-II 5.8.4 GSASIIdataGUI.py:2192-2201: a histogram's Limits default to the "
                   "full data range on import (checked)"
@@ -4971,15 +7149,23 @@ ROWS: tuple[Row, ...] = (
                   "(docs/practice.md): none defaults to Le Bail; FullProf, RIETAN-FP and TOPAS "
                   "make the user state it. GSAS-II fits each histogram of a series by RefineCore, "
                   "the single fit's solver (docs/practice.md § Sequential refinement, checked)")),
-    Row("rietx.sequential.SequentialRefinement.fit:plan", "default", tier=3, ambiguity=1,
+    Row("rietx.sequential.SequentialRefinement.fit:plan", "default", tier=3, ambiguity=3,
         value="mccusker_default",
         evidence=("the first pattern's plan and, collapsed, every warm refit's; the same "
                   "value as Refinement.fit:plan, whose row carries the evidence (McCusker et "
-                  "al. 1999, the order only; no program ships a default plan)"),
-        grounds=("B7's approval of the single fit's default plan (ruled 2026-10-19), "
-                 "extended to the series seat by the maintainer 2026-11-03 "
-                 "(2003-batch/batch.md, C9 q3)."),
-        approved="2026-11-03"),
+                  "al. 1999, the order only; no program ships a default plan). WP-2081 "
+                  "measured the alternatives: held setups carry frame 0's calibration "
+                  "error to every frame, outside every esd (synthetic LaB6, -1.83 ppm), and "
+                  "on the CuCr2O4 ramp holding every width put the transition near 60 K, "
+                  "230 K or nowhere, where this default closes it between 111 and 123 K"),
+        grounds=("the maintainer kept today's default on 2026-11-16 (docs/milestones/"
+                 "series.md § Ruled after the open; WP-2081 question 1, option a). The "
+                 "traditional sequential, which calibrates the instrument and holds it "
+                 "through the series, is a named dissent (WP-2081 § How a human expert "
+                 "runs a series), so the unanimity gate fails; whether the setup held "
+                 "still is a fact outside the pattern (series rule 4). Tier 3 with the "
+                 "plan kept, ruled 2026-11-22."),
+        approved="2026-11-22"),
     Row("rietx.sequential.SequentialRefinement.fit:refit", "default", value="single"),
     Row("rietx.sequential.SequentialRefinement.fit:two_theta_limits", "default", tier=2,
         ambiguity=1, value=None,
@@ -5073,7 +7259,8 @@ ROWS: tuple[Row, ...] = (
         value="carry",
         evidence=("consulted only once every rung of a pattern raised (sequential.py _chain): "
                   "'carry' records a SeriesFailure with SERIES_PATTERN_FAILED and warm-starts "
-                  "the successor from the last accepted pattern, 'skip' starts it cold, "
+                  "the successor from the last accepted pattern, 'skip' starts it cold "
+                  "(a held path keeping the last accepted value, WP-2081), "
                   "'raise' ends the chain keeping what completed; no case on disk outside "
                   "injected raises; GSAS-II and MAUD stop the chain, EasyDiffraction carries "
                   "on (docs/practice.md § Sequential refinement, checked)"),
@@ -5092,6 +7279,33 @@ ROWS: tuple[Row, ...] = (
         evidence=("answer-invariant: the run recorder, one run a job; tests/test_answer_invariant_defaults.py asserts a three-pattern chain's every kept value, esd, rung and code equal with it on (WP-2003)")),
     Row("rietx.sequential.SequentialRefinement.fit:label", "default", tier="invariant", ambiguity=1, value=None,
         evidence=("answer-invariant: a run's name; tests/test_answer_invariant_defaults.py asserts a three-pattern chain's every kept value, esd, rung and code equal with it on (WP-2003)")),
+    Row("rietx.indexing.kvector.kgrid_positions:harmonics", "default", tier=1, ambiguity=1,
+        value=(1,),
+        evidence=("definition: (1,) is the first-order hypothesis H ± k the satellite generator "
+                  "builds; another order is another hypothesis the caller names, never added "
+                  "by the package (issue #795, K1a)")),
+    Row("rietx.indexing.kvector.kgrid_null:budget", "default", tier="caller", ambiguity=1,
+        value=None,
+        evidence=("opt-in: budget=None sets no cap; a Budget or Deadline is passed by name, and "
+                  "it is read before every block of _CHUNK k, so a cut stops every shuffle at "
+                  "the same k, inside a stratum if need be, and names strata_cut and strata_left")),
+    Row("rietx.indexing.kvector.kgrid_null:harmonics", "default", tier=1, ambiguity=1,
+        value=(1,),
+        evidence=("definition: (1,) is the first-order hypothesis H ± k; another order is "
+                  "another hypothesis the caller names (issue #795, K1a)")),
+    Row("rietx.indexing.kvector.score_kgrid:budget", "default", tier="caller", ambiguity=1,
+        value=None,
+        evidence=("opt-in: budget=None sets no cap; a Budget or Deadline is passed by name, and "
+                  "it is read before every block of _CHUNK k, and a cut is reported as "
+                  "strata_cut and strata_left, never as a smaller search called complete")),
+    Row("rietx.indexing.kvector.score_kgrid:harmonics", "default", tier=1, ambiguity=1,
+        value=(1,),
+        evidence=("definition: (1,) is the first-order hypothesis H ± k; another order is "
+                  "another hypothesis the caller names (issue #795, K1a)")),
+    Row("rietx.indexing.kvector.score_kvector:harmonics", "default", tier=1, ambiguity=1,
+        value=(1,),
+        evidence=("definition: (1,) is the first-order hypothesis H ± k; (2,) or (3,) scores 2k "
+                  "or 3k as its own hypothesis (issue #795, K1a)")),
     Row("rietx.indexing.workflow.index_pattern:peaks", "default", value=None),
     Row("rietx.indexing.workflow.index_pattern:data", "default", value=None),
     Row("rietx.indexing.workflow.index_pattern:instrument", "default", value=None),
@@ -5145,47 +7359,102 @@ ROWS: tuple[Row, ...] = (
         ambiguity=1, value=None,
         evidence="off by default; a caller names the cell whose translations every subgroup keeps"),
     # suggestion: 197
-    Row("ABSORPTION_ESTIMATE_UNAVAILABLE.suggestion", "suggestion", value=1),
-    Row("ABSORPTION_MU_R_OUT_OF_RANGE.suggestion", "suggestion", value=1),
+    Row("ABSORPTION_ESTIMATE_UNAVAILABLE.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: names the field that takes the value by hand, and the one "
+                  "input that lets the estimate run")),
+    Row("ABSORPTION_MU_R_OUT_OF_RANGE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: names the three ways to lower muR and the call that prices "
+                  "each; picks none")),
     Row("ABSORPTION_THICKNESS_MATTERS.suggestion", "suggestion", value=1),
-    Row("ADP_NOT_POSITIVE_DEFINITE.suggestion", "suggestion", value=1),
+    Row("ADP_NOT_POSITIVE_DEFINITE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence="arithmetic: names three ways back to a defined tensor; picks none"),
     Row("AIR_SCATTER_UNDECLARED.suggestion", "suggestion", value=1),
     Row("BACKGROUND_ABSORPTION.suggestion", "suggestion", value=1),
-    Row("BACKGROUND_ORDER_AT_CAP.suggestion", "suggestion", value=1),
+    Row("BACKGROUND_ORDER_AT_CAP.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: points at the finding that measures a too-flexible background "
+                  "and at the other kind; picks neither")),
     Row("BACKGROUND_SMOOTHING_AT_FLEXIBLE_END.suggestion", "suggestion", tier=1, ambiguity=1,
         value=1,
         evidence=("arithmetic: names the argument that overrides the fallback and the "
                   "package's other background forms, and ranks none of them, so no dissenter is "
                   "left (a held SNIP under a broad hump is one, references/judging.md)")),
-    Row("BISO_NEGATIVE.suggestion", "suggestion", value=1),
+    Row("BISO_NEGATIVE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence="arithmetic: lists the usual causes and holding B with a note; picks none"),
     Row("BISO_UNUSUALLY_LARGE.suggestion", "suggestion", value=1),
-    Row("BOUND_HIT.suggestion", "suggestion", value=1),
-    Row("BRINDLEY_OUTSIDE_REGIME.suggestion", "suggestion", value=1),
-    Row("CAPILLARY_OFFSET_UNAVAILABLE.suggestion", "suggestion", value=1),
+    Row("BOUND_HIT.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: names widening the limit or fixing the parameter; picks "
+                  "neither")),
+    Row("BRINDLEY_OUTSIDE_REGIME.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: names grinding, a shorter wavelength, or quoting the "
+                  "uncorrected fractions; picks none")),
+    Row("CAPILLARY_OFFSET_UNAVAILABLE.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence="arithmetic: names the field that lets the terms refine"),
     Row("CELL_RUNAWAY.suggestion", "suggestion", tier=3, ambiguity=1, value=1,
         evidence=("WP-1110's trigger: a visible phase sharing its cell with a 2 % trace copy ran "
                   "4.16 -> 3803 A in one stage; fired in none of WP-1523's 104 fits"),
         grounds=("Each named fix breaks the joint degeneracy the trigger case walked, and the "
                  "choice among them is the caller's (B8, ruled 2026-10-19)."),
         approved="2026-10-19"),
-    Row("CHILD_GROUP_UNNAMED.suggestion", "suggestion", value=1),
-    Row("CIF_CELL_ANGLE_CORRECTED.suggestion", "suggestion", value=1),
-    Row("CIF_MAGNETIC_CENTERING_ASSUMED.suggestion", "suggestion", value=1),
-    Row("CIF_MAGNETIC_ION_UNCHARGED.suggestion", "suggestion", value=1),
-    Row("CIF_MAGNETIC_MAGNITUDE_ESD_NOT_STORED.suggestion", "suggestion", value=1),
-    Row("CIF_MAGNETIC_NUCLEAR_GROUP.suggestion", "suggestion", value=1),
-    Row("CIF_MAGNETIC_NUCLEAR_SETTING.suggestion", "suggestion", value=1),
-    Row("CIF_MAGNETIC_NUMBER_MISMATCH.suggestion", "suggestion", value=1),
-    Row("CIF_MAGNETIC_SPHERICAL_ESD_NOT_STORED.suggestion", "suggestion", value=1),
-    Row("CIF_MAGNETIC_SYMMFORM.suggestion", "suggestion", value=1),
-    Row("CIF_SITE_LISTED_TWICE.suggestion", "suggestion", value=1),
-    Row("CIF_SITE_MULTIPLICITY_DISAGREES.suggestion", "suggestion", value=1),
-    Row("CIF_SITE_TWINS_MERGED.suggestion", "suggestion", value=1),
+    Row("CHILD_GROUP_UNNAMED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=('arithmetic: names the two ways to quote the child group (its operation list, '
+                  'or the closest type with the cell beside it) and asks for the transform to be '
+                  'checked before a published symbol is compared; ranks neither '
+                  '(magnetic/supercell.py:1446-1450)')),
+    Row("CIF_CELL_ANGLE_CORRECTED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=('arithmetic: names the one alternative to the correction, a space group that '
+                  'leaves the angle free, for a deviation that is real (cif.py:110-111)')),
+    Row("CIF_CELL_TIE_CORRECTED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: names the one way a real difference can be kept, a space "
+                  "group that leaves the parameter free; picks no group")),
+    Row("CIF_MAGNETIC_CENTERING_ASSUMED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=('arithmetic: names the loop to add and an anti-centring as the example of what '
+                  'it would change (magcif.py:651-653)')),
+    Row("CIF_MAGNETIC_ION_UNCHARGED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=('arithmetic: names the argument that states the ion and lists every ion the '
+                  'table carries for the element, ranking none (magcif.py:1994-1999)')),
+    Row("CIF_MAGNETIC_MAGNITUDE_ESD_NOT_STORED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=('arithmetic: names the field that carries the refined modulus esd '
+                  '(FitReport.magnetic[i].magnitude_esd; magcif.py:2008-2009)')),
+    Row("CIF_MAGNETIC_NUCLEAR_GROUP.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: names the switch, nuclear_group='file', that refines positions "
+                  "under the file's own group, and is given only where the index is above 1 "
+                  '(magcif.py:1180-1184); it names the alternative to a batched act and ranks '
+                  'nothing')),
+    Row("CIF_MAGNETIC_NUCLEAR_SETTING.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=('arithmetic: for a group no tabulated symbol names, says a CIF carries its '
+                  'operation list and a symbol-only format refuses it (magcif.py:1227-1230); the '
+                  'tabulated-setting site passes None')),
+    Row("CIF_MAGNETIC_NUMBER_MISMATCH.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=('arithmetic: asks for the operator and centring loops to be checked against '
+                  "the file's source and states the centring count read, the fact that separates "
+                  'the two explanations (magcif.py:718-721)')),
+    Row("CIF_MAGNETIC_SPHERICAL_ESD_NOT_STORED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=('arithmetic: names the two row forms whose su this reader keeps '
+                  '(magcif.py:2018-2019)')),
+    Row("CIF_MAGNETIC_SYMMFORM.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=('arithmetic: on disagreement only, asks that the operator loop and the '
+                  'symmform be checked against each other; ranks neither (magcif.py:2036-2038)')),
+    Row("CIF_SITE_LISTED_TWICE.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=('arithmetic: names both readings, one site under two labels or two sites whose '
+                  'coordinates need checking, and ranks neither (cif.py:531-533)')),
+    Row("CIF_SITE_MULTIPLICITY_DISAGREES.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=('arithmetic: names the two things that can be wrong, the setting and the '
+                  'sites, and ranks neither (cif.py:1475-1476)')),
+    Row("CIF_SITE_TWINS_MERGED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=('arithmetic: asks for the coordinates to be checked against the source '
+                  '(cif.py:409)')),
+    Row("COMPARISON_UNCONVERGED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: names the one remedy for a fit short of its optimum, running "
+                  "it on, and the two ways to start it (more iterations, or the other "
+                  "fit's values)")),
     Row("CONSTRAINT_ACTIVE.suggestion", "suggestion", value=1),
-    Row("COVARIANCE_DIRECTION_DISCARDED.suggestion", "suggestion", value=1),
+    Row("COVARIANCE_DIRECTION_DISCARDED.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: names three levers, fewer free, held known values, a wider "
+                  "range; picks none")),
     Row("COVARIANCE_UNAVAILABLE.suggestion", "suggestion", value=1),
     Row("DATA_SUPPORT_LOW.suggestion", "suggestion", value=1),
-    Row("DECLARED_RANGE_NOT_RESTORED.suggestion", "suggestion", value=1),
+    Row("DECLARED_RANGE_NOT_RESTORED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence="arithmetic: names the act that restores a limit"),
     Row("DECLARED_RANGE_RESTORED.suggestion", "suggestion", value=1),
     Row("DISPERSION_NEGLECTED.suggestion", "suggestion", value=1),
     Row("EXTINCTION_CONDITIONS_PARTIAL.suggestion", "suggestion", value=1),
@@ -5200,28 +7469,72 @@ ROWS: tuple[Row, ...] = (
                  "(PR #939) once it listed them unranked."),
         approved="2026-10-21"),
     Row("EXTINCTION_SYMBOL_AMBIGUOUS.suggestion", "suggestion", value=4),
-    Row("EXTRA_PEAK_NO_INTENSITY.suggestion", "suggestion", value=1),
+    Row("EXTRA_PEAK_NO_INTENSITY.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: names dropping the component or checking its centre bounds; "
+                  "picks neither")),
     Row("EXTRA_PEAK_ON_REFLECTION.suggestion", "suggestion", value=1),
-    Row("FLAT_DIRECTION.suggestion", "suggestion", value=1),
+    Row("FLAT_DIRECTION.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: names holding one at a known value or staging them apart; "
+                  "picks neither")),
     Row("FLOOR_HIT.suggestion", "suggestion", value=1),
-    Row("FULLPROF_MAGNETIC_PHASE_OMITTED.suggestion", "suggestion", value=2),
-    Row("FULLPROF_MAGNETIC_PHASE_READ.suggestion", "suggestion", value=1),
-    Row("FULLPROF_OCCUPANCY_UNCHECKED.suggestion", "suggestion", value=1),
-    Row("FULLPROF_TIE_DROPPED.suggestion", "suggestion", value=3),
-    Row("GSAS2_CIF_FIELD_NOT_WRITTEN.suggestion", "suggestion", value=1),
-    Row("GSAS2_GPX_BACKGROUND_NOT_CARRIED.suggestion", "suggestion", value=1),
-    Row("GSAS2_GPX_CONSTRAINT_NOT_CARRIED.suggestion", "suggestion", value=1),
-    Row("GSAS2_GPX_PHASE_MAGNETIC.suggestion", "suggestion", value=1),
-    Row("GSAS2_GPX_SCALE_NOT_COMPARABLE.suggestion", "suggestion", value=1),
-    Row("GSAS2_GPX_TEXTURE_NOT_CARRIED.suggestion", "suggestion", value=1),
-    Row("GSAS2_INSTPRM_GEOMETRY_ASSUMED.suggestion", "suggestion", value=1),
-    Row("GSAS_BANK_COMMENTED.suggestion", "suggestion", value=1),
-    Row("GSAS_EXP_BACKGROUND_NOT_CARRIED.suggestion", "suggestion", value=1),
-    Row("GSAS_EXP_PHASE_MAGNETIC.suggestion", "suggestion", value=1),
-    Row("GSAS_EXP_REFINE_FLAG_MERGED.suggestion", "suggestion", value=1),
-    Row("GSAS_EXP_SCALE_NOT_COMPARABLE.suggestion", "suggestion", value=1),
-    Row("GSAS_PRM_GEOMETRY_ASSUMED.suggestion", "suggestion", value=1),
-    Row("GSAS_PRM_PROFILE_SET_DEFAULTED.suggestion", "suggestion", value=1),
+    Row("FULLPROF_MAGNETIC_PHASE_OMITTED.suggestion", "suggestion", tier=1, ambiguity=1, value=2,
+        evidence=('read both sites (fullprof.py:3730, :3743): names the one flag (leave '
+                  'nuclear_only off) that reads the phase or says why it cannot; ranks no '
+                  'alternative')),
+    Row("FULLPROF_MAGNETIC_PHASE_READ.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("read fullprof.py:3694: 'Refine the merged phase as one' names what the merge "
+                  'did; ranks nothing')),
+    Row("FULLPROF_OCCUPANCY_UNCHECKED.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=('read fullprof.py:3792: points the reader to the published structure for the '
+                  'setting; no pick is made')),
+    Row("FULLPROF_TIE_DROPPED.suggestion", "suggestion", tier=1, ambiguity=1, value=3,
+        evidence=('read the three sites (fullprof.py:3801, :3814, :3843): each names the '
+                  'restoring call (tie_equal on the column or DOF paths, tie with scale= for a '
+                  'signed group); the DOF-path rule is tested '
+                  '(test_a_recoverable_coordinate_tie_restores_on_the_dof_path)')),
+    Row("GSAS2_CIF_FIELD_NOT_WRITTEN.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=('read gsas2.py:2164: tells the caller to set the listed terms in GSAS-II; '
+                  'names no value')),
+    Row("GSAS2_GPX_BACKGROUND_NOT_CARRIED.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("read gsas2.py:1404: 'Choose a background and refine it' names no background "
+                  "and ranks none (auto_background is the caller's verb)")),
+    Row("GSAS2_GPX_CONSTRAINT_NOT_CARRIED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=('read gsas2.py:1462: names tie_equal for each equivalence and leaves the other '
+                  'constraints to the caller')),
+    Row("GSAS2_GPX_PHASE_MAGNETIC.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=('read gsas2.py:1423: points to a magCIF read with Structure.from_cif; the only '
+                  'site that has a suggestion is the magnetic-phase warning')),
+    Row("GSAS2_GPX_SCALE_NOT_COMPARABLE.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("read gsas2.py:1861: 'Refine the scale before you trust it' is the arithmetic "
+                  "fact that the seed is a start, not a measurement; independent of the seed's "
+                  'value (batch row)')),
+    Row("GSAS2_GPX_TEXTURE_NOT_CARRIED.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("read gsas2.py:1578: for the warning level only, 'declare a texture yourself "
+                  "and refine it from zero'; zero is no texture, the neutral start")),
+    Row("GSAS2_INSTPRM_GEOMETRY_ASSUMED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=('read instrument_profile.py:1605: set geometry.kind, carrying axial_sl and '
+                  'axial_hl first because a fresh Geometry starts at 0; a stated call sequence')),
+    Row("GSAS_BANK_COMMENTED.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=('advises checking that the bank was not commented out on purpose '
+                  '(gsas.py:452-455); names no action and ranks no reading, so no dissenter is '
+                  'left; takes no action itself')),
+    Row("GSAS_EXP_BACKGROUND_NOT_CARRIED.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence='read gsas.py:1324: as GSAS2_GPX_BACKGROUND_NOT_CARRIED.suggestion'),
+    Row("GSAS_EXP_PHASE_MAGNETIC.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence='read gsas.py:1337: points to a magCIF read with Structure.from_cif'),
+    Row("GSAS_EXP_REFINE_FLAG_MERGED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("read gsas.py:2037: 'Hold or free the whole group before you write' tells the "
+                  'caller how to avoid the merge; it ranks neither direction')),
+    Row("GSAS_EXP_SCALE_NOT_COMPARABLE.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("read gsas.py:1647: 'Refine the scale before you trust it', the same "
+                  'arithmetic fact as the gpx row; independent of the seed value')),
+    Row("GSAS_PRM_GEOMETRY_ASSUMED.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=('read instrument_profile.py:707: set the geometry yourself for a flat-plate '
+                  'calibration, carrying geometry.axial_sl and axial_hl over first; ranks no '
+                  'geometry')),
+    Row("GSAS_PRM_PROFILE_SET_DEFAULTED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("read instrument_profile.py:690: 'Name the set with read_gsas_prm(..., "
+                  "profile_set=N)', the argument that overrides the default")),
     Row("HARMONIC_ABSENT.suggestion", "suggestion", value=1),
     Row("HARMONIC_FRACTION.suggestion", "suggestion", value=1),
     Row("HARMONIC_HELD.suggestion", "suggestion", value=1),
@@ -5230,7 +7543,9 @@ ROWS: tuple[Row, ...] = (
         value=1,
         evidence=("arithmetic: names the skipped tree's line range, which is the whole of "
                   "what reading it needs, and the reader that loads it")),
-    Row("HOLD_BLOCKED_PLAN.suggestion", "suggestion", value=1),
+    Row("HOLD_BLOCKED_PLAN.suggestion", "suggestion", tier='caller', ambiguity=1, value=1,
+        evidence=("opt-in, as its code: names unhold(), the verb that lifts the caller's "
+                  "hold")),
     Row("HUMP_TOO_NARROW.suggestion", "suggestion", value=1),
     Row("INDEX_ABSTAINED.suggestion", "suggestion", value=1),
     Row("INDEX_BRAVAIS_AMBIGUOUS.suggestion", "suggestion", value=1),
@@ -5257,6 +7572,16 @@ ROWS: tuple[Row, ...] = (
     Row("INDEX_SYSTEMS_NOT_COVERED.suggestion", "suggestion", value=1),
     Row("INDEX_VALIDATION_FAILED.suggestion", "suggestion", value=1),
     Row("INDEX_VOLUME_UNPHYSICAL.suggestion", "suggestion", value=1),
+    Row("INDEX_WEAK_LINE_RETRY.suggestion", "suggestion", tier=1, ambiguity=2, value=1,
+        evidence=("arithmetic: names the set-aside lines and asks whether the leading cell "
+                  "predicts them, lists the three readings of a line it does not predict "
+                  "(second phase, picker artefact, a supercell's ordering line) without "
+                  "ranking them, and names the argument that forbids the retry")),
+    Row("K_SEARCH_PARTNER.suggestion", "suggestion", tier=1, ambiguity=2, value=1,
+        evidence=("arithmetic: the metric is unchanged within tol by the map between the two "
+                  "k, so the suggestion names the calls that would separate them (score the "
+                  "partner's neighbourhood; a moment or modulation model reading intensities) "
+                  "and ranks neither")),
     Row("LANDE_G_ASSUMED.suggestion", "suggestion", tier=1, ambiguity=1, value=2,
         evidence="arithmetic: names the argument that overrides the default"),
     Row("LAUE_CLASS_NOT_SEPARABLE.suggestion", "suggestion", value=1),
@@ -5294,8 +7619,11 @@ ROWS: tuple[Row, ...] = (
     Row("OCCUPANCY_ABOVE_ONE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence=("physics: names the one reading under which the value is right (site "
                   "scattering on a mixed site) and the model terms to check otherwise")),
-    Row("ORIGIN_FIXED_ON_POLAR_AXIS.suggestion", "suggestion", value=2),
-    Row("ORIGIN_NOT_FIXED.suggestion", "suggestion", value=1),
+    Row("ORIGIN_FIXED_ON_POLAR_AXIS.suggestion", "suggestion", tier=1, ambiguity=3, value=2,
+        evidence=("arithmetic: names the two other ways to fix the origin, and that letting "
+                  "it slide is a flat direction")),
+    Row("ORIGIN_NOT_FIXED.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence="arithmetic: names two ways to fix the origin; picks neither"),
     Row("PARAMETRIC_FORM_REJECTED.suggestion", "suggestion", value=2),
     Row("PARAMETRIC_OUT_OF_RANGE.suggestion", "suggestion", tier="caller", ambiguity=1, value=1,
         evidence=("opt-in, as its code: names three changes to the caller's own declaration "
@@ -5306,19 +7634,47 @@ ROWS: tuple[Row, ...] = (
         grounds="Says how to test for the strain the glob left held (PR #1108, ruled 2026-10-27).",
         approved="2026-10-27"),
     Row("PATTERN_DEAD_CHANNELS.suggestion", "suggestion", value=2),
-    Row("PATTERN_INTENSITY_SCALED.suggestion", "suggestion", value=6),
-    Row("PATTERN_MULTISCAN_DEFAULTED.suggestion", "suggestion", value=1),
+    Row("PATTERN_INTENSITY_SCALED.suggestion", "suggestion", tier=1, ambiguity=1, value=6,
+        evidence=('six sites, all the same advice: export the scan in counts, or supply the esds '
+                  '(base.py:753, brml.py:332, gsas.py:1040, uxd.py:219, xrdml.py:311, 324). Each '
+                  'is the arithmetic remedy for a withheld sigma, names two ways out and ranks '
+                  'neither; takes no action itself')),
+    Row("PATTERN_MULTISCAN_DEFAULTED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=('names the argument that selects a scan (scan=<0..n-1>) and the verb that '
+                  'lists them (list_scans); ranks no scan and takes no action (base.py:316-318)')),
     Row("PATTERN_NET_HAS_BACKGROUND.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence=("says how to tell the two readings apart (y against y - "
                   "_pd_proc_intensity_bkg_calc where the file states one, an empty stretch "
                   "of baseline otherwise) and names each reading's fix; it prescribes "
                   "neither branch, so no dissenter is left; takes no action itself")),
-    Row("PATTERN_ROWS_DROPPED.suggestion", "suggestion", value=3),
-    Row("PATTERN_SIGMA_CONSTANT.suggestion", "suggestion", value=1),
+    Row("PATTERN_ROWS_DROPPED.suggestion", "suggestion", tier=1, ambiguity=3, value=3,
+        evidence=('three sites (base.py:446-449, xy.py:433-436, 454-456): each tells the reader '
+                  'to check or correct the source file if a dropped row was a measured point. It '
+                  'prescribes no branch and takes no action; whether the row was measured is the '
+                  "writer's fact")),
+    Row("PATTERN_SIGMA_NONPOSITIVE.suggestion", "suggestion", value=2, tier=2, ambiguity=3,
+        evidence=("names the reader option that weights a zero count at one count, "
+                  "√max(y, 1), the fallback rietx and TOPAS (1/Max(Yobs, 1), Technical "
+                  "Reference section 6.2) apply to a file with no esd; for the column case, "
+                  "that the Poisson σ is the counts' and not a rate's. Kind 3: whether the "
+                  "points counted zero is the writer's fact, so the message gives how many "
+                  "record y = 0 for the reader to weigh. It moves nothing by itself")),
+    Row("PATTERN_SIGMA_CONSTANT.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=('names both readings, a placeholder (set pattern.sigma to None for Poisson '
+                  'weights) and a real uniform esd (re-export with the esd where the reader '
+                  "looks), conditional on each ('If the column is a placeholder... Otherwise'); "
+                  'prescribes neither and takes no action (readers.py:206-213)')),
     Row("PATTERN_UNDERSAMPLED.suggestion", "suggestion", value=1),
-    Row("PATTERN_X_AXIS_ASSUMED.suggestion", "suggestion", value=1),
-    Row("PATTERN_X_AXIS_IMPLAUSIBLE.suggestion", "suggestion", value=1),
-    Row("PAWLEY_OFF_DATA_RIDGED.suggestion", "suggestion", value=1),
+    Row("PATTERN_X_AXIS_ASSUMED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("says 'Check <field> in the file', the field the message names; takes no "
+                  'action (base.py:599)')),
+    Row("PATTERN_X_AXIS_IMPLAUSIBLE.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=('says to check the axis is 2theta in degrees and, if it is, to exclude the '
+                  'interval of points at or below 0 degrees, which is the geometric fact that no '
+                  "reflection lies there; the exclusion is the caller's to make "
+                  '(readers.py:268-273)')),
+    Row("PAWLEY_OFF_DATA_RIDGED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence="arithmetic: the one input that measures them, a wider fitted range"),
     Row("PAWLEY_OVERLAP_UNRESOLVED.suggestion", "suggestion", value=1),
     Row("PEAK_ASYMMETRY_UNMODELLED.suggestion", "suggestion", value=1),
     Row("PEAK_AXIAL_TAIL.suggestion", "suggestion", value=1),
@@ -5340,6 +7696,14 @@ ROWS: tuple[Row, ...] = (
                  "far past the bound the fit would have moved. It says nothing "
                  "of the line's true position, which the 16 Oct re-solve showed the "
                  "bound does not predict (Yue, #993 round 2, 2026-10-21)."),
+    Row("PEAK_EQUATION_SHARED_ACROSS_WAVELENGTHS.suggestion", "suggestion", tier=1,
+        ambiguity=3, value=1,
+        evidence=("arithmetic: names the SharingMap glob that gives each pattern its own "
+                  "coefficient, and says a term reading no wavelength can stay shared; "
+                  "picks neither")),
+    Row("PEAK_WIDTH_NOT_POSITIVE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: names a bound, a square or max(x, 0) as ways to keep the "
+                  "width positive; picks none")),
     Row("PEAK_POSITION_PRECISION.suggestion", "suggestion", value=1),
     Row("PEAK_SHOULDER_SEEDED.suggestion", "suggestion", value=1),
     Row("PEAK_SIGMA_ASSUMED.suggestion", "suggestion", value=1),
@@ -5352,28 +7716,67 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic: a parameter no stage frees cannot be refined, so the remedy "
                   "names the glob that frees the moment DOFs and the preset that names it "
                   "(magnetic_structural, WP-1418); it moves nothing by itself")),
-    Row("QPA_ESD_UNAVAILABLE.suggestion", "suggestion", value=1),
+    Row("QPA_ESD_UNAVAILABLE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: removing a phase at zero scale restores the others' esds; "
+                  "profile_fraction gives one fraction's range; picks neither")),
     Row("QPA_FRACTION_RANGE.suggestion", "suggestion", tier=2, ambiguity=3, value=1,
         evidence=("profile-likelihood interval in place of the Wald esd: Venzon & Moolgavkar (1988)"
                   " Appl. Statist. 37, 87; Hamilton (1965) (docstring)")),
-    Row("QPA_UNAVAILABLE.suggestion", "suggestion", value=1),
-    Row("RAS_ATTENUATOR_PRESENT.suggestion", "suggestion", value=1),
-    Row("READER_OPTION_IGNORED.suggestion", "suggestion", value=1),
-    Row("RECIPE_BACKGROUND_PEAK_DEGENERATE.suggestion", "suggestion", value=1),
-    Row("RECIPE_ENGINE_DEFAULT_DECLINED.suggestion", "suggestion", value=1),
-    Row("RECIPE_FIELD_DROPPED.suggestion", "suggestion", value=1),
-    Row("RECIPE_FIT_RANGE_CHANNELS.suggestion", "suggestion", value=1),
+    Row("QPA_INTENSITY_FACTOR.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: a factor averaging 1 leaves the scale the phase's amount; "
+                  "multiplying the scale by the mean factor is the same correction after "
+                  "the fit; picks neither")),
+    Row("QPA_UNAVAILABLE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: points at the model and the start, and at the run's other "
+                  "findings; picks no cause")),
+    Row("RAS_ATTENUATOR_PRESENT.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=('says to check the export against the instrument software before trusting the '
+                  'relative intensities of the named points; it prescribes neither convention '
+                  'and takes no action (ras.py:214-215)')),
+    Row("READER_OPTION_IGNORED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=('says to drop the option or run identify_format to see which reader claimed '
+                  'the file; both are the arithmetic remedy for an option the format does not '
+                  'take (base.py:289-290)')),
+    Row("RECIPE_BACKGROUND_PEAK_DEGENERATE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("read recipe.py:1010: 'Use a background peak or extra Chebyshev terms, not "
+                  "both', HumpComponent's own stated rule; it picks neither")),
+    Row("RECIPE_ENGINE_DEFAULT_DECLINED.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("read recipe.py:1302: only when the recipe flags the magnitude, 'give the "
+                  "block a non-zero start', since a refinement cannot start from a zero size or "
+                  'strain block')),
+    Row("RECIPE_FIELD_DROPPED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=('read recipe.py:1346: for refinement_algorithm only, \'Set solver="trf" for '
+                  "scipy's Trust Region Reflective'; names the one argument that selects the "
+                  'other solver')),
+    Row("RECIPE_FIT_RANGE_CHANNELS.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("read recipe.py:464: 'Check this count against the reference engine's before "
+                  "you compare any Rwp', root CLAUDE.md's protocol-adoption rule")),
     Row("RESOLUTION_NOT_POSITIVE.suggestion", "suggestion", value=1),
     Row("RESOLUTION_UNCONSTRAINED.suggestion", "suggestion", value=1),
+    Row("RESTRAINT_BODY_CONTACTS_UNCHECKED.suggestion", "suggestion", tier=1, ambiguity=1,
+        value=1,
+        evidence=("arithmetic: points at the table that lists the body's own distances and names "
+                  "the remedies (a row for that pair with a minimum the caller states, or a "
+                  "torsion restrained or held) and picks none; it cautions against a floor on a "
+                  "torsion's own ends, which the WP-1816 ruling says biases the conformation; it states no minimum (#677's rule)")),
+    Row("RESTRAINT_ON_FIXED_BODY_GEOMETRY.suggestion", "suggestion", tier=1, ambiguity=1,
+        value=1,
+        evidence=("arithmetic: names the four ways forward (drop the row, a torsion that "
+                  "changes it, free atoms, or keep it as the template's penalty) and picks "
+                  "none")),
     Row("RESTRAINT_PAIRS_STALE.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence="arithmetic: names the two remedies (the builder that makes the missing rows, or a lower species-pair minimum for a real contact) and picks neither"),
     Row("RESTRAINT_TENSION.suggestion", "suggestion", value=1),
     Row("RIGID_BODY_MISFIT.suggestion", "suggestion", value=1),
-    Row("RIGID_BODY_UNSUPPORTED.suggestion", "suggestion", value=1),
+    Row("RIGID_BODY_UNSUPPORTED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: a zero column carries no information, so holding it loses "
+                  "none")),
     Row("ROUGHNESS_ABSORPTION.suggestion", "suggestion", value=1),
     Row("ROUGHNESS_OUTSIDE_REGIME.suggestion", "suggestion", value=2),
     Row("ROUGHNESS_UNCONSTRAINED.suggestion", "suggestion", value=1),
-    Row("SCALE_B_INSEPARABLE.suggestion", "suggestion", value=1),
+    Row("SCALE_B_INSEPARABLE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: names the two inputs that separate the columns, an outside B "
+                  "or a second d-spacing")),
     Row("SEQUENTIAL_CANCELLED.suggestion", "suggestion", tier="caller", ambiguity=1, value=1,
         evidence=("opt-in, as its code: says the one way to extend a trajectory the caller "
                   "stopped, re-running it (sequential.py:2166)")),
@@ -5398,14 +7801,15 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic: names the one step that separates the pattern from its chain, "
                   "fitting it alone (sequential.py _unrecovered_diagnostics); settled by "
                   "Claude 2026-10-26 under the maintainer's delegation (2003-batch/batch.md, C2)")),
-    Row("SEQUENTIAL_WIDTH_GROWTH.suggestion", "suggestion", value=1),
     Row("SERIES_PATTERN_FAILED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence=("arithmetic: names the one step that reads the exception, the pattern fitted "
                   "on its own (sequential.py:2277)")),
     Row("SITE_DOFS_RENUMBERED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence=("arithmetic: points at parameters() for the site, where the renumbered "
                   "paths are listed; it states no value")),
-    Row("SITE_SNAPPED_TO_SPECIAL_POSITION.suggestion", "suggestion", value=2),
+    Row("SITE_SNAPPED_TO_SPECIAL_POSITION.suggestion", "suggestion", tier=1, ambiguity=1, value=2,
+        evidence=('arithmetic: both sites (symmetry.py:1337, cif.py:1463) ask for the '
+                  'multiplicities to be checked against the source file, ranking nothing')),
     Row("SITE_MULTIPLICITY_KEPT.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence=("arithmetic: names the occupancy that keeps the fitted content on the "
                   "special position (occ x fitted / fresh multiplicity), only where it is at "
@@ -5425,7 +7829,9 @@ ROWS: tuple[Row, ...] = (
                   "(caglioti.apparent_size_from_size_coefficient) and the argument that "
                   "declares a size per histogram instead (multi.py:2293-2298)")),
     Row("SIZE_UNUSUALLY_SMALL.suggestion", "suggestion", value=1),
-    Row("SPACE_GROUP_SETTING_ASSUMED.suggestion", "suggestion", value=1),
+    Row("SPACE_GROUP_SETTING_ASSUMED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=('arithmetic: names the setting taken and every alternative, as a symbol to '
+                  'write into the file, and ranks none (symmetry.py:1436-1438)')),
     Row("SPECIES_FALLBACK_NEUTRAL.suggestion", "suggestion", value=1),
     Row("STAGE_FREED_NOTHING.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence=("arithmetic: names how to list the histogram's rows and the two ways to "
@@ -5441,7 +7847,9 @@ ROWS: tuple[Row, ...] = (
                   "(gaussian_width_inequalities, lorentzian_width_inequalities) that TRF "
                   "has no vocabulary for")),
     Row("STAGE_PATH_NOT_FREE.suggestion", "suggestion", value=3),
-    Row("STAGE_PATH_UNKNOWN.suggestion", "suggestion", value=3),
+    Row("STAGE_PATH_UNKNOWN.suggestion", "suggestion", tier=1, ambiguity=1, value=3,
+        evidence=("arithmetic: names the current spelling, the declaration, or the table "
+                  "that lists every path")),
     Row("STAGE_SLOW_DESCENT.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence=("arithmetic: points at the findings that name a shallow direction, "
                   "HIGH_CORRELATION and a bound hit, and defers the remedy to their own "
@@ -5458,21 +7866,64 @@ ROWS: tuple[Row, ...] = (
         approved="2026-10-25"),
     Row("STEPHENS_STRAIN_NOT_POSITIVE.suggestion", "suggestion", value=1),
     Row("STRAIN_UNUSUALLY_LARGE.suggestion", "suggestion", value=1),
-    Row("TEXTURE_NOT_POSITIVE.suggestion", "suggestion", value=1),
-    Row("TOPAS_BLOCK_SKIPPED.suggestion", "suggestion", value=1),
-    Row("TOPAS_CELL_COUPLING_DROPPED.suggestion", "suggestion", value=1),
-    Row("TOPAS_FEATURES_NOT_IMPORTED.suggestion", "suggestion", value=2),
-    Row("TOPAS_FEATURE_REFUSED.suggestion", "suggestion", value=2),
-    Row("TOPAS_FIELD_NOT_WRITTEN.suggestion", "suggestion", value=1),
-    Row("TOPAS_MAGNETIC_GROUP_READ.suggestion", "suggestion", value=1),
-    Row("TOPAS_MAGNETIC_PART_MERGED.suggestion", "suggestion", value=1),
-    Row("TOPAS_MOMENT_CONVENTION.suggestion", "suggestion", value=1),
-    Row("TOPAS_MOMENT_G_HELD.suggestion", "suggestion", value=1),
-    Row("TOPAS_MOMENT_ION_UNCHARGED.suggestion", "suggestion", value=1),
-    Row("TOPAS_PHASE_TERM_READ.suggestion", "suggestion", value=1),
-    Row("WAVELENGTH_CALIBRATION.suggestion", "suggestion", value=1),
-    Row("rietx.crystallography.scattering.written_neutral_diagnostics.suggestion", "suggestion", value=1),
-    Row("rietx.crystallography.symmetry.rhombohedral_restated_diagnostic.suggestion", "suggestion", value=1),
+    Row("TEXTURE_NOT_POSITIVE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: names a lower order, held top terms, or the LM driver; picks "
+                  "none")),
+    Row("TOPAS_BLOCK_SKIPPED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=('read topas.py:3814: names the missing keywords to add to the block '
+                  '(_skipped_wants)')),
+    Row("TOPAS_CELL_COUPLING_DROPPED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("read topas.py:3717: 'Tie <key> to <source> on the refinement before you fit', "
+                  'the restoring call with the two names')),
+    Row("TOPAS_FEATURES_NOT_IMPORTED.suggestion", "suggestion", tier=1, ambiguity=1, value=2,
+        evidence=('read the two sites (topas.py:3732, :3743): point to model.coverage and, for '
+                  'an unread call, check the name for a misspelling')),
+    Row("TOPAS_FEATURE_REFUSED.suggestion", "suggestion", tier=1, ambiguity=1, value=2,
+        evidence=('read the two sites (topas.py:3752, :3761): point to model.phases and '
+                  'model.time_of_flight for what the file states')),
+    Row("TOPAS_FIELD_NOT_WRITTEN.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("read topas.py:5329: 'State them in TOPAS before you compare results', the "
+                  "writer's omission remedy")),
+    Row("TOPAS_MAGNETIC_GROUP_READ.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=('read topas.py:4102: pass to_structure(magnetic_symmetry=...) with an operator '
+                  'list if the file uses another setting; the argument that overrides the '
+                  'reading')),
+    Row("TOPAS_MAGNETIC_PART_MERGED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("read topas.py:4607: 'Refine the merged phase as one'; names what the merge "
+                  'did')),
+    Row("TOPAS_MOMENT_CONVENTION.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("read topas.py:4113: check the stored components against the file's "
+                  'MM_CrystalAxis_Display values; the measured reference, ranks nothing')),
+    Row("TOPAS_MOMENT_G_HELD.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("read topas.py:4132: 'Set Atom.moment.g on the built structure to try another "
+                  "value', the field that holds g")),
+    Row("TOPAS_MOMENT_ION_UNCHARGED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("read topas.py:4145: 'Write the site's occ with its charge (occ Cr+3) so the "
+                  "ion resolves', the file spelling TOPAS reads as an ion")),
+    Row("TOPAS_PHASE_TERM_READ.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("read topas.py:4621: 'If the name is the file's own and means something else, "
+                  "set the phase term back on the built Structure'; names the escape from the "
+                  'convention, ranks nothing')),
+    Row("VARIABLE_NOT_FREED.suggestion", "suggestion", tier=1, ambiguity=3, value=2,
+        evidence=("arithmetic: names the stage turn_on that frees the variable, the only "
+                  "route a plan has, and picks nothing: holding it may be the caller's "
+                  "intent")),
+    Row("WAVELENGTH_CALIBRATION.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence="arithmetic: points at the instrument's own record; picks no verdict"),
+    Row("INSTRUMENT_WIDTH_HELD.suggestion", "suggestion", tier=2, ambiguity=1, value=1,
+        evidence=("practice: every program that separates instrument from specimen "
+                  "broadening fixes the instrument from a standard (FullProf's resolution "
+                  "file, BGMN's ray tracing, RIETAN-FP's advised protocol, GSAS-II's "
+                  "defaults; docs/practice.md § Instrument and specimen widths refined "
+                  "together); names rietx's route for it, lab_calibrate, "
+                  "load_instrument_profile and a sample-only plan")),
+    Row("rietx.crystallography.scattering.written_neutral_diagnostics.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=('arithmetic: names the one step in the target program that refines the ion, '
+                  'respelling the site there by hand, and the code a rietx fit gives instead '
+                  '(scattering.py:375-378)')),
+    Row("rietx.crystallography.symmetry.rhombohedral_restated_diagnostic.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=('arithmetic: tells the reader to free in the target program the hexagonal '
+                  'parameters they mean to refine, which the writer held (symmetry.py:205-206)')),
     Row("rietx.refine._dedup_high_correlations.suggestion", "suggestion", value=1),
     Row("rietx.schemas.results._cap_one_code.suggestion", "suggestion", value=1),
 )
@@ -5480,73 +7931,19 @@ ROWS: tuple[Row, ...] = (
 #: The names allowed at ``unaudited``, sorted.  Written once at the open
 #: (2026-10-19); it shrinks as rows are audited.
 UNAUDITED_BASELINE: tuple[str, ...] = (
-    "ABSORPTION_ESTIMATE_UNAVAILABLE",
-    "ABSORPTION_ESTIMATE_UNAVAILABLE.suggestion",
-    "ABSORPTION_MU_R_OUT_OF_RANGE",
-    "ABSORPTION_MU_R_OUT_OF_RANGE.suggestion",
     "ABSORPTION_PLATE_THICKNESS",
     "ABSORPTION_THICKNESS_MATTERS",
     "ABSORPTION_THICKNESS_MATTERS.suggestion",
-    "ADP_NOT_POSITIVE_DEFINITE",
-    "ADP_NOT_POSITIVE_DEFINITE.suggestion",
     "AIR_SCATTER_UNDECLARED",
     "AIR_SCATTER_UNDECLARED.suggestion",
     "BACKGROUND_ABSORPTION",
     "BACKGROUND_ABSORPTION.suggestion",
-    "BACKGROUND_ORDER_AT_CAP",
-    "BACKGROUND_ORDER_AT_CAP.suggestion",
-    "BISO_NEGATIVE",
-    "BISO_NEGATIVE.suggestion",
     "BISO_UNUSUALLY_LARGE",
     "BISO_UNUSUALLY_LARGE.suggestion",
-    "BOUND_HIT",
-    "BOUND_HIT.suggestion",
-    "BRINDLEY_OUTSIDE_REGIME",
-    "BRINDLEY_OUTSIDE_REGIME.suggestion",
-    "BRML_ABSORBER_ENGAGED",
-    "CAPILLARY_OFFSET_UNAVAILABLE",
-    "CAPILLARY_OFFSET_UNAVAILABLE.suggestion",
-    "CELL_DEGENERATE_PROBE",
-    "CHILD_GROUP_UNNAMED",
-    "CHILD_GROUP_UNNAMED.suggestion",
-    "CIF_CELL_ANGLE_CORRECTED",
-    "CIF_CELL_ANGLE_CORRECTED.suggestion",
-    "CIF_MAGNETIC_CENTERING_ASSUMED",
-    "CIF_MAGNETIC_CENTERING_ASSUMED.suggestion",
-    "CIF_MAGNETIC_ION_UNCHARGED",
-    "CIF_MAGNETIC_ION_UNCHARGED.suggestion",
-    "CIF_MAGNETIC_MAGNITUDE_ESD_NOT_STORED",
-    "CIF_MAGNETIC_MAGNITUDE_ESD_NOT_STORED.suggestion",
-    "CIF_MAGNETIC_MOMENT_ON_ALLOWED",
-    "CIF_MAGNETIC_NUCLEAR_GROUP",
-    "CIF_MAGNETIC_NUCLEAR_GROUP.suggestion",
-    "CIF_MAGNETIC_NUCLEAR_SETTING",
-    "CIF_MAGNETIC_NUCLEAR_SETTING.suggestion",
-    "CIF_MAGNETIC_NUMBER_MISMATCH",
-    "CIF_MAGNETIC_NUMBER_MISMATCH.suggestion",
-    "CIF_MAGNETIC_SPHERICAL_ESD_NOT_STORED",
-    "CIF_MAGNETIC_SPHERICAL_ESD_NOT_STORED.suggestion",
-    "CIF_MAGNETIC_SYMMFORM",
-    "CIF_MAGNETIC_SYMMFORM.suggestion",
-    "CIF_MAGNETIC_UNIDENTIFIED",
-    "CIF_SITE_LISTED_TWICE",
-    "CIF_SITE_LISTED_TWICE.suggestion",
-    "CIF_SITE_MULTIPLICITY_DISAGREES",
-    "CIF_SITE_MULTIPLICITY_DISAGREES.suggestion",
-    "CIF_SITE_TWINS_MERGED",
-    "CIF_SITE_TWINS_MERGED.suggestion",
-    "CIF_SPECIES_NORMALISED",
-    "CONSTRAINT_ACTIVE",
     "CONSTRAINT_ACTIVE.suggestion",
-    "COVARIANCE_DIRECTION_DISCARDED",
-    "COVARIANCE_DIRECTION_DISCARDED.suggestion",
-    "COVARIANCE_UNAVAILABLE",
     "COVARIANCE_UNAVAILABLE.suggestion",
     "DATA_SUPPORT_LOW",
     "DATA_SUPPORT_LOW.suggestion",
-    "DECLARED_RANGE_NOT_RESTORED",
-    "DECLARED_RANGE_NOT_RESTORED.suggestion",
-    "DECLARED_RANGE_RESTORED",
     "DECLARED_RANGE_RESTORED.suggestion",
     "DISPERSION_NEGLECTED",
     "DISPERSION_NEGLECTED.suggestion",
@@ -5562,96 +7959,24 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "EXTINCTION_SCREEN_FAILED.suggestion",
     "EXTINCTION_SYMBOL_AMBIGUOUS",
     "EXTINCTION_SYMBOL_AMBIGUOUS.suggestion",
-    "EXTRA_PEAK_NO_INTENSITY",
-    "EXTRA_PEAK_NO_INTENSITY.suggestion",
     "EXTRA_PEAK_ON_REFLECTION",
     "EXTRA_PEAK_ON_REFLECTION.suggestion",
-    "FLAT_DIRECTION",
-    "FLAT_DIRECTION.suggestion",
     "FLAT_DIRECTION_OMITTED",
-    "FLOOR_HIT",
     "FLOOR_HIT.suggestion",
     "FROZEN_COMPILE_STALE",
-    "FULLPROF_MAGNETIC_PHASE_OMITTED",
-    "FULLPROF_MAGNETIC_PHASE_OMITTED.suggestion",
-    "FULLPROF_MAGNETIC_PHASE_READ",
-    "FULLPROF_MAGNETIC_PHASE_READ.suggestion",
-    "FULLPROF_OCCUPANCY_UNCHECKED",
-    "FULLPROF_OCCUPANCY_UNCHECKED.suggestion",
-    "FULLPROF_ORIGIN_CHOICE",
-    "FULLPROF_RHOMBOHEDRAL_RESTATED",
-    "FULLPROF_SPECIES_NORMALISED",
-    "FULLPROF_SPECIES_WRITTEN_NEUTRAL",
-    "FULLPROF_TIE_DROPPED",
-    "FULLPROF_TIE_DROPPED.suggestion",
-    "GSAS2_CIF_DEUTERIUM_AS_D",
-    "GSAS2_CIF_FIELD_NOT_WRITTEN",
-    "GSAS2_CIF_FIELD_NOT_WRITTEN.suggestion",
-    "GSAS2_CIF_RHOMBOHEDRAL_RESTATED",
-    "GSAS2_CIF_SETTING_IN_OPERATORS",
-    "GSAS2_CIF_SPECIES_WRITTEN_NEUTRAL",
-    "GSAS2_GPX_BACKGROUND_NOT_CARRIED",
-    "GSAS2_GPX_BACKGROUND_NOT_CARRIED.suggestion",
-    "GSAS2_GPX_CONSTRAINT_NOT_CARRIED",
-    "GSAS2_GPX_CONSTRAINT_NOT_CARRIED.suggestion",
-    "GSAS2_GPX_COORDINATES_SYMMETRY_FIXED",
-    "GSAS2_GPX_ITEM_NOT_READ",
-    "GSAS2_GPX_PHASE_MAGNETIC",
-    "GSAS2_GPX_PHASE_MAGNETIC.suggestion",
     "GSAS2_GPX_SCALE_NOT_COMPARABLE",
-    "GSAS2_GPX_SCALE_NOT_COMPARABLE.suggestion",
-    "GSAS2_GPX_SETTING_FROM_OPERATORS",
-    "GSAS2_GPX_SPECIES_NORMALISED",
-    "GSAS2_GPX_TEXTURE_CONVERTED",
-    "GSAS2_GPX_TEXTURE_NOT_CARRIED",
-    "GSAS2_GPX_TEXTURE_NOT_CARRIED.suggestion",
-    "GSAS2_INSTPRM_CONVENTION_ASSUMED",
-    "GSAS2_INSTPRM_FIELD_DROPPED",
-    "GSAS2_INSTPRM_FIELD_NOT_READ",
-    "GSAS2_INSTPRM_FIELD_NOT_WRITTEN",
-    "GSAS2_INSTPRM_GEOMETRY_ASSUMED",
-    "GSAS2_INSTPRM_GEOMETRY_ASSUMED.suggestion",
-    "GSAS2_INSTPRM_VALUE_DEFAULTED",
-    "GSAS2_INSTPRM_VALUE_FLOORED",
-    "GSAS2_INSTPRM_VALUE_MERGED",
     "GSAS_BANK_COMMENTED",
-    "GSAS_BANK_COMMENTED.suggestion",
-    "GSAS_EXP_BACKGROUND_NOT_CARRIED",
-    "GSAS_EXP_BACKGROUND_NOT_CARRIED.suggestion",
-    "GSAS_EXP_COORDINATES_SYMMETRY_FIXED",
-    "GSAS_EXP_HISTOGRAM_NOT_READ",
-    "GSAS_EXP_PHASE_MAGNETIC",
-    "GSAS_EXP_PHASE_MAGNETIC.suggestion",
     "GSAS_EXP_REFINE_FLAG_MERGED",
-    "GSAS_EXP_REFINE_FLAG_MERGED.suggestion",
     "GSAS_EXP_SCALE_NOT_COMPARABLE",
-    "GSAS_EXP_SCALE_NOT_COMPARABLE.suggestion",
-    "GSAS_EXP_SPECIES_NORMALISED",
-    "GSAS_EXP_SPECIES_WRITTEN_NEUTRAL",
-    "GSAS_EXP_VALUE_NARROWED",
-    "GSAS_FIELD_OVERFLOW",
-    "GSAS_IPARM_FIELD_DROPPED",
-    "GSAS_IPARM_LEGACY_LAYOUT",
-    "GSAS_IPARM_PROFILE_DECLINED",
-    "GSAS_IPARM_PROFILE_READ",
-    "GSAS_PRM_FIELD_DROPPED",
-    "GSAS_PRM_FIELD_NOT_WRITTEN",
     "GSAS_PRM_GEOMETRY_ASSUMED",
-    "GSAS_PRM_GEOMETRY_ASSUMED.suggestion",
-    "GSAS_PRM_PROFILE_SET_DEFAULTED",
-    "GSAS_PRM_PROFILE_SET_DEFAULTED.suggestion",
-    "GSAS_PRM_VALUE_NARROWED",
     "HARMONIC_ABSENT",
     "HARMONIC_ABSENT.suggestion",
     "HARMONIC_FRACTION",
     "HARMONIC_FRACTION.suggestion",
-    "HARMONIC_HELD",
     "HARMONIC_HELD.suggestion",
     "HIGH_CORRELATION",
     "HIGH_CORRELATION.suggestion",
     "HIGH_CORRELATION_OMITTED",
-    "HOLD_BLOCKED_PLAN",
-    "HOLD_BLOCKED_PLAN.suggestion",
     "HUMP_TOO_NARROW",
     "HUMP_TOO_NARROW.suggestion",
     "INDEX_ABSTAINED",
@@ -5714,41 +8039,22 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "MAGNETIC_WIDTH_UNMEASURED.suggestion",
     "MAGNETIC_WIDTH_UNMODELLED",
     "MAGNETIC_WIDTH_UNMODELLED.suggestion",
-    "MICROABSORPTION_SKIPPED",
     "MICROABSORPTION_SKIPPED.suggestion",
     "MODEL_FAR_FROM_DATA",
     "MODEL_FAR_FROM_DATA.suggestion",
     "MOMENT_PAIR_DEGENERATE",
     "NEUTRON_RESONANT_ABSORBER",
     "NEUTRON_RESONANT_ABSORBER.suggestion",
-    "ORIGIN_FIXED_ON_POLAR_AXIS",
-    "ORIGIN_FIXED_ON_POLAR_AXIS.suggestion",
-    "ORIGIN_NOT_FIXED",
-    "ORIGIN_NOT_FIXED.suggestion",
     "PARAMETRIC_FORM_REJECTED",
     "PARAMETRIC_FORM_REJECTED.suggestion",
     "PARAMETRIC_TARGET_UNSEEN",
     "PARAMETRIC_TARGET_UNSEEN.suggestion",
     "PATTERN_DEAD_CHANNELS",
     "PATTERN_DEAD_CHANNELS.suggestion",
-    "PATTERN_DUPLICATE_POINTS",
-    "PATTERN_INTENSITY_SCALED",
-    "PATTERN_INTENSITY_SCALED.suggestion",
     "PATTERN_MULTISCAN_DEFAULTED",
-    "PATTERN_MULTISCAN_DEFAULTED.suggestion",
     "PATTERN_ROWS_DROPPED",
-    "PATTERN_ROWS_DROPPED.suggestion",
-    "PATTERN_SCAN_REVERSED",
-    "PATTERN_SIGMA_CONSTANT",
-    "PATTERN_SIGMA_CONSTANT.suggestion",
     "PATTERN_UNDERSAMPLED",
     "PATTERN_UNDERSAMPLED.suggestion",
-    "PATTERN_X_AXIS_ASSUMED",
-    "PATTERN_X_AXIS_ASSUMED.suggestion",
-    "PATTERN_X_AXIS_IMPLAUSIBLE",
-    "PATTERN_X_AXIS_IMPLAUSIBLE.suggestion",
-    "PAWLEY_OFF_DATA_RIDGED",
-    "PAWLEY_OFF_DATA_RIDGED.suggestion",
     "PAWLEY_OVERLAP_UNRESOLVED",
     "PAWLEY_OVERLAP_UNRESOLVED.suggestion",
     "PEAK_ASYMMETRY_UNMODELLED",
@@ -5783,34 +8089,10 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "PEAK_WIDTH_LAW_MISMATCH.suggestion",
     "PHASE_UNCONSTRAINED",
     "PHASE_UNCONSTRAINED.suggestion",
-    "QPA_ESD_UNAVAILABLE",
-    "QPA_ESD_UNAVAILABLE.suggestion",
-    "QPA_UNAVAILABLE",
-    "QPA_UNAVAILABLE.suggestion",
-    "RAS_ATTENUATOR_PRESENT",
-    "RAS_ATTENUATOR_PRESENT.suggestion",
-    "READER_OPTION_IGNORED",
-    "READER_OPTION_IGNORED.suggestion",
     "RECIPE_BACKGROUND_PEAK_DEGENERATE",
-    "RECIPE_BACKGROUND_PEAK_DEGENERATE.suggestion",
     "RECIPE_BACKGROUND_RESEEDED",
-    "RECIPE_BOUND_HONOURED",
-    "RECIPE_CONVENTION_ASSUMED",
-    "RECIPE_DISPERSION_DECLINED",
     "RECIPE_ENGINE_DEFAULT_DECLINED",
-    "RECIPE_ENGINE_DEFAULT_DECLINED.suggestion",
-    "RECIPE_FIELD_DROPPED",
-    "RECIPE_FIELD_DROPPED.suggestion",
-    "RECIPE_FIT_RANGE_CHANNELS",
-    "RECIPE_FIT_RANGE_CHANNELS.suggestion",
-    "RECIPE_FLAG_DROPPED",
-    "RECIPE_FLAG_TRANSLATED",
-    "RECIPE_NOTHING_REFINED",
     "RECIPE_PLAN_STAGED",
-    "RECIPE_SCALE_RESEEDED",
-    "RECIPE_SCHEMA_UNTESTED",
-    "RECIPE_ZERO_WEIGHT_EXCLUDED",
-    "RESOLUTION_NOT_POSITIVE",
     "RESOLUTION_NOT_POSITIVE.suggestion",
     "RESOLUTION_UNCONSTRAINED",
     "RESOLUTION_UNCONSTRAINED.suggestion",
@@ -5818,73 +8100,29 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "RESTRAINT_TENSION.suggestion",
     "RIGID_BODY_MISFIT",
     "RIGID_BODY_MISFIT.suggestion",
-    "RIGID_BODY_UNSUPPORTED",
-    "RIGID_BODY_UNSUPPORTED.suggestion",
     "ROUGHNESS_ABSORPTION",
     "ROUGHNESS_ABSORPTION.suggestion",
     "ROUGHNESS_OUTSIDE_REGIME",
     "ROUGHNESS_OUTSIDE_REGIME.suggestion",
     "ROUGHNESS_UNCONSTRAINED",
     "ROUGHNESS_UNCONSTRAINED.suggestion",
-    "SCALE_B_INSEPARABLE",
-    "SCALE_B_INSEPARABLE.suggestion",
     "SEQUENTIAL_MOMENT_HOLD",
     "SEQUENTIAL_MOMENT_HOLD.suggestion",
     "SEQUENTIAL_MOMENT_ONSET",
     "SEQUENTIAL_MOMENT_ONSET.suggestion",
-    "SEQUENTIAL_WIDTH_GROWTH",
-    "SEQUENTIAL_WIDTH_GROWTH.suggestion",
-    "SITE_SNAPPED_TO_SPECIAL_POSITION",
-    "SITE_SNAPPED_TO_SPECIAL_POSITION.suggestion",
     "SIZE_UNUSUALLY_SMALL",
     "SIZE_UNUSUALLY_SMALL.suggestion",
     "SPACE_GROUP_SETTING_ASSUMED",
-    "SPACE_GROUP_SETTING_ASSUMED.suggestion",
     "SPECIES_FALLBACK_NEUTRAL",
     "SPECIES_FALLBACK_NEUTRAL.suggestion",
     "STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT",
     "STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT.suggestion",
-    "STAGE_MAX_ITER",
     "STAGE_MAX_ITER.suggestion",
     "STAGE_PATH_NOT_FREE.suggestion",
-    "STAGE_PATH_UNKNOWN",
-    "STAGE_PATH_UNKNOWN.suggestion",
-    "STEPHENS_STRAIN_NOT_POSITIVE",
     "STEPHENS_STRAIN_NOT_POSITIVE.suggestion",
     "STRAIN_UNUSUALLY_LARGE",
     "STRAIN_UNUSUALLY_LARGE.suggestion",
-    "TEXTURE_NOT_POSITIVE",
-    "TEXTURE_NOT_POSITIVE.suggestion",
-    "TOPAS_BLOCK_SKIPPED",
-    "TOPAS_BLOCK_SKIPPED.suggestion",
-    "TOPAS_CELL_COUPLING_DROPPED",
-    "TOPAS_CELL_COUPLING_DROPPED.suggestion",
-    "TOPAS_FEATURES_NOT_IMPORTED",
-    "TOPAS_FEATURES_NOT_IMPORTED.suggestion",
-    "TOPAS_FEATURE_REFUSED",
-    "TOPAS_FEATURE_REFUSED.suggestion",
-    "TOPAS_FIELD_NOT_WRITTEN",
-    "TOPAS_FIELD_NOT_WRITTEN.suggestion",
-    "TOPAS_FIRST_RUN_READ",
-    "TOPAS_MAGNETIC_GROUP_READ",
-    "TOPAS_MAGNETIC_GROUP_READ.suggestion",
-    "TOPAS_MAGNETIC_PART_MERGED",
-    "TOPAS_MAGNETIC_PART_MERGED.suggestion",
-    "TOPAS_MOMENT_CONVENTION",
-    "TOPAS_MOMENT_CONVENTION.suggestion",
-    "TOPAS_MOMENT_G_HELD",
-    "TOPAS_MOMENT_G_HELD.suggestion",
-    "TOPAS_MOMENT_ION_UNCHARGED",
-    "TOPAS_MOMENT_ION_UNCHARGED.suggestion",
-    "TOPAS_ORIGIN_TRANSLATED",
-    "TOPAS_PHASE_RESTATED_IN_P1",
     "TOPAS_PHASE_TERM_READ",
-    "TOPAS_PHASE_TERM_READ.suggestion",
-    "TOPAS_SPECIES_NORMALISED",
-    "TOPAS_SPECIES_WRITTEN_NEUTRAL",
-    "WAVELENGTH_CALIBRATION",
-    "WAVELENGTH_CALIBRATION.suggestion",
-    "XRDML_ATTENUATOR_APPLIED",
     "rietx.background.diagnostics.COVERAGE_INFLATION_THRESHOLD",
     "rietx.background.diagnostics.COVERAGE_SMOOTH_DEG",
     "rietx.background.diagnostics.CUTOFF_FRACTION",
@@ -5908,90 +8146,40 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.background.diagnostics._ANODE_MATCH_TOL",
     "rietx.background.diagnostics._DEAD_INTERVAL_DECIMALS",
     "rietx.background.diagnostics._DEAD_REPAIR_PASSES",
-    "rietx.crystallography.atomic_volume.TABLE_TEMPERATURE",
-    "rietx.crystallography.atomic_volume.THERMAL_EXPANSION",
-    "rietx.crystallography.atomic_volume.THERMAL_EXPANSION_ESD",
-    "rietx.crystallography.atomic_volume.VOLUME_SCATTER",
-    "rietx.crystallography.attenuation._HC_EV_ANGSTROM",
-    "rietx.crystallography.attenuation._NA_BARN",
     "rietx.crystallography.cif.CIF_ANGLE_CORRECT_MAX_DEG",
     "rietx.crystallography.cif.CIF_STATED_MULTIPLICITY_SNAP_TOL",
     "rietx.crystallography.cif.DUPLICATE_U_TOLERANCE",
     "rietx.crystallography.cif.OCCUPANCY_TOLERANCE",
     "rietx.crystallography.dispersion.LINE_DISPERSION_TOL",
     "rietx.crystallography.dispersion.NEAR_EDGE_EV",
-    "rietx.crystallography.fragments.COLLINEAR_TOL",
-    "rietx.crystallography.fragments.INERTIA_RANK_TOL",
-    "rietx.crystallography.fragments._COINCIDENT_A2",
     "rietx.crystallography.magcif.MOMENT_FORM_AGREEMENT_MU_B",
     "rietx.crystallography.magnetic.isotropy.CROSS_IRREP_DRAWS",
     "rietx.crystallography.magnetic.isotropy.DEFAULT_CELL_SCALE",
     "rietx.crystallography.magnetic.isotropy.DUAL_AFTER_RESTART",
-    "rietx.crystallography.magnetic.isotropy.FARKAS_FLOOR",
-    "rietx.crystallography.magnetic.isotropy.FARKAS_QUOTE",
     "rietx.crystallography.magnetic.isotropy.INTENSITY_RTOL",
-    "rietx.crystallography.magnetic.isotropy.ISOMETRY_RESIDUAL",
-    "rietx.crystallography.magnetic.isotropy.KERNEL_AMPLITUDE_RATIO",
     "rietx.crystallography.magnetic.isotropy.TRANSFER_FLOAT_STACK",
     "rietx.crystallography.magnetic.isotropy.WITHIN_IRREP_DRAWS",
     "rietx.crystallography.magnetic.isotropy._CLOSURE_LIMIT",
     "rietx.crystallography.magnetic.isotropy._SPAN_GAP",
-    "rietx.crystallography.magnetic.moments.MOMENT_DIRECTION_SUPPORT",
-    "rietx.crystallography.magnetic.moments.SEED_TILT",
-    "rietx.crystallography.magnetic.operators.N_MAGNETIC_SPACE_GROUPS",
-    "rietx.crystallography.magnetic.operators._MAX_CODE",
-    "rietx.crystallography.magnetic.p1._WRAP_TOL",
     "rietx.crystallography.magnetic.scattering.INVARIANCE_MOMENT_TOL",
     "rietx.crystallography.magnetic.scattering.INVARIANCE_POS_TOL",
     "rietx.crystallography.magnetic.scattering.METRIC_TOL",
-    "rietx.crystallography.magnetic.scattering.P_MAGNETIC_FM",
     "rietx.crystallography.magnetic.supercell.CHILD_SITE_TOL",
-    "rietx.crystallography.neutron.NEUTRON_LAMBDA_EV_ANGSTROM",
-    "rietx.crystallography.neutron.SIGMA_ABS_REFERENCE_WAVELENGTH",
     "rietx.crystallography.representation.distortion._POSITION_TOL",
     "rietx.crystallography.representation.distortion._PROBE_AMPLITUDE",
     "rietx.crystallography.representation.distortion._PROBE_SYMPREC",
     "rietx.crystallography.representation.distortion._RANK_TOL",
-    "rietx.crystallography.representation.irreps.IRREP_ATOL",
     "rietx.crystallography.representation.irreps.K_FLOAT_TOL",
-    "rietx.crystallography.representation.irreps.K_MAX_DENOMINATOR",
-    "rietx.crystallography.representation.irreps._H",
     "rietx.crystallography.representation.irreps._SEEDS",
-    "rietx.crystallography.representation.irreps._T",
-    "rietx.crystallography.representation.irreps._TT",
-    "rietx.crystallography.representation.irreps._ZERO",
     "rietx.crystallography.representation.modes.MODE_ATOL",
     "rietx.crystallography.representation.modes.POSITION_ATOL",
     "rietx.crystallography.representation.order_parameter.ISOTROPY_ATOL",
-    "rietx.crystallography.riding.RIDING_MIN_SEPARATION",
-    "rietx.crystallography.rotation.SERIES_THRESHOLD",
-    "rietx.crystallography.rotation.UNIT_TOLERANCE",
-    "rietx.crystallography.rotation._A_SERIES",
-    "rietx.crystallography.rotation._B_SERIES",
-    "rietx.crystallography.rotation._C_SERIES",
-    "rietx.crystallography.rotation._LOG_SERIES_NORM",
-    "rietx.crystallography.satellites._ORDERS",
-    "rietx.crystallography.scattering.written_neutral_diagnostics.suggestion",
     "rietx.crystallography.spherical_harmonics._TOL",
-    "rietx.crystallography.stephens._DEG_PER_RAD",
-    "rietx.crystallography.superspace.generation.N_BRAVAIS_CLASSES_D1",
-    "rietx.crystallography.superspace.generation.N_SUPERSPACE_GROUPS_D1",
-    "rietx.crystallography.superspace.generation._F0",
-    "rietx.crystallography.superspace.generation._GRID",
-    "rietx.crystallography.superspace.generation._QR_COMPONENTS",
-    "rietx.crystallography.superspace.operators._ZERO3",
     "rietx.crystallography.symmetry.MAX_HKL_GRID_POINTS",
     "rietx.crystallography.symmetry.SITE_TOL",
     "rietx.crystallography.symmetry.SYMMETRY_ANGLE_TOL_DEG",
     "rietx.crystallography.symmetry.TWIN_DISTANCE",
-    "rietx.crystallography.symmetry._COINCIDENCE_TOL",
-    "rietx.crystallography.symmetry._GAMMA_HEX",
-    "rietx.crystallography.symmetry._ORBIT_CHUNK_ELEMENTS",
-    "rietx.crystallography.symmetry._SITE_TOL_SLACK",
     "rietx.crystallography.symmetry._SNAP_MESSAGE_SITES",
-    "rietx.crystallography.symmetry._SNAP_NOISE",
-    "rietx.crystallography.symmetry._TRANSLATION_DEN",
-    "rietx.crystallography.symmetry.rhombohedral_restated_diagnostic.suggestion",
     "rietx.gui.imports.MAX_UPLOAD_BYTES",
     "rietx.gui.imports.PREVIEW_POINTS",
     "rietx.gui.imports.WAVELENGTH_RTOL",
@@ -6141,24 +8329,11 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.io.formats.base.HEAD_BYTES",
     "rietx.io.formats.base.INTEGRAL_TOL",
     "rietx.io.formats.dif._MIN_ROWS",
-    "rietx.io.formats.gsas.ESD_FIELD_CHARS",
-    "rietx.io.formats.gsas.TIME_MAP_FIELD_CHARS",
     "rietx.io.formats.gsas._GSAS_TIME_MAP_SCAN_BYTES",
     "rietx.io.formats.peaklist._MIN_ROWS",
-    "rietx.io.instrument_profile.INSTPRM_SHL_FLOOR",
-    "rietx.io.instrument_profile._PRCF_TYPE_3",
-    "rietx.io.instrument_profile._PRM_BANK",
-    "rietx.io.instrument_profile._PRM_CENTIDEG",
-    "rietx.io.instrument_profile._PRM_CENTIDEG_SQUARED",
-    "rietx.io.instrument_profile._PRM_COEFFICIENT_COLUMNS",
-    "rietx.io.instrument_profile._PRM_COEFFICIENT_DIGITS",
-    "rietx.io.instrument_profile._PRM_CUTOFF",
-    "rietx.io.instrument_profile._PRM_GAUSS_TO_DEG2",
-    "rietx.io.instrument_profile._PRM_PER_RECORD",
     "rietx.io.projects.fullprof._CELL_TIE_MULTIPLIER_TOL",
     "rietx.io.projects.fullprof._DISPERSION_ATOL_E",
     "rietx.io.projects.fullprof._MAGNETIC_MATCH_ATOL",
-    "rietx.io.projects.fullprof._NAM_WIDTH",
     "rietx.io.projects.fullprof._OCCUPANCY_RTOL",
     "rietx.io.projects.fullprof._RHOMBOHEDRAL_ANGLE_ATOL",
     "rietx.io.projects.fullprof._RHOMBOHEDRAL_LENGTH_RTOL",
@@ -6166,10 +8341,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.io.projects.registry.INP_SNIFF_BYTES",
     "rietx.io.projects.topas_input.CALC_POINTS_PER_FWHM",
     "rietx.io.projects.topas_input.DEFAULT_RADIUS_MM",
-    "rietx.io.projects.topas_input._SABINE_XPOL",
-    "rietx.io.projects.topas_input._TCH_ETA",
-    "rietx.io.projects.topas_input._TCH_GAMMA",
-    "rietx.io.readers.TWO_THETA_MAX_DEG",
     "rietx.optimize.identifiability.EXCHANGE_MIN_LOADING",
     "rietx.optimize.identifiability.SOFT_MODES_K",
     "rietx.optimize.identifiability.SOFT_MODE_MIN_LOADING",
@@ -6310,9 +8481,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.sequential.SequentialRefinement.fit:refit",
     "rietx.sequential.SequentialRefinement.fit:x",
     "rietx.sequential.SequentialRefinement.fit:x_label",
-    "rietx.sequential.WIDTH_GROWTH_FACTOR",
-    "rietx.sequential.WIDTH_GROWTH_GOF_FACTOR",
-    "rietx.sequential.WIDTH_GROWTH_SIGMA",
     "rietx.solve.cost.NAMED_REFLECTIONS",
     "rietx.solve.cost.NUISANCE_RCOND",
     "rietx.strategy.magnetic.SOLVE_D_MIN",
@@ -6333,32 +8501,14 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "ADP_NOT_POSITIVE_DEFINITE",
     "AIR_SCATTER_UNDECLARED",
     "BACKGROUND_ABSORPTION",
-    "BACKGROUND_ORDER_AT_CAP",
     "BISO_NEGATIVE",
     "BISO_UNUSUALLY_LARGE",
     "BOUND_HIT",
     "BRINDLEY_OUTSIDE_REGIME",
-    "BRML_ABSORBER_ENGAGED",
-    "CAPILLARY_OFFSET_UNAVAILABLE",
-    "CELL_DEGENERATE_PROBE",
     "CELL_RUNAWAY",
-    "CHILD_GROUP_UNNAMED",
     "CIF_CELL_ANGLE_CORRECTED",
-    "CIF_MAGNETIC_CENTERING_ASSUMED",
-    "CIF_MAGNETIC_ION_UNCHARGED",
-    "CIF_MAGNETIC_MAGNITUDE_ESD_NOT_STORED",
-    "CIF_MAGNETIC_MOMENT_ON_ALLOWED",
-    "CIF_MAGNETIC_NUCLEAR_GROUP",
-    "CIF_MAGNETIC_NUCLEAR_SETTING",
     "CIF_MAGNETIC_NUMBER_MISMATCH",
-    "CIF_MAGNETIC_SPHERICAL_ESD_NOT_STORED",
     "CIF_MAGNETIC_SYMMFORM",
-    "CIF_MAGNETIC_UNIDENTIFIED",
-    "CIF_SITE_LISTED_TWICE",
-    "CIF_SITE_MULTIPLICITY_DISAGREES",
-    "CIF_SITE_TWINS_MERGED",
-    "CIF_SPECIES_NORMALISED",
-    "CONSTRAINT_ACTIVE",
     "COVARIANCE_DIRECTION_DISCARDED",
     "COVARIANCE_UNAVAILABLE",
     "DATA_SUPPORT_LOW",
@@ -6377,62 +8527,36 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "FLAT_DIRECTION_OMITTED",
     "FROZEN_COMPILE_STALE",
     "FULLPROF_MAGNETIC_PHASE_OMITTED",
-    "FULLPROF_MAGNETIC_PHASE_READ",
     "FULLPROF_OCCUPANCY_UNCHECKED",
-    "FULLPROF_ORIGIN_CHOICE",
     "FULLPROF_RHOMBOHEDRAL_RESTATED",
-    "FULLPROF_SPECIES_NORMALISED",
     "FULLPROF_SPECIES_WRITTEN_NEUTRAL",
     "FULLPROF_TIE_DROPPED",
-    "GSAS2_CIF_DEUTERIUM_AS_D",
     "GSAS2_CIF_FIELD_NOT_WRITTEN",
     "GSAS2_CIF_RHOMBOHEDRAL_RESTATED",
-    "GSAS2_CIF_SETTING_IN_OPERATORS",
     "GSAS2_CIF_SPECIES_WRITTEN_NEUTRAL",
-    "GSAS2_GPX_BACKGROUND_NOT_CARRIED",
     "GSAS2_GPX_CONSTRAINT_NOT_CARRIED",
-    "GSAS2_GPX_COORDINATES_SYMMETRY_FIXED",
     "GSAS2_GPX_ITEM_NOT_READ",
     "GSAS2_GPX_PHASE_MAGNETIC",
     "GSAS2_GPX_SCALE_NOT_COMPARABLE",
-    "GSAS2_GPX_SETTING_FROM_OPERATORS",
-    "GSAS2_GPX_SPECIES_NORMALISED",
-    "GSAS2_GPX_TEXTURE_CONVERTED",
     "GSAS2_GPX_TEXTURE_NOT_CARRIED",
-    "GSAS2_INSTPRM_CONVENTION_ASSUMED",
-    "GSAS2_INSTPRM_FIELD_DROPPED",
-    "GSAS2_INSTPRM_FIELD_NOT_READ",
     "GSAS2_INSTPRM_FIELD_NOT_WRITTEN",
-    "GSAS2_INSTPRM_GEOMETRY_ASSUMED",
     "GSAS2_INSTPRM_VALUE_DEFAULTED",
     "GSAS2_INSTPRM_VALUE_FLOORED",
     "GSAS2_INSTPRM_VALUE_MERGED",
     "GSAS_BANK_COMMENTED",
-    "GSAS_EXP_BACKGROUND_NOT_CARRIED",
-    "GSAS_EXP_COORDINATES_SYMMETRY_FIXED",
     "GSAS_EXP_HISTOGRAM_NOT_READ",
     "GSAS_EXP_PHASE_MAGNETIC",
     "GSAS_EXP_REFINE_FLAG_MERGED",
     "GSAS_EXP_SCALE_NOT_COMPARABLE",
-    "GSAS_EXP_SPECIES_NORMALISED",
     "GSAS_EXP_SPECIES_WRITTEN_NEUTRAL",
-    "GSAS_EXP_VALUE_NARROWED",
     "GSAS_FIELD_OVERFLOW",
-    "GSAS_IPARM_FIELD_DROPPED",
-    "GSAS_IPARM_LEGACY_LAYOUT",
     "GSAS_IPARM_PROFILE_DECLINED",
-    "GSAS_IPARM_PROFILE_READ",
-    "GSAS_PRM_FIELD_DROPPED",
     "GSAS_PRM_FIELD_NOT_WRITTEN",
     "GSAS_PRM_GEOMETRY_ASSUMED",
-    "GSAS_PRM_PROFILE_SET_DEFAULTED",
-    "GSAS_PRM_VALUE_NARROWED",
     "HARMONIC_ABSENT",
     "HARMONIC_FRACTION",
-    "HARMONIC_HELD",
     "HIGH_CORRELATION",
     "HIGH_CORRELATION_OMITTED",
-    "HOLD_BLOCKED_PLAN",
     "HUMP_TOO_NARROW",
     "INDEX_ABSTAINED",
     "INDEX_BRAVAIS_AMBIGUOUS",
@@ -6475,16 +8599,13 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "MOMENT_PAIR_DEGENERATE",
     "NEUTRON_RESONANT_ABSORBER",
     "OCCUPANCY_ABOVE_ONE",
-    "ORIGIN_FIXED_ON_POLAR_AXIS",
     "ORIGIN_NOT_FIXED",
     "PARAMETRIC_FORM_REJECTED",
     "PARAMETRIC_TARGET_UNSEEN",
     "PATTERN_DEAD_CHANNELS",
-    "PATTERN_DUPLICATE_POINTS",
     "PATTERN_INTENSITY_SCALED",
     "PATTERN_MULTISCAN_DEFAULTED",
     "PATTERN_ROWS_DROPPED",
-    "PATTERN_SCAN_REVERSED",
     "PATTERN_SIGMA_CONSTANT",
     "PATTERN_X_AXIS_ASSUMED",
     "PATTERN_X_AXIS_IMPLAUSIBLE",
@@ -6510,22 +8631,14 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "QPA_FRACTION_RANGE",
     "QPA_UNAVAILABLE",
     "RAS_ATTENUATOR_PRESENT",
-    "READER_OPTION_IGNORED",
     "RECIPE_BACKGROUND_PEAK_DEGENERATE",
     "RECIPE_BACKGROUND_RESEEDED",
-    "RECIPE_BOUND_HONOURED",
-    "RECIPE_CONVENTION_ASSUMED",
-    "RECIPE_DISPERSION_DECLINED",
     "RECIPE_ENGINE_DEFAULT_DECLINED",
     "RECIPE_FIELD_DROPPED",
-    "RECIPE_FIT_RANGE_CHANNELS",
     "RECIPE_FLAG_DROPPED",
-    "RECIPE_FLAG_TRANSLATED",
     "RECIPE_NOTHING_REFINED",
     "RECIPE_PLAN_STAGED",
-    "RECIPE_SCALE_RESEEDED",
     "RECIPE_SCHEMA_UNTESTED",
-    "RECIPE_ZERO_WEIGHT_EXCLUDED",
     "RESOLUTION_NOT_POSITIVE",
     "RESTRAINT_TENSION",
     "RIGID_BODY_MISFIT",
@@ -6536,7 +8649,6 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "SCALE_B_INSEPARABLE",
     "SEQUENTIAL_MOMENT_HOLD",
     "SEQUENTIAL_MOMENT_ONSET",
-    "SEQUENTIAL_WIDTH_GROWTH",
     "SIZE_UNUSUALLY_SMALL",
     "SOLVE_B_TIED_PER_PARENT_SITE",
     "SPACE_GROUP_SETTING_ASSUMED",
@@ -6553,16 +8665,7 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "TOPAS_FEATURE_REFUSED",
     "TOPAS_FIELD_NOT_WRITTEN",
     "TOPAS_FIRST_RUN_READ",
-    "TOPAS_MAGNETIC_GROUP_READ",
-    "TOPAS_MAGNETIC_PART_MERGED",
-    "TOPAS_MOMENT_CONVENTION",
     "TOPAS_MOMENT_G_HELD",
-    "TOPAS_MOMENT_ION_UNCHARGED",
-    "TOPAS_ORIGIN_TRANSLATED",
-    "TOPAS_PHASE_RESTATED_IN_P1",
     "TOPAS_PHASE_TERM_READ",
-    "TOPAS_SPECIES_NORMALISED",
     "TOPAS_SPECIES_WRITTEN_NEUTRAL",
-    "WAVELENGTH_CALIBRATION",
-    "XRDML_ATTENUATOR_APPLIED",
 )
