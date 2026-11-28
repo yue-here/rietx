@@ -99,6 +99,7 @@ either fine or broken depending on which seed the suite happened to pin.
 | `cr2wo6_hb2a` | `tests/data/gsas2_hb2a_cr2wo6_4K.dat` | characterisation | HFIR HB-2A constant-wavelength neutron (lambda 2.4067 A) Cr2WO6 at 4 K, below its ordering temperature, and its 150 K partner gsas2_hb2a_cr2wo6_150K.dat, above it -- the GSAS-II Magnetic-II tutorial pair, vendored verbatim.  No certified moment exists, so every row referenced to it is characterisation: a moment the report supports below T_N and refuses above it |
 | `lamno3_bt1` | `tests/data/gsas2_bt1_lamno3_50K.gsas` | characterisation | NIST BT-1 constant-wavelength neutron (lambda 1.5403 A, Cu(311)) LaMnO3 at 50 K, below its ordering temperature, with the tutorial's own structure file -- the GSAS-II Magnetic-I tutorial, vendored verbatim.  k = 0, and two magnetic groups index every line.  The tutorial quotes no moment, so every row referenced to it is characterisation: which group the data prefers, and the shape of the moment it carries |
 | `srm1976a_plate` | `tests/data/srm1976a_corundum_xpert.xy` | cross-code | NIST SRM 1976a sintered corundum plate, lab Cu Ka on a Philips/PANalytical X'Pert with X'Celerator, 2013; a genuinely textured flat specimen, committed with its solved TOPAS refinement (PO_Spherical_Harmonics at order 4).  The certificate certifies relative intensities on another instrument, not this texture, so every row referenced to it is cross-code |
+| `pbso4_rr` | `tests/data/gsas2_pbso4.gpx` | cross-code | The IUCr CPD Rietveld round robin on PbSO4, Hill (1992) J. Appl. Cryst. 25, 589-610 (doi:10.1107/S0021889892003649): one ILL D1A neutron pattern (lambda 1.909 A as given to the participants) and one Cu Ka Bragg-Brentano pattern of one specimen, the two histograms of the vendored GSAS-II tutorial project, read through the gsas2_gpx pattern reader.  The only published inter-laboratory spread of Rietveld parameters: 23 participants' 18 X-ray and 20 neutron refinements with 11 programs, each parameter's range, weighted mean (over 16 and 17 of them) and sigma_ext (Tables 7-9, hill1992_pbso4_round_robin.json).  Every reference is other programs' answers to the same data, so it is cross-code |
 | `acridine_ix` | `tests/data/cod_2242872.cif` | characterisation | Acridine form IX, C13H9N, P2_1/n, Stephens, Schur, Lapidus & Bernstein (2019) Acta Cryst. E75, 489: synchrotron capillary data at lambda 0.699789 A deposited with the structure in one CC0 COD file.  A molecular crystal refined as one rigid body and as free atoms; no row asserts against the deposited coordinates, cell or esds, which are another model's answer under another protocol (docs/DESIGN.md Rule 2), so every row referenced to it is about the body machinery, not the structure's accuracy |
 
 `consistency` is a fence, not a label: 11-BM calibrated its wavelength against
@@ -137,6 +138,18 @@ Cell and Bragg's law.
 - *Domain:* one phase (corundum), one laboratory instrument (Cu Ka), c/a and both axes; the absolute axes are not at certificate grade
 - *Mismatch:* c/a +29 ppm; absolute axes -314 / -284 ppm with |da - dc| within 2.9e-5; Rwp 14.4 %, GoF 1.60 against a GoF floor of 1.5-1.9 for analytical-PSF lab fits (Cline 2015); 1.9.0 read +30, -312 / -282 ppm, Rwp 14.6 % and GoF 1.63
 
+**Validated by:** `test_every_table7_value_lies_inside_the_participants_envelope`, dataset `pbso4_rr` (development data).
+
+- *Reference value:* Hill (1992) Table 7 p. 601: the range and the weighted mean of 16 X-ray and 17 neutron refinements; a spread is sigma_ext*sqrt(n) (Table 8), the participants' own standard deviation, so 3 spreads passes a participant-like fit on all 19 values with probability ~95 %
+- *Domain:* cell edges, coordinates and B of PbSO4 only: one ILL D1A neutron pattern (lambda 1.909 A as given to the participants) and one Cu Ka Bragg-Brentano pattern of one specimen, judged against 1992 participants' answers to the same data (Hill's 23 participants, 11 programs), so no independent measurement; development data
+- *Mismatch:* neutron 19/19 inside, worst 1.52 spreads (O3 x); X-ray 19/19 inside, worst 1.26 spreads (B O1); bar 3 spreads
+
+**Validated by:** `test_an_axial_model_raises_the_neutron_cell_towards_the_xray_cell`, dataset `pbso4_rr` (development data).
+
+- *Reference value:* Hill (1992) p. 605: the participants who modelled the detector-height asymmetry physically reported larger neutron cells, nearer the X-ray ones; the X-ray mean cell of Table 7 is the ceiling
+- *Domain:* the neutron cell edges under a freed FCJ axial model, PbSO4 only: one ILL D1A neutron pattern (lambda 1.909 A as given to the participants) and one Cu Ka Bragg-Brentano pattern of one specimen, judged against 1992 participants' answers to the same data (Hill's 23 participants, 11 programs), so no independent measurement; development data
+- *Mismatch:* each edge +0.08 %; b and c then 5.5 spreads above the neutron mean, still inside its range
+
 **State:** validated on development data.
 
 ### `wavelength`
@@ -150,6 +163,12 @@ Emission lines, wavelength scales, harmonics, wavelength-cell degeneracy.
 - *Reference value:* NIST's cell recomputed for this dataset's 20.85 C block, 4.156780 A, under an explicitly interim +-2e-4 A band; the certificate's own +-8e-5 A (k = 2, 19 ppm) at 22.5 C is NOT claimed and the residual is a characterised cotTheta/sin2Theta aberration (divergence, tube tails, monochromator passband) fenced to the v2 FPA work
 - *Domain:* one phase (LaB6), one laboratory instrument (Cu Ka doublet, graphite analyser), the cell at the certification measurement's 20.85 C; not the certificate's own 22.5 C band
 - *Mismatch:* a = 4.156882(21) A, +24 ppm; Rwp 8.74 %, GoF 1.89; zero_shift held at exactly 0.0; displacement -0.0790 mm vs the CIF's -0.07877. The Gaussian width is real at all 60 reflections. 1.9.0 read +25 ppm (24.6 against 24.5), Rwp 8.75 % and -0.0791 mm, before WP-2002's closing stage (#1085). Before WP-1938 the width sat on its clamp at 12 reflections, and the fit read 4.156895 A, +28 ppm, Rwp 8.67 %
+
+**Validated by:** `test_the_joint_fit_finds_the_wavelength_hill_back_calculated`, dataset `pbso4_rr` (development data).
+
+- *Reference value:* Hill (1992) p. 605 ('closer to 1.912 A'); the band is 1.909 * (X-ray mean edge) / (neutron edge) over every neutron edge in Table 7's range, 1.91083-1.91290 A
+- *Domain:* the free neutron wavelength of a joint fit, PbSO4 only: one ILL D1A neutron pattern (lambda 1.909 A as given to the participants) and one Cu Ka Bragg-Brentano pattern of one specimen, judged against 1992 participants' answers to the same data (Hill's 23 participants, 11 programs), so no independent measurement; development data
+- *Mismatch:* lambda_N 1.91252(5) A
 
 **State:** validated on development data.
 
@@ -205,7 +224,13 @@ Finger-Cox-Jephcoat axial divergence.
 
 **Verified by:** `test_the_refined_wavelength_recovers_xnds_calibration_error`, `test_the_symmetric_window_recovers_xnd_to_sub_ppm`
 
-**State:** not yet validated.
+**Validated by:** `test_an_axial_model_raises_the_neutron_cell_towards_the_xray_cell`, dataset `pbso4_rr` (development data).
+
+- *Reference value:* Hill (1992) p. 605: the participants who modelled the detector-height asymmetry physically reported larger neutron cells, nearer the X-ray ones; the X-ray mean cell of Table 7 is the ceiling
+- *Domain:* the neutron cell edges under a freed FCJ axial model, PbSO4 only: one ILL D1A neutron pattern (lambda 1.909 A as given to the participants) and one Cu Ka Bragg-Brentano pattern of one specimen, judged against 1992 participants' answers to the same data (Hill's 23 participants, 11 programs), so no independent measurement; development data
+- *Mismatch:* each edge +0.08 %; b and c then 5.5 spreads above the neutron mean, still inside its range
+
+**State:** validated on development data.
 
 ### `bragg_intensities`
 
@@ -243,7 +268,13 @@ Isotropic and anisotropic displacement parameters.
 
 **Verified by:** `test_tying_the_similar_atoms_bisos_buys_precision`, `test_biso_is_positive_and_agrees_with_xnd`
 
-**State:** not yet validated.
+**Validated by:** `test_every_table7_value_lies_inside_the_participants_envelope`, dataset `pbso4_rr` (development data).
+
+- *Reference value:* Hill (1992) Table 7 p. 601: the range and the weighted mean of 16 X-ray and 17 neutron refinements; a spread is sigma_ext*sqrt(n) (Table 8), the participants' own standard deviation, so 3 spreads passes a participant-like fit on all 19 values with probability ~95 %
+- *Domain:* cell edges, coordinates and B of PbSO4 only: one ILL D1A neutron pattern (lambda 1.909 A as given to the participants) and one Cu Ka Bragg-Brentano pattern of one specimen, judged against 1992 participants' answers to the same data (Hill's 23 participants, 11 programs), so no independent measurement; development data
+- *Mismatch:* neutron 19/19 inside, worst 1.52 spreads (O3 x); X-ray 19/19 inside, worst 1.26 spreads (B O1); bar 3 spreads
+
+**State:** validated on development data.
 
 ### `atomic_coordinates`
 
@@ -251,7 +282,13 @@ Fractional coordinates and site-symmetry DOFs.
 
 **Verified by:** `test_the_one_free_coordinate_agrees`, `test_fap_lab_rietveld_matches_gsas`
 
-**State:** not yet validated.
+**Validated by:** `test_every_table7_value_lies_inside_the_participants_envelope`, dataset `pbso4_rr` (development data).
+
+- *Reference value:* Hill (1992) Table 7 p. 601: the range and the weighted mean of 16 X-ray and 17 neutron refinements; a spread is sigma_ext*sqrt(n) (Table 8), the participants' own standard deviation, so 3 spreads passes a participant-like fit on all 19 values with probability ~95 %
+- *Domain:* cell edges, coordinates and B of PbSO4 only: one ILL D1A neutron pattern (lambda 1.909 A as given to the participants) and one Cu Ka Bragg-Brentano pattern of one specimen, judged against 1992 participants' answers to the same data (Hill's 23 participants, 11 programs), so no independent measurement; development data
+- *Mismatch:* neutron 19/19 inside, worst 1.52 spreads (O3 x); X-ray 19/19 inside, worst 1.26 spreads (B O1); bar 3 spreads
+
+**State:** validated on development data.
 
 ### `rigid_bodies`
 
@@ -585,7 +622,13 @@ Joint multi-histogram refinement (refine_multi).
 
 **Verified by:** `test_the_refined_wavelength_is_the_solo_cell_disagreement`, `test_the_diagnostic_reports_the_ppm_and_nothing_claims_rwp`, `test_the_cell_belongs_to_the_synchrotron`, `test_swapping_which_wavelength_is_held_measures_the_same_ratio`, `test_the_neutron_widths_leave_one_esd_at_every_start`
 
-**State:** not yet validated.
+**Validated by:** `test_the_joint_fit_finds_the_wavelength_hill_back_calculated`, dataset `pbso4_rr` (development data).
+
+- *Reference value:* Hill (1992) p. 605 ('closer to 1.912 A'); the band is 1.909 * (X-ray mean edge) / (neutron edge) over every neutron edge in Table 7's range, 1.91083-1.91290 A
+- *Domain:* the free neutron wavelength of a joint fit, PbSO4 only: one ILL D1A neutron pattern (lambda 1.909 A as given to the participants) and one Cu Ka Bragg-Brentano pattern of one specimen, judged against 1992 participants' answers to the same data (Hill's 23 participants, 11 programs), so no independent measurement; development data
+- *Mismatch:* lambda_N 1.91252(5) A
+
+**State:** validated on development data.
 
 ### `parametric_refinement`
 
@@ -2292,6 +2335,48 @@ WP-1806: the rigid body on acridine form IX (COD 2242872, CC0), whose synchrotro
 **Measured:** Hamilton p 0.40 (bar 1e-3), Delta-BIC -233.1 (bar 10)
 
 **Diagnostics:** `RIGID_BODY_MISFIT` asserted *absent*
+
+### `tests/test_acceptance_pbso4_round_robin.py`
+
+WP-1943: the IUCr CPD Rietveld round robin on PbSO4 (Hill 1992), the **inter-laboratory reference** for refined parameters.  Both round-robin patterns, read from the vendored GSAS-II project through the gsas2_gpx pattern reader, are refined from the published single-crystal model under a protocol frozen in the module docstring, and every cell edge, coordinate and B is asserted against the envelope the 16 X-ray and 17 neutron refinements bracket: inside their range and within 3 of their own standard deviations of their mean.  Two of Hill's qualitative findings ride on top: a physical axial model raises the neutron cell toward the X-ray cell, and a joint fit measures the neutron wavelength above the nominal 1.909 A, where Hill's cells put it.  No esd is compared with the spread: Hill's spread is one dataset refined many ways, not replicate measurements.
+
+#### `test_every_table7_value_lies_inside_the_participants_envelope`
+
+`spread` `ceiling` · dataset `pbso4_rr`
+
+**Claims:** a single-radiation refinement from the published single-crystal model, neutron and X-ray each, puts every cell edge, coordinate and B of Hill's Table 7 inside the participants' range and within 3 spreads of their weighted mean
+
+**Referenced to:** Hill (1992) Table 7 p. 601: the range and the weighted mean of 16 X-ray and 17 neutron refinements; a spread is sigma_ext*sqrt(n) (Table 8), the participants' own standard deviation, so 3 spreads passes a participant-like fit on all 19 values with probability ~95 %
+
+**Measured:** neutron 19/19 inside, worst 1.52 spreads (O3 x); X-ray 19/19 inside, worst 1.26 spreads (B O1); bar 3 spreads
+
+#### `test_the_agreement_indices_are_a_participants`
+
+`ceiling` · dataset `pbso4_rr`
+
+**Claims:** Rwp and GoF of each single-radiation fit inside Table 5's participant ranges
+
+**Measured:** neutron Rwp 4.27 % in 2.4-12.3, GoF 2.20 in 1.0-3.1; X-ray Rwp 9.36 % in 8.2-20.0, GoF 1.94 in 1.3-7.4
+
+#### `test_an_axial_model_raises_the_neutron_cell_towards_the_xray_cell`
+
+`characterisation` `spread` · dataset `pbso4_rr`
+
+**Claims:** freeing the FCJ axial model (one SH/L) on the neutron pattern raises every cell edge toward, and not past, the X-ray mean cell, while the values stay inside the neutron range: Hill's Simpson's-rule finding
+
+**Referenced to:** Hill (1992) p. 605: the participants who modelled the detector-height asymmetry physically reported larger neutron cells, nearer the X-ray ones; the X-ray mean cell of Table 7 is the ceiling
+
+**Measured:** each edge +0.08 %; b and c then 5.5 spreads above the neutron mean, still inside its range
+
+#### `test_the_joint_fit_finds_the_wavelength_hill_back_calculated`
+
+`spread` · dataset `pbso4_rr`
+
+**Claims:** a joint neutron + X-ray fit with the X-ray wavelength held and the neutron one free measures lambda_N inside the band Hill's own cells imply, and above the nominal 1.909 A by more than 10 esd
+
+**Referenced to:** Hill (1992) p. 605 ('closer to 1.912 A'); the band is 1.909 * (X-ray mean edge) / (neutron edge) over every neutron edge in Table 7's range, 1.91083-1.91290 A
+
+**Measured:** lambda_N 1.91252(5) A
 
 ## The one default this matrix decided
 
