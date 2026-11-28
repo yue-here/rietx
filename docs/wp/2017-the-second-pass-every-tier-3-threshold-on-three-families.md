@@ -193,6 +193,19 @@ and have no free factor to measure, so this file's old list named them without c
 
 ### Inherited
 
+- **From WP-2317 R7 (2026-11-28): group Q's `LEBAIL_CONVERGED_REL` now
+  warns on every near start of LaB₆ + cBN.**
+  - At 5.1-25°, `profile_only`, `lebail_passes = 8`: since R7 every cell start
+    from −0.15 % to +0.6 % reads pass 1 at Rwp 13.918 % and pass 2 at
+    13.927 %, a rise of 6.5e-4 relative against the 1e-4 band, so
+    `LEBAIL_ALTERNATION_STOPPED` is a warning. Before R7 the starts from
+    +0.2 % to +0.52 % gave the same verdict (13.918 then 13.935 %).
+  - From −1 % the alternation settles at 13.928 %, above pass 1's 13.918 %.
+    So the alternation's fixed point sits above the best single pass.
+  - Group Q's question: whether a rise of 0.009 Rwp points should send a
+    user to "check the cell and the background". It is the threshold's
+    question, not R7's (macOS arm64, `[dev]`, development data).
+
 - **From WP-2317 / WP-2316 (2026-11-27): group Q's `lebail_tol` has a cost
   measured on a large cell.**
   - On a synthetic 12 × 36 × 4 Å cell (899 / 1 601 reflections, Cu Kα), a Le

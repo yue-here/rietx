@@ -699,6 +699,96 @@ what it costs here.
 
 ## Handover log
 
+### 2026-11-28 (2nd session) — R7's handover: the slack follows what a later stage refits, the Le Bail warning read, the PR opened (runner 3)
+
+R7 is in a pull request, #PRNUM, which waits on the maintainer for a
+stored-format change. The generality judge found that a stage sized its
+windows whenever any stage came after it, while the rule says "a stage a later
+stage refits". A stage whose cell a later stage fixes now keeps the old
+uniform windows, as the last stage does. The Le Bail warning that runner 2
+flagged is a correct reading. The package gave the same warning at the same
+state before R7, and R7 now reaches that state from every near start. The
+Le Bail slow row RESULT_SLOW.
+
+**For the maintainer** (the top of the PR body).
+1. *Stored-format change.* `NodeAction.movement_slack: bool = False` is
+   written to `history.jsonl` on every stage node. A new build reads an old
+   node as `False`, which is what it ran. An older build refuses a new node
+   (`extra="forbid"`), the shape WP-2315's `ReflectionState.merged_groups` had
+   when it was ruled (a) on 2026-11-27. Options: (a) keep the field, so replay
+   reproduces the stage exactly; (b) drop it, so replay compiles the uniform
+   slack and differs by up to 2e-3 in Rwp, a staleness the history docs
+   already allow, with the exact-replay test relaxed; (c) derive it, which the
+   node cannot, since it does not know whether a later stage followed.
+   Recommendation: (a), a clear call on the sibling ruling.
+2. *Reader output, two cases.* (i) The cpd-1b hostile runaway (reached only
+   under the pre-WP-2045 tolerance schedule) now re-solves, and
+   `STAGE_WINDOWS_STALE` reads the second solve, so the warning no longer
+   fires; the 73 % stays on `StageResult.window_refit_loss`. The judge called
+   this weak: the code has no fit-level case left that fires it. (ii) A fit
+   with `lebail_passes` > 1 from a near start now ends with the
+   `LEBAIL_ALTERNATION_STOPPED` warning where it ended with `info`. Settled
+   by Claude as a correct reading (below), and a blind reviewer agreed.
+3. *Audit rows the judge did not pass.* `WINDOW_MOVE_FWHM` (3 FWHM) lost its
+   `approved_by="checked"`: the judge called it weak, since no series was run
+   sized against uniform. It needs the maintainer's approval or that
+   measurement (the cpd-1 chain or the CuCr₂O₄ ramp, worst departure in esd).
+   `StageSpec:window_slack_deg`'s approval moved to R7's ruling date,
+   2026-11-27, since its meaning changed then.
+
+**Done (runner 3).**
+- `staged.refit_later`: a stage sizes its slack only where every path it
+  frees is free again in a later stage, read as `fixed_at_end` reads a plan.
+  The decision rides `_StageHold.movement_slack` to the history node, so
+  replay compiles what ran (`79d6f4bc9`). Tests: a later `turn_off` keeps the
+  uniform slack and records `False`; the closing stage refits what the plan
+  leaves free, and a declared `turn_off` reaches it (`373f6f42e`).
+- The judge's stale texts: `STAGE_WINDOWS_STALE`'s help, the skill row's
+  73 % moved to `window_refit_loss`, `WINDOW_MIN_DEG`'s comment (it is tail
+  room too), a test docstring. Audit evidence for `window_refit_loss` now
+  cites what the re-solve moved rather than an Rwp pair.
+- Merged `origin/main` (`5a06184af`).
+- WP-2017 `### Inherited`: group Q's threshold now warns on every near start.
+
+**The Le Bail warning, measured** (5.1-25°, `profile_only`, 8 passes, Rwp %
+per pass, macOS arm64, `[dev]`, development data).
+
+| cell start | before R7 | R7 |
+|---|---|---|
+| −1 % | 84.032, 84.032 (info, stuck) | 15.162, 13.943, 13.929, 13.928 (info) |
+| −0.15 % | 19.417, 14.127, 13.950, 13.937, 13.937 (info) | 13.918, 13.927 (warning) |
+| +0.2 % | 13.918, 13.935 (warning) | 13.918, 13.927 (warning) |
+| +0.36 % | 13.919, 13.935 (warning) | 13.918, 13.927 (warning) |
+
+The rule is unchanged, and R7 lands pass 1 at the state where the package
+already warned. The kept answer is 0.019 Rwp points lower than the old fixed
+point. The alternation's own fixed point (13.928 % from −1 %) sits above its
+best single pass, which is group Q's threshold question in WP-2017.
+
+**Measured.** RESULT_NUMBERS
+
+**Generality** (the judge's verdicts, `generality-review`, on the branch at
+`792d98170`; its full tables are in the PR body).
+- `WINDOW_MOVE_FWHM`: weak. Claim and code differed on "a later stage
+  refits" (answered: `refit_later`); no series measured (open, item 3).
+- `StageResult.window_refit_loss`: holds; replace the Rwp evidence (done).
+- `STAGE_WINDOWS_STALE`: weak; its firing case went silent (item 2 (i)).
+- `WINDOW_MIN_DEG`: holds. `StageSpec:window_slack_deg`: weak on the
+  condition (answered) and the approval date (moved).
+- The family shapes and the uniform-slack exceptions: hold.
+
+**Blind review** (a fresh subagent, given the evidence and not the picks):
+the reader diff moves numbers only, and `window_refit_loss` is not junk; the
+Le Bail warning is a correct reading; `refit_later` is right for every plan
+shape traced. Its one gap, a closing-stage test, is added. It also noted that
+an intermediate stage's report and node carry the narrower windows' esds,
+which a branch from that node inherits.
+
+**Next.** (1) The maintainer's three items. (2) The joint runner's re-solve
+(`multi.py`'s stage loop is inline, so the stage body is factored first). (3)
+The series measurement item 3 names, if the maintainer wants it before
+approving 3 FWHM.
+
 ### 2026-11-28 — R7 implemented on `wp2317-window-slack`; suite fixes, handed off mid-handover (runner 2)
 
 R7 is built and most of the fast suite's fallout is fixed. A stage that a
