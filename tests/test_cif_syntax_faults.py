@@ -76,3 +76,35 @@ def test_a_malformed_number_is_named(tmp_path, old, new, named):
     with pytest.raises(ValueError, match="not a CIF number") as info:
         structure_from_cif(path)
     assert named in str(info.value)
+
+
+@pytest.mark.parametrize("new, tag, meaning", [
+    (b"O1 O . 0.5 0.5 1", "_atom_site_fract_x", "inapplicable"),
+    (b"O1 O 0.5 ? 0.5 1", "_atom_site_fract_y", "unknown"),
+    (b"O1 O 0.5 0.5 . 1", "_atom_site_fract_z", "inapplicable"),
+])
+def test_a_null_coordinate_is_refused_by_name(tmp_path, new, tag, meaning):
+    """A coordinate written ``.`` or ``?`` is refused naming the file, the site
+    and the tag (#913, item 1).  CIF reads ``?`` as unknown and ``.`` as
+    inapplicable, never as zero; gemmi reads both as NaN, which reached the
+    schema as an anonymous "value nan lies outside bounds"."""
+    path = tmp_path / "null.cif"
+    path.write_bytes(_BASE.replace(b"O1 O 0.5 0.5 0.5 1", new))
+    with pytest.raises(ValueError, match="not as a number") as info:
+        structure_from_cif(path)
+    message = str(info.value)
+    assert str(path) in message
+    assert f"{tag} for site 'O1'" in message
+    assert meaning in message
+
+
+@pytest.mark.parametrize("null", [b"?", b"."])
+def test_a_null_occupancy_reads_by_the_core_default(tmp_path, null):
+    """An occupancy written ``.`` or ``?`` reads as 1.0, the
+    ``_enumeration_default`` of ``_atom_site_occupancy`` in the IUCr core
+    dictionary 2.4.5, as an absent column does (#913, item 1)."""
+    path = tmp_path / "occ.cif"
+    path.write_bytes(_BASE.replace(b"O1 O 0.5 0.5 0.5 1",
+                                   b"O1 O 0.5 0.5 0.5 " + null))
+    atoms = structure_from_cif(path).phases[0].atoms
+    assert [a.occ.value for a in atoms] == [1.0, 1.0]
