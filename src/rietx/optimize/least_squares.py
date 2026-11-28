@@ -3564,17 +3564,18 @@ class _StepTracker:
 
 
 def _final_step(tracker, res) -> tuple[np.ndarray, np.ndarray] | None:
-    """The step :func:`_final_shift_over_esd` reads: the solve's final accepted
-    one, or, where the shift test stopped the solve before it accepted any,
-    the undamped step the test read there (WP-2317 R6).  That is the next
-    cycle the convergence claim rests on, so the quantity stays measured
-    rather than ``None`` on a stage that starts at its answer."""
-    step = tracker.step()
+    """The step :func:`_final_shift_over_esd` reads: where the shift test
+    ended the solve, the undamped step it read there (WP-2317 R6), and
+    otherwise the solve's final accepted one.  The tested step is the next
+    cycle the convergence claim rests on, as FullProf's printed final shifts
+    are the cycle its Eps test passed; the last accepted step can be a damped
+    step of more than an esd taken before it (1.08 esd on a joint fit whose
+    test then read 0.008), and a stage started at its answer accepts none."""
     tested = getattr(res, "gauss_newton_step", None)
-    if step is None and tested is not None:
+    if tested is not None:
         x = np.asarray(res.x, dtype=np.float64)
         return x, x + tested
-    return step
+    return tracker.step()
 
 
 def _final_shift_over_esd(table: ParameterTable,
