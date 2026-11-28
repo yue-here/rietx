@@ -71,7 +71,7 @@ rietx refines it with the structure and never subtracts an estimate from the cou
 Three curves are available:
 
 - `BackgroundChebyshev`, a Chebyshev polynomial;
-- `BackgroundFixedPlusChebyshev`, an estimated baseline held fixed, with a Chebyshev polynomial refined on top;
+- `BackgroundFixedPlusChebyshev`, a fixed curve (normally a measured blank) held in the model, with a Chebyshev polynomial refined on top;
 - `BackgroundPSpline`, a spline whose coefficients refine under a smoothness penalty.
 
 `rx.auto_background` chooses the polynomial order or the spline's knot spacing from the pattern.
