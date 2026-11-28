@@ -127,6 +127,261 @@ def test_event_stream_hot_loop_is_plain_json(tmp_path):
 
 
 # ----------------------------------------------------------------------
+# the opt-in preview on accepted evals (WP-1949)
+# ----------------------------------------------------------------------
+def _last_stage_previews(seen: list[dict]) -> tuple[dict, list[dict]]:
+    """The last stage's ``stage_start`` data and its previewed ``eval``s."""
+    start = [e for e in seen if e["kind"] == "stage_start"][-1]
+    stage = start["data"]["stage"]
+    evals = [e for e in seen if e["kind"] == "eval"
+             and e["data"]["stage"] == stage]
+    return start["data"], evals
+
+
+@pytest.mark.parametrize("solver", ["lm", "trf"])
+def test_a_preview_rides_accepted_evals_to_the_callback_alone(
+        tmp_path, synthetic_pattern, solver):
+    """WP-1949's acceptance: a callback draws the curve and the atoms from
+    accepted ``eval`` events alone, within the documented 8e-6 of
+    ``predict()``, and the stream's own file never carries the preview.
+
+    ``y_calc`` is read off the residual the driver measured (``y_obs − r·σ``),
+    so on the last accepted evaluation — the answer — it is the fitted curve.
+    ``predict()`` evaluates a compile *at* the answer, whose windows differ
+    from the stage's (its docstring), which is the 8e-6.  The bar has little
+    headroom: 4.38e-6 on this fixture, and 7.45e-6 (93 % of it) with an
+    excluded region or ``two_theta_limits`` 5° in from each end (review of
+    #1623).  That gap is ``predict()``'s, never the preview's, so a fixture
+    change tripping it says nothing about the preview; the exact check of
+    ``y_calc`` against the event's own residual is the toy test below.
+    """
+    structure, ins = perturbed_models()
+    seen: list[dict] = []
+    log = tmp_path / "e.jsonl"
+    stream = EventStream(path=log, callback=seen.append, preview=True)
+    ref = rx.Refinement(structure, ins, history=False, solver=solver)
+    ref.fit(synthetic_pattern, events=stream)
+    stream.close()
+
+    evals = [e for e in seen if e["kind"] == "eval"]
+    assert evals and any(e["data"]["accepted"] for e in evals)
+    for e in evals:
+        assert ("preview" in e) == e["data"]["accepted"], e["data"]
+    assert all("preview" not in e for e in seen if e["kind"] != "eval")
+    # the file got the plain lines: no preview, and nothing it could not write
+    assert "preview" not in log.read_text(encoding="utf-8")
+
+    start, stage_evals = _last_stage_previews(seen)
+    accepted = [e for e in stage_evals if e["data"]["accepted"]]
+    for e in accepted:
+        pv = e["preview"]
+        assert set(pv) == {"two_theta", "y_calc", "values"}
+        assert pv["y_calc"].shape == pv["two_theta"].shape
+        assert not pv["two_theta"].flags.writeable
+        # every free value the event carries is among the moving ones, equal
+        for path, value in zip(start["free_paths"], e["data"]["values"]):
+            assert pv["values"][path] == value
+    # the moving set reaches past the free set: the tied cell and coordinates
+    moving = set(accepted[-1]["preview"]["values"])
+    assert set(start["free_paths"]) < moving
+    assert "phases.0.cell.b" in moving
+
+    last = accepted[-1]["preview"]
+    y = ref.predict()
+    assert len(y) == len(last["y_calc"])
+    gap = np.max(np.abs(last["y_calc"] - y)) / np.max(np.abs(y))
+    assert gap <= 8e-6, gap
+
+    if solver == "lm":
+        _draw_preview(last, synthetic_pattern, OUT / "wp1949_preview_obs_calc_diff.png")
+
+
+@pytest.mark.parametrize("mode", ["pawley", "lebail"])
+def test_a_preview_in_the_extraction_modes(synthetic_pattern, mode):
+    """Pawley carries its intensities in θ, so its preview is the fitted
+    curve to the 8e-6 bar.  Le Bail's residual reads intensities frozen for
+    the solve, re-extracted only after it, so its preview is the curve the
+    solve minimised and is not held to ``predict()`` (``_preview_builder``'s
+    docstring has the measured gap)."""
+    structure, ins = perturbed_models()
+    seen: list[dict] = []
+    ref = rx.Refinement(structure, ins, history=False)
+    ref.fit(synthetic_pattern, mode=mode,
+            events=EventStream(callback=seen.append, preview=True))
+    evals = [e for e in seen if e["kind"] == "eval"]
+    assert evals and all(("preview" in e) == e["data"]["accepted"]
+                         for e in evals)
+    _, stage_evals = _last_stage_previews(seen)
+    last = [e for e in stage_evals if e["data"]["accepted"]][-1]["preview"]
+    assert np.all(np.isfinite(last["y_calc"]))
+    if mode == "pawley":
+        y = ref.predict()
+        gap = np.max(np.abs(last["y_calc"] - y)) / np.max(np.abs(y))
+        assert gap <= 8e-6, gap
+
+
+class _ToyModel:
+    """What :func:`_preview_builder` and ``rows.block`` read off a compiled
+    model: a grid, the data and σ, and one penalty block of two rows after
+    the data block, so a slice of the wrong rows changes the length."""
+
+    def __init__(self):
+        self.tt = np.linspace(10.0, 20.0, 41)
+        self.sigma = np.linspace(0.5, 1.5, self.tt.size)
+        self.y_obs = self._curve(np.array([3.0, 14.0, 0.8]))
+        self.bkg_penalty = np.zeros((2, 1))
+        self.pawley = self.restraints = self.origin = None
+
+    def _curve(self, theta):
+        amp, centre, width = theta
+        return amp * np.exp(-((self.tt - centre) / width) ** 2) + 1.0
+
+    def residual(self, theta):
+        theta = np.asarray(theta, dtype=np.float64)
+        data = (self.y_obs - self._curve(theta)) / self.sigma
+        return np.concatenate([data, 0.1 * (theta[:2] - [3.0, 14.0])])
+
+
+class _ToyTable:
+    """The table half: θ is the physical vector, and ``x`` moves with ``a``
+    as a tie would, so the moving set is the free set plus one."""
+
+    free_paths = ["a", "c", "w"]
+    moving_paths = ["a", "c", "w", "x"]
+
+    def decode(self, theta):
+        a, c, w = (float(v) for v in theta)
+        return {"a": a, "c": c, "w": w, "x": 2.0 * a}
+
+    def free_values(self, theta):
+        return [float(v) for v in theta]
+
+
+@pytest.mark.parametrize("solver", ["lm", "trf"])
+def test_a_previewed_curve_is_its_own_events_residual(solver):
+    """Every preview's ``y_calc`` is ``y_obs − σ·r(θ)`` at *its own* event's
+    θ, on a toy residual whose output moves with θ (review of #1623).
+
+    The ``predict()`` bar in the test above reads only the last accepted
+    preview, where the curve has converged, so a preview built from the
+    previous accepted residual passes it; here each accepted evaluation
+    moves the curve, and a lagged ``r`` fails on the first step.  θ is read
+    off the event's ``data["values"]``, which ``_free_values`` writes, never
+    off the preview it checks.
+    """
+    from scipy.optimize import least_squares
+
+    from rietx.optimize import least_squares as ls
+    from rietx.optimize import lm
+
+    model, table = _ToyModel(), _ToyTable()
+    seen: list[dict] = []
+    stream = EventStream(callback=seen.append, preview=True)
+    preview = ls._preview_builder(model, table)
+    tracker = ls._StepTracker()
+    x0 = np.array([1.5, 13.0, 1.4])
+    lo, hi = np.full(3, -np.inf), np.full(3, np.inf)
+    jac = lambda th: _fd_jacobian(model.residual, th)  # noqa: E731
+    if solver == "lm":
+        ls._lm_outcome(model.residual, jac, x0, lo, hi, max_nfev=50,
+                       ftol=lm.FTOL, inequalities=None, events=stream,
+                       stage="toy", track=tracker, table=table,
+                       preview=preview)
+    else:
+        least_squares(ls._tracked(model.residual, tracker, stream, "toy",
+                                  table, preview=preview),
+                      x0, jac=jac, method="trf", max_nfev=50)
+
+    previewed = [e for e in seen if "preview" in e]
+    curves = [e["preview"]["y_calc"] for e in previewed]
+    # the toy moves: the early accepted curves differ by far more than the
+    # bar below, so a preview one accepted evaluation behind would show
+    assert len(previewed) >= 3
+    assert all(np.max(np.abs(b - a)) > 1e-3 for a, b in zip(curves[:3], curves[1:3]))
+    for e in previewed:
+        theta = np.array(e["data"]["values"])
+        r = model.residual(theta)
+        expected = model.y_obs - r[:model.tt.size] * model.sigma
+        np.testing.assert_allclose(e["preview"]["y_calc"], expected,
+                                   rtol=0, atol=1e-12)
+        assert e["preview"]["values"] == table.decode(theta)
+
+
+def _fd_jacobian(residual, theta, h=1e-7):
+    r0 = residual(theta)
+    cols = []
+    for i in range(theta.size):
+        step = np.array(theta, dtype=np.float64)
+        step[i] += h
+        cols.append((residual(step) - r0) / h)
+    return np.stack(cols, axis=1)
+
+
+def _draw_preview(preview: dict, pattern, path: Path) -> None:
+    """The obs/calc/diff picture a viewer draws from one preview (WP-1949)."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    tt = preview["two_theta"]
+    obs = np.interp(tt, np.asarray(pattern.two_theta), np.asarray(pattern.intensity))
+    fig, (top, bottom) = plt.subplots(
+        2, 1, sharex=True, figsize=(7, 4), gridspec_kw={"height_ratios": [3, 1]})
+    top.plot(tt, obs, ".", ms=2, label="obs")
+    top.plot(tt, preview["y_calc"], "-", lw=0.8, label="calc (preview)")
+    top.legend()
+    bottom.plot(tt, obs - preview["y_calc"], "-", lw=0.6)
+    bottom.set_xlabel("2θ (°)")
+    OUT.mkdir(exist_ok=True)
+    fig.savefig(path, dpi=110)
+    plt.close(fig)
+
+
+def test_without_the_option_no_event_carries_a_preview(synthetic_pattern):
+    structure, ins = perturbed_models()
+    seen: list[dict] = []
+    stream = EventStream(callback=seen.append)
+    assert stream.preview is False
+    rx.Refinement(structure, ins, history=False).fit(
+        synthetic_pattern, events=stream)
+    assert seen and all("preview" not in e for e in seen)
+
+
+def test_a_preview_without_a_callback_is_refused(tmp_path):
+    with pytest.raises(ValueError, match="needs a callback"):
+        EventStream(path=tmp_path / "e.jsonl", preview=True)
+
+
+def test_a_series_hands_each_pattern_its_preview(synthetic_pattern):
+    """The series wraps the caller's stream per pattern (``_SeriesStream``);
+    the preview passes through it, stamped like every other event."""
+    structure, ins = perturbed_models()
+    seen: list[dict] = []
+    # The second pattern is scaled: an identical one starts the warm refit
+    # already converged, so it takes no trial step and emits no ``eval`` to
+    # carry a preview (main's warm_refit, seen after the 2026-11-19 merge).
+    second = synthetic_pattern.model_copy(update={
+        "intensity": list(np.asarray(synthetic_pattern.intensity) * 1.2)})
+    series = rx.SequentialRefinement(structure, ins, history=False)
+    series.fit([synthetic_pattern, second], x=[1.0, 2.0],
+               events=EventStream(callback=seen.append, preview=True))
+    previewed = [e for e in seen if "preview" in e]
+    assert {e["data"]["series_index"] for e in previewed} == {0, 1}
+    assert all(e["data"]["accepted"] for e in previewed)
+
+
+def test_a_joint_fit_refuses_a_preview(synthetic_pattern):
+    """Its data rows are several histograms', so no one grid draws them."""
+    structure, ins = perturbed_models()
+    with pytest.raises(ValueError,
+                       match=r"preview=True\) is not supported on a joint fit"):
+        rx.refine_multi([synthetic_pattern, synthetic_pattern], structure,
+                        [ins, ins.model_copy(deep=True)],
+                        events=EventStream(callback=lambda e: None,
+                                           preview=True))
+
+
+# ----------------------------------------------------------------------
 # the self-contained page (WP-1461)
 # ----------------------------------------------------------------------
 @pytest.fixture(scope="module")

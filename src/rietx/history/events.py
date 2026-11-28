@@ -140,6 +140,24 @@ is additive and would not have bumped anything on its own.
 validates every line as an :class:`EventRecord` — this module's own
 ``read_events`` before 1322 — refuses the line, so it is a change a consumer
 can observe and the constant moves for it.
+
+**A preview rides beside ``data``, to a callback only** (WP-1949, issue
+#892).  ``EventStream(callback=..., preview=True)`` asks for what a live view
+draws, so an application need not keep a shadow refinement and recompile it
+every frame (548 ms a frame on a 26 Å MOF, against 0.02 ms to carry it).
+Each *accepted* ``eval`` then reaches the callback with one more top-level
+key, ``preview``, holding ``two_theta`` (the fitted grid, a read-only view),
+``y_calc`` (an ndarray on that grid, recovered from the residual the solver
+already measured as ``y_obs − r·σ``) and ``values`` (every *moving* path's
+physical value, the tied coordinates and cell included, absolute; a magnetic
+fit's moment components are not among them, being refreshed only when a stage
+commits, issue #1626).  It is a
+key of the dict the callback receives and of nothing written: the stream's
+own file, a run recorder chained onto it and a ``progress=`` writer write the
+line they wrote without it, byte for byte, so the version does not move.
+A rejected trial and every other kind carry no preview.  A joint fit refuses
+it (:func:`rietx.optimize.least_squares.run_multi_least_squares`), since its
+data rows are several histograms' and no one grid draws them.
 """
 
 from __future__ import annotations
@@ -166,6 +184,10 @@ EVENT_SCHEMA_VERSION = "3"
 
 #: The ``record`` tag of the one line a stream writes when it opens a file.
 RUN_RECORD = "run"
+
+#: The top-level key an opted-in ``eval`` carries its preview under, in the
+#: dict a callback receives and in no line any sink writes (WP-1949).
+_PREVIEW_KEY = "preview"
 
 EventKind = Literal["fit_start", "stage_start", "eval", "stage_end", "fit_end",
                     "index_start", "index_end"]
@@ -219,11 +241,22 @@ class EventStream:
     ``callback`` — called with each event dict after it is written; exceptions
     in the callback are the caller's problem (they propagate — a monitoring
     hook that crashes the refinement is a bug you want to see, not swallow).
+    ``preview`` — off by default; on, each accepted ``eval`` reaches the
+    callback with a ``preview`` key beside ``data`` (the fitted grid,
+    ``y_calc`` as an ndarray and every moving path's value), which no file
+    ever receives (module docstring, WP-1949).  It needs a callback, and the
+    arrays are the callback's to read during the call: copy what you keep.
     """
 
-    def __init__(self, path: str | Path | None = None, callback=None):
+    def __init__(self, path: str | Path | None = None, callback=None, *,
+                 preview: bool = False):
+        if preview and callback is None:
+            raise ValueError(
+                "preview=True needs a callback: the preview reaches a callback "
+                "only, and a file never carries it")
         self.path = Path(path) if path is not None else None
         self.callback = callback
+        self._preview = bool(preview)
         # ``newline="\n"``: JSONL, so the line ending is the format's and
         # not the platform's (WP-1439).
         self._fh = (open(self.path, "a", encoding="utf-8", newline="\n")
@@ -236,6 +269,15 @@ class EventStream:
         if self._fh is not None:
             self._write_header()
 
+    @property
+    def preview(self) -> bool:
+        """Whether the solvers build a preview for accepted ``eval`` events.
+
+        Read-only, so the constructor's refusal of a preview with no callback
+        to receive it cannot be stepped round afterwards (WP-1949).
+        """
+        return self._preview
+
     def _write_header(self) -> None:
         """Mark where this run begins in the file (WP-1322).
 
@@ -246,14 +288,20 @@ class EventStream:
         self._fh.write(json.dumps(run_header(self.header_id)) + "\n")
         self._fh.flush()
 
-    def emit(self, kind: str, **data: Any) -> None:
+    def emit(self, kind: str, *, preview: dict | None = None,
+             **data: Any) -> None:
+        """Write one event, then hand it to the callback.
+
+        ``preview`` is the solvers' (WP-1949): the file gets the event without
+        it and the callback gets it beside ``data``.
+        """
         event = {"record": "event", "v": EVENT_SCHEMA_VERSION,
                  "t": time.time(), "kind": kind, "data": data}
         if self._fh is not None:
             self._fh.write(json.dumps(event) + "\n")
             self._fh.flush()
         if self.callback is not None:
-            self.callback(event)
+            self.callback(_with_preview(event, preview))
         self.n_written += 1
 
     def close(self) -> None:
@@ -266,6 +314,24 @@ class EventStream:
 
     def __exit__(self, *exc) -> None:
         self.close()
+
+
+def _with_preview(event: dict, preview: dict | None) -> dict:
+    """``event`` as a callback receives it: itself, or a shallow copy carrying
+    ``preview`` beside ``data`` (WP-1949).  The copy leaves ``event`` itself
+    unchanged, so a sink that writes it afterwards writes the plain line."""
+    return event if preview is None else {**event, _PREVIEW_KEY: preview}
+
+
+def _without_preview(event: dict) -> dict:
+    """``event`` as a sink writes it: any ``preview`` key dropped (WP-1949).
+
+    For a sink reached as a *callback* — the run recorder chained onto a
+    caller's stream — which receives the dict the caller's callback does.
+    """
+    if _PREVIEW_KEY not in event:
+        return event
+    return {k: v for k, v in event.items() if k != _PREVIEW_KEY}
 
 
 def as_event_stream(events) -> EventStream | None:

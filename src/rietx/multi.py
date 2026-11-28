@@ -56,6 +56,7 @@ from .optimize.least_squares import (
     _joint_aux_paths,
     _longest_line_wavelength,
     _multi_closures,
+    _refuse_joint_preview,
     covariance_estimates,
     rechart_outcome,
     run_multi_least_squares,
@@ -1773,6 +1774,8 @@ class MultiHistogramRefinement:
         weights = [1.0] * n if weights is None else list(weights)
         if len(weights) != n or any(w <= 0 for w in weights):
             raise ValueError("weights must be one positive number per histogram")
+        # before a run is recorded or an event emitted (WP-1949)
+        _refuse_joint_preview(events)
 
         stream = _attach_progress(as_event_stream(events), progress)
         # beside the caller's stream, never inside it, and once per job
