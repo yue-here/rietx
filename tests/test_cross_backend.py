@@ -231,10 +231,11 @@ def _state_families_tied():
     was written for.  So this row is where the choice is checked against three
     independent opinions.
 
-    Three shapes, one per outcome of that choice: an identity tie and a general
-    affine one (scale ≠ 1 **and** a constant) on a branch that reads its
-    coefficients off C (the site-scalar branch since WP-2314, the peak chain
-    before it), and a background tie the gate sends to the whole-model FD
+    Four shapes, one per outcome of that choice: an identity tie and a general
+    affine one (scale ≠ 1 **and** a constant) on the site-scalar branch, which
+    reads its coefficients off C (WP-2314); a general affine tie between two
+    width scalars on the peak chain, which finite-differences θ through
+    ``decode``; and a background tie the gate sends to the whole-model FD
     fallback instead — so the one column numpy finite-differences is compared
     against exact ones.
     """
@@ -245,6 +246,8 @@ def _state_families_tied():
                   AffineTie.identity("phases.0.atoms.0.occ"))
     table.set_tie("phases.0.atoms.1.biso",
                   AffineTie(terms=(("phases.0.atoms.0.biso", 2.0),), const=0.1))
+    table.set_tie("phases.0.gauss_strain",
+                  AffineTie(terms=(("phases.0.lor_size", 2.0),), const=0.001))
     table.set_tie("instrument.background.c1",
                   AffineTie.identity("instrument.background.c0"))
     table.refresh_ties()
