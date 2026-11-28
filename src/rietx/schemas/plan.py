@@ -396,7 +396,9 @@ class PlanSpec(Base):
     def _a_fraction_or_none(cls, value: Any) -> float | None:
         return check_closing_window_tol(value)
 
-    @field_validator("shift_over_esd_tol")
+    # before coercion, so True and "0.1" are refused here as the dataclass
+    # and run_stage refuse them, rather than read as 1.0 and 0.1
+    @field_validator("shift_over_esd_tol", mode="before")
     @classmethod
     def _a_shift_or_none(cls, value: Any) -> float | None:
         return check_shift_over_esd_tol(value)

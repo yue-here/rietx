@@ -100,6 +100,9 @@ def _collapse(plan: RefinementPlan) -> RefinementPlan:
         # and the closing stage itself, the protocol's like the two below
         # (WP-2002, the sixth round's Q1 and Q2)
         closing_window_tol=plan.closing_window_tol,
+        # and the stop its answer stage ran (WP-2317 R6), or a series the
+        # caller held at 1e-9 refits each warm pattern on the shift test
+        shift_over_esd_tol=plan.shift_over_esd_tol,
         # the alternation is the protocol's, not a stage's: a collapsed warm
         # refit under mode="lebail" would otherwise run one pass (WP-1323)
         lebail_passes=plan.lebail_passes,

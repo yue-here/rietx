@@ -88,6 +88,7 @@ from ..schemas.plan import (
     StageSpec,
     check_closing_window_tol,
     check_phase_support_sigma,
+    check_shift_over_esd_tol,
 )
 from ..schemas.project import ProjectDoc, check_interval
 from ..strategy.staged import PLAN_PRESETS, resolve_plan
@@ -159,7 +160,8 @@ RESERVED_BLOCKS: dict[str, str] = {}
 _PEAK_FLAG_WORDS: tuple[str, ...] = get_args(PeakFlag)
 
 _KEYWORDS = (TEXTDOC_MAGIC, "project", "pattern", "mode", "limits", "excluded", "plan",
-             "guard", "tolerance", "passes", "support", "closing", "stage", "phase",
+             "guard", "tolerance", "passes", "support", "closing", "shift", "stage",
+             "phase",
              "instrument",
              "peaks", *RESERVED_BLOCKS)
 
@@ -265,6 +267,10 @@ class ParsedDocument:
     #: whether it appeared, for the same reason: ``none`` is a value
     closing: float | None = None
     closing_set: bool = False
+    #: the ``shift`` line's value (WP-2317 R6), and whether it appeared, for
+    #: the same reason: ``none`` (stop on the solver's ftol) is a value
+    shift: float | None = None
+    shift_set: bool = False
     stages: list[StageSpec] = field(default_factory=list)
     stage_lines: list[int] = field(default_factory=list)
     phases: dict[int, tuple[int, str | None]] = field(default_factory=dict)
@@ -488,6 +494,14 @@ def _render_plan(doc: ProjectDoc) -> list[str]:
     lines.append(f"closing {closing}".ljust(34)
                  + "# closing_window_tol: the closing stage's windows "
                    "('none' = no closing stage)")
+    # shown only away from its default, like ``support``, so every stored
+    # document renders byte for byte as before (WP-2317 R6)
+    if spec.shift_over_esd_tol != PlanSpec().shift_over_esd_tol:
+        shift = ("none" if spec.shift_over_esd_tol is None
+                 else _fmt(spec.shift_over_esd_tol))
+        lines.append(f"shift {shift}".ljust(34)
+                     + "# shift_over_esd_tol: the last stage stops under this "
+                       "shift/esd ('none' = at its ftol)")
     width = max((len(s.name) for s in spec.stages), default=4)
     default = StageSpec(name="_")
     for stage in spec.stages:
@@ -784,6 +798,20 @@ def parse(text: str) -> ParsedDocument:
                      raw, "closing")
             else:
                 doc.closing_set = True
+        elif keyword == "shift":
+            value = rest[0] if len(rest) == 1 else ""
+            number = _number(value)
+            try:
+                # the schema's own check, the ``support`` line's rule
+                doc.shift = (None if value == "none" else
+                             check_shift_over_esd_tol(
+                                 value if number is None else number))
+            except ValueError:
+                fail(n, "shift takes one positive number — the shift/esd under "
+                        "which the last stage stops — or 'none' to stop on the "
+                        "solver's ftol", raw, "shift")
+            else:
+                doc.shift_set = True
         elif keyword == "stage":
             stage = _parse_stage(n, rest, raw, fail)
             if stage is not None:
@@ -1028,7 +1056,9 @@ def _plan_changes(parsed: ParsedDocument, doc: ProjectDoc, delta: Delta,
                         phase_support_sigma=(parsed.support if parsed.support_set
                                              else PlanSpec().phase_support_sigma),
                         closing_window_tol=(parsed.closing if parsed.closing_set
-                                            else PlanSpec().closing_window_tol))
+                                            else PlanSpec().closing_window_tol),
+                        shift_over_esd_tol=(parsed.shift if parsed.shift_set
+                                            else PlanSpec().shift_over_esd_tol))
     stages_changed = spec is not None and spec != current
 
     if name_changed and stages_changed:

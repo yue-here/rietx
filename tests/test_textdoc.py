@@ -679,6 +679,34 @@ def test_the_support_line_carries_the_hold_threshold_and_refuses_nonsense(projec
         assert delta.plan is None, bad
 
 
+def test_the_shift_line_carries_the_stop_and_refuses_nonsense(project):
+    """``shift_over_esd_tol`` (WP-2317 R6) has a line, on the ``support``
+    line's rule: absent at its default, so every stored document renders byte
+    for byte as before, and ``none`` a value, the stop on the solver's ftol."""
+    text = td.render(project)
+    assert not any(ln.startswith("shift ") for ln in text.splitlines())
+
+    for typed, stored in (("none", None), ("0.05", 0.05)):
+        delta, errors = _changes(
+            _edit(text, "tolerance", f"tolerance 1e-06\nshift {typed}"), project)
+        assert errors == []
+        assert delta.plan["plan"]["shift_over_esd_tol"] == stored
+
+    for value, shown in ((None, "none"), (0.05, "0.05")):
+        project.doc.plan = project.doc.plan.model_copy(
+            update={"shift_over_esd_tol": value})
+        line = next(ln for ln in td.render(project).splitlines()
+                    if ln.startswith("shift "))
+        assert line.split()[1] == shown and "shift_over_esd_tol" in line
+
+    for bad in ("shift 0", "shift -1", "shift inf", "shift nan", "shift many",
+                "shift", "shift 0.1 0.2"):
+        delta, errors = _changes(
+            _edit(text, "tolerance", f"tolerance 1e-06\n{bad}"), project)
+        assert errors and errors[0].where == "shift", bad
+        assert delta.plan is None, bad
+
+
 def test_a_stage_line_round_trips_every_key_stage_spec_has(project):
     """The keys are derived from ``StageSpec``, so this is the whole set at once.
 
