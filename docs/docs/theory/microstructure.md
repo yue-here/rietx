@@ -39,8 +39,11 @@ peak area divided by the peak height, and the table in
 {ref}`sec-units` rules that out as a width measure here. The lower-case $2w$ is a
 width in radians and has nothing to do with the Caglioti $W$ of
 {eq}`prof-caglioti-g`, which is a variance in deg². $K$ depends on the
-crystallite shape and on which of the two breadths is used: 0.89 for the FWHM of
-a sphere against 1.0747 for its integral breadth. An apparent size
+crystallite shape and on which of the two breadths is used. For the FWHM,
+Langford and Wilson (§ 3) find that it "does not display a wide variation with
+hkl or crystallite shape" and that 0.90 may be taken as a first approximation,
+with the size taken as the cube root of the crystallite volume for crystallites
+of one size; they give 0.829 for spheres. An apparent size
 is therefore an order-of-magnitude statement rather than a quotable two-figure
 one. It is also a lower bound unless the instrument and strain contributions
 have been taken out first, since Scherrer attributes every degree it is handed

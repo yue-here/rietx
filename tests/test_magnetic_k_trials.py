@@ -26,6 +26,7 @@ from rietx.schemas.structure import Atom, Cell, Phase
 from rietx.strategy.magnetic import (
     SOLVE_K_OFFSET_MARGIN_DEG,
     SOLVE_K_TIE_DELTA_BIC,
+    SOLVE_TOP_K,
     MagneticTrial,
     MomentRow,
     _best_eligible_delta_bic,
@@ -182,6 +183,35 @@ def test_k_trials_1_keeps_the_single_k_behaviour(true_k_and_data, monkeypatch):
     assert len(solution.k_trials) == 1
     assert solution.k_trials[0].k == ("0", "0", "1/2")
     assert not any(d.code == "K_VECTOR_UNSEPARATED" for d in solution.diagnostics)
+
+
+@pytest.mark.xdist_group("magnetic-k-trials-true-k")
+def test_top_k_cuts_the_reported_candidate_list_and_never_the_pick(true_k_and_data):
+    """`SOLVE_TOP_K`'s named synthetic case (WP-2017 group L, ruled 2026-11-18).
+
+    The real satellite arm (nothing monkeypatched) on this k = (0,0,1/2)
+    pattern lists five candidate k's: the true one matching 11 satellites and
+    four matching none, (0,1/2,0), (0,1/2,1/2), (1/2,1/2,0) and (1/2,1/2,1/2).
+    `top_k` cuts that list to what the solution reports in `k_candidates`; a
+    candidate that matches nothing is never walked, so the pick and its
+    ranking are the same at every cut.  At the shipped 3 the reported list
+    stops at (0,1/2,1/2); 2 or 4 shortens or lengthens it, and the pick does
+    not move.  Not marked slow: it is the case that reaches an audited
+    constant, three solves of about 1 s on macOS arm64.
+    """
+    ref, data, truth = true_k_and_data
+    shipped = rx.solve_magnetic(ref, data, sites=["Mn1"], ion="Mn3+")
+    assert [c[0] for c in shipped.k_candidates] == [
+        "(0, 0, 1/2)", "(0, 1/2, 0)", "(0, 1/2, 1/2)"], shipped.k_candidates
+    assert len(shipped.k_trials) == 1
+    for top_k, length in ((SOLVE_TOP_K - 1, 2), (SOLVE_TOP_K + 1, 4)):
+        moved = rx.solve_magnetic(ref, data, sites=["Mn1"], ion="Mn3+",
+                                  top_k=top_k)
+        assert len(moved.k_candidates) == length, moved.k_candidates
+        assert moved.k == shipped.k == ("0", "0", "1/2")
+        assert moved.best.bns_number == shipped.best.bns_number == truth.bns_number
+        assert ([(t.bns_number, t.delta_bic) for t in moved.trials]
+                == [(t.bns_number, t.delta_bic) for t in shipped.trials])
 
 
 # ================================================== the ranking helpers, direct

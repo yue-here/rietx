@@ -159,6 +159,14 @@ above, which come from lab and synchrotron single-phase patterns
 
 ### Inherited
 
+- **2026-11-19, from WP-2017 group J (PR #1577, Q14): Le Bail's doublet-weight gap and FAP's
+  Rwp.** With the Kα2/Kα1 weight free in every mode, Le Bail read it 4.3 and 11 plain esds
+  below Rietveld and Pawley on FAP and SRM 1976a, and its FAP Rwp sits above Rietveld's. No
+  cell moved more than 0.59 plain esd. The maintainer kept the weight free in Le Bail (one rule
+  across modes) and filed the gap and the Rwp here, under the 2026-11-05 ruling that Pawley is
+  the direction (#1577, comment 6963408737). Owed here: whether the gap is Le Bail's partition
+  (Pawley agrees with Rietveld), read when the default changes.
+
 - **2026-11-28, from the issue triage (#1852, a bug in an output): the sum
   `PAWLEY_OVERLAP_UNRESOLVED` names as the datum has no esd anywhere.** The
   diagnostic says "Use the group's summed intensity as the datum". The fit

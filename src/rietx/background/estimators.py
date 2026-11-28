@@ -56,6 +56,11 @@ def arpls(y: np.ndarray, lam: float = 1e7, *, max_iter: int = 50,
 
     ``lam`` controls stiffness; larger = smoother.  For powder patterns with
     ~10⁴ points, λ of 1e6–1e9 is typical (choose with :func:`auto_lambda`).
+
+    ``max_iter`` = 50 and ``tol`` = 1e-3 stay caller keywords at pybaselines'
+    defaults (recalled, not checked).  The stop is not tight: under
+    (500, 1e-6) the baseline moved by 4.6σ (WP-2017, Yue's 2026-11-17 note),
+    so tightening it moves every baseline the selector scores.
     """
     y = np.asarray(y, dtype=np.float64)
     n = len(y)

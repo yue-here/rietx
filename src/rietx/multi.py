@@ -2712,7 +2712,8 @@ class MultiHistogramRefinement:
             per_floors.append(floored_paths(table, _hist_floors(at_bounds, h)))
             diags.extend(_extra_peak_diagnostics(
                 model, values, ticks, table, floors=per_floors[h]))
-            diags.extend(_far_from_data_diagnostics(model, y_calc, y_bkg, stats))
+            diags.extend(_far_from_data_diagnostics(model, y_calc, y_bkg, stats,
+                                                    values, set(table.free_paths)))
             # the measurement's half only: support=None withholds the ratio,
             # which has no joint definition (DIAGNOSTIC_SCOPES says why)
             diags.extend(_data_support_diagnostics(None, model))

@@ -325,8 +325,9 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "cosθ shape is close to the constant shape of `zero_shift`, so freeing both "
             "on one pattern usually reports a correlation. It has no default bound. "
             "Where the scan cannot separate it from the zero and the cell, the fit "
-            "reports `FLAT_DIRECTION` and the cell's esd grows to show it. Set a bound if "
-            "you know your mount."
+            "reports `FLAT_DIRECTION`, though the cell's esd does not reliably grow to show "
+            "it: the cell walked 3.6-6.6 esds on three of six flat-plate fits. Set a bound "
+            "if you know your mount."
         ),
         unit="mm", default="0.0",
         typical="|s| < 0.05 mm on a carefully packed flat plate",
@@ -3559,8 +3560,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
     "MODEL_FAR_FROM_DATA": HelpEntry(
         title="The model does not describe the data",
         description=(
-            "Rwp is so high that the model does no better than one that predicts no "
-            "intensity. This is a mismatch between model and data. The optimiser can "
+            "The fit's chi-squared is no better than a refit of the background alone "
+            "(Hamilton's ratio test at the 0.05 level), so the model explains none of the "
+            "peaks. This is a mismatch between model and data. The optimiser can "
             "still report convergence, because a zero phase scale is a minimum once the "
             "peaks sit far from the data. Do not read the parameters or their esds. "
             "Check the cell, the wavelength, the zero shift and the 2θ range. Re-index "
