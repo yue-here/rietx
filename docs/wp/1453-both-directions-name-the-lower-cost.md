@@ -1,6 +1,6 @@
 # WP-1453 — both directions name the lower cost
 
-Milestone: unscheduled · Status: 🔄 2026-11-16 — task 1 measured (the passes disagree in cost); option 1's field and the option 2/3 choice wait on the maintainer
+Milestone: unscheduled · Status: 🔄 2026-11-28 — task 1 measured (#1594); option 1 ruled (one cost pair per pattern) and not started; option 2 deferred to #1402's B2
 Track: A long run is not one fit
 Depends on: — (1420 soft: its fixture may serve this one)
 Priority: P3 2026-11-15 — `SeriesResult.direction_gaps` already lists the gap but does not say which answer to quote; the package's own passes now measured to disagree in cost on one public ramp (issue #1556, relative Rwp up to 1.4e-3), which keeps the row at P3: a diagnostic that says less than it could
@@ -194,6 +194,19 @@ the rows.)* *(2026-11-16: was "the finding at the disagreeing pattern"; WP-2003 
   rule), WP-1301 (the holds), WP-1417 (ΔBIC).
 
 ## Handover log
+
+- **2026-11-28** — **Repair, close-only bookkeeping** (ghostshift runner; PR #PRNUM). PR #1594
+  merged on 2026-11-23 and left the session-start scan flagging this WP. The flag came from
+  dates alone. The PR's last commit, `78f8f999b`, was committed on 2026-11-22 and wrote the
+  2026-11-21 entry below, so that entry already records it. No work is missing from the log,
+  and this repair reconstructs nothing. It changes the Status line, which still said the
+  rulings were owed. The WP stays open. Option 1, its test and the skill paragraph are not
+  started.
+  *Checked on `origin/main` at `300853e90`:* PR #1594 merged at 2026-11-23 10:40 UTC. PR #1401
+  is still open, so `tests/test_identity_point_seed.py` is not on main.
+  *Next:* task 2, option 1, in `_direction_gaps`, as ruled on 2026-11-21. Then the test task:
+  land #1401 first or copy its helpers. Then the skill paragraph. Option 2 waits on the joint
+  ruling with #1402's B2.
 
 - **2026-11-21** — **Rulings recorded** (maintainer's review of PR #1594;
   the PR merges as it stands, since it records a measurement and decides
