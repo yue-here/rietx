@@ -204,6 +204,8 @@ GHOST_N_PARENTS = 8
 #: having measured at zero false findings here, on the maintainer's call.
 #: *(Chosen: WP-1447, 2026-09-22 — a fixed bar over a control run per
 #: pattern)*
+#: WP-1447's machinery, :func:`ghost_control`, now draws that control and its
+#: p-value on request; nothing reads it by default.
 GHOST_MIN_PARENTS = 5
 
 #: How far two parents' ratios may differ and still be called one leak, as a
@@ -456,6 +458,60 @@ class ContaminationFlag(Base):
     leak_ratio: float          # the ratio fitted across the supporting parents
     n_parents: int             # parents supporting the finding
     n_parents_searched: int    # parents whose ghost position was in range
+
+
+class GhostControl(Base):
+    """One ghost search judged against the pattern's own control (WP-1447).
+
+    :func:`ghost_control` asks the screen's question twice on one peak list:
+    once at the real ghost ratio (``observed``, the consensus count
+    :data:`GHOST_MIN_PARENTS` is compared with), and once at each of
+    ``ratios``, wavelength ratios that match no emission line and whose
+    companions stay clear of the lines the anode names, so a count in
+    ``control`` is this pattern's coincidence rate (see
+    :func:`_ghost_control_ratios` for the lines it cannot exclude, and for
+    where that leaves a wall near a ratio of 1 the exclusions do not reach).
+    ``p_value`` is the Monte Carlo p of :func:`ghost_p_value`: how often this
+    pattern's coincidences reach what the real ratio found.
+
+    **Nothing here decides.**  The screen still reports on
+    :data:`GHOST_MIN_PARENTS` alone; :meth:`decide` takes the significance
+    level and the floor as arguments, because which values a default would
+    use is the maintainer's call.  Measured on the 16 round-robin patterns
+    with ``k=199, span=(0.80, 1.0)`` (WP-1447's handover has the table): at
+    the real Kβ ratio every pattern's p is ≥ 0.125 on the census pool and
+    the fitted list, and a Kβ image injected at r = 0.10 or 0.15 comes back
+    at p = 0.005, the smallest ``k=199`` can return, on all sixteen and both
+    paths.  At r = 0.05 it holds on 16 of 16 on the census pool, brucite and
+    magnetite included at 3 supporting parents, which the fixed bar of 5
+    does not report, and on 15 of 16 fitted lists (magnetite: 2 parents,
+    p = 0.035).
+
+    **The p-value alone is not a rule, which is why** :meth:`decide` **takes a
+    floor.**  On zircon with a Kβ image at r = 0.10 the *W Lα* search's
+    fitted-list count is 3 at p = 0.005: the control is quiet there (its
+    maximum is 2) and the pattern carries extra lines the control does not
+    see (the leak's, excluded around Kβ; which parents they pair with was not
+    traced, so the mechanism is a hypothesis).  The fixed bar
+    stays silent on it, as it should.  The floor is what count a reader
+    accepts as evidence however quiet the control, and this is a case
+    where 3 would have been wrong.
+    """
+
+    kind: str                  # "kbeta" | "tungsten_la"
+    ratio: float               # the ghost's wavelength over the pattern's
+    observed: int              # parents supporting the consensus at ``ratio``
+    n_parents_searched: int    # parents whose ghost position was in range
+    ratios: list[float]        # the control's ratios, ascending
+    control: list[int]         # the consensus count at each of them
+    p_value: float             # (1 + #{control ≥ observed}) / (1 + len(control))
+
+    def decide(self, *, alpha: float, floor: int) -> bool:
+        """Whether this search reports at significance ``alpha`` with at
+        least ``floor`` supporting parents.  Both are required: the floor is
+        what keeps a degenerate control (one that never reaches 2) from
+        lowering the bar to two agreeing reflections."""
+        return self.observed >= floor and self.p_value <= alpha
 
 
 class SignalCutoff(Base):
@@ -1796,9 +1852,7 @@ def _ghost_candidates(
     r_lo, r_hi = GHOST_RATIO_RANGE
     out: list[tuple[int, int, float]] = []
     n_searched = 0
-    placed = (np.ones(len(tt), dtype=bool) if esd is None
-              else np.isfinite(esd) & (esd <= GHOST_ESD_MAX_DEG))
-    rank = np.argsort(np.where(placed, inten, -np.inf))[::-1][:GHOST_N_PARENTS]
+    placed, rank = _ghost_parent_rank(inten, esd)
     for ip in rank:
         if not placed[ip]:
             continue
@@ -1864,6 +1918,230 @@ def _ghost_consensus(
         chosen = sorted(per.values(), key=lambda c: c[1])
         best = (n, float(np.median([c[2] for c in chosen])), chosen)
     return best
+
+
+def _ghost_parent_rank(inten: np.ndarray, esd: np.ndarray | None
+                       ) -> tuple[np.ndarray, np.ndarray]:
+    """Which lines have a position (``placed``) and the strongest
+    :data:`GHOST_N_PARENTS` indices, the parents :func:`_ghost_candidates`
+    searches; an unplaced line can rank only when fewer are placed, and is
+    skipped by every caller."""
+    placed = (np.ones(len(inten), dtype=bool) if esd is None
+              else np.isfinite(esd) & (esd <= GHOST_ESD_MAX_DEG))
+    rank = np.argsort(np.where(placed, inten, -np.inf))[::-1][:GHOST_N_PARENTS]
+    return placed, rank
+
+
+def _check_control_args(k: int, span: tuple[float, float]) -> None:
+    """``k`` a positive integer, ``span`` finite with 0 < lo < hi."""
+    if isinstance(k, bool) or not isinstance(k, (int, np.integer)) or k < 1:
+        raise ValueError(f"k must be a positive integer, got {k!r}")
+    lo, hi = (float(span[0]), float(span[1]))
+    if not (np.isfinite(lo) and np.isfinite(hi) and 0.0 < lo < hi):
+        raise ValueError(f"span must be finite with 0 < lo < hi, got {span!r}")
+
+
+def _ghost_control_ratios(
+    tt: np.ndarray, inten: np.ndarray, esd: np.ndarray | None,
+    wavelength: float, *, k: int, span: tuple[float, float],
+    tol_deg: float = GHOST_TOL_DEG, k_sigma: float = GHOST_MATCH_K,
+) -> np.ndarray:
+    """The control's wavelength ratios for one pattern: ``k`` of them, evenly
+    spread over the part of ``span`` where a made-up companion cannot match a
+    line that is really there (WP-1447).
+
+    The control asks the screen's question at ratios that are not an emission
+    line of anything, so whatever agreement it finds is coincidence.  That
+    holds only where the predicted companion of every parent stays clear of
+    the lines the parent *does* put in the pattern, and those are five
+    positions per parent, all read off the anode table rather than written
+    down: the parent itself (ratio 1), its own Kα doublet partner on either
+    side (λKα1/λKα2 and its inverse), and the two real ghosts the screen
+    looks for (Kβ/λ and W Lα1/λ).  A ratio is **excluded** when, for any
+    searched parent, its predicted companion falls within that parent's
+    matching window of one of those five positions — the widest window the
+    screen could match that parent with, ``max(tol_deg, k_sigma·√(σ_c² +
+    σ_p²))`` with σ_c the largest position esd of any line that can be a
+    candidate (a placed one).  So a ratio whose companion would land on one
+    of those five predicted positions is not drawn.  What it does not exclude:
+    lines the five do not name (W Lα2, the Kβ image of a Kα2 component, a
+    leak's images of lines too weak to be parents), so on a leaking pattern
+    the control is not pure coincidence.  The exclusion is exact (an interval
+    per parent and position, in ratio), so no grid step is chosen anywhere.
+
+    **The near-unity trap WP-1442 hit is closed on the 16 round-robin
+    patterns, measured, not derived.**  There the fitted list's chance
+    consensus rises from a mean of 0.55 to 2.03 in 0.990-0.995 and 4.35
+    above, reaching 8; with these exclusions the largest support at any
+    admitted ratio ≥ 0.95 is 2 on both paths, the bulk's own level.  What
+    feeds that wall is not one of the five positions (the parent and its Kα
+    partner can never be candidates: their intensity ratios, 1 and about
+    0.5 or 2, lie outside :data:`GHOST_RATIO_RANGE`).  It is weak flank
+    lines 0.11-0.18° below their parents, at 4-17 % of them (corundum,
+    zincite, cpd-1c at r = 0.9965), which the parent's own exclusion covers
+    because one matching window is about that wide, while the companion's
+    offset, scaling with tan θ, splits their agreement across parents spread
+    over a wide 2θ range.  **The known limit:** flank lines further out,
+    beside parents spread over a narrow 2θ band (so the companion's tan θ
+    scaling does not break their agreement), reopen it.  Eight parents in 24-33° with a 10 %
+    line 0.20° below each reach 8 at admitted ratios, and a real Kβ leak on
+    that list gets p = 0.015, which the fixed bar reports and
+    ``decide(alpha=0.01, floor=5)`` does not (pinned by
+    ``test_flank_lines_outside_the_exclusions_reopen_the_wall``).  The
+    band is wider on the fitted path than on the census because its window
+    carries the list's position esds (the census has none), and wider on a
+    pattern whose strongest line sits at low angle, where a ratio moves a line least — which is why a fixed 0.98 could
+    not be right for every pattern, and why it moves with the anode.
+
+    The ``k`` ratios sit at the centres of ``k`` equal slices of the admitted
+    length, so the control is deterministic: the same pattern always gets the
+    same answer.  Neighbouring ratios closer than a matching window are not
+    independent draws, so a p-value over them is a rank among correlated
+    scores rather than a calibrated probability; ``k`` sets its resolution,
+    not the number of independent coincidences sampled.  Returns an empty array when
+    the wavelength is no tabulated anode or nothing of ``span`` survives.
+    """
+    from ..schemas.instrument import _KA_DOUBLETS
+
+    _check_control_args(k, span)
+    lo_span, hi_span = (float(span[0]), float(span[1]))
+    anode = identify_anode(wavelength)
+    if anode is None or not len(tt):
+        return np.empty(0)
+    _, ka2 = _KA_DOUBLETS[anode]
+    real = (1.0, ka2 / wavelength, wavelength / ka2,
+            _KBETA[anode] / wavelength, _W_LA1 / wavelength)
+    placed, rank = _ghost_parent_rank(inten, esd)
+    sigma_c = (0.0 if esd is None or not placed.any()
+               else float(np.max(esd[placed])))
+    cut: list[tuple[float, float]] = []
+    for ip in rank:
+        if not placed[ip]:
+            continue
+        s = float(np.sin(np.radians(tt[ip] / 2.0)))
+        if s <= 0.0:
+            continue
+        window = (tol_deg if esd is None else
+                  max(tol_deg, k_sigma * float(np.hypot(sigma_c, esd[ip]))))
+        for r_real in real:
+            if s * r_real >= 1.0:
+                continue
+            g = 2.0 * np.degrees(np.arcsin(s * r_real))
+            a = np.sin(np.radians(max(g - window, 0.0) / 2.0)) / s
+            b = np.sin(np.radians(min(g + window, 180.0) / 2.0)) / s
+            cut.append((float(a), float(b)))
+    pieces = [(lo_span, hi_span)]
+    for a, b in cut:
+        nxt: list[tuple[float, float]] = []
+        for p, q in pieces:
+            if b <= p or a >= q:
+                nxt.append((p, q))
+                continue
+            if a > p:
+                nxt.append((p, a))
+            if b < q:
+                nxt.append((b, q))
+        pieces = nxt
+    lengths = np.array([q - p for p, q in pieces])
+    total = float(lengths.sum()) if len(pieces) else 0.0
+    if total <= 0.0:
+        return np.empty(0)
+    edges = np.concatenate([[0.0], np.cumsum(lengths)])
+    at = (np.arange(int(k)) + 0.5) / int(k) * total
+    which = np.clip(np.searchsorted(edges, at, side="right") - 1, 0, len(pieces) - 1)
+    starts = np.array([p for p, _ in pieces])
+    return starts[which] + (at - edges[which])
+
+
+def ghost_p_value(observed: int, control: list[int] | np.ndarray) -> float:
+    """The Monte Carlo p-value of an observed count against ``control``:
+    ``(1 + #{control ≥ observed}) / (1 + K)`` for ``K`` control counts.
+
+    North, Curtis & Sham (2002), Am. J. Hum. Genet. 71, 439-441: the observed
+    statistic counts as one of the draws, so p is never 0 and the naive
+    ``#/K`` bias is gone.  Ties count against the observation.  An empty
+    control gives 1, no evidence.  The smallest p a control of ``K`` can
+    return is ``1/(K+1)``, so ``K`` sets the resolution of any level tested.
+    The formula's calibration assumes exchangeable random draws; over
+    :func:`ghost_control`'s deterministic grid of correlated ratios it is a
+    rank of the observation among the pattern's own chance scores.
+    """
+    c = np.asarray(control)
+    return float((1 + np.count_nonzero(c >= observed)) / (1 + c.size))
+
+
+def ghost_control(
+    two_theta: np.ndarray, intensity: np.ndarray,
+    two_theta_esd: np.ndarray | None, wavelength: float, *,
+    k: int, span: tuple[float, float],
+    intensity_esd: np.ndarray | None = None,
+    tt_range: tuple[float, float] | None = None,
+    tol_deg: float = GHOST_TOL_DEG, k_sigma: float = GHOST_MATCH_K,
+    source: object | None = None,
+) -> list[GhostControl]:
+    """Each ghost search on a peak list, with the pattern's own control
+    (WP-1447).
+
+    The arguments are :func:`contamination_flags_from_peaks`' and mean the
+    same, so the counts are the screen's own; ``k`` and ``span`` choose the
+    control, ``k`` wavelength ratios spread evenly over the part of ``span``
+    no named line can reach (the exclusions are derived from the anode and
+    the matching window; :func:`_ghost_control_ratios` says what they leave
+    open).
+
+    **A control ratio is compared only where it asks as many parents.**  A
+    ratio whose companions fall off the measured range for some parents
+    searches fewer of them and scores low for that reason alone, which would
+    make the observation look rarer than it is.  So each search keeps the
+    control ratios that searched at least as many parents as it did, and
+    ``GhostControl.ratios``/``control`` are that subset; one that searched
+    more can only make p larger.
+
+    Returns one :class:`GhostControl` per search :func:`ghost_searches`
+    leaves running, and ``[]`` where there is no anode, no search or no line.
+    Unlike the screen, it also returns a search with fewer than
+    :data:`GHOST_MIN_PARENTS` parents in range (``n_parents_searched`` says
+    so), and :meth:`GhostControl.decide` with a lower floor can pass one.
+    It changes nothing the screen reports: a caller reads ``p_value`` beside
+    the flags, or applies :meth:`GhostControl.decide` with its own level and
+    floor.
+
+    Cost: ``k + 2`` candidate searches and consensus counts on the given
+    list, with no second peak fit; 6-10 ms at ``k=199`` on lists of 18 to 113
+    lines (macOS arm64, WP-1447).
+    """
+    _check_control_args(k, span)
+    searches = ghost_searches(source)
+    anode = identify_anode(wavelength)
+    tt = np.asarray(two_theta, dtype=np.float64)
+    inten = np.asarray(intensity, dtype=np.float64)
+    if anode is None or not searches or not len(tt):
+        return []
+    lo, hi = (float(tt.min()), float(tt.max())) if tt_range is None else tt_range
+    esd = None if two_theta_esd is None else np.asarray(two_theta_esd, dtype=np.float64)
+
+    def support(ratio: float) -> tuple[int, int]:
+        cands, n_searched = _ghost_candidates(
+            tt, inten, esd, intensity_esd, ratio, lo, hi,
+            tol_deg=tol_deg, k_sigma=k_sigma)
+        return _ghost_consensus(cands)[0], n_searched
+
+    ratios = _ghost_control_ratios(tt, inten, esd, wavelength, k=k, span=span,
+                                   tol_deg=tol_deg, k_sigma=k_sigma)
+    drawn = [support(float(r)) for r in ratios]
+    out: list[GhostControl] = []
+    for kind, lam_ghost in (("kbeta", _KBETA[anode]), ("tungsten_la", _W_LA1)):
+        if kind not in searches:
+            continue
+        observed, n_searched = support(lam_ghost / wavelength)
+        keep = [i for i, (_, n) in enumerate(drawn) if n >= n_searched]
+        control = [drawn[i][0] for i in keep]
+        out.append(GhostControl(
+            kind=kind, ratio=lam_ghost / wavelength, observed=observed,
+            n_parents_searched=n_searched,
+            ratios=[float(ratios[i]) for i in keep],
+            control=control, p_value=ghost_p_value(observed, control)))
+    return out
 
 
 def _contamination_flags(tt: np.ndarray, net: np.ndarray, sigma: np.ndarray,

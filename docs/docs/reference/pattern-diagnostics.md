@@ -225,6 +225,44 @@ An unfiltered tube sits at 14 % (Hölzer et al. 1997), which is the case the scr
 A residual leak past a working filter is below the floor and comes back as nothing.
 :::
 
+### The pattern's own control
+
+`rietx.background.ghost_control` asks the screen's question twice on one peak list: at the real ghost ratio, and at `k` made-up wavelength ratios that match no emission line.
+You call it yourself, and nothing in `diagnose` reads it.
+The screen still reports on the fixed bar of five parents.
+
+`ghost_control(two_theta, intensity, two_theta_esd, wavelength, *, k, span)` takes the arguments of `contamination_flags_from_peaks`, so its counts are the screen's own.
+It returns one `GhostControl` per search that could run, and `[]` where there is no anode, no search or no line.
+A search with fewer than five parents in range is returned too, and `n_parents_searched` says so.
+
+| Field | Is |
+|---|---|
+| `GhostControl.kind` | which search, `"kbeta"` or `"tungsten_la"` |
+| `GhostControl.ratio` | the ghost's wavelength over the pattern's |
+| `GhostControl.observed` | parents supporting the consensus at that ratio |
+| `GhostControl.n_parents_searched` | parents whose ghost position fell inside the range |
+| `GhostControl.ratios` | the control's wavelength ratios, ascending |
+| `GhostControl.control` | the consensus count at each of them |
+| `GhostControl.p_value` | the Monte Carlo p-value of `observed` against `control` |
+
+`ghost_p_value(observed, control)` is the p-value alone: `(1 + #{control ≥ observed}) / (1 + K)` after North, Curtis and Sham (2002).
+It is never zero, an empty control gives 1, and `K` sets the smallest value it can return, `1/(K+1)`.
+`GhostControl.decide(alpha=, floor=)` is true when `observed` reaches the floor and `p_value` is at most `alpha`.
+
+Every number is yours.
+`k`, `span`, `alpha` and `floor` have no default, because which values the screen should use is the maintainer's decision, open in [#1615](https://github.com/yue-here/rietx/issues/1615).
+The floor matters as much as the p-value.
+A control that never reaches two would otherwise let two agreeing reflections pass.
+
+:::{warning}
+The control is clean on the 16 round-robin patterns and not in general.
+Its exclusions cut five positions round each parent, and a weak line outside them can still gather parents at an admitted control ratio.
+That happens when the strong lines sit in a narrow band of 2θ, where the companion positions barely spread.
+Eight parents between 24° and 33°, each with a 10 % line 0.20° below it, reach eight parents at several control ratios.
+Add a real Kβ image at 10 % and the fixed bar reports it, but `decide(alpha=0.01, floor=5)` does not (p = 0.015).
+That is a loss of power, not a false alarm, and `test_flank_lines_outside_the_exclusions_reopen_the_wall` pins it.
+:::
+
 ## Low-angle checks after a fit
 
 A fitted result carries two checks on the low-angle end that `air_scatter_gain` cannot make.
