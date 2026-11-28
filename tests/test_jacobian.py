@@ -270,7 +270,7 @@ def test_a_tie_beyond_a_branchs_reach_falls_back_and_stays_exact():
 def test_a_cross_atom_dof_tie_matches_finite_differences():
     """Two general-position atoms moving together: outside one atom's rows.
 
-    ``_structural_column`` reads the coefficients of *one* atom's x/y/z off C,
+    ``_structural_df2`` reads the coefficients of *one* atom's x/y/z off C,
     so a tie between two atoms' displacement DOFs reaches past it.  Nothing
     here is protected by symmetry — P2₁/c general sites, monoclinic cell.
     """

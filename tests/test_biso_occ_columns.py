@@ -4,7 +4,7 @@ Before angle 3 a Biso or occupancy column went to the peak chain, which
 re-runs ``phase_peaks`` at a perturbed θ, so every such column re-expanded
 the whole phase's structure factor.  Now ``structure_factor.d_f2_d_sites``
 returns ∂|F|²/∂B_j and ∂|F|²/∂occ_j from the one expansion the coordinate
-columns already share, and ``_site_column`` sums them through C.
+columns already share, and ``_site_df2`` sums them through C.
 
 The oracles are exact, as the root CLAUDE.md asks of a new branch.  ⟨|F|²⟩
 is quadratic in occ_j, so a central difference in occupancy is exact at any
@@ -204,15 +204,15 @@ def test_the_site_scalar_gradients_meet_their_exact_oracles(dispersion):
 
 
 def _claimed(monkeypatch) -> list[int]:
-    """The columns ``_site_column`` builds, in order."""
+    """The columns the site branch claims (``_site_df2``), in order."""
     seen: list[int] = []
-    real = LS._site_column
+    real = LS._site_df2
 
-    def record(model, table, bases, values, c, *a, **k):
+    def record(table, c, *a, **k):
         seen.append(c)
-        return real(model, table, bases, values, c, *a, **k)
+        return real(table, c, *a, **k)
 
-    monkeypatch.setattr(LS, "_site_column", record)
+    monkeypatch.setattr(LS, "_site_df2", record)
     return seen
 
 
