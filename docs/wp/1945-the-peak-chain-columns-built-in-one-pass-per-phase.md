@@ -201,6 +201,14 @@ first.
 
 ### Inherited
 
+- **2026-11-28, from WP-2314 angle 2: most of the cell columns' cost is
+  their structure factor.** On `bigcell-structural` (one cProfile run,
+  darwin arm64, loaded machine, shares only) each cell column's
+  `phase_peaks` rebuilt the whole |F|² at its perturbed d: 589 `_total_f2`
+  calls, about 3 s of a 13 s profiled fit, and nearly nine tenths of every
+  `_orbit_terms` call in it. So this WP's cell task gains most where it
+  shares |F|² across the batch's cell columns. WP-2314's angles 5-7 would
+  make each of those calls cheaper instead, with re-pinned goldens.
 - **2026-11-28, from WP-2314 angle 4: the cell columns are now the largest
   peak-chain cost on a large structural fit.** A coordinate column whose
   reach crosses atoms (a co-sited tie, a named variable, a distortion-mode
