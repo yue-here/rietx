@@ -314,7 +314,7 @@ class PeakEditor:
     def det(self) -> Detection:
         if self._det is None:
             self._det = detect_peaks(self.data, self.instrument,
-                                     two_theta_range=self.two_theta_range,
+                                     two_theta_limits=self.two_theta_range,
                                      shoulders=self.shoulders)
         return self._det
 
@@ -326,7 +326,7 @@ class PeakEditor:
     def pick(self) -> PeakDoc:
         """A fresh list — and a fresh detection, since the fits come from one."""
         peaks, det, fits = pick_peaks_with_state(
-            self.data, self.instrument, two_theta_range=self.two_theta_range,
+            self.data, self.instrument, two_theta_limits=self.two_theta_range,
             shoulders=self.shoulders,
             flag_contamination=self.flag_contamination)
         self._det = det

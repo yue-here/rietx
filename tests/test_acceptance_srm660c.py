@@ -161,9 +161,9 @@ def test_srm660c_lab6_rietveld(srm660c_baseline):
     out.mkdir(exist_ok=True)
     plot_result(result, path=str(out / "srm660c_fit.png"))
     plot_result(result, path=str(out / "srm660c_fit_lowangle.png"),
-                two_theta_range=(20.6, 22.2))
+                two_theta_limits=(20.6, 22.2))
     plot_result(result, path=str(out / "srm660c_fit_highangle.png"),
-                two_theta_range=(147.5, 150.9))
+                two_theta_limits=(147.5, 150.9))
     plot_for_vlm(result, full, path=str(out / "srm660c_vlm.png"))
 
 
@@ -199,7 +199,7 @@ def test_srm660c_zero_apertures_report_names_axial_asymmetry():
     out.mkdir(exist_ok=True)
     plot_result(result, path=str(out / "srm660c_zero_apertures_fit.png"))
     plot_result(result, path=str(out / "srm660c_zero_apertures_lowangle.png"),
-                two_theta_range=(20.6, 22.2))
+                two_theta_limits=(20.6, 22.2))
 
 
 def test_srm660c_extinction_does_no_harm(srm660c_baseline):

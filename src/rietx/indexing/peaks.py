@@ -417,11 +417,11 @@ def _drop_kalpha2_aliases(tt: np.ndarray, idx: np.ndarray, height: np.ndarray,
 
 
 def detect_peaks(data: PatternData, instrument: Instrument, *,
-                 two_theta_range: tuple[float, float] | None = None,
+                 two_theta_limits: tuple[float, float] | None = None,
                  shoulders: bool = True) -> Detection:
     """Detect every candidate line and group them into frozen fit windows.
 
-    ``two_theta_range`` crops on top of ``data.excluded_regions``; the
+    ``two_theta_limits`` crops on top of ``data.excluded_regions``; the
     excluded channels are removed rather than masked, because a window that
     straddles a gap has no meaningful frozen background.
     """
@@ -430,8 +430,8 @@ def detect_peaks(data: PatternData, instrument: Instrument, *,
     require_two_theta(data, "detect_peaks()", instrument=instrument)
     mask = data.in_range_mask()
     tt_all, y_all, sig_all = data.tt(), data.y(), data.sig()
-    if two_theta_range is not None:
-        lo, hi = two_theta_range
+    if two_theta_limits is not None:
+        lo, hi = two_theta_limits
         mask = mask & (tt_all >= lo) & (tt_all <= hi)
     tt, y, sigma = tt_all[mask], y_all[mask], sig_all[mask]
     if len(tt) < 16:
