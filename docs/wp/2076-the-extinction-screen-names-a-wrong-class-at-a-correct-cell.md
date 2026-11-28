@@ -1,6 +1,6 @@
 # WP-2076 — The extinction screen names a wrong class at a correct cell
 
-Milestone: unscheduled · Status: 🔄 2026-11-13 — option (c)'s allowance measured (2·ln N + d). Ruled by Yue 2026-11-13: option (a); the landing task is open (PR #1466)
+Milestone: unscheduled · Status: 🔄 2026-11-24 — the ruled margin, max(10, 2·ln N + d), is landed in `best_or_none` by PR #1738 (open, awaiting merge); WP closes on merge
 Track: What fires, and what stays silent
 Depends on: — (1910 soft: its second screen agrees with the wrong class here; 2062 soft: its decision 2 moves the screen's fits to Pawley)
 Priority: P2 2026-11-07 — a silent wrong answer on a path few fits run: at a prefit cell within 600 ppm the default screen names a class excluding the true group on 318 of 1082 synthetic rows (41 groups), and nothing fires. Yue ruled the repair on 2026-11-07, so it is ready to build
@@ -370,7 +370,7 @@ The question and its measurements are in the handover entry of 2026-11-08 (secon
       *Measured 2026-11-08 (handover entry of that day, second session): the
       allowance is d, the count of tested positions where the two leading classes
       differ. The row is Question 3 below; no margin moved.*
-- [ ] Ruled by Yue 2026-11-13: option (a). Land the margin in
+- [x] Ruled by Yue 2026-11-13: option (a). Land the margin in
       `ExtinctionScreen.best_or_none` with its `_audit` row, flip PbSO₄'s pinned
       row to `None`, and rewrite the acceptance clause to match. The row carries
       `approved="2026-11-13"` and the grounds quoted in the handover entry of 2026-11-13.
@@ -387,9 +387,10 @@ On P 6₃/m m c, P 6/m c c, P n -3 n, P 4/n m m and F m -3 m, with the true
 background declared and the cell within 600 ppm, `best_or_none()` returns a
 class containing the true group or `None` with a finding naming the undecided
 position. It never returns a class that excludes the true group. The certified
-corundum and NAC rows keep their classes, FAP and Si abstain with the undecided
-position named, and PbSO₄ names `P c - a`: the known wrong answer the ruling of
-2026-11-07 accepts at margin 10 (handover log), pinned so a tightening shows.
+corundum and NAC rows keep their classes, and FAP, Si and PbSO₄ abstain with the
+undecided positions named: the leading class's lead over the runner-up must
+strictly exceed max(`DECISIVE_DELTA_BIC`, 2·ln N + d), as ruled 2026-11-13
+(handover log). A lead of exactly 2·ln N + d abstains.
 
 ## References
 
@@ -402,6 +403,42 @@ position named, and PbSO₄ names `P c - a`: the known wrong answer the ruling o
   WP-2062 (Le Bail against Pawley).
 
 ## Handover log
+
+### 2026-11-24 — the ruled margin landed in `best_or_none` (PR #1738)
+
+*Done.* `ExtinctionScreen.best_or_none()` names the leading class only when its lead over the runner-up
+strictly exceeds max(`DECISIVE_DELTA_BIC`, 2·ln N + d), N the screen's `n_points` and d the tested
+positions where the two classes differ (read off `tested_two_theta` rounded to 1e-3°).
+`EXTINCTION_SYMBOL_AMBIGUOUS` applies the same bar and now states N and d. The constant keeps the name
+`SILENT_POSITIONS_UNDECIDED` (settled at landing by Yue on PR #1738). The tier-3 row is in `_audit.py`
+with the ruling's `grounds` and `approved="2026-11-13"`. The prior's "contradicting" test still uses
+`>= DECISIVE_DELTA_BIC`, which the ruling does not address.
+
+The certified rows, `main` against the PR (the class tables are the same; only the verdict moves):
+
+| row | N | runner-up | lead | d | bar | `main` | PR |
+|---|---|---|---|---|---|---|---|
+| SRM 676a corundum | 3501 | R - - - | 45.87 | 6 | 22.32 | R - c - | R - c - |
+| 11-BM NAC | 22003 | (only class) | – | – | – | I - - - | I - - - |
+| FAP | 3751 | P - - - | 8.23 | 1 | 17.46 | None | None |
+| synthetic Si | 11976 | F 41 - - | 9.39 | 1 | 19.78 | None | None |
+| PbSO₄ X-ray | 5800 | P c - n | 17.04 | 2 | 19.33 | **P c - a** | **None** |
+| PbSO₄ X-ray, cell ×0.99 | 5800 | P c - n | 16.57 | 2 | 19.33 | **P c - a** | **None** |
+| synthetic P 2₁/c | 2750 | P 1 c 1 | 21.80 | 3 | 18.84 | P 1 21/c 1 | P 1 21/c 1 |
+
+PbSO₄ is P c - n: `main` named the wrong P c - a at both cells, and the screen now abstains with the right
+class as runner-up. The ×0.99 row was a strict xfail (`test_the_gate_misses_pbso4_at_one_percent_short`);
+a pearl canary caught it passing, so it is now a plain test pinned at `None`. The gate still passes that
+cell and P c - a still leads; only the verdict changed. The synthetic P 2₁/c at ×0.995 stays wrong (three
+silent positions, lead 23.6 over a bar of 18.8): no margin stops it, as the 2026-11-08 entry says.
+
+Review round 2026-11-24 (Yue's comment on PR #1738): this entry and the `Status:` line (item 1); the
+row's evidence restored to name CuCr₂O₄ 289 K and the failing case (item 2); the finding's message and the
+help entry name N (item 3); `DECISIVE_DELTA_BIC`'s comment says it is now a floor, binding only where
+2·ln N + d < 10, about N < 150 points (item 4); the constant's comment says it is a factor on ln N.
+
+*Next.* PR #1738 merges; the WP's acceptance clause is already rewritten to the ruled rule, so the WP then
+closes.
 
 ### 2026-11-08 (second session) — option (c)'s allowance, measured; its row goes to the maintainer (PR #1466)
 

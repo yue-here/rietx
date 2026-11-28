@@ -191,3 +191,80 @@ def test_no_class_fits_better_than_the_lattice_that_contains_it(group, screens):
     below = [(k.symbol, k.chi2, screen.reference_chi2) for k in screen.candidates
              if k.screened and k.chi2 < screen.reference_chi2 * (1.0 - 1e-6)]
     assert not below, below
+
+
+# ----------------------------------------------------------------------
+# the margin as ruled 2026-11-13: max(DECISIVE_DELTA_BIC, 2·ln N + d), strict
+# ----------------------------------------------------------------------
+def _margin_screen(n_points, lead, top_tested, runner_tested=()):
+    """Two unrefuted classes, ``top`` ahead of ``runner`` by ``lead`` in ΔBIC,
+    each with its tested forbidden positions (2θ, hkl)."""
+    from rietx.schemas.indexing import ExtinctionCandidate, ExtinctionScreen
+
+    def cand(symbol, group, delta_bic, tested):
+        return ExtinctionCandidate(
+            symbol=symbol, representative=group, space_groups=[group],
+            n_absent=len(tested), n_testable=len(tested), screened=True,
+            delta_bic=delta_bic, tested_two_theta=[t for t, _ in tested],
+            tested_hkl=[h for _, h in tested])
+
+    top = cand("P - 21 -", "P 1 21 1", -lead, top_tested)
+    runner = cand("P - - -", "P 1 2 1", 0.0, runner_tested)
+    return ExtinctionScreen(candidates=[top, runner], system="monoclinic",
+                            n_points=n_points)
+
+
+SILENT = [(20.123, (0, 1, 0)), (40.456, (0, 3, 0))]
+
+
+def test_a_lead_of_exactly_two_silent_positions_plus_d_abstains():
+    """P 4/m b m's ``P - 21 -`` rows in WP-2076's sweep won by exactly 2·ln N,
+    their two 0k0 intensities on the Pawley bound of zero: the bar is strictly
+    exceeded or the screen abstains.  Positive arm: the same screen a hair
+    above the bar names the class."""
+    import math
+
+    from rietx.indexing.diagnostics import extinction_diagnostics
+
+    n = 3501
+    need = 2 * math.log(n) + 2                     # d = 2: the top's two positions
+    at_bar = _margin_screen(n, need, SILENT)
+    assert at_bar.best_or_none() is None
+    ambiguous = next(d for d in extinction_diagnostics(at_bar)
+                     if d.code == "EXTINCTION_SYMBOL_AMBIGUOUS")
+    assert (f"decisive is {need:.1f}, 2·ln N + d with N = {n} points and d = 2"
+            in ambiguous.message), ambiguous.message
+    assert "(0, 1, 0) at 20.123°" in ambiguous.message, ambiguous.message
+
+    above = _margin_screen(n, need * (1 + 1e-9), SILENT)
+    assert above.best_or_none() is above.candidates[0]
+    assert not [d for d in extinction_diagnostics(above)
+                if d.code == "EXTINCTION_SYMBOL_AMBIGUOUS"]
+
+
+def test_the_margin_scales_with_n_where_a_fixed_bar_would_slip():
+    """At N = 40 001 two silent positions buy 21.2, so a lead of 19.7 on three
+    differing positions (11-BM Si 640c's in WP-2076's table) abstains where the
+    margin of 10 named it; at a small N the floor is DECISIVE_DELTA_BIC, also
+    strictly exceeded."""
+    from rietx.indexing.extinction import DECISIVE_DELTA_BIC
+
+    three = SILENT + [(60.789, (0, 5, 0))]
+    assert _margin_screen(40_001, 19.7, three).best_or_none() is None
+    assert _margin_screen(40_001, 24.3, three).best_or_none() is not None
+    assert _margin_screen(50, DECISIVE_DELTA_BIC, []).best_or_none() is None
+    assert _margin_screen(50, DECISIVE_DELTA_BIC + 1e-9, []).best_or_none() is not None
+
+
+def test_d_counts_positions_at_a_thousandth_of_a_degree_on_both_sides():
+    """d is read off ``tested_two_theta`` at 1e-3°, because two classes can
+    name different hkl at one position; a position both test is no part of
+    it, and one only the runner-up tests is."""
+    from rietx.indexing.extinction import _decisive_margin, _differing_positions
+
+    screen = _margin_screen(3501, 0.0, SILENT + [(70.0001, (1, 0, 0))],
+                            [(70.0003, (0, 0, 1)), (75.5, (0, 0, 3))])
+    top, runner = screen.candidates
+    assert _differing_positions(top, runner) == [
+        (20.123, (0, 1, 0)), (40.456, (0, 3, 0)), (75.5, (0, 0, 3))]
+    assert _decisive_margin(3501, top, runner)[1] == 3

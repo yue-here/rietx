@@ -1108,7 +1108,7 @@ def extinction_diagnostics(screen, fit_errors=None) -> list[Diagnostic]:
     these data.
     """
     from ..schemas.indexing import ExtinctionScreen  # noqa: F401  (documented)
-    from .extinction import DECISIVE_DELTA_BIC
+    from .extinction import DECISIVE_DELTA_BIC, _decisive_margin
 
     out: list[Diagnostic] = []
     if screen.status == "unreliable":
@@ -1212,11 +1212,16 @@ def extinction_diagnostics(screen, fit_errors=None) -> list[Diagnostic]:
     rivals = admissible if admissible else alive
     contradicting = [c for c in alive if not c.space_groups
                      and top.delta_bic - c.delta_bic >= DECISIVE_DELTA_BIC]
-    if len(rivals) > 1 and rivals[1].delta_bic - top.delta_bic < DECISIVE_DELTA_BIC:
+    need, d = (_decisive_margin(screen.n_points, top, rivals[1])
+               if len(rivals) > 1 else (DECISIVE_DELTA_BIC, 0))
+    if len(rivals) > 1 and not rivals[1].delta_bic - top.delta_bic > need:
         undecided = _undecided_positions(top, rivals[1])
+        bar = (f"decisive is {need:.1f}, 2·ln N + d with "
+               f"N = {screen.n_points} points and d = {d}"
+               if need > DECISIVE_DELTA_BIC else f"decisive is {need:g}")
         reasons.append(f"{rivals[1].symbol} is within ΔBIC "
                        f"{rivals[1].delta_bic - top.delta_bic:.1f} of it "
-                       f"(decisive is {DECISIVE_DELTA_BIC:g})"
+                       f"({bar})"
                        + (f", and the two differ at the tested position(s) "
                           f"{undecided}" if undecided else ""))
     if contradicting:
@@ -1269,13 +1274,12 @@ def _undecided_positions(a, b, limit: int = 4) -> str:
     """The tested forbidden positions one of two classes has and the other lacks.
 
     These are the positions the margin between them rests on (WP-2076), so
-    they are where counting longer would separate the two.
+    they are where counting longer would separate the two, and their count is
+    the margin's d (:func:`~rietx.indexing.extinction._differing_positions`).
     """
-    seen_a = set(a.tested_two_theta)
-    seen_b = set(b.tested_two_theta)
-    pairs = sorted({(t, tuple(h)) for c, other in ((a, seen_b), (b, seen_a))
-                    for h, t in zip(c.tested_hkl, c.tested_two_theta)
-                    if t not in other})
+    from .extinction import _differing_positions
+
+    pairs = _differing_positions(a, b)
     text = ", ".join(f"{h} at {t:.3f}°" for t, h in pairs[:limit])
     return text + (f" and {len(pairs) - limit} more" if len(pairs) > limit else "")
 

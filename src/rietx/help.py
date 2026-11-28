@@ -2403,7 +2403,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         title="The extinction symbol is not settled",
         description=(
             "The data do not pick one extinction symbol. A second class may score within "
-            "the decisive margin, the leading class may have no absence that is testable "
+            "the decisive margin, max(10, 2·ln N + d) with N the points fitted and d the "
+            "tested positions where the two differ, the leading class may have no absence that is testable "
             "in this range, some classes may never have been fitted, or no class could "
             "be screened at all. Counting longer at the positions where the leading "
             "classes disagree, or widening the range, helps with the first two. Rwp is "

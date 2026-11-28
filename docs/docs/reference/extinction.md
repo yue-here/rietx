@@ -175,10 +175,11 @@ The screen's diagnostics say what the answer is and why it may not be one.
 - no class that is not refuted was left without a score, since a `max_classes` cap, a cancelled run or a class fit that raised leaves a question unasked, which must not read as a clean answer;
 - the class was fitted and is not refuted;
 - it rests on at least one absence the data could test, or is the absence-free class itself, whose claim is that there is nothing to see;
-- it leads the next surviving class by at least the decisive ΔBIC margin, 10 (`rietx.indexing.extinction.DECISIVE_DELTA_BIC`).
+- its lead over the next surviving class strictly exceeds max(10, 2·ln N + d) in ΔBIC, with N the fitted points and d the tested positions where the two classes differ (`rietx.indexing.extinction.DECISIVE_DELTA_BIC` and `rietx.indexing.extinction.SILENT_POSITIONS_UNDECIDED`).
 
-Removing one testable line can buy a class ΔBIC ln N at most, about 8 at a few thousand channels, so a class resting on a single testable position never clears the margin.
-When the runner-up is inside it, `EXTINCTION_SYMBOL_AMBIGUOUS` names the tested positions the two classes differ at, which is where counting longer would separate them.
+Removing one testable line can buy a class ΔBIC ln N at most, about 8 at a few thousand channels, so a position that shows nothing is worth ln N and no more.
+Two such positions never decide, and the d positions where the classes differ carry about d of χ² by chance, so the bar is 2·ln N + d, which grows with N where a fixed margin would not.
+When the runner-up is inside it, `EXTINCTION_SYMBOL_AMBIGUOUS` gives the bar and names the tested positions the two classes differ at, which is where counting longer would separate them.
 
 Otherwise it returns `None`, with the reason in `ExtinctionScreen.diagnostics`.
 With a declared prior, only classes it leaves a member in can be returned and the margin is taken to the next such class; a class the prior emptied that the data prefer by the decisive margin makes it abstain.
@@ -315,7 +316,7 @@ A screen that never computed a Z (cancelled, failed) does not say the density co
 On the GSAS-II fluorapatite tutorial pattern over 15–90°, the screen enumerates seven classes and fits all seven in about three seconds.
 It ranks `P 63 - -` first, whose members are `P 63`, `P 63/m` and `P 63 2 2`, with one condition, `00l: l = 2n`; every other class but `P - - -` is refuted by named reflections.
 `best_or_none` returns `None`.
-The class rests on one testable absence, (0 0 5) at 68.0°, since (0 0 3) sits in a stronger neighbour's tail, and one line can move ΔBIC by ln N = 8.2 at most, under the margin of 10.
+The class rests on one testable absence, (0 0 5) at 68.0°, since (0 0 3) sits in a stronger neighbour's tail, and one line can move ΔBIC by ln N = 8.2 at most, under the bar of 2·ln N + 1 = 17.5.
 `EXTINCTION_SYMBOL_AMBIGUOUS` names that position, where counting longer would decide.
 The mirror and the twofold axes that separate the three members produce no absences, so no counting time distinguishes them, and both `EXTINCTION_GROUPS_NOT_SEPARABLE` and `LAUE_CLASS_NOT_SEPARABLE` say so, the last because `P 63 2 2` sits in a different Laue class from the other two.
 Declared enantiopure, the same screen ranks `P 63 - -` first holding `P 63` and `P 63 2 2`.

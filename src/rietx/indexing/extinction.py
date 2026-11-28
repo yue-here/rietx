@@ -120,6 +120,7 @@ is the v1.0 form of the same logic; the posterior is a v2 fence.
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass, field, replace
 
@@ -146,11 +147,28 @@ from .workflow import (
     structure_from_candidate,
 )
 
-#: ΔBIC below which two classes are **not** separated.  Kass & Raftery (1995),
-#: *J. Am. Stat. Assoc.* **90**, 773, call a difference above 10 "very strong"
-#: evidence; anything less is reported as an ambiguity rather than resolved,
-#: which is the same posture ``ShiftScreen.separable`` takes one module over.
+#: The floor of the ΔBIC lead two classes need to be separated.  Kass & Raftery
+#: (1995), *J. Am. Stat. Assoc.* **90**, 773, call a difference above 10 "very
+#: strong" evidence; anything less is reported as an ambiguity rather than
+#: resolved, which is the same posture ``ShiftScreen.separable`` takes one module
+#: over.  Since WP-2076 the bar is max(this, :data:`SILENT_POSITIONS_UNDECIDED`·ln N
+#: + d) (:func:`_decisive_margin`), so this floor binds only where 2·ln N + d < 10,
+#: about N < 150 points.
 DECISIVE_DELTA_BIC = 10.0
+
+#: The number of silent positions' worth of ln N that never decides between two
+#: extinction classes (the factor on ln N, not a count of positions; WP-2076,
+#: ruled 2026-11-13).  Under the nested scoring a tested
+#: forbidden position moves its class's ΔBIC by z² − ln N (Schwarz 1978), so a
+#: position that shows nothing buys ln N and nothing else, and the d positions
+#: where two classes differ carry χ²_d by chance, whose mean is d.
+#: :meth:`~rietx.schemas.indexing.ExtinctionScreen.best_or_none` therefore
+#: names the leading class only when its lead over the runner-up strictly
+#: exceeds max(:data:`DECISIVE_DELTA_BIC`, value·ln N + d)
+#: (:func:`_decisive_margin`).  The value 2 is ours, measured on one synthetic
+#: family (rietx's forward model, Cu Bragg-Brentano, Ca/Si/O) and thirteen
+#: real patterns, untested beyond.
+SILENT_POSITIONS_UNDECIDED = 2
 
 #: Background-subtracted Rwp of the **reference** fit (the absence-free class
 #: under the frozen shared profile) above which the screen abstains, reported
@@ -1578,6 +1596,41 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
                                 e.n_absent))
     screen.diagnostics = extinction_diagnostics(screen, fit_errors) + prefit_capped
     return screen
+
+
+def _differing_positions(a: ExtinctionCandidate, b: ExtinctionCandidate
+                         ) -> list[tuple[float, tuple[int, int, int]]]:
+    """The tested forbidden positions one of two classes has and the other lacks.
+
+    Read off :attr:`~rietx.schemas.indexing.ExtinctionCandidate.tested_two_theta`
+    at 1e-3° (WP-2076), because two classes can name different hkl at one
+    position.  Sorted by 2θ, one reflection each.  These are the positions the
+    margin between the two rests on, so they are where counting longer would
+    separate them, and their count is the d of :func:`_decisive_margin`.
+    """
+    seen = {}
+    keys = []
+    for c in (a, b):
+        k = {round(float(t), 3) for t in c.tested_two_theta}
+        keys.append(k)
+        for h, t in zip(c.tested_hkl, c.tested_two_theta):
+            seen.setdefault(round(float(t), 3), tuple(h))
+    return sorted((t, seen[t]) for t in keys[0] ^ keys[1])
+
+
+def _decisive_margin(n_points: int, a: ExtinctionCandidate,
+                     b: ExtinctionCandidate) -> tuple[float, int]:
+    """The lead over ``b`` that ``a`` must strictly exceed to be named, and d.
+
+    max(:data:`DECISIVE_DELTA_BIC`, :data:`SILENT_POSITIONS_UNDECIDED`·ln N + d),
+    N the points both ΔBIC were taken at and d the tested positions where the
+    two classes differ (:func:`_differing_positions`).  Ruled by Yue
+    2026-11-13 (WP-2076).  ln N is guarded at N ≥ 2, as
+    :func:`~rietx.report.layer2.delta_bic` guards it.
+    """
+    d = len(_differing_positions(a, b))
+    silent = SILENT_POSITIONS_UNDECIDED * math.log(max(float(n_points), 2.0)) + d
+    return max(DECISIVE_DELTA_BIC, silent), d
 
 
 def _content_notes(entry: ExtinctionCandidate, z: int,
