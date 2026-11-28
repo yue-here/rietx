@@ -9,6 +9,7 @@ The real-data movement measurements are ``tests/test_window_domain.py``'s.
 from __future__ import annotations
 
 import importlib
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -24,6 +25,16 @@ refine_mod = importlib.import_module("rietx.refine")
 @pytest.fixture(scope="module")
 def pattern():
     return synthesize()
+
+
+def _plot(result, name):
+    """obs/calc/diff to ``tests/output/`` (``tests/CLAUDE.md``)."""
+    from rietx.viz.plots import plot_result
+    out = Path(__file__).parent / "output"
+    out.mkdir(exist_ok=True)
+    plot_result(result, path=str(out / name))
+    import matplotlib.pyplot as plt
+    plt.close("all")
 
 
 def _halves(model):
@@ -145,6 +156,7 @@ def test_a_stage_past_its_window_tolerance_refits_once(pattern, monkeypatch):
     res = ref.fit(pattern, plan=rx.RefinementPlan(stages=[
         rx.Stage("cell", ["phases.*.scale", "phases.*.cell.*"], max_iter=40)]),
         events=lambda e: ends.append(e["data"]) if e["kind"] == "stage_end" else None)
+    _plot(res, "window_slack_refit_once.png")
     (stage,) = res.stages
     assert stage.window_refit_loss == 0.5
     assert stage.window_loss is not None and stage.window_loss < 0.5
@@ -160,6 +172,7 @@ def test_a_declared_slack_is_never_refitted(pattern, monkeypatch):
     res = ref.fit(pattern, plan=rx.RefinementPlan(stages=[
         rx.Stage("cell", ["phases.*.scale", "phases.*.cell.*"], max_iter=40,
                  window_slack_deg=0.3)]))
+    _plot(res, "window_slack_declared.png")
     assert res.stages[0].window_refit_loss is None
 
 
@@ -178,9 +191,10 @@ def test_only_a_stage_a_later_one_refits_sizes_its_slack(pattern, monkeypatch):
     monkeypatch.setattr(refine_mod, "compile_model", recording)
     structure, ins = perturbed_models()
     ref = rx.Refinement(structure, ins, history=False)
-    ref.fit(pattern, plan=rx.RefinementPlan(stages=[
+    res = ref.fit(pattern, plan=rx.RefinementPlan(stages=[
         rx.Stage("scale", ["phases.*.scale"], max_iter=20),
         rx.Stage("cell", ["phases.*.scale", "phases.*.cell.*"], max_iter=40)]))
+    _plot(res, "window_slack_two_stages.png")
     stage_compiles = [x for x in asked if x is not None]
     assert stage_compiles[0] is True and stage_compiles[-1] is False
     assert stage_compiles.count(False) == 1

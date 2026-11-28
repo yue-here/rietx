@@ -5233,8 +5233,16 @@ class Refinement:
                 refined_before=frozenset(refined_before | set(table.free_paths)),
                 **kw)
 
-            def joined(a, b):
-                return list(a) + [x for x in b if x not in a]
+            # A path the second solve can move again is a measurement of this
+            # answer, as a later stage's is (``_build_result``'s CELL_RUNAWAY
+            # rule): the first solve's reset or collapse of it leaves the
+            # record, which keeps ``cell_reset`` and ``collapsed`` disjoint
+            # from ``freed`` and keeps CELL_RUNAWAY from withholding its esd
+            moving_now = set(table.moving_paths)
+
+            def joined(a, b, key=lambda x: x):
+                kept = [x for x in a if key(x) not in moving_now]
+                return kept + [x for x in b if x not in kept]
 
             outcome = dataclasses.replace(
                 outcome, cost_initial=first.cost_initial,
@@ -5254,11 +5262,16 @@ class Refinement:
                 # what the stage did before the refit stays on its record:
                 # its seeds, what it put back, the Le Bail cycles it ran
                 seeded=first_hold.seeded,
-                cell_runaway=joined(first_hold.cell_runaway, hold.cell_runaway),
+                # the second solve's own fix finds these already fixed, so
+                # it names none of them (``fixed`` counts what left the free set)
+                fixed=list(dict.fromkeys([*first_hold.fixed, *hold.fixed])),
+                cell_runaway=joined(first_hold.cell_runaway, hold.cell_runaway,
+                                    key=lambda c: c[0]),
                 cell_reset=joined(first_hold.cell_reset, hold.cell_reset),
                 collapsed=joined(first_hold.collapsed, hold.collapsed),
                 cell_runaway_unresolved=_merge_unresolved(
-                    first_hold.cell_runaway_unresolved,
+                    [(d, e) for d, e in first_hold.cell_runaway_unresolved
+                     if d not in moving_now],
                     hold.cell_runaway_unresolved),
                 lebail_run=first_hold.lebail_run + hold.lebail_run,
                 lebail_settled=all(settled) if settled else None)
@@ -5792,7 +5805,8 @@ class Refinement:
             # solve starts from, and frozen for it (WP-1912)
             model.origin = compile_origin(model, table)
             # Once — never a third solve, whichever way the measurement moved,
-            # so the cost of a wrong hold is bounded at one stage's budget.
+            # so the cost of a wrong hold is bounded at one solve's budget
+            # (``_run_stage``'s window re-solve can pay it once more).
             second = run_least_squares(
                 model, table, max_iter=stage.max_iter, events=events,
                 stage=stage.name, backend=self._backend,

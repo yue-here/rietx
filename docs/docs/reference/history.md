@@ -132,11 +132,11 @@ A stage node also records the two plan settings its stage ran under, so a cherry
 | `NodeAction.window_area_tol` | `None` | the fraction of each peak's area the stage's windows dropped; a plan's closing stage records `closing_window_tol`, a stage run by hand the fraction it ran at, and `None` a declared stage's 2 % |
 
 A node written before 1.10 has neither field and reads as the defaults, which are what it ran at unless its plan set them.
+`api_call()` adds either setting to the stage's line only where it differs from the default.
 
 `NodeAction.movement_slack` (default `False`) records whether the stage's windows had their movement slack sized from what the stage freed.
 A plan gives that slack to every stage a later stage refits, and `replay` compiles the node's model with the same windows.
 `False` is the uniform slack, which every node written before the field also ran with.
-`api_call()` adds either setting to the stage's line only where it differs from the default.
 
 ## Actions as calls
 
