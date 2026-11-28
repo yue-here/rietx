@@ -32,14 +32,14 @@ print(peaks)
 |---|---|---|
 | `data` | | the pattern; its excluded regions are removed from detection, not masked |
 | `instrument` | | read, never refined (below) |
-| `two_theta_range` | `None` | crops detection and fitting to a (low, high) range in degrees, on top of the excluded regions |
+| `two_theta_limits` | `None` | crops detection and fitting to a (low, high) range in degrees, on top of the excluded regions |
 | `shoulders` | `True` | also proposes shoulder seeds from the curvature, not only maxima |
 | `flag_contamination` | `True` | flags Kβ and tungsten Lα lines; they stay in the list and leave the usable set, and nothing is subtracted |
 
 The instrument is read for four things: the primary wavelength and the emission lines (the positions and the doublet constraint), the U, V, W, X, Y width law (the separation floor and the width seeds), `ProfileTCHZ.shape` (so the list and the refinement after it share one peak shape), and the axial apertures, applied and held.
 Its declared beam also decides the contamination search: a neutron source, or an X-ray source with `kbeta="monochromator"`, skips both ghost searches, because neither line reaches the detector.
 
-`pick_peaks` raises `ValueError` for a time-of-flight pattern or a time-of-flight source, and when fewer than 16 points survive the excluded regions and `two_theta_range`.
+`pick_peaks` raises `ValueError` for a time-of-flight pattern or a time-of-flight source, and when fewer than 16 points survive the excluded regions and `two_theta_limits`.
 A list that is too short to index is not an error.
 It comes back carrying [`PEAK_LIST_TOO_SHORT`](diagnostics-indexing.md#peak_list_too_short), a warning that fires under 20 usable lines.
 `PeakList.diagnostics` holds that and the other picker codes; [Diagnostics: peaks and indexing](diagnostics-indexing.md) explains each one.
@@ -212,7 +212,7 @@ for p in peaks.peaks[:3]:
  39.985 ± 0.0007°   d = 2.2529 Å   FWHM = 0.0707°   manual
 ```
 
-It takes `data`, `instrument`, `positions` (a list or an array of 2θ in degrees) and `two_theta_range`, and returns a `PeakList` read the same way as a picked one ([What a list holds](#peak-list-fields)).
+It takes `data`, `instrument`, `positions` (a list or an array of 2θ in degrees) and `two_theta_limits`, and returns a `PeakList` read the same way as a picked one ([What a list holds](#peak-list-fields)).
 
 | | `pick_peaks` | `fit_peaks` |
 |---|---|---|

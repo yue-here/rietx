@@ -30,6 +30,8 @@ docstring holds the rules.
 | `cod_1550439.cif` | Perhydropyrene, C₁₆H₂₆, at **350 K**: van de Streek, Alig, Parsons & Vella-Zarb (2019) *IUCrJ* 6, 136–144, doi:10.1107/S205225251801686X, space group P 1 2₁/n 1, a = 14.3334, b = 5.56223, c = 8.53021 Å, β = 92.0219°, Z = 2, so the 21 listed atoms are half a molecule about the 2a inversion centre. Vendored untrimmed; sha256 `df0769b7b33116d62048739a4206cc3394072e3e06775fd0422ad11d5d5f639e`. WP-1807's monoclinic case, a body on −1 (`test_rigid_body_special.py`) | Crystallography Open Database entry 1550439 (CC0 public-domain dedication) | COD (public domain dedication); the paper is CC BY 2.0 UK |
 | `cod_1567181.cif` | Glutaric acid–isonicotinamide cocrystal, form II, C₅H₈O₄·C₆H₆N₂O, at 298 K: Linberg, Röder, Al-Sabbagh, Emmerling & Michalchuk (2023) *Faraday Discuss.* 241, 178–193, doi:10.1039/d2fd00115b, space group P 1 2₁/a 1, a = 26.371, b = 5.2029, c = 8.904 Å, β = 99.325°, refined in TOPAS-6 from laboratory Cu Kα₁ powder data. Carries the authors' `_geom_torsion` loop, 18 torsions to 0.01° written by TOPAS's CIF macro, among them a gauche C2–C3–C4–C5 of 64.66° and the amide's −13.40°. Vendored untrimmed, byte-identical to the COD's copy on 2026-10-31; sha256 `8956c5574e00fc43852ab76f4dd8d6bf047ebb87b0b2e99f4d9b4a795ab2fa1c`. WP-1815's published reference for torsion values, their Klyne–Prelog sign and the table's completeness (`test_geometry_torsions.py`) | Crystallography Open Database entry 1567181 (CC0 public-domain dedication) | COD (public domain dedication) |
 | `cod_7252065.cif` | Benzoic acid, C₇H₆O₂, single-crystal structure: Rajput & Dalvi (2026) *CrystEngComm* 28, 3874–3883, doi:10.1039/d6ce00164e, space group P 1 2₁/n 1, a = 5.507, b = 5.1404, c = 21.964 Å, β = 97.038°, refined in SHELXL-2019/2. Carries the authors' `_geom_torsion` loop, 12 torsions to 0.1° with esds, written by SHELXL, every one within 1.5° of 0° or 180°. Vendored untrimmed, byte-identical to the COD's copy on 2026-10-31; sha256 `e2231fee9620e8fa32b4e94eb11260efd73bae987edb60afe97427040ea4d296`. WP-1815's second program for the torsion sign, where the angles sit next to the ±180° cut (`test_geometry_torsions.py`) | Crystallography Open Database entry 7252065 (CC0 public-domain dedication) | COD (public domain dedication) |
+| `cod_2107344.cif` | Nb₁₈W₁₆O₉₃, a tetragonal-tungsten-bronze superstructure: Stephenson (1968) *Acta Cryst.* B 24, 637–653, "A structural investigation of some stable phases in the region Nb₂O₅·WO₃–WO₃", space group P b a m, a = 12.195, b = 36.740, c = 3.951 Å, V = 1 770.2 Å³, Z = 1, 43 sites. Eight sites are Nb 0.6 / W 0.4 pairs at one position, and two pentagonal-channel W sites (occupancy 0.5) each have an O site (occupancy 0.375) half a cell along c. Every Uiso is 0.0 in the file, so its users declare Biso. Checked on the vendored file (`test_large_cell_refinement.py` and a one-off script): the cell content is Nb₁₈W₁₆O₉₃, each metal's six nearest O lie 1.64–2.39 Å away, and no two images are under 1.6 Å apart except a mixed pair. Vendored untrimmed, as fetched on 2026-11-27; sha256 `014fbb4feb17456bdbb7ed66b1908a9b0b778764e8a16c718129da0c6db94958`. The real large cell closest to the 12 × 36 × 4 Å cell a user reported: the bench's `bigcell-*` cases (WP-2317) and the orthorhombic rows of `test_large_cell_refinement.py` simulate their patterns from it | COD entry 2107344 (from IUCr Journals) | COD (public domain dedication); the file asks for attribution to the journal article, given here |
+| `cod_2107337.cif` | H-Nb₂O₅, Kato (1976) *Acta Cryst.* B 32, 764–767, "Structure refinement of H-Nb₂O₅", space group P 1 2/m 1, a = 21.153, b = 3.8233, c = 19.356 Å, β = 119.8°, V = 1 358.4 Å³, Z = 14, 51 sites, every one Nb or O. Nb1 is the split tetrahedral site, two half-occupied images 1.75 Å apart across the mirror. Every Uiso is 0.0 in the file, so its users declare Biso. Checked on the vendored file as for `cod_2107344.cif`: the cell content is Nb₂₈O₇₀, the shortest Nb–O is 1.75 Å, and each octahedral Nb's sixth O lies within 2.48 Å. Vendored untrimmed, as fetched on 2026-11-27; sha256 `41dd49ca018beda3a5adf53c2b513c2f64e2a3ab71fc55b17ce9ce0ea801806e`. The monoclinic large cell of `test_large_cell_refinement.py` (WP-2317) | COD entry 2107337 (from IUCr Journals) | COD (public domain dedication); the file asks for attribution to the journal article, given here |
 | `polyhedra_phases.json` | WP-1466's measured phase set for the structure viewer's coordination polyhedra: 21 phases, one per line, each as cell, space group and sites, with the shells a chemist draws first written beside it before the run. Written by `docs/wp/1466-measure/measure.py --fixture`; `test_structure3d.py` holds the default picture to it | 17 Crystallography Open Database entries, named in each row's `source`; the two COD files above and `fluorapatite.cif`; and an olivine built from COD 9007377 by putting Fe at 0.1 beside Mg on both M sites | COD (public domain dedication) |
 | `nist_srm660c_100a.cif` | NIST SRM 660c LaB6 certification dataset incl. measured profile (5332 pts in 24 stitched scan regions, Cu Kα + graphite post-monochromator, NIST DBD, R = 217.5 mm) — v0.2 lab-instrument acceptance (`test_acceptance_srm660c.py`) | NIST Public Data Repository mds2-2315 (data.nist.gov) | NIST open data license (U.S. Government work) |
 | `FAP.XRA` | Fluorapatite Ca₅(PO₄)₃F powder pattern, conventional lab Bragg-Brentano, Cu Kα doublet, 15-130.04° 2θ, 5753 pts, GSAS STD (counts-only) format — v0.2 cross-code acceptance (`test_acceptance_fap.py`) | GSAS-II tutorials repo, `LabData/data/` (github.com/AdvancedPhotonSource/GSAS-II-tutorials) | Argonne/APS tutorial data (U.S. Government work; publicly distributed) |
@@ -614,6 +616,47 @@ the function's own rounding: about 1e-6 for scipy's `i0e`, against 8e-8 for the
 old polynomial. At x ≥ 1e-3 the two slopes agree to the last digit. The other
 nine states reproduced bit-for-bit and were not re-captured. Both recaptured
 states pass twice over.
+
+**WP-1955 re-baseline (2026-11-02)**: `srm660c` and `toy_rich` again, the two
+states that free the axial apertures, on macOS 26.7.2 arm64 (Python 3.12.10,
+numpy 2.5.4, scipy 1.18.1). The FCJ node derivatives became a second-order
+forward difference at 3e-6 in place of a first-order one at 1e-7. Only the two
+aperture columns of `jacobian` moved: by 1.1e-5 of their norm in `srm660c`,
+and by 6.7e-6 (S/L) and 3.0e-6 (H/L) in `toy_rich`. Every other key is
+bit-identical. The other eight states reproduced bit-for-bit and were not
+re-captured.
+
+**WP-2315 re-baseline (2026-11-27)**: `toy_pawley` only, on macOS 26.7.2 arm64
+(Python 3.12.10, numpy 2.5.5). The Pawley overlap restraint's target became
+equal F², a share of m_k/Σm per member, in place of an equal 1/n share of the
+group's intensity. Only the restraint rows moved: 12 of the 18 rows of
+`residual` (rows 3250 onward), and 24 entries of `jacobian` in those rows. These
+are the overlap groups whose members have unequal multiplicities. A group with
+equal multiplicities gives the old rows bit for bit. `pawley_x0`, `theta` and
+`y_calc` are bit-identical. The toy has no lattice-forced coincidence, so it
+merges no column. The other ten states reproduced bit-for-bit and were not
+re-captured.
+
+**WP-2315 re-baseline, second event (2026-11-27)**: `srm660c` and `nac`, on the
+same machine. `generate_reflections` now keeps reflections of equal d (within
+1e-12 relative) in the order their orbits are first met, where numpy's
+unstable argsort had left that order to the platform: Linux CI swapped LaB6's
+(2 2 1) and (3 0 0) between two fits that macOS kept in place. Only the order
+in which tied reflections are summed moved. `theta` is bit-identical, and the
+largest change in `y_calc`, `residual` and `jacobian` is 1.6e-16 of the key's
+largest value. The other nine states reproduced bit-for-bit.
+
+**WP-2314 re-baseline (2026-11-28)**: `toy_roughness`, `toy_restraints`,
+`toy_anomalous`, `nac` and `srm660c`, the five states that free a Biso or an
+occupancy, on macOS 26.7.2 arm64 (Python 3.12.10, numpy 2.5.5). Those columns are
+now analytic, from the structure-factor expansion the coordinate columns share,
+where the peak chain finite-differenced them. Only the `jacobian` key moved,
+and inside it only those columns: one Biso or occupancy column per toy state,
+two Biso columns in `nac` and in `srm660c`. Each moved by 0.9e-7 to 4.0e-7 of
+its norm. Against a Richardson-extrapolated central difference of the residual
+the old columns were off by exactly that, and the new ones by 5e-13 to 8e-10,
+the oracle's own precision. The other five states reproduced bit-for-bit and
+were not re-captured.
 
 These are *environment-pinned* bit patterns, not physical reference values: a
 different BLAS/numpy build may legitimately differ in final bits.  **WP-1002

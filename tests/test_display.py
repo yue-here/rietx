@@ -536,7 +536,7 @@ def test_pre_fit_ticks_are_where_the_fit_puts_its_own(fap):
 def test_pre_fit_ticks_draw_one_row_per_phase_and_need_a_linear_axis(fap):
     pytest.importorskip("matplotlib")
     ref = rx.Refinement(fap["structure"], fap["instrument"])
-    fig = fap["data"].plot(model=ref, two_theta_range=(25, 40), dpi=72)
+    fig = fap["data"].plot(model=ref, two_theta_limits=(25, 40), dpi=72)
     texts = [t.get_text() for t in fig.axes[0].texts]
     assert texts == ["observed", "fluorapatite"]
     with pytest.raises(ValueError, match="linear intensity axis"):

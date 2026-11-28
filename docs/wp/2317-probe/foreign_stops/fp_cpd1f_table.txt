@@ -1,0 +1,8 @@
+r6_carry default  cyc= 11 conv=True  chi2=14383.53 (ref 14406.23) chi2red_fp=1.924 cell=0.21 zero/disp=0.24 profile=37 Biso=0.24 scale=0.28 bkg=0.062  worst=SL_asym_ph1_pat1 36.6
+r6_carry eps0.1   cyc= 65 conv=True  chi2=14395.59 (ref 14406.23) chi2red_fp=1.926 cell=0.1 zero/disp=0.11 profile=18 Biso=0.23 scale=0.2 bkg=0.043  worst=SL_asym_ph1_pat1 18.3
+r6_carry ncy15    cyc= 11 conv=True  chi2=14383.53 (ref 14406.23) chi2red_fp=1.924 cell=0.21 zero/disp=0.24 profile=37 Biso=0.24 scale=0.28 bkg=0.062  worst=SL_asym_ph1_pat1 36.6
+r6_carry tight    cyc=600 conv=False chi2=14406.23 (ref 14406.23) chi2red_fp=1.928 cell=0 zero/disp=0 profile=0 Biso=0 scale=0 bkg=0  worst= 0
+r6_carry default  cyc= 12 conv=True  chi2=14382.44 (ref 14381.48) chi2red_fp=1.923 cell=0.079 zero/disp=0.014 profile=0.069 Biso=0.013 scale=0.028 bkg=0.0078  worst=Cell_C_ph2_pat1 0.0791
+r6_carry eps0.1   cyc= 13 conv=True  chi2=14381.91 (ref 14381.48) chi2red_fp=1.923 cell=0.046 zero/disp=0.0056 profile=0.025 Biso=0.0032 scale=0.014 bkg=0.0029  worst=Cell_C_ph2_pat1 0.0458
+r6_carry ncy15    cyc= 12 conv=True  chi2=14382.44 (ref 14381.48) chi2red_fp=1.923 cell=0.079 zero/disp=0.014 profile=0.069 Biso=0.013 scale=0.028 bkg=0.0078  worst=Cell_C_ph2_pat1 0.0791
+r6_carry tight    cyc= 26 conv=True  chi2=14381.48 (ref 14381.48) chi2red_fp=1.923 cell=0 zero/disp=0 profile=0 Biso=0 scale=0 bkg=0  worst= 0

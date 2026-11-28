@@ -187,7 +187,8 @@ rebuild piece that touches it, or a WP of its own.
   WP-2121 made the refusal name a user tie's own verbs, `ref.untie()` and `ref.tie()`. The
   block for user variables is still owed.
 - The Le Bail check's absent lines arrive in its own refined frame, about 0.011° from the
-  candidate's ticks on fluorapatite; they should be served as tick indices.
+  candidate's ticks on fluorapatite; they should be served as tick indices. The Judge step's
+  red marks for the peaks no line explains wait on them too (the prototype's round 11d).
 - `supercell_checks` names a relation for 8 of fluorapatite's 12 candidates (measured by WP-2124
   on 63d7c120a; naming the other four is WP-2124's follow-up); lattice relations between
   candidates ("c doubled", "a × √3", "same cell") belong in rietx.
@@ -195,6 +196,14 @@ rebuild piece that touches it, or a WP of its own.
   (WP-2202) serves them as `lines` on each group, and R6 takes that half. R6 served them in
   PR #1788 (WP-2240).
 - `set_flags(..., use_for_indexing=True)` forgets which flags a person overruled.
+- The indexing result is lost when the GUI restarts. Keeping it is a stored-format change.
+- Search these, under the Index step's coverage line, waits on a route that searches named
+  crystal systems with the rest of the form unchanged (WP-2240 § Non-goals).
+- The Judge step prints a grade's caveats and the engine names as code words with the
+  underscores replaced (`next/Candidates.svelte`). The prototype's words ("figures of merit
+  disagree", "trial and error") need a `rietx.help` arm, since names are described there.
+  These three, and the red marks above, come from WP-2202's § Follow-ups, a file that exists
+  only on PR #1526's branch (folded 2026-11-24).
 - `--plot-peak` (purple) loses to the data crosses as a mark colour. WP-2130 measured the ruled
   blue against the palette and took the choice to the maintainer, who ruled on 2026-11-09 that it
   moves with the palette piece, since the blue was chosen as the complement of orange fits.
@@ -251,7 +260,7 @@ and 11 now review whole screens at a piece's end.
 |---|---|---|---|
 | 1 | No click moves the layout unless it asks to. Expanding, collapsing, switching a tab and jumping ask; editing a value, ticking a box and choosing a mode do not | R1, then every piece | the layout-shift browser test clicks every control on a fresh page in each starting state and compares element boxes before and after |
 | 2 | Every panel and route of the GUI before the milestone stays reachable | the swap | `tests/test_gui_manual.py`'s partitions, plus a browser pass that opens every tab |
-| 3 | A choice never looks like an action: every segmented choice is a sunken track with one raised option, and actions are outlined or filled buttons | R1, then every piece | `lib/style.test.ts` and a look at the screenshots |
+| 3 | A choice never looks like an action: every segmented choice is a sunken track with one raised option, and actions are outlined or filled buttons | R1, then every piece | `lib/style.test.ts`, which reads the new page since WP-2246, and a look at the screenshots |
 | 4 | Colour values live in `src/rietx/viz/theme.py`, and `gui/src/tokens.css` is generated from it | R1, then every piece | `tests/test_gui_palette.py` |
 | 5 | Below a measured width the window is one column, graphs above the model, with no sideways scroll of the page | R1 | the browser test at 420 px and at the threshold |
 | 6 | The graphs say what they show, so a preview never reads as a changed fit | R2, R3 | the title line's text in each state, asserted in vitest |

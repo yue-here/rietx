@@ -30,12 +30,15 @@ Reference: Dollase (1986) J. Appl. Cryst. 19, 267.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 
 from ..crystallography.lattice import reciprocal_metric_tensor
 from ..crystallography.symmetry import reflection_orbits, resolve_group
 from ..model.forward import CompiledModel
 from ..model.preferred_orientation import cos2_alpha, march_term, orbit_layout
+from ..optimize import lapack
 from .schemas import (
     TEXTURE_MIN_R2,
     TEXTURE_MIN_REFLECTIONS,
@@ -282,3 +285,300 @@ def _equivalent(a: tuple[int, int, int], b: tuple[int, int, int], gstar,
     pa = _p_pattern(a, gstar, members, seg, counts, _EQUIV_REF_R)
     pb = _p_pattern(b, gstar, members, seg, counts, _EQUIV_REF_R)
     return bool(np.max(np.abs(pa - pb)) < tol)
+
+
+# ------------------------------------------------------------ the order screen
+# WP-1974 tasks 1-2: the spherical-harmonics order the misfit needs, scored on
+# the same f_k and w_k as the axis.  A measurement hook: nothing in the report
+# calls it yet, so no default output moves.  Which numbers would make it
+# suggest an order is the gated Layer-2 action of the WP's task 3.
+
+
+#: A design column counts towards the order screen's rank when its singular
+#: value, on weight-centred columns scaled to the unit norm of their
+#: *unpartitioned* values, is above this (absolute, since the scaling already
+#: makes it a surviving fraction for a column orthogonal to the rest;
+#: collinearity among visible terms also makes small ones).  ``tests/test_texture.py`` records the gap it
+#: sits in over six Laue classes and a short-range P -1 phase at orders 2-8:
+#: dropped columns at roundoff (1e-15 on arm64, above 1e-14 on one Linux
+#: py3.14 leg), kept ones at least 2e-4, so any value from 1e-12 to 1e-4 gives
+#: the same ranks there.  With no gap the tolerance decides.
+_ORDER_RANK_TOL = 1e-8
+
+
+@dataclass(frozen=True)
+class _OrderFit:
+    """One order's weighted linear solve on a phase's extracted corrections."""
+
+    order: int
+    n_terms: int
+    rank: int                       # terms the partition leaves resolvable
+    r2: float                       # same baseline as the axis score's
+    names: tuple[str, ...]
+    visibility: tuple[float, ...]   # ‖M·K_t‖_w / ‖K_t‖_w, centred
+    coefficients: tuple[float, ...]  # C_t, in the block's own units; NaN when a = 0
+    rms_p: float                    # weighted rms of P − 1 at the reflections
+    min_kept_sv: float              # the rank gap, each side of _ORDER_RANK_TOL
+    max_dropped_sv: float
+
+
+@dataclass(frozen=True)
+class _OrderStep:
+    """The nested comparison of one order against the order below it.
+
+    ``p_value`` is not calibrated: w_k are calculated areas, inverse variances
+    only under counting noise, and the residual is mostly systematic.  NaN
+    wherever a number was not measured.
+    """
+
+    order: int
+    added_rank: int
+    delta_r2: float
+    f_stat: float
+    p_value: float
+    delta_bic: float                # n·ln(SS_hi/SS_lo) + Δp·ln n; < 0 favours hi
+    delta_bic_vs_axis: float        # against the best axis; NaN when none was scored
+
+
+@dataclass(frozen=True)
+class _OrderScreen:
+    phase_index: int
+    n_reflections_used: int
+    n_effective: float              # Kish: (Σw)²/Σw², beside the n the BIC charges
+    axis: tuple[int, int, int] | None
+    axis_r: float | None            # r polished on the best axis, not the grid's
+    axis_r2: float | None           # at axis_r; the steps' ΔBIC vs axis reads this
+    fits: tuple[_OrderFit, ...]
+    steps: tuple[_OrderStep, ...]
+
+
+def _partitioned(model: CompiledModel, values: dict[str, float], ip: int,
+                 multipliers: np.ndarray) -> np.ndarray:
+    """Phase ip's extraction applied to a pattern of its own peaks times g.
+
+    ``multipliers`` is (n_reflections, m).  Column j of the answer is what
+    :func:`_extracted_corrections` would read off a net intensity built from
+    phase ip's calculated peaks, reflection k scaled by g_kj, partitioned over
+    every phase's calculated pattern as the extraction does.  The extraction is
+    linear in the net, so this is M·g, M the partition operator: a texture term
+    whose values the partition averages away (hkl and khl at one position with
+    opposite signs) comes back near zero here.
+    """
+    bases = model.derivative_bases(values)
+    y_bragg = np.zeros_like(model.tt)
+    for jp in range(len(bases.planes)):
+        for rows, peaks in bases.component_entries(jp):
+            for (il, k, i0, i1, omega, *_rest) in rows:
+                y_bragg[i0:i1] += peaks[il][3][k] * omega
+    g = np.asarray(multipliers, dtype=np.float64)
+    net = np.zeros((len(model.tt), g.shape[1]))
+    for rows, peaks in bases.component_entries(ip):
+        for (il, k, i0, i1, omega, *_rest) in rows:
+            net[i0:i1] += (peaks[il][3][k] * omega)[:, None] * g[k][None, :]
+    num = np.zeros_like(g)
+    den = np.zeros(g.shape[0])
+    for rows, peaks in bases.component_entries(ip):
+        for (il, k, i0, i1, omega, *_rest) in rows:
+            intensity = peaks[il][3][k]
+            if intensity == 0.0:
+                continue
+            denom = y_bragg[i0:i1]
+            good = denom > 1e-12
+            if not np.any(good):
+                continue
+            share = intensity * omega[good] / denom[good]
+            num[k] += share @ net[i0:i1][good]
+            den[k] += intensity * float(omega.sum())
+    return np.where(den[:, None] > 0.0, num / np.where(den > 0.0, den, 1.0)[:, None], 0.0)
+
+
+def _weighted_fit(f: np.ndarray, w: np.ndarray, design: np.ndarray, scale: np.ndarray
+                  ) -> tuple[float, int, np.ndarray, float, float, float]:
+    """(SS, rank, b, a, min kept sv, max dropped sv) of f ≈ a + design·b, weights w.
+
+    The columns are weight-centred, so a is the free scale, and divided by
+    ``scale`` before the rank is read, so for a column orthogonal to the rest
+    its singular value is its surviving fraction.
+    """
+    sw = np.sqrt(w)
+    W = float(w.sum())
+    fbar = float((w * f).sum() / W)
+    y = sw * (f - fbar)
+    nan = float("nan")
+    if design.shape[1] == 0:
+        return float(y @ y), 0, np.zeros(0), fbar, nan, nan
+    centre = (w @ design) / W
+    x = sw[:, None] * (design - centre[None, :]) / scale[None, :]
+    u, sv, vt = lapack.svd(x, full_matrices=False)
+    keep = sv > _ORDER_RANK_TOL
+    coef = vt[keep].T @ ((u[:, keep].T @ y) / sv[keep])
+    resid = y - x @ coef
+    b = coef / scale
+    # a design wider than tall has columns beyond the singular values: zero
+    dropped = np.concatenate([sv[~keep], np.zeros(max(design.shape[1] - len(sv), 0))])
+    return (float(resid @ resid), int(keep.sum()), b, fbar - float(centre @ b),
+            float(sv[keep].min()) if keep.any() else nan,
+            float(dropped.max()) if dropped.size else nan)
+
+
+def _order_screen(model: CompiledModel, values: dict[str, float], *,
+                  orders: tuple[int, ...] = (2, 4, 6, 8), max_index: int = 2,
+                  min_weight_frac: float = 1e-3) -> list[_OrderScreen]:
+    """The per-order solve and the nested comparison, per phase (WP-1974).
+
+    For each even order L the extracted corrections are fitted as
+    f_k ≈ a + Σ_t b_t·(M·w_l K_t)_k, every term of the Laue class from l = 2
+    to L, M the extraction's own partition (:func:`_partitioned`) and w_l the
+    geometry's term weight; C_t = b_t/a.  Linear, so one solve per order, and
+    its R² has the axis score's baseline (the weighted mean), so the two
+    compare directly.  Each order is compared with the one below by the F
+    statistic and ΔBIC on the rank it adds, and with the best March-Dollase
+    axis by ΔBIC at one shape parameter.  The basis is the symmetrised
+    spherical-harmonics expansion of the orientation distribution, one term
+    per Laue-allowed harmonic (Von Dreele 1997, J. Appl. Cryst. 30, 517) and
+    ΔBIC = n·ln(SS_hi/SS_lo) + Δp·ln n (negative favours the higher order), the
+    Bayesian information criterion of Schwarz (1978, Ann. Statist. 6, 461).
+    The axis's r is polished off the
+    axis screen's grid (a bounded solve in ln r between the grid's neighbours
+    of its best r), since the order solve is exact and the grid's step would
+    otherwise charge the axis its quantisation: on a −3m1 specimen built with
+    r = 0.8 the grid made order 4 win by ΔBIC −16.7 (PR #1604 review).  The
+    search over axes is not charged, which leans towards the axis; the axis
+    screen's own r and R² (:func:`analyse_texture`) are not changed.  Measures,
+    decides nothing.
+
+    Three limits a consumer inherits.  The p-values are not calibrated
+    (:class:`_OrderStep`).  The BIC charges n, the live reflection count, which
+    can sit well above the Kish count beside it.  And the constant a stands for
+    the other phases' share of an overlapped reflection, 1 − (M·1)_k, which
+    holds where they fit and a = 1: on overlapped peaks of a multi-phase
+    pattern whose scale absorbed the mean texture the screen carries a bias of
+    (a − 1)(M·1 − 1), as does the axis score.  ``max_index`` and
+    ``min_weight_frac`` are the axis screen's, so both read the same
+    reflections against the same axes.
+    """
+    from scipy.optimize import minimize_scalar
+    from scipy.stats import f as f_dist
+
+    from ..crystallography.spherical_harmonics import texture_basis
+    from ..model.preferred_orientation import (
+        TEXTURE_SAMPLE_PSI_DEG,
+        texture_term_weights,
+    )
+
+    orders = tuple(orders)
+    if not orders or list(orders) != sorted(set(orders)) or any(
+            o < 2 or o % 2 for o in orders):
+        raise ValueError(f"orders {orders}: even, at least 2, strictly ascending")
+    if model.mode != "rietveld":
+        return []
+    nan = float("nan")
+    axes = {r.phase_index: r for r in analyse_texture(
+        model, values, max_index=max_index, min_weight_frac=min_weight_frac)}
+    corrections = _extracted_corrections(model, values)
+    psi = TEXTURE_SAMPLE_PSI_DEG[model.geometry_kind]
+    out: list[_OrderScreen] = []
+    for ip, (f, w) in enumerate(corrections):
+        live = w > min_weight_frac * (w.max() if w.size and w.max() > 0 else 1.0)
+        n = int(live.sum())
+        tex = axes.get(ip)
+        scored = tex is not None and tex.best_axis is not None
+        if n < 2:
+            out.append(_OrderScreen(phase_index=ip, n_reflections_used=n, n_effective=0.0,
+                                    axis=None, axis_r=None, axis_r2=None, fits=(),
+                                    steps=()))
+            continue
+        refl = model.phases[ip].reflections
+        cell = tuple(values[f"phases.{ip}.cell.{k}"]
+                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+        group = resolve_group(refl.spacegroup, refl.operations)
+        wl = w[live]
+        fl = f[live]
+        W = float(wl.sum())
+        base = float((wl * (fl - (wl * fl).sum() / W) ** 2).sum())
+        # The highest order's terms hold every lower order's as a prefix
+        # (``texture_basis`` builds l = 2 up), so one partition serves all.
+        top = texture_basis(group, orders[-1], cell)
+        top_w = texture_term_weights([t.degree for t in top.terms], psi)
+        raw_all = (top.at_reflections(refl.hkl, cell) * top_w[None, :]
+                   if top.names else np.zeros((len(f), 0)))
+        part_all = _partitioned(model, values, ip, raw_all)[live]
+        rawl_all = raw_all[live]
+        fits: list[_OrderFit] = []
+        ss: dict[int, tuple[float, int]] = {}
+        for order in orders:
+            names = texture_basis(group, order, cell).names
+            m = len(names)
+            assert names == top.names[:m], (names, top.names)
+            rawl, part = rawl_all[:, :m], part_all[:, :m]
+            centred = rawl - ((wl @ rawl) / W)[None, :]
+            norm = np.sqrt(wl @ centred ** 2)
+            norm = np.where(norm > 0.0, norm, 1.0)
+            pc = part - ((wl @ part) / W)[None, :]
+            vis = np.sqrt(wl @ pc ** 2) / norm
+            s, rank, b, a, kept, dropped = _weighted_fit(fl, wl, part, norm)
+            c = b / a if a else np.full_like(b, nan)
+            dp_k = rawl @ c if c.size else np.zeros(len(fl))
+            ss[order] = (s, rank)
+            fits.append(_OrderFit(
+                order=order, n_terms=m, rank=rank,
+                r2=(1.0 - s / base) if base > 0 else 0.0, names=names,
+                visibility=tuple(float(v) for v in vis),
+                coefficients=tuple(float(v) for v in c),
+                rms_p=float(np.sqrt((wl * dp_k ** 2).sum() / W)),
+                min_kept_sv=kept, max_dropped_sv=dropped))
+        axis_r = axis_r2 = None
+        ss_axis = nan
+        if scored and base > 0:
+            members, seg, counts = orbit_layout(reflection_orbits(group, refl.hkl))
+            cos2 = cos2_alpha(members, np.array(tex.best_axis, dtype=np.int64),
+                              reciprocal_metric_tensor(*cell))
+            w_live = np.where(live, w, 0.0)
+
+            def axis_ss(log_r: float) -> float:
+                # _score_axis's free-scale SS at one r, a negative scale inadmissible
+                p = np.bincount(seg, weights=march_term(cos2, float(np.exp(log_r))),
+                                minlength=len(counts)) / counts
+                denom = float((w_live * p * p).sum())
+                scale = float((w_live * f * p).sum()) / denom if denom > 0.0 else 0.0
+                if scale <= 0.0:
+                    return base
+                return min(float((w_live * (f - scale * p) ** 2).sum()), base)
+
+            step = float(np.log(_R_GRID[1] / _R_GRID[0]))
+            lo_r = float(np.log(tex.march_coefficient))
+            bounds = (max(lo_r - step, float(np.log(_R_GRID[0]))),
+                      min(lo_r + step, float(np.log(_R_GRID[-1]))))
+            polished = minimize_scalar(axis_ss, bounds=bounds, method="bounded",
+                                       options={"xatol": 1e-10})
+            ss_axis, log_r = min((axis_ss(lo_r), lo_r),
+                                 (float(polished.fun), float(polished.x)))
+            axis_r, axis_r2 = float(np.exp(log_r)), 1.0 - ss_axis / base
+        steps: list[_OrderStep] = []
+        lo_ss, lo_rank = base, 0
+        log_n = float(np.log(n))
+        for order in orders:
+            hi_ss, hi_rank = ss[order]
+            dp = hi_rank - lo_rank
+            dof = n - 1 - hi_rank
+            if dp > 0 and dof > 0 and hi_ss > 0:
+                fs = ((lo_ss - hi_ss) / dp) / (hi_ss / dof)
+                pv = float(f_dist.sf(fs, dp, dof))
+            else:
+                fs, pv = nan, nan
+            dbic = (n * float(np.log(hi_ss / lo_ss)) + dp * log_n
+                    if hi_ss > 0 and lo_ss > 0 else nan)
+            dbic_axis = (n * float(np.log(hi_ss / ss_axis)) + (hi_rank - 1) * log_n
+                         if hi_ss > 0 and ss_axis > 0 else nan)
+            steps.append(_OrderStep(
+                order=order, added_rank=dp,
+                delta_r2=(lo_ss - hi_ss) / base if base > 0 else 0.0,
+                f_stat=float(fs), p_value=pv, delta_bic=dbic,
+                delta_bic_vs_axis=dbic_axis))
+            lo_ss, lo_rank = hi_ss, hi_rank
+        out.append(_OrderScreen(
+            phase_index=ip, n_reflections_used=n,
+            n_effective=W * W / float((wl * wl).sum()),
+            axis=tex.best_axis if scored else None, axis_r=axis_r, axis_r2=axis_r2,
+            fits=tuple(fits), steps=tuple(steps)))
+    return out

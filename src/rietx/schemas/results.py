@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import functools
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, ClassVar, Literal
 
 import numpy as np
@@ -1416,7 +1417,13 @@ class StageResult(Base):
     #: reason.  It feeds ``STAGE_FREED_NOTHING``.
     unreached_histograms: dict[int, list[str]] | None = None
     #: each row this stage lifted before solving, and the value it started at
-    #: in column units (WP-1930).  Two writers put a row here.  The stage's own
+    #: in column units (WP-1930).  Three writers put a row here.  The runner
+    #: itself starts an FCJ axial ratio the stage newly frees on zero at
+    #: :data:`~rietx.model.forward.AXIAL_SL_START` (S/L) or
+    #: :data:`~rietx.model.forward.AXIAL_HL_START` (H/L), never at its
+    #: partner's value
+    #: (:func:`~rietx.model.forward.apertures_to_lift`, WP-1955), on every
+    #: stage and in both runners.  The stage's own
     #: :attr:`~rietx.strategy.staged.Stage.seed`, through
     #: :meth:`~rietx.params.vector.ParameterTable.seed_floored`, starts a
     #: freed row sitting exactly on a floor of 0 or above at the seed.  Its
@@ -1426,7 +1433,7 @@ class StageResult(Base):
     #: is here at the value the seed wrote, a zero coefficient of the ray
     #: included (WP-2002, B14).  Those rows sit at zero rather than on a floor,
     #: since a Stephens DOF is unbounded below.  The joint fit's runner writes
-    #: both through :class:`~rietx.params.multi.MultiParameterTable`'s
+    #: both seeds through :class:`~rietx.params.multi.MultiParameterTable`'s
     #: twins, keyed by the joint column (WP-2239): a shared block's DOFs under
     #: their bare paths, a per-histogram one's under ``hist.N.``.
     #: WP-1930's floor seed sized by unit went with WP-1938: it existed because
@@ -2551,12 +2558,16 @@ class RefinementResult(Base):
         view.histograms = []
         return view
 
-    def plot(self, path: str | None = None, **kw):
+    def plot(self, path: str | Path | None = None, **kw):
+        """Draw this result, writing it to the file ``path`` when given:
+        :func:`rietx.viz.plots.plot_result`, forwarding ``**kw``."""
         from ..viz.plots import plot_result
 
         return plot_result(self, path=path, **kw)
 
     def parameter(self, path: str) -> RefinedParameter:
+        """The refined row at the parameter dot-path ``path``; ``KeyError``
+        when no row carries it."""
         for p in self.parameters:
             if p.path == path:
                 return p

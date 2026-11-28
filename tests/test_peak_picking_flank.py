@@ -48,13 +48,13 @@ def _false(peaks):
 
 
 def test_the_control_has_no_false_line(flat):
-    peaks = rx.pick_peaks(flat, INSTRUMENT, two_theta_range=(10.0, 110.0))
+    peaks = rx.pick_peaks(flat, INSTRUMENT, two_theta_limits=(10.0, 110.0))
     assert _false(peaks) == []
     assert len(peaks.usable()) >= 8
 
 
 def test_a_steep_flank_gives_no_usable_false_line(steep):
-    peaks = rx.pick_peaks(steep, INSTRUMENT, two_theta_range=(10.0, 110.0))
+    peaks = rx.pick_peaks(steep, INSTRUMENT, two_theta_limits=(10.0, 110.0))
     # drawn before asserting, so a red run leaves its own picture rather than
     # the last green run's sidecar
     gallery.draw("silicon_steep_peaks", peaks=peaks, data=steep,
@@ -92,7 +92,7 @@ def test_every_true_line_is_still_found_and_nothing_false_is_kept(
     pattern, and every usable component of either lies on a true Kα1 or Kα2
     position."""
     data = flat if which == "flat" else steep
-    peaks = rx.pick_peaks(data, INSTRUMENT, two_theta_range=(10.0, 110.0))
+    peaks = rx.pick_peaks(data, INSTRUMENT, two_theta_limits=(10.0, 110.0))
     found = [p.two_theta for p in peaks.usable()]
     for t in _true_lines():
         assert min(abs(t - u) for u in found) < 0.05, (which, round(t, 3))
@@ -102,7 +102,7 @@ def test_every_true_line_is_still_found_and_nothing_false_is_kept(
 
 
 def test_index_pattern_finds_the_cubic_cell_on_the_steep_flank(steep):
-    peaks = rx.pick_peaks(steep, INSTRUMENT, two_theta_range=(10.0, 110.0))
+    peaks = rx.pick_peaks(steep, INSTRUMENT, two_theta_limits=(10.0, 110.0))
     result = rx.index_pattern(peaks, data=steep, instrument=INSTRUMENT,
                               two_theta_limits=(10.0, 110.0), preset="quick")
     gallery.draw("silicon_steep", peaks=peaks, data=steep, result=result,

@@ -969,7 +969,7 @@ class SuggestedAction(Base):
     covers (measured: 16.16 predicted against 16.30 observed for ``refine_cell``).
     ``predict_then_verify`` in :mod:`.layer2` measures the real one and rolls back
     if it disagrees.  ``vetoed_by`` is set when the staged plan already refines the
-    parameter, or when a guard forbids it.
+    parameter, or when the refinement already frees it.
 
     ``execution`` is the recipe table's ``how`` (``report/apply.py``), stamped
     by :func:`~rietx.report.build_report` on every action it emits — the fact

@@ -154,7 +154,7 @@ def _draw(name, factor, mode, screen, fits):
     if true.refuted and true.forbidden_two_theta:
         tt = float(true.forbidden_two_theta[0])
         plot_result(result, path=str(OUT / f"{stem}_refuting.png"),
-                    two_theta_range=(tt - 2.0, tt + 2.0),
+                    two_theta_limits=(tt - 2.0, tt + 2.0),
                     title=f"{title}; first refuting position {tt:.3f}°")
 
 
