@@ -816,6 +816,13 @@ not move either.  The grammar parses any name, and the names a peak equation
 binds belong to the schema (``schemas.peak_equation.REFLECTION_NAMES``).
 WP-2107 moved the grammar for its two functions and the schema for its names.
 
+Also in 0.62 (WP-1965): ``ParametricEquation.where``, a subset stated as a
+condition on the coordinate columns, stored as written and re-evaluated at
+every resolution.  Additive and defaulted to ``None``, the 0.25 → 0.26 rule;
+an older build refuses a declaration carrying the key.  A glob ``target`` is
+expanded at resolution into one declaration per matched path, so a result
+stores bare targets and nothing new.
+
 Also in 0.62 (WP-2315): ``ReflectionState.merged_groups``, a list of
 ``MergedGroup`` (``hkl``, ``intensity``, ``stderr``): the reflections a Pawley
 fit refined as one intensity because their d agree in every cell of the space

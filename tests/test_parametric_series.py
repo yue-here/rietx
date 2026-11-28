@@ -46,6 +46,7 @@ from rietx.multi import (
     MultiHistogramRefinement,
     _equation_rows,
     _joint_fixed_literals,
+    _parametric_glob_diagnostics,
     _parametric_range_diagnostics,
     _unsupported_paths_multi,
     refine_multi,
@@ -66,6 +67,7 @@ from rietx.params.parametric import (
     ResolvedParametric,
     coefficient_rows,
     form_tests,
+    glob_member_name,
     parametric_equation,
     resolve_parametric,
     target_columns,
@@ -113,6 +115,7 @@ def test_the_declarations_round_trip_through_json():
     ties = [
         _equation(patterns=[0, 2], reference={"T": 400.0}, scale={"T": 100.0}),
         ParametricEquation(name="c", target="instrument.background.c2", basis="constant"),
+        _equation(name="w", where="T < 800 and x >= 0.1"),
         ParametricEquation(name="d", target="phases.0.atoms.0.biso", basis="design",
                            design=[[1.0, 0.0], [0.5, 0.5], [0.0, 1.0]]),
     ]
@@ -140,7 +143,8 @@ def test_a_1_9_coefficient_row_opens_with_its_tie_key_read_as_equation():
 
 @pytest.mark.parametrize("kw, fragment", [
     (dict(name="a.b"), "single identifier"),
-    (dict(target="phases.*.cell.a"), "not a glob"),
+    (dict(basis="expression", terms=None, expression="a0", target="phases.0.cell.*"),
+     "glob, which an expression equation cannot take"),
     (dict(target="hist.0.phases.0.cell.a"), "model parameter"),
     (dict(target="vars.x"), "model parameter"),
     (dict(basis="constant"), "takes no terms"),
@@ -153,6 +157,12 @@ def test_a_1_9_coefficient_row_opens_with_its_tie_key_read_as_equation():
     (dict(patterns=[]), "selects nothing"),
     (dict(basis="design", terms=None, design=[[1.0], [1.0, 2.0]]), "same number"),
     (dict(basis="design", terms=None, design=[[1.0]], patterns=[0, 1]), "one row per"),
+    (dict(where="T < 800", patterns=[0, 1]), "not both"),
+    (dict(basis="design", terms=None, design=[[1.0]], where="T < 800"), "takes no where"),
+    (dict(where="T"), "a condition is a comparison"),
+    (dict(where="1 < T < 2"), "chained"),
+    (dict(target=None, basis="expression", terms=None, expression="T", where="T > 1"),
+     "takes no patterns and no where"),
 ])
 def test_a_malformed_declaration_is_refused_by_its_shape(kw, fragment):
     with pytest.raises(ValidationError, match=fragment):
@@ -189,6 +199,63 @@ def test_resolution_freezes_the_reference_and_scale_and_a_refit_keeps_them():
     assert fresh.equation.reference == {"T": 600.0} and fresh.equation.scale == {"T": 300.0}
 
 
+def test_a_condition_keeps_its_specimens_when_a_pattern_is_dropped():
+    """The subset is stored as the condition and re-evaluated at each
+    resolution (WP-1965): dropping a pattern from the campaign shifts every
+    later index, and an index list then names other specimens, while the
+    condition still names the same ones.  The reference and scale stay frozen."""
+    temps = [300.0, 400.0, 500.0, 900.0, 1000.0, 450.0]
+    by_index = _equation(patterns=[0, 1, 2, 5])
+    by_condition = _equation(where="T < 800")
+    full = resolve_parametric(by_condition, _coords(*temps), 6)
+    assert full.patterns == [0, 1, 2, 5]
+    assert full.patterns == resolve_parametric(by_index, _coords(*temps), 6).patterns
+    # the resolved declaration keeps the condition, never the indices it found
+    assert full.equation.where == "T < 800" and full.equation.patterns is None
+    assert full.equation.reference == {"T": 400.0} and full.equation.scale == {"T": 100.0}
+    # the specimen at 400 K is dropped: indices 2, 3, 4, 5 move down one
+    kept = [t for t in temps if t != 400.0]
+    after = resolve_parametric(full.equation, _coords(*kept), 5)
+    want = {300.0, 500.0, 450.0}
+    assert {kept[k] for k in after.patterns} == want
+    assert after.equation.reference == {"T": 400.0} and after.equation.scale == {"T": 100.0}
+    # the index list with the dropped index struck out names the 900 K specimen
+    stale = resolve_parametric(by_index.model_copy(update={"patterns": [0, 2, 4]}),
+                               _coords(*kept), 5)
+    assert {kept[k] for k in stale.patterns} == {300.0, 900.0, 450.0}
+    # a specimen that joins inside the field joins the equation
+    grown = resolve_parametric(full.equation, _coords(*kept, 700.0), 6)
+    assert grown.patterns == [*after.patterns, 5]
+
+
+def test_two_phase_fields_by_condition_drive_one_target_and_may_not_overlap():
+    s, _ = perturbed_inputs()
+    coords = _coords(300.0, 500.0, 900.0, 1100.0)
+    lo = _equation(name="lo", basis="constant", terms=None, where="T < 800")
+    hi = _equation(name="hi", basis="constant", terms=None, where="T >= 800")
+    mt = MultiParameterTable(s, _lab6_instruments(4), coordinates=coords,
+                             parametric=[lo, hi])
+    sources = [mt.tables[h].entries[mt.tables[h]._paths["phases.0.cell.a"]].tie.terms
+               for h in range(4)]
+    assert [src for (src, _), in sources] == ["vars.lo_0", "vars.lo_0",
+                                             "vars.hi_0", "vars.hi_0"]
+    assert [r.patterns for r in mt.parametric] == [[0, 1], [2, 3]]
+    assert [e.where for e in mt.declared] == ["T < 800", "T >= 800"]
+    with pytest.raises(ValueError, match="both drive phases.0.cell.a on pattern 2:"):
+        MultiParameterTable(s, _lab6_instruments(4), coordinates=coords, parametric=[
+            lo.model_copy(update={"where": "T < 1000"}), hi])
+
+
+def test_an_expression_takes_its_subset_by_condition():
+    s, _ = perturbed_inputs()
+    equation = ParametricEquation(name="e", target="phases.0.cell.a", basis="expression",
+                                  expression="a0 + k*T", where="T > 350")
+    mt = MultiParameterTable(s, _lab6_instruments(3), coordinates=_coords(300.0, 400.0, 500.0),
+                             parametric=[equation],
+                             variables={"a0": Parameter(value=4.15), "k": Parameter(value=1e-5)})
+    assert [r.patterns for r in mt.expressions] == [[1, 2]]
+
+
 def test_term_labels_and_units_name_each_monomial():
     assert [term_label(t) for t in ([], ["T"], ["x", "y"], ["T", "T"],
                                     ["x", "y", "x"])] == ["1", "T", "x*y", "T^2", "x^2*y"]
@@ -205,6 +272,13 @@ def test_term_labels_and_units_name_each_monomial():
 
 @pytest.mark.parametrize("equation, coords, n, fragment", [
     (_equation(patterns=[0, 3]), _coords(1.0, 2.0, 3.0), 3, "out of range"),
+    (_equation(where="T > 1"), None, 3, "where='T > 1', which needs a CoordinateTable"),
+    (_equation(where="T > 1"), _coords(1.0, 2.0), 3, "2 rows for 3 patterns"),
+    (_equation(where="Temp > 1"), _coords(1.0, 2.0, 3.0), 3, "'Temp', which is not a coordinate"),
+    (_equation(where="T > 1"), _coords(1.0, None, 3.0), 3, "undecided"),
+    (_equation(where="T > 9"), _coords(1.0, 2.0, 3.0), 3, "holds at no pattern"),
+    (_equation(where="sqrt(T - 1.5) < 100"), _coords(1.0, 2.0, 3.0), 3,
+     "not finite at pattern 0"),
     (_equation(), None, 3, "needs a CoordinateTable"),
     (_equation(), _coords(1.0, 2.0), 3, "2 rows for 3 patterns"),
     (_equation(terms=[[], ["x"]]), _coords(1.0, 2.0, 3.0), 3, "does not have"),
@@ -336,6 +410,115 @@ def test_a_sharing_map_that_splits_a_coefficient_is_refused():
         MultiParameterTable(s, _lab6_instruments(2),
                             sharing=SharingMap(per_histogram=["vars.*"]),
                             parametric=[_equation(basis="constant", terms=None)])
+
+
+# -- a glob target, expanded at resolution (WP-1965) -------------------------
+
+def test_a_glob_member_is_named_by_the_path_past_the_globs_literal_segments():
+    assert glob_member_name("cell", "phases.0.cell.*", "phases.0.cell.c") == "cell_c"
+    assert glob_member_name("s", "phases.*.scale", "phases.1.scale") == "s_1_scale"
+    assert glob_member_name("bg", "instrument.background.c*",
+                            "instrument.background.c2") == "bg_c2"
+    # accepted on a linear basis, as written
+    assert _equation(target="phases.0.cell.*").target == "phases.0.cell.*"
+
+
+def test_a_glob_target_expands_per_path_and_reports_what_it_skips():
+    """A cubic cell's glob drives ``a`` and skips the two edges tied to it and
+    the three locked angles, saying so; an atom glob gives each atom its own
+    coefficients.  The declarations as resolved carry bare targets, so a refit
+    passing them back wires the same ties."""
+    s, _ = perturbed_inputs()
+    coords = _coords(300.0, 400.0, 500.0)
+    cell = _equation(name="cell", target="phases.0.cell.*")
+    biso = _equation(name="B", target="phases.0.atoms.*.biso")
+    mt = MultiParameterTable(s, _lab6_instruments(3), coordinates=coords,
+                             parametric=[cell, biso])
+    assert [(r.name, r.target) for r in mt.parametric] == [
+        ("cell_a", "phases.0.cell.a"), ("B_0_biso", "phases.0.atoms.0.biso"),
+        ("B_1_biso", "phases.0.atoms.1.biso")]
+    assert [r.paths for r in mt.parametric][1:] == [["vars.B_0_biso_0", "vars.B_0_biso_1"],
+                                                    ["vars.B_1_biso_0", "vars.B_1_biso_1"]]
+    for h in range(3):
+        t = mt.tables[h]
+        for target, name in [("phases.0.atoms.0.biso", "B_0_biso"),
+                             ("phases.0.atoms.1.biso", "B_1_biso")]:
+            assert [src for src, _ in t.entries[t._paths[target]].tie.terms] == [
+                f"vars.{name}_0", f"vars.{name}_1"]
+    (record, plain) = mt.glob_expansions
+    assert record.members == ["cell_a"] and plain.skipped == []
+    # the five symmetry skips (two ties, three locked angles) are no news to
+    # whoever wrote a cell glob, so none is recorded or reported (#1619 review)
+    assert record.skipped == []
+    assert _parametric_glob_diagnostics(mt) == []
+    # the resolved declarations are bare, and refit to the same wiring
+    assert [e.target for e in mt.declared] == [r.target for r in mt.parametric]
+    again = MultiParameterTable(s, _lab6_instruments(3), coordinates=coords,
+                                parametric=mt.declared)
+    assert again.glob_expansions == []
+    assert [(r.name, r.target, r.equation.reference) for r in again.parametric] == [
+        (r.name, r.target, r.equation.reference) for r in mt.parametric]
+
+
+def test_a_glob_reports_the_origin_hold_it_skips_and_nothing_the_symmetry_fixes():
+    """The one skip the caller could not foresee is the floating origin's hold,
+    which the package puts on a path the glob did not name: reported.  What the
+    space group ties or locks stays silent (the maintainer's ruling on #1619)."""
+    from tests.test_floating_origin import _zno
+
+    phase = _zno()
+    phase.floating_origin = "hold"
+    s = rx.Structure(phases=[phase])
+    glob = _equation(name="d", target="phases.0.atoms.*.dof.*", basis="constant",
+                     terms=None)
+    mt = MultiParameterTable(s, [rx.Instrument.bragg_brentano(radiation="CuKa")] * 2,
+                             parametric=[glob])
+    (record,) = mt.glob_expansions
+    assert record.skipped and all("floating_origin" in why for _, why in record.skipped)
+    (finding,) = _parametric_glob_diagnostics(mt)
+    assert finding.code == "PARAMETRIC_GLOB_SKIPPED"
+    assert finding.where == [p for p, _ in record.skipped]
+    assert finding.value == float(len(record.skipped))
+
+
+@pytest.mark.parametrize("equation, fragment", [
+    (_equation(name="g", target="phases.0.cell.q*"), "matches no parameter"),
+    (_equation(name="g", target="phases.0.cell.[bc]"),
+     r"matches only parameters no equation can drive: phases.0.cell.b is tied"),
+])
+def test_a_glob_that_drives_nothing_is_refused(equation, fragment):
+    s, _ = perturbed_inputs()
+    with pytest.raises(ValueError, match=fragment):
+        MultiParameterTable(s, _lab6_instruments(2), coordinates=_coords(300.0, 400.0),
+                            parametric=[equation])
+
+
+def test_a_glob_is_matched_on_every_pattern_of_its_subset():
+    """A path one pattern's model has and another's lacks becomes a member, so
+    the pattern without it refuses by name, rather than the path going
+    unmatched there; and a member's refusal names the glob it came from."""
+    s, _ = perturbed_inputs()
+    instruments = _lab6_instruments(2)
+    instruments[1].background = rx.schemas.instrument.BackgroundChebyshev.with_terms(5)
+    with pytest.raises(ValueError, match=r"'bg_c3'.*not a parameter of histogram 0.*"
+                                         r"member of glob 'bg' on instrument\.background\.c\*"):
+        MultiParameterTable(s, instruments, coordinates=_coords(300.0, 400.0),
+                            parametric=[_equation(name="bg", target="instrument.background.c*",
+                                                  basis="constant", terms=None)])
+
+
+def test_a_glob_member_named_like_another_declaration_is_refused():
+    s, _ = perturbed_inputs()
+    glob = _equation(name="cell", target="phases.0.cell.*")
+    clash = _equation(name="cell_a", target="phases.0.atoms.0.biso", basis="constant",
+                      terms=None)
+    with pytest.raises(ValueError, match="two parametric equations are named 'cell_a'"):
+        MultiParameterTable(s, _lab6_instruments(2), coordinates=_coords(300.0, 400.0),
+                            parametric=[glob, clash])
+    # and the names as given: a glob and a bare declaration of one name
+    with pytest.raises(ValueError, match="two parametric equations are named 'cell'"):
+        MultiParameterTable(s, _lab6_instruments(2), coordinates=_coords(300.0, 400.0),
+                            parametric=[glob, clash.model_copy(update={"name": "cell"})])
 
 
 # -- the joint table's wiring ------------------------------------------------
@@ -1822,3 +2005,42 @@ def test_a_pawley_joint_ramp_recovers_its_line_without_bias():
             z[c.term].append((c.value - truth[c.term]) / c.esd)
     for term, zs in z.items():
         assert abs(float(np.mean(zs))) < 0.5, (term, zs)
+
+
+# -- the review of #1619, round 2 --------------------------------------------
+
+def test_a_glob_path_locked_on_some_patterns_only_does_not_depend_on_their_order():
+    """A path the capillary locks and the flat plate frees can be driven on the
+    plate, so the glob is refused naming the capillary in either order, rather
+    than the path being skipped in silence when the capillary comes first."""
+    s = rx.Structure(phases=[perturbed_inputs()[0].phases[0]])
+    plate = rx.Instrument.bragg_brentano(radiation="CuKa")
+    capillary = rx.Instrument.debye_scherrer(wavelength=0.41390)
+    glob = _equation(name="g", target="instrument.geometry.*", basis="constant", terms=None)
+    for instruments in ([plate, capillary], [capillary, plate]):
+        with pytest.raises(ValueError, match=r"instrument\.geometry\.sample_displacement"
+                                              r".*histogram|histogram.*instrument\.geometry"):
+            MultiParameterTable(s, instruments, parametric=[glob])
+
+
+@pytest.mark.parametrize("where, temps, expect", [
+    # the NaN sits in an if() condition: the two spellings must not disagree
+    ("if(sqrt(T - 350) < 10, 1, 2) < 1.5", (300.0, 400.0), "not finite at pattern 0"),
+    ("if(not (sqrt(T - 350) >= 10), 1, 2) < 1.5", (300.0, 400.0), "not finite at pattern 0"),
+])
+def test_a_comparison_inside_an_if_is_checked_for_a_value_that_is_not_finite(
+        where, temps, expect):
+    with pytest.raises(ValueError, match=expect):
+        resolve_parametric(_equation(where=where), _coords(*temps), 2)
+
+
+@pytest.mark.parametrize("where, holds", [
+    ("T > 0 and log(T) < 5", [1, 2]),       # False and ... is False at T = 0
+    ("T <= 0 or log(T) < 5", [0, 1, 2]),  # True or ... is True at T = 0
+    ("if(T > 0, log(T), 0) < 5", [0, 1, 2]),
+])
+def test_an_and_or_an_or_that_one_operand_settles_is_not_refused(where, holds):
+    """With T = [0, 10, 100], ``log(T)`` is -inf at the first pattern only; a
+    condition whose other operand already decides the answer there is decided."""
+    r = resolve_parametric(_equation(where=where), _coords(0.0, 10.0, 100.0), 3)
+    assert list(r.patterns) == holds

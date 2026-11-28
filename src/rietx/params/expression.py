@@ -511,6 +511,31 @@ def parse(text: str):
     The tree is a number: a condition is refused at the top level, since an
     equation's value is a number.
     """
+    node = _parse_any(text)
+    if _is_condition(node):
+        raise ExpressionError("type", "the expression is a condition; an equation's "
+                              "value is a number (a condition goes in if(…))", text, 0)
+    return node
+
+
+def parse_condition(text: str):
+    """The tree of a condition ``text``; raises :class:`ExpressionError`.
+
+    The grammar's own conditions (a comparison, or comparisons joined by
+    ``and``, ``or`` and ``not``), written alone: a parametric equation's
+    ``where`` (WP-1965).  A number is refused at the top level, the mirror of
+    :func:`parse`.
+    """
+    node = _parse_any(text)
+    if not _is_condition(node):
+        raise ExpressionError("type", "the text is a number; a condition is a "
+                              "comparison such as 'T < 800', or comparisons joined "
+                              "by and, or and not", text, 0)
+    return node
+
+
+def _parse_any(text: str):
+    """The tree of ``text``, a number or a condition, with every shared refusal."""
     if not isinstance(text, str):
         raise TypeError(f"an expression is text, got {type(text).__name__}")
     if len(text) > MAX_LENGTH:
@@ -530,9 +555,6 @@ def parse(text: str):
                               f"{MAX_DEPTH} levels; group a long sum or product in "
                               "parentheses, or split it into intermediate "
                               "equations", text, 0)
-    if _is_condition(node):
-        raise ExpressionError("type", "the expression is a condition; an equation's "
-                              "value is a number (a condition goes in if(…))", text, 0)
     return node
 
 
@@ -1082,3 +1104,96 @@ class Expression:
         out = [np.array(np.broadcast_to(np.asarray(d.get(k, 0.0)), v.shape),
                         dtype=v.dtype) for k in wrt]
         return v, out
+
+
+class Condition:
+    """One parsed condition: its text, its tree, its names, and where it holds.
+
+    ``Condition("T < 800 and x >= 0.1")`` parses (raising
+    :class:`ExpressionError`, a number at the top level included) and keeps
+    the user's text.  A parametric equation's ``where`` (WP-1965) is one,
+    evaluated over the coordinate columns at every resolution.
+    """
+
+    def __init__(self, text: str):
+        self.text = text
+        self.tree = parse_condition(text)
+        #: the free names, first use first, ``pi`` left out
+        self.names: tuple[str, ...] = tuple(names_in(self.tree))
+
+    def __repr__(self) -> str:
+        return f"Condition({self.text!r})"
+
+    def holds(self, bindings: Mapping[str, Any]) -> np.ndarray:
+        """Where the condition holds, element-wise over numpy ``bindings``.
+
+        A bool array of the bindings' broadcast shape (a 0-d one when every
+        binding is a scalar).  A name with no binding raises with code
+        ``unbound``.
+        """
+        xp = _numpy_xp()
+        with np.errstate(all="ignore"):
+            v = _Eval(xp, bindings, ()).cond(rewrite(self.tree))
+        return np.asarray(v, dtype=bool)
+
+    def undecided(self, bindings: Mapping[str, Any]) -> np.ndarray:
+        """Where the condition's truth rests on a comparison with a value that
+        is not finite.
+
+        IEEE reads every comparison with a NaN as false, so ``sqrt(T - 350) <
+        100`` and ``not (sqrt(T - 350) >= 100)`` would disagree at T = 300.
+        A caller deciding membership refuses these places rather than reading
+        the NaN as an answer.  Each side of each comparison is evaluated on
+        its own, numpy, element-wise, and the walk goes into the operands of
+        ``if(...)``: a comparison inside one decides which branch is taken, so
+        its NaN moves the value just as a top-level one does.
+
+        ``and`` and ``or`` are decided wherever one operand alone decides them
+        (``False and …``, ``True or …``): the other operand's NaN cannot move
+        the answer there, so it is not refused.
+        """
+        xp = _numpy_xp()
+        ev = _Eval(xp, bindings, ())
+
+        def truth(n):
+            return np.asarray(ev.cond(rewrite(n)), dtype=bool)
+
+        def bad(n):
+            """Where the numeric node's own value is not finite, or an ``if``
+            inside it is undecided."""
+            v, _ = ev(rewrite(n))
+            return (~np.isfinite(np.asarray(v, dtype=np.float64))) | nested(n)
+
+        def nested(n):
+            """Where a condition inside the numeric node ``n`` is undecided."""
+            if isinstance(n, Neg):
+                return nested(n.arg)
+            if isinstance(n, BinOp):
+                return nested(n.left) | nested(n.right)
+            if isinstance(n, Call):
+                if n.func == "if":
+                    c = und(n.args[0])
+                    t = truth(n.args[0])
+                    return (c | np.where(t, nested(n.args[1]), nested(n.args[2])))
+                out = np.asarray(False)
+                for a in n.args:
+                    out = out | nested(a)
+                return out
+            return np.asarray(False)
+
+        def und(n):
+            if isinstance(n, Compare):
+                return bad(n.left) | bad(n.right)
+            if isinstance(n, BoolOp):
+                ul, ur = und(n.left), und(n.right)
+                tl, tr = truth(n.left), truth(n.right)
+                # the value that decides: False for ``and``, True for ``or``
+                decide = False if n.op == "and" else True
+                settled = ((~ul) & (tl == decide)) | ((~ur) & (tr == decide))
+                return (ul | ur) & ~settled
+            if isinstance(n, Not):
+                return und(n.arg)
+            return np.asarray(False)
+
+        with np.errstate(all="ignore"):
+            return np.asarray(und(self.tree), dtype=bool)
