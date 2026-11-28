@@ -161,6 +161,29 @@ the transposed rotation set is a group too and passes any dimension count.
 
 ### Inherited
 
+- **2026-11-28, from the issue triage (#1829, a proposal): report the mirror-well
+  Δχ² for a distortion block.** A mode amplitude or a strain whose sign only a
+  weak symmetry breaker sets converges to whichever well its start points at,
+  and comes back `converged` with a tight esd. The proposal: after a fit with
+  a distortion block, for each parent operation g the child has lost, evaluate
+  χ² at the block's image D(g)A (de-duplicated, every other parameter at its
+  fitted value, no refit), and report the smallest Δχ² and
+  Δχ²/(χ²_red·f²) beside the amplitude with the operation that gives it. One
+  diagnostic fires below a stated level, with an `_audit` row; a small Δχ²
+  means "sign not determined by the data", never "no distortion". Rule 1's
+  second kind: it reports and does not pick. The reporter's evidence is on
+  Mike's open PR #1533 (C3b, the candidate route) at `e4a5bbb26`, on a
+  synthetic LaMnO₃ Pm child at k = (½ ½ 0) in CW neutron. Freed from 0, the
+  strain lands at +0.00200 in 6 of 6 seeds with esd 5e-6, while the two wells
+  differ by about 0.1 in total χ². Mn mode 9's sign follows the noise seed,
+  3 of 6 wrong, one 6.8 esd from the truth. Not re-run here, since the block
+  is on #1533's branch and not on `main` (checked at `02341ffdb`: no
+  mirror-image test exists; `distortion_block_tests` refits with a block held
+  at 0, not at its image). That verb, which already compares a block's χ² on
+  a caller's request, is one seat on offer. Placed here because it reads this
+  WP's block. Its shape, placement and threshold are distortion-mode calls, which
+  are Mike's since 2026-11-21, so the issue's "your call" goes back to him
+  rather than being ruled here. It waits on #1533 merging.
 - **2026-11-23, from WP-2220 (closed; PR #1717): the restart test still orders at `FTOL`
   relative.** Yue ruled on 2026-11-20 that a nested comparison's ordering flag
   (`report.layer2._chi2_ordered`) allows the fuller fit an absolute margin of 2 cost units
