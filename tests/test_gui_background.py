@@ -252,7 +252,9 @@ def test_a_pending_glob_hold_is_held_as_the_hold_verb_resolves_it(tmp_path_facto
     np.testing.assert_array_equal(swept.arrays["band_esd"],
                                   session.background().arrays["band_esd"])
     assert swept.header["pending_holds"] == ["phases.0.atoms.*.adp.*"]
-    assert project.refinement.hold("phases.0.atoms.*.adp.*") == []  # the verb's sweep
+    # the verb's sweep, which since WP-2303 warns that the pattern names nothing
+    with pytest.warns(UserWarning, match=r"'phases\.0\.atoms\.\*\.adp\.\*'"):
+        assert project.refinement.hold("phases.0.atoms.*.adp.*") == []
 
 
 def test_releasing_a_pending_hold_reuses_the_unheld_answer(tmp_path_factory, tmp_path, monkeypatch):
