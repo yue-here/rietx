@@ -1363,6 +1363,18 @@ Anisotropic strain, and the matrix's canonical inadmissibility result — an imp
 
 **Diagnostics:** `STEPHENS_STRAIN_NOT_POSITIVE`
 
+#### `test_the_refined_surface_is_the_module_sum_and_shows_the_cone`
+
+`identity` · dataset `qarr` · survives 4 starts
+
+**Claims:** the strain surface drawn over every direction is the module's own strain variance, and the figure of the out-of-cone brucite block draws its negative region beside the guard's finding (WP-1318)
+
+**Referenced to:** sigma2_m itself: along every fitted reflection the surface equals sigma^2(M) d^4, with d from the lattice rather than the reciprocal frame, so a wrong frame cannot cancel; the figure's text carries the guard's own message
+
+**Measured:** agrees to rtol 1e-10 on every fitted reflection; the figure states the negative region and quotes STEPHENS_STRAIN_NOT_POSITIVE word for word.  The block is the brucite_aniso_trf fixture the unconstrained control row swept, out of the cone at all four seeds (19/19/19/17)
+
+**Diagnostics:** `STEPHENS_STRAIN_NOT_POSITIVE`
+
 #### `test_corundum_is_reported_isotropic`
 
 `characterisation` `ceiling` · dataset `qarr`

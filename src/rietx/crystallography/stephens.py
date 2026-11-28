@@ -233,6 +233,51 @@ def strain_width_deg(monomials: np.ndarray, s: np.ndarray, d: np.ndarray) -> np.
 
 
 # ----------------------------------------------------------------------
+# the directional surface — the same sum, read over the sphere (WP-1318)
+# ----------------------------------------------------------------------
+def reciprocal_frame(cell: tuple[float, float, float, float, float, float]
+                     ) -> np.ndarray:
+    """B, the reciprocal basis in a Cartesian frame: columns a*, b*, c* in Å⁻¹.
+
+    BᵀB = G*, so |B·h| = √M for any hkl.  B is the transpose of the lower
+    Cholesky factor of G*, which puts a* along x and b* in the x–y plane.  The
+    frame is a drawing convention; :func:`directional_sigma2` is the same in
+    any rotation of it.
+    """
+    gstar = np.asarray(reciprocal_metric_tensor(*cell), dtype=np.float64)
+    return np.linalg.cholesky(gstar).T
+
+
+def directional_sigma2(s: np.ndarray,
+                       cell: tuple[float, float, float, float, float, float],
+                       directions: np.ndarray) -> np.ndarray:
+    """σ²(M)/M² along each reciprocal-space direction, in units of 10⁻¹².
+
+    ``directions`` are unit vectors (n, 3) in :func:`reciprocal_frame`'s
+    Cartesian frame.  The hkl along a unit u that has M = 1 Å⁻² is B⁻¹u, and
+    (1) evaluated there is σ²(M)/M², since the quartic is homogeneous of
+    degree 4 and M of degree 2.  So the value is :func:`sigma2_m` itself, the
+    module's one sum, at non-integer hkl, and an integer reflection h along u
+    gives ``sigma2_m(h)·d⁴``.
+
+    √ of a positive value is the FWHM of the ΔM/M distribution in ppm along u,
+    the quantity of (2) without its d² and its degree conversion.  The
+    isotropic block of :func:`isotropic_coefficients` gives ε² in every
+    direction, so its surface is a sphere of radius ε.
+
+    Unfloored like :func:`sigma2_m`: a negative value is a direction where the
+    coefficients leave the physical cone.  The guard tests the frozen
+    reflection list and this tests the sphere, so the surface can show a
+    region below zero between the measured directions that the guard, by
+    design, does not report.
+    """
+    b = reciprocal_frame(cell)
+    u = np.asarray(directions, dtype=np.float64)
+    hkl = np.linalg.solve(b, u.T).T
+    return np.asarray(sigma2_m(monomial_matrix(hkl), np.asarray(s, dtype=np.float64)))
+
+
+# ----------------------------------------------------------------------
 # the isotropic limit — an exact point of the allowed subspace
 # ----------------------------------------------------------------------
 def isotropic_coefficients(cell: tuple[float, float, float, float, float, float],
