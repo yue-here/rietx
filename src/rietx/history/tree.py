@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from .._nearmiss import check_choice
 from ..crystallography.twins import (
     carry_action_constraints,
     carry_state_constraints,
@@ -478,6 +479,16 @@ class RefinementTree:
         return max(shared, key=lambda nid: self.order.index(nid))
 
     def best(self, metric: str = "rwp", *, minimize: bool = True) -> HistoryNode:
+        """The node whose statistics hold the smallest ``metric`` (the largest
+        under ``minimize=False``).  ``metric`` is a numeric
+        :class:`~rietx.schemas.results.Statistics` field; any other name is
+        refused, because no node carries it and the answer would read as
+        "nothing scored yet" (WP-2302)."""
+        from ..schemas.results import Statistics
+
+        check_choice("metric", metric, tuple(
+            name for name, field in Statistics.model_fields.items()
+            if field.annotation in (float, int, float | None)))
         scored = [n for n in self.nodes.values()
                   if n.metrics.statistics is not None
                   and getattr(n.metrics.statistics, metric, None) is not None]

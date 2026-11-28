@@ -19,7 +19,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Literal
 
-from .._nearmiss import did_you_mean
+from .._nearmiss import check_choice, did_you_mean
 from ..schemas.common import Mode
 
 # INTERMEDIATE_FTOL, CORRELATION_GUARD, PHASE_SUPPORT_SIGMA and
@@ -383,6 +383,27 @@ def fixed_at_end(stages: Iterable[Stage],
         if last is False:
             out.append(names[0])
     return out
+
+
+def refit_later(path: str, later: Iterable[Stage]) -> bool:
+    """Whether a path free now is free again in one of the ``later`` stages.
+
+    Read as :func:`fixed_at_end` reads a plan: the flags carry, ``turn_on``
+    frees and then ``turn_off`` fixes, so a free path stays free into the next
+    stage unless that stage's ``turn_off`` matches it.  This is the test of
+    "a later stage refits this stage's answer" that sizes a stage's window
+    slack (WP-2317 R7): a stage whose free path no later stage refits has a
+    final answer for it, and keeps the uniform slack.
+    """
+    free = True
+    for stage in later:
+        if any(fnmatch.fnmatchcase(path, g) for g in stage.turn_on):
+            free = True
+        if any(fnmatch.fnmatchcase(path, g) for g in stage.turn_off):
+            free = False
+        if free:
+            return True
+    return False
 
 
 @dataclass
@@ -1285,6 +1306,7 @@ class GuardFinding:
                                ) -> "GuardFinding":
         """``width="lorentzian"`` is Γ_L's finding: one code for both widths,
         since the action is the same for either (WP-2002)."""
+        check_choice("width", width, ("gaussian", "lorentzian"))
         if width == "lorentzian":
             return cls("RESOLUTION_NOT_POSITIVE",
                        ("instrument.profile.x", "instrument.profile.y"),

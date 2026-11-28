@@ -58,11 +58,14 @@ FLAT_TRIPLE = ("phases.0.gauss_size", "phases.0.gauss_strain", "instrument.profi
 #: five starts and neither at k = 20, which is the set Linux read on
 #: 2026-11-20 and 2026-11-21; zincite adds a ``FLOOR_HIT`` row on
 #: ``gauss_strain`` at four starts.  Corundum and brucite gave one set at all
-#: seven.  The pin holds what the platforms share, so :func:`firing_table`
-#: leaves these findings out, and every other finding on these standards is
-#: still pinned.
+#: seven.  Zincite's ``COVARIANCE_DIRECTION_DISCARDED`` on the triple joined
+#: the set with WP-2314's exact Biso column, which moves the solver's path at
+#: rounding level: it fires at k = 0 and at none of the six nudged starts, and
+#: ``FLOOR_HIT`` moves to ``gauss_strain`` at three.  The pin holds what the
+#: platforms share, so :func:`firing_table` leaves these findings out, and
+#: every other finding on these standards is still pinned.
 ROUNDING = {"fluorite": frozenset({"COVARIANCE_DIRECTION_DISCARDED", "FLOOR_HIT"}),
-            "zincite": frozenset({"FLOOR_HIT"})}
+            "zincite": frozenset({"COVARIANCE_DIRECTION_DISCARDED", "FLOOR_HIT"})}
 
 
 def decided_by_rounding(key: str, diagnostic) -> bool:

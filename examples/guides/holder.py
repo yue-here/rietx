@@ -97,7 +97,7 @@ from _holder_line import AREA, CENTER, FWHM  # noqa: E402
 # steel line, 8.4(97) -> 7.7(96).
 moves = {name: largest_move(r) for name, r in results.items()}
 assert {name: (round(m, 2), path) for name, (m, path) in moves.items()} == {
-    "ignored": (1.91, "phases.0.atoms.6.x"), "excluded": (0.25, "phases.0.atoms.6.x"),
+    "ignored": (1.90, "phases.0.atoms.6.x"), "excluded": (0.25, "phases.0.atoms.6.x"),
     "declared": (0.22, "phases.0.atoms.6.x")}
 assert declared.fitted_structure.phases[0].atoms[6].label == "O7"
 line = {n: result.parameter(f"instrument.extra_components.0.{n}") for n in ("center", "area", "fwhm")}

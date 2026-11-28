@@ -466,7 +466,7 @@ def test_twelve_seeds_recover_every_coefficient_without_bias():
             OUT.mkdir(exist_ok=True)
             plot_result(result, path=OUT / "peak_equations_recovery.png")
             plot_result(result, path=OUT / "peak_equations_recovery_zoom.png",
-                        two_theta_range=(55.0, 75.0))
+                        two_theta_limits=(55.0, 75.0))
     means = {k: float(np.mean(v)) for k, v in zs.items()}
     assert all(abs(m) < 0.5 for m in means.values()), means
 
