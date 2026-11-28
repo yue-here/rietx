@@ -241,6 +241,7 @@ Its first five fields describe the crystal, and the rest describe what this spec
 | `Phase.texture` | `SphericalHarmonicTexture` or `None` | `None` | spherical-harmonics texture, {eq}`corr-sh` |
 | `Phase.microstrain` | `StephensStrain` or `None` | `None` | anisotropic strain, a width per hkl, {eq}`ms-sigma` |
 | `Phase.particle_radius_um` | `float` or `None` | `None` | particle radius in µm for Brindley's microabsorption correction, {eq}`corr-brindley`; never refined |
+| `Phase.formula_units` | `int` (≥ 1) or `None` | `None` | formula units per cell, declared for a solid solution whose occupancies do not reduce; read only by the mole fraction per formula unit ([Phase fractions](qpa.md)); never refined |
 | `Phase.propagation_vector` | three rational strings, or None | `None` | a commensurate k on the conventional reciprocal cell, adding satellites at Q = H ± k, {eq}`sat-position` |
 | `Phase.magnetic_symmetry` | `MagneticSymmetry` or `None` | `None` | the magnetic space group, as its magCIF operator and centring loops, {eq}`int-Fmag` |
 | `Phase.restraints` | `list` | `[]` | soft restraints on bonds, angles and values, {eq}`par-restraint` |

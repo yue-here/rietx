@@ -455,7 +455,9 @@ def _start_with(edit) -> rx.Structure:
     (lambda ph: ph.restraints.append(
         rx.schemas.structure.BondRestraint(atom_i=0, atom_j=1, target=3.0, sigma=0.01)),
      "phases.0.restraints"),
-], ids=["texture-declared", "extinction-declared", "restraint"])
+    # a declared Z is the QPA's formula unit: two starts, two mol % (WP-1340)
+    (lambda ph: setattr(ph, "formula_units", 2), "phases.0.formula_units"),
+], ids=["texture-declared", "extinction-declared", "restraint", "formula-units"])
 def test_per_pattern_starts_must_agree_beyond_their_parameters(edit, where):
     """One model with different values: a field that is not a parameter and
     shapes a shared column is the model's, and two starts that disagree there

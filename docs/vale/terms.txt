@@ -96,6 +96,7 @@ microabsorption
 micrograph
 microstrain
 microstructure
+mol
 monatomic
 monochromated
 monochromator
@@ -118,6 +119,7 @@ orthorhombic
 oxygens
 pdCIF
 perovskite
+perovskites
 photoabsorption
 polycrystal
 polycrystalline
@@ -135,6 +137,7 @@ Shubnikov
 Sohncke
 spallation
 spinel
+stoichiometry
 structureless
 subcell
 sublattice

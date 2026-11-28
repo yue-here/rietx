@@ -75,6 +75,16 @@ The 1b docs recipe rests on one synthetic family and says so.
 
 ### Inherited
 
+- **2026-11-16, from [1340](1340-qpa-on-a-molar-basis.md).** `PhaseQuantity` now
+  carries `mole_fraction` (per unit cell), `mole_fraction_formula_unit` (per
+  formula unit, `None` on every row unless every measured phase's Z is
+  established), their esds and `z_source`, and
+  `QuantitativePhaseAnalysis.formula_unit_withheld` says why the second column
+  is absent. `write_qpa_table` (`io/exporters.py`, `QPA_COLUMNS`) and
+  `qpa_trajectory` carry none of them. Since this WP already reopens both
+  surfaces, add the mole-fraction columns there too, with a `#` line quoting
+  `formula_unit_withheld` when it is set, so a table never shows a
+  per-formula-unit column on two bases.
 - **2026-11-21, issue triage (#1653 items 1 and 2): two more fields the table and the
   trajectory do not carry.** WP-1942 (PR #1642, open on 2026-11-21) adds
   `PhaseQuantity.element_counts` and `QuantitativePhaseAnalysis.weight_fraction_covariance`.

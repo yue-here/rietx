@@ -216,6 +216,7 @@ Maxwellian
 [mM]icrostructure
 [mM]inimisations
 [mM]oduli
+[mM]ol
 [mM]onatomic
 [mM]onochromated
 [mM]onochromator
@@ -258,6 +259,7 @@ Pawley
 [pP]dCIF
 [pP]entadiagonal
 [pP]erovskite
+[pP]erovskites
 [pP]hotoabsorption
 Pitschke
 [pP]lanarity
@@ -333,6 +335,7 @@ Sohncke
 Stegun
 Stinton
 Stoe
+[sS]toichiometry
 [sS]tructureless
 [sS]ubcell
 [sS]ubcommand

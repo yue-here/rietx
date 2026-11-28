@@ -442,6 +442,26 @@ within 0.26 % of the nuclide's mass above A = 4. These are fractions of the mode
 crystalline content, so they still sum to 1 when an amorphous fraction is
 present.
 
+Mole fractions come from the same scales. Dividing the weight by the cell mass
+leaves the number of unit cells, $n_p \propto S_p V_p$, and multiplying by $Z$
+counts formula units:
+
+```{math}
+:label: corr-qpa-mole
+
+x_p \;=\; \frac{S_p\, V_p}{\sum_q S_q\, V_q}
+\quad\text{(per unit cell)},
+\qquad
+x_p \;=\; \frac{Z_p\, S_p\, V_p}{\sum_q Z_q\, S_q\, V_q}
+\quad\text{(per formula unit)},
+```
+
+{source}`rietx.optimize.qpa.mole_fractions`
+
+with the same Jacobian and correlated scale block as {eq}`corr-qpa`. The two
+bases agree only where every phase's cell holds the same number of formula
+units.
+
 When phases differ in absorption, coarse particles of an absorbing phase shadow
 their own interiors. That is the Brindley microabsorption effect
 {cite}`brindley1945`. In the parallel-path approximation for a sphere of radius
