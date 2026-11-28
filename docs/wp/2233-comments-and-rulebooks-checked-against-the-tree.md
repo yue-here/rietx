@@ -253,6 +253,24 @@ alongside any other edit fails, and a pull request with no base fails.
 
 ## Handover log
 
+- **2026-11-28** — repair, by a ghostshift close-only runner (PR #1879). The session-start
+  scan flagged two `WP-2233:` commits made after this file was last touched. The entry below
+  records them. They were CI fixes on the closing PR, #1757, and reopen no work. Nothing else
+  changed, and the status stays ✅. Both entries correct this WP's own record and ask for no work.
+
+- **2026-11-21** (reconstructed post hoc) — two commits landed after the close entry. Both rode
+  PR #1757 before it merged as `e439a8f48` that evening, and CI was green on its final head
+  `f1e524fda`. The rulebook path check passed in the session's checkout and failed in CI. A
+  build output, `docs/docs/_generated`, existed locally and not in CI's clean checkout.
+  `0b536d21c` made the rulebook check and the comment check ask git instead of the disk. A path
+  `.gitignore` covers counts as generated and passes on every checkout. CI still failed,
+  because `git check-ignore` matches the directory-only rule `docs/docs/_generated/` against the
+  bare path only while the directory exists. `16734c9b6` makes `code_references.generated()`
+  ask with a trailing slash too. Its planted test now checks a missing directory,
+  `kernels/target`, and no longer creates `_generated` mid-suite. Both commits changed
+  `tests/code_references.py` and `tests/test_docs_consistency.py` only. The commits do not say
+  whether the fast suite ran locally after them.
+
 - **2026-11-21** — closed, every task ticked. A comment, docstring or rulebook that cites
   code, a file or a test the tree no longer has now fails CI with the citing file and line.
   The always-loaded rulebooks have byte budgets read from the base, so a change cannot raise

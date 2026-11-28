@@ -198,9 +198,10 @@ def test_a_tie_makes_one_column_carry_both_dependents():
 
     Exact by the chain rule at coefficient 1, and measurable one column at a
     time by freeing each Biso alone — so this says the tie is *carried*, not
-    merely that the column looks plausible.  The peak-chain branch handles it
-    because it re-derives from ``table.decode``; the assertion is what would
-    fail if a branch computed only the path it was named for.
+    merely that the column looks plausible.  The site branch handles it
+    because it reads every Biso row the column moves off C (WP-2314); the
+    assertion is what would fail if a branch computed only the path it was
+    named for.
     """
     tie = [("phases.0.atoms.1.biso", AffineTie.identity("phases.0.atoms.0.biso"))]
     b0 = _column(make_rutile(), ["phases.0.atoms.0.biso"], "phases.0.atoms.0.biso")
@@ -208,8 +209,9 @@ def test_a_tie_makes_one_column_carry_both_dependents():
     tied = _column(make_rutile(), ["phases.0.atoms.0.biso"],
                    "phases.0.atoms.0.biso", ties=tie)
     assert np.linalg.norm(b1) > 0.01 * np.linalg.norm(b0), "degenerate test state"
-    # 3.1e-8 measured; the floor is the peak chain's own per-reflection FD, and
-    # a dropped dependent would be 20-30 % of the column, not 1e-5 of it
+    # 2.2e-16 measured on darwin/arm64, rounding, since the site branch is
+    # analytic (3.1e-8 on the peak chain's FD before WP-2314); a dropped
+    # dependent would be 20-30 % of the column, not 1e-5 of it
     assert np.allclose(tied, b0 + b1, rtol=0, atol=1e-5 * np.abs(b0 + b1).max())
 
 

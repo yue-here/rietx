@@ -159,6 +159,25 @@ above, which come from lab and synchrotron single-phase patterns
 
 ### Inherited
 
+- **2026-11-28, from the issue triage (#1852, a bug in an output): the sum
+  `PAWLEY_OVERLAP_UNRESOLVED` names as the datum has no esd anywhere.** The
+  diagnostic says "Use the group's summed intensity as the datum". The fit
+  forms the full covariance of table and intensities, then keeps the
+  intensities' esds (`model.pawley.stderr = stderr_full[n_table:]`) and slices
+  the correlation to the table block (`corr_full[:n_table, :n_table]`,
+  `optimize/least_squares.py:3910-3914` at `02341ffdb`; the blocked path does
+  the same). `_pawley_unresolved_diagnostics` (`refine.py:10560`) reads only the
+  per-member esds. So a caller can form only √(σ₁² + σ₂²). The reporter's
+  synthetic case (`P m m m`, a = 5.000, b = 5.003 Å, the (0 1 2)/(1 0 2) pair):
+  ρ = −0.919, the sum's esd from the covariance 2.98, the caller's √(σ₁² + σ₂²)
+  10.29, so the caller's number overstates the datum's uncertainty 3.5×. Their
+  numbers, not re-run here; the code path is as they describe. The reporter
+  offers (a) the group's sum and its esd gᵀCg on the diagnostic or on a typed
+  overlap-group row, or (b) the intensity block of the correlation, or a
+  `sum_esd(indices)` helper, on the result. Rule 4 ("the statistic travels with
+  any verdict") leans to (a): the verdict is the group's, so its statistic rides
+  with it. That is an API shape the session working this settles under Rules 4
+  and 5. A bug task beside the two absolute floors below.
 - **2026-11-27, from WP-2317: on a large cell Pawley is 3-7× faster than Le Bail
   and lands at a third of its Rwp.**
   - Measured on a synthetic 12 × 36 × 4 Å cell (one run each, Linux, `[dev]`):
@@ -166,7 +185,9 @@ above, which come from lab and synchrotron single-phase patterns
     reflections; Pawley 125.4 s, 0.042 against Le Bail 351.8 s, 0.145 at 1 601.
   - WP-2317 puts Rule 5's Le Bail fence (R3) to the maintainer, including
     whether "route a large cell to Pawley" is the answer for a user at the wall
-    on Le Bail. That would close WP-2316 on its angle 9.
+    on Le Bail. That would close WP-2316 on its angle 9. *Ruled 2026-11-27: the
+    fence is lifted and Le Bail follows practice, so WP-2316 proceeds. This WP's
+    route (a), Pawley as the default where rietx picks, is unchanged.*
   - WP-2316 task 1 asks why Le Bail lands so much worse here. Its answer may
     bear on this WP's site-by-site choice. *Answered 2026-11-27 by WP-2316:
     the threefold Rwp came from the probe's unseeded background, so the
@@ -267,6 +288,8 @@ above, which come from lab and synchrotron single-phase patterns
   The arm was retired to this WP on 2026-11-13, settled by Claude under Yue's
   2026-11-05 ruling, and Yue raised no objection. If this WP retires Le Bail from the
   structure-free sites, the joint refusal is already the end state and needs no work.
+
+- **2026-11-08, from the issue triage (#1451): the empty-phase refusal does not name the structure-free route.** `Phase(atoms=[])` raises `phase 'bare' has no atoms` (`schemas/structure.py:1762`). The rule stands (the `lebail_scaffold` docstring: "The dummy atom is mandatory, not a convenience"), but the message names no way out. `rietx.schemas.structure.lebail_scaffold` (`:1974`), which both structure-free modes use, is not a top-level export, and the manual names it once (`docs/docs/start/first-fit.md:230`). An agent needing a bare-cell phase for an approximant Le Bail met only the refusal and wrote a dummy site by hand. Checked against the tree at `63d7c120a`: the issue's snippet raises that `ValidationError` and `hasattr(rietx, "lebail_scaffold")` is `False`. The reporter's suggestion: keep the rule, have the refusal name `lebail_scaffold(space_group, cell)` and say the lebail and pawley modes hold its dummy atom fixed, and export the scaffold beside `Phase`. The message is cheap. A top-level export grows the public surface (`tests/api_surface.py` partition, the skill's API page at its cap), so it is the maintainer's call, best made with decision 3's rename, which keeps `lebail_scaffold`'s name.
 
 - **From WP-1542, 2026-11-05: whether a Le Bail result's final compile should
   re-partition. Decide it or retire it with this move.** `_final_compile` carries the

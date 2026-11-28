@@ -1,6 +1,6 @@
 # WP-2317 — a large cell fits as fast as its reflections allow: the case, the bar, and the rulings in the way
 
-Milestone: unscheduled · Status: 🔄 2026-11-27 — tasks 2, 4 and 6 done (PR #1864); task 1 and task 3's R0-R7 wait on the maintainer, 5, 7 and 8 open
+Milestone: unscheduled · Status: 🔄 2026-11-28 — R0, R2, R3 and R5-R7 ruled, R4 unruled; R7 built, in PR #1881, waiting on the maintainer; task 1 waits on the maintainer; R6, 5, 7 and 8 open
 Track: A large cell
 Depends on: —
 Priority: P2 2026-11-27 — the scoping WP of a track the maintainer opened for a user at the wall (slowdowns on a 12 × 36 × 4 Å cell); 2314, 2315 and 2316 read its case, its bar and its rulings
@@ -51,6 +51,34 @@ Until the maintainer answers, a successor WP treats (a) as the working reading a
 holds (b) for a ruling. The compiled tier already has a bar of kind (a):
 `compiled.py` rule 3 holds `solve_orbit_sums` to 1e-13 relative. R0 asks whether
 that bar extends to a converged fit.
+
+**Ruled 2026-11-27 (R0): allow both kinds of move.** The 1e-3 esd and 1e-7 Rwp
+figures in (a) were Claude's proposal and were never ruled. A second independent
+review withdrew them the same day: a 1-ulp change in `exp` already moves a
+converged fit 0.2-0.5 esd (WP-1940), so no regrouping could meet them. A
+regrouping is verified at fixed parameters (`compiled.py` rule 3) and guarded on
+the whole fit by the measured spread (`test_compiled_kernels.FIT_THETA_ESD`), with
+old and new goldens recorded in the WP. The maintainer generalised it (dictated, one word corrected): "our accuracy threshold should just
+be comparable with other Rietveld refinement codes. We don't need to be much more
+accurate than them. Consider the user and the amount of accuracy they need on
+different measurements. For common applications. This should be a general rule
+for the repo." It is now DESIGN-RULES Rule 5 *Arithmetic accuracy*, so a speed
+change answers to that bar and Rule 2's pinned-number test governs model changes.
+
+**Ruled 2026-11-27, later (R0 clarified), "in spirit".** A Claude draft had set the
+level at a tenth of each quantity's esd, borrowed from McCusker et al. (1999, §7).
+The maintainer never ruled that number, and it would have reversed the 2026-11-19
+window ruling. His words: "all my comments arise from the same intent: rietx should
+strive for a level of accuracy sufficient for users rather than wasting compute.
+evidence for this comes from other codes, which clearly have been sufficient for
+existing users." Then: "Whether or not 1e-9 should be the bar is not important to
+me: as long as you understand the intent and are able to make appropriate judgement
+on this tradeoff based on that knowledge going forward, I'd like to leave the
+details of judgement and implementation to you." So the level is what the
+established programs deliver to their users, and the esd is the unit an error is
+read in. Claude settles each speed-accuracy trade under that intent and lists it
+under *Settled for you*. Rule 5 *Arithmetic accuracy* carries the level. The window
+ruling of 2026-11-19 stands: 2 % windows, closing stage off.
 
 **Probe 1, the synthetic stand-in** ([`2317-probe/probe1_bigcell.py`](2317-probe/probe1_bigcell.py)):
 - 12 × 36 × 4 Å, P2₁2₁2₁;
@@ -284,6 +312,7 @@ what it costs here.
   `compiled.py` rule 3 already admits a stated bound for a transcendental. The
   convention forbids every reassociation (`np.bincount` for `np.add.at`, a
   vectorised atom loop, a fused kernel), and R0 (a) is the proposed replacement.
+  *Closed 2026-11-27 by R0.*
 - **R2 — a Le Bail partition settles to 1e-7 of the Bragg counts with the model
   frozen.**
   - *Where:* WP-1542, under WP-2002's ruling B11; `lebail_tol` = 1e-7 settled by
@@ -311,6 +340,12 @@ what it costs here.
     sentence also fences even a bit-identical Le Bail kernel that no ruling asked
     for.
   - *Question:* does a user at the wall on Le Bail count as the ruling that asks?
+  - **Ruled 2026-11-27 (R2, R3): follow best practice and lift the fence.** The
+    maintainer also ruled that the Le Bail and Pawley speed work goes ahead
+    whatever the user's case shows, since cells this size are met in the wild.
+    He asked why rietx diverged from practice here, and that every cascading
+    change is found and made with it. Rule 5 *Structure-free fitting* now says
+    Le Bail follows the established programs' practice.
 - **R4 — the width floor is held inside the step in every mode** (WP-1938 D8,
   WP-2153).
   - *Reasoning* (the `gaussian_width_inequalities` docstring): without the row,
@@ -332,6 +367,16 @@ what it costs here.
   invariant says profiling a linear block out "cannot buy an evaluation", but that
   Pawley *dimension* is "a per-step cost", and that a bounded block leaves the
   identity once a bound is active. On a large cell the dimension is the cost.
+  - **Ruled 2026-11-27 (R5): "go (b)".** Reflections whose d coincide for every
+    metric of their Laue class (cubic 333/511, hkl/khl under 4/m) merge into one
+    intensity column, the sum measured and each member's share unmeasured.
+    Accidental coincidences (b ≈ 3a) keep the restraint while their practice is
+    surveyed. Built under WP-2315.
+  - **Ruled 2026-11-27 (R5 c): "follow your recommendations".** Accidental
+    coincidences keep the soft restraint, retargeted to equal F², and report the
+    group sum as the measurement. Practice mostly ties nothing (TOPAS), or ties
+    only in low symmetry (GSAS-II) or in a hybrid step (RIETAN-FP)
+    (`docs/practice.md` § Accidental overlaps during extraction).
 - **R6 — the stopping rule.**
   - *rietx:* intermediate stages at 1e-6 (`intermediate_ftol`, WP-1123), the last
     declared stage at the solver's 1e-9. The closing stage is **off by default
@@ -341,6 +386,89 @@ what it costs here.
     is under `Eps` × its esd (0.2 "or lower").
   - *The question:* is 1e-9 on the last stage more than "on par" buys? It is a
     kind (b) move under R0.
+  - **Ruled 2026-11-27 (R6): "Start with your recommendation. Consider best
+    practice."** The recommendation: the last stage stops on a FullProf-style
+    test, every free parameter's last shift under a fraction of its esd, with the
+    fraction measured against FullProf's 0.2 and GSAS-II's answer on the bench
+    cases. The three compounding places keep 1e-9 through a plan field. The change
+    is measured before the default moves.
+  - **Measured 2026-11-27 (`2317-probe/convnoise/RESULTS.md`), and the
+    recommendation withdrawn: settled by Claude under that measurement.** Five single
+    fits (SRM 660c, FAP, NAC, cpd-1a, the COD large cell) and two series (CuCr₂O₄,
+    17 patterns; cpd-1, 8 patterns) ran each stop as a real stop on the last stage.
+    - A FullProf 0.2 or GSAS-II-like stop **alone** is unsafe. On cpd-1f both
+      stopped mid-crawl with `axial_sl` 18 esd from the answer and χ²_red 9 % high,
+      and reported converged. The 1e-4 and FullProf 0.1 stops landed within 0.1 esd.
+    - Single fits: every stop holds every family under 0.06 reported esd; 1e-6
+      under 0.0075. The last stage is 9-29 of 40-165 evaluations, so 1e-6 saves
+      0-9 % of a fit.
+    - Series: the stop is most of the bill (CuCr₂O₄ 1 293 evaluations at 1e-9,
+      1 089 at 1e-8, 695 at 1e-6). At 1e-6 the 1 wt% CuO cell sits 0.68 esd off.
+      At 1e-8 every quantity is under 0.072 esd (cpd-1 profile), a margin of 1.4×
+      on development data.
+    - The floor is zero on single fits (≤ 4.5e-6 esd) and not on a series: on
+      cpd-1 one start in ten moves `axial_sl` 0.5 esd. The large cell's apparent
+      second minimum was a fixture defect (`co_sited()` rounds to 1e-4, so the
+      nudge decided two ties), found by `2317-probe/errmeasure/`.
+    - χ²-based decisions keep ≥ 100× margin over a single fit's stop, except
+      profile-interval refits, whose settle tolerance a GSAS-like stop exceeds.
+    - ~~**Settled:** the shipped schedule stays (1e-6 intermediate, 1e-9 last). The
+      runner-up, 1e-8 on the last stage, saves 7-16 % of a series and 0-4 % of a
+      single fit, at a 1.4× margin measured only on development data.~~ That
+      margin was against the tenth-of-an-esd draft level, which R0 clarified
+      withdrew.
+    - **Re-settled 2026-11-27 by Claude under R0 clarified: the last stage stops
+      when every free parameter's shift is under 0.1 of its esd.** That is the
+      field's test of a published refinement (McCusker et al. 1999 §7; checkCIF
+      alert B above 0.10), so it is parity with what other programs' users
+      publish. Their default stops are not parity: GSAS-II's 1e-3 and FullProf's
+      0.2 ended cpd-1f 18 esd off and reported convergence. Measured against the
+      1e-9 answer (`2317-probe/convnoise/RESULTS.md`, addendum for 1e-7):
+
+      | stop | CuCr₂O₄ ramp evals | worst (esd) | cpd-1 evals | worst (esd) |
+      |---|---|---|---|---|
+      | 1e-9 (shipped) | 1 293 | 0 | 517 | 0 |
+      | 1e-8 | 1 089 | 0.006 | 479 | 0.072 |
+      | 1e-7 | 917 | 0.022 | 442 | 0.22 |
+      | shift/esd < 0.1 | 363 | 1.2 | 322 | 0.071 |
+      | FullProf 0.2 | 300 | 1.7 | 312 | 18 |
+      | GSAS-II 1e-3 | 183 | 1.8 | 269 | 18 |
+
+      The worst entry on the ramp is the cell of CuO at about 1 wt%, on a flat
+      valley; the main phase stays under 0.053 esd. A departure of one esd is
+      inside the error bar the user is shown, and it is what a FullProf user
+      reporting shift/esd 0.1 gets. Single fits stay under 0.06 esd at every
+      stop. Runner-up 1e-7 holds every quantity to 0.22 esd at 2.5× the
+      evaluations on the ramp; it loses on the intent (accuracy no user reads,
+      paid in compute). The three compounding places (WP-2222) keep 1e-9 through a
+      plan field. The measured test used the damped LM step, and a crawl takes
+      short damped steps, so the implementing change tests the shift of the
+      undamped Gauss-Newton step, which a crawl cannot shrink. It re-pins goldens
+      (R0) and checks that profile-interval refits still settle.
+    - **The two programs' stops in their own programs** (Measured 2026-11-27,
+      `2317-probe/foreign_stops/RESULTS.md`). Each program was compared with
+      itself, default stop against tight, from its own warm start on cpd-1f.
+      - GSAS-II's 1e-3 test leaves the answer short at home too, and says
+        converged: on cpd-1f 13 cycles, χ² 0.38 % high, zincite c* 16 esd off,
+        Zero 14, Shift 12. One default `Refine` (3 cycles) is 34 esd off and says
+        not converged. Its own floor between two tight starts is 1.5 esd. On the
+        CuCr₂O₄ ramp in sequential mode, 1e-3 alone has all 17 patterns say
+        converged with the CuO Dij 10.5 esd and U 52 esd off.
+      - FullProf's Eps 0.2 does not: 12 cycles and 0.08 esd from its tight run,
+        with `S_L` held. Its steps are undamped Gauss-Newton, so a crawl does not
+        shrink them. That is why the implementation tests the undamped step.
+      - For GSAS-II, the in-solver failure (18 esd) carries over to its own
+        program. For FullProf, it came from rietx's damped steps. Either way the
+        rule's sentence ("their thresholds do not carry over") stands.
+      - Program defects seen (recorded, not acted on): GSAS-II accepted
+        χ²-raising steps and still said converged; it lets W go negative; it
+        refuses cell refinement in sequential mode. FullProf printed
+        "Convergence reached" after diverging to NaN from rietx's `seed_scales`
+        start, froze U, V, W once the Gaussian FWHM² went negative, and quotes an
+        `S_L` esd about 23× GSAS-II's (inference: too small).
+    - Unexplained, recorded for a later WP: the reported χ² differs from the χ²
+      the solver minimised by 0.2-2.1 χ²_red at the answer, and that gap moves
+      0.1 χ²_red between nearby answers.
 - **R7 — `WINDOW_MIN_DEG` = 0.3° of movement slack per window side**
   (`src/rietx/model/forward.py:234`).
   - About 30 of the probe's ~122 points a window (~25 %) are slack at a 0.02°
@@ -348,11 +476,17 @@ what it costs here.
   - The slack could be sized from the stage's own moving position parameters
     instead. This is a kind (b) move, and it is not WP-2051's per-evaluation
     windows.
+  - **Ruled 2026-11-27 (R7): "follow your recommendations".** The slack is sized
+    per stage from the stage's free position parameters, with a refit on fresh
+    windows when `window_loss` passes its tolerance. No surveyed program adds
+    movement slack, since they rebuild windows or freeze them with none
+    (`docs/practice.md` § Room for a peak to move inside its window).
 - **R8 — the bench measures the shapes it was built on.** No
   `bench_refinement.py` case has more than ~1 200 (line, reflection) pairs or
   ~15 atoms in a phase. So v1.1's ranking under-weights every term that grows with
   the atom count or the reflection count, which WP-1111 said of its own
   baselines.
+  *Closed 2026-11-27: task 2's four bench cases (PR #1864).*
 
 **Angles beyond the three WPs** (kept open, not yet measured):
 
@@ -375,6 +509,55 @@ what it costs here.
 - **Iterations, not only cost per iteration:** R6, and task 5.
 
 ### Inherited
+
+- **2026-11-27, research for the rulings (three read-only agents; file:line in
+  their reports, summarised here).**
+  - *Why Le Bail diverged (R2).* The extraction has sat between solves since v0.1
+    (`f51e8e67b`), under the frozen-per-stage rule written the same day. WP-2062
+    states the reason: the trust region judges each step against one fixed
+    objective. Ruling B11 (2026-10-19) asked to "repeat until the intensities stop
+    changing" on the premise that every refiner does so; none surveyed does
+    (`docs/practice.md` § Structure-free fitting). WP-1542 built the settled
+    partition to it, on issue #740 (Rwp 4.56 % at 3 cycles against 1.09 % for the
+    true structure) and on `test_window_domain.py` bar 1, a bar written for peak
+    windows. The fence came from a delegated settlement in WP-1542, not a ruling of
+    the maintainer's.
+  - *Cascade of a per-cycle extraction.* LM needs a between-iteration hook and a
+    gain-ratio rule for a moving objective. The intensity snapshots
+    (`least_squares._lebail_snapshot`, `traced.py`) freeze per solve.
+    `lebail_passes`, `LEBAIL_CONVERGED_REL`, `LEBAIL_CYCLES_AT_CAP`,
+    `StageResult.lebail_cycles_run`/`.lebail_settled` and `StageSpec.lebail_tol`/
+    `lebail_cycles` change meaning. A new `NodeAction` field is a stored-format
+    change and goes to the maintainer. The extinction screen's prefit, the GUI
+    (wizard default, Adopt, `.rxt` words, dist), `help.py`, `_audit.py` rows, the
+    manual's `fm-lebail-stop` equation, the skill's two rows and WP-2017 group Q
+    follow. Tests: `test_lebail_cycles.py`, `test_lebail_alternation.py`, NAC,
+    SRM 676a and indexing acceptance, validation-matrix rows. Unchanged: the
+    Pawley seed, the report's `lebail_gap`, the `toy_lebail` goldens. Risk:
+    #740's 3-cycle plateau returns unless the stop reads the χ² change per
+    extraction and an initial extraction runs first (FullProf: "say 10").
+  - *R0's cascade into the root CLAUDE.md.* The compiled tier's rule 3
+    ("associations as written") and the `_orbit_terms` association clause predate
+    R0. The off-state clause stays bit-identical (Rule 4). Rule 3 is revisited
+    when a kernel first regroups.
+  - *R5.* GSAS-II's merged Pawley intensities are not symmetry equivalents, which
+    both codes already merge into one reflection. GSAS-II ties (b) lattice-forced
+    coincidences by integer identity in the higher Laue classes, and (c) any pair
+    within 1e-4 in d in -1, 2/m and mmm. The b = 3a case is (c). rietx groups
+    within 0.5 FWHM and restrains toward equal peak intensity, where the
+    equipartition convention is equal F². TOPAS ties nothing automatically.
+  - *R4.* GSAS-II clamps by value and its derivative ignores the clamp, so a
+    clamped reflection keeps pulling U, V, W back. FullProf's peaks vanish at
+    1e-10. RIETAN-FP refuses a step to a negative width. Every probe crossing was
+    on the Lorentzian rows.
+  - *R6.* `ftol` is the relative decrease in S over three consecutive accepted
+    iterations. GSAS-II stops at 1e-3 relative χ² (about 2 esd of joint movement
+    at N = 5 000, inferred), FullProf at shifts under 0.2 esd, TOPAS on
+    `chi2_convergence_criteria` for three cycles. Nothing looser than 1e-8 was
+    ever run on the last stage. WP-2045 kept 1e-9 after cpd-1b stalled at 1e-6.
+  - *R7.* 0.3° dates from v0.1 and became capture slack in WP-1112. WP-2002 B10
+    measured a largest move of 0.21° over four families. Sizing it per stage from
+    the free position parameters needs a bound on each one's movement.
 
 - **From WP-2316, 2026-11-27 (task 1): probe 1's Le Bail fit sat in a wrong
   valley, and the cause is its background seed.** Probe 1 starts every
@@ -424,6 +607,15 @@ what it costs here.
   Task 1's re-rating of 2314-2316 starts from these numbers. The driver,
   `2314-probe/drive_bigcell.py`, runs both arms and prints a bit-level digest.
 
+- **From WP-2315, 2026-11-28:** for R4's cost, the real-structure bench cases
+  never reach the constrained step. `bigcell-pawley` and `bigcell-pawley-120`
+  carry 3 544 and 6 272 width rows in their last stage and cross none, so the
+  in-step floor costs them nothing. Probe 1 still crosses on the same tree,
+  with the same instrument and start, so its crossings came from its
+  invented structure, not the U = V = Y = 0 truth. On the 120° case about
+  half the 15 s fit is `spilu`'s factorisation (WP-2315 Angle 4). WP-2315's
+  Context § Re-read on the real structure has the table.
+
 ## Non-goals
 
 - The fixes themselves: WP-2314 (structural columns), WP-2315 (Pawley step),
@@ -458,6 +650,10 @@ what it costs here.
       practice does. Record each answer here as a dated ruling, and push each into
       the `### Inherited` of the WP it unblocks: 2314-2316, and WP-2017 for R2's
       number.
+- [ ] R6 as re-settled: the last declared stage stops when every free shift of
+      the undamped Gauss-Newton step is under 0.1 esd, and a plan field keeps 1e-9
+      in WP-2222's three compounding places. Re-pin the goldens in the
+      same change (R0), and check that profile-interval refits still settle.
 - [x] Why the 40-atom `coordinates` stage took 119 LM iterations from the true
       coordinates. *Answered 2026-11-27 by the review: the first probe drew its
       atoms inside a 1/15.6 sub-box, 65 % of nearest neighbours under 1 Å. On
@@ -471,6 +667,11 @@ what it costs here.
       "on par" comparison, and it is the reference for "as fast as possible".
       *Done 2026-11-27 for all three modes (Context, Cross-code timing). Not
       done: GSAS-II from the seeded Le Bail background.*
+- [x] R7 as ruled: window slack sized per stage from its free position
+      parameters, one re-solve on fresh windows past the window fraction.
+      *Done 2026-11-28 in PR #1881 (`wp2317-window-slack`); its four held
+      items settled for landing before v1.13.0 (handover, 4th session).*
+- [ ] The joint runner's re-solve (`multi.py`), which R7 left out.
 - [ ] `backend="jax"` on the three bench cases once, under a runaway guard: wall,
       compile time, Rwp.
 - [ ] Skill: none until a fix lands. The interim advice (Pawley over Le Bail on a
@@ -498,6 +699,478 @@ what it costs here.
 - `docs/practice.md` § Structure-free fitting, § When a fit stops, § Peak-width limits.
 
 ## Handover log
+
+### 2026-11-28 (4th session) — R7 settled for landing: two series sized against uniform, the LaMnO₃ control, a fit that fires the stale-window warning (runner 5)
+
+On 2026-11-28 the maintainer directed that PR #1881 land before v1.13.0. The
+four items the PR held for the maintainer are now settled by Claude, and that
+direction approves the stored-format field. Two measurements were run to
+settle them. Sized against the uniform 0.3°, R7's slack moves no refined value
+of two series past what rounding moves it. The LaMnO₃ control shows that the
+sized slack alone causes the Le Bail partition's extra cost there.
+
+**Settled for the maintainer** (each settled by Claude under the grounds named;
+the PR body carries the full text).
+1. `NodeAction.movement_slack` is kept as a stored field. Settled by Claude
+   under the sibling rulings on `ReflectionState.merged_groups` (2026-11-27)
+   and `lebail_extraction` (2026-11-28). The maintainer's 2026-11-28
+   direction to land #1881 approves it. No code change.
+2. `STAGE_WINDOWS_STALE` staying silent on the cpd-1b runaway is correct.
+   Settled by Claude under the code's own rule: it reads the stage's last
+   solve, and the re-solve's windows hold their peaks. A fit-level case now
+   fires it (below).
+3. `WINDOW_MOVE_FWHM` = 3 is kept, and the audit row is
+   `approved_by="checked"` again. Settled by Claude under DESIGN-RULES Rule 5
+   *Arithmetic accuracy*, on the series below. Neither series moves a quantity
+   systematically. The largest mean shift is 0.059 esd on the lab chain and
+   0.005 esd on the synchrotron ramp. On the lab chain the shipped stop
+   departs 0.071 esd and FullProf's 0.08, so the sized slack stays under what
+   the established stops leave. The alternative, the uniform 0.3° everywhere,
+   gives up the synchrotron points for no measured accuracy.
+4. LaMnO₃'s non-strict xfail and the WP-2017 group Q filing are kept, now
+   with the uniform-slack control (below).
+
+**Done.**
+- `test_window_loss.py::test_a_fit_whose_last_stage_outgrew_its_windows_reports_them`
+  (`59dcc925a`). The last stage declares `window_slack_deg` 0, which declines
+  the re-solve, and moves the cell, the zero and the width from peaks at half
+  their true width. Its windows drop 45 % at the answer and the warning
+  fires. The default slack on the same plan stays under 2 % and is silent.
+  The audit row's evidence cites it. `STAGE_WINDOWS_STALE`'s help names the
+  declared-slack case (`771626a40`).
+- LaMnO₃'s control in WP-2017's `### Inherited` group Q entry (`adc97deb2`).
+- `WINDOW_MOVE_FWHM`'s audit row: the series evidence, `approved="2026-11-28"`,
+  `approved_by="checked"` (`4e18667a4`).
+- Merged `origin/main` `300853e90` (`729cf1b4a`), no conflict.
+
+**Measured** (macOS arm64, this worktree's `[dev]` venv, a machine shared with
+other runners' suites, all development data). The uniform arm is R7's code
+with `staged.refit_later` patched to `False`, so every stage compiles the
+uniform 0.3° and the re-solve stays. Shifts are sized minus uniform, in the
+unnudged uniform fit's esd. The starts are the unnudged one and seeds that
+nudge every parameter by 1e-12 relative (`2317-probe/errmeasure`'s method). A
+quantity departs systematically when its mean shift passes 0.1 esd and twice
+its standard error.
+- cpd-1 chain (`test_acceptance_sequential.py`'s `chained` protocol, 8 lab
+  patterns, `qpa_plan` with its closing stage, so every warm stage is sized),
+  11 starts, 360 quantities. Largest mean shift +0.059 esd (cpd-1h
+  `profile.v`, se 0.033). No quantity departs systematically. Largest single
+  pair 0.31 esd, inside the 0.35 a rounding-level change gives on this chain
+  (errmeasure M2). Cells: mean 0.008 esd at most. Weight fractions: 0.006 esd.
+  LM iterations over the 11 runs: 5 548 sized, 5 639 uniform.
+- CuCr₂O₄ ramp (17 patterns from 11-BM, λ = 0.413 Å; `mccusker_default`
+  warm-started, as `2317-probe/convnoise/series.py` builds it). With the shipped closing stage
+  declared, every warm stage is sized (21 of 55 compiles). Over 5 starts and
+  425 quantities the largest mean shift is 0.005 esd (the CuO minor phase's
+  cell b), and so is the largest single pair. On the default route, with no
+  closing stage, the warm rung is one answer stage, so only pattern 0's cold
+  plan sizes (4 of 38 compiles) and nothing moves past 0.001 esd. LM
+  iterations per run change by −1 % to +4 %, and wall time is about equal
+  (69-159 s default, 378-449 s with the closing stage, on a loaded machine).
+- LaMnO₃, the bar-1 protocol on the four starts. Closing-stage cycles
+  9 188, 10 094, 25 000 and 7 742 uniform, which is main to the cycle, at Rwp
+  17.30-17.32 %. Sized: 25 000, 25 000, 22 376 and 22 682 at 16.94-16.96 %.
+  No stage re-solved in either arm. Values within 0.28 esd (cell c).
+- `python -m tests.reader_output`: exit 1, the lines the PR body declares
+  and no others.
+- Fast suite through `serial.py`, on `adc97deb2` (this session's test
+  added): 15 941 passed, 467 skipped, 30 xfailed, 0 failed (830 s). Passed
+  plus skipped moved +7 against runner 4's run; this session added 1 test,
+  and the merged main the rest. After the audit row's edit, the audit, audit
+  delta and help files: 77 passed.
+- Ruff clean. CI's Vale steps: 0 errors (one fixed, a bare `window_slack_deg`
+  in the new help sentence, now in backticks).
+- Slow rows that read the window slack, two functions a command:
+  `test_window_domain.py`'s per-stage movement and stale-window rows, 15
+  passed (42 s); the hostile pair's runaway and LaMnO₃'s bar row, 1 passed
+  and 1 xfailed (444 s). No measured number moved this session, so the full
+  suite was not rerun.
+
+**Blind review** (a fresh subagent, `generality-review` on Opus, given the
+numbers and Rule 5, not the pick). On the cpd-1 chain alone it judged the row
+weak. Lab data barely changes the windows (0.98-0.99× the uniform points on
+cpd-1a), so a null there was near certain. It asked for the same comparison on
+a synchrotron series. Given the ramp, it judged that the
+row holds and that `approved_by="checked"` is supported. Its open point: no
+series was measured from a cold cell start or with a free wavelength, which
+move peaks furthest, and the joint fit has no re-solve.
+
+**Next.** (1) The joint runner's re-solve (`multi.py`'s stage loop is inline,
+so the stage body is factored first). (2) The LaMnO₃ cap, in WP-2017's group Q.
+
+### 2026-11-28 (3rd session) — the two Le Bail failures are R7's: one pin moved, one cap question filed (runner 4)
+
+Both full-suite failures are R7's. A snapshot of main (`9f3dd5542`) ran
+the two rows alone: 2 passed (80 s). The branch merged with main
+`cd4a461f1` failed both (553 s, beside another runner's suite).
+
+- **The nudged runaway pin moved with the trajectory.** The row asserts
+  that on macOS arm64 a start nudged by k × 1e-14 in cell a reaches a
+  non-finite model. R7's windows move the trajectory. Of k = −4 to +3,
+  only +3 (once) and −4 (twice) still reach `STAGE_NOT_FINITE`, and
+  `CELL_RUNAWAY` fires at every k. The row is re-pinned to k = +3, and its
+  docstring says why. It passed on the branch. The injected rows of
+  `test_non_finite_stage.py` cover the mechanism through `fit` on every
+  platform.
+- **LaMnO₃'s closing partition now costs more than half the cycle cap.**
+  `test_the_tolerance_meets_its_bar[lamno3]` asserts that the 25 000-cycle
+  default holds twice the dearest partition. The plan is `profile_only` in
+  Le Bail mode, with the opt-in closing stage declared. The closing
+  stage's cycles, at the pinned start and three starts 1e-4 apart in a
+  (about 0.1 esd):
+
+  | start (a ×) | main | R7 |
+  |---|---|---|
+  | 1 | 9 188 | 25 000 (cap) |
+  | 1.0001 | 10 094 | 25 000 (cap) |
+  | 0.9999 | 25 000 (cap) | 22 376 |
+  | 1.00001 | 7 742 | 22 682 |
+
+  At the pinned start, the cell and profile values agree within 0.2 esd.
+  R7's Rwp reads 16.95 % on every start, against 17.30 % on main. Bar 1
+  (the shipped curve against a partition carried to a tenth of the
+  tolerance) reads 0.048 σ, against 0.081 σ on main and a bar of 0.1 σ.
+  No stage re-solved (`window_refit_loss` is `None` on every stage), so the
+  cost comes from the sized slack of the intermediate stages. R7's fit now
+  carries `LEBAIL_CYCLES_AT_CAP`. The row is a non-strict xfail citing
+  WP-2017, and WP-2017's `### Inherited` carries the measurement under
+  group Q. A strict mark would rest on one platform's numbers.
+- Merged `origin/main` `cd4a461f1` (`9b67deee6`). The conflict was in
+  WP-2017's `### Inherited`, and both entries are kept.
+
+**For the maintainer**, a fourth item: the LaMnO₃ cost above. R7 makes this
+partition about 2.4 times dearer (median of four starts, 23 500 against
+9 600 cycles) and the fit lands lower in Rwp. Why the Rwp moves 0.35
+points while the values move under 0.2 esd is not measured. One possible
+cause is the unsettled partition itself. A branch run at the uniform 0.3°
+slack on the same starts would separate the sized slack from the rest of
+R7; it was not run.
+
+**Blind review** (a fresh subagent, given the evidence and not the picks).
+It agreed on LaMnO₃: a non-strict xfail, no change to the cap, and the
+question to the maintainer. On the nudged pin it would drop the macOS
+assertion rather than re-pin it, since the pin will move again with the
+next trajectory change. Settled by Claude as a re-pin: it keeps the one
+real fit that walks into the non-finite path, at the cost of a re-pin when
+the trajectory moves.
+
+**Measured** (macOS arm64, this worktree's `[dev]` venv, shared machine).
+- Fast suite on `9b67deee6`: 15 934 passed, 467 skipped, 30 xfailed, 0
+  failed (680 s). Passed plus skipped moved +40 against runner 3's run.
+  The tree has merged main twice since, and this session added no fast
+  test.
+- After the fixes, through `serial.py` on the merged tree: the two rows
+  gave 1 passed, 1 xfailed (175 s). The R7 Le Bail rows runner 3 fixed,
+  the alternation's slow row and the hostile pair's runaway, gave 2 passed
+  (637 s).
+
+**Next.** (1) The maintainer's four items. (2) The joint runner's re-solve.
+(3) The series measurement for 3 FWHM, if the maintainer wants it.
+
+### 2026-11-28 (2nd session) — R7's handover: the slack follows what a later stage refits, the Le Bail warning read, the PR opened (runner 3)
+
+R7 is in a pull request, #1881, which waits on the maintainer for a
+stored-format change. The generality judge found that a stage sized its
+windows whenever any stage came after it, while the rule says "a stage a later
+stage refits". A stage whose cell a later stage fixes now keeps the old
+uniform windows, as the last stage does. The Le Bail warning that runner 2
+flagged is a correct reading. The package gave the same warning at the same
+state before R7, and R7 now reaches that state from every near start. The
+Le Bail slow row did run away under R7, past twice its documented time. A
+stage now re-solves only an answer that fits the data better than the
+stage's start, each read on windows that hold its peaks.
+
+**For the maintainer** (the top of the PR body).
+1. *Stored-format change.* `NodeAction.movement_slack: bool = False` is
+   written to `history.jsonl` on every stage node. A new build reads an old
+   node as `False`, which is what it ran. An older build refuses a new node
+   (`extra="forbid"`), the shape WP-2315's `ReflectionState.merged_groups` had
+   when it was ruled (a) on 2026-11-27. Options: (a) keep the field, so replay
+   reproduces the stage exactly; (b) drop it, so replay compiles the uniform
+   slack and differs by up to 2e-3 in Rwp, a staleness the history docs
+   already allow, with the exact-replay test relaxed; (c) derive it, which the
+   node cannot, since it does not know whether a later stage followed.
+   Recommendation: (a), a clear call on the sibling ruling.
+2. *Reader output, two cases.* (i) The cpd-1b hostile runaway (reached only
+   under the pre-WP-2045 tolerance schedule) now re-solves, and
+   `STAGE_WINDOWS_STALE` reads the second solve, so the warning no longer
+   fires; the 73 % stays on `StageResult.window_refit_loss`. The judge called
+   this weak: the code has no fit-level case left that fires it. The re-solve
+   gate below does not change this case, since its answer beats its start on
+   fresh windows (`test_the_hostile_pairs_runaway_reports_its_stale_windows`
+   passed alone, 41 s). (ii) A fit
+   with `lebail_passes` > 1 from a near start now ends with the
+   `LEBAIL_ALTERNATION_STOPPED` warning where it ended with `info`. Settled
+   by Claude as a correct reading (below), and a blind reviewer agreed.
+3. *Audit rows the judge did not pass.* `WINDOW_MOVE_FWHM` (3 FWHM) lost its
+   `approved_by="checked"`: the judge called it weak, since no series was run
+   sized against uniform. It needs the maintainer's approval or that
+   measurement (the cpd-1 chain or the CuCr₂O₄ ramp, worst departure in esd).
+   `StageSpec:window_slack_deg`'s approval moved to R7's ruling date,
+   2026-11-27, since its meaning changed then.
+
+**Done (runner 3).**
+- `staged.refit_later`: a stage sizes its slack only where every path it
+  frees is free again in a later stage, read as `fixed_at_end` reads a plan.
+  The decision rides `_StageHold.movement_slack` to the history node, so
+  replay compiles what ran (`79d6f4bc9`). Tests: a later `turn_off` keeps the
+  uniform slack and records `False`; the closing stage refits what the plan
+  leaves free, and a declared `turn_off` reaches it (`373f6f42e`).
+- **The slow row's runaway, fixed** (`63d154e1c`). Alone, through
+  `serial.py`, it was killed at the 3 208 s cap. The same fit on the base tree
+  took 246 s. A stage-event probe showed why: the `profile` stage of pass 1
+  ends on windows dropping 87-95 % of the intensity, and R7 re-solved it from
+  there. That walk widened the peaks until the closing stage's Le Bail
+  partition, on windows at 1e-3 of those peaks, ran for minutes (a stack dump
+  sat in `_settled_partition`). `refine._improved_on_fresh_windows` compares
+  the weighted residual at the stage's start, on its own windows, with the one
+  at its answer, on windows sized there. A stage no better keeps its first
+  answer and its loss, as before R7, and `STAGE_WINDOWS_STALE` reports it on
+  the last stages. The probe now ends in 435 s (pass 1 of 2 kept, 91.2 % then
+  335.1 %), on a machine running a suite beside it. The near Le Bail starts
+  read the same to three decimals. Tests: the gate both ways on the synthetic
+  fit, and a stage it refuses keeps its loss.
+- The judge's stale texts: `STAGE_WINDOWS_STALE`'s help, the skill row's
+  73 % moved to `window_refit_loss`, `WINDOW_MIN_DEG`'s comment (it is tail
+  room too), a test docstring. Audit evidence for `window_refit_loss` now
+  cites what the re-solve moved rather than an Rwp pair.
+- Merged `origin/main` (`5a06184af`).
+- WP-2017 `### Inherited`: group Q's threshold now warns on every near start.
+
+**The Le Bail warning, measured** (5.1-25°, `profile_only`, 8 passes, Rwp %
+per pass, macOS arm64, `[dev]`, development data).
+
+| cell start | before R7 | R7 |
+|---|---|---|
+| −1 % | 84.032, 84.032 (info, stuck) | 15.162, 13.943, 13.929, 13.928 (info) |
+| −0.15 % | 19.417, 14.127, 13.950, 13.937, 13.937 (info) | 13.918, 13.927 (warning) |
+| +0.2 % | 13.918, 13.935 (warning) | 13.918, 13.927 (warning) |
+| +0.36 % | 13.919, 13.935 (warning) | 13.918, 13.927 (warning) |
+
+The rule is unchanged, and R7 lands pass 1 at the state where the package
+already warned. The kept answer is 0.019 Rwp points lower than the old fixed
+point. The alternation's own fixed point (13.928 % from −1 %) sits above its
+best single pass, which is group Q's threshold question in WP-2017.
+
+**Measured** (macOS arm64, this worktree's `[dev]` venv, a machine shared
+with other runners' suites).
+- The Le Bail slow row alone, through `serial.py`: killed at the 3 208 s cap
+  before the gate, 613 s after it (passed). The hostile pair's runaway test
+  alone: passed, 41 s.
+- Fast suite, on the tree merged with `5a06184af` and the gate: 1 failed,
+  15 904 passed, 457 skipped, 30 xfailed (534 s). The failure was
+  `test_audit_delta`, from an `_audit.py` edit made while the run was going;
+  it and the audit, help and slack files then passed (148). Passed plus failed
+  moved +5 against runner 2's run, the five tests this session added. The
+  added tests cost 2.0 s in all (`tests.added_test_times`, local junit).
+- Full suite, on `8f46a9e67` (main `9f3dd5542` merged): 2 failed, 16 880
+  passed, 473 skipped, 49 xfailed, 1 xpassed (2 226 s). Both failures are
+  Le Bail slow rows, and neither is attributed yet:
+  `test_lebail_cycles.py::test_the_tolerance_meets_its_bar[lamno3]` (a stage's
+  partition ran to the 25 000-cycle cap; the bar is half of it) and
+  `test_cell_runaway_safety.py::…[nudged]` (the macOS-only pin that the
+  nudged start reaches a non-finite model; `CELL_RUNAWAY` still fires and
+  restores the cell). The latest nightly on main passed on Linux
+  (2026-11-27), and the second pin is not run there. A run of both on a
+  snapshot of main was queued behind two other runners' jobs when this
+  session handed off (`main_two.log` in the shift's scratch).
+
+**Generality** (the judge's verdicts, `generality-review`, on the branch at
+`792d98170`; its full tables are in the PR body).
+- `WINDOW_MOVE_FWHM`: weak. Claim and code differed on "a later stage
+  refits" (answered: `refit_later`); no series measured (open, item 3).
+- `StageResult.window_refit_loss`: holds; replace the Rwp evidence (done).
+- `STAGE_WINDOWS_STALE`: weak; its firing case went silent (item 2 (i)).
+- `WINDOW_MIN_DEG`: holds. `StageSpec:window_slack_deg`: weak on the
+  condition (answered) and the approval date (moved).
+- The family shapes and the uniform-slack exceptions: hold.
+
+**Blind review** (a fresh subagent, given the evidence and not the picks):
+the reader diff moves numbers only, and `window_refit_loss` is not junk; the
+Le Bail warning is a correct reading; `refit_later` is right for every plan
+shape traced. Its one gap, a closing-stage test, is added. It also noted that
+an intermediate stage's report and node carry the narrower windows' esds,
+which a branch from that node inherits.
+
+**Next.** (0) Attribute the two full-suite failures: run both on main
+(the snapshot recipe: `git archive` main into scratch, `PYTHONPATH=<it>/src`,
+through `serial.py`). If main passes, they are R7's: the `lamno3` cap is the
+slow row's class (a partition that does not settle on a re-solved answer), so
+read its stage events first. Then mark PR #1881 ready. (1) The maintainer's three items. (2) The joint runner's re-solve
+(`multi.py`'s stage loop is inline, so the stage body is factored first). (3)
+The series measurement item 3 names, if the maintainer wants it before
+approving 3 FWHM.
+
+### 2026-11-28 — R7 implemented on `wp2317-window-slack`; suite fixes, handed off mid-handover (runner 2)
+
+R7 is built and most of the fast suite's fallout is fixed. A stage that a
+later stage refits now sizes each window's room for peak movement from the
+position parameters it frees, and any stage of the single-pattern runners
+solves once more on fresh windows when its frozen windows dropped more than
+its tolerance at its answer. The re-solve also makes some fits more accurate.
+A solo width stage that widens its peaks now reads the synthetic specimen's
+400 Å as 400.35 and 401.91 Å, where it read about 409. The joint runner does
+not re-solve yet and still reads 409.8. Not done: the second fast run, the
+full suite, `tests.reader_output`, the generality judge and the PR. Two
+stored-format and reader-output questions wait on the maintainer (below).
+
+**Done (runner 1, commits `c1b8f48d1`..`50d0f0dd7`).** `forward.WINDOW_MOVE_FWHM`
+= 3 FWHM per position family a stage frees (zero, displacement, transparency,
+capillary offsets, cell or λ), shaped by each family's 2θ dependence, plus
+half a point step, capped at the old 0.3°. The answer stage, a stage run on
+its own, a joint fit, a shift equation and a declared `window_slack_deg` keep
+0.3°. `StageResult.window_refit_loss` records the first solve's loss. Audit
+rows, help, manual, practice.md, skill row, the guides re-pinned. Runner 1's
+evidence: every refined value moved under 0.06 esd against the uniform slack,
+background coefficients under 0.08 esd, Rwp to 1e-5 (macOS arm64, `[dev]`,
+four acceptance families, all development data, and four Nb₁₈W₁₆O₉₃ bench
+cases). Points per evaluation in declared stages: 0.20-0.22× on 11-BM NAC,
+0.76-0.85× on SRM 660c, 0.98-0.996× elsewhere.
+
+**Done (runner 2).**
+- `NodeAction.movement_slack` (stored, default `False`) so `replay` compiles
+  the windows the stage solved (`4b570f857`, recovered from runner 1's
+  uncommitted tree). Documented in `reference/history.md`.
+- Merged `origin/main` (WP-2315's merged groups); export guide re-pinned.
+- Tests that pinned a pre-R7 path: the joint-size test's solo arms, the
+  width-floor trap, the sulfate body's and the split pair's stage boundaries
+  declare the uniform slack (claims about joint sharing, the clamp and site
+  multiplicity, not windows). The tutorial-step test runs the tutorial's own
+  plan. The extinction gate's out-of-basin cell starts 2 % off (R7 brings a
+  1 % cell back). The Le Bail converging and cap tests start at −1 %.
+- `/code-review high --fix`: a re-solved stage keeps its `fixed` paths, and
+  the first solve's resets and collapses stay only for paths the answer cannot
+  move (`7f1dc2c90`). Declined: the non-finite message after a non-finite
+  re-solve (says nothing moved, while the first solve's values stand; a safe
+  fix restores the free set and holds, not a local patch), and replay sizing
+  families from the end-of-stage free set (exact only where the free set did
+  not change at the answer).
+
+**Measured** (macOS arm64, this worktree's `[dev]` venv, shared machine).
+- Fast suite on the merged tree before the fixes: 12 failed, 15 888 passed,
+  457 skipped, 30 xfailed. Each failure is listed above as fixed, except the
+  Le Bail file, which was running when the session stopped.
+- Replay with the stored flag: a `scale_bkg` node replays bit-exact
+  (synthetic, FAP). Without it, replay's Rwp moves −2.0e-4 and −2.1e-3
+  relative, and `test_history`'s exact-replay pin fails.
+- Tutorial 05's 2 % jump: under the tutorial's plan (no closing stage) R7
+  reaches it warm (Rwp 0.0395) where the uniform slack took `warm_staged`. With
+  the closing stage declared, R7 takes `warm_staged` (0.0389) where the uniform
+  slack stayed warm (0.0390).
+- Le Bail, 5.1-25°: from −0.15 % to +0.6 % pass 1 now lands at Rwp 13.918 %
+  and pass 2 at 13.927 %.
+
+**In flight.**
+- **A hang.** `pytest tests/test_lebail_alternation.py -n 4` ran 67 minutes
+  with one worker at 100 % CPU, killed by the shift lead. That command omitted
+  `-m "not slow"`, and the file's one slow row says its partitions took 1 604 s
+  alone on an arm64 Mac, so the slow row is the likely cause. The file's fast
+  rows then passed serially under a 470 s cap: 12 passed, 1 deselected, 8 s.
+  Not yet known: whether the slow row
+  (`test_the_state_the_loop_keeps_is_the_state_a_hand_loop_would_continue_from`)
+  hangs under R7 or only takes its documented time. Run it alone through
+  `serial.py` under a cap before the full suite.
+- Not run: fast suite 2 with junit, full suite (`serial.py`), reader_output,
+  generality judge (runner 1's verdict on the audit rows is not on disk), CI
+  lint steps after the latest commits (ruff and Vale were clean at the merge).
+
+**For the maintainer** (to go at the top of the PR body).
+1. *Stored-format change.* `NodeAction.movement_slack: bool = False` is
+   written to `history.jsonl` on every stage node. A new build reads an old
+   node as `False`, which is what it ran. An older build refuses a new node
+   (`extra="forbid"`), the shape WP-2315's `ReflectionState.merged_groups` had
+   when it was ruled (a) on 2026-11-27. Options: (a) keep the field, so replay
+   reproduces the stage exactly; (b) drop it, so replay compiles the uniform
+   slack and differs by up to 2e-3 in Rwp, a staleness the history docs
+   already allow, with the exact-replay test relaxed; (c) derive it, which the
+   node cannot, since it does not know whether a later stage followed.
+   Recommendation: (a), a clear call on the sibling ruling.
+2. *Reader output, two cases.* (i) The cpd-1b hostile runaway (reached only
+   under the pre-WP-2045 tolerance schedule) now re-solves, and
+   `STAGE_WINDOWS_STALE` reads the second solve, so the warning no longer
+   fires; the 73 % stays on `StageResult.window_refit_loss`. (ii) A fit with
+   `lebail_passes` > 1 from a near start now ends with the
+   `LEBAIL_ALTERNATION_STOPPED` *warning* ("stopped at the first pass that did
+   not lower Rwp … Check the cell and the background") though pass 1 is the
+   best pass, because pass 2 rises 6.5e-4 relative, past `LEBAIL_CONVERGED_REL`
+   (1e-4). Before R7 the same start converged over five passes and said
+   "fixed point" at info level.
+
+**Gotchas.** The worktree harness refuses `git -C` into another tree: take
+over a dormant tree by copying its files, restoring it with `git show`, and
+`git worktree remove`. `rietx.refine` the attribute is a function, so a probe
+imports the module with `importlib.import_module`.
+
+**Next.** (1) Time the Le Bail slow row alone, capped. (2) Fast suite with junit, then the full suite through
+`serial.py`. (3) `tests.reader_output`; dispatch the generality judge on the
+audit rows. (4) Open the PR as a draft with the two maintainer items at the
+top, name it here, push, mark it ready. (5) Follow-up, unowned: the joint
+runner's re-solve (`multi.py`'s stage loop is inline, so it needs the stage
+body factored first).
+
+### 2026-11-27 (5th session) — the rulings recorded, accuracy set by what users need, and the stopping rule re-settled
+
+The maintainer answered the rulings that held up the large-cell track, except R4.
+The one with the widest reach is the accuracy level. rietx aims for accuracy
+sufficient for users rather than spending compute past it, the established
+programs being the evidence of what suffices. Claude settles each speed-accuracy
+trade under that intent. A Claude draft of the rule had put the level at a tenth
+of an esd. That was never ruled, and it would have reversed the 2026-11-19 window
+ruling, so it is withdrawn. Measured: the last stage's 1e-9 stop costs little on
+one fit but most of a series. The field's published-fit test, every shift under
+0.1 esd, cuts a 17-pattern ramp from 1 293 evaluations to 363, and its worst
+quantity, a 1 wt% phase's cell, lands about one esd off. The programs' own default
+stops, run inside rietx, left a series pattern 18 esd off while reporting
+convergence. The large cell's apparent second minimum was a fixture defect, fixed
+separately (PR #1870).
+
+**Done.**
+- Rulings R0 (and R0 clarified), R2-R3, R5 (b) and (c), R6 and R7 recorded in
+  Context with the maintainer's words. Rule 5 *Arithmetic accuracy* rewritten to
+  the clarified R0, reviewed blind three times for the earlier drafts and once for
+  this one (wording adopted from the last review). Rule 5 also gained the *Intent*
+  test. The 2026-11-01 validation amendment moved to DESIGN.md for room.
+- `docs/practice.md`: the seven-program survey behind R4, R5 (c), R6 and R7.
+- R6 measured (`2317-probe/convnoise/`), then re-settled twice the same day: to
+  1e-8 on the clarified level, then to the 0.1-esd shift test on parity. The
+  table is in R6's entry. A new task carries the implementation.
+- `2317-probe/errmeasure/`: how a speed setting's error is measured (mean shift
+  over paired nudged starts), and the co-sited tie defect it found.
+- R0's note in 2314's and 2316's `### Inherited` updated to the clarified level.
+
+**Measured** (macOS arm64, rietx's `.venv` on this worktree, shared machine).
+- Single fits: every stop tried holds every family under 0.06 esd of the 1e-9
+  answer; the last stage is 9-29 of 40-165 evaluations.
+- Series, evaluations and worst departure from 1e-9 (esd): CuCr₂O₄ ramp 1e-8 1 089
+  / 0.006, 1e-7 917 / 0.022, shift/esd 0.1 363 / 1.2, FullProf 0.2 300 / 1.7,
+  GSAS-II 1e-3 183 / 1.8; cpd-1 chain 1e-7 442 / 0.22, shift/esd 0.1 322 / 0.071,
+  FullProf 0.2 and GSAS-II 18 (cpd-1f, `axial_sl`). The 1e-7 rerun reproduced the
+  earlier 1e-9, 1e-8 and 1e-6 counts exactly.
+- No test count moved: the branch adds no test. The fast suite was not run (prose
+  and probe scripts only).
+
+**In flight.**
+- Landed the same session: GSAS-II's and FullProf's default stops measured in
+  their own programs (`2317-probe/foreign_stops/`, R6's entry). GSAS-II's 1e-3
+  stops short at home too (14-16 esd on cpd-1f); FullProf's 0.2 does not (0.08).
+- Stopped runners, not restarted: WP-2316's Le Bail fix on `wp2316-lebail-practice`
+  (4 pushed commits, untracked probes and a design patch in its worktree), and
+  R7's window slack on `wp2317-window-slack` (state not checked).
+- PR #1869 (WP-2315's lattice merge): its stored field
+  `ReflectionState.merged_groups` was ruled (a), kept as is, and the PR merged
+  the same day.
+
+**Gotchas.**
+- A ruling that picks a unit (the esd) sets no level. Read the maintainer's
+  intent, and never invent a tighter bar.
+- A program's stop threshold is not its users' accuracy. The probe tested shifts
+  on the damped LM step, which a crawl keeps short; the implementation tests the
+  undamped Gauss-Newton step.
+
+**Next.** (1) Done the same session: the GSAS-II/FullProf result is in R6, and the
+rule's sentence stands. (2) Get R4 ruled by the
+maintainer. (3) Implement R6 (its task), re-pinning goldens. (4) Task 1, the
+user's case, still decides the re-rating of 2314-2316.
 
 ### 2026-11-27 (4th session) — the bench and the suite carry real large cells
 

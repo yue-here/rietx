@@ -137,8 +137,44 @@ def test_a_fit_records_each_stages_loss_and_its_node_carries_it(pattern):
     assert ref.history[out.node_id].metrics.window_loss == out.stages[-1].window_loss
 
 
+def test_a_fit_whose_last_stage_outgrew_its_windows_reports_them(pattern):
+    """The code fires from a real fit, not only from a hand-built record.
+
+    The last stage moves the cell, the zero and the width together, from a
+    start whose peaks are half their true width.  It declares
+    ``window_slack_deg`` 0, so its windows have no room for that movement, and
+    a declared slack also declines the stage's re-solve on fresh windows
+    (WP-2317 R7).  Its frozen windows then drop about 45 % of the intensity
+    at its answer.  The same plan with the default slack stays under its
+    tolerance and does not fire."""
+    from tests.test_refine_synthetic import TRUE_W
+
+    def fit(slack):
+        structure, ins = _axial(0.0)
+        ins.profile.w.value = TRUE_W * 0.25
+        plan = rx.RefinementPlan(stages=[
+            rx.Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
+            rx.Stage("all", ["phases.*.scale", "instrument.background.*",
+                             "phases.*.cell.*", "instrument.zero_shift",
+                             "instrument.profile.w"], window_slack_deg=slack)])
+        return rx.Refinement(structure, ins, history=False).fit(
+            pattern, plan=plan, telemetry=False)
+
+    stale = fit(0.0)
+    last = stale.stages[-1]
+    assert last.window_loss > 10 * WINDOW_AREA_TOL
+    assert last.window_refit_loss is None    # the declared slack declined it
+    fired = [d for d in stale.diagnostics if d.code == "STAGE_WINDOWS_STALE"]
+    assert [(d.level, d.value) for d in fired] == [("warning", last.window_loss)]
+    assert "'all'" in fired[0].message
+
+    held = fit(None)
+    assert abs(held.stages[-1].window_loss) < WINDOW_AREA_TOL
+    assert "STAGE_WINDOWS_STALE" not in {d.code for d in held.diagnostics}
+
+
 @pytest.mark.parametrize("closing", [False, True])
-@pytest.mark.parametrize(("sl", "hl"), [(0.02, 0.02), (0.05, 0.0), (0.3, 0.1), (0.0, 0.0)])
+@pytest.mark.parametrize(("sl", "hl"),[(0.02, 0.02), (0.05, 0.0), (0.3, 0.1), (0.0, 0.0)])
 def test_the_vectorised_node_count_is_the_compiles(sl, hl, closing):
     """``fcj_node_counts`` (rewindow's) gives the integers ``fcj_node_count``
     (the compile's) gives, over 2θ from 5 to 160° and FWHM from 0.005 to 2°,
