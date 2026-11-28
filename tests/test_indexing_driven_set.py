@@ -167,9 +167,12 @@ def test_916s_flat_silicon_is_driven_by_its_own_lines(tmp_path):
     res = index_pattern(peaks, spec=spec, preset="full")
     assert len(search_line_order(peaks, spec)) == 11
     assert truth_rank(res) == 1
-    # the control: main's driven set, every weak_line component in it
+    # the control: main's driven set, every weak_line component in it.  Since
+    # WP-2120 one of them (a tail on its position bound) is ``tail_shoulder``
+    # and unusable; the control offers it again, so the set is the one this
+    # control was measured on
     stripped = peaks.model_copy(deep=True)
     for p in stripped.peaks:
-        p.flags = [f for f in p.flags if f != "weak_line"]
+        p.flags = [f for f in p.flags if f not in ("weak_line", "tail_shoulder")]
     assert len(search_line_order(stripped, spec)) == 18
     assert not index_pattern(stripped, spec=spec, preset="full").candidates

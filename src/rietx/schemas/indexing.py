@@ -43,7 +43,7 @@ from .structure import Cell
 #: under that number, so a PR rebased onto a ``main`` already bumped keeps
 #: ``main``'s number.  Decided 2026-10-15, after six concurrent PRs had
 #: renumbered one another after every merge.
-INDEXING_THRESHOLDS_VERSION = "1.12"
+INDEXING_THRESHOLDS_VERSION = "1.13"
 
 #: Position esd, in ° 2θ, past which a fitted line locates nothing and is
 #: flagged ``position_unmeasured``.
@@ -604,6 +604,21 @@ PEAK_ASSUMED_ESD_DEG = 0.02
 #: from :data:`PEAK_UNUSABLE_FLAGS` for that reason, and it does not move
 #: :data:`INDEXING_THRESHOLDS_VERSION`: no ``pick_peaks`` answer changes, and a
 #: list that can carry the flag comes from a call that did not exist at 1.3.
+#: ``tail_shoulder`` — the component carries both ``axial_tail`` and
+#: ``position_at_bound`` (WP-2120).  It is a weak shoulder on the axial-tail side
+#: of a much stronger group-mate, and the fit pushed it from detection's seed to
+#: its position bound.  Either flag alone is reported, not
+#: refused (``axial_tail`` for WP-1043's reason, ``position_at_bound`` because
+#: real lines carry it alone at I/σ_I up to 29).  On the development data every
+#: component carrying both was the strong line's own tail (a census finding, not
+#: a property of the conjunction: a real weak line 0.6-1.0 FWHM below a strong
+#: one can carry both), so the conjunction **is** unusable.  Measured on three
+#: unrelated lab families (the IUCr round robin, SRM 660c and SRM 1976a; the
+#: fluorapatite pattern has none), 11 of 11 sit 0.62-0.95 FWHM below a mate that
+#: is on the lattice line nearest to them.  Ten have no other lattice line there,
+#: and the eleventh (brucite 71.80°) has one with 0.25 % of its mate's
+#: intensity where the component carries 24 %.  It stays in ``peaks`` for the
+#: reason ``not_separable`` does: it is shape that lets the strong line fit.
 PeakFlag = Literal[
     "ghost_kbeta",
     "ghost_tungsten",
@@ -624,6 +639,7 @@ PeakFlag = Literal[
     "weak_line",
     "unresolved_split",
     "width_capped",
+    "tail_shoulder",
 ]
 
 #: FWHM multiple within which a weak component may be read as a stronger
@@ -658,10 +674,13 @@ PEAK_AXIAL_TAIL_MAX_FWHM = 3.5
 #: shows why ``unresolved_shoulder``'s exemption needed a companion: "their σ
 #: already says so" holds while σ is finite and a consumer can act on it, and
 #: stops holding at ±1 961° (WP-1442).
+#: ``tail_shoulder`` is here and neither of the two flags that define it is
+#: (WP-2120): on the development data the conjunction was always a strong line's
+#: tail, while each flag alone also marks real lines.
 PEAK_UNUSABLE_FLAGS: frozenset[str] = frozenset(
     {"ghost_kbeta", "ghost_tungsten", "excluded", "fit_failed", "not_separable",
      "no_intensity", "position_unmeasured", "duplicate_line",
-     "unresolved_split", "width_capped"})
+     "unresolved_split", "width_capped", "tail_shoulder"})
 
 #: Flags that keep a line in :meth:`PeakList.usable` (scored, reported) and out
 #: of the set a search is **driven** by

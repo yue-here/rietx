@@ -426,6 +426,7 @@
   "peak_flags:position_at_bound",
   "peak_flags:position_unmeasured",
   "peak_flags:sigma_assumed",
+  "peak_flags:tail_shoulder",
   "peak_flags:unnamed_neighbour",
   "peak_flags:unresolved_shoulder",
   "peak_flags:unresolved_split",

@@ -56,6 +56,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2072](2072-the-le-bail-and-pawley-cell-against-the-srm-660c-certificate.md) | The Le Bail and Pawley cell, validated against the SRM 660c certificate | 2026-11-16 | P3 | [Unscheduled](#unscheduled-the-fit-has-no-reference) |
 | [2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md) | The extinction screen names a wrong class at a correct cell | 2026-11-13 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-16 | P2 | [series](#series) |
+| [2120](2120-a-tail-shoulder-offered-as-a-line.md) | A tail shoulder on its position bound is offered as a line | 2026-11-16 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2140](2140-every-atom-is-named-by-its-unique-label.md) | Every atom is named by its unique label | 2026-11-16 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2211](2211-the-history-table.md) | The History table: Compare on the pattern, Restore as pending edits | 2026-11-23 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2221](2221-a-group-with-no-tabulated-type-reaches-the-report.md) | A phase whose group has no tabulated type still gets its report and its CIF | 2026-11-21 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
@@ -715,7 +716,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2114](2114-turn-families-composition-does-not-keep.md) | Turn families composition does not keep: a series carry, cross-body ties, a late hold, a profile | ⬜ | P3 | [1805](1805-the-rigid-body.md) ([1811](1811-bodies-in-a-series.md) soft) |
 | [2115](2115-what-the-bounded-suggestion-gain-still-leaves-open.md) | What the bounded suggestion gain still leaves open | ⬜ | P3 | [1998](1998-a-suggestion-past-its-bound.md) |
 | [2117](2117-a-recipe-ties-the-axial-pair.md) | A recipe ties the axial pair instead of holding H/L | ⬜ | P4 | [2012](2012-the-axial-ratios-are-interchangeable.md) |
-| [2120](2120-a-tail-shoulder-offered-as-a-line.md) | A tail shoulder on its position bound is offered as a line | ⬜ | P3 | — |
+| [2120](2120-a-tail-shoulder-offered-as-a-line.md) | A tail shoulder on its position bound is offered as a line | 🔄 2026-11-16 | P3 | — |
 | [2121](2121-a-restraint-follows-its-atoms-through-an-edit.md) | A restraint follows its atoms through an edit | ✅ 2026-11-09 | — | — |
 | [2140](2140-every-atom-is-named-by-its-unique-label.md) | Every atom is named by its unique label | 🔄 2026-11-16 | P2 | — |
 | [2141](2141-a-declared-peak-on-its-floor-reads-the-bound-test.md) | A declared peak on its floor reads the bound test | ✅ 2026-11-13 | — | — ([1914](1914-a-size-read-off-a-coefficient-at-its-floor.md) soft) |

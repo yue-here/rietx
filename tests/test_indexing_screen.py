@@ -143,7 +143,8 @@ def test_the_refuter_reaches_the_cells_the_sublattice_relation_could_not(si):
     from rietx.indexing.screen import containment_evidence
 
     pattern, s = _screens(*si, SI_CELLS)
-    assert len(si[2].usable()) == 16
+    # 15 since WP-2120: the 35.31° tail shoulder (0.095° off its line) left usable()
+    assert len(si[2].usable()) == 15
     truth = s["truth cF"]
     expect = {"cI sqrt2 a0": ("containment", 0), "cP a0": ("sublattice", 4),
               "cP 2a0": ("containment", 0), "hR rank-1 of #916": ("containment", 0),

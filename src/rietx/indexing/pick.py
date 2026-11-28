@@ -146,9 +146,11 @@ def fit_peaks(data: PatternData, instrument: Instrument,
     position, so what comes back is wherever the solve left it (measured: 40 m°
     from the seed, with an esd of 1e+16 degrees saying exactly that) — the flag
     is the answer, the number is not.
-    (3) The two resolvability judgements of detection (``unresolved_split``,
-    ``width_capped``) are **not** made: the components are the caller's, so a
-    named pair closer than Sparrow's limit comes back as two lines.
+    (3) The three judgements detection makes about the components it proposed
+    (``unresolved_split``, ``width_capped``, ``tail_shoulder``) are **not**
+    made: the components are the caller's, so a named pair closer than
+    Sparrow's limit comes back as two lines, and a named shoulder on a tail
+    keeps its ``axial_tail`` and ``position_at_bound`` and stays usable.
     (4) Where the window holds a component the list did not name, its named
     lines are flagged ``unnamed_neighbour``: the unnamed intensity had nowhere
     to go but into them.  The question is asked of the caller's own fit, and
@@ -390,6 +392,11 @@ def _flags_for(fit: GroupFit, j: int,
         flags.append("not_separable")
     if _axial_tail(fit, j):
         flags.append("axial_tail")
+        # on detection's seed path, the strong line's own tail (WP-2120).
+        # Detection's judgement about a component it proposed, so only on a
+        # fit ``fit_group`` judged: never on positions a caller named
+        if bool(fit.at_bound[j]) and fit.width_at_bound is not None:
+            flags.append("tail_shoulder")
     if (float(fit.intensity[j]) <= BOUND_HIT_RTOL
             or float(fit.intensity[j])
             < PEAK_NO_INTENSITY_SIGMA * float(fit.intensity_esd[j])):
@@ -419,7 +426,18 @@ def _axial_tail(fit: GroupFit, j: int) -> bool:
     **Reported, not refused** — the flag is absent from
     ``PEAK_UNUSABLE_FLAGS``: the side test is evidence, not proof, and a real
     weak line can sit there too (measured, the screen reaches 11 unverified
-    usable components across the six other real lab patterns).  Measured on
+    usable components across the six other real lab patterns).  **Refused only
+    together with** ``position_at_bound``, as ``tail_shoulder`` (WP-2120): on
+    three lab families every component the fit pushed from detection's seed to
+    its bound sat below its mate's reflection (a census finding, not a property
+    of the conjunction: a real weak line 0.6-1.0 FWHM below a strong one can
+    carry both).  That is detection's judgement, made only on a fit
+    :func:`fit_group` judged, never on named positions (:func:`fit_peaks`, the
+    peak editor's add, move, remove and ``n_components`` refits).  The editor's
+    fresh refit (``PeakEditor.refit`` without ``n_components``) runs
+    :func:`fit_group` again and judges anew: seeded at the fitted positions, 9
+    of the 10 development shoulders converge off their bound and come back
+    usable with ``axial_tail`` alone.  Measured on
     SRM 660c it catches exactly the five tails, worth 125 ppm of
     certified-cell bias, and excluding the flagged components is what took the
     gate to ``high`` at −2 ppm.

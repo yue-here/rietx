@@ -559,7 +559,8 @@ def fit_group_at(det: Detection, group: PeakGroup, instrument: Instrument,
 
     **It makes neither resolvability judgement** (``merged_into`` and
     ``width_at_bound`` stay ``None``): two named components 0.5 FWHM apart come
-    back as two lines, and a broadened sample's lines are not ``width_capped``.
+    back as two lines, and a broadened sample's lines are not ``width_capped``
+    or ``tail_shoulder`` (WP-2120 reads the same ``None``).
     Those are detection's judgements about components *it* proposed
     (:func:`fit_group`); a caller who names positions has said what is there.
     """

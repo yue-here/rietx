@@ -224,3 +224,15 @@ after the inlier retry searches again on the lines at or above
 search's ranking when it finds agreement (``INDEX_WEAK_LINE_RETRY``).  A run
 that found agreement, a declared ``n_unindexed`` and a position-only list
 rank exactly as before.
+
+1.12 → 1.13 (WP-2120): ``PeakFlag`` gains ``tail_shoulder`` and
+``PEAK_UNUSABLE_FLAGS`` gains it too.  It is a component carrying both
+``axial_tail`` and ``position_at_bound``: a weak shoulder on a much stronger
+group-mate's axial-tail side, which the fit pushed to its position bound.  On
+the 16 IUCr round-robin lab patterns the eight such components leave
+``usable()``.  Seven of them are 0.070-0.142 degrees from every lattice line.
+Two leave on SRM 1976a and one on #916's flat synthetic silicon (0.095 degrees
+off its line); SRM 660c's one was ``weak_line`` and is now out of the
+false-discovery screen, which reads usable components only.  A component that
+was a ``duplicate_line`` copy can now be ``tail_shoulder`` instead, unusable
+either way.  Neither flag alone moves, and no threshold here moved.
