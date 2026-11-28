@@ -44,7 +44,7 @@ Quote `stderr`.
 
 <!-- output of examples/guides/cell.py -->
 ```text
-Bérar-Lelann factor 2.15
+Bérar-Lelann factor 2.16
 ```
 
 Neighbouring points of a step scan have correlated residuals, so they carry less independent information than their number suggests.
@@ -69,10 +69,10 @@ Refining again with only the tutorial's wavelengths:
 ```text
 a with rietx's Cu Ka      9.370962(82)
 a with the tutorial's     9.370341(82)
-difference 66 ppm, 7.6 esd
+difference 66 ppm, 7.5 esd
 ```
 
-A 60 ppm change in the declared wavelength moves a by 7.6 esd, and the esd itself does not change.
+A 60 ppm change in the declared wavelength moves a by 7.5 esd, and the esd itself does not change.
 GSAS's own refinement of this pattern, at the tutorial's wavelengths and with its own peak-position model, gives a = 9.371724(36) Å, 148 ppm above the second fit.
 
 To quote an accurate cell, state the wavelength you used.

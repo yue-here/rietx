@@ -40,6 +40,8 @@ ranking over one population and is the regression gate, not a family.
 
 ### Inherited
 
+- **2026-11-08, from the issue triage (#1374; in PR #1373, WP-1924's close): the share rule under a declared ceiling, decided 2026-11-17.** Under `total_budget_seconds`, each (engine × system) unit runs until its own `budget_seconds` or the deadline. A caller who raises `budget_seconds` to the ceiling lets the first unfinished unit hold the whole run: on #780's list over all seven systems, svd's orthorhombic unit does, and the run never reaches the monoclinic truth. The 30 s default (`indexing/engines.py:296`) under `quick`'s 120 s (`:2345`) is not affected. The issue's table (15 synthetic rows, `4099cbd07`) finds a third of the ceiling per engine, or the 30 s slice, never worse than a unit budget at the ceiling. It ranks three options: (1) `min(budget_seconds, T_search / n_engines)`, (2) `min(budget_seconds, DEFAULT_BUDGET_SECONDS)` under a ceiling, (3) no change, plus a sentence in `INDEX_BUDGET_EXHAUSTED` saying one unit held the ceiling. It recommends 1 with 3's sentence, and leaves per engine against a share of the remaining time open. **Decided 2026-11-17:** the maintainer accepted option 1 with option 3's sentence (the decisions-walk note on #1373). Each (engine × system) unit is capped at `min(budget_seconds, T / n_engines)`, and `INDEX_BUDGET_EXHAUSTED` gains one sentence; the bethanechol benchmark runs alone before that change merges. That settles the "per engine against a share of the remaining time" question too. PR #1373 closes WP-1924 and names #1374 as the maintainer's, with no WP owning it; its claim agrees with the issue. Option 1 is a tier-3 scheduling rule, so it gets its row here beside `DEFAULT_BUDGET_SECONDS` and `QUICK_TOTAL_BUDGET_SECONDS`, and this WP's alone-run of the benchmark covers the check #1374 says WP-1924 still owes: a default-mode `tests.bethanechol_benchmark` against the 2026-10-13 score of −6, since trial_error now honours its budget between the solutions of one base. Checked against the tree at `63d7c120a`: `workflow.run_units` (`indexing/workflow.py:995`) and both constants are where the issue says; the timing table was not re-run (CPU-hours, and the benchmark must run alone).
+
 - **2026-11-02, from [2033](2033-a-declared-z-filters-the-extinction-class.md) (closed):
   a stale comment on `DENSITY_Z_TOLERANCE`'s consequence.** The `z_candidates` field
   comment on `ExtinctionScreen` (`schemas/indexing.py`, about line 2547) says two whole Z
@@ -83,6 +85,16 @@ ranking over one population and is the regression gate, not a family.
 - **From WP-1986 (2026-10-22, PR #1099), writing the indexing reference.** Two gate behaviours to rule on while tiering. (1) A candidate the ambiguity search never reached gets `geometric_ambiguity` (`indexing/consensus.py:627-632`), a refuting caveat, so under a binding whole-run ceiling every unreached candidate grades `low`; seven comments in `consensus.py`/`workflow.py` call that case *capping*, and `src/rietx/indexing/CLAUDE.md` § The scheduler says the streamed lists treat it as capping. Which is meant decides the wording WP-2013 fixes. (2) `VALIDATION_RESERVE_FRACTION` (`indexing/engines.py:2293-2309`) is there so the first click's shortlist arrives validated, and a default `index_pattern` on the bundled fluorapatite (2026-10-22, Linux `[dev]`, 130.7 s) validated none of its 12 candidates; the default qarr corundum run (121.3 s) entered four systems and ranked the certified R cell first.
 
 - 2026-10-26 issue triage: #1059 is the outside contributor's (mustachefeeling) claim on this WP. It starts after the gate ruling and after their open indexing PRs land, and runs `tests.bethanechol_benchmark` alone before and after. Checked against the tree at c0e32ab29: status ⬜, nothing started.
+- **2026-11-28, from the issue triage (issue #1629, WP-1448's follow-ups): two choices with no
+  record of their alternatives.** Checked against the tree at `300853e90`. (1)
+  `background.diagnostics.GHOST_RATIO_TOL` is still `unaudited`, and B13 above hands it here.
+  Its 1.3/1.5/2.0/3.0 sweep is written only in its docstring. When its row is tiered, the
+  row's `evidence` carries that sweep. A `*(Chosen: …)*` tag (root CLAUDE.md, WP-1448) may
+  then point at the record of that day. (2) `indexing.fom`'s ⟨ΔQ⟩ floor (the median σ(Q),
+  `fom.py` ~352-380) is "this package's own" and has no row and no record of what was
+  rejected. Settled by Claude 2026-11-28 under WP-1448's rule ("inventing a record for them
+  would be the failure this WP describes"): a record and a tag are written when the value is
+  next chosen, never reconstructed after the fact.
 
 ## Non-goals
 

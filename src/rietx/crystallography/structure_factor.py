@@ -317,6 +317,34 @@ def _aniso_dw(hkl: np.ndarray, rot: np.ndarray, u6, astar: np.ndarray) -> np.nda
     return xp.exp(-2.0 * xp.pi ** 2 * xp.einsum("mnc,cd,mnd->mn", q, ustar, q))
 
 
+def _scattering_factor(stol, sites, j):
+    """Atom ``j``'s real scattering amplitude per reflection, (N,).
+
+    f₀ + f′ for X-rays (f′ only under dispersion), the coherent length b for
+    neutrons.  Sources: f₀ Waasmaier & Kirfel (1995), Acta Cryst. A51,
+    416-431; f′ Cromer & Liberman (1970), J. Chem. Phys. 53, 1891-1898; b
+    Sears (1992), Neutron News 3(3), 26-37.
+    :func:`_orbit_terms` multiplies it by the occupancy and the
+    isotropic Debye-Waller factor; the occupancy column of
+    :func:`d_f2_d_sites` reads it bare.
+    """
+    xp = get_backend()
+    if sites.b_coh is None:
+        f = f0(sites.species[j], stol)
+        if sites.f_anom is not None:
+            f = f + float(sites.f_anom[j].real)
+        return f
+    # A nucleus is a point scatterer on this scale, so b has no s
+    # dependence.  Broadcast to (N,) anyway rather than passing a scalar:
+    # the anisotropic branch of ``_orbit_terms`` builds ``amp_b`` with
+    # ``full_like(f, …)`` and the derivative kernels index amplitudes as
+    # ``amp[:, None]``, so every amplitude in this module is
+    # reflection-shaped by contract.  ``full_like(stol, …)`` also keeps the
+    # constant off the left of a python operator against a θ-derived value
+    # (see backend/api.py).
+    return xp.full_like(stol, float(sites.b_coh[j]))
+
+
 def _orbit_terms(hkl, stol, sites, xyz, occ, biso, uaniso, astar, j):
     """Per-atom pieces of F: ``(amp_a, amp_b, phase (m,N), dw (m,N) | None)``.
 
@@ -344,19 +372,7 @@ def _orbit_terms(hkl, stol, sites, xyz, occ, biso, uaniso, astar, j):
     positions = xp.matmul(rot, xyz[j]) + xp.asarray(tran, dtype=np.float64)  # (m, 3)
     phase = xp.exp(2.0j * xp.pi * (positions @ hkl.T))  # (m, N)
     fa = None if sites.f_anom is None else sites.f_anom[j]
-    if sites.b_coh is None:
-        f = f0(sites.species[j], stol)
-        if fa is not None:
-            f = f + float(fa.real)
-    else:
-        # A nucleus is a point scatterer on this scale, so b has no s
-        # dependence.  Broadcast to (N,) anyway rather than passing a scalar:
-        # the anisotropic branch below builds ``amp_b`` with ``full_like(f, …)``
-        # and the derivative kernels index amplitudes as ``amp[:, None]``, so
-        # every amplitude in this module is reflection-shaped by contract.
-        # ``full_like(stol, …)`` also keeps the constant off the left of a
-        # python operator against a θ-derived value (see backend/api.py).
-        f = xp.full_like(stol, float(sites.b_coh[j]))
+    f = _scattering_factor(stol, sites, j)
     if sites.aniso[j]:
         dw = _aniso_dw(hkl, rot, uaniso[j], astar)
         # broadcast to (N,) like every other amplitude: f″ is reflection-
@@ -430,6 +446,132 @@ def structure_factors_squared(
     return _abs2(A) if B is None else _abs2(A) + _abs2(B)
 
 
+def d_f2_d_sites(
+    hkl: np.ndarray,
+    d: np.ndarray,
+    sites: PhaseSites,
+    xyz: np.ndarray,
+    occ: np.ndarray,
+    biso: np.ndarray,
+    uaniso: np.ndarray | None = None,
+    astar: np.ndarray | None = None,
+    *,
+    xyz_atoms=(),
+    u_atoms=(),
+    biso_atoms=(),
+    occ_atoms=(),
+) -> tuple[dict[int, np.ndarray], dict[int, np.ndarray],
+           dict[int, np.ndarray], dict[int, np.ndarray]]:
+    """:func:`d_f2_d_xyz`, :func:`d_f2_d_uaniso`, ∂/∂Biso and ∂/∂occ for
+    several atoms at once.
+
+    Returns ``({j: (N, 3)}, {j: (N, 6)}, {j: (N,)}, {j: (N,)})`` for the atoms
+    in ``xyz_atoms``, ``u_atoms``, ``biso_atoms`` and ``occ_atoms``
+    (structure-factor derivatives per Rietveld, 1969, J. Appl. Cryst. 2, 65;
+    the coordinate and U^ij equations are the two kernels').  Every bracket
+    ∂A/∂p_j is built from the same per-atom expansion as A itself
+    (:func:`_orbit_terms`), so one pass over the sites serves every atom,
+    where one call per atom repeats the whole expansion
+    (WP-2314).  The arithmetic is the single-atom kernels' as written: the
+    same site order into A and B, the same association in each bracket, so
+    each array is bit-identical to what the single-atom call returns.  The
+    two kernels below are this function asked for one atom.  Host-side
+    Jacobian support like them, never traced, so the U^ij buffers are
+    written in place.
+
+    The two scalar derivatives need no bracket over the orbit.  With
+    A = Σ_j a_j·G_j, a_j = occ_j·f_j·exp(−B_j s²) on an isotropic site and
+    occ_j·f_j on an anisotropic one:
+
+        ∂A/∂B_j   = −s²·a_j·G_j        (isotropic; 0 on an anisotropic site,
+                                        whose Debye-Waller factor never reads
+                                        Biso)
+        ∂A/∂occ_j = (a_j/occ_j)·G_j    (built from f_j, so occ_j = 0 is no
+                                        division)
+
+    and the B term alike with f″ in place of f₀ + f′.  ⟨|F|²⟩ is quadratic in
+    occ_j and in t_j = exp(−B_j s²) per reflection, which is the exact oracle
+    ``tests/test_biso_occ_columns.py`` holds both to.
+    """
+    xp = get_backend()
+    stol = 1.0 / (2.0 * xp.asarray(d, dtype=np.float64))  # s = sinθ/λ = 1/(2d)
+    h = xp.asarray(hkl, dtype=np.float64)
+    want_xyz, want_u = set(xyz_atoms), set(u_atoms)
+    want_b, want_o = set(biso_atoms), set(occ_atoms)
+    for j in want_xyz | want_u | want_b | want_o:
+        if not 0 <= j < sites.n_asym:
+            raise IndexError(f"atom {j} is not one of the phase's {sites.n_asym}")
+    s = xp.asarray(astar, dtype=np.float64) if want_u else None
+    A = xp.zeros(len(h), dtype=np.complex128)
+    B = None if sites.f_anom is None else xp.zeros(len(h), dtype=np.complex128)
+    d_xyz: dict[int, tuple] = {}
+    d_u: dict[int, tuple] = {}
+    d_b: dict[int, tuple] = {}
+    d_o: dict[int, tuple] = {}
+    for jj in range(sites.n_asym):
+        amp_a, amp_b, phase, dw = _orbit_terms(
+            h, stol, sites, xyz, occ, biso, uaniso, astar, jj)
+        orbit = _orbit_sum(phase, dw)
+        A = A + amp_a * orbit
+        if B is not None:
+            B = B + amp_b * orbit
+        if jj in want_b:
+            if dw is None:
+                ds = -(stol * stol)
+                d_b[jj] = (ds * (amp_a * orbit),
+                           None if B is None else ds * (amp_b * orbit))
+            else:
+                zero = xp.zeros(len(h), dtype=np.complex128)
+                d_b[jj] = (zero, None if B is None else zero)
+        if jj in want_o:
+            f = _scattering_factor(stol, sites, jj)
+            fb = None if B is None else float(sites.f_anom[jj].imag)
+            if dw is None:
+                t = xp.exp(-biso[jj] * stol * stol)
+                d_o[jj] = (f * t * orbit, None if B is None else fb * t * orbit)
+            else:
+                d_o[jj] = (f * orbit, None if B is None else fb * orbit)
+        if jj not in want_xyz and jj not in want_u:
+            continue
+        q = transposed_rotation_indices(h, sites.ops[jj][0])  # (m, N, 3)
+        if jj in want_xyz:
+            weighted = phase if dw is None else phase * dw
+            bracket = (weighted[:, :, None] * q).sum(axis=0)
+            dA = amp_a[:, None] * (2.0j * xp.pi) * bracket
+            dB = None if B is None else amp_b[:, None] * (2.0j * xp.pi) * bracket
+            d_xyz[jj] = (dA, dB)
+        if jj in want_u:
+            if dw is None:
+                raise ValueError(f"atom {jj} is isotropic: no U^ij to differentiate")
+            dA = np.zeros((len(h), 6), dtype=np.complex128)
+            dB = None if B is None else np.zeros((len(h), 6), dtype=np.complex128)
+            for v, (c, e) in enumerate(VOIGT):
+                fold = 1.0 if c == e else 2.0
+                de = (-2.0 * xp.pi ** 2 * fold * s[c] * s[e]) * q[:, :, c] * q[:, :, e]
+                bracket = (phase * dw * de).sum(axis=0)
+                dA[:, v] = amp_a * bracket
+                if dB is not None:
+                    dB[:, v] = amp_b * bracket
+            d_u[jj] = (dA, dB)
+
+    def close(dA, dB):
+        out = 2.0 * xp.real(xp.conj(A)[:, None] * dA)
+        if B is not None:
+            out = out + 2.0 * xp.real(xp.conj(B)[:, None] * dB)
+        return out
+
+    def close1(dA, dB):
+        out = 2.0 * xp.real(xp.conj(A) * dA)
+        if B is not None:
+            out = out + 2.0 * xp.real(xp.conj(B) * dB)
+        return out
+
+    return ({j: close(*t) for j, t in d_xyz.items()},
+            {j: close(*t) for j, t in d_u.items()},
+            {j: close1(*t) for j, t in d_b.items()},
+            {j: close1(*t) for j, t in d_o.items()})
+
+
 def d_f2_d_xyz(
     hkl: np.ndarray,
     d: np.ndarray,
@@ -461,31 +603,8 @@ def d_f2_d_xyz(
     bracketed sum: the anomalous term costs one extra multiply-and-accumulate,
     not a second expansion.
     """
-    xp = get_backend()
-    stol = 1.0 / (2.0 * xp.asarray(d, dtype=np.float64))  # s = sinθ/λ = 1/(2d)
-    h = xp.asarray(hkl, dtype=np.float64)
-    A = xp.zeros(len(h), dtype=np.complex128)
-    B = None if sites.f_anom is None else xp.zeros(len(h), dtype=np.complex128)
-    dA = xp.zeros((len(h), 3), dtype=np.complex128)
-    dB = None if B is None else xp.zeros((len(h), 3), dtype=np.complex128)
-    for jj in range(sites.n_asym):
-        amp_a, amp_b, phase, dw = _orbit_terms(
-            h, stol, sites, xyz, occ, biso, uaniso, astar, jj)
-        orbit = _orbit_sum(phase, dw)
-        A = A + amp_a * orbit
-        if B is not None:
-            B = B + amp_b * orbit
-        if jj == j:
-            rth = transposed_rotation_indices(h, sites.ops[jj][0])  # (m, N, 3)
-            weighted = phase if dw is None else phase * dw
-            bracket = (weighted[:, :, None] * rth).sum(axis=0)
-            dA = amp_a[:, None] * (2.0j * xp.pi) * bracket
-            if dB is not None:
-                dB = amp_b[:, None] * (2.0j * xp.pi) * bracket
-    out = 2.0 * xp.real(xp.conj(A)[:, None] * dA)
-    if B is not None:
-        out = out + 2.0 * xp.real(xp.conj(B)[:, None] * dB)
-    return out
+    return d_f2_d_sites(hkl, d, sites, xyz, occ, biso, uaniso, astar,
+                        xyz_atoms=(j,))[0][j]
 
 
 def d_f2_d_uaniso(
@@ -522,33 +641,5 @@ def d_f2_d_uaniso(
     columns, never traced by an autodiff backend (which differentiates the
     residual itself) — so the in-place per-component buffer writes are fine.
     """
-    xp = get_backend()
-    stol = 1.0 / (2.0 * xp.asarray(d, dtype=np.float64))  # s = sinθ/λ = 1/(2d)
-    h = xp.asarray(hkl, dtype=np.float64)
-    s = xp.asarray(astar, dtype=np.float64)
-    A = xp.zeros(len(h), dtype=np.complex128)
-    B = None if sites.f_anom is None else xp.zeros(len(h), dtype=np.complex128)
-    dA = np.zeros((len(h), 6), dtype=np.complex128)
-    dB = None if B is None else np.zeros((len(h), 6), dtype=np.complex128)
-    for jj in range(sites.n_asym):
-        amp_a, amp_b, phase, dw = _orbit_terms(
-            h, stol, sites, xyz, occ, biso, uaniso, astar, jj)
-        orbit = _orbit_sum(phase, dw)
-        A = A + amp_a * orbit
-        if B is not None:
-            B = B + amp_b * orbit
-        if jj == j:
-            if dw is None:
-                raise ValueError(f"atom {j} is isotropic: no U^ij to differentiate")
-            q = transposed_rotation_indices(h, sites.ops[jj][0])  # (m, N, 3)
-            for v, (c, e) in enumerate(VOIGT):
-                fold = 1.0 if c == e else 2.0
-                de = (-2.0 * xp.pi ** 2 * fold * s[c] * s[e]) * q[:, :, c] * q[:, :, e]
-                bracket = (phase * dw * de).sum(axis=0)
-                dA[:, v] = amp_a * bracket
-                if dB is not None:
-                    dB[:, v] = amp_b * bracket
-    out = 2.0 * xp.real(xp.conj(A)[:, None] * dA)
-    if B is not None:
-        out = out + 2.0 * xp.real(xp.conj(B)[:, None] * dB)
-    return out
+    return d_f2_d_sites(hkl, d, sites, xyz, occ, biso, uaniso, astar,
+                        u_atoms=(j,))[1][j]

@@ -174,6 +174,8 @@ class SharingMap:
     shared: list[str] = field(default_factory=list)
 
     def is_shared(self, path: str) -> bool:
+        """Whether the parameter dot-path ``path`` is one value for every
+        pattern, rather than one per pattern."""
         if any(fnmatch.fnmatchcase(path, g) for g in self.per_histogram):
             return False
         if any(fnmatch.fnmatchcase(path, g) for g in self.shared):

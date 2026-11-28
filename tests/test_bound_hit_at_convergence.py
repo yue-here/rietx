@@ -378,7 +378,7 @@ def test_the_rows_render(data):
         result = _fit_at(data, 1e-4, *stages)
         plot_result(result, path=str(out / f"bound_hit_{name}.png"))
         plot_result(result, path=str(out / f"bound_hit_{name}_zoom.png"),
-                    two_theta_range=(20.0, 35.0))
+                    two_theta_limits=(20.0, 35.0))
 
 
 def test_a_width_on_its_floor_is_read_against_its_floor():
