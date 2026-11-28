@@ -821,3 +821,22 @@ rule above the constant).  ``capabilities().expression_grammar_version`` does
 not move either.  The grammar parses any name, and the names a peak equation
 binds belong to the schema (``schemas.peak_equation.REFLECTION_NAMES``).
 WP-2107 moved the grammar for its two functions and the schema for its names.
+
+Also in 0.62 (WP-2317, ruling R7): ``StageResult.window_refit_loss`` added.
+A stage that a later stage refits now sizes its windows' movement slack from
+the position parameters it can move (``forward.WINDOW_MOVE_FWHM``, at most the
+old 0.3°), and every stage of ``Refinement``'s runners re-solves once on fresh windows when its frozen ones dropped
+more than its window fraction at its answer.  The field is the loss that
+triggered that refit, and ``None`` where none ran.  The ``stage_end`` event
+carries it too, an additive field on an existing kind.
+``NodeAction.movement_slack`` records whether a stage ran on those sized
+windows, so ``replay`` recompiles the model the stage solved; ``False`` is
+the uniform slack every older node ran, so an old node replays as before.
+
+Also in 0.62 (WP-2315): ``ReflectionState.merged_groups``, a list of
+``MergedGroup`` (``hkl``, ``intensity``, ``stderr``): the reflections a Pawley
+fit refined as one intensity because their d agree in every cell of the space
+group, with the measured sum and its esd.  Additive and defaulted to ``None``,
+the 0.25 → 0.26 rule; an older build refuses a node carrying the key.  In the
+same change a member's ``ReflectionState.stderr`` row reads ``inf``, the
+unmeasured convention, where it read a finite esd.
