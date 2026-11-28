@@ -112,7 +112,7 @@ def _draw(res, stem):
     out = Path(__file__).parent / "output"
     out.mkdir(exist_ok=True)
     plot_result(res, path=str(out / f"low_angle_asymmetry_{stem}.png"),
-                two_theta_range=(6.0, 20.0))
+                two_theta_limits=(6.0, 20.0))
 
 
 @pytest.fixture(scope="module")
