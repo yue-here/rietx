@@ -667,9 +667,10 @@ what it costs here.
       "on par" comparison, and it is the reference for "as fast as possible".
       *Done 2026-11-27 for all three modes (Context, Cross-code timing). Not
       done: GSAS-II from the seeded Le Bail background.*
-- [ ] R7 as ruled: window slack sized per stage from its free position
+- [x] R7 as ruled: window slack sized per stage from its free position
       parameters, one re-solve on fresh windows past the window fraction.
-      *Built 2026-11-27/28 on `wp2317-window-slack`; suites and PR open.*
+      *Done 2026-11-28 in PR #1881 (`wp2317-window-slack`); its four held
+      items settled for landing before v1.13.0 (handover, 4th session).*
 - [ ] The joint runner's re-solve (`multi.py`), which R7 left out.
 - [ ] `backend="jax"` on the three bench cases once, under a runaway guard: wall,
       compile time, Rwp.
@@ -698,6 +699,104 @@ what it costs here.
 - `docs/practice.md` § Structure-free fitting, § When a fit stops, § Peak-width limits.
 
 ## Handover log
+
+### 2026-11-28 (4th session) — R7 settled for landing: two series sized against uniform, the LaMnO₃ control, a fit that fires the stale-window warning (runner 5)
+
+On 2026-11-28 the maintainer directed that PR #1881 land before v1.13.0. The
+four items the PR held for the maintainer are now settled by Claude, and that
+direction approves the stored-format field. Two measurements were run to
+settle them. Sized against the uniform 0.3°, R7's slack moves no refined value
+of two series past what rounding moves it. The LaMnO₃ control shows that the
+sized slack alone causes the Le Bail partition's extra cost there.
+
+**Settled for the maintainer** (each settled by Claude under the grounds named;
+the PR body carries the full text).
+1. `NodeAction.movement_slack` is kept as a stored field. Settled by Claude
+   under the sibling rulings on `ReflectionState.merged_groups` (2026-11-27)
+   and `lebail_extraction` (2026-11-28). The maintainer's 2026-11-28
+   direction to land #1881 approves it. No code change.
+2. `STAGE_WINDOWS_STALE` staying silent on the cpd-1b runaway is correct.
+   Settled by Claude under the code's own rule: it reads the stage's last
+   solve, and the re-solve's windows hold their peaks. A fit-level case now
+   fires it (below).
+3. `WINDOW_MOVE_FWHM` = 3 is kept, and the audit row is
+   `approved_by="checked"` again. Settled by Claude under DESIGN-RULES Rule 5
+   *Arithmetic accuracy*, on the series below. Neither series moves a quantity
+   systematically. The largest mean shift is 0.059 esd on the lab chain and
+   0.005 esd on the synchrotron ramp. On the lab chain the shipped stop
+   departs 0.071 esd and FullProf's 0.08, so the sized slack stays under what
+   the established stops leave. The alternative, the uniform 0.3° everywhere,
+   gives up the synchrotron points for no measured accuracy.
+4. LaMnO₃'s non-strict xfail and the WP-2017 group Q filing are kept, now
+   with the uniform-slack control (below).
+
+**Done.**
+- `test_window_loss.py::test_a_fit_whose_last_stage_outgrew_its_windows_reports_them`
+  (`59dcc925a`). The last stage declares `window_slack_deg` 0, which declines
+  the re-solve, and moves the cell, the zero and the width from peaks at half
+  their true width. Its windows drop 45 % at the answer and the warning
+  fires. The default slack on the same plan stays under 2 % and is silent.
+  The audit row's evidence cites it. `STAGE_WINDOWS_STALE`'s help names the
+  declared-slack case (`771626a40`).
+- LaMnO₃'s control in WP-2017's `### Inherited` group Q entry (`adc97deb2`).
+- `WINDOW_MOVE_FWHM`'s audit row: the series evidence, `approved="2026-11-28"`,
+  `approved_by="checked"` (`4e18667a4`).
+- Merged `origin/main` `300853e90` (`729cf1b4a`), no conflict.
+
+**Measured** (macOS arm64, this worktree's `[dev]` venv, a machine shared with
+other runners' suites, all development data). The uniform arm is R7's code
+with `staged.refit_later` patched to `False`, so every stage compiles the
+uniform 0.3° and the re-solve stays. Shifts are sized minus uniform, in the
+unnudged uniform fit's esd. The starts are the unnudged one and seeds that
+nudge every parameter by 1e-12 relative (`2317-probe/errmeasure`'s method). A
+quantity departs systematically when its mean shift passes 0.1 esd and twice
+its standard error.
+- cpd-1 chain (`test_acceptance_sequential.py`'s `chained` protocol, 8 lab
+  patterns, `qpa_plan` with its closing stage, so every warm stage is sized),
+  11 starts, 360 quantities. Largest mean shift +0.059 esd (cpd-1h
+  `profile.v`, se 0.033). No quantity departs systematically. Largest single
+  pair 0.31 esd, inside the 0.35 a rounding-level change gives on this chain
+  (errmeasure M2). Cells: mean 0.008 esd at most. Weight fractions: 0.006 esd.
+  LM iterations over the 11 runs: 5 548 sized, 5 639 uniform.
+- CuCr₂O₄ ramp (17 patterns from 11-BM, λ = 0.413 Å; `mccusker_default`
+  warm-started, as `2317-probe/convnoise/series.py` builds it). With the shipped closing stage
+  declared, every warm stage is sized (21 of 55 compiles). Over 5 starts and
+  425 quantities the largest mean shift is 0.005 esd (the CuO minor phase's
+  cell b), and so is the largest single pair. On the default route, with no
+  closing stage, the warm rung is one answer stage, so only pattern 0's cold
+  plan sizes (4 of 38 compiles) and nothing moves past 0.001 esd. LM
+  iterations per run change by −1 % to +4 %, and wall time is about equal
+  (69-159 s default, 378-449 s with the closing stage, on a loaded machine).
+- LaMnO₃, the bar-1 protocol on the four starts. Closing-stage cycles
+  9 188, 10 094, 25 000 and 7 742 uniform, which is main to the cycle, at Rwp
+  17.30-17.32 %. Sized: 25 000, 25 000, 22 376 and 22 682 at 16.94-16.96 %.
+  No stage re-solved in either arm. Values within 0.28 esd (cell c).
+- `python -m tests.reader_output`: exit 1, the lines the PR body declares
+  and no others.
+- Fast suite through `serial.py`, on `adc97deb2` (this session's test
+  added): 15 941 passed, 467 skipped, 30 xfailed, 0 failed (830 s). Passed
+  plus skipped moved +7 against runner 4's run; this session added 1 test,
+  and the merged main the rest. After the audit row's edit, the audit, audit
+  delta and help files: 77 passed.
+- Ruff clean. CI's Vale steps: 0 errors (one fixed, a bare `window_slack_deg`
+  in the new help sentence, now in backticks).
+- Slow rows that read the window slack, two functions a command:
+  `test_window_domain.py`'s per-stage movement and stale-window rows, 15
+  passed (42 s); the hostile pair's runaway and LaMnO₃'s bar row, 1 passed
+  and 1 xfailed (444 s). No measured number moved this session, so the full
+  suite was not rerun.
+
+**Blind review** (a fresh subagent, `generality-review` on Opus, given the
+numbers and Rule 5, not the pick). On the cpd-1 chain alone it judged the row
+weak. Lab data barely changes the windows (0.98-0.99× the uniform points on
+cpd-1a), so a null there was near certain. It asked for the same comparison on
+a synchrotron series. Given the ramp, it judged that the
+row holds and that `approved_by="checked"` is supported. Its open point: no
+series was measured from a cold cell start or with a free wavelength, which
+move peaks furthest, and the joint fit has no re-solve.
+
+**Next.** (1) The joint runner's re-solve (`multi.py`'s stage loop is inline,
+so the stage body is factored first). (2) The LaMnO₃ cap, in WP-2017's group Q.
 
 ### 2026-11-28 (3rd session) — the two Le Bail failures are R7's: one pin moved, one cap question filed (runner 4)
 
