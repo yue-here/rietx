@@ -275,7 +275,7 @@ npm --prefix gui test
 
 ## Handover log
 
-- **2026-11-28** — **Repair, close-only bookkeeping** (ghostshift runner; PR #PRNUM). PR #1625
+- **2026-11-28** — **Repair, close-only bookkeeping** (ghostshift runner; PR #1886). PR #1625
   merged on 2026-11-23, and a decision record landed on the same day. Neither had an entry, so
   the session-start scan flagged this WP. This repair adds the reconstructed 2026-11-23 entry
   below and moves the Status date. The WP stays open. Tasks 2 to 12 are unticked, and the
