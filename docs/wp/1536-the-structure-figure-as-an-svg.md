@@ -205,7 +205,7 @@ measurement set. Inkscape opens the file with one element per atom.
 
 ## Handover log
 
-### 2026-11-28 — repair, close-only bookkeeping (ghostshift runner), PR #PRNUM
+### 2026-11-28 — repair, close-only bookkeeping (ghostshift runner), PR #1886
 
 PR #1606 merged on 2026-11-24, and two of its commits from 2026-11-17 had no entry, so the
 session-start scan flagged this WP. This repair adds the reconstructed 2026-11-17 entry below.
