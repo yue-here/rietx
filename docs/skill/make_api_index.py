@@ -397,10 +397,17 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
                 "and a **negative** width "
                 "coefficient refused rather than clamped, which 2 of the 4 "
                 "constant-wavelength files in GSAS-II's own tutorial corpus trip "
-                "(Measured: WP-1118).",
+                "(Measured: WP-1118). A TOPAS `.inp` stating its profile as "
+                "`TCHZ_Peak_Type(…)` reads with `topas.to_instrument(model, "
+                "instrument)` on `rx.read_topas_inp`'s model, the radius `Rs` "
+                "included, so do not translate the letters by hand: the six values "
+                "map by position, the fourth (Z/cos²θ) folds into U and W, and the "
+                "TOPAS formula's X and Y are this package's Y and X "
+                "(Measured: WP-1455, against TOPAS 6's own output).",
                 ("rx.read_recipe", "rx.write_recipe_tables",
                  "rx.read_gsas_prm", "rx.write_gsas_prm", "rx.read_gsas_tof_iparm",
-                 "rx.read_gsas2_instprm", "rx.write_gsas2_instprm"),
+                 "rx.read_gsas2_instprm", "rx.write_gsas2_instprm",
+                 "rietx.io.projects.topas.to_instrument"),
             ),
             (
                 "Other programs' projects",

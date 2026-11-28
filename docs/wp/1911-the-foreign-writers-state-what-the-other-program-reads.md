@@ -213,6 +213,16 @@ a `tests/data/README.md` row.
 
 ### Inherited
 
+- **2026-11-17, from [1455](1455-a-topas-tchz-profile-reads-in.md): the
+  reader half of #732 reads the macro only.** `topas.to_instrument` reads a
+  `TCHZ_Peak_Type(…)` call and the secondary radius (`Rs`, `Radius(r)`) into an
+  `Instrument`, mapping the six slots by position as TOPAS 6 computes them
+  (measured, fixtures `tests/data/topas_tchz_nacl_xray_run1[01]*`). It does not
+  read back the `peak_type pv` + `pv_fwhm`/`pv_lor` equations this writer
+  emits, so an instrument does not yet round-trip through a `.inp`; that read
+  is this WP's, if a round trip is still wanted. The writer's `Rp R Rs R` line
+  now reads back as `goniometer_radius_mm` = R.
+
 - **2026-11-28, from the issue triage (#1853, a bug): with no `free=`, the
   TOPAS writer frees what the parameter table ties or force-fixes.** The
   default path, `stored_free_paths` (`io/projects/topas_refined.py:188`), reads

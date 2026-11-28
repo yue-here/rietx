@@ -22,7 +22,11 @@ The models differ from each other because the formats do, and each one changes a
 | `TopasModel.emission_lines`, `TopasModel.emission_macro`, `TopasModel.anode` | every emission line in file order, and the macro that named the profile (`CuKa5`, read as anode `CuKa`) |
 | `TopasModel.wavelength` | the profile's reference wavelength: the `lo` of the `lo_ref` line, else of the line with the largest `la`, and `None` where the file states no profile |
 | `TopasModel.geometry` | `"debye_scherrer"` only where the file states a capillary construct, `None` where every dataset is time of flight, and otherwise `"bragg_brentano"`. That last value is the reader's default, so read this field only as "a capillary was declared, or not" |
-| `TopasModel.goniometer_radius_mm` | the goniometer radius, where the file states one |
+| `TopasModel.goniometer_radius_mm` | the secondary radius `Rs`, the one a specimen displacement divides by, where the file states one positive value for it. `None` where it states none, two different ones, or one that is not a radius |
+| `TopasModel.secondary_radii` | every secondary radius the file states, in mm and file order: each `Rs` value and each `Radius(r)` or `Radius(r, r)` call |
+| `TopasModel.secondary_radius_datasets` | the dataset each of `secondary_radii` is stated in, in the same order: the index of its `xdd` block, or `None` above every one |
+| `TopasModel.phase_datasets` | every phase block's name, `str`, `hkl_Is`, `xo_Is` and `d_Is` alike, with the datasets it sits in: the names `to_instrument` takes as `phase=` |
+| `TopasModel.radius_unread` | each `Radius(…)` call not read as one radius, as its values: two different ones, since which is `Rs` has not been measured, or one that does not resolve (`None`) |
 | `TopasModel.background_terms`, `TopasModel.background_refined` | how many coefficients the `bkg` list states, and whether any is refined (`@`) rather than held (`!`). Both `None` when the file states no `bkg` |
 | `TopasModel.skipped_blocks` | `str` blocks that stated no name, or neither a `space_group` nor a `mag_space_group`, with the cell, scale and `weight_percent` each did carry. Recorded whether or not a diagnostics list was passed |
 | `TopasModel.coverage` | what the reader met and did not carry ([TOPAS constructs and their stances](foreign-files.md#topas-constructs-and-their-stances)) |
@@ -30,6 +34,7 @@ The models differ from each other because the formats do, and each one changes a
 | `TopasModel.symbols` | every parameter the file declares, by name, with its value and refine flag: what a name in an equation refers to |
 | `TopasModel.neutron` | whether the file states `neutron_data` |
 | `TopasModel.lp_factor` | the angle of the file's `LP_Factor(c)`, or `None`. With `neutron`, what `to_structure(scale="rietx")` converts TOPAS's scale by |
+| `TopasModel.tchz` | every `TCHZ_Peak_Type(…)` call, in file order, with its twelve arguments, its six values by position, each one's refine flag, its dataset and the phase it sits in (`""` at dataset level). `to_instrument` reads it ([A TOPAS TCHZ profile](instrument-files.md#a-topas-tchz-profile)) |
 
 ## FullProf input files
 
