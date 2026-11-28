@@ -448,8 +448,11 @@ def test_an_imported_childs_free_flags_come_back_held_and_recorded():
     assert not any(getattr(phase.cell, n).vary for n in CELL)
     assert not any(getattr(phase.atoms[3], c).vary for c in "xyz")
     amp = "phases.0.distortion_modes.modes.0.amplitude"
+    # the P4/mbm child's three angles are 90 degrees by its group: neither the
+    # parent's cell nor a strain moves them, so nothing carries them (round 5)
     assert statement.held == (
-        *(D.HeldVary(f"phases.0.cell.{n}", CARRIERS) for n in CELL),
+        *(D.HeldVary(f"phases.0.cell.{n}", CARRIERS) for n in ("a", "b", "c")),
+        *(D.HeldVary(f"phases.0.cell.{n}", ()) for n in ("alpha", "beta", "gamma")),
         D.HeldVary("phases.0.atoms.3.x", (amp,)), D.HeldVary("phases.0.atoms.3.y", (amp,)),
         D.HeldVary("phases.0.atoms.3.z", ()))
     (note,) = statement.diagnostics
@@ -458,6 +461,11 @@ def test_an_imported_childs_free_flags_come_back_held_and_recorded():
     for h in statement.held:
         assert h.path in note.message
     assert all(c in note.message for c in (*CARRIERS, amp))
+    # one reason per row: the angles and O2's z are the child group's, said once
+    assert ("phases.0.cell.alpha, phases.0.cell.beta, phases.0.cell.gamma, "
+            "phases.0.atoms.3.z (fixed by the child's group: no mode moves it)") in note.message
+    assert note.message.count("fixed by the child's group") == 1
+    assert "derived by the statement" in note.message
 
     quiet = D.displacive_statement(natao3_parent(), natao3_child(), NATAO3_T)
     assert quiet.held == () and quiet.diagnostics == ()
@@ -480,6 +488,13 @@ def test_held_because_names_what_carries_a_reset_cell_row_and_a_moved_coordinate
         "derived from the parent's cell (Phase.parent_cell): free "
         "phases.0.parent_cell.cell.*, which phases.*.cell.* reaches, and a strain "
         "only by naming phases.0.parent_cell.strain.*")
+    # an angle the child's group fixes at 90 deg is moved by nothing: it keeps
+    # the symmetry reason, where a carrier would send the caller to free what
+    # leaves it where it is (Yue, round 5)
+    for name in ("alpha", "beta", "gamma"):
+        angle = rows[f"phases.0.cell.{name}"]
+        assert not angle.refinable and angle.carried_by == ()
+        assert angle.held_because == "structurally fixed by symmetry or by the model"
     x = rows["phases.0.atoms.3.x"]
     assert not x.refinable and x.carried_by is None
     assert "phases.0.distortion_modes.modes.0.amplitude" in x.held_because
@@ -523,6 +538,133 @@ def test_the_cell_glob_frees_the_parents_edge_and_no_strain():
     freed = ref.set_vary(["phases.*.cell.*"])
     assert freed == ["phases.0.parent_cell.cell.a"]
     assert ref.set_vary([STRAINS]) == ["phases.0.parent_cell.strain.0"]
+
+
+def test_the_suggestion_names_only_what_carries_a_reset_row():
+    """Round 5, item 2: the suggestion is built from ``held``'s carriers.
+
+    An operator-list parent has no ``parent_cell``, so only O2's x and y are
+    reset and the suggestion names the amplitude, not the parent's edges.  A
+    child whose group allows no strain (Cmc21 in the Pnma parent) is carried
+    by the parent's cell alone, and naming the strain would return ``[]``.
+    Only O2's z stated free, which nothing carries, says there is nothing to
+    free.  Control: the NaTaO3 import names all three ways.
+    """
+    import gemmi
+
+    parent = natao3_parent()
+    ops = [op.triplet() for op in gemmi.SpaceGroup("P m -3 m").operations()]
+    listed = parent.model_copy(update={"symmetry_operations": ops})
+    (note,) = D.displacive_statement(listed, _stated_free(natao3_child()), NATAO3_T).diagnostics
+    assert "distortion_modes.modes.*.amplitude" in note.suggestion
+    assert "cell" not in note.suggestion and "strain" not in note.suggestion
+
+    case, _, n_strain = REFUSED_FIVE[1]
+    assert n_strain == 0
+    supercell = supercell_child(*case)
+    child = _stated_free(supercell.phase, moved=())
+    statement = D.displacive_statement(_lamno3(), child, _floats(supercell.transform))
+    (note,) = statement.diagnostics
+    assert statement.phase.parent_cell.strain == []
+    assert "phases.*.cell.* reaches the parent's cell edges" in note.suggestion
+    assert "strain" not in note.suggestion
+
+    own = natao3_child()
+    z_only = own.model_copy(update={"atoms": [
+        a.model_copy(update={"z": a.z.model_copy(update={"vary": True})}) if j == 3 else a
+        for j, a in enumerate(own.atoms)]})
+    statement = D.displacive_statement(natao3_parent(), z_only, NATAO3_T)
+    assert statement.held == (D.HeldVary("phases.0.atoms.3.z", ()),)
+    (note,) = statement.diagnostics
+    assert "nothing to free" in note.suggestion and "phases.*" not in note.suggestion
+    assert "fixed by the child's group" in note.message
+    assert "derived by the statement" not in note.message
+
+    (full,) = D.displacive_statement(
+        natao3_parent(), _stated_free(natao3_child()), NATAO3_T).diagnostics
+    for way in ("phases.*.cell.*", "phases.*.parent_cell.strain.*",
+                "phases.*.distortion_modes.modes.*.amplitude"):
+        assert way in full.suggestion
+
+
+def _moves(table, block, step=1e-3):
+    """Per child cell row, whether the parent's cell and the strains move it:
+    a finite step through ``evaluate``, the table's own entries, with a tied
+    parent entry stepped with its source.  No Jacobian."""
+    by_path = {e.path: e for e in table.entries}
+    x = np.array([by_path[q].value for q in block.inputs])
+    base = np.asarray(block.evaluate(x))
+    out = np.zeros((6, 2), dtype=bool)
+    free = [i for i, q in enumerate(block.inputs[:6])
+            if by_path[q].tie is None and not by_path[q].locked]
+    edge = x.copy()
+    for i, q in enumerate(block.inputs[:6]):
+        tie = by_path[q].tie
+        if i in free:
+            edge[i] += step
+        elif tie is not None:
+            edge[i] += step if block.inputs.index(tie.terms[0][0]) in free else 0.0
+    out[:, 0] = np.abs(np.asarray(block.evaluate(edge)) - base) > 1e-7
+    for j in range(6, len(x)):
+        y = x.copy()
+        y[j] += step
+        out[:, 1] |= np.abs(np.asarray(block.evaluate(y)) - base) > 1e-7
+    return out
+
+
+def _stated_cases():
+    for name, irrep, label, number in HOWARD_STOKES:
+        parent, cand = _howard_stokes(name, irrep, number)
+        yield f"{label}", D.displacive_statement(parent, candidate=cand).phase
+    parent = _lamno3()
+    for case, label, _ in REFUSED_FIVE:
+        sc = supercell_child(*case)
+        yield label, D.displacive_statement(parent, sc.phase, _floats(sc.transform)).phase
+
+
+def test_a_cell_row_lists_only_the_paths_that_move_it():
+    """Round 5, item 1: ``carried_by`` and ``held`` name what moves a row.
+
+    Over every candidate child and the five Pnma children, a row's carriers
+    are the parent's-cell and strain globs whose finite step (through
+    ``ParentCellBlock.evaluate``, no Jacobian) moves that row.  Positive arm:
+    the sweep finds rows moved by both globs, by the strain alone (a monoclinic
+    angle), by the edges alone, and by neither (a right angle the child's group
+    keeps), or the check cannot fail the way the old fixed list did.
+    """
+    from rietx.params.parent_cell import ParentCellBlock
+
+    seen = set()
+    for label, phase in _stated_cases():
+        table = ParameterTable(Structure(phases=[phase]), neutron())
+        (block,) = [b for b in table._cell_blocks if isinstance(b, ParentCellBlock)]
+        rows = table.parent_cell_rows()
+        moves = _moves(table, block)
+        for i, q in enumerate(block.outputs):
+            want = tuple(g for g, m in zip(CARRIERS, moves[i], strict=True) if m)
+            assert rows[q] == want, (label, q)
+            seen.add(want)
+    assert seen == {CARRIERS, (CARRIERS[1],), (CARRIERS[0],), ()}, seen
+
+
+def test_a_tied_parent_edge_carries_only_through_its_source():
+    """``ParentCellBlock.carriers`` steps a tied edge with its source (round 5).
+
+    P takes the child's c axis to b + c, so an orthogonal child's alpha is
+    cos = b / sqrt(b^2 + c^2): either edge moves it alone, and c tied to b
+    (a parent group that equates them) leaves it where it was.  Control: the
+    same map with c free moves alpha.
+    """
+    from rietx.params.parent_cell import ParentCellBlock
+
+    p = [[1, 0, 0], [0, 1, 1], [0, 0, 1]]
+    block = ParentCellBlock("p.cell", "c.cell", [], p, np.zeros((0, 3, 3)))
+    x = np.array([4.0, 5.0, 5.0, 90.0, 90.0, 90.0])
+    alpha = 3
+    assert not block.carriers(x, ties={2: 1}, held=(3, 4, 5))[alpha, 0]
+    assert block.carriers(x, ties={}, held=(3, 4, 5))[alpha, 0]
+    # a cell edge outside the tie still moves its own lengths
+    assert block.carriers(x, ties={2: 1}, held=(3, 4, 5))[0, 0]
 
 
 def test_the_two_records_name_one_parent_and_one_transform():

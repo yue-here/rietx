@@ -807,8 +807,8 @@ A construction that used to succeed and now doesn't is a bump (the 0.17
 rule): a stored document whose two records disagree no longer opens.
 ``displacive_statement`` never writes such a pair.  No field is added.
 
-Also in 0.62 (WP-1419 C3b, Michael's ruling D59): ``ParameterRow.carried_by``,
-the paths that refine a ``Phase.parent_cell`` child's derived cell row.
+Also in 0.62 (WP-1419 C3b): ``ParameterRow.carried_by``,
+the paths that move and so refine a ``Phase.parent_cell`` child's derived cell row.
 Additive and defaulted to ``None``, the 0.25 → 0.26 rule.
 
 Also in 0.62 (WP-2081): ``SeriesEntry.held_values``, every path the

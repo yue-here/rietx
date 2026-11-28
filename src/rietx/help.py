@@ -1984,9 +1984,11 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "and the coordinates of every atom a distortion mode moves. A derived row is "
             "not refined directly, so a `vary` flag the child carried on it (the GSAS and "
             "GSAS-II importers set every refined cell parameter free) is reset. The "
-            "message names each reset row and what now refines it: `phases.*.cell.*` "
-            "frees the parent's cell edges, a strain is freed only by naming "
-            "`phases.*.parent_cell.strain.*`, and the mode amplitudes move the atoms. "
+            "message names each reset row and what now refines it, only where something "
+            "does: `phases.*.cell.*` frees the parent's cell edges, a strain is freed only "
+            "by naming `phases.*.parent_cell.strain.*`, and the mode amplitudes move the "
+            "atoms. A row nothing carries, such as an angle or a coordinate the child's "
+            "group fixes, is named as fixed by the group. "
             "`DisplaciveStatement.held` lists the same pairs."
         ),
     ),

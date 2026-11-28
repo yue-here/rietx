@@ -2357,23 +2357,38 @@ class ParameterTable:
     def parent_cell_rows(self) -> dict[str, tuple[str, ...]]:
         """Every child cell row a ``Phase.parent_cell`` block derives → what carries it.
 
-        The carriers are the globs a stage frees it through:
-        ``phases.i.parent_cell.cell.*``, which ``phases.*.cell.*`` reaches, and
-        ``phases.i.parent_cell.strain.*`` where the child's group allows a
+        The carriers are the globs a stage frees it through, and a row lists
+        only those that move it at the table's values
+        (:meth:`~rietx.params.parent_cell.ParentCellBlock.carriers`):
+        ``phases.i.parent_cell.cell.*``, which ``phases.*.cell.*`` reaches,
+        and ``phases.i.parent_cell.strain.*`` where the child's group allows a
         strain, freed only by naming it (WP-1419; Michael's ruling D59,
-        2026-11-24).  Read off the blocks :meth:`_collect_parent_cell` built,
-        so ``ParameterRow.held_because`` names them rather than reading as a
-        symmetry-fixed row.
+        2026-11-24).  A row nothing moves, such as an angle the child's group
+        fixes at 90 deg, maps to ``()``: it is held by symmetry, and
+        ``ParameterRow.held_because`` says that.  Read off the blocks
+        :meth:`_collect_parent_cell` built.
         """
         from .parent_cell import ParentCellBlock
+        by_path = {e.path: e for e in self.entries}
         out: dict[str, tuple[str, ...]] = {}
         for block in self._cell_blocks:
             if not isinstance(block, ParentCellBlock):
                 continue
             edges = block.inputs[0].rsplit(".", 1)[0]
-            carriers = (f"{edges}.*",) + (
-                (f"{edges.rsplit('.', 1)[0]}.strain.*",) if len(block.inputs) > 6 else ())
-            out.update(dict.fromkeys(block.outputs, carriers))
+            strains = f"{edges.rsplit('.', 1)[0]}.strain.*"
+            index = {path: i for i, path in enumerate(block.inputs[:6])}
+            ties = {index[path]: index[e.tie.terms[0][0]]
+                    for path in block.inputs[:6]
+                    if (e := by_path[path]).tie is not None}
+            held = [index[path] for path in block.inputs[:6]
+                    if by_path[path].locked and by_path[path].tie is None]
+            x = np.array([by_path[path].value for path in block.inputs], dtype=np.float64)
+            for i, src in ties.items():  # a tied entry holds its source's value after the rebuild
+                x[i] = x[src]
+            for i, row in enumerate(block.carriers(x, ties, held)):
+                found = tuple(g for g, moves in zip((f"{edges}.*", strains), row,
+                                                    strict=True) if moves)
+                out[block.outputs[i]] = found
         return out
 
     def body_rows(self) -> dict[str, str]:

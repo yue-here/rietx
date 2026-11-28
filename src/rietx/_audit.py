@@ -5587,6 +5587,12 @@ ROWS: tuple[Row, ...] = (
                   "covariance's pinv would discard the direction anyway (docstring derivation)")),
     Row("rietx.params.parent_cell._DEG", "constant", tier=1, value=0.017453292519943295,
         evidence="arithmetic: degrees to radians"),
+    Row("rietx.params.parent_cell._MOVES_TOL", "constant", tier=1, value=1e-09,
+        evidence=("numerical floor: a Jacobian entry the child's group makes zero (a right angle "
+                  "against an edge or a strain) comes out at round-off, ~1e-14; one that moves a "
+                  "row is of order 1e-2 or more per Å or per unit strain. The carriers it picks "
+                  "equal a finite step's over the six candidate children and the five Pnma "
+                  "children (test_a_cell_row_lists_only_the_paths_that_move_it)")),
     Row("rietx.params.vector.CELL_MIN_LENGTH_A", "constant", tier=2, value=1.5,
         evidence=("TOPAS Tech Ref Version 9 § 2.17 Table 2-1 (checked 2026-10-19): a, b, c floored "
                   "at Max(1.5, ...)"
@@ -7325,10 +7331,11 @@ ROWS: tuple[Row, ...] = (
                   'checked before a published symbol is compared; ranks neither '
                   '(magnetic/supercell.py:1446-1450)')),
     Row("CHILD_VARY_RESET.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
-        evidence=("arithmetic: names the paths that carry each reset row's freedom "
-                  "(phases.*.cell.*, the strains by name, the amplitudes) and points at "
-                  "DisplaciveStatement.held; ranks nothing (distortion.py "
-                  "_vary_reset_diagnostics)")),
+        evidence=("arithmetic: names the paths that carry the reset rows' freedom, each "
+                  "only where a reset row has it as a carrier (phases.*.cell.*, the "
+                  "strains by name, the amplitudes), says nothing to free where none "
+                  "does, and points at DisplaciveStatement.held; ranks nothing "
+                  "(distortion.py _vary_reset_diagnostics)")),
     Row("CIF_CELL_ANGLE_CORRECTED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence=('arithmetic: names the one alternative to the correction, a space group that '
                   'leaves the angle free, for a deviation that is real (cif.py:110-111)')),

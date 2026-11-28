@@ -917,7 +917,10 @@ class HeldVary:
     what refines that freedom instead, as paths a stage's ``turn_on`` takes:
     ``phases.0.parent_cell.cell.*`` (which ``phases.*.cell.*`` reaches) and
     ``phases.0.parent_cell.strain.*`` (freed only by naming it) for a cell
-    row, the amplitude paths whose vectors move the coordinate for an atom.
+    row, whichever of them moves that row at the statement's values, and the
+    amplitude paths whose vectors move the coordinate for an atom.  Empty
+    where nothing moves the row: an angle the child's group fixes at 90 deg,
+    a coordinate no mode moves.
     """
 
     path: str
@@ -1303,7 +1306,7 @@ def _from_candidate(parent, candidate, reference: str):
 
 
 def _parent_cell_of(parent, child, big, small):
-    """The child's cell as its parent's plus Γ strains: (``ParentCell``, child cell) (WP-1419).
+    """The child's cell as its parent's plus Γ strains: (``ParentCell``, child cell, carriers) (WP-1419).
 
     The parent's cell is the parent-symmetric part of the child's metric
     carried into the parent's basis (the Reynolds average ⟨Rᵀ·G·R⟩ over the
@@ -1322,9 +1325,13 @@ def _parent_cell_of(parent, child, big, small):
     (2006), *J. Appl. Cryst.* 39, 607, for the Γ strain as the part of a
     child's metric the parent's group does not fix.  ``None`` for a parent stated by an operator list,
     which ``ParentCell`` cannot name: that child keeps its own cell.
+    ``carriers`` maps each of the child's six cell names to the globs that
+    move it (``ParentCellBlock.carriers``, the table's own reading): the
+    parent's cell, the strains, or neither, as an angle the child's group
+    fixes at 90 deg is moved by neither.
     """
     if parent.symmetry_operations is not None:
-        return None, None
+        return None, None, {}
     from types import SimpleNamespace
 
     from ...schemas.common import Parameter
@@ -1379,7 +1386,19 @@ def _parent_cell_of(parent, child, big, small):
     cell = child.cell.model_copy(update={
         n: getattr(child.cell, n).model_copy(update={"value": float(v), "vary": False})
         for n, v in zip(names, derived, strict=True)})
-    return record, cell
+    from ...params.parent_cell import ParentCellBlock
+
+    block = ParentCellBlock(
+        "phases.0.parent_cell.cell", "phases.0.cell",
+        [f"phases.0.parent_cell.strain.{j}" for j in range(len(basis))], big, basis)
+    moves = block.carriers(
+        np.array([values[n] for n in names] + [float(a) for a in amps], dtype=np.float64),
+        ties={names.index(n): names.index(src) for n, src in cons.ties.items()},
+        held=[names.index(n) for n in cons.fixed_angles])
+    globs = ("phases.0.parent_cell.cell.*", "phases.0.parent_cell.strain.*")
+    carriers = {n: tuple(g for g, m in zip(globs, row, strict=True) if m)
+                for n, row in zip(names, moves, strict=True)}
+    return record, cell, carriers
 
 
 def displacive_statement(parent, child=None, transform=None, *, candidate=None,
@@ -1601,13 +1620,11 @@ def displacive_statement(parent, child=None, transform=None, *, candidate=None,
             amplitude=Parameter(value=float(a), unit="A"))
             for (comp, index, label, invariant, v), a in zip(modes, amps, strict=True)])
     update = {"atoms": atoms, "distortion_modes": record}
-    parent_cell, cell = _parent_cell_of(parent, child, big, small)
+    parent_cell, cell, cell_carriers = _parent_cell_of(parent, child, big, small)
     held: list[HeldVary] = []
     if parent_cell is not None:
         update.update(parent_cell=parent_cell, cell=cell)
-        carriers = ("phases.0.parent_cell.cell.*",) + (
-            ("phases.0.parent_cell.strain.*",) if parent_cell.strain else ())
-        held = [HeldVary(f"phases.0.cell.{n}", carriers)
+        held = [HeldVary(f"phases.0.cell.{n}", cell_carriers[n])
                 for n in ("a", "b", "c", "alpha", "beta", "gamma")
                 if getattr(child.cell, n).vary]
     held.extend(moved_held)
@@ -1636,20 +1653,32 @@ def _vary_reset_diagnostics(held) -> tuple:
     groups: dict[tuple[str, ...], list[str]] = {}
     for h in held:
         groups.setdefault(h.carried_by, []).append(h.path)
-    parts = [f"{', '.join(paths)} (carried by {', '.join(carriers)})" if carriers
+    # one reason per row: a row something carries is derived by the statement
+    # and named with its carriers; a row nothing carries is the child group's
+    parts = [f"{', '.join(paths)} (derived by the statement, carried by "
+             f"{', '.join(carriers)})" if carriers
              else f"{', '.join(paths)} (fixed by the child's group: no mode moves it)"
              for carriers, paths in groups.items()]
     n = len(held)
+    # the suggestion names only what carries a row in this statement
+    carriers = {c for h in held for c in h.carried_by}
+    ways = []
+    if any(c.endswith(".parent_cell.cell.*") for c in carriers):
+        ways.append("phases.*.cell.* reaches the parent's cell edges")
+    if any(c.endswith(".parent_cell.strain.*") for c in carriers):
+        ways.append("a strain is freed only by naming phases.*.parent_cell.strain.*")
+    if any(".distortion_modes.modes." in c for c in carriers):
+        ways.append("phases.*.distortion_modes.modes.*.amplitude moves the atoms")
+    suggestion = (
+        "Free what carries each row instead (DisplaciveStatement.held pairs them): "
+        + "; ".join(ways) + "." if ways else
+        "Nothing carries these rows: the child's group fixes them, so there is nothing to free.")
     return (Diagnostic(
         level="info", code="CHILD_VARY_RESET",
         where=[h.path for h in held], value=float(n),
         message=(f"displacive_statement(): {n} row{'' if n == 1 else 's'} stated free "
-                 f"{'is' if n == 1 else 'are'} returned held, because the statement "
-                 f"derives {'it' if n == 1 else 'them'}: {'; '.join(parts)}."),
-        suggestion=("Free what carries each row instead (DisplaciveStatement.held "
-                    "pairs them): phases.*.cell.* reaches the parent's cell edges, a "
-                    "strain is freed only by naming phases.*.parent_cell.strain.*, and "
-                    "phases.*.distortion_modes.modes.*.amplitude moves the atoms."),
+                 f"{'is' if n == 1 else 'are'} returned held: {'; '.join(parts)}."),
+        suggestion=suggestion,
     ),)
 
 
