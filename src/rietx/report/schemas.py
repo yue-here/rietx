@@ -416,6 +416,28 @@ class UnmatchedPeak(Base):
     flank: FlankEvidence | None = None
 
 
+class UnidentifiedPhase(Base):
+    """Layer 0's impurity evidence as numbers; ``FitReport.unidentified_phase``.
+
+    The counts the ``add_impurity_phase`` action states in its rationale, read
+    from the same computation (``layer2.unidentified_phase``), so a program
+    need not parse the prose.  ``present`` is whether Layer 0 emitted that
+    action at all: some strong unmatched observed peak survives the
+    small-shift region test.  ``n_foreign`` counts those the position-error
+    evidence does not account for; ``n_shift_matched`` counts those it does
+    (they sit near a calculated position or pair with a missing calculated
+    line).  ``present`` with ``n_foreign == 0`` is the capped call, where a
+    wrong cell or zero error is the likelier reading than a new phase.
+    ``strongest_two_theta`` (degrees) is the strongest counted peak, foreign
+    ones first, the position the action names; ``None`` when nothing counted.
+    """
+
+    present: bool
+    n_foreign: int
+    n_shift_matched: int
+    strongest_two_theta: float | None = None
+
+
 class SatelliteCandidate(Base):
     """One candidate propagation vector, scored against the unexplained peaks.
 
@@ -1582,6 +1604,11 @@ class FitReport(Base):
     #: channels to read residuals from — its carrier-derived fields are
     #: individually None when the fit did not measure them.
     identifiability: IdentifiabilityEvidence | None = None
+    #: the impurity evidence behind ``add_impurity_phase`` as numbers, written
+    #: by ``build_report`` from ``layer2.unidentified_phase`` (the computation
+    #: ``layer0_actions`` reads).  None when that pass did not run (no
+    #: compiled model supplied), never "no unidentified phase"
+    unidentified_phase: UnidentifiedPhase | None = None
     summary: str = ""
 
     # -- Layer 1

@@ -368,6 +368,44 @@ def _state_toy_torsion():
     return model, table, {}
 
 
+def _state_toy_linear():
+    """A structure-level linear restraint across two phases (WP-1942).
+
+    One row Σ cₖ·pₖ over both phases' scales and one phase's cell edge: its
+    numpy Jacobian is the constant coefficient row chained through C (the cubic
+    cell ties b and c to a, so the edge's column carries one term), the traced
+    backends differentiate the python-float-times-value sum, and the fd row
+    differences the residual.  Every scale and cell free.
+    """
+    from rietx.schemas.common import Parameter as P
+    from rietx.schemas.pattern import PatternData
+    from rietx.schemas.structure import Atom, Cell, LinearRestraint, Phase, Structure
+
+    def fcc(name, species, a, scale):
+        return Phase(name=name, space_group="F m -3 m",
+                     cell=Cell(a=P(value=a, vary=True), b=P(value=a), c=P(value=a),
+                               alpha=P(value=90.0), beta=P(value=90.0),
+                               gamma=P(value=90.0)),
+                     scale=P(value=scale, vary=True, min=0.0),
+                     atoms=[Atom(label=species, species=species, x=P(value=0.0),
+                                 y=P(value=0.0), z=P(value=0.0))])
+
+    structure = Structure(
+        phases=[fcc("cu", "Cu", 3.615, 1e-3), fcc("ni", "Ni", 3.524, 6e-4)],
+        restraints=[LinearRestraint(
+            terms=[("phases.0.scale", 2.0), ("phases.1.scale", -3.0),
+                   ("phases.1.cell.a", 0.25)],
+            target=0.5, sigma=0.01, weight=2.0)])
+    ins = Instrument.debye_scherrer(wavelength=1.5406)
+    tt = np.arange(40.0, 80.0, 0.1)
+    pattern = PatternData(two_theta=tt.tolist(), intensity=np.ones_like(tt).tolist())
+    table = ParameterTable(structure, ins)
+    model = compile_model(structure, ins, pattern, mode="rietveld",
+                          moving_paths=set(table.moving_paths))
+    assert model.restraints is not None and model.restraints.n_rows == 1
+    return model, table, {}
+
+
 def _state_families_variable():
     """A **named variable** carrying the columns instead of a model path (WP-1119).
 
@@ -1585,6 +1623,7 @@ CONFIGS = {"families": _state_families,
            "toy_body": _state_toy_body,
            "toy_planarity": _state_toy_planarity,
            "toy_torsion": _state_toy_torsion,
+           "toy_linear": _state_toy_linear,
            "capillary_offsets": _state_capillary_offsets,
            "extra_components": _state_extra_components,
            "extra_components_tied": _state_extra_components_tied,
@@ -1629,6 +1668,7 @@ CONFIG_PARAMS = [
     _config("centroid_origin"),
     _config("toy_body"),
     _config("toy_planarity"),
+    _config("toy_linear"),
     _config("toy_torsion"),
     _config("capillary_offsets"),
     _config("extra_components"),

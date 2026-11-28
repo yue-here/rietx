@@ -4735,6 +4735,8 @@ def _as_structure(payload, uploads=None) -> Structure:
     The list is the sixth form (WP-2131): the New project dialog lists several
     phases, each a CIF or a typed cell, and their phases are concatenated in
     the order given.  An empty list is the pattern-only project, as ``None``.
+    A member's own ``restraints`` are refused rather than dropped: their phase
+    indices count within the member, and the join does not re-key them.
 
     Every route into the model passes through here, which is where the species
     check belongs: a structure carrying a scattering species no form-factor table
@@ -4760,12 +4762,27 @@ def _as_structure(payload, uploads=None) -> Structure:
         # the joined list, so a refused atom's path carries its phase index in
         # the project rather than in its own file
         phases: list = []
-        for item in payload:
+        for i, item in enumerate(payload):
             if _is_typed_cell(item) and not str(item.get("name") or "").strip():
                 # two unnamed cells would both be "phase"; a number from the
                 # joined list keeps them apart, in the CIF reader's phase_N form
                 item = {**item, "name": f"phase_{len(phases) + 1}"}
-            phases.extend(_structure_form(item, uploads).phases)
+            member = _structure_form(item, uploads)
+            if member.restraints:
+                # the join keeps phases only, and a row's phase indices are
+                # its member's, so carrying it means re-keying it: until then
+                # a silent drop becomes a refusal (#1653 item 3)
+                names = ", ".join(repr(p.name) for p in member.phases)
+                raise GuiError(
+                    f"structure member {i} ({names}) carries "
+                    f"{len(member.restraints)} structure-level restraint(s), "
+                    "which joining a list of structures cannot carry yet: "
+                    "their phase indices count within the member, not the "
+                    "joined structure. Send the member without them, or send "
+                    "the joined structure as one inline structure whose "
+                    "restraints count phases in the joined list.",
+                    where=[f"structure.{i}.restraints"])
+            phases.extend(member.phases)
         structure = Structure(phases=phases)
     else:
         structure = _structure_form(payload, uploads)

@@ -58,6 +58,7 @@ On the 11-BM NAC walkthrough, `examples/nac_11bm.py`, the Le Bail report is 38 k
 | `FitReport.trends` | one `TrendAnalysis` per observable | when Layer 1 is available |
 | `FitReport.abstained_reason`, `FitReport.abstained_kind` | why Layer 1 abstained, and which kind of abstention | when the global gate refused |
 | `FitReport.suggested_actions` | the `SuggestedAction` list, highest confidence first | with the model |
+| `FitReport.unidentified_phase` | an `UnidentifiedPhase`, the impurity evidence behind `add_impurity_phase` as numbers | with the model |
 
 `FitReport.action(kind)` returns the first suggestion of that kind and raises `KeyError` when there is none.
 `FitReport.for_stage` puts the report into the shape of one stage's rung ([Reports at every stage](#reports-at-every-stage)).
@@ -395,6 +396,15 @@ The diagnosis, a flat specimen off the axis, is right, and there is no parameter
 
 When Layer 1 abstains, the model-free suggestions still stand: an impurity phase for strong unmatched peaks, `reindex_or_recheck_cell` for widespread validity failures, `collect_better_data` on a `resolution_limited` abstention, and the texture and background suggestions.
 An impurity is suggested only for an unmatched observed peak above {{ IMPURITY_SIGMA }} esds.
+
+`FitReport.unidentified_phase` gives the counts that suggestion states, read from the same computation, so a program need not parse its rationale.
+
+| Field | Is | Reads as |
+|---|---|---|
+| `UnidentifiedPhase.present` | whether `add_impurity_phase` was suggested | some strong unmatched observed peak lies outside every region with a significant position shift |
+| `UnidentifiedPhase.n_foreign` | how many of those peaks the position-error evidence does not account for | the count the impurity call rests on |
+| `UnidentifiedPhase.n_shift_matched` | how many it does: near a calculated position, or paired with a missing calculated line | `present` with `n_foreign` at 0 is the capped call, where a wrong cell or zero error is the likelier reading |
+| `UnidentifiedPhase.strongest_two_theta` | the strongest counted peak, in degrees, foreign ones first; `None` when nothing counted | where the suggestion points |
 
 ## Reports at every stage
 

@@ -890,6 +890,14 @@ def test_broad_peak_lobes_cap_impurity_without_reindex():
                     if a.kind == "add_impurity_phase")
     assert impurity.confidence <= IMPURITY_SHIFT_CAP, impurity
     assert impurity.alternatives[0] == "reindex_or_recheck_cell", impurity
+    # the record reads the capped call as numbers: present, none foreign
+    from rietx.report.layer2 import unidentified_phase
+    record = unidentified_phase(unmeasured, report.attribution, ticks=ticks)
+    assert record.present and record.n_foreign == 0, record
+    assert record.n_shift_matched >= 1
+    assert record.strongest_two_theta == impurity.two_theta_range[0]
+    # and on the report itself, where the flank rows count for nothing
+    assert report.unidentified_phase.present is False
 
     _plot_state(structure, perturbed, data, "wp1054_broad_zero_lobes")
 
@@ -1830,3 +1838,49 @@ def test_building_a_report_performs_no_fits(monkeypatch, displaced):
     report = ref.report()
     assert report.identifiability is not None      # it did build the section
     assert report.summary
+
+
+# -- FitReport.unidentified_phase (WP-1942, #349) ---------------------------
+
+
+def _layer0_impurity(report, result):
+    """The add_impurity_phase action layer0_actions gives on the report's own
+    inputs, or None: the surface the record must agree with."""
+    from rietx.report.layer2 import layer0_actions
+
+    ticks = [t for v in result.ticks.values() for t in v]
+    return next((a for a in layer0_actions(report.unmatched, report.attribution,
+                                           ticks=ticks)
+                 if a.kind == "add_impurity_phase"), None)
+
+
+def test_unidentified_phase_agrees_with_layer0_where_the_impurity_fires(truth):
+    structure, ins, data = truth
+    doped = _doped(data)
+    result, model, values = _result_for(structure, ins, doped)
+    report = build_report(result, model=model, values=values, instrument=ins,
+                          structure=structure)
+    record = report.unidentified_phase
+    action = _layer0_impurity(report, result)
+    assert action is not None and record.present
+    assert record.n_foreign >= 1
+    assert record.strongest_two_theta == action.two_theta_range[0]
+    assert abs(record.strongest_two_theta - 29.35) < 0.15
+    assert f"{record.n_foreign} observed peak(s)" in action.rationale
+    assert report.action("add_impurity_phase").two_theta_range[0] == \
+        record.strongest_two_theta
+
+
+def test_unidentified_phase_is_absent_where_the_impurity_does_not_fire(truth):
+    structure, ins, data = truth
+    result, model, values = _result_for(structure, ins, data)
+    report = build_report(result, model=model, values=values, instrument=ins,
+                          structure=structure)
+    assert _layer0_impurity(report, result) is None
+    assert "add_impurity_phase" not in _kinds(report, active_only=False)
+    record = report.unidentified_phase
+    assert record is not None and not record.present
+    assert (record.n_foreign, record.n_shift_matched) == (0, 0)
+    assert record.strongest_two_theta is None
+    # without the model the pass never runs: absent, not "no phase"
+    assert build_report(result).unidentified_phase is None

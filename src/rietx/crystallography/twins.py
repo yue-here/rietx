@@ -555,9 +555,73 @@ def carry_restraints(old: Structure, new: Structure) -> tuple[Structure, list[st
             # whole structure once (``Structure._check_atom_references``)
             phases[pn] = after.model_copy(update=update)
             changed = True
-    if not changed:
+    linear, moved_linear = _carry_linear_restraints(old, new, atoms, atom_exists, dropped)
+    if not changed and not moved_linear:
         return new, dropped
-    return new.model_copy(update={"phases": phases}), dropped
+    return new.model_copy(update={"phases": phases, "restraints": linear}), dropped
+
+
+def _carry_linear_restraints(old: Structure, new: Structure, atoms, atom_exists,
+                             dropped: list[str]) -> tuple[list, bool]:
+    """``new.restraints`` with each row carried from ``old`` read into the new numbering.
+
+    The structure-level rows (``LinearRestraint``, WP-1942) name phases and
+    atoms by index in their term paths and ``occupancies``, so the place rule
+    of a phase's own list holds (WP-2121): a row equal to the one ``old``
+    held at its index was carried and is renumbered, through
+    :func:`renumber_path`; one appended past the old list, or one reading the
+    same entries in either numbering, is left as written; any other changed
+    in the edit that renumbered what it names, and could mean either, so it
+    raises ``ValueError``.  A carried row naming a phase or atom ``new``
+    lacks, including a trailing phase :func:`atom_moves` gives no key, is
+    dropped and named in ``dropped``.  Returns (the rows, whether any changed).
+    """
+    n_new = len(new.phases)
+
+    def gone(path: str | None) -> bool:
+        if path is None or not atom_exists(path):
+            return True
+        m = _PHASE_PATH.match(path)
+        return m is not None and int(m.group(1).split(".")[1]) >= n_new
+
+    def read_old(r):
+        terms = [(renumber_path(p, atoms), c) for p, c in r.terms]
+        occ = {renumber_path(p, atoms): v for p, v in r.occupancies.items()}
+        if any(gone(p) for p, _ in terms) or any(gone(p) for p in occ):
+            return None
+        update = {}
+        if terms != list(r.terms):
+            update["terms"] = terms
+        if occ != dict(r.occupancies):
+            update["occupancies"] = occ
+        return r.model_copy(update=update) if update else r
+
+    out: list = []
+    moved = False
+    for k, r in enumerate(new.restraints):
+        prior = old.restraints[k] if k < len(old.restraints) else None
+        carried = read_old(r)
+        if prior is not None and r == prior:
+            if carried is None:
+                dropped.append(f"the linear restraint {k}"
+                               + (f" ({r.label})" if r.label else "")
+                               + " on " + ", ".join(p for p, _ in r.terms))
+                moved = True
+            else:
+                out.append(carried)
+                moved = moved or carried is not r
+        elif prior is None or carried == r:
+            out.append(r)
+        else:
+            raise ValueError(
+                f"linear restraint {k} differs from the one the structure held "
+                f"at that place. This change also renumbers the phases or atoms "
+                f"it names, so its paths could mean either numbering. Deleting "
+                f"a row counts as changing every one after it, since each moves "
+                f"up a place. Make the phase or atom change alone, which carries "
+                f"every row onto what it named, and then change the rows. A row "
+                f"appended after the carried ones is read in the new numbering")
+    return out, moved
 
 
 def restraints_dropped_message(dropped: Sequence[str]) -> str:
