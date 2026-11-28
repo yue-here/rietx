@@ -816,6 +816,10 @@ not move either.  The grammar parses any name, and the names a peak equation
 binds belong to the schema (``schemas.peak_equation.REFLECTION_NAMES``).
 WP-2107 moved the grammar for its two functions and the schema for its names.
 
+Also 0.62 (WP-2113): ``LeBailValidation.background_terms``, the
+validation fit's Chebyshev order.  Additive and defaulted to ``None``, the
+0.25 → 0.26 rule; an older build refuses a validation carrying the key.
+
 Also in 0.62 (WP-2317, ruling R7): ``StageResult.window_refit_loss`` added.
 A stage that a later stage refits now sizes its windows' movement slack from
 the position parameters it can move (``forward.WINDOW_MOVE_FWHM``, at most the

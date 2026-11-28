@@ -224,3 +224,13 @@ after the inlier retry searches again on the lines at or above
 search's ranking when it finds agreement (``INDEX_WEAK_LINE_RETRY``).  A run
 that found agreement, a declared ``n_unindexed`` and a position-only list
 rank exactly as before.
+
+1.13 (WP-2113, #1382): the whole-pattern validation sizes a Chebyshev
+background from the data (``auto_background(kind="chebyshev")`` over the
+fitted range, never fewer terms than declared), so a candidate's
+``lebail.rwp``, ``gof`` and ``unmatched_observed`` move wherever the
+declared four terms could not follow the background: on a steep synthetic
+silicon 72 unmatched lines go to 0.  ``LeBailValidation.background_terms``
+records the order.  No search, rank or grade reads ``rwp``, ``gof`` or
+``unmatched_observed``; the grade reads ``status``, and without a peak list
+the fitted-background ``predicted_but_absent``, both of which can move.

@@ -43,7 +43,7 @@ from .structure import Cell
 #: under that number, so a PR rebased onto a ``main`` already bumped keeps
 #: ``main``'s number.  Decided 2026-10-15, after six concurrent PRs had
 #: renumbered one another after every merge.
-INDEXING_THRESHOLDS_VERSION = "1.12"
+INDEXING_THRESHOLDS_VERSION = "1.13"
 
 #: Position esd, in ° 2θ, past which a fitted line locates nothing and is
 #: flagged ``position_unmeasured``.
@@ -1197,6 +1197,14 @@ class LeBailValidation(Base):
     #: ``"pawley"`` since WP-2011 (schema 0.60).  A record written before then
     #: carries no key and was a Le Bail fit, which is what the default reads.
     mode: Literal["lebail", "pawley"] = "lebail"
+    #: the Chebyshev terms the fit's background carried: since WP-2113 the
+    #: number ``auto_background(kind="chebyshev")`` selects from the data, and
+    #: never fewer than the instrument declared, so a band of background misfit
+    #: is not read as ``unmatched_observed`` lines.  The scan's cap,
+    #: ``background.select.CHEBYSHEV_MAX_ORDER``, is returned whenever BIC still
+    #: falls there.  ``None`` for a background of another kind, and in a
+    #: record written before schema 0.62
+    background_terms: int | None = None
 
 
 class CellCandidate(Base):
