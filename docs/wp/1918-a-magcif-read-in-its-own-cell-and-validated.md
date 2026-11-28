@@ -127,6 +127,27 @@ transcriptions were deliberately not copied. TOPAS is a black box.
 
 ### Inherited
 
+- **2026-11-28, from the issue triage (#1833, a bug in a message): the k ≠ 0
+  refusal's wording fails two ways, and both belong to I-a.** Checked at
+  `02341ffdb`, `crystallography/magcif.py` `refuse_a_magnetic_supercell`
+  (`:763`, the wording at `:815-836`). (1) A decimal k is called
+  incommensurate. A component counts as incommensurate when it matches
+  neither `_RATIONAL` nor `_INTEGER_DECIMAL`, so `0.5` falls through.
+  MAGNDATA 1.31 (MnO, k1 `[0.5 0.5 0.5]`, transform `2a,2b,2c;0,0,0`, |det| = 8)
+  is told "The k stated here is not a rational, so this is an incommensurate
+  structure". The module's own comment (`:311`, review of #478) says telling
+  `0.5` from `0.128` is a judgement this reader does not make, and the
+  transform's determinant already settles commensurability. (2) A truly
+  incommensurate k gets the supercell sentences: Fe₂SiO₄
+  (`fe2sio4_42deg_1_8k2.mcif`, k `[0.7757 0 0]`, doi:10.7488/ds/2439) opens with
+  "states its magnetic structure in a cell that is not the parent cell" and ends
+  with "the nuclear space group of the supercell", neither of which holds. The
+  reporter's asks: the commensurate wording when the transform is a supercell;
+  otherwise, for decimals, "k written as decimals; not judged commensurate or
+  incommensurate"; and the incommensurate branch its own lead-in and its own
+  "what would be needed" (a modulated-moment, superspace model). The asks come
+  from the magnetic path's owner (#1075) and match the module's own stance, so
+  the session takes them as stated, with both files as message pins.
 - **2026-10-11, from the issue triage (#757): #756's C-a registry has landed,
   so I-b and I-c take tag names from it.** `rietx.io.cif.registry` (PR #851)
   has no `_parent_*` rows yet, and `tests/test_cif_registry.py` asserts that

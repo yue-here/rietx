@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: 🔄 2026-11-03 — PR #1370 lands Part A's reader and writer items; Parts B-D wait on the maintainer's decisions
 Track: Coming from another code
 Depends on: — (#713 soft: the P1 restatement Part D builds on)
-Priority: P3 2026-10-06 — was P2 for #716, which PR #733 fixed; the remaining issues cost a user hand edits
+Priority: P2 2026-11-28 — was P3: #1853's default TOPAS file frees what the table ties or fixes and says nothing (a silent wrong file, on a path few fits run)
 
 ## Goal
 
@@ -223,6 +223,29 @@ a `tests/data/README.md` row.
   is this WP's, if a round trip is still wanted. The writer's `Rp R Rs R` line
   now reads back as `goniometer_radius_mm` = R.
 
+- **2026-11-28, from the issue triage (#1853, a bug): with no `free=`, the
+  TOPAS writer frees what the parameter table ties or force-fixes.** The
+  default path, `stored_free_paths` (`io/projects/topas_refined.py:188`), reads
+  each row's own `Parameter.vary` and never builds a `ParameterTable`. So
+  ties and locks never reach the file. Reproduced at `02341ffdb` on a
+  synthetic `P 4/m b m` cell (a = 5.55, c = 3.93) with `from_structure`. With
+  `a.vary` and `c.vary` set, the file writes `a @ 5.55`, `b ! 5.55` and
+  `c @ 3.93`. TOPAS imposes no Laue-class tie from `space_group`, so it
+  refines a with b held: a cell that stops being tetragonal. With all six
+  flags set, the file writes `al @ 90`, `be @ 90` and `ga @ 90`.
+  `diagnostics` stays empty in both arms. The reporter's third row (x free on
+  a fully fixed 2a site, written `x @ 0.0`) was not re-run here. The `free=`
+  path already rederives the ties from the table (`_result_rows`), so the
+  default path is the one route that neither ties nor says it did not. The
+  reporter offers two fixes. One builds the stored-flags rows through one
+  `ParameterTable`, as `_result_rows` does, and refuses a fixed site asked
+  to vary, as the table does. The other keeps the flags and emits a
+  diagnostic per row the table ties or fixes. The first follows *Convention*
+  (Rule 5: the writer's other routes already tie), and the change to a
+  written file is the header note's to state. It is a Part B task. The
+  `.pcr` writer's stored-flags path (`fullprof.py`, Part B's other half) asks
+  the same question and should be checked in the same change. Priority
+  re-rated P3 → P2: a silent wrong file on a path few fits run.
 - **2026-10-24, from [2044](2044-the-sabine-laue-factor-is-continuous.md):
   two facts for C3 and the TOPAS writer.** FullProf's powder extinction is one
   empirical parameter (`Extinc`, the SHELX-style form), with no Laue and Bragg
