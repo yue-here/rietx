@@ -1,6 +1,6 @@
 # WP-1918 — a magCIF the reader refuses today is read in its own cell, and one validator checks it on the way in and out
 
-Milestone: unscheduled · Status: 🔄 2026-11-03 — FullProf's `_parent_space_group.name_H-M` spelling read, from outside as PR #1193 (`cd1c39ff`); an empty second block skipped and the draft magnetic tags refused, as PR #1257 (`1c55eda6`, #1063 items 1 and 3); its review follow-ups (text fields skipped by every raw-text scan, the draft k tag reaching the supercell refusal) as PR #1284 (`fd5c0bf5`); the six decisions recorded; I-a onwards open, I-d waiting on PR #1108
+Milestone: unscheduled · Status: 🔄 2026-11-28 — FullProf's `_parent_space_group.name_H-M` spelling read, from outside as PR #1193 (`cd1c39ff`); an empty second block skipped and the draft magnetic tags refused, as PR #1257 (`1c55eda6`, #1063 items 1 and 3); its review follow-ups (text fields skipped by every raw-text scan, the draft k tag reaching the supercell refusal) as PR #1284 (`fd5c0bf5`), and #1284's four follow-ups (the k readers) as PR #1378 (`917b7417`); the six decisions recorded; I-a onwards open, I-d waiting on PR #1108
 Track: Coming from another code
 Depends on: 1419 soft (I-d reads through its `Phase.parent_cell`, PR #1108)
 Priority: P2 2026-10-08 — a refusal that fires on readable files: 615 of the 900 supercell refusals name a double count the file does not have
@@ -481,6 +481,30 @@ transcriptions were deliberately not copied. TOPAS is a black box.
   the CIF writer.
 
 ## Handover log
+
+- **2026-11-28** (`/pr-review`, post-merge bookkeeping; PR #PRNUM) — PR #1378 merged from outside
+  as `917b74174`. It closes the four follow-ups the 2026-11-03 entry listed for the two k readers.
+  A file that states k ≠ 0 now reaches the supercell refusal in two cases where it read as k = 0
+  before. One is a loop listing `kxkykz` before its id column. The other is a bracketed k inside
+  quotes (`'[1/2 0 0]'`), which round 1 of the review found the PR had briefly broken. A
+  commented-out k and a k on a text field's opening `;` line are no longer read as a k. The draft
+  reader's four-token fallback (`id k1 k2 k3`) is pinned by a test and unchanged. No task of this
+  WP is ticked by it; I-a onwards stays open.
+  *Detail.* `_k_statements` reads the k tag's own column in whatever loop holds it. A loop whose
+  values do not fill whole rows, or that holds a text field, is read as malformed: every bracketed
+  or quoted value in it is taken, so a malformed row can add a k but never hide one. A new
+  `_without_comments` blanks CIF comments before the scan. `_without_text_fields` now blanks the
+  rest of a field's opening line. Its other three users' results cannot change, since each anchors
+  on `^\s*_tag`. The release note is `docs/releases/unreleased/1378.magnetic-structures.md`.
+  *What ran* (review round 2, macOS arm64, Python 3.12, `[dev]` without jax): the magCIF, magnetic,
+  reader, audit and docs files on the merged tree, 762 passed. Stacked with #1272 and #1285 on
+  `main` `0f4894d58`: fast 15 975 passed, 467 skipped, 30 xfailed, 0 failed; `-m slow` 964 passed,
+  25 skipped, 20 xfailed, 1 xpassed, 0 failed. `ruff`, `tests.audit_delta` (no change) and
+  `tests.reader_output` (exit 0) clean.
+  *Gap, not blocking:* in a draft-tag loop that holds a text field, a three-word quoted note is
+  read as a k, and the file is refused as incommensurate. `main` took every quoted value there too,
+  and no magCIF dictionary item adds such a column.
+  Next: unchanged from the 2026-11-02 entry, I-a, I-b and V-a.
 
 - **2026-11-03** (`/pr-review`) — the two review follow-ups of PR #1257 merged from outside as PR #1284 (`fd5c0bf5`). Every raw-text scan of a magCIF now skips the content of semicolon text fields. The four scans are `refuse_draft_tags`, `refuse_modulation`, the k reader `propagation_vectors` and `cif._magnetic_content`. So prose that quotes a tag no longer refuses a file, supplies a k, or sends a nuclear CIF to the magnetic reader. A k ≠ 0 stated only under the draft tag `_magnetic_propagation_vector_kxkykz` now reaches `refuse_a_magnetic_supercell`. The refusal names only the k tag the file used. No task of this WP is ticked by it. Follow-ups, not blocking: a commented-out k line (`# _parent_propagation_vector.kxkykz [1/2 0 0]`) still reads as a k, as it did on `main` before the PR. Text on a field's opening `;` line is not blanked, so a k there still reads. A loop that lists `kxkykz` before its id column reads no k. The draft reader's four-token fallback has no test. What ran, on the review's merge of head `06909a34` into `main` `62724a30` (Mac arm64, Python 3.12; the slow selection under `[dev,jax]`): fast 13 605 passed, 319 skipped, 34 xfailed, 1 failed; full `-m slow` 921 passed, 16 skipped, 17 xfailed, 1 failed in 46:36. The fast failure is `test_display`'s kernel row, whose Jupyter kernel spec points at a deleted venv on this Mac. The slow failure is `test_watch_app`'s GUI-boot socket timeout, which passed alone. Targeted magCIF rows 505 passed; ruff, the audit delta and the reader output were clean. The PR's later head `81fa6bb3` only merged `main` in.
 
