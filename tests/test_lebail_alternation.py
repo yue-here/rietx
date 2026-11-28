@@ -3,15 +3,16 @@
 The pattern is 11-BM LaB6 + cBN, Le Bail scaffolds, ``profile_only``.  It is the
 in-tree stand-in for issue #210's multi-phase lab pattern.  It shows three
 shapes depending on where the cells start.  At +0.48 % pass 2 comes back
-*worse* than pass 1 (``WORSE_START``).  At -0.15 % the passes converge.  At +2 %
+*worse* than pass 1 (``WORSE_START``).  At -1 % the passes converge.  At +2 %
 they never settle.
 
 The fast tests fit 5.1-25° (``LIMITS``), under half the range the hand loop
 used, and a fit costs a quarter to a fifth of one at 5.1-50° (WP-1547).  The
-three shapes hold there.  The converging one starts at -0.15 %, because +0.4 %
+three shapes hold there.  The converging one starts at -1 % (-0.15 % until
+WP-2317, R7, whose windows land pass 1 at the fixed point from there), because +0.4 %
 sits on an edge at 5.1-25°: WP-1936's step for ``u`` and ``v`` turns it into a
-worse-pass start.  -0.15 % converges with or without that step on macOS, and
-without it on Linux.  How many passes it takes depends on the platform, so its
+worse-pass start.  Before R7, -0.15 % converged with or without that step on
+macOS, and without it on Linux.  How many passes it takes depends on the platform, so its
 test asserts the shape and not the count.  A start of +0.6 % or more diverges at
 5.1-25° whatever the
 loop does.  Every Rwp the fast tests pin was measured at 5.1-25°.
@@ -22,7 +23,9 @@ its own units and makes LM the default driver.  Under TRF, from +0.45 % to
 Γ_G² is under the clamp at the high-angle reflections (U = -0.0032).  LM holds
 Γ_G² ≥ 1e-8 at every reflection (D7, D8), so it stops short of that point.
 Under LM, from +0.20 % to +0.52 % pass 1 reads 13.918-13.920 % and pass 2
-13.932 %.  +0.10 % and +0.56 % converge instead (macOS arm64, ``[dev]``), so
+13.932 %.  +0.10 % and +0.56 % converged instead before WP-2317 R7 (macOS
+arm64, ``[dev]``; since R7 every start from -0.15 % to +0.6 % is a worse-pass
+one, the converging test's docstring), so
 ``WORSE_START`` is the middle of that range.  The one
 ``slow`` test keeps 5.1-50° (``WIDE_LIMITS``), where its pins were measured.
 
@@ -133,7 +136,7 @@ def worse(pattern):
 
 @pytest.fixture(scope="module")
 def converging(pattern, tmp_path_factory):
-    """-0.15 % cells recorded to a run directory.  The run state is read from
+    """-1 % cells recorded to a run directory.  The run state is read from
     ``status.json`` at each pass's ``fit_start`` and ``fit_end``."""
     from rietx import runs
     root = tmp_path_factory.mktemp("lebail-runs")
@@ -147,7 +150,7 @@ def converging(pattern, tmp_path_factory):
 
     was = runs.set_enabled(True)
     try:
-        result = rx.Refinement.fit(_refinement(0.9985), pattern, mode="lebail",
+        result = rx.Refinement.fit(_refinement(0.99), pattern, mode="lebail",
                                    plan=_plan(8), two_theta_limits=LIMITS,
                                    telemetry=str(root), events=on_event)
     finally:
@@ -199,12 +202,15 @@ def test_a_pass_that_comes_back_worse_stops_the_loop_and_pass_one_is_kept(worse)
 
 @pytest.mark.xdist_group("lebail-converging")
 def test_a_converging_run_is_not_cut_short_and_ends_at_a_fixed_point(converging):
-    """-0.15 % cells: each pass lower than the last until two are level.
+    """-1 % cells: each pass lower than the last until two are level.
 
-    The shape is the claim, and the pass it stops on is not.  The path splits by
-    platform from pass 3: macOS read 18.810, 14.150, 13.949, 13.933, 13.932,
-    and Linux 18.810, 14.150, 13.927, 13.908, 13.905, 13.905 (PR #857's CI).
-    PR #855's pin at 5.1-50° split the same way, pass 6 against pass 5.
+    The shape is the claim, and the pass it stops on is not.  macOS read
+    15.162, 13.943, 13.929, 13.928 (2026-11-28).  The start was -0.15 % until
+    WP-2317 (R7): from -0.15 % to +0.6 % pass 1 now lands at 13.918 and pass 2
+    at 13.927, a first pass that does not lower Rwp.  From -0.15 % before R7
+    the path split by platform from pass 3: macOS read 18.810, 14.150, 13.949,
+    13.933, 13.932, and Linux 18.810, 14.150, 13.927, 13.908, 13.905, 13.905
+    (PR #857's CI).  PR #855's pin at 5.1-50° split the same way.
     """
     from rietx.refine import LEBAIL_CONVERGED_REL
     result, _, _ = converging
@@ -226,7 +232,7 @@ def test_a_converging_run_is_not_cut_short_and_ends_at_a_fixed_point(converging)
 
 def test_the_cap_is_a_cap_and_says_it_truncated(pattern):
     """Two passes of a run that was still falling: truncated, not finished."""
-    result = _fit(_refinement(0.9985), pattern, 2)
+    result = _fit(_refinement(0.99), pattern, 2)
     stop = _stop(result)
     assert stop.level == "warning"
     assert "cap of 2 passes" in stop.message

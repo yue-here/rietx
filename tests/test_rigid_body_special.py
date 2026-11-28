@@ -38,7 +38,7 @@ from rietx.crystallography.symmetry import resolve_group, site_orbit
 from rietx.crystallography.wyckoff import axial_basis, coordinate_basis
 from rietx.io.projects.gsas2 import read_gsas2_gpx, to_structure
 from rietx.io.readers import read_pattern
-from rietx.model.forward import compile_model
+from rietx.model.forward import WINDOW_MIN_DEG, compile_model
 from rietx.optimize.qpa import phase_zmv
 from rietx.params.bodies import RigidBodyBlock, compose_rotation, site_reach
 from rietx.params.derived import cartesian_frame
@@ -600,8 +600,12 @@ def _two_stage_fit(truth: Structure, pattern: PatternData, stem: str):
     globs = ["phases.*.scale", "instrument.background.*", "phases.*.atoms.*.dof.*",
              *BODY]
     ref = Refinement(start, LAB, history=False)
+    # one declared slack on both stages: since WP-2317 (R7) a stage a later
+    # one refits sizes its windows from what it frees, so a boundary would
+    # change the windows and the cost with them (4 679 -> 2 262 here)
     result = ref.fit(pattern, plan=RefinementPlan(stages=[
-        Stage("s1", globs, max_iter=100), Stage("s2", globs, max_iter=100)],
+        Stage("s1", globs, max_iter=100, window_slack_deg=WINDOW_MIN_DEG),
+        Stage("s2", globs, max_iter=100, window_slack_deg=WINDOW_MIN_DEG)],
         closing_window_tol=None))
     _draw(result, stem)
     return ref, result

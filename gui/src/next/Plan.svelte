@@ -1019,11 +1019,6 @@
     transform: rotate(90deg);
   }
 
-  .ib.words {
-    padding: 0 8px;
-    font-size: var(--text);
-  }
-
   .bad {
     color: var(--bad);
     margin: 2px 12px;
@@ -1325,35 +1320,7 @@
     color: var(--muted);
   }
 
-  button.op {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    height: auto;
-    min-height: 28px;
-    padding: 0 6px;
-    border: 0;
-    border-radius: 6px;
-    background: none;
-    color: var(--fg);
-    font-size: var(--text-sm);
-    font-weight: 400;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  button.op:disabled {
-    color: var(--muted);
-    cursor: default;
-  }
-
-  @media (hover: hover) {
-    button.op:hover:not(:disabled) {
-      background: var(--hover);
-    }
-  }
-
+  /* `button.op`, an option row, is drawn in `next.css` (WP-2246) */
   .op .w {
     margin-left: auto;
     font-size: var(--text-sm);

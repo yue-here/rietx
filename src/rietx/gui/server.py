@@ -208,6 +208,12 @@ def _series_index(q: dict, what: str) -> int:
 
 
 def _series_curves(s: GuiSession, q: dict, _body: dict) -> Packed:
+    # ``pattern`` is the place in a list (``of``: the run's or the staged
+    # one), served before, during and after a run; ``index`` is the entry's
+    # position in the last run's record, which today's Series panel reads
+    if q.get("pattern") and q["pattern"][0] != "":
+        of = (q.get("of") or ["run"])[0]
+        return s.series_pattern_curves(_query_int(q, "pattern", 0), of)
     return s.series_curves(_series_index(q, "curves"))
 
 
@@ -347,6 +353,8 @@ ROUTES: dict[tuple[str, str], Any] = {
     ("POST", "/api/series/run"): lambda s, q, b: s.run({**b, "kind": "series"}),
     ("GET", "/api/series/result"): lambda s, q, b: s.series_result(),
     ("GET", "/api/series/curves"): _series_curves,
+    # every member on one grid, for the Map graph, before a run too (WP-2243)
+    ("GET", "/api/series/map"): lambda s, q, b: s.series_map(),
     ("GET", "/api/series/history"): _series_history,
 
     ("GET", "/api/history"): lambda s, q, b: s.history(),
