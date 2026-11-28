@@ -41,19 +41,25 @@ assert [s.name for s in result.stages] == ["profile"]
 assert [r.stage for r in plan_ref.stage_reports_] == [
     "scale_bkg", "displacement", "cell", "profile_w", "profile"]
 # The page quotes each Rwp, and compares the two ends: the hand-run plan frees
-# all five widths in one stage, the preset frees `w` first.  The gap is where
-# each stage fixed its windows: the hand-run result is stale, and a stage
-# freeing nothing new, started from its answer, ends lower than either.
-# Moved with WP-2222 (closing stage off by default, 2026-11-19): the preset
-# ends at its `profile` stage, and the hand-run `profile` stage ends at 0.1028.
-assert f"{result.statistics.rwp:.4f}" == "0.1028"
+# all five widths in one stage, the preset frees `w` first.  Each stage fixes its
+# windows at the values it starts from; a stage past its window fraction solves
+# again on windows sized at its answer (WP-2317 R7, 2026-11-27), so the hand-run
+# `profile` stage and the preset's end at the same Rwp, and the preset's earlier
+# stages read a little higher because a stage a later one refits sizes its
+# slack from what it frees.  The preset ends at its `profile` stage (WP-2222,
+# closing stage off by default, 2026-11-19) and frees the displacement, not the
+# zero shift, on this Bragg-Brentano instrument (WP-2015).
+assert f"{result.statistics.rwp:.4f}" == "0.0946"
 assert [f"{r.rwp:.4f}" for r in plan_ref.stage_reports_] == [
-    "0.6050", "0.4938", "0.4921", "0.1935", "0.0994"]
+    "0.6063", "0.4945", "0.4924", "0.1948", "0.0946"]
+# "4.4 %" and "3.4 %"
+assert f"{100 * result.stages[-1].window_refit_loss:.1f}" == "4.4"
+assert f"{100 * plan_ref.result_.stages[-1].window_refit_loss:.1f}" == "3.4"
 assert [s.name for s in plan_ref.result_.stages][-1] == "profile"
 assert result.stages[-1].window_area_tol == 0.02  # `run_stage`'s default windows
 assert plan_ref.result_.stages[-1].window_area_tol is None  # a declared stage records none
 assert sorted(p.path for p in result.parameters) == sorted(
     p.path for p in plan_ref.result_.parameters)
-assert "FROZEN_COMPILE_STALE" in {d.code for d in result.diagnostics}
+assert "FROZEN_COMPILE_STALE" not in {d.code for d in result.diagnostics}
 again = ref.branch().run_stage(data, rx.Stage("again", []), two_theta_limits=(15, 130))
 assert f"{again.statistics.rwp:.4f}" == "0.0946"

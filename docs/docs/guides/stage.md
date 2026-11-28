@@ -20,7 +20,7 @@ This runs three stages by hand on the GSAS-II tutorial fluorapatite pattern that
 ```text
 scale_bkg    converged  Rwp 0.6050
 cell         converged  Rwp 0.4921
-profile      converged  Rwp 0.1028
+profile      converged  Rwp 0.0946
 ```
 
 Each call returns a full `RefinementResult` for the stage it ran, with the statistics, the parameters and their esds, and the diagnostics.
@@ -38,7 +38,7 @@ If a stage made things worse, `Refinement.checkout` returns the model to an earl
 ## Compare with the preset
 
 The `profile` stage above frees all five width terms together.
-`mccusker_default` frees `w` alone first and then `u`, `v`, `x` and `y`, and on this pattern it ends lower.
+`mccusker_default` frees `w` alone first and then `u`, `v`, `x` and `y`, and on this pattern it ends at the same Rwp as the hand-run stage.
 To see where the preset pulls ahead, ask it for a report at each stage:
 
 ```{literalinclude} ../../../examples/guides/stage.py
@@ -49,21 +49,23 @@ To see where the preset pulls ahead, ask it for a report at each stage:
 
 <!-- output of examples/guides/stage.py -->
 ```text
-scale_bkg    Rwp 0.6050
-displacement Rwp 0.4938
-cell         Rwp 0.4921
-profile_w    Rwp 0.1935
-profile      Rwp 0.0994
+scale_bkg    Rwp 0.6063
+displacement Rwp 0.4945
+cell         Rwp 0.4924
+profile_w    Rwp 0.1948
+profile      Rwp 0.0946
 ```
 
 The instrument is Bragg-Brentano, so the preset frees the specimen displacement in place of the zero shift, in a stage named `displacement` ([Plans](../concepts/plans.md)).
-The preset's `profile` stage reaches Rwp 0.0994, and the hand-run `profile` stage 0.1028.
+The preset's `profile` stage reaches Rwp 0.0946, and the hand-run `profile` stage 0.0946.
 The preset ends there, because a plan runs a closing stage only when it asks for one ([The closing stage](../reference/refinement.md#the-closing-stage)).
-The difference comes from where each stage fixed its peak windows.
-A stage fixes them at the values it starts from.
-The hand-run stage fixed them at the default widths, and its result carries `FROZEN_COMPILE_STALE`.
-The preset's `profile` stage fixed them at the widths its `profile_w` stage had fitted.
-One more hand-run stage that frees nothing new starts from the fitted widths too, and it ends at 0.0946.
+The preset's earlier stages read a little higher than the hand-run ones.
+A stage that a later stage refits computes each peak over a narrower window, and a stage's Rwp is measured on its own windows.
+A stage fixes its peak windows at the values it starts from.
+Both `profile` stages started from narrower peaks than they ended with, so the peaks outgrew their windows.
+The hand-run stage's windows dropped 4.4 % of the intensity at its first answer, and the preset's 3.4 %.
+Each stage then solved once more on windows sized at its answer, and `StageResult.window_refit_loss` records the first figure.
+One more hand-run stage that frees nothing new ends at 0.0946 too.
 The full script is `examples/guides/stage.py`.
 
 ## Read a report at every stage

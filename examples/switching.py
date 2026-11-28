@@ -45,8 +45,8 @@ TOPAS_EXCERPT = [
     "  b p0_cell_a 9.37331",
 ]
 INSTPRM = [
-    "Type:PXC", "Lam1:1.54059", "Lam2:1.54443", "Zero:-0.0365483", "I(L2)/I(L1):0.5",
-    "Polariz.:0.5", "U:-1.57858", "V:2.93235", "W:2.29048", "X:2.74538", "Y:3.9936",
+    "Type:PXC", "Lam1:1.54059", "Lam2:1.54443", "Zero:-0.0365497", "I(L2)/I(L1):0.5",
+    "Polariz.:0.5", "U:-1.57916", "V:2.93629", "W:2.28639", "X:2.74811", "Y:3.98994",
 ]
 # fullprof.md prints these runs with `...` between them; each run is
 # consecutive in the file, so an atom's codeword line is the one under it.
@@ -146,7 +146,7 @@ def gsas2_page(out: Path) -> None:
                      for line in path.read_text(encoding="utf-8").splitlines()
                      if line.startswith("U:"))
     u_rietx = rx.read_gsas2_instprm(path).profile.u.value
-    assert same("-0.000875351", cut(repr(u_rietx)))
+    assert same("-0.000875675", cut(repr(u_rietx)))
     assert math.isclose(u_instprm * 8 * math.log(2) * 1e-4, u_rietx, rel_tol=1e-6)
 
 

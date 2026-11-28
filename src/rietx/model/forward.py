@@ -229,9 +229,129 @@ from .restraints import (
 WINDOW_AREA_TOL = 2e-2
 #: Absolute slack added to every half-width: windows are frozen per stage,
 #: so a peak must stay inside its window while zero-shift, displacement and
-#: the cell move it during the stage — this is movement headroom, not tail
-#: coverage (a cold fit's zero error is instrument-scale, ~0.1°).
+#: the cell move it during the stage.  It was chosen as movement headroom
+#: (a cold fit's zero error is instrument-scale, ~0.1°), and it is tail room
+#: as well, which the next paragraph's answer stage depends on.
+#:
+#: Since WP-2317 (R7) it is the slack of every compile but the stage compile
+#: of a stage that a later stage of its plan refits (``compile_model``'s
+#: ``movement_slack``), and the **ceiling** of the slack that stage sizes from
+#: what it frees (:data:`WINDOW_MOVE_FWHM`), so no stage computes more points
+#: than before.  Its tail room is load-bearing on the stage whose answer is
+#: the result: sized from the frees there, a series' cell esds doubled.
 WINDOW_MIN_DEG = 0.3
+#: How far a stage may move a peak inside its frozen window, in multiples of
+#: that peak's own FWHM, for each position family the stage can move (WP-2317
+#: R7, ruled 2026-11-27).  A family is zero shift, specimen displacement,
+#: transparency, each capillary offset, and the strain a free cell or a free
+#: wavelength carries.  Each family's 2θ shape is the physics' (1 for the
+#: zero, cos θ for displacement, sin 2θ for transparency and the along-beam
+#: offset, cos 2θ for the across-beam one, tan θ for Δd/d), scaled so that the
+#: reflection in range it moves most gets the whole allowance; a stage's slack
+#: at a reflection is the sum over the families it moves, capped at
+#: :data:`WINDOW_MIN_DEG`.  A stage moving none gets half the local point
+#: step and nothing more (:func:`movement_slack_deg`), since nothing in it can
+#: move a peak.
+#:
+#: The bound on a stage's movement is not this number but the re-solve the
+#: staged runner makes, once, when a stage ends past its window tolerance
+#: (``StageResult.window_refit_loss``): the allowance only sets how often that
+#: re-solve is paid.  It sizes only a stage that a later stage refits, since
+#: the answer stage's tail room is in the esds a result reports.  3 covers the movements measured on the four acceptance
+#: protocols with room: 1.17 FWHM at most from their own starts and 2.43 from a
+#: zero 0.1° off (cpd-1a, the ``zero_disp`` stage).  A cell 0.3 % off moves
+#: peaks 6-21 FWHM in a stage, past any modest allowance and past the old
+#: 0.3° too (1.15° on SRM 660c); the refit and the next stage's recompile
+#: carry that case.  *(Chosen: WP-2317, 2026-11-27 — the measured movements,
+#: with the refit as the bound.)*
+WINDOW_MOVE_FWHM = 3.0
+
+#: The 2θ shape of each position family's shift, as a function of θ in
+#: radians (``corrections``' formulas, the scale dropped): what
+#: :data:`WINDOW_MOVE_FWHM` is spread over.
+_MOVE_SHAPES = {
+    "zero": lambda th: np.ones_like(th),
+    "displacement": np.cos,
+    "transparency": lambda th: np.sin(2.0 * th),
+    "capillary_along": lambda th: np.sin(2.0 * th),
+    "capillary_across": lambda th: np.cos(2.0 * th),
+    "strain": np.tan,
+}
+
+
+def moving_position_families(moving_paths: set[str] | None, ip: int,
+                             geometry_kind: str) -> tuple[str, ...] | None:
+    """The position families a stage can move for phase ``ip`` (WP-2317 R7).
+
+    ``None`` where no claim is made (``moving_paths is None``), which sizes
+    the uniform :data:`WINDOW_MIN_DEG`.  Read off ``moving_paths``, so a tie
+    or a variable driving a cell counts as the cell (root ``CLAUDE.md``: "can
+    this parameter move?" is ``moving_paths``).
+    """
+    if moving_paths is None:
+        return None
+    out = []
+    if "instrument.zero_shift" in moving_paths:
+        out.append("zero")
+    if geometry_kind == "bragg_brentano":
+        if "instrument.geometry.sample_displacement" in moving_paths:
+            out.append("displacement")
+        if "instrument.geometry.sample_transparency" in moving_paths:
+            out.append("transparency")
+    elif geometry_kind == "debye_scherrer":
+        if f"instrument.geometry.{CAPILLARY_OFFSETS[0]}" in moving_paths:
+            out.append("capillary_along")
+        if f"instrument.geometry.{CAPILLARY_OFFSETS[1]}" in moving_paths:
+            out.append("capillary_across")
+    # the wavelength's spelling has one authority, ``params.vector``'s, which
+    # imports from this package's neighbours, hence the late import
+    from ..params.vector import _is_wavelength
+    cell = f"phases.{ip}.cell."
+    if any(p.startswith(cell) or _is_wavelength(p) for p in moving_paths):
+        out.append("strain")
+    return tuple(out)
+
+
+def window_slack_shape(families: tuple[str, ...], theta_deg: np.ndarray,
+                       in_range: np.ndarray) -> np.ndarray:
+    """Σ over ``families`` of each one's 2θ shape at every reflection, each
+    scaled to 1 at the reflection in range it moves most (``in_range``; every
+    finite one where none is).  Times :data:`WINDOW_MOVE_FWHM` and the
+    reflection's FWHM it is the stage's movement slack (WP-2317 R7)."""
+    th = np.radians(np.asarray(theta_deg, dtype=np.float64))
+    total = np.zeros_like(th)
+    for fam in families:
+        s = np.nan_to_num(np.abs(_MOVE_SHAPES[fam](th)), nan=0.0, posinf=0.0)
+        ref = s[in_range] if in_range.any() else s
+        top = float(ref.max()) if ref.size else 0.0
+        if top > 0.0:
+            total = total + s / top
+    return total
+
+
+def movement_slack_deg(shape: np.ndarray, gamma: np.ndarray,
+                       half_step: np.ndarray) -> np.ndarray:
+    """The movement slack a stage's rule gives each window, in degrees.
+
+    ``half_step`` (:func:`grid_half_step`) is added under the cap because a
+    window takes the points within ±half of the peak, so the cells it draws
+    can stop up to half a step short of ±half.  Without it a stage moving
+    nothing drops up to 2.02 % of a peak's area against
+    :data:`WINDOW_AREA_TOL`'s 2 % (FAP and NAC ``scale_bkg``, measured
+    2026-11-27); the old uniform slack hid that.
+    """
+    return np.minimum(WINDOW_MIN_DEG, WINDOW_MOVE_FWHM * gamma * shape + half_step)
+
+
+def grid_half_step(tt: np.ndarray, pos: np.ndarray) -> np.ndarray:
+    """Half the grid's point step at each peak position, interpolated
+    between the steps and clamped at the grid's ends."""
+    tt = np.asarray(tt, dtype=np.float64)
+    pos = np.asarray(pos, dtype=np.float64)
+    if tt.size < 2:
+        return np.zeros_like(pos)
+    p = np.where(np.isfinite(pos), pos, tt[0])
+    return 0.5 * np.interp(p, tt[1:], np.diff(tt))
 
 def recorded_window_tol(tol: float | None) -> float:
     """A stage's window fraction as a record or a plan states it, for a compile.
@@ -1055,6 +1175,12 @@ class CompiledPhase:
     # evaluated on.  ``None`` is exactly off: a phase declaring none reaches
     # every expression below as it always did.
     peq: PhasePeakEquations | None = None
+    # WP-2317 R7.  The movement-slack shape the stage sized this phase's
+    # windows with (``window_slack_shape``), one row per emission line, so
+    # ``window_sizing`` reapplies the compile's rule at other widths.  ``None``
+    # is the uniform ``CompiledModel.window_slack_deg``: a caller's declared
+    # slack, a compile making no claim, or a phase a shift equation moves.
+    window_slack_shape: np.ndarray | None = None  # (n_lines, N)
 
 
 @dataclass
@@ -1208,9 +1334,11 @@ class CompiledModel:
     # FitReport reads it to know which precision it was handed
     # (``report._reading_models``).
     window_area_tol: float | None = None
-    # The absolute capture slack every window half-width carries, as
-    # ``compile_model`` resolved it (``WINDOW_MIN_DEG`` unless a stage set
-    # ``window_slack_deg``), so ``rewindow`` sizes by the compile's rule.
+    # The absolute capture slack a window half-width carries where the slack
+    # is uniform, as ``compile_model`` resolved it (``WINDOW_MIN_DEG`` unless a
+    # stage set ``window_slack_deg``), so ``rewindow`` sizes by the compile's
+    # rule.  A phase carrying ``window_slack_shape`` is sized by that instead
+    # (WP-2317 R7), and this is then its ceiling.
     window_slack_deg: float = WINDOW_MIN_DEG
     # WP-2107.  The instrument's ``shift`` equation, which moves every phase's
     # peaks and reads only the angle, so it sits in ``_position_shift_deg``
@@ -4862,7 +4990,8 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                   restraint_weight_scale: float = 1.0,
                   window_slack_deg: float | None = None,
                   window_area_tol: float | None = None,
-                  orbit_split: list | None = None) -> CompiledModel:
+                  orbit_split: list | None = None,
+                  movement_slack: bool = False) -> CompiledModel:
     """Freeze reflection lists, orbits, windows and FCJ nodes for one stage.
 
     ``moving_paths`` is every parameter the coming stage can move, or ``None``
@@ -4887,6 +5016,15 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
     ``window_slack_deg`` overrides ``WINDOW_MIN_DEG`` as the absolute capture
     slack added to every window half-width (``Stage.window_slack_deg`` has
     the two-jobs story); ``None`` — every ordinary caller — is the default.
+
+    ``movement_slack`` sizes that slack per reflection from the position
+    families ``moving_paths`` can move (:data:`WINDOW_MOVE_FWHM`, WP-2317 R7)
+    where no ``window_slack_deg`` is declared.  Only the staged runner's
+    stage compile passes it, since only a solve moves a peak and that runner
+    re-solves a stage whose windows went stale.  Every other compile, a
+    fresh one at an answer included, keeps the uniform
+    :data:`WINDOW_MIN_DEG`, whose tail room the reported statistics were
+    measured with.
 
     ``window_area_tol`` is the area each window may drop from its peak, for the
     phase windows and the declared sharp peaks alike.  ``None`` is
@@ -5199,6 +5337,19 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
             win_mag = np.zeros((n_lines, n, 2), dtype=np.int64)
             fcj_n_mag = np.zeros((n_lines, n), dtype=np.int64)
 
+        # WP-2317 R7: the position families this stage can move for this
+        # phase, which size its windows' movement slack.  ``None`` is the
+        # uniform slack: a caller's declared one, a compile making no claim
+        # (``gate_off_states`` is that test), or a shift equation, whose reach
+        # the families do not describe
+        move_families = (
+            None if (not movement_slack or window_slack_deg is not None
+                     or inst_shift is not None or "shift" in eqs)
+            else moving_position_families(moving_paths if gate_off_states else None,
+                                          ip, geom.kind))
+        slack_shape = (None if move_families is None
+                       else np.zeros((n_lines, n), dtype=np.float64))
+
         def _size_family(win, fcj_n, extra_size: float, extra_strain: float,
                          *, primary: bool):
             """Fill one component's frozen windows and FCJ node counts.
@@ -5259,8 +5410,17 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                     if il == 0:  # primary line drives Pawley overlap grouping
                         tt_primary, fwhm_primary = pos.copy(), gamma_est.copy()
                     on_data[:] |= (pos >= tt_min) & (pos <= tt_max)
-                slack = (WINDOW_MIN_DEG if window_slack_deg is None
-                         else window_slack_deg)
+                if move_families is None:
+                    slack = (WINDOW_MIN_DEG if window_slack_deg is None
+                             else window_slack_deg)
+                else:
+                    # WP-2317 R7: sized from what the stage can move, over
+                    # the reflections the fitted range draws
+                    shape = window_slack_shape(
+                        move_families, theta,
+                        np.isfinite(pos) & (pos >= tt_min) & (pos <= tt_max))
+                    slack_shape[il] = shape
+                    slack = movement_slack_deg(shape, gamma_est, grid_half_step(tt, pos))
                 half = window_fwhm_mult(eta_est, window_area_tol) * gamma_est + slack
                 if fcj_on:
                     half = half + fcj_extent_deg(pos, sl_eff, hl_eff)
@@ -5309,7 +5469,8 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                            strain_monomials=strain_monomials,
                            satellites=satellites,
                            win_mag=win_mag, fcj_n_mag=fcj_n_mag,
-                           peq=None if frame is None else PhasePeakEquations(eqs, frame))
+                           peq=None if frame is None else PhasePeakEquations(eqs, frame),
+                           window_slack_shape=slack_shape)
         if satellites is not None:
             cp.nuclear_mask = (~refl.is_satellite).astype(np.float64)
         if magnetic_mask is not None:
@@ -5593,7 +5754,12 @@ def window_sizing(model: CompiledModel, values: dict[str, float],
                 model.phase_peaks(ip, values, component=component)):
             pos = np.asarray(pos, dtype=np.float64)
             gamma, eta = model.peak_gamma_eta(w1, w2)
-            half = window_fwhm_mult_interp(eta, tol) * gamma + model.window_slack_deg
+            # the compile's slack rule at these widths (WP-2317 R7)
+            slack = (model.window_slack_deg if cp.window_slack_shape is None
+                     else movement_slack_deg(cp.window_slack_shape[il],
+                                             np.asarray(gamma, dtype=np.float64),
+                                             grid_half_step(tt, pos)))
+            half = window_fwhm_mult_interp(eta, tol) * gamma + slack
             if fcj_on:
                 half = half + fcj_extent_deg(pos, sl, hl)
             valid = np.isfinite(pos) & np.isfinite(half)
