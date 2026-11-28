@@ -1558,27 +1558,28 @@ def _structural_column(model: CompiledModel, table: ParameterTable,
 def _site_scalar_column(model: CompiledModel, table: ParameterTable,
                         bases: DerivativeBases, values: dict[str, float], c: int,
                         ip: int, reach: list[str],
-                        grads: tuple[dict[int, np.ndarray], dict[int, np.ndarray]]
-                        ) -> np.ndarray:
+                        grads: tuple[dict[int, np.ndarray], dict[int, np.ndarray]],
+                        lj: sparse.csc_matrix) -> np.ndarray:
     """∂y/∂θ_c for a column moving Biso and occupancy rows of phase ip only
     (WP-2314).
 
     Both enter the intensity through |F_N|² alone, so only the intensity
     scalar moves.  ``grads`` is the ``({j: ∂|F|²/∂B_j}, {j: ∂|F|²/∂occ_j})``
     half of :meth:`CompiledModel.structural_f2_grads` at this θ.  The column's
-    ∂|F|² is their sum weighted by the column's coefficients in C, so a tie
-    between two atoms' Biso, an occupancy constraint such as
-    occ_W = 1 − occ_Nb, or a named variable driving several sites is carried
-    exactly: the rows are affine in θ.  ``reach`` is every path the column
-    moves, its own included; :func:`_site_scalar_reach_ok` has checked that
-    nothing else is in it.
+    ∂|F|² is their sum weighted by ∂p_q/∂θ_c over the rows it moves, read off
+    ``lj``, the table's :meth:`~ParameterTable.local_jacobian` at θ.  That is
+    C itself on a table without a derived block, so a tie between two atoms'
+    Biso, an occupancy constraint such as occ_W = 1 − occ_Nb, or a named
+    variable driving several sites is carried exactly, and a row a formula
+    writes takes the formula's own derivative there.  ``reach`` is every path
+    the column moves, its own included; :func:`_site_scalar_reach_ok` has
+    checked that nothing else is in it.
     """
-    C, _ = table.constraint_block()
     g_biso, g_occ = grads
     df2 = None
     for q in reach:
         m = _SITE_SCALAR_PATH.match(q)
-        w = float(C[table._paths[q], c])
+        w = float(lj[table._paths[q], c])
         if w == 0.0:
             continue
         g = (g_biso if m.group(3) == "biso" else g_occ)[int(m.group(2))]
@@ -1593,20 +1594,18 @@ def _site_scalar_column(model: CompiledModel, table: ParameterTable,
     return _accumulate(len(model.tt), [(pp.layout, terms)])
 
 
-def _site_scalar_reach_ok(ip: str, path: str, extra: list[str],
-                          derived: frozenset[str]) -> bool:
+def _site_scalar_reach_ok(ip: str, path: str, extra: list[str]) -> bool:
     """Whether ``_site_scalar_column`` claims this column.
 
     Its reach is the Biso and occupancy rows of phase ``ip``, any atom, since
-    it sums each row's ∂|F|² weighted by its coefficient in C.  A row a derived
-    block writes (``ParameterTable.derived``) has no coefficient in C, so a
-    column reaching one is declined, as is one reaching anything else: a
-    coordinate, a cell, another phase.  Such a column takes the peak chain,
-    which decodes through every row and is exact for it.
+    it sums each row's ∂|F|² weighted by that row's ∂p/∂θ_c.  A column
+    reaching anything else (a coordinate, a cell, another phase) is declined
+    and takes the peak chain, which decodes through every row and is exact
+    for it.
     """
     for q in (path, *extra):
         m = _SITE_SCALAR_PATH.match(q)
-        if m is None or m.group(1) != ip or q in derived:
+        if m is None or m.group(1) != ip:
             return False
     return True
 
@@ -2426,10 +2425,9 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
     # for and never read costs one bracket); a column whose atom is missing
     # would raise, never return short.
     struct_atoms: dict[int, tuple[set[int], set[int], set[int], set[int]]] = {}
-    derived = table.derived_paths()
     # the Biso and occupancy columns' claim, decided once (C is frozen)
     site_scalar = [bool((ss := _SITE_SCALAR_PATH.match(path))
-                        and _site_scalar_reach_ok(ss.group(1), path, extra, derived))
+                        and _site_scalar_reach_ok(ss.group(1), path, extra))
                    for path, extra, _own in identities]
     for (path, extra, _own), scalar in zip(identities, site_scalar, strict=True):
         if ((dof := _STRUCTURAL_PATH.match(path))
@@ -2496,6 +2494,16 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
                     ip, values, *(sorted(w) for w in struct_atoms[ip]))
             return struct_grads[ip]
 
+        # ∂p/∂θ at this θ: C itself unless a derived row (a formula) sets a
+        # Biso or an occupancy, whose coefficient then moves with θ
+        lj_now: list[sparse.csc_matrix] = []
+
+        def get_lj() -> sparse.csc_matrix:
+            if not lj_now:
+                lj_now.append(coef_c if not table.derived else table.local_jacobian(
+                    np.asarray(theta_t, dtype=np.float64)).tocsc())
+            return lj_now[0]
+
         for c, (path, extra, own) in enumerate(identities):
             if bkg_mix[c] is not None:
                 # y is linear in the coefficient: ∂y/∂c_n = basis row; the
@@ -2532,7 +2540,7 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
                         ip := int(path.split(".")[1]))):
                 J[:n_data, c] = -sqrt_w * _site_scalar_column(
                     model, table, get_bases(), values, c, ip, [path, *extra],
-                    get_struct_grads(ip)[2:])
+                    get_struct_grads(ip)[2:], get_lj())
             elif ((mom := _MOMENT_PATH.match(path))
                     and model.moment_grad_supported(int(mom.group(1)))
                     and _moment_reach_ok(path, extra, angles=moment_angles)):
