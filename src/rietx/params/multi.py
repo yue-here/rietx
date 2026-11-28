@@ -27,6 +27,7 @@ unchanged, while a scoped glob (``hist.1.*``) targets one.
 
 from __future__ import annotations
 
+import copy
 import fnmatch
 import math
 from dataclasses import dataclass, field
@@ -37,6 +38,7 @@ from pydantic import BaseModel
 from ..schemas.common import Parameter
 from ..schemas.instrument import Instrument
 from ..schemas.parametric import CoordinateTable, ParametricEquation
+from ..schemas.params import TieSpec
 from ..schemas.structure import Phase, Structure
 from .expression import RESERVED, Expression, ExpressionError, names_in
 from .parametric import ResolvedParametric, least_squares_start, resolve_parametric
@@ -46,6 +48,8 @@ from .vector import (
     _is_wavelength,
     _tie_text,
     check_wavelength_freedom,
+    is_literal_path,
+    is_variable_path,
     unknown_paths_among,
 )
 
@@ -525,6 +529,18 @@ class MultiParameterTable:
         #: ``vars.{name}`` of each variable declared ``vary=False``, which a
         #: glob reaching an equation's target does not free
         self._fixed_variables: set[str] = set()
+        #: the caller's holds (WP-2103), by joint name: the one register
+        #: :meth:`unhold` reads, so a hold a table derives (the floating
+        #: origin, WP-1912) is never the caller's to release here
+        self.user_holds: set[str] = set()
+        # (histogram, bare path) of every row ``set_values`` wrote, which
+        # ``refit(result=)`` reads: a held row is the caller's value only if
+        # the caller set it (WP-2103, round 2)
+        self.user_set: set[tuple[int, str]] = set()
+        #: the caller's ties (WP-2103), joint target name → its spec, sources
+        #: spelled as the caller wrote them: the register :meth:`untie` reads
+        #: and the joint ``parameters()`` marks ``user=True`` from
+        self.user_ties: dict[str, TieSpec] = {}
         # a private structure copy per histogram: shared parameters are written
         # identically into every copy at each commit; only the per-histogram
         # scale (and any per-histogram override) diverges.
@@ -1128,7 +1144,40 @@ class MultiParameterTable:
                           for g in path_globs)]
             out.update(self._canonical(h, p) for h in hit for p in r.paths
                        if p not in self._fixed_variables)
+        # a caller's tie onto a variable is the same shape (WP-2103): its
+        # target is a tied row the glob alone would skip.  A held one frees
+        # nothing: the hold is on the row, and the variable is what moves it
+        for h, t, variables in self._user_tie_reach(path_globs):
+            if not self._entry(h, t).held:
+                out.update(variables)
         return out
+
+    def _user_tie_reach(self, path_globs: list[str]):
+        """``(h, path, variables)`` for each place of a caller's tie a glob reaches.
+
+        ``variables`` are the joint names of the variables the tie reads that
+        reaching it would free (bar one declared ``vary=False``); a tie that
+        reads none is left out, since reaching it frees nothing.
+        """
+        for target, spec in self.user_ties.items():
+            reads = [_unscoped(p) for p in spec.sources]
+            free = [p for p in reads
+                    if is_variable_path(p) and p not in self._fixed_variables]
+            if not free:
+                continue
+            for h, t in self.places(target, every=True):
+                if any(fnmatch.fnmatchcase(name, g)
+                       for name in (t, f"hist.{h}.{t}", target)
+                       for g in path_globs):
+                    yield h, t, [self._canonical(h, p) for p in free]
+
+    def _user_tie_at(self, h: int, path: str) -> tuple[str, TieSpec] | None:
+        """The caller's tie declared on histogram ``h``'s ``path``, under
+        whichever spelling it was declared (bare or ``hist.<h>.``), or None."""
+        for name, spec in self.user_ties.items():
+            if (h, path) in self.places(name, every=True):
+                return name, spec
+        return None
 
     def variable_rows(self, r) -> list[str]:
         """The joint rows of a declaration's coefficients or variables, in order.
@@ -1221,7 +1270,8 @@ class MultiParameterTable:
         freed: list[str] = []
         seen: set[str] = set()
         coupled = (self._parametric_reached(path_globs)
-                   if self.parametric or self.expressions else set())
+                   if self.parametric or self.expressions or self.user_ties
+                   else set())
         for h, table in enumerate(self.tables):
             matched = []
             for e in table.entries:
@@ -1246,9 +1296,9 @@ class MultiParameterTable:
 
         ``StageResult.blocked_by_hold`` for a joint stage: the rows
         :meth:`set_vary` would have freed but for ``Entry.held``, under its
-        matching rule (bare or scoped name), a shared row named once.  A
-        joint fit has no hold verb, so every such row is a floating-origin
-        hold its tables derive from the structure (WP-1912).
+        matching rule (bare or scoped name), a shared row named once: the
+        caller's own (:meth:`hold`, WP-2103) or a floating-origin hold its
+        tables derive from the structure (WP-1912).
         """
         blocked: dict[str, None] = {}
         for h, table in enumerate(self.tables):
@@ -1259,7 +1309,548 @@ class MultiParameterTable:
                 if any(fnmatch.fnmatchcase(canon, g)
                        or fnmatch.fnmatchcase(e.path, g) for g in path_globs):
                     blocked[canon] = None
+        # a held row the caller tied onto a variable: the glob would have
+        # freed the variable, and the hold kept it fixed.  Not when the
+        # variable is freed another way (a glob naming it, or an unheld row
+        # tied onto it), since then the held row moves with it
+        held_ties = [(h, t, v) for h, t, v in self._user_tie_reach(path_globs)
+                     if self._entry(h, t).held]
+        if held_ties:
+            coupled = self._parametric_reached(path_globs)
+
+            def freed(var: str) -> bool:
+                where = self.places(var, every=True)
+                named = any(fnmatch.fnmatchcase(var, g)
+                            or fnmatch.fnmatchcase(_unscoped(var), g)
+                            for g in path_globs)
+                return ((var in coupled or named)
+                        and not any(self._entry(k, p).held for k, p in where))
+
+            for h, t, variables in held_ties:
+                if not any(freed(v) for v in variables):
+                    blocked[self._canonical(h, t)] = None
         return sorted(blocked)
+
+    # -- the caller's steering (WP-2103) --------------------------------
+    def _matches(self, path_globs: list[str]) -> dict[str, list[tuple[int, str]]]:
+        """Joint name → its ``(histogram, bare path)`` places, for every row
+        ``path_globs`` reach under :meth:`set_vary`'s matching rule (bare or
+        scoped name), locked and tied rows included."""
+        hits: dict[str, list[tuple[int, str]]] = {}
+        for h, table in enumerate(self.tables):
+            for e in table.entries:
+                canon = self._canonical(h, e.path)
+                row = self.row_path(h, e)
+                if any(fnmatch.fnmatchcase(canon, g) or fnmatch.fnmatchcase(row, g)
+                       or fnmatch.fnmatchcase(e.path, g) for g in path_globs):
+                    # keyed by the name ``parameters()`` prints, so a row tied
+                    # onto per-pattern sources is one pattern's row to hold
+                    hits.setdefault(row, []).append((h, e.path))
+        return hits
+
+    def _refuse_unknown_literals(self, globs: list[str]) -> None:
+        """An unknown literal is a typo, refused as the single fit refuses it."""
+        known = self.known_paths()
+        for glob in globs:
+            if is_literal_path(glob) and glob not in known:
+                raise ValueError(f"unknown parameter path {glob!r} in this joint "
+                                 "fit; a row per pattern is named "
+                                 "'hist.<h>.<path>', a shared one bare")
+
+    def places(self, name: str, *, every: bool = False) -> list[tuple[int, str]]:
+        """Each ``(histogram, bare path)`` a joint row name stands for (WP-2103).
+
+        A bare shared path is one column every table holds; ``hist.<h>.<path>``
+        is histogram ``h``'s own row.  Refuses a name that is not a row of the
+        joint fit as :meth:`row_names` spells them: a scoped shared path (one
+        column, never one pattern's) and, unless ``every``, a bare per-pattern
+        path (one row per pattern, so which one is the caller's to say) each
+        name the spelling that is.  ``every`` reads a bare per-pattern path as
+        every pattern's row, which is what a tie declared once means.
+        """
+        if name.startswith("hist."):
+            parts = name.split(".", 2)
+            h = int(parts[1]) if len(parts) == 3 and parts[1].isdigit() else -1
+            if not 0 <= h < self.n_histograms or parts[2] not in self.tables[h]._paths:
+                raise ValueError(f"unknown parameter path {name!r} in this joint fit")
+            if row_shared(self.sharing, self._entry(h, parts[2])):
+                raise ValueError(
+                    f"{parts[2]!r} is one column every pattern shares, so it has "
+                    f"no row of pattern {h}'s own; name it bare, or make it a row "
+                    "per pattern with SharingMap(per_histogram=[...])")
+            return [(h, parts[2])]
+        where = [(h, name) for h, t in enumerate(self.tables) if name in t._paths]
+        if not where:
+            raise ValueError(f"unknown parameter path {name!r} in this joint fit")
+        if not every and not row_shared(self.sharing, self._entry(where[0][0], name)):
+            raise ValueError(
+                f"{name!r} is a row per pattern; name one, 'hist.<h>.{name}'")
+        return where
+
+    def _entry(self, h: int, path: str):
+        return self.tables[h].entries[self.tables[h]._paths[path]]
+
+    def _scale(self, h: int, path: str) -> float:
+        """Histogram ``h``'s unit factor on ``path`` (WP-1131), 1 elsewhere."""
+        return self.value_scales[h].get(path, 1.0) if h < len(self.value_scales) else 1.0
+
+    def set_values(self, values: dict[str, float]) -> None:
+        """Set values by joint row name, every refusal made before any write.
+
+        ``Refinement.set_values``' refusals, row by row in each histogram that
+        holds it: a locked row is structurally fixed, a tied one names its
+        sources, a value off the row's bounds would start the solver
+        infeasible.  A shared size row is written in each histogram's own
+        units, as construction writes it (WP-1131).  Dependents follow.  The
+        rows written are recorded in :attr:`user_set`.
+        """
+        self.write_values(values, record=True)
+
+    def write_values(self, values: dict[str, float], *, record: bool) -> None:
+        """:meth:`set_values`' body; ``record`` says whether the caller wrote it.
+
+        ``refit(result=)`` writes a saved answer back with ``record=False``,
+        so its values never read as ones the caller set.
+        """
+        writes: list[tuple[int, str, float]] = []
+        for name, value in values.items():
+            for h, path in self.places(name):
+                e = self._entry(h, path)
+                declared = self._user_tie_at(h, path)
+                if declared is not None and declared[1].expression is not None:
+                    raise ValueError(
+                        f"{name!r} follows {declared[1].describe()} (a user tie); "
+                        "set the variables it reads instead")
+                if e.locked:
+                    raise ValueError(
+                        f"{name!r} is structurally fixed (symmetry, or a "
+                        "representation that owns this channel) and cannot be set")
+                if e.tie is not None:
+                    sources = ", ".join(repr(p) for p, _ in e.tie.terms)
+                    raise ValueError(f"{name!r} follows {sources} as an affine "
+                                     "tie; set its sources instead")
+                v = float(value) * self._scale(h, path)
+                if not (e.lo <= v <= e.hi):
+                    raise ValueError(f"{name}={value} lies outside its bounds "
+                                     f"[{e.lo / self._scale(h, path)}, "
+                                     f"{e.hi / self._scale(h, path)}]")
+                writes.append((h, path, v))
+        for h, path, v in writes:
+            self._entry(h, path).value = v
+            if record:
+                self.user_set.add((h, path))
+        for h in sorted({h for h, _, _ in writes}):
+            self.tables[h].refresh_ties()
+        self.apply_to_models()
+        self._rebuild_columns()
+
+    def hold(self, path_globs: list[str] | str) -> list[str]:
+        """Declare rows that do not move, whatever a plan asks (WP-1435's verb).
+
+        Globs match as :meth:`set_vary` matches them, so a shared row is held
+        in every histogram and ``hist.<h>.…`` holds pattern ``h``'s own.  An
+        unknown literal raises; a pattern matching nothing is an empty sweep.
+        Returns the joint names newly held, sorted.  A row a rigid body places
+        is refused, as the single fit refuses it.
+        """
+        globs = [path_globs] if isinstance(path_globs, str) else list(path_globs)
+        self._refuse_unknown_literals(globs)
+        hits = self._matches(globs)
+        for glob in globs:
+            if is_literal_path(glob) and not any(
+                    fnmatch.fnmatchcase(n, glob) or fnmatch.fnmatchcase(_unscoped(n), glob)
+                    for n in hits):
+                raise ValueError(f"{glob!r} names no row of this joint fit")
+        for name, where in hits.items():
+            for h, path in where:
+                owner = self.tables[h].body_rows().get(path)
+                if owner is not None:
+                    raise ValueError(
+                        f"cannot hold {name!r}: placed by rigid body {owner!r}; "
+                        "hold the body's own origin, rotation and torsions instead")
+        new = sorted(n for n in hits if n not in self.user_holds)
+        by_table: dict[int, list[str]] = {}
+        for name in new:
+            for h, path in hits[name]:
+                by_table.setdefault(h, []).append(path)
+        for h, paths in by_table.items():
+            self.tables[h].set_held(paths, True)
+        self.user_holds.update(new)
+        if new:
+            self._rebuild_columns()
+        return new
+
+    def held_by(self, name: str) -> str | None:
+        """Who holds the joint row ``name``: ``"caller"``, ``"origin"`` or ``None``.
+
+        :meth:`ParameterTable.held_by <rietx.params.vector.ParameterTable.held_by>`
+        asked of every table the row lives in (a bare per-pattern path is
+        every pattern's row), so the answer is the tables', as the hold itself
+        is, never :attr:`user_holds` read at a call site.  ``"caller"`` wins
+        where any table says so, as it does on one table.
+        """
+        who = {self.tables[h].held_by(p) for h, p in self.places(name, every=True)}
+        return "caller" if "caller" in who else "origin" if "origin" in who else None
+
+    def unhold(self, path_globs: list[str] | str) -> list[str]:
+        """Take back the caller's holds; returns the joint names released, sorted.
+
+        Globs match the declared holds only.  A literal that is not one is
+        refused with the reason.  A released row comes back **fixed** at its
+        value, never free.  A floating-origin hold (WP-1912) is the table's,
+        not the caller's: its literal is refused, naming
+        ``Phase.floating_origin``.
+        """
+        globs = [path_globs] if isinstance(path_globs, str) else list(path_globs)
+        # a register name matches as a stage glob matches a row: by its joint
+        # name or its bare path, so ``unhold`` takes back what ``hold`` took
+        def reached(n: str, g: str) -> bool:
+            return fnmatch.fnmatchcase(n, g) or fnmatch.fnmatchcase(_unscoped(n), g)
+
+        hits = sorted(n for n in self.user_holds if any(reached(n, g) for g in globs))
+        for glob in globs:
+            if not is_literal_path(glob) or any(reached(n, glob) for n in hits):
+                continue
+            self._refuse_unknown_literals([glob])
+            origin = any(self._canonical(h, p) == glob
+                         for h, t in enumerate(self.tables) for p in t.origin_holds)
+            raise ValueError(
+                f"{glob!r} is held to fix a floating origin, which is the "
+                "structure's declaration: set Phase.floating_origin to None"
+                if origin else f"{glob!r} is not held by this refinement")
+        by_table: dict[int, list[str]] = {}
+        for name, where in self._matches(hits).items():
+            if name in hits:
+                for h, path in where:
+                    by_table.setdefault(h, []).append(path)
+        for h, paths in by_table.items():
+            self.tables[h].set_held(paths, False)
+        self.user_holds.difference_update(hits)
+        if hits:
+            self._rebuild_columns()
+        return hits
+
+    def _tie_place(self, target: str, source: str) -> list[tuple[int, str, str]]:
+        """Where a tie of ``target`` onto ``source`` lands: ``(h, target, source)``
+        bare in histogram ``h``, every refusal that is about histograms made.
+
+        One number across patterns is ``sharing=``, never a tie, so a source
+        in another pattern is refused, and a shared target cannot follow a
+        per-pattern source (it would be a row per pattern under a shared
+        name).
+        """
+        spelled = ("; one number across patterns is SharingMap(shared=[...]), "
+                   "never a tie")
+        out = []
+        for h, t in self.places(target, every=True):
+            if source.startswith("hist."):
+                if not target.startswith("hist."):
+                    raise ValueError(
+                        f"tying every pattern's {target!r} to {source!r} ties "
+                        f"each pattern to one pattern's row{spelled}")
+                (k, s), = self.places(source)
+                if k != h:
+                    raise ValueError(f"{target!r} and {source!r} are rows of "
+                                     f"different patterns{spelled}")
+            else:
+                s = source
+                if s not in self.tables[h]._paths:
+                    raise ValueError(f"unknown parameter path {source!r} in "
+                                     f"pattern {h}")
+            if s == t:
+                raise ValueError(f"{target!r} cannot be tied to itself")
+            if self.sharing.is_shared(t) and not self.sharing.is_shared(s):
+                raise ValueError(
+                    f"{target!r} is shared and {source!r} is a row per pattern, "
+                    f"so the tie would give {target!r} a value per pattern; "
+                    "make it a row per pattern too with "
+                    "SharingMap(per_histogram=[...])")
+            out.append((h, t, s))
+        return out
+
+    def _check_target(self, name: str, h: int, path: str) -> None:
+        e = self._entry(h, path)
+        declared = self._user_tie_at(h, path)
+        if declared is not None:
+            raise ValueError(f"{name!r} already follows {declared[1].describe()} "
+                             "(a user tie); untie it first")
+        if e.locked:
+            raise ValueError(f"{name!r} is structurally fixed (symmetry, or a "
+                             "representation that owns this channel) and "
+                             "cannot be a tie target")
+        if e.tie is not None:
+            sources = ", ".join(repr(p) for p, _ in e.tie.terms)
+            raise ValueError(f"{name!r} already follows {sources} (symmetry, or "
+                             "a parametric equation), which outranks a user tie")
+
+    def tie(self, spec: dict[str, tuple[list[tuple[str, float]], float]]) -> list[str]:
+        """Declare linear ties ``{target: ([(source, c), ...], const)}`` as one move.
+
+        Every name is a joint row name (:meth:`places`).  A bare target is
+        tied in every pattern that holds it, each pattern's to its own source
+        when the source is a row per pattern; ``hist.<h>.…`` ties pattern
+        ``h``'s alone.  ``Refinement.tie``'s refusals, per pattern: an unknown
+        or locked end, an already-tied target, a tied model source (a variable
+        may follow another), a self-tie, a zero coefficient and an implied
+        value off the bounds.  Validated whole before any table is written,
+        and every table put back if a write raises.
+        """
+        writes: list[tuple[int, str, AffineTie]] = []
+        for target, (terms, const) in spec.items():
+            by_h: dict[int, tuple[str, list[tuple[str, float]]]] = {}
+            for source, c in terms:
+                if source == target:
+                    raise ValueError(f"{target!r} cannot be tied to itself")
+                if c == 0.0:
+                    raise ValueError(
+                        f"a tie with scale 0 fixes {target!r} at {const}; that "
+                        "is set_values" if len(terms) == 1 else
+                        f"the term on {source!r} has coefficient 0; drop the term")
+                for h, t, s in self._tie_place(target, source):
+                    self._check_target(target, h, t)
+                    src = self._entry(h, s)
+                    if src.locked or (src.tie is not None and not is_variable_path(s)):
+                        raise ValueError(
+                            f"{source!r} is fixed or follows another parameter, so "
+                            "it carries no freedom of its own; tie to what it "
+                            "follows instead, or name a variable")
+                    # a size row is stored in each pattern's units (WP-1131).
+                    # The tie's coefficients are written against the source's
+                    # physical value but a column holds value/f_s, so a scaled
+                    # source would decode short by f_s in that pattern: refuse
+                    # it, as ParameterTable.apply_value_scale does.
+                    if self._scale(h, s) != 1.0:
+                        raise ValueError(
+                            f"{source!r} carries a value scale in pattern {h} "
+                            "(a size across wavelengths, WP-1131); a tie's "
+                            "sources must be unscaled")
+                    by_h.setdefault(h, (t, []))[1].append(
+                        (s, c * self._scale(h, t)))
+            for h, (t, pairs) in by_h.items():
+                e = self._entry(h, t)
+                k = const * self._scale(h, t)
+                implied = k + sum(c * self._entry(h, s).value for s, c in pairs)
+                if not (e.lo <= implied <= e.hi):
+                    f = self._scale(h, t)
+                    raise ValueError(f"the tie puts {target}={implied / f:g} outside "
+                                     f"its bounds [{e.lo / f}, {e.hi / f}]")
+                writes.append((h, t, AffineTie(terms=tuple(pairs), const=k)))
+        before = [{e.path: (e.value, e.tie, e.vary) for e in t.entries}
+                  for t in self.tables]
+        try:
+            for h, t, tie in writes:
+                self.tables[h].set_tie(t, tie)
+            for h in sorted({h for h, _, _ in writes}):
+                self.tables[h].refresh_ties()
+                broken = [e for e in self.tables[h].entries
+                          if e.value != before[h][e.path][0]
+                          and not (e.lo <= e.value <= e.hi)]
+                if broken:
+                    e = broken[0]
+                    raise ValueError(f"the tie implies {e.path}={e.value:g} in "
+                                     f"pattern {h}, outside its bounds "
+                                     f"[{e.lo:g}, {e.hi:g}]; loosen that bound "
+                                     "or change the tie")
+            self._rebuild_columns()
+        except BaseException:
+            for h, t, _ in writes:
+                old = before[h][t][1]
+                self.tables[h].set_tie(t, old)
+            for h, table in enumerate(self.tables):
+                for e in table.entries:
+                    e.value, _, e.vary = before[h][e.path]
+                table.refresh_ties()
+            self._rebuild_columns()
+            raise
+        for target, (terms, const) in spec.items():
+            self.user_ties[target] = TieSpec(terms=[(s, float(c)) for s, c in terms],
+                                             const=float(const), user=True)
+        self.apply_to_models()
+        return list(spec)
+
+    def tie_expression(self, target: str, text: str) -> str:
+        """Set ``target`` by a formula over named variables (WP-2118's ``expression=``).
+
+        ``Refinement.tie(path, expression=...)``'s grammar and refusals: the
+        formula reads ``vars.<name>`` variables and numbers only, it must read
+        one, and its value at the variables' present values must be finite and
+        inside the target's bounds.  A target per pattern meets the formula
+        once in each pattern's table, as a parametric expression is installed.
+        A displacement from where the fit began (a site DOF, a rigid-body
+        increment) is refused, since no formula sets it absolutely.  Checked
+        whole before any table is written, because a table cannot take a
+        formula back (:meth:`untie` refuses one).
+        """
+        if not isinstance(text, str):
+            raise TypeError(f"expression must be text, got {type(text).__name__}")
+        expr = Expression(text)
+        if not expr.names:
+            raise ValueError(
+                f"the expression {text!r} reads no variable, so it fixes "
+                f"{target!r} at a number; that is set_values")
+        where = self.places(target, every=True)
+        for h, t in where:
+            self._check_target(target, h, t)
+            table = self.tables[h]
+            if t in table.anchored_dof_paths or table._body_increment_kind(t):
+                raise ValueError(
+                    f"{target!r} is a displacement from where the fit began (a "
+                    "site DOF or a rigid-body increment), so a formula cannot "
+                    "set it absolutely; tie it linearly")
+            if any(self._scale(k, t) != 1.0 for k in range(self.n_histograms)):
+                raise ValueError(
+                    f"{target!r} is stored in each pattern's own units (a size "
+                    "across wavelengths, WP-1131), which a formula cannot "
+                    "follow; tie it linearly")
+            # a caller's tie reading the target would become the formula's
+            # locked follower, a tie neither untie nor the register could name
+            i = table._paths[t]
+            for f in table.entries:
+                if f.tie is None or f.path == t:
+                    continue
+                terms, _ = table._flatten(f.tie, (f.path,))
+                declared = self._user_tie_at(h, f.path)
+                if declared is not None and any(j == i for j, _ in terms):
+                    raise ValueError(
+                        f"{declared[0]!r} follows it (a user tie), so a formula "
+                        f"on {target!r} would lock that row with it; untie "
+                        f"{declared[0]!r} first, or tie it to the formula too")
+            missing = [n for n in expr.names if f"vars.{n}" not in table._paths]
+            if missing:
+                raise ValueError(
+                    f"the expression for {target!r} reads {missing[0]!r}, which "
+                    "is not a declared variable.  A formula reads named "
+                    f"variables and numbers only: add_variable({missing[0]!r}, "
+                    "value) first")
+            if self.sharing.is_shared(t) and not all(
+                    self.sharing.is_shared(f"vars.{n}") for n in expr.names):
+                raise ValueError(
+                    f"{target!r} is shared and the formula reads a variable per "
+                    "pattern; make the target a row per pattern too with "
+                    "SharingMap(per_histogram=[...])")
+            value = float(expr.evaluate(
+                {n: self._entry(h, f"vars.{n}").value for n in expr.names}))
+            e = self._entry(h, t)
+            if not math.isfinite(value):
+                raise ValueError(f"the expression {text!r} gives {target}={value} "
+                                 "at the variables' present values; set them "
+                                 "where it is defined")
+            if not (e.lo <= value <= e.hi):
+                raise ValueError(f"tying {target} to {text} implies "
+                                 f"{target}={value:g}, outside its bounds "
+                                 f"[{e.lo:g}, {e.hi:g}]; loosen that bound or set "
+                                 "the variables nearer")
+        # the table's own refusals (a follower reading the target beside
+        # another source) are asked of a copy of every table first, because a
+        # table cannot take a formula back
+        for live in (False, True):
+            for h, t in where:
+                table = self.tables[h] if live else copy.deepcopy(self.tables[h])
+                held = table.entries[table._paths[t]].held
+                if held:
+                    table.set_held([t], False)
+                table.add_expression(t, expr,
+                                     variables={n: f"vars.{n}" for n in expr.names})
+                if held:
+                    table.set_held([t], True)
+        self.user_ties[target] = TieSpec(expression=text, user=True)
+        self._rebuild_columns()
+        self.apply_to_models()
+        return target
+
+    def untie(self, path_globs: list[str] | str) -> list[str]:
+        """Release the caller's linear ties; returns the joint names released.
+
+        Globs match the declared ties only, so symmetry and a parametric
+        equation are never reached: a declared name by its joint name or its
+        bare path, as :meth:`unhold` matches, and a bare tie of a row per
+        pattern in the patterns a ``hist.<h>.`` glob names (the others keep
+        theirs, declared scoped).  A literal that is not a user tie is
+        refused with the reason, and nothing is released unless all is.  An untied row comes back **fixed** at the
+        value its tie last gave it.  A formula tie is refused: a joint fit's
+        tables cannot take a formula back, so build the fit again without it.
+        """
+        globs = [path_globs] if isinstance(path_globs, str) else list(path_globs)
+
+        # a declared name matches as ``unhold`` matches one: by its joint name
+        # or its bare path, so a tie declared per pattern is released by the
+        # bare path too
+        def reached(n: str, g: str) -> bool:
+            return fnmatch.fnmatchcase(n, g) or fnmatch.fnmatchcase(_unscoped(n), g)
+
+        hits = [n for n in self.user_ties if any(reached(n, g) for g in globs)]
+        # and a bare tie of a row per pattern is released in the patterns a
+        # scoped glob names, the other patterns keeping theirs, declared scoped
+        part: dict[str, list[int]] = {}
+        for n in self.user_ties:
+            if n in hits or n.startswith("hist."):
+                continue
+            hs = [h for h, t in self.places(n, every=True)
+                  if not self.sharing.is_shared(t)
+                  and any(fnmatch.fnmatchcase(f"hist.{h}.{t}", g) for g in globs)]
+            if hs:
+                part[n] = hs
+        released = [*hits, *(f"hist.{h}.{n}" for n, hs in part.items() for h in hs)]
+        for glob in globs:
+            if not is_literal_path(glob) or glob in released or any(
+                    reached(n, glob) for n in hits):
+                continue
+            self._refuse_unknown_literals([glob])
+            raise ValueError(f"{glob!r} is not tied by this refinement; a tie "
+                             "symmetry or a parametric equation holds is not "
+                             "the caller's to release")
+        formula = [n for n in (*hits, *part) if self.user_ties[n].expression is not None]
+        if formula:
+            raise ValueError(
+                f"{formula[0]!r} follows a formula, which a joint fit's tables "
+                "cannot take back; build the MultiHistogramRefinement again "
+                "without that tie")
+        where = [(n, h, t) for n in hits for h, t in self.places(n, every=True)]
+        where += [(n, h, n) for n, hs in part.items() for h in hs]
+        for n, h, t in where:
+            if self._entry(h, t).locked:
+                raise ValueError(
+                    f"cannot untie {n!r}: its row in pattern {h} is structurally "
+                    "fixed now, so nothing was released")
+        for _, h, t in where:
+            self.tables[h].set_tie(t, None)
+        kept: dict[str, TieSpec] = {}
+        for n, spec in self.user_ties.items():
+            if n in hits:
+                continue
+            if n in part:
+                kept.update((f"hist.{h}.{t}", spec)
+                            for h, t in self.places(n, every=True)
+                            if h not in part[n])
+            else:
+                kept[n] = spec
+        self.user_ties.clear()
+        self.user_ties.update(kept)
+        if released:
+            self._rebuild_columns()
+        return released
+
+    def add_variable(self, name: str, param: Parameter) -> str:
+        """Add ``vars.<name>`` to every table, a column of the caller's own.
+
+        One shared column, or a column per pattern when ``sharing`` names the
+        path per histogram.  Fixed until a stage frees it: a glob naming
+        ``vars.<name>``, or (unless ``param.vary`` is ``False``) a glob
+        reaching a row a user tie puts on it, as a parametric expression's
+        variables are freed (:meth:`_parametric_reached`).
+        """
+        if not name or not name.isidentifier():
+            raise ValueError(f"variable name {name!r} must be a single identifier")
+        path = f"vars.{name}"
+        if any(path in t._paths for t in self.tables):
+            raise ValueError(f"variable {name!r} already exists in this joint fit")
+        for table in self.tables:
+            table.add_parameter(path, float(param.value), vary=False,
+                                lo=param.min, hi=param.max, unit=param.unit)
+        if not param.vary:
+            self._fixed_variables.add(path)
+        self._rebuild_columns()
+        return path
 
     def row_path(self, h: int, entry) -> str:
         """The name histogram ``h``'s ``entry`` goes by in the joint result.

@@ -1,6 +1,6 @@
 # Joint refinement
 
-This page gives `MultiHistogramRefinement` and `refine_multi`, which refine one structure against several patterns at once: their arguments, which parameters the patterns share, two radiations in one fit, a refinable wavelength, the joint result and its per-pattern half, the events and cancellation of a joint fit, and a report per pattern.
+This page gives `MultiHistogramRefinement` and `refine_multi`, which refine one structure against several patterns at once: their arguments, which parameters the patterns share, how to steer a joint fit by hand, two radiations in one fit, a refinable wavelength, the joint result and its per-pattern half, the events and cancellation of a joint fit, and a report per pattern.
 
 The patterns are stacked into one residual {cite}`vondreele1997`.
 GSAS-II calls this a combined refinement, and calls each pattern a histogram, as rietx does.
@@ -41,7 +41,8 @@ Both return an ordinary `RefinementResult`, with the per-pattern half on `Refine
 |---|---|
 | `MultiHistogramRefinement.n_histograms` | how many patterns there are |
 | `MultiHistogramRefinement.mtable` | the multi-histogram parameter table: one ordinary table per pattern, threaded by a column map that folds the shared columns onto one |
-| `MultiHistogramRefinement.parameters()` | every parameter as `ParameterRow`s, held rows included, under the joint names; read-only ([Shared parameters](#shared-parameters)) |
+| `MultiHistogramRefinement.parameters()` | every parameter as `ParameterRow`s, held rows included, under the joint names ([Shared parameters](#shared-parameters)) |
+| `MultiHistogramRefinement.hold`, `unhold`, `tie`, `tie_equal`, `untie`, `add_variable`, `set_values`, `refit` | the steering verbs ([Steering a joint fit](#steering-a-joint-fit)) |
 | `MultiHistogramRefinement.parametric` | the parametric declarations as resolved at construction ([Reference and scale](parametric.md#reference-and-scale)) |
 | `MultiHistogramRefinement.fitted_structures`, `MultiHistogramRefinement.fitted_instruments` | after a fit, each pattern's refined models; the shared parameters are identical across the structures |
 | `MultiHistogramRefinement.result_` | after a fit, the result |
@@ -100,13 +101,52 @@ A stage glob matches either form, so an existing single-pattern plan frees every
 A shared parameter is one row and a per-pattern one is a row per pattern.
 A row tied to a per-pattern source is that pattern's own and carries its scope too: with `SharingMap(per_histogram=["phases.0.cell.a"])` on a cubic phase, `b` follows each pattern's `a` and lists as `hist.1.phases.0.cell.b`.
 After a fit, each row carries that fit's esd.
-The listing is read-only: a joint fit frees parameters through its plan's globs, and has no `set_vary` or `set_values`.
+A joint fit frees parameters through its plan's globs and has no `set_vary`; the verbs that edit a row are in [Steering a joint fit](#steering-a-joint-fit).
 
 The cell is the one entry in that rule that is a judgement.
 The structure is shared because it is one structure: space group, coordinates, ADPs and occupancies together.
 The scale, background and peak widths are per-pattern, because they belong to the instrument.
 Whether the cell is one number or several is a claim about the specimens: one number if the patterns are one material state, separate numbers if they differ.
 That choice decides whether a wavelength can refine ([Wavelength refinement](#wavelength-refinement)).
+
+## Steering a joint fit
+
+A joint fit has the single fit's steering verbs ([Held rows](parameter-table.md#held-rows), [Ties](parameter-table.md#ties), [Editing the table](parameter-table.md#editing-the-table)), and each names a row as `MultiHistogramRefinement.parameters()` prints it: a shared row bare, a per-pattern row `hist.{h}.`-scoped.
+A joint fit keeps no history, so a verb records no node; the rows of `parameters()` carry `held` and a `user` tie instead.
+
+<!-- api-doc: no-exec — it refines the reader's own patterns -->
+```python
+import rietx as rx
+from rietx.params.multi import SharingMap
+
+joint = rx.MultiHistogramRefinement(
+    structure, instruments,
+    sharing=SharingMap(per_histogram=["phases.0.atoms.*.biso"]))
+joint.hold("instrument.profile.*")                  # the calibrated setup, every pattern
+joint.tie_equal("phases.0.atoms.*.biso")            # one B per pattern, every site
+joint.set_values({"hist.0.instrument.zero_shift": 0.004})
+result = joint.fit(patterns, plan="mccusker_default")
+result = joint.refit(patterns)                      # again from the answer, in one stage
+```
+
+| Verb | Does |
+|---|---|
+| `MultiHistogramRefinement.hold`, `MultiHistogramRefinement.unhold` | a held row stays fixed whatever a plan frees; a stage whose glob reached one lists it on `StageResult.blocked_by_hold`, and the result says so once in `HOLD_BLOCKED_PLAN`; a bare glob holds every pattern's copy, a scoped one that pattern's; a held row tied onto a variable keeps the variable fixed when a glob reaches the row, and follows it when the variable is freed another way (a glob naming `vars.{name}`, or one reaching another row tied onto it that is not held) |
+| `MultiHistogramRefinement.tie`, `MultiHistogramRefinement.tie_equal`, `MultiHistogramRefinement.untie` | `Refinement.tie`'s keywords and refusals, `expression=` included; a bare target is tied in every pattern, each to its own source where the source is a per-pattern row; a `hist.{h}.` target is tied in that pattern alone; `untie` matches as `unhold` does, so `untie("hist.{h}.…")` releases one pattern's copy of a tie declared bare |
+| `MultiHistogramRefinement.add_variable` | `vars.{name}`, one shared column (or one per pattern, where `sharing=` says so) that a tie can name; a stage frees it through a glob naming it or reaching a row tied onto it, unless declared `vary=False` |
+| `MultiHistogramRefinement.set_values` | values by row name, refused before any write as `Refinement.set_values` refuses them; the next fit starts there |
+| `MultiHistogramRefinement.refit` | one stage, `"restart"`, freeing what the fit refined and starting from its answer: this object's last fit, or `result=` a saved one read back with `RefinementResult.model_validate_json` |
+
+Three refusals are the joint fit's own.
+One number across patterns is `sharing=`, never a tie, so a tie whose source is in another pattern, or a bare target tied to one pattern's row, raises and says so.
+A shared target cannot follow a per-pattern source, which would give it a value per pattern.
+And `untie` refuses a formula tie, because a pattern's table cannot take a formula back: build the joint fit again without it.
+
+`MultiHistogramRefinement.refit` compiles its stage at the window fraction the answer was solved at, so a converged fit restarted stops after one iteration of that one stage and moves no parameter by more than 0.01 esd (measured on the two LaB6 patterns below: 0.0 esd, in process and from a result saved to JSON).
+That is TOPAS's restart from stored values: a hold or a tie declared after the fit is honoured by the restart, so it is how a 100-pattern fit is rerun after one edit without starting again.
+The restart runs under the fit's own `weights` and `two_theta_limits` unless they are passed.
+A result keeps each pattern's weight but not its limits, so `refit(result=)` raises for a pattern the result fitted on fewer channels than the pattern holds, until `two_theta_limits` is passed.
+It raises too for a result of another pattern count, since a pattern the result lacks would restart with none of its rows freed.
 
 ## Two radiations
 
@@ -302,7 +342,7 @@ Each copy is the same finding about one pattern, so count it once.
 
 The rule is written as data.
 `rietx.multi.DIAGNOSTIC_SCOPES` places the output of each function that writes diagnostics, and `rietx.multi.GUARD_SCOPES` each field of a `GuardReport`, each row with its reason.
-Four rows are marked absent, for diagnostics a joint fit does not compute: `HOLD_BLOCKED_PLAN` (a joint fit has no hold verb), `RESTRAINT_TENSION` (restraints are refused), and the two magnetic-width checks, `STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT` and `MAGNETIC_WIDTH_MOVED_MOMENT`.
+Three rows are marked absent, for diagnostics a joint fit does not compute: `RESTRAINT_TENSION` (restraints are refused) and the two magnetic-width checks, `STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT` and `MAGNETIC_WIDTH_MOVED_MOMENT`.
 The magnetic-width checks read the single-pattern plan, so a joint fit's width-before-moment ordering is unchecked.
 `DATA_SUPPORT_LOW` is withheld on purpose.
 Its ratio of observations to parameters has no agreed definition across patterns, and one pattern's reflections counted against the shared columns would warn about a fit the other patterns support.

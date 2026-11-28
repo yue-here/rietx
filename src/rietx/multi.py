@@ -22,9 +22,10 @@ from __future__ import annotations
 
 import copy
 import dataclasses
+import fnmatch
 import math
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from contextlib import contextmanager
 
 import numpy as np
@@ -117,6 +118,7 @@ from .refine import (
     _guard_diagnostics,
     _harmonic_diagnostics,
     _held_scale_phases,
+    _hold_diagnostics,
     _instrument_width_held_diagnostics,
     _judge_magnetic_groups,
     _lineless_phases,
@@ -156,6 +158,7 @@ from .refine import (
     _strain_flag_diagnostics,
     _symmetry_silence_diagnostics,
     _tick_rows,
+    _tie_terms,
     _uncorrected,
     _unknown_path_diagnostics,
     _unmeasured_phases,
@@ -197,6 +200,7 @@ from .strategy.staged import (
     GuardFinding,
     GuardReport,
     RefinementPlan,
+    Stage,
     _correlation_findings,
     _exact_active_bounds,
     biso_over_bound,
@@ -406,10 +410,10 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
                    "beside _joint_fixed_literals waits on PR #1270 reshaping "
                    "that wrapper; the follow-up is in WP-2028's Inherited"),
     "_hold_diagnostics": (
-        (ABSENT,), "a joint fit has no hold verb: the one hold its tables "
-                   "carry is the floating origin's, which HOLD_BLOCKED_PLAN "
-                   "leaves to _origin_diagnostics, so it would report "
-                   "nothing"),
+        (FIT,), "the caller's holds (MultiHistogramRefinement.hold, WP-2103) "
+                "are the fit's declarations, read off every stage's "
+                "blocked_by_hold under joint names; the floating-origin hold "
+                "is left to _origin_diagnostics, as the single fit leaves it"),
     "_pawley_unresolved_diagnostics": (
         (HISTOGRAM,), "each histogram keeps its own Pawley intensity block "
                       "and overlap groups (WP-2104)"),
@@ -1573,6 +1577,10 @@ class MultiHistogramRefinement:
         self._declared_wavelengths: list[list[float]] = [
             _declared_wavelengths(ins) for ins in self.mtable.instruments]
         self.result_: RefinementResult | None = None
+        #: the 2θ limits ``result_`` was fitted under, per histogram, which
+        #: :meth:`refit` restarts it under (WP-2103); a result keeps its
+        #: weights but not its limits
+        self._fit_limits: list[tuple[float, float] | None] | None = None
         self._models = None
         #: what :meth:`report` reads besides the models, per histogram, taken
         #: with the result it reports on (:meth:`_freeze_answer`)
@@ -1635,10 +1643,10 @@ class MultiHistogramRefinement:
         each table's entries in θ order.  A path read here is one a stage's
         ``turn_on`` accepts and one ``result_.parameters`` and the findings
         print.  A tie's sources are spelled the same way, and its
-        :attr:`~rietx.schemas.params.TieSpec.user` is always ``False``: a
-        joint fit has no ``untie``, so every tie it lists is one the fit holds
-        for the caller, symmetry-derived or a parametric equation's target,
-        and none is a user tie the caller could release.  A shared row's
+        :attr:`~rietx.schemas.params.TieSpec.user` is ``True`` for a tie the
+        caller declared (:meth:`tie`, WP-2103), the one kind :meth:`untie`
+        releases; a symmetry tie or a parametric equation's target reads
+        ``False``.  A formula tie's row reads its formula.  A shared row's
         ``lo``/``hi`` are the **intersection** of its histograms' stored
         bounds, in the shared column's units, which is the window the solver
         enforces; a size cap is divided by each histogram's wavelength factor
@@ -1649,9 +1657,9 @@ class MultiHistogramRefinement:
         the same path; ``mode_fixed`` for ``mode``, else the last fit's mode,
         else ``"rietveld"`` (WP-2104: a Pawley joint fit force-fixes every
         ``.atoms.`` path and each scale); ``needs_held_cell`` from that
-        histogram's own cell and wavelength.  Read-only: ``set_vary`` and
-        ``set_values`` on the joint fit are not built (#1205's ruling), and the
-        plan's globs are how a joint fit frees a row.
+        histogram's own cell and wavelength.  A row is edited through
+        :meth:`set_values`, :meth:`hold` and :meth:`tie` (WP-2103); a joint fit
+        has no ``set_vary``, the plan's globs being how it frees a row.
         """
         if mode is not None:
             check_mode(mode)
@@ -1691,16 +1699,228 @@ class MultiHistogramRefinement:
                 if path in seen:
                     continue
                 seen.add(path)
+                user = mt.user_ties.get(path, mt.user_ties.get(e.path))
                 tie = (None if e.tie is None else TieSpec(
                     terms=[(mt.row_path(h, by_path[src]), float(c))
                            for src, c in e.tie.terms],
-                    const=float(e.tie.const)))
+                    const=float(e.tie.const), user=user is not None))
+                if user is not None and user.expression is not None:
+                    tie = user
                 lo, hi = window.get(e.path, (e.lo, e.hi))
                 rows.append(_parameter_row(
                     e, tie=tie, esd=esd.get(path), mode=mode,
                     blocked=blocked, reach=reach, owned=owned, origin=origin,
                     path=path, lo=lo, hi=hi))
         return rows
+
+    # ------------------------------------------------------------------
+    # the caller's steering (WP-2103): a joint fit has the single fit's verbs
+    # ------------------------------------------------------------------
+    # Every verb names rows as :meth:`parameters` and ``result_.parameters``
+    # print them: a shared row bare, a row per pattern ``hist.<h>.``-scoped.
+    # The registers live on ``mtable`` (``user_holds``, ``user_ties``), the
+    # one authority a joint fit's stages read, as ``Refinement._user_holds``
+    # and ``_ties`` are a single fit's.  A joint fit keeps no history, so a
+    # verb records no node: what stands in for one is ``parameters()``, whose
+    # rows carry ``held`` and a ``user`` tie, and the result, whose stages
+    # carry ``blocked_by_hold``.
+
+    def hold(self, path_globs: list[str] | str) -> list[str]:
+        """Declare that these rows do not move, whatever a plan asks.
+
+        :meth:`Refinement.hold <rietx.refine.Refinement.hold>` on the joint
+        table: globs match as a stage's ``turn_on`` matches (bare or scoped),
+        so ``hold("instrument.zero_shift")`` holds every pattern's and
+        ``hold("hist.0.instrument.zero_shift")`` pattern 0's alone.  A stage
+        whose glob reaches a held row records it on
+        ``StageResult.blocked_by_hold``, and the result says so once in
+        ``HOLD_BLOCKED_PLAN``.  This is how a series that calibrated its setup
+        keeps it (the maintainer's ruling of 2026-11-03).  Returns the rows
+        newly held, sorted.
+
+        A held row tied onto a variable (:meth:`add_variable`) keeps the
+        variable fixed when a glob reaches the row, and the block is recorded
+        the same way.  The row still follows its variable when the variable
+        is freed another way: a glob naming ``vars.<name>``, or a glob reaching
+        another row tied onto it that is not held.
+        """
+        return self.mtable.hold(path_globs)
+
+    def unhold(self, path_globs: list[str] | str) -> list[str]:
+        """Take back :meth:`hold`; the rows come back fixed, never free."""
+        return self.mtable.unhold(path_globs)
+
+    def tie(self, path: str,
+            source: "str | dict[str, float] | Sequence[tuple[str, float]] | None" = None,
+            *, scale: float = 1.0, offset: float = 0.0,
+            expression: str | None = None) -> str:
+        """Constrain the dot-path ``path`` to ``scale·source + offset``, or to ``expression=``.
+
+        :meth:`Refinement.tie <rietx.refine.Refinement.tie>` on the joint
+        table, the same keywords and refusals.  Which patterns it reaches is
+        read off the names:
+
+        * a bare ``path`` is tied in **every** pattern.  A source that is a row
+          per pattern is each pattern's own, so with each site's ``biso`` per
+          pattern (``SharingMap(per_histogram=["phases.0.atoms.*.biso"])``)::
+
+              ref.tie("phases.0.atoms.1.biso", "phases.0.atoms.0.biso")
+
+          gives one B per pattern, WP-1325's WO₃ protocol;
+        * ``hist.<h>.<path>`` ties pattern ``h``'s row alone, to a source in
+          the same pattern or a shared one (a variable);
+        * a source in **another** pattern is refused, as is a bare target
+          tied to one pattern's row: one number across patterns is
+          ``sharing=``, never a tie.  So is a shared target with a source per
+          pattern, which would give a shared row a value per pattern.
+
+        ``expression=`` reads variables only (``add_variable``, or the
+        constructor's ``variables=``), and a target per pattern meets the
+        formula once in each pattern's table.  Returns ``path``.
+        """
+        if expression is not None:
+            if source is not None:
+                raise TypeError("tie() takes a source or an expression, not both")
+            if scale != 1.0 or offset != 0.0:
+                raise ValueError("scale and offset apply to a source; write them "
+                                 "into the expression instead")
+            return self.mtable.tie_expression(path, expression)
+        if source is None:
+            raise TypeError("tie() needs a source path or an expression=")
+        return self.mtable.tie({path: (_tie_terms(source, float(scale)),
+                                       float(offset))})[0]
+
+    def tie_equal(self, paths: list[str] | str, *,
+                  source: str | None = None) -> list[str]:
+        """Make every row matching ``paths`` follow one source, in each pattern.
+
+        :meth:`Refinement.tie_equal <rietx.refine.Refinement.tie_equal>` on the
+        joint table.  Bare globs match a pattern's own paths, in table order,
+        and the group is tied in every pattern, each to its own source when
+        the rows are per pattern: one equality group per pattern, never one
+        across them (that is ``sharing=``).  Globs scoped to one pattern
+        (``hist.<h>.…``) tie that pattern's alone.  The first match carries
+        the freedom unless ``source`` names another.  Returns the targets.
+        """
+        globs = [paths] if isinstance(paths, str) else list(paths)
+        scoped = {g.split(".", 2)[1] for g in globs if g.startswith("hist.")}
+        bad = sorted(k for k in scoped if not k.isdigit())
+        if bad:
+            raise ValueError(f"'hist.{bad[0]}.' names no pattern; one pattern's "
+                             "rows are 'hist.<h>.…', <h> its index from 0")
+        if scoped and (len(scoped) != 1
+                       or not all(g.startswith("hist.") for g in globs)):
+            raise ValueError("tie_equal() takes bare globs, or globs scoped to "
+                             "one pattern ('hist.<h>.…'), not a mix: a group "
+                             "across patterns is sharing=")
+        prefix = f"hist.{next(iter(scoped))}." if scoped else ""
+        bare = [g[len(prefix):] for g in globs]
+        h0 = int(next(iter(scoped))) if scoped else 0
+        if not 0 <= h0 < self.n_histograms:
+            raise ValueError(f"no pattern {h0} in this {self.n_histograms}-pattern fit")
+        matched = [e.path for e in self.mtable.tables[h0].entries
+                   if any(fnmatch.fnmatchcase(e.path, g) for g in bare)]
+        if not matched:
+            raise ValueError(f"no parameter matches {globs}")
+        src = source if source is not None else prefix + matched[0]
+        targets = [prefix + p for p in matched if prefix + p != src]
+        if not targets:
+            raise ValueError(f"{globs} matches only {src!r}, so there is nothing "
+                             "to tie to it; an equality group needs at least two "
+                             "parameters")
+        return self.mtable.tie({t: ([(src, 1.0)], 0.0) for t in targets})
+
+    def untie(self, paths: list[str] | str) -> list[str]:
+        """Release the caller's linear ties; the rows come back fixed.
+
+        Globs match the declared ties only, by joint name or bare path, as
+        :meth:`unhold` matches holds: ``untie("hist.0.<path>")`` releases
+        pattern 0's copy of a tie declared bare, and the other patterns keep
+        theirs.  A formula tie is refused, since a joint fit's tables cannot
+        take one back: build the fit again.
+        """
+        return self.mtable.untie(paths)
+
+    def add_variable(self, name: str, value: float, *, vary: bool = True,
+                     min: float = -math.inf, max: float = math.inf,
+                     unit: str | None = None) -> str:
+        """Declare ``vars.<name>``, a parameter of the caller's own, and return its path.
+
+        A column every pattern shares, or one per pattern where ``sharing``
+        names the path per histogram.  It refines when a stage frees it: a
+        glob naming ``vars.<name>``, or a glob reaching a row the caller tied
+        onto it, unless it is declared ``vary=False``.  That is the rule the
+        constructor's ``variables=`` follow for an equation's variables, so
+        ``vary`` defaults to ``True`` here where ``Refinement.add_variable``'s
+        is ``False``: a plan replaces the vary flags either way.
+        """
+        return self.mtable.add_variable(
+            name, Parameter(value=value, vary=vary, min=min, max=max, unit=unit))
+
+    def set_values(self, values: dict[str, float]) -> None:
+        """Set values by row name, as :meth:`parameters` prints them.
+
+        :meth:`Refinement.set_values <rietx.refine.Refinement.set_values>`'s
+        refusals, made before any write.  A bare per-pattern path is refused
+        (which pattern is the caller's to say), and so is a scoped shared one.
+        The next :meth:`fit` starts here.
+        """
+        self.mtable.set_values(values)
+
+    def refit(self, data: list[PatternData], *,
+              result: RefinementResult | None = None,
+              **kw) -> RefinementResult:
+        """Fit again from where a fit ended, in one stage.
+
+        TOPAS's restart from stored values (``load_save_locals``).  The stage,
+        ``"restart"``, frees exactly the rows the fit refined, every pattern's
+        values and every coefficient, and starts from its answer.  With no
+        ``result`` that is this object's last fit, whose values the tables
+        still hold.  A ``result`` (a saved one, read back with
+        ``RefinementResult.model_validate_json``) is written in first by
+        :meth:`set_values`: every row it refined that is neither tied nor one
+        you both set and held here (that value stays yours; a row you held
+        without setting takes the saved value, so a calibration carries into
+        a held setup).  Construct the object from
+        the inputs that fit was built from: a result of another pattern count
+        raises, and so does a refined row with no place here, naming it.  A
+        row the result did not refine keeps the constructor's value.
+
+        The restart runs under the fit's own ``weights`` (each
+        ``HistogramResult.weight``) and ``two_theta_limits``, unless they are
+        passed.  A result does not keep its limits, so under ``result=`` a
+        pattern the result fitted on fewer channels than this one has raises
+        until ``two_theta_limits`` is passed.
+
+        A restart of a converged fit stops in that one stage and moves nothing
+        by more than 0.01 esd.  Holds and ties declared since are honoured,
+        so this is the way to rerun after editing one.  A held row tied onto
+        a refined ``vars.<name>`` still moves with the variable, which the
+        restart frees literally (``hold``'s rule: naming a variable frees it).
+        ``mode`` is the
+        result's; ``plan`` is refused, being what this replaces.  Every other
+        keyword is :meth:`fit`'s.
+        """
+        if "plan" in kw:
+            raise TypeError("refit() runs one stage freeing what the fit "
+                            "refined; for a plan of your own, call fit()")
+        start = self.result_ if result is None else result
+        if start is None:
+            raise ValueError("refit() needs a fit to restart from: fit() "
+                             "first, or pass result=")
+        data = list(data)
+        if result is not None:
+            _refuse_restart_shape(result, self.n_histograms, data, kw)
+            self.mtable.write_values(_restart_values(self.mtable, result), record=False)
+        else:
+            kw.setdefault("two_theta_limits", self._fit_limits)
+        free = [p.path for p in start.parameters if p.vary]
+        last = start.stages[-1] if start.stages else None
+        plan = _RestartPlan(stages=[Stage("restart", free)],
+                            window_tol=None if last is None else last.window_area_tol)
+        kw.setdefault("mode", start.mode)
+        kw.setdefault("weights", [h.weight for h in start.histograms])
+        return self.fit(data, plan=plan, **kw)
 
     # ------------------------------------------------------------------
     def fit(self, data: list[PatternData], *, mode: str = "rietveld",
@@ -1806,6 +2026,7 @@ class MultiHistogramRefinement:
                                             for h in range(n)])
                 raise
             self._models = models
+            self._fit_limits = limits
             self.result_ = self._build_result(models, outcome, weights,
                                                plan.correlation_guard,
                                                stage_results, cell_runaway_diags,
@@ -2805,6 +3026,11 @@ class MultiHistogramRefinement:
         # copy of the one structure (WP-1912): asked of each and told once
         diagnostics = diagnostics + _joint_origin_findings(stage_results,
                                                               mt)
+        # a glob the caller's hold outranked, said once for the fit (WP-2103)
+        diagnostics = diagnostics + _hold_diagnostics(
+            stage_results, origin={mt._canonical(h, p)
+                                   for h, t in enumerate(mt.tables)
+                                   for p in t.origin_holds})
         # a stage's budget is spent by the one joint solve (FIT)
         diagnostics = diagnostics + _max_iter_diagnostics(stage_results)
         diagnostics = diagnostics + _slow_descent_diagnostics(stage_results)
@@ -3107,6 +3333,113 @@ class MultiHistogramRefinement:
         return (_guard_diagnostics(report) + _size_sharing_diagnostics(mt)
                 + _peak_equation_sharing_diagnostics(mt))
 
+
+
+
+@dataclasses.dataclass
+class _RestartPlan(RefinementPlan):
+    """:meth:`MultiHistogramRefinement.refit`'s plan: its one stage, compiled at
+    the window fraction the answer it restarts was solved at (WP-2103).
+
+    A plan's declared stages compile at ``forward.WINDOW_AREA_TOL`` and its
+    closing stage at ``closing_window_tol``, so a one-stage plan restarting a
+    closed answer would solve on wider-cut windows and move it (2.9 esd on
+    the cheap LaB6 pair), and the closing stage after it would move it back:
+    two stages to stand still.  The one stage takes the closing fraction
+    instead and there is no closing stage.
+    """
+
+    window_tol: float | None = None
+
+    def closing_stage(self, paths=None):
+        return None
+
+    def stage_window_tols(self) -> list[float | None]:
+        return [self.window_tol] * len(self.stages)
+
+def _refuse_restart_shape(result: RefinementResult, n: int,
+                          data: list[PatternData], kw: dict) -> None:
+    """Refuse a ``refit(result=)`` the object cannot restart as it was fitted
+    (WP-2103), before any value is written.
+
+    **The pattern count.**  A result of k patterns on an object of n: a
+    refined row of a pattern the object lacks has no place here, but a
+    pattern the result lacks has no row in it, so the restart frees none of
+    that pattern's rows and fits it at the constructor's values, dragging
+    the shared rows after it (a two-pattern LaB6 fit refitted with a third:
+    pattern 0's Rwp went from 0.04 to 0.75, under ``converged``).
+
+    **The 2θ limits.**  The result keeps each pattern's weight but not the
+    limits it was fitted under, only the channels they kept.  Without
+    ``two_theta_limits=`` a pattern whose result holds fewer channels than
+    this restart would fit was range-limited, and fitting its whole range
+    would move the answer: refused, with the range it was fitted over.
+    """
+    k = len(result.histograms)
+    if k != n:
+        if n > k:
+            which = (f"pattern {k}" if n == k + 1
+                     else f"patterns {k}-{n - 1}")
+            why = (f"{which} would restart with no row freed, at the "
+                   "constructor's values")
+        else:
+            which = (f"pattern {n}" if k == n + 1
+                     else f"patterns {n}-{k - 1}")
+            why = f"the result's {which} have no place here"
+        raise ValueError(
+            f"result= was fitted on {k} patterns and this joint fit has {n}: "
+            f"{why}; build the object from the inputs (histograms and sharing "
+            "map) the result was fitted with, or fit() this one with a plan")
+    if "two_theta_limits" in kw or len(data) != n:
+        return  # the caller's limits, or fit()'s refusal of the data
+    for h, (hist, d) in enumerate(zip(result.histograms, data, strict=True)):
+        kept = len(hist.two_theta)
+        if kept and kept < int(d.in_range_mask().sum()):
+            raise ValueError(
+                f"result= fitted pattern {h} on {kept} channels, "
+                f"{hist.two_theta[0]:g}-{hist.two_theta[-1]:g} deg 2θ, and this "
+                "pattern has more: a result keeps its weights but not its "
+                "two_theta_limits, so pass the ones it was fitted with")
+
+
+def _restart_values(mtable, result: RefinementResult) -> dict[str, float]:
+    """The rows of ``result`` a restart writes back (WP-2103).
+
+    Every row it refined that names a free-able row here: not tied, not
+    locked, and not a row the caller both set (:meth:`set_values`) and held
+    (that value is the caller's, and wins over the saved one).  A row held but
+    never set takes the saved value, so the calibrate-hold-rerun workflow
+    carries the calibration.  A parametric target is a
+    tied row, so its coefficients carry it.  A refined row this object has
+    no place for means it was built differently from the fit that made
+    ``result`` (another sharing map, another histogram count): refused,
+    naming the first few, since writing the rest would drop those rows
+    silently.
+    """
+    out: dict[str, float] = {}
+    unplaced: list[str] = []
+    for row in result.parameters:
+        try:
+            where = mtable.places(row.path)
+        except ValueError:
+            if row.vary:
+                unplaced.append(row.path)
+            continue
+        if any(mtable._entry(h, p).tie is not None or mtable._entry(h, p).locked
+               for h, p in where):
+            continue
+        if mtable.held_by(row.path) == "caller" and any(
+                place in mtable.user_set for place in where):
+            continue
+        out[row.path] = float(row.value)
+    if unplaced:
+        shown = ", ".join(repr(n) for n in unplaced[:3])
+        more = f" and {len(unplaced) - 3} more" if len(unplaced) > 3 else ""
+        raise ValueError(
+            f"result= refined {shown}{more}, which this joint fit has no row "
+            "for; build the object from the inputs (histograms and sharing "
+            "map) the result was fitted with")
+    return out
 
 def _refuse_joint_mode(mtable, mode: str) -> None:
     """The modes a joint fit runs, and the one Pawley fit it refuses (WP-2104).
@@ -3804,9 +4137,12 @@ def _parametric_not_freed_diagnostics(mtable, coefficients, stage_results
     counts them.  "Freed" is every stage's ``freed`` and ``held`` together, so
     a coefficient the support hold took back is ``PARAMETRIC_TARGET_UNSEEN``'s
     and is not named twice.  A report of the fact, with no action taken
-    (DESIGN.md Rule 4).  The single fit leaves out a variable the caller
-    holds (ruled 2026-11-19, option (a)); a joint fit has no hold verb yet
-    (WP-2103), so nothing here can be held and every such coefficient warns.
+    (DESIGN.md Rule 4).  A coefficient the caller holds
+    (:meth:`MultiHistogramRefinement.hold`, WP-2103) is left out, read off the
+    tables through ``MultiParameterTable.held_by``: the hold says the start is
+    meant.  A coefficient at ``vary=False`` without one still warns, as in the single
+    fit (ruled 2026-11-19, option (a)).  Counts in the message are then over
+    the coefficients the caller does not hold.
     """
     if not coefficients:
         return []
@@ -3814,20 +4150,31 @@ def _parametric_not_freed_diagnostics(mtable, coefficients, stage_results
     out: list[Diagnostic] = []
     for r in (*mtable.parametric, *mtable.expressions):
         rows = [c for c in coefficients if c.equation == r.name]
-        idle = [c for c in rows if c.path not in ever]
+        unfreed = [c for c in rows if c.path not in ever]
+        held = [c for c in unfreed if mtable.held_by(c.path) == "caller"]
+        idle = [c for c in unfreed if c not in held]
         if not idle:
             continue
         names = ", ".join(c.path for c in idle[:-1])
         names = f"{names} and {idle[-1].path}" if names else idle[-1].path
         starts = ", ".join(f"{c.value:.6g}" for c in idle)
+        left = len(rows) - len(held)
+        of = (f"of its {len(rows)} coefficients" if not held else
+              f"of the {left} coefficients the caller does not hold")
         if len(idle) == len(rows):
             what = (f"no stage freed its coefficient{'s' if len(idle) > 1 else ''} "
                     f"{names}. {'They' if len(idle) > 1 else 'It'} kept the starting "
                     f"value{'s' if len(idle) > 1 else ''} ({starts}), so the "
                     "equation is the one declared and the data did not measure it.")
+        elif len(idle) == left:
+            what = (f"no stage freed {names}, and the caller holds the "
+                    f"other{'s' if len(held) > 1 else ''}. "
+                    f"{'They' if len(idle) > 1 else 'It'} kept the starting "
+                    f"value{'s' if len(idle) > 1 else ''} ({starts}), so the "
+                    "equation is the one declared and the data did not measure it.")
         else:
-            what = (f"no stage freed {names}, {len(idle)} of its {len(rows)} "
-                    f"coefficients. {'They' if len(idle) > 1 else 'It'} kept the "
+            what = (f"no stage freed {names}, {len(idle)} {of}. "
+                    f"{'They' if len(idle) > 1 else 'It'} kept the "
                     f"starting value{'s' if len(idle) > 1 else ''} ({starts}), and the "
                     "others were fitted with "
                     f"{'them' if len(idle) > 1 else 'it'} held there.")
@@ -4030,8 +4377,8 @@ def _joint_fixed_literals(stages, mtable) -> list[Diagnostic]:
 
     A shared row is one column, so a shared path fixed in every table is one
     finding, keyed by its ``where``.  The message says which histograms' tables
-    hold it.  A joint fit has no tie verb; its one caller's constraint is a
-    parametric equation's target (WP-1325), spared as a single fit spares a user tie,
+    hold it.  A caller's constraint is a tie (WP-2103) or a parametric
+    equation's target (WP-1325), spared as a single fit spares a user tie,
     since a stage naming it frees its coefficients.
     """
     found: dict[str, tuple[Diagnostic, list[int]]] = {}

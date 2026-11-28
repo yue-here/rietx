@@ -1158,8 +1158,19 @@ def test_the_joint_runner_refuses_a_partial_turn_too():
     ins2 = INS.model_copy(deep=True)
     joint = MultiHistogramRefinement(body_structure(_turned(Q_TRUE, 2.0)), [INS, ins2])
     plan = RefinementPlan(stages=[Stage("body", [*ORIGIN_GLOBS, f"{ROT}.0", f"{ROT}.1"])])
-    with pytest.raises(ValueError, match="RIGID_BODY_PARTIAL_TURN: rigid body 'c6br'"):
+    with pytest.raises(ValueError, match="RIGID_BODY_PARTIAL_TURN: rigid body 'c6br'") as err:
         joint.fit(data, plan=plan)
+    # the joint fit's own verbs (WP-2103), each of which then runs
+    for remedy in ("Free all 3", f"MultiHistogramRefinement.hold('{ROT}.*')",
+                   f"MultiHistogramRefinement.tie_equal('{ROT}.*')"):
+        assert remedy in str(err.value)
+    for remedy in ("hold", "tie_equal"):
+        joint = MultiHistogramRefinement(body_structure(_turned(Q_TRUE, 2.0)),
+                                         [INS, ins2])
+        getattr(joint, remedy)(f"{ROT}.*")
+        result = joint.fit(data, plan=RefinementPlan(stages=[Stage("body", BODY_GLOBS)]),
+                           telemetry=False)
+        assert result.status == "converged", remedy
 
 
 def test_a_profile_of_one_turn_direction_of_three_says_why_it_has_no_ends():
