@@ -1,6 +1,6 @@
 # WP-2316 — a Le Bail partition costs what its overlaps need, not thousands of cycles
 
-Milestone: unscheduled · Status: 🔄 2026-11-27 — task 1 answered: the Rwp gap is a valley entered through an unseeded background, not the partition; the rest waits on WP-2317's R2-R3
+Milestone: unscheduled · Status: 🔄 2026-11-28 — angle 8 (extraction once per iteration) built and measured: slower than main on five of seven cases and unconverged on three; whether to land it is with the maintainer
 Track: A large cell
 Depends on: 2317 soft (its `bigcell-lebail` case and rulings R0, R2, R3); 2017 soft (group Q owns `lebail_tol`'s number); 2062 soft (Rule 5's Le Bail fence)
 Priority: P2 2026-11-27 — the maintainer's large-cell track, ruled to proceed whatever the user's case shows (cells this size are met in the wild); 95-97 % of a large-cell Le Bail fit is in the partition, and R2-R3 are ruled: follow practice, fence lifted
@@ -214,8 +214,10 @@ partition's cost. `test_lebail_alternation.py` is a natural second timing case.
       if it is a defect. *Answered 2026-11-27: a valley, entered through the
       probe's unseeded background. No package defect; nothing filed
       ([`2316-probe/diag_gap.py`](2316-probe/diag_gap.py)).*
-- [ ] Wait for WP-2317 task 3's answer on R2-R3. If it is "route to Pawley", close
-      this WP on angle 9 and say so.
+- [x] Wait for WP-2317 task 3's answer on R2-R3. If it is "route to Pawley", close
+      this WP on angle 9 and say so. *Ruled 2026-11-27: follow practice, fence
+      lifted. Angle 8 was built on `wp2316-lebail-practice`; see the entry of
+      2026-11-28.*
 - [ ] Measure main against the branch on `bigcell-lebail`, interleaved, one
       machine, min-max over at least three runs. Record cycles per update, first
       against second update of each stage, and angle 6's floor count.
@@ -256,6 +258,88 @@ partition's cost. `test_lebail_alternation.py` is a natural second timing case.
   (Anderson acceleration, angle 7).
 
 ## Handover log
+
+### 2026-11-28 (4th session) — angle 8 measured: slower than main, and three cases never converge; held for the maintainer
+
+The 3rd session (2026-11-27, no entry of its own) built angle 8 on
+`wp2316-lebail-practice`: a Le Bail stage extracts at its start and after every
+accepted LM iteration, 10 accelerated cycles each time
+(`lm.minimize(refresh=)`, `least_squares._LeBailRefresh`). It removed
+`lebail_tol`, `lebail_settled`, `LEBAIL_CYCLES_AT_CAP` and `_settled_partition`,
+and added `NodeAction.lebail_extraction`. Its last commit (`1d63bbbdf`) returns
+the joint fixed point of a converged stage and the lowest-S state of a stage
+that ends on its budget. That session's checkpoint lists the four stop rules it
+compared; it is in the dormant tree `agent-aa446ce11f83bebfa` as
+`CHECKPOINT.md`, beside `fixed_point_rule.patch` and untracked probes in
+`docs/wp/2316-probe/`. This session merged main (`300853e90`) into it and
+measured it. It is not a speedup, so no PR was opened.
+
+*Ruled by the maintainer, 2026-11-28 00:56Z:* `NodeAction.lebail_extraction`,
+the stored-format field, is kept as built (option (a)): old nodes read
+`"between_solves"`.
+
+*Measured* (macOS arm64, `[dev]` venv, compiled tier on, one run per row on a
+machine shared with other runners, so walls are indicative; profile_only,
+Le Bail, closing stage at `CLOSING_WINDOW_TOL`; main is `300853e90` run from a
+snapshot; probes in the ghostshift scratch dir, `family_probe.py`,
+`hump_probe.py`, `clip_ab.sh`):
+
+| case | main wall, Rwp % | branch wall, Rwp % | branch stages at `max_iter` |
+|---|---|---|---|
+| #740 | 1.0 s, 1.066 | 8.5 s, 1.067 | 0 |
+| #740 weak | 0.7 s, 4.680 | 7.7 s, 4.994 | 0 |
+| corundum | 1.6 s, 15.18 | 15.0 s, 14.48 | 0 |
+| FAP | 11.0 s, 10.11 | 274.6 s, 8.49 | 1 (closing) |
+| LaMnO₃ | 177.0 s, 17.30 | 67.7 s, 13.70 | 5 of 6 |
+| NAC | 2.1 s, 14.358 | 6.3 s, 14.363 | 0 |
+| `bigcell-lebail` seeded | 61.7-61.8 s (2316 Inherited), 4.685 | 125.0 s, 4.188 | 5 of 5 |
+
+- The branch lands a lower Rwp on the three real lab and neutron patterns. It
+  is 3-25× slower on five of the seven cases. On LaMnO₃ and the bench case
+  every stage walks: each extraction raises S more than the next step lowers
+  it, so S rises until the 400-evaluation budget ends (`STAGE_MAX_ITER`). On
+  LaMnO₃ the cell moves about 3 esd from main's (a 5.7310 against 5.7334 Å).
+- **The goal is not met.** The bench case runs about 2× slower, not 10×
+  faster.
+- **The slow Le Bail rows fail on the branch** (10 of 98 in
+  `test_lebail_cycles.py`, `test_lebail_alternation.py`,
+  `test_lebail_background_hump.py`, `test_window_domain.py`):
+  `test_an_extraction_at_the_answer_meets_its_bar` for #740 (0.96 σ against
+  0.1), #740 weak (3.73 σ), FAP and LaMnO₃ (a stage not converged); five
+  alternation tests whose pins are the old rule's (every LaB₆ + cBN start now
+  reads 13.939, 13.937, 13.937 and keeps pass 2); and the hump test's no-hump
+  widths. The docs quote the old rule's 13.928 / 13.931 in
+  `reference/refinement.md`, `references/judging.md`, `_audit.py` and the
+  `lebail_passes` comment in `staged.py`.
+- **The walk on #740 weak is the closing stage.** The declared stages end at
+  Rwp 4.04 %, under main's 4.30 %. The closing stage's wider windows then walk
+  S from 765 to 1081 over 135 evaluations and end at 4.99 %, with Y at
+  0.066 ± 0.018 where the truth is 0 (main 0.034 ± 0.014).
+- **The partition's clip feeds it.** `lebail_update` hands out
+  max(y_obs − y_bkg, 0), so in a peak's tails, where the true net is zero,
+  noise is counted only when positive. A copy without the clip lands every
+  hump fit nearer the truth: no hump 4.15 % (background 0.995 of the truth at
+  50°, Y 0.031), seeded hump 5.72 % against 9.34 %. It does not cure the walk
+  on FAP, LaMnO₃ or the bench case, and the bar rows still fail. GSAS-II 5.8.4
+  clips the same way (`GSASIImpsubs.ComputeFobsSqCW`, `where(ratio > 0, …)`),
+  so dropping it departs from practice.
+- Fast selection on the merged tree: see *Gates*.
+
+*Gates.* Ruff clean. Slow Le Bail rows as above. Fast selection (macOS arm64, `[dev]`, merged
+tree `2e3078b10`): 13 failed, 15 913 passed, 467 skipped, 30 xfailed. The 13:
+five in `test_lebail_alternation.py` and one hump test (above); three in
+`test_extinction_margin.py` (the screen's Le Bail prefit lands elsewhere:
+corundum at 1.015, FAP at 1.005 and 1.0075);
+`test_cell_runaway_safety`'s Le Bail negative-length reset;
+`test_solve_cost::test_refuses_a_converged_fit_far_from_the_data`;
+`test_manual`'s twin cap (`reference/refinement.md` over 50 000 characters);
+`test_multi_diagnostics`' helper scopes (a removed helper still listed).
+
+*Next:* the maintainer's answer to the question at the end of the runner's
+report (whether to land, hold or rework angle 8). Nothing was fixed or
+re-pinned, since every fix depends on that answer. The merge commit
+(`2e3078b10`) resolved `docs/contracts/schema.md` (both 0.62 notes kept) and
+`docs/practice.md` (this branch's re-extraction cell, main's Pawley cell).
 
 ### 2026-11-27 (2nd session) — task 1: the Rwp gap is a valley, entered through an unseeded background
 

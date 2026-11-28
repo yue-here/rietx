@@ -68,7 +68,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2246](2246-the-register-guard-reads-the-rebuilt-page.md) | The register guard reads the rebuilt page: `lib/style.test.ts` scans `gui/src/next/` | 2026-11-25 | P3 | [gui-overhaul](#gui-overhaul) |
 | [2314](2314-a-structural-jacobian-costs-one-structure-factor.md) | A structural Jacobian costs one structure factor, not one per column | 2026-11-28 | P2 | [Unscheduled](#unscheduled-a-large-cell) |
 | [2315](2315-a-large-pawley-step-pays-for-the-rows-that-bind.md) | A large Pawley step pays for the rows that bind, not for every intensity | 2026-11-28 | P2 | [Unscheduled](#unscheduled-a-large-cell) |
-| [2316](2316-a-le-bail-partition-costs-what-its-overlaps-need.md) | A Le Bail partition costs what its overlaps need, not thousands of cycles | 2026-11-27 | P2 | [Unscheduled](#unscheduled-a-large-cell) |
+| [2316](2316-a-le-bail-partition-costs-what-its-overlaps-need.md) | A Le Bail partition costs what its overlaps need, not thousands of cycles | 2026-11-28 | P2 | [Unscheduled](#unscheduled-a-large-cell) |
 | [2317](2317-a-large-cell-fits-as-fast-as-its-reflections-allow.md) | A large cell fits as fast as its reflections allow: the case, the bar, and the rulings in the way | 2026-11-27 | P2 | [Unscheduled](#unscheduled-a-large-cell) |
 
 ## Next, by priority
@@ -850,7 +850,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 |---|---|---|---|---|
 | [2314](2314-a-structural-jacobian-costs-one-structure-factor.md) | A structural Jacobian costs one structure factor, not one per column | 🔄 2026-11-28 | P2 | — ([2317](2317-a-large-cell-fits-as-fast-as-its-reflections-allow.md), [1945](1945-the-peak-chain-columns-built-in-one-pass-per-phase.md) soft) |
 | [2315](2315-a-large-pawley-step-pays-for-the-rows-that-bind.md) | A large Pawley step pays for the rows that bind, not for every intensity | 🔄 2026-11-28 | P2 | — ([2317](2317-a-large-cell-fits-as-fast-as-its-reflections-allow.md) soft) |
-| [2316](2316-a-le-bail-partition-costs-what-its-overlaps-need.md) | A Le Bail partition costs what its overlaps need, not thousands of cycles | 🔄 2026-11-27 | P2 | — ([2317](2317-a-large-cell-fits-as-fast-as-its-reflections-allow.md), [2017](2017-the-second-pass-every-tier-3-threshold-on-three-families.md), [2062](2062-pawley-is-the-structure-free-default.md) soft) |
+| [2316](2316-a-le-bail-partition-costs-what-its-overlaps-need.md) | A Le Bail partition costs what its overlaps need, not thousands of cycles | 🔄 2026-11-28 | P2 | — ([2317](2317-a-large-cell-fits-as-fast-as-its-reflections-allow.md), [2017](2017-the-second-pass-every-tier-3-threshold-on-three-families.md), [2062](2062-pawley-is-the-structure-free-default.md) soft) |
 | [2317](2317-a-large-cell-fits-as-fast-as-its-reflections-allow.md) | A large cell fits as fast as its reflections allow: the case, the bar, and the rulings in the way | 🔄 2026-11-27 | P2 | — |
 
 ### <a id="unscheduled-the-repo-s-own-process"></a>The repo's own process
