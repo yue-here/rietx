@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: 🔄 2026-11-16 — quotations corrected; Sirota check open (paper not held); test and matrix row wait on WP-2010 (#1266)
 Track: The fit has no reference
 Depends on: 2010 (the feature registry and the `reference_kind` join, PR #1266); 2015 soft (the shipped presets pass the bar only once the declared geometry picks the offset)
-Priority: P3 2026-10-31 — a validation row over a measurement already made; changes no number a user gets, but lifts one feature to "validated on development data"
+Priority: P3 2026-11-25 — WP-2010 closed with its registry merged, so the test and the matrix row wait on nothing; still a validation row that changes no number a user gets
 
 ## Goal
 

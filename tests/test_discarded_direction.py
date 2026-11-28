@@ -305,10 +305,11 @@ def test_an_overlap_split_with_no_esd_says_so_rather_than_inf_percent():
     overlap report states it has no esd, never "reaches inf%"."""
     from types import SimpleNamespace
 
+    from rietx.model.forward import PawleyBlock
     from rietx.refine import _pawley_unresolved_diagnostics
 
-    pb = SimpleNamespace(stderr=np.array([1.0, np.inf, 2.0]), groups=[(0, 1)],
-                         phase_slices=[(0, 3)])
+    pb = PawleyBlock(n=3, phase_slices=[(0, 3)], groups=[[0, 1]],
+                     stderr=np.array([1.0, np.inf, 2.0]))
     hklm = np.array([[1, 0, 0, 0], [1, 1, 0, 0], [1, 1, 1, 0]])
     model = SimpleNamespace(
         pawley=pb, pawley_x0=lambda: np.array([10.0, 20.0, 30.0]),

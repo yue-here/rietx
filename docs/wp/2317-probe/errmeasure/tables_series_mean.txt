@@ -1,0 +1,6 @@
+numpy     K= 5: largest |mean shift| +0.090 esd (sd 0.154, se 0.069) on cpd-1h:instrument.geometry.axial_sl; quantities with |mean| > 0.1 and > 2 se: 0; largest single-pair |shift| 0.351
+numpy     K=11: largest |mean shift| +0.039 esd (sd 0.109, se 0.033) on cpd-1h:instrument.geometry.axial_sl; quantities with |mean| > 0.1 and > 2 se: 0; largest single-pair |shift| 0.351
+ftol1e-6  K= 5: largest |mean shift| +0.115 esd (sd 0.006, se 0.003) on cpd-1g:instrument.geometry.axial_sl; quantities with |mean| > 0.1 and > 2 se: 2; largest single-pair |shift| 0.411
+ftol1e-6  K=11: largest |mean shift| -0.168 esd (sd 0.100, se 0.030) on cpd-1h:instrument.profile.v; quantities with |mean| > 0.1 and > 2 se: 3; largest single-pair |shift| 0.411
+gsas      K= 5: largest |mean shift| -18.009 esd (sd 0.002, se 0.001) on cpd-1f:instrument.geometry.axial_sl; quantities with |mean| > 0.1 and > 2 se: 48; largest single-pair |shift| 18.011
+gsas      K=11: largest |mean shift| -18.008 esd (sd 0.002, se 0.001) on cpd-1f:instrument.geometry.axial_sl; quantities with |mean| > 0.1 and > 2 se: 52; largest single-pair |shift| 18.011

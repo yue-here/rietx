@@ -157,7 +157,7 @@ def test_one_tied_fit_reaches_the_joint_minimum_and_not_the_loops_fixed_point():
     from rietx.viz.plots import plot_result
     plot_result(result, path=str(_OUT / "simulated_curve_tie.png"))
     plot_result(result, path=str(_OUT / "simulated_curve_tie_zoom.png"),
-                two_theta_range=(18.0, 52.0))
+                two_theta_limits=(18.0, 52.0))
 
     # the curve's amplitude is the phase scale
     assert ref.fitted_instrument.background.scale.value == s_fit

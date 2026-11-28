@@ -353,18 +353,29 @@ def projected_cg(H, g: np.ndarray, lo: np.ndarray, hi: np.ndarray, *,
     the free block H_ff preconditioned by its incomplete LU (Saad, Y. (2003).
     *Iterative Methods for Sparse Linear Systems*, 2nd ed., ch. 10.
     Philadelphia: SIAM), ``scipy.sparse.linalg.spilu`` at scipy's own drop
-    tolerance and fill factor.  The factor is rebuilt whenever the free set
-    differs from the one it was built on.  The step length is
+    tolerance and fill factor.  The factor is rebuilt when the free set
+    gains a variable it was not built on, and kept while the free set stays
+    inside the set it was built on (WP-2315): the CG then solves with the
+    factor on that set, r zero on the variables fixed since, and drops the
+    answer there.  That changes the CG's path, and a converged solve stops
+    at the same residual floor (:data:`_PCG_TOL`); one that spends its
+    ``budget`` first stops elsewhere, as on either path.  On
+    ``bigcell-pawley-120`` (1 575 columns) the rebuilds fell from 1 290 to
+    67, while the Hessian products rose from 5 887 to 11 481, and the fit
+    went from 14.25-14.73 s to 7.87-8.28 s; it took the same iterations per
+    stage and moved every parameter under 3e-7 of its esd (macOS arm64,
+    ``[dev]``).  A factor that failed is rebuilt on any change, as before.
+    The step length is
     ``(r·z)/(pᵀHp)`` with ``z = M⁻¹r``, which is the exact line minimiser
     along p because ``p·r = r·z`` holds for any preconditioner, so every
     segment still lowers the model.  A factorisation that fails, or a
     direction with ``r·z ≤ 0``, takes the unpreconditioned direction r, and a
     switch between the two restarts the recurrence (β = 0).  **A dense H is
     preconditioned by the exact Cholesky factor of its free block**, rebuilt
-    on the same rule: a direction is then the face's Newton step, so CG on a
-    face ends in one product.  A block that is not numerically positive
-    definite has its diagonal raised until it factors (:func:`_factor`, as
-    Lin & Moré's ICFS does): at λ = 0 a pseudo-symmetric Pawley block is
+    whenever the free set differs from the one it was built on: a direction
+    is then the face's Newton step, so CG on a face ends in one product.  A
+    block that is not numerically positive definite has its diagonal raised
+    until it factors (:func:`_factor`, as Lin & Moré's ICFS does): at λ = 0 a pseudo-symmetric Pawley block is
     singular, and the worst systems of two such candidates had 23-54
     eigenvalues within 2e-15 of zero, some negative.  Unshifted, 260 of 893
     and 234 of 835 factorisations failed on two such validations, and the
@@ -410,7 +421,14 @@ def projected_cg(H, g: np.ndarray, lo: np.ndarray, hi: np.ndarray, *,
             fixed &= ~release
             continue
         free = ~fixed
-        if _PRECONDITION_DENSE or sparse.issparse(H):
+        if sparse.issparse(H):
+            # an incomplete LU built on a superset of the free set still
+            # preconditions it (see the docstring); a failed one is retried
+            stale = (_REUSE_STALE_FACTOR and ilu is not None
+                     and not np.any(free & ~factored))
+            if factored is None or not (stale or np.array_equal(free, factored)):
+                factored, ilu = free, _factor(H, free, check)
+        elif _PRECONDITION_DENSE:
             if factored is None or not np.array_equal(free, factored):
                 factored, ilu = free, _factor(H, free, check)
         if isinstance(ilu, _Cholesky):
@@ -426,7 +444,7 @@ def projected_cg(H, g: np.ndarray, lo: np.ndarray, hi: np.ndarray, *,
             if stalled:
                 break
             continue
-        z, rz = _preconditioned(ilu, r, rr, free)
+        z, rz = _preconditioned(ilu, r, rr, free, factored)
         plain = z is r      # this direction took no preconditioner
         p = z
         stalled = False
@@ -456,7 +474,7 @@ def projected_cg(H, g: np.ndarray, lo: np.ndarray, hi: np.ndarray, *,
             rr_next = float(r @ r)
             if rr_next <= floor:
                 break
-            z, rz_next = _preconditioned(ilu, r, rr_next, free)
+            z, rz_next = _preconditioned(ilu, r, rr_next, free, factored)
             # a direction that fell back to r (or came back from it) restarts
             # the recurrence: β would divide one preconditioner's r·z by the
             # other's.  p·r = r·z still holds, so the step stays a descent
@@ -470,6 +488,12 @@ def projected_cg(H, g: np.ndarray, lo: np.ndarray, hi: np.ndarray, *,
     side[fixed & (y <= lo)] = -1
     side[fixed & (y >= hi)] = 1
     return y, side
+
+
+#: whether a sparse H's CG keeps an incomplete LU built on a superset of
+#: its free set rather than refactoring; a switch for the WP-2315 probe to
+#: measure the refactoring path against, never set by the package
+_REUSE_STALE_FACTOR = True
 
 
 #: whether a dense H takes the Cholesky-preconditioned face step; a switch for
@@ -601,15 +625,22 @@ def _factor(H, free: np.ndarray, check: Callable[[], None] | None = None):
     return None
 
 
-def _preconditioned(ilu, r: np.ndarray, rr: float,
-                    free: np.ndarray) -> tuple[np.ndarray, float]:
+def _preconditioned(ilu, r: np.ndarray, rr: float, free: np.ndarray,
+                    factored: np.ndarray | None = None
+                    ) -> tuple[np.ndarray, float]:
     """``z = M⁻¹r`` on the free variables, zero on the fixed ones, with
-    ``r·z``.  Without a factor, or where ``r·z`` is not positive and finite,
-    the direction is r itself with ``r·r``, unpreconditioned CG's."""
+    ``r·z``.  A factor built on ``factored``, a superset of ``free``, solves
+    on its own set with r zero on the variables fixed since, and its answer
+    there is dropped.  Without a factor, or where ``r·z`` is not positive and
+    finite, the direction is r itself with ``r·r``, unpreconditioned CG's."""
     if ilu is None:
         return r, rr
     z = np.zeros_like(r)
-    z[free] = ilu.solve(r[free])
+    if factored is None or factored is free:
+        z[free] = ilu.solve(r[free])
+    else:
+        z[factored] = ilu.solve(r[factored])
+        z[~free] = 0.0
     rz = float(r @ z)
     if not (np.isfinite(rz) and rz > 0.0):
         return r, rr
