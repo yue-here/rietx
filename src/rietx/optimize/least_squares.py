@@ -2419,11 +2419,12 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
     # partials are a constant of the solve: scattered once, never per call
     o_phys = (None if model.origin is None or not n_table
               else origin_partials(model.origin, table))
-    # WP-2314: the atoms whose coordinate or ADP columns the structural branch
-    # may build, per phase, so one expansion of each phase's structure factor
-    # per evaluation serves them all.  A superset is harmless (an atom asked
-    # for and never read costs one bracket); a column whose atom is missing
-    # would raise, never return short.
+    # WP-2314: the atoms whose coordinate, ADP, Biso or occupancy columns the
+    # structural and site-scalar branches may build, per phase, so one
+    # expansion of each phase's structure factor per evaluation serves them
+    # all.  A superset is harmless (an atom asked for and never read costs
+    # one bracket); a column whose atom is missing would raise, never return
+    # short.
     struct_atoms: dict[int, tuple[set[int], set[int], set[int], set[int]]] = {}
     # the Biso and occupancy columns' claim, decided once (C is frozen)
     site_scalar = [bool((ss := _SITE_SCALAR_PATH.match(path))
@@ -2494,8 +2495,9 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
                     ip, values, *(sorted(w) for w in struct_atoms[ip]))
             return struct_grads[ip]
 
-        # ∂p/∂θ at this θ: C itself unless a derived row (a formula) sets a
-        # Biso or an occupancy, whose coefficient then moves with θ
+        # ∂p/∂θ at this θ, shared by the site-scalar and hump columns: C
+        # itself unless a derived row (a formula) sets one of their paths,
+        # whose coefficient then moves with θ
         lj_now: list[sparse.csc_matrix] = []
 
         def get_lj() -> sparse.csc_matrix:
@@ -2593,8 +2595,7 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
             # their true value.
             # C itself unless a derived row (an expression) sets a hump field,
             # whose coefficient then moves with θ
-            lj = (coef_c if not table.derived else table.local_jacobian(
-                np.asarray(theta_t, dtype=np.float64)).tocsc())
+            lj = get_lj()
             partials: dict[int, tuple[np.ndarray, ...]] = {}
             for c in hump_cols:
                 col = np.zeros(n_data, dtype=np.float64)

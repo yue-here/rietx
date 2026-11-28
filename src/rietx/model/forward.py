@@ -3324,13 +3324,13 @@ class CompiledModel:
         if P is not None:
             d_base = d_base * P
         # extinction couples |F|² into the intensity twice (as the prefactor
-        # and through x ∝ |F|²), so a coordinate/ADP move chains through the
-        # factor G = E + x·dE/dx (see model/extinction.py) — at ext=0, x=0
-        # makes G exactly 1 (purity (b)), so the stage that cannot move ext off
-        # zero skips it exactly as ``phase_peaks`` does, and every other stage
-        # applies it unconditionally.  Only these pure-analytic columns need it
-        # explicitly; the scale/cell/extinction columns pick it up from the
-        # FD-of-phase_peaks chain.
+        # and through x ∝ |F|²), so a coordinate, ADP, Biso or occupancy move
+        # chains through the factor G = E + x·dE/dx (see model/extinction.py)
+        # — at ext=0, x=0 makes G exactly 1 (purity (b)), so the stage that
+        # cannot move ext off zero skips it exactly as ``phase_peaks`` does,
+        # and every other stage applies it unconditionally.  Only these
+        # pure-analytic columns need it explicitly; the scale/cell/extinction
+        # columns pick it up from the FD-of-phase_peaks chain.
         ext = values.get(f"phases.{ip}.extinction", 0.0)
         # the extinction variable x is built from the whole reflection, so the
         # magnetic term belongs in it exactly as it does in ``phase_peaks``

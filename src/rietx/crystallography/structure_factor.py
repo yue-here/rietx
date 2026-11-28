@@ -321,7 +321,10 @@ def _scattering_factor(stol, sites, j):
     """Atom ``j``'s real scattering amplitude per reflection, (N,).
 
     f₀ + f′ for X-rays (f′ only under dispersion), the coherent length b for
-    neutrons.  :func:`_orbit_terms` multiplies it by the occupancy and the
+    neutrons.  Sources: f₀ Waasmaier & Kirfel (1995), Acta Cryst. A51,
+    416-431; f′ Cromer & Liberman (1970), J. Chem. Phys. 53, 1891-1898; b
+    Sears (1992), Neutron News 3(3), 26-37.
+    :func:`_orbit_terms` multiplies it by the occupancy and the
     isotropic Debye-Waller factor; the occupancy column of
     :func:`d_f2_d_sites` reads it bare.
     """
