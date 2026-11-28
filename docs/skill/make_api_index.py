@@ -164,11 +164,13 @@ SECTIONS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     (
         "Series, history, projects",
         "`refine_sequential` chains N patterns by warm start (§9b); "
-        "`refine_multi` stacks them into one joint residual. The history verbs "
+        "`refine_multi` stacks them into one joint residual, and `fit_trajectory` "
+        "fits an equation to one trajectory afterwards. The history verbs "
         "work the DAG every fit commits to "
         "(§9); a `Project` owns a `.rex` directory; a `CancelToken` cancels "
         "cooperatively, between residual evaluations.",
         ("rx.refine_sequential", "rx.SequentialRefinement", "rx.refine_multi",
+         "rx.fit_trajectory",
          "rx.MultiHistogramRefinement", "rx.MultiHistogramRefinement.report",
          "rx.Refinement.checkout",
          "rx.Refinement.branch", "rx.Refinement.merge",

@@ -233,6 +233,9 @@ CASES: dict[tuple[str, str], tuple] = {
     ("SeriesResult.agreement_trajectory", "metric"): (
         lambda c, v: rx.SeriesResult.model_construct().agreement_trajectory("p", metric=v),
         ("r_bragg", "r_f")),
+    ("fit_trajectory", "chain"): (
+        lambda c, v: rx.fit_trajectory(rx.SeriesResult.model_construct(), "p", "x", {},
+                                       chain=v), ("forward", "backward")),
     ("SeriesResult.summary", "deliverable"): (
         lambda c, v: rx.SeriesResult.model_construct().summary(deliverable=v), None),
     ("refine_multi", "mode"): (lambda c, v: _joint(c, mode=v), None),

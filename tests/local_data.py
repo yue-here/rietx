@@ -138,6 +138,16 @@ DATASETS: dict[str, dict[str, tuple[str, str]]] = {
             "b38e701071b995ad7621bbabd28086d74e5f9df5b2eb04f8dd749c31d0a6fa81",
         ),
     },
+    # The GSAS-II tutorials' "TOF Sequential Single Peak Fit": a project GSAS-II
+    # wrote, storing one equation fitted to its sequential table (WP-2106).
+    # Redistributable under the GSAS-II licence, and kept here for its 8.3 MB.
+    "gsas2-tutorials/steel": {
+        "steel.gpx": (
+            "https://raw.githubusercontent.com/AdvancedPhotonSource/GSAS-II-tutorials/"
+            "494c2700cde7c92591e328fdce1515c662cf11ab/TOF%20Sequential%20Single%20Peak%20Fit/data/steel.gpx",
+            "dbb3ad96eef5e6ce8826b2ade506680d15010e4324580b6a2c6a2a91c04b6e02",
+        ),
+    },
 }
 
 
